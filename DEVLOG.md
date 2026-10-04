@@ -115,3 +115,7 @@
 - Salvato tutto il contesto nel repository per altri agenti e sessioni: `AGENTS.md` (regole e punto d'ingresso), `CLAUDE.md`, `docs/CONTEXT.md` (storia, preferenze, decisioni, riferimenti, backlog), `docs/ARCHITECTURE.md`, `docs/MUSIC-ENGINE.md` (modello, compilatore, preset, insidie di Strudel), `docs/DESIGN-SYSTEM.md`.
 - Strumenti riutilizzabili in `tools/`: verifica livelli per scena, screenshot, registrazione demo con audio, test del tema hardware, analisi audio.
 - Regola: ogni modifica aggiunge una voce a questo file e aggiorna `docs/` quando cambiano architettura, modello, design o decisioni.
+
+## Prossimo passo (da fare dopo la compattazione del contesto)
+
+- Issue `#3` Voci: ricerca approfondita su come generare voci cantate in locale, gratis, da scaricare e integrare nel progetto. Coprire: modelli locali di canto e sintesi vocale, conversione di voce (cantare con la propria voce o ricostruirla), registrazione della voce dell'utente dal browser, effetti per renderla musicale (pitch, formanti, vocoder, distorsione, chop, glitch) e come portare il risultato nei brani (campioni in `public/samples/` o generazione al volo). Consegnare un confronto delle opzioni con raccomandazione, senza ancora implementare.
