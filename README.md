@@ -26,7 +26,7 @@ Italiano e inglese, con il selettore IT/EN in alto a destra.
 - **Componi**: arrangiatore a scene con selettore del brano. Ogni scena ha nome, battute, entrata (taglio netto o dissolvenza), BPM (anche in rampa fino a fine scena), tonalità, accordi (anche settime), metro (4/4, 3/4, 5/4, 7/8), swing, crash sul primo colpo, mezza battuta di silenzio finale, e tutti i canali: sequencer (7 righe), basso, arpeggio, hook, pad, texture, riser. Canale **Chitarra**: tipo (pulita, crunch, distorta, metal hi-gain, palm mute), ritmo (power chord, chug, galoppo, riff, djent, tenuto), saturazione, accordatura, raddoppio stereo; il suono è un campione di chitarra sovrapposto a un dente di sega, saturati insieme, e il volume sta dopo la distorsione. L'hook ha armonia a terze o quinte e saturazione. Ogni canale può usare un oscillatore o uno strumento General MIDI (chitarre, organi, piano elettrico, basso, archi, vibrafono…). Volume e filtro hanno l'automazione ↗ fino a fine scena; ci sono saturazione, sgranatura (bitcrusher), risonanza, FM e filtro vocale. Clic su una scena mentre suona = salto lì. Salva, Salva come nuovo, Nuovo brano, Elimina o Ripristina originale.
 - **Brani**: tutti i brani a scene si aprono in Componi. Player con timeline cliccabile, Pausa/Riprendi e Stop, pulsanti per gli stacchi, ripetizione della sezione, stop automatico.
   - *Ghost Protocol* e *Neon Ascent* in versione a scene, *Synth Lab Demo* (la traccia di prova del primo giorno).
-  - Reel da 30 secondi: *Ferro* (metal, 160 BPM, doppia cassa, galoppo, palm mute, breakdown), *Ali di cenere* (metal melodico con chitarre gemelle armonizzate a terze), *Drift* (phonk con cowbell 808 e basso distorto).
+  - Brani interi e reel da 30 secondi ricavati da loro (il reel parte dal ritornello o dal drop): *Ferro* (metal), *Ali di cenere* (metal melodico con chitarre gemelle), *Drift* (phonk).
   - *Neon Rush · reel 28s* (techno cyberpunk, 145 BPM, 17 battute esatte), *Settimo Cielo* (progressive rock in 7/8, 5/4 e 4/4), *Pioggia sul vetro* (lo-fi con swing e vinile).
   - *Ten Years · ricostruzione* e *DCI Jingle · ricostruzione*: ricostruite analizzando due tracce audio (tempo, tonalità, accordi per battuta, struttura, griglia della batteria, sidechain).
   - *Next Chapter* e *DCI Ignition*: brani nuovi negli stessi due stili.
@@ -35,16 +35,17 @@ Italiano e inglese, con il selettore IT/EN in alto a destra.
   - *Ghost Protocol* (codice): hard techno cyberpunk, 60 battute, 1:43. Tempo da 132 a 148 BPM in rampa, layer continui con automazione per battuta, sezioni di passaggio (Fall, Rebuild), cambio di tonalità nel drop B.
   - *Neon Ascent*: techno trance, 128 BPM, 32 battute, 60 s.
 - **Visual**: sei temi.
-  - *Palco*: batteria, cassa del basso, tastiera, sequencer, synth lead e bobina di Tesla che si accendono quando lo strumento suona.
+  - *Palco*: batteria con crash, cassa del basso, testata e cassa 4×12 con chitarra, tastiera e sequencer, synth lead, campionatore FX, bobina di Tesla: ogni strumento si accende quando suona.
   - *Pixel*: città pixel art con montagne low poly.
-  - *Tramonto*, *Montagne*, *Spazio*, *Sonar*.
+  - *Spazio*: nebulose, salto nell'iperspazio, aurora con la forma d'onda, gigante gassoso con anelli, comete, navicella.
+  - *Tramonto*, *Montagne*, *Sonar*.
 - **Guida**: 14 lezioni da caricare e ascoltare.
 - **Suoni**: anteprima di drum machine, oscillatori, suoni ruvidi e campioni.
 - **Apri su strudel.cc**: porta il codice corrente nell'editor ufficiale. Rampe di tempo, salto a una battuta e campioni extra funzionano solo in coding-misk.
 
 ### Collegare uno strumento ai visual
 
-Aggiungi `.analyze("nome")` a un layer. Nomi riconosciuti dal Palco: `kick`, `snare`, `hats`, `fx`, `bass`, `arp`, `pad`, `hook`, `riser`. Il codice senza tag usa un canale generico.
+Aggiungi `.analyze("nome")` a un layer. Nomi riconosciuti dal Palco: `kick`, `snare`, `hats`, `fx`, `bass`, `guitar`, `arp`, `pad`, `hook`, `riser`. Il codice senza tag usa un canale generico.
 
 ## Campioni personalizzati
 

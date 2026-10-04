@@ -47,6 +47,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (k === 'kick') { kick = 1; echoes.push({ r: 0, a: 1 }); if (echoes.length > 12) echoes.shift(); }
     if (k === 'snare') { flash = 1; blips.push({ ang: Math.random() * 6.283, rad: .55 + Math.random() * .2, a: 1, big: true }); }
     if (k === 'hats') blips.push({ ang: Math.random() * 6.283, rad: .75 + Math.random() * .2, a: 1, big: false });
+    if (k === 'guitar') { flash = Math.max(flash, .6); blips.push({ ang: Math.random() * 6.283, rad: .35 + Math.random() * .2, a: 1, big: true }); }
     if (k === 'hook' || k === 'arp') streaks.push({ x: Math.random(), y: Math.random() * .4, a: 1 });
     if (blips.length > 40) blips.shift();
     if (streaks.length > 16) streaks.shift();
@@ -188,7 +189,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
         const pts = [], stepX = W / 48;
         for (let i = 0; i <= 48; i++) {
           const wv = li === 2 ? wave[Math.floor(i / 48 * (N - 1))] * H * .5 : 0;
-          const y = hz - (noise(i * fr * .35 + cyc * sp + li * 9) * .5 + .55) * H * amp * (1 + (li === 2 ? lv.bass * .2 : 0)) - Math.abs(wv);
+          const y = hz - (noise(i * fr * .35 + cyc * sp + li * 9) * .5 + .55) * H * amp * (1 + (li === 2 ? lv.bass * .2 + lv.guitar * .15 : 0)) - Math.abs(wv);
           pts.push([i * stepX, y]);
         }
         cx.beginPath(); cx.moveTo(0, hz); pts.forEach(([x, y]) => cx.lineTo(x, y)); cx.lineTo(W, hz); cx.closePath();
@@ -200,32 +201,88 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       });
       grid(pal, hz, (cyc * 4) % 1);
     },
+    // spazio: nebulose, salto nell'iperspazio, aurora con la forma d'onda, gigante gassoso che sorge dal basso, navicella
     spazio(pal, cyc, dt) {
-      cx.fillStyle = pal.sky[0]; cx.fillRect(0, 0, W, H);
-      const ng = cx.createRadialGradient(W * .3, H * .7, 0, W * .3, H * .7, W * .7);
-      ng.addColorStop(0, 'rgba(91,61,255,.22)'); ng.addColorStop(1, 'rgba(0,0,0,0)');
-      cx.fillStyle = ng; cx.fillRect(0, 0, W, H);
-      const speed = (reduce ? .05 : .12) + level * .8 + kick * .9;
+      const bg = cx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#02010a'); bg.addColorStop(1, '#0d0724');
+      cx.fillStyle = bg; cx.fillRect(0, 0, W, H);
+      // nebulose che respirano col pad e con l'hook
+      cx.save(); cx.globalCompositeOperation = 'lighter';
+      [[.2, .3, .45, pal.sun[2], .1 + lv.pad * .18], [.55, .18, .35, pal.sun[1], .07 + lv.hook * .18], [.4, .62, .5, '#00b3ff', .06 + lv.guitar * .15]].forEach(([nx, ny, nr, col, al], i) => {
+        const x = (nx + Math.sin(cyc * .05 + i) * .03) * W, y = (ny + Math.cos(cyc * .04 + i) * .03) * H, r = nr * Math.max(W, H);
+        const g = cx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
+        cx.globalAlpha = al; cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+      });
+      cx.restore();
+      // stelle in corsa verso chi guarda: più veloci con l'energia del brano
+      const vx = W * .36, vy = H * .4, speed = (reduce ? .04 : .1) + level * .7 + kick * .8 + lv.guitar * .4;
       cx.strokeStyle = '#fff';
-      for (const s of STARS) {
-        const pz = s.z; s.z -= dt * speed;
-        if (s.z <= .02) { s.z = 1; s.x = Math.random() * 2 - 1; s.y = Math.random() * 2 - 1; continue; }
-        const k = .5 / s.z, kp = .5 / pz;
-        cx.globalAlpha = Math.min(1, (1 - s.z) * 1.4); cx.lineWidth = (1 - s.z) * 2.2;
-        cx.beginPath(); cx.moveTo(W / 2 + s.x * W * kp, H / 2 + s.y * H * kp); cx.lineTo(W / 2 + s.x * W * k, H / 2 + s.y * H * k); cx.stroke();
+      for (const st of STARS) {
+        const pz = st.z; st.z -= dt * speed;
+        if (st.z <= .02) { st.z = 1; st.x = Math.random() * 2 - 1; st.y = Math.random() * 2 - 1; continue; }
+        const k = .5 / st.z, kp = .5 / pz;
+        cx.globalAlpha = Math.min(1, (1 - st.z) * 1.3); cx.lineWidth = (1 - st.z) * 2;
+        cx.beginPath(); cx.moveTo(vx + st.x * W * kp, vy + st.y * H * kp); cx.lineTo(vx + st.x * W * k, vy + st.y * H * k); cx.stroke();
       }
       cx.globalAlpha = 1;
-      const px = W * .5, py = H * .52, pr = Math.min(W, H) * .17 * (1 + kick * .04);
-      drawEchoes(pal.echo, px, py, Math.max(W, H) * .6, dt);
-      const pg = cx.createRadialGradient(px - pr * .4, py - pr * .4, pr * .1, px, py, pr);
-      pg.addColorStop(0, pal.sun[0]); pg.addColorStop(.5, pal.sun[1]); pg.addColorStop(1, pal.sun[2]);
-      cx.save(); cx.translate(px, py); cx.rotate(-.35);
-      cx.strokeStyle = pal.grid; cx.lineWidth = 2; cx.globalAlpha = .9;
-      cx.beginPath(); cx.ellipse(0, 0, pr * 1.9, pr * .45, 0, Math.PI, Math.PI * 2); cx.stroke();
-      cx.globalAlpha = 1; cx.fillStyle = pg; cx.beginPath(); cx.arc(0, 0, pr, 0, Math.PI * 2); cx.fill();
-      cx.beginPath(); cx.ellipse(0, 0, pr * 1.9, pr * .45, 0, 0, Math.PI); cx.stroke();
+      // aurora: la forma d'onda di tutti gli strumenti come nastro luminoso
+      cx.save(); cx.globalCompositeOperation = 'lighter';
+      cx.globalAlpha = .75; waveLine(pal.grid, pal.grid, H * .3, H * .13);
+      cx.globalAlpha = .4; waveLine(pal.sun[1], pal.sun[1], H * .3 + 6, H * .09);
       cx.restore();
-      waveRing(pal, px, py, pr * 2.3, pr * 1.2);
+      // comete sugli attacchi di hook e arpeggio
+      for (const c of streaks) {
+        c.a -= dt * .9; if (c.a <= 0) continue;
+        const x = (c.x * .7 + (1 - c.a) * .4) * W, y = (c.y * .8 + (1 - c.a) * .25) * H;
+        const g = cx.createLinearGradient(x, y, x - W * .12, y - H * .07);
+        g.addColorStop(0, `rgba(255,255,255,${c.a})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+        cx.strokeStyle = g; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x - W * .12, y - H * .07); cx.stroke();
+      }
+      while (streaks.length && streaks[0].a <= 0) streaks.shift();
+      // luna con le eco della cassa
+      const mx = W * .16, my = H * .2, mr = Math.min(W, H) * .045;
+      drawEchoes(pal.echo, mx, my, Math.max(W, H) * .45, dt);
+      cx.fillStyle = '#e8e2ff'; cx.beginPath(); cx.arc(mx, my, mr, 0, Math.PI * 2); cx.fill();
+      cx.fillStyle = '#0d0724'; cx.beginPath(); cx.arc(mx + mr * .45, my - mr * .2, mr * .95, 0, Math.PI * 2); cx.fill();
+      // gigante gassoso che sorge dal basso a destra, con bande, anelli e atmosfera
+      const R = Math.max(W, H) * .55, px = W * .86, py = H + R * .42;
+      const ring = (front) => {
+        cx.save(); cx.translate(px, py); cx.rotate(-.42);
+        cx.strokeStyle = pal.grid; cx.globalAlpha = .55 + lv.bass * .4; cx.lineWidth = 2 + lv.bass * 3;
+        // anelli visti dall'alto: passano davanti al disco del pianeta
+        for (const k of [1.12, 1.2, 1.27]) { cx.beginPath(); cx.ellipse(0, 0, R * k, R * k * .3, 0, 0, Math.PI * 2); cx.stroke(); }
+        cx.restore();
+      };
+      cx.save();
+      cx.shadowColor = pal.sun[1]; cx.shadowBlur = 30 + kick * 50;
+      const pg = cx.createRadialGradient(px - R * .35, py - R * .45, R * .1, px, py, R);
+      pg.addColorStop(0, pal.sun[0]); pg.addColorStop(.45, pal.sun[1]); pg.addColorStop(1, pal.sun[2]);
+      cx.fillStyle = pg; cx.beginPath(); cx.arc(px, py, R, 0, Math.PI * 2); cx.fill();
+      cx.shadowBlur = 0;
+      cx.beginPath(); cx.arc(px, py, R, 0, Math.PI * 2); cx.clip();
+      for (let i = 0; i < 18; i++) {
+        const y = py - R + i * R / 9 + Math.sin(cyc * .2 + i) * 4;
+        cx.globalAlpha = .12 + (i % 3 === 0 ? .12 : 0) + lv.pad * .08; cx.fillStyle = i % 2 ? '#1a0b2e' : '#ffffff';
+        cx.beginPath();
+        for (let xx = px - R; xx <= px + R; xx += 24) { const yy = y + Math.sin(xx * .01 + cyc * .5 + i) * 6; xx === px - R ? cx.moveTo(xx, yy) : cx.lineTo(xx, yy); }
+        cx.lineTo(px + R, y + R / 18); cx.lineTo(px - R, y + R / 18); cx.closePath(); cx.fill();
+      }
+      cx.restore();
+      cx.save(); cx.strokeStyle = pal.sun[0]; cx.globalAlpha = .5 + kick * .5; cx.lineWidth = 2;
+      cx.beginPath(); cx.arc(px, py, R + 3, Math.PI * 1.05, Math.PI * 1.95); cx.stroke(); cx.restore();
+      ring(true);
+      // navicella retrò che attraversa il cielo: il motore segue basso e cassa
+      const t8 = (cyc / 8) % 1, sx = -W * .1 + t8 * W * 1.2, sy = H * .55 + Math.sin(cyc * 1.3) * H * .03, sz = Math.min(W, H) * .035;
+      cx.save(); cx.translate(sx, sy); cx.rotate(-.08);
+      const flame = sz * (1.2 + lv.bass * 2.5 + kick * 1.5);
+      const fg = cx.createLinearGradient(-sz, 0, -sz - flame, 0);
+      fg.addColorStop(0, '#fff'); fg.addColorStop(.3, pal.echo); fg.addColorStop(1, 'rgba(0,0,0,0)');
+      cx.fillStyle = fg; cx.beginPath(); cx.moveTo(-sz, -sz * .25); cx.lineTo(-sz - flame, 0); cx.lineTo(-sz, sz * .25); cx.fill();
+      cx.fillStyle = '#d9d4ff'; cx.strokeStyle = pal.grid; cx.lineWidth = 1.5;
+      cx.beginPath(); cx.moveTo(sz * 1.6, 0); cx.lineTo(-sz, -sz * .55); cx.lineTo(-sz * .6, 0); cx.lineTo(-sz, sz * .55); cx.closePath(); cx.fill(); cx.stroke();
+      cx.fillStyle = pal.sun[1]; cx.beginPath(); cx.ellipse(sz * .35, 0, sz * .35, sz * .16, 0, 0, Math.PI * 2); cx.fill();
+      cx.restore();
     },
     sonar(pal, cyc, dt) {
       cx.fillStyle = pal.sky[1]; cx.fillRect(0, 0, W, H);
@@ -286,7 +343,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
         const h = Math.round(b.h * .7 * (ph / 110));
         p.fillStyle = pal.city; p.fillRect(x, hz - h, b.w, h);
         for (let wy = hz - h + 2; wy < hz - 2; wy += 3) for (let wx = x + 1; wx < x + b.w - 1; wx += 2) {
-          const lit = hash(bi * 31 + wx, wy + Math.floor(cyc * 2)) < .12 + lv.pad * .35 + lv.hats * .25;
+          const lit = hash(bi * 31 + wx, wy + Math.floor(cyc * 2)) < .12 + lv.pad * .3 + lv.hats * .2 + lv.guitar * .25;
           if (lit) { p.fillStyle = pal.win[(bi + wx) % 3]; p.fillRect(wx, wy, 1, 1); }
         }
         if (b.s > .7) { p.fillStyle = lv.snare > .3 ? '#ff3355' : '#551122'; p.fillRect(x + (b.w >> 1), hz - h - 2, 1, 2); }
@@ -320,9 +377,16 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       cx.imageSmoothingEnabled = true;
     },
 
-    // palco cyberpunk: ogni strumento disegnato si accende quando suona
+    // palco cyberpunk: ogni strumento disegnato si accende quando suona.
+    // Gli strumenti sono disposti in fila con larghezze in unità "u"; lo spazio libero si divide tra gli spazi.
     palco(pal, cyc, dt, playing) {
-      const u = Math.min(W / 9, H / 3.9), base = Math.min(H * .8, H - 62);
+      const base = Math.min(H * .8, H - 62);
+      const ITEMS = [['hats', .75], ['kick', 1.3], ['snare', .8], ['bass', 1.1], ['guitar', 1.5], ['keys', 2.1], ['hook', 1.2], ['fx', .95], ['riser', .6]];
+      const totalU = ITEMS.reduce((a, [, w]) => a + w, 0);
+      const u = Math.min(W / (totalU + 1.6), H / 3.9);
+      const gap = (W - totalU * u) / (ITEMS.length + 1);
+      const X = {}; let cur = gap;
+      for (const [k, w] of ITEMS) { X[k] = cur + w * u / 2; cur += w * u + gap; }
       const wg = cx.createLinearGradient(0, 0, 0, base);
       wg.addColorStop(0, pal.wall[0]); wg.addColorStop(1, pal.wall[1]);
       cx.fillStyle = wg; cx.fillRect(0, 0, W, H);
@@ -336,8 +400,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
         }
         cx.globalAlpha = 1;
       }
-      // muro LED con la forma d'onda
-      const lx0 = W * .14, lx1 = W * .86, ly0 = H * .08, ly1 = H * .34;
+      // muro LED con la forma d'onda di tutti gli strumenti
+      const lx0 = W * .14, lx1 = W * .86, ly0 = H * .07, ly1 = H * .3;
       cx.fillStyle = 'rgba(5,3,12,.85)'; cx.fillRect(lx0, ly0, lx1 - lx0, ly1 - ly0);
       cx.strokeStyle = pal.metal; cx.lineWidth = 2; cx.strokeRect(lx0, ly0, lx1 - lx0, ly1 - ly0);
       cx.fillStyle = pal.metal;
@@ -345,19 +409,17 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       cx.save(); cx.beginPath(); cx.rect(lx0, ly0, lx1 - lx0, ly1 - ly0); cx.clip();
       waveLine(pal.b, pal.b, (ly0 + ly1) / 2, (ly1 - ly0) * .45, lx0 + 4, lx1 - 4);
       cx.restore();
-      // luci dall'alto
+      // luci dall'alto, una per gruppo di strumenti
       cx.save(); cx.globalCompositeOperation = 'lighter';
-      const beams = [['kick', pal.a], ['snare', pal.b], ['hook', pal.c], ['kick', pal.a], ['snare', pal.b], ['arp', pal.c]];
-      beams.forEach(([k, col], i) => {
-        const x = W * (.1 + i * .16), ang = Math.sin(cyc * Math.PI / 2 + i * 1.3) * .35, len = base * 1.05, wdt = u * .9;
+      [['kick', pal.a, X.kick], ['snare', pal.b, X.snare], ['bass', pal.b, X.bass], ['guitar', pal.c, X.guitar], ['arp', pal.a, X.keys], ['hook', pal.c, X.hook]].forEach(([k, col, x], i) => {
+        const ang = Math.sin(cyc * Math.PI / 2 + i * 1.3) * .25, len = base * 1.05, wdt = u * .8;
         const g = cx.createLinearGradient(x, 0, x, len);
         g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
-        cx.globalAlpha = .05 + lv[k] * .28;
-        cx.fillStyle = g; cx.beginPath(); cx.moveTo(x - 4, 0); cx.lineTo(x + 4, 0);
-        cx.lineTo(x + Math.sin(ang) * len + wdt, len); cx.lineTo(x + Math.sin(ang) * len - wdt, len); cx.closePath(); cx.fill();
+        cx.globalAlpha = .04 + lv[k] * .26; cx.fillStyle = g;
+        cx.beginPath(); cx.moveTo(x - 4, 0); cx.lineTo(x + 4, 0); cx.lineTo(x + Math.sin(ang) * len + wdt, len); cx.lineTo(x + Math.sin(ang) * len - wdt, len); cx.closePath(); cx.fill();
       });
       cx.restore();
-      // pavimento del palco
+      // pavimento
       cx.fillStyle = pal.dark; cx.beginPath(); cx.moveTo(W * .02, base); cx.lineTo(W * .98, base); cx.lineTo(W, H); cx.lineTo(0, H); cx.closePath(); cx.fill();
       cx.strokeStyle = pal.a; cx.lineWidth = 1;
       for (let k = 0; k < 6; k++) { const y = base + (H - base) * Math.pow(k / 6, 1.6); cx.globalAlpha = .15 + kick * .5 * (1 - k / 6); cx.beginPath(); cx.moveTo(0, y); cx.lineTo(W, y); cx.stroke(); }
@@ -366,114 +428,149 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
 
       const glow = (col, k) => { cx.shadowColor = col; cx.shadowBlur = 4 + lv[k] * 26; };
       const lineCol = (col, k) => lv[k] > .12 ? col : pal.label;
-      const stand = (x, y0, y1) => { cx.strokeStyle = pal.metal; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(x, y0); cx.lineTo(x, y1); cx.moveTo(x - u * .14, y1); cx.lineTo(x, y1 - u * .1); cx.lineTo(x + u * .14, y1); cx.stroke(); };
+      const stand = (x, y0, y1, w = .14) => { cx.shadowBlur = 0; cx.strokeStyle = pal.metal; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(x, y0); cx.lineTo(x, y1); cx.moveTo(x - u * w, y1); cx.lineTo(x, y1 - u * .1); cx.lineTo(x + u * w, y1); cx.stroke(); };
+      const box = (x, y, w, h, col, k) => { glow(col, k); cx.fillStyle = pal.dark; cx.fillRect(x, y, w, h); cx.strokeStyle = lineCol(col, k); cx.lineWidth = 2.5; cx.strokeRect(x, y, w, h); };
       cx.save();
 
-      // hi-hat
-      const hx = W * .06, hy = base - u * 1.55, gap = u * .1 * (1 - lv.hats);
-      stand(hx, hy, base);
+      // --- batteria: hi-hat, cassa, rullante, crash (si accende con gli FX) ---
+      const hy = base - u * 1.45, hgap = u * .1 * (1 - lv.hats);
+      stand(X.hats, hy, base);
       glow(pal.c, 'hats'); cx.strokeStyle = lineCol(pal.c, 'hats'); cx.lineWidth = 2.5;
-      cx.beginPath(); cx.ellipse(hx, hy, u * .34, u * .06, 0, 0, Math.PI * 2); cx.stroke();
-      cx.beginPath(); cx.ellipse(hx, hy - gap - u * .04, u * .34, u * .06, 0, 0, Math.PI * 2); cx.stroke();
-      // crash
-      const crx = W * .3, cry = base - u * 2.05, tilt = -.3 + Math.sin(performance.now() / 40) * lv.fx * .25;
-      stand(crx, cry, base - u * 1.3);
-      glow(pal.c, 'fx'); cx.strokeStyle = lineCol(pal.c, 'fx');
-      cx.beginPath(); cx.ellipse(crx, cry, u * .42, u * .08, tilt, 0, Math.PI * 2); cx.stroke();
-      // cassa
-      const kx = W * .165, kr = u * .62 * (1 + lv.kick * .07), ky = base - u * .64;
+      cx.beginPath(); cx.ellipse(X.hats, hy, u * .32, u * .06, 0, 0, Math.PI * 2); cx.stroke();
+      cx.beginPath(); cx.ellipse(X.hats, hy - hgap - u * .04, u * .32, u * .06, 0, 0, Math.PI * 2); cx.stroke();
+      const cry = Math.max(ly1 + u * .3, base - u * 1.75), crx = (X.kick + X.snare) / 2, tilt = -.3 + Math.sin(performance.now() / 40) * lv.fx * .25;
+      stand(crx, cry, base - u * 1.25);
+      glow(pal.c, 'fx'); cx.strokeStyle = lineCol(pal.c, 'fx'); cx.lineWidth = 2.5;
+      cx.beginPath(); cx.ellipse(crx, cry, u * .4, u * .075, tilt, 0, Math.PI * 2); cx.stroke();
+      const kr = u * .6 * (1 + lv.kick * .07), ky = base - u * .62;
       glow(pal.a, 'kick');
-      const kg = cx.createRadialGradient(kx, ky, 0, kx, ky, kr);
+      const kg = cx.createRadialGradient(X.kick, ky, 0, X.kick, ky, kr);
       kg.addColorStop(0, `rgba(255,46,136,${.15 + lv.kick * .5})`); kg.addColorStop(1, 'rgba(20,10,35,.95)');
-      cx.fillStyle = kg; cx.beginPath(); cx.arc(kx, ky, kr, 0, Math.PI * 2); cx.fill();
+      cx.fillStyle = kg; cx.beginPath(); cx.arc(X.kick, ky, kr, 0, Math.PI * 2); cx.fill();
       cx.strokeStyle = lineCol(pal.a, 'kick'); cx.lineWidth = 3 + lv.kick * 3; cx.stroke();
-      cx.lineWidth = 1.5; cx.beginPath(); cx.arc(kx, ky, kr * .62, 0, Math.PI * 2); cx.stroke();
+      cx.lineWidth = 1.5; cx.beginPath(); cx.arc(X.kick, ky, kr * .62, 0, Math.PI * 2); cx.stroke();
       cx.font = `700 ${Math.round(kr * .38)}px "Russo One", sans-serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-      cx.fillStyle = lineCol(pal.a, 'kick'); cx.fillText('CM', kx, ky + 1);
-      // rullante
-      const sx = W * .275, sy = base - u * 1.05;
-      stand(sx, sy + u * .16, base);
+      cx.fillStyle = lineCol(pal.a, 'kick'); cx.fillText('CM', X.kick, ky + 1);
+      const sy = base - u * 1.02;
+      stand(X.snare, sy + u * .16, base);
       glow(pal.b, 'snare'); cx.strokeStyle = lineCol(pal.b, 'snare'); cx.lineWidth = 2.5;
-      cx.fillStyle = pal.dark; cx.fillRect(sx - u * .34, sy, u * .68, u * .16); cx.strokeRect(sx - u * .34, sy, u * .68, u * .16);
-      cx.beginPath(); cx.ellipse(sx, sy, u * .34, u * .08, 0, 0, Math.PI * 2); cx.fillStyle = `rgba(0,229,255,${lv.snare * .6})`; cx.fill(); cx.stroke();
-      // cassa del basso
-      const bx = W * .39, bw = u * 1.1, bh = u * 1.75, bt = base - bh;
-      glow(pal.b, 'bass'); cx.fillStyle = pal.dark; cx.fillRect(bx - bw / 2, bt, bw, bh);
-      cx.strokeStyle = lineCol(pal.b, 'bass'); cx.lineWidth = 2.5; cx.strokeRect(bx - bw / 2, bt, bw, bh);
+      cx.fillStyle = pal.dark; cx.fillRect(X.snare - u * .32, sy, u * .64, u * .16); cx.strokeRect(X.snare - u * .32, sy, u * .64, u * .16);
+      cx.beginPath(); cx.ellipse(X.snare, sy, u * .32, u * .08, 0, 0, Math.PI * 2); cx.fillStyle = `rgba(0,229,255,${lv.snare * .6})`; cx.fill(); cx.stroke();
+
+      // --- cassa del basso ---
+      const bw = u * 1.05, bh = u * 1.7, bt = base - bh;
+      box(X.bass - bw / 2, bt, bw, bh, pal.b, 'bass');
       [bt + bh * .3, bt + bh * .72].forEach(cyy => {
-        const r = u * .32; cx.lineWidth = 2; cx.beginPath(); cx.arc(bx, cyy, r, 0, Math.PI * 2); cx.stroke();
-        cx.fillStyle = `rgba(0,229,255,${.1 + lv.bass * .55})`; cx.beginPath(); cx.arc(bx, cyy, r * (.35 + lv.bass * .35), 0, Math.PI * 2); cx.fill();
+        const r = u * .3; cx.lineWidth = 2; cx.beginPath(); cx.arc(X.bass, cyy, r, 0, Math.PI * 2); cx.stroke();
+        cx.fillStyle = `rgba(0,229,255,${.1 + lv.bass * .55})`; cx.beginPath(); cx.arc(X.bass, cyy, r * (.35 + lv.bass * .35), 0, Math.PI * 2); cx.fill();
       });
-      // tastiera (pad) e sequencer (arp)
-      const kbx = W * .6, kbw = u * 2.5, kbh = u * .42, kbt = base - u * 1.1;
-      cx.shadowBlur = 0; cx.strokeStyle = pal.metal; cx.lineWidth = 3;
-      cx.beginPath(); cx.moveTo(kbx - kbw * .35, kbt + kbh); cx.lineTo(kbx + kbw * .3, base); cx.moveTo(kbx + kbw * .35, kbt + kbh); cx.lineTo(kbx - kbw * .3, base); cx.stroke();
-      glow(pal.a, 'pad'); cx.fillStyle = pal.dark; cx.fillRect(kbx - kbw / 2, kbt, kbw, kbh);
-      cx.strokeStyle = lineCol(pal.a, 'pad'); cx.lineWidth = 2; cx.strokeRect(kbx - kbw / 2, kbt, kbw, kbh);
-      const keys = 15, kw = (kbw - 8) / keys, bar = Math.floor(cyc);
-      for (let i = 0; i < keys; i++) {
-        const lit = hash(i, bar) < lv.pad * .7;
-        cx.fillStyle = lit ? pal.a : 'rgba(232,228,255,.18)';
-        cx.fillRect(kbx - kbw / 2 + 4 + i * kw + 1, kbt + kbh * .35, kw - 2, kbh * .55);
+
+      // --- chitarra: testata e cassa 4x12, chitarra sul suo supporto davanti ---
+      const aw = u * 1.0, ax = X.guitar + u * .2 - aw / 2, headH = u * .32, cabH = u * 1.2, cabT = base - cabH, headT = cabT - headH - 3;
+      box(ax, headT, aw, headH, pal.c, 'guitar');
+      for (let i = 0; i < 5; i++) { const kx = ax + aw * (i + 1) / 6; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(kx, headT + headH * .55, u * .045, 0, Math.PI * 2); cx.stroke(); }
+      cx.fillStyle = lv.guitar > .12 ? '#ff4040' : '#401010'; cx.fillRect(ax + 6, headT + 5, 5, 5);
+      box(ax, cabT, aw, cabH, pal.c, 'guitar');
+      for (const [ox, oy] of [[.27, .28], [.73, .28], [.27, .72], [.73, .72]]) {
+        const r = u * .2; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(ax + aw * ox, cabT + cabH * oy, r, 0, Math.PI * 2); cx.stroke();
+        cx.fillStyle = `rgba(255,225,77,${.08 + lv.guitar * .5})`; cx.beginPath(); cx.arc(ax + aw * ox, cabT + cabH * oy, r * (.35 + lv.guitar * .4), 0, Math.PI * 2); cx.fill();
       }
-      const sqt = kbt - u * .62, sqh = u * .36, sqw = kbw * .82;
-      glow(pal.b, 'arp'); cx.fillStyle = pal.dark; cx.fillRect(kbx - sqw / 2, sqt, sqw, sqh);
-      cx.strokeStyle = lineCol(pal.b, 'arp'); cx.strokeRect(kbx - sqw / 2, sqt, sqw, sqh);
+      // chitarra elettrica appoggiata, leggermente inclinata
+      const gx = X.guitar - u * .45, gy = base - u * .5;
+      cx.save(); cx.translate(gx, gy); cx.rotate(-.18 + Math.sin(performance.now() / 60) * lv.guitar * .04);
+      glow(pal.a, 'guitar'); cx.strokeStyle = lineCol(pal.a, 'guitar'); cx.fillStyle = pal.dark; cx.lineWidth = 2.5;
+      const gs = u * .5;
+      cx.beginPath(); cx.moveTo(0, -gs * .55);
+      cx.bezierCurveTo(gs * .55, -gs * .9, gs * .7, -gs * .2, gs * .45, 0);
+      cx.bezierCurveTo(gs * .75, gs * .3, gs * .55, gs * .75, 0, gs * .6);
+      cx.bezierCurveTo(-gs * .55, gs * .75, -gs * .75, gs * .3, -gs * .45, 0);
+      cx.bezierCurveTo(-gs * .7, -gs * .2, -gs * .55, -gs * .9, 0, -gs * .55);
+      cx.closePath(); cx.fill(); cx.stroke();
+      cx.fillStyle = lineCol(pal.a, 'guitar');
+      cx.fillRect(-gs * .25, gs * .12, gs * .5, gs * .06); cx.fillRect(-gs * .25, -gs * .12, gs * .5, gs * .06);
+      cx.lineWidth = 3; cx.beginPath(); cx.moveTo(0, -gs * .5); cx.lineTo(0, -gs * 2.1); cx.stroke();
+      cx.fillRect(-gs * .12, -gs * 2.45, gs * .24, gs * .38);
+      cx.shadowBlur = 0; cx.strokeStyle = `rgba(255,255,255,${.15 + lv.guitar * .7})`; cx.lineWidth = .8;
+      for (let i = -1; i <= 1; i++) { cx.beginPath(); cx.moveTo(i * gs * .06, gs * .3); cx.lineTo(i * gs * .03, -gs * 2.1); cx.stroke(); }
+      cx.restore();
+      stand(gx, base - u * .05, base, .2);
+
+      // --- tastiera (pad) e sequencer (arpeggio) ---
+      const kbw = u * 2.05, kbh = u * .4, kbt = base - u * 1.05;
+      cx.shadowBlur = 0; cx.strokeStyle = pal.metal; cx.lineWidth = 3;
+      cx.beginPath(); cx.moveTo(X.keys - kbw * .35, kbt + kbh); cx.lineTo(X.keys + kbw * .3, base); cx.moveTo(X.keys + kbw * .35, kbt + kbh); cx.lineTo(X.keys - kbw * .3, base); cx.stroke();
+      box(X.keys - kbw / 2, kbt, kbw, kbh, pal.a, 'pad');
+      const keys = 13, kw = (kbw - 8) / keys, bar = Math.floor(cyc);
+      for (let i = 0; i < keys; i++) {
+        cx.fillStyle = hash(i, bar) < lv.pad * .7 ? pal.a : 'rgba(232,228,255,.18)';
+        cx.fillRect(X.keys - kbw / 2 + 4 + i * kw + 1, kbt + kbh * .35, kw - 2, kbh * .55);
+      }
+      const sqt = kbt - u * .6, sqh = u * .34, sqw = kbw * .85;
+      box(X.keys - sqw / 2, sqt, sqw, sqh, pal.b, 'arp');
       const active = playing ? Math.floor(cyc * 8) % 8 : -1;
       for (let i = 0; i < 8; i++) {
-        const lx = kbx - sqw / 2 + sqw * (i + .5) / 8, on = i === active;
+        const lx = X.keys - sqw / 2 + sqw * (i + .5) / 8, on = i === active;
         cx.fillStyle = on ? (lv.arp > .1 ? pal.b : pal.label) : 'rgba(0,229,255,.12)';
-        cx.beginPath(); cx.arc(lx, sqt + sqh / 2, u * .06 * (on ? 1.3 : 1), 0, Math.PI * 2); cx.fill();
+        cx.beginPath(); cx.arc(lx, sqt + sqh / 2, u * .055 * (on ? 1.3 : 1), 0, Math.PI * 2); cx.fill();
       }
-      cx.strokeStyle = pal.metal; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(kbx, sqt + sqh); cx.lineTo(kbx, kbt); cx.stroke();
-      // synth lead (hook) con oscilloscopio
-      const hx2 = W * .8, hw = u * 1.25, hh = u * 1.35, ht = base - hh - u * .25;
-      stand(hx2, ht + hh, base);
-      glow(pal.c, 'hook'); cx.fillStyle = pal.dark; cx.fillRect(hx2 - hw / 2, ht, hw, hh);
-      cx.strokeStyle = lineCol(pal.c, 'hook'); cx.lineWidth = 2.5; cx.strokeRect(hx2 - hw / 2, ht, hw, hh);
-      const scx = hx2 - hw / 2 + u * .1, scw = hw - u * .2, scy = ht + u * .1, sch = hh * .45;
+      cx.shadowBlur = 0; cx.strokeStyle = pal.metal; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(X.keys, sqt + sqh); cx.lineTo(X.keys, kbt); cx.stroke();
+
+      // --- synth lead (hook) con oscilloscopio ---
+      const hw = u * 1.15, hh = u * 1.3, ht = base - hh - u * .25;
+      stand(X.hook, ht + hh, base);
+      box(X.hook - hw / 2, ht, hw, hh, pal.c, 'hook');
+      const scx = X.hook - hw / 2 + u * .1, scw = hw - u * .2, scy = ht + u * .1, sch = hh * .45;
       cx.fillStyle = '#04120f'; cx.fillRect(scx, scy, scw, sch);
       cx.restore(); cx.save();
       cx.beginPath(); cx.rect(scx, scy, scw, sch); cx.clip();
       waveLine(lv.hook > .1 ? pal.c : pal.label, pal.c, scy + sch / 2, sch * 1.6, scx, scx + scw, hookWave);
       cx.restore(); cx.save();
       for (let i = 0; i < 3; i++) {
-        const kx2 = hx2 - hw / 2 + hw * (i + .5) / 3, ky2 = ht + hh * .76, r = u * .13, ang = cyc * 2 * lv.hook + i * 2;
+        const kx2 = X.hook - hw / 2 + hw * (i + .5) / 3, ky2 = ht + hh * .76, r = u * .12, ang = cyc * 2 * lv.hook + i * 2;
         cx.strokeStyle = lineCol(pal.c, 'hook'); cx.lineWidth = 2; cx.beginPath(); cx.arc(kx2, ky2, r, 0, Math.PI * 2); cx.stroke();
         cx.beginPath(); cx.moveTo(kx2, ky2); cx.lineTo(kx2 + Math.cos(ang) * r, ky2 + Math.sin(ang) * r); cx.stroke();
       }
-      // bobina di Tesla (riser)
-      const tx = W * .94, ttop = base - u * 2.3;
-      cx.strokeStyle = pal.metal; cx.lineWidth = 3;
-      cx.beginPath(); cx.moveTo(tx - u * .18, base); cx.lineTo(tx - u * .06, ttop + u * .2); cx.lineTo(tx + u * .06, ttop + u * .2); cx.lineTo(tx + u * .18, base); cx.stroke();
+
+      // --- campionatore FX: voci, rumori, metalli, crash ---
+      const fw = u * .85, fh = u * .7, ft = base - u * 1.25;
+      stand(X.fx, ft + fh, base);
+      box(X.fx - fw / 2, ft, fw, fh, pal.a, 'fx');
+      const beat = Math.floor(cyc * 4);
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+        const lit = lv.fx > .1 && hash(r * 3 + c, beat) < lv.fx;
+        cx.fillStyle = lit ? pal.a : 'rgba(255,46,136,.14)';
+        cx.fillRect(X.fx - fw / 2 + fw * (.12 + c * .27), ft + fh * (.12 + r * .27), fw * .2, fh * .2);
+      }
+
+      // --- bobina di Tesla (riser) ---
+      const tx = X.riser, ttop = base - u * 2.1;
+      cx.shadowBlur = 0; cx.strokeStyle = pal.metal; cx.lineWidth = 3;
+      cx.beginPath(); cx.moveTo(tx - u * .17, base); cx.lineTo(tx - u * .06, ttop + u * .2); cx.lineTo(tx + u * .06, ttop + u * .2); cx.lineTo(tx + u * .17, base); cx.stroke();
       for (let y = ttop + u * .4; y < base; y += u * .16) { cx.beginPath(); cx.moveTo(tx - u * .1, y); cx.lineTo(tx + u * .1, y); cx.stroke(); }
       glow(pal.b, 'riser'); cx.strokeStyle = lineCol(pal.b, 'riser'); cx.lineWidth = 3;
-      cx.beginPath(); cx.ellipse(tx, ttop + u * .12, u * .3, u * .1, 0, 0, Math.PI * 2); cx.stroke();
+      cx.beginPath(); cx.ellipse(tx, ttop + u * .12, u * .28, u * .09, 0, 0, Math.PI * 2); cx.stroke();
       if (lv.riser > .05) {
         cx.strokeStyle = '#d6f8ff'; cx.lineWidth = 1.5;
-        for (let a = 0; a < 1 + lv.riser * 5; a++) {
-          let x = tx, y = ttop + u * .1; const ang = Math.random() * Math.PI * 2, len = u * (.5 + lv.riser * 1.4);
+        for (let k = 0; k < 1 + lv.riser * 5; k++) {
+          let x = tx, y = ttop + u * .1; const ang = Math.random() * Math.PI * 2, len = u * (.5 + lv.riser * 1.3);
           cx.beginPath(); cx.moveTo(x, y);
-          for (let s = 1; s <= 6; s++) { x = tx + Math.cos(ang) * len * s / 6 + (Math.random() - .5) * u * .2; y = ttop + u * .1 + Math.sin(ang) * len * s / 6 * .7 + (Math.random() - .5) * u * .2; cx.lineTo(x, y); }
+          for (let st = 1; st <= 6; st++) { x = tx + Math.cos(ang) * len * st / 6 + (Math.random() - .5) * u * .2; y = ttop + u * .1 + Math.sin(ang) * len * st / 6 * .7 + (Math.random() - .5) * u * .2; cx.lineTo(x, y); }
           cx.stroke();
         }
       }
       cx.restore();
-      drawEchoes(pal.echo, kx, ky, Math.max(W, H) * .5, dt);
-      // etichette
-      cx.font = `600 ${Math.max(9, Math.round(u * .16))}px "JetBrains Mono", monospace`; cx.textAlign = 'center'; cx.textBaseline = 'top';
-      cx.textBaseline = 'bottom'; cx.fillStyle = lv.fx > .12 ? '#ffffff' : pal.label; cx.fillText('FX', crx, cry - u * .14); cx.textBaseline = 'top';
-      [['HATS', hx, 'hats'], ['KICK', kx, 'kick'], ['SNARE', sx, 'snare'], ['BASS', bx, 'bass'], ['PAD · ARP', kbx, 'pad'], ['HOOK', hx2, 'hook'], ['RISER', tx, 'riser']]
-        .forEach(([label, x, k]) => {
-          const on = lv[k] > .12 || (k === 'pad' && lv.arp > .12);
-          cx.fillStyle = on ? '#ffffff' : pal.label; cx.fillText(label, x, base + 6);
-        });
+      drawEchoes(pal.echo, X.kick, ky, Math.max(W, H) * .5, dt);
+      // etichette, tutte sulla stessa riga sotto gli strumenti
+      cx.font = `600 ${Math.max(9, Math.round(u * .15))}px "JetBrains Mono", monospace`; cx.textAlign = 'center'; cx.textBaseline = 'top';
+      [['HATS', X.hats, ['hats']], ['KICK', X.kick, ['kick']], ['SNARE', X.snare, ['snare']], ['BASS', X.bass, ['bass']], ['GUITAR', X.guitar, ['guitar']],
+       ['PAD · ARP', X.keys, ['pad', 'arp']], ['HOOK', X.hook, ['hook']], ['FX', X.fx, ['fx']], ['RISER', X.riser, ['riser']]]
+        .forEach(([label, x, ks]) => { cx.fillStyle = ks.some(k => lv[k] > .12) ? '#ffffff' : pal.label; cx.fillText(label, x, base + 6); });
     },
   };
 
   // equalizzatore del logo: un'asta per strumento
   const eq = [...document.querySelectorAll('.logo-eq i')];
-  const EQ = ['kick', 'snare', 'hats', 'bass', 'arp', 'pad', 'hook'];
+  const EQ = ['kick', 'snare', 'hats', 'bass', 'guitar', 'arp', 'pad', 'hook'];
   const logo = document.querySelector('.logo');
 
   function frame(now) {

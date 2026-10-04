@@ -81,3 +81,10 @@
 - Con distorsione pesante il `gain` prima dell'amp cambia solo la saturazione: il volume della chitarra e la dissolvenza della scena sono applicati con `postgain` (`.postgain(sceneN.mul(livello))`). Livelli misurati per strumento e bilanciati (chitarre ~0,5 di picco nel metal, alla pari con la cassa).
 - Hook: armonia (`superimpose(x => x.add(2))` per le terze), saturazione, cowbell 808 come suono.
 - Brani reel da 30 s: *Ferro* (metal), *Ali di cenere* (metal melodico), *Drift* (phonk). Prog e reel cyberpunk passati al canale Chitarra.
+
+## 2026-10-06 (sera)
+
+- Reel ricavati da brani interi (`reelFrom` in `src/tracks.js`): il reel prende le scene più cariche (ritornello o drop, breakdown, finale) e parte col crash, senza build-up. Brani interi *Ferro*, *Ali di cenere*, *Drift* (circa 1:20) e i rispettivi reel da 30 s.
+- Chitarra con riff: pattern con spostamenti in semitoni del power chord (`.struct()` + `.transpose("0 0 1 0 …")`): thrash con seconda bemolle, galoppo, groove, djent, aperture eroiche. La chitarra ha il suo analizzatore `guitar`.
+- Palco ridisegnato con disposizione calcolata in unità: crash dentro la batteria sotto il muro LED, testata e cassa 4×12 con chitarra, campionatore FX con pad, etichette su una riga. La chitarra guida anche Tramonto, Montagne, Pixel, Sonar, Spazio e l'equalizzatore del logo.
+- Spazio ridisegnato: niente pianeta al centro; gigante gassoso dal basso a destra con bande e anelli, nebulose, aurora, comete, navicella.

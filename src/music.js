@@ -112,8 +112,14 @@ export const GUITAR_TYPES = {
   metal: ['Metal hi-gain', 'gm_distortion_guitar,sawtooth', 6, 110],
   muted: [{ it: 'Palm mute', en: 'Palm muted' }, 'gm_electric_guitar_muted,sawtooth', 4, 90],
 };
-// [nome, ritmo per beat o sedicesimi, note corte]
+// [nome, ritmo per beat o sedicesimi, note corte, riff]
+// riff: sedicesimi con lo spostamento in semitoni del power chord (0 = accordo, 1 = seconda bemolle, ~ = pausa)
 export const GUITAR_PATTERNS = {
+  thrash: [{ it: 'Riff thrash', en: 'Thrash riff' }, null, true, '0 0 0 0 0 0 1 0 0 0 0 0 3 0 1 0'],
+  gallopRiff: [{ it: 'Riff in galoppo', en: 'Gallop riff' }, null, true, '0 ~ 0 0 0 ~ 0 0 1 ~ 1 1 0 ~ -2 -2'],
+  groove: [{ it: 'Riff groove', en: 'Groove riff' }, null, true, '0 ~ ~ 0 0 ~ 3 ~ 0 ~ ~ 0 5 ~ 3 ~'],
+  djentRiff: [{ it: 'Riff djent', en: 'Djent riff' }, null, true, '0 ~ ~ 0 ~ ~ 0 ~ ~ 0 ~ 1 ~ ~ 0 ~'],
+  heroic: [{ it: 'Aperture eroiche', en: 'Heroic chords' }, null, false, '0 ~ 0 ~ 0 ~ 0 ~ 5 ~ 5 ~ 3 ~ 2 ~'],
   power8: [{ it: 'Power chord a ottavi', en: 'Power chords, 8ths' }, ['[x x]', 'x']],
   chug: [{ it: 'Chug a sedicesimi', en: '16th chugs' }, ['[x x x x]', '[x x]'], true],
   gallop: [{ it: 'Galoppo', en: 'Gallop' }, ['[x ~ x x]', '[x ~]'], true],
@@ -174,7 +180,7 @@ export const LOOKS = [
   ['montagne', { it: 'Montagne', en: 'Mountains' }], ['spazio', { it: 'Spazio', en: 'Space' }], ['sonar', 'Sonar'],
 ];
 // strumenti del visual Palco, nell'ordine in cui compaiono sul palco
-export const INSTRUMENTS = ['kick', 'snare', 'hats', 'fx', 'bass', 'arp', 'pad', 'hook', 'riser'];
+export const INSTRUMENTS = ['kick', 'snare', 'hats', 'fx', 'bass', 'guitar', 'arp', 'pad', 'hook', 'riser'];
 
 // Stato di una scena. "…End" a null significa nessuna automazione: il valore resta fisso.
 // cutoff 20000 = filtro aperto. grit 0 = niente bitcrusher. drive 0 = niente saturazione.
@@ -327,16 +333,19 @@ function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, cras
   }
   const gt = s.guitar, gty = GUITAR_TYPES[gt.type] || GUITAR_TYPES.distorted, gpt = GUITAR_PATTERNS[gt.pattern] || GUITAR_PATTERNS.power8;
   if (show(gt.on)) {
-    const gr = rhythm(gpt[1], N), short = gt.type === 'muted' || gpt[2], held = !gr;
+    // riff: struttura dalle note, spostamento del power chord battuta per battuta
+    const riff = gpt[3] ? stepGrid(gpt[3], N).split(' ') : null;
+    const gr = riff ? riff.map(x => x === '~' ? '~' : 'x').join(' ') : rhythm(gpt[1], N), short = gt.type === 'muted' || gpt[2], held = !gr;
+    const shift = riff ? `.transpose("${riff.map(x => x === '~' ? 0 : x).join(' ')}")` : '';
     const gtr = tr + (Number(gt.octave) || 0), dist = gty[2] + gt.drive;
     const voicing = c => gt.type === 'clean' ? CHORDS[c].pad : powerOf(c);
     L.push('', `// ${t('cGuitar')} · ${tx(gty[0])}, ${tx(gpt[0])}${gt.octave && gt.octave !== '0' ? ` · ${t('tuning').toLowerCase()} ${gt.octave}` : ''}`);
-    L.push(`${lab(gt.on)}: note("<${chords.map(c => `[${voicing(c)}]`).join(' ')}>")${gtr ? `.transpose(${gtr})` : ''}${gr ? `.struct("${gr}")` : ''}${gr ? sw : ''}`);
+    L.push(`${lab(gt.on)}: note("<${chords.map(c => `[${voicing(c)}]`).join(' ')}>")${gtr ? `.transpose(${gtr})` : ''}${gr ? `.struct("${gr}")` : ''}${shift}${gr ? sw : ''}`);
     L.push(`  .s("${gty[1]}").attack(.003).decay(${held ? 1.5 : short ? .09 : .3}).sustain(${held ? .8 : short ? 0 : .55}).release(.08)`);
     L.push(`  ${dist > 0 ? `.distort(${num(dist)}).distortvol(.2)` : ''}.hpf(${gty[3]})${filter(gt.cutoff, gt.cutoffEnd)}${gt.width === 'double' ? '.jux(x => x.late(.012))' : ''}`);
     // il volume va dopo l'amplificatore (postgain): prima della distorsione cambierebbe solo la saturazione
     const lvl = auto(gt.gain, gt.gainEnd);
-    L.push(`  .room(${f(gt.room)}).gain(.8)${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}.analyze("pad")`);
+    L.push(`  .room(${f(gt.room)}).gain(.8)${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}.analyze("guitar")`);
   }
   const p = s.pad, pp = PADS[p.preset] || PADS.pad;
   if (show(p.on)) {

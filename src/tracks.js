@@ -339,97 +339,130 @@ export const LOFI_TRACK = {
   ],
 };
 
-// ---------- metal: 160 BPM, 20 battute = 30 secondi ----------
-// Mi frigio ribassato, doppia cassa, galoppo e chug in palm mute, breakdown djent, accordo finale che suona.
+// ---------- reel: estratto da un brano intero ----------
+// Un reel parte già carico, come se fosse un pezzo di una canzone più lunga.
+// picks: [nome della scena del brano, battute, opzioni]. La prima scena entra col crash.
+const reelFrom = (full, id, title, style, picks) => ({
+  id, title, look: full.look, style,
+  scenes: picks.map(([name, bars, opts = {}], i) => {
+    const sc = JSON.parse(JSON.stringify(full.scenes.find(x => x.name === name)));
+    return { ...sc, name: opts.name || sc.name, bars, fade: i === 0 ? 0 : (opts.fade ?? 0), crash: i === 0 ? true : (opts.crash ?? sc.crash), fill: opts.fill ?? false, breath: opts.breath ?? false };
+  }),
+});
+
+// ---------- metal: Ferro ----------
+// Mi frigio accordato un tono sotto, 160 BPM. Riff thrash con la seconda bemolle, galoppo, ritornello con aperture e chitarre gemelle, breakdown djent.
 const metalKit = (s, rows, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'AkaiXR10', gain: .95, gainEnd: null, drive: 1.2, grit: 0, cutoff: 20000, cutoffEnd: null, ...extra }); steps(s, rows); };
 const metalBass = (s, gain = .6) => Object.assign(s.bass, { on: true, preset: 'ottavi', wave: 'gm_electric_bass_pick', cutoff: 1500, cutoffEnd: null, reso: 1, gain, gainEnd: null, move: 'fisso', drive: 2 });
 const heavy = (s, bpm = 160) => { s.bpm = bpm; s.key = 'E'; s.prog = 'frigio'; };
-
-export const METAL_TRACK = {
-  id: 'ferro-reel', title: 'Ferro · reel 30s', look: 'palco',
-  style: { it: 'Metal · Mi frigio ribassato · 160 BPM · doppia cassa, galoppo, palm mute, breakdown · 30 secondi', en: 'Metal · dropped E phrygian · 160 BPM · double kick, gallop, palm mute, breakdown · 30 seconds' },
-  scenes: [
-    makeScene('Feedback', 2, { breath: true }, s => { heavy(s); only(s, ['guitar', 'riser', 'drums']);
-      metalKit(s, { bd: E16, cp: E16, sd: E16, hh: E16, oh: E16, rd: 'x...x...x...x...' }, { gain: .5, gainEnd: .9 });
-      guitar(s, 'held', .45, 'metal', { octave: '-2', cutoff: 1500, cutoffEnd: 4500 }); Object.assign(s.riser, { dir: 'up', bars: '2', gain: .3 }); }),
-    makeScene('Riff', 6, { crash: true }, s => { heavy(s); only(s, ['drums', 'bass', 'guitar']);
-      metalKit(s, GROOVES.gallopDrums[1]); metalBass(s); guitar(s, 'gallop', .5, 'metal', { octave: '-2' }); }),
-    makeScene('Chug', 4, { fill: true }, s => { heavy(s); only(s, ['drums', 'bass', 'guitar']);
-      metalKit(s, GROOVES.metal[1]); metalBass(s); guitar(s, 'chug', .5, 'muted', { octave: '-2', drive: 2 }); }),
-    makeScene('Breakdown', 4, { crash: true, breath: true }, s => { heavy(s, 160); s.prog = 'pendolo'; only(s, ['drums', 'bass', 'guitar', 'texture']);
-      metalKit(s, { bd: 'x..x..x.x..x..x.', cp: E16, sd: '........x.......', hh: E16, oh: E16, rd: E16 }); s.drums.rows.cr = { steps: 'x...............', mute: false };
-      metalBass(s, .7); guitar(s, 'djent', .52, 'metal', { octave: '-2', drive: 3 });
-      Object.assign(s.texture, { on: true, sample: 'metal', rhythm: 'bar', grit: .4, gain: .3, room: .6 }); }),
-    makeScene('Assalto', 3, { crash: true }, s => { heavy(s); only(s, ['drums', 'bass', 'guitar']);
-      metalKit(s, GROOVES.blast[1]); metalBass(s); guitar(s, 'chug', .5, 'metal', { octave: '-2' }); }),
-    makeScene('Ultimo accordo', 1, { crash: true }, s => { heavy(s); only(s, ['bass', 'guitar']);
-      Object.assign(s.bass, { on: true, preset: 'sub', wave: 'gm_electric_bass_pick', cutoff: 1500, gain: .7, gainEnd: 0, drive: 2, reso: 1, move: 'fisso' });
-      guitar(s, 'held', .52, 'metal', { octave: '-2', gainEnd: 0, room: .5 }); }),
-  ],
-};
-
-// ---------- metal melodico: 150 BPM, 19 battute ≈ 30 secondi ----------
-// Si minore eroico, chitarre gemelle armonizzate a terze, intro pulita, galoppo, assolo.
 const twinLead = (s, preset, gain = .13, extra = {}) => Object.assign(s.hook, { on: true, preset, mode: 'minor', wave: 'gm_distortion_guitar,sawtooth', fm: 0, vowel: '', cutoff: 4500, cutoffEnd: null, delay: .2, gain, gainEnd: null, move: 'fisso', grit: 0, drive: 2.5, harmony: '2', ...extra });
-const epic = (s, bpm = 150) => { s.bpm = bpm; s.key = 'B'; s.prog = 'epica'; };
+const choir = (s, gain = .2, wave = 'gm_choir_aahs') => Object.assign(s.pad, { on: true, preset: 'pad', wave, cutoff: 3500, cutoffEnd: null, gain, gainEnd: null, room: .7, move: 'fisso', drive: 0 });
+const DROP = { octave: '-2' };
 
-export const MELODIC_METAL_TRACK = {
-  id: 'ali-di-cenere', title: 'Ali di cenere · reel 30s', look: 'montagne',
-  style: { it: 'Metal melodico · Si minore · 150 BPM · chitarre gemelle armonizzate a terze, galoppo, assolo · 30 secondi', en: 'Melodic metal · B minor · 150 BPM · twin guitars harmonised in thirds, gallop, solo · 30 seconds' },
+export const METAL_FULL = {
+  id: 'ferro', title: 'Ferro', look: 'palco',
+  style: { it: 'Metal · Mi frigio un tono sotto · 160 BPM · brano intero', en: 'Metal · E phrygian one step down · 160 BPM · full track' },
   scenes: [
-    makeScene('Arpeggio', 2, {}, s => { epic(s); only(s, ['guitar', 'pad', 'arp']);
-      guitar(s, 'held', .28, 'clean', { width: 'mono', room: .6 });
-      Object.assign(s.arp, { on: true, preset: 'sugiu', wave: 'gm_electric_guitar_clean', speed: '8', cutoff: 5000, cutoffEnd: null, reso: 1, delay: .3, gain: .4, gainEnd: null, move: 'fisso', drive: 0 });
-      Object.assign(s.pad, { on: true, preset: 'pad', wave: 'gm_string_ensemble_1', cutoff: 3000, gain: .1, gainEnd: .3, room: .8, move: 'fisso', drive: 0 }); }),
-    makeScene('Carica', 1, { fill: true, breath: true }, s => { epic(s); only(s, ['drums', 'guitar', 'riser']);
-      metalKit(s, { bd: 'x.x.x.x.x.x.x.x.', cp: E16, sd: E16, hh: E16, oh: E16, rd: E16 }); guitar(s, 'power8', .7, 'distorted');
-      Object.assign(s.riser, { dir: 'up', bars: '2', gain: .35 }); }),
-    makeScene('Tema', 8, { crash: true }, s => { epic(s); only(s, ['drums', 'bass', 'guitar', 'hook', 'pad']);
-      metalKit(s, GROOVES.gallopDrums[1], { drive: .8 }); metalBass(s, .55); guitar(s, 'gallop', .72, 'distorted');
-      twinLead(s, 'eroico');
-      Object.assign(s.pad, { on: true, preset: 'pad', wave: 'gm_string_ensemble_1', cutoff: 3500, gain: .2, room: .6, move: 'fisso', drive: 0 }); }),
-    makeScene('Assolo', 4, { crash: true, fill: true }, s => { epic(s); only(s, ['drums', 'bass', 'guitar', 'hook']);
-      metalKit(s, GROOVES.metal[1], { drive: .8 }); metalBass(s, .55); guitar(s, 'chug', .65, 'muted');
-      twinLead(s, 'assolo', .18, { harmony: '', cutoff: 5500, delay: .3 }); }),
-    makeScene('Finale', 3, { crash: true }, s => { epic(s); only(s, ['drums', 'bass', 'guitar', 'hook', 'pad']);
-      metalKit(s, GROOVES.gallopDrums[1], { drive: .8 }); metalBass(s, .55); guitar(s, 'power8', .72, 'distorted');
-      twinLead(s, 'eroico', .14);
-      Object.assign(s.pad, { on: true, preset: 'pad', wave: 'gm_choir_aahs', cutoff: 4000, gain: .25, room: .7, move: 'fisso', drive: 0 }); }),
-    makeScene('Coda', 1, { crash: true }, s => { epic(s); only(s, ['guitar', 'pad', 'bass']);
-      guitar(s, 'held', .75, 'distorted', { gainEnd: 0, room: .5 });
-      Object.assign(s.bass, { on: true, preset: 'sub', wave: 'gm_electric_bass_pick', cutoff: 1500, gain: .6, gainEnd: 0, drive: 1, reso: 1, move: 'fisso' });
-      Object.assign(s.pad, { on: true, preset: 'pad', wave: 'gm_choir_aahs', cutoff: 4000, gain: .3, gainEnd: 0, room: .8, move: 'fisso', drive: 0 }); }),
+    makeScene('Feedback', 2, { breath: true }, s => { heavy(s); only(s, ['drums', 'guitar', 'riser']);
+      metalKit(s, { bd: E16, cp: E16, sd: E16, hh: E16, oh: E16, rd: 'x...x...x...x...' }, { gain: .5, gainEnd: .9 });
+      guitar(s, 'held', .45, 'metal', { ...DROP, cutoff: 1500, cutoffEnd: 4500 }); Object.assign(s.riser, { dir: 'up', bars: '2', gain: .3 }); }),
+    makeScene('Riff', 8, { crash: true }, s => { heavy(s); only(s, ['drums', 'bass', 'guitar']);
+      metalKit(s, GROOVES.gallopDrums[1]); metalBass(s); guitar(s, 'thrash', .5, 'metal', DROP); }),
+    makeScene('Strofa', 8, {}, s => { heavy(s); only(s, ['drums', 'bass', 'guitar']);
+      metalKit(s, { ...GROOVES.metal[1], hh: E16, rd: 'x.x.x.x.x.x.x.x.' }); metalBass(s); guitar(s, 'groove', .48, 'muted', { ...DROP, drive: 2 }); }),
+    makeScene('Pre', 4, { fill: true, breath: true }, s => { heavy(s); only(s, ['drums', 'bass', 'guitar', 'riser']);
+      metalKit(s, GROOVES.gallopDrums[1]); metalBass(s); guitar(s, 'gallopRiff', .5, 'metal', DROP); Object.assign(s.riser, { dir: 'up', bars: '4', gain: .3 }); }),
+    makeScene('Ritornello', 8, { crash: true }, s => { heavy(s); only(s, ['drums', 'bass', 'guitar', 'hook', 'pad']);
+      metalKit(s, GROOVES.metal[1]); metalBass(s); guitar(s, 'heroic', .52, 'distorted', DROP);
+      twinLead(s, 'eroico', .13, { mode: 'phrygian' }); choir(s, .16); }),
+    makeScene('Breakdown', 8, { crash: true, breath: true }, s => { heavy(s); only(s, ['drums', 'bass', 'guitar', 'texture']);
+      metalKit(s, { bd: 'x..x..x.x..x..x.', cp: E16, sd: '........x.......', hh: E16, oh: E16, rd: 'x.......x.......' }); metalBass(s, .7);
+      guitar(s, 'djentRiff', .55, 'metal', { ...DROP, drive: 3 });
+      Object.assign(s.texture, { on: true, sample: 'metal', rhythm: 'bar', grit: .4, gain: .3, room: .6 }); }),
+    makeScene('Assolo', 8, { fill: true }, s => { heavy(s); only(s, ['drums', 'bass', 'guitar', 'hook']);
+      metalKit(s, GROOVES.gallopDrums[1]); metalBass(s); guitar(s, 'thrash', .38, 'metal', DROP);
+      twinLead(s, 'assolo', .17, { harmony: '', mode: 'phrygian', cutoff: 5500, delay: .3 }); }),
+    makeScene('Ritornello 2', 8, { crash: true, fill: true }, s => { heavy(s); only(s, ['drums', 'bass', 'guitar', 'hook', 'pad']);
+      metalKit(s, GROOVES.blast[1]); metalBass(s); guitar(s, 'heroic', .55, 'distorted', DROP);
+      twinLead(s, 'eroico', .14, { mode: 'phrygian' }); choir(s, .2); }),
+    makeScene('Fine', 1, { crash: true }, s => { heavy(s); only(s, ['bass', 'guitar']);
+      Object.assign(s.bass, { on: true, preset: 'sub', wave: 'gm_electric_bass_pick', cutoff: 1500, gain: .7, gainEnd: 0, drive: 2, reso: 1, move: 'fisso' });
+      guitar(s, 'held', .52, 'metal', { ...DROP, gainEnd: 0, room: .5 }); }),
   ],
 };
+export const METAL_TRACK = reelFrom(METAL_FULL, 'ferro-reel', 'Ferro · reel 30s',
+  { it: 'Reel da 30 s estratto da Ferro: parte dal ritornello, breakdown, ritornello, accordo finale', en: '30 s reel cut from Ferro: chorus, breakdown, chorus, final chord' },
+  [['Ritornello', 8], ['Breakdown', 6, { breath: true }], ['Ritornello 2', 5, { fill: true }], ['Fine', 1]]);
 
-// ---------- phonk: 128 BPM, 16 battute = 30 secondi ----------
-// Fa# minore, melodia di cowbell 808, basso 808 distorto, hi-hat a sedicesimi, voce radio sgranata.
+// ---------- metal melodico: Ali di cenere ----------
+// Si minore, 150 BPM. Chitarre gemelle a terze, galoppo, ritornello con aperture e coro, ultimo ritornello un semitono sopra.
+const epic = (s, key = 'B', bpm = 150) => { s.bpm = bpm; s.key = key; s.prog = 'epica'; };
+export const MELODIC_METAL_FULL = {
+  id: 'ali-di-cenere', title: 'Ali di cenere', look: 'montagne',
+  style: { it: 'Metal melodico · Si minore, finale in Do · 150 BPM · brano intero', en: 'Melodic metal · B minor, last chorus in C · 150 BPM · full track' },
+  scenes: [
+    makeScene('Arpeggio', 4, {}, s => { epic(s); only(s, ['guitar', 'pad', 'arp']);
+      guitar(s, 'held', .3, 'clean', { width: 'mono', room: .6 });
+      Object.assign(s.arp, { on: true, preset: 'sugiu', wave: 'gm_electric_guitar_clean', speed: '8', cutoff: 5000, cutoffEnd: null, reso: 1, delay: .3, gain: .4, gainEnd: null, move: 'fisso', drive: 0 });
+      choir(s, .1, 'gm_string_ensemble_1'); s.pad.gainEnd = .3; }),
+    makeScene('Tema', 8, { crash: true }, s => { epic(s); only(s, ['drums', 'bass', 'guitar', 'hook', 'pad']);
+      metalKit(s, GROOVES.gallopDrums[1], { drive: .8 }); metalBass(s, .55); guitar(s, 'gallopRiff', .62, 'distorted');
+      twinLead(s, 'eroico'); choir(s, .18, 'gm_string_ensemble_1'); }),
+    makeScene('Strofa', 8, {}, s => { epic(s); only(s, ['drums', 'bass', 'guitar', 'pad']);
+      metalKit(s, { ...GROOVES.rock[1], bd: 'x.x.....x.x.....' }, { drive: .8 }); metalBass(s, .55); guitar(s, 'groove', .55, 'muted');
+      choir(s, .14, 'gm_string_ensemble_1'); }),
+    makeScene('Pre', 4, { fill: true, breath: true }, s => { epic(s); only(s, ['drums', 'bass', 'guitar', 'riser']);
+      metalKit(s, GROOVES.gallopDrums[1], { drive: .8 }); metalBass(s, .55); guitar(s, 'power8', .62, 'distorted');
+      Object.assign(s.riser, { dir: 'up', bars: '4', gain: .32 }); }),
+    makeScene('Ritornello', 8, { crash: true }, s => { epic(s); only(s, ['drums', 'bass', 'guitar', 'hook', 'pad']);
+      metalKit(s, GROOVES.metal[1], { drive: .8 }); metalBass(s, .55); guitar(s, 'heroic', .7, 'distorted');
+      twinLead(s, 'orizzonte', .14); choir(s, .24); }),
+    makeScene('Assolo', 8, { fill: true }, s => { epic(s); only(s, ['drums', 'bass', 'guitar', 'hook']);
+      metalKit(s, GROOVES.gallopDrums[1], { drive: .8 }); metalBass(s, .55); guitar(s, 'chug', .55, 'muted');
+      twinLead(s, 'assolo', .18, { harmony: '', cutoff: 5500, delay: .3 }); }),
+    makeScene('Ritornello finale', 8, { crash: true, fill: true }, s => { epic(s, 'C'); only(s, ['drums', 'bass', 'guitar', 'hook', 'pad']);
+      metalKit(s, GROOVES.metal[1], { drive: .8 }); metalBass(s, .55); guitar(s, 'heroic', .72, 'distorted');
+      twinLead(s, 'orizzonte', .15); choir(s, .28); }),
+    makeScene('Coda', 2, { crash: true }, s => { epic(s, 'C'); only(s, ['guitar', 'pad', 'bass']);
+      guitar(s, 'held', .72, 'distorted', { gainEnd: 0, room: .5 });
+      Object.assign(s.bass, { on: true, preset: 'sub', wave: 'gm_electric_bass_pick', cutoff: 1500, gain: .6, gainEnd: 0, drive: 1, reso: 1, move: 'fisso' });
+      choir(s, .3); s.pad.gainEnd = 0; }),
+  ],
+};
+export const MELODIC_METAL_TRACK = reelFrom(MELODIC_METAL_FULL, 'ali-di-cenere-reel', 'Ali di cenere · reel 30s',
+  { it: 'Reel da 30 s estratto da Ali di cenere: ritornello, assolo, ritornello finale un semitono sopra, coda', en: '30 s reel cut from Ali di cenere: chorus, solo, last chorus a semitone up, coda' },
+  [['Ritornello', 8], ['Assolo', 4, { fill: true }], ['Ritornello finale', 6], ['Coda', 1]]);
+
+// ---------- phonk: Drift ----------
+// Fa# minore, 128 BPM. Cowbell 808, basso 808 distorto, hi-hat a sedicesimi, coro, vinile.
 const phonkKit = (s, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'RolandTR808', gain: .95, gainEnd: null, drive: 1.5, grit: .2, cutoff: 20000, cutoffEnd: null, ...extra }); steps(s, GROOVES.phonk[1]); };
 const bass808 = (s, gain = .8, drv = 4) => Object.assign(s.bass, { on: true, preset: 'sub', wave: 'sine', cutoff: 900, cutoffEnd: null, reso: 2, gain, gainEnd: null, move: 'fisso', drive: drv });
 const cowbell = (s, gain = .45, extra = {}) => Object.assign(s.hook, { on: true, preset: 'phonk', mode: 'minor', wave: 'cowbell', fm: 0, vowel: '', cutoff: 6000, cutoffEnd: null, delay: .15, gain, gainEnd: null, move: 'fisso', grit: 0, drive: 1, harmony: '', ...extra });
 const phonkKey = s => { s.bpm = 128; s.key = 'F#'; s.prog = 'pendolo'; };
+const vinylOn = (s, gain = .4) => Object.assign(s.texture, { on: true, sample: 'vinyl', rhythm: 'bar', grit: 0, gain, gainEnd: null, room: .2 });
 
-export const PHONK_TRACK = {
-  id: 'drift-reel', title: 'Drift · phonk reel 30s', look: 'pixel',
-  style: { it: 'Phonk · Fa# minore · 128 BPM · cowbell 808, basso distorto, hi-hat a sedicesimi · 30 secondi', en: 'Phonk · F# minor · 128 BPM · 808 cowbell, distorted bass, 16th hi-hats · 30 seconds' },
+export const PHONK_FULL = {
+  id: 'drift', title: 'Drift', look: 'pixel',
+  style: { it: 'Phonk · Fa# minore · 128 BPM · brano intero', en: 'Phonk · F# minor · 128 BPM · full track' },
   scenes: [
-    makeScene('Intro', 2, {}, s => { phonkKey(s); only(s, ['hook', 'texture']);
-      cowbell(s, .4, { cutoff: 1500, cutoffEnd: 6000 });
-      Object.assign(s.texture, { on: true, sample: 'numbers', rhythm: 'bar', grit: .9, gain: .45, room: .6 }); }),
-    makeScene('Drop', 8, { crash: true }, s => { phonkKey(s); only(s, ['drums', 'bass', 'hook', 'pad', 'texture']);
-      phonkKit(s); bass808(s); cowbell(s);
-      Object.assign(s.pad, { on: true, preset: 'pad', wave: 'gm_choir_aahs', cutoff: 2000, gain: .18, room: .6, move: 'fisso', drive: 0 });
-      Object.assign(s.texture, { on: true, sample: 'vinyl', rhythm: 'bar', grit: 0, gain: .4, room: .2 }); }),
-    makeScene('Respiro', 2, { breath: true, fill: true }, s => { phonkKey(s); only(s, ['drums', 'hook', 'riser', 'texture']);
+    makeScene('Intro', 4, {}, s => { phonkKey(s); only(s, ['hook', 'texture']);
+      cowbell(s, .4, { cutoff: 1200, cutoffEnd: 6000 }); Object.assign(s.texture, { on: true, sample: 'numbers', rhythm: 'bar', grit: .9, gain: .45, room: .6 }); }),
+    makeScene('Drop', 16, { crash: true }, s => { phonkKey(s); only(s, ['drums', 'bass', 'hook', 'pad', 'texture']);
+      phonkKit(s); bass808(s); cowbell(s); choir(s, .16); s.pad.cutoff = 2000; vinylOn(s); }),
+    makeScene('Break', 4, { fade: 1, breath: true, fill: true }, s => { phonkKey(s); only(s, ['drums', 'hook', 'riser', 'texture']);
       phonkKit(s, { cutoff: 600, cutoffEnd: 20000 }); steps(s, { bd: E16, cp: E16, hh: 'xxxxxxxxxxxxxxxx', oh: E16 });
-      cowbell(s, .4, { cutoff: 2000 }); Object.assign(s.riser, { dir: 'up', bars: '2', gain: .35 });
-      Object.assign(s.texture, { on: true, sample: 'numbers', rhythm: 'sixteenth', grit: .9, gain: .25, room: .3 }); }),
-    makeScene('Drop 2', 3, { crash: true }, s => { phonkKey(s); only(s, ['drums', 'bass', 'hook', 'pad', 'texture']);
-      phonkKit(s, { drive: 2.5, grit: .4 }); bass808(s, .85, 6); cowbell(s, .5, { drive: 2 });
-      Object.assign(s.pad, { on: true, preset: 'pad', wave: 'gm_choir_aahs', cutoff: 2500, gain: .2, room: .6, move: 'fisso', drive: 0 });
-      Object.assign(s.texture, { on: true, sample: 'vinyl', rhythm: 'bar', grit: 0, gain: .4, room: .2 }); }),
-    makeScene('Coda', 1, { crash: true }, s => { phonkKey(s); only(s, ['bass', 'hook']); bass808(s, .8, 5); s.bass.gainEnd = 0; cowbell(s, .4, { gainEnd: 0, delay: .5 }); }),
+      cowbell(s, .4, { cutoff: 2000, delay: .4 }); Object.assign(s.riser, { dir: 'up', bars: '4', gain: .35 });
+      Object.assign(s.texture, { on: true, sample: 'numbers', rhythm: 'sixteenth', grit: .9, gain: .22, room: .3 }); }),
+    makeScene('Drop 2', 16, { crash: true }, s => { phonkKey(s); only(s, ['drums', 'bass', 'hook', 'pad', 'texture']);
+      phonkKit(s, { drive: 2.5, grit: .4 }); steps(s, { oh: '..x...x...x...x.' }); bass808(s, .85, 6); cowbell(s, .5, { drive: 2 });
+      choir(s, .2); s.pad.cutoff = 2500; vinylOn(s); }),
+    makeScene('Outro', 3, {}, s => { phonkKey(s); only(s, ['drums', 'hook', 'texture']);
+      phonkKit(s, { gainEnd: .2 }); cowbell(s, .4, { cutoffEnd: 1200 }); vinylOn(s, .5); }),
+    makeScene('Colpo', 1, { crash: true }, s => { phonkKey(s); only(s, ['bass', 'hook']); bass808(s, .8, 5); s.bass.gainEnd = 0; cowbell(s, .4, { gainEnd: 0, delay: .5 }); }),
   ],
 };
+export const PHONK_TRACK = reelFrom(PHONK_FULL, 'drift-reel', 'Drift · phonk reel 30s',
+  { it: 'Reel da 30 s estratto da Drift: drop, break, drop più duro, colpo finale', en: '30 s reel cut from Drift: drop, break, harder drop, final hit' },
+  [['Drop', 8], ['Break', 2, { breath: true, fill: true }], ['Drop 2', 5], ['Colpo', 1]]);
 
-export const BUILTIN_TRACKS = [METAL_TRACK, MELODIC_METAL_TRACK, PHONK_TRACK, NEON_RUSH_TRACK, PROG_TRACK, LOFI_TRACK, GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];
+export const BUILTIN_TRACKS = [METAL_TRACK, MELODIC_METAL_TRACK, PHONK_TRACK, METAL_FULL, MELODIC_METAL_FULL, PHONK_FULL, NEON_RUSH_TRACK, PROG_TRACK, LOFI_TRACK, GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];
