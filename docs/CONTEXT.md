@@ -1,0 +1,61 @@
+# Project context
+
+## Story
+
+The owner (Alessandro, GitHub `alessandrodevecchi`) got hooked a year ago on Switch Angel's live-coding videos and kept the idea of music as code with Strudel. This project joins that idea with what current models can do. It started as a few Strudel patterns and a player, then grew, at the owner's push, into a scene arranger able to produce structured tracks.
+
+Original request: "create a project `coding-misk`, take inspiration from Switch Angel, explore music made with code using Strudel or TidalCycles". "misk" is probably a typo of "music/musik"; the owner kept the name. Renaming to `coding-musik` was offered and is still open.
+
+## Goals
+
+- Compose with code, in the spirit of Switch Angel; eventually recreate a live-coded track.
+- Practical use: background music for short videos and social reels (15 to 60 seconds, starting at full energy).
+- Reusable moods and presets; more genres; vocals (probably a small local model).
+
+## Owner preferences and feedback (keep applying these)
+
+- Conversation in Italian. Likes concise answers and visible progress.
+- Melodies were "too sweet" and tracks "too similar": stepwise minor-scale hooks felt cantabile. Prefer tension: tritone, flat second, octave jumps, repeated notes, silence. Use the `chromatic` and `locrian` hook modes, bass riffs, one-chord or b2 progressions.
+- Too many instruments at once: keep 4 to 5 layers per scene, focus on rhythm.
+- "Cyberpunk" tracks came out cheerful; dark club music (John Wick, Le Castle Vania) is the reference for action and club moods.
+- Reels must start loaded, like an excerpt of a longer song: no long build-up. Write the full song, then cut the reel from its strongest sections (`reelFrom` in `src/tracks.js`).
+- Wants to see everything in the Compose UI: every built-in track is a scene track. Hand-written code tracks are kept only as references.
+- Transitions matter: avoid hard cuts that sound like different tracks. Use fades, transition scenes, continuous layers, tempo ramps.
+- Loved the visuals and the logo; asked for Stage to show every instrument, and for an anime (Edgerunners) visual and a hardware-style UI.
+- Git: `main` stable, `develop` for experiments, merge to `main` only after confirmation. Repo is private.
+
+## Key decisions
+
+- **No Strudel fork.** `@strudel/repl` 1.3.0 from npm; the app wraps it. A fork only if the audio engine itself must change.
+- **Local app, not hosted.** A claude.ai artifact was tried and dropped: its sandbox blocks Strudel's `data:` audio worklets, so it played no sound. The artifact was deleted.
+- **Tempo is driven by the player** (`scheduler.setCps` at bar boundaries), never by `.cps()` inside patterns.
+- **Scene model over hand-written code** for all built-in tracks, so they open in Compose.
+- **Master gain 0.6** on Strudel's output to avoid clipping when all layers play.
+- **Guitar volume after the distortion** (`postgain`), otherwise level and fades do not change.
+
+## References
+
+- Switch Angel, Coding Trance Music: https://www.youtube.com/watch?v=GWXCCBsOMSg and channel https://www.youtube.com/@Switch-Angel
+- Le Castle Vania, John Wick medley (club fight reference): https://youtu.be/IBvf7KUEZ78
+- Strudel: https://strudel.cc/ (workshop, mini-notation, effects docs); source https://codeberg.org/uzu/strudel
+- TidalCycles: https://tidalcycles.org/ ; dirt-samples: https://github.com/tidalcycles/dirt-samples ; drum machines: https://github.com/ritchse/tidal-drum-machines
+- Reference audio analysed (owner's files, not in the repo): `/Users/Alessandro.Vecchi/webdev/drupalcampitaly/social/templates/sf-shared/audio/`
+  - `sf-tenyears-149s.m4a`: inspirational future pop, 92 BPM, E minor, Em Em D D C C D D, strong sidechain, 57 bars.
+  - `dci-track-23s.m4a`: tech jingle, 103 BPM, F# minor with G bass (phrygian tension), staccato then syncopated stabs, 10 bars.
+  - Rebuilds kept structure, tempo and harmony but not the timbre; the owner found them not very similar.
+
+## Built-in tracks (`src/tracks.js`)
+
+Scene tracks, in library order: Segnale nel rumore (the free-form piece, D dorian, 7/8), Luci Rosse (dark club), DCI Jingle carica, Insert Coin (90s arcade), Circuito Ruggine (industrial techno with guitars), Ferro / Ali di cenere / Drift with their 30 s reels, Neon Rush reel, Settimo Cielo (prog rock 7/8, 5/4), Pioggia sul vetro (lo-fi), Ghost Protocol, Neon Ascent, Ten Years rebuild, Next Chapter, DCI rebuild, DCI Ignition, Synth Lab Demo. Hand-written originals: `patterns/05-neon-ascent.js`, `patterns/06-ghost-protocol.js`.
+
+## Backlog (GitHub issues)
+
+- `#1` Edgerunners visual: done on `develop`, closes when merged to `main`.
+- `#2` Hardware interface theme: done on `develop`, closes when merged to `main`.
+- `#3` Vocals, `#4` Recreate a live-coded track, `#5` Background music for short videos, `#6` Moods and presets, `#7` More genres: open.
+
+## Media and demo
+
+- `docs/media/`: README screenshots, `demo.gif` (17 s), `demo.mp4` (38 s, with audio).
+- `demo/coding-misk-demo.mp4`: 1:26 demo for the team (git-ignored).
+- A video inside the repo shows only as a link on GitHub; for an inline player, upload it through GitHub's web editor.
