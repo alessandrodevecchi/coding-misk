@@ -60,6 +60,17 @@ $('#edhost').appendChild(el);
 const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor) { clearInterval(iv); ed = el.editor; res(ed); } }, 100); });
 // il REPL carica solo una parte di dirt-samples: carichiamo l'archivio completo (arpy, industrial, glitch, …)
 ready.then(() => { try { globalThis.samples && globalThis.samples('github:tidalcycles/dirt-samples'); } catch (e) { console.error(e); } });
+// campioni personalizzati da public/samples/ (elenco generato dal plugin in vite.config.js)
+let custom = [];
+ready.then(async () => {
+  try {
+    const list = await (await fetch('/samples/strudel.json')).json();
+    custom = Object.keys(list).filter(k => k !== '_base');
+    if (!custom.length) return;
+    await globalThis.samples('/samples/strudel.json');
+    renderChannels(); renderSounds(); syncAll();
+  } catch (e) { console.warn('campioni personalizzati non disponibili', e); }
+});
 const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
 
@@ -210,6 +221,58 @@ document.addEventListener('keydown', e => {
   if (e.key === '.' && !inEditor) { e.preventDefault(); stop(); }
 });
 
+// ---------- esportazione audio ----------
+// Registra l'uscita master di Strudel in tempo reale mentre il brano suona dall'inizio alla fine,
+// poi converte la registrazione in WAV a 16 bit e la scarica.
+let rec = null;
+function tapMaster() {
+  if (!rec) return;
+  try {
+    const node = globalThis.getSuperdoughAudioController().output.destinationGain;
+    if (node && node !== rec.node) { node.connect(rec.dest); rec.node = node; }
+  } catch (e) {}
+}
+async function exportTrack(sg, as) {
+  if (rec) { rec.cancel = true; rec.recorder.stop(); stop(); return; }
+  initAudioOnce(); await ready; await initAudioOnce();
+  const ctx = globalThis.getAudioContext();
+  const dest = ctx.createMediaStreamDestination();
+  const recorder = new MediaRecorder(dest.stream);
+  rec = { recorder, dest, chunks: [], node: null, id: sg.id, title: sg.title, total: sg.meta.seconds, ending: 0, cancel: false };
+  recorder.ondataavailable = e => e.data.size && rec.chunks.push(e.data);
+  recorder.onstop = () => finishExport(rec);
+  tapMaster();
+  recorder.start(500);
+  loopIdx = -1;
+  await playSong(sg, 0, as);
+}
+async function finishExport(r) {
+  rec = null;
+  try { if (r.node) r.node.disconnect(r.dest); } catch (e) {}
+  if (r.cancel) return toast(t('exportCancel'));
+  toast(t('exportWorking'));
+  const blob = new Blob(r.chunks, { type: r.recorder.mimeType });
+  const audio = await globalThis.getAudioContext().decodeAudioData(await blob.arrayBuffer());
+  const url = URL.createObjectURL(wavBlob(audio));
+  const a = document.createElement('a');
+  a.href = url; a.download = `${(r.title || 'coding-misk').replace(/[^\w\- ]+/g, '').replace(/\s+/g, ' ').trim() || 'coding-misk'}.wav`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast(t('exportDone', { name: a.download }));
+}
+function wavBlob(buf) {
+  const ch = Math.min(2, buf.numberOfChannels), n = buf.length, data = new DataView(new ArrayBuffer(44 + n * ch * 2));
+  const str = (o, s) => [...s].forEach((c, i) => data.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); data.setUint32(4, 36 + n * ch * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+  data.setUint32(16, 16, true); data.setUint16(20, 1, true); data.setUint16(22, ch, true); data.setUint32(24, buf.sampleRate, true);
+  data.setUint32(28, buf.sampleRate * ch * 2, true); data.setUint16(32, ch * 2, true); data.setUint16(34, 16, true); str(36, 'data'); data.setUint32(40, n * ch * 2, true);
+  const chans = Array.from({ length: ch }, (_, c) => buf.getChannelData(c));
+  let o = 44;
+  for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++) { const v = Math.max(-1, Math.min(1, chans[c][i])); data.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7fff, true); o += 2; }
+  return new Blob([data], { type: 'audio/wav' });
+}
+$('#tr-export').addEventListener('click', () => exportTrack(compiled, 'track'));
+
 // ---------- arrangiatore ----------
 function selectScene(i) {
   if (i < 0 || i >= T.scenes.length) return;
@@ -233,7 +296,7 @@ function renderArranger() {
   if (document.activeElement !== $('#sc-bars')) $('#sc-bars').value = sc.bars;
   $('#sc-fade').value = String(sel === 0 ? 0 : sc.fade || 0);
   $('#sc-fade').disabled = sel === 0;
-  $('#sc-crash').checked = !!sc.crash; $('#sc-breath').checked = !!sc.breath;
+  $('#sc-crash').checked = !!sc.crash; $('#sc-breath').checked = !!sc.breath; $('#sc-fill').checked = !!sc.fill;
   $('#sc-left').disabled = sel === 0; $('#sc-right').disabled = sel === T.scenes.length - 1; $('#sc-del').disabled = T.scenes.length === 1;
   $('#dirty').textContent = dirty ? t('unsaved') : '';
   const builtin = isBuiltin(T.id), overridden = user.tracks.some(u => u.id === T.id);
@@ -262,6 +325,7 @@ $('#sc-bars').addEventListener('change', e => { T.scenes[sel].bars = Math.max(1,
 $('#sc-fade').addEventListener('change', e => { T.scenes[sel].fade = +e.target.value; changed(); });
 $('#sc-crash').addEventListener('change', e => { T.scenes[sel].crash = e.target.checked; changed(); });
 $('#sc-breath').addEventListener('change', e => { T.scenes[sel].breath = e.target.checked; changed(); });
+$('#sc-fill').addEventListener('change', e => { T.scenes[sel].fill = e.target.checked; changed(); });
 $('#sc-add').addEventListener('click', () => {
   const copy = clone(T.scenes[sel]);
   copy.name = t('newScene', { n: T.scenes.length + 1 }); copy.fade = 0;
@@ -350,7 +414,7 @@ const CONTROLS = {
     ['select', 'vowel', 'vowel', () => VOWELS], ['range', 'grit', 'grit'], ['range', 'delay', 'delay']],
   pad: [['select', 'preset', 'type', () => named(PADS)], ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
     ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['range', 'drive', 'drive', NUM4], ['range', 'room', 'reverb']],
-  texture: [['select', 'sample', 'sample', () => TEXTURES.map(x => [x, x])], ['select', 'rhythm', 'rhythm', () => named(TEX_RHYTHMS)],
+  texture: [['select', 'sample', 'sample', () => [...TEXTURES, ...custom].map(x => [x, x])], ['select', 'rhythm', 'rhythm', () => named(TEX_RHYTHMS)],
     ['range', 'gain', 'volume', { ramp: 1 }], ['range', 'grit', 'grit'], ['range', 'room', 'reverb']],
   riser: [['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['2', '4', '8', '16'].map(n => [n, t('nBars', { n })])],
     ['select', 'dir', 'direction', () => [['up', t('up')], ['down', t('down')]]]],
@@ -515,6 +579,7 @@ function songCard({ tr, p }, i) {
       <button class="btn primary" data-act="play">${t('songPlay')}</button>
       <button class="btn" data-act="pause" hidden></button>
       <button class="btn" data-act="stop" hidden>${t('stop')}</button>
+      <button class="btn" data-act="export" data-export="${esc(tr.id)}">${t('exportWav')}</button>
       ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}`}
       <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
       <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
@@ -553,6 +618,10 @@ $('#songs').addEventListener('click', e => {
     if (a === 'play') return startCard(i, 0);
     if (a === 'pause') return togglePlay();
     if (a === 'stop') return stop();
+    if (a === 'export') {
+      if (tr.kind === 'composed') { if (!rec && !loadTrack(tr)) return; return exportTrack(rec ? null : compiled, 'track'); }
+      return exportTrack(p, 'free');
+    }
     if (a === 'open') {
       if (!loadTrack(tr)) return;
       if (tr.look) setLook(tr.look);
@@ -595,9 +664,17 @@ const pauseLabel = () => isPlaying() ? t('pause') : paused ? t('resume') : t('pa
     if (loopIdx >= 0) {
       const sec = m.sections[loopIdx];
       if (sec && cyc >= sec.start + sec.len) playSong(song, sec.start, mode);
-    } else if (cyc >= m.bars) stop();
+    } else if (cyc >= m.bars) { stop(); if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
     if (mode === 'track' && follow) { const i = m.sectionAt(cyc); if (i >= 0 && i !== sel) selectScene(i); }
   }
+  // registrazione: aggancio all'uscita master, coda di riverbero, etichette dei pulsanti
+  if (rec) {
+    tapMaster();
+    if (rec.ending && performance.now() - rec.ending > 2500 && rec.recorder.state === 'recording') rec.recorder.stop();
+    if (!rec.ending && !playing && !seeking && rec.recorder.state === 'recording' && performance.now() - (rec.started || (rec.started = performance.now())) > 3000) rec.ending = performance.now();
+  }
+  const recLabel = rec ? t('exporting', { t: clock(song && s ? song.meta.secondsAt(s.now()) : 0), total: clock(rec.total) }) : null;
+  $$('[data-export]').forEach(b => { const l = rec && (b.dataset.export === rec.id || b.id === 'tr-export') ? recLabel : t('exportWav'); if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!(rec && l === recLabel)); });
   // pulsanti di trasporto
   const playBtn = $('#play'), state = playing ? 'playing' : paused ? 'paused' : 'stopped';
   if (playBtn.dataset.state !== state) {
@@ -637,13 +714,14 @@ const pauseLabel = () => isPlaying() ? t('pause') : paused ? t('resume') : t('pa
 })();
 
 // ---------- suoni ----------
+const soundGroups = () => custom.length ? [[{ it: 'I tuoi campioni (public/samples)', en: 'Your samples (public/samples)' }, custom.map(x => [x, `$: s("${x}*2").n("<0 1 2 3>")`])], ...SOUND_GROUPS] : SOUND_GROUPS;
 function renderSounds() {
-  $('#sounds').innerHTML = SOUND_GROUPS.map(([g, list], gi) => `
+  $('#sounds').innerHTML = soundGroups().map(([g, list], gi) => `
     <div class="snd-group"><h3>${esc(tx(g))}</h3><div class="snds">${list.map(([n], i) => `<button class="snd" data-g="${gi}" data-i="${i}">${esc(n)}</button>`).join('')}</div></div>`).join('');
 }
 $('#sounds').addEventListener('click', e => {
   const b = e.target.closest('.snd'); if (!b) return;
-  const [n, code] = SOUND_GROUPS[+b.dataset.g][1][+b.dataset.i];
+  const [n, code] = soundGroups()[+b.dataset.g][1][+b.dataset.i];
   $$('.snd.on').forEach(x => x.classList.remove('on')); b.classList.add('on');
   loadFree(code, { kind: 'sound', name: n });
 });
@@ -696,8 +774,8 @@ startVisuals({
       line2 = `${song.title}  ·  ${sec ? sec.label : ''}`;
       if (mode === 'track' && sec && T.scenes[i]) {
         const st = T.scenes[i].state, tr = (KEYS.find(k => k[0] === st.key) || [0, 0])[1];
-        const pos = (bar - sec.start) % 4;
-        line2 += '\n' + PROGS[st.prog][1].map(c => chordName(c, tr)).map((n, j) => j === pos ? `[${n}]` : ` ${n} `).join('');
+        const prog = PROGS[st.prog][1], pos = (bar - sec.start) % prog.length;
+        line2 += '\n' + prog.map(c => chordName(c, tr)).map((n, j) => j === pos ? `[${n}]` : ` ${n} `).join('');
       }
     }
     return `${bpm} BPM  ·  ${t('rdBar')} ${String(bar + 1).padStart(3, '0')}.${(step >> 2) + 1}\n${line2}`;

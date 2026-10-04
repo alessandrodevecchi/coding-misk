@@ -129,4 +129,79 @@ export const NEON_TRACK = {
   ],
 };
 
-export const BUILTIN_TRACKS = [GHOST_TRACK, NEON_TRACK, DEMO_TRACK];
+// ---------- stile "future pop" (da sf-tenyears-149s.m4a) ----------
+// 92 BPM, Mi minore, cassa dritta con sidechain su pad e basso, plucks a sedicesimi, swoosh e riser.
+const fourFloor = (s, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'RolandTR909', gain: .85, drive: 0, grit: 0 }); steps(s, { bd: 'x...x...x...x...', cp: '....x.......x...', sd: E16, hh: 'xxxxxxxxxxxxxxxx', oh: E16, rd: E16, ...extra }); };
+const scPad = (s, cutoff, cutoffEnd = null, gain = .3) => Object.assign(s.pad, { on: true, preset: 'sidechain', wave: 'supersaw', cutoff, cutoffEnd, gain, gainEnd: null, room: .45, move: 'fisso', drive: 0 });
+const airPad = (s, cutoff, cutoffEnd = null, gain = .28, gainEnd = null) => Object.assign(s.pad, { on: true, preset: 'pad', wave: 'supersaw', cutoff, cutoffEnd, gain, gainEnd, room: .9, move: 'fisso', drive: 0 });
+const pumpBass = (s, gain = .7) => Object.assign(s.bass, { on: true, preset: 'pumping', wave: 'sine', cutoff: 600, cutoffEnd: null, reso: 2, gain, gainEnd: null, move: 'fisso', drive: 0 });
+const subBass = (s, gain = .4) => Object.assign(s.bass, { on: true, preset: 'sub', wave: 'sine', cutoff: 400, cutoffEnd: null, reso: 2, gain, gainEnd: null, move: 'fisso', drive: 0 });
+const pluck = (s, cutoff = 2600, gain = .28, cutoffEnd = null, gainEnd = null) => Object.assign(s.arp, { on: true, preset: 'sugiu', wave: 'triangle', speed: '16', cutoff, cutoffEnd, reso: 2, delay: .35, gain, gainEnd, move: 'fisso', drive: 0 });
+const lead = (s, preset, gain = .26, mode = 'minor') => Object.assign(s.hook, { on: true, preset, mode, wave: 'square', fm: 0, vowel: '', cutoff: 3200, cutoffEnd: null, delay: .3, gain, gainEnd: null, move: 'fisso', grit: 0 });
+const future = (s, prog, bpm = 92, key = 'E') => { s.bpm = bpm; s.key = key; s.prog = prog; };
+
+export const TEN_YEARS_TRACK = {
+  id: 'ten-years-rebuild', title: 'Ten Years · ricostruzione', look: 'montagne',
+  style: { it: 'Ricostruita da sf-tenyears-149s.m4a · future pop ispirazionale · Mi minore · 92 BPM · sidechain su pad e basso', en: 'Rebuilt from sf-tenyears-149s.m4a · inspirational future pop · E minor · 92 BPM · sidechained pad and bass' },
+  scenes: [
+    makeScene('Intro', 8, {}, s => { future(s, 'pendolo'); only(s, ['bass', 'arp', 'pad']); subBass(s, .35); airPad(s, 600, 2200, .2, .32); pluck(s, 1200, .15, 2600, .28); }),
+    makeScene('Strofa A', 9, { crash: true, fill: true }, s => { future(s, 'anthem'); only(s, ['drums', 'bass', 'arp', 'pad']); fourFloor(s); pumpBass(s); scPad(s, 2400); pluck(s); }),
+    makeScene('Swoosh', 1, {}, s => { future(s, 'anthem'); only(s, ['pad', 'riser']); airPad(s, 1200, null, .2); Object.assign(s.riser, { dir: 'down', bars: '2', gain: .35 }); }),
+    makeScene('Strofa B', 8, { crash: true }, s => { future(s, 'anthem'); only(s, ['drums', 'bass', 'arp', 'hook', 'pad']); fourFloor(s); pumpBass(s); scPad(s, 2600); pluck(s); lead(s, 'decade', .24); }),
+    makeScene('Breakdown', 6, { fade: 2 }, s => { future(s, 'pendolo'); only(s, ['bass', 'arp', 'pad']); subBass(s, .4); airPad(s, 900, 1600, .3); pluck(s, 900, .2); }),
+    makeScene('Riser', 2, { fill: true, breath: true }, s => { future(s, 'pendolo'); only(s, ['drums', 'arp', 'pad', 'riser']); fourFloor(s, { bd: E16, cp: E16 }); airPad(s, 1600, 3000, .3); pluck(s, 1400, .22, 2600); Object.assign(s.riser, { dir: 'up', bars: '2', gain: .4 }); }),
+    makeScene('Finale', 20, { crash: true, fill: true }, s => { future(s, 'anthem'); only(s, ['drums', 'bass', 'arp', 'hook', 'pad']); fourFloor(s, { oh: '..x...x...x...x.' }); pumpBass(s, .8); scPad(s, 3200, null, .34); pluck(s, 3000, .3); lead(s, 'decade', .28); }),
+    makeScene('Outro', 3, {}, s => { future(s, 'pendolo'); only(s, ['pad', 'riser']); airPad(s, 2000, 600, .3, 0); Object.assign(s.riser, { dir: 'down', bars: '4', gain: .3 }); }),
+  ],
+};
+
+// nuovo brano nello stesso stile: 96 BPM, Si minore con giro VI-VII-i-v, salto di un semitono nel drop 2
+export const NEXT_CHAPTER_TRACK = {
+  id: 'next-chapter', title: 'Next Chapter', look: 'montagne',
+  style: { it: 'Nuovo brano nello stile di Ten Years · future pop · Si minore, poi Do · 96 BPM', en: 'New track in the Ten Years style · future pop · B minor, then C · 96 BPM' },
+  scenes: [
+    makeScene('Intro', 4, {}, s => { future(s, 'ascesa', 96, 'B'); only(s, ['arp', 'pad']); airPad(s, 500, 1800, .18, .3); pluck(s, 900, .12, 2200, .26); }),
+    makeScene('Strofa', 8, { fade: 1 }, s => { future(s, 'ascesa', 96, 'B'); only(s, ['drums', 'bass', 'arp', 'pad']); fourFloor(s, { cp: E16, hh: '..x...x...x...x.' }); pumpBass(s, .6); scPad(s, 1800, 2600, .28); pluck(s, 2400); }),
+    makeScene('Pre', 4, { fill: true, breath: true }, s => { future(s, 'pendolo', 96, 'B'); only(s, ['drums', 'bass', 'arp', 'pad', 'riser']); fourFloor(s, { hh: 'x.x.x.x.x.x.x.x.' }); pumpBass(s, .6); scPad(s, 2600, 3600, .3); pluck(s, 2600); Object.assign(s.riser, { dir: 'up', bars: '4', gain: .35 }); }),
+    makeScene('Drop', 16, { crash: true, fill: true }, s => { future(s, 'ascesa', 96, 'B'); only(s, ['drums', 'bass', 'arp', 'hook', 'pad']); fourFloor(s, { oh: '..x...x...x...x.' }); pumpBass(s, .8); scPad(s, 3400, null, .34); pluck(s, 3000, .28); lead(s, 'orizzonte', .27); }),
+    makeScene('Break', 8, { fade: 2 }, s => { future(s, 'pendolo', 96, 'B'); only(s, ['drums', 'bass', 'hook', 'pad']); fourFloor(s, { bd: E16, cp: E16, hh: '..x...x...x...x.' }); subBass(s, .4); airPad(s, 1200, 2400, .3); lead(s, 'orizzonte', .2); s.hook.cutoff = 1800; s.hook.delay = .5; }),
+    makeScene('Riser', 2, { fill: true, breath: true }, s => { future(s, 'pendolo', 96, 'B'); only(s, ['drums', 'pad', 'riser']); fourFloor(s, { bd: E16, cp: E16 }); airPad(s, 2400, 3600, .3); Object.assign(s.riser, { dir: 'up', bars: '2', gain: .4 }); }),
+    makeScene('Drop 2', 16, { crash: true, fill: true }, s => { future(s, 'ascesa', 96, 'C'); only(s, ['drums', 'bass', 'arp', 'hook', 'pad']); fourFloor(s, { oh: '..x...x...x...x.', rd: '..x...x...x...x.' }); pumpBass(s, .85); scPad(s, 3800, null, .36); pluck(s, 3400, .3); lead(s, 'orizzonte', .29); }),
+    makeScene('Outro', 4, {}, s => { future(s, 'pendolo', 96, 'C'); only(s, ['arp', 'pad', 'riser']); airPad(s, 2400, 600, .3, 0); pluck(s, 2000, .24, 600, 0); Object.assign(s.riser, { dir: 'down', bars: '4', gain: .3 }); }),
+  ],
+};
+
+// ---------- stile "jingle tech" (da dci-track-23s.m4a) ----------
+// 103 BPM, Fa# minore con tensione frigia, accordi staccati, build di hi-hat e rumore, drop sincopato a cassa dritta.
+const stabs = (s, preset, cutoff, gain = .38, cutoffEnd = null, gainEnd = null) => Object.assign(s.pad, { on: true, preset, wave: 'supersaw', cutoff, cutoffEnd, gain, gainEnd, room: .25, move: 'fisso', drive: .6 });
+const techBass = (s, gain = .6) => Object.assign(s.bass, { on: true, preset: 'offbeat', wave: 'sawtooth', cutoff: 500, cutoffEnd: null, reso: 6, gain, gainEnd: null, move: 'fisso', drive: 1 });
+const techDrums = (s, rows, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'RolandTR909', gain: .9, gainEnd: null, drive: .6, grit: 0, cutoff: 20000, cutoffEnd: null, ...extra }); steps(s, { bd: E16, cp: E16, sd: E16, hh: E16, oh: E16, rd: E16, ...rows }); };
+const tech = (s, bpm = 103, key = 'F#', prog = 'pendolo') => { s.bpm = bpm; s.key = key; s.prog = prog; };
+
+export const DCI_TRACK = {
+  id: 'dci-rebuild', title: 'DCI Jingle · ricostruzione', look: 'palco',
+  style: { it: 'Ricostruita da dci-track-23s.m4a · jingle tech · Fa# minore · 103 BPM · stab sincopati', en: 'Rebuilt from dci-track-23s.m4a · tech jingle · F# minor · 103 BPM · syncopated stabs' },
+  scenes: [
+    makeScene('Stab', 2, {}, s => { tech(s); only(s, ['pad']); stabs(s, 'staccato', 3000, .35); }),
+    makeScene('Build', 2, { fill: true, breath: true }, s => { tech(s); only(s, ['drums', 'pad', 'riser']); techDrums(s, { hh: 'xxxxxxxxxxxxxxxx' }, { gain: .2, gainEnd: .85 }); stabs(s, 'staccato', 3000, .35, 5000, .45); Object.assign(s.riser, { dir: 'up', bars: '2', gain: .4 }); }),
+    makeScene('Drop', 5, { crash: true }, s => { tech(s); only(s, ['drums', 'bass', 'pad']); techDrums(s, { bd: 'x...x...x...x...', cp: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.' }); techBass(s); stabs(s, 'synco', 4000, .4); }),
+    makeScene('Coda', 1, { crash: true }, s => { tech(s); only(s, ['pad']); Object.assign(s.pad, { on: true, preset: 'pad', wave: 'supersaw', cutoff: 3000, cutoffEnd: 800, gain: .35, gainEnd: 0, room: .9, move: 'fisso', drive: 0 }); }),
+  ],
+};
+
+// nuovo jingle nello stesso stile, più lungo: aggiunge un hook frigio e una sezione che sale di un semitono (bII)
+const spark = (s, gain = .24, cutoff = 3600) => Object.assign(s.hook, { on: true, preset: 'scintilla', mode: 'phrygian', wave: 'square', fm: 1, vowel: '', cutoff, cutoffEnd: null, delay: .25, gain, gainEnd: null, move: 'fisso', grit: 0 });
+export const DCI_IGNITION_TRACK = {
+  id: 'dci-ignition', title: 'DCI Ignition', look: 'palco',
+  style: { it: 'Nuovo jingle nello stile DCI · tech · Fa# frigio, sezione in Sol · 106 BPM', en: 'New jingle in the DCI style · tech · F# phrygian, section in G · 106 BPM' },
+  scenes: [
+    makeScene('Stab', 4, {}, s => { tech(s, 106); only(s, ['pad', 'hook']); stabs(s, 'staccato', 2400, .32, 3600); spark(s, .14, 1400); }),
+    makeScene('Build', 4, { fill: true, breath: true }, s => { tech(s, 106); only(s, ['drums', 'bass', 'pad', 'riser']); techDrums(s, { bd: 'x...x...x...x...', hh: 'xxxxxxxxxxxxxxxx' }, { gain: .3, gainEnd: .9, cutoff: 600, cutoffEnd: 20000 }); techBass(s, .4); s.bass.gainEnd = .6; stabs(s, 'staccato', 3600, .36, 5200); Object.assign(s.riser, { dir: 'up', bars: '4', gain: .4 }); }),
+    makeScene('Drop', 8, { crash: true, fill: true }, s => { tech(s, 106); only(s, ['drums', 'bass', 'hook', 'pad']); techDrums(s, { bd: 'x...x...x...x...', cp: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: '..x...x...x...x.' }); techBass(s); stabs(s, 'synco', 4200, .4); spark(s); }),
+    makeScene('Switch', 4, { fade: 1 }, s => { tech(s, 106, 'G'); only(s, ['drums', 'bass', 'hook', 'pad']); techDrums(s, GROOVES.halftime[1]); Object.assign(s.bass, { on: true, preset: 'sub', wave: 'sine', cutoff: 400, cutoffEnd: null, gain: .5, drive: 0, reso: 2, move: 'fisso' }); stabs(s, 'pad', 2000, .3, 3200); s.pad.room = .7; spark(s, .22, 2600); s.hook.delay = .5; }),
+    makeScene('Drop 2', 6, { crash: true, fill: true }, s => { tech(s, 106); only(s, ['drums', 'bass', 'hook', 'pad', 'texture']); techDrums(s, GROOVES.hard[1], { drive: 1 }); techBass(s, .65); stabs(s, 'synco', 4800, .42); spark(s, .26); s.hook.fm = 2; Object.assign(s.texture, { on: true, sample: 'metal', rhythm: 'euclid', grit: .5, gain: .25, room: .3 }); }),
+    makeScene('Coda', 2, { crash: true }, s => { tech(s, 106); only(s, ['pad', 'hook']); Object.assign(s.pad, { on: true, preset: 'pad', wave: 'supersaw', cutoff: 3200, cutoffEnd: 700, gain: .35, gainEnd: 0, room: .9, move: 'fisso', drive: 0 }); spark(s, .18, 2400); s.hook.gainEnd = 0; s.hook.delay = .6; }),
+  ],
+};
+
+export const BUILTIN_TRACKS = [GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];

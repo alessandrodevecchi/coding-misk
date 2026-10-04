@@ -26,6 +26,9 @@ Italiano e inglese, con il selettore IT/EN in alto a destra.
 - **Componi**: arrangiatore a scene con selettore del brano. Ogni scena ha nome, battute, entrata (taglio netto o dissolvenza), BPM (anche in rampa fino a fine scena), tonalità, accordi, crash sul primo colpo, mezza battuta di silenzio finale, e tutti i canali: sequencer (7 righe), basso, arpeggio, hook, pad, texture, riser. Volume e filtro hanno l'automazione ↗ fino a fine scena; ci sono saturazione, sgranatura (bitcrusher), risonanza, FM e filtro vocale. Clic su una scena mentre suona = salto lì. Salva, Salva come nuovo, Nuovo brano, Elimina o Ripristina originale.
 - **Brani**: tutti i brani a scene si aprono in Componi. Player con timeline cliccabile, Pausa/Riprendi e Stop, pulsanti per gli stacchi, ripetizione della sezione, stop automatico.
   - *Ghost Protocol* e *Neon Ascent* in versione a scene, *Synth Lab Demo* (la traccia di prova del primo giorno).
+  - *Ten Years · ricostruzione* e *DCI Jingle · ricostruzione*: ricostruite analizzando due tracce audio (tempo, tonalità, accordi per battuta, struttura, griglia della batteria, sidechain).
+  - *Next Chapter* e *DCI Ignition*: brani nuovi negli stessi due stili.
+  - **⬇ Esporta WAV** (card e arrangiatore): registra il brano in tempo reale e scarica un WAV stereo 16 bit.
   - In fondo, le versioni originali scritte a mano (`patterns/05`, `patterns/06`), modificabili nell'editor con Salva il codice nel brano.
   - *Ghost Protocol* (codice): hard techno cyberpunk, 60 battute, 1:43. Tempo da 132 a 148 BPM in rampa, layer continui con automazione per battuta, sezioni di passaggio (Fall, Rebuild), cambio di tonalità nel drop B.
   - *Neon Ascent*: techno trance, 128 BPM, 32 battute, 60 s.
@@ -41,6 +44,10 @@ Italiano e inglese, con il selettore IT/EN in alto a destra.
 
 Aggiungi `.analyze("nome")` a un layer. Nomi riconosciuti dal Palco: `kick`, `snare`, `hats`, `fx`, `bass`, `arp`, `pad`, `hook`, `riser`. Il codice senza tag usa un canale generico.
 
+## Campioni personalizzati
+
+Metti file WAV, MP3, OGG o FLAC in `public/samples/`: una cartella per strumento (`voce/01.wav` → `s("voce").n(0)`) o un file sciolto (`swoosh.wav` → `s("swoosh")`). Il plugin in `vite.config.js` genera `/samples/strudel.json`; i suoni compaiono nel canale Texture e nel tab Suoni dopo un ricaricamento. Dettagli in `public/samples/README.md`.
+
 ## Struttura
 
 | Percorso | Contenuto |
@@ -49,7 +56,8 @@ Aggiungi `.analyze("nome")` a un layer. Nomi riconosciuti dal Palco: `kick`, `sn
 | `src/main.js` | Libreria dei brani, arrangiatore, controlli, trasporto, collegamento con l'editor Strudel |
 | `src/i18n.js` | Testi in italiano e inglese |
 | `src/music.js` | Tonalità, accordi, preset, stato di una scena, compilatore da scene a codice, brano demo |
-| `src/tracks.js` | Ghost Protocol e Neon Ascent in versione a scene |
+| `src/tracks.js` | Brani a scene inclusi: Ghost Protocol, Neon Ascent, ricostruzioni e brani nuovi |
+| `vite.config.js` | Plugin che pubblica i campioni di `public/samples/` |
 | `src/songs.js` | Lettura di sezioni e tempo dal codice di un brano |
 | `src/content.js` | Lezioni, libreria suoni, riferimenti |
 | `src/visuals.js` | Visual su canvas sincronizzati con l'audio |

@@ -104,6 +104,9 @@
   .arranger input[type=number] { border-radius: 6px; width: 100%; }
   .dirty { font-size: 13px; color: var(--a2); min-height: 1em; }
   .btn.danger { border-color: color-mix(in srgb, #ff5577 60%, var(--line)); color: #ff8ea6; }
+  .btn.rec { border-color: #ff3355; color: #ff6680; animation: recblink 1s steps(2) infinite; }
+  @keyframes recblink { 50% { opacity: .55; } }
+  @media (prefers-reduced-motion: reduce) { .btn.rec { animation: none; } }
   .btn.icon { min-width: 38px; justify-content: center; }
   .arr-strip { position: relative; display: flex; gap: 3px; height: 58px; overflow-x: auto; }
   .arr-scene-btn { position: relative; flex: 1 0 auto; min-width: 54px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); text-align: left; overflow: hidden; }

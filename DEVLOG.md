@@ -56,3 +56,13 @@
 - *Ghost Protocol* e *Neon Ascent* riscritti come brani a scene (`src/tracks.js`): si aprono in Componi. Gli originali in codice restano in fondo al tab Brani.
 - Selettore del brano in Componi. Clic su una scena durante la riproduzione = salto a quella scena (prima "Segui la riproduzione" riportava subito indietro la selezione).
 - Pausa/Riprendi (riparte dalla posizione esatta) e Stop: barra in alto, arrangiatore, card dei brani. Barra spaziatrice = play/pausa.
+
+## 2026-10-05 (notte)
+
+- Analisi di due tracce audio (librosa in un ambiente temporaneo, non nel progetto): tempo, tonalità, accordi per battuta, struttura per energia e novità, griglia della batteria per banda, melodia per ottavi, zoom sugli attacchi.
+  - `sf-tenyears-149s.m4a`: future pop ispirazionale, 92 BPM, Mi minore, giro Em Em D D C C D D, cassa dritta con sidechain evidente (bassi che crollano a ogni cassa), hi-hat a sedicesimi, swoosh, riser, 57 battute.
+  - `dci-track-23s.m4a`: jingle tech, 103 BPM, Fa# minore con tensione frigia (basso su Sol), accordi staccati, build di hi-hat e rumore, drop con stab sincopati, coda tenuta, 10 battute.
+- Nuovi elementi del modello: pad sidechain/staccato/sincopato, basso pompato (forma del volume con `postgain`, perché `velocity` viene sovrascritta dalla lane della scena), progressioni con accordi di due battute, rullata di fine scena, hook Decennale, Scintilla, Orizzonte.
+- Brani: *Ten Years · ricostruzione*, *Next Chapter*, *DCI Jingle · ricostruzione*, *DCI Ignition*.
+- Esportazione WAV: `MediaRecorder` collegato a `getSuperdoughAudioController().output.destinationGain`, registrazione in tempo reale con 2,5 s di coda, conversione in WAV 16 bit.
+- Campioni personalizzati da `public/samples/` con manifest generato da un plugin Vite.
