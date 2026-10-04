@@ -1,0 +1,21 @@
+# DEVLOG
+
+## 2026-10-03
+
+- Creato il progetto con player locale (`index.html`, web component `@strudel/repl@1.3.0` da jsDelivr).
+- Aggiunti 4 pattern progressivi in `patterns/`, da batteria a traccia trance completa.
+- Scelto Strudel invece di TidalCycles per partire senza installazioni.
+- `index.html` riscritto come synth lab: sequencer 909, canali melodici, scene, guida, libreria suoni, riferimenti.
+- Visual canvas a ritmo con 4 temi; audio letto con `all(x => x.analyze(1))` e `getAnalyzerData`.
+- `Ctrl+Enter` nel vecchio player funzionava solo con il focus nell'editor: ora la scorciatoia è globale.
+- Pubblicata copia su claude.ai per mobile (poi abbandonata, vedi 2026-10-04).
+- Prossimi passi: esplorare sample custom (`samples()`), visual (`_pianoroll()`), struttura di brano con `arrange()`.
+
+## 2026-10-04
+
+- Abbandonata la versione pubblicata su claude.ai: la pagina non riproduceva suoni perché le regole di sicurezza bloccano i worklet audio di Strudel caricati come `data:` URL.
+- Progetto convertito in app Vite locale (`npm run dev`), con `@strudel/repl@1.3.0` da npm invece che da CDN.
+- Codice diviso in moduli: `src/main.js`, `src/music.js`, `src/content.js`, `src/visuals.js`, `src/style.css`.
+- Play chiama `initAudio()` dentro il gesto dell'utente: prima i worklet (supersaw, rumore) si caricavano solo al primo `mousedown`.
+- Scelto di non fare un fork di Strudel: dipendenza npm finché non serve modificare il motore.
+- Inizializzato git.

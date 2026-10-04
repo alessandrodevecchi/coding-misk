@@ -1,0 +1,56 @@
+// Lezioni, libreria suoni e riferimenti mostrati nei tab.
+
+export const LESSONS = [
+  ['Il ciclo', 'Tutto in Strudel gira in cicli: un ciclo è una battuta. I suoni tra virgolette si dividono il ciclo in parti uguali, quindi quattro suoni durano un quarto ciascuno.',
+    '$: s("bd hh sd hh")', 'Aggiungi un quinto suono, per esempio "cp". Senti come si stringe tutto.'],
+  ['Moltiplica, suddividi, sovrapponi', '"*" ripete un suono nello stesso spazio. Le parentesi quadre stringono più eventi in un solo passo. La virgola fa suonare due sequenze insieme. "~" è una pausa.',
+    '$: s("bd*4, [~ hh]*4, ~ cp")', 'Cambia "[~ hh]*4" in "hh*8" e poi in "hh*16".'],
+  ['Alternare tra cicli', 'Le parentesi angolari scelgono un elemento diverso a ogni ciclo. È il modo più semplice per creare variazione senza scrivere più battute.',
+    '$: s("bd*4, [~ hh]*4, <cp [cp cp]> ~")', 'Aggiungi un terzo elemento dentro < >, per esempio "[~ cp]".'],
+  ['Drum machine', '.bank() sceglie il campionario di una drum machine storica. Stesso ritmo, carattere diverso.',
+    '$: s("bd*4, [~ hh]*4, ~ cp").bank("RolandTR808")', 'Prova "RolandTR909", "RolandTR707" o "LinnDrum".'],
+  ['Note e accordi', 'note() suona altezze per nome. La virgola dentro le quadre crea un accordo. .s() sceglie lo strumento: qui un oscillatore a dente di sega.',
+    '$: note("<[a2,c3,e3] [f2,a2,c3] [c3,e3,g3] [g2,b2,d3]>").s("sawtooth")', 'Sostituisci "sawtooth" con "square", "triangle" o "supersaw".'],
+  ['Scale', 'Con n() e .scale() scrivi gradi della scala invece di nomi di nota. Non sbagli mai una nota, e cambiare tonalità diventa una parola sola.',
+    '$: n("0 2 4 <7 6> 4 2").scale("A3:minor").s("triangle")', 'Cambia "A3:minor" in "C4:major" o "D3:dorian".'],
+  ['Filtro e risonanza', 'Il filtro passa-basso (.lpf) toglie le frequenze alte. .lpq aumenta la risonanza attorno al taglio. È il cuore del suono acid e trance.',
+    '$: note("a1*8").s("sawtooth").lpf(400).lpq(15)', 'Porta lpf da 200 a 3000 e premi Ctrl+Enter ogni volta.'],
+  ['Inviluppo', 'attack, decay, sustain e release decidono come un suono nasce e muore. Decay corto e sustain zero danno note secche, attack lungo dà un pad che si gonfia.',
+    '$: note("<a3 c4 e4 g4>*4").s("supersaw").attack(.01).decay(.1).sustain(0)', 'Prova .attack(.5).release(1) per trasformarlo in un pad.'],
+  ['Modulazione', 'Al posto di un numero puoi passare un segnale. sine.range(a, b) oscilla tra due valori, .slow(4) lo fa durare quattro cicli. Il filtro "respira" da solo.',
+    '$: note("a1*16").s("sawtooth").lpf(sine.range(200, 3000).slow(4)).lpq(10)', 'Usa saw al posto di sine per un filtro che sale e riparte.'],
+  ['Spazio: delay e riverbero', '.delay() ripete il suono come un\'eco, .delayfeedback() decide quante volte. .room() mette il suono in una stanza.',
+    '$: n("0 ~ 4 ~ 7 ~ ~ ~").scale("A4:minor").s("square").delay(.5).delayfeedback(.6).room(.6).gain(.5)', 'Alza delayfeedback a .85, ma attenzione al volume.'],
+  ['Caso controllato', 'sometimes() applica una trasformazione a circa metà degli eventi, degradeBy() ne toglie una parte a caso. Il pattern resta vivo senza scrivere variazioni a mano.',
+    '$: s("hh*16").bank("RolandTR909").gain(.5).sometimes(x => x.speed(2)).degradeBy(.2)', 'Prova rarely() e often() al posto di sometimes().'],
+  ['Layer e mute', 'Ogni riga che inizia con "$:" è un layer indipendente. Scrivi "_$:" per silenziarlo senza cancellarlo: è il modo di fare entrare e uscire le parti dal vivo.',
+    '$: s("bd*4").bank("RolandTR909")\n_$: s("[~ hh]*4").bank("RolandTR909")\n$: note("<a1 f1 c2 g1>").struct("[~ x x x]*4").s("sawtooth").lpf(600).decay(.1).sustain(0)', 'Togli il trattino basso dalla seconda riga e premi Ctrl+Enter.'],
+  ['Slider live', 'slider(valore, min, max) disegna un cursore dentro il codice. Muovilo mentre suona: è così che si costruiscono build-up e drop come nel video di Switch Angel.',
+    'setcpm(138/4)\nconst cut = slider(800, 200, 5000)\n$: s("bd*4, [~ hh]*4").bank("RolandTR909")\n$: note("<a1 f1 c2 g1>").struct("[~ x x x]*4").s("sawtooth").lpf(cut).lpq(8).decay(.12).sustain(0)', 'Trascina il cursore lentamente verso destra per 8 battute, poi riportalo giù di colpo.'],
+  ['Ricetta trance', 'Una traccia trance in quattro ingredienti: cassa dritta a 138 BPM, basso in levare, arpeggio sugli accordi, pad largo. Il tab Componi genera esattamente questa struttura.',
+    'setcpm(138/4)\n$: s("bd*4, [~ hh]*4, ~ cp ~ cp").bank("RolandTR909")\n$: note("<a1 f1 c2 g1>").struct("[~ x x x]*4").s("sawtooth").lpf(700).lpq(8).decay(.12).sustain(0)\n$: note("<[a3 c4 e4 a4]*4 [f3 a3 c4 f4]*4 [g3 c4 e4 g4]*4 [g3 b3 d4 g4]*4>").s("supersaw").lpf(2400).decay(.15).sustain(.15).delay(.35).gain(.4)\n$: note("<[a2,c3,e3] [f2,a2,c3] [g2,c3,e3] [g2,b2,d3]>").s("supersaw").attack(.4).release(1.2).lpf(1400).room(.85).gain(.28)', 'Torna su Componi e prova le scene Intro, Build, Drop e Break.'],
+];
+
+export const SOUND_GROUPS = [
+  ['Drum machine · TR-909', ['bd', 'sd', 'cp', 'hh', 'oh', 'rim', 'lt', 'mt', 'ht', 'cr', 'rd'].map(x => [x, `$: s("${x}*2").bank("RolandTR909")`])],
+  ['Drum machine · TR-808', ['bd', 'sd', 'cp', 'hh', 'oh', 'rim', 'cb', 'perc', 'sh', 'lt', 'ht'].map(x => [x, `$: s("${x}*2").bank("RolandTR808")`])],
+  ['Drum machine · altre', [['707 bd', '$: s("bd*2, [~ hh]*2").bank("RolandTR707")'], ['LinnDrum', '$: s("bd [~ bd] sd ~, hh*8").bank("LinnDrum")'], ['AkaiLinn', '$: s("bd [~ bd] sd ~, hh*8").bank("AkaiLinn")'], ['TR-606', '$: s("bd ~ sd ~, hh*8").bank("RolandTR606")'], ['Minipops', '$: s("bd hh sd hh").bank("KorgMinipops")']]],
+  ['Oscillatori', ['sawtooth', 'supersaw', 'square', 'triangle', 'sine'].map(w => [w, `$: note("a2 c3 e3 g3").s("${w}").decay(.25).sustain(.2).lpf(3000)`])],
+  ['Rumore', ['white', 'pink', 'brown'].map(w => [w, `$: s("${w}*8").decay(.06).sustain(0).gain(.5)`])],
+  ['Campioni da dirt-samples (n sceglie la variante)', ['arpy', 'casio', 'east', 'jvbass', 'pluck', 'sitar', 'jazz', 'metal', 'glitch', 'future', 'feel', 'industrial'].map(x => [x, `$: s("${x}*4").n("<0 1 2 3>")`])],
+  ['Atmosfere', ['space', 'wind', 'birds', 'crow', 'numbers'].map(x => [x, `$: s("${x}").n("<0 1 2 3>").slow(2).room(.5)`])],
+];
+
+export const REFS = [
+  ['Coding Trance Music', 'Switch Angel costruisce una traccia trance dal vivo in Strudel. Il punto di partenza di questo progetto.', 'https://www.youtube.com/watch?v=GWXCCBsOMSg'],
+  ['Switch Angel su YouTube', 'Altre sessioni di live coding melodico e trance.', 'https://www.youtube.com/@Switch-Angel'],
+  ['Strudel REPL', 'L\'editor ufficiale nel browser, con esempi casuali a ogni apertura.', 'https://strudel.cc/'],
+  ['Workshop di Strudel', 'Il corso introduttivo ufficiale, passo per passo.', 'https://strudel.cc/workshop/getting-started/'],
+  ['Mini-notation', 'Riferimento completo della sintassi tra virgolette.', 'https://strudel.cc/learn/mini-notation/'],
+  ['Synth ed effetti', 'Oscillatori, filtri, inviluppi, delay e riverbero.', 'https://strudel.cc/learn/effects/'],
+  ['TidalCycles', 'Il linguaggio originale in Haskell da cui nasce Strudel. Serve SuperCollider.', 'https://tidalcycles.org/'],
+  ['Tidal Club', 'Forum della comunità Tidal e Strudel: domande, pezzi, eventi.', 'https://club.tidalcycles.org/'],
+  ['Algorave', 'Eventi dove si balla musica scritta dal vivo con il codice.', 'https://algorave.com/'],
+  ['Tidal drum machines', 'L\'archivio di campioni dietro a .bank(): 909, 808 e molte altre.', 'https://github.com/ritchse/tidal-drum-machines'],
+  ['Codice di Strudel', 'Il repository del progetto, per capire come funziona dentro.', 'https://codeberg.org/uzu/strudel'],
+];
