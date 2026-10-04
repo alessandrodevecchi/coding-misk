@@ -19,6 +19,7 @@ export const CHORDS = {
   E:  { bass: 'e1', pad: 'g#2,b2,e3', arp: ['g#3', 'b3', 'e4', 'g#4'] },
   Em: { bass: 'e1', pad: 'g2,b2,e3', arp: ['g3', 'b3', 'e4', 'g4'] },
   D:  { bass: 'd2', pad: 'a2,d3,f#3', arp: ['a3', 'd4', 'f#4', 'a4'] },
+  'A#': { bass: 'a#1', pad: 'a#2,d3,f3', arp: ['a#3', 'd4', 'f4', 'a#4'] },
   // settime per lo-fi e jazz
   Am7:   { bass: 'a1', pad: 'g2,c3,e3,a3', arp: ['a3', 'c4', 'e4', 'g4'] },
   Dm7:   { bass: 'd2', pad: 'c3,d3,f3,a3', arp: ['d4', 'f4', 'a4', 'c5'] },
@@ -28,7 +29,7 @@ export const CHORDS = {
   G7:    { bass: 'g1', pad: 'f2,g2,b2,d3', arp: ['g3', 'b3', 'd4', 'f4'] },
 };
 // bicordi di potenza (fondamentale, quinta, ottava) per le chitarre distorte
-const POWER = { A: 'a2,e3,a3', F: 'f2,c3,f3', C: 'c3,g3,c4', G: 'g2,d3,g3', D: 'd3,a3,d4', E: 'e2,b2,e3' };
+const POWER = { A: 'a2,e3,a3', 'A#': 'a#2,f3,a#3', F: 'f2,c3,f3', C: 'c3,g3,c4', G: 'g2,d3,g3', D: 'd3,a3,d4', E: 'e2,b2,e3' };
 const powerOf = c => POWER[c.match(/^[A-G]#?/)[0]] || CHORDS[c].pad;
 // progressioni scritte in La minore (gradi i, VI, III, VII, …)
 export const PROGS = {
@@ -46,6 +47,7 @@ export const PROGS = {
   prog: ['Prog', ['Am', 'C', 'D', 'F']],
   lofi: ['Lo-fi', ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7']],
   jazz: ['ii-V-I', ['Dm7', 'G7', 'Cmaj7', 'Am7']],
+  frigio: [{ it: 'Frigio (metal)', en: 'Phrygian (metal)' }, ['Am', 'A#', 'Am', 'G']],
 };
 export const chordName = (c, tr) => {
   const m = c.match(/^([A-G]#?)(.*)$/);
@@ -60,7 +62,7 @@ export const WAVES = [['sawtooth', 'Sawtooth'], ['supersaw', 'Supersaw'], ['squa
   ['gm_electric_bass_finger', { it: 'Basso elettrico', en: 'Electric bass' }], ['gm_electric_bass_pick', { it: 'Basso a plettro', en: 'Picked bass' }],
   ['gm_acoustic_bass', { it: 'Contrabbasso', en: 'Upright bass' }], ['gm_string_ensemble_1', { it: 'Archi', en: 'Strings' }],
   ['gm_synth_strings_1', { it: 'Archi synth', en: 'Synth strings' }], ['gm_choir_aahs', { it: 'Coro', en: 'Choir' }], ['gm_flute', { it: 'Flauto', en: 'Flute' }],
-  ['gm_lead_2_sawtooth', 'Lead saw'], ['gm_synth_brass_1', { it: 'Ottoni synth', en: 'Synth brass' }], ['gm_pad_warm', { it: 'Pad caldo', en: 'Warm pad' }]];
+  ['cowbell', 'Cowbell 808'], ['gm_lead_2_sawtooth', 'Lead saw'], ['gm_synth_brass_1', { it: 'Ottoni synth', en: 'Synth brass' }], ['gm_pad_warm', { it: 'Pad caldo', en: 'Warm pad' }]];
 // metro → sedicesimi per battuta
 export const METERS = [['4/4', 16], ['3/4', 12], ['5/4', 20], ['7/8', 14]];
 export const meterSteps = m => (METERS.find(x => x[0] === m) || METERS[0])[1];
@@ -94,10 +96,32 @@ export const HOOKS = {
   // 7 ottavi per frase: in 7/8 riempie la battuta, in 4/4 riprende la prima nota
   prog: ['Prog', '<[0 2 4 ~ 4 5 4] [3 2 0 ~ -1 0 2] [4 5 7 ~ 7 9 7] [5 4 2 ~ 0 -1 0]>'],
   assolo: [{ it: 'Assolo', en: 'Solo' }, '<[0 2 3 4 7 4 3 2] [0 2 3 4 7 9 7 4] [9 7 4 3 4 2 0 -1] [0 ~ 7 ~ 4 ~ 0 ~]>'],
+  eroico: [{ it: 'Eroico', en: 'Heroic' }, '<[0 ~ 2 4 7 ~ 4 2] [3 ~ 2 0 -1 ~ 0 2] [4 ~ 5 7 9 ~ 7 5] [4 2 0 2 4 ~ ~ ~]>'],
+  phonk: ['Phonk', '<[0 ~ 0 ~ 3 ~ 2 ~] [0 ~ 0 ~ 5 ~ 4 3] [0 ~ 0 ~ 3 ~ 2 ~] [7 ~ 5 ~ 4 ~ 3 ~]>'],
   pioggia: [{ it: 'Pioggia', en: 'Rain' }, '<[4 ~ 2 ~ 0 ~ ~ ~] [~ 1 2 ~ 4 ~ 2 ~] [5 ~ 4 ~ 2 ~ 0 ~] [1 ~ ~ ~ ~ ~ ~ ~]>'],
   orizzonte: [{ it: 'Orizzonte', en: 'Horizon' }, '<[4 ~ 4 5 4 ~ 2 ~] [0 ~ 2 ~ 4 ~ 7 ~] [5 ~ 5 4 2 ~ 0 ~] [1 ~ 2 ~ 4 ~ ~ ~]>'],
 };
 export const MODES = [['minor', { it: 'Minore', en: 'Minor' }], ['phrygian', { it: 'Frigio', en: 'Phrygian' }], ['dorian', { it: 'Dorico', en: 'Dorian' }], ['mixolydian', { it: 'Misolidio', en: 'Mixolydian' }]];
+export const HARMONIES = [['', { it: 'Nessuna', en: 'None' }], ['2', { it: 'Terze (chitarre gemelle)', en: 'Thirds (twin guitars)' }], ['4', { it: 'Quinte', en: 'Fifths' }]];
+// Chitarra: campione di chitarra + dente di sega, saturati insieme, come un amplificatore simulato.
+// [nome, suoni sovrapposti, saturazione di base, passa-alto]
+export const GUITAR_TYPES = {
+  clean: [{ it: 'Pulita', en: 'Clean' }, 'gm_electric_guitar_clean', 0, 60],
+  crunch: ['Crunch', 'gm_overdriven_guitar,sawtooth', 1.5, 70],
+  distorted: [{ it: 'Distorta', en: 'Distorted' }, 'gm_distortion_guitar,sawtooth', 3, 80],
+  metal: ['Metal hi-gain', 'gm_distortion_guitar,sawtooth', 6, 110],
+  muted: [{ it: 'Palm mute', en: 'Palm muted' }, 'gm_electric_guitar_muted,sawtooth', 4, 90],
+};
+// [nome, ritmo per beat o sedicesimi, note corte]
+export const GUITAR_PATTERNS = {
+  power8: [{ it: 'Power chord a ottavi', en: 'Power chords, 8ths' }, ['[x x]', 'x']],
+  chug: [{ it: 'Chug a sedicesimi', en: '16th chugs' }, ['[x x x x]', '[x x]'], true],
+  gallop: [{ it: 'Galoppo', en: 'Gallop' }, ['[x ~ x x]', '[x ~]'], true],
+  riff: ['Riff', 'x ~ x x ~ x ~ x x ~ x ~ x x ~ ~', true],
+  djent: ['Djent', 'x ~ ~ x ~ ~ x ~ x ~ ~ x ~ ~ x ~', true],
+  quarter: [{ it: 'Quarti', en: 'Quarters' }, ['x', 'x']],
+  held: [{ it: 'Tenuto', en: 'Held' }, ''],
+};
 export const VOWELS = [['', { it: 'Nessuna', en: 'None' }], ['<a e i o>', 'a e i o'], ['a', 'a'], ['o', 'o']];
 // [nome, ritmo, attack, decay, sustain, release, forma del volume (postgain), voicing]
 // ritmo: '' = accordo tenuto; [beat, mezzo beat] = modello per beat; stringa = sedicesimi che si ripetono
@@ -141,6 +165,10 @@ export const GROOVES = {
 };
 // adatta una riga del sequencer alla lunghezza della battuta
 export const fitSteps = (steps, n) => steps.length >= n ? steps.slice(0, n) : steps + '.'.repeat(n - steps.length);
+GROOVES.metal = ['Metal (doppia cassa)', { bd: 'xxxxxxxxxxxxxxxx', cp: E16, sd: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }];
+GROOVES.gallopDrums = [{ it: 'Galoppo (metal)', en: 'Gallop (metal)' }, { bd: 'x.xxx.xxx.xxx.xx', cp: E16, sd: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }];
+GROOVES.blast = ['Blast beat', { bd: 'x.x.x.x.x.x.x.x.', cp: E16, sd: '.x.x.x.x.x.x.x.x', hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }];
+GROOVES.phonk = ['Phonk', { bd: 'x......x..x.....', cp: '....x.......x...', sd: E16, hh: 'xxxxxxxxxxxxxxxx', oh: '......x.......x.', rd: E16 }];
 export const LOOKS = [
   ['palco', { it: 'Palco', en: 'Stage' }], ['pixel', 'Pixel'], ['tramonto', { it: 'Tramonto', en: 'Sunset' }],
   ['montagne', { it: 'Montagne', en: 'Mountains' }], ['spazio', { it: 'Spazio', en: 'Space' }], ['sonar', 'Sonar'],
@@ -156,7 +184,8 @@ export const DEFAULT = {
     rows: Object.fromEntries(ROWS.map(([id]) => [id, { steps: GROOVES.trance[1][id], mute: false }])) },
   bass: { on: true, preset: 'rolling', wave: 'sawtooth', gain: .8, gainEnd: null, cutoff: 700, cutoffEnd: null, move: 'lento', reso: 8, drive: 0 },
   arp: { on: true, preset: 'su', wave: 'supersaw', gain: .4, gainEnd: null, cutoff: 2400, cutoffEnd: null, move: 'lento', reso: 4, delay: .35, speed: '16', drive: 0 },
-  hook: { on: true, preset: 'richiamo', wave: 'square', gain: .3, gainEnd: null, cutoff: 3000, cutoffEnd: null, move: 'fisso', delay: .4, mode: 'minor', fm: 0, vowel: '', grit: 0 },
+  hook: { on: true, preset: 'richiamo', wave: 'square', gain: .3, gainEnd: null, cutoff: 3000, cutoffEnd: null, move: 'fisso', delay: .4, mode: 'minor', fm: 0, vowel: '', grit: 0, drive: 0, harmony: '' },
+  guitar: { on: false, type: 'distorted', pattern: 'power8', gain: .5, gainEnd: null, cutoff: 4200, cutoffEnd: null, drive: 0, octave: '0', width: 'double', room: .2 },
   pad: { on: true, preset: 'pad', wave: 'supersaw', gain: .28, gainEnd: null, cutoff: 1400, cutoffEnd: null, move: 'lento', room: .85, drive: 0 },
   texture: { on: false, sample: 'numbers', rhythm: 'bar', gain: .4, gainEnd: null, grit: .7, room: .6 },
   riser: { on: false, gain: .25, bars: '8', dir: 'up' },
@@ -292,9 +321,22 @@ function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, cras
     const items = (altItems(hp[1]) || [hp[1]]).map(it => `[${fitTokens(it, Math.max(1, Math.round(N / 2)))}]`);
     const mel = `<${rotate(items, start).join(' ')}>`;
     L.push('', `// Hook · ${tx(hp[0])}`);
-    L.push(`${lab(h.on)}: n("${mel}").scale("${s.key}4:${h.mode}")${sw}`);
-    L.push(`  .s("${h.wave}")${h.fm > 0 ? `.fm(${num(h.fm)})` : ''}${h.vowel ? `.vowel("${h.vowel}")` : ''}${filter(h.cutoff, h.cutoffEnd, h.move)}${grit(h.grit)}`);
+    L.push(`${lab(h.on)}: n("${mel}")${h.harmony ? `.superimpose(x => x.add(${h.harmony}))` : ''}.scale("${s.key}4:${h.mode}")${sw}`);
+    L.push(`  ${h.wave === 'cowbell' ? '.s("cb").bank("RolandTR808")' : `.s("${h.wave}")`}${drive(h.drive)}${h.fm > 0 ? `.fm(${num(h.fm)})` : ''}${h.vowel ? `.vowel("${h.vowel}")` : ''}${filter(h.cutoff, h.cutoffEnd, h.move)}${grit(h.grit)}`);
     L.push(`  .decay(.2).sustain(.3).delay(${f(h.delay)}).room(.3).gain(${auto(h.gain, h.gainEnd)})${breathMask}${g}.analyze("hook")`);
+  }
+  const gt = s.guitar, gty = GUITAR_TYPES[gt.type] || GUITAR_TYPES.distorted, gpt = GUITAR_PATTERNS[gt.pattern] || GUITAR_PATTERNS.power8;
+  if (show(gt.on)) {
+    const gr = rhythm(gpt[1], N), short = gt.type === 'muted' || gpt[2], held = !gr;
+    const gtr = tr + (Number(gt.octave) || 0), dist = gty[2] + gt.drive;
+    const voicing = c => gt.type === 'clean' ? CHORDS[c].pad : powerOf(c);
+    L.push('', `// ${t('cGuitar')} · ${tx(gty[0])}, ${tx(gpt[0])}${gt.octave && gt.octave !== '0' ? ` · ${t('tuning').toLowerCase()} ${gt.octave}` : ''}`);
+    L.push(`${lab(gt.on)}: note("<${chords.map(c => `[${voicing(c)}]`).join(' ')}>")${gtr ? `.transpose(${gtr})` : ''}${gr ? `.struct("${gr}")` : ''}${gr ? sw : ''}`);
+    L.push(`  .s("${gty[1]}").attack(.003).decay(${held ? 1.5 : short ? .09 : .3}).sustain(${held ? .8 : short ? 0 : .55}).release(.08)`);
+    L.push(`  ${dist > 0 ? `.distort(${num(dist)}).distortvol(.2)` : ''}.hpf(${gty[3]})${filter(gt.cutoff, gt.cutoffEnd)}${gt.width === 'double' ? '.jux(x => x.late(.012))' : ''}`);
+    // il volume va dopo l'amplificatore (postgain): prima della distorsione cambierebbe solo la saturazione
+    const lvl = auto(gt.gain, gt.gainEnd);
+    L.push(`  .room(${f(gt.room)}).gain(.8)${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}.analyze("pad")`);
   }
   const p = s.pad, pp = PADS[p.preset] || PADS.pad;
   if (show(p.on)) {

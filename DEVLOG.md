@@ -74,3 +74,10 @@
 - Swing per scena (`.swingBy(swing/6, sedicesimi/2)`), strumenti General MIDI come suono di ogni canale, accordi di settima, power chord, preset rock e lo-fi, fruscio del vinile sintetico, drum machine LinnLM1, OberheimDMX, EmuSP12, AkaiMPC60, AlesisHR16, YamahaRX5.
 - Brani: *Neon Rush · reel 28s*, *Settimo Cielo*, *Pioggia sul vetro*.
 - I soundfont General MIDI hanno livelli molto diversi (vibrafono e organo molto più bassi del piano elettrico): volumi bilanciati a mano nei brani.
+
+## 2026-10-06 (pomeriggio)
+
+- Le chitarre General MIDI da sole erano quasi inudibili (campioni piccoli, livello basso, riverbero). Nuovo canale Chitarra: campione di chitarra + dente di sega (`s("gm_distortion_guitar,sawtooth")`), saturazione, passa-alto, filtro, raddoppio stereo con `.jux(x => x.late(.012))`, voicing a power chord, accordatura (−2, −12).
+- Con distorsione pesante il `gain` prima dell'amp cambia solo la saturazione: il volume della chitarra e la dissolvenza della scena sono applicati con `postgain` (`.postgain(sceneN.mul(livello))`). Livelli misurati per strumento e bilanciati (chitarre ~0,5 di picco nel metal, alla pari con la cassa).
+- Hook: armonia (`superimpose(x => x.add(2))` per le terze), saturazione, cowbell 808 come suono.
+- Brani reel da 30 s: *Ferro* (metal), *Ali di cenere* (metal melodico), *Drift* (phonk). Prog e reel cyberpunk passati al canale Chitarra.

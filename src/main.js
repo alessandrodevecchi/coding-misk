@@ -1,6 +1,6 @@
 import '@strudel/repl';
 import './style.css';
-import { METERS, meterSteps, fitSteps, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, compileTrack, cloneState, normalizeState } from './music.js';
+import { METERS, meterSteps, fitSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, compileTrack, cloneState, normalizeState } from './music.js';
 import { BUILTIN_TRACKS } from './tracks.js';
 import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
@@ -417,7 +417,10 @@ const CONTROLS = {
     ['range', 'reso', 'reso', { max: 30, step: 1, fmt: 'num' }], ['range', 'drive', 'drive', NUM4], ['range', 'delay', 'delay']],
   hook: [['select', 'preset', 'melody', () => named(HOOKS)], ['select', 'mode', 'mode', () => MODES], ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
     ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['range', 'fm', 'fm', { max: 8, step: .5, fmt: 'num' }],
-    ['select', 'vowel', 'vowel', () => VOWELS], ['range', 'grit', 'grit'], ['range', 'delay', 'delay']],
+    ['select', 'harmony', 'harmony', () => HARMONIES], ['range', 'drive', 'drive', NUM4], ['select', 'vowel', 'vowel', () => VOWELS], ['range', 'grit', 'grit'], ['range', 'delay', 'delay']],
+  guitar: [['select', 'type', 'type', () => named(GUITAR_TYPES)], ['select', 'pattern', 'rhythm', () => named(GUITAR_PATTERNS)], ['range', 'gain', 'volume', { ramp: 1 }],
+    ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['range', 'drive', 'drive', { max: 8, step: .1, fmt: 'num' }],
+    ['select', 'octave', 'tuning', () => [['0', t('standard')], ['-2', t('dropTuning')], ['-12', t('lowOpt')]]], ['select', 'width', 'width', () => [['double', t('doubleOpt')], ['mono', t('mono')]]], ['range', 'room', 'reverb']],
   pad: [['select', 'preset', 'type', () => named(PADS)], ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
     ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['range', 'drive', 'drive', NUM4], ['range', 'room', 'reverb']],
   texture: [['select', 'sample', 'sample', () => [...TEXTURES, ...custom].map(x => [x, x])], ['select', 'rhythm', 'rhythm', () => named(TEX_RHYTHMS)],
@@ -425,7 +428,7 @@ const CONTROLS = {
   riser: [['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['2', '4', '8', '16'].map(n => [n, t('nBars', { n })])],
     ['select', 'dir', 'direction', () => [['up', t('up')], ['down', t('down')]]]],
 };
-const CHANNELS = ['bass', 'arp', 'hook', 'pad', 'texture', 'riser'];
+const CHANNELS = ['bass', 'guitar', 'arp', 'hook', 'pad', 'texture', 'riser'];
 // filtro su scala logaritmica 100 Hz … 20 kHz (20 kHz = aperto)
 const cutToRange = c => Math.round(Math.log(c / 100) / Math.log(200) * 100);
 const rangeToCut = v => Math.round(100 * Math.pow(200, v / 100));
