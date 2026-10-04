@@ -1,3 +1,5 @@
+import neonAscent from '../patterns/05-neon-ascent.js?raw';
+
 // Lezioni, libreria suoni e riferimenti mostrati nei tab.
 
 export const LESSONS = [
@@ -53,4 +55,10 @@ export const REFS = [
   ['Algorave', 'Eventi dove si balla musica scritta dal vivo con il codice.', 'https://algorave.com/'],
   ['Tidal drum machines', 'L\'archivio di campioni dietro a .bank(): 909, 808 e molte altre.', 'https://github.com/ritchse/tidal-drum-machines'],
   ['Codice di Strudel', 'Il repository del progetto, per capire come funziona dentro.', 'https://codeberg.org/uzu/strudel'],
+];
+
+// Brani completi: ogni sezione è [nome, prima battuta, ultima battuta].
+export const SONGS = [
+  { id: 'neon-ascent', title: 'Neon Ascent', style: 'Techno trance · La minore', bpm: 128, bars: 32, code: neonAscent,
+    sections: [['Intro', 1, 4], ['Build', 5, 12], ['Drop', 13, 20], ['Break', 21, 24], ['Drop 2', 25, 32]] },
 ];

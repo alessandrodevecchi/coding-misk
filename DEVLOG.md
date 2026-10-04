@@ -19,3 +19,6 @@
 - Play chiama `initAudio()` dentro il gesto dell'utente: prima i worklet (supersaw, rumore) si caricavano solo al primo `mousedown`.
 - Scelto di non fare un fork di Strudel: dipendenza npm finché non serve modificare il motore.
 - Inizializzato git.
+- Eliminata la pagina su claude.ai.
+- Aggiunto il brano *Neon Ascent* (`patterns/05-neon-ascent.js`): techno trance, 128 BPM, 32 battute = 60 s, sezioni con `.mask()` a 32 valori.
+- Nuovo tab Brani: il brano riparte dalla battuta 1, timeline con sezione attiva, stop automatico a fine pezzo.

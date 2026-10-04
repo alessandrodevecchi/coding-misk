@@ -39,6 +39,7 @@
   <div>
     <nav class="tabs" role="tablist">
       <button class="tab" role="tab" data-tab="componi" aria-selected="true">Componi</button>
+      <button class="tab" role="tab" data-tab="brani" aria-selected="false">Brani</button>
       <button class="tab" role="tab" data-tab="guida" aria-selected="false">Guida</button>
       <button class="tab" role="tab" data-tab="suoni" aria-selected="false">Suoni</button>
       <button class="tab" role="tab" data-tab="riferimenti" aria-selected="false">Riferimenti</button>
@@ -55,6 +56,11 @@
         <div class="seq" id="seq"></div>
       </div>
       <div class="chgrid" id="channels"></div>
+    </section>
+
+    <section id="tab-brani" hidden>
+      <p class="intro">Brani completi scritti a mano in Strudel. Ognuno riparte dalla prima battuta e si ferma da solo alla fine. Le sezioni si accendono e spengono con <code>.mask()</code>: guarda il codice a destra.</p>
+      <div class="lessons" id="songs"></div>
     </section>
 
     <section id="tab-guida" hidden>

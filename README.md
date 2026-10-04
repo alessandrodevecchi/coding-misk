@@ -23,6 +23,7 @@ Si apre <http://localhost:5173>. Premi **Play**.
 - **Componi**: sequencer a 16 passi stile TR-909, canali basso, arpeggio, hook, pad e riser. Ogni controllo rigenera il codice Strudel visibile a destra.
 - **Scene**: Intro, Build, Drop e Break accendono e spengono i canali (i layer spenti diventano `_$:`).
 - **Visual**: quattro temi (Tramonto, Montagne, Spazio, Sonar). Forma d'onda reale da `getAnalyzerData`, eco sincronizzate con la cassa.
+- **Brani**: pezzi completi con timeline delle sezioni. *Neon Ascent* è una techno trance di 60 secondi (128 BPM, 32 battute) che si ferma da sola.
 - **Guida**: 14 lezioni da caricare e ascoltare.
 - **Suoni**: anteprima di drum machine, oscillatori e campioni.
 - **Apri su strudel.cc**: porta il codice corrente nell'editor ufficiale.
@@ -37,7 +38,7 @@ Si apre <http://localhost:5173>. Premi **Play**.
 | `src/content.js` | Lezioni, libreria suoni, riferimenti |
 | `src/visuals.js` | Visual su canvas sincronizzati con l'audio |
 | `src/style.css` | Stili e temi |
-| `patterns/` | Pattern di esempio da incollare su strudel.cc |
+| `patterns/` | Pattern di esempio e brani completi (`05-neon-ascent.js`), anche da incollare su strudel.cc |
 
 ## Note
 

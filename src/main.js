@@ -1,7 +1,7 @@
 import '@strudel/repl';
 import './style.css';
 import * as M from './music.js';
-import { LESSONS, SOUND_GROUPS, REFS } from './content.js';
+import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
 
 const { KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, KITS, ROWS, GROOVES, LOOKS, SCENES, DEFAULT, gen, VIS } = M;
@@ -49,10 +49,13 @@ function changed() {
   clearTimeout(evalTimer);
   if (isPlaying()) evalTimer = setTimeout(() => ed.evaluate(), 120);
 }
-async function loadFree(code, label) {
+let song = null;
+async function loadFree(code, label, { restart = false, song: sg = null } = {}) {
+  song = sg;
   initAudioOnce();
   await ready;
   await initAudioOnce();
+  if (restart) ed.stop(); // fermare riporta lo scheduler alla battuta 1
   mode = 'free';
   $('#src').textContent = label;
   $('#back').hidden = false;
@@ -62,6 +65,7 @@ async function loadFree(code, label) {
 }
 function backToComp() {
   mode = 'comp';
+  song = null;
   $('#src').textContent = 'generato dalla composizione';
   $('#back').hidden = true;
   $$('.snd.on').forEach(b => b.classList.remove('on'));
@@ -257,7 +261,7 @@ function syncAll() {
 // tab
 $$('.tab').forEach(t => t.addEventListener('click', () => {
   $$('.tab').forEach(x => x.setAttribute('aria-selected', x === t));
-  for (const id of ['componi', 'guida', 'suoni', 'riferimenti']) $('#tab-' + id).hidden = id !== t.dataset.tab;
+  for (const id of ['componi', 'brani', 'guida', 'suoni', 'riferimenti']) $('#tab-' + id).hidden = id !== t.dataset.tab;
   try { localStorage.setItem('coding-misk-tab', t.dataset.tab); } catch (e) {}
 }));
 try { const tb = localStorage.getItem('coding-misk-tab'); if (tb) { const t = $(`.tab[data-tab="${tb}"]`); if (t) t.click(); } } catch (e) {}
@@ -277,6 +281,33 @@ $('#lessons').addEventListener('click', e => {
   const [t, , code] = LESSONS[+b.dataset.lesson];
   loadFree(code, `Guida: ${t}`);
 });
+
+// ---------- brani ----------
+$('#songs').innerHTML = SONGS.map((sg, i) => `
+  <article class="card lesson" data-song-card="${i}">
+    <div class="song-meta">${sg.bpm} BPM · ${sg.bars} battute · ${Math.round(sg.bars * 4 * 60 / sg.bpm)} secondi</div>
+    <h3>${sg.title}</h3>
+    <p>${sg.style}</p>
+    <div class="timeline">${sg.sections.map(([n, a, b]) => `<div class="sec${/drop/i.test(n) ? ' drop' : ''}" style="flex:${b - a + 1}" title="Battute ${a}-${b}">${n}</div>`).join('')}<span class="head"></span></div>
+    <div><button class="btn primary" data-song="${i}">▶ Ascolta dall'inizio</button></div>
+  </article>`).join('');
+$('#songs').addEventListener('click', e => {
+  const b = e.target.closest('[data-song]'); if (!b) return;
+  const sg = SONGS[+b.dataset.song];
+  loadFree(sg.code, `Brano: ${sg.title}`, { restart: true, song: sg });
+});
+// avanzamento del brano e stop automatico a fine pezzo
+(function songLoop() {
+  requestAnimationFrame(songLoop);
+  $$('[data-song-card]').forEach(card => {
+    const sg = SONGS[+card.dataset.songCard], active = song === sg && mode === 'free' && isPlaying();
+    const cyc = active ? sched().now() : 0;
+    card.querySelector('.head').style.left = `${Math.min(100, cyc / sg.bars * 100)}%`;
+    const bar = Math.floor(cyc) + 1;
+    card.querySelectorAll('.sec').forEach((el, j) => { const [, a, z] = sg.sections[j]; el.classList.toggle('on', active && bar >= a && bar <= z); });
+    if (active && cyc >= sg.bars) { stop(); }
+  });
+})();
 
 // ---------- suoni ----------
 $('#sounds').innerHTML = SOUND_GROUPS.map(([g, list], gi) => `
