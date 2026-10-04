@@ -39,3 +39,12 @@
 - Causa degli inciampi ai cambi di BPM: `.cps()` dentro il pattern fa ricalcolare le note in coda con un riferimento vecchio (fino a ~1 s di errore), superdough le scarta. Ora il tempo lo cambia il player con `scheduler.setCps` al confine di battuta, in rampa. Nessun avviso "cannot schedule sounds in the past" sul brano intero.
 - Player dei brani (`src/songs.js`): sezioni e tempo letti dal codice, partenza da una battuta impostando `scheduler.lastEnd` prima di avviare, timeline cliccabile, pulsanti per gli stacchi (2 battute prima), ripetizione della sezione, tempo trascorso.
 - Trappola: nel codice Strudel i doppi apici e i backtick diventano mini-notation anche dentro funzioni JS. Usare apici singoli e `mini()`.
+
+## 2026-10-05 (pomeriggio)
+
+- Tolti i pulsanti Intro/Build/Drop/Break dal visual. Componi ora è un arrangiatore: brano = lista di scene (nome, battute, entrata, stato completo del compositore).
+- `compileTrack()` in `src/music.js`: ogni scena diventa un blocco di layer con una lane per battuta (`.mask().velocity()`), le dissolvenze sovrappongono la scena uscente e quella entrante. Il codice dichiara `SECTIONS` e `TEMPO`, quindi usa lo stesso player dei brani scritti a mano (salto, rampe, loop).
+- La traccia di prova è diventata *Synth Lab Demo* (5 scene) nel tab Brani.
+- Libreria in `localStorage`: brani dell'utente, modifiche ai brani inclusi (Ripristina originale), codice modificato dei brani scritti a mano.
+- Riproduzione: la scena selezionata segue il playhead ("Segui la riproduzione"); le modifiche durante il play rivalutano il codice senza fermare la musica.
+- Ghost Protocol e Neon Ascent restano brani "scritti nel codice": le loro automazioni non sono rappresentabili nelle scene.

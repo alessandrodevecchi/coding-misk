@@ -22,9 +22,9 @@ Si apre <http://localhost:5173>. Premi **Play**.
 
 Italiano e inglese, con il selettore IT/EN in alto a destra.
 
-- **Componi**: sequencer a 16 passi stile TR-909, canali basso, arpeggio, hook, pad e riser. Ogni controllo rigenera il codice Strudel visibile a destra.
-- **Scene**: Intro, Build, Drop e Break accendono e spengono i canali (i layer spenti diventano `_$:`).
-- **Brani**: player con timeline cliccabile (parte da qualsiasi battuta), pulsanti per ascoltare ogni stacco, ripetizione della sezione, stop automatico.
+- **Componi**: arrangiatore a scene. Ogni scena ha nome, battute, entrata (taglio netto o dissolvenza) e tutte le impostazioni: BPM, tonalità, accordi, sequencer 909, basso, arpeggio, hook, pad, riser. Aggiungi, sposta, elimina scene; suona da una scena o ripetila. Mentre suona, i controlli seguono la scena attiva. Salva, Salva come nuovo, Nuovo brano, Elimina (o Ripristina originale per i brani inclusi). Il brano si compila in codice Strudel visibile a destra.
+- **Brani**: brani a scene (si aprono in Componi) e brani scritti nel codice (si modificano nell'editor, con Salva il codice nel brano). Player con timeline cliccabile, pulsanti per gli stacchi, ripetizione della sezione, stop automatico.
+  - *Synth Lab Demo*: la traccia di prova del primo giorno, ora in 5 scene con cambio di tonalità e tempo nel Drop 2.
   - *Ghost Protocol*: hard techno cyberpunk, 60 battute, 1:43. Tempo da 132 a 148 BPM in rampa, layer continui con automazione per battuta, sezioni di passaggio (Fall, Rebuild), cambio di tonalità nel drop B.
   - *Neon Ascent*: techno trance, 128 BPM, 32 battute, 60 s.
 - **Visual**: sei temi.
@@ -33,7 +33,7 @@ Italiano e inglese, con il selettore IT/EN in alto a destra.
   - *Tramonto*, *Montagne*, *Spazio*, *Sonar*.
 - **Guida**: 14 lezioni da caricare e ascoltare.
 - **Suoni**: anteprima di drum machine, oscillatori, suoni ruvidi e campioni.
-- **Apri su strudel.cc**: porta il codice corrente nell'editor ufficiale.
+- **Apri su strudel.cc**: porta il codice corrente nell'editor ufficiale. Rampe di tempo, salto a una battuta e campioni extra funzionano solo in coding-misk.
 
 ### Collegare uno strumento ai visual
 
@@ -44,9 +44,10 @@ Aggiungi `.analyze("nome")` a un layer. Nomi riconosciuti dal Palco: `kick`, `sn
 | Percorso | Contenuto |
 | --- | --- |
 | `index.html` | Markup dell'interfaccia |
-| `src/main.js` | Stato, controlli, render dell'interfaccia, collegamento con l'editor Strudel |
+| `src/main.js` | Libreria dei brani, arrangiatore, controlli, trasporto, collegamento con l'editor Strudel |
 | `src/i18n.js` | Testi in italiano e inglese |
-| `src/music.js` | Tonalità, accordi, preset e generatore di codice |
+| `src/music.js` | Tonalità, accordi, preset, compilatore da scene a codice, brano demo |
+| `src/songs.js` | Lettura di sezioni e tempo dal codice di un brano |
 | `src/content.js` | Lezioni, libreria suoni, riferimenti |
 | `src/visuals.js` | Visual su canvas sincronizzati con l'audio |
 | `src/style.css` | Stili e temi |
@@ -60,3 +61,5 @@ Aggiungi `.analyze("nome")` a un layer. Nomi riconosciuti dal Palco: `kick`, `sn
 - Il player legge dal codice del brano due righe su una sola linea, con apici singoli: `const SECTIONS = [['intro', 8], …]` e `const TEMPO = {'intro': 132, 'build': [132, 140], …}` (un numero è fisso, `[da, a]` è una rampa).
 - Nel codice Strudel i doppi apici e i backtick sono mini-notation. Le stringhe JavaScript normali vanno tra apici singoli; `mini('…')` le trasforma in pattern.
 - Strudel è distribuito con licenza AGPL-3.0. Per uso locale non cambia nulla; se un giorno pubblichiamo il tool, il codice va rilasciato con licenza compatibile.
+
+- I brani salvati e la bozza in corso stanno nel `localStorage` del browser (`coding-misk-library`, `coding-misk-draft`). Svuotare i dati del sito li cancella.

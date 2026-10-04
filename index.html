@@ -33,15 +33,10 @@
   <canvas id="stage"></canvas>
   <div class="hud">
     <div class="readout" id="readout"></div>
-    <div class="chips" role="group" data-i18n-aria="looks" id="looks"></div>
-  </div>
-  <div class="scenes" role="group" data-i18n-aria="scenes">
-    <span class="lbl" data-i18n="scene"></span>
-    <button class="scene" data-scene="intro">Intro</button>
-    <button class="scene" data-scene="build">Build</button>
-    <button class="scene" data-scene="drop">Drop</button>
-    <button class="scene" data-scene="break">Break</button>
-    <button class="chip fs" id="fs" data-i18n="fullscreen"></button>
+    <div class="hud-right">
+      <div class="chips" role="group" data-i18n-aria="looks" id="looks"></div>
+      <button class="chip fs" id="fs" data-i18n="fullscreen"></button>
+    </div>
   </div>
 </section>
 
@@ -56,6 +51,37 @@
     </nav>
 
     <section id="tab-componi" class="rack">
+      <div class="card arranger" id="arranger">
+        <div class="arr-top">
+          <div class="ctrl grow"><label class="lbl" for="track-title" data-i18n="trackTitle"></label><input id="track-title" type="text" maxlength="40" autocomplete="off"></div>
+          <span class="dirty" id="dirty" aria-live="polite"></span>
+          <div class="actions">
+            <button class="btn primary" id="tr-save" data-i18n="save"></button>
+            <button class="btn" id="tr-saveas" data-i18n="saveAs"></button>
+            <button class="btn" id="tr-new" data-i18n="newTrack"></button>
+            <button class="btn danger" id="tr-del"></button>
+          </div>
+        </div>
+        <div class="arr-strip" id="arr-strip"></div>
+        <div class="arr-tools">
+          <button class="btn" id="sc-add" data-i18n="addScene"></button>
+          <button class="btn icon" id="sc-left" data-i18n-aria="moveLeft">◀</button>
+          <button class="btn icon" id="sc-right" data-i18n-aria="moveRight">▶</button>
+          <button class="btn" id="sc-del" data-i18n="delScene"></button>
+          <span class="song-meta" id="arr-total"></span>
+        </div>
+        <div class="arr-scene">
+          <div class="ctrl"><label class="lbl" for="sc-name" data-i18n="sceneName"></label><input id="sc-name" type="text" maxlength="40" autocomplete="off"></div>
+          <div class="ctrl"><label class="lbl" for="sc-bars" data-i18n="sceneBars"></label><input id="sc-bars" type="number" min="1" max="64" step="1"></div>
+          <div class="ctrl"><label class="lbl" for="sc-fade" data-i18n="sceneEntry"></label><select id="sc-fade"></select></div>
+        </div>
+        <div class="songbar">
+          <button class="btn primary" id="sc-play" data-i18n="playFromScene"></button>
+          <label class="loop"><input type="checkbox" id="sc-loop"> <span data-i18n="loopScene"></span></label>
+          <label class="loop"><input type="checkbox" id="sc-follow" checked> <span data-i18n="follow"></span></label>
+        </div>
+        <p class="note" data-i18n="sceneHint"></p>
+      </div>
       <div class="card" id="drums">
         <div class="chhead"><button class="led" data-on="drums"></button><h3 data-i18n="drums"></h3><span class="hint" data-i18n="drumsHint"></span></div>
         <div class="seqtop">
@@ -98,7 +124,7 @@
     <div class="actions">
       <a class="btn primary" id="share" href="https://strudel.cc/" target="_blank" rel="noopener" data-i18n="share"></a>
       <button class="btn" id="copy" data-i18n="copy"></button>
-      <button class="btn" id="reset" data-i18n="reset"></button>
+      <button class="btn" id="save-code" hidden data-i18n="saveCode"></button>
     </div>
     <p class="note" data-i18n-html="note"></p>
   </aside>

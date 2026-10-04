@@ -13,8 +13,11 @@ export function parseSong(code) {
   const bpm = [], sections = [];
   let start = 0;
   for (const [key, len] of sec) {
+    // un numero è fisso, [da, a] è una rampa, [[battute, da, a], …] sono segmenti
     const v = tempo[key];
-    bpm.push(...(Array.isArray(v) ? ramp(len, v[0], v[1]) : Array(len).fill(v)));
+    bpm.push(...(!Array.isArray(v) ? Array(len).fill(v)
+      : typeof v[0] === 'number' ? ramp(len, v[0], v[1])
+      : v.flatMap(([k, a, b = a]) => ramp(k, a, b))));
     sections.push({ key, label: label(key), start, len });
     start += len;
   }
