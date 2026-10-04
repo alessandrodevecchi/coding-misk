@@ -1,127 +1,145 @@
-// Ghost Protocol · hard techno cyberpunk
-// 36 battute, circa 60 secondi. Il tempo sale: 135 → 140 → 145 → 150 BPM.
-// Ogni sezione è uno stack() indipendente: drum machine, groove, tonalità,
-// suoni e effetti cambiano liberamente. arrange() le mette in fila.
+// Ghost Protocol · hard techno cyberpunk · 60 battute, circa 1:40
 //
-// Trucchi usati:
-//   tempo(bpm)        un evento muto con .cps() cambia il tempo all'inizio della sezione
-//   .transpose(n)     cambio di tonalità: Mi frigio → Sol (break) → Fa (drop 2)
-//   .bank("<a b>")    la drum machine cambia battuta per battuta
-//   .distort .crush .coarse   la ruvidità: saturazione, bitcrusher, riduzione di campionamento
-//   .analyze("…")     accende lo strumento nel visual Palco
-samples('github:tidalcycles/dirt-samples') // industrial, metal, numbers
-setcpm(135/4)
+// Costruito come in un DAW: i layer suonano per tutto il brano e ognuno ha
+// un'automazione per battuta (volume, filtro, tonalità, drum machine).
+// Così le sezioni si sovrappongono e sfumano invece di tagliarsi.
+//
+// Nel codice di supporto le stringhe usano apici singoli: per Strudel i doppi apici
+// e i backtick sono mini-notation e diventerebbero pattern. mini() trasforma il
+// risultato finale in pattern.
+//
+// lane({ sezione: valore }) produce un pattern "<…>" con un valore per battuta:
+//   numero        valore fisso per tutta la sezione
+//   [da, a]       rampa lungo la sezione
+//   [[n, da, a]]  segmenti: n battute con rampa da → a (o fisso se manca "a")
+//   ["x", "y"]    lista di pattern che si ripete battuta dopo battuta
+// fade(pattern, { … }) usa la stessa lane come volume e come mute.
+//
+// TEMPO: il player di coding-misk legge questa riga e cambia BPM battuta per
+// battuta. Su strudel.cc il brano resta al tempo di setcpm.
 
-const tempo = bpm => note("c").s("sine").gain(0).cps(bpm / 240)
-const kick = (bank, pat = "bd*4") => s(pat).bank(bank)
-  .distort(1.6).distortvol(.45).lpf(3200).analyze("kick")
-const powerChords = "<[e2,b2,e3] [f2,c3,f3] [e2,b2,e3] [d2,a2,d3]>"
+samples('github:tidalcycles/dirt-samples') // industrial, metal, numbers
+setcpm(132/4)
+
+const SECTIONS = [['intro', 8], ['build', 8], ['dropA', 12], ['fall', 2], ['break', 6], ['rebuild', 8], ['dropB', 12], ['outro', 4]]
+const TEMPO = {'intro': 132, 'build': [132, 140], 'dropA': 140, 'fall': 140, 'break': 140, 'rebuild': [140, 148], 'dropB': 148, 'outro': 148}
+
+const ramp = (n, a, b) => Array.from({ length: n }, (_, i) => +(a + (b - a) * (i + 1) / n).toFixed(3))
+const segs = (n, v) =>
+  !Array.isArray(v) ? Array(n).fill(v)
+  : typeof v[0] === 'number' ? ramp(n, v[0], v[1])
+  : typeof v[0] === 'string' ? Array.from({ length: n }, (_, i) => v[i % v.length])
+  : v.flatMap(([k, a, b = a]) => typeof a === 'number' ? ramp(k, a, b) : Array(k).fill(a))
+const lane = (vals, def = 0) => mini('<' + SECTIONS.flatMap(([name, n]) => {
+  const out = segs(n, vals[name] ?? def)
+  if (out.length !== n) throw new Error('lane: ' + name + ' ha ' + out.length + ' battute invece di ' + n)
+  return out
+}).map(v => typeof v === 'string' && /[\s,]/.test(v) ? '[' + v + ']' : v).join(' ') + '>')
+const fade = (pat, vals) => { const l = lane(vals); return pat.mask(l).velocity(l) }
+
+// tonalità: Mi frigio, poi su di un semitono nel drop B (il classico "cambio da camionista")
+const key = lane({ dropB: 1, outro: 1 })
+const chords = "<[e2,g2,b2,e3] [c2,g2,c3,e3] [d2,a2,d3,f#3] [b1,f#2,b2,d3]>"
+const roots = "<e1 c2 d1 b0>"
 const acid = "e2 e2 [e3 e2] f2 e2 g2 [e2 e3] f2"
 
-// ---------- INTRO · 4 battute · 135 BPM · radio disturbata nel vuoto ----------
-const intro = stack(
-  tempo(135),
-  s("numbers").n("<0 3 7 1>").crush(5).hpf(900)
-    .room(.7).delay(.4).gain(.5).analyze("hook"),
-  s("industrial*8").n(irand(16)).coarse(6).hpf(2000)
-    .gain(.22).pan(rand).analyze("fx"),
-  note("e1").s("sawtooth").lpf(sine.range(80, 400).slow(4)).lpq(12)
-    .distort(2).attack(.5).release(1).gain(.35).analyze("bass"),
-  s("hh*16").bank("RolandTR606").crush(4)
-    .gain("[.15 .25]*8").degradeBy(.4).analyze("hats")
-)
+// ---------- cassa 909: entra filtrata nell'intro, respira prima dei drop ----------
+$: s(lane({
+    intro: [[6, '~'], [2, 'bd*4']], build: [[7, 'bd*4'], [1, 'bd bd ~ ~']], dropA: 'bd*4',
+    fall: [[1, 'bd*4'], [1, 'bd ~ ~ ~']], rebuild: [[2, '~'], [5, 'bd*4'], [1, 'bd bd ~ ~']],
+    dropB: ['bd*4', 'bd*4', 'bd*4', 'bd*4, ~ ~ ~ [~ bd]'], outro: ['bd*4', 'bd*8', 'bd*16', 'bd*32'],
+  }, '~'))
+  .bank(lane({ dropB: ['RolandTR909', 'RolandTR909', 'RolandTR808', 'RolandTR909'] }, 'RolandTR909'))
+  .lpf(lane({ intro: [[6, 300], [2, 300, 1500]], build: [1500, 8000], fall: [8000, 1500], rebuild: [[2, 300], [6, 300, 8000]], outro: [8000, 800] }, 8000))
+  .distort(lane({ dropA: 1.6, fall: 1.6, rebuild: [.6, 1.8], dropB: 2, outro: [2, 3] }, 1.2)).distortvol(.45)
+  .analyze("kick")
 
-// ---------- BUILD · 8 battute · 140 BPM · entra la macchina ----------
-const build = stack(
-  tempo(140),
-  kick("RolandTR909").mask("<0!2 1!6>"),
-  s("[~ hh]*4").bank("RolandTR909").crush(6).gain(.45).analyze("hats"),
-  note("e1").struct("[~ x x]*4").s("sawtooth")
-    .lpf(sine.range(120, 600).slow(8)).lpq(8).distort(2.5)
-    .decay(.12).sustain(0).gain(.55).mask("<0!4 1!4>").analyze("bass"),
-  note(acid).s("sawtooth")
-    .lpf("<300 450 650 900 1200 1600 2100 2800>").lpq(18).distort(1)
-    .decay(.15).sustain(.1).gain(.4).analyze("arp"),
-  s("<~!4 sd*4 sd*8 sd*16 sd*16>").bank("RolandTR909")
-    .gain("<0!4 .4 .5 .6 .75>").room(.3).analyze("snare"),
-  s("white*16").decay(.05).sustain(0)
-    .hpf(saw.slow(8).range(200, 10000))
-    .gain(saw.slow(8).range(0, .3)).analyze("riser")
-)
+// ---------- batteria half-time LinnDrum: sfuma dentro il break e fuori nel rebuild ----------
+$: fade(s("bd ~ ~ ~ ~ ~ bd ~, ~ ~ ~ ~ sd ~ ~ ~, hh*8").bank("LinnDrum").crush(5),
+    { fall: [[1, 0], [1, 0, .5]], break: [[2, .5, 1], [4, 1]], rebuild: [[3, 1, 0], [5, 0]] })
+  .gain(.75).room(.3).analyze("snare")
 
-// ---------- DROP A · 8 battute · 145 BPM · Mi frigio, tutto saturo ----------
-const dropA = stack(
-  tempo(145),
-  kick("RolandTR909"),
-  s("~ cp ~ cp").bank("RolandTR909").room(.35).gain(.7).analyze("snare"),
-  s("hh*16").bank("RolandTR808").gain("[.2 .35 .25 .45]*4").crush(7).analyze("hats"),
-  s("[~ oh]*4").bank("RolandTR909").gain(.35).analyze("hats"),
-  note("<e1 e1 f1 d1>").struct("[~ x x]*4").s("sawtooth")
-    .lpf(450).lpq(10).distort(3).decay(.1).sustain(0).gain(.55).analyze("bass"),
-  note(acid).s("sawtooth")
-    .lpf(sine.range(400, 3000).slow(4)).lpq(22).distort(1.4)
-    .decay(.12).sustain(.1).gain(.36).jux(rev).analyze("arp"),
-  note(powerChords).struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
-    .s("supersaw").decay(.15).sustain(0).distort(.8)
-    .lpf(2800).room(.4).gain(.3).analyze("pad"),
-  s("metal(3,8,2)").n("<0 2 4 6>").speed(.7).crush(6)
-    .room(.3).gain(.35).analyze("fx")
-)
+// ---------- clap e rullate ----------
+$: s(lane({
+    build: [[4, '~'], [1, 'sd*4'], [1, 'sd*8'], [2, 'sd*16']], dropA: '~ cp ~ cp',
+    fall: [[1, '~ cp ~ cp'], [1, '~ ~ ~ [cp cp cp cp]']],
+    rebuild: [[4, '~'], [2, 'sd*8'], [2, 'sd*16']], dropB: ['~ cp ~ cp', '~ cp ~ [cp cp]'],
+  }, '~'))
+  .bank(lane({ dropB: 'RolandTR707' }, 'RolandTR909'))
+  .gain(lane({ build: [[4, 0], [4, .35, .8]], rebuild: [[4, 0], [4, .4, .85]] }, .7))
+  .room(.35).analyze("snare")
 
-// ---------- BREAK · 4 battute · half-time su LinnDrum · tonalità su di 3 ----------
-const brk = stack(
-  tempo(145),
-  s("bd ~ ~ ~ ~ ~ bd ~").bank("LinnDrum").crush(5).gain(.7).analyze("kick"),
-  s("~ ~ ~ ~ sd ~ ~ ~").bank("LinnDrum").room(.5).gain(.6).analyze("snare"),
-  s("hh*8").bank("LinnDrum").crush(5).gain(.35).analyze("hats"),
-  note("<[e2,g2,b2,e3] [c2,g2,c3,e3] [d2,a2,d3,f#3] [b1,f#2,b2,d3]>").transpose(3)
-    .s("supersaw").attack(.4).release(1.5).lpf(1800).room(.9).gain(.3).analyze("pad"),
-  n("<[0 ~ 3 ~ 7 ~ 3 1] [0 ~ 3 ~ 8 7 ~ ~]>").scale("G4:phrygian")
-    .s("square").fm(3).vowel("<a e i o>")
-    .delay(.5).delayfeedback(.6).room(.5).gain(.25).analyze("hook"),
-  s("numbers").n("<5 2>").chop(8).rev().crush(4).gain(.4).analyze("fx"),
-  s("white*16").decay(.05).sustain(0)
-    .hpf(saw.slow(4).range(300, 9000))
-    .gain(saw.slow(4).range(0, .3)).analyze("riser")
-)
+// ---------- hi-hat: filo continuo, cambiano macchina e sporcizia ----------
+$: fade(s("hh*16").gain("[.2 .32 .24 .4]*4"),
+    { intro: [.3, .7], build: .8, dropA: 1, fall: [[1, 1], [1, .5]], break: .45, rebuild: [.45, 1], dropB: 1, outro: [1, .3] })
+  .bank(lane({ intro: 'RolandTR606', dropA: 'RolandTR808', dropB: ['RolandTR909', 'RolandTR707'] }, 'RolandTR909'))
+  .crush(lane({ intro: 4, dropA: 7, dropB: 6, outro: [6, 2] }, 9))
+  .degradeBy(lane({ intro: .45, fall: [.2, .6], break: .5 }, 0))
+  .pan(sine.fast(2)).analyze("hats")
 
-// ---------- DROP B · 8 battute · 150 BPM · Fa frigio, drum machine che si alternano ----------
-const dropB = stack(
-  tempo(150),
-  kick("<RolandTR909 RolandTR909 RolandTR808 RolandTR909>", "bd*4, ~ ~ ~ [~ bd]"),
-  s("~ cp ~ [cp cp]").bank("RolandTR707").room(.35).gain(.7).analyze("snare"),
-  s("hh(11,16)").bank("<RolandTR909 RolandTR707>").gain(.4).crush(6)
-    .pan(sine.fast(2)).analyze("hats"),
-  s("[~ rd]*4").bank("RolandTR909").gain(.3).analyze("hats"),
-  note("<e1 e1 f1 d1>").transpose(1).struct("[~ x x]*4").s("sawtooth")
-    .lpf(500).lpq(12).distort(3.5).decay(.1).sustain(0).gain(.55).analyze("bass"),
-  note(acid).transpose(1).s("sawtooth")
-    .lpf(sine.range(600, 4000).slow(2)).lpq(24).distort(1.8)
-    .decay(.1).sustain(.1).gain(.34).jux(rev).analyze("arp"),
-  note(powerChords).transpose(1).struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
-    .s("supersaw").decay(.15).sustain(0).distort(1.2)
-    .lpf(3200).room(.4).gain(.3).analyze("pad"),
-  n("<[0 ~ 3 ~ 7 ~ 3 1] [0 ~ 3 ~ 8 7 ~ ~]>").scale("F4:phrygian")
-    .s("square").fm(4).crush(8).lpf(3500)
-    .delay(.3).gain(.22).analyze("hook"),
-  s("industrial*16").n(irand(16)).coarse(3).gain(.18).pan(rand).analyze("fx")
-)
+$: fade(s("[~ oh]*4").bank("RolandTR909"), { dropA: 1, fall: [[1, 1], [1, 0]], rebuild: [[6, 0], [2, .3, .8]], dropB: 1 })
+  .gain(.35).analyze("hats")
+$: fade(s("[~ rd]*4").bank("RolandTR909"), { dropB: [[4, 0], [8, 1]] }).gain(.3).analyze("hats")
 
-// ---------- OUTRO · 4 battute · 150 BPM · il segnale si sgretola ----------
-const outro = stack(
-  tempo(150),
-  kick("RolandTR909").ply("<1 2 4 8>").gain("<1 .9 .8 .6>"),
-  s("hh*16").bank("RolandTR909").crush("<8 6 4 2>").gain(.35).analyze("hats"),
-  note("e1*8").transpose(1).s("sawtooth").lpf("<800 500 300 150>").lpq(15)
-    .distort(4).decay(.1).sustain(0).gain(.5).analyze("bass"),
-  s("numbers").n("<9 8 7 0>").crush(4).room(.8).gain(.5).analyze("hook")
-)
+// ---------- basso rumble in levare · sub lungo nel break: si danno il cambio ----------
+$: fade(note(roots).struct("[~ x x]*4").s("sawtooth").lpq(10).decay(.1).sustain(0),
+    { build: [[4, 0], [4, .5, 1]], dropA: 1, fall: [[1, 1], [1, .4]], rebuild: [[4, 0], [4, .4, 1]], dropB: 1, outro: [1, .4] })
+  .transpose(key)
+  .lpf(lane({ build: [200, 450], fall: [450, 150], rebuild: [150, 500], dropB: 500, outro: [500, 120] }, 450))
+  .distort(lane({ dropB: 3.5 }, 3)).gain(.55).analyze("bass")
 
-$: arrange(
-  [4, intro],
-  [8, build],
-  [8, dropA],
-  [4, brk],
-  [8, dropB],
-  [4, outro],
-)
+$: fade(note(roots).s("sine").attack(.05).release(.6),
+    { intro: [0, .6], build: [.6, 0], fall: [[1, 0], [1, 0, .7]], break: .8, rebuild: [[4, .8], [4, .8, 0]] })
+  .transpose(key).gain(.6).analyze("bass")
+
+// ---------- acid: non si ferma mai, il filtro decide quanto si sente ----------
+$: fade(note(acid).s("sawtooth").lpq(20).decay(.13).sustain(.1).jux(rev),
+    { build: [.3, .9], dropA: .9, fall: .9, break: .5, rebuild: [.5, .9], dropB: 1, outro: [1, 0] })
+  .transpose(key)
+  .lpf(lane({ build: [300, 2800], dropA: [[4, 1400, 3000], [4, 3000, 1400], [4, 1400, 3400]],
+              fall: [3000, 450], break: 380, rebuild: [400, 3600],
+              dropB: [[4, 1800, 4200], [4, 4200, 2000], [4, 2000, 4800]], outro: [3000, 250] }, 300))
+  .distort(lane({ dropA: 1.4, dropB: 1.8, rebuild: [.8, 1.6] }, 1)).gain(.36).analyze("arp")
+
+// ---------- accordi: stab saturi nei drop, pad largo che fa da ponte ----------
+$: fade(note(chords).struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~").s("supersaw").decay(.15).sustain(0),
+    { dropA: [[2, .6, 1], [10, 1]], fall: [[1, 1], [1, .2]], rebuild: [[6, 0], [2, 0, .6]], dropB: 1, outro: [1, 0] })
+  .transpose(key)
+  .lpf(lane({ fall: [2800, 600], rebuild: [[6, 600], [2, 600, 2800]], dropB: 3400 }, 2800))
+  .distort(lane({ dropB: 1.2 }, .8)).room(.4).gain(.3).analyze("pad")
+
+$: fade(note(chords).s("supersaw").attack(.6).release(1.8),
+    { intro: [[2, 0, .8], [6, .8]], build: [.8, .25], dropA: [[10, 0], [2, 0, .5]], fall: .8, break: 1, rebuild: [1, .2], outro: [0, .7] })
+  .transpose(key)
+  .lpf(lane({ intro: [500, 1400], break: [1400, 2400], rebuild: [2400, 800] }, 1400))
+  .room(.9).gain(.28).analyze("pad")
+
+// ---------- hook FM: anticipato a fine drop A, protagonista nel break, ritorna nel drop B ----------
+$: fade(n("<[0 ~ 3 ~ 7 ~ 3 1] [0 ~ 3 ~ 8 7 ~ ~]>").s("square").vowel("<a e i o>"),
+    { dropA: [[8, 0], [4, 0, .6]], fall: .7, break: 1, rebuild: [[4, 1], [4, 1, .4]], dropB: [[4, .5], [8, 1]], outro: [1, 0] })
+  .scale(lane({ dropB: 'F4:phrygian', outro: 'F4:phrygian' }, 'E4:phrygian'))
+  .fm(lane({ break: 3, dropB: 4 }, 2)).crush(lane({ dropB: 8 }, 16))
+  .delay(.45).delayfeedback(lane({ fall: .7, break: .6 }, .4))
+  .room(lane({ fall: .7, break: .6 }, .3)).lpf(3500).gain(.24).analyze("hook")
+
+// ---------- voce radio e texture ----------
+$: fade(s("numbers").n("<0 3 7 1>").crush(5).hpf(900),
+    { intro: 1, build: [1, 0], break: [[2, 0, .8], [4, .8]], rebuild: [.8, 0], outro: [0, 1] })
+  .room(.7).delay(.4).gain(.5).analyze("hook")
+$: fade(s("industrial*8").n(irand(16)).coarse(lane({ dropB: 3 }, 6)).hpf(2000).pan(rand),
+    { intro: [.4, 1], build: [1, .3], break: .4, dropB: [[4, 0], [8, .8]] })
+  .gain(.22).analyze("fx")
+$: fade(s("metal(3,8,2)").n("<0 2 4 6>").speed(.7).crush(6), { dropA: [[4, 0], [8, 1]], fall: [1, 0], dropB: .8 })
+  .room(.3).gain(.35).analyze("fx")
+
+// ---------- crash e boom sul primo colpo dei drop ----------
+$: s(lane({ dropA: [[1, 'cr'], [11, '~']], dropB: [[1, 'cr'], [11, '~']], break: [[1, 'cr'], [5, '~']] }, '~'))
+  .bank("RolandTR909").gain(.55).room(.4).analyze("fx")
+$: s(lane({ dropA: [[1, 'bd ~ ~ ~'], [11, '~']], dropB: [[1, 'bd ~ ~ ~'], [11, '~']] }, '~'))
+  .bank("RolandTR808").speed(.5).room(.9).gain(.8).analyze("fx")
+
+// ---------- riser prima dei drop, downlifter nel fall ----------
+$: fade(s("white*16").decay(.05).sustain(0),
+    { build: [[4, 0], [4, .1, .35]], fall: [.35, .05], rebuild: [[4, 0], [4, .1, .4]] })
+  .hpf(lane({ build: [[4, 300], [4, 1200, 10000]], fall: [8000, 300], rebuild: [[4, 300], [4, 1200, 11000]] }, 300))
+  .analyze("riser")

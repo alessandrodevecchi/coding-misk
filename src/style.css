@@ -136,7 +136,18 @@
   pre { margin: 0; padding: 10px 12px; background: #0a0a0f; border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; font: 13px/1.5 var(--mono); color: #e9e4ff; }
   .song-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
   .timeline { position: relative; display: flex; height: 34px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-  .timeline .sec { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-right: 1px solid var(--line); background: var(--panel2); min-width: 0; overflow: hidden; white-space: nowrap; }
+  .timeline .ticks { position: absolute; inset: 0; pointer-events: none; }
+  .timeline .ticks i { position: absolute; bottom: 0; width: 1px; height: 6px; background: var(--muted); opacity: .6; }
+  .timeline { cursor: pointer; height: 42px; }
+  .songbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  .songbar .time { font-family: var(--mono); font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .loop { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+  .loop input { accent-color: var(--a1); width: 16px; height: 16px; }
+  .trans { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .trans .lbl { margin-right: 4px; }
+  .trans .chip { background: var(--panel2); border-color: var(--line); color: var(--ink); font-size: 12px; }
+  .trans .chip:hover { border-color: var(--a1); color: var(--a1); }
+  .timeline .sec { border: 0; border-right: 1px solid var(--line); padding: 0; font-family: var(--ui); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-right: 1px solid var(--line); background: var(--panel2); min-width: 0; overflow: hidden; white-space: nowrap; }
   .timeline .sec:last-of-type { border-right: 0; }
   .timeline .sec.drop { color: var(--a1); }
   .timeline .sec.on { background: color-mix(in srgb, var(--a1) 22%, var(--panel2)); color: var(--ink); }

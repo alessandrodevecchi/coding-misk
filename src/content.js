@@ -81,12 +81,10 @@ export const REFS = [
   [{ it: 'Codice di Strudel', en: 'Strudel source code' }, { it: 'Il repository del progetto, per capire come funziona dentro.', en: 'The project repository, to see how it works inside.' }, 'https://codeberg.org/uzu/strudel'],
 ];
 
-// Brani completi: ogni sezione è [nome, prima battuta, ultima battuta].
+// Brani completi: sezioni, battute e tempo si leggono dal codice (righe SECTIONS e TEMPO).
 export const SONGS = [
-  { id: 'ghost-protocol', title: 'Ghost Protocol', bpm: '135→150', bars: 36, seconds: 60, look: 'palco', code: ghostProtocol,
-    style: { it: 'Hard techno cyberpunk · Mi frigio · il tempo sale, cambiano drum machine e tonalità', en: 'Cyberpunk hard techno · E phrygian · tempo climbs, drum machines and key change' },
-    sections: [['Intro', 1, 4], ['Build', 5, 12], ['Drop', 13, 20], ['Break', 21, 24], ['Drop 2', 25, 32], ['Outro', 33, 36]] },
-  { id: 'neon-ascent', title: 'Neon Ascent', bpm: '128', bars: 32, seconds: 60, look: 'tramonto', code: neonAscent,
-    style: { it: 'Techno trance · La minore', en: 'Techno trance · A minor' },
-    sections: [['Intro', 1, 4], ['Build', 5, 12], ['Drop', 13, 20], ['Break', 21, 24], ['Drop 2', 25, 32]] },
+  { id: 'ghost-protocol', title: 'Ghost Protocol', look: 'palco', code: ghostProtocol,
+    style: { it: 'Hard techno cyberpunk · Mi frigio, poi Fa nel drop B · il tempo sale da 132 a 148 BPM', en: 'Cyberpunk hard techno · E phrygian, then F in drop B · tempo climbs from 132 to 148 BPM' } },
+  { id: 'neon-ascent', title: 'Neon Ascent', look: 'tramonto', code: neonAscent,
+    style: { it: 'Techno trance · La minore', en: 'Techno trance · A minor' } },
 ];

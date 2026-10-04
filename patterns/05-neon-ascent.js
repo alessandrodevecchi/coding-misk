@@ -6,6 +6,10 @@
 // .analyze("…") accende lo strumento corrispondente nel visual Palco.
 setcpm(128/4)
 
+// sezioni e tempo letti dal player di coding-misk (timeline, salto a una battuta)
+const SECTIONS = [['intro', 4], ['build', 8], ['dropA', 8], ['break', 4], ['dropB', 8]]
+const TEMPO = {'intro': 128, 'build': 128, 'dropA': 128, 'break': 128, 'dropB': 128}
+
 const kit = "RolandTR909"
 
 // ---------- batteria ----------

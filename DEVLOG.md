@@ -32,3 +32,10 @@
 - Nuovo logo: script al neon, scritta cromata, griglia in prospettiva, equalizzatore collegato agli strumenti.
 - Il REPL carica solo parte di dirt-samples: l'app carica l'archivio completo.
 - Limite noto: ai cambi di `.cps()` superdough scarta alcune note ("cannot schedule sounds in the past").
+
+## 2026-10-05
+
+- *Ghost Protocol* riscritto come arrangiamento a layer continui (60 battute, 1:43): helper `lane()` e `fade()` per automazioni per battuta di volume, filtro, distorsione, tonalità e drum machine. Sezioni di passaggio Fall (2 battute, downlifter, filtri che si chiudono) e Rebuild (8 battute, cassa filtrata che si apre, rullate, riser). Acid, accordi e hi-hat restano accesi per tutto il brano come filo conduttore; batteria LinnDrum e sub del break in dissolvenza incrociata con 909 e rumble.
+- Causa degli inciampi ai cambi di BPM: `.cps()` dentro il pattern fa ricalcolare le note in coda con un riferimento vecchio (fino a ~1 s di errore), superdough le scarta. Ora il tempo lo cambia il player con `scheduler.setCps` al confine di battuta, in rampa. Nessun avviso "cannot schedule sounds in the past" sul brano intero.
+- Player dei brani (`src/songs.js`): sezioni e tempo letti dal codice, partenza da una battuta impostando `scheduler.lastEnd` prima di avviare, timeline cliccabile, pulsanti per gli stacchi (2 battute prima), ripetizione della sezione, tempo trascorso.
+- Trappola: nel codice Strudel i doppi apici e i backtick diventano mini-notation anche dentro funzioni JS. Usare apici singoli e `mini()`.

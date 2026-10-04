@@ -4,6 +4,7 @@ import { KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, KITS, ROWS, GROOVES, LOOK
 import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
 import { t, tx, getLang, setLang } from './i18n.js';
+import { parseSong, clock } from './songs.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -269,32 +270,96 @@ $('#lessons').addEventListener('click', e => {
 });
 
 // ---------- brani ----------
+for (const sg of SONGS) sg.meta = parseSong(sg.code);
+let loopIdx = -1;
+
+// Parte dalla battuta "bar": lo scheduler di Strudel riprende da lastEnd, quindi basta impostarlo prima di avviare.
+async function playSong(sg, bar = 0) {
+  initAudioOnce();
+  await ready;
+  await initAudioOnce();
+  const m = sg.meta;
+  bar = Math.max(0, Math.min(m.bars - 1, Math.floor(bar)));
+  song = sg; mode = 'free';
+  source = { kind: 'song', name: sg.title }; renderSource();
+  ed.stop();
+  ed.setCode(withVisuals(sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+m.bpm[bar].toFixed(2)}/4)`));
+  sched().lastEnd = bar;
+  if (loopIdx >= 0) loopIdx = m.sectionAt(bar);
+  await ed.evaluate();
+  updateShare();
+}
+
 function renderSongs() {
-  $('#songs').innerHTML = SONGS.map((sg, i) => `
-    <article class="card lesson" data-song-card="${i}">
-      <div class="song-meta">${t('songMeta', { bpm: sg.bpm, bars: sg.bars, sec: sg.seconds })}</div>
+  $('#songs').innerHTML = SONGS.map((sg, i) => {
+    const m = sg.meta;
+    const ticks = Array.from({ length: Math.floor(m.bars / 4) - 1 }, (_, k) => `<i style="left:${(k + 1) * 4 / m.bars * 100}%"></i>`).join('');
+    return `<article class="card lesson song" data-song-card="${i}">
+      <div class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}</div>
       <h3>${esc(sg.title)}</h3>
       <p>${esc(tx(sg.style))}</p>
-      <div class="timeline">${sg.sections.map(([n, a, b]) => `<div class="sec${/drop/i.test(n) ? ' drop' : ''}" style="flex:${b - a + 1}" title="${esc(t('barsRange', { a, b }))}">${n}</div>`).join('')}<span class="head"></span></div>
-      <div><button class="btn primary" data-song="${i}">${t('songPlay')}</button></div>
-    </article>`).join('');
+      <div class="timeline" data-tl="${i}">
+        ${m.sections.map(sec => `<button class="sec${/drop/i.test(sec.key) ? ' drop' : ''}" style="flex:${sec.len}" data-seek="${sec.start}" title="${esc(t('barsRange', { a: sec.start + 1, b: sec.start + sec.len }))}" aria-label="${esc(t('seekAria', { name: sec.label, bar: sec.start + 1 }))}">${sec.label}</button>`).join('')}
+        <span class="ticks">${ticks}</span><span class="head"></span>
+      </div>
+      <div class="songbar">
+        <button class="btn primary" data-song="${i}">${t('songPlay')}</button>
+        <span class="time" data-time="${i}">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
+        <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
+      </div>
+      <div class="trans"><span class="lbl">${t('transitions')}</span>
+        ${m.sections.slice(1).map((sec, k) => `<button class="chip" data-song-i="${i}" data-seek="${Math.max(0, sec.start - 2)}">${m.sections[k].label} → ${sec.label}</button>`).join('')}
+      </div>
+      <p class="note">${t('seekHint')}</p>
+    </article>`;
+  }).join('');
 }
 $('#songs').addEventListener('click', e => {
-  const b = e.target.closest('[data-song]'); if (!b) return;
-  const sg = SONGS[+b.dataset.song];
-  if (sg.look) { S.look = sg.look; syncAll(); save(); }
-  loadFree(sg.code, { kind: 'song', name: sg.title }, { restart: true, song: sg });
+  const card = e.target.closest('[data-song-card]'); if (!card) return;
+  const sg = SONGS[+card.dataset.songCard];
+  const startSong = bar => { if (sg.look && song !== sg) { S.look = sg.look; syncAll(); save(); } playSong(sg, bar); };
+  if (e.target.closest('[data-song]')) return startSong(0);
+  const chip = e.target.closest('.trans [data-seek]');
+  if (chip) return startSong(+chip.dataset.seek);
+  const tl = e.target.closest('.timeline');
+  if (tl) {
+    const r = tl.getBoundingClientRect();
+    // da tastiera (detail 0) si va all'inizio della sezione, col puntatore al punto esatto
+    const bar = e.detail === 0 ? +e.target.closest('[data-seek]').dataset.seek : (e.clientX - r.left) / r.width * sg.meta.bars;
+    return startSong(bar);
+  }
 });
-// avanzamento del brano e stop automatico a fine pezzo
+$('#songs').addEventListener('change', e => {
+  const cb = e.target.closest('[data-loop]'); if (!cb) return;
+  const sg = SONGS[+cb.dataset.loop];
+  loopIdx = cb.checked ? (song === sg && isPlaying() ? sg.meta.sectionAt(sched().now()) : 0) : -1;
+  $$('[data-loop]').forEach(x => { if (x !== cb) x.checked = false; });
+});
+
+// a ogni frame: tempo per battuta, avanzamento, ripetizione della sezione, stop a fine brano
 (function songLoop() {
   requestAnimationFrame(songLoop);
   $$('[data-song-card]').forEach(card => {
-    const sg = SONGS[+card.dataset.songCard], active = song === sg && mode === 'free' && isPlaying();
-    const cyc = active ? sched().now() : 0;
-    card.querySelector('.head').style.left = `${Math.min(100, cyc / sg.bars * 100)}%`;
-    const bar = Math.floor(cyc) + 1;
-    card.querySelectorAll('.sec').forEach((el, j) => { const [, a, z] = sg.sections[j]; el.classList.toggle('on', active && bar >= a && bar <= z); });
-    if (active && cyc >= sg.bars) stop();
+    const i = +card.dataset.songCard, sg = SONGS[i], m = sg.meta;
+    const active = song === sg && mode === 'free' && isPlaying();
+    const s = sched();
+    const cyc = active ? s.now() : 0;
+    if (active) {
+      const ahead = Math.min(m.bars - 1, Math.floor(s.lastEnd + s.cps * .1));
+      const target = m.bpm[ahead] / 240;
+      if (Math.abs(s.cps - target) > 1e-6) s.setCps(target);
+      if (loopIdx >= 0) {
+        const sec = m.sections[loopIdx];
+        if (cyc >= sec.start + sec.len) playSong(sg, sec.start);
+      } else if (cyc >= m.bars) stop();
+    }
+    card.querySelector('.head').style.left = `${Math.min(100, cyc / m.bars * 100)}%`;
+    const cur = active ? m.sectionAt(cyc) : -1;
+    card.querySelectorAll('.sec').forEach((el, j) => el.classList.toggle('on', j === cur));
+    const bar = Math.min(m.bars, Math.floor(cyc) + 1);
+    const label = t('songTime', { t: clock(m.secondsAt(cyc)), total: clock(m.seconds), bar, bars: m.bars });
+    const te = card.querySelector('.time');
+    if (te.textContent !== label) te.textContent = label;
   });
 })();
 
@@ -350,8 +415,8 @@ startVisuals({
       const tr = (KEYS.find(k => k[0] === S.key) || [0, 0])[1];
       line2 = PROGS[S.prog][1].map(c => chordName(c, tr)).map((n, i) => i === bar % 4 ? `[${n}]` : ` ${n} `).join('');
     } else if (song) {
-      const sec = song.sections.find(([, a, z]) => bar + 1 >= a && bar + 1 <= z);
-      line2 = `${song.title}  ·  ${sec ? sec[0] : ''}`;
+      const sec = song.meta.sections[song.meta.sectionAt(cyc)];
+      line2 = `${song.title}  ·  ${sec ? sec.label : ''}`;
     } else line2 = $('#src').textContent;
     return `${bpm} BPM  ·  ${t('rdBar')} ${String(bar + 1).padStart(3, '0')}.${(step >> 2) + 1}\n${line2}`;
   },
