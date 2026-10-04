@@ -7,6 +7,7 @@
     --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   :root[data-look="palco"]    { --bg: #0a0614; --panel: #140d22; --panel2: #1d1430; --line: #3b2758; --muted: #a491c4; --a1: #ff2e88; --a2: #00e5ff; }
+  :root[data-look="edgerunners"] { --bg: #0b0410; --panel: #170a1f; --panel2: #221030; --line: #4a1f5c; --muted: #b48fc4; --a1: #fcee0a; --a2: #00f0ff; }
   :root[data-look="pixel"]    { --bg: #0f0f1b; --panel: #191a2e; --panel2: #22233d; --line: #3a3b63; --muted: #9d9ec9; --a1: #ffcc33; --a2: #ff5577; }
   :root[data-look="montagne"] { --bg: #070d1d; --panel: #0e1730; --panel2: #142142; --line: #26386a; --muted: #8fa3cf; --a1: #4fe3ff; --a2: #a98bff; }
   :root[data-look="spazio"]   { --bg: #06050d; --panel: #100e1e; --panel2: #18152c; --line: #2d2850; --muted: #9a94c4; --a1: #a495ff; --a2: #ff7ad9; }

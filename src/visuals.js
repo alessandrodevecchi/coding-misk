@@ -23,6 +23,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     pixel:    { sky: ['#0d0b26', '#1f1147', '#3d1a6b', '#6e2483', '#b3367f', '#f2607a', '#ffa45c'], sun: ['#fff3a1', '#ffcf4d', '#ff8a3d', '#ff4f7b'],
                 far: ['#2a1f5c', '#1d1645'], near: ['#43287a', '#2a1a57'], city: '#0b0918', win: ['#ffd166', '#7cf3ff', '#ff6ec7'],
                 ground: '#120a24', grid: '#ff3f9e', road: '#1a1030', dash: '#ffd166', car: '#00e5ff', wave: '#ffffff', echo: '#ffcc33' },
+    edgerunners: { sky: ['#0d0018', '#3b0a52', '#ff2a6d'], y: '#fcee0a', c: '#00f0ff', m: '#ff2a6d', ink: '#06010a', echo: '#fcee0a', wave: '#fcee0a', grid: '#00f0ff' },
     palco:    { wall: ['#05030b', '#140a26'], a: '#ff2e88', b: '#00e5ff', c: '#ffe14d', metal: '#2a2340', dark: '#0c0817', wave: '#00e5ff', echo: '#ff2e88', label: '#6f5f8f' },
   };
   let seed = 7;
@@ -40,11 +41,14 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const hookWave = new Float32Array(128);
   const lv = {}, prev = {}, norm = {}, lastOn = {};
   for (const k of INSTRUMENTS) { lv[k] = 0; prev[k] = 0; norm[k] = .05; lastOn[k] = 0; }
+  let glitch = 0, shake = 0;
   let level = 0, kick = 0, flash = 0, lastStep = -1, lastT = performance.now();
   const echoes = [], blips = [], streaks = [];
 
   function onset(k) {
     if (k === 'kick') { kick = 1; echoes.push({ r: 0, a: 1 }); if (echoes.length > 12) echoes.shift(); }
+    if (k === 'snare') { glitch = 1; }
+    if (k === 'guitar') { shake = 1; glitch = Math.max(glitch, .5); }
     if (k === 'snare') { flash = 1; blips.push({ ang: Math.random() * 6.283, rad: .55 + Math.random() * .2, a: 1, big: true }); }
     if (k === 'hats') blips.push({ ang: Math.random() * 6.283, rad: .75 + Math.random() * .2, a: 1, big: false });
     if (k === 'guitar') { flash = Math.max(flash, .6); blips.push({ ang: Math.random() * 6.283, rad: .35 + Math.random() * .2, a: 1, big: true }); }
@@ -134,6 +138,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
 
   // ---------- pixel art: buffer a bassa risoluzione ingrandito senza smussare ----------
   const pc = document.createElement('canvas'), p = pc.getContext('2d');
+  let halftone = null;
   let skyCache = null, skyKey = '';
   const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
   function pixelSky(pal, pw, hz) {
@@ -377,6 +382,111 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       cx.imageSmoothingEnabled = true;
     },
 
+
+    // Edgerunners: luna a retino, città a strati con bordi ciano, insegne olografiche, treno sopraelevato,
+    // linee di velocità sui colpi forti, glitch con fette spostate e separazione RGB sul rullante
+    edgerunners(pal, cyc, dt, playing) {
+      if (!halftone) {
+        const t = document.createElement('canvas'); t.width = t.height = 6;
+        const tc = t.getContext('2d'); tc.fillStyle = '#000'; tc.beginPath(); tc.arc(3, 3, 1.3, 0, Math.PI * 2); tc.fill();
+        halftone = cx.createPattern(t, 'repeat');
+      }
+      cx.save();
+      if (shake > .05 && !reduce) cx.translate((Math.random() - .5) * 10 * shake, (Math.random() - .5) * 6 * shake);
+      const hz = H * .74;
+      const sg = cx.createLinearGradient(0, 0, 0, hz);
+      sg.addColorStop(0, pal.sky[0]); sg.addColorStop(.62, pal.sky[1]); sg.addColorStop(1, pal.sky[2]);
+      cx.fillStyle = sg; cx.fillRect(-20, -20, W + 40, H + 40);
+      // luna gialla con ombreggiatura a retino
+      const mx = W * .74, my = H * .32, mr = Math.min(W, H) * (.24 + kick * .01);
+      cx.save(); cx.shadowColor = pal.y; cx.shadowBlur = 40 + lv.pad * 60;
+      cx.fillStyle = pal.y; cx.beginPath(); cx.arc(mx, my, mr, 0, Math.PI * 2); cx.fill(); cx.restore();
+      cx.save(); cx.beginPath(); cx.arc(mx, my, mr, 0, Math.PI * 2); cx.clip();
+      const shade = cx.createLinearGradient(mx - mr, my, mx + mr * .3, my);
+      shade.addColorStop(0, 'rgba(255,42,109,.85)'); shade.addColorStop(1, 'rgba(255,42,109,0)');
+      cx.fillStyle = shade; cx.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+      cx.globalAlpha = .35; cx.fillStyle = halftone; cx.fillRect(mx - mr, my - mr, mr * 1.2, mr * 2);
+      cx.restore();
+      drawEchoes(pal.y, mx, my, Math.max(W, H) * .5, dt);
+      // tre strati di città: lontano viola, medio con bordo ciano e insegne, vicino nero
+      const layers = [[.55, '#2a0d3d', .022, 0], [.68, '#14061f', .035, 1], [.42, pal.ink, .05, 2]];
+      layers.forEach(([hk, col, wk, li]) => {
+        let x = -10, i = 0;
+        while (x < W + 20) {
+          const w = W * (wk + hash(i, li) * wk * 1.4), h = H * hk * (.18 + hash(i + 7, li) * .32);
+          const top = hz - h + (li === 2 ? H * .12 : 0);
+          cx.fillStyle = col; cx.fillRect(x, top, w, H - top);
+          if (li === 1) {
+            cx.fillStyle = pal.c; cx.globalAlpha = .5 + lv.bass * .5; cx.fillRect(x + w - 2, top, 2, h); cx.globalAlpha = 1;
+            // insegne olografiche che tremolano con gli hi-hat
+            if (hash(i, 3) > .55) {
+              const on = hash(i, Math.floor(cyc * 8)) > .25 - lv.hats * .2;
+              const sw = w * .6, sh = h * .12, sx = x + w * .2, sy = top + h * .2;
+              cx.save(); cx.globalAlpha = on ? .9 : .25; cx.shadowColor = i % 2 ? pal.m : pal.c; cx.shadowBlur = 16;
+              cx.strokeStyle = i % 2 ? pal.m : pal.c; cx.lineWidth = 2; cx.strokeRect(sx, sy, sw, sh);
+              cx.fillStyle = cx.strokeStyle;
+              for (let g = 0; g < 4; g++) cx.fillRect(sx + 4 + g * (sw - 8) / 4, sy + 3, (sw - 8) / 4 - 4, sh - 6);
+              cx.restore();
+            }
+          }
+          if (li < 2) {
+            cx.fillStyle = li ? pal.y : pal.c;
+            for (let wy = top + 6; wy < hz - 4; wy += 8) for (let wx = x + 3; wx < x + w - 3; wx += 6) {
+              if (hash(wx + i, wy) < .06 + lv.pad * .1 + lv.guitar * .08) { cx.globalAlpha = .7; cx.fillRect(wx, wy, 2, 3); }
+            }
+            cx.globalAlpha = 1;
+          }
+          x += w + (li === 2 ? 0 : 3); i++;
+        }
+      });
+      // binario sopraelevato e treno che passa ogni 4 battute
+      const ty = H * .8;
+      cx.fillStyle = pal.ink; cx.fillRect(0, ty, W, H * .03);
+      cx.fillStyle = pal.m; cx.fillRect(0, ty, W, 2);
+      for (let px = ((-cyc * 80) % 120); px < W; px += 120) cx.fillRect(px, ty, 6, H - ty);
+      const tp = ((cyc / 4) % 1), tx = -W * .6 + tp * W * 2.2, tw = W * .55, th = H * .07;
+      cx.save(); cx.fillStyle = pal.y; cx.fillRect(tx, ty - th, tw, th);
+      cx.fillStyle = pal.ink; for (let k = 0; k < 8; k++) cx.fillRect(tx + 12 + k * tw / 8, ty - th * .8, tw / 8 - 18, th * .45);
+      cx.fillStyle = pal.c; cx.fillRect(tx, ty - th * .2, tw, th * .08);
+      const tg = cx.createLinearGradient(tx - W * .3, 0, tx, 0); tg.addColorStop(0, 'rgba(252,238,10,0)'); tg.addColorStop(1, 'rgba(252,238,10,.5)');
+      cx.fillStyle = tg; cx.fillRect(tx - W * .3, ty - th * .7, W * .3, th * .4);
+      cx.restore();
+      // linee di velocità da anime sui colpi di cassa e chitarra
+      const hit = Math.max(kick, lv.guitar * .8);
+      if (hit > .25 && !reduce) {
+        cx.save(); cx.strokeStyle = '#fff'; cx.globalAlpha = (hit - .25) * .7;
+        for (let i = 0; i < 70; i++) {
+          const a = hash(i, Math.floor(cyc * 16)) * Math.PI * 2, r0 = Math.min(W, H) * (.32 + hash(i + 3, 1) * .1), r1 = Math.max(W, H) * .9;
+          cx.lineWidth = 1 + hash(i, 9) * 2.5;
+          cx.beginPath(); cx.moveTo(W / 2 + Math.cos(a) * r0, H / 2 + Math.sin(a) * r0); cx.lineTo(W / 2 + Math.cos(a) * r1, H / 2 + Math.sin(a) * r1); cx.stroke();
+        }
+        cx.restore();
+      }
+      // HUD cyberware con la forma d'onda di tutti gli strumenti
+      const hwid = Math.min(W * .3, 380), hht = H * .13, hx = W * .5 - hwid / 2, hy = H * .05;
+      cx.save(); cx.fillStyle = 'rgba(6,1,10,.7)';
+      cx.beginPath(); cx.moveTo(hx, hy); cx.lineTo(hx + hwid - 16, hy); cx.lineTo(hx + hwid, hy + 16); cx.lineTo(hx + hwid, hy + hht); cx.lineTo(hx + 16, hy + hht); cx.lineTo(hx, hy + hht - 16); cx.closePath(); cx.fill();
+      cx.strokeStyle = pal.y; cx.lineWidth = 1.5; cx.stroke();
+      cx.beginPath(); cx.rect(hx + 6, hy + 6, hwid - 12, hht - 12); cx.clip();
+      waveLine(pal.y, pal.y, hy + hht / 2, hht * .9, hx + 8, hx + hwid - 8);
+      cx.restore();
+      // retino su tutta l'immagine, più presente quando il brano è pieno
+      cx.globalAlpha = .06 + level * .1; cx.fillStyle = halftone; cx.fillRect(-20, -20, W + 40, H + 40); cx.globalAlpha = 1;
+      cx.restore();
+      // glitch: fette orizzontali spostate e separazione dei canali
+      if (glitch > .15 && !reduce) {
+        const d = Math.min(window.devicePixelRatio || 1, 2), cwp = cv.width, chp = cv.height;
+        cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0);
+        for (let i = 0; i < 3 + glitch * 6; i++) {
+          const y = Math.floor(Math.random() * chp), h = Math.floor((4 + Math.random() * 30) * d), off = Math.floor((Math.random() - .5) * 80 * glitch * d);
+          cx.drawImage(cv, 0, y, cwp, h, off, y, cwp, h);
+        }
+        cx.globalCompositeOperation = 'lighter'; cx.globalAlpha = .25 * glitch;
+        cx.drawImage(cv, 6 * glitch * d, 0); cx.drawImage(cv, -6 * glitch * d, 0);
+        cx.restore();
+      }
+    },
+
     // palco cyberpunk: ogni strumento disegnato si accende quando suona.
     // Gli strumenti sono disposti in fila con larghezze in unità "u"; lo spazio libero si divide tra gli spazi.
     palco(pal, cyc, dt, playing) {
@@ -584,7 +694,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const step = playing ? Math.floor(cyc * nSteps) % nSteps : -1;
     if (step !== lastStep) { lastStep = step; onStep(step); }
     if (!playing) echoes.length = 0;
-    kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10);
+    kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
     const look = getS().look, pal = PAL[look] || PAL.palco;
     cx.clearRect(0, 0, W, H);
     (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing);
