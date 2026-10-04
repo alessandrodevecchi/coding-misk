@@ -4,54 +4,64 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>coding-misk</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230a0614%22/%3E%3Cpath d=%22M6 22V10l5 7 5-7v12M20 22v-6M24 22V10M28 22v-9%22 stroke=%22%23ff2e88%22 stroke-width=%222.5%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Monoton&family=Chakra+Petch:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mr+Dafoe&family=Russo+One&family=Chakra+Petch:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 </head>
 <body>
 <header class="bar">
-  <div class="brand"><span class="logo">coding·misk</span><span class="tag">synth lab per Strudel</span></div>
+  <div class="brand">
+    <div class="logo" role="img" aria-label="coding-misk">
+      <span class="logo-grid" aria-hidden="true"></span>
+      <span class="logo-chrome" aria-hidden="true" data-text="MISK">MISK</span>
+      <span class="logo-script" aria-hidden="true">coding</span>
+      <span class="logo-eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
+    <span class="tag" data-i18n="tag"></span>
+  </div>
   <div class="transport">
     <button id="play" class="play" aria-pressed="false">▶ Play</button>
-    <div class="field bpm"><label class="lbl" for="bpm">BPM</label><div><button type="button" data-bpm="-1" aria-label="BPM meno">−</button><input id="bpm" type="number" min="60" max="200" step="1"><button type="button" data-bpm="1" aria-label="BPM più">+</button></div></div>
-    <div class="field"><label class="lbl" for="key">Tonalità</label><select id="key"></select></div>
-    <div class="field"><label class="lbl" for="prog">Accordi</label><select id="prog"></select></div>
+    <div class="field bpm"><label class="lbl" for="bpm">BPM</label><div><button type="button" data-bpm="-1" data-i18n-aria="bpmDown">−</button><input id="bpm" type="number" min="60" max="200" step="1"><button type="button" data-bpm="1" data-i18n-aria="bpmUp">+</button></div></div>
+    <div class="field"><label class="lbl" for="key" data-i18n="key"></label><select id="key"></select></div>
+    <div class="field"><label class="lbl" for="prog" data-i18n="chords"></label><select id="prog"></select></div>
+    <div class="langs" role="group" data-i18n-aria="lang"><button data-lang="it">IT</button><button data-lang="en">EN</button></div>
   </div>
 </header>
 
-<section class="stagewrap" id="stagewrap" aria-label="Visual a ritmo">
+<section class="stagewrap" id="stagewrap" data-i18n-aria="stage">
   <canvas id="stage"></canvas>
   <div class="hud">
     <div class="readout" id="readout"></div>
-    <div class="chips" role="group" aria-label="Tema visual" id="looks"></div>
+    <div class="chips" role="group" data-i18n-aria="looks" id="looks"></div>
   </div>
-  <div class="scenes" role="group" aria-label="Scene">
-    <span class="lbl">Scena</span>
+  <div class="scenes" role="group" data-i18n-aria="scenes">
+    <span class="lbl" data-i18n="scene"></span>
     <button class="scene" data-scene="intro">Intro</button>
     <button class="scene" data-scene="build">Build</button>
     <button class="scene" data-scene="drop">Drop</button>
     <button class="scene" data-scene="break">Break</button>
-    <button class="chip fs" id="fs">Schermo intero</button>
+    <button class="chip fs" id="fs" data-i18n="fullscreen"></button>
   </div>
 </section>
 
 <div class="work">
   <div>
     <nav class="tabs" role="tablist">
-      <button class="tab" role="tab" data-tab="componi" aria-selected="true">Componi</button>
-      <button class="tab" role="tab" data-tab="brani" aria-selected="false">Brani</button>
-      <button class="tab" role="tab" data-tab="guida" aria-selected="false">Guida</button>
-      <button class="tab" role="tab" data-tab="suoni" aria-selected="false">Suoni</button>
-      <button class="tab" role="tab" data-tab="riferimenti" aria-selected="false">Riferimenti</button>
+      <button class="tab" role="tab" data-tab="componi" aria-selected="true" data-i18n="tabComponi"></button>
+      <button class="tab" role="tab" data-tab="brani" aria-selected="false" data-i18n="tabBrani"></button>
+      <button class="tab" role="tab" data-tab="guida" aria-selected="false" data-i18n="tabGuida"></button>
+      <button class="tab" role="tab" data-tab="suoni" aria-selected="false" data-i18n="tabSuoni"></button>
+      <button class="tab" role="tab" data-tab="riferimenti" aria-selected="false" data-i18n="tabRiferimenti"></button>
     </nav>
 
     <section id="tab-componi" class="rack">
       <div class="card" id="drums">
-        <div class="chhead"><button class="led" data-on="drums" aria-label="Batteria on/off"></button><h3>Batteria</h3><span class="hint">Tocca i passi. Il nome della riga la silenzia.</span></div>
+        <div class="chhead"><button class="led" data-on="drums"></button><h3 data-i18n="drums"></h3><span class="hint" data-i18n="drumsHint"></span></div>
         <div class="seqtop">
-          <div class="ctrl"><label class="lbl" for="drums-kit">Drum machine</label><select id="drums-kit" data-path="drums.kit"></select></div>
-          <div class="ctrl"><div class="row"><label class="lbl" for="drums-gain">Volume</label><output id="drums-gain-o"></output></div><input type="range" id="drums-gain" data-path="drums.gain" min="0" max="1" step="0.01"></div>
-          <div class="ctrl"><label class="lbl" for="drums-preset">Groove</label><select id="drums-preset"></select></div>
+          <div class="ctrl"><label class="lbl" for="drums-kit" data-i18n="drumMachine"></label><select id="drums-kit" data-path="drums.kit"></select></div>
+          <div class="ctrl"><div class="row"><label class="lbl" for="drums-gain" data-i18n="volume"></label><output id="drums-gain-o"></output></div><input type="range" id="drums-gain" data-path="drums.gain" min="0" max="1" step="0.01"></div>
+          <div class="ctrl"><label class="lbl" for="drums-preset" data-i18n="groove"></label><select id="drums-preset"></select></div>
         </div>
         <div class="seq" id="seq"></div>
       </div>
@@ -59,38 +69,38 @@
     </section>
 
     <section id="tab-brani" hidden>
-      <p class="intro">Brani completi scritti a mano in Strudel. Ognuno riparte dalla prima battuta e si ferma da solo alla fine. Le sezioni si accendono e spengono con <code>.mask()</code>: guarda il codice a destra.</p>
+      <p class="intro" data-i18n="introSongs"></p>
       <div class="lessons" id="songs"></div>
     </section>
 
     <section id="tab-guida" hidden>
-      <p class="intro">Quattordici passi brevi, dal primo colpo di cassa a una traccia trance. Ogni esempio si carica nell'editor e parte subito. Modifica il codice e premi <kbd>Ctrl</kbd>+<kbd>Enter</kbd> per sentire il cambiamento. I visual seguono anche gli esempi.</p>
+      <p class="intro" data-i18n-html="introGuide"></p>
       <div class="lessons" id="lessons"></div>
     </section>
 
     <section id="tab-suoni" hidden>
-      <p class="intro">Tocca un suono per ascoltarlo in loop. Il codice che lo produce compare nell'editor, pronto da copiare nella tua traccia.</p>
+      <p class="intro" data-i18n="introSounds"></p>
       <div id="sounds"></div>
     </section>
 
     <section id="tab-riferimenti" hidden>
-      <p class="intro">Da dove viene tutto questo e dove andare dopo.</p>
+      <p class="intro" data-i18n="introRefs"></p>
       <div class="refs" id="refs"></div>
     </section>
   </div>
 
-  <aside class="codecol" aria-label="Codice Strudel">
+  <aside class="codecol" data-i18n-aria="code">
     <div class="codehead">
-      <div><div class="lbl">Codice live</div><div class="src" id="src">generato dalla composizione</div></div>
-      <button class="btn" id="back" hidden>Torna alla composizione</button>
+      <div><div class="lbl" data-i18n="liveCode"></div><div class="src" id="src"></div></div>
+      <button class="btn" id="back" hidden data-i18n="back"></button>
     </div>
     <div class="edhost" id="edhost"></div>
     <div class="actions">
-      <a class="btn primary" id="share" href="https://strudel.cc/" target="_blank" rel="noopener">Apri su strudel.cc ↗</a>
-      <button class="btn" id="copy">Copia codice</button>
-      <button class="btn" id="reset">Ripristina composizione</button>
+      <a class="btn primary" id="share" href="https://strudel.cc/" target="_blank" rel="noopener" data-i18n="share"></a>
+      <button class="btn" id="copy" data-i18n="copy"></button>
+      <button class="btn" id="reset" data-i18n="reset"></button>
     </div>
-    <p class="note"><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd> suona o aggiorna, da qualsiasi punto della pagina. <kbd>Ctrl</kbd>+<kbd>.</kbd> ferma. Puoi scrivere nel codice, ma toccando un controllo della composizione il codice viene rigenerato.</p>
+    <p class="note" data-i18n-html="note"></p>
   </aside>
 </div>
 

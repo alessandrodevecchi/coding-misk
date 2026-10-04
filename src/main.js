@@ -1,26 +1,32 @@
 import '@strudel/repl';
 import './style.css';
-import * as M from './music.js';
+import { KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, KITS, ROWS, GROOVES, LOOKS, SCENES, DEFAULT, gen, withVisuals, chordName } from './music.js';
 import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
-
-const { KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, KITS, ROWS, GROOVES, LOOKS, SCENES, DEFAULT, gen, VIS } = M;
+import { t, tx, getLang, setLang } from './i18n.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
 const clone = o => JSON.parse(JSON.stringify(o));
 let S = clone(DEFAULT);
 try { const saved = JSON.parse(localStorage.getItem('coding-misk-state')); if (saved && saved.drums) S = Object.assign(clone(DEFAULT), saved); } catch (e) {}
+if (!LOOKS.some(([k]) => k === S.look)) S.look = DEFAULT.look;
 const save = () => { try { localStorage.setItem('coding-misk-state', JSON.stringify(S)); } catch (e) {} };
+setLang(getLang());
 
 // ---------- editor Strudel ----------
 let ed = null, mode = 'comp', evalTimer = 0;
-const host = $('#edhost');
+// cosa c'è nell'editor, per ritradurre l'etichetta quando cambia la lingua
+let source = { kind: 'comp', name: '' };
+let song = null;
 const el = document.createElement('strudel-editor');
 el.innerHTML = `<!--\n${gen(S)}\n-->`;
-host.appendChild(el);
-const ready = new Promise(res => { const t = setInterval(() => { if (el.editor) { clearInterval(t); ed = el.editor; res(ed); } }, 100); });
+$('#edhost').appendChild(el);
+const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor) { clearInterval(iv); ed = el.editor; res(ed); } }, 100); });
+// il REPL carica solo una parte di dirt-samples: carichiamo l'archivio completo (arpy, industrial, glitch, …)
+ready.then(() => { try { globalThis.samples && globalThis.samples('github:tidalcycles/dirt-samples'); } catch (e) { console.error(e); } });
 const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
 
@@ -49,29 +55,33 @@ function changed() {
   clearTimeout(evalTimer);
   if (isPlaying()) evalTimer = setTimeout(() => ed.evaluate(), 120);
 }
-let song = null;
-async function loadFree(code, label, { restart = false, song: sg = null } = {}) {
+async function loadFree(code, src, { restart = false, song: sg = null } = {}) {
   song = sg;
   initAudioOnce();
   await ready;
   await initAudioOnce();
   if (restart) ed.stop(); // fermare riporta lo scheduler alla battuta 1
   mode = 'free';
-  $('#src').textContent = label;
-  $('#back').hidden = false;
-  ed.setCode(code + VIS);
+  source = src;
+  renderSource();
+  ed.setCode(withVisuals(code));
   await ed.evaluate();
   updateShare();
 }
 function backToComp() {
   mode = 'comp';
   song = null;
-  $('#src').textContent = 'generato dalla composizione';
-  $('#back').hidden = true;
+  source = { kind: 'comp', name: '' };
+  renderSource();
   $$('.snd.on').forEach(b => b.classList.remove('on'));
   if (ed) ed.setCode(gen(S));
   if (isPlaying()) ed.evaluate();
   updateShare();
+}
+function renderSource() {
+  const map = { comp: () => t('fromComp'), lesson: () => t('srcGuide', { name: source.name }), sound: () => t('srcSound', { name: source.name }), song: () => t('srcSong', { name: source.name }) };
+  $('#src').textContent = map[source.kind]();
+  $('#back').hidden = source.kind === 'comp';
 }
 const currentCode = () => (ed && ed.code) || gen(S);
 const shareLink = code => {
@@ -85,94 +95,73 @@ $('#share').addEventListener('focus', updateShare);
 
 let toastT = 0;
 function toast(msg) {
-  let t = $('.toast');
-  if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
-  t.textContent = msg; t.hidden = false;
-  clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2200);
+  let el = $('.toast');
+  if (!el) { el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2200);
 }
 $('#copy').addEventListener('click', () => {
-  const code = currentCode();
-  try {
-    navigator.clipboard.writeText(code).then(() => toast('Codice copiato'), () => toast('Copia non disponibile qui: usa "Apri su strudel.cc"'));
-  } catch (e) { toast('Copia non disponibile qui: usa "Apri su strudel.cc"'); }
+  try { navigator.clipboard.writeText(currentCode()).then(() => toast(t('copied')), () => toast(t('copyNo'))); }
+  catch (e) { toast(t('copyNo')); }
 });
-$('#reset').addEventListener('click', () => { const look = S.look; S = clone(DEFAULT); S.look = look; syncAll(); backToComp(); changed(); toast('Composizione ripristinata'); });
+$('#reset').addEventListener('click', () => { const look = S.look; S = clone(DEFAULT); S.look = look; syncAll(); backToComp(); changed(); toast(t('resetDone')); });
 $('#back').addEventListener('click', backToComp);
 
 $('#play').addEventListener('click', () => isPlaying() ? stop() : play());
 document.addEventListener('keydown', e => {
-  const mod = e.ctrlKey || e.metaKey;
-  if (!mod) return;
+  if (!(e.ctrlKey || e.metaKey)) return;
   const inEditor = e.target.closest && e.target.closest('strudel-editor');
   if (e.key === 'Enter' && !inEditor) { e.preventDefault(); play(); }
   if (e.key === '.' && !inEditor) { e.preventDefault(); stop(); }
 });
 
 // ---------- controlli ----------
-const opts = (sel, list) => { sel.innerHTML = list.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); };
-opts($('#key'), KEYS.map(k => [k[0], k[2]]));
-opts($('#prog'), Object.entries(PROGS).map(([k, v]) => [k, `${v[0]} · ${v[1].join(' ')}`]));
-opts($('#drums-kit'), KITS.map(k => [k, k.replace('Roland', '')]));
-opts($('#drums-preset'), [['', 'Scegli un groove…'], ...Object.entries(GROOVES).map(([k, v]) => [k, v[0]])]);
-
+const opts = (sel, list) => {
+  const v = sel.value;
+  sel.innerHTML = list.map(([val, l]) => `<option value="${esc(val)}">${esc(tx(l))}</option>`).join('');
+  if (v) sel.value = v;
+};
 const CHANNELS = [
-  { id: 'bass', name: 'Basso', hint: 'la spinta sotto la cassa', ctrls: [
-    ['select', 'preset', 'Ritmo', Object.entries(BASS).map(([k, v]) => [k, v[0]])],
-    ['select', 'wave', 'Suono', WAVES], ['range', 'gain', 'Volume'], ['cutoff', 'cutoff', 'Filtro'], ['select', 'move', 'Movimento filtro', MOVES]] },
-  { id: 'arp', name: 'Arpeggio', hint: 'gli accordi suonati una nota alla volta', ctrls: [
-    ['select', 'preset', 'Figura', Object.entries(ARPS).map(([k, v]) => [k, v[0]])],
-    ['select', 'wave', 'Suono', WAVES], ['range', 'gain', 'Volume'], ['cutoff', 'cutoff', 'Filtro'],
-    ['select', 'speed', 'Velocità', [['16', 'Sedicesimi'], ['8', 'Ottavi']]], ['range', 'delay', 'Delay']] },
-  { id: 'hook', name: 'Hook', hint: 'la melodia che resta in testa', ctrls: [
-    ['select', 'preset', 'Melodia', Object.entries(HOOKS).map(([k, v]) => [k, v[0]])],
-    ['select', 'wave', 'Suono', WAVES], ['range', 'gain', 'Volume'], ['cutoff', 'cutoff', 'Filtro'],
-    ['select', 'move', 'Movimento filtro', MOVES], ['range', 'delay', 'Delay']] },
-  { id: 'pad', name: 'Pad', hint: 'il tappeto armonico', ctrls: [
-    ['select', 'wave', 'Suono', WAVES], ['range', 'gain', 'Volume'], ['cutoff', 'cutoff', 'Filtro'],
-    ['select', 'move', 'Movimento filtro', MOVES], ['range', 'room', 'Riverbero']] },
-  { id: 'riser', name: 'Riser', hint: 'tensione prima del drop', ctrls: [
-    ['range', 'gain', 'Volume'], ['select', 'bars', 'Durata', [['4', '4 battute'], ['8', '8 battute'], ['16', '16 battute']]]] },
+  { id: 'bass', ctrls: [
+    ['select', 'preset', 'rhythm', () => Object.entries(BASS).map(([k, v]) => [k, v[0]])],
+    ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume'], ['cutoff', 'cutoff', 'filter'], ['select', 'move', 'filterMove', () => MOVES]] },
+  { id: 'arp', ctrls: [
+    ['select', 'preset', 'figure', () => Object.entries(ARPS).map(([k, v]) => [k, v[0]])],
+    ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume'], ['cutoff', 'cutoff', 'filter'],
+    ['select', 'speed', 'speed', () => [['16', t('sixteenths')], ['8', t('eighths')]]], ['range', 'delay', 'delay']] },
+  { id: 'hook', ctrls: [
+    ['select', 'preset', 'melody', () => Object.entries(HOOKS).map(([k, v]) => [k, v[0]])],
+    ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume'], ['cutoff', 'cutoff', 'filter'],
+    ['select', 'move', 'filterMove', () => MOVES], ['range', 'delay', 'delay']] },
+  { id: 'pad', ctrls: [
+    ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume'], ['cutoff', 'cutoff', 'filter'],
+    ['select', 'move', 'filterMove', () => MOVES], ['range', 'room', 'reverb']] },
+  { id: 'riser', ctrls: [
+    ['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['4', '8', '16'].map(n => [n, t('nBars', { n })])]] },
 ];
 const cutToRange = c => Math.round(Math.log(c / 100) / Math.log(80) * 100);
 const rangeToCut = v => Math.round(100 * Math.pow(80, v / 100));
 
-const chHost = $('#channels');
-for (const ch of CHANNELS) {
-  const card = document.createElement('div');
-  card.className = 'card'; card.id = 'ch-' + ch.id;
-  card.innerHTML = `<div class="chhead"><button class="led" data-on="${ch.id}" aria-label="${ch.name} on/off"></button><h3>${ch.name}</h3><span class="hint">${ch.hint}</span></div><div class="ctrls"></div>`;
-  const box = $('.ctrls', card);
-  for (const [type, key, label, list] of ch.ctrls) {
-    const id = `${ch.id}-${key}`;
-    const c = document.createElement('div'); c.className = 'ctrl';
-    if (type === 'select') {
-      c.innerHTML = `<label class="lbl" for="${id}">${label}</label><select id="${id}" data-path="${ch.id}.${key}"></select>`;
-      opts($('select', c), list);
-    } else {
-      const cut = type === 'cutoff';
-      c.innerHTML = `<div class="row"><label class="lbl" for="${id}">${label}</label><output id="${id}-o"></output></div><input type="range" id="${id}" data-path="${ch.id}.${key}" ${cut ? 'data-cut="1" min="0" max="100" step="1"' : 'min="0" max="1" step="0.01"'}>`;
-    }
-    box.appendChild(c);
-  }
-  chHost.appendChild(card);
+function renderChannels() {
+  $('#channels').innerHTML = CHANNELS.map(ch => `
+    <div class="card" id="ch-${ch.id}">
+      <div class="chhead"><button class="led" data-on="${ch.id}" aria-label="${esc(t('onoff', { name: t(ch.id) }))}"></button><h3>${t(ch.id)}</h3><span class="hint">${t(ch.id + 'Hint')}</span></div>
+      <div class="ctrls">${ch.ctrls.map(([type, key, label]) => {
+        const id = `${ch.id}-${key}`;
+        if (type === 'select') return `<div class="ctrl"><label class="lbl" for="${id}">${t(label)}</label><select id="${id}" data-path="${ch.id}.${key}"></select></div>`;
+        const cut = type === 'cutoff';
+        return `<div class="ctrl"><div class="row"><label class="lbl" for="${id}">${t(label)}</label><output id="${id}-o"></output></div><input type="range" id="${id}" data-path="${ch.id}.${key}" ${cut ? 'data-cut="1" min="0" max="100" step="1"' : 'min="0" max="1" step="0.01"'}></div>`;
+      }).join('')}</div>
+    </div>`).join('');
+  for (const ch of CHANNELS) for (const [type, key, , list] of ch.ctrls) if (type === 'select') opts($(`#${ch.id}-${key}`), list());
 }
 
-// sequencer
-const seq = $('#seq');
-seq.innerHTML = '<span></span><div class="stepnums">' + Array.from({ length: 16 }, (_, i) => `<span>${i + 1}</span>`).join('') + '</div>';
-for (const [id, label] of ROWS) {
-  const lb = document.createElement('button');
-  lb.className = 'rowlbl'; lb.dataset.row = id; lb.textContent = label; lb.title = 'Silenzia o riattiva ' + label;
-  const st = document.createElement('div'); st.className = 'steps';
-  for (let i = 0; i < 16; i++) {
-    const b = document.createElement('button');
-    b.className = 'step'; b.dataset.row = id; b.dataset.i = i;
-    b.setAttribute('aria-label', `${label} passo ${i + 1}`);
-    st.appendChild(b);
-  }
-  seq.append(lb, st);
+function renderSeq() {
+  $('#seq').innerHTML = '<span></span><div class="stepnums">' + Array.from({ length: 16 }, (_, i) => `<span>${i + 1}</span>`).join('') + '</div>' +
+    ROWS.map(([id, label]) => `<button class="rowlbl" data-row="${id}" title="${esc(t('muteRow', { name: label }))}">${label}</button><div class="steps">${
+      Array.from({ length: 16 }, (_, i) => `<button class="step" data-row="${id}" data-i="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('')}</div>`).join('');
 }
-seq.addEventListener('click', e => {
+$('#seq').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   const row = S.drums.rows[b.dataset.row];
   if (b.classList.contains('step')) {
@@ -218,18 +207,14 @@ $$('.scene').forEach(b => b.addEventListener('click', () => {
   if (!isPlaying()) play();
 }));
 
-// temi visual
-const looks = $('#looks');
-looks.innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${l}</button>`).join('');
-looks.addEventListener('click', e => { const b = e.target.closest('[data-look]'); if (!b) return; S.look = b.dataset.look; syncAll(); save(); });
-
+$('#looks').addEventListener('click', e => { const b = e.target.closest('[data-look]'); if (!b) return; S.look = b.dataset.look; syncAll(); save(); });
 $('#fs').addEventListener('click', () => {
   const w = $('#stagewrap');
   try {
     if (document.fullscreenElement) document.exitFullscreen();
-    else if (w.requestFullscreen) w.requestFullscreen().catch(() => toast('Schermo intero non disponibile qui'));
-    else toast('Schermo intero non disponibile qui');
-  } catch (e) { toast('Schermo intero non disponibile qui'); }
+    else if (w.requestFullscreen) w.requestFullscreen().catch(() => toast(t('fsNo')));
+    else toast(t('fsNo'));
+  } catch (e) { toast(t('fsNo')); }
 });
 
 function syncOutputs() {
@@ -241,60 +226,64 @@ function syncOutputs() {
 function syncAll() {
   document.documentElement.dataset.look = S.look;
   $('#bpm').value = S.bpm; $('#key').value = S.key; $('#prog').value = S.prog;
-  $$('[data-path]').forEach(i => {
-    const v = getPath(i.dataset.path);
-    i.value = i.dataset.cut ? cutToRange(v) : v;
-  });
+  $$('[data-path]').forEach(i => { const v = getPath(i.dataset.path); i.value = i.dataset.cut ? cutToRange(v) : v; });
   $$('[data-on]').forEach(b => {
     const on = S[b.dataset.on].on;
     b.setAttribute('aria-pressed', on);
-    const card = b.dataset.on === 'drums' ? $('#drums') : $('#ch-' + b.dataset.on);
-    card.classList.toggle('off', !on);
+    (b.dataset.on === 'drums' ? $('#drums') : $('#ch-' + b.dataset.on)).classList.toggle('off', !on);
   });
   $$('.step').forEach(b => b.setAttribute('aria-pressed', S.drums.rows[b.dataset.row].steps[b.dataset.i] === 'x'));
   $$('.rowlbl').forEach(b => b.setAttribute('aria-pressed', S.drums.rows[b.dataset.row].mute));
   $$('.scene').forEach(b => b.setAttribute('aria-pressed', S.scene === b.dataset.scene));
   $$('#looks .chip').forEach(b => b.setAttribute('aria-pressed', S.look === b.dataset.look));
+  $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', getLang() === b.dataset.lang));
   syncOutputs();
 }
 
 // tab
-$$('.tab').forEach(t => t.addEventListener('click', () => {
-  $$('.tab').forEach(x => x.setAttribute('aria-selected', x === t));
-  for (const id of ['componi', 'brani', 'guida', 'suoni', 'riferimenti']) $('#tab-' + id).hidden = id !== t.dataset.tab;
-  try { localStorage.setItem('coding-misk-tab', t.dataset.tab); } catch (e) {}
+const TABS = ['componi', 'brani', 'guida', 'suoni', 'riferimenti'];
+$$('.tab').forEach(tb => tb.addEventListener('click', () => {
+  $$('.tab').forEach(x => x.setAttribute('aria-selected', x === tb));
+  for (const id of TABS) $('#tab-' + id).hidden = id !== tb.dataset.tab;
+  try { localStorage.setItem('coding-misk-tab', tb.dataset.tab); } catch (e) {}
 }));
-try { const tb = localStorage.getItem('coding-misk-tab'); if (tb) { const t = $(`.tab[data-tab="${tb}"]`); if (t) t.click(); } } catch (e) {}
+try { const tb = localStorage.getItem('coding-misk-tab'); if (tb) { const el = $(`.tab[data-tab="${tb}"]`); if (el) el.click(); } } catch (e) {}
 
 // ---------- guida ----------
-$('#lessons').innerHTML = LESSONS.map(([t, p, code, tryit], i) => `
-  <article class="card lesson">
-    <div class="step-n">${String(i + 1).padStart(2, '0')} / ${LESSONS.length}</div>
-    <h3>${t}</h3>
-    <p>${p}</p>
-    <pre><code>${code.replace(/</g, '&lt;')}</code></pre>
-    <p class="try">Prova: ${tryit}</p>
-    <div><button class="btn primary" data-lesson="${i}">▶ Carica e ascolta</button></div>
-  </article>`).join('');
+function renderLessons() {
+  $('#lessons').innerHTML = LESSONS.map((l, i) => {
+    const [title, text, tryit] = tx(l);
+    return `<article class="card lesson">
+      <div class="step-n">${String(i + 1).padStart(2, '0')} / ${LESSONS.length}</div>
+      <h3>${esc(title)}</h3><p>${esc(text)}</p>
+      <pre><code>${esc(l.code)}</code></pre>
+      <p class="try">${t('tryIt')} ${esc(tryit)}</p>
+      <div><button class="btn primary" data-lesson="${i}">${t('loadPlay')}</button></div>
+    </article>`;
+  }).join('');
+}
 $('#lessons').addEventListener('click', e => {
   const b = e.target.closest('[data-lesson]'); if (!b) return;
-  const [t, , code] = LESSONS[+b.dataset.lesson];
-  loadFree(code, `Guida: ${t}`);
+  const l = LESSONS[+b.dataset.lesson];
+  loadFree(l.code, { kind: 'lesson', get name() { return tx(l)[0]; } });
 });
 
 // ---------- brani ----------
-$('#songs').innerHTML = SONGS.map((sg, i) => `
-  <article class="card lesson" data-song-card="${i}">
-    <div class="song-meta">${sg.bpm} BPM · ${sg.bars} battute · ${Math.round(sg.bars * 4 * 60 / sg.bpm)} secondi</div>
-    <h3>${sg.title}</h3>
-    <p>${sg.style}</p>
-    <div class="timeline">${sg.sections.map(([n, a, b]) => `<div class="sec${/drop/i.test(n) ? ' drop' : ''}" style="flex:${b - a + 1}" title="Battute ${a}-${b}">${n}</div>`).join('')}<span class="head"></span></div>
-    <div><button class="btn primary" data-song="${i}">▶ Ascolta dall'inizio</button></div>
-  </article>`).join('');
+function renderSongs() {
+  $('#songs').innerHTML = SONGS.map((sg, i) => `
+    <article class="card lesson" data-song-card="${i}">
+      <div class="song-meta">${t('songMeta', { bpm: sg.bpm, bars: sg.bars, sec: sg.seconds })}</div>
+      <h3>${esc(sg.title)}</h3>
+      <p>${esc(tx(sg.style))}</p>
+      <div class="timeline">${sg.sections.map(([n, a, b]) => `<div class="sec${/drop/i.test(n) ? ' drop' : ''}" style="flex:${b - a + 1}" title="${esc(t('barsRange', { a, b }))}">${n}</div>`).join('')}<span class="head"></span></div>
+      <div><button class="btn primary" data-song="${i}">${t('songPlay')}</button></div>
+    </article>`).join('');
+}
 $('#songs').addEventListener('click', e => {
   const b = e.target.closest('[data-song]'); if (!b) return;
   const sg = SONGS[+b.dataset.song];
-  loadFree(sg.code, `Brano: ${sg.title}`, { restart: true, song: sg });
+  if (sg.look) { S.look = sg.look; syncAll(); save(); }
+  loadFree(sg.code, { kind: 'song', name: sg.title }, { restart: true, song: sg });
 });
 // avanzamento del brano e stop automatico a fine pezzo
 (function songLoop() {
@@ -305,23 +294,65 @@ $('#songs').addEventListener('click', e => {
     card.querySelector('.head').style.left = `${Math.min(100, cyc / sg.bars * 100)}%`;
     const bar = Math.floor(cyc) + 1;
     card.querySelectorAll('.sec').forEach((el, j) => { const [, a, z] = sg.sections[j]; el.classList.toggle('on', active && bar >= a && bar <= z); });
-    if (active && cyc >= sg.bars) { stop(); }
+    if (active && cyc >= sg.bars) stop();
   });
 })();
 
 // ---------- suoni ----------
-$('#sounds').innerHTML = SOUND_GROUPS.map(([g, list], gi) => `
-  <div class="snd-group"><h3>${g}</h3><div class="snds">${list.map(([n], i) => `<button class="snd" data-g="${gi}" data-i="${i}">${n}</button>`).join('')}</div></div>`).join('');
+function renderSounds() {
+  $('#sounds').innerHTML = SOUND_GROUPS.map(([g, list], gi) => `
+    <div class="snd-group"><h3>${esc(tx(g))}</h3><div class="snds">${list.map(([n], i) => `<button class="snd" data-g="${gi}" data-i="${i}">${esc(n)}</button>`).join('')}</div></div>`).join('');
+}
 $('#sounds').addEventListener('click', e => {
   const b = e.target.closest('.snd'); if (!b) return;
   const [n, code] = SOUND_GROUPS[+b.dataset.g][1][+b.dataset.i];
   $$('.snd.on').forEach(x => x.classList.remove('on')); b.classList.add('on');
-  loadFree(code, `Suono: ${n}`);
+  loadFree(code, { kind: 'sound', name: n });
 });
 
 // ---------- riferimenti ----------
-$('#refs').innerHTML = REFS.map(([t, d, u]) => `<a class="card ref" href="${u}" target="_blank" rel="noopener"><strong>${t} ↗</strong><span>${d}</span></a>`).join('');
+function renderRefs() {
+  $('#refs').innerHTML = REFS.map(([title, d, u]) => `<a class="card ref" href="${u}" target="_blank" rel="noopener"><strong>${esc(tx(title))} ↗</strong><span>${esc(tx(d))}</span></a>`).join('');
+}
 
-syncAll();
+// ---------- lingua ----------
+function renderStatic() {
+  $$('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  $$('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  $$('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
+  $('[data-on="drums"]').setAttribute('aria-label', t('onoff', { name: t('drums') }));
+  opts($('#key'), KEYS.map(k => [k[0], k[2]]));
+  opts($('#prog'), Object.entries(PROGS).map(([k, v]) => [k, `${tx(v[0])} · ${v[1].join(' ')}`]));
+  opts($('#drums-kit'), KITS.map(k => [k, k.replace('Roland', '')]));
+  opts($('#drums-preset'), [['', t('pickGroove')], ...Object.entries(GROOVES).map(([k, v]) => [k, v[0]])]);
+  $('#looks').innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${esc(tx(l))}</button>`).join('');
+}
+function renderAll() {
+  renderStatic(); renderChannels(); renderSeq(); renderLessons(); renderSongs(); renderSounds(); renderRefs(); renderSource();
+  syncAll();
+}
+$$('[data-lang]').forEach(b => b.addEventListener('click', () => {
+  setLang(b.dataset.lang);
+  renderAll();
+  if (mode === 'comp') changed();
+}));
+
+renderAll();
 updateShare();
-startVisuals({ getS: () => S, getMode: () => mode, isPlaying, sched });
+startVisuals({
+  getS: () => S, getMode: () => mode, isPlaying, sched,
+  readout(cyc, step, playing) {
+    if (!playing) return `${S.bpm} BPM  ·  ${t('rdPaused')}\n${t('rdHint')}`;
+    const bpm = mode === 'comp' ? S.bpm : Math.round(sched().cps * 240);
+    const bar = Math.floor(cyc);
+    let line2;
+    if (mode === 'comp') {
+      const tr = (KEYS.find(k => k[0] === S.key) || [0, 0])[1];
+      line2 = PROGS[S.prog][1].map(c => chordName(c, tr)).map((n, i) => i === bar % 4 ? `[${n}]` : ` ${n} `).join('');
+    } else if (song) {
+      const sec = song.sections.find(([, a, z]) => bar + 1 >= a && bar + 1 <= z);
+      line2 = `${song.title}  ·  ${sec ? sec[0] : ''}`;
+    } else line2 = $('#src').textContent;
+    return `${bpm} BPM  ·  ${t('rdBar')} ${String(bar + 1).padStart(3, '0')}.${(step >> 2) + 1}\n${line2}`;
+  },
+});

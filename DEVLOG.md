@@ -22,3 +22,13 @@
 - Eliminata la pagina su claude.ai.
 - Aggiunto il brano *Neon Ascent* (`patterns/05-neon-ascent.js`): techno trance, 128 BPM, 32 battute = 60 s, sezioni con `.mask()` a 32 valori.
 - Nuovo tab Brani: il brano riparte dalla battuta 1, timeline con sezione attiva, stop automatico a fine pezzo.
+
+## 2026-10-04 (sera)
+
+- Nuovo brano *Ghost Protocol* (`patterns/06-ghost-protocol.js`): hard techno cyberpunk, 36 battute, 60 s. Sezioni come `stack()` messe in fila con `arrange()`, tempo cambiato con un evento muto `.cps()`, tonalità con `.transpose()`, drum machine con `.bank("<…>")`, ruvidità con `distort`, `crush`, `coarse`, `fm`, `vowel`.
+- Interfaccia bilingue IT/EN (`src/i18n.js`): testi statici, controlli, lezioni, suoni, riferimenti, commenti del codice generato.
+- Ogni layer usa `.analyze("strumento")`: i visual leggono un livello per strumento e rilevano gli attacchi.
+- Nuovi visual: *Palco* (strumenti che si accendono) e *Pixel* (pixel art low poly). Il Palco è il visual predefinito.
+- Nuovo logo: script al neon, scritta cromata, griglia in prospettiva, equalizzatore collegato agli strumenti.
+- Il REPL carica solo parte di dirt-samples: l'app carica l'archivio completo.
+- Limite noto: ai cambi di `.cps()` superdough scarta alcune note ("cannot schedule sounds in the past").
