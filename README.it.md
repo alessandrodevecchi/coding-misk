@@ -4,6 +4,22 @@
 
 Un laboratorio locale per comporre musica scrivendo codice, costruito sopra [Strudel](https://strudel.cc/), il porting JavaScript di [TidalCycles](https://tidalcycles.org/). Ogni brano diventa codice Strudel leggibile, che suona nel browser insieme a visual sincronizzati con gli strumenti.
 
+## Demo
+
+![I visual di coding-misk che reagiscono alla musica](docs/media/demo.gif)
+
+[Guarda la demo da 38 secondi con audio (MP4)](docs/media/demo.mp4)
+
+![Il visual Palco mentre suona Luci Rosse](docs/media/visual-palco.jpg)
+
+|                                                          |                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------ |
+| ![Visual Palco](docs/media/stage-palco.jpg)              | ![Visual Spazio](docs/media/stage-spazio.jpg)          |
+| ![Visual Pixel](docs/media/stage-pixel.jpg)              | ![Visual Montagne](docs/media/stage-montagne.jpg)      |
+| ![Arrangiatore a scene](docs/media/compose-arranger.jpg) | ![Sequencer e canali](docs/media/compose-channels.jpg) |
+
+![Tab Brani](docs/media/tracks.jpg)
+
 ## Da dove nasce
 
 Un anno fa mi ero appassionato ai video di [Switch Angel](https://www.youtube.com/@Switch-Angel), in particolare a [Coding Trance Music](https://www.youtube.com/watch?v=GWXCCBsOMSg). Mi era rimasta dentro l'idea di musica come codice con strudel.cc: brani costruiti dal vivo, riga dopo riga.
@@ -25,11 +41,15 @@ Questo progetto unisce quell'idea alle capacità dei nuovi modelli, con il mio t
 
 ## Idee e prossimi passi
 
+Il backlog è nelle [issue del repository](https://github.com/alessandrodevecchi/coding-misk/issues). Le idee principali:
+
 - **Voci.** Capire come generarle, probabilmente con un piccolo modello locale.
 - **Live coding.** Arrivare a ricreare un brano costruito dal vivo, come nei video di Switch Angel.
 - **Musica per video brevi.** Usare i brani come sottofondo per reel e contenuti social, con durate e partenze già pronte.
 - **Mood e preset.** Definire mood e preset riutilizzabili, per comporre più in fretta e con più varietà.
 - **Altri generi.** Continuare a esplorare stili diversi, con meno strati e più ritmo.
+- **Visual anime cyberpunk.** Un nuovo visual ispirato allo stile di Cyberpunk: Edgerunners.
+- **Tema interfaccia hardware.** Un tema che sembra strumentazione fisica: manopole, piccoli display, luci che si accendono e si spengono.
 
 ## Avvio
 

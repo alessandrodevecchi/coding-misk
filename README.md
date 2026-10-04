@@ -4,6 +4,22 @@
 
 A local lab for composing music by writing code, built on [Strudel](https://strudel.cc/), the JavaScript port of [TidalCycles](https://tidalcycles.org/). Every track becomes readable Strudel code that plays in the browser, with visuals synced to each instrument.
 
+## Demo
+
+![coding-misk visuals reacting to the music](docs/media/demo.gif)
+
+[Watch the 38 second demo with audio (MP4)](docs/media/demo.mp4)
+
+![Stage visual while Luci Rosse plays](docs/media/visual-palco.jpg)
+
+|                                                    |                                                                 |
+| -------------------------------------------------- | --------------------------------------------------------------- |
+| ![Stage visual](docs/media/stage-palco.jpg)        | ![Space visual](docs/media/stage-spazio.jpg)                    |
+| ![Pixel visual](docs/media/stage-pixel.jpg)        | ![Mountains visual](docs/media/stage-montagne.jpg)              |
+| ![Scene arranger](docs/media/compose-arranger.jpg) | ![Drum sequencer and channels](docs/media/compose-channels.jpg) |
+
+![Tracks tab](docs/media/tracks.jpg)
+
 ## Where it comes from
 
 A year ago I got hooked on [Switch Angel](https://www.youtube.com/@Switch-Angel)'s videos, especially [Coding Trance Music](https://www.youtube.com/watch?v=GWXCCBsOMSg). The idea of music as code with strudel.cc stuck with me: tracks built live, one line at a time.
@@ -25,11 +41,15 @@ This project combines that idea with what the new models can do, with my own twi
 
 ## Ideas and next steps
 
+The backlog lives in the [repository issues](https://github.com/alessandrodevecchi/coding-misk/issues). The main ideas:
+
 - **Vocals.** Find out how to generate them, probably with a small local model.
 - **Live coding.** Recreate a track built live, like in Switch Angel's videos.
 - **Music for short videos.** Use the tracks as background music for reels and social content, with ready-made lengths and starting points.
 - **Moods and presets.** Define reusable moods and presets to compose faster and with more variety.
 - **More genres.** Keep exploring different styles, with fewer layers and more rhythm.
+- **Cyberpunk anime visual.** A new visual inspired by the look of Cyberpunk: Edgerunners.
+- **Hardware interface theme.** A theme that looks like physical gear: knobs, small displays, lights that turn on and off.
 
 ## Getting started
 
