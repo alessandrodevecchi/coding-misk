@@ -22,9 +22,7 @@
   </div>
   <div class="transport">
     <button id="play" class="play" aria-pressed="false">▶ Play</button>
-    <div class="field bpm"><label class="lbl" for="bpm">BPM</label><div><button type="button" data-bpm="-1" data-i18n-aria="bpmDown">−</button><input id="bpm" type="number" min="60" max="200" step="1"><button type="button" data-bpm="1" data-i18n-aria="bpmUp">+</button></div></div>
-    <div class="field"><label class="lbl" for="key" data-i18n="key"></label><select id="key"></select></div>
-    <div class="field"><label class="lbl" for="prog" data-i18n="chords"></label><select id="prog"></select></div>
+    <button id="stop" class="btn stopbtn" data-i18n="stop"></button>
     <div class="langs" role="group" data-i18n-aria="lang"><button data-lang="it">IT</button><button data-lang="en">EN</button></div>
   </div>
 </header>
@@ -53,6 +51,7 @@
     <section id="tab-componi" class="rack">
       <div class="card arranger" id="arranger">
         <div class="arr-top">
+          <div class="ctrl"><label class="lbl" for="track-pick" data-i18n="trackPick"></label><select id="track-pick"></select></div>
           <div class="ctrl grow"><label class="lbl" for="track-title" data-i18n="trackTitle"></label><input id="track-title" type="text" maxlength="40" autocomplete="off"></div>
           <span class="dirty" id="dirty" aria-live="polite"></span>
           <div class="actions">
@@ -74,9 +73,20 @@
           <div class="ctrl"><label class="lbl" for="sc-name" data-i18n="sceneName"></label><input id="sc-name" type="text" maxlength="40" autocomplete="off"></div>
           <div class="ctrl"><label class="lbl" for="sc-bars" data-i18n="sceneBars"></label><input id="sc-bars" type="number" min="1" max="64" step="1"></div>
           <div class="ctrl"><label class="lbl" for="sc-fade" data-i18n="sceneEntry"></label><select id="sc-fade"></select></div>
+          <div class="ctrl"><div class="row"><label class="lbl" for="bpm">BPM</label><button type="button" class="ramp" id="bpm-ramp" data-i18n-aria="rampToggle">↗</button></div>
+            <div class="bpm"><button type="button" data-bpm="-1" data-i18n-aria="bpmDown">−</button><input id="bpm" type="number" min="60" max="200" step="1"><button type="button" data-bpm="1" data-i18n-aria="bpmUp">+</button></div>
+            <div class="bpm" id="bpm-end-row" hidden><span class="lbl" data-i18n="bpmEnd"></span><input id="bpm-end" type="number" min="60" max="200" step="1"></div></div>
+          <div class="ctrl"><label class="lbl" for="key" data-i18n="key"></label><select id="key"></select></div>
+          <div class="ctrl"><label class="lbl" for="prog" data-i18n="chords"></label><select id="prog"></select></div>
+        </div>
+        <div class="arr-flags">
+          <label class="loop"><input type="checkbox" id="sc-crash"> <span data-i18n="crashStart"></span></label>
+          <label class="loop"><input type="checkbox" id="sc-breath"> <span data-i18n="breath"></span></label>
         </div>
         <div class="songbar">
           <button class="btn primary" id="sc-play" data-i18n="playFromScene"></button>
+          <button class="btn" id="sc-pause" data-tp="pause"></button>
+          <button class="btn" id="sc-stop" data-i18n="stop"></button>
           <label class="loop"><input type="checkbox" id="sc-loop"> <span data-i18n="loopScene"></span></label>
           <label class="loop"><input type="checkbox" id="sc-follow" checked> <span data-i18n="follow"></span></label>
         </div>
@@ -86,9 +96,9 @@
         <div class="chhead"><button class="led" data-on="drums"></button><h3 data-i18n="drums"></h3><span class="hint" data-i18n="drumsHint"></span></div>
         <div class="seqtop">
           <div class="ctrl"><label class="lbl" for="drums-kit" data-i18n="drumMachine"></label><select id="drums-kit" data-path="drums.kit"></select></div>
-          <div class="ctrl"><div class="row"><label class="lbl" for="drums-gain" data-i18n="volume"></label><output id="drums-gain-o"></output></div><input type="range" id="drums-gain" data-path="drums.gain" min="0" max="1" step="0.01"></div>
           <div class="ctrl"><label class="lbl" for="drums-preset" data-i18n="groove"></label><select id="drums-preset"></select></div>
         </div>
+        <div class="ctrls drumctrls" id="drums-ctrls"></div>
         <div class="seq" id="seq"></div>
       </div>
       <div class="chgrid" id="channels"></div>

@@ -22,10 +22,12 @@ Si apre <http://localhost:5173>. Premi **Play**.
 
 Italiano e inglese, con il selettore IT/EN in alto a destra.
 
-- **Componi**: arrangiatore a scene. Ogni scena ha nome, battute, entrata (taglio netto o dissolvenza) e tutte le impostazioni: BPM, tonalità, accordi, sequencer 909, basso, arpeggio, hook, pad, riser. Aggiungi, sposta, elimina scene; suona da una scena o ripetila. Mentre suona, i controlli seguono la scena attiva. Salva, Salva come nuovo, Nuovo brano, Elimina (o Ripristina originale per i brani inclusi). Il brano si compila in codice Strudel visibile a destra.
-- **Brani**: brani a scene (si aprono in Componi) e brani scritti nel codice (si modificano nell'editor, con Salva il codice nel brano). Player con timeline cliccabile, pulsanti per gli stacchi, ripetizione della sezione, stop automatico.
-  - *Synth Lab Demo*: la traccia di prova del primo giorno, ora in 5 scene con cambio di tonalità e tempo nel Drop 2.
-  - *Ghost Protocol*: hard techno cyberpunk, 60 battute, 1:43. Tempo da 132 a 148 BPM in rampa, layer continui con automazione per battuta, sezioni di passaggio (Fall, Rebuild), cambio di tonalità nel drop B.
+- **Barra in alto**: Play/Pausa, Stop, lingua. Barra spaziatrice = play e pausa.
+- **Componi**: arrangiatore a scene con selettore del brano. Ogni scena ha nome, battute, entrata (taglio netto o dissolvenza), BPM (anche in rampa fino a fine scena), tonalità, accordi, crash sul primo colpo, mezza battuta di silenzio finale, e tutti i canali: sequencer (7 righe), basso, arpeggio, hook, pad, texture, riser. Volume e filtro hanno l'automazione ↗ fino a fine scena; ci sono saturazione, sgranatura (bitcrusher), risonanza, FM e filtro vocale. Clic su una scena mentre suona = salto lì. Salva, Salva come nuovo, Nuovo brano, Elimina o Ripristina originale.
+- **Brani**: tutti i brani a scene si aprono in Componi. Player con timeline cliccabile, Pausa/Riprendi e Stop, pulsanti per gli stacchi, ripetizione della sezione, stop automatico.
+  - *Ghost Protocol* e *Neon Ascent* in versione a scene, *Synth Lab Demo* (la traccia di prova del primo giorno).
+  - In fondo, le versioni originali scritte a mano (`patterns/05`, `patterns/06`), modificabili nell'editor con Salva il codice nel brano.
+  - *Ghost Protocol* (codice): hard techno cyberpunk, 60 battute, 1:43. Tempo da 132 a 148 BPM in rampa, layer continui con automazione per battuta, sezioni di passaggio (Fall, Rebuild), cambio di tonalità nel drop B.
   - *Neon Ascent*: techno trance, 128 BPM, 32 battute, 60 s.
 - **Visual**: sei temi.
   - *Palco*: batteria, cassa del basso, tastiera, sequencer, synth lead e bobina di Tesla che si accendono quando lo strumento suona.
@@ -46,7 +48,8 @@ Aggiungi `.analyze("nome")` a un layer. Nomi riconosciuti dal Palco: `kick`, `sn
 | `index.html` | Markup dell'interfaccia |
 | `src/main.js` | Libreria dei brani, arrangiatore, controlli, trasporto, collegamento con l'editor Strudel |
 | `src/i18n.js` | Testi in italiano e inglese |
-| `src/music.js` | Tonalità, accordi, preset, compilatore da scene a codice, brano demo |
+| `src/music.js` | Tonalità, accordi, preset, stato di una scena, compilatore da scene a codice, brano demo |
+| `src/tracks.js` | Ghost Protocol e Neon Ascent in versione a scene |
 | `src/songs.js` | Lettura di sezioni e tempo dal codice di un brano |
 | `src/content.js` | Lezioni, libreria suoni, riferimenti |
 | `src/visuals.js` | Visual su canvas sincronizzati con l'audio |

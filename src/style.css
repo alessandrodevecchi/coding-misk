@@ -115,10 +115,21 @@
   .arr-strip .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); box-shadow: 0 0 8px var(--a1); left: 0; pointer-events: none; }
   .arr-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .arr-tools .song-meta { margin-left: auto; }
-  .arr-scene { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; }
-  @media (max-width: 560px) { .arr-scene { grid-template-columns: 1fr 1fr; } .arr-scene .ctrl:first-child { grid-column: 1 / -1; } }
+  .arr-scene { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .arr-flags { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .bpm { display: flex; align-items: center; gap: 6px; }
+  .bpm input[type=number] { width: 70px; border-radius: 0; }
+  #bpm-end-row { margin-top: 4px; }
+  #bpm-end-row input { border-radius: 6px; }
+  .ramp { margin-left: auto; border: 1px solid var(--line); background: var(--panel2); border-radius: 4px; font-size: 11px; line-height: 1; padding: 3px 6px; color: var(--muted); }
+  .ramp[aria-pressed="true"] { border-color: var(--a2); color: var(--a2); }
+  .ctrl .end { margin-top: 2px; }
+  .ctrl .end .lbl { color: var(--a2); }
+  .drumctrls { margin-bottom: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .stopbtn { min-height: 44px; border-radius: 999px; padding: 0 16px; }
   .badge { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
   .badge.composed { border-color: var(--a1); color: var(--a1); }
+  .songs-sub { margin-top: 12px; font-size: 15px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .song-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
   /* sequencer stile 909 */

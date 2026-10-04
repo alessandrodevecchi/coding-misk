@@ -495,8 +495,6 @@ export function startVisuals({ getS, getMode, isPlaying, sched, readout }) {
     if (logo) logo.style.setProperty('--pulse', kick.toFixed(3));
     eq.forEach((el, i) => el.style.setProperty('--l', (playing ? lv[EQ[i]] : .15 + .1 * Math.sin(now / 400 + i)).toFixed(3)));
 
-    const btn = $('#play');
-    if (btn.getAttribute('aria-pressed') !== String(playing)) { btn.setAttribute('aria-pressed', playing); btn.textContent = playing ? '■ Stop' : '▶ Play'; }
     $('#readout').textContent = readout(cyc, Math.max(0, step), playing);
     requestAnimationFrame(frame);
   }

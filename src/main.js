@@ -1,6 +1,7 @@
 import '@strudel/repl';
 import './style.css';
-import { KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, compileTrack, DEMO_TRACK, cloneState } from './music.js';
+import { KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, compileTrack, cloneState, normalizeState } from './music.js';
+import { BUILTIN_TRACKS } from './tracks.js';
 import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
 import { t, tx, getLang, setLang } from './i18n.js';
@@ -17,20 +18,20 @@ const store = {
 setLang(getLang());
 
 // ---------- libreria dei brani ----------
-// "composed": fatti di scene, si modificano con l'arrangiatore.
-// "coded": scritti a mano nel codice, si modificano nell'editor.
+// "composed": fatti di scene, si aprono nell'arrangiatore.
+// "coded": le versioni originali scritte a mano, si modificano nell'editor.
 // Le modifiche dell'utente vivono in localStorage e hanno la precedenza sugli originali.
 const user = store.get('coding-misk-library', { tracks: [], code: {} });
 const saveLibrary = () => store.set('coding-misk-library', user);
 const CODED = SONGS.map(sg => ({ ...sg, kind: 'coded' }));
-const isBuiltin = id => id === DEMO_TRACK.id || CODED.some(c => c.id === id);
-function library() {
-  const demo = user.tracks.find(u => u.id === DEMO_TRACK.id) || DEMO_TRACK;
-  return [
-    ...[demo, ...user.tracks.filter(u => u.id !== DEMO_TRACK.id)].map(tr => ({ ...tr, kind: 'composed' })),
-    ...CODED.map(c => ({ ...c, code: user.code[c.id] || c.code })),
-  ];
+const builtinOf = id => BUILTIN_TRACKS.find(b => b.id === id);
+const isBuiltin = id => !!builtinOf(id) || CODED.some(c => c.id === id);
+const withStates = tr => ({ ...tr, scenes: tr.scenes.map(s => ({ ...s, state: normalizeState(s.state) })) });
+function composedTracks() {
+  const builtins = BUILTIN_TRACKS.map(b => { const o = user.tracks.find(u => u.id === b.id); return o ? { ...b, ...o } : b; });
+  return [...builtins, ...user.tracks.filter(u => !builtinOf(u.id))].map(tr => ({ ...withStates(tr), kind: 'composed' }));
 }
+const codedTracks = () => CODED.map(c => ({ ...c, code: user.code[c.id] || c.code }));
 // oggetto riproducibile: codice + mappa di sezioni e tempo
 function playable(tr) {
   const code = tr.kind === 'composed' ? compileTrack(tr) : tr.code;
@@ -39,18 +40,19 @@ function playable(tr) {
 
 // ---------- brano in modifica ----------
 const draft = store.get('coding-misk-draft', null);
-let T = draft && draft.T && draft.T.scenes && draft.T.scenes.length ? draft.T : clone(DEMO_TRACK);
+let T = withStates(draft && draft.T && draft.T.scenes && draft.T.scenes.length ? draft.T : clone(BUILTIN_TRACKS[0]));
 let sel = Math.min(draft ? draft.sel || 0 : 0, T.scenes.length - 1);
 let dirty = !!(draft && draft.dirty);
 let S = T.scenes[sel].state;
-let look = store.get('coding-misk-look', 'palco');
+let look = store.get('coding-misk-look', T.look || 'palco');
 if (!LOOKS.some(([k]) => k === look)) look = 'palco';
 let compiled = playable({ ...T, kind: 'composed' });
 const saveDraft = () => store.set('coding-misk-draft', { T, sel, dirty });
 const sceneStart = i => T.scenes.slice(0, i).reduce((a, s) => a + s.bars, 0);
 
-// ---------- editor Strudel ----------
+// ---------- editor Strudel e trasporto ----------
 let ed = null, mode = 'track', evalTimer = 0, song = null, loopIdx = -1, follow = true, seeking = false;
+let paused = null; // { id, cyc } quando la musica è in pausa
 let source = { kind: 'track' };
 const el = document.createElement('strudel-editor');
 el.innerHTML = `<!--\n${compiled.code}\n-->`;
@@ -69,8 +71,8 @@ function initAudioOnce() {
   return audioInit;
 }
 
-// Riproduce un brano dalla battuta "bar": lo scheduler di Strudel riprende da lastEnd,
-// quindi basta impostarlo prima di avviare. Il tempo lo gestisce transport() battuta per battuta.
+// Riproduce un brano dalla posizione "bar" (anche frazionaria): lo scheduler di Strudel riprende
+// da lastEnd, quindi basta impostarlo prima di avviare. Il tempo lo gestisce transport() battuta per battuta.
 async function playSong(sg, bar = 0, as = 'free') {
   if (seeking) return;
   seeking = true;
@@ -79,12 +81,12 @@ async function playSong(sg, bar = 0, as = 'free') {
     await ready;
     await initAudioOnce();
     const m = sg.meta;
-    bar = Math.max(0, Math.min(m.bars - 1, Math.floor(bar)));
-    song = sg; mode = as;
+    bar = Math.max(0, Math.min(m.bars - .01, bar));
+    paused = null; song = sg; mode = as;
     source = as === 'track' ? { kind: 'track' } : { kind: 'song', name: sg.title, id: sg.id };
     renderSource();
     ed.stop();
-    ed.setCode(withVisuals(sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+m.bpm[bar].toFixed(2)}/4)`));
+    ed.setCode(withVisuals(sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+m.bpm[Math.floor(bar)].toFixed(2)}/4)`));
     sched().lastEnd = bar;
     if (loopIdx >= 0) loopIdx = m.sectionAt(bar);
     if (as === 'track') selectScene(m.sectionAt(bar));
@@ -97,10 +99,23 @@ async function play() {
   await ready;
   await initAudioOnce();
   if (mode === 'track' && !isPlaying()) return playSong(compiled, sceneStart(sel), 'track');
+  paused = null;
   await ed.evaluate();
   updateShare();
 }
-async function stop() { await ready; ed.stop(); }
+function pause() {
+  if (!isPlaying()) return;
+  paused = { id: song ? song.id : null, cyc: sched().now() };
+  ed.stop();
+}
+function resume() {
+  const p = paused;
+  if (p && song && p.id === song.id) return playSong(song, p.cyc, mode);
+  paused = null;
+  return play();
+}
+const togglePlay = () => isPlaying() ? pause() : paused ? resume() : play();
+async function stop() { await ready; paused = null; ed.stop(); }
 
 // ogni modifica alla composizione: brano non salvato, codice ricompilato, rivalutato se sta suonando
 function changed() {
@@ -116,7 +131,7 @@ function changed() {
   if (isPlaying()) evalTimer = setTimeout(() => ed.evaluate(), 150);
 }
 async function loadFree(code, src) {
-  song = null;
+  song = null; paused = null;
   initAudioOnce();
   await ready;
   await initAudioOnce();
@@ -128,7 +143,7 @@ async function loadFree(code, src) {
 }
 function backToTrack() {
   const wasPlaying = isPlaying();
-  mode = 'track'; source = { kind: 'track' };
+  mode = 'track'; source = { kind: 'track' }; paused = null;
   renderSource();
   $$('.snd.on').forEach(b => b.classList.remove('on'));
   if (wasPlaying) return playSong(compiled, sceneStart(sel), 'track');
@@ -184,10 +199,13 @@ $('#save-code').addEventListener('click', () => {
   saveLibrary(); renderSongs(); toast(t('codeSaved'));
 });
 
-$('#play').addEventListener('click', () => isPlaying() ? stop() : play());
+$('#play').addEventListener('click', togglePlay);
+$('#stop').addEventListener('click', stop);
 document.addEventListener('keydown', e => {
-  if (!(e.ctrlKey || e.metaKey)) return;
   const inEditor = e.target.closest && e.target.closest('strudel-editor');
+  // barra spaziatrice: play/pausa, tranne mentre si scrive o su un pulsante
+  if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !inEditor && !e.target.closest('input, select, textarea, button, [contenteditable]')) { e.preventDefault(); togglePlay(); return; }
+  if (!(e.ctrlKey || e.metaKey)) return;
   if (e.key === 'Enter' && !inEditor) { e.preventDefault(); play(); }
   if (e.key === '.' && !inEditor) { e.preventDefault(); stop(); }
 });
@@ -199,16 +217,23 @@ function selectScene(i) {
   sel = i; S = T.scenes[i].state;
   saveDraft(); syncAll(); renderArranger();
 }
+function renderTrackPick() {
+  const list = composedTracks();
+  if (!list.some(tr => tr.id === T.id)) list.push({ ...T, kind: 'composed' });
+  $('#track-pick').innerHTML = list.map(tr => `<option value="${esc(tr.id)}">${esc(tr.id === T.id ? T.title : tr.title)}${!isBuiltin(tr.id) ? ` · ${t('mine')}` : ''}</option>`).join('');
+  $('#track-pick').value = T.id;
+}
 function renderArranger() {
   const total = T.scenes.reduce((a, s) => a + s.bars, 0);
   $('#arr-strip').innerHTML = T.scenes.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" style="flex-grow:${s.bars}" aria-current="${i === sel}">
-      <b>${esc(s.name || t('newScene', { n: i + 1 }))}</b><span>${s.bars} · ${s.state.bpm}</span></button>`).join('') + '<span class="head"></span>';
+      <b>${esc(s.name || t('newScene', { n: i + 1 }))}</b><span>${s.bars} · ${s.state.bpmEnd ? `${s.state.bpm}→${s.state.bpmEnd}` : s.state.bpm}</span></button>`).join('') + '<span class="head"></span>';
   const sc = T.scenes[sel];
   if (document.activeElement !== $('#track-title')) $('#track-title').value = T.title;
   if (document.activeElement !== $('#sc-name')) $('#sc-name').value = sc.name;
   if (document.activeElement !== $('#sc-bars')) $('#sc-bars').value = sc.bars;
   $('#sc-fade').value = String(sel === 0 ? 0 : sc.fade || 0);
   $('#sc-fade').disabled = sel === 0;
+  $('#sc-crash').checked = !!sc.crash; $('#sc-breath').checked = !!sc.breath;
   $('#sc-left').disabled = sel === 0; $('#sc-right').disabled = sel === T.scenes.length - 1; $('#sc-del').disabled = T.scenes.length === 1;
   $('#dirty').textContent = dirty ? t('unsaved') : '';
   const builtin = isBuiltin(T.id), overridden = user.tracks.some(u => u.id === T.id);
@@ -216,17 +241,27 @@ function renderArranger() {
   $('#tr-del').disabled = builtin && !overridden && !dirty;
   $('#arr-total').textContent = t('arrTotal', { scenes: T.scenes.length, bars: total, time: clock(compiled.meta.seconds) });
   $('#sc-loop').checked = loopIdx >= 0 && mode === 'track';
+  renderTrackPick();
 }
+// clic su una scena: se il brano suona salta lì, altrimenti la seleziona
 $('#arr-strip').addEventListener('click', e => {
-  const b = e.target.closest('[data-scene-i]'); if (b) selectScene(+b.dataset.sceneI);
-});
-$('#arr-strip').addEventListener('dblclick', e => {
-  const b = e.target.closest('[data-scene-i]'); if (b) playSong(compiled, sceneStart(+b.dataset.sceneI), 'track');
+  const b = e.target.closest('[data-scene-i]'); if (!b) return;
+  const i = +b.dataset.sceneI;
+  if (isPlaying() && mode === 'track') return playSong(compiled, sceneStart(i), 'track');
+  paused = null; selectScene(i);
 });
 $('#track-title').addEventListener('input', e => { T.title = e.target.value; changed(); renderSource(); });
+$('#track-pick').addEventListener('change', e => {
+  const tr = composedTracks().find(x => x.id === e.target.value);
+  if (!tr || !loadTrack(tr)) { e.target.value = T.id; return; }
+  if (tr.look) setLook(tr.look);
+  if (mode !== 'track') backToTrack(); else if (ed) { if (isPlaying()) playSong(compiled, 0, 'track'); else ed.setCode(compiled.code); }
+});
 $('#sc-name').addEventListener('input', e => { T.scenes[sel].name = e.target.value; changed(); });
 $('#sc-bars').addEventListener('change', e => { T.scenes[sel].bars = Math.max(1, Math.min(64, Math.round(+e.target.value) || 8)); changed(); });
 $('#sc-fade').addEventListener('change', e => { T.scenes[sel].fade = +e.target.value; changed(); });
+$('#sc-crash').addEventListener('change', e => { T.scenes[sel].crash = e.target.checked; changed(); });
+$('#sc-breath').addEventListener('change', e => { T.scenes[sel].breath = e.target.checked; changed(); });
 $('#sc-add').addEventListener('click', () => {
   const copy = clone(T.scenes[sel]);
   copy.name = t('newScene', { n: T.scenes.length + 1 }); copy.fade = 0;
@@ -247,6 +282,8 @@ const moveScene = d => {
 $('#sc-left').addEventListener('click', () => moveScene(-1));
 $('#sc-right').addEventListener('click', () => moveScene(1));
 $('#sc-play').addEventListener('click', () => playSong(compiled, sceneStart(sel), 'track'));
+$('#sc-pause').addEventListener('click', togglePlay);
+$('#sc-stop').addEventListener('click', stop);
 $('#sc-loop').addEventListener('change', e => {
   loopIdx = e.target.checked ? sel : -1;
   $$('[data-loop]').forEach(x => x.checked = false);
@@ -256,40 +293,40 @@ $('#sc-follow').addEventListener('change', e => { follow = e.target.checked; });
 
 function loadTrack(tr) {
   if (tr.id !== T.id && dirty && !confirmTwice('load', t('loadConfirm'))) return false;
-  if (tr.id !== T.id) { T = clone({ id: tr.id, title: tr.title, look: tr.look, scenes: tr.scenes }); dirty = false; }
-  sel = 0; S = T.scenes[0].state;
+  if (tr.id !== T.id) { T = withStates(clone({ id: tr.id, title: tr.title, look: tr.look, scenes: tr.scenes })); dirty = false; }
+  sel = 0; S = T.scenes[0].state; paused = null;
   compiled = playable({ ...T, kind: 'composed' });
   saveDraft(); syncAll(); renderArranger(); renderSource();
   return true;
 }
+const asStored = () => clone({ id: T.id, title: T.title, look: T.look, scenes: T.scenes });
 $('#tr-save').addEventListener('click', () => {
   const i = user.tracks.findIndex(u => u.id === T.id);
-  const copy = clone({ id: T.id, title: T.title, look: T.look, scenes: T.scenes });
-  if (i >= 0) user.tracks[i] = copy; else user.tracks.push(copy);
+  if (i >= 0) user.tracks[i] = asStored(); else user.tracks.push(asStored());
   dirty = false; saveLibrary(); saveDraft(); renderArranger(); renderSongs(); toast(t('trackSaved'));
 });
 $('#tr-saveas').addEventListener('click', () => {
   T.id = 'u-' + Date.now(); T.title = t('copyOf', { name: T.title });
-  user.tracks.push(clone({ id: T.id, title: T.title, look: T.look, scenes: T.scenes }));
+  user.tracks.push(asStored());
   dirty = false; compiled = playable({ ...T, kind: 'composed' });
   saveLibrary(); saveDraft(); renderArranger(); renderSongs(); renderSource(); toast(t('trackSaved'));
 });
 $('#tr-new').addEventListener('click', () => {
   if (dirty && !confirmTwice('new', t('loadConfirm'))) return;
-  T = { id: 'u-' + Date.now(), title: t('newTrackTitle'), look, scenes: [{ name: t('newScene', { n: 1 }), bars: 8, fade: 0, state: cloneState(DEFAULT) }] };
+  T = { id: 'u-' + Date.now(), title: t('newTrackTitle'), look, scenes: [{ name: t('newScene', { n: 1 }), bars: 8, fade: 0, crash: false, breath: false, state: cloneState(DEFAULT) }] };
   sel = 0; S = T.scenes[0].state; syncAll(); changed();
 });
 $('#tr-del').addEventListener('click', () => {
   if (!confirmTwice('delete')) return;
-  const builtin = isBuiltin(T.id);
+  const orig = builtinOf(T.id);
   user.tracks = user.tracks.filter(u => u.id !== T.id);
   saveLibrary();
-  T = clone(builtin ? DEMO_TRACK : (user.tracks[0] || DEMO_TRACK));
+  T = withStates(clone(orig || composedTracks()[0]));
   dirty = false; sel = 0; S = T.scenes[0].state;
   compiled = playable({ ...T, kind: 'composed' });
   saveDraft(); syncAll(); renderArranger(); renderSongs(); renderSource();
-  if (mode === 'track' && ed) ed.setCode(compiled.code);
-  toast(builtin ? t('restored') : t('trackDeleted'));
+  if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.code);
+  toast(orig ? t('restored') : t('trackDeleted'));
 });
 
 // ---------- controlli della scena ----------
@@ -298,39 +335,49 @@ const opts = (box, list) => {
   box.innerHTML = list.map(([val, l]) => `<option value="${esc(val)}">${esc(tx(l))}</option>`).join('');
   if (v) box.value = v;
 };
-const CHANNELS = [
-  { id: 'bass', ctrls: [
-    ['select', 'preset', 'rhythm', () => Object.entries(BASS).map(([k, v]) => [k, v[0]])],
-    ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume'], ['cutoff', 'cutoff', 'filter'], ['select', 'move', 'filterMove', () => MOVES]] },
-  { id: 'arp', ctrls: [
-    ['select', 'preset', 'figure', () => Object.entries(ARPS).map(([k, v]) => [k, v[0]])],
-    ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume'], ['cutoff', 'cutoff', 'filter'],
-    ['select', 'speed', 'speed', () => [['16', t('sixteenths')], ['8', t('eighths')]]], ['range', 'delay', 'delay']] },
-  { id: 'hook', ctrls: [
-    ['select', 'preset', 'melody', () => Object.entries(HOOKS).map(([k, v]) => [k, v[0]])],
-    ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume'], ['cutoff', 'cutoff', 'filter'],
-    ['select', 'move', 'filterMove', () => MOVES], ['range', 'delay', 'delay']] },
-  { id: 'pad', ctrls: [
-    ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume'], ['cutoff', 'cutoff', 'filter'],
-    ['select', 'move', 'filterMove', () => MOVES], ['range', 'room', 'reverb']] },
-  { id: 'riser', ctrls: [
-    ['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['4', '8', '16'].map(n => [n, t('nBars', { n })])]] },
-];
-const cutToRange = c => Math.round(Math.log(c / 100) / Math.log(80) * 100);
-const rangeToCut = v => Math.round(100 * Math.pow(80, v / 100));
+const named = obj => Object.entries(obj).map(([k, v]) => [k, v[0]]);
+const NUM4 = { max: 4, step: .1, fmt: 'num' };
+// [tipo, chiave, etichetta, opzioni]: "range" e "cutoff" con ramp hanno anche il valore a fine scena
+const CONTROLS = {
+  drums: [['range', 'gain', 'volume', { ramp: 1 }], ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['range', 'drive', 'drive', NUM4], ['range', 'grit', 'grit']],
+  bass: [['select', 'preset', 'rhythm', () => named(BASS)], ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
+    ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['range', 'reso', 'reso', { max: 30, step: 1, fmt: 'num' }], ['range', 'drive', 'drive', NUM4]],
+  arp: [['select', 'preset', 'figure', () => named(ARPS)], ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
+    ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['select', 'speed', 'speed', () => [['16', t('sixteenths')], ['8', t('eighths')]]],
+    ['range', 'reso', 'reso', { max: 30, step: 1, fmt: 'num' }], ['range', 'drive', 'drive', NUM4], ['range', 'delay', 'delay']],
+  hook: [['select', 'preset', 'melody', () => named(HOOKS)], ['select', 'mode', 'mode', () => MODES], ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
+    ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['range', 'fm', 'fm', { max: 8, step: .5, fmt: 'num' }],
+    ['select', 'vowel', 'vowel', () => VOWELS], ['range', 'grit', 'grit'], ['range', 'delay', 'delay']],
+  pad: [['select', 'preset', 'type', () => named(PADS)], ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
+    ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['range', 'drive', 'drive', NUM4], ['range', 'room', 'reverb']],
+  texture: [['select', 'sample', 'sample', () => TEXTURES.map(x => [x, x])], ['select', 'rhythm', 'rhythm', () => named(TEX_RHYTHMS)],
+    ['range', 'gain', 'volume', { ramp: 1 }], ['range', 'grit', 'grit'], ['range', 'room', 'reverb']],
+  riser: [['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['2', '4', '8', '16'].map(n => [n, t('nBars', { n })])],
+    ['select', 'dir', 'direction', () => [['up', t('up')], ['down', t('down')]]]],
+};
+const CHANNELS = ['bass', 'arp', 'hook', 'pad', 'texture', 'riser'];
+// filtro su scala logaritmica 100 Hz … 20 kHz (20 kHz = aperto)
+const cutToRange = c => Math.round(Math.log(c / 100) / Math.log(200) * 100);
+const rangeToCut = v => Math.round(100 * Math.pow(200, v / 100));
 
+function controlHtml(ch, [type, key, label, o]) {
+  const id = `${ch}-${key}`, path = `${ch}.${key}`;
+  if (type === 'select') return `<div class="ctrl"><label class="lbl" for="${id}">${t(label)}</label><select id="${id}" data-path="${path}"></select></div>`;
+  const opt = typeof o === 'object' ? o : {};
+  const attrs = type === 'cutoff' ? 'data-cut="1" min="0" max="100" step="1"' : `min="0" max="${opt.max || 1}" step="${opt.step || .01}"${opt.fmt ? ` data-fmt="${opt.fmt}"` : ''}`;
+  const slider = (sid, spath) => `<input type="range" id="${sid}" data-path="${spath}" ${attrs}>`;
+  const ramp = opt.ramp ? `<button type="button" class="ramp" data-ramp="${path}" aria-label="${esc(t('rampToggle'))}" title="${esc(t('rampToggle'))}">↗</button>` : '';
+  const end = opt.ramp ? `<div class="end" data-end-for="${path}" hidden><div class="row"><label class="lbl" for="${id}End">${esc(t('endOf', { name: t(label) }))}</label><output id="${id}End-o"></output></div>${slider(id + 'End', path + 'End')}</div>` : '';
+  return `<div class="ctrl"><div class="row"><label class="lbl" for="${id}">${t(label)}</label>${ramp}<output id="${id}-o"></output></div>${slider(id, path)}${end}</div>`;
+}
 function renderChannels() {
+  $('#drums-ctrls').innerHTML = CONTROLS.drums.map(c => controlHtml('drums', c)).join('');
   $('#channels').innerHTML = CHANNELS.map(ch => `
-    <div class="card" id="ch-${ch.id}">
-      <div class="chhead"><button class="led" data-on="${ch.id}" aria-label="${esc(t('onoff', { name: t(ch.id) }))}"></button><h3>${t(ch.id)}</h3><span class="hint">${t(ch.id + 'Hint')}</span></div>
-      <div class="ctrls">${ch.ctrls.map(([type, key, label]) => {
-        const id = `${ch.id}-${key}`;
-        if (type === 'select') return `<div class="ctrl"><label class="lbl" for="${id}">${t(label)}</label><select id="${id}" data-path="${ch.id}.${key}"></select></div>`;
-        const cut = type === 'cutoff';
-        return `<div class="ctrl"><div class="row"><label class="lbl" for="${id}">${t(label)}</label><output id="${id}-o"></output></div><input type="range" id="${id}" data-path="${ch.id}.${key}" ${cut ? 'data-cut="1" min="0" max="100" step="1"' : 'min="0" max="1" step="0.01"'}></div>`;
-      }).join('')}</div>
+    <div class="card" id="ch-${ch}">
+      <div class="chhead"><button class="led" data-on="${ch}" aria-label="${esc(t('onoff', { name: t(ch) }))}"></button><h3>${t(ch)}</h3><span class="hint">${t(ch + 'Hint')}</span></div>
+      <div class="ctrls">${CONTROLS[ch].map(c => controlHtml(ch, c)).join('')}</div>
     </div>`).join('');
-  for (const ch of CHANNELS) for (const [type, key, , list] of ch.ctrls) if (type === 'select') opts($(`#${ch.id}-${key}`), list());
+  for (const ch of ['drums', ...CHANNELS]) for (const [type, key, , list] of CONTROLS[ch]) if (type === 'select') opts($(`#${ch}-${key}`), list());
 }
 function renderSeq() {
   $('#seq').innerHTML = '<span></span><div class="stepnums">' + Array.from({ length: 16 }, (_, i) => `<span>${i + 1}</span>`).join('') + '</div>' +
@@ -366,12 +413,18 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('click', e => {
   const led = e.target.closest('[data-on]');
-  if (led) { S[led.dataset.on].on = !S[led.dataset.on].on; syncAll(); changed(); }
+  if (led) { S[led.dataset.on].on = !S[led.dataset.on].on; syncAll(); changed(); return; }
+  // automazione: attiva il valore a fine scena partendo da quello attuale, o la toglie
+  const rb = e.target.closest('[data-ramp]');
+  if (rb) { const p = rb.dataset.ramp + 'End'; setPath(p, getPath(p) === null || getPath(p) === undefined ? getPath(rb.dataset.ramp) : null); syncAll(); changed(); }
 });
 $('#key').addEventListener('change', e => { S.key = e.target.value; changed(); });
 $('#prog').addEventListener('change', e => { S.prog = e.target.value; changed(); });
-$('#bpm').addEventListener('change', e => { S.bpm = Math.max(60, Math.min(200, Math.round(+e.target.value) || 138)); syncAll(); changed(); });
-$$('[data-bpm]').forEach(b => b.addEventListener('click', () => { S.bpm = Math.max(60, Math.min(200, S.bpm + +b.dataset.bpm)); syncAll(); changed(); }));
+const clampBpm = v => Math.max(60, Math.min(200, Math.round(+v) || 138));
+$('#bpm').addEventListener('change', e => { S.bpm = clampBpm(e.target.value); syncAll(); changed(); });
+$('#bpm-end').addEventListener('change', e => { S.bpmEnd = clampBpm(e.target.value); syncAll(); changed(); });
+$('#bpm-ramp').addEventListener('click', () => { S.bpmEnd = S.bpmEnd == null ? S.bpm : null; syncAll(); changed(); });
+$$('[data-bpm]').forEach(b => b.addEventListener('click', () => { S.bpm = clampBpm(S.bpm + +b.dataset.bpm); syncAll(); changed(); }));
 
 const setLook = l => { look = l; store.set('coding-misk-look', l); syncAll(); };
 $('#looks').addEventListener('click', e => { const b = e.target.closest('[data-look]'); if (b) setLook(b.dataset.look); });
@@ -387,13 +440,22 @@ $('#fs').addEventListener('click', () => {
 function syncOutputs() {
   $$('input[type=range][data-path]').forEach(i => {
     const v = getPath(i.dataset.path), o = $('#' + i.id + '-o');
-    if (o) o.textContent = i.dataset.cut ? `${v} Hz` : `${Math.round(v * 100)}%`;
+    if (!o || v === null || v === undefined) return;
+    o.textContent = i.dataset.cut ? (v >= 18000 ? '∞' : `${v} Hz`) : i.dataset.fmt === 'num' ? String(v) : `${Math.round(v * 100)}%`;
   });
 }
 function syncAll() {
   document.documentElement.dataset.look = look;
   $('#bpm').value = S.bpm; $('#key').value = S.key; $('#prog').value = S.prog;
-  $$('[data-path]').forEach(i => { const v = getPath(i.dataset.path); i.value = i.dataset.cut ? cutToRange(v) : v; });
+  $('#bpm-ramp').setAttribute('aria-pressed', S.bpmEnd != null);
+  $('#bpm-end-row').hidden = S.bpmEnd == null;
+  if (S.bpmEnd != null) $('#bpm-end').value = S.bpmEnd;
+  $$('[data-path]').forEach(i => { const v = getPath(i.dataset.path); if (v === null || v === undefined) return; i.value = i.dataset.cut ? cutToRange(v) : v; });
+  $$('[data-ramp]').forEach(b => {
+    const on = getPath(b.dataset.ramp + 'End') != null;
+    b.setAttribute('aria-pressed', on);
+    const end = $(`[data-end-for="${b.dataset.ramp}"]`); if (end) end.hidden = !on;
+  });
   $$('[data-on]').forEach(b => {
     const on = S[b.dataset.on].on;
     b.setAttribute('aria-pressed', on);
@@ -408,6 +470,7 @@ function syncAll() {
 
 // tab
 const TABS = ['componi', 'brani', 'guida', 'suoni', 'riferimenti'];
+let cards = [];
 function showTab(name) {
   $$('.tab').forEach(x => x.setAttribute('aria-selected', x.dataset.tab === name));
   for (const id of TABS) $('#tab-' + id).hidden = id !== name;
@@ -415,7 +478,6 @@ function showTab(name) {
   store.set('coding-misk-tab', name);
 }
 $$('.tab').forEach(tb => tb.addEventListener('click', () => showTab(tb.dataset.tab)));
-{ const tb = store.get('coding-misk-tab', 'componi'); if (TABS.includes(tb)) showTab(tb); }
 
 // ---------- guida ----------
 function renderLessons() {
@@ -437,34 +499,39 @@ $('#lessons').addEventListener('click', e => {
 });
 
 // ---------- brani ----------
-let cards = [];
+function songCard({ tr, p }, i) {
+  const m = p.meta, composed = tr.kind === 'composed';
+  const ticks = Array.from({ length: Math.max(0, Math.floor(m.bars / 4) - 1) }, (_, k) => `<i style="left:${(k + 1) * 4 / m.bars * 100}%"></i>`).join('');
+  return `<article class="card lesson song" data-song-card="${i}">
+    <div class="song-head"><span class="badge${composed ? ' composed' : ''}">${composed ? t('composedBadge') : t('codedBadge')}</span>${composed && !isBuiltin(tr.id) ? `<span class="badge">${t('mine')}</span>` : ''}
+      <span class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}</span></div>
+    <h3>${esc(tr.title)}</h3>
+    ${tr.style ? `<p>${esc(tx(tr.style))}</p>` : ''}
+    <div class="timeline" data-tl="${i}">
+      ${m.sections.map(sec => `<button class="sec${/drop/i.test(sec.key) ? ' drop' : ''}" style="flex:${sec.len}" data-seek="${sec.start}" title="${esc(t('barsRange', { a: sec.start + 1, b: sec.start + sec.len }))}" aria-label="${esc(t('seekAria', { name: sec.label, bar: sec.start + 1 }))}">${esc(sec.label)}</button>`).join('')}
+      <span class="ticks">${ticks}</span><span class="head"></span>
+    </div>
+    <div class="songbar">
+      <button class="btn primary" data-act="play">${t('songPlay')}</button>
+      <button class="btn" data-act="pause" hidden></button>
+      <button class="btn" data-act="stop" hidden>${t('stop')}</button>
+      ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}`}
+      <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
+      <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
+    </div>
+    ${m.sections.length > 1 ? `<div class="trans"><span class="lbl">${t('transitions')}</span>
+      ${m.sections.slice(1).map((sec, k) => `<button class="chip" data-seek="${Math.max(0, sec.start - 2)}">${esc(m.sections[k].label)} → ${esc(sec.label)}</button>`).join('')}
+    </div>` : ''}
+  </article>`;
+}
 function renderSongs() {
-  cards = library().map(tr => (tr.kind === 'composed' && tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr)).map(tr => ({ tr, p: playable(tr) }));
-  $('#songs').innerHTML = cards.map(({ tr, p }, i) => {
-    const m = p.meta, composed = tr.kind === 'composed';
-    const ticks = Array.from({ length: Math.max(0, Math.floor(m.bars / 4) - 1) }, (_, k) => `<i style="left:${(k + 1) * 4 / m.bars * 100}%"></i>`).join('');
-    const mine = composed && !isBuiltin(tr.id);
-    return `<article class="card lesson song" data-song-card="${i}">
-      <div class="song-head"><span class="badge${composed ? ' composed' : ''}">${composed ? t('composedBadge') : t('codedBadge')}</span>${mine ? `<span class="badge">${t('mine')}</span>` : ''}
-        <span class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}</span></div>
-      <h3>${esc(tr.title)}</h3>
-      ${tr.style ? `<p>${esc(tx(tr.style))}</p>` : ''}
-      ${composed ? '' : `<p class="note">${t('codedNote')}</p>`}
-      <div class="timeline" data-tl="${i}">
-        ${m.sections.map(sec => `<button class="sec${/drop/i.test(sec.key) ? ' drop' : ''}" style="flex:${sec.len}" data-seek="${sec.start}" title="${esc(t('barsRange', { a: sec.start + 1, b: sec.start + sec.len }))}" aria-label="${esc(t('seekAria', { name: sec.label, bar: sec.start + 1 }))}">${esc(sec.label)}</button>`).join('')}
-        <span class="ticks">${ticks}</span><span class="head"></span>
-      </div>
-      <div class="songbar">
-        <button class="btn primary" data-act="play">${t('songPlay')}</button>
-        ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}`}
-        <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
-        <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
-      </div>
-      ${m.sections.length > 1 ? `<div class="trans"><span class="lbl">${t('transitions')}</span>
-        ${m.sections.slice(1).map((sec, k) => `<button class="chip" data-seek="${Math.max(0, sec.start - 2)}">${esc(m.sections[k].label)} → ${esc(sec.label)}</button>`).join('')}
-      </div>` : ''}
-    </article>`;
-  }).join('') + `<p class="note">${t('seekHint')}</p>`;
+  const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr));
+  const coded = codedTracks();
+  cards = [...composed, ...coded].map(tr => ({ tr, p: playable(tr) }));
+  $('#songs').innerHTML = cards.slice(0, composed.length).map(songCard).join('') +
+    `<h3 class="songs-sub">${t('codedSection')}</h3><p class="note">${t('codedIntro')}</p>` +
+    cards.slice(composed.length).map((c, k) => songCard(c, composed.length + k)).join('') +
+    `<p class="note">${t('seekHint')}</p>`;
 }
 // avvia un brano dalla card: i brani a scene si caricano anche nell'arrangiatore
 function startCard(i, bar) {
@@ -484,12 +551,15 @@ $('#songs').addEventListener('click', e => {
   if (act) {
     const a = act.dataset.act;
     if (a === 'play') return startCard(i, 0);
+    if (a === 'pause') return togglePlay();
+    if (a === 'stop') return stop();
     if (a === 'open') {
       if (!loadTrack(tr)) return;
+      if (tr.look) setLook(tr.look);
       if (mode !== 'track') backToTrack(); else if (ed && !isPlaying()) ed.setCode(compiled.code);
       showTab('componi'); return;
     }
-    if (a === 'code') { if (ed) ed.stop(); song = p; mode = 'free'; source = { kind: 'song', name: tr.title, id: tr.id }; renderSource(); if (ed) ed.setCode(p.code); updateShare(); return; }
+    if (a === 'code') { if (ed) ed.stop(); paused = null; song = p; mode = 'free'; source = { kind: 'song', name: tr.title, id: tr.id }; renderSource(); if (ed) ed.setCode(p.code); updateShare(); return; }
     if (a === 'restore') { if (!confirmTwice('restore-' + tr.id)) return; delete user.code[tr.id]; saveLibrary(); renderSongs(); toast(t('restored')); return; }
   }
   const chip = e.target.closest('.trans [data-seek]');
@@ -512,6 +582,7 @@ $('#songs').addEventListener('change', e => {
 });
 
 // trasporto, a ogni frame: tempo per battuta, ripetizione, stop a fine brano, scena che segue la riproduzione
+const pauseLabel = () => isPlaying() ? t('pause') : paused ? t('resume') : t('pause');
 (function transport() {
   requestAnimationFrame(transport);
   const s = sched();
@@ -527,6 +598,15 @@ $('#songs').addEventListener('change', e => {
     } else if (cyc >= m.bars) stop();
     if (mode === 'track' && follow) { const i = m.sectionAt(cyc); if (i >= 0 && i !== sel) selectScene(i); }
   }
+  // pulsanti di trasporto
+  const playBtn = $('#play'), state = playing ? 'playing' : paused ? 'paused' : 'stopped';
+  if (playBtn.dataset.state !== state) {
+    playBtn.dataset.state = state;
+    playBtn.setAttribute('aria-pressed', playing);
+    playBtn.textContent = playing ? t('pause') : paused ? t('resume') : '▶ Play';
+    $('#sc-pause').textContent = pauseLabel();
+    $('#sc-pause').disabled = state === 'stopped';
+  }
   // avanzamento nell'arrangiatore
   const head = $('#arr-strip .head');
   if (head) {
@@ -537,17 +617,22 @@ $('#songs').addEventListener('change', e => {
     if (b) head.style.left = `${b.offsetLeft + (trackCyc - compiled.meta.sections[idx].start) / compiled.meta.sections[idx].len * b.offsetWidth}px`;
     btns.forEach((x, j) => x.classList.toggle('playing', j === idx));
   }
-  // avanzamento nelle card
+  // avanzamento e pulsanti nelle card
   $$('[data-song-card]').forEach(card => {
     const c = cards[+card.dataset.songCard]; if (!c) return;
-    const active = playing && song && song.id === c.tr.id;
-    const m = active ? song.meta : c.p.meta, cyc = active ? s.now() : 0;
+    const mine = song && song.id === c.tr.id;
+    const active = playing && mine, isPaused = !playing && paused && mine;
+    const m = mine ? song.meta : c.p.meta, cyc = active ? s.now() : isPaused ? paused.cyc : 0;
     card.querySelector('.head').style.left = `${Math.min(100, cyc / m.bars * 100)}%`;
-    const cur = active ? m.sectionAt(cyc) : -1;
+    const cur = active || isPaused ? m.sectionAt(cyc) : -1;
     card.querySelectorAll('.sec').forEach((x, j) => x.classList.toggle('on', j === cur));
     const label = t('songTime', { t: clock(m.secondsAt(cyc)), total: clock(m.seconds), bar: Math.min(m.bars, Math.floor(cyc) + 1), bars: m.bars });
     const te = card.querySelector('.time');
     if (te.textContent !== label) te.textContent = label;
+    const pb = card.querySelector('[data-act=pause]'), sb = card.querySelector('[data-act=stop]');
+    pb.hidden = sb.hidden = !(active || isPaused);
+    const pl = active ? t('pause') : t('resume');
+    if (pb.textContent !== pl) pb.textContent = pl;
   });
 })();
 
@@ -580,6 +665,7 @@ function renderStatic() {
   opts($('#drums-preset'), [['', t('pickGroove')], ...Object.entries(GROOVES).map(([k, v]) => [k, v[0]])]);
   opts($('#sc-fade'), [['0', t('cut')], ['1', t('fade1')], ['2', t('fadeN', { n: 2 })], ['4', t('fadeN', { n: 4 })], ['8', t('fadeN', { n: 8 })]]);
   $('#looks').innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${esc(tx(l))}</button>`).join('');
+  $('#play').dataset.state = '';
 }
 function renderAll() {
   renderStatic(); renderChannels(); renderSeq(); renderLessons(); renderSongs(); renderSounds(); renderRefs(); renderSource(); renderArranger();
@@ -593,6 +679,7 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => {
 }));
 
 renderAll();
+{ const tb = store.get('coding-misk-tab', 'componi'); if (TABS.includes(tb)) showTab(tb); }
 updateShare();
 startVisuals({
   getS: () => ({ look }),
@@ -600,7 +687,7 @@ startVisuals({
   getMode: () => (mode === 'track' && song && isPlaying() && song.meta.sectionAt(sched().now()) === sel ? 'comp' : 'free'),
   isPlaying, sched,
   readout(cyc, step, playing) {
-    if (!playing) return `${S.bpm} BPM  ·  ${t('rdPaused')}\n${t('rdHint')}`;
+    if (!playing) return `${S.bpm} BPM  ·  ${paused ? t('resume').replace('▶ ', '') : t('rdPaused')}\n${t('rdHint')}`;
     const bpm = Math.round(sched().cps * 240);
     const bar = Math.floor(cyc);
     let line2 = $('#src').textContent;

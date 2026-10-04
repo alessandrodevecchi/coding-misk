@@ -48,3 +48,11 @@
 - Libreria in `localStorage`: brani dell'utente, modifiche ai brani inclusi (Ripristina originale), codice modificato dei brani scritti a mano.
 - Riproduzione: la scena selezionata segue il playhead ("Segui la riproduzione"); le modifiche durante il play rivalutano il codice senza fermare la musica.
 - Ghost Protocol e Neon Ascent restano brani "scritti nel codice": le loro automazioni non sono rappresentabili nelle scene.
+
+## 2026-10-05 (sera)
+
+- BPM, tonalità e accordi spostati dalla barra in alto al pannello della scena: sono proprietà della scena, non del brano. In alto restano Play/Pausa, Stop e lingua.
+- Modello della scena esteso (`normalizeState` completa gli stati salvati prima): automazioni ↗ di volume e filtro fino a fine scena, BPM in rampa (`bpmEnd`), saturazione, sgranatura, risonanza, FM, filtro vocale, modi della scala, preset rumble/acid/stab/pump/cyber/neon, canale Texture, riser che scende, crash sul primo colpo, mezza battuta di silenzio, tonalità Mi e Fa, progressione Cyber, riga Ride nel sequencer.
+- *Ghost Protocol* e *Neon Ascent* riscritti come brani a scene (`src/tracks.js`): si aprono in Componi. Gli originali in codice restano in fondo al tab Brani.
+- Selettore del brano in Componi. Clic su una scena durante la riproduzione = salto a quella scena (prima "Segui la riproduzione" riportava subito indietro la selezione).
+- Pausa/Riprendi (riparte dalla posizione esatta) e Stop: barra in alto, arrangiatore, card dei brani. Barra spaziatrice = play/pausa.
