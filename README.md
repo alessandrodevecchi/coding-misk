@@ -1,82 +1,83 @@
 # coding-misk
 
-Synth lab locale per comporre musica con il codice usando [Strudel](https://strudel.cc/), il porting JavaScript di [TidalCycles](https://tidalcycles.org/).
+**English** · [Italiano](README.it.md)
 
-Ispirazione: [Coding Trance Music (Full Narrated)](https://www.youtube.com/watch?v=GWXCCBsOMSg) di Switch Angel.
+A local lab for composing music by writing code, built on [Strudel](https://strudel.cc/), the JavaScript port of [TidalCycles](https://tidalcycles.org/). Every track becomes readable Strudel code that plays in the browser, with visuals synced to each instrument.
 
-## Avvio
+## Where it comes from
 
-Serve Node.js 20 o successivo.
+A year ago I got hooked on [Switch Angel](https://www.youtube.com/@Switch-Angel)'s videos, especially [Coding Trance Music](https://www.youtube.com/watch?v=GWXCCBsOMSg). The idea of music as code with strudel.cc stuck with me: tracks built live, one line at a time.
+
+This project combines that idea with what the new models can do, with my own twist. The first engine was rigid. I extended it with Claude, pushing at every round, until it could produce tracks with real structure: sections, transitions, odd meters, guitars and a balanced mix.
+
+## What it does
+
+- **Scene arranger.** A track is a sequence of scenes, each with a name, length, entry (hard cut or fade) and every setting: BPM including ramps, key, chords, meter (4/4, 3/4, 5/4, 7/8) and swing. Scenes compile to Strudel code in real time.
+- **Channels.** Drum sequencer with several drum machines, bass with riffs, guitar (clean, crunch, distorted, metal, palm muted) with riffs and stereo double tracking, arpeggio, hook with harmonies and dark modes, pad, texture (voices, metal hits, vinyl) and riser. Every channel can use oscillators or General MIDI instruments.
+- **Automation.** Volume, filter and tempo can move from the start to the end of a scene. Drive, bitcrusher, resonance, FM and vowel filter are available too.
+- **Player.** Clickable timeline, start from any bar, buttons to hear each transition between sections, section loop, pause and resume.
+- **Included tracks.** About twenty tracks across genres: techno, trance, hard techno, industrial, dark club, metal, melodic metal, phonk, progressive rock, lo-fi and 90s arcade, plus 30 second reels cut from the full tracks.
+- **Visuals.** Six canvas themes (Stage, Pixel, Sunset, Mountains, Space, Sonar). Each instrument has its own audio analyser, so on the Stage the drums, bass, guitar, keys and FX light up when they play.
+- **WAV export.** Records the track in real time from Strudel's output and downloads a stereo WAV.
+- **Custom samples.** Audio files placed in `public/samples/` become sounds you can use in tracks.
+- **Guide and sounds.** 14 lessons to listen to and a library to try drum machines, oscillators and samples.
+- **Italian and English**, including the comments in the generated code.
+
+## Ideas and next steps
+
+- **Vocals.** Find out how to generate them, probably with a small local model.
+- **Live coding.** Recreate a track built live, like in Switch Angel's videos.
+- **Music for short videos.** Use the tracks as background music for reels and social content, with ready-made lengths and starting points.
+- **Moods and presets.** Define reusable moods and presets to compose faster and with more variety.
+- **More genres.** Keep exploring different styles, with fewer layers and more rhythm.
+
+## Getting started
+
+Requires Node.js 20 or later.
 
 ```sh
 npm install
 npm run dev
 ```
 
-Si apre <http://localhost:5173>. Premi **Play**.
+The app opens at <http://localhost:5173>. Space bar plays and pauses, `Ctrl+Enter` (or `⌘+Enter`) plays or updates, `Ctrl+.` stops.
 
-- `Ctrl+Enter` o `⌘+Enter` avvia o aggiorna, da qualsiasi punto della pagina
-- `Ctrl+.` ferma
+## Branches
 
-## Interfaccia
+- `main` holds the stable version.
+- `develop` collects changes being tried out. When a change is confirmed, `develop` is merged into `main`.
 
-Italiano e inglese, con il selettore IT/EN in alto a destra.
+## Project layout
 
-- **Barra in alto**: Play/Pausa, Stop, lingua. Barra spaziatrice = play e pausa.
-- **Componi**: arrangiatore a scene con selettore del brano. Ogni scena ha nome, battute, entrata (taglio netto o dissolvenza), BPM (anche in rampa fino a fine scena), tonalità, accordi (anche settime), metro (4/4, 3/4, 5/4, 7/8), swing, crash sul primo colpo, mezza battuta di silenzio finale, e tutti i canali: sequencer (7 righe), basso, arpeggio, hook, pad, texture, riser. Canale **Chitarra**: tipo (pulita, crunch, distorta, metal hi-gain, palm mute), ritmo (power chord, chug, galoppo, riff, djent, tenuto), saturazione, accordatura, raddoppio stereo; il suono è un campione di chitarra sovrapposto a un dente di sega, saturati insieme, e il volume sta dopo la distorsione. L'hook ha armonia a terze o quinte, saturazione, ottava e modi scuri (locrio, cromatico in semitoni). Il basso ha riff con salti d'ottava, seconda bemolle e tritono. Ogni canale può usare un oscillatore o uno strumento General MIDI (chitarre, organi, piano elettrico, basso, archi, vibrafono…). Volume e filtro hanno l'automazione ↗ fino a fine scena; ci sono saturazione, sgranatura (bitcrusher), risonanza, FM e filtro vocale. Clic su una scena mentre suona = salto lì. Salva, Salva come nuovo, Nuovo brano, Elimina o Ripristina originale.
-- **Brani**: tutti i brani a scene si aprono in Componi. Player con timeline cliccabile, Pausa/Riprendi e Stop, pulsanti per gli stacchi, ripetizione della sezione, stop automatico.
-  - *Ghost Protocol* e *Neon Ascent* in versione a scene, *Synth Lab Demo* (la traccia di prova del primo giorno).
-  - *Segnale nel rumore*: il brano scritto con massima libertà, dal fruscio al 7/8 e ritorno (Re dorico, vibrafono, celesta, archi).
-  - *Luci Rosse* (club scuro da film d'azione, riff di basso distorto su un solo accordo), *DCI Jingle · carica*, *Insert Coin* (arcade anni '90).
-  - *Circuito Ruggine*: techno industrial cyberpunk con chitarre distorte un tono sotto (riff stomp e industrial), 132 BPM, 1:49.
-  - Brani interi e reel da 30 secondi ricavati da loro (il reel parte dal ritornello o dal drop): *Ferro* (metal), *Ali di cenere* (metal melodico con chitarre gemelle), *Drift* (phonk).
-  - *Neon Rush · reel 28s* (techno cyberpunk, 145 BPM, 17 battute esatte), *Settimo Cielo* (progressive rock in 7/8, 5/4 e 4/4), *Pioggia sul vetro* (lo-fi con swing e vinile).
-  - *Ten Years · ricostruzione* e *DCI Jingle · ricostruzione*: ricostruite analizzando due tracce audio (tempo, tonalità, accordi per battuta, struttura, griglia della batteria, sidechain).
-  - *Next Chapter* e *DCI Ignition*: brani nuovi negli stessi due stili.
-  - **⬇ Esporta WAV** (card e arrangiatore): registra il brano in tempo reale e scarica un WAV stereo 16 bit.
-  - In fondo, le versioni originali scritte a mano (`patterns/05`, `patterns/06`), modificabili nell'editor con Salva il codice nel brano.
-  - *Ghost Protocol* (codice): hard techno cyberpunk, 60 battute, 1:43. Tempo da 132 a 148 BPM in rampa, layer continui con automazione per battuta, sezioni di passaggio (Fall, Rebuild), cambio di tonalità nel drop B.
-  - *Neon Ascent*: techno trance, 128 BPM, 32 battute, 60 s.
-- **Visual**: sei temi.
-  - *Palco*: batteria con crash, cassa del basso, testata e cassa 4×12 con chitarra, tastiera e sequencer, synth lead, campionatore FX, bobina di Tesla: ogni strumento si accende quando suona.
-  - *Pixel*: città pixel art con montagne low poly.
-  - *Spazio*: nebulose, salto nell'iperspazio, aurora con la forma d'onda, gigante gassoso con anelli, comete, navicella.
-  - *Tramonto*, *Montagne*, *Sonar*.
-- **Guida**: 14 lezioni da caricare e ascoltare.
-- **Suoni**: anteprima di drum machine, oscillatori, suoni ruvidi e campioni.
-- **Apri su strudel.cc**: porta il codice corrente nell'editor ufficiale. Rampe di tempo, salto a una battuta e campioni extra funzionano solo in coding-misk.
+| Path             | Contents                                                            |
+| ---------------- | ------------------------------------------------------------------- |
+| `index.html`     | Interface markup                                                    |
+| `src/main.js`    | Track library, arranger, controls, transport, Strudel editor wiring |
+| `src/music.js`   | Keys, chords, presets, scene state, scene-to-code compiler          |
+| `src/tracks.js`  | Included scene tracks                                               |
+| `src/songs.js`   | Reads sections and tempo from a track's code                        |
+| `src/visuals.js` | Canvas visuals synced to the audio                                  |
+| `src/i18n.js`    | Italian and English strings                                         |
+| `src/content.js` | Lessons, sound library, references                                  |
+| `src/style.css`  | Styles and themes                                                   |
+| `vite.config.js` | Plugin that serves the samples in `public/samples/`                 |
+| `patterns/`      | Example patterns and hand-written tracks, also usable on strudel.cc |
 
-### Collegare uno strumento ai visual
+## Connecting an instrument to the visuals
 
-Aggiungi `.analyze("nome")` a un layer. Nomi riconosciuti dal Palco: `kick`, `snare`, `hats`, `fx`, `bass`, `guitar`, `arp`, `pad`, `hook`, `riser`. Il codice senza tag usa un canale generico.
+Add `.analyze("name")` to a layer. Names the Stage understands: `kick`, `snare`, `hats`, `fx`, `bass`, `guitar`, `arp`, `pad`, `hook`, `riser`. Code without a tag uses a generic channel.
 
-## Campioni personalizzati
+## Custom samples
 
-Metti file WAV, MP3, OGG o FLAC in `public/samples/`: una cartella per strumento (`voce/01.wav` → `s("voce").n(0)`) o un file sciolto (`swoosh.wav` → `s("swoosh")`). Il plugin in `vite.config.js` genera `/samples/strudel.json`; i suoni compaiono nel canale Texture e nel tab Suoni dopo un ricaricamento. Dettagli in `public/samples/README.md`.
+Put WAV, MP3, OGG or FLAC files in `public/samples/`: one folder per instrument (`voice/01.wav` becomes `s("voice").n(0)`) or a single file (`swoosh.wav` becomes `s("swoosh")`). The sounds show up in the Texture channel and in the Sounds tab after a reload. Details in `public/samples/README.md`.
 
-## Struttura
+## Technical notes
 
-| Percorso | Contenuto |
-| --- | --- |
-| `index.html` | Markup dell'interfaccia |
-| `src/main.js` | Libreria dei brani, arrangiatore, controlli, trasporto, collegamento con l'editor Strudel |
-| `src/i18n.js` | Testi in italiano e inglese |
-| `src/music.js` | Tonalità, accordi, preset, stato di una scena, compilatore da scene a codice, brano demo |
-| `src/tracks.js` | Brani a scene inclusi: Ghost Protocol, Neon Ascent, ricostruzioni e brani nuovi |
-| `vite.config.js` | Plugin che pubblica i campioni di `public/samples/` |
-| `src/songs.js` | Lettura di sezioni e tempo dal codice di un brano |
-| `src/content.js` | Lezioni, libreria suoni, riferimenti |
-| `src/visuals.js` | Visual su canvas sincronizzati con l'audio |
-| `src/style.css` | Stili e temi |
-| `patterns/` | Pattern di esempio e brani completi (`05-neon-ascent.js`, `06-ghost-protocol.js`), anche da incollare su strudel.cc |
-
-## Note
-
-- Strudel è una dipendenza npm (`@strudel/repl`), non un fork. Per aggiornarlo: `npm update @strudel/repl`.
-- I campioni arrivano da GitHub al primo utilizzo: serve la connessione. L'app carica l'archivio completo di dirt-samples, il REPL di base ne carica solo una parte.
-- Non usare `.cps()` dentro un pattern per cambiare tempo: lo scheduler ricalcola le note in coda con il riferimento sbagliato e ne scarta alcune. I brani dichiarano `const TEMPO = {…}` e il player cambia il tempo battuta per battuta con `scheduler.setCps`. Su strudel.cc il brano resta al tempo di `setcpm`.
-- Il player legge dal codice del brano due righe su una sola linea, con apici singoli: `const SECTIONS = [['intro', 8], …]` e `const TEMPO = {'intro': 132, 'build': [132, 140], …}` (un numero è fisso, `[da, a]` è una rampa).
-- Nel codice Strudel i doppi apici e i backtick sono mini-notation. Le stringhe JavaScript normali vanno tra apici singoli; `mini('…')` le trasforma in pattern.
-- Strudel è distribuito con licenza AGPL-3.0. Per uso locale non cambia nulla; se un giorno pubblichiamo il tool, il codice va rilasciato con licenza compatibile.
-
-- I brani salvati e la bozza in corso stanno nel `localStorage` del browser (`coding-misk-library`, `coding-misk-draft`). Svuotare i dati del sito li cancella.
+- Strudel is an npm dependency (`@strudel/repl`), not a fork. To update it: `npm update @strudel/repl`.
+- Samples are downloaded from GitHub on first use, so a connection is needed. The app loads the full dirt-samples archive.
+- The player changes the tempo bar by bar. A `.cps()` inside a pattern makes the scheduler drop notes.
+- Tracks declare two lines read by the player, with single quotes: `const SECTIONS = [['intro', 8], …]` and `const TEMPO = {'intro': 132, 'build': [132, 140], …}`.
+- In Strudel code, double quotes and backticks are mini-notation. Plain JavaScript strings use single quotes; `mini('…')` turns them into patterns.
+- Tempo ramps, starting from a bar and the extra samples only work in coding-misk, not on strudel.cc.
+- Saved tracks and the current draft live in the browser's `localStorage`. Clearing site data deletes them.
+- Strudel is licensed under AGPL-3.0. If the project is published, its code must be released under a compatible license.

@@ -1,0 +1,83 @@
+# coding-misk
+
+[English](README.md) · **Italiano**
+
+Un laboratorio locale per comporre musica scrivendo codice, costruito sopra [Strudel](https://strudel.cc/), il porting JavaScript di [TidalCycles](https://tidalcycles.org/). Ogni brano diventa codice Strudel leggibile, che suona nel browser insieme a visual sincronizzati con gli strumenti.
+
+## Da dove nasce
+
+Un anno fa mi ero appassionato ai video di [Switch Angel](https://www.youtube.com/@Switch-Angel), in particolare a [Coding Trance Music](https://www.youtube.com/watch?v=GWXCCBsOMSg). Mi era rimasta dentro l'idea di musica come codice con strudel.cc: brani costruiti dal vivo, riga dopo riga.
+
+Questo progetto unisce quell'idea alle capacità dei nuovi modelli, con il mio taglio. Il motore iniziale era rigido. L'ho esteso con Claude, insistendo a ogni giro, finché non è diventato capace di produrre brani con una struttura vera: sezioni, transizioni, tempi dispari, chitarre, mix bilanciato.
+
+## Cosa fa
+
+- **Arrangiatore a scene.** Un brano è una sequenza di scene con nome, durata, entrata (taglio netto o dissolvenza) e tutte le impostazioni: BPM anche in rampa, tonalità, accordi, metro (4/4, 3/4, 5/4, 7/8), swing. Le scene diventano codice Strudel in tempo reale.
+- **Canali.** Sequencer di batteria con varie drum machine, basso con riff, chitarra (pulita, crunch, distorta, metal, palm mute) con riff e raddoppio stereo, arpeggio, hook con armonie e modi scuri, pad, texture (voci, metalli, vinile), riser. Ogni canale può usare oscillatori o strumenti General MIDI.
+- **Automazioni.** Volume, filtro e tempo possono cambiare da inizio a fine scena. Ci sono saturazione, bitcrusher, risonanza, FM e filtro vocale.
+- **Player.** Timeline cliccabile, salto a qualsiasi battuta, pulsanti per ascoltare gli stacchi tra le sezioni, ripetizione di una sezione, pausa e ripresa.
+- **Brani inclusi.** Una ventina di brani in generi diversi: techno, trance, hard techno, industrial, club scuro, metal, metal melodico, phonk, progressive rock, lo-fi, arcade anni '90, più reel da 30 secondi ricavati dai brani interi.
+- **Visual.** Sei temi su canvas (Palco, Pixel, Tramonto, Montagne, Spazio, Sonar). Ogni strumento ha il suo analizzatore audio, così sul Palco batteria, basso, chitarra, tastiere e FX si accendono quando suonano.
+- **Esportazione WAV.** Registra il brano in tempo reale dall'uscita di Strudel e scarica un WAV stereo.
+- **Campioni personalizzati.** I file messi in `public/samples/` diventano suoni utilizzabili nei brani.
+- **Guida e suoni.** 14 lezioni da ascoltare e una libreria per provare drum machine, oscillatori e campioni.
+- **Italiano e inglese**, anche nei commenti del codice generato.
+
+## Idee e prossimi passi
+
+- **Voci.** Capire come generarle, probabilmente con un piccolo modello locale.
+- **Live coding.** Arrivare a ricreare un brano costruito dal vivo, come nei video di Switch Angel.
+- **Musica per video brevi.** Usare i brani come sottofondo per reel e contenuti social, con durate e partenze già pronte.
+- **Mood e preset.** Definire mood e preset riutilizzabili, per comporre più in fretta e con più varietà.
+- **Altri generi.** Continuare a esplorare stili diversi, con meno strati e più ritmo.
+
+## Avvio
+
+Serve Node.js 20 o successivo.
+
+```sh
+npm install
+npm run dev
+```
+
+Si apre <http://localhost:5173>. La barra spaziatrice fa play e pausa, `Ctrl+Enter` (o `⌘+Enter`) avvia o aggiorna, `Ctrl+.` ferma.
+
+## Branch
+
+- `main` contiene la versione stabile.
+- `develop` raccoglie le evoluzioni in prova. Quando una novità è confermata, `develop` viene unito in `main`.
+
+## Struttura
+
+| Percorso         | Contenuto                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| `index.html`     | Markup dell'interfaccia                                                                   |
+| `src/main.js`    | Libreria dei brani, arrangiatore, controlli, trasporto, collegamento con l'editor Strudel |
+| `src/music.js`   | Tonalità, accordi, preset, stato di una scena, compilatore da scene a codice              |
+| `src/tracks.js`  | Brani a scene inclusi                                                                     |
+| `src/songs.js`   | Lettura di sezioni e tempo dal codice di un brano                                         |
+| `src/visuals.js` | Visual su canvas sincronizzati con l'audio                                                |
+| `src/i18n.js`    | Testi in italiano e inglese                                                               |
+| `src/content.js` | Lezioni, libreria suoni, riferimenti                                                      |
+| `src/style.css`  | Stili e temi                                                                              |
+| `vite.config.js` | Plugin che pubblica i campioni di `public/samples/`                                       |
+| `patterns/`      | Pattern di esempio e brani scritti a mano, anche da incollare su strudel.cc               |
+
+## Collegare uno strumento ai visual
+
+Aggiungi `.analyze("nome")` a un layer. Nomi riconosciuti dal Palco: `kick`, `snare`, `hats`, `fx`, `bass`, `guitar`, `arp`, `pad`, `hook`, `riser`. Il codice senza tag usa un canale generico.
+
+## Campioni personalizzati
+
+Metti file WAV, MP3, OGG o FLAC in `public/samples/`: una cartella per strumento (`voce/01.wav` diventa `s("voce").n(0)`) o un file sciolto (`swoosh.wav` diventa `s("swoosh")`). I suoni compaiono nel canale Texture e nel tab Suoni dopo un ricaricamento. Dettagli in `public/samples/README.md`.
+
+## Note tecniche
+
+- Strudel è una dipendenza npm (`@strudel/repl`), non un fork. Per aggiornarlo: `npm update @strudel/repl`.
+- I campioni arrivano da GitHub al primo utilizzo, quindi serve la connessione. L'app carica l'archivio completo di dirt-samples.
+- Il tempo dei brani lo cambia il player battuta per battuta. Un `.cps()` dentro un pattern fa perdere note allo scheduler.
+- I brani dichiarano due righe lette dal player, con apici singoli: `const SECTIONS = [['intro', 8], …]` e `const TEMPO = {'intro': 132, 'build': [132, 140], …}`.
+- Nel codice Strudel i doppi apici e i backtick sono mini-notation. Le stringhe JavaScript normali vanno tra apici singoli; `mini('…')` le trasforma in pattern.
+- Rampe di tempo, salto a una battuta e campioni extra funzionano solo in coding-misk, non su strudel.cc.
+- I brani salvati e la bozza in corso stanno nel `localStorage` del browser. Svuotare i dati del sito li cancella.
+- Strudel è distribuito con licenza AGPL-3.0. Se il progetto viene pubblicato, il codice va rilasciato con una licenza compatibile.
