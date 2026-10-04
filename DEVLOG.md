@@ -116,6 +116,10 @@
 - Strumenti riutilizzabili in `tools/`: verifica livelli per scena, screenshot, registrazione demo con audio, test del tema hardware, analisi audio.
 - Regola: ogni modifica aggiunge una voce a questo file e aggiorna `docs/` quando cambiano architettura, modello, design o decisioni.
 
-## Prossimo passo (da fare dopo la compattazione del contesto)
+## 2026-10-04
 
-- Issue `#3` Voci: ricerca approfondita su come generare voci cantate in locale, gratis, da scaricare e integrare nel progetto. Coprire: modelli locali di canto e sintesi vocale, conversione di voce (cantare con la propria voce o ricostruirla), registrazione della voce dell'utente dal browser, effetti per renderla musicale (pitch, formanti, vocoder, distorsione, chop, glitch) e come portare il risultato nei brani (campioni in `public/samples/` o generazione al volo). Consegnare un confronto delle opzioni con raccomandazione, senza ancora implementare.
+- `#3` Voci: ricerca completata, risultati in `docs/VOCALS.md`. Raccomandazione: ACE-Step 1.5 turbo (MIT, gira su Mac M4 16 GB) per generare parti cantate, estrazione della voce, Seed-VC per portarle nella voce del proprietario, effetti offline con `pedalboard`/`pyworld`, nuovo canale `vocal` nel modello a scene. Escluse per uso aziendale le licenze non commerciali (SongGeneration/LeVo, F5-TTS, XTTS-v2).
+
+## Prossimo passo
+
+- In attesa di conferma del proprietario per lo spike su `#3`: installare ACE-Step 1.5 turbo e audio-separator in un venv fuori dal repo, generare una voce, ritagliare 4 chop in `public/samples/vox/`.
