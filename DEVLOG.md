@@ -98,3 +98,8 @@
 - Riscontro: melodie troppo dolci e ricorrenti, troppi strati insieme. Le melodie dell'hook andavano per gradi congiunti della scala minore. Aggiunti modi `locrian` e `chromatic` (melodie in semitoni: tritono, seconda bemolle, ottave), ottava dell'hook, riff per il basso (`spirale`, `mirino`, `tritono`, `ottaveArcade`), progressioni ferme (`drone`, `tensione`), `dorico`.
 - Brani nuovi con al massimo 4-5 strati per scena: *Luci Rosse* (club scuro stile Le Castle Vania / John Wick: il riff di basso distorto è il protagonista), *DCI Jingle · carica*, *Insert Coin* (arcade anni '90: lead FM, basso a ottave, arpeggi), *Segnale nel rumore* (il brano libero).
 - Le drum machine senza crash (YamahaRX5, AlesisHR16, KorgMinipops) prendono il crash dalla 909.
+
+## 2026-10-07 (pomeriggio)
+
+- Volume master di Strudel fissato a 0,6 (`destinationGain` del controller di superdough): nei drop la somma degli strumenti arrivava a 1,33 e saturava l'uscita.
+- Video demo registrato con Playwright (Chrome headless) + audio catturato dall'uscita master, unito con ffmpeg: `demo/coding-misk-demo.mp4` (ignorato da git).

@@ -670,8 +670,11 @@ $('#songs').addEventListener('change', e => {
 
 // trasporto, a ogni frame: tempo per battuta, ripetizione, stop a fine brano, scena che segue la riproduzione
 const pauseLabel = () => isPlaying() ? t('pause') : paused ? t('resume') : t('pause');
+// volume master di Strudel a 0,6: la somma degli strumenti nei drop supera 1 e saturerebbe l'uscita
+const MASTER = .6;
 (function transport() {
   requestAnimationFrame(transport);
+  try { const out = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController().output.destinationGain; if (out && out.gain.value !== MASTER) out.gain.value = MASTER; } catch (e) {}
   const s = sched();
   const playing = isPlaying();
   if (song && s && playing && !seeking) {
