@@ -92,3 +92,9 @@
 ## 2026-10-06 (notte)
 
 - Nuovo brano *Circuito Ruggine* (techno industrial cyberpunk con chitarre): riff `stomp` e `industrial` aggiunti al canale Chitarra. Mix misurato: la saturazione forte sulla batteria portava gli hi-hat sopra la cassa, ridotta e tolto il ride nei drop.
+
+## 2026-10-07
+
+- Riscontro: melodie troppo dolci e ricorrenti, troppi strati insieme. Le melodie dell'hook andavano per gradi congiunti della scala minore. Aggiunti modi `locrian` e `chromatic` (melodie in semitoni: tritono, seconda bemolle, ottave), ottava dell'hook, riff per il basso (`spirale`, `mirino`, `tritono`, `ottaveArcade`), progressioni ferme (`drone`, `tensione`), `dorico`.
+- Brani nuovi con al massimo 4-5 strati per scena: *Luci Rosse* (club scuro stile Le Castle Vania / John Wick: il riff di basso distorto è il protagonista), *DCI Jingle · carica*, *Insert Coin* (arcade anni '90: lead FM, basso a ottave, arpeggi), *Segnale nel rumore* (il brano libero).
+- Le drum machine senza crash (YamahaRX5, AlesisHR16, KorgMinipops) prendono il crash dalla 909.

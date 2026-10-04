@@ -514,4 +514,135 @@ export const RUST_TRACK = {
   ],
 };
 
-export const BUILTIN_TRACKS = [RUST_TRACK, METAL_TRACK, MELODIC_METAL_TRACK, PHONK_TRACK, METAL_FULL, MELODIC_METAL_FULL, PHONK_FULL, NEON_RUSH_TRACK, PROG_TRACK, LOFI_TRACK, GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];
+// ---------- Luci Rosse: club scuro da film d'azione (stile Le Castle Vania, John Wick) ----------
+// 124 BPM, un solo accordo di La minore. Il protagonista è il riff di basso distorto; pochi strati, tanto ritmo.
+const club = (s, prog = 'drone') => { s.bpm = 124; s.key = 'A'; s.prog = prog; };
+const clubDrums = (s, rows, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'RolandTR909', gain: .95, gainEnd: null, drive: 1.6, grit: 0, cutoff: 20000, cutoffEnd: null, ...extra }); steps(s, { bd: E16, cp: E16, sd: E16, hh: E16, oh: E16, rd: E16, ...rows }); };
+const KICK4 = 'x...x...x...x...', CLAP24 = '....x.......x...', OFFHAT = '..x...x...x...x.';
+const wickBass = (s, preset, cutoff, cutoffEnd = null, extra = {}) => Object.assign(s.bass, { on: true, preset, wave: 'sawtooth', cutoff, cutoffEnd, reso: 8, gain: .6, gainEnd: null, move: 'fisso', drive: 4.5, ...extra });
+const darkHook = (s, preset, gain, extra = {}) => Object.assign(s.hook, { on: true, preset, mode: 'chromatic', octave: '3', wave: 'square', fm: 0, vowel: '', cutoff: 2600, cutoffEnd: null, delay: .25, gain, gainEnd: null, move: 'fisso', grit: 0, drive: 1.5, harmony: '', ...extra });
+
+export const CLUB_TRACK = {
+  id: 'luci-rosse', title: 'Luci Rosse', look: 'palco',
+  style: { it: 'Club scuro da film d\'azione · La minore su un solo accordo · 124 BPM · riff di basso distorto, cassa, clap, pochi strati', en: 'Dark action-movie club track · A minor on one chord · 124 BPM · distorted bass riff, kick, clap, few layers' },
+  scenes: [
+    makeScene('Ingresso', 8, {}, s => { club(s); only(s, ['drums', 'bass']);
+      clubDrums(s, { bd: KICK4, hh: OFFHAT }); wickBass(s, 'spirale', 300, 1000); }),
+    makeScene('Pista', 8, { crash: true }, s => { club(s); only(s, ['drums', 'bass']);
+      clubDrums(s, { bd: KICK4, cp: CLAP24, hh: OFFHAT }); wickBass(s, 'spirale', 1400); }),
+    makeScene('Taglio', 2, { breath: true }, s => { club(s); only(s, ['bass', 'riser']);
+      wickBass(s, 'spirale', 1400, 500); Object.assign(s.riser, { dir: 'up', bars: '2', gain: .35 }); }),
+    makeScene('Scontro', 16, { crash: true }, s => { club(s); only(s, ['drums', 'bass', 'hook']);
+      clubDrums(s, { bd: KICK4, cp: CLAP24, hh: 'x.x.x.x.x.x.x.x.', oh: OFFHAT });
+      wickBass(s, 'mirino', 1300, null, { move: 'veloce', drive: 5 }); darkHook(s, 'colpi', .3); }),
+    makeScene('Ombra', 4, {}, s => { club(s, 'tensione'); only(s, ['drums', 'bass', 'hook', 'texture']);
+      clubDrums(s, { bd: 'x.........x.....', cp: '........x.......' });
+      wickBass(s, 'tritono', 700); darkHook(s, 'allarme', .2, { octave: '4', delay: .45 });
+      Object.assign(s.texture, { on: true, sample: 'metal', rhythm: 'bar', grit: .5, gain: .3, room: .7 }); }),
+    makeScene('Scontro 2', 16, { crash: true, fill: true }, s => { club(s, 'tensione'); only(s, ['drums', 'bass', 'pad']);
+      clubDrums(s, { bd: KICK4, cp: CLAP24, hh: 'xxxxxxxxxxxxxxxx', oh: OFFHAT }, { drive: 1.5 });
+      wickBass(s, 'spirale', 2000, null, { drive: 5 });
+      Object.assign(s.pad, { on: true, preset: 'stab', wave: 'square', cutoff: 2400, cutoffEnd: null, gain: .16, gainEnd: null, room: .3, move: 'fisso', drive: 1 }); }),
+    makeScene('Uscita', 4, {}, s => { club(s); only(s, ['drums', 'bass']);
+      clubDrums(s, { bd: KICK4, hh: OFFHAT }, { gainEnd: .4 }); wickBass(s, 'spirale', 1400, 150); }),
+  ],
+};
+
+// ---------- DCI Jingle · carica ----------
+// La stessa identità del jingle DCI (Fa# minore, basso che scarta su Sol, stab), ma parte già col groove e picchia di più.
+const dci = (s, prog = 'tensione') => { s.bpm = 106; s.key = 'F#'; s.prog = prog; };
+const dciStabs = (s, preset, gain = .36, extra = {}) => Object.assign(s.pad, { on: true, preset, wave: 'supersaw', cutoff: 4200, cutoffEnd: null, gain, gainEnd: null, room: .2, move: 'fisso', drive: 1.2, ...extra });
+export const DCI_CHARGED_TRACK = {
+  id: 'dci-carica', title: 'DCI Jingle · carica', look: 'palco',
+  style: { it: 'Versione più carica del jingle DCI · Fa# minore con lo scarto su Sol · 106 BPM · 27 secondi', en: 'Harder version of the DCI jingle · F# minor with the G push · 106 BPM · 27 seconds' },
+  scenes: [
+    makeScene('Stab', 1, { crash: true }, s => { dci(s); only(s, ['drums', 'pad']); clubDrums(s, { bd: KICK4 }, { drive: 1.5 }); dciStabs(s, 'staccato'); }),
+    makeScene('Carica', 2, { fill: true, breath: true }, s => { dci(s); only(s, ['drums', 'bass', 'pad', 'riser']);
+      clubDrums(s, { bd: KICK4, hh: 'xxxxxxxxxxxxxxxx' }, { drive: 1.5, gain: .6, gainEnd: .95 });
+      wickBass(s, 'mirino', 400, 1600, { drive: 4 }); dciStabs(s, 'staccato', .34, { cutoff: 2500, cutoffEnd: 5000 });
+      Object.assign(s.riser, { dir: 'up', bars: '2', gain: .4 }); }),
+    makeScene('Drop', 6, { crash: true }, s => { dci(s); only(s, ['drums', 'bass', 'pad']);
+      clubDrums(s, { bd: KICK4, cp: CLAP24, hh: OFFHAT, oh: E16 }, { drive: 1.6 });
+      wickBass(s, 'mirino', 1700, null, { drive: 4 }); dciStabs(s, 'synco', .4); }),
+    makeScene('Picco', 2, { crash: true }, s => { dci(s); only(s, ['drums', 'bass', 'guitar', 'pad']);
+      clubDrums(s, { bd: KICK4, cp: CLAP24, hh: 'xxxxxxxxxxxxxxxx', oh: OFFHAT }, { drive: 1.8 });
+      wickBass(s, 'mirino', 2200, null, { drive: 5 }); dciStabs(s, 'synco', .4);
+      guitar(s, 'stomp', .45, 'metal', { octave: '-2' }); }),
+    makeScene('Colpo', 1, { crash: true }, s => { dci(s); only(s, ['bass', 'pad']);
+      Object.assign(s.bass, { on: true, preset: 'sub', wave: 'sine', cutoff: 400, gain: .8, gainEnd: 0, drive: 2, reso: 2, move: 'fisso' });
+      dciStabs(s, 'pad', .38, { gainEnd: 0, cutoffEnd: 800, room: .7 }); }),
+  ],
+};
+
+// ---------- Insert Coin: arcade anni '90 ----------
+// 150 BPM, stile picchiaduro a scorrimento: lead FM squadrato, basso a ottave, arpeggi veloci, drum machine digitale.
+const arcadeScene = (s, bpm = 150, key = 'A', prog = 'arcade') => { s.bpm = bpm; s.key = key; s.prog = prog; };
+const arcadeDrums = (s, rows, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'YamahaRX5', gain: .9, gainEnd: null, drive: .4, grit: .25, cutoff: 20000, cutoffEnd: null, ...extra }); steps(s, { bd: E16, cp: E16, sd: E16, hh: E16, oh: E16, rd: E16, ...rows }); };
+const fmLead = (s, preset, gain = .45, extra = {}) => Object.assign(s.hook, { on: true, preset, mode: 'chromatic', octave: '4', wave: 'square', fm: 2, vowel: '', cutoff: 5000, cutoffEnd: null, delay: .15, gain, gainEnd: null, move: 'fisso', grit: .3, drive: 0, harmony: '', ...extra });
+const octBass = (s, preset = 'ottaveArcade', gain = .85) => Object.assign(s.bass, { on: true, preset, wave: 'square', cutoff: 1800, cutoffEnd: null, reso: 2, gain, gainEnd: null, move: 'fisso', drive: .5 });
+const chipArp = (s, gain = .32, preset = 'su') => Object.assign(s.arp, { on: true, preset, wave: 'square', speed: '16', cutoff: 4000, cutoffEnd: null, reso: 1, delay: 0, gain, gainEnd: null, move: 'fisso', drive: 0 });
+const BREAK = { bd: 'x.....x...x.....', sd: '....x.......x..x', hh: 'x.x.x.x.x.x.x.x.' };
+
+export const ARCADE_TRACK = {
+  id: 'insert-coin', title: 'Insert Coin', look: 'pixel',
+  style: { it: 'Arcade anni \'90 · La minore, boss in tensione, ultimo livello in Si · 150 BPM · lead FM, basso a ottave, arpeggi', en: '90s arcade · A minor, tense boss, last stage in B · 150 BPM · FM lead, octave bass, arpeggios' },
+  scenes: [
+    makeScene('Insert coin', 2, { breath: true }, s => { arcadeScene(s); only(s, ['arp', 'drums']); chipArp(s, .26); arcadeDrums(s, { hh: 'xxxxxxxxxxxxxxxx' }, { gain: .4, gainEnd: .8 }); }),
+    makeScene('Livello 1', 8, { crash: true }, s => { arcadeScene(s); only(s, ['drums', 'bass', 'hook']); arcadeDrums(s, BREAK); octBass(s); fmLead(s, 'arcade'); }),
+    makeScene('Livello 1 B', 8, { fill: true }, s => { arcadeScene(s); only(s, ['drums', 'bass', 'hook', 'arp']); arcadeDrums(s, { ...BREAK, oh: '..............x.' }); octBass(s); fmLead(s, 'arcadeB'); chipArp(s, .24); }),
+    makeScene('Boss', 8, { crash: true, fill: true }, s => { arcadeScene(s, 156, 'A', 'tensione'); only(s, ['drums', 'bass', 'hook']);
+      arcadeDrums(s, { bd: KICK4, sd: CLAP24, hh: 'xxxxxxxxxxxxxxxx' }, { drive: 1 });
+      Object.assign(s.bass, { on: true, preset: 'tritono', wave: 'sawtooth', cutoff: 1600, cutoffEnd: null, reso: 6, gain: .55, gainEnd: null, move: 'fisso', drive: 2 });
+      fmLead(s, 'boss', .45, { fm: 3 }); }),
+    makeScene('Bonus', 4, { fade: 1 }, s => { arcadeScene(s); only(s, ['drums', 'arp']); arcadeDrums(s, { bd: 'x.........x.....', sd: '........x.......', hh: 'x.x.x.x.x.x.x.x.' }); chipArp(s, .26, 'sugiu'); }),
+    makeScene('Livello 2', 8, { crash: true, fill: true }, s => { arcadeScene(s, 152, 'B'); only(s, ['drums', 'bass', 'hook', 'arp']); arcadeDrums(s, { ...BREAK, oh: '..x.......x.....' }); octBass(s, 'ottaveArcade', .9); fmLead(s, 'arcade', .48); chipArp(s, .22); }),
+    makeScene('Game over', 2, { crash: true }, s => { arcadeScene(s, 152, 'B'); only(s, ['hook', 'pad']);
+      fmLead(s, 'colpi', .26, { gainEnd: 0, delay: .5 });
+      Object.assign(s.pad, { on: true, preset: 'pad', wave: 'square', cutoff: 2500, cutoffEnd: 600, gain: .2, gainEnd: 0, room: .6, move: 'fisso', drive: 0 }); }),
+  ],
+};
+
+// ---------- Segnale nel rumore ----------
+// Il brano che ho scritto con la massima libertà. Racconta come un significato emerge da un pattern:
+// si parte dal fruscio, un segnale affiora, trova un respiro in 7/8 (asimmetrico, vivo), si apre in 4/4,
+// tace un attimo, ritorna più pieno e si scioglie di nuovo nel rumore.
+// Re dorico: né triste né dolce, sospeso. Pochi strumenti: vibrafono, celesta, archi, sub, una cassa morbida, click.
+const soul = (s, meter = '7/8', prog = 'dorico') => { s.bpm = 96; s.key = 'D'; s.prog = prog; s.meter = meter; };
+const vibes = (s, gain = .45, extra = {}) => Object.assign(s.arp, { on: true, preset: 'pulsar', wave: 'gm_vibraphone', speed: '8', cutoff: 6000, cutoffEnd: null, reso: 1, delay: .3, gain: gain * 1.6, gainEnd: null, move: 'fisso', drive: 0, ...extra });
+const softKit = (s, rows, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'RolandTR808', gain: .8, gainEnd: null, drive: 0, grit: .55, cutoff: 6000, cutoffEnd: null, ...extra }); steps(s, rows); };
+const celesta = (s, preset, gain = .5, extra = {}) => Object.assign(s.hook, { on: true, preset, mode: 'dorian', octave: '4', wave: 'gm_celesta', fm: 0, vowel: '', cutoff: 7000, cutoffEnd: null, delay: .45, gain: gain * 1.5, gainEnd: null, move: 'fisso', grit: 0, drive: 0, harmony: '', ...extra });
+const strings = (s, gain = .22, extra = {}) => Object.assign(s.pad, { on: true, preset: 'pad', wave: 'gm_string_ensemble_1', cutoff: 3000, cutoffEnd: null, gain, gainEnd: null, room: .8, move: 'fisso', drive: 0, ...extra });
+const sub = (s, gain = .6, extra = {}) => Object.assign(s.bass, { on: true, preset: 'sub', wave: 'sine', cutoff: 500, cutoffEnd: null, reso: 1, gain: gain * 1.6, gainEnd: null, move: 'fisso', drive: .5, ...extra });
+const E14 = '..............';
+
+export const SOUL_TRACK = {
+  id: 'segnale-nel-rumore', title: 'Segnale nel rumore', look: 'spazio',
+  style: { it: 'Il brano che ho scritto con massima libertà · Re dorico · 96 BPM · dal fruscio al 7/8, poi 4/4, e di nuovo rumore', en: 'The track I wrote with complete freedom · D dorian · 96 BPM · from noise to 7/8, then 4/4, and back to noise' },
+  scenes: [
+    makeScene('Rumore', 4, {}, s => { soul(s, '4/4'); only(s, ['texture', 'hook']);
+      Object.assign(s.texture, { on: true, sample: 'vinyl', rhythm: 'bar', grit: 0, gain: .9, gainEnd: .6, room: .3 });
+      celesta(s, 'segnale', .35, { mode: 'chromatic', wave: 'sine', delay: .6 }); }),
+    makeScene('Emersione', 8, { fade: 2 }, s => { soul(s); only(s, ['arp', 'drums', 'texture', 'bass']);
+      vibes(s, .2); s.arp.gainEnd = .7; sub(s, 0); s.bass.gainEnd = .85;
+      softKit(s, { bd: E14, cp: E14, sd: E14, hh: 'x.x.x.x.x.x.x.', oh: E14, rd: E14 }, { gain: .35, gainEnd: .6 });
+      Object.assign(s.texture, { on: true, sample: 'vinyl', rhythm: 'bar', grit: 0, gain: .6, gainEnd: .25, room: .3 }); }),
+    makeScene('Pulsazione', 8, {}, s => { soul(s); only(s, ['arp', 'drums', 'bass', 'pad']);
+      vibes(s); sub(s, .55);
+      softKit(s, { bd: 'x.......x.....', cp: E14, sd: '....x.......x.', hh: 'x.x.x.x.x.x.x.', oh: E14, rd: E14 });
+      Object.assign(s.pad, { on: true, preset: 'comp', wave: 'gm_epiano1', cutoff: 2600, cutoffEnd: null, gain: .22, gainEnd: null, room: .5, move: 'fisso', drive: 0 }); }),
+    makeScene('Fioritura', 8, { crash: true }, s => { soul(s, '4/4'); only(s, ['arp', 'drums', 'bass', 'hook', 'pad']);
+      vibes(s, .32, { preset: 'su' }); sub(s, .6); celesta(s, 'anima', .5); strings(s, .2);
+      softKit(s, { bd: 'x.......x.x.....', cp: E16, sd: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }); }),
+    makeScene('Silenzio', 2, { breath: true }, s => { soul(s, '4/4'); only(s, ['hook', 'pad']);
+      celesta(s, 'segnale', .4, { mode: 'chromatic', delay: .7 }); strings(s, .2, { gainEnd: .05 }); }),
+    makeScene('Ritorno', 8, { crash: true, fill: true }, s => { soul(s); only(s, ['arp', 'drums', 'bass', 'hook', 'pad']);
+      vibes(s, .4); sub(s, .65); celesta(s, 'anima', .5); strings(s, .26);
+      softKit(s, { bd: 'x.....x.x.....', cp: E14, sd: '....x.......x.', hh: 'xxxxxxxxxxxxxx', oh: E14, rd: E14 }, { grit: .45 }); }),
+    makeScene('Dissolvenza', 4, { fade: 2 }, s => { soul(s, '4/4'); only(s, ['arp', 'texture', 'hook']);
+      vibes(s, .4, { gainEnd: 0, cutoffEnd: 600 });
+      Object.assign(s.texture, { on: true, sample: 'vinyl', rhythm: 'bar', grit: 0, gain: .3, gainEnd: .9, room: .3 });
+      celesta(s, 'segnale', .3, { mode: 'chromatic', wave: 'sine', delay: .7, gainEnd: 0 }); }),
+  ],
+};
+
+export const BUILTIN_TRACKS = [SOUL_TRACK, CLUB_TRACK, DCI_CHARGED_TRACK, ARCADE_TRACK, RUST_TRACK, METAL_TRACK, MELODIC_METAL_TRACK, PHONK_TRACK, METAL_FULL, MELODIC_METAL_FULL, PHONK_FULL, NEON_RUSH_TRACK, PROG_TRACK, LOFI_TRACK, GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];
