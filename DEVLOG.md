@@ -88,3 +88,7 @@
 - Chitarra con riff: pattern con spostamenti in semitoni del power chord (`.struct()` + `.transpose("0 0 1 0 …")`): thrash con seconda bemolle, galoppo, groove, djent, aperture eroiche. La chitarra ha il suo analizzatore `guitar`.
 - Palco ridisegnato con disposizione calcolata in unità: crash dentro la batteria sotto il muro LED, testata e cassa 4×12 con chitarra, campionatore FX con pad, etichette su una riga. La chitarra guida anche Tramonto, Montagne, Pixel, Sonar, Spazio e l'equalizzatore del logo.
 - Spazio ridisegnato: niente pianeta al centro; gigante gassoso dal basso a destra con bande e anelli, nebulose, aurora, comete, navicella.
+
+## 2026-10-06 (notte)
+
+- Nuovo brano *Circuito Ruggine* (techno industrial cyberpunk con chitarre): riff `stomp` e `industrial` aggiunti al canale Chitarra. Mix misurato: la saturazione forte sulla batteria portava gli hi-hat sopra la cassa, ridotta e tolto il ride nei drop.

@@ -120,6 +120,9 @@ export const GUITAR_PATTERNS = {
   groove: [{ it: 'Riff groove', en: 'Groove riff' }, null, true, '0 ~ ~ 0 0 ~ 3 ~ 0 ~ ~ 0 5 ~ 3 ~'],
   djentRiff: [{ it: 'Riff djent', en: 'Djent riff' }, null, true, '0 ~ ~ 0 ~ ~ 0 ~ ~ 0 ~ 1 ~ ~ 0 ~'],
   heroic: [{ it: 'Aperture eroiche', en: 'Heroic chords' }, null, false, '0 ~ 0 ~ 0 ~ 0 ~ 5 ~ 5 ~ 3 ~ 2 ~'],
+  // industrial: colpi secchi sui tempi forti (stomp) e sedicesimi stoppati che seguono la cassa
+  stomp: ['Stomp (industrial)', null, true, '0 ~ ~ ~ 0 ~ ~ ~ 0 ~ 0 ~ 1 ~ ~ ~'],
+  industrial: ['Industrial', null, true, '0 ~ 0 0 ~ 0 0 ~ 1 ~ 0 0 ~ 3 1 ~'],
   power8: [{ it: 'Power chord a ottavi', en: 'Power chords, 8ths' }, ['[x x]', 'x']],
   chug: [{ it: 'Chug a sedicesimi', en: '16th chugs' }, ['[x x x x]', '[x x]'], true],
   gallop: [{ it: 'Galoppo', en: 'Gallop' }, ['[x ~ x x]', '[x ~]'], true],

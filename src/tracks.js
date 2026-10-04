@@ -465,4 +465,53 @@ export const PHONK_TRACK = reelFrom(PHONK_FULL, 'drift-reel', 'Drift · phonk re
   { it: 'Reel da 30 s estratto da Drift: drop, break, drop più duro, colpo finale', en: '30 s reel cut from Drift: drop, break, harder drop, final hit' },
   [['Drop', 8], ['Break', 2, { breath: true, fill: true }], ['Drop 2', 5], ['Colpo', 1]]);
 
-export const BUILTIN_TRACKS = [METAL_TRACK, MELODIC_METAL_TRACK, PHONK_TRACK, METAL_FULL, MELODIC_METAL_FULL, PHONK_FULL, NEON_RUSH_TRACK, PROG_TRACK, LOFI_TRACK, GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];
+// ---------- Circuito Ruggine: techno industrial cyberpunk con chitarre ----------
+// 132 BPM, Mi frigio poi Fa. Groove techno saturo, chitarre accordate un tono sotto con riff stomp e industrial.
+const rust = (s, key = 'E') => { s.bpm = 132; cyber(s, key); };
+const rustGuitar = (s, pattern, gain = .5, extra = {}) => guitar(s, pattern, gain, 'metal', { octave: '-2', drive: 2, cutoff: 3800, ...extra });
+const rustDrums = (s, rows, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'RolandTR909', gain: .95, gainEnd: null, drive: 1.4, grit: .2, cutoff: 20000, cutoffEnd: null, ...extra }); steps(s, rows); };
+const metalHits = (s, gain = .3) => Object.assign(s.texture, { on: true, sample: 'metal', rhythm: 'euclid', grit: .7, gain, gainEnd: null, room: .25 });
+
+export const RUST_TRACK = {
+  id: 'circuito-ruggine', title: 'Circuito Ruggine', look: 'palco',
+  style: { it: 'Techno industrial cyberpunk · Mi frigio, poi Fa · 132 BPM · cassa satura, acid, metalli, chitarre distorte un tono sotto', en: 'Cyberpunk industrial techno · E phrygian, then F · 132 BPM · saturated kick, acid, metal hits, distorted guitars one step down' },
+  scenes: [
+    makeScene('Avvio', 4, { breath: true }, s => { rust(s); only(s, ['drums', 'guitar', 'texture', 'riser']);
+      rustDrums(s, { bd: 'x...x...x...x...', cp: E16, sd: E16, hh: E16, oh: E16, rd: E16 }, { cutoff: 300, cutoffEnd: 2500 });
+      rustGuitar(s, 'held', .35, { cutoff: 900, cutoffEnd: 3000, room: .6 });
+      Object.assign(s.texture, { on: true, sample: 'numbers', rhythm: 'bar', grit: .95, gain: .5, room: .7 });
+      Object.assign(s.riser, { dir: 'up', bars: '4', gain: .3 }); }),
+    makeScene('Macchina', 8, { crash: true }, s => { rust(s); only(s, ['drums', 'bass', 'arp', 'texture']);
+      rustDrums(s, GROOVES.techno[1]); rumble(s, 450, null, .55); acid(s, 700, 2400, .32, 1.6); s.arp.reso = 22; metalHits(s); }),
+    makeScene('Riff', 8, { crash: true }, s => { rust(s); only(s, ['drums', 'bass', 'guitar', 'arp', 'texture']);
+      rustDrums(s, GROOVES.techno[1]); rumble(s, 450, null, .5); rustGuitar(s, 'stomp', .55);
+      acid(s, 1600, null, .24, 1.6); s.arp.reso = 22; metalHits(s, .25); }),
+    makeScene('Corridoio', 4, { fill: true, breath: true }, s => { rust(s); only(s, ['drums', 'bass', 'guitar', 'arp', 'riser']);
+      rustDrums(s, { bd: 'x...x...x...x...', cp: E16, sd: E16, hh: 'xxxxxxxxxxxxxxxx', oh: E16, rd: E16 }, { gain: .7, gainEnd: .95 });
+      rumble(s, 300, 600, .5); rustGuitar(s, 'industrial', .45, { type: 'muted' }); acid(s, 1200, 4000, .3, 1.8);
+      Object.assign(s.riser, { dir: 'up', bars: '4', gain: .4 }); }),
+    makeScene('Drop', 16, { crash: true }, s => { rust(s); only(s, ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture']);
+      rustDrums(s, { ...GROOVES.hard[1], rd: E16 }, { drive: 1.6 }); rumble(s, 550, null, .6); s.bass.drive = 4;
+      rustGuitar(s, 'industrial', .55); acid(s, 1800, 4200, .3, 2); s.arp.reso = 24;
+      cyberHook(s, .42, { fm: 4, grit: .5 });
+      Object.assign(s.pad, { preset: 'stab', wave: 'supersaw', cutoff: 3000, drive: 1.2, room: .3, gain: .24, move: 'fisso' });
+      Object.assign(s.texture, { on: true, sample: 'industrial', rhythm: 'eighth', grit: .85, gain: .2, room: .2 }); }),
+    makeScene('Blackout', 4, { fade: 1, breath: true }, s => { rust(s); only(s, ['drums', 'guitar', 'texture', 'riser']);
+      rustDrums(s, { bd: 'x.........x.....', cp: E16, sd: '........x.......', hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }, { grit: .9 });
+      rustGuitar(s, 'held', .45, { cutoff: 4000, cutoffEnd: 1200, room: .7 });
+      Object.assign(s.texture, { on: true, sample: 'numbers', rhythm: 'sixteenth', grit: .95, gain: .3, room: .4 });
+      Object.assign(s.riser, { dir: 'up', bars: '4', gain: .42 }); }),
+    makeScene('Drop 2', 12, { crash: true, fill: true }, s => { rust(s, 'F'); only(s, ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture']);
+      rustDrums(s, { ...GROOVES.hard[1], oh: '..x...x...x...x.', rd: E16 }, { drive: 1.8 }); rumble(s, 600, null, .6); s.bass.drive = 4;
+      rustGuitar(s, 'thrash', .55, { drive: 3 }); acid(s, 2200, 5000, .3, 2.2); s.arp.reso = 24;
+      cyberHook(s, .45, { fm: 5, grit: .7 });
+      Object.assign(s.pad, { preset: 'stab', wave: 'supersaw', cutoff: 3400, drive: 1.5, room: .3, gain: .26, move: 'fisso' });
+      metalHits(s, .3); }),
+    makeScene('Spegnimento', 4, {}, s => { rust(s, 'F'); only(s, ['drums', 'guitar', 'texture']);
+      rustDrums(s, { bd: 'x...x...x...x...', cp: E16, sd: E16, hh: E16, oh: E16, rd: E16 }, { cutoff: 20000, cutoffEnd: 300, gainEnd: .3 });
+      rustGuitar(s, 'held', .5, { gainEnd: 0, cutoff: 3500, cutoffEnd: 700, room: .8 });
+      Object.assign(s.texture, { on: true, sample: 'numbers', rhythm: 'bar', grit: .95, gain: .5, room: .9 }); }),
+  ],
+};
+
+export const BUILTIN_TRACKS = [RUST_TRACK, METAL_TRACK, MELODIC_METAL_TRACK, PHONK_TRACK, METAL_FULL, MELODIC_METAL_FULL, PHONK_FULL, NEON_RUSH_TRACK, PROG_TRACK, LOFI_TRACK, GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];
