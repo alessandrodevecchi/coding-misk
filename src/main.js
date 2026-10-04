@@ -1,6 +1,6 @@
 import '@strudel/repl';
 import './style.css';
-import { KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, compileTrack, cloneState, normalizeState } from './music.js';
+import { METERS, meterSteps, fitSteps, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, compileTrack, cloneState, normalizeState } from './music.js';
 import { BUILTIN_TRACKS } from './tracks.js';
 import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
@@ -35,7 +35,13 @@ const codedTracks = () => CODED.map(c => ({ ...c, code: user.code[c.id] || c.cod
 // oggetto riproducibile: codice + mappa di sezioni e tempo
 function playable(tr) {
   const code = tr.kind === 'composed' ? compileTrack(tr) : tr.code;
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta: parseSong(code) };
+  const meta = parseSong(code);
+  if (tr.kind === 'composed') {
+    // la mappa del tempo è in "BPM da 4/4": per l'etichetta usiamo i BPM veri delle scene
+    const v = tr.scenes.flatMap(s => [s.state.bpm, s.state.bpmEnd ?? s.state.bpm]), lo = Math.min(...v), hi = Math.max(...v);
+    meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
+  }
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta };
 }
 
 // ---------- brano in modifica ----------
@@ -444,9 +450,17 @@ function renderChannels() {
   for (const ch of ['drums', ...CHANNELS]) for (const [type, key, , list] of CONTROLS[ch]) if (type === 'select') opts($(`#${ch}-${key}`), list());
 }
 function renderSeq() {
-  $('#seq').innerHTML = '<span></span><div class="stepnums">' + Array.from({ length: 16 }, (_, i) => `<span>${i + 1}</span>`).join('') + '</div>' +
-    ROWS.map(([id, label]) => `<button class="rowlbl" data-row="${id}" title="${esc(t('muteRow', { name: label }))}">${label}</button><div class="steps">${
-      Array.from({ length: 16 }, (_, i) => `<button class="step" data-row="${id}" data-i="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('')}</div>`).join('');
+  const n = meterSteps(S.meter), cols = `style="grid-template-columns:repeat(${n}, minmax(0, 1fr))"`;
+  $('#seq').dataset.n = n;
+  $('#seq').innerHTML = `<span></span><div class="stepnums" ${cols}>` + Array.from({ length: n }, (_, i) => `<span>${i + 1}</span>`).join('') + '</div>' +
+    ROWS.map(([id, label]) => `<button class="rowlbl" data-row="${id}" title="${esc(t('muteRow', { name: label }))}">${label}</button><div class="steps" ${cols}>${
+      Array.from({ length: n }, (_, i) => `<button class="step" data-g="${Math.floor(i / 4) % 4}" data-row="${id}" data-i="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('')}</div>`).join('');
+}
+// adegua le righe del sequencer al metro della scena
+function fitRows() {
+  const n = meterSteps(S.meter);
+  for (const [id] of ROWS) S.drums.rows[id].steps = fitSteps(S.drums.rows[id].steps, n);
+  if (+$('#seq').dataset.n !== n) renderSeq();
 }
 $('#seq').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -460,7 +474,7 @@ $('#seq').addEventListener('click', e => {
 });
 $('#drums-preset').addEventListener('change', e => {
   const g = GROOVES[e.target.value]; if (!g) return;
-  for (const [id] of ROWS) S.drums.rows[id].steps = g[1][id];
+  for (const [id] of ROWS) S.drums.rows[id].steps = fitSteps(g[1][id], meterSteps(S.meter));
   syncAll(); changed();
 });
 
@@ -473,7 +487,7 @@ document.addEventListener('input', e => {
   setPath(p, v); syncOutputs(); changed();
 });
 document.addEventListener('change', e => {
-  if (e.target.matches('select[data-path]')) { setPath(e.target.dataset.path, e.target.value); changed(); }
+  if (e.target.matches('select[data-path]')) { setPath(e.target.dataset.path, e.target.value); if (e.target.dataset.path === 'meter') { fitRows(); syncAll(); } changed(); }
 });
 document.addEventListener('click', e => {
   const led = e.target.closest('[data-on]');
@@ -510,6 +524,7 @@ function syncOutputs() {
 }
 function syncAll() {
   document.documentElement.dataset.look = look;
+  fitRows();
   $('#bpm').value = S.bpm; $('#key').value = S.key; $('#prog').value = S.prog;
   $('#bpm-ramp').setAttribute('aria-pressed', S.bpmEnd != null);
   $('#bpm-end-row').hidden = S.bpmEnd == null;
@@ -741,6 +756,7 @@ function renderStatic() {
   opts($('#prog'), Object.entries(PROGS).map(([k, v]) => [k, `${tx(v[0])} · ${v[1].join(' ')}`]));
   opts($('#drums-kit'), KITS.map(k => [k, k.replace('Roland', '')]));
   opts($('#drums-preset'), [['', t('pickGroove')], ...Object.entries(GROOVES).map(([k, v]) => [k, v[0]])]);
+  opts($('#sc-meter'), METERS.map(([k]) => [k, k]));
   opts($('#sc-fade'), [['0', t('cut')], ['1', t('fade1')], ['2', t('fadeN', { n: 2 })], ['4', t('fadeN', { n: 4 })], ['8', t('fadeN', { n: 8 })]]);
   $('#looks').innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${esc(tx(l))}</button>`).join('');
   $('#play').dataset.state = '';
@@ -761,13 +777,15 @@ renderAll();
 updateShare();
 startVisuals({
   getS: () => ({ look }),
+  getSteps: () => meterSteps(S.meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando
   getMode: () => (mode === 'track' && song && isPlaying() && song.meta.sectionAt(sched().now()) === sel ? 'comp' : 'free'),
   isPlaying, sched,
   readout(cyc, step, playing) {
     if (!playing) return `${S.bpm} BPM  ·  ${paused ? t('resume').replace('▶ ', '') : t('rdPaused')}\n${t('rdHint')}`;
-    const bpm = Math.round(sched().cps * 240);
     const bar = Math.floor(cyc);
+    const cur = song && mode === 'track' ? T.scenes[song.meta.sectionAt(cyc)] : null;
+    const bpm = Math.round(sched().cps * 240 * (cur ? meterSteps(cur.state.meter) / 16 : 1));
     let line2 = $('#src').textContent;
     if (song) {
       const i = song.meta.sectionAt(cyc), sec = song.meta.sections[i];

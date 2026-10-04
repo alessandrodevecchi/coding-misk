@@ -18,7 +18,18 @@ export const CHORDS = {
   Dm: { bass: 'd2', pad: 'a2,d3,f3', arp: ['a3', 'd4', 'f4', 'a4'] },
   E:  { bass: 'e1', pad: 'g#2,b2,e3', arp: ['g#3', 'b3', 'e4', 'g#4'] },
   Em: { bass: 'e1', pad: 'g2,b2,e3', arp: ['g3', 'b3', 'e4', 'g4'] },
+  D:  { bass: 'd2', pad: 'a2,d3,f#3', arp: ['a3', 'd4', 'f#4', 'a4'] },
+  // settime per lo-fi e jazz
+  Am7:   { bass: 'a1', pad: 'g2,c3,e3,a3', arp: ['a3', 'c4', 'e4', 'g4'] },
+  Dm7:   { bass: 'd2', pad: 'c3,d3,f3,a3', arp: ['d4', 'f4', 'a4', 'c5'] },
+  Em7:   { bass: 'e1', pad: 'd3,e3,g3,b3', arp: ['e4', 'g4', 'b4', 'd5'] },
+  Fmaj7: { bass: 'f1', pad: 'a2,c3,e3,f3', arp: ['f3', 'a3', 'c4', 'e4'] },
+  Cmaj7: { bass: 'c2', pad: 'g2,b2,c3,e3', arp: ['c4', 'e4', 'g4', 'b4'] },
+  G7:    { bass: 'g1', pad: 'f2,g2,b2,d3', arp: ['g3', 'b3', 'd4', 'f4'] },
 };
+// bicordi di potenza (fondamentale, quinta, ottava) per le chitarre distorte
+const POWER = { A: 'a2,e3,a3', F: 'f2,c3,f3', C: 'c3,g3,c4', G: 'g2,d3,g3', D: 'd3,a3,d4', E: 'e2,b2,e3' };
+const powerOf = c => POWER[c.match(/^[A-G]#?/)[0]] || CHORDS[c].pad;
 // progressioni scritte in La minore (gradi i, VI, III, VII, …)
 export const PROGS = {
   epica: [{ it: 'Epica', en: 'Epic' }, ['Am', 'F', 'C', 'G']],
@@ -31,20 +42,40 @@ export const PROGS = {
   pendolo: [{ it: 'Pendolo (2 battute)', en: 'Pendulum (2 bars)' }, ['Am', 'Am', 'G', 'G']],
   anthem: [{ it: 'Anthem (2 battute)', en: 'Anthem (2 bars)' }, ['Am', 'Am', 'G', 'G', 'F', 'F', 'G', 'G']],
   ascesa: [{ it: 'Ascesa (2 battute)', en: 'Ascent (2 bars)' }, ['F', 'F', 'G', 'G', 'Am', 'Am', 'Em', 'Em']],
+  andalusa: [{ it: 'Andalusa', en: 'Andalusian' }, ['Am', 'G', 'F', 'E']],
+  prog: ['Prog', ['Am', 'C', 'D', 'F']],
+  lofi: ['Lo-fi', ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7']],
+  jazz: ['ii-V-I', ['Dm7', 'G7', 'Cmaj7', 'Am7']],
 };
 export const chordName = (c, tr) => {
-  const m = c.match(/^([A-G]#?)(m?)$/);
+  const m = c.match(/^([A-G]#?)(.*)$/);
   return NOTE_NAMES[(NOTE_NAMES.indexOf(m[1]) + tr + 12) % 12] + m[2];
 };
-export const WAVES = [['sawtooth', 'Sawtooth'], ['supersaw', 'Supersaw'], ['square', 'Square'], ['triangle', 'Triangle'], ['sine', 'Sine']];
+export const WAVES = [['sawtooth', 'Sawtooth'], ['supersaw', 'Supersaw'], ['square', 'Square'], ['triangle', 'Triangle'], ['sine', 'Sine'],
+  // strumenti General MIDI (soundfont inclusi in Strudel)
+  ['gm_epiano1', { it: 'Piano elettrico', en: 'Electric piano' }], ['gm_piano', 'Piano'], ['gm_vibraphone', { it: 'Vibrafono', en: 'Vibraphone' }],
+  ['gm_rock_organ', { it: 'Organo rock', en: 'Rock organ' }], ['gm_drawbar_organ', { it: 'Organo drawbar', en: 'Drawbar organ' }],
+  ['gm_distortion_guitar', { it: 'Chitarra distorta', en: 'Distortion guitar' }], ['gm_overdriven_guitar', { it: 'Chitarra overdrive', en: 'Overdriven guitar' }],
+  ['gm_electric_guitar_clean', { it: 'Chitarra pulita', en: 'Clean guitar' }], ['gm_electric_guitar_muted', { it: 'Chitarra stoppata', en: 'Muted guitar' }],
+  ['gm_electric_bass_finger', { it: 'Basso elettrico', en: 'Electric bass' }], ['gm_electric_bass_pick', { it: 'Basso a plettro', en: 'Picked bass' }],
+  ['gm_acoustic_bass', { it: 'Contrabbasso', en: 'Upright bass' }], ['gm_string_ensemble_1', { it: 'Archi', en: 'Strings' }],
+  ['gm_synth_strings_1', { it: 'Archi synth', en: 'Synth strings' }], ['gm_choir_aahs', { it: 'Coro', en: 'Choir' }], ['gm_flute', { it: 'Flauto', en: 'Flute' }],
+  ['gm_lead_2_sawtooth', 'Lead saw'], ['gm_synth_brass_1', { it: 'Ottoni synth', en: 'Synth brass' }], ['gm_pad_warm', { it: 'Pad caldo', en: 'Warm pad' }]];
+// metro → sedicesimi per battuta
+export const METERS = [['4/4', 16], ['3/4', 12], ['5/4', 20], ['7/8', 14]];
+export const meterSteps = m => (METERS.find(x => x[0] === m) || METERS[0])[1];
 export const MOVES = [['fisso', { it: 'Fisso', en: 'Fixed' }], ['lento', { it: 'Respiro lento', en: 'Slow sweep' }], ['veloce', { it: 'Respiro veloce', en: 'Fast sweep' }]];
-// [nome, struttura, decay, sustain, forma del volume facoltativa (postgain)]
+// Ritmi come modelli per beat [beat intero, mezzo beat]: si ripetono per i beat della battuta,
+// così funzionano anche in 3/4, 5/4 e 7/8. 'x' da solo = una nota per battuta.
+// [nome, ritmo, decay, sustain, forma del volume facoltativa (postgain)]
 export const BASS = {
-  rolling: ['Rolling', '[~ x x x]*4', .12, 0], offbeat: ['Offbeat', '[~ x]*4', .18, 0],
-  rumble: ['Rumble', '[~ x x]*4', .1, 0], galoppo: [{ it: 'Galoppo', en: 'Gallop' }, '[x ~ x x]*4', .1, 0],
+  rolling: ['Rolling', ['[~ x x x]', '[~ x]'], .12, 0], offbeat: ['Offbeat', ['[~ x]', '~'], .18, 0],
+  rumble: ['Rumble', ['[~ x x]', '[~ x]'], .1, 0], galoppo: [{ it: 'Galoppo', en: 'Gallop' }, ['[x ~ x x]', '[x ~]'], .1, 0],
+  ottavi: [{ it: 'Ottavi (rock)', en: '8th notes (rock)' }, ['[x x]', 'x'], .25, .5],
+  walking: [{ it: 'Walking (un beat)', en: 'Walking (quarters)' }, ['x', 'x'], .4, .3],
   sub: [{ it: 'Sub lungo', en: 'Long sub' }, 'x', .6, .8],
   // sedicesimi che riprendono volume dopo ogni cassa: il sidechain del future pop
-  pumping: [{ it: 'Pompato (sidechain)', en: 'Pumping (sidechain)' }, 'x*16', .2, .6, '[.1 .4 .75 1]*4'],
+  pumping: [{ it: 'Pompato (sidechain)', en: 'Pumping (sidechain)' }, ['[x x x x]', '[x x]'], .2, .6, ['[.1 .4 .75 1]', '[.1 .4]']],
 };
 // figure come modelli: 0-3 sono le note dell'accordo dal basso verso l'alto
 export const ARPS = {
@@ -60,20 +91,30 @@ export const HOOKS = {
   cyber: ['Cyber', '<[0 ~ 3 ~ 7 ~ 3 1] [0 ~ 3 ~ 8 7 ~ ~]>'],
   decade: [{ it: 'Decennale', en: 'Decade' }, '<[0 0 0 1 2 0 2 0] [0 0 4 1 0 0 2 0] [2 -1 -1 ~ -1 1 2 1] [-1 ~ -1 ~ -1 -1 2 2] [4 ~ 4 3 2 ~ 1 0] [2 ~ 2 1 0 ~ -1 0] [1 1 1 ~ 1 2 1 -1] [-1 ~ ~ ~ 1 ~ 2 ~]>'],
   scintilla: [{ it: 'Scintilla', en: 'Spark' }, '<[0 ~ 0 1 ~ 0 ~ 4] [~ 3 ~ 1 0 ~ -1 ~] [0 ~ 0 1 ~ 4 ~ 5] [4 ~ 3 ~ 1 ~ 0 ~]>'],
+  // 7 ottavi per frase: in 7/8 riempie la battuta, in 4/4 riprende la prima nota
+  prog: ['Prog', '<[0 2 4 ~ 4 5 4] [3 2 0 ~ -1 0 2] [4 5 7 ~ 7 9 7] [5 4 2 ~ 0 -1 0]>'],
+  assolo: [{ it: 'Assolo', en: 'Solo' }, '<[0 2 3 4 7 4 3 2] [0 2 3 4 7 9 7 4] [9 7 4 3 4 2 0 -1] [0 ~ 7 ~ 4 ~ 0 ~]>'],
+  pioggia: [{ it: 'Pioggia', en: 'Rain' }, '<[4 ~ 2 ~ 0 ~ ~ ~] [~ 1 2 ~ 4 ~ 2 ~] [5 ~ 4 ~ 2 ~ 0 ~] [1 ~ ~ ~ ~ ~ ~ ~]>'],
   orizzonte: [{ it: 'Orizzonte', en: 'Horizon' }, '<[4 ~ 4 5 4 ~ 2 ~] [0 ~ 2 ~ 4 ~ 7 ~] [5 ~ 5 4 2 ~ 0 ~] [1 ~ 2 ~ 4 ~ ~ ~]>'],
 };
 export const MODES = [['minor', { it: 'Minore', en: 'Minor' }], ['phrygian', { it: 'Frigio', en: 'Phrygian' }], ['dorian', { it: 'Dorico', en: 'Dorian' }], ['mixolydian', { it: 'Misolidio', en: 'Mixolydian' }]];
 export const VOWELS = [['', { it: 'Nessuna', en: 'None' }], ['<a e i o>', 'a e i o'], ['a', 'a'], ['o', 'o']];
-// [nome, struttura, attack, decay, sustain, release, forma del volume facoltativa (postgain)]
+// [nome, ritmo, attack, decay, sustain, release, forma del volume (postgain), voicing]
+// ritmo: '' = accordo tenuto; [beat, mezzo beat] = modello per beat; stringa = sedicesimi che si ripetono
 export const PADS = {
   pad: [{ it: 'Tappeto', en: 'Sustained' }, '', .4, 0, 1, 1.2],
   stab: ['Stab', 'x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~', .01, .15, 0, .1],
-  pump: [{ it: 'In levare', en: 'Offbeat pump' }, '[~ x]*4', .02, .25, .2, .3],
-  sidechain: ['Sidechain', 'x*16', .01, .2, .7, .05, '[.1 .4 .75 1]*4'],
-  staccato: [{ it: 'Staccato a ottavi', en: 'Staccato 8ths' }, 'x*8', .005, .08, 0, .05],
-  synco: [{ it: 'Sincopato', en: 'Syncopated' }, '[~ ~ x x]*4', .005, .1, 0, .05],
+  pump: [{ it: 'In levare', en: 'Offbeat pump' }, ['[~ x]', '~'], .02, .25, .2, .3],
+  sidechain: ['Sidechain', ['[x x x x]', '[x x]'], .01, .2, .7, .05, ['[.1 .4 .75 1]', '[.1 .4]']],
+  staccato: [{ it: 'Staccato a ottavi', en: 'Staccato 8ths' }, ['[x x]', 'x'], .005, .08, 0, .05],
+  synco: [{ it: 'Sincopato', en: 'Syncopated' }, ['[~ ~ x x]', '[~ ~]'], .005, .1, 0, .05],
+  comp: [{ it: 'Accompagnamento (lo-fi)', en: 'Comping (lo-fi)' }, 'x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~', .01, .9, .35, .8],
+  power: [{ it: 'Power chord a ottavi', en: 'Power chords, 8ths' }, ['[x x]', 'x'], .005, .25, .6, .1, null, 'power'],
+  riff: [{ it: 'Riff power chord', en: 'Power chord riff' }, ['[x ~ x x]', '[x ~]'], .005, .2, .5, .1, null, 'power'],
+  ring: [{ it: 'Power chord tenuto', en: 'Held power chord' }, '', .01, 0, 1, .6, null, 'power'],
 };
-export const TEXTURES = ['numbers', 'industrial', 'metal', 'glitch', 'space', 'wind', 'crow'];
+// 'vinyl' non è un campione: è fruscio sintetico
+export const TEXTURES = ['vinyl', 'numbers', 'industrial', 'metal', 'glitch', 'space', 'wind', 'crow'];
 // [nome, mini-notation con X al posto del campione, varianti n]
 export const TEX_RHYTHMS = {
   bar: [{ it: 'Uno per battuta', en: 'One per bar' }, 'X', '<0 3 7 1>'],
@@ -81,7 +122,7 @@ export const TEX_RHYTHMS = {
   eighth: [{ it: 'Ottavi', en: '8th notes' }, 'X*8', 'irand(16)'],
   sixteenth: [{ it: 'Sedicesimi', en: '16th notes' }, 'X*16', 'irand(16)'],
 };
-export const KITS = ['RolandTR909', 'RolandTR808', 'RolandTR707', 'RolandTR606', 'LinnDrum', 'AkaiLinn'];
+export const KITS = ['RolandTR909', 'RolandTR808', 'RolandTR707', 'RolandTR606', 'LinnDrum', 'AkaiLinn', 'LinnLM1', 'OberheimDMX', 'EmuSP12', 'AkaiMPC60', 'AlesisHR16', 'YamahaRX5'];
 // [id campione, etichetta, moltiplicatore volume, strumento nel visual Palco]
 export const ROWS = [['bd', 'Kick', 1, 'kick'], ['cp', 'Clap', .8, 'snare'], ['sd', 'Snare', .75, 'snare'], ['hh', 'Hat', .5, 'hats'], ['oh', 'Open', .45, 'hats'], ['rd', 'Ride', .35, 'hats']];
 const E16 = '................';
@@ -92,7 +133,14 @@ export const GROOVES = {
   halftime: ['Half-time', { bd: 'x.........x.....', cp: '........x.......', sd: E16, hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }],
   techno:   ['Techno', { bd: 'x...x...x...x...', cp: '....x.......x...', sd: '...........x....', hh: '..x...x...x...x.', oh: '..x.......x.....', rd: E16 }],
   hard:     ['Hard techno', { bd: 'x...x...x...x...', cp: '....x.......x..x', sd: E16, hh: 'x.xx.x.xx.xx.x.x', oh: '..x...x...x...x.', rd: '..x...x...x...x.' }],
+  rock:     ['Rock', { bd: 'x.......x.x.....', cp: E16, sd: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }],
+  boombap:  ['Boom bap (lo-fi)', { bd: 'x......x.x......', cp: E16, sd: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: '..............x.', rd: E16 }],
+  // metri dispari: 7/8 = 2+2+3 ottavi, 5/4 = 3+2 beat
+  prog78:   ['Prog 7/8', { bd: 'x.......x.....', cp: '..............', sd: '....x.......x.', hh: 'x.x.x.x.x.x.x.', oh: '..............', rd: '..............' }],
+  prog54:   ['Prog 5/4', { bd: 'x.........x.........', cp: '....................', sd: '....x.......x...x...', hh: 'x.x.x.x.x.x.x.x.x.x.', oh: '....................', rd: '....................' }],
 };
+// adatta una riga del sequencer alla lunghezza della battuta
+export const fitSteps = (steps, n) => steps.length >= n ? steps.slice(0, n) : steps + '.'.repeat(n - steps.length);
 export const LOOKS = [
   ['palco', { it: 'Palco', en: 'Stage' }], ['pixel', 'Pixel'], ['tramonto', { it: 'Tramonto', en: 'Sunset' }],
   ['montagne', { it: 'Montagne', en: 'Mountains' }], ['spazio', { it: 'Spazio', en: 'Space' }], ['sonar', 'Sonar'],
@@ -103,7 +151,7 @@ export const INSTRUMENTS = ['kick', 'snare', 'hats', 'fx', 'bass', 'arp', 'pad',
 // Stato di una scena. "…End" a null significa nessuna automazione: il valore resta fisso.
 // cutoff 20000 = filtro aperto. grit 0 = niente bitcrusher. drive 0 = niente saturazione.
 export const DEFAULT = {
-  bpm: 138, bpmEnd: null, key: 'A', prog: 'epica',
+  bpm: 138, bpmEnd: null, key: 'A', prog: 'epica', meter: '4/4', swing: 0,
   drums: { on: true, kit: 'RolandTR909', gain: .9, gainEnd: null, cutoff: 20000, cutoffEnd: null, drive: 0, grit: 0,
     rows: Object.fromEntries(ROWS.map(([id]) => [id, { steps: GROOVES.trance[1][id], mute: false }])) },
   bass: { on: true, preset: 'rolling', wave: 'sawtooth', gain: .8, gainEnd: null, cutoff: 700, cutoffEnd: null, move: 'lento', reso: 8, drive: 0 },
@@ -129,13 +177,34 @@ export function normalizeState(s) {
 // ---------- generatore di codice ----------
 export const lab = on => on ? '$' : '_$';
 export const drumPattern = (id, steps) => {
+  const q = steps.split('').map(c => c === 'x' ? id : '~');
+  if (q.length % 4) return q.join(' ');
   const groups = [];
-  for (let g = 0; g < 4; g++) {
-    const q = steps.slice(g * 4, g * 4 + 4).split('').map(c => c === 'x' ? id : '~');
-    groups.push(q.every(x => x === '~') ? '~' : `[${q.join(' ')}]`);
-  }
+  for (let i = 0; i < q.length; i += 4) { const b = q.slice(i, i + 4); groups.push(b.every(x => x === '~') ? '~' : `[${b.join(' ')}]`); }
   return groups.join(' ');
 };
+// modello per beat → battuta di n sedicesimi; l'eventuale mezzo beat finale pesa 2 (@2)
+const beatGrid = ([beat, half], n) => {
+  const full = Math.floor(n / 4), rest = n % 4, toks = Array(full).fill(beat);
+  if (!rest) return toks.join(' ');
+  return [...toks.map(x => `${x}@4`), `${half}@${rest}`].join(' ');
+};
+// sedicesimi scritti per il 4/4 → n sedicesimi, ripetendo da capo
+const stepGrid = (str, n) => { const t = str.split(' '); return Array.from({ length: n }, (_, i) => t[i % t.length]).join(' '); };
+const rhythm = (spec, n) => !spec ? '' : Array.isArray(spec) ? beatGrid(spec, n) : spec === 'x' ? 'x' : stepGrid(spec, n);
+// "a [b c] d" → ["a", "[b c]", "d"]
+const topTokens = s => {
+  const out = []; let depth = 0, cur = '';
+  for (const ch of s) {
+    if (ch === '[' || ch === '<') depth++;
+    if (ch === ']' || ch === '>') depth--;
+    if (ch === ' ' && depth === 0) { if (cur) out.push(cur); cur = ''; } else cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out;
+};
+// riempie la battuta con "count" elementi presi in ciclo dal modello
+const fitTokens = (str, count) => { const t = topTokens(str.replace(/^\[(.*)\]$/, '$1')); return Array.from({ length: count }, (_, i) => t[i % t.length]).join(' '); };
 // "<0 0 0 1 1>" → "<0!3 1!2>"
 const rle = vals => {
   const out = [];
@@ -167,6 +236,8 @@ const altItems = s => {
 // crash, breath: crash sul primo colpo, mezza battuta di silenzio alla fine
 function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, crash = false, breath = false, fill = false } = {}) {
   s = normalizeState(s);
+  const N = meterSteps(s.meter);
+  const sw = s.swing > 0 && N % 2 === 0 ? `.swingBy(${num(s.swing / 6)}, ${N / 2})` : '';
   const [, tr] = KEYS.find(k => k[0] === s.key) || KEYS[4];
   const trs = tr ? `.transpose(${tr})` : '';
   const chords = rotate(PROGS[s.prog][1], start);
@@ -194,56 +265,65 @@ function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, cras
   const d = s.drums;
   if (show(d.on)) L.push(`// ${t('cDrums')} · ${d.kit}`);
   for (const [id, , mult, inst] of ROWS) {
-    const row = d.rows[id], on = d.on && !row.mute;
-    if (!row || !row.steps.includes('x') || !show(on)) continue;
-    L.push(`${lab(on)}: s("${drumPattern(id, row.steps)}").bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${breathMask}${g}.analyze("${inst}")`);
+    const row = d.rows[id], on = d.on && !row.mute, steps = fitSteps(row.steps, N);
+    if (!steps.includes('x') || !show(on)) continue;
+    L.push(`${lab(on)}: s("${drumPattern(id, steps)}").bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${breathMask}${g}.analyze("${inst}")`);
   }
-  if (fill && d.on) L.push(`$: s("sd*16").bank("${d.kit}").gain(saw.range(.15, .75)).mask("${rle(rotate([...Array(Math.max(0, bars - 1)).fill('0'), '1'], start))}")${g}.analyze("snare")`);
+  if (fill && d.on) L.push(`$: s("sd*${N}").bank("${d.kit}").gain(saw.range(.15, .75)).mask("${rle(rotate([...Array(Math.max(0, bars - 1)).fill('0'), '1'], start))}")${g}.analyze("snare")`);
   if (crash && d.on) L.push(`$: s("cr").bank("${d.kit}").gain(.55).room(.4).mask("${rle(rotate(['1', ...Array(Math.max(0, bars - 1)).fill('0')], start))}")${g}.analyze("fx")`);
 
   const b = s.bass, bp = BASS[b.preset] || BASS.rolling;
   if (show(b.on)) {
     L.push('', `// ${t('cBass')} · ${tx(bp[0])}`);
-    L.push(`${lab(b.on)}: note("<${chords.map(c => CHORDS[c].bass).join(' ')}>")${trs}.struct("${bp[1]}")`);
+    L.push(`${lab(b.on)}: note("<${chords.map(c => CHORDS[c].bass).join(' ')}>")${trs}.struct("${rhythm(bp[1], N)}")${sw}`);
     L.push(`  .s("${b.wave}")${filter(b.cutoff, b.cutoffEnd, b.move)}.lpq(${num(b.reso)})${drive(b.drive)}`);
-    L.push(`  .decay(${f(bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${bp[4]}")` : ''}.gain(${auto(b.gain, b.gainEnd)})${breathMask}${g}.analyze("bass")`);
+    L.push(`  .decay(${f(bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${rhythm(bp[4], N)}")` : ''}.gain(${auto(b.gain, b.gainEnd)})${breathMask}${g}.analyze("bass")`);
   }
   const a = s.arp, ap = ARPS[a.preset] || ARPS.su;
   if (show(a.on)) {
-    const rep = a.speed === '16' ? '*2' : '';
+    const count = a.speed === '16' ? N : N / 2;
     L.push('', `// ${t('cArp')} · ${tx(ap[0])}, ${a.speed === '16' ? t('c16') : t('c8')}`);
-    L.push(`${lab(a.on)}: note("<${chords.map(c => `[${ap[1].replace(/\d/g, i => CHORDS[c].arp[i])}]${rep}`).join(' ')}>")${trs}`);
+    L.push(`${lab(a.on)}: note("<${chords.map(c => `[${fitTokens(ap[1], count).replace(/\d/g, i => CHORDS[c].arp[i])}]`).join(' ')}>")${trs}${sw}`);
     L.push(`  .s("${a.wave}")${filter(a.cutoff, a.cutoffEnd, a.move)}.lpq(${num(a.reso)})${drive(a.drive)}`);
     L.push(`  .decay(.15).sustain(.15)${a.delay > 0 ? `.delay(${f(a.delay)})` : ''}.gain(${auto(a.gain, a.gainEnd)})${breathMask}${g}.analyze("arp")`);
   }
   const h = s.hook, hp = HOOKS[h.preset] || HOOKS.richiamo;
   if (show(h.on)) {
-    const items = altItems(hp[1]);
-    const mel = items ? `<${rotate(items, start).join(' ')}>` : hp[1];
+    const items = (altItems(hp[1]) || [hp[1]]).map(it => `[${fitTokens(it, Math.max(1, Math.round(N / 2)))}]`);
+    const mel = `<${rotate(items, start).join(' ')}>`;
     L.push('', `// Hook · ${tx(hp[0])}`);
-    L.push(`${lab(h.on)}: n("${mel}").scale("${s.key}4:${h.mode}")`);
+    L.push(`${lab(h.on)}: n("${mel}").scale("${s.key}4:${h.mode}")${sw}`);
     L.push(`  .s("${h.wave}")${h.fm > 0 ? `.fm(${num(h.fm)})` : ''}${h.vowel ? `.vowel("${h.vowel}")` : ''}${filter(h.cutoff, h.cutoffEnd, h.move)}${grit(h.grit)}`);
     L.push(`  .decay(.2).sustain(.3).delay(${f(h.delay)}).room(.3).gain(${auto(h.gain, h.gainEnd)})${breathMask}${g}.analyze("hook")`);
   }
   const p = s.pad, pp = PADS[p.preset] || PADS.pad;
   if (show(p.on)) {
     L.push('', `// ${t('cPad')} · ${tx(pp[0])}`);
-    L.push(`${lab(p.on)}: note("<${chords.map(c => `[${CHORDS[c].pad}]`).join(' ')}>")${trs}${pp[1] ? `.struct("${pp[1]}")` : ''}`);
+    const voice = c => pp[7] === 'power' ? powerOf(c) : CHORDS[c].pad;
+    const pr = rhythm(pp[1], N);
+    L.push(`${lab(p.on)}: note("<${chords.map(c => `[${voice(c)}]`).join(' ')}>")${trs}${pr ? `.struct("${pr}")` : ''}${pr ? sw : ''}`);
     L.push(`  .s("${p.wave}").attack(${f(pp[2])})${pp[3] ? `.decay(${f(pp[3])}).sustain(${f(pp[4])})` : ''}.release(${f(pp[5])})${filter(p.cutoff, p.cutoffEnd, p.move)}${drive(p.drive)}`);
-    L.push(`  .room(${f(p.room)})${pp[6] ? `.postgain("${pp[6]}")` : ''}.gain(${auto(p.gain, p.gainEnd)})${g}.analyze("pad")`);
+    L.push(`  .room(${f(p.room)})${pp[6] ? `.postgain("${rhythm(pp[6], N)}")` : ''}.gain(${auto(p.gain, p.gainEnd)})${g}.analyze("pad")`);
   }
   const x = s.texture, xr = TEX_RHYTHMS[x.rhythm] || TEX_RHYTHMS.bar;
   if (show(x.on)) {
-    const nArg = xr[2].startsWith('irand') ? xr[2] : `"${xr[2]}"`;
     L.push('', `// Texture · ${x.sample}`);
-    L.push(`${lab(x.on)}: s("${xr[1].replace('X', x.sample)}").n(${nArg})${grit(x.grit)}.hpf(400).room(${f(x.room)})${xr[1].includes('*') ? '.pan(rand)' : ''}`);
-    L.push(`  .gain(${auto(x.gain, x.gainEnd)})${g}.analyze("fx")`);
+    if (x.sample === 'vinyl') {
+      // fruscio del vinile: impulsi di rumore brevissimi e radi
+      L.push(`${lab(x.on)}: s("white*${N * 2}").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)`);
+      L.push(`  .gain(${auto(x.gain * .5, x.gainEnd === null || x.gainEnd === undefined ? null : x.gainEnd * .5)})${g}.analyze("fx")`);
+    } else {
+      const nArg = xr[2].startsWith('irand') ? xr[2] : `"${xr[2]}"`;
+      const pat = xr[1].replace('*16', `*${N}`).replace('*8', `*${N / 2}`).replace('X', x.sample);
+      L.push(`${lab(x.on)}: s("${pat}").n(${nArg})${grit(x.grit)}.hpf(400).room(${f(x.room)})${xr[1].includes('*') ? '.pan(rand)' : ''}`);
+      L.push(`  .gain(${auto(x.gain, x.gainEnd)})${g}.analyze("fx")`);
+    }
   }
   const r = s.riser;
   if (show(r.on)) {
     const up = r.dir !== 'down';
     L.push('', `// ${t(up ? 'cRiser' : 'cDown', { n: r.bars })}`);
-    L.push(`${lab(r.on)}: s("white*16").decay(.06).sustain(0)`);
+    L.push(`${lab(r.on)}: s("white*${N}").decay(.06).sustain(0)`);
     L.push(`  .hpf(saw.slow(${r.bars}).range(${up ? '300, 8000' : '8000, 300'})${late})`);
     L.push(`  .gain(saw.slow(${r.bars}).range(${up ? `0, ${f(r.gain)}` : `${f(r.gain)}, 0`})${late})${g}.analyze("riser")`);
   }
@@ -278,14 +358,15 @@ export function compileTrack(track) {
       if (b < fin) return prevEnd + (st.bpm - prevEnd) * (b + 1) / fin;
       const rest = s.bars - fin;
       return rest > 1 ? st.bpm + (end - st.bpm) * (b - fin) / (rest - 1) : end;
-    }).map(v => Math.round(v * 100) / 100);
+    }).map(v => Math.round(v * 16 / meterSteps(st.meter) * 100) / 100);
+    // TEMPO è in "BPM da 4/4": in 7/8 una battuta dura 14 sedicesimi invece di 16
     return per.every(v => v === per[0]) ? per[0] : per.map(v => [1, v]);
   });
   const L = [
     `// coding-misk · ${safeName(track.title, 0)}`,
     `// ${t('cTrack')}`,
     `// ${t('cTag')}`,
-    `setcpm(${sc[0].state.bpm}/4)`, '',
+    `setcpm(${Math.round(sc[0].state.bpm * 16 / meterSteps(sc[0].state.meter) * 100) / 100}/4)`, '',
     `const SECTIONS = [${names.map((n, i) => `['${n}', ${sc[i].bars}]`).join(', ')}]`,
     `const TEMPO = {${names.map((n, i) => `'${n}': ${JSON.stringify(tempo[i]).replace(/"/g, "'")}`).join(', ')}}`,
   ];
@@ -297,7 +378,7 @@ export function compileTrack(track) {
     for (let k = 0; k < fo; k++) v[end + k] = +(1 - (k + 1) / (fo + 1)).toFixed(2);
     const [, tr, keyName] = KEYS.find(k => k[0] === s.state.key) || KEYS[4];
     const gate = `scene${i + 1}`;
-    L.push('', `// ---------- ${i + 1} · ${names[i]} · ${t('cSceneInfo', { bars: s.bars, bpm: s.state.bpmEnd ? `${s.state.bpm}→${s.state.bpmEnd}` : s.state.bpm, key: tx(keyName), chords: PROGS[s.state.prog][1].map(c => chordName(c, tr)).join(' ') })}${fin ? ' · ' + t('cFadeIn', { n: fin }) : ''} ----------`);
+    L.push('', `// ---------- ${i + 1} · ${names[i]} · ${t('cSceneInfo', { bars: `${s.bars}${s.state.meter !== '4/4' ? ` (${s.state.meter})` : ''}`, bpm: s.state.bpmEnd ? `${s.state.bpm}→${s.state.bpmEnd}` : s.state.bpm, key: tx(keyName), chords: PROGS[s.state.prog][1].map(c => chordName(c, tr)).join(' ') })}${fin ? ' · ' + t('cFadeIn', { n: fin }) : ''} ----------`);
     L.push(`const ${gate} = "${rle(v.map(String))}"`);
     L.push(...sceneLayers(s.state, { start: st, bars: s.bars, gate, crash: s.crash, breath: s.breath, fill: s.fill }));
   });

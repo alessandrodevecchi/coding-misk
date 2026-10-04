@@ -3,7 +3,7 @@ import { INSTRUMENTS } from './music.js';
 // Visual su canvas sincronizzati con l'audio.
 // Ogni strumento suona su un analizzatore separato (.analyze("kick"), .analyze("bass"), …):
 // da lì ricaviamo un livello 0..1 per strumento e gli attacchi (onset) che accendono la scena.
-export function startVisuals({ getS, getMode, isPlaying, sched, readout }) {
+export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout }) {
   const $ = (s, r = document) => r.querySelector(s);
   const cv = $('#stage'), cx = cv.getContext('2d');
   let W = 0, H = 0;
@@ -483,7 +483,8 @@ export function startVisuals({ getS, getMode, isPlaying, sched, readout }) {
     let cyc;
     if (playing) cyc = sched().now();
     else { idle += dt * (reduce ? .03 : .12); cyc = idle; }
-    const step = playing ? Math.floor(cyc * 16) % 16 : -1;
+    const nSteps = getSteps ? getSteps() : 16;
+    const step = playing ? Math.floor(cyc * nSteps) % nSteps : -1;
     if (step !== lastStep) { lastStep = step; onStep(step); }
     if (!playing) echoes.length = 0;
     kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10);

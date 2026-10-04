@@ -79,6 +79,8 @@
             <div class="bpm" id="bpm-end-row" hidden><span class="lbl" data-i18n="bpmEnd"></span><input id="bpm-end" type="number" min="60" max="200" step="1"></div></div>
           <div class="ctrl"><label class="lbl" for="key" data-i18n="key"></label><select id="key"></select></div>
           <div class="ctrl"><label class="lbl" for="prog" data-i18n="chords"></label><select id="prog"></select></div>
+          <div class="ctrl"><label class="lbl" for="sc-meter" data-i18n="meter"></label><select id="sc-meter" data-path="meter"></select></div>
+          <div class="ctrl"><div class="row"><label class="lbl" for="sc-swing">Swing</label><output id="sc-swing-o"></output></div><input type="range" id="sc-swing" data-path="swing" min="0" max="1" step="0.05"></div>
         </div>
         <div class="arr-flags">
           <label class="loop"><input type="checkbox" id="sc-crash"> <span data-i18n="crashStart"></span></label>

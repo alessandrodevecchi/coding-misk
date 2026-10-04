@@ -204,4 +204,136 @@ export const DCI_IGNITION_TRACK = {
   ],
 };
 
-export const BUILTIN_TRACKS = [GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];
+// ---------- reel cyberpunk: 145 BPM, 17 battute = 28 secondi ----------
+// Impatto subito (cassa filtrata dalla prima battuta), build corto, drop lungo, glitch, colpo finale.
+export const NEON_RUSH_TRACK = {
+  id: 'neon-rush-reel', title: 'Neon Rush · reel 28s', look: 'palco',
+  style: { it: 'Techno cyberpunk ruvida per un reel · Mi frigio · 145 BPM · 28 secondi', en: 'Rough cyberpunk techno for a reel · E phrygian · 145 BPM · 28 seconds' },
+  scenes: [
+    makeScene('Glitch', 2, {}, s => {
+      s.bpm = 145; cyber(s); only(s, ['drums', 'arp', 'texture']);
+      Object.assign(s.drums, { drive: 2.5, grit: .3, cutoff: 400, cutoffEnd: 2200 }); steps(s, { bd: 'x...x...x...x...', cp: E16, sd: E16, hh: E16, oh: E16, rd: E16 });
+      acid(s, 300, 900, .3, 1.5); s.arp.reso = 22;
+      Object.assign(s.texture, { sample: 'numbers', rhythm: 'bar', grit: .95, gain: .55, room: .5 });
+    }),
+    makeScene('Build', 3, { fill: true, breath: true }, s => {
+      s.bpm = 145; cyber(s); only(s, ['drums', 'bass', 'arp', 'texture', 'riser']);
+      Object.assign(s.drums, { drive: 2.5, grit: .3, gain: .55, gainEnd: .95, cutoff: 2200, cutoffEnd: 20000 }); steps(s, { bd: 'x...x...x...x...', cp: E16, sd: E16, hh: 'xxxxxxxxxxxxxxxx', oh: E16, rd: E16 });
+      rumble(s, 200, 500, .45); s.bass.gainEnd = .6;
+      acid(s, 900, 3200, .32, 1.6); s.arp.reso = 22;
+      Object.assign(s.texture, { sample: 'industrial', rhythm: 'eighth', grit: .8, gain: .25 });
+      Object.assign(s.riser, { dir: 'up', bars: '4', gain: .42 });
+    }),
+    makeScene('Drop', 8, { crash: true }, s => {
+      s.bpm = 145; cyber(s); only(s, ['drums', 'bass', 'arp', 'hook', 'pad', 'texture']);
+      Object.assign(s.drums, { drive: 2.8, grit: .5 }); steps(s, GROOVES.hard[1]);
+      rumble(s, 500, null, .6); s.bass.drive = 4;
+      acid(s, 1600, 4500, .34, 2); s.arp.reso = 24;
+      Object.assign(s.pad, { preset: 'stab', wave: 'supersaw', cutoff: 3200, drive: 1.5, room: .3, gain: .3, move: 'fisso' });
+      cyberHook(s, .22, { fm: 5, grit: .6 });
+      Object.assign(s.texture, { sample: 'metal', rhythm: 'euclid', grit: .8, gain: .3, room: .2 });
+    }),
+    makeScene('Glitch break', 2, { breath: true }, s => {
+      s.bpm = 145; cyber(s); only(s, ['drums', 'arp', 'texture', 'riser']);
+      Object.assign(s.drums, { drive: 3, grit: .95 }); steps(s, { bd: 'x.....x...x.x.xx', cp: E16, sd: E16, hh: 'xxxxxxxxxxxxxxxx', oh: E16, rd: E16 });
+      acid(s, 3000, 500, .34, 2);
+      Object.assign(s.texture, { sample: 'numbers', rhythm: 'sixteenth', grit: .95, gain: .3 });
+      Object.assign(s.riser, { dir: 'up', bars: '2', gain: .45 });
+    }),
+    makeScene('Final', 1, { crash: true }, s => {
+      s.bpm = 145; cyber(s); only(s, ['drums', 'bass', 'arp', 'hook', 'pad']);
+      Object.assign(s.drums, { drive: 3, grit: .5 }); steps(s, GROOVES.hard[1]);
+      rumble(s, 600, null, .6); s.bass.drive = 4; acid(s, 4500, null, .34, 2);
+      Object.assign(s.pad, { preset: 'stab', wave: 'supersaw', cutoff: 3600, drive: 1.5, room: .3, gain: .32, move: 'fisso' });
+      cyberHook(s, .22, { fm: 5, grit: .6 });
+    }),
+    makeScene('Hit', 1, { crash: true }, s => {
+      s.bpm = 145; cyber(s); only(s, ['bass', 'pad', 'texture']);
+      Object.assign(s.bass, { on: true, preset: 'sub', wave: 'sine', cutoff: 300, gain: .8, gainEnd: 0, drive: 1, reso: 2, move: 'fisso' });
+      Object.assign(s.pad, { preset: 'ring', wave: 'gm_distortion_guitar', cutoff: 5000, drive: .5, room: .6, gain: .4, gainEnd: 0, move: 'fisso' });
+      Object.assign(s.texture, { sample: 'numbers', rhythm: 'bar', grit: .95, gain: .5, room: .9 });
+    }),
+  ],
+};
+
+// ---------- progressive rock: 7/8, 5/4 e 4/4, chitarre, organo, archi stile mellotron ----------
+const rockKit = (s, rows, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'AkaiXR10', gain: .9, gainEnd: null, drive: .3, grit: 0, cutoff: 20000, cutoffEnd: null, ...extra }); steps(s, rows); };
+const rockBass = (s, preset = 'ottavi', gain = .6) => Object.assign(s.bass, { on: true, preset, wave: 'gm_electric_bass_pick', cutoff: 2000, cutoffEnd: null, reso: 1, gain, gainEnd: null, move: 'fisso', drive: .4 });
+const guitar = (s, preset, gain = .42, wave = 'gm_distortion_guitar') => Object.assign(s.pad, { on: true, preset, wave, cutoff: 5000, cutoffEnd: null, gain, gainEnd: null, room: .35, move: 'fisso', drive: .4 });
+const organ = (s, preset = 'su', gain = .4, wave = 'gm_rock_organ', speed = '8') => Object.assign(s.arp, { on: true, preset, wave, speed, cutoff: 4000, cutoffEnd: null, reso: 1, delay: .15, gain, gainEnd: null, move: 'fisso', drive: 0 });
+const solo = (s, preset, wave, gain = .3, mode = 'minor') => Object.assign(s.hook, { on: true, preset, mode, wave, fm: 0, vowel: '', cutoff: 6000, cutoffEnd: null, delay: .25, gain, gainEnd: null, move: 'fisso', grit: 0 });
+const prog = (s, meter, chords = 'prog', bpm = 120) => { s.bpm = bpm; s.key = 'A'; s.prog = chords; s.meter = meter; };
+
+export const PROG_TRACK = {
+  id: 'settimo-cielo', title: 'Settimo Cielo', look: 'montagne',
+  style: { it: 'Progressive rock · La minore · 120 BPM · riff in 7/8, ponte in 5/4, assolo in 4/4 · chitarre distorte, organo, archi', en: 'Progressive rock · A minor · 120 BPM · riff in 7/8, bridge in 5/4, solo in 4/4 · distorted guitars, organ, strings' },
+  scenes: [
+    makeScene('Mellotron', 4, {}, s => {
+      prog(s, '4/4', 'andalusa'); only(s, ['hook', 'pad']);
+      Object.assign(s.pad, { on: true, preset: 'pad', wave: 'gm_string_ensemble_1', cutoff: 3000, gain: .1, gainEnd: .32, room: .8, move: 'fisso', drive: 0 });
+      solo(s, 'prog', 'gm_flute', .4);
+    }),
+    makeScene('Riff 7/8', 8, { crash: true }, s => {
+      prog(s, '7/8'); only(s, ['drums', 'bass', 'pad']);
+      rockKit(s, GROOVES.prog78[1]); rockBass(s, 'ottavi'); guitar(s, 'riff');
+    }),
+    makeScene('Strofa 7/8', 8, {}, s => {
+      prog(s, '7/8'); only(s, ['drums', 'bass', 'arp', 'hook', 'pad']);
+      rockKit(s, { ...GROOVES.prog78[1], hh: E16.slice(0, 14), rd: 'x.x.x.x.x.x.x.' }); rockBass(s, 'ottavi', .55);
+      guitar(s, 'ring', .3); organ(s, 'su', .4); solo(s, 'prog', 'gm_lead_2_sawtooth', .4);
+    }),
+    makeScene('Ponte 5/4', 6, { fade: 1, fill: true }, s => {
+      prog(s, '5/4', 'andalusa'); only(s, ['drums', 'bass', 'arp', 'pad']);
+      rockKit(s, GROOVES.prog54[1]); rockBass(s, 'walking', .6);
+      Object.assign(s.pad, { on: true, preset: 'pad', wave: 'gm_drawbar_organ', cutoff: 4000, gain: .26, room: .5, move: 'fisso', drive: 0 });
+      organ(s, 'spezzato', .3, 'gm_electric_guitar_clean', '16');
+    }),
+    makeScene('Assolo 4/4', 8, { crash: true, fill: true }, s => {
+      prog(s, '4/4', 'andalusa', 124); only(s, ['drums', 'bass', 'hook', 'pad']);
+      rockKit(s, { ...GROOVES.rock[1], oh: '..............x.', rd: E16 }); rockBass(s, 'ottavi', .6);
+      guitar(s, 'power', .34, 'gm_overdriven_guitar'); solo(s, 'assolo', 'gm_distortion_guitar', .45, 'dorian');
+    }),
+    makeScene('Riff ripresa', 4, { crash: true }, s => {
+      prog(s, '7/8'); only(s, ['drums', 'bass', 'arp', 'pad']);
+      rockKit(s, GROOVES.prog78[1]); rockBass(s, 'ottavi'); guitar(s, 'riff', .45); organ(s, 'pulsar', .38);
+    }),
+    makeScene('Finale', 4, { crash: true }, s => {
+      prog(s, '4/4', 'andalusa'); s.bpmEnd = 92; only(s, ['drums', 'bass', 'pad', 'hook']);
+      rockKit(s, { bd: 'x.......x.......', cp: E16, sd: '........x.......', hh: E16, oh: E16, rd: 'x...x...x...x...' }, { gain: .9, gainEnd: .4 });
+      rockBass(s, 'sub', .6); guitar(s, 'ring', .34); s.pad.gainEnd = .1;
+      Object.assign(s.hook, { on: true, preset: 'prog', mode: 'minor', wave: 'gm_string_ensemble_1', fm: 0, vowel: '', cutoff: 5000, cutoffEnd: null, delay: .3, gain: .2, gainEnd: 0, move: 'fisso', grit: 0 });
+    }),
+  ],
+};
+
+// ---------- lo-fi: 78 BPM, swing, settime, piano elettrico, vinile ----------
+const lofi = s => { s.bpm = 78; s.key = 'D'; s.prog = 'lofi'; s.swing = .6; };
+const dusty = (s, extra = {}) => { Object.assign(s.drums, { on: true, kit: 'EmuSP12', gain: .75, gainEnd: null, drive: 0, grit: .3, cutoff: 5000, cutoffEnd: null, ...extra }); steps(s, GROOVES.boombap[1]); };
+const keys = (s, cutoff = 2400, gain = .32, extra = {}) => Object.assign(s.pad, { on: true, preset: 'comp', wave: 'gm_epiano1', cutoff, cutoffEnd: null, gain, gainEnd: null, room: .45, move: 'fisso', drive: 0, ...extra });
+const upright = (s, gain = .55) => Object.assign(s.bass, { on: true, preset: 'walking', wave: 'gm_acoustic_bass', cutoff: 1200, cutoffEnd: null, reso: 1, gain, gainEnd: null, move: 'fisso', drive: 0 });
+const vinyl = (s, gain = .5) => Object.assign(s.texture, { on: true, sample: 'vinyl', rhythm: 'bar', grit: 0, gain, gainEnd: null, room: .2 });
+
+export const LOFI_TRACK = {
+  id: 'pioggia-sul-vetro', title: 'Pioggia sul vetro', look: 'pixel',
+  style: { it: 'Lo-fi hip hop · Re minore · 78 BPM con swing · piano elettrico, contrabbasso, vibrafono, vinile', en: 'Lo-fi hip hop · D minor · 78 BPM with swing · electric piano, upright bass, vibraphone, vinyl' },
+  scenes: [
+    makeScene('Vinile', 4, {}, s => { lofi(s); only(s, ['pad', 'texture']); keys(s, 800, .28, { cutoffEnd: 2200 }); vinyl(s, .6); }),
+    makeScene('A', 8, {}, s => { lofi(s); only(s, ['drums', 'bass', 'pad', 'texture']); dusty(s); upright(s); keys(s); vinyl(s); }),
+    makeScene('B', 8, {}, s => {
+      lofi(s); only(s, ['drums', 'bass', 'arp', 'hook', 'pad', 'texture']); dusty(s); upright(s); keys(s, 2200, .28); vinyl(s);
+      Object.assign(s.hook, { on: true, preset: 'pioggia', mode: 'minor', wave: 'gm_vibraphone', fm: 0, vowel: '', cutoff: 5000, cutoffEnd: null, delay: .35, gain: .55, gainEnd: null, move: 'fisso', grit: 0 });
+      Object.assign(s.arp, { on: true, preset: 'pedale', wave: 'gm_electric_guitar_clean', speed: '8', cutoff: 2600, cutoffEnd: null, reso: 1, delay: .3, gain: .14, gainEnd: null, move: 'fisso', drive: 0 });
+    }),
+    makeScene('Pausa', 4, { fade: 1 }, s => {
+      lofi(s); only(s, ['hook', 'pad', 'texture']); keys(s, 1400, .3); vinyl(s, .7);
+      Object.assign(s.hook, { on: true, preset: 'pioggia', mode: 'minor', wave: 'gm_vibraphone', fm: 0, vowel: '', cutoff: 3000, cutoffEnd: null, delay: .5, gain: .5, gainEnd: null, move: 'fisso', grit: 0 });
+    }),
+    makeScene('Ritorno', 8, {}, s => {
+      lofi(s); only(s, ['drums', 'bass', 'hook', 'pad', 'texture']); dusty(s, { gain: .8 }); upright(s); keys(s); vinyl(s);
+      Object.assign(s.hook, { on: true, preset: 'pioggia', mode: 'minor', wave: 'gm_flute', fm: 0, vowel: '', cutoff: 4000, cutoffEnd: null, delay: .3, gain: .4, gainEnd: null, move: 'fisso', grit: 0 });
+    }),
+    makeScene('Coda', 4, {}, s => { lofi(s); only(s, ['drums', 'pad', 'texture']); dusty(s, { gain: .6, gainEnd: 0 }); keys(s, 2200, .32, { cutoffEnd: 500, gainEnd: 0 }); vinyl(s, .6); }),
+  ],
+};
+
+export const BUILTIN_TRACKS = [NEON_RUSH_TRACK, PROG_TRACK, LOFI_TRACK, GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];

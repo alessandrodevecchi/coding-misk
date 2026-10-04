@@ -143,9 +143,7 @@
   .rowlbl[aria-pressed="true"] { text-decoration: line-through; color: var(--muted); opacity: .6; }
   .steps { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; }
   .step { --c: var(--s1); aspect-ratio: 1 / 1.25; min-width: 0; padding: 0; border-radius: 3px; border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); background: color-mix(in srgb, var(--c) 8%, var(--panel2)); border-bottom: 3px solid var(--c); }
-  .step:nth-child(16n+5), .step:nth-child(16n+6), .step:nth-child(16n+7), .step:nth-child(16n+8) { --c: var(--s2); }
-  .step:nth-child(16n+9), .step:nth-child(16n+10), .step:nth-child(16n+11), .step:nth-child(16n+12) { --c: var(--s3); }
-  .step:nth-child(16n+13), .step:nth-child(16n+14), .step:nth-child(16n+15), .step:nth-child(16n+16) { --c: var(--s4); }
+  .step[data-g="1"] { --c: var(--s2); } .step[data-g="2"] { --c: var(--s3); } .step[data-g="3"] { --c: var(--s4); }
   .step[aria-pressed="true"] { background: var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 70%, transparent); }
   .step.now { outline: 2px solid var(--ink); outline-offset: -1px; }
   .stepnums { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; font-family: var(--mono); font-size: 9px; color: var(--muted); text-align: center; }

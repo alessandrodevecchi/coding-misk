@@ -66,3 +66,11 @@
 - Brani: *Ten Years · ricostruzione*, *Next Chapter*, *DCI Jingle · ricostruzione*, *DCI Ignition*.
 - Esportazione WAV: `MediaRecorder` collegato a `getSuperdoughAudioController().output.destinationGain`, registrazione in tempo reale con 2,5 s di coda, conversione in WAV 16 bit.
 - Campioni personalizzati da `public/samples/` con manifest generato da un plugin Vite.
+
+## 2026-10-06
+
+- Le ricostruzioni da audio restano lontane dagli originali: struttura, tempo e armonia tornano, timbri e melodie no (synth di Strudel, melodie stimate dallo spettro).
+- Scene con metro (4/4, 3/4, 5/4, 7/8): ritmi di basso, pad, sidechain scritti come modelli per beat `[beat, mezzo beat]` e ripetuti per i beat della battuta, con pesi `@` per il mezzo beat del 7/8. Sequencer a lunghezza variabile. `TEMPO` e `setcpm` sono in "BPM da 4/4" (BPM × 16 / sedicesimi della battuta); le etichette mostrano i BPM veri.
+- Swing per scena (`.swingBy(swing/6, sedicesimi/2)`), strumenti General MIDI come suono di ogni canale, accordi di settima, power chord, preset rock e lo-fi, fruscio del vinile sintetico, drum machine LinnLM1, OberheimDMX, EmuSP12, AkaiMPC60, AlesisHR16, YamahaRX5.
+- Brani: *Neon Rush · reel 28s*, *Settimo Cielo*, *Pioggia sul vetro*.
+- I soundfont General MIDI hanno livelli molto diversi (vibrafono e organo molto più bassi del piano elettrico): volumi bilanciati a mano nei brani.
