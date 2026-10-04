@@ -103,3 +103,9 @@
 
 - Volume master di Strudel fissato a 0,6 (`destinationGain` del controller di superdough): nei drop la somma degli strumenti arrivava a 1,33 e saturava l'uscita.
 - Video demo registrato con Playwright (Chrome headless) + audio catturato dall'uscita master, unito con ffmpeg: `demo/coding-misk-demo.mp4` (ignorato da git).
+
+## 2026-10-07 (sera)
+
+- `#1` Visual Edgerunners: luna a retino, città a strati con bordi ciano, insegne olografiche sugli hi-hat, treno sopraelevato, linee di velocità su cassa e chitarra, glitch con fette e separazione RGB sul rullante, HUD con la forma d'onda.
+- `#2` Tema interfaccia hardware (`src/hardware.js`): selettore NEON/HW, manopole che leggono e scrivono i cursori originali (nascosti ma usabili da tastiera), display LCD ambra, LED di attività per canale dagli analizzatori, pannelli anodizzati.
+- Flusso: un branch per issue partito da `develop`, unito in `develop`.

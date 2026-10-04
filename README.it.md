@@ -33,7 +33,8 @@ Questo progetto unisce quell'idea alle capacità dei nuovi modelli, con il mio t
 - **Automazioni.** Volume, filtro e tempo possono cambiare da inizio a fine scena. Ci sono saturazione, bitcrusher, risonanza, FM e filtro vocale.
 - **Player.** Timeline cliccabile, salto a qualsiasi battuta, pulsanti per ascoltare gli stacchi tra le sezioni, ripetizione di una sezione, pausa e ripresa.
 - **Brani inclusi.** Una ventina di brani in generi diversi: techno, trance, hard techno, industrial, club scuro, metal, metal melodico, phonk, progressive rock, lo-fi, arcade anni '90, più reel da 30 secondi ricavati dai brani interi.
-- **Visual.** Sei temi su canvas (Palco, Pixel, Tramonto, Montagne, Spazio, Sonar). Ogni strumento ha il suo analizzatore audio, così sul Palco batteria, basso, chitarra, tastiere e FX si accendono quando suonano.
+- **Visual.** Sette temi su canvas (Palco, Pixel, Tramonto, Montagne, Spazio, Sonar, Edgerunners). Ogni strumento ha il suo analizzatore audio, così sul Palco batteria, basso, chitarra, tastiere e FX si accendono quando suonano.
+- **Tema interfaccia hardware.** Si passa da neon a hardware: manopole al posto dei cursori, piccoli display ambra, LED di accensione e di attività su ogni canale, pannelli anodizzati.
 - **Esportazione WAV.** Registra il brano in tempo reale dall'uscita di Strudel e scarica un WAV stereo.
 - **Campioni personalizzati.** I file messi in `public/samples/` diventano suoni utilizzabili nei brani.
 - **Guida e suoni.** 14 lezioni da ascoltare e una libreria per provare drum machine, oscillatori e campioni.
@@ -48,8 +49,6 @@ Il backlog è nelle [issue del repository](https://github.com/alessandrodevecchi
 - **Musica per video brevi.** Usare i brani come sottofondo per reel e contenuti social, con durate e partenze già pronte.
 - **Mood e preset.** Definire mood e preset riutilizzabili, per comporre più in fretta e con più varietà.
 - **Altri generi.** Continuare a esplorare stili diversi, con meno strati e più ritmo.
-- **Visual anime cyberpunk.** Un nuovo visual ispirato allo stile di Cyberpunk: Edgerunners.
-- **Tema interfaccia hardware.** Un tema che sembra strumentazione fisica: manopole, piccoli display, luci che si accendono e si spengono.
 
 ## Avvio
 

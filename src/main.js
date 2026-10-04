@@ -6,6 +6,7 @@ import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
+import { startHardware } from './hardware.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -507,6 +508,10 @@ $('#bpm-end').addEventListener('change', e => { S.bpmEnd = clampBpm(e.target.val
 $('#bpm-ramp').addEventListener('click', () => { S.bpmEnd = S.bpmEnd == null ? S.bpm : null; syncAll(); changed(); });
 $$('[data-bpm]').forEach(b => b.addEventListener('click', () => { S.bpm = clampBpm(S.bpm + +b.dataset.bpm); syncAll(); changed(); }));
 
+// tema dell'interfaccia: neon (predefinito) o hardware con manopole, display e LED
+let ui = store.get('coding-misk-ui', 'neon');
+const setUi = v => { ui = v === 'hw' ? 'hw' : 'neon'; store.set('coding-misk-ui', ui); syncAll(); };
+$$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.dataset.uitheme)));
 const setLook = l => { look = l; store.set('coding-misk-look', l); syncAll(); };
 $('#looks').addEventListener('click', e => { const b = e.target.closest('[data-look]'); if (b) setLook(b.dataset.look); });
 $('#fs').addEventListener('click', () => {
@@ -527,6 +532,8 @@ function syncOutputs() {
 }
 function syncAll() {
   document.documentElement.dataset.look = look;
+  document.documentElement.dataset.ui = ui;
+  $$('[data-uitheme]').forEach(b => b.setAttribute('aria-pressed', ui === b.dataset.uitheme));
   fitRows();
   $('#bpm').value = S.bpm; $('#key').value = S.key; $('#prog').value = S.prog;
   $('#bpm-ramp').setAttribute('aria-pressed', S.bpmEnd != null);
@@ -779,6 +786,7 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => {
 }));
 
 renderAll();
+startHardware();
 { const tb = store.get('coding-misk-tab', 'componi'); if (TABS.includes(tb)) showTab(tb); }
 updateShare();
 startVisuals({

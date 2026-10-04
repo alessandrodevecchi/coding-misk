@@ -33,7 +33,8 @@ This project combines that idea with what the new models can do, with my own twi
 - **Automation.** Volume, filter and tempo can move from the start to the end of a scene. Drive, bitcrusher, resonance, FM and vowel filter are available too.
 - **Player.** Clickable timeline, start from any bar, buttons to hear each transition between sections, section loop, pause and resume.
 - **Included tracks.** About twenty tracks across genres: techno, trance, hard techno, industrial, dark club, metal, melodic metal, phonk, progressive rock, lo-fi and 90s arcade, plus 30 second reels cut from the full tracks.
-- **Visuals.** Six canvas themes (Stage, Pixel, Sunset, Mountains, Space, Sonar). Each instrument has its own audio analyser, so on the Stage the drums, bass, guitar, keys and FX light up when they play.
+- **Visuals.** Seven canvas themes (Stage, Pixel, Sunset, Mountains, Space, Sonar, Edgerunners). Each instrument has its own audio analyser, so on the Stage the drums, bass, guitar, keys and FX light up when they play.
+- **Hardware interface theme.** Switch from neon to hardware: knobs instead of sliders, small amber displays, power and activity LEDs on every channel, anodized panels.
 - **WAV export.** Records the track in real time from Strudel's output and downloads a stereo WAV.
 - **Custom samples.** Audio files placed in `public/samples/` become sounds you can use in tracks.
 - **Guide and sounds.** 14 lessons to listen to and a library to try drum machines, oscillators and samples.
@@ -48,8 +49,6 @@ The backlog lives in the [repository issues](https://github.com/alessandrodevecc
 - **Music for short videos.** Use the tracks as background music for reels and social content, with ready-made lengths and starting points.
 - **Moods and presets.** Define reusable moods and presets to compose faster and with more variety.
 - **More genres.** Keep exploring different styles, with fewer layers and more rhythm.
-- **Cyberpunk anime visual.** A new visual inspired by the look of Cyberpunk: Edgerunners.
-- **Hardware interface theme.** A theme that looks like physical gear: knobs, small displays, lights that turn on and off.
 
 ## Getting started
 
