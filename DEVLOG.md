@@ -132,6 +132,7 @@
 - Decisioni del proprietario sul piano: timeline libera come obiettivo con modalità a sezioni come MVP (passaggio senza perdite fra le due), note relative agli accordi, tracce di codice componibili. Aggiunti al piano: un bus (orbit) per traccia, brani in JSON con validatore e CLI per gli agenti, `docs/COMPOSING.md` con esempi verificati.
 - Aperte le issue delle fasi del piano: `#9` rete di sicurezza, `#10` ritmo per ogni strumento, `#11` formato brani v2, `#12` griglia con tracce libere, `#13` rack ed effetti e tracce di codice, `#14` timeline libera.
 - `#9` Rete di sicurezza: `tools/snapshot-code.mjs` (codice generato dei 18 brani in `tests/snapshots/code/`, senza browser, `npm run check:code`) e `tools/snapshot-levels.cjs` (picchi per scena e strumento in `tests/snapshots/levels.json`, tolleranza 0,12). Due giri sul codice invariato: tutto entro tolleranza tranne `fx` (crash e riser dipendono da dove cade la finestra di misura), quindi `fx` viene registrato ma non confrontato.
+- `#10` Ritmo per ogni strumento: riga di passi per basso, chitarra, arpeggio, hook e pad (parte dal preset, il primo clic la copia, "Torna al preset" la azzera, cambiare preset la azzera). Basso, chitarra e pad la usano come `struct`, arpeggio e hook come `mask` (possono solo togliere note). Timeline in sola lettura sotto le scene con una corsia per strumento e la testina. Un orbit per strumento: delay e riverbero indipendenti. Il codice dei brani cambia solo per `.orbit(n)`; snapshot aggiornati.
 
 ## Prossimo passo
 

@@ -213,11 +213,11 @@ export const DEFAULT = {
   bpm: 138, bpmEnd: null, key: 'A', prog: 'epica', meter: '4/4', swing: 0,
   drums: { on: true, kit: 'RolandTR909', gain: .9, gainEnd: null, cutoff: 20000, cutoffEnd: null, drive: 0, grit: 0,
     rows: Object.fromEntries(ROWS.map(([id]) => [id, { steps: GROOVES.trance[1][id], mute: false }])) },
-  bass: { on: true, preset: 'rolling', wave: 'sawtooth', gain: .8, gainEnd: null, cutoff: 700, cutoffEnd: null, move: 'lento', reso: 8, drive: 0 },
-  arp: { on: true, preset: 'su', wave: 'supersaw', gain: .4, gainEnd: null, cutoff: 2400, cutoffEnd: null, move: 'lento', reso: 4, delay: .35, speed: '16', drive: 0 },
-  hook: { on: true, preset: 'richiamo', wave: 'square', gain: .3, gainEnd: null, cutoff: 3000, cutoffEnd: null, move: 'fisso', delay: .4, mode: 'minor', fm: 0, vowel: '', grit: 0, drive: 0, harmony: '', octave: '4' },
-  guitar: { on: false, type: 'distorted', pattern: 'power8', gain: .5, gainEnd: null, cutoff: 4200, cutoffEnd: null, drive: 0, octave: '0', width: 'double', room: .2 },
-  pad: { on: true, preset: 'pad', wave: 'supersaw', gain: .28, gainEnd: null, cutoff: 1400, cutoffEnd: null, move: 'lento', room: .85, drive: 0 },
+  bass: { on: true, preset: 'rolling', wave: 'sawtooth', gain: .8, gainEnd: null, cutoff: 700, cutoffEnd: null, move: 'lento', reso: 8, drive: 0, steps: '' },
+  arp: { on: true, preset: 'su', wave: 'supersaw', gain: .4, gainEnd: null, cutoff: 2400, cutoffEnd: null, move: 'lento', reso: 4, delay: .35, speed: '16', drive: 0, steps: '' },
+  hook: { on: true, preset: 'richiamo', wave: 'square', gain: .3, gainEnd: null, cutoff: 3000, cutoffEnd: null, move: 'fisso', delay: .4, mode: 'minor', fm: 0, vowel: '', grit: 0, drive: 0, harmony: '', octave: '4', steps: '' },
+  guitar: { on: false, type: 'distorted', pattern: 'power8', gain: .5, gainEnd: null, cutoff: 4200, cutoffEnd: null, drive: 0, octave: '0', width: 'double', room: .2, steps: '' },
+  pad: { on: true, preset: 'pad', wave: 'supersaw', gain: .28, gainEnd: null, cutoff: 1400, cutoffEnd: null, move: 'lento', room: .85, drive: 0, steps: '' },
   texture: { on: false, sample: 'numbers', rhythm: 'bar', gain: .4, gainEnd: null, grit: .7, room: .6 },
   riser: { on: false, gain: .25, bars: '8', dir: 'up' },
 };
@@ -265,6 +265,53 @@ const topTokens = s => {
 };
 // riempie la battuta con "count" elementi presi in ciclo dal modello
 const fitTokens = (str, count) => { const t = topTokens(str.replace(/^\[(.*)\]$/, '$1')); return Array.from({ length: count }, (_, i) => t[i % t.length]).join(' '); };
+// struttura in mini-notation ("[x x] x@2", "0 ~ 2 ~") → n passi 'x'/'.' (onset di ogni nota che non sia "~")
+const structToSteps = (str, n) => {
+  const out = Array(n).fill('.');
+  const walk = (toks, start, len) => {
+    const parts = toks.map(tk => { const m = tk.match(/^(.*)@([\d.]+)$/); return m ? [m[1], +m[2]] : [tk, 1]; });
+    const total = parts.reduce((a, [, w]) => a + w, 0);
+    let pos = start;
+    for (const [tk, w] of parts) {
+      const span = len * w / total;
+      if (tk.startsWith('[') && tk.endsWith(']')) walk(topTokens(tk.slice(1, -1)), pos, span);
+      else if (tk !== '~' && tk !== '') { const i = Math.round(pos + 1e-6); if (i < n) out[i] = 'x'; }
+      pos += span;
+    }
+  };
+  if (str) walk(topTokens(str), 0, n);
+  return out.join('');
+};
+// passi 'x'/'.' → struct; legato: ogni nota dura fino alla successiva (per pad e accordi tenuti)
+const stepsStruct = (steps, legato) => {
+  if (!legato) return drumPattern('x', steps);
+  const out = [], lead = steps.indexOf('x');
+  if (lead < 0) return '~';
+  if (lead > 0) out.push(`~@${lead}`);
+  for (let i = lead; i < steps.length;) { let j = i + 1; while (j < steps.length && steps[j] !== 'x') j++; out.push(j - i > 1 ? `x@${j - i}` : 'x'); i = j; }
+  return out.join(' ');
+};
+const stepsMask = steps => drumPattern('1', steps);
+// canali melodici con una riga di passi propria; steps vuoto = ritmo del preset
+export const RHYTHM_CHANNELS = ['bass', 'guitar', 'arp', 'hook', 'pad'];
+// passi che suonano davvero per un canale: quelli disegnati o quelli del preset
+export function channelSteps(s, ch) {
+  const N = meterSteps(s.meter), c = s[ch];
+  if (c && c.steps) return fitSteps(c.steps, N);
+  return presetSteps(s, ch, N);
+}
+function presetSteps(s, ch, N) {
+  const hit0 = 'x' + '.'.repeat(N - 1);
+  if (ch === 'bass') { const bp = BASS[s.bass.preset] || BASS.rolling; return bp[5] ? stepGrid(bp[5], N).split(' ').map(x => x === '~' ? '.' : 'x').join('') : structToSteps(rhythm(bp[1], N), N); }
+  if (ch === 'guitar') { const gp = GUITAR_PATTERNS[s.guitar.pattern] || GUITAR_PATTERNS.power8; if (gp[3]) return stepGrid(gp[3], N).split(' ').map(x => x === '~' ? '.' : 'x').join(''); const r = rhythm(gp[1], N); return r ? structToSteps(r, N) : hit0; }
+  if (ch === 'pad') { const pp = PADS[s.pad.preset] || PADS.pad; const r = rhythm(pp[1], N); return r ? structToSteps(r, N) : hit0; }
+  if (ch === 'arp') { const ap = ARPS[s.arp.preset] || ARPS.su; return structToSteps(fitTokens(ap[1], s.arp.speed === '16' ? N : N / 2), N); }
+  if (ch === 'hook') { const hp = HOOKS[s.hook.preset] || HOOKS.richiamo; const it = (altItems(hp[1]) || [hp[1]])[0]; return structToSteps(fitTokens(it, Math.max(1, Math.round(N / 2))), N); }
+  return hit0;
+}
+// un bus (orbit) per strumento: delay e riverbero indipendenti
+const ORBITS = { drums: 1, bass: 2, arp: 3, hook: 4, guitar: 5, pad: 6, texture: 7, riser: 8 };
+const orb = ch => `.orbit(${ORBITS[ch]})`;
 // "<0 0 0 1 1>" → "<0!3 1!2>"
 const rle = vals => {
   const out = [];
@@ -327,43 +374,44 @@ function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, cras
   for (const [id, , mult, inst] of ROWS) {
     const row = d.rows[id], on = d.on && !row.mute, steps = fitSteps(row.steps, N);
     if (!steps.includes('x') || !show(on)) continue;
-    L.push(`${lab(on)}: s("${drumPattern(id, steps)}").bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${breathMask}${g}.analyze("${inst}")`);
+    L.push(`${lab(on)}: s("${drumPattern(id, steps)}").bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
   }
-  if (fill && d.on) L.push(`$: s("sd*${N}").bank("${d.kit}").gain(saw.range(.15, .75)).mask("${rle(rotate([...Array(Math.max(0, bars - 1)).fill('0'), '1'], start))}")${g}.analyze("snare")`);
-  if (crash && d.on) L.push(`$: s("cr").bank("${NO_CRASH.includes(d.kit) ? 'RolandTR909' : d.kit}").gain(.55).room(.4).mask("${rle(rotate(['1', ...Array(Math.max(0, bars - 1)).fill('0')], start))}")${g}.analyze("fx")`);
+  if (fill && d.on) L.push(`$: s("sd*${N}").bank("${d.kit}").gain(saw.range(.15, .75)).mask("${rle(rotate([...Array(Math.max(0, bars - 1)).fill('0'), '1'], start))}")${g}${orb('drums')}.analyze("snare")`);
+  if (crash && d.on) L.push(`$: s("cr").bank("${NO_CRASH.includes(d.kit) ? 'RolandTR909' : d.kit}").gain(.55).room(.4).mask("${rle(rotate(['1', ...Array(Math.max(0, bars - 1)).fill('0')], start))}")${g}${orb('drums')}.analyze("fx")`);
 
   const b = s.bass, bp = BASS[b.preset] || BASS.rolling;
   if (show(b.on)) {
     L.push('', `// ${t('cBass')} · ${tx(bp[0])}`);
     const briff = bp[5] ? stepGrid(bp[5], N).split(' ') : null;
-    const bstruct = briff ? briff.map(x => x === '~' ? '~' : 'x').join(' ') : rhythm(bp[1], N);
+    const bstruct = b.steps ? stepsStruct(fitSteps(b.steps, N)) : briff ? briff.map(x => x === '~' ? '~' : 'x').join(' ') : rhythm(bp[1], N);
     const bshift = briff ? `.transpose("${briff.map(x => x === '~' ? 0 : x).join(' ')}")` : '';
     L.push(`${lab(b.on)}: note("<${chords.map(c => CHORDS[c].bass).join(' ')}>")${trs}.struct("${bstruct}")${bshift}${sw}`);
     L.push(`  .s("${b.wave}")${filter(b.cutoff, b.cutoffEnd, b.move)}.lpq(${num(b.reso)})${drive(b.drive)}`);
-    L.push(`  .decay(${f(bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${rhythm(bp[4], N)}")` : ''}.gain(${auto(b.gain, b.gainEnd)})${breathMask}${g}.analyze("bass")`);
+    L.push(`  .decay(${f(bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${rhythm(bp[4], N)}")` : ''}.gain(${auto(b.gain, b.gainEnd)})${breathMask}${g}${orb('bass')}.analyze("bass")`);
   }
   const a = s.arp, ap = ARPS[a.preset] || ARPS.su;
   if (show(a.on)) {
     const count = a.speed === '16' ? N : N / 2;
     L.push('', `// ${t('cArp')} · ${tx(ap[0])}, ${a.speed === '16' ? t('c16') : t('c8')}`);
-    L.push(`${lab(a.on)}: note("<${chords.map(c => `[${fitTokens(ap[1], count).replace(/\d/g, i => CHORDS[c].arp[i])}]`).join(' ')}>")${trs}${sw}`);
+    L.push(`${lab(a.on)}: note("<${chords.map(c => `[${fitTokens(ap[1], count).replace(/\d/g, i => CHORDS[c].arp[i])}]`).join(' ')}>")${trs}${a.steps ? `.mask("${stepsMask(fitSteps(a.steps, N))}")` : ''}${sw}`);
     L.push(`  .s("${a.wave}")${filter(a.cutoff, a.cutoffEnd, a.move)}.lpq(${num(a.reso)})${drive(a.drive)}`);
-    L.push(`  .decay(.15).sustain(.15)${a.delay > 0 ? `.delay(${f(a.delay)})` : ''}.gain(${auto(a.gain, a.gainEnd)})${breathMask}${g}.analyze("arp")`);
+    L.push(`  .decay(.15).sustain(.15)${a.delay > 0 ? `.delay(${f(a.delay)})` : ''}.gain(${auto(a.gain, a.gainEnd)})${breathMask}${g}${orb('arp')}.analyze("arp")`);
   }
   const h = s.hook, hp = HOOKS[h.preset] || HOOKS.richiamo;
   if (show(h.on)) {
     const items = (altItems(hp[1]) || [hp[1]]).map(it => `[${fitTokens(it, Math.max(1, Math.round(N / 2)))}]`);
     const mel = `<${rotate(items, start).join(' ')}>`;
     L.push('', `// Hook · ${tx(hp[0])}`);
-    L.push(`${lab(h.on)}: n("${mel}")${h.harmony ? `.superimpose(x => x.add(${h.harmony}))` : ''}.scale("${s.key}${h.octave || 4}:${h.mode}")${sw}`);
+    L.push(`${lab(h.on)}: n("${mel}")${h.harmony ? `.superimpose(x => x.add(${h.harmony}))` : ''}.scale("${s.key}${h.octave || 4}:${h.mode}")${h.steps ? `.mask("${stepsMask(fitSteps(h.steps, N))}")` : ''}${sw}`);
     L.push(`  ${h.wave === 'cowbell' ? '.s("cb").bank("RolandTR808")' : `.s("${h.wave}")`}${drive(h.drive)}${h.fm > 0 ? `.fm(${num(h.fm)})` : ''}${h.vowel ? `.vowel("${h.vowel}")` : ''}${filter(h.cutoff, h.cutoffEnd, h.move)}${grit(h.grit)}`);
-    L.push(`  .decay(.2).sustain(.3).delay(${f(h.delay)}).room(.3).gain(${auto(h.gain, h.gainEnd)})${breathMask}${g}.analyze("hook")`);
+    L.push(`  .decay(.2).sustain(.3).delay(${f(h.delay)}).room(.3).gain(${auto(h.gain, h.gainEnd)})${breathMask}${g}${orb('hook')}.analyze("hook")`);
   }
   const gt = s.guitar, gty = GUITAR_TYPES[gt.type] || GUITAR_TYPES.distorted, gpt = GUITAR_PATTERNS[gt.pattern] || GUITAR_PATTERNS.power8;
   if (show(gt.on)) {
     // riff: struttura dalle note, spostamento del power chord battuta per battuta
     const riff = gpt[3] ? stepGrid(gpt[3], N).split(' ') : null;
-    const gr = riff ? riff.map(x => x === '~' ? '~' : 'x').join(' ') : rhythm(gpt[1], N), short = gt.type === 'muted' || gpt[2], held = !gr;
+    const pre = riff ? riff.map(x => x === '~' ? '~' : 'x').join(' ') : rhythm(gpt[1], N), short = gt.type === 'muted' || gpt[2], held = !pre;
+    const gr = gt.steps ? stepsStruct(fitSteps(gt.steps, N), held) : pre;
     const shift = riff ? `.transpose("${riff.map(x => x === '~' ? 0 : x).join(' ')}")` : '';
     const gtr = tr + (Number(gt.octave) || 0), dist = gty[2] + gt.drive;
     const voicing = c => gt.type === 'clean' ? CHORDS[c].pad : powerOf(c);
@@ -373,16 +421,16 @@ function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, cras
     L.push(`  ${dist > 0 ? `.distort(${num(dist)}).distortvol(.2)` : ''}.hpf(${gty[3]})${filter(gt.cutoff, gt.cutoffEnd)}${gt.width === 'double' ? '.jux(x => x.late(.012))' : ''}`);
     // il volume va dopo l'amplificatore (postgain): prima della distorsione cambierebbe solo la saturazione
     const lvl = auto(gt.gain, gt.gainEnd);
-    L.push(`  .room(${f(gt.room)}).gain(.8)${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}.analyze("guitar")`);
+    L.push(`  .room(${f(gt.room)}).gain(.8)${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}${orb('guitar')}.analyze("guitar")`);
   }
   const p = s.pad, pp = PADS[p.preset] || PADS.pad;
   if (show(p.on)) {
     L.push('', `// ${t('cPad')} · ${tx(pp[0])}`);
     const voice = c => pp[7] === 'power' ? powerOf(c) : CHORDS[c].pad;
-    const pr = rhythm(pp[1], N);
+    const pr = p.steps ? stepsStruct(fitSteps(p.steps, N), !rhythm(pp[1], N)) : rhythm(pp[1], N);
     L.push(`${lab(p.on)}: note("<${chords.map(c => `[${voice(c)}]`).join(' ')}>")${trs}${pr ? `.struct("${pr}")` : ''}${pr ? sw : ''}`);
     L.push(`  .s("${p.wave}").attack(${f(pp[2])})${pp[3] ? `.decay(${f(pp[3])}).sustain(${f(pp[4])})` : ''}.release(${f(pp[5])})${filter(p.cutoff, p.cutoffEnd, p.move)}${drive(p.drive)}`);
-    L.push(`  .room(${f(p.room)})${pp[6] ? `.postgain("${rhythm(pp[6], N)}")` : ''}.gain(${auto(p.gain, p.gainEnd)})${g}.analyze("pad")`);
+    L.push(`  .room(${f(p.room)})${pp[6] ? `.postgain("${rhythm(pp[6], N)}")` : ''}.gain(${auto(p.gain, p.gainEnd)})${g}${orb('pad')}.analyze("pad")`);
   }
   const x = s.texture, xr = TEX_RHYTHMS[x.rhythm] || TEX_RHYTHMS.bar;
   if (show(x.on)) {
@@ -390,12 +438,12 @@ function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, cras
     if (x.sample === 'vinyl') {
       // fruscio del vinile: impulsi di rumore brevissimi e radi
       L.push(`${lab(x.on)}: s("white*${N * 2}").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)`);
-      L.push(`  .gain(${auto(x.gain * .5, x.gainEnd === null || x.gainEnd === undefined ? null : x.gainEnd * .5)})${g}.analyze("fx")`);
+      L.push(`  .gain(${auto(x.gain * .5, x.gainEnd === null || x.gainEnd === undefined ? null : x.gainEnd * .5)})${g}${orb('texture')}.analyze("fx")`);
     } else {
       const nArg = xr[2].startsWith('irand') ? xr[2] : `"${xr[2]}"`;
       const pat = xr[1].replace('*16', `*${N}`).replace('*8', `*${N / 2}`).replace('X', x.sample);
       L.push(`${lab(x.on)}: s("${pat}").n(${nArg})${grit(x.grit)}.hpf(400).room(${f(x.room)})${xr[1].includes('*') ? '.pan(rand)' : ''}`);
-      L.push(`  .gain(${auto(x.gain, x.gainEnd)})${g}.analyze("fx")`);
+      L.push(`  .gain(${auto(x.gain, x.gainEnd)})${g}${orb('texture')}.analyze("fx")`);
     }
   }
   const r = s.riser;
@@ -404,7 +452,7 @@ function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, cras
     L.push('', `// ${t(up ? 'cRiser' : 'cDown', { n: r.bars })}`);
     L.push(`${lab(r.on)}: s("white*${N}").decay(.06).sustain(0)`);
     L.push(`  .hpf(saw.slow(${r.bars}).range(${up ? '300, 8000' : '8000, 300'})${late})`);
-    L.push(`  .gain(saw.slow(${r.bars}).range(${up ? `0, ${f(r.gain)}` : `${f(r.gain)}, 0`})${late})${g}.analyze("riser")`);
+    L.push(`  .gain(saw.slow(${r.bars}).range(${up ? `0, ${f(r.gain)}` : `${f(r.gain)}, 0`})${late})${g}${orb('riser')}.analyze("riser")`);
   }
   return L;
 }

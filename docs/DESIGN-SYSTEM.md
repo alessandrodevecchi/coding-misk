@@ -28,7 +28,7 @@ The UI is dark only, by design.
 
 ## Components
 
-- `.card` panels, `.btn` (primary uses `--a1`), `.chip` toggles, `.tab`, `.led` channel switch, `.ramp` automation toggle (↗), `.arr-scene-btn` scene blocks (width proportional to bars, `.playing`, `[aria-current]`), `.timeline` with `.sec` blocks and `.head` playhead, `.step` sequencer keys.
+- `.card` panels, `.btn` (primary uses `--a1`), `.chip` toggles, `.tab`, `.led` channel switch, `.ramp` automation toggle (↗), `.arr-scene-btn` scene blocks (width proportional to bars, `.playing`, `[aria-current]`), `.timeline` with `.sec` blocks and `.head` playhead, `.step` sequencer keys (drum grid and `.chsteps` rows in melodic channels), `.arr-lanes` read-only timeline under the scene strip (one `.lane` per instrument, `.lane-cell.on` where it plays, shared horizontal scroll with the strip in `.arr-scroll`).
 - Toasts for feedback; two-tap confirmation instead of `confirm()`.
 
 ## Hardware theme (`data-ui="hw"`)

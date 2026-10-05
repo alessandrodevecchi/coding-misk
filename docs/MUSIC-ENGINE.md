@@ -25,6 +25,8 @@ scene = { name, bars, fade, crash, breath, fill, state }
 
 Every `…End` value enables an automation from the start to the end of the scene.
 
+`steps` on `bass`, `guitar`, `arp`, `hook` and `pad`: one character per 16th (`x` plays, `.` rests), like a drum row. Empty means the preset rhythm (`channelSteps(state, ch)` returns what actually plays). Bass, guitar and pad use the steps as `.struct()`; when the preset holds the chord (pad without rhythm, guitar `held`), each note lasts until the next step (`x@3`). Arp and hook keep their note sequence and use the steps as `.mask()`: a step can silence a note but cannot add one where the melody rests. Changing the preset clears `steps`.
+
 ## Presets (in `src/music.js`)
 
 - Progressions (`PROGS`, written in A): `epica notturna euforica ipnotica malinconica cyber pendolo anthem ascesa andalusa prog lofi jazz frigio drone tensione arcade dorico`. Two-bar chords are written by repeating the chord.
@@ -45,6 +47,7 @@ Every `…End` value enables an automation from the start to the end of the scen
 - Rhythms are per-beat templates `[beat, half beat]` repeated for the bar length, with `@` weights for a half beat (7/8). Riffs are 16th-step strings of semitone offsets: `.struct()` plus `.transpose("0 0 1 0 …")`.
 - Odd meters: `TEMPO` is stored as "4/4 BPM" (`bpm * 16 / steps per bar`); labels show the real BPM.
 - Every layer ends with `.analyze("<instrument>")` for the visuals.
+- Each instrument has its own orbit (`.orbit(n)`: drums 1, bass 2, arp 3, hook 4, guitar 5, pad 6, texture 7, riser 8). In superdough, delay time, feedback and reverb size belong to the orbit, so separate orbits keep them independent per instrument.
 
 ## Writing a new track
 

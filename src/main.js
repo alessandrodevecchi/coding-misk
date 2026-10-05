@@ -1,6 +1,6 @@
 import '@strudel/repl';
 import './style.css';
-import { METERS, meterSteps, fitSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, compileTrack, cloneState, normalizeState } from './music.js';
+import { METERS, meterSteps, fitSteps, RHYTHM_CHANNELS, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, compileTrack, cloneState, normalizeState } from './music.js';
 import { BUILTIN_TRACKS } from './tracks.js';
 import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
@@ -297,6 +297,7 @@ function renderArranger() {
   const total = T.scenes.reduce((a, s) => a + s.bars, 0);
   $('#arr-strip').innerHTML = T.scenes.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" style="flex-grow:${s.bars}" aria-current="${i === sel}">
       <b>${esc(s.name || t('newScene', { n: i + 1 }))}</b><span>${s.bars} · ${s.state.bpmEnd ? `${s.state.bpm}→${s.state.bpmEnd}` : s.state.bpm}</span></button>`).join('') + '<span class="head"></span>';
+  renderLanes();
   const sc = T.scenes[sel];
   if (document.activeElement !== $('#track-title')) $('#track-title').value = T.title;
   if (document.activeElement !== $('#sc-name')) $('#sc-name').value = sc.name;
@@ -313,7 +314,23 @@ function renderArranger() {
   $('#sc-loop').checked = loopIdx >= 0 && mode === 'track';
   renderTrackPick();
 }
+// timeline in sola lettura: una corsia per strumento, accesa nelle scene in cui suona
+const playsIn = (st, ch) => {
+  const s = st[ch]; if (!s || !s.on) return false;
+  if (ch === 'drums') return ROWS.some(([id]) => !s.rows[id].mute && s.rows[id].steps.includes('x'));
+  return true;
+};
+function renderLanes() {
+  $('#arr-lanes').innerHTML = ['drums', ...CHANNELS].map(ch => `<div class="lane" data-lane="${ch}"><span class="lane-name">${esc(t(ch))}</span>${
+    T.scenes.map((s, i) => `<span class="lane-cell${playsIn(normalizeState(s.state), ch) ? ' on' : ''}" data-lane-scene="${i}" style="flex-grow:${s.bars}" aria-current="${i === sel}"></span>`).join('')}</div>`).join('') + '<span class="head"></span>';
+}
 // clic su una scena: se il brano suona salta lì, altrimenti la seleziona
+$('#arr-lanes').addEventListener('click', e => {
+  const c = e.target.closest('[data-lane-scene]'); if (!c) return;
+  const i = +c.dataset.laneScene;
+  if (isPlaying() && mode === 'track') return playSong(compiled, sceneStart(i), 'track');
+  paused = null; selectScene(i);
+});
 $('#arr-strip').addEventListener('click', e => {
   const b = e.target.closest('[data-scene-i]'); if (!b) return;
   const i = +b.dataset.sceneI;
@@ -449,8 +466,10 @@ function renderChannels() {
   $('#channels').innerHTML = CHANNELS.map(ch => `
     <div class="card" id="ch-${ch}">
       <div class="chhead"><button class="led" data-on="${ch}" aria-label="${esc(t('onoff', { name: t(ch) }))}"></button><h3>${t(ch)}</h3><span class="hint">${t(ch + 'Hint')}</span></div>
+      ${RHYTHM_CHANNELS.includes(ch) ? `<div class="chsteps" data-chsteps="${ch}"></div>` : ''}
       <div class="ctrls">${CONTROLS[ch].map(c => controlHtml(ch, c)).join('')}</div>
     </div>`).join('');
+  renderChSteps();
   for (const ch of ['drums', ...CHANNELS]) for (const [type, key, , list] of CONTROLS[ch]) if (type === 'select') opts($(`#${ch}-${key}`), list());
 }
 function renderSeq() {
@@ -460,11 +479,44 @@ function renderSeq() {
     ROWS.map(([id, label]) => `<button class="rowlbl" data-row="${id}" title="${esc(t('muteRow', { name: label }))}">${label}</button><div class="steps" ${cols}>${
       Array.from({ length: n }, (_, i) => `<button class="step" data-g="${Math.floor(i / 4) % 4}" data-row="${id}" data-i="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('')}</div>`).join('');
 }
+// righe di passi dei canali melodici: si parte dal ritmo del preset, il primo clic lo copia
+function renderChSteps() {
+  const n = meterSteps(S.meter), cols = `style="grid-template-columns:repeat(${n}, minmax(0, 1fr))"`;
+  $$('[data-chsteps]').forEach(el => {
+    const ch = el.dataset.chsteps;
+    el.dataset.n = n;
+    el.title = ch === 'hook' || ch === 'arp' ? t('stepsMaskHint') : '';
+    el.innerHTML = `<div class="row"><span class="lbl">${t('chSteps')}</span><span class="hint" data-steps-state></span><button type="button" class="btn small" data-steps-reset="${ch}">${t('stepsReset')}</button></div>
+      <div class="steps" ${cols}>${Array.from({ length: n }, (_, i) => `<button type="button" class="step" data-g="${Math.floor(i / 4) % 4}" data-ch="${ch}" data-i="${i}" aria-label="${esc(t('stepAria', { name: t(ch), n: i + 1 }))}"></button>`).join('')}</div>`;
+  });
+}
+function syncChSteps() {
+  $$('[data-chsteps]').forEach(el => {
+    const ch = el.dataset.chsteps, steps = channelSteps(S, ch), custom = !!S[ch].steps;
+    el.querySelectorAll('.step').forEach(b => b.setAttribute('aria-pressed', steps[b.dataset.i] === 'x'));
+    el.querySelector('[data-steps-state]').textContent = custom ? t('stepsCustom') : t('stepsPreset');
+    el.querySelector('[data-steps-reset]').disabled = !custom;
+  });
+}
+$('#channels').addEventListener('click', e => {
+  const st = e.target.closest('.step[data-ch]');
+  if (st) {
+    const ch = st.dataset.ch, a = channelSteps(S, ch).split(''), i = +st.dataset.i;
+    a[i] = a[i] === 'x' ? '.' : 'x'; S[ch].steps = a.join('');
+    syncAll(); changed(); return;
+  }
+  const rs = e.target.closest('[data-steps-reset]');
+  if (rs) { S[rs.dataset.stepsReset].steps = ''; syncAll(); changed(); }
+});
+// cambiare preset riporta la riga di passi al ritmo del preset
+const PRESET_PATHS = ['bass.preset', 'guitar.pattern', 'arp.preset', 'arp.speed', 'hook.preset', 'pad.preset'];
 // adegua le righe del sequencer al metro della scena
 function fitRows() {
   const n = meterSteps(S.meter);
   for (const [id] of ROWS) S.drums.rows[id].steps = fitSteps(S.drums.rows[id].steps, n);
+  for (const ch of RHYTHM_CHANNELS) if (S[ch].steps) S[ch].steps = fitSteps(S[ch].steps, n);
   if (+$('#seq').dataset.n !== n) renderSeq();
+  if ($$('[data-chsteps]').some(el => +el.dataset.n !== n)) renderChSteps();
 }
 $('#seq').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -491,7 +543,13 @@ document.addEventListener('input', e => {
   setPath(p, v); syncOutputs(); changed();
 });
 document.addEventListener('change', e => {
-  if (e.target.matches('select[data-path]')) { setPath(e.target.dataset.path, e.target.value); if (e.target.dataset.path === 'meter') { fitRows(); syncAll(); } changed(); }
+  if (e.target.matches('select[data-path]')) {
+    const p = e.target.dataset.path;
+    setPath(p, e.target.value);
+    if (PRESET_PATHS.includes(p)) { S[p.split('.')[0]].steps = ''; syncAll(); }
+    if (p === 'meter') { fitRows(); syncAll(); }
+    changed();
+  }
 });
 document.addEventListener('click', e => {
   const led = e.target.closest('[data-on]');
@@ -550,7 +608,8 @@ function syncAll() {
     b.setAttribute('aria-pressed', on);
     (b.dataset.on === 'drums' ? $('#drums') : $('#ch-' + b.dataset.on)).classList.toggle('off', !on);
   });
-  $$('.step').forEach(b => b.setAttribute('aria-pressed', S.drums.rows[b.dataset.row].steps[b.dataset.i] === 'x'));
+  $$('#seq .step').forEach(b => b.setAttribute('aria-pressed', S.drums.rows[b.dataset.row].steps[b.dataset.i] === 'x'));
+  syncChSteps();
   $$('.rowlbl').forEach(b => b.setAttribute('aria-pressed', S.drums.rows[b.dataset.row].mute));
   $$('#looks .chip').forEach(b => b.setAttribute('aria-pressed', look === b.dataset.look));
   $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', getLang() === b.dataset.lang));
@@ -720,6 +779,8 @@ const MASTER = .6;
     const btns = $$('.arr-scene-btn'), b = btns[idx];
     head.hidden = !b;
     if (b) head.style.left = `${b.offsetLeft + (trackCyc - compiled.meta.sections[idx].start) / compiled.meta.sections[idx].len * b.offsetWidth}px`;
+    const lh = $('#arr-lanes .head');
+    if (lh) { lh.hidden = !b; if (b) lh.style.left = head.style.left; }
     btns.forEach((x, j) => x.classList.toggle('playing', j === idx));
   }
   // avanzamento e pulsanti nelle card
