@@ -418,6 +418,7 @@ function renderTimeline(total) {
 }
 function renderSectionPanel(total) {
   const sc = SEC();
+  syncSectionFields();
   if (document.activeElement !== $('#track-title')) $('#track-title').value = T.title;
   if (document.activeElement !== $('#sc-name')) $('#sc-name').value = sc.name;
   if (document.activeElement !== $('#sc-bars')) $('#sc-bars').value = sc.bars;
@@ -989,15 +990,27 @@ function syncOutputs() {
   });
   $('#sc-swing-o').textContent = `${Math.round((SEC().swing || 0) * 100)}%`;
 }
+// accordi delle progressioni nella tonalità della sezione (sono scritti in La e trasposti)
+function renderProgOptions() {
+  const tr = (KEYS.find(k => k[0] === secFull().key) || KEYS[4])[1];
+  opts($('#prog'), Object.entries(PROGS).map(([k, v]) => [k, `${tx(v[0])} · ${v[1].map(c => chordName(c, tr)).join(' ')}`]));
+}
+// campi della sezione selezionata: tempo, tonalità, accordi, metro, swing
+function syncSectionFields() {
+  renderProgOptions();
+  const sc = secFull();
+  if (document.activeElement !== $('#bpm')) $('#bpm').value = sc.bpm;
+  $('#key').value = sc.key; $('#prog').value = sc.chords; $('#sc-meter').value = sc.meter; $('#sc-swing').value = sc.swing;
+  $('#bpm-ramp').setAttribute('aria-pressed', sc.bpmEnd != null);
+  $('#bpm-end-row').hidden = sc.bpmEnd == null;
+  if (sc.bpmEnd != null && document.activeElement !== $('#bpm-end')) $('#bpm-end').value = sc.bpmEnd;
+  $('#sc-swing-o').textContent = `${Math.round((sc.swing || 0) * 100)}%`;
+}
 function syncAll() {
   document.documentElement.dataset.look = look;
   document.documentElement.dataset.ui = ui;
   $$('[data-uitheme]').forEach(b => b.setAttribute('aria-pressed', ui === b.dataset.uitheme));
-  const sc = secFull();
-  $('#bpm').value = sc.bpm; $('#key').value = sc.key; $('#prog').value = sc.chords; $('#sc-meter').value = sc.meter; $('#sc-swing').value = sc.swing;
-  $('#bpm-ramp').setAttribute('aria-pressed', sc.bpmEnd != null);
-  $('#bpm-end-row').hidden = sc.bpmEnd == null;
-  if (sc.bpmEnd != null) $('#bpm-end').value = sc.bpmEnd;
+  syncSectionFields();
   syncTrackPanel();
   $$('#looks .chip').forEach(b => b.setAttribute('aria-pressed', look === b.dataset.look));
   $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', getLang() === b.dataset.lang));
@@ -1242,7 +1255,6 @@ function renderStatic() {
   $$('[data-i18n-html]').forEach(x => { x.innerHTML = t(x.dataset.i18nHtml); });
   $$('[data-i18n-aria]').forEach(x => { x.setAttribute('aria-label', t(x.dataset.i18nAria)); });
   opts($('#key'), KEYS.map(k => [k[0], k[2]]));
-  opts($('#prog'), Object.entries(PROGS).map(([k, v]) => [k, `${tx(v[0])} · ${v[1].join(' ')}`]));
   opts($('#tk-type'), ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture', 'riser', 'code'].map(k => [k, `${TYPE_ICON[k]}  ${t(k)}`]));
   opts($('#sc-meter'), METERS.map(([k]) => [k, k]));
   opts($('#sc-fade'), [['0', t('cut')], ['1', t('fade1')], ['2', t('fadeN', { n: 2 })], ['4', t('fadeN', { n: 4 })], ['8', t('fadeN', { n: 8 })]]);

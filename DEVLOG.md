@@ -144,6 +144,7 @@
 - Idea a priorità minima, da rivalutare: pattern condivisi tra tracce (annotata in `docs/CONTEXT.md`).
 - Due brani scritti direttamente nel formato v2 per collaudarlo: _Cavo Scoperto_ (electro techno scura, Fa# frigio poi Sol, 126 BPM; due hook a botta e risposta con clip liberi, arpeggio che entra a metà build, riser su clip, traccia di codice glitch, rack con delay, riverbero, crush e panorama) e _Ruggine Lenta_ (trip-hop lento, Re minore andaluso, 84 BPM half-time; arpeggio di chitarra pulita come traccia arp con suono GM, muro di chitarre metal un'ottava sotto con tremolo, coro, flauto su un clip tardivo, vinile su un clip lungo tutto il brano, rallentando finale). Validi, nessun errore nel browser, volumi bilanciati misurando sezione per sezione (cassa MPC60 troppo forte, basso e flauto GM troppo deboli: corretti).
 - Emerso dal collaudo: la timeline usava almeno 18 px per battuta e i brani lunghi richiedevano scroll anche a schermo largo; ora 10 px. Le dissolvenze fanno suonare la sezione precedente sulle prime battute della successiva: per misurare i livelli di una sezione con dissolvenza bisogna aspettare la fine della dissolvenza.
+- Corretto: il menu degli accordi mostrava i nomi scritti in La (es. "Am G F E") anche in altre tonalità; ora mostra gli accordi nella tonalità della sezione (in Re: "Dm C A# A"). Corretto anche un difetto di `#12`: selezionando una sezione dalla griglia o dalla timeline, BPM, tonalità, accordi, metro e swing restavano quelli della sezione precedente.
 
 ## Prossimo passo
 
