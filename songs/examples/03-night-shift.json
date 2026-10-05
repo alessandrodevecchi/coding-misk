@@ -1,0 +1,68 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "example-night-shift",
+  "title": "Example 3 · Night Shift",
+  "look": "edgerunners",
+  "style": { "en": "Two guitars, a hook written as scale degrees, a clip that starts mid-section and a code track", "it": "Due chitarre, un hook scritto come gradi della scala, un clip che parte a metà sezione e una traccia di codice" },
+  "sections": [
+    { "name": "Intro", "bars": 8, "bpm": 128, "key": "E", "chords": "tensione", "meter": "4/4" },
+    { "name": "Drop", "bars": 16, "bpm": 128, "key": "E", "chords": "frigio", "meter": "4/4", "fade": 1, "crash": true, "breath": true },
+    { "name": "Outro", "bars": 4, "bpm": 128, "key": "E", "chords": "drone", "meter": "4/4", "crash": true }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": { "kit": "RolandTR909", "gain": 0.9, "drive": 1.2 },
+      "patterns": {
+        "intro": { "rows": { "bd": "x.......x.......", "hh": "..x...x...x...x." } },
+        "drop": { "rows": { "bd": "x...x...x...x...", "cp": "....x.......x...", "hh": "x.xxx.xxx.xxx.xx", "oh": "..x...x...x...x." } },
+        "outro": { "rows": { "bd": "x..............." } }
+      },
+      "clips": [
+        { "section": "Intro", "pattern": "intro" },
+        { "section": "Drop", "pattern": "drop" },
+        { "section": "Outro", "pattern": "outro" }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": { "wave": "sawtooth", "gain": 0.6, "cutoff": 700, "move": "lento", "reso": 10, "drive": 2 },
+      "patterns": { "roll": { "preset": "rolling" } },
+      "clips": [{ "start": 4, "bars": 20, "pattern": "roll" }]
+    },
+    {
+      "id": "riff",
+      "name": "Guitar riff",
+      "type": "guitar",
+      "settings": { "type": "metal", "gain": 0.45, "cutoff": 4200, "octave": "-2", "width": "double", "room": 0.15 },
+      "patterns": { "stomp": { "preset": "stomp" } },
+      "clips": [{ "section": "Drop", "pattern": "stomp" }]
+    },
+    {
+      "id": "wall",
+      "name": "Guitar wall",
+      "type": "guitar",
+      "settings": { "type": "distorted", "gain": 0.25, "cutoff": 2600, "width": "double", "room": 0.5 },
+      "patterns": { "held": { "preset": "held" } },
+      "clips": [{ "start": 16, "bars": 8, "pattern": "held" }, { "section": "Outro", "pattern": "held", "set": { "gainEnd": 0 } }]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": { "mode": "phrygian", "octave": "4", "wave": "square", "gain": 0.4, "cutoff": 2800, "delay": 0.3, "drive": 1 },
+      "patterns": { "call": { "notes": "<[0 ~ 1 ~ 0 ~ [~ 4] 3] [1 ~ 0 ~ ~ ~ ~ ~]>" } },
+      "clips": [{ "start": 12, "bars": 12, "pattern": "call" }]
+    },
+    {
+      "id": "noise",
+      "name": "Radio noise",
+      "type": "code",
+      "settings": { "visual": "fx" },
+      "patterns": { "static": { "code": "s(\"white*16\").decay(.03).sustain(0).hpf(6000).gain(perlin.range(.05, .25)).pan(rand)" } },
+      "clips": [{ "section": "Intro", "pattern": "static" }, { "section": "Outro", "pattern": "static" }]
+    }
+  ]
+}

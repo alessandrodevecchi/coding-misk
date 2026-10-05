@@ -1,6 +1,6 @@
 # Plan: tracks, patterns and a timeline
 
-Status: planned (2026-10-05), not started. Owner request: give every instrument its own rhythm control, allow several instruments of the same type, and show a timeline with one lane per track, without giving up music as code.
+Status: in progress. Phases 0 (`#9`), 1 (`#10`) and 2 (`#11`) done on `develop`. Owner request: give every instrument its own rhythm control, allow several instruments of the same type, and show a timeline with one lane per track, without giving up music as code.
 
 ## Findings
 
@@ -122,7 +122,7 @@ Each phase is a GitHub issue and a branch from `develop`, verified (errors, leve
 
 0. **Safety net. (`#9`)** Snapshot the compiled code and measured levels of every built-in track, with check scripts. No visible change. Splitting the compiler into modules moves to phase 2, where it is rewritten.
 1. **Quick wins in the current model. (`#10`)** A read-only timeline under the arranger (one lane per instrument, lit where it plays); a step row per melodic channel so its rhythm can be drawn, starting from the preset; one orbit per channel.
-2. **Model v2, compiler v2, JSON songs and CLI. (`#11`)** Schema, validator, `pick` compiler, automatic migration of built-in and saved tracks, parity check against phase 0 snapshots. First version of `docs/COMPOSING.md`.
+2. **Model v2, compiler v2, JSON songs and CLI. (`#11`)** Schema, validator, compiler, automatic conversion of built-in and saved tracks, parity check against phase 0 snapshots. First version of `docs/COMPOSING.md`. Done: one layer group per clip instead of `pick` (exact parity with the scene compiler); built-in tracks stay authored as scenes until the arranger edits v2 in phase 3; JSON songs in `songs/` play from the Tracks tab.
 3. **Interface v2, sections mode. (`#12`)** Arrangement grid, pattern editor, add, duplicate and remove tracks of any type and number, mute and solo, lanes shown per section.
 4. **Rack and code tracks. (`#13`)** Players and effects as ordered devices; code tracks composed in the arranger; code highlight per track.
 5. **Timeline mode. (`#14`)** Free clips, drag and resize, lossless switch with sections mode.

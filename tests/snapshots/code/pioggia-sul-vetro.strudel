@@ -1,134 +1,123 @@
 // coding-misk · Pioggia sul vetro
-// track composed with the arranger: each scene is a block of layers switched on by its lane (1 plays, 0 is silent, values in between fade)
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
 // each .analyze("…") lights up its instrument in the Stage visual
 setcpm(78/4)
 
 const SECTIONS = [['Vinile', 4], ['A', 8], ['B', 8], ['Pausa', 4], ['Ritorno', 8], ['Coda', 4]]
 const TEMPO = {'Vinile': 78, 'A': 78, 'B': 78, 'Pausa': 78, 'Ritorno': 78, 'Coda': 78}
 
-// ---------- 1 · Vinile · 4 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7 ----------
-const scene1 = "<1!4 0!32>"
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!4 0!32>"  // Vinile · 4 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7
+const section2 = "<0!4 1!8 0!24>"  // A · 8 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7
+const section3 = "<0!12 1!8 0.5 0!15>"  // B · 8 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7
+const section4 = "<0!20 0.5 1!3 0!12>"  // Pausa · 4 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7 · fades in over 1 bars
+const section5 = "<0!24 1!8 0!4>"  // Ritorno · 8 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7
+const section6 = "<0!32 1!4>"  // Coda · 4 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7
 
-// Pad · Comping (lo-fi)
-$: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
-  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf("<800 1266.67 1733.33 2200>")
-  .room(.45).gain(0.28).mask(scene1).velocity(scene1).orbit(6).analyze("pad")
-
-// Texture · vinyl
-$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
-  .gain(0.3).mask(scene1).velocity(scene1).orbit(7).analyze("fx")
-
-// ---------- 2 · A · 8 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7 ----------
-const scene2 = "<0!4 1!8 0!24>"
+// ========== drums ==========
+// A · bars 5-12 · pattern A
 // Drums · EmuSP12
-$: s("[bd ~ ~ ~] [~ ~ ~ bd] [~ bd ~ ~] ~").bank("EmuSP12").gain(0.75).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene2).velocity(scene2).orbit(1).analyze("kick")
-$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("EmuSP12").gain(0.56).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene2).velocity(scene2).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("EmuSP12").gain(0.38).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene2).velocity(scene2).orbit(1).analyze("hats")
-$: s("~ ~ ~ [~ ~ oh ~]").bank("EmuSP12").gain(0.34).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene2).velocity(scene2).orbit(1).analyze("hats")
+$: s("[bd ~ ~ ~] [~ ~ ~ bd] [~ bd ~ ~] ~").bank("EmuSP12").gain(0.75).lpf(5000).crush(12).swingBy(0.1, 8).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("EmuSP12").gain(0.56).lpf(5000).crush(12).swingBy(0.1, 8).mask(section2).velocity(section2).orbit(1).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("EmuSP12").gain(0.38).lpf(5000).crush(12).swingBy(0.1, 8).mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("~ ~ ~ [~ ~ oh ~]").bank("EmuSP12").gain(0.34).lpf(5000).crush(12).swingBy(0.1, 8).mask(section2).velocity(section2).orbit(1).analyze("hats")
+// B · bars 13-20 · pattern A
+$: s("[bd ~ ~ ~] [~ ~ ~ bd] [~ bd ~ ~] ~").bank("EmuSP12").gain(0.75).lpf(5000).crush(12).swingBy(0.1, 8).mask(section3).velocity(section3).orbit(1).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("EmuSP12").gain(0.56).lpf(5000).crush(12).swingBy(0.1, 8).mask(section3).velocity(section3).orbit(1).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("EmuSP12").gain(0.38).lpf(5000).crush(12).swingBy(0.1, 8).mask(section3).velocity(section3).orbit(1).analyze("hats")
+$: s("~ ~ ~ [~ ~ oh ~]").bank("EmuSP12").gain(0.34).lpf(5000).crush(12).swingBy(0.1, 8).mask(section3).velocity(section3).orbit(1).analyze("hats")
+// Ritorno · bars 25-32 · pattern A
+$: s("[bd ~ ~ ~] [~ ~ ~ bd] [~ bd ~ ~] ~").bank("EmuSP12").gain(0.8).lpf(5000).crush(12).swingBy(0.1, 8).mask(section5).velocity(section5).orbit(1).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("EmuSP12").gain(0.6).lpf(5000).crush(12).swingBy(0.1, 8).mask(section5).velocity(section5).orbit(1).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("EmuSP12").gain(0.4).lpf(5000).crush(12).swingBy(0.1, 8).mask(section5).velocity(section5).orbit(1).analyze("hats")
+$: s("~ ~ ~ [~ ~ oh ~]").bank("EmuSP12").gain(0.36).lpf(5000).crush(12).swingBy(0.1, 8).mask(section5).velocity(section5).orbit(1).analyze("hats")
+// Coda · bars 33-36 · pattern A
+$: s("[bd ~ ~ ~] [~ ~ ~ bd] [~ bd ~ ~] ~").bank("EmuSP12").gain("<0.6 0.4 0.2 0>").lpf(5000).crush(12).swingBy(0.1, 8).mask(section6).velocity(section6).orbit(1).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("EmuSP12").gain("<0.45 0.3 0.15 0>").lpf(5000).crush(12).swingBy(0.1, 8).mask(section6).velocity(section6).orbit(1).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("EmuSP12").gain("<0.3 0.2 0.1 0>").lpf(5000).crush(12).swingBy(0.1, 8).mask(section6).velocity(section6).orbit(1).analyze("hats")
+$: s("~ ~ ~ [~ ~ oh ~]").bank("EmuSP12").gain("<0.27 0.18 0.09 0>").lpf(5000).crush(12).swingBy(0.1, 8).mask(section6).velocity(section6).orbit(1).analyze("hats")
 
+// ========== bass ==========
+// A · bars 5-12 · pattern A
 // Bass · Walking (quarters)
 $: note("<f1 e1 d2 c2>").transpose(5).struct("x x x x").swingBy(0.1, 8)
   .s("gm_acoustic_bass").lpf(1200).lpq(1)
-  .decay(.4).sustain(.3).gain(0.55).mask(scene2).velocity(scene2).orbit(2).analyze("bass")
-
-// Pad · Comping (lo-fi)
-$: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
-  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf(2400)
-  .room(.45).gain(0.32).mask(scene2).velocity(scene2).orbit(6).analyze("pad")
-
-// Texture · vinyl
-$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
-  .gain(0.25).mask(scene2).velocity(scene2).orbit(7).analyze("fx")
-
-// ---------- 3 · B · 8 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7 ----------
-const scene3 = "<0!12 1!8 0.5 0!15>"
-// Drums · EmuSP12
-$: s("[bd ~ ~ ~] [~ ~ ~ bd] [~ bd ~ ~] ~").bank("EmuSP12").gain(0.75).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene3).velocity(scene3).orbit(1).analyze("kick")
-$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("EmuSP12").gain(0.56).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene3).velocity(scene3).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("EmuSP12").gain(0.38).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene3).velocity(scene3).orbit(1).analyze("hats")
-$: s("~ ~ ~ [~ ~ oh ~]").bank("EmuSP12").gain(0.34).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene3).velocity(scene3).orbit(1).analyze("hats")
-
-// Bass · Walking (quarters)
+  .decay(.4).sustain(.3).gain(0.55).mask(section2).velocity(section2).orbit(2).analyze("bass")
+// B · bars 13-20 · pattern A
 $: note("<f1 e1 d2 c2>").transpose(5).struct("x x x x").swingBy(0.1, 8)
   .s("gm_acoustic_bass").lpf(1200).lpq(1)
-  .decay(.4).sustain(.3).gain(0.55).mask(scene3).velocity(scene3).orbit(2).analyze("bass")
+  .decay(.4).sustain(.3).gain(0.55).mask(section3).velocity(section3).orbit(2).analyze("bass")
+// Ritorno · bars 25-32 · pattern A
+$: note("<f1 e1 d2 c2>").transpose(5).struct("x x x x").swingBy(0.1, 8)
+  .s("gm_acoustic_bass").lpf(1200).lpq(1)
+  .decay(.4).sustain(.3).gain(0.55).mask(section5).velocity(section5).orbit(2).analyze("bass")
 
+// ========== arp ==========
+// B · bars 13-20 · pattern A
 // Arpeggio · Pedal, 8ths
 $: note("<[f3 e4 f3 c4 f3 a3 f3 c4] [e4 d5 e4 b4 e4 g4 e4 b4] [d4 c5 d4 a4 d4 f4 d4 a4] [c4 b4 c4 g4 c4 e4 c4 g4]>").transpose(5).swingBy(0.1, 8)
   .s("gm_electric_guitar_clean").lpf(2600).lpq(1)
-  .decay(.15).sustain(.15).delay(.3).gain(0.14).mask(scene3).velocity(scene3).orbit(3).analyze("arp")
+  .decay(.15).sustain(.15).delay(.3).gain(0.14).mask(section3).velocity(section3).orbit(3).analyze("arp")
 
+// ========== hook ==========
+// B · bars 13-20 · pattern A
 // Hook · Rain
 $: n("<[4 ~ 2 ~ 0 ~ ~ ~] [~ 1 2 ~ 4 ~ 2 ~] [5 ~ 4 ~ 2 ~ 0 ~] [1 ~ ~ ~ ~ ~ ~ ~]>").scale("D4:minor").swingBy(0.1, 8)
   .s("gm_vibraphone").lpf(5000)
-  .decay(.2).sustain(.3).delay(.35).room(.3).gain(0.55).mask(scene3).velocity(scene3).orbit(4).analyze("hook")
-
-// Pad · Comping (lo-fi)
-$: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
-  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf(2200)
-  .room(.45).gain(0.28).mask(scene3).velocity(scene3).orbit(6).analyze("pad")
-
-// Texture · vinyl
-$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
-  .gain(0.25).mask(scene3).velocity(scene3).orbit(7).analyze("fx")
-
-// ---------- 4 · Pausa · 4 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7 · fades in over 1 bars ----------
-const scene4 = "<0!20 0.5 1!3 0!12>"
-
-// Hook · Rain
+  .decay(.2).sustain(.3).delay(.35).room(.3).gain(0.55).mask(section3).velocity(section3).orbit(4).analyze("hook")
+// Pausa · bars 21-24 · pattern A
 $: n("<[4 ~ 2 ~ 0 ~ ~ ~] [~ 1 2 ~ 4 ~ 2 ~] [5 ~ 4 ~ 2 ~ 0 ~] [1 ~ ~ ~ ~ ~ ~ ~]>").scale("D4:minor").swingBy(0.1, 8)
   .s("gm_vibraphone").lpf(3000)
-  .decay(.2).sustain(.3).delay(.5).room(.3).gain(0.5).mask(scene4).velocity(scene4).orbit(4).analyze("hook")
-
-// Pad · Comping (lo-fi)
-$: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
-  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf(1400)
-  .room(.45).gain(0.3).mask(scene4).velocity(scene4).orbit(6).analyze("pad")
-
-// Texture · vinyl
-$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
-  .gain(0.35).mask(scene4).velocity(scene4).orbit(7).analyze("fx")
-
-// ---------- 5 · Ritorno · 8 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7 ----------
-const scene5 = "<0!24 1!8 0!4>"
-// Drums · EmuSP12
-$: s("[bd ~ ~ ~] [~ ~ ~ bd] [~ bd ~ ~] ~").bank("EmuSP12").gain(0.8).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene5).velocity(scene5).orbit(1).analyze("kick")
-$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("EmuSP12").gain(0.6).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene5).velocity(scene5).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("EmuSP12").gain(0.4).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene5).velocity(scene5).orbit(1).analyze("hats")
-$: s("~ ~ ~ [~ ~ oh ~]").bank("EmuSP12").gain(0.36).lpf(5000).crush(12).swingBy(0.1, 8).mask(scene5).velocity(scene5).orbit(1).analyze("hats")
-
-// Bass · Walking (quarters)
-$: note("<f1 e1 d2 c2>").transpose(5).struct("x x x x").swingBy(0.1, 8)
-  .s("gm_acoustic_bass").lpf(1200).lpq(1)
-  .decay(.4).sustain(.3).gain(0.55).mask(scene5).velocity(scene5).orbit(2).analyze("bass")
-
-// Hook · Rain
+  .decay(.2).sustain(.3).delay(.5).room(.3).gain(0.5).mask(section4).velocity(section4).orbit(4).analyze("hook")
+// Ritorno · bars 25-32 · pattern A
 $: n("<[4 ~ 2 ~ 0 ~ ~ ~] [~ 1 2 ~ 4 ~ 2 ~] [5 ~ 4 ~ 2 ~ 0 ~] [1 ~ ~ ~ ~ ~ ~ ~]>").scale("D4:minor").swingBy(0.1, 8)
   .s("gm_flute").lpf(4000)
-  .decay(.2).sustain(.3).delay(.3).room(.3).gain(0.4).mask(scene5).velocity(scene5).orbit(4).analyze("hook")
+  .decay(.2).sustain(.3).delay(.3).room(.3).gain(0.4).mask(section5).velocity(section5).orbit(4).analyze("hook")
 
+// ========== pad ==========
+// Vinile · bars 1-4 · pattern A
 // Pad · Comping (lo-fi)
+$: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
+  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf("<800 1266.67 1733.33 2200>")
+  .room(.45).gain(0.28).mask(section1).velocity(section1).orbit(6).analyze("pad")
+// A · bars 5-12 · pattern A
 $: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
   .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf(2400)
-  .room(.45).gain(0.32).mask(scene5).velocity(scene5).orbit(6).analyze("pad")
-
-// Texture · vinyl
-$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
-  .gain(0.25).mask(scene5).velocity(scene5).orbit(7).analyze("fx")
-
-// ---------- 6 · Coda · 4 bars · 78 BPM · D · A#maj7 Am7 Gm7 Fmaj7 ----------
-const scene6 = "<0!32 1!4>"
-// Drums · EmuSP12
-$: s("[bd ~ ~ ~] [~ ~ ~ bd] [~ bd ~ ~] ~").bank("EmuSP12").gain("<0.6 0.4 0.2 0>").lpf(5000).crush(12).swingBy(0.1, 8).mask(scene6).velocity(scene6).orbit(1).analyze("kick")
-$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("EmuSP12").gain("<0.45 0.3 0.15 0>").lpf(5000).crush(12).swingBy(0.1, 8).mask(scene6).velocity(scene6).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("EmuSP12").gain("<0.3 0.2 0.1 0>").lpf(5000).crush(12).swingBy(0.1, 8).mask(scene6).velocity(scene6).orbit(1).analyze("hats")
-$: s("~ ~ ~ [~ ~ oh ~]").bank("EmuSP12").gain("<0.27 0.18 0.09 0>").lpf(5000).crush(12).swingBy(0.1, 8).mask(scene6).velocity(scene6).orbit(1).analyze("hats")
-
-// Pad · Comping (lo-fi)
+  .room(.45).gain(0.32).mask(section2).velocity(section2).orbit(6).analyze("pad")
+// B · bars 13-20 · pattern A
+$: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
+  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf(2200)
+  .room(.45).gain(0.28).mask(section3).velocity(section3).orbit(6).analyze("pad")
+// Pausa · bars 21-24 · pattern A
+$: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
+  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf(1400)
+  .room(.45).gain(0.3).mask(section4).velocity(section4).orbit(6).analyze("pad")
+// Ritorno · bars 25-32 · pattern A
+$: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
+  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf(2400)
+  .room(.45).gain(0.32).mask(section5).velocity(section5).orbit(6).analyze("pad")
+// Coda · bars 33-36 · pattern A
 $: note("<[a2,c3,e3,f3] [d3,e3,g3,b3] [c3,d3,f3,a3] [g2,b2,c3,e3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~ ~ ~").swingBy(0.1, 8)
   .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf("<2200 1633.33 1066.67 500>")
-  .room(.45).gain("<0.32 0.21 0.11 0>").mask(scene6).velocity(scene6).orbit(6).analyze("pad")
+  .room(.45).gain("<0.32 0.21 0.11 0>").mask(section6).velocity(section6).orbit(6).analyze("pad")
 
+// ========== texture ==========
+// Vinile · bars 1-4 · pattern A
 // Texture · vinyl
 $: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
-  .gain(0.3).mask(scene6).velocity(scene6).orbit(7).analyze("fx")
+  .gain(0.3).mask(section1).velocity(section1).orbit(7).analyze("fx")
+// A · bars 5-12 · pattern A
+$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
+  .gain(0.25).mask(section2).velocity(section2).orbit(7).analyze("fx")
+// B · bars 13-20 · pattern A
+$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
+  .gain(0.25).mask(section3).velocity(section3).orbit(7).analyze("fx")
+// Pausa · bars 21-24 · pattern A
+$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
+  .gain(0.35).mask(section4).velocity(section4).orbit(7).analyze("fx")
+// Ritorno · bars 25-32 · pattern A
+$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
+  .gain(0.25).mask(section5).velocity(section5).orbit(7).analyze("fx")
+// Coda · bars 33-36 · pattern A
+$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
+  .gain(0.3).mask(section6).velocity(section6).orbit(7).analyze("fx")

@@ -1,147 +1,139 @@
 // coding-misk · Segnale nel rumore
-// track composed with the arranger: each scene is a block of layers switched on by its lane (1 plays, 0 is silent, values in between fade)
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
 // each .analyze("…") lights up its instrument in the Stage visual
 setcpm(96/4)
 
 const SECTIONS = [['Rumore', 4], ['Emersione', 8], ['Pulsazione', 8], ['Fioritura', 8], ['Silenzio', 2], ['Ritorno', 8], ['Dissolvenza', 4]]
 const TEMPO = {'Rumore': 96, 'Emersione': 109.71, 'Pulsazione': 109.71, 'Fioritura': 96, 'Silenzio': 96, 'Ritorno': 109.71, 'Dissolvenza': 96}
 
-// ---------- 1 · Rumore · 4 bars · 96 BPM · D · Dm Dm G G ----------
-const scene1 = "<1!4 0.67 0.33 0!36>"
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!4 0.67 0.33 0!36>"  // Rumore · 4 bars · 96 BPM · D · Dm Dm G G
+const section2 = "<0!4 0.33 0.67 1!6 0!30>"  // Emersione · 8 (7/8) bars · 96 BPM · D · Dm Dm G G · fades in over 2 bars
+const section3 = "<0!12 1!8 0!22>"  // Pulsazione · 8 (7/8) bars · 96 BPM · D · Dm Dm G G
+const section4 = "<0!20 1!8 0!14>"  // Fioritura · 8 bars · 96 BPM · D · Dm Dm G G
+const section5 = "<0!28 1!2 0!12>"  // Silenzio · 2 bars · 96 BPM · D · Dm Dm G G
+const section6 = "<0!30 1!8 0.67 0.33 0!2>"  // Ritorno · 8 (7/8) bars · 96 BPM · D · Dm Dm G G
+const section7 = "<0!38 0.33 0.67 1!2>"  // Dissolvenza · 4 bars · 96 BPM · D · Dm Dm G G · fades in over 2 bars
 
-// Hook · Signal
-$: n("<[~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>").scale("D4:chromatic")
-  .s("sine").lpf(7000)
-  .decay(.2).sustain(.3).delay(.6).room(.3).gain(0.52).mask(scene1).velocity(scene1).orbit(4).analyze("hook")
-
-// Texture · vinyl
-$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
-  .gain("<0.45 0.4 0.35 0.3>").mask(scene1).velocity(scene1).orbit(7).analyze("fx")
-
-// ---------- 2 · Emersione · 8 (7/8) bars · 96 BPM · D · Dm Dm G G · fades in over 2 bars ----------
-const scene2 = "<0!4 0.33 0.67 1!6 0!30>"
+// ========== drums ==========
+// Emersione · bars 5-12 · pattern A
 // Drums · RolandTR808
-$: s("hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").bank("RolandTR808").gain("<0.25 0.26 0.28 0.3 0.18 0.19 0.21 0.23>").lpf(6000).crush(9).mask(scene2).velocity(scene2).orbit(1).analyze("hats")
+$: s("hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").bank("RolandTR808").gain("<0.25 0.26 0.28 0.3 0.18 0.19 0.21 0.23>").lpf(6000).crush(9).mask(section2).velocity(section2).orbit(1).analyze("hats")
+// Pulsazione · bars 13-20 · pattern B
+$: s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").bank("RolandTR808").gain(0.8).lpf(6000).crush(9).mask(section3).velocity(section3).orbit(1).analyze("kick")
+$: s("~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~").bank("RolandTR808").gain(0.6).lpf(6000).crush(9).mask(section3).velocity(section3).orbit(1).analyze("snare")
+$: s("hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").bank("RolandTR808").gain(0.4).lpf(6000).crush(9).mask(section3).velocity(section3).orbit(1).analyze("hats")
+// Fioritura · bars 21-28 · pattern C
+$: s("[bd ~ ~ ~] ~ [bd ~ bd ~] ~").bank("RolandTR808").gain(0.8).lpf(6000).crush(9).mask(section4).velocity(section4).orbit(1).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("RolandTR808").gain(0.6).lpf(6000).crush(9).mask(section4).velocity(section4).orbit(1).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("RolandTR808").gain(0.4).lpf(6000).crush(9).mask(section4).velocity(section4).orbit(1).analyze("hats")
+$: s("cr").bank("RolandTR808").gain(.55).room(.4).mask("<0!4 1 0!3>").mask(section4).velocity(section4).orbit(1).analyze("fx")
+// Ritorno · bars 31-38 · pattern D
+$: s("bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~").bank("RolandTR808").gain(0.8).lpf(6000).crush(10).mask(section6).velocity(section6).orbit(1).analyze("kick")
+$: s("~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~").bank("RolandTR808").gain(0.6).lpf(6000).crush(10).mask(section6).velocity(section6).orbit(1).analyze("snare")
+$: s("hh hh hh hh hh hh hh hh hh hh hh hh hh hh").bank("RolandTR808").gain(0.4).lpf(6000).crush(10).mask(section6).velocity(section6).orbit(1).analyze("hats")
+$: s("sd*14").bank("RolandTR808").gain(saw.range(.15, .75)).mask("<0!5 1 0!2>").mask(section6).velocity(section6).orbit(1).analyze("snare")
+$: s("cr").bank("RolandTR808").gain(.55).room(.4).mask("<0!6 1 0>").mask(section6).velocity(section6).orbit(1).analyze("fx")
 
+// ========== bass ==========
+// Emersione · bars 5-12 · pattern A
 // Bass · Long sub
 $: note("<a1 a1 d2 d2>").transpose(5).struct("x")
   .s("sine").lpf(500).lpq(1).distort(0.5).distortvol(.5)
-  .decay(.6).sustain(.8).gain("<0.49 0.61 0.73 0.85 0 0.12 0.24 0.36>").mask(scene2).velocity(scene2).orbit(2).analyze("bass")
+  .decay(.6).sustain(.8).gain("<0.49 0.61 0.73 0.85 0 0.12 0.24 0.36>").mask(section2).velocity(section2).orbit(2).analyze("bass")
+// Pulsazione · bars 13-20 · pattern A
+$: note("<a1 a1 d2 d2>").transpose(5).struct("x")
+  .s("sine").lpf(500).lpq(1).distort(0.5).distortvol(.5)
+  .decay(.6).sustain(.8).gain(0.88).mask(section3).velocity(section3).orbit(2).analyze("bass")
+// Fioritura · bars 21-28 · pattern A
+$: note("<a1 a1 d2 d2>").transpose(5).struct("x")
+  .s("sine").lpf(500).lpq(1).distort(0.5).distortvol(.5)
+  .decay(.6).sustain(.8).gain(0.96).mask(section4).velocity(section4).orbit(2).analyze("bass")
+// Ritorno · bars 31-38 · pattern A
+$: note("<d2 d2 a1 a1>").transpose(5).struct("x")
+  .s("sine").lpf(500).lpq(1).distort(0.5).distortvol(.5)
+  .decay(.6).sustain(.8).gain(1.04).mask(section6).velocity(section6).orbit(2).analyze("bass")
 
+// ========== arp ==========
+// Emersione · bars 5-12 · pattern A
 // Arpeggio · Pulsar, 8ths
 $: note("<[a3 a4 c4 a4 e4 a4 c4] [a3 a4 c4 a4 e4 a4 c4] [a3 a4 d4 a4 f#4 a4 d4] [a3 a4 d4 a4 f#4 a4 d4]>").transpose(5)
   .s("gm_vibraphone").lpf(6000).lpq(1)
-  .decay(.15).sustain(.15).delay(.3).gain("<0.54 0.59 0.65 0.7 0.32 0.37 0.43 0.48>").mask(scene2).velocity(scene2).orbit(3).analyze("arp")
-
-// Texture · vinyl
-$: s("white*28").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
-  .gain("<0.2 0.18 0.15 0.13 0.3 0.27 0.25 0.23>").mask(scene2).velocity(scene2).orbit(7).analyze("fx")
-
-// ---------- 3 · Pulsazione · 8 (7/8) bars · 96 BPM · D · Dm Dm G G ----------
-const scene3 = "<0!12 1!8 0!22>"
-// Drums · RolandTR808
-$: s("bd ~ ~ ~ ~ ~ ~ ~ bd ~ ~ ~ ~ ~").bank("RolandTR808").gain(0.8).lpf(6000).crush(9).mask(scene3).velocity(scene3).orbit(1).analyze("kick")
-$: s("~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~").bank("RolandTR808").gain(0.6).lpf(6000).crush(9).mask(scene3).velocity(scene3).orbit(1).analyze("snare")
-$: s("hh ~ hh ~ hh ~ hh ~ hh ~ hh ~ hh ~").bank("RolandTR808").gain(0.4).lpf(6000).crush(9).mask(scene3).velocity(scene3).orbit(1).analyze("hats")
-
-// Bass · Long sub
-$: note("<a1 a1 d2 d2>").transpose(5).struct("x")
-  .s("sine").lpf(500).lpq(1).distort(0.5).distortvol(.5)
-  .decay(.6).sustain(.8).gain(0.88).mask(scene3).velocity(scene3).orbit(2).analyze("bass")
-
-// Arpeggio · Pulsar, 8ths
+  .decay(.15).sustain(.15).delay(.3).gain("<0.54 0.59 0.65 0.7 0.32 0.37 0.43 0.48>").mask(section2).velocity(section2).orbit(3).analyze("arp")
+// Pulsazione · bars 13-20 · pattern A
 $: note("<[a3 a4 c4 a4 e4 a4 c4] [a3 a4 c4 a4 e4 a4 c4] [a3 a4 d4 a4 f#4 a4 d4] [a3 a4 d4 a4 f#4 a4 d4]>").transpose(5)
   .s("gm_vibraphone").lpf(6000).lpq(1)
-  .decay(.15).sustain(.15).delay(.3).gain(0.72).mask(scene3).velocity(scene3).orbit(3).analyze("arp")
-
-// Pad · Comping (lo-fi)
-$: note("<[a2,c3,e3] [a2,c3,e3] [a2,d3,f#3] [a2,d3,f#3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~")
-  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf(2600)
-  .room(.5).gain(0.22).mask(scene3).velocity(scene3).orbit(6).analyze("pad")
-
-// ---------- 4 · Fioritura · 8 bars · 96 BPM · D · Dm Dm G G ----------
-const scene4 = "<0!20 1!8 0!14>"
-// Drums · RolandTR808
-$: s("[bd ~ ~ ~] ~ [bd ~ bd ~] ~").bank("RolandTR808").gain(0.8).lpf(6000).crush(9).mask(scene4).velocity(scene4).orbit(1).analyze("kick")
-$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("RolandTR808").gain(0.6).lpf(6000).crush(9).mask(scene4).velocity(scene4).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("RolandTR808").gain(0.4).lpf(6000).crush(9).mask(scene4).velocity(scene4).orbit(1).analyze("hats")
-$: s("cr").bank("RolandTR808").gain(.55).room(.4).mask("<0!4 1 0!3>").mask(scene4).velocity(scene4).orbit(1).analyze("fx")
-
-// Bass · Long sub
-$: note("<a1 a1 d2 d2>").transpose(5).struct("x")
-  .s("sine").lpf(500).lpq(1).distort(0.5).distortvol(.5)
-  .decay(.6).sustain(.8).gain(0.96).mask(scene4).velocity(scene4).orbit(2).analyze("bass")
-
+  .decay(.15).sustain(.15).delay(.3).gain(0.72).mask(section3).velocity(section3).orbit(3).analyze("arp")
+// Fioritura · bars 21-28 · pattern B
 // Arpeggio · Up, 8ths
 $: note("<[a3 c4 e4 a4 a3 c4 e4 a4] [a3 c4 e4 a4 a3 c4 e4 a4] [a3 d4 f#4 a4 a3 d4 f#4 a4] [a3 d4 f#4 a4 a3 d4 f#4 a4]>").transpose(5)
   .s("gm_vibraphone").lpf(6000).lpq(1)
-  .decay(.15).sustain(.15).delay(.3).gain(0.51).mask(scene4).velocity(scene4).orbit(3).analyze("arp")
-
-// Hook · Soul
-$: n("<[0 ~ 4 ~ 3 ~ ~ 2] [~ 4 ~ 7 ~ 5 4 ~] [0 ~ 4 ~ 3 ~ 2 0] [-3 ~ ~ ~ ~ ~ ~ ~]>").scale("D4:dorian")
-  .s("gm_celesta").lpf(7000)
-  .decay(.2).sustain(.3).delay(.45).room(.3).gain(0.75).mask(scene4).velocity(scene4).orbit(4).analyze("hook")
-
-// Pad · Sustained
-$: note("<[a2,c3,e3] [a2,c3,e3] [a2,d3,f#3] [a2,d3,f#3]>").transpose(5)
-  .s("gm_string_ensemble_1").attack(.4).release(1.2).lpf(3000)
-  .room(.8).gain(0.2).mask(scene4).velocity(scene4).orbit(6).analyze("pad")
-
-// ---------- 5 · Silenzio · 2 bars · 96 BPM · D · Dm Dm G G ----------
-const scene5 = "<0!28 1!2 0!12>"
-
-// Hook · Signal
-$: n("<[~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>").scale("D4:chromatic")
-  .s("gm_celesta").lpf(7000)
-  .decay(.2).sustain(.3).delay(.7).room(.3).gain(0.6).mask("<1 [1 0]>").mask(scene5).velocity(scene5).orbit(4).analyze("hook")
-
-// Pad · Sustained
-$: note("<[a2,c3,e3] [a2,c3,e3] [a2,d3,f#3] [a2,d3,f#3]>").transpose(5)
-  .s("gm_string_ensemble_1").attack(.4).release(1.2).lpf(3000)
-  .room(.8).gain("<0.2 0.05>").mask(scene5).velocity(scene5).orbit(6).analyze("pad")
-
-// ---------- 6 · Ritorno · 8 (7/8) bars · 96 BPM · D · Dm Dm G G ----------
-const scene6 = "<0!30 1!8 0.67 0.33 0!2>"
-// Drums · RolandTR808
-$: s("bd ~ ~ ~ ~ ~ bd ~ bd ~ ~ ~ ~ ~").bank("RolandTR808").gain(0.8).lpf(6000).crush(10).mask(scene6).velocity(scene6).orbit(1).analyze("kick")
-$: s("~ ~ ~ ~ sd ~ ~ ~ ~ ~ ~ ~ sd ~").bank("RolandTR808").gain(0.6).lpf(6000).crush(10).mask(scene6).velocity(scene6).orbit(1).analyze("snare")
-$: s("hh hh hh hh hh hh hh hh hh hh hh hh hh hh").bank("RolandTR808").gain(0.4).lpf(6000).crush(10).mask(scene6).velocity(scene6).orbit(1).analyze("hats")
-$: s("sd*14").bank("RolandTR808").gain(saw.range(.15, .75)).mask("<0!5 1 0!2>").mask(scene6).velocity(scene6).orbit(1).analyze("snare")
-$: s("cr").bank("RolandTR808").gain(.55).room(.4).mask("<0!6 1 0>").mask(scene6).velocity(scene6).orbit(1).analyze("fx")
-
-// Bass · Long sub
-$: note("<d2 d2 a1 a1>").transpose(5).struct("x")
-  .s("sine").lpf(500).lpq(1).distort(0.5).distortvol(.5)
-  .decay(.6).sustain(.8).gain(1.04).mask(scene6).velocity(scene6).orbit(2).analyze("bass")
-
+  .decay(.15).sustain(.15).delay(.3).gain(0.51).mask(section4).velocity(section4).orbit(3).analyze("arp")
+// Ritorno · bars 31-38 · pattern A
 // Arpeggio · Pulsar, 8ths
 $: note("<[a3 a4 d4 a4 f#4 a4 d4] [a3 a4 d4 a4 f#4 a4 d4] [a3 a4 c4 a4 e4 a4 c4] [a3 a4 c4 a4 e4 a4 c4]>").transpose(5)
   .s("gm_vibraphone").lpf(6000).lpq(1)
-  .decay(.15).sustain(.15).delay(.3).gain(0.64).mask(scene6).velocity(scene6).orbit(3).analyze("arp")
+  .decay(.15).sustain(.15).delay(.3).gain(0.64).mask(section6).velocity(section6).orbit(3).analyze("arp")
+// Dissolvenza · bars 39-42 · pattern A
+$: note("<[a3 a4 d4 a4 f#4 a4 d4 a4] [a3 a4 d4 a4 f#4 a4 d4 a4] [a3 a4 c4 a4 e4 a4 c4 a4] [a3 a4 c4 a4 e4 a4 c4 a4]>").transpose(5)
+  .s("gm_vibraphone").lpf("<2400 600 6000 4200>").lpq(1)
+  .decay(.15).sustain(.15).delay(.3).gain("<0.21 0 0.64 0.43>").mask(section7).velocity(section7).orbit(3).analyze("arp")
 
+// ========== hook ==========
+// Rumore · bars 1-4 · pattern A
+// Hook · Signal
+$: n("<[~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>").scale("D4:chromatic")
+  .s("sine").lpf(7000)
+  .decay(.2).sustain(.3).delay(.6).room(.3).gain(0.52).mask(section1).velocity(section1).orbit(4).analyze("hook")
+// Fioritura · bars 21-28 · pattern B
+// Hook · Soul
+$: n("<[0 ~ 4 ~ 3 ~ ~ 2] [~ 4 ~ 7 ~ 5 4 ~] [0 ~ 4 ~ 3 ~ 2 0] [-3 ~ ~ ~ ~ ~ ~ ~]>").scale("D4:dorian")
+  .s("gm_celesta").lpf(7000)
+  .decay(.2).sustain(.3).delay(.45).room(.3).gain(0.75).mask(section4).velocity(section4).orbit(4).analyze("hook")
+// Silenzio · bars 29-30 · pattern A
+// Hook · Signal
+$: n("<[~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>").scale("D4:chromatic")
+  .s("gm_celesta").lpf(7000)
+  .decay(.2).sustain(.3).delay(.7).room(.3).gain(0.6).mask("<1 [1 0]>").mask(section5).velocity(section5).orbit(4).analyze("hook")
+// Ritorno · bars 31-38 · pattern B
 // Hook · Soul
 $: n("<[0 ~ 4 ~ 3 ~ 2] [-3 ~ ~ ~ ~ ~ ~] [0 ~ 4 ~ 3 ~ ~] [~ 4 ~ 7 ~ 5 4]>").scale("D4:dorian")
   .s("gm_celesta").lpf(7000)
-  .decay(.2).sustain(.3).delay(.45).room(.3).gain(0.75).mask(scene6).velocity(scene6).orbit(4).analyze("hook")
-
-// Pad · Sustained
-$: note("<[a2,d3,f#3] [a2,d3,f#3] [a2,c3,e3] [a2,c3,e3]>").transpose(5)
-  .s("gm_string_ensemble_1").attack(.4).release(1.2).lpf(3000)
-  .room(.8).gain(0.26).mask(scene6).velocity(scene6).orbit(6).analyze("pad")
-
-// ---------- 7 · Dissolvenza · 4 bars · 96 BPM · D · Dm Dm G G · fades in over 2 bars ----------
-const scene7 = "<0!38 0.33 0.67 1!2>"
-
-// Arpeggio · Pulsar, 8ths
-$: note("<[a3 a4 d4 a4 f#4 a4 d4 a4] [a3 a4 d4 a4 f#4 a4 d4 a4] [a3 a4 c4 a4 e4 a4 c4 a4] [a3 a4 c4 a4 e4 a4 c4 a4]>").transpose(5)
-  .s("gm_vibraphone").lpf("<2400 600 6000 4200>").lpq(1)
-  .decay(.15).sustain(.15).delay(.3).gain("<0.21 0 0.64 0.43>").mask(scene7).velocity(scene7).orbit(3).analyze("arp")
-
+  .decay(.2).sustain(.3).delay(.45).room(.3).gain(0.75).mask(section6).velocity(section6).orbit(4).analyze("hook")
+// Dissolvenza · bars 39-42 · pattern A
 // Hook · Signal
 $: n("<[~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~] [~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~]>").scale("D4:chromatic")
   .s("sine").lpf(7000)
-  .decay(.2).sustain(.3).delay(.7).room(.3).gain("<0.15 0 0.45 0.3>").mask(scene7).velocity(scene7).orbit(4).analyze("hook")
+  .decay(.2).sustain(.3).delay(.7).room(.3).gain("<0.15 0 0.45 0.3>").mask(section7).velocity(section7).orbit(4).analyze("hook")
 
+// ========== pad ==========
+// Pulsazione · bars 13-20 · pattern A
+// Pad · Comping (lo-fi)
+$: note("<[a2,c3,e3] [a2,c3,e3] [a2,d3,f#3] [a2,d3,f#3]>").transpose(5).struct("x ~ ~ ~ ~ ~ x ~ ~ ~ x ~ ~ ~")
+  .s("gm_epiano1").attack(.01).decay(.9).sustain(.35).release(.8).lpf(2600)
+  .room(.5).gain(0.22).mask(section3).velocity(section3).orbit(6).analyze("pad")
+// Fioritura · bars 21-28 · pattern B
+// Pad · Sustained
+$: note("<[a2,c3,e3] [a2,c3,e3] [a2,d3,f#3] [a2,d3,f#3]>").transpose(5)
+  .s("gm_string_ensemble_1").attack(.4).release(1.2).lpf(3000)
+  .room(.8).gain(0.2).mask(section4).velocity(section4).orbit(6).analyze("pad")
+// Silenzio · bars 29-30 · pattern B
+$: note("<[a2,c3,e3] [a2,c3,e3] [a2,d3,f#3] [a2,d3,f#3]>").transpose(5)
+  .s("gm_string_ensemble_1").attack(.4).release(1.2).lpf(3000)
+  .room(.8).gain("<0.2 0.05>").mask(section5).velocity(section5).orbit(6).analyze("pad")
+// Ritorno · bars 31-38 · pattern B
+$: note("<[a2,d3,f#3] [a2,d3,f#3] [a2,c3,e3] [a2,c3,e3]>").transpose(5)
+  .s("gm_string_ensemble_1").attack(.4).release(1.2).lpf(3000)
+  .room(.8).gain(0.26).mask(section6).velocity(section6).orbit(6).analyze("pad")
+
+// ========== texture ==========
+// Rumore · bars 1-4 · pattern A
 // Texture · vinyl
 $: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
-  .gain("<0.35 0.45 0.15 0.25>").mask(scene7).velocity(scene7).orbit(7).analyze("fx")
+  .gain("<0.45 0.4 0.35 0.3>").mask(section1).velocity(section1).orbit(7).analyze("fx")
+// Emersione · bars 5-12 · pattern A
+$: s("white*28").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
+  .gain("<0.2 0.18 0.15 0.13 0.3 0.27 0.25 0.23>").mask(section2).velocity(section2).orbit(7).analyze("fx")
+// Dissolvenza · bars 39-42 · pattern A
+$: s("white*32").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)
+  .gain("<0.35 0.45 0.15 0.25>").mask(section7).velocity(section7).orbit(7).analyze("fx")

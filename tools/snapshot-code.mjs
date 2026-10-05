@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { BUILTIN_TRACKS } from '../src/tracks.js';
-import { compileTrack } from '../src/music.js';
+import { compileTrack } from '../src/song/compile.js';
 import { getLang } from '../src/i18n.js';
 
 const DIR = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'tests', 'snapshots', 'code');

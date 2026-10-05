@@ -1,57 +1,59 @@
 // coding-misk · DCI Jingle · ricostruzione
-// track composed with the arranger: each scene is a block of layers switched on by its lane (1 plays, 0 is silent, values in between fade)
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
 // each .analyze("…") lights up its instrument in the Stage visual
 setcpm(103/4)
 
 const SECTIONS = [['Stab', 2], ['Build', 2], ['Drop', 5], ['Coda', 1]]
 const TEMPO = {'Stab': 103, 'Build': 103, 'Drop': 103, 'Coda': 103}
 
-// ---------- 1 · Stab · 2 bars · 103 BPM · F# · F#m F#m E E ----------
-const scene1 = "<1!2 0!8>"
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!2 0!8>"  // Stab · 2 bars · 103 BPM · F# · F#m F#m E E
+const section2 = "<0!2 1!2 0!6>"  // Build · 2 bars · 103 BPM · F# · F#m F#m E E
+const section3 = "<0!4 1!5 0>"  // Drop · 5 bars · 103 BPM · F# · F#m F#m E E
+const section4 = "<0!9 1>"  // Coda · 1 bars · 103 BPM · F# · F#m F#m E E
 
-// Pad · Staccato 8ths
-$: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").transpose(-3).struct("[x x] [x x] [x x] [x x]")
-  .s("supersaw").attack(.01).decay(.08).sustain(0).release(.05).lpf(3000).distort(0.6).distortvol(.5)
-  .room(.25).gain(0.35).mask(scene1).velocity(scene1).orbit(6).analyze("pad")
-
-// ---------- 2 · Build · 2 bars · 103 BPM · F# · F#m F#m E E ----------
-const scene2 = "<0!2 1!2 0!6>"
+// ========== drums ==========
+// Build · bars 3-4 · pattern A
 // Drums · RolandTR909
-$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("RolandTR909").gain("<0.1 0.42>").distort(0.6).distortvol(.5).mask("<1 [1 0]>").mask(scene2).velocity(scene2).orbit(1).analyze("hats")
-$: s("sd*16").bank("RolandTR909").gain(saw.range(.15, .75)).mask("<0 1>").mask(scene2).velocity(scene2).orbit(1).analyze("snare")
+$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("RolandTR909").gain("<0.1 0.42>").distort(0.6).distortvol(.5).mask("<1 [1 0]>").mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("sd*16").bank("RolandTR909").gain(saw.range(.15, .75)).mask("<0 1>").mask(section2).velocity(section2).orbit(1).analyze("snare")
+// Drop · bars 5-9 · pattern B
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).distort(0.6).distortvol(.5).mask(section3).velocity(section3).orbit(1).analyze("kick")
+$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR909").gain(0.72).distort(0.6).distortvol(.5).mask(section3).velocity(section3).orbit(1).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("RolandTR909").gain(0.45).distort(0.6).distortvol(.5).mask(section3).velocity(section3).orbit(1).analyze("hats")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<0!4 1>").mask(section3).velocity(section3).orbit(1).analyze("fx")
 
-// Pad · Staccato 8ths
-$: note("<[g2,b2,d3] [g2,b2,d3] [a2,c3,e3] [a2,c3,e3]>").transpose(-3).struct("[x x] [x x] [x x] [x x]")
-  .s("supersaw").attack(.01).decay(.08).sustain(0).release(.05).lpf("<3000 5000>").distort(0.6).distortvol(.5)
-  .room(.25).gain("<0.35 0.45>").mask(scene2).velocity(scene2).orbit(6).analyze("pad")
-
-// Riser · white noise rising over 2 bars
-$: s("white*16").decay(.06).sustain(0)
-  .hpf(saw.slow(2).range(300, 8000).late(2))
-  .gain(saw.slow(2).range(0, .4).late(2)).mask(scene2).velocity(scene2).orbit(8).analyze("riser")
-
-// ---------- 3 · Drop · 5 bars · 103 BPM · F# · F#m F#m E E ----------
-const scene3 = "<0!4 1!5 0>"
-// Drums · RolandTR909
-$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).distort(0.6).distortvol(.5).mask(scene3).velocity(scene3).orbit(1).analyze("kick")
-$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR909").gain(0.72).distort(0.6).distortvol(.5).mask(scene3).velocity(scene3).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("RolandTR909").gain(0.45).distort(0.6).distortvol(.5).mask(scene3).velocity(scene3).orbit(1).analyze("hats")
-$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<0!4 1>").mask(scene3).velocity(scene3).orbit(1).analyze("fx")
-
+// ========== bass ==========
+// Drop · bars 5-9 · pattern A
 // Bass · Offbeat
 $: note("<a1 a1 g1 g1>").transpose(-3).struct("[~ x] [~ x] [~ x] [~ x]")
   .s("sawtooth").lpf(500).lpq(6).distort(1).distortvol(.5)
-  .decay(.18).sustain(0).gain(0.6).mask(scene3).velocity(scene3).orbit(2).analyze("bass")
+  .decay(.18).sustain(0).gain(0.6).mask(section3).velocity(section3).orbit(2).analyze("bass")
 
+// ========== pad ==========
+// Stab · bars 1-2 · pattern A
+// Pad · Staccato 8ths
+$: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").transpose(-3).struct("[x x] [x x] [x x] [x x]")
+  .s("supersaw").attack(.01).decay(.08).sustain(0).release(.05).lpf(3000).distort(0.6).distortvol(.5)
+  .room(.25).gain(0.35).mask(section1).velocity(section1).orbit(6).analyze("pad")
+// Build · bars 3-4 · pattern A
+$: note("<[g2,b2,d3] [g2,b2,d3] [a2,c3,e3] [a2,c3,e3]>").transpose(-3).struct("[x x] [x x] [x x] [x x]")
+  .s("supersaw").attack(.01).decay(.08).sustain(0).release(.05).lpf("<3000 5000>").distort(0.6).distortvol(.5)
+  .room(.25).gain("<0.35 0.45>").mask(section2).velocity(section2).orbit(6).analyze("pad")
+// Drop · bars 5-9 · pattern B
 // Pad · Syncopated
 $: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").transpose(-3).struct("[~ ~ x x] [~ ~ x x] [~ ~ x x] [~ ~ x x]")
   .s("supersaw").attack(.01).decay(.1).sustain(0).release(.05).lpf(4000).distort(0.6).distortvol(.5)
-  .room(.25).gain(0.4).mask(scene3).velocity(scene3).orbit(6).analyze("pad")
-
-// ---------- 4 · Coda · 1 bars · 103 BPM · F# · F#m F#m E E ----------
-const scene4 = "<0!9 1>"
-
+  .room(.25).gain(0.4).mask(section3).velocity(section3).orbit(6).analyze("pad")
+// Coda · bars 10-10 · pattern C
 // Pad · Sustained
 $: note("<[g2,b2,d3] [a2,c3,e3] [a2,c3,e3] [g2,b2,d3]>").transpose(-3)
   .s("supersaw").attack(.4).release(1.2).lpf(3000)
-  .room(.9).gain(0.35).mask(scene4).velocity(scene4).orbit(6).analyze("pad")
+  .room(.9).gain(0.35).mask(section4).velocity(section4).orbit(6).analyze("pad")
+
+// ========== riser ==========
+// Build · bars 3-4 · pattern A
+// Riser · white noise rising over 2 bars
+$: s("white*16").decay(.06).sustain(0)
+  .hpf(saw.slow(2).range(300, 8000).late(2))
+  .gain(saw.slow(2).range(0, .4).late(2)).mask(section2).velocity(section2).orbit(8).analyze("riser")

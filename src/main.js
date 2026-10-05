@@ -1,6 +1,8 @@
 import '@strudel/repl';
 import './style.css';
-import { METERS, meterSteps, fitSteps, RHYTHM_CHANNELS, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, compileTrack, cloneState, normalizeState } from './music.js';
+import { METERS, meterSteps, fitSteps, RHYTHM_CHANNELS, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName, cloneState, normalizeState } from './music.js';
+import { compileTrack, compileSong } from './song/compile.js';
+import { validateSong } from './song/validate.js';
 import { BUILTIN_TRACKS } from './tracks.js';
 import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
@@ -24,7 +26,13 @@ setLang(getLang());
 // Le modifiche dell'utente vivono in localStorage e hanno la precedenza sugli originali.
 const user = store.get('coding-misk-library', { tracks: [], code: {} });
 const saveLibrary = () => store.set('coding-misk-library', user);
-const CODED = SONGS.map(sg => ({ ...sg, kind: 'coded' }));
+// brani v2 in JSON (cartella songs/): per ora si ascoltano e si leggono; l'arrangiatore v2 li aprirà
+const SONG_FILES = Object.entries(import.meta.glob('../songs/**/*.json', { eager: true, import: 'default' })).flatMap(([file, sg]) => {
+  const { errors } = validateSong(sg);
+  if (errors.length) { console.warn(`${file}: ${errors.map(e => `${e.path} ${e.msg}`).join('; ')}`); return []; }
+  try { return [{ id: sg.id, title: sg.title, look: sg.look, style: sg.style, code: compileSong(sg) }]; } catch (e) { console.warn(`${file}: ${e.message}`); return []; }
+});
+const CODED = [...SONGS, ...SONG_FILES].map(sg => ({ ...sg, kind: 'coded' }));
 const builtinOf = id => BUILTIN_TRACKS.find(b => b.id === id);
 const isBuiltin = id => !!builtinOf(id) || CODED.some(c => c.id === id);
 const withStates = tr => ({ ...tr, scenes: tr.scenes.map(s => ({ ...s, state: normalizeState(s.state) })) });

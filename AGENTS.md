@@ -9,6 +9,8 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 | `docs/CONTEXT.md`       | Project story, owner preferences and feedback, decisions, references, backlog status |
 | `docs/ARCHITECTURE.md`  | Modules, data flow, player and transport, visuals, persistence                       |
 | `docs/MUSIC-ENGINE.md`  | Scene model, compiler, presets, how to write tracks, Strudel gotchas                 |
+| `docs/SONG-FORMAT.md`   | JSON song format v2: sections, tracks, patterns, clips (reference)                   |
+| `docs/COMPOSING.md`     | Guide to composing songs as code, with validated examples in `songs/examples/`        |
 | `docs/VOCALS.md`        | Vocals research (`#3`): local models, licenses, recording, effects, channel design   |
 | `docs/PLAN-TRACKS.md`   | Plan for tracks, per-instrument patterns and a timeline (proposal)                   |
 | `docs/DESIGN-SYSTEM.md` | Themes, tokens, fonts, components, visuals, hardware theme                           |
@@ -22,7 +24,7 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 - **Git flow.** `main` is stable, `develop` collects work in progress. One branch per issue from `develop` (`feat/<issue>-<slug>`, `fix/<issue>-<slug>`), merged back into `develop`. Merge `develop` into `main` only when the owner confirms. Never force push `main`.
 - **Commits.** Conventional Commits (`feat(scope): …`, `fix: …`, `docs: …`). Reference issues with a trailer: `Closes: alessandrodevecchi/coding-misk#N` (or `Refs:`).
 - **Verify before claiming.** Run the app, play every scene you touched, check `evalError`, and measure per-instrument levels (see Tooling). You cannot hear: say so, and report measured levels instead.
-- **Regression checks.** Before merging a change to the compiler, presets or built-in tracks, run `npm run check:code` (generated code, no browser) and `node tools/snapshot-levels.cjs check` (levels, dev server running). When a change is intended, update the snapshots (`npm run snapshot:code`, `node tools/snapshot-levels.cjs write [track-id]`) in the same commit and say why.
+- **Regression checks.** Before merging a change to the compiler, presets or built-in tracks, run `npm run check:code` (generated code, no browser), `npm run check:songs` and `node tools/snapshot-levels.cjs check` (levels, dev server running). Do not edit files under `src/` while the level check runs: Vite reloads the page and the rest of the run measures silence. When a change is intended, update the snapshots (`npm run snapshot:code`, `node tools/snapshot-levels.cjs write [track-id]`) in the same commit and say why.
 - **Fewer layers, more rhythm.** The owner prefers tracks with at most 4 to 5 layers per scene, dark or tense melodic material, and variety between tracks. See `docs/CONTEXT.md`.
 
 ## Run
@@ -48,6 +50,10 @@ node tools/record-demo.cjs /tmp/demo                  # scripted demo video + au
 node tools/test-hardware-theme.cjs /tmp/hw            # hardware theme: knob drag, LEDs, screenshots
 node tools/export-audio.cjs /tmp/wav luci-rosse        # export tracks to WAV through the app (real time, one after another)
 node tools/snapshot-levels.cjs check                  # compare levels per scene and instrument with tests/snapshots/levels.json
+node --no-warnings tools/song.mjs validate songs/my-song.json   # check a v2 song (errors and warnings with JSON paths)
+node --no-warnings tools/song.mjs compile songs/my-song.json    # print its Strudel code
+node --no-warnings tools/song.mjs export luci-rosse             # built-in track as v2 JSON
+npm run check:songs                                    # validate songs/ and check v2 parity of built-in tracks
 ```
 
 Video recording needs Playwright's ffmpeg (`node $PLAYWRIGHT_CORE/cli.js install ffmpeg`). The demo script writes `video.webm`, `audio.webm` and `offset.txt`; merge with system ffmpeg (see `docs/ARCHITECTURE.md`).
@@ -59,6 +65,7 @@ Audio analysis of reference tracks: `tools/analyze-audio.py` and `tools/zoom-aud
 - `src/main.js`: app shell, track library, arranger, controls, transport, export.
 - `src/music.js`: musical data, presets, scene state, scene-to-code compiler.
 - `src/tracks.js`: built-in scene tracks.
+- `src/song/`: song format v2 (format, converter, compiler, validator). `songs/`: JSON songs, `songs/examples/` used by the guide.
 - `src/visuals.js`: canvas visuals. `src/hardware.js`: knobs and LEDs for the hardware theme.
 - `src/songs.js`: reads `SECTIONS` and `TEMPO` from track code. `src/i18n.js`: strings. `src/content.js`: lessons, sounds, references, hand-written tracks.
 - `patterns/`: hand-written Strudel files. `public/samples/`: custom samples. `docs/media/`: README media. `demo/`: local demo videos (git-ignored).
