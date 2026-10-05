@@ -79,6 +79,8 @@ let sel = Math.min(draft ? draft.sel || 0 : 0, T.sections.length - 1);
 let tk = Math.min(draft ? draft.tk || 0 : 0, Math.max(0, T.tracks.length - 1));
 let dirty = !!(draft && draft.dirty);
 let scope = 'track', editPat = null, panelView = store.get('coding-misk-panel', 'one');
+// vista dell'arrangiatore: 'sections' (celle per sezione) o 'timeline' (clip liberi); selClip = indice del clip scelto nella timeline
+let arrMode = store.get('coding-misk-arr-mode', 'sections'), selClip = null;
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!LOOKS.some(([k]) => k === look)) look = 'palco';
 let compiled = playable({ ...T, kind: 'composed' });
@@ -333,8 +335,10 @@ function cellOf(tr, j) {
 const curTrack = () => T.tracks[tk];
 const baseSettings = type => type === 'code' ? { visual: 'fx' } : Object.fromEntries(SETTING_FIELDS[type].map(k => [k, DEFAULT[type][k]]));
 // impostazioni che suonano nella sezione selezionata: traccia + eventuale modifica solo per questa sezione
-const eff = tr => { const c = wholeClip(tr, sel); return { ...baseSettings(tr.type), ...tr.settings, ...((c && c.set) || {}) }; };
-const patOf = tr => { const c = wholeClip(tr, sel); const k = editPat && tr.patterns[editPat] ? editPat : c && tr.patterns[c.pattern] ? c.pattern : Object.keys(tr.patterns)[0]; return k; };
+// clip su cui agiscono pattern e impostazioni "solo qui": nella timeline quello scelto, altrimenti quello della sezione
+const focusClip = tr => (arrMode === 'timeline' && tr === curTrack() && selClip !== null && tr.clips[selClip]) || wholeClip(tr, sel);
+const eff = tr => { const c = focusClip(tr); return { ...baseSettings(tr.type), ...tr.settings, ...((c && c.set) || {}) }; };
+const patOf = tr => { const c = focusClip(tr); const k = editPat && tr.patterns[editPat] ? editPat : c && tr.patterns[c.pattern] ? c.pattern : Object.keys(tr.patterns)[0]; return k; };
 const secFull = () => ({ ...SECTION_DEFAULTS, ...SEC() });
 // stato v1 equivalente al pattern in modifica (per i passi del preset e le note)
 const patState = tr => clipState(secFull(), tr, { pattern: patOf(tr) });
@@ -355,7 +359,7 @@ function selectScene(i) {
 }
 function selectTrack(i) {
   if (i < 0 || i >= T.tracks.length) return;
-  if (i !== tk) { tk = i; editPat = null; }
+  if (i !== tk) { tk = i; editPat = null; selClip = null; }
   saveDraft(); renderArranger(); renderTrackPanel(); highlightTrack();
 }
 function renderTrackPick() {
@@ -366,6 +370,15 @@ function renderTrackPick() {
 }
 function renderArranger() {
   const total = T.sections.reduce((a, s) => a + s.bars, 0);
+  $('#arranger').classList.toggle('tl-mode', arrMode === 'timeline');
+  $$('[data-arr-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.arrMode === arrMode));
+  $('#arr-mode-hint').textContent = arrMode === 'timeline' ? t('timelineHint') : '';
+  if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
+  renderSectionPanel(total);
+}
+// vista a sezioni: una cella per traccia e sezione
+function renderCells(total) {
+  $('#arr-strip').style.minWidth = $('#arr-grid').style.minWidth = '';
   // sezioni e tracce condividono le stesse colonne: larghezza proporzionale alle battute
   const cols = `var(--trk-col) ${T.sections.map(s => `minmax(54px, ${s.bars}fr)`).join(' ')}`;
   $('#arr-strip').style.gridTemplateColumns = cols;
@@ -382,6 +395,28 @@ function renderArranger() {
         const label = !c ? '' : c.clip ? esc(c.clip.pattern) + (c.clip.set ? '*' : '') : '≈';
         return `<button class="trk-cell${cls}" data-cell="${i}:${j}" aria-current="${i === tk && j === sel}" title="${esc(`${trackLabel(tr)} · ${s.name}`)}">${label}</button>`;
       }).join('')}</div>`).join('') + '<span class="head"></span>';
+}
+// vista timeline: clip liberi su una corsia continua, larghezza proporzionale alle battute
+const clipLabel = c => esc(c.pattern) + (c.set ? '*' : '');
+function renderTimeline(total) {
+  const st = starts(), minW = `calc(var(--trk-col) + ${total * 18}px)`;
+  $('#arr-strip').style.gridTemplateColumns = `var(--trk-col) ${T.sections.map(s => `minmax(0, ${s.bars}fr)`).join(' ')}`;
+  $('#arr-strip').style.minWidth = $('#arr-grid').style.minWidth = minW;
+  $('#arr-strip').innerHTML = `<span class="arr-corner">${t('sections')}</span>` + T.sections.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" aria-current="${i === sel}">
+      <b>${esc(s.name)}</b><span>${s.bars} · ${s.bpmEnd ? `${s.bpm}→${s.bpmEnd}` : s.bpm ?? 138}</span></button>`).join('') + '<span class="head"></span>';
+  const solo = T.tracks.some(tr => tr.solo);
+  const lines = st.slice(1).map(b => `<i class="sec-line" style="left:${b / total * 100}%"></i>`).join('');
+  $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}" style="grid-template-columns:var(--trk-col) minmax(0, 1fr)" aria-current="${i === tk}">
+      <div class="trk-head" data-act-ids="${ACT_IDS[tr.type] || esc((tr.settings && tr.settings.visual) || 'fx')}">
+        <button class="trk-name" data-trk="${i}" title="${esc(tr.type)}"><span class="trk-type">${esc(TYPE_ICON[tr.type] || '·')}</span>${esc(trackLabel(tr))}</button>
+        <button class="mini" data-mute="${i}" aria-pressed="${!!tr.mute}" title="${esc(t('mute'))}">M</button><button class="mini" data-solo="${i}" aria-pressed="${!!tr.solo}" title="${esc(t('solo'))}">S</button>
+      </div>
+      <div class="trk-lane" data-lane="${i}" style="--bars:${total}" title="${esc(t('laneAdd'))}">${lines}${spans(tr).map(({ c, s: a, e: b }) => {
+        const k = tr.clips.indexOf(c);
+        return `<button class="clip${isWhole(c) ? '' : ' free'}" data-clip="${i}:${k}" aria-current="${i === tk && k === selClip}" style="left:${a / total * 100}%;width:${(b - a) / total * 100}%" aria-label="${esc(`${trackLabel(tr)} · ${t('cBars', { from: a + 1, to: b })} · ${t('cPattern', { p: c.pattern })}`)}">${clipLabel(c)}<span class="clip-grip" data-grip aria-hidden="true"></span></button>`;
+      }).join('')}</div></div>`).join('') + '<span class="head"></span>';
+}
+function renderSectionPanel(total) {
   const sc = SEC();
   if (document.activeElement !== $('#track-title')) $('#track-title').value = T.title;
   if (document.activeElement !== $('#sc-name')) $('#sc-name').value = sc.name;
@@ -413,6 +448,83 @@ $('#arr-grid').addEventListener('click', e => {
   if (isPlaying() && mode === 'track' && j !== sel) { playSong(compiled, sceneStart(j), 'track'); }
   sel = j; editPat = null; saveDraft(); renderArranger(); renderTrackPanel(); highlightTrack();
 });
+// ---------- timeline: crea, sposta e allunga i clip (si fermano sui clip vicini) ----------
+const songBars = () => T.sections.reduce((a, s) => a + s.bars, 0);
+const spanOf = (tr, c) => spans(tr).find(x => x.c === c);
+// un clip spostato o allungato smette di seguire la sua sezione e diventa a battute fisse
+const toAbs = (tr, c) => { const sp = spanOf(tr, c); delete c.section; c.start = sp.s; c.bars = sp.e - sp.s; return c; };
+function bounds(tr, c) {
+  const me = spanOf(tr, c), others = spans(tr).filter(x => x.c !== c);
+  return { lo: Math.max(0, ...others.filter(x => x.e <= me.s).map(x => x.e)), hi: Math.min(songBars(), ...others.filter(x => x.s >= me.e).map(x => x.s)) };
+}
+function selectClip(i, k) {
+  tk = i; selClip = k; editPat = null;
+  const sp = spanOf(T.tracks[i], T.tracks[i].clips[k]);
+  if (sp) { const st = starts(); let j = 0; while (j + 1 < st.length && st[j + 1] <= sp.s) j++; sel = j; }
+  saveDraft(); renderArranger(); renderTrackPanel(); highlightTrack();
+}
+function setClipSpan(tr, c, start, bars) {
+  toAbs(tr, c);
+  const bd = bounds(tr, c);
+  start = Math.max(bd.lo, Math.min(start, bd.hi - 1));
+  bars = Math.max(1, Math.min(bars, bd.hi - start));
+  c.start = start; c.bars = bars;
+}
+let drag = null;
+$('#arr-grid').addEventListener('pointerdown', e => {
+  if (arrMode !== 'timeline' || e.button !== 0) return;
+  const lane = e.target.closest('.trk-lane'); if (!lane) return;
+  const i = +lane.dataset.lane, tr = T.tracks[i], rect = lane.getBoundingClientRect(), total = songBars();
+  const barAt = x => (x - rect.left) / rect.width * total;
+  const clipEl = e.target.closest('[data-clip]');
+  if (!clipEl) {
+    // clic su una zona vuota: nuovo clip di 4 battute (o fino al clip successivo) col pattern in modifica
+    const b = Math.max(0, Math.min(total - 1, Math.floor(barAt(e.clientX)))), all = spans(tr);
+    if (all.some(x => x.s <= b && b < x.e)) return;
+    const next = Math.min(total, ...all.filter(x => x.s > b).map(x => x.s));
+    const key = tk === i && editPat && tr.patterns[editPat] ? editPat : Object.keys(tr.patterns)[0];
+    if (!key) return;
+    tr.clips.push({ start: b, bars: Math.min(4, next - b), pattern: key });
+    changed(); selectClip(i, tr.clips.length - 1); return;
+  }
+  const k = +clipEl.dataset.clip.split(':')[1], c = tr.clips[k], sp = spanOf(tr, c);
+  drag = { i, k, c, el: clipEl, total, barAt, bd: bounds(tr, c), s: sp.s, e: sp.e, ns: sp.s, ne: sp.e, x0: e.clientX, moved: false,
+    mode: e.target.closest('[data-grip]') ? 'resize' : 'move', grab: barAt(e.clientX) - sp.s };
+  clipEl.setPointerCapture(e.pointerId); e.preventDefault();
+});
+$('#arr-grid').addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.abs(e.clientX - drag.x0) > 3) drag.moved = true;
+  if (!drag.moved) return;
+  const b = drag.barAt(e.clientX), len = drag.e - drag.s;
+  if (drag.mode === 'move') { drag.ns = Math.max(drag.bd.lo, Math.min(drag.bd.hi - len, Math.round(b - drag.grab))); drag.ne = drag.ns + len; }
+  else { drag.ns = drag.s; drag.ne = Math.max(drag.s + 1, Math.min(drag.bd.hi, Math.round(b))); }
+  drag.el.style.left = `${drag.ns / drag.total * 100}%`; drag.el.style.width = `${(drag.ne - drag.ns) / drag.total * 100}%`;
+});
+$('#arr-grid').addEventListener('pointerup', () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  const tr = T.tracks[d.i];
+  if (d.moved && (d.ns !== d.s || d.ne !== d.e)) { toAbs(tr, d.c); d.c.start = d.ns; d.c.bars = d.ne - d.ns; changed(); }
+  selectClip(d.i, d.k);
+});
+// tastiera sul clip scelto: frecce spostano di una battuta, Maiusc + frecce allungano o accorciano, Canc lo toglie
+$('#arr-grid').addEventListener('keydown', e => {
+  const el = e.target.closest('[data-clip]'); if (!el || arrMode !== 'timeline') return;
+  const [i, k] = el.dataset.clip.split(':').map(Number), tr = T.tracks[i], c = tr.clips[k], sp = spanOf(tr, c);
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); tr.clips.splice(k, 1); selClip = null; changed(); renderTrackPanel(); return; }
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  const d = e.key === 'ArrowLeft' ? -1 : 1;
+  if (e.shiftKey) setClipSpan(tr, c, sp.s, sp.e - sp.s + d); else setClipSpan(tr, c, sp.s + d, sp.e - sp.s);
+  changed(); selectClip(i, k);
+  const again = $(`[data-clip="${i}:${k}"]`); if (again) again.focus();
+});
+$$('[data-arr-mode]').forEach(b => b.addEventListener('click', () => {
+  arrMode = b.dataset.arrMode === 'timeline' ? 'timeline' : 'sections'; store.set('coding-misk-arr-mode', arrMode);
+  selClip = null; renderArranger(); renderTrackPanel();
+}));
+
 $('#arr-strip').addEventListener('click', e => {
   const b = e.target.closest('[data-scene-i]'); if (!b) return;
   const i = +b.dataset.sceneI;
@@ -496,7 +608,7 @@ $('#tk-add').addEventListener('click', () => addTrack($('#tk-type').value));
 function loadTrack(tr) {
   if (tr.id !== T.id && dirty && !confirmTwice('load', t('loadConfirm'))) return false;
   if (tr.id !== T.id) { T = prepare(tr); dirty = false; }
-  sel = 0; tk = 0; editPat = null; paused = null;
+  sel = 0; tk = 0; editPat = null; selClip = null; paused = null;
   compiled = playable({ ...T, kind: 'composed' });
   saveDraft(); syncAll(); renderArranger(); renderTrackPanel(); renderSource();
   return true;
@@ -622,6 +734,17 @@ function highlightTrack() {
   } catch (e) {}
 }
 
+// pannello traccia nella timeline: il clip scelto (battute, pattern, elimina) o come aggiungerne uno
+function clipBlock(tr) {
+  const c = selClip !== null && tr.clips[selClip];
+  if (!c) return `<div class="tp-plays"><span class="lbl">${t('clipLbl')}</span><p class="note">${t('timelineHint')}</p></div>`;
+  const sp = spans(tr).find(x => x.c === c);
+  return `<div class="tp-plays"><span class="lbl">${esc(t('clipInfo', { from: sp.s + 1, to: sp.e }))}</span>
+    <div class="clip-ctl"><div class="ctrl"><label class="lbl" for="clip-start">${t('clipStart')}</label><input id="clip-start" type="number" min="1" step="1" value="${sp.s + 1}"></div>
+      <div class="ctrl"><label class="lbl" for="clip-bars">${t('clipBars')}</label><input id="clip-bars" type="number" min="1" step="1" value="${sp.e - sp.s}"></div>
+      <button class="btn danger" id="clip-del">${t('clipDelete')}</button></div>
+    <div class="chips">${Object.keys(tr.patterns).map(k => `<button class="chip" data-clip-pat="${esc(k)}" aria-pressed="${c.pattern === k}">${esc(k)}</button>`).join('')}</div></div>`;
+}
 const viewSwitch = () => `<div class="tp-view chips" role="group" aria-label="${esc(t('panelView'))}"><button class="chip" data-view="one" aria-pressed="${panelView === 'one'}">${t('viewOne')}</button><button class="chip" data-view="all" aria-pressed="${panelView === 'all'}">${esc(t('viewAll', { name: SEC().name }))}</button></div>`;
 // controlli principali di una scheda compatta (i primi disponibili per il tipo)
 const QUICK = ['gain', 'cutoff', 'drive', 'room', 'delay'];
@@ -706,15 +829,15 @@ function renderTrackPanel() {
         <button class="btn danger" id="tk-del">${t('removeTrack')}</button>
       </div>
     </div>
-    <div class="tp-plays"><span class="lbl">${esc(t('playsIn', { name: SEC().name }))}</span>
-      <div class="chips">${custom ? `<span class="note">${t('customCell')}</span>` : `<button class="chip" data-play-pat="" aria-pressed="${!c}">${t('silent')}</button>${Object.keys(tr.patterns).map(k => `<button class="chip" data-play-pat="${esc(k)}" aria-pressed="${!!(c && c.clip && c.clip.pattern === k)}">${esc(k)}</button>`).join('')}`}</div></div>
+    ${arrMode === 'timeline' ? clipBlock(tr) : `<div class="tp-plays"><span class="lbl">${esc(t('playsIn', { name: SEC().name }))}</span>
+      <div class="chips">${custom ? `<span class="note">${t('customCell')}</span>` : `<button class="chip" data-play-pat="" aria-pressed="${!c}">${t('silent')}</button>${Object.keys(tr.patterns).map(k => `<button class="chip" data-play-pat="${esc(k)}" aria-pressed="${!!(c && c.clip && c.clip.pattern === k)}">${esc(k)}</button>`).join('')}`}</div></div>`}
     <div class="tp-pats"><span class="lbl">${t('patterns')}</span>
       <div class="chips">${Object.keys(tr.patterns).map(k => `<button class="chip" data-edit-pat="${esc(k)}" aria-pressed="${k === key}">${esc(k)}</button>`).join('')}
         <button class="chip" id="pt-new">${t('newPattern')}</button><button class="chip" id="pt-del">${t('deletePattern')}</button></div>
       <p class="note">${esc(t('editingPattern', { p: key }))}</p></div>
     <div class="tp-editor">${editor}</div>
     <div class="tp-scope"><span class="lbl">${t('settingsScope')}</span>
-      <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}" ${c && c.clip ? '' : 'disabled'}>${esc(t('scopeSection', { name: SEC().name }))}</button></div></div>
+      <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}" ${focusClip(tr) ? '' : 'disabled'}>${esc(arrMode === 'timeline' && selClip !== null ? t('scopeClip') : t('scopeSection', { name: SEC().name }))}</button></div></div>
     <div class="ctrls">${(CONTROLS[tr.type] || []).map(settingHtml).join('')}</div>
     <div class="tp-rack"><div class="row"><span class="lbl">Rack</span><span class="hint">${t('rackHint')}</span></div>
       <div class="rack-list">${(tr.rack || []).map((d, i) => deviceHtml(d, i, tr)).join('') || `<p class="note">${t('noDevices')}</p>`}</div>
@@ -729,7 +852,7 @@ function renderTrackPanel() {
 function syncTrackPanel() {
   if (panelView === 'all') return syncSectionRack();
   const tr = curTrack(); if (!tr || !$('#tk-name')) return;
-  const key = patOf(tr), pat = tr.patterns[key] || {}, e = eff(tr), c = wholeClip(tr, sel), over = (c && c.set) || {};
+  const key = patOf(tr), pat = tr.patterns[key] || {}, e = eff(tr), c = focusClip(tr), over = (c && c.set) || {};
   if (document.activeElement !== $('#tk-name')) $('#tk-name').value = trackLabel(tr);
   $$('#track-panel [data-set]').forEach(i => {
     const v = e[i.dataset.set]; if (v === null || v === undefined) return;
@@ -759,7 +882,7 @@ function syncTrackPanel() {
 }
 // scrive un'impostazione: per tutta la traccia, o solo per il clip della sezione selezionata
 function setSetting(k, v, tr = curTrack()) {
-  const c = wholeClip(tr, sel);
+  const c = focusClip(tr);
   if (scope === 'section' && c) { c.set = { ...(c.set || {}), [k]: v }; return; }
   tr.settings[k] = v;
   if (c && c.set) { delete c.set[k]; if (!Object.keys(c.set).length) delete c.set; }
@@ -779,6 +902,11 @@ let codeTimer = 0;
 $('#track-panel').addEventListener('change', e => {
   const tr = curTrack();
   if (e.target.matches('select[data-set]')) { setSetting(e.target.dataset.set, e.target.value); changed(); syncTrackPanel(); return; }
+  if ((e.target.id === 'clip-start' || e.target.id === 'clip-bars') && selClip !== null && tr.clips[selClip]) {
+    const c = tr.clips[selClip], sp = spanOf(tr, c);
+    const start = e.target.id === 'clip-start' ? Math.round(+e.target.value) - 1 : sp.s, bars = e.target.id === 'clip-bars' ? Math.round(+e.target.value) : sp.e - sp.s;
+    setClipSpan(tr, c, start, bars); changed(); renderTrackPanel(); return;
+  }
   if (e.target.matches('select[data-dev-arg]')) { const [i, name] = e.target.dataset.devArg.split(':'); const v = e.target.value; tr.rack[+i][name] = isNaN(+v) ? v : +v; changed(); syncRack(tr); return; }
   if (e.target.id === 'pt-preset') editPattern(p => { p.preset = e.target.value; delete p.steps; });
   if (e.target.id === 'pt-speed') { editPattern(p => { p.speed = e.target.value; delete p.steps; }); renderTrackPanel(); }
@@ -809,6 +937,8 @@ $('#track-panel').addEventListener('click', e => {
     return editPattern((p, t2) => { const tk2 = noteTokens(p.notes, noteCols(t2, p)); tk2[+b.dataset.ni] = tk2[+b.dataset.ni] === b.dataset.nd ? '~' : b.dataset.nd; if (tk2.every(x => x === '~')) delete p.notes; else p.notes = tk2.join(' '); });
   }
   if (b.id === 'pt-notes-reset') return editPattern(p => { delete p.notes; });
+  if (b.id === 'clip-del') { tr.clips.splice(selClip, 1); selClip = null; changed(); renderTrackPanel(); return; }
+  if (b.dataset.clipPat !== undefined) { const c = tr.clips[selClip]; if (c) { c.pattern = b.dataset.clipPat; editPat = c.pattern; changed(); renderTrackPanel(); } return; }
   if (b.id === 'rk-add') { tr.rack = [...(tr.rack || []), newDevice($('#rk-type').value)]; changed(); renderTrackPanel(); return; }
   if (b.dataset.devOn !== undefined) { const d = tr.rack[+b.dataset.devOn]; if (d.on === false) delete d.on; else d.on = false; changed(); renderTrackPanel(); return; }
   if (b.dataset.devDel !== undefined) { tr.rack.splice(+b.dataset.devDel, 1); if (!tr.rack.length) delete tr.rack; changed(); renderTrackPanel(); return; }
@@ -1065,7 +1195,7 @@ const MASTER = .6;
     const btns = $$('.arr-scene-btn'), b = btns[idx];
     head.hidden = !b;
     if (b) head.style.left = `${b.offsetLeft + (trackCyc - compiled.meta.sections[idx].start) / compiled.meta.sections[idx].len * b.offsetWidth}px`;
-    const lh = $('#arr-lanes .head');
+    const lh = $('#arr-grid .head');
     if (lh) { lh.hidden = !b; if (b) lh.style.left = head.style.left; }
     btns.forEach((x, j) => x.classList.toggle('playing', j === idx));
   }

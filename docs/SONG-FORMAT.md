@@ -146,6 +146,7 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 - **`pattern`:** a key of the track's `patterns`.
 - **`set`:** settings for this clip only, on top of the track settings.
 - Clips on one track cannot overlap; put layered parts on separate tracks.
+- In the app, the sections view writes `section` clips and the free timeline writes `start`/`bars` clips; a section clip that is moved or resized becomes a `start`/`bars` clip.
 - A clip covering a whole section fades in and out with the section's `fade`. A clip that starts or ends inside a section starts and stops on the bar.
 - A clip spanning several sections follows each section's chords and key. Automations (`gainEnd`, `cutoffEnd`) ramp within each section.
 

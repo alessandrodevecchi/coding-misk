@@ -20,7 +20,7 @@ Vanilla JavaScript ES modules served by Vite 8. No framework. Strudel runs insid
 
 1. The library merges built-in tracks with the owner's saved tracks (`localStorage` key `coding-misk-library`). Saved copies of built-ins override them by id.
 2. Built-in songs are the JSON files in `songs/` (loaded with `import.meta.glob`, validated, ordered by `songs/index.json`). Saved songs from older versions (scenes) are converted with `fromScenes` by `prepare()`.
-3. The song being edited (`T`, format v2), the selected section `sel` and the selected track `tk` live in `coding-misk-draft`. The arranger grid shows one row per track and one column per section; a cell is a clip covering that section. The track panel edits the selected track: its settings (for the whole track, or only the selected section through the clip's `set`), its patterns and which pattern plays in the selected section.
+3. The song being edited (`T`, format v2), the selected section `sel` and the selected track `tk` live in `coding-misk-draft`. The arranger shows one row per track, in two views of the same data: sections (a cell is a clip covering that section) and free timeline (clips positioned by bar, created, moved and resized with the pointer or the keyboard; `selClip` is the selected clip). The track panel edits the selected track: its settings (for the whole track, or only the selected section through the clip's `set`), its patterns and which pattern plays in the selected section.
 4. Any change calls `changed()`: mark dirty, recompile with `compileSong`, `ed.setCode`, re-evaluate if playing (without stopping). Muted tracks, and non-solo tracks when any track is soloed, are left out of the code.
 5. `playSong(sg, bar, mode)` stops, sets the editor code (with `setcpm` replaced by the start bar tempo), sets `scheduler.lastEnd = bar` to start from any bar, then evaluates.
 6. The `transport()` loop runs every animation frame: applies the per-bar tempo with `scheduler.setCps`, handles section loop and end of track, follows the playing section in the arranger (not while a field of the song is being edited), updates buttons, timelines and the master gain (0.6).
@@ -40,7 +40,7 @@ Modes: `track` (song from the arranger) and `free` (lessons, sounds, hand-writte
 
 ## Persistence keys
 
-`coding-misk-library`, `coding-misk-draft`, `coding-misk-look`, `coding-misk-ui`, `coding-misk-lang`, `coding-misk-tab`, `coding-misk-code-w` (code panel width), `coding-misk-code-collapsed`, `coding-misk-panel` (track panel view: `one` or `all`).
+`coding-misk-library`, `coding-misk-draft`, `coding-misk-look`, `coding-misk-ui`, `coding-misk-lang`, `coding-misk-tab`, `coding-misk-code-w` (code panel width), `coding-misk-code-collapsed`, `coding-misk-panel` (track panel view: `one` or `all`), `coding-misk-arr-mode` (arranger view: `sections` or `timeline`).
 
 ## Recording a demo
 

@@ -146,6 +146,20 @@
   .trk-cell.custom { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--a2) 45%, var(--panel2)) 0 6px, color-mix(in srgb, var(--a2) 20%, var(--panel2)) 6px 12px); }
   .trk-cell[aria-current="true"] { outline: 2px solid var(--ink); outline-offset: -1px; }
   .arr-grid .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); box-shadow: 0 0 8px var(--a1); left: 0; pointer-events: none; }
+  .arr-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .arr-mode .hint { font-size: 11px; color: var(--muted); flex: 1 1 260px; }
+  .tl-mode .arr-strip { gap: 0; }
+  .tl-mode .arr-scene-btn { border-radius: 0; border-right-width: 0; }
+  .tl-mode .arr-scene-btn:last-of-type { border-right-width: 1px; }
+  .tl-mode .trk-row { gap: 0; }
+  .trk-lane { position: relative; height: 28px; border-radius: 4px; cursor: copy; background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--line) 30%, transparent) 0 1px, transparent 1px calc(100% / var(--bars))), color-mix(in srgb, var(--line) 22%, transparent); }
+  .sec-line { position: absolute; top: 0; bottom: 0; width: 1px; background: color-mix(in srgb, var(--a2) 55%, transparent); pointer-events: none; }
+  .clip { position: absolute; top: 2px; bottom: 2px; min-width: 6px; padding: 0 10px 0 6px; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--a1) 70%, #000); background: color-mix(in srgb, var(--a1) 55%, var(--panel2)); color: var(--ink); font: 700 11px/1 var(--mono); text-align: left; overflow: hidden; white-space: nowrap; cursor: grab; touch-action: none; }
+  .clip.free { background: color-mix(in srgb, var(--a2) 45%, var(--panel2)); border-color: color-mix(in srgb, var(--a2) 70%, #000); }
+  .clip[aria-current="true"] { outline: 2px solid var(--ink); outline-offset: 0; z-index: 1; }
+  .clip-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 35%, transparent)); }
+  .clip-ctl { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+  .clip-ctl .ctrl { width: 130px; }
   .tk-add { display: inline-flex; gap: 6px; align-items: center; }
   .tk-add select { width: auto; }
   .track-panel { display: grid; gap: 14px; }
