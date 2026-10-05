@@ -399,7 +399,7 @@ function renderCells(total) {
 // vista timeline: clip liberi su una corsia continua, larghezza proporzionale alle battute
 const clipLabel = c => esc(c.pattern) + (c.set ? '*' : '');
 function renderTimeline(total) {
-  const st = starts(), minW = `calc(var(--trk-col) + ${total * 18}px)`;
+  const st = starts(), minW = `calc(var(--trk-col) + ${total * 10}px)`;
   $('#arr-strip').style.gridTemplateColumns = `var(--trk-col) ${T.sections.map(s => `minmax(0, ${s.bars}fr)`).join(' ')}`;
   $('#arr-strip').style.minWidth = $('#arr-grid').style.minWidth = minW;
   $('#arr-strip').innerHTML = `<span class="arr-corner">${t('sections')}</span>` + T.sections.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" aria-current="${i === sel}">

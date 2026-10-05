@@ -1,0 +1,388 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "cavo-scoperto",
+  "title": "Cavo Scoperto",
+  "look": "edgerunners",
+  "style": {
+    "en": "Dark electro techno · F# phrygian, then G in the second drop · 126 BPM · two hooks in call and response, a glitch code track, an arpeggio that enters mid-build",
+    "it": "Electro techno scura · Fa# frigio, poi Sol nel secondo drop · 126 BPM · due hook a botta e risposta, una traccia di codice glitch, un arpeggio che entra a metà build"
+  },
+  "sections": [
+    {
+      "name": "Corrente",
+      "bars": 8,
+      "bpm": 126,
+      "key": "F#",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Tensione",
+      "bars": 8,
+      "bpm": 126,
+      "key": "F#",
+      "chords": "tensione",
+      "meter": "4/4",
+      "breath": true
+    },
+    {
+      "name": "Scarica",
+      "bars": 16,
+      "bpm": 126,
+      "key": "F#",
+      "chords": "tensione",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Blackout",
+      "bars": 8,
+      "bpm": 126,
+      "key": "F#",
+      "chords": "drone",
+      "meter": "4/4",
+      "fade": 2
+    },
+    {
+      "name": "Scarica 2",
+      "bars": 16,
+      "bpm": 126,
+      "key": "G",
+      "chords": "frigio",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Fusibile",
+      "bars": 4,
+      "bpm": 126,
+      "key": "G",
+      "chords": "drone",
+      "meter": "4/4",
+      "fade": 1
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.8,
+        "drive": 1.2
+      },
+      "patterns": {
+        "pulse": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "..x...x...x...x."
+          }
+        },
+        "build": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "drop": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "xx.xxx.xxx.xxx.x",
+            "oh": "..x...x...x...x."
+          }
+        },
+        "last": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Corrente",
+          "pattern": "pulse"
+        },
+        {
+          "section": "Tensione",
+          "pattern": "build"
+        },
+        {
+          "section": "Scarica",
+          "pattern": "drop"
+        },
+        {
+          "section": "Scarica 2",
+          "pattern": "drop",
+          "set": {
+            "drive": 1.8
+          }
+        },
+        {
+          "section": "Fusibile",
+          "pattern": "last",
+          "set": {
+            "gainEnd": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.75,
+        "cutoff": 600,
+        "move": "lento",
+        "reso": 12,
+        "drive": 2.5
+      },
+      "patterns": {
+        "sub": {
+          "preset": "sub"
+        },
+        "wire": {
+          "preset": "rolling",
+          "notes": "0 ~ 0 3 ~ 0 3 ~ 0 ~ 0 3 ~ 2 ~ 1"
+        }
+      },
+      "clips": [
+        {
+          "section": "Corrente",
+          "pattern": "sub",
+          "set": {
+            "gain": 0.6
+          }
+        },
+        {
+          "section": "Tensione",
+          "pattern": "wire",
+          "set": {
+            "cutoff": 400,
+            "cutoffEnd": 900
+          }
+        },
+        {
+          "section": "Scarica",
+          "pattern": "wire"
+        },
+        {
+          "section": "Scarica 2",
+          "pattern": "wire",
+          "set": {
+            "cutoff": 800
+          }
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "name": "Arp",
+      "type": "arp",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.4,
+        "cutoff": 900,
+        "move": "fisso",
+        "reso": 6,
+        "delay": 0
+      },
+      "rack": [
+        {
+          "device": "delay",
+          "amount": 0.3,
+          "time": 0.1875,
+          "feedback": 0.4
+        }
+      ],
+      "patterns": {
+        "climb": {
+          "preset": "su",
+          "speed": "16",
+          "notes": "0 2 3 2 0 2 3 1"
+        }
+      },
+      "clips": [
+        {
+          "start": 12,
+          "bars": 4,
+          "pattern": "climb",
+          "set": {
+            "cutoffEnd": 3200
+          }
+        },
+        {
+          "section": "Blackout",
+          "pattern": "climb",
+          "set": {
+            "cutoff": 1400,
+            "gain": 0.35
+          }
+        }
+      ]
+    },
+    {
+      "id": "lead",
+      "name": "Lead",
+      "type": "hook",
+      "settings": {
+        "mode": "phrygian",
+        "octave": "4",
+        "wave": "gm_lead_2_sawtooth",
+        "gain": 1.0,
+        "cutoff": 3200,
+        "move": "fisso",
+        "delay": 0,
+        "drive": 1
+      },
+      "rack": [
+        {
+          "device": "delay",
+          "amount": 0.35,
+          "time": 0.1875,
+          "feedback": 0.45
+        },
+        {
+          "device": "reverb",
+          "amount": 0.25,
+          "size": 0.5
+        }
+      ],
+      "patterns": {
+        "call": {
+          "notes": "<[0 ~ 1 ~ 0 ~ ~ ~] [0 ~ 1 ~ 3 ~ 1 0]>"
+        }
+      },
+      "clips": [
+        {
+          "section": "Scarica",
+          "pattern": "call"
+        },
+        {
+          "start": 36,
+          "bars": 4,
+          "pattern": "call",
+          "set": {
+            "gain": 0.3
+          }
+        },
+        {
+          "section": "Scarica 2",
+          "pattern": "call"
+        }
+      ]
+    },
+    {
+      "id": "answer",
+      "name": "Answer",
+      "type": "hook",
+      "settings": {
+        "mode": "phrygian",
+        "octave": "5",
+        "wave": "square",
+        "gain": 0.5,
+        "cutoff": 2600,
+        "move": "fisso",
+        "delay": 0,
+        "drive": 0
+      },
+      "rack": [
+        {
+          "device": "crush",
+          "bits": 8
+        },
+        {
+          "device": "pan",
+          "motion": "slow"
+        }
+      ],
+      "patterns": {
+        "reply": {
+          "notes": "<[~ ~ ~ ~ ~ 4 ~ 3] [~ ~ ~ ~ 6 ~ 4 ~]>"
+        }
+      },
+      "clips": [
+        {
+          "start": 24,
+          "bars": 8,
+          "pattern": "reply"
+        },
+        {
+          "section": "Scarica 2",
+          "pattern": "reply"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "gm_synth_strings_1",
+        "gain": 0.35,
+        "cutoff": 2200,
+        "room": 0.9
+      },
+      "patterns": {
+        "hold": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Blackout",
+          "pattern": "hold"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.25,
+        "bars": "4",
+        "dir": "up"
+      },
+      "patterns": {
+        "up": {}
+      },
+      "clips": [
+        {
+          "start": 12,
+          "bars": 4,
+          "pattern": "up"
+        },
+        {
+          "start": 36,
+          "bars": 4,
+          "pattern": "up"
+        }
+      ]
+    },
+    {
+      "id": "glitch",
+      "name": "Glitch",
+      "type": "code",
+      "settings": {
+        "visual": "fx"
+      },
+      "patterns": {
+        "sparks": {
+          "code": "s(\"glitch*8\").n(irand(8)).gain(.3).hpf(1500).degradeBy(.45).pan(rand)"
+        }
+      },
+      "clips": [
+        {
+          "section": "Corrente",
+          "pattern": "sparks"
+        },
+        {
+          "section": "Fusibile",
+          "pattern": "sparks"
+        }
+      ]
+    }
+  ]
+}

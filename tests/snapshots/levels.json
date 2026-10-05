@@ -1384,5 +1384,140 @@
     "guitar": 0.15
    }
   }
+ ],
+ "cavo-scoperto": [
+  {
+   "name": "Corrente",
+   "levels": {
+    "bass": 0.49,
+    "kick": 0.47,
+    "hats": 0.33,
+    "fx": 0.05
+   }
+  },
+  {
+   "name": "Tensione",
+   "levels": {
+    "bass": 0.45,
+    "kick": 0.47,
+    "hats": 0.34,
+    "snare": 0.44
+   }
+  },
+  {
+   "name": "Scarica",
+   "levels": {
+    "bass": 0.45,
+    "kick": 0.47,
+    "hats": 0.38,
+    "snare": 0.43,
+    "hook": 0.29
+   }
+  },
+  {
+   "name": "Blackout",
+   "levels": {
+    "bass": 0.41,
+    "kick": 0.4,
+    "hats": 0.28,
+    "fx": 0.04,
+    "snare": 0.36,
+    "hook": 0.19,
+    "arp": 0.08,
+    "pad": 0.12
+   }
+  },
+  {
+   "name": "Scarica 2",
+   "levels": {
+    "bass": 0.45,
+    "kick": 0.48,
+    "hats": 0.48,
+    "fx": 0.06,
+    "snare": 0.46,
+    "hook": 0.38,
+    "pad": 0.05
+   }
+  },
+  {
+   "name": "Fusibile",
+   "levels": {
+    "bass": 0.38,
+    "kick": 0.74,
+    "hats": 0.33,
+    "fx": 0.23,
+    "snare": 0.36,
+    "hook": 0.16
+   }
+  }
+ ],
+ "ruggine-lenta": [
+  {
+   "name": "Polvere",
+   "levels": {
+    "arp": 0.23
+   }
+  },
+  {
+   "name": "Strofa",
+   "levels": {
+    "bass": 0.35,
+    "kick": 0.55,
+    "hats": 0.24,
+    "fx": 0.03,
+    "snare": 0.38,
+    "arp": 0.3
+   }
+  },
+  {
+   "name": "Muro",
+   "levels": {
+    "bass": 0.35,
+    "kick": 0.55,
+    "hats": 0.39,
+    "fx": 0.1,
+    "snare": 0.4,
+    "guitar": 0.41
+   }
+  },
+  {
+   "name": "Vuoto",
+   "levels": {
+    "bass": 0.26,
+    "kick": 0.37,
+    "hats": 0.27,
+    "fx": 0.08,
+    "snare": 0.25,
+    "arp": 0.19,
+    "pad": 0.05,
+    "guitar": 0.51
+   }
+  },
+  {
+   "name": "Muro 2",
+   "levels": {
+    "bass": 0.33,
+    "kick": 0.54,
+    "hats": 0.24,
+    "fx": 0.06,
+    "snare": 0.19,
+    "arp": 0.15,
+    "pad": 0.22,
+    "guitar": 0.4
+   }
+  },
+  {
+   "name": "Coda",
+   "levels": {
+    "bass": 0.26,
+    "kick": 0.54,
+    "hats": 0.35,
+    "fx": 0.08,
+    "snare": 0.38,
+    "hook": 0.09,
+    "arp": 0.13,
+    "guitar": 0.54
+   }
+  }
  ]
 }

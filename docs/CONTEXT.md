@@ -46,13 +46,17 @@ Original request: "create a project `coding-misk`, take inspiration from Switch 
 
 ## Built-in songs (`songs/`)
 
-JSON songs (format v2), in library order (`songs/index.json`): Segnale nel rumore (the free-form piece, D dorian, 7/8), Luci Rosse (dark club), DCI Jingle carica, Insert Coin (90s arcade), Circuito Ruggine (industrial techno with guitars), Ferro, Ali di cenere, Drift, Neon Rush reel, Settimo Cielo (prog rock 7/8, 5/4), Pioggia sul vetro (lo-fi), Ghost Protocol, Neon Ascent, Ten Years rebuild, Next Chapter, DCI rebuild, DCI Ignition, Synth Lab Demo. Examples for the guide: `songs/examples/`. Hand-written originals: `patterns/05-neon-ascent.js`, `patterns/06-ghost-protocol.js`.
+JSON songs (format v2), in library order (`songs/index.json`): Cavo Scoperto (dark electro techno, two hooks in call and response, glitch code track), Ruggine Lenta (slow trip-hop, clean guitar arpeggio, guitar wall, flute), both written directly in the v2 format, Segnale nel rumore (the free-form piece, D dorian, 7/8), Luci Rosse (dark club), DCI Jingle carica, Insert Coin (90s arcade), Circuito Ruggine (industrial techno with guitars), Ferro, Ali di cenere, Drift, Neon Rush reel, Settimo Cielo (prog rock 7/8, 5/4), Pioggia sul vetro (lo-fi), Ghost Protocol, Neon Ascent, Ten Years rebuild, Next Chapter, DCI rebuild, DCI Ignition, Synth Lab Demo. Examples for the guide: `songs/examples/`. Hand-written originals: `patterns/05-neon-ascent.js`, `patterns/06-ghost-protocol.js`.
 
 ## Backlog (GitHub issues)
 
 - `#1` Edgerunners visual and `#2` Hardware interface theme: done, closed.
 - `#3` Vocals, `#4` Recreate a live-coded track, `#5` Background music for short videos, `#6` Moods and presets, `#7` More genres, `#8` Faster than real-time audio export: open.
 - Tracks rework (plan in `docs/PLAN-TRACKS.md`), one issue per phase: `#9` Safety net, `#10` Own rhythm for every instrument, `#11` Song format v2, `#12` Arrangement grid with free tracks, `#13` Effect rack and code tracks, `#14` Free timeline mode.
+
+## Ideas to re-evaluate (lowest priority)
+
+- **Shared patterns across tracks.** Today patterns belong to one track and are reused across its sections and clips. A song-level library could share rhythms (steps) and melodies (degree notes) between melodic tracks, for example bass and guitar in unison; drum rows would stay per track. Owner decision (2026-10-05): not now, per-track patterns are fine.
 
 ## Media and demo
 
