@@ -390,9 +390,6 @@ export const METAL_FULL = {
       guitar(s, 'held', .52, 'metal', { ...DROP, gainEnd: 0, room: .5 }); }),
   ],
 };
-export const METAL_TRACK = reelFrom(METAL_FULL, 'ferro-reel', 'Ferro · reel 30s',
-  { it: 'Reel da 30 s estratto da Ferro: parte dal ritornello, breakdown, ritornello, accordo finale', en: '30 s reel cut from Ferro: chorus, breakdown, chorus, final chord' },
-  [['Ritornello', 8], ['Breakdown', 6, { breath: true }], ['Ritornello 2', 5, { fill: true }], ['Fine', 1]]);
 
 // ---------- metal melodico: Ali di cenere ----------
 // Si minore, 150 BPM. Chitarre gemelle a terze, galoppo, ritornello con aperture e coro, ultimo ritornello un semitono sopra.
@@ -429,9 +426,6 @@ export const MELODIC_METAL_FULL = {
       choir(s, .3); s.pad.gainEnd = 0; }),
   ],
 };
-export const MELODIC_METAL_TRACK = reelFrom(MELODIC_METAL_FULL, 'ali-di-cenere-reel', 'Ali di cenere · reel 30s',
-  { it: 'Reel da 30 s estratto da Ali di cenere: ritornello, assolo, ritornello finale un semitono sopra, coda', en: '30 s reel cut from Ali di cenere: chorus, solo, last chorus a semitone up, coda' },
-  [['Ritornello', 8], ['Assolo', 4, { fill: true }], ['Ritornello finale', 6], ['Coda', 1]]);
 
 // ---------- phonk: Drift ----------
 // Fa# minore, 128 BPM. Cowbell 808, basso 808 distorto, hi-hat a sedicesimi, coro, vinile.
@@ -461,9 +455,6 @@ export const PHONK_FULL = {
     makeScene('Colpo', 1, { crash: true }, s => { phonkKey(s); only(s, ['bass', 'hook']); bass808(s, .8, 5); s.bass.gainEnd = 0; cowbell(s, .4, { gainEnd: 0, delay: .5 }); }),
   ],
 };
-export const PHONK_TRACK = reelFrom(PHONK_FULL, 'drift-reel', 'Drift · phonk reel 30s',
-  { it: 'Reel da 30 s estratto da Drift: drop, break, drop più duro, colpo finale', en: '30 s reel cut from Drift: drop, break, harder drop, final hit' },
-  [['Drop', 8], ['Break', 2, { breath: true, fill: true }], ['Drop 2', 5], ['Colpo', 1]]);
 
 // ---------- Circuito Ruggine: techno industrial cyberpunk con chitarre ----------
 // 132 BPM, Mi frigio poi Fa. Groove techno saturo, chitarre accordate un tono sotto con riff stomp e industrial.
@@ -645,4 +636,4 @@ export const SOUL_TRACK = {
   ],
 };
 
-export const BUILTIN_TRACKS = [SOUL_TRACK, CLUB_TRACK, DCI_CHARGED_TRACK, ARCADE_TRACK, RUST_TRACK, METAL_TRACK, MELODIC_METAL_TRACK, PHONK_TRACK, METAL_FULL, MELODIC_METAL_FULL, PHONK_FULL, NEON_RUSH_TRACK, PROG_TRACK, LOFI_TRACK, GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];
+export const BUILTIN_TRACKS = [SOUL_TRACK, CLUB_TRACK, DCI_CHARGED_TRACK, ARCADE_TRACK, RUST_TRACK, METAL_FULL, MELODIC_METAL_FULL, PHONK_FULL, NEON_RUSH_TRACK, PROG_TRACK, LOFI_TRACK, GHOST_TRACK, NEON_TRACK, TEN_YEARS_TRACK, NEXT_CHAPTER_TRACK, DCI_TRACK, DCI_IGNITION_TRACK, DEMO_TRACK];

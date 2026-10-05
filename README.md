@@ -32,7 +32,7 @@ This project combines that idea with what the new models can do, with my own twi
 - **Channels.** Drum sequencer with several drum machines, bass with riffs, guitar (clean, crunch, distorted, metal, palm muted) with riffs and stereo double tracking, arpeggio, hook with harmonies and dark modes, pad, texture (voices, metal hits, vinyl) and riser. Every channel can use oscillators or General MIDI instruments.
 - **Automation.** Volume, filter and tempo can move from the start to the end of a scene. Drive, bitcrusher, resonance, FM and vowel filter are available too.
 - **Player.** Clickable timeline, start from any bar, buttons to hear each transition between sections, section loop, pause and resume.
-- **Included tracks.** About twenty tracks across genres: techno, trance, hard techno, industrial, dark club, metal, melodic metal, phonk, progressive rock, lo-fi and 90s arcade, plus 30 second reels cut from the full tracks.
+- **Included tracks.** About twenty tracks across genres: techno, trance, hard techno, industrial, dark club, metal, melodic metal, phonk, progressive rock, lo-fi and 90s arcade, plus a 30 second reel.
 - **Visuals.** Seven canvas themes (Stage, Pixel, Sunset, Mountains, Space, Sonar, Edgerunners). Each instrument has its own audio analyser, so on the Stage the drums, bass, guitar, keys and FX light up when they play.
 - **Hardware interface theme.** Switch from neon to hardware: knobs instead of sliders, small amber displays, power and activity LEDs on every channel, anodized panels.
 - **WAV export.** Records the track in real time from Strudel's output and downloads a stereo WAV.
@@ -100,3 +100,7 @@ Put WAV, MP3, OGG or FLAC files in `public/samples/`: one folder per instrument 
 - Tempo ramps, starting from a bar and the extra samples only work in coding-misk, not on strudel.cc.
 - Saved tracks and the current draft live in the browser's `localStorage`. Clearing site data deletes them.
 - Strudel is licensed under AGPL-3.0. If the project is published, its code must be released under a compatible license.
+
+## License
+
+AGPL-3.0-or-later, the same license as Strudel. See [LICENSE](LICENSE).

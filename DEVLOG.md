@@ -120,6 +120,11 @@
 
 - `#3` Voci: ricerca completata, risultati in `docs/VOCALS.md`. Raccomandazione: ACE-Step 1.5 turbo (MIT, gira su Mac M4 16 GB) per generare parti cantate, estrazione della voce, Seed-VC per portarle nella voce del proprietario, effetti offline con `pedalboard`/`pyworld`, nuovo canale `vocal` nel modello a scene. Escluse per uso aziendale le licenze non commerciali (SongGeneration/LeVo, F5-TTS, XTTS-v2).
 
+## 2026-10-05
+
+- Licenza AGPL-3.0-or-later (la stessa di Strudel) in `LICENSE`, `package.json` e nei README, in vista del repository pubblico.
+- Tolti i reel da 30 s di Ferro, Ali di cenere e Drift: restano i brani interi. Tolto da `docs/CONTEXT.md` il percorso locale dei file audio di riferimento.
+
 ## Prossimo passo
 
 - In attesa di conferma del proprietario per lo spike su `#3`: installare ACE-Step 1.5 turbo e audio-separator in un venv fuori dal repo, generare una voce, ritagliare 4 chop in `public/samples/vox/`.

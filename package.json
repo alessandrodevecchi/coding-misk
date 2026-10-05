@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Synth lab locale per comporre musica con Strudel",
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

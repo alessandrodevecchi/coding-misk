@@ -39,14 +39,14 @@ Original request: "create a project `coding-misk`, take inspiration from Switch 
 - Le Castle Vania, John Wick medley (club fight reference): https://youtu.be/IBvf7KUEZ78
 - Strudel: https://strudel.cc/ (workshop, mini-notation, effects docs); source https://codeberg.org/uzu/strudel
 - TidalCycles: https://tidalcycles.org/ ; dirt-samples: https://github.com/tidalcycles/dirt-samples ; drum machines: https://github.com/ritchse/tidal-drum-machines
-- Reference audio analysed (owner's files, not in the repo): `/Users/Alessandro.Vecchi/webdev/drupalcampitaly/social/templates/sf-shared/audio/`
+- Reference audio analysed (owner's files, kept outside the repo):
   - `sf-tenyears-149s.m4a`: inspirational future pop, 92 BPM, E minor, Em Em D D C C D D, strong sidechain, 57 bars.
   - `dci-track-23s.m4a`: tech jingle, 103 BPM, F# minor with G bass (phrygian tension), staccato then syncopated stabs, 10 bars.
   - Rebuilds kept structure, tempo and harmony but not the timbre; the owner found them not very similar.
 
 ## Built-in tracks (`src/tracks.js`)
 
-Scene tracks, in library order: Segnale nel rumore (the free-form piece, D dorian, 7/8), Luci Rosse (dark club), DCI Jingle carica, Insert Coin (90s arcade), Circuito Ruggine (industrial techno with guitars), Ferro / Ali di cenere / Drift with their 30 s reels, Neon Rush reel, Settimo Cielo (prog rock 7/8, 5/4), Pioggia sul vetro (lo-fi), Ghost Protocol, Neon Ascent, Ten Years rebuild, Next Chapter, DCI rebuild, DCI Ignition, Synth Lab Demo. Hand-written originals: `patterns/05-neon-ascent.js`, `patterns/06-ghost-protocol.js`.
+Scene tracks, in library order: Segnale nel rumore (the free-form piece, D dorian, 7/8), Luci Rosse (dark club), DCI Jingle carica, Insert Coin (90s arcade), Circuito Ruggine (industrial techno with guitars), Ferro, Ali di cenere, Drift, Neon Rush reel, Settimo Cielo (prog rock 7/8, 5/4), Pioggia sul vetro (lo-fi), Ghost Protocol, Neon Ascent, Ten Years rebuild, Next Chapter, DCI rebuild, DCI Ignition, Synth Lab Demo. Hand-written originals: `patterns/05-neon-ascent.js`, `patterns/06-ghost-protocol.js`.
 
 ## Backlog (GitHub issues)
 

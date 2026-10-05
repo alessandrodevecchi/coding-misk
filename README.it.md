@@ -32,7 +32,7 @@ Questo progetto unisce quell'idea alle capacità dei nuovi modelli, con il mio t
 - **Canali.** Sequencer di batteria con varie drum machine, basso con riff, chitarra (pulita, crunch, distorta, metal, palm mute) con riff e raddoppio stereo, arpeggio, hook con armonie e modi scuri, pad, texture (voci, metalli, vinile), riser. Ogni canale può usare oscillatori o strumenti General MIDI.
 - **Automazioni.** Volume, filtro e tempo possono cambiare da inizio a fine scena. Ci sono saturazione, bitcrusher, risonanza, FM e filtro vocale.
 - **Player.** Timeline cliccabile, salto a qualsiasi battuta, pulsanti per ascoltare gli stacchi tra le sezioni, ripetizione di una sezione, pausa e ripresa.
-- **Brani inclusi.** Una ventina di brani in generi diversi: techno, trance, hard techno, industrial, club scuro, metal, metal melodico, phonk, progressive rock, lo-fi, arcade anni '90, più reel da 30 secondi ricavati dai brani interi.
+- **Brani inclusi.** Una ventina di brani in generi diversi: techno, trance, hard techno, industrial, club scuro, metal, metal melodico, phonk, progressive rock, lo-fi, arcade anni '90, più un reel da 30 secondi.
 - **Visual.** Sette temi su canvas (Palco, Pixel, Tramonto, Montagne, Spazio, Sonar, Edgerunners). Ogni strumento ha il suo analizzatore audio, così sul Palco batteria, basso, chitarra, tastiere e FX si accendono quando suonano.
 - **Tema interfaccia hardware.** Si passa da neon a hardware: manopole al posto dei cursori, piccoli display ambra, LED di accensione e di attività su ogni canale, pannelli anodizzati.
 - **Esportazione WAV.** Registra il brano in tempo reale dall'uscita di Strudel e scarica un WAV stereo.
@@ -100,3 +100,7 @@ Metti file WAV, MP3, OGG o FLAC in `public/samples/`: una cartella per strumento
 - Rampe di tempo, salto a una battuta e campioni extra funzionano solo in coding-misk, non su strudel.cc.
 - I brani salvati e la bozza in corso stanno nel `localStorage` del browser. Svuotare i dati del sito li cancella.
 - Strudel è distribuito con licenza AGPL-3.0. Se il progetto viene pubblicato, il codice va rilasciato con una licenza compatibile.
+
+## Licenza
+
+AGPL-3.0-or-later, la stessa licenza di Strudel. Vedi [LICENSE](LICENSE).
