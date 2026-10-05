@@ -2,7 +2,7 @@
 
 How to write songs as code, for humans and agents. coding-misk extends [Strudel](https://strudel.cc/) with sections, tracks and clips: you describe the song in JSON, the app compiles it to readable Strudel code and plays it. The field reference is [SONG-FORMAT.md](SONG-FORMAT.md).
 
-This guide grows with the project. Today songs are written as JSON files in `songs/` (the app lists them in the Tracks tab, under the coded tracks); the arranger will edit the same format.
+This guide grows with the project. Songs are JSON files in `songs/`; the arranger in the Compose tab edits the same format, and Save keeps your version in the browser.
 
 ## The model in one minute
 
@@ -19,7 +19,7 @@ This guide grows with the project. Today songs are written as JSON files in `son
 3. Add tracks one at a time, starting with drums and bass.
 4. Validate: `node --no-warnings tools/song.mjs validate songs/my-song.json`. Fix every error; read every warning.
 5. Look at the code: `node --no-warnings tools/song.mjs compile songs/my-song.json`.
-6. Listen in the app (`npm run dev`, Tracks tab). An agent cannot hear: measure instead (see "Checking levels").
+6. Listen in the app (`npm run dev`, pick the song in Compose or in the Tracks tab). Add new files to `songs/index.json` to set their place in the library. An agent cannot hear: measure instead (see "Checking levels").
 
 ## Example 1: first beat
 

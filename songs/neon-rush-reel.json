@@ -1,0 +1,476 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "neon-rush-reel",
+  "title": "Neon Rush · reel 28s",
+  "look": "palco",
+  "style": {
+    "it": "Techno cyberpunk ruvida per un reel · Mi frigio · 145 BPM · 28 secondi",
+    "en": "Rough cyberpunk techno for a reel · E phrygian · 145 BPM · 28 seconds"
+  },
+  "sections": [
+    {
+      "name": "Glitch",
+      "bars": 2,
+      "bpm": 145,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 3,
+      "bpm": 145,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "breath": true,
+      "fill": true
+    },
+    {
+      "name": "Drop",
+      "bars": 8,
+      "bpm": 145,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Glitch break",
+      "bars": 2,
+      "bpm": 145,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "breath": true
+    },
+    {
+      "name": "Final",
+      "bars": 1,
+      "bpm": 145,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Hit",
+      "bars": 1,
+      "bpm": 145,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.9,
+        "gainEnd": null,
+        "cutoff": 400,
+        "cutoffEnd": 2200,
+        "drive": 2.5,
+        "grit": 0.3
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x..x",
+            "hh": "x.xx.x.xx.xx.x.x",
+            "oh": "..x...x...x...x.",
+            "rd": "..x...x...x...x."
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "x.....x...x.x.xx",
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Glitch",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "B",
+          "set": {
+            "gain": 0.55,
+            "gainEnd": 0.95,
+            "cutoff": 2200,
+            "cutoffEnd": 20000
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "C",
+          "set": {
+            "cutoff": 20000,
+            "cutoffEnd": null,
+            "drive": 2.8,
+            "grit": 0.5
+          }
+        },
+        {
+          "section": "Glitch break",
+          "pattern": "D",
+          "set": {
+            "cutoff": 20000,
+            "cutoffEnd": null,
+            "drive": 3,
+            "grit": 0.95
+          }
+        },
+        {
+          "section": "Final",
+          "pattern": "C",
+          "set": {
+            "cutoff": 20000,
+            "cutoffEnd": null,
+            "drive": 3,
+            "grit": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.45,
+        "gainEnd": 0.6,
+        "cutoff": 200,
+        "cutoffEnd": 500,
+        "move": "fisso",
+        "reso": 10,
+        "drive": 3
+      },
+      "patterns": {
+        "A": {
+          "preset": "rumble"
+        },
+        "B": {
+          "preset": "sub"
+        }
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "gain": 0.6,
+            "gainEnd": null,
+            "cutoff": 500,
+            "cutoffEnd": null,
+            "drive": 4
+          }
+        },
+        {
+          "section": "Final",
+          "pattern": "A",
+          "set": {
+            "gain": 0.6,
+            "gainEnd": null,
+            "cutoff": 600,
+            "cutoffEnd": null,
+            "drive": 4
+          }
+        },
+        {
+          "section": "Hit",
+          "pattern": "B",
+          "set": {
+            "wave": "sine",
+            "gain": 0.8,
+            "gainEnd": 0,
+            "cutoff": 300,
+            "cutoffEnd": null,
+            "reso": 2,
+            "drive": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "guitar",
+      "type": "guitar",
+      "settings": {
+        "type": "metal",
+        "gain": 0.55,
+        "gainEnd": 0,
+        "cutoff": 4200,
+        "cutoffEnd": null,
+        "drive": 0,
+        "octave": "-12",
+        "width": "double",
+        "room": 0.5
+      },
+      "patterns": {
+        "A": {
+          "preset": "held"
+        }
+      },
+      "clips": [
+        {
+          "section": "Hit",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.3,
+        "gainEnd": null,
+        "cutoff": 300,
+        "cutoffEnd": 900,
+        "move": "fisso",
+        "reso": 22,
+        "delay": 0,
+        "drive": 1.5
+      },
+      "patterns": {
+        "A": {
+          "preset": "acid",
+          "speed": "8"
+        }
+      },
+      "clips": [
+        {
+          "section": "Glitch",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "A",
+          "set": {
+            "gain": 0.32,
+            "cutoff": 900,
+            "cutoffEnd": 3200,
+            "drive": 1.6
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "gain": 0.34,
+            "cutoff": 1600,
+            "cutoffEnd": 4500,
+            "reso": 24,
+            "drive": 2
+          }
+        },
+        {
+          "section": "Glitch break",
+          "pattern": "A",
+          "set": {
+            "gain": 0.34,
+            "cutoff": 3000,
+            "cutoffEnd": 500,
+            "reso": 20,
+            "drive": 2
+          }
+        },
+        {
+          "section": "Final",
+          "pattern": "A",
+          "set": {
+            "gain": 0.34,
+            "cutoff": 4500,
+            "cutoffEnd": null,
+            "reso": 20,
+            "drive": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.22,
+        "gainEnd": null,
+        "cutoff": 3500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.45,
+        "mode": "phrygian",
+        "fm": 5,
+        "vowel": "<a e i o>",
+        "grit": 0.6,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "cyber"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "A"
+        },
+        {
+          "section": "Final",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.3,
+        "gainEnd": null,
+        "cutoff": 3200,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.3,
+        "drive": 1.5
+      },
+      "patterns": {
+        "A": {
+          "preset": "stab"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "A"
+        },
+        {
+          "section": "Final",
+          "pattern": "A",
+          "set": {
+            "gain": 0.32,
+            "cutoff": 3600
+          }
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "type": "texture",
+      "settings": {
+        "sample": "numbers",
+        "gain": 0.55,
+        "gainEnd": null,
+        "grit": 0.95,
+        "room": 0.5
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "bar"
+        },
+        "B": {
+          "rhythm": "eighth"
+        },
+        "C": {
+          "rhythm": "euclid"
+        },
+        "D": {
+          "rhythm": "sixteenth"
+        }
+      },
+      "clips": [
+        {
+          "section": "Glitch",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "B",
+          "set": {
+            "sample": "industrial",
+            "gain": 0.25,
+            "grit": 0.8,
+            "room": 0.6
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "C",
+          "set": {
+            "sample": "metal",
+            "gain": 0.3,
+            "grit": 0.8,
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Glitch break",
+          "pattern": "D",
+          "set": {
+            "gain": 0.3,
+            "room": 0.6
+          }
+        },
+        {
+          "section": "Hit",
+          "pattern": "A",
+          "set": {
+            "gain": 0.5,
+            "room": 0.9
+          }
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.42,
+        "bars": "4",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Glitch break",
+          "pattern": "A",
+          "set": {
+            "gain": 0.45,
+            "bars": "2"
+          }
+        }
+      ]
+    }
+  ]
+}

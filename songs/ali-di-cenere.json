@@ -1,0 +1,492 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "ali-di-cenere",
+  "title": "Ali di cenere",
+  "look": "montagne",
+  "style": {
+    "it": "Metal melodico · Si minore, finale in Do · 150 BPM · brano intero",
+    "en": "Melodic metal · B minor, last chorus in C · 150 BPM · full track"
+  },
+  "sections": [
+    {
+      "name": "Arpeggio",
+      "bars": 4,
+      "bpm": 150,
+      "key": "B",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Tema",
+      "bars": 8,
+      "bpm": 150,
+      "key": "B",
+      "chords": "epica",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Strofa",
+      "bars": 8,
+      "bpm": 150,
+      "key": "B",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Pre",
+      "bars": 4,
+      "bpm": 150,
+      "key": "B",
+      "chords": "epica",
+      "meter": "4/4",
+      "breath": true,
+      "fill": true
+    },
+    {
+      "name": "Ritornello",
+      "bars": 8,
+      "bpm": 150,
+      "key": "B",
+      "chords": "epica",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Assolo",
+      "bars": 8,
+      "bpm": 150,
+      "key": "B",
+      "chords": "epica",
+      "meter": "4/4",
+      "fill": true
+    },
+    {
+      "name": "Ritornello finale",
+      "bars": 8,
+      "bpm": 150,
+      "key": "C",
+      "chords": "epica",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Coda",
+      "bars": 2,
+      "bpm": 150,
+      "key": "C",
+      "chords": "epica",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "AkaiXR10",
+        "gain": 0.95,
+        "gainEnd": null,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 0.8,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x.xxx.xxx.xxx.xx",
+            "sd": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x.x.....x.x.....",
+            "sd": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "xxxxxxxxxxxxxxxx",
+            "sd": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Tema",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa",
+          "pattern": "B"
+        },
+        {
+          "section": "Pre",
+          "pattern": "A"
+        },
+        {
+          "section": "Ritornello",
+          "pattern": "C"
+        },
+        {
+          "section": "Assolo",
+          "pattern": "A"
+        },
+        {
+          "section": "Ritornello finale",
+          "pattern": "C"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "gm_electric_bass_pick",
+        "gain": 0.55,
+        "gainEnd": null,
+        "cutoff": 1500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 1,
+        "drive": 2
+      },
+      "patterns": {
+        "A": {
+          "preset": "ottavi"
+        },
+        "B": {
+          "preset": "sub"
+        }
+      },
+      "clips": [
+        {
+          "section": "Tema",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa",
+          "pattern": "A"
+        },
+        {
+          "section": "Pre",
+          "pattern": "A"
+        },
+        {
+          "section": "Ritornello",
+          "pattern": "A"
+        },
+        {
+          "section": "Assolo",
+          "pattern": "A"
+        },
+        {
+          "section": "Ritornello finale",
+          "pattern": "A"
+        },
+        {
+          "section": "Coda",
+          "pattern": "B",
+          "set": {
+            "gain": 0.6,
+            "gainEnd": 0,
+            "drive": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "guitar",
+      "type": "guitar",
+      "settings": {
+        "type": "clean",
+        "gain": 0.3,
+        "gainEnd": null,
+        "cutoff": 4200,
+        "cutoffEnd": null,
+        "drive": 0,
+        "octave": "0",
+        "width": "mono",
+        "room": 0.6
+      },
+      "patterns": {
+        "A": {
+          "preset": "held"
+        },
+        "B": {
+          "preset": "gallopRiff"
+        },
+        "C": {
+          "preset": "groove"
+        },
+        "D": {
+          "preset": "power8"
+        },
+        "E": {
+          "preset": "heroic"
+        },
+        "F": {
+          "preset": "chug"
+        }
+      },
+      "clips": [
+        {
+          "section": "Arpeggio",
+          "pattern": "A"
+        },
+        {
+          "section": "Tema",
+          "pattern": "B",
+          "set": {
+            "type": "distorted",
+            "gain": 0.62,
+            "width": "double",
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Strofa",
+          "pattern": "C",
+          "set": {
+            "type": "muted",
+            "gain": 0.55,
+            "width": "double",
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Pre",
+          "pattern": "D",
+          "set": {
+            "type": "distorted",
+            "gain": 0.62,
+            "width": "double",
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Ritornello",
+          "pattern": "E",
+          "set": {
+            "type": "distorted",
+            "gain": 0.7,
+            "width": "double",
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Assolo",
+          "pattern": "F",
+          "set": {
+            "type": "muted",
+            "gain": 0.55,
+            "width": "double",
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Ritornello finale",
+          "pattern": "E",
+          "set": {
+            "type": "distorted",
+            "gain": 0.72,
+            "width": "double",
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Coda",
+          "pattern": "A",
+          "set": {
+            "type": "distorted",
+            "gain": 0.72,
+            "gainEnd": 0,
+            "width": "double",
+            "room": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "gm_electric_guitar_clean",
+        "gain": 0.4,
+        "gainEnd": null,
+        "cutoff": 5000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 1,
+        "delay": 0.3,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "sugiu",
+          "speed": "8"
+        }
+      },
+      "clips": [
+        {
+          "section": "Arpeggio",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "gm_distortion_guitar,sawtooth",
+        "gain": 0.13,
+        "gainEnd": null,
+        "cutoff": 4500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.2,
+        "mode": "minor",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 2.5,
+        "harmony": "2",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "eroico"
+        },
+        "B": {
+          "preset": "orizzonte"
+        },
+        "C": {
+          "preset": "assolo"
+        }
+      },
+      "clips": [
+        {
+          "section": "Tema",
+          "pattern": "A"
+        },
+        {
+          "section": "Ritornello",
+          "pattern": "B",
+          "set": {
+            "gain": 0.14
+          }
+        },
+        {
+          "section": "Assolo",
+          "pattern": "C",
+          "set": {
+            "gain": 0.18,
+            "cutoff": 5500,
+            "delay": 0.3,
+            "harmony": ""
+          }
+        },
+        {
+          "section": "Ritornello finale",
+          "pattern": "B",
+          "set": {
+            "gain": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "gm_string_ensemble_1",
+        "gain": 0.1,
+        "gainEnd": 0.3,
+        "cutoff": 3500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.7,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Arpeggio",
+          "pattern": "A"
+        },
+        {
+          "section": "Tema",
+          "pattern": "A",
+          "set": {
+            "gain": 0.18,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Strofa",
+          "pattern": "A",
+          "set": {
+            "gain": 0.14,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Ritornello",
+          "pattern": "A",
+          "set": {
+            "wave": "gm_choir_aahs",
+            "gain": 0.24,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Ritornello finale",
+          "pattern": "A",
+          "set": {
+            "wave": "gm_choir_aahs",
+            "gain": 0.28,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Coda",
+          "pattern": "A",
+          "set": {
+            "wave": "gm_choir_aahs",
+            "gain": 0.3,
+            "gainEnd": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.32,
+        "bars": "4",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Pre",
+          "pattern": "A"
+        }
+      ]
+    }
+  ]
+}

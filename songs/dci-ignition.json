@@ -1,0 +1,396 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "dci-ignition",
+  "title": "DCI Ignition",
+  "look": "palco",
+  "style": {
+    "it": "Nuovo jingle nello stile DCI · tech · Fa# frigio, sezione in Sol · 106 BPM",
+    "en": "New jingle in the DCI style · tech · F# phrygian, section in G · 106 BPM"
+  },
+  "sections": [
+    {
+      "name": "Stab",
+      "bars": 4,
+      "bpm": 106,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 4,
+      "bpm": 106,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "breath": true,
+      "fill": true
+    },
+    {
+      "name": "Drop",
+      "bars": 8,
+      "bpm": 106,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Switch",
+      "bars": 4,
+      "bpm": 106,
+      "key": "G",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "fade": 1
+    },
+    {
+      "name": "Drop 2",
+      "bars": 6,
+      "bpm": 106,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Coda",
+      "bars": 2,
+      "bpm": 106,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.3,
+        "gainEnd": 0.9,
+        "cutoff": 600,
+        "cutoffEnd": 20000,
+        "drive": 0.6,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x.",
+            "oh": "..x...x...x...x."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x.........x.....",
+            "cp": "........x.......",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x..x",
+            "hh": "x.xx.x.xx.xx.x.x",
+            "oh": "..x...x...x...x.",
+            "rd": "..x...x...x...x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "B",
+          "set": {
+            "gain": 0.9,
+            "gainEnd": null,
+            "cutoff": 20000,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Switch",
+          "pattern": "C",
+          "set": {
+            "gain": 0.9,
+            "gainEnd": null,
+            "cutoff": 20000,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "D",
+          "set": {
+            "gain": 0.9,
+            "gainEnd": null,
+            "cutoff": 20000,
+            "cutoffEnd": null,
+            "drive": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.4,
+        "gainEnd": 0.6,
+        "cutoff": 500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 6,
+        "drive": 1
+      },
+      "patterns": {
+        "A": {
+          "preset": "offbeat"
+        },
+        "B": {
+          "preset": "sub"
+        }
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "gain": 0.6,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Switch",
+          "pattern": "B",
+          "set": {
+            "wave": "sine",
+            "gain": 0.5,
+            "gainEnd": null,
+            "cutoff": 400,
+            "reso": 2,
+            "drive": 0
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.65,
+            "gainEnd": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.14,
+        "gainEnd": null,
+        "cutoff": 1400,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.25,
+        "mode": "phrygian",
+        "fm": 1,
+        "vowel": "",
+        "grit": 0,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "scintilla"
+        }
+      },
+      "clips": [
+        {
+          "section": "Stab",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "gain": 0.24,
+            "cutoff": 3600
+          }
+        },
+        {
+          "section": "Switch",
+          "pattern": "A",
+          "set": {
+            "gain": 0.22,
+            "cutoff": 2600,
+            "delay": 0.5
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.26,
+            "cutoff": 3600,
+            "fm": 2
+          }
+        },
+        {
+          "section": "Coda",
+          "pattern": "A",
+          "set": {
+            "gain": 0.18,
+            "gainEnd": 0,
+            "cutoff": 2400,
+            "delay": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.32,
+        "gainEnd": null,
+        "cutoff": 2400,
+        "cutoffEnd": 3600,
+        "move": "fisso",
+        "room": 0.25,
+        "drive": 0.6
+      },
+      "patterns": {
+        "A": {
+          "preset": "staccato"
+        },
+        "B": {
+          "preset": "synco"
+        },
+        "C": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Stab",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "A",
+          "set": {
+            "gain": 0.36,
+            "cutoff": 3600,
+            "cutoffEnd": 5200
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "B",
+          "set": {
+            "gain": 0.4,
+            "cutoff": 4200,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Switch",
+          "pattern": "C",
+          "set": {
+            "gain": 0.3,
+            "cutoff": 2000,
+            "cutoffEnd": 3200,
+            "room": 0.7
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "B",
+          "set": {
+            "gain": 0.42,
+            "cutoff": 4800,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Coda",
+          "pattern": "C",
+          "set": {
+            "gain": 0.35,
+            "gainEnd": 0,
+            "cutoff": 3200,
+            "cutoffEnd": 700,
+            "room": 0.9,
+            "drive": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "type": "texture",
+      "settings": {
+        "sample": "metal",
+        "gain": 0.25,
+        "gainEnd": null,
+        "grit": 0.5,
+        "room": 0.3
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "euclid"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop 2",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.4,
+        "bars": "4",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        }
+      ]
+    }
+  ]
+}

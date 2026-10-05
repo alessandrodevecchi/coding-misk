@@ -1324,5 +1324,65 @@
     "kick": 0.9
    }
   }
+ ],
+ "example-first-beat": [
+  {
+   "name": "Loop",
+   "levels": {
+    "kick": 0.6,
+    "hats": 0.29,
+    "snare": 0.49
+   }
+  }
+ ],
+ "example-bass-and-chords": [
+  {
+   "name": "Verse",
+   "levels": {
+    "kick": 0.43,
+    "hats": 0.24,
+    "snare": 0.66,
+    "bass": 0.3
+   }
+  },
+  {
+   "name": "Chorus",
+   "levels": {
+    "kick": 0.43,
+    "hats": 0.37,
+    "snare": 0.67,
+    "bass": 0.31,
+    "pad": 0.18
+   }
+  }
+ ],
+ "example-night-shift": [
+  {
+   "name": "Intro",
+   "levels": {
+    "kick": 0.48,
+    "hats": 0.34,
+    "fx": 0.05
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "kick": 0.71,
+    "hats": 0.48,
+    "snare": 0.44,
+    "bass": 0.57,
+    "fx": 0.03,
+    "guitar": 0.43
+   }
+  },
+  {
+   "name": "Outro",
+   "levels": {
+    "kick": 0.48,
+    "fx": 0.06,
+    "guitar": 0.15
+   }
+  }
  ]
 }

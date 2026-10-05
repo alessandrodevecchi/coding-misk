@@ -46,7 +46,8 @@ function patternOf(type, ch) {
 const settingsOf = (type, ch) => Object.fromEntries(SETTING_FIELDS[type].map(k => [k, ch[k] ?? null]));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-// v1 track (scenes with a full state each) → v2 song. Lossless: compiles to the same layers.
+// v1 track (scenes with a full state each, as saved by older versions of the app) → v2 song.
+// Lossless: it compiles to the same layers as the scene compiler did.
 export function fromScenes(track) {
   const scenes = track.scenes.map(s => ({ ...s, state: normalizeState(s.state) }));
   const sections = scenes.map(s => {

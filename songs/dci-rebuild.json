@@ -1,0 +1,192 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "dci-rebuild",
+  "title": "DCI Jingle · ricostruzione",
+  "look": "palco",
+  "style": {
+    "it": "Ricostruita da dci-track-23s.m4a · jingle tech · Fa# minore · 103 BPM · stab sincopati",
+    "en": "Rebuilt from dci-track-23s.m4a · tech jingle · F# minor · 103 BPM · syncopated stabs"
+  },
+  "sections": [
+    {
+      "name": "Stab",
+      "bars": 2,
+      "bpm": 103,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 2,
+      "bpm": 103,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "breath": true,
+      "fill": true
+    },
+    {
+      "name": "Drop",
+      "bars": 5,
+      "bpm": 103,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Coda",
+      "bars": 1,
+      "bpm": 103,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.2,
+        "gainEnd": 0.85,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 0.6,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "B",
+          "set": {
+            "gain": 0.9,
+            "gainEnd": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.6,
+        "gainEnd": null,
+        "cutoff": 500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 6,
+        "drive": 1
+      },
+      "patterns": {
+        "A": {
+          "preset": "offbeat"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.35,
+        "gainEnd": null,
+        "cutoff": 3000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.25,
+        "drive": 0.6
+      },
+      "patterns": {
+        "A": {
+          "preset": "staccato"
+        },
+        "B": {
+          "preset": "synco"
+        },
+        "C": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Stab",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "A",
+          "set": {
+            "gainEnd": 0.45,
+            "cutoffEnd": 5000
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "B",
+          "set": {
+            "gain": 0.4,
+            "cutoff": 4000
+          }
+        },
+        {
+          "section": "Coda",
+          "pattern": "C",
+          "set": {
+            "gainEnd": 0,
+            "cutoffEnd": 800,
+            "room": 0.9,
+            "drive": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.4,
+        "bars": "2",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        }
+      ]
+    }
+  ]
+}

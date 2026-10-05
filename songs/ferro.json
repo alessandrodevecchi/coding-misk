@@ -1,0 +1,528 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "ferro",
+  "title": "Ferro",
+  "look": "palco",
+  "style": {
+    "it": "Metal · Mi frigio un tono sotto · 160 BPM · brano intero",
+    "en": "Metal · E phrygian one step down · 160 BPM · full track"
+  },
+  "sections": [
+    {
+      "name": "Feedback",
+      "bars": 2,
+      "bpm": 160,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4",
+      "breath": true
+    },
+    {
+      "name": "Riff",
+      "bars": 8,
+      "bpm": 160,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Strofa",
+      "bars": 8,
+      "bpm": 160,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4"
+    },
+    {
+      "name": "Pre",
+      "bars": 4,
+      "bpm": 160,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4",
+      "breath": true,
+      "fill": true
+    },
+    {
+      "name": "Ritornello",
+      "bars": 8,
+      "bpm": 160,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Breakdown",
+      "bars": 8,
+      "bpm": 160,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4",
+      "crash": true,
+      "breath": true
+    },
+    {
+      "name": "Assolo",
+      "bars": 8,
+      "bpm": 160,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4",
+      "fill": true
+    },
+    {
+      "name": "Ritornello 2",
+      "bars": 8,
+      "bpm": 160,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Fine",
+      "bars": 1,
+      "bpm": 160,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "AkaiXR10",
+        "gain": 0.5,
+        "gainEnd": 0.9,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 1.2,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "rd": "x...x...x...x..."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x.xxx.xxx.xxx.xx",
+            "sd": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "xxxxxxxxxxxxxxxx",
+            "sd": "....x.......x...",
+            "rd": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "xxxxxxxxxxxxxxxx",
+            "sd": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "E": {
+          "rows": {
+            "bd": "x..x..x.x..x..x.",
+            "sd": "........x.......",
+            "rd": "x.......x......."
+          }
+        },
+        "F": {
+          "rows": {
+            "bd": "x.x.x.x.x.x.x.x.",
+            "sd": ".x.x.x.x.x.x.x.x",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Feedback",
+          "pattern": "A"
+        },
+        {
+          "section": "Riff",
+          "pattern": "B",
+          "set": {
+            "gain": 0.95,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Strofa",
+          "pattern": "C",
+          "set": {
+            "gain": 0.95,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Pre",
+          "pattern": "B",
+          "set": {
+            "gain": 0.95,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Ritornello",
+          "pattern": "D",
+          "set": {
+            "gain": 0.95,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Breakdown",
+          "pattern": "E",
+          "set": {
+            "gain": 0.95,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Assolo",
+          "pattern": "B",
+          "set": {
+            "gain": 0.95,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Ritornello 2",
+          "pattern": "F",
+          "set": {
+            "gain": 0.95,
+            "gainEnd": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "gm_electric_bass_pick",
+        "gain": 0.6,
+        "gainEnd": null,
+        "cutoff": 1500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 1,
+        "drive": 2
+      },
+      "patterns": {
+        "A": {
+          "preset": "ottavi"
+        },
+        "B": {
+          "preset": "sub"
+        }
+      },
+      "clips": [
+        {
+          "section": "Riff",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa",
+          "pattern": "A"
+        },
+        {
+          "section": "Pre",
+          "pattern": "A"
+        },
+        {
+          "section": "Ritornello",
+          "pattern": "A"
+        },
+        {
+          "section": "Breakdown",
+          "pattern": "A",
+          "set": {
+            "gain": 0.7
+          }
+        },
+        {
+          "section": "Assolo",
+          "pattern": "A"
+        },
+        {
+          "section": "Ritornello 2",
+          "pattern": "A"
+        },
+        {
+          "section": "Fine",
+          "pattern": "B",
+          "set": {
+            "gain": 0.7,
+            "gainEnd": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "guitar",
+      "type": "guitar",
+      "settings": {
+        "type": "metal",
+        "gain": 0.45,
+        "gainEnd": null,
+        "cutoff": 1500,
+        "cutoffEnd": 4500,
+        "drive": 0,
+        "octave": "-2",
+        "width": "double",
+        "room": 0.2
+      },
+      "patterns": {
+        "A": {
+          "preset": "held"
+        },
+        "B": {
+          "preset": "thrash"
+        },
+        "C": {
+          "preset": "groove"
+        },
+        "D": {
+          "preset": "gallopRiff"
+        },
+        "E": {
+          "preset": "heroic"
+        },
+        "F": {
+          "preset": "djentRiff"
+        }
+      },
+      "clips": [
+        {
+          "section": "Feedback",
+          "pattern": "A"
+        },
+        {
+          "section": "Riff",
+          "pattern": "B",
+          "set": {
+            "gain": 0.5,
+            "cutoff": 4200,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Strofa",
+          "pattern": "C",
+          "set": {
+            "type": "muted",
+            "gain": 0.48,
+            "cutoff": 4200,
+            "cutoffEnd": null,
+            "drive": 2
+          }
+        },
+        {
+          "section": "Pre",
+          "pattern": "D",
+          "set": {
+            "gain": 0.5,
+            "cutoff": 4200,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Ritornello",
+          "pattern": "E",
+          "set": {
+            "type": "distorted",
+            "gain": 0.52,
+            "cutoff": 4200,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Breakdown",
+          "pattern": "F",
+          "set": {
+            "gain": 0.55,
+            "cutoff": 4200,
+            "cutoffEnd": null,
+            "drive": 3
+          }
+        },
+        {
+          "section": "Assolo",
+          "pattern": "B",
+          "set": {
+            "gain": 0.38,
+            "cutoff": 4200,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Ritornello 2",
+          "pattern": "E",
+          "set": {
+            "type": "distorted",
+            "gain": 0.55,
+            "cutoff": 4200,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Fine",
+          "pattern": "A",
+          "set": {
+            "gain": 0.52,
+            "gainEnd": 0,
+            "cutoff": 4200,
+            "cutoffEnd": null,
+            "room": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "gm_distortion_guitar,sawtooth",
+        "gain": 0.13,
+        "gainEnd": null,
+        "cutoff": 4500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.2,
+        "mode": "phrygian",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 2.5,
+        "harmony": "2",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "eroico"
+        },
+        "B": {
+          "preset": "assolo"
+        }
+      },
+      "clips": [
+        {
+          "section": "Ritornello",
+          "pattern": "A"
+        },
+        {
+          "section": "Assolo",
+          "pattern": "B",
+          "set": {
+            "gain": 0.17,
+            "cutoff": 5500,
+            "delay": 0.3,
+            "harmony": ""
+          }
+        },
+        {
+          "section": "Ritornello 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.14
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "gm_choir_aahs",
+        "gain": 0.16,
+        "gainEnd": null,
+        "cutoff": 3500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.7,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Ritornello",
+          "pattern": "A"
+        },
+        {
+          "section": "Ritornello 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "type": "texture",
+      "settings": {
+        "sample": "metal",
+        "gain": 0.3,
+        "gainEnd": null,
+        "grit": 0.4,
+        "room": 0.6
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "bar"
+        }
+      },
+      "clips": [
+        {
+          "section": "Breakdown",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.3,
+        "bars": "2",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Feedback",
+          "pattern": "A"
+        },
+        {
+          "section": "Pre",
+          "pattern": "A",
+          "set": {
+            "bars": "4"
+          }
+        }
+      ]
+    }
+  ]
+}

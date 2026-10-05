@@ -28,7 +28,7 @@ The UI is dark only, by design.
 
 ## Components
 
-- `.card` panels, `.btn` (primary uses `--a1`), `.chip` toggles, `.tab`, `.led` channel switch, `.ramp` automation toggle (↗), `.arr-scene-btn` scene blocks (width proportional to bars, `.playing`, `[aria-current]`), `.timeline` with `.sec` blocks and `.head` playhead, `.step` sequencer keys (drum grid and `.chsteps` rows in melodic channels), `.arr-lanes` read-only timeline under the scene strip (one `.lane` per instrument, `.lane-cell.on` where it plays, shared horizontal scroll with the strip in `.arr-scroll`).
+- `.card` panels, `.btn` (primary uses `--a1`), `.chip` toggles, `.tab`, `.led` channel switch, `.ramp` automation toggle (↗), `.arr-scene-btn` scene blocks (width proportional to bars, `.playing`, `[aria-current]`), `.timeline` with `.sec` blocks and `.head` playhead, `.step` sequencer keys (drum grid and `.chsteps` rows in melodic channels), arranger grid (`.arr-strip` sections and `.arr-grid` rows share one CSS grid template: a `--trk-col` label column, then `minmax(54px, <bars>fr)` per section; `.trk-row` with `.trk-head` name, `.mini` mute/solo keys, `.trk-cell` cells: `.on` pattern clip, `.custom` striped partial clips, `*` marks per-section overrides), `.track-panel` (header, pattern chips, `.tp-editor` with drum grid, `.chsteps` step row, `.notegrid` degree grid, code textarea; `.ctrl.over` marks a setting overridden in the selected section), code panel (`.code-resize` grip up to 50% width, `.code-collapsed` rail, `.codecol.full` overlay).
 - Toasts for feedback; two-tap confirmation instead of `confirm()`.
 
 ## Hardware theme (`data-ui="hw"`)

@@ -1,0 +1,431 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "segnale-nel-rumore",
+  "title": "Segnale nel rumore",
+  "look": "spazio",
+  "style": {
+    "it": "Il brano che ho scritto con massima libertà · Re dorico · 96 BPM · dal fruscio al 7/8, poi 4/4, e di nuovo rumore",
+    "en": "The track I wrote with complete freedom · D dorian · 96 BPM · from noise to 7/8, then 4/4, and back to noise"
+  },
+  "sections": [
+    {
+      "name": "Rumore",
+      "bars": 4,
+      "bpm": 96,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "4/4"
+    },
+    {
+      "name": "Emersione",
+      "bars": 8,
+      "bpm": 96,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "7/8",
+      "fade": 2
+    },
+    {
+      "name": "Pulsazione",
+      "bars": 8,
+      "bpm": 96,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "7/8"
+    },
+    {
+      "name": "Fioritura",
+      "bars": 8,
+      "bpm": 96,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Silenzio",
+      "bars": 2,
+      "bpm": 96,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "4/4",
+      "breath": true
+    },
+    {
+      "name": "Ritorno",
+      "bars": 8,
+      "bpm": 96,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "7/8",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Dissolvenza",
+      "bars": 4,
+      "bpm": 96,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "4/4",
+      "fade": 2
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR808",
+        "gain": 0.35,
+        "gainEnd": 0.6,
+        "cutoff": 6000,
+        "cutoffEnd": null,
+        "drive": 0,
+        "grit": 0.55
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "hh": "x.x.x.x.x.x.x."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x.......x.....",
+            "sd": "....x.......x.",
+            "hh": "x.x.x.x.x.x.x."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x.......x.x.....",
+            "sd": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "x.....x.x.....",
+            "sd": "....x.......x.",
+            "hh": "xxxxxxxxxxxxxx"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Emersione",
+          "pattern": "A"
+        },
+        {
+          "section": "Pulsazione",
+          "pattern": "B",
+          "set": {
+            "gain": 0.8,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Fioritura",
+          "pattern": "C",
+          "set": {
+            "gain": 0.8,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Ritorno",
+          "pattern": "D",
+          "set": {
+            "gain": 0.8,
+            "gainEnd": null,
+            "grit": 0.45
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sine",
+        "gain": 0,
+        "gainEnd": 0.85,
+        "cutoff": 500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 1,
+        "drive": 0.5
+      },
+      "patterns": {
+        "A": {
+          "preset": "sub"
+        }
+      },
+      "clips": [
+        {
+          "section": "Emersione",
+          "pattern": "A"
+        },
+        {
+          "section": "Pulsazione",
+          "pattern": "A",
+          "set": {
+            "gain": 0.8800000000000001,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Fioritura",
+          "pattern": "A",
+          "set": {
+            "gain": 0.96,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Ritorno",
+          "pattern": "A",
+          "set": {
+            "gain": 1.04,
+            "gainEnd": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "gm_vibraphone",
+        "gain": 0.32000000000000006,
+        "gainEnd": 0.7,
+        "cutoff": 6000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 1,
+        "delay": 0.3,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pulsar",
+          "speed": "8"
+        },
+        "B": {
+          "preset": "su",
+          "speed": "8"
+        }
+      },
+      "clips": [
+        {
+          "section": "Emersione",
+          "pattern": "A"
+        },
+        {
+          "section": "Pulsazione",
+          "pattern": "A",
+          "set": {
+            "gain": 0.7200000000000001,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Fioritura",
+          "pattern": "B",
+          "set": {
+            "gain": 0.512,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Ritorno",
+          "pattern": "A",
+          "set": {
+            "gain": 0.6400000000000001,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Dissolvenza",
+          "pattern": "A",
+          "set": {
+            "gain": 0.6400000000000001,
+            "gainEnd": 0,
+            "cutoffEnd": 600
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "sine",
+        "gain": 0.5249999999999999,
+        "gainEnd": null,
+        "cutoff": 7000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.6,
+        "mode": "chromatic",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "segnale"
+        },
+        "B": {
+          "preset": "anima"
+        }
+      },
+      "clips": [
+        {
+          "section": "Rumore",
+          "pattern": "A"
+        },
+        {
+          "section": "Fioritura",
+          "pattern": "B",
+          "set": {
+            "wave": "gm_celesta",
+            "gain": 0.75,
+            "delay": 0.45,
+            "mode": "dorian"
+          }
+        },
+        {
+          "section": "Silenzio",
+          "pattern": "A",
+          "set": {
+            "wave": "gm_celesta",
+            "gain": 0.6000000000000001,
+            "delay": 0.7
+          }
+        },
+        {
+          "section": "Ritorno",
+          "pattern": "B",
+          "set": {
+            "wave": "gm_celesta",
+            "gain": 0.75,
+            "delay": 0.45,
+            "mode": "dorian"
+          }
+        },
+        {
+          "section": "Dissolvenza",
+          "pattern": "A",
+          "set": {
+            "gain": 0.44999999999999996,
+            "gainEnd": 0,
+            "delay": 0.7
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "gm_epiano1",
+        "gain": 0.22,
+        "gainEnd": null,
+        "cutoff": 2600,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.5,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "comp"
+        },
+        "B": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Pulsazione",
+          "pattern": "A"
+        },
+        {
+          "section": "Fioritura",
+          "pattern": "B",
+          "set": {
+            "wave": "gm_string_ensemble_1",
+            "gain": 0.2,
+            "cutoff": 3000,
+            "room": 0.8
+          }
+        },
+        {
+          "section": "Silenzio",
+          "pattern": "B",
+          "set": {
+            "wave": "gm_string_ensemble_1",
+            "gain": 0.2,
+            "gainEnd": 0.05,
+            "cutoff": 3000,
+            "room": 0.8
+          }
+        },
+        {
+          "section": "Ritorno",
+          "pattern": "B",
+          "set": {
+            "wave": "gm_string_ensemble_1",
+            "gain": 0.26,
+            "cutoff": 3000,
+            "room": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "type": "texture",
+      "settings": {
+        "sample": "vinyl",
+        "gain": 0.9,
+        "gainEnd": 0.6,
+        "grit": 0,
+        "room": 0.3
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "bar"
+        }
+      },
+      "clips": [
+        {
+          "section": "Rumore",
+          "pattern": "A"
+        },
+        {
+          "section": "Emersione",
+          "pattern": "A",
+          "set": {
+            "gain": 0.6,
+            "gainEnd": 0.25
+          }
+        },
+        {
+          "section": "Dissolvenza",
+          "pattern": "A",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": 0.9
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,447 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "ten-years-rebuild",
+  "title": "Ten Years · ricostruzione",
+  "look": "montagne",
+  "style": {
+    "it": "Ricostruita da sf-tenyears-149s.m4a · future pop ispirazionale · Mi minore · 92 BPM · sidechain su pad e basso",
+    "en": "Rebuilt from sf-tenyears-149s.m4a · inspirational future pop · E minor · 92 BPM · sidechained pad and bass"
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 8,
+      "bpm": 92,
+      "key": "E",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Strofa A",
+      "bars": 9,
+      "bpm": 92,
+      "key": "E",
+      "chords": "anthem",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Swoosh",
+      "bars": 1,
+      "bpm": 92,
+      "key": "E",
+      "chords": "anthem",
+      "meter": "4/4"
+    },
+    {
+      "name": "Strofa B",
+      "bars": 8,
+      "bpm": 92,
+      "key": "E",
+      "chords": "anthem",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Breakdown",
+      "bars": 6,
+      "bpm": 92,
+      "key": "E",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "fade": 2
+    },
+    {
+      "name": "Riser",
+      "bars": 2,
+      "bpm": 92,
+      "key": "E",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "breath": true,
+      "fill": true
+    },
+    {
+      "name": "Finale",
+      "bars": 20,
+      "bpm": 92,
+      "key": "E",
+      "chords": "anthem",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Outro",
+      "bars": 3,
+      "bpm": 92,
+      "key": "E",
+      "chords": "pendolo",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85,
+        "gainEnd": null,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 0,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "B": {
+          "rows": {
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "xxxxxxxxxxxxxxxx",
+            "oh": "..x...x...x...x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Strofa A",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa B",
+          "pattern": "A"
+        },
+        {
+          "section": "Riser",
+          "pattern": "B"
+        },
+        {
+          "section": "Finale",
+          "pattern": "C"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sine",
+        "gain": 0.35,
+        "gainEnd": null,
+        "cutoff": 400,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 2,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "sub"
+        },
+        "B": {
+          "preset": "pumping"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa A",
+          "pattern": "B",
+          "set": {
+            "gain": 0.7,
+            "cutoff": 600
+          }
+        },
+        {
+          "section": "Strofa B",
+          "pattern": "B",
+          "set": {
+            "gain": 0.7,
+            "cutoff": 600
+          }
+        },
+        {
+          "section": "Breakdown",
+          "pattern": "A",
+          "set": {
+            "gain": 0.4
+          }
+        },
+        {
+          "section": "Finale",
+          "pattern": "B",
+          "set": {
+            "gain": 0.8,
+            "cutoff": 600
+          }
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "triangle",
+        "gain": 0.15,
+        "gainEnd": 0.28,
+        "cutoff": 1200,
+        "cutoffEnd": 2600,
+        "move": "fisso",
+        "reso": 2,
+        "delay": 0.35,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "sugiu",
+          "speed": "16"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa A",
+          "pattern": "A",
+          "set": {
+            "gain": 0.28,
+            "gainEnd": null,
+            "cutoff": 2600,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Strofa B",
+          "pattern": "A",
+          "set": {
+            "gain": 0.28,
+            "gainEnd": null,
+            "cutoff": 2600,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Breakdown",
+          "pattern": "A",
+          "set": {
+            "gain": 0.2,
+            "gainEnd": null,
+            "cutoff": 900,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Riser",
+          "pattern": "A",
+          "set": {
+            "gain": 0.22,
+            "gainEnd": null,
+            "cutoff": 1400
+          }
+        },
+        {
+          "section": "Finale",
+          "pattern": "A",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": null,
+            "cutoff": 3000,
+            "cutoffEnd": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.24,
+        "gainEnd": null,
+        "cutoff": 3200,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.3,
+        "mode": "minor",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "decade"
+        }
+      },
+      "clips": [
+        {
+          "section": "Strofa B",
+          "pattern": "A"
+        },
+        {
+          "section": "Finale",
+          "pattern": "A",
+          "set": {
+            "gain": 0.28
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.2,
+        "gainEnd": 0.32,
+        "cutoff": 600,
+        "cutoffEnd": 2200,
+        "move": "fisso",
+        "room": 0.9,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pad"
+        },
+        "B": {
+          "preset": "sidechain"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa A",
+          "pattern": "B",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": null,
+            "cutoff": 2400,
+            "cutoffEnd": null,
+            "room": 0.45
+          }
+        },
+        {
+          "section": "Swoosh",
+          "pattern": "A",
+          "set": {
+            "gainEnd": null,
+            "cutoff": 1200,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Strofa B",
+          "pattern": "B",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": null,
+            "cutoff": 2600,
+            "cutoffEnd": null,
+            "room": 0.45
+          }
+        },
+        {
+          "section": "Breakdown",
+          "pattern": "A",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": null,
+            "cutoff": 900,
+            "cutoffEnd": 1600
+          }
+        },
+        {
+          "section": "Riser",
+          "pattern": "A",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": null,
+            "cutoff": 1600,
+            "cutoffEnd": 3000
+          }
+        },
+        {
+          "section": "Finale",
+          "pattern": "B",
+          "set": {
+            "gain": 0.34,
+            "gainEnd": null,
+            "cutoff": 3200,
+            "cutoffEnd": null,
+            "room": 0.45
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "A",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": 0,
+            "cutoff": 2000,
+            "cutoffEnd": 600
+          }
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.35,
+        "bars": "2",
+        "dir": "down"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Swoosh",
+          "pattern": "A"
+        },
+        {
+          "section": "Riser",
+          "pattern": "A",
+          "set": {
+            "gain": 0.4,
+            "dir": "up"
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "A",
+          "set": {
+            "gain": 0.3,
+            "bars": "4"
+          }
+        }
+      ]
+    }
+  ]
+}

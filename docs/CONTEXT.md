@@ -18,8 +18,8 @@ Original request: "create a project `coding-misk`, take inspiration from Switch 
 - Melodies were "too sweet" and tracks "too similar": stepwise minor-scale hooks felt cantabile. Prefer tension: tritone, flat second, octave jumps, repeated notes, silence. Use the `chromatic` and `locrian` hook modes, bass riffs, one-chord or b2 progressions.
 - Too many instruments at once: keep 4 to 5 layers per scene, focus on rhythm.
 - "Cyberpunk" tracks came out cheerful; dark club music (John Wick, Le Castle Vania) is the reference for action and club moods.
-- Reels must start loaded, like an excerpt of a longer song: no long build-up. Write the full song, then cut the reel from its strongest sections (`reelFrom` in `src/tracks.js`).
-- Wants to see everything in the Compose UI: every built-in track is a scene track. Hand-written code tracks are kept only as references.
+- Reels must start loaded, like an excerpt of a longer song: no long build-up. Write the full song, then cut the reel from its strongest sections.
+- Wants to see everything in the Compose UI: every built-in song opens in the arranger. Hand-written code tracks are kept only as references.
 - Transitions matter: avoid hard cuts that sound like different tracks. Use fades, transition scenes, continuous layers, tempo ramps.
 - Loved the visuals and the logo; asked for Stage to show every instrument, and for an anime (Edgerunners) visual and a hardware-style UI.
 - Git: `main` stable, `develop` for experiments, merge to `main` only after confirmation. Repo is private.
@@ -44,9 +44,9 @@ Original request: "create a project `coding-misk`, take inspiration from Switch 
   - `dci-track-23s.m4a`: tech jingle, 103 BPM, F# minor with G bass (phrygian tension), staccato then syncopated stabs, 10 bars.
   - Rebuilds kept structure, tempo and harmony but not the timbre; the owner found them not very similar.
 
-## Built-in tracks (`src/tracks.js`)
+## Built-in songs (`songs/`)
 
-Scene tracks, in library order: Segnale nel rumore (the free-form piece, D dorian, 7/8), Luci Rosse (dark club), DCI Jingle carica, Insert Coin (90s arcade), Circuito Ruggine (industrial techno with guitars), Ferro, Ali di cenere, Drift, Neon Rush reel, Settimo Cielo (prog rock 7/8, 5/4), Pioggia sul vetro (lo-fi), Ghost Protocol, Neon Ascent, Ten Years rebuild, Next Chapter, DCI rebuild, DCI Ignition, Synth Lab Demo. Hand-written originals: `patterns/05-neon-ascent.js`, `patterns/06-ghost-protocol.js`.
+JSON songs (format v2), in library order (`songs/index.json`): Segnale nel rumore (the free-form piece, D dorian, 7/8), Luci Rosse (dark club), DCI Jingle carica, Insert Coin (90s arcade), Circuito Ruggine (industrial techno with guitars), Ferro, Ali di cenere, Drift, Neon Rush reel, Settimo Cielo (prog rock 7/8, 5/4), Pioggia sul vetro (lo-fi), Ghost Protocol, Neon Ascent, Ten Years rebuild, Next Chapter, DCI rebuild, DCI Ignition, Synth Lab Demo. Examples for the guide: `songs/examples/`. Hand-written originals: `patterns/05-neon-ascent.js`, `patterns/06-ghost-protocol.js`.
 
 ## Backlog (GitHub issues)
 

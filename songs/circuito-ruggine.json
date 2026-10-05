@@ -1,0 +1,625 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "circuito-ruggine",
+  "title": "Circuito Ruggine",
+  "look": "palco",
+  "style": {
+    "it": "Techno industrial cyberpunk · Mi frigio, poi Fa · 132 BPM · cassa satura, acid, metalli, chitarre distorte un tono sotto",
+    "en": "Cyberpunk industrial techno · E phrygian, then F · 132 BPM · saturated kick, acid, metal hits, distorted guitars one step down"
+  },
+  "sections": [
+    {
+      "name": "Avvio",
+      "bars": 4,
+      "bpm": 132,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "breath": true
+    },
+    {
+      "name": "Macchina",
+      "bars": 8,
+      "bpm": 132,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Riff",
+      "bars": 8,
+      "bpm": 132,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Corridoio",
+      "bars": 4,
+      "bpm": 132,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "breath": true,
+      "fill": true
+    },
+    {
+      "name": "Drop",
+      "bars": 16,
+      "bpm": 132,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Blackout",
+      "bars": 4,
+      "bpm": 132,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "fade": 1,
+      "breath": true
+    },
+    {
+      "name": "Drop 2",
+      "bars": 12,
+      "bpm": 132,
+      "key": "F",
+      "chords": "cyber",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Spegnimento",
+      "bars": 4,
+      "bpm": 132,
+      "key": "F",
+      "chords": "cyber",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.95,
+        "gainEnd": null,
+        "cutoff": 300,
+        "cutoffEnd": 2500,
+        "drive": 1.4,
+        "grit": 0.2
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "sd": "...........x....",
+            "hh": "..x...x...x...x.",
+            "oh": "..x.......x....."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x..x",
+            "hh": "x.xx.x.xx.xx.x.x",
+            "oh": "..x...x...x...x."
+          }
+        },
+        "E": {
+          "rows": {
+            "bd": "x.........x.....",
+            "sd": "........x.......",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Avvio",
+          "pattern": "A"
+        },
+        {
+          "section": "Macchina",
+          "pattern": "B",
+          "set": {
+            "cutoff": 20000,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Riff",
+          "pattern": "B",
+          "set": {
+            "cutoff": 20000,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Corridoio",
+          "pattern": "C",
+          "set": {
+            "gain": 0.7,
+            "gainEnd": 0.95,
+            "cutoff": 20000,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "D",
+          "set": {
+            "cutoff": 20000,
+            "cutoffEnd": null,
+            "drive": 1.6
+          }
+        },
+        {
+          "section": "Blackout",
+          "pattern": "E",
+          "set": {
+            "cutoff": 20000,
+            "cutoffEnd": null,
+            "grit": 0.9
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "D",
+          "set": {
+            "cutoff": 20000,
+            "cutoffEnd": null,
+            "drive": 1.8
+          }
+        },
+        {
+          "section": "Spegnimento",
+          "pattern": "A",
+          "set": {
+            "gainEnd": 0.3,
+            "cutoff": 20000,
+            "cutoffEnd": 300
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.55,
+        "gainEnd": null,
+        "cutoff": 450,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 10,
+        "drive": 3
+      },
+      "patterns": {
+        "A": {
+          "preset": "rumble"
+        }
+      },
+      "clips": [
+        {
+          "section": "Macchina",
+          "pattern": "A"
+        },
+        {
+          "section": "Riff",
+          "pattern": "A",
+          "set": {
+            "gain": 0.5
+          }
+        },
+        {
+          "section": "Corridoio",
+          "pattern": "A",
+          "set": {
+            "gain": 0.5,
+            "cutoff": 300,
+            "cutoffEnd": 600
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "gain": 0.6,
+            "cutoff": 550,
+            "drive": 4
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.6,
+            "cutoff": 600,
+            "drive": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "guitar",
+      "type": "guitar",
+      "settings": {
+        "type": "metal",
+        "gain": 0.35,
+        "gainEnd": null,
+        "cutoff": 900,
+        "cutoffEnd": 3000,
+        "drive": 2,
+        "octave": "-2",
+        "width": "double",
+        "room": 0.6
+      },
+      "patterns": {
+        "A": {
+          "preset": "held"
+        },
+        "B": {
+          "preset": "stomp"
+        },
+        "C": {
+          "preset": "industrial"
+        },
+        "D": {
+          "preset": "thrash"
+        }
+      },
+      "clips": [
+        {
+          "section": "Avvio",
+          "pattern": "A"
+        },
+        {
+          "section": "Riff",
+          "pattern": "B",
+          "set": {
+            "gain": 0.55,
+            "cutoff": 3800,
+            "cutoffEnd": null,
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Corridoio",
+          "pattern": "C",
+          "set": {
+            "type": "muted",
+            "gain": 0.45,
+            "cutoff": 3800,
+            "cutoffEnd": null,
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "C",
+          "set": {
+            "gain": 0.55,
+            "cutoff": 3800,
+            "cutoffEnd": null,
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Blackout",
+          "pattern": "A",
+          "set": {
+            "gain": 0.45,
+            "cutoff": 4000,
+            "cutoffEnd": 1200,
+            "room": 0.7
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "D",
+          "set": {
+            "gain": 0.55,
+            "cutoff": 3800,
+            "cutoffEnd": null,
+            "drive": 3,
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Spegnimento",
+          "pattern": "A",
+          "set": {
+            "gain": 0.5,
+            "gainEnd": 0,
+            "cutoff": 3500,
+            "cutoffEnd": 700,
+            "room": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.32,
+        "gainEnd": null,
+        "cutoff": 700,
+        "cutoffEnd": 2400,
+        "move": "fisso",
+        "reso": 22,
+        "delay": 0,
+        "drive": 1.6
+      },
+      "patterns": {
+        "A": {
+          "preset": "acid",
+          "speed": "8"
+        }
+      },
+      "clips": [
+        {
+          "section": "Macchina",
+          "pattern": "A"
+        },
+        {
+          "section": "Riff",
+          "pattern": "A",
+          "set": {
+            "gain": 0.24,
+            "cutoff": 1600,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Corridoio",
+          "pattern": "A",
+          "set": {
+            "gain": 0.3,
+            "cutoff": 1200,
+            "cutoffEnd": 4000,
+            "reso": 20,
+            "drive": 1.8
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "gain": 0.3,
+            "cutoff": 1800,
+            "cutoffEnd": 4200,
+            "reso": 24,
+            "drive": 2
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.3,
+            "cutoff": 2200,
+            "cutoffEnd": 5000,
+            "reso": 24,
+            "drive": 2.2
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.42,
+        "gainEnd": null,
+        "cutoff": 3500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.45,
+        "mode": "phrygian",
+        "fm": 4,
+        "vowel": "<a e i o>",
+        "grit": 0.5,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "cyber"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.45,
+            "fm": 5,
+            "grit": 0.7
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.24,
+        "gainEnd": null,
+        "cutoff": 3000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.3,
+        "drive": 1.2
+      },
+      "patterns": {
+        "A": {
+          "preset": "stab"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.26,
+            "cutoff": 3400,
+            "drive": 1.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "type": "texture",
+      "settings": {
+        "sample": "numbers",
+        "gain": 0.5,
+        "gainEnd": null,
+        "grit": 0.95,
+        "room": 0.7
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "bar"
+        },
+        "B": {
+          "rhythm": "euclid"
+        },
+        "C": {
+          "rhythm": "eighth"
+        },
+        "D": {
+          "rhythm": "sixteenth"
+        }
+      },
+      "clips": [
+        {
+          "section": "Avvio",
+          "pattern": "A"
+        },
+        {
+          "section": "Macchina",
+          "pattern": "B",
+          "set": {
+            "sample": "metal",
+            "gain": 0.3,
+            "grit": 0.7,
+            "room": 0.25
+          }
+        },
+        {
+          "section": "Riff",
+          "pattern": "B",
+          "set": {
+            "sample": "metal",
+            "gain": 0.25,
+            "grit": 0.7,
+            "room": 0.25
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "C",
+          "set": {
+            "sample": "industrial",
+            "gain": 0.2,
+            "grit": 0.85,
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Blackout",
+          "pattern": "D",
+          "set": {
+            "gain": 0.3,
+            "room": 0.4
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "B",
+          "set": {
+            "sample": "metal",
+            "gain": 0.3,
+            "grit": 0.7,
+            "room": 0.25
+          }
+        },
+        {
+          "section": "Spegnimento",
+          "pattern": "A",
+          "set": {
+            "room": 0.9
+          }
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.3,
+        "bars": "4",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Avvio",
+          "pattern": "A"
+        },
+        {
+          "section": "Corridoio",
+          "pattern": "A",
+          "set": {
+            "gain": 0.4
+          }
+        },
+        {
+          "section": "Blackout",
+          "pattern": "A",
+          "set": {
+            "gain": 0.42
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,375 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "insert-coin",
+  "title": "Insert Coin",
+  "look": "pixel",
+  "style": {
+    "it": "Arcade anni '90 · La minore, boss in tensione, ultimo livello in Si · 150 BPM · lead FM, basso a ottave, arpeggi",
+    "en": "90s arcade · A minor, tense boss, last stage in B · 150 BPM · FM lead, octave bass, arpeggios"
+  },
+  "sections": [
+    {
+      "name": "Insert coin",
+      "bars": 2,
+      "bpm": 150,
+      "key": "A",
+      "chords": "arcade",
+      "meter": "4/4",
+      "breath": true
+    },
+    {
+      "name": "Livello 1",
+      "bars": 8,
+      "bpm": 150,
+      "key": "A",
+      "chords": "arcade",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Livello 1 B",
+      "bars": 8,
+      "bpm": 150,
+      "key": "A",
+      "chords": "arcade",
+      "meter": "4/4",
+      "fill": true
+    },
+    {
+      "name": "Boss",
+      "bars": 8,
+      "bpm": 156,
+      "key": "A",
+      "chords": "tensione",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Bonus",
+      "bars": 4,
+      "bpm": 150,
+      "key": "A",
+      "chords": "arcade",
+      "meter": "4/4",
+      "fade": 1
+    },
+    {
+      "name": "Livello 2",
+      "bars": 8,
+      "bpm": 152,
+      "key": "B",
+      "chords": "arcade",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Game over",
+      "bars": 2,
+      "bpm": 152,
+      "key": "B",
+      "chords": "arcade",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "YamahaRX5",
+        "gain": 0.4,
+        "gainEnd": 0.8,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 0.4,
+        "grit": 0.25
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x.....x...x.....",
+            "sd": "....x.......x..x",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x.....x...x.....",
+            "sd": "....x.......x..x",
+            "hh": "x.x.x.x.x.x.x.x.",
+            "oh": "..............x."
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "sd": "....x.......x...",
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "E": {
+          "rows": {
+            "bd": "x.........x.....",
+            "sd": "........x.......",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "F": {
+          "rows": {
+            "bd": "x.....x...x.....",
+            "sd": "....x.......x..x",
+            "hh": "x.x.x.x.x.x.x.x.",
+            "oh": "..x.......x....."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Insert coin",
+          "pattern": "A"
+        },
+        {
+          "section": "Livello 1",
+          "pattern": "B",
+          "set": {
+            "gain": 0.9,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Livello 1 B",
+          "pattern": "C",
+          "set": {
+            "gain": 0.9,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Boss",
+          "pattern": "D",
+          "set": {
+            "gain": 0.9,
+            "gainEnd": null,
+            "drive": 1
+          }
+        },
+        {
+          "section": "Bonus",
+          "pattern": "E",
+          "set": {
+            "gain": 0.9,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Livello 2",
+          "pattern": "F",
+          "set": {
+            "gain": 0.9,
+            "gainEnd": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "square",
+        "gain": 0.85,
+        "gainEnd": null,
+        "cutoff": 1800,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 2,
+        "drive": 0.5
+      },
+      "patterns": {
+        "A": {
+          "preset": "ottaveArcade"
+        },
+        "B": {
+          "preset": "tritono"
+        }
+      },
+      "clips": [
+        {
+          "section": "Livello 1",
+          "pattern": "A"
+        },
+        {
+          "section": "Livello 1 B",
+          "pattern": "A"
+        },
+        {
+          "section": "Boss",
+          "pattern": "B",
+          "set": {
+            "wave": "sawtooth",
+            "gain": 0.55,
+            "cutoff": 1600,
+            "reso": 6,
+            "drive": 2
+          }
+        },
+        {
+          "section": "Livello 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.9
+          }
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "square",
+        "gain": 0.26,
+        "gainEnd": null,
+        "cutoff": 4000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 1,
+        "delay": 0,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "su",
+          "speed": "16"
+        },
+        "B": {
+          "preset": "sugiu",
+          "speed": "16"
+        }
+      },
+      "clips": [
+        {
+          "section": "Insert coin",
+          "pattern": "A"
+        },
+        {
+          "section": "Livello 1 B",
+          "pattern": "A",
+          "set": {
+            "gain": 0.24
+          }
+        },
+        {
+          "section": "Bonus",
+          "pattern": "B"
+        },
+        {
+          "section": "Livello 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.22
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.45,
+        "gainEnd": null,
+        "cutoff": 5000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.15,
+        "mode": "chromatic",
+        "fm": 2,
+        "vowel": "",
+        "grit": 0.3,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "arcade"
+        },
+        "B": {
+          "preset": "arcadeB"
+        },
+        "C": {
+          "preset": "boss"
+        },
+        "D": {
+          "preset": "colpi"
+        }
+      },
+      "clips": [
+        {
+          "section": "Livello 1",
+          "pattern": "A"
+        },
+        {
+          "section": "Livello 1 B",
+          "pattern": "B"
+        },
+        {
+          "section": "Boss",
+          "pattern": "C",
+          "set": {
+            "fm": 3
+          }
+        },
+        {
+          "section": "Livello 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.48
+          }
+        },
+        {
+          "section": "Game over",
+          "pattern": "D",
+          "set": {
+            "gain": 0.26,
+            "gainEnd": 0,
+            "delay": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "square",
+        "gain": 0.2,
+        "gainEnd": 0,
+        "cutoff": 2500,
+        "cutoffEnd": 600,
+        "move": "fisso",
+        "room": 0.6,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Game over",
+          "pattern": "A"
+        }
+      ]
+    }
+  ]
+}

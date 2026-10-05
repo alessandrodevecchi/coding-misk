@@ -1,0 +1,348 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "luci-rosse",
+  "title": "Luci Rosse",
+  "look": "palco",
+  "style": {
+    "it": "Club scuro da film d'azione · La minore su un solo accordo · 124 BPM · riff di basso distorto, cassa, clap, pochi strati",
+    "en": "Dark action-movie club track · A minor on one chord · 124 BPM · distorted bass riff, kick, clap, few layers"
+  },
+  "sections": [
+    {
+      "name": "Ingresso",
+      "bars": 8,
+      "bpm": 124,
+      "key": "A",
+      "chords": "drone",
+      "meter": "4/4"
+    },
+    {
+      "name": "Pista",
+      "bars": 8,
+      "bpm": 124,
+      "key": "A",
+      "chords": "drone",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Taglio",
+      "bars": 2,
+      "bpm": 124,
+      "key": "A",
+      "chords": "drone",
+      "meter": "4/4",
+      "breath": true
+    },
+    {
+      "name": "Scontro",
+      "bars": 16,
+      "bpm": 124,
+      "key": "A",
+      "chords": "drone",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Ombra",
+      "bars": 4,
+      "bpm": 124,
+      "key": "A",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Scontro 2",
+      "bars": 16,
+      "bpm": 124,
+      "key": "A",
+      "chords": "tensione",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Uscita",
+      "bars": 4,
+      "bpm": 124,
+      "key": "A",
+      "chords": "drone",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.95,
+        "gainEnd": null,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 1.6,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "..x...x...x...x."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "..x...x...x...x."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x.",
+            "oh": "..x...x...x...x."
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "x.........x.....",
+            "cp": "........x......."
+          }
+        },
+        "E": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "xxxxxxxxxxxxxxxx",
+            "oh": "..x...x...x...x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Ingresso",
+          "pattern": "A"
+        },
+        {
+          "section": "Pista",
+          "pattern": "B"
+        },
+        {
+          "section": "Scontro",
+          "pattern": "C"
+        },
+        {
+          "section": "Ombra",
+          "pattern": "D"
+        },
+        {
+          "section": "Scontro 2",
+          "pattern": "E",
+          "set": {
+            "drive": 1.5
+          }
+        },
+        {
+          "section": "Uscita",
+          "pattern": "A",
+          "set": {
+            "gainEnd": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.6,
+        "gainEnd": null,
+        "cutoff": 300,
+        "cutoffEnd": 1000,
+        "move": "fisso",
+        "reso": 8,
+        "drive": 4.5
+      },
+      "patterns": {
+        "A": {
+          "preset": "spirale"
+        },
+        "B": {
+          "preset": "mirino"
+        },
+        "C": {
+          "preset": "tritono"
+        }
+      },
+      "clips": [
+        {
+          "section": "Ingresso",
+          "pattern": "A"
+        },
+        {
+          "section": "Pista",
+          "pattern": "A",
+          "set": {
+            "cutoff": 1400,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Taglio",
+          "pattern": "A",
+          "set": {
+            "cutoff": 1400,
+            "cutoffEnd": 500
+          }
+        },
+        {
+          "section": "Scontro",
+          "pattern": "B",
+          "set": {
+            "cutoff": 1300,
+            "cutoffEnd": null,
+            "move": "veloce",
+            "drive": 5
+          }
+        },
+        {
+          "section": "Ombra",
+          "pattern": "C",
+          "set": {
+            "cutoff": 700,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Scontro 2",
+          "pattern": "A",
+          "set": {
+            "cutoff": 2000,
+            "cutoffEnd": null,
+            "drive": 5
+          }
+        },
+        {
+          "section": "Uscita",
+          "pattern": "A",
+          "set": {
+            "cutoff": 1400,
+            "cutoffEnd": 150
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.3,
+        "gainEnd": null,
+        "cutoff": 2600,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.25,
+        "mode": "chromatic",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 1.5,
+        "harmony": "",
+        "octave": "3"
+      },
+      "patterns": {
+        "A": {
+          "preset": "colpi"
+        },
+        "B": {
+          "preset": "allarme"
+        }
+      },
+      "clips": [
+        {
+          "section": "Scontro",
+          "pattern": "A"
+        },
+        {
+          "section": "Ombra",
+          "pattern": "B",
+          "set": {
+            "gain": 0.2,
+            "delay": 0.45,
+            "octave": "4"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "square",
+        "gain": 0.16,
+        "gainEnd": null,
+        "cutoff": 2400,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.3,
+        "drive": 1
+      },
+      "patterns": {
+        "A": {
+          "preset": "stab"
+        }
+      },
+      "clips": [
+        {
+          "section": "Scontro 2",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "type": "texture",
+      "settings": {
+        "sample": "metal",
+        "gain": 0.3,
+        "gainEnd": null,
+        "grit": 0.5,
+        "room": 0.7
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "bar"
+        }
+      },
+      "clips": [
+        {
+          "section": "Ombra",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.35,
+        "bars": "2",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Taglio",
+          "pattern": "A"
+        }
+      ]
+    }
+  ]
+}

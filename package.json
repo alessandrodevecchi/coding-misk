@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "check:code": "node --no-warnings tools/snapshot-code.mjs check",
     "snapshot:code": "node --no-warnings tools/snapshot-code.mjs write",
-    "check:songs": "node --no-warnings tools/song.mjs validate songs/**/*.json && node --no-warnings tools/parity-v2.mjs"
+    "check:songs": "node --no-warnings tools/song.mjs validate songs"
   },
   "dependencies": {
     "@strudel/repl": "1.3.0"

@@ -1,0 +1,366 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "drift",
+  "title": "Drift",
+  "look": "pixel",
+  "style": {
+    "it": "Phonk · Fa# minore · 128 BPM · brano intero",
+    "en": "Phonk · F# minor · 128 BPM · full track"
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 4,
+      "bpm": 128,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Drop",
+      "bars": 16,
+      "bpm": 128,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Break",
+      "bars": 4,
+      "bpm": 128,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "fade": 1,
+      "breath": true,
+      "fill": true
+    },
+    {
+      "name": "Drop 2",
+      "bars": 16,
+      "bpm": 128,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Outro",
+      "bars": 3,
+      "bpm": 128,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Colpo",
+      "bars": 1,
+      "bpm": 128,
+      "key": "F#",
+      "chords": "pendolo",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR808",
+        "gain": 0.95,
+        "gainEnd": null,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 1.5,
+        "grit": 0.2
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x......x..x.....",
+            "cp": "....x.......x...",
+            "hh": "xxxxxxxxxxxxxxxx",
+            "oh": "......x.......x."
+          }
+        },
+        "B": {
+          "rows": {
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x......x..x.....",
+            "cp": "....x.......x...",
+            "hh": "xxxxxxxxxxxxxxxx",
+            "oh": "..x...x...x...x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "A"
+        },
+        {
+          "section": "Break",
+          "pattern": "B",
+          "set": {
+            "cutoff": 600,
+            "cutoffEnd": 20000
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "C",
+          "set": {
+            "drive": 2.5,
+            "grit": 0.4
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "A",
+          "set": {
+            "gainEnd": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sine",
+        "gain": 0.8,
+        "gainEnd": null,
+        "cutoff": 900,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 2,
+        "drive": 4
+      },
+      "patterns": {
+        "A": {
+          "preset": "sub"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.85,
+            "drive": 6
+          }
+        },
+        {
+          "section": "Colpo",
+          "pattern": "A",
+          "set": {
+            "gainEnd": 0,
+            "drive": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "cowbell",
+        "gain": 0.4,
+        "gainEnd": null,
+        "cutoff": 1200,
+        "cutoffEnd": 6000,
+        "move": "fisso",
+        "delay": 0.15,
+        "mode": "minor",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 1,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "phonk"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "gain": 0.45,
+            "cutoff": 6000,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "A",
+          "set": {
+            "cutoff": 2000,
+            "cutoffEnd": null,
+            "delay": 0.4
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.5,
+            "cutoff": 6000,
+            "cutoffEnd": null,
+            "drive": 2
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "A",
+          "set": {
+            "cutoff": 6000,
+            "cutoffEnd": 1200
+          }
+        },
+        {
+          "section": "Colpo",
+          "pattern": "A",
+          "set": {
+            "gainEnd": 0,
+            "cutoff": 6000,
+            "cutoffEnd": null,
+            "delay": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "gm_choir_aahs",
+        "gain": 0.16,
+        "gainEnd": null,
+        "cutoff": 2000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.7,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.2,
+            "cutoff": 2500
+          }
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "type": "texture",
+      "settings": {
+        "sample": "numbers",
+        "gain": 0.45,
+        "gainEnd": null,
+        "grit": 0.9,
+        "room": 0.6
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "bar"
+        },
+        "B": {
+          "rhythm": "sixteenth"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "sample": "vinyl",
+            "gain": 0.4,
+            "grit": 0,
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "B",
+          "set": {
+            "gain": 0.22,
+            "room": 0.3
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "sample": "vinyl",
+            "gain": 0.4,
+            "grit": 0,
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "A",
+          "set": {
+            "sample": "vinyl",
+            "gain": 0.5,
+            "grit": 0,
+            "room": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.35,
+        "bars": "4",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Break",
+          "pattern": "A"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+// coding-misk · Example 3 · Night Shift
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(128/4)
+
+const SECTIONS = [['Intro', 8], ['Drop', 16], ['Outro', 4]]
+const TEMPO = {'Intro': 128, 'Drop': 128, 'Outro': 128}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0.5 0!19>"  // Intro · 8 bars · 128 BPM · E · Em Em Em F
+const section2 = "<0!8 0.5 1!15 0!4>"  // Drop · 16 bars · 128 BPM · E · Em F Em D · fades in over 1 bars
+const section3 = "<0!24 1!4>"  // Outro · 4 bars · 128 BPM · E · Em
+
+// ========== drums ==========
+// Intro · bars 1-8 · pattern intro
+// Drums · RolandTR909
+$: s("[bd ~ ~ ~] ~ [bd ~ ~ ~] ~").bank("RolandTR909").gain(0.9).distort(1.2).distortvol(.5).mask(section1).velocity(section1).orbit(1).analyze("kick")
+$: s("[~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~]").bank("RolandTR909").gain(0.45).distort(1.2).distortvol(.5).mask(section1).velocity(section1).orbit(1).analyze("hats")
+// Drop · bars 9-24 · pattern drop
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).distort(1.2).distortvol(.5).mask("<1!7 [1 0] 1!8>").mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR909").gain(0.72).distort(1.2).distortvol(.5).mask("<1!7 [1 0] 1!8>").mask(section2).velocity(section2).orbit(1).analyze("snare")
+$: s("[hh ~ hh hh] [hh ~ hh hh] [hh ~ hh hh] [hh ~ hh hh]").bank("RolandTR909").gain(0.45).distort(1.2).distortvol(.5).mask("<1!7 [1 0] 1!8>").mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("[~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~]").bank("RolandTR909").gain(0.41).distort(1.2).distortvol(.5).mask("<1!7 [1 0] 1!8>").mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<0!8 1 0!7>").mask(section2).velocity(section2).orbit(1).analyze("fx")
+// Outro · bars 25-28 · pattern outro
+$: s("[bd ~ ~ ~] ~ ~ ~").bank("RolandTR909").gain(0.9).distort(1.2).distortvol(.5).mask(section3).velocity(section3).orbit(1).analyze("kick")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<1 0!3>").mask(section3).velocity(section3).orbit(1).analyze("fx")
+
+// ========== bass ==========
+const clip1 = "<0!4 1!4 0.5 0!19>"
+// Intro · bars 5-8 · pattern roll
+// Bass · Rolling
+$: note("<a1 a1 a1 a#1>").transpose(-5).struct("[~ x x x] [~ x x x] [~ x x x] [~ x x x]")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(10).distort(2).distortvol(.5)
+  .decay(.12).sustain(0).gain(0.6).mask(clip1).velocity(clip1).orbit(2).analyze("bass")
+// Drop · bars 9-24 · pattern roll
+$: note("<a1 a#1 a1 g1>").transpose(-5).struct("[~ x x x] [~ x x x] [~ x x x] [~ x x x]")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(10).distort(2).distortvol(.5)
+  .decay(.12).sustain(0).gain(0.6).mask("<1!7 [1 0] 1!8>").mask(section2).velocity(section2).orbit(2).analyze("bass")
+
+// ========== Guitar riff · guitar ==========
+// Drop · bars 9-24 · pattern stomp
+// Guitar · Metal hi-gain, Stomp (industrial) · tuning -2
+$: note("<[a2,e3,a3] [a#2,f3,a#3] [a2,e3,a3] [g2,d3,g3]>").transpose(-7).struct("x ~ ~ ~ x ~ ~ ~ x ~ x ~ x ~ ~ ~").transpose("0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0")
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(0.09).sustain(0).release(.08)
+  .distort(6).distortvol(.2).hpf(110).lpf(4200).jux(x => x.late(.012))
+  .room(.15).gain(.8).mask("<1!7 [1 0] 1!8>").mask(section2).postgain(section2.mul(0.45)).orbit(5).analyze("guitar")
+
+// ========== Guitar wall · guitar ==========
+const clip2 = "<0!16 1!8 0!4>"
+// Drop · bars 17-24 · pattern held
+// Guitar · Distorted, Held
+$: note("<[a2,e3,a3] [a#2,f3,a#3] [a2,e3,a3] [g2,d3,g3]>").transpose(-5)
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(1.5).sustain(0.8).release(.08)
+  .distort(3).distortvol(.2).hpf(80).lpf(2600).jux(x => x.late(.012))
+  .room(.5).gain(.8).mask("<1!7 [1 0]>").mask(clip2).postgain(clip2.mul(0.25)).orbit(9).analyze("guitar")
+// Outro · bars 25-28 · pattern held
+$: note("<[a2,e3,a3]>").transpose(-5)
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(1.5).sustain(0.8).release(.08)
+  .distort(3).distortvol(.2).hpf(80).lpf(2600).jux(x => x.late(.012))
+  .room(.5).gain(.8).mask(section3).postgain(section3.mul("<0.25 0.17 0.08 0>")).orbit(9).analyze("guitar")
+
+// ========== hook ==========
+const clip3 = "<0!12 1!12 0!4>"
+// Drop · bars 13-24 · pattern call
+// Hook · notes written by hand
+$: n("<[0 ~ 1 ~ 0 ~ [~ 4] 3] [1 ~ 0 ~ ~ ~ ~ ~]>").scale("E4:phrygian")
+  .s("square").distort(1).distortvol(.5).lpf(2800)
+  .decay(.2).sustain(.3).delay(.3).room(.3).gain(0.4).mask("<1!11 [1 0]>").mask(clip3).velocity(clip3).orbit(4).analyze("hook")
+
+// ========== Radio noise · code ==========
+// Intro · bars 1-8 · pattern static
+$: (s("white*16").decay(.03).sustain(0).hpf(6000).gain(perlin.range(.05, .25)).pan(rand))
+  .mask(section1).velocity(section1).orbit(10).analyze("fx")
+// Outro · bars 25-28 · pattern static
+$: (s("white*16").decay(.03).sustain(0).hpf(6000).gain(perlin.range(.05, .25)).pan(rand))
+  .mask(section3).velocity(section3).orbit(10).analyze("fx")

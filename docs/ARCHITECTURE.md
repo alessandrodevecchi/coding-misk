@@ -9,7 +9,6 @@ Vanilla JavaScript ES modules served by Vite 8. No framework. Strudel runs insid
 | `src/main.js`     | Entry point. Track library, draft persistence, arranger UI, channel controls, sequencer, tabs, transport, WAV export, language and theme switches, custom samples loading |
 | `src/music.js`    | Musical data (keys, chords, progressions, presets), `DEFAULT` scene state, `normalizeState`, `sceneLayers` (per-instrument code generator), `compileTrackV1` (reference), `makeScene`, demo track |
 | `src/song/`       | Song format v2: `format.js` (types, `fromScenes` converter, `normalizeSong`, `clipState`), `compile.js` (`compileSong`, `compileTrack`), `validate.js` (`validateSong`) |
-| `src/tracks.js`   | Built-in scene tracks and `reelFrom` (reel excerpts from a full track)                                                                                                    |
 | `src/songs.js`    | `parseSong(code)`: reads `SECTIONS` and `TEMPO` lines into per-bar BPM, section map, `secondsAt`, `sectionAt`                                                             |
 | `src/visuals.js`  | Canvas visuals, per-instrument levels and onsets from Strudel analysers                                                                                                   |
 | `src/hardware.js` | Hardware theme: knobs bound to range inputs, activity LEDs                                                                                                                |
@@ -20,13 +19,13 @@ Vanilla JavaScript ES modules served by Vite 8. No framework. Strudel runs insid
 ## Data flow
 
 1. The library merges built-in tracks with the owner's saved tracks (`localStorage` key `coding-misk-library`). Saved copies of built-ins override them by id.
-2. The track being edited (`T`) and the selected scene live in `coding-misk-draft`. `S` always points to the selected scene's state; every control reads and writes `S` through `data-path` attributes.
-3. Any change calls `changed()`: mark dirty, recompile with `compileTrack` (scenes converted to the v2 format, then `compileSong`), `ed.setCode`, re-evaluate if playing (without stopping).
-   JSON songs in `songs/` are validated and compiled at startup and listed with the coded tracks.
-4. `playSong(sg, bar, mode)` stops, sets the editor code (with `setcpm` replaced by the start bar tempo), sets `scheduler.lastEnd = bar` to start from any bar, then evaluates.
-5. The `transport()` loop runs every animation frame: applies the per-bar tempo with `scheduler.setCps`, handles section loop and end of track, follows the playing scene in the arranger, updates buttons, timelines and the master gain (0.6).
+2. Built-in songs are the JSON files in `songs/` (loaded with `import.meta.glob`, validated, ordered by `songs/index.json`). Saved songs from older versions (scenes) are converted with `fromScenes` by `prepare()`.
+3. The song being edited (`T`, format v2), the selected section `sel` and the selected track `tk` live in `coding-misk-draft`. The arranger grid shows one row per track and one column per section; a cell is a clip covering that section. The track panel edits the selected track: its settings (for the whole track, or only the selected section through the clip's `set`), its patterns and which pattern plays in the selected section.
+4. Any change calls `changed()`: mark dirty, recompile with `compileSong`, `ed.setCode`, re-evaluate if playing (without stopping). Muted tracks, and non-solo tracks when any track is soloed, are left out of the code.
+5. `playSong(sg, bar, mode)` stops, sets the editor code (with `setcpm` replaced by the start bar tempo), sets `scheduler.lastEnd = bar` to start from any bar, then evaluates.
+6. The `transport()` loop runs every animation frame: applies the per-bar tempo with `scheduler.setCps`, handles section loop and end of track, follows the playing section in the arranger (not while a field of the song is being edited), updates buttons, timelines and the master gain (0.6).
 
-Modes: `track` (scene track from the arranger) and `free` (lessons, sounds, hand-written tracks).
+Modes: `track` (song from the arranger) and `free` (lessons, sounds, hand-written tracks).
 
 ## Strudel integration notes
 
@@ -41,7 +40,7 @@ Modes: `track` (scene track from the arranger) and `free` (lessons, sounds, hand
 
 ## Persistence keys
 
-`coding-misk-library`, `coding-misk-draft`, `coding-misk-look`, `coding-misk-ui`, `coding-misk-lang`, `coding-misk-tab`.
+`coding-misk-library`, `coding-misk-draft`, `coding-misk-look`, `coding-misk-ui`, `coding-misk-lang`, `coding-misk-tab`, `coding-misk-code-w` (code panel width), `coding-misk-code-collapsed`.
 
 ## Recording a demo
 

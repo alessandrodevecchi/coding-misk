@@ -1,0 +1,331 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "neon-ascent-scenes",
+  "title": "Neon Ascent",
+  "look": "tramonto",
+  "style": {
+    "it": "Techno trance · La minore · 128 BPM",
+    "en": "Techno trance · A minor · 128 BPM"
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 4,
+      "bpm": 128,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 8,
+      "bpm": 128,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Drop",
+      "bars": 8,
+      "bpm": 128,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Break",
+      "bars": 4,
+      "bpm": 128,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4",
+      "fade": 1
+    },
+    {
+      "name": "Drop 2",
+      "bars": 8,
+      "bpm": 128,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.9,
+        "gainEnd": null,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 0,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "oh": "..x...x...x...x."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "xxxxxxxxxxxxxxxx",
+            "oh": "..x...x...x...x."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "xxxxxxxxxxxxxxxx",
+            "oh": "..x...x...x...x."
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "xxxxxxxxxxxxxxxx",
+            "oh": "..x...x...x...x.",
+            "rd": "..x...x...x...x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "B",
+          "set": {
+            "gain": 0.7,
+            "gainEnd": 0.95
+          }
+        },
+        {
+          "section": "Drop",
+          "pattern": "C"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "D"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0,
+        "gainEnd": 0.85,
+        "cutoff": 700,
+        "cutoffEnd": null,
+        "move": "lento",
+        "reso": 10,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "rolling"
+        }
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "gain": 0.85,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "gain": 0.85,
+            "gainEnd": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.38,
+        "gainEnd": null,
+        "cutoff": 600,
+        "cutoffEnd": 4200,
+        "move": "lento",
+        "reso": 5,
+        "delay": 0.3,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "su",
+          "speed": "16"
+        }
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "A",
+          "set": {
+            "cutoff": 4200,
+            "cutoffEnd": null,
+            "move": "fisso"
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "A",
+          "set": {
+            "cutoff": 2000,
+            "cutoffEnd": null,
+            "move": "fisso"
+          }
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A",
+          "set": {
+            "cutoff": 4200,
+            "cutoffEnd": null,
+            "move": "fisso"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.28,
+        "gainEnd": null,
+        "cutoff": 3200,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.4,
+        "mode": "minor",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "neon"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "A"
+        },
+        {
+          "section": "Break",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.3,
+        "gainEnd": null,
+        "cutoff": 1400,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.9,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pad"
+        },
+        "B": {
+          "preset": "pump"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop",
+          "pattern": "B",
+          "set": {
+            "cutoff": 2200,
+            "room": 0.5
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "B",
+          "set": {
+            "cutoff": 2200,
+            "room": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.3,
+        "bars": "8",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Break",
+          "pattern": "A",
+          "set": {
+            "bars": "4"
+          }
+        }
+      ]
+    }
+  ]
+}

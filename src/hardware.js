@@ -3,10 +3,7 @@
 // la manopola li legge e li scrive, così il resto dell'app non sa che esistono.
 
 const SPAN = 180; // pixel di trascinamento per tutta la corsa
-const CHANNEL_IDS = {
-  drums: ['kick', 'snare', 'hats'], 'ch-bass': ['bass'], 'ch-guitar': ['guitar'], 'ch-arp': ['arp'],
-  'ch-hook': ['hook'], 'ch-pad': ['pad'], 'ch-texture': ['fx'], 'ch-riser': ['riser'],
-};
+// ogni elemento con data-act-ids="kick,snare" riceve un LED acceso dai livelli di quegli strumenti (righe della griglia)
 
 function setValue(input, v) {
   const min = +input.min || 0, max = +input.max || 1, step = +input.step || .01;
@@ -47,10 +44,9 @@ function attachKnob(input) {
 export function startHardware() {
   const enhance = () => {
     document.querySelectorAll('input[type=range]').forEach(attachKnob);
-    for (const id of Object.keys(CHANNEL_IDS)) {
-      const head = document.querySelector(`#${id} .chhead`);
-      if (head && !head.querySelector('.act')) { const s = document.createElement('span'); s.className = 'act'; s.setAttribute('aria-hidden', 'true'); head.insertBefore(s, head.children[1]); }
-    }
+    document.querySelectorAll('[data-act-ids]').forEach(head => {
+      if (!head.querySelector('.act')) { const s = document.createElement('span'); s.className = 'act'; s.setAttribute('aria-hidden', 'true'); head.prepend(s); }
+    });
   };
   enhance();
   new MutationObserver(enhance).observe(document.body, { childList: true, subtree: true });
@@ -63,7 +59,6 @@ export function startHardware() {
       return m;
     } catch (e) { return 0; }
   };
-  const lv = {};
   (function frame() {
     requestAnimationFrame(frame);
     if (document.documentElement.dataset.ui !== 'hw') return;
@@ -75,11 +70,13 @@ export function startHardware() {
       k.classList.toggle('off', input.closest('.end')?.hidden || false);
     });
     const A = window.analysers;
-    for (const [id, ids] of Object.entries(CHANNEL_IDS)) {
-      const led = document.querySelector(`#${id} .act`); if (!led) continue;
+    document.querySelectorAll('[data-act-ids]').forEach(head => {
+      const led = head.querySelector('.act'); if (!led) return;
+      const key = head.dataset.actIds, ids = key.split(',');
       const v = A ? Math.max(...ids.map(x => (A[x] ? peak(x) : 0))) : 0;
-      lv[id] = Math.max(Math.min(1, v * 2.2), (lv[id] || 0) * .86);
-      led.style.setProperty('--lv', lv[id].toFixed(2));
-    }
+      const prev = +(led.dataset.lv || 0), now = Math.max(Math.min(1, v * 2.2), prev * .86);
+      led.dataset.lv = now.toFixed(3);
+      led.style.setProperty('--lv', now.toFixed(2));
+    });
   })();
 }

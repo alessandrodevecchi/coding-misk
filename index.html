@@ -65,13 +65,14 @@
         </div>
         <div class="arr-scroll">
           <div class="arr-strip" id="arr-strip"></div>
-          <div class="arr-lanes" id="arr-lanes" aria-label="Timeline"></div>
+          <div class="arr-grid" id="arr-grid" data-i18n-aria="arrangement"></div>
         </div>
         <div class="arr-tools">
           <button class="btn" id="sc-add" data-i18n="addScene"></button>
           <button class="btn icon" id="sc-left" data-i18n-aria="moveLeft">◀</button>
           <button class="btn icon" id="sc-right" data-i18n-aria="moveRight">▶</button>
           <button class="btn" id="sc-del" data-i18n="delScene"></button>
+          <span class="tk-add"><select id="tk-type" data-i18n-aria="trackType"></select><button class="btn" id="tk-add" data-i18n="addTrack"></button></span>
           <span class="song-meta" id="arr-total"></span>
         </div>
         <div class="arr-scene">
@@ -83,8 +84,8 @@
             <div class="bpm" id="bpm-end-row" hidden><span class="lbl" data-i18n="bpmEnd"></span><input id="bpm-end" type="number" min="60" max="200" step="1"></div></div>
           <div class="ctrl"><label class="lbl" for="key" data-i18n="key"></label><select id="key"></select></div>
           <div class="ctrl"><label class="lbl" for="prog" data-i18n="chords"></label><select id="prog"></select></div>
-          <div class="ctrl"><label class="lbl" for="sc-meter" data-i18n="meter"></label><select id="sc-meter" data-path="meter"></select></div>
-          <div class="ctrl"><div class="row"><label class="lbl" for="sc-swing">Swing</label><output id="sc-swing-o"></output></div><input type="range" id="sc-swing" data-path="swing" min="0" max="1" step="0.05"></div>
+          <div class="ctrl"><label class="lbl" for="sc-meter" data-i18n="meter"></label><select id="sc-meter"></select></div>
+          <div class="ctrl"><div class="row"><label class="lbl" for="sc-swing">Swing</label><output id="sc-swing-o"></output></div><input type="range" id="sc-swing" min="0" max="1" step="0.05"></div>
         </div>
         <div class="arr-flags">
           <label class="loop"><input type="checkbox" id="sc-crash"> <span data-i18n="crashStart"></span></label>
@@ -100,16 +101,7 @@
         </div>
         <p class="note" data-i18n="sceneHint"></p>
       </div>
-      <div class="card" id="drums">
-        <div class="chhead"><button class="led" data-on="drums"></button><h3 data-i18n="drums"></h3><span class="hint" data-i18n="drumsHint"></span></div>
-        <div class="seqtop">
-          <div class="ctrl"><label class="lbl" for="drums-kit" data-i18n="drumMachine"></label><select id="drums-kit" data-path="drums.kit"></select></div>
-          <div class="ctrl"><label class="lbl" for="drums-preset" data-i18n="groove"></label><select id="drums-preset"></select></div>
-        </div>
-        <div class="ctrls drumctrls" id="drums-ctrls"></div>
-        <div class="seq" id="seq"></div>
-      </div>
-      <div class="chgrid" id="channels"></div>
+      <div class="card track-panel" id="track-panel"></div>
     </section>
 
     <section id="tab-brani" hidden>
@@ -133,10 +125,15 @@
     </section>
   </div>
 
-  <aside class="codecol" data-i18n-aria="code">
+  <aside class="codecol" id="codecol" data-i18n-aria="code">
+    <div class="code-resize" id="code-resize" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-aria="codeResize"></div>
     <div class="codehead">
       <div><div class="lbl" data-i18n="liveCode"></div><div class="src" id="src"></div></div>
       <button class="btn" id="back" hidden data-i18n="back"></button>
+      <div class="code-tools">
+        <button class="btn icon" id="code-full" data-i18n-aria="codeFull" aria-pressed="false">⤢</button>
+        <button class="btn icon" id="code-collapse" data-i18n-aria="codeCollapse" aria-pressed="false">⇥</button>
+      </div>
     </div>
     <div class="edhost" id="edhost"></div>
     <div class="actions">

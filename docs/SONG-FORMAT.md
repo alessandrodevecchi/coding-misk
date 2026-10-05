@@ -54,7 +54,7 @@ Progressions are written in A minor and moved to `key`; see `PROGS` in `src/musi
 { "id": "riff", "name": "Guitar riff", "type": "guitar", "settings": {}, "patterns": { "A": {} }, "clips": [] }
 ```
 
-- `id`: unique in the song. `name`: label in the code and UI (defaults to `id`).
+- `id`: unique in the song. `name`: label in the code and UI (defaults to `id`). `mute`, `solo`: `true` leaves the track out of the code (solo: every other track).
 - `type`: `drums bass guitar arp hook pad texture riser code`. Any number of tracks of any type.
 - `settings`: how the track sounds. Missing settings take the defaults below.
 - `patterns`: named patterns (`"A"`, `"verse"`, …), what the track plays.
@@ -120,4 +120,4 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 
 `compileSong` writes, in order: `setcpm`, `SECTIONS` and `TEMPO` (read by the player for seeking and tempo changes), one lane per section (`section1 = "<1!8 0!24>"`), then one block per track with its clips. Each clip line ends with `.mask(lane).velocity(lane).orbit(n).analyze("<instrument>")`.
 
-The built-in tracks are still written as scenes in `src/tracks.js`; they are converted with `fromScenes` (export them with `node --no-warnings tools/song.mjs export <id>`). `tools/parity-v2.mjs` checks that the conversion compiles to exactly the same layers as the scene compiler.
+Songs saved by older versions of the app (scenes with a full state each) are converted with `fromScenes` when loaded. The conversion was checked layer by layer against the old scene compiler before the scene model was removed.

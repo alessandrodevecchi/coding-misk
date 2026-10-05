@@ -177,7 +177,7 @@ export const TEX_RHYTHMS = {
 };
 // drum machine senza piatto crash: il crash viene preso dalla 909
 const NO_CRASH = ['YamahaRX5', 'AlesisHR16', 'KorgMinipops'];
-export const KITS = ['RolandTR909', 'RolandTR808', 'RolandTR707', 'RolandTR606', 'LinnDrum', 'AkaiLinn', 'LinnLM1', 'OberheimDMX', 'EmuSP12', 'AkaiMPC60', 'AlesisHR16', 'YamahaRX5'];
+export const KITS = ['RolandTR909', 'RolandTR808', 'RolandTR707', 'RolandTR606', 'LinnDrum', 'AkaiLinn', 'LinnLM1', 'OberheimDMX', 'EmuSP12', 'AkaiMPC60', 'AkaiXR10', 'AlesisHR16', 'YamahaRX5'];
 // [id campione, etichetta, moltiplicatore volume, strumento nel visual Palco]
 export const ROWS = [['bd', 'Kick', 1, 'kick'], ['cp', 'Clap', .8, 'snare'], ['sd', 'Snare', .75, 'snare'], ['hh', 'Hat', .5, 'hats'], ['oh', 'Open', .45, 'hats'], ['rd', 'Ride', .35, 'hats']];
 const E16 = '................';
@@ -523,44 +523,6 @@ export const songHeader = (title, first, names, secs) => {
     `const SECTIONS = [${names.map((n, i) => `['${n}', ${secs[i].bars}]`).join(', ')}]`,
     `const TEMPO = {${names.map((n, i) => `'${n}': ${JSON.stringify(tempo[i]).replace(/"/g, "'")}`).join(', ')}}`,
   ];
-};
-
-// Brano a scene (modello v1) → codice Strudel, una scena alla volta.
-// Resta come riferimento: l'app compila con il formato v2 (src/song/compile.js), che produce gli stessi layer.
-export function compileTrackV1(track) {
-  const sc = track.scenes.map(s => ({ ...s, state: normalizeState(s.state) })), starts = [];
-  let total = 0;
-  for (const s of sc) { starts.push(total); total += s.bars; }
-  const secs = sc.map(s => ({ bars: s.bars, fade: s.fade, bpm: s.state.bpm, bpmEnd: s.state.bpmEnd, meter: s.state.meter }));
-  const names = uniqueNames(sc.map(s => s.name));
-  const L = songHeader(track.title, sc[0].state, names, secs);
-  sc.forEach((s, i) => {
-    const gate = `scene${i + 1}`;
-    L.push('', `// ---------- ${i + 1} · ${names[i]} · ${sectionInfo({ ...s.state, bars: s.bars }, fadeIn(secs, i))} ----------`);
-    L.push(`const ${gate} = "${rle(sectionLane(secs, i).map(String))}"`);
-    L.push(...sceneLayers(s.state, { start: starts[i], bars: s.bars, gate, crash: s.crash, breath: s.breath, fill: s.fill }));
-  });
-  return L.join('\n');
-}
-
-// scena = { name, bars, fade, crash, breath, state }; edit modifica una copia dello stato predefinito
-export const makeScene = (name, bars, opts, edit) => {
-  const st = cloneState(DEFAULT); edit && edit(st);
-  return { name, bars, fade: 0, crash: false, breath: false, fill: false, ...opts, state: st };
-};
-const off = (...chs) => st => chs.forEach(c => { st[c].on = false; });
-
-// La traccia di prova del primo giorno, ora un brano a scene.
-export const DEMO_TRACK = {
-  id: 'demo-synth-lab', title: 'Synth Lab Demo', look: 'tramonto',
-  scenes: [
-    makeScene('Intro', 8, {}, s => { s.drums.rows.bd.mute = true; off('bass', 'hook')(s); s.arp.cutoff = 900; s.pad.cutoff = 700; s.pad.cutoffEnd = 1400; }),
-    makeScene('Build', 8, { fade: 2, breath: true }, s => { s.hook.on = false; s.bass.cutoff = 300; s.bass.cutoffEnd = 700; s.arp.cutoff = 900; s.arp.cutoffEnd = 2600; s.riser.on = true; s.riser.bars = '8'; }),
-    makeScene('Drop', 16, { crash: true }, s => { s.arp.cutoff = 2600; }),
-    makeScene('Break', 8, { fade: 2, breath: true }, s => { off('drums', 'bass')(s); s.arp.cutoff = 1200; s.pad.room = .95; s.riser.on = true; s.riser.bars = '8'; }),
-    makeScene('Drop 2', 16, { crash: true }, s => { s.bpm = 140; s.key = 'B'; s.hook.preset = 'domanda'; s.arp.cutoff = 3000; s.arp.preset = 'pulsar';
-      for (const [id, steps] of Object.entries(GROOVES.rolling[1])) s.drums.rows[id].steps = steps; }),
-  ],
 };
 
 // Codice libero (guida, suoni): se non ha già i suoi .analyze, ne aggiungiamo uno generico.

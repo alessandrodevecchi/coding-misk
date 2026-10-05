@@ -1,0 +1,725 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "ghost-protocol-scenes",
+  "title": "Ghost Protocol",
+  "look": "palco",
+  "style": {
+    "it": "Hard techno cyberpunk · Mi frigio, poi Fa nel drop B · tempo da 132 a 148 BPM",
+    "en": "Cyberpunk hard techno · E phrygian, then F in drop B · tempo from 132 to 148 BPM"
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 8,
+      "bpm": 132,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 8,
+      "bpm": 134,
+      "bpmEnd": 140,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "fade": 2,
+      "breath": true
+    },
+    {
+      "name": "Drop A",
+      "bars": 12,
+      "bpm": 140,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Fall",
+      "bars": 2,
+      "bpm": 140,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4"
+    },
+    {
+      "name": "Break",
+      "bars": 6,
+      "bpm": 140,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "fade": 1,
+      "crash": true
+    },
+    {
+      "name": "Rebuild",
+      "bars": 8,
+      "bpm": 141,
+      "bpmEnd": 148,
+      "key": "E",
+      "chords": "cyber",
+      "meter": "4/4",
+      "fade": 2,
+      "breath": true
+    },
+    {
+      "name": "Drop B",
+      "bars": 12,
+      "bpm": 148,
+      "key": "F",
+      "chords": "cyber",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Outro",
+      "bars": 4,
+      "bpm": 148,
+      "key": "F",
+      "chords": "cyber",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR606",
+        "gain": 0.6,
+        "gainEnd": 1,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 0,
+        "grit": 0.9
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "..x...x...x...x."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "xxxxxxxxxxxxxxxx",
+            "oh": "..x...x...x...x."
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "E": {
+          "rows": {
+            "bd": "x.........x.....",
+            "cp": "........x.......",
+            "hh": "x.x.x.x.x.x.x.x."
+          }
+        },
+        "F": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x..x",
+            "hh": "x.xx.x.xx.xx.x.x",
+            "oh": "..x...x...x...x.",
+            "rd": "..x...x...x...x."
+          }
+        },
+        "G": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "xxxxxxxxxxxxxxxx"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "B",
+          "set": {
+            "kit": "RolandTR909",
+            "gain": 0.9,
+            "gainEnd": null,
+            "drive": 1.6,
+            "grit": 0
+          }
+        },
+        {
+          "section": "Drop A",
+          "pattern": "C",
+          "set": {
+            "kit": "RolandTR909",
+            "gain": 0.9,
+            "gainEnd": null,
+            "drive": 1.6,
+            "grit": 0.4
+          }
+        },
+        {
+          "section": "Fall",
+          "pattern": "D",
+          "set": {
+            "kit": "RolandTR909",
+            "gain": 0.9,
+            "gainEnd": 0.3,
+            "drive": 1.6,
+            "grit": 0
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "E",
+          "set": {
+            "kit": "LinnDrum",
+            "gain": 0.75,
+            "gainEnd": null,
+            "grit": 0.85
+          }
+        },
+        {
+          "section": "Rebuild",
+          "pattern": "B",
+          "set": {
+            "kit": "RolandTR909",
+            "gain": 0.5,
+            "gainEnd": 0.9,
+            "cutoff": 300,
+            "cutoffEnd": 20000,
+            "drive": 1.8,
+            "grit": 0
+          }
+        },
+        {
+          "section": "Drop B",
+          "pattern": "F",
+          "set": {
+            "kit": "RolandTR909",
+            "gain": 0.9,
+            "gainEnd": null,
+            "drive": 2,
+            "grit": 0.6
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "G",
+          "set": {
+            "kit": "RolandTR909",
+            "gain": 0.9,
+            "gainEnd": 0.2,
+            "drive": 2.5,
+            "grit": 0.95
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sine",
+        "gain": 0,
+        "gainEnd": 0.5,
+        "cutoff": 400,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 8,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "sub"
+        },
+        "B": {
+          "preset": "rumble"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "B",
+          "set": {
+            "wave": "sawtooth",
+            "gain": 0.2,
+            "gainEnd": 0.55,
+            "cutoff": 200,
+            "cutoffEnd": 450,
+            "reso": 10,
+            "drive": 3
+          }
+        },
+        {
+          "section": "Drop A",
+          "pattern": "B",
+          "set": {
+            "wave": "sawtooth",
+            "gain": 0.55,
+            "gainEnd": null,
+            "cutoff": 450,
+            "reso": 10,
+            "drive": 3
+          }
+        },
+        {
+          "section": "Fall",
+          "pattern": "B",
+          "set": {
+            "wave": "sawtooth",
+            "gain": 0.55,
+            "gainEnd": 0.2,
+            "cutoff": 450,
+            "cutoffEnd": 150,
+            "reso": 10,
+            "drive": 3
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "A",
+          "set": {
+            "gain": 0.6,
+            "gainEnd": null
+          }
+        },
+        {
+          "section": "Rebuild",
+          "pattern": "B",
+          "set": {
+            "wave": "sawtooth",
+            "gain": 0.2,
+            "gainEnd": 0.55,
+            "cutoff": 150,
+            "cutoffEnd": 500,
+            "reso": 10,
+            "drive": 3
+          }
+        },
+        {
+          "section": "Drop B",
+          "pattern": "B",
+          "set": {
+            "wave": "sawtooth",
+            "gain": 0.55,
+            "gainEnd": null,
+            "cutoff": 500,
+            "reso": 10,
+            "drive": 3.5
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "B",
+          "set": {
+            "wave": "sawtooth",
+            "gain": 0.5,
+            "gainEnd": 0.1,
+            "cutoff": 500,
+            "cutoffEnd": 120,
+            "reso": 10,
+            "drive": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.3,
+        "gainEnd": 0.38,
+        "cutoff": 300,
+        "cutoffEnd": 2800,
+        "move": "fisso",
+        "reso": 20,
+        "delay": 0,
+        "drive": 1
+      },
+      "patterns": {
+        "A": {
+          "preset": "acid",
+          "speed": "8"
+        }
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Drop A",
+          "pattern": "A",
+          "set": {
+            "gain": 0.36,
+            "gainEnd": null,
+            "cutoff": 1400,
+            "cutoffEnd": 3400,
+            "drive": 1.4
+          }
+        },
+        {
+          "section": "Fall",
+          "pattern": "A",
+          "set": {
+            "gain": 0.36,
+            "gainEnd": null,
+            "cutoff": 3000,
+            "cutoffEnd": 450,
+            "drive": 1.4
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "A",
+          "set": {
+            "gain": 0.18,
+            "gainEnd": null,
+            "cutoff": 380,
+            "cutoffEnd": null
+          }
+        },
+        {
+          "section": "Rebuild",
+          "pattern": "A",
+          "set": {
+            "gainEnd": 0.36,
+            "cutoff": 400,
+            "cutoffEnd": 3600,
+            "drive": 1.2
+          }
+        },
+        {
+          "section": "Drop B",
+          "pattern": "A",
+          "set": {
+            "gain": 0.34,
+            "gainEnd": null,
+            "cutoff": 1800,
+            "cutoffEnd": 4800,
+            "reso": 24,
+            "drive": 1.8
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "A",
+          "set": {
+            "gain": 0.34,
+            "gainEnd": 0,
+            "cutoff": 3000,
+            "cutoffEnd": 250,
+            "drive": 1.4
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0,
+        "gainEnd": 0.24,
+        "cutoff": 3500,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.45,
+        "mode": "phrygian",
+        "fm": 2,
+        "vowel": "<a e i o>",
+        "grit": 0,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "cyber"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop A",
+          "pattern": "A"
+        },
+        {
+          "section": "Fall",
+          "pattern": "A",
+          "set": {
+            "gain": 0.24,
+            "gainEnd": null,
+            "delay": 0.7,
+            "fm": 3
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "A",
+          "set": {
+            "gain": 0.24,
+            "gainEnd": null,
+            "delay": 0.6,
+            "fm": 3
+          }
+        },
+        {
+          "section": "Rebuild",
+          "pattern": "A",
+          "set": {
+            "gain": 0.24,
+            "gainEnd": 0.1,
+            "fm": 3
+          }
+        },
+        {
+          "section": "Drop B",
+          "pattern": "A",
+          "set": {
+            "gain": 0.22,
+            "gainEnd": null,
+            "fm": 4,
+            "grit": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.05,
+        "gainEnd": 0.28,
+        "cutoff": 500,
+        "cutoffEnd": 1400,
+        "move": "lento",
+        "room": 0.9,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pad"
+        },
+        "B": {
+          "preset": "stab"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "A",
+          "set": {
+            "gain": 0.28,
+            "gainEnd": 0.08,
+            "cutoff": 1400,
+            "cutoffEnd": null,
+            "room": 0.85
+          }
+        },
+        {
+          "section": "Drop A",
+          "pattern": "B",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": null,
+            "cutoff": 2800,
+            "cutoffEnd": null,
+            "move": "fisso",
+            "room": 0.4,
+            "drive": 0.8
+          }
+        },
+        {
+          "section": "Fall",
+          "pattern": "B",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": 0.06,
+            "cutoff": 2800,
+            "cutoffEnd": 600,
+            "move": "fisso",
+            "room": 0.85
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "A",
+          "set": {
+            "gain": 0.28,
+            "gainEnd": null,
+            "cutoff": 1400,
+            "cutoffEnd": 2400
+          }
+        },
+        {
+          "section": "Rebuild",
+          "pattern": "A",
+          "set": {
+            "gain": 0.28,
+            "gainEnd": 0.06,
+            "cutoff": 2400,
+            "cutoffEnd": 800,
+            "room": 0.85
+          }
+        },
+        {
+          "section": "Drop B",
+          "pattern": "B",
+          "set": {
+            "gain": 0.3,
+            "gainEnd": null,
+            "cutoff": 3400,
+            "cutoffEnd": null,
+            "move": "fisso",
+            "room": 0.4,
+            "drive": 1.2
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "A",
+          "set": {
+            "gain": 0,
+            "gainEnd": 0.3,
+            "cutoff": 1400,
+            "cutoffEnd": null,
+            "room": 0.85
+          }
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "type": "texture",
+      "settings": {
+        "sample": "numbers",
+        "gain": 0.5,
+        "gainEnd": null,
+        "grit": 0.85,
+        "room": 0.7
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "bar"
+        },
+        "B": {
+          "rhythm": "eighth"
+        },
+        "C": {
+          "rhythm": "euclid"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Build",
+          "pattern": "B",
+          "set": {
+            "sample": "industrial",
+            "gain": 0.25,
+            "grit": 0.6,
+            "room": 0.6
+          }
+        },
+        {
+          "section": "Drop A",
+          "pattern": "C",
+          "set": {
+            "sample": "metal",
+            "gain": 0.35,
+            "grit": 0.75,
+            "room": 0.3
+          }
+        },
+        {
+          "section": "Break",
+          "pattern": "A",
+          "set": {
+            "gain": 0.4
+          }
+        },
+        {
+          "section": "Drop B",
+          "pattern": "B",
+          "set": {
+            "sample": "industrial",
+            "gain": 0.18,
+            "grit": 0.9,
+            "room": 0.2
+          }
+        },
+        {
+          "section": "Outro",
+          "pattern": "A",
+          "set": {
+            "grit": 0.9,
+            "room": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.35,
+        "bars": "8",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "A"
+        },
+        {
+          "section": "Fall",
+          "pattern": "A",
+          "set": {
+            "bars": "2",
+            "dir": "down"
+          }
+        },
+        {
+          "section": "Rebuild",
+          "pattern": "A",
+          "set": {
+            "gain": 0.4
+          }
+        }
+      ]
+    }
+  ]
+}

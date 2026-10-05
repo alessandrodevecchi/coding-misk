@@ -40,9 +40,10 @@ This project combines that idea with what the new models can do, with my own twi
 
 ## What it does
 
-- **Scene arranger.** A track is a sequence of scenes, each with a name, length, entry (hard cut or fade) and every setting: BPM including ramps, key, chords, meter (4/4, 3/4, 5/4, 7/8) and swing. Scenes compile to Strudel code in real time.
-- **Channels.** Drum sequencer with several drum machines, bass with riffs, guitar (clean, crunch, distorted, metal, palm muted) with riffs and stereo double tracking, arpeggio, hook with harmonies and dark modes, pad, texture (voices, metal hits, vinyl) and riser. Every channel can use oscillators or General MIDI instruments.
-- **Automation.** Volume, filter and tempo can move from the start to the end of a scene. Drive, bitcrusher, resonance, FM and vowel filter are available too.
+- **Arranger.** A grid of tracks and sections. Sections hold tempo (with ramps), key, chords, meter (4/4, 3/4, 5/4, 7/8), swing and the entry (hard cut or fade). Tracks are free: any number of any instrument, each with its own patterns, mute and solo. Everything compiles to Strudel code in real time.
+- **Songs as JSON.** Songs are files in `songs/` with a documented format, a validator and a command line tool, so people and agents can write them as code ([docs/COMPOSING.md](docs/COMPOSING.md)). Code tracks hold plain Strudel inside a song.
+- **Instruments.** Drum sequencer with several drum machines, bass with riffs, guitar (clean, crunch, distorted, metal, palm muted) with riffs and stereo double tracking, arpeggio, hook with harmonies and dark modes, pad, texture (voices, metal hits, vinyl) and riser. Every instrument can use oscillators or General MIDI sounds, has its own rhythm steps, and bass, arpeggio and hook take notes written as chord or scale degrees.
+- **Automation.** Volume, filter and tempo can move from the start to the end of a section. Drive, bitcrusher, resonance, FM and vowel filter are available too.
 - **Player.** Clickable timeline, start from any bar, buttons to hear each transition between sections, section loop, pause and resume.
 - **Included tracks.** About twenty tracks across genres: techno, trance, hard techno, industrial, dark club, metal, melodic metal, phonk, progressive rock, lo-fi and 90s arcade, plus a 30 second reel.
 - **Visuals.** Seven canvas themes (Stage, Pixel, Sunset, Mountains, Space, Sonar, Edgerunners). Each instrument has its own audio analyser, so on the Stage the drums, bass, guitar, keys and FX light up when they play.
@@ -84,8 +85,9 @@ The app opens at <http://localhost:5173>. Space bar plays and pauses, `Ctrl+Ente
 | ---------------- | ------------------------------------------------------------------- |
 | `index.html`     | Interface markup                                                    |
 | `src/main.js`    | Track library, arranger, controls, transport, Strudel editor wiring |
-| `src/music.js`   | Keys, chords, presets, scene state, scene-to-code compiler          |
-| `src/tracks.js`  | Included scene tracks                                               |
+| `src/music.js`   | Keys, chords, presets, per-instrument code generator                |
+| `src/song/`      | Song format: compiler, validator, converter from older saves        |
+| `songs/`         | Included songs as JSON, `songs/examples/` for the guide             |
 | `src/songs.js`   | Reads sections and tempo from a track's code                        |
 | `src/visuals.js` | Canvas visuals synced to the audio                                  |
 | `src/i18n.js`    | Italian and English strings                                         |

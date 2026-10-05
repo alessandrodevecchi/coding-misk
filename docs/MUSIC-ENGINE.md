@@ -1,17 +1,10 @@
 # Music engine
 
-## Track and scene model
+## Songs and channel state
 
-```js
-track = { id, title, look, style: { it, en }, scenes: [scene, …] }
-scene = { name, bars, fade, crash, breath, fill, state }
-```
+Songs follow the format v2 (`docs/SONG-FORMAT.md`): sections, tracks, patterns, clips. To generate code, each clip is turned into a channel state (`clipState` in `src/song/format.js`): section fields + track settings + clip overrides + pattern. That state follows `DEFAULT` in `src/music.js` (the model of the old scenes, kept as the generator's input), and `sceneLayers(state, { only: type })` writes the Strudel layers of one instrument.
 
-- `fade`: bars of crossfade from the previous scene (0 = hard cut). Tempo also ramps over these bars.
-- `crash`: crash cymbal on the first beat. `breath`: half bar of silence at the end (before a drop). `fill`: snare roll in the last bar.
-- `state` follows `DEFAULT` in `src/music.js`; `normalizeState` fills fields missing from older saves.
-
-`state` fields:
+State fields:
 
 - Scene: `bpm`, `bpmEnd` (ramp to the end of the scene, `null` = fixed), `key` (`E F F# G A B C D`, all music is written in A and transposed), `prog`, `meter` (`4/4 3/4 5/4 7/8`), `swing` (0 to 1).
 - `drums`: `on`, `kit`, `gain`/`gainEnd`, `cutoff`/`cutoffEnd`, `drive`, `grit`, `rows` (`bd cp sd hh oh rd`, each `{ steps: 'x...', mute }`, one char per 16th).
@@ -52,11 +45,11 @@ The app compiles every track through the song format v2 (`src/song/compile.js`, 
 - Every layer ends with `.analyze("<instrument>")` for the visuals.
 - Each instrument has its own orbit (`.orbit(n)`: drums 1, bass 2, arp 3, hook 4, guitar 5, pad 6, texture 7, riser 8). In superdough, delay time, feedback and reverb size belong to the orbit, so separate orbits keep them independent per instrument.
 
-## Writing a new track
+## Writing a new song
 
-Add it to `src/tracks.js` with `makeScene(name, bars, opts, state => { … })` and the helpers there (`only`, `steps`, `guitar`, `acid`, `rumble`, `club…`). Put it in `BUILTIN_TRACKS`. Then run `node tools/check-levels.cjs <id>` and balance: target peaks around 0.5 for kick and lead elements, keep the sum under the master limit.
+Write a JSON file in `songs/` (see `docs/COMPOSING.md`), add its id to `songs/index.json`, validate with `npm run check:songs`, then run `node tools/check-levels.cjs <id>` and balance: target peaks around 0.5 for kick and lead elements, keep the sum under the master limit. Update the snapshots (`npm run snapshot:code`, `node tools/snapshot-levels.cjs write <id>`).
 
-Guidelines from the owner's feedback: 4 to 5 layers per scene; tension over sweetness; reels start at full energy (`reelFrom`); avoid hard cuts between sections; vary the material between tracks.
+Guidelines from the owner's feedback: 4 to 5 layers per section; tension over sweetness; reels start at full energy (cut them from the strongest sections of a full song); avoid hard cuts between sections; vary the material between songs.
 
 ## Strudel gotchas (learned the hard way)
 

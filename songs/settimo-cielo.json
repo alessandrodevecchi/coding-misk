@@ -1,0 +1,441 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "settimo-cielo",
+  "title": "Settimo Cielo",
+  "look": "montagne",
+  "style": {
+    "it": "Progressive rock · La minore · 120 BPM · riff in 7/8, ponte in 5/4, assolo in 4/4 · chitarre distorte, organo, archi",
+    "en": "Progressive rock · A minor · 120 BPM · riff in 7/8, bridge in 5/4, solo in 4/4 · distorted guitars, organ, strings"
+  },
+  "sections": [
+    {
+      "name": "Mellotron",
+      "bars": 4,
+      "bpm": 120,
+      "key": "A",
+      "chords": "andalusa",
+      "meter": "4/4"
+    },
+    {
+      "name": "Riff 7/8",
+      "bars": 8,
+      "bpm": 120,
+      "key": "A",
+      "chords": "prog",
+      "meter": "7/8",
+      "crash": true
+    },
+    {
+      "name": "Strofa 7/8",
+      "bars": 8,
+      "bpm": 120,
+      "key": "A",
+      "chords": "prog",
+      "meter": "7/8"
+    },
+    {
+      "name": "Ponte 5/4",
+      "bars": 6,
+      "bpm": 120,
+      "key": "A",
+      "chords": "andalusa",
+      "meter": "5/4",
+      "fade": 1,
+      "fill": true
+    },
+    {
+      "name": "Assolo 4/4",
+      "bars": 8,
+      "bpm": 124,
+      "key": "A",
+      "chords": "andalusa",
+      "meter": "4/4",
+      "crash": true,
+      "fill": true
+    },
+    {
+      "name": "Riff ripresa",
+      "bars": 4,
+      "bpm": 120,
+      "key": "A",
+      "chords": "prog",
+      "meter": "7/8",
+      "crash": true
+    },
+    {
+      "name": "Finale",
+      "bars": 4,
+      "bpm": 120,
+      "bpmEnd": 92,
+      "key": "A",
+      "chords": "andalusa",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "AkaiXR10",
+        "gain": 0.9,
+        "gainEnd": null,
+        "cutoff": 20000,
+        "cutoffEnd": null,
+        "drive": 0.3,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x.......x.....",
+            "sd": "....x.......x.",
+            "hh": "x.x.x.x.x.x.x."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x.......x.....",
+            "sd": "....x.......x.",
+            "rd": "x.x.x.x.x.x.x."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x.........x.........",
+            "sd": "....x.......x...x...",
+            "hh": "x.x.x.x.x.x.x.x.x.x."
+          }
+        },
+        "D": {
+          "rows": {
+            "bd": "x.......x.x.....",
+            "sd": "....x.......x...",
+            "hh": "x.x.x.x.x.x.x.x.",
+            "oh": "..............x."
+          }
+        },
+        "E": {
+          "rows": {
+            "bd": "x.......x.......",
+            "sd": "........x.......",
+            "rd": "x...x...x...x..."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Riff 7/8",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa 7/8",
+          "pattern": "B"
+        },
+        {
+          "section": "Ponte 5/4",
+          "pattern": "C"
+        },
+        {
+          "section": "Assolo 4/4",
+          "pattern": "D"
+        },
+        {
+          "section": "Riff ripresa",
+          "pattern": "A"
+        },
+        {
+          "section": "Finale",
+          "pattern": "E",
+          "set": {
+            "gainEnd": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "gm_electric_bass_pick",
+        "gain": 0.9,
+        "gainEnd": null,
+        "cutoff": 2000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 1,
+        "drive": 0.4
+      },
+      "patterns": {
+        "A": {
+          "preset": "ottavi"
+        },
+        "B": {
+          "preset": "walking"
+        },
+        "C": {
+          "preset": "sub"
+        }
+      },
+      "clips": [
+        {
+          "section": "Riff 7/8",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa 7/8",
+          "pattern": "A",
+          "set": {
+            "gain": 0.85
+          }
+        },
+        {
+          "section": "Ponte 5/4",
+          "pattern": "B"
+        },
+        {
+          "section": "Assolo 4/4",
+          "pattern": "A"
+        },
+        {
+          "section": "Riff ripresa",
+          "pattern": "A"
+        },
+        {
+          "section": "Finale",
+          "pattern": "C"
+        }
+      ]
+    },
+    {
+      "id": "guitar",
+      "type": "guitar",
+      "settings": {
+        "type": "distorted",
+        "gain": 0.8,
+        "gainEnd": null,
+        "cutoff": 4200,
+        "cutoffEnd": null,
+        "drive": 0,
+        "octave": "0",
+        "width": "double",
+        "room": 0.2
+      },
+      "patterns": {
+        "A": {
+          "preset": "riff"
+        },
+        "B": {
+          "preset": "held"
+        },
+        "C": {
+          "preset": "power8"
+        }
+      },
+      "clips": [
+        {
+          "section": "Riff 7/8",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa 7/8",
+          "pattern": "B",
+          "set": {
+            "type": "crunch",
+            "gain": 0.55
+          }
+        },
+        {
+          "section": "Assolo 4/4",
+          "pattern": "C",
+          "set": {
+            "type": "crunch",
+            "gain": 0.7
+          }
+        },
+        {
+          "section": "Riff ripresa",
+          "pattern": "A",
+          "set": {
+            "gain": 0.85
+          }
+        },
+        {
+          "section": "Finale",
+          "pattern": "B",
+          "set": {
+            "gainEnd": 0.15
+          }
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "gm_rock_organ",
+        "gain": 0.4,
+        "gainEnd": null,
+        "cutoff": 4000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "reso": 1,
+        "delay": 0.15,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "su",
+          "speed": "8"
+        },
+        "B": {
+          "preset": "spezzato",
+          "speed": "16"
+        },
+        "C": {
+          "preset": "pulsar",
+          "speed": "8"
+        }
+      },
+      "clips": [
+        {
+          "section": "Strofa 7/8",
+          "pattern": "A"
+        },
+        {
+          "section": "Ponte 5/4",
+          "pattern": "B",
+          "set": {
+            "wave": "gm_electric_guitar_clean",
+            "gain": 0.3
+          }
+        },
+        {
+          "section": "Riff ripresa",
+          "pattern": "C",
+          "set": {
+            "gain": 0.38
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "gm_flute",
+        "gain": 0.4,
+        "gainEnd": null,
+        "cutoff": 6000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "delay": 0.25,
+        "mode": "minor",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "prog"
+        },
+        "B": {
+          "preset": "assolo"
+        }
+      },
+      "clips": [
+        {
+          "section": "Mellotron",
+          "pattern": "A"
+        },
+        {
+          "section": "Strofa 7/8",
+          "pattern": "A",
+          "set": {
+            "wave": "gm_lead_2_sawtooth"
+          }
+        },
+        {
+          "section": "Assolo 4/4",
+          "pattern": "B",
+          "set": {
+            "wave": "gm_distortion_guitar,sawtooth",
+            "mode": "dorian",
+            "drive": 2.5
+          }
+        },
+        {
+          "section": "Finale",
+          "pattern": "A",
+          "set": {
+            "wave": "gm_string_ensemble_1",
+            "gain": 0.2,
+            "gainEnd": 0,
+            "cutoff": 5000,
+            "delay": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "gm_string_ensemble_1",
+        "gain": 0.1,
+        "gainEnd": 0.32,
+        "cutoff": 3000,
+        "cutoffEnd": null,
+        "move": "fisso",
+        "room": 0.8,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Mellotron",
+          "pattern": "A"
+        },
+        {
+          "section": "Ponte 5/4",
+          "pattern": "A",
+          "set": {
+            "wave": "gm_drawbar_organ",
+            "gain": 0.26,
+            "gainEnd": null,
+            "cutoff": 4000,
+            "room": 0.5
+          }
+        },
+        {
+          "section": "Assolo 4/4",
+          "pattern": "A",
+          "set": {
+            "wave": "gm_drawbar_organ",
+            "gain": 0.18,
+            "gainEnd": null,
+            "room": 0.4
+          }
+        },
+        {
+          "section": "Finale",
+          "pattern": "A",
+          "set": {
+            "gain": 0.25,
+            "gainEnd": 0.05,
+            "cutoff": 4000
+          }
+        }
+      ]
+    }
+  ]
+}

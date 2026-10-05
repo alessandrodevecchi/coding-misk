@@ -40,9 +40,10 @@ Questo progetto unisce quell'idea alle capacità dei nuovi modelli, con il mio t
 
 ## Cosa fa
 
-- **Arrangiatore a scene.** Un brano è una sequenza di scene con nome, durata, entrata (taglio netto o dissolvenza) e tutte le impostazioni: BPM anche in rampa, tonalità, accordi, metro (4/4, 3/4, 5/4, 7/8), swing. Le scene diventano codice Strudel in tempo reale.
-- **Canali.** Sequencer di batteria con varie drum machine, basso con riff, chitarra (pulita, crunch, distorta, metal, palm mute) con riff e raddoppio stereo, arpeggio, hook con armonie e modi scuri, pad, texture (voci, metalli, vinile), riser. Ogni canale può usare oscillatori o strumenti General MIDI.
-- **Automazioni.** Volume, filtro e tempo possono cambiare da inizio a fine scena. Ci sono saturazione, bitcrusher, risonanza, FM e filtro vocale.
+- **Arrangiatore.** Una griglia di tracce e sezioni. Le sezioni tengono tempo (anche in rampa), tonalità, accordi, metro (4/4, 3/4, 5/4, 7/8), swing ed entrata (taglio netto o dissolvenza). Le tracce sono libere: quanti strumenti vuoi, anche dello stesso tipo, ognuno con i suoi pattern, muto e solo. Tutto diventa codice Strudel in tempo reale.
+- **Brani in JSON.** I brani sono file in `songs/` con un formato documentato, un validatore e uno strumento da riga di comando, così persone e agenti possono scriverli come codice ([docs/COMPOSING.md](docs/COMPOSING.md)). Le tracce di codice contengono Strudel scritto a mano dentro un brano.
+- **Strumenti.** Sequencer di batteria con varie drum machine, basso con riff, chitarra (pulita, crunch, distorta, metal, palm mute) con riff e raddoppio stereo, arpeggio, hook con armonie e modi scuri, pad, texture (voci, metalli, vinile), riser. Ogni strumento può usare oscillatori o suoni General MIDI, ha i suoi passi ritmici, e basso, arpeggio e hook accettano note scritte come gradi dell'accordo o della scala.
+- **Automazioni.** Volume, filtro e tempo possono cambiare da inizio a fine sezione. Ci sono saturazione, bitcrusher, risonanza, FM e filtro vocale.
 - **Player.** Timeline cliccabile, salto a qualsiasi battuta, pulsanti per ascoltare gli stacchi tra le sezioni, ripetizione di una sezione, pausa e ripresa.
 - **Brani inclusi.** Una ventina di brani in generi diversi: techno, trance, hard techno, industrial, club scuro, metal, metal melodico, phonk, progressive rock, lo-fi, arcade anni '90, più un reel da 30 secondi.
 - **Visual.** Sette temi su canvas (Palco, Pixel, Tramonto, Montagne, Spazio, Sonar, Edgerunners). Ogni strumento ha il suo analizzatore audio, così sul Palco batteria, basso, chitarra, tastiere e FX si accendono quando suonano.
@@ -84,8 +85,9 @@ Si apre <http://localhost:5173>. La barra spaziatrice fa play e pausa, `Ctrl+Ent
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | `index.html`     | Markup dell'interfaccia                                                                   |
 | `src/main.js`    | Libreria dei brani, arrangiatore, controlli, trasporto, collegamento con l'editor Strudel |
-| `src/music.js`   | Tonalità, accordi, preset, stato di una scena, compilatore da scene a codice              |
-| `src/tracks.js`  | Brani a scene inclusi                                                                     |
+| `src/music.js`   | Tonalità, accordi, preset, generatore di codice per strumento                             |
+| `src/song/`      | Formato dei brani: compilatore, validatore, conversione dei salvataggi vecchi             |
+| `songs/`         | Brani inclusi in JSON, `songs/examples/` per la guida                                     |
 | `src/songs.js`   | Lettura di sezioni e tempo dal codice di un brano                                         |
 | `src/visuals.js` | Visual su canvas sincronizzati con l'audio                                                |
 | `src/i18n.js`    | Testi in italiano e inglese                                                               |
