@@ -44,6 +44,7 @@ node tools/screenshot-visual.cjs edgerunners luci-rosse 3 /tmp/edge   # stage sc
 node tools/screenshots.cjs /tmp/shots                 # README screenshots
 node tools/record-demo.cjs /tmp/demo                  # scripted demo video + audio from Strudel's master
 node tools/test-hardware-theme.cjs /tmp/hw            # hardware theme: knob drag, LEDs, screenshots
+node tools/export-audio.cjs /tmp/wav luci-rosse        # export tracks to WAV through the app (real time, one after another)
 ```
 
 Video recording needs Playwright's ffmpeg (`node $PLAYWRIGHT_CORE/cli.js install ffmpeg`). The demo script writes `video.webm`, `audio.webm` and `offset.txt`; merge with system ffmpeg (see `docs/ARCHITECTURE.md`).

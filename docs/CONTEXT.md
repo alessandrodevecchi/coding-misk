@@ -50,9 +50,8 @@ Scene tracks, in library order: Segnale nel rumore (the free-form piece, D doria
 
 ## Backlog (GitHub issues)
 
-- `#1` Edgerunners visual: done on `develop`, closes when merged to `main`.
-- `#2` Hardware interface theme: done on `develop`, closes when merged to `main`.
-- `#3` Vocals, `#4` Recreate a live-coded track, `#5` Background music for short videos, `#6` Moods and presets, `#7` More genres: open.
+- `#1` Edgerunners visual and `#2` Hardware interface theme: done, closed.
+- `#3` Vocals, `#4` Recreate a live-coded track, `#5` Background music for short videos, `#6` Moods and presets, `#7` More genres, `#8` Faster than real-time audio export: open.
 
 ## Media and demo
 

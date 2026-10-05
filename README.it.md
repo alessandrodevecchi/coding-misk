@@ -20,6 +20,18 @@ Un laboratorio locale per comporre musica scrivendo codice, costruito sopra [Str
 
 ![Tab Brani](docs/media/tracks.jpg)
 
+## Ascolta
+
+Cinque brani esportati con l'export WAV dell'app (qui in MP3). Sono tutti anche nell'app, dove puoi aprirli in Compose e leggerne il codice.
+
+| Brano | Stile | Durata |
+| --- | --- | --- |
+| [Luci Rosse](docs/media/audio/luci-rosse.mp3) | Club scuro da film d'azione, La minore su un solo accordo, 124 BPM | 1:55 |
+| [Ghost Protocol](docs/media/audio/ghost-protocol.mp3) | Hard techno cyberpunk, tempo da 132 a 148 BPM | 1:45 |
+| [Segnale nel rumore](docs/media/audio/segnale-nel-rumore.mp3) | Brano libero scritto da Claude, Re dorico, dal fruscio al 7/8 e ritorno | 1:40 |
+| [Pioggia sul vetro](docs/media/audio/pioggia-sul-vetro.mp3) | Lo-fi hip hop, Re minore, 78 BPM con swing | 1:53 |
+| [DCI Jingle carica](docs/media/audio/dci-carica.mp3) | Jingle tech breve, Fa# minore, 106 BPM | 0:30 |
+
 ## Da dove nasce
 
 Un anno fa mi ero appassionato ai video di [Switch Angel](https://www.youtube.com/@Switch-Angel), in particolare a [Coding Trance Music](https://www.youtube.com/watch?v=GWXCCBsOMSg). Mi era rimasta dentro l'idea di musica come codice con strudel.cc: brani costruiti dal vivo, riga dopo riga.

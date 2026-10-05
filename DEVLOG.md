@@ -124,6 +124,9 @@
 
 - Licenza AGPL-3.0-or-later (la stessa di Strudel) in `LICENSE`, `package.json` e nei README, in vista del repository pubblico.
 - Tolti i reel da 30 s di Ferro, Ali di cenere e Drift: restano i brani interi. Tolto da `docs/CONTEXT.md` il percorso locale dei file audio di riferimento.
+- Lingua predefinita dell'interfaccia: inglese (prima seguiva la lingua del browser). La scelta salvata resta.
+- Esportati 5 brani in `docs/media/audio/` (MP3 160k, limitatore a -0,5 dB) con il nuovo `tools/export-audio.cjs`, collegati nella sezione Listen dei README: Luci Rosse, Ghost Protocol, Segnale nel rumore, Pioggia sul vetro, DCI Jingle carica. Picchi misurati prima del limitatore fra -6,5 e 0 dB, nessun buco.
+- Aperta la issue `#8`: export più veloce del tempo reale (oggi l'export registra il brano mentre suona).
 
 ## Prossimo passo
 

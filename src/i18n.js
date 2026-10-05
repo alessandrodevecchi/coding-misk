@@ -115,14 +115,13 @@ const STR = {
   },
 };
 
-const browserLang = (navigator.language || 'it').toLowerCase().startsWith('it') ? 'it' : 'en';
-let lang = browserLang;
-try { lang = localStorage.getItem('coding-misk-lang') || browserLang; } catch (e) {}
-if (!STR[lang]) lang = 'it';
+let lang = 'en';
+try { lang = localStorage.getItem('coding-misk-lang') || 'en'; } catch (e) {}
+if (!STR[lang]) lang = 'en';
 
 export const getLang = () => lang;
 export function setLang(l) {
-  lang = STR[l] ? l : 'it';
+  lang = STR[l] ? l : 'en';
   document.documentElement.lang = lang;
   try { localStorage.setItem('coding-misk-lang', lang); } catch (e) {}
 }

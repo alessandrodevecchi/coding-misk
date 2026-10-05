@@ -20,6 +20,18 @@ A local lab for composing music by writing code, built on [Strudel](https://stru
 
 ![Tracks tab](docs/media/tracks.jpg)
 
+## Listen
+
+Five tracks exported with the app's WAV export (MP3 here). Each one is also in the app, where you can open it in Compose and read its code.
+
+| Track | Style | Length |
+| --- | --- | --- |
+| [Luci Rosse](docs/media/audio/luci-rosse.mp3) | Dark action-movie club, A minor on one chord, 124 BPM | 1:55 |
+| [Ghost Protocol](docs/media/audio/ghost-protocol.mp3) | Cyberpunk hard techno, tempo from 132 to 148 BPM | 1:45 |
+| [Segnale nel rumore](docs/media/audio/segnale-nel-rumore.mp3) | Free piece written by Claude, D dorian, from noise to 7/8 and back | 1:40 |
+| [Pioggia sul vetro](docs/media/audio/pioggia-sul-vetro.mp3) | Lo-fi hip hop, D minor, 78 BPM with swing | 1:53 |
+| [DCI Jingle, charged](docs/media/audio/dci-carica.mp3) | Short tech jingle, F# minor, 106 BPM | 0:30 |
+
 ## Where it comes from
 
 A year ago I got hooked on [Switch Angel](https://www.youtube.com/@Switch-Angel)'s videos, especially [Coding Trance Music](https://www.youtube.com/watch?v=GWXCCBsOMSg). The idea of music as code with strudel.cc stuck with me: tracks built live, one line at a time.
