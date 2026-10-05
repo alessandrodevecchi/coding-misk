@@ -127,6 +127,9 @@
 - Lingua predefinita dell'interfaccia: inglese (prima seguiva la lingua del browser). La scelta salvata resta.
 - Esportati 5 brani in `docs/media/audio/` (MP3 160k, limitatore a -0,5 dB) con il nuovo `tools/export-audio.cjs`, collegati nella sezione Listen dei README: Luci Rosse, Ghost Protocol, Segnale nel rumore, Pioggia sul vetro, DCI Jingle carica. Picchi misurati prima del limitatore fra -6,5 e 0 dB, nessun buco.
 - Aperta la issue `#8`: export più veloce del tempo reale (oggi l'export registra il brano mentre suona).
+- Verificato: la chitarra suona anche con la batteria spenta (picco 0,43); il pad controlla solo la batteria, gli altri canali hanno ritmi da preset sulla stessa griglia.
+- Piano per tracce, pattern e timeline in `docs/PLAN-TRACKS.md`, ispirato a Reason (rack, pattern, Blocks): una riga `$:` per traccia con `pick` per sezione, tracce di codice, fasi da 0 a 5. In attesa delle decisioni del proprietario.
+- Decisioni del proprietario sul piano: timeline libera come obiettivo con modalità a sezioni come MVP (passaggio senza perdite fra le due), note relative agli accordi, tracce di codice componibili. Aggiunti al piano: un bus (orbit) per traccia, brani in JSON con validatore e CLI per gli agenti, `docs/COMPOSING.md` con esempi verificati.
 
 ## Prossimo passo
 

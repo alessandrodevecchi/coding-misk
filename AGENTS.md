@@ -10,6 +10,7 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 | `docs/ARCHITECTURE.md`  | Modules, data flow, player and transport, visuals, persistence                       |
 | `docs/MUSIC-ENGINE.md`  | Scene model, compiler, presets, how to write tracks, Strudel gotchas                 |
 | `docs/VOCALS.md`        | Vocals research (`#3`): local models, licenses, recording, effects, channel design   |
+| `docs/PLAN-TRACKS.md`   | Plan for tracks, per-instrument patterns and a timeline (proposal)                   |
 | `docs/DESIGN-SYSTEM.md` | Themes, tokens, fonts, components, visuals, hardware theme                           |
 | `DEVLOG.md`             | Chronological log of every change (Italian)                                          |
 | `README.md`             | Public description (English), `README.it.md` in Italian                              |
