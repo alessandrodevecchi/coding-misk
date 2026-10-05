@@ -1,0 +1,128 @@
+// coding-misk · Insert Coin
+// track composed with the arranger: each scene is a block of layers switched on by its lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(150/4)
+
+const SECTIONS = [['Insert coin', 2], ['Livello 1', 8], ['Livello 1 B', 8], ['Boss', 8], ['Bonus', 4], ['Livello 2', 8], ['Game over', 2]]
+const TEMPO = {'Insert coin': 150, 'Livello 1': 150, 'Livello 1 B': 150, 'Boss': 156, 'Bonus': 150, 'Livello 2': 152, 'Game over': 152}
+
+// ---------- 1 · Insert coin · 2 bars · 150 BPM · A · Am F G Am ----------
+const scene1 = "<1!2 0!38>"
+// Drums · YamahaRX5
+$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("YamahaRX5").gain("<0.2 0.4>").distort(0.4).distortvol(.5).crush(13).mask("<1 [1 0]>").mask(scene1).velocity(scene1).analyze("hats")
+
+// Arpeggio · Up, 16ths
+$: note("<[a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4] [f3 a3 c4 f4 f3 a3 c4 f4 f3 a3 c4 f4 f3 a3 c4 f4] [g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4] [a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4]>")
+  .s("square").lpf(4000).lpq(1)
+  .decay(.15).sustain(.15).gain(0.26).mask("<1 [1 0]>").mask(scene1).velocity(scene1).analyze("arp")
+
+// ---------- 2 · Livello 1 · 8 bars · 150 BPM · A · Am F G Am ----------
+const scene2 = "<0!2 1!8 0!30>"
+// Drums · YamahaRX5
+$: s("[bd ~ ~ ~] [~ ~ bd ~] [~ ~ bd ~] ~").bank("YamahaRX5").gain(0.9).distort(0.4).distortvol(.5).crush(13).mask(scene2).velocity(scene2).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ sd]").bank("YamahaRX5").gain(0.68).distort(0.4).distortvol(.5).crush(13).mask(scene2).velocity(scene2).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("YamahaRX5").gain(0.45).distort(0.4).distortvol(.5).crush(13).mask(scene2).velocity(scene2).analyze("hats")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<0!2 1 0!5>").mask(scene2).velocity(scene2).analyze("fx")
+
+// Bass · Arcade octaves
+$: note("<g1 a1 a1 f1>").struct("x x x x x x x x x x x x x x x x").transpose("0 12 0 12 0 12 0 12 0 12 0 12 -2 10 -2 10")
+  .s("square").lpf(1800).lpq(2).distort(0.5).distortvol(.5)
+  .decay(.1).sustain(.3).gain(0.85).mask(scene2).velocity(scene2).analyze("bass")
+
+// Hook · Arcade
+$: n("<[8 8 15 8 ~ 8 13 15] [10 ~ 12 ~ 15 ~ 17 ~] [0 0 12 0 ~ 0 10 12] [0 0 12 0 ~ 15 12 10]>").scale("A4:chromatic")
+  .s("square").fm(2).lpf(5000).crush(12)
+  .decay(.2).sustain(.3).delay(.15).room(.3).gain(0.45).mask(scene2).velocity(scene2).analyze("hook")
+
+// ---------- 3 · Livello 1 B · 8 bars · 150 BPM · A · Am F G Am ----------
+const scene3 = "<0!10 1!8 0!22>"
+// Drums · YamahaRX5
+$: s("[bd ~ ~ ~] [~ ~ bd ~] [~ ~ bd ~] ~").bank("YamahaRX5").gain(0.9).distort(0.4).distortvol(.5).crush(13).mask(scene3).velocity(scene3).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ sd]").bank("YamahaRX5").gain(0.68).distort(0.4).distortvol(.5).crush(13).mask(scene3).velocity(scene3).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("YamahaRX5").gain(0.45).distort(0.4).distortvol(.5).crush(13).mask(scene3).velocity(scene3).analyze("hats")
+$: s("~ ~ ~ [~ ~ oh ~]").bank("YamahaRX5").gain(0.41).distort(0.4).distortvol(.5).crush(13).mask(scene3).velocity(scene3).analyze("hats")
+$: s("sd*16").bank("YamahaRX5").gain(saw.range(.15, .75)).mask("<0 1 0!6>").mask(scene3).velocity(scene3).analyze("snare")
+
+// Bass · Arcade octaves
+$: note("<g1 a1 a1 f1>").struct("x x x x x x x x x x x x x x x x").transpose("0 12 0 12 0 12 0 12 0 12 0 12 -2 10 -2 10")
+  .s("square").lpf(1800).lpq(2).distort(0.5).distortvol(.5)
+  .decay(.1).sustain(.3).gain(0.85).mask(scene3).velocity(scene3).analyze("bass")
+
+// Arpeggio · Up, 16ths
+$: note("<[g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4] [a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4] [a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4] [f3 a3 c4 f4 f3 a3 c4 f4 f3 a3 c4 f4 f3 a3 c4 f4]>")
+  .s("square").lpf(4000).lpq(1)
+  .decay(.15).sustain(.15).gain(0.24).mask(scene3).velocity(scene3).analyze("arp")
+
+// Hook · Arcade B
+$: n("<[5 ~ 7 8 ~ 10 ~ 12] [15 12 10 7 ~ 12 ~ ~] [12 ~ 10 12 ~ 15 ~ 12] [10 ~ 8 7 ~ 5 ~ 3]>").scale("A4:chromatic")
+  .s("square").fm(2).lpf(5000).crush(12)
+  .decay(.2).sustain(.3).delay(.15).room(.3).gain(0.45).mask(scene3).velocity(scene3).analyze("hook")
+
+// ---------- 4 · Boss · 8 bars · 156 BPM · A · Am Am Am A# ----------
+const scene4 = "<0!18 1!8 0.5 0!13>"
+// Drums · YamahaRX5
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("YamahaRX5").gain(0.9).distort(1).distortvol(.5).crush(13).mask(scene4).velocity(scene4).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("YamahaRX5").gain(0.68).distort(1).distortvol(.5).crush(13).mask(scene4).velocity(scene4).analyze("snare")
+$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("YamahaRX5").gain(0.45).distort(1).distortvol(.5).crush(13).mask(scene4).velocity(scene4).analyze("hats")
+$: s("sd*16").bank("YamahaRX5").gain(saw.range(.15, .75)).mask("<0 1 0!6>").mask(scene4).velocity(scene4).analyze("snare")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<0!2 1 0!5>").mask(scene4).velocity(scene4).analyze("fx")
+
+// Bass · Tritone riff
+$: note("<a1 a#1 a1 a1>").struct("x ~ ~ x ~ ~ x ~ x ~ x ~ x ~ ~ ~").transpose("0 0 0 0 0 0 0 0 7 0 6 0 0 0 0 0")
+  .s("sawtooth").lpf(1600).lpq(6).distort(2).distortvol(.5)
+  .decay(.12).sustain(.3).gain(0.55).mask(scene4).velocity(scene4).analyze("bass")
+
+// Hook · Boss
+$: n("<[0 1 0 1 0 ~ 6 ~] [0 1 0 1 3 ~ 1 ~]>").scale("A4:chromatic")
+  .s("square").fm(3).lpf(5000).crush(12)
+  .decay(.2).sustain(.3).delay(.15).room(.3).gain(0.45).mask(scene4).velocity(scene4).analyze("hook")
+
+// ---------- 5 · Bonus · 4 bars · 150 BPM · A · Am F G Am · fades in over 1 bars ----------
+const scene5 = "<0!26 0.5 1!3 0!10>"
+// Drums · YamahaRX5
+$: s("[bd ~ ~ ~] ~ [~ ~ bd ~] ~").bank("YamahaRX5").gain(0.9).distort(0.4).distortvol(.5).crush(13).mask(scene5).velocity(scene5).analyze("kick")
+$: s("~ ~ [sd ~ ~ ~] ~").bank("YamahaRX5").gain(0.68).distort(0.4).distortvol(.5).crush(13).mask(scene5).velocity(scene5).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("YamahaRX5").gain(0.45).distort(0.4).distortvol(.5).crush(13).mask(scene5).velocity(scene5).analyze("hats")
+
+// Arpeggio · Up and down, 16ths
+$: note("<[g3 b3 d4 g4 d4 b3 g3 b3 g3 b3 d4 g4 d4 b3 g3 b3] [a3 c4 e4 a4 e4 c4 a3 c4 a3 c4 e4 a4 e4 c4 a3 c4] [a3 c4 e4 a4 e4 c4 a3 c4 a3 c4 e4 a4 e4 c4 a3 c4] [f3 a3 c4 f4 c4 a3 f3 a3 f3 a3 c4 f4 c4 a3 f3 a3]>")
+  .s("square").lpf(4000).lpq(1)
+  .decay(.15).sustain(.15).gain(0.26).mask(scene5).velocity(scene5).analyze("arp")
+
+// ---------- 6 · Livello 2 · 8 bars · 152 BPM · B · Bm G A Bm ----------
+const scene6 = "<0!30 1!8 0!2>"
+// Drums · YamahaRX5
+$: s("[bd ~ ~ ~] [~ ~ bd ~] [~ ~ bd ~] ~").bank("YamahaRX5").gain(0.9).distort(0.4).distortvol(.5).crush(13).mask(scene6).velocity(scene6).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ sd]").bank("YamahaRX5").gain(0.68).distort(0.4).distortvol(.5).crush(13).mask(scene6).velocity(scene6).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("YamahaRX5").gain(0.45).distort(0.4).distortvol(.5).crush(13).mask(scene6).velocity(scene6).analyze("hats")
+$: s("[~ ~ oh ~] ~ [~ ~ oh ~] ~").bank("YamahaRX5").gain(0.41).distort(0.4).distortvol(.5).crush(13).mask(scene6).velocity(scene6).analyze("hats")
+$: s("sd*16").bank("YamahaRX5").gain(saw.range(.15, .75)).mask("<0!5 1 0!2>").mask(scene6).velocity(scene6).analyze("snare")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<0!6 1 0>").mask(scene6).velocity(scene6).analyze("fx")
+
+// Bass · Arcade octaves
+$: note("<g1 a1 a1 f1>").transpose(2).struct("x x x x x x x x x x x x x x x x").transpose("0 12 0 12 0 12 0 12 0 12 0 12 -2 10 -2 10")
+  .s("square").lpf(1800).lpq(2).distort(0.5).distortvol(.5)
+  .decay(.1).sustain(.3).gain(0.9).mask(scene6).velocity(scene6).analyze("bass")
+
+// Arpeggio · Up, 16ths
+$: note("<[g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4] [a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4] [a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4] [f3 a3 c4 f4 f3 a3 c4 f4 f3 a3 c4 f4 f3 a3 c4 f4]>").transpose(2)
+  .s("square").lpf(4000).lpq(1)
+  .decay(.15).sustain(.15).gain(0.22).mask(scene6).velocity(scene6).analyze("arp")
+
+// Hook · Arcade
+$: n("<[8 8 15 8 ~ 8 13 15] [10 ~ 12 ~ 15 ~ 17 ~] [0 0 12 0 ~ 0 10 12] [0 0 12 0 ~ 15 12 10]>").scale("B4:chromatic")
+  .s("square").fm(2).lpf(5000).crush(12)
+  .decay(.2).sustain(.3).delay(.15).room(.3).gain(0.48).mask(scene6).velocity(scene6).analyze("hook")
+
+// ---------- 7 · Game over · 2 bars · 152 BPM · B · Bm G A Bm ----------
+const scene7 = "<0!38 1!2>"
+
+// Hook · Hits
+$: n("<[0 ~ ~ 0 ~ ~ 12 ~] [~ ~ 0 ~ 1 ~ ~ ~]>").scale("B4:chromatic")
+  .s("square").fm(2).lpf(5000).crush(12)
+  .decay(.2).sustain(.3).delay(.5).room(.3).gain("<0.26 0>").mask(scene7).velocity(scene7).analyze("hook")
+
+// Pad · Sustained
+$: note("<[g2,b2,d3] [a2,c3,e3] [a2,c3,e3] [f2,a2,c3]>").transpose(2)
+  .s("square").attack(.4).release(1.2).lpf("<2500 600>")
+  .room(.6).gain("<0.2 0>").mask(scene7).velocity(scene7).analyze("pad")

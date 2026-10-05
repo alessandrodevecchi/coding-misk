@@ -1,0 +1,204 @@
+// coding-misk · Ferro
+// track composed with the arranger: each scene is a block of layers switched on by its lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(160/4)
+
+const SECTIONS = [['Feedback', 2], ['Riff', 8], ['Strofa', 8], ['Pre', 4], ['Ritornello', 8], ['Breakdown', 8], ['Assolo', 8], ['Ritornello 2', 8], ['Fine', 1]]
+const TEMPO = {'Feedback': 160, 'Riff': 160, 'Strofa': 160, 'Pre': 160, 'Ritornello': 160, 'Breakdown': 160, 'Assolo': 160, 'Ritornello 2': 160, 'Fine': 160}
+
+// ---------- 1 · Feedback · 2 bars · 160 BPM · E · Em F Em D ----------
+const scene1 = "<1!2 0!53>"
+// Drums · AkaiXR10
+$: s("[rd ~ ~ ~] [rd ~ ~ ~] [rd ~ ~ ~] [rd ~ ~ ~]").bank("AkaiXR10").gain("<0.18 0.32>").distort(1.2).distortvol(.5).mask("<1 [1 0]>").mask(scene1).velocity(scene1).analyze("hats")
+
+// Guitar · Metal hi-gain, Held · tuning -2
+$: note("<[a2,e3,a3] [a#2,f3,a#3] [a2,e3,a3] [g2,d3,g3]>").transpose(-7)
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(1.5).sustain(0.8).release(.08)
+  .distort(6).distortvol(.2).hpf(110).lpf("<1500 4500>").jux(x => x.late(.012))
+  .room(.2).gain(.8).mask("<1 [1 0]>").mask(scene1).postgain(scene1.mul(0.45)).analyze("guitar")
+
+// Riser · white noise rising over 2 bars
+$: s("white*16").decay(.06).sustain(0)
+  .hpf(saw.slow(2).range(300, 8000))
+  .gain(saw.slow(2).range(0, .3)).mask(scene1).velocity(scene1).analyze("riser")
+
+// ---------- 2 · Riff · 8 bars · 160 BPM · E · Em F Em D ----------
+const scene2 = "<0!2 1!8 0!45>"
+// Drums · AkaiXR10
+$: s("[bd ~ bd bd] [bd ~ bd bd] [bd ~ bd bd] [bd ~ bd bd]").bank("AkaiXR10").gain(0.95).distort(1.2).distortvol(.5).mask(scene2).velocity(scene2).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("AkaiXR10").gain(0.71).distort(1.2).distortvol(.5).mask(scene2).velocity(scene2).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("AkaiXR10").gain(0.48).distort(1.2).distortvol(.5).mask(scene2).velocity(scene2).analyze("hats")
+$: s("cr").bank("AkaiXR10").gain(.55).room(.4).mask("<0!2 1 0!5>").mask(scene2).velocity(scene2).analyze("fx")
+
+// Bass · 8th notes (rock)
+$: note("<a1 g1 a1 a#1>").transpose(-5).struct("[x x] [x x] [x x] [x x]")
+  .s("gm_electric_bass_pick").lpf(1500).lpq(1).distort(2).distortvol(.5)
+  .decay(.25).sustain(.5).gain(0.6).mask(scene2).velocity(scene2).analyze("bass")
+
+// Guitar · Metal hi-gain, Thrash riff · tuning -2
+$: note("<[a2,e3,a3] [g2,d3,g3] [a2,e3,a3] [a#2,f3,a#3]>").transpose(-7).struct("x x x x x x x x x x x x x x x x").transpose("0 0 0 0 0 0 1 0 0 0 0 0 3 0 1 0")
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(0.09).sustain(0).release(.08)
+  .distort(6).distortvol(.2).hpf(110).lpf(4200).jux(x => x.late(.012))
+  .room(.2).gain(.8).mask(scene2).postgain(scene2.mul(0.5)).analyze("guitar")
+
+// ---------- 3 · Strofa · 8 bars · 160 BPM · E · Em F Em D ----------
+const scene3 = "<0!10 1!8 0!37>"
+// Drums · AkaiXR10
+$: s("[bd bd bd bd] [bd bd bd bd] [bd bd bd bd] [bd bd bd bd]").bank("AkaiXR10").gain(0.95).distort(1.2).distortvol(.5).mask(scene3).velocity(scene3).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("AkaiXR10").gain(0.71).distort(1.2).distortvol(.5).mask(scene3).velocity(scene3).analyze("snare")
+$: s("[rd ~ rd ~] [rd ~ rd ~] [rd ~ rd ~] [rd ~ rd ~]").bank("AkaiXR10").gain(0.33).distort(1.2).distortvol(.5).mask(scene3).velocity(scene3).analyze("hats")
+
+// Bass · 8th notes (rock)
+$: note("<a1 g1 a1 a#1>").transpose(-5).struct("[x x] [x x] [x x] [x x]")
+  .s("gm_electric_bass_pick").lpf(1500).lpq(1).distort(2).distortvol(.5)
+  .decay(.25).sustain(.5).gain(0.6).mask(scene3).velocity(scene3).analyze("bass")
+
+// Guitar · Palm muted, Groove riff · tuning -2
+$: note("<[a2,e3,a3] [g2,d3,g3] [a2,e3,a3] [a#2,f3,a#3]>").transpose(-7).struct("x ~ ~ x x ~ x ~ x ~ ~ x x ~ x ~").transpose("0 0 0 0 0 0 3 0 0 0 0 0 5 0 3 0")
+  .s("gm_electric_guitar_muted,sawtooth").attack(.003).decay(0.09).sustain(0).release(.08)
+  .distort(6).distortvol(.2).hpf(90).lpf(4200).jux(x => x.late(.012))
+  .room(.2).gain(.8).mask(scene3).postgain(scene3.mul(0.48)).analyze("guitar")
+
+// ---------- 4 · Pre · 4 bars · 160 BPM · E · Em F Em D ----------
+const scene4 = "<0!18 1!4 0!33>"
+// Drums · AkaiXR10
+$: s("[bd ~ bd bd] [bd ~ bd bd] [bd ~ bd bd] [bd ~ bd bd]").bank("AkaiXR10").gain(0.95).distort(1.2).distortvol(.5).mask("<1 [1 0] 1!2>").mask(scene4).velocity(scene4).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("AkaiXR10").gain(0.71).distort(1.2).distortvol(.5).mask("<1 [1 0] 1!2>").mask(scene4).velocity(scene4).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("AkaiXR10").gain(0.48).distort(1.2).distortvol(.5).mask("<1 [1 0] 1!2>").mask(scene4).velocity(scene4).analyze("hats")
+$: s("sd*16").bank("AkaiXR10").gain(saw.range(.15, .75)).mask("<0 1 0!2>").mask(scene4).velocity(scene4).analyze("snare")
+
+// Bass · 8th notes (rock)
+$: note("<a1 g1 a1 a#1>").transpose(-5).struct("[x x] [x x] [x x] [x x]")
+  .s("gm_electric_bass_pick").lpf(1500).lpq(1).distort(2).distortvol(.5)
+  .decay(.25).sustain(.5).gain(0.6).mask("<1 [1 0] 1!2>").mask(scene4).velocity(scene4).analyze("bass")
+
+// Guitar · Metal hi-gain, Gallop riff · tuning -2
+$: note("<[a2,e3,a3] [g2,d3,g3] [a2,e3,a3] [a#2,f3,a#3]>").transpose(-7).struct("x ~ x x x ~ x x x ~ x x x ~ x x").transpose("0 0 0 0 0 0 0 0 1 0 1 1 0 0 -2 -2")
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(0.09).sustain(0).release(.08)
+  .distort(6).distortvol(.2).hpf(110).lpf(4200).jux(x => x.late(.012))
+  .room(.2).gain(.8).mask("<1 [1 0] 1!2>").mask(scene4).postgain(scene4.mul(0.5)).analyze("guitar")
+
+// Riser · white noise rising over 4 bars
+$: s("white*16").decay(.06).sustain(0)
+  .hpf(saw.slow(4).range(300, 8000).late(18))
+  .gain(saw.slow(4).range(0, .3).late(18)).mask(scene4).velocity(scene4).analyze("riser")
+
+// ---------- 5 · Ritornello · 8 bars · 160 BPM · E · Em F Em D ----------
+const scene5 = "<0!22 1!8 0!25>"
+// Drums · AkaiXR10
+$: s("[bd bd bd bd] [bd bd bd bd] [bd bd bd bd] [bd bd bd bd]").bank("AkaiXR10").gain(0.95).distort(1.2).distortvol(.5).mask(scene5).velocity(scene5).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("AkaiXR10").gain(0.71).distort(1.2).distortvol(.5).mask(scene5).velocity(scene5).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("AkaiXR10").gain(0.48).distort(1.2).distortvol(.5).mask(scene5).velocity(scene5).analyze("hats")
+$: s("cr").bank("AkaiXR10").gain(.55).room(.4).mask("<0!6 1 0>").mask(scene5).velocity(scene5).analyze("fx")
+
+// Bass · 8th notes (rock)
+$: note("<a1 g1 a1 a#1>").transpose(-5).struct("[x x] [x x] [x x] [x x]")
+  .s("gm_electric_bass_pick").lpf(1500).lpq(1).distort(2).distortvol(.5)
+  .decay(.25).sustain(.5).gain(0.6).mask(scene5).velocity(scene5).analyze("bass")
+
+// Hook · Heroic
+$: n("<[4 ~ 5 7 9 ~ 7 5] [4 2 0 2 4 ~ ~ ~] [0 ~ 2 4 7 ~ 4 2] [3 ~ 2 0 -1 ~ 0 2]>").superimpose(x => x.add(2)).scale("E4:phrygian")
+  .s("gm_distortion_guitar,sawtooth").distort(2.5).distortvol(.5).lpf(4500)
+  .decay(.2).sustain(.3).delay(.2).room(.3).gain(0.13).mask(scene5).velocity(scene5).analyze("hook")
+
+// Guitar · Distorted, Heroic chords · tuning -2
+$: note("<[a2,e3,a3] [g2,d3,g3] [a2,e3,a3] [a#2,f3,a#3]>").transpose(-7).struct("x ~ x ~ x ~ x ~ x ~ x ~ x ~ x ~").transpose("0 0 0 0 0 0 0 0 5 0 5 0 3 0 2 0")
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(0.3).sustain(0.55).release(.08)
+  .distort(3).distortvol(.2).hpf(80).lpf(4200).jux(x => x.late(.012))
+  .room(.2).gain(.8).mask(scene5).postgain(scene5.mul(0.52)).analyze("guitar")
+
+// Pad · Sustained
+$: note("<[a2,c3,e3] [g2,b2,d3] [a2,c3,e3] [a#2,d3,f3]>").transpose(-5)
+  .s("gm_choir_aahs").attack(.4).release(1.2).lpf(3500)
+  .room(.7).gain(0.16).mask(scene5).velocity(scene5).analyze("pad")
+
+// ---------- 6 · Breakdown · 8 bars · 160 BPM · E · Em F Em D ----------
+const scene6 = "<0!30 1!8 0!17>"
+// Drums · AkaiXR10
+$: s("[bd ~ ~ bd] [~ ~ bd ~] [bd ~ ~ bd] [~ ~ bd ~]").bank("AkaiXR10").gain(0.95).distort(1.2).distortvol(.5).mask("<1!5 [1 0] 1!2>").mask(scene6).velocity(scene6).analyze("kick")
+$: s("~ ~ [sd ~ ~ ~] ~").bank("AkaiXR10").gain(0.71).distort(1.2).distortvol(.5).mask("<1!5 [1 0] 1!2>").mask(scene6).velocity(scene6).analyze("snare")
+$: s("[rd ~ ~ ~] ~ [rd ~ ~ ~] ~").bank("AkaiXR10").gain(0.33).distort(1.2).distortvol(.5).mask("<1!5 [1 0] 1!2>").mask(scene6).velocity(scene6).analyze("hats")
+$: s("cr").bank("AkaiXR10").gain(.55).room(.4).mask("<0!6 1 0>").mask(scene6).velocity(scene6).analyze("fx")
+
+// Bass · 8th notes (rock)
+$: note("<a1 g1 a1 a#1>").transpose(-5).struct("[x x] [x x] [x x] [x x]")
+  .s("gm_electric_bass_pick").lpf(1500).lpq(1).distort(2).distortvol(.5)
+  .decay(.25).sustain(.5).gain(0.7).mask("<1!5 [1 0] 1!2>").mask(scene6).velocity(scene6).analyze("bass")
+
+// Guitar · Metal hi-gain, Djent riff · tuning -2
+$: note("<[a2,e3,a3] [g2,d3,g3] [a2,e3,a3] [a#2,f3,a#3]>").transpose(-7).struct("x ~ ~ x ~ ~ x ~ ~ x ~ x ~ ~ x ~").transpose("0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0")
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(0.09).sustain(0).release(.08)
+  .distort(9).distortvol(.2).hpf(110).lpf(4200).jux(x => x.late(.012))
+  .room(.2).gain(.8).mask("<1!5 [1 0] 1!2>").mask(scene6).postgain(scene6.mul(0.55)).analyze("guitar")
+
+// Texture · metal
+$: s("metal").n("<0 3 7 1>").crush(11).hpf(400).room(.6)
+  .gain(0.3).mask(scene6).velocity(scene6).analyze("fx")
+
+// ---------- 7 · Assolo · 8 bars · 160 BPM · E · Em F Em D ----------
+const scene7 = "<0!38 1!8 0!9>"
+// Drums · AkaiXR10
+$: s("[bd ~ bd bd] [bd ~ bd bd] [bd ~ bd bd] [bd ~ bd bd]").bank("AkaiXR10").gain(0.95).distort(1.2).distortvol(.5).mask(scene7).velocity(scene7).analyze("kick")
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("AkaiXR10").gain(0.71).distort(1.2).distortvol(.5).mask(scene7).velocity(scene7).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("AkaiXR10").gain(0.48).distort(1.2).distortvol(.5).mask(scene7).velocity(scene7).analyze("hats")
+$: s("sd*16").bank("AkaiXR10").gain(saw.range(.15, .75)).mask("<0!5 1 0!2>").mask(scene7).velocity(scene7).analyze("snare")
+
+// Bass · 8th notes (rock)
+$: note("<a1 g1 a1 a#1>").transpose(-5).struct("[x x] [x x] [x x] [x x]")
+  .s("gm_electric_bass_pick").lpf(1500).lpq(1).distort(2).distortvol(.5)
+  .decay(.25).sustain(.5).gain(0.6).mask(scene7).velocity(scene7).analyze("bass")
+
+// Hook · Solo
+$: n("<[9 7 4 3 4 2 0 -1] [0 ~ 7 ~ 4 ~ 0 ~] [0 2 3 4 7 4 3 2] [0 2 3 4 7 9 7 4]>").scale("E4:phrygian")
+  .s("gm_distortion_guitar,sawtooth").distort(2.5).distortvol(.5).lpf(5500)
+  .decay(.2).sustain(.3).delay(.3).room(.3).gain(0.17).mask(scene7).velocity(scene7).analyze("hook")
+
+// Guitar · Metal hi-gain, Thrash riff · tuning -2
+$: note("<[a2,e3,a3] [g2,d3,g3] [a2,e3,a3] [a#2,f3,a#3]>").transpose(-7).struct("x x x x x x x x x x x x x x x x").transpose("0 0 0 0 0 0 1 0 0 0 0 0 3 0 1 0")
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(0.09).sustain(0).release(.08)
+  .distort(6).distortvol(.2).hpf(110).lpf(4200).jux(x => x.late(.012))
+  .room(.2).gain(.8).mask(scene7).postgain(scene7.mul(0.38)).analyze("guitar")
+
+// ---------- 8 · Ritornello 2 · 8 bars · 160 BPM · E · Em F Em D ----------
+const scene8 = "<0!46 1!8 0>"
+// Drums · AkaiXR10
+$: s("[bd ~ bd ~] [bd ~ bd ~] [bd ~ bd ~] [bd ~ bd ~]").bank("AkaiXR10").gain(0.95).distort(1.2).distortvol(.5).mask(scene8).velocity(scene8).analyze("kick")
+$: s("[~ sd ~ sd] [~ sd ~ sd] [~ sd ~ sd] [~ sd ~ sd]").bank("AkaiXR10").gain(0.71).distort(1.2).distortvol(.5).mask(scene8).velocity(scene8).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("AkaiXR10").gain(0.48).distort(1.2).distortvol(.5).mask(scene8).velocity(scene8).analyze("hats")
+$: s("sd*16").bank("AkaiXR10").gain(saw.range(.15, .75)).mask("<0!5 1 0!2>").mask(scene8).velocity(scene8).analyze("snare")
+$: s("cr").bank("AkaiXR10").gain(.55).room(.4).mask("<0!6 1 0>").mask(scene8).velocity(scene8).analyze("fx")
+
+// Bass · 8th notes (rock)
+$: note("<a1 g1 a1 a#1>").transpose(-5).struct("[x x] [x x] [x x] [x x]")
+  .s("gm_electric_bass_pick").lpf(1500).lpq(1).distort(2).distortvol(.5)
+  .decay(.25).sustain(.5).gain(0.6).mask(scene8).velocity(scene8).analyze("bass")
+
+// Hook · Heroic
+$: n("<[4 ~ 5 7 9 ~ 7 5] [4 2 0 2 4 ~ ~ ~] [0 ~ 2 4 7 ~ 4 2] [3 ~ 2 0 -1 ~ 0 2]>").superimpose(x => x.add(2)).scale("E4:phrygian")
+  .s("gm_distortion_guitar,sawtooth").distort(2.5).distortvol(.5).lpf(4500)
+  .decay(.2).sustain(.3).delay(.2).room(.3).gain(0.14).mask(scene8).velocity(scene8).analyze("hook")
+
+// Guitar · Distorted, Heroic chords · tuning -2
+$: note("<[a2,e3,a3] [g2,d3,g3] [a2,e3,a3] [a#2,f3,a#3]>").transpose(-7).struct("x ~ x ~ x ~ x ~ x ~ x ~ x ~ x ~").transpose("0 0 0 0 0 0 0 0 5 0 5 0 3 0 2 0")
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(0.3).sustain(0.55).release(.08)
+  .distort(3).distortvol(.2).hpf(80).lpf(4200).jux(x => x.late(.012))
+  .room(.2).gain(.8).mask(scene8).postgain(scene8.mul(0.55)).analyze("guitar")
+
+// Pad · Sustained
+$: note("<[a2,c3,e3] [g2,b2,d3] [a2,c3,e3] [a#2,d3,f3]>").transpose(-5)
+  .s("gm_choir_aahs").attack(.4).release(1.2).lpf(3500)
+  .room(.7).gain(0.2).mask(scene8).velocity(scene8).analyze("pad")
+
+// ---------- 9 · Fine · 1 bars · 160 BPM · E · Em F Em D ----------
+const scene9 = "<0!54 1>"
+
+// Bass · Long sub
+$: note("<a1 g1 a1 a#1>").transpose(-5).struct("x")
+  .s("gm_electric_bass_pick").lpf(1500).lpq(1).distort(2).distortvol(.5)
+  .decay(.6).sustain(.8).gain(0.7).mask(scene9).velocity(scene9).analyze("bass")
+
+// Guitar · Metal hi-gain, Held · tuning -2
+$: note("<[a2,e3,a3] [g2,d3,g3] [a2,e3,a3] [a#2,f3,a#3]>").transpose(-7)
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(1.5).sustain(0.8).release(.08)
+  .distort(6).distortvol(.2).hpf(110).lpf(4200).jux(x => x.late(.012))
+  .room(.5).gain(.8).mask(scene9).postgain(scene9.mul(0.52)).analyze("guitar")

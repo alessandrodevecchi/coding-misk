@@ -1,0 +1,1328 @@
+{
+ "segnale-nel-rumore": [
+  {
+   "name": "Rumore",
+   "levels": {
+    "hook": 0.15
+   }
+  },
+  {
+   "name": "Emersione",
+   "levels": {
+    "hook": 0.05,
+    "fx": 0.06,
+    "hats": 0.03,
+    "arp": 0.08
+   }
+  },
+  {
+   "name": "Pulsazione",
+   "levels": {
+    "bass": 0.19,
+    "hats": 0.09,
+    "arp": 0.23,
+    "snare": 0.3,
+    "pad": 0.11,
+    "kick": 0.39
+   }
+  },
+  {
+   "name": "Fioritura",
+   "levels": {
+    "hook": 0.2,
+    "bass": 0.32,
+    "hats": 0.09,
+    "arp": 0.17,
+    "snare": 0.3,
+    "pad": 0.11,
+    "kick": 0.39
+   }
+  },
+  {
+   "name": "Silenzio",
+   "levels": {
+    "hook": 0.14,
+    "bass": 0.17,
+    "pad": 0.13
+   }
+  },
+  {
+   "name": "Ritorno",
+   "levels": {
+    "hook": 0.2,
+    "bass": 0.22,
+    "hats": 0.09,
+    "arp": 0.2,
+    "snare": 0.29,
+    "pad": 0.14,
+    "kick": 0.39
+   }
+  },
+  {
+   "name": "Dissolvenza",
+   "levels": {
+    "hook": 0.13,
+    "bass": 0.23,
+    "fx": 0.03,
+    "hats": 0.06,
+    "arp": 0.15,
+    "snare": 0.2,
+    "pad": 0.15,
+    "kick": 0.26
+   }
+  }
+ ],
+ "luci-rosse": [
+  {
+   "name": "Ingresso",
+   "levels": {
+    "bass": 0.75,
+    "hats": 0.41,
+    "kick": 0.49
+   }
+  },
+  {
+   "name": "Pista",
+   "levels": {
+    "bass": 0.75,
+    "hats": 0.41,
+    "snare": 0.48,
+    "kick": 0.49
+   }
+  },
+  {
+   "name": "Taglio",
+   "levels": {
+    "bass": 0.76,
+    "riser": 0.09
+   }
+  },
+  {
+   "name": "Scontro",
+   "levels": {
+    "hook": 0.18,
+    "bass": 0.57,
+    "fx": 0.06,
+    "hats": 0.61,
+    "snare": 0.48,
+    "kick": 0.49
+   }
+  },
+  {
+   "name": "Ombra",
+   "levels": {
+    "hook": 0.13,
+    "bass": 0.49,
+    "fx": 0.17,
+    "snare": 0.47,
+    "kick": 0.49
+   }
+  },
+  {
+   "name": "Scontro 2",
+   "levels": {
+    "bass": 0.83,
+    "fx": 0.06,
+    "hats": 0.59,
+    "snare": 0.47,
+    "pad": 0.18,
+    "kick": 0.49
+   }
+  },
+  {
+   "name": "Uscita",
+   "levels": {
+    "bass": 0.75,
+    "hats": 0.41,
+    "kick": 0.49
+   }
+  }
+ ],
+ "dci-carica": [
+  {
+   "name": "Carica",
+   "levels": {
+    "bass": 0.48,
+    "fx": 0.07,
+    "hats": 0.32,
+    "pad": 0.32,
+    "kick": 0.49
+   }
+  },
+  {
+   "name": "Carica",
+   "levels": {
+    "bass": 0.48,
+    "hats": 0.4,
+    "snare": 0.33,
+    "pad": 0.25,
+    "kick": 0.49,
+    "riser": 0.11
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "bass": 0.48,
+    "fx": 0.06,
+    "hats": 0.41,
+    "snare": 0.48,
+    "pad": 0.37,
+    "kick": 0.49
+   }
+  },
+  {
+   "name": "Picco",
+   "levels": {
+    "bass": 0.49,
+    "fx": 0.07,
+    "hats": 0.64,
+    "snare": 0.48,
+    "pad": 0.31,
+    "kick": 0.5,
+    "guitar": 0.41
+   }
+  },
+  {
+   "name": "Colpo",
+   "levels": {
+    "bass": 0.32,
+    "fx": 0.54,
+    "pad": 0.33,
+    "kick": 0.49
+   }
+  }
+ ],
+ "insert-coin": [
+  {
+   "name": "Livello 1",
+   "levels": {
+    "hats": 0.22,
+    "arp": 0.12
+   }
+  },
+  {
+   "name": "Livello 1",
+   "levels": {
+    "hook": 0.21,
+    "bass": 0.25,
+    "fx": 0.07,
+    "hats": 0.24,
+    "snare": 0.39,
+    "kick": 0.47
+   }
+  },
+  {
+   "name": "Livello 1 B",
+   "levels": {
+    "hook": 0.19,
+    "bass": 0.25,
+    "hats": 0.32,
+    "arp": 0.11,
+    "snare": 0.39,
+    "kick": 0.47
+   }
+  },
+  {
+   "name": "Boss",
+   "levels": {
+    "hook": 0.21,
+    "bass": 0.36,
+    "fx": 0.06,
+    "hats": 0.34,
+    "snare": 0.43,
+    "kick": 0.48
+   }
+  },
+  {
+   "name": "Bonus",
+   "levels": {
+    "hook": 0.08,
+    "bass": 0.26,
+    "fx": 0.04,
+    "hats": 0.36,
+    "arp": 0.12,
+    "snare": 0.4,
+    "kick": 0.47
+   }
+  },
+  {
+   "name": "Livello 2",
+   "levels": {
+    "hook": 0.22,
+    "bass": 0.26,
+    "fx": 0.06,
+    "hats": 0.36,
+    "arp": 0.1,
+    "snare": 0.4,
+    "kick": 0.47
+   }
+  },
+  {
+   "name": "Game over",
+   "levels": {
+    "hook": 0.1,
+    "pad": 0.21
+   }
+  }
+ ],
+ "circuito-ruggine": [
+  {
+   "name": "Avvio",
+   "levels": {
+    "fx": 0.13,
+    "kick": 0.52,
+    "riser": 0.04,
+    "guitar": 0.48
+   }
+  },
+  {
+   "name": "Macchina",
+   "levels": {
+    "bass": 0.44,
+    "fx": 0.18,
+    "hats": 0.56,
+    "arp": 0.41,
+    "snare": 0.51,
+    "kick": 0.49,
+    "guitar": 0.21
+   }
+  },
+  {
+   "name": "Riff",
+   "levels": {
+    "bass": 0.43,
+    "fx": 0.15,
+    "hats": 0.56,
+    "arp": 0.3,
+    "snare": 0.52,
+    "kick": 0.49,
+    "guitar": 0.64
+   }
+  },
+  {
+   "name": "Corridoio",
+   "levels": {
+    "bass": 0.43,
+    "hats": 0.36,
+    "arp": 0.36,
+    "kick": 0.47,
+    "riser": 0.06,
+    "guitar": 0.37
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "hook": 0.16,
+    "bass": 0.48,
+    "fx": 0.05,
+    "hats": 0.6,
+    "arp": 0.4,
+    "snare": 0.48,
+    "pad": 0.21,
+    "kick": 0.49,
+    "guitar": 0.63
+   }
+  },
+  {
+   "name": "Blackout",
+   "levels": {
+    "hook": 0.06,
+    "bass": 0.45,
+    "fx": 0.18,
+    "hats": 0.59,
+    "arp": 0.26,
+    "snare": 0.44,
+    "pad": 0.08,
+    "kick": 0.5,
+    "riser": 0.07,
+    "guitar": 0.54
+   }
+  },
+  {
+   "name": "Drop 2",
+   "levels": {
+    "hook": 0.16,
+    "bass": 0.48,
+    "fx": 0.18,
+    "hats": 0.65,
+    "arp": 0.51,
+    "snare": 0.49,
+    "pad": 0.28,
+    "kick": 0.5,
+    "guitar": 0.92
+   }
+  },
+  {
+   "name": "Spegnimento",
+   "levels": {
+    "fx": 0.13,
+    "kick": 0.49,
+    "guitar": 0.67
+   }
+  }
+ ],
+ "ferro": [
+  {
+   "name": "Riff",
+   "levels": {
+    "bass": 0.29,
+    "fx": 0.52,
+    "hats": 0.34,
+    "kick": 0.49,
+    "riser": 0.08,
+    "guitar": 0.76
+   }
+  },
+  {
+   "name": "Riff",
+   "levels": {
+    "bass": 0.3,
+    "hats": 0.33,
+    "snare": 0.44,
+    "kick": 0.57,
+    "guitar": 0.49
+   }
+  },
+  {
+   "name": "Strofa",
+   "levels": {
+    "bass": 0.3,
+    "hats": 0.25,
+    "snare": 0.44,
+    "kick": 0.57,
+    "guitar": 0.35
+   }
+  },
+  {
+   "name": "Pre",
+   "levels": {
+    "bass": 0.3,
+    "hats": 0.34,
+    "snare": 0.43,
+    "kick": 0.57,
+    "riser": 0.06,
+    "guitar": 0.5
+   }
+  },
+  {
+   "name": "Ritornello",
+   "levels": {
+    "hook": 0.57,
+    "bass": 0.3,
+    "hats": 0.34,
+    "snare": 0.43,
+    "pad": 0.07,
+    "kick": 0.57,
+    "guitar": 0.38
+   }
+  },
+  {
+   "name": "Breakdown",
+   "levels": {
+    "bass": 0.32,
+    "fx": 0.18,
+    "hats": 0.29,
+    "snare": 0.43,
+    "pad": 0.05,
+    "kick": 0.49,
+    "guitar": 0.55
+   }
+  },
+  {
+   "name": "Assolo",
+   "levels": {
+    "hook": 0.35,
+    "bass": 0.3,
+    "hats": 0.34,
+    "snare": 0.43,
+    "kick": 0.57,
+    "guitar": 0.37
+   }
+  },
+  {
+   "name": "Ritornello 2",
+   "levels": {
+    "hook": 0.61,
+    "bass": 0.3,
+    "hats": 0.33,
+    "snare": 0.46,
+    "pad": 0.09,
+    "kick": 0.49,
+    "guitar": 0.4
+   }
+  },
+  {
+   "name": "Fine",
+   "levels": {
+    "bass": 0.24,
+    "hats": 0.29,
+    "pad": 0.06,
+    "riser": 0.06,
+    "guitar": 0.64
+   }
+  }
+ ],
+ "ali-di-cenere": [
+  {
+   "name": "Arpeggio",
+   "levels": {
+    "arp": 0.13,
+    "pad": 0.11,
+    "guitar": 0.21
+   }
+  },
+  {
+   "name": "Tema",
+   "levels": {
+    "hook": 0.59,
+    "bass": 0.29,
+    "hats": 0.29,
+    "snare": 0.41,
+    "pad": 0.12,
+    "kick": 0.53,
+    "guitar": 0.41
+   }
+  },
+  {
+   "name": "Strofa",
+   "levels": {
+    "bass": 0.29,
+    "hats": 0.34,
+    "snare": 0.41,
+    "pad": 0.1,
+    "kick": 0.5,
+    "guitar": 0.34
+   }
+  },
+  {
+   "name": "Pre",
+   "levels": {
+    "bass": 0.29,
+    "hats": 0.29,
+    "snare": 0.41,
+    "pad": 0.05,
+    "kick": 0.53,
+    "riser": 0.05,
+    "guitar": 0.52
+   }
+  },
+  {
+   "name": "Ritornello",
+   "levels": {
+    "hook": 0.59,
+    "bass": 0.29,
+    "hats": 0.29,
+    "snare": 0.41,
+    "pad": 0.11,
+    "kick": 0.53,
+    "guitar": 0.52
+   }
+  },
+  {
+   "name": "Assolo",
+   "levels": {
+    "hook": 0.35,
+    "bass": 0.29,
+    "hats": 0.34,
+    "snare": 0.41,
+    "pad": 0.11,
+    "kick": 0.53,
+    "guitar": 0.27
+   }
+  },
+  {
+   "name": "Ritornello finale",
+   "levels": {
+    "hook": 0.68,
+    "bass": 0.29,
+    "hats": 0.29,
+    "snare": 0.41,
+    "pad": 0.14,
+    "kick": 0.53,
+    "guitar": 0.57
+   }
+  },
+  {
+   "name": "Coda",
+   "levels": {
+    "bass": 0.11,
+    "pad": 0.2,
+    "guitar": 0.37
+   }
+  }
+ ],
+ "drift": [
+  {
+   "name": "Intro",
+   "levels": {
+    "hook": 0.12,
+    "fx": 0.13
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "hook": 0.26,
+    "bass": 0.73,
+    "fx": 0.04,
+    "hats": 0.48,
+    "snare": 0.46,
+    "pad": 0.08,
+    "kick": 0.4
+   }
+  },
+  {
+   "name": "Break",
+   "levels": {
+    "hook": 0.15,
+    "bass": 0.43,
+    "fx": 0.09,
+    "hats": 0.29,
+    "snare": 0.35,
+    "pad": 0.05,
+    "kick": 0.29,
+    "riser": 0.05
+   }
+  },
+  {
+   "name": "Drop 2",
+   "levels": {
+    "hook": 0.39,
+    "bass": 0.94,
+    "fx": 0.04,
+    "hats": 0.71,
+    "snare": 0.48,
+    "pad": 0.1,
+    "kick": 0.46
+   }
+  },
+  {
+   "name": "Outro",
+   "levels": {
+    "hook": 0.22,
+    "fx": 0.04,
+    "hats": 0.48,
+    "snare": 0.45,
+    "pad": 0.04,
+    "kick": 0.4
+   }
+  },
+  {
+   "name": "Colpo",
+   "levels": {
+    "hook": 0.23,
+    "bass": 0.49,
+    "fx": 0.25
+   }
+  }
+ ],
+ "neon-rush-reel": [
+  {
+   "name": "Glitch",
+   "levels": {
+    "fx": 0.13,
+    "arp": 0.33,
+    "kick": 0.5
+   }
+  },
+  {
+   "name": "Build",
+   "levels": {
+    "bass": 0.43,
+    "hats": 0.44,
+    "arp": 0.34,
+    "kick": 0.49,
+    "riser": 0.07
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "hook": 0.06,
+    "bass": 0.48,
+    "fx": 0.19,
+    "hats": 1.18,
+    "arp": 0.47,
+    "snare": 0.51,
+    "pad": 0.34,
+    "kick": 0.5
+   }
+  },
+  {
+   "name": "Glitch break",
+   "levels": {
+    "fx": 0.17,
+    "hats": 0.48,
+    "arp": 0.48,
+    "kick": 0.5,
+    "riser": 0.15
+   }
+  },
+  {
+   "name": "Hit",
+   "levels": {
+    "hook": 0.1,
+    "bass": 0.48,
+    "fx": 0.25,
+    "hats": 1.24,
+    "arp": 0.37,
+    "snare": 0.51,
+    "pad": 0.38,
+    "kick": 0.5,
+    "guitar": 0.48
+   }
+  },
+  {
+   "name": "Hit",
+   "levels": {
+    "bass": 0.2,
+    "fx": 0.13,
+    "arp": 0.27,
+    "kick": 0.5,
+    "guitar": 0.47
+   }
+  }
+ ],
+ "settimo-cielo": [
+  {
+   "name": "Mellotron",
+   "levels": {
+    "hook": 0.11,
+    "pad": 0.11
+   }
+  },
+  {
+   "name": "Riff 7/8",
+   "levels": {
+    "bass": 0.17,
+    "hats": 0.25,
+    "snare": 0.36,
+    "pad": 0.03,
+    "kick": 0.46,
+    "guitar": 0.45
+   }
+  },
+  {
+   "name": "Strofa 7/8",
+   "levels": {
+    "hook": 0.15,
+    "bass": 0.16,
+    "hats": 0.2,
+    "arp": 0.03,
+    "snare": 0.35,
+    "kick": 0.46,
+    "guitar": 0.2
+   }
+  },
+  {
+   "name": "Ponte 5/4",
+   "levels": {
+    "hook": 0.08,
+    "bass": 0.17,
+    "hats": 0.27,
+    "arp": 0.1,
+    "snare": 0.36,
+    "pad": 0.11,
+    "kick": 0.46,
+    "guitar": 0.19
+   }
+  },
+  {
+   "name": "Assolo 4/4",
+   "levels": {
+    "hook": 0.64,
+    "bass": 0.17,
+    "hats": 0.28,
+    "snare": 0.35,
+    "pad": 0.15,
+    "kick": 0.46,
+    "guitar": 0.2
+   }
+  },
+  {
+   "name": "Riff ripresa",
+   "levels": {
+    "bass": 0.17,
+    "hats": 0.25,
+    "arp": 0.03,
+    "snare": 0.36,
+    "pad": 0.04,
+    "kick": 0.46,
+    "guitar": 0.48
+   }
+  },
+  {
+   "name": "Finale",
+   "levels": {
+    "hook": 0.03,
+    "bass": 0.17,
+    "hats": 0.2,
+    "snare": 0.36,
+    "pad": 0.13,
+    "kick": 0.46,
+    "guitar": 0.55
+   }
+  }
+ ],
+ "pioggia-sul-vetro": [
+  {
+   "name": "Vinile",
+   "levels": {
+    "pad": 0.19
+   }
+  },
+  {
+   "name": "A",
+   "levels": {
+    "bass": 0.15,
+    "fx": 0.05,
+    "hats": 0.27,
+    "snare": 0.59,
+    "pad": 0.2,
+    "kick": 0.82
+   }
+  },
+  {
+   "name": "B",
+   "levels": {
+    "hook": 0.15,
+    "bass": 0.15,
+    "fx": 0.04,
+    "hats": 0.26,
+    "arp": 0.05,
+    "snare": 0.6,
+    "pad": 0.17,
+    "kick": 0.83
+   }
+  },
+  {
+   "name": "Pausa",
+   "levels": {
+    "hook": 0.14,
+    "bass": 0.07,
+    "fx": 0.05,
+    "hats": 0.13,
+    "snare": 0.3,
+    "pad": 0.18,
+    "kick": 0.41
+   }
+  },
+  {
+   "name": "Ritorno",
+   "levels": {
+    "hook": 0.05,
+    "bass": 0.15,
+    "fx": 0.04,
+    "hats": 0.27,
+    "snare": 0.64,
+    "pad": 0.2,
+    "kick": 0.88
+   }
+  },
+  {
+   "name": "Coda",
+   "levels": {
+    "fx": 0.05,
+    "hats": 0.21,
+    "snare": 0.48,
+    "pad": 0.2,
+    "kick": 0.66
+   }
+  }
+ ],
+ "ghost-protocol-scenes": [
+  {
+   "name": "Intro",
+   "levels": {
+    "fx": 0.13,
+    "hats": 0.38,
+    "pad": 0.05
+   }
+  },
+  {
+   "name": "Build",
+   "levels": {
+    "bass": 0.32,
+    "fx": 0.06,
+    "hats": 0.34,
+    "arp": 0.16,
+    "pad": 0.13,
+    "kick": 0.44
+   }
+  },
+  {
+   "name": "Drop A",
+   "levels": {
+    "bass": 0.44,
+    "fx": 0.22,
+    "hats": 0.6,
+    "arp": 0.33,
+    "snare": 0.47,
+    "pad": 0.2,
+    "kick": 0.49
+   }
+  },
+  {
+   "name": "Fall",
+   "levels": {
+    "hook": 0.28,
+    "bass": 0.44,
+    "hats": 0.4,
+    "arp": 0.31,
+    "snare": 0.46,
+    "pad": 0.14,
+    "kick": 0.49,
+    "riser": 0.1
+   }
+  },
+  {
+   "name": "Break",
+   "levels": {
+    "hook": 0.18,
+    "bass": 0.4,
+    "fx": 0.13,
+    "hats": 0.4,
+    "arp": 0.27,
+    "snare": 0.63,
+    "pad": 0.2,
+    "kick": 0.75,
+    "riser": 0.05
+   }
+  },
+  {
+   "name": "Rebuild",
+   "levels": {
+    "hook": 0.26,
+    "bass": 0.34,
+    "fx": 0.05,
+    "hats": 0.26,
+    "arp": 0.24,
+    "snare": 0.19,
+    "pad": 0.26,
+    "kick": 0.62
+   }
+  },
+  {
+   "name": "Drop B",
+   "levels": {
+    "hook": 0.09,
+    "bass": 0.46,
+    "fx": 0.06,
+    "hats": 0.92,
+    "arp": 0.43,
+    "snare": 0.48,
+    "pad": 0.27,
+    "kick": 0.49
+   }
+  },
+  {
+   "name": "Outro",
+   "levels": {
+    "bass": 0.43,
+    "fx": 0.13,
+    "hats": 0.46,
+    "arp": 0.3,
+    "pad": 0.07,
+    "kick": 0.49
+   }
+  }
+ ],
+ "neon-ascent-scenes": [
+  {
+   "name": "Intro",
+   "levels": {
+    "hats": 0.36,
+    "pad": 0.26
+   }
+  },
+  {
+   "name": "Build",
+   "levels": {
+    "bass": 0.06,
+    "hats": 0.37,
+    "arp": 0.18,
+    "pad": 0.07,
+    "kick": 0.74
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "hook": 0.12,
+    "bass": 0.43,
+    "fx": 0.06,
+    "hats": 0.45,
+    "arp": 0.18,
+    "snare": 0.71,
+    "pad": 0.19,
+    "kick": 0.9
+   }
+  },
+  {
+   "name": "Break",
+   "levels": {
+    "hook": 0.12,
+    "bass": 0.21,
+    "fx": 0.03,
+    "hats": 0.22,
+    "arp": 0.12,
+    "snare": 0.35,
+    "pad": 0.2,
+    "kick": 0.45,
+    "riser": 0.04
+   }
+  },
+  {
+   "name": "Drop 2",
+   "levels": {
+    "hook": 0.12,
+    "bass": 0.43,
+    "fx": 0.06,
+    "hats": 0.5,
+    "arp": 0.16,
+    "snare": 0.71,
+    "pad": 0.18,
+    "kick": 0.9
+   }
+  }
+ ],
+ "ten-years-rebuild": [
+  {
+   "name": "Intro",
+   "levels": {
+    "bass": 0.11,
+    "arp": 0.06,
+    "pad": 0.19
+   }
+  },
+  {
+   "name": "Strofa A",
+   "levels": {
+    "bass": 0.25,
+    "fx": 0.06,
+    "hats": 0.43,
+    "arp": 0.09,
+    "snare": 0.67,
+    "pad": 0.25,
+    "kick": 0.85
+   }
+  },
+  {
+   "name": "Strofa B",
+   "levels": {
+    "hook": 0.09,
+    "bass": 0.15,
+    "fx": 0.55,
+    "hats": 0.38,
+    "arp": 0.09,
+    "pad": 0.19,
+    "kick": 0.85,
+    "riser": 0.1
+   }
+  },
+  {
+   "name": "Strofa B",
+   "levels": {
+    "hook": 0.1,
+    "bass": 0.2,
+    "fx": 0.06,
+    "hats": 0.43,
+    "arp": 0.09,
+    "snare": 0.65,
+    "pad": 0.25,
+    "kick": 0.85
+   }
+  },
+  {
+   "name": "Breakdown",
+   "levels": {
+    "hook": 0.07,
+    "bass": 0.17,
+    "fx": 0.04,
+    "hats": 0.28,
+    "arp": 0.09,
+    "snare": 0.45,
+    "pad": 0.14,
+    "kick": 0.57
+   }
+  },
+  {
+   "name": "Riser",
+   "levels": {
+    "bass": 0.06,
+    "hats": 0.43,
+    "arp": 0.07,
+    "snare": 0.21,
+    "pad": 0.28,
+    "riser": 0.09
+   }
+  },
+  {
+   "name": "Finale",
+   "levels": {
+    "hook": 0.12,
+    "bass": 0.23,
+    "fx": 0.06,
+    "hats": 0.43,
+    "arp": 0.1,
+    "snare": 0.71,
+    "pad": 0.28,
+    "kick": 0.85
+   }
+  },
+  {
+   "name": "Outro",
+   "levels": {
+    "pad": 0.22,
+    "riser": 0.1
+   }
+  }
+ ],
+ "next-chapter": [
+  {
+   "name": "Intro",
+   "levels": {
+    "arp": 0.05,
+    "pad": 0.14
+   }
+  },
+  {
+   "name": "Strofa",
+   "levels": {
+    "bass": 0.18,
+    "hats": 0.39,
+    "arp": 0.08,
+    "pad": 0.16,
+    "kick": 0.85
+   }
+  },
+  {
+   "name": "Pre",
+   "levels": {
+    "bass": 0.18,
+    "hats": 0.43,
+    "arp": 0.09,
+    "snare": 0.72,
+    "pad": 0.17,
+    "kick": 0.85,
+    "riser": 0.04
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "hook": 0.12,
+    "bass": 0.23,
+    "fx": 0.06,
+    "hats": 0.44,
+    "arp": 0.09,
+    "snare": 0.72,
+    "pad": 0.26,
+    "kick": 0.85
+   }
+  },
+  {
+   "name": "Break",
+   "levels": {
+    "hook": 0.1,
+    "bass": 0.19,
+    "fx": 0.04,
+    "hats": 0.4,
+    "arp": 0.06,
+    "snare": 0.48,
+    "pad": 0.17,
+    "kick": 0.57
+   }
+  },
+  {
+   "name": "Riser",
+   "levels": {
+    "bass": 0.07,
+    "hats": 0.39,
+    "snare": 0.25,
+    "pad": 0.27,
+    "riser": 0.08
+   }
+  },
+  {
+   "name": "Drop 2",
+   "levels": {
+    "hook": 0.11,
+    "bass": 0.32,
+    "fx": 0.06,
+    "hats": 0.52,
+    "arp": 0.1,
+    "snare": 0.72,
+    "pad": 0.3,
+    "kick": 0.85
+   }
+  },
+  {
+   "name": "Outro",
+   "levels": {
+    "arp": 0.08,
+    "pad": 0.24,
+    "riser": 0.07
+   }
+  }
+ ],
+ "dci-rebuild": [
+  {
+   "name": "Stab",
+   "levels": {
+    "pad": 0.21
+   }
+  },
+  {
+   "name": "Build",
+   "levels": {
+    "hats": 0.28,
+    "snare": 0.3,
+    "pad": 0.26,
+    "riser": 0.1
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "bass": 0.24,
+    "fx": 0.06,
+    "hats": 0.29,
+    "snare": 0.42,
+    "pad": 0.2,
+    "kick": 0.47
+   }
+  },
+  {
+   "name": "Coda",
+   "levels": {
+    "pad": 0.27
+   }
+  }
+ ],
+ "dci-ignition": [
+  {
+   "name": "Stab",
+   "levels": {
+    "hook": 0.05,
+    "pad": 0.14
+   }
+  },
+  {
+   "name": "Build",
+   "levels": {
+    "bass": 0.21,
+    "hats": 0.2,
+    "pad": 0.23,
+    "kick": 0.34,
+    "riser": 0.05
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "hook": 0.09,
+    "bass": 0.24,
+    "fx": 0.06,
+    "hats": 0.35,
+    "snare": 0.42,
+    "pad": 0.18,
+    "kick": 0.47
+   }
+  },
+  {
+   "name": "Switch",
+   "levels": {
+    "hook": 0.08,
+    "bass": 0.19,
+    "fx": 0.03,
+    "hats": 0.33,
+    "snare": 0.26,
+    "pad": 0.24,
+    "kick": 0.47
+   }
+  },
+  {
+   "name": "Drop 2",
+   "levels": {
+    "hook": 0.09,
+    "bass": 0.26,
+    "fx": 0.15,
+    "hats": 0.54,
+    "snare": 0.45,
+    "pad": 0.21,
+    "kick": 0.48
+   }
+  },
+  {
+   "name": "Coda",
+   "levels": {
+    "hook": 0.06,
+    "pad": 0.22
+   }
+  }
+ ],
+ "demo-synth-lab": [
+  {
+   "name": "Intro",
+   "levels": {
+    "hats": 0.43,
+    "arp": 0.2,
+    "snare": 0.71,
+    "pad": 0.22
+   }
+  },
+  {
+   "name": "Build",
+   "levels": {
+    "bass": 0.24,
+    "hats": 0.45,
+    "arp": 0.13,
+    "snare": 0.74,
+    "pad": 0.24,
+    "kick": 0.6
+   }
+  },
+  {
+   "name": "Drop",
+   "levels": {
+    "hook": 0.13,
+    "bass": 0.38,
+    "fx": 0.06,
+    "hats": 0.43,
+    "arp": 0.19,
+    "snare": 0.71,
+    "pad": 0.27,
+    "kick": 0.9
+   }
+  },
+  {
+   "name": "Break",
+   "levels": {
+    "hook": 0.13,
+    "bass": 0.25,
+    "fx": 0.04,
+    "hats": 0.29,
+    "arp": 0.13,
+    "snare": 0.5,
+    "pad": 0.25,
+    "kick": 0.6
+   }
+  },
+  {
+   "name": "Drop 2",
+   "levels": {
+    "hook": 0.12,
+    "bass": 0.38,
+    "fx": 0.06,
+    "hats": 0.47,
+    "arp": 0.19,
+    "snare": 0.72,
+    "pad": 0.31,
+    "kick": 0.9
+   }
+  }
+ ]
+}

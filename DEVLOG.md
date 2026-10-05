@@ -131,8 +131,8 @@
 - Piano per tracce, pattern e timeline in `docs/PLAN-TRACKS.md`, ispirato a Reason (rack, pattern, Blocks): una riga `$:` per traccia con `pick` per sezione, tracce di codice, fasi da 0 a 5. In attesa delle decisioni del proprietario.
 - Decisioni del proprietario sul piano: timeline libera come obiettivo con modalità a sezioni come MVP (passaggio senza perdite fra le due), note relative agli accordi, tracce di codice componibili. Aggiunti al piano: un bus (orbit) per traccia, brani in JSON con validatore e CLI per gli agenti, `docs/COMPOSING.md` con esempi verificati.
 - Aperte le issue delle fasi del piano: `#9` rete di sicurezza, `#10` ritmo per ogni strumento, `#11` formato brani v2, `#12` griglia con tracce libere, `#13` rack ed effetti e tracce di codice, `#14` timeline libera.
+- `#9` Rete di sicurezza: `tools/snapshot-code.mjs` (codice generato dei 18 brani in `tests/snapshots/code/`, senza browser, `npm run check:code`) e `tools/snapshot-levels.cjs` (picchi per scena e strumento in `tests/snapshots/levels.json`, tolleranza 0,12). Due giri sul codice invariato: tutto entro tolleranza tranne `fx` (crash e riser dipendono da dove cade la finestra di misura), quindi `fx` viene registrato ma non confrontato.
 
 ## Prossimo passo
 
-- `#9` Rete di sicurezza, poi `#10`. Lo spike sulle voci (`#3`) aspetta spazio su disco (servono circa 10 GB liberi).
-
+- `#10` Ritmo per ogni strumento, timeline in sola lettura, un bus di delay e riverbero per strumento. Lo spike sulle voci (`#3`) aspetta spazio su disco (servono circa 10 GB liberi).

@@ -120,7 +120,7 @@ Clips that start or end inside a bar use a finer lane. Section fades and tempo s
 
 Each phase is a GitHub issue and a branch from `develop`, verified (errors, levels per instrument, screenshots) before merging; `main` only after the owner confirms.
 
-0. **Safety net. (`#9`)** Snapshot the compiled code and measured levels of every built-in track, split the compiler into modules. No visible change.
+0. **Safety net. (`#9`)** Snapshot the compiled code and measured levels of every built-in track, with check scripts. No visible change. Splitting the compiler into modules moves to phase 2, where it is rewritten.
 1. **Quick wins in the current model. (`#10`)** A read-only timeline under the arranger (one lane per instrument, lit where it plays); a step row per melodic channel so its rhythm can be drawn, starting from the preset; one orbit per channel.
 2. **Model v2, compiler v2, JSON songs and CLI. (`#11`)** Schema, validator, `pick` compiler, automatic migration of built-in and saved tracks, parity check against phase 0 snapshots. First version of `docs/COMPOSING.md`.
 3. **Interface v2, sections mode. (`#12`)** Arrangement grid, pattern editor, add, duplicate and remove tracks of any type and number, mute and solo, lanes shown per section.

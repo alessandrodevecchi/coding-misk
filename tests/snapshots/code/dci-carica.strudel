@@ -1,0 +1,96 @@
+// coding-misk · DCI Jingle · carica
+// track composed with the arranger: each scene is a block of layers switched on by its lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(106/4)
+
+const SECTIONS = [['Stab', 1], ['Carica', 2], ['Drop', 6], ['Picco', 2], ['Colpo', 1]]
+const TEMPO = {'Stab': 106, 'Carica': 106, 'Drop': 106, 'Picco': 106, 'Colpo': 106}
+
+// ---------- 1 · Stab · 1 bars · 106 BPM · F# · F#m F#m F#m G ----------
+const scene1 = "<1 0!11>"
+// Drums · RolandTR909
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.95).distort(1.5).distortvol(.5).mask(scene1).velocity(scene1).analyze("kick")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<1>").mask(scene1).velocity(scene1).analyze("fx")
+
+// Pad · Staccato 8ths
+$: note("<[a2,c3,e3] [a2,c3,e3] [a2,c3,e3] [a#2,d3,f3]>").transpose(-3).struct("[x x] [x x] [x x] [x x]")
+  .s("supersaw").attack(.01).decay(.08).sustain(0).release(.05).lpf(4200).distort(1.2).distortvol(.5)
+  .room(.2).gain(0.36).mask(scene1).velocity(scene1).analyze("pad")
+
+// ---------- 2 · Carica · 2 bars · 106 BPM · F# · F#m F#m F#m G ----------
+const scene2 = "<0 1!2 0!9>"
+// Drums · RolandTR909
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain("<0.95 0.6>").distort(1.5).distortvol(.5).mask("<[1 0] 1>").mask(scene2).velocity(scene2).analyze("kick")
+$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("RolandTR909").gain("<0.48 0.3>").distort(1.5).distortvol(.5).mask("<[1 0] 1>").mask(scene2).velocity(scene2).analyze("hats")
+$: s("sd*16").bank("RolandTR909").gain(saw.range(.15, .75)).mask("<1 0>").mask(scene2).velocity(scene2).analyze("snare")
+
+// Bass · Crosshair riff
+$: note("<a#1 a1 a1 a1>").transpose(-3).struct("x x ~ x ~ x ~ x ~ x x ~ x ~ ~ ~").transpose("0 0 0 0 0 0 0 3 0 0 0 0 1 0 0 0")
+  .s("sawtooth").lpf("<1600 400>").lpq(8).distort(4).distortvol(.5)
+  .decay(.1).sustain(.25).gain(0.6).mask("<[1 0] 1>").mask(scene2).velocity(scene2).analyze("bass")
+
+// Pad · Staccato 8ths
+$: note("<[a#2,d3,f3] [a2,c3,e3] [a2,c3,e3] [a2,c3,e3]>").transpose(-3).struct("[x x] [x x] [x x] [x x]")
+  .s("supersaw").attack(.01).decay(.08).sustain(0).release(.05).lpf("<5000 2500>").distort(1.2).distortvol(.5)
+  .room(.2).gain(0.34).mask(scene2).velocity(scene2).analyze("pad")
+
+// Riser · white noise rising over 2 bars
+$: s("white*16").decay(.06).sustain(0)
+  .hpf(saw.slow(2).range(300, 8000).late(1))
+  .gain(saw.slow(2).range(0, .4).late(1)).mask(scene2).velocity(scene2).analyze("riser")
+
+// ---------- 3 · Drop · 6 bars · 106 BPM · F# · F#m F#m F#m G ----------
+const scene3 = "<0!3 1!6 0!3>"
+// Drums · RolandTR909
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.95).distort(1.6).distortvol(.5).mask(scene3).velocity(scene3).analyze("kick")
+$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR909").gain(0.76).distort(1.6).distortvol(.5).mask(scene3).velocity(scene3).analyze("snare")
+$: s("[~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~]").bank("RolandTR909").gain(0.48).distort(1.6).distortvol(.5).mask(scene3).velocity(scene3).analyze("hats")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<0!3 1 0!2>").mask(scene3).velocity(scene3).analyze("fx")
+
+// Bass · Crosshair riff
+$: note("<a1 a1 a#1 a1>").transpose(-3).struct("x x ~ x ~ x ~ x ~ x x ~ x ~ ~ ~").transpose("0 0 0 0 0 0 0 3 0 0 0 0 1 0 0 0")
+  .s("sawtooth").lpf(1700).lpq(8).distort(4).distortvol(.5)
+  .decay(.1).sustain(.25).gain(0.6).mask(scene3).velocity(scene3).analyze("bass")
+
+// Pad · Syncopated
+$: note("<[a2,c3,e3] [a2,c3,e3] [a#2,d3,f3] [a2,c3,e3]>").transpose(-3).struct("[~ ~ x x] [~ ~ x x] [~ ~ x x] [~ ~ x x]")
+  .s("supersaw").attack(.01).decay(.1).sustain(0).release(.05).lpf(4200).distort(1.2).distortvol(.5)
+  .room(.2).gain(0.4).mask(scene3).velocity(scene3).analyze("pad")
+
+// ---------- 4 · Picco · 2 bars · 106 BPM · F# · F#m F#m F#m G ----------
+const scene4 = "<0!9 1!2 0>"
+// Drums · RolandTR909
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.95).distort(1.8).distortvol(.5).mask(scene4).velocity(scene4).analyze("kick")
+$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR909").gain(0.76).distort(1.8).distortvol(.5).mask(scene4).velocity(scene4).analyze("snare")
+$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("RolandTR909").gain(0.48).distort(1.8).distortvol(.5).mask(scene4).velocity(scene4).analyze("hats")
+$: s("[~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~]").bank("RolandTR909").gain(0.43).distort(1.8).distortvol(.5).mask(scene4).velocity(scene4).analyze("hats")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<0 1>").mask(scene4).velocity(scene4).analyze("fx")
+
+// Bass · Crosshair riff
+$: note("<a#1 a1 a1 a1>").transpose(-3).struct("x x ~ x ~ x ~ x ~ x x ~ x ~ ~ ~").transpose("0 0 0 0 0 0 0 3 0 0 0 0 1 0 0 0")
+  .s("sawtooth").lpf(2200).lpq(8).distort(5).distortvol(.5)
+  .decay(.1).sustain(.25).gain(0.6).mask(scene4).velocity(scene4).analyze("bass")
+
+// Guitar · Metal hi-gain, Stomp (industrial) · tuning -2
+$: note("<[a#2,f3,a#3] [a2,e3,a3] [a2,e3,a3] [a2,e3,a3]>").transpose(-5).struct("x ~ ~ ~ x ~ ~ ~ x ~ x ~ x ~ ~ ~").transpose("0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0")
+  .s("gm_distortion_guitar,sawtooth").attack(.003).decay(0.09).sustain(0).release(.08)
+  .distort(6).distortvol(.2).hpf(110).lpf(4200).jux(x => x.late(.012))
+  .room(.2).gain(.8).mask(scene4).postgain(scene4.mul(0.45)).analyze("guitar")
+
+// Pad · Syncopated
+$: note("<[a#2,d3,f3] [a2,c3,e3] [a2,c3,e3] [a2,c3,e3]>").transpose(-3).struct("[~ ~ x x] [~ ~ x x] [~ ~ x x] [~ ~ x x]")
+  .s("supersaw").attack(.01).decay(.1).sustain(0).release(.05).lpf(4200).distort(1.2).distortvol(.5)
+  .room(.2).gain(0.4).mask(scene4).velocity(scene4).analyze("pad")
+
+// ---------- 5 · Colpo · 1 bars · 106 BPM · F# · F#m F#m F#m G ----------
+const scene5 = "<0!11 1>"
+
+// Bass · Long sub
+$: note("<a1 a1 a#1 a1>").transpose(-3).struct("x")
+  .s("sine").lpf(400).lpq(2).distort(2).distortvol(.5)
+  .decay(.6).sustain(.8).gain(0.8).mask(scene5).velocity(scene5).analyze("bass")
+
+// Pad · Sustained
+$: note("<[a2,c3,e3] [a2,c3,e3] [a#2,d3,f3] [a2,c3,e3]>").transpose(-3)
+  .s("supersaw").attack(.4).release(1.2).lpf(4200).distort(1.2).distortvol(.5)
+  .room(.7).gain(0.38).mask(scene5).velocity(scene5).analyze("pad")
