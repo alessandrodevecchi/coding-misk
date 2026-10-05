@@ -303,7 +303,10 @@ function renderTrackPick() {
 }
 function renderArranger() {
   const total = T.scenes.reduce((a, s) => a + s.bars, 0);
-  $('#arr-strip').innerHTML = T.scenes.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" style="flex-grow:${s.bars}" aria-current="${i === sel}">
+  // scene e corsie della timeline condividono le stesse colonne: larghezza proporzionale alle battute
+  const cols = T.scenes.map(s => `minmax(54px, ${s.bars}fr)`).join(' ');
+  $('#arr-strip').style.gridTemplateColumns = cols;
+  $('#arr-strip').innerHTML = T.scenes.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" aria-current="${i === sel}">
       <b>${esc(s.name || t('newScene', { n: i + 1 }))}</b><span>${s.bars} · ${s.state.bpmEnd ? `${s.state.bpm}→${s.state.bpmEnd}` : s.state.bpm}</span></button>`).join('') + '<span class="head"></span>';
   renderLanes();
   const sc = T.scenes[sel];
@@ -329,8 +332,9 @@ const playsIn = (st, ch) => {
   return true;
 };
 function renderLanes() {
-  $('#arr-lanes').innerHTML = ['drums', ...CHANNELS].map(ch => `<div class="lane" data-lane="${ch}"><span class="lane-name">${esc(t(ch))}</span>${
-    T.scenes.map((s, i) => `<span class="lane-cell${playsIn(normalizeState(s.state), ch) ? ' on' : ''}" data-lane-scene="${i}" style="flex-grow:${s.bars}" aria-current="${i === sel}"></span>`).join('')}</div>`).join('') + '<span class="head"></span>';
+  const cols = T.scenes.map(s => `minmax(54px, ${s.bars}fr)`).join(' ');
+  $('#arr-lanes').innerHTML = ['drums', ...CHANNELS].map(ch => `<div class="lane" data-lane="${ch}" style="grid-template-columns:${cols}"><span class="lane-name">${esc(t(ch))}</span>${
+    T.scenes.map((s, i) => `<span class="lane-cell${playsIn(normalizeState(s.state), ch) ? ' on' : ''}" data-lane-scene="${i}" aria-current="${i === sel}"></span>`).join('')}</div>`).join('') + '<span class="head"></span>';
 }
 // clic su una scena: se il brano suona salta lì, altrimenti la seleziona
 $('#arr-lanes').addEventListener('click', e => {
