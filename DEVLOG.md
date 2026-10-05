@@ -130,7 +130,9 @@
 - Verificato: la chitarra suona anche con la batteria spenta (picco 0,43); il pad controlla solo la batteria, gli altri canali hanno ritmi da preset sulla stessa griglia.
 - Piano per tracce, pattern e timeline in `docs/PLAN-TRACKS.md`, ispirato a Reason (rack, pattern, Blocks): una riga `$:` per traccia con `pick` per sezione, tracce di codice, fasi da 0 a 5. In attesa delle decisioni del proprietario.
 - Decisioni del proprietario sul piano: timeline libera come obiettivo con modalità a sezioni come MVP (passaggio senza perdite fra le due), note relative agli accordi, tracce di codice componibili. Aggiunti al piano: un bus (orbit) per traccia, brani in JSON con validatore e CLI per gli agenti, `docs/COMPOSING.md` con esempi verificati.
+- Aperte le issue delle fasi del piano: `#9` rete di sicurezza, `#10` ritmo per ogni strumento, `#11` formato brani v2, `#12` griglia con tracce libere, `#13` rack ed effetti e tracce di codice, `#14` timeline libera.
 
 ## Prossimo passo
 
-- In attesa di conferma del proprietario per lo spike su `#3`: installare ACE-Step 1.5 turbo e audio-separator in un venv fuori dal repo, generare una voce, ritagliare 4 chop in `public/samples/vox/`.
+- `#9` Rete di sicurezza, poi `#10`. Lo spike sulle voci (`#3`) aspetta spazio su disco (servono circa 10 GB liberi).
+

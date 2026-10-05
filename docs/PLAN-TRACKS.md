@@ -120,12 +120,12 @@ Clips that start or end inside a bar use a finer lane. Section fades and tempo s
 
 Each phase is a GitHub issue and a branch from `develop`, verified (errors, levels per instrument, screenshots) before merging; `main` only after the owner confirms.
 
-0. **Safety net.** Snapshot the compiled code and measured levels of every built-in track, split the compiler into modules. No visible change.
-1. **Quick wins in the current model.** A read-only timeline under the arranger (one lane per instrument, lit where it plays); a step row per melodic channel so its rhythm can be drawn, starting from the preset; one orbit per channel.
-2. **Model v2, compiler v2, JSON songs and CLI.** Schema, validator, `pick` compiler, automatic migration of built-in and saved tracks, parity check against phase 0 snapshots. First version of `docs/COMPOSING.md`.
-3. **Interface v2, sections mode.** Arrangement grid, pattern editor, add, duplicate and remove tracks of any type and number, mute and solo, lanes shown per section.
-4. **Rack and code tracks.** Players and effects as ordered devices; code tracks composed in the arranger; code highlight per track.
-5. **Timeline mode.** Free clips, drag and resize, lossless switch with sections mode.
+0. **Safety net. (`#9`)** Snapshot the compiled code and measured levels of every built-in track, split the compiler into modules. No visible change.
+1. **Quick wins in the current model. (`#10`)** A read-only timeline under the arranger (one lane per instrument, lit where it plays); a step row per melodic channel so its rhythm can be drawn, starting from the preset; one orbit per channel.
+2. **Model v2, compiler v2, JSON songs and CLI. (`#11`)** Schema, validator, `pick` compiler, automatic migration of built-in and saved tracks, parity check against phase 0 snapshots. First version of `docs/COMPOSING.md`.
+3. **Interface v2, sections mode. (`#12`)** Arrangement grid, pattern editor, add, duplicate and remove tracks of any type and number, mute and solo, lanes shown per section.
+4. **Rack and code tracks. (`#13`)** Players and effects as ordered devices; code tracks composed in the arranger; code highlight per track.
+5. **Timeline mode. (`#14`)** Free clips, drag and resize, lossless switch with sections mode.
 6. **Later.** Automation lanes, piano roll view, vocal tracks (issue `#3`), faster export (issue `#8`).
 
 Documentation grows with every phase; a phase is done only when its features are documented with an example.
