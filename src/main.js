@@ -4,6 +4,7 @@ import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTER
 import { compileSong } from './song/compile.js';
 import { validateSong } from './song/validate.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, fromScenes, clipState } from './song/format.js';
+import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
 import SONG_ORDER from '../songs/index.json';
 import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
@@ -77,7 +78,7 @@ let T = prepare(draft && draft.T && (draft.T.sections || draft.T.scenes) ? draft
 let sel = Math.min(draft ? draft.sel || 0 : 0, T.sections.length - 1);
 let tk = Math.min(draft ? draft.tk || 0 : 0, Math.max(0, T.tracks.length - 1));
 let dirty = !!(draft && draft.dirty);
-let scope = 'track', editPat = null;
+let scope = 'track', editPat = null, panelView = store.get('coding-misk-panel', 'one');
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!LOOKS.some(([k]) => k === look)) look = 'palco';
 let compiled = playable({ ...T, kind: 'composed' });
@@ -355,7 +356,7 @@ function selectScene(i) {
 function selectTrack(i) {
   if (i < 0 || i >= T.tracks.length) return;
   if (i !== tk) { tk = i; editPat = null; }
-  saveDraft(); renderArranger(); renderTrackPanel();
+  saveDraft(); renderArranger(); renderTrackPanel(); highlightTrack();
 }
 function renderTrackPick() {
   const list = composedTracks();
@@ -410,7 +411,7 @@ $('#arr-grid').addEventListener('click', e => {
   const [i, j] = c.dataset.cell.split(':').map(Number);
   if (i !== tk) { tk = i; editPat = null; }
   if (isPlaying() && mode === 'track' && j !== sel) { playSong(compiled, sceneStart(j), 'track'); }
-  sel = j; editPat = null; saveDraft(); renderArranger(); renderTrackPanel();
+  sel = j; editPat = null; saveDraft(); renderArranger(); renderTrackPanel(); highlightTrack();
 });
 $('#arr-strip').addEventListener('click', e => {
   const b = e.target.closest('[data-scene-i]'); if (!b) return;
@@ -584,7 +585,89 @@ const noteRows = tr => tr.type === 'hook' ? [7, 6, 5, 4, 3, 2, 1, 0] : [3, 2, 1,
 const simpleNotes = s => !s || /^[-\d~\s]+$/.test(s);
 const noteTokens = (s, n) => { const tk = (s || '').trim().split(/\s+/).filter(Boolean); return Array.from({ length: n }, (_, i) => tk.length ? tk[i % tk.length] : '~'); };
 
+// un modulo del rack: nome, acceso/spento, codice Strudel che aggiunge, valori, ordine
+const devValue = (name, v) => name === 'time' ? `${+(v * 16).toFixed(2)}/16` : String(v);
+function deviceHtml(d, i, tr) {
+  const spec = DEVICES[d.device]; if (!spec) return '';
+  const a = deviceArgs(d), n = (tr.rack || []).length;
+  return `<div class="device${d.on === false ? ' off' : ''}" data-dev="${i}">
+    <div class="dev-head"><button class="led" data-dev-on="${i}" aria-pressed="${d.on !== false}" aria-label="${esc(t('onoff', { name: tx(spec.label) }))}"></button>
+      <b>${esc(tx(spec.label))}</b><code data-dev-code="${i}"></code>
+      <span class="dev-tools"><button class="mini" data-dev-move="${i}:-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(t('moveUp'))}">▲</button><button class="mini" data-dev-move="${i}:1" ${i === n - 1 ? 'disabled' : ''} aria-label="${esc(t('moveDown'))}">▼</button><button class="mini" data-dev-del="${i}" aria-label="${esc(t('remove'))}">✕</button></span></div>
+    ${spec.args.length ? `<div class="dev-args">${spec.args.map(([name, kind, , lo, hi, step]) => kind === 'choice'
+      ? `<div class="ctrl"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><select id="dev-${i}-${name}" data-dev-arg="${i}:${name}">${lo.map(v => `<option value="${v}"${v === a[name] ? ' selected' : ''}>${esc(devValue(name, v))}</option>`).join('')}</select></div>`
+      : `<div class="ctrl"><div class="row"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><output data-dev-out="${i}:${name}"></output></div><input type="range" id="dev-${i}-${name}" data-dev-arg="${i}:${name}" min="${lo}" max="${hi}" step="${step}" value="${a[name]}"></div>`).join('')}</div>` : ''}
+  </div>`;
+}
+function syncRack(tr) {
+  (tr.rack || []).forEach((d, i) => {
+    const spec = DEVICES[d.device]; if (!spec) return;
+    const a = deviceArgs(d), code = $(`[data-dev-code="${i}"]`);
+    if (code) code.textContent = spec.code(a, tr.type);
+    for (const [name] of spec.args) { const o = $(`[data-dev-out="${i}:${name}"]`); if (o) o.textContent = devValue(name, a[name]); }
+  });
+}
+// selezionando una traccia, il suo blocco nel codice viene evidenziato e portato in vista
+function highlightTrack() {
+  const tr = curTrack(), view = ed && ed.editor;
+  if (!tr || !view || mode !== 'track') return;
+  try {
+    const doc = view.state.doc.toString(), head = `// ========== ${[...new Set([tr.name || tr.id, tr.type])].join(' · ')} ==========`;
+    const from = doc.indexOf(head); if (from < 0) return;
+    const next = doc.indexOf('\n// ========== ', from + head.length), to = next < 0 ? doc.length : next;
+    view.dispatch({ selection: { anchor: from, head: to } });
+    // il riquadro che scorre è #edhost, non lo scroller di CodeMirror
+    const host = $('#edhost'), at = view.coordsAtPos(from);
+    if (at) host.scrollTop += at.top - host.getBoundingClientRect().top - 8;
+  } catch (e) {}
+}
+
+const viewSwitch = () => `<div class="tp-view chips" role="group" aria-label="${esc(t('panelView'))}"><button class="chip" data-view="one" aria-pressed="${panelView === 'one'}">${t('viewOne')}</button><button class="chip" data-view="all" aria-pressed="${panelView === 'all'}">${esc(t('viewAll', { name: SEC().name }))}</button></div>`;
+// controlli principali di una scheda compatta (i primi disponibili per il tipo)
+const QUICK = ['gain', 'cutoff', 'drive', 'room', 'delay'];
+// passi che suonano in una sezione (solo lettura), per vedere chi suona su quali colpi
+function hitsOf(tr, clip) {
+  const n = meterSteps(secFull().meter), pat = tr.patterns[clip.pattern] || {};
+  if (tr.type === 'drums') { const rows = Object.values(pat.rows || {}).map(r => fitSteps(r, n)); return Array.from({ length: n }, (_, i) => rows.some(r => r[i] === 'x') ? 'x' : '.').join(''); }
+  if (['bass', 'guitar', 'arp', 'hook', 'pad'].includes(tr.type)) return channelSteps(clipState(secFull(), tr, clip), tr.type);
+  return '';
+}
+function renderSectionRack() {
+  const box = $('#track-panel'), active = T.tracks.map((tr, i) => ({ tr, i, c: cellOf(tr, sel) })).filter(x => x.c);
+  box.innerHTML = `<div class="tp-top">${viewSwitch()}</div>
+    <div class="tp-scope"><span class="lbl">${t('settingsScope')}</span>
+      <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}">${esc(t('scopeSection', { name: SEC().name }))}</button></div></div>
+    <div class="srack">${active.map(({ tr, i, c }) => {
+      const ctls = (CONTROLS[tr.type] || []).filter(x => QUICK.includes(x[1])).slice(0, 3);
+      const hits = c.clip ? hitsOf(tr, c.clip) : '';
+      return `<div class="scard${tr.mute ? ' silent' : ''}" data-scard="${i}">
+        <div class="sc-head" data-act-ids="${ACT_IDS[tr.type] || esc((tr.settings && tr.settings.visual) || 'fx')}">
+          <span class="trk-type">${esc(TYPE_ICON[tr.type] || '·')}</span><b>${esc(trackLabel(tr))}</b>
+          <button class="mini" data-cmute="${i}" aria-pressed="${!!tr.mute}" title="${esc(t('mute'))}">M</button><button class="mini" data-csolo="${i}" aria-pressed="${!!tr.solo}" title="${esc(t('solo'))}">S</button>
+          <button class="btn small" data-edit-trk="${i}">${t('editTrack')}</button></div>
+        <div class="chips">${c.parts ? `<span class="note">${t('customCell')}</span>` : Object.keys(tr.patterns).map(k => `<button class="chip small" data-cpat="${i}:${esc(k)}" aria-pressed="${c.clip.pattern === k}">${esc(k)}</button>`).join('') + `<button class="chip small" data-cpat="${i}:" aria-pressed="false">${t('silent')}</button>`}</div>
+        ${hits ? `<div class="hits" style="grid-template-columns:repeat(${hits.length}, minmax(0, 1fr))">${[...hits].map((h, k) => `<i class="${h === 'x' ? 'on' : ''}" data-g="${Math.floor(k / 4) % 4}"></i>`).join('')}</div>` : ''}
+        <div class="ctrls">${ctls.map(([type, key, label]) => {
+          const attrs = type === 'cutoff' ? 'data-cut="1" min="0" max="100" step="1"' : 'min="0" max="1" step="0.01"';
+          return `<div class="ctrl"><div class="row"><label class="lbl" for="cs-${i}-${key}">${t(label)}</label><output data-cs-out="${i}:${key}"></output></div><input type="range" id="cs-${i}-${key}" data-cset="${i}:${key}" ${attrs}${type !== 'cutoff' && key === 'drive' ? ' max="4" step="0.1"' : ''}></div>`;
+        }).join('')}</div>
+        ${(tr.rack || []).length ? `<p class="rack-sum">Rack: ${tr.rack.map(d => esc(tx((DEVICES[d.device] || { label: d.device }).label)) + (d.on === false ? ' (off)' : '')).join(' → ')}</p>` : ''}
+      </div>`;
+    }).join('') || `<p class="note">${t('nothingPlays')}</p>`}</div>`;
+  syncSectionRack();
+}
+function syncSectionRack() {
+  $$('#track-panel [data-cset]').forEach(inp => {
+    const [i, key] = inp.dataset.cset.split(':'), tr = T.tracks[+i]; if (!tr) return;
+    const v = eff(tr)[key]; if (v === null || v === undefined) return;
+    if (document.activeElement !== inp) inp.value = inp.dataset.cut ? cutToRange(v) : v;
+    const o = $(`[data-cs-out="${i}:${key}"]`);
+    if (o) o.textContent = inp.dataset.cut ? (v >= 18000 ? '∞' : `${v} Hz`) : key === 'drive' ? String(v) : `${Math.round(v * 100)}%`;
+  });
+}
+
 function renderTrackPanel() {
+  if (panelView === 'all') return renderSectionRack();
   const box = $('#track-panel'), tr = curTrack();
   if (!tr) { box.innerHTML = `<p class="note">${t('noTracks')}</p>`; return; }
   const key = patOf(tr), pat = tr.patterns[key] || {}, c = cellOf(tr, sel), n = meterSteps(secFull().meter);
@@ -612,7 +695,7 @@ function renderTrackPanel() {
     editor = `<label class="lbl" for="pt-code">${t('codeLbl')}</label><textarea id="pt-code" rows="5" spellcheck="false"></textarea><p class="note">${t('codeHint')}</p>`;
   } else editor = `<p class="note">${t('riserHint')}</p>`;
   const custom = c && c.parts;
-  box.innerHTML = `
+  box.innerHTML = `<div class="tp-top">${viewSwitch()}</div>
     <div class="tp-head">
       <span class="trk-type big">${esc(TYPE_ICON[tr.type] || '·')}</span>
       <div class="ctrl grow"><label class="lbl" for="tk-name">${t('trackName')} · ${esc(t(tr.type))}</label><input id="tk-name" type="text" maxlength="40" autocomplete="off"></div>
@@ -632,7 +715,11 @@ function renderTrackPanel() {
     <div class="tp-editor">${editor}</div>
     <div class="tp-scope"><span class="lbl">${t('settingsScope')}</span>
       <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}" ${c && c.clip ? '' : 'disabled'}>${esc(t('scopeSection', { name: SEC().name }))}</button></div></div>
-    <div class="ctrls">${(CONTROLS[tr.type] || []).map(settingHtml).join('')}</div>`;
+    <div class="ctrls">${(CONTROLS[tr.type] || []).map(settingHtml).join('')}</div>
+    <div class="tp-rack"><div class="row"><span class="lbl">Rack</span><span class="hint">${t('rackHint')}</span></div>
+      <div class="rack-list">${(tr.rack || []).map((d, i) => deviceHtml(d, i, tr)).join('') || `<p class="note">${t('noDevices')}</p>`}</div>
+      <div class="rack-add"><select id="rk-type" aria-label="${esc(t('addDevice'))}">${['note', 'sound'].map(kind => `<optgroup label="${esc(t(kind === 'note' ? 'devNote' : 'devSound'))}">${Object.entries(DEVICES).filter(([, d]) => d.kind === kind).map(([k, d]) => `<option value="${k}">${esc(tx(d.label))}</option>`).join('')}</optgroup>`).join('')}</select><button class="btn" id="rk-add">${t('addDevice')}</button></div>
+    </div>`;
   if ($('#pt-groove')) opts($('#pt-groove'), [['', t('pickGroove')], ...Object.entries(GROOVES).map(([k, v]) => [k, v[0]])]);
   if ($('#pt-preset')) opts($('#pt-preset'), PRESET_LIST[tr.type]());
   if ($('#pt-rhythm')) opts($('#pt-rhythm'), named(TEX_RHYTHMS));
@@ -640,6 +727,7 @@ function renderTrackPanel() {
   syncTrackPanel();
 }
 function syncTrackPanel() {
+  if (panelView === 'all') return syncSectionRack();
   const tr = curTrack(); if (!tr || !$('#tk-name')) return;
   const key = patOf(tr), pat = tr.patterns[key] || {}, e = eff(tr), c = wholeClip(tr, sel), over = (c && c.set) || {};
   if (document.activeElement !== $('#tk-name')) $('#tk-name').value = trackLabel(tr);
@@ -666,11 +754,12 @@ function syncTrackPanel() {
     $$('[data-nd]').forEach(b => b.setAttribute('aria-pressed', simpleNotes(pat.notes) && !!pat.notes && tokens[b.dataset.ni] === b.dataset.nd));
     $('#pt-notes-reset').disabled = !pat.notes;
   }
+  syncRack(tr);
   syncOutputs();
 }
 // scrive un'impostazione: per tutta la traccia, o solo per il clip della sezione selezionata
-function setSetting(k, v) {
-  const tr = curTrack(), c = wholeClip(tr, sel);
+function setSetting(k, v, tr = curTrack()) {
+  const c = wholeClip(tr, sel);
   if (scope === 'section' && c) { c.set = { ...(c.set || {}), [k]: v }; return; }
   tr.settings[k] = v;
   if (c && c.set) { delete c.set[k]; if (!Object.keys(c.set).length) delete c.set; }
@@ -678,6 +767,8 @@ function setSetting(k, v) {
 const editPattern = fn => { const tr = curTrack(), key = patOf(tr); tr.patterns[key] = tr.patterns[key] || {}; fn(tr.patterns[key], tr); changed(); syncTrackPanel(); };
 
 $('#track-panel').addEventListener('input', e => {
+  if (e.target.dataset.cset) { const [i, key] = e.target.dataset.cset.split(':'); const v = e.target.dataset.cut ? rangeToCut(+e.target.value) : +e.target.value; setSetting(key, v, T.tracks[+i]); changed(); syncSectionRack(); return; }
+  if (e.target.dataset.devArg && e.target.type === 'range') { const [i, name] = e.target.dataset.devArg.split(':'); curTrack().rack[+i][name] = +e.target.value; changed(); syncRack(curTrack()); return; }
   const k = e.target.dataset.set;
   if (k) { let v = e.target.value; if (e.target.type === 'range') v = e.target.dataset.cut ? rangeToCut(+v) : +v; setSetting(k, v); changed(); syncTrackPanel(); return; }
   if (e.target.id === 'tk-name') { curTrack().name = e.target.value; changed(); return; }
@@ -688,6 +779,7 @@ let codeTimer = 0;
 $('#track-panel').addEventListener('change', e => {
   const tr = curTrack();
   if (e.target.matches('select[data-set]')) { setSetting(e.target.dataset.set, e.target.value); changed(); syncTrackPanel(); return; }
+  if (e.target.matches('select[data-dev-arg]')) { const [i, name] = e.target.dataset.devArg.split(':'); const v = e.target.value; tr.rack[+i][name] = isNaN(+v) ? v : +v; changed(); syncRack(tr); return; }
   if (e.target.id === 'pt-preset') editPattern(p => { p.preset = e.target.value; delete p.steps; });
   if (e.target.id === 'pt-speed') { editPattern(p => { p.speed = e.target.value; delete p.steps; }); renderTrackPanel(); }
   if (e.target.id === 'pt-rhythm') editPattern(p => { p.rhythm = e.target.value; });
@@ -695,8 +787,18 @@ $('#track-panel').addEventListener('change', e => {
   if (e.target.id === 'tk-name' && !tr.name.trim()) { tr.name = t(tr.type); changed(); renderArranger(); }
 });
 $('#track-panel').addEventListener('click', e => {
-  const tr = curTrack(); if (!tr) return;
   const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.view) { panelView = b.dataset.view; store.set('coding-misk-panel', panelView); renderTrackPanel(); return; }
+  if (b.dataset.editTrk !== undefined) { panelView = 'one'; store.set('coding-misk-panel', panelView); tk = +b.dataset.editTrk; editPat = null; saveDraft(); renderArranger(); renderTrackPanel(); highlightTrack(); return; }
+  if (b.dataset.cmute !== undefined) { const x = T.tracks[+b.dataset.cmute]; x.mute = !x.mute || undefined; changed(); renderTrackPanel(); return; }
+  if (b.dataset.csolo !== undefined) { const x = T.tracks[+b.dataset.csolo]; x.solo = !x.solo || undefined; changed(); renderTrackPanel(); return; }
+  if (b.dataset.cpat !== undefined) {
+    const [i, k] = b.dataset.cpat.split(':'), x = T.tracks[+i], c = wholeClip(x, sel);
+    if (!k) x.clips = x.clips.filter(y => y !== c); else if (c) c.pattern = k;
+    changed(); renderTrackPanel(); return;
+  }
+  if (b.dataset.scope && panelView === 'all') { scope = b.dataset.scope; renderTrackPanel(); return; }
+  const tr = curTrack(); if (!tr) return;
   const n = meterSteps(secFull().meter);
   if (b.dataset.row) return editPattern(p => { p.rows = p.rows || {}; const a = fitSteps(p.rows[b.dataset.row] || '', n).split(''); a[+b.dataset.i] = a[+b.dataset.i] === 'x' ? '.' : 'x'; const s = a.join(''); if (s.includes('x')) p.rows[b.dataset.row] = s; else delete p.rows[b.dataset.row]; });
   if (b.dataset.ps !== undefined) return editPattern((p, t2) => { const a = channelSteps(patState(t2), t2.type).split(''); a[+b.dataset.ps] = a[+b.dataset.ps] === 'x' ? '.' : 'x'; p.steps = a.join(''); });
@@ -707,6 +809,10 @@ $('#track-panel').addEventListener('click', e => {
     return editPattern((p, t2) => { const tk2 = noteTokens(p.notes, noteCols(t2, p)); tk2[+b.dataset.ni] = tk2[+b.dataset.ni] === b.dataset.nd ? '~' : b.dataset.nd; if (tk2.every(x => x === '~')) delete p.notes; else p.notes = tk2.join(' '); });
   }
   if (b.id === 'pt-notes-reset') return editPattern(p => { delete p.notes; });
+  if (b.id === 'rk-add') { tr.rack = [...(tr.rack || []), newDevice($('#rk-type').value)]; changed(); renderTrackPanel(); return; }
+  if (b.dataset.devOn !== undefined) { const d = tr.rack[+b.dataset.devOn]; if (d.on === false) delete d.on; else d.on = false; changed(); renderTrackPanel(); return; }
+  if (b.dataset.devDel !== undefined) { tr.rack.splice(+b.dataset.devDel, 1); if (!tr.rack.length) delete tr.rack; changed(); renderTrackPanel(); return; }
+  if (b.dataset.devMove) { const [i, d] = b.dataset.devMove.split(':').map(Number), j = i + d; if (j < 0 || j >= tr.rack.length) return; [tr.rack[i], tr.rack[j]] = [tr.rack[j], tr.rack[i]]; changed(); renderTrackPanel(); return; }
   if (b.dataset.setRamp) { const k = b.dataset.setRamp + 'End', ev = eff(tr); setSetting(k, ev[k] == null ? ev[b.dataset.setRamp] : null); changed(); syncTrackPanel(); return; }
   if (b.dataset.scope) { scope = b.dataset.scope; renderTrackPanel(); return; }
   if (b.dataset.editPat !== undefined) { editPat = b.dataset.editPat; renderTrackPanel(); return; }

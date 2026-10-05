@@ -2,6 +2,7 @@
 // Each message has a JSON path, so a human or an agent can find the spot quickly.
 import { KEYS, PROGS, METERS, meterSteps, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEX_RHYTHMS, KITS, MODES, ROWS, LOOKS, WAVES } from '../music.js';
 import { FORMAT, VERSION, TYPES, PATTERN_FIELDS, SETTING_FIELDS, VISUALS } from './format.js';
+import { checkRack } from './rack.js';
 
 const PRESETS = { bass: BASS, arp: ARPS, hook: HOOKS, pad: PADS, guitar: GUITAR_PATTERNS };
 const SECTION_FIELDS = ['name', 'bars', 'bpm', 'bpmEnd', 'key', 'chords', 'meter', 'swing', 'fade', 'crash', 'breath', 'fill'];
@@ -60,6 +61,8 @@ export function validateSong(song) {
     ids.add(tr.id);
     if (!TYPES.includes(tr.type)) { err(`${p}.type`, `one of ${TYPES.join(', ')}`); return; }
     checkSettings(tr.type, tr.settings || {}, `${p}.settings`, err, warn);
+    if (tr.rack !== undefined) checkRack(tr.rack, `${p}.rack`, err, warn);
+    for (const k of ['mute', 'solo']) if (tr[k] !== undefined && typeof tr[k] !== 'boolean') err(`${p}.${k}`, 'true or false');
     const pats = tr.patterns || {};
     if (typeof pats !== 'object' || Array.isArray(pats)) err(`${p}.patterns`, 'an object of named patterns, for example {"A": {...}}');
     for (const [k, pat] of Object.entries(pats)) checkPattern(tr.type, pat, `${p}.patterns.${k}`, err, warn);

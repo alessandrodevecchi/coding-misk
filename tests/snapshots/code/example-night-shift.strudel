@@ -53,12 +53,12 @@ const clip2 = "<0!16 1!8 0!4>"
 $: note("<[a2,e3,a3] [a#2,f3,a#3] [a2,e3,a3] [g2,d3,g3]>").transpose(-5)
   .s("gm_distortion_guitar,sawtooth").attack(.003).decay(1.5).sustain(0.8).release(.08)
   .distort(3).distortvol(.2).hpf(80).lpf(2600).jux(x => x.late(.012))
-  .room(.5).gain(.8).mask("<1!7 [1 0]>").mask(clip2).postgain(clip2.mul(0.25)).orbit(9).analyze("guitar")
+  .room(.5).gain(.8).room(0.5).roomsize(0.8).tremolosync(8).tremolodepth(0.4).mask("<1!7 [1 0]>").mask(clip2).postgain(clip2.mul(0.25)).orbit(9).analyze("guitar")
 // Outro · bars 25-28 · pattern held
 $: note("<[a2,e3,a3]>").transpose(-5)
   .s("gm_distortion_guitar,sawtooth").attack(.003).decay(1.5).sustain(0.8).release(.08)
   .distort(3).distortvol(.2).hpf(80).lpf(2600).jux(x => x.late(.012))
-  .room(.5).gain(.8).mask(section3).postgain(section3.mul("<0.25 0.17 0.08 0>")).orbit(9).analyze("guitar")
+  .room(.5).gain(.8).room(0.5).roomsize(0.8).tremolosync(8).tremolodepth(0.4).mask(section3).postgain(section3.mul("<0.25 0.17 0.08 0>")).orbit(9).analyze("guitar")
 
 // ========== hook ==========
 const clip3 = "<0!12 1!12 0!4>"
@@ -66,7 +66,7 @@ const clip3 = "<0!12 1!12 0!4>"
 // Hook · notes written by hand
 $: n("<[0 ~ 1 ~ 0 ~ [~ 4] 3] [1 ~ 0 ~ ~ ~ ~ ~]>").scale("E4:phrygian")
   .s("square").distort(1).distortvol(.5).lpf(2800)
-  .decay(.2).sustain(.3).delay(.3).room(.3).gain(0.4).mask("<1!11 [1 0]>").mask(clip3).velocity(clip3).orbit(4).analyze("hook")
+  .decay(.2).sustain(.3).delay(.3).room(.3).gain(0.4).delay(0.35).delaysync(0.188).delayfeedback(0.5).pan(sine.slow(8)).mask("<1!11 [1 0]>").mask(clip3).velocity(clip3).orbit(4).analyze("hook")
 
 // ========== Radio noise · code ==========
 // Intro · bars 1-8 · pattern static

@@ -343,7 +343,7 @@ const altItems = s => {
 // labels: true scrive anche i layer spenti come "_$:" (anteprima di una scena)
 // crash, breath: crash sul primo colpo, mezza battuta di silenzio alla fine
 // only: genera un solo strumento (compilatore v2, un clip alla volta); orbit: bus del clip
-export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, crash = false, breath = false, fill = false, only = null, orbit = null } = {}) {
+export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, crash = false, breath = false, fill = false, only = null, orbit = null, rack = '' } = {}) {
   s = normalizeState(s);
   const want = ch => !only || only === ch;
   const orb = ch => `.orbit(${orbit ?? ORBITS[ch]})`;
@@ -378,7 +378,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
   if (want('drums')) for (const [id, , mult, inst] of ROWS) {
     const row = d.rows[id], on = d.on && !row.mute, steps = fitSteps(row.steps, N);
     if (!steps.includes('x') || !show(on)) continue;
-    L.push(`${lab(on)}: s("${drumPattern(id, steps)}").bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
+    L.push(`${lab(on)}: s("${drumPattern(id, steps)}").bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
   }
   if (want('drums') && fill && d.on) L.push(`$: s("sd*${N}").bank("${d.kit}").gain(saw.range(.15, .75)).mask("${rle(rotate([...Array(Math.max(0, bars - 1)).fill('0'), '1'], start))}")${g}${orb('drums')}.analyze("snare")`);
   if (want('drums') && crash && d.on) L.push(`$: s("cr").bank("${NO_CRASH.includes(d.kit) ? 'RolandTR909' : d.kit}").gain(.55).room(.4).mask("${rle(rotate(['1', ...Array(Math.max(0, bars - 1)).fill('0')], start))}")${g}${orb('drums')}.analyze("fx")`);
@@ -393,7 +393,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     if (b.notes) L.push(`${lab(b.on)}: note("<${chords.map(c => `[${fitTokens(b.notes, N).replace(/\d/g, i => CHORDS[c].arp[i])}]`).join(' ')}>").transpose(${tr - 24})${b.steps ? `.mask("${stepsMask(fitSteps(b.steps, N))}")` : ''}${sw}`);
     else L.push(`${lab(b.on)}: note("<${chords.map(c => CHORDS[c].bass).join(' ')}>")${trs}.struct("${bstruct}")${bshift}${sw}`);
     L.push(`  .s("${b.wave}")${filter(b.cutoff, b.cutoffEnd, b.move)}.lpq(${num(b.reso)})${drive(b.drive)}`);
-    L.push(`  .decay(${f(bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${rhythm(bp[4], N)}")` : ''}.gain(${auto(b.gain, b.gainEnd)})${breathMask}${g}${orb('bass')}.analyze("bass")`);
+    L.push(`  .decay(${f(bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${rhythm(bp[4], N)}")` : ''}.gain(${auto(b.gain, b.gainEnd)})${rack}${breathMask}${g}${orb('bass')}.analyze("bass")`);
   }
   const a = s.arp, ap = ARPS[a.preset] || ARPS.su;
   if (want('arp') && show(a.on)) {
@@ -401,7 +401,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     L.push('', `// ${t('cArp')} · ${a.notes ? t('cNotes') : tx(ap[0])}, ${a.speed === '16' ? t('c16') : t('c8')}`);
     L.push(`${lab(a.on)}: note("<${chords.map(c => `[${fitTokens(a.notes || ap[1], count).replace(/\d/g, i => CHORDS[c].arp[i])}]`).join(' ')}>")${trs}${a.steps ? `.mask("${stepsMask(fitSteps(a.steps, N))}")` : ''}${sw}`);
     L.push(`  .s("${a.wave}")${filter(a.cutoff, a.cutoffEnd, a.move)}.lpq(${num(a.reso)})${drive(a.drive)}`);
-    L.push(`  .decay(.15).sustain(.15)${a.delay > 0 ? `.delay(${f(a.delay)})` : ''}.gain(${auto(a.gain, a.gainEnd)})${breathMask}${g}${orb('arp')}.analyze("arp")`);
+    L.push(`  .decay(.15).sustain(.15)${a.delay > 0 ? `.delay(${f(a.delay)})` : ''}.gain(${auto(a.gain, a.gainEnd)})${rack}${breathMask}${g}${orb('arp')}.analyze("arp")`);
   }
   const h = s.hook, hp = HOOKS[h.preset] || HOOKS.richiamo;
   if (want('hook') && show(h.on)) {
@@ -410,7 +410,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     L.push('', `// Hook · ${h.notes ? t('cNotes') : tx(hp[0])}`);
     L.push(`${lab(h.on)}: n("${mel}")${h.harmony ? `.superimpose(x => x.add(${h.harmony}))` : ''}.scale("${s.key}${h.octave || 4}:${h.mode}")${h.steps ? `.mask("${stepsMask(fitSteps(h.steps, N))}")` : ''}${sw}`);
     L.push(`  ${h.wave === 'cowbell' ? '.s("cb").bank("RolandTR808")' : `.s("${h.wave}")`}${drive(h.drive)}${h.fm > 0 ? `.fm(${num(h.fm)})` : ''}${h.vowel ? `.vowel("${h.vowel}")` : ''}${filter(h.cutoff, h.cutoffEnd, h.move)}${grit(h.grit)}`);
-    L.push(`  .decay(.2).sustain(.3).delay(${f(h.delay)}).room(.3).gain(${auto(h.gain, h.gainEnd)})${breathMask}${g}${orb('hook')}.analyze("hook")`);
+    L.push(`  .decay(.2).sustain(.3).delay(${f(h.delay)}).room(.3).gain(${auto(h.gain, h.gainEnd)})${rack}${breathMask}${g}${orb('hook')}.analyze("hook")`);
   }
   const gt = s.guitar, gty = GUITAR_TYPES[gt.type] || GUITAR_TYPES.distorted, gpt = GUITAR_PATTERNS[gt.pattern] || GUITAR_PATTERNS.power8;
   if (want('guitar') && show(gt.on)) {
@@ -427,7 +427,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     L.push(`  ${dist > 0 ? `.distort(${num(dist)}).distortvol(.2)` : ''}.hpf(${gty[3]})${filter(gt.cutoff, gt.cutoffEnd)}${gt.width === 'double' ? '.jux(x => x.late(.012))' : ''}`);
     // il volume va dopo l'amplificatore (postgain): prima della distorsione cambierebbe solo la saturazione
     const lvl = auto(gt.gain, gt.gainEnd);
-    L.push(`  .room(${f(gt.room)}).gain(.8)${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}${orb('guitar')}.analyze("guitar")`);
+    L.push(`  .room(${f(gt.room)}).gain(.8)${rack}${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}${orb('guitar')}.analyze("guitar")`);
   }
   const p = s.pad, pp = PADS[p.preset] || PADS.pad;
   if (want('pad') && show(p.on)) {
@@ -436,7 +436,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     const pr = p.steps ? stepsStruct(fitSteps(p.steps, N), !rhythm(pp[1], N)) : rhythm(pp[1], N);
     L.push(`${lab(p.on)}: note("<${chords.map(c => `[${voice(c)}]`).join(' ')}>")${trs}${pr ? `.struct("${pr}")` : ''}${pr ? sw : ''}`);
     L.push(`  .s("${p.wave}").attack(${f(pp[2])})${pp[3] ? `.decay(${f(pp[3])}).sustain(${f(pp[4])})` : ''}.release(${f(pp[5])})${filter(p.cutoff, p.cutoffEnd, p.move)}${drive(p.drive)}`);
-    L.push(`  .room(${f(p.room)})${pp[6] ? `.postgain("${rhythm(pp[6], N)}")` : ''}.gain(${auto(p.gain, p.gainEnd)})${g}${orb('pad')}.analyze("pad")`);
+    L.push(`  .room(${f(p.room)})${pp[6] ? `.postgain("${rhythm(pp[6], N)}")` : ''}.gain(${auto(p.gain, p.gainEnd)})${rack}${g}${orb('pad')}.analyze("pad")`);
   }
   const x = s.texture, xr = TEX_RHYTHMS[x.rhythm] || TEX_RHYTHMS.bar;
   if (want('texture') && show(x.on)) {
@@ -444,12 +444,12 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     if (x.sample === 'vinyl') {
       // fruscio del vinile: impulsi di rumore brevissimi e radi
       L.push(`${lab(x.on)}: s("white*${N * 2}").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)`);
-      L.push(`  .gain(${auto(x.gain * .5, x.gainEnd === null || x.gainEnd === undefined ? null : x.gainEnd * .5)})${g}${orb('texture')}.analyze("fx")`);
+      L.push(`  .gain(${auto(x.gain * .5, x.gainEnd === null || x.gainEnd === undefined ? null : x.gainEnd * .5)})${rack}${g}${orb('texture')}.analyze("fx")`);
     } else {
       const nArg = xr[2].startsWith('irand') ? xr[2] : `"${xr[2]}"`;
       const pat = xr[1].replace('*16', `*${N}`).replace('*8', `*${N / 2}`).replace('X', x.sample);
       L.push(`${lab(x.on)}: s("${pat}").n(${nArg})${grit(x.grit)}.hpf(400).room(${f(x.room)})${xr[1].includes('*') ? '.pan(rand)' : ''}`);
-      L.push(`  .gain(${auto(x.gain, x.gainEnd)})${g}${orb('texture')}.analyze("fx")`);
+      L.push(`  .gain(${auto(x.gain, x.gainEnd)})${rack}${g}${orb('texture')}.analyze("fx")`);
     }
   }
   const r = s.riser;
@@ -458,7 +458,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     L.push('', `// ${t(up ? 'cRiser' : 'cDown', { n: r.bars })}`);
     L.push(`${lab(r.on)}: s("white*${N}").decay(.06).sustain(0)`);
     L.push(`  .hpf(saw.slow(${r.bars}).range(${up ? '300, 8000' : '8000, 300'})${late})`);
-    L.push(`  .gain(saw.slow(${r.bars}).range(${up ? `0, ${f(r.gain)}` : `${f(r.gain)}, 0`})${late})${g}${orb('riser')}.analyze("riser")`);
+    L.push(`  .gain(saw.slow(${r.bars}).range(${up ? `0, ${f(r.gain)}` : `${f(r.gain)}, 0`})${late})${rack}${g}${orb('riser')}.analyze("riser")`);
   }
   return L;
 }

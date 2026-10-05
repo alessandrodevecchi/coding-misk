@@ -1,6 +1,6 @@
 # Plan: tracks, patterns and a timeline
 
-Status: in progress. Phases 0 (`#9`), 1 (`#10`), 2 (`#11`) and 3 (`#12`) done on `develop`. The code panel is resizable up to half the screen, collapsible and full screen (owner request, done with `#12`). Owner request: give every instrument its own rhythm control, allow several instruments of the same type, and show a timeline with one lane per track, without giving up music as code.
+Status: in progress. Phases 0 to 4 (`#9` to `#13`) done on `develop`. The code panel is resizable up to half the screen, collapsible and full screen (owner request, done with `#12`). Owner request: give every instrument its own rhythm control, allow several instruments of the same type, and show a timeline with one lane per track, without giving up music as code.
 
 ## Findings
 

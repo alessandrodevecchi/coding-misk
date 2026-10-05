@@ -51,7 +51,7 @@ Progressions are written in A minor and moved to `key`; see `PROGS` in `src/musi
 ## Tracks
 
 ```json
-{ "id": "riff", "name": "Guitar riff", "type": "guitar", "settings": {}, "patterns": { "A": {} }, "clips": [] }
+{ "id": "riff", "name": "Guitar riff", "type": "guitar", "settings": {}, "rack": [], "patterns": { "A": {} }, "clips": [] }
 ```
 
 - `id`: unique in the song. `name`: label in the code and UI (defaults to `id`). `mute`, `solo`: `true` leaves the track out of the code (solo: every other track).
@@ -61,6 +61,39 @@ Progressions are written in A minor and moved to `key`; see `PROGS` in `src/musi
 - `clips`: where it plays. A track plays nothing outside its clips.
 
 Each track gets its own orbit (bus), so its delay and reverb are independent.
+
+### Rack
+
+`rack` is an ordered chain of devices added after the instrument, for the whole track. Each device is one Strudel function; missing values take the defaults, `"on": false` bypasses it.
+
+```json
+"rack": [
+  { "device": "delay", "amount": 0.35, "time": 0.1875, "feedback": 0.5 },
+  { "device": "pan", "motion": "slow" }
+]
+```
+
+| Device | Values (defaults) | Strudel |
+| --- | --- | --- |
+| `echo` | `count` 3 (2 to 8), `time` 0.125, `feedback` 0.5 | `.echo(count, time, feedback)` |
+| `off` | `time` 0.125, `semitones` 12 (melodic tracks) | `.off(time, x => x.add(note(semitones)))` |
+| `ply` | `times` 2 (2 to 4) | `.ply(times)` |
+| `degrade` | `amount` 0.3 | `.degradeBy(amount)` |
+| `rev` | none | `.rev()` |
+| `jux` | none | `.jux(rev)` |
+| `delay` | `amount` 0.4, `time` 0.1875, `feedback` 0.45 | `.delay().delaysync().delayfeedback()` |
+| `reverb` | `amount` 0.4, `size` 0.6 | `.room().roomsize()` |
+| `distort` | `amount` 2 (0 to 8) | `.distort()` |
+| `shape` | `amount` 0.4 | `.shape()` |
+| `crush` | `bits` 6 (1 to 16) | `.crush()` |
+| `coarse` | `amount` 8 (1 to 32) | `.coarse()` |
+| `phaser` | `rate` 1, `depth` 0.6 | `.phaser().phaserdepth()` |
+| `tremolo` | `rate` 8 per bar, `depth` 0.7 | `.tremolosync().tremolodepth()` |
+| `vowel` | `vowel` a (`a e i o u`) | `.vowel()` |
+| `hpf`, `lpf` | `cutoff` (Hz), `reso` 0 | `.hpf().hpq()`, `.lpf().lpq()` |
+| `pan` | `position` 0.5, `motion` fixed (`fixed slow fast`) | `.pan()` |
+
+Times are fractions of a bar: `0.0625` a 16th, `0.125` an 8th, `0.1875` a dotted 8th, `0.25` a quarter. Devices act after the instrument settings, so a rack `lpf` or `distort` replaces or adds to the track's own filter and drive.
 
 ### Settings per type
 

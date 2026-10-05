@@ -3,6 +3,7 @@
 import { sceneLayers, sectionLane, uniqueNames, sectionInfo, songHeader, rle, ORBIT_OF } from '../music.js';
 import { t } from '../i18n.js';
 import { normalizeSong, clipState } from './format.js';
+import { rackCode } from './rack.js';
 
 const fadeIn = (secs, i) => i > 0 ? Math.min(secs[i].fade || 0, secs[i].bars) : 0;
 
@@ -28,6 +29,7 @@ export function compileSong(input) {
     const orbit = !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : ++extra;
     used.add(tr.type);
     L.push('', `// ========== ${[...new Set([tr.name || tr.id, tr.type])].join(' · ')} ==========`);
+    const rack = rackCode(tr.rack, tr.type);
     let described = null;
     for (const clip of tr.clips) {
       const end = clip.start + clip.bars;
@@ -47,8 +49,8 @@ export function compileSong(input) {
           L.push(`const ${gate} = "${rle(v.map(String))}"`);
         }
         L.push(`// ${names[i]} · ${t('cBars', { from: a + 1, to: b })} · ${t('cPattern', { p: clip.pattern })}`);
-        const opts = { start: a, bars: b - a, gate, crash: sec.crash && a === sec.start, breath: sec.breath && b === sec.start + sec.bars, fill: sec.fill && b === sec.start + sec.bars, only: tr.type, orbit };
-        if (tr.type === 'code') L.push(...codeLayer(tr, clip, gate, orbit));
+        const opts = { start: a, bars: b - a, gate, crash: sec.crash && a === sec.start, breath: sec.breath && b === sec.start + sec.bars, fill: sec.fill && b === sec.start + sec.bars, only: tr.type, orbit, rack };
+        if (tr.type === 'code') L.push(...codeLayer(tr, clip, gate, orbit, rack));
         else {
           // the instrument comment ("// Bass · Rolling") is repeated per clip only when it changes
           const lines = sceneLayers(clipState(sec, tr, clip), opts).filter(l => l !== '');
@@ -63,9 +65,9 @@ export function compileSong(input) {
 }
 
 // code track: the pattern is plain Strudel; the app adds the lane, the bus and the visual
-function codeLayer(tr, clip, gate, orbit) {
+function codeLayer(tr, clip, gate, orbit, rack = '') {
   const pat = (tr.patterns || {})[clip.pattern] || {};
   const code = String(pat.code || 'silence').trim().replace(/;\s*$/, '');
   const visual = (tr.settings && tr.settings.visual) || 'fx';
-  return [`$: (${code.includes('\n') ? '\n  ' + code.split('\n').join('\n  ') + '\n' : code})`, `  .mask(${gate}).velocity(${gate}).orbit(${orbit}).analyze("${visual}")`];
+  return [`$: (${code.includes('\n') ? '\n  ' + code.split('\n').join('\n  ') + '\n' : code})`, `  ${rack}.mask(${gate}).velocity(${gate}).orbit(${orbit}).analyze("${visual}")`];
 }
