@@ -151,7 +151,9 @@
 - Viste del pannello riordinate: "Tutte in <sezione>" (complete, predefinita), "Traccia selezionata", "Sintesi della sezione".
 - Nomi decisi col proprietario: in inglese "Song" per il brano (tab Songs, Open song, New song), "Track" per la riga dello strumento, "Section" ovunque al posto di "scene" (anche in italiano "sezione" al posto di "scena"); badge "Song" / "Code song". Glossario in `docs/CONTEXT.md`.
 - Corretto: a fine brano il cursore saltava all'inizio dell'ultima sezione (a brano fermo mostra da dove ripartirebbe il Play, e "segui la riproduzione" aveva selezionato l'ultima sezione). Ora, quando il brano finisce da solo, il cursore resta in fondo e il Play successivo riparte dall'inizio; scegliere un punto o una sezione annulla questo stato.
+- Contati i suoni disponibili: il motore ne carica circa 1.650 (71 drum machine con 683 suoni, 125 strumenti General MIDI, 218 banchi dirt-samples, 128 strumenti acustici VCSL, 25 synth); la tab Suoni ne mostrava circa 70 e i menu di Componi 13 drum machine e circa 23 strumenti. Aperta la issue `#15` (browser completo dei suoni), programmata dopo il rilascio.
+- Rilascio `v0.2.0`: `develop` portato su `main` (piano tracce e timeline completo, brani in JSON, rack, barra di riproduzione, nomi nuovi).
 
 ## Prossimo passo
 
-- Backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. Su `develop` c'è tutto il lavoro dei piani tracce e timeline, da portare su `main` dopo la prova del proprietario.
+- `#15` Browser completo dei suoni. Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`.
