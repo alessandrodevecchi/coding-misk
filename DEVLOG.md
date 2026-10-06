@@ -166,7 +166,8 @@
 - Groove completo della macchina (`#15`, richiesta del proprietario): 4 battute, battute 1-2 il ritmo base (cassa, rullante o clap, charleston chiuso e aperto), battute 3-4 entrano tutti gli altri suoni nel loro ruolo (crash all'ingresso, ride, clap e tamburello col rullante, rimshot, campanaccio, percussioni, shaker, misc, effetti), fill di tom dal più acuto al più grave alla fine della battuta 4. Senza cassa fa da cassa il tom basso; senza ritmo base gli altri suoni partono dalla battuta 1. Ogni riga del codice ha il commento del suo ruolo; varianti escluse. Il browser carica tutti i suoni della macchina prima di partire, altrimenti al primo giro crash e tom arrivavano tardi e Strudel li saltava. Verificato su tutte le 71 macchine (ogni suono suona almeno una volta in 4 battute, nessun errore) e nel browser su Boss DR-55, TR-808, XR10 e RY30.
 - Luci dei suoni nel browser (richiesta del proprietario): mentre qualcosa suona, la chip, la scheda, la riga o il pad di ogni suono si accende quando quel suono viene colpito, come i LED di una drum machine. Ogni fotogramma legge dal sequencer di Strudel i colpi in arrivo. Verificato col groove della TR-808: tutti i 13 suoni si accendono, nessun errore.
 
+- Rilascio `v0.3.0`: `develop` portato su `main` (browser dei suoni completo `#15` con libreria, ispettori, pad, foto e pixel art, groove completo delle macchine e luci dei suoni). Issue `#15` chiusa.
+
 ## Prossimo passo
 
-- Ascolto del proprietario sul nuovo groove e sulle luci, poi eventuali ritocchi.
-- Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. Su `develop` ci sono le rifiniture di `#15` non ancora su `main` (dopo `v0.2.0`).
+- Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.
