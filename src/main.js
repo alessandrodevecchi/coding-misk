@@ -80,7 +80,7 @@ let tk = Math.min(draft ? draft.tk || 0 : 0, Math.max(0, T.tracks.length - 1));
 let dirty = !!(draft && draft.dirty);
 let scope = 'track', editPat = null, panelView = store.get('coding-misk-panel', 'one');
 // vista dell'arrangiatore: 'sections' (celle per sezione) o 'timeline' (clip liberi); selClip = indice del clip scelto nella timeline
-let arrMode = store.get('coding-misk-arr-mode', 'sections'), selClip = null;
+let arrMode = store.get('coding-misk-arr-mode', 'timeline'), selClip = null;
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!LOOKS.some(([k]) => k === look)) look = 'palco';
 let compiled = playable({ ...T, kind: 'composed' });
@@ -375,6 +375,7 @@ function renderArranger() {
   $('#arr-mode-hint').textContent = arrMode === 'timeline' ? t('timelineHint') : '';
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
+  renderRuler();
 }
 // vista a sezioni: una cella per traccia e sezione
 function renderCells(total) {
@@ -525,6 +526,64 @@ $$('[data-arr-mode]').forEach(b => b.addEventListener('click', () => {
   arrMode = b.dataset.arrMode === 'timeline' ? 'timeline' : 'sections'; store.set('coding-misk-arr-mode', arrMode);
   selClip = null; renderArranger(); renderTrackPanel();
 }));
+
+// ---------- barra di riproduzione: tempo continuo, clic o trascinamento per spostarsi ----------
+// la posizione si calcola sui blocchi delle sezioni, così funziona in entrambe le viste
+function rulerGeo() {
+  const track = $('#ruler-track'), btns = $$('.arr-scene-btn'), tr = track.getBoundingClientRect(), st = starts();
+  return { tr, secs: btns.map((b, i) => { const r = b.getBoundingClientRect(); return { left: r.left - tr.left, width: r.width, start: st[i], bars: T.sections[i].bars }; }) };
+}
+function barToX(g, bar) {
+  const s = g.secs.find(x => bar < x.start + x.bars) || g.secs[g.secs.length - 1];
+  return s ? s.left + Math.min(1, Math.max(0, (bar - s.start) / s.bars)) * s.width : 0;
+}
+function xToBar(g, x) {
+  let s = g.secs[0];
+  for (const c of g.secs) if (x >= c.left - 2) s = c;
+  if (!s) return 0;
+  const bar = s.start + Math.min(1, Math.max(0, (x - s.left) / s.width)) * s.bars;
+  return Math.max(0, Math.min(songBars() - .25, Math.round(bar * 4) / 4));
+}
+function renderRuler() {
+  requestAnimationFrame(() => {
+    const g = rulerGeo(), total = songBars(), every = total > 96 ? 8 : 4;
+    $('#ruler-ticks').innerHTML = Array.from({ length: total }, (_, b) => `<i class="${b % every === 0 ? 'major' : ''}" style="left:${barToX(g, b)}px">${b % every === 0 ? b + 1 : ''}</i>`).join('');
+    $('#ruler-track').setAttribute('aria-valuemax', total);
+  });
+}
+// dove ripartirebbe la musica: la posizione in pausa, oppure l'inizio della sezione selezionata
+const cueBar = () => (paused && song && paused.id === compiled.id ? paused.cyc : sceneStart(sel));
+async function seekTo(bar) {
+  if (isPlaying() && mode === 'track') return playSong(compiled, bar, 'track');
+  if (mode !== 'track') backToTrack();
+  song = compiled; paused = { id: compiled.id, cyc: bar };
+  const i = compiled.meta.sectionAt(bar); if (i >= 0 && i !== sel) selectScene(i);
+}
+let rulerDrag = null;
+$('#ruler-track').addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  const g = rulerGeo(); rulerDrag = { g, bar: xToBar(g, e.clientX - g.tr.left) };
+  $('#ruler-track').setPointerCapture(e.pointerId); e.preventDefault();
+});
+$('#ruler-track').addEventListener('pointermove', e => { if (rulerDrag) rulerDrag.bar = xToBar(rulerDrag.g, e.clientX - rulerDrag.g.tr.left); });
+$('#ruler-track').addEventListener('pointerup', () => { if (!rulerDrag) return; const b = rulerDrag.bar; rulerDrag = null; seekTo(b); });
+$('#ruler-track').addEventListener('keydown', e => {
+  const now = isPlaying() && mode === 'track' && sched() ? sched().now() : cueBar(), total = songBars();
+  const to = { ArrowLeft: Math.floor(now) - 1, ArrowRight: Math.floor(now) + 1, Home: 0, End: total - 1 }[e.key];
+  if (to === undefined) return;
+  e.preventDefault(); seekTo(Math.max(0, Math.min(total - 1, to)));
+});
+// a ogni frame: cursore e tempo (durante il trascinamento segue il puntatore)
+function updateRuler(playing) {
+  const knob = $('#ruler-knob'); if (!knob || !compiled) return;
+  const g = rulerGeo(), s = sched();
+  const pos = rulerDrag ? rulerDrag.bar : playing && mode === 'track' && s ? Math.min(s.now(), songBars()) : cueBar();
+  const x = barToX(g, pos);
+  knob.style.left = `${x}px`; $('#ruler-fill').style.width = `${x}px`;
+  const tt = `${clock(compiled.meta.secondsAt(pos))} / ${clock(compiled.meta.seconds)}`;
+  if ($('#ruler-time').textContent !== tt) $('#ruler-time').textContent = tt;
+  $('#ruler-track').setAttribute('aria-valuenow', Math.floor(pos) + 1);
+}
 
 $('#arr-strip').addEventListener('click', e => {
   const b = e.target.closest('[data-scene-i]'); if (!b) return;
@@ -1201,6 +1260,7 @@ const MASTER = .6;
     $('#sc-pause').disabled = state === 'stopped';
   }
   // avanzamento nell'arrangiatore
+  updateRuler(playing);
   const head = $('#arr-strip .head');
   if (head) {
     const trackCyc = playing && mode === 'track' && s ? s.now() : -1;

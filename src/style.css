@@ -146,6 +146,13 @@
   .trk-cell.custom { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--a2) 45%, var(--panel2)) 0 6px, color-mix(in srgb, var(--a2) 20%, var(--panel2)) 6px 12px); }
   .trk-cell[aria-current="true"] { outline: 2px solid var(--ink); outline-offset: -1px; }
   .arr-grid .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); box-shadow: 0 0 8px var(--a1); left: 0; pointer-events: none; }
+  .arr-ruler { display: grid; grid-template-columns: var(--trk-col) minmax(0, 1fr); align-items: center; margin-bottom: 4px; }
+  .ruler-time { font: 600 12px/1 var(--mono); color: var(--a2); font-variant-numeric: tabular-nums; padding-left: 4px; }
+  .ruler-track { position: relative; height: 26px; cursor: pointer; touch-action: none; border-radius: 4px; background: color-mix(in srgb, var(--line) 25%, transparent); outline-offset: 2px; }
+  .ruler-ticks i { position: absolute; bottom: 0; height: 5px; border-left: 1px solid color-mix(in srgb, var(--muted) 45%, transparent); font: 600 9px/10px var(--mono); font-style: normal; color: var(--muted); white-space: nowrap; pointer-events: none; }
+  .ruler-ticks i.major { top: 2px; height: auto; bottom: 0; padding-left: 3px; border-left-color: var(--muted); }
+  .ruler-fill { position: absolute; left: 0; top: 11px; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--a1) 60%, transparent); pointer-events: none; }
+  .ruler-knob { position: absolute; top: 5px; width: 14px; height: 16px; margin-left: -7px; border-radius: 3px; background: var(--ink); box-shadow: 0 0 10px var(--a1); pointer-events: none; }
   .arr-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
   .arr-mode .hint { font-size: 11px; color: var(--muted); flex: 1 1 260px; }
   .tl-mode .arr-strip { gap: 0; }

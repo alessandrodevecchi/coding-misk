@@ -72,7 +72,7 @@ Each track can chain devices after the instrument: delays, reverbs, distortion, 
 "rack": [{ "device": "delay", "amount": 0.35, "time": 0.1875, "feedback": 0.5 }, { "device": "pan", "motion": "slow" }]
 ```
 
-In the app, the arranger has two views of the same song: **Sections** (a cell per track and section, quick to fill) and **Free timeline** (clips at any bar: click an empty lane to add one, drag to move, drag the right edge to resize, arrows and Shift + arrows on the selected clip). Switching loses nothing: a section covered by free clips shows a striped cell in the sections view. The track panel has two views too: the selected track with every editor, and "All playing" with a compact card for each track that plays in the selected section (patterns, volume, filter, drive, rhythm, rack).
+In the app, the arranger has two views of the same song: **Free timeline** (the default) and **Sections** (a cell per track and section, quick to fill). The free timeline places clips at any bar: click an empty lane to add one, drag to move, drag the right edge to resize, arrows and Shift + arrows on the selected clip). Above the sections, a player ruler shows the time and a cursor: click or drag it to start from any point, arrow keys move one bar. Switching views loses nothing: a section covered by free clips shows a striped cell in the sections view. The track panel has two views too: the selected track with every editor, and "All playing" with a compact card for each track that plays in the selected section (patterns, volume, filter, drive, rhythm, rack).
 
 ## Patterns in practice
 
