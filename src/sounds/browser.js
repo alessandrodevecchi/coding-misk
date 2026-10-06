@@ -9,7 +9,7 @@ const PAD_KEYS = '1234qwerasdfzxcv';
 const PAGE = { cards: 48, list: 150 };
 const LIB = '*lib'; // group value for the library view (all instruments of a category)
 
-export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, stop, useSound, toast }) {
+export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, stop, useSound, toast, scheduler }) {
   const st = { cat: 'drums', group: LIB, qRaw: '', q: '', view: store.get('coding-misk-snd-view', 'cards'), sel: null, mode: 'auto', variant: null, limit: 0, page: 0, favs: new Set(store.get('coding-misk-favs', [])) };
   let items = [], byKey = new Map(), lastSize = 0;
   const refresh = () => {
@@ -207,6 +207,22 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     if (d.sbCopy !== undefined) { const code = usageCode(it) + (st.variant ? `.n(${st.variant})` : ''); try { navigator.clipboard.writeText(code).then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (err) { toast(t('copyNo')); } return; }
     if (d.sbFav !== undefined) { if (st.favs.has(it.key)) st.favs.delete(it.key); else st.favs.add(it.key); saveFavs(); return render(); }
   });
+  // while something plays, the chip, card, row or pad of each sound lights up when that sound is hit, like the LEDs on a drum machine:
+  // every frame reads the hits the scheduler has queued since the previous frame
+  let ledFrom = null;
+  const flash = el => { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); clearTimeout(el._hit); el._hit = setTimeout(() => el.classList.remove('hit'), 140); };
+  (function leds() {
+    requestAnimationFrame(leds);
+    const sc = scheduler && scheduler(), els = root.offsetParent ? root.querySelectorAll('[data-sb-shot], [data-sb-pad], [data-sb-item]') : [];
+    if (!sc || !sc.started || !sc.pattern || !els.length) { ledFrom = null; return; }
+    const now = sc.now();
+    if (ledFrom === null || now < ledFrom || now - ledFrom > 1) { ledFrom = now; return; }
+    let haps = [];
+    try { haps = sc.pattern.queryArc(ledFrom, now); } catch (e) { /* a pattern that cannot be queried: no lights */ }
+    const from = ledFrom; ledFrom = now;
+    const hit = new Set(haps.filter(h => h.hasOnset() && h.whole.begin >= from && h.value && h.value.s).map(h => (h.value.bank ? `${h.value.bank}_${h.value.s}` : String(h.value.s)).toLowerCase()));
+    if (hit.size) els.forEach(el => { if (hit.has(el.dataset.sbShot || el.dataset.sbPad || el.dataset.sbItem)) flash(el); });
+  })();
   // pads with the keyboard: 1-4, Q-R, A-F, Z-V (only in the pads view, not while typing)
   document.addEventListener('keydown', e => {
     if (st.view !== 'pads' || root.hidden || !root.offsetParent || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, textarea, select, [contenteditable], strudel-editor')) return;

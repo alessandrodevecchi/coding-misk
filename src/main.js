@@ -1352,7 +1352,7 @@ function useSound(it) {
   tr.settings[key] = value; changed(); renderTrackPanel();
   return t('sbUsed', { sound: it.cat === 'drums' ? machineLabel(it.group) : value, track: trackLabel(tr), song: T.title });
 }
-const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast });
+const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast, scheduler: sched });
 function renderSounds() { sounds.render(); }
 
 // ---------- riferimenti ----------
