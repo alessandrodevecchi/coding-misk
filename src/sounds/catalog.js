@@ -83,9 +83,38 @@ export function usageCode(item) {
   if (item.cat === 'instruments' || item.cat === 'synths') return `note("a3").s("${item.name}")`;
   return `s("${item.name}").n(0)`;
 }
-// a drum machine as a groove with the sounds it has
+// a drum machine as a 4-bar groove that plays every sound it has (variant 0 of each):
+// bars 1-2 the basic beat, bars 3-4 every other sound joins in its usual role, a tom fill closes bar 4.
+// Machine sound names come from a small set (bd sd cp hh oh cr rd rim cb sh tb perc misc fx ht mt lt);
+// any other name is played once in the last beat of bar 3.
+const TOMS = ['ht', 'mt', 'lt'];
+const KNOWN = ['bd', 'sd', 'cp', 'hh', 'oh', 'cr', 'rd', 'rim', 'cb', 'sh', 'tb', 'perc', 'misc', 'fx', ...TOMS];
 export function grooveCode(machine, sounds) {
-  const has = s => sounds.includes(s);
-  const parts = [has('bd') && 's("bd*4")', (has('sd') || has('cp')) && `s("~ ${has('sd') ? 'sd' : 'cp'} ~ ${has('sd') ? 'sd' : 'cp'}")`, has('hh') && 's("[~ hh]*4")'].filter(Boolean);
-  return parts.length ? parts.map(p => `$: ${p}.bank("${machine}")`).join('\n') : `$: s("${sounds.slice(0, 4).join(' ')}").bank("${machine}")`;
+  const has = x => sounds.includes(x), kick = has('bd') ? 'bd' : ['lt', 'mt'].find(has), snare = has('sd') ? 'sd' : has('cp') ? 'cp' : null, fill = TOMS.filter(has);
+  const late = '.mask("<0 0 1 1>")';
+  const lines = [
+    // the basic beat, all 4 bars
+    kick && [`s("${kick}*4")`, kick === 'bd' ? 'kick on every beat' : 'low tom as the kick (no bass drum)'],
+    snare && [`s("~ ${snare} ~ ${snare}")${fill.length ? '.mask("<1 1 1 [1 1 1 0]>")' : ''}`, `${snare === 'sd' ? 'snare' : 'clap'} on 2 and 4${fill.length ? ', rests under the fill' : ''}`],
+    has('hh') && ['s("[~ hh]*4")' + (has('oh') ? '.mask("[1 1 1 0]")' : ''), 'closed hat on the offbeats'],
+    has('oh') && ['s("~ ~ ~ [~ oh]")', 'open hat on the last offbeat'],
+    // bars 3-4: the rest of the machine
+    has('cr') && ['s("cr")' + '.mask("<0 0 1 0>")', 'crash where the new sounds come in (bar 3)'],
+    has('rd') && ['s("rd*4")' + late, 'ride on the beats'],
+    snare === 'sd' && has('cp') && ['s("~ cp ~ cp")' + late, 'clap with the snare'],
+    has('tb') && ['s("~ tb ~ tb")' + late, 'tambourine with the snare'],
+    has('rim') && ['s("[~ ~ ~ rim ~ ~ ~ ~]*2")' + late, 'rimshot, syncopated'],
+    has('cb') && ['s("[~ ~ ~ ~ ~ ~ ~ cb]*2")' + late, 'cowbell closing each half bar'],
+    has('perc') && ['s("[~ ~ ~ ~ ~ perc ~ ~]*2")' + late, 'percussion in the gaps'],
+    has('sh') && ['s("sh*16").gain(.6)' + late, 'shaker on sixteenths'],
+    has('misc') && ['s("[~ misc ~ ~] ~ ~ ~")' + late, 'misc sound after the first beat'],
+    has('fx') && ['s("~ ~ [~ fx ~ ~] ~")' + late, 'effect after the third beat'],
+  ].filter(Boolean);
+  const other = sounds.filter(x => x && !KNOWN.includes(x));
+  if (other.length) lines.push([`s("~ ~ ~ [${other.join(' ')}]")` + '.mask("<0 0 1 0>")', 'other sounds, once in bar 3']);
+  if (fill.length) lines.push([`s("~ ~ ~ [${fill.length === 1 ? `${fill[0]} ${fill[0]}` : fill.join(' ')}]")` + '.mask("<0 0 0 1>")', 'tom fill, high to low (bar 4)']);
+  // nothing for the basic beat (a percussion-only machine): the rest plays from bar 1
+  const basic = kick || snare || has('hh') || has('oh');
+  const code = lines.map(([p, why]) => `$: ${basic ? p : p.replace(late, '')}.bank("${machine}") // ${why}`);
+  return `// ${machineLabel(machine)}: 4 bars, every sound of the machine (bars 1-2 the beat, 3-4 the rest)\n${code.join('\n')}`;
 }

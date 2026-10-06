@@ -192,7 +192,8 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     if (d.sbMore !== undefined) { st.limit += PAGE[st.view]; return render(); }
     if (d.sbPage) { st.page += +d.sbPage; return render(); }
     if (d.sbZoom) return zoom(d.sbZoom);
-    if (d.sbGroove) return play(grooveCode(d.sbGroove, groupItems('drums', d.sbGroove).map(x => x.name)), machineLabel(d.sbGroove));
+    // the groove plays the crash and the tom fill once every 4 bars: load every sound first, so none is skipped as late
+    if (d.sbGroove) { const items = groupItems('drums', d.sbGroove); return Promise.all(items.map(x => warm(x))).then(() => play(grooveCode(d.sbGroove, items.map(x => x.name)), machineLabel(d.sbGroove))); }
     if (d.sbUsekit) { const first = groupItems('drums', d.sbUsekit)[0]; return first && toast(useSound(first)); }
     if (d.sbShot) return oneShot(byKey.get(d.sbShot));
     if (d.sbStop !== undefined) return stop();
