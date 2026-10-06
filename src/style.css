@@ -125,7 +125,7 @@
   @keyframes recblink { 50% { opacity: .55; } }
   @media (prefers-reduced-motion: reduce) { .btn.rec { animation: none; } }
   .btn.icon { min-width: 38px; justify-content: center; }
-  .arr-scroll { overflow-x: auto; display: grid; gap: 4px; }
+  .arr-scroll { overflow-x: auto; overflow-y: hidden; display: grid; gap: 4px; }
   .arr-strip { position: relative; display: grid; gap: 3px; height: 58px; }
   .arr-scroll { --trk-col: 150px; position: relative; }
   .arr-corner { align-self: end; font: 600 10px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); padding: 0 0 6px 4px; }

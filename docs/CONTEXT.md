@@ -54,6 +54,13 @@ JSON songs (format v2), in library order (`songs/index.json`): Cavo Scoperto (da
 - `#3` Vocals, `#4` Recreate a live-coded track, `#5` Background music for short videos, `#6` Moods and presets, `#7` More genres, `#8` Faster than real-time audio export: open.
 - Tracks rework (plan in `docs/PLAN-TRACKS.md`), one issue per phase: `#9` Safety net, `#10` Own rhythm for every instrument, `#11` Song format v2, `#12` Arrangement grid with free tracks, `#13` Effect rack and code tracks, `#14` Free timeline mode.
 
+## Vocabulary (decided 2026-10-06)
+
+- **Song** (IT "brano"): the whole composition. Tab "Songs", "Open song", "New song". "Composition" was considered and dropped because it sits too close to the "Compose" tab.
+- **Track** (IT "traccia"): one row of the arranger: an instrument with its settings, rack, patterns and clips.
+- **Section** (IT "sezione"): a part of the song (intro, drop). The word "scene" is no longer used in the interface.
+- **Pattern**, **clip**: what a track plays, and where.
+
 ## Ideas to re-evaluate (lowest priority)
 
 - **Shared patterns across tracks.** Today patterns belong to one track and are reused across its sections and clips. A song-level library could share rhythms (steps) and melodies (degree notes) between melodic tracks, for example bass and guitar in unison; drum rows would stay per track. Owner decision (2026-10-05): not now, per-track patterns are fine.

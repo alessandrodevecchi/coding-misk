@@ -19,7 +19,7 @@ This guide grows with the project. Songs are JSON files in `songs/`; the arrange
 3. Add tracks one at a time, starting with drums and bass.
 4. Validate: `node --no-warnings tools/song.mjs validate songs/my-song.json`. Fix every error; read every warning.
 5. Look at the code: `node --no-warnings tools/song.mjs compile songs/my-song.json`.
-6. Listen in the app (`npm run dev`, pick the song in Compose or in the Tracks tab). Add new files to `songs/index.json` to set their place in the library. An agent cannot hear: measure instead (see "Checking levels").
+6. Listen in the app (`npm run dev`, pick the song in Compose or in the Songs tab). Add new files to `songs/index.json` to set their place in the library. An agent cannot hear: measure instead (see "Checking levels").
 
 ## Example 1: first beat
 
@@ -72,7 +72,7 @@ Each track can chain devices after the instrument: delays, reverbs, distortion, 
 "rack": [{ "device": "delay", "amount": 0.35, "time": 0.1875, "feedback": 0.5 }, { "device": "pan", "motion": "slow" }]
 ```
 
-In the app, the arranger has two views of the same song: **Free timeline** (the default) and **Sections** (a cell per track and section, quick to fill). The free timeline places clips at any bar: click an empty lane to add one, drag to move, drag the right edge to resize, arrows and Shift + arrows on the selected clip. Above the sections, a player ruler shows the time and a cursor: click or drag it to start from any point, arrow keys move one bar. Switching views loses nothing: a section covered by free clips shows a striped cell in the sections view. The track panel has three views: the selected track with every editor; "All in section: summary" with a compact card for each track that plays in the selected section (patterns, volume, filter, drive, rhythm, rack); "All in section: full" with the complete editor of every one of those tracks, one under the other.
+In the app, the arranger has two views of the same song: **Free timeline** (the default) and **Sections** (a cell per track and section, quick to fill). The free timeline places clips at any bar: click an empty lane to add one, drag to move, drag the right edge to resize, arrows and Shift + arrows on the selected clip. Above the sections, a player ruler shows the time and a cursor: click or drag it to start from any point, arrow keys move one bar. Switching views loses nothing: a section covered by free clips shows a striped cell in the sections view. The track panel has three views: "All in <section>" (the default) with the complete editor of every track that plays in the selected section, one under the other; "Selected track" with the editor of one track; "Section summary" with a compact card per playing track (patterns, volume, filter, drive, rhythm, rack).
 
 ## Patterns in practice
 

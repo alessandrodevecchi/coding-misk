@@ -78,7 +78,7 @@ let T = prepare(draft && draft.T && (draft.T.sections || draft.T.scenes) ? draft
 let sel = Math.min(draft ? draft.sel || 0 : 0, T.sections.length - 1);
 let tk = Math.min(draft ? draft.tk || 0 : 0, Math.max(0, T.tracks.length - 1));
 let dirty = !!(draft && draft.dirty);
-let scope = 'track', editPat = null, panelView = store.get('coding-misk-panel', 'one');
+let scope = 'track', editPat = null, panelView = store.get('coding-misk-panel', 'full');
 // vista dell'arrangiatore: 'sections' (celle per sezione) o 'timeline' (clip liberi); selClip = indice del clip scelto nella timeline
 let arrMode = store.get('coding-misk-arr-mode', 'timeline'), selClip = null;
 let look = store.get('coding-misk-look', T.look || 'palco');
@@ -578,8 +578,9 @@ function updateRuler(playing) {
   const knob = $('#ruler-knob'); if (!knob || !compiled) return;
   const g = rulerGeo(), s = sched();
   const pos = rulerDrag ? rulerDrag.bar : playing && mode === 'track' && s ? Math.min(s.now(), songBars()) : cueBar();
-  const x = barToX(g, pos);
-  knob.style.left = `${x}px`; $('#ruler-fill').style.width = `${x}px`;
+  const x = barToX(g, pos), w = g.tr.width;
+  // il cursore resta dentro la barra anche a fine brano (prima sporgeva e faceva comparire le barre di scorrimento)
+  knob.style.left = `${Math.max(7, Math.min(w - 7, x))}px`; $('#ruler-fill').style.width = `${Math.max(0, Math.min(w, x))}px`;
   const tt = `${clock(compiled.meta.secondsAt(pos))} / ${clock(compiled.meta.seconds)}`;
   if ($('#ruler-time').textContent !== tt) $('#ruler-time').textContent = tt;
   $('#ruler-track').setAttribute('aria-valuenow', Math.floor(pos) + 1);
@@ -805,7 +806,7 @@ function clipBlock(tr) {
       <button class="btn danger" id="clip-del">${t('clipDelete')}</button></div>
     <div class="chips">${Object.keys(tr.patterns).map(k => `<button class="chip" data-clip-pat="${esc(k)}" aria-pressed="${c.pattern === k}">${esc(k)}</button>`).join('')}</div></div>`;
 }
-const viewSwitch = () => `<div class="tp-view chips" role="group" aria-label="${esc(t('panelView'))}"><button class="chip" data-view="one" aria-pressed="${panelView === 'one'}">${t('viewOne')}</button><button class="chip" data-view="all" aria-pressed="${panelView === 'all'}">${esc(t('viewAll', { name: SEC().name }))}</button><button class="chip" data-view="full" aria-pressed="${panelView === 'full'}">${esc(t('viewFull', { name: SEC().name }))}</button></div>`;
+const viewSwitch = () => `<div class="tp-view chips" role="group" aria-label="${esc(t('panelView'))}"><button class="chip" data-view="full" aria-pressed="${panelView === 'full'}">${esc(t('viewFull', { name: SEC().name }))}</button><button class="chip" data-view="one" aria-pressed="${panelView === 'one'}">${t('viewOne')}</button><button class="chip" data-view="all" aria-pressed="${panelView === 'all'}">${t('viewAll')}</button></div>`;
 // ogni pannello traccia ha identificativi propri (p<indice>_nome): nella vista estesa ce ne sono molti insieme
 const pfx = (ti, html) => html.replace(/\b(id|for)="([^"]+)"/g, (m, a, v) => `${a}="p${ti}_${v}"`);
 const role = el => ((el && el.id) || '').replace(/^p\d+_/, '');
@@ -1294,7 +1295,7 @@ const MASTER = .6;
     const idx = trackCyc >= 0 ? compiled.meta.sectionAt(trackCyc) : -1;
     const btns = $$('.arr-scene-btn'), b = btns[idx];
     head.hidden = !b;
-    if (b) head.style.left = `${b.offsetLeft + (trackCyc - compiled.meta.sections[idx].start) / compiled.meta.sections[idx].len * b.offsetWidth}px`;
+    if (b) head.style.left = `${b.offsetLeft + Math.min(1, (trackCyc - compiled.meta.sections[idx].start) / compiled.meta.sections[idx].len) * (b.offsetWidth - 2)}px`;
     const lh = $('#arr-grid .head');
     if (lh) { lh.hidden = !b; if (b) lh.style.left = head.style.left; }
     btns.forEach((x, j) => x.classList.toggle('playing', j === idx));

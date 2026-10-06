@@ -18,7 +18,7 @@ A local lab for composing music by writing code, built on [Strudel](https://stru
 | ![Pixel visual](docs/media/stage-pixel.jpg)        | ![Mountains visual](docs/media/stage-montagne.jpg)              |
 | ![Scene arranger](docs/media/compose-arranger.jpg) | ![Drum sequencer and channels](docs/media/compose-channels.jpg) |
 
-![Tracks tab](docs/media/tracks.jpg)
+![Songs tab](docs/media/tracks.jpg)
 
 ## Listen
 
@@ -109,7 +109,7 @@ Put WAV, MP3, OGG or FLAC files in `public/samples/`: one folder per instrument 
 - Strudel is an npm dependency (`@strudel/repl`), not a fork. To update it: `npm update @strudel/repl`.
 - Samples are downloaded from GitHub on first use, so a connection is needed. The app loads the full dirt-samples archive.
 - The player changes the tempo bar by bar. A `.cps()` inside a pattern makes the scheduler drop notes.
-- Tracks declare two lines read by the player, with single quotes: `const SECTIONS = [['intro', 8], …]` and `const TEMPO = {'intro': 132, 'build': [132, 140], …}`.
+- Songs compile to code with two lines read by the player, with single quotes: `const SECTIONS = [['intro', 8], …]` and `const TEMPO = {'intro': 132, 'build': [132, 140], …}`.
 - In Strudel code, double quotes and backticks are mini-notation. Plain JavaScript strings use single quotes; `mini('…')` turns them into patterns.
 - Tempo ramps, starting from a bar and the extra samples only work in coding-misk, not on strudel.cc.
 - Saved tracks and the current draft live in the browser's `localStorage`. Clearing site data deletes them.
