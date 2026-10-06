@@ -165,4 +165,5 @@
 
 ## Prossimo passo
 
-- Rifiniture di `#15` su indicazione del proprietario. Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`.
+- Groove completo della macchina (richiesta del proprietario, da fare dopo la compattazione del contesto): `grooveCode` in `src/sounds/catalog.js` oggi usa solo bd, sd/cp, hh. Nuovo groove di 4 battute: battute 1-2 groove base (cassa, rullante o clap, hh chiuso, oh in levare); battute 3-4 entrano tutti gli altri suoni con un ruolo ricavato dal nome (cr crash sul primo battito, rd ride al posto di hh, rim/rs e cp come contrattempi, cb/perc/conga/shaker/tambourine negli spazi, lt/mt/ht in un fill finale dal più acuto al più grave, nomi sconosciuti negli spazi della battuta 3), così ogni suono della macchina si sente almeno una volta. Varianti escluse (restano nel modo "Varianti" del singolo suono). Commento del ruolo su ogni riga del codice mostrato; chip del suono illuminato quando suona (facoltativo). Provare su macchine con pochi e molti suoni (BossDR55 4, RolandTR808 13, AkaiXR10 16, YamahaRY30 16) e verificare nel browser che non ci siano errori.
+- Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. Su `develop` ci sono le rifiniture di `#15` non ancora su `main` (dopo `v0.2.0`).
