@@ -150,6 +150,7 @@
 - Corretto: a fine brano il cursore della barra di riproduzione sporgeva di qualche pixel e faceva comparire barre di scorrimento orizzontali e verticali; cursore e testine ora restano dentro, `.arr-scroll` non scorre in verticale. Misurato sulla fine di Ruggine Lenta: nessuno sforamento.
 - Viste del pannello riordinate: "Tutte in <sezione>" (complete, predefinita), "Traccia selezionata", "Sintesi della sezione".
 - Nomi decisi col proprietario: in inglese "Song" per il brano (tab Songs, Open song, New song), "Track" per la riga dello strumento, "Section" ovunque al posto di "scene" (anche in italiano "sezione" al posto di "scena"); badge "Song" / "Code song". Glossario in `docs/CONTEXT.md`.
+- Corretto: a fine brano il cursore saltava all'inizio dell'ultima sezione (a brano fermo mostra da dove ripartirebbe il Play, e "segui la riproduzione" aveva selezionato l'ultima sezione). Ora, quando il brano finisce da solo, il cursore resta in fondo e il Play successivo riparte dall'inizio; scegliere un punto o una sezione annulla questo stato.
 
 ## Prossimo passo
 

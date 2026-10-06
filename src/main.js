@@ -91,6 +91,7 @@ const SEC = () => T.sections[sel];
 // ---------- editor Strudel e trasporto ----------
 let ed = null, mode = 'track', evalTimer = 0, song = null, loopIdx = -1, follow = true, seeking = false;
 let paused = null; // { id, cyc } quando la musica è in pausa
+let ended = null; // id del brano arrivato alla fine da solo
 let source = { kind: 'track' };
 const el = document.createElement('strudel-editor');
 el.innerHTML = `<!--\n${compiled.code}\n-->`;
@@ -147,7 +148,8 @@ async function play() {
   initAudioOnce();
   await ready;
   await initAudioOnce();
-  if (mode === 'track' && !isPlaying()) return playSong(compiled, sceneStart(sel), 'track');
+  // a brano finito si riparte dall'inizio, altrimenti dalla sezione selezionata
+  if (mode === 'track' && !isPlaying()) { const from = ended === compiled.id ? 0 : sceneStart(sel); ended = null; return playSong(compiled, from, 'track'); }
   paused = null;
   await ed.evaluate();
   updateShare();
@@ -355,6 +357,7 @@ const trackLabel = tr => tr.name || t(tr.type) || tr.id;
 function selectScene(i) {
   if (i < 0 || i >= T.sections.length || i === sel) return;
   sel = i; editPat = null;
+  if (!isPlaying()) ended = null;
   saveDraft(); renderArranger(); renderTrackPanel();
 }
 function selectTrack(i) {
@@ -552,8 +555,10 @@ function renderRuler() {
   });
 }
 // dove ripartirebbe la musica: la posizione in pausa, oppure l'inizio della sezione selezionata
-const cueBar = () => (paused && song && paused.id === compiled.id ? paused.cyc : sceneStart(sel));
+// a brano finito il cursore resta in fondo finché non si sceglie un altro punto
+const cueBar = () => (ended === compiled.id ? songBars() : paused && song && paused.id === compiled.id ? paused.cyc : sceneStart(sel));
 async function seekTo(bar) {
+  ended = null;
   if (isPlaying() && mode === 'track') return playSong(compiled, bar, 'track');
   if (mode !== 'track') backToTrack();
   song = compiled; paused = { id: compiled.id, cyc: bar };
@@ -583,7 +588,7 @@ function updateRuler(playing) {
   knob.style.left = `${Math.max(7, Math.min(w - 7, x))}px`; $('#ruler-fill').style.width = `${Math.max(0, Math.min(w, x))}px`;
   const tt = `${clock(compiled.meta.secondsAt(pos))} / ${clock(compiled.meta.seconds)}`;
   if ($('#ruler-time').textContent !== tt) $('#ruler-time').textContent = tt;
-  $('#ruler-track').setAttribute('aria-valuenow', Math.floor(pos) + 1);
+  $('#ruler-track').setAttribute('aria-valuenow', Math.min(songBars(), Math.floor(pos) + 1));
 }
 
 $('#arr-strip').addEventListener('click', e => {
@@ -1265,7 +1270,7 @@ const MASTER = .6;
     if (loopIdx >= 0) {
       const sec = m.sections[loopIdx];
       if (sec && cyc >= sec.start + sec.len) playSong(song, sec.start, mode);
-    } else if (cyc >= m.bars) { stop(); if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
+    } else if (cyc >= m.bars) { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
     // segue la sezione che suona, ma non mentre si sta scrivendo in un campo del brano
     const typing = document.activeElement && document.activeElement.matches('input, select, textarea') && document.activeElement.closest('#arranger, #track-panel');
     if (mode === 'track' && follow && !typing) { const i = m.sectionAt(cyc); if (i >= 0 && i !== sel) selectScene(i); }
