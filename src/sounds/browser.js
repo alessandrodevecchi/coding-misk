@@ -2,7 +2,7 @@
 // and an inspector for the selected instrument or sound.
 // Pictures: pixel art drawn from src/sounds/art.js everywhere, a free photo when one exists (drum machines).
 import { CATEGORIES, buildCatalog, auditionCode, usageCode, grooveCode, machineLabel, prettyName } from './catalog.js';
-import { artFor, pixelArt } from './art.js';
+import { artFor, groupArt, pixelArt } from './art.js';
 import { PHOTOS } from './photos.js';
 
 const PAD_KEYS = '1234qwerasdfzxcv';
@@ -44,7 +44,8 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
   }
   const libraryMode = () => !st.q && st.cat !== 'favs' && st.group === LIB;
   const px = (it, w) => it ? `<img class="px" alt="" data-art="${esc(it.key)}" data-w="${w}">` : '';
-  const groupPx = (cat, g, w) => px(items.find(x => x.cat === cat && x.group === g), w);
+  // a machine, family or kind has its own picture
+  const groupPx = (cat, g, w) => `<img class="px" alt="" data-gart="${esc(cat)}|${esc(g)}" data-w="${w}">`;
   // picture of a group: the photo when there is one, otherwise the pixel art
   const groupPic = (cat, g, w) => { const p = photoOf(cat, g); return p ? `<img class="photo" src="${p.file}" alt="">` : groupPx(cat, g, w); };
 
@@ -121,7 +122,7 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     const code = usageCode(it) + (st.variant ? `.n(${st.variant})` : '');
     return `<div class="card sb-insp">
       ${picture(it.cat, it.group, it)}
-      <div class="sb-info"><b>${esc(it.cat === 'drums' ? `${machineLabel(it.group)} · ${it.name}` : label(it))}</b><span class="lbl">${esc(t('sbCat_' + it.cat))} · ${esc(groupLabel(it.cat, it.group))}${it.n > 1 ? ' · ' + t('sbVariants', { n: it.n }) : ''}</span>
+      <div class="sb-info"><b>${esc(it.cat === 'drums' ? `${machineLabel(it.group)} · ${it.name}` : label(it))}</b><span class="lbl">${esc(t('sbCat_' + it.cat))} · ${esc(groupLabel(it.cat, it.group))}${it.source ? ' · ' + esc(it.source) : ''}${it.n > 1 ? ' · ' + t('sbVariants', { n: it.n }) : ''}</span>
         <code>${esc(code)}</code>
         ${modes.length ? `<div class="chips">${modes.map(m => `<button class="chip" data-sb-mode="${m}" aria-pressed="${st.mode === m}">${t('sbMode_' + (m === 'auto' ? (it.cat === 'instruments' || it.cat === 'synths' ? 'chords' : 'rhythm') : m))}</button>`).join('')}${it.cat === 'drums' ? `<button class="chip" data-sb-groove="${esc(it.group)}">${t('sbGroove')}</button>` : ''}</div>` : ''}
         ${it.n > 1 ? `<div class="sb-vars"><span class="lbl">${t('sbVariantPick')}</span><div class="chips">${Array.from({ length: Math.min(it.n, 32) }, (_, i) => `<button class="chip small" data-sb-var="${i}" aria-pressed="${(st.variant || 0) === i}">${i}</button>`).join('')}</div><p class="note">${t('sbVariantHint')}</p></div>` : ''}
@@ -131,7 +132,11 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     </div>`;
   }
   function hydrate() {
-    root.querySelectorAll('img.px:not([src])').forEach(img => {
+    root.querySelectorAll('img.px[data-gart]:not([src])').forEach(img => {
+      const [cat, g] = img.dataset.gart.split('|');
+      pixelArt(`group:${cat}:${g}`, groupArt(cat, g, items.find(x => x.cat === cat && x.group === g)), +img.dataset.w).then(src => { if (src) img.src = src; });
+    });
+    root.querySelectorAll('img.px[data-art]:not([src])').forEach(img => {
       const it = byKey.get(img.dataset.art); if (!it) return;
       pixelArt(`${it.cat}:${it.group}:${it.cat === 'drums' ? '' : it.name}`, artFor(it), +img.dataset.w).then(src => { if (src) img.src = src; });
     });

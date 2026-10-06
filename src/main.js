@@ -101,7 +101,9 @@ el.innerHTML = `<!--\n${compiled.code}\n-->`;
 $('#edhost').appendChild(el);
 const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor) { clearInterval(iv); ed = el.editor; res(ed); } }, 100); });
 // il REPL carica solo una parte di dirt-samples: carichiamo l'archivio completo (arpy, industrial, glitch, …)
-ready.then(() => { try { globalThis.samples && globalThis.samples('github:tidalcycles/dirt-samples'); } catch (e) { console.error(e); } });
+// samples() can appear a little after the editor: wait for it, otherwise the call was skipped and only part of the archive loaded
+const whenSamples = () => new Promise(res => { const iv = setInterval(() => { if (typeof globalThis.samples === 'function') { clearInterval(iv); res(globalThis.samples); } }, 100); });
+ready.then(whenSamples).then(load => load('github:tidalcycles/dirt-samples')).catch(e => console.error(e));
 // campioni personalizzati da public/samples/ (elenco generato dal plugin in vite.config.js)
 let custom = [];
 ready.then(async () => {
