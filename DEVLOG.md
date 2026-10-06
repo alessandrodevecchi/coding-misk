@@ -168,6 +168,8 @@
 
 - Rilascio `v0.3.0`: `develop` portato su `main` (browser dei suoni completo `#15` con libreria, ispettori, pad, foto e pixel art, groove completo delle macchine e luci dei suoni). Issue `#15` chiusa.
 
+- Nuovo brano "Kellerlicht" (richiesta del proprietario: dark techno trance, club underground di Berlino, almeno 4-5 minuti, bassi in primo piano, niente acuti se non in una breve pausa a volume basso, poi "con un flavour di synthwave"): 160 battute a 132 BPM (4:50), Fa minore. Cassa 909 con un rimbombo di riverbero filtrato (traccia codice), basso a sega che rotola, linea acid bassa, charleston LinnDrum filtrati e rullante con riverbero gated; nella pausa "Nebel" pad e una melodia a sega in frigio a volume basso; nell'ultimo drop accordi epici, basso a ottave e pad che pompa (il tocco synthwave). Nessun crash. Livelli misurati: cassa 0.47, bassi 0.47-0.60, charleston 0.17, melodia 0.06 sotto i bassi; nessun errore.
+
 ## Prossimo passo
 
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.
