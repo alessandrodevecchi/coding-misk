@@ -8,3 +8,34 @@ Photos of drum machines shown in the Sounds tab, from Wikimedia Commons, resized
 - `roland-tr-707.jpg`: [Roland TR-707.jpg](https://commons.wikimedia.org/wiki/File:Roland_TR-707.jpg) by Speculos, CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0).
 - `akai-mpc60.jpg`: [Akai MPC60.jpg](https://commons.wikimedia.org/wiki/File:Akai_MPC60.jpg) by Kimi95 (Italian Wikipedia), CC BY 3.0 (https://creativecommons.org/licenses/by/3.0).
 - `oberheim-dmx.jpg`: [Oberheim DMX with factory MIDI.jpg](https://commons.wikimedia.org/wiki/File:Oberheim_DMX_with_factory_MIDI.jpg) by Alison, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0).
+- `roland-t-r606.jpg`: [Roland TR-606.jpg](https://commons.wikimedia.org/wiki/File:Roland_TR-606.jpg) by Midas Wouters, CC BY-SA 3.0.
+- `roland-t-r505.jpg`: [Roland TR-505 4578.jpg](https://commons.wikimedia.org/wiki/File:Roland_TR-505_4578.jpg) by EternityofNight, CC BY-SA 4.0.
+- `roland-r8.jpg`: [Roland R-8 human rhythm composer.jpg](https://commons.wikimedia.org/wiki/File:Roland_R-8_human_rhythm_composer.jpg) by Candyman777, CC BY-SA 3.0.
+- `roland-m-c202.jpg`: [Roland MC-202 Synthesizer at SMEM Playroom.jpg](https://commons.wikimedia.org/wiki/File:Roland_MC-202_Synthesizer_at_SMEM_Playroom.jpg) by 1904.CC, CC BY 4.0.
+- `roland-m-c303.jpg`: [MC-303.jpg](https://commons.wikimedia.org/wiki/File:MC-303.jpg) by Nina Richards, Public domain.
+- `roland-j-d990.jpg`: [Roland JD-990 front.png](https://commons.wikimedia.org/wiki/File:Roland_JD-990_front.png) by Matt Perry, CC BY-SA 3.0.
+- `roland-m-t32.jpg`: [MT 32.jpg](https://commons.wikimedia.org/wiki/File:MT_32.jpg) by Cloudschatze, Public domain.
+- `roland-s50.jpg`: [Roland S-50.jpg](https://commons.wikimedia.org/wiki/File:Roland_S-50.jpg) by Gansweith, CC BY-SA 3.0.
+- `roland-system100.jpg`: [Roland System 100 in use.jpg](https://commons.wikimedia.org/wiki/File:Roland_System_100_in_use.jpg) by Notreshuggie, CC BY 2.0.
+- `roland-compurhythm8000.jpg`: [Roland CR-8000 CompuRhythm.jpg](https://commons.wikimedia.org/wiki/File:Roland_CR-8000_CompuRhythm.jpg) by Blair Rideout, CC BY 2.0.
+- `emu-s-p12.jpg`: [E-mu SP-12.png](https://commons.wikimedia.org/wiki/File:E-mu_SP-12.png) by Clusternote, CC BY-SA 3.0.
+- `emu-drumulator.jpg`: [Drumulator Vorderseite.png](https://commons.wikimedia.org/wiki/File:Drumulator_Vorderseite.png) by Andreas Gortan, CC BY-SA 4.0.
+- `linn-l-m1.jpg`: [Linn LM-1 Drum Computer.jpg](https://commons.wikimedia.org/wiki/File:Linn_LM-1_Drum_Computer.jpg) by Ekwatts, Public domain.
+- `linn9000.jpg`: [Linn 9000 view top 300dpi 2550 1635.jpg](https://commons.wikimedia.org/wiki/File:Linn_9000_view_top_300dpi_2550_1635.jpg) by Forat Electronics (Bruce Forat), CC BY-SA 3.0.
+- `linn-l-m2.jpg`: [LinnDrum digital drum machine front panel .jpg](https://commons.wikimedia.org/wiki/File:LinnDrum_digital_drum_machine_front_panel_.jpg) by Forat Electronics (Bruce Forat), CC BY-SA 3.0.
+- `korg-k-r55.jpg`: [Korg Rhythm 55 (KR-55).jpg](https://commons.wikimedia.org/wiki/File:Korg_Rhythm_55_(KR-55).jpg) by anders pearson, CC BY-SA 2.0.
+- `korg-m1.jpg`: [Korg M1 (2017-02-10 22.06.29 by deepsonic) (minor filter).jpg](https://commons.wikimedia.org/wiki/File:Korg_M1_(2017-02-10_22.06.29_by_deepsonic)_(minor_filter).jpg) by Deepsonic from Switzerland, CC BY 2.0.
+- `korg-poly800.jpg`: [Korg poly800.jpg](https://commons.wikimedia.org/wiki/File:Korg_poly800.jpg) by Fataltourist, Public domain.
+- `yamaha-r-y30.jpg`: [YAMAHA RY30.JPG](https://commons.wikimedia.org/wiki/File:YAMAHA_RY30.JPG) by Solaria, Public domain.
+- `casio-r-z1.jpg`: [Casio RZ-1 Digital Sampling Rhythm Composer (lowreso).jpg](https://commons.wikimedia.org/wiki/File:Casio_RZ-1_Digital_Sampling_Rhythm_Composer_(lowreso).jpg) by Brandon Daniel (derivative work), CC BY-SA 2.0.
+- `casio-s-k1.jpg`: [Casio SK-1.jpg](https://commons.wikimedia.org/wiki/File:Casio_SK-1.jpg) by Vlad Spears (derivative work), CC BY-SA 2.0.
+- `casio-v-l1.jpg`: [Casio vl tone.jpg](https://commons.wikimedia.org/wiki/File:Casio_vl_tone.jpg) by Dontpanic, CC BY-SA 3.0.
+- `alesis-h-r16.jpg`: [Alesis HR-16 modified.jpg](https://commons.wikimedia.org/wiki/File:Alesis_HR-16_modified.jpg) by driftpattern, CC BY-SA 2.0.
+- `alesis-s-r16.jpg`: [Alesis SR-16, Devi Ever OK.jpg](https://commons.wikimedia.org/wiki/File:Alesis_SR-16,_Devi_Ever_OK.jpg) by David McMahon, CC BY-SA 2.0.
+- `akai-linn.jpg`: [Akai MPC60.jpg](https://commons.wikimedia.org/wiki/File:Akai_MPC60.jpg) by Kimi95 (Italian Wikipedia), CC BY 3.0.
+- `m-p-c1000.jpg`: [Akai MPC1000 black.jpg](https://commons.wikimedia.org/wiki/File:Akai_MPC1000_black.jpg) by paulkhor, CC BY 2.0.
+- `sequential-circuits-drumtracks.jpg`: [SCI model 400 drumtraks - front mid.jpg](https://commons.wikimedia.org/wiki/File:SCI_model_400_drumtraks_-_front_mid.jpg) by Gerald Moore, CC BY 2.0.
+- `simmons-s-d-s5.jpg`: [Simmons SDS5 Electric Drum.jpg](https://commons.wikimedia.org/wiki/File:Simmons_SDS5_Electric_Drum.jpg) by Ben Franske (BenFranske), CC BY-SA 2.5.
+- `moog-concert-mate-m-g1.jpg`: [Realistic Concertmate MG-1.jpg](https://commons.wikimedia.org/wiki/File:Realistic_Concertmate_MG-1.jpg) by glacial23 (derivative work), CC BY-SA 2.0.
+- `doepfer-m-s404.jpg`: [Doepfer MS-404 (50952632408).jpg](https://commons.wikimedia.org/wiki/File:Doepfer_MS-404_(50952632408).jpg) by deepsonic, CC BY-SA 2.0.
+- `rhythm-ace.jpg`: [Multivox Rhythm Ace FR-3S.jpg](https://commons.wikimedia.org/wiki/File:Multivox_Rhythm_Ace_FR-3S.jpg) by Alison Cassidy, CC BY-SA 4.0.

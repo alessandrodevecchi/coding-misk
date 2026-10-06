@@ -68,6 +68,7 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
       </div>
       ${inspector()}`;
     hydrate();
+    if (!lib && !st.q && st.cat !== 'favs') warmGroup(st.cat, st.group);
   }
   // the library: every instrument of the category as a card (photo or pixel art) or a row
   function library(gs) {
@@ -152,16 +153,23 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
   const fire = (v, at = .02, dur = .4) => Promise.resolve(globalThis.initAudio && globalThis.initAudio()).then(() => globalThis.superdough(v, globalThis.getAudioContext().currentTime + at, dur));
   // Strudel loads each variant the first time it is asked for, and skips it if it is late:
   // load them silently first, so the "Variants" audition plays every one
-  const preload = it => { const n = Math.min(it.n || 1, 16); for (let i = 0; i < n; i++) fire(voice(it, { n: i, gain: 0 }), .6, .05).catch(() => {}); };
-  const audition = it => {
-    if (st.mode === 'variants' && it.n > 1) { preload(it); setTimeout(() => play(auditionCode(it, 'variants'), label(it)), 700); return; }
-    play(auditionCode(it, st.mode), label(it));
-  };
-  const oneShot = (it, extra) => { try { fire(voice(it, extra)); } catch (e) { audition(it); } };
+  // a silent trigger makes Strudel download the sample (or the soundfont) ahead of time
+  // superdough resolves once the sample is loaded: keep that promise per sound and variant.
+  // The silent trigger is scheduled far ahead, so it never counts as late.
+  const warmed = new Map();
+  const warm = (it, n = 0) => { const k = `${it.key}|${n}`; if (!warmed.has(k)) warmed.set(k, fire(voice(it, { n, gain: 0 }), 3, .05).catch(() => {})); return warmed.get(k); };
+  // opening a machine or a family loads all its sounds, so the first click already plays
+  let warmedGroup = '';
+  const warmGroup = (cat, g) => { if (`${cat}:${g}` === warmedGroup) return; warmedGroup = `${cat}:${g}`; groupItems(cat, g).slice(0, 40).forEach(it => warm(it)); };
+  const preloadAll = it => Promise.all(Array.from({ length: Math.min(it.n || 1, 16) }, (_, i) => warm(it, i)));
+  // play once the sound is loaded: immediately if it already is, a moment later the first time
+  const audition = it => (st.mode === 'variants' && it.n > 1 ? preloadAll(it) : warm(it)).then(() => play(auditionCode(it, st.mode), label(it)));
+  const oneShot = (it, extra = {}) => { try { warm(it, extra.n || 0).then(() => fire(voice(it, extra))); } catch (e) { audition(it); } };
   const select = (key, then) => { st.sel = key; st.mode = 'auto'; st.variant = null; render(); if (then) then(byKey.get(key)); };
   const saveFavs = () => store.set('coding-misk-favs', [...st.favs]);
   const refreshInspector = () => { const ins = root.querySelector('.sb-insp'); if (ins) { ins.outerHTML = inspector(); hydrate(); } };
 
+  root.addEventListener('pointerover', e => { const el = e.target.closest('[data-sb-item], [data-sb-pad], [data-sb-shot]'); if (!el) return; const it = byKey.get(el.dataset.sbItem || el.dataset.sbPad || el.dataset.sbShot); if (it && globalThis.getAudioContext && globalThis.getAudioContext().state === 'running') warm(it); });
   root.addEventListener('input', e => {
     if (!e.target.matches('.sb-search')) return;
     // the field keeps what is typed (spaces too); matching uses the trimmed text
