@@ -200,6 +200,9 @@
   .rack-add { display: flex; gap: 6px; flex-wrap: wrap; }
   .rack-add select { width: auto; }
   .tp-top { display: flex; justify-content: flex-start; }
+  .tp-host { display: grid; gap: 14px; }
+  .tp-full { padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--panel2) 35%, transparent); }
+  .tp-full[aria-current="true"] { border-color: var(--a1); }
   .srack { display: grid; gap: 10px; }
   .scard { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 70%, transparent); }
   .scard.silent { opacity: .5; }
