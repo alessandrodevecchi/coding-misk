@@ -46,6 +46,7 @@ This project combines that idea with what the new models can do, with my own twi
 - **Automation.** Volume, filter and tempo can move from the start to the end of a section. Drive, bitcrusher, resonance, FM and vowel filter are available too.
 - **Player.** Clickable timeline, start from any bar, buttons to hear each transition between sections, section loop, pause and resume.
 - **Included tracks.** About twenty tracks across genres: techno, trance, hard techno, industrial, dark club, metal, melodic metal, phonk, progressive rock, lo-fi and 90s arcade, plus a 30 second reel.
+- **Sound browser.** Every sound Strudel loads (about 1,200 after removing aliases: 71 drum machines, 125 General MIDI instruments, sample banks, acoustic instruments, synths, your own samples) with search, categories, cards, list and keyboard-playable pads, pixel art pictures and free photos of famous drum machines. One click puts a sound in the selected track.
 - **Visuals.** Seven canvas themes (Stage, Pixel, Sunset, Mountains, Space, Sonar, Edgerunners). Each instrument has its own audio analyser, so on the Stage the drums, bass, guitar, keys and FX light up when they play.
 - **Hardware interface theme.** Switch from neon to hardware: knobs instead of sliders, small amber displays, power and activity LEDs on every channel, anodized panels.
 - **WAV export.** Records the track in real time from Strudel's output and downloads a stereo WAV.
@@ -117,4 +118,4 @@ Put WAV, MP3, OGG or FLAC files in `public/samples/`: one folder per instrument 
 
 ## License
 
-AGPL-3.0-or-later, the same license as Strudel. See [LICENSE](LICENSE).
+AGPL-3.0-or-later, the same license as Strudel. See [LICENSE](LICENSE). Drum machine photos come from Wikimedia Commons under their own licences: see [public/sounds/photos/CREDITS.md](public/sounds/photos/CREDITS.md).

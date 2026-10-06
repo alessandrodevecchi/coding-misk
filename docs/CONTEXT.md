@@ -52,7 +52,7 @@ JSON songs (format v2), in library order (`songs/index.json`): Cavo Scoperto (da
 
 - `#1` Edgerunners visual and `#2` Hardware interface theme: done, closed.
 - `#3` Vocals, `#4` Recreate a live-coded track, `#5` Background music for short videos, `#6` Moods and presets, `#7` More genres, `#8` Faster than real-time audio export: open.
-- `#15` Full sound browser (about 1,650 sounds loaded, about 70 shown today): planned, next after the v0.2.0 release.
+- `#15` Full sound browser: done on `develop`.
 - Tracks rework (plan in `docs/PLAN-TRACKS.md`), one issue per phase: `#9` Safety net, `#10` Own rhythm for every instrument, `#11` Song format v2, `#12` Arrangement grid with free tracks, `#13` Effect rack and code tracks, `#14` Free timeline mode.
 
 ## Vocabulary (decided 2026-10-06)

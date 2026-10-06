@@ -5,8 +5,11 @@ import { compileSong } from './song/compile.js';
 import { validateSong } from './song/validate.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
+import { createSoundBrowser } from './sounds/browser.js';
+import { MACHINES } from './sounds/machines.js';
+import { machineLabel, prettyName } from './sounds/catalog.js';
 import SONG_ORDER from '../songs/index.json';
-import { LESSONS, SOUND_GROUPS, REFS, SONGS } from './content.js';
+import { LESSONS, REFS, SONGS } from './content.js';
 import { startVisuals } from './visuals.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
@@ -196,7 +199,6 @@ function backToTrack() {
   const wasPlaying = isPlaying();
   mode = 'track'; source = { kind: 'track' }; paused = null;
   renderSource();
-  $$('.snd.on').forEach(b => b.classList.remove('on'));
   if (wasPlaying) return playSong(compiled, sceneStart(sel), 'track');
   song = null;
   if (ed) ed.setCode(compiled.code);
@@ -721,25 +723,36 @@ const named = obj => Object.entries(obj).map(([k, v]) => [k, v[0]]);
 const NUM4 = { max: 4, step: .1, fmt: 'num' };
 // [tipo, chiave, etichetta, opzioni] delle impostazioni di ogni tipo di traccia; "ramp" = valore anche a fine sezione
 const CONTROLS = {
-  drums: [['select', 'kit', 'drumMachine', () => KITS.map(k => [k, k.replace('Roland', '')])], ['range', 'gain', 'volume', { ramp: 1 }], ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['range', 'drive', 'drive', NUM4], ['range', 'grit', 'grit']],
-  bass: [['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
+  drums: [['select', 'kit', 'drumMachine', () => MACHINES.map(k => [k, machineLabel(k)])], ['range', 'gain', 'volume', { ramp: 1 }], ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['range', 'drive', 'drive', NUM4], ['range', 'grit', 'grit']],
+  bass: [['select', 'wave', 'sound', allWaves], ['range', 'gain', 'volume', { ramp: 1 }],
     ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['range', 'reso', 'reso', { max: 30, step: 1, fmt: 'num' }], ['range', 'drive', 'drive', NUM4]],
-  arp: [['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
+  arp: [['select', 'wave', 'sound', allWaves], ['range', 'gain', 'volume', { ramp: 1 }],
     ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES],
     ['range', 'reso', 'reso', { max: 30, step: 1, fmt: 'num' }], ['range', 'drive', 'drive', NUM4], ['range', 'delay', 'delay']],
-  hook: [['select', 'mode', 'mode', () => MODES], ['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
+  hook: [['select', 'mode', 'mode', () => MODES], ['select', 'wave', 'sound', allWaves], ['range', 'gain', 'volume', { ramp: 1 }],
     ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['range', 'fm', 'fm', { max: 8, step: .5, fmt: 'num' }],
     ['select', 'octave', 'octaveOpt', () => [['3', '3'], ['4', '4'], ['5', '5']]], ['select', 'harmony', 'harmony', () => HARMONIES], ['range', 'drive', 'drive', NUM4], ['select', 'vowel', 'vowel', () => VOWELS], ['range', 'grit', 'grit'], ['range', 'delay', 'delay']],
   guitar: [['select', 'type', 'type', () => named(GUITAR_TYPES)], ['range', 'gain', 'volume', { ramp: 1 }],
     ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['range', 'drive', 'drive', { max: 8, step: .1, fmt: 'num' }],
     ['select', 'octave', 'tuning', () => [['0', t('standard')], ['-2', t('dropTuning')], ['-12', t('lowOpt')]]], ['select', 'width', 'width', () => [['double', t('doubleOpt')], ['mono', t('mono')]]], ['range', 'room', 'reverb']],
-  pad: [['select', 'wave', 'sound', () => WAVES], ['range', 'gain', 'volume', { ramp: 1 }],
+  pad: [['select', 'wave', 'sound', allWaves], ['range', 'gain', 'volume', { ramp: 1 }],
     ['cutoff', 'cutoff', 'filter', { ramp: 1 }], ['select', 'move', 'filterMove', () => MOVES], ['range', 'drive', 'drive', NUM4], ['range', 'room', 'reverb']],
-  texture: [['select', 'sample', 'sample', () => [...TEXTURES, ...custom].map(x => [x, x])], ['range', 'gain', 'volume', { ramp: 1 }], ['range', 'grit', 'grit'], ['range', 'room', 'reverb']],
+  texture: [['select', 'sample', 'sample', allSamples], ['range', 'gain', 'volume', { ramp: 1 }], ['range', 'grit', 'grit'], ['range', 'room', 'reverb']],
   riser: [['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['2', '4', '8', '16'].map(n => [n, t('nBars', { n })])],
     ['select', 'dir', 'direction', () => [['up', t('up')], ['down', t('down')]]]],
   code: [['select', 'visual', 'visualOpt', () => VISUALS.map(v => [v, v])]],
 };
+// suoni per strumento: quelli scelti a mano, poi tutti gli strumenti General MIDI e i synth caricati
+function allWaves() {
+  const map = (globalThis.soundMap && globalThis.soundMap.get && globalThis.soundMap.get()) || {}, have = new Set(WAVES.map(([k]) => k.split(',')[0]));
+  const more = Object.entries(map).filter(([k, v]) => v && v.data && (v.data.type === 'soundfont' || (v.data.type === 'synth' && !/^(user|one|white|pink|brown|crackle)$/.test(k))) && !have.has(k)).map(([k]) => [k, prettyName(k)]).sort((a, b) => a[1].localeCompare(b[1]));
+  return [...WAVES, ...more];
+}
+function allSamples() {
+  const map = (globalThis.soundMap && globalThis.soundMap.get && globalThis.soundMap.get()) || {}, have = new Set([...TEXTURES, ...custom]);
+  const more = Object.entries(map).filter(([k, v]) => !k.startsWith('_') && v && v.data && v.data.type === 'sample' && !(v.data.baseUrl || '').includes('tidal-drum-machines') && !have.has(k)).map(([k]) => k).sort();
+  return [...TEXTURES, ...custom, ...more].map(x => [x, x]);
+}
 // preset di ogni tipo (nel pattern)
 const PRESET_LIST = { bass: () => named(BASS), guitar: () => named(GUITAR_PATTERNS), arp: () => named(ARPS), hook: () => named(HOOKS), pad: () => named(PADS) };
 const NOTE_TYPES = ['bass', 'arp', 'hook'];
@@ -1142,6 +1155,7 @@ function showTab(name) {
   $$('.tab').forEach(x => x.setAttribute('aria-selected', x.dataset.tab === name));
   for (const id of TABS) $('#tab-' + id).hidden = id !== name;
   if (name === 'brani' && cards.length) renderSongs();
+  if (name === 'suoni') renderSounds();
   store.set('coding-misk-tab', name);
 }
 $$('.tab').forEach(tb => tb.addEventListener('click', () => showTab(tb.dataset.tab)));
@@ -1324,18 +1338,20 @@ const MASTER = .6;
   });
 })();
 
-// ---------- suoni ----------
-const soundGroups = () => custom.length ? [[{ it: 'I tuoi campioni (public/samples)', en: 'Your samples (public/samples)' }, custom.map(x => [x, `$: s("${x}*2").n("<0 1 2 3>")`])], ...SOUND_GROUPS] : SOUND_GROUPS;
-function renderSounds() {
-  $('#sounds').innerHTML = soundGroups().map(([g, list], gi) => `
-    <div class="snd-group"><h3>${esc(tx(g))}</h3><div class="snds">${list.map(([n], i) => `<button class="snd" data-g="${gi}" data-i="${i}">${esc(n)}</button>`).join('')}</div></div>`).join('');
+// ---------- suoni: browser completo (src/sounds/browser.js) ----------
+// "Usa nella traccia": kit per la batteria, suono per basso, arpeggio, hook e pad, campione per la texture
+function useSound(it) {
+  const pick = types => { const c = curTrack(); return c && types.includes(c.type) ? c : T.tracks.find(x => types.includes(x.type)); };
+  let tr, key, value;
+  if (it.cat === 'drums') { tr = pick(['drums']); key = 'kit'; value = it.group; }
+  else if (it.cat === 'instruments' || it.cat === 'synths') { tr = pick(['bass', 'arp', 'hook', 'pad']); key = 'wave'; value = it.name; }
+  else { tr = pick(['texture']); key = 'sample'; value = it.name; }
+  if (!tr) return t('sbNoTarget', { kind: t(it.cat === 'drums' ? 'drums' : key === 'wave' ? 'sbMelodic' : 'texture') });
+  tr.settings[key] = value; changed(); renderTrackPanel();
+  return t('sbUsed', { sound: it.cat === 'drums' ? machineLabel(it.group) : value, track: trackLabel(tr), song: T.title });
 }
-$('#sounds').addEventListener('click', e => {
-  const b = e.target.closest('.snd'); if (!b) return;
-  const [n, code] = soundGroups()[+b.dataset.g][1][+b.dataset.i];
-  $$('.snd.on').forEach(x => x.classList.remove('on')); b.classList.add('on');
-  loadFree(code, { kind: 'sound', name: n });
-});
+const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast });
+function renderSounds() { sounds.render(); }
 
 // ---------- riferimenti ----------
 function renderRefs() {

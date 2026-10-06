@@ -65,6 +65,7 @@ Audio analysis of reference tracks: `tools/analyze-audio.py` and `tools/zoom-aud
 - `src/main.js`: app shell, track library, arranger, controls, transport, export.
 - `src/music.js`: musical data, presets, channel state (`DEFAULT`), per-instrument code generator (`sceneLayers`).
 - `songs/*.json`: built-in songs (order in `songs/index.json`); `songs/examples/`: songs used by the guide.
+- `src/sounds/`: sound browser (catalogue from the loaded sounds, pixel art drawings, free photos with credits in `public/sounds/photos/CREDITS.md`).
 - `src/song/`: song format v2 (format, converter from older scene saves, compiler, validator).
 - `src/visuals.js`: canvas visuals. `src/hardware.js`: knobs and LEDs for the hardware theme.
 - `src/songs.js`: reads `SECTIONS` and `TEMPO` from track code. `src/i18n.js`: strings. `src/content.js`: lessons, sounds, references, hand-written tracks.

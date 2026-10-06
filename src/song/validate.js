@@ -3,6 +3,9 @@
 import { KEYS, PROGS, METERS, meterSteps, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEX_RHYTHMS, KITS, MODES, ROWS, LOOKS, WAVES } from '../music.js';
 import { FORMAT, VERSION, TYPES, PATTERN_FIELDS, SETTING_FIELDS, VISUALS } from './format.js';
 import { checkRack } from './rack.js';
+import { MACHINES } from '../sounds/machines.js';
+// built-in synths of superdough (oscillators, noise, ZzFX)
+const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
 
 const PRESETS = { bass: BASS, arp: ARPS, hook: HOOKS, pad: PADS, guitar: GUITAR_PATTERNS };
 const SECTION_FIELDS = ['name', 'bars', 'bpm', 'bpmEnd', 'key', 'chords', 'meter', 'swing', 'fade', 'crash', 'breath', 'fill'];
@@ -110,8 +113,8 @@ function checkSettings(type, set, p, err, warn) {
     if (!known.includes(k)) { warn(`${p}.${k}`, `unknown setting for ${type}; settings: ${known.join(', ')}`); continue; }
     if (/^(gain|cutoff|drive|grit|room|delay|reso|fm|swing)$/.test(k) && !isNum(v)) err(`${p}.${k}`, 'a number');
     if (/End$/.test(k) && v !== null && !isNum(v)) err(`${p}.${k}`, 'a number, or null for no automation');
-    if (k === 'kit' && !KITS.includes(v)) warn(`${p}.kit`, `not in the kit list (${KITS.join(', ')}); it plays only if Strudel has that bank`);
-    if (k === 'wave' && typeof v === 'string' && !v.split(',').every(w => WAVES.some(([id]) => id === w) || /^gm_/.test(w))) warn(`${p}.wave`, 'unknown sound; see the Sounds tab');
+    if (k === 'kit' && !MACHINES.includes(v)) warn(`${p}.kit`, `not a drum machine of tidal-drum-machines (see the Sounds tab, for example RolandTR909, LinnDrum, AkaiMPC60)`);
+    if (k === 'wave' && typeof v === 'string' && !v.split(',').every(w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w))) warn(`${p}.wave`, 'unknown sound; see the Sounds tab (General MIDI instruments start with gm_)');
     if (k === 'type' && type === 'guitar' && !GUITAR_TYPES[v]) err(`${p}.type`, `one of ${Object.keys(GUITAR_TYPES).join(', ')}`);
     if (k === 'mode' && !MODES.some(([m]) => m === v)) err(`${p}.mode`, `one of ${MODES.map(([m]) => m).join(', ')}`);
     if (k === 'visual' && !VISUALS.includes(v)) warn(`${p}.visual`, `the visuals know: ${VISUALS.join(', ')}`);

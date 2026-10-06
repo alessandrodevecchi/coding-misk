@@ -46,6 +46,7 @@ Questo progetto unisce quell'idea alle capacità dei nuovi modelli, con il mio t
 - **Automazioni.** Volume, filtro e tempo possono cambiare da inizio a fine sezione. Ci sono saturazione, bitcrusher, risonanza, FM e filtro vocale.
 - **Player.** Timeline cliccabile, salto a qualsiasi battuta, pulsanti per ascoltare gli stacchi tra le sezioni, ripetizione di una sezione, pausa e ripresa.
 - **Brani inclusi.** Una ventina di brani in generi diversi: techno, trance, hard techno, industrial, club scuro, metal, metal melodico, phonk, progressive rock, lo-fi, arcade anni '90, più un reel da 30 secondi.
+- **Browser dei suoni.** Tutti i suoni caricati da Strudel (circa 1.200 senza gli alias: 71 drum machine, 125 strumenti General MIDI, banchi di campioni, strumenti acustici, synth, i tuoi campioni) con ricerca, categorie, schede, lista e pad suonabili da tastiera, immagini in pixel art e foto libere delle drum machine più famose. Un clic mette il suono nella traccia selezionata.
 - **Visual.** Sette temi su canvas (Palco, Pixel, Tramonto, Montagne, Spazio, Sonar, Edgerunners). Ogni strumento ha il suo analizzatore audio, così sul Palco batteria, basso, chitarra, tastiere e FX si accendono quando suonano.
 - **Tema interfaccia hardware.** Si passa da neon a hardware: manopole al posto dei cursori, piccoli display ambra, LED di accensione e di attività su ogni canale, pannelli anodizzati.
 - **Esportazione WAV.** Registra il brano in tempo reale dall'uscita di Strudel e scarica un WAV stereo.
@@ -117,4 +118,4 @@ Metti file WAV, MP3, OGG o FLAC in `public/samples/`: una cartella per strumento
 
 ## Licenza
 
-AGPL-3.0-or-later, la stessa licenza di Strudel. Vedi [LICENSE](LICENSE).
+AGPL-3.0-or-later, la stessa licenza di Strudel. Vedi [LICENSE](LICENSE). Le foto delle drum machine vengono da Wikimedia Commons con le loro licenze: vedi [public/sounds/photos/CREDITS.md](public/sounds/photos/CREDITS.md).

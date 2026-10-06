@@ -49,24 +49,6 @@ export const LESSONS = [
 ];
 
 // gruppi di suoni: [nome bilingue, [[etichetta, codice], …]]
-export const SOUND_GROUPS = [
-  ['Drum machine · TR-909', ['bd', 'sd', 'cp', 'hh', 'oh', 'rim', 'lt', 'mt', 'ht', 'cr', 'rd'].map(x => [x, `$: s("${x}*2").bank("RolandTR909")`])],
-  ['Drum machine · TR-808', ['bd', 'sd', 'cp', 'hh', 'oh', 'rim', 'cb', 'perc', 'sh', 'lt', 'ht'].map(x => [x, `$: s("${x}*2").bank("RolandTR808")`])],
-  [{ it: 'Drum machine · altre', en: 'Drum machines · others' }, [['707 bd', '$: s("bd*2, [~ hh]*2").bank("RolandTR707")'], ['LinnDrum', '$: s("bd [~ bd] sd ~, hh*8").bank("LinnDrum")'], ['AkaiLinn', '$: s("bd [~ bd] sd ~, hh*8").bank("AkaiLinn")'], ['TR-606', '$: s("bd ~ sd ~, hh*8").bank("RolandTR606")'], ['Minipops', '$: s("bd hh sd hh").bank("KorgMinipops")']]],
-  [{ it: 'Oscillatori', en: 'Oscillators' }, ['sawtooth', 'supersaw', 'square', 'triangle', 'sine'].map(w => [w, `$: note("a2 c3 e3 g3").s("${w}").decay(.25).sustain(.2).lpf(3000)`])],
-  [{ it: 'Rumore', en: 'Noise' }, ['white', 'pink', 'brown'].map(w => [w, `$: s("${w}*8").decay(.06).sustain(0).gain(.5)`])],
-  [{ it: 'Suoni ruvidi', en: 'Rough sounds' }, [
-    ['distort', '$: note("e1*8").s("sawtooth").lpf(600).distort(3).decay(.1).sustain(0)'],
-    ['crush', '$: s("hh*16").bank("RolandTR909").crush("<8 6 4 3>")'],
-    ['coarse', '$: s("industrial*8").n(irand(16)).coarse(6)'],
-    ['fm', '$: n("0 3 7 3").scale("E3:phrygian").s("square").fm("<1 3 6>")'],
-    ['vowel', '$: note("e2*8").s("sawtooth").vowel("<a e i o>")'],
-    ['acid', '$: note("e2 e2 [e3 e2] f2 e2 g2 [e2 e3] f2").s("sawtooth").lpf(sine.range(300, 3000).slow(2)).lpq(22).distort(1.2).decay(.12).sustain(.1)'],
-  ]],
-  [{ it: 'Campioni da dirt-samples (n sceglie la variante)', en: 'dirt-samples (n picks the variant)' }, ['arpy', 'casio', 'east', 'jvbass', 'pluck', 'sitar', 'jazz', 'metal', 'glitch', 'future', 'feel', 'industrial'].map(x => [x, `$: s("${x}*4").n("<0 1 2 3>")`])],
-  [{ it: 'Atmosfere', en: 'Atmospheres' }, ['space', 'wind', 'birds', 'crow', 'numbers'].map(x => [x, `$: s("${x}").n("<0 1 2 3>").slow(2).room(.5)`])],
-];
-
 export const REFS = [
   ['Coding Trance Music', { it: 'Switch Angel costruisce una traccia trance dal vivo in Strudel. Il punto di partenza di questo progetto.', en: 'Switch Angel builds a trance track live in Strudel. The starting point of this project.' }, 'https://www.youtube.com/watch?v=GWXCCBsOMSg'],
   [{ it: 'Switch Angel su YouTube', en: 'Switch Angel on YouTube' }, { it: 'Altre sessioni di live coding melodico e trance.', en: 'More melodic and trance live coding sessions.' }, 'https://www.youtube.com/@Switch-Angel'],
