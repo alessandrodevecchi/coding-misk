@@ -26,6 +26,7 @@ Cinque brani esportati con l'export WAV dell'app (qui in MP3). Sono tutti anche 
 
 | Brano | Stile | Durata |
 | --- | --- | --- |
+| [Kellerlicht](docs/media/audio/kellerlicht.mp3) | Techno trance scura da scantinato berlinese con un ultimo drop synthwave, Fa minore, 132 BPM | 4:53 |
 | [Luci Rosse](docs/media/audio/luci-rosse.mp3) | Club scuro da film d'azione, La minore su un solo accordo, 124 BPM | 1:55 |
 | [Ghost Protocol](docs/media/audio/ghost-protocol.mp3) | Hard techno cyberpunk, tempo da 132 a 148 BPM | 1:45 |
 | [Segnale nel rumore](docs/media/audio/segnale-nel-rumore.mp3) | Brano libero scritto da Claude, Re dorico, dal fruscio al 7/8 e ritorno | 1:40 |

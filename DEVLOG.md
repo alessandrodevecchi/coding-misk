@@ -170,6 +170,8 @@
 
 - Nuovo brano "Kellerlicht" (richiesta del proprietario: dark techno trance, club underground di Berlino, almeno 4-5 minuti, bassi in primo piano, niente acuti se non in una breve pausa a volume basso, poi "con un flavour di synthwave"): 160 battute a 132 BPM (4:50), Fa minore. Cassa 909 con un rimbombo di riverbero filtrato (traccia codice), basso a sega che rotola, linea acid bassa, charleston LinnDrum filtrati e rullante con riverbero gated; nella pausa "Nebel" pad e una melodia a sega in frigio a volume basso; nell'ultimo drop accordi epici, basso a ottave e pad che pompa (il tocco synthwave). Nessun crash. Livelli misurati: cassa 0.47, bassi 0.47-0.60, charleston 0.17, melodia 0.06 sotto i bassi; nessun errore.
 
+- "Kellerlicht" esportato (tempo reale, 4:53, picco 0.63, nessun buco di silenzio) e aggiunto agli esempi audio in `docs/media/audio` e nei README.
+
 ## Prossimo passo
 
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.
