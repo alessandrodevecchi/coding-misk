@@ -25,9 +25,10 @@ export function compileSong(input) {
   // muto e solo: le tracce silenziate non entrano nel codice
   const solo = song.tracks.some(tr => tr.solo);
   for (const tr of song.tracks) {
-    if (tr.mute || (solo && !tr.solo)) continue;
+    // the bus is chosen before skipping muted tracks, so a track that comes in later (live build) does not move the others
     const orbit = !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : ++extra;
     used.add(tr.type);
+    if (tr.mute || (solo && !tr.solo)) continue;
     L.push('', `// ========== ${[...new Set([tr.name || tr.id, tr.type])].join(' · ')} ==========`);
     const rack = rackCode(tr.rack, tr.type);
     let described = null;

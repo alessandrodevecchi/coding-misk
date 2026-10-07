@@ -65,6 +65,10 @@
   .stagewrap::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px); mix-blend-mode: multiply; }
   .hud { position: absolute; z-index: 2; inset: 10px 10px auto 10px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; pointer-events: none; }
   .hud > * { pointer-events: auto; }
+  /* live build: the short comment of the latest step, over the stage */
+  .say { position: absolute; z-index: 2; left: 50%; bottom: 14%; transform: translate(-50%, 8px); max-width: calc(100% - 32px); padding: 6px 14px; border-radius: 6px; background: color-mix(in srgb, #000 55%, transparent); color: var(--a1); font: 700 clamp(18px, 3.2vw, 34px) var(--mono); letter-spacing: .02em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
+  .say.on { opacity: 1; transform: translate(-50%, 0); }
+  .say::before { content: '> '; color: var(--a2); }
   .readout { font-family: var(--mono); font-size: 12px; color: var(--ink); text-shadow: 0 0 6px #000; font-variant-numeric: tabular-nums; white-space: pre; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); background: rgba(0,0,0,.45); border-radius: 999px; padding: 4px 12px; font-size: 13px; }

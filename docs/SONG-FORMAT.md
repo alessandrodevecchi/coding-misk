@@ -150,6 +150,33 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 - A clip covering a whole section fades in and out with the section's `fade`. A clip that starts or ends inside a section starts and stops on the bar.
 - A clip spanning several sections follows each section's chords and key. Automations (`gainEnd`, `cutoffEnd`) ramp within each section.
 
+## Live build
+
+`build` is an optional list of timed steps. A song with steps starts from silence and builds itself while it plays, in the style of live-coding videos: each change is typed into the code panel during the bar before its step and sounds on the step's bar.
+
+```json
+"build": [
+  { "at": 0,  "add": "kick", "say": { "en": "just a kick", "it": "solo una cassa" } },
+  { "at": 16, "add": "bass", "say": "need bass" },
+  { "at": 24, "set": { "track": "bass", "cutoff": 1100 }, "say": "open it up" },
+  { "at": 40, "rack": { "track": "arp", "device": "delay", "amount": 0.35 } },
+  { "at": 64, "remove": ["kick", "hats"], "say": "breakdown" }
+]
+```
+
+| Field | Value |
+| --- | --- |
+| `at` | bar from 0 where the change sounds |
+| `add` | track id, or a list: the track starts playing. Tracks named by an `add` step are silent before it; the others play from the start |
+| `remove` | track id, or a list: the track stops |
+| `set` | `{ "track", …settings }`: settings of that track from now on |
+| `pattern` | `{ "track", "to" }`: every clip of the track plays pattern `to` from now on |
+| `rack` | `{ "track", "device", …values }`: adds a rack device (replaces one of the same kind) |
+| `unrack` | `{ "track", "device" }`: removes a rack device |
+| `say` | a short comment, or one per language (`{ "en", "it" }`): shown over the stage for 4 bars and written as `// > …` above the track it changes |
+
+One step can combine several actions. Steps on the same bar apply in file order. The state at any bar is the song with every step up to that bar applied, so seeking and pausing land on the right version. Clips still decide where a track can play. `node tools/song.mjs steps <file>` lists the steps; `compile <file> --at N` prints the code at bar N.
+
 ## Compiled code
 
 `compileSong` writes, in order: `setcpm`, `SECTIONS` and `TEMPO` (read by the player for seeking and tempo changes), one lane per section (`section1 = "<1!8 0!24>"`), then one block per track with its clips. Each clip line ends with `.mask(lane).velocity(lane).orbit(n).analyze("<instrument>")`.

@@ -55,6 +55,10 @@ ffmpeg -ss $OFF -i out/video.webm -i out/audio.webm -map 0:v -map 1:a -c:v libx2
 
 Lessons from recording: clicking a native `<select>` opens a popup that swallows the next click (set the value programmatically and draw the click ripple yourself); controls below the 900 px fold cannot be clicked by coordinates; start playback with the top Play button.
 
+## Live build
+
+A song with `build` steps (`src/song/build.js`) is played by state: `stateAt(song, bar)` applies the steps up to that bar, and the playable object gets `codeAt(bar)` (compiled state with the latest comment as `// > …`). `playSong` loads the code of the starting bar. During playback `transport()` calls `liveBuild()`: during the bar before the next step it animates the editor from the current code to the next one (`src/song/typing.js`: unchanged lines stay, changed lines are edited in place, new lines typed), keeps the edit in view, then evaluates just before the step's bar so the change sounds on the beat. The comment of the latest step shows over the stage (`#say`). Track buses are assigned before muted tracks are skipped, so a track coming in later does not move the others.
+
 ## Sound browser
 
 `buildCatalog(soundMap, customBanks)` reads every loaded sound. Keys in `soundMap` are lowercase and drum machines also have aliases (`tr909_bd` next to `rolandtr909_bd`): only the 71 canonical machines of `machines.js` are kept. Sample banks keep loading after start-up (the full dirt-samples archive arrives a few seconds later), so the browser re-reads the catalogue every second until it stops growing. Pads play one shot through `superdough()`; cards and lists play a looping audition through the editor. "Use" sets the kit of a drums track, the sound of a bass, arp, hook or pad track, or the sample of a texture track (the selected track first, otherwise the first suitable one).

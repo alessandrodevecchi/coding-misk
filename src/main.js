@@ -2,6 +2,8 @@ import '@strudel/repl';
 import './style.css';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
+import { hasBuild, buildSteps, stateAt, sayAt, annotate } from './song/build.js';
+import { typingFrames } from './song/typing.js';
 import { validateSong } from './song/validate.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
@@ -65,14 +67,17 @@ function composedTracks() {
 const codedTracks = () => CODED.map(c => ({ ...c, code: user.code[c.id] || c.code }));
 // oggetto riproducibile: codice + mappa di sezioni e tempo
 function playable(tr) {
-  const code = tr.kind === 'composed' ? compileSong(tr) : tr.code;
+  // live build: the code depends on the bar (steps applied up to there), with the latest comment written in
+  const build = tr.kind === 'composed' && hasBuild(tr) ? tr : null;
+  const codeAt = build ? bar => { const st = stateAt(build, bar), c = annotate(compileSong(st.song), build, st.upTo, getLang()); return c.includes('$:') ? c : `${c}\n$: silence`; } : null;
+  const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
   const meta = parseSong(code);
   if (tr.kind === 'composed') {
     // la mappa del tempo è in "BPM da 4/4": per l'etichetta usiamo i BPM veri delle sezioni
     const v = tr.sections.flatMap(s => [s.bpm ?? 138, s.bpmEnd ?? s.bpm ?? 138]), lo = Math.min(...v), hi = Math.max(...v);
     meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   }
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta };
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, build };
 }
 
 // ---------- brano in modifica ----------
@@ -117,6 +122,38 @@ ready.then(async () => {
 });
 const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
+// code of a song at a bar, with the tempo of that bar (a live build changes code over time)
+const codeFor = (sg, bar) => withVisuals(sg.codeAt ? sg.codeAt(bar) : sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
+// keeps the point being edited in view: #edhost scrolls, not CodeMirror's own scroller
+function followEdit(a, b) {
+  let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  const view = ed && ed.editor, host = $('#edhost');
+  try {
+    // lineBlockAt works for lines CodeMirror has not drawn yet (below the window), coordsAtPos does not
+    if (!view) return;
+    const blk = view.lineBlockAt(Math.min(i, view.state.doc.length)), at = { top: view.documentTop + blk.top, bottom: view.documentTop + blk.bottom };
+    // the visible part of the panel: it can run below the window
+    const box = host.getBoundingClientRect(), top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight);
+    if (at.top < top + 8 || at.bottom > bottom - 8) host.scrollTop += at.top - top - (bottom - top) / 3;
+  } catch (e) {}
+}
+// live build in progress: steps already in the editor, and the edit being typed towards the next step
+let built = 0, typing = null;
+function liveBuild(sg, s, cyc) {
+  const steps = buildSteps(sg.build), next = steps[built];
+  if (!next) return;
+  // the change is typed during the bar before its step and evaluated just before the bar, so it sounds on the beat
+  const evalAt = next.at - .15 * s.cps, typeAt = next.at - Math.min(1, 2 * s.cps);
+  if (cyc < typeAt) return;
+  if (!typing) typing = { frame: typingFrames(ed.code || '', codeFor(sg, next.at)), t0: cyc, t1: evalAt, shown: '' };
+  if (cyc < evalAt) {
+    const txt = typing.frame((cyc - typing.t0) / Math.max(.01, typing.t1 - typing.t0));
+    if (txt !== typing.shown) { const prev = typing.shown || ed.code || ''; typing.shown = txt; ed.setCode(txt); followEdit(prev, txt); }
+    return;
+  }
+  typing = null; built = steps.filter(x => x.at <= next.at).length;
+  ed.setCode(codeFor(sg, next.at)); ed.evaluate();
+}
 
 // Strudel carica i worklet audio (supersaw, rumore, effetti) solo al primo mousedown.
 // Li inizializziamo noi dentro il gesto dell'utente, così funziona anche da tastiera.
@@ -141,7 +178,8 @@ async function playSong(sg, bar = 0, as = 'free') {
     source = as === 'track' ? { kind: 'track' } : { kind: 'song', name: sg.title, id: sg.id };
     renderSource();
     ed.stop();
-    ed.setCode(withVisuals(sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+m.bpm[Math.floor(bar)].toFixed(2)}/4)`));
+    typing = null; built = sg.build ? buildSteps(sg.build).filter(x => x.at <= bar).length : 0;
+    ed.setCode(codeFor(sg, bar));
     sched().lastEnd = bar;
     if (loopIdx >= 0) loopIdx = m.sectionAt(bar);
     if (as === 'track') selectScene(m.sectionAt(bar));
@@ -180,8 +218,11 @@ function changed() {
   renderArranger();
   if (!$('#tab-brani').hidden) renderSongs();
   if (mode !== 'track') return backToTrack();
-  if (ed) ed.setCode(compiled.code);
   if (song && song.id === compiled.id) song = compiled;
+  typing = null;
+  const now = isPlaying() && song === compiled ? sched().now() : 0;
+  if (compiled.build) built = buildSteps(compiled.build).filter(x => x.at <= now).length;
+  if (ed) ed.setCode(compiled.codeAt ? codeFor(compiled, now) : compiled.code);
   updateShare();
   clearTimeout(evalTimer);
   if (isPlaying()) evalTimer = setTimeout(() => ed.evaluate(), 150);
@@ -1283,6 +1324,7 @@ const MASTER = .6;
     const ahead = Math.min(m.bars - 1, Math.floor(s.lastEnd + s.cps * .1));
     const target = m.bpm[ahead] / 240;
     if (Math.abs(s.cps - target) > 1e-6) s.setCps(target);
+    if (song.build) liveBuild(song, s, cyc);
     if (loopIdx >= 0) {
       const sec = m.sections[loopIdx];
       if (sec && cyc >= sec.start + sec.len) playSong(song, sec.start, mode);
@@ -1308,6 +1350,10 @@ const MASTER = .6;
     $('#sc-pause').textContent = pauseLabel();
     $('#sc-pause').disabled = state === 'stopped';
   }
+  // live build: the comment of the latest step over the stage
+  const say = playing && song && song.build && s ? sayAt(song.build, s.now(), getLang()) : '', sayEl = $('#say');
+  if (say && sayEl.textContent !== say) sayEl.textContent = say;
+  sayEl.classList.toggle('on', !!say);
   // avanzamento nell'arrangiatore
   updateRuler(playing);
   const head = $('#arr-strip .head');

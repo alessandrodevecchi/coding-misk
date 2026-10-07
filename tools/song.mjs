@@ -1,6 +1,7 @@
 // Command line for v2 songs (docs/SONG-FORMAT.md).
 //   node tools/song.mjs validate <file.json|dir …>   errors and warnings with JSON paths; exit 1 on errors
-//   node tools/song.mjs compile <file.json>          print the Strudel code
+//   node tools/song.mjs compile <file.json> [--at N]  print the Strudel code (live build: the code at bar N, from 0)
+//   node tools/song.mjs steps <file.json>            live build: each step with its bar and comment
 //   node tools/song.mjs list                         songs in songs/ (id, title, file)
 // Run with `node --no-warnings` to hide Node's experimental localStorage warning.
 import fs from 'node:fs';
@@ -8,6 +9,7 @@ import path from 'node:path';
 import { songFiles } from './songs-dir.mjs';
 import { validateSong } from '../src/song/validate.js';
 import { compileSong } from '../src/song/compile.js';
+import { hasBuild, buildSteps, stateAt, annotate, sayText, BUILD_ACTIONS } from '../src/song/build.js';
 
 const [cmd, ...args] = process.argv.slice(2);
 const read = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { console.error(`${f}: ${e.message}`); process.exit(1); } };
@@ -28,10 +30,21 @@ if (cmd === 'validate' && args.length) {
 } else if (cmd === 'compile' && args[0]) {
   const song = read(args[0]), { errors } = validateSong(song);
   if (errors.length) { for (const e of errors) console.error(`error ${e.path}: ${e.msg}`); process.exit(1); }
-  process.stdout.write(compileSong(song) + '\n');
+  const i = args.indexOf('--at'), at = i > 0 ? Number(args[i + 1]) : null;
+  if (at !== null && !Number.isFinite(at)) { console.error('--at needs a bar number'); process.exit(2); }
+  // a live build plays its steps: without --at the code is the one at bar 0
+  if (hasBuild(song)) { const st = stateAt(song, at ?? 0); process.stdout.write(annotate(compileSong(st.song), song, st.upTo, 'en') + '\n'); }
+  else process.stdout.write(compileSong(song) + '\n');
+} else if (cmd === 'steps' && args[0]) {
+  const song = read(args[0]);
+  if (!hasBuild(song)) { console.log(`${args[0]}: no build steps`); process.exit(0); }
+  for (const s of buildSteps(song)) {
+    const what = BUILD_ACTIONS.filter(k => s[k] !== undefined).map(k => `${k} ${JSON.stringify(s[k])}`).join(', ');
+    console.log(`bar ${String(s.at + 1).padStart(3)}  ${what}${s.say ? `  // ${sayText(s.say, 'en')}` : ''}`);
+  }
 } else if (cmd === 'list') {
   for (const f of songFiles('songs')) { const s = read(f); console.log(`${s.id}\t${s.title}\t${f}`); }
 } else {
-  console.error('usage: node tools/song.mjs validate <file|dir …> | compile <file> | list');
+  console.error('usage: node tools/song.mjs validate <file|dir …> | compile <file> [--at N] | steps <file> | list');
   process.exit(2);
 }

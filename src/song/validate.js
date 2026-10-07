@@ -3,6 +3,7 @@
 import { KEYS, PROGS, METERS, meterSteps, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEX_RHYTHMS, KITS, MODES, ROWS, LOOKS, WAVES } from '../music.js';
 import { FORMAT, VERSION, TYPES, PATTERN_FIELDS, SETTING_FIELDS, VISUALS } from './format.js';
 import { checkRack } from './rack.js';
+import { checkBuild } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
 const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
@@ -103,6 +104,7 @@ export function validateSong(song) {
   const peak = Math.max(0, ...playing);
   if (peak > 15) warn('tracks', `${peak} tracks play at the same time; above about 15 the browser may drop notes`);
   else if (peak > 6) warn('tracks', `${peak} tracks play at the same time; the owner prefers 4 to 5 layers per section`);
+  checkBuild(song, total, err, warn);
   return { errors, warnings };
 }
 

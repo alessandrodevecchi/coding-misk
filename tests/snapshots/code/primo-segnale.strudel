@@ -1,0 +1,48 @@
+// coding-misk · Primo Segnale · live build
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(138/4)
+
+const SECTIONS = [['Live', 96]]
+const TEMPO = {'Live': 138}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!96>"  // Live · 96 bars · 138 BPM · A · Am G F G
+
+// ========== Kick · drums ==========
+// Live · bars 1-96 · pattern floor
+// Drums · RolandTR909
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.85).distort(0.2).distortvol(.5).mask(section1).velocity(section1).orbit(1).analyze("kick")
+
+// ========== Hats · drums ==========
+// Live · bars 1-96 · pattern off
+// Drums · RolandTR909
+$: s("[~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~]").bank("RolandTR909").gain(0.18).lpf(9000).mask(section1).velocity(section1).orbit(9).analyze("hats")
+
+// ========== Bass · bass ==========
+// Live · bars 1-96 · pattern roll
+// Bass · Rolling
+$: note("<a1 g1 f1 g1>").struct("[~ x x x] [~ x x x] [~ x x x] [~ x x x]")
+  .s("sawtooth").lpf(sine.range(200, 800).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.7).mask(section1).velocity(section1).orbit(2).analyze("bass")
+
+// ========== Arp · arp ==========
+// Live · bars 1-96 · pattern up
+// Arpeggio · Pulsar, 16ths
+$: note("<[a3 a4 c4 a4 e4 a4 c4 a4 a3 a4 c4 a4 e4 a4 c4 a4] [g3 g4 b3 g4 d4 g4 b3 g4 g3 g4 b3 g4 d4 g4 b3 g4] [f3 f4 a3 f4 c4 f4 a3 f4 f3 f4 a3 f4 c4 f4 a3 f4] [g3 g4 b3 g4 d4 g4 b3 g4 g3 g4 b3 g4 d4 g4 b3 g4]>")
+  .s("supersaw").lpf(sine.range(600, 2400).slow(8)).lpq(6)
+  .decay(.15).sustain(.15).gain(0.3).mask(section1).velocity(section1).orbit(3).analyze("arp")
+
+// ========== Pad · pad ==========
+// Live · bars 1-96 · pattern bed
+// Pad · Sustained
+$: note("<[a2,c3,e3] [g2,b2,d3] [f2,a2,c3] [g2,b2,d3]>")
+  .s("supersaw").attack(.4).release(1.2).lpf(sine.range(640, 2560).slow(8))
+  .room(.85).gain(0.2).mask(section1).velocity(section1).orbit(6).analyze("pad")
+
+// ========== Lead · hook ==========
+// Live · bars 1-96 · pattern call
+// Hook · notes written by hand
+$: n("<[0 ~ 2 ~ 4 ~ 2 ~] [3 ~ 2 ~ 0 ~ ~ ~] [0 ~ 2 ~ 4 ~ 6 ~] [5 ~ 4 ~ 2 ~ ~ ~]>").scale("A4:minor")
+  .s("square").lpf(2800)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.22).mask(section1).velocity(section1).orbit(4).analyze("hook")

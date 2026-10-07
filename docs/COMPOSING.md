@@ -74,6 +74,15 @@ Each track can chain devices after the instrument: delays, reverbs, distortion, 
 
 In the app, the arranger has two views of the same song: **Free timeline** (the default) and **Sections** (a cell per track and section, quick to fill). The free timeline places clips at any bar: click an empty lane to add one, drag to move, drag the right edge to resize, arrows and Shift + arrows on the selected clip. Above the sections, a player ruler shows the time and a cursor: click or drag it to start from any point, arrow keys move one bar. Switching views loses nothing: a section covered by free clips shows a striped cell in the sections view. The track panel has three views: "All in <section>" (the default) with the complete editor of every track that plays in the selected section, one under the other; "Selected track" with the editor of one track; "Section summary" with a compact card per playing track (patterns, volume, filter, drive, rhythm, rack).
 
+## Live build
+
+[`songs/primo-segnale.json`](../songs/primo-segnale.json) builds itself in front of the listener: one section of 96 bars, six tracks with clips over the whole section, and a `build` list that brings them in one at a time, opens a filter, adds a delay, takes the drums out for a breakdown and strips everything back at the end. Each step carries a comment of two or three words ("more rhythm", "add distortion"), shown over the stage and written in the code.
+
+- Start from one sound and change one thing every 4 to 8 bars.
+- Keep at most 4 to 5 tracks playing at a time: remove one when another comes in.
+- Write comments as a performer would say them: very short, about what the music needs.
+- Check the order with `node --no-warnings tools/song.mjs steps songs/my-song.json` and the code at a bar with `compile … --at N`.
+
 ## Patterns in practice
 
 - **Drums:** start from a groove (`GROOVES` in `src/music.js`: trance, rolling, breakbeat, halftime, techno, hard, rock, boombap, metal, phonk, …) and vary one row per section.
