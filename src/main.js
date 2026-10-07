@@ -2,7 +2,7 @@ import '@strudel/repl';
 import './style.css';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { hasBuild, buildSteps, stateAt, sayAt, annotate } from './song/build.js';
+import { hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText } from './song/build.js';
 import { typingFrames } from './song/typing.js';
 import { validateSong } from './song/validate.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, fromScenes, clipState } from './song/format.js';
@@ -65,10 +65,12 @@ function composedTracks() {
   return [...builtins, ...user.tracks.filter(u => !builtinOf(u.id)).map(prepare)].map(tr => ({ ...tr, kind: 'composed' }));
 }
 const codedTracks = () => CODED.map(c => ({ ...c, code: user.code[c.id] || c.code }));
+let liveOn = !!store.get('coding-misk-live', false);
 // oggetto riproducibile: codice + mappa di sezioni e tempo
 function playable(tr) {
   // live build: the code depends on the bar (steps applied up to there), with the latest comment written in
-  const build = tr.kind === 'composed' && hasBuild(tr) ? tr : null;
+  // a song without steps can build itself too ("Live build" switch): steps derived from its clips
+  const build = tr.kind !== 'composed' ? null : hasBuild(tr) ? tr : liveOn ? { ...tr, build: deriveBuild(tr) } : null;
   const codeAt = build ? bar => { const st = stateAt(build, bar), c = annotate(compileSong(st.song), build, st.upTo, getLang()); return c.includes('$:') ? c : `${c}\n$: silence`; } : null;
   const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
   const meta = parseSong(code);
@@ -421,6 +423,8 @@ function renderArranger() {
   $('#arranger').classList.toggle('tl-mode', arrMode === 'timeline');
   $$('[data-arr-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.arrMode === arrMode));
   $('#arr-mode-hint').textContent = arrMode === 'timeline' ? t('timelineHint') : '';
+  const own = hasBuild(T), lt = $('#live-toggle');
+  lt.setAttribute('aria-pressed', own || liveOn); lt.disabled = own; lt.title = own ? t('liveOwn') : t('liveHint');
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
   renderRuler();
@@ -447,20 +451,26 @@ function renderCells(total) {
 }
 // vista timeline: clip liberi su una corsia continua, larghezza proporzionale alle battute
 const clipLabel = c => esc(c.pattern) + (c.set ? '*' : '');
+// live build on the timeline: where the steps keep a track silent (hatched), and the bars where a step changes it
+function liveLayer(bmap, tr, total) {
+  const m = bmap && bmap[tr.id]; if (!m) return '';
+  return m.off.map(([a, b]) => `<i class="build-off" style="left:${a / total * 100}%;width:${(b - a) / total * 100}%" title="${esc(t('liveOff'))}"></i>`).join('')
+    + m.marks.map(k => `<i class="build-mark" style="left:${k.at / total * 100}%" title="${esc(`${t('liveMark', { n: k.at + 1 })} · ${k.action}${k.say ? ` · ${sayText(k.say, getLang())}` : ''}`)}"></i>`).join('');
+}
 function renderTimeline(total) {
   const st = starts(), minW = `calc(var(--trk-col) + ${total * 10}px)`;
   $('#arr-strip').style.gridTemplateColumns = `var(--trk-col) ${T.sections.map(s => `minmax(0, ${s.bars}fr)`).join(' ')}`;
   $('#arr-strip').style.minWidth = $('#arr-grid').style.minWidth = minW;
   $('#arr-strip').innerHTML = `<span class="arr-corner">${t('sections')}</span>` + T.sections.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" aria-current="${i === sel}">
       <b>${esc(s.name)}</b><span>${s.bars} · ${s.bpmEnd ? `${s.bpm}→${s.bpmEnd}` : s.bpm ?? 138}</span></button>`).join('') + '<span class="head"></span>';
-  const solo = T.tracks.some(tr => tr.solo);
+  const solo = T.tracks.some(tr => tr.solo), bmap = compiled.build ? buildMap(compiled.build, total) : null;
   const lines = st.slice(1).map(b => `<i class="sec-line" style="left:${b / total * 100}%"></i>`).join('');
   $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}" style="grid-template-columns:var(--trk-col) minmax(0, 1fr)" aria-current="${i === tk}">
       <div class="trk-head" data-act-ids="${ACT_IDS[tr.type] || esc((tr.settings && tr.settings.visual) || 'fx')}">
         <button class="trk-name" data-trk="${i}" title="${esc(tr.type)}"><span class="trk-type">${esc(TYPE_ICON[tr.type] || '·')}</span>${esc(trackLabel(tr))}</button>
         <button class="mini" data-mute="${i}" aria-pressed="${!!tr.mute}" title="${esc(t('mute'))}">M</button><button class="mini" data-solo="${i}" aria-pressed="${!!tr.solo}" title="${esc(t('solo'))}">S</button>
       </div>
-      <div class="trk-lane" data-lane="${i}" style="--bars:${total}" title="${esc(t('laneAdd'))}">${lines}${spans(tr).map(({ c, s: a, e: b }) => {
+      <div class="trk-lane" data-lane="${i}" style="--bars:${total}" title="${esc(t('laneAdd'))}">${lines}${liveLayer(bmap, tr, total)}${spans(tr).map(({ c, s: a, e: b }) => {
         const k = tr.clips.indexOf(c);
         return `<button class="clip${isWhole(c) ? '' : ' free'}" data-clip="${i}:${k}" aria-current="${i === tk && k === selClip}" style="left:${a / total * 100}%;width:${(b - a) / total * 100}%" aria-label="${esc(`${trackLabel(tr)} · ${t('cBars', { from: a + 1, to: b })} · ${t('cPattern', { p: c.pattern })}`)}">${clipLabel(c)}<span class="clip-grip" data-grip aria-hidden="true"></span></button>`;
       }).join('')}</div></div>`).join('') + '<span class="head"></span>';
@@ -569,6 +579,13 @@ $('#arr-grid').addEventListener('keydown', e => {
   if (e.shiftKey) setClipSpan(tr, c, sp.s, sp.e - sp.s + d); else setClipSpan(tr, c, sp.s + d, sp.e - sp.s);
   changed(); selectClip(i, k);
   const again = $(`[data-clip="${i}:${k}"]`); if (again) again.focus();
+});
+$('#live-toggle').addEventListener('click', () => {
+  liveOn = !liveOn; store.set('coding-misk-live', liveOn);
+  compiled = playable({ ...T, kind: 'composed' });
+  if (isPlaying() && mode === 'track') playSong(compiled, sched().now(), 'track');
+  else if (ed && mode === 'track') ed.setCode(compiled.code);
+  renderArranger(); if (!$('#tab-brani').hidden) renderSongs();
 });
 $$('[data-arr-mode]').forEach(b => b.addEventListener('click', () => {
   arrMode = b.dataset.arrMode === 'timeline' ? 'timeline' : 'sections'; store.set('coding-misk-arr-mode', arrMode);

@@ -41,7 +41,7 @@ Modes: `track` (song from the arranger) and `free` (lessons, sounds, hand-writte
 
 ## Persistence keys
 
-`coding-misk-library`, `coding-misk-draft`, `coding-misk-look`, `coding-misk-ui`, `coding-misk-lang`, `coding-misk-tab`, `coding-misk-code-w` (code panel width), `coding-misk-code-collapsed`, `coding-misk-panel` (track panel view: `one`, `all` summary or `full`), `coding-misk-arr-mode` (arranger view: `sections` or `timeline`), `coding-misk-snd-view` (sound browser view), `coding-misk-favs` (favourite sounds).
+`coding-misk-library`, `coding-misk-draft`, `coding-misk-look`, `coding-misk-ui`, `coding-misk-lang`, `coding-misk-tab`, `coding-misk-code-w` (code panel width), `coding-misk-code-collapsed`, `coding-misk-panel` (track panel view: `one`, `all` summary or `full`), `coding-misk-arr-mode` (arranger view: `sections` or `timeline`), `coding-misk-snd-view` (sound browser view), `coding-misk-favs` (favourite sounds), `coding-misk-live` (live build switch for songs without steps).
 
 ## Recording a demo
 
@@ -58,6 +58,8 @@ Lessons from recording: clicking a native `<select>` opens a popup that swallows
 ## Live build
 
 A song with `build` steps (`src/song/build.js`) is played by state: `stateAt(song, bar)` applies the steps up to that bar, and the playable object gets `codeAt(bar)` (compiled state with the latest comment as `// > …`). `playSong` loads the code of the starting bar. During playback `transport()` calls `liveBuild()`: during the bar before the next step it animates the editor from the current code to the next one (`src/song/typing.js`: unchanged lines stay, changed lines are edited in place, new lines typed), keeps the edit in view, then evaluates just before the step's bar so the change sounds on the beat. The comment of the latest step shows over the stage (`#say`). Track buses are assigned before muted tracks are skipped, so a track coming in later does not move the others.
+
+The "Live build" switch (`coding-misk-live`) gives songs without steps a derived build (`deriveBuild`): add and remove only at clip edges, removals delayed past a section's fade, so the audio does not change. `buildMap` gives the timeline the silent spans and the step marks of each track.
 
 ## Sound browser
 

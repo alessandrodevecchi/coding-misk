@@ -177,6 +177,8 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 
 One step can combine several actions. Steps on the same bar apply in file order. The state at any bar is the song with every step up to that bar applied, so seeking and pausing land on the right version. Clips still decide where a track can play. `node tools/song.mjs steps <file>` lists the steps; `compile <file> --at N` prints the code at bar N.
 
+A song without `build` can also build itself: the "Live build" switch above the arranger derives steps from its clips (each track comes in where its clips start and leaves where they stop, with a short comment), so it sounds exactly as written. On the timeline, a live build shows hatching where its steps keep a track silent and a diamond where a step changes it.
+
 ## Compiled code
 
 `compileSong` writes, in order: `setcpm`, `SECTIONS` and `TEMPO` (read by the player for seeking and tempo changes), one lane per section (`section1 = "<1!8 0!24>"`), then one block per track with its clips. Each clip line ends with `.mask(lane).velocity(lane).orbit(n).analyze("<instrument>")`.

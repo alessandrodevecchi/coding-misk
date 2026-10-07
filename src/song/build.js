@@ -97,3 +97,61 @@ export function checkBuild(song, total, err, warn) {
     if (s.unrack) { needTrack(`${p}.unrack.track`, s.unrack.track); if (!DEVICES[s.unrack.device]) err(`${p}.unrack.device`, `one of ${Object.keys(DEVICES).join(', ')}`); }
   });
 }
+
+// where each track is silent because of the build, and where a step changes it (for the timeline)
+// → { trackId: { off: [[from, to], …], marks: [{ at, action, say }] } }
+export function buildMap(song, total) {
+  const steps = buildSteps(song), added = new Set(steps.flatMap(s => (s.add !== undefined ? list(s.add) : [])));
+  const map = {};
+  for (const t of song.tracks || []) {
+    let on = !added.has(t.id), from = 0;
+    const off = [], marks = [];
+    for (const s of steps) {
+      if (s.add !== undefined && list(s.add).includes(t.id) && !on) { if (s.at > from) off.push([from, s.at]); on = true; }
+      if (s.remove !== undefined && list(s.remove).includes(t.id) && on) { from = s.at; on = false; }
+      for (const k of ['set', 'pattern', 'rack', 'unrack']) if (s[k] && s[k].track === t.id) marks.push({ at: s.at, action: k, say: s.say });
+    }
+    if (!on && total > from) off.push([from, total]);
+    map[t.id] = { off, marks };
+  }
+  return map;
+}
+
+// steps for a song that has none: each track comes in where its clips start and leaves where they stop,
+// with a short comment. Only add and remove at clip edges, so the song sounds exactly as written.
+const PHRASES = {
+  start: { en: "let's go", it: 'si parte' },
+  drums: { en: 'more rhythm', it: 'serve più ritmo' }, bass: { en: 'need bass', it: 'serve il basso' },
+  guitar: { en: 'guitars!', it: 'chitarre!' }, hook: { en: 'melody!', it: 'melodia!' }, arp: { en: 'now the arp', it: "ora l'arpeggio" },
+  pad: { en: 'some warmth', it: "un po' di calore" }, riser: { en: 'here it comes', it: 'sta arrivando' },
+  texture: { en: 'some dirt', it: "un po' di sporco" }, code: { en: 'something odd', it: 'qualcosa di strano' },
+  less: { en: 'strip it back', it: 'togliamo qualcosa' }, breakdown: { en: 'breakdown', it: 'pausa' }, end: { en: 'winding down', it: 'chiudiamo' },
+};
+const PRIORITY = ['drums', 'bass', 'guitar', 'hook', 'arp', 'pad', 'riser', 'texture', 'code'];
+export function deriveBuild(song) {
+  const secs = song.sections || [], total = secs.reduce((a, s) => a + (s.bars || 0), 0);
+  const startOf = ref => { const i = typeof ref === 'number' ? ref : secs.findIndex(s => s.name === ref); return secs.slice(0, i).reduce((a, s) => a + s.bars, 0); };
+  const barsOf = ref => { const i = typeof ref === 'number' ? ref : secs.findIndex(s => s.name === ref); return secs[i] ? secs[i].bars : 0; };
+  const events = new Map(), ev = bar => { if (!events.has(bar)) events.set(bar, { add: [], remove: [], types: [] }); return events.get(bar); };
+  for (const t of song.tracks || []) {
+    if (t.mute) continue;
+    const spans = (t.clips || []).map(c => {
+      const a = c.start ?? startOf(c.section), b = a + (c.bars ?? (c.section !== undefined ? startOf(c.section) + barsOf(c.section) - a : 0));
+      return [a, b];
+    }).filter(([a, b]) => b > a)
+      // a clip ending where a section with "fade" starts keeps sounding during the fade: leave it in until then
+      .map(([a, b]) => { const i = secs.findIndex((_, k) => k > 0 && startOf(k) === b); return [a, i > 0 ? b + Math.min(secs[i].fade || 0, secs[i].bars) : b]; })
+      .sort((x, y) => x[0] - y[0]);
+    const merged = [];
+    for (const [a, b] of spans) { const last = merged[merged.length - 1]; if (last && a <= last[1]) last[1] = Math.max(last[1], b); else merged.push([a, b]); }
+    for (const [a, b] of merged) { const e = ev(a); e.add.push(t.id); e.types.push(t.type); if (b < total) ev(b).remove.push(t.id); }
+  }
+  return [...events.entries()].sort((x, y) => x[0] - y[0]).map(([at, e]) => {
+    const step = { at };
+    if (e.add.length) step.add = e.add;
+    if (e.remove.length) step.remove = e.remove;
+    const type = PRIORITY.find(p => e.types.includes(p));
+    step.say = at === 0 ? PHRASES.start : e.add.length ? PHRASES[type] || PHRASES.code : secs.length > 1 && at >= startOf(secs.length - 1) ? PHRASES.end : e.remove.length > 1 ? PHRASES.breakdown : PHRASES.less;
+    return step;
+  });
+}
