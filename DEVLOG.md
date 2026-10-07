@@ -172,6 +172,8 @@
 
 - "Kellerlicht" esportato (tempo reale, 4:53, picco 0.63, nessun buco di silenzio) e aggiunto agli esempi audio in `docs/media/audio` e nei README.
 
+- Indagine esplorativa su FastTracker 2 col proprietario: codice Strudel e moduli XM non si convertono bene l'uno nell'altro; la strada che convince è una traccia `module` che suona un file `.xm` come strumento della canzone, con il pannello in stile FT2 (il tema visivo ha senso lì). Import come codice Strudel, export in XM e doppio motore audio scartati; un editor a righe stile tracker per le nostre tracce resta un'idea separata. Tutto nella issue `#16`, non programmata: il proprietario deve ancora raccontare altre feature.
+
 ## Prossimo passo
 
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.
