@@ -1,0 +1,136 @@
+{
+  "id": "classic-rock",
+  "name": {
+    "en": "Classic rock",
+    "it": "Rock classico"
+  },
+  "description": "Seventies and eighties rock: verse and chorus beats, overdriven power chords, organ and a guitar-like lead.",
+  "tempo": [
+    100,
+    140
+  ],
+  "keys": [
+    "E",
+    "A",
+    "D",
+    "G"
+  ],
+  "progressions": [
+    "rock",
+    "dorico",
+    "epica",
+    "andalusa"
+  ],
+  "shapes": [
+    "verse-chorus",
+    "late-peak",
+    "build-drop"
+  ],
+  "minutes": [
+    3,
+    5
+  ],
+  "phrase": 8,
+  "drums": {
+    "kits": [
+      "LinnDrum",
+      "RolandR8",
+      "AkaiXR10"
+    ],
+    "grooves": [
+      "rock",
+      "rockChorus"
+    ]
+  },
+  "bass": {
+    "presets": [
+      "ottavi",
+      "walking",
+      "galoppo"
+    ],
+    "waves": [
+      "gm_electric_bass_pick",
+      "gm_electric_bass_finger"
+    ]
+  },
+  "hook": {
+    "presets": [
+      "eroico",
+      "assolo",
+      "domanda"
+    ],
+    "waves": [
+      "gm_overdriven_guitar",
+      "gm_lead_2_sawtooth"
+    ],
+    "modes": [
+      "dorian",
+      "mixolydian",
+      "minor"
+    ]
+  },
+  "pad": {
+    "presets": [
+      "pad",
+      "staccato"
+    ],
+    "waves": [
+      "gm_rock_organ",
+      "gm_drawbar_organ"
+    ],
+    "weight": 0.6
+  },
+  "guitar": {
+    "patterns": [
+      "power8",
+      "heroic",
+      "riff",
+      "quarter"
+    ],
+    "types": [
+      "crunch",
+      "distorted"
+    ]
+  },
+  "voice": {
+    "gain": 0.3,
+    "pitch": 0.9,
+    "tempo": 0.9,
+    "hpf": 200,
+    "drive": 0.8,
+    "room": 0.35,
+    "delay": 0.2
+  },
+  "words": {
+    "en": [
+      "Thunder",
+      "Road",
+      "Highway",
+      "Rebel",
+      "Stone",
+      "Engine",
+      "Wild",
+      "Fire"
+    ],
+    "it": [
+      "Tuono",
+      "Strada",
+      "Ribelle",
+      "Pietra",
+      "Motore",
+      "Selvaggio",
+      "Fuoco",
+      "Polvere"
+    ],
+    "es": [
+      "Trueno",
+      "Camino",
+      "Rebelde",
+      "Piedra",
+      "Motor",
+      "Salvaje",
+      "Fuego",
+      "Ruta"
+    ]
+  }
+}

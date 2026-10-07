@@ -1,0 +1,156 @@
+{
+  "id": "lo-fi",
+  "name": {
+    "en": "Lo-fi",
+    "it": "Lo-fi"
+  },
+  "description": "Slow, dusty beats with seventh chords, electric piano and vinyl crackle; sparse and calm.",
+  "tempo": [
+    70,
+    88
+  ],
+  "keys": [
+    "C",
+    "D",
+    "F",
+    "A"
+  ],
+  "progressions": [
+    "lofi",
+    "jazz",
+    "turnaround"
+  ],
+  "swing": [
+    0.15,
+    0.35
+  ],
+  "shapes": [
+    "flat-groove",
+    "waves",
+    "descent"
+  ],
+  "minutes": [
+    2,
+    4
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      3,
+      4
+    ],
+    "max": 6
+  },
+  "energy": {
+    "tracks": 0.5,
+    "drums": 0.3,
+    "filter": 0.2,
+    "drive": 0
+  },
+  "drums": {
+    "kits": [
+      "AkaiMPC60",
+      "EmuSP12",
+      "AkaiXR10"
+    ],
+    "grooves": [
+      "boombap",
+      "halftime"
+    ],
+    "settings": {
+      "cutoff": [
+        3000,
+        7000
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "walking",
+      "sub",
+      "offbeat"
+    ],
+    "waves": [
+      "gm_electric_bass_finger",
+      "gm_acoustic_bass",
+      "sine"
+    ]
+  },
+  "hook": {
+    "presets": [
+      "pioggia",
+      "anima",
+      "eco"
+    ],
+    "waves": [
+      "gm_vibraphone",
+      "gm_epiano1",
+      "gm_flute"
+    ],
+    "modes": [
+      "dorian",
+      "minor"
+    ],
+    "weight": 0.6
+  },
+  "pad": {
+    "presets": [
+      "comp",
+      "pad"
+    ],
+    "waves": [
+      "gm_epiano1",
+      "gm_piano"
+    ]
+  },
+  "texture": {
+    "samples": [
+      "vinyl",
+      "wind"
+    ],
+    "rhythms": [
+      "bar"
+    ],
+    "weight": 0.9
+  },
+  "voice": {
+    "gain": 0.28,
+    "pitch": 0.85,
+    "tempo": 0.8,
+    "cutoff": 4000,
+    "room": 0.4,
+    "delay": 0.2
+  },
+  "words": {
+    "en": [
+      "Rain",
+      "Window",
+      "Coffee",
+      "Tape",
+      "Dusk",
+      "Pages",
+      "Quiet",
+      "Sunday"
+    ],
+    "it": [
+      "Pioggia",
+      "Finestra",
+      "Caffè",
+      "Nastro",
+      "Sera",
+      "Pagine",
+      "Quiete",
+      "Domenica"
+    ],
+    "es": [
+      "Lluvia",
+      "Ventana",
+      "Café",
+      "Cinta",
+      "Tarde",
+      "Páginas",
+      "Calma",
+      "Domingo"
+    ]
+  }
+}

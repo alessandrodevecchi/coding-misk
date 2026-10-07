@@ -1,0 +1,142 @@
+{
+  "id": "phonk",
+  "name": {
+    "en": "Phonk",
+    "it": "Phonk"
+  },
+  "description": "Drift phonk: cowbell melodies, heavy 808 sub, rolling hats and distorted drums.",
+  "tempo": [
+    130,
+    150
+  ],
+  "keys": [
+    "F",
+    "F#",
+    "G",
+    "E"
+  ],
+  "progressions": [
+    "frigio",
+    "tensione",
+    "drone"
+  ],
+  "shapes": [
+    "build-drop",
+    "flat-groove",
+    "waves"
+  ],
+  "minutes": [
+    2,
+    4
+  ],
+  "phrase": 8,
+  "drums": {
+    "kits": [
+      "RolandTR808"
+    ],
+    "grooves": [
+      "phonk"
+    ],
+    "settings": {
+      "drive": [
+        0.5,
+        1.5
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "sub",
+      "tritono",
+      "mirino"
+    ],
+    "waves": [
+      "sine",
+      "sawtooth"
+    ],
+    "settings": {
+      "drive": [
+        1,
+        3
+      ]
+    }
+  },
+  "hook": {
+    "presets": [
+      "phonk",
+      "colpi",
+      "boss"
+    ],
+    "waves": [
+      "cowbell",
+      "square"
+    ],
+    "modes": [
+      "phrygian",
+      "chromatic"
+    ]
+  },
+  "pad": {
+    "presets": [
+      "stab",
+      "pad"
+    ],
+    "waves": [
+      "gm_choir_aahs",
+      "supersaw"
+    ],
+    "weight": 0.4
+  },
+  "texture": {
+    "samples": [
+      "vinyl",
+      "glitch"
+    ],
+    "rhythms": [
+      "bar",
+      "eighth"
+    ],
+    "weight": 0.5
+  },
+  "voice": {
+    "gain": 0.32,
+    "pitch": 0.7,
+    "tempo": 0.8,
+    "hpf": 800,
+    "drive": 2.5,
+    "room": 0.35,
+    "delay": 0.25
+  },
+  "words": {
+    "en": [
+      "Drift",
+      "Smoke",
+      "Tokyo",
+      "Hustle",
+      "Murder",
+      "Rearview",
+      "Asphalt",
+      "Ghost"
+    ],
+    "it": [
+      "Derapata",
+      "Fumo",
+      "Asfalto",
+      "Specchietto",
+      "Fantasma",
+      "Gomme",
+      "Notte",
+      "Fuga"
+    ],
+    "es": [
+      "Derrape",
+      "Humo",
+      "Asfalto",
+      "Retrovisor",
+      "Fantasma",
+      "Llanta",
+      "Noche",
+      "Fuga"
+    ]
+  }
+}

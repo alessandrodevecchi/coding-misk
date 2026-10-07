@@ -6,7 +6,7 @@ import { checkRack } from './rack.js';
 import { checkBuild } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
-const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
+export const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
 
 const PRESETS = { bass: BASS, arp: ARPS, hook: HOOKS, pad: PADS, guitar: GUITAR_PATTERNS };
 const SECTION_FIELDS = ['name', 'bars', 'bpm', 'bpmEnd', 'key', 'chords', 'meter', 'swing', 'fade', 'crash', 'breath', 'fill'];

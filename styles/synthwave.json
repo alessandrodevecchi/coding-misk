@@ -1,0 +1,149 @@
+{
+  "id": "synthwave",
+  "name": {
+    "en": "Synthwave",
+    "it": "Synthwave"
+  },
+  "description": "Eighties night drive: gated snare, octave bass, warm pads and a sawtooth lead, in minor.",
+  "tempo": [
+    96,
+    118
+  ],
+  "keys": [
+    "F",
+    "E",
+    "A",
+    "D"
+  ],
+  "progressions": [
+    "epica",
+    "malinconica",
+    "cyber",
+    "notturna"
+  ],
+  "shapes": [
+    "verse-chorus",
+    "slow-burn",
+    "build-drop"
+  ],
+  "minutes": [
+    3,
+    5
+  ],
+  "phrase": 8,
+  "drums": {
+    "kits": [
+      "LinnDrum",
+      "OberheimDMX",
+      "RolandTR707"
+    ],
+    "grooves": [
+      "synthwave",
+      "rock"
+    ]
+  },
+  "bass": {
+    "presets": [
+      "ottavi",
+      "spirale",
+      "ottaveArcade",
+      "pumping"
+    ],
+    "waves": [
+      "sawtooth",
+      "square"
+    ],
+    "settings": {
+      "cutoff": [
+        500,
+        1400
+      ]
+    }
+  },
+  "arp": {
+    "presets": [
+      "su",
+      "sugiu",
+      "pedale"
+    ],
+    "waves": [
+      "square",
+      "sawtooth"
+    ],
+    "speeds": [
+      "16",
+      "8"
+    ],
+    "weight": 0.7
+  },
+  "hook": {
+    "presets": [
+      "neon",
+      "orizzonte",
+      "decade",
+      "anima"
+    ],
+    "waves": [
+      "gm_lead_2_sawtooth",
+      "sawtooth",
+      "square"
+    ],
+    "modes": [
+      "minor",
+      "dorian"
+    ]
+  },
+  "pad": {
+    "presets": [
+      "pad",
+      "sidechain",
+      "stab"
+    ],
+    "waves": [
+      "supersaw",
+      "gm_synth_strings_1",
+      "gm_synth_brass_1"
+    ]
+  },
+  "riser": {},
+  "voice": {
+    "gain": 0.3,
+    "pitch": 0.9,
+    "tempo": 0.85,
+    "hpf": 300,
+    "room": 0.55,
+    "delay": 0.4
+  },
+  "words": {
+    "en": [
+      "Neon",
+      "Midnight",
+      "Chrome",
+      "Highway",
+      "Sunset",
+      "Grid",
+      "Drive",
+      "Arcade"
+    ],
+    "it": [
+      "Neon",
+      "Mezzanotte",
+      "Cromo",
+      "Autostrada",
+      "Tramonto",
+      "Corsa",
+      "Riflesso",
+      "Notte"
+    ],
+    "es": [
+      "Neón",
+      "Medianoche",
+      "Cromo",
+      "Autopista",
+      "Ocaso",
+      "Ruta",
+      "Reflejo",
+      "Noche"
+    ]
+  }
+}

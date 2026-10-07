@@ -1,0 +1,135 @@
+{
+  "id": "jazz",
+  "name": {
+    "en": "Jazz",
+    "it": "Jazz"
+  },
+  "description": "Small combo at night: swing ride, walking upright bass, comping piano and vibraphone lines.",
+  "tempo": [
+    96,
+    140
+  ],
+  "keys": [
+    "C",
+    "F",
+    "D",
+    "B"
+  ],
+  "progressions": [
+    "jazz",
+    "turnaround",
+    "lofi"
+  ],
+  "swing": [
+    0.45,
+    0.6
+  ],
+  "shapes": [
+    "flat-groove",
+    "waves",
+    "verse-chorus"
+  ],
+  "minutes": [
+    3,
+    5
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      3,
+      4
+    ],
+    "max": 6
+  },
+  "drums": {
+    "kits": [
+      "AkaiXR10",
+      "RolandR8",
+      "AkaiMPC60"
+    ],
+    "grooves": [
+      "swing"
+    ],
+    "settings": {
+      "gain": [
+        0.5,
+        0.7
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "walking"
+    ],
+    "waves": [
+      "gm_acoustic_bass"
+    ]
+  },
+  "hook": {
+    "presets": [
+      "anima",
+      "domanda",
+      "assolo",
+      "pioggia"
+    ],
+    "waves": [
+      "gm_vibraphone",
+      "gm_flute",
+      "gm_epiano1"
+    ],
+    "modes": [
+      "dorian",
+      "mixolydian"
+    ]
+  },
+  "pad": {
+    "presets": [
+      "comp",
+      "synco"
+    ],
+    "waves": [
+      "gm_piano",
+      "gm_epiano1"
+    ]
+  },
+  "voice": {
+    "gain": 0.28,
+    "pitch": 0.9,
+    "tempo": 0.85,
+    "cutoff": 6000,
+    "room": 0.35,
+    "delay": 0.15
+  },
+  "words": {
+    "en": [
+      "Blue",
+      "Smoke",
+      "Corner",
+      "Velvet",
+      "Late",
+      "Moon",
+      "Brass",
+      "Alley"
+    ],
+    "it": [
+      "Blu",
+      "Fumo",
+      "Angolo",
+      "Velluto",
+      "Tardi",
+      "Luna",
+      "Ottone",
+      "Vicolo"
+    ],
+    "es": [
+      "Azul",
+      "Humo",
+      "Esquina",
+      "Terciopelo",
+      "Tarde",
+      "Luna",
+      "Bronce",
+      "Callejón"
+    ]
+  }
+}

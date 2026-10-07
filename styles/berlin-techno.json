@@ -1,0 +1,205 @@
+{
+  "id": "berlin-techno",
+  "name": {
+    "en": "Berlin techno",
+    "it": "Techno berlinese"
+  },
+  "description": "Dark warehouse techno: one chord or a flat-second tension, low rolling bass, dry hats, no sweet melodies.",
+  "tempo": [
+    126,
+    134
+  ],
+  "keys": [
+    "F",
+    "E",
+    "G",
+    "A"
+  ],
+  "progressions": [
+    "drone",
+    "tensione",
+    "ipnotica"
+  ],
+  "shapes": [
+    "slow-burn",
+    "waves",
+    "build-drop",
+    "flat-groove"
+  ],
+  "minutes": [
+    4,
+    6
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      4,
+      5
+    ],
+    "max": 7
+  },
+  "drums": {
+    "kits": [
+      "RolandTR909",
+      "OberheimDMX"
+    ],
+    "grooves": [
+      "techno",
+      "hard",
+      "rolling"
+    ],
+    "settings": {
+      "drive": [
+        0,
+        0.4
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "rolling",
+      "rumble",
+      "sub",
+      "mirino"
+    ],
+    "waves": [
+      "sawtooth",
+      "square"
+    ],
+    "settings": {
+      "cutoff": [
+        300,
+        900
+      ],
+      "reso": [
+        6,
+        14
+      ]
+    }
+  },
+  "arp": {
+    "presets": [
+      "acid",
+      "pedale",
+      "pulsar"
+    ],
+    "waves": [
+      "sawtooth",
+      "square"
+    ],
+    "speeds": [
+      "16"
+    ],
+    "weight": 0.6,
+    "settings": {
+      "cutoff": [
+        600,
+        2000
+      ],
+      "gain": [
+        0.18,
+        0.28
+      ]
+    }
+  },
+  "hook": {
+    "presets": [
+      "colpi",
+      "segnale",
+      "allarme"
+    ],
+    "waves": [
+      "square",
+      "sawtooth"
+    ],
+    "modes": [
+      "chromatic",
+      "phrygian"
+    ],
+    "weight": 0.4,
+    "settings": {
+      "gain": [
+        0.15,
+        0.22
+      ]
+    }
+  },
+  "pad": {
+    "presets": [
+      "pad",
+      "stab"
+    ],
+    "waves": [
+      "supersaw",
+      "gm_synth_strings_1"
+    ],
+    "weight": 0.5,
+    "settings": {
+      "cutoff": [
+        600,
+        1600
+      ],
+      "gain": [
+        0.12,
+        0.2
+      ]
+    }
+  },
+  "texture": {
+    "samples": [
+      "industrial",
+      "metal",
+      "numbers"
+    ],
+    "rhythms": [
+      "bar",
+      "euclid"
+    ],
+    "weight": 0.6
+  },
+  "riser": {},
+  "voice": {
+    "gain": 0.32,
+    "pitch": 0.8,
+    "tempo": 0.85,
+    "hpf": 600,
+    "drive": 1.5,
+    "room": 0.5,
+    "delay": 0.3
+  },
+  "words": {
+    "en": [
+      "Concrete",
+      "Basement",
+      "Signal",
+      "Pulse",
+      "Shadow",
+      "Steel",
+      "Night",
+      "Floor",
+      "Static"
+    ],
+    "it": [
+      "Cemento",
+      "Cantina",
+      "Segnale",
+      "Battito",
+      "Ombra",
+      "Acciaio",
+      "Notte",
+      "Ferro",
+      "Buio"
+    ],
+    "es": [
+      "Hormigón",
+      "Sótano",
+      "Señal",
+      "Pulso",
+      "Sombra",
+      "Acero",
+      "Noche",
+      "Eco",
+      "Niebla"
+    ]
+  }
+}

@@ -53,6 +53,10 @@ export const PROGS = {
   tensione: [{ it: 'Tensione (b2)', en: 'Tension (b2)' }, ['Am', 'Am', 'Am', 'A#']],
   arcade: ['Arcade', ['Am', 'F', 'G', 'Am']],
   dorico: [{ it: 'Dorico (i–IV)', en: 'Dorian (i–IV)' }, ['Am', 'Am', 'D', 'D']],
+  // gradi maggiori (I, V, vi, IV della relativa maggiore): rock classico, country, jazz
+  rock: [{ it: 'Rock (I–V–vi–IV)', en: 'Rock (I–V–vi–IV)' }, ['C', 'G', 'Am', 'F']],
+  country: [{ it: 'Country (I–IV–V)', en: 'Country (I–IV–V)' }, ['C', 'F', 'G', 'C']],
+  turnaround: [{ it: 'Turnaround jazz (I–vi–ii–V)', en: 'Jazz turnaround (I–vi–ii–V)' }, ['Cmaj7', 'Am7', 'Dm7', 'G7']],
 };
 export const chordName = (c, tr) => {
   const m = c.match(/^([A-G]#?)(.*)$/);
@@ -88,6 +92,8 @@ export const BASS = {
   mirino: [{ it: 'Riff mirino', en: 'Crosshair riff' }, null, .1, .25, null, '0 0 ~ 0 ~ 0 ~ 3 ~ 0 0 ~ 1 ~ ~ ~'],
   tritono: [{ it: 'Riff tritono', en: 'Tritone riff' }, null, .12, .3, null, '0 ~ ~ 0 ~ ~ 0 ~ 7 ~ 6 ~ 0 ~ ~ ~'],
   ottaveArcade: [{ it: 'Ottave arcade', en: 'Arcade octaves' }, null, .1, .3, null, '0 12 0 12 0 12 0 12 0 12 0 12 -2 10 -2 10'],
+  // country: fondamentale e quinta alternate sui quarti
+  boomchick: [{ it: 'Boom-chick (country)', en: 'Boom-chick (country)' }, null, .3, .2, null, '0 ~ ~ ~ 7 ~ ~ ~ 0 ~ ~ ~ -5 ~ ~ ~'],
 };
 // figure come modelli: 0-3 sono le note dell'accordo dal basso verso l'alto
 export const ARPS = {
@@ -200,6 +206,15 @@ GROOVES.metal = ['Metal (doppia cassa)', { bd: 'xxxxxxxxxxxxxxxx', cp: E16, sd: 
 GROOVES.gallopDrums = [{ it: 'Galoppo (metal)', en: 'Gallop (metal)' }, { bd: 'x.xxx.xxx.xxx.xx', cp: E16, sd: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }];
 GROOVES.blast = ['Blast beat', { bd: 'x.x.x.x.x.x.x.x.', cp: E16, sd: '.x.x.x.x.x.x.x.x', hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }];
 GROOVES.phonk = ['Phonk', { bd: 'x......x..x.....', cp: '....x.......x...', sd: E16, hh: 'xxxxxxxxxxxxxxxx', oh: '......x.......x.', rd: E16 }];
+// stili dell'endless: synthwave, drum and bass, ambient, jazz, country, rock
+GROOVES.synthwave = ['Synthwave', { bd: 'x...x...x...x...', cp: E16, sd: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: '..............x.', rd: E16 }];
+GROOVES.dnb = ['Drum and bass', { bd: 'x.........x.....', cp: E16, sd: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: '......x.........', rd: E16 }];
+GROOVES.pulse = [{ it: 'Battito (ambient)', en: 'Pulse (ambient)' }, { bd: 'x...............', cp: E16, sd: E16, hh: '........x.......', oh: E16, rd: E16 }];
+// ride swing: 1, 2 e-di-2, 3, 4 e-di-4 (lo swing della sezione sposta gli ottavi), charleston col piede su 2 e 4
+GROOVES.swing = ['Jazz swing', { bd: E16, cp: E16, sd: '..........x.....', hh: '....x.......x...', oh: E16, rd: 'x...x.x.x...x.x.' }];
+// treno country: cassa su 1 e 3, rullante a ottavi, accento su 2 e 4
+GROOVES.train = [{ it: 'Treno (country)', en: 'Train beat (country)' }, { bd: 'x.......x.......', cp: '....x.......x...', sd: 'x.x.x.x.x.x.x.x.', hh: E16, oh: E16, rd: E16 }];
+GROOVES.rockChorus = [{ it: 'Rock ritornello', en: 'Rock chorus' }, { bd: 'x.x.....x.x.....', cp: E16, sd: '....x.......x...', hh: E16, oh: 'x.x.x.x.x.x.x.x.', rd: E16 }];
 export const LOOKS = [
   ['palco', { it: 'Palco', en: 'Stage' }], ['pixel', 'Pixel'], ['tramonto', { it: 'Tramonto', en: 'Sunset' }],
   ['montagne', { it: 'Montagne', en: 'Mountains' }], ['spazio', { it: 'Spazio', en: 'Space' }], ['sonar', 'Sonar'], ['edgerunners', 'Edgerunners'],

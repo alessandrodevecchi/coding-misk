@@ -1,0 +1,162 @@
+{
+  "id": "trance",
+  "name": {
+    "en": "Trance",
+    "it": "Trance"
+  },
+  "description": "Driving trance with rolling bass, arpeggios and a big lift before the drop.",
+  "tempo": [
+    134,
+    140
+  ],
+  "keys": [
+    "A",
+    "F#",
+    "G",
+    "B"
+  ],
+  "progressions": [
+    "epica",
+    "euforica",
+    "anthem",
+    "ascesa",
+    "ipnotica"
+  ],
+  "shapes": [
+    "build-drop",
+    "late-peak",
+    "waves"
+  ],
+  "minutes": [
+    4,
+    6
+  ],
+  "phrase": 8,
+  "drums": {
+    "kits": [
+      "RolandTR909"
+    ],
+    "grooves": [
+      "trance",
+      "rolling"
+    ]
+  },
+  "bass": {
+    "presets": [
+      "rolling",
+      "offbeat",
+      "galoppo"
+    ],
+    "waves": [
+      "sawtooth",
+      "supersaw"
+    ],
+    "settings": {
+      "cutoff": [
+        400,
+        1200
+      ],
+      "reso": [
+        6,
+        10
+      ]
+    }
+  },
+  "arp": {
+    "presets": [
+      "su",
+      "sugiu",
+      "pulsar",
+      "spezzato"
+    ],
+    "waves": [
+      "supersaw",
+      "sawtooth"
+    ],
+    "speeds": [
+      "16"
+    ],
+    "settings": {
+      "cutoff": [
+        1200,
+        3200
+      ]
+    }
+  },
+  "hook": {
+    "presets": [
+      "neon",
+      "eroico",
+      "scintilla",
+      "orizzonte"
+    ],
+    "waves": [
+      "square",
+      "supersaw",
+      "gm_lead_2_sawtooth"
+    ],
+    "modes": [
+      "minor",
+      "phrygian"
+    ],
+    "weight": 0.7
+  },
+  "pad": {
+    "presets": [
+      "pad",
+      "pump",
+      "sidechain"
+    ],
+    "waves": [
+      "supersaw",
+      "gm_pad_warm"
+    ],
+    "settings": {
+      "cutoff": [
+        900,
+        2200
+      ]
+    }
+  },
+  "riser": {},
+  "voice": {
+    "gain": 0.3,
+    "pitch": 1.0,
+    "tempo": 0.9,
+    "hpf": 400,
+    "room": 0.6,
+    "delay": 0.35
+  },
+  "words": {
+    "en": [
+      "Horizon",
+      "Ascent",
+      "Skyline",
+      "Lift",
+      "Aurora",
+      "Rise",
+      "Beacon",
+      "Signal"
+    ],
+    "it": [
+      "Orizzonte",
+      "Ascesa",
+      "Volo",
+      "Aurora",
+      "Faro",
+      "Cielo",
+      "Luce",
+      "Slancio"
+    ],
+    "es": [
+      "Horizonte",
+      "Ascenso",
+      "Vuelo",
+      "Aurora",
+      "Faro",
+      "Cielo",
+      "Luz",
+      "Impulso"
+    ]
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "id": "drum-and-bass",
+  "name": {
+    "en": "Drum and bass",
+    "it": "Drum and bass"
+  },
+  "description": "Fast two-step breaks over deep sub bass, dark pads and short stabs.",
+  "tempo": [
+    168,
+    176
+  ],
+  "keys": [
+    "F",
+    "E",
+    "G",
+    "D"
+  ],
+  "progressions": [
+    "notturna",
+    "pendolo",
+    "drone",
+    "malinconica"
+  ],
+  "shapes": [
+    "build-drop",
+    "waves",
+    "late-peak"
+  ],
+  "minutes": [
+    3,
+    5
+  ],
+  "phrase": 8,
+  "drums": {
+    "kits": [
+      "AkaiMPC60",
+      "EmuSP12",
+      "RolandTR909"
+    ],
+    "grooves": [
+      "dnb",
+      "breakbeat"
+    ]
+  },
+  "bass": {
+    "presets": [
+      "sub",
+      "rumble",
+      "mirino",
+      "tritono"
+    ],
+    "waves": [
+      "sine",
+      "sawtooth",
+      "square"
+    ],
+    "settings": {
+      "cutoff": [
+        200,
+        900
+      ]
+    }
+  },
+  "arp": {
+    "presets": [
+      "pedale",
+      "spezzato"
+    ],
+    "waves": [
+      "square",
+      "triangle"
+    ],
+    "speeds": [
+      "16"
+    ],
+    "weight": 0.4
+  },
+  "hook": {
+    "presets": [
+      "eco",
+      "segnale",
+      "colpi"
+    ],
+    "waves": [
+      "square",
+      "gm_vibraphone"
+    ],
+    "modes": [
+      "minor",
+      "phrygian"
+    ],
+    "weight": 0.5
+  },
+  "pad": {
+    "presets": [
+      "pad",
+      "stab"
+    ],
+    "waves": [
+      "supersaw",
+      "gm_synth_strings_1",
+      "gm_choir_aahs"
+    ]
+  },
+  "texture": {
+    "samples": [
+      "space",
+      "glitch"
+    ],
+    "rhythms": [
+      "bar",
+      "euclid"
+    ],
+    "weight": 0.5
+  },
+  "riser": {},
+  "voice": {
+    "gain": 0.3,
+    "pitch": 0.8,
+    "tempo": 0.9,
+    "hpf": 500,
+    "drive": 1.0,
+    "room": 0.45,
+    "delay": 0.3
+  },
+  "words": {
+    "en": [
+      "Velocity",
+      "Undertow",
+      "Circuit",
+      "Tunnel",
+      "Breaker",
+      "Pressure",
+      "Riot",
+      "Edge"
+    ],
+    "it": [
+      "Velocità",
+      "Risacca",
+      "Circuito",
+      "Galleria",
+      "Pressione",
+      "Fuga",
+      "Margine",
+      "Scintilla"
+    ],
+    "es": [
+      "Velocidad",
+      "Resaca",
+      "Circuito",
+      "Túnel",
+      "Presión",
+      "Fuga",
+      "Borde",
+      "Chispa"
+    ]
+  }
+}

@@ -201,6 +201,8 @@
 
 - Endless `#21`, gruppo 1 di `endless-director`: generatore casuale con seme (`src/endless/random.js`, mulberry32 su hash FNV del seme, flussi separati per piano, mosse, mutazioni, titoli e commenti) e `npm run check:endless`. Verificato: stessa sequenza in Node e nel browser, flussi indipendenti tra loro.
 
+- Endless `#21`, gruppo 2 (ricette di stile): formato delle ricette e validatore (`src/endless/recipe.js`, errori con percorso JSON, nomi controllati contro preset, groove, progressioni, tonalità, metri, drum machine e forme di energia; suoni sconosciuti come avvisi), `tools/style.mjs validate|list`, documentazione in `docs/STYLES.md`. Dodici ricette in `styles/` (Berlin techno, trance, synthwave, lo-fi, drum and bass, ambient, phonk, industrial, jazz, country, classic rock, metal melodico) con parole per i titoli in inglese, italiano e spagnolo. Nuovi mattoni in `src/music.js`, usabili anche in Compose: groove synthwave, drum and bass, battito ambient, jazz swing, treno country, ritornello rock; progressioni rock (I-V-vi-IV), country (I-IV-V), turnaround jazz; basso boom-chick. Mescolanza degli stili col caos (`src/endless/mix.js`). Nuovo controllo nel browser `tools/check-style-sounds.cjs`: ha trovato tre drum machine senza ride per i loro groove (808 e Alesis HR16), sostituite. Verificato: `check:endless` (12 controlli), `check:code`, `check:songs`, build.
+
 ## Prossimo passo
 
 - Endless `#18`, fase 1 `#21`: implementare la change OpenSpec `endless-director` con `openspec-apply-change`, un gruppo di task alla volta (5 gruppi, 26 task in `openspec/changes/endless-director/tasks.md`), aggiornando il proprietario alla fine di ogni gruppo. Ramo `feat/21-endless-director`.

@@ -1,0 +1,162 @@
+{
+  "id": "ambient",
+  "name": {
+    "en": "Ambient",
+    "it": "Ambient"
+  },
+  "description": "Long held chords, slow filters, distant bells and wind; very few layers, almost no drums.",
+  "tempo": [
+    60,
+    80
+  ],
+  "keys": [
+    "D",
+    "E",
+    "C",
+    "A"
+  ],
+  "progressions": [
+    "drone",
+    "pendolo",
+    "malinconica",
+    "dorico"
+  ],
+  "shapes": [
+    "slow-burn",
+    "descent",
+    "waves"
+  ],
+  "minutes": [
+    4,
+    6
+  ],
+  "phrase": 16,
+  "tracks": {
+    "usual": [
+      2,
+      3
+    ],
+    "max": 5
+  },
+  "energy": {
+    "tracks": 0.5,
+    "drums": 0.1,
+    "filter": 0.35,
+    "drive": 0.05
+  },
+  "drums": {
+    "kits": [
+      "RolandTR808"
+    ],
+    "grooves": [
+      "pulse"
+    ],
+    "weight": 0.4,
+    "settings": {
+      "gain": [
+        0.35,
+        0.55
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "sub"
+    ],
+    "waves": [
+      "sine",
+      "triangle"
+    ],
+    "weight": 0.6
+  },
+  "hook": {
+    "presets": [
+      "segnale",
+      "eco",
+      "pioggia"
+    ],
+    "waves": [
+      "gm_celesta",
+      "gm_tubular_bells",
+      "gm_vibraphone"
+    ],
+    "modes": [
+      "dorian",
+      "minor"
+    ],
+    "weight": 0.6,
+    "settings": {
+      "gain": [
+        0.12,
+        0.2
+      ]
+    }
+  },
+  "pad": {
+    "presets": [
+      "pad"
+    ],
+    "waves": [
+      "gm_pad_warm",
+      "gm_string_ensemble_1",
+      "gm_choir_aahs",
+      "supersaw"
+    ],
+    "settings": {
+      "cutoff": [
+        500,
+        1800
+      ]
+    }
+  },
+  "texture": {
+    "samples": [
+      "wind",
+      "space",
+      "vinyl"
+    ],
+    "rhythms": [
+      "bar"
+    ],
+    "weight": 0.8
+  },
+  "voice": {
+    "gain": 0.26,
+    "pitch": 0.75,
+    "tempo": 0.7,
+    "room": 0.85,
+    "delay": 0.45
+  },
+  "words": {
+    "en": [
+      "Drift",
+      "Glacier",
+      "Haze",
+      "Tide",
+      "Lantern",
+      "Stillness",
+      "Ether",
+      "Bloom"
+    ],
+    "it": [
+      "Deriva",
+      "Ghiacciaio",
+      "Foschia",
+      "Marea",
+      "Lanterna",
+      "Quiete",
+      "Etere",
+      "Fioritura"
+    ],
+    "es": [
+      "Deriva",
+      "Glaciar",
+      "Bruma",
+      "Marea",
+      "Linterna",
+      "Quietud",
+      "Éter",
+      "Brote"
+    ]
+  }
+}

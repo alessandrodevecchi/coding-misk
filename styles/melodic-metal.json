@@ -1,0 +1,143 @@
+{
+  "id": "melodic-metal",
+  "name": {
+    "en": "Melodic metal",
+    "it": "Metal melodico"
+  },
+  "description": "Double kick and gallops, high-gain riffs in phrygian, heroic twin-guitar leads and choir pads.",
+  "tempo": [
+    140,
+    180
+  ],
+  "keys": [
+    "E",
+    "D",
+    "F#",
+    "B"
+  ],
+  "progressions": [
+    "frigio",
+    "epica",
+    "andalusa",
+    "anthem"
+  ],
+  "shapes": [
+    "verse-chorus",
+    "build-drop",
+    "late-peak"
+  ],
+  "minutes": [
+    3,
+    6
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      4,
+      5
+    ],
+    "max": 7
+  },
+  "drums": {
+    "kits": [
+      "RolandR8",
+      "AlesisHR16",
+      "LinnDrum"
+    ],
+    "grooves": [
+      "metal",
+      "gallopDrums",
+      "rock"
+    ]
+  },
+  "bass": {
+    "presets": [
+      "galoppo",
+      "ottavi",
+      "spirale"
+    ],
+    "waves": [
+      "gm_electric_bass_pick"
+    ]
+  },
+  "hook": {
+    "presets": [
+      "eroico",
+      "assolo",
+      "prog"
+    ],
+    "waves": [
+      "gm_distortion_guitar",
+      "gm_lead_2_sawtooth"
+    ],
+    "modes": [
+      "minor",
+      "phrygian"
+    ]
+  },
+  "pad": {
+    "presets": [
+      "pad",
+      "ring"
+    ],
+    "waves": [
+      "gm_choir_aahs",
+      "gm_string_ensemble_1"
+    ],
+    "weight": 0.6
+  },
+  "guitar": {
+    "patterns": [
+      "gallopRiff",
+      "thrash",
+      "heroic",
+      "chug"
+    ],
+    "types": [
+      "metal",
+      "distorted",
+      "muted"
+    ]
+  },
+  "voice": {
+    "gain": 0.3,
+    "pitch": 0.75,
+    "tempo": 0.85,
+    "hpf": 500,
+    "drive": 2,
+    "room": 0.5,
+    "delay": 0.25
+  },
+  "words": {
+    "en": [
+      "Ashes",
+      "Valor",
+      "Storm",
+      "Crown",
+      "Wings",
+      "Oath",
+      "Blade",
+      "Dawn"
+    ],
+    "it": [
+      "Cenere",
+      "Valore",
+      "Tempesta",
+      "Corona",
+      "Ali",
+      "Giuramento",
+      "Lama",
+      "Alba"
+    ],
+    "es": [
+      "Ceniza",
+      "Valor",
+      "Tormenta",
+      "Corona",
+      "Alas",
+      "Juramento",
+      "Espada",
+      "Alba"
+    ]
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "id": "country",
+  "name": {
+    "en": "Country",
+    "it": "Country"
+  },
+  "description": "Train beat and boom-chick bass, steel-string and banjo chords, harmonica or fiddle lines.",
+  "tempo": [
+    100,
+    132
+  ],
+  "keys": [
+    "G",
+    "D",
+    "A",
+    "E"
+  ],
+  "progressions": [
+    "country",
+    "rock",
+    "andalusa"
+  ],
+  "swing": [
+    0,
+    0.2
+  ],
+  "shapes": [
+    "verse-chorus",
+    "flat-groove",
+    "late-peak"
+  ],
+  "minutes": [
+    2,
+    4
+  ],
+  "phrase": 8,
+  "drums": {
+    "kits": [
+      "RolandR8",
+      "AkaiXR10",
+      "LinnDrum"
+    ],
+    "grooves": [
+      "train",
+      "rock"
+    ],
+    "settings": {
+      "gain": [
+        0.6,
+        0.8
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "boomchick",
+      "walking"
+    ],
+    "waves": [
+      "gm_acoustic_bass",
+      "gm_electric_bass_pick"
+    ]
+  },
+  "hook": {
+    "presets": [
+      "richiamo",
+      "domanda",
+      "eroico"
+    ],
+    "waves": [
+      "gm_harmonica",
+      "gm_fiddle",
+      "gm_banjo"
+    ],
+    "modes": [
+      "mixolydian",
+      "dorian"
+    ]
+  },
+  "pad": {
+    "presets": [
+      "staccato",
+      "synco",
+      "pad"
+    ],
+    "waves": [
+      "gm_acoustic_guitar_steel",
+      "gm_banjo",
+      "gm_drawbar_organ"
+    ]
+  },
+  "guitar": {
+    "patterns": [
+      "quarter",
+      "power8"
+    ],
+    "types": [
+      "clean",
+      "crunch"
+    ],
+    "weight": 0.5
+  },
+  "voice": {
+    "gain": 0.3,
+    "pitch": 0.95,
+    "tempo": 0.9,
+    "cutoff": 7000,
+    "room": 0.3,
+    "delay": 0.15
+  },
+  "words": {
+    "en": [
+      "Dust",
+      "Prairie",
+      "Whiskey",
+      "Rail",
+      "Canyon",
+      "Porch",
+      "Lonesome",
+      "Wagon"
+    ],
+    "it": [
+      "Polvere",
+      "Prateria",
+      "Binario",
+      "Canyon",
+      "Veranda",
+      "Solitario",
+      "Carro",
+      "Frontiera"
+    ],
+    "es": [
+      "Polvo",
+      "Pradera",
+      "Vía",
+      "Cañón",
+      "Porche",
+      "Solitario",
+      "Carreta",
+      "Frontera"
+    ]
+  }
+}

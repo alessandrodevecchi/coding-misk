@@ -7,12 +7,12 @@
 
 ## 2. Style recipes
 
-- [ ] 2.1 Define the recipe format and write `docs/STYLES.md` (fields, defaults, how chaos mixes parts, how to add a style), and verify every field in the doc matches the validator from 2.2.
-- [ ] 2.2 Implement the recipe loader and validator (errors and warnings with JSON paths, checks against presets, grooves, progressions, keys, meters, machines, shapes, ranges, song length 2 to 6 minutes) and `tools/style.mjs validate`, and verify it with the failing cases of the recipe spec (unknown preset, reversed range) in `check:endless`.
-- [ ] 2.3 Add the building blocks the twelve styles need that `src/music.js` lacks (at least a jazz swing groove, a country train beat, a rock verse and chorus beat, any missing chord progressions), usable in Compose too, and verify `npm run check:code` and `npm run check:songs` still pass with snapshots updated only for the new presets.
-- [ ] 2.4 Write the twelve starting recipes in `styles/` (Berlin techno, trance, synthwave, lo-fi, drum and bass, ambient, phonk, industrial, jazz, country, classic rock, melodic metal) with title words in English, Italian and Spanish, and verify `node tools/style.mjs validate` reports all twelve valid.
-- [ ] 2.5 Add a browser check (Playwright, dev server) that every sound named by a recipe is in the loaded sound map, and verify it passes on the twelve recipes.
-- [ ] 2.6 Implement style mixing with chaos (parts: tempo, drums, bass, harmony, lead, pads and texture, voice; rotation at chaos 0; independent parts at chaos 1) and verify the three mixing scenarios of the recipe spec in `check:endless`.
+- [x] 2.1 Define the recipe format and write `docs/STYLES.md` (fields, defaults, how chaos mixes parts, how to add a style), and verify every field in the doc matches the validator from 2.2.
+- [x] 2.2 Implement the recipe loader and validator (errors and warnings with JSON paths, checks against presets, grooves, progressions, keys, meters, machines, shapes, ranges, song length 2 to 6 minutes) and `tools/style.mjs validate`, and verify it with the failing cases of the recipe spec (unknown preset, reversed range) in `check:endless`.
+- [x] 2.3 Add the building blocks the twelve styles need that `src/music.js` lacks (at least a jazz swing groove, a country train beat, a rock verse and chorus beat, any missing chord progressions), usable in Compose too, and verify `npm run check:code` and `npm run check:songs` still pass with snapshots updated only for the new presets.
+- [x] 2.4 Write the twelve starting recipes in `styles/` (Berlin techno, trance, synthwave, lo-fi, drum and bass, ambient, phonk, industrial, jazz, country, classic rock, melodic metal) with title words in English, Italian and Spanish, and verify `node tools/style.mjs validate` reports all twelve valid.
+- [x] 2.5 Add a browser check (Playwright, dev server) that every sound named by a recipe is in the loaded sound map, and verify it passes on the twelve recipes.
+- [x] 2.6 Implement style mixing with chaos (parts: tempo, drums, bass, harmony, lead, pads and texture, voice; rotation at chaos 0; independent parts at chaos 1) and verify the three mixing scenarios of the recipe spec in `check:endless`.
 
 ## 3. Director
 

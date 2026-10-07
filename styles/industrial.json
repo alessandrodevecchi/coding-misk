@@ -1,0 +1,160 @@
+{
+  "id": "industrial",
+  "name": {
+    "en": "Industrial",
+    "it": "Industrial"
+  },
+  "description": "Machines and metal: hard techno drums, stomping guitars, bit-crushed textures and tritone riffs.",
+  "tempo": [
+    120,
+    140
+  ],
+  "keys": [
+    "E",
+    "F",
+    "D",
+    "A"
+  ],
+  "progressions": [
+    "frigio",
+    "tensione",
+    "drone"
+  ],
+  "shapes": [
+    "slow-burn",
+    "build-drop",
+    "flat-groove"
+  ],
+  "minutes": [
+    3,
+    5
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      4,
+      5
+    ],
+    "max": 7
+  },
+  "drums": {
+    "kits": [
+      "RolandTR909",
+      "OberheimDMX"
+    ],
+    "grooves": [
+      "hard",
+      "techno"
+    ],
+    "settings": {
+      "drive": [
+        0.6,
+        1.6
+      ],
+      "grit": [
+        0,
+        0.4
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "tritono",
+      "mirino",
+      "rumble"
+    ],
+    "waves": [
+      "sawtooth",
+      "square"
+    ],
+    "settings": {
+      "drive": [
+        0.5,
+        2
+      ]
+    }
+  },
+  "hook": {
+    "presets": [
+      "allarme",
+      "boss",
+      "colpi"
+    ],
+    "waves": [
+      "square",
+      "sawtooth"
+    ],
+    "modes": [
+      "chromatic",
+      "locrian"
+    ],
+    "weight": 0.5
+  },
+  "guitar": {
+    "patterns": [
+      "stomp",
+      "industrial",
+      "chug"
+    ],
+    "types": [
+      "metal",
+      "muted",
+      "distorted"
+    ],
+    "weight": 0.8
+  },
+  "texture": {
+    "samples": [
+      "industrial",
+      "metal",
+      "glitch"
+    ],
+    "rhythms": [
+      "euclid",
+      "eighth",
+      "sixteenth"
+    ]
+  },
+  "riser": {},
+  "voice": {
+    "gain": 0.32,
+    "pitch": 0.65,
+    "tempo": 0.8,
+    "hpf": 900,
+    "drive": 3,
+    "room": 0.4,
+    "delay": 0.25
+  },
+  "words": {
+    "en": [
+      "Rust",
+      "Furnace",
+      "Gear",
+      "Rivet",
+      "Press",
+      "Foundry",
+      "Iron",
+      "Smog"
+    ],
+    "it": [
+      "Ruggine",
+      "Fornace",
+      "Ingranaggio",
+      "Rivetto",
+      "Pressa",
+      "Fonderia",
+      "Ferro",
+      "Smog"
+    ],
+    "es": [
+      "Óxido",
+      "Horno",
+      "Engranaje",
+      "Remache",
+      "Prensa",
+      "Fundición",
+      "Hierro",
+      "Humo"
+    ]
+  }
+}
