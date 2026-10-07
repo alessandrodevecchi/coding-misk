@@ -9,7 +9,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAPES, RECIPE_DEFAULTS } from '../src/endless/recipe.js';
 import { mixParts, stylesOf } from '../src/endless/mix.js';
 import { loadStyles } from './styles-dir.mjs';
-import { generateSession } from '../src/endless/director.js';
+import { generateSession, createSession } from '../src/endless/director.js';
+import { windowSong } from '../src/endless/join.js';
+import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { stateAt, buildSteps } from '../src/song/build.js';
 import { playing, energyOf } from '../src/endless/energy.js';
@@ -246,6 +248,36 @@ const CHECKS = {
     const saved = JSON.parse(fs.readFileSync(FIXTURES_FILE, 'utf8'));
     now.forEach((f, i) => assert(saved[i] && saved[i].hash === f.hash, `seed ${f.seed} (${f.styles}) gives ${f.hash}, fixture ${saved[i] && saved[i].hash}; if the change is intended, run npm run check:endless -- --write-fixtures`));
   },
+  'radio: song by song equals a whole session'() {
+    const whole = generateSession(loadStyles(), { styles: ['synthwave', 'jazz'], chaos: 0.6, minutes: 12, seed: 'radio' });
+    const ses = createSession(loadStyles(), 'radio');
+    const one = whole.songs.map(() => ses.next({ styles: ['synthwave', 'jazz'], chaos: 0.6 }).song);
+    assert(JSON.stringify(one) === JSON.stringify(whole.songs), 'songs made one at a time differ from the whole session');
+  },
+  'radio: an option change applies from the next song and replays the same'() {
+    const run = () => { const ses = createSession(loadStyles(), 'change'); const o = { styles: ['trance'] }; return [ses.next(o), ses.next(o), ses.next({ ...o, energy: 0.9 }), ses.next({ ...o, energy: 0.9 })].map(r => r.song); };
+    const plain = (() => { const ses = createSession(loadStyles(), 'change'); return [0, 1, 2, 3].map(() => ses.next({ styles: ['trance'] }).song); })();
+    const a = run(), b = run();
+    assert(JSON.stringify(a) === JSON.stringify(b), 'the same recorded changes give different songs');
+    assert(JSON.stringify(a.slice(0, 2)) === JSON.stringify(plain.slice(0, 2)), 'songs before the change are different');
+    assert(JSON.stringify(a[2]) !== JSON.stringify(plain[2]), 'the change did not apply to song 3');
+  },
+  'radio: window song keeps each song as it is, at any offset'() {
+    const ses = createSession(loadStyles(), 'window'), o = { styles: ['berlin-techno', 'jazz'], chaos: 0.5 };
+    const a = ses.next(o).song, b = ses.next(o).song;
+    const barsOf = s => s.sections.reduce((x, y) => x + y.bars, 0);
+    for (const start of [0, 37, 5216]) {
+      const win = windowSong([{ song: a, n: 4, start }, { song: b, n: 5, start: start + barsOf(a) }]);
+      const v = validateSong(win);
+      assert(!v.errors.length, `window at ${start}: ${v.errors.slice(0, 2).map(e => `${e.path}: ${e.msg}`).join('; ')}`);
+      compileSong(win);
+      for (const [song, n, s0] of [[a, 4, start], [b, 5, start + barsOf(a)]]) for (const at of [...new Set(buildSteps(song).map(x => x.at))]) {
+        const own = stateAt(song, at).song.tracks, inWin = stateAt(win, s0 + at).song.tracks.filter(t => t.id.startsWith(`s${n}-`));
+        const sig = ts => JSON.stringify(ts.map(t => [t.id.replace(/^s\d+-/, ''), !!t.mute, t.settings, t.rack || [], (t.clips[0] || {}).pattern]));
+        assert(sig(own) === sig(inWin), `window at ${start}: song ${n} differs at its bar ${at}`);
+      }
+    }
+  },
   'command line: session written, report and join'() {
     const out = fs.mkdtempSync(path.join(os.tmpdir(), 'endless-'));
     try {
@@ -273,9 +305,9 @@ const CHECKS = {
   },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');
-    const listed = [...doc.matchAll(/`((?:director|determinism): [^`]+)`/g)].map(m => m[1]);
+    const listed = [...doc.matchAll(/`((?:director|determinism|radio): [^`]+)`/g)].map(m => m[1]);
     for (const n of listed) assert(CHECKS[n], `docs/ENDLESS.md names a check that does not exist: ${n}`);
-    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
+    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
   },
 };
 

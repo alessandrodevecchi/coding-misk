@@ -284,24 +284,45 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   return { song, entry };
 }
 
-// Generates a session. recipes: valid recipes (all known styles); opts: styles (ids), chaos, energy, complexity, minutes, seed.
+// A session that makes one song at a time (the radio, docs/ENDLESS.md "Incremental sessions").
+// next(options) generates the next song with the options given (styles, chaos, energy, complexity);
+// the random streams and the variety history carry over between calls, so the same seed and the same
+// sequence of options always give the same songs. Without a seed, a new one is drawn and kept in .seed.
+export function createSession(recipes, seed) {
+  if (seed === undefined || seed === null || seed === '') seed = freshSeed();
+  const byId = Object.fromEntries(recipes.map(r => [r.id, withDefaults(r)]));
+  const rng = makeRng(seed), entries = [];
+  return {
+    seed: String(seed),
+    entries,
+    get count() { return entries.length; },
+    next(options) {
+      const opts = { ...OPTION_DEFAULTS, ...options, seed };
+      const unknown = (opts.styles || []).filter(id => !byId[id]);
+      if (!opts.styles || !opts.styles.length || unknown.length) throw new Error(`unknown or missing styles: ${unknown.join(', ') || 'none'}`);
+      const selected = opts.styles.map(id => byId[id]), i = entries.length;
+      // parts: avoid the style-per-part combination of the last three songs when another one is possible
+      const recent = entries.slice(-3).map(e => partsKey(e.parts));
+      let parts = mixParts(selected, opts.chaos, i, rng.plan);
+      for (let t = 0; t < 12 && recent.includes(partsKey(parts)) && selected.length > 1 && opts.chaos > 0; t++) parts = mixParts(selected, opts.chaos, i, rng.plan);
+      const { song, entry } = makeSong({ parts, byId, prev: entries[i - 1], opts, rng, index: i, seed });
+      entries.push(entry);
+      return { song, entry };
+    },
+  };
+}
+
+// Generates a whole session: songs until the length is reached, all with the same options.
+// recipes: valid recipes (all known styles); options: styles (ids), chaos, energy, complexity, minutes, seed.
 export function generateSession(recipes, options) {
   const opts = { ...OPTION_DEFAULTS, ...options };
-  if (opts.seed === undefined || opts.seed === null || opts.seed === '') opts.seed = freshSeed();
-  const byId = Object.fromEntries(recipes.map(r => [r.id, withDefaults(r)]));
-  const selected = opts.styles.map(id => byId[id]);
-  const rng = makeRng(opts.seed);
-  const songs = [], entries = [];
+  const ses = createSession(recipes, opts.seed), songs = [];
   let seconds = 0;
-  for (let i = 0; seconds < opts.minutes * 60 && i < 200; i++) {
-    // parts: avoid the style-per-part combination of the last three songs when another one is possible
-    const recent = entries.slice(-3).map(e => partsKey(e.parts));
-    let parts = mixParts(selected, opts.chaos, i, rng.plan);
-    for (let t = 0; t < 12 && recent.includes(partsKey(parts)) && selected.length > 1 && opts.chaos > 0; t++) parts = mixParts(selected, opts.chaos, i, rng.plan);
-    const { song, entry } = makeSong({ parts, byId, prev: entries[entries.length - 1], opts, rng, index: i, seed: opts.seed });
-    songs.push(song); entries.push(entry); seconds += entry.seconds;
+  while (seconds < opts.minutes * 60 && songs.length < 200) {
+    const { song, entry } = ses.next(opts);
+    songs.push(song); seconds += entry.seconds;
   }
-  const session = { format: SESSION_FORMAT, version: 1, seed: String(opts.seed), options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, minutes: opts.minutes }, seconds: Math.round(seconds), songs: entries };
+  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, minutes: opts.minutes }, seconds: Math.round(seconds), songs: ses.entries };
   return { session, songs };
 }
 

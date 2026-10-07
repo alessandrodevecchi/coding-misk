@@ -2,10 +2,10 @@
 
 ## 1. Incremental director
 
-- [ ] 1.1 Add `createSession(recipes, seed)` with `next(options)` to the director and rewrite `generateSession` as a loop over it; verify `npm run check:endless` passes with the seed fixtures unchanged.
-- [ ] 1.2 Add a check that a session made song by song with an option change before song 3 gives songs 1 and 2 equal to an unchanged session, and the same songs twice for the same recorded changes; verify it in `check:endless`.
-- [ ] 1.3 Add the window builder: the song on air plus the next one, joined with a silent offset so bars equal stream bars; verify in `check:endless` that the window song is valid, that its code at a bar equals the song's own code at the same relative bar (apart from the offset lanes), and that an offset above 5000 bars works.
-- [ ] 1.4 Update `docs/ENDLESS.md` (incremental sessions, window) and `DEVLOG.md`; verify the documented check names exist.
+- [x] 1.1 Add `createSession(recipes, seed)` with `next(options)` to the director and rewrite `generateSession` as a loop over it; verify `npm run check:endless` passes with the seed fixtures unchanged.
+- [x] 1.2 Add a check that a session made song by song with an option change before song 3 gives songs 1 and 2 equal to an unchanged session, and the same songs twice for the same recorded changes; verify it in `check:endless`.
+- [x] 1.3 Add the window builder: the song on air plus the next one, joined with a silent offset so bars equal stream bars; verify in `check:endless` that the window song is valid, that its code at a bar equals the song's own code at the same relative bar (apart from the offset lanes), and that an offset above 5000 bars works.
+- [x] 1.4 Update `docs/ENDLESS.md` (incremental sessions, window) and `DEVLOG.md`; verify the documented check names exist.
 
 ## 2. Radio tab and controls
 

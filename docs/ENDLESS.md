@@ -105,6 +105,12 @@ An unknown style or a value out of range stops the command with the valid choice
 
 `src/endless/phrases.js` holds two or three short phrases per kind of move in English and Italian (`add-drums`, `add-bass`, `add-lead`, `break`, `drop`, `brighter`, `dirtier`, `more-space`, `strip`, `song-start`, `song-end`, …). `npm run voices` makes a sample of each.
 
+## Incremental sessions and the radio window
+
+`createSession(recipes, seed)` makes one song at a time: `next(options)` generates the next song with the options given (styles, chaos, energy, complexity), keeping the random streams and the variety history between calls. `generateSession` is a loop over it, so the command line and the radio make the same songs for the same seed and options. A change of options applies from the next song; replaying the same sequence of options gives the same songs.
+
+The radio plays songs on one timeline of absolute bars. `windowSong` (`src/endless/join.js`) joins the song on air and the next one, with silent sections before them so that the window's bar numbers equal the stream's: the scheduler never restarts between songs. Track ids carry the song number in the stream (`s7-bass`), so a song's code does not change when the window moves.
+
 ## Determinism
 
 Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit.
@@ -128,6 +134,9 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Same seed, same session                      | `determinism: same seed, same session`                           |
 | Seed recorded                                | `determinism: a session without seed records the seed`           |
 | No unintended change                         | `determinism: seed fixtures`                                     |
+| Song by song equals a whole session          | `radio: song by song equals a whole session`                     |
+| Options apply from the next song             | `radio: an option change applies from the next song and replays the same` |
+| Window keeps each song, at any offset        | `radio: window song keeps each song as it is, at any offset`     |
 
 ## Later phases
 
