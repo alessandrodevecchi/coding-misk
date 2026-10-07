@@ -12,7 +12,8 @@
     "check:code": "node --no-warnings tools/snapshot-code.mjs check",
     "snapshot:code": "node --no-warnings tools/snapshot-code.mjs write",
     "check:songs": "node --no-warnings tools/song.mjs validate songs",
-    "voices": "node --no-warnings tools/voice.mjs"
+    "voices": "node --no-warnings tools/voice.mjs",
+    "check:endless": "node --no-warnings tools/check-endless.mjs"
   },
   "dependencies": {
     "@strudel/repl": "1.3.0"

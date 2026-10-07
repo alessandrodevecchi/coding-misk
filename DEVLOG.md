@@ -199,6 +199,8 @@
 
 - Il proprietario ha approvato la change `endless-director`. Idee per dopo: più registi con personalità e "manie" diverse (commento sulla `#18`); video ricreato dal JSON di una sessione e unito all'audio registrato (`#27`).
 
+- Endless `#21`, gruppo 1 di `endless-director`: generatore casuale con seme (`src/endless/random.js`, mulberry32 su hash FNV del seme, flussi separati per piano, mosse, mutazioni, titoli e commenti) e `npm run check:endless`. Verificato: stessa sequenza in Node e nel browser, flussi indipendenti tra loro.
+
 ## Prossimo passo
 
 - Endless `#18`, fase 1 `#21`: implementare la change OpenSpec `endless-director` con `openspec-apply-change`, un gruppo di task alla volta (5 gruppi, 26 task in `openspec/changes/endless-director/tasks.md`), aggiornando il proprietario alla fine di ogni gruppo. Ramo `feat/21-endless-director`.

@@ -2,8 +2,8 @@
 
 ## 1. Foundations
 
-- [ ] 1.1 Create `src/endless/` with a seeded random generator (string seed, named streams) that runs in Node and in the browser, and verify with a check that the same seed and stream give the same sequence and different streams differ.
-- [ ] 1.2 Add `npm run check:endless` (a Node script under `tools/`) that will host every director and recipe check, and verify it runs and exits 0 with the generator check from 1.1.
+- [x] 1.1 Create `src/endless/` with a seeded random generator (string seed, named streams) that runs in Node and in the browser, and verify with a check that the same seed and stream give the same sequence and different streams differ.
+- [x] 1.2 Add `npm run check:endless` (a Node script under `tools/`) that will host every director and recipe check, and verify it runs and exits 0 with the generator check from 1.1.
 
 ## 2. Style recipes
 
