@@ -176,6 +176,8 @@
 
 - Cartella `notes/` esclusa da git per appunti locali del proprietario; contiene la trascrizione della conversazione su FastTracker 2 (`notes/ft2-conversazione.md`).
 
+- Nuove feature dal proprietario, messe nel backlog: `#17` canzone in divenire (si costruisce mentre suona, con commenti brevi come testo), `#18` modalità endless (su `#17`), `#19` pannelli dei dispositivi stile Reason (solo interfaccia). `#3` voci riorientata: prima commenti parlati come campioni (voce del proprietario, poi `say` di macOS o Piper, circa 60 MB per voce e gira nel browser), ACE-Step solo per il canto più avanti. Provato `say -v Alice`: un campione di 1 secondo in italiano.
+
 ## Prossimo passo
 
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.
