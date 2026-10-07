@@ -7,6 +7,7 @@ import { typingFrames } from './song/typing.js';
 import { validateSong } from './song/validate.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
+import { createRadio, usableRecipes } from './radio/radio.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
 import { machineLabel, prettyName } from './sounds/catalog.js';
@@ -66,6 +67,8 @@ function composedTracks() {
 }
 const codedTracks = () => CODED.map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
+// the radio tab (created further down, once the player exists)
+let radio = null;
 // custom samples manifest (bank → files), for spoken comments
 let customFiles = {};
 // oggetto riproducibile: codice + mappa di sezioni e tempo
@@ -179,13 +182,14 @@ async function playSong(sg, bar = 0, as = 'free') {
   if (seeking) return;
   seeking = true;
   try {
+    if (as !== 'radio' && radio && radio.on) radio.stopped();
     initAudioOnce();
     await ready;
     await initAudioOnce();
     const m = sg.meta;
     bar = Math.max(0, Math.min(m.bars - .01, bar));
     paused = null; song = sg; mode = as;
-    source = as === 'track' ? { kind: 'track' } : { kind: 'song', name: sg.title, id: sg.id };
+    source = as === 'track' ? { kind: 'track' } : as === 'radio' ? { kind: 'radio', name: sg.title } : { kind: 'song', name: sg.title, id: sg.id };
     renderSource();
     ed.stop();
     typing = null; built = sg.build ? buildSteps(sg.build).filter(x => x.at <= bar).length : 0;
@@ -211,6 +215,8 @@ async function play() {
 }
 function pause() {
   if (!isPlaying()) return;
+  // the radio has no pause: the header button stops it
+  if (mode === 'radio') { stop(); return; }
   paused = { id: song ? song.id : null, cyc: sched().now() };
   ed.stop();
 }
@@ -221,7 +227,7 @@ function resume() {
   return play();
 }
 const togglePlay = () => isPlaying() ? pause() : paused ? resume() : play();
-async function stop() { await ready; paused = null; ed.stop(); }
+async function stop() { await ready; paused = null; ed.stop(); if (radio && radio.on) radio.stopped(); }
 
 // ogni modifica alla composizione: brano non salvato, codice ricompilato, rivalutato se sta suonando
 function changed() {
@@ -240,6 +246,7 @@ function changed() {
   if (isPlaying()) evalTimer = setTimeout(() => ed.evaluate(), 150);
 }
 async function loadFree(code, src) {
+  if (radio && radio.on) radio.stopped();
   song = null; paused = null;
   initAudioOnce();
   await ready;
@@ -265,6 +272,7 @@ function renderSource() {
     lesson: () => t('srcGuide', { name: source.name }),
     sound: () => t('srcSound', { name: source.name }),
     song: () => t('srcSong', { name: source.name }),
+    radio: () => t('srcRadio', { name: source.name }),
   };
   $('#src').textContent = map[source.kind]();
   $('#back').hidden = source.kind === 'track';
@@ -1253,13 +1261,16 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'guida', 'suoni', 'riferimenti'];
+const TABS = ['componi', 'brani', 'radio', 'guida', 'suoni', 'riferimenti'];
 let cards = [];
 function showTab(name) {
   $$('.tab').forEach(x => x.setAttribute('aria-selected', x.dataset.tab === name));
   for (const id of TABS) $('#tab-' + id).hidden = id !== name;
   if (name === 'brani' && cards.length) renderSongs();
   if (name === 'suoni') renderSounds();
+  if (name === 'radio' && radio) radio.render();
+// for the browser checks (tools/check-radio.cjs)
+globalThis.codingMiskRadio = radio;
   store.set('coding-misk-tab', name);
 }
 $$('.tab').forEach(tb => tb.addEventListener('click', () => showTab(tb.dataset.tab)));
@@ -1386,10 +1397,11 @@ const MASTER = .6;
     const target = m.bpm[ahead] / 240;
     if (Math.abs(s.cps - target) > 1e-6) s.setCps(target);
     if (song.build) liveBuild(song, s, cyc);
+    if (mode === 'radio' && radio) radio.tick(cyc);
     if (loopIdx >= 0) {
       const sec = m.sections[loopIdx];
       if (sec && cyc >= sec.start + sec.len) playSong(song, sec.start, mode);
-    } else if (cyc >= m.bars) { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
+    } else if (cyc >= m.bars && mode !== 'radio') { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
     // segue la sezione che suona, ma non mentre si sta scrivendo in un campo del brano
     const typing = document.activeElement && document.activeElement.matches('input, select, textarea') && document.activeElement.closest('#arranger, #track-panel');
     if (mode === 'track' && follow && !typing) { const i = m.sectionAt(cyc); if (i >= 0 && i !== sel) selectScene(i); }
@@ -1462,6 +1474,39 @@ function useSound(it) {
 const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast, scheduler: sched });
 function renderSounds() { sounds.render(); }
 
+// ---------- radio ----------
+// recipes from styles/ (the same files the command line reads); the radio plays the director's songs
+const RECIPES = usableRecipes(Object.values(import.meta.glob('../styles/*.json', { eager: true, import: 'default' })));
+// preloads the spoken comments of a song, silently, as playSong does
+const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
+radio = createRadio({
+  root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang,
+  player: {
+    makePlayable: sg => playable({ ...sg, kind: 'composed' }),
+    start: (p, bar) => playSong(p, bar, 'radio'),
+    // a new window while the radio plays: the code on air does not change, the steps to come do
+    swap: p => {
+      if (mode !== 'radio' || !song) return;
+      const s = sched(), cyc = s ? s.now() : 0;
+      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
+      warmVoices(p); source = { kind: 'radio', name: p.title }; renderSource();
+    },
+    // skip: the new window takes over now, its first song starts on "bar"
+    jump: (p, bar) => {
+      if (mode !== 'radio' || !song) return;
+      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= bar).length;
+      warmVoices(p); source = { kind: 'radio', name: p.title }; renderSource();
+      ed.setCode(codeFor(p, bar)); ed.evaluate();
+    },
+    stop: () => stop(),
+    now: () => (sched() ? sched().now() : 0),
+    saveSong: sg => { user.tracks.push({ ...clone(sg), id: 'u-' + Date.now() }); saveLibrary(); renderSongs(); toast(t('trackSaved')); },
+    // the song opens ready to play, not playing
+    openSong: async sg => { await stop(); if (loadTrack({ ...clone(sg), kind: 'composed' })) { if (mode !== 'track') backToTrack(); showTab('componi'); } },
+  },
+});
+radio.render();
+
 // ---------- riferimenti ----------
 function renderRefs() {
   $('#refs').innerHTML = REFS.map(([title, d, u]) => `<a class="card ref" href="${u}" target="_blank" rel="noopener"><strong>${esc(tx(title))} ↗</strong><span>${esc(tx(d))}</span></a>`).join('');
@@ -1476,6 +1521,7 @@ function renderStatic() {
   opts($('#tk-type'), ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture', 'riser', 'code', 'voice'].map(k => [k, `${TYPE_ICON[k]}  ${t(k)}`]));
   opts($('#sc-meter'), METERS.map(([k]) => [k, k]));
   opts($('#sc-fade'), [['0', t('cut')], ['1', t('fade1')], ['2', t('fadeN', { n: 2 })], ['4', t('fadeN', { n: 4 })], ['8', t('fadeN', { n: 8 })]]);
+  if (radio) radio.render();
   $('#looks').innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${esc(tx(l))}</button>`).join('');
   $('#play').dataset.state = '';
 }

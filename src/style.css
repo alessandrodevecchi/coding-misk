@@ -448,3 +448,34 @@
 :root[data-ui="hw"] .arr-scene-btn[aria-current="true"] { box-shadow: inset 0 0 0 1px var(--a1), 0 0 10px color-mix(in srgb, var(--a1) 50%, transparent); }
 :root[data-ui="hw"] .arr-scene-btn.playing::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--led); box-shadow: 0 0 8px var(--led); }
 :root[data-ui="hw"] .edhost, :root[data-ui="hw"] .stagewrap { border: 6px solid #0f0f11; box-shadow: 0 0 0 1px #3d3d43, 0 6px 16px rgba(0,0,0,.6); }
+
+/* radio (#22) */
+.radio { display: grid; gap: 12px; }
+.radio-grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+@media (max-width: 760px) { .radio-grid { grid-template-columns: 1fr; } }
+.radio-ctrls { display: grid; gap: 12px; align-content: start; }
+.radio-onair { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.radio .onair { margin-left: auto; font: 700 12px var(--mono); letter-spacing: .2em; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+.radio .onair.on { color: #fff; background: #d8203c; border-color: #ff4a66; box-shadow: 0 0 14px #ff2a48; animation: onair 2.4s ease-in-out infinite; }
+@keyframes onair { 50% { box-shadow: 0 0 4px #ff2a48; } }
+.ctrls.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 480px) { .ctrls.three { grid-template-columns: 1fr; } }
+.radio .hint { font-size: 12px; margin: 0; }
+.radio .muted { color: var(--muted); }
+.radio-seed { display: flex; align-items: end; gap: 8px; }
+.radio-seed .grow { flex: 1; }
+.radio-now { display: grid; gap: 8px; align-content: start; }
+.radio-title { font-size: 20px; letter-spacing: .03em; margin: 0; }
+.radio-meta { font: 13px var(--mono); }
+.radio-parts { font-size: 12px; color: var(--muted); }
+.radio-pos { display: flex; align-items: center; gap: 12px; font: 12px var(--mono); color: var(--muted); }
+.radio-curve { width: 160px; height: 36px; color: var(--a1); flex: none; }
+.radio-curve .pos { stroke: var(--a2); stroke-width: 2; }
+.radio-next { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.radio-next li { display: block; background: none; padding: 0; }
+.radio-next .at { font: 11px var(--mono); color: var(--a2); margin-right: 6px; }
+.radio-after { font-size: 12px; }
+.radio-hist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; max-height: 320px; overflow: auto; }
+.radio-hist li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; font-size: 13px; }
+.radio-hist .when { font: 11px var(--mono); color: var(--muted); }
+.radio-hist .hist-actions { margin-left: auto; display: flex; gap: 6px; }

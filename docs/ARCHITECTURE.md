@@ -10,6 +10,7 @@ Vanilla JavaScript ES modules served by Vite 8. No framework. Strudel runs insid
 | `src/music.js`    | Musical data (keys, chords, progressions, presets), `DEFAULT` scene state, `normalizeState`, `sceneLayers` (per-instrument code generator), `compileTrackV1` (reference), `makeScene`, demo track |
 | `src/song/`       | Song format v2: `format.js` (types, `fromScenes` converter, `normalizeSong`, `clipState`), `compile.js` (`compileSong`), `validate.js` (`validateSong`), `rack.js` (rack devices: `DEVICES`, `rackCode`) |
 | `src/endless/`    | Endless director (`docs/ENDLESS.md`): `random.js` (seeded streams), `recipe.js` (style recipes, validator), `mix.js` (parts per style, chaos), `shapes.js`, `energy.js`, `mutate.js`, `phrases.js`, `director.js` (`generateSession`), `join.js`. Pure modules: they run in Node (`tools/endless.mjs`) and in the browser |
+| `src/radio/`      | Radio tab (`radio.js`, `createRadio`): controls, now playing card, history, and the stream of songs (window moved at each song end, next song generated at 40 % of the song on air). The player in `main.js` gives it `start`, `swap`, `jump`, `stop` |
 | `src/songs.js`    | `parseSong(code)`: reads `SECTIONS` and `TEMPO` lines into per-bar BPM, section map, `secondsAt`, `sectionAt`                                                             |
 | `src/sounds/`     | Sound browser: `catalog.js` (catalogue from superdough's `soundMap`, categories, audition code), `art.js` (SVG drawings rendered as pixel art), `photos.js` (free photos, credits in `public/sounds/photos/CREDITS.md`), `machines.js` (71 canonical drum machines), `browser.js` (UI) |
 | `src/visuals.js`  | Canvas visuals, per-instrument levels and onsets from Strudel analysers                                                                                                   |
@@ -69,6 +70,16 @@ Spoken comments: `tools/voice.mjs` writes `public/samples/say_<lang>/<slug>.wav`
 ## Endless director
 
 `generateSession(recipes, options)` returns `{ session, songs }`: plain v2 songs with `build` steps, so the player, the live build engine, the voice track and the exporter play them unchanged. For each song the director plans parts, tempo, key, sections and candidate tracks, then walks phrase boundaries: it applies candidate moves to a copy of the steps, measures the result with `stateAt` and `energyOf`, and keeps the move closest to the target energy. All randomness comes from named seeded streams, never `Math.random`. `tools/endless.mjs` writes songs to `songs/endless/` (git-ignored); the library picks them up through the `songs/**` glob, which skips `session.json`. The radio view (`#22`) will call the same functions in the browser.
+
+## Radio
+
+The radio is a third player mode, `radio`, next to `track` and `free`. It plays a window song (`windowSong`: the song on air and the next one, on absolute stream bars), so the scheduler never restarts. `transport()` calls `radio.tick(cyc)` every frame and, in radio mode, does not stop at the end of the window. The radio:
+
+- generates the next song in an idle callback once the song on air has played 40 % of it, then hands the player a new window (`swap`: steps already played are not repeated);
+- moves the window when a song ends, and adds the new song to the history;
+- on skip, cuts the song on air at the next bar and evaluates the new window at once (`jump`).
+
+Starting any other playback, the header pause or stop, or "open in Compose" stops the radio: they share one editor and scheduler. Recipes reach the browser through `import.meta.glob('../styles/*.json')`; invalid ones are left out. Browser storage keys: `coding-misk-radio` (controls), `coding-misk-radio-history` (last 50 songs with their JSON and session recipe).
 
 ## Sound browser
 
