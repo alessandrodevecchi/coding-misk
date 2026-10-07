@@ -405,7 +405,7 @@ const nextKey = tr => { for (let i = 0; i < 26; i++) { const k = String.fromChar
 const DEFAULT_PATTERN = {
   drums: () => ({ rows: Object.fromEntries(Object.entries(GROOVES.trance[1]).filter(([, v]) => v.includes('x'))) }),
   bass: () => ({ preset: 'rolling' }), guitar: () => ({ preset: 'power8' }), arp: () => ({ preset: 'su', speed: '16' }),
-  hook: () => ({ preset: 'richiamo' }), pad: () => ({ preset: 'pad' }), texture: () => ({ rhythm: 'bar' }), riser: () => ({}),
+  hook: () => ({ preset: 'richiamo' }), pad: () => ({ preset: 'pad' }), texture: () => ({ rhythm: 'bar' }), riser: () => ({}), voice: () => ({}),
   code: () => ({ code: 'note("a2 ~ c3 [e3 a3]").s("triangle").lpf(1800).gain(.4)' }),
 };
 const ACT_IDS = { drums: 'kick,snare,hats', bass: 'bass', guitar: 'guitar', arp: 'arp', hook: 'hook', pad: 'pad', texture: 'fx', riser: 'riser', voice: 'fx' };
@@ -1064,7 +1064,7 @@ function syncPanel(host) {
   });
   all('[data-ctl]').forEach(x => x.classList.toggle('over', Object.keys(over).some(k => k === x.dataset.ctl || k === x.dataset.ctl + 'End')));
   if (tr.type === 'drums') all('[data-row]').forEach(b => b.setAttribute('aria-pressed', ((pat.rows || {})[b.dataset.row] || '')[b.dataset.i] === 'x'));
-  if (q('pt-preset')) q('pt-preset').value = pat.preset || DEFAULT_PATTERN[tr.type]().preset;
+  if (q('pt-preset')) q('pt-preset').value = pat.preset || (DEFAULT_PATTERN[tr.type] ? DEFAULT_PATTERN[tr.type]().preset : '') || '';
   if (q('pt-speed')) q('pt-speed').value = pat.speed || '16';
   if (q('pt-rhythm')) q('pt-rhythm').value = pat.rhythm || 'bar';
   if (q('pt-code') && !active(q('pt-code'))) q('pt-code').value = pat.code || '';

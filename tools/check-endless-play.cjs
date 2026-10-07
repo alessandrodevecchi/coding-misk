@@ -1,5 +1,5 @@
 // Evaluates generated endless songs in the app: the code of every live build step, as the player builds it,
-// and reports Strudel evaluation errors. For levels per section use tools/check-levels.cjs <song-id …>.
+// and reports Strudel evaluation errors; it also opens each song from the song menu and reports page errors. For levels per section use tools/check-levels.cjs <song-id …>.
 // Usage: PLAYWRIGHT_CORE=... node tools/check-endless-play.cjs [dir]   (dev server on :5173; default songs/endless)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -12,6 +12,8 @@ const files = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isD
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
   const logs = [];
   page.on('console', m => { if (m.type() === 'error') logs.push(m.text()); });
+  const pageErrors = [];
+  page.on('pageerror', e => pageErrors.push(e.message));
   await page.goto('http://localhost:5173/'); await sleep(6000);
   let errors = 0;
   for (const song of songs) {
@@ -29,10 +31,15 @@ const files = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isD
       ed.stop();
       return { errs, steps: new Set(buildSteps(song).map(x => x.at)).size };
     }, song);
+    // the song also opens in Compose from the song menu, with no page error
+    const before = pageErrors.length;
+    await page.locator('#track-pick').selectOption(song.id); await sleep(700);
+    const shown = await page.locator('#sc-name').inputValue();
+    if (pageErrors.length > before || !song.sections.some(x => x.name === shown)) r.errs.push(`does not open in Compose: ${pageErrors.slice(before).join('; ') || `editor shows "${shown}"`}`);
     errors += r.errs.length;
     console.log(`${song.id.padEnd(28)} ${song.title.padEnd(22)} ${r.errs.length ? 'ERRORS ' + r.errs.join(' | ') : `ok (${r.steps} steps evaluated)`}`);
   }
-  console.log(`${songs.length} songs, ${errors} evaluation errors; console errors: ${logs.length}`);
+  console.log(`${songs.length} songs, ${errors} errors; console errors: ${logs.length}; page errors: ${pageErrors.length}`);
   for (const l of [...new Set(logs)].slice(0, 10)) console.log('  console:', l.slice(0, 200));
   await browser.close();
   process.exit(errors ? 1 : 0);
