@@ -76,7 +76,7 @@ export function voiceSamples(song, lang, files) {
   return [...new Set(buildSteps(song).map(st => list.findIndex(f => decodeURI(f).endsWith(`/${saySlug(sayText(st.say, lang))}.wav`))))].filter(n => n >= 0).map(n => ({ s: bank, n }));
 }
 // spoken comment of the latest step: a sample of public/samples/say_<lang>/ (tools/voice.mjs), played once on the
-// step's bar, with the song's "voice" settings: { "gain": 0.6, "speed": 1, "rack": [...] } (speed < 1 lowers it, < 0 reverses it)
+// step's bar (the volume is applied after the effects, so distortion does not change it), with the song's "voice" settings: { "gain": 0.6, "speed": 1, "rack": [...] } (speed < 1 lowers it, < 0 reverses it)
 // files: the custom samples manifest ({ say_en: ["say_en/more_bass.wav", …] }); no file, no voice
 export function voiceCode(song, upTo, total, lang, files) {
   const step = buildSteps(song)[upTo - 1], text = step && sayText(step.say, lang);
@@ -87,7 +87,7 @@ export function voiceCode(song, upTo, total, lang, files) {
   const v = song.voice || {}, at = step.at, rest = total - at - 1;
   const lane = `<${at > 0 ? `0!${at} ` : ''}1${rest > 0 ? ` 0!${rest}` : ''}>`;
   const fx = v.rack && v.rack.length ? rackCode(v.rack, 'texture') : '.room(0.2)';
-  return `\n// voice · "${text}", spoken on bar ${at + 1}\n$: s("${bank}").n(${n}).mask("${lane}").gain(${v.gain ?? 0.6})${v.speed !== undefined && v.speed !== 1 ? `.speed(${v.speed})` : ''}${fx}.orbit(15).analyze("fx")`;
+  return `\n// voice · "${text}", spoken on bar ${at + 1}\n$: s("${bank}").n(${n}).mask("${lane}")${v.speed !== undefined && v.speed !== 1 ? `.speed(${v.speed})` : ''}${fx}.postgain(${v.gain ?? 0.6}).orbit(15).analyze("fx")`;
 }
 
 // checks for the "build" list; err/warn take (path, message)

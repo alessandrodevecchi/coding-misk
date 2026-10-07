@@ -183,7 +183,7 @@ One step can combine several actions. Steps on the same bar apply in file order.
 "voice": { "gain": 0.6, "speed": 0.9, "rack": [{ "device": "crush", "bits": 8 }, { "device": "delay", "amount": 0.3 }] }
 ```
 
-`gain` 0 to 2 (default 0.6), `speed` -4 to 4 (below 1 lower and slower, below 0 backwards), `rack` any rack devices (default a light reverb).
+`gain` 0 to 2 (default 0.6, applied after the effects), `speed` -4 to 4 (below 1 lower and slower, below 0 backwards), `rack` any rack devices (default a light reverb).
 
 A song without `build` can also build itself: the "Live build" switch above the arranger derives steps from its clips (each track comes in where its clips start and leaves where they stop, with a short comment), so it sounds exactly as written. On the timeline, a live build shows hatching where its steps keep a track silent and a diamond where a step changes it.
 

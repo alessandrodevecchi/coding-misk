@@ -168,22 +168,27 @@
     }
   ],
   "voice": {
-    "gain": 0.6,
+    "gain": 0.55,
+    "speed": 1.25,
     "rack": [
       {
-        "device": "crush",
-        "bits": 8
+        "device": "distort",
+        "amount": 2.5
+      },
+      {
+        "device": "hpf",
+        "cutoff": 300
       },
       {
         "device": "delay",
-        "amount": 0.3,
+        "amount": 0.25,
         "time": 0.1875,
-        "feedback": 0.4
+        "feedback": 0.35
       },
       {
         "device": "reverb",
-        "amount": 0.3,
-        "size": 0.5
+        "amount": 0.55,
+        "size": 0.75
       }
     ]
   },
