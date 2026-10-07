@@ -84,6 +84,16 @@ In the app, the arranger has two views of the same song: **Free timeline** (the 
 - Check the order with `node --no-warnings tools/song.mjs steps songs/my-song.json` and the code at a bar with `compile … --at N`.
 - Add a track of type `voice` and run `npm run voices` after writing new comments: each phrase becomes a spoken sample, shaped by the voice track's knobs and rack (Primo Segnale: higher pitch, distortion, low cut, delay, reverb).
 
+## Endless sessions
+
+The endless director writes songs like these on its own, from style recipes (`docs/STYLES.md`, `docs/ENDLESS.md`):
+
+```sh
+npm run endless -- --styles synthwave,jazz,country --chaos 1 --minutes 20 --seed aurora --join
+```
+
+The command writes each song and `session.json` to `songs/endless/` (git-ignored), and with `--join` one more song with the whole session in order. The songs appear in the Songs tab after a reload. The report prints one line per song (title, length, tempo, key, shape, tracks, style of each part) and one line per phrase (target and measured energy, moves, comment). The same seed gives the same session; without `--seed` the command prints the seed it chose.
+
 ## Patterns in practice
 
 - **Drums:** start from a groove (`GROOVES` in `src/music.js`: trance, rolling, breakbeat, halftime, techno, hard, rock, boombap, metal, phonk, …) and vary one row per section.

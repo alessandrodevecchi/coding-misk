@@ -212,7 +212,13 @@ export function directSong(plan, opts, rng, comments) {
     const want = (k === 0 ? 0 : 1) + (gap > 0.2 ? 1 : 0) + (landmark && gap > 0.35 ? 1 : 0) - chosen.filter(c => !c.quiet).length + (k === 0 ? 0 : 0);
     for (let i = 0; i < want; i++) {
       state = stateAt(working(base, steps), at).song;
-      const e0 = energyOf(state, ctx), cands = candidateMoves(state, ctx, blocked, M);
+      const e0 = energyOf(state, ctx);
+      let cands = candidateMoves(state, ctx, blocked, M);
+      // after the intro, below the usual count of tracks, the first move adds one (taste rule: 4 to 5 layers)
+      if (k >= 2 && i === 0 && playing(state).length < R.tracks.usual[0] && !['break', 'outro'].includes(role)) {
+        const adds = cands.filter(c => c.step.add !== undefined);
+        if (adds.length) cands = adds;
+      }
       if (!cands.length) break;
       let best = null;
       for (const c of cands) {
@@ -221,6 +227,10 @@ export function directSong(plan, opts, rng, comments) {
         if (c.kind === lastKind) score -= 0.03;
         const count = playing(stateAt(working(base, [...steps, { at, ...c.step }]), at).song).length;
         if (count > plan.usualHigh) score -= 0.08 * (count - plan.usualHigh);
+        // below the usual count, prefer adding, and in the usual entry order (drums, bass, pads, …)
+        const low = R.tracks.usual[0], before = playing(state).length;
+        if (k > 0 && before < low && c.step.add !== undefined) score += 0.06 + 0.03 * (1 - ENTRY.indexOf(state.tracks.find(t => t.id === c.track).type) / ENTRY.length);
+        if (k > 0 && count < low && c.step.remove !== undefined) score -= 0.06;
         if (c.lastDrum && role !== 'break') score -= 0.3;
         if (Math.abs(e0 - target) < 0.08 && ['variation', 'more-space', 'brighter', 'darker', 'dirtier', 'cleaner'].includes(c.kind)) score += 0.04;
         score += M.range(0, 0.02);

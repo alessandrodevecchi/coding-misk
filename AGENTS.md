@@ -12,6 +12,8 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 | `docs/SONG-FORMAT.md`   | JSON song format v2: sections, tracks, patterns, clips (reference)                   |
 | `docs/COMPOSING.md`     | Guide to composing songs as code, with validated examples in `songs/examples/`        |
 | `docs/VOCALS.md`        | Vocals research (`#3`): local models, licenses, recording, effects, channel design   |
+| `docs/ENDLESS.md`       | Endless director (`#18`, `#21`): sessions, energy shapes, moves, rules, checks        |
+| `docs/STYLES.md`        | Style recipes in `styles/`: fields, mixing styles with chaos, adding a style          |
 | `docs/PLAN-TRACKS.md`   | Plan for tracks, per-instrument patterns and a timeline (proposal)                   |
 | `openspec/`             | OpenSpec specs and changes (spec-driven development, used for `#18` endless mode)     |
 | `docs/DESIGN-SYSTEM.md` | Themes, tokens, fonts, components, visuals, hardware theme                           |
@@ -56,6 +58,10 @@ node --no-warnings tools/song.mjs compile songs/my-song.json    # print its Stru
 node --no-warnings tools/song.mjs list                          # songs in songs/
 npm run check:songs                                    # validate every song in songs/
 npm run voices                                         # spoken comments for live builds (macOS say + ffmpeg)
+npm run endless -- --styles berlin-techno,jazz --chaos 0.5 --minutes 20 --seed aurora --join   # endless session in songs/endless/ (git-ignored), with a report
+npm run check:styles                                   # validate the style recipes in styles/
+npm run check:endless                                  # recipes, director rules, determinism (seed fixtures), command line
+node tools/check-style-sounds.cjs                      # every sound and drum machine a recipe names is loaded (dev server)
 ```
 
 Video recording needs Playwright's ffmpeg (`node $PLAYWRIGHT_CORE/cli.js install ffmpeg`). The demo script writes `video.webm`, `audio.webm` and `offset.txt`; merge with system ffmpeg (see `docs/ARCHITECTURE.md`).
@@ -69,6 +75,7 @@ Audio analysis of reference tracks: `tools/analyze-audio.py` and `tools/zoom-aud
 - `songs/*.json`: built-in songs (order in `songs/index.json`); `songs/examples/`: songs used by the guide.
 - `src/sounds/`: sound browser (catalogue from the loaded sounds, pixel art drawings, free photos with credits in `public/sounds/photos/CREDITS.md`).
 - `src/song/`: song format v2 (format, converter from older scene saves, compiler, validator).
+- `src/endless/`: endless director (seeded random, recipes, mixing, shapes, energy, mutation, phrases, director, join). `styles/`: style recipes.
 - `src/visuals.js`: canvas visuals. `src/hardware.js`: knobs and LEDs for the hardware theme.
 - `src/songs.js`: reads `SECTIONS` and `TEMPO` from track code. `src/i18n.js`: strings. `src/content.js`: lessons, sounds, references, hand-written tracks.
 - `patterns/`: hand-written Strudel files. `public/samples/`: custom samples. `docs/media/`: README media. `demo/`: local demo videos (git-ignored).

@@ -33,7 +33,7 @@ setLang(getLang());
 // Le modifiche dell'utente vivono in localStorage e hanno la precedenza sugli originali.
 const user = store.get('coding-misk-library', { tracks: [], code: {} });
 const saveLibrary = () => store.set('coding-misk-library', user);
-const validSongs = Object.entries(import.meta.glob(['../songs/**/*.json', '!../songs/index.json'], { eager: true, import: 'default' })).flatMap(([file, sg]) => {
+const validSongs = Object.entries(import.meta.glob(['../songs/**/*.json', '!../songs/index.json', '!../songs/**/session.json'], { eager: true, import: 'default' })).flatMap(([file, sg]) => {
   const { errors } = validateSong(sg);
   if (errors.length) { console.warn(`${file}: ${errors.map(e => `${e.path} ${e.msg}`).join('; ')}`); return []; }
   return [sg];

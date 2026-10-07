@@ -27,10 +27,10 @@
 
 ## 4. Command line
 
-- [ ] 4.1 Implement `tools/endless.mjs` (options, defaults, errors that list valid choices and write nothing, song files and `session.json` in `--out`) and verify the "Session written" and "Unknown style" scenarios.
-- [ ] 4.2 Implement `--join` (one song with every song in order, unique track ids, offset bars and steps) and verify the joined file passes `tools/song.mjs validate`.
-- [ ] 4.3 Implement the report (one line per song with title, styles per part, length, tempo, key, shape, tracks; one line per phrase with target and measured energy, moves and comments) and verify its lines on a fixed seed.
-- [ ] 4.4 Document the commands in `AGENTS.md` (tooling) and `docs/COMPOSING.md`, add npm scripts, and verify the documented commands run as written.
+- [x] 4.1 Implement `tools/endless.mjs` (options, defaults, errors that list valid choices and write nothing, song files and `session.json` in `--out`) and verify the "Session written" and "Unknown style" scenarios.
+- [x] 4.2 Implement `--join` (one song with every song in order, unique track ids, offset bars and steps) and verify the joined file passes `tools/song.mjs validate`.
+- [x] 4.3 Implement the report (one line per song with title, styles per part, length, tempo, key, shape, tracks; one line per phrase with target and measured energy, moves and comments) and verify its lines on a fixed seed.
+- [x] 4.4 Document the commands in `AGENTS.md` (tooling) and `docs/COMPOSING.md`, add npm scripts, and verify the documented commands run as written.
 
 ## 5. Integration
 

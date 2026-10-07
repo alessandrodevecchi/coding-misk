@@ -70,6 +70,28 @@ The director walks the song phrase by phrase. On each phrase boundary it measure
 
 Each candidate move gets a score: how close it brings the measured energy to the target, minus penalties (same kind as the last move, more tracks than usual, removing the last drum outside a break), plus a small bonus for colour moves when the energy is already close, plus a tiny random amount. Usually one move per boundary, two when the energy is far from the target, three at a big moment that is far.
 
+## Command line
+
+```sh
+npm run endless -- --styles berlin-techno --minutes 12 --seed test
+npm run endless -- --styles synthwave,jazz,country --chaos 1 --energy 0.8 --complexity 0.7 --minutes 30 --join
+npm run endless -- --styles lo-fi --out /tmp/lofi --quiet
+```
+
+| Option         | Value                                                     | Default         |
+| -------------- | --------------------------------------------------------- | --------------- |
+| `--styles`     | Recipe ids, comma-separated (required)                    |                 |
+| `--chaos`      | 0 to 1: how much parts mix between styles                 | 0.3             |
+| `--energy`     | 0 to 1: moves every energy target                         | 0.6             |
+| `--complexity` | 0 to 1: tracks and mutation                               | 0.5             |
+| `--minutes`    | Total length; songs are added until it is reached         | 15              |
+| `--seed`       | Any text; without it, a new seed is printed               | new             |
+| `--out`        | Output folder                                             | `songs/endless` |
+| `--join`       | Also write one song with the whole session                |                 |
+| `--quiet`      | Report one line per song only                             |                 |
+
+An unknown style or a value out of range stops the command with the valid choices, and nothing is written. A new session in the same folder replaces the files of the previous one.
+
 ## Rules
 
 - Steps fall on phrase boundaries; breaks and drops on double-phrase boundaries.

@@ -3,6 +3,9 @@
 // Each check is a named function that throws on failure. New checks go in CHECKS.
 import { stream, makeRng, STREAMS, hashString } from '../src/endless/random.js';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAPES, RECIPE_DEFAULTS } from '../src/endless/recipe.js';
 import { mixParts, stylesOf } from '../src/endless/mix.js';
 import { loadStyles } from './styles-dir.mjs';
@@ -242,6 +245,31 @@ const CHECKS = {
     if (process.argv.includes('--write-fixtures')) { fs.writeFileSync(FIXTURES_FILE, JSON.stringify(now, null, 2) + '\n'); console.log('      fixtures written'); return; }
     const saved = JSON.parse(fs.readFileSync(FIXTURES_FILE, 'utf8'));
     now.forEach((f, i) => assert(saved[i] && saved[i].hash === f.hash, `seed ${f.seed} (${f.styles}) gives ${f.hash}, fixture ${saved[i] && saved[i].hash}; if the change is intended, run npm run check:endless -- --write-fixtures`));
+  },
+  'command line: session written, report and join'() {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'endless-'));
+    try {
+      const txt = execFileSync('node', ['--no-warnings', 'tools/endless.mjs', '--styles', 'berlin-techno', '--minutes', '12', '--seed', 'test', '--out', out, '--join'], { cwd: new URL('..', import.meta.url).pathname, encoding: 'utf8' });
+      const s = JSON.parse(fs.readFileSync(path.join(out, 'session.json'), 'utf8'));
+      assert(/^seed: test$/m.test(txt), 'the seed is not printed');
+      assert(s.seconds >= 12 * 60, `session lasts ${s.seconds} s, less than 12 minutes`);
+      for (const f of s.files) assert(fs.existsSync(path.join(out, f)), `missing ${f}`);
+      const songLines = txt.split('\n').filter(l => /^#\d+ "/.test(l)), phraseLines = txt.split('\n').filter(l => /^  bar +\d+ .*target .*energy/.test(l));
+      assert(songLines.length === s.songs.length, `${songLines.length} summary lines for ${s.songs.length} songs`);
+      assert(phraseLines.length === s.songs.reduce((a, e) => a + e.phrases.length, 0), 'one line per phrase expected');
+      const joined = JSON.parse(fs.readFileSync(path.join(out, s.files.find(f => f.endsWith('-joined.json'))), 'utf8'));
+      const v = validateSong(joined);
+      assert(!v.errors.length, `joined song: ${v.errors.slice(0, 2).map(e => `${e.path}: ${e.msg}`).join('; ')}`);
+      assert(joined.sections.reduce((a, x) => a + x.bars, 0) === s.songs.reduce((a, e) => a + e.bars, 0), 'joined song length differs');
+      assert(new Set(joined.tracks.map(t => t.id)).size === joined.tracks.length, 'joined track ids not unique');
+    } finally { fs.rmSync(out, { recursive: true, force: true }); }
+  },
+  'command line: unknown style writes nothing'() {
+    const out = path.join(os.tmpdir(), `endless-none-${process.pid}`);
+    const r = spawnSync('node', ['--no-warnings', 'tools/endless.mjs', '--styles', 'berlin,nonexistent', '--out', out], { cwd: new URL('..', import.meta.url).pathname, encoding: 'utf8' });
+    assert(r.status !== 0, 'the command did not fail');
+    assert(/available styles: .*berlin-techno/.test(r.stderr), `no list of styles: ${r.stderr}`);
+    assert(!fs.existsSync(out), 'something was written');
   },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');
