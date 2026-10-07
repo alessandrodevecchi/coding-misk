@@ -28,7 +28,8 @@ export function compileSong(input) {
     // the bus is chosen before skipping muted tracks, so a track that comes in later (live build) does not move the others
     const orbit = !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : ++extra;
     used.add(tr.type);
-    if (tr.mute || (solo && !tr.solo)) continue;
+    // voice tracks speak the live build comments: their code comes from the build (build.js), not from clips
+    if (tr.mute || (solo && !tr.solo) || tr.type === 'voice') continue;
     L.push('', `// ========== ${[...new Set([tr.name || tr.id, tr.type])].join(' · ')} ==========`);
     const rack = rackCode(tr.rack, tr.type);
     let described = null;

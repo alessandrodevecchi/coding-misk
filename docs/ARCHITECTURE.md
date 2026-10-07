@@ -61,7 +61,7 @@ A song with `build` steps (`src/song/build.js`) is played by state: `stateAt(son
 
 The "Live build" switch (`coding-misk-live`) gives songs without steps a derived build (`deriveBuild`): add and remove only at clip edges, removals delayed past a section's fade, so the audio does not change. `buildMap` gives the timeline the silent spans and the step marks of each track.
 
-Spoken comments: `tools/voice.mjs` writes `public/samples/say_<lang>/<slug>.wav` with macOS `say` (git-ignored). The custom samples manifest maps them to `s("say_en").n(k)`; `voiceCode` adds a one-shot layer masked to the step's bar with the song's `voice` settings, and `playSong` loads every voice sample silently first. A step is evaluated when the scheduler's `lastEnd` is about to reach its bar, so the first hit of the bar already comes from the new code.
+Spoken comments: `tools/voice.mjs` writes `public/samples/say_<lang>/<slug>.wav` with macOS `say` (git-ignored). The custom samples manifest maps them to `s("say_en").n(k)`; `voiceCode` adds a one-shot layer masked to the step's bar with the settings and rack of the step's voice track (taken from the state at that bar; `compileSong` skips voice tracks), and `playSong` loads every voice sample silently first. A step is evaluated when the scheduler's `lastEnd` is about to reach its bar, so the first hit of the bar already comes from the new code.
 
 ## Sound browser
 

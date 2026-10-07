@@ -3,7 +3,7 @@
 //   { "at": 8, "add": "bass", "say": "more bass" }
 // The state at a bar is the song with every step up to that bar applied, so seeking, pausing and the code
 // shown in the editor always agree. Tracks named by an "add" step are silent before it; the others play from the start.
-import { SETTING_FIELDS } from './format.js';
+import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
 
 export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack'];
@@ -70,38 +70,38 @@ export function annotate(code, song, upTo, lang) {
   return lines.join('\n');
 }
 
+// the voice track a step speaks with: the one named by "voice", otherwise the first voice track (none: default settings)
+export const voiceOf = (song, step) => (song.tracks || []).find(t => t.type === 'voice' && (!step || !step.voice || t.id === step.voice)) || null;
+const sampleIndex = (list, text) => list.findIndex(f => decodeURI(f).endsWith(`/${saySlug(text)}.wav`));
 // every spoken comment of a song that has a sample: [{ s, n }], to load them before they play
 export function voiceSamples(song, lang, files) {
   const bank = `say_${lang}`, list = (files || {})[bank] || [];
-  return [...new Set(buildSteps(song).map(st => list.findIndex(f => decodeURI(f).endsWith(`/${saySlug(sayText(st.say, lang))}.wav`))))].filter(n => n >= 0).map(n => ({ s: bank, n }));
+  return [...new Set(buildSteps(song).map(st => sampleIndex(list, sayText(st.say, lang))))].filter(n => n >= 0).map(n => ({ s: bank, n }));
 }
 // spoken comment of the latest step: a sample of public/samples/say_<lang>/ (tools/voice.mjs), played once on the
-// step's bar (the volume is applied after the effects, so distortion does not change it), with the song's "voice" settings: { "gain": 0.6, "speed": 1, "rack": [...] } (speed < 1 lowers it, < 0 reverses it)
+// step's bar with the settings and rack of its voice track (in "state": the song at that bar, so steps can change them).
+// The volume is applied after the effects, so distortion does not make it louder.
 // files: the custom samples manifest ({ say_en: ["say_en/more_bass.wav", …] }); no file, no voice
-export function voiceCode(song, upTo, total, lang, files) {
+export function voiceCode(song, state, upTo, total, lang, files) {
   const step = buildSteps(song)[upTo - 1], text = step && sayText(step.say, lang);
   const bank = `say_${lang}`, list = (files || {})[bank];
   if (!text || !list) return '';
-  const n = list.findIndex(f => decodeURI(f).endsWith(`/${saySlug(text)}.wav`));
+  const n = sampleIndex(list, text);
   if (n < 0) return '';
-  const v = song.voice || {}, at = step.at, rest = total - at - 1;
+  const track = voiceOf(state, step);
+  if (track && track.mute) return '';
+  const v = { ...VOICE_DEFAULT, ...((track && track.settings) || {}) }, at = step.at, rest = total - at - 1;
   const lane = `<${at > 0 ? `0!${at} ` : ''}1${rest > 0 ? ` 0!${rest}` : ''}>`;
-  const fx = v.rack && v.rack.length ? rackCode(v.rack, 'texture') : '.room(0.2)';
-  return `\n// voice · "${text}", spoken on bar ${at + 1}\n$: s("${bank}").n(${n}).mask("${lane}")${v.speed !== undefined && v.speed !== 1 ? `.speed(${v.speed})` : ''}${fx}.postgain(${v.gain ?? 0.6}).orbit(15).analyze("fx")`;
+  const fx = (v.speed !== 1 ? `.speed(${v.speed})` : '') + (v.cutoff < 18000 ? `.lpf(${v.cutoff})` : '') + (v.hpf > 0 ? `.hpf(${v.hpf})` : '')
+    + (v.drive > 0 ? `.distort(${v.drive})` : '') + (v.delay > 0 ? `.delay(${v.delay}).delaysync(0.1875).delayfeedback(0.4)` : '') + (v.room > 0 ? `.room(${v.room})` : '')
+    + rackCode(track && track.rack, 'voice');
+  const orbit = 15 + Math.max(0, (state.tracks || []).filter(t => t.type === 'voice').indexOf(track));
+  return `\n// ========== ${track ? `${track.name || track.id} · voice` : 'voice'} ==========\n// "${text}", spoken on bar ${at + 1}\n$: s("${bank}").n(${n}).mask("${lane}")${fx}.postgain(${v.gain}).orbit(${orbit}).analyze("fx")`;
 }
 
 // checks for the "build" list; err/warn take (path, message)
 export function checkBuild(song, total, err, warn) {
-  if (song.voice !== undefined) {
-    const v = song.voice;
-    if (!v || typeof v !== 'object' || Array.isArray(v)) err('voice', 'an object: { "gain": 0.6, "speed": 1, "rack": [...] }');
-    else {
-      for (const k of Object.keys(v)) if (!['gain', 'speed', 'rack'].includes(k)) warn(`voice.${k}`, 'unknown field; voice fields: gain, speed, rack');
-      if (v.gain !== undefined && (!Number.isFinite(v.gain) || v.gain < 0 || v.gain > 2)) err('voice.gain', 'a number from 0 to 2');
-      if (v.speed !== undefined && (!Number.isFinite(v.speed) || v.speed === 0 || Math.abs(v.speed) > 4)) err('voice.speed', 'a number from -4 to 4, not 0 (below 1 lowers the voice, below 0 plays it backwards)');
-      if (v.rack !== undefined) checkRack(v.rack, 'voice.rack', err, warn);
-    }
-  }
+  if (song.voice !== undefined) warn('voice', 'voice settings now live on a track of type "voice"; this field is ignored');
   if (song.build === undefined) return;
   if (!Array.isArray(song.build)) { err('build', 'an array of steps, for example [{ "at": 4, "add": "bass", "say": "more bass" }]'); return; }
   const tracks = Array.isArray(song.tracks) ? song.tracks : [];
@@ -111,7 +111,8 @@ export function checkBuild(song, total, err, warn) {
     const p = `build[${i}]`;
     if (!s || typeof s !== 'object') { err(p, 'a step is an object'); return; }
     if (!Number.isFinite(s.at) || s.at < 0 || (total && s.at >= total)) err(`${p}.at`, `a bar from 0 to ${Math.max(0, total - 1)}`);
-    for (const k of Object.keys(s)) if (!['at', 'say', ...BUILD_ACTIONS].includes(k)) warn(`${p}.${k}`, `unknown field; step fields: at, say, ${BUILD_ACTIONS.join(', ')}`);
+    for (const k of Object.keys(s)) if (!['at', 'say', 'voice', ...BUILD_ACTIONS].includes(k)) warn(`${p}.${k}`, `unknown field; step fields: at, say, voice, ${BUILD_ACTIONS.join(', ')}`);
+    if (s.voice !== undefined) { const t = byId(s.voice); if (!t || t.type !== 'voice') err(`${p}.voice`, `a track of type voice; voice tracks: ${tracks.filter(x => x && x.type === 'voice').map(x => x.id).join(', ') || 'none'}`); }
     const phrases = s.say === undefined ? [] : typeof s.say === 'string' ? [s.say] : s.say && typeof s.say === 'object' ? Object.values(s.say) : [null];
     if (phrases.some(x => typeof x !== 'string' || !x.trim())) err(`${p}.say`, 'a short phrase, or one per language: { "en": "more bass", "it": "più basso" }');
     else if (phrases.some(x => x.length > 40)) warn(`${p}.say`, 'comments read best when very short (a few words)');
@@ -142,6 +143,7 @@ export function buildMap(song, total) {
       if (s.add !== undefined && list(s.add).includes(t.id) && !on) { if (s.at > from) off.push([from, s.at]); on = true; }
       if (s.remove !== undefined && list(s.remove).includes(t.id) && on) { from = s.at; on = false; }
       for (const k of ['set', 'pattern', 'rack', 'unrack']) if (s[k] && s[k].track === t.id) marks.push({ at: s.at, action: k, say: s.say });
+      if (t.type === 'voice' && s.say && voiceOf(song, s) === t) marks.push({ at: s.at, action: 'say', say: s.say });
     }
     if (!on && total > from) off.push([from, total]);
     map[t.id] = { off, marks };

@@ -2,10 +2,10 @@ import '@strudel/repl';
 import './style.css';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples } from './song/build.js';
+import { hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf } from './song/build.js';
 import { typingFrames } from './song/typing.js';
 import { validateSong } from './song/validate.js';
-import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, fromScenes, clipState } from './song/format.js';
+import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
@@ -75,7 +75,7 @@ function playable(tr) {
   const build = tr.kind !== 'composed' ? null : hasBuild(tr) ? tr : liveOn ? { ...tr, build: deriveBuild(tr) } : null;
   const codeAt = build ? bar => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
-    const c = annotate(compileSong(st.song), build, st.upTo, getLang()) + voiceCode(build, st.upTo, total, getLang(), customFiles);
+    const c = annotate(compileSong(st.song), build, st.upTo, getLang()) + voiceCode(build, st.song, st.upTo, total, getLang(), customFiles);
     return c.includes('$:') ? c : `${c}\n$: silence`;
   } : null;
   const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
@@ -392,7 +392,7 @@ function cellOf(tr, j) {
   return parts.length ? { parts } : null;
 }
 const curTrack = () => T.tracks[tk];
-const baseSettings = type => type === 'code' ? { visual: 'fx' } : Object.fromEntries(SETTING_FIELDS[type].map(k => [k, DEFAULT[type][k]]));
+const baseSettings = type => type === 'code' ? { visual: 'fx' } : type === 'voice' ? { ...VOICE_DEFAULT } : Object.fromEntries(SETTING_FIELDS[type].map(k => [k, DEFAULT[type][k]]));
 // impostazioni che suonano nella sezione selezionata: traccia + eventuale modifica solo per questa sezione
 // clip su cui agiscono pattern e impostazioni "solo qui": nella timeline quello scelto, altrimenti quello della sezione
 const focusClip = tr => (arrMode === 'timeline' && tr === curTrack() && selClip !== null && tr.clips[selClip]) || wholeClip(tr, sel);
@@ -408,7 +408,7 @@ const DEFAULT_PATTERN = {
   hook: () => ({ preset: 'richiamo' }), pad: () => ({ preset: 'pad' }), texture: () => ({ rhythm: 'bar' }), riser: () => ({}),
   code: () => ({ code: 'note("a2 ~ c3 [e3 a3]").s("triangle").lpf(1800).gain(.4)' }),
 };
-const ACT_IDS = { drums: 'kick,snare,hats', bass: 'bass', guitar: 'guitar', arp: 'arp', hook: 'hook', pad: 'pad', texture: 'fx', riser: 'riser' };
+const ACT_IDS = { drums: 'kick,snare,hats', bass: 'bass', guitar: 'guitar', arp: 'arp', hook: 'hook', pad: 'pad', texture: 'fx', riser: 'riser', voice: 'fx' };
 const trackLabel = tr => tr.name || t(tr.type) || tr.id;
 
 function selectScene(i) {
@@ -503,7 +503,7 @@ function renderSectionPanel(total) {
   $('#sc-loop').checked = loopIdx >= 0 && mode === 'track';
   renderTrackPick();
 }
-const TYPE_ICON = { drums: '◉', bass: '▁', guitar: '⚡', arp: '⋰', hook: '♪', pad: '▒', texture: '∿', riser: '↗', code: '{}' };
+const TYPE_ICON = { drums: '◉', bass: '▁', guitar: '⚡', arp: '⋰', hook: '♪', pad: '▒', texture: '∿', riser: '↗', code: '{}', voice: '❝' };
 
 // clic sulla griglia: nome traccia, mute, solo, cella (seleziona sezione e traccia; se suona salta lì)
 $('#arr-grid').addEventListener('click', e => {
@@ -545,6 +545,8 @@ $('#arr-grid').addEventListener('pointerdown', e => {
   if (arrMode !== 'timeline' || e.button !== 0) return;
   const lane = e.target.closest('.trk-lane'); if (!lane) return;
   const i = +lane.dataset.lane, tr = T.tracks[i], rect = lane.getBoundingClientRect(), total = songBars();
+  // a voice track has no clips: it speaks on the steps of the live build
+  if (tr.type === 'voice') return;
   const barAt = x => (x - rect.left) / rect.width * total;
   const clipEl = e.target.closest('[data-clip]');
   if (!clipEl) {
@@ -811,6 +813,8 @@ const CONTROLS = {
   riser: [['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['2', '4', '8', '16'].map(n => [n, t('nBars', { n })])],
     ['select', 'dir', 'direction', () => [['up', t('up')], ['down', t('down')]]]],
   code: [['select', 'visual', 'visualOpt', () => VISUALS.map(v => [v, v])]],
+  voice: [['range', 'gain', 'volume'], ['range', 'speed', 'pitch', { min: .5, max: 2, step: .05, fmt: 'num' }], ['cutoff', 'cutoff', 'filter'],
+    ['range', 'hpf', 'lowCut', { max: 2000, step: 10, fmt: 'num' }], ['range', 'drive', 'drive', NUM4], ['range', 'room', 'reverb'], ['range', 'delay', 'delay']],
 };
 // suoni per strumento: quelli scelti a mano, poi tutti gli strumenti General MIDI e i synth caricati
 function allWaves() {
@@ -834,7 +838,7 @@ function settingHtml([type, key, label, o]) {
   const id = `set-${key}`;
   if (type === 'select') return `<div class="ctrl" data-ctl="${key}"><label class="lbl" for="${id}">${t(label)}</label><select id="${id}" data-set="${key}"></select></div>`;
   const opt = typeof o === 'object' ? o : {};
-  const attrs = type === 'cutoff' ? 'data-cut="1" min="0" max="100" step="1"' : `min="0" max="${opt.max || 1}" step="${opt.step || .01}"${opt.fmt ? ` data-fmt="${opt.fmt}"` : ''}`;
+  const attrs = type === 'cutoff' ? 'data-cut="1" min="0" max="100" step="1"' : `min="${opt.min || 0}" max="${opt.max || 1}" step="${opt.step || .01}"${opt.fmt ? ` data-fmt="${opt.fmt}"` : ''}`;
   const slider = (sid, k) => `<input type="range" id="${sid}" data-set="${k}" ${attrs}>`;
   const ramp = opt.ramp ? `<button type="button" class="ramp" data-set-ramp="${key}" aria-label="${esc(t('rampToggle'))}" title="${esc(t('rampToggle'))}">↗</button>` : '';
   const end = opt.ramp ? `<div class="end" data-end-for="${key}" hidden><div class="row"><label class="lbl" for="${id}End">${esc(t('endOf', { name: t(label) }))}</label><output id="${id}End-o"></output></div>${slider(id + 'End', key + 'End')}</div>` : '';
@@ -946,7 +950,8 @@ function renderTrackPanel() {
   const box = $('#track-panel');
   if (!T.tracks.length) { box.innerHTML = `<div class="tp-top">${viewSwitch()}</div><p class="note">${t('noTracks')}</p>`; return; }
   // vista estesa: un pannello completo per ogni traccia che suona nella sezione selezionata
-  const list = panelView === 'full' ? T.tracks.map((_, i) => i).filter(i => cellOf(T.tracks[i], sel)) : [tk];
+  // voice tracks have no clips: they show with the tracks of every section
+  const list = panelView === 'full' ? T.tracks.map((_, i) => i).filter(i => cellOf(T.tracks[i], sel) || T.tracks[i].type === 'voice') : [tk];
   box.innerHTML = `<div class="tp-top">${viewSwitch()}</div>` + (list.length
     ? list.map(i => `<div class="tp-host${panelView === 'full' ? ' tp-full' : ''}" data-ptrk="${i}" aria-current="${i === tk}">${panelHtml(i)}</div>`).join('')
     : `<p class="note">${t('nothingPlays')}</p>`);
@@ -977,6 +982,10 @@ function panelHtml(ti) {
     editor = `<div class="ctrl"><label class="lbl" for="pt-rhythm">${t('rhythm')}</label><select id="pt-rhythm"></select></div>`;
   } else if (tr.type === 'code') {
     editor = `<label class="lbl" for="pt-code">${t('codeLbl')}</label><textarea id="pt-code" rows="5" spellcheck="false"></textarea><p class="note">${t('codeHint')}</p>`;
+  } else if (tr.type === 'voice') {
+    // the phrases this voice speaks: the comments of the live build steps
+    const steps = compiled.build ? buildSteps(compiled.build).filter(x => x.say && voiceOf(T, x) === tr) : [];
+    editor = `<p class="note">${t('voiceHint')}</p>${steps.length ? `<ul class="voice-lines">${steps.map(x => `<li><b>${t('liveMark', { n: x.at + 1 })}</b> ${esc(sayText(x.say, getLang()))}</li>`).join('')}</ul>` : `<p class="note">${t('voiceNone')}</p>`}`;
   } else editor = `<p class="note">${t('riserHint')}</p>`;
   const custom = c && c.parts;
   return pfx(ti, `
@@ -990,14 +999,14 @@ function panelHtml(ti) {
         <button class="btn danger" id="tk-del">${t('removeTrack')}</button>
       </div>
     </div>
-    ${arrMode === 'timeline' ? clipBlock(tr) : `<div class="tp-plays"><span class="lbl">${esc(t('playsIn', { name: SEC().name }))}</span>
+    ${tr.type === 'voice' ? '' : arrMode === 'timeline' ? clipBlock(tr) : `<div class="tp-plays"><span class="lbl">${esc(t('playsIn', { name: SEC().name }))}</span>
       <div class="chips">${custom ? `<span class="note">${t('customCell')}</span>` : `<button class="chip" data-play-pat="" aria-pressed="${!c}">${t('silent')}</button>${Object.keys(tr.patterns).map(k => `<button class="chip" data-play-pat="${esc(k)}" aria-pressed="${!!(c && c.clip && c.clip.pattern === k)}">${esc(k)}</button>`).join('')}`}</div></div>`}
-    <div class="tp-pats"><span class="lbl">${t('patterns')}</span>
+    ${tr.type === 'voice' ? '' : `<div class="tp-pats"><span class="lbl">${t('patterns')}</span>
       <div class="chips">${Object.keys(tr.patterns).map(k => `<button class="chip" data-edit-pat="${esc(k)}" aria-pressed="${k === key}">${esc(k)}</button>`).join('')}
         <button class="chip" id="pt-new">${t('newPattern')}</button><button class="chip" id="pt-del">${t('deletePattern')}</button></div>
-      <p class="note">${esc(t('editingPattern', { p: key }))}</p></div>
+      <p class="note">${esc(t('editingPattern', { p: key }))}</p></div>`}
     <div class="tp-editor">${editor}</div>
-    <div class="tp-scope"><span class="lbl">${t('settingsScope')}</span>
+    <div class="tp-scope"${tr.type === 'voice' ? ' hidden' : ''}><span class="lbl">${t('settingsScope')}</span>
       <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}" ${focusClip(tr) ? '' : 'disabled'}>${esc(arrMode === 'timeline' && selClip !== null ? t('scopeClip') : t('scopeSection', { name: SEC().name }))}</button></div></div>
     <div class="ctrls">${(CONTROLS[tr.type] || []).map(settingHtml).join('')}</div>
     <div class="tp-rack"><div class="row"><span class="lbl">Rack</span><span class="hint">${t('rackHint')}</span></div>
@@ -1439,7 +1448,7 @@ function renderStatic() {
   $$('[data-i18n-html]').forEach(x => { x.innerHTML = t(x.dataset.i18nHtml); });
   $$('[data-i18n-aria]').forEach(x => { x.setAttribute('aria-label', t(x.dataset.i18nAria)); });
   opts($('#key'), KEYS.map(k => [k[0], k[2]]));
-  opts($('#tk-type'), ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture', 'riser', 'code'].map(k => [k, `${TYPE_ICON[k]}  ${t(k)}`]));
+  opts($('#tk-type'), ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture', 'riser', 'code', 'voice'].map(k => [k, `${TYPE_ICON[k]}  ${t(k)}`]));
   opts($('#sc-meter'), METERS.map(([k]) => [k, k]));
   opts($('#sc-fade'), [['0', t('cut')], ['1', t('fade1')], ['2', t('fadeN', { n: 2 })], ['4', t('fadeN', { n: 4 })], ['8', t('fadeN', { n: 8 })]]);
   $('#looks').innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${esc(tx(l))}</button>`).join('');

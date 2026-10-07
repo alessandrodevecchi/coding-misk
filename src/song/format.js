@@ -17,14 +17,18 @@ export const PATTERN_FIELDS = {
   texture: ['rhythm'],
   riser: [],
   code: ['code'],
+  voice: [],
 };
 export const TYPES = Object.keys(PATTERN_FIELDS);
+// a voice track speaks the comments of a live build: these are its settings (speed below 1 lowers the pitch, below 0 reverses)
+export const VOICE_DEFAULT = { gain: 0.6, speed: 1, cutoff: 18000, hpf: 0, drive: 0, room: 0.2, delay: 0 };
 const STATE_KEY = { guitar: { preset: 'pattern' } };
 const stateKey = (type, k) => (STATE_KEY[type] && STATE_KEY[type][k]) || k;
 const skip = new Set(['on', 'rows']);
 // settings of a type: the channel fields that are not pattern fields
 export const SETTING_FIELDS = Object.fromEntries(TYPES.map(type => {
   if (type === 'code') return [type, ['visual']];
+  if (type === 'voice') return [type, Object.keys(VOICE_DEFAULT)];
   const pat = new Set(PATTERN_FIELDS[type].map(k => stateKey(type, k)));
   return [type, Object.keys(DEFAULT[type]).filter(k => !skip.has(k) && !pat.has(k))];
 }));
@@ -113,7 +117,7 @@ export function clipState(sec, tr, clip) {
   const st = cloneState(DEFAULT);
   Object.assign(st, { bpm: sec.bpm, bpmEnd: sec.bpmEnd, key: sec.key, prog: sec.chords, meter: sec.meter, swing: sec.swing });
   const type = tr.type, pat = (tr.patterns || {})[clip.pattern] || {};
-  if (type === 'code') return st;
+  if (type === 'code' || type === 'voice') return st;
   const ch = { ...DEFAULT[type], ...tr.settings, ...(clip.set || {}), on: true };
   if (type === 'drums') ch.rows = Object.fromEntries(ROWS.map(([id]) => [id, { steps: (pat.rows || {})[id] || '', mute: !(pat.rows || {})[id] }]));
   else for (const k of PATTERN_FIELDS[type]) if (pat[k] !== undefined) ch[stateKey(type, k)] = pat[k];

@@ -165,33 +165,24 @@
           "pattern": "call"
         }
       ]
+    },
+    {
+      "id": "voice",
+      "name": "Voice",
+      "type": "voice",
+      "settings": {
+        "gain": 0.55,
+        "speed": 1.25,
+        "cutoff": 18000,
+        "hpf": 300,
+        "drive": 2.5,
+        "room": 0.55,
+        "delay": 0.25
+      },
+      "patterns": {},
+      "clips": []
     }
   ],
-  "voice": {
-    "gain": 0.55,
-    "speed": 1.25,
-    "rack": [
-      {
-        "device": "distort",
-        "amount": 2.5
-      },
-      {
-        "device": "hpf",
-        "cutoff": 300
-      },
-      {
-        "device": "delay",
-        "amount": 0.25,
-        "time": 0.1875,
-        "feedback": 0.35
-      },
-      {
-        "device": "reverb",
-        "amount": 0.55,
-        "size": 0.75
-      }
-    ]
-  },
   "build": [
     {
       "at": 0,

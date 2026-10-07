@@ -186,7 +186,9 @@
 
 - Feedback del proprietario sulla voce di Primo Segnale (effetti poco udibili, modifiche alla traccia Lead senza effetto). Verificato: le modifiche alle tracce si applicano al brano in divenire (volume della Lead da 0.22 a 0.9, subito nel codice e nel suono), ma la Lead suona solo dalla battuta 77 alla 88; la voce invece non ha ancora un pannello, i suoi effetti stanno nel campo `voice` del brano. Voce di Primo Segnale rifatta su richiesta: pitch più alto (`speed` 1.25), distorsione, passa-alto, delay e riverbero più ampio. Il volume della voce ora si applica dopo gli effetti (`postgain`), così la distorsione non la rende più forte: picco misurato 0.52, come la cassa.
 
+- `#3` Traccia "Voce": nuovo tipo di traccia che dice i commenti del brano in divenire. Pannello con volume, pitch, filtro, taglio dei bassi, distorsione, riverbero, delay e rack, più l'elenco delle frasi con la loro battuta; niente pattern né clip (un clic sulla corsia non crea clip, e la traccia compare nel pannello di ogni sezione). Un passo può scegliere la voce con `voice` (più voci con suoni diversi), altrimenti parla la prima. Nella timeline la corsia della voce mostra un rombo per ogni frase. Il vecchio campo `voice` del brano è sostituito dalla traccia (Primo Segnale convertito). Verificato nel browser: pitch da 1.25 a 1.8 mentre suona, codice aggiornato subito, nessun errore.
+
 ## Prossimo passo
 
-- Ascolto del proprietario su "Primo Segnale" (con le voci: prima `npm run voices`) e sull'interruttore "In divenire"; poi campioni della sua voce e la modalità endless (`#18`).
+- Valori fissati dall'utente che vincono sui passi del brano in divenire (proposta: si fissano quando cambi un valore che un passo dopo reimposterebbe, con un'icona per sbloccarli); live coding a mano che ferma il divenire; poi campioni della voce del proprietario e modalità endless (`#18`).
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.

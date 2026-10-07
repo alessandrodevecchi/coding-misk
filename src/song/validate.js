@@ -99,7 +99,7 @@ export function validateSong(song) {
         if (lens.some(x => x.length !== n)) warn(cp, `steps are not ${n} long for section "${s.name}" (${s.meter || '4/4'}); they are cut or padded with rests`);
       });
     });
-    if (!Array.isArray(tr.clips) || !tr.clips.length) warn(`${p}.clips`, 'no clips: the track never plays');
+    if ((!Array.isArray(tr.clips) || !tr.clips.length) && tr.type !== 'voice') warn(`${p}.clips`, 'no clips: the track never plays');
   });
   const peak = Math.max(0, ...playing);
   if (peak > 15) warn('tracks', `${peak} tracks play at the same time; above about 15 the browser may drop notes`);
@@ -113,7 +113,8 @@ function checkSettings(type, set, p, err, warn) {
   const known = SETTING_FIELDS[type];
   for (const [k, v] of Object.entries(set)) {
     if (!known.includes(k)) { warn(`${p}.${k}`, `unknown setting for ${type}; settings: ${known.join(', ')}`); continue; }
-    if (/^(gain|cutoff|drive|grit|room|delay|reso|fm|swing)$/.test(k) && !isNum(v)) err(`${p}.${k}`, 'a number');
+    if (/^(gain|cutoff|drive|grit|room|delay|reso|fm|swing|hpf)$/.test(k) && !isNum(v)) err(`${p}.${k}`, 'a number');
+    if (k === 'speed' && type === 'voice' && (!isNum(v) || v === 0 || Math.abs(v) > 4)) err(`${p}.speed`, 'a number from -4 to 4, not 0 (below 1 lowers the voice, below 0 plays it backwards)');
     if (/End$/.test(k) && v !== null && !isNum(v)) err(`${p}.${k}`, 'a number, or null for no automation');
     if (k === 'kit' && !MACHINES.includes(v)) warn(`${p}.kit`, `not a drum machine of tidal-drum-machines (see the Sounds tab, for example RolandTR909, LinnDrum, AkaiMPC60)`);
     if (k === 'wave' && typeof v === 'string' && !v.split(',').every(w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w))) warn(`${p}.wave`, 'unknown sound; see the Sounds tab (General MIDI instruments start with gm_)');
