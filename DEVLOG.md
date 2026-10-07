@@ -182,7 +182,9 @@
 
 - `#17` completata la prima parte: interruttore "In divenire" sopra l'arrangiatore. Un brano senza passi se li ricava dai clip (ogni traccia entra dove parte il suo clip ed esce dove finisce, con un commento breve: "si parte", "serve il basso", "pausa", "chiudiamo"); solo entrate e uscite ai bordi dei clip, e le uscite aspettano la dissolvenza della sezione dopo, quindi il brano suona identico. I brani con passi propri hanno l'interruttore sempre acceso. Nella timeline i tratti in cui i passi tengono zitta una traccia sono tratteggiati e un rombo segna ogni cambiamento (titolo con battuta, azione e commento). Verificato nel browser su Primo Segnale e su Kellerlicht (in divenire parte con 3 tracce su 8 e "si parte"; spento mentre suona torna normale), nessun errore.
 
+- `#3` Voci, primo passo: i commenti dei brani in divenire ora si sentono. `npm run voices` (macOS) raccoglie tutte le frasi dei brani e dei passi ricavati e crea un WAV per frase e lingua con la voce di sistema (`say`, Samantha in inglese, Alice in italiano), tagliando il silenzio iniziale e uniformando il volume; i file vanno in `public/samples/say_en/` e `say_it/`, esclusi da git per la licenza delle voci Apple. Ogni frase suona una volta sulla battuta del suo passo, con gli effetti del campo `voice` del brano (volume, velocità o pitch, rack); Primo Segnale usa bit crush, delay e riverbero. Le frasi vengono caricate in silenzio all'avvio. Corretto anche il tempo dei passi: il codice nuovo viene valutato quando lo scheduler di Strudel sta per arrivare alla battuta (prima si basava sul tempo e poteva perdere il primo colpo). Misurato: voce e primo charleston partono sulla battuta del passo, con la stessa latenza degli altri strumenti.
+
 ## Prossimo passo
 
-- Ascolto del proprietario su "Primo Segnale" e sull'interruttore "In divenire"; poi voci da campioni (`#3`).
+- Ascolto del proprietario su "Primo Segnale" (con le voci: prima `npm run voices`) e sull'interruttore "In divenire"; poi campioni della sua voce e la modalità endless (`#18`).
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.

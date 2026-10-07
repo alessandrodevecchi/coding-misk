@@ -9,62 +9,319 @@
     "it": "Live build: trance che parte da una cassa sola e si costruisce davanti a te, un cambiamento ogni poche battute · La minore · 138 BPM"
   },
   "sections": [
-    { "name": "Live", "bars": 96, "bpm": 138, "key": "A", "chords": "ipnotica", "meter": "4/4" }
+    {
+      "name": "Live",
+      "bars": 96,
+      "bpm": 138,
+      "key": "A",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    }
   ],
   "tracks": [
     {
-      "id": "kick", "name": "Kick", "type": "drums",
-      "settings": { "kit": "RolandTR909", "gain": 0.85, "drive": 0.2 },
-      "patterns": { "floor": { "rows": { "bd": "x...x...x...x..." } } },
-      "clips": [{ "section": "Live", "pattern": "floor" }]
-    },
-    {
-      "id": "hats", "name": "Hats", "type": "drums",
-      "settings": { "kit": "RolandTR909", "gain": 0.35, "cutoff": 9000 },
-      "patterns": {
-        "off": { "rows": { "hh": "..x...x...x...x." } },
-        "full": { "rows": { "hh": "..x...x...x...x.", "cp": "....x.......x...", "oh": "......x.......x." } }
+      "id": "kick",
+      "name": "Kick",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85,
+        "drive": 0.2
       },
-      "clips": [{ "section": "Live", "pattern": "off" }]
+      "patterns": {
+        "floor": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Live",
+          "pattern": "floor"
+        }
+      ]
     },
     {
-      "id": "bass", "name": "Bass", "type": "bass",
-      "settings": { "wave": "sawtooth", "gain": 0.7, "cutoff": 500, "move": "lento", "reso": 8 },
-      "patterns": { "roll": { "preset": "rolling" } },
-      "clips": [{ "section": "Live", "pattern": "roll" }]
+      "id": "hats",
+      "name": "Hats",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.35,
+        "cutoff": 9000
+      },
+      "patterns": {
+        "off": {
+          "rows": {
+            "hh": "..x...x...x...x."
+          }
+        },
+        "full": {
+          "rows": {
+            "hh": "..x...x...x...x.",
+            "cp": "....x.......x...",
+            "oh": "......x.......x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Live",
+          "pattern": "off"
+        }
+      ]
     },
     {
-      "id": "arp", "name": "Arp", "type": "arp",
-      "settings": { "wave": "supersaw", "gain": 0.3, "cutoff": 1500, "move": "lento", "reso": 6, "delay": 0 },
-      "patterns": { "up": { "preset": "pulsar", "speed": "16" } },
-      "clips": [{ "section": "Live", "pattern": "up" }]
+      "id": "bass",
+      "name": "Bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.7,
+        "cutoff": 500,
+        "move": "lento",
+        "reso": 8
+      },
+      "patterns": {
+        "roll": {
+          "preset": "rolling"
+        }
+      },
+      "clips": [
+        {
+          "section": "Live",
+          "pattern": "roll"
+        }
+      ]
     },
     {
-      "id": "pad", "name": "Pad", "type": "pad",
-      "settings": { "wave": "supersaw", "gain": 0.2, "cutoff": 1600, "room": 0.85 },
-      "patterns": { "bed": { "preset": "pad" } },
-      "clips": [{ "section": "Live", "pattern": "bed" }]
+      "id": "arp",
+      "name": "Arp",
+      "type": "arp",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.3,
+        "cutoff": 1500,
+        "move": "lento",
+        "reso": 6,
+        "delay": 0
+      },
+      "patterns": {
+        "up": {
+          "preset": "pulsar",
+          "speed": "16"
+        }
+      },
+      "clips": [
+        {
+          "section": "Live",
+          "pattern": "up"
+        }
+      ]
     },
     {
-      "id": "lead", "name": "Lead", "type": "hook",
-      "settings": { "wave": "square", "mode": "minor", "octave": "4", "gain": 0.22, "cutoff": 2800, "delay": 0.4 },
-      "patterns": { "call": { "notes": "<[0 ~ 2 ~ 4 ~ 2 ~] [3 ~ 2 ~ 0 ~ ~ ~] [0 ~ 2 ~ 4 ~ 6 ~] [5 ~ 4 ~ 2 ~ ~ ~]>" } },
-      "clips": [{ "section": "Live", "pattern": "call" }]
+      "id": "pad",
+      "name": "Pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.2,
+        "cutoff": 1600,
+        "room": 0.85
+      },
+      "patterns": {
+        "bed": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Live",
+          "pattern": "bed"
+        }
+      ]
+    },
+    {
+      "id": "lead",
+      "name": "Lead",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "mode": "minor",
+        "octave": "4",
+        "gain": 0.22,
+        "cutoff": 2800,
+        "delay": 0.4
+      },
+      "patterns": {
+        "call": {
+          "notes": "<[0 ~ 2 ~ 4 ~ 2 ~] [3 ~ 2 ~ 0 ~ ~ ~] [0 ~ 2 ~ 4 ~ 6 ~] [5 ~ 4 ~ 2 ~ ~ ~]>"
+        }
+      },
+      "clips": [
+        {
+          "section": "Live",
+          "pattern": "call"
+        }
+      ]
     }
   ],
+  "voice": {
+    "gain": 0.6,
+    "rack": [
+      {
+        "device": "crush",
+        "bits": 8
+      },
+      {
+        "device": "delay",
+        "amount": 0.3,
+        "time": 0.1875,
+        "feedback": 0.4
+      },
+      {
+        "device": "reverb",
+        "amount": 0.3,
+        "size": 0.5
+      }
+    ]
+  },
   "build": [
-    { "at": 0, "add": "kick", "say": { "en": "just a kick", "it": "solo una cassa" } },
-    { "at": 8, "add": "hats", "say": { "en": "some air", "it": "un po' d'aria" } },
-    { "at": 16, "add": "bass", "say": { "en": "need bass", "it": "serve il basso" } },
-    { "at": 24, "set": { "track": "bass", "cutoff": 1100 }, "say": { "en": "open it up", "it": "apriamolo" } },
-    { "at": 32, "add": "arp", "say": { "en": "now the arp", "it": "ora l'arpeggio" } },
-    { "at": 40, "rack": { "track": "arp", "device": "delay", "amount": 0.35, "time": 0.1875, "feedback": 0.5 }, "say": { "en": "more space", "it": "più spazio" } },
-    { "at": 48, "add": "pad", "pattern": { "track": "hats", "to": "full" }, "say": { "en": "more rhythm", "it": "serve più ritmo" } },
-    { "at": 56, "set": { "track": "arp", "cutoff": 3500 }, "say": { "en": "brighter", "it": "più luce" } },
-    { "at": 64, "remove": ["kick", "hats"], "say": { "en": "breakdown", "it": "pausa" } },
-    { "at": 72, "add": ["kick", "hats"], "rack": { "track": "bass", "device": "distort", "amount": 1.5 }, "say": { "en": "more force", "it": "più forza" } },
-    { "at": 76, "remove": "pad", "add": "lead", "say": { "en": "lead!", "it": "melodia!" } },
-    { "at": 88, "remove": ["arp", "lead"], "say": { "en": "strip it back", "it": "togliamo tutto" } },
-    { "at": 92, "remove": "bass", "say": { "en": "bye", "it": "ciao" } }
+    {
+      "at": 0,
+      "add": "kick",
+      "say": {
+        "en": "just a kick",
+        "it": "solo una cassa"
+      }
+    },
+    {
+      "at": 8,
+      "add": "hats",
+      "say": {
+        "en": "some air",
+        "it": "un po' d'aria"
+      }
+    },
+    {
+      "at": 16,
+      "add": "bass",
+      "say": {
+        "en": "need bass",
+        "it": "serve il basso"
+      }
+    },
+    {
+      "at": 24,
+      "set": {
+        "track": "bass",
+        "cutoff": 1100
+      },
+      "say": {
+        "en": "open it up",
+        "it": "apriamolo"
+      }
+    },
+    {
+      "at": 32,
+      "add": "arp",
+      "say": {
+        "en": "now the arp",
+        "it": "ora l'arpeggio"
+      }
+    },
+    {
+      "at": 40,
+      "rack": {
+        "track": "arp",
+        "device": "delay",
+        "amount": 0.35,
+        "time": 0.1875,
+        "feedback": 0.5
+      },
+      "say": {
+        "en": "more space",
+        "it": "più spazio"
+      }
+    },
+    {
+      "at": 48,
+      "add": "pad",
+      "pattern": {
+        "track": "hats",
+        "to": "full"
+      },
+      "say": {
+        "en": "more rhythm",
+        "it": "serve più ritmo"
+      }
+    },
+    {
+      "at": 56,
+      "set": {
+        "track": "arp",
+        "cutoff": 3500
+      },
+      "say": {
+        "en": "brighter",
+        "it": "più luce"
+      }
+    },
+    {
+      "at": 64,
+      "remove": [
+        "kick",
+        "hats"
+      ],
+      "say": {
+        "en": "breakdown",
+        "it": "pausa"
+      }
+    },
+    {
+      "at": 72,
+      "add": [
+        "kick",
+        "hats"
+      ],
+      "rack": {
+        "track": "bass",
+        "device": "distort",
+        "amount": 1.5
+      },
+      "say": {
+        "en": "more force",
+        "it": "più forza"
+      }
+    },
+    {
+      "at": 76,
+      "remove": "pad",
+      "add": "lead",
+      "say": {
+        "en": "lead!",
+        "it": "melodia!"
+      }
+    },
+    {
+      "at": 88,
+      "remove": [
+        "arp",
+        "lead"
+      ],
+      "say": {
+        "en": "strip it back",
+        "it": "togliamo tutto"
+      }
+    },
+    {
+      "at": 92,
+      "remove": "bass",
+      "say": {
+        "en": "bye",
+        "it": "ciao"
+      }
+    }
   ]
 }

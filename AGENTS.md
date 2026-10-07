@@ -54,6 +54,7 @@ node --no-warnings tools/song.mjs validate songs/my-song.json   # check a v2 son
 node --no-warnings tools/song.mjs compile songs/my-song.json    # print its Strudel code
 node --no-warnings tools/song.mjs list                          # songs in songs/
 npm run check:songs                                    # validate every song in songs/
+npm run voices                                         # spoken comments for live builds (macOS say + ffmpeg)
 ```
 
 Video recording needs Playwright's ffmpeg (`node $PLAYWRIGHT_CORE/cli.js install ffmpeg`). The demo script writes `video.webm`, `audio.webm` and `offset.txt`; merge with system ffmpeg (see `docs/ARCHITECTURE.md`).

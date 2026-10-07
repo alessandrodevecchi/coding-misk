@@ -4,7 +4,7 @@
 // The state at a bar is the song with every step up to that bar applied, so seeking, pausing and the code
 // shown in the editor always agree. Tracks named by an "add" step are silent before it; the others play from the start.
 import { SETTING_FIELDS } from './format.js';
-import { DEVICES, checkRack } from './rack.js';
+import { DEVICES, checkRack, rackCode } from './rack.js';
 
 export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack'];
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -46,6 +46,8 @@ export function stateAt(song, bar) {
   return { song: out, upTo };
 }
 
+// file name of a spoken comment: "Serve più ritmo!" → "serve_piu_ritmo"
+export const saySlug = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48);
 // "say" is a phrase, or one phrase per language: { "en": "more bass", "it": "più basso" }
 export const sayText = (say, lang = 'en') => !say ? '' : typeof say === 'string' ? say : say[lang] || say.en || Object.values(say)[0] || '';
 // comment shown at a bar: the latest step with "say" that is not older than "hold" bars
@@ -68,8 +70,38 @@ export function annotate(code, song, upTo, lang) {
   return lines.join('\n');
 }
 
+// every spoken comment of a song that has a sample: [{ s, n }], to load them before they play
+export function voiceSamples(song, lang, files) {
+  const bank = `say_${lang}`, list = (files || {})[bank] || [];
+  return [...new Set(buildSteps(song).map(st => list.findIndex(f => decodeURI(f).endsWith(`/${saySlug(sayText(st.say, lang))}.wav`))))].filter(n => n >= 0).map(n => ({ s: bank, n }));
+}
+// spoken comment of the latest step: a sample of public/samples/say_<lang>/ (tools/voice.mjs), played once on the
+// step's bar, with the song's "voice" settings: { "gain": 0.6, "speed": 1, "rack": [...] } (speed < 1 lowers it, < 0 reverses it)
+// files: the custom samples manifest ({ say_en: ["say_en/more_bass.wav", …] }); no file, no voice
+export function voiceCode(song, upTo, total, lang, files) {
+  const step = buildSteps(song)[upTo - 1], text = step && sayText(step.say, lang);
+  const bank = `say_${lang}`, list = (files || {})[bank];
+  if (!text || !list) return '';
+  const n = list.findIndex(f => decodeURI(f).endsWith(`/${saySlug(text)}.wav`));
+  if (n < 0) return '';
+  const v = song.voice || {}, at = step.at, rest = total - at - 1;
+  const lane = `<${at > 0 ? `0!${at} ` : ''}1${rest > 0 ? ` 0!${rest}` : ''}>`;
+  const fx = v.rack && v.rack.length ? rackCode(v.rack, 'texture') : '.room(0.2)';
+  return `\n// voice · "${text}", spoken on bar ${at + 1}\n$: s("${bank}").n(${n}).mask("${lane}").gain(${v.gain ?? 0.6})${v.speed !== undefined && v.speed !== 1 ? `.speed(${v.speed})` : ''}${fx}.orbit(15).analyze("fx")`;
+}
+
 // checks for the "build" list; err/warn take (path, message)
 export function checkBuild(song, total, err, warn) {
+  if (song.voice !== undefined) {
+    const v = song.voice;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) err('voice', 'an object: { "gain": 0.6, "speed": 1, "rack": [...] }');
+    else {
+      for (const k of Object.keys(v)) if (!['gain', 'speed', 'rack'].includes(k)) warn(`voice.${k}`, 'unknown field; voice fields: gain, speed, rack');
+      if (v.gain !== undefined && (!Number.isFinite(v.gain) || v.gain < 0 || v.gain > 2)) err('voice.gain', 'a number from 0 to 2');
+      if (v.speed !== undefined && (!Number.isFinite(v.speed) || v.speed === 0 || Math.abs(v.speed) > 4)) err('voice.speed', 'a number from -4 to 4, not 0 (below 1 lowers the voice, below 0 plays it backwards)');
+      if (v.rack !== undefined) checkRack(v.rack, 'voice.rack', err, warn);
+    }
+  }
   if (song.build === undefined) return;
   if (!Array.isArray(song.build)) { err('build', 'an array of steps, for example [{ "at": 4, "add": "bass", "say": "more bass" }]'); return; }
   const tracks = Array.isArray(song.tracks) ? song.tracks : [];
@@ -119,7 +151,7 @@ export function buildMap(song, total) {
 
 // steps for a song that has none: each track comes in where its clips start and leaves where they stop,
 // with a short comment. Only add and remove at clip edges, so the song sounds exactly as written.
-const PHRASES = {
+export const PHRASES = {
   start: { en: "let's go", it: 'si parte' },
   drums: { en: 'more rhythm', it: 'serve più ritmo' }, bass: { en: 'need bass', it: 'serve il basso' },
   guitar: { en: 'guitars!', it: 'chitarre!' }, hook: { en: 'melody!', it: 'melodia!' }, arp: { en: 'now the arp', it: "ora l'arpeggio" },

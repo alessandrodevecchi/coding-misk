@@ -61,6 +61,8 @@ A song with `build` steps (`src/song/build.js`) is played by state: `stateAt(son
 
 The "Live build" switch (`coding-misk-live`) gives songs without steps a derived build (`deriveBuild`): add and remove only at clip edges, removals delayed past a section's fade, so the audio does not change. `buildMap` gives the timeline the silent spans and the step marks of each track.
 
+Spoken comments: `tools/voice.mjs` writes `public/samples/say_<lang>/<slug>.wav` with macOS `say` (git-ignored). The custom samples manifest maps them to `s("say_en").n(k)`; `voiceCode` adds a one-shot layer masked to the step's bar with the song's `voice` settings, and `playSong` loads every voice sample silently first. A step is evaluated when the scheduler's `lastEnd` is about to reach its bar, so the first hit of the bar already comes from the new code.
+
 ## Sound browser
 
 `buildCatalog(soundMap, customBanks)` reads every loaded sound. Keys in `soundMap` are lowercase and drum machines also have aliases (`tr909_bd` next to `rolandtr909_bd`): only the 71 canonical machines of `machines.js` are kept. Sample banks keep loading after start-up (the full dirt-samples archive arrives a few seconds later), so the browser re-reads the catalogue every second until it stops growing. Pads play one shot through `superdough()`; cards and lists play a looping audition through the editor. "Use" sets the kit of a drums track, the sound of a bass, arp, hook or pad track, or the sample of a texture track (the selected track first, otherwise the first suitable one).

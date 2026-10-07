@@ -2,7 +2,7 @@ import '@strudel/repl';
 import './style.css';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText } from './song/build.js';
+import { hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples } from './song/build.js';
 import { typingFrames } from './song/typing.js';
 import { validateSong } from './song/validate.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, fromScenes, clipState } from './song/format.js';
@@ -66,12 +66,18 @@ function composedTracks() {
 }
 const codedTracks = () => CODED.map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
+// custom samples manifest (bank → files), for spoken comments
+let customFiles = {};
 // oggetto riproducibile: codice + mappa di sezioni e tempo
 function playable(tr) {
   // live build: the code depends on the bar (steps applied up to there), with the latest comment written in
   // a song without steps can build itself too ("Live build" switch): steps derived from its clips
   const build = tr.kind !== 'composed' ? null : hasBuild(tr) ? tr : liveOn ? { ...tr, build: deriveBuild(tr) } : null;
-  const codeAt = build ? bar => { const st = stateAt(build, bar), c = annotate(compileSong(st.song), build, st.upTo, getLang()); return c.includes('$:') ? c : `${c}\n$: silence`; } : null;
+  const codeAt = build ? bar => {
+    const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
+    const c = annotate(compileSong(st.song), build, st.upTo, getLang()) + voiceCode(build, st.upTo, total, getLang(), customFiles);
+    return c.includes('$:') ? c : `${c}\n$: silence`;
+  } : null;
   const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
   const meta = parseSong(code);
   if (tr.kind === 'composed') {
@@ -117,6 +123,7 @@ ready.then(async () => {
   try {
     const list = await (await fetch('/samples/strudel.json')).json();
     custom = Object.keys(list).filter(k => k !== '_base');
+    customFiles = list;
     if (!custom.length) return;
     await globalThis.samples('/samples/strudel.json');
     renderTrackPanel(); renderSounds(); syncAll();
@@ -144,11 +151,12 @@ let built = 0, typing = null;
 function liveBuild(sg, s, cyc) {
   const steps = buildSteps(sg.build), next = steps[built];
   if (!next) return;
-  // the change is typed during the bar before its step and evaluated just before the bar, so it sounds on the beat
-  const evalAt = next.at - .15 * s.cps, typeAt = next.at - Math.min(1, 2 * s.cps);
-  if (cyc < typeAt) return;
-  if (!typing) typing = { frame: typingFrames(ed.code || '', codeFor(sg, next.at)), t0: cyc, t1: evalAt, shown: '' };
-  if (cyc < evalAt) {
+  // the change is typed during the bar before its step. Strudel schedules ahead from lastEnd, so the new code is
+  // evaluated when the next query is about to reach the step's bar: everything from the bar on comes from the new code
+  const typeAt = next.at - Math.min(1, 2 * s.cps), due = s.lastEnd + .1 * s.cps >= next.at;
+  if (cyc < typeAt && !due) return;
+  if (!typing) typing = { frame: typingFrames(ed.code || '', codeFor(sg, next.at)), t0: cyc, t1: next.at - .2 * s.cps, shown: '' };
+  if (!due) {
     const txt = typing.frame((cyc - typing.t0) / Math.max(.01, typing.t1 - typing.t0));
     if (txt !== typing.shown) { const prev = typing.shown || ed.code || ''; typing.shown = txt; ed.setCode(txt); followEdit(prev, txt); }
     return;
@@ -181,6 +189,8 @@ async function playSong(sg, bar = 0, as = 'free') {
     renderSource();
     ed.stop();
     typing = null; built = sg.build ? buildSteps(sg.build).filter(x => x.at <= bar).length : 0;
+    // spoken comments load the first time they play, too late for that hit: load them all now, silently
+    if (sg.build) voiceSamples(sg.build, getLang(), customFiles).forEach(v => { try { globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05); } catch (e) {} });
     ed.setCode(codeFor(sg, bar));
     sched().lastEnd = bar;
     if (loopIdx >= 0) loopIdx = m.sectionAt(bar);

@@ -177,6 +177,14 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 
 One step can combine several actions. Steps on the same bar apply in file order. The state at any bar is the song with every step up to that bar applied, so seeking and pausing land on the right version. Clips still decide where a track can play. `node tools/song.mjs steps <file>` lists the steps; `compile <file> --at N` prints the code at bar N.
 
+**Spoken comments.** When a sample exists for a comment, it is spoken once on its step's bar. `npm run voices` (macOS) makes one WAV per phrase and language with the system voice (`say`), in `public/samples/say_en/` and `say_it/` (git-ignored). The optional song field `voice` shapes it with the usual effects:
+
+```json
+"voice": { "gain": 0.6, "speed": 0.9, "rack": [{ "device": "crush", "bits": 8 }, { "device": "delay", "amount": 0.3 }] }
+```
+
+`gain` 0 to 2 (default 0.6), `speed` -4 to 4 (below 1 lower and slower, below 0 backwards), `rack` any rack devices (default a light reverb).
+
 A song without `build` can also build itself: the "Live build" switch above the arranger derives steps from its clips (each track comes in where its clips start and leaves where they stop, with a short comment), so it sounds exactly as written. On the timeline, a live build shows hatching where its steps keep a track silent and a diamond where a step changes it.
 
 ## Compiled code
