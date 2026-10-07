@@ -190,7 +190,12 @@
 
 - Voce e valori fissati (feedback del proprietario): impostazioni della voce di Primo Segnale prese dal suo screenshot (volume 31%, pitch e velocità 0.7, taglio bassi 1100 Hz, drive 2.4, riverbero 55%, delay 38%). Pitch e velocità della voce ora sono indipendenti: `speed` cambia la durata e `stretch` (phase vocoder di Strudel) rimette il pitch dove deve stare; misurato con velocità 0.7, frase da circa 0.6 a circa 1 secondo. Nella vista Sezioni la riga della voce mostra quante frasi dice in ogni sezione. Valori fissati (`pinned` sulla traccia): accanto a una manopola compare una puntina quando i passi cambiano quel valore; cambiandolo a mano si fissa e vince sui passi per tutto il brano, cliccando la puntina si sblocca. Verificato: filtro del basso alla battuta 30 da 1100 (passo) al valore scelto (fissato) e ritorno a 1100 (sbloccato), nessun errore.
 
+- Controllo dei livelli prima del rilascio: tutto uguale tranne la sezione "Hit" di Neon Rush reel, muta. Non è una regressione: anche `v0.3.1` (provata in un worktree su un'altra porta) dà lo stesso risultato. "Hit" è l'ultima sezione e dura una battuta: da quando a fine brano la riproduzione si ferma, la finestra di misura (da 1.2 a 3.2 secondi) cade dopo la fine. Istantanee dei livelli riscritte per Neon Rush reel e aggiunte per Kellerlicht e Primo Segnale. "Ferro" differiva una volta e ricontrollato da solo è a posto (misura instabile già nota).
+- OpenSpec inizializzato nel progetto (`openspec/`, schema spec-driven, artefatti in inglese) per la modalità endless `#18`: una change per fase.
+- Rilascio `v0.4.0`: brano in divenire, interruttore "In divenire", traccia Voce con commenti parlati, valori fissati.
+
 ## Prossimo passo
 
+- Endless `#18`, fase 0: esplorazione e domande al proprietario (primo giro inviato), poi la change OpenSpec della fase 1 (ricette e regista).
 - Live coding a mano che ferma il divenire; poi campioni della voce del proprietario e modalità endless (`#18`).
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.

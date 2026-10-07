@@ -622,67 +622,62 @@
   {
    "name": "Glitch",
    "levels": {
-    "fx": 0.13,
     "arp": 0.33,
-    "kick": 0.5
+    "kick": 0.5,
+    "fx": 0.13
    }
   },
   {
    "name": "Build",
    "levels": {
-    "bass": 0.43,
-    "hats": 0.44,
     "arp": 0.34,
     "kick": 0.49,
-    "riser": 0.07
+    "fx": 0.28,
+    "riser": 0.07,
+    "hats": 0.44,
+    "bass": 0.43
    }
   },
   {
    "name": "Drop",
    "levels": {
-    "hook": 0.06,
-    "bass": 0.48,
+    "arp": 0.47,
+    "kick": 0.5,
     "fx": 0.19,
     "hats": 1.18,
-    "arp": 0.47,
+    "bass": 0.48,
     "snare": 0.51,
-    "pad": 0.34,
-    "kick": 0.5
+    "hook": 0.06,
+    "pad": 0.29
    }
   },
   {
    "name": "Glitch break",
    "levels": {
-    "fx": 0.17,
-    "hats": 0.48,
     "arp": 0.48,
     "kick": 0.5,
-    "riser": 0.15
+    "fx": 0.17,
+    "riser": 0.15,
+    "hats": 0.48
    }
   },
   {
    "name": "Hit",
    "levels": {
-    "hook": 0.1,
-    "bass": 0.48,
-    "fx": 0.25,
-    "hats": 1.24,
     "arp": 0.37,
-    "snare": 0.51,
-    "pad": 0.38,
     "kick": 0.5,
-    "guitar": 0.48
+    "fx": 0.25,
+    "hats": 1.23,
+    "bass": 0.48,
+    "snare": 0.52,
+    "hook": 0.05,
+    "pad": 0.27,
+    "guitar": 0.23
    }
   },
   {
    "name": "Hit",
-   "levels": {
-    "bass": 0.2,
-    "fx": 0.13,
-    "arp": 0.27,
-    "kick": 0.5,
-    "guitar": 0.47
-   }
+   "levels": {}
   }
  ],
  "settimo-cielo": [
@@ -1517,6 +1512,95 @@
     "hook": 0.09,
     "arp": 0.13,
     "guitar": 0.54
+   }
+  }
+ ],
+ "primo-segnale": [
+  {
+   "name": "Live",
+   "levels": {
+    "kick": 0.44,
+    "fx": 0.05
+   }
+  }
+ ],
+ "kellerlicht": [
+  {
+   "name": "Tunnel",
+   "levels": {
+    "kick": 0.47,
+    "fx": 0.19,
+    "bass": 0.47
+   }
+  },
+  {
+   "name": "Eingang",
+   "levels": {
+    "kick": 0.47,
+    "hats": 0.09,
+    "bass": 0.47
+   }
+  },
+  {
+   "name": "Körper",
+   "levels": {
+    "kick": 0.47,
+    "hats": 0.09,
+    "bass": 0.47
+   }
+  },
+  {
+   "name": "Nebel",
+   "levels": {
+    "arp": 0.09,
+    "kick": 0.35,
+    "fx": 0.13,
+    "hats": 0.06,
+    "bass": 0.34,
+    "pad": 0.09
+   }
+  },
+  {
+   "name": "Druck",
+   "levels": {
+    "arp": 0.13,
+    "kick": 0.47,
+    "hats": 0.17,
+    "bass": 0.47,
+    "snare": 0.15,
+    "pad": 0.03
+   }
+  },
+  {
+   "name": "Abstieg",
+   "levels": {
+    "arp": 0.07,
+    "kick": 0.55,
+    "hats": 0.12,
+    "bass": 0.52,
+    "snare": 0.08,
+    "pad": 0.11
+   }
+  },
+  {
+   "name": "Druck 2",
+   "levels": {
+    "kick": 0.55,
+    "hats": 0.13,
+    "bass": 0.55,
+    "snare": 0.15,
+    "pad": 0.11
+   }
+  },
+  {
+   "name": "Ausgang",
+   "levels": {
+    "kick": 0.55,
+    "fx": 0.16,
+    "hats": 0.08,
+    "bass": 0.29,
+    "snare": 0.08,
+    "pad": 0.04
    }
   }
  ]

@@ -13,6 +13,7 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 | `docs/COMPOSING.md`     | Guide to composing songs as code, with validated examples in `songs/examples/`        |
 | `docs/VOCALS.md`        | Vocals research (`#3`): local models, licenses, recording, effects, channel design   |
 | `docs/PLAN-TRACKS.md`   | Plan for tracks, per-instrument patterns and a timeline (proposal)                   |
+| `openspec/`             | OpenSpec specs and changes (spec-driven development, used for `#18` endless mode)     |
 | `docs/DESIGN-SYSTEM.md` | Themes, tokens, fonts, components, visuals, hardware theme                           |
 | `DEVLOG.md`             | Chronological log of every change (Italian)                                          |
 | `README.md`             | Public description (English), `README.it.md` in Italian                              |
