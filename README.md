@@ -52,6 +52,7 @@ This project combines that idea with what the new models can do, with my own twi
 - **Hardware interface theme.** Switch from neon to hardware: knobs instead of sliders, small amber displays, power and activity LEDs on every channel, anodized panels.
 - **WAV export.** Records the track in real time from Strudel's output and downloads a stereo WAV.
 - **Custom samples.** Audio files placed in `public/samples/` become sounds you can use in tracks.
+- **Endless sessions (first phase).** A director writes sessions of songs from twelve style recipes (Berlin techno, trance, synthwave, lo-fi, drum and bass, ambient, phonk, industrial, jazz, country, classic rock, melodic metal), mixes styles with a chaos amount, follows energy shapes and builds each song live with spoken comments. Same seed, same music. Command line for now: `npm run endless -- --styles synthwave,jazz --seed aurora --join` ([docs/ENDLESS.md](docs/ENDLESS.md)).
 - **Guide and sounds.** 14 lessons to listen to and a library to try drum machines, oscillators and samples.
 - **Italian and English**, including the comments in the generated code.
 
@@ -90,6 +91,8 @@ The app opens at <http://localhost:5173>. Space bar plays and pauses, `Ctrl+Ente
 | `src/music.js`   | Keys, chords, presets, per-instrument code generator                |
 | `src/song/`      | Song format: compiler, validator, converter from older saves        |
 | `songs/`         | Included songs as JSON, `songs/examples/` for the guide             |
+| `src/endless/`   | Endless director: recipes, mixing, energy shapes, moves, sessions   |
+| `styles/`        | Style recipes for endless sessions                                  |
 | `src/songs.js`   | Reads sections and tempo from a track's code                        |
 | `src/visuals.js` | Canvas visuals synced to the audio                                  |
 | `src/i18n.js`    | Italian and English strings                                         |

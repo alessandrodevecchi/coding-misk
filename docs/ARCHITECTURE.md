@@ -9,6 +9,7 @@ Vanilla JavaScript ES modules served by Vite 8. No framework. Strudel runs insid
 | `src/main.js`     | Entry point. Track library, draft persistence, arranger UI, channel controls, sequencer, tabs, transport, WAV export, language and theme switches, custom samples loading |
 | `src/music.js`    | Musical data (keys, chords, progressions, presets), `DEFAULT` scene state, `normalizeState`, `sceneLayers` (per-instrument code generator), `compileTrackV1` (reference), `makeScene`, demo track |
 | `src/song/`       | Song format v2: `format.js` (types, `fromScenes` converter, `normalizeSong`, `clipState`), `compile.js` (`compileSong`), `validate.js` (`validateSong`), `rack.js` (rack devices: `DEVICES`, `rackCode`) |
+| `src/endless/`    | Endless director (`docs/ENDLESS.md`): `random.js` (seeded streams), `recipe.js` (style recipes, validator), `mix.js` (parts per style, chaos), `shapes.js`, `energy.js`, `mutate.js`, `phrases.js`, `director.js` (`generateSession`), `join.js`. Pure modules: they run in Node (`tools/endless.mjs`) and in the browser |
 | `src/songs.js`    | `parseSong(code)`: reads `SECTIONS` and `TEMPO` lines into per-bar BPM, section map, `secondsAt`, `sectionAt`                                                             |
 | `src/sounds/`     | Sound browser: `catalog.js` (catalogue from superdough's `soundMap`, categories, audition code), `art.js` (SVG drawings rendered as pixel art), `photos.js` (free photos, credits in `public/sounds/photos/CREDITS.md`), `machines.js` (71 canonical drum machines), `browser.js` (UI) |
 | `src/visuals.js`  | Canvas visuals, per-instrument levels and onsets from Strudel analysers                                                                                                   |
@@ -64,6 +65,10 @@ The "Live build" switch (`coding-misk-live`) gives songs without steps a derived
 Pinned settings: `stateAt` restores a track's own value for every key in `track.pinned` after applying the steps. In the panel, a pin next to a knob shows when steps change that value; changing it pins it (`setSetting`), clicking the pin releases it. Voice pitch and tempo are independent: `speed` sets the length and `stretch` (Strudel's phase vocoder) corrects the pitch.
 
 Spoken comments: `tools/voice.mjs` writes `public/samples/say_<lang>/<slug>.wav` with macOS `say` (git-ignored). The custom samples manifest maps them to `s("say_en").n(k)`; `voiceCode` adds a one-shot layer masked to the step's bar with the settings and rack of the step's voice track (taken from the state at that bar; `compileSong` skips voice tracks), and `playSong` loads every voice sample silently first. A step is evaluated when the scheduler's `lastEnd` is about to reach its bar, so the first hit of the bar already comes from the new code.
+
+## Endless director
+
+`generateSession(recipes, options)` returns `{ session, songs }`: plain v2 songs with `build` steps, so the player, the live build engine, the voice track and the exporter play them unchanged. For each song the director plans parts, tempo, key, sections and candidate tracks, then walks phrase boundaries: it applies candidate moves to a copy of the steps, measures the result with `stateAt` and `energyOf`, and keeps the move closest to the target energy. All randomness comes from named seeded streams, never `Math.random`. `tools/endless.mjs` writes songs to `songs/endless/` (git-ignored); the library picks them up through the `songs/**` glob, which skips `session.json`. The radio view (`#22`) will call the same functions in the browser.
 
 ## Sound browser
 

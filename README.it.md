@@ -52,6 +52,7 @@ Questo progetto unisce quell'idea alle capacità dei nuovi modelli, con il mio t
 - **Tema interfaccia hardware.** Si passa da neon a hardware: manopole al posto dei cursori, piccoli display ambra, LED di accensione e di attività su ogni canale, pannelli anodizzati.
 - **Esportazione WAV.** Registra il brano in tempo reale dall'uscita di Strudel e scarica un WAV stereo.
 - **Campioni personalizzati.** I file messi in `public/samples/` diventano suoni utilizzabili nei brani.
+- **Sessioni endless (prima fase).** Un regista scrive sessioni di brani a partire da dodici ricette di stile (Berlin techno, trance, synthwave, lo-fi, drum and bass, ambient, phonk, industrial, jazz, country, rock classico, metal melodico), mescola gli stili con una dose di caos, segue curve di energia e costruisce ogni brano dal vivo con commenti parlati. Stesso seme, stessa musica. Per ora da riga di comando: `npm run endless -- --styles synthwave,jazz --seed aurora --join` ([docs/ENDLESS.md](docs/ENDLESS.md)).
 - **Guida e suoni.** 14 lezioni da ascoltare e una libreria per provare drum machine, oscillatori e campioni.
 - **Italiano e inglese**, anche nei commenti del codice generato.
 
@@ -90,6 +91,8 @@ Si apre <http://localhost:5173>. La barra spaziatrice fa play e pausa, `Ctrl+Ent
 | `src/music.js`   | Tonalità, accordi, preset, generatore di codice per strumento                             |
 | `src/song/`      | Formato dei brani: compilatore, validatore, conversione dei salvataggi vecchi             |
 | `songs/`         | Brani inclusi in JSON, `songs/examples/` per la guida                                     |
+| `src/endless/`   | Regista endless: ricette, mescolanza, curve di energia, mosse, sessioni                   |
+| `styles/`        | Ricette di stile per le sessioni endless                                                  |
 | `src/songs.js`   | Lettura di sezioni e tempo dal codice di un brano                                         |
 | `src/visuals.js` | Visual su canvas sincronizzati con l'audio                                                |
 | `src/i18n.js`    | Testi in italiano e inglese                                                               |

@@ -62,6 +62,7 @@ npm run endless -- --styles berlin-techno,jazz --chaos 0.5 --minutes 20 --seed a
 npm run check:styles                                   # validate the style recipes in styles/
 npm run check:endless                                  # recipes, director rules, determinism (seed fixtures), command line
 node tools/check-style-sounds.cjs                      # every sound and drum machine a recipe names is loaded (dev server)
+node tools/check-endless-play.cjs [songs/endless]     # evaluate every live build step of generated songs in the app (dev server)
 ```
 
 Video recording needs Playwright's ffmpeg (`node $PLAYWRIGHT_CORE/cli.js install ffmpeg`). The demo script writes `video.webm`, `audio.webm` and `offset.txt`; merge with system ffmpeg (see `docs/ARCHITECTURE.md`).

@@ -16,7 +16,8 @@ fs.mkdirSync(DIR, { recursive: true });
 
 let failed = 0;
 const ids = new Set();
-for (const file of songFiles(path.join(ROOT, 'songs'))) {
+// generated endless sessions (songs/endless/, git-ignored) change with every run: no snapshots
+for (const file of songFiles(path.join(ROOT, 'songs')).filter(f => !f.includes(`${path.sep}endless${path.sep}`))) {
   const song = JSON.parse(fs.readFileSync(file, 'utf8'));
   ids.add(song.id);
   const snap = path.join(DIR, `${song.id}.strudel`);

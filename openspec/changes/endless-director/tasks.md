@@ -34,6 +34,6 @@
 
 ## 5. Integration
 
-- [ ] 5.1 Generate a session for each of the twelve styles and a mixed session (for example synthwave, jazz and country with chaos 1), open them in Compose, and verify in the browser that every song plays as a live build without evaluation errors, with measured levels per instrument reported.
-- [ ] 5.2 Update `docs/CONTEXT.md`, `docs/ARCHITECTURE.md`, README and `DEVLOG.md`, run `npm run check:code`, `npm run check:songs`, `npm run check:endless` and `npm run build`, and verify all pass before merging into `develop`.
+- [x] 5.1 Generate a session for each of the twelve styles and a mixed session (for example synthwave, jazz and country with chaos 1), open them in Compose, and verify in the browser that every song plays as a live build without evaluation errors, with measured levels per instrument reported.
+- [x] 5.2 Update `docs/CONTEXT.md`, `docs/ARCHITECTURE.md`, README and `DEVLOG.md`, run `npm run check:code`, `npm run check:songs`, `npm run check:endless` and `npm run build`, and verify all pass before merging into `develop`.
 - [ ] 5.3 Hand the owner a few joined sessions (and exported audio if asked) to listen to, and record the feedback in `DEVLOG.md` and issue #21.

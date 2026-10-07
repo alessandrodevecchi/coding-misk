@@ -151,8 +151,12 @@ function candidateMoves(state, ctx, blocked, rng) {
     }
     if (MELODIC.includes(t.type)) {
       const have = (byId(t.id).rack || []).map(d => d.device);
-      const free = [...SPACE, ...DIRT].filter(d => !have.includes(d));
-      if (free.length && have.length < 2) { const dev = rng.pick(free); out.push({ kind: SPACE.includes(dev) ? 'more-space' : 'dirtier', track: t.id, step: { rack: { track: t.id, device: dev } } }); }
+      // held pads clip with distortion: they only get space or colour; distortion stays gentle (the default 2 clips held chords)
+      const free = [...SPACE, ...DIRT].filter(d => !have.includes(d) && !(t.type === 'pad' && d === 'distort'));
+      if (free.length && have.length < 2) {
+        const dev = rng.pick(free), extra = dev === 'distort' ? { amount: 0.8 } : dev === 'crush' ? { bits: 8 } : {};
+        out.push({ kind: SPACE.includes(dev) ? 'more-space' : 'dirtier', track: t.id, step: { rack: { track: t.id, device: dev, ...extra } } });
+      }
       if (have.length) out.push({ kind: 'cleaner', track: t.id, step: { unrack: { track: t.id, device: have[0] } } });
     }
   }
