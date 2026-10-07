@@ -194,8 +194,11 @@
 - OpenSpec inizializzato nel progetto (`openspec/`, schema spec-driven, artefatti in inglese) per la modalità endless `#18`: una change per fase.
 - Rilascio `v0.4.0`: brano in divenire, interruttore "In divenire", traccia Voce con commenti parlati, valori fissati.
 
+- Endless `#18`, fase 0 completata: esplorazione (esperimento: Strudel regge cicli oltre 5000, lane a finestra e due brani sovrapposti su bus separati) e due giri di domande col proprietario. Decisioni: fase 1 solo riga di comando; materiale ibrido (preset più mutazioni controllate); frasi da 8 battute, eventi grossi ogni 16, regolabili per stile; energia come numero unico più 7 forme della curva (costruzione e drop, crescita lenta, onde, groove piatto, strofa e ritornello, culmine tardivo, discesa), assi di dettaglio più avanti dietro una spunta; stili a selezione multipla con "caos"; seme visibile e riascoltabile; commenti su circa metà delle mosse, mai più vicini di 8 battute; titoli in italiano, inglese e spagnolo; dodici stili (i dieci proposti più classic rock e metal melodico); "salva" salva il brano dall'inizio; cronologia degli ultimi 50 nel browser; inizio brano alla sua prima battuta con un cartello "ora in onda"; sessione sempre salvata come ricetta riascoltabile, registrazione audio opzionale (Opus o WAV) e video per YouTube più avanti; tempo e tonalità casuali, bloccabili nella radio; 4-5 tracce di solito, limite morbido 8, di più solo con "più complesso"; varietà tra brani consecutivi; niente modello locale per ora.
+- Change OpenSpec `endless-director` (fase 1, `#21`) scritta: proposta, tre specifiche (`endless/style-recipes`, `endless/director`, `endless/session-cli`), design con le decisioni anche per le fasi successive, 26 task. `openspec validate --strict` passa. Non ancora implementata.
+
 ## Prossimo passo
 
-- Endless `#18`, fase 0: esplorazione e domande al proprietario (primo giro inviato), poi la change OpenSpec della fase 1 (ricette e regista).
+- Endless `#18`: revisione del proprietario della change `endless-director`, poi implementazione (`openspec-apply-change`).
 - Live coding a mano che ferma il divenire; poi campioni della voce del proprietario e modalità endless (`#18`).
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.
