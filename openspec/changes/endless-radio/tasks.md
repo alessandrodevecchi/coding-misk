@@ -16,7 +16,7 @@
 
 ## 3. Continuous playback
 
-- [ ] 3.1 Add the `radio` player mode: play the window song with the live build, voice and tempo per bar, move the window at each song end, generate the next song in an idle callback after a song starts; verify in the browser that three consecutive song changes have no gap longer than one beat and no evaluation error.
+- [x] 3.1 Add the `radio` player mode: play the window song with the live build, voice and tempo per bar, move the window at each song end, generate the next song in an idle callback after a song starts; verify in the browser that three consecutive song changes have no gap longer than one beat and no evaluation error.
 - [x] 3.2 Make the radio and Compose exclusive (starting one stops the other) and make skip move to the next song on the next bar; verify both in the browser.
 - [x] 3.3 Apply control changes from the next song and record them in the session recipe; verify in the browser that raising energy during song 1 leaves song 1 unchanged and generates song 2 with the new value.
 - [x] 3.4 Add a browser check script that starts the radio with seed `aurora` and compares its first songs with `npm run endless -- --styles berlin-techno --seed aurora`, and plays across song changes measuring levels; verify it passes.
@@ -30,6 +30,6 @@
 
 ## 5. Integration
 
-- [ ] 5.1 Run the radio for at least 30 minutes with three styles and chaos 1, with the check script measuring levels and errors at every song change; verify no evaluation or page error and levels in the usual range.
-- [ ] 5.2 Run `npm run check:code`, `npm run check:songs`, `npm run check:endless`, `npm run build` and the level check of the built-in songs; verify all pass before merging into `develop`.
+- [x] 5.1 Run the radio for at least 30 minutes with three styles and chaos 1, with the check script measuring levels and errors at every song change; verify no evaluation or page error and levels in the usual range.
+- [x] 5.2 Run `npm run check:code`, `npm run check:songs`, `npm run check:endless`, `npm run build` and the level check of the built-in songs; verify all pass before merging into `develop`.
 - [ ] 5.3 Hand the radio to the owner to try, and record the feedback in `DEVLOG.md` and issue #22.

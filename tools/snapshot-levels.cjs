@@ -17,7 +17,8 @@ if (!['write', 'check'].includes(mode)) { console.error('usage: node tools/snaps
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
   await page.goto('http://localhost:5173/'); await sleep(5000);
-  const ids = only.length ? only : await page.$$eval('#track-pick option', os => os.map(o => o.value).filter(Boolean));
+  // generated endless songs (songs/endless/, git-ignored) change with every run: no snapshots
+  const ids = only.length ? only : (await page.$$eval('#track-pick option', os => os.map(o => o.value).filter(Boolean))).filter(id => !id.startsWith('endless-'));
   const old = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : {};
   const out = mode === 'write' && only.length ? { ...old } : {};
   let failed = 0;
