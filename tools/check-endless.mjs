@@ -6,6 +6,14 @@ import fs from 'node:fs';
 import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAPES, RECIPE_DEFAULTS } from '../src/endless/recipe.js';
 import { mixParts, stylesOf } from '../src/endless/mix.js';
 import { loadStyles } from './styles-dir.mjs';
+import { generateSession } from '../src/endless/director.js';
+import { validateSong } from '../src/song/validate.js';
+import { stateAt, buildSteps } from '../src/song/build.js';
+import { playing, energyOf } from '../src/endless/energy.js';
+import { chordTonesOnly, degreesOnly } from '../src/endless/mutate.js';
+import { partsKey } from '../src/endless/mix.js';
+import { allPhrases } from '../src/endless/phrases.js';
+import { GROOVES, BASS, ARPS, HOOKS } from '../src/music.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const take = (s, n) => Array.from({ length: n }, () => s.next());
@@ -18,6 +26,25 @@ const mixSession = (ids, chaos, songs, seed = 'mix') => {
   const rng = stream(seed, 'plan');
   return Array.from({ length: songs }, (_, i) => mixParts(ids.map(id => byId[id]), chaos, i, rng));
 };
+
+// sessions are cached: several checks look at the same one
+const cache = new Map();
+const session = (opts) => { const k = JSON.stringify(opts); if (!cache.has(k)) cache.set(k, generateSession(loadStyles(), opts)); return cache.get(k); };
+const every = fn => { for (const id of STARTING) fn(session({ styles: [id], minutes: 10, seed: `check-${id}` }), id); };
+const avg = a => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
+const listOf = v => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
+// track ids a step moves
+const stepTracks = s => [...listOf(s.add), ...listOf(s.remove), ...['set', 'pattern', 'rack', 'unrack'].filter(k => s[k]).map(k => s[k].track)];
+
+// seed fixtures: an intended change to the director updates them (npm run check:endless -- --write-fixtures)
+const FIXTURES_FILE = new URL('../tests/snapshots/endless.json', import.meta.url);
+const FIXTURES = [
+  { seed: 'aurora', styles: ['berlin-techno'] },
+  { seed: 'aurora', styles: ['synthwave', 'jazz', 'country'], chaos: 1 },
+  { seed: 'kellerlicht', styles: ['trance', 'phonk'], energy: 0.9, complexity: 0.9, minutes: 20 },
+  { seed: 'quiet', styles: ['ambient', 'lo-fi'], energy: 0.2, complexity: 0.1, minutes: 12 },
+];
+const sessionHash = r => hashString(JSON.stringify(r)).toString(16).padStart(8, '0');
 
 const CHECKS = {
   'random: same seed and stream repeat'() {
@@ -96,6 +123,131 @@ const CHECKS = {
     const mixed = s.filter(p => stylesOf(p).length >= 2).length;
     assert(mixed >= 20, `only ${mixed} of 40 songs mix styles`);
     for (const id of ['synthwave', 'jazz', 'country']) assert(s.some(p => p.tempo === id), `${id} never gives the tempo`);
+  },
+  'director: songs of every style are valid'() {
+    every(({ songs }, id) => songs.forEach(song => {
+      const { errors } = validateSong(song);
+      assert(!errors.length, `${id} ${song.id}: ${errors.slice(0, 3).map(e => `${e.path}: ${e.msg}`).join('; ')}`);
+    }));
+  },
+  'director: song plan (length, sections, title, voice)'() {
+    every(({ session, songs }, id) => {
+      session.songs.forEach((e, i) => {
+        assert(e.seconds >= 120 && e.seconds <= 360, `${id} song ${i} lasts ${e.seconds} s`);
+        const words = e.styles.flatMap(s => Object.values(byId[s].words).flat());
+        assert(e.title && e.title.split(' ').every(w => words.includes(w)), `${id} song ${i} title "${e.title}" not from the word lists`);
+        songs[i].sections.forEach(sec => assert(sec.bars % (2 * e.phrase) === 0, `${id} section ${sec.name} has ${sec.bars} bars, not a multiple of ${2 * e.phrase}`));
+        assert(songs[i].tracks.some(t => t.type === 'voice'), `${id} song ${i} has no voice track`);
+      });
+    });
+    const lens = session({ styles: ['trance'], minutes: 30, seed: 'lengths' }).session.songs.map(e => e.seconds);
+    assert(new Set(lens).size > 1, 'every song has the same length');
+  },
+  'director: build and drop follows its shape'() {
+    let checked = 0;
+    for (const id of STARTING) for (const [i, e] of session({ styles: [id], minutes: 10, seed: `check-${id}` }).session.songs.entries()) {
+      if (e.shape !== 'build-drop') continue;
+      const ph = e.phrases, en = role => avg(ph.filter(p => p.role === role).map(p => p.energy));
+      const build = ph.filter(p => p.role === 'build').map(p => p.energy);
+      assert(build[build.length - 1] > build[0], `${id} song ${i}: energy does not rise in the build`);
+      assert(en('drop') > en('build') && en('drop') > en('break'), `${id} song ${i}: drop ${en('drop')} is not the highest (build ${en('build')}, break ${en('break')})`);
+      checked++;
+    }
+    assert(checked >= 3, `only ${checked} build and drop songs checked`);
+  },
+  'director: energy amount raises the measured energy'() {
+    for (const id of ['berlin-techno', 'synthwave', 'jazz']) {
+      const m = energy => avg(session({ styles: [id], minutes: 10, seed: 'amount', energy }).session.songs.flatMap(e => e.phrases.map(p => p.energy)));
+      assert(m(0.9) > m(0.2), `${id}: energy 0.9 gives ${m(0.9).toFixed(2)}, energy 0.2 gives ${m(0.2).toFixed(2)}`);
+    }
+  },
+  'director: complexity 0 keeps presets, complexity 1 stays in key'() {
+    const grooveRows = new Set(Object.values(GROOVES).flatMap(g => Object.values(g[1])));
+    for (const id of STARTING) {
+      for (const song of session({ styles: [id], minutes: 8, seed: 'plain', complexity: 0 }).songs) for (const t of song.tracks) for (const p of Object.values(t.patterns)) {
+        assert(p.notes === undefined, `${id} ${t.id}: complexity 0 wrote notes`);
+        for (const r of Object.values(p.rows || {})) assert(grooveRows.has(r), `${id} ${t.id}: drum row ${r} is not from a groove`);
+      }
+      for (const song of session({ styles: [id], minutes: 8, seed: 'wild', complexity: 1 }).songs) for (const t of song.tracks) for (const p of Object.values(t.patterns)) {
+        if (p.notes === undefined) continue;
+        if (t.type === 'hook') assert(degreesOnly(p.notes), `${id} hook notes not scale degrees: ${p.notes}`);
+        else assert(chordTonesOnly(p.notes), `${id} ${t.type} notes not chord tones: ${p.notes}`);
+      }
+    }
+    const mutated = STARTING.flatMap(id => session({ styles: [id], minutes: 8, seed: 'wild', complexity: 1 }).songs.flatMap(s => s.tracks.flatMap(t => Object.values(t.patterns)))).filter(p => p.notes).length;
+    assert(mutated > 10, `only ${mutated} mutated patterns at complexity 1`);
+  },
+  'director: moves on the grid, one per track, never back to back'() {
+    every(({ session, songs }, id) => songs.forEach((song, i) => {
+      const e = session.songs[i], ph = e.phrase, by = new Map();
+      for (const s of buildSteps(song)) {
+        assert(s.at % ph === 0, `${id} song ${i}: step at bar ${s.at} is off the ${ph}-bar grid`);
+        const big = /^(break|drop)/.test(e.phrases.find(p => p.bar === s.at).moves.join(' '));
+        if (big && (s.remove || s.add) && listOf(s.add || s.remove).length > 1) assert(s.at % (2 * ph) === 0, `${id} song ${i}: break or drop at bar ${s.at} not on a ${2 * ph}-bar boundary`);
+        for (const t of stepTracks(s)) { const k = s.at / ph; assert(by.get(t) !== k, `${id} song ${i}: two moves on ${t} at bar ${s.at}`); assert(by.get(t) !== k - 1, `${id} song ${i}: ${t} moves on two consecutive boundaries (bar ${s.at})`); by.set(t, k); }
+      }
+    }));
+  },
+  'director: track limits'() {
+    every(({ session, songs }, id) => songs.forEach((song, i) => {
+      for (let bar = 0; bar < session.songs[i].bars; bar++) {
+        const n = playing(stateAt(song, bar).song).length;
+        assert(n <= 8, `${id} song ${i}: ${n} tracks at bar ${bar}`);
+        assert(n <= session.songs[i].hardMax, `${id} song ${i}: ${n} tracks at bar ${bar}, above the style max ${session.songs[i].hardMax}`);
+      }
+    }));
+  },
+  'director: variety between songs'() {
+    for (const [styles, chaos] of [[['berlin-techno'], 0.3], [['synthwave', 'jazz', 'country'], 0.6], [['trance', 'phonk', 'lo-fi', 'industrial'], 1]]) {
+      const s = session({ styles, chaos, minutes: 60, seed: 'variety' }).session.songs;
+      s.forEach((e, i) => {
+        if (!i) return;
+        assert(e.key !== s[i - 1].key, `${styles}: songs ${i - 1} and ${i} share key ${e.key}`);
+        assert(e.shape !== s[i - 1].shape, `${styles}: songs ${i - 1} and ${i} share shape ${e.shape}`);
+        if (styles.length > 1) assert(!s.slice(Math.max(0, i - 3), i).some(p => partsKey(p.parts) === partsKey(e.parts)), `${styles}: song ${i} repeats the parts of a recent song`);
+      });
+    }
+  },
+  'director: comments about half of the boundaries, 8 bars apart'() {
+    let moves = 0, said = 0;
+    every(({ session }, id) => session.songs.forEach((e, i) => {
+      let last = -Infinity;
+      for (const p of e.phrases) {
+        if (p.moves.length) moves++;
+        if (!p.say) continue;
+        said++;
+        assert(p.bar - last >= 8, `${id} song ${i}: comments at bars ${last} and ${p.bar}`);
+        last = p.bar;
+      }
+    }));
+    const rate = said / moves;
+    assert(rate > 0.35 && rate < 0.75, `comments on ${Math.round(rate * 100)} % of the boundaries with moves`);
+  },
+  'director: phrase pool is short and complete'() {
+    for (const p of allPhrases()) for (const lang of ['en', 'it']) assert(p[lang] && p[lang].length <= 24, `phrase too long: ${p[lang]}`);
+  },
+  'determinism: same seed, same session'() {
+    const opts = { styles: ['melodic-metal', 'drum-and-bass'], chaos: 0.5, seed: 'aurora' };
+    const a = JSON.stringify(generateSession(loadStyles(), opts)), b = JSON.stringify(generateSession(loadStyles(), opts));
+    assert(a === b, 'two runs with seed aurora differ');
+  },
+  'determinism: a session without seed records the seed'() {
+    const r = generateSession(loadStyles(), { styles: ['jazz'], minutes: 6 });
+    assert(r.session.seed, 'no seed recorded');
+    const again = generateSession(loadStyles(), { styles: ['jazz'], minutes: 6, seed: r.session.seed });
+    assert(JSON.stringify(again) === JSON.stringify(r), 'the recorded seed does not reproduce the session');
+  },
+  'determinism: seed fixtures'() {
+    const now = FIXTURES.map(f => ({ ...f, hash: sessionHash(generateSession(loadStyles(), f)) }));
+    if (process.argv.includes('--write-fixtures')) { fs.writeFileSync(FIXTURES_FILE, JSON.stringify(now, null, 2) + '\n'); console.log('      fixtures written'); return; }
+    const saved = JSON.parse(fs.readFileSync(FIXTURES_FILE, 'utf8'));
+    now.forEach((f, i) => assert(saved[i] && saved[i].hash === f.hash, `seed ${f.seed} (${f.styles}) gives ${f.hash}, fixture ${saved[i] && saved[i].hash}; if the change is intended, run npm run check:endless -- --write-fixtures`));
+  },
+  'docs: ENDLESS.md has a check for every rule'() {
+    const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');
+    const listed = [...doc.matchAll(/`((?:director|determinism): [^`]+)`/g)].map(m => m[1]);
+    for (const n of listed) assert(CHECKS[n], `docs/ENDLESS.md names a check that does not exist: ${n}`);
+    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
   },
 };
 

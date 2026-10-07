@@ -1,5 +1,6 @@
 // Spoken comments for live builds, generated with macOS `say` (local and free).
-// Collects every "say" phrase of the songs in songs/ and the comments of derived live builds, and writes one
+// Collects every "say" phrase of the songs in songs/, the comments of derived live builds and the endless
+// director's phrase pool (src/endless/phrases.js), and writes one
 // WAV per phrase and language: public/samples/say_en/<slug>.wav, public/samples/say_it/<slug>.wav.
 // The app plays them on the bar of their step. Files are git-ignored (Apple voices): run this again to make them.
 //   node tools/voice.mjs [--en Samantha] [--it Alice] [--force]
@@ -9,6 +10,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { songFiles } from './songs-dir.mjs';
 import { PHRASES, saySlug } from '../src/song/build.js';
+import { allPhrases } from '../src/endless/phrases.js';
 
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const VOICES = { en: opt('en', 'Samantha'), it: opt('it', 'Alice') }, force = args.includes('--force');
@@ -20,6 +22,7 @@ const addSay = say => {
 };
 for (const f of songFiles('songs')) { const song = JSON.parse(fs.readFileSync(f, 'utf8')); (song.build || []).forEach(s => addSay(s.say)); }
 Object.values(PHRASES).forEach(addSay);
+allPhrases().forEach(addSay);
 
 let made = 0, kept = 0;
 for (const [lang, set] of Object.entries(phrases)) {

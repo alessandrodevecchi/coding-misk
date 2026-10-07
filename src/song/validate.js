@@ -3,7 +3,7 @@
 import { KEYS, PROGS, METERS, meterSteps, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEX_RHYTHMS, KITS, MODES, ROWS, LOOKS, WAVES } from '../music.js';
 import { FORMAT, VERSION, TYPES, PATTERN_FIELDS, SETTING_FIELDS, VISUALS } from './format.js';
 import { checkRack } from './rack.js';
-import { checkBuild } from './build.js';
+import { checkBuild, buildMap } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
 export const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
@@ -102,6 +102,11 @@ export function validateSong(song) {
     });
     if ((!Array.isArray(tr.clips) || !tr.clips.length) && tr.type !== 'voice') warn(`${p}.clips`, 'no clips: the track never plays');
   });
+  // a live build keeps tracks silent before their "add" and after their "remove": count only what plays
+  if (Array.isArray(song.build) && !errors.length) {
+    const map = buildMap(song, total);
+    for (const tr of tracks) for (const [a, b] of (map[tr.id] || { off: [] }).off) for (let x = a; x < Math.min(b, total); x++) if (tr.type !== 'voice' && (tr.clips || []).length) playing[x]--;
+  }
   const peak = Math.max(0, ...playing);
   if (peak > 15) warn('tracks', `${peak} tracks play at the same time; above about 15 the browser may drop notes`);
   else if (peak > 6) warn('tracks', `${peak} tracks play at the same time; the owner prefers 4 to 5 layers per section`);

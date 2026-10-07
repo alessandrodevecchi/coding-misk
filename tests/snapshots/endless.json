@@ -1,0 +1,41 @@
+[
+  {
+    "seed": "aurora",
+    "styles": [
+      "berlin-techno"
+    ],
+    "hash": "8198942e"
+  },
+  {
+    "seed": "aurora",
+    "styles": [
+      "synthwave",
+      "jazz",
+      "country"
+    ],
+    "chaos": 1,
+    "hash": "a0e2909e"
+  },
+  {
+    "seed": "kellerlicht",
+    "styles": [
+      "trance",
+      "phonk"
+    ],
+    "energy": 0.9,
+    "complexity": 0.9,
+    "minutes": 20,
+    "hash": "1259b86e"
+  },
+  {
+    "seed": "quiet",
+    "styles": [
+      "ambient",
+      "lo-fi"
+    ],
+    "energy": 0.2,
+    "complexity": 0.1,
+    "minutes": 12,
+    "hash": "093a838e"
+  }
+]

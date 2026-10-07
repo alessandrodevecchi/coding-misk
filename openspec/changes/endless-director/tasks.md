@@ -16,14 +16,14 @@
 
 ## 3. Director
 
-- [ ] 3.1 Implement the song plan (length 2 to 6 minutes, tempo from the tempo style, key, sections as multiples of two phrases with chords, energy shape allowed by the style, candidate tracks with clips over the whole song, voice track with the voice style's settings, multilingual title) and verify the "Song plan" scenarios in `check:endless`.
-- [ ] 3.2 Implement the seven energy shapes and the energy and complexity amounts, and `energyOf(state, bar)` measured from tracks playing, drum density, filter openness and drive, and verify in `check:endless` that build and drop rises before the drop and that energy 0.9 averages higher than 0.2 for the same seed.
-- [ ] 3.3 Implement mutation operators for drums, bass, arp and hook scaled by complexity, and verify in `check:endless` that complexity 0 keeps presets unchanged and complexity 1 keeps notes as chord tones and scale degrees.
-- [ ] 3.4 Implement moves on phrase boundaries (add, remove, pattern switch, setting change, rack device, break and drop on double phrases) chosen toward the target energy with the penalties of the design, and verify in `check:endless` the grid rule, one move per track per boundary, no back-to-back moves on a track, and the track limits (4 to 5 usual, at most 8 below complexity 0.8).
-- [ ] 3.5 Implement the variety rules between songs (no same key or shape twice in a row, no repeated style-per-part combination within the last three songs) and verify them on long sessions in `check:endless`.
-- [ ] 3.6 Add the phrase pool per move kind in English and Italian, the comment rate (about half of the moves) and spacing (at least 8 bars), and make `tools/voice.mjs` voice the pool; verify the spacing rule in `check:endless` and that `npm run voices` creates a sample for every pool phrase.
-- [ ] 3.7 Make sessions deterministic end to end and add seed fixtures (seed, options, expected session hash) to `check:endless`, and verify that two runs with the same seed are identical and that a run without seed records the seed it used.
-- [ ] 3.8 Write `docs/ENDLESS.md` (what the director does, shapes, moves, rules, comments, determinism, what comes in later phases) and verify each rule in it has a matching check.
+- [x] 3.1 Implement the song plan (length 2 to 6 minutes, tempo from the tempo style, key, sections as multiples of two phrases with chords, energy shape allowed by the style, candidate tracks with clips over the whole song, voice track with the voice style's settings, multilingual title) and verify the "Song plan" scenarios in `check:endless`.
+- [x] 3.2 Implement the seven energy shapes and the energy and complexity amounts, and `energyOf(state, bar)` measured from tracks playing, drum density, filter openness and drive, and verify in `check:endless` that build and drop rises before the drop and that energy 0.9 averages higher than 0.2 for the same seed.
+- [x] 3.3 Implement mutation operators for drums, bass, arp and hook scaled by complexity, and verify in `check:endless` that complexity 0 keeps presets unchanged and complexity 1 keeps notes as chord tones and scale degrees.
+- [x] 3.4 Implement moves on phrase boundaries (add, remove, pattern switch, setting change, rack device, break and drop on double phrases) chosen toward the target energy with the penalties of the design, and verify in `check:endless` the grid rule, one move per track per boundary, no back-to-back moves on a track, and the track limits (4 to 5 usual, at most 8 below complexity 0.8).
+- [x] 3.5 Implement the variety rules between songs (no same key or shape twice in a row, no repeated style-per-part combination within the last three songs) and verify them on long sessions in `check:endless`.
+- [x] 3.6 Add the phrase pool per move kind in English and Italian, the comment rate (about half of the moves) and spacing (at least 8 bars), and make `tools/voice.mjs` voice the pool; verify the spacing rule in `check:endless` and that `npm run voices` creates a sample for every pool phrase.
+- [x] 3.7 Make sessions deterministic end to end and add seed fixtures (seed, options, expected session hash) to `check:endless`, and verify that two runs with the same seed are identical and that a run without seed records the seed it used.
+- [x] 3.8 Write `docs/ENDLESS.md` (what the director does, shapes, moves, rules, comments, determinism, what comes in later phases) and verify each rule in it has a matching check.
 
 ## 4. Command line
 
