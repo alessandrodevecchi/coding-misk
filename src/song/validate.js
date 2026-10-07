@@ -67,6 +67,7 @@ export function validateSong(song) {
     checkSettings(tr.type, tr.settings || {}, `${p}.settings`, err, warn);
     if (tr.rack !== undefined) checkRack(tr.rack, `${p}.rack`, err, warn);
     for (const k of ['mute', 'solo']) if (tr[k] !== undefined && typeof tr[k] !== 'boolean') err(`${p}.${k}`, 'true or false');
+    if (tr.pinned !== undefined && (!Array.isArray(tr.pinned) || tr.pinned.some(k => !SETTING_FIELDS[tr.type].includes(k)))) err(`${p}.pinned`, `settings fixed against the live build steps, from: ${SETTING_FIELDS[tr.type].join(', ')}`);
     const pats = tr.patterns || {};
     if (typeof pats !== 'object' || Array.isArray(pats)) err(`${p}.patterns`, 'an object of named patterns, for example {"A": {...}}');
     for (const [k, pat] of Object.entries(pats)) checkPattern(tr.type, pat, `${p}.patterns.${k}`, err, warn);
@@ -114,7 +115,7 @@ function checkSettings(type, set, p, err, warn) {
   for (const [k, v] of Object.entries(set)) {
     if (!known.includes(k)) { warn(`${p}.${k}`, `unknown setting for ${type}; settings: ${known.join(', ')}`); continue; }
     if (/^(gain|cutoff|drive|grit|room|delay|reso|fm|swing|hpf)$/.test(k) && !isNum(v)) err(`${p}.${k}`, 'a number');
-    if (k === 'speed' && type === 'voice' && (!isNum(v) || v === 0 || Math.abs(v) > 4)) err(`${p}.speed`, 'a number from -4 to 4, not 0 (below 1 lowers the voice, below 0 plays it backwards)');
+    if ((k === 'pitch' || k === 'tempo') && type === 'voice' && (!isNum(v) || v < 0.25 || v > 4)) err(`${p}.${k}`, `a number from 0.25 to 4 (1 is the original ${k === 'pitch' ? 'pitch, 2 an octave up' : 'speed, 0.5 twice as long'})`);
     if (/End$/.test(k) && v !== null && !isNum(v)) err(`${p}.${k}`, 'a number, or null for no automation');
     if (k === 'kit' && !MACHINES.includes(v)) warn(`${p}.kit`, `not a drum machine of tidal-drum-machines (see the Sounds tab, for example RolandTR909, LinnDrum, AkaiMPC60)`);
     if (k === 'wave' && typeof v === 'string' && !v.split(',').every(w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w))) warn(`${p}.wave`, 'unknown sound; see the Sounds tab (General MIDI instruments start with gm_)');

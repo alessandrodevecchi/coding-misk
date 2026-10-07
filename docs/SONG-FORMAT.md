@@ -54,7 +54,7 @@ Progressions are written in A minor and moved to `key`; see `PROGS` in `src/musi
 { "id": "riff", "name": "Guitar riff", "type": "guitar", "settings": {}, "rack": [], "patterns": { "A": {} }, "clips": [] }
 ```
 
-- `id`: unique in the song. `name`: label in the code and UI (defaults to `id`). `mute`, `solo`: `true` leaves the track out of the code (solo: every other track).
+- `id`: unique in the song. `name`: label in the code and UI (defaults to `id`). `mute`, `solo`: `true` leaves the track out of the code (solo: every other track). `pinned`: settings fixed against live build steps (a list of setting names): the track's own value holds even where a `set` step would change it.
 - `type`: `drums bass guitar arp hook pad texture riser code voice`. Any number of tracks of any type.
 - `settings`: how the track sounds. Missing settings take the defaults below.
 - `patterns`: named patterns (`"A"`, `"verse"`, …), what the track plays.
@@ -110,7 +110,7 @@ Common: `gain` (about 0 to 1), `gainEnd` and `cutoffEnd` (ramp to this value ove
 | `texture` | `sample` numbers (`vinyl numbers industrial metal glitch space wind crow`, or a custom bank), `gain` .4, `grit` .7, `room` .6 |
 | `riser` | `gain` .25, `bars` "8" (length of the sweep), `dir` up (`up` riser, `down` downlifter) |
 | `code` | `visual`: which Stage instrument lights up (`kick snare hats bass guitar arp hook pad fx riser`, default `fx`) |
-| `voice` | `gain` .6 (applied after the effects), `speed` 1 (pitch and speed: below 1 lower, below 0 backwards), `cutoff` 18000, `hpf` 0 (low cut in Hz), `drive` 0, `room` .2, `delay` 0. No patterns or clips: it speaks the `say` comments of the live build |
+| `voice` | `gain` .6 (applied after the effects), `pitch` 1 (2 an octave up, same length), `tempo` 1 (0.5 twice as long, same pitch), `cutoff` 18000, `hpf` 0 (low cut in Hz), `drive` 0, `room` .2, `delay` 0. No patterns or clips: it speaks the `say` comments of the live build |
 
 `wave` takes an oscillator (`sawtooth supersaw square triangle sine`) or a General MIDI sound (`gm_epiano1`, `gm_distortion_guitar`, `gm_choir_aahs`, …; see the Sounds tab). Layer two with a comma: `"gm_distortion_guitar,sawtooth"`.
 

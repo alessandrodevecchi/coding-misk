@@ -41,8 +41,11 @@ export function stateAt(song, bar) {
   const steps = buildSteps(song), out = clone({ ...song, build: undefined });
   const added = new Set(steps.flatMap(s => (s.add !== undefined ? list(s.add) : [])));
   out.tracks.forEach(t => { if (added.has(t.id)) t.mute = true; });
+  // settings fixed by the user ("pinned" on a track) win over the steps: they keep the track's own value
+  const base = Object.fromEntries(out.tracks.map(t => [t.id, { ...(t.settings || {}) }]));
   let upTo = 0;
   for (const s of steps) { if (s.at > bar) break; apply(out, s); upTo++; }
+  out.tracks.forEach(t => (t.pinned || []).forEach(k => { if (k in base[t.id]) t.settings[k] = base[t.id][k]; else if (t.settings) delete t.settings[k]; }));
   return { song: out, upTo };
 }
 
@@ -50,6 +53,12 @@ export function stateAt(song, bar) {
 export const saySlug = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48);
 // "say" is a phrase, or one phrase per language: { "en": "more bass", "it": "più basso" }
 export const sayText = (say, lang = 'en') => !say ? '' : typeof say === 'string' ? say : say[lang] || say.en || Object.values(say)[0] || '';
+// settings of a track that steps change: { key: [bars from 0] }
+export function stepKeys(song, trackId) {
+  const out = {};
+  for (const s of buildSteps(song)) if (s.set && s.set.track === trackId) for (const k of Object.keys(s.set)) if (k !== 'track') (out[k] = out[k] || []).push(s.at);
+  return out;
+}
 // comment shown at a bar: the latest step with "say" that is not older than "hold" bars
 export function sayAt(song, bar, lang, hold = 4) {
   const s = buildSteps(song).filter(x => x.say && x.at <= bar && bar < x.at + hold).pop();
@@ -92,7 +101,9 @@ export function voiceCode(song, state, upTo, total, lang, files) {
   if (track && track.mute) return '';
   const v = { ...VOICE_DEFAULT, ...((track && track.settings) || {}) }, at = step.at, rest = total - at - 1;
   const lane = `<${at > 0 ? `0!${at} ` : ''}1${rest > 0 ? ` 0!${rest}` : ''}>`;
-  const fx = (v.speed !== 1 ? `.speed(${v.speed})` : '') + (v.cutoff < 18000 ? `.lpf(${v.cutoff})` : '') + (v.hpf > 0 ? `.hpf(${v.hpf})` : '')
+  // speed changes length and pitch together; the phase vocoder (stretch) then moves the pitch alone to where it should be
+  const f3 = x => Math.round(x * 1000) / 1000, shift = f3(v.pitch / v.tempo);
+  const fx = (v.tempo !== 1 ? `.speed(${f3(v.tempo)})` : '') + (shift !== 1 ? `.stretch(${shift})` : '') + (v.cutoff < 18000 ? `.lpf(${v.cutoff})` : '') + (v.hpf > 0 ? `.hpf(${v.hpf})` : '')
     + (v.drive > 0 ? `.distort(${v.drive})` : '') + (v.delay > 0 ? `.delay(${v.delay}).delaysync(0.1875).delayfeedback(0.4)` : '') + (v.room > 0 ? `.room(${v.room})` : '')
     + rackCode(track && track.rack, 'voice');
   const orbit = 15 + Math.max(0, (state.tracks || []).filter(t => t.type === 'voice').indexOf(track));

@@ -188,7 +188,9 @@
 
 - `#3` Traccia "Voce": nuovo tipo di traccia che dice i commenti del brano in divenire. Pannello con volume, pitch, filtro, taglio dei bassi, distorsione, riverbero, delay e rack, più l'elenco delle frasi con la loro battuta; niente pattern né clip (un clic sulla corsia non crea clip, e la traccia compare nel pannello di ogni sezione). Un passo può scegliere la voce con `voice` (più voci con suoni diversi), altrimenti parla la prima. Nella timeline la corsia della voce mostra un rombo per ogni frase. Il vecchio campo `voice` del brano è sostituito dalla traccia (Primo Segnale convertito). Verificato nel browser: pitch da 1.25 a 1.8 mentre suona, codice aggiornato subito, nessun errore.
 
+- Voce e valori fissati (feedback del proprietario): impostazioni della voce di Primo Segnale prese dal suo screenshot (volume 31%, pitch e velocità 0.7, taglio bassi 1100 Hz, drive 2.4, riverbero 55%, delay 38%). Pitch e velocità della voce ora sono indipendenti: `speed` cambia la durata e `stretch` (phase vocoder di Strudel) rimette il pitch dove deve stare; misurato con velocità 0.7, frase da circa 0.6 a circa 1 secondo. Nella vista Sezioni la riga della voce mostra quante frasi dice in ogni sezione. Valori fissati (`pinned` sulla traccia): accanto a una manopola compare una puntina quando i passi cambiano quel valore; cambiandolo a mano si fissa e vince sui passi per tutto il brano, cliccando la puntina si sblocca. Verificato: filtro del basso alla battuta 30 da 1100 (passo) al valore scelto (fissato) e ritorno a 1100 (sbloccato), nessun errore.
+
 ## Prossimo passo
 
-- Valori fissati dall'utente che vincono sui passi del brano in divenire (proposta: si fissano quando cambi un valore che un passo dopo reimposterebbe, con un'icona per sbloccarli); live coding a mano che ferma il divenire; poi campioni della voce del proprietario e modalità endless (`#18`).
+- Live coding a mano che ferma il divenire; poi campioni della voce del proprietario e modalità endless (`#18`).
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.

@@ -171,13 +171,14 @@
       "name": "Voice",
       "type": "voice",
       "settings": {
-        "gain": 0.55,
-        "speed": 1.25,
+        "gain": 0.31,
+        "pitch": 0.7,
+        "tempo": 0.7,
         "cutoff": 18000,
-        "hpf": 300,
-        "drive": 2.5,
+        "hpf": 1100,
+        "drive": 2.4,
         "room": 0.55,
-        "delay": 0.25
+        "delay": 0.38
       },
       "patterns": {},
       "clips": []

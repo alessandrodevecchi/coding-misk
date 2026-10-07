@@ -73,6 +73,9 @@
   .build-mark { position: absolute; top: 50%; z-index: 3; width: 9px; height: 9px; margin: -5px 0 0 -5px; transform: rotate(45deg); background: var(--a2); box-shadow: 0 0 0 1px #000; pointer-events: auto; }
   .say::before { content: '> '; color: var(--a2); }
   .voice-lines { display: grid; gap: 2px; margin: 6px 0 0; padding: 0; list-style: none; font: 12px var(--mono); max-height: 160px; overflow-y: auto; }
+  /* pin: a value fixed against the live build steps (dim when the steps still change it) */
+  .pin { padding: 0 2px; border: 0; background: none; font-size: 11px; line-height: 1; cursor: pointer; opacity: .35; filter: grayscale(1); }
+  .pin[aria-pressed="true"] { opacity: 1; filter: none; }
   .voice-lines b { color: var(--muted); font-weight: 400; margin-right: 6px; }
   .readout { font-family: var(--mono); font-size: 12px; color: var(--ink); text-shadow: 0 0 6px #000; font-variant-numeric: tabular-nums; white-space: pre; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -2,7 +2,7 @@ import '@strudel/repl';
 import './style.css';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf } from './song/build.js';
+import { hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames } from './song/typing.js';
 import { validateSong } from './song/validate.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
@@ -453,6 +453,11 @@ function renderCells(total) {
         <button class="trk-name" data-trk="${i}" title="${esc(tr.type)}"><span class="trk-type">${esc(TYPE_ICON[tr.type] || '·')}</span>${esc(trackLabel(tr))}</button>
         <button class="mini" data-mute="${i}" aria-pressed="${!!tr.mute}" title="${esc(t('mute'))}">M</button><button class="mini" data-solo="${i}" aria-pressed="${!!tr.solo}" title="${esc(t('solo'))}">S</button>
       </div>${T.sections.map((s, j) => {
+        // a voice track: how many comments it speaks in the section
+        if (tr.type === 'voice') {
+          const a = sceneStart(j), lines = compiled.build ? buildSteps(compiled.build).filter(x => x.say && x.at >= a && x.at < a + s.bars && voiceOf(T, x) === tr) : [];
+          return `<button class="trk-cell voice${lines.length ? ' on' : ''}" data-cell="${i}:${j}" aria-current="${i === tk && j === sel}" title="${esc(lines.map(x => `${t('liveMark', { n: x.at + 1 })} · ${sayText(x.say, getLang())}`).join('\n') || `${trackLabel(tr)} · ${s.name}`)}">${lines.length ? `❝ ${lines.length}` : ''}</button>`;
+        }
         const c = cellOf(tr, j);
         const cls = !c ? '' : c.clip ? ' on' : ' custom';
         const label = !c ? '' : c.clip ? esc(c.clip.pattern) + (c.clip.set ? '*' : '') : '≈';
@@ -591,6 +596,15 @@ $('#arr-grid').addEventListener('keydown', e => {
   if (e.shiftKey) setClipSpan(tr, c, sp.s, sp.e - sp.s + d); else setClipSpan(tr, c, sp.s + d, sp.e - sp.s);
   changed(); selectClip(i, k);
   const again = $(`[data-clip="${i}:${k}"]`); if (again) again.focus();
+});
+// pin: fix a value against the live build steps, or let the steps change it again
+$('#track-panel').addEventListener('click', e => {
+  const b = e.target.closest('[data-pin]'); if (!b) return;
+  const host = b.closest('[data-ptrk]'), tr = host && T.tracks[+host.dataset.ptrk]; if (!tr) return;
+  const k = b.dataset.pin, on = (tr.pinned || []).includes(k);
+  tr.pinned = on ? tr.pinned.filter(x => x !== k) : [...(tr.pinned || []), k];
+  if (!tr.pinned.length) delete tr.pinned;
+  changed(); syncTrackPanel();
 });
 $('#live-toggle').addEventListener('click', () => {
   liveOn = !liveOn; store.set('coding-misk-live', liveOn);
@@ -813,7 +827,7 @@ const CONTROLS = {
   riser: [['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['2', '4', '8', '16'].map(n => [n, t('nBars', { n })])],
     ['select', 'dir', 'direction', () => [['up', t('up')], ['down', t('down')]]]],
   code: [['select', 'visual', 'visualOpt', () => VISUALS.map(v => [v, v])]],
-  voice: [['range', 'gain', 'volume'], ['range', 'speed', 'pitch', { min: .5, max: 2, step: .05, fmt: 'num' }], ['cutoff', 'cutoff', 'filter'],
+  voice: [['range', 'gain', 'volume'], ['range', 'pitch', 'pitch', { min: .5, max: 2, step: .05, fmt: 'num' }], ['range', 'tempo', 'voiceTempo', { min: .25, max: 2, step: .05, fmt: 'num' }], ['cutoff', 'cutoff', 'filter'],
     ['range', 'hpf', 'lowCut', { max: 2000, step: 10, fmt: 'num' }], ['range', 'drive', 'drive', NUM4], ['range', 'room', 'reverb'], ['range', 'delay', 'delay']],
 };
 // suoni per strumento: quelli scelti a mano, poi tutti gli strumenti General MIDI e i synth caricati
@@ -840,9 +854,10 @@ function settingHtml([type, key, label, o]) {
   const opt = typeof o === 'object' ? o : {};
   const attrs = type === 'cutoff' ? 'data-cut="1" min="0" max="100" step="1"' : `min="${opt.min || 0}" max="${opt.max || 1}" step="${opt.step || .01}"${opt.fmt ? ` data-fmt="${opt.fmt}"` : ''}`;
   const slider = (sid, k) => `<input type="range" id="${sid}" data-set="${k}" ${attrs}>`;
+  const pin = `<button type="button" class="pin" data-pin="${key}" hidden>📌</button>`;
   const ramp = opt.ramp ? `<button type="button" class="ramp" data-set-ramp="${key}" aria-label="${esc(t('rampToggle'))}" title="${esc(t('rampToggle'))}">↗</button>` : '';
   const end = opt.ramp ? `<div class="end" data-end-for="${key}" hidden><div class="row"><label class="lbl" for="${id}End">${esc(t('endOf', { name: t(label) }))}</label><output id="${id}End-o"></output></div>${slider(id + 'End', key + 'End')}</div>` : '';
-  return `<div class="ctrl" data-ctl="${key}"><div class="row"><label class="lbl" for="${id}">${t(label)}</label>${ramp}<output id="${id}-o"></output></div>${slider(id, key)}${end}</div>`;
+  return `<div class="ctrl" data-ctl="${key}"><div class="row"><label class="lbl" for="${id}">${t(label)}</label>${pin}${ramp}<output id="${id}-o"></output></div>${slider(id, key)}${end}</div>`;
 }
 // note per gradi: una griglia passi × gradi (basso e arpeggio: note dell'accordo 0-3, hook: gradi della scala 0-7)
 const noteCols = (tr, pat) => { const n = meterSteps(secFull().meter); return tr.type === 'hook' || (tr.type === 'arp' && pat.speed === '8') ? n / 2 : n; };
@@ -1040,6 +1055,13 @@ function syncPanel(host) {
     if (o && i.type === 'range') o.textContent = i.dataset.cut ? (v >= 18000 ? '∞' : `${v} Hz`) : i.dataset.fmt === 'num' ? String(v) : `${Math.round(v * 100)}%`;
   });
   all('[data-set-ramp]').forEach(b => { const on = e[b.dataset.setRamp + 'End'] != null; b.setAttribute('aria-pressed', on); const end = host.querySelector(`[data-end-for="${b.dataset.setRamp}"]`); if (end) end.hidden = !on; });
+  // values the live build steps change: a pin shows whether the track's own value is fixed against them
+  const sk = compiled.build ? stepKeys(compiled.build, tr.id) : {};
+  all('[data-pin]').forEach(b => {
+    const k = b.dataset.pin, on = (tr.pinned || []).includes(k), bars = (sk[k] || []).map(x => x + 1).join(', ');
+    b.hidden = !bars && !on; b.setAttribute('aria-pressed', on);
+    b.title = on ? t('pinOn') : t('pinOff', { bars });
+  });
   all('[data-ctl]').forEach(x => x.classList.toggle('over', Object.keys(over).some(k => k === x.dataset.ctl || k === x.dataset.ctl + 'End')));
   if (tr.type === 'drums') all('[data-row]').forEach(b => b.setAttribute('aria-pressed', ((pat.rows || {})[b.dataset.row] || '')[b.dataset.i] === 'x'));
   if (q('pt-preset')) q('pt-preset').value = pat.preset || DEFAULT_PATTERN[tr.type]().preset;
@@ -1066,6 +1088,9 @@ function setSetting(k, v, tr = curTrack()) {
   if (scope === 'section' && c) { c.set = { ...(c.set || {}), [k]: v }; return; }
   tr.settings[k] = v;
   if (c && c.set) { delete c.set[k]; if (!Object.keys(c.set).length) delete c.set; }
+  // a value the live build steps would change: changing it fixes it, so it wins over the steps until unpinned
+  const base = k.replace(/End$/, '');
+  if (compiled.build && stepKeys(compiled.build, tr.id)[base] && !(tr.pinned || []).includes(base)) tr.pinned = [...(tr.pinned || []), base];
 }
 const editPattern = fn => { const tr = curTrack(), key = patOf(tr); tr.patterns[key] = tr.patterns[key] || {}; fn(tr.patterns[key], tr); changed(); syncTrackPanel(); };
 
