@@ -18,4 +18,5 @@
 ## 4. Docs and checks
 
 - [x] 4.1 Document hand takeover in `docs/COMPOSING.md` (live build section), `docs/ARCHITECTURE.md`, README (both languages) and `DEVLOG.md`; add a browser check script `tools/check-hand.cjs` for the Compose scenarios; verify it and `tools/check-radio.cjs` pass, with `npm run build`.
+- [x] 4.3 Add the switch "from where I was" next to resume (on by default, remembered): on, the song goes back to the bar of the takeover with its code there; off, it goes on from where it has got to; verify both in `tools/check-hand.cjs` and the radio case in `tools/check-radio.cjs`.
 - [ ] 4.2 Hand it to the owner to try, and record the feedback in `DEVLOG.md` and issue #20.

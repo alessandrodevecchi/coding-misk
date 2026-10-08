@@ -146,6 +146,8 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     for (let k = 0; k < 400 && (await ed()).cyc < end + 1.5; k++) await sleep(1000);
     h = await R();
     check(h.state.onAir === 0 && (await ed()).started, 'radio: by hand the song on air is held past its end', `bar ${(await ed()).cyc.toFixed(1)}, end ${end}`);
+    // option off: the song on air ended meanwhile, so the next one starts
+    if (await page.isChecked('#hand-from')) await page.click('#hand-from');
     await page.click('#hand-resume'); await sleep(4000);
     h = await R(); const e = await ed();
     check(h.state.onAir === 1 && !(await page.isVisible('#hand-tag')) && !e.err && e.cyc >= h.state.stream[1].start, 'radio: resume after the end starts the next song', `on air ${h.state.onAir}, start ${h.state.stream[1] && h.state.stream[1].start}`);

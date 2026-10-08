@@ -153,7 +153,9 @@ function followEdit(a, b) {
 let built = 0, typing = null;
 // hand live coding (#20): the user typed in the code during a live build. Steps, comments and the stop at the end
 // wait until "resume live build"; the user's code plays meanwhile. resumeTo: the bar where the build takes over again.
-let hand = false, lastHand = null, resumeTo = null;
+let hand = false, lastHand = null, resumeTo = null, handFrom = 0;
+// resume from the bar where the user took over (default) or from where the song has got to meanwhile
+let handFromHere = store.get('coding-misk-hand-from', true) !== false;
 function liveBuild(sg, s, cyc) {
   const steps = buildSteps(sg.build), next = steps[built];
   if (!next) return;
@@ -174,13 +176,14 @@ function liveBuild(sg, s, cyc) {
 // ---------- hand live coding (#20) ----------
 function setHand(on) {
   hand = on;
-  $('#hand-tag').hidden = !on; $('#hand-resume').hidden = !on;
+  $('#hand-tag').hidden = !on; $('#hand-resume').hidden = !on; $('#hand-from-wrap').hidden = !on; $('#hand-from').checked = handFromHere;
   document.body.classList.toggle('by-hand', on);
 }
 // a character typed or deleted, a paste, a cut or a drop in the code during a live build: the user takes over
 function takeOver() {
   if (hand || !song || !song.build || !(isPlaying() || (radio && radio.paused))) return;
   typing = null; resumeTo = null;
+  const s = sched(); handFrom = Math.floor(s ? s.now() : 0);
   setHand(true);
 }
 const editKey = e => !e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || ['Backspace', 'Delete', 'Enter', 'Tab'].includes(e.key));
@@ -196,6 +199,12 @@ function resumeHand() {
   setHand(false);
   if (!song || !s || !isPlaying()) { resumeTo = null; return; }
   const cyc = s.now(), bar = Math.ceil(cyc + .05);
+  // from where I was: the song goes back to the bar where the user took over, with the code it had there
+  if (handFromHere) {
+    const target = Math.min(handFrom, Math.max(0, song.meta.bars - 1));
+    resumeTo = { bar, target, frame: typingFrames(ed.code || '', codeFor(song, target)), t0: cyc, t1: bar - .2 * s.cps, shown: '' };
+    return;
+  }
   // the radio: when the song on air ended by hand, the next song starts on the next bar
   if (mode === 'radio' && radio && radio.afterHand(bar)) return;
   // Compose past the end of the song: start again from the top
@@ -210,6 +219,7 @@ function resumeBuild(sg, s, cyc) {
     return;
   }
   resumeTo = null; typing = null;
+  if (r.target !== undefined) { playSong(sg, r.target, mode); return; }
   built = sg.build ? buildSteps(sg.build).filter(x => x.at <= r.bar).length : 0;
   ed.setCode(codeFor(sg, r.bar)); ed.evaluate();
 }
@@ -218,10 +228,11 @@ function renderHandLast() {
   $('#hand-last-code').textContent = lastHand || '';
 }
 $('#hand-resume').addEventListener('click', resumeHand);
+$('#hand-from').addEventListener('change', e => { handFromHere = e.target.checked; store.set('coding-misk-hand-from', handFromHere); });
 $('#hand-copy').addEventListener('click', () => { try { navigator.clipboard.writeText(lastHand || '').then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (e) { toast(t('copyNo')); } });
 $('#hand-back').addEventListener('click', async () => {
   if (!lastHand || !song || !isPlaying()) return;
-  typing = null; resumeTo = null; setHand(true);
+  typing = null; resumeTo = null; handFrom = Math.floor(sched().now()); setHand(true);
   ed.setCode(lastHand); await ed.evaluate();
 });
 try { lastHand = sessionStorage.getItem('coding-misk-hand'); } catch (e) {}
@@ -1587,6 +1598,7 @@ function renderStatic() {
   $$('[data-i18n]').forEach(x => { x.textContent = t(x.dataset.i18n); });
   $$('[data-i18n-html]').forEach(x => { x.innerHTML = t(x.dataset.i18nHtml); });
   $$('[data-i18n-aria]').forEach(x => { x.setAttribute('aria-label', t(x.dataset.i18nAria)); });
+  $$('[data-i18n-title]').forEach(x => { x.title = t(x.dataset.i18nTitle); });
   opts($('#key'), KEYS.map(k => [k[0], k[2]]));
   opts($('#tk-type'), ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture', 'riser', 'code', 'voice'].map(k => [k, `${TYPE_ICON[k]}  ${t(k)}`]));
   opts($('#sc-meter'), METERS.map(([k]) => [k, k]));

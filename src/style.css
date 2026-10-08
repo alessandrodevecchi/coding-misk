@@ -486,6 +486,7 @@
 
 /* hand live coding (#20) */
 .hand-tag { font: 700 11px var(--mono); letter-spacing: .18em; padding: 3px 8px; border-radius: 4px; color: var(--bg); background: var(--a2); align-self: center; }
+.hand-from { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); align-self: center; }
 .hand-last { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 .hand-last summary { cursor: pointer; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .hand-last pre { max-height: 180px; overflow: auto; font: 12px var(--mono); white-space: pre; margin: 8px 0; }

@@ -53,6 +53,8 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
 
   // resume: back to the song's code at the next bar, the user's code kept
   const userCode = s.code;
+  // first the option off: the song goes on from where it has got to
+  if (await page.isChecked('#hand-from')) await page.click('#hand-from');
   await page.click('#hand-resume');
   const bar = Math.ceil(s.cyc + .05);
   await untilBar(bar + 0.6);
@@ -63,10 +65,21 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   s = await st();
   check(s.code !== resumed && !s.hand && !s.err, 'after resume, the next step plays on its bar');
 
+  // the option on (default): resume goes back to the bar where the user took over
+  const tookOver = Math.floor((await st()).cyc);
+  await page.click('#edhost .cm-line >> nth=0'); await page.keyboard.press('End'); await page.keyboard.type(' z');
+  if (!(await page.isChecked('#hand-from'))) await page.click('#hand-from');
+  await sleep(7000);
+  const beforeResume = (await st()).cyc;
+  await page.click('#hand-resume'); await sleep(3500);
+  s = await st();
+  check(!s.hand && s.cyc >= tookOver && s.cyc < tookOver + 3 && beforeResume > tookOver + 3 && !s.err, 'resume from where I was goes back to the bar of the takeover', `took over at ${tookOver}, resumed at ${s.cyc.toFixed(1)} instead of ${beforeResume.toFixed(1)}`);
+
   // back to this code
+  const kept = (await st()).last;
   await page.click('#hand-last summary'); await page.click('#hand-back'); await sleep(800);
   s = await st();
-  check(s.hand && s.code === userCode && s.active.includes('hand!'), 'back to this code: by hand again with the user\'s code evaluated');
+  check(s.hand && kept && s.code === kept && s.active === kept, 'back to this code: by hand again with the user\'s code evaluated');
 
   // past the end of the song by hand: the music goes on
   // jump to the last bar with the ruler (End), take over again, let the song end
@@ -78,7 +91,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   // resume past the end: the song starts again from the top
   await page.click('#hand-resume'); await sleep(2500);
   s = await st();
-  check(s.started && !s.hand && s.cyc < 4, 'resume past the end starts the song again', `bar ${s.cyc.toFixed(1)}`);
+  check(s.started && !s.hand && s.cyc >= 94 && s.cyc < 97, 'resume past the end goes back to the last bar played by the song', `bar ${s.cyc.toFixed(1)}`);
 
   // the arranger does not overwrite the code by hand
   await page.click('#edhost .cm-line >> nth=0'); await page.keyboard.press('End'); await page.keyboard.type(' x'); await sleep(200);
