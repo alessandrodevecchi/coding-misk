@@ -709,3 +709,9 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* radio: transitions and harmony (#23) */
 .radio-how { display: flex; flex-wrap: wrap; gap: 10px 16px; }
 .radio-how .ctrl { display: grid; gap: 4px; min-width: 160px; }
+/* hardware theme: shuffle, repeat and mix are latching keys with a lamp that lights when on */
+:root[data-ui="hw"] .pb-mode::after { content: ""; position: absolute; top: 3px; right: 3px; width: 5px; height: 5px; border-radius: 50%; background: #2a2a2e; box-shadow: inset 0 1px 1px rgba(0,0,0,.8); }
+:root[data-ui="hw"] .pb-mode[aria-pressed="true"] { color: #ffb347; text-shadow: 0 0 6px #ff9a1f; border-color: #0d0d10; box-shadow: inset 0 1px 3px rgba(0,0,0,.55), 0 1px 0 #0d0d10; transform: translateY(1px); }
+:root[data-ui="hw"] .pb-mode[aria-pressed="true"] svg { filter: drop-shadow(0 0 3px #ff9a1f); }
+:root[data-ui="hw"] .pb-mode[aria-pressed="true"]::after { background: var(--led); box-shadow: 0 0 6px var(--led), 0 0 2px var(--led); }
+:root[data-ui="hw"] .pb-one { color: #ffb347; }

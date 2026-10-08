@@ -273,6 +273,8 @@
 
 - Domanda del proprietario sull'app per iPhone da portarsi in giro prima del sito: risposta salvata in `notes/pubblicazione-e-diritti.md` (serve Xcode, che sul Mac non c'è ancora).
 
+- Barra player, tema hardware, segnalato dal proprietario: non si capiva quando casuale, ripeti e mix erano accesi. Ora sono tasti a ritenuta con una spia: acceso, il tasto resta abbassato, l'icona diventa ambra e la spia verde si illumina.
+
 ## Prossimo passo
 
 Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live coding a mano `#20`); `develop` = `763c59f` con in più barra player e volume `#32` (change `player-bar`, tutti i task fatti tranne la prova del proprietario) e artisti con schede Artisti e Stili `#35` (change `artists-and-styles`, 14/14 task). Il proprietario sta provando a fondo artisti e barra.
