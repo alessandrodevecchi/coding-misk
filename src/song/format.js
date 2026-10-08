@@ -5,6 +5,13 @@ import { DEFAULT, ROWS, cloneState, normalizeState } from '../music.js';
 export const FORMAT = 'coding-misk/song';
 export const VERSION = 2;
 
+// Song library tags (#34): a fixed, broad list of genres. Every style recipe declares one of them;
+// a song's genres are those of its styles plus the ones it names itself. Names are in src/i18n.js.
+export const GENRES = ['techno', 'trance', 'house', 'synthwave', 'drum-and-bass', 'industrial', 'rock', 'metal', 'hip-hop', 'pop', 'jazz', 'country', 'ambient', 'experimental'];
+export const TAG_KINDS = ['genres', 'styles', 'free'];
+// where a song comes from: "endless" for songs made by the director (kept when saved from the radio)
+export const ORIGINS = ['endless'];
+
 // Fields that belong to the pattern (what and when a track plays); everything else in the
 // channel state is a track setting (how it sounds). Guitar keeps its preset in `pattern`.
 export const PATTERN_FIELDS = {

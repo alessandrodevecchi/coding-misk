@@ -8,6 +8,11 @@
     "it": "Lo-fi hip hop · Re minore · 78 BPM con swing · piano elettrico, contrabbasso, vibrafono, vinile",
     "en": "Lo-fi hip hop · D minor · 78 BPM with swing · electric piano, upright bass, vibraphone, vinyl"
   },
+  "tags": {
+    "styles": [
+      "lo-fi"
+    ]
+  },
   "sections": [
     {
       "name": "Vinile",

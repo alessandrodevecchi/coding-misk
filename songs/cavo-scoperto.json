@@ -8,6 +8,11 @@
     "en": "Dark electro techno · F# phrygian, then G in the second drop · 126 BPM · two hooks in call and response, a glitch code track, an arpeggio that enters mid-build",
     "it": "Electro techno scura · Fa# frigio, poi Sol nel secondo drop · 126 BPM · due hook a botta e risposta, una traccia di codice glitch, un arpeggio che entra a metà build"
   },
+  "tags": {
+    "styles": [
+      "dark-cyberpunk"
+    ]
+  },
   "sections": [
     {
       "name": "Corrente",

@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { songFiles } from './songs-dir.mjs';
+import { loadStyles } from './styles-dir.mjs';
 import { validateSong } from '../src/song/validate.js';
 import { compileSong } from '../src/song/compile.js';
 import { hasBuild, buildSteps, stateAt, annotate, sayText, voiceCode, BUILD_ACTIONS } from '../src/song/build.js';
@@ -17,8 +18,9 @@ const read = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch
 if (cmd === 'validate' && args.length) {
   let bad = 0;
   const files = args.flatMap(a => fs.statSync(a).isDirectory() ? songFiles(a) : [a]);
+  const styles = loadStyles().map(r => r.id);
   for (const f of files) {
-    const { errors, warnings } = validateSong(read(f));
+    const { errors, warnings } = validateSong(read(f), { styles });
     let compiled = '';
     if (!errors.length) try { compileSong(read(f)); } catch (e) { errors.push({ path: '', msg: `does not compile: ${e.message}` }); }
     for (const e of errors) console.log(`${f}: error   ${e.path || '(song)'}: ${e.msg}`);

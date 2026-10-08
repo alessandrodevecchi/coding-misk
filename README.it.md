@@ -42,6 +42,7 @@ Questo progetto unisce quell'idea alle capacità dei nuovi modelli, con il mio t
 ## Cosa fa
 
 - **Arrangiatore.** Una griglia di tracce e sezioni. Le sezioni tengono tempo (anche in rampa), tonalità, accordi, metro (4/4, 3/4, 5/4, 7/8), swing ed entrata (taglio netto o dissolvenza). Le tracce sono libere: quanti strumenti vuoi, anche dello stesso tipo, ognuno con i suoi pattern, muto e solo. Tutto diventa codice Strudel in tempo reale.
+- **Trova i brani.** La scheda Brani è una lista unica con ricerca (titolo, stile, tonalità, tag), filtri per genere, stile e tipo (standard, live build, generato, tuo, codice), preferiti e ordinamento. I tag di stile seguono la scheda Stili, e puoi taggare i tuoi brani.
 - **Brani in JSON.** I brani sono file in `songs/` con un formato documentato, un validatore e uno strumento da riga di comando, così persone e agenti possono scriverli come codice ([docs/COMPOSING.md](docs/COMPOSING.md)). Le tracce di codice contengono Strudel scritto a mano dentro un brano.
 - **Strumenti.** Sequencer di batteria con varie drum machine, basso con riff, chitarra (pulita, crunch, distorta, metal, palm mute) con riff e raddoppio stereo, arpeggio, hook con armonie e modi scuri, pad, texture (voci, metalli, vinile), riser. Ogni strumento può usare oscillatori o suoni General MIDI, ha i suoi passi ritmici, e basso, arpeggio e hook accettano note scritte come gradi dell'accordo o della scala.
 - **Automazioni.** Volume, filtro e tempo possono cambiare da inizio a fine sezione. Ci sono saturazione, bitcrusher, risonanza, FM e filtro vocale.

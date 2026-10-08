@@ -66,7 +66,9 @@ export const REFS = [
 // Brani completi: sezioni, battute e tempo si leggono dal codice (righe SECTIONS e TEMPO).
 export const SONGS = [
   { id: 'ghost-protocol', title: 'Ghost Protocol', look: 'palco', code: ghostProtocol,
-    style: { it: 'Hard techno cyberpunk · Mi frigio, poi Fa nel drop B · il tempo sale da 132 a 148 BPM', en: 'Cyberpunk hard techno · E phrygian, then F in drop B · tempo climbs from 132 to 148 BPM' } },
+    style: { it: 'Hard techno cyberpunk · Mi frigio, poi Fa nel drop B · il tempo sale da 132 a 148 BPM', en: 'Cyberpunk hard techno · E phrygian, then F in drop B · tempo climbs from 132 to 148 BPM' },
+    tags: { styles: ['dark-cyberpunk', 'berlin-techno'], free: ['hard techno'] } },
   { id: 'neon-ascent', title: 'Neon Ascent', look: 'tramonto', code: neonAscent,
-    style: { it: 'Techno trance · La minore', en: 'Techno trance · A minor' } },
+    style: { it: 'Techno trance · La minore', en: 'Techno trance · A minor' },
+    tags: { styles: ['trance', 'berlin-techno'] } },
 ];

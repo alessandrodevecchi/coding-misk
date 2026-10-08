@@ -8,6 +8,11 @@
     "it": "Phonk · Fa# minore · 128 BPM · brano intero",
     "en": "Phonk · F# minor · 128 BPM · full track"
   },
+  "tags": {
+    "styles": [
+      "phonk"
+    ]
+  },
   "sections": [
     {
       "name": "Intro",

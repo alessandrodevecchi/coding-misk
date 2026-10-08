@@ -8,6 +8,14 @@
     "it": "Progressive rock · La minore · 120 BPM · riff in 7/8, ponte in 5/4, assolo in 4/4 · chitarre distorte, organo, archi",
     "en": "Progressive rock · A minor · 120 BPM · riff in 7/8, bridge in 5/4, solo in 4/4 · distorted guitars, organ, strings"
   },
+  "tags": {
+    "styles": [
+      "classic-rock"
+    ],
+    "free": [
+      "progressive"
+    ]
+  },
   "sections": [
     {
       "name": "Mellotron",

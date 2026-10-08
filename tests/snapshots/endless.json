@@ -4,7 +4,7 @@
     "styles": [
       "berlin-techno"
     ],
-    "hash": "73d7d05b"
+    "hash": "05c39ed5"
   },
   {
     "seed": "aurora",
@@ -14,7 +14,7 @@
       "country"
     ],
     "chaos": 1,
-    "hash": "e4972377"
+    "hash": "335367d5"
   },
   {
     "seed": "kellerlicht",
@@ -25,7 +25,7 @@
     "energy": 0.9,
     "complexity": 0.9,
     "minutes": 20,
-    "hash": "8c3e4f83"
+    "hash": "dfd48411"
   },
   {
     "seed": "quiet",
@@ -36,6 +36,6 @@
     "energy": 0.2,
     "complexity": 0.1,
     "minutes": 12,
-    "hash": "36587253"
+    "hash": "97aeb127"
   }
 ]

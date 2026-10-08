@@ -5,6 +5,7 @@
   "title": "Example 1 · First beat",
   "look": "sonar",
   "style": { "en": "Smallest useful song: one section, one drum track", "it": "Il brano più piccolo: una sezione, una traccia di batteria" },
+  "tags": { "genres": ["techno"], "free": ["example"] },
   "sections": [
     { "name": "Loop", "bars": 8, "bpm": 124, "key": "A", "chords": "drone", "meter": "4/4" }
   ],

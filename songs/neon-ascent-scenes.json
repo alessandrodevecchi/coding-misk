@@ -8,6 +8,12 @@
     "it": "Techno trance · La minore · 128 BPM",
     "en": "Techno trance · A minor · 128 BPM"
   },
+  "tags": {
+    "styles": [
+      "trance",
+      "berlin-techno"
+    ]
+  },
   "sections": [
     {
       "name": "Intro",

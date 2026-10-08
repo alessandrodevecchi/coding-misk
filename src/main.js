@@ -10,6 +10,8 @@ import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { createStylesTab } from './library/styles-tab.js';
 import { createArtistsTab } from './library/artists-tab.js';
+import { createSongsView } from './library/songs-view.js';
+import { kindOf, parseFree } from './library/song-filter.js';
 import { createSession } from './endless/director.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
@@ -1398,11 +1400,14 @@ $('#lessons').addEventListener('click', e => {
 function songCard({ tr, p }, i) {
   const m = p.meta, composed = tr.kind === 'composed';
   const ticks = Array.from({ length: Math.max(0, Math.floor(m.bars / 4) - 1) }, (_, k) => `<i style="left:${(k + 1) * 4 / m.bars * 100}%"></i>`).join('');
-  return `<article class="card lesson song" data-song-card="${i}">
-    <div class="song-head"><span class="badge${composed ? ' composed' : ''}">${composed ? t('composedBadge') : t('codedBadge')}</span>${composed && !isBuiltin(tr.id) ? `<span class="badge">${t('mine')}</span>` : ''}
-      <span class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}</span></div>
+  const sg = songOf({ tr, p }), kind = kindOf(sg), own = composed && !isBuiltin(tr.id);
+  return `<article class="card lesson song" data-song-card="${i}" data-song-id="${esc(tr.id)}">
+    <div class="song-head"><span class="badge kind-${kind}">${t(`k:${kind}`)}</span>${sg.mine ? `<span class="badge">${t('mine')}</span>` : ''}
+      <span class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}</span>${songsView.starButton(tr.id)}</div>
     <h3>${esc(tr.title)}</h3>
     ${tr.style ? `<p>${esc(tx(tr.style))}</p>` : ''}
+    <div class="song-tags">${songsView.tagsHtml(sg)}${own ? ` <button class="chip small" data-act="tags" aria-expanded="false">${t('tagsEdit')}</button>` : ''}</div>
+    ${own ? '<div class="song-tags-edit" hidden></div>' : ''}
     <div class="timeline" data-tl="${i}">
       ${m.sections.map(sec => `<button class="sec${/drop/i.test(sec.key) ? ' drop' : ''}" style="flex:${sec.len}" data-seek="${sec.start}" title="${esc(t('barsRange', { a: sec.start + 1, b: sec.start + sec.len }))}" aria-label="${esc(t('seekAria', { name: sec.label, bar: sec.start + 1 }))}">${esc(sec.label)}</button>`).join('')}
       <span class="ticks">${ticks}</span><span class="head"></span>
@@ -1421,14 +1426,33 @@ function songCard({ tr, p }, i) {
     </div>` : ''}
   </article>`;
 }
+// a card as a song for search and filters (#34): kind, tags, whether it is the user's
+function isMine(tr) { return tr.kind === 'composed' ? !isBuiltin(tr.id) || user.tracks.some(u => u.id === tr.id) : !!user.code[tr.id]; }
+function songOf({ tr, p }) {
+  // songs generated before #34 have no origin: their id still tells
+  return { id: tr.id, title: tr.title, style: tr.style, tags: tr.tags, origin: tr.origin || (/^endless-/.test(tr.id) ? 'endless' : undefined), code: tr.kind !== 'composed', build: tr.kind === 'composed' && hasBuild(tr),
+    mine: isMine(tr), bpm: parseFloat(p.meta.bpmLabel) || 0, seconds: p.meta.seconds };
+}
+// every style, built-in and the user's (also the invalid ones), for tag names and filters
+function allStyles() { return [...BUILTIN_STYLES, ...((stylesTab && stylesTab.mine) || []).filter(r => r && r.id && !BUILTIN_STYLES.some(b => b.id === r.id))]; }
+const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, tx, esc, store, styles: allStyles });
 function renderSongs() {
   const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr));
-  const coded = codedTracks();
-  cards = [...composed, ...coded].map(tr => ({ tr, p: playable(tr) }));
-  $('#songs').innerHTML = cards.slice(0, composed.length).map(songCard).join('') +
-    `<h3 class="songs-sub">${t('codedSection')}</h3><p class="note">${t('codedIntro')}</p>` +
-    cards.slice(composed.length).map((c, k) => songCard(c, composed.length + k)).join('') +
-    `<p class="note">${t('seekHint')}</p>`;
+  cards = [...composed, ...codedTracks()].map(tr => ({ tr, p: playable(tr) }));
+  songsView.setSongs(cards.map(songOf));
+  songsView.renderBar();
+  $('#songs').innerHTML = cards.map(songCard).join('');
+  $('#songs-hint').innerHTML = `${t('seekHint')} ${t('codedIntro')}`;
+  songsView.apply();
+}
+// tags of one of the user's songs, edited from its card
+function saveTags(id, tags) {
+  const clean = Object.fromEntries(Object.entries(tags).filter(([, v]) => v.length));
+  const i = user.tracks.findIndex(u => u.id === id);
+  if (i < 0) return;
+  if (Object.keys(clean).length) user.tracks[i].tags = clean; else delete user.tracks[i].tags;
+  if (T.id === id) { if (user.tracks[i].tags) T.tags = clone(clean); else delete T.tags; }
+  saveLibrary();
 }
 // avvia un brano dalla card: i brani a scene si caricano anche nell'arrangiatore
 function startCard(i, bar) {
@@ -1444,9 +1468,32 @@ function startCard(i, bar) {
 $('#songs').addEventListener('click', e => {
   const card = e.target.closest('[data-song-card]'); if (!card) return;
   const i = +card.dataset.songCard, { tr, p } = cards[i];
+  const star = e.target.closest('[data-star]');
+  if (star) {
+    const on = songsView.toggleFav(star.dataset.star), lbl = t(on ? 'favRemove' : 'favAdd');
+    star.setAttribute('aria-pressed', on); star.setAttribute('aria-label', lbl); star.title = lbl;
+    return;
+  }
+  const panel = e.target.closest('.sv-tags-panel');
+  if (panel) {
+    const c = e.target.closest('[data-tg]');
+    if (c) c.setAttribute('aria-pressed', c.getAttribute('aria-pressed') !== 'true');
+    if (e.target.closest('[data-tags-done]')) {
+      const pick = g => [...panel.querySelectorAll(`[data-tg="${g}"][aria-pressed="true"]`)].map(x => x.dataset.v);
+      saveTags(tr.id, { genres: pick('genres'), styles: pick('styles'), free: parseFree(panel.querySelector('[data-tg-free]').value) });
+      toast(t('tagsSaved')); renderSongs();
+    }
+    return;
+  }
   const act = e.target.closest('[data-act]');
   if (act) {
     const a = act.dataset.act;
+    if (a === 'tags') {
+      const box = card.querySelector('.song-tags-edit'), open = box.hidden;
+      box.hidden = !open; act.setAttribute('aria-expanded', open);
+      box.innerHTML = open ? songsView.tagsPanel(tr) : '';
+      return;
+    }
     if (a === 'play') return startCard(i, 0);
     if (a === 'pause') return togglePlay();
     if (a === 'stop') return stop();
@@ -1614,7 +1661,12 @@ function libraryCards() { if (!cards.length) { const composed = composedTracks()
 function currentSongId() { return mode === 'track' ? T.id : mode === 'free' && song ? song.id : null; }
 function neighbour(dir) {
   if (mode === 'radio' && radio && radio.on) return dir > 0 ? radio.skip() : radio.restart();
-  const id = currentSongId(), list = libraryCards(), i = list.findIndex(c => c.tr.id === id);
+  const id = currentSongId(), list = libraryCards();
+  // the order the user sees in the Songs tab (search, filters, sorting); the full list when the song is filtered out
+  songsView.setSongs(list.map(songOf));
+  const shown = songsView.order(), k = shown.indexOf(id);
+  if (k >= 0) { const next = shown[k + dir]; return next === undefined ? -1 : list.findIndex(c => c.tr.id === next); }
+  const i = list.findIndex(c => c.tr.id === id);
   return i < 0 ? -1 : i + dir >= 0 && i + dir < list.length ? i + dir : -1;
 }
 function goNeighbour(dir) {
@@ -1680,7 +1732,12 @@ const BUILTIN_STYLES = usableRecipes(Object.values(import.meta.glob('../styles/*
 // the styles the radio uses: built-ins plus the user's valid styles (Styles tab), kept in this one array
 const RECIPES = BUILTIN_STYLES.slice();
 stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins: BUILTIN_STYLES, toast,
-  onChange: () => { RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable())); if (radio) radio.render(); } });
+  onChange: () => { RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable())); if (radio) radio.render(); },
+  // the user's songs tagged with a renamed style keep the link (#34)
+  onRename: (from, to) => {
+    for (const tr of [...user.tracks, T]) if (tr.tags && tr.tags.styles) tr.tags.styles = tr.tags.styles.map(id => (id === from ? to : id));
+    saveLibrary();
+  } });
 RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
 // artists from artists/ plus the user's (Artists tab)
 const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));

@@ -8,6 +8,11 @@
     "it": "Il brano che ho scritto con massima libertà · Re dorico · 96 BPM · dal fruscio al 7/8, poi 4/4, e di nuovo rumore",
     "en": "The track I wrote with complete freedom · D dorian · 96 BPM · from noise to 7/8, then 4/4, and back to noise"
   },
+  "tags": {
+    "genres": [
+      "experimental"
+    ]
+  },
   "sections": [
     {
       "name": "Rumore",

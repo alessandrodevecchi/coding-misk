@@ -8,6 +8,15 @@
     "en": "Slow heavy trip-hop · D minor, Andalusian cadence · 84 BPM half-time · clean guitar arpeggio, a wall of tuned-down guitars, a flute that answers late, vinyl under everything",
     "it": "Trip-hop lento e pesante · Re minore, cadenza andalusa · 84 BPM in half-time · arpeggio di chitarra pulita, muro di chitarre accordate basse, un flauto che risponde tardi, vinile sotto tutto"
   },
+  "tags": {
+    "genres": [
+      "hip-hop",
+      "rock"
+    ],
+    "free": [
+      "trip-hop"
+    ]
+  },
   "sections": [
     {
       "name": "Polvere",

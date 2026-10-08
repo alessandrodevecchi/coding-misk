@@ -4,6 +4,7 @@ import { KITS, KEYS, PROGS, METERS, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GU
 import { validateRecipe, INSTRUMENTS, SHAPES, RECIPE_FORMAT } from '../endless/recipe.js';
 import { MACHINES } from '../sounds/machines.js';
 import { SPEAKERS } from '../song/build.js';
+import { GENRES } from '../song/format.js';
 import { downloadJson, pickJsonFiles, userStore, freeId, errorsByPath } from './library.js';
 
 // names a list field of an instrument offers in the form
@@ -14,7 +15,8 @@ const CHOICES = {
 };
 const INSTR = Object.keys(INSTRUMENTS);
 
-export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onChange }) {
+// onRename(oldId, newId): a user style got a new id (song tags follow it, #34)
+export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onChange, onRename = () => {} }) {
   const mine = userStore(store, 'coding-misk-styles');
   let open = null, editing = null, jsonView = false;
   const builtinIds = () => builtins.map(r => r.id);
@@ -36,6 +38,7 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
     }).join('');
     const v = r.voice || {};
     return `<div class="sheet-grid">
+      <div class="sheet-block"><h4>${esc(t('genreLbl'))}</h4><div class="big">${esc(t(`g:${GENRES.includes(r.genre) ? r.genre : 'experimental'}`))}</div></div>
       <div class="sheet-block"><h4>${esc(t('libTempo'))}</h4><div class="big">${esc(range(r.tempo))} BPM</div>
         <div><span class="lbl">${esc(t('libLength'))}</span> ${esc(range(r.minutes || [3, 5]))} min · ${esc(t('libPhrase'))} ${r.phrase || 8} · ${esc(t('libTracks'))} ${esc(range((r.tracks || {}).usual || [4, 5]))}, max ${(r.tracks || {}).max ?? 8}</div>
         <div><span class="lbl">${esc(t('libShapes'))}</span> ${tagList(r.shapes)}</div></div>
@@ -67,6 +70,7 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
           <div class="ctrl"><span class="lbl">id</span><input type="text" data-text="id" value="${esc(r.id)}">${err('id')}</div>
           <div class="ctrl"><span class="lbl">English</span><input type="text" data-text="name.en" value="${esc((r.name || {}).en || '')}">${err('name.en')}</div>
           <div class="ctrl"><span class="lbl">Italiano</span><input type="text" data-text="name.it" value="${esc((r.name || {}).it || '')}">${err('name.it')}</div>
+          <div class="ctrl"><span class="lbl">${esc(t('genreLbl'))}</span><select data-text="genre">${GENRES.map(g => `<option value="${g}"${(r.genre || 'experimental') === g ? ' selected' : ''}>${esc(t(`g:${g}`))}</option>`).join('')}</select>${err('genre')}</div>
           <div class="ctrl"><span class="lbl">${esc(t('libDescription'))}</span><input type="text" data-text="description" value="${esc(r.description || '')}"></div></div>
         <div class="sheet-block"><h4>${esc(t('libTempo'))}</h4>
           <div class="ctrl"><span class="lbl">BPM</span><div class="pair">${num('tempo.0', (r.tempo || [])[0])}${num('tempo.1', (r.tempo || [])[1])}</div>${err('tempo')}</div>
@@ -131,7 +135,7 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
     if (b.id === 'st-cancel') { editing = null; jsonView = false; render(); return; }
     if (b.id === 'st-json') { jsonView = !jsonView; render(); return; }
     if (b.id === 'st-save' && editing) {
-      if (editing.id !== cur.r.id) { if (all().some(x => x.r.id === editing.id)) { toast(t('libIdTaken')); return; } mine.remove(cur.r.id); }
+      if (editing.id !== cur.r.id) { if (all().some(x => x.r.id === editing.id)) { toast(t('libIdTaken')); return; } mine.remove(cur.r.id); onRename(cur.r.id, editing.id); }
       mine.put(editing); open = editing.id; editing = null; jsonView = false; onChange(); render(); toast(t('libSaved')); return;
     }
     if (b.id === 'st-del') { mine.remove(cur.r.id); open = null; onChange(); render(); return; }

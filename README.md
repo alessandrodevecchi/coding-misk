@@ -42,6 +42,7 @@ This project combines that idea with what the new models can do, with my own twi
 ## What it does
 
 - **Arranger.** A grid of tracks and sections. Sections hold tempo (with ramps), key, chords, meter (4/4, 3/4, 5/4, 7/8), swing and the entry (hard cut or fade). Tracks are free: any number of any instrument, each with its own patterns, mute and solo. Everything compiles to Strudel code in real time.
+- **Find songs.** The Songs tab has one list with search (title, style, key, tags), filters by genre, style and kind (standard, live build, generated, yours, code), favourites and sorting. Style tags follow the Styles tab, and you can tag your own songs.
 - **Songs as JSON.** Songs are files in `songs/` with a documented format, a validator and a command line tool, so people and agents can write them as code ([docs/COMPOSING.md](docs/COMPOSING.md)). Code tracks hold plain Strudel inside a song.
 - **Instruments.** Drum sequencer with several drum machines, bass with riffs, guitar (clean, crunch, distorted, metal, palm muted) with riffs and stereo double tracking, arpeggio, hook with harmonies and dark modes, pad, texture (voices, metal hits, vinyl) and riser. Every instrument can use oscillators or General MIDI sounds, has its own rhythm steps, and bass, arpeggio and hook take notes written as chord or scale degrees.
 - **Automation.** Volume, filter and tempo can move from the start to the end of a section. Drive, bitcrusher, resonance, FM and vowel filter are available too.

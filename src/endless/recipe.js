@@ -2,7 +2,7 @@
 // A recipe names building blocks the app already has (src/music.js, drum machines, sounds);
 // the validator checks every name, like the song validator, with a JSON path per problem.
 import { KEYS, PROGS, METERS, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEXTURES, TEX_RHYTHMS, GROOVES, MODES, WAVES } from '../music.js';
-import { SETTING_FIELDS, VOICE_DEFAULT } from '../song/format.js';
+import { SETTING_FIELDS, VOICE_DEFAULT, GENRES } from '../song/format.js';
 import { SYNTHS } from '../song/validate.js';
 import { SPEAKERS } from '../song/build.js';
 import { MACHINES } from '../sounds/machines.js';
@@ -47,10 +47,11 @@ export const RECIPE_DEFAULTS = {
   tracks: { usual: [4, 5], max: 8 },
   energy: { tracks: 0.4, drums: 0.3, filter: 0.2, drive: 0.1 },
   voice: VOICE_DEFAULT,
+  genre: 'experimental',
 };
 
 export const RECIPE_FORMAT = 1;
-export const TOP_FIELDS = ['format', 'id', 'name', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'words', ...Object.keys(INSTRUMENTS)];
+export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'words', ...Object.keys(INSTRUMENTS)];
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const isInt = v => Number.isInteger(v);
 const knownSound = w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w);
@@ -78,6 +79,10 @@ export function validateRecipe(r) {
   if (r.format !== undefined && (!Number.isInteger(r.format) || r.format < 1 || r.format > RECIPE_FORMAT)) err('format', `a format version from 1 to ${RECIPE_FORMAT}`);
   if (typeof r.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(r.id)) err('id', 'lowercase letters, digits and hyphens, for example "berlin-techno"');
   for (const lang of ['en', 'it']) if (!r.name || typeof r.name[lang] !== 'string' || !r.name[lang].trim()) err(`name.${lang}`, 'the style name in English and Italian, for example {"en": "Berlin techno", "it": "Techno berlinese"}');
+
+  // one genre of the song library (#34); a style without one is treated as experimental
+  if (r.genre === undefined) warn('genre', `no genre: treated as "experimental"; genres: ${GENRES.join(', ')}`);
+  else if (!GENRES.includes(r.genre)) err('genre', `a genre: ${GENRES.join(', ')}`);
 
   // [lo, hi] ranges
   const range = (path, v, lo, hi, int = false) => {

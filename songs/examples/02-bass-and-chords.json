@@ -5,6 +5,7 @@
   "title": "Example 2 · Bass and chords",
   "look": "tramonto",
   "style": { "en": "Two sections, a bass line written as chord tones, a pad that enters later", "it": "Due sezioni, un basso scritto come note dell'accordo, un pad che entra dopo" },
+  "tags": { "genres": ["techno"], "free": ["example"] },
   "sections": [
     { "name": "Verse", "bars": 8, "bpm": 110, "key": "E", "chords": "malinconica", "meter": "4/4" },
     { "name": "Chorus", "bars": 8, "bpm": 110, "key": "E", "chords": "epica", "meter": "4/4", "crash": true }

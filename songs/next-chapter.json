@@ -8,6 +8,14 @@
     "it": "Nuovo brano nello stile di Ten Years · future pop · Si minore, poi Do · 96 BPM",
     "en": "New track in the Ten Years style · future pop · B minor, then C · 96 BPM"
   },
+  "tags": {
+    "genres": [
+      "pop"
+    ],
+    "free": [
+      "future pop"
+    ]
+  },
   "sections": [
     {
       "name": "Intro",

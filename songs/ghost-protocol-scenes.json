@@ -8,6 +8,15 @@
     "it": "Hard techno cyberpunk · Mi frigio, poi Fa nel drop B · tempo da 132 a 148 BPM",
     "en": "Cyberpunk hard techno · E phrygian, then F in drop B · tempo from 132 to 148 BPM"
   },
+  "tags": {
+    "styles": [
+      "dark-cyberpunk",
+      "berlin-techno"
+    ],
+    "free": [
+      "hard techno"
+    ]
+  },
   "sections": [
     {
       "name": "Intro",

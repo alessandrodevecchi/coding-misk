@@ -23,6 +23,7 @@ One recipe per file, `styles/<id>.json`. Required fields are marked.
 | `format`       | Format version of the file (1). Fields added by later versions take their defaults when missing. | `1` |
 | `id`           | Required. Lowercase letters, digits and hyphens, the same as the file name.               |                         |
 | `name`         | Required. `{ "en": "...", "it": "..." }`                                                   |                         |
+| `genre`        | One genre of the song library: `techno`, `trance`, `house`, `synthwave`, `drum-and-bass`, `industrial`, `rock`, `metal`, `hip-hop`, `pop`, `jazz`, `country`, `ambient`, `experimental`. Songs tagged with the style count under this genre. | `experimental`, with a warning |
 | `description`  | One sentence on the sound of the style, for people and agents.                             |                         |
 | `tempo`        | Required. BPM range `[low, high]`, within 40 to 240.                                       |                         |
 | `keys`         | Required. Keys the songs can use: `E F F# G A B C D`.                                      |                         |

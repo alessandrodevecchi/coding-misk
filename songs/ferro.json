@@ -8,6 +8,11 @@
     "it": "Metal · Mi frigio un tono sotto · 160 BPM · brano intero",
     "en": "Metal · E phrygian one step down · 160 BPM · full track"
   },
+  "tags": {
+    "genres": [
+      "metal"
+    ]
+  },
   "sections": [
     {
       "name": "Feedback",

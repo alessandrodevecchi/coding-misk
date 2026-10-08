@@ -5,6 +5,7 @@
     "en": "Classic rock",
     "it": "Rock classico"
   },
+  "genre": "rock",
   "description": "Seventies and eighties rock: verse and chorus beats, overdriven power chords, organ and a guitar-like lead.",
   "tempo": [
     100,

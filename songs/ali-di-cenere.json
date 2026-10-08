@@ -8,6 +8,11 @@
     "it": "Metal melodico · Si minore, finale in Do · 150 BPM · brano intero",
     "en": "Melodic metal · B minor, last chorus in C · 150 BPM · full track"
   },
+  "tags": {
+    "styles": [
+      "melodic-metal"
+    ]
+  },
   "sections": [
     {
       "name": "Arpeggio",

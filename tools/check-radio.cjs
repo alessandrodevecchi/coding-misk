@@ -115,6 +115,8 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   await page.click('#radio-save'); await sleep(300);
   const libAfter = await page.evaluate(() => (JSON.parse(localStorage.getItem('coding-misk-library') || '{"tracks":[]}').tracks || []).length);
   check(libAfter === libBefore + 1, 'save adds the song to the library');
+  const saved = await page.evaluate(() => { const l = JSON.parse(localStorage.getItem('coding-misk-library')).tracks; return l[l.length - 1]; });
+  check(saved.origin === 'endless' && saved.tags && saved.tags.styles.length > 0, 'a saved song keeps its generated label and style tags', JSON.stringify(saved.tags));
   const onAir = r.state.stream[r.state.onAir];
   await page.click('#radio-open'); await sleep(1500);
   r = await R();

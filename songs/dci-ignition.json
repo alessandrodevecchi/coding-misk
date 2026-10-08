@@ -8,6 +8,14 @@
     "it": "Nuovo jingle nello stile DCI · tech · Fa# frigio, sezione in Sol · 106 BPM",
     "en": "New jingle in the DCI style · tech · F# phrygian, section in G · 106 BPM"
   },
+  "tags": {
+    "genres": [
+      "techno"
+    ],
+    "free": [
+      "jingle"
+    ]
+  },
   "sections": [
     {
       "name": "Stab",

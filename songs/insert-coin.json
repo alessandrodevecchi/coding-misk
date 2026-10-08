@@ -8,6 +8,15 @@
     "it": "Arcade anni '90 · La minore, boss in tensione, ultimo livello in Si · 150 BPM · lead FM, basso a ottave, arpeggi",
     "en": "90s arcade · A minor, tense boss, last stage in B · 150 BPM · FM lead, octave bass, arpeggios"
   },
+  "tags": {
+    "genres": [
+      "synthwave"
+    ],
+    "free": [
+      "arcade",
+      "chiptune"
+    ]
+  },
   "sections": [
     {
       "name": "Insert coin",

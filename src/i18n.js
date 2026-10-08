@@ -4,6 +4,12 @@
 
 const STR = {
   it: {
+    'g:techno': 'Techno', 'g:trance': 'Trance', 'g:house': 'House', 'g:synthwave': 'Synthwave', 'g:drum-and-bass': 'Drum and bass', 'g:industrial': 'Industrial', 'g:rock': 'Rock', 'g:metal': 'Metal', 'g:hip-hop': 'Hip hop', 'g:pop': 'Pop', 'g:jazz': 'Jazz', 'g:country': 'Country', 'g:ambient': 'Ambient', 'g:experimental': 'Sperimentale',
+    'k:standard': 'Standard', 'k:live': 'Live build', 'k:generated': 'Generato', 'k:mine': 'Tuo', 'k:code': 'Codice',
+    songSearch: 'Cerca titolo, stile, tonalità, tag…', songSearchAria: 'Cerca tra i brani', fGenres: 'Genere', fStyles: 'Stile', fKinds: 'Tipo', fFav: 'Solo preferiti',
+    sortLbl: 'Ordine', 'sort:default': 'Predefinito', 'sort:title': 'Titolo', 'sort:bpm': 'BPM', 'sort:length': 'Durata',
+    songCount: '{n} di {total} brani', songNone: 'Nessun brano corrisponde.', clearFilters: 'Azzera filtri', favAdd: 'Aggiungi ai preferiti', favRemove: 'Togli dai preferiti',
+    tagsEdit: 'Tag', tagsDone: 'Fatto', tagsFree: 'Tag liberi', tagsFreeHint: 'parole separate da virgola', tagsSaved: 'Tag salvati', genreLbl: 'Genere', moreChips: 'altri {n}', fewerChips: 'meno',
     tag: 'synth lab per Strudel', lang: 'Lingua',
     key: 'Tonalità', chords: 'Accordi', bpmDown: 'BPM meno', bpmUp: 'BPM più',
     stage: 'Visual a ritmo', looks: 'Tema visual', scenes: 'Sezioni', scene: 'Sezione',
@@ -114,10 +120,16 @@ const STR = {
     drive: 'Saturazione', grit: 'Sgranatura', reso: 'Risonanza', mode: 'Modo', fm: 'FM', vowel: 'Vocale', type: 'Tipo',
     sample: 'Campione', texture: 'Texture', textureHint: 'voci, rumori e metalli', direction: 'Direzione', up: 'Sale (riser)', down: 'Scende (downlifter)',
     cDown: 'Downlifter · rumore che scende in {n} battute', codedSection: 'Brani in codice',
-    codedIntro: 'I brani originali scritti direttamente in codice, con automazioni che l\'arrangiatore non può rappresentare. Restano qui come riferimento: le versioni a scene sopra si aprono in Componi.',
+    codedIntro: 'I brani di tipo Codice sono gli originali scritti direttamente in Strudel, con automazioni che l\'arrangiatore non può rappresentare: si modificano nell\'editor.',
     trackSaved: 'Brano salvato', trackDeleted: 'Brano eliminato', restored: 'Originale ripristinato', minScene: 'Serve almeno una sezione', mine: 'Tuo',
   },
   en: {
+    'g:techno': 'Techno', 'g:trance': 'Trance', 'g:house': 'House', 'g:synthwave': 'Synthwave', 'g:drum-and-bass': 'Drum and bass', 'g:industrial': 'Industrial', 'g:rock': 'Rock', 'g:metal': 'Metal', 'g:hip-hop': 'Hip hop', 'g:pop': 'Pop', 'g:jazz': 'Jazz', 'g:country': 'Country', 'g:ambient': 'Ambient', 'g:experimental': 'Experimental',
+    'k:standard': 'Standard', 'k:live': 'Live build', 'k:generated': 'Generated', 'k:mine': 'Yours', 'k:code': 'Code',
+    songSearch: 'Search title, style, key, tags…', songSearchAria: 'Search songs', fGenres: 'Genre', fStyles: 'Style', fKinds: 'Kind', fFav: 'Favourites only',
+    sortLbl: 'Order', 'sort:default': 'Default', 'sort:title': 'Title', 'sort:bpm': 'BPM', 'sort:length': 'Length',
+    songCount: '{n} of {total} songs', songNone: 'No song matches.', clearFilters: 'Clear filters', favAdd: 'Add to favourites', favRemove: 'Remove from favourites',
+    tagsEdit: 'Tags', tagsDone: 'Done', tagsFree: 'Free tags', tagsFreeHint: 'words separated by commas', tagsSaved: 'Tags saved', genreLbl: 'Genre', moreChips: '{n} more', fewerChips: 'fewer',
     tag: 'synth lab for Strudel', lang: 'Language',
     key: 'Key', chords: 'Chords', bpmDown: 'BPM down', bpmUp: 'BPM up',
     stage: 'Beat-synced visuals', looks: 'Visual theme', scenes: 'Sections', scene: 'Section',
@@ -186,7 +198,7 @@ const STR = {
     drive: 'Drive', grit: 'Grit', reso: 'Resonance', mode: 'Mode', fm: 'FM', vowel: 'Vowel', type: 'Type',
     sample: 'Sample', texture: 'Texture', textureHint: 'voices, noise and metal', direction: 'Direction', up: 'Rises (riser)', down: 'Falls (downlifter)',
     cDown: 'Downlifter · noise falling over {n} bars', codedSection: 'Code songs',
-    codedIntro: 'The original songs written directly in Strudel code, with automation the arranger cannot represent. They stay here as reference: the songs above open in Compose.',
+    codedIntro: 'Code songs are the originals written directly in Strudel, with automation the arranger cannot represent: you edit them in the editor.',
     trackSaved: 'Song saved', trackDeleted: 'Song deleted', restored: 'Original restored', minScene: 'A song needs at least one section', mine: 'Yours',
   },
 };

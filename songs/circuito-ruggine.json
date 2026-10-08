@@ -8,6 +8,12 @@
     "it": "Techno industrial cyberpunk · Mi frigio, poi Fa · 132 BPM · cassa satura, acid, metalli, chitarre distorte un tono sotto",
     "en": "Cyberpunk industrial techno · E phrygian, then F · 132 BPM · saturated kick, acid, metal hits, distorted guitars one step down"
   },
+  "tags": {
+    "styles": [
+      "industrial",
+      "dark-cyberpunk"
+    ]
+  },
   "sections": [
     {
       "name": "Avvio",

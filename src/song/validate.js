@@ -1,7 +1,7 @@
 // Validates a v2 song. Errors make the song unusable; warnings point at likely mistakes.
 // Each message has a JSON path, so a human or an agent can find the spot quickly.
 import { KEYS, PROGS, METERS, meterSteps, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEX_RHYTHMS, KITS, MODES, ROWS, LOOKS, WAVES } from '../music.js';
-import { FORMAT, VERSION, TYPES, PATTERN_FIELDS, SETTING_FIELDS, VISUALS } from './format.js';
+import { FORMAT, VERSION, GENRES, TAG_KINDS, ORIGINS, TYPES, PATTERN_FIELDS, SETTING_FIELDS, VISUALS } from './format.js';
 import { checkRack } from './rack.js';
 import { checkBuild, buildMap, SPEAKERS } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
@@ -16,7 +16,8 @@ const isInt = v => Number.isInteger(v);
 const topLevel = str => { const out = []; let depth = 0, cur = ''; for (const ch of str.trim()) { if ('[<'.includes(ch)) depth++; if (']>'.includes(ch)) depth--; if (ch === ' ' && !depth) { if (cur) out.push(cur); cur = ''; } else cur += ch; } if (cur) out.push(cur); return out; };
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 
-export function validateSong(song) {
+// opts.styles: known style recipe ids, to warn about style tags that match none
+export function validateSong(song, opts = {}) {
   const errors = [], warnings = [];
   const err = (path, msg) => errors.push({ path, msg });
   const warn = (path, msg) => warnings.push({ path, msg });
@@ -26,6 +27,23 @@ export function validateSong(song) {
   if (typeof song.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(song.id)) err('id', 'lowercase letters, digits and hyphens, for example "night-drive"');
   if (typeof song.title !== 'string' || !song.title.trim()) err('title', 'a non-empty string');
   if (song.look !== undefined && !LOOKS.some(([k]) => k === song.look)) warn('look', `unknown visual "${song.look}"; known: ${LOOKS.map(([k]) => k).join(', ')}`);
+
+  // tags and origin (song library, #34)
+  if (song.origin !== undefined && !ORIGINS.includes(song.origin)) err('origin', `one of ${ORIGINS.join(', ')}, or left out`);
+  if (song.tags !== undefined) {
+    const tg = song.tags;
+    if (!tg || typeof tg !== 'object' || Array.isArray(tg)) err('tags', 'an object with genres, styles and free lists');
+    else {
+      for (const k of Object.keys(tg)) if (!TAG_KINDS.includes(k)) warn(`tags.${k}`, `unknown field; tag lists: ${TAG_KINDS.join(', ')}`);
+      for (const k of TAG_KINDS) if (tg[k] !== undefined && !Array.isArray(tg[k])) err(`tags.${k}`, 'a list of strings');
+      (Array.isArray(tg.genres) ? tg.genres : []).forEach((g, i) => { if (!GENRES.includes(g)) err(`tags.genres[${i}]`, `a genre: ${GENRES.join(', ')}`); });
+      (Array.isArray(tg.styles) ? tg.styles : []).forEach((id, i) => {
+        if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(id)) err(`tags.styles[${i}]`, 'a style id: lowercase letters, digits and hyphens');
+        else if (opts.styles && !opts.styles.includes(id)) warn(`tags.styles[${i}]`, `no known style "${id}"`);
+      });
+      (Array.isArray(tg.free) ? tg.free : []).forEach((f, i) => { if (typeof f !== 'string' || !/^[a-z0-9][a-z0-9 -]{0,23}$/.test(f)) err(`tags.free[${i}]`, 'a lowercase word or short phrase, at most 24 characters'); });
+    }
+  }
 
   // sections
   const secs = Array.isArray(song.sections) ? song.sections : [];

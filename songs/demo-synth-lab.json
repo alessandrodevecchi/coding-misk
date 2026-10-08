@@ -3,6 +3,14 @@
   "version": 2,
   "id": "demo-synth-lab",
   "title": "Synth Lab Demo",
+  "tags": {
+    "genres": [
+      "experimental"
+    ],
+    "free": [
+      "demo"
+    ]
+  },
   "look": "tramonto",
   "sections": [
     {

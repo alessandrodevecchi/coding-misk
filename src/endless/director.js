@@ -327,6 +327,7 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   const song = {
     format: FORMAT, version: VERSION, id: `endless-${slug(seed)}-${index + 1}`, title,
     style: { en: `Endless · ${names('en')} · ${plan.key} · ${plan.bpm} BPM · ${plan.shape}`, it: `Endless · ${names('it')} · ${plan.key} · ${plan.bpm} BPM · ${plan.shape}` },
+    tags: { styles }, origin: 'endless',
     sections: plan.sections.map(({ role, ...s }) => s), tracks, build: steps,
   };
   // measured energy of the final song at each phrase

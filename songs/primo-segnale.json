@@ -8,6 +8,11 @@
     "en": "Live build: trance that starts from a lone kick and builds itself in front of you, one change every few bars · A minor · 138 BPM",
     "it": "Live build: trance che parte da una cassa sola e si costruisce davanti a te, un cambiamento ogni poche battute · La minore · 138 BPM"
   },
+  "tags": {
+    "styles": [
+      "trance"
+    ]
+  },
   "sections": [
     {
       "name": "Live",

@@ -30,6 +30,7 @@ export function joinSession(session, songs) {
     format: FORMAT, version: VERSION, id: first.id.replace(/-1$/, '-joined'),
     title: `Endless · ${songs.map(s => s.title).join(' / ')}`.slice(0, 120),
     style: { en: `Endless session ${session.seed}: ${songs.length} songs, ${list(session.options.styles).join(' + ')}`, it: `Sessione endless ${session.seed}: ${songs.length} brani, ${list(session.options.styles).join(' + ')}` },
+    tags: { styles: [...new Set(songs.flatMap(s => (s.tags && s.tags.styles) || []))] }, origin: 'endless',
     sections, tracks, build,
   };
 }

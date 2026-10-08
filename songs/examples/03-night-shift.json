@@ -8,6 +8,14 @@
     "en": "Two guitars, a hook written as scale degrees with a delay rack, a clip that starts mid-section and a code track",
     "it": "Due chitarre, un hook scritto come gradi della scala con un rack di delay, un clip che parte a metà sezione e una traccia di codice"
   },
+  "tags": {
+    "genres": [
+      "rock"
+    ],
+    "free": [
+      "example"
+    ]
+  },
   "sections": [
     {
       "name": "Intro",

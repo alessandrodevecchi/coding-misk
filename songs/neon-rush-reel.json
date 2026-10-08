@@ -8,6 +8,14 @@
     "it": "Techno cyberpunk ruvida per un reel · Mi frigio · 145 BPM · 28 secondi",
     "en": "Rough cyberpunk techno for a reel · E phrygian · 145 BPM · 28 seconds"
   },
+  "tags": {
+    "styles": [
+      "dark-cyberpunk"
+    ],
+    "free": [
+      "reel"
+    ]
+  },
   "sections": [
     {
       "name": "Glitch",
