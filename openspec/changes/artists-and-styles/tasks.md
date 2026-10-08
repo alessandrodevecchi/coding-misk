@@ -15,8 +15,8 @@
 
 ## 3. Styles tab
 
-- [ ] 3.1 Add the Styles tab: list and readable sheet for every style; verify in the browser that each of the 16 styles opens with its tempo, progressions and instruments.
-- [ ] 3.2 Add duplicate, new, the edit form and the JSON view with errors in place, user styles in browser storage, export and import; verify in the browser that a duplicated and edited style appears in the radio chips, an invalid edit shows its error, and export then import gives the same style.
+- [x] 3.1 Add the Styles tab: list and readable sheet for every style; verify in the browser that each of the 16 styles opens with its tempo, progressions and instruments.
+- [x] 3.2 Add duplicate, new, the edit form and the JSON view with errors in place, user styles in browser storage, export and import; verify in the browser that a duplicated and edited style appears in the radio chips, an invalid edit shows its error, and export then import gives the same style.
 
 ## 4. Artists tab
 
