@@ -12,6 +12,8 @@ import { createStylesTab } from './library/styles-tab.js';
 import { createArtistsTab } from './library/artists-tab.js';
 import { createSongsView } from './library/songs-view.js';
 import { kindOf, parseFree } from './library/song-filter.js';
+import { createPlaylistStore, createQueue, REPEATS } from './library/playlists.js';
+import { createPlaylistsTab } from './library/playlists-tab.js';
 import { createSession } from './endless/director.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
@@ -30,6 +32,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const store = {
   get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  remove(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
 setLang(getLang());
 
@@ -73,7 +76,7 @@ function composedTracks() {
 const codedTracks = () => CODED.map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
 // the radio tab (created further down, once the player exists)
-let radio = null, stylesTab = null, artistsTab = null;
+let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null;
 // custom samples manifest (bank → files), for spoken comments
 let customFiles = {};
 // oggetto riproducibile: codice + mappa di sezioni e tempo
@@ -1361,7 +1364,7 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'radio', 'artisti', 'stili', 'guida', 'suoni', 'riferimenti'];
+const TABS = ['componi', 'brani', 'playlist', 'radio', 'artisti', 'stili', 'guida', 'suoni', 'riferimenti'];
 let cards = [];
 function showTab(name) {
   $$('.tab').forEach(x => x.setAttribute('aria-selected', x.dataset.tab === name));
@@ -1369,6 +1372,7 @@ function showTab(name) {
   if (name === 'brani' && cards.length) renderSongs();
   if (name === 'suoni') renderSounds();
   if (name === 'radio' && radio) radio.render();
+  if (name === 'playlist' && playlistsTab) playlistsTab.render();
   if (name === 'stili' && stylesTab) stylesTab.render();
   if (name === 'artisti' && artistsTab) artistsTab.render();
 // for the browser checks (tools/check-radio.cjs)
@@ -1417,6 +1421,7 @@ function songCard({ tr, p }, i) {
       <button class="btn" data-act="pause" hidden></button>
       <button class="btn" data-act="stop" hidden>${t('stop')}</button>
       <button class="btn" data-act="export" data-export="${esc(tr.id)}">${t('exportWav')}</button>
+      <button class="btn" data-act="playlist" aria-expanded="false">${t('addToPlaylist')}</button>
       ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}`}
       <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
       <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
@@ -1435,7 +1440,40 @@ function songOf({ tr, p }) {
 }
 // every style, built-in and the user's (also the invalid ones), for tag names and filters
 function allStyles() { return [...BUILTIN_STYLES, ...((stylesTab && stylesTab.mine) || []).filter(r => r && r.id && !BUILTIN_STYLES.some(b => b.id === r.id))]; }
-const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, tx, esc, store, styles: allStyles });
+// playlists (#36): favourites are the first one; the queue plays a playlist song after song
+const playlists = createPlaylistStore(store);
+let queue = null, shuffleOn = !!store.get('coding-misk-shuffle', false), repeatMode = REPEATS.includes(store.get('coding-misk-repeat', 'off')) ? store.get('coding-misk-repeat', 'off') : 'off';
+const cardIndex = id => libraryCards().findIndex(c => c.tr.id === id);
+// starts a song of the library by id (as its card's play button); false when it cannot start
+function playById(id) {
+  const i = cardIndex(id);
+  if (i < 0) return false;
+  startCard(i, 0);
+  return true;
+}
+// plays a playlist (or a list of ids) from a song: ids in order, name for the player bar
+function playQueue(listId, ids, startId = null) {
+  const pl = playlists.get(listId), name = pl ? songsView.listName(pl) : '';
+  queue = createQueue({ ids, start: startId, shuffle: shuffleOn, repeat: repeatMode, exists: id => cardIndex(id) >= 0, name, listId });
+  if (!queue.current || !playById(queue.current)) { queue = null; toast(t('plEmpty')); }
+  pbLast = '';
+}
+// end of a song: the next one of the queue, the same one again (repeat one), or nothing
+function advance() {
+  const id = currentSongId();
+  if (queue && queue.current === id) { const next = queue.next({ auto: true }); return next !== null && playById(next); }
+  if (repeatMode === 'one' && id !== null) return playById(id);
+  return false;
+}
+const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, tx, esc, store, styles: allStyles, playlists, toast,
+  onPlayList: (listId, ids) => playQueue(listId, ids) });
+playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, playlists, confirmTwice, toast,
+  songs: () => libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: c.p.meta.seconds })),
+  play: (listId, ids, startId) => playQueue(listId, ids, startId),
+  userSong: id => user.tracks.find(u => u.id === id) || null,
+  newSongId: () => { let id; do id = 'u-' + Date.now().toString(36) + Math.floor(Math.random() * 1e4); while (user.tracks.some(u => u.id === id)); return id; },
+  addSongs: list => { if (!list.length) return; user.tracks.push(...list.map(clone)); saveLibrary(); cards = []; renderSongs(); },
+  onChange: () => { if (!$('#tab-brani').hidden) { songsView.renderBar(); songsView.apply(); } } });
 function renderSongs() {
   const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr));
   cards = [...composed, ...codedTracks()].map(tr => ({ tr, p: playable(tr) }));
@@ -1494,7 +1532,14 @@ $('#songs').addEventListener('click', e => {
       box.innerHTML = open ? songsView.tagsPanel(tr) : '';
       return;
     }
-    if (a === 'play') return startCard(i, 0);
+    if (a === 'playlist') {
+      const open = card.querySelector('.sv-pl-menu');
+      if (open) { open.remove(); act.setAttribute('aria-expanded', 'false'); return; }
+      card.querySelector('.songbar').insertAdjacentHTML('afterend', songsView.playlistMenu(tr.id));
+      act.setAttribute('aria-expanded', 'true'); return;
+    }
+    // a song outside the playing queue ends it; one inside moves the queue there
+    if (a === 'play') { if (queue && !queue.jump(tr.id)) queue = null; return startCard(i, 0); }
     if (a === 'pause') return togglePlay();
     if (a === 'stop') return stop();
     if (a === 'export') {
@@ -1550,6 +1595,10 @@ function applyVolume() {
 }
 // minimal speaker icons, drawn with the text colour like the other keys
 const SPK = (extra) => `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h2.5L8 3v10L4.5 10H2z" fill="currentColor" stroke="none"/>${extra}</svg>`;
+// shuffle and repeat icons in the same line style (#36)
+const ICON = body => `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+const SPK_SHUFFLE = ICON('<path d="M2 4.5h2.5c3 0 4 7 7 7H14M2 11.5h2.5c1.2 0 2-1.1 2.7-2.5M9 6.6c.7-1.2 1.4-2.1 2.5-2.1H14"/><path d="M12.5 3l1.5 1.5L12.5 6M12.5 10l1.5 1.5L12.5 13"/>');
+const SPK_REPEAT = ICON('<path d="M3 7V6a2 2 0 0 1 2-2h8M11 2l2 2-2 2M13 9v1a2 2 0 0 1-2 2H3M5 14l-2-2 2-2"/>');
 const SPK_HIGH = SPK('<path d="M10.5 5.5a3.5 3.5 0 0 1 0 5"/><path d="M12.5 3.5a6.3 6.3 0 0 1 0 9"/>'), SPK_LOW = SPK('<path d="M10.5 5.5a3.5 3.5 0 0 1 0 5"/>'), SPK_OFF = SPK('<path d="M11 6l4 4M15 6l-4 4"/>');
 function renderVolume() {
   for (const id of ['pb-volume', 'radio-volume']) { const el = document.getElementById(id); if (el && +el.value !== volume) el.value = volume; }
@@ -1582,7 +1631,7 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
     if (loopIdx >= 0) {
       const sec = m.sections[loopIdx];
       if (sec && cyc >= sec.start + sec.len) playSong(song, sec.start, mode);
-    } else if (cyc >= m.bars && mode !== 'radio' && !hand && resumeTo === null) { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
+    } else if (cyc >= m.bars && mode !== 'radio' && !hand && resumeTo === null && !(!rec && advance())) { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
     // segue la sezione che suona, ma non mentre si sta scrivendo in un campo del brano
     const typing = document.activeElement && document.activeElement.matches('input, select, textarea') && document.activeElement.closest('#arranger, #track-panel');
     if (mode === 'track' && follow && !typing) { const i = m.sectionAt(cyc); if (i >= 0 && i !== sel) selectScene(i); }
@@ -1662,6 +1711,8 @@ function currentSongId() { return mode === 'track' ? T.id : mode === 'free' && s
 function neighbour(dir) {
   if (mode === 'radio' && radio && radio.on) return dir > 0 ? radio.skip() : radio.restart();
   const id = currentSongId(), list = libraryCards();
+  // a playlist playing: its order (shuffle and repeat included)
+  if (queue && queue.current === id) { const next = dir > 0 ? queue.next() : queue.prev(); return next === null ? -1 : list.findIndex(c => c.tr.id === next); }
   // the order the user sees in the Songs tab (search, filters, sorting); the full list when the song is filtered out
   songsView.setSongs(list.map(songOf));
   const shown = songsView.order(), k = shown.indexOf(id);
@@ -1715,16 +1766,38 @@ function renderPlayerBar() {
     const v = Math.round(Math.max(0, Math.min(1, (cyc - sr.from) / sr.bars)) * 1000);
     if (+seek.value !== v) { seek.value = v; seek.style.setProperty('--pos', `${v / 10}%`); }
   }
+  if (!onRadio && queue && queue.current === currentSongId()) { const q = queue.position; pos = `${queue.name} · ${q.n} / ${q.total}${pos ? ` · ${pos}` : ''}`; }
   const onair = onRadio && !radio.paused;
   const canNav = onRadio || (currentSongId() !== null && (mode === 'track' || (source && source.kind === 'song')));
-  const key = [title, pos, onair, canNav].join('|');
+  const key = [title, pos, onair, canNav, shuffleOn, repeatMode].join('|');
   if (key === pbLast) return;
   pbLast = key;
   $('#pb-title').textContent = title || ''; $('#pb-pos').textContent = pos;
   $('#pb-onair').classList.toggle('on', onair);
   $('#pbar').classList.toggle('radio', onRadio);
   $('#pb-prev').disabled = !canNav; $('#pb-next').disabled = !canNav;
+  renderModes(onRadio);
 }
+// shuffle and repeat (#36): remembered, off in the radio
+const REPEAT_ICON = { off: SPK_REPEAT, all: SPK_REPEAT, one: SPK_REPEAT + '<b class="pb-one">1</b>' };
+function renderModes(onRadio = mode === 'radio' && radio && radio.on) {
+  const sh = $('#pb-shuffle'), rp = $('#pb-repeat');
+  sh.setAttribute('aria-pressed', shuffleOn); sh.disabled = !!onRadio;
+  rp.setAttribute('aria-pressed', repeatMode !== 'off'); rp.disabled = !!onRadio; rp.dataset.mode = repeatMode;
+  rp.innerHTML = REPEAT_ICON[repeatMode];
+  const tip = t(`repeat:${repeatMode}`); rp.title = tip; rp.setAttribute('aria-label', tip);
+}
+$('#pb-shuffle').innerHTML = SPK_SHUFFLE;
+$('#pb-shuffle').addEventListener('click', () => {
+  shuffleOn = !shuffleOn; store.set('coding-misk-shuffle', shuffleOn);
+  if (queue) queue.setShuffle(shuffleOn);
+  pbLast = ''; renderPlayerBar();
+});
+$('#pb-repeat').addEventListener('click', () => {
+  repeatMode = REPEATS[(REPEATS.indexOf(repeatMode) + 1) % REPEATS.length]; store.set('coding-misk-repeat', repeatMode);
+  if (queue) queue.setRepeat(repeatMode);
+  pbLast = ''; renderPlayerBar();
+});
 
 // ---------- radio ----------
 // recipes from styles/ (the same files the command line reads); the radio plays the director's songs

@@ -43,6 +43,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab" role="tab" data-tab="componi" aria-selected="true" data-i18n="tabComponi"></button>
       <button class="tab" role="tab" data-tab="brani" aria-selected="false" data-i18n="tabBrani"></button>
+      <button class="tab" role="tab" data-tab="playlist" aria-selected="false" data-i18n="tabPlaylist"></button>
       <button class="tab" role="tab" data-tab="radio" aria-selected="false" data-i18n="tabRadio"></button>
       <button class="tab" role="tab" data-tab="artisti" aria-selected="false" data-i18n="tabArtisti"></button>
       <button class="tab" role="tab" data-tab="stili" aria-selected="false" data-i18n="tabStili"></button>
@@ -117,6 +118,8 @@
       <p class="note" id="songs-hint"></p>
     </section>
 
+    <section id="tab-playlist" class="playlists" hidden></section>
+
     <section id="tab-radio" class="radio" hidden></section>
 
     <section id="tab-artisti" class="lib" hidden></section>
@@ -173,6 +176,8 @@
     <button id="play" class="play" aria-pressed="false">▶ Play</button>
     <button class="pb-btn stopbtn" id="stop" data-i18n-aria="stop" data-i18n-title="stop">■</button>
     <button class="pb-btn" id="pb-next" data-i18n-aria="nextSong" data-i18n-title="nextSong">⏭</button>
+    <button class="pb-btn pb-mode" id="pb-shuffle" aria-pressed="false" data-i18n-aria="shuffle" data-i18n-title="shuffle"></button>
+    <button class="pb-btn pb-mode" id="pb-repeat" aria-pressed="false"></button>
   </div>
   <div class="pb-mid">
     <div class="pb-now"><span class="pb-onair" id="pb-onair" data-i18n="radioOnAir"></span><span class="pb-title" id="pb-title"></span><span class="pb-pos" id="pb-pos"></span></div>

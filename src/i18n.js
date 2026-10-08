@@ -4,6 +4,10 @@
 
 const STR = {
   it: {
+    tabPlaylist: 'Playlist', playlistsLbl: 'Playlist', allSongs: 'Tutti i brani', favourites: 'Preferiti', playPlaylist: '▶ Riproduci playlist', addToPlaylist: '+ Playlist', newPlaylist: 'Nuova playlist', newPlaylistName: 'Nome della nuova playlist', plAdded: 'Aggiunto a {name}', plAlready: 'È già in {name}', plEmpty: 'Nessun brano da riprodurre',
+    shuffle: 'Casuale', 'repeat:off': 'Ripeti: spento', 'repeat:all': 'Ripeti: tutta la playlist', 'repeat:one': 'Ripeti: questo brano',
+    plIntro: 'Le tue playlist. I Preferiti si riempiono con la stella sui brani; le altre le crei qui o con "+ Playlist" su ogni brano.', plNew: 'Nuova playlist', plExport: 'Esporta', plImport: 'Importa', plRename: 'Rinomina', plDelete: 'Elimina', plDeleteConfirm: 'Premi di nuovo per eliminare la playlist', plDeleted: 'Playlist eliminata',
+    plSongs: '{n} brani · {time}', plPlay: '▶ Riproduci', plPlayFrom: 'Riproduci da qui', plUp: 'Su', plDown: 'Giù', plRemove: 'Togli', plMissing: 'brano non più nella libreria', plNone: 'Nessun brano: aggiungili dalla scheda Brani con "+ Playlist" o con la stella.', plImported: 'Playlist importata: {name}', plImportBad: 'Il file non è una playlist di coding-misk', plDrag: 'Trascina per riordinare', plPick: 'Scegli una playlist.',
     'g:techno': 'Techno', 'g:trance': 'Trance', 'g:house': 'House', 'g:synthwave': 'Synthwave', 'g:drum-and-bass': 'Drum and bass', 'g:industrial': 'Industrial', 'g:rock': 'Rock', 'g:metal': 'Metal', 'g:hip-hop': 'Hip hop', 'g:pop': 'Pop', 'g:jazz': 'Jazz', 'g:country': 'Country', 'g:ambient': 'Ambient', 'g:experimental': 'Sperimentale',
     'k:standard': 'Standard', 'k:live': 'Live build', 'k:generated': 'Generato', 'k:mine': 'Tuo', 'k:code': 'Codice',
     songSearch: 'Cerca titolo, stile, tonalità, tag…', songSearchAria: 'Cerca tra i brani', fGenres: 'Genere', fStyles: 'Stile', fKinds: 'Tipo', fFav: 'Solo preferiti',
@@ -124,6 +128,10 @@ const STR = {
     trackSaved: 'Brano salvato', trackDeleted: 'Brano eliminato', restored: 'Originale ripristinato', minScene: 'Serve almeno una sezione', mine: 'Tuo',
   },
   en: {
+    tabPlaylist: 'Playlists', playlistsLbl: 'Playlist', allSongs: 'All songs', favourites: 'Favourites', playPlaylist: '▶ Play playlist', addToPlaylist: '+ Playlist', newPlaylist: 'New playlist', newPlaylistName: 'Name of the new playlist', plAdded: 'Added to {name}', plAlready: 'Already in {name}', plEmpty: 'No song to play',
+    shuffle: 'Shuffle', 'repeat:off': 'Repeat: off', 'repeat:all': 'Repeat: whole playlist', 'repeat:one': 'Repeat: this song',
+    plIntro: 'Your playlists. Favourites fill up with the star on songs; make the others here or with "+ Playlist" on every song.', plNew: 'New playlist', plExport: 'Export', plImport: 'Import', plRename: 'Rename', plDelete: 'Delete', plDeleteConfirm: 'Press again to delete the playlist', plDeleted: 'Playlist deleted',
+    plSongs: '{n} songs · {time}', plPlay: '▶ Play', plPlayFrom: 'Play from here', plUp: 'Up', plDown: 'Down', plRemove: 'Remove', plMissing: 'song no longer in the library', plNone: 'No songs: add them from the Songs tab with "+ Playlist" or the star.', plImported: 'Playlist imported: {name}', plImportBad: 'The file is not a coding-misk playlist', plDrag: 'Drag to reorder', plPick: 'Pick a playlist.',
     'g:techno': 'Techno', 'g:trance': 'Trance', 'g:house': 'House', 'g:synthwave': 'Synthwave', 'g:drum-and-bass': 'Drum and bass', 'g:industrial': 'Industrial', 'g:rock': 'Rock', 'g:metal': 'Metal', 'g:hip-hop': 'Hip hop', 'g:pop': 'Pop', 'g:jazz': 'Jazz', 'g:country': 'Country', 'g:ambient': 'Ambient', 'g:experimental': 'Experimental',
     'k:standard': 'Standard', 'k:live': 'Live build', 'k:generated': 'Generated', 'k:mine': 'Yours', 'k:code': 'Code',
     songSearch: 'Search title, style, key, tags…', songSearchAria: 'Search songs', fGenres: 'Genre', fStyles: 'Style', fKinds: 'Kind', fFav: 'Favourites only',

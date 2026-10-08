@@ -643,3 +643,47 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* hardware theme: the display and the timeline need more room than 52 px, or the display touches the bar's top edge */
 :root[data-ui="hw"] .pbar { height: 60px; }
 :root[data-ui="hw"] .pb-now { padding-block: 3px; }
+
+/* playlists (#36) */
+.sv-lists .chip small { font: 10px var(--mono); color: var(--muted); margin-left: 2px; }
+.sv-play-list { padding: 4px 12px; font-size: 12px; }
+.sv-pl-menu { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
+.sv-pl-new { display: inline-flex; gap: 6px; flex: 1 1 220px; min-width: 0; }
+.sv-pl-new input { flex: 1; min-width: 0; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); font: inherit; font-size: 13px; }
+.pb-mode { position: relative; }
+.pb-mode[aria-pressed="true"] { color: var(--a1); border-color: var(--a1); }
+.pb-one { position: absolute; right: 2px; bottom: 0; font: 700 9px var(--mono); }
+.playlists .pl-tools { display: flex; gap: 8px; margin-bottom: 12px; }
+.pl-layout { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.pl-lists { display: grid; gap: 8px; }
+.pl-card { display: grid; gap: 2px; text-align: left; padding: 10px 12px; cursor: pointer; color: var(--ink); font: inherit; }
+.pl-card[aria-pressed="true"] { border-color: var(--a1); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 35%, transparent); }
+.pl-card .muted { font: 11px var(--mono); }
+.pl-open { min-width: 0; }
+.pl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; }
+.pl-head h3 { margin: 0; }
+.pl-head .muted { font: 12px var(--mono); }
+.pl-head-acts { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.pl-name { font: inherit; font-size: 18px; font-weight: 700; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); min-width: 0; max-width: 100%; }
+.pl-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.pl-row { display: grid; grid-template-columns: 16px 24px minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); }
+.pl-row.over { border-color: var(--a1); }
+.pl-row.dragging { opacity: .4; }
+.pl-row.missing { opacity: .6; border-style: dashed; }
+.pl-grip { cursor: grab; color: var(--muted); font-size: 11px; letter-spacing: -2px; }
+.pl-n, .pl-len { font: 12px var(--mono); color: var(--muted); }
+.pl-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-acts { display: flex; gap: 4px; }
+@media (max-width: 700px) {
+  .pl-layout { grid-template-columns: minmax(0, 1fr); }
+  .pl-lists { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .pl-row { grid-template-columns: 20px minmax(0, 1fr) auto; }
+  .pl-row .pl-grip, .pl-row .badge, .pl-row .pl-len { display: none; }
+  .pl-row .pl-acts { grid-column: 1 / -1; justify-content: flex-end; }
+}
+/* phones: shuffle and repeat need room; the volume slider gives way (the phone's own buttons set the volume, mute stays) */
+@media (max-width: 640px) {
+  .pbar .pb-btns { gap: 4px; }
+  .pbar .pb-btn { min-width: 30px; height: 30px; padding: 0 6px; }
+  .pb-vol input[type=range] { display: none; }
+}

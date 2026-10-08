@@ -4,7 +4,7 @@ import { GENRES } from '../song/format.js';
 
 export const KINDS = ['standard', 'live', 'generated', 'mine', 'code'];
 export const SORTS = ['default', 'title', 'bpm', 'length'];
-export const VIEW_DEFAULT = { q: '', genres: [], styles: [], kinds: [], favOnly: false, sort: 'default' };
+export const VIEW_DEFAULT = { q: '', genres: [], styles: [], kinds: [], favOnly: false, sort: 'default', list: 'all' };
 
 // lowercase, without accents: "Frigio" and "frìgio" match "frigio"
 export const fold = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -71,6 +71,7 @@ export function cleanView(raw, { styles = [] } = {}) {
     kinds: list(v.kinds, k => KINDS.includes(k)),
     favOnly: !!v.favOnly,
     sort: SORTS.includes(v.sort) ? v.sort : 'default',
+    list: typeof v.list === 'string' && v.list ? v.list : 'all',
   };
 }
 
