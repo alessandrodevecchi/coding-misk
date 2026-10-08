@@ -3,7 +3,8 @@ import { INSTRUMENTS } from './music.js';
 // Visual su canvas sincronizzati con l'audio.
 // Ogni strumento suona su un analizzatore separato (.analyze("kick"), .analyze("bass"), …):
 // da lì ricaviamo un livello 0..1 per strumento e gli attacchi (onset) che accendono la scena.
-export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout }) {
+// getInfo(cyc): what plays, for the studio scene: { onAir, title, artist, line, bar, bars, bpm, say, sayAt, n }
+export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}) }) {
   const $ = (s, r = document) => r.querySelector(s);
   const cv = $('#stage'), cx = cv.getContext('2d');
   let W = 0, H = 0;
@@ -24,6 +25,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
                 far: ['#2a1f5c', '#1d1645'], near: ['#43287a', '#2a1a57'], city: '#0b0918', win: ['#ffd166', '#7cf3ff', '#ff6ec7'],
                 ground: '#120a24', grid: '#ff3f9e', road: '#1a1030', dash: '#ffd166', car: '#00e5ff', wave: '#ffffff', echo: '#ffcc33' },
     edgerunners: { sky: ['#0d0018', '#3b0a52', '#ff2a6d'], y: '#fcee0a', c: '#00f0ff', m: '#ff2a6d', ink: '#06010a', echo: '#fcee0a', wave: '#fcee0a', grid: '#00f0ff' },
+    studio:   { wall: ['#07050b', '#160d1c'], foam: '#120b18', foam2: '#1b1124', amber: '#ffb347', red: '#ff2a3d', screen: '#04070b', ink: '#7cf3ff', dim: '#3d5a66', desk: '#17131d', metal: '#3a3346', wave: '#7cf3ff', echo: '#ffb347', grid: '#ffb347' },
     palco:    { wall: ['#05030b', '#140a26'], a: '#ff2e88', b: '#00e5ff', c: '#ffe14d', metal: '#2a2340', dark: '#0c0817', wave: '#00e5ff', echo: '#ff2e88', label: '#6f5f8f' },
   };
   let seed = 7;
@@ -487,6 +489,131 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       }
     },
 
+    // studio di registrazione per la radio (#28): luce ON AIR, microfono che si accende quando la voce parla,
+    // schermo con brano e commenti, manopola della radio con la lancetta, mixer e giradischi.
+    studio(pal, cyc, dt, playing) {
+      const info = getInfo(cyc) || {}, onAir = !!info.onAir && playing;
+      const desk = H * .74, mono = px => `600 ${Math.max(9, Math.round(px))}px "JetBrains Mono", monospace`;
+      // muro con pannelli fonoassorbenti a piramide, luce calda che pulsa con la cassa
+      const wg = cx.createLinearGradient(0, 0, 0, desk);
+      wg.addColorStop(0, pal.wall[0]); wg.addColorStop(1, pal.wall[1]);
+      cx.fillStyle = wg; cx.fillRect(0, 0, W, H);
+      const cell = Math.max(18, Math.min(W, H) / 11);
+      for (let y = cell * .3; y < desk - cell * .6; y += cell) for (let x = (Math.floor(y / cell) % 2) * cell / 2 - cell / 2; x < W; x += cell) {
+        tri(cx, [x, y], [x + cell * .92, y], [x + cell * .46, y + cell * .46], pal.foam2);
+        tri(cx, [x, y + cell * .92], [x + cell * .92, y + cell * .92], [x + cell * .46, y + cell * .46], pal.foam);
+      }
+      const lamp = cx.createRadialGradient(W * .5, desk * .2, 0, W * .5, desk * .2, W * .6);
+      lamp.addColorStop(0, `rgba(255,179,71,${.12 + kick * .1})`); lamp.addColorStop(1, 'rgba(255,179,71,0)');
+      cx.fillStyle = lamp; cx.fillRect(0, 0, W, desk);
+
+      // ON AIR
+      const ow = Math.min(W * .16, 150), oh = ow * .3, ox = W / 2 - ow / 2, oy = H * .05;
+      cx.fillStyle = '#0a0508'; cx.fillRect(ox - 4, oy - 4, ow + 8, oh + 8);
+      cx.fillStyle = onAir ? pal.red : '#3a1016';
+      if (onAir) { cx.shadowColor = pal.red; cx.shadowBlur = 26 + kick * 20; }
+      cx.fillRect(ox, oy, ow, oh); cx.shadowBlur = 0;
+      cx.fillStyle = onAir ? '#fff2f2' : '#6e2a33'; cx.font = `700 ${Math.round(oh * .55)}px "Russo One", sans-serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      cx.fillText('ON AIR', W / 2, oy + oh / 2 + 1);
+
+      // schermo: brano, artista, battuta e l'ultimo commento parlato, scritto lettera per lettera
+      const sx = W * .3, sw = W * .4, sy = oy + oh + H * .05, sh = desk - sy - H * .06;
+      cx.fillStyle = '#0b0b10'; cx.fillRect(sx - 6, sy - 6, sw + 12, sh + 12);
+      cx.fillStyle = pal.screen; cx.fillRect(sx, sy, sw, sh);
+      cx.save(); cx.beginPath(); cx.rect(sx, sy, sw, sh); cx.clip();
+      const fs = Math.min(sh / 7, sw / 22);
+      cx.textAlign = 'left'; cx.textBaseline = 'top'; cx.fillStyle = pal.dim; cx.font = mono(fs * .7);
+      cx.fillText(info.onAir ? `NOW PLAYING${info.n ? ` · SONG ${info.n}` : ''}` : playing ? 'PLAYING' : 'STANDBY', sx + fs * .6, sy + fs * .5);
+      cx.fillStyle = pal.ink; cx.font = `700 ${Math.round(fs * 1.25)}px "Russo One", sans-serif`;
+      cx.shadowColor = pal.ink; cx.shadowBlur = 8;
+      cx.fillText((info.title || '—').slice(0, 34), sx + fs * .6, sy + fs * 1.4); cx.shadowBlur = 0;
+      cx.font = mono(fs * .75); cx.fillStyle = pal.amber;
+      cx.fillText([info.artist, info.line].filter(Boolean).join(' · ').slice(0, 60), sx + fs * .6, sy + fs * 3);
+      cx.fillStyle = pal.dim;
+      if (info.bars) cx.fillText(`BAR ${Math.min(info.bars, Math.floor(info.bar || 0) + 1)} / ${info.bars}${info.bpm ? ` · ${info.bpm} BPM` : ''}`, sx + fs * .6, sy + fs * 4.1);
+      if (info.say) {
+        const typed = Math.max(0, Math.min(info.say.length, Math.floor(((info.bar || 0) - (info.sayAt || 0)) * 24)));
+        cx.fillStyle = '#e8fbff'; cx.font = `italic ${mono(fs * .85).replace('600 ', '600 ')}`;
+        cx.fillText(`“${info.say.slice(0, typed)}${typed < info.say.length && Math.floor(performance.now() / 300) % 2 ? '▌' : ''}${typed >= info.say.length ? '”' : ''}`.slice(0, 48), sx + fs * .6, sy + fs * 5.3);
+      }
+      waveLine(pal.wave, pal.wave, sy + sh - fs * 1.1, fs * .9, sx + 6, sx + sw - 6);
+      cx.restore();
+
+      // microfono con l'asta: l'anello si accende mentre la voce parla, le onde escono dalla griglia
+      const speaking = playing && info.say && (info.bar - info.sayAt) >= 0 && (info.bar - info.sayAt) < 1.6;
+      const mx = W * .15, my = desk * .52, mr = Math.min(W * .045, H * .11);
+      cx.strokeStyle = pal.metal; cx.lineWidth = Math.max(3, mr * .12);
+      cx.beginPath(); cx.moveTo(mx, my + mr * 1.6); cx.lineTo(mx - mr * .8, desk); cx.moveTo(mx, my + mr * 1.6); cx.lineTo(mx, my + mr * 1.1); cx.stroke();
+      if (speaking) for (let i = 1; i <= 3; i++) { const ph = (performance.now() / 600 + i / 3) % 1; cx.strokeStyle = pal.amber; cx.globalAlpha = (1 - ph) * .7; cx.lineWidth = 2; cx.beginPath(); cx.arc(mx, my, mr * (1.2 + ph * 1.6), -1.1, 1.1); cx.stroke(); cx.beginPath(); cx.arc(mx, my, mr * (1.2 + ph * 1.6), Math.PI - 1.1, Math.PI + 1.1); cx.stroke(); }
+      cx.globalAlpha = 1;
+      cx.fillStyle = '#26212e'; cx.beginPath(); cx.ellipse(mx, my, mr * .7, mr * 1.15, 0, 0, Math.PI * 2); cx.fill();
+      cx.fillStyle = '#3c3548';
+      for (let gy = -mr; gy < mr; gy += mr * .22) for (let gx = -mr * .55; gx < mr * .6; gx += mr * .22) if ((gx * gx) / (mr * mr * .45) + (gy * gy) / (mr * mr * 1.25) < 1) cx.fillRect(mx + gx, my + gy, 2, 2);
+      cx.strokeStyle = speaking ? pal.amber : '#3a2a1a'; cx.lineWidth = 3;
+      if (speaking) { cx.shadowColor = pal.amber; cx.shadowBlur = 18; }
+      cx.beginPath(); cx.ellipse(mx, my + mr * .2, mr * .74, mr * .2, 0, 0, Math.PI * 2); cx.stroke(); cx.shadowBlur = 0;
+      // filtro antipop
+      cx.strokeStyle = 'rgba(160,150,190,.35)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(mx + mr * 1.6, my, mr * .9, 0, Math.PI * 2); cx.stroke();
+      cx.fillStyle = 'rgba(40,30,60,.35)'; cx.fill();
+
+      // manopola della radio: scala delle frequenze, la lancetta cerca la stazione e vibra col suono
+      const dx = W * .74, dw = W * .22, dy = sy, dh = Math.min(H * .18, sh * .42);
+      cx.fillStyle = '#120c08'; cx.fillRect(dx, dy, dw, dh);
+      cx.strokeStyle = '#4a3420'; cx.lineWidth = 2; cx.strokeRect(dx, dy, dw, dh);
+      cx.fillStyle = pal.amber; cx.font = mono(dh * .16); cx.textAlign = 'center'; cx.textBaseline = 'top';
+      for (let f = 88; f <= 108; f += 2) { const x = dx + 8 + (f - 88) / 20 * (dw - 16); cx.globalAlpha = .8; cx.fillRect(x, dy + dh * .55, 1.5, f % 4 === 0 ? dh * .25 : dh * .14); if (f % 4 === 0) cx.fillText(String(f), x, dy + dh * .14); }
+      cx.globalAlpha = 1;
+      const station = info.title ? 0.15 + hash(info.title.length, (info.n || 1) * 7.3) * .7 : .5;
+      const need = Math.max(0, Math.min(1, station + (playing ? Math.sin(cyc * .7) * .01 + (level - .3) * .015 : Math.sin(performance.now() / 2000) * .25)));
+      const nx = dx + 8 + need * (dw - 16);
+      cx.strokeStyle = pal.red; cx.lineWidth = 2; cx.shadowColor = pal.red; cx.shadowBlur = 8;
+      cx.beginPath(); cx.moveTo(nx, dy + 3); cx.lineTo(nx, dy + dh - 3); cx.stroke(); cx.shadowBlur = 0;
+      // due VU meter
+      const vy = dy + dh + H * .03, vh = Math.min(dh * 1.1, desk - vy - H * .04), vw = dw / 2 - 6;
+      for (let k = 0; k < 2; k++) {
+        const vx = dx + k * (vw + 12);
+        cx.fillStyle = '#f2e6c8'; cx.fillRect(vx, vy, vw, vh);
+        cx.strokeStyle = '#2a2018'; cx.lineWidth = 1;
+        cx.beginPath(); cx.arc(vx + vw / 2, vy + vh * 1.05, vh * .8, Math.PI * 1.2, Math.PI * 1.8); cx.stroke();
+        cx.fillStyle = '#c2272d'; cx.fillRect(vx + vw * .72, vy + vh * .18, vw * .2, 3);
+        const v = playing ? Math.min(1, (k ? lv.bass + lv.pad * .5 : lv.kick * .6 + lv.hook * .4 + lv.hats * .3) * .9) : 0;
+        const ang = Math.PI * (1.25 + v * .5);
+        cx.strokeStyle = '#111'; cx.lineWidth = 1.5;
+        cx.beginPath(); cx.moveTo(vx + vw / 2, vy + vh * .98); cx.lineTo(vx + vw / 2 + Math.cos(ang) * vh * .85, vy + vh * .98 + Math.sin(ang) * vh * .85); cx.stroke();
+        cx.fillStyle = '#2a2018'; cx.font = mono(vh * .14); cx.textAlign = 'center'; cx.fillText('VU', vx + vw / 2, vy + vh * .55);
+      }
+
+      // banco: un fader per strumento (alto quanto suona) e il giradischi
+      const dg = cx.createLinearGradient(0, desk, 0, H);
+      dg.addColorStop(0, '#26202e'); dg.addColorStop(1, pal.desk);
+      cx.fillStyle = dg; cx.fillRect(0, desk, W, H - desk);
+      cx.fillStyle = pal.amber; cx.globalAlpha = .5; cx.fillRect(0, desk, W, 2); cx.globalAlpha = 1;
+      const CH = ['kick', 'snare', 'hats', 'bass', 'guitar', 'arp', 'pad', 'hook', 'fx', 'riser'];
+      const fx0 = W * .06, fw = W * .55, gapF = fw / CH.length, fy0 = desk + (H - desk) * .2, fh = (H - desk) * .6;
+      CH.forEach((k, i) => {
+        const x = fx0 + i * gapF + gapF / 2;
+        cx.fillStyle = '#0b090f'; cx.fillRect(x - 2, fy0, 4, fh);
+        const v = playing ? lv[k] : 0, cy2 = fy0 + fh - v * fh;
+        cx.fillStyle = v > .05 ? pal.amber : pal.metal; cx.fillRect(x - gapF * .28, cy2 - 4, gapF * .56, 8);
+        cx.fillStyle = v > .5 ? '#3dff6a' : '#1d3a24'; cx.beginPath(); cx.arc(x, fy0 - 6, 2.5, 0, Math.PI * 2); cx.fill();
+      });
+      // giradischi: il disco gira al tempo del brano
+      const tx = W * .82, ty = desk + (H - desk) * .5, tr = Math.min((H - desk) * .42, W * .07);
+      cx.fillStyle = '#100d14'; cx.fillRect(tx - tr * 1.5, ty - tr * 1.15, tr * 3.2, tr * 2.3);
+      spin = (spin + (playing ? dt * (info.bpm || 120) / 120 * 3.5 : 0)) % (Math.PI * 2);
+      cx.save(); cx.translate(tx, ty); cx.rotate(spin);
+      cx.fillStyle = '#050407'; cx.beginPath(); cx.arc(0, 0, tr, 0, Math.PI * 2); cx.fill();
+      cx.strokeStyle = 'rgba(255,255,255,.07)'; cx.lineWidth = 1;
+      for (let r = tr * .45; r < tr; r += tr * .09) { cx.beginPath(); cx.arc(0, 0, r, 0, Math.PI * 2); cx.stroke(); }
+      cx.fillStyle = pal.red; cx.beginPath(); cx.arc(0, 0, tr * .32, 0, Math.PI * 2); cx.fill();
+      cx.fillStyle = pal.amber; cx.fillRect(-tr * .05, -tr * .3, tr * .1, tr * .18);
+      cx.fillStyle = '#000'; cx.beginPath(); cx.arc(0, 0, tr * .04, 0, Math.PI * 2); cx.fill();
+      cx.restore();
+      // braccio
+      cx.strokeStyle = '#b9b2c6'; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(tx + tr * 1.3, ty - tr * .9); cx.lineTo(tx + tr * (playing ? .55 : 1.1), ty + tr * (playing ? .1 : -.1)); cx.stroke();
+      cx.fillStyle = '#b9b2c6'; cx.beginPath(); cx.arc(tx + tr * 1.3, ty - tr * .9, 4, 0, Math.PI * 2); cx.fill();
+    },
+
     // palco cyberpunk: ogni strumento disegnato si accende quando suona.
     // Gli strumenti sono disposti in fila con larghezze in unità "u"; lo spazio libero si divide tra gli spazi.
     palco(pal, cyc, dt, playing) {
@@ -706,6 +833,6 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     $('#readout').textContent = readout(cyc, Math.max(0, step), playing);
     requestAnimationFrame(frame);
   }
-  let idle = 0;
+  let idle = 0, spin = 0;
   requestAnimationFrame(frame);
 }

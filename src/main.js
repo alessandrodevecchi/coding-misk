@@ -1299,7 +1299,8 @@ let ui = store.get('coding-misk-ui', 'neon');
 const setUi = v => { ui = v === 'hw' ? 'hw' : 'neon'; store.set('coding-misk-ui', ui); syncAll(); };
 $$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.dataset.uitheme)));
 const setLook = l => { look = l; store.set('coding-misk-look', l); syncAll(); };
-$('#looks').addEventListener('click', e => { const b = e.target.closest('[data-look]'); if (b) setLook(b.dataset.look); });
+// a look picked while the radio plays becomes the radio's look (the studio by default, #28)
+$('#looks').addEventListener('click', e => { const b = e.target.closest('[data-look]'); if (!b) return; setLook(b.dataset.look); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', b.dataset.look); });
 $('#fs').addEventListener('click', () => {
   const w = $('#stagewrap');
   try {
@@ -1879,7 +1880,7 @@ radio = createRadio({
   root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a),
   player: {
     makePlayable: sg => playable({ ...sg, kind: 'composed' }),
-    start: (p, bar) => playSong(p, bar, 'radio'),
+    start: (p, bar) => { setLook(store.get('coding-misk-radio-look', 'studio')); return playSong(p, bar, 'radio'); },
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
     // a new window while the radio plays: the code on air does not change, the steps to come do
@@ -1951,6 +1952,14 @@ startHardware();
 updateShare();
 startVisuals({
   getS: () => ({ look }),
+  // the studio scene (#28): the radio's song on air, or the song playing elsewhere
+  getInfo(cyc) {
+    if (mode === 'radio' && radio && radio.on) return radio.info(cyc);
+    if (!song || !song.meta) return { title: T.title };
+    const it = mixActive() ? mixS.items[0] : null, rel = it ? cyc - it.start : cyc;
+    const said = song.build ? buildSteps(song.build).filter(x => x.say && x.at <= cyc).pop() : null;
+    return { title: it ? it.song.title : mode === 'track' ? T.title : song.title, bar: rel, bars: it ? it.bars : song.meta.bars, bpm: Math.round((song.meta.bpm || [])[Math.max(0, Math.floor(cyc))] || 0) || undefined, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at - (it ? it.start : 0) : 0 };
+  },
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando
   getMode: () => (mode === 'track' && song && isPlaying() && song.meta.sectionAt(sched().now()) === sel ? 'comp' : 'free'),

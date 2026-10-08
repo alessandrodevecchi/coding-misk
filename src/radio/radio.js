@@ -466,8 +466,16 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (e.target.id === 'radio-volume') player.setVolume(+e.target.value);
   });
 
+  // what plays, for the studio visual (#28): song, artist, styles, bar, the last spoken comment
+  function info(cyc) {
+    if (!S) return null;
+    const it = S.stream[S.onAir], e = it.entry, rel = Math.max(0, cyc - it.start);
+    const said = buildSteps(it.song).filter(x => x.say && x.at <= rel).pop();
+    return { onAir: S.paused === undefined, n: it.n + 1, title: it.song.title, artist: e.artist && e.artist.name, line: `${e.styles.map(styleName).join(' + ')} · ${e.key}`, bar: rel, bars: barsOf(it.song), bpm: e.bpm, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at : 0 };
+  }
+
   return {
-    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel,
+    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info,
     get steering() { if (!S) return null; const it = S.stream[S.onAir]; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },
     get paused() { return !!S && S.paused !== undefined; },
     // the player stopped the radio (Compose started, stop pressed)

@@ -17,6 +17,7 @@ Each visual sets `data-look` on `<html>` and overrides the tokens:
 | `spazio` (Space)         | `#06050d` | `#a495ff` | `#ff7ad9` |
 | `sonar`                  | `#03110d` | `#3dffb0` | `#d4ff5a` |
 | `edgerunners`            | `#0b0410` | `#fcee0a` | `#00f0ff` |
+| `studio`                 | `#0b0710` | `#ffb347` | `#ff2a3d` |
 
 The UI is dark only, by design.
 
@@ -47,6 +48,7 @@ Each theme reacts to per-instrument levels and onsets (kick echoes and flashes, 
 - **Montagne:** wireframe ridges reacting to bass and guitar, moon with echoes.
 - **Spazio:** nebulae, warp starfield, waveform aurora, rising ringed gas giant, moon, comets, retro ship.
 - **Sonar:** radar sweep per bar, echo rings, blips.
+- **Studio** (`#28`, the radio's look by default): acoustic foam wall, an ON AIR light lit while the radio is on air, a microphone whose ring lights up and sends waves while the voice speaks, a screen with the song, artist, styles, bar and the last spoken comment typed out, a radio dial whose needle finds the station, two VU meters, a desk with one fader per instrument and a turntable that spins at the song's tempo. A look picked while the radio plays becomes the radio's look.
 - **Edgerunners:** halftone moon, layered city with cyan rim light and holo signs, elevated train, anime speed lines, glitch slices with RGB split, cyberware HUD.
 
 The stage area has a CRT scanline overlay; visuals respect `prefers-reduced-motion`.

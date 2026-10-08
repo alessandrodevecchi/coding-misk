@@ -217,7 +217,7 @@ GROOVES.train = [{ it: 'Treno (country)', en: 'Train beat (country)' }, { bd: 'x
 GROOVES.rockChorus = [{ it: 'Rock ritornello', en: 'Rock chorus' }, { bd: 'x.x.....x.x.....', cp: E16, sd: '....x.......x...', hh: E16, oh: 'x.x.x.x.x.x.x.x.', rd: E16 }];
 export const LOOKS = [
   ['palco', { it: 'Palco', en: 'Stage' }], ['pixel', 'Pixel'], ['tramonto', { it: 'Tramonto', en: 'Sunset' }],
-  ['montagne', { it: 'Montagne', en: 'Mountains' }], ['spazio', { it: 'Spazio', en: 'Space' }], ['sonar', 'Sonar'], ['edgerunners', 'Edgerunners'],
+  ['montagne', { it: 'Montagne', en: 'Mountains' }], ['spazio', { it: 'Spazio', en: 'Space' }], ['sonar', 'Sonar'], ['edgerunners', 'Edgerunners'], ['studio', 'Studio'],
 ];
 // strumenti del visual Palco, nell'ordine in cui compaiono sul palco
 export const INSTRUMENTS = ['kick', 'snare', 'hats', 'fx', 'bass', 'guitar', 'arp', 'pad', 'hook', 'riser'];
