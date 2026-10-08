@@ -36,6 +36,14 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   if (shots) await page.screenshot({ path: path.join(shots, 'songs-all.png') });
   const kl = await page.$$eval('#songs [data-song-id="kellerlicht"] .tag-chip', xs => xs.map(x => x.textContent));
   check(kl.join('|') === 'Techno|Trance|Synthwave|Berlin techno', 'a style with the same name as its genre is not repeated', kl.join('|'));
+  check(await page.isVisible('.sv-legend'), 'legend of the tag colours shown');
+  await page.click('#songs [data-song-id="kellerlicht"] [data-tag-f="styles"][data-v="berlin-techno"]'); await sleep(300);
+  let tv = await visible();
+  check(tv.includes('kellerlicht') && !tv.includes('drift') && (await page.getAttribute('[data-f="styles"][data-v="berlin-techno"]', 'aria-pressed')) === 'true', 'a style tag on a card filters by that style', tv.join(', '));
+  await page.click('#sv-clear'); await sleep(200);
+  await page.click('#songs [data-song-id="neon-rush-reel"] [data-tag-f="q"]'); await sleep(300);
+  check((await page.inputValue('#sv-q')) === 'reel' && (await visible()).includes('neon-rush-reel'), 'a free tag on a card goes in the search');
+  await page.click('#sv-clear'); await sleep(200);
 
   // search
   await page.fill('#sv-q', 'FRÌGIO'); await sleep(400);
@@ -77,7 +85,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // style tags use the current style names; style filter
   const userCard = await page.innerText('#songs [data-song-id="u-test"] .song-tags');
   check(/Notte in auto|Night drive/.test(userCard), 'a user style shows its name on the card', userCard);
-  await page.click('.sv-styles summary').catch(() => {}); await sleep(100);
+  await page.$eval('.sv-styles', d => { d.open = true; }); await sleep(100);
   await page.click('[data-f="styles"][data-v="night-drive"]'); await sleep(200);
   check((await visible()).join() === 'u-test', 'style filter with a user style', (await visible()).join());
   await page.click('#sv-clear'); await sleep(200);

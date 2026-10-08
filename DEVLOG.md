@@ -257,6 +257,8 @@
 
 - Scheda Brani, riscontro del proprietario: su Kellerlicht i tag sembravano doppi (genere "Trance" e stile "Trance"). Ora uno stile con lo stesso nome del suo genere non si ripete: restano i generi (colore d'accento) e gli stili che dicono qualcosa in più (per esempio Berlin techno sotto Techno); i tag liberi hanno il `#`. Ogni chip ha un suggerimento che dice se è un genere, uno stile (con il suo genere) o un tag libero. `check-songs-tab.cjs` lo controlla.
 
+- Scheda Brani: legenda dei colori dei tag sotto i filtri (genere, stile, `#tag libero`, "tocca un tag per filtrare") e tag delle card cliccabili: genere e stile accendono il loro filtro, un tag libero va nella ricerca. Il proprietario temeva che solo i tag colorati fossero filtrabili: ora lo sono tutti. Il proprietario conferma: "ora chiaro, ottima la legenda". `check-songs-tab.cjs` 31 controlli, tutti passano.
+
 ## Prossimo passo
 
 Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live coding a mano `#20`); `develop` = `763c59f` con in più barra player e volume `#32` (change `player-bar`, tutti i task fatti tranne la prova del proprietario) e artisti con schede Artisti e Stili `#35` (change `artists-and-styles`, 14/14 task). Il proprietario sta provando a fondo artisti e barra.

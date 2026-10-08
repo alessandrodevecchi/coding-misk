@@ -50,6 +50,7 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, onChange
       <div class="sv-group"><span class="lbl">${esc(t('fGenres'))}</span><div class="chips">${GENRES.filter(g => used.has(g) || view.genres.includes(g)).map(g => chip('genres', g, t(`g:${g}`))).join('')}</div></div>
       <div class="sv-group"><span class="lbl">${esc(t('fKinds'))}</span><div class="chips">${KINDS.map(k => chip('kinds', k, t(`k:${k}`))).join('')}</div></div>
       <details class="sv-group sv-styles"${stylesOpen || view.styles.length ? ' open' : ''}><summary class="lbl">${esc(t('fStyles'))}${view.styles.length ? ` (${view.styles.length})` : ''}</summary><div class="chips">${allStyles.map(r => chip('styles', r.id, tx(r.name))).join('')}</div></details>
+      <p class="sv-legend"><span class="lbl">${esc(t('legend'))}</span> <span class="tag-chip genre">${esc(t('tagGenre'))}</span> <span class="tag-chip style">${esc(t('tagStyleShort'))}</span> <span class="tag-chip free">#${esc(t('tagFree').toLowerCase())}</span> <span class="muted">${esc(t('legendHint'))}</span></p>
       <p class="sv-count" aria-live="polite"><span id="sv-n"></span> <button class="btn sv-clear" id="sv-clear" hidden>${esc(t('clearFilters'))}</button></p>`;
   }
 
@@ -90,7 +91,17 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, onChange
     if (e.target.closest('#sv-fav-lbl')) { bar.querySelector('#sv-fav').click(); return; }
     if (e.target.closest('#sv-clear')) clearAll();
   });
-  list.addEventListener('click', e => { if (e.target.closest('[data-sv-clear]')) clearAll(); });
+  list.addEventListener('click', e => {
+    if (e.target.closest('[data-sv-clear]')) return clearAll();
+    // a tag on a card filters by it: genre and style add their chip, a free tag goes in the search
+    const tag = e.target.closest('[data-tag-f]');
+    if (!tag) return;
+    const g = tag.dataset.tagF, v = tag.dataset.v;
+    if (g === 'q') view.q = v;
+    else if (!view[g].includes(v)) view[g] = [...view[g], v];
+    save(); renderBar(); apply();
+    bar.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
 
   const isFav = id => favs.includes(id);
   function toggleFav(id) {
@@ -110,9 +121,9 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, onChange
     const same = id => { const nm = styleName(id), g = n.genreOf(id); return nm && g && e.genres.includes(g) && nm.toLowerCase() === t(`g:${g}`).toLowerCase(); };
     const tip = (kind, extra = '') => ` title="${esc(t(kind))}${extra ? `: ${esc(extra)}` : ''}"`;
     return [
-      ...e.genres.map(g => { const st = e.styles.filter(id => same(id) && n.genreOf(id) === g); return `<span class="tag-chip genre"${tip(st.length ? 'tagGenreStyle' : 'tagGenre')}>${esc(t(`g:${g}`))}</span>`; }),
-      ...e.styles.filter(id => !same(id)).map(id => { const nm = styleName(id), g = n.genreOf(id); return `<span class="tag-chip style${nm ? '' : ' unknown'}"${tip('tagStyle', g ? t(`g:${g}`) : '')}>${esc(nm || id)}</span>`; }),
-      ...e.free.map(f => `<span class="tag-chip free"${tip('tagFree')}>#${esc(f)}</span>`),
+      ...e.genres.map(g => { const st = e.styles.filter(id => same(id) && n.genreOf(id) === g); return `<button class="tag-chip genre" data-tag-f="genres" data-v="${g}"${tip(st.length ? 'tagGenreStyle' : 'tagGenre')}>${esc(t(`g:${g}`))}</button>`; }),
+      ...e.styles.filter(id => !same(id)).map(id => { const nm = styleName(id), g = n.genreOf(id); return `<button class="tag-chip style${nm ? '' : ' unknown'}" data-tag-f="styles" data-v="${esc(id)}"${tip('tagStyle', g ? t(`g:${g}`) : '')}>${esc(nm || id)}</button>`; }),
+      ...e.free.map(f => `<button class="tag-chip free" data-tag-f="q" data-v="${esc(f)}"${tip('tagFree')}>#${esc(f)}</button>`),
     ].join(' ');
   }
 

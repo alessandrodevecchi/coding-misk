@@ -634,3 +634,9 @@ details.sv-group > summary { cursor: pointer; margin-bottom: 6px; }
 }
 /* one column on phones: the tab bar and wide panels scroll in their own box, not the page */
 .work > * { min-width: 0; }
+.sv-legend { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.sv-legend .lbl { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); min-width: 58px; }
+button.tag-chip { background: none; color: inherit; cursor: pointer; font: 11px var(--mono); }
+button.tag-chip.genre { color: var(--a1); }
+button.tag-chip.free { color: var(--muted); }
+button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
