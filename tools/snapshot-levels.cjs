@@ -7,6 +7,8 @@ const fs = require('fs');
 const path = require('path');
 const FILE = path.join(__dirname, '..', 'tests', 'snapshots', 'levels.json');
 const TOL = 0.12, FLOOR = 0.03;
+// distorted guitars peak differently from run to run (up to about 0.2 in the same section): wider tolerance
+const TOL_OF = { guitar: 0.25 };
 // crash and riser (fx) depend on where the short measuring window falls in the scene: recorded, not compared
 const SKIP = new Set(['fx']);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -25,6 +27,9 @@ if (!['write', 'check'].includes(mode)) { console.error('usage: node tools/snaps
   for (const id of ids) {
     if (!(await page.$(`#track-pick option[value="${id}"]`))) continue;
     await page.locator('#track-pick').selectOption(id); await page.click('#play'); await sleep(1500);
+    // loop the section being measured: a short section (one bar at the end of a song) would otherwise end,
+    // and the song stop, before the measuring window is over
+    if (!(await page.isChecked('#sc-loop'))) await page.click('#sc-loop');
     const n = await page.locator('.arr-scene-btn').count();
     const scenes = [];
     for (let i = 0; i < n; i++) {
@@ -52,7 +57,7 @@ if (!['write', 'check'].includes(mode)) { console.error('usage: node tools/snaps
       for (const a of new Set([...Object.keys(r.levels), ...Object.keys(lv[i])])) {
         if (SKIP.has(a)) continue;
         const x = r.levels[a] || 0, y = lv[i][a] || 0;
-        if (Math.abs(x - y) > TOL) diffs.push(`${r.name} ${a} ${x.toFixed(2)} -> ${y.toFixed(2)}`);
+        if (Math.abs(x - y) > (TOL_OF[a] ?? TOL)) diffs.push(`${r.name} ${a} ${x.toFixed(2)} -> ${y.toFixed(2)}`);
       }
     });
     console.log(diffs.length ? `DIFF  ${id}\n  ${diffs.join('\n  ')}` : `ok    ${id}`);

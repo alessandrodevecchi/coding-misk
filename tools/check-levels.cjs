@@ -18,6 +18,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       if (!names.length || names.includes(await page.locator('#sc-name').inputValue())) break;
     }
     await page.click('#play'); await sleep(2000);
+    // loop the section being measured: a short section (one bar at the end of a song) would otherwise end,
+    // and the song stop, before the measuring window is over
+    if (!(await page.isChecked('#sc-loop'))) await page.click('#sc-loop');
     const n = names.length || await page.locator('.arr-scene-btn').count();
     for (let i = 0; i < n; i++) {
       // click the section until the editor shows it (the strip is redrawn once the song plays)

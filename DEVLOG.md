@@ -219,6 +219,8 @@
 
 - Radio `#22`, gruppo 5: prova di 30 minuti (synthwave, jazz e country, caos 1, seme `long`): 7 cambi di brano a fine brano, 0 errori di valutazione e di pagina, il brano nuovo suona subito dopo ogni cambio (livelli misurati 3 secondi dopo, non la durata esatta del passaggio). Controlli finali: `check:code`, `check:songs`, `check:endless` (31), build; livelli dei brani inclusi uguali alle istantanee (Neon Rush reel diverso una volta nella sezione Hit di una battuta, uguale rimisurato da solo: misura instabile nota). `snapshot-levels.cjs` ora salta i brani generati in `songs/endless/`.
 
+- Misura dei livelli più affidabile: `check-levels.cjs` e `snapshot-levels.cjs` attivano il loop della sezione mentre misurano. Prima una sezione corta in fondo al brano (Hit di Neon Rush reel, una battuta) finiva, il brano si fermava e la finestra di ascolto cadeva nel silenzio: il risultato cambiava da un giro all'altro. Con il loop Hit misura basso 0.23-0.32 e chitarra 0.62-0.69 su tre giri. Istantanee riscritte per tutti i brani (cambiano le ultime sezioni, prima tagliate). Le chitarre distorte variano fino a circa 0.2 tra un giro e l'altro nella stessa sezione: per loro la tolleranza ora è 0.25 (0.12 per gli altri strumenti). Due controlli completi dopo la riscrittura: restano solo differenze di chitarra entro 0.21.
+
 ## Prossimo passo
 
 - Endless `#21`: il proprietario ascolta le sessioni generate (`npm run endless -- --styles … --join`, brani nella libreria dopo un ricaricamento) e dà il suo parere (task 5.3); poi `openspec-verify-change` e archiviazione della change e rilascio `v0.5.0` (con conferma). Radio `#22` su `develop`: manca la prova del proprietario (task 5.3), poi verifica e archiviazione di `endless-radio`.
