@@ -52,6 +52,14 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     check(geo.visible && geo.lastBottom <= geo.barTop + 1, `bar visible in ${tab} without hiding content`, `content ends ${geo.lastBottom.toFixed(0)}, bar at ${geo.barTop.toFixed(0)}`);
   }
 
+  // the timeline: drag to the middle of the song
+  const seekTo = v => page.evaluate(v => { const el = document.getElementById('pb-seek'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, v);
+  await page.click('[data-tab="componi"]');
+  const meta = await page.evaluate(() => ({ cyc: document.querySelector('strudel-editor').editor.repl.scheduler.now() }));
+  await seekTo(500); await sleep(2500);
+  const mid = await page.evaluate(() => ({ cyc: document.querySelector('strudel-editor').editor.repl.scheduler.now(), seek: +document.getElementById('pb-seek').value, started: document.querySelector('strudel-editor').editor.repl.scheduler.started }));
+  check(mid.started && mid.seek >= 480 && mid.seek < 600 && mid.cyc > meta.cyc + 5, 'dragging the timeline moves inside the song', `bar ${meta.cyc.toFixed(1)} -> ${mid.cyc.toFixed(1)}, timeline ${mid.seek}`);
+
   // next and previous in the library
   const first = (await bar()).pick;
   await page.click('#pb-next'); await sleep(3000);
@@ -78,6 +86,10 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const after = await page.evaluate(() => document.querySelector('strudel-editor').editor.repl.scheduler.now());
   const r2 = await page.evaluate(() => codingMiskRadio.state);
   check(r2.onAir === r1.onAir && after < before && after - r2.stream[r2.onAir].start < 2, 'radio: previous starts the song on air again', `${before.toFixed(1)} -> ${after.toFixed(1)}`);
+  await seekTo(500); await sleep(2500);
+  const r3 = await page.evaluate(() => ({ st: codingMiskRadio.state, cyc: document.querySelector('strudel-editor').editor.repl.scheduler.now() }));
+  const it = r3.st.stream[r3.st.onAir];
+  check(r3.st.onAir === r2.onAir && r3.cyc - it.start > it.bars * 0.45 && r3.cyc - it.start < it.bars * 0.6, 'radio: the timeline moves inside the song on air', `bar ${(r3.cyc - it.start).toFixed(1)} of ${it.bars}`);
   await setVol('radio-volume', 55); await sleep(200);
   check((await bar()).vol === 55, 'radio volume and bar volume in sync');
   await page.click('#radio-start'); await sleep(300);

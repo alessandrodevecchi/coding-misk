@@ -7,7 +7,7 @@ The player bar is the app's one place to control playback and volume, whatever i
 ## ADDED Requirements
 
 ### Requirement: Bottom player bar
-The app SHALL show a low bar fixed at the bottom of the window in every tab, with: play and pause, stop, previous, next, the title of what is playing with its position (time or bar), volume and mute, and an ON AIR light while the radio plays. The bar SHALL NOT cover page content (the page leaves room for it), SHALL fit narrow screens, and SHALL follow the theme: neon in the neon theme, mechanical in the hardware theme. Play and stop SHALL no longer be in the top bar, which keeps the logo, the theme and the language.
+The app SHALL show a low bar fixed at the bottom of the window in every tab, with: play and pause, stop, previous, next, the title of what is playing with its position (time or bar) and a timeline that can be dragged to move inside the song (in the radio, inside the song on air), volume and mute, and an ON AIR light while the radio plays. The bar SHALL NOT cover page content (the page leaves room for it), SHALL fit narrow screens, and SHALL follow the theme: neon in the neon theme, mechanical in the hardware theme. Play and stop SHALL no longer be in the top bar, which keeps the logo, the theme and the language.
 
 #### Scenario: Visible everywhere
 - **WHEN** the user moves between Compose, Songs, Radio and the other tabs while music plays
@@ -42,3 +42,15 @@ The app SHALL have one volume from 0 to 100 % with a mute toggle, remembered bet
 #### Scenario: Mute
 - **WHEN** the user presses mute and then unmutes
 - **THEN** sound stops and comes back at the previous volume
+
+### Requirement: Draggable timeline
+The bar's timeline SHALL follow the position of what is playing, and dragging it SHALL move playback to that point: inside the song for Compose and library songs, inside the song on air for the radio. While the user drags, the timeline SHALL NOT jump back.
+
+#### Scenario: Seek a song
+- **WHEN** a song plays and the user drags the timeline to the middle
+- **THEN** playback goes on from the middle of the song
+
+#### Scenario: Seek in the radio
+- **WHEN** the radio plays and the user drags the timeline to the middle
+- **THEN** the song on air goes on from its middle and the radio keeps the same next song
+

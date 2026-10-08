@@ -11,6 +11,8 @@
 - [x] 2.3 Previous and next for library songs and the radio (next skips, previous restarts the song on air); verify in the browser for a library song and the radio.
 - [x] 2.4 Volume next to the radio controls, in sync with the bar; verify in `tools/check-radio.cjs`.
 
+- [x] 2.5 Owner feedback: same height for every key, minimal volume icons, a draggable timeline (songs and the song on air in the radio); verify in `tools/check-player.cjs`.
+
 ## 3. Checks and docs
 
 - [x] 3.1 Add `tools/check-player.cjs` for the scenarios above; run it with `tools/check-radio.cjs`, `tools/check-hand.cjs` and `npm run build`; verify all pass.

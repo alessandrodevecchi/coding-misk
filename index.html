@@ -165,7 +165,10 @@
     <button class="pb-btn stopbtn" id="stop" data-i18n-aria="stop" data-i18n-title="stop">■</button>
     <button class="pb-btn" id="pb-next" data-i18n-aria="nextSong" data-i18n-title="nextSong">⏭</button>
   </div>
-  <div class="pb-now"><span class="pb-onair" id="pb-onair" data-i18n="radioOnAir"></span><span class="pb-title" id="pb-title"></span><span class="pb-pos" id="pb-pos"></span></div>
+  <div class="pb-mid">
+    <div class="pb-now"><span class="pb-onair" id="pb-onair" data-i18n="radioOnAir"></span><span class="pb-title" id="pb-title"></span><span class="pb-pos" id="pb-pos"></span></div>
+    <input type="range" id="pb-seek" class="pb-seek" min="0" max="1000" step="1" value="0" data-no-knob data-i18n-aria="seek" data-i18n-title="seek">
+  </div>
   <div class="pb-vol">
     <button class="pb-btn" id="pb-mute" aria-pressed="false" data-i18n-aria="mute" data-i18n-title="mute">🔊</button>
     <input type="range" id="pb-volume" min="0" max="100" step="1" data-i18n-aria="volumeAll" data-i18n-title="volumeAll">

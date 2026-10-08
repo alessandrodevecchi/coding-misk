@@ -133,6 +133,13 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     render();
     return true;
   }
+  // the bar's timeline: a bar inside the song on air
+  function seek(rel) {
+    if (!S) return;
+    const it = S.stream[S.onAir], bar = it.start + Math.max(0, Math.min(it.bars - .25, rel));
+    if (S.paused !== undefined) { S.paused = bar; return; }
+    player.start(windowPlayable(), bar);
+  }
   // previous in the player bar: the song on air from its first bar
   function restart() {
     if (!S) return;
@@ -258,7 +265,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   });
 
   return {
-    render, tick, stop, start, skip, pause, resume, afterHand, restart,
+    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek,
     get paused() { return !!S && S.paused !== undefined; },
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },

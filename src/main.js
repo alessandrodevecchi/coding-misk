@@ -1478,10 +1478,14 @@ function applyVolume() {
     if (Math.abs(volNode.gain.value - g) > 1e-4) volNode.gain.setTargetAtTime(g, volNode.context.currentTime, .02);
   } catch (e) {}
 }
+// minimal speaker icons, drawn with the text colour like the other keys
+const SPK = (extra) => `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h2.5L8 3v10L4.5 10H2z" fill="currentColor" stroke="none"/>${extra}</svg>`;
+const SPK_HIGH = SPK('<path d="M10.5 5.5a3.5 3.5 0 0 1 0 5"/><path d="M12.5 3.5a6.3 6.3 0 0 1 0 9"/>'), SPK_LOW = SPK('<path d="M10.5 5.5a3.5 3.5 0 0 1 0 5"/>'), SPK_OFF = SPK('<path d="M11 6l4 4M15 6l-4 4"/>');
 function renderVolume() {
   for (const id of ['pb-volume', 'radio-volume']) { const el = document.getElementById(id); if (el && +el.value !== volume) el.value = volume; }
   for (const id of ['pb-volume-out', 'radio-volume-out']) { const el = document.getElementById(id); if (el) el.textContent = `${volume}%`; }
-  for (const id of ['pb-mute', 'radio-mute']) { const el = document.getElementById(id); if (el) { el.setAttribute('aria-pressed', muted); el.textContent = muted || !volume ? '🔇' : volume < 40 ? '🔈' : '🔊'; } }
+  const icon = muted || !volume ? SPK_OFF : volume < 40 ? SPK_LOW : SPK_HIGH;
+  for (const id of ['pb-mute', 'radio-mute']) { const el = document.getElementById(id); if (el) { el.setAttribute('aria-pressed', muted); if (el.dataset.icon !== icon) { el.innerHTML = icon; el.dataset.icon = icon; } } }
 }
 function setVolume(v) { volume = Math.max(0, Math.min(100, Math.round(v))); if (volume > 0) muted = false; store.set('coding-misk-volume', volume); store.set('coding-misk-muted', muted); renderVolume(); applyVolume(); }
 function toggleMute() { muted = !muted; store.set('coding-misk-muted', muted); renderVolume(); applyVolume(); }
@@ -1598,6 +1602,22 @@ function goNeighbour(dir) {
   if (tr.kind === 'composed') { if (loadTrack(tr) && mode !== 'track') backToTrack(); return; }
   if (ed) ed.stop(); paused = null; song = p; mode = 'free'; source = { kind: 'song', name: tr.title, id: tr.id }; renderSource(); if (ed) ed.setCode(p.code); updateShare();
 }
+// timeline in the bar: drag to move inside what is playing (a song, or the song on air in the radio)
+let pbSeeking = false;
+function seekRange() {
+  if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs.stream[rs.onAir]; return { from: it.start, bars: it.bars }; }
+  if (song && song.meta) return { from: 0, bars: song.meta.bars };
+  return null;
+}
+$('#pb-seek').addEventListener('input', () => { pbSeeking = true; });
+$('#pb-seek').addEventListener('change', e => {
+  pbSeeking = false;
+  const r = seekRange(); if (!r) return;
+  const bar = Math.min(r.bars - .25, Math.round(+e.target.value / 1000 * r.bars * 4) / 4);
+  if (mode === 'radio' && radio && radio.on) return radio.seek(bar);
+  if (mode === 'track') return seekTo(bar);
+  if (song) { if (isPlaying()) playSong(song, bar, mode); else paused = { id: song.id, cyc: bar }; }
+});
 $('#pb-prev').addEventListener('click', () => goNeighbour(-1));
 $('#pb-next').addEventListener('click', () => goNeighbour(1));
 var pbLast = '';
@@ -1612,6 +1632,14 @@ function renderPlayerBar() {
     title = mode === 'track' ? T.title : song.title || source.name || title;
     pos = `${clock(m.secondsAt(Math.min(cyc, m.bars)))} / ${clock(m.seconds)}`;
   } else if (mode === 'free' && source && source.name) title = source.name;
+  // timeline position (not while the user drags it)
+  const seek = $('#pb-seek'), sr = seekRange();
+  seek.disabled = !sr || (mode === 'free' && !(source && source.kind === 'song') && !onRadio);
+  if (!pbSeeking && sr) {
+    const cyc = onRadio ? (playing && s ? s.now() : rs && rs.paused !== undefined ? rs.paused : sr.from) : playing && s ? s.now() : paused && song && paused.id === song.id ? paused.cyc : mode === 'track' ? cueBar() : 0;
+    const v = Math.round(Math.max(0, Math.min(1, (cyc - sr.from) / sr.bars)) * 1000);
+    if (+seek.value !== v) seek.value = v;
+  }
   const onair = onRadio && !radio.paused;
   const canNav = onRadio || (currentSongId() !== null && (mode === 'track' || (source && source.kind === 'song')));
   const key = [title, pos, onair, canNav].join('|');

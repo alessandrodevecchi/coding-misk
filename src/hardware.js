@@ -43,7 +43,7 @@ function attachKnob(input) {
 
 export function startHardware() {
   const enhance = () => {
-    document.querySelectorAll('input[type=range]').forEach(attachKnob);
+    document.querySelectorAll('input[type=range]:not([data-no-knob])').forEach(attachKnob);
     document.querySelectorAll('[data-act-ids]').forEach(head => {
       if (!head.querySelector('.act')) { const s = document.createElement('span'); s.className = 'act'; s.setAttribute('aria-hidden', 'true'); head.prepend(s); }
     });
