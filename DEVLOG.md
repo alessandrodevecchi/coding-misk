@@ -285,11 +285,14 @@
 
 - `#28` Visual **Studio** per la radio, proposta del proprietario ("non è grande ed è ad effetto"): muro con pannelli fonoassorbenti, luce ON AIR accesa quando la radio è in onda, microfono con l'anello che si accende e manda onde mentre la voce parla, schermo con brano, artista, stili, battuta e l'ultimo commento scritto lettera per lettera, manopola della radio con la lancetta che trova la stazione, due VU meter, banco con un fader per strumento e giradischi che gira al tempo del brano. La radio parte con lo Studio; un tema scelto mentre la radio suona diventa il suo. Fuori dalla radio lo Studio mostra il brano che suona. Colori dell'interfaccia ambra e rosso. Verificato con uno screenshot durante un commento parlato, nessun errore di pagina.
 
+- `#28` Studio, riscontro del proprietario: "non è proprio come la immaginavo", da riprendere in un altro momento; la issue resta aperta. Il commit `1779768` ha il trailer `Closes:`: al merge su `main` GitHub potrebbe chiuderla, quindi dopo il rilascio va riaperta.
+
 ## Prossimo passo
 
 Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live coding a mano `#20`); `develop` = `763c59f` con in più barra player e volume `#32` (change `player-bar`, tutti i task fatti tranne la prova del proprietario) e artisti con schede Artisti e Stili `#35` (change `artists-and-styles`, 14/14 task). Il proprietario sta provando a fondo artisti e barra.
 
 - **Subito:** prova del proprietario delle playlist (`#36`, in `develop`). Il proprietario prova barra, artisti e scheda Brani nei prossimi giorni (`#34` è in `develop`); `#37` da ragionare con calma (vedi `notes/pubblicazione-e-diritti.md`).
+- **Al rilascio su `main`:** riaprire `#28` se GitHub la chiude (il visual Studio va rivisto con il proprietario).
 - **Dopo le prove del proprietario:** nomi definitivi dei sei artisti (ora provvisori: Night Owl, HYPERDROP, Lumen Drift, Jukebox Joe, The Purist, Wake Horizon), verifica e archiviazione di `player-bar`, `artists-and-styles`, `song-search`, `playlists`, `song-transitions` e `radio-steering`, rilascio `v0.6.0` su `main` con conferma.
 - **Fatto, da provare:** `#23` transizioni (radio e playlist), `#24` console della radio.
 - **Poi:** `#29` continua in radio da Componi, `#40` più curve, `#38` sessioni radio nelle playlist, `#39` passaggi parlati lunghi, `#37` uso online (vedi note locali), `#30` registrazione audio della sessione, `#33` salva il codice a mano come nuova versione, `#31` pagina impostazioni (tema, lingua), `#25`/`#26` agenti e MCP, `#19`, `#3`, `#16`, `#4`-`#8`. Idea per dopo: voce/frasi proprie per artista.
