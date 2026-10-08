@@ -140,6 +140,23 @@ Mix and morph ramp the tempo across the overlap and are never planned for a temp
 
 On the stream, the next song starts `bars` before the end of the current one for mix, morph and echo, and `bars` after it for an interlude. A skip always cuts.
 
+## Steering
+
+The listener can change the song on air from the Radio tab (`#24`). `src/endless/steering.js` turns each command into a rewrite of the song from a boundary: the steps before it are kept, the plan is changed (targets, length, sections, track limits, voice amount), and `directSong` writes the rest with the listener's moves first (`by: "listener"` on their steps) and the locked tracks blocked. A song is always rebuilt from its original plan plus every command still standing, in order, with random streams named after the song and the command (`steer:<song>:<index>`), so cancelling a command or replaying a session gives the same song.
+
+| Command | Applies | Change |
+| --- | --- | --- |
+| Energy up, down | next phrase | targets of the remaining double phrases ±0.15 |
+| Curve | next phrase | one double phrase gets the dragged target |
+| Add, remove a type | next phrase | a forced add of a silent track of that type, or a forced remove of every playing one |
+| More, less complex | next phrase | usual track count ±1 |
+| Darker, brighter, dirtier, cleaner, more space | next phrase | that move on every playing track that allows it |
+| Change instrument | next phrase | another wave, kit, guitar or texture from the style |
+| Change progression, key | next double phrase | the following sections take another progression, or a key a fifth away |
+| Talk more, less | next phrase | voice amount ±0.2 for the rest of the song |
+| Go to the drop, stay here, end | next double phrase | the plan jumps to its drop, repeats the current part, or ends with an outro |
+| Volume, mute, lock (mixer) | next bar | pinned gain; a step plus a lock; the director stops moving the track |
+
 ## Determinism
 
 Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`, `voice`, `artist`, `transition`. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit.
@@ -179,6 +196,11 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | No overlap over a big tempo jump             | `transitions: a big tempo jump never mixes or morphs`            |
 | Artist preferences                           | `transitions: artist preferences are followed`                   |
 | Compatible harmony                           | `transitions: compatible harmony keeps keys a fifth apart`       |
+| Steering is exact                            | `steering: no command gives the same song, and the same commands the same song` |
+| Steering keeps the past                      | `steering: every command keeps the past and makes a valid song`  |
+| Energy up                                    | `steering: energy up raises the rest of the song`                |
+| Song length commands                         | `steering: drop, stay and end change the length`                 |
+| Locks and removed types                      | `steering: locked tracks and removed types`                      |
 
 ## Artists
 

@@ -44,7 +44,7 @@ A switch SHALL choose whether commands apply to "this song" or "the whole sessio
 
 #### Scenario: Session scope
 - **WHEN** the scope is "the whole session" and the user presses "energy up" twice
-- **THEN** the song on air rises in energy and the energy slider is 0.2 higher for the next songs
+- **THEN** the song on air rises in energy and the energy slider is 0.2 higher for the next songs (0.1 per command)
 
 ### Requirement: Editable energy curve
 The now playing card SHALL show the song's energy curve with a handle per double phrase still to come. Dragging a handle SHALL set the target energy of that part (from 0 to 1); on release the change SHALL be queued like a command for the next boundary. Parts already played or at the current phrase SHALL NOT be editable.

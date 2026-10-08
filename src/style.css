@@ -715,3 +715,24 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 :root[data-ui="hw"] .pb-mode[aria-pressed="true"] svg { filter: drop-shadow(0 0 3px #ff9a1f); }
 :root[data-ui="hw"] .pb-mode[aria-pressed="true"]::after { background: var(--led); box-shadow: 0 0 6px var(--led), 0 0 2px var(--led); }
 :root[data-ui="hw"] .pb-one { color: #ffb347; }
+
+/* radio console (#24) */
+.radio-steer { margin-top: 16px; display: grid; gap: 10px; }
+.steer-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.steer-console { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 16px; }
+.steer-group { display: grid; gap: 6px; align-content: start; }
+.steer-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.steer-btn { padding: 6px 12px; font-size: 13px; }
+.steer-queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.steer-queue .at { font: 12px var(--mono); color: var(--a1); margin-right: 6px; }
+.steer-queue .mini { margin-left: 6px; }
+.steer-mixer { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px 16px; }
+.mix-row { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto auto auto; align-items: center; gap: 6px; font-size: 13px; }
+.mix-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mix-row .mini[aria-pressed="true"] { color: var(--a1); border-color: var(--a1); }
+.radio-curve.steer { width: 100%; max-width: 360px; height: auto; touch-action: none; }
+.radio-curve .handle { fill: var(--panel); stroke: var(--a1); stroke-width: 2; cursor: ns-resize; }
+.radio-curve .handle:hover { fill: var(--a1); }
+.radio-curve .past { fill: currentColor; opacity: .5; }
+@media (max-width: 560px) { .mix-row { grid-template-columns: minmax(0, 1fr) 80px auto auto auto; } }
+.radio-pos:has(.radio-curve.steer) { flex-direction: column; align-items: stretch; gap: 4px; }

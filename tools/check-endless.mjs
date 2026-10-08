@@ -17,6 +17,7 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
+import { steerSong, applyBar, COMMANDS, canApply } from '../src/endless/steering.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { stateAt, buildSteps } from '../src/song/build.js';
@@ -461,11 +462,65 @@ const CHECKS = {
       if (keys.some(k => fifth(k, prev))) assert(fifth(e.key, prev), `${prev} then ${e.key}`);
     });
   },
+  'steering: no command gives the same song, and the same commands the same song'() {
+    const ses = createSession(STYLES, 'steer-same'), g = ses.next({ styles: ['berlin-techno'] });
+    const a = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [], seed: 'steer-same', n: 0 });
+    assert(JSON.stringify(a.song) === JSON.stringify(g.song), 'no command changed the song');
+    const cmds = [{ kind: 'energy-up', at: applyBar('energy-up', 20, g.plan) }, { kind: 'darker', at: applyBar('darker', 40, g.plan) }];
+    const x = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: 'steer-same', n: 0 });
+    const y = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: 'steer-same', n: 0 });
+    assert(JSON.stringify(x.song) === JSON.stringify(y.song), 'same commands gave different songs');
+  },
+  'steering: every command keeps the past and makes a valid song'() {
+    const ses = createSession(STYLES, 'steer-all'), g = ses.next({ styles: ['synthwave'] });
+    const now = 20, playingIds = playing(stateAt(g.song, 24).song).map(t => t.id);
+    const cmds = Object.keys(COMMANDS).map(kind => ({ kind, type: kind === 'add' ? 'pad' : kind === 'remove' ? 'drums' : undefined, track: ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(kind) ? playingIds[0] : undefined, d: kind === 'curve' ? 3 : undefined, value: kind === 'curve' ? 0.2 : kind === 'volume' ? 0.3 : undefined }));
+    for (const c of cmds) {
+      const cmd = { ...c, at: applyBar(c.kind, now, g.plan) };
+      const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [cmd], seed: 'steer-all', n: 0 });
+      const v = validateSong(r.song);
+      assert(!v.errors.length, `${c.kind}: ${v.errors.slice(0, 2).map(e => `${e.path}: ${e.msg}`).join('; ')}`);
+      const before = s => JSON.stringify((s.build || []).filter(x => x.at < Math.min(cmd.at, 16)));
+      assert(before(r.song) === before(g.song), `${c.kind}: steps before bar ${cmd.at} changed`);
+      compileSong(stateAt(r.song, cmd.at + 1).song);
+    }
+  },
+  'steering: energy up raises the rest of the song'() {
+    const ses = createSession(STYLES, 'steer-energy'), g = ses.next({ styles: ['berlin-techno'], energy: 0.3 });
+    const at = applyBar('energy-up', 16, g.plan), cmds = [1, 2, 3].map(() => ({ kind: 'energy-up', at }));
+    const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: 'steer-energy', n: 0 });
+    const ctx = { usual: g.plan.usualHigh, weights: g.plan.R.energy, hardMax: g.plan.hardMax };
+    const avg = sg => { const bars = []; for (let b = at + 8; b < Math.min(at + 48, g.plan.bars - 8); b += 8) bars.push(energyOf(stateAt(sg, b).song, ctx)); return bars.reduce((x, y) => x + y, 0) / bars.length; };
+    assert(avg(r.song) > avg(g.song) + 0.05, `energy ${avg(g.song).toFixed(2)} then ${avg(r.song).toFixed(2)}`);
+  },
+  'steering: drop, stay and end change the length'() {
+    const ses = createSession(STYLES, 'steer-len'), g = ses.next({ styles: ['trance'], energy: 0.6 });
+    const len = sg => sg.sections.reduce((a, x) => a + x.bars, 0), dbl = 2 * g.plan.phrase, bars = len(g.song);
+    const go = kind => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind, at: applyBar(kind, 1, g.plan) }], seed: 'steer-len', n: 0 });
+    assert(len(go('stay').song) === bars + dbl, 'stay adds a double phrase');
+    assert(len(go('end').song) === 2 * dbl, `end: ${len(go('end').song)} bars`);
+    const drop = go('drop');
+    if (g.plan.plan.slice(2).some(d => d.role === 'drop') && g.plan.plan[1].role !== 'drop') assert(len(drop.song) < bars && drop.plan.plan[1].role === 'drop', 'drop comes next');
+  },
+  'steering: locked tracks and removed types'() {
+    const ses = createSession(STYLES, 'steer-lock'), g = ses.next({ styles: ['berlin-techno'] });
+    const at = applyBar('remove', 30, g.plan), on = playing(stateAt(g.song, at).song).filter(t => t.type !== 'voice');
+    const target = on.find(t => t.type !== 'drums') || on[0];
+    const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'lock', track: target.id, at: applyBar('lock', 30, g.plan) }], seed: 'steer-lock', n: 0 });
+    const touched = r.song.build.filter(x => x.at >= at && !x.by).some(x => JSON.stringify(x).includes(`"${target.id}"`));
+    assert(!touched, `locked ${target.id} was moved`);
+    if (on.some(t => t.type === 'bass')) {
+      const rm = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'remove', type: 'bass', at }], seed: 'steer-lock', n: 0 });
+      assert(!playing(stateAt(rm.song, at).song).some(t => t.type === 'bass'), 'bass still plays');
+      assert(rm.song.build.some(x => x.at === at && x.by === 'listener'), 'listener step not marked');
+    }
+    assert(canApply({ kind: 'remove', type: 'bass' }, g.song, g.plan, 30) === on.some(t => t.type === 'bass') || on.length <= 1, 'canApply remove bass');
+  },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');
-    const listed = [...doc.matchAll(/`((?:director|determinism|radio|artists|transitions): [^`]+)`/g)].map(m => m[1]);
+    const listed = [...doc.matchAll(/`((?:director|determinism|radio|artists|transitions|steering): [^`]+)`/g)].map(m => m[1]);
     for (const n of listed) assert(CHECKS[n], `docs/ENDLESS.md names a check that does not exist: ${n}`);
-    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists|transitions):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
+    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists|transitions|steering):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
   },
 };
 

@@ -68,14 +68,27 @@ export function sayAt(song, bar, lang, hold = 4) {
 export const nextStep = (song, bar) => buildSteps(song).find(s => s.at > bar) || null;
 
 // compiled code of a state with the comment of its latest step written above the track it changes
+// what a step does, in a few words, for the code comment of a listener's change: "add bass", "set pad cutoff 900"
+const stepWords = s => {
+  for (const k of ['add', 'remove']) if (s[k] !== undefined) return `${k} ${list(s[k]).join(' ')}`;
+  if (s.set) { const { track, ...v } = s.set; return `set ${track} ${Object.entries(v).map(([k, x]) => `${k} ${x}`).join(' ')}`; }
+  if (s.pattern) return `${s.pattern.track} pattern ${s.pattern.to}`;
+  if (s.rack) return `${s.rack.track} + ${s.rack.device}`;
+  if (s.unrack) return `${s.unrack.track} - ${s.unrack.device}`;
+  return '';
+};
 export function annotate(code, song, upTo, lang) {
   const step = buildSteps(song)[upTo - 1];
-  if (!step || !step.say) return code;
+  if (!step || (!step.say && !buildSteps(song).slice(0, upTo).some(x => x.at === step.at && x.by === 'listener'))) return code;
   const tr = stepTrack(step), t = tr && song.tracks.find(x => x.id === tr);
   const lines = code.split('\n');
   const head = t ? lines.findIndex(l => l.startsWith('// ==========') && l.includes(` ${t.name || t.id} `)) : -1;
   const at = head >= 0 ? head + 1 : Math.max(0, lines.findIndex(l => l.startsWith('// ==========')));
-  lines.splice(at, 0, `// > ${sayText(step.say, lang)}`);
+  // the listener's changes from the radio console (#24) are marked "you:"
+  // every listener's change on this bar, not only the last step applied
+  const mine = buildSteps(song).slice(0, upTo).filter(x => x.at === step.at && x.by === 'listener');
+  const add = [...mine.map(x => `// you: ${stepWords(x)}`), step.say ? `// > ${sayText(step.say, lang)}` : null].filter(Boolean);
+  lines.splice(at, 0, ...add);
   return lines.join('\n');
 }
 
@@ -136,7 +149,8 @@ export function checkBuild(song, total, err, warn) {
     const p = `build[${i}]`;
     if (!s || typeof s !== 'object') { err(p, 'a step is an object'); return; }
     if (!Number.isFinite(s.at) || s.at < 0 || (total && s.at >= total)) err(`${p}.at`, `a bar from 0 to ${Math.max(0, total - 1)}`);
-    for (const k of Object.keys(s)) if (!['at', 'say', 'voice', ...BUILD_ACTIONS].includes(k)) warn(`${p}.${k}`, `unknown field; step fields: at, say, voice, ${BUILD_ACTIONS.join(', ')}`);
+    for (const k of Object.keys(s)) if (!['at', 'say', 'voice', 'by', ...BUILD_ACTIONS].includes(k)) warn(`${p}.${k}`, `unknown field; step fields: at, say, voice, by, ${BUILD_ACTIONS.join(', ')}`);
+    if (s.by !== undefined && s.by !== 'listener') warn(`${p}.by`, 'only "listener" (a change made by the person listening to the radio)');
     if (s.voice !== undefined) { const t = byId(s.voice); if (!t || t.type !== 'voice') err(`${p}.voice`, `a track of type voice; voice tracks: ${tracks.filter(x => x && x.type === 'voice').map(x => x.id).join(', ') || 'none'}`); }
     const phrases = s.say === undefined ? [] : typeof s.say === 'string' ? [s.say] : s.say && typeof s.say === 'object' ? Object.values(s.say) : [null];
     if (phrases.some(x => typeof x !== 'string' || !x.trim())) err(`${p}.say`, 'a short phrase, or one per language: { "en": "more bass", "it": "più basso" }');

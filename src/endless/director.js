@@ -24,7 +24,7 @@ const cap = s => s[0].toUpperCase() + s.slice(1);
 const ROW_IDS = ROWS.map(([id]) => id);
 const MELODIC = ['bass', 'arp', 'hook', 'pad', 'guitar'];
 // order in which instruments usually come in at the start of a song
-const ENTRY = ['drums', 'bass', 'pad', 'arp', 'guitar', 'hook', 'texture'];
+export const ENTRY = ['drums', 'bass', 'pad', 'arp', 'guitar', 'hook', 'texture'];
 // keys a fifth apart (up or down), on the app's semitone offsets of KEYS
 const semis = k => (KEYS.find(x => x[0] === k) || [k, 0])[1];
 const fifthApart = (a, b) => { const d = ((semis(a) - semis(b)) % 12 + 12) % 12; return d === 5 || d === 7; };
@@ -123,21 +123,28 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
   const doubles = bars / dbl, plan = applyPlanQuirks(shapePlan(shape, doubles, opts.energy), shape, opts);
   // sections: consecutive double phrases with the same role; big moments take the second progression
   const mainChords = P.pick(R.progressions), liftChords = P.chance(0.5) ? pickOther(P, R.progressions, mainChords) : mainChords;
-  const sections = [], seen = {};
-  plan.forEach((d, i) => {
-    const last = sections[sections.length - 1];
-    if (last && last.role === d.role) { last.bars += dbl; return; }
-    seen[d.role] = (seen[d.role] || 0) + 1;
-    const name = cap(d.role) + (seen[d.role] > 1 ? ` ${seen[d.role]}` : '');
-    const sec = { role: d.role, name, bars: dbl, bpm, key, chords: LANDMARKS.includes(d.role) ? liftChords : mainChords, meter };
-    if (swing > 0) sec.swing = swing;
-    sections.push(sec);
-  });
+  const sections = sectionsOf(plan, { dbl, bpm, key, meter, swing, mainChords, liftChords });
   const tracks = candidateTracks(R, meter, opts.complexity, P, rng.mutation, opts);
   const usual = R.tracks.usual, hardMax = opts.complexity > 0.8 ? Math.max(R.tracks.max, 8) + 2 : Math.min(R.tracks.max, 8);
   const usualHigh = clamp(usual[1] + Math.round((opts.complexity - 0.5) * 2), usual[0], hardMax);
   const voice = voiceFor(R, opts, rng.voice);
-  return { index, parts, R, voice, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax };
+  return { index, parts, R, voice, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords };
+}
+
+// Sections of an energy plan: consecutive double phrases with the same role; big moments take the second
+// progression. h: { dbl, bpm, key, meter, swing, mainChords, liftChords }.
+export function sectionsOf(plan, h) {
+  const sections = [], seen = {};
+  plan.forEach(d => {
+    const last = sections[sections.length - 1];
+    if (last && last.role === d.role) { last.bars += h.dbl; return; }
+    seen[d.role] = (seen[d.role] || 0) + 1;
+    const name = cap(d.role) + (seen[d.role] > 1 ? ` ${seen[d.role]}` : '');
+    const sec = { role: d.role, name, bars: h.dbl, bpm: h.bpm, key: h.key, chords: LANDMARKS.includes(d.role) ? h.liftChords : h.mainChords, meter: h.meter };
+    if (h.swing > 0) sec.swing = h.swing;
+    sections.push(sec);
+  });
+  return sections;
 }
 
 // ---------- voice ----------
@@ -176,7 +183,7 @@ const KIND_OF_ADD = { drums: 'add-drums', bass: 'add-bass', arp: 'add-lead', hoo
 const SPACE = ['delay', 'reverb'], DIRT = ['distort', 'crush', 'phaser'];
 
 // every move allowed on a boundary, given the current state
-function candidateMoves(state, ctx, blocked, rng) {
+export function candidateMoves(state, ctx, blocked, rng) {
   const out = [], on = playing(state), byId = id => state.tracks.find(t => t.id === id);
   for (const t of state.tracks) {
     if (t.type === 'voice' || t.type === 'riser' || blocked.has(t.id)) continue;
@@ -214,32 +221,50 @@ function candidateMoves(state, ctx, blocked, rng) {
 const working = (base, steps) => ({ ...base, build: steps });
 const measure = (song, bar, ctx) => energyOf(stateAt(song, bar).song, ctx);
 
+const stepIds = s => [...['add', 'remove'].flatMap(k => (s[k] === undefined ? [] : Array.isArray(s[k]) ? s[k] : [s[k]])), ...['set', 'pattern', 'rack', 'unrack'].filter(k => s[k]).map(k => s[k].track)];
+
 // Writes the steps of a planned song: phrase by phrase, moves toward the target energy.
-export function directSong(plan, opts, rng, comments) {
+// steer (radio steering, #24, steering.js): keep = steps before the boundary "from", kept as they are;
+// forced = { boundary: [moves] } taken before the ordinary ones; locked = track ids no move may touch.
+export function directSong(plan, opts, rng, comments, steer = {}) {
   const { phrase, bars, R } = plan;
+  const { keep = [], from = 0, forced = {}, locked = [] } = steer;
   const ctx = { usual: plan.usualHigh, weights: R.energy, hardMax: plan.hardMax };
   const voice = { id: 'voice', name: 'Voice', type: 'voice', settings: plan.voice.settings, patterns: {}, clips: [] };
   const base = { tracks: [...plan.tracks.map(t => ({ ...t, mute: true, clips: [{ start: 0, bars, pattern: 'A' }] })), voice] };
-  const steps = [], phrases = [], moved = new Map(); // track id → boundary index of its last move
+  const steps = keep.map(s => ({ ...s })), phrases = [], moved = new Map(); // track id → boundary index of its last move
   const M = rng.moves;
   let lastKind = '', lastSay = -Infinity, brokeDrums = [];
+  // the memory of the loop, from the kept steps
+  for (const s of steps) { for (const id of stepIds(s)) moved.set(id, Math.floor(s.at / phrase)); if (s.say) lastSay = Math.max(lastSay, s.at); }
+  if (from > 0) {
+    const st = stateAt(working(base, steps), from * phrase).song, added = new Set(steps.flatMap(s => stepIds(s)));
+    brokeDrums = st.tracks.filter(t => t.type === 'drums' && t.mute && added.has(t.id)).map(t => t.id);
+  }
   const boundaries = bars / phrase;
   const say = (kind, at) => { lastSay = at; return pickPhrase(kind, comments); };
-  for (let k = 0; k < boundaries; k++) {
+  for (let k = from; k < boundaries; k++) {
     const at = k * phrase, d = Math.floor(k / 2), { role, target } = plan.plan[d];
     const isDouble = k % 2 === 0, prevRole = d > 0 ? plan.plan[d - 1].role : null;
     const landmark = isDouble && role !== prevRole && LANDMARKS.includes(role);
     const nextRole = k % 2 === 1 && d + 1 < plan.plan.length ? plan.plan[d + 1].role : null;
     // tracks that cannot move now: moved on the previous boundary, or needed by a big event on the next one
-    const blocked = new Set([...moved].filter(([, b]) => b === k - 1).map(([id]) => id));
+    const blocked = new Set([...[...moved].filter(([, b]) => b === k - 1).map(([id]) => id), ...locked]);
     if (nextRole === 'break' || nextRole === 'drop') base.tracks.filter(t => t.type === 'drums').forEach(t => blocked.add(t.id));
     const hardEnd = has(opts, 'hard-endings') && boundaries > 2;
     if (hardEnd && k === boundaries - 2) base.tracks.forEach(t => blocked.add(t.id));
     const chosen = [];
     const take = move => { chosen.push(move); steps.push({ at, ...move.step }); (move.tracks || [move.track]).forEach(id => { moved.set(id, k); blocked.add(id); }); };
     let state = stateAt(working(base, steps), at).song;
+    // the listener's moves come first on their boundary (they ignore the one-move-per-track rule, not the locks)
+    for (const f of forced[k] || []) {
+      const ids = f.tracks || [f.track];
+      if (ids.some(id => locked.includes(id) && !f.mixer)) continue;
+      take({ ...f, by: 'listener' }); steps[steps.length - 1].by = 'listener';
+    }
+    state = stateAt(working(base, steps), at).song;
 
-    if (k === 0) {
+    if (k === 0 && !(forced[0] || []).length) {
       // start: the first one or two instruments in the usual entry order
       const order = state.tracks.filter(t => t.type !== 'voice' && t.type !== 'riser').sort((a, b) => ENTRY.indexOf(a.type) - ENTRY.indexOf(b.type));
       let first = order.slice(0, has(opts, 'slow-builds') ? 1 : target > 0.35 || order.length < 3 ? 2 : 1).map(t => t.id);
@@ -344,7 +369,7 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   // measured energy of the final song at each phrase
   for (const p of phrases) p.energy = round(measure(song, p.bar, ctx));
   const entry = { id: song.id, title, parts, styles, bars: plan.bars, seconds: Math.round(plan.seconds), bpm: plan.bpm, key: plan.key, meter: plan.meter, shape: plan.shape, phrase: plan.phrase, tracks: tracks.filter(t => t.type !== 'voice').length, voice: { speaker: plan.voice.settings.speaker, character: plan.voice.character }, usualHigh: plan.usualHigh, hardMax: plan.hardMax, phrases };
-  return { song, entry };
+  return { song, entry, plan };
 }
 
 // A session that makes one song at a time (the radio, docs/ENDLESS.md "Incremental sessions").
@@ -372,12 +397,13 @@ export function createSession(recipes, seed) {
       const at = drawn ? 0 : i;
       let parts = mixParts(selected, opts.chaos, at, rng.plan);
       for (let t = 0; t < 12 && recent.includes(partsKey(parts)) && selected.length > 1 && opts.chaos > 0; t++) parts = mixParts(selected, opts.chaos, at, rng.plan);
-      const { song, entry } = makeSong({ parts, byId, prev: entries[i - 1], opts, rng, index: i, seed });
+      const { song, entry, plan } = makeSong({ parts, byId, prev: entries[i - 1], opts, rng, index: i, seed });
       // the transition from the song before to this one (it needs both tempos)
       if (i > 0) entries[i - 1].transition = planTransition(entries[i - 1], entry, opts, rng.transition);
       if (drawn) entry.artist = { id: options.artist.id, name: options.artist.name, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, pace: opts.pace, quirks: opts.quirks };
       entries.push(entry);
-      return { song, entry };
+      // plan and options stay with the song for steering (#24): the radio rewrites the song from them
+      return { song, entry, plan, opts };
     },
   };
 }

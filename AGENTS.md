@@ -71,6 +71,7 @@ node tools/check-songs-tab.cjs [shots-dir]             # Songs tab in the browse
 npm run check:playlists                                # playlist store, play queue (shuffle, repeat), export and import (no browser)
 node tools/check-playlists.cjs [shots-dir]             # playlists in the browser: favourites migration, + Playlist, tab, auto-advance, shuffle, repeat, export and import (dev server)
 node tools/check-transitions.cjs [kind,kind…]          # radio through each transition (mix, morph, echo, break, interlude): no errors, below clipping (dev server)
+node tools/check-steering.cjs [shots-dir]              # radio console: queue, cancel, curve drag, mixer, scope, shortcuts, end, replay (dev server)
 node tools/check-player.cjs                            # player bar and global volume: modes, previous and next, volume after the master, layout (dev server)
 node tools/check-hand.cjs                              # hand live coding in Compose: take over, steps held, resume, last code (dev server)
 node --no-warnings tools/check-radio.cjs [--long 30]  # radio in the browser: controls, same songs as the director, skip, history, save, open in Compose (dev server)
