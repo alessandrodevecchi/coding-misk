@@ -20,8 +20,8 @@
 
 ## 4. Artists tab
 
-- [ ] 4.1 Add the pixel-art portrait from a seed and palette; verify that the same seed always gives the same picture and different seeds give different faces.
-- [ ] 4.2 Add the Artists tab: cards and the character sheet; duplicate, new, edit form and JSON view, user artists in browser storage, export and import; verify in the browser.
+- [x] 4.1 Add the pixel-art portrait from a seed and palette; verify that the same seed always gives the same picture and different seeds give different faces.
+- [x] 4.2 Add the Artists tab: cards and the character sheet; duplicate, new, edit form and JSON view, user artists in browser storage, export and import; verify in the browser.
 
 ## 5. Radio and Compose
 

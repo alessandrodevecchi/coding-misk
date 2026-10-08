@@ -9,6 +9,7 @@ import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAU
 import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { createStylesTab } from './library/styles-tab.js';
+import { createArtistsTab } from './library/artists-tab.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
 import { machineLabel, prettyName } from './sounds/catalog.js';
@@ -69,7 +70,7 @@ function composedTracks() {
 const codedTracks = () => CODED.map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
 // the radio tab (created further down, once the player exists)
-let radio = null, stylesTab = null;
+let radio = null, stylesTab = null, artistsTab = null;
 // custom samples manifest (bank → files), for spoken comments
 let customFiles = {};
 // oggetto riproducibile: codice + mappa di sezioni e tempo
@@ -1339,7 +1340,7 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'radio', 'stili', 'guida', 'suoni', 'riferimenti'];
+const TABS = ['componi', 'brani', 'radio', 'artisti', 'stili', 'guida', 'suoni', 'riferimenti'];
 let cards = [];
 function showTab(name) {
   $$('.tab').forEach(x => x.setAttribute('aria-selected', x.dataset.tab === name));
@@ -1348,6 +1349,7 @@ function showTab(name) {
   if (name === 'suoni') renderSounds();
   if (name === 'radio' && radio) radio.render();
   if (name === 'stili' && stylesTab) stylesTab.render();
+  if (name === 'artisti' && artistsTab) artistsTab.render();
 // for the browser checks (tools/check-radio.cjs)
 globalThis.codingMiskRadio = radio;
   store.set('coding-misk-tab', name);
@@ -1661,6 +1663,9 @@ const RECIPES = BUILTIN_STYLES.slice();
 stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins: BUILTIN_STYLES, toast,
   onChange: () => { RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable())); if (radio) radio.render(); } });
 RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
+// artists from artists/ plus the user's (Artists tab)
+const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));
+artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onChange: () => { if (radio) radio.render(); } });
 // preloads the spoken comments of a song, silently, as playSong does
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
 radio = createRadio({
@@ -1717,6 +1722,7 @@ function renderStatic() {
   opts($('#sc-fade'), [['0', t('cut')], ['1', t('fade1')], ['2', t('fadeN', { n: 2 })], ['4', t('fadeN', { n: 4 })], ['8', t('fadeN', { n: 8 })]]);
   if (radio) radio.render();
   if (stylesTab) stylesTab.render();
+  if (artistsTab) artistsTab.render();
   $('#looks').innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${esc(tx(l))}</button>`).join('');
   $('#play').dataset.state = '';
 }

@@ -578,4 +578,21 @@
 .style-form .pair { display: flex; gap: 6px; }
 .style-form input[type=number] { width: 90px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; color: var(--ink); }
 .lib-json { width: 100%; min-height: 420px; font: 12px/1.5 var(--mono); background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.portrait { width: 56px; height: 56px; image-rendering: pixelated; border-radius: 6px; border: 1px solid var(--line); flex: none; }
+.portrait.big { width: 128px; height: 128px; border-radius: 10px; box-shadow: 0 0 22px color-mix(in srgb, var(--a1) 30%, transparent); }
+.art-card { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.art-card > span { display: grid; gap: 2px; }
+.lib-list.artists { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.char { display: grid; gap: 12px; }
+.char-id { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.char-id h3 { margin: 0 0 4px; font-size: 22px; letter-spacing: .04em; }
+.char-id p { margin: 0; max-width: 60ch; }
+.wrow { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(80px, 1.4fr) auto; align-items: center; gap: 8px; font-size: 12px; }
+.stat { position: relative; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
+.stat-fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--a1); box-shadow: 0 0 8px var(--a1); }
+.mono { font-family: var(--mono); }
+.wgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 10px; }
+.wgrid label { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; }
+.wgrid input[type=number], .lib-sheet input[type=number] { width: 70px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; color: var(--ink); }
+:root[data-ui="hw"] .stat-fill { background: #ffb347; box-shadow: 0 0 6px #ff9a1f; }
 

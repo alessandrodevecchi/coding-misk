@@ -12,6 +12,7 @@ import { loadStyles } from './styles-dir.mjs';
 import { generateSession, createSession } from '../src/endless/director.js';
 import { validateArtist, ARTIST_FIELDS, PALETTES, MOVE_KINDS, VOICE_CHARACTER_NAMES } from '../src/endless/artist.js';
 import { QUIRKS } from '../src/endless/quirks.js';
+import { portraitPixels } from '../src/endless/portrait.js';
 import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { compileSong } from '../src/song/compile.js';
@@ -313,6 +314,14 @@ const CHECKS = {
     const keys = Object.values(prof).map(p => p.styles);
     assert(new Set(keys).size === keys.length, `two artists use the same styles: ${JSON.stringify(prof)}`);
     assert(prof.hype.energy > prof.dreamer.energy + 0.1, `HYPERDROP (${prof.hype.energy.toFixed(2)}) not clearly above Lumen Drift (${prof.dreamer.energy.toFixed(2)})`);
+  },
+  'artists: portraits are the same for a seed and differ between seeds'() {
+    const a = JSON.stringify(portraitPixels('owl-7', 'violet')), b = JSON.stringify(portraitPixels('owl-7', 'violet'));
+    assert(a === b, 'the same seed draws two different faces');
+    const faces = new Set(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(x => JSON.stringify(portraitPixels(x, 'neon'))));
+    assert(faces.size === 8, `${faces.size} different faces out of 8 seeds`);
+    const g = portraitPixels('sym', 'amber');
+    assert(g.length === 16 && g.every(row => row.length === 16 && row.every((c, x) => c === row[15 - x])), 'the face is not 16x16 and symmetric');
   },
   'docs: ARTISTS.md names every artist field'() {
     const doc = fs.readFileSync(new URL('../docs/ARTISTS.md', import.meta.url), 'utf8');

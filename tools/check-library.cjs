@@ -61,6 +61,25 @@ const shots = process.argv[2];
   const imported = await page2.evaluate(id => (JSON.parse(localStorage.getItem('coding-misk-styles') || '[]')).find(x => x.id === id), exported.id);
   check(imported && JSON.stringify(imported) === JSON.stringify(exported), 'export then import gives the same style');
 
+  // Artists tab: cards, character sheet, duplicate and edit, new face
+  await page.click('[data-tab="artisti"]'); await sleep(300);
+  const arts = await page.$$eval('#tab-artisti [data-open]', xs => xs.map(x => x.dataset.open));
+  check(arts.length >= 6 && await page.$$eval('#tab-artisti .art-card img.portrait', xs => xs.every(i => i.naturalWidth > 0)), `the Artists tab shows the artists with portraits (${arts.length})`);
+  await page.click('#tab-artisti [data-open="horizon"]'); await sleep(200);
+  const sheetTxt = await page.innerText('#tab-artisti .lib-sheet');
+  check(/Wake Horizon/.test(sheetTxt) && /Avicii/.test(sheetTxt) && /Progressive house/i.test(sheetTxt), 'the character sheet shows name, inspired by and favourite style');
+  if (shots) await (await page.$('#tab-artisti')).screenshot({ path: path.join(shots, 'artist-sheet.png') });
+  await page.click('#ar-dup'); await sleep(200);
+  const before = await page.getAttribute('#tab-artisti .lib-sheet img.portrait', 'src');
+  await page.click('#ar-face'); await sleep(200);
+  check(await page.getAttribute('#tab-artisti .lib-sheet img.portrait', 'src') !== before, 'new face changes the portrait');
+  await page.fill('#tab-artisti [data-text="name"]', 'Sunrise Test'); await page.press('#tab-artisti [data-text="name"]', 'Tab');
+  await page.fill('#tab-artisti [data-num="quirks.no-guitars"]', '1'); await page.press('#tab-artisti [data-num="quirks.no-guitars"]', 'Tab'); await sleep(200);
+  if (shots) await (await page.$('#tab-artisti')).screenshot({ path: path.join(shots, 'artist-form.png') });
+  await page.click('#ar-save'); await sleep(300);
+  const savedArt = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-artists') || '[]').find(a => a.name === 'Sunrise Test'));
+  check(savedArt && savedArt.quirks && savedArt.quirks['no-guitars'] === 1, 'a duplicated artist is saved with its changes');
+
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `${failed} failed` : 'all passed');

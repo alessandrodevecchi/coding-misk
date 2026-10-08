@@ -148,6 +148,7 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Quirks                                       | `artists: quirks do what they say`                               |
 | Replay with the recorded artist              | `artists: a recorded session replays the same after the artist changes` |
 | Built-in artists                             | `artists: the built-in artists are valid, make valid songs and differ` |
+| Portraits                                    | `artists: portraits are the same for a seed and differ between seeds` |
 | Same seed, same session                      | `determinism: same seed, same session`                           |
 | Seed recorded                                | `determinism: a session without seed records the seed`           |
 | No unintended change                         | `determinism: seed fixtures`                                     |
