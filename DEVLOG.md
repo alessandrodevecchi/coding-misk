@@ -259,11 +259,15 @@
 
 - Scheda Brani: legenda dei colori dei tag sotto i filtri (genere, stile, `#tag libero`, "tocca un tag per filtrare") e tag delle card cliccabili: genere e stile accendono il loro filtro, un tag libero va nella ricerca. Il proprietario temeva che solo i tag colorati fossero filtrabili: ora lo sono tutti. Il proprietario conferma: "ora chiaro, ottima la legenda". `check-songs-tab.cjs` 31 controlli, tutti passano.
 
+- Barra player, tema hardware, segnalato dal proprietario: il display toccava il bordo superiore della barra. Con la timeline aggiunta dopo, display e timeline occupavano 50 dei 52 px; ora nel tema hardware la barra è alta 60 px e il display ha 5 px di margine sopra. `check-player.cjs` passa.
+
+- `#36` Playlist: change OpenSpec `playlists` scritta con le scelte del proprietario (gestione in una scheda Playlist e scelta rapida nella scheda Brani; per ora solo brani, le sessioni radio in una issue successiva; passaggio automatico al brano seguente, casuale, ripeti tutto e ripeti un brano anche fuori dalle playlist; "+ Playlist" sulle card, riordino, rinomina, esporta e importa JSON). I preferiti diventano la prima playlist, fissa.
+
 ## Prossimo passo
 
 Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live coding a mano `#20`); `develop` = `763c59f` con in più barra player e volume `#32` (change `player-bar`, tutti i task fatti tranne la prova del proprietario) e artisti con schede Artisti e Stili `#35` (change `artists-and-styles`, 14/14 task). Il proprietario sta provando a fondo artisti e barra.
 
-- **Subito:** prova del proprietario della scheda Brani (`#34`, ramo `feat/34-song-search`, poi in `develop`); `#37` da ragionare con calma (vedi `notes/pubblicazione-e-diritti.md`).
+- **Subito:** `#36` playlist (change `playlists` pronta, da implementare). Il proprietario prova barra, artisti e scheda Brani nei prossimi giorni (`#34` è in `develop`); `#37` da ragionare con calma (vedi `notes/pubblicazione-e-diritti.md`).
 - **Dopo le prove del proprietario:** nomi definitivi dei sei artisti (ora provvisori: Night Owl, HYPERDROP, Lumen Drift, Jukebox Joe, The Purist, Wake Horizon), verifica e archiviazione di `player-bar`, `artists-and-styles` e `song-search`, rilascio `v0.6.0` su `main` con conferma.
 - **Poi:** `#36` playlist, `#23` transizioni tra brani (con preferenza per artista), `#24` comandi di guida della radio, `#28` visual studio di registrazione, `#29` continua in radio da Componi, `#30` registrazione audio della sessione, `#33` salva il codice a mano come nuova versione, `#31` pagina impostazioni (tema, lingua), `#25`/`#26` agenti e MCP, `#19`, `#3`, `#16`, `#4`-`#8`. Idea per dopo: voce/frasi proprie per artista.
 - **Messa a punto del regista:** con le note brano per brano del proprietario (lavoro lungo, non blocca). Strumento: `node --no-warnings tools/endless-recap.mjs` (riepilogo con spazio per le note).

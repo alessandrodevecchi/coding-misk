@@ -640,3 +640,6 @@ button.tag-chip { background: none; color: inherit; cursor: pointer; font: 11px 
 button.tag-chip.genre { color: var(--a1); }
 button.tag-chip.free { color: var(--muted); }
 button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
+/* hardware theme: the display and the timeline need more room than 52 px, or the display touches the bar's top edge */
+:root[data-ui="hw"] .pbar { height: 60px; }
+:root[data-ui="hw"] .pb-now { padding-block: 3px; }
