@@ -231,6 +231,27 @@ const CHECKS = {
   'director: phrase pool is short and complete'() {
     for (const p of allPhrases()) for (const lang of ['en', 'it']) assert(p[lang] && p[lang].length <= 24, `phrase too long: ${p[lang]}`);
   },
+  'director: voice amount sets how often comments are spoken'() {
+    const said = talk => STARTING.reduce((a, id) => a + session({ styles: [id], minutes: 10, seed: `check-${id}`, ...(talk === undefined ? {} : { talk }) }).session.songs.reduce((b, e) => b + e.phrases.filter(p => p.say).length, 0), 0);
+    assert(said(0) === 0, `talk 0 still speaks ${said(0)} comments`);
+    assert(said(1) > said(0.5), `talk 1 (${said(1)}) does not speak more than 0.5 (${said(0.5)})`);
+    assert(said(0.5) === said(undefined), 'talk 0.5 differs from the default');
+    for (const id of STARTING) for (const e of session({ styles: [id], minutes: 10, seed: `check-${id}`, talk: 1 }).session.songs) {
+      let last = -Infinity; for (const p of e.phrases) if (p.say) { assert(p.bar - last >= 8, `talk 1: comments at bars ${last} and ${p.bar}`); last = p.bar; }
+    }
+  },
+  'director: each song has its own voice'() {
+    const songs = session({ styles: ['berlin-techno'], minutes: 60, seed: 'voices' });
+    const voices = songs.songs.map(s => JSON.stringify(s.tracks.find(t => t.type === 'voice').settings));
+    assert(new Set(voices).size === voices.length, 'two songs of the same style have the same voice');
+    const entries = songs.session.songs;
+    assert(entries.some(e => e.voice.character), 'no song got a voice character');
+    assert(new Set(entries.map(e => e.voice.speaker)).size > 1, 'every song has the same speaker');
+    for (const id of STARTING) for (const sg of session({ styles: [id], minutes: 10, seed: `check-${id}` }).songs) {
+      const v = sg.tracks.find(t => t.type === 'voice').settings;
+      assert(v.pitch >= 0.25 && v.pitch <= 4 && v.tempo >= 0.25 && v.tempo <= 4, `${id}: voice pitch or tempo out of range`);
+    }
+  },
   'determinism: same seed, same session'() {
     const opts = { styles: ['melodic-metal', 'drum-and-bass'], chaos: 0.5, seed: 'aurora' };
     const a = JSON.stringify(generateSession(loadStyles(), opts)), b = JSON.stringify(generateSession(loadStyles(), opts));

@@ -2,7 +2,7 @@ import '@strudel/repl';
 import './style.css';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf, stepKeys } from './song/build.js';
+import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames } from './song/typing.js';
 import { validateSong } from './song/validate.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
@@ -215,8 +215,8 @@ async function play() {
 }
 function pause() {
   if (!isPlaying()) return;
-  // the radio has no pause: the header button stops it
-  if (mode === 'radio') { stop(); return; }
+  // the radio keeps its own pause (session, window and bar)
+  if (mode === 'radio' && radio && radio.on) { radio.pause(); return; }
   paused = { id: song ? song.id : null, cyc: sched().now() };
   ed.stop();
 }
@@ -226,7 +226,7 @@ function resume() {
   paused = null;
   return play();
 }
-const togglePlay = () => isPlaying() ? pause() : paused ? resume() : play();
+const togglePlay = () => isPlaying() ? pause() : radio && radio.paused ? radio.resume() : paused ? resume() : play();
 async function stop() { await ready; paused = null; ed.stop(); if (radio && radio.on) radio.stopped(); }
 
 // ogni modifica alla composizione: brano non salvato, codice ricompilato, rivalutato se sta suonando
@@ -835,7 +835,7 @@ const CONTROLS = {
   riser: [['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['2', '4', '8', '16'].map(n => [n, t('nBars', { n })])],
     ['select', 'dir', 'direction', () => [['up', t('up')], ['down', t('down')]]]],
   code: [['select', 'visual', 'visualOpt', () => VISUALS.map(v => [v, v])]],
-  voice: [['range', 'gain', 'volume'], ['range', 'pitch', 'pitch', { min: .5, max: 2, step: .05, fmt: 'num' }], ['range', 'tempo', 'voiceTempo', { min: .25, max: 2, step: .05, fmt: 'num' }], ['cutoff', 'cutoff', 'filter'],
+  voice: [['select', 'speaker', 'speaker', () => [['', t('speakerDefault')], ...SPEAKERS.map(k => [k, k[0].toUpperCase() + k.slice(1)])]], ['range', 'gain', 'volume'], ['range', 'pitch', 'pitch', { min: .5, max: 2, step: .05, fmt: 'num' }], ['range', 'tempo', 'voiceTempo', { min: .25, max: 2, step: .05, fmt: 'num' }], ['cutoff', 'cutoff', 'filter'],
     ['range', 'hpf', 'lowCut', { max: 2000, step: 10, fmt: 'num' }], ['range', 'drive', 'drive', NUM4], ['range', 'room', 'reverb'], ['range', 'delay', 'delay']],
 };
 // suoni per strumento: quelli scelti a mano, poi tutti gli strumenti General MIDI e i synth caricati
@@ -1499,6 +1499,8 @@ radio = createRadio({
       ed.setCode(codeFor(p, bar)); ed.evaluate();
     },
     stop: () => stop(),
+    // stops the sound and gives the bar it stopped at
+    halt: () => { const s = sched(), cyc = s ? s.now() : 0; ed.stop(); return cyc; },
     now: () => (sched() ? sched().now() : 0),
     saveSong: sg => { user.tracks.push({ ...clone(sg), id: 'u-' + Date.now() }); saveLibrary(); renderSongs(); toast(t('trackSaved')); },
     // the song opens ready to play, not playing

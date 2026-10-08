@@ -80,12 +80,27 @@ export function annotate(code, song, upTo, lang) {
 }
 
 // the voice track a step speaks with: the one named by "voice", otherwise the first voice track (none: default settings)
+// system voices that speak both English and Italian (macOS); '' is the default (Samantha, Alice)
+export const SPEAKERS = ['eddy', 'flo', 'grandma', 'grandpa', 'reed', 'rocko', 'sandy', 'shelley'];
+// sample bank of a speaker: public/samples/say_<lang>[_<speaker>]/
+export const sayBank = (lang, speaker) => (speaker ? `say_${lang}_${speaker}` : `say_${lang}`);
 export const voiceOf = (song, step) => (song.tracks || []).find(t => t.type === 'voice' && (!step || !step.voice || t.id === step.voice)) || null;
 const sampleIndex = (list, text) => list.findIndex(f => decodeURI(f).endsWith(`/${saySlug(text)}.wav`));
 // every spoken comment of a song that has a sample: [{ s, n }], to load them before they play
 export function voiceSamples(song, lang, files) {
-  const bank = `say_${lang}`, list = (files || {})[bank] || [];
-  return [...new Set(buildSteps(song).map(st => sampleIndex(list, sayText(st.say, lang))))].filter(n => n >= 0).map(n => ({ s: bank, n }));
+  const out = new Map();
+  for (const st of buildSteps(song)) {
+    if (!st.say) continue;
+    const { bank, list } = bankFor(voiceOf(song, st), lang, files), n = sampleIndex(list, sayText(st.say, lang));
+    if (n >= 0) out.set(`${bank}:${n}`, { s: bank, n });
+  }
+  return [...out.values()];
+}
+// the speaker's bank when it has samples, else the default voice
+function bankFor(track, lang, files) {
+  const speaker = track && track.settings && track.settings.speaker, own = speaker && (files || {})[sayBank(lang, speaker)];
+  const bank = own ? sayBank(lang, speaker) : sayBank(lang);
+  return { bank, list: (files || {})[bank] || [] };
 }
 // spoken comment of the latest step: a sample of public/samples/say_<lang>/ (tools/voice.mjs), played once on the
 // step's bar with the settings and rack of its voice track (in "state": the song at that bar, so steps can change them).
@@ -93,12 +108,11 @@ export function voiceSamples(song, lang, files) {
 // files: the custom samples manifest ({ say_en: ["say_en/more_bass.wav", …] }); no file, no voice
 export function voiceCode(song, state, upTo, total, lang, files) {
   const step = buildSteps(song)[upTo - 1], text = step && sayText(step.say, lang);
-  const bank = `say_${lang}`, list = (files || {})[bank];
-  if (!text || !list) return '';
-  const n = sampleIndex(list, text);
-  if (n < 0) return '';
+  if (!text) return '';
   const track = voiceOf(state, step);
   if (track && track.mute) return '';
+  const { bank, list } = bankFor(track, lang, files), n = sampleIndex(list, text);
+  if (n < 0) return '';
   const v = { ...VOICE_DEFAULT, ...((track && track.settings) || {}) }, at = step.at, rest = total - at - 1;
   const lane = `<${at > 0 ? `0!${at} ` : ''}1${rest > 0 ? ` 0!${rest}` : ''}>`;
   // speed changes length and pitch together; the phase vocoder (stretch) then moves the pitch alone to where it should be

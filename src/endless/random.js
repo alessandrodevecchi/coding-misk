@@ -62,8 +62,8 @@ export function stream(seed, name = '') {
   return r;
 }
 
-// All named streams of one seed: rng.plan, rng.moves, rng.mutation, rng.titles, rng.comments.
-export const STREAMS = ['plan', 'moves', 'mutation', 'titles', 'comments'];
+// All named streams of one seed: rng.plan, rng.moves, rng.mutation, rng.titles, rng.comments, rng.voice.
+export const STREAMS = ['plan', 'moves', 'mutation', 'titles', 'comments', 'voice'];
 export function makeRng(seed) {
   const out = { seed: String(seed) };
   for (const name of STREAMS) out[name] = stream(out.seed, name);

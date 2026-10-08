@@ -33,3 +33,11 @@
 - [x] 5.1 Run the radio for at least 30 minutes with three styles and chaos 1, with the check script measuring levels and errors at every song change; verify no evaluation or page error and levels in the usual range.
 - [x] 5.2 Run `npm run check:code`, `npm run check:songs`, `npm run check:endless`, `npm run build` and the level check of the built-in songs; verify all pass before merging into `develop`.
 - [ ] 5.3 Hand the radio to the owner to try, and record the feedback in `DEVLOG.md` and issue #22.
+
+## 6. Owner feedback (first listen)
+
+- [x] 6.1 Add pause and resume to the radio: resume plays from the exact bar where it paused, with the same song and window; verify in `tools/check-radio.cjs` that the bar after resume equals the bar at pause and the song on air is the same.
+- [x] 6.2 Add tooltips to every radio control (styles, chaos, energy, complexity, voice, seed, replay, skip, pause, save, open in Compose), in Italian and English; verify in the browser that each control has one.
+- [x] 6.3 Add the voice amount (0 never speaks, 1 speaks on most changes, default 0.5 as today) as a director option `talk`, a radio control applying from the next song and recorded in the recipe, and `--talk` on the command line; verify in `check:endless` that talk 0 gives no comments, talk 1 more comments than 0.5, the 8-bar spacing holds, and the seed fixtures are unchanged at 0.5.
+- [x] 6.4 Give each style its own speaker (a system voice that speaks English and Italian) with clearer effect differences: recipe field `voice.speaker`, voice track setting `speaker`, one sample bank per speaker made by `npm run voices`; verify that every recipe speaker is valid in `check:endless`, that `npm run voices` makes the samples for every speaker, and in the browser that two styles with different speakers play different sample banks.
+- [x] 6.5 Give every song its own voice: recipe voice values as ranges and a list of speakers, drawn per song, with now and then another speaker or a voice character (radio, robot, deep, bright, cathedral, echo, dirty, slow), more often with chaos, from a separate random stream so the music of a seed does not change; verify in `check:endless` that songs of one style have different voices and that the music without the voice track is unchanged.

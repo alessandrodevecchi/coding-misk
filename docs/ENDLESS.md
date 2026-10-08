@@ -84,6 +84,7 @@ npm run endless -- --styles lo-fi --out /tmp/lofi --quiet
 | `--chaos`      | 0 to 1: how much parts mix between styles                 | 0.3             |
 | `--energy`     | 0 to 1: moves every energy target                         | 0.6             |
 | `--complexity` | 0 to 1: tracks and mutation                               | 0.5             |
+| `--talk`       | 0 to 1: how often the voice comments                      | 0.5             |
 | `--minutes`    | Total length; songs are added until it is reached         | 15              |
 | `--seed`       | Any text; without it, a new seed is printed               | new             |
 | `--out`        | Output folder                                             | `songs/endless` |
@@ -99,7 +100,16 @@ An unknown style or a value out of range stops the command with the valid choice
 - Usually 4 to 5 tracks (fewer for sparse styles such as ambient and lo-fi). Complexity moves the usual count by up to one track. Never more than 8 tracks or the style's maximum, unless complexity is above 0.8.
 - Material starts from recipe presets. Variations come from mutation, whose amount grows with complexity; at complexity 0 there is none and variations are other presets. Bass and arp notes stay chord tones, hook notes stay scale degrees.
 - Consecutive songs never share the key or the shape, and a song never repeats the style-per-part combination of the three songs before it, unless the options leave no other choice.
-- Comments: always on the start, breaks, drops and the song end, on about half of the other boundaries with moves, never closer than 8 bars.
+- Comments: always on the start, breaks, drops and the song end, on about half of the other boundaries with moves (option `talk`, 0 to 1, default 0.5: 0 never speaks, 1 speaks on almost every boundary), never closer than 8 bars.
+
+## Voice
+
+Each song has its own voice. The style that gives the voice part sets the base: a list of speakers and a range for each effect (pitch, tempo, filters, drive, reverb, delay). The song draws a speaker from the list and a value from each range. Then, now and then, it goes further:
+
+- another speaker, any of the nine (chance 0.15, up to 0.45 with chaos 1);
+- a character on top of the base (chance 0.3, up to 0.6 with chaos 1): `radio`, `robot`, `deep`, `bright`, `cathedral`, `echo`, `dirty` or `slow`, each overriding a few settings.
+
+The draws use their own random stream (`voice`), so they never change the music of a seed. The session report and the recap show the speaker and the character of each song.
 
 ## Comments
 
@@ -131,6 +141,8 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Variety between songs                        | `director: variety between songs`                                |
 | Comment rate and spacing                     | `director: comments about half of the boundaries, 8 bars apart`  |
 | Short phrases                                | `director: phrase pool is short and complete`                    |
+| Voice amount                                 | `director: voice amount sets how often comments are spoken`      |
+| A voice per song                             | `director: each song has its own voice`                          |
 | Same seed, same session                      | `determinism: same seed, same session`                           |
 | Seed recorded                                | `determinism: a session without seed records the seed`           |
 | No unintended change                         | `determinism: seed fixtures`                                     |

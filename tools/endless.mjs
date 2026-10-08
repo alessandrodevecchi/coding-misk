@@ -1,5 +1,5 @@
 // Endless sessions from the command line (docs/ENDLESS.md).
-//   node tools/endless.mjs --styles berlin-techno[,jazz…] [--chaos 0.3] [--energy 0.6] [--complexity 0.5]
+//   node tools/endless.mjs --styles berlin-techno[,jazz…] [--chaos 0.3] [--energy 0.6] [--complexity 0.5] [--talk 0.5]
 //                          [--minutes 15] [--seed text] [--out songs/endless] [--join] [--quiet]
 // Writes one song file per song and session.json in --out, prints the seed and a report.
 // --join also writes one song with the whole session in order, to play in Compose as a single live build.
@@ -15,10 +15,10 @@ import { validateSong } from '../src/song/validate.js';
 const args = process.argv.slice(2);
 const fail = msg => { console.error(`error: ${msg}`); process.exit(1); };
 const opt = name => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : undefined; };
-const KNOWN = ['styles', 'chaos', 'energy', 'complexity', 'minutes', 'seed', 'out', 'join', 'quiet', 'help'];
+const KNOWN = ['styles', 'chaos', 'energy', 'complexity', 'talk', 'minutes', 'seed', 'out', 'join', 'quiet', 'help'];
 for (const a of args) if (a.startsWith('--') && !KNOWN.includes(a.slice(2))) fail(`unknown option ${a}; options: ${KNOWN.map(k => `--${k}`).join(' ')}`);
 if (args.includes('--help') || !args.length) {
-  console.log('usage: node tools/endless.mjs --styles id[,id…] [--chaos 0-1] [--energy 0-1] [--complexity 0-1] [--minutes n] [--seed text] [--out dir] [--join] [--quiet]');
+  console.log('usage: node tools/endless.mjs --styles id[,id…] [--chaos 0-1] [--energy 0-1] [--complexity 0-1] [--talk 0-1] [--minutes n] [--seed text] [--out dir] [--join] [--quiet]');
   process.exit(args.length ? 0 : 1);
 }
 
@@ -39,7 +39,7 @@ const amount = name => {
   if (!Number.isFinite(n) || n < 0 || n > 1) fail(`--${name} must be a number from 0 to 1 (got ${v})`);
   return n;
 };
-const options = { styles, chaos: amount('chaos'), energy: amount('energy'), complexity: amount('complexity'), minutes: OPTION_DEFAULTS.minutes };
+const options = { styles, chaos: amount('chaos'), energy: amount('energy'), complexity: amount('complexity'), talk: amount('talk'), minutes: OPTION_DEFAULTS.minutes };
 if (opt('minutes') !== undefined) {
   const m = Number(opt('minutes'));
   if (!Number.isFinite(m) || m < 2 || m > 600) fail(`--minutes must be a number from 2 to 600 (got ${opt('minutes')})`);
@@ -71,7 +71,8 @@ console.log(`seed: ${session.seed}`);
 console.log(`styles: ${styles.join(', ')} · chaos ${options.chaos} · energy ${options.energy} · complexity ${options.complexity} · ${session.songs.length} songs · ${mmss(session.seconds)}`);
 session.songs.forEach((e, i) => {
   const parts = Object.entries(e.parts).filter(([k]) => k !== 'dominant').map(([k, v]) => `${k}=${v}`).join(' ');
-  console.log(`\n#${i + 1} "${e.title}" · ${mmss(e.seconds)} · ${e.bpm} BPM · ${e.key} ${e.meter} · ${e.shape} · ${e.tracks} tracks · ${parts}`);
+  const voice = `voice ${e.voice.speaker || 'default'}${e.voice.character ? ` (${e.voice.character})` : ''}`;
+  console.log(`\n#${i + 1} "${e.title}" · ${mmss(e.seconds)} · ${e.bpm} BPM · ${e.key} ${e.meter} · ${e.shape} · ${e.tracks} tracks · ${voice} · ${parts}`);
   if (args.includes('--quiet')) return;
   for (const p of e.phrases) console.log(`  bar ${String(p.bar + 1).padStart(3)}  ${p.role.padEnd(7)} target ${p.target.toFixed(2)}  energy ${p.energy.toFixed(2)}  ${p.moves.join(', ') || '-'}${p.say ? `  "${p.say}"` : ''}`);
 });

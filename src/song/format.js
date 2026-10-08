@@ -22,7 +22,8 @@ export const PATTERN_FIELDS = {
 export const TYPES = Object.keys(PATTERN_FIELDS);
 // a voice track speaks the comments of a live build: these are its settings
 // pitch and tempo are independent: tempo 0.5 lasts twice as long at the same pitch, pitch 2 is an octave up at the same length
-export const VOICE_DEFAULT = { gain: 0.6, pitch: 1, tempo: 1, cutoff: 18000, hpf: 0, drive: 0, room: 0.2, delay: 0 };
+// speaker: '' is the default system voice, or one of SPEAKERS (song/build.js): samples in say_<lang>_<speaker>/
+export const VOICE_DEFAULT = { gain: 0.6, pitch: 1, tempo: 1, cutoff: 18000, hpf: 0, drive: 0, room: 0.2, delay: 0, speaker: '' };
 const STATE_KEY = { guitar: { preset: 'pattern' } };
 const stateKey = (type, k) => (STATE_KEY[type] && STATE_KEY[type][k]) || k;
 const skip = new Set(['on', 'rows']);

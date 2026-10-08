@@ -52,7 +52,7 @@ for (const file of sessions.sort()) {
     md.push(`- ${L.sections}: ${song.sections.map(s => `${s.name} ${s.bars}`).join(' · ')}`);
     md.push(`- ${L.target} ${avg(e.phrases.map(p => p.target)).toFixed(2)}, ${L.measured} ${avg(e.phrases.map(p => p.energy)).toFixed(2)}, ${L.peak} ${Math.max(...e.phrases.map(p => p.energy)).toFixed(2)}`);
     md.push(`- ${L.moves}: ${Object.entries(kinds).map(([k, n]) => `${k} ${n}`).join(', ')} · ${said} ${L.comments}`);
-    if (voice) { const v = voice.settings; md.push(`- ${L.voice}: pitch ${v.pitch}, tempo ${v.tempo}, drive ${v.drive}, room ${v.room}, delay ${v.delay}`); }
+    if (voice) { const v = voice.settings, c = e.voice && e.voice.character; md.push(`- ${L.voice}: ${v.speaker || 'default'}${c ? ` (${c})` : ''} · pitch ${v.pitch}, tempo ${v.tempo}, drive ${v.drive}, room ${v.room}, delay ${v.delay}, hpf ${v.hpf}, cutoff ${v.cutoff}`); }
     md.push('', `${L.tracks}:`, '', ...song.tracks.filter(t => t.type !== 'voice').map(trackLine), '', `${L.notes}:`, '', '- ', '');
   });
 }

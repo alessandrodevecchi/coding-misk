@@ -3,7 +3,7 @@
 import { KEYS, PROGS, METERS, meterSteps, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEX_RHYTHMS, KITS, MODES, ROWS, LOOKS, WAVES } from '../music.js';
 import { FORMAT, VERSION, TYPES, PATTERN_FIELDS, SETTING_FIELDS, VISUALS } from './format.js';
 import { checkRack } from './rack.js';
-import { checkBuild, buildMap } from './build.js';
+import { checkBuild, buildMap, SPEAKERS } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
 export const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
@@ -126,6 +126,7 @@ function checkSettings(type, set, p, err, warn) {
     if (k === 'wave' && typeof v === 'string' && !v.split(',').every(w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w))) warn(`${p}.wave`, 'unknown sound; see the Sounds tab (General MIDI instruments start with gm_)');
     if (k === 'type' && type === 'guitar' && !GUITAR_TYPES[v]) err(`${p}.type`, `one of ${Object.keys(GUITAR_TYPES).join(', ')}`);
     if (k === 'mode' && !MODES.some(([m]) => m === v)) err(`${p}.mode`, `one of ${MODES.map(([m]) => m).join(', ')}`);
+    if (k === 'speaker' && v !== '' && !SPEAKERS.includes(v)) warn(`${p}.speaker`, `unknown speaker; speakers: ${SPEAKERS.join(', ')} (or "" for the default voice)`);
     if (k === 'visual' && !VISUALS.includes(v)) warn(`${p}.visual`, `the visuals know: ${VISUALS.join(', ')}`);
   }
 }

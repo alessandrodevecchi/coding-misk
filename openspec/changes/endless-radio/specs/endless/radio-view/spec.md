@@ -18,7 +18,7 @@ The app SHALL have a Radio tab next to Compose and Songs, in Italian and English
 - **THEN** the stage shows that visual and its instruments react to the radio
 
 ### Requirement: Radio controls
-The radio SHALL offer: start and stop, skip song, a multi-select of the starting styles (at least one selected), chaos, energy and complexity from 0 to 1, the seed with a "replay" action, "save" and "open in Compose". The defaults SHALL be those of the director (chaos 0.3, energy 0.6, complexity 0.5) with one style selected. Changes to styles, chaos, energy and complexity SHALL apply from the next song generated, never to the song on air. The controls SHALL be remembered in the browser between visits.
+The radio SHALL offer: start and stop, pause and resume, skip song, a multi-select of the starting styles (at least one selected), chaos, energy, complexity and voice amount from 0 to 1, the seed with a "replay" action, "save" and "open in Compose". The defaults SHALL be those of the director (chaos 0.3, energy 0.6, complexity 0.5) with one style selected. Every control SHALL have a short tooltip that explains it. Changes to styles, chaos, energy, complexity and voice amount SHALL apply from the next song generated, never to the song on air. The controls SHALL be remembered in the browser between visits.
 
 #### Scenario: Start
 - **WHEN** the user selects synthwave and presses start
@@ -53,3 +53,11 @@ The radio SHALL show the code of the song on air as it types itself, as the live
 #### Scenario: Collapse the code
 - **WHEN** the user collapses the code panel
 - **THEN** the music keeps playing and the panel stays collapsed on the next visit
+
+### Requirement: Pause
+Pause SHALL stop the sound and keep the position; resume SHALL go on from the same bar of the same song, with the same next song.
+
+#### Scenario: Resume where it paused
+- **WHEN** the user pauses at bar 37 of a song and resumes later
+- **THEN** the song goes on from bar 37 and the song after it is the one prepared before the pause
+

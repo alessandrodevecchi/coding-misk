@@ -3,7 +3,7 @@
 // Pure and deterministic: no Node or browser APIs, no Math.random (randomness comes from random.js).
 import { BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, TEX_RHYTHMS, GROOVES, ROWS, DEFAULT, fitSteps, meterSteps } from '../music.js';
 import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT } from '../song/format.js';
-import { stateAt } from '../song/build.js';
+import { stateAt, SPEAKERS } from '../song/build.js';
 import { makeRng, freshSeed } from './random.js';
 import { withDefaults, PART_NAMES } from './recipe.js';
 import { mixParts, partRecipe, partsKey, stylesOf } from './mix.js';
@@ -13,7 +13,8 @@ import { mutateRows, mutateBass, mutateArp, mutateHook } from './mutate.js';
 import { phrase as pickPhrase } from './phrases.js';
 
 export const SESSION_FORMAT = 'coding-misk/endless-session';
-export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, minutes: 15 };
+// talk: how often the voice speaks (0 never, 0.5 about half of the boundaries with moves, 1 almost all)
+export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15 };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const round = x => (Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100);
 const cap = s => s[0].toUpperCase() + s.slice(1);
@@ -120,7 +121,37 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
   const tracks = candidateTracks(R, meter, opts.complexity, P, rng.mutation);
   const usual = R.tracks.usual, hardMax = opts.complexity > 0.8 ? Math.max(R.tracks.max, 8) + 2 : Math.min(R.tracks.max, 8);
   const usualHigh = clamp(usual[1] + Math.round((opts.complexity - 0.5) * 2), usual[0], hardMax);
-  return { index, parts, R, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax };
+  const voice = voiceFor(R, opts, rng.voice);
+  return { index, parts, R, voice, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax };
+}
+
+// ---------- voice ----------
+
+// Characters that take a song's voice away from its style's base, now and then (docs/ENDLESS.md "Voice").
+// Each one overrides a few settings; the rest stays as drawn from the recipe.
+export const VOICE_CHARACTERS = {
+  radio: { cutoff: 3200, hpf: 900, drive: 1.2, room: 0.15 },
+  robot: { pitch: 0.7, drive: 3.5, hpf: 400, delay: 0.1 },
+  deep: { pitch: 0.55, tempo: 0.75, cutoff: 6000, room: 0.4 },
+  bright: { pitch: 1.35, tempo: 1, hpf: 500, room: 0.35 },
+  cathedral: { room: 0.95, delay: 0.25, tempo: 0.7, cutoff: 9000 },
+  echo: { delay: 0.6, room: 0.5 },
+  dirty: { drive: 4.5, hpf: 700, pitch: 0.8 },
+  slow: { tempo: 0.55, pitch: 0.85, room: 0.6 },
+};
+// The voice of one song: the style's base (ranges drawn, a speaker among the style's), sometimes another
+// speaker, sometimes a character on top. More chaos, more variety.
+export function voiceFor(R, opts, rng) {
+  const base = { ...VOICE_DEFAULT }, v = R.voice || {};
+  for (const [k, x] of Object.entries(v)) {
+    if (k === 'speaker' || k === 'speakers') continue;
+    base[k] = Array.isArray(x) ? round(rng.range(x[0], x[1])) : x;
+  }
+  const own = Array.isArray(v.speakers) && v.speakers.length ? v.speakers : [v.speaker ?? ''];
+  base.speaker = rng.chance(0.15 + 0.3 * opts.chaos) ? rng.pick(['', ...SPEAKERS]) : rng.pick(own);
+  let character = null;
+  if (rng.chance(0.3 + 0.3 * opts.chaos)) { character = rng.pick(Object.keys(VOICE_CHARACTERS)); Object.assign(base, VOICE_CHARACTERS[character]); }
+  return { settings: base, character };
 }
 
 // ---------- moves ----------
@@ -171,7 +202,7 @@ const measure = (song, bar, ctx) => energyOf(stateAt(song, bar).song, ctx);
 export function directSong(plan, opts, rng, comments) {
   const { phrase, bars, R } = plan;
   const ctx = { usual: plan.usualHigh, weights: R.energy, hardMax: plan.hardMax };
-  const voice = { id: 'voice', name: 'Voice', type: 'voice', settings: { ...VOICE_DEFAULT, ...R.voice }, patterns: {}, clips: [] };
+  const voice = { id: 'voice', name: 'Voice', type: 'voice', settings: plan.voice.settings, patterns: {}, clips: [] };
   const base = { tracks: [...plan.tracks.map(t => ({ ...t, mute: true, clips: [{ start: 0, bars, pattern: 'A' }] })), voice] };
   const steps = [], phrases = [], moved = new Map(); // track id → boundary index of its last move
   const M = rng.moves;
@@ -247,9 +278,10 @@ export function directSong(plan, opts, rng, comments) {
     const main = chosen.find(c => !c.quiet) || chosen[0];
     const isEnd = k === boundaries - 2;
     let said = null;
-    if (main && at - lastSay >= 8) {
+    const talk = opts.talk ?? OPTION_DEFAULTS.talk;
+    if (main && talk > 0 && at - lastSay >= 8) {
       const kind = isEnd ? 'song-end' : main.kind;
-      if (k === 0 || isEnd || ['break', 'drop'].includes(kind) || comments.chance(0.55)) said = say(kind, at);
+      if (k === 0 || isEnd || ['break', 'drop'].includes(kind) || comments.chance(Math.min(1, 1.1 * talk))) said = say(kind, at);
     }
     if (said) { const first = steps.find(s => s.at === at); first.say = said; }
     phrases.push({ bar: at, role, target: round(target), moves: chosen.map(c => `${c.kind} ${(c.tracks || [c.track]).join('+')}`), say: said ? said.en : null });
@@ -280,7 +312,7 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   };
   // measured energy of the final song at each phrase
   for (const p of phrases) p.energy = round(measure(song, p.bar, ctx));
-  const entry = { id: song.id, title, parts, styles, bars: plan.bars, seconds: Math.round(plan.seconds), bpm: plan.bpm, key: plan.key, meter: plan.meter, shape: plan.shape, phrase: plan.phrase, tracks: tracks.filter(t => t.type !== 'voice').length, usualHigh: plan.usualHigh, hardMax: plan.hardMax, phrases };
+  const entry = { id: song.id, title, parts, styles, bars: plan.bars, seconds: Math.round(plan.seconds), bpm: plan.bpm, key: plan.key, meter: plan.meter, shape: plan.shape, phrase: plan.phrase, tracks: tracks.filter(t => t.type !== 'voice').length, voice: { speaker: plan.voice.settings.speaker, character: plan.voice.character }, usualHigh: plan.usualHigh, hardMax: plan.hardMax, phrases };
   return { song, entry };
 }
 
@@ -322,7 +354,7 @@ export function generateSession(recipes, options) {
     const { song, entry } = ses.next(opts);
     songs.push(song); seconds += entry.seconds;
   }
-  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, minutes: opts.minutes }, seconds: Math.round(seconds), songs: ses.entries };
+  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes }, seconds: Math.round(seconds), songs: ses.entries };
   return { session, songs };
 }
 

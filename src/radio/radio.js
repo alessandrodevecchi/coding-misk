@@ -29,6 +29,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const opts = {
     styles: (saved.styles || []).filter(id => ids.includes(id)),
     chaos: saved.chaos ?? OPTION_DEFAULTS.chaos, energy: saved.energy ?? OPTION_DEFAULTS.energy, complexity: saved.complexity ?? OPTION_DEFAULTS.complexity,
+    talk: saved.talk ?? OPTION_DEFAULTS.talk,
   };
   if (!opts.styles.length) opts.styles = [ids.includes('synthwave') ? 'synthwave' : ids[0]];
   let history = store.get('coding-misk-radio-history', []);
@@ -37,7 +38,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // the session on air: stream of songs with their start bar; onAir = index in the stream
   let S = null;
   const saveOpts = () => store.set('coding-misk-radio', opts);
-  const current = () => ({ styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity });
+  const current = () => ({ styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk });
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   // ---------- stream ----------
@@ -73,6 +74,14 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   function stopQuiet() { if (S) { S = null; } }
   function stop() { if (!S) return; S = null; player.stop(); render(); }
+  // pause keeps the session, the window and the bar; resume plays on from that bar
+  function pause() { if (!S || S.paused !== undefined) return; S.paused = player.halt(); render(); }
+  function resume() {
+    if (!S || S.paused === undefined) return;
+    const bar = S.paused; delete S.paused;
+    player.start(windowPlayable(), bar);
+    render();
+  }
   // the next song is generated once the song on air has played 40 % of its length: control changes made
   // before then still reach it, and it is ready long before it is needed
   function prepareNext(cyc) {
@@ -84,7 +93,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   // called by the player every frame while the radio plays
   function tick(cyc) {
-    if (!S) return;
+    if (!S || S.paused !== undefined) return;
     prepareNext(cyc);
     const cur = S.stream[S.onAir];
     if (cyc >= cur.start + cur.bars) {
@@ -97,7 +106,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   // skip: the song on air ends with this bar, the next one starts on the next bar
   function skip() {
-    if (!S) return;
+    if (!S || S.paused !== undefined) return;
     const cyc = player.now(), cur = S.stream[S.onAir], cut = Math.floor(cyc) + 1;
     if (S.stream.length <= S.onAir + 1) generate();
     cur.bars = Math.max(1, cut - cur.start);
@@ -157,27 +166,29 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
 
   function render() {
     const on = !!S;
-    const slider = (k, label) => `<div class="ctrl"><div class="row"><label class="lbl" for="radio-${k}">${esc(t(label))}</label><output>${fmt(opts[k])}</output></div><input id="radio-${k}" type="range" min="0" max="1" step="0.05" value="${opts[k]}" data-opt="${k}"></div>`;
+    const paused = on && S.paused !== undefined, tip = k => `title="${esc(t(k))}"`;
+    const slider = (k, label, help) => `<div class="ctrl" ${tip(help)}><div class="row"><label class="lbl" for="radio-${k}">${esc(t(label))}</label><output>${fmt(opts[k])}</output></div><input id="radio-${k}" type="range" min="0" max="1" step="0.05" value="${opts[k]}" data-opt="${k}" ${tip(help)}></div>`;
     root.innerHTML = `<p class="intro">${esc(t('introRadio'))}</p>
     <div class="radio-grid">
       <div class="card radio-ctrls">
         <div class="radio-onair">
-          <button class="btn primary radio-start" id="radio-start" aria-pressed="${on}">${on ? '■ ' + esc(t('radioStop')) : '▶ ' + esc(t('radioStart'))}</button>
-          <button class="btn" id="radio-skip" ${on ? '' : 'disabled'}>⏭ ${esc(t('radioSkip'))}</button>
-          <span class="onair ${on ? 'on' : ''}">${esc(t('radioOnAir'))}</span>
+          <button class="btn primary radio-start" id="radio-start" aria-pressed="${on}" ${tip(on ? 'tipStop' : 'tipStart')}>${on ? '■ ' + esc(t('radioStop')) : '▶ ' + esc(t('radioStart'))}</button>
+          <button class="btn" id="radio-pause" ${on ? '' : 'disabled'} ${tip(paused ? 'tipResume' : 'tipPause')}>${paused ? '▶ ' + esc(t('radioResume')) : '❚❚ ' + esc(t('radioPause'))}</button>
+          <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
+          <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
         </div>
-        <div class="ctrl"><span class="lbl">${esc(t('radioStyles'))}</span>
-          <div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${opts.styles.includes(r.id)}" title="${esc(r.description || '')}">${esc(tx(r.name))}</button>`).join('')}</div>
+        <div class="ctrl" ${tip('tipStyles')}><span class="lbl">${esc(t('radioStyles'))}</span>
+          <div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${opts.styles.includes(r.id)}" title="${esc(r.description || t('tipStyles'))}">${esc(tx(r.name))}</button>`).join('')}</div>
         </div>
-        <div class="ctrls three">${slider('chaos', 'radioChaos')}${slider('energy', 'radioEnergy')}${slider('complexity', 'radioComplexity')}</div>
+        <div class="ctrls four">${slider('chaos', 'radioChaos', 'tipChaos')}${slider('energy', 'radioEnergy', 'tipEnergy')}${slider('complexity', 'radioComplexity', 'tipComplexity')}${slider('talk', 'radioTalk', 'tipTalk')}</div>
         <p class="hint muted">${esc(t('radioNextHint'))}</p>
         <div class="radio-seed">
-          <div class="ctrl grow"><label class="lbl" for="radio-seed">${esc(t('radioSeed'))}</label><input id="radio-seed" type="text" maxlength="40" autocomplete="off" placeholder="${esc(t('radioSeedAuto'))}" value="${esc(on ? S.recipe.seed : seedField)}" ${on ? 'readonly' : ''}></div>
-          <button class="btn" id="radio-replay" ${on || history.length ? '' : 'disabled'}>↺ ${esc(t('radioReplay'))}</button>
+          <div class="ctrl grow" ${tip('tipSeed')}><label class="lbl" for="radio-seed">${esc(t('radioSeed'))}</label><input id="radio-seed" type="text" maxlength="40" autocomplete="off" placeholder="${esc(t('radioSeedAuto'))}" value="${esc(on ? S.recipe.seed : seedField)}" ${on ? 'readonly' : ''}></div>
+          <button class="btn" id="radio-replay" ${on || history.length ? '' : 'disabled'} ${tip('tipReplay')}>↺ ${esc(t('radioReplay'))}</button>
         </div>
         <div class="actions">
-          <button class="btn" id="radio-save" ${on ? '' : 'disabled'}>${esc(t('radioSave'))}</button>
-          <button class="btn" id="radio-open" ${on ? '' : 'disabled'}>${esc(t('radioOpen'))}</button>
+          <button class="btn" id="radio-save" ${on ? '' : 'disabled'} ${tip('tipSave')}>${esc(t('radioSave'))}</button>
+          <button class="btn" id="radio-open" ${on ? '' : 'disabled'} ${tip('tipOpen')}>${esc(t('radioOpen'))}</button>
         </div>
       </div>
       <div class="card radio-now" id="radio-now" aria-live="polite"></div>
@@ -185,7 +196,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     <div class="card radio-history">
       <div class="lbl">${esc(t('radioHistory'))}</div>
       ${history.length ? `<ol class="radio-hist">${history.map((h, i) => `<li><span class="when">${esc(new Date(h.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span> <strong>${esc(h.title)}</strong> <span class="muted">${esc(h.styles.map(styleName).join(' + '))} · ${esc(t('radioSeed'))} ${esc(h.seed)}</span>
-        <span class="hist-actions"><button class="btn small" data-hist-save="${i}">${esc(t('radioSave'))}</button><button class="btn small" data-hist-open="${i}">${esc(t('radioOpen'))}</button></span></li>`).join('')}</ol>` : `<p class="muted">${esc(t('radioNoHistory'))}</p>`}
+        <span class="hist-actions"><button class="btn small" data-hist-save="${i}" ${tip('tipSave')}>${esc(t('radioSave'))}</button><button class="btn small" data-hist-open="${i}" ${tip('tipOpen')}>${esc(t('radioOpen'))}</button></span></li>`).join('')}</ol>` : `<p class="muted">${esc(t('radioNoHistory'))}</p>`}
     </div>`;
     renderNow();
   }
@@ -194,6 +205,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const b = e.target.closest('button'); if (!b) return;
     if (b.id === 'radio-start') return S ? stop() : start();
     if (b.id === 'radio-skip') return skip();
+    if (b.id === 'radio-pause') return S && S.paused !== undefined ? resume() : pause();
     if (b.id === 'radio-replay') {
       // replay the session on air from its first song, or the session of the latest song heard
       const recipe = S ? clone(S.recipe) : history[0] && history[0].recipe && clone(history[0].recipe);
@@ -219,11 +231,12 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   });
 
   return {
-    render, tick, stop, start, skip,
+    render, tick, stop, start, skip, pause, resume,
+    get paused() { return !!S && S.paused !== undefined; },
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },
     get on() { return !!S; },
-    get state() { return S && { seed: S.recipe.seed, recipe: clone(S.recipe), onAir: S.onAir, stream: S.stream.map(x => ({ n: x.n, start: x.start, bars: x.bars, title: x.song.title, id: x.song.id })) }; },
+    get state() { return S && { paused: S.paused, seed: S.recipe.seed, recipe: clone(S.recipe), onAir: S.onAir, stream: S.stream.map(x => ({ n: x.n, start: x.start, bars: x.bars, title: x.song.title, id: x.song.id })) }; },
     get history() { return history; },
     get options() { return current(); },
   };

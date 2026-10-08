@@ -99,13 +99,35 @@
     "weight": 0.5
   },
   "voice": {
+    "speakers": [
+      "grandpa",
+      "rocko"
+    ],
     "gain": 0.32,
-    "pitch": 0.7,
-    "tempo": 0.8,
-    "hpf": 800,
-    "drive": 2.5,
-    "room": 0.35,
-    "delay": 0.25
+    "pitch": [
+      0.5,
+      0.7
+    ],
+    "tempo": [
+      0.65,
+      0.85
+    ],
+    "hpf": [
+      600,
+      1200
+    ],
+    "drive": [
+      2,
+      4
+    ],
+    "room": [
+      0.25,
+      0.45
+    ],
+    "delay": [
+      0.2,
+      0.4
+    ]
   },
   "words": {
     "en": [

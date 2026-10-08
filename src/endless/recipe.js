@@ -4,6 +4,7 @@
 import { KEYS, PROGS, METERS, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEXTURES, TEX_RHYTHMS, GROOVES, MODES, WAVES } from '../music.js';
 import { SETTING_FIELDS, VOICE_DEFAULT } from '../song/format.js';
 import { SYNTHS } from '../song/validate.js';
+import { SPEAKERS } from '../song/build.js';
 import { MACHINES } from '../sounds/machines.js';
 
 // The seven energy shapes (docs/ENDLESS.md); their curves live in shapes.js.
@@ -127,11 +128,14 @@ export function validateRecipe(r) {
     }
   }
   if (r.voice !== undefined) {
-    const v = r.voice, keys = Object.keys(VOICE_DEFAULT);
+    const v = r.voice, keys = [...Object.keys(VOICE_DEFAULT), 'speakers'];
     if (!v || typeof v !== 'object' || Array.isArray(v)) err('voice', `voice track settings: ${keys.join(', ')}`);
     else for (const [k, x] of Object.entries(v)) {
       if (!keys.includes(k)) { warn(`voice.${k}`, `unknown voice setting; settings: ${keys.join(', ')}`); continue; }
-      if (!isNum(x)) err(`voice.${k}`, 'a number');
+      if (k === 'speakers') { if (!Array.isArray(x) || !x.length || x.some(y => y !== '' && !SPEAKERS.includes(y))) err('voice.speakers', `a list of speakers: ${SPEAKERS.join(', ')}, or "" for the default voice`); continue; }
+      if (k === 'speaker') { if (x !== '' && !SPEAKERS.includes(x)) err('voice.speaker', `a speaker: ${SPEAKERS.join(', ')}, or "" for the default voice`); continue; }
+      if (Array.isArray(x)) { range(`voice.${k}`, x, k === 'pitch' || k === 'tempo' ? 0.25 : 0, k === 'pitch' || k === 'tempo' ? 4 : 20000); continue; }
+      if (!isNum(x)) err(`voice.${k}`, 'a number or a range [low, high]');
       else if ((k === 'pitch' || k === 'tempo') && (x < 0.25 || x > 4)) err(`voice.${k}`, 'a number from 0.25 to 4');
     }
   }

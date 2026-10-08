@@ -33,7 +33,7 @@ One recipe per file, `styles/<id>.json`. Required fields are marked.
 | `phrase`       | Phrase length in bars: 4, 8 or 16. Moves happen on phrase boundaries.                      | `8`                     |
 | `tracks`       | `{ "usual": [low, high], "max": n }`: tracks playing at once, usually and at most.         | `{ usual: [4, 5], max: 8 }` |
 | `energy`       | Weights of the energy measure: `tracks`, `drums`, `filter`, `drive`, each 0 to 1.          | `0.4, 0.3, 0.2, 0.1`    |
-| `voice`        | Settings of the voice track: `gain`, `pitch`, `tempo`, `cutoff`, `hpf`, `drive`, `room`, `delay`. | voice track defaults |
+| `voice`        | The base of the voice: `speakers` (system voices that speak English and Italian: `eddy`, `flo`, `grandma`, `grandpa`, `reed`, `rocko`, `sandy`, `shelley`, or `""` for the default; `speaker` for just one) and the voice track settings `gain`, `pitch`, `tempo`, `cutoff`, `hpf`, `drive`, `room`, `delay`, each a number or a range `[low, high]`. Each song draws its own values; see "Voice" in `docs/ENDLESS.md`. | voice track defaults |
 | `words`        | Required. Title words: `{ "en": [...], "it": [...], "es": [...] }`, at least 3 each.       |                         |
 
 Energy shapes: `build-drop`, `slow-burn`, `waves`, `flat-groove`, `verse-chorus`, `late-peak`, `descent`.

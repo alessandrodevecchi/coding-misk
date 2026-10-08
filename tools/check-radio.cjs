@@ -16,7 +16,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  const R = () => page.evaluate(() => { const r = globalThis.codingMiskRadio; return { on: r.on, state: r.state, history: r.history.map(h => ({ title: h.title, n: h.n })), options: r.options }; });
+  const R = () => page.evaluate(() => { const r = globalThis.codingMiskRadio; return { on: r.on, paused: r.paused, state: r.state, history: r.history.map(h => ({ title: h.title, n: h.n })), options: r.options }; });
   const ed = () => page.evaluate(() => { const e = document.querySelector('strudel-editor').editor; return { err: String(e.repl.state.evalError || ''), started: e.repl.scheduler.started, cyc: e.repl.scheduler.now() }; });
   const levels = () => page.evaluate(async () => { const mx = {}; for (let k = 0; k < 30; k++) { for (const a of Object.keys(window.analysers || {})) { const d = getAnalyzerData('time', a); let m = 0; for (const v of d) m = Math.max(m, Math.abs(v)); mx[a] = Math.max(mx[a] || 0, m); } await new Promise(r => setTimeout(r, 50)); } return Object.entries(mx).filter(([, v]) => v > .02).map(([a, v]) => `${a}=${v.toFixed(2)}`).join(' '); });
   const pick = async ids => {
@@ -53,6 +53,20 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   check(card.includes(want1.title) && card.includes(`${want1.sections[0].bpm} BPM`), 'now playing card shows the song on air');
   check(!(await ed()).err, 'no evaluation error at start');
 
+  // pause and resume from the same bar
+  await sleep(2000);
+  const onAirBefore = (await R()).state.onAir;
+  await page.click('#radio-pause'); await sleep(300);
+  const pausedAt = (await R()).state.paused;
+  await sleep(2500);
+  check(!(await ed()).started && typeof pausedAt === 'number', 'pause stops the sound and keeps the bar', `bar ${pausedAt}`);
+  await page.click('#radio-pause'); await sleep(1500);
+  const after = await ed(), rs = await R();
+  check(after.started && rs.state.onAir === onAirBefore && after.cyc >= pausedAt && after.cyc < pausedAt + 1.5 && !after.err, 'resume goes on from the same bar of the same song', `paused ${pausedAt.toFixed(2)}, now ${after.cyc.toFixed(2)}`);
+  // tooltips on every control
+  const noTip = await page.$$eval('#tab-radio button, #tab-radio input', xs => xs.filter(x => !x.title && !x.closest('[title]')).map(x => x.id || x.dataset.style || x.className));
+  check(!noTip.length, 'every radio control has a tooltip', noTip.join(', '));
+
   // options from the next song: raise energy now, then skip
   await setRange('energy', 0.9);
   const before = (await R()).state.stream[0];
@@ -67,10 +81,26 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   await sleep(6000);
   check((await levels()).length > 0, 'sound after skip', await levels());
 
+  // the voice of each song comes from its voice style, with its own speaker
+  {
+    const voiceBank = () => page.evaluate(() => (document.querySelector('strudel-editor').editor.code.match(/s\("(say_[a-z_]+)"\)/) || [])[1] || '');
+    const banks = {};
+    for (const style of ['industrial', 'country']) {
+      await page.click('#radio-start'); await sleep(500);
+      await pick([style]); await page.fill('#radio-seed', `voice-${style}`); await page.click('#radio-start');
+      for (let k = 0; k < 20 && !banks[style]; k++) { await sleep(1000); banks[style] = await voiceBank(); }
+    }
+    check(banks.industrial && banks.country && banks.industrial !== banks.country, 'two styles speak with different speakers', JSON.stringify(banks));
+    await page.click('#radio-start'); await sleep(500);
+    await pick(['berlin-techno']); await page.fill('#radio-seed', 'aurora'); await page.click('#radio-start'); await sleep(5000);
+    for (let i = 0; i < 1; i++) { await page.click('#radio-skip'); await sleep(3000); }
+  }
+
   // three song changes in a row
+  const startAir = (await R()).state.onAir;
   for (let i = 0; i < 3; i++) { await page.click('#radio-skip'); await sleep(4000); }
   r = await R(); const e2 = await ed();
-  check(r.state.onAir === 4 && !e2.err, 'three more song changes without errors', `on air ${r.state.onAir}`);
+  check(r.state.onAir === startAir + 3 && !e2.err, 'three more song changes without errors', `on air ${r.state.onAir}`);
   check(r.history.length >= 5 && r.history[0].title === r.state.stream[r.state.onAir].title, 'history lists the songs heard, newest first');
 
   // replay gives the same songs
@@ -96,8 +126,12 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   // exclusive playback
   await page.click('[data-tab="radio"]'); await page.click('#radio-start'); await sleep(4000);
   check((await R()).on, 'radio on again');
-  await page.click('#play'); await sleep(2500);
-  check(!(await R()).on, 'Compose playback stops the radio');
+  await page.click('#play'); await sleep(1000);
+  check((await R()).paused && (await R()).on, 'the header pause pauses the radio');
+  await page.click('#play'); await sleep(2000);
+  check(!(await R()).paused && (await ed()).started, 'the header play resumes the radio');
+  await page.click('[data-tab="brani"]'); await page.click('[data-song-card="0"] [data-act="play"]'); await sleep(2500);
+  check(!(await R()).on && (await ed()).started, 'Compose playback stops the radio');
   await page.click('#stop'); await sleep(500);
 
   // history limit
