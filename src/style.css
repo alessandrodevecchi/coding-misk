@@ -756,3 +756,7 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .set-row .lbl { letter-spacing: .06em; text-transform: uppercase; font-size: 11px; }
 .set-row { align-items: start; }
 .set-row > .lbl { padding-top: 10px; }
+/* radio recording (#30) */
+.rec-btn[aria-pressed="true"] { color: #fff; background: #b3122a; border-color: #ff4a66; box-shadow: 0 0 12px #ff2a48; }
+.rec-btn .rec-time { font: 12px var(--mono); margin-left: 4px; }
+:root[data-ui="hw"] .rec-btn[aria-pressed="true"] { color: #ffdede; background: linear-gradient(#7a1020, #4e0a14); text-shadow: 0 0 6px #ff4a66; }

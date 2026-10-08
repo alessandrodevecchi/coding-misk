@@ -5,6 +5,7 @@
 const STR = {
   it: {
     setTheme: 'Tema', setLang: 'Lingua', setVolume: 'Volume',
+    recStart: 'Registra', recStop: 'Ferma', recFromStart: 'Registra dall\'inizio', recSaved: 'Registrazione salvata: audio, scaletta e ricetta', tipRec: 'Registra la radio da adesso finché la fermi; le pause non lasciano buchi. Formato nelle Impostazioni', tipRecStop: 'Ferma e scarica audio, scaletta e ricetta', tipRecFromStart: 'Riparte la sessione dal primo brano (stesso seme e stesse mosse) e la registra',
     settings: 'Impostazioni', setIntro: 'Le opzioni usate meno spesso. Tema e lingua restano anche in alto, per le prove veloci.', setLook: 'Aspetto', setRadioLook: 'Visual della radio', setRadioLookHint: 'Il visual con cui parte la radio; quello scelto mentre la radio suona diventa il nuovo predefinito.',
     setAudio: 'Audio', setFormat: 'Formato dell\'export', setWav: 'WAV (qualità piena, file grandi)', setOpus: 'Opus (file piccoli)', setFormatHint: 'Vale per l\'export dei brani e per la registrazione della radio.', setRadio: 'Radio', setScope: 'I comandi della console valgono per',
     setData: 'Dati', setDataIntro: 'Brani, versioni, playlist, stili, artisti, storico della radio e impostazioni restano in questo browser. Esportali in un file per salvarli o per portarli su un altro computer; l\'import aggiunge e aggiorna, non cancella nulla.',
@@ -150,6 +151,7 @@ const STR = {
   },
   en: {
     setTheme: 'Theme', setLang: 'Language', setVolume: 'Volume',
+    recStart: 'Record', recStop: 'Stop', recFromStart: 'Record from the start', recSaved: 'Recording saved: audio, track list and recipe', tipRec: 'Record the radio from now until you stop; pauses leave no gap. Format in Settings', tipRecStop: 'Stop and download the audio, track list and recipe', tipRecFromStart: 'Start the session again from its first song (same seed, same moves) and record it',
     settings: 'Settings', setIntro: 'Options used less often. Theme and language stay in the top bar too, for quick tests.', setLook: 'Appearance', setRadioLook: 'Radio visual', setRadioLookHint: 'The visual the radio starts with; the one picked while the radio plays becomes the new default.',
     setAudio: 'Audio', setFormat: 'Export format', setWav: 'WAV (full quality, big files)', setOpus: 'Opus (small files)', setFormatHint: 'Applies to song exports and to radio recordings.', setRadio: 'Radio', setScope: 'Console commands apply to',
     setData: 'Data', setDataIntro: 'Songs, versions, playlists, styles, artists, radio history and settings stay in this browser. Export them to a file to keep them or to move them to another computer; import adds and updates, it never deletes.',

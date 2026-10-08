@@ -102,12 +102,13 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     render();
   }
   function stopQuiet() { if (S) { S = null; } }
-  function stop() { if (!S) return; S = null; player.stop(); render(); }
+  function stop() { if (!S) return; if (recS) stopRec(); S = null; player.stop(); render(); }
   // pause keeps the session, the window and the bar; resume plays on from that bar
-  function pause() { if (!S || S.paused !== undefined) return; S.paused = player.halt(); render(); }
+  function pause() { if (!S || S.paused !== undefined) return; S.paused = player.halt(); if (recS) { recS.cap.pause(); recS.pauseStart = performance.now(); } render(); }
   function resume() {
     if (!S || S.paused === undefined) return;
     const bar = S.paused; delete S.paused;
+    if (recS) { recS.cap.resume(); if (recS.pauseStart) recS.paused += performance.now() - recS.pauseStart; recS.pauseStart = null; }
     player.resumeAt(windowPlayable(), bar);
     render();
   }
@@ -145,6 +146,44 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     player.jump(windowPlayable(), S.stream[S.onAir].start);
     render();
   }
+  // ---------- recording (#30) ----------
+  // the session as audio, from now until stopped (pauses leave no gap), with the recipe and a track list
+  let recS = null;
+  const recElapsed = () => !recS ? 0 : (performance.now() - recS.t0 - recS.paused - (recS.pauseStart ? performance.now() - recS.pauseStart : 0)) / 1000;
+  const clockOf = sec => { const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s2 = Math.floor(sec % 60); return `${h ? `${h}:${String(m).padStart(2, '0')}` : String(m).padStart(2, '0')}:${String(s2).padStart(2, '0')}`; };
+  const listEntry = item => ({ t: recElapsed(), title: item.song.title, artist: item.entry.artist ? item.entry.artist.name : '' });
+  function startRec() {
+    if (recS) return;
+    if (!S) start();
+    recS = { cap: player.capture(), t0: performance.now(), paused: 0, pauseStart: S.paused !== undefined ? performance.now() : null, list: [], seed: S.recipe.seed };
+    if (recS.pauseStart) recS.cap.pause();
+    recS.list.push(listEntry(S.stream[S.onAir]));
+    render();
+  }
+  function recordFromStart() {
+    const recipe = S ? clone(S.recipe) : history[0] && history[0].recipe && clone(history[0].recipe);
+    if (!recipe) return;
+    if (recS) stopRec();
+    start({ recipe });
+    startRec();
+  }
+  async function stopRec() {
+    if (!recS) return;
+    const r = recS; recS = null; render();
+    const recipe = S ? clone(S.recipe) : null, base = `coding-misk-radio-${String(r.seed).replace(/[^\w-]+/g, '-')}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}`;
+    const { blob, ext } = await r.cap.stop();
+    saveBlob(`${base}.${ext}`, blob);
+    const lines = [`coding-misk radio · seed ${r.seed} · ${new Date().toLocaleString()}`, '', ...r.list.map(x => `${clockOf(x.t)} ${x.title}${x.artist ? ` · ${x.artist}` : ''}`)];
+    setTimeout(() => saveBlob(`${base}-tracklist.txt`, new Blob([lines.join('\n') + '\n'], { type: 'text/plain' })), 400);
+    if (recipe) setTimeout(() => saveBlob(`${base}-recipe.json`, new Blob([JSON.stringify(recipe, null, 2) + '\n'], { type: 'application/json' })), 800);
+    toast(t('recSaved'));
+  }
+  function saveBlob(name, blob) {
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
   // ---------- steering (#24) ----------
   // the song of an item rebuilt from its original plus every command still standing
   function resteer(item) {
@@ -237,6 +276,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     render();
   }
   function remember(item) {
+    if (recS && recS.list.length && recS.list[recS.list.length - 1].title !== item.song.title) recS.list.push(listEntry(item));
     history.unshift({ title: item.song.title, styles: item.entry.styles, seed: S.recipe.seed, recipe: clone(S.recipe), n: item.n, at: new Date().toISOString(), song: item.song, entry: item.entry });
     history = history.slice(0, HISTORY);
     try { store.set('coding-misk-radio-history', history); } catch (e) { history = history.slice(0, 20); try { store.set('coding-misk-radio-history', history); } catch (e2) {} }
@@ -323,6 +363,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function renderNow(cyc) {
     const box = root.querySelector('#radio-now');
     if (!box || dragging) return;
+    const rt = root.querySelector('#radio-rec-time'); if (rt) rt.textContent = clockOf(recElapsed());
     renderSteer();
     if (!S) { box.innerHTML = `<div class="lbl">${esc(t('radioNow'))}</div><p class="muted">${esc(t('radioIdle'))}</p>`; return; }
     const item = S.stream[S.onAir], song = item.song, e = item.entry;
@@ -354,6 +395,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <button class="btn" id="radio-pause" ${on ? '' : 'disabled'} ${tip(paused ? 'tipResume' : 'tipPause')}>${paused ? '▶ ' + esc(t('radioResume')) : '❚❚ ' + esc(t('radioPause'))}</button>
           <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
           <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
+          <button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>
           <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
         </div>
         <div class="ctrl" ${tip('tipArtist')}><span class="lbl">${esc(t('radioArtist'))}</span>
@@ -371,6 +413,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         <div class="radio-seed">
           <div class="ctrl grow" ${tip('tipSeed')}><label class="lbl" for="radio-seed">${esc(t('radioSeed'))}</label><input id="radio-seed" type="text" maxlength="40" autocomplete="off" placeholder="${esc(t('radioSeedAuto'))}" value="${esc(on ? S.recipe.seed : seedField)}" ${on ? 'readonly' : ''}></div>
           <button class="btn" id="radio-replay" ${on || history.length ? '' : 'disabled'} ${tip('tipReplay')}>↺ ${esc(t('radioReplay'))}</button>
+          <button class="btn" id="radio-rec-start" ${on || history.length ? '' : 'disabled'} ${tip('tipRecFromStart')}>● ${esc(t('recFromStart'))}</button>
         </div>
         <div class="actions">
           <button class="btn" id="radio-save" ${on ? '' : 'disabled'} ${tip('tipSave')}>${esc(t('radioSave'))}</button>
@@ -395,6 +438,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const b = e.target.closest('button'); if (!b) return;
     if (b.id === 'radio-start') return S ? stop() : start();
     if (b.id === 'radio-skip') return skip();
+    if (b.id === 'radio-rec') return recS ? stopRec() : startRec();
+    if (b.id === 'radio-rec-start') return recordFromStart();
     if (b.id === 'radio-mute') return player.toggleMute();
     if (b.id === 'radio-pause') return S && S.paused !== undefined ? resume() : pause();
     if (b.id === 'radio-replay') {
@@ -478,6 +523,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info,
     get steering() { if (!S) return null; const it = S.stream[S.onAir]; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },
     get paused() { return !!S && S.paused !== undefined; },
+    get recording() { return recS ? { seconds: recElapsed(), list: recS.list.map(x => ({ ...x })) } : null; },
+    startRec, stopRec, recordFromStart,
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },
     get on() { return !!S; },

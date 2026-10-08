@@ -442,6 +442,35 @@ document.addEventListener('keydown', e => {
 // Registra l'uscita master di Strudel in tempo reale mentre il brano suona dall'inizio alla fine,
 // poi converte la registrazione in WAV a 16 bit e la scarica.
 let rec = null;
+// a live capture of the master output (#30, the radio's recording): WAV or Opus from the settings,
+// pause and resume without gaps; the volume does not change it (it taps the master before the volume)
+let capture = null;
+function startCapture() {
+  initAudioOnce();
+  const ctx = globalThis.getAudioContext(), dest = ctx.createMediaStreamDestination();
+  const opus = store.get('coding-misk-export-format', 'wav') === 'opus', mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'].find(m => globalThis.MediaRecorder && MediaRecorder.isTypeSupported(m));
+  const recorder = opus && mime ? new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 192000 }) : new MediaRecorder(dest.stream);
+  const chunks = [], c = { node: null, dest, recorder, opus: !!(opus && mime) };
+  c.tap = () => { try { const node = globalThis.getSuperdoughAudioController().output.destinationGain; if (node && node !== c.node) { if (c.node) try { c.node.disconnect(dest); } catch (e) {} node.connect(dest); c.node = node; } } catch (e) {} };
+  recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+  c.tap(); recorder.start(1000);
+  c.pause = () => { if (recorder.state === 'recording') recorder.pause(); };
+  c.resume = () => { if (recorder.state === 'paused') recorder.resume(); };
+  c.stop = () => new Promise(res => {
+    recorder.onstop = async () => {
+      try { if (c.node) c.node.disconnect(dest); } catch (e) {}
+      capture = null;
+      const raw = new Blob(chunks, { type: recorder.mimeType });
+      if (c.opus) return res({ blob: raw, ext: /ogg/.test(recorder.mimeType) ? 'ogg' : 'webm' });
+      toast(t('exportWorking'));
+      try { res({ blob: wavBlob(await globalThis.getAudioContext().decodeAudioData(await raw.arrayBuffer())), ext: 'wav' }); }
+      catch (e) { res({ blob: raw, ext: 'webm' }); }
+    };
+    recorder.stop();
+  });
+  capture = c;
+  return c;
+}
 function tapMaster() {
   if (!rec) return;
   try {
@@ -1724,6 +1753,7 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
     if (mode === 'track' && follow && !typing) { const i = m.sectionAt(cyc); if (i >= 0 && i !== sel) selectScene(i); }
   }
   // registrazione: aggancio all'uscita master, coda di riverbero, etichette dei pulsanti
+  if (capture) capture.tap();
   if (rec) {
     tapMaster();
     if (rec.ending && performance.now() - rec.ending > 2500 && rec.recorder.state === 'recording') rec.recorder.stop();
@@ -1941,6 +1971,7 @@ radio = createRadio({
     renderVolume: () => renderVolume(),
     // stops the sound and gives the bar it stopped at
     halt: () => { const s = sched(), cyc = s ? s.now() : 0; ed.stop(); return cyc; },
+    capture: () => startCapture(),
     now: () => (sched() ? sched().now() : 0),
     saveSong: sg => { user.tracks.push({ ...clone(sg), id: 'u-' + Date.now() }); saveLibrary(); renderSongs(); toast(t('trackSaved')); },
     // the song opens ready to play, not playing
