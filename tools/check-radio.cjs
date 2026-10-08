@@ -134,6 +134,24 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   check(!(await R()).on && (await ed()).started, 'Compose playback stops the radio');
   await page.click('#stop'); await sleep(500);
 
+  // by hand the song on air is held past its end; resume starts the next song on the next bar
+  {
+    await page.click('[data-tab="radio"]');
+    if ((await R()).on) await page.click('#radio-start');
+    await pick(['lo-fi']); await page.fill('#radio-seed', 'hand'); await page.click('#radio-start'); await sleep(4000);
+    await page.click('#edhost .cm-line >> nth=0'); await page.keyboard.press('End'); await page.keyboard.type(' mine'); await sleep(300);
+    let h = await R();
+    const cur = h.state.stream[0], end = cur.start + cur.bars;
+    check(await page.isVisible('#hand-tag'), 'radio: typing takes over');
+    for (let k = 0; k < 400 && (await ed()).cyc < end + 1.5; k++) await sleep(1000);
+    h = await R();
+    check(h.state.onAir === 0 && (await ed()).started, 'radio: by hand the song on air is held past its end', `bar ${(await ed()).cyc.toFixed(1)}, end ${end}`);
+    await page.click('#hand-resume'); await sleep(4000);
+    h = await R(); const e = await ed();
+    check(h.state.onAir === 1 && !(await page.isVisible('#hand-tag')) && !e.err && e.cyc >= h.state.stream[1].start, 'radio: resume after the end starts the next song', `on air ${h.state.onAir}, start ${h.state.stream[1] && h.state.stream[1].start}`);
+    await page.click('#radio-start'); await sleep(500);
+  }
+
   // history limit
   await page.evaluate(() => { const h = Array.from({ length: 50 }, (_, i) => ({ title: `old ${i}`, styles: ['jazz'], seed: 'x', n: i, at: new Date().toISOString(), song: null })); localStorage.setItem('coding-misk-radio-history', JSON.stringify(h)); });
   await page.reload(); await sleep(5000); await page.click('[data-tab="radio"]'); await page.click('#radio-start'); await sleep(4000);

@@ -82,6 +82,7 @@ In the app, the arranger has two views of the same song: **Free timeline** (the 
 - Keep at most 4 to 5 tracks playing at a time: remove one when another comes in.
 - Write comments as a performer would say them: very short, about what the music needs.
 - Check the order with `node --no-warnings tools/song.mjs steps songs/my-song.json` and the code at a bar with `compile … --at N`.
+- Take over by hand at any moment: type in the code (a click, a selection or a copy does not count) and the steps stop, the music goes on and Ctrl+Enter plays your code, even past the end of the song. "Resume live build" types the song's code back at the next bar and the steps go on; your code stays in "Your last code" under the editor, with "Back to this code". In the Radio, by hand holds the song on air until you resume.
 - Add a track of type `voice` and run `npm run voices` after writing new comments: each phrase becomes a spoken sample, shaped by the voice track's knobs and rack (Primo Segnale: higher pitch, distortion, low cut, delay, reverb).
 
 ## Endless sessions

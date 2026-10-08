@@ -151,6 +151,9 @@ function followEdit(a, b) {
 }
 // live build in progress: steps already in the editor, and the edit being typed towards the next step
 let built = 0, typing = null;
+// hand live coding (#20): the user typed in the code during a live build. Steps, comments and the stop at the end
+// wait until "resume live build"; the user's code plays meanwhile. resumeTo: the bar where the build takes over again.
+let hand = false, lastHand = null, resumeTo = null;
 function liveBuild(sg, s, cyc) {
   const steps = buildSteps(sg.build), next = steps[built];
   if (!next) return;
@@ -168,6 +171,62 @@ function liveBuild(sg, s, cyc) {
   ed.setCode(codeFor(sg, next.at)); ed.evaluate();
 }
 
+// ---------- hand live coding (#20) ----------
+function setHand(on) {
+  hand = on;
+  $('#hand-tag').hidden = !on; $('#hand-resume').hidden = !on;
+  document.body.classList.toggle('by-hand', on);
+}
+// a character typed or deleted, a paste, a cut or a drop in the code during a live build: the user takes over
+function takeOver() {
+  if (hand || !song || !song.build || !(isPlaying() || (radio && radio.paused))) return;
+  typing = null; resumeTo = null;
+  setHand(true);
+}
+const editKey = e => !e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || ['Backspace', 'Delete', 'Enter', 'Tab'].includes(e.key));
+$('#edhost').addEventListener('keydown', e => { if (editKey(e)) takeOver(); }, true);
+for (const ev of ['paste', 'cut', 'drop']) $('#edhost').addEventListener(ev, takeOver, true);
+// resume: keep the user's code, type back to the song's code at the next bar, then the steps go on
+function resumeHand() {
+  if (!hand) return;
+  const s = sched();
+  lastHand = ed.code || '';
+  try { sessionStorage.setItem('coding-misk-hand', lastHand); } catch (e) {}
+  renderHandLast();
+  setHand(false);
+  if (!song || !s || !isPlaying()) { resumeTo = null; return; }
+  const cyc = s.now(), bar = Math.ceil(cyc + .05);
+  // the radio: when the song on air ended by hand, the next song starts on the next bar
+  if (mode === 'radio' && radio && radio.afterHand(bar)) return;
+  // Compose past the end of the song: start again from the top
+  if (bar >= song.meta.bars) { playSong(song, 0, mode); return; }
+  resumeTo = { bar, frame: typingFrames(ed.code || '', codeFor(song, bar)), t0: cyc, t1: bar - .2 * s.cps, shown: '' };
+}
+function resumeBuild(sg, s, cyc) {
+  const r = resumeTo, due = s.lastEnd + .1 * s.cps >= r.bar;
+  if (!due) {
+    const txt = r.frame((cyc - r.t0) / Math.max(.01, r.t1 - r.t0));
+    if (txt !== r.shown) { const prev = r.shown || ed.code || ''; r.shown = txt; ed.setCode(txt); followEdit(prev, txt); }
+    return;
+  }
+  resumeTo = null; typing = null;
+  built = sg.build ? buildSteps(sg.build).filter(x => x.at <= r.bar).length : 0;
+  ed.setCode(codeFor(sg, r.bar)); ed.evaluate();
+}
+function renderHandLast() {
+  $('#hand-last').hidden = !lastHand;
+  $('#hand-last-code').textContent = lastHand || '';
+}
+$('#hand-resume').addEventListener('click', resumeHand);
+$('#hand-copy').addEventListener('click', () => { try { navigator.clipboard.writeText(lastHand || '').then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (e) { toast(t('copyNo')); } });
+$('#hand-back').addEventListener('click', async () => {
+  if (!lastHand || !song || !isPlaying()) return;
+  typing = null; resumeTo = null; setHand(true);
+  ed.setCode(lastHand); await ed.evaluate();
+});
+try { lastHand = sessionStorage.getItem('coding-misk-hand'); } catch (e) {}
+renderHandLast();
+
 // Strudel carica i worklet audio (supersaw, rumore, effetti) solo al primo mousedown.
 // Li inizializziamo noi dentro il gesto dell'utente, così funziona anche da tastiera.
 let audioInit = null;
@@ -178,7 +237,7 @@ function initAudioOnce() {
 
 // Riproduce un brano dalla posizione "bar" (anche frazionaria): lo scheduler di Strudel riprende
 // da lastEnd, quindi basta impostarlo prima di avviare. Il tempo lo gestisce transport() battuta per battuta.
-async function playSong(sg, bar = 0, as = 'free') {
+async function playSong(sg, bar = 0, as = 'free', { keepHand = false } = {}) {
   if (seeking) return;
   seeking = true;
   try {
@@ -195,6 +254,8 @@ async function playSong(sg, bar = 0, as = 'free') {
     typing = null; built = sg.build ? buildSteps(sg.build).filter(x => x.at <= bar).length : 0;
     // spoken comments load the first time they play, too late for that hit: load them all now, silently
     if (sg.build) voiceSamples(sg.build, getLang(), customFiles).forEach(v => { try { globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05); } catch (e) {} });
+    if (hand && keepHand) { song = sg; sched().lastEnd = bar; await ed.evaluate(); return; }
+    setHand(false); resumeTo = null;
     ed.setCode(codeFor(sg, bar));
     sched().lastEnd = bar;
     if (loopIdx >= 0) loopIdx = m.sectionAt(bar);
@@ -222,12 +283,12 @@ function pause() {
 }
 function resume() {
   const p = paused;
-  if (p && song && p.id === song.id) return playSong(song, p.cyc, mode);
+  if (p && song && p.id === song.id) return playSong(song, p.cyc, mode, { keepHand: true });
   paused = null;
   return play();
 }
 const togglePlay = () => isPlaying() ? pause() : radio && radio.paused ? radio.resume() : paused ? resume() : play();
-async function stop() { await ready; paused = null; ed.stop(); if (radio && radio.on) radio.stopped(); }
+async function stop() { await ready; paused = null; ed.stop(); setHand(false); resumeTo = null; if (radio && radio.on) radio.stopped(); }
 
 // ogni modifica alla composizione: brano non salvato, codice ricompilato, rivalutato se sta suonando
 function changed() {
@@ -235,6 +296,8 @@ function changed() {
   compiled = playable({ ...T, kind: 'composed' });
   renderArranger();
   if (!$('#tab-brani').hidden) renderSongs();
+  // by hand the editor keeps the user's code; the song's changes are heard on resume
+  if (hand) { if (song && song.id === compiled.id && mode === 'track') song = compiled; return; }
   if (mode !== 'track') return backToTrack();
   if (song && song.id === compiled.id) song = compiled;
   typing = null;
@@ -247,6 +310,7 @@ function changed() {
 }
 async function loadFree(code, src) {
   if (radio && radio.on) radio.stopped();
+  setHand(false); resumeTo = null;
   song = null; paused = null;
   initAudioOnce();
   await ready;
@@ -1396,12 +1460,13 @@ const MASTER = .6;
     const ahead = Math.min(m.bars - 1, Math.floor(s.lastEnd + s.cps * .1));
     const target = m.bpm[ahead] / 240;
     if (Math.abs(s.cps - target) > 1e-6) s.setCps(target);
-    if (song.build) liveBuild(song, s, cyc);
-    if (mode === 'radio' && radio) radio.tick(cyc);
+    if (resumeTo !== null) resumeBuild(song, s, cyc);
+    else if (song.build && !hand) liveBuild(song, s, cyc);
+    if (mode === 'radio' && radio && !hand && resumeTo === null) radio.tick(cyc);
     if (loopIdx >= 0) {
       const sec = m.sections[loopIdx];
       if (sec && cyc >= sec.start + sec.len) playSong(song, sec.start, mode);
-    } else if (cyc >= m.bars && mode !== 'radio') { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
+    } else if (cyc >= m.bars && mode !== 'radio' && !hand && resumeTo === null) { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
     // segue la sezione che suona, ma non mentre si sta scrivendo in un campo del brano
     const typing = document.activeElement && document.activeElement.matches('input, select, textarea') && document.activeElement.closest('#arranger, #track-panel');
     if (mode === 'track' && follow && !typing) { const i = m.sectionAt(cyc); if (i >= 0 && i !== sel) selectScene(i); }
@@ -1424,7 +1489,7 @@ const MASTER = .6;
     $('#sc-pause').disabled = state === 'stopped';
   }
   // live build: the comment of the latest step over the stage
-  const say = playing && song && song.build && s ? sayAt(song.build, s.now(), getLang()) : '', sayEl = $('#say');
+  const say = playing && !hand && resumeTo === null && song && song.build && s ? sayAt(song.build, s.now(), getLang()) : '', sayEl = $('#say');
   if (say && sayEl.textContent !== say) sayEl.textContent = say;
   sayEl.classList.toggle('on', !!say);
   // avanzamento nell'arrangiatore
@@ -1484,6 +1549,8 @@ radio = createRadio({
   player: {
     makePlayable: sg => playable({ ...sg, kind: 'composed' }),
     start: (p, bar) => playSong(p, bar, 'radio'),
+    // resume after a pause: by hand, the user's code goes on
+    resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
     // a new window while the radio plays: the code on air does not change, the steps to come do
     swap: p => {
       if (mode !== 'radio' || !song) return;
@@ -1494,6 +1561,7 @@ radio = createRadio({
     // skip: the new window takes over now, its first song starts on "bar"
     jump: (p, bar) => {
       if (mode !== 'radio' || !song) return;
+      setHand(false); resumeTo = null;
       song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= bar).length;
       warmVoices(p); source = { kind: 'radio', name: p.title }; renderSource();
       ed.setCode(codeFor(p, bar)); ed.evaluate();

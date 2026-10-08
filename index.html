@@ -136,6 +136,8 @@
     <div class="code-resize" id="code-resize" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-aria="codeResize"></div>
     <div class="codehead">
       <div><div class="lbl" data-i18n="liveCode"></div><div class="src" id="src"></div></div>
+      <span class="hand-tag" id="hand-tag" hidden data-i18n="handTag"></span>
+      <button class="btn primary" id="hand-resume" hidden data-i18n="handResume"></button>
       <button class="btn" id="back" hidden data-i18n="back"></button>
       <div class="code-tools">
         <button class="btn icon" id="code-full" data-i18n-aria="codeFull" aria-pressed="false">⤢</button>
@@ -143,6 +145,11 @@
       </div>
     </div>
     <div class="edhost" id="edhost"></div>
+    <details class="hand-last" id="hand-last" hidden>
+      <summary data-i18n="handLast"></summary>
+      <pre id="hand-last-code"></pre>
+      <div class="actions"><button class="btn small" id="hand-copy" data-i18n="copy"></button><button class="btn small" id="hand-back" data-i18n="handBack"></button></div>
+    </details>
     <div class="actions">
       <a class="btn primary" id="share" href="https://strudel.cc/" target="_blank" rel="noopener" data-i18n="share"></a>
       <button class="btn" id="copy" data-i18n="copy"></button>

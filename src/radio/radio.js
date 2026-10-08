@@ -79,7 +79,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function resume() {
     if (!S || S.paused === undefined) return;
     const bar = S.paused; delete S.paused;
-    player.start(windowPlayable(), bar);
+    player.resumeAt(windowPlayable(), bar);
     render();
   }
   // the next song is generated once the song on air has played 40 % of its length: control changes made
@@ -116,6 +116,22 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     remember(S.stream[S.onAir]);
     player.jump(windowPlayable(), S.stream[S.onAir].start);
     render();
+  }
+  // after live coding by hand: when the song on air ended meanwhile, the next one starts on "bar"
+  // (returns true); otherwise the song on air goes on and the player types its code back (false)
+  function afterHand(bar) {
+    if (!S) return false;
+    const cur = S.stream[S.onAir];
+    if (bar < cur.start + cur.bars) return false;
+    if (S.stream.length <= S.onAir + 1) generate();
+    cur.bars = bar - cur.start;
+    let at = bar;
+    for (const x of S.stream.slice(S.onAir + 1)) { x.start = at; at += x.bars; }
+    S.onAir++;
+    remember(S.stream[S.onAir]);
+    player.jump(windowPlayable(), S.stream[S.onAir].start);
+    render();
+    return true;
   }
   function remember(item) {
     history.unshift({ title: item.song.title, styles: item.entry.styles, seed: S.recipe.seed, recipe: clone(S.recipe), n: item.n, at: new Date().toISOString(), song: item.song, entry: item.entry });
@@ -231,7 +247,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   });
 
   return {
-    render, tick, stop, start, skip, pause, resume,
+    render, tick, stop, start, skip, pause, resume, afterHand,
     get paused() { return !!S && S.paused !== undefined; },
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },

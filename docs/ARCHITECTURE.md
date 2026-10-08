@@ -71,6 +71,10 @@ Spoken comments: `tools/voice.mjs` writes `public/samples/say_<lang>/<slug>.wav`
 
 `generateSession(recipes, options)` returns `{ session, songs }`: plain v2 songs with `build` steps, so the player, the live build engine, the voice track and the exporter play them unchanged. For each song the director plans parts, tempo, key, sections and candidate tracks, then walks phrase boundaries: it applies candidate moves to a copy of the steps, measures the result with `stateAt` and `energyOf`, and keeps the move closest to the target energy. All randomness comes from named seeded streams, never `Math.random`. `tools/endless.mjs` writes songs to `songs/endless/` (git-ignored); the library picks them up through the `songs/**` glob, which skips `session.json`. The radio view (`#22`) will call the same functions in the browser.
 
+## Hand live coding
+
+A keystroke that edits (or a paste, cut or drop) in `#edhost` during a live build sets `hand` (`takeOver`). By hand `transport()` skips `liveBuild()`, the comment overlay, the stop at the end and `radio.tick()`; the tempo map goes on. `changed()` recompiles the song without touching the editor. Resume (`resumeHand`) keeps the editor code in `lastHand` (session storage, "Your last code" block), then `resumeBuild()` types back to `codeFor(song, bar)` and evaluates on the next bar; past the end of a song in Compose it plays from the top; in the radio `radio.afterHand(bar)` starts the next song when the song on air ended. Pause and resume keep the hand code (`playSong(..., { keepHand: true })`); any other playback, skip or stop leaves the hand mode.
+
 ## Radio
 
 The radio is a third player mode, `radio`, next to `track` and `free`. It plays a window song (`windowSong`: the song on air and the next one, on absolute stream bars), so the scheduler never restarts. `transport()` calls `radio.tick(cyc)` every frame and, in radio mode, does not stop at the end of the window. The radio:
