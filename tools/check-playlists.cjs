@@ -43,19 +43,24 @@ async function seed(page) {
   await page.click('[data-tab="brani"]'); await sleep(400);
   const card = id => `#songs [data-song-id="${id}"]`;
   await page.click(`${card('u-s1')} [data-act="playlist"]`); await sleep(150);
-  await page.fill(`${card('u-s1')} [data-pl-name]`, 'Corsa'); await page.click(`${card('u-s1')} [data-pl-create]`); await sleep(200);
+  await page.selectOption(`${card('u-s1')} [data-pl-pick]`, '__new'); await sleep(100);
+  await page.fill(`${card('u-s1')} [data-pl-name]`, 'Corsa'); await page.click(`${card('u-s1')} [data-pl-confirm]`); await sleep(200);
   ls = await lists();
   const corsa = ls.find(l => l.name === 'Corsa');
   check(corsa && corsa.songs.join() === 'u-s1', 'new playlist from a card', JSON.stringify(corsa));
-  for (const id of ['u-s2', 'u-s3']) { await page.click(`${card(id)} [data-act="playlist"]`); await sleep(150); await page.click(`${card(id)} [data-pl-add="${corsa.id}"]`); await sleep(150); }
-  await page.click(`${card('u-s3')} [data-act="playlist"]`); await sleep(150); await page.click(`${card('u-s3')} [data-pl-add="${corsa.id}"]`); await sleep(150);
+  const addTo = async (id, list) => { await page.click(`${card(id)} [data-act="playlist"]`); await sleep(150); await page.selectOption(`${card(id)} [data-pl-pick]`, list); await page.click(`${card(id)} [data-pl-confirm]`); await sleep(150); };
+  for (const id of ['u-s2', 'u-s3']) await addTo(id, corsa.id);
+  await addTo('u-s3', corsa.id);
+  const menuText = await page.innerText(`${card('u-s3')} [data-pl-pick]`).catch(() => '');
+  await page.$eval(`${card('u-s3')} .sv-pl-menu`, m => m.remove()).catch(() => {});
   ls = await lists();
   check(ls.find(l => l.id === corsa.id).songs.join() === 'u-s1,u-s2,u-s3', 'add to an existing playlist, only once', ls.find(l => l.id === corsa.id).songs.join());
   await page.click(`${card('drift')} [data-star]`); await sleep(100);
   check((await lists())[0].songs.includes('drift'), 'the star adds to Favourites');
 
   // Songs tab playlist row
-  await page.click(`[data-list="${corsa.id}"]`); await sleep(300);
+  check((await page.$$eval('#songs-bar .sv-row', rows => rows.map(r => !!r.querySelector('#sv-q')))).indexOf(true) === 0, 'search bar comes first');
+  await page.selectOption('#sv-list', corsa.id); await sleep(300);
   const vis = await page.$$eval('#songs [data-song-id]', xs => xs.filter(x => !x.hidden).map(x => x.dataset.songId));
   check(vis.join() === 'u-s1,u-s2,u-s3', 'picking a playlist shows its songs in order', vis.join());
   if (shots) await page.screenshot({ path: path.join(shots, 'songs-playlist.png') });
@@ -90,7 +95,7 @@ async function seed(page) {
   await page.click('#pb-repeat'); await page.click('#pb-repeat'); await sleep(100);
   check((await page.getAttribute('#pb-repeat', 'data-mode')) === 'one', 'repeat cycles to one');
   await page.click('[data-tab="brani"]'); await sleep(300);
-  await page.click('[data-list="all"]'); await sleep(200);
+  await page.selectOption('#sv-list', 'all'); await sleep(200);
   await page.click(`${card('u-s2')} [data-act="play"]`); await sleep(4500);
   check((await playing()) && (await title()) === 'Short 2', 'repeat one replays a single song', await title());
   await page.click('#stop'); await sleep(200);
@@ -99,7 +104,7 @@ async function seed(page) {
 
   // shuffle: every song once
   await page.click('#pb-shuffle'); await sleep(100);
-  await page.click(`[data-list="${corsa.id}"]`); await sleep(200);
+  await page.selectOption('#sv-list', corsa.id); await sleep(200);
   await page.click('[data-play-list]'); await sleep(800);
   const sh = [await title()];
   for (let k = 0; k < 40 && sh.length < 3; k++) { await sleep(250); const tt = await title(); if (tt !== sh[sh.length - 1]) sh.push(tt); }
@@ -133,6 +138,10 @@ async function seed(page) {
   await page.click('#pl-delete'); await sleep(300);
   check(!(await lists()).some(l => l.id === corsa.id), 'second press deletes');
   check(!(await page.$('#pl-delete')), 'Favourites cannot be deleted');
+
+  // dropdowns use the theme's colours (Chrome's customizable select)
+  const appearance = await page.$eval('#sv-sort', el => getComputedStyle(el).appearance).catch(() => '');
+  check(appearance === 'base-select', 'dropdowns drawn in the theme', appearance);
 
   // phone width
   await page.setViewportSize({ width: 390, height: 900 }); await sleep(400);

@@ -4,7 +4,7 @@
 
 const STR = {
   it: {
-    tabPlaylist: 'Playlist', playlistsLbl: 'Playlist', allSongs: 'Tutti i brani', favourites: 'Preferiti', playPlaylist: '▶ Riproduci playlist', addToPlaylist: '+ Playlist', newPlaylist: 'Nuova playlist', newPlaylistName: 'Nome della nuova playlist', plAdded: 'Aggiunto a {name}', plAlready: 'È già in {name}', plEmpty: 'Nessun brano da riprodurre',
+    tabPlaylist: 'Playlist', playlistsLbl: 'Playlist', allSongs: 'Tutti i brani', favourites: 'Preferiti', playPlaylist: '▶ Riproduci playlist', addToPlaylist: '+ Playlist', newPlaylist: 'Nuova playlist', newPlaylistName: 'Nome della nuova playlist', plAdd: 'Aggiungi', plAdded: 'Aggiunto a {name}', plAlready: 'È già in {name}', plEmpty: 'Nessun brano da riprodurre',
     shuffle: 'Casuale', 'repeat:off': 'Ripeti: spento', 'repeat:all': 'Ripeti: tutta la playlist', 'repeat:one': 'Ripeti: questo brano',
     plIntro: 'Le tue playlist. I Preferiti si riempiono con la stella sui brani; le altre le crei qui o con "+ Playlist" su ogni brano.', plNew: 'Nuova playlist', plExport: 'Esporta', plImport: 'Importa', plRename: 'Rinomina', plDelete: 'Elimina', plDeleteConfirm: 'Premi di nuovo per eliminare la playlist', plDeleted: 'Playlist eliminata',
     plSongs: '{n} brani · {time}', plPlay: '▶ Riproduci', plPlayFrom: 'Riproduci da qui', plUp: 'Su', plDown: 'Giù', plRemove: 'Togli', plMissing: 'brano non più nella libreria', plNone: 'Nessun brano: aggiungili dalla scheda Brani con "+ Playlist" o con la stella.', plImported: 'Playlist importata: {name}', plImportBad: 'Il file non è una playlist di coding-misk', plDrag: 'Trascina per riordinare', plPick: 'Scegli una playlist.',
@@ -128,7 +128,7 @@ const STR = {
     trackSaved: 'Brano salvato', trackDeleted: 'Brano eliminato', restored: 'Originale ripristinato', minScene: 'Serve almeno una sezione', mine: 'Tuo',
   },
   en: {
-    tabPlaylist: 'Playlists', playlistsLbl: 'Playlist', allSongs: 'All songs', favourites: 'Favourites', playPlaylist: '▶ Play playlist', addToPlaylist: '+ Playlist', newPlaylist: 'New playlist', newPlaylistName: 'Name of the new playlist', plAdded: 'Added to {name}', plAlready: 'Already in {name}', plEmpty: 'No song to play',
+    tabPlaylist: 'Playlists', playlistsLbl: 'Playlist', allSongs: 'All songs', favourites: 'Favourites', playPlaylist: '▶ Play playlist', addToPlaylist: '+ Playlist', newPlaylist: 'New playlist', newPlaylistName: 'Name of the new playlist', plAdd: 'Add', plAdded: 'Added to {name}', plAlready: 'Already in {name}', plEmpty: 'No song to play',
     shuffle: 'Shuffle', 'repeat:off': 'Repeat: off', 'repeat:all': 'Repeat: whole playlist', 'repeat:one': 'Repeat: this song',
     plIntro: 'Your playlists. Favourites fill up with the star on songs; make the others here or with "+ Playlist" on every song.', plNew: 'New playlist', plExport: 'Export', plImport: 'Import', plRename: 'Rename', plDelete: 'Delete', plDeleteConfirm: 'Press again to delete the playlist', plDeleted: 'Playlist deleted',
     plSongs: '{n} songs · {time}', plPlay: '▶ Play', plPlayFrom: 'Play from here', plUp: 'Up', plDown: 'Down', plRemove: 'Remove', plMissing: 'song no longer in the library', plNone: 'No songs: add them from the Songs tab with "+ Playlist" or the star.', plImported: 'Playlist imported: {name}', plImportBad: 'The file is not a coding-misk playlist', plDrag: 'Drag to reorder', plPick: 'Pick a playlist.',

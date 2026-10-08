@@ -51,12 +51,12 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     if (!playlists.get(view.list)) view.list = 'all';
     const lists = [{ id: 'all' }, ...playlists.all];
     bar.innerHTML = `
-      <div class="sv-group sv-lists"><span class="lbl">${esc(t('playlistsLbl'))}</span><div class="chips">${lists.map(l => `<button class="chip small" data-list="${esc(l.id)}" aria-pressed="${view.list === l.id}">${esc(l.id === 'all' ? t('allSongs') : listName(l))}${l.id === 'all' ? '' : ` <small>${l.songs.length}</small>`}</button>`).join('')}</div>${view.list !== 'all' ? `<button class="btn primary sv-play-list" data-play-list="${esc(view.list)}">${esc(t('playPlaylist'))}</button>` : ''}</div>
       <div class="sv-row">
         <input type="search" class="sv-q" id="sv-q" value="${esc(view.q)}" placeholder="${esc(t('songSearch'))}" aria-label="${esc(t('songSearchAria'))}" autocomplete="off" data-no-knob>
         <label class="sv-sort"><span>${esc(t('sortLbl'))}</span><select id="sv-sort" data-no-knob>${SORTS.map(s => `<option value="${s}"${view.sort === s ? ' selected' : ''}>${esc(t(`sort:${s}`))}</option>`).join('')}</select></label>
         <span class="hand-from sv-fav"><button class="led" id="sv-fav" aria-pressed="${view.favOnly}" aria-labelledby="sv-fav-lbl"></button><span id="sv-fav-lbl">${esc(t('fFav'))}</span></span>
       </div>
+      <div class="sv-row sv-lists"><label class="sv-sort"><span class="lbl">${esc(t('playlistsLbl'))}</span><select id="sv-list" data-no-knob>${lists.map(l => `<option value="${esc(l.id)}"${view.list === l.id ? ' selected' : ''}>${esc(l.id === 'all' ? t('allSongs') : `${listName(l)} (${l.songs.length})`)}</option>`).join('')}</select></label>${view.list !== 'all' ? `<button class="btn primary sv-play-list" data-play-list="${esc(view.list)}">${esc(t('playPlaylist'))}</button>` : ''}</div>
       <div class="sv-group"><span class="lbl">${esc(t('fGenres'))}</span><div class="chips">${GENRES.filter(g => used.has(g) || view.genres.includes(g)).map(g => chip('genres', g, t(`g:${g}`))).join('')}</div></div>
       <div class="sv-group"><span class="lbl">${esc(t('fKinds'))}</span><div class="chips">${KINDS.map(k => chip('kinds', k, t(`k:${k}`))).join('')}</div></div>
       <details class="sv-group sv-styles"${stylesOpen || view.styles.length ? ' open' : ''}><summary class="lbl">${esc(t('fStyles'))}${view.styles.length ? ` (${view.styles.length})` : ''}</summary><div class="chips">${allStyles.map(r => chip('styles', r.id, tx(r.name))).join('')}</div></details>
@@ -88,11 +88,12 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     clearTimeout(timer);
     timer = setTimeout(() => { view.q = e.target.value; save(); apply(); }, 120);
   });
-  bar.addEventListener('change', e => { if (e.target.id === 'sv-sort') { view.sort = e.target.value; save(); apply(); } });
+  bar.addEventListener('change', e => {
+    if (e.target.id === 'sv-sort') { view.sort = e.target.value; save(); apply(); }
+    if (e.target.id === 'sv-list') { view.list = e.target.value; save(); renderBar(); apply(); }
+  });
   bar.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('sv-styles')) stylesOpen = e.target.open; }, true);
   bar.addEventListener('click', e => {
-    const pick = e.target.closest('[data-list]');
-    if (pick) { view.list = pick.dataset.list; save(); renderBar(); apply(); return; }
     const play = e.target.closest('[data-play-list]');
     if (play) { const ids = visible().map(x => x.id); onPlayList(play.dataset.playList, ids); return; }
     const c = e.target.closest('[data-f]');
@@ -123,7 +124,7 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     const on = playlists.toggleFav(id);
     const en = entries.find(x => x.id === id); if (en) en.fav = on;
     if (view.favOnly || view.list === 'favourites') apply();
-    const chip = bar.querySelector('[data-list="favourites"] small'); if (chip) chip.textContent = playlists.favourites.songs.length;
+    const opt = bar.querySelector('#sv-list option[value="favourites"]'); if (opt) opt.textContent = `${listName(playlists.favourites)} (${playlists.favourites.songs.length})`;
     return on;
   }
   const starButton = id => `<button class="star" data-star="${esc(id)}" aria-pressed="${isFav(id)}" aria-label="${esc(t(isFav(id) ? 'favRemove' : 'favAdd'))}" title="${esc(t(isFav(id) ? 'favRemove' : 'favAdd'))}">${STAR}</button>`;
@@ -154,34 +155,45 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     </div>`;
   }
 
-  // "+ Playlist" on a card: the playlists (a tick where the song is) and a new one
+  // "+ Playlist" on a card: a dropdown of the playlists (a tick where the song already is) or a new one, then Add
+  const NEW = '__new';
   function playlistMenu(songId) {
+    const first = playlists.all.find(l => !l.songs.includes(songId));
     return `<div class="sv-pl-menu" data-pl-for="${esc(songId)}">
-      ${playlists.all.map(l => { const has = l.songs.includes(songId); return `<button class="chip small" data-pl-add="${esc(l.id)}" aria-pressed="${has}">${has ? '✓ ' : ''}${esc(listName(l))}</button>`; }).join('')}
-      <span class="sv-pl-new"><input type="text" data-pl-name placeholder="${esc(t('newPlaylistName'))}" aria-label="${esc(t('newPlaylist'))}" data-no-knob><button class="btn" data-pl-create>${esc(t('newPlaylist'))}</button></span>
+      <select data-pl-pick aria-label="${esc(t('addToPlaylist'))}" data-no-knob>
+        ${playlists.all.map(l => `<option value="${esc(l.id)}"${first && first.id === l.id ? ' selected' : ''}>${l.songs.includes(songId) ? '✓ ' : ''}${esc(listName(l))}</option>`).join('')}
+        <option value="${NEW}"${first ? '' : ' selected'}>${esc(t('newPlaylist'))}…</option>
+      </select>
+      <input type="text" data-pl-name placeholder="${esc(t('newPlaylistName'))}" aria-label="${esc(t('newPlaylistName'))}" data-no-knob${first ? ' hidden' : ''}>
+      <button class="btn primary" data-pl-confirm>${esc(t('plAdd'))}</button>
     </div>`;
   }
+  list.addEventListener('change', e => {
+    if (!e.target.matches('[data-pl-pick]')) return;
+    const input = e.target.closest('.sv-pl-menu').querySelector('[data-pl-name]');
+    input.hidden = e.target.value !== NEW;
+    if (!input.hidden) input.focus();
+  });
   list.addEventListener('click', e => {
-    const menu = e.target.closest('.sv-pl-menu'); if (!menu) return;
-    const songId = menu.dataset.plFor;
-    const add = e.target.closest('[data-pl-add]');
-    if (add) {
-      const l = playlists.get(add.dataset.plAdd), name = listName(l);
-      if (l.songs.includes(songId)) { toast(t('plAlready', { name })); return; }
-      if (l.id === 'favourites') toggleFav(songId); else playlists.add(l.id, songId);
-      toast(t('plAdded', { name }));
-    } else if (e.target.closest('[data-pl-create]')) {
+    if (!e.target.closest('[data-pl-confirm]')) return;
+    const menu = e.target.closest('.sv-pl-menu'), songId = menu.dataset.plFor, pick = menu.querySelector('[data-pl-pick]').value;
+    if (pick === NEW) {
       const input = menu.querySelector('[data-pl-name]'), name = input.value.trim();
       if (!name) { input.focus(); return; }
       const l = playlists.create(name, [songId]);
       toast(t('plAdded', { name: l.name }));
-    } else return;
-    menu.outerHTML = '';
+    } else {
+      const l = playlists.get(pick), name = listName(l);
+      if (l.songs.includes(songId)) { toast(t('plAlready', { name })); return; }
+      if (l.id === 'favourites') toggleFav(songId); else playlists.add(l.id, songId);
+      toast(t('plAdded', { name }));
+    }
+    menu.remove();
     const card = list.querySelector(`[data-song-id="${CSS.escape(songId)}"]`);
     if (card) { const star = card.querySelector('[data-star]'); if (star) star.setAttribute('aria-pressed', isFav(songId)); const b = card.querySelector('[data-act="playlist"]'); if (b) b.setAttribute('aria-expanded', 'false'); }
     renderBar(); apply();
   });
-  list.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-pl-name]')) e.target.closest('.sv-pl-menu').querySelector('[data-pl-create]').click(); });
+  list.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-pl-name]')) e.target.closest('.sv-pl-menu').querySelector('[data-pl-confirm]').click(); });
 
   // ids of the visible songs in order, for the player bar
   const order = () => visible().map(e => e.id);
