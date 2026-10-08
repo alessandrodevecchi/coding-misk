@@ -54,7 +54,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   // resume: back to the song's code at the next bar, the user's code kept
   const userCode = s.code;
   // first the option off: the song goes on from where it has got to
-  if (await page.isChecked('#hand-from')) await page.click('#hand-from');
+  if ((await page.getAttribute('#hand-from', 'aria-pressed')) === 'true') await page.click('#hand-from');
   await page.click('#hand-resume');
   const bar = Math.ceil(s.cyc + .05);
   await untilBar(bar + 0.6);
@@ -68,7 +68,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   // the option on (default): resume goes back to the bar where the user took over
   const tookOver = Math.floor((await st()).cyc);
   await page.click('#edhost .cm-line >> nth=0'); await page.keyboard.press('End'); await page.keyboard.type(' z');
-  if (!(await page.isChecked('#hand-from'))) await page.click('#hand-from');
+  if (!((await page.getAttribute('#hand-from', 'aria-pressed')) === 'true')) await page.click('#hand-from');
   await sleep(7000);
   const beforeResume = (await st()).cyc;
   await page.click('#hand-resume'); await sleep(3500);

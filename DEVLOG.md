@@ -231,6 +231,8 @@
 
 - Tre stili nuovi chiesti dal proprietario: Cyberpunk oscuro (tritoni, glitch, stab freddi, 100-122 BPM), Cyberpunk sognante (pioggia sul neon, tappeti caldi, campane, 82-100 BPM), Darksynth (synthwave horror: cassa dritta, ottave al galoppo, lead a dente di sega, a volte chitarra distorta, 110-132 BPM). Quindici ricette valide; suoni tutti caricati; una sessione per stile: 7 brani, nessun errore di valutazione o di pagina, livelli nella norma (cassa fino a 0.85, chitarra 0.67, basso fino a 0.46).
 
+- Lo switch "dal punto in cui ero" era una casella di spunta: ora è l'interruttore a LED già usato nei dispositivi del rack (switch nel tema neon, spia accesa o spenta nel tema hardware); anche l'etichetta lo commuta.
+
 ## Prossimo passo
 
 - Endless `#21`: il proprietario ascolta le sessioni generate (`npm run endless -- --styles … --join`, brani nella libreria dopo un ricaricamento) e dà il suo parere (task 5.3); poi `openspec-verify-change` e archiviazione della change e rilascio `v0.5.0` (con conferma). Radio `#22` su `develop`: manca la prova del proprietario (task 5.3), poi verifica e archiviazione di `endless-radio`.

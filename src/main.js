@@ -176,7 +176,7 @@ function liveBuild(sg, s, cyc) {
 // ---------- hand live coding (#20) ----------
 function setHand(on) {
   hand = on;
-  $('#hand-tag').hidden = !on; $('#hand-resume').hidden = !on; $('#hand-from-wrap').hidden = !on; $('#hand-from').checked = handFromHere;
+  $('#hand-tag').hidden = !on; $('#hand-resume').hidden = !on; $('#hand-from-wrap').hidden = !on; $('#hand-from').setAttribute('aria-pressed', handFromHere);
   document.body.classList.toggle('by-hand', on);
 }
 // a character typed or deleted, a paste, a cut or a drop in the code during a live build: the user takes over
@@ -228,7 +228,9 @@ function renderHandLast() {
   $('#hand-last-code').textContent = lastHand || '';
 }
 $('#hand-resume').addEventListener('click', resumeHand);
-$('#hand-from').addEventListener('change', e => { handFromHere = e.target.checked; store.set('coding-misk-hand-from', handFromHere); });
+const toggleHandFrom = () => { handFromHere = !handFromHere; store.set('coding-misk-hand-from', handFromHere); $('#hand-from').setAttribute('aria-pressed', handFromHere); };
+$('#hand-from').addEventListener('click', toggleHandFrom);
+$('#hand-from-lbl').addEventListener('click', toggleHandFrom);
 $('#hand-copy').addEventListener('click', () => { try { navigator.clipboard.writeText(lastHand || '').then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (e) { toast(t('copyNo')); } });
 $('#hand-back').addEventListener('click', async () => {
   if (!lastHand || !song || !isPlaying()) return;
