@@ -233,8 +233,10 @@
 
 - Lo switch "dal punto in cui ero" era una casella di spunta: ora è l'interruttore a LED già usato nei dispositivi del rack (switch nel tema neon, spia accesa o spenta nel tema hardware); anche l'etichetta lo commuta.
 
+- Riscontro del proprietario registrato per chiudere le tre change: la radio e il live coding a mano provati ("molto bello, testato tutto"), richieste già fatte (pausa, tooltip, voce, voce per brano, ripresa dal punto in cui ero, switch a LED, stili cyberpunk); i brani generati li sta ascoltando uno per uno, è un lavoro lungo e non blocca il rilascio: alcuni brani non sono sbagliati ma non sono del suo gusto, da cui l'idea dei registi con personalità (`#35`). Change `endless-director`, `endless-radio` e `hand-live-coding` archiviate (specifiche in `openspec/specs/`). Rilascio `v0.5.0` su `main` con la conferma del proprietario.
+
 ## Prossimo passo
 
-- Endless `#21`: il proprietario ascolta le sessioni generate (`npm run endless -- --styles … --join`, brani nella libreria dopo un ricaricamento) e dà il suo parere (task 5.3); poi `openspec-verify-change` e archiviazione della change e rilascio `v0.5.0` (con conferma). Radio `#22` su `develop`: manca la prova del proprietario (task 5.3), poi verifica e archiviazione di `endless-radio`.
+- (fatto in `v0.5.0`) Endless `#21`: il proprietario ascolta le sessioni generate (`npm run endless -- --styles … --join`, brani nella libreria dopo un ricaricamento) e dà il suo parere (task 5.3); poi `openspec-verify-change` e archiviazione della change e rilascio `v0.5.0` (con conferma). Radio `#22` su `develop`: manca la prova del proprietario (task 5.3), poi verifica e archiviazione di `endless-radio`.
 - `#20` live coding a mano su `develop`: manca la prova del proprietario (task 4.2). Poi, a scelta: `#23` transizioni, `#24` comandi di guida, `#31` menu impostazioni, `#32` volume e barra player, `#34` ricerca brani.
 - Poi backlog: `#3` voci (aspetta circa 10 GB liberi), `#4` a `#8`. `main` e `develop` allineati a `v0.3.0`.

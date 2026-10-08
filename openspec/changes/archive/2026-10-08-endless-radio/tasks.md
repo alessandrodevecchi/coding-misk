@@ -32,7 +32,7 @@
 
 - [x] 5.1 Run the radio for at least 30 minutes with three styles and chaos 1, with the check script measuring levels and errors at every song change; verify no evaluation or page error and levels in the usual range.
 - [x] 5.2 Run `npm run check:code`, `npm run check:songs`, `npm run check:endless`, `npm run build` and the level check of the built-in songs; verify all pass before merging into `develop`.
-- [ ] 5.3 Hand the radio to the owner to try, and record the feedback in `DEVLOG.md` and issue #22.
+- [x] 5.3 Hand the radio to the owner to try, and record the feedback in `DEVLOG.md` and issue #22.
 
 ## 6. Owner feedback (first listen)
 
