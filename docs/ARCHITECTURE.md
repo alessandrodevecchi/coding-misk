@@ -71,6 +71,12 @@ Spoken comments: `tools/voice.mjs` writes `public/samples/say_<lang>/<slug>.wav`
 
 `generateSession(recipes, options)` returns `{ session, songs }`: plain v2 songs with `build` steps, so the player, the live build engine, the voice track and the exporter play them unchanged. For each song the director plans parts, tempo, key, sections and candidate tracks, then walks phrase boundaries: it applies candidate moves to a copy of the steps, measures the result with `stateAt` and `energyOf`, and keeps the move closest to the target energy. All randomness comes from named seeded streams, never `Math.random`. `tools/endless.mjs` writes songs to `songs/endless/` (git-ignored); the library picks them up through the `songs/**` glob, which skips `session.json`. The radio view (`#22`) will call the same functions in the browser.
 
+## Player bar and volume
+
+The bottom bar (`#pbar`) holds `#play` and `#stop` (moved from the top bar with their handlers), previous and next, title and position, ON AIR, volume and mute. `renderPlayerBar()` runs in `transport()` and redraws only when its text changes. Previous and next walk the Songs tab order (`libraryCards()`) and play the neighbour if music was playing; in the radio they call `radio.restart()` and `radio.skip()`.
+
+The volume is a `GainNode` inserted once between superdough's `destinationGain` and the audio destination (`applyVolume`, checked every frame like `MASTER`). The WAV recorder taps `destinationGain`, before the volume, so exports keep their level. Keys: `coding-misk-volume` (0 to 100), `coding-misk-muted`.
+
 ## Hand live coding
 
 A keystroke that edits (or a paste, cut or drop) in `#edhost` during a live build sets `hand` (`takeOver`). By hand `transport()` skips `liveBuild()`, the comment overlay, the stop at the end and `radio.tick()`; the tempo map goes on. `changed()` recompiles the song without touching the editor. Resume (`resumeHand`) keeps the editor code in `lastHand` (session storage, "Your last code" block). With "from where I was" (`coding-misk-hand-from`, default on) `resumeBuild()` types back to the song's code at `handFrom`, the bar of the takeover, and on the next bar plays the song from there (`playSong`); otherwise it types back to `codeFor(song, bar)` and evaluates on the next bar, and past the end of a song in Compose plays from the top; in the radio `radio.afterHand(bar)` starts the next song when the song on air ended. Pause and resume keep the hand code (`playSong(..., { keepHand: true })`); any other playback, skip or stop leaves the hand mode.

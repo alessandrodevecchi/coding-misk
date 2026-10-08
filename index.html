@@ -21,8 +21,6 @@
     <span class="tag" data-i18n="tag"></span>
   </div>
   <div class="transport">
-    <button id="play" class="play" aria-pressed="false">▶ Play</button>
-    <button id="stop" class="btn stopbtn" data-i18n="stop"></button>
     <div class="langs" role="group" data-i18n-aria="uiTheme"><button data-uitheme="neon">NEON</button><button data-uitheme="hw">HW</button></div>
     <div class="langs" role="group" data-i18n-aria="lang"><button data-lang="it">IT</button><button data-lang="en">EN</button></div>
   </div>
@@ -159,6 +157,21 @@
     <p class="note" data-i18n-html="note"></p>
   </aside>
 </div>
+
+<footer class="pbar" id="pbar" data-i18n-aria="player">
+  <div class="pb-btns">
+    <button class="pb-btn" id="pb-prev" data-i18n-aria="prevSong" data-i18n-title="prevSong">⏮</button>
+    <button id="play" class="play" aria-pressed="false">▶ Play</button>
+    <button class="pb-btn stopbtn" id="stop" data-i18n-aria="stop" data-i18n-title="stop">■</button>
+    <button class="pb-btn" id="pb-next" data-i18n-aria="nextSong" data-i18n-title="nextSong">⏭</button>
+  </div>
+  <div class="pb-now"><span class="pb-onair" id="pb-onair" data-i18n="radioOnAir"></span><span class="pb-title" id="pb-title"></span><span class="pb-pos" id="pb-pos"></span></div>
+  <div class="pb-vol">
+    <button class="pb-btn" id="pb-mute" aria-pressed="false" data-i18n-aria="mute" data-i18n-title="mute">🔊</button>
+    <input type="range" id="pb-volume" min="0" max="100" step="1" data-i18n-aria="volumeAll" data-i18n-title="volumeAll">
+    <output id="pb-volume-out"></output>
+  </div>
+</footer>
 
 <script type="module" src="/src/main.js"></script>
 </body>

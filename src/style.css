@@ -15,7 +15,7 @@
 
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--ui); padding-inline: 16px; padding-block: 0 48px; transition: background .4s; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--ui); padding-inline: 16px; padding-block: 0 calc(72px + env(safe-area-inset-bottom, 0px)); transition: background .4s; }
   button, select, input { font: inherit; color: inherit; }
   button { cursor: pointer; }
   :focus-visible { outline: 2px solid var(--a2); outline-offset: 2px; }
@@ -492,4 +492,49 @@
 .hand-last { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 .hand-last summary { cursor: pointer; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .hand-last pre { max-height: 180px; overflow: auto; font: 12px var(--mono); white-space: pre; margin: 8px 0; }
+
+/* player bar (#32): low, fixed at the bottom, in every tab */
+.pbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; height: 52px; padding: 0 16px env(safe-area-inset-bottom, 0px); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(10px); border-top: 1px solid color-mix(in srgb, var(--a1) 55%, var(--line)); box-shadow: 0 -1px 0 color-mix(in srgb, var(--a1) 40%, transparent), 0 -10px 30px color-mix(in srgb, var(--a1) 12%, transparent); }
+.pbar .pb-btns { display: flex; align-items: center; gap: 6px; }
+.pbar .play { min-width: 96px; min-height: 34px; padding: 0 14px; font-size: 13px; }
+.pb-btn { min-width: 34px; height: 34px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); background: transparent; color: var(--ink); font-size: 14px; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; }
+.pb-btn:hover:not(:disabled) { border-color: var(--a1); color: var(--a1); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 45%, transparent); }
+.pb-btn:disabled { opacity: .35; }
+.pb-now { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 13px; }
+.pb-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pb-pos { font: 12px var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pb-onair { display: none; font: 700 10px var(--mono); letter-spacing: .2em; padding: 2px 7px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+.pbar.radio .pb-onair { display: inline-block; }
+.pb-onair.on { color: #fff; background: #d8203c; border-color: #ff4a66; box-shadow: 0 0 12px #ff2a48; }
+.pb-vol, .radio-vol { display: flex; align-items: center; gap: 6px; }
+.pb-vol input[type=range] { width: 110px; }
+.pb-vol output, .radio-vol output { font: 11px var(--mono); color: var(--muted); min-width: 3.2em; font-variant-numeric: tabular-nums; }
+.radio-vol input[type=range] { width: 90px; }
+@media (max-width: 640px) {
+  .pbar { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; padding-inline: 10px; }
+  .pbar .play { min-width: 64px; padding: 0 8px; }
+  .pb-pos, .pb-vol output, #pb-prev { display: none; }
+  .pb-vol input[type=range] { width: 64px; }
+}
+/* hardware: a brushed panel with square mechanical buttons and an amber display */
+:root[data-ui="hw"] .pbar { backdrop-filter: none; border-top: 2px solid #0b0b0d; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 -4px 14px rgba(0,0,0,.5);
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px), linear-gradient(#3a3a40, #26262b); }
+:root[data-ui="hw"] .pb-btn, :root[data-ui="hw"] .pbar .play { border-radius: 4px; border: 1px solid #0d0d10; background: linear-gradient(#4a4a52, #2c2c32); box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 2px 0 #0d0d10; color: #e8e2d4; }
+:root[data-ui="hw"] .pb-btn:active:not(:disabled), :root[data-ui="hw"] .pbar .play:active { transform: translateY(2px); box-shadow: inset 0 1px 3px rgba(0,0,0,.6), 0 0 0 #0d0d10; }
+:root[data-ui="hw"] .pbar .play[aria-pressed="true"] { color: #ffb347; text-shadow: 0 0 6px #ff9a1f; }
+:root[data-ui="hw"] .pb-now { background: #120b04; border: 1px solid #000; border-radius: 3px; padding: 4px 10px; box-shadow: inset 0 1px 4px rgba(0,0,0,.8); }
+:root[data-ui="hw"] .pb-title, :root[data-ui="hw"] .pb-pos { font-family: var(--mono); color: #ffb347; text-shadow: 0 0 6px rgba(255,154,31,.55); }
+:root[data-ui="hw"] .pb-onair { border-radius: 50%; width: 12px; height: 12px; padding: 0; font-size: 0; background: #3a0d12; border-color: #000; }
+:root[data-ui="hw"] .pb-onair.on { background: radial-gradient(circle at 35% 35%, #ff8a99, #e0203a 60%, #7a0d18); box-shadow: 0 0 10px #ff2a48; }
+/* hardware: the volume is a small knob, the slider stays hidden behind it */
+:root[data-ui="hw"] .pb-vol input[type=range][data-knob], :root[data-ui="hw"] .radio-vol input[type=range][data-knob] { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+:root[data-ui="hw"] .pb-vol .knob, :root[data-ui="hw"] .radio-vol .knob { width: 32px; height: 32px; margin: 0 4px; }
+:root[data-ui="hw"] .pb-vol .knob-cap i, :root[data-ui="hw"] .radio-vol .knob-cap i { top: 3px; height: 9px; }
+:root[data-ui="hw"] .pb-vol output { color: #ffb347; }
+.pb-onair { white-space: nowrap; }
+@media (max-width: 640px) {
+  .pb-onair { font-size: 0; width: 10px; height: 10px; padding: 0; border-radius: 50%; }
+  .pbar.radio .pb-onair { display: inline-block; }
+}
 

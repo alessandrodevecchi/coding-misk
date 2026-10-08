@@ -1463,9 +1463,38 @@ $('#songs').addEventListener('change', e => {
 const pauseLabel = () => isPlaying() ? t('pause') : paused ? t('resume') : t('pause');
 // volume master di Strudel a 0,6: la somma degli strumenti nei drop supera 1 e saturerebbe l'uscita
 const MASTER = .6;
+// global volume (#32): a gain node after the master output, so WAV exports (taken from the master) keep their level
+let volume = Math.max(0, Math.min(100, +store.get('coding-misk-volume', 100))), muted = !!store.get('coding-misk-muted', false), volNode = null, volFor = null;
+function applyVolume() {
+  try {
+    const out = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController().output.destinationGain;
+    if (!out) return;
+    if (volFor !== out) {
+      const ctx = out.context;
+      volNode = ctx.createGain(); volNode.connect(ctx.destination);
+      out.disconnect(ctx.destination); out.connect(volNode); volFor = out;
+    }
+    const g = muted ? 0 : volume / 100;
+    if (Math.abs(volNode.gain.value - g) > 1e-4) volNode.gain.setTargetAtTime(g, volNode.context.currentTime, .02);
+  } catch (e) {}
+}
+function renderVolume() {
+  for (const id of ['pb-volume', 'radio-volume']) { const el = document.getElementById(id); if (el && +el.value !== volume) el.value = volume; }
+  for (const id of ['pb-volume-out', 'radio-volume-out']) { const el = document.getElementById(id); if (el) el.textContent = `${volume}%`; }
+  for (const id of ['pb-mute', 'radio-mute']) { const el = document.getElementById(id); if (el) { el.setAttribute('aria-pressed', muted); el.textContent = muted || !volume ? '🔇' : volume < 40 ? '🔈' : '🔊'; } }
+}
+function setVolume(v) { volume = Math.max(0, Math.min(100, Math.round(v))); if (volume > 0) muted = false; store.set('coding-misk-volume', volume); store.set('coding-misk-muted', muted); renderVolume(); applyVolume(); }
+function toggleMute() { muted = !muted; store.set('coding-misk-muted', muted); renderVolume(); applyVolume(); }
+$('#pb-volume').addEventListener('input', e => setVolume(+e.target.value));
+$('#pb-mute').addEventListener('click', toggleMute);
+renderVolume();
+// for the browser checks (tools/check-player.cjs): the node after the master output
+globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
 (function transport() {
   requestAnimationFrame(transport);
   try { const out = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController().output.destinationGain; if (out && out.gain.value !== MASTER) out.gain.value = MASTER; } catch (e) {}
+  applyVolume();
+  if (radio) renderPlayerBar();
   const s = sched();
   const playing = isPlaying();
   if (song && s && playing && !seeking) {
@@ -1552,6 +1581,48 @@ function useSound(it) {
 const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast, scheduler: sched });
 function renderSounds() { sounds.render(); }
 
+// ---------- player bar (#32) ----------
+// the library in the order of the Songs tab: composed songs, then hand-written code songs
+function libraryCards() { if (!cards.length) { const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr)); cards = [...composed, ...codedTracks()].map(tr => ({ tr, p: playable(tr) })); } return cards; }
+function currentSongId() { return mode === 'track' ? T.id : mode === 'free' && song ? song.id : null; }
+function neighbour(dir) {
+  if (mode === 'radio' && radio && radio.on) return dir > 0 ? radio.skip() : radio.restart();
+  const id = currentSongId(), list = libraryCards(), i = list.findIndex(c => c.tr.id === id);
+  return i < 0 ? -1 : i + dir >= 0 && i + dir < list.length ? i + dir : -1;
+}
+function goNeighbour(dir) {
+  const j = neighbour(dir);
+  if (typeof j !== 'number' || j < 0) return;
+  const wasPlaying = isPlaying(), { tr, p } = cards[j];
+  if (wasPlaying) return startCard(j, 0);
+  if (tr.kind === 'composed') { if (loadTrack(tr) && mode !== 'track') backToTrack(); return; }
+  if (ed) ed.stop(); paused = null; song = p; mode = 'free'; source = { kind: 'song', name: tr.title, id: tr.id }; renderSource(); if (ed) ed.setCode(p.code); updateShare();
+}
+$('#pb-prev').addEventListener('click', () => goNeighbour(-1));
+$('#pb-next').addEventListener('click', () => goNeighbour(1));
+var pbLast = '';
+function renderPlayerBar() {
+  const s = sched(), playing = isPlaying(), onRadio = mode === 'radio' && radio && radio.on, rs = onRadio ? radio.state : null;
+  let title = T.title, pos = '';
+  if (onRadio && rs) {
+    const it = rs.stream[rs.onAir], cyc = playing && s ? s.now() : rs.paused ?? it.start;
+    title = it.title; pos = t('radioBar', { n: Math.max(1, Math.floor(cyc - it.start) + 1), total: it.bars });
+  } else if (song && (playing || (paused && paused.id === song.id))) {
+    const m = song.meta, cyc = playing && s ? s.now() : paused.cyc;
+    title = mode === 'track' ? T.title : song.title || source.name || title;
+    pos = `${clock(m.secondsAt(Math.min(cyc, m.bars)))} / ${clock(m.seconds)}`;
+  } else if (mode === 'free' && source && source.name) title = source.name;
+  const onair = onRadio && !radio.paused;
+  const canNav = onRadio || (currentSongId() !== null && (mode === 'track' || (source && source.kind === 'song')));
+  const key = [title, pos, onair, canNav].join('|');
+  if (key === pbLast) return;
+  pbLast = key;
+  $('#pb-title').textContent = title || ''; $('#pb-pos').textContent = pos;
+  $('#pb-onair').classList.toggle('on', onair);
+  $('#pbar').classList.toggle('radio', onRadio);
+  $('#pb-prev').disabled = !canNav; $('#pb-next').disabled = !canNav;
+}
+
 // ---------- radio ----------
 // recipes from styles/ (the same files the command line reads); the radio plays the director's songs
 const RECIPES = usableRecipes(Object.values(import.meta.glob('../styles/*.json', { eager: true, import: 'default' })));
@@ -1580,6 +1651,10 @@ radio = createRadio({
       ed.setCode(codeFor(p, bar)); ed.evaluate();
     },
     stop: () => stop(),
+    volume: () => ({ volume, muted }),
+    setVolume: v => setVolume(v),
+    toggleMute: () => toggleMute(),
+    renderVolume: () => renderVolume(),
     // stops the sound and gives the bar it stopped at
     halt: () => { const s = sched(), cyc = s ? s.now() : 0; ed.stop(); return cyc; },
     now: () => (sched() ? sched().now() : 0),
