@@ -737,3 +737,22 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .radio-curve .past { fill: currentColor; opacity: .5; }
 @media (max-width: 560px) { .mix-row { grid-template-columns: minmax(0, 1fr) 80px auto auto auto; } }
 .radio-pos:has(.radio-curve.steer) { flex-direction: column; align-items: stretch; gap: 4px; }
+
+/* settings page (#31) */
+.set-gear { font-size: 18px; min-width: 38px; }
+.set-gear[aria-pressed="true"] { color: var(--a1); border-color: var(--a1); }
+.set-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.set-card { display: grid; gap: 12px; align-content: start; }
+.set-card h3 { margin: 0; }
+.set-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: center; }
+.set-row .lbl { font-size: 12px; color: var(--muted); }
+.set-ctrl { display: grid; gap: 4px; min-width: 0; }
+.set-ctrl .hint { margin: 0; font-size: 12px; }
+.set-ctrl select { max-width: 100%; }
+.set-vol { display: flex; align-items: center; gap: 8px; }
+.set-vol output { font: 12px var(--mono); color: var(--muted); }
+@media (max-width: 560px) { .set-row { grid-template-columns: minmax(0, 1fr); } }
+.set-ctrl .langs { justify-self: start; }
+.set-row .lbl { letter-spacing: .06em; text-transform: uppercase; font-size: 11px; }
+.set-row { align-items: start; }
+.set-row > .lbl { padding-top: 10px; }

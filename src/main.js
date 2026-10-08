@@ -15,6 +15,7 @@ import { createSongsView } from './library/songs-view.js';
 import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS } from './library/playlists.js';
 import { createPlaylistsTab } from './library/playlists-tab.js';
+import { createSettings } from './settings/settings.js';
 import { windowSong } from './endless/join.js';
 import { absoluteClips, playlistTransition, overlapOf } from './endless/transitions.js';
 import { createSession } from './endless/director.js';
@@ -81,7 +82,7 @@ if (!Array.isArray(user.codeSongs)) user.codeSongs = [];
 const codedTracks = () => [...CODED, ...user.codeSongs.map(v => ({ ...v, kind: 'coded' }))].map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
 // the radio tab (created further down, once the player exists)
-let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null;
+let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, prevTab = 'componi';
 // custom samples manifest (bank → files), for spoken comments
 let customFiles = {};
 // oggetto riproducibile: codice + mappa di sezioni e tempo
@@ -453,8 +454,10 @@ async function exportTrack(sg, as) {
   initAudioOnce(); await ready; await initAudioOnce();
   const ctx = globalThis.getAudioContext();
   const dest = ctx.createMediaStreamDestination();
-  const recorder = new MediaRecorder(dest.stream);
-  rec = { recorder, dest, chunks: [], node: null, id: sg.id, title: sg.title, total: sg.meta.seconds, ending: 0, cancel: false };
+  // WAV (decoded after the recording) or Opus (the recording itself, much smaller), from the settings (#31)
+  const opus = store.get('coding-misk-export-format', 'wav') === 'opus', mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'].find(m => globalThis.MediaRecorder && MediaRecorder.isTypeSupported(m));
+  const recorder = opus && mime ? new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 192000 }) : new MediaRecorder(dest.stream);
+  rec = { opus: !!(opus && mime), recorder, dest, chunks: [], node: null, id: sg.id, title: sg.title, total: sg.meta.seconds, ending: 0, cancel: false };
   recorder.ondataavailable = e => e.data.size && rec.chunks.push(e.data);
   recorder.onstop = () => finishExport(rec);
   tapMaster();
@@ -468,10 +471,11 @@ async function finishExport(r) {
   if (r.cancel) return toast(t('exportCancel'));
   toast(t('exportWorking'));
   const blob = new Blob(r.chunks, { type: r.recorder.mimeType });
-  const audio = await globalThis.getAudioContext().decodeAudioData(await blob.arrayBuffer());
-  const url = URL.createObjectURL(wavBlob(audio));
+  const out = r.opus ? blob : wavBlob(await globalThis.getAudioContext().decodeAudioData(await blob.arrayBuffer()));
+  const ext = r.opus ? (/ogg/.test(r.recorder.mimeType) ? 'ogg' : 'webm') : 'wav';
+  const url = URL.createObjectURL(out);
   const a = document.createElement('a');
-  a.href = url; a.download = `${(r.title || 'coding-misk').replace(/[^\w\- ]+/g, '').replace(/\s+/g, ' ').trim() || 'coding-misk'}.wav`;
+  a.href = url; a.download = `${(r.title || 'coding-misk').replace(/[^\w\- ]+/g, '').replace(/\s+/g, ' ').trim() || 'coding-misk'}.${ext}`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
   toast(t('exportDone', { name: a.download }));
@@ -1391,7 +1395,7 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'playlist', 'radio', 'artisti', 'stili', 'guida', 'suoni', 'riferimenti'];
+const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'radio', 'artisti', 'stili', 'guida', 'suoni', 'riferimenti'];
 let cards = [];
 function showTab(name) {
   $$('.tab').forEach(x => x.setAttribute('aria-selected', x.dataset.tab === name));
@@ -1400,6 +1404,9 @@ function showTab(name) {
   if (name === 'suoni') renderSounds();
   if (name === 'radio' && radio) radio.render();
   if (name === 'playlist' && playlistsTab) playlistsTab.render();
+  if (name === 'impostazioni' && settingsPage) settingsPage.render();
+  $('#open-settings').setAttribute('aria-pressed', name === 'impostazioni');
+  if (name !== 'impostazioni') prevTab = name;
   if (name === 'stili' && stylesTab) stylesTab.render();
   if (name === 'artisti' && artistsTab) artistsTab.render();
 // for the browser checks (tools/check-radio.cjs)
@@ -1968,12 +1975,21 @@ function renderAll() {
   renderStatic(); renderLessons(); renderSongs(); renderSounds(); renderRefs(); renderSource(); renderArranger(); renderTrackPanel();
   syncAll();
 }
-$$('[data-lang]').forEach(b => b.addEventListener('click', () => {
-  setLang(b.dataset.lang);
+function changeLang(l) {
+  setLang(l);
   compiled = playable({ ...T, kind: 'composed' });
   renderAll();
   if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.code);
-}));
+}
+$$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.dataset.lang)));
+// settings page (#31): the gear opens it, a second press goes back to the tab before
+settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: LOOKS, toast, confirmTwice,
+  app: {
+    ui: () => ui, setUi: v => setUi(v), lang: () => getLang(), setLang: l => changeLang(l),
+    volume: () => volume, setVolume: v => setVolume(v),
+    radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', scope: 'song' }), setRadio: (k, v) => radio && radio.setOption(k, v),
+  } });
+$('#open-settings').addEventListener('click', () => showTab($('#tab-impostazioni').hidden ? 'impostazioni' : prevTab));
 
 renderAll();
 startHardware();

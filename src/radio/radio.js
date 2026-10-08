@@ -484,5 +484,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     get state() { return S && { paused: S.paused, seed: S.recipe.seed, recipe: clone(S.recipe), onAir: S.onAir, stream: S.stream.map(x => ({ n: x.n, start: x.start, bars: x.bars, title: x.song.title, id: x.song.id, transition: x.entry.transition || null })), transition: S.stream[S.onAir].entry.transition || null }; },
     get history() { return history; },
     get options() { return current(); },
+    // defaults the settings page shows and changes (#31)
+    get settings() { return { transition: opts.transition, harmony: opts.harmony, scope: opts.scope }; },
+    setOption(k, v) { if (!['transition', 'harmony', 'scope'].includes(k)) return; opts[k] = v; saveOpts(); if (!root.hidden) render(); },
   };
 }
