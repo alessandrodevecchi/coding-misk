@@ -10,7 +10,9 @@ import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAP
 import { mixParts, stylesOf } from '../src/endless/mix.js';
 import { loadStyles } from './styles-dir.mjs';
 import { generateSession, createSession } from '../src/endless/director.js';
-import { validateArtist } from '../src/endless/artist.js';
+import { validateArtist, ARTIST_FIELDS, PALETTES, MOVE_KINDS, VOICE_CHARACTER_NAMES } from '../src/endless/artist.js';
+import { QUIRKS } from '../src/endless/quirks.js';
+import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
@@ -296,6 +298,26 @@ const CHECKS = {
     artist.styles = { phonk: 1 };
     const again = generateSession(loadStyles(), { artist: recorded, seed: 'replay', minutes: 10 });
     assert(JSON.stringify(again.songs) === JSON.stringify(first.songs), 'replay from the recorded artist differs');
+  },
+  'artists: the built-in artists are valid, make valid songs and differ'() {
+    const ids = STYLES.map(r => r.id), arts = loadArtists();
+    assert(arts.length >= 6, `${arts.length} built-in artists`);
+    const prof = {};
+    for (const a of arts) {
+      const { errors } = validateArtist(a, ids);
+      assert(!errors.length, `${a.id}: ${errors.map(e => `${e.path}: ${e.msg}`).join('; ')}`);
+      const g = generateSession(loadStyles(), { artist: a, seed: `builtin-${a.id}`, minutes: 25 });
+      g.songs.forEach(sg => { const v = validateSong(sg); assert(!v.errors.length, `${a.id} ${sg.id}: ${v.errors[0] && v.errors[0].msg}`); });
+      prof[a.id] = { styles: [...new Set(g.session.songs.map(e => e.parts.dominant))].sort().join(), energy: avg(g.session.songs.flatMap(e => e.phrases.map(p => p.energy))) };
+    }
+    const keys = Object.values(prof).map(p => p.styles);
+    assert(new Set(keys).size === keys.length, `two artists use the same styles: ${JSON.stringify(prof)}`);
+    assert(prof.hype.energy > prof.dreamer.energy + 0.1, `HYPERDROP (${prof.hype.energy.toFixed(2)}) not clearly above Lumen Drift (${prof.dreamer.energy.toFixed(2)})`);
+  },
+  'docs: ARTISTS.md names every artist field'() {
+    const doc = fs.readFileSync(new URL('../docs/ARTISTS.md', import.meta.url), 'utf8');
+    const missing = [...new Set([...ARTIST_FIELDS, ...PALETTES, ...MOVE_KINDS, ...VOICE_CHARACTER_NAMES, ...Object.keys(QUIRKS)])].filter(n => !doc.includes(`\`${n}\``));
+    assert(!missing.length, `not in docs/ARTISTS.md: ${missing.join(', ')}`);
   },
   'determinism: same seed, same session'() {
     const opts = { styles: ['melodic-metal', 'drum-and-bass'], chaos: 0.5, seed: 'aurora' };

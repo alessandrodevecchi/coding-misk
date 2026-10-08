@@ -1,0 +1,60 @@
+{
+  "format": 1,
+  "id": "dreamer",
+  "name": "Lumen Drift",
+  "bio": {
+    "en": "Rain on neon and long held chords: drifts more than it builds.",
+    "it": "Pioggia sul neon e accordi lunghi: più che costruire, va alla deriva."
+  },
+  "inspiredBy": "ambient records at 3 a.m.",
+  "portrait": {
+    "seed": "lumen",
+    "palette": "ice"
+  },
+  "styles": {
+    "ambient": 3,
+    "dreamy-cyberpunk": 3,
+    "lo-fi": 1
+  },
+  "explore": 0.08,
+  "chaos": [
+    0.1,
+    0.4
+  ],
+  "energy": [
+    0.15,
+    0.5
+  ],
+  "complexity": [
+    0.2,
+    0.5
+  ],
+  "talk": [
+    0.1,
+    0.35
+  ],
+  "shapes": {
+    "descent": 2,
+    "waves": 2,
+    "slow-burn": 2
+  },
+  "pace": [
+    0.15,
+    0.4
+  ],
+  "moves": {
+    "more-space": 3,
+    "darker": 1,
+    "strip": 1
+  },
+  "voice": {
+    "characters": {
+      "cathedral": 3,
+      "slow": 2
+    },
+    "chance": 0.6
+  },
+  "quirks": {
+    "slow-builds": 0.6
+  }
+}

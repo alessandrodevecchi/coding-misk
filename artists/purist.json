@@ -1,0 +1,53 @@
+{
+  "format": 1,
+  "id": "purist",
+  "name": "The Purist",
+  "bio": {
+    "en": "One style, done right: steady grooves, no tricks, few words.",
+    "it": "Uno stile, fatto bene: groove costanti, niente trucchi, poche parole."
+  },
+  "inspiredBy": "minimal techno and jazz trios",
+  "portrait": {
+    "seed": "purist",
+    "palette": "mono"
+  },
+  "styles": {
+    "jazz": 2,
+    "berlin-techno": 2,
+    "lo-fi": 1
+  },
+  "explore": 0,
+  "chaos": [
+    0,
+    0.1
+  ],
+  "energy": [
+    0.4,
+    0.65
+  ],
+  "complexity": [
+    0.2,
+    0.5
+  ],
+  "talk": [
+    0,
+    0.2
+  ],
+  "shapes": {
+    "flat-groove": 4,
+    "waves": 1
+  },
+  "pace": [
+    0.2,
+    0.4
+  ],
+  "moves": {
+    "variation": 3
+  },
+  "voice": {
+    "chance": 0.1
+  },
+  "quirks": {
+    "no-guitars": 1
+  }
+}

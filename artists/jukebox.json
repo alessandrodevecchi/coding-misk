@@ -1,0 +1,51 @@
+{
+  "format": 1,
+  "id": "jukebox",
+  "name": "Jukebox Joe",
+  "bio": {
+    "en": "Never plays the same thing twice: every style, all mixed up.",
+    "it": "Non suona mai due volte la stessa cosa: tutti gli stili, mescolati."
+  },
+  "inspiredBy": "a broken jukebox in a road bar",
+  "portrait": {
+    "seed": "joe-jukebox",
+    "palette": "sunset"
+  },
+  "styles": {
+    "synthwave": 1,
+    "jazz": 1,
+    "country": 1,
+    "classic-rock": 1,
+    "lo-fi": 1,
+    "phonk": 1,
+    "trance": 1,
+    "melodic-metal": 1
+  },
+  "explore": 0.3,
+  "chaos": [
+    0.6,
+    1
+  ],
+  "energy": [
+    0.3,
+    0.9
+  ],
+  "complexity": [
+    0.3,
+    0.9
+  ],
+  "talk": [
+    0.3,
+    0.7
+  ],
+  "pace": [
+    0.3,
+    0.8
+  ],
+  "voice": {
+    "chance": 0.6
+  },
+  "quirks": {
+    "hard-endings": 0.3
+  }
+}

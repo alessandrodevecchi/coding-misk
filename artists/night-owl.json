@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "id": "night-owl",
+  "name": "Night Owl",
+  "bio": {
+    "en": "Plays when the city sleeps: dark, patient techno that grows slowly and barely speaks.",
+    "it": "Suona quando la città dorme: techno scura e paziente, che cresce piano e parla poco."
+  },
+  "inspiredBy": "Berlin basement nights",
+  "portrait": {
+    "seed": "owl-7",
+    "palette": "violet"
+  },
+  "styles": {
+    "berlin-techno": 4,
+    "industrial": 2,
+    "dark-cyberpunk": 1
+  },
+  "explore": 0.05,
+  "chaos": [
+    0.05,
+    0.3
+  ],
+  "energy": [
+    0.45,
+    0.75
+  ],
+  "complexity": [
+    0.3,
+    0.6
+  ],
+  "talk": [
+    0.05,
+    0.25
+  ],
+  "shapes": {
+    "slow-burn": 3,
+    "flat-groove": 2,
+    "build-drop": 1
+  },
+  "pace": [
+    0.2,
+    0.45
+  ],
+  "moves": {
+    "darker": 2,
+    "dirtier": 2,
+    "variation": 1
+  },
+  "voice": {
+    "characters": {
+      "deep": 2,
+      "radio": 1
+    },
+    "chance": 0.5
+  },
+  "quirks": {
+    "long-breaks": 0.4,
+    "texture-first": 0.3
+  }
+}

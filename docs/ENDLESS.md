@@ -147,12 +147,17 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Songs drawn from an artist's taste           | `artists: songs draw their values from the taste`                |
 | Quirks                                       | `artists: quirks do what they say`                               |
 | Replay with the recorded artist              | `artists: a recorded session replays the same after the artist changes` |
+| Built-in artists                             | `artists: the built-in artists are valid, make valid songs and differ` |
 | Same seed, same session                      | `determinism: same seed, same session`                           |
 | Seed recorded                                | `determinism: a session without seed records the seed`           |
 | No unintended change                         | `determinism: seed fixtures`                                     |
 | Song by song equals a whole session          | `radio: song by song equals a whole session`                     |
 | Options apply from the next song             | `radio: an option change applies from the next song and replays the same` |
 | Window keeps each song, at any offset        | `radio: window song keeps each song as it is, at any offset`     |
+
+## Artists
+
+Artists (`docs/ARTISTS.md`) are tastes the director samples for every song: favourite styles with weights, ranges for chaos, energy, complexity, voice and pace, preferred shapes and moves, voice characters and quirks. Pass one with `--artist` or pick it in the Radio.
 
 ## Later phases
 

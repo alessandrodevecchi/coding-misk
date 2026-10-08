@@ -39,7 +39,7 @@ For each song, `next(options)` turns the artist into concrete options with the `
 
 **6. Sheets and forms from one description.** A small field description per format (label, kind: range, weights, list, menu, text) drives both the read-only sheet and the edit form, so new fields appear in both. The advanced JSON view edits the raw object and shows the validator's errors with their paths.
 
-**7. Progressive house and a major mode.** `MODES` gains `major` (Strudel's major scale), used by hooks in uplifting styles. The progressive house recipe uses the existing major progressions (`rock` I-V-vi-IV, `country` I-IV-V) plus a new `euphoria` progression (vi-IV-I-V), piano stabs, plucked arps and a four-on-the-floor groove.
+**7. Progressive house without a new mode.** Keys in the app are written as minor keys, whose notes are those of their relative major, and the existing `epica` progression is vi-IV-I-V of that major (the progression of "Wake Me Up"). Hooks in `minor` mode therefore already use the right notes; a `major` mode would build a major scale on the minor root and clash with the chords, so none is added. The progressive house recipe uses `epica`, `euforica`, `anthem`, `ascesa` and `rock`, piano and supersaw sounds, plucked arps and a four-on-the-floor groove.
 
 ## Risks / Trade-offs
 

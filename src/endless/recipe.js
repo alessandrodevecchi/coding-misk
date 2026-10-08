@@ -49,7 +49,8 @@ export const RECIPE_DEFAULTS = {
   voice: VOICE_DEFAULT,
 };
 
-export const TOP_FIELDS = ['id', 'name', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'words', ...Object.keys(INSTRUMENTS)];
+export const RECIPE_FORMAT = 1;
+export const TOP_FIELDS = ['format', 'id', 'name', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'words', ...Object.keys(INSTRUMENTS)];
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const isInt = v => Number.isInteger(v);
 const knownSound = w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w);
@@ -74,6 +75,7 @@ export function validateRecipe(r) {
   if (!r || typeof r !== 'object' || Array.isArray(r)) { err('', 'a recipe is a JSON object'); return { errors, warnings }; }
   for (const k of Object.keys(r)) if (!TOP_FIELDS.includes(k)) warn(k, `unknown field; recipe fields: ${TOP_FIELDS.join(', ')}`);
 
+  if (r.format !== undefined && (!Number.isInteger(r.format) || r.format < 1 || r.format > RECIPE_FORMAT)) err('format', `a format version from 1 to ${RECIPE_FORMAT}`);
   if (typeof r.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(r.id)) err('id', 'lowercase letters, digits and hyphens, for example "berlin-techno"');
   for (const lang of ['en', 'it']) if (!r.name || typeof r.name[lang] !== 'string' || !r.name[lang].trim()) err(`name.${lang}`, 'the style name in English and Italian, for example {"en": "Berlin techno", "it": "Techno berlinese"}');
 

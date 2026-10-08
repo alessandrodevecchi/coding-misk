@@ -11,7 +11,7 @@ Listening to generated songs, the owner found that many are not wrong, just not 
   - **Taste with variety:** favourite styles with weights (other styles stay possible, more rarely), and ranges rather than fixed values for chaos, energy, complexity and voice amount, preferred energy shapes, pace of change and favourite kinds of move, voice characters. Each song draws its own values, so two songs by the same artist differ.
   - **Quirks:** a few habits from a fixed list, each with a chance (for example "two drops", "long breaks", "no guitars", "texture first", "hard endings").
   - **Six to start:** a dark techno night owl, a hype drop maker, a dreamer, a jukebox, a purist, and one inspired by Avicii (melodic progressive house).
-- **New style** progressive house for the Avicii-inspired artist, with a major mode for uplifting hooks.
+- **New style** progressive house for the Avicii-inspired artist (uplifting vi-IV-I-V progressions, piano, plucks, supersaw).
 - **Styles tab:** every style as a readable sheet (tempo, keys, chords, instruments, sounds, shapes, voice), editable with a form and an advanced JSON view; built-in styles are read-only and can be duplicated; your styles live in the browser, with import and export as JSON; validation errors shown in place.
 - **Artists tab:** profiles as cards, the character sheet, edit, duplicate, create, import and export, same rules.
 - **Where artists are used:** the Radio gets an artist picker (picking one sets styles and sliders; touching them makes the session "custom"); Compose gets "New song from artist", which writes one live build song and opens it.

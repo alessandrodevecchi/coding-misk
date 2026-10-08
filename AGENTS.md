@@ -13,6 +13,7 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 | `docs/COMPOSING.md`     | Guide to composing songs as code, with validated examples in `songs/examples/`        |
 | `docs/VOCALS.md`        | Vocals research (`#3`): local models, licenses, recording, effects, channel design   |
 | `docs/ENDLESS.md`       | Endless director (`#18`, `#21`): sessions, energy shapes, moves, rules, checks        |
+| `docs/ARTISTS.md`       | Artists (`#35`): profile, taste with variety, quirks, built-in artists in `artists/`   |
 | `docs/STYLES.md`        | Style recipes in `styles/`: fields, mixing styles with chaos, adding a style          |
 | `docs/PLAN-TRACKS.md`   | Plan for tracks, per-instrument patterns and a timeline (proposal)                   |
 | `openspec/`             | OpenSpec specs and changes (spec-driven development, used for `#18` endless mode)     |
@@ -60,6 +61,7 @@ npm run check:songs                                    # validate every song in 
 npm run voices                                         # spoken comments for live builds (macOS say + ffmpeg)
 npm run endless -- --styles berlin-techno,jazz --chaos 0.5 --minutes 20 --seed aurora --join   # endless session in songs/endless/ (git-ignored), with a report
 npm run check:styles                                   # validate the style recipes in styles/
+node --no-warnings tools/artist.mjs validate|list      # artists in artists/; npm run endless -- --artist night-owl
 npm run check:endless                                  # recipes, director rules, determinism (seed fixtures), command line
 node tools/check-style-sounds.cjs                      # every sound and drum machine a recipe names is loaded (dev server)
 node tools/check-endless-play.cjs [songs/endless]     # evaluate every live build step of generated songs and open each from the song menu (dev server)

@@ -20,6 +20,7 @@ One recipe per file, `styles/<id>.json`. Required fields are marked.
 
 | Field          | Value                                                                                      | Default                 |
 | -------------- | ------------------------------------------------------------------------------------------ | ----------------------- |
+| `format`       | Format version of the file (1). Fields added by later versions take their defaults when missing. | `1` |
 | `id`           | Required. Lowercase letters, digits and hyphens, the same as the file name.               |                         |
 | `name`         | Required. `{ "en": "...", "it": "..." }`                                                   |                         |
 | `description`  | One sentence on the sound of the style, for people and agents.                             |                         |

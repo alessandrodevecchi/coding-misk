@@ -1,0 +1,60 @@
+{
+  "format": 1,
+  "id": "horizon",
+  "name": "Wake Horizon",
+  "bio": {
+    "en": "Euphoric melodies over piano and pumping bass: songs that feel like a sunrise.",
+    "it": "Melodie euforiche su piano e basso pompato: brani che sembrano un'alba."
+  },
+  "inspiredBy": "Avicii",
+  "portrait": {
+    "seed": "wake-horizon",
+    "palette": "amber"
+  },
+  "styles": {
+    "progressive-house": 5,
+    "trance": 1,
+    "synthwave": 1
+  },
+  "explore": 0.05,
+  "chaos": [
+    0.05,
+    0.3
+  ],
+  "energy": [
+    0.6,
+    0.95
+  ],
+  "complexity": [
+    0.4,
+    0.7
+  ],
+  "talk": [
+    0.3,
+    0.6
+  ],
+  "shapes": {
+    "build-drop": 3,
+    "late-peak": 2,
+    "verse-chorus": 1
+  },
+  "pace": [
+    0.45,
+    0.7
+  ],
+  "moves": {
+    "brighter": 3,
+    "add-lead": 2,
+    "add-pad": 1
+  },
+  "voice": {
+    "characters": {
+      "bright": 2,
+      "echo": 1
+    },
+    "chance": 0.4
+  },
+  "quirks": {
+    "two-drops": 0.3
+  }
+}

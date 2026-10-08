@@ -9,9 +9,9 @@
 
 ## 2. Built-in artists and progressive house
 
-- [ ] 2.1 Add the `major` mode and the `euphoria` progression to `src/music.js`, and `styles/progressive-house.json`; verify `npm run check:code`, `npm run check:styles` and the browser sound check.
-- [ ] 2.2 Write the six artists in `artists/` (night owl, hype, dreamer, jukebox, purist, Avicii-inspired) with bios in English and Italian; verify in `check:endless` that they are valid, generate valid songs, and differ from each other (styles used, average energy, shapes).
-- [ ] 2.3 Document artists in `docs/ARTISTS.md` (format, taste, quirks, how songs are drawn, versions) and update `docs/ENDLESS.md` and `docs/STYLES.md`; verify the documented fields match the validator.
+- [x] 2.1 Add `styles/progressive-house.json` (uplifting progressions already in the app, see design decision 7); verify `npm run check:styles` and the browser sound check.
+- [x] 2.2 Write the six artists in `artists/` (night owl, hype, dreamer, jukebox, purist, Avicii-inspired) with bios in English and Italian; verify in `check:endless` that they are valid, generate valid songs, and differ from each other (styles used, average energy, shapes).
+- [x] 2.3 Document artists in `docs/ARTISTS.md` (format, taste, quirks, how songs are drawn, versions) and update `docs/ENDLESS.md` and `docs/STYLES.md`; verify the documented fields match the validator.
 
 ## 3. Styles tab
 

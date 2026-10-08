@@ -1,38 +1,45 @@
 {
   "format": 1,
-  "id": "trance",
+  "id": "progressive-house",
   "name": {
-    "en": "Trance",
-    "it": "Trance"
+    "en": "Progressive house",
+    "it": "Progressive house"
   },
-  "description": "Driving trance with rolling bass, arpeggios and a big lift before the drop.",
+  "description": "Uplifting festival house: four-on-the-floor, offbeat and pumping bass, piano chords, plucked arps and a big singable lead over vi-IV-I-V.",
   "tempo": [
-    134,
-    140
+    124,
+    128
   ],
   "keys": [
+    "B",
     "A",
-    "F#",
     "G",
-    "B"
+    "F#"
   ],
   "progressions": [
     "epica",
     "euforica",
     "anthem",
     "ascesa",
-    "ipnotica"
+    "rock"
   ],
   "shapes": [
     "build-drop",
     "late-peak",
-    "waves"
+    "verse-chorus"
   ],
   "minutes": [
-    4,
-    6
+    3,
+    5
   ],
   "phrase": 8,
+  "tracks": {
+    "usual": [
+      4,
+      5
+    ],
+    "max": 7
+  },
   "drums": {
     "kits": [
       "RolandTR909"
@@ -44,9 +51,9 @@
   },
   "bass": {
     "presets": [
-      "rolling",
       "offbeat",
-      "galoppo"
+      "pumping",
+      "rolling"
     ],
     "waves": [
       "sawtooth",
@@ -54,70 +61,60 @@
     ],
     "settings": {
       "cutoff": [
-        400,
-        1200
-      ],
-      "reso": [
-        6,
-        10
+        500,
+        1400
       ]
     }
   },
   "arp": {
     "presets": [
-      "su",
       "sugiu",
-      "pulsar",
-      "spezzato"
+      "su",
+      "pedale"
     ],
     "waves": [
+      "triangle",
       "supersaw",
-      "sawtooth"
+      "gm_piano"
     ],
     "speeds": [
-      "16"
+      "16",
+      "8"
     ],
     "settings": {
-      "cutoff": [
-        1200,
-        3200
+      "gain": [
+        0.18,
+        0.28
       ]
     }
   },
   "hook": {
     "presets": [
-      "neon",
       "eroico",
-      "scintilla",
-      "orizzonte"
+      "orizzonte",
+      "decade",
+      "neon"
     ],
     "waves": [
-      "square",
       "supersaw",
+      "gm_piano",
       "gm_lead_2_sawtooth"
     ],
     "modes": [
-      "minor",
-      "phrygian"
-    ],
-    "weight": 0.7
+      "minor"
+    ]
   },
   "pad": {
     "presets": [
-      "pad",
+      "sidechain",
       "pump",
-      "sidechain"
+      "stab"
     ],
     "waves": [
+      "gm_piano",
       "supersaw",
-      "gm_pad_warm"
-    ],
-    "settings": {
-      "cutoff": [
-        900,
-        2200
-      ]
-    }
+      "gm_string_ensemble_1"
+    ]
   },
   "riser": {},
   "voice": {
@@ -127,8 +124,8 @@
     ],
     "gain": 0.3,
     "pitch": [
-      0.95,
-      1.25
+      1,
+      1.2
     ],
     "tempo": [
       0.85,
@@ -139,44 +136,44 @@
       600
     ],
     "room": [
-      0.6,
-      0.9
+      0.5,
+      0.8
     ],
     "delay": [
-      0.3,
+      0.35,
       0.55
     ]
   },
   "words": {
     "en": [
+      "Wake",
+      "Levels",
       "Horizon",
-      "Ascent",
-      "Skyline",
-      "Lift",
-      "Aurora",
-      "Rise",
-      "Beacon",
-      "Signal"
+      "Bright",
+      "Heart",
+      "Summer",
+      "Waiting",
+      "Home"
     ],
     "it": [
+      "Risveglio",
       "Orizzonte",
-      "Ascesa",
-      "Volo",
-      "Aurora",
-      "Faro",
-      "Cielo",
       "Luce",
-      "Slancio"
+      "Cuore",
+      "Estate",
+      "Casa",
+      "Volo",
+      "Alba"
     ],
     "es": [
+      "Despertar",
       "Horizonte",
-      "Ascenso",
-      "Vuelo",
-      "Aurora",
-      "Faro",
-      "Cielo",
       "Luz",
-      "Impulso"
+      "Corazón",
+      "Verano",
+      "Hogar",
+      "Vuelo",
+      "Alba"
     ]
   }
 }

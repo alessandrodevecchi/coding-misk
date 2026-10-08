@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "id": "hype",
+  "name": "HYPERDROP",
+  "bio": {
+    "en": "Lives for the drop: builds fast, hits hard, and never stops talking.",
+    "it": "Vive per il drop: costruisce in fretta, colpisce forte e non smette mai di parlare."
+  },
+  "inspiredBy": "festival main stages",
+  "portrait": {
+    "seed": "hype-3",
+    "palette": "neon"
+  },
+  "styles": {
+    "trance": 3,
+    "drum-and-bass": 2,
+    "phonk": 2,
+    "progressive-house": 1
+  },
+  "explore": 0.1,
+  "chaos": [
+    0.2,
+    0.5
+  ],
+  "energy": [
+    0.7,
+    1
+  ],
+  "complexity": [
+    0.5,
+    0.85
+  ],
+  "talk": [
+    0.6,
+    0.9
+  ],
+  "shapes": {
+    "build-drop": 4,
+    "late-peak": 2
+  },
+  "pace": [
+    0.6,
+    0.9
+  ],
+  "moves": {
+    "brighter": 2,
+    "dirtier": 1,
+    "add-lead": 2
+  },
+  "voice": {
+    "characters": {
+      "bright": 2,
+      "echo": 1
+    },
+    "chance": 0.5
+  },
+  "quirks": {
+    "two-drops": 0.6,
+    "talks-a-lot": 0.5
+  }
+}
