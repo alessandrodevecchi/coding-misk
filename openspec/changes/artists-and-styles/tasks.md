@@ -25,6 +25,6 @@
 
 ## 5. Radio and Compose
 
-- [ ] 5.1 Add the artist picker to the radio (sets styles and sliders, "custom" after a change, artist in the now playing card, recorded in the session recipe); verify in `tools/check-radio.cjs`.
-- [ ] 5.2 Add "New song from artist" in Compose; verify in the browser that it opens an unsaved live build song that plays and can be saved.
-- [ ] 5.3 Update README (both languages), `docs/ARCHITECTURE.md`, `docs/CONTEXT.md`, `AGENTS.md`, `DEVLOG.md`; run every check and `npm run build`; hand it to the owner.
+- [x] 5.1 Add the artist picker to the radio (sets styles and sliders, "custom" after a change, artist in the now playing card, recorded in the session recipe); verify in `tools/check-radio.cjs`.
+- [x] 5.2 Add "New song from artist" in Compose; verify in the browser that it opens an unsaved live build song that plays and can be saved.
+- [x] 5.3 Update README (both languages), `docs/ARCHITECTURE.md`, `docs/CONTEXT.md`, `AGENTS.md`, `DEVLOG.md`; run every check and `npm run build`; hand it to the owner.

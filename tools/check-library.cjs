@@ -80,6 +80,33 @@ const shots = process.argv[2];
   const savedArt = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-artists') || '[]').find(a => a.name === 'Sunrise Test'));
   check(savedArt && savedArt.quirks && savedArt.quirks['no-guitars'] === 1, 'a duplicated artist is saved with its changes');
 
+  // radio: picking an artist sets styles and sliders, the song names the artist, a slider makes it custom
+  await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.click('#tab-radio [data-artist="night-owl"]'); await sleep(200);
+  const picked = await page.$$eval('#tab-radio [data-style][aria-pressed="true"]', xs => xs.map(x => x.dataset.style).sort().join(','));
+  check(picked === 'berlin-techno,dark-cyberpunk,industrial', 'picking an artist selects its favourite styles', picked);
+  await page.fill('#radio-seed', 'artist'); await page.click('#radio-start'); await sleep(5000);
+  const card = await page.innerText('#radio-now');
+  const rec = await page.evaluate(() => codingMiskRadio.state.recipe);
+  check(/Night Owl/.test(card) && rec.options.artist && rec.options.artist.id === 'night-owl', 'the song on air names the artist and the session records it');
+  if (shots) await (await page.$('#tab-radio')).screenshot({ path: path.join(shots, 'radio-artist.png') });
+  await page.evaluate(() => { const el = document.getElementById('radio-energy'); el.value = 0.9; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  check(await page.getAttribute('#tab-radio [data-artist=""]', 'aria-pressed') === 'true', 'moving a slider makes the session custom');
+  await page.click('#radio-start'); await sleep(300);
+
+  // Compose: a new song from an artist opens unsaved, plays as a live build, and can be saved
+  await page.click('[data-tab="componi"]'); await sleep(300);
+  await page.selectOption('#tr-artist', 'dreamer'); await sleep(800);
+  const title = await page.inputValue('#track-title'), dirtyTxt = await page.innerText('#dirty');
+  check(title && dirtyTxt.trim().length > 0, 'a new song from an artist opens in Compose, unsaved', `${title} · ${dirtyTxt}`);
+  await page.click('#play'); await sleep(5000);
+  const ev = await page.evaluate(() => { const e = document.querySelector('strudel-editor').editor; return { err: String(e.repl.state.evalError || ''), started: e.repl.scheduler.started }; });
+  check(ev.started && !ev.err, 'it plays as a live build without errors');
+  await page.click('#stop');
+  const libN = await page.evaluate(() => (JSON.parse(localStorage.getItem('coding-misk-library') || '{"tracks":[]}').tracks || []).length);
+  await page.click('#tr-save'); await sleep(300);
+  check(await page.evaluate(() => (JSON.parse(localStorage.getItem('coding-misk-library') || '{"tracks":[]}').tracks || []).length) === libN + 1, 'it can be saved to the library');
+
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `${failed} failed` : 'all passed');

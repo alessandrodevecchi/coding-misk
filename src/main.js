@@ -10,6 +10,7 @@ import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { createStylesTab } from './library/styles-tab.js';
 import { createArtistsTab } from './library/artists-tab.js';
+import { createSession } from './endless/director.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
 import { machineLabel, prettyName } from './sounds/catalog.js';
@@ -873,6 +874,24 @@ $('#tr-new').addEventListener('click', () => {
     tracks: [{ id: 'drums', name: t('drums'), type: 'drums', settings: baseSettings('drums'), patterns: { A: DEFAULT_PATTERN.drums() }, clips: [{ section: name, pattern: 'A' }] }] });
   sel = 0; tk = 0; editPat = null; syncAll(); changed(); renderTrackPanel();
 });
+// a new live build song by an artist (#35): written by the director, opened unsaved
+function renderArtistPick() {
+  const sel = $('#tr-artist'); if (!sel || !artistsTab) return;
+  sel.innerHTML = `<option value="">${esc(t('newFromArtist'))}</option>` + artistsTab.usable().map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
+}
+$('#tr-artist').addEventListener('change', e => {
+  const a = artistsTab && artistsTab.usable().find(x => x.id === e.target.value);
+  e.target.value = '';
+  if (!a) return;
+  if (dirty && !confirmTwice('new', t('loadConfirm'))) return;
+  const { song: sg } = createSession(RECIPES).next({ artist: a });
+  const tr = { ...sg, id: 'u-' + Date.now(), kind: 'composed', style: { en: `${a.name} · ${sg.style.en}`, it: `${a.name} · ${sg.style.it}` } };
+  dirty = false;
+  if (!loadTrack(tr)) return;
+  dirty = true; saveDraft(); renderArranger();
+  if (mode !== 'track') backToTrack();
+  toast(t('newFromArtistDone', { name: a.name }));
+});
 $('#tr-del').addEventListener('click', () => {
   if (!confirmTwice('delete')) return;
   const orig = builtinOf(T.id);
@@ -1665,11 +1684,12 @@ stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins
 RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
 // artists from artists/ plus the user's (Artists tab)
 const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));
-artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onChange: () => { if (radio) radio.render(); } });
+artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onChange: () => { if (radio) radio.render(); renderArtistPick(); } });
+renderArtistPick();
 // preloads the spoken comments of a song, silently, as playSong does
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
 radio = createRadio({
-  root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang,
+  root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a),
   player: {
     makePlayable: sg => playable({ ...sg, kind: 'composed' }),
     start: (p, bar) => playSong(p, bar, 'radio'),
@@ -1723,6 +1743,7 @@ function renderStatic() {
   if (radio) radio.render();
   if (stylesTab) stylesTab.render();
   if (artistsTab) artistsTab.render();
+  renderArtistPick();
   $('#looks').innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${esc(tx(l))}</button>`).join('');
   $('#play').dataset.state = '';
 }

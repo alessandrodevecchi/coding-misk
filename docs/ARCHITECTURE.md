@@ -71,6 +71,10 @@ Spoken comments: `tools/voice.mjs` writes `public/samples/say_<lang>/<slug>.wav`
 
 `generateSession(recipes, options)` returns `{ session, songs }`: plain v2 songs with `build` steps, so the player, the live build engine, the voice track and the exporter play them unchanged. For each song the director plans parts, tempo, key, sections and candidate tracks, then walks phrase boundaries: it applies candidate moves to a copy of the steps, measures the result with `stateAt` and `energyOf`, and keeps the move closest to the target energy. All randomness comes from named seeded streams, never `Math.random`. `tools/endless.mjs` writes songs to `songs/endless/` (git-ignored); the library picks them up through the `songs/**` glob, which skips `session.json`. The radio view (`#22`) will call the same functions in the browser.
 
+## Artists and styles tabs
+
+`src/library/styles-tab.js` and `src/library/artists-tab.js` (shared helpers in `src/library/library.js`) list built-ins (`styles/*.json`, `artists/*.json`, read-only, loaded with `import.meta.glob`) and the user's items (browser storage `coding-misk-styles`, `coding-misk-artists`), show sheets, and edit with a form and a JSON view validated by `validateRecipe` and `validateArtist`. The radio's `RECIPES` array is refilled in place with the built-ins plus the user's valid styles whenever they change. The radio's artist picker sends the whole artist to the director (`next({ artist })`), which draws each song's options from it; Compose's "New song from artist" calls `createSession(RECIPES).next({ artist })` and opens the song unsaved. Portraits come from `src/endless/portrait.js` (16x16 from a seed and a palette).
+
 ## Player bar and volume
 
 The bottom bar (`#pbar`) holds `#play` and `#stop` (moved from the top bar with their handlers), previous and next, title and position, ON AIR, volume and mute. `renderPlayerBar()` runs in `transport()` and redraws only when its text changes. Previous and next walk the Songs tab order (`libraryCards()`) and play the neighbour if music was playing; in the radio they call `radio.restart()` and `radio.skip()`.

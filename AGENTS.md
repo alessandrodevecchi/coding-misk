@@ -65,6 +65,7 @@ node --no-warnings tools/artist.mjs validate|list      # artists in artists/; np
 npm run check:endless                                  # recipes, director rules, determinism (seed fixtures), command line
 node tools/check-style-sounds.cjs                      # every sound and drum machine a recipe names is loaded (dev server)
 node tools/check-endless-play.cjs [songs/endless]     # evaluate every live build step of generated songs and open each from the song menu (dev server)
+node tools/check-library.cjs [shots-dir]               # Styles and Artists tabs, radio artist picker, new song from artist (dev server)
 node tools/check-player.cjs                            # player bar and global volume: modes, previous and next, volume after the master, layout (dev server)
 node tools/check-hand.cjs                              # hand live coding in Compose: take over, steps held, resume, last code (dev server)
 node --no-warnings tools/check-radio.cjs [--long 30]  # radio in the browser: controls, same songs as the director, skip, history, save, open in Compose (dev server)

@@ -7,6 +7,7 @@ import { createSession, OPTION_DEFAULTS } from '../endless/director.js';
 import { windowSong } from '../endless/join.js';
 import { validateRecipe } from '../endless/recipe.js';
 import { buildSteps, sayText } from '../song/build.js';
+import { QUIRKS } from '../endless/quirks.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -23,13 +24,15 @@ export function usableRecipes(list) {
   }).sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang }) {
+export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang, artists = () => [], face = () => '' }) {
   const ids = recipes.map(r => r.id);
   const saved = store.get('coding-misk-radio', null) || {};
   const opts = {
     styles: (saved.styles || []).filter(id => ids.includes(id)),
     chaos: saved.chaos ?? OPTION_DEFAULTS.chaos, energy: saved.energy ?? OPTION_DEFAULTS.energy, complexity: saved.complexity ?? OPTION_DEFAULTS.complexity,
     talk: saved.talk ?? OPTION_DEFAULTS.talk,
+    // the artist picked (its id), or null when the controls are set by hand ("custom")
+    artist: saved.artist ?? null,
   };
   if (!opts.styles.length) opts.styles = [ids.includes('synthwave') ? 'synthwave' : ids[0]];
   let history = store.get('coding-misk-radio-history', []);
@@ -38,7 +41,18 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // the session on air: stream of songs with their start bar; onAir = index in the stream
   let S = null;
   const saveOpts = () => store.set('coding-misk-radio', opts);
-  const current = () => ({ styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk });
+  const artistOf = id => (id ? artists().find(a => a.id === id) || null : null);
+  // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
+  const current = () => { const a = artistOf(opts.artist); return a ? { artist: JSON.parse(JSON.stringify(a)) } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk }; };
+  const mid = r => Math.round((r[0] + r[1]) / 2 * 20) / 20;
+  function pickArtist(id) {
+    const a = artistOf(id);
+    if (!a) { opts.artist = null; saveOpts(); render(); return; }
+    opts.artist = a.id;
+    opts.styles = Object.keys(a.styles).filter(s => a.styles[s] > 0 && recipes.some(r => r.id === s));
+    for (const k of ['chaos', 'energy', 'complexity', 'talk']) if (a[k]) opts[k] = mid(a[k]);
+    saveOpts(); render();
+  }
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   // ---------- stream ----------
@@ -185,6 +199,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const next = buildSteps(song).filter(s => s.at > rel).slice(0, 3);
     const nextSong = S.stream[S.onAir + 1];
     box.innerHTML = `<div class="lbl">${esc(t('radioNow'))} · ${esc(t('radioSongN', { n: item.n + 1 }))}</div>
+      ${e.artist ? `<div class="radio-artist">${(() => { const a = artistOf(e.artist.id); return a ? `<img class="portrait tiny" src="${face(a)}" alt="">` : ''; })()}<span>${esc(e.artist.name)}</span>${e.artist.quirks && e.artist.quirks.length ? `<span class="muted small">· ${esc(e.artist.quirks.map(q => tx(QUIRKS[q] || { en: q })).join(', '))}</span>` : ''}</div>` : ''}
       <h3 class="radio-title">${esc(song.title)}</h3>
       <div class="radio-meta">${esc(e.key)} · ${e.bpm} BPM · ${esc(e.meter)} · ${esc(t('shape_' + e.shape))}</div>
       <div class="radio-parts">${esc(partsText(e))}</div>
@@ -207,6 +222,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
           <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
           <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
+        </div>
+        <div class="ctrl" ${tip('tipArtist')}><span class="lbl">${esc(t('radioArtist'))}</span>
+          <div class="chips artist-chips" role="group"><button class="chip" data-artist="" aria-pressed="${!opts.artist}">${esc(t('radioCustom'))}</button>${artists().map(a => `<button class="chip" data-artist="${esc(a.id)}" aria-pressed="${opts.artist === a.id}" title="${esc(tx(a.bio || {}))}"><img class="portrait tiny" src="${face(a)}" alt=""> ${esc(a.name)}</button>`).join('')}</div>
         </div>
         <div class="ctrl" ${tip('tipStyles')}><span class="lbl">${esc(t('radioStyles'))}</span>
           <div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${opts.styles.includes(r.id)}" title="${esc(r.description || t('tipStyles'))}">${esc(tx(r.name))}</button>`).join('')}</div>
@@ -249,17 +267,20 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.id === 'radio-open' && S) { const sg = S.stream[S.onAir].song; stop(); return player.openSong(sg); }
     if (b.dataset.histSave) return player.saveSong(history[+b.dataset.histSave].song);
     if (b.dataset.histOpen) { const sg = history[+b.dataset.histOpen].song; stop(); return player.openSong(sg); }
+    if (b.dataset.artist !== undefined) return pickArtist(b.dataset.artist);
     if (b.dataset.style) {
+      if (opts.artist) opts.artist = null;
       const id = b.dataset.style, has = opts.styles.includes(id);
       if (has && opts.styles.length === 1) { toast(t('radioOneStyle')); return; }
       opts.styles = has ? opts.styles.filter(x => x !== id) : [...opts.styles, id];
       saveOpts();
       b.setAttribute('aria-pressed', !has);
+      root.querySelectorAll('[data-artist]').forEach(c => c.setAttribute('aria-pressed', c.dataset.artist === ''));
     }
   });
   root.addEventListener('input', e => {
     const k = e.target.dataset.opt;
-    if (k) { opts[k] = +e.target.value; saveOpts(); e.target.closest('.ctrl').querySelector('output').textContent = fmt(opts[k]); }
+    if (k) { if (opts.artist) { opts.artist = null; root.querySelectorAll('[data-artist]').forEach(c => c.setAttribute('aria-pressed', c.dataset.artist === '')); } opts[k] = +e.target.value; saveOpts(); e.target.closest('.ctrl').querySelector('output').textContent = fmt(opts[k]); }
     if (e.target.id === 'radio-seed') seedField = e.target.value.trim();
     if (e.target.id === 'radio-volume') player.setVolume(+e.target.value);
   });

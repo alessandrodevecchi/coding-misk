@@ -595,4 +595,8 @@
 .wgrid label { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; }
 .wgrid input[type=number], .lib-sheet input[type=number] { width: 70px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; color: var(--ink); }
 :root[data-ui="hw"] .stat-fill { background: #ffb347; box-shadow: 0 0 6px #ff9a1f; }
+.portrait.tiny { width: 20px; height: 20px; border-radius: 3px; vertical-align: middle; }
+.artist-chips .chip { display: inline-flex; align-items: center; gap: 6px; }
+.radio-artist { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+#tr-artist { max-width: 220px; }
 
