@@ -47,14 +47,14 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
 
   // in every tab, content not hidden
   for (const tab of ['componi', 'brani', 'radio', 'guida', 'suoni', 'riferimenti']) {
-    await page.click(`[data-tab="${tab}"]`); await sleep(300);
+    await page.click(`[data-mode="${['artisti', 'stili', 'suoni', 'guida', 'riferimenti'].includes(tab) ? 'lab' : 'ascolta'}"]`); await page.click(`[data-tab="${tab}"]`); await sleep(300);
     const geo = await page.evaluate(() => { window.scrollTo(0, document.body.scrollHeight); const bar = document.getElementById('pbar').getBoundingClientRect(); const sec = document.querySelector(`section[id^="tab-"]:not([hidden])`); const last = sec.lastElementChild || sec; return { visible: bar.height > 30 && bar.bottom <= innerHeight + 1, lastBottom: last.getBoundingClientRect().bottom, barTop: bar.top }; });
     check(geo.visible && geo.lastBottom <= geo.barTop + 1, `bar visible in ${tab} without hiding content`, `content ends ${geo.lastBottom.toFixed(0)}, bar at ${geo.barTop.toFixed(0)}`);
   }
 
   // the timeline: drag to the middle of the song
   const seekTo = v => page.evaluate(v => { const el = document.getElementById('pb-seek'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, v);
-  await page.click('[data-tab="componi"]');
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="componi"]');
   const meta = await page.evaluate(() => ({ cyc: document.querySelector('strudel-editor').editor.repl.scheduler.now() }));
   await seekTo(500); await sleep(2500);
   const mid = await page.evaluate(() => ({ cyc: document.querySelector('strudel-editor').editor.repl.scheduler.now(), seek: +document.getElementById('pb-seek').value, started: document.querySelector('strudel-editor').editor.repl.scheduler.started }));
@@ -73,7 +73,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   check((await bar()).vol === 20, 'volume remembered after reload');
 
   // radio: on air in the bar, next skips, previous restarts, volume in sync
-  await page.click('[data-tab="radio"]'); await page.fill('#radio-seed', 'bar'); await page.click('#radio-start'); await sleep(6000);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await page.fill('#radio-seed', 'bar'); await page.click('#radio-start'); await sleep(6000);
   b = await bar();
   const r0 = await page.evaluate(() => codingMiskRadio.state);
   check(b.onair && b.title === r0.stream[r0.onAir].title, 'radio: ON AIR and the song on air in the bar');

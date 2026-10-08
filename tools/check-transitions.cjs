@@ -15,7 +15,7 @@ const KINDS = (process.argv[2] || 'mix,morph,echo,break,interlude').split(',');
   await page.goto('http://localhost:5173/'); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['berlin-techno'], chaos: 0.3, energy: 0.7, complexity: 0.5, talk: 0.5, artist: null, transition: 'mix', harmony: 'compatible' })); });
   await page.reload(); await sleep(3500);
-  await page.click('[data-tab="radio"]'); await sleep(400);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(400);
   const R = () => page.evaluate(() => globalThis.codingMiskRadio.state);
   const ed = () => page.evaluate(() => { const e = document.querySelector('strudel-editor').editor; return { err: String(e.repl.state.evalError || ''), cyc: e.repl.scheduler.now() }; });
   const peak = ms => page.evaluate(async ms => { let m = 0; const end = performance.now() + ms; while (performance.now() < end) { for (const a of Object.keys(window.analysers || {})) { const d = getAnalyzerData('time', a); for (const v of d) m = Math.max(m, Math.abs(v)); } await new Promise(r => setTimeout(r, 50)); } return m; }, ms);

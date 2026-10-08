@@ -22,7 +22,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     localStorage.setItem('coding-misk-library', JSON.stringify({ tracks: [{ ...base, id: 'u-short', title: 'Short', sections: [{ ...base.sections[0], bars: 2, bpm: 200 }] }], code: {} }));
   });
   await page.reload(); await sleep(3500);
-  await page.click('[data-tab="brani"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
 
   // the gear opens the page; a second press goes back
   await page.click('#open-settings'); await sleep(300);
@@ -48,11 +48,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.selectOption('#set-format', 'opus'); await sleep(100);
   const saved = await page.evaluate(() => ({ radio: JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').transition, look: JSON.parse(localStorage.getItem('coding-misk-radio-look')), fmt: JSON.parse(localStorage.getItem('coding-misk-export-format')) }));
   check(saved.radio === 'morph' && saved.look === 'sonar' && saved.fmt === 'opus', 'radio defaults and export format saved', JSON.stringify(saved));
-  await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   check((await page.inputValue('#radio-transition')) === 'morph', 'the radio shows the default from the settings');
 
   // Opus export of a short song
-  await page.click('[data-tab="brani"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('#songs [data-song-id="u-short"] [data-act="export"]')]);
   check(/\.(webm|ogg)$/.test(dl.suggestedFilename()), 'Opus export downloads a small file', dl.suggestedFilename());
 

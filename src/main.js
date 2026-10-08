@@ -946,7 +946,10 @@ function renderArtistPick() {
 $('#tr-artist').addEventListener('change', e => {
   const a = artistsTab && artistsTab.usable().find(x => x.id === e.target.value);
   e.target.value = '';
-  if (!a) return;
+  if (a) newSongFromArtist(a);
+});
+// also from the artist's sheet in the Groove Lab, which switches to Listen and Compose (#42)
+function newSongFromArtist(a) {
   if (dirty && !confirmTwice('new', t('loadConfirm'))) return;
   const { song: sg } = createSession(RECIPES).next({ artist: a });
   const tr = { ...sg, id: 'u-' + Date.now(), kind: 'composed', style: { en: `${a.name} · ${sg.style.en}`, it: `${a.name} · ${sg.style.it}` } };
@@ -954,8 +957,9 @@ $('#tr-artist').addEventListener('change', e => {
   if (!loadTrack(tr)) return;
   dirty = true; saveDraft(); renderArranger();
   if (mode !== 'track') backToTrack();
+  showTab('componi');
   toast(t('newFromArtistDone', { name: a.name }));
-});
+}
 $('#tr-del').addEventListener('click', () => {
   if (!confirmTwice('delete')) return;
   const orig = builtinOf(T.id);
@@ -1426,7 +1430,20 @@ function syncAll() {
 // tab
 const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'radio', 'artisti', 'stili', 'guida', 'suoni', 'riferimenti'];
 let cards = [];
+// two modes (#42): Listen to make and hear music, Groove Lab for its material and for learning
+const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'suoni', 'guida', 'riferimenti'] };
+const modeOf = tab => Object.keys(APP_MODES).find(m => APP_MODES[m].includes(tab)) || null;
+let modeTabs = store.get('coding-misk-mode-tabs', {});
+if (!modeTabs || typeof modeTabs !== 'object') modeTabs = {};
+function setMode(m) {
+  $$('.mode-btn').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m));
+  $$('.tab').forEach(b => { b.hidden = !!m && b.dataset.modeOf !== m; });
+}
+$$('.mode-btn').forEach(b => b.addEventListener('click', () => { const m = b.dataset.mode, last = modeTabs[m]; showTab(APP_MODES[m].includes(last) ? last : APP_MODES[m][0]); }));
 function showTab(name) {
+  const m = modeOf(name);
+  if (m) { setMode(m); modeTabs[m] = name; store.set('coding-misk-mode-tabs', modeTabs); }
+  else $$('.mode-btn').forEach(b => b.setAttribute('aria-pressed', false));
   $$('.tab').forEach(x => x.setAttribute('aria-selected', x.dataset.tab === name));
   for (const id of TABS) $('#tab-' + id).hidden = id !== name;
   if (name === 'brani' && cards.length) renderSongs();
@@ -1938,7 +1955,7 @@ stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins
 RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
 // artists from artists/ plus the user's (Artists tab)
 const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));
-artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onChange: () => { if (radio) radio.render(); renderArtistPick(); } });
+artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onCompose: a => newSongFromArtist(a), onChange: () => { if (radio) radio.render(); renderArtistPick(); } });
 renderArtistPick();
 // preloads the spoken comments of a song, silently, as playSong does
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };

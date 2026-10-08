@@ -8,7 +8,8 @@ import { downloadJson, pickJsonFiles, userStore, freeId, errorsByPath } from './
 
 const RANGES = ['chaos', 'energy', 'complexity', 'talk', 'pace'];
 
-export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, toast, onChange }) {
+// onCompose(artist): a new song by the artist in Compose (#42: from the Groove Lab to Listen)
+export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, toast, onChange, onCompose = () => {} }) {
   const mine = userStore(store, 'coding-misk-artists');
   let open = null, editing = null, jsonView = false;
   const faces = new Map();
@@ -87,7 +88,7 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
     ${cur ? `<div class="card lib-sheet">
       <div class="sheet-head"><div></div><div class="actions">${cur.own ? (editing ? `<button class="btn" id="ar-json" aria-pressed="${jsonView}">${esc(t('libJson'))}</button><button class="btn primary" id="ar-save" ${res.errors.length ? 'disabled' : ''}>${esc(t('save'))}</button><button class="btn" id="ar-cancel">${esc(t('libCancel'))}</button>`
         : `<button class="btn primary" id="ar-edit">${esc(t('libEdit'))}</button><button class="btn danger" id="ar-del">${esc(t('libDelete'))}</button>`) : ''}
-        <button class="btn" id="ar-dup">${esc(t('libDuplicate'))}</button><button class="btn" id="ar-export">${esc(t('libExport'))}</button></div></div>
+        ${editing ? '' : `<button class="btn" id="ar-compose">${esc(t('artCompose'))}</button>`}<button class="btn" id="ar-dup">${esc(t('libDuplicate'))}</button><button class="btn" id="ar-export">${esc(t('libExport'))}</button></div></div>
       ${res.errors.length ? `<div class="field-err">${esc(t('libErrors', { n: res.errors.length }))}</div>` : ''}
       ${editing ? (jsonView ? `<textarea class="lib-json" id="ar-json-text" spellcheck="false">${esc(JSON.stringify(editing, null, 2))}</textarea>${res.errors.map(e => `<div class="field-err">${esc(e.path || '(artist)')}: ${esc(e.msg)}</div>`).join('')}` : form(editing, errorsByPath(res.errors))) : sheet(cur.a)}
     </div>` : `<p class="muted">${esc(t('artPick'))}</p>`}`;
@@ -97,6 +98,7 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.open) { open = b.dataset.open; editing = null; jsonView = false; render(); return; }
     const cur = open && all().find(x => x.a.id === open);
+    if (b.id === 'ar-compose' && cur) { const a = usable().find(x => x.id === cur.a.id); if (a) onCompose(a); else toast(t('artInvalid')); return; }
     if (b.id === 'ar-new' || b.id === 'ar-dup') {
       const src = b.id === 'ar-dup' && cur ? cur.a : { format: ARTIST_FORMAT, id: 'new-artist', name: t('artNewName'), bio: { en: 'A new artist.', it: 'Un nuovo artista.' }, portrait: { seed: `new-${Date.now()}`, palette: 'neon' }, styles: { [styleIds()[0]]: 1 } };
       const copy = { ...JSON.parse(JSON.stringify(src)), format: ARTIST_FORMAT, id: freeId(src.id, all().map(x => x.a.id)) };

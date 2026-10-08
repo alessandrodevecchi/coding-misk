@@ -17,7 +17,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.goto('http://localhost:5173/'); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['berlin-techno'], chaos: 0.3, energy: 0.5, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); });
   await page.reload(); await sleep(3500);
-  await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   await page.fill('#radio-seed', 'steer-check');
   await page.click('#radio-start'); await sleep(2500);
   const ST = () => page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return s && { n: s.n, commands: s.commands, plan: s.plan, recipe: s.recipe, build: s.song.build.filter(x => x.by).map(x => ({ at: x.at, add: x.add, remove: x.remove, set: x.set })) }; });
@@ -58,9 +58,14 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
 
   // the curve: drag the last handle down
   await page.$eval('#radio-now', el => el.scrollIntoView({ block: 'center' })); await sleep(300);
-  const handle = (await page.$$('#radio-now circle.handle')).pop();
-  if (handle) {
-    const d = +(await handle.getAttribute('data-d')), box = await handle.boundingBox(), svg = await (await page.$('#radio-now svg.steer')).boundingBox();
+  // the card redraws four times a second: take the handle and its box in one go, retrying until both are there
+  let handle = null, d = -1, box = null, svg = null;
+  for (let k = 0; k < 10 && !box; k++) {
+    handle = (await page.$$('#radio-now circle.handle')).pop();
+    if (handle) { d = +(await handle.getAttribute('data-d').catch(() => -1)); box = await handle.boundingBox().catch(() => null); const sv = await page.$('#radio-now svg.steer'); svg = sv && await sv.boundingBox(); }
+    if (!box) await sleep(100);
+  }
+  if (box && svg) {
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2, svg.y + svg.height - 6, { steps: 5 }); await page.mouse.up(); await sleep(300);
     st = await ST();

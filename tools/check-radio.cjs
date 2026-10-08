@@ -26,7 +26,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const setRange = (k, v) => page.evaluate(([k, v]) => { const el = document.getElementById(`radio-${k}`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, [k, v]);
 
   await page.goto('http://localhost:5173/'); await sleep(5000);
-  await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
 
   // tab and controls
   check(await page.locator('#tab-radio [data-style]').count() === loadStyles().length, 'radio tab shows every style');
@@ -36,7 +36,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   await page.click('[data-style="jazz"]'); await sleep(200);
   check(await page.getAttribute('[data-style="jazz"]', 'aria-pressed') === 'true', 'the last style cannot be unselected');
   await pick(['synthwave', 'country']); await setRange('chaos', 0.7);
-  await page.reload(); await sleep(5000); await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.reload(); await sleep(5000); await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   const o = (await R()).options;
   check(o.styles.join() === 'country,synthwave' || o.styles.join() === 'synthwave,country', 'controls kept after reload', JSON.stringify(o));
   check(o.chaos === 0.7, 'chaos kept after reload');
@@ -126,19 +126,19 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   check(!(await ed()).err && (await ed()).started, 'the opened song plays in Compose');
 
   // exclusive playback
-  await page.click('[data-tab="radio"]'); await page.click('#radio-start'); await sleep(4000);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await page.click('#radio-start'); await sleep(4000);
   check((await R()).on, 'radio on again');
   await page.click('#play'); await sleep(1000);
   check((await R()).paused && (await R()).on, 'the header pause pauses the radio');
   await page.click('#play'); await sleep(2000);
   check(!(await R()).paused && (await ed()).started, 'the header play resumes the radio');
-  await page.click('[data-tab="brani"]'); await page.click('[data-song-card="0"] [data-act="play"]'); await sleep(2500);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await page.click('[data-song-card="0"] [data-act="play"]'); await sleep(2500);
   check(!(await R()).on && (await ed()).started, 'Compose playback stops the radio');
   await page.click('#stop'); await sleep(500);
 
   // by hand the song on air is held past its end; resume starts the next song on the next bar
   {
-    await page.click('[data-tab="radio"]');
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]');
     if ((await R()).on) await page.click('#radio-start');
     await pick(['lo-fi']); await page.fill('#radio-seed', 'hand'); await page.click('#radio-start'); await sleep(4000);
     await page.click('#edhost .cm-line >> nth=0'); await page.keyboard.press('End'); await page.keyboard.type(' mine'); await sleep(300);
@@ -158,7 +158,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
 
   // history limit
   await page.evaluate(() => { const h = Array.from({ length: 50 }, (_, i) => ({ title: `old ${i}`, styles: ['jazz'], seed: 'x', n: i, at: new Date().toISOString(), song: null })); localStorage.setItem('coding-misk-radio-history', JSON.stringify(h)); });
-  await page.reload(); await sleep(5000); await page.click('[data-tab="radio"]'); await page.click('#radio-start'); await sleep(4000);
+  await page.reload(); await sleep(5000); await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await page.click('#radio-start'); await sleep(4000);
   r = await R();
   check(r.history.length === 50 && r.history[49].title === 'old 48', 'history keeps 50 songs and drops the oldest');
   await page.click('#radio-start'); await sleep(300);

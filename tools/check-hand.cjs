@@ -105,7 +105,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const v = lib[lib.length - 1];
   check(v && v.version === 2 && / · v2$/.test(v.title) && v.from === 'primo-segnale' && v.code.includes(' x'), 'a new version keeps the code and links the original', v && v.title);
   await page.click('#stop'); await sleep(500);
-  await page.click('[data-tab="brani"]'); await sleep(500);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
   const card = `#songs [data-song-id="${v.id}"]`;
   check(await page.$(card) && (await page.innerText(`${card} .badge`)).toLowerCase().includes('cod'), 'the version is a code song in the Songs tab');
   check(!!(await page.$(`#songs [data-song-id="primo-segnale"] [data-version="${v.id}"]`)), 'the original lists its versions');
@@ -113,7 +113,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   check(!(await st()).err && (await st()).started, 'the version plays', (await st()).err);
   await page.click('#stop'); await sleep(300);
   // in the radio the version is cropped to the song on air
-  await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   await page.click('#radio-start'); await sleep(2500);
   await page.click('#edhost .cm-line >> nth=0'); await page.keyboard.press('End'); await page.keyboard.type(' '); await sleep(300);
   await page.click('#hand-save'); await sleep(400);

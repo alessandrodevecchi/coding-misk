@@ -18,7 +18,7 @@ const shots = process.argv[2];
   await page.reload(); await sleep(4000);
 
   // Styles tab: every style opens with tempo, progressions and instruments
-  await page.click('[data-tab="stili"]'); await sleep(300);
+  await page.click('[data-mode="lab"]'); await page.click('[data-tab="stili"]'); await sleep(300);
   const ids = await page.$$eval('#tab-stili [data-open]', xs => xs.map(x => x.dataset.open));
   check(ids.length >= 16, `the Styles tab lists the styles (${ids.length})`);
   let bad = [];
@@ -38,12 +38,12 @@ const shots = process.argv[2];
   await page.fill('#tab-stili [data-num="tempo.1"]', '124'); await page.press('#tab-stili [data-num="tempo.1"]', 'Tab'); await sleep(200);
   if (shots) await (await page.$('#tab-stili')).screenshot({ path: path.join(shots, 'styles-form.png') });
   await page.click('#st-save'); await sleep(300);
-  await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   check(await page.$(`#tab-radio [data-style="${dupId}"]`) !== null && (await page.innerText(`#tab-radio [data-style="${dupId}"]`)) === 'Night Drive', 'a duplicated and edited style appears in the radio chips', dupId);
   const builtinTempo = await page.evaluate(() => fetch('/styles/synthwave.json').then(r => r.ok ? r.json() : null).catch(() => null));
 
   // invalid edit: reversed tempo
-  await page.click('[data-tab="stili"]'); await page.click(`#tab-stili [data-open="${dupId}"]`); await page.click('#st-edit'); await sleep(200);
+  await page.click('[data-mode="lab"]'); await page.click('[data-tab="stili"]'); await page.click(`#tab-stili [data-open="${dupId}"]`); await page.click('#st-edit'); await sleep(200);
   await page.fill('#tab-stili [data-num="tempo.0"]', '150'); await page.press('#tab-stili [data-num="tempo.0"]', 'Tab'); await sleep(200);
   const err = await page.innerText('#tab-stili .lib-sheet');
   check(/reversed range/.test(err) && await page.isDisabled('#st-save'), 'a reversed tempo shows its error and blocks saving');
@@ -55,14 +55,14 @@ const shots = process.argv[2];
   const file = path.join(os.tmpdir(), `style-${Date.now()}.json`); await dl.saveAs(file);
   const exported = JSON.parse(fs.readFileSync(file, 'utf8'));
   const page2 = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
-  await page2.goto('http://localhost:5173/'); await sleep(4000); await page2.click('[data-tab="stili"]');
+  await page2.goto('http://localhost:5173/'); await sleep(4000); await page2.click('[data-mode="lab"]'); await page2.click('[data-tab="stili"]');
   const [chooser] = await Promise.all([page2.waitForEvent('filechooser'), page2.click('#st-import')]);
   await chooser.setFiles(file); await sleep(500);
   const imported = await page2.evaluate(id => (JSON.parse(localStorage.getItem('coding-misk-styles') || '[]')).find(x => x.id === id), exported.id);
   check(imported && JSON.stringify(imported) === JSON.stringify(exported), 'export then import gives the same style');
 
   // Artists tab: cards, character sheet, duplicate and edit, new face
-  await page.click('[data-tab="artisti"]'); await sleep(300);
+  await page.click('[data-mode="lab"]'); await page.click('[data-tab="artisti"]'); await sleep(300);
   const arts = await page.$$eval('#tab-artisti [data-open]', xs => xs.map(x => x.dataset.open));
   check(arts.length >= 6 && await page.$$eval('#tab-artisti .art-card img.portrait', xs => xs.every(i => i.naturalWidth > 0)), `the Artists tab shows the artists with portraits (${arts.length})`);
   await page.click('#tab-artisti [data-open="horizon"]'); await sleep(200);
@@ -81,7 +81,7 @@ const shots = process.argv[2];
   check(savedArt && savedArt.quirks && savedArt.quirks['no-guitars'] === 1, 'a duplicated artist is saved with its changes');
 
   // radio: picking an artist sets styles and sliders, the song names the artist, a slider makes it custom
-  await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   await page.click('#tab-radio [data-artist="night-owl"]'); await sleep(200);
   const picked = await page.$$eval('#tab-radio [data-style][aria-pressed="true"]', xs => xs.map(x => x.dataset.style).sort().join(','));
   check(picked === 'berlin-techno,dark-cyberpunk,industrial', 'picking an artist selects its favourite styles', picked);
@@ -95,7 +95,7 @@ const shots = process.argv[2];
   await page.click('#radio-start'); await sleep(300);
 
   // Compose: a new song from an artist opens unsaved, plays as a live build, and can be saved
-  await page.click('[data-tab="componi"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="componi"]'); await sleep(300);
   await page.selectOption('#tr-artist', 'dreamer'); await sleep(800);
   const title = await page.inputValue('#track-title'), dirtyTxt = await page.innerText('#dirty');
   check(title && dirtyTxt.trim().length > 0, 'a new song from an artist opens in Compose, unsaved', `${title} · ${dirtyTxt}`);

@@ -34,6 +34,10 @@ The UI is dark only, by design.
 - Radio (`.radio`): `.radio-grid` controls and now playing card, `.onair` light, `.ctrls.four` sliders on two rows in a narrow panel (container query), `.radio-curve` energy line.
 - Toasts for feedback; two-tap confirmation instead of `confirm()`.
 
+## Navigation
+
+Two modes at the top of the work area (`#42`): **Listen** (Compose, Songs, Playlists, Radio) to make and hear music, and **Groove Lab** (Artists, Styles, Sounds, Guide, References) for the material music is made of and for learning. The mode buttons are large toggles with the tab names as a subtitle (hidden on phones); in the hardware theme they are latching keys with a lamp. Under them, the tabs of the mode. Each mode remembers its last tab; a link to a tab of the other mode switches mode. The live code stays on the right in both modes and can be collapsed; the settings open from the gear next to the code, with no mode lit.
+
 ## Hardware theme (`data-ui="hw"`)
 
 Switch NEON/HW in the top bar (`coding-misk-ui`). Anodized panels with screws, rubber keys, amber LCD fields (`--lcd-bg #1b1306`, `--lcd-fg #ffb347`, `VT323`), knobs replacing range inputs (arc in `--a1`, pointer cap rotating -135° to +135°), power LEDs on channel switches, green activity LEDs (`--led #39ff6a`) driven by each channel's level, bezels around the stage and the code editor. Knobs drive the hidden original inputs, so keyboard use and state stay the same. The player bar becomes a brushed panel with square mechanical keys (they sink when pressed), an amber display for title and position, a small volume knob and a round red ON AIR lamp.

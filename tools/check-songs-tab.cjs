@@ -24,7 +24,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     if (synth) localStorage.setItem('coding-misk-styles', JSON.stringify([{ ...synth, id: 'night-drive', name: { en: 'Night drive', it: 'Notte in auto' } }]));
   });
   await page.reload(); await sleep(3500);
-  await page.click('[data-tab="brani"]'); await sleep(500);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
 
   const visible = () => page.$$eval('#songs [data-song-id]', xs => xs.filter(x => !x.hidden).map(x => x.dataset.songId));
   const total = (await page.$$('#songs [data-song-id]')).length;
@@ -100,14 +100,14 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('#songs [data-song-id="kellerlicht"] [data-star]'); await sleep(100);
   await page.click('[data-f="genres"][data-v="metal"]'); await sleep(100);
   await page.reload(); await sleep(3500);
-  await page.click('[data-tab="brani"]'); await sleep(500);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
   check((await page.getAttribute('#songs [data-song-id="kellerlicht"] [data-star]', 'aria-pressed')) === 'true', 'favourite kept after reload');
   v = await visible();
   check(v.includes('ferro') && !v.includes('kellerlicht'), 'view (genre filter) restored after reload', v.join(', '));
   await page.click('#sv-clear'); await sleep(200);
   await page.click('#sv-fav'); await sleep(200);
   check((await visible()).join() === 'kellerlicht', 'favourites only', (await visible()).join());
-  await page.click('[data-tab="radio"]'); await sleep(200); await page.click('[data-tab="brani"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(200); await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
   check((await visible()).join() === 'kellerlicht', 'view kept when switching tabs');
   await page.click('#sv-fav'); await sleep(200);
 
@@ -131,17 +131,17 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click(`#songs [data-song-id="${v[0]}"] [data-act="open"]`); await sleep(600);
   await page.click('#pb-next'); await sleep(600);
   const title2 = await page.innerText('#pb-title');
-  await page.click('[data-tab="brani"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
   const want = await page.innerText(`#songs [data-song-id="${v[1]}"] h3`);
   check(title2 === want, 'next follows the filtered and sorted list', `${title2} / ${want}`);
   await page.click('#sv-clear'); await page.selectOption('#sv-sort', 'default'); await sleep(200);
 
   // renaming a user style (name and id) renames its tag on the songs
-  await page.click('[data-tab="stili"]'); await sleep(300);
+  await page.click('[data-mode="lab"]'); await page.click('[data-tab="stili"]'); await sleep(300);
   await page.click('#tab-stili [data-open="night-drive"]'); await page.click('#st-edit'); await sleep(200);
   for (const [f, val] of [['id', 'late-drive'], ['name.en', 'Late drive'], ['name.it', 'Tarda notte']]) { await page.fill(`#tab-stili [data-text="${f}"]`, val); await page.press(`#tab-stili [data-text="${f}"]`, 'Tab'); await sleep(150); }
   await page.click('#st-save'); await sleep(300);
-  await page.click('[data-tab="brani"]'); await sleep(400);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(400);
   const renamed = await page.innerText('#songs [data-song-id="u-test"] .song-tags');
   const tagsNow = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-library')).tracks[0].tags.styles);
   check(/Late drive|Tarda notte/.test(renamed) && tagsNow.join() === 'late-drive', 'a renamed style renames its tag', `${renamed.replace(/\n/g, ' ')} · ${tagsNow}`);

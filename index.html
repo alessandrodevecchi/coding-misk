@@ -41,16 +41,20 @@
 
 <div class="work">
   <div>
+    <div class="modes" role="group" data-i18n-aria="modes">
+      <button class="mode-btn" data-mode="ascolta" aria-pressed="true"><span class="mode-name" data-i18n="modeListen"></span><small data-i18n="modeListenSub"></small></button>
+      <button class="mode-btn" data-mode="lab" aria-pressed="false"><span class="mode-name" data-i18n="modeLab"></span><small data-i18n="modeLabSub"></small></button>
+    </div>
     <nav class="tabs" role="tablist">
-      <button class="tab" role="tab" data-tab="componi" aria-selected="true" data-i18n="tabComponi"></button>
-      <button class="tab" role="tab" data-tab="brani" aria-selected="false" data-i18n="tabBrani"></button>
-      <button class="tab" role="tab" data-tab="playlist" aria-selected="false" data-i18n="tabPlaylist"></button>
-      <button class="tab" role="tab" data-tab="radio" aria-selected="false" data-i18n="tabRadio"></button>
-      <button class="tab" role="tab" data-tab="artisti" aria-selected="false" data-i18n="tabArtisti"></button>
-      <button class="tab" role="tab" data-tab="stili" aria-selected="false" data-i18n="tabStili"></button>
-      <button class="tab" role="tab" data-tab="guida" aria-selected="false" data-i18n="tabGuida"></button>
-      <button class="tab" role="tab" data-tab="suoni" aria-selected="false" data-i18n="tabSuoni"></button>
-      <button class="tab" role="tab" data-tab="riferimenti" aria-selected="false" data-i18n="tabRiferimenti"></button>
+      <button class="tab" role="tab" data-mode-of="ascolta" data-tab="componi" aria-selected="true" data-i18n="tabComponi"></button>
+      <button class="tab" role="tab" data-mode-of="ascolta" data-tab="brani" aria-selected="false" data-i18n="tabBrani"></button>
+      <button class="tab" role="tab" data-mode-of="ascolta" data-tab="playlist" aria-selected="false" data-i18n="tabPlaylist"></button>
+      <button class="tab" role="tab" data-mode-of="ascolta" data-tab="radio" aria-selected="false" data-i18n="tabRadio"></button>
+      <button class="tab" role="tab" data-mode-of="lab" data-tab="artisti" aria-selected="false" data-i18n="tabArtisti" hidden></button>
+      <button class="tab" role="tab" data-mode-of="lab" data-tab="stili" aria-selected="false" data-i18n="tabStili" hidden></button>
+      <button class="tab" role="tab" data-mode-of="lab" data-tab="suoni" aria-selected="false" data-i18n="tabSuoni" hidden></button>
+      <button class="tab" role="tab" data-mode-of="lab" data-tab="guida" aria-selected="false" data-i18n="tabGuida" hidden></button>
+      <button class="tab" role="tab" data-mode-of="lab" data-tab="riferimenti" aria-selected="false" data-i18n="tabRiferimenti" hidden></button>
     </nav>
 
     <section id="tab-componi" class="rack">

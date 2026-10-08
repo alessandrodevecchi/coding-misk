@@ -75,6 +75,7 @@ node tools/check-steering.cjs [shots-dir]              # radio console: queue, c
 node --no-warnings tools/check-backup.mjs            # backup of everything in the browser: export and merge on import (no browser)
 node tools/check-settings.cjs [shots-dir]              # settings page: gear, theme, language, radio defaults, Opus export, backup, reset (dev server)
 node tools/check-recording.cjs                         # radio recording: pause without gaps, track list, downloads, record from the start (dev server)
+node tools/check-modes.cjs [shots-dir]                 # the two modes: tabs, memory per mode, old remembered tab, link across modes, phone (dev server)
 node tools/check-player.cjs                            # player bar and global volume: modes, previous and next, volume after the master, layout (dev server)
 node tools/check-hand.cjs                              # hand live coding in Compose: take over, steps held, resume, last code (dev server)
 node --no-warnings tools/check-radio.cjs [--long 30]  # radio in the browser: controls, same songs as the director, skip, history, save, open in Compose (dev server)

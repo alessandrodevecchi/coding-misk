@@ -40,7 +40,7 @@ async function seed(page) {
   check(await page.evaluate(() => localStorage.getItem('coding-misk-favourites') === null), 'old favourites key removed');
 
   // "+ Playlist" on a card: new playlist, then add to it
-  await page.click('[data-tab="brani"]'); await sleep(400);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(400);
   const card = id => `#songs [data-song-id="${id}"]`;
   await page.click(`${card('u-s1')} [data-act="playlist"]`); await sleep(150);
   await page.selectOption(`${card('u-s1')} [data-pl-pick]`, '__new'); await sleep(100);
@@ -66,7 +66,7 @@ async function seed(page) {
   if (shots) await page.screenshot({ path: path.join(shots, 'songs-playlist.png') });
 
   // Playlists tab: reorder with the buttons, kept after reload
-  await page.click('[data-tab="playlist"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(300);
   await page.click(`[data-pl-open="${corsa.id}"]`); await sleep(200);
   await page.click('#tab-playlist [data-pl-up="2"]'); await sleep(200);
   check((await lists()).find(l => l.id === corsa.id).songs.join() === 'u-s1,u-s3,u-s2', 'move up');
@@ -75,7 +75,7 @@ async function seed(page) {
   check((await lists()).find(l => l.id === corsa.id).songs.join() === 'u-s1,u-s3,u-s2', 'order kept after reload');
 
   // auto-advance: the next song starts by itself, the player bar shows the position, stop after the last
-  await page.click('[data-tab="playlist"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(300);
   await page.click(`[data-pl-open="${corsa.id}"]`); await sleep(200);
   await page.click('#pl-play'); await sleep(800);
   const seen = [await title()], posSeen = [await pos()];
@@ -94,7 +94,7 @@ async function seed(page) {
   // repeat one on a single song
   await page.click('#pb-repeat'); await page.click('#pb-repeat'); await sleep(100);
   check((await page.getAttribute('#pb-repeat', 'data-mode')) === 'one', 'repeat cycles to one');
-  await page.click('[data-tab="brani"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
   await page.selectOption('#sv-list', 'all'); await sleep(200);
   await page.click(`${card('u-s2')} [data-act="play"]`); await sleep(4500);
   check((await playing()) && (await title()) === 'Short 2', 'repeat one replays a single song', await title());
@@ -113,7 +113,7 @@ async function seed(page) {
   check(await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-shuffle')) === false && JSON.parse(localStorage.getItem('coding-misk-repeat')) === 'off'), 'shuffle and repeat remembered');
 
   // export, then import in a fresh browser
-  await page.click('[data-tab="playlist"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(300);
   await page.click(`[data-pl-open="${corsa.id}"]`); await sleep(200);
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#pl-export')]);
   const file = path.join(os.tmpdir(), `coding-misk-playlist-${Date.now()}.json`);
@@ -124,7 +124,7 @@ async function seed(page) {
   const p2 = await ctx2.newPage();
   p2.on('pageerror', e => errors.push(e.message));
   await p2.goto('http://localhost:5173/'); await sleep(3000);
-  await p2.click('[data-tab="playlist"]'); await sleep(300);
+  await p2.click('[data-mode="ascolta"]'); await p2.click('[data-tab="playlist"]'); await sleep(300);
   const [chooser] = await Promise.all([p2.waitForEvent('filechooser'), p2.click('#pl-import')]);
   await chooser.setFiles(file); await sleep(800);
   const ls2 = await p2.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-playlists')).lists);
@@ -152,7 +152,7 @@ async function seed(page) {
   });
   await page.reload(); await sleep(3500);
   check((await page.getAttribute('#pb-mix', 'aria-pressed')) === 'true', 'mix switch remembered');
-  await page.click('[data-tab="playlist"]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(300);
   await page.click('[data-pl-open="p-mix"]'); await sleep(200);
   await page.click('#pl-play'); await sleep(1500);
   const cyc = () => page.evaluate(() => document.querySelector('strudel-editor').editor.repl.scheduler.now());
@@ -179,7 +179,7 @@ async function seed(page) {
   // phone width
   await page.setViewportSize({ width: 390, height: 900 }); await sleep(400);
   for (const tab of ['playlist', 'brani']) {
-    await page.click(`[data-tab="${tab}"]`); await sleep(300);
+    await page.click(`[data-mode="${['artisti', 'stili', 'suoni', 'guida', 'riferimenti'].includes(tab) ? 'lab' : 'ascolta'}"]`); await page.click(`[data-tab="${tab}"]`); await sleep(300);
     const sw = await page.evaluate(() => document.documentElement.scrollWidth);
     check(sw <= 392, `no horizontal scroll at phone width (${tab})`, `${sw}px`);
   }
