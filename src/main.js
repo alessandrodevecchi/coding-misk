@@ -5,6 +5,7 @@ import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames } from './song/typing.js';
 import { validateSong } from './song/validate.js';
+import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
@@ -75,7 +76,9 @@ function composedTracks() {
   const builtins = BUILTIN.map(b => { const o = user.tracks.find(u => u.id === b.id); return o ? prepare(o) : b; });
   return [...builtins, ...user.tracks.filter(u => !builtinOf(u.id)).map(prepare)].map(tr => ({ ...tr, kind: 'composed' }));
 }
-const codedTracks = () => CODED.map(c => ({ ...c, code: user.code[c.id] || c.code }));
+// code songs: the hand-written originals, then the versions saved from live coding by hand (#33)
+if (!Array.isArray(user.codeSongs)) user.codeSongs = [];
+const codedTracks = () => [...CODED, ...user.codeSongs.map(v => ({ ...v, kind: 'coded' }))].map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
 // the radio tab (created further down, once the player exists)
 let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null;
@@ -186,7 +189,7 @@ function liveBuild(sg, s, cyc) {
 // ---------- hand live coding (#20) ----------
 function setHand(on) {
   hand = on;
-  $('#hand-tag').hidden = !on; $('#hand-resume').hidden = !on; $('#hand-from-wrap').hidden = !on; $('#hand-from').setAttribute('aria-pressed', handFromHere);
+  $('#hand-tag').hidden = !on; $('#hand-resume').hidden = !on; $('#hand-save').hidden = !on; $('#hand-from-wrap').hidden = !on; $('#hand-from').setAttribute('aria-pressed', handFromHere);
   document.body.classList.toggle('by-hand', on);
 }
 // a character typed or deleted, a paste, a cut or a drop in the code during a live build: the user takes over
@@ -248,6 +251,27 @@ $('#hand-back').addEventListener('click', async () => {
   ed.setCode(lastHand); await ed.evaluate();
 });
 try { lastHand = sessionStorage.getItem('coding-misk-hand'); } catch (e) {}
+// save the code written by hand as a new version of the song (#33): a code song of the user's, linked to the
+// original, which stays as it is. In the radio the code is cropped to the song on air.
+function saveVersion(code) {
+  if (!code || !code.trim()) return;
+  let from = null, origin = null;
+  if (mode === 'radio' && radio && radio.on) {
+    const st = radio.state, it = st.stream[st.onAir], sg = radio.steering.song;
+    code = cropCode(code, it.start, it.start + it.bars);
+    origin = { id: sg.id, title: sg.title, look: look, style: sg.style, tags: sg.tags };
+  } else if (mode === 'track') origin = { id: T.id, title: T.title, look: T.look, style: T.style, tags: T.tags };
+  else if (song) { const c = libraryCards().find(x => x.tr.id === song.id); origin = { id: song.id, title: song.title, look: c && c.tr.look, style: c && c.tr.style, tags: c && c.tr.tags }; }
+  if (!origin) return;
+  from = origin.id;
+  const n = user.codeSongs.filter(v => v.from === from).length + 2;
+  const v = { id: `v-${Date.now().toString(36)}`, title: `${origin.title} · v${n}`, code, look: origin.look, from, fromTitle: origin.title, version: n, created: new Date().toISOString(),
+    ...(origin.style ? { style: origin.style } : {}), ...(origin.tags ? { tags: origin.tags } : {}) };
+  user.codeSongs.push(v); saveLibrary(); cards = []; renderSongs();
+  toast(t('handSaved', { title: v.title }));
+}
+$('#hand-save').addEventListener('click', () => saveVersion(ed.code || ''));
+$('#hand-save-last').addEventListener('click', () => saveVersion(lastHand || ''));
 renderHandLast();
 
 // Strudel carica i worklet audio (supersaw, rumore, effetti) solo al primo mousedown.
@@ -1413,6 +1437,8 @@ function songCard({ tr, p }, i) {
       <span class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}</span>${songsView.starButton(tr.id)}</div>
     <h3>${esc(tr.title)}</h3>
     ${tr.style ? `<p>${esc(tx(tr.style))}</p>` : ''}
+    ${tr.version ? `<p class="note">${esc(t('versionOf', { title: tr.fromTitle || tr.from }))}</p>` : ''}
+    ${(() => { const vs = user.codeSongs.filter(v => v.from === tr.id); return vs.length ? `<div class="song-versions"><span class="lbl">${esc(t('versions'))}</span> ${vs.map(v => `<button class="chip small" data-version="${esc(v.id)}">v${v.version}</button>`).join(' ')}</div>` : ''; })()}
     <div class="song-tags">${songsView.tagsHtml(sg)}${own ? ` <button class="chip small" data-act="tags" aria-expanded="false">${t('tagsEdit')}</button>` : ''}</div>
     ${own ? '<div class="song-tags-edit" hidden></div>' : ''}
     <div class="timeline" data-tl="${i}">
@@ -1425,7 +1451,7 @@ function songCard({ tr, p }, i) {
       <button class="btn" data-act="stop" hidden>${t('stop')}</button>
       <button class="btn" data-act="export" data-export="${esc(tr.id)}">${t('exportWav')}</button>
       <button class="btn" data-act="playlist" aria-expanded="false">${t('addToPlaylist')}</button>
-      ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}`}
+      ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}${tr.version ? `<button class="btn danger" data-act="del-version">${t('plDelete')}</button>` : ''}`}
       <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
       <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
     </div>
@@ -1435,7 +1461,7 @@ function songCard({ tr, p }, i) {
   </article>`;
 }
 // a card as a song for search and filters (#34): kind, tags, whether it is the user's
-function isMine(tr) { return tr.kind === 'composed' ? !isBuiltin(tr.id) || user.tracks.some(u => u.id === tr.id) : !!user.code[tr.id]; }
+function isMine(tr) { return tr.kind === 'composed' ? !isBuiltin(tr.id) || user.tracks.some(u => u.id === tr.id) : !!user.code[tr.id] || !!tr.version; }
 function songOf({ tr, p }) {
   // songs generated before #34 have no origin: their id still tells
   return { id: tr.id, title: tr.title, style: tr.style, tags: tr.tags, origin: tr.origin || (/^endless-/.test(tr.id) ? 'endless' : undefined), code: tr.kind !== 'composed', build: tr.kind === 'composed' && hasBuild(tr),
@@ -1555,6 +1581,8 @@ function startCard(i, bar) {
 $('#songs').addEventListener('click', e => {
   const card = e.target.closest('[data-song-card]'); if (!card) return;
   const i = +card.dataset.songCard, { tr, p } = cards[i];
+  const ver = e.target.closest('[data-version]');
+  if (ver) { const j = cardIndex(ver.dataset.version); if (j >= 0) { const el = $(`#songs [data-song-id="${CSS.escape(ver.dataset.version)}"]`); if (el) { el.hidden = false; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200); } } return; }
   const star = e.target.closest('[data-star]');
   if (star) {
     const on = songsView.toggleFav(star.dataset.star), lbl = t(on ? 'favRemove' : 'favAdd');
@@ -1602,6 +1630,7 @@ $('#songs').addEventListener('click', e => {
       showTab('componi'); return;
     }
     if (a === 'code') { if (ed) ed.stop(); paused = null; song = p; mode = 'free'; source = { kind: 'song', name: tr.title, id: tr.id }; renderSource(); if (ed) ed.setCode(p.code); updateShare(); return; }
+    if (a === 'del-version') { if (!confirmTwice('delv-' + tr.id, t('confirmAgain'))) return; user.codeSongs = user.codeSongs.filter(v => v.id !== tr.id); delete user.code[tr.id]; saveLibrary(); cards = []; renderSongs(); toast(t('trackDeleted')); return; }
     if (a === 'restore') { if (!confirmTwice('restore-' + tr.id)) return; delete user.code[tr.id]; saveLibrary(); renderSongs(); toast(t('restored')); return; }
   }
   const chip = e.target.closest('.trans [data-seek]');

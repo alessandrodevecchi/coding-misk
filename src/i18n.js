@@ -5,6 +5,7 @@
 const STR = {
   it: {
     'steerWhy:late': 'troppo vicino alla fine del brano', 'steerWhy:paused': 'la radio è in pausa', 'steerWhy:no-type': 'questo brano non ha {type}', 'steerWhy:all-playing': 'ogni traccia di {type} suona già', 'steerWhy:locked': 'le tracce di {type} sono bloccate nel mixer', 'steerWhy:last-track': 'è l\'ultima traccia che suona', 'steerWhy:no-target': 'nessuna traccia può cambiare così adesso', 'steerWhy:no-drop': 'nel resto del brano non c\'è un drop',
+    handSave: 'Salva come nuova versione', handSaveTip: 'Salva il codice scritto a mano come un nuovo brano di tipo Codice; l\'originale resta com\'è', handSaved: 'Salvato: {title}', versionOf: 'Versione scritta a mano di {title}', versions: 'Versioni',
     steerTitle: 'Console', steerIdle: 'Avvia la radio per guidare il brano in onda.', steerLate: 'Troppo tardi per questo brano: prova sul prossimo', steerScopeSong: 'Vale per questo brano', steerScopeSession: 'Vale per tutta la diretta', steerScopeTip: 'Per tutta la diretta: energia, complessità e voce spostano anche i cursori per i brani dopo',
     'steerGroup:energy': 'Energia', 'steerGroup:arrangement': 'Arrangiamento', 'steerGroup:sound': 'Suono', 'steerGroup:harmony': 'Armonia', 'steerGroup:voice': 'Voce', 'steerGroup:song': 'Brano',
     'steer:energy-up': '▲ Più energia', 'steer:energy-down': '▼ Meno energia', 'steer:add': '+ {type}', 'steer:remove': '− {type}', 'steer:more-complex': 'Più complesso', 'steer:less-complex': 'Più semplice',
@@ -144,6 +145,7 @@ const STR = {
   },
   en: {
     'steerWhy:late': 'too close to the end of the song', 'steerWhy:paused': 'the radio is paused', 'steerWhy:no-type': 'this song has no {type}', 'steerWhy:all-playing': 'every {type} track already plays', 'steerWhy:locked': 'the {type} tracks are locked in the mixer', 'steerWhy:last-track': 'it is the last track playing', 'steerWhy:no-target': 'no track can change this way now', 'steerWhy:no-drop': 'there is no drop in the rest of the song',
+    handSave: 'Save as a new version', handSaveTip: 'Save the code written by hand as a new code song; the original stays as it is', handSaved: 'Saved: {title}', versionOf: 'Hand-written version of {title}', versions: 'Versions',
     steerTitle: 'Console', steerIdle: 'Start the radio to steer the song on air.', steerLate: 'Too late for this song: try on the next one', steerScopeSong: 'This song only', steerScopeSession: 'The whole session', steerScopeTip: 'The whole session: energy, complexity and voice also move the sliders for the next songs',
     'steerGroup:energy': 'Energy', 'steerGroup:arrangement': 'Arrangement', 'steerGroup:sound': 'Sound', 'steerGroup:harmony': 'Harmony', 'steerGroup:voice': 'Voice', 'steerGroup:song': 'Song',
     'steer:energy-up': '▲ More energy', 'steer:energy-down': '▼ Less energy', 'steer:add': '+ {type}', 'steer:remove': '− {type}', 'steer:more-complex': 'More complex', 'steer:less-complex': 'Simpler',
