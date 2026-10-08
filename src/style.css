@@ -458,9 +458,12 @@
 .radio .onair { margin-left: auto; font: 700 12px var(--mono); letter-spacing: .2em; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
 .radio .onair.on { color: #fff; background: #d8203c; border-color: #ff4a66; box-shadow: 0 0 14px #ff2a48; animation: onair 2.4s ease-in-out infinite; }
 @keyframes onair { 50% { box-shadow: 0 0 4px #ff2a48; } }
-.ctrls.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@media (max-width: 1100px) { .ctrls.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 480px) { .ctrls.four { grid-template-columns: 1fr; } }
+/* sliders: two rows of two in a narrow panel, one row of four when there is room (the panel width, not the window) */
+.radio-ctrls { container-type: inline-size; }
+.ctrls.four, :root[data-ui="hw"] .ctrls.four { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+@container (min-width: 620px) { .ctrls.four, :root[data-ui="hw"] .ctrls.four { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* hardware theme: label above the display, so every knob has the same height */
+:root[data-ui="hw"] .radio-ctrls .ctrl .row { flex-direction: column; align-items: center; gap: 4px; }
 .radio .hint { font-size: 12px; margin: 0; }
 .radio .muted { color: var(--muted); }
 .radio-seed { display: flex; align-items: end; gap: 8px; }
