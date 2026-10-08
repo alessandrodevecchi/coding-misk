@@ -10,6 +10,7 @@ import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAP
 import { mixParts, stylesOf } from '../src/endless/mix.js';
 import { loadStyles } from './styles-dir.mjs';
 import { generateSession, createSession } from '../src/endless/director.js';
+import { validateArtist } from '../src/endless/artist.js';
 import { windowSong } from '../src/endless/join.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
@@ -252,6 +253,50 @@ const CHECKS = {
       assert(v.pitch >= 0.25 && v.pitch <= 4 && v.tempo >= 0.25 && v.tempo <= 4, `${id}: voice pitch or tempo out of range`);
     }
   },
+  'artists: validator reports errors at their paths'() {
+    const ok = { format: 1, id: 'tester', name: 'Tester', bio: { en: 'a test artist', it: 'un artista di prova' }, portrait: { seed: 't', palette: 'neon' }, styles: { 'berlin-techno': 2, jazz: 1 } };
+    const ids = STYLES.map(r => r.id);
+    assert(!validateArtist(ok, ids).errors.length, `valid artist rejected: ${JSON.stringify(validateArtist(ok, ids).errors)}`);
+    const errs = validateArtist({ ...ok, styles: { polka: 1 }, energy: [0.9, 0.2], quirks: { 'moonwalk': 1 } }, ids).errors.map(e => e.path);
+    for (const p of ['styles.polka', 'energy', 'quirks.moonwalk']) assert(errs.includes(p), `no error at ${p}: ${errs.join(', ')}`);
+  },
+  'artists: songs draw their values from the taste'() {
+    const artist = { format: 1, id: 'tester', name: 'Tester', bio: { en: 'x', it: 'x' }, portrait: { seed: 't', palette: 'neon' }, styles: { 'berlin-techno': 3, industrial: 1 }, explore: 0.25,
+      chaos: [0, 0.6], energy: [0.3, 0.9], complexity: [0.2, 0.8], talk: [0.1, 0.9], shapes: { 'slow-burn': 3, 'build-drop': 1 } };
+    const g = generateSession(loadStyles(), { artist, seed: 'taste', minutes: 80 });
+    const a = g.session.songs.map(e => e.artist);
+    assert(a.every(Boolean), 'songs do not record the artist');
+    assert(new Set(a.map(x => `${x.chaos}|${x.energy}|${x.complexity}|${x.talk}`)).size === a.length, 'two songs have the same values');
+    const fav = g.session.songs.filter(e => ['berlin-techno', 'industrial'].includes(e.parts.dominant)).length;
+    assert(fav > g.session.songs.length * 0.6, `only ${fav} of ${g.session.songs.length} songs use the favourite styles`);
+    assert(g.session.songs.some(e => !['berlin-techno', 'industrial'].includes(e.parts.dominant)), 'no song outside the favourites with explore 0.25');
+    g.songs.forEach(sg => { const v = validateSong(sg); assert(!v.errors.length, `${sg.id}: ${v.errors[0] && v.errors[0].msg}`); });
+  },
+  'artists: quirks do what they say'() {
+    const base = { format: 1, id: 'q', name: 'Q', bio: { en: 'x', it: 'x' }, portrait: { seed: 'q', palette: 'neon' } };
+    const run = (quirk, styles, extra = {}) => generateSession(loadStyles(), { artist: { ...base, styles, quirks: { [quirk]: 1 }, ...extra }, seed: `q-${quirk}`, minutes: 25 });
+    const ng = run('no-guitars', { 'classic-rock': 1, 'melodic-metal': 1 });
+    assert(ng.songs.every(sg => !sg.tracks.some(t => t.type === 'guitar')), 'no-guitars: a song has a guitar');
+    const td = run('two-drops', { trance: 1 }, { shapes: { 'build-drop': 1 } });
+    assert(td.session.songs.some(e => e.phrases.filter((p, i, a) => p.role === 'drop' && (i === 0 || a[i - 1].role !== 'drop')).length >= 2), 'two-drops: no song with two drops');
+    const he = run('hard-endings', { synthwave: 1 });
+    for (const sg of he.songs) { const total = sg.sections.reduce((x, y) => x + y.bars, 0), st = stateAt(sg, total - 1).song; assert(playing(st).length === 0, `hard-endings: ${playing(st).length} tracks still play at the end of ${sg.id}`); }
+    const tf = run('texture-first', { 'berlin-techno': 1 });
+    for (const sg of tf.songs) if (sg.tracks.some(t => t.type === 'texture')) assert(listOf(buildSteps(sg)[0].add).some(id => id === 'texture'), `texture-first: ${sg.id} does not start with the texture`);
+    const sb = run('slow-builds', { trance: 1 });
+    for (const e of sb.session.songs) e.phrases.slice(1, Math.floor(e.phrases.length / 2)).forEach(p => assert(p.moves.length <= 1, `slow-builds: ${p.moves.length} moves at bar ${p.bar}`));
+    const lb = run('long-breaks', { trance: 1 }, { shapes: { 'build-drop': 1 } });
+    assert(lb.session.songs.some(e => e.phrases.filter(p => p.role === 'break').length >= 4), 'long-breaks: no break of two double phrases');
+  },
+  'artists: a recorded session replays the same after the artist changes'() {
+    const artist = { format: 1, id: 'r', name: 'R', bio: { en: 'x', it: 'x' }, portrait: { seed: 'r', palette: 'neon' }, styles: { lofi: 1, 'lo-fi': 1, jazz: 1 } };
+    delete artist.styles.lofi;
+    const first = generateSession(loadStyles(), { artist, seed: 'replay', minutes: 10 });
+    const recorded = JSON.parse(JSON.stringify(first.session.options.artist));
+    artist.styles = { phonk: 1 };
+    const again = generateSession(loadStyles(), { artist: recorded, seed: 'replay', minutes: 10 });
+    assert(JSON.stringify(again.songs) === JSON.stringify(first.songs), 'replay from the recorded artist differs');
+  },
   'determinism: same seed, same session'() {
     const opts = { styles: ['melodic-metal', 'drum-and-bass'], chaos: 0.5, seed: 'aurora' };
     const a = JSON.stringify(generateSession(loadStyles(), opts)), b = JSON.stringify(generateSession(loadStyles(), opts));
@@ -326,9 +371,9 @@ const CHECKS = {
   },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');
-    const listed = [...doc.matchAll(/`((?:director|determinism|radio): [^`]+)`/g)].map(m => m[1]);
+    const listed = [...doc.matchAll(/`((?:director|determinism|radio|artists): [^`]+)`/g)].map(m => m[1]);
     for (const n of listed) assert(CHECKS[n], `docs/ENDLESS.md names a check that does not exist: ${n}`);
-    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
+    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
   },
 };
 

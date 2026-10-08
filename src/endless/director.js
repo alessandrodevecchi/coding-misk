@@ -11,6 +11,8 @@ import { shapePlan, LANDMARKS } from './shapes.js';
 import { energyOf, playing } from './energy.js';
 import { mutateRows, mutateBass, mutateArp, mutateHook } from './mutate.js';
 import { phrase as pickPhrase } from './phrases.js';
+import { artistSongOptions, pickWeighted } from './artist.js';
+import { has, applyPlanQuirks } from './quirks.js';
 
 export const SESSION_FORMAT = 'coding-misk/endless-session';
 // talk: how often the voice speaks (0 never, 0.5 about half of the boundaries with moves, 1 almost all)
@@ -36,7 +38,7 @@ function settingsFor(type, recipePart, extra, rng) {
 }
 
 // candidate tracks of a song, each with a base pattern A and variations B (and C at high complexity)
-function candidateTracks(R, meter, complexity, rng, mut) {
+function candidateTracks(R, meter, complexity, rng, mut, opts = {}) {
   const n = meterSteps(meter), tracks = [];
   const fit = rows => Object.fromEntries(Object.entries(rows).filter(([, v]) => v.includes('x')).map(([k, v]) => [k, fitSteps(v, n)]));
   const use = part => part && rng.chance(part.weight ?? 1);
@@ -78,7 +80,7 @@ function candidateTracks(R, meter, complexity, rng, mut) {
     tracks.push({ id: 'pad', name: 'Pad', type: 'pad', settings: settingsFor('pad', R.pad, { wave: rng.pick(R.pad.waves) }, rng),
       patterns: variants({ preset: p }, () => null, R.pad.presets.map(x => ({ preset: x }))) });
   }
-  if (use(R.guitar)) {
+  if (!has(opts, 'no-guitars') && use(R.guitar)) {
     const p = rng.pick(R.guitar.patterns);
     tracks.push({ id: 'guitar', name: 'Guitar', type: 'guitar', settings: settingsFor('guitar', R.guitar, { type: rng.pick(R.guitar.types) }, rng),
       patterns: variants({ preset: p }, () => null, R.guitar.patterns.map(x => ({ preset: x }))) });
@@ -98,14 +100,16 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
   const P = rng.plan, bpm = Math.round(P.range(R.tempo[0], R.tempo[1] + 0.999));
   const meter = P.pick(R.meters), swing = round(P.range(R.swing[0], R.swing[1]));
   const key = pickOther(P, R.keys, prev && prev.key);
-  const shape = pickOther(P, R.shapes, prev && prev.shape);
+  // an artist's favourite shapes, among those the style allows (not the previous song's when another is possible)
+  const liked = opts.shapeWeights && pickWeighted(rng.artist, opts.shapeWeights, R.shapes.filter(x => x !== (prev && prev.shape)).length ? R.shapes.filter(x => x !== (prev && prev.shape)) : R.shapes);
+  const shape = liked || pickOther(P, R.shapes, prev && prev.shape);
   const phrase = R.phrase, dbl = 2 * phrase, beats = meterSteps(meter) / 4;
   const secondsOf = bars => bars * beats * 60 / bpm;
   const lo = Math.max(2, R.minutes[0]), hi = Math.min(6, R.minutes[1]);
   let bars = Math.max(2, Math.round(P.range(lo, hi) * 60 / (beats * 60 / bpm) / dbl)) * dbl;
   while (secondsOf(bars) < 120) bars += dbl;
   while (secondsOf(bars) > 360 && bars > 2 * dbl) bars -= dbl;
-  const doubles = bars / dbl, plan = shapePlan(shape, doubles, opts.energy);
+  const doubles = bars / dbl, plan = applyPlanQuirks(shapePlan(shape, doubles, opts.energy), shape, opts);
   // sections: consecutive double phrases with the same role; big moments take the second progression
   const mainChords = P.pick(R.progressions), liftChords = P.chance(0.5) ? pickOther(P, R.progressions, mainChords) : mainChords;
   const sections = [], seen = {};
@@ -118,7 +122,7 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
     if (swing > 0) sec.swing = swing;
     sections.push(sec);
   });
-  const tracks = candidateTracks(R, meter, opts.complexity, P, rng.mutation);
+  const tracks = candidateTracks(R, meter, opts.complexity, P, rng.mutation, opts);
   const usual = R.tracks.usual, hardMax = opts.complexity > 0.8 ? Math.max(R.tracks.max, 8) + 2 : Math.min(R.tracks.max, 8);
   const usualHigh = clamp(usual[1] + Math.round((opts.complexity - 0.5) * 2), usual[0], hardMax);
   const voice = voiceFor(R, opts, rng.voice);
@@ -150,7 +154,8 @@ export function voiceFor(R, opts, rng) {
   const own = Array.isArray(v.speakers) && v.speakers.length ? v.speakers : [v.speaker ?? ''];
   base.speaker = rng.chance(0.15 + 0.3 * opts.chaos) ? rng.pick(['', ...SPEAKERS]) : rng.pick(own);
   let character = null;
-  if (rng.chance(0.3 + 0.3 * opts.chaos)) { character = rng.pick(Object.keys(VOICE_CHARACTERS)); Object.assign(base, VOICE_CHARACTERS[character]); }
+  const chance = opts.voiceChance ?? 0.3 + 0.3 * opts.chaos;
+  if (rng.chance(chance)) { character = (opts.voiceCharacters && pickWeighted(rng, opts.voiceCharacters)) || rng.pick(Object.keys(VOICE_CHARACTERS)); Object.assign(base, VOICE_CHARACTERS[character]); }
   return { settings: base, character };
 }
 
@@ -217,6 +222,8 @@ export function directSong(plan, opts, rng, comments) {
     // tracks that cannot move now: moved on the previous boundary, or needed by a big event on the next one
     const blocked = new Set([...moved].filter(([, b]) => b === k - 1).map(([id]) => id));
     if (nextRole === 'break' || nextRole === 'drop') base.tracks.filter(t => t.type === 'drums').forEach(t => blocked.add(t.id));
+    const hardEnd = has(opts, 'hard-endings') && boundaries > 2;
+    if (hardEnd && k === boundaries - 2) base.tracks.forEach(t => blocked.add(t.id));
     const chosen = [];
     const take = move => { chosen.push(move); steps.push({ at, ...move.step }); (move.tracks || [move.track]).forEach(id => { moved.set(id, k); blocked.add(id); }); };
     let state = stateAt(working(base, steps), at).song;
@@ -224,8 +231,13 @@ export function directSong(plan, opts, rng, comments) {
     if (k === 0) {
       // start: the first one or two instruments in the usual entry order
       const order = state.tracks.filter(t => t.type !== 'voice' && t.type !== 'riser').sort((a, b) => ENTRY.indexOf(a.type) - ENTRY.indexOf(b.type));
-      const first = order.slice(0, target > 0.35 || order.length < 3 ? 2 : 1).map(t => t.id);
+      let first = order.slice(0, has(opts, 'slow-builds') ? 1 : target > 0.35 || order.length < 3 ? 2 : 1).map(t => t.id);
+      const tex = has(opts, 'texture-first') && order.find(t => t.type === 'texture');
+      if (tex && !first.includes(tex.id)) first = [...first.slice(0, 1), tex.id];
       if (first.length) take({ kind: 'song-start', track: first[0], tracks: first, step: { add: first } });
+    } else if (hardEnd && k === boundaries - 1) {
+      const all = playing(state).filter(t => t.type !== 'voice').map(t => t.id);
+      if (all.length) take({ kind: 'song-end', track: all[0], tracks: all, step: { remove: all } });
     } else if (landmark && role === 'break') {
       const drums = playing(state).filter(t => t.type === 'drums').map(t => t.id);
       if (drums.length && playing(state).length > drums.length) { brokeDrums = drums; take({ kind: 'break', track: drums[0], tracks: drums, step: { remove: drums } }); }
@@ -244,7 +256,12 @@ export function directSong(plan, opts, rng, comments) {
     // ordinary moves toward the target
     state = stateAt(working(base, steps), at).song;
     const gap = Math.abs(measure(working(base, steps), at, ctx) - target);
-    const want = (k === 0 ? 0 : 1) + (gap > 0.2 ? 1 : 0) + (landmark && gap > 0.35 ? 1 : 0) - chosen.filter(c => !c.quiet).length + (k === 0 ? 0 : 0);
+    let want = (k === 0 ? 0 : 1) + (gap > 0.2 ? 1 : 0) + (landmark && gap > 0.35 ? 1 : 0) - chosen.filter(c => !c.quiet).length + (k === 0 ? 0 : 0);
+    // an artist's pace: busy artists add a move, calm ones sometimes let a phrase go by
+    if (opts.pace !== undefined && k > 0) { if (opts.pace > 0.7) want++; else if (opts.pace < 0.3 && gap < 0.15 && M.chance(0.6)) want = 0; }
+    const slow = has(opts, 'slow-builds') && k > 0 && k < boundaries / 2;
+    if (slow) want = Math.min(want, 1);
+    if (hardEnd && k >= boundaries - 2) want = 0;
     for (let i = 0; i < want; i++) {
       state = stateAt(working(base, steps), at).song;
       const e0 = energyOf(state, ctx);
@@ -268,6 +285,8 @@ export function directSong(plan, opts, rng, comments) {
         if (k > 0 && count < low && c.step.remove !== undefined) score -= 0.06;
         if (c.lastDrum && role !== 'break') score -= 0.3;
         if (Math.abs(e0 - target) < 0.08 && ['variation', 'more-space', 'brighter', 'darker', 'dirtier', 'cleaner'].includes(c.kind)) score += 0.04;
+        if (opts.moveWeights && opts.moveWeights[c.kind]) score += 0.015 * opts.moveWeights[c.kind];
+        if (slow && c.step.add !== undefined) score += 0.5;
         score += M.range(0, 0.02);
         if (!best || score > best.score) best = { ...c, score };
       }
@@ -329,15 +348,20 @@ export function createSession(recipes, seed) {
     entries,
     get count() { return entries.length; },
     next(options) {
-      const opts = { ...OPTION_DEFAULTS, ...options, seed };
+      // with an artist, this song's styles and values come from the artist's taste
+      const drawn = options && options.artist ? artistSongOptions(options.artist, Object.keys(byId), rng.artist) : null;
+      const opts = { ...OPTION_DEFAULTS, ...options, ...(drawn || {}), seed };
       const unknown = (opts.styles || []).filter(id => !byId[id]);
       if (!opts.styles || !opts.styles.length || unknown.length) throw new Error(`unknown or missing styles: ${unknown.join(', ') || 'none'}`);
       const selected = opts.styles.map(id => byId[id]), i = entries.length;
       // parts: avoid the style-per-part combination of the last three songs when another one is possible
       const recent = entries.slice(-3).map(e => partsKey(e.parts));
-      let parts = mixParts(selected, opts.chaos, i, rng.plan);
-      for (let t = 0; t < 12 && recent.includes(partsKey(parts)) && selected.length > 1 && opts.chaos > 0; t++) parts = mixParts(selected, opts.chaos, i, rng.plan);
+      // an artist's dominant style comes first; without an artist the selection rotates song by song
+      const at = drawn ? 0 : i;
+      let parts = mixParts(selected, opts.chaos, at, rng.plan);
+      for (let t = 0; t < 12 && recent.includes(partsKey(parts)) && selected.length > 1 && opts.chaos > 0; t++) parts = mixParts(selected, opts.chaos, at, rng.plan);
       const { song, entry } = makeSong({ parts, byId, prev: entries[i - 1], opts, rng, index: i, seed });
+      if (drawn) entry.artist = { id: options.artist.id, name: options.artist.name, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, pace: opts.pace, quirks: opts.quirks };
       entries.push(entry);
       return { song, entry };
     },
@@ -354,7 +378,7 @@ export function generateSession(recipes, options) {
     const { song, entry } = ses.next(opts);
     songs.push(song); seconds += entry.seconds;
   }
-  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes }, seconds: Math.round(seconds), songs: ses.entries };
+  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes, ...(opts.artist ? { artist: opts.artist } : {}) }, seconds: Math.round(seconds), songs: ses.entries };
   return { session, songs };
 }
 

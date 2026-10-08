@@ -241,6 +241,8 @@
 
 - Barra player: il cursore della timeline ora è un quadratino come quello del righello in Componi, con la parte già suonata colorata (ambra nel tema hardware). Il proprietario conferma la barra in basso come scelta giusta.
 
+- `#35` Artisti (change `artists-and-styles`), gruppo 1: formato dell'artista con validatore (`src/endless/artist.js`, `tools/artist.mjs validate|list`), gusto estratto brano per brano (stile dominante per peso o, con la probabilità `explore`, uno qualsiasi; caos, energia, complessità, voce e ritmo dei cambi negli intervalli dell'artista; curve, mosse e caratteri vocali per peso), manie (`src/endless/quirks.js`: due drop, break lunghi, niente chitarre, texture subito, finali secchi, parla tanto, costruzione lenta), artista registrato per intero nella sessione, `--artist` da riga di comando. Le sessioni senza artista restano identiche (impronte invariate). `check:endless` 37 controlli.
+
 ## Prossimo passo
 
 - (fatto in `v0.5.0`) Endless `#21`: il proprietario ascolta le sessioni generate (`npm run endless -- --styles … --join`, brani nella libreria dopo un ricaricamento) e dà il suo parere (task 5.3); poi `openspec-verify-change` e archiviazione della change e rilascio `v0.5.0` (con conferma). Radio `#22` su `develop`: manca la prova del proprietario (task 5.3), poi verifica e archiviazione di `endless-radio`.

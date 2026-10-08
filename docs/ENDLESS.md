@@ -143,6 +143,10 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Short phrases                                | `director: phrase pool is short and complete`                    |
 | Voice amount                                 | `director: voice amount sets how often comments are spoken`      |
 | A voice per song                             | `director: each song has its own voice`                          |
+| Artist validator                             | `artists: validator reports errors at their paths`               |
+| Songs drawn from an artist's taste           | `artists: songs draw their values from the taste`                |
+| Quirks                                       | `artists: quirks do what they say`                               |
+| Replay with the recorded artist              | `artists: a recorded session replays the same after the artist changes` |
 | Same seed, same session                      | `determinism: same seed, same session`                           |
 | Seed recorded                                | `determinism: a session without seed records the seed`           |
 | No unintended change                         | `determinism: seed fixtures`                                     |

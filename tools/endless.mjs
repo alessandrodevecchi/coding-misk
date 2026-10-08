@@ -1,6 +1,6 @@
 // Endless sessions from the command line (docs/ENDLESS.md).
 //   node tools/endless.mjs --styles berlin-techno[,jazz…] [--chaos 0.3] [--energy 0.6] [--complexity 0.5] [--talk 0.5]
-//                          [--minutes 15] [--seed text] [--out songs/endless] [--join] [--quiet]
+//                          [--minutes 15] [--seed text] [--artist id|file] [--out songs/endless] [--join] [--quiet]
 // Writes one song file per song and session.json in --out, prints the seed and a report.
 // --join also writes one song with the whole session in order, to play in Compose as a single live build.
 // Run with `node --no-warnings` to hide Node's experimental localStorage warning.
@@ -11,11 +11,13 @@ import { validateRecipe } from '../src/endless/recipe.js';
 import { generateSession, OPTION_DEFAULTS } from '../src/endless/director.js';
 import { joinSession } from '../src/endless/join.js';
 import { validateSong } from '../src/song/validate.js';
+import { findArtist, loadArtists } from './artists-dir.mjs';
+import { validateArtist } from '../src/endless/artist.js';
 
 const args = process.argv.slice(2);
 const fail = msg => { console.error(`error: ${msg}`); process.exit(1); };
 const opt = name => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : undefined; };
-const KNOWN = ['styles', 'chaos', 'energy', 'complexity', 'talk', 'minutes', 'seed', 'out', 'join', 'quiet', 'help'];
+const KNOWN = ['styles', 'artist', 'chaos', 'energy', 'complexity', 'talk', 'minutes', 'seed', 'out', 'join', 'quiet', 'help'];
 for (const a of args) if (a.startsWith('--') && !KNOWN.includes(a.slice(2))) fail(`unknown option ${a}; options: ${KNOWN.map(k => `--${k}`).join(' ')}`);
 if (args.includes('--help') || !args.length) {
   console.log('usage: node tools/endless.mjs --styles id[,id…] [--chaos 0-1] [--energy 0-1] [--complexity 0-1] [--talk 0-1] [--minutes n] [--seed text] [--out dir] [--join] [--quiet]');
@@ -27,8 +29,16 @@ const recipes = loadStyles();
 const bad = recipes.filter(r => validateRecipe(r).errors.length);
 if (bad.length) fail(`invalid recipes: ${bad.map(r => r.id).join(', ')}; run node --no-warnings tools/style.mjs validate`);
 const ids = recipes.map(r => r.id);
-const stylesArg = opt('styles');
-if (!stylesArg) fail(`--styles is required; available styles: ${ids.join(', ')}`);
+// an artist (id in artists/ or a file) instead of styles: each song draws its styles and values from the artist's taste
+let artist = null;
+if (opt('artist') !== undefined) {
+  artist = findArtist(opt('artist'));
+  if (!artist) fail(`unknown artist ${opt('artist')}; available artists: ${loadArtists().map(a => a.id).join(', ')}`);
+  const { errors } = validateArtist(artist, ids);
+  if (errors.length) fail(`invalid artist ${artist.id}: ${errors[0].path}: ${errors[0].msg}`);
+}
+const stylesArg = opt('styles') || (artist ? Object.keys(artist.styles).join(',') : undefined);
+if (!stylesArg) fail(`--styles or --artist is required; available styles: ${ids.join(', ')}`);
 const styles = stylesArg.split(',').map(s => s.trim()).filter(Boolean);
 const unknown = styles.filter(s => !ids.includes(s));
 if (unknown.length) fail(`unknown style ${unknown.join(', ')}; available styles: ${ids.join(', ')}`);
@@ -46,6 +56,7 @@ if (opt('minutes') !== undefined) {
   options.minutes = m;
 }
 if (opt('seed') !== undefined) options.seed = opt('seed');
+if (artist) options.artist = artist;
 const out = opt('out') || path.join('songs', 'endless');
 
 const { session, songs } = generateSession(recipes, options);
@@ -72,6 +83,7 @@ console.log(`styles: ${styles.join(', ')} · chaos ${options.chaos} · energy ${
 session.songs.forEach((e, i) => {
   const parts = Object.entries(e.parts).filter(([k]) => k !== 'dominant').map(([k, v]) => `${k}=${v}`).join(' ');
   const voice = `voice ${e.voice.speaker || 'default'}${e.voice.character ? ` (${e.voice.character})` : ''}`;
+  if (e.artist) console.log(`\n${e.artist.name}: chaos ${e.artist.chaos} · energy ${e.artist.energy} · complexity ${e.artist.complexity} · talk ${e.artist.talk} · pace ${e.artist.pace}${e.artist.quirks.length ? ` · quirks ${e.artist.quirks.join(', ')}` : ''}`);
   console.log(`\n#${i + 1} "${e.title}" · ${mmss(e.seconds)} · ${e.bpm} BPM · ${e.key} ${e.meter} · ${e.shape} · ${e.tracks} tracks · ${voice} · ${parts}`);
   if (args.includes('--quiet')) return;
   for (const p of e.phrases) console.log(`  bar ${String(p.bar + 1).padStart(3)}  ${p.role.padEnd(7)} target ${p.target.toFixed(2)}  energy ${p.energy.toFixed(2)}  ${p.moves.join(', ') || '-'}${p.say ? `  "${p.say}"` : ''}`);

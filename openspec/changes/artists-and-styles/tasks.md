@@ -2,10 +2,10 @@
 
 ## 1. Artists in the director
 
-- [ ] 1.1 Define the artist format (format version, profile, taste, quirks) with a validator and `tools/artist.mjs validate`; verify in `check:endless` that a valid artist passes, and that an unknown style, a reversed range and an unknown quirk are errors with their paths.
-- [ ] 1.2 Make `createSession` accept an artist and draw each song's options from its taste (styles by weight with `explore`, ranges, shapes by weight, pace, move weights, voice characters); verify in `check:endless` that sessions without an artist are unchanged (seed fixtures) and that with an artist songs differ in their values and mostly use the favourite styles.
-- [ ] 1.3 Implement the quirks in `src/endless/quirks.js`; verify each in `check:endless` with chance 1 (for example no guitar track with `no-guitars`, a second drop with `two-drops`, everything stopped at the last boundary with `hard-endings`).
-- [ ] 1.4 Record the artist in the session data and the report, add `--artist` to `tools/endless.mjs`; verify that a replay from the recorded session gives the same songs after the artist file changes.
+- [x] 1.1 Define the artist format (format version, profile, taste, quirks) with a validator and `tools/artist.mjs validate`; verify in `check:endless` that a valid artist passes, and that an unknown style, a reversed range and an unknown quirk are errors with their paths.
+- [x] 1.2 Make `createSession` accept an artist and draw each song's options from its taste (styles by weight with `explore`, ranges, shapes by weight, pace, move weights, voice characters); verify in `check:endless` that sessions without an artist are unchanged (seed fixtures) and that with an artist songs differ in their values and mostly use the favourite styles.
+- [x] 1.3 Implement the quirks in `src/endless/quirks.js`; verify each in `check:endless` with chance 1 (for example no guitar track with `no-guitars`, a second drop with `two-drops`, everything stopped at the last boundary with `hard-endings`).
+- [x] 1.4 Record the artist in the session data and the report, add `--artist` to `tools/endless.mjs`; verify that a replay from the recorded session gives the same songs after the artist file changes.
 
 ## 2. Built-in artists and progressive house
 
