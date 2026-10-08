@@ -34,6 +34,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const noGenre = await page.$$eval('#songs [data-song-id]', xs => xs.filter(x => !x.querySelector('.tag-chip.genre') && !/^endless-/.test(x.dataset.songId)).map(x => x.dataset.songId));
   check(!noGenre.length, 'every card shows at least one genre', noGenre.join(', '));
   if (shots) await page.screenshot({ path: path.join(shots, 'songs-all.png') });
+  const kl = await page.$$eval('#songs [data-song-id="kellerlicht"] .tag-chip', xs => xs.map(x => x.textContent));
+  check(kl.join('|') === 'Techno|Trance|Synthwave|Berlin techno', 'a style with the same name as its genre is not repeated', kl.join('|'));
 
   // search
   await page.fill('#sv-q', 'FRÌGIO'); await sleep(400);

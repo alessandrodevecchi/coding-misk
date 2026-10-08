@@ -255,6 +255,8 @@
 
 - Aperte `#36` Playlist (i preferiti come prima playlist; da decidere se una playlist può contenere sessioni radio da seme) e `#37` uso dell'app online da qualsiasi dispositivo (hosting statico gratuito, account solo per il proprietario, telefono e PWA, app iOS forse più avanti). Analisi su hosting, app iOS, account e diritti in `notes/pubblicazione-e-diritti.md` (locale, non nel repo).
 
+- Scheda Brani, riscontro del proprietario: su Kellerlicht i tag sembravano doppi (genere "Trance" e stile "Trance"). Ora uno stile con lo stesso nome del suo genere non si ripete: restano i generi (colore d'accento) e gli stili che dicono qualcosa in più (per esempio Berlin techno sotto Techno); i tag liberi hanno il `#`. Ogni chip ha un suggerimento che dice se è un genere, uno stile (con il suo genere) o un tag libero. `check-songs-tab.cjs` lo controlla.
+
 ## Prossimo passo
 
 Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live coding a mano `#20`); `develop` = `763c59f` con in più barra player e volume `#32` (change `player-bar`, tutti i task fatti tranne la prova del proprietario) e artisti con schede Artisti e Stili `#35` (change `artists-and-styles`, 14/14 task). Il proprietario sta provando a fondo artisti e barra.

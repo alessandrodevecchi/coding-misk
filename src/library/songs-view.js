@@ -102,13 +102,17 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, onChange
   }
   const starButton = id => `<button class="star" data-star="${esc(id)}" aria-pressed="${isFav(id)}" aria-label="${esc(t(isFav(id) ? 'favRemove' : 'favAdd'))}" title="${esc(t(isFav(id) ? 'favRemove' : 'favAdd'))}">${STAR}</button>`;
 
-  // tags of a card: genres, then styles with their current names (an unknown style shows its id, dimmed), then free tags
+  // tags of a card: genres (accent colour), then the styles whose name says more than their genre
+  // (Berlin techno under Techno; a "Trance" style under the Trance genre is not repeated), then free tags (#).
+  // The tooltip tells what each chip is.
   function tagsHtml(song) {
-    const e = songEntry(song, 0, names());
+    const e = songEntry(song, 0, names()), n = names();
+    const same = id => { const nm = styleName(id), g = n.genreOf(id); return nm && g && e.genres.includes(g) && nm.toLowerCase() === t(`g:${g}`).toLowerCase(); };
+    const tip = (kind, extra = '') => ` title="${esc(t(kind))}${extra ? `: ${esc(extra)}` : ''}"`;
     return [
-      ...e.genres.map(g => `<span class="tag-chip genre">${esc(t(`g:${g}`))}</span>`),
-      ...e.styles.map(id => { const nm = styleName(id); return `<span class="tag-chip style${nm ? '' : ' unknown'}">${esc(nm || id)}</span>`; }),
-      ...e.free.map(f => `<span class="tag-chip free">#${esc(f)}</span>`),
+      ...e.genres.map(g => { const st = e.styles.filter(id => same(id) && n.genreOf(id) === g); return `<span class="tag-chip genre"${tip(st.length ? 'tagGenreStyle' : 'tagGenre')}>${esc(t(`g:${g}`))}</span>`; }),
+      ...e.styles.filter(id => !same(id)).map(id => { const nm = styleName(id), g = n.genreOf(id); return `<span class="tag-chip style${nm ? '' : ' unknown'}"${tip('tagStyle', g ? t(`g:${g}`) : '')}>${esc(nm || id)}</span>`; }),
+      ...e.free.map(f => `<span class="tag-chip free"${tip('tagFree')}>#${esc(f)}</span>`),
     ].join(' ');
   }
 
