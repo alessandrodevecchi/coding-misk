@@ -239,6 +239,8 @@
 
 - Barra player, prova del proprietario: lo stop era più alto degli altri tasti (prendeva l'altezza globale di `.stopbtn`), ora tutti 34 px; icone del volume minimali in SVG (altoparlante con una, due onde o una X) al posto delle emoji; timeline trascinabile sotto il titolo per spostarsi nel brano (nella radio dentro il brano in onda, il brano seguente resta lo stesso), esclusa dalle manopole del tema hardware. `check-player.cjs` 22 controlli, tutti passano.
 
+- Barra player: il cursore della timeline ora è un quadratino come quello del righello in Componi, con la parte già suonata colorata (ambra nel tema hardware). Il proprietario conferma la barra in basso come scelta giusta.
+
 ## Prossimo passo
 
 - (fatto in `v0.5.0`) Endless `#21`: il proprietario ascolta le sessioni generate (`npm run endless -- --styles … --join`, brani nella libreria dopo un ricaricamento) e dà il suo parere (task 5.3); poi `openspec-verify-change` e archiviazione della change e rilascio `v0.5.0` (con conferma). Radio `#22` su `develop`: manca la prova del proprietario (task 5.3), poi verifica e archiviazione di `endless-radio`.

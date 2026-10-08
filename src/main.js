@@ -1609,7 +1609,7 @@ function seekRange() {
   if (song && song.meta) return { from: 0, bars: song.meta.bars };
   return null;
 }
-$('#pb-seek').addEventListener('input', () => { pbSeeking = true; });
+$('#pb-seek').addEventListener('input', e => { pbSeeking = true; e.target.style.setProperty('--pos', `${e.target.value / 10}%`); });
 $('#pb-seek').addEventListener('change', e => {
   pbSeeking = false;
   const r = seekRange(); if (!r) return;
@@ -1638,7 +1638,7 @@ function renderPlayerBar() {
   if (!pbSeeking && sr) {
     const cyc = onRadio ? (playing && s ? s.now() : rs && rs.paused !== undefined ? rs.paused : sr.from) : playing && s ? s.now() : paused && song && paused.id === song.id ? paused.cyc : mode === 'track' ? cueBar() : 0;
     const v = Math.round(Math.max(0, Math.min(1, (cyc - sr.from) / sr.bars)) * 1000);
-    if (+seek.value !== v) seek.value = v;
+    if (+seek.value !== v) { seek.value = v; seek.style.setProperty('--pos', `${v / 10}%`); }
   }
   const onair = onRadio && !radio.paused;
   const canNav = onRadio || (currentSongId() !== null && (mode === 'track' || (source && source.kind === 'song')));
