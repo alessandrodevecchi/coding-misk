@@ -57,5 +57,17 @@
   "quirks": {
     "two-drops": 0.6,
     "talks-a-lot": 0.5
+  },
+  "transitions": {
+    "kinds": {
+      "break": 4,
+      "cut": 2,
+      "mix": 1
+    },
+    "bars": [
+      8,
+      8
+    ],
+    "harmony": "free"
   }
 }

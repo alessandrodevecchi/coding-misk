@@ -14,6 +14,8 @@ import { createSongsView } from './library/songs-view.js';
 import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS } from './library/playlists.js';
 import { createPlaylistsTab } from './library/playlists-tab.js';
+import { windowSong } from './endless/join.js';
+import { absoluteClips, playlistTransition, overlapOf } from './endless/transitions.js';
 import { createSession } from './endless/director.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
@@ -1444,12 +1446,58 @@ function allStyles() { return [...BUILTIN_STYLES, ...((stylesTab && stylesTab.mi
 const playlists = createPlaylistStore(store);
 let queue = null, shuffleOn = !!store.get('coding-misk-shuffle', false), repeatMode = REPEATS.includes(store.get('coding-misk-repeat', 'off')) ? store.get('coding-misk-repeat', 'off') : 'off';
 const cardIndex = id => libraryCards().findIndex(c => c.tr.id === id);
-// starts a song of the library by id (as its card's play button); false when it cannot start
+// starts a song of the library by id (as its card's play button); false when it cannot start.
+// In a playlist with mix on, a saved song starts the mix stream instead
 function playById(id) {
   const i = cardIndex(id);
   if (i < 0) return false;
+  if (mixOn && queue && repeatMode !== 'one' && mixSong(id)) return startMix(id);
+  mixS = null;
   startCard(i, 0);
   return true;
+}
+
+// ---------- playlist mix (#23) ----------
+// Two saved songs on one timeline, the next one mixed in under the end of the one playing; when it comes on
+// air the window moves on, as in the radio. Code songs and the end of the queue stop the stream with a cut.
+let mixOn = !!store.get('coding-misk-playlist-mix', false), mixS = null, mixN = 0;
+const barsOfSong = sg => sg.sections.reduce((a, x) => a + x.bars, 0);
+function mixSong(id) { const c = libraryCards().find(x => x.tr.id === id); if (!c || c.tr.kind !== 'composed') return null; const { kind, ...sg } = c.tr; return absoluteClips(clone(sg)); }
+const mixActive = () => !!(mixS && song && song === mixS.p);
+// the song after the last one of the window, from the queue, mixed in when it is a saved song
+function extendMix() {
+  const last = mixS.items[mixS.items.length - 1], id = queue && queue.peek(), sg = id && mixSong(id);
+  if (!sg || mixS.items.length > 1) return;
+  last.transition = playlistTransition(last.song, sg);
+  mixS.items.push({ id, song: sg, n: ++mixN, start: last.start + last.bars - overlapOf(last.transition), bars: barsOfSong(sg) });
+}
+function mixPlayable() {
+  const w = windowSong(mixS.items.map(x => ({ song: x.song, n: x.n, start: x.start, transition: x.transition })));
+  const first = mixS.items[0];
+  return playable({ ...w, id: `mix-${first.id}`, title: first.song.title, kind: 'composed' });
+}
+function startMix(id) {
+  const sg = mixSong(id);
+  if (!sg) return false;
+  mixS = { items: [{ id, song: sg, n: ++mixN, start: 0, bars: barsOfSong(sg) }] };
+  extendMix();
+  mixS.p = mixPlayable();
+  if (sg.look) setLook(sg.look);
+  playSong(mixS.p, 0, 'free');
+  return true;
+}
+// every frame while the mix plays: the next song comes on air at the end of the current one
+function mixTick(cyc) {
+  if (!mixActive() || hand || resumeTo !== null) return;
+  const cur = mixS.items[0];
+  if (mixS.items.length < 2 || cyc < cur.start + cur.bars) return;
+  if (queue) queue.next({ auto: true });
+  mixS.items.shift(); extendMix();
+  const p = mixPlayable();
+  mixS.p = p; song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
+  warmVoices(p); source = { kind: 'song', name: p.title, id: p.id }; renderSource();
+  if (mixS.items[0].song.look) setLook(mixS.items[0].song.look);
+  pbLast = '';
 }
 // plays a playlist (or a list of ids) from a song: ids in order, name for the player bar
 function playQueue(listId, ids, startId = null) {
@@ -1598,6 +1646,7 @@ const SPK = (extra) => `<svg viewBox="0 0 16 16" width="14" height="14" aria-hid
 // shuffle and repeat icons in the same line style (#36)
 const ICON = body => `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 const SPK_SHUFFLE = ICON('<path d="M2 4.5h2.5c3 0 4 7 7 7H14M2 11.5h2.5c1.2 0 2-1.1 2.7-2.5M9 6.6c.7-1.2 1.4-2.1 2.5-2.1H14"/><path d="M12.5 3l1.5 1.5L12.5 6M12.5 10l1.5 1.5L12.5 13"/>');
+const SPK_MIX = ICON('<path d="M2 12c4 0 5-8 12-8M2 4c4 0 5 8 12 8"/><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/>');
 const SPK_REPEAT = ICON('<path d="M3 7V6a2 2 0 0 1 2-2h8M11 2l2 2-2 2M13 9v1a2 2 0 0 1-2 2H3M5 14l-2-2 2-2"/>');
 const SPK_HIGH = SPK('<path d="M10.5 5.5a3.5 3.5 0 0 1 0 5"/><path d="M12.5 3.5a6.3 6.3 0 0 1 0 9"/>'), SPK_LOW = SPK('<path d="M10.5 5.5a3.5 3.5 0 0 1 0 5"/>'), SPK_OFF = SPK('<path d="M11 6l4 4M15 6l-4 4"/>');
 function renderVolume() {
@@ -1628,6 +1677,7 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
     if (resumeTo !== null) resumeBuild(song, s, cyc);
     else if (song.build && !hand) liveBuild(song, s, cyc);
     if (mode === 'radio' && radio && !hand && resumeTo === null) radio.tick(cyc);
+    mixTick(cyc);
     if (loopIdx >= 0) {
       const sec = m.sections[loopIdx];
       if (sec && cyc >= sec.start + sec.len) playSong(song, sec.start, mode);
@@ -1707,7 +1757,7 @@ function renderSounds() { sounds.render(); }
 // ---------- player bar (#32) ----------
 // the library in the order of the Songs tab: composed songs, then hand-written code songs
 function libraryCards() { if (!cards.length) { const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr)); cards = [...composed, ...codedTracks()].map(tr => ({ tr, p: playable(tr) })); } return cards; }
-function currentSongId() { return mode === 'track' ? T.id : mode === 'free' && song ? song.id : null; }
+function currentSongId() { return mixActive() ? mixS.items[0].id : mode === 'track' ? T.id : mode === 'free' && song ? song.id : null; }
 function neighbour(dir) {
   if (mode === 'radio' && radio && radio.on) return dir > 0 ? radio.skip() : radio.restart();
   const id = currentSongId(), list = libraryCards();
@@ -1724,7 +1774,7 @@ function goNeighbour(dir) {
   const j = neighbour(dir);
   if (typeof j !== 'number' || j < 0) return;
   const wasPlaying = isPlaying(), { tr, p } = cards[j];
-  if (wasPlaying) return startCard(j, 0);
+  if (wasPlaying) { if (queue) return playById(tr.id); return startCard(j, 0); }
   if (tr.kind === 'composed') { if (loadTrack(tr) && mode !== 'track') backToTrack(); return; }
   if (ed) ed.stop(); paused = null; song = p; mode = 'free'; source = { kind: 'song', name: tr.title, id: tr.id }; renderSource(); if (ed) ed.setCode(p.code); updateShare();
 }
@@ -1732,6 +1782,7 @@ function goNeighbour(dir) {
 let pbSeeking = false;
 function seekRange() {
   if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs.stream[rs.onAir]; return { from: it.start, bars: it.bars }; }
+  if (mixActive()) { const it = mixS.items[0]; return { from: it.start, bars: it.bars }; }
   if (song && song.meta) return { from: 0, bars: song.meta.bars };
   return null;
 }
@@ -1742,7 +1793,8 @@ $('#pb-seek').addEventListener('change', e => {
   const bar = Math.min(r.bars - .25, Math.round(+e.target.value / 1000 * r.bars * 4) / 4);
   if (mode === 'radio' && radio && radio.on) return radio.seek(bar);
   if (mode === 'track') return seekTo(bar);
-  if (song) { if (isPlaying()) playSong(song, bar, mode); else paused = { id: song.id, cyc: bar }; }
+  const at = r.from + bar;
+  if (song) { if (isPlaying()) playSong(song, at, mode); else paused = { id: song.id, cyc: at }; }
 });
 $('#pb-prev').addEventListener('click', () => goNeighbour(-1));
 $('#pb-next').addEventListener('click', () => goNeighbour(1));
@@ -1757,6 +1809,7 @@ function renderPlayerBar() {
     const m = song.meta, cyc = playing && s ? s.now() : paused.cyc;
     title = mode === 'track' ? T.title : song.title || source.name || title;
     pos = `${clock(m.secondsAt(Math.min(cyc, m.bars)))} / ${clock(m.seconds)}`;
+    if (mixActive()) { const it = mixS.items[0], t0 = m.secondsAt(it.start); title = it.song.title; pos = `${clock(Math.max(0, m.secondsAt(Math.min(cyc, m.bars)) - t0))} / ${clock(m.secondsAt(Math.min(m.bars, it.start + it.bars)) - t0)}`; }
   } else if (mode === 'free' && source && source.name) title = source.name;
   // timeline position (not while the user drags it)
   const seek = $('#pb-seek'), sr = seekRange();
@@ -1785,9 +1838,13 @@ function renderModes(onRadio = mode === 'radio' && radio && radio.on) {
   sh.setAttribute('aria-pressed', shuffleOn); sh.disabled = !!onRadio;
   rp.setAttribute('aria-pressed', repeatMode !== 'off'); rp.disabled = !!onRadio; rp.dataset.mode = repeatMode;
   rp.innerHTML = REPEAT_ICON[repeatMode];
+  const mx = $('#pb-mix'); mx.setAttribute('aria-pressed', mixOn); mx.disabled = !!onRadio;
   const tip = t(`repeat:${repeatMode}`); rp.title = tip; rp.setAttribute('aria-label', tip);
 }
 $('#pb-shuffle').innerHTML = SPK_SHUFFLE;
+$('#pb-mix').innerHTML = SPK_MIX;
+// playlist mix on or off: applies from the next song started
+$('#pb-mix').addEventListener('click', () => { mixOn = !mixOn; store.set('coding-misk-playlist-mix', mixOn); toast(t(mixOn ? 'mixOnToast' : 'mixOffToast')); pbLast = ''; renderPlayerBar(); });
 $('#pb-shuffle').addEventListener('click', () => {
   shuffleOn = !shuffleOn; store.set('coding-misk-shuffle', shuffleOn);
   if (queue) queue.setShuffle(shuffleOn);

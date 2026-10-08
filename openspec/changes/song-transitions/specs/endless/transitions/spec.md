@@ -11,7 +11,7 @@ The system SHALL support six transitions between a song and the next one: mix, m
 
 #### Scenario: Mix
 - **WHEN** a mix of 16 bars joins song A to song B
-- **THEN** during the last 16 bars of A the drums of B play, the melodic tracks of A fade and filter out by the end, and from the first bar after the mix only B plays
+- **THEN** during the last 16 bars of A the tracks of B enter one group at a time (drums first, then bass, then the rest), the tracks of A fade and filter out by the end, the second half of the mix is in B's key, and from the first bar after the mix only B plays
 
 #### Scenario: Morph
 - **WHEN** a morph of two phrases joins A to B
@@ -70,7 +70,7 @@ The player bar SHALL offer, for playlists, a choice between cut and mix, remembe
 
 #### Scenario: Mix in a playlist
 - **WHEN** mix is chosen and a playlist plays two composed songs in a row
-- **THEN** the second song's drums enter during the first song's last 8 bars and the second song continues from its first bar after that
+- **THEN** the second song's tracks enter during the first song's last 8 bars and the second song continues as written after that
 
 #### Scenario: Code song cuts
 - **WHEN** a playlist moves from a composed song to a code song with mix chosen

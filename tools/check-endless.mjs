@@ -15,6 +15,8 @@ import { QUIRKS } from '../src/endless/quirks.js';
 import { portraitPixels } from '../src/endless/portrait.js';
 import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
+import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
+import { KEYS } from '../src/music.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { stateAt, buildSteps } from '../src/song/build.js';
@@ -389,7 +391,8 @@ const CHECKS = {
       const joined = JSON.parse(fs.readFileSync(path.join(out, s.files.find(f => f.endsWith('-joined.json'))), 'utf8'));
       const v = validateSong(joined);
       assert(!v.errors.length, `joined song: ${v.errors.slice(0, 2).map(e => `${e.path}: ${e.msg}`).join('; ')}`);
-      assert(joined.sections.reduce((a, x) => a + x.bars, 0) === s.songs.reduce((a, e) => a + e.bars, 0), 'joined song length differs');
+      const want = s.songs.reduce((a, e, i) => a + e.bars + extraOf(e.transition) - (i < s.songs.length - 1 ? overlapOf(e.transition) : 0), 0);
+      assert(joined.sections.reduce((a, x) => a + x.bars, 0) === want, `joined song length differs: ${joined.sections.reduce((a, x) => a + x.bars, 0)} for ${want}`);
       assert(new Set(joined.tracks.map(t => t.id)).size === joined.tracks.length, 'joined track ids not unique');
     } finally { fs.rmSync(out, { recursive: true, force: true }); }
   },
@@ -400,11 +403,69 @@ const CHECKS = {
     assert(/available styles: .*berlin-techno/.test(r.stderr), `no list of styles: ${r.stderr}`);
     assert(!fs.existsSync(out), 'something was written');
   },
+  'transitions: every kind joins two songs into a valid song'() {
+    const ses = createSession(STYLES, 'tx-kinds');
+    const a = ses.next({ styles: ['synthwave'], harmony: 'compatible' }), b = ses.next({ styles: ['synthwave'], harmony: 'compatible' });
+    assert(Math.abs(a.entry.bpm - b.entry.bpm) <= MAX_RAMP, `compatible tempos ${a.entry.bpm} and ${b.entry.bpm}`);
+    for (const kind of TRANSITION_KINDS) {
+      const t = planTransition(a.entry, b.entry, { transition: kind }, stream('tx', kind));
+      assert(t.kind === kind, `${kind} planned as ${t.kind}`);
+      const items = [{ song: a.song, n: 1, bars: a.entry.bars, transition: t }, { song: b.song, n: 2, bars: b.entry.bars }];
+      const starts = layout(items, 0), win = windowSong(items.map((x, i) => ({ ...x, start: starts[i] })));
+      const v = validateSong(win);
+      assert(!v.errors.length, `${kind}: ${v.errors.slice(0, 2).map(e => `${e.path}: ${e.msg}`).join('; ')}`);
+      const total = win.sections.reduce((s, x) => s + x.bars, 0);
+      assert(total === a.entry.bars + b.entry.bars + extraOf(t) - overlapOf(t), `${kind}: length ${total}`);
+      for (const bar of [starts[1] - 1, starts[1], a.entry.bars - 1, a.entry.bars + extraOf(t), total - 1]) compileSong(stateAt(win, Math.max(0, bar)).song);
+    }
+  },
+  'transitions: mix and morph bring the next song in before the end and leave only it'() {
+    const ses = createSession(STYLES, 'tx-overlap');
+    const a = ses.next({ styles: ['berlin-techno'], harmony: 'compatible' }), b = ses.next({ styles: ['berlin-techno'], harmony: 'compatible' });
+    for (const kind of ['mix', 'morph']) {
+      const t = planTransition(a.entry, b.entry, { transition: kind, transitionBars: [16, 16] }, stream('tx', kind));
+      const items = [{ song: a.song, n: 1, bars: a.entry.bars, transition: t }, { song: b.song, n: 2, bars: b.entry.bars }];
+      const starts = layout(items, 0), win = windowSong(items.map((x, i) => ({ ...x, start: starts[i] })));
+      assert(starts[1] === a.entry.bars - t.bars, `${kind}: next song starts at ${starts[1]}`);
+      const during = stateAt(win, a.entry.bars - 1).song.tracks.filter(x => !x.mute && x.type !== 'voice');
+      assert(during.some(x => x.id.startsWith('s2-')), `${kind}: no track of the next song during the transition`);
+      const after = stateAt(win, a.entry.bars).song.tracks.filter(x => !x.mute && x.id.startsWith('s1-') && x.clips.some(c => c.start <= a.entry.bars && c.start + c.bars > a.entry.bars));
+      assert(!after.length, `${kind}: tracks of the first song still play after it: ${after.map(x => x.id).join(', ')}`);
+      if (kind === 'morph') {
+        const left = stateAt(win, a.entry.bars - 1).song.tracks.filter(x => !x.mute && x.id.startsWith('s1-') && !['voice', 'code', 'riser'].includes(x.type) && x.clips.some(c => c.start < a.entry.bars));
+        assert(!left.length, `morph: still playing in the last bar: ${left.map(x => x.id).join(', ')}`);
+      }
+      if (t.ramp) {
+        const sec = win.sections.filter(x => /Mix|Morph/.test(x.name));
+        assert(sec[0].bpm === a.entry.bpm && sec[sec.length - 1].bpmEnd === b.entry.bpm, `${kind}: tempo ramp ${JSON.stringify(sec.map(x => [x.bpm, x.bpmEnd]))}`);
+      }
+    }
+  },
+  'transitions: a big tempo jump never mixes or morphs'() {
+    const a = { bpm: 90, meter: '4/4', bars: 128, phrase: 8 }, b = { bpm: 140, meter: '4/4', bars: 128, phrase: 8 };
+    for (let k = 0; k < 40; k++) assert(!['mix', 'morph'].includes(planTransition(a, b, { transitionWeights: { mix: 5, morph: 5, cut: 1 } }, stream('jump', String(k))).kind), 'mix over a 50 BPM jump');
+    assert(planTransition(a, b, { transition: 'mix' }, stream('jump')).kind === 'cut', 'forced mix over a jump is a cut');
+  },
+  'transitions: artist preferences are followed'() {
+    const artist = { ...loadArtists()[0], transitions: { kinds: { break: 10, cut: 1 }, bars: [8, 8] } };
+    const { session } = generateSession(STYLES, { artist, styles: Object.keys(artist.styles), minutes: 60, seed: 'tx-pref' });
+    const kinds = session.songs.slice(0, -1).map(e => e.transition.kind), count = k => kinds.filter(x => x === k).length;
+    assert(count('break') > kinds.length / 2, `breaks ${count('break')} of ${kinds.length}: ${kinds.join(' ')}`);
+  },
+  'transitions: compatible harmony keeps keys a fifth apart'() {
+    const semis = k => KEYS.find(x => x[0] === k)[1], fifth = (x, y) => [5, 7].includes(((semis(x) - semis(y)) % 12 + 12) % 12);
+    const { session } = generateSession(STYLES, { styles: ['synthwave'], minutes: 40, seed: 'tx-keys', harmony: 'compatible' });
+    const keys = byId.synthwave.keys;
+    session.songs.slice(1).forEach((e, i) => {
+      const prev = session.songs[i].key;
+      if (keys.some(k => fifth(k, prev))) assert(fifth(e.key, prev), `${prev} then ${e.key}`);
+    });
+  },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');
-    const listed = [...doc.matchAll(/`((?:director|determinism|radio|artists): [^`]+)`/g)].map(m => m[1]);
+    const listed = [...doc.matchAll(/`((?:director|determinism|radio|artists|transitions): [^`]+)`/g)].map(m => m[1]);
     for (const n of listed) assert(CHECKS[n], `docs/ENDLESS.md names a check that does not exist: ${n}`);
-    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
+    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists|transitions):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
   },
 };
 

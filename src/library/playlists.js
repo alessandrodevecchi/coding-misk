@@ -142,6 +142,15 @@ export function createQueue({ ids, start = null, shuffle = false, repeat = 'off'
       pos = Math.max(0, order.indexOf(cur));
     },
     setRepeat(mode) { if (REPEATS.includes(mode)) rep = mode; },
+    // the song that would come next at the end of this one, without moving (null at a reshuffle or the end)
+    peek() {
+      if (!order.length || rep === 'one') return null;
+      const i = seek(pos + 1, 1);
+      if (i >= 0) return order[i];
+      if (rep !== 'all' || shuf) return null;
+      const j = seek(0, 1);
+      return j >= 0 ? order[j] : null;
+    },
     // jump to a song of the playlist (picked by the user)
     jump(id) { const i = order.indexOf(id); if (i < 0) return false; pos = i; return true; },
   };

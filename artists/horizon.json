@@ -56,5 +56,17 @@
   },
   "quirks": {
     "two-drops": 0.3
+  },
+  "transitions": {
+    "kinds": {
+      "morph": 3,
+      "mix": 2,
+      "break": 1
+    },
+    "bars": [
+      16,
+      32
+    ],
+    "harmony": "compatible"
   }
 }

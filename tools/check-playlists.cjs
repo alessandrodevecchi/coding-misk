@@ -139,6 +139,39 @@ async function seed(page) {
   check(!(await lists()).some(l => l.id === corsa.id), 'second press deletes');
   check(!(await page.$('#pl-delete')), 'Favourites cannot be deleted');
 
+  // mix between saved songs (#23): the next song comes in under the end of the current one, a code song cuts
+  await page.evaluate(async () => {
+    const base = await (await fetch('/songs/examples/02-bass-and-chords.json')).json();
+    const mk = n => ({ ...base, id: `u-m${n}`, title: `Mix ${n}`, sections: base.sections.map(x => ({ ...x, bars: 4, bpm: 240 })) });
+    const lib = JSON.parse(localStorage.getItem('coding-misk-library'));
+    lib.tracks.push(mk(1), mk(2)); localStorage.setItem('coding-misk-library', JSON.stringify(lib));
+    const pl = JSON.parse(localStorage.getItem('coding-misk-playlists'));
+    pl.lists.push({ id: 'p-mix', name: 'Mix test', songs: ['u-m1', 'u-m2', 'ghost-protocol'] });
+    localStorage.setItem('coding-misk-playlists', JSON.stringify(pl));
+    localStorage.setItem('coding-misk-playlist-mix', 'true');
+  });
+  await page.reload(); await sleep(3500);
+  check((await page.getAttribute('#pb-mix', 'aria-pressed')) === 'true', 'mix switch remembered');
+  await page.click('[data-tab="playlist"]'); await sleep(300);
+  await page.click('[data-pl-open="p-mix"]'); await sleep(200);
+  await page.click('#pl-play'); await sleep(1500);
+  const cyc = () => page.evaluate(() => document.querySelector('strudel-editor').editor.repl.scheduler.now());
+  const code = () => page.evaluate(() => document.querySelector('strudel-editor').editor.code);
+  const t1 = await title();
+  let both = false;
+  for (let k = 0; k < 40 && !both; k++) { await sleep(200); const c = await code(); both = /=+ 1 \w/.test(c) && /=+ 2 \w/.test(c) && (await cyc()) > 4.2 && (await cyc()) < 8; }
+  check(t1 === 'Mix 1' && both, 'the next saved song plays under the end of the current one', t1);
+  let t2 = '', c2 = 0;
+  for (let k = 0; k < 40 && t2 !== 'Mix 2'; k++) { await sleep(200); t2 = await title(); c2 = await cyc(); }
+  check(t2 === 'Mix 2' && c2 > 8, 'the next song comes on air without a restart', `${t2} at bar ${c2.toFixed(1)}`);
+  let t3 = '';
+  for (let k = 0; k < 60 && !/Ghost/.test(t3); k++) { await sleep(250); t3 = await title(); }
+  check(/Ghost/.test(t3) && (await cyc()) < 3, 'a code song after it starts with a cut', `${t3}`);
+  const err = await page.evaluate(() => String(document.querySelector('strudel-editor').editor.repl.state.evalError || ''));
+  check(!err, 'no evaluation error in the mix', err.slice(0, 120));
+  await page.click('#stop'); await sleep(200);
+  await page.click('#pb-mix'); await sleep(100);
+
   // dropdowns use the theme's colours (Chrome's customizable select)
   const appearance = await page.$eval('#sv-sort', el => getComputedStyle(el).appearance).catch(() => '');
   check(appearance === 'base-select', 'dropdowns drawn in the theme', appearance);

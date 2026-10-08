@@ -1,6 +1,6 @@
 // Spoken comments for live builds, generated with macOS `say` (local and free).
 // Collects every "say" phrase of the songs in songs/, the comments of derived live builds and the endless
-// director's phrase pool (src/endless/phrases.js), and writes one
+// director's phrase pool (src/endless/phrases.js) with the interlude comments (transitions.js), and writes one
 // WAV per phrase, language and speaker: public/samples/say_<lang>[_<speaker>]/<slug>.wav (speaker: the voice
 // track's `speaker` setting, see SPEAKERS in src/song/build.js; none = the default voice).
 // The app plays them on the bar of their step. Files are git-ignored (Apple voices): run this again to make them.
@@ -13,6 +13,7 @@ import { songFiles } from './songs-dir.mjs';
 import { PHRASES, saySlug, sayBank, voiceOf } from '../src/song/build.js';
 import { loadStyles } from './styles-dir.mjs';
 import { allPhrases } from '../src/endless/phrases.js';
+import { INTERLUDE_SAY } from '../src/endless/transitions.js';
 
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const DEFAULT_VOICE = { en: opt('en', 'Samantha'), it: opt('it', 'Alice') }, force = args.includes('--force');
@@ -43,7 +44,7 @@ for (const f of songFiles('songs')) {
 Object.values(PHRASES).forEach(s => addSay(s));
 // the director's pool, for the default voice and every speaker a style recipe names
 const speakers = new Set(['', ...loadStyles().map(r => (r.voice && r.voice.speaker) || '')]);
-for (const sp of speakers) allPhrases().forEach(p => addSay(p, sp));
+for (const sp of speakers) [...allPhrases(), ...INTERLUDE_SAY.map(([en, it]) => ({ en, it }))].forEach(p => addSay(p, sp));
 
 let made = 0, kept = 0;
 const missing = new Set();

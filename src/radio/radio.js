@@ -4,6 +4,8 @@
 // moves the window when a song ends. The player (main.js) owns the editor and the scheduler; the radio
 // only builds playables and tells it when to start, swap or stop.
 import { createSession, OPTION_DEFAULTS } from '../endless/director.js';
+import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
+import { overlapOf, extraOf } from '../endless/transitions.js';
 import { windowSong } from '../endless/join.js';
 import { validateRecipe } from '../endless/recipe.js';
 import { buildSteps, sayText } from '../song/build.js';
@@ -33,6 +35,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     talk: saved.talk ?? OPTION_DEFAULTS.talk,
     // the artist picked (its id), or null when the controls are set by hand ("custom")
     artist: saved.artist ?? null,
+    // transitions (#23): the artist's choice or always one kind; harmony: the artist's, compatible or free
+    transition: ['artist', ...TRANSITION_KINDS].includes(saved.transition) ? saved.transition : 'artist',
+    harmony: ['artist', ...HARMONY_MODES].includes(saved.harmony) ? saved.harmony : 'artist',
   };
   if (!opts.styles.length) opts.styles = [ids.includes('synthwave') ? 'synthwave' : ids[0]];
   let history = store.get('coding-misk-radio-history', []);
@@ -43,7 +48,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const saveOpts = () => store.set('coding-misk-radio', opts);
   const artistOf = id => (id ? artists().find(a => a.id === id) || null : null);
   // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
-  const current = () => { const a = artistOf(opts.artist); return a ? { artist: JSON.parse(JSON.stringify(a)) } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk }; };
+  const current = () => { const a = artistOf(opts.artist), how = { transition: opts.transition, harmony: opts.harmony }; return a ? { artist: JSON.parse(JSON.stringify(a)), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how }; };
   const mid = r => Math.round((r[0] + r[1]) / 2 * 20) / 20;
   function pickArtist(id) {
     const a = artistOf(id);
@@ -67,13 +72,16 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function generate() {
     const n = S.stream.length, prev = S.stream[n - 1];
     const { song, entry } = S.session.next(optionsFor(n));
-    const item = { song, entry, n, start: prev ? prev.start + prev.bars : 0, bars: barsOf(song) };
+    // the director has just planned the transition from the song before: an interlude lengthens it,
+    // an overlap starts this song before it ends
+    if (prev && !prev.cut) prev.bars += extraOf(prev.entry.transition);
+    const item = { song, entry, n, start: prev ? prev.start + prev.bars - (prev.cut ? 0 : overlapOf(prev.entry.transition)) : 0, bars: barsOf(song) };
     S.stream.push(item);
     return item;
   }
   function windowPlayable() {
     const items = S.stream.slice(S.onAir, S.onAir + 2);
-    return player.makePlayable(windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start }))));
+    return player.makePlayable(windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut }))));
   }
   function start({ seed, recipe } = {}) {
     stopQuiet();
@@ -123,13 +131,16 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (!S || S.paused !== undefined) return;
     const cyc = player.now(), cur = S.stream[S.onAir], cut = Math.floor(cyc) + 1;
     if (S.stream.length <= S.onAir + 1) generate();
-    cur.bars = Math.max(1, cut - cur.start);
-    let at = cur.start + cur.bars;
-    for (const x of S.stream.slice(S.onAir + 1)) { x.start = at; at += x.bars; }
+    cur.bars = Math.max(1, cut - cur.start); cur.cut = true;
+    relayout();
     S.onAir++;
     remember(S.stream[S.onAir]);
     player.jump(windowPlayable(), S.stream[S.onAir].start);
     render();
+  }
+  // starts of the songs after the one on air, once it was cut short (a skip always cuts, no transition)
+  function relayout() {
+    for (let i = S.onAir + 1; i < S.stream.length; i++) { const p = S.stream[i - 1]; S.stream[i].start = p.start + p.bars - (p.cut ? 0 : overlapOf(p.entry.transition)); }
   }
   // after live coding by hand: when the song on air ended meanwhile, the next one starts on "bar"
   // (returns true); otherwise the song on air goes on and the player types its code back (false)
@@ -138,9 +149,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const cur = S.stream[S.onAir];
     if (bar < cur.start + cur.bars) return false;
     if (S.stream.length <= S.onAir + 1) generate();
-    cur.bars = bar - cur.start;
-    let at = bar;
-    for (const x of S.stream.slice(S.onAir + 1)) { x.start = at; at += x.bars; }
+    cur.bars = bar - cur.start; cur.cut = true;
+    relayout();
     S.onAir++;
     remember(S.stream[S.onAir]);
     player.jump(windowPlayable(), S.stream[S.onAir].start);
@@ -206,7 +216,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       <div class="radio-pos">${curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>
       <div class="lbl">${esc(t('radioComing'))}</div>
       <ul class="radio-next">${next.map(s => `<li><span class="at">${esc(t('radioBarShort', { n: s.at + 1 }))}</span> ${esc(stepText(s))}${s.say ? ` <em>“${esc(sayText(s.say, getLang()))}”</em>` : ''}</li>`).join('') || `<li class="muted">${esc(t('radioNoChanges'))}</li>`}</ul>
-      <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) : esc(t('radioPreparing'))}</div>`;
+      <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) : esc(t('radioPreparing'))}${nextSong && e.transition && !item.cut ? ` · ${esc(e.transition.kind === 'cut' ? t('radioNextTxCut') : t('radioNextTx', { kind: t(`tx:${e.transition.kind}`), bars: e.transition.bars }))}` : ''}</div>`;
   }
 
   function render() {
@@ -230,6 +240,10 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${opts.styles.includes(r.id)}" title="${esc(r.description || t('tipStyles'))}">${esc(tx(r.name))}</button>`).join('')}</div>
         </div>
         <div class="ctrls four">${slider('chaos', 'radioChaos', 'tipChaos')}${slider('energy', 'radioEnergy', 'tipEnergy')}${slider('complexity', 'radioComplexity', 'tipComplexity')}${slider('talk', 'radioTalk', 'tipTalk')}</div>
+        <div class="radio-how">
+          <label class="ctrl" ${tip('tipTransition')}><span class="lbl">${esc(t('radioTransition'))}</span><select id="radio-transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => `<option value="${k}"${opts.transition === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtist' : `tx:${k}`))}</option>`).join('')}</select></label>
+          <label class="ctrl" ${tip('tipHarmony')}><span class="lbl">${esc(t('radioHarmony'))}</span><select id="radio-harmony" data-no-knob>${['artist', ...HARMONY_MODES].map(k => `<option value="${k}"${opts.harmony === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtist' : `harmony:${k}`))}</option>`).join('')}</select></label>
+        </div>
         <p class="hint muted">${esc(t('radioNextHint'))}</p>
         <div class="radio-seed">
           <div class="ctrl grow" ${tip('tipSeed')}><label class="lbl" for="radio-seed">${esc(t('radioSeed'))}</label><input id="radio-seed" type="text" maxlength="40" autocomplete="off" placeholder="${esc(t('radioSeedAuto'))}" value="${esc(on ? S.recipe.seed : seedField)}" ${on ? 'readonly' : ''}></div>
@@ -278,6 +292,10 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       root.querySelectorAll('[data-artist]').forEach(c => c.setAttribute('aria-pressed', c.dataset.artist === ''));
     }
   });
+  root.addEventListener('change', e => {
+    if (e.target.id === 'radio-transition') { opts.transition = e.target.value; saveOpts(); }
+    if (e.target.id === 'radio-harmony') { opts.harmony = e.target.value; saveOpts(); }
+  });
   root.addEventListener('input', e => {
     const k = e.target.dataset.opt;
     if (k) { if (opts.artist) { opts.artist = null; root.querySelectorAll('[data-artist]').forEach(c => c.setAttribute('aria-pressed', c.dataset.artist === '')); } opts[k] = +e.target.value; saveOpts(); e.target.closest('.ctrl').querySelector('output').textContent = fmt(opts[k]); }
@@ -291,7 +309,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },
     get on() { return !!S; },
-    get state() { return S && { paused: S.paused, seed: S.recipe.seed, recipe: clone(S.recipe), onAir: S.onAir, stream: S.stream.map(x => ({ n: x.n, start: x.start, bars: x.bars, title: x.song.title, id: x.song.id })) }; },
+    get state() { return S && { paused: S.paused, seed: S.recipe.seed, recipe: clone(S.recipe), onAir: S.onAir, stream: S.stream.map(x => ({ n: x.n, start: x.start, bars: x.bars, title: x.song.title, id: x.song.id, transition: x.entry.transition || null })), transition: S.stream[S.onAir].entry.transition || null }; },
     get history() { return history; },
     get options() { return current(); },
   };

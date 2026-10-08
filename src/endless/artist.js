@@ -9,17 +9,22 @@ export const PALETTES = ['violet', 'neon', 'amber', 'ice', 'blood', 'forest', 's
 // kinds of move an artist can like (the director's move kinds)
 export const MOVE_KINDS = ['add-drums', 'add-bass', 'add-lead', 'add-pad', 'add-guitar', 'add-texture', 'strip', 'variation', 'brighter', 'darker', 'dirtier', 'cleaner', 'more-space'];
 export const VOICE_CHARACTER_NAMES = ['radio', 'robot', 'deep', 'bright', 'cathedral', 'echo', 'dirty', 'slow'];
+// transitions between songs (#23, src/endless/transitions.js) and harmony modes for the next song
+export const TRANSITION_KINDS = ['mix', 'morph', 'break', 'echo', 'interlude', 'cut'];
+export const HARMONY_MODES = ['compatible', 'free'];
 
 // values used when an artist leaves a field out (also for fields added by later formats)
 export const ARTIST_DEFAULTS = {
   explore: 0.1, chaos: [0.1, 0.5], energy: [0.4, 0.8], complexity: [0.3, 0.7], talk: [0.3, 0.6],
   shapes: {}, pace: [0.4, 0.6], moves: {}, voice: { characters: {}, chance: 0.35 }, quirks: {},
+  transitions: { kinds: { mix: 3, cut: 2, morph: 1, break: 1, echo: 1, interlude: 0.5 }, bars: [8, 16], harmony: 'compatible' },
 };
 export const ARTIST_FIELDS = ['format', 'id', 'name', 'bio', 'inspiredBy', 'portrait', 'styles', ...Object.keys(ARTIST_DEFAULTS)];
 
 export const withArtistDefaults = a => {
   const out = { ...structuredClone(ARTIST_DEFAULTS), ...a };
   out.voice = { ...ARTIST_DEFAULTS.voice, ...(a.voice || {}) };
+  out.transitions = { ...structuredClone(ARTIST_DEFAULTS.transitions), ...(a.transitions || {}) };
   return out;
 };
 
@@ -73,6 +78,21 @@ export function validateArtist(a, styleIds = []) {
       if (!isNum(c) || c < 0 || c > 1) err(`quirks.${k}`, 'a chance from 0 to 1');
     }
   }
+  if (a.transitions !== undefined) {
+    const tr = a.transitions;
+    if (!tr || typeof tr !== 'object' || Array.isArray(tr)) err('transitions', 'an object {"kinds": {"mix": 3}, "bars": [8, 16], "harmony": "compatible"}');
+    else {
+      if (tr.kinds !== undefined) {
+        weights('transitions.kinds', tr.kinds, TRANSITION_KINDS, 'transitions');
+        if (tr.kinds && typeof tr.kinds === 'object' && !Object.values(tr.kinds).some(w => w > 0)) err('transitions.kinds', 'at least one transition with a weight above 0');
+      }
+      if (tr.bars !== undefined) {
+        range('transitions.bars', tr.bars, 2, 64);
+        if (Array.isArray(tr.bars) && !tr.bars.every(Number.isInteger)) err('transitions.bars', 'whole numbers of bars');
+      }
+      if (tr.harmony !== undefined && !HARMONY_MODES.includes(tr.harmony)) err('transitions.harmony', `one of ${HARMONY_MODES.join(', ')}`);
+    }
+  }
   return { errors, warnings };
 }
 
@@ -96,6 +116,7 @@ export function artistSongOptions(artist, styleIds, rng) {
     chaos: draw(A.chaos), energy: draw(A.energy), complexity: draw(A.complexity), talk: draw(A.talk), pace: draw(A.pace),
     shapeWeights: A.shapes, moveWeights: A.moves, voiceCharacters: A.voice.characters, voiceChance: A.voice.chance,
     quirks: Object.entries(A.quirks).filter(([, c]) => rng.chance(c)).map(([k]) => k),
+    transitionWeights: A.transitions.kinds, transitionBars: A.transitions.bars, artistHarmony: A.transitions.harmony,
   };
   if (opts.quirks.includes('talks-a-lot')) opts.talk = Math.max(opts.talk, 0.9);
   return opts;

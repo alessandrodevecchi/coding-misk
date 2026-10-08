@@ -706,3 +706,6 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
   :root[data-ui="hw"] select option:hover, :root[data-ui="hw"] select option:focus-visible { background: #2c1f08; color: #ffd27a; text-shadow: 0 0 6px #ff9a1f; }
   :root[data-ui="hw"] select option:checked { color: #ffd27a; }
 }
+/* radio: transitions and harmony (#23) */
+.radio-how { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.radio-how .ctrl { display: grid; gap: 4px; min-width: 160px; }

@@ -24,7 +24,7 @@ Each session entry gets `transition: { kind, bars, ramp }`, the transition from 
 The songs themselves stay as generated. `joinPair(a, b, transition)` (pure, in `src/endless/transitions.js`) turns the end of A and the start of B into the joined material on the shared timeline:
 
 - **Overlap kinds (mix, morph, echo out)** place B's start `overlap` bars before A's end. A's last section is split at the overlap start; the overlap bars keep A's key and chords, with `bpm` A to `bpmEnd` B for a ramp. B's sections that fall inside the overlap are dropped from the timeline (B's intro is shortened, as a DJ mixes an intro under an outro), and B's clips are shifted by `-overlap`.
-  - **Mix:** during the overlap only B's drums and texture tracks sound (they do not depend on the key); B's other tracks start after it. Steps on A's melodic tracks lower gain and cutoff phrase by phrase to silence at the end; A's drums leave on the last bar.
+  - **Mix** (owner: not only drums): the overlap's first half keeps A's key and chords, the second half takes B's. B's tracks enter in groups: drums and texture at the start, bass at the second quarter, the rest at the half (in B's key from there). Steps on A's tracks lower gain and cutoff to silence by the end; A's drums leave at three quarters, so two kicks never play for long.
   - **Morph:** the overlap is split in steps on half phrases; each step removes one of A's tracks and adds one of B's (by type: drums for drums, bass for bass first), the second half of the overlap takes B's key and chords.
   - **Echo out:** overlap of 1 or 2 bars: A's tracks get a delay and a reverb device on the overlap's first bar and are removed on its last; B starts on the overlap's first bar with drums only, the rest as written.
 - **Break and riser:** no overlap. A's last phrase keeps pad and texture, the rest is removed, a riser track and a rising cutoff are added; B starts with a crash on its first section.
@@ -47,7 +47,7 @@ The player bar gets a small "Mix" switch for playlists (remembered as `coding-mi
 
 ## Risks / Trade-offs
 
-- During a mix B's bass and melody wait until the overlap ends, so the mix sounds like a drum blend; with compatible keys a later step could bring B's bass in earlier.
+- During a mix B's bass plays a quarter in A's key; with compatible harmony (a fifth) the clash is small, in free mode it is part of the artist's character.
 - Morph halfway changes key under A's remaining tracks; with compatible keys (a fifth) the clash is small, in free mode it is audible and becomes part of the artist's character.
 - Long joined runs in playlists compile more code; runs are joined lazily, two songs ahead.
 - Seed fixtures and any saved session recipe change meaning; sessions recorded before this change replay without transitions only if the recipe says `transitions: cut`, which old recipes do not have. Accepted: the radio is not yet released to others.

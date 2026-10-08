@@ -17,9 +17,9 @@ The code lives in `src/endless/` and runs in Node and in the browser:
 
 ## Session
 
-A session is an ordered list of songs plus session data: the seed, the options (styles, chaos, energy, complexity, minutes) and, for each song, its title, the style of each part, length, tempo, key, meter, shape, track count and one entry per phrase (role, target energy, measured energy, moves, comment). Songs follow each other with a plain end and start in this phase.
+A session is an ordered list of songs plus session data: the seed, the options (styles, chaos, energy, complexity, minutes) and, for each song, its title, the style of each part, length, tempo, key, meter, shape, track count and one entry per phrase (role, target energy, measured energy, moves, comment), and the transition to the next song (see Transitions).
 
-Options and defaults: chaos 0.3, energy 0.6, complexity 0.5, 15 minutes. The director adds songs until the session reaches the length.
+Options and defaults: chaos 0.3, energy 0.6, complexity 0.5, 15 minutes, transitions and harmony from the artist (compatible harmony without one). The director adds songs until the session reaches the length.
 
 ## Song plan
 
@@ -121,9 +121,28 @@ The draws use their own random stream (`voice`), so they never change the music 
 
 The radio plays songs on one timeline of absolute bars. `windowSong` (`src/endless/join.js`) joins the song on air and the next one, with silent sections before them so that the window's bar numbers equal the stream's: the scheduler never restarts between songs. Track ids carry the song number in the stream (`s7-bass`), so a song's code does not change when the window moves.
 
+## Transitions
+
+The director plans the transition from each song to the next when it makes the next one (it needs both tempos), with the `transition` random stream, and records it in the earlier song's entry: `{ kind, bars, ramp?, say? }`. `src/endless/transitions.js` writes it where the two songs meet, as sections, extra tracks and build steps, so the joined song compiles and opens in Compose like any other:
+
+| Kind        | What happens                                                                                                  | Bars              |
+| ----------- | ------------------------------------------------------------------------------------------------------------- | ----------------- |
+| `mix`       | The next song starts under the last bars: its intro builds in, the current song fades and filters out, its drums leave at three quarters. First half in the current key, second half in the next. | 1 to 2 phrases |
+| `morph`     | The current song's tracks leave one at a time (texture and melody first, drums last) while the next song builds in. | 2 to 4 phrases |
+| `echo`      | The current song's tracks get delay and reverb two bars before the end and stop on the last bar; the next song starts under the tail. | 2 |
+| `break`     | The last phrase keeps pad and texture, a riser climbs and the pad opens; the next song starts with a crash.      | 1 phrase          |
+| `interlude` | After the song, a near-silence: at most two quiet tracks of it, a sparse click, a spoken comment.               | 1 to 4 phrases    |
+| `cut`       | A plain end and start.                                                                                        | 0                 |
+
+Mix and morph ramp the tempo across the overlap and are never planned for a tempo jump above 12 BPM or a change of meter. The kind comes from the artist's weights (`transitions.kinds`, defaults mix 3, cut 2, morph, break and echo 1, interlude 0.5) or from the option `transition` (`artist` or a kind); chaos lifts the kinds the artist likes less.
+
+**Harmony.** With `harmony: compatible` (the default, or the artist's choice) the next song takes a key a fifth up or down from the current one and a tempo within 12 BPM, when its style allows; with `free` keys and tempos are drawn as before. Consecutive songs never share a key unless the style allows only one.
+
+On the stream, the next song starts `bars` before the end of the current one for mix, morph and echo, and `bars` after it for an interlude. A skip always cuts.
+
 ## Determinism
 
-Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit.
+Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`, `voice`, `artist`, `transition`. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit.
 
 ## Checks
 
@@ -155,6 +174,11 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Song by song equals a whole session          | `radio: song by song equals a whole session`                     |
 | Options apply from the next song             | `radio: an option change applies from the next song and replays the same` |
 | Window keeps each song, at any offset        | `radio: window song keeps each song as it is, at any offset`     |
+| Every transition makes a valid song          | `transitions: every kind joins two songs into a valid song`      |
+| Overlaps bring the next song in and leave it | `transitions: mix and morph bring the next song in before the end and leave only it` |
+| No overlap over a big tempo jump             | `transitions: a big tempo jump never mixes or morphs`            |
+| Artist preferences                           | `transitions: artist preferences are followed`                   |
+| Compatible harmony                           | `transitions: compatible harmony keeps keys a fifth apart`       |
 
 ## Artists
 
@@ -162,4 +186,4 @@ Artists (`docs/ARTISTS.md`) are tastes the director samples for every song: favo
 
 ## Later phases
 
-Planned in `openspec/changes/endless-director/design.md` and in issues `#22` to `#26`: the radio view linked to Compose, transitions (crossfade, morph), steering buttons, session recording, agents and live voice, an MCP server. Ideas for later still: several directors with their own personality and quirks, and a video made from a session (`#27`).
+Planned in `openspec/changes/endless-director/design.md` and in issues `#22` to `#26`: steering buttons (`#24`), continuing a Compose song in the radio (`#29`), long spoken passages (`#39`), session recording, agents and live voice, an MCP server. Ideas for later still: several directors with their own personality and quirks, and a video made from a session (`#27`).

@@ -57,5 +57,18 @@
   "quirks": {
     "long-breaks": 0.4,
     "texture-first": 0.3
+  },
+  "transitions": {
+    "kinds": {
+      "mix": 4,
+      "echo": 2,
+      "morph": 1,
+      "cut": 0.5
+    },
+    "bars": [
+      16,
+      32
+    ],
+    "harmony": "compatible"
   }
 }

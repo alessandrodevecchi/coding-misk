@@ -47,5 +47,18 @@
   },
   "quirks": {
     "hard-endings": 0.3
+  },
+  "transitions": {
+    "kinds": {
+      "cut": 3,
+      "break": 2,
+      "echo": 1,
+      "mix": 0.5
+    },
+    "bars": [
+      8,
+      16
+    ],
+    "harmony": "free"
   }
 }

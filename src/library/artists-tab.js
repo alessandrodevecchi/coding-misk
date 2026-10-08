@@ -1,6 +1,6 @@
 // Artists tab (#35): profiles as cards and character sheets; the user's artists edited with a form and a JSON view.
 // Built-in artists (artists/*.json) are read-only and can be duplicated. The user's artists live in browser storage.
-import { validateArtist, withArtistDefaults, ARTIST_FORMAT, PALETTES, MOVE_KINDS, VOICE_CHARACTER_NAMES } from '../endless/artist.js';
+import { validateArtist, withArtistDefaults, ARTIST_FORMAT, PALETTES, MOVE_KINDS, VOICE_CHARACTER_NAMES, TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { QUIRKS } from '../endless/quirks.js';
 import { SHAPES } from '../endless/recipe.js';
 import { portraitUrl } from '../endless/portrait.js';
@@ -34,6 +34,7 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
         <div class="sheet-block"><h4>${esc(t('libShapes'))}</h4>${weightsBars(a.shapes, k => t('shape_' + k))}</div>
         <div class="sheet-block"><h4>${esc(t('artMoves'))}</h4>${weightsBars(a.moves)}</div>
         <div class="sheet-block"><h4>${esc(t('voice'))}</h4>${weightsBars(a.voice.characters)}<div class="muted small">${esc(t('artVoiceChance', { p: pct(a.voice.chance) }))}</div></div>
+        <div class="sheet-block"><h4>${esc(t('artTransitions'))}</h4>${weightsBars(a.transitions.kinds, k => t(`tx:${k}`))}<div class="muted small">${esc(t('artTxBars', { a: a.transitions.bars[0], b: a.transitions.bars[1] }))} · ${esc(t('radioHarmony'))}: ${esc(t(`harmony:${a.transitions.harmony}`))}</div></div>
         <div class="sheet-block"><h4>${esc(t('artQuirks'))}</h4>${Object.entries(a.quirks).length ? Object.entries(a.quirks).map(([q, c]) => `<div class="wrow"><span>${esc(tx(QUIRKS[q] || { en: q }))}</span><span class="muted mono">${pct(c)}</span></div>`).join('') : `<span class="muted">${esc(t('libNone'))}</span>`}</div>
       </div></div>`;
   }
@@ -59,6 +60,10 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
       <div class="sheet-block"><h4>${esc(t('artMoves'))}</h4>${weights('moves', MOVE_KINDS)}</div>
       <div class="sheet-block"><h4>${esc(t('voice'))}</h4><div class="ctrl"><span class="lbl">${esc(t('artVoiceChanceLbl'))}</span>${num('voice.chance', A.voice.chance)}</div>
         <div class="wgrid">${VOICE_CHARACTER_NAMES.map(k => `<label><span>${k}</span>${num(`voice.characters.${k}`, (A.voice.characters || {})[k] ?? 0, 1)}</label>`).join('')}</div>${err('voice')}</div>
+      <div class="sheet-block"><h4>${esc(t('artTransitions'))}</h4>
+        <div class="wgrid">${TRANSITION_KINDS.map(k => `<label><span>${esc(t(`tx:${k}`))}</span>${num(`transitions.kinds.${k}`, A.transitions.kinds[k] ?? 0, 1)}</label>`).join('')}</div>
+        <div class="ctrl"><span class="lbl">${esc(t('artTxBarsLbl'))}</span><div class="pair">${num('transitions.bars.0', A.transitions.bars[0], 1)}${num('transitions.bars.1', A.transitions.bars[1], 1)}</div></div>
+        <div class="ctrl"><span class="lbl">${esc(t('radioHarmony'))}</span><select data-text="transitions.harmony">${HARMONY_MODES.map(h => `<option value="${h}"${A.transitions.harmony === h ? ' selected' : ''}>${esc(t(`harmony:${h}`))}</option>`).join('')}</select></div>${err('transitions')}</div>
       <div class="sheet-block"><h4>${esc(t('artQuirks'))}</h4>${weights('quirks', Object.keys(QUIRKS), k => tx(QUIRKS[k]), 0.05)}</div>
     </div>`;
   }
@@ -67,6 +72,7 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
   function setAt(o, path, v) { const ks = path.split('.'); let x = o; ks.slice(0, -1).forEach((k, i) => { if (x[k] == null) x[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; x = x[k]; }); x[ks[ks.length - 1]] = v; }
   // weights at 0 are left out, so the file stays readable
   const tidy = a => { for (const k of ['styles', 'shapes', 'moves', 'quirks']) if (a[k]) { a[k] = Object.fromEntries(Object.entries(a[k]).filter(([, v]) => v > 0)); if (!Object.keys(a[k]).length && k !== 'styles') delete a[k]; }
+    if (a.transitions && a.transitions.kinds) a.transitions.kinds = Object.fromEntries(Object.entries(a.transitions.kinds).filter(([, v]) => v > 0));
     if (a.voice && a.voice.characters) a.voice.characters = Object.fromEntries(Object.entries(a.voice.characters).filter(([, v]) => v > 0)); return a; };
 
   function render() {

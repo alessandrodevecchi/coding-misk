@@ -56,5 +56,18 @@
   },
   "quirks": {
     "slow-builds": 0.6
+  },
+  "transitions": {
+    "kinds": {
+      "mix": 3,
+      "interlude": 2,
+      "echo": 1.5,
+      "morph": 1
+    },
+    "bars": [
+      16,
+      32
+    ],
+    "harmony": "compatible"
   }
 }

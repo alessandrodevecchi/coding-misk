@@ -1,7 +1,7 @@
 // The endless director (docs/ENDLESS.md): writes a seeded session of songs in the song format v2,
 // each with live build steps that make it evolve phrase by phrase toward an energy shape.
 // Pure and deterministic: no Node or browser APIs, no Math.random (randomness comes from random.js).
-import { BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, TEX_RHYTHMS, GROOVES, ROWS, DEFAULT, fitSteps, meterSteps } from '../music.js';
+import { BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, TEX_RHYTHMS, GROOVES, ROWS, DEFAULT, KEYS, fitSteps, meterSteps } from '../music.js';
 import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT } from '../song/format.js';
 import { stateAt, SPEAKERS } from '../song/build.js';
 import { makeRng, freshSeed } from './random.js';
@@ -13,10 +13,11 @@ import { mutateRows, mutateBass, mutateArp, mutateHook } from './mutate.js';
 import { phrase as pickPhrase } from './phrases.js';
 import { artistSongOptions, pickWeighted } from './artist.js';
 import { has, applyPlanQuirks } from './quirks.js';
+import { planTransition, MAX_RAMP } from './transitions.js';
 
 export const SESSION_FORMAT = 'coding-misk/endless-session';
 // talk: how often the voice speaks (0 never, 0.5 about half of the boundaries with moves, 1 almost all)
-export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15 };
+export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist' };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const round = x => (Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100);
 const cap = s => s[0].toUpperCase() + s.slice(1);
@@ -24,6 +25,11 @@ const ROW_IDS = ROWS.map(([id]) => id);
 const MELODIC = ['bass', 'arp', 'hook', 'pad', 'guitar'];
 // order in which instruments usually come in at the start of a song
 const ENTRY = ['drums', 'bass', 'pad', 'arp', 'guitar', 'hook', 'texture'];
+// keys a fifth apart (up or down), on the app's semitone offsets of KEYS
+const semis = k => (KEYS.find(x => x[0] === k) || [k, 0])[1];
+const fifthApart = (a, b) => { const d = ((semis(a) - semis(b)) % 12 + 12) % 12; return d === 5 || d === 7; };
+// the harmony mode of a song: the options' override, else the artist's, else compatible
+const harmonyOf = opts => (opts.harmony && opts.harmony !== 'artist' ? opts.harmony : opts.artistHarmony || 'compatible');
 const pickOther = (rng, list, avoid) => { const rest = list.filter(x => x !== avoid); return rng.pick(rest.length ? rest : list); };
 const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 
@@ -97,9 +103,14 @@ function candidateTracks(R, meter, complexity, rng, mut, opts = {}) {
 // Plan of one song: parts, tempo, key, length, sections with chords, shape, candidate tracks.
 export function planSong({ parts, byId, prev, opts, rng, index }) {
   const R = withDefaults(partRecipe(parts, byId));
-  const P = rng.plan, bpm = Math.round(P.range(R.tempo[0], R.tempo[1] + 0.999));
+  // compatible harmony (#23): a tempo a transition can ramp to, and a key a fifth away, when the style allows
+  const compatible = prev && harmonyOf(opts) === 'compatible';
+  const near = compatible ? [Math.max(R.tempo[0], prev.bpm - MAX_RAMP), Math.min(R.tempo[1], prev.bpm + MAX_RAMP)] : null;
+  const span = near && near[0] <= near[1] ? near : R.tempo;
+  const P = rng.plan, bpm = Math.round(Math.min(span[1], P.range(span[0], span[1] + 0.999)));
   const meter = P.pick(R.meters), swing = round(P.range(R.swing[0], R.swing[1]));
-  const key = pickOther(P, R.keys, prev && prev.key);
+  const fifths = compatible ? R.keys.filter(k => fifthApart(k, prev.key)) : [];
+  const key = fifths.length ? P.pick(fifths) : pickOther(P, R.keys, prev && prev.key);
   // an artist's favourite shapes, among those the style allows (not the previous song's when another is possible)
   const liked = opts.shapeWeights && pickWeighted(rng.artist, opts.shapeWeights, R.shapes.filter(x => x !== (prev && prev.shape)).length ? R.shapes.filter(x => x !== (prev && prev.shape)) : R.shapes);
   const shape = liked || pickOther(P, R.shapes, prev && prev.shape);
@@ -362,6 +373,8 @@ export function createSession(recipes, seed) {
       let parts = mixParts(selected, opts.chaos, at, rng.plan);
       for (let t = 0; t < 12 && recent.includes(partsKey(parts)) && selected.length > 1 && opts.chaos > 0; t++) parts = mixParts(selected, opts.chaos, at, rng.plan);
       const { song, entry } = makeSong({ parts, byId, prev: entries[i - 1], opts, rng, index: i, seed });
+      // the transition from the song before to this one (it needs both tempos)
+      if (i > 0) entries[i - 1].transition = planTransition(entries[i - 1], entry, opts, rng.transition);
       if (drawn) entry.artist = { id: options.artist.id, name: options.artist.name, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, pace: opts.pace, quirks: opts.quirks };
       entries.push(entry);
       return { song, entry };
@@ -379,7 +392,7 @@ export function generateSession(recipes, options) {
     const { song, entry } = ses.next(opts);
     songs.push(song); seconds += entry.seconds;
   }
-  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes, ...(opts.artist ? { artist: opts.artist } : {}) }, seconds: Math.round(seconds), songs: ses.entries };
+  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes, transition: opts.transition, harmony: opts.harmony, ...(opts.artist ? { artist: opts.artist } : {}) }, seconds: Math.round(seconds), songs: ses.entries };
   return { session, songs };
 }
 

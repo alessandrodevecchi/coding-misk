@@ -49,5 +49,16 @@
   },
   "quirks": {
     "no-guitars": 1
+  },
+  "transitions": {
+    "kinds": {
+      "cut": 3,
+      "mix": 2
+    },
+    "bars": [
+      8,
+      16
+    ],
+    "harmony": "compatible"
   }
 }

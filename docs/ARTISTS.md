@@ -29,6 +29,7 @@ npm run endless -- --artist night-owl --minutes 20    # a session by one artist
 | `moves`      | Kinds of move with weights: a bonus when the director scores them.                              | none               |
 | `voice`      | `{ "characters": { "deep": 2 }, "chance": 0.4 }`: voice characters by weight and how often one is used. | `chance` 0.35 |
 | `quirks`     | Quirks with their chance per song, for example `{ "no-guitars": 1 }`.                           | none               |
+| `transitions` | `{ "kinds": { "mix": 3, "break": 1 }, "bars": [8, 16], "harmony": "compatible" }`: transitions to the next song by weight (`mix`, `morph`, `break`, `echo`, `interlude`, `cut`), their length in bars, and `compatible` or `free` harmony (docs/ENDLESS.md, Transitions). | mix 3, cut 2, morph, break and echo 1, interlude 0.5; 8 to 16 bars; compatible |
 
 Palettes: `violet`, `neon`, `amber`, `ice`, `blood`, `forest`, `sunset`, `mono`. Kinds of move: `add-drums`, `add-bass`, `add-lead`, `add-pad`, `add-guitar`, `add-texture`, `strip`, `variation`, `brighter`, `darker`, `dirtier`, `cleaner`, `more-space`. Voice characters: `radio`, `robot`, `deep`, `bright`, `cathedral`, `echo`, `dirty`, `slow`.
 
