@@ -275,6 +275,8 @@
 
 - Barra player, tema hardware, segnalato dal proprietario: non si capiva quando casuale, ripeti e mix erano accesi. Ora sono tasti a ritenuta con una spia: acceso, il tasto resta abbassato, l'icona diventa ambra e la spia verde si illumina.
 
+- `#24` Comandi per guidare la radio: change OpenSpec `radio-steering` scritta con le risposte del proprietario: console nella scheda Radio con gruppi di comandi e scorciatoie da tastiera, comandi alla frase successiva (i brevi alla battuta successiva) con coda annullabile, switch "questo brano / tutta la diretta" (idea del proprietario: nella diretta i comandi spostano anche i cursori per i brani dopo), curva dell'energia trascinabile nella scheda "ora in onda" (idea del proprietario), mixer per traccia con volume, muto, blocca e cambia strumento, comandi registrati nella ricetta per il riascolto. Una vista con più curve andrà in una issue a parte.
+
 ## Prossimo passo
 
 Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live coding a mano `#20`); `develop` = `763c59f` con in più barra player e volume `#32` (change `player-bar`, tutti i task fatti tranne la prova del proprietario) e artisti con schede Artisti e Stili `#35` (change `artists-and-styles`, 14/14 task). Il proprietario sta provando a fondo artisti e barra.
