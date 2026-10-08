@@ -29,7 +29,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   await page.click('[data-tab="radio"]'); await sleep(300);
 
   // tab and controls
-  check(await page.locator('#tab-radio [data-style]').count() === 12, 'radio tab shows the twelve styles');
+  check(await page.locator('#tab-radio [data-style]').count() === 15, 'radio tab shows every style');
   check(!(await ed()).started, 'nothing plays before start');
   check(await page.locator('#stagewrap').isVisible() && (await page.locator('#looks [data-look]').count()) > 1, 'stage on top with every visual');
   await pick(['jazz']);

@@ -1,0 +1,208 @@
+{
+  "id": "darksynth",
+  "name": {
+    "en": "Darksynth",
+    "it": "Darksynth"
+  },
+  "description": "Synthwave turned to horror: driving kick, galloping octave bass, aggressive saw leads, sidechained walls and the odd distorted guitar.",
+  "tempo": [
+    110,
+    132
+  ],
+  "keys": [
+    "E",
+    "F",
+    "G",
+    "A"
+  ],
+  "progressions": [
+    "cyber",
+    "frigio",
+    "epica",
+    "tensione"
+  ],
+  "shapes": [
+    "build-drop",
+    "late-peak",
+    "verse-chorus"
+  ],
+  "minutes": [
+    3,
+    5
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      4,
+      5
+    ],
+    "max": 7
+  },
+  "drums": {
+    "kits": [
+      "LinnDrum",
+      "OberheimDMX",
+      "RolandTR909"
+    ],
+    "grooves": [
+      "synthwave",
+      "rock",
+      "metal"
+    ],
+    "settings": {
+      "drive": [
+        0.3,
+        1
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "ottaveArcade",
+      "spirale",
+      "galoppo",
+      "rolling"
+    ],
+    "waves": [
+      "sawtooth",
+      "square"
+    ],
+    "settings": {
+      "cutoff": [
+        500,
+        1500
+      ],
+      "drive": [
+        0.5,
+        2
+      ]
+    }
+  },
+  "arp": {
+    "presets": [
+      "acid",
+      "pulsar"
+    ],
+    "waves": [
+      "sawtooth",
+      "square"
+    ],
+    "speeds": [
+      "16"
+    ],
+    "weight": 0.6
+  },
+  "hook": {
+    "presets": [
+      "neon",
+      "boss",
+      "eroico",
+      "cyber"
+    ],
+    "waves": [
+      "gm_lead_2_sawtooth",
+      "sawtooth"
+    ],
+    "modes": [
+      "minor",
+      "phrygian"
+    ]
+  },
+  "pad": {
+    "presets": [
+      "sidechain",
+      "stab",
+      "pad"
+    ],
+    "waves": [
+      "supersaw",
+      "gm_synth_brass_1"
+    ]
+  },
+  "guitar": {
+    "patterns": [
+      "power8",
+      "chug"
+    ],
+    "types": [
+      "distorted",
+      "metal"
+    ],
+    "weight": 0.4
+  },
+  "texture": {
+    "samples": [
+      "industrial",
+      "metal"
+    ],
+    "rhythms": [
+      "bar",
+      "euclid"
+    ],
+    "weight": 0.4
+  },
+  "riser": {},
+  "voice": {
+    "speakers": [
+      "rocko",
+      "grandpa"
+    ],
+    "gain": 0.32,
+    "pitch": [
+      0.5,
+      0.75
+    ],
+    "tempo": [
+      0.75,
+      0.9
+    ],
+    "hpf": [
+      400,
+      900
+    ],
+    "drive": [
+      2,
+      4
+    ],
+    "room": [
+      0.4,
+      0.7
+    ],
+    "delay": [
+      0.25,
+      0.45
+    ]
+  },
+  "words": {
+    "en": [
+      "Carnage",
+      "Nightcrawler",
+      "Turbo",
+      "Inferno",
+      "Slasher",
+      "Hellride",
+      "Voltage",
+      "Tombstone"
+    ],
+    "it": [
+      "Carneficina",
+      "Inferno",
+      "Lama",
+      "Notturno",
+      "Voltaggio",
+      "Lapide",
+      "Corsa",
+      "Furia"
+    ],
+    "es": [
+      "Carnicería",
+      "Infierno",
+      "Hoja",
+      "Nocturno",
+      "Voltaje",
+      "Lápida",
+      "Carrera",
+      "Furia"
+    ]
+  }
+}

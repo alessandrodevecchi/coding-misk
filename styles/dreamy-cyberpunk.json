@@ -1,0 +1,196 @@
+{
+  "id": "dreamy-cyberpunk",
+  "name": {
+    "en": "Dreamy cyberpunk",
+    "it": "Cyberpunk sognante"
+  },
+  "description": "Rain on neon at three in the morning: slow pulse, warm pads, bells and a melancholic lead, more nostalgia than threat.",
+  "tempo": [
+    82,
+    100
+  ],
+  "keys": [
+    "D",
+    "E",
+    "C",
+    "A"
+  ],
+  "progressions": [
+    "malinconica",
+    "notturna",
+    "pendolo",
+    "lofi"
+  ],
+  "shapes": [
+    "slow-burn",
+    "waves",
+    "descent"
+  ],
+  "minutes": [
+    3,
+    5
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      3,
+      5
+    ],
+    "max": 6
+  },
+  "drums": {
+    "kits": [
+      "LinnDrum",
+      "EmuSP12",
+      "AkaiMPC60"
+    ],
+    "grooves": [
+      "halftime",
+      "synthwave",
+      "boombap"
+    ],
+    "settings": {
+      "gain": [
+        0.6,
+        0.8
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "sub",
+      "ottavi",
+      "pumping"
+    ],
+    "waves": [
+      "sine",
+      "sawtooth"
+    ],
+    "settings": {
+      "cutoff": [
+        300,
+        900
+      ]
+    }
+  },
+  "arp": {
+    "presets": [
+      "sugiu",
+      "pedale"
+    ],
+    "waves": [
+      "triangle",
+      "square"
+    ],
+    "speeds": [
+      "8",
+      "16"
+    ],
+    "weight": 0.7,
+    "settings": {
+      "gain": [
+        0.15,
+        0.25
+      ]
+    }
+  },
+  "hook": {
+    "presets": [
+      "pioggia",
+      "orizzonte",
+      "anima",
+      "segnale"
+    ],
+    "waves": [
+      "gm_vibraphone",
+      "gm_celesta",
+      "sawtooth"
+    ],
+    "modes": [
+      "dorian",
+      "minor"
+    ]
+  },
+  "pad": {
+    "presets": [
+      "pad",
+      "sidechain"
+    ],
+    "waves": [
+      "gm_pad_warm",
+      "supersaw",
+      "gm_choir_aahs"
+    ]
+  },
+  "texture": {
+    "samples": [
+      "space",
+      "wind",
+      "vinyl"
+    ],
+    "rhythms": [
+      "bar"
+    ],
+    "weight": 0.8
+  },
+  "voice": {
+    "speakers": [
+      "flo",
+      "shelley",
+      "sandy"
+    ],
+    "gain": 0.28,
+    "pitch": [
+      0.85,
+      1.1
+    ],
+    "tempo": [
+      0.7,
+      0.9
+    ],
+    "cutoff": [
+      5000,
+      9000
+    ],
+    "room": [
+      0.6,
+      0.9
+    ],
+    "delay": [
+      0.35,
+      0.6
+    ]
+  },
+  "words": {
+    "en": [
+      "Rain",
+      "Neon",
+      "Afterglow",
+      "Skyline",
+      "Halo",
+      "Mirage",
+      "Satellite",
+      "Lullaby"
+    ],
+    "it": [
+      "Pioggia",
+      "Neon",
+      "Bagliore",
+      "Miraggio",
+      "Satellite",
+      "Ninnananna",
+      "Vetro",
+      "Riflesso"
+    ],
+    "es": [
+      "Lluvia",
+      "Neón",
+      "Resplandor",
+      "Espejismo",
+      "Satélite",
+      "Nana",
+      "Cristal",
+      "Reflejo"
+    ]
+  }
+}

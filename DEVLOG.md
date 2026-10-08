@@ -229,6 +229,8 @@
 
 - `#20`, feedback del proprietario: in Radio, dopo qualche minuto a mano, "Riprendi il divenire" saltava avanti di due minuti con un ritmo del tutto diverso. Ora accanto al pulsante c'è lo switch "dal punto in cui ero" (acceso di base, ricordato): il brano torna alla battuta in cui avevi iniziato a scrivere, con il codice che valeva lì, e riparte da lì; spento, riparte da dove sarebbe arrivato (comportamento di prima). Vale in Componi e in Radio. Verificato in `check-hand.cjs` (preso il controllo alla battuta 27, ripresa da 27 invece che da 32) e in `check-radio.cjs`.
 
+- Tre stili nuovi chiesti dal proprietario: Cyberpunk oscuro (tritoni, glitch, stab freddi, 100-122 BPM), Cyberpunk sognante (pioggia sul neon, tappeti caldi, campane, 82-100 BPM), Darksynth (synthwave horror: cassa dritta, ottave al galoppo, lead a dente di sega, a volte chitarra distorta, 110-132 BPM). Quindici ricette valide; suoni tutti caricati; una sessione per stile: 7 brani, nessun errore di valutazione o di pagina, livelli nella norma (cassa fino a 0.85, chitarra 0.67, basso fino a 0.46).
+
 ## Prossimo passo
 
 - Endless `#21`: il proprietario ascolta le sessioni generate (`npm run endless -- --styles … --join`, brani nella libreria dopo un ricaricamento) e dà il suo parere (task 5.3); poi `openspec-verify-change` e archiviazione della change e rilascio `v0.5.0` (con conferma). Radio `#22` su `develop`: manca la prova del proprietario (task 5.3), poi verifica e archiviazione di `endless-radio`.

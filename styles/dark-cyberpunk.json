@@ -1,0 +1,203 @@
+{
+  "id": "dark-cyberpunk",
+  "name": {
+    "en": "Dark cyberpunk",
+    "it": "Cyberpunk oscuro"
+  },
+  "description": "Night city at its worst: tritone riffs, glitching machines, cold stabs and a threat in every bar, in the John Wick club mood.",
+  "tempo": [
+    100,
+    122
+  ],
+  "keys": [
+    "F",
+    "E",
+    "D",
+    "F#"
+  ],
+  "progressions": [
+    "cyber",
+    "tensione",
+    "frigio",
+    "notturna"
+  ],
+  "shapes": [
+    "build-drop",
+    "slow-burn",
+    "late-peak"
+  ],
+  "minutes": [
+    3,
+    5
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      4,
+      5
+    ],
+    "max": 7
+  },
+  "drums": {
+    "kits": [
+      "OberheimDMX",
+      "LinnDrum",
+      "RolandTR909"
+    ],
+    "grooves": [
+      "synthwave",
+      "techno",
+      "halftime"
+    ],
+    "settings": {
+      "drive": [
+        0.3,
+        1.2
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "spirale",
+      "mirino",
+      "tritono",
+      "pumping"
+    ],
+    "waves": [
+      "sawtooth",
+      "square"
+    ],
+    "settings": {
+      "cutoff": [
+        400,
+        1200
+      ],
+      "drive": [
+        0.5,
+        1.8
+      ]
+    }
+  },
+  "arp": {
+    "presets": [
+      "pulsar",
+      "acid",
+      "spezzato"
+    ],
+    "waves": [
+      "sawtooth",
+      "square"
+    ],
+    "speeds": [
+      "16"
+    ],
+    "weight": 0.6
+  },
+  "hook": {
+    "presets": [
+      "cyber",
+      "allarme",
+      "boss",
+      "colpi"
+    ],
+    "waves": [
+      "sawtooth",
+      "square",
+      "gm_lead_2_sawtooth"
+    ],
+    "modes": [
+      "phrygian",
+      "chromatic",
+      "locrian"
+    ]
+  },
+  "pad": {
+    "presets": [
+      "stab",
+      "sidechain",
+      "pad"
+    ],
+    "waves": [
+      "supersaw",
+      "gm_synth_brass_1"
+    ],
+    "weight": 0.7
+  },
+  "texture": {
+    "samples": [
+      "glitch",
+      "numbers",
+      "industrial"
+    ],
+    "rhythms": [
+      "euclid",
+      "eighth",
+      "bar"
+    ],
+    "weight": 0.7
+  },
+  "riser": {},
+  "voice": {
+    "speakers": [
+      "rocko",
+      "eddy"
+    ],
+    "gain": 0.32,
+    "pitch": [
+      0.55,
+      0.8
+    ],
+    "tempo": [
+      0.75,
+      0.95
+    ],
+    "hpf": [
+      600,
+      1200
+    ],
+    "drive": [
+      1.5,
+      3.5
+    ],
+    "room": [
+      0.3,
+      0.55
+    ],
+    "delay": [
+      0.25,
+      0.45
+    ]
+  },
+  "words": {
+    "en": [
+      "Chrome",
+      "Netrunner",
+      "Static",
+      "Blackwall",
+      "Ghost",
+      "Circuit",
+      "Implant",
+      "Overdrive"
+    ],
+    "it": [
+      "Cromo",
+      "Rete",
+      "Statico",
+      "Fantasma",
+      "Circuito",
+      "Innesto",
+      "Neon",
+      "Buio"
+    ],
+    "es": [
+      "Cromo",
+      "Red",
+      "Estática",
+      "Fantasma",
+      "Circuito",
+      "Implante",
+      "Neón",
+      "Sombra"
+    ]
+  }
+}
