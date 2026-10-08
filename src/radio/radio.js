@@ -6,7 +6,7 @@
 import { createSession, OPTION_DEFAULTS } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
-import { steerSong, applyBar, canApply, COMMANDS, ARRANGE_TYPES } from '../endless/steering.js';
+import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
 import { validateRecipe } from '../endless/recipe.js';
@@ -290,8 +290,15 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (!force && key === steerKey) return;
     steerKey = key;
     const tip = k => `title="${esc(t(k))}"`;
-    const btn = (c, label) => { const ok = S.paused === undefined && canApply(c, item.song, item.plan, rel), k = c.type ? TYPE_KEYS[c.type] : KEYS_OF[c.kind]; return `<button class="btn steer-btn" data-cmd="${c.kind}"${c.type ? ` data-type="${c.type}"` : ''} ${ok ? '' : 'disabled'} title="${esc(t(`steerTip:${c.kind}`))}${k ? ` (${esc(keyLabel(k))})` : ''}">${esc(label || t(`steer:${c.kind}`))}</button>`; };
-    const types = ARRANGE_TYPES.map(type => { const playingType = on.some(x => (type === 'lead' ? ['arp', 'hook', 'guitar'].includes(x.type) : x.type === type)); return btn({ kind: playingType ? 'remove' : 'add', type }, t(`steer:${playingType ? 'remove' : 'add'}`, { type: t(`steerType:${type}`) })); }).join('');
+    // a disabled button says why in its tooltip ("this song has no pad")
+    const btn = (c, label) => {
+      const why = S.paused !== undefined ? 'paused' : whyNot(c, item.song, item.plan, rel), k = c.type ? TYPE_KEYS[c.type] : KEYS_OF[c.kind];
+      const tipText = `${t(`steerTip:${c.kind}`)}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
+      return `<button class="btn steer-btn" data-cmd="${c.kind}"${c.type ? ` data-type="${c.type}"` : ''} ${why ? 'disabled' : ''} title="${esc(tipText)}">${esc(label || t(`steer:${c.kind}`))}</button>`;
+    };
+    // the type buttons say what the next phrase can do: "+" when the type will be silent there, "−" when it will play
+    const nextBar = Math.min(barsOf(item.song) - 1, applyBar('add', rel, item.plan)), onNext = stateAt(item.song, nextBar).song.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= nextBar && c.start + c.bars > nextBar));
+    const types = ARRANGE_TYPES.map(type => { const playingType = onNext.some(x => (type === 'lead' ? ['arp', 'hook', 'guitar'].includes(x.type) : x.type === type)); return btn({ kind: playingType ? 'remove' : 'add', type }, t(`steer:${playingType ? 'remove' : 'add'}`, { type: t(`steerType:${type}`) })); }).join('');
     const group = (name, html) => `<div class="steer-group"><span class="lbl">${esc(t(`steerGroup:${name}`))}</span><div class="steer-btns">${html}</div></div>`;
     box.innerHTML = `<div class="steer-head"><div class="lbl">${esc(t('steerTitle'))}</div>
         <span class="hand-from steer-scope" ${tip('steerScopeTip')}><button class="led" id="steer-scope" aria-pressed="${opts.scope === 'session'}" aria-labelledby="steer-scope-lbl"></button><span id="steer-scope-lbl">${esc(t(opts.scope === 'session' ? 'steerScopeSession' : 'steerScopeSong'))}</span></span></div>

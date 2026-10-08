@@ -17,7 +17,7 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
-import { steerSong, applyBar, COMMANDS, canApply } from '../src/endless/steering.js';
+import { steerSong, applyBar, COMMANDS, canApply, whyNot } from '../src/endless/steering.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { stateAt, buildSteps } from '../src/song/build.js';
@@ -515,6 +515,10 @@ const CHECKS = {
       assert(rm.song.build.some(x => x.at === at && x.by === 'listener'), 'listener step not marked');
     }
     assert(canApply({ kind: 'remove', type: 'bass' }, g.song, g.plan, 30) === on.some(t => t.type === 'bass') || on.length <= 1, 'canApply remove bass');
+    // a type the song has no track for is disabled with its reason
+    const missing = ['pad', 'texture', 'lead', 'bass'].find(ty => !g.plan.tracks.some(t => (ty === 'lead' ? ['arp', 'hook', 'guitar'].includes(t.type) : t.type === ty)));
+    if (missing) assert(whyNot({ kind: 'add', type: missing }, g.song, g.plan, 30) === 'no-type', `add ${missing}: ${whyNot({ kind: 'add', type: missing }, g.song, g.plan, 30)}`);
+    assert(whyNot({ kind: 'energy-up' }, g.song, g.plan, g.plan.bars - 1) === 'late', 'late at the end');
   },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');

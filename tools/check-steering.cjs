@@ -25,6 +25,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const err = () => page.evaluate(() => String(document.querySelector('strudel-editor').editor.repl.state.evalError || ''));
 
   check(await page.isVisible('#radio-steer .steer-console'), 'console shown while the radio plays');
+  const tips = await page.$$eval('#radio-steer .steer-btn[disabled]', xs => xs.map(x => x.title));
+  check(tips.every(x => x.includes(' · ')), 'disabled buttons say why', tips.slice(0, 3).join(' | '));
   if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'console.png') });
 
   // energy up queues at the next phrase and raises the targets; cancel brings them back

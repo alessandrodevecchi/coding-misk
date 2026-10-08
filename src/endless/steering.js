@@ -42,17 +42,33 @@ function stateOf(song, plan, bar) {
   return stateAt(base, bar).song;
 }
 
-// whether a command can apply now (for the console): "add bass" needs a bass that is not playing, and so on
-export function canApply(cmd, song, plan, now) {
+// why a command cannot apply now, or null when it can (for the console: disabled buttons say why)
+//   late, no-type, all-playing, locked, last-track, no-target, no-drop
+export function whyNot(cmd, song, plan, now) {
   const at = applyBar(cmd.kind, now, plan);
-  if (at <= now || at >= plan.bars) return false;
-  const st = stateOf(song, plan, at), on = playing(st);
-  if (cmd.kind === 'add') return st.tracks.some(t => t.mute && ofType(t, cmd.type));
-  if (cmd.kind === 'remove') return on.some(t => ofType(t, cmd.type)) && on.length > 1;
-  if (['darker', 'brighter', 'dirtier', 'cleaner', 'more-space'].includes(cmd.kind)) return candidateMoves(st, { usual: plan.usualHigh, weights: plan.R.energy, hardMax: plan.hardMax }, new Set(), stream('probe')).some(m => m.kind === cmd.kind);
-  if (cmd.kind === 'drop') return plan.plan.slice(Math.ceil(at / (2 * plan.phrase))).some(d => d.role === 'drop');
-  return true;
+  if (at <= now || at >= plan.bars) return 'late';
+  const st = stateOf(song, plan, at), on = playing(st), locked = plan.locked || [];
+  if (cmd.kind === 'add') {
+    const all = st.tracks.filter(t => ofType(t, cmd.type));
+    if (!all.length) return 'no-type';
+    const free = all.filter(t => t.mute);
+    if (!free.length) return 'all-playing';
+    return free.some(t => !locked.includes(t.id)) ? null : 'locked';
+  }
+  if (cmd.kind === 'remove') {
+    const mine = on.filter(t => ofType(t, cmd.type));
+    if (!mine.length) return 'no-type';
+    if (on.length <= 1) return 'last-track';
+    return mine.some(t => !locked.includes(t.id)) ? null : 'locked';
+  }
+  if (['darker', 'brighter', 'dirtier', 'cleaner', 'more-space'].includes(cmd.kind)) {
+    const ok = candidateMoves(st, { usual: plan.usualHigh, weights: plan.R.energy, hardMax: plan.hardMax }, new Set(locked), stream('probe')).some(m => m.kind === cmd.kind);
+    return ok ? null : 'no-target';
+  }
+  if (cmd.kind === 'drop') return plan.plan.slice(Math.ceil(at / (2 * plan.phrase))).some(d => d.role === 'drop') ? null : 'no-drop';
+  return null;
 }
+export const canApply = (cmd, song, plan, now) => !whyNot(cmd, song, plan, now);
 
 // the sections of a plan, with the harmony changes made from a bar on
 function sectionsWith(plan) {
