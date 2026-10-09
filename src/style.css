@@ -737,6 +737,24 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .radio-curve .past { fill: currentColor; opacity: .5; }
 @media (max-width: 560px) { .mix-row { grid-template-columns: minmax(0, 1fr) 80px auto auto auto; } }
 .radio-pos:has(.radio-curve.steer) { flex-direction: column; align-items: stretch; gap: 4px; }
+/* the other curves of the song on air (#40): one lane each, colour per curve */
+.radio-lanes { display: grid; gap: 6px; max-width: 360px; margin-top: 4px; }
+.radio-lane { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 2px 8px; font: 11px var(--mono); }
+.radio-lane svg { grid-column: 1 / -1; }
+.radio-lane .lane-name { color: var(--lane); text-transform: uppercase; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; }
+.radio-lane output { color: var(--ink); font-variant-numeric: tabular-nums; }
+.radio-lane .mini { padding: 0 6px; min-width: 0; }
+.radio-lane[data-lane="density"] { --lane: #5ec8ff; }
+.radio-lane[data-lane="brightness"] { --lane: #ffd84d; }
+.radio-lane[data-lane="tension"] { --lane: #ff6b5e; }
+.radio-lane[data-lane="voice"] { --lane: #8fe07a; }
+.radio-curve.lane { width: 100%; height: auto; color: var(--lane); touch-action: none; }
+.radio-curve.lane .pos { stroke-width: 1.5; }
+.radio-curve.lane .handle { stroke: var(--lane); stroke-width: 1.5; }
+.radio-curve.lane .handle.set, .radio-curve.lane .handle:hover { fill: var(--lane); }
+.radio-curve.lane .past { fill: var(--lane); opacity: .35; }
+.radio-curve.lane .past.set { opacity: .9; }
+@media (max-width: 560px) { .radio-lanes { max-width: none; } }
 
 /* settings page (#31) */
 .set-gear { font-size: 18px; min-width: 38px; }

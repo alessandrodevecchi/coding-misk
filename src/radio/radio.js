@@ -6,7 +6,7 @@
 import { createSession, OPTION_DEFAULTS } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
-import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES } from '../endless/steering.js';
+import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, songCurves, densityMax } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
 import { validateRecipe } from '../endless/recipe.js';
@@ -189,7 +189,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function resteer(item) {
     const r = steerSong({ ...item.base, commands: item.commands, seed: S.recipe.seed, n: item.n });
     const extra = item.cut ? 0 : extraOf(item.entry.transition);
-    item.song = r.song; item.plan = r.plan;
+    item.song = r.song; item.plan = r.plan; item.opts = r.opts; item.curves = null;
     const bars = barsOf(r.song) + extra;
     if (bars !== item.bars && !item.cut) { item.bars = bars; const i = S.stream.indexOf(item); if (i >= 0) relayoutFrom(i); }
   }
@@ -206,7 +206,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (at <= rel || at >= barsOf(item.song)) { toast(t('steerLate')); return false; }
     const cmd = { ...c, at, id: ++cmdN };
     // a later command of the same kind on the same track (or curve part) replaces a pending one
-    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.d ?? -1) === (cmd.d ?? -1) && ['volume', 'curve', 'instrument'].includes(x.kind);
+    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && ['volume', 'curve', 'curve-reset', 'instrument'].includes(x.kind);
     item.commands = item.commands.filter(x => !same(x));
     item.commands.push(cmd);
     S.recipe.steering = [...(S.recipe.steering || []).filter(x => !(x.song === item.n && same(x))), { song: item.n, ...cmd }];
@@ -303,6 +303,28 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const handles = P.plan.map((d, i) => (i > cur ? `<circle class="handle" data-d="${i}" cx="${xOf(i).toFixed(1)}" cy="${yOf(d.target).toFixed(1)}" r="6"><title>${esc(t('steerCurveTip'))}</title></circle>` : `<circle class="past" cx="${xOf(i).toFixed(1)}" cy="${yOf(d.target).toFixed(1)}" r="2.5"/>`)).join('');
     return `<svg class="radio-curve steer" viewBox="0 0 ${w} ${h}" data-w="${w}" data-h="${h}" data-pad="${pad}" role="img" aria-label="${esc(t('radioShape'))}"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2"/><line x1="${x}" x2="${x}" y1="0" y2="${h}" class="pos"/>${handles}</svg>`;
   };
+  // the other curves of the song on air (#40): one lane each; dashed = what the song does, solid points = set by
+  // the listener; handles on the parts still to come, a reset button per lane
+  const LANES = ['density', 'brightness', 'tension', 'voice'];
+  const curveLanes = (item, rel) => {
+    const P = item.plan, dbl = 2 * P.phrase, n = P.plan.length, w = 320, h = 44, pad = 8, max = densityMax(P);
+    if (!item.curves) item.curves = songCurves(item.song, P, item.opts || item.base.opts);
+    const C = item.curves, cur = Math.min(n - 1, Math.floor(rel / dbl)), x = pad + Math.min(1, rel / Math.max(1, n * dbl)) * (w - 2 * pad);
+    const xOf = d => pad + (d + 0.5) / n * (w - 2 * pad), yOf = v => h - pad - v * (h - 2 * pad);
+    return `<div class="radio-lanes">${LANES.map(c => {
+      const norm = v => (c === 'density' ? v / Math.max(1, max) : v), val = d => C[d].set[c] ?? C[d].measured[c];
+      const shown = v => (c === 'density' ? t('curveOf', { n: v, max }) : String(Math.round(v * 100)));
+      const pts = C.map((p, i) => `${xOf(i).toFixed(1)},${yOf(norm(p.measured[c])).toFixed(1)}`).join(' ');
+      const dots = C.map((p, i) => {
+        const v = norm(val(i)), set = p.set[c] !== null;
+        return i > cur ? `<circle class="handle${set ? ' set' : ''}" data-d="${i}" data-curve="${c}" cx="${xOf(i).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="6"><title>${esc(t('curveTip', { curve: t('curve:' + c) }))}</title></circle>` : `<circle class="past${set ? ' set' : ''}" cx="${xOf(i).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="2.5"/>`;
+      }).join('');
+      const anySet = C.some((p, i) => i > cur && p.set[c] !== null);
+      return `<div class="radio-lane" data-lane="${c}"><span class="lane-name">${esc(t('curve:' + c))}</span><output>${esc(shown(val(cur)))}</output>
+        <button class="mini" data-curve-reset="${c}" ${anySet ? '' : 'disabled'} title="${esc(t('curveResetTip'))}">↺</button>
+        <svg class="radio-curve lane" viewBox="0 0 ${w} ${h}" data-w="${w}" data-h="${h}" data-pad="${pad}" data-max="${c === 'density' ? max : ''}" role="img" aria-label="${esc(t('curve:' + c))}"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/><line x1="${x}" x2="${x}" y1="0" y2="${h}" class="pos"/>${dots}</svg></div>`;
+    }).join('')}</div>`;
+  };
   const curve = (entry, rel) => {
     const ph = entry.phrases, w = 160, h = 36, n = Math.max(1, ph.length - 1);
     const pts = ph.map((p, i) => `${(i / n * w).toFixed(1)},${(h - 3 - p.target * (h - 6)).toFixed(1)}`).join(' ');
@@ -318,7 +340,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const TYPE_KEYS = { drums: '1', bass: '2', lead: '3', pad: '4', texture: '5' };
   const keyLabel = k => ({ ArrowUp: '↑', ArrowDown: '↓', V: 'Shift+V' }[k] || k.toUpperCase());
   let steerKey = '', dragging = null;
-  const cmdLabel = c => c.kind === 'add' || c.kind === 'remove' ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type}`) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
+  const cmdLabel = c => c.kind === 'add' || c.kind === 'remove' ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
   function renderSteer(force = false) {
     const box = root.querySelector('#radio-steer');
     if (!box || dragging) return;
@@ -377,7 +399,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       <h3 class="radio-title">${esc(song.title)}</h3>
       <div class="radio-meta">${esc(e.key)} · ${e.bpm} BPM · ${esc(e.meter)} · ${esc(t('shape_' + e.shape))}</div>
       <div class="radio-parts">${esc(partsText(e))}</div>
-      <div class="radio-pos">${item.plan ? steerCurve(item, rel) : curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>
+      <div class="radio-pos">${item.plan ? steerCurve(item, rel) : curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span>${item.plan ? curveLanes(item, rel) : ''}</div>
       <div class="lbl">${esc(t('radioComing'))}</div>
       <ul class="radio-next">${next.map(s => `<li><span class="at">${esc(t('radioBarShort', { n: s.at + 1 }))}</span> ${esc(stepText(s))}${s.say ? ` <em>“${esc(sayText(s.say, getLang()))}”</em>` : ''}</li>`).join('') || `<li class="muted">${esc(t('radioNoChanges'))}</li>`}</ul>
       <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) : esc(t('radioPreparing'))}${nextSong && e.transition && !item.cut ? ` · ${esc(e.transition.kind === 'cut' ? t('radioNextTxCut') : t('radioNextTx', { kind: t(`tx:${e.transition.kind}`), bars: e.transition.bars }))}` : ''}</div>`;
@@ -459,6 +481,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.mixMute) return command({ kind: b.getAttribute('aria-pressed') === 'true' ? 'unmute' : 'mute', track: b.dataset.mixMute });
     if (b.dataset.mixLock) { const item = S && S.stream[S.onAir]; return command({ kind: item && (item.plan.locked || []).includes(b.dataset.mixLock) ? 'unlock' : 'lock', track: b.dataset.mixLock }); }
     if (b.dataset.mixInst) return command({ kind: 'instrument', track: b.dataset.mixInst });
+    if (b.dataset.curveReset) return command({ kind: 'curve-reset', curve: b.dataset.curveReset });
     if (b.dataset.style) {
       if (opts.artist) opts.artist = null;
       const id = b.dataset.style, has = opts.styles.includes(id);
@@ -473,19 +496,23 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   root.addEventListener('pointerdown', e => {
     const hnd = e.target.closest('circle.handle'); if (!hnd || !S) return;
     const svg = hnd.closest('svg');
-    dragging = { d: +hnd.dataset.d, hnd, svg, value: null };
+    dragging = { d: +hnd.dataset.d, curve: hnd.dataset.curve, hnd, svg, value: null };
     hnd.setPointerCapture(e.pointerId); e.preventDefault();
   });
   root.addEventListener('pointermove', e => {
     if (!dragging) return;
     const { svg, hnd } = dragging, r = svg.getBoundingClientRect(), h = +svg.dataset.h, pad = +svg.dataset.pad;
     const y = (e.clientY - r.top) / r.height * h, v = Math.max(0, Math.min(1, (h - pad - y) / (h - 2 * pad)));
-    dragging.value = Math.round(v * 20) / 20;
-    hnd.setAttribute('cy', (h - pad - dragging.value * (h - 2 * pad)).toFixed(1));
+    // density snaps to a count of tracks (at least one)
+    const max = +svg.dataset.max || 0;
+    dragging.value = max ? Math.max(1, Math.round(v * max)) : Math.round(v * 20) / 20;
+    const nv = max ? dragging.value / max : dragging.value;
+    hnd.setAttribute('cy', (h - pad - nv * (h - 2 * pad)).toFixed(1));
+    if (dragging.curve) { hnd.classList.add('set'); const o = svg.parentNode.querySelector('output'); if (o) o.textContent = max ? t('curveOf', { n: dragging.value, max }) : Math.round(dragging.value * 100); return; }
     const line = svg.querySelector('polyline'), pts = line.getAttribute('points').split(' ');
     pts[dragging.d] = `${pts[dragging.d].split(',')[0]},${hnd.getAttribute('cy')}`; line.setAttribute('points', pts.join(' '));
   });
-  const endDrag = () => { if (!dragging) return; const { d, value } = dragging; dragging = null; if (value !== null) command({ kind: 'curve', d, value }); else renderNow(); };
+  const endDrag = () => { if (!dragging) return; const { d, value, curve } = dragging; dragging = null; if (value !== null) command({ kind: 'curve', d, value, ...(curve ? { curve } : {}) }); else renderNow(); };
   root.addEventListener('pointerup', endDrag);
   root.addEventListener('pointercancel', endDrag);
   // shortcuts while the Radio tab is open and the radio plays (not while typing in a field)
@@ -521,7 +548,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
 
   return {
     render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info,
-    get steering() { if (!S) return null; const it = S.stream[S.onAir]; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },
+    get steering() { if (!S) return null; const it = S.stream[S.onAir]; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },
     get paused() { return !!S && S.paused !== undefined; },
     get recording() { return recS ? { seconds: recElapsed(), list: recS.list.map(x => ({ ...x })) } : null; },
     startRec, stopRec, recordFromStart,

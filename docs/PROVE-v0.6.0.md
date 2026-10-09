@@ -41,6 +41,8 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Console: più o meno energia, + e − strumenti, più scuro e più sporco, cambia accordi e tonalità, vai al drop, resta qui, chiudi il brano.
 - [ ] Coda "In arrivo" con ✕; switch "questo brano / tutta la diretta".
 - [ ] Trascinare la curva dell'energia.
+- [ ] Curve di densità, luminosità, tensione e voce (`#40`): trascinare un punto, sentire la differenza, tasto ↺ per tornare automatica.
+- [ ] Tensione alta (70 o più) sulla parte prima di un drop: si sente la carica e il drop la scarica.
 - [ ] Mixer: volume, muto, lucchetto, cambia strumento.
 - [ ] Scorciatoie da tastiera (↑ ↓, 1-5, G, R, E).
 - [ ] Riascolta: rifà le stesse mosse.

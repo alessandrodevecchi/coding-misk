@@ -32,3 +32,17 @@ export function energyOf(state, opts = {}) {
   const total = Object.values(w).reduce((a, b) => a + b, 0) || 1;
   return Object.keys(w).reduce((a, k) => a + w[k] * (parts[k] || 0), 0) / total;
 }
+
+// The curves next to energy (#40, docs/ENDLESS.md "Curves"), measured on what plays:
+//   density: tracks playing (voice and riser left out), a count; brightness: the filter part, 0 to 1;
+//   tension: drive and distortion, the riser playing, the strong progression (opts.lift), 0 to 1.
+export const CURVES = ['density', 'brightness', 'tension', 'voice'];
+export function curveParts(state, opts = {}) {
+  const on = playing(state), parts = energyParts(state, opts);
+  const riser = on.some(t => t.type === 'riser') ? 1 : 0;
+  return {
+    density: on.filter(t => t.type !== 'riser').length,
+    brightness: parts.filter,
+    tension: clamp(0.65 * clamp(parts.drive * 1.6) + 0.2 * riser + 0.15 * (opts.lift ? 1 : 0)),
+  };
+}

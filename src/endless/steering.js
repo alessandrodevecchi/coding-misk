@@ -1,10 +1,10 @@
 // Radio steering (#24, docs/ENDLESS.md "Steering"): the listener's commands turn into a rewrite of the song on
 // air from a boundary. A song is always rebuilt from its original plan plus every command still standing,
 // in order, so cancelling a command or replaying a session gives exactly the same song.
-import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind } from './director.js';
+import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, liftOf, OPTION_DEFAULTS } from './director.js';
 import { stream } from './random.js';
 import { stateAt } from '../song/build.js';
-import { playing } from './energy.js';
+import { playing, curveParts, CURVES } from './energy.js';
 import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS } from '../music.js';
 
 // commands of the console: group, whether they change the song's structure (applied on a double phrase)
@@ -15,7 +15,7 @@ export const COMMANDS = {
   progression: { group: 'harmony', structural: true }, key: { group: 'harmony', structural: true },
   'talk-more': { group: 'voice' }, 'talk-less': { group: 'voice' },
   drop: { group: 'song', structural: true }, stay: { group: 'song', structural: true }, end: { group: 'song', structural: true },
-  curve: { group: 'curve' },
+  curve: { group: 'curve' }, 'curve-reset': { group: 'curve' },
   // mixer: on the next bar
   volume: { group: 'mixer', bar: true }, mute: { group: 'mixer', bar: true }, unmute: { group: 'mixer', bar: true }, lock: { group: 'mixer' }, unlock: { group: 'mixer' },
 };
@@ -106,7 +106,7 @@ function otherSound(t, R, rng) {
 
 // One command applied to a song: the modified plan and options, and the rewrite from its bar.
 function rewrite(song, plan, opts, cmd, rng) {
-  const P = { ...plan, plan: plan.plan.map(d => ({ ...d })), tracks: plan.tracks.map(t => ({ ...t, settings: { ...(t.settings || {}) } })), harmony: (plan.harmony || []).slice(), locked: (plan.locked || []).slice() };
+  const P = { ...plan, plan: plan.plan.map(d => ({ ...d, ...(d.curves ? { curves: { ...d.curves } } : {}) })), tracks: plan.tracks.map(t => ({ ...t, settings: { ...(t.settings || {}) } })), harmony: (plan.harmony || []).slice(), locked: (plan.locked || []).slice() };
   const O = { ...opts };
   const ph = P.phrase, dbl = 2 * ph, at = cmd.at;
   const extra = [], forced = [];
@@ -118,8 +118,16 @@ function rewrite(song, plan, opts, cmd, rng) {
     case 'energy-up': case 'energy-down':
       for (let d = d0; d < P.plan.length; d++) P.plan[d].target = round2(clamp(P.plan[d].target + (cmd.kind === 'energy-up' ? 0.15 : -0.15), 0.05, 1));
       break;
-    case 'curve':
-      if (cmd.d >= d0 && cmd.d < P.plan.length) P.plan[cmd.d].target = round2(clamp(cmd.value, 0, 1));
+    case 'curve': {
+      // no curve (or energy): the energy target; the other curves (#40) set a soft target of that part
+      const d = P.plan[cmd.d];
+      if (!d || cmd.d < d0) break;
+      if (!cmd.curve || cmd.curve === 'energy') d.target = round2(clamp(cmd.value, 0, 1));
+      else if (CURVES.includes(cmd.curve)) d.curves = { ...(d.curves || {}), [cmd.curve]: cmd.curve === 'density' ? Math.round(clamp(cmd.value, 1, densityMax(P))) : round2(clamp(cmd.value, 0, 1)) };
+      break;
+    }
+    case 'curve-reset':
+      for (let d = d0; d < P.plan.length; d++) if (P.plan[d].curves) { const { [cmd.curve]: _, ...rest } = P.plan[d].curves; P.plan[d].curves = rest; }
       break;
     case 'add': {
       let t = st.tracks.filter(x => x.mute && ofType(x, cmd.type) && !P.locked.includes(x.id)).sort((a, b) => ENTRY.indexOf(a.type) - ENTRY.indexOf(b.type))[0];
@@ -220,4 +228,18 @@ export function steerSong({ song, plan, opts, commands, seed, n }) {
     cur = rewrite(cur.song, cur.plan, cur.opts, cmd, rng);
   });
   return cur;
+}
+
+// the most tracks a song can play at once: its candidate tracks (riser left out), at most its track maximum
+export const densityMax = plan => Math.min(plan.hardMax, plan.tracks.filter(t => t.type !== 'riser').length);
+
+// The curves of a song as it plays (#40): per double phrase, what the song does (measured on its second phrase,
+// after the moves of both boundaries) and what the listener set (null when automatic).
+export function songCurves(song, plan, opts = {}) {
+  const ph = plan.phrase, dbl = 2 * ph;
+  return plan.plan.map((d, i) => {
+    const m = curveParts(stateOf(song, plan, Math.min(plan.bars - 1, i * dbl + ph)), { lift: liftOf(d) });
+    const set = Object.fromEntries(CURVES.map(c => [c, d.curves && Number.isFinite(d.curves[c]) ? d.curves[c] : null]));
+    return { measured: { ...m, voice: set.voice ?? opts.talk ?? OPTION_DEFAULTS.talk }, set };
+  });
 }

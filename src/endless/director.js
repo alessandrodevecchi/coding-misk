@@ -8,7 +8,7 @@ import { makeRng, freshSeed } from './random.js';
 import { withDefaults, PART_NAMES } from './recipe.js';
 import { mixParts, partRecipe, partsKey, stylesOf } from './mix.js';
 import { shapePlan, LANDMARKS } from './shapes.js';
-import { energyOf, playing } from './energy.js';
+import { energyOf, playing, curveParts } from './energy.js';
 import { mutateRows, mutateBass, mutateArp, mutateHook } from './mutate.js';
 import { phrase as pickPhrase } from './phrases.js';
 import { artistSongOptions, pickWeighted } from './artist.js';
@@ -140,16 +140,23 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
   return { index, parts, R, voice, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords };
 }
 
+// A part takes the strong progression on a big moment, or when the listener set a high tension (#40).
+export const CHARGE = 0.7;
+const curveOf = (d, c) => (d && d.curves && Number.isFinite(d.curves[c]) ? d.curves[c] : null);
+export const liftOf = d => LANDMARKS.includes(d.role) || curveOf(d, 'tension') >= CHARGE;
+// the part before a drop with a high tension builds a charge that the drop releases
+const chargeOf = (plan, d) => plan[d].role !== 'drop' && (plan[d + 1] || {}).role === 'drop' && curveOf(plan[d], 'tension') >= CHARGE;
+
 // Sections of an energy plan: consecutive double phrases with the same role; big moments take the second
 // progression. h: { dbl, bpm, key, meter, swing, mainChords, liftChords }.
 export function sectionsOf(plan, h) {
   const sections = [], seen = {};
   plan.forEach(d => {
-    const last = sections[sections.length - 1];
-    if (last && last.role === d.role) { last.bars += h.dbl; return; }
+    const last = sections[sections.length - 1], chords = liftOf(d) ? h.liftChords : h.mainChords;
+    if (last && last.role === d.role && last.chords === chords) { last.bars += h.dbl; return; }
     seen[d.role] = (seen[d.role] || 0) + 1;
     const name = cap(d.role) + (seen[d.role] > 1 ? ` ${seen[d.role]}` : '');
-    const sec = { role: d.role, name, bars: h.dbl, bpm: h.bpm, key: h.key, chords: LANDMARKS.includes(d.role) ? h.liftChords : h.mainChords, meter: h.meter };
+    const sec = { role: d.role, name, bars: h.dbl, bpm: h.bpm, key: h.key, chords, meter: h.meter };
     if (h.swing > 0) sec.swing = h.swing;
     sections.push(sec);
   });
@@ -255,6 +262,14 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
   for (let k = from; k < boundaries; k++) {
     const at = k * phrase, d = Math.floor(k / 2), { role, target } = plan.plan[d];
     const isDouble = k % 2 === 0, prevRole = d > 0 ? plan.plan[d - 1].role : null;
+    // the listener's curves for this part (#40): set ones are soft targets next to energy
+    const part = plan.plan[d], lift = liftOf(part), charge = chargeOf(plan.plan, d), released = d > 0 && role === 'drop' && chargeOf(plan.plan, d - 1);
+    const setCurves = ['density', 'brightness', 'tension'].filter(c => curveOf(part, c) !== null);
+    const curveGap = song => {
+      if (!setCurves.length) return 0;
+      const m = curveParts(stateAt(song, at).song, { lift });
+      return setCurves.reduce((a, c) => a + (c === 'density' ? Math.abs(m.density - curveOf(part, c)) / Math.max(3, plan.usualHigh) : Math.abs(m[c] - curveOf(part, c))), 0);
+    };
     const landmark = isDouble && role !== prevRole && LANDMARKS.includes(role);
     const nextRole = k % 2 === 1 && d + 1 < plan.plan.length ? plan.plan[d + 1].role : null;
     // tracks that cannot move now: moved on the previous boundary, or needed by a big event on the next one
@@ -291,8 +306,19 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       if (back.length) take({ kind: 'drop', track: back[0], tracks: back, step: { add: back } });
       brokeDrums = [];
     }
-    // riser: in the phrase before a big moment, out in the phrase after it
     const riser = base.tracks.find(t => t.type === 'riser');
+    // the charge before a drop: the riser from the first phrase, fewer drums on the last one (the drop brings them back)
+    if (charge && k > 0) {
+      state = stateAt(working(base, steps), at).song;
+      const r = riser && state.tracks.find(t => t.id === riser.id);
+      if (isDouble && r && r.mute && !locked.includes(riser.id)) take({ kind: 'add-riser', track: riser.id, step: { add: riser.id } });
+      if (!isDouble) {
+        const drums = playing(state).filter(t => t.type === 'drums' && !locked.includes(t.id));
+        if (drums.length) { const out = drums[drums.length - 1].id; brokeDrums = [...new Set([...brokeDrums, out])]; take({ kind: 'charge', track: out, step: { remove: out } }); }
+      }
+      state = stateAt(working(base, steps), at).song;
+    }
+    // riser: in the phrase before a big moment, out in the phrase after it
     if (riser && !blocked.has(riser.id)) {
       const r = state.tracks.find(t => t.id === riser.id);
       if (r.mute && nextRole && nextRole !== role && LANDMARKS.includes(nextRole) && nextRole !== 'break') take({ kind: 'add-riser', track: riser.id, step: { add: riser.id } });
@@ -301,7 +327,9 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     // ordinary moves toward the target
     state = stateAt(working(base, steps), at).song;
     const gap = Math.abs(measure(working(base, steps), at, ctx) - target);
-    let want = (k === 0 ? 0 : 1) + (gap > 0.2 ? 1 : 0) + (landmark && gap > 0.35 ? 1 : 0) - chosen.filter(c => !c.quiet).length + (k === 0 ? 0 : 0);
+    let want = (k === 0 ? 0 : 1) + (gap > 0.2 ? 1 : 0) + (landmark && gap > 0.35 ? 1 : 0) - chosen.filter(c => !c.quiet && c.kind !== 'charge').length + (k === 0 ? 0 : 0);
+    if (k > 0 && setCurves.length && curveGap(working(base, steps)) > 0.25) want++;
+    if (charge && k > 0) want = Math.max(want, 1);
     // an artist's pace: busy artists add a move, calm ones sometimes let a phrase go by
     if (opts.pace !== undefined && k > 0) { if (opts.pace > 0.7) want++; else if (opts.pace < 0.3 && gap < 0.15 && M.chance(0.6)) want = 0; }
     const slow = has(opts, 'slow-builds') && k > 0 && k < boundaries / 2;
@@ -312,7 +340,9 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       const e0 = energyOf(state, ctx);
       let cands = candidateMoves(state, ctx, blocked, M);
       // after the intro, below the usual count of tracks, the first move adds one (taste rule: 4 to 5 layers)
-      if (k >= 2 && i === 0 && playing(state).length < R.tracks.usual[0] && !['break', 'outro'].includes(role)) {
+      // (not when the listener asked for fewer tracks, #40)
+      const fewer = curveOf(part, 'density') !== null && curveOf(part, 'density') < R.tracks.usual[0];
+      if (k >= 2 && i === 0 && !fewer && playing(state).length < R.tracks.usual[0] && !['break', 'outro'].includes(role)) {
         const adds = cands.filter(c => c.step.add !== undefined);
         if (adds.length) cands = adds;
       }
@@ -323,15 +353,19 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
         let score = -Math.abs(e - target);
         if (c.kind === lastKind) score -= 0.03;
         const count = playing(stateAt(working(base, [...steps, { at, ...c.step }]), at).song).length;
-        if (count > plan.usualHigh) score -= 0.08 * (count - plan.usualHigh);
+        const high = Math.max(plan.usualHigh, curveOf(part, 'density') ?? 0);
+        if (count > high) score -= 0.08 * (count - high);
         // below the usual count, prefer adding, and in the usual entry order (drums, bass, pads, …)
-        const low = R.tracks.usual[0], before = playing(state).length;
+        const low = fewer ? curveOf(part, 'density') : R.tracks.usual[0], before = playing(state).length;
         if (k > 0 && before < low && c.step.add !== undefined) score += 0.06 + 0.03 * (1 - ENTRY.indexOf(state.tracks.find(t => t.id === c.track).type) / ENTRY.length);
         if (k > 0 && count < low && c.step.remove !== undefined) score -= 0.06;
         if (c.lastDrum && role !== 'break') score -= 0.3;
         if (Math.abs(e0 - target) < 0.08 && ['variation', 'more-space', 'brighter', 'darker', 'dirtier', 'cleaner'].includes(c.kind)) score += 0.04;
         if (opts.moveWeights && opts.moveWeights[c.kind]) score += 0.015 * opts.moveWeights[c.kind];
         if (slow && c.step.add !== undefined) score += 0.5;
+        if (setCurves.length) score -= curveGap(working(base, [...steps, { at, ...c.step }]));
+        if (charge) score += { darker: 0.05, dirtier: 0.05, brighter: -0.05, cleaner: -0.05 }[c.kind] || 0;
+        if (released && isDouble) score += { brighter: 0.06, darker: -0.06 }[c.kind] || 0;
         score += M.range(0, 0.02);
         if (!best || score > best.score) best = { ...c, score };
       }
@@ -342,7 +376,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     const main = chosen.find(c => !c.quiet) || chosen[0];
     const isEnd = k === boundaries - 2;
     let said = null;
-    const talk = opts.talk ?? OPTION_DEFAULTS.talk;
+    const talk = curveOf(part, 'voice') ?? opts.talk ?? OPTION_DEFAULTS.talk;
     if (main && talk > 0 && at - lastSay >= 8) {
       const kind = isEnd ? 'song-end' : main.kind;
       if (k === 0 || isEnd || ['break', 'drop'].includes(kind) || comments.chance(Math.min(1, 1.1 * talk))) said = say(kind, at);

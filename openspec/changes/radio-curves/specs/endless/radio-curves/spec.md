@@ -15,7 +15,7 @@ The now playing card SHALL show, under the energy curve, four lanes in this orde
 
 ### Requirement: Measured curves
 Each curve SHALL have a measure of what the song plays at each double phrase:
-- **density:** the number of tracks playing, voice and riser excluded, out of the song's track maximum;
+- **density:** the number of tracks playing, voice and riser excluded, out of the most the song can play (its candidate tracks, at most its track maximum);
 - **brightness:** the mean filter cutoff of the melodic tracks playing, on a log scale from closed to open;
 - **tension:** drive and distortion of the tracks playing, the riser playing, and the strong chord progression in use;
 - **voice:** how often the voice may speak in that part (the talk option, or the set value).

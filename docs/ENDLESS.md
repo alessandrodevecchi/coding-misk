@@ -147,7 +147,8 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | Command | Applies | Change |
 | --- | --- | --- |
 | Energy up, down | next phrase | targets of the remaining double phrases ±0.15 |
-| Curve | next phrase | one double phrase gets the dragged target |
+| Curve | next phrase | one double phrase gets the dragged target: energy, or a curve target (`#40`) |
+| Reset a curve | next phrase | the remaining double phrases of that curve go back to automatic |
 | Add, remove a type | next phrase | a forced add of a silent track of that type (a new one from the song's style when the song has none, `#41`), or a forced remove of every playing one |
 | More, less complex | next phrase | usual track count ±1 |
 | Darker, brighter, dirtier, cleaner, more space | next phrase | that move on every playing track that allows it |
@@ -156,6 +157,19 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | Talk more, less | next phrase | voice amount ±0.2 for the rest of the song |
 | Go to the drop, stay here, end | next double phrase | the plan jumps to its drop, repeats the current part, or ends with an outro |
 | Volume, mute, lock (mixer) | next bar | pinned gain; a step plus a lock; the director stops moving the track |
+
+### Curves
+
+Next to energy, the radio shows four curves per double phrase (`#40`), measured on what plays (`curveParts` in `energy.js`, `songCurves` in `steering.js`):
+
+- **Density:** tracks playing (voice and riser left out), out of the most the song can play.
+- **Brightness:** the filter part of the energy measure.
+- **Tension:** drive and distortion, the riser playing, and the strong progression.
+- **Voice:** how often the voice speaks (the talk option, or the set value).
+
+A curve is automatic until the listener drags a part: the part then gets a target in `plan.plan[d].curves`. Set targets are soft: each candidate move loses the distance between the measured curves and their targets, the phrase gets one more move when they are far (over 0.25), and energy stays the main target. A density target below the usual track count turns off the "add a track first" taste rule, and one above it raises the track limit. Parts without set targets are written exactly as before.
+
+A tension of 0.7 or more gives a part the strong progression (sections split where chords change). On the part right before a drop it builds a charge: the riser from its first phrase, darker and dirtier moves, and a drum out on its last phrase. The drop brings the drums back and prefers brighter moves. A voice of 0 makes a part silent, start and end included. Curve edits only change the song on air.
 
 ## Determinism
 
@@ -201,6 +215,8 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Energy up                                    | `steering: energy up raises the rest of the song`                |
 | Song length commands                         | `steering: drop, stay and end change the length`                 |
 | Locks and removed types                      | `steering: locked tracks and removed types`                      |
+| Curves                                       | `steering: curves set density, brightness and the voice of a part` |
+| Charge before a drop                         | `steering: high tension charges the part before a drop`          |
 
 ## Artists
 

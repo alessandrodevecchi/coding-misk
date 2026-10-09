@@ -61,7 +61,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // the card redraws four times a second: take the handle and its box in one go, retrying until both are there
   let handle = null, d = -1, box = null, svg = null;
   for (let k = 0; k < 10 && !box; k++) {
-    handle = (await page.$$('#radio-now circle.handle')).pop();
+    handle = (await page.$$('#radio-now svg.steer circle.handle')).pop();
     if (handle) { d = +(await handle.getAttribute('data-d').catch(() => -1)); box = await handle.boundingBox().catch(() => null); const sv = await page.$('#radio-now svg.steer'); svg = sv && await sv.boundingBox(); }
     if (!box) await sleep(100);
   }
@@ -73,6 +73,36 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(c && c.d === d && c.value <= 0.15 && st.plan.targets[d] === c.value, 'dragging a curve handle queues a curve command', `${JSON.stringify(c)} d=${d} targets=${JSON.stringify(st.plan.targets)} cmds=${JSON.stringify(st.commands.map(x => x.kind))}`);
     if (shots) await (await page.$('#radio-now')).screenshot({ path: path.join(shots, 'curve.png') });
   } else check(false, 'curve handles shown');
+
+  // the other curves (#40): four lanes; drag the last density handle down, then reset the lane
+  check((await page.$$eval('#radio-now .radio-lane', xs => xs.map(x => x.dataset.lane).join())) === 'density,brightness,tension,voice', 'four curve lanes under the energy curve');
+  let lh = null, lbox = null, lsvg = null, ld = -1;
+  for (let k = 0; k < 10 && !lbox; k++) {
+    lh = (await page.$$('#radio-now [data-lane="density"] circle.handle')).pop();
+    if (lh) { ld = +(await lh.getAttribute('data-d').catch(() => -1)); lbox = await lh.boundingBox().catch(() => null); const sv = await page.$('#radio-now [data-lane="density"] svg'); lsvg = sv && await sv.boundingBox(); }
+    if (!lbox) await sleep(100);
+  }
+  if (lbox && lsvg) {
+    await page.mouse.move(lbox.x + lbox.width / 2, lbox.y + lbox.height / 2); await page.mouse.down();
+    await page.mouse.move(lbox.x + lbox.width / 2, lsvg.y + lsvg.height - 2, { steps: 5 }); await page.mouse.up(); await sleep(300);
+    st = await ST();
+    const c = st.commands.find(x => x.kind === 'curve' && x.curve === 'density');
+    check(c && c.d === ld && c.value === 1 && st.plan.curves[ld].density === 1, 'dragging a density handle sets a track count', JSON.stringify(c));
+    check(await page.isVisible(`#radio-now [data-lane="density"] circle.handle.set[data-d="${ld}"]`), 'a set part is drawn solid');
+    if (shots) await (await page.$('#radio-now')).screenshot({ path: path.join(shots, 'lanes.png') });
+    await page.click('#radio-now [data-curve-reset="density"]'); await sleep(300);
+    st = await ST();
+    check(st.commands.some(x => x.kind === 'curve-reset' && x.curve === 'density') && st.plan.curves.every(x => x.density === undefined), 'reset makes the lane automatic again');
+    check(/density|densità/i.test(await page.innerText('#radio-steer .steer-queue')), 'curve commands in the queue');
+  } else check(false, 'density handles shown');
+  // phone width: the lanes fit the card
+  if (await page.evaluate(() => !!globalThis.codingMiskRadio.on)) {
+    await page.setViewportSize({ width: 390, height: 900 }); await sleep(600);
+    const fit = await page.evaluate(() => { const card = document.querySelector('#radio-now'), lanes = [...document.querySelectorAll('#radio-now .radio-lane')]; return lanes.length === 4 && lanes.every(l => l.getBoundingClientRect().right <= card.getBoundingClientRect().right + 1) && document.documentElement.scrollWidth <= 392; });
+    check(fit, 'phone: the lanes fit without horizontal scroll');
+    if (shots) await (await page.$('#radio-now')).screenshot({ path: path.join(shots, 'lanes-phone.png') });
+    await page.setViewportSize({ width: 1300, height: 1300 }); await sleep(400);
+  }
 
   // mixer: volume and lock
   const vol = await page.$('#radio-steer [data-mix-vol]');

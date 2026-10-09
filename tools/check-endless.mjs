@@ -17,11 +17,11 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
-import { steerSong, applyBar, COMMANDS, canApply, whyNot } from '../src/endless/steering.js';
+import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves } from '../src/endless/steering.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { stateAt, buildSteps } from '../src/song/build.js';
-import { playing, energyOf } from '../src/endless/energy.js';
+import { playing, energyOf, curveParts } from '../src/endless/energy.js';
 import { chordTonesOnly, degreesOnly } from '../src/endless/mutate.js';
 import { partsKey } from '../src/endless/mix.js';
 import { allPhrases } from '../src/endless/phrases.js';
@@ -529,6 +529,41 @@ const CHECKS = {
       assert(!validateSong(r.song).errors.length, `song with a new ${ty} is valid`);
     }
     assert(whyNot({ kind: 'energy-up' }, g.song, g.plan, g.plan.bars - 1) === 'late', 'late at the end');
+  },
+  'steering: curves set density, brightness and the voice of a part'() {
+    const ses = createSession(STYLES, 'steer-curves'), g = ses.next({ styles: ['berlin-techno'], energy: 0.7 });
+    const ph = g.plan.phrase, dbl = 2 * ph, at = applyBar('curve', 1, g.plan), parts = [2, 3, 4].filter(d => d < g.plan.plan.length);
+    const go = (curve, value) => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: parts.map(d => ({ kind: 'curve', curve, d, value, at })), seed: 'steer-curves', n: 0 });
+    const mean = (sg, plan, c) => avg(parts.map(d => songCurves(sg, plan, g.opts)[d].measured[c]));
+    const sparse = go('density', 2);
+    assert(mean(sparse.song, sparse.plan, 'density') < mean(g.song, g.plan, 'density') - 0.5, `density ${mean(g.song, g.plan, 'density')} then ${mean(sparse.song, sparse.plan, 'density')}`);
+    assert(songCurves(sparse.song, sparse.plan)[parts[0]].set.density === 2 && songCurves(sparse.song, sparse.plan)[0].set.density === null, 'set and auto parts');
+    const dark = go('brightness', 0.05);
+    assert(mean(dark.song, dark.plan, 'brightness') < mean(g.song, g.plan, 'brightness') - 0.05, `brightness ${mean(g.song, g.plan, 'brightness').toFixed(2)} then ${mean(dark.song, dark.plan, 'brightness').toFixed(2)}`);
+    const quiet = go('voice', 0), lo = parts[0] * dbl, hi = (parts[parts.length - 1] + 1) * dbl;
+    assert(!quiet.song.build.some(s => s.say && s.at >= lo && s.at < hi), 'the voice spoke in a silent part');
+    // a reset makes the parts automatic again: the same song as without the edits
+    const back = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [...parts.map(d => ({ kind: 'curve', curve: 'density', d, value: 2, at })), { kind: 'curve-reset', curve: 'density', at }], seed: 'steer-curves', n: 0 });
+    assert(back.plan.plan.every(d => !d.curves || d.curves.density === undefined), 'reset left a density target');
+    const again = go('density', 2);
+    assert(JSON.stringify(again.song) === JSON.stringify(sparse.song), 'same curve edits gave different songs');
+  },
+  'steering: high tension charges the part before a drop'() {
+    const ses = createSession(STYLES, 'steer-charge');
+    let g = null;
+    for (let i = 0; i < 12 && !g; i++) { const x = ses.next({ styles: ['berlin-techno'], energy: 0.7 }); const j = x.plan.plan.findIndex((d, k) => k >= 2 && d.role === 'drop' && x.plan.plan[k - 1].role !== 'drop'); if (j > 0 && x.plan.tracks.some(t => t.type === 'riser')) g = { ...x, j }; }
+    assert(g, 'no song with a drop and a riser');
+    const ph = g.plan.phrase, dbl = 2 * ph, d = g.j - 1, at = applyBar('curve', 1, g.plan);
+    const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'curve', curve: 'tension', d, value: 0.9, at }], seed: 'steer-charge', n: 0 });
+    const riser = r.song.tracks.find(t => t.type === 'riser');
+    assert(riser && playing(stateAt(r.song, d * dbl).song).some(t => t.id === riser.id), 'riser from the first phrase of the charge');
+    const drumsAt = (sg, bar) => playing(stateAt(sg, bar).song).filter(t => t.type === 'drums').length;
+    assert(drumsAt(r.song, d * dbl + ph) < drumsAt(r.song, d * dbl) || drumsAt(r.song, d * dbl) === 0, 'fewer drums on the last phrase of the charge');
+    assert(drumsAt(r.song, g.j * dbl) >= drumsAt(r.song, d * dbl), 'the drop brings the drums back');
+    const tension = sg => curveParts(stateAt(sg, d * dbl + ph).song, { lift: true }).tension;
+    assert(tension(r.song) > tension(g.song), `tension ${tension(g.song).toFixed(2)} then ${tension(r.song).toFixed(2)}`);
+    assert(r.song.sections.some(s => s.chords === g.plan.liftChords), 'strong progression');
+    assert(!validateSong(r.song).errors.length, 'charged song is valid');
   },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');
