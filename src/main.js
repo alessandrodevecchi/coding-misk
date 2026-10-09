@@ -16,6 +16,8 @@ import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS } from './library/playlists.js';
 import { createPlaylistsTab } from './library/playlists-tab.js';
 import { createSettings } from './settings/settings.js';
+import { createGenresTab } from './library/genres-tab.js';
+import { genresOf } from './library/song-filter.js';
 import { windowSong } from './endless/join.js';
 import { absoluteClips, playlistTransition, overlapOf } from './endless/transitions.js';
 import { createSession } from './endless/director.js';
@@ -82,7 +84,7 @@ if (!Array.isArray(user.codeSongs)) user.codeSongs = [];
 const codedTracks = () => [...CODED, ...user.codeSongs.map(v => ({ ...v, kind: 'coded' }))].map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
 // the radio tab (created further down, once the player exists)
-let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, prevTab = 'componi';
+let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, genresTab = null, prevTab = 'componi';
 // custom samples manifest (bank → files), for spoken comments
 let customFiles = {};
 // oggetto riproducibile: codice + mappa di sezioni e tempo
@@ -1428,10 +1430,10 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'radio', 'artisti', 'stili', 'guida', 'suoni', 'riferimenti'];
+const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'suoni', 'riferimenti'];
 let cards = [];
 // two modes (#42): Listen to make and hear music, Groove Lab for its material and for learning
-const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'suoni', 'guida', 'riferimenti'] };
+const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'guida', 'riferimenti'] };
 const modeOf = tab => Object.keys(APP_MODES).find(m => APP_MODES[m].includes(tab)) || null;
 let modeTabs = store.get('coding-misk-mode-tabs', {});
 if (!modeTabs || typeof modeTabs !== 'object') modeTabs = {};
@@ -1451,6 +1453,7 @@ function showTab(name) {
   if (name === 'radio' && radio) radio.render();
   if (name === 'playlist' && playlistsTab) playlistsTab.render();
   if (name === 'impostazioni' && settingsPage) settingsPage.render();
+  if (name === 'generi' && genresTab) genresTab.render();
   $('#open-settings').setAttribute('aria-pressed', name === 'impostazioni');
   if (name !== 'impostazioni') prevTab = name;
   if (name === 'stili' && stylesTab) stylesTab.render();
@@ -1957,6 +1960,13 @@ RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
 const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));
 artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onCompose: a => newSongFromArtist(a), onChange: () => { if (radio) radio.render(); renderArtistPick(); } });
 renderArtistPick();
+// genres (#43): every genre with its styles, songs and artists; play it in the radio or see its songs
+genresTab = createGenresTab({ root: $('#tab-generi'), t, tx, esc, face: a => artistsTab.face(a),
+  styles: () => allStyles(), artists: () => artistsTab.usable(),
+  songs: () => { const by = Object.fromEntries(allStyles().map(r => [r.id, r])); return libraryCards().map(c => ({ genres: genresOf(c.tr.tags, id => by[id] && (by[id].genre || 'experimental')) })); },
+  onStyle: id => { showTab('stili'); stylesTab.openStyle(id); },
+  onSongs: g => { songsView.onlyGenre(g); showTab('brani'); },
+  onRadio: ids => { showTab('radio'); if (radio && !radio.playStyles(ids)) toast(t('genreNoStyle')); } });
 // preloads the spoken comments of a song, silently, as playSong does
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
 radio = createRadio({

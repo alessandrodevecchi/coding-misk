@@ -43,7 +43,7 @@ This project combines that idea with what the new models can do, with my own twi
 
 - **Arranger.** A grid of tracks and sections. Sections hold tempo (with ramps), key, chords, meter (4/4, 3/4, 5/4, 7/8), swing and the entry (hard cut or fade). Tracks are free: any number of any instrument, each with its own patterns, mute and solo. Everything compiles to Strudel code in real time.
 - **Find songs.** The Songs tab has one list with search (title, style, key, tags), filters by genre, style and kind (standard, live build, generated, yours, code), favourites and sorting. Style tags follow the Styles tab, and you can tag your own songs.
-- **Two modes.** Listen (Compose, Songs, Playlists, Radio) to make and hear music; Groove Lab (Artists, Styles, Sounds, Guide, References) for what music is made of and for learning.
+- **Two modes.** Listen (Compose, Songs, Playlists, Radio) to make and hear music; Groove Lab (Artists, Styles, Genres, Sounds, Guide, References) for what music is made of and for learning.
 - **Record the radio.** Record a radio session as audio (Opus or WAV) with its track list and recipe, from now or from the start of the session, since a seed and its moves always replay the same.
 - **Settings.** The gear in the top bar opens the settings: theme, language, the radio's visual and defaults, volume, export format (WAV or Opus), and a backup of everything in one file to move to another computer.
 - **Keep what you write by hand.** After taking over a live build, "Save as a new version" keeps your code as a new code song ("Song · v2"), linked to the original, which stays as it is. Works in the radio too.

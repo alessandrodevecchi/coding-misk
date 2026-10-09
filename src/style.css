@@ -777,3 +777,11 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
   .tabs { flex-wrap: wrap; overflow: visible; }
   .tab { padding: 8px 10px; font-size: 12px; }
 }
+
+/* genres (#43) */
+.genre-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.genre-card { display: grid; gap: 8px; align-content: start; }
+.genre-card h3 { margin: 0; }
+.genre-fans { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); }
+.genre-fan { display: inline-flex; align-items: center; gap: 4px; }
+.genre-card .actions { display: flex; flex-wrap: wrap; gap: 6px; }

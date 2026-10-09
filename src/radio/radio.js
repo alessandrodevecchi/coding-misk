@@ -525,6 +525,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     get paused() { return !!S && S.paused !== undefined; },
     get recording() { return recS ? { seconds: recElapsed(), list: recS.list.map(x => ({ ...x })) } : null; },
     startRec, stopRec, recordFromStart,
+    // the Genres tab (#43): the radio plays these styles, with the sliders as they are
+    playStyles(ids) { const ok = ids.filter(id => recipes.some(r => r.id === id)); if (!ok.length) return false; opts.artist = null; opts.styles = ok; saveOpts(); start(); return true; },
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },
     get on() { return !!S; },

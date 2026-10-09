@@ -36,7 +36,7 @@ The UI is dark only, by design.
 
 ## Navigation
 
-Two modes at the top of the work area (`#42`): **Listen** (Compose, Songs, Playlists, Radio) to make and hear music, and **Groove Lab** (Artists, Styles, Sounds, Guide, References) for the material music is made of and for learning. The mode buttons are large toggles with the tab names as a subtitle (hidden on phones); in the hardware theme they are latching keys with a lamp. Under them, the tabs of the mode. Each mode remembers its last tab; a link to a tab of the other mode switches mode. The live code stays on the right in both modes and can be collapsed; the settings open from the gear next to the code, with no mode lit.
+Two modes at the top of the work area (`#42`): **Listen** (Compose, Songs, Playlists, Radio) to make and hear music, and **Groove Lab** (Artists, Styles, Genres, Sounds, Guide, References) for the material music is made of and for learning. The mode buttons are large toggles with the tab names as a subtitle (hidden on phones); in the hardware theme they are latching keys with a lamp. Under them, the tabs of the mode. Each mode remembers its last tab; a link to a tab of the other mode switches mode. The live code stays on the right in both modes and can be collapsed; the settings open from the gear next to the code, with no mode lit.
 
 ## Hardware theme (`data-ui="hw"`)
 

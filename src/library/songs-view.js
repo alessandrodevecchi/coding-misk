@@ -197,5 +197,7 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
 
   // ids of the visible songs in order, for the player bar
   const order = () => visible().map(e => e.id);
-  return { setSongs, renderBar, apply, order, isFav, toggleFav, starButton, tagsHtml, tagsPanel, playlistMenu, listName, get view() { return view; } };
+  // shows only one genre (from the Genres tab, #43)
+  function onlyGenre(g) { view = cleanView({ genres: [g] }); save(); }
+  return { onlyGenre, setSongs, renderBar, apply, order, isFav, toggleFav, starButton, tagsHtml, tagsPanel, playlistMenu, listName, get view() { return view; } };
 }

@@ -301,6 +301,8 @@
 
 - Lista delle prove prima di `v0.6.0` in `docs/PROVE-v0.6.0.md` (in italiano, per il proprietario, da spuntare). Ordine scelto per i prossimi lavori: `#43` vista Generi, `#41` aggiungere uno strumento che il brano non ha, `#40` più curve.
 
+- `#43` Vista **Generi** nel Groove Lab (dopo Stili): una scheda per genere con i suoi stili (un tocco apre lo stile), quanti brani ci sono, gli artisti che lo amano (dai pesi dei loro stili preferiti), "▶ Ascolta in radio" (la radio parte negli stili di quel genere) e "Vedi i N brani" (la scheda Brani filtrata sul genere). `check-modes.cjs` con 4 controlli nuovi, tutti passano.
+
 ## Prossimo passo
 
 Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live coding a mano `#20`); `develop` = `763c59f` con in più barra player e volume `#32` (change `player-bar`, tutti i task fatti tranne la prova del proprietario) e artisti con schede Artisti e Stili `#35` (change `artists-and-styles`, 14/14 task). Il proprietario sta provando a fondo artisti e barra.
@@ -309,7 +311,7 @@ Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live co
 - **Al rilascio su `main`:** riaprire `#28` se GitHub la chiude (il visual Studio va rivisto con il proprietario).
 - **Dopo le prove del proprietario:** nomi definitivi dei sei artisti (ora provvisori: Night Owl, HYPERDROP, Lumen Drift, Jukebox Joe, The Purist, Wake Horizon), verifica e archiviazione di `player-bar`, `artists-and-styles`, `song-search`, `playlists`, `song-transitions` e `radio-steering`, rilascio `v0.6.0` su `main` con conferma.
 - **Fatto, da provare:** `#23` transizioni (radio e playlist), `#24` console della radio.
-- **Poi:** `#44` revisione dell'interfaccia (linguette, spazio), `#43` vista Generi, `#29` continua in radio da Componi, `#40` più curve, `#38` sessioni radio nelle playlist, `#39` passaggi parlati lunghi, `#37` uso online (vedi note locali), `#25`/`#26` agenti e MCP, `#19`, `#3`, `#16`, `#4`-`#8`. Idea per dopo: voce/frasi proprie per artista.
+- **Poi:** `#44` revisione dell'interfaccia (linguette, spazio), `#29` continua in radio da Componi, `#40` più curve, `#38` sessioni radio nelle playlist, `#39` passaggi parlati lunghi, `#37` uso online (vedi note locali), `#25`/`#26` agenti e MCP, `#19`, `#3`, `#16`, `#4`-`#8`. Idea per dopo: voce/frasi proprie per artista.
 - **Messa a punto del regista:** con le note brano per brano del proprietario (lavoro lungo, non blocca). Strumento: `node --no-warnings tools/endless-recap.mjs` (riepilogo con spazio per le note).
 - **Nota tecnica:** in questa sessione di Claude Code il push via SSH fallisce (agente SSH ereditato prima del crash del Mac); si pubblica con `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push https://github.com/alessandrodevecchi/coding-misk.git <ramo>`. La chiave GitHub è `~/.ssh/id_ed25519_github`.
 - **Controlli da lanciare** (dev server `npm run dev` su :5173, `PLAYWRIGHT_CORE` in `AGENTS.md`): `npm run check:code`, `check:songs`, `check:styles`, `check:endless`, `check:song-filter`, `check:playlists`, `check-playlists.cjs`, `check-transitions.cjs`, `check-steering.cjs`, `node tools/artist.mjs validate`, `npm run build`, `tools/check-library.cjs`, `check-songs-tab.cjs`, `check-player.cjs`, `check-hand.cjs`, `check-radio.cjs`, `snapshot-levels.cjs check`.

@@ -21,7 +21,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const visibleTabs = () => page.$$eval('.tabs .tab', xs => xs.filter(x => !x.hidden).map(x => x.dataset.tab).join());
   const pressed = () => page.$$eval('.mode-btn', xs => xs.filter(x => x.getAttribute('aria-pressed') === 'true').map(x => x.dataset.mode).join());
   check((await pressed()) === 'lab' && await page.isVisible('#tab-stili'), 'an old remembered tab opens in its mode', await pressed());
-  check((await visibleTabs()) === 'artisti,stili,suoni,guida,riferimenti', 'Groove Lab tabs', await visibleTabs());
+  check((await visibleTabs()) === 'artisti,stili,generi,suoni,guida,riferimenti', 'Groove Lab tabs', await visibleTabs());
   if (shots) await page.screenshot({ path: path.join(shots, 'lab.png') });
 
   await page.click('[data-mode="ascolta"]'); await sleep(300);
@@ -52,6 +52,24 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('[data-mode="lab"]'); await page.click('[data-tab="guida"]'); await sleep(200);
   await page.reload(); await sleep(3500);
   check((await pressed()) === 'lab' && await page.isVisible('#tab-guida'), 'mode and tab kept after reload');
+
+  // genres (#43): cards, songs of a genre, a style, the radio in a genre
+  await page.click('[data-mode="lab"]'); await page.click('[data-tab="generi"]'); await sleep(400);
+  const genres = await page.$$eval('#tab-generi .genre-card', xs => xs.map(x => x.dataset.genre));
+  check(genres.length >= 8 && genres.includes('techno') && genres.includes('hip-hop'), 'genre cards', genres.join(','));
+  if (shots) await page.screenshot({ path: path.join(shots, 'genres.png') });
+  await page.click('#tab-generi [data-genre-songs="metal"]'); await sleep(500);
+  const vis = await page.$$eval('#songs [data-song-id]', xs => xs.filter(x => !x.hidden).map(x => x.dataset.songId));
+  check(await page.isVisible('#tab-brani') && vis.includes('ferro') && !vis.includes('drift'), 'see the songs of a genre', vis.join(','));
+  await page.click('#sv-clear'); await sleep(200);
+  await page.click('[data-mode="lab"]'); await page.click('[data-tab="generi"]'); await sleep(300);
+  await page.click('#tab-generi [data-genre-style="phonk"]'); await sleep(400);
+  check(await page.isVisible('#tab-stili') && /Phonk/.test(await page.innerText('#tab-stili')), 'a style chip opens the style');
+  await page.click('[data-tab="generi"]'); await sleep(300);
+  await page.click('#tab-generi [data-genre-radio="trance"]'); await sleep(2500);
+  const r = await page.evaluate(() => ({ on: globalThis.codingMiskRadio.on, styles: globalThis.codingMiskRadio.options.styles }));
+  check(await page.isVisible('#tab-radio') && r.on && r.styles.join() === 'trance', 'listen to a genre in the radio', JSON.stringify(r));
+  await page.click('#radio-start'); await sleep(300);
 
   // phone
   await page.setViewportSize({ width: 390, height: 900 }); await sleep(400);

@@ -160,5 +160,5 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
     if (el.id === 'st-json-text') { try { editing = JSON.parse(el.value); } catch (err) { toast(t('libJsonBad', { msg: err.message })); } render(); }
   });
 
-  return { render, usable, get mine() { return mine.all; } };
+  return { render, usable, get mine() { return mine.all; }, openStyle(id) { open = id; editing = null; jsonView = false; render(); } };
 }
