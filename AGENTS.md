@@ -19,6 +19,7 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 | `openspec/`             | OpenSpec specs and changes (spec-driven development, used for `#18` endless mode)     |
 | `docs/DESIGN-SYSTEM.md` | Themes, tokens, fonts, components, visuals, hardware theme                           |
 | `DEVLOG.md`             | Chronological log of every change (Italian)                                          |
+| `docs/PROVE-v0.6.0.md`  | The owner's test checklist before `v0.6.0` (Italian)                                 |
 | `README.md`             | Public description (English), `README.it.md` in Italian                              |
 
 ## Rules

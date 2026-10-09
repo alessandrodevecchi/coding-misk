@@ -299,6 +299,8 @@
 
 - Modalità: anteprima delle "linguette" da cartella al posto dei due pulsantoni (solo screenshot con uno stile iniettato, nessun commit). Il proprietario: per ora restano i pulsantoni, ci vuole ragionare per ottimizzare l'interfaccia; aperta `#44` (revisione dell'interfaccia). Lo stile dell'anteprima è salvato in `notes/linguette-modalita.css` (locale).
 
+- Lista delle prove prima di `v0.6.0` in `docs/PROVE-v0.6.0.md` (in italiano, per il proprietario, da spuntare). Ordine scelto per i prossimi lavori: `#43` vista Generi, `#41` aggiungere uno strumento che il brano non ha, `#40` più curve.
+
 ## Prossimo passo
 
 Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live coding a mano `#20`); `develop` = `763c59f` con in più barra player e volume `#32` (change `player-bar`, tutti i task fatti tranne la prova del proprietario) e artisti con schede Artisti e Stili `#35` (change `artists-and-styles`, 14/14 task). Il proprietario sta provando a fondo artisti e barra.

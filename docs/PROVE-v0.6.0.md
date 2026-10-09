@@ -1,0 +1,72 @@
+# Prove prima di v0.6.0
+
+Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develop` prima di portarlo su `main`. Spunta mentre provi e annota accanto quello che non va. Avvia con `npm run dev` e apri http://localhost:5173.
+
+## Barra del player e volume (`#32`)
+
+- [ ] Play, pausa, stop, precedente e successivo dalla barra in fondo, in ogni scheda.
+- [ ] Trascinare la timeline per spostarsi nel brano.
+- [ ] Volume e muto; l'export WAV resta allo stesso livello anche col volume basso.
+- [ ] Tema HW: tasti meccanici, display ambra, spie di casuale, ripeti e mix.
+
+## Modalità (`#42`)
+
+- [ ] Ascolta e Groove Lab: ognuna ricorda l'ultima scheda.
+- [ ] Sul telefono (o finestra stretta) tutto sta nello schermo.
+
+## Brani (`#34`)
+
+- [ ] Ricerca (prova "frigio" e "phrygian"), chip di genere, stile e tipo, ordine.
+- [ ] Legenda dei tag; un tocco su un tag filtra.
+- [ ] Stella dei preferiti; tag sui tuoi brani.
+
+## Playlist (`#36`)
+
+- [ ] Creare una playlist da "+ Playlist" su una card, riordinare nella scheda Playlist.
+- [ ] Riproduci playlist: passa da sola al brano dopo; casuale; ripeti tutto e ripeti un brano.
+- [ ] Interruttore Mix nella barra: due brani salvati si mixano.
+- [ ] Esporta e importa una playlist.
+
+## Artisti e stili (`#35`)
+
+- [ ] Scheda Artisti: ritratti, scheda personaggio, preferenze di transizione.
+- [ ] "♪ Nuovo brano" dalla scheda di un artista porta in Componi.
+- [ ] Scheda Stili: duplicare, modificare, genere dello stile.
+- [ ] **Decidere i nomi definitivi** dei sei artisti (ora: Night Owl, HYPERDROP, Lumen Drift, Jukebox Joe, The Purist, Wake Horizon).
+
+## Radio: transizioni e console (`#23`, `#24`)
+
+- [ ] Ascoltare qualche cambio di brano con artisti diversi (mix, morph, eco, break, interludio).
+- [ ] Menu Transizioni e Armonia.
+- [ ] Console: più o meno energia, + e − strumenti, più scuro e più sporco, cambia accordi e tonalità, vai al drop, resta qui, chiudi il brano.
+- [ ] Coda "In arrivo" con ✕; switch "questo brano / tutta la diretta".
+- [ ] Trascinare la curva dell'energia.
+- [ ] Mixer: volume, muto, lucchetto, cambia strumento.
+- [ ] Scorciatoie da tastiera (↑ ↓, 1-5, G, R, E).
+- [ ] Riascolta: rifà le stesse mosse.
+
+## Visual Studio (`#28`, da rivedere)
+
+- [ ] La radio parte con lo Studio; come lo vorresti invece.
+
+## Codice a mano (`#20`, `#33`)
+
+- [ ] Prendere il controllo di un live build scrivendo nel codice, "Riprendi" e "dal punto in cui ero".
+- [ ] "Salva come nuova versione" in Componi e in radio; versioni sulla scheda dell'originale.
+
+## Impostazioni (`#31`)
+
+- [ ] Ingranaggio: tema, lingua, visual della radio, formato WAV o Opus.
+- [ ] Esporta tutto e importa in un altro browser.
+
+## Registrazione (`#30`)
+
+- [ ] Registrare 5-10 minuti di radio in Opus e ascoltare il file.
+- [ ] Pausa durante la registrazione: niente buchi.
+- [ ] Scaletta e ricetta scaricate; "Registra dall'inizio".
+
+## Dopo le prove
+
+- [ ] Nomi degli artisti decisi.
+- [ ] Problemi trovati scritti qui o nel DEVLOG.
+- [ ] Via libera per `v0.6.0` su `main` (dopo il rilascio riaprire `#28` se GitHub la chiude).
