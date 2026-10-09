@@ -293,38 +293,77 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (s.unrack) parts.push(`${s.unrack.track} − ${s.unrack.device}`);
     return parts.join(' · ');
   };
-  // energy shape as a small line, with the position in the song
-  // the energy curve of the song on air, one point per double phrase; the parts still to come have a handle (#24)
-  const steerCurve = (item, rel) => {
-    const P = item.plan, dbl = 2 * P.phrase, n = P.plan.length, w = 320, h = 72, pad = 8;
-    const xOf = d => pad + (d + 0.5) / n * (w - 2 * pad), yOf = v => h - pad - v * (h - 2 * pad);
-    const pts = P.plan.map((d, i) => `${xOf(i).toFixed(1)},${yOf(d.target).toFixed(1)}`).join(' ');
-    const cur = Math.floor(rel / dbl), x = pad + Math.min(1, rel / Math.max(1, n * dbl)) * (w - 2 * pad);
-    const handles = P.plan.map((d, i) => (i > cur ? `<circle class="handle" data-d="${i}" cx="${xOf(i).toFixed(1)}" cy="${yOf(d.target).toFixed(1)}" r="6"><title>${esc(t('steerCurveTip'))}</title></circle>` : `<circle class="past" cx="${xOf(i).toFixed(1)}" cy="${yOf(d.target).toFixed(1)}" r="2.5"/>`)).join('');
-    return `<svg class="radio-curve steer" viewBox="0 0 ${w} ${h}" data-w="${w}" data-h="${h}" data-pad="${pad}" role="img" aria-label="${esc(t('radioShape'))}"><title>${esc(t('curveHelp:energy'))}</title><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2"/><line x1="${x}" x2="${x}" y1="0" y2="${h}" class="pos"/>${handles}</svg>`;
-  };
-  // the other curves of the song on air (#40): one lane each; dashed = what the song does, solid points = set by
-  // the listener; handles on the parts still to come, a reset button per lane
+  // ---------- curves of the song on air (#24, #40, look #47) ----------
+  // energy is the main curve, on top; the four detail lanes fold under a summary line. Every curve: one small
+  // square per double phrase (filled when the listener set it), a solid line, a glow on set parts, the parts
+  // already played shaded. Handles only on the parts still to come.
   const LANES = ['density', 'brightness', 'tension', 'voice'];
-  const curveLanes = (item, rel) => {
-    const P = item.plan, dbl = 2 * P.phrase, n = P.plan.length, w = 320, h = 44, pad = 8, max = densityMax(P);
+  const CW = 320, CPAD = 8;
+  let detailsOpen = !!store.get('coding-misk-radio-details', false), hoverD = null;
+  const curveData = item => {
+    const P = item.plan, max = densityMax(P);
     if (!item.curves) item.curves = songCurves(item.song, P, item.opts || item.base.opts);
-    const C = item.curves, cur = Math.min(n - 1, Math.floor(rel / dbl)), x = pad + Math.min(1, rel / Math.max(1, n * dbl)) * (w - 2 * pad);
-    const xOf = d => pad + (d + 0.5) / n * (w - 2 * pad), yOf = v => h - pad - v * (h - 2 * pad);
-    return `<div class="radio-lanes">${LANES.map(c => {
-      const norm = v => (c === 'density' ? v / Math.max(1, max) : v), val = d => C[d].set[c] ?? C[d].measured[c];
-      const shown = v => (c === 'density' ? t('curveOf', { n: v, max }) : String(Math.round(v * 100)));
-      const pts = C.map((p, i) => `${xOf(i).toFixed(1)},${yOf(norm(p.measured[c])).toFixed(1)}`).join(' ');
-      const dots = C.map((p, i) => {
-        const v = norm(val(i)), set = p.set[c] !== null;
-        return i > cur ? `<circle class="handle${set ? ' set' : ''}" data-d="${i}" data-curve="${c}" cx="${xOf(i).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="6"><title>${esc(t('curveTip', { curve: t('curve:' + c) }))}</title></circle>` : `<circle class="past${set ? ' set' : ''}" cx="${xOf(i).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="2.5"/>`;
-      }).join('');
-      const anySet = C.some((p, i) => i > cur && p.set[c] !== null);
-      return `<div class="radio-lane" data-lane="${c}" title="${esc(t('curveHelp:' + c))}"><span class="lane-name">${esc(t('curve:' + c))}</span><output>${esc(shown(val(cur)))}</output>
-        <button class="mini" data-curve-reset="${c}" ${anySet ? '' : 'disabled'} title="${esc(t('curveResetTip'))}">↺</button>
-        <svg class="radio-curve lane" viewBox="0 0 ${w} ${h}" data-w="${w}" data-h="${h}" data-pad="${pad}" data-max="${c === 'density' ? max : ''}" role="img" aria-label="${esc(t('curve:' + c))}"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/><line x1="${x}" x2="${x}" y1="0" y2="${h}" class="pos"/>${dots}</svg></div>`;
-    }).join('')}</div>`;
+    const C = item.curves, val = (d, c) => C[d].set[c] ?? C[d].measured[c];
+    const charge = P.plan.map((d, i) => d.role !== 'drop' && (P.plan[i + 1] || {}).role === 'drop' && (C[i].set.tension ?? 0) >= 0.7);
+    return { P, C, max, val, charge };
   };
+  const shownOf = (c, v, max) => (c === 'density' ? t('curveOf', { n: v, max }) : String(Math.round(v * 100)));
+  // one curve as SVG: vals 0..max, set[i] true when the listener set part i
+  function drawCurve({ vals, set = [], max = 1, cur, frac, h, energy = false, curve = '', roles = null, charge = [], title = '' }) {
+    const n = vals.length, top = 6, bot = energy ? 16 : 6, col = (CW - 2 * CPAD) / n;
+    const x = i => CPAD + (i + 0.5) * col, y = v => top + (1 - Math.max(0, Math.min(1, v / max))) * (h - top - bot);
+    const f = `cg-${curve || 'energy'}`, px = CPAD + Math.min(1, frac) * (CW - 2 * CPAD);
+    let g = `<defs><filter id="${f}" filterUnits="userSpaceOnUse" x="-10" y="-10" width="${CW + 20}" height="${h + 20}"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+    for (const q of [0, 0.5, 1]) g += `<line class="grid${q === 0.5 ? ' mid' : ''}" x1="${CPAD}" x2="${CW - CPAD}" y1="${y(q * max).toFixed(1)}" y2="${y(q * max).toFixed(1)}"/>`;
+    for (let i = 0; i <= n; i++) g += `<line class="grid v" x1="${(CPAD + i * col).toFixed(1)}" x2="${(CPAD + i * col).toFixed(1)}" y1="${top}" y2="${h - bot}"/>`;
+    // part names where the part changes, skipped when too close to the previous one, kept inside on the right
+    if (roles) { let last = -Infinity; roles.forEach((r, i) => { if (i > 0 && roles[i - 1] === r) return; const lx = CPAD + i * col + 2, label = t('role:' + r).toUpperCase(), wide = label.length * 5 + 4; if (lx < last) return; last = lx + wide; const end = lx + wide > CW; g += `<text class="role" x="${(end ? CW - CPAD : lx).toFixed(1)}" y="${h - 4}"${end ? ' text-anchor="end"' : ''}>${esc(label)}</text>`; }); }
+    charge.forEach((on, i) => { if (on) g += `<rect class="charge" x="${(CPAD + i * col).toFixed(1)}" y="${top}" width="${col.toFixed(1)}" height="${h - top - bot}"/><text class="charge-name" x="${(CPAD + i * col + 3).toFixed(1)}" y="${top + 9}">${esc(t('curveCharge').toUpperCase())}</text>`; });
+    g += `<rect class="past-shade" x="${CPAD}" y="${top}" width="${Math.max(0, px - CPAD).toFixed(1)}" height="${h - top - bot}"/>`;
+    g += `<polyline class="line" points="${vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="currentColor" stroke-width="${energy ? 2.2 : 1.6}"/>`;
+    set.forEach((s, i) => { if (s) g += `<polyline class="glow" points="${[i - 1, i, i + 1].filter(j => j >= 0 && j < n).map(j => `${x(j).toFixed(1)},${y(vals[j]).toFixed(1)}`).join(' ')}" fill="none" stroke="currentColor" stroke-width="3" filter="url(#${f})"/>`; });
+    const sz = energy ? 7 : 6;
+    vals.forEach((v, i) => {
+      const cls = `${i > cur ? 'handle' : 'pt past'}${set[i] ? ' set' : ''}`, data = i > cur ? ` data-d="${i}"${curve ? ` data-curve="${curve}"` : ''}` : '';
+      const tip = i > cur ? `<title>${esc(curve ? t('curveTip', { curve: t('curve:' + curve) }) : t('steerCurveTip'))}</title>` : '';
+      g += `<rect class="${cls}"${data} x="${(x(i) - sz / 2).toFixed(1)}" y="${(y(v) - sz / 2).toFixed(1)}" width="${sz}" height="${sz}" ${set[i] ? `filter="url(#${f})"` : ''}>${tip}</rect>`;
+    });
+    g += `<line class="pos" x1="${px.toFixed(1)}" x2="${px.toFixed(1)}" y1="0" y2="${h - bot + 2}"/>`;
+    if (hoverD !== null && hoverD < n) g += `<line class="hover" x1="${x(hoverD).toFixed(1)}" x2="${x(hoverD).toFixed(1)}" y1="0" y2="${h}"/>`;
+    return `<svg class="radio-curve ${energy ? 'steer' : 'lane'}" viewBox="0 0 ${CW} ${h}" data-h="${h}" data-top="${top}" data-bot="${bot}" data-n="${n}" data-sz="${sz}" data-max="${curve === 'density' ? max : ''}" role="img" aria-label="${esc(title)}">${energy ? `<title>${esc(t('curveHelp:energy'))}</title>` : ''}${g}</svg>`;
+  }
+  function curvePanel(item, rel, sec) {
+    const { P, C, max, val, charge } = curveData(item), dbl = 2 * P.phrase, n = P.plan.length;
+    const cur = Math.min(n - 1, Math.floor(rel / dbl)), frac = rel / Math.max(1, n * dbl);
+    const energy = drawCurve({ vals: P.plan.map(d => d.target), cur, frac, h: 96, energy: true, roles: P.plan.map(d => d.role), charge, title: t('radioShape') });
+    const lanes = LANES.map(c => {
+      const anySet = C.some((p, i) => i > cur && p.set[c] !== null);
+      const svg = drawCurve({ vals: C.map((p, i) => val(i, c)), set: C.map(p => p.set[c] !== null), max: c === 'density' ? Math.max(1, max) : 1, cur, frac, h: 50, curve: c, title: t('curve:' + c) });
+      return `<div class="radio-lane" data-lane="${c}" title="${esc(t('curveHelp:' + c))}"><span class="lane-name">${esc(t('curve:' + c))}</span><output>${esc(shownOf(c, val(cur, c), max))}</output>
+        <button class="mini" data-curve-reset="${c}" ${anySet ? '' : 'disabled'} title="${esc(t('curveResetTip'))}">↺</button><div class="screen">${svg}</div></div>`;
+    }).join('');
+    const summary = LANES.map(c => `<span data-lane="${c}">${esc(t('curve:' + c))} <b>${esc(shownOf(c, val(cur, c), max))}</b></span>`).join(' · ');
+    return `<div class="curves">
+      <div class="radio-lane main" data-lane="energy"><span class="lane-name">${esc(t('curve:energy'))} · ${esc(t('curveMain'))}</span><output>${Math.round(P.plan[cur].target * 100)}</output><span></span><div class="screen">${energy}</div></div>
+      <span class="curves-where">${esc(sec)}</span>
+      <button class="curves-toggle" id="curves-toggle" aria-expanded="${detailsOpen}" title="${esc(t('curvesDetailsTip'))}"><span class="tw">${detailsOpen ? '▾' : '▸'} ${esc(t('curvesDetails'))}</span> ${detailsOpen ? '' : summary}</button>
+      <div class="radio-lanes" ${detailsOpen ? '' : 'hidden'}>${lanes}</div>
+    </div>`;
+  }
+  // the box with every value of one part (hover, or the part being dragged)
+  const tipBox = (() => { const el = document.createElement('div'); el.className = 'curve-tip'; el.hidden = true; document.body.appendChild(el); return el; })();
+  function showTip(item, d, px, py, over = {}) {
+    if (!item || !item.plan || d === null) { tipBox.hidden = true; return; }
+    const { P, max, val } = curveData(item);
+    if (d < 0 || d >= P.plan.length) { tipBox.hidden = true; return; }
+    const v = c => (over.curve === c ? over.value : c === 'energy' ? P.plan[d].target : val(d, c));
+    tipBox.innerHTML = `<div class="tip-part">${esc(t('curvePart', { n: d + 1, role: t('role:' + P.plan[d].role) }))}</div>${['energy', ...LANES].map(c => `<div data-lane="${c}"><span>${esc(t('curve:' + c))}</span><b>${esc(c === 'energy' ? String(Math.round(v(c) * 100)) : shownOf(c, v(c), max))}</b></div>`).join('')}`;
+    tipBox.hidden = false;
+    const w = tipBox.offsetWidth, hh = tipBox.offsetHeight;
+    tipBox.style.left = `${px + 14 + w > innerWidth ? px - 14 - w : px + 14}px`;
+    tipBox.style.top = `${Math.max(4, Math.min(innerHeight - hh - 4, py - hh / 2))}px`;
+  }
+  const partAt = (svg, clientX) => { const r = svg.getBoundingClientRect(), n = +svg.dataset.n, vx = (clientX - r.left) / r.width * CW; return Math.max(0, Math.min(n - 1, Math.floor((vx - CPAD) / ((CW - 2 * CPAD) / n)))); };
   const curve = (entry, rel) => {
     const ph = entry.phrases, w = 160, h = 36, n = Math.max(1, ph.length - 1);
     const pts = ph.map((p, i) => `${(i / n * w).toFixed(1)},${(h - 3 - p.target * (h - 6)).toFixed(1)}`).join(' ');
@@ -399,7 +438,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       <h3 class="radio-title">${esc(song.title)}</h3>
       <div class="radio-meta">${esc(e.key)} · ${e.bpm} BPM · ${esc(e.meter)} · ${esc(t('shape_' + e.shape))}</div>
       <div class="radio-parts">${esc(partsText(e))}</div>
-      <div class="radio-pos">${item.plan ? steerCurve(item, rel) : curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span>${item.plan ? curveLanes(item, rel) : ''}</div>
+      ${item.plan ? curvePanel(item, rel, `${sec.name} · ${t('radioBar', { n: Math.floor(rel) + 1, total: item.bars })}`) : `<div class="radio-pos">${curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>`}
       <div class="lbl">${esc(t('radioComing'))}</div>
       <ul class="radio-next">${next.map(s => `<li><span class="at">${esc(t('radioBarShort', { n: s.at + 1 }))}</span> ${esc(stepText(s))}${s.say ? ` <em>“${esc(sayText(s.say, getLang()))}”</em>` : ''}</li>`).join('') || `<li class="muted">${esc(t('radioNoChanges'))}</li>`}</ul>
       <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) : esc(t('radioPreparing'))}${nextSong && e.transition && !item.cut ? ` · ${esc(e.transition.kind === 'cut' ? t('radioNextTxCut') : t('radioNextTx', { kind: t(`tx:${e.transition.kind}`), bars: e.transition.bars }))}` : ''}</div>`;
@@ -482,6 +521,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.mixLock) { const item = S && S.stream[S.onAir]; return command({ kind: item && (item.plan.locked || []).includes(b.dataset.mixLock) ? 'unlock' : 'lock', track: b.dataset.mixLock }); }
     if (b.dataset.mixInst) return command({ kind: 'instrument', track: b.dataset.mixInst });
     if (b.dataset.curveReset) return command({ kind: 'curve-reset', curve: b.dataset.curveReset });
+    if (b.id === 'curves-toggle') { detailsOpen = !detailsOpen; try { store.set('coding-misk-radio-details', detailsOpen); } catch (err) {} return renderNow(); }
     if (b.dataset.style) {
       if (opts.artist) opts.artist = null;
       const id = b.dataset.style, has = opts.styles.includes(id);
@@ -492,27 +532,39 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       root.querySelectorAll('[data-artist]').forEach(c => c.setAttribute('aria-pressed', c.dataset.artist === ''));
     }
   });
-  // dragging a handle of the energy curve: the point follows the pointer, the command is queued on release
+  // dragging a handle of a curve: the square follows the pointer, the values box shows the part, the command is
+  // queued on release
+  const onAir = () => S && S.stream[S.onAir];
   root.addEventListener('pointerdown', e => {
-    const hnd = e.target.closest('circle.handle'); if (!hnd || !S) return;
+    const hnd = e.target.closest('rect.handle'); if (!hnd || !S) return;
     const svg = hnd.closest('svg');
     dragging = { d: +hnd.dataset.d, curve: hnd.dataset.curve, hnd, svg, value: null };
     hnd.setPointerCapture(e.pointerId); e.preventDefault();
   });
   root.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    const { svg, hnd } = dragging, r = svg.getBoundingClientRect(), h = +svg.dataset.h, pad = +svg.dataset.pad;
-    const y = (e.clientY - r.top) / r.height * h, v = Math.max(0, Math.min(1, (h - pad - y) / (h - 2 * pad)));
+    if (!dragging) {
+      // hover (mouse only): a line on the part under the pointer in every curve, and its values
+      if (e.pointerType !== 'mouse') return;
+      const svg = e.target.closest && e.target.closest('.curves svg.radio-curve');
+      const d = svg ? partAt(svg, e.clientX) : null;
+      if (d !== hoverD) { hoverD = d; renderNow(); }
+      showTip(onAir(), d, e.clientX, e.clientY);
+      return;
+    }
+    const { svg, hnd } = dragging, r = svg.getBoundingClientRect(), h = +svg.dataset.h, top = +svg.dataset.top, bot = +svg.dataset.bot, sz = +svg.dataset.sz;
+    const y = (e.clientY - r.top) / r.height * h, v = Math.max(0, Math.min(1, (h - bot - y) / (h - top - bot)));
     // density snaps to a count of tracks (at least one)
     const max = +svg.dataset.max || 0;
     dragging.value = max ? Math.max(1, Math.round(v * max)) : Math.round(v * 20) / 20;
-    const nv = max ? dragging.value / max : dragging.value;
-    hnd.setAttribute('cy', (h - pad - nv * (h - 2 * pad)).toFixed(1));
-    if (dragging.curve) { hnd.classList.add('set'); const o = svg.parentNode.querySelector('output'); if (o) o.textContent = max ? t('curveOf', { n: dragging.value, max }) : Math.round(dragging.value * 100); return; }
-    const line = svg.querySelector('polyline'), pts = line.getAttribute('points').split(' ');
-    pts[dragging.d] = `${pts[dragging.d].split(',')[0]},${hnd.getAttribute('cy')}`; line.setAttribute('points', pts.join(' '));
+    const nv = max ? dragging.value / max : dragging.value, cy = top + (1 - nv) * (h - top - bot);
+    hnd.setAttribute('y', (cy - sz / 2).toFixed(1)); hnd.classList.add('set');
+    showTip(onAir(), dragging.d, e.clientX, e.clientY, { curve: dragging.curve || 'energy', value: dragging.value });
+    if (dragging.curve) { const o = svg.closest('.radio-lane').querySelector('output'); if (o) o.textContent = max ? t('curveOf', { n: dragging.value, max }) : Math.round(dragging.value * 100); return; }
+    const line = svg.querySelector('polyline.line'), pts = line.getAttribute('points').split(' ');
+    pts[dragging.d] = `${pts[dragging.d].split(',')[0]},${cy.toFixed(1)}`; line.setAttribute('points', pts.join(' '));
   });
-  const endDrag = () => { if (!dragging) return; const { d, value, curve } = dragging; dragging = null; if (value !== null) command({ kind: 'curve', d, value, ...(curve ? { curve } : {}) }); else renderNow(); };
+  root.addEventListener('pointerleave', () => { if (hoverD !== null && !dragging) { hoverD = null; tipBox.hidden = true; renderNow(); } });
+  const endDrag = () => { if (!dragging) return; const { d, value, curve } = dragging; dragging = null; tipBox.hidden = true; if (value !== null) command({ kind: 'curve', d, value, ...(curve ? { curve } : {}) }); else renderNow(); };
   root.addEventListener('pointerup', endDrag);
   root.addEventListener('pointercancel', endDrag);
   // shortcuts while the Radio tab is open and the radio plays (not while typing in a field)

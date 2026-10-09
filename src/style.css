@@ -731,30 +731,68 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .mix-row { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto auto auto; align-items: center; gap: 6px; font-size: 13px; }
 .mix-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mix-row .mini[aria-pressed="true"] { color: var(--a1); border-color: var(--a1); }
-.radio-curve.steer { width: 100%; max-width: 360px; height: auto; touch-action: none; }
-.radio-curve .handle { fill: var(--panel); stroke: var(--a1); stroke-width: 2; cursor: ns-resize; }
-.radio-curve .handle:hover { fill: var(--a1); }
-.radio-curve .past { fill: currentColor; opacity: .5; }
 @media (max-width: 560px) { .mix-row { grid-template-columns: minmax(0, 1fr) 80px auto auto auto; } }
-.radio-pos:has(.radio-curve.steer) { flex-direction: column; align-items: stretch; gap: 4px; }
-/* the other curves of the song on air (#40): one lane each, colour per curve */
-.radio-lanes { display: grid; gap: 6px; max-width: 360px; margin-top: 4px; }
-.radio-lane { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 2px 8px; font: 11px var(--mono); }
-.radio-lane svg { grid-column: 1 / -1; }
-.radio-lane .lane-name { color: var(--lane); text-transform: uppercase; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; }
-.radio-lane output { color: var(--ink); font-variant-numeric: tabular-nums; }
-.radio-lane .mini { padding: 0 6px; min-width: 0; }
-.radio-lane[data-lane="density"] { --lane: #5ec8ff; }
-.radio-lane[data-lane="brightness"] { --lane: #ffd84d; }
-.radio-lane[data-lane="tension"] { --lane: #ff6b5e; }
-.radio-lane[data-lane="voice"] { --lane: #8fe07a; }
-.radio-curve.lane { width: 100%; height: auto; color: var(--lane); touch-action: none; }
-.radio-curve.lane .pos { stroke-width: 1.5; }
-.radio-curve.lane .handle { stroke: var(--lane); stroke-width: 1.5; }
-.radio-curve.lane .handle.set, .radio-curve.lane .handle:hover { fill: var(--lane); }
-.radio-curve.lane .past { fill: var(--lane); opacity: .35; }
-.radio-curve.lane .past.set { opacity: .9; }
-@media (max-width: 560px) { .radio-lanes { max-width: none; } }
+/* curves of the song on air (#40, look #47): neon in the normal theme, oscilloscope in HW */
+.curves { display: grid; gap: 6px; max-width: 380px; font: 12px var(--mono); color: var(--muted); }
+.curves .radio-lane { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 2px 8px; font: 11px var(--mono); }
+.curves .radio-lane .screen { grid-column: 1 / -1; }
+.curves .lane-name { color: var(--lane); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.curves .radio-lane output { color: var(--ink); font-variant-numeric: tabular-nums; }
+.curves .radio-lane .mini { padding: 0 6px; min-width: 0; }
+.curves [data-lane="energy"] { --lane: var(--a1); }
+.curves [data-lane] .radio-curve, .curves [data-lane] .screen { --set: var(--lane); }
+.curves [data-lane="density"] { --lane: #5ec8ff; }
+.curves [data-lane="brightness"] { --lane: #ffd84d; }
+.curves [data-lane="tension"] { --lane: #ff6b5e; }
+.curves [data-lane="voice"] { --lane: #8fe07a; }
+.curves .radio-lanes { display: grid; gap: 8px; }
+.curves-where { font-size: 11px; }
+.curves-toggle { all: unset; cursor: pointer; display: block; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font: 11px/1.5 var(--mono); color: var(--muted); }
+.curves-toggle:hover, .curves-toggle:focus-visible { border-color: var(--a1); color: var(--ink); }
+.curves-toggle .tw { color: var(--ink); }
+.curves-toggle [data-lane] { color: var(--lane); }
+.curves-toggle b { color: var(--ink); font-weight: 400; }
+.radio-curve.steer, .radio-curve.lane { display: block; width: 100%; height: auto; color: var(--lane); touch-action: none; overflow: visible; }
+.radio-curve .grid { stroke: color-mix(in srgb, var(--muted) 18%, transparent); stroke-width: 1; }
+.radio-curve .grid.mid { stroke-dasharray: 2 3; }
+.radio-curve .grid.v { display: none; }
+.radio-curve .role { font: 8px var(--mono); fill: var(--muted); opacity: .85; }
+.radio-curve .charge { fill: #ff6b5e; opacity: .12; }
+.radio-curve .charge-name { font: 7px var(--mono); fill: #ff6b5e; }
+.radio-curve .past-shade { fill: #000; opacity: .25; }
+.radio-curve .glow { stroke: var(--set); opacity: .9; }
+.radio-curve rect.handle, .radio-curve rect.pt { fill: var(--panel); stroke: var(--lane); stroke-width: 1.4; }
+.radio-curve rect.handle { cursor: ns-resize; }
+.radio-curve rect.handle:hover { fill: var(--lane); }
+.radio-curve rect.set { fill: var(--set); stroke: var(--set); }
+.radio-curve rect.past { opacity: .4; }
+.radio-curve .pos { stroke: var(--a2); stroke-width: 1.5; }
+.radio-curve .hover, .radio-curve .pos, .radio-curve .grid, .radio-curve text, .radio-curve .charge, .radio-curve .past-shade, .radio-curve .glow, .radio-curve .line { pointer-events: none; }
+.radio-curve .hover { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 2 2; opacity: .7; }
+.curve-tip { position: fixed; z-index: 50; pointer-events: none; display: grid; gap: 2px; padding: 6px 8px; min-width: 130px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; font: 10px var(--mono); color: var(--ink); box-shadow: 0 4px 14px #0008; }
+.curve-tip > div { display: flex; justify-content: space-between; gap: 12px; }
+.curve-tip .tip-part { color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.curve-tip [data-lane] span { color: var(--lane); text-transform: uppercase; }
+.curve-tip b { font-weight: 400; font-variant-numeric: tabular-nums; }
+.curve-tip [data-lane="energy"] { --lane: var(--a1); }
+.curve-tip [data-lane="density"] { --lane: #5ec8ff; }
+.curve-tip [data-lane="brightness"] { --lane: #ffd84d; }
+.curve-tip [data-lane="tension"] { --lane: #ff6b5e; }
+.curve-tip [data-lane="voice"] { --lane: #8fe07a; }
+/* HW: oscilloscope, amber traces on dark grids, set parts in warm white, the position in green */
+:root[data-ui="hw"] .curves [data-lane], :root[data-ui="hw"] .curve-tip [data-lane] { --lane: #ffb347; }
+:root[data-ui="hw"] .curves [data-lane] .radio-curve { --set: #fff3c4; }
+:root[data-ui="hw"] .curves .screen { background: #0b0a06; border: 1px solid #000; box-shadow: inset 0 0 18px #000; border-radius: 3px; padding: 4px 6px; }
+:root[data-ui="hw"] .radio-curve .grid { stroke: #3a2a08; }
+:root[data-ui="hw"] .radio-curve .grid.v { display: inline; }
+:root[data-ui="hw"] .radio-curve .role { fill: #ffb347; }
+:root[data-ui="hw"] .radio-curve .past-shade { opacity: .35; }
+:root[data-ui="hw"] .radio-curve rect.handle, :root[data-ui="hw"] .radio-curve rect.pt { fill: #0b0a06; }
+:root[data-ui="hw"] .radio-curve rect.set { fill: var(--set); stroke: var(--set); }
+:root[data-ui="hw"] .radio-curve .pos { stroke: #39ff6a; }
+:root[data-ui="hw"] .radio-curve.steer, :root[data-ui="hw"] .radio-curve.lane { filter: drop-shadow(0 0 2px rgba(255, 179, 71, .55)); }
+:root[data-ui="hw"] .curve-tip { background: #0b0a06; border-color: #3a2a08; color: #ffe2a8; }
+@media (max-width: 560px) { .curves { max-width: none; } }
 
 /* settings page (#31) */
 .set-gear { font-size: 18px; min-width: 38px; }

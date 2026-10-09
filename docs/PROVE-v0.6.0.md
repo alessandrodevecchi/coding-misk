@@ -42,6 +42,7 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Coda "In arrivo" con ✕; switch "questo brano / tutta la diretta".
 - [ ] Trascinare la curva dell'energia.
 - [ ] Curve di densità, luminosità, tensione e voce (`#40`): trascinare un punto, sentire la differenza, tasto ↺ per tornare automatica.
+- [ ] Aspetto delle curve (`#47`): dettagli chiusi di default e riga riassunto, apri e chiudi, punti fissati che si illuminano, riquadro dei valori passando col mouse, tema HW a oscilloscopio.
 - [ ] Tensione alta (70 o più) sulla parte prima di un drop: si sente la carica e il drop la scarica.
 - [ ] Mixer: volume, muto, lucchetto, cambia strumento.
 - [ ] Scorciatoie da tastiera (↑ ↓, 1-5, G, R, E).

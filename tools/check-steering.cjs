@@ -61,7 +61,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // the card redraws four times a second: take the handle and its box in one go, retrying until both are there
   let handle = null, d = -1, box = null, svg = null;
   for (let k = 0; k < 10 && !box; k++) {
-    handle = (await page.$$('#radio-now svg.steer circle.handle')).pop();
+    handle = (await page.$$('#radio-now svg.steer rect.handle')).pop();
     if (handle) { d = +(await handle.getAttribute('data-d').catch(() => -1)); box = await handle.boundingBox().catch(() => null); const sv = await page.$('#radio-now svg.steer'); svg = sv && await sv.boundingBox(); }
     if (!box) await sleep(100);
   }
@@ -74,12 +74,21 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     if (shots) await (await page.$('#radio-now')).screenshot({ path: path.join(shots, 'curve.png') });
   } else check(false, 'curve handles shown');
 
-  // the other curves (#40): four lanes; drag the last density handle down, then reset the lane
-  check((await page.$$eval('#radio-now .radio-lane', xs => xs.map(x => x.dataset.lane).join())) === 'density,brightness,tension,voice', 'four curve lanes under the energy curve');
-  check(await page.$$eval('#radio-now .radio-lane', xs => xs.every(x => x.title.length > 40)) && /main|principale/i.test(await page.$eval('#radio-now svg.steer > title', x => x.textContent)), 'tooltips explain the curves, energy first');
+  // the other curves (#40): folded by default under a summary (#47); the toggle opens four lanes and is remembered
+  check(!(await page.isVisible('#radio-now .radio-lanes')) && /density/i.test(await page.innerText('#curves-toggle')), 'details folded by default with a summary');
+  await page.click('#curves-toggle'); await sleep(300);
+  check(await page.isVisible('#radio-now .radio-lanes') && await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio-details')) === true), 'the toggle opens the details and is remembered');
+  // hover: a line in every curve and the values box
+  { const sv = await page.$('#radio-now svg.steer'), bb = sv && await sv.boundingBox();
+    if (bb) { await page.mouse.move(bb.x + bb.width * 0.7, bb.y + bb.height * 0.4); await sleep(400); }
+    const tip = await page.evaluate(() => { const el = document.querySelector('.curve-tip'); return el && !el.hidden ? el.querySelectorAll('[data-lane]').length : 0; });
+    check(tip === 5 && (await page.$$('#radio-now line.hover')).length === 5, 'hover shows a line in every curve and the values of the part', `${tip}`);
+    await page.mouse.move(5, 5); await sleep(300); }
+  check((await page.$$eval('#radio-now .radio-lanes .radio-lane', xs => xs.map(x => x.dataset.lane).join())) === 'density,brightness,tension,voice', 'four curve lanes under the energy curve');
+  check(await page.$$eval('#radio-now .radio-lanes .radio-lane', xs => xs.every(x => x.title.length > 40)) && /main|principale/i.test(await page.$eval('#radio-now svg.steer > title', x => x.textContent)), 'tooltips explain the curves, energy first');
   let lh = null, lbox = null, lsvg = null, ld = -1;
   for (let k = 0; k < 10 && !lbox; k++) {
-    lh = (await page.$$('#radio-now [data-lane="density"] circle.handle')).pop();
+    lh = (await page.$$('#radio-now [data-lane="density"] rect.handle')).pop();
     if (lh) { ld = +(await lh.getAttribute('data-d').catch(() => -1)); lbox = await lh.boundingBox().catch(() => null); const sv = await page.$('#radio-now [data-lane="density"] svg'); lsvg = sv && await sv.boundingBox(); }
     if (!lbox) await sleep(100);
   }
@@ -89,7 +98,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     st = await ST();
     const c = st.commands.find(x => x.kind === 'curve' && x.curve === 'density');
     check(c && c.d === ld && c.value === 1 && st.plan.curves[ld].density === 1, 'dragging a density handle sets a track count', JSON.stringify(c));
-    check(await page.isVisible(`#radio-now [data-lane="density"] circle.handle.set[data-d="${ld}"]`), 'a set part is drawn solid');
+    check(await page.isVisible(`#radio-now [data-lane="density"] rect.handle.set[data-d="${ld}"]`), 'a set part is drawn solid');
     if (shots) await (await page.$('#radio-now')).screenshot({ path: path.join(shots, 'lanes.png') });
     await page.click('#radio-now [data-curve-reset="density"]'); await sleep(300);
     st = await ST();
@@ -99,10 +108,16 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // phone width: the lanes fit the card
   if (await page.evaluate(() => !!globalThis.codingMiskRadio.on)) {
     await page.setViewportSize({ width: 390, height: 900 }); await sleep(600);
-    const fit = await page.evaluate(() => { const card = document.querySelector('#radio-now'), lanes = [...document.querySelectorAll('#radio-now .radio-lane')]; return lanes.length === 4 && lanes.every(l => l.getBoundingClientRect().right <= card.getBoundingClientRect().right + 1) && document.documentElement.scrollWidth <= 392; });
+    const fit = await page.evaluate(() => { const card = document.querySelector('#radio-now'), lanes = [...document.querySelectorAll('#radio-now .curves .radio-lane')]; return lanes.length === 5 && lanes.every(l => l.getBoundingClientRect().right <= card.getBoundingClientRect().right + 1) && document.documentElement.scrollWidth <= 392; });
     check(fit, 'phone: the lanes fit without horizontal scroll');
     if (shots) await (await page.$('#radio-now')).screenshot({ path: path.join(shots, 'lanes-phone.png') });
     await page.setViewportSize({ width: 1300, height: 1300 }); await sleep(400);
+    // HW theme: the curves become oscilloscope screens
+    await page.click('[data-uitheme="hw"]'); await sleep(500);
+    const hw = await page.evaluate(() => { const sc = document.querySelector('#radio-now .curves .screen'); return sc && getComputedStyle(sc).backgroundColor; });
+    check(hw === 'rgb(11, 10, 6)', 'HW theme draws the curves on dark screens', hw);
+    if (shots) await (await page.$('#radio-now')).screenshot({ path: path.join(shots, 'lanes-hw.png') });
+    await page.click('[data-uitheme="neon"]'); await sleep(300);
   }
 
   // mixer: volume and lock
