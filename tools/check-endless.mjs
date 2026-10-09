@@ -17,7 +17,7 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
-import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves } from '../src/endless/steering.js';
+import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds } from '../src/endless/steering.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { stateAt, buildSteps } from '../src/song/build.js';
@@ -564,6 +564,32 @@ const CHECKS = {
     assert(tension(r.song) > tension(g.song), `tension ${tension(g.song).toFixed(2)} then ${tension(r.song).toFixed(2)}`);
     assert(r.song.sections.some(s => s.chords === g.plan.liftChords), 'strong progression');
     assert(!validateSong(r.song).errors.length, 'charged song is valid');
+  },
+  'steering: extend adds a part before the ending and keeps it'() {
+    const ses = createSession(STYLES, 'steer-extend'), g = ses.next({ styles: ['trance'], energy: 0.6 });
+    const len = sg => sg.sections.reduce((a, x) => a + x.bars, 0), dbl = 2 * g.plan.phrase, bars = len(g.song);
+    const at = applyBar('extend', 10, g.plan), d0 = at / dbl;
+    const go = n => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: Array.from({ length: n }, () => ({ kind: 'extend', at })), seed: 'steer-extend', n: 0 });
+    const one = go(1), three = go(3);
+    assert(len(one.song) === bars + dbl && len(three.song) === bars + 3 * dbl && three.plan.extended === 3, `lengths ${bars} ${len(one.song)} ${len(three.song)}`);
+    const ins = extendIndex(g.plan, d0), roles = g.plan.plan.map(d => d.role);
+    assert(JSON.stringify(one.plan.plan.map(d => d.role)) === JSON.stringify([...roles.slice(0, ins), roles[ins - 1], ...roles.slice(ins)]), `roles ${one.plan.plan.map(d => d.role)}`);
+    // the ending is kept: the outro is still last, and the added part sits right before it
+    if (roles[roles.length - 1] === 'outro') assert(one.plan.plan[one.plan.plan.length - 1].role === 'outro' && one.plan.plan[ins].role !== 'outro', 'outro kept at the end');
+    // the steps before the boundary stay, and the added part has moves of its own
+    const before = s => JSON.stringify((s.build || []).filter(x => x.at < at));
+    assert(before(one.song) === before(g.song), 'steps before the extension changed');
+    const a0 = ins * dbl, own = one.song.build.filter(x => x.at >= a0 && x.at < a0 + dbl).map(x => JSON.stringify({ ...x, at: x.at - a0 }));
+    const prev = one.song.build.filter(x => x.at >= a0 - dbl && x.at < a0).map(x => JSON.stringify({ ...x, at: x.at - a0 + dbl }));
+    assert(own.length && own.join() !== prev.join(), 'the added part repeats the part before it');
+    assert(!validateSong(three.song).errors.length, 'extended song is valid');
+    assert(JSON.stringify(go(3).song) === JSON.stringify(three.song), 'same extensions gave different songs');
+    // extend after end goes before the outro
+    const ended = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'end', at }, { kind: 'extend', at }], seed: 'steer-extend', n: 0 });
+    assert(ended.plan.plan[ended.plan.plan.length - 1].role === 'outro' && ended.plan.plan.length === d0 + 2, `end then extend: ${ended.plan.plan.map(d => d.role)}`);
+    const s = extendSeconds(g.plan);
+    assert(s > 10 && s < 80, `seconds per press ${s}`);
+    assert(whyNot({ kind: 'extend' }, g.song, g.plan, 10, g.plan.bars - at) === 'transition' && whyNot({ kind: 'extend' }, g.song, g.plan, 10, 0) === null, 'too late once the transition plays');
   },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');

@@ -6,7 +6,7 @@
 import { createSession, OPTION_DEFAULTS } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
-import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, songCurves, densityMax } from '../endless/steering.js';
+import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
 import { validateRecipe } from '../endless/recipe.js';
@@ -197,14 +197,19 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     for (let k = i + 1; k < S.stream.length; k++) { const p = S.stream[k - 1]; S.stream[k].start = p.start + p.bars - (p.cut ? 0 : overlapOf(p.entry.transition)); }
   }
   const relNow = () => { const it = S.stream[S.onAir]; return Math.max(0, player.now() - it.start); };
+  // bars at the end of a song where the next song already plays (the transition overlap past the song's own bars)
+  const tailOf = item => (item.cut || !item.entry.transition ? 0 : Math.max(0, overlapOf(item.entry.transition) - extraOf(item.entry.transition)));
+  const secs = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
   let cmdN = 0;
   // queues a command on the song on air: rewrites it from the command's bar and swaps the window
   function command(c) {
     if (!S || S.paused !== undefined) return false;
     const item = S.stream[S.onAir], rel = relNow();
     const at = applyBar(c.kind, rel, item.plan);
-    if (at <= rel || at >= barsOf(item.song)) { toast(t('steerLate')); return false; }
+    if (at <= rel || at >= barsOf(item.song) || (c.kind === 'extend' && whyNot(c, item.song, item.plan, rel, tailOf(item)))) { toast(t('steerLate')); return false; }
     const cmd = { ...c, at, id: ++cmdN };
+    // an extension remembers where its part goes, so cancelling it also drops the curve edits made on later parts
+    if (c.kind === 'extend') { cmd.ins = extendIndex(item.plan, Math.ceil(at / item.plan.phrase) >> 1); cmd.s = Math.round(extendSeconds(item.plan)); }
     // a later command of the same kind on the same track (or curve part) replaces a pending one
     const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && ['volume', 'curve', 'curve-reset', 'instrument'].includes(x.kind);
     item.commands = item.commands.filter(x => !same(x));
@@ -226,8 +231,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (!item) return;
     const c = item.commands.find(x => x.id === id);
     if (!c || c.at <= relNow()) return;
-    item.commands = item.commands.filter(x => x.id !== id);
-    S.recipe.steering = (S.recipe.steering || []).filter(x => !(x.song === item.n && x.id === id));
+    const drop = x => x.id === id || (c.kind === 'extend' && x.kind === 'curve' && x.id > id && x.at > relNow() && x.d >= c.ins);
+    item.commands = item.commands.filter(x => !drop(x));
+    S.recipe.steering = (S.recipe.steering || []).filter(x => !(x.song === item.n && drop(x)));
     resteer(item);
     keepHistory(item);
     player.swap(windowPlayable());
@@ -375,11 +381,11 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
 
   // ---------- console, queue and mixer (#24) ----------
   // keyboard shortcuts: a key per command (type toggles add or remove)
-  const KEYS_OF = { 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', instrument: 'i', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', end: 'e' };
+  const KEYS_OF = { 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', instrument: 'i', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', extend: 'l', end: 'e' };
   const TYPE_KEYS = { drums: '1', bass: '2', lead: '3', pad: '4', texture: '5' };
   const keyLabel = k => ({ ArrowUp: '↑', ArrowDown: '↓', V: 'Shift+V' }[k] || k.toUpperCase());
   let steerKey = '', dragging = null;
-  const cmdLabel = c => c.kind === 'add' || c.kind === 'remove' ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
+  const cmdLabel = c => c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : c.kind === 'add' || c.kind === 'remove' ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
   function renderSteer(force = false) {
     const box = root.querySelector('#radio-steer');
     if (!box || dragging) return;
@@ -393,8 +399,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const tip = k => `title="${esc(t(k))}"`;
     // a disabled button says why in its tooltip ("this song has no pad")
     const btn = (c, label) => {
-      const why = S.paused !== undefined ? 'paused' : whyNot(c, item.song, item.plan, rel), k = c.type ? TYPE_KEYS[c.type] : KEYS_OF[c.kind];
-      const tipText = `${t(`steerTip:${c.kind}`)}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
+      const why = S.paused !== undefined ? 'paused' : whyNot(c, item.song, item.plan, rel, tailOf(item)), k = c.type ? TYPE_KEYS[c.type] : KEYS_OF[c.kind];
+      const tipText = `${t(`steerTip:${c.kind}`, c.vars || {})}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
       return `<button class="btn steer-btn" data-cmd="${c.kind}"${c.type ? ` data-type="${c.type}"` : ''} ${why ? 'disabled' : ''} title="${esc(tipText)}">${esc(label || t(`steer:${c.kind}`))}</button>`;
     };
     // the type buttons say what the next phrase can do: "+" when the type will be silent there, "−" when it will play
@@ -409,7 +415,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         ${group('sound', ['darker', 'brighter', 'dirtier', 'cleaner', 'more-space', 'instrument'].map(k => btn({ kind: k })).join(''))}
         ${group('harmony', btn({ kind: 'progression' }) + btn({ kind: 'key' }))}
         ${group('voice', btn({ kind: 'talk-more' }) + btn({ kind: 'talk-less' }))}
-        ${group('song', btn({ kind: 'drop' }) + btn({ kind: 'stay' }) + btn({ kind: 'end' }))}
+        ${group('song', btn({ kind: 'drop' }) + btn({ kind: 'stay' }) + (() => { const s = `+${Math.round(extendSeconds(item.plan))} s`; return btn({ kind: 'extend', vars: { s } }, t('steer:extend', { s })); })() + btn({ kind: 'end' }))}
       </div>
       <div class="lbl">${esc(t('steerQueue'))}</div>
       <ul class="steer-queue">${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: c.at + 1 }))}</span> ${esc(cmdLabel(c))} <button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button></li>`).join('') || `<li class="muted">${esc(t('steerQueueEmpty'))}</li>`}</ul>
@@ -438,7 +444,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       <h3 class="radio-title">${esc(song.title)}</h3>
       <div class="radio-meta">${esc(e.key)} · ${e.bpm} BPM · ${esc(e.meter)} · ${esc(t('shape_' + e.shape))}</div>
       <div class="radio-parts">${esc(partsText(e))}</div>
-      ${item.plan ? curvePanel(item, rel, `${sec.name} · ${t('radioBar', { n: Math.floor(rel) + 1, total: item.bars })}`) : `<div class="radio-pos">${curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>`}
+      ${item.plan ? curvePanel(item, rel, `${sec.name} · ${t('radioBar', { n: Math.floor(rel) + 1, total: item.bars })}${item.plan.extended ? ` · ${t('radioExtended', { t: secs(item.plan.extended * extendSeconds(item.plan)) })}` : ''}`) : `<div class="radio-pos">${curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>`}
       <div class="lbl">${esc(t('radioComing'))}</div>
       <ul class="radio-next">${next.map(s => `<li><span class="at">${esc(t('radioBarShort', { n: s.at + 1 }))}</span> ${esc(stepText(s))}${s.say ? ` <em>“${esc(sayText(s.say, getLang()))}”</em>` : ''}</li>`).join('') || `<li class="muted">${esc(t('radioNoChanges'))}</li>`}</ul>
       <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) : esc(t('radioPreparing'))}${nextSong && e.transition && !item.cut ? ` · ${esc(e.transition.kind === 'cut' ? t('radioNextTxCut') : t('radioNextTx', { kind: t(`tx:${e.transition.kind}`), bars: e.transition.bars }))}` : ''}</div>`;
@@ -571,6 +577,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   document.addEventListener('keydown', e => {
     if (root.hidden || !S || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, select, textarea, [contenteditable], strudel-editor, .cm-editor')) return;
     const kind = Object.keys(KEYS_OF).find(k => KEYS_OF[k] === e.key);
+    if (kind === 'extend' && e.repeat) return;
     const type = Object.keys(TYPE_KEYS).find(k => TYPE_KEYS[k] === e.key);
     if (!kind && !type) return;
     e.preventDefault();

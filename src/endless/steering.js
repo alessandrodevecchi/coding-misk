@@ -5,7 +5,7 @@ import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, liftOf, OP
 import { stream } from './random.js';
 import { stateAt } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
-import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS } from '../music.js';
+import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, meterSteps } from '../music.js';
 
 // commands of the console: group, whether they change the song's structure (applied on a double phrase)
 export const COMMANDS = {
@@ -14,7 +14,7 @@ export const COMMANDS = {
   darker: { group: 'sound' }, brighter: { group: 'sound' }, dirtier: { group: 'sound' }, cleaner: { group: 'sound' }, 'more-space': { group: 'sound' }, instrument: { group: 'sound' },
   progression: { group: 'harmony', structural: true }, key: { group: 'harmony', structural: true },
   'talk-more': { group: 'voice' }, 'talk-less': { group: 'voice' },
-  drop: { group: 'song', structural: true }, stay: { group: 'song', structural: true }, end: { group: 'song', structural: true },
+  drop: { group: 'song', structural: true }, stay: { group: 'song', structural: true }, extend: { group: 'song', structural: true }, end: { group: 'song', structural: true },
   curve: { group: 'curve' }, 'curve-reset': { group: 'curve' },
   // mixer: on the next bar
   volume: { group: 'mixer', bar: true }, mute: { group: 'mixer', bar: true }, unmute: { group: 'mixer', bar: true }, lock: { group: 'mixer' }, unlock: { group: 'mixer' },
@@ -44,9 +44,11 @@ function stateOf(song, plan, bar) {
 
 // why a command cannot apply now, or null when it can (for the console: disabled buttons say why)
 //   late, no-type, all-playing, locked, last-track, no-target, no-drop
-export function whyNot(cmd, song, plan, now) {
+// tail: bars at the end of the song where the transition to the next song already plays (extend cannot go there)
+export function whyNot(cmd, song, plan, now, tail = 0) {
   const at = applyBar(cmd.kind, now, plan);
   if (at <= now || at >= plan.bars) return 'late';
+  if (cmd.kind === 'extend' && at >= plan.bars - tail) return 'transition';
   const st = stateOf(song, plan, at), on = playing(st), locked = plan.locked || [];
   if (cmd.kind === 'add') {
     const all = st.tracks.filter(t => ofType(t, cmd.type));
@@ -189,6 +191,15 @@ function rewrite(song, plan, opts, cmd, rng) {
     case 'stay':
       if (d0 > 0) P.plan = [...P.plan.slice(0, d0), { ...P.plan[d0 - 1] }, ...P.plan.slice(d0)];
       break;
+    case 'extend': {
+      // one more double phrase before the ending (#45): the role and curves of the part before it, energy a little
+      // lower then a little higher on repeated presses; the director writes its own moves
+      const at2 = extendIndex(P, d0), src = P.plan[Math.max(0, at2 - 1)], k = P.extended || 0;
+      const part = { ...src, ...(src.curves ? { curves: { ...src.curves } } : {}), target: round2(clamp(src.target + (k % 2 ? 0.06 : -0.08), 0.05, 1)) };
+      P.plan = [...P.plan.slice(0, at2), part, ...P.plan.slice(at2)];
+      P.extended = k + 1;
+      break;
+    }
     case 'end':
       if (d0 < P.plan.length - 1) P.plan = [...P.plan.slice(0, d0), { role: 'outro', target: Math.min(0.3, P.plan[P.plan.length - 1].target) }];
       break;
@@ -243,3 +254,14 @@ export function songCurves(song, plan, opts = {}) {
     return { measured: { ...m, voice: set.voice ?? opts.talk ?? OPTION_DEFAULTS.talk }, set };
   });
 }
+
+// Extend (#45): where the added double phrase goes, before the closing run of outros (or the last part without
+// one), never before the double phrase d0 where the command applies; and how long one press adds, in seconds.
+export function extendIndex(plan, d0) {
+  const n = plan.plan.length;
+  let end = n;
+  while (end > 0 && plan.plan[end - 1].role === 'outro') end--;
+  if (end === n) end = n - 1;
+  return Math.max(d0, end);
+}
+export const extendSeconds = plan => 2 * plan.phrase * (meterSteps(plan.meter) / 4) * 60 / plan.bpm;

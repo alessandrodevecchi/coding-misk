@@ -14,9 +14,11 @@ Steering rebuilds a song from its original plan plus every command (`steerSong`)
 
 - **Command:** `{ kind: 'extend' }`, structural (next double phrase), group `song`.
 - **Where:** the ending is the closing run of `outro` entries; without one, the last entry. The insert index is `max(d0, start of the ending)`, where `d0` is the double phrase where the command applies.
-- **What:** a copy of the entry before the insert index (its role) with `target` moved by `-0.08` then `+0.06` on alternate presses (counted from the plan's `extended` field), clamped 0.05 to 1, and no listener curve targets. The plan gets `extended: n`. The director writes it with the steering random streams, so the moves differ from the part before.
+- **What:** a copy of the entry before the insert index (its role) with `target` moved by `-0.08` then `+0.06` on alternate presses (counted from the plan's `extended` field), clamped 0.05 to 1, keeping that entry's listener curve targets. The plan gets `extended: n`. The director writes it with the steering random streams, so the moves differ from the part before.
 - **Seconds per press:** `2 * phrase * beatsPerBar * 60 / bpm`, with `beatsPerBar` from the meter, as the director computes song length.
 - **Total:** `plan.extended * seconds per press`, shown as `+m:ss`.
+- **Too late:** the radio passes the bars of the transition overlap to `whyNot`; `extend` is `late` when it would apply at or after `bars - overlap`.
+- **Cancel:** cancelling a pending `extend` also removes later pending `curve` commands with `d` at or after its insertion index.
 - **Key repeat:** the shortcut handler ignores `keydown` events with `repeat`.
 
 ## Risks / Trade-offs

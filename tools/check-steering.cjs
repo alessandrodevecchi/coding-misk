@@ -120,6 +120,19 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     await page.click('[data-uitheme="neon"]'); await sleep(300);
   }
 
+  // extend (#45): the button says how long, a press makes the song longer and shows the total; cancelling it also
+  // drops a curve edit made after it on the added part
+  { const b0 = (await ST()).plan.bars, label = await page.innerText('#radio-steer [data-cmd="extend"]');
+    check(/\+\d+ s/.test(label) && /\+\d+ s/.test(await page.getAttribute('#radio-steer [data-cmd="extend"]', 'title')), 'extend says how long one press adds', label);
+    await page.click('#radio-steer [data-cmd="extend"]'); await sleep(300);
+    let x = await ST();
+    const ext = x.commands.find(c => c.kind === 'extend');
+    check(ext && x.plan.bars === b0 + 2 * x.plan.phrase && /extended|esteso/.test(await page.innerText('#radio-now .curves-where')), 'extend makes the song longer and shows the total', `${b0} → ${x.plan.bars}`);
+    await page.evaluate(d => globalThis.codingMiskRadio.command({ kind: 'curve', curve: 'tension', d, value: 0.8 }), ext.ins); await sleep(200);
+    await page.evaluate(id => globalThis.codingMiskRadio.cancel(id), ext.id); await sleep(300);
+    x = await ST();
+    check(x.plan.bars === b0 && !x.commands.some(c => c.kind === 'extend' || (c.kind === 'curve' && c.curve === 'tension')), 'cancelling an extension drops the later curve edit');
+  }
   // mixer: volume and lock
   const vol = await page.$('#radio-steer [data-mix-vol]');
   const tr = await vol.getAttribute('data-mix-vol');

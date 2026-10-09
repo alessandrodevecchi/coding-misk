@@ -39,6 +39,7 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Ascoltare qualche cambio di brano con artisti diversi (mix, morph, eco, break, interludio).
 - [ ] Menu Transizioni e Armonia.
 - [ ] Console: più o meno energia, + e − strumenti, più scuro e più sporco, cambia accordi e tonalità, vai al drop, resta qui, chiudi il brano.
+- [ ] Estendi (`#45`): il tasto dice quanto aggiunge, il brano si allunga prima del finale con un tratto nuovo, la riga mostra il totale; più pressioni; annullare dalla coda; spento quando parte la transizione.
 - [ ] Coda "In arrivo" con ✕; switch "questo brano / tutta la diretta".
 - [ ] Trascinare la curva dell'energia.
 - [ ] Curve di densità, luminosità, tensione e voce (`#40`): trascinare un punto, sentire la differenza, tasto ↺ per tornare automatica.

@@ -14,7 +14,7 @@ The console SHALL have an Extend button in the Song group, right after "Stay her
 - **THEN** the song is one double phrase longer, the new part plays right before the outro, and the outro and the transition follow it
 
 ### Requirement: A new stretch in the song's character
-The added double phrase SHALL take the role of the last part before the ending, with an energy target near that part's (alternating a little lower and a little higher on repeated presses), and the director SHALL write it with its ordinary moves, so it is not a copy of an earlier part. The rest of the song after it SHALL be rewritten as for any other command, keeping everything before the boundary.
+The added double phrase SHALL take the role of the last part before the ending, with an energy target near that part's (alternating a little lower and a little higher on repeated presses) and the curve targets the listener set on that part, and the director SHALL write it with its ordinary moves, so it is not a copy of an earlier part. The rest of the song after it SHALL be rewritten as for any other command, keeping everything before the boundary.
 
 #### Scenario: Not a repeat
 - **WHEN** a song is extended
@@ -40,3 +40,18 @@ Extensions SHALL change only the song on air; the following songs SHALL start la
 #### Scenario: Replay
 - **WHEN** a session where a song was extended twice is replayed
 - **THEN** that song is extended twice at the same boundaries and has the same length
+
+### Requirement: Interactions with the other functions
+- **Curves:** the added part SHALL appear in the energy curve and in the detail lanes as a part to come, editable like the others. Cancelling a pending extension SHALL also cancel the curve edits queued after it on parts at or after its insertion, so no edit lands on a different part.
+- **Transition:** the ending and the transition to the next song SHALL stay at the end of the song. Extend SHALL be disabled, with its reason, when the transition to the next song has started or would start before the command applies.
+- **Song length commands:** "End the song" after an extension SHALL cut the extension too; an extension after "End the song" SHALL go before the outro.
+- **Mixer:** locks and volumes set by hand SHALL hold in the added part.
+- **Next song:** its key and tempo SHALL stay as planned, since the ending they follow is unchanged.
+
+#### Scenario: Too late
+- **WHEN** the transition to the next song has started
+- **THEN** the Extend button is disabled and says it is too late for this song
+
+#### Scenario: Cancel with a later curve edit
+- **WHEN** the listener presses Extend, then sets the tension of the added part, then cancels the extension
+- **THEN** both commands leave the queue and the song is as before the extension

@@ -156,6 +156,7 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | Change progression, key | next double phrase | the following sections take another progression, or a key a fifth away |
 | Talk more, less | next phrase | voice amount ±0.2 for the rest of the song |
 | Go to the drop, stay here, end | next double phrase | the plan jumps to its drop, repeats the current part, or ends with an outro |
+| Extend (`#45`) | next double phrase | one more double phrase before the ending (the closing outros, or the last part), with the role and curves of the part before it and energy a little lower, then higher, on repeated presses; disabled once the transition to the next song plays |
 | Volume, mute, lock (mixer) | next bar | pinned gain; a step plus a lock; the director stops moving the track |
 
 ### Curves
@@ -217,6 +218,7 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Locks and removed types                      | `steering: locked tracks and removed types`                      |
 | Curves                                       | `steering: curves set density, brightness and the voice of a part` |
 | Charge before a drop                         | `steering: high tension charges the part before a drop`          |
+| Extend                                       | `steering: extend adds a part before the ending and keeps it`    |
 
 ## Artists
 
