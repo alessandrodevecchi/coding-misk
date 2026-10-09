@@ -66,3 +66,15 @@ The code of the song on air SHALL show steering changes like the director's own 
 #### Scenario: Listener's move in the code
 - **WHEN** a "darker" command applies
 - **THEN** the step in the code carries a comment marking it as the listener's
+
+### Requirement: Add an instrument the song does not have
+"Add" for a type the song has no track of SHALL make a new track of that type from the song's style (its sounds and presets) and bring it in at the next phrase. The command SHALL be disabled, saying why, only when the style itself has no instrument of that type. (#41)
+
+#### Scenario: New pad
+- **WHEN** a song has no pad track and its style has pads, and the user presses "+ pad"
+- **THEN** a new pad from the style starts playing at the next phrase
+
+#### Scenario: Style without the instrument
+- **WHEN** the song's style has no texture
+- **THEN** "+ texture" is disabled with the reason "the style of this song has no texture"
+

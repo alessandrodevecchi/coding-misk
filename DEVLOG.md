@@ -305,12 +305,14 @@
 
 - `#41` Dalla console si può aggiungere uno strumento che il brano non ha: se tra le tracce preparate dal regista non c'è nessun pad (o basso, melodia, texture, batteria), "+ pad" ne crea uno nuovo dallo stile del brano, con i suoi suoni e preset, e lo fa entrare alla frase dopo. Il pulsante è spento solo se lo stile stesso non ha quello strumento ("lo stile di questo brano non ha pad"). `check:endless` controlla che la traccia nuova suoni e che il brano resti valido.
 
+- Specifiche OpenSpec a posteriori (chieste dal proprietario): change `backfill-app-features` con le specifiche di `#33` versioni a mano, `#31` Impostazioni e backup, `#30` registrazione della radio, `#43` Generi, scritte dal comportamento attuale e verificate con i controlli che lo coprono; `#41` aggiunto come requisito alla change `radio-steering`. Da qui in avanti ogni funzione passa prima da una proposta OpenSpec.
+
 ## Prossimo passo
 
 Stato al 2026-10-09: `main` = `v0.5.0`; tag `v0.6.0-beta.1` su `develop` a `a87e842`; `develop` = `07a3e56` con in più console della radio (`#24`), Studio (`#28`, da rivedere, issue aperta), versioni a mano (`#33`), Impostazioni (`#31`), registrazione (`#30`), due modalità Ascolta e Groove Lab (`#42`), Generi (`#43`), strumento nuovo dalla console (`#41`). Tutti i controlli passano.
 
-- **Subito:** `#40` più curve nella radio (ultima della serie scelta dal proprietario: `#43`, `#41`, `#40`).
-- **Specifiche OpenSpec mancanti:** `#30`, `#31`, `#33`, `#41`, `#43` sono stati fatti senza change OpenSpec (comportamento descritto in DEVLOG, docs e controlli); da decidere col proprietario se scriverle a posteriori.
+- **Specifiche:** scritte a posteriori per `#30`, `#31`, `#33`, `#43` (change `backfill-app-features`) e `#41` (in `radio-steering`). Regola: prima la proposta OpenSpec, poi il codice al via del proprietario.
+- **Dopo il compact:** proposta OpenSpec per `#40` (più curve nella radio), poi implementazione al via.
 - **Prove del proprietario:** lista in `docs/PROVE-v0.6.0.md`; poi nomi degli artisti, archiviazione delle change (`player-bar`, `artists-and-styles`, `song-search`, `playlists`, `song-transitions`, `radio-steering`, `two-modes`) e rilascio `v0.6.0` su `main` con conferma. Dopo il rilascio riaprire `#28` se GitHub la chiude.
 - **Poi:** `#44` revisione dell'interfaccia (linguette in `notes/linguette-modalita.css`), `#29` continua in radio da Componi, `#38` sessioni radio nelle playlist, `#39` passaggi parlati lunghi, `#37` uso online (note locali `notes/pubblicazione-e-diritti.md`, da ricordare al proprietario quando se ne parla), `#25`/`#26` agenti e MCP, `#19`, `#3`, `#16`, `#4`-`#8`, `#27`.
 - **Preferenze del proprietario:** domande in testo libero in chat (non il riquadro a scelte); anteprime con screenshot prima di cambiare l'aspetto.
