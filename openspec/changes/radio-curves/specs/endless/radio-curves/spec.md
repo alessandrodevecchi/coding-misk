@@ -9,6 +9,8 @@ Several editable curves for the song on air in the radio (density, brightness, t
 ### Requirement: Curve lanes
 The now playing card SHALL show, under the energy curve, four lanes in this order: density, brightness, tension, voice. Each lane SHALL have one point per double phrase, share the time axis and the position line of the energy curve, and show its name and the value of the part playing. The density lane SHALL show its value as a count of tracks ("3 of 6"); the others SHALL show it from 0 to 100. The lanes SHALL fit the card at phone width without horizontal scroll.
 
+Energy SHALL stay the main curve; the four lanes are detail curves. The energy curve and each lane SHALL have a tooltip that says what the curve controls, that energy comes first, and how to set a part and go back to automatic.
+
 #### Scenario: Lanes on air
 - **WHEN** a song plays in the radio
 - **THEN** the card shows the energy curve and, under it, the four lanes with the position line at the same place in each

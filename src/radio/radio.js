@@ -301,7 +301,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const pts = P.plan.map((d, i) => `${xOf(i).toFixed(1)},${yOf(d.target).toFixed(1)}`).join(' ');
     const cur = Math.floor(rel / dbl), x = pad + Math.min(1, rel / Math.max(1, n * dbl)) * (w - 2 * pad);
     const handles = P.plan.map((d, i) => (i > cur ? `<circle class="handle" data-d="${i}" cx="${xOf(i).toFixed(1)}" cy="${yOf(d.target).toFixed(1)}" r="6"><title>${esc(t('steerCurveTip'))}</title></circle>` : `<circle class="past" cx="${xOf(i).toFixed(1)}" cy="${yOf(d.target).toFixed(1)}" r="2.5"/>`)).join('');
-    return `<svg class="radio-curve steer" viewBox="0 0 ${w} ${h}" data-w="${w}" data-h="${h}" data-pad="${pad}" role="img" aria-label="${esc(t('radioShape'))}"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2"/><line x1="${x}" x2="${x}" y1="0" y2="${h}" class="pos"/>${handles}</svg>`;
+    return `<svg class="radio-curve steer" viewBox="0 0 ${w} ${h}" data-w="${w}" data-h="${h}" data-pad="${pad}" role="img" aria-label="${esc(t('radioShape'))}"><title>${esc(t('curveHelp:energy'))}</title><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2"/><line x1="${x}" x2="${x}" y1="0" y2="${h}" class="pos"/>${handles}</svg>`;
   };
   // the other curves of the song on air (#40): one lane each; dashed = what the song does, solid points = set by
   // the listener; handles on the parts still to come, a reset button per lane
@@ -320,7 +320,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         return i > cur ? `<circle class="handle${set ? ' set' : ''}" data-d="${i}" data-curve="${c}" cx="${xOf(i).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="6"><title>${esc(t('curveTip', { curve: t('curve:' + c) }))}</title></circle>` : `<circle class="past${set ? ' set' : ''}" cx="${xOf(i).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="2.5"/>`;
       }).join('');
       const anySet = C.some((p, i) => i > cur && p.set[c] !== null);
-      return `<div class="radio-lane" data-lane="${c}"><span class="lane-name">${esc(t('curve:' + c))}</span><output>${esc(shown(val(cur)))}</output>
+      return `<div class="radio-lane" data-lane="${c}" title="${esc(t('curveHelp:' + c))}"><span class="lane-name">${esc(t('curve:' + c))}</span><output>${esc(shown(val(cur)))}</output>
         <button class="mini" data-curve-reset="${c}" ${anySet ? '' : 'disabled'} title="${esc(t('curveResetTip'))}">↺</button>
         <svg class="radio-curve lane" viewBox="0 0 ${w} ${h}" data-w="${w}" data-h="${h}" data-pad="${pad}" data-max="${c === 'density' ? max : ''}" role="img" aria-label="${esc(t('curve:' + c))}"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/><line x1="${x}" x2="${x}" y1="0" y2="${h}" class="pos"/>${dots}</svg></div>`;
     }).join('')}</div>`;

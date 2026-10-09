@@ -30,6 +30,8 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 - **Commits.** Conventional Commits (`feat(scope): …`, `fix: …`, `docs: …`). Reference issues with a trailer: `Closes: alessandrodevecchi/coding-misk#N` (or `Refs:`).
 - **Verify before claiming.** Run the app, play every section you touched, check `evalError`, and measure per-instrument levels (see Tooling). You cannot hear: say so, and report measured levels instead.
 - **Regression checks.** Before merging a change to the compiler, presets or built-in tracks, run `npm run check:code` (generated code, no browser), `npm run check:songs` and `node tools/snapshot-levels.cjs check` (levels, dev server running). Do not edit files under `src/` while the level check runs: Vite reloads the page and the rest of the run measures silence. When a change is intended, update the snapshots (`npm run snapshot:code`, `node tools/snapshot-levels.cjs write [track-id]`) in the same commit and say why.
+- **Spec first.** Every feature starts with an OpenSpec change (proposal, specs, design, tasks) shown to the owner; code only after the owner says go.
+- **Keep the Guide current.** Every user-facing feature adds or updates its section in the app's Guide, in English and Italian, in the same change (`#48`).
 - **Fewer layers, more rhythm.** The owner prefers tracks with at most 4 to 5 layers per section, dark or tense melodic material, and variety between tracks. See `docs/CONTEXT.md`.
 
 ## Run

@@ -76,6 +76,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
 
   // the other curves (#40): four lanes; drag the last density handle down, then reset the lane
   check((await page.$$eval('#radio-now .radio-lane', xs => xs.map(x => x.dataset.lane).join())) === 'density,brightness,tension,voice', 'four curve lanes under the energy curve');
+  check(await page.$$eval('#radio-now .radio-lane', xs => xs.every(x => x.title.length > 40)) && /main|principale/i.test(await page.$eval('#radio-now svg.steer > title', x => x.textContent)), 'tooltips explain the curves, energy first');
   let lh = null, lbox = null, lsvg = null, ld = -1;
   for (let k = 0; k < 10 && !lbox; k++) {
     lh = (await page.$$('#radio-now [data-lane="density"] circle.handle')).pop();
