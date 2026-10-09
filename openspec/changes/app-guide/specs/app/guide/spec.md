@@ -14,7 +14,7 @@ The Groove Lab SHALL have a "Guide" tab for the app and a separate "Strudel less
 - **THEN** the tab bar shows Guide and Strudel lessons as two tabs
 
 ### Requirement: Feature cards
-The Guide SHALL show a row of feature chips and one card per feature: modes, Compose, Songs, Playlists, Radio, Artists, Styles, Genres, Sounds, hand editing, Settings. Each card SHALL name the mode it lives in and give "What it does", "How to use it" (with the real button names and keyboard shortcuts) and, when useful, "Good to know". A chip SHALL scroll to its card. Text SHALL follow the app language.
+The Guide SHALL show a row of feature chips and one card per feature: modes, player bar, Compose, hand editing, Songs, Playlists, Radio, Artists, Styles, Genres, Sounds, Strudel lessons, References, Settings. Each card SHALL name the mode it lives in (cards for parts outside the tabs, such as the modes and the player bar, name none) and give "What it does", "How to use it" (with the real button names and keyboard shortcuts) and, when useful, "Good to know". A chip SHALL scroll to its card. Text SHALL follow the app language.
 
 #### Scenario: Pick a feature
 - **WHEN** the listener taps the Playlists chip
@@ -42,7 +42,7 @@ Every tab except the Guide SHALL have a "?" button next to its intro that opens 
 - **THEN** the Groove Lab opens on the Guide, scrolled to the Radio card
 
 ### Requirement: Guide check
-A check (`npm run check:guide`) SHALL fail, naming what is missing, when a tab in the page has no guide card, when a console command has no line in the Radio card, or when a guide text lacks English or Italian. An entry MAY be marked exempt with a reason. The check SHALL NOT run in the app or in the build.
+A check (`npm run check:guide`) SHALL fail, naming what is missing, when a tab in the page has no guide card, when a console command has no line in the Radio card, when a guide text lacks English or Italian, or when an interface string exists in one language only. An entry MAY be marked exempt with a reason. The check SHALL NOT run in the app or in the build.
 
 #### Scenario: A new tab without a card
 - **WHEN** a developer adds a tab and no guide card

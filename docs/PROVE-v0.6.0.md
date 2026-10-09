@@ -69,6 +69,12 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Pausa durante la registrazione: niente buchi.
 - [ ] Scaletta e ricetta scaricate; "Registra dall'inizio".
 
+## Guida (`#48`)
+
+- [ ] Groove Lab: schede Guida e Lezioni Strudel; chip in alto, card per funzione, tabella "Cosa cambia cosa" nella Radio.
+- [ ] "Mostrami" apre la funzione e fa lampeggiare il controllo; il "?" in ogni scheda porta alla sua card.
+- [ ] Testi chiari e giusti? Segna qui cosa manca o non torna.
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.

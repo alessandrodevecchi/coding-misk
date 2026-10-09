@@ -55,6 +55,7 @@
       <button class="tab" role="tab" data-mode-of="lab" data-tab="generi" aria-selected="false" data-i18n="tabGeneri" hidden></button>
       <button class="tab" role="tab" data-mode-of="lab" data-tab="suoni" aria-selected="false" data-i18n="tabSuoni" hidden></button>
       <button class="tab" role="tab" data-mode-of="lab" data-tab="guida" aria-selected="false" data-i18n="tabGuida" hidden></button>
+      <button class="tab" role="tab" data-mode-of="lab" data-tab="lezioni" aria-selected="false" data-i18n="tabLezioni" hidden></button>
       <button class="tab" role="tab" data-mode-of="lab" data-tab="riferimenti" aria-selected="false" data-i18n="tabRiferimenti" hidden></button>
     </nav>
 
@@ -136,8 +137,13 @@
 
     <section id="tab-stili" class="lib" hidden></section>
 
-    <section id="tab-guida" hidden>
-      <p class="intro" data-i18n-html="introGuide"></p>
+    <section id="tab-guida" class="guide" hidden>
+      <p class="intro" data-i18n="introGuide"></p>
+      <div id="guide"></div>
+    </section>
+
+    <section id="tab-lezioni" hidden>
+      <p class="intro" data-i18n-html="introLessons"></p>
       <div class="lessons" id="lessons"></div>
     </section>
 

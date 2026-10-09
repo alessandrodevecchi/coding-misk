@@ -21,7 +21,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const visibleTabs = () => page.$$eval('.tabs .tab', xs => xs.filter(x => !x.hidden).map(x => x.dataset.tab).join());
   const pressed = () => page.$$eval('.mode-btn', xs => xs.filter(x => x.getAttribute('aria-pressed') === 'true').map(x => x.dataset.mode).join());
   check((await pressed()) === 'lab' && await page.isVisible('#tab-stili'), 'an old remembered tab opens in its mode', await pressed());
-  check((await visibleTabs()) === 'artisti,stili,generi,suoni,guida,riferimenti', 'Groove Lab tabs', await visibleTabs());
+  check((await visibleTabs()) === 'artisti,stili,generi,suoni,guida,lezioni,riferimenti', 'Groove Lab tabs', await visibleTabs());
   if (shots) await page.screenshot({ path: path.join(shots, 'lab.png') });
 
   await page.click('[data-mode="ascolta"]'); await sleep(300);
@@ -70,6 +70,33 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const r = await page.evaluate(() => ({ on: globalThis.codingMiskRadio.on, styles: globalThis.codingMiskRadio.options.styles }));
   check(await page.isVisible('#tab-radio') && r.on && r.styles.join() === 'trance', 'listen to a genre in the radio', JSON.stringify(r));
   await page.click('#radio-start'); await sleep(300);
+
+  // the Guide (#48): its own tab next to the Strudel lessons; chips scroll; "Show me" opens the feature; "?" from a tab
+  await page.click('[data-mode="lab"]'); await page.click('[data-tab="guida"]'); await sleep(400);
+  const cards = await page.$$eval('#guide .g-card', xs => xs.map(x => x.id));
+  check(cards.length >= 12 && cards.includes('g-radio') && await page.isVisible('#g-radio .g-scope'), 'the Guide has a card per feature and the radio scope table', `${cards.length}`);
+  await page.click('[data-tab="lezioni"]'); await sleep(300);
+  check(await page.isVisible('#lessons .lesson'), 'the Strudel lessons have their own tab');
+  if (shots) await page.screenshot({ path: path.join(shots, 'lessons.png') });
+  await page.click('[data-tab="guida"]'); await sleep(300);
+  await page.click('[data-g-chip="playlists"]'); await sleep(800);
+  const top = await page.$eval('#g-playlists', el => el.getBoundingClientRect().top);
+  check(top >= -2 && top < 200, 'a chip scrolls to its card', `${Math.round(top)}`);
+  if (shots) await page.screenshot({ path: path.join(shots, 'guide.png') });
+  await page.click('#g-radio [data-g-show]'); await sleep(500);
+  check((await pressed()) === 'ascolta' && await page.isVisible('#tab-radio') && await page.$eval('#radio-start', el => el.classList.contains('g-flash')), '"Show me" opens the Radio and flashes On air');
+  await sleep(2200);
+  const help = await page.$('#tab-radio .g-help');
+  check(!!help, 'the Radio tab has a "?"');
+  if (help) { await help.click(); await sleep(500); check((await pressed()) === 'lab' && await page.isVisible('#tab-guida') && await page.$eval('#g-radio', el => el.classList.contains('g-flash')), '"?" opens the Guide on the Radio card'); }
+  for (const tb of ['componi', 'brani', 'playlist', 'artisti', 'stili', 'generi', 'suoni', 'lezioni', 'riferimenti']) {
+    await page.click(`[data-mode="${['componi', 'brani', 'playlist'].includes(tb) ? 'ascolta' : 'lab'}"]`); await page.click(`[data-tab="${tb}"]`); await sleep(250);
+    if (!(await page.$(`#tab-${tb} .g-help`))) check(false, `the ${tb} tab has a "?"`);
+  }
+  // Italian names (the English strings had slipped into the Italian ones)
+  await page.click('[data-lang="it"]'); await sleep(400);
+  check((await page.innerText('[data-tab="artisti"]')).toLowerCase() === 'artisti' && (await page.innerText('[data-tab="stili"]')).toLowerCase() === 'stili', 'Artists and Styles in Italian');
+  await page.click('[data-lang="en"]'); await sleep(300);
 
   // phone
   await page.setViewportSize({ width: 390, height: 900 }); await sleep(400);

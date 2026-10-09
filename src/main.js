@@ -26,6 +26,7 @@ import { MACHINES } from './sounds/machines.js';
 import { machineLabel, prettyName } from './sounds/catalog.js';
 import SONG_ORDER from '../songs/index.json';
 import { LESSONS, REFS, SONGS } from './content.js';
+import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
@@ -1430,10 +1431,10 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'suoni', 'riferimenti'];
+const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'lezioni', 'suoni', 'riferimenti'];
 let cards = [];
 // two modes (#42): Listen to make and hear music, Groove Lab for its material and for learning
-const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'guida', 'riferimenti'] };
+const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'guida', 'lezioni', 'riferimenti'] };
 const modeOf = tab => Object.keys(APP_MODES).find(m => APP_MODES[m].includes(tab)) || null;
 let modeTabs = store.get('coding-misk-mode-tabs', {});
 if (!modeTabs || typeof modeTabs !== 'object') modeTabs = {};
@@ -1464,7 +1465,46 @@ globalThis.codingMiskRadio = radio;
 }
 $$('.tab').forEach(tb => tb.addEventListener('click', () => showTab(tb.dataset.tab)));
 
-// ---------- guida ----------
+// ---------- guide (#48) ----------
+// one card per feature (src/guide.js); "Show me" opens the feature and flashes its control; a "?" next to each
+// tab's intro opens the card of that tab
+const MODE_NAME = { ascolta: 'modeListen', lab: 'modeLab' };
+function renderGuide() {
+  const row = (k, v) => (v ? `<dt>${esc(t(k))}</dt><dd>${guideText(tx(v))}</dd>` : '');
+  const part = p => `<div class="g-sub" id="g-${p.id}"><h4>${esc(tx(p.title))}</h4><dl class="g-row">${row('guideWhat', p.what)}${row('guideHow', p.how)}${row('guideKnow', p.know)}</dl></div>`;
+  const scope = c => (c.scope ? `<div class="g-sub"><h4>${esc(t('guideScope'))}</h4><div class="g-scope-wrap"><table class="g-scope"><tr><th>${esc(t('guideScopeWhat'))}</th><th>${esc(t('guideScopeNow'))}</th><th>${esc(t('guideScopeNext'))}</th></tr>${c.scope.map(r => `<tr><td>${esc(tx(r.what))}</td><td>${esc(tx(r.now))}</td><td>${esc(tx(r.next))}</td></tr>`).join('')}</table></div></div>` : '');
+  $('#guide').innerHTML = `<div class="g-index">${GUIDE.map(c => `<button class="chip" data-g-chip="${c.id}">${esc(tx(c.title))}</button>`).join('')}</div>
+    <div class="g-cards">${GUIDE.map(c => `<article class="card g-card" id="g-${c.id}">
+      <h3>${esc(tx(c.title))}${c.mode ? `<span class="g-mode">${esc(t(MODE_NAME[c.mode]))}</span>` : ''}</h3>
+      <dl class="g-row">${row('guideWhat', c.what)}${row('guideHow', c.how)}${row('guideKnow', c.know)}</dl>
+      ${(c.parts || []).map(part).join('')}${scope(c)}
+      <div class="g-actions"><button class="btn" data-g-show="${c.id}">${esc(t('guideShow'))}</button></div>
+    </article>`).join('')}</div>`;
+}
+function flash(el) { if (!el) return; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('g-flash'); setTimeout(() => el.classList.remove('g-flash'), 2000); }
+function openGuide(id) { showTab('guida'); requestAnimationFrame(() => flash($('#g-' + id))); }
+function showFeature(id) {
+  const c = GUIDE.find(x => x.id === id); if (!c) return;
+  if (c.tab && c.tab !== 'impostazioni') showTab(c.tab);
+  setTimeout(() => flash($(c.show)), 60);
+}
+$('#guide').addEventListener('click', e => {
+  const chip = e.target.closest('[data-g-chip]'); if (chip) { const el = $('#g-' + chip.dataset.gChip); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
+  const sh = e.target.closest('[data-g-show]'); if (sh) showFeature(sh.dataset.gShow);
+});
+// the "?" of a tab: next to its intro (tabs that render themselves get it back after each render)
+const helpCard = tab => (GUIDE.find(c => c.tab === tab) || {}).id;
+function ensureHelp(tab) {
+  const sec = $('#tab-' + tab), id = helpCard(tab);
+  if (!sec || !id || tab === 'guida' || sec.querySelector(':scope > .g-help-row, :scope > .intro .g-help')) return;
+  const btn = `<button class="g-help" data-g-help="${id}" title="${esc(t('guideHelp'))}" aria-label="${esc(t('guideHelp'))}">?</button>`;
+  const intro = sec.querySelector(':scope > .intro');
+  if (intro) intro.insertAdjacentHTML('beforeend', btn); else sec.insertAdjacentHTML('afterbegin', `<div class="g-help-row">${btn}</div>`);
+}
+for (const tab of TABS) { const sec = $('#tab-' + tab); if (sec) new MutationObserver(() => ensureHelp(tab)).observe(sec, { childList: true, subtree: true }); }
+document.addEventListener('click', e => { const h = e.target.closest('[data-g-help]'); if (h) openGuide(h.dataset.gHelp); });
+
+// ---------- Strudel lessons ----------
 function renderLessons() {
   $('#lessons').innerHTML = LESSONS.map((l, i) => {
     const [title, text, tryit] = tx(l);
@@ -2030,7 +2070,7 @@ function renderStatic() {
   $('#play').dataset.state = '';
 }
 function renderAll() {
-  renderStatic(); renderLessons(); renderSongs(); renderSounds(); renderRefs(); renderSource(); renderArranger(); renderTrackPanel();
+  renderStatic(); renderLessons(); renderGuide(); renderSongs(); renderSounds(); renderRefs(); renderSource(); renderArranger(); renderTrackPanel();
   syncAll();
 }
 function changeLang(l) {
@@ -2051,6 +2091,12 @@ $('#open-settings').addEventListener('click', () => showTab($('#tab-impostazioni
 
 renderAll();
 startHardware();
+// the Guide tab held the Strudel lessons before #48: a tab remembered from then opens the lessons, once
+if (!store.get('coding-misk-guide-v', 0)) {
+  if (store.get('coding-misk-tab', '') === 'guida') store.set('coding-misk-tab', 'lezioni');
+  if (modeTabs.lab === 'guida') { modeTabs.lab = 'lezioni'; store.set('coding-misk-mode-tabs', modeTabs); }
+  store.set('coding-misk-guide-v', 1);
+}
 { const tb = store.get('coding-misk-tab', 'componi'); if (TABS.includes(tb)) showTab(tb); }
 updateShare();
 startVisuals({
