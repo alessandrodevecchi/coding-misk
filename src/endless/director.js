@@ -17,6 +17,9 @@ import { planTransition, MAX_RAMP } from './transitions.js';
 
 export const SESSION_FORMAT = 'coding-misk/endless-session';
 // talk: how often the voice speaks (0 never, 0.5 about half of the boundaries with moves, 1 almost all)
+// The director's version (#38): sessions saved in playlists record it, and warn when it changes. Bump it whenever
+// `npm run check:endless -- --write-fixtures` changes the fixtures (the same seed gives different songs).
+export const DIRECTOR_VERSION = 1;
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist' };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const round = x => (Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100);

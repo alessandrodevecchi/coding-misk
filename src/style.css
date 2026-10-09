@@ -867,3 +867,10 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .g-flash { outline: 2px solid var(--a1); outline-offset: 3px; box-shadow: 0 0 0 6px color-mix(in srgb, var(--a1) 30%, transparent), 0 0 24px var(--a1); transition: box-shadow .3s; }
 :root[data-ui="hw"] .g-row dt, :root[data-ui="hw"] .g-sub h4 { color: var(--lcd-fg); }
 @media (max-width: 560px) { .g-row { grid-template-columns: minmax(0, 1fr); gap: 2px; } .g-row dd { margin-bottom: 6px; } }
+
+/* radio sessions in playlists (#38) */
+.badge.kind-session { border-color: #5ec8ff; color: #5ec8ff; }
+:root[data-ui="hw"] .badge.kind-session { border-color: var(--lcd-fg); color: var(--lcd-fg); }
+.pl-old { color: var(--a2); font-size: 11px; white-space: nowrap; }
+.radio-pl-menu { display: inline-flex; gap: 6px; align-items: center; margin-left: 6px; }
+.radio-pl-menu select { max-width: 180px; }

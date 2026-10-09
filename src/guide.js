@@ -46,7 +46,7 @@ export const GUIDE = [
     title: { en: 'Playlists', it: 'Playlist' },
     what: { en: 'Lists of songs to play in a row. Favourites is the first list and fills up with the star.', it: 'Liste di brani da suonare di fila. Preferiti è la prima lista e si riempie con la stella.' },
     how: { en: '[New playlist] here, or [+ Playlist] on any song. Reorder by dragging or with the arrows, rename, delete. Play it: it moves to the next song by itself.', it: '[Nuova playlist] qui, o [+ Playlist] su un brano. Riordina trascinando o con le frecce, rinomina, elimina. Suonala: passa da sola al brano dopo.' },
-    know: { en: 'Export and import a playlist as JSON, your songs included. Shuffle, repeat and Mix are in the player bar.', it: 'Esporta e importa una playlist in JSON, con i tuoi brani dentro. Casuale, ripeti e Mix sono nella barra del player.' },
+    know: { en: 'A playlist can hold radio sessions (📻): they play as you heard them, then the list moves on. After a director update a session may sound different; ❄ Freeze keeps its songs as they are. Export and import a playlist as JSON, your songs and sessions included. Shuffle, repeat and Mix are in the player bar.', it: 'Una playlist può contenere sessioni della radio (📻): suonano come le hai sentite, poi la lista va avanti. Dopo un aggiornamento del regista una sessione può suonare diversa; ❄ Congela tiene i suoi brani così come sono. Esporta e importa una playlist in JSON, con i tuoi brani e le sessioni. Casuale, ripeti e Mix sono nella barra del player.' },
   },
   {
     id: 'radio', tab: 'radio', mode: 'ascolta', show: '#radio-start',
@@ -104,7 +104,7 @@ export const GUIDE = [
       {
         id: 'seed', title: { en: 'Seed and replay', it: 'Seme e Riascolta' },
         what: { en: 'Same seed and same settings give the same songs. The seed of the session is shown in its field.', it: 'Stesso seme e stesse impostazioni danno gli stessi brani. Il seme della sessione è nel suo campo.' },
-        how: { en: '[Replay] plays the session again from its seed, with the same console moves, curve edits and extensions.', it: '[Riascolta] rifà la sessione dal suo seme, con le stesse mosse della console, modifiche alle curve ed estensioni.' },
+        how: { en: '[Replay] plays the session again from its seed, with the same console moves, curve edits and extensions. [+ Playlist] next to the controls, or on a session of the History, keeps the session in a playlist.', it: '[Riascolta] rifà la sessione dal suo seme, con le stesse mosse della console, modifiche alle curve ed estensioni. [+ Playlist] accanto ai comandi, o su una sessione della Cronologia, tiene la sessione in una playlist.' },
       },
     ],
     // what changes the song on air, what changes the next songs

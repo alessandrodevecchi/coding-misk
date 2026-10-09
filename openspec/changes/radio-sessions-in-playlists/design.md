@@ -16,7 +16,7 @@ Playlists store song ids (`songs: [id]`) and the queue plays ids through the app
 - **Version:** `DIRECTOR_VERSION` in `director.js`, an integer; the rule in `AGENTS.md` and `ENDLESS.md`: bump it whenever `check:endless -- --write-fixtures` changes the fixtures.
 - **Play:** the queue asks the radio to `playSession(item, { onEnd })`: `start({ recipe, limit: count })` with `limit` stopping after `count` songs (no song is prepared past it) and calling `onEnd`, which advances the queue. The radio tab is not opened; the player bar shows the song titles.
 - **Freeze:** the radio rebuilds the session's songs (replaying the recipe without audio, as the CLI does) and stores them in `frozen`; a frozen item plays as a list of saved songs through the existing Mix or song path.
-- **Mix:** the session's songs enter the mix stream like saved songs; the transition kinds and harmony come from the recipe.
+- **Mix:** the session's songs, rebuilt as heard (or frozen), enter the mix stream like saved songs, with playlist transitions between them; the queue moves on after the session's last song.
 
 ## Risks / Trade-offs
 

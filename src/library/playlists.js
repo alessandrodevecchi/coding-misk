@@ -6,6 +6,9 @@ export const OLD_FAV_KEY = 'coding-misk-favourites';
 export const FAV_ID = 'favourites';
 export const REPEATS = ['off', 'all', 'one'];
 export const PLAYLIST_FORMAT = 'coding-misk/playlist';
+// radio sessions as playlist items (#38): an id with this prefix in a list's songs, its data in data.sessions
+export const SESSION_PREFIX = 'session:';
+export const isSession = id => typeof id === 'string' && id.startsWith(SESSION_PREFIX);
 
 const uniq = list => [...new Set(list.filter(x => typeof x === 'string' && x))];
 
@@ -23,6 +26,7 @@ export function freeName(name, taken) {
 export function createPlaylistStore(store, now = () => Date.now()) {
   let data = store.get(PLAYLISTS_KEY, null);
   if (!data || !Array.isArray(data.lists)) data = { format: 1, lists: [] };
+  if (!data.sessions || typeof data.sessions !== 'object') data.sessions = {};
   data.lists = data.lists.filter(l => l && typeof l.id === 'string').map(l => ({ id: l.id, name: l.id === FAV_ID ? null : String(l.name || 'Playlist'), songs: uniq(l.songs || []) }));
   if (!data.lists.some(l => l.id === FAV_ID)) data.lists.unshift({ id: FAV_ID, name: null, songs: [] });
   else data.lists = [data.lists.find(l => l.id === FAV_ID), ...data.lists.filter(l => l.id !== FAV_ID)];
@@ -39,6 +43,15 @@ export function createPlaylistStore(store, now = () => Date.now()) {
   const get = id => data.lists.find(l => l.id === id) || null;
   const names = () => data.lists.filter(l => l.id !== FAV_ID).map(l => l.name);
   let n = 0;
+  const sessionId = () => { let id; do id = `${SESSION_PREFIX}${now().toString(36)}${(n++).toString(36)}`; while (data.sessions[id]); return id; };
+  // sessions no list holds any more are forgotten
+  const gc = () => { const used = new Set(data.lists.flatMap(l => l.songs)); for (const id of Object.keys(data.sessions)) if (!used.has(id)) delete data.sessions[id]; };
+  // sessions brought in from an export: kept under a new id when the id is taken by a different session
+  const adopt = (songs, sessions = {}) => songs.map(id => {
+    if (!isSession(id) || !sessions[id]) return id;
+    if (!data.sessions[id] || JSON.stringify(data.sessions[id]) === JSON.stringify(sessions[id])) { data.sessions[id] = sessions[id]; return id; }
+    const fresh = sessionId(); data.sessions[fresh] = sessions[id]; return fresh;
+  });
   const api = {
     get all() { return data.lists; },
     get,
@@ -51,8 +64,8 @@ export function createPlaylistStore(store, now = () => Date.now()) {
       return fav.songs.includes(songId);
     },
     // a new playlist; returns it
-    create(name, songs = []) {
-      const list = { id: `p-${now().toString(36)}${(n++).toString(36)}`, name: freeName(name, names()), songs: uniq(songs) };
+    create(name, songs = [], sessions = {}) {
+      const list = { id: `p-${now().toString(36)}${(n++).toString(36)}`, name: freeName(name, names()), songs: uniq(adopt(songs, sessions)) };
       data.lists.push(list); save();
       return list;
     },
@@ -64,9 +77,20 @@ export function createPlaylistStore(store, now = () => Date.now()) {
     },
     remove(id) {
       if (id === FAV_ID || !get(id)) return false;
-      data.lists = data.lists.filter(l => l.id !== id); save();
+      data.lists = data.lists.filter(l => l.id !== id); gc(); save();
       return true;
     },
+    // a radio session (#38): { recipe, count, title, date, version, frozen? }; added at the end, returns its id
+    addSession(id, session) {
+      const l = get(id); if (!l || !session || !session.recipe) return null;
+      const sid = sessionId();
+      data.sessions[sid] = { ...session };
+      l.songs.push(sid); save();
+      return sid;
+    },
+    session: sid => data.sessions[sid] || null,
+    // Freeze: the songs as played, so the session sounds the same whatever the director becomes
+    freeze(sid, songs) { const s = data.sessions[sid]; if (!s || !Array.isArray(songs)) return false; s.frozen = songs; save(); return true; },
     // add a song at the end; false when it is already there
     add(id, songId) {
       const l = get(id); if (!l || l.songs.includes(songId)) return false;
@@ -75,7 +99,7 @@ export function createPlaylistStore(store, now = () => Date.now()) {
     },
     removeAt(id, index) {
       const l = get(id); if (!l || index < 0 || index >= l.songs.length) return false;
-      l.songs.splice(index, 1); save();
+      l.songs.splice(index, 1); gc(); save();
       return true;
     },
     move(id, from, to) {
@@ -158,9 +182,11 @@ export function createQueue({ ids, start = null, shuffle = false, repeat = 'off'
 }
 
 // Export: the playlist with copies of the user's own songs it lists. isUser(id) → the user's song or null.
-export function exportPlaylist(list, userSong, favName = 'Favourites') {
-  const userSongs = list.songs.map(userSong).filter(Boolean);
-  return { format: PLAYLIST_FORMAT, version: 1, name: list.name || favName, songs: list.songs.slice(), userSongs };
+// sessionOf(id) → the radio session item (#38), exported with the playlist (frozen songs included)
+export function exportPlaylist(list, userSong, favName = 'Favourites', sessionOf = () => null) {
+  const userSongs = list.songs.filter(id => !isSession(id)).map(userSong).filter(Boolean);
+  const sessions = Object.fromEntries(list.songs.filter(isSession).map(id => [id, sessionOf(id)]).filter(([, s]) => s));
+  return { format: PLAYLIST_FORMAT, version: 1, name: list.name || favName, songs: list.songs.slice(), userSongs, ...(Object.keys(sessions).length ? { sessions } : {}) };
 }
 
 // Import: which user songs to add (with new ids on a clash with different content) and the playlist songs.
@@ -176,5 +202,6 @@ export function importPlaylist(data, has, newId) {
     const id = newId(s.id);
     ids[s.id] = id; add.push({ ...s, id });
   }
-  return { name: String(data.name || 'Playlist'), songs: uniq(data.songs.map(x => ids[x] || x)), add };
+  const sessions = data.sessions && typeof data.sessions === 'object' ? Object.fromEntries(Object.entries(data.sessions).filter(([id, s]) => isSession(id) && s && s.recipe)) : {};
+  return { name: String(data.name || 'Playlist'), songs: uniq(data.songs.map(x => ids[x] || x)), add, sessions };
 }

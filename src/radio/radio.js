@@ -3,7 +3,7 @@
 // the player plays a "window" song (the song on air and the next one, see windowSong), and the radio
 // moves the window when a song ends. The player (main.js) owns the editor and the scheduler; the radio
 // only builds playables and tells it when to start, swap or stop.
-import { createSession, OPTION_DEFAULTS, leadEntry, stylesNear } from '../endless/director.js';
+import { createSession, OPTION_DEFAULTS, leadEntry, stylesNear, DIRECTOR_VERSION } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
 import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
@@ -75,6 +75,15 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   function generate() {
     const n = S.stream.length, prev = S.stream[n - 1];
+    // a frozen session (#38) plays its stored songs, never regenerated
+    if (S.frozen) {
+      const f = S.frozen[n]; if (!f) return null;
+      if (prev && !prev.cut) prev.bars += extraOf(prev.entry.transition);
+      const entry = { ...leadEntry(f.song), lead: false, frozen: true, transition: f.transition || undefined };
+      const item = { song: f.song, entry, n, start: prev ? prev.start + prev.bars - (prev.cut ? 0 : overlapOf(prev.entry.transition)) : 0, bars: barsOf(f.song), frozen: true, commands: [] };
+      S.stream.push(item);
+      return item;
+    }
     const { song, entry, plan, opts: used } = S.session.next(optionsFor(n));
     // the director has just planned the transition from the song before: an interlude lengthens it,
     // an overlap starts this song before it ends
@@ -92,20 +101,39 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   // lead (#29): { song, from } a song from Compose or the Songs tab played first (song 0, from bar "from"); the
   // radio continues after it. A recipe with a lead replays it.
-  function start({ seed, recipe, lead } = {}) {
+  // limit and onEnd (#38): a saved session plays that many songs, then hands back; frozen: its stored songs
+  function start({ seed, recipe, lead, limit = 0, onEnd = null, frozen = null } = {}) {
     stopQuiet();
     const s = recipe ? recipe.seed : (seed || seedField || undefined);
     const L = recipe ? recipe.lead : lead, le = L ? leadEntry(L.song) : null;
     const session = createSession(recipes, s, le ? { lead: le } : {});
     S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: current(), changes: [], ...(L ? { lead: { song: clone(L.song), from: L.from || 0 } } : {}) }, lastOptions: null, lastCard: 0 };
     S.recipe.seed = session.seed;
-    if (L) S.stream.push({ song: L.song, entry: le, n: 0, start: 0, bars: barsOf(L.song), lead: true, commands: [] });
+    if (limit) { S.limit = limit; S.onEnd = onEnd; }
+    if (frozen) { S.frozen = frozen; S.replay = true; generate(); }
+    else if (L) S.stream.push({ song: L.song, entry: le, n: 0, start: 0, bars: barsOf(L.song), lead: true, commands: [] });
     else generate();
-    remember(S.stream[0]);
+    if (!limit) remember(S.stream[0]);
     player.start(windowPlayable(), L ? Math.min(L.from || 0, barsOf(L.song) - 1) : 0);
     render();
   }
   // a song from Compose or a song card goes on in the radio, in the styles closest to it
+  // the songs of a session as heard (#38), rebuilt without playing: song 0, then each song with its steering
+  function rebuild(recipe, count) {
+    const L = recipe.lead, le = L ? leadEntry(L.song) : null, ses = createSession(recipes, recipe.seed, le ? { lead: le } : {});
+    const out = L ? [{ song: L.song, entry: le }] : [];
+    for (let n = out.length; out.length < count; n++) {
+      let o = recipe.options; for (const c of recipe.changes || []) if (c.song <= n) o = c.options;
+      const g = ses.next(o), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
+      out.push({ song: cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song, entry: g.entry });
+    }
+    return out.map(x => ({ song: x.song, transition: x.entry.transition || null }));
+  }
+  // a session item of a playlist: the songs heard so far (the one on air included)
+  const sessionItem = (recipe, count, first) => ({ recipe: clone(recipe), count, title: t(count === 1 ? 'plSessionTitle1' : 'plSessionTitle', { title: first, n: count }), date: new Date().toISOString(), version: DIRECTOR_VERSION });
+  function playSession(s, { onEnd } = {}) { start({ recipe: s.recipe, limit: s.count, onEnd, frozen: s.frozen || null }); }
+  // the end of a limited session: hand back to the playlist
+  function endLimited() { const cb = S.onEnd; S = null; render(); if (cb) cb(); else player.stop(); }
   function continueSong(song, from = 0) {
     opts.artist = null;
     opts.styles = stylesNear(song, recipes);
@@ -127,7 +155,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // before then still reach it, and it is ready long before it is needed
   function prepareNext(cyc) {
     const cur = S.stream[S.onAir];
-    if (S.stream.length > S.onAir + 1 || S.pending || cyc < cur.start + cur.bars * 0.4) return;
+    if (S.stream.length > S.onAir + 1 || S.pending || cyc < cur.start + cur.bars * 0.4 || (S.limit && S.stream.length >= S.limit)) return;
     S.pending = true;
     const mine = S;
     idle(() => { if (S !== mine) return; generate(); S.pending = false; player.swap(windowPlayable()); render(); });
@@ -138,9 +166,10 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     prepareNext(cyc);
     const cur = S.stream[S.onAir];
     if (cyc >= cur.start + cur.bars) {
-      if (S.stream.length <= S.onAir + 1) generate();
+      if (S.limit && S.onAir + 1 >= S.limit) return endLimited();
+      if (S.stream.length <= S.onAir + 1 && !generate()) return endLimited();
       S.onAir++;
-      remember(S.stream[S.onAir]);
+      if (!S.limit) remember(S.stream[S.onAir]);
       player.swap(windowPlayable());
       render();
     } else if (performance.now() - S.lastCard > 250) { S.lastCard = performance.now(); renderNow(cyc); }
@@ -148,6 +177,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // skip: the song on air ends with this bar, the next one starts on the next bar
   function skip() {
     if (!S || S.paused !== undefined) return;
+    if (S.limit && S.onAir + 1 >= S.limit) return endLimited();
     const cyc = player.now(), cur = S.stream[S.onAir], cut = Math.floor(cyc) + 1;
     if (S.stream.length <= S.onAir + 1) generate();
     cur.bars = Math.max(1, cut - cur.start); cur.cut = true;
@@ -216,7 +246,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function command(c) {
     if (!S || S.paused !== undefined) return false;
     const item = S.stream[S.onAir], rel = relNow();
-    if (!item.plan) { toast(t('steerWhy:lead')); return false; }
+    if (!item.plan) { toast(t(item.frozen ? 'steerWhy:frozen' : 'steerWhy:lead')); return false; }
     const at = applyBar(c.kind, rel, item.plan);
     if (at <= rel || at >= barsOf(item.song) || (c.kind === 'extend' && whyNot(c, item.song, item.plan, rel, tailOf(item)))) { toast(t('steerLate')); return false; }
     const cmd = { ...c, at, id: ++cmdN };
@@ -396,7 +426,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const KEYS_OF = { 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', instrument: 'i', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', extend: 'l', end: 'e' };
   const TYPE_KEYS = { drums: '1', bass: '2', lead: '3', pad: '4', texture: '5' };
   const keyLabel = k => ({ ArrowUp: '↑', ArrowDown: '↓', V: 'Shift+V' }[k] || k.toUpperCase());
-  let steerKey = '', dragging = null;
+  let steerKey = '', dragging = null, pendingSession = null;
   const cmdLabel = c => c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : c.kind === 'add' || c.kind === 'remove' ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
   function renderSteer(force = false) {
     const box = root.querySelector('#radio-steer');
@@ -404,7 +434,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (!S) { if (box.dataset.k !== 'off') { box.dataset.k = 'off'; box.innerHTML = `<div class="lbl">${esc(t('steerTitle'))}</div><p class="muted">${esc(t('steerIdle'))}</p>`; } return; }
     const item = S.stream[S.onAir], rel = relNow();
     // song 0 from Compose (#29) is not the director's: steering starts from song 1
-    if (!item.plan) { if (box.dataset.k !== 'lead') { box.dataset.k = 'lead'; steerKey = ''; box.innerHTML = `<div class="lbl">${esc(t('steerTitle'))}</div><p class="muted">${esc(t('steerWhy:lead'))}</p>`; } return; }
+    if (!item.plan) { const k = item.frozen ? 'frozen' : 'lead'; if (box.dataset.k !== k) { box.dataset.k = k; steerKey = ''; box.innerHTML = `<div class="lbl">${esc(t('steerTitle'))}</div><p class="muted">${esc(t('steerWhy:' + k))}</p>`; } return; }
     box.dataset.k = '';
     const ph = item.plan.phrase;
     const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
@@ -479,6 +509,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
           <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
           <button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>
+          <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
           <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
         </div>
         <div class="ctrl" ${tip('tipArtist')}><span class="lbl">${esc(t('radioArtist'))}</span>
@@ -509,7 +540,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     <div class="card radio-history">
       <div class="lbl">${esc(t('radioHistory'))}</div>
       ${history.length ? `<ol class="radio-hist">${history.map((h, i) => `<li><span class="when">${esc(new Date(h.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span> <strong>${esc(h.title)}</strong> <span class="muted">${esc(h.styles.map(styleName).join(' + '))} · ${esc(t('radioSeed'))} ${esc(h.seed)}</span>
-        <span class="hist-actions"><button class="btn small" data-hist-save="${i}" ${tip('tipSave')}>${esc(t('radioSave'))}</button><button class="btn small" data-hist-open="${i}" ${tip('tipOpen')}>${esc(t('radioOpen'))}</button></span></li>`).join('')}</ol>` : `<p class="muted">${esc(t('radioNoHistory'))}</p>`}
+        <span class="hist-actions"><button class="btn small" data-hist-save="${i}" ${tip('tipSave')}>${esc(t('radioSave'))}</button><button class="btn small" data-hist-open="${i}" ${tip('tipOpen')}>${esc(t('radioOpen'))}</button>${h.recipe ? `<button class="btn small" data-hist-pl="${i}" ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>` : ''}</span></li>`).join('')}</ol>` : `<p class="muted">${esc(t('radioNoHistory'))}</p>`}
     </div>`;
     steerKey = '';
     renderNow();
@@ -542,6 +573,17 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.mixMute) return command({ kind: b.getAttribute('aria-pressed') === 'true' ? 'unmute' : 'mute', track: b.dataset.mixMute });
     if (b.dataset.mixLock) { const item = S && S.stream[S.onAir]; return command({ kind: item && (item.plan.locked || []).includes(b.dataset.mixLock) ? 'unlock' : 'lock', track: b.dataset.mixLock }); }
     if (b.dataset.mixInst) return command({ kind: 'instrument', track: b.dataset.mixInst });
+    // a session into a playlist (#38): a small menu next to the button
+    if (b.id === 'radio-pl' || b.dataset.histPl !== undefined) {
+      const old = root.querySelector('.radio-pl-menu'); if (old) { const same = old.previousElementSibling === b; old.remove(); if (same) return; }
+      const h = b.dataset.histPl !== undefined ? history[+b.dataset.histPl] : null;
+      const item = h ? sessionItem(h.recipe, h.n + 1, h.recipe.lead ? h.recipe.lead.song.title : h.title) : (S && sessionItem(S.recipe, S.onAir + 1, S.stream[0].song.title));
+      if (!item) return;
+      pendingSession = item;
+      b.insertAdjacentHTML('afterend', `<span class="radio-pl-menu"><select data-pl-pick aria-label="${esc(t('addToPlaylist'))}" data-no-knob>${player.playlists().map(l => `<option value="${esc(l.id)}">${esc(l.name)}</option>`).join('')}<option value="">${esc(t('newPlaylist'))}…</option></select><button class="btn small primary" data-pl-ok>${esc(t('plAdd'))}</button></span>`);
+      return;
+    }
+    if (b.dataset.plOk !== undefined) { const sel = b.parentNode.querySelector('select'); if (pendingSession) player.addSession(sel.value || null, pendingSession); pendingSession = null; b.parentNode.remove(); return; }
     if (b.dataset.curveReset) return command({ kind: 'curve-reset', curve: b.dataset.curveReset });
     if (b.id === 'curves-toggle') { detailsOpen = !detailsOpen; try { store.set('coding-misk-radio-details', detailsOpen); } catch (err) {} return renderNow(); }
     if (b.dataset.style) {
@@ -622,7 +664,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
 
   return {
-    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, continueSong,
+    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, continueSong, playSession, rebuild,
+    // the session on air as a playlist item (#38)
+    get sessionNow() { return S && !S.limit ? sessionItem(S.recipe, S.onAir + 1, S.stream[0].song.title) : null; },
     get steering() { if (!S) return null; const it = S.stream[S.onAir]; if (!it.plan) return { n: it.n, lead: true, commands: [], plan: null, song: it.song, recipe: clone(S.recipe) }; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },
     get paused() { return !!S && S.paused !== undefined; },
     get recording() { return recS ? { seconds: recElapsed(), list: recS.list.map(x => ({ ...x })) } : null; },

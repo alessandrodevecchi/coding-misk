@@ -75,6 +75,12 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Sulla card di un brano, "▶ Continua in radio" parte dall'inizio.
 - [ ] Mentre suona il tuo brano la console dice che vale dal prossimo; dal brano dopo funziona. Riascolta rifà anche il tuo brano.
 
+## Sessioni nelle playlist (`#38`)
+
+- [ ] In radio, "+ Playlist" accanto ai comandi e su una sessione della Cronologia.
+- [ ] Nella playlist la sessione (📻) suona i suoi brani con le tue mosse, poi passa all'elemento dopo; con Mix entra con una transizione.
+- [ ] ❄ Congela; esporta e importa una playlist con una sessione.
+
 ## Guida (`#48`)
 
 - [ ] Groove Lab: schede Guida e Lezioni Strudel; chip in alto, card per funzione, tabella "Cosa cambia cosa" nella Radio.

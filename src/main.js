@@ -13,7 +13,8 @@ import { createStylesTab } from './library/styles-tab.js';
 import { createArtistsTab } from './library/artists-tab.js';
 import { createSongsView } from './library/songs-view.js';
 import { kindOf, parseFree } from './library/song-filter.js';
-import { createPlaylistStore, createQueue, REPEATS } from './library/playlists.js';
+import { createPlaylistStore, createQueue, REPEATS, isSession } from './library/playlists.js';
+import { DIRECTOR_VERSION } from './endless/director.js';
 import { createPlaylistsTab } from './library/playlists-tab.js';
 import { createSettings } from './settings/settings.js';
 import { createGenresTab } from './library/genres-tab.js';
@@ -1583,6 +1584,14 @@ const cardIndex = id => libraryCards().findIndex(c => c.tr.id === id);
 // starts a song of the library by id (as its card's play button); false when it cannot start.
 // In a playlist with mix on, a saved song starts the mix stream instead
 function playById(id) {
+  // a radio session (#38): with Mix, its songs join the stream; else the radio replays it, then the queue moves on
+  if (isSession(id)) {
+    if (mixOn && queue && repeatMode !== 'one' && mixParts(id)) return startMix(id);
+    const s = playlists.session(id); if (!s || !radio) return false;
+    mixS = null;
+    radio.playSession(s, { onEnd: () => { if (!advanceFrom(id)) stop(); } });
+    return true;
+  }
   const i = cardIndex(id);
   if (i < 0) return false;
   if (mixOn && queue && repeatMode !== 'one' && mixSong(id)) return startMix(id);
@@ -1597,13 +1606,26 @@ function playById(id) {
 let mixOn = !!store.get('coding-misk-playlist-mix', false), mixS = null, mixN = 0;
 const barsOfSong = sg => sg.sections.reduce((a, x) => a + x.bars, 0);
 function mixSong(id) { const c = libraryCards().find(x => x.tr.id === id); if (!c || c.tr.kind !== 'composed') return null; const { kind, ...sg } = c.tr; return absoluteClips(clone(sg)); }
+// the songs an item brings to the mix: a saved song, or the songs of a radio session (frozen, or rebuilt as heard)
+const sessionSongs = new Map();
+function mixParts(id) {
+  if (!isSession(id)) { const sg = mixSong(id); return sg ? [sg] : null; }
+  const s = playlists.session(id); if (!s || !radio) return null;
+  if (!sessionSongs.has(id)) sessionSongs.set(id, (s.frozen || radio.rebuild(s.recipe, s.count)).map(x => absoluteClips(clone(x.song))));
+  return sessionSongs.get(id);
+}
 const mixActive = () => !!(mixS && song && song === mixS.p);
 // the song after the last one of the window, from the queue, mixed in when it is a saved song
 function extendMix() {
-  const last = mixS.items[mixS.items.length - 1], id = queue && queue.peek(), sg = id && mixSong(id);
-  if (!sg || mixS.items.length > 1) return;
+  if (mixS.items.length > 1) return;
+  const last = mixS.items[0];
+  let next = null;
+  if (last.part + 1 < last.parts.length) next = { id: last.id, parts: last.parts, part: last.part + 1 };
+  else { const id = queue && queue.peek(), parts = id && mixParts(id); if (parts) next = { id, parts, part: 0 }; }
+  if (!next) return;
+  const sg = next.parts[next.part];
   last.transition = playlistTransition(last.song, sg);
-  mixS.items.push({ id, song: sg, n: ++mixN, start: last.start + last.bars - overlapOf(last.transition), bars: barsOfSong(sg) });
+  mixS.items.push({ ...next, song: sg, n: ++mixN, start: last.start + last.bars - overlapOf(last.transition), bars: barsOfSong(sg) });
 }
 function mixPlayable() {
   const w = windowSong(mixS.items.map(x => ({ song: x.song, n: x.n, start: x.start, transition: x.transition })));
@@ -1611,9 +1633,9 @@ function mixPlayable() {
   return playable({ ...w, id: `mix-${first.id}`, title: first.song.title, kind: 'composed' });
 }
 function startMix(id) {
-  const sg = mixSong(id);
+  const parts = mixParts(id), sg = parts && parts[0];
   if (!sg) return false;
-  mixS = { items: [{ id, song: sg, n: ++mixN, start: 0, bars: barsOfSong(sg) }] };
+  mixS = { items: [{ id, parts, part: 0, song: sg, n: ++mixN, start: 0, bars: barsOfSong(sg) }] };
   extendMix();
   mixS.p = mixPlayable();
   if (sg.look) setLook(sg.look);
@@ -1625,7 +1647,8 @@ function mixTick(cyc) {
   if (!mixActive() || hand || resumeTo !== null) return;
   const cur = mixS.items[0];
   if (mixS.items.length < 2 || cyc < cur.start + cur.bars) return;
-  if (queue) queue.next({ auto: true });
+  // the queue moves on when an item ends (a session moves on after its last song)
+  if (queue && mixS.items[1].id !== cur.id) queue.next({ auto: true });
   mixS.items.shift(); extendMix();
   const p = mixPlayable();
   mixS.p = p; song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
@@ -1636,13 +1659,13 @@ function mixTick(cyc) {
 // plays a playlist (or a list of ids) from a song: ids in order, name for the player bar
 function playQueue(listId, ids, startId = null) {
   const pl = playlists.get(listId), name = pl ? songsView.listName(pl) : '';
-  queue = createQueue({ ids, start: startId, shuffle: shuffleOn, repeat: repeatMode, exists: id => cardIndex(id) >= 0, name, listId });
+  queue = createQueue({ ids, start: startId, shuffle: shuffleOn, repeat: repeatMode, exists: id => (isSession(id) ? !!playlists.session(id) : cardIndex(id) >= 0), name, listId });
   if (!queue.current || !playById(queue.current)) { queue = null; toast(t('plEmpty')); }
   pbLast = '';
 }
 // end of a song: the next one of the queue, the same one again (repeat one), or nothing
-function advance() {
-  const id = currentSongId();
+function advance() { return advanceFrom(currentSongId()); }
+function advanceFrom(id) {
   if (queue && queue.current === id) { const next = queue.next({ auto: true }); return next !== null && playById(next); }
   if (repeatMode === 'one' && id !== null) return playById(id);
   return false;
@@ -1650,7 +1673,10 @@ function advance() {
 const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, tx, esc, store, styles: allStyles, playlists, toast,
   onPlayList: (listId, ids) => playQueue(listId, ids) });
 playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, playlists, confirmTwice, toast,
-  songs: () => libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: c.p.meta.seconds })),
+  songs: () => [...libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: c.p.meta.seconds })),
+    ...playlists.all.flatMap(l => l.songs).filter(isSession).map(id => { const s = playlists.session(id); return s && { id, title: s.title, kind: 'session', seconds: 0, count: s.count, frozen: !!s.frozen, old: !s.frozen && (s.version || 0) < DIRECTOR_VERSION }; }).filter(Boolean)],
+  freeze: id => { const s = playlists.session(id); if (!s || !radio) return; playlists.freeze(id, radio.rebuild(s.recipe, s.count)); sessionSongs.delete(id); toast(t('plFrozen')); },
+  sessionOf: id => playlists.session(id),
   play: (listId, ids, startId) => playQueue(listId, ids, startId),
   userSong: id => user.tracks.find(u => u.id === id) || null,
   newSongId: () => { let id; do id = 'u-' + Date.now().toString(36) + Math.floor(Math.random() * 1e4); while (user.tracks.some(u => u.id === id)); return id; },
@@ -2053,6 +2079,9 @@ radio = createRadio({
     capture: () => startCapture(),
     now: () => (sched() ? sched().now() : 0),
     saveSong: sg => { user.tracks.push({ ...clone(sg), id: 'u-' + Date.now() }); saveLibrary(); renderSongs(); toast(t('trackSaved')); },
+    // sessions into playlists (#38): the lists to pick from, and adding (null: a new playlist)
+    playlists: () => playlists.all.map(l => ({ id: l.id, name: songsView.listName(l) })),
+    addSession: (listId, item) => { const l = listId ? playlists.get(listId) : playlists.create(t('newPlaylist')); if (!l) return; playlists.addSession(l.id, item); toast(t('plSessionAdded', { name: songsView.listName(l) })); if (playlistsTab) playlistsTab.render(); },
     // the song opens ready to play, not playing
     openSong: async sg => { await stop(); if (loadTrack({ ...clone(sg), kind: 'composed' })) { if (mode !== 'track') backToTrack(); showTab('componi'); } },
   },

@@ -163,6 +163,10 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 
 A session can start after a song from Compose or the Songs tab (`#29`): `createSession(recipes, seed, { lead: leadEntry(song) })`. The lead entry carries the tempo and key of the song's last section, its meter and length; the first generated song is planned after it (compatible harmony, the transition from the lead), and the generated songs keep their usual indexes and random streams. `stylesNear(song, recipes)` picks the styles: the song's style tags, else the styles of its genres closest in tempo, else the one to three styles closest in tempo and meter. In the radio the song is song 0: it plays to its end, steering starts from song 1, and the recipe keeps a copy of it for Replay.
 
+### Sessions in playlists
+
+A radio session can be a playlist item (`#38`): the recipe (seed, options and changes, steering, song 0), the number of songs heard, a title and `DIRECTOR_VERSION`. In a playlist the radio replays it for that many songs and hands back to the queue; with Mix on its songs are rebuilt as heard and join the mix stream like saved songs. A session made with an older director version warns that it may sound different; Freeze stores its songs and transitions, and a frozen session plays them without the director. Bump `DIRECTOR_VERSION` whenever the fixtures change.
+
 ### Curves
 
 Next to energy, the radio shows four curves per double phrase (`#40`), measured on what plays (`curveParts` in `energy.js`, `songCurves` in `steering.js`):

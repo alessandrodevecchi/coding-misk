@@ -5,7 +5,7 @@ import { downloadJson, pickJsonFiles } from './library.js';
 
 // songs(): the library as [{ id, title, kind, seconds }]; play(listId, ids, startId): start a playlist;
 // userSong(id): the user's song with that id or null; addSongs(list): add imported user songs to the library, returns a map old → new id
-export function createPlaylistsTab({ root, t, esc, clock, playlists, songs, play, userSong, addSongs, newSongId, confirmTwice, toast, onChange = () => {} }) {
+export function createPlaylistsTab({ root, t, esc, clock, playlists, songs, play, userSong, addSongs, newSongId, confirmTwice, toast, onChange = () => {}, freeze = () => {}, sessionOf = () => null }) {
   let open = FAV_ID, drag = null;
   const name = l => (l.id === FAV_ID ? t('favourites') : l.name);
   const byId = () => new Map(songs().map(s => [s.id, s]));
@@ -21,9 +21,11 @@ export function createPlaylistsTab({ root, t, esc, clock, playlists, songs, play
         <span class="pl-grip" aria-hidden="true">⋮⋮</span>
         <span class="pl-n">${i + 1}</span>
         <span class="pl-title">${s ? esc(s.title) : `<span class="muted">${esc(id)} · ${esc(t('plMissing'))}</span>`}</span>
-        ${s ? `<span class="badge kind-${s.kind}">${esc(t(`k:${s.kind}`))}</span><span class="pl-len">${clock(s.seconds)}</span>` : '<span></span><span></span>'}
+        ${s && s.kind === 'session' ? `<span class="badge kind-session" title="${esc(t('plSession'))}">📻 ${esc(s.frozen ? t('plFrozen') : t('plSession'))}</span><span class="pl-len">${esc(t(s.count === 1 ? 'plSessionLen1' : 'plSessionLen', { n: s.count }))}${s.old ? ` <span class="pl-old" title="${esc(t('plSessionOldTip'))}">⚠ ${esc(t('plSessionOld'))}</span>` : ''}</span>`
+          : s ? `<span class="badge kind-${s.kind}">${esc(t(`k:${s.kind}`))}</span><span class="pl-len">${clock(s.seconds)}</span>` : '<span></span><span></span>'}
         <span class="pl-acts">
           ${s ? `<button class="mini" data-pl-from="${i}" title="${esc(t('plPlayFrom'))}" aria-label="${esc(t('plPlayFrom'))}">▶</button>` : ''}
+          ${s && s.kind === 'session' && !s.frozen ? `<button class="mini" data-pl-freeze="${esc(id)}" title="${esc(t('plFreezeTip'))}" aria-label="${esc(t('plFreeze'))}">❄</button>` : ''}
           <button class="mini" data-pl-up="${i}" title="${esc(t('plUp'))}" aria-label="${esc(t('plUp'))}"${i ? '' : ' disabled'}>↑</button>
           <button class="mini" data-pl-down="${i}" title="${esc(t('plDown'))}" aria-label="${esc(t('plDown'))}"${i < cur.songs.length - 1 ? '' : ' disabled'}>↓</button>
           <button class="mini" data-pl-rm="${i}" title="${esc(t('plRemove'))}" aria-label="${esc(t('plRemove'))}">✕</button>
@@ -62,17 +64,18 @@ export function createPlaylistsTab({ root, t, esc, clock, playlists, songs, play
     if (b.dataset.plUp !== undefined) { const i = +b.dataset.plUp; playlists.move(cur.id, i, i - 1); return changed(); }
     if (b.dataset.plDown !== undefined) { const i = +b.dataset.plDown; playlists.move(cur.id, i, i + 1); return changed(); }
     if (b.dataset.plRm !== undefined) { playlists.removeAt(cur.id, +b.dataset.plRm); return changed(); }
+    if (b.dataset.plFreeze) { freeze(b.dataset.plFreeze); return changed(); }
     if (b.id === 'pl-delete') {
       if (!confirmTwice(`pl-del-${cur.id}`, t('plDeleteConfirm'))) return;
       playlists.remove(cur.id); open = FAV_ID; toast(t('plDeleted')); return changed();
     }
-    if (b.id === 'pl-export') return downloadJson(`playlist-${(name(cur) || 'playlist').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, exportPlaylist(cur, userSong, t('favourites')));
+    if (b.id === 'pl-export') return downloadJson(`playlist-${(name(cur) || 'playlist').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, exportPlaylist(cur, userSong, t('favourites'), sessionOf));
     if (b.id === 'pl-import') {
       return pickJsonFiles((data, file) => {
         const r = importPlaylist(data, userSong, newSongId);
         if (!data || r.error) { toast(t('plImportBad')); return; }
         addSongs(r.add);
-        const l = playlists.create(r.name, r.songs);
+        const l = playlists.create(r.name, r.songs, r.sessions);
         open = l.id; toast(t('plImported', { name: l.name })); changed();
       });
     }

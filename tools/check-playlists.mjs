@@ -1,6 +1,6 @@
 // Checks for playlists (#36): store, migration of the old favourites, play queue, export and import. No browser.
 //   npm run check:playlists      exit 1 when any check fails
-import { createPlaylistStore, createQueue, shuffled, exportPlaylist, importPlaylist, freeName, FAV_ID, PLAYLISTS_KEY, OLD_FAV_KEY } from '../src/library/playlists.js';
+import { createPlaylistStore, createQueue, shuffled, exportPlaylist, importPlaylist, freeName, FAV_ID, PLAYLISTS_KEY, OLD_FAV_KEY, isSession } from '../src/library/playlists.js';
 import { stream } from '../src/endless/random.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -10,7 +10,31 @@ const rand = () => { const s = stream('playlists-check'); return s.next; };
 const playOut = (q, n = 50) => { const out = [q.current]; for (let i = 0; i < n; i++) { const x = q.next({ auto: true }); if (x === null) break; out.push(x); } return out; };
 const IDS = ['a', 'b', 'c', 'd', 'e'];
 
+const SESSION = { recipe: { seed: 's1', options: { styles: ['trance'] }, changes: [] }, count: 3, title: 'First · 3 songs', date: '2026-10-10', version: 1 };
 const CHECKS = {
+  'sessions: added, held, forgotten when no list holds them, frozen'() {
+    const st = memory(), p = createPlaylistStore(st);
+    const l = p.create('Mix', ['a']);
+    const sid = p.addSession(l.id, SESSION);
+    assert(isSession(sid) && p.get(l.id).songs.join() === `a,${sid}` && p.session(sid).count === 3, 'session added at the end');
+    const q = createQueue({ ids: p.get(l.id).songs, shuffle: true, rand: rand() });
+    assert(q.order.includes(sid) && q.order.length === 2, 'shuffle moves the session as one item');
+    assert(p.freeze(sid, [{ song: { id: 'x' } }]) && p.session(sid).frozen.length === 1, 'freeze stores songs');
+    const again = createPlaylistStore(st);
+    assert(again.session(sid) && again.session(sid).frozen, 'sessions kept in the store');
+    p.removeAt(l.id, 1);
+    assert(!p.session(sid), 'a session no list holds is forgotten');
+  },
+  'sessions: export and import carry them, with a new id on a clash'() {
+    const p = createPlaylistStore(memory()), l = p.create('Mix', ['a']), sid = p.addSession(l.id, SESSION);
+    const ex = exportPlaylist(p.get(l.id), () => null, 'Favourites', id => p.session(id));
+    assert(ex.sessions && ex.sessions[sid] && !ex.userSongs.length, 'export holds the session');
+    const r = importPlaylist(JSON.parse(JSON.stringify(ex)), () => null, id => id + '-2');
+    const other = createPlaylistStore(memory()), m = other.create(r.name, r.songs, r.sessions);
+    assert(other.session(m.songs[1]) && other.session(m.songs[1]).count === 3, 'import brings the session');
+    const clash = p.create('Again', r.songs, { [sid]: { ...SESSION, count: 9 } });
+    assert(clash.songs[1] !== sid && p.session(clash.songs[1]).count === 9 && p.session(sid).count === 3, 'a different session with the same id gets a new id');
+  },
   'favourites always first and fixed': () => {
     const st = createPlaylistStore(memory());
     assert(st.all.length === 1 && st.all[0].id === FAV_ID, 'favourites created');
