@@ -1,7 +1,7 @@
 // Radio steering (#24, docs/ENDLESS.md "Steering"): the listener's commands turn into a rewrite of the song on
 // air from a boundary. A song is always rebuilt from its original plan plus every command still standing,
 // in order, so cancelling a command or replaying a session gives exactly the same song.
-import { directSong, sectionsOf, candidateMoves, ENTRY } from './director.js';
+import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind } from './director.js';
 import { stream } from './random.js';
 import { stateAt } from '../song/build.js';
 import { playing } from './energy.js';
@@ -50,7 +50,8 @@ export function whyNot(cmd, song, plan, now) {
   const st = stateOf(song, plan, at), on = playing(st), locked = plan.locked || [];
   if (cmd.kind === 'add') {
     const all = st.tracks.filter(t => ofType(t, cmd.type));
-    if (!all.length) return 'no-type';
+    // a type the song has no track for: a new one from the song's style (#41), unless the style has none
+    if (!all.length) return styleHas(plan, cmd.type) ? null : 'no-type';
     const free = all.filter(t => t.mute);
     if (!free.length) return 'all-playing';
     return free.some(t => !locked.includes(t.id)) ? null : 'locked';
@@ -69,6 +70,9 @@ export function whyNot(cmd, song, plan, now) {
   return null;
 }
 export const canApply = (cmd, song, plan, now) => !whyNot(cmd, song, plan, now);
+
+const KIND_OF = { drums: ['drums'], bass: ['bass'], lead: ['hook', 'arp', 'guitar'], pad: ['pad'], texture: ['texture'] };
+const styleHas = (plan, type) => (KIND_OF[type] || []).some(k => plan.R[k]);
 
 // the sections of a plan, with the harmony changes made from a bar on
 function sectionsWith(plan) {
@@ -118,7 +122,19 @@ function rewrite(song, plan, opts, cmd, rng) {
       if (cmd.d >= d0 && cmd.d < P.plan.length) P.plan[cmd.d].target = round2(clamp(cmd.value, 0, 1));
       break;
     case 'add': {
-      const t = st.tracks.filter(x => x.mute && ofType(x, cmd.type) && !P.locked.includes(x.id)).sort((a, b) => ENTRY.indexOf(a.type) - ENTRY.indexOf(b.type))[0];
+      let t = st.tracks.filter(x => x.mute && ofType(x, cmd.type) && !P.locked.includes(x.id)).sort((a, b) => ENTRY.indexOf(a.type) - ENTRY.indexOf(b.type))[0];
+      // the song has no track of this type: the style makes one now, with its own sounds and presets (#41)
+      if (!t && !st.tracks.some(x => ofType(x, cmd.type))) {
+        const made = tracksOfKind(P.R, cmd.type, P.meter, opts.complexity ?? 0.5, rng.moves)[0];
+        if (made) {
+          const ids = new Set(P.tracks.map(x => x.id));
+          let id = made.id, n = 2;
+          while (ids.has(id)) id = `${made.id}-${n++}`;
+          const fresh = { ...made, id, name: id === made.id ? made.name : `${made.name} ${n - 1}` };
+          P.tracks.push(fresh);
+          t = fresh;
+        }
+      }
       if (t) forced.push({ kind: 'add', track: t.id, step: { add: t.id } });
       break;
     }

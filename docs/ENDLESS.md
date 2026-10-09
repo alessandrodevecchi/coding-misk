@@ -148,7 +148,7 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | --- | --- | --- |
 | Energy up, down | next phrase | targets of the remaining double phrases ±0.15 |
 | Curve | next phrase | one double phrase gets the dragged target |
-| Add, remove a type | next phrase | a forced add of a silent track of that type, or a forced remove of every playing one |
+| Add, remove a type | next phrase | a forced add of a silent track of that type (a new one from the song's style when the song has none, `#41`), or a forced remove of every playing one |
 | More, less complex | next phrase | usual track count ±1 |
 | Darker, brighter, dirtier, cleaner, more space | next phrase | that move on every playing track that allows it |
 | Change instrument | next phrase | another wave, kit, guitar or texture from the style |

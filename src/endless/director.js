@@ -100,6 +100,15 @@ function candidateTracks(R, meter, complexity, rng, mut, opts = {}) {
   return tracks;
 }
 
+// The tracks a style can give for one kind of instrument, always (no weight draw): used by steering (#41)
+// when the listener adds an instrument the song does not have. kind: drums, bass, lead, pad, texture.
+const KIND_PARTS = { drums: ['drums'], bass: ['bass'], lead: ['hook', 'arp', 'guitar'], pad: ['pad'], texture: ['texture'] };
+export function tracksOfKind(R, kind, meter, complexity, rng) {
+  const parts = KIND_PARTS[kind] || [];
+  const only = Object.fromEntries(['drums', 'bass', 'arp', 'hook', 'pad', 'guitar', 'texture', 'riser'].map(k => [k, parts.includes(k) && R[k] ? { ...R[k], weight: 1 } : undefined]));
+  return candidateTracks({ ...R, ...only }, meter, complexity, rng, rng, {});
+}
+
 // Plan of one song: parts, tempo, key, length, sections with chords, shape, candidate tracks.
 export function planSong({ parts, byId, prev, opts, rng, index }) {
   const R = withDefaults(partRecipe(parts, byId));

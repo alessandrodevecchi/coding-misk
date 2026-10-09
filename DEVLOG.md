@@ -303,6 +303,8 @@
 
 - `#43` Vista **Generi** nel Groove Lab (dopo Stili): una scheda per genere con i suoi stili (un tocco apre lo stile), quanti brani ci sono, gli artisti che lo amano (dai pesi dei loro stili preferiti), "▶ Ascolta in radio" (la radio parte negli stili di quel genere) e "Vedi i N brani" (la scheda Brani filtrata sul genere). `check-modes.cjs` con 4 controlli nuovi, tutti passano.
 
+- `#41` Dalla console si può aggiungere uno strumento che il brano non ha: se tra le tracce preparate dal regista non c'è nessun pad (o basso, melodia, texture, batteria), "+ pad" ne crea uno nuovo dallo stile del brano, con i suoi suoni e preset, e lo fa entrare alla frase dopo. Il pulsante è spento solo se lo stile stesso non ha quello strumento ("lo stile di questo brano non ha pad"). `check:endless` controlla che la traccia nuova suoni e che il brano resti valido.
+
 ## Prossimo passo
 
 Stato al 2026-10-08 sera: `main` = `v0.5.0` (regista `#21`, radio `#22`, live coding a mano `#20`); `develop` = `763c59f` con in più barra player e volume `#32` (change `player-bar`, tutti i task fatti tranne la prova del proprietario) e artisti con schede Artisti e Stili `#35` (change `artists-and-styles`, 14/14 task). Il proprietario sta provando a fondo artisti e barra.

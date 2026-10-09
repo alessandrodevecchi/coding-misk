@@ -516,8 +516,18 @@ const CHECKS = {
     }
     assert(canApply({ kind: 'remove', type: 'bass' }, g.song, g.plan, 30) === on.some(t => t.type === 'bass') || on.length <= 1, 'canApply remove bass');
     // a type the song has no track for is disabled with its reason
-    const missing = ['pad', 'texture', 'lead', 'bass'].find(ty => !g.plan.tracks.some(t => (ty === 'lead' ? ['arp', 'hook', 'guitar'].includes(t.type) : t.type === ty)));
-    if (missing) assert(whyNot({ kind: 'add', type: missing }, g.song, g.plan, 30) === 'no-type', `add ${missing}: ${whyNot({ kind: 'add', type: missing }, g.song, g.plan, 30)}`);
+    // a type the song has no track for: added from the style when it has one (#41), else disabled
+    const kinds = { lead: ['arp', 'hook', 'guitar'], pad: ['pad'], texture: ['texture'], bass: ['bass'] };
+    for (const [ty, parts] of Object.entries(kinds)) {
+      if (g.plan.tracks.some(t => parts.includes(t.type))) continue;
+      const styleHas = parts.some(k => g.plan.R[k]), why = whyNot({ kind: 'add', type: ty }, g.song, g.plan, 30);
+      assert(why === (styleHas ? null : 'no-type'), `add ${ty}: ${why}`);
+      if (!styleHas) continue;
+      const at = applyBar('add', 30, g.plan), r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'add', type: ty, at }], seed: 'steer-lock', n: 0 });
+      const now = playing(stateAt(r.song, at).song).filter(t => parts.includes(t.type));
+      assert(now.length === 1 && !g.song.tracks.some(t => t.id === now[0].id && parts.includes(t.type)), `new ${ty} track playing: ${now.map(t => t.id)}`);
+      assert(!validateSong(r.song).errors.length, `song with a new ${ty} is valid`);
+    }
     assert(whyNot({ kind: 'energy-up' }, g.song, g.plan, g.plan.bars - 1) === 'late', 'late at the end');
   },
   'docs: ENDLESS.md has a check for every rule'() {
