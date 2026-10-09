@@ -11,7 +11,7 @@ Compose and every song card in the Songs tab SHALL have a "▶ Continue in radio
 
 #### Scenario: From Compose
 - **WHEN** the listener presses "Continue in radio" in Compose at bar 33 of a song
-- **THEN** the Radio tab opens, the song plays on from bar 33, and the now playing card shows it as song 0
+- **THEN** the Radio tab opens, the song plays on from bar 33, and the now playing card shows it as "Your song"
 
 ### Requirement: Transition into the radio
 The director SHALL plan song 1 after song 0 as after any song: with harmony "compatible", a key a fifth away and a tempo within reach of song 0's last section; the transition from song 0 to song 1 SHALL follow the transition setting. Song 0 SHALL play to its end before its transition.
@@ -28,11 +28,11 @@ The session SHALL take the styles named in song 0's tags when there are any know
 - **THEN** the session plays Phonk
 
 ### Requirement: Steering from song 1
-While song 0 plays, the console buttons, the curves and Extend SHALL be disabled and say that they apply from the next song. They SHALL work as usual from song 1.
+While song 0 plays, the console SHALL show, in place of its buttons, that console, curves and Extend apply from the next song, and the now playing card SHALL show no curves. They SHALL work as usual from song 1.
 
 #### Scenario: Console on song 0
 - **WHEN** song 0 plays
-- **THEN** the console buttons are disabled with the reason "from the next song"
+- **THEN** the console says that it applies from the next song
 
 ### Requirement: Replay with song 0
 The session recipe SHALL keep a copy of song 0 and the bar it started from. Replay and "Record from the start" SHALL play song 0 again and then the same songs.

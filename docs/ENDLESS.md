@@ -159,6 +159,10 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | Extend (`#45`) | next double phrase | one more double phrase before the ending (the closing outros, or the last part), with the role and curves of the part before it and energy a little lower, then higher, on repeated presses; disabled once the transition to the next song plays |
 | Volume, mute, lock (mixer) | next bar | pinned gain; a step plus a lock; the director stops moving the track |
 
+### Continue in radio
+
+A session can start after a song from Compose or the Songs tab (`#29`): `createSession(recipes, seed, { lead: leadEntry(song) })`. The lead entry carries the tempo and key of the song's last section, its meter and length; the first generated song is planned after it (compatible harmony, the transition from the lead), and the generated songs keep their usual indexes and random streams. `stylesNear(song, recipes)` picks the styles: the song's style tags, else the styles of its genres closest in tempo, else the one to three styles closest in tempo and meter. In the radio the song is song 0: it plays to its end, steering starts from song 1, and the recipe keeps a copy of it for Replay.
+
 ### Curves
 
 Next to energy, the radio shows four curves per double phrase (`#40`), measured on what plays (`curveParts` in `energy.js`, `songCurves` in `steering.js`):
@@ -219,6 +223,7 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Curves                                       | `steering: curves set density, brightness and the voice of a part` |
 | Charge before a drop                         | `steering: high tension charges the part before a drop`          |
 | Extend                                       | `steering: extend adds a part before the ending and keeps it`    |
+| Continue a Compose song                      | `radio: a session continues after a song from Compose`           |
 
 ## Artists
 

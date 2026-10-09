@@ -25,7 +25,7 @@ export const GUIDE = [
     title: { en: 'Compose', it: 'Componi' },
     what: { en: 'The workbench of a song: tracks, sections and their settings. Every change writes the Strudel code on the right.', it: 'Il banco di lavoro di un brano: tracce, sezioni e le loro impostazioni. Ogni modifica scrive il codice Strudel a destra.' },
     how: { en: '[Open song] or [New song]; [+ Add track] and [+ Add section]; pick a section to set tempo, key, chords, meter and entry. [▶ Play from this section], [Loop section]. [Save] or [Save as new].', it: '[Apri brano] o [Nuovo brano]; [+ Aggiungi traccia] e [+ Aggiungi sezione]; scegli una sezione per tempo, tonalità, accordi, metro ed entrata. [▶ Suona da questa sezione], [Ripeti la sezione]. [Salva] o [Salva come nuovo].' },
-    know: { en: '[Live build] plays the song as it builds up, one change per phrase. {Ctrl}+{Enter} plays from anywhere, {Ctrl}+{.} stops.', it: '[In divenire] suona il brano mentre si costruisce, un cambio per frase. {Ctrl}+{Enter} suona da qualsiasi punto, {Ctrl}+{.} ferma.' },
+    know: { en: '[Live build] plays the song as it builds up, one change per phrase. [▶ Continue in radio] plays the song on from where it is, then the radio goes on after it. {Ctrl}+{Enter} plays from anywhere, {Ctrl}+{.} stops.', it: '[In divenire] suona il brano mentre si costruisce, un cambio per frase. [▶ Continua in radio] suona il brano da dove sei, poi la radio continua dopo di lui. {Ctrl}+{Enter} suona da qualsiasi punto, {Ctrl}+{.} ferma.' },
   },
   {
     id: 'hand', tab: 'componi', mode: 'ascolta', show: '#edhost',
@@ -38,7 +38,7 @@ export const GUIDE = [
     id: 'songs', tab: 'brani', mode: 'ascolta', show: '#sv-q',
     title: { en: 'Songs', it: 'Brani' },
     what: { en: 'Every song: the app\'s, yours and those saved from the radio, with search, tags and favourites.', it: 'Tutti i brani: quelli dell\'app, i tuoi e quelli salvati dalla radio, con ricerca, tag e preferiti.' },
-    how: { en: 'Type in the search (it understands both languages: "frigio" finds "phrygian"), tap a genre, style or kind chip, sort. ☆ adds to the favourites, [+ Playlist] adds to a playlist. The playlist menu on top plays one.', it: 'Scrivi nella ricerca (capisce tutte e due le lingue: "frigio" trova "phrygian"), tocca un chip di genere, stile o tipo, ordina. ☆ mette tra i preferiti, [+ Playlist] aggiunge a una playlist. Il menu delle playlist in alto ne suona una.' },
+    how: { en: 'Type in the search (it understands both languages: "frigio" finds "phrygian"), tap a genre, style or kind chip, sort. ☆ adds to the favourites, [+ Playlist] adds to a playlist, [▶ Continue in radio] lets the radio go on after the song. The playlist menu on top plays one.', it: 'Scrivi nella ricerca (capisce tutte e due le lingue: "frigio" trova "phrygian"), tocca un chip di genere, stile o tipo, ordina. ☆ mette tra i preferiti, [+ Playlist] aggiunge a una playlist, [▶ Continua in radio] fa continuare la radio dopo il brano. Il menu delle playlist in alto ne suona una.' },
     know: { en: 'A tap on a tag of a card filters by it; the legend explains the tag colours. Your songs can have their own tags.', it: 'Un tocco su un tag di una card filtra per quel tag; la legenda spiega i colori. I tuoi brani possono avere tag tuoi.' },
   },
   {
@@ -94,6 +94,12 @@ export const GUIDE = [
         id: 'extend', title: { en: 'Extend', it: 'Estendi' },
         what: { en: 'Makes the song on air longer, a block at a time (the button says how long), before its ending: a new stretch in the song\'s character, then the outro and the transition as planned.', it: 'Allunga il brano in onda, un blocco alla volta (il pulsante dice quanto), prima del finale: un tratto nuovo nel carattere del brano, poi outro e transizione come previsto.' },
         know: { en: 'No limit. It switches off once the transition to the next song plays. The card shows the total added.', it: 'Nessun limite. Si spegne quando la transizione al brano dopo sta già suonando. La card mostra il totale aggiunto.' },
+      },
+      {
+        id: 'continue', title: { en: 'Continue a song in the radio', it: 'Continua un brano in radio' },
+        what: { en: 'A song from Compose or the Songs tab becomes the first song of a new session: it plays to its end, then a transition leads into the radio, in the styles closest to it and in a compatible key and tempo.', it: 'Un brano da Componi o dai Brani diventa il primo brano di una diretta nuova: suona fino alla fine, poi una transizione porta nella radio, negli stili più vicini e in tonalità e tempo compatibili.' },
+        how: { en: '[▶ Continue in radio] in Compose (from the bar you are at) or on a song card (from the start).', it: '[▶ Continua in radio] in Componi (dalla battuta in cui sei) o sulla card di un brano (dall\'inizio).' },
+        know: { en: 'Your song is not the director\'s: console, curves and Extend apply from the next song. Replay plays your song again too.', it: 'Il tuo brano non è del regista: console, curve ed Estendi valgono dal brano dopo. Riascolta rifà anche il tuo brano.' },
       },
       {
         id: 'seed', title: { en: 'Seed and replay', it: 'Seme e Riascolta' },

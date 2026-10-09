@@ -3,7 +3,7 @@
 // the player plays a "window" song (the song on air and the next one, see windowSong), and the radio
 // moves the window when a song ends. The player (main.js) owns the editor and the scheduler; the radio
 // only builds playables and tells it when to start, swap or stop.
-import { createSession, OPTION_DEFAULTS } from '../endless/director.js';
+import { createSession, OPTION_DEFAULTS, leadEntry, stylesNear } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
 import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
@@ -90,16 +90,27 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const items = S.stream.slice(S.onAir, S.onAir + 2);
     return player.makePlayable(windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut }))));
   }
-  function start({ seed, recipe } = {}) {
+  // lead (#29): { song, from } a song from Compose or the Songs tab played first (song 0, from bar "from"); the
+  // radio continues after it. A recipe with a lead replays it.
+  function start({ seed, recipe, lead } = {}) {
     stopQuiet();
     const s = recipe ? recipe.seed : (seed || seedField || undefined);
-    const session = createSession(recipes, s);
-    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: current(), changes: [] }, lastOptions: null, lastCard: 0 };
+    const L = recipe ? recipe.lead : lead, le = L ? leadEntry(L.song) : null;
+    const session = createSession(recipes, s, le ? { lead: le } : {});
+    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: current(), changes: [], ...(L ? { lead: { song: clone(L.song), from: L.from || 0 } } : {}) }, lastOptions: null, lastCard: 0 };
     S.recipe.seed = session.seed;
-    generate();
+    if (L) S.stream.push({ song: L.song, entry: le, n: 0, start: 0, bars: barsOf(L.song), lead: true, commands: [] });
+    else generate();
     remember(S.stream[0]);
-    player.start(windowPlayable(), 0);
+    player.start(windowPlayable(), L ? Math.min(L.from || 0, barsOf(L.song) - 1) : 0);
     render();
+  }
+  // a song from Compose or a song card goes on in the radio, in the styles closest to it
+  function continueSong(song, from = 0) {
+    opts.artist = null;
+    opts.styles = stylesNear(song, recipes);
+    saveOpts();
+    start({ lead: { song, from } });
   }
   function stopQuiet() { if (S) { S = null; } }
   function stop() { if (!S) return; if (recS) stopRec(); S = null; player.stop(); render(); }
@@ -205,6 +216,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function command(c) {
     if (!S || S.paused !== undefined) return false;
     const item = S.stream[S.onAir], rel = relNow();
+    if (!item.plan) { toast(t('steerWhy:lead')); return false; }
     const at = applyBar(c.kind, rel, item.plan);
     if (at <= rel || at >= barsOf(item.song) || (c.kind === 'extend' && whyNot(c, item.song, item.plan, rel, tailOf(item)))) { toast(t('steerLate')); return false; }
     const cmd = { ...c, at, id: ++cmdN };
@@ -390,7 +402,11 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const box = root.querySelector('#radio-steer');
     if (!box || dragging) return;
     if (!S) { if (box.dataset.k !== 'off') { box.dataset.k = 'off'; box.innerHTML = `<div class="lbl">${esc(t('steerTitle'))}</div><p class="muted">${esc(t('steerIdle'))}</p>`; } return; }
-    const item = S.stream[S.onAir], rel = relNow(), ph = item.plan.phrase;
+    const item = S.stream[S.onAir], rel = relNow();
+    // song 0 from Compose (#29) is not the director's: steering starts from song 1
+    if (!item.plan) { if (box.dataset.k !== 'lead') { box.dataset.k = 'lead'; steerKey = ''; box.innerHTML = `<div class="lbl">${esc(t('steerTitle'))}</div><p class="muted">${esc(t('steerWhy:lead'))}</p>`; } return; }
+    box.dataset.k = '';
+    const ph = item.plan.phrase;
     const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel);
     const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => c.id).join(), (item.plan.locked || []).join(), S.paused !== undefined, opts.scope].join('|');
@@ -439,12 +455,12 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     for (const s of song.sections) { if (rel >= acc) sec = s; acc += s.bars; }
     const next = buildSteps(song).filter(s => s.at > rel).slice(0, 3);
     const nextSong = S.stream[S.onAir + 1];
-    box.innerHTML = `<div class="lbl">${esc(t('radioNow'))} · ${esc(t('radioSongN', { n: item.n + 1 }))}</div>
+    box.innerHTML = `<div class="lbl">${esc(t('radioNow'))} · ${esc(e.lead ? t('radioLeadShort') : t('radioSongN', { n: item.n + 1 }))}</div>
       ${e.artist ? `<div class="radio-artist">${(() => { const a = artistOf(e.artist.id); return a ? `<img class="portrait tiny" src="${face(a)}" alt="">` : ''; })()}<span>${esc(e.artist.name)}</span>${e.artist.quirks && e.artist.quirks.length ? `<span class="muted small">· ${esc(e.artist.quirks.map(q => tx(QUIRKS[q] || { en: q })).join(', '))}</span>` : ''}</div>` : ''}
       <h3 class="radio-title">${esc(song.title)}</h3>
-      <div class="radio-meta">${esc(e.key)} · ${e.bpm} BPM · ${esc(e.meter)} · ${esc(t('shape_' + e.shape))}</div>
-      <div class="radio-parts">${esc(partsText(e))}</div>
-      ${item.plan ? curvePanel(item, rel, `${sec.name} · ${t('radioBar', { n: Math.floor(rel) + 1, total: item.bars })}${item.plan.extended ? ` · ${t('radioExtended', { t: secs(item.plan.extended * extendSeconds(item.plan)) })}` : ''}`) : `<div class="radio-pos">${curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>`}
+      <div class="radio-meta">${esc(e.key)} · ${e.bpm} BPM · ${esc(e.meter)}${e.shape ? ` · ${esc(t('shape_' + e.shape))}` : ''}</div>
+      <div class="radio-parts">${esc(e.lead ? t('radioLeadParts', { styles: opts.styles.map(styleName).join(', ') }) : partsText(e))}</div>
+      ${item.plan ? curvePanel(item, rel, `${sec.name} · ${t('radioBar', { n: Math.floor(rel) + 1, total: item.bars })}${item.plan.extended ? ` · ${t('radioExtended', { t: secs(item.plan.extended * extendSeconds(item.plan)) })}` : ''}`) : `<div class="radio-pos">${e.lead ? '' : curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>`}
       <div class="lbl">${esc(t('radioComing'))}</div>
       <ul class="radio-next">${next.map(s => `<li><span class="at">${esc(t('radioBarShort', { n: s.at + 1 }))}</span> ${esc(stepText(s))}${s.say ? ` <em>“${esc(sayText(s.say, getLang()))}”</em>` : ''}</li>`).join('') || `<li class="muted">${esc(t('radioNoChanges'))}</li>`}</ul>
       <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) : esc(t('radioPreparing'))}${nextSong && e.transition && !item.cut ? ` · ${esc(e.transition.kind === 'cut' ? t('radioNextTxCut') : t('radioNextTx', { kind: t(`tx:${e.transition.kind}`), bars: e.transition.bars }))}` : ''}</div>`;
@@ -602,12 +618,12 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (!S) return null;
     const it = S.stream[S.onAir], e = it.entry, rel = Math.max(0, cyc - it.start);
     const said = buildSteps(it.song).filter(x => x.say && x.at <= rel).pop();
-    return { onAir: S.paused === undefined, n: it.n + 1, title: it.song.title, artist: e.artist && e.artist.name, line: `${e.styles.map(styleName).join(' + ')} · ${e.key}`, bar: rel, bars: barsOf(it.song), bpm: e.bpm, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at : 0 };
+    return { onAir: S.paused === undefined, n: it.n + 1, title: it.song.title, artist: e.artist && e.artist.name, line: `${e.lead ? t('radioLeadShort') : e.styles.map(styleName).join(' + ')} · ${e.key}`, bar: rel, bars: barsOf(it.song), bpm: e.bpm, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at : 0 };
   }
 
   return {
-    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info,
-    get steering() { if (!S) return null; const it = S.stream[S.onAir]; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },
+    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, continueSong,
+    get steering() { if (!S) return null; const it = S.stream[S.onAir]; if (!it.plan) return { n: it.n, lead: true, commands: [], plan: null, song: it.song, recipe: clone(S.recipe) }; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },
     get paused() { return !!S && S.paused !== undefined; },
     get recording() { return recS ? { seconds: recElapsed(), list: recS.list.map(x => ({ ...x })) } : null; },
     startRec, stopRec, recordFromStart,

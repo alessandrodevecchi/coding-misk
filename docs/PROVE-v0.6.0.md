@@ -69,6 +69,12 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Pausa durante la registrazione: niente buchi.
 - [ ] Scaletta e ricetta scaricate; "Registra dall'inizio".
 
+## Continua in radio (`#29`)
+
+- [ ] In Componi, a metà brano, "▶ Continua in radio": il brano prosegue da lì, poi una transizione porta nella radio in uno stile vicino.
+- [ ] Sulla card di un brano, "▶ Continua in radio" parte dall'inizio.
+- [ ] Mentre suona il tuo brano la console dice che vale dal prossimo; dal brano dopo funziona. Riascolta rifà anche il tuo brano.
+
 ## Guida (`#48`)
 
 - [ ] Groove Lab: schede Guida e Lezioni Strudel; chip in alto, card per funzione, tabella "Cosa cambia cosa" nella Radio.

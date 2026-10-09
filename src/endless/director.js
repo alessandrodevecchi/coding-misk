@@ -419,13 +419,16 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
 // next(options) generates the next song with the options given (styles, chaos, energy, complexity);
 // the random streams and the variety history carry over between calls, so the same seed and the same
 // sequence of options always give the same songs. Without a seed, a new one is drawn and kept in .seed.
-export function createSession(recipes, seed) {
+// lead (#29): an entry the session starts after (leadEntry, a song from Compose): the first song is planned
+// after it (harmony, transition), the generated songs keep the same indexes and random streams.
+export function createSession(recipes, seed, { lead = null } = {}) {
   if (seed === undefined || seed === null || seed === '') seed = freshSeed();
   const byId = Object.fromEntries(recipes.map(r => [r.id, withDefaults(r)]));
   const rng = makeRng(seed), entries = [];
   return {
     seed: String(seed),
     entries,
+    lead,
     get count() { return entries.length; },
     next(options) {
       // with an artist, this song's styles and values come from the artist's taste
@@ -440,15 +443,40 @@ export function createSession(recipes, seed) {
       const at = drawn ? 0 : i;
       let parts = mixParts(selected, opts.chaos, at, rng.plan);
       for (let t = 0; t < 12 && recent.includes(partsKey(parts)) && selected.length > 1 && opts.chaos > 0; t++) parts = mixParts(selected, opts.chaos, at, rng.plan);
-      const { song, entry, plan } = makeSong({ parts, byId, prev: entries[i - 1], opts, rng, index: i, seed });
+      const before = i > 0 ? entries[i - 1] : lead;
+      const { song, entry, plan } = makeSong({ parts, byId, prev: before, opts, rng, index: i, seed });
       // the transition from the song before to this one (it needs both tempos)
-      if (i > 0) entries[i - 1].transition = planTransition(entries[i - 1], entry, opts, rng.transition);
+      if (before) before.transition = planTransition(before, entry, opts, rng.transition);
       if (drawn) entry.artist = { id: options.artist.id, name: options.artist.name, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, pace: opts.pace, quirks: opts.quirks };
       entries.push(entry);
       // plan and options stay with the song for steering (#24): the radio rewrites the song from them
       return { song, entry, plan, opts };
     },
   };
+}
+
+// The entry of a song the radio continues from (#29): what the next song needs to follow it (tempo and key of
+// its last section, meter, length).
+export function leadEntry(song) {
+  const secs = song.sections || [], last = secs[secs.length - 1] || {}, bars = secs.reduce((a, s) => a + s.bars, 0);
+  const bpm = Math.round(last.bpmEnd || last.bpm || song.bpm || 120), meter = last.meter || song.meter || '4/4';
+  const seconds = secs.reduce((a, s) => a + s.bars * (meterSteps(s.meter || meter) / 4) * 60 / (s.bpm || bpm), 0);
+  return { id: song.id, title: song.title, lead: true, parts: {}, styles: [], bars, seconds: Math.round(seconds), bpm, key: last.key || song.key || 'A', meter, shape: null, phrase: 8, phrases: [], sections: secs };
+}
+
+// Styles close to a song (#29): the known styles of its tags; else the styles of its genres closest in tempo;
+// else the one to three styles closest in tempo and meter. Deterministic.
+export function stylesNear(song, recipes) {
+  const tags = song.tags || {}, byId = Object.fromEntries(recipes.map(r => [r.id, withDefaults(r)]));
+  const tagged = (tags.styles || []).filter(id => byId[id]);
+  if (tagged.length) return tagged;
+  const e = leadEntry(song), dist = R => (e.bpm < R.tempo[0] ? R.tempo[0] - e.bpm : e.bpm > R.tempo[1] ? e.bpm - R.tempo[1] : 0) + (R.meters.includes(e.meter) ? 0 : 30);
+  const rank = list => list.map(r => byId[r.id]).sort((a, b) => dist(a) - dist(b) || (a.id < b.id ? -1 : 1));
+  const genres = tags.genres || [];
+  const ofGenre = rank(recipes.filter(r => genres.includes(r.genre)));
+  if (ofGenre.length) return ofGenre.slice(0, 2).map(r => r.id);
+  const all = rank(recipes), best = dist(all[0]);
+  return all.filter(r => dist(r) <= best + 4).slice(0, 3).map(r => r.id);
 }
 
 // Generates a whole session: songs until the length is reached, all with the same options.

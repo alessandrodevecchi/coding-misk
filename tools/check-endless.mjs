@@ -9,7 +9,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAPES, RECIPE_DEFAULTS } from '../src/endless/recipe.js';
 import { mixParts, stylesOf } from '../src/endless/mix.js';
 import { loadStyles } from './styles-dir.mjs';
-import { generateSession, createSession } from '../src/endless/director.js';
+import { generateSession, createSession, leadEntry, stylesNear } from '../src/endless/director.js';
 import { validateArtist, ARTIST_FIELDS, PALETTES, MOVE_KINDS, VOICE_CHARACTER_NAMES } from '../src/endless/artist.js';
 import { QUIRKS } from '../src/endless/quirks.js';
 import { portraitPixels } from '../src/endless/portrait.js';
@@ -590,6 +590,25 @@ const CHECKS = {
     const s = extendSeconds(g.plan);
     assert(s > 10 && s < 80, `seconds per press ${s}`);
     assert(whyNot({ kind: 'extend' }, g.song, g.plan, 10, g.plan.bars - at) === 'transition' && whyNot({ kind: 'extend' }, g.song, g.plan, 10, 0) === null, 'too late once the transition plays');
+  },
+  'radio: a session continues after a song from Compose'() {
+    const song = JSON.parse(fs.readFileSync(new URL('../songs/ferro.json', import.meta.url), 'utf8'));
+    const lead = leadEntry(song), ses = createSession(STYLES, 'lead-check', { lead });
+    const styles = stylesNear(song, STYLES);
+    assert(styles.length && styles.every(id => byId[id]), `styles near ${song.id}: ${styles}`);
+    const g = ses.next({ styles, harmony: 'compatible' });
+    const semis = k => (KEYS.find(x => x[0] === k) || [k, 0])[1], d = ((semis(g.entry.key) - semis(lead.key)) % 12 + 12) % 12;
+    assert(Math.abs(g.entry.bpm - lead.bpm) <= MAX_RAMP || !g.plan.R.tempo.some(b => Math.abs(b - lead.bpm) <= MAX_RAMP), `tempo ${lead.bpm} then ${g.entry.bpm}`);
+    assert([0, 5, 7].includes(d) || !g.plan.R.keys.some(k => [5, 7].includes(((semis(k) - semis(lead.key)) % 12 + 12) % 12)), `key ${lead.key} then ${g.entry.key}`);
+    assert(lead.transition && TRANSITION_KINDS.includes(lead.transition.kind), 'transition from the lead planned');
+    const again = createSession(STYLES, 'lead-check', { lead: leadEntry(song) }).next({ styles, harmony: 'compatible' });
+    assert(JSON.stringify(again.song) === JSON.stringify(g.song), 'same lead and seed gave different songs');
+    // styles: tags first, then genres, then tempo
+    assert(stylesNear({ ...song, tags: { styles: ['phonk'] } }, STYLES).join() === 'phonk', 'tagged style');
+    const jazz = stylesNear({ ...song, tags: { genres: ['jazz'] } }, STYLES);
+    assert(jazz.length && jazz.every(id => byId[id].genre === 'jazz'), `genre jazz: ${jazz}`);
+    const free = stylesNear({ ...song, tags: {} }, STYLES);
+    assert(free.length >= 1 && free.length <= 3, `by tempo: ${free}`);
   },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');

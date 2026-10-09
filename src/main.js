@@ -524,6 +524,16 @@ function wavBlob(buf) {
   return new Blob([data], { type: 'audio/wav' });
 }
 $('#tr-export').addEventListener('click', () => exportTrack(compiled, 'track'));
+// Continue in radio (#29): the song in Compose is song 0 of a new radio session, from the bar it is at
+const continuable = sg => (sg.tracks || []).some(x => x.type !== 'code' && x.type !== 'voice');
+function continueInRadio(sg, from = 0) {
+  if (!radio || !continuable(sg)) { toast(t('steerWhy:lead')); return; }
+  queue = null;
+  const { kind, ...plain } = clone(sg);
+  radio.continueSong(absoluteClips(plain), from);
+  showTab('radio');
+}
+$('#tr-radio').addEventListener('click', () => { const s = sched(); continueInRadio(T, mode === 'track' && isPlaying() && s ? Math.max(0, Math.floor(s.now())) : 0); });
 
 // ---------- arrangiatore: sezioni × tracce ----------
 const starts = () => { const out = []; let p = 0; for (const s of T.sections) { out.push(p); p += s.bars; } return out; };
@@ -1547,6 +1557,7 @@ function songCard({ tr, p }, i) {
       <button class="btn" data-act="stop" hidden>${t('stop')}</button>
       <button class="btn" data-act="export" data-export="${esc(tr.id)}">${t('exportWav')}</button>
       <button class="btn" data-act="playlist" aria-expanded="false">${t('addToPlaylist')}</button>
+      ${composed && continuable(tr) ? `<button class="btn" data-act="radio" title="${esc(t('continueRadioTip'))}">${t('continueRadio')}</button>` : ''}
       ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}${tr.version ? `<button class="btn danger" data-act="del-version">${t('plDelete')}</button>` : ''}`}
       <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
       <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
@@ -1715,6 +1726,7 @@ $('#songs').addEventListener('click', e => {
     if (a === 'play') { if (queue && !queue.jump(tr.id)) queue = null; return startCard(i, 0); }
     if (a === 'pause') return togglePlay();
     if (a === 'stop') return stop();
+    if (a === 'radio') return continueInRadio({ ...tr, tags: tr.tags || songOf({ tr, p }).tags }, 0);
     if (a === 'export') {
       if (tr.kind === 'composed') { if (!rec && !loadTrack(tr)) return; return exportTrack(rec ? null : compiled, 'track'); }
       return exportTrack(p, 'free');
