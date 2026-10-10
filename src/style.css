@@ -717,6 +717,9 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
   :root[data-ui="hw"] select::picker(select) { background: #1b1306; color: var(--lcd-fg); border: 1px solid #000; border-radius: 3px; font-family: var(--mono); box-shadow: inset 0 1px 4px rgba(0,0,0,.8), 0 10px 26px rgba(0,0,0,.65); }
   :root[data-ui="hw"] select option:hover, :root[data-ui="hw"] select option:focus-visible { background: #2c1f08; color: #ffd27a; text-shadow: 0 0 6px #ff9a1f; }
   :root[data-ui="hw"] select option:checked { color: #ffd27a; }
+  select option:disabled { opacity: .45; cursor: default; }
+  select option:disabled:hover { background: none; color: inherit; }
+  :root[data-ui="hw"] select option:disabled { color: #8a6a3a; text-shadow: none; opacity: .7; }
 }
 /* radio: transitions and harmony (#23) */
 .radio-how { display: flex; flex-wrap: wrap; gap: 10px 16px; }
