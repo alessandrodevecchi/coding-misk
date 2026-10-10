@@ -31,7 +31,9 @@ The owner's doubts: a card in the tab, a collapsible section like the live code,
 
 **Shells and motion (owner's request):** the display has shells, picked with a lever: a sci-fi terminal, a wasteland terminal, a retro-futuristic screen, a 2000s CRT monitor or TV; a default per theme. It lives in a hatch beside the stage: on power the stage shrinks, the hatch slides in and opens, the display comes out and switches on; a shell change sends the display back in and brings the next one out; power off plays the reverse. The override lever draws a cable from the display to the stage. These concepts get mockups (stills and a short video) before phase 2 starts.
 
-**Recommendation:** beside the visual stage. The power button is also the collapse control: off closes the display and gives the stage its full width back. A small "monitor" in the now playing card can come later as a shortcut.
+**Decided (mockups v1 to v4):** beside the stage, in a bay that fills with the display seen from the front; seven shells (`src/soul/shells.js`, SVG drawn from the v4 mockups); a hidden screw in the stage's corner and typing "soul" open it (no button names it; the Guide only hints); a shell selector on the bay's bottom edge; a SCART cable drawn on a canvas over the page with a verlet rope (gravity, length constraint, a few iterations a frame), its ends pinned to the sockets, draggable with the pointer.
+
+**Recommendation (before the mockups):** beside the visual stage. The power button is also the collapse control: off closes the display and gives the stage its full width back. A small "monitor" in the now playing card can come later as a shortcut.
 
 ## Risks / Trade-offs
 

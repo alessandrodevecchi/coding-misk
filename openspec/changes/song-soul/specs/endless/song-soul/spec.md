@@ -49,22 +49,30 @@ The visual stage SHALL offer the soul as a scene (phase 1). The visual picker SH
 - **THEN** the stage shows the soul of the song on air
 
 ### Requirement: Soul display
-A Soul display (phase 2) SHALL show the soul independently of the visual stage: the stage can show any visual while the display shows the soul. It SHALL have a power button with switch-on and switch-off animations, a full-screen button, previous and next view buttons, a lock switch and an "override visual" lever. With the lever on, the visual stage SHALL show the soul; turning the lever or the display off SHALL bring the chosen visual back. The display SHALL offer several shells (at least a sci-fi terminal, a wasteland terminal, a retro-futuristic screen and a 2000s CRT monitor), with a default per theme, and a control next to it that changes the shell without changing the theme.
+A Soul display (phase 2) SHALL show the soul independently of the visual stage: the stage can show any visual while the display shows the soul. It SHALL be hidden, as an easter egg: no button on the stage names it; a small screw in the stage's corner, unscrewed with three clicks, opens it, and so does typing "soul". The display SHALL carry its own controls: power (which closes it), full screen, previous and next view, lock and override. With override on, the visual stage SHALL show the soul; turning override or the display off SHALL bring the chosen visual back. The display SHALL offer seven shells (MISK/OS 6000, Unified terminal, Wrist-Link, Deck console, MiskVision, Pro monitor, Electronic Brain 1958), seen from the front and filling the bay, with a default per theme; a selector on the bay's bottom edge (two arrow keys side by side, then a small display with the shell's number and name) changes the shell without changing the theme.
+
+#### Scenario: Find the display
+- **WHEN** the listener clicks the screw in the stage's corner three times
+- **THEN** the screw drops out and the display opens
 
 #### Scenario: Change the shell
-- **WHEN** the listener moves the shell lever
-- **THEN** the display goes back into its hatch and the next shell comes out and switches on, showing the same soul
+- **WHEN** the listener presses the next shell key
+- **THEN** the display goes back into its bay and the next shell comes out and switches on, showing the same soul
 
 ### Requirement: Display animations
-Opening the display SHALL be animated: the stage shrinks, a hatch beside it slides in and opens, the display comes out and switches on. Turning it off SHALL play the reverse. With the override lever on, a cable SHALL be drawn from the display to the stage while the stage shows the soul.
+Opening the display SHALL be animated: the stage shrinks, a bay beside it slides in and opens, the display comes out and switches on. Turning it off SHALL play the reverse and screw the screw back in. With override on, a SCART cable SHALL run from a socket under the bay to a socket under the stage; the cable SHALL hang and swing like a real cable and the listener SHALL be able to drag it.
 
 #### Scenario: Open the display
-- **WHEN** the listener presses the power button with the display closed
-- **THEN** the stage shrinks, the hatch opens, the display comes out and switches on within about three seconds
+- **WHEN** the screw drops out
+- **THEN** the stage shrinks, the bay opens, the display comes out and switches on within about three seconds
 
 #### Scenario: Override the visual
-- **WHEN** the stage shows Edgerunners, the display is on and the listener turns the override lever on
-- **THEN** the stage shows the soul; turning the display off brings Edgerunners back
+- **WHEN** the stage shows Edgerunners, the display is on and the listener turns override on
+- **THEN** the cable plugs into the stage and the stage shows the soul; turning the display off brings Edgerunners back
+
+#### Scenario: Drag the cable
+- **WHEN** the listener drags the cable
+- **THEN** it follows the pointer and swings back when released, staying plugged in
 
 ### Requirement: Names
 Screen labels SHALL use the app's own names (such as "MISK/OS"), never film trademarks.

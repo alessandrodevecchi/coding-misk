@@ -97,6 +97,14 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Anima anche in Componi, sui brani e nelle playlist (curve misurate dalle sezioni); schermo intero; telefono.
 - [ ] Un brano con un suo visual non toglie l'Anima se la stai guardando.
 
+## Display dell'anima, fase 2 (`#46`)
+
+- [ ] Sul palco nessun pulsante parla del display; la vitina nell'angolo in basso a destra si svita con tre clic e cade, si apre il portellone e il display esce e si accende. Anche scrivendo "soul".
+- [ ] I tasti del display: accensione (lo richiude e la vite torna), schermo intero, vista precedente e successiva, blocco, override.
+- [ ] Selettore sotto il display: ◀ ▶ cambiano guscio (il display rientra ed esce il nuovo); il guscio scelto resta.
+- [ ] Override: il cavo SCART scende da sotto il display ed entra nella presa sotto il palco, il palco mostra l'anima; il cavo si trascina e oscilla; spegnendo torna il visual.
+- [ ] Tema HW: guscio MISK/OS 6000 di default, cavo intrecciato con una spia; telefono.
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.

@@ -43,7 +43,16 @@ export function createSoulScene({ getSource, store, isHw, baseLook, onChange = (
   // draw into the stage: cx a 2D context in CSS pixels, W×H the stage size, dpr the device pixel ratio
   function draw(cx, W, H, dpr, cyc, playing) {
     if (!shown) { shown = true; analyze(); }
+    frame(cyc, playing, Math.min(W / R.W, H / R.H) * dpr);
+    fitInto(cx, W, H);
+  }
+  // the soul picture now (at most 30 renders a second, shared by the stage and the display); scale: device px per logical px
+  let maxScale = 0, scaleAt = 0;
+  function frame(cyc, playing, scale) {
     const src = follow(cyc), t = now();
+    // the biggest size asked for in the last half second wins, so the stage and the display can share one render
+    if (t - scaleAt > .5) maxScale = 0;
+    if (scale >= maxScale) { maxScale = scale; scaleAt = t; }
     if (t - lastRender >= 1 / FPS - 0.004 || lastRender < 0) {
       lastRender = t;
       let o;
@@ -53,9 +62,11 @@ export function createSoulScene({ getSource, store, isHw, baseLook, onChange = (
         else o = overlay.kind === 'analyzing' ? { analyzing: k, phrase: overlay.phrase } : { glitch: k, word: overlay.word };
       }
       const D = data, bpb = D ? (parseInt(D.meter, 10) || 4) : 4, bar = src && src.bar !== undefined ? src.bar : 0;
-      const scale = Math.min(W / R.W, H / R.H) * dpr;
-      R.render({ data: D, view: view || 'a', t, bar, beat: playing ? bar * bpb : undefined, bpb, hw: isHw(), hue: LOOK_HUE[baseLook()] ?? 0, overlay: o }, scale);
+      R.render({ data: D, view: view || 'a', t, bar, beat: playing ? bar * bpb : undefined, bpb, hw: isHw(), hue: LOOK_HUE[baseLook()] ?? 0, overlay: o }, maxScale);
     }
+    return R.canvas;
+  }
+  function fitInto(cx, W, H) {
     // fit: the whole screen inside the stage, the free sides filled with a blurred, darkened copy
     const s = Math.min(W / R.W, H / R.H), w = R.W * s, h = R.H * s, x = (W - w) / 2, y = (H - h) / 2;
     cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);
@@ -74,7 +85,7 @@ export function createSoulScene({ getSource, store, isHw, baseLook, onChange = (
   }
   const step = d => pick(VIEWS[(VIEWS.indexOf(view || 'a') + d + VIEWS.length) % VIEWS.length]);
   return {
-    draw, analyze, recalibrate,
+    draw, frame, analyze, recalibrate,
     next: () => step(1), prev: () => step(-1), pick,
     // the stage stopped showing the soul: the next time it shows, it types its line again
     hide() { shown = false; },

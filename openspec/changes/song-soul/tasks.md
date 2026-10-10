@@ -17,9 +17,10 @@
 
 ## 4. Phase 2: Soul display
 
-- [ ] 4.0 Mockups of the display concepts (shells, hatch and cable animations), owner's choice before code.
+- [x] 4.0 Mockups of the display concepts (shells, hatch and cable animations), owner's choice before code (`docs/soul/display-v1` to `v4`).
 
-- [ ] 4.1 The display beside the stage: power with on and off animations, full screen, view buttons, lock, override lever; HW terminal and neon looks; phone layout.
+- [x] 4.1 The display beside the stage: hidden screw and "soul" to open, power with on and off animations, full screen, view buttons, lock, override; seven shells with the selector; default shell per theme; phone layout.
+- [x] 4.3 SCART cable from under the bay to under the stage, with rope physics and dragging.
 - [ ] 4.2 Souls for Compose, Songs and playlists.
 
 ## 5. Checks and docs

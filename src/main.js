@@ -30,6 +30,7 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createSoulScene } from './soul/scene.js';
+import { createSoulDisplay } from './soul/display.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
 import { startHardware } from './hardware.js';
@@ -123,6 +124,7 @@ let arrMode = store.get('coding-misk-arr-mode', 'timeline'), selClip = null;
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!LOOKS.some(([k]) => k === look)) look = 'palco';
 // the soul scene (#46) keeps the colours of the last other visual: the app's accents and the colour views' hue
+let soulOverride = false; // the Soul display's override (#46): the stage shows the soul
 let soulBase = store.get('coding-misk-soul-base', look === 'soul' ? 'palco' : look);
 let compiled = playable({ ...T, kind: 'composed' });
 const saveDraft = () => store.set('coding-misk-draft', { T, sel, tk, dirty });
@@ -1375,7 +1377,7 @@ $('#track-panel').addEventListener('click', e => {
 
 // tema dell'interfaccia: neon (predefinito) o hardware con manopole, display e LED
 let ui = store.get('coding-misk-ui', 'neon');
-const setUi = v => { ui = v === 'hw' ? 'hw' : 'neon'; store.set('coding-misk-ui', ui); syncAll(); };
+const setUi = v => { ui = v === 'hw' ? 'hw' : 'neon'; store.set('coding-misk-ui', ui); syncAll(); if (globalThis.codingMiskSoulDisplay) globalThis.codingMiskSoulDisplay.themeChanged(); };
 $$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.dataset.uitheme)));
 const setLook = l => { look = l; store.set('coding-misk-look', l); if (l !== 'soul') { soulBase = l; store.set('coding-misk-soul-base', l); } syncAll(); };
 // a song's own visual, unless the listener is watching the soul
@@ -1412,7 +1414,7 @@ function syncSectionFields() {
 }
 function syncAll() {
   document.documentElement.dataset.look = look === 'soul' ? soulBase : look;
-  $('#stagewrap').dataset.soul = look === 'soul';
+  $('#stagewrap').dataset.soul = look === 'soul' || soulOverride;
   $('#soul-ctl').hidden = look !== 'soul';
   document.documentElement.dataset.ui = ui;
   $$('[data-uitheme]').forEach(b => b.setAttribute('aria-pressed', ui === b.dataset.uitheme));
@@ -2161,6 +2163,13 @@ const soul = createSoulScene({
   onChange: () => syncSoul(),
 });
 globalThis.codingMiskSoul = soul;
+// the Soul display (#46, phase 2): hidden in a bay beside the stage; with override on, the stage shows the soul
+const soulDisplay = createSoulDisplay({
+  stagewrap: $('#stagewrap'), row: $('#stagerow'), scene: soul, store, isHw: () => ui === 'hw',
+  getCyc: () => (isPlaying() ? sched().now() : 0), isPlaying,
+  onOverride: on => { soulOverride = on; syncAll(); },
+});
+globalThis.codingMiskSoulDisplay = soulDisplay;
 function syncSoul() {
   $('#soul-name').textContent = soul.label;
   $('#soul-ctl [data-soul="lock"]').setAttribute('aria-pressed', soul.locked);
@@ -2171,7 +2180,7 @@ $('#soul-ctl').addEventListener('click', e => {
 });
 syncSoul();
 startVisuals({
-  getS: () => ({ look }), soul,
+  getS: () => ({ look: soulOverride ? 'soul' : look }), soul,
   // the studio scene (#28): the radio's song on air, or the song playing elsewhere
   getInfo(cyc) {
     if (mode === 'radio' && radio && radio.on) return radio.info(cyc);
