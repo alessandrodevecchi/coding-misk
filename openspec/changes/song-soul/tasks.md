@@ -1,16 +1,26 @@
 # Tasks
 
-## 1. Choice
+## 1. Data and core
 
-- [ ] 1.1 Owner picks the concept (A, B, C or a mix) from the mockups; record it in design.md.
+- [ ] 1.1 `soulData`, sigil, `H32`, `ev`; measured curves for non-radio songs; Node checks.
+- [ ] 1.2 Overlays: analyzing (rotating lines) and interference (recalibrating lines).
 
-## 2. Screen
+## 2. Views (from v3)
 
-- [ ] 2.1 `soulData` and the sigil, with Node checks (same seed, same sigil; every curve present).
-- [ ] 2.2 The Soul screen: canvas drawing of the chosen concept, CRT layers, green and amber, phone layout.
-- [ ] 2.3 Open from the now playing card and the History; live following; close.
-- [ ] 2.4 i18n; Guide card; browser check.
+- [ ] 2.1 CRT family: A Tracker, B Terrain, C Sphere (green, amber).
+- [ ] 2.2 Colour family: D Lattice, E Strands, F Landscape, G Particles, H Halftone, I Aura, J Spectrum; neon hue from the visual; HW retro filter.
 
-## 3. Docs
+## 3. Phase 1: scene
 
-- [ ] 3.1 DEVLOG, `PROVE-v0.6.0.md`, `DESIGN-SYSTEM.md`.
+- [ ] 3.1 Visual dropdown plus full-screen button; the soul as a scene of the stage for the song on air.
+- [ ] 3.2 Default view per song, previous and next, lock; steering and song changes trigger the overlays.
+
+## 4. Phase 2: Soul display
+
+- [ ] 4.1 The display beside the stage: power with on and off animations, full screen, view buttons, lock, override lever; HW terminal and neon looks; phone layout.
+- [ ] 4.2 Souls for Compose, Songs and playlists.
+
+## 5. Checks and docs
+
+- [ ] 5.1 Browser check: scene, every view draws, full screen, display power and override.
+- [ ] 5.2 Guide card, DEVLOG, `PROVE-v0.6.0.md`, `DESIGN-SYSTEM.md`, README.

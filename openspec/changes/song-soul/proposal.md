@@ -2,21 +2,23 @@
 
 ## Why
 
-The radio shows a song's settings as separate curves, menus and knobs. The owner wants one screen that draws the whole "soul" of a song (its seed, settings, curves and instruments) as a single picture, in the style of an old green CRT radar or sonar display from science-fiction films (#46). It is the showpiece of the radio and builds on the curves of #40.
+The radio shows a song's settings as separate curves, menus and knobs. The owner wants the whole "soul" of a song (its seed, settings, curves and instruments) drawn as living pictures, in retro science-fiction screens, as the showpiece of the app (#46). Three generations of mockups (`docs/soul/v1`, `v2`, `v3`) fixed the look; the owner wants all ten views.
 
 ## What Changes
 
-- **A "Soul" screen** for the song on air (and for any saved radio song): a full-window CRT display, green phosphor in the normal theme and amber in the HW theme, with scanlines, glow, vignette and a curved bezel.
-- **One concept chosen from mockups** (open, see design): A "motion tracker" (the song as a dial, curves as rings, a sweep at the current bar, instruments as blips), B "terrain scan" (the curves as a wireframe landscape with a terminal readout), C "soul sphere" (a 3D wireframe globe shaped by the curves, instruments in orbit). A and C can rotate or animate; B can scroll.
-- **The seed's sigil:** a symbol drawn from the seed, the same for the same seed, shown on the screen as the song's signature, with the seed and a short hash.
-- **Live:** while the song plays, the screen follows the bar (sweep, scan line or rotation), instruments light up when they play, the readouts follow steering changes.
-- **Own names:** the screen's labels use the app's own names (no film trademarks).
+- **Ten soul views** from the v3 mockups, all animated: A Tracker, B Terrain, C Sphere (CRT family: green phosphor, amber in HW) and D Lattice, E Strands, F Landscape, G Particles, H Halftone, I Aura, J Spectrum (colour family: hue from the selected visual in neon, a retro amber filter in HW). Each song gets its own shapes and small events from its seed.
+- **Messages:** an "analyzing" overlay when the soul opens or the song changes (a rotating list of sci-fi and horror lines), and an interference effect with "recalibrating" lines when steering changes the song.
+- **One view per song by default** (picked from the seed), changing with the song unless locked; the listener can switch view at any time.
+- **Phase 1, scene:** the soul as a scene of the visual stage (temporary while it is built), with full screen. The visual picker becomes a dropdown plus a full-screen button.
+- **Phase 2, the Soul display:** a retro device of its own, independent of the visual stage: a power button with switch-on and switch-off animations, a full-screen button, buttons to change view, a lock switch and an "override visual" lever that puts the soul on the visual stage. In HW it looks like an old terminal (Alien, Fallout); in neon a retro-futuristic screen.
+- **Radio first,** then any song (curves measured from its sections and tracks).
+- **Own names:** labels use the app's own names (no film trademarks); the mockups are versioned in `docs/soul`.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `endless/song-soul`: the Soul screen, its data, the sigil, live following, themes, opening and closing.
+- `endless/song-soul`: the soul data, the ten views, the sigil, live following, messages, themes, the scene and the Soul display.
 
 ### Modified Capabilities
 
@@ -24,6 +26,5 @@ None.
 
 ## Impact
 
-- New `src/radio/soul.js` (canvas drawing, the chosen concept), `src/radio/radio.js` (open from the now playing card and the History), `src/style.css`, `src/i18n.js`, `src/guide.js` (Radio card).
-- Fonts: VT323 and Share Tech Mono (Google Fonts) or a local monospace fallback.
-- Checks: a browser check (opens, draws, follows the bar, closes, no errors, phone width).
+- New `src/soul/` (data, views, overlays, display), `src/visuals.js` and `index.html` (visual dropdown, soul scene), `src/radio/radio.js` (data and events), `src/style.css`, `src/i18n.js`, `src/guide.js`.
+- Checks: Node checks for the data and the sigil; a browser check for the scene, the display and full screen.

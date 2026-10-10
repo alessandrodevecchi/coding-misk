@@ -2,24 +2,36 @@
 
 ## Context
 
-The radio has, per song on air, the plan (energy targets, roles), the measured and set curves (`songCurves`), the tracks and the build steps, the seed and the options. Mockups of three concepts were made with a real generated song (`nostromo-6`, "Humo Voltage") on a 1200 by 760 canvas.
+The radio has, per song on air, the plan (energy targets, roles), the curves (`songCurves`), tracks, build steps, seed and options. Three generations of mockups in `docs/soul` (one self-contained HTML page each, two test songs, comparison sheets) fixed the look; v3 is the reference. The visual stage (`src/visuals.js`) draws looks such as Studio, Sonar, Edgerunners, with a row of look buttons and full screen.
 
 ## Goals / Non-Goals
 
-**Goals:** a striking, readable picture of a song; live while it plays; one canvas, no library.
+**Goals:** the ten v3 views in the app, animated, per song; the scene first, then the Soul display; radio first, then any song.
 
-**Non-Goals:** editing from the Soul screen (the curves stay the place to edit); video export (#27).
+**Non-Goals:** editing from the soul; video export (#27, which can reuse the views).
 
 ## Decisions
 
-- **Concept:** to be chosen by the owner among A (motion tracker), B (terrain scan), C (soul sphere), or a mix (for example A as the main view with a toggle to C). The requirements hold for any choice.
-- **Drawing:** one `<canvas>` at device pixel ratio, drawn with 2D context; glow with `shadowBlur`; scanlines, vignette and bezel as CSS layers over it. 3D (B, C) by a small projection, no WebGL.
-- **Data:** a pure function `soulData(song, plan, opts, seed)` builds what the screen needs, so it can be checked in Node and reused by the video of #27.
-- **Sigil:** FNV-1a hash of the seed feeding a small generator: symmetric arms (5 to 8 by hash), point paths, two rings.
-- **Live:** redraw on the player's frame at most 30 times a second while open; still otherwise.
-- **Names:** "MISK/OS" and "Misk Industries" style labels, never film trademarks.
+- **Modules:** `src/soul/data.js` (pure: `soulData(song, plan, opts, seed)`, sigil, seeded `H32` and timed events `ev`, checkable in Node), `src/soul/views.js` (one draw function per view, ported from v3 with the canvas size as a parameter), `src/soul/overlays.js` (analyzing, interference, line lists), `src/soul/display.js` (phase 2).
+- **Drawing:** one 2D canvas at device pixel ratio; CRT layers (scanlines, vignette) and the HW retro filter drawn in the canvas; at most 30 frames a second while visible, paused when hidden; a lighter path on phones (fewer points).
+- **Default view:** `views[H32(seed) % 10]`; lock state and the last manual choice remembered in the browser.
+- **Neon hue:** each visual look has an accent hue; the colour views read it, plus a small seeded shift.
+- **Events:** steering commands call the soul's `recalibrate()`; song changes call `analyze()`.
+- **Visual picker:** the look buttons become a themed dropdown (the app's `appearance: base-select` style) next to the full-screen button.
+- **Other songs:** curves measured per section with the same measures as the radio (energy, density, brightness, tension; voice from the comments), so Compose, Songs and playlists get a soul too.
+
+## The Soul display: where it lives
+
+The owner's doubts: a card in the tab, a collapsible section like the live code, a tab on the edge, or beside the visual. Options:
+
+- **A card in the Radio tab:** simple, but only for the radio, and gone in other tabs.
+- **A collapsible section in the right column, like the live code:** global (every tab, radio and songs), next to the code it complements; but the column is busy and narrow.
+- **A tab on the edge that slides a panel out:** global, but hidden, and the owner is not convinced.
+- **Beside the visual stage:** the stage is full width; a button shrinks it and opens the display on its right (collapsible). Global, always above the tabs, and the "override visual" lever has an obvious meaning there. On phones the display goes under the stage, closed by default.
+
+**Recommendation:** beside the visual stage. The power button is also the collapse control: off closes the display and gives the stage its full width back. A small "monitor" in the now playing card can come later as a shortcut.
 
 ## Risks / Trade-offs
 
-- Canvas glow is costly on large screens; the screen caps its frame rate and pauses when hidden.
-- Small screens cannot hold the side panels; the phone layout keeps the picture and a short readout.
+- Glow and filters are costly on big screens: frame cap, pause when hidden, lighter phone path.
+- Ten views are a lot of code: ported one by one from the mockups, each with a browser smoke check.
