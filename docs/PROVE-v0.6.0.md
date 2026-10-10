@@ -99,7 +99,7 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 
 ## Display dell'anima, fase 2 (`#46`)
 
-- [ ] Sul palco nessun pulsante parla del display; la vitina nell'angolo in basso a destra si svita con tre clic e cade, si apre il portellone e il display esce e si accende. Anche scrivendo "soul".
+- [ ] Sul palco nessun pulsante parla del display; la vitina nell'angolo in basso a destra si svita con tre clic e cade, esce la linguetta "SONG SOUL ANALYZER" (rientra da sola dopo 20 secondi); OPEN apre il portellone, il display si accende e chiede "ANALYZE NOW?" (testi che variano): YES mostra l'anima, NO richiude. Anche scrivendo "soul".
 - [ ] I tasti del display: accensione (lo richiude e la vite torna), schermo intero, vista precedente e successiva, blocco, override.
 - [ ] Selettore sotto il display: ◀ ▶ cambiano guscio (il display rientra ed esce il nuovo); il guscio scelto resta.
 - [ ] Override: il cavo SCART scende da sotto il display ed entra nella presa sotto il palco, il palco mostra l'anima; il cavo si trascina e oscilla; spegnendo torna il visual.

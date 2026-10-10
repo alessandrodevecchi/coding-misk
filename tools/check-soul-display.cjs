@@ -1,4 +1,4 @@
-// Browser checks for the Soul display (#46, phase 2): hidden screw and "soul" open it, the display's controls,
+// Browser checks for the Soul display (#46, phase 2): hidden screw and "soul" show the tab, OPEN and the question, the display's controls,
 // shell selector, override with the SCART cable (the stage shows the soul), cable dragging, power off.
 // Usage: PLAYWRIGHT_CORE=... node tools/check-soul-display.cjs [shots-dir]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -25,9 +25,16 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const w0 = await stageW();
   await page.click('.soul-screw'); await sleep(350); await page.click('.soul-screw'); await sleep(350);
   check(!(await D()).open, 'two turns are not enough');
-  await page.click('.soul-screw'); await sleep(4200);
+  await page.click('.soul-screw'); await sleep(1500);
+  check(await page.isVisible('.soul-tab') && !(await D()).open, 'three turns: the screw drops and the SONG SOUL ANALYZER tab peeks out');
+  await page.click('.soul-tab .st-open'); await sleep(4200);
   let d = await D();
-  check(d.open && await page.isVisible('.soulbay .sb-panel') && (await stageW()) < w0 - 300, 'three turns open the bay: the stage shrinks, the display comes out', `${Math.round(w0)} -> ${Math.round(await stageW())}`);
+  check(d.open && await page.isVisible('.soulbay .sb-panel') && (await stageW()) < w0 - 300, 'OPEN: the stage shrinks, the display comes out', `${Math.round(w0)} -> ${Math.round(await stageW())}`);
+  await sleep(4000);
+  check(await page.evaluate(() => globalThis.codingMiskSoulDisplay.mode) === 'prompt', 'the screen asks before reading the soul');
+  if (shots) await page.screenshot({ path: path.join(shots, 'prompt.png') });
+  await page.keyboard.press('Enter'); await sleep(300);
+  check(await page.evaluate(() => globalThis.codingMiskSoulDisplay.mode) === 'soul' && await page.evaluate(() => globalThis.codingMiskSoul.overlay) === 'analyzing', 'yes: the soul is analyzed and shown');
   check(d.shell === 'E', 'neon default shell', d.shell);
   if (shots) await page.screenshot({ path: path.join(shots, 'open.png') });
 
@@ -61,11 +68,13 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(!d.open && !d.override && await page.evaluate(() => document.querySelector('#stagewrap').dataset.soul) === 'false' && Math.abs((await stageW()) - w0) < 2, 'power off: the visual comes back, the bay closes, the stage gets its width back');
   check(await page.isVisible('.soul-screw'), 'the screw is back');
 
-  await page.keyboard.type('soul'); await sleep(4000);
-  check((await D()).open, 'typing "soul" opens it too');
-  await page.click('.sb-panel [data-act="power"]'); await sleep(3500);
+  await page.keyboard.type('soul'); await sleep(1500);
+  check(await page.isVisible('.soul-tab'), 'typing "soul" shows the tab too');
+  await page.click('.soul-tab .st-open'); await sleep(8000);
+  await page.keyboard.press('n'); await sleep(4800);
+  check(!(await D()).open && await page.isVisible('.soul-screw'), 'no: the display closes and the screw goes back');
   await page.click('[data-uitheme="hw"]'); await page.evaluate(() => localStorage.removeItem('coding-misk-soul-shell')); await page.evaluate(() => globalThis.codingMiskSoulDisplay.themeChanged());
-  await page.keyboard.type('soul'); await sleep(4000);
+  await page.keyboard.type('soul'); await sleep(1500); await page.click('.soul-tab .st-open'); await sleep(4000);
   check((await D()).shell === 'A', 'HW default shell', (await D()).shell);
   if (shots) await page.screenshot({ path: path.join(shots, 'hw.png') });
 

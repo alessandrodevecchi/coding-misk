@@ -18,6 +18,15 @@ const BOOT = {
   B: ['MISK UNIFIED OS  MOD. 59', '> TUBE ............. WARM', '> SIGNAL ........... WEAK', '> TUNING IN_'],
   C: ['WRIST-LINK MODEL 59', 'LINK ......... OK', 'SOUL SCAN .... READY', '> _'],
 };
+// the question on the screen when the display switches on: a few variants of each line
+const PROMPT = {
+  head: ['MISK LABS · EXPERIMENTAL MK-01', 'MISK LABS · PROTOTYPE MK-01', 'MISK LABS · UNIT MK-01 · NOT FOR SALE'],
+  name: ['SONG SOUL ANALYZER'],
+  warn: ['WARNING: MAY REVEAL WHAT THE SONG REALLY IS', 'CAUTION: SOULS DO NOT ALWAYS WANT TO BE SEEN', 'UNSTABLE PROTOTYPE · DO NOT STARE TOO LONG', 'SIDE EFFECTS MAY INCLUDE GOOSEBUMPS', 'THE SONG WILL KNOW YOU LOOKED'],
+  ask: ['ANALYZE NOW?', 'PROCEED?', 'OPEN THE SOUL?', 'LOOK INSIDE?', 'BEGIN THE READING?'],
+  no: ['SOUL LEFT ALONE.', 'MAYBE ANOTHER TIME.', 'THE SONG KEEPS ITS SECRET.', 'STANDING DOWN.'],
+};
+const pickOf = list => list[Math.floor(Math.random() * list.length)];
 const MONO = { neon: 'grayscale(1) sepia(1) hue-rotate(62deg) saturate(3.2) brightness(.95)', hw: 'grayscale(1) sepia(1) saturate(2.6) brightness(1.05)' };
 
 // stagewrap: the stage element; row: its parent (the bay and the sockets go there); scene: the soul scene;
@@ -29,6 +38,11 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
   screw.className = 'soul-screw'; screw.type = 'button'; screw.setAttribute('aria-label', 'screw');
   screw.innerHTML = '<svg viewBox="-6 -6 12 12" aria-hidden="true"><circle r="5.6" fill="rgba(0,0,0,.6)" transform="translate(.4,.8)"/><circle r="5.2" fill="url(#sd-chrome)"/><g class="slot"><line x1="-3.6" y1="0" x2="3.6" y2="0" stroke="rgba(0,0,0,.7)" stroke-width="1.2"/></g></svg>';
   stagewrap.appendChild(screw);
+  // the tab that peeks out of the stage's edge once the screw is out
+  const tab = document.createElement('div');
+  tab.className = 'soul-tab'; tab.hidden = true;
+  tab.innerHTML = '<i class="st-screw"></i><i class="st-screw r"></i><b>SONG SOUL ANALYZER</b><small>EXPERIMENTAL · MK-01</small><button type="button" class="st-open"><i></i>OPEN</button>';
+  stagewrap.appendChild(tab);
   const bay = document.createElement('div');
   bay.className = 'soulbay'; bay.hidden = true;
   bay.innerHTML = `<div class="sb-rim"></div><div class="sb-well"><div class="sb-mount"></div><div class="sb-lamp"></div><div class="sb-dark"></div><div class="sb-door top"></div><div class="sb-door bot"></div></div><div class="sb-sel"></div>`;
@@ -50,7 +64,9 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
 
   // ---------- state ----------
   const ui = () => (isHw() ? 'hw' : 'neon');
-  let open = false, busy = false, override = false, turns = 0, osd = null;
+  let open = false, busy = false, override = false, turns = 0, osd = null, tabOut = false, tabTimer = 0;
+  // the screen's mode: 'prompt' (the question), 'bye' (the answer was no), 'soul'
+  let mode = 'soul', ask = null, answer = 0, askAt = 0, optRects = [];
   let shell = store.get('coding-misk-soul-shell', '') || DEFAULT_SHELL[ui()];
   if (!BYID[shell]) shell = DEFAULT_SHELL[ui()];
   let shown = null, panel = null, screen = null, raf = 0, lastFrame = 0, lastScale = 0;
@@ -117,12 +133,31 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
   function reveal() {
     if (open || busy) return;
     turns = 3; go('screw', 390, t(), .3, back); later(() => go('screwOut', 1, t(), .55, lin), .3);
-    later(powerOn, .75);
+    later(showTab, .7);
   }
+  function showTab() {
+    if (open || tabOut) return;
+    tabOut = true; tab.hidden = false; go('tab', 1, t(), .55, back);
+    // left alone, the tab slides back in and the screw goes back
+    clearTimeout(tabTimer); tabTimer = setTimeout(() => hideTab(true), 20000);
+  }
+  function hideTab(screwBack) {
+    if (!tabOut) return;
+    tabOut = false; clearTimeout(tabTimer); go('tab', 0, t(), .4);
+    later(() => { if (!tabOut) tab.hidden = true; }, .45);
+    if (screwBack) { later(() => go('screwOut', 0, t(), .5, eout), .4); later(() => { go('screw', 0, t(), .6); turns = 0; }, .9); }
+  }
+  tab.querySelector('.st-open').addEventListener('click', () => { hideTab(false); later(powerOn, .3); });
   let typed = '';
   document.addEventListener('keydown', e => {
     const el = e.target;
     if (el.closest && (el.closest('input, textarea, select, [contenteditable="true"], .cm-editor'))) return;
+    if (open && mode === 'prompt' && !busy) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); answer = 1 - answer; return; }
+      if (e.key === 'Enter') { e.preventDefault(); answerAsk(answer === 0); return; }
+      if (e.key === 'y' || e.key === 'Y') return answerAsk(true);
+      if (e.key === 'n' || e.key === 'N') return answerAsk(false);
+    }
     if (e.key.length !== 1) return;
     typed = (typed + e.key.toLowerCase()).slice(-4);
     if (typed === 'soul') { typed = ''; reveal(); }
@@ -138,7 +173,7 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
     later(() => go('doors', 1, t(), .7, eout), .6); later(() => go('lamp', 1, t(), .25), .55); later(() => go('lamp', 0, t(), .4), 1.25);
     later(() => go('out', 1, t(), .85, back), 1.15);
     later(() => { go('screen', 1, t(), 1, lin); }, 2.0);
-    later(() => { scene.analyze(); busy = false; }, 3.0);
+    mode = 'prompt'; newAsk(); later(() => { askAt = t(); busy = false; }, 3.0);
     onOpen(true);
   }
   function powerOff() {
@@ -150,7 +185,7 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
     later(() => go('lamp', 1, t(), .2), d + .9); later(() => go('lamp', 0, t(), .3), d + 1.5);
     later(() => go('doors', 0, t(), .6), d + 1.05);
     later(() => go('shrink', 0, t(), .8), d + 1.6);
-    later(() => { open = false; go('screwOut', 0, t(), .5, eout); }, d + 2.4);
+    later(() => { open = false; mode = 'soul'; go('screwOut', 0, t(), .5, eout); }, d + 2.4);
     later(() => { go('screw', 0, t(), .6); turns = 0; busy = false; onOpen(false); }, d + 2.9);
   }
   function changeShell(dir) {
@@ -164,7 +199,7 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
     later(() => mountShell(shell), 1.15);
     later(() => { go('dark', 0, t(), .45); go('out', 1, t(), .75, back); }, 1.45);
     later(() => go('screen', 1, t(), 1, lin), 2.2);
-    later(() => { scene.analyze(); busy = false; if (ov) setOverride(true); }, 3.2);
+    later(() => { if (mode === 'soul') scene.analyze(); else askAt = t(); busy = false; if (ov) setOverride(true); }, 3.2);
   }
   function setOverride(on, quiet = false) {
     if (on === override) return;
@@ -174,9 +209,18 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
     else if (on) { onOverride(true); scene.recalibrate(); }
     else { onOverride(false); cable.unplug(); }
   }
+  function newAsk() { ask = { head: pickOf(PROMPT.head), name: pickOf(PROMPT.name), warn: pickOf(PROMPT.warn), ask: pickOf(PROMPT.ask), no: pickOf(PROMPT.no) }; answer = 0; }
+  // the answer to the question: yes reads the soul, no closes the display
+  function answerAsk(yes) {
+    if (mode !== 'prompt' || busy) return;
+    if (!scene.data) { powerOff(); return; }
+    if (yes) { mode = 'soul'; scene.analyze(); return; }
+    mode = 'bye'; askAt = t(); busy = true; later(() => { busy = false; powerOff(); }, 1.6);
+  }
   function act(a) {
     if (a === 'power') return open ? powerOff() : powerOn();
     if (!open || busy) return;
+    if (mode === 'prompt') { if (a === 'prev' || a === 'next') answer = 1 - answer; return; }
     if (a === 'override') setOverride(!override);
     else if (a === 'next' || a === 'prev') { a === 'next' ? scene.next() : scene.prev(); viewTurn += a === 'next' ? 1 : -1; osd = { txt: `VIEW ${VIEWS.indexOf(scene.view) + 1}/10  ${VIEW_NAMES[scene.view].toUpperCase()}`, at: t() }; }
     else if (a === 'lock') { scene.locked = !scene.locked; osd = { txt: scene.locked ? 'HOLD  ON' : 'HOLD  OFF', at: t() }; }
@@ -185,6 +229,14 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
   let viewTurn = 0, pressed = null;
   bay.addEventListener('click', e => {
     const a = e.target.closest('[data-act]'); if (a) return act(a.dataset.act);
+    const scr = e.target.closest('.sb-scr');
+    if (scr && mode === 'prompt' && screen) {
+      // the click in the question's own coordinates (1200 × 760, fitted into the screen)
+      const r = screen.getBoundingClientRect(), s = Math.min(r.width / 1200, r.height / 760), x = (e.clientX - r.left - (r.width - 1200 * s) / 2) / s, y = (e.clientY - r.top - (r.height - 760 * s) / 2) / s;
+      const hit = optRects.find(o => x >= o.x && x <= o.x + o.w && y >= o.y && y <= o.y + o.h);
+      if (hit) { answer = hit.i; answerAsk(hit.yes); }
+      return;
+    }
     const s = e.target.closest('[data-sel]'); if (s) changeShell(s.dataset.sel === 'next' ? 1 : -1);
   });
   bay.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && (e.target.dataset.act || e.target.dataset.sel)) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
@@ -232,7 +284,7 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
     const c = screen.getContext('2d'), sh = BYID[shown];
     c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.filter = 'none'; c.fillStyle = '#020302'; c.fillRect(0, 0, w, h);
     if (P.to === 0 && P.k >= 1) return;
-    const src = scene.frame(getCyc(), isPlaying(), Math.min(w / 1200, h / 760));
+    const src = mode === 'soul' ? scene.frame(getCyc(), isPlaying(), Math.min(w / 1200, h / 760)) : promptFrame(Math.min(w / 1200, h / 760));
     const fit = (alpha = 1, sy = 1, bright = 1) => { const s = Math.min(w / src.width, h / src.height), dw = src.width * s, dh = src.height * s * sy; c.save(); c.globalAlpha = alpha; if (bright !== 1) c.filter = `brightness(${bright})`; c.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh); c.restore(); };
     const phos = sh.mono ? (isHw() ? '#ffb347' : '#7dff8a') : isHw() ? '#ffb347' : '#b8ffcb';
     if (P.to === 1 && P.k < 1) {
@@ -254,13 +306,50 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
     if (shown === 'E' && on > .9 && osd && t() - osd.at < 1.6) { c.font = `bold ${Math.round(h / 12)}px "Share Tech Mono", monospace`; c.textAlign = 'right'; c.fillStyle = '#5dff5d'; c.strokeStyle = '#000'; c.lineWidth = 3 * d; c.strokeText(osd.txt, w * .95, h * .14); c.fillText(osd.txt, w * .95, h * .14); c.textAlign = 'left'; }
   }
 
+  // ---------- the question, drawn like the soul (1200 × 760) so the power effects work the same ----------
+  const pc = document.createElement('canvas'), pg = pc.getContext('2d');
+  function promptFrame(scale) {
+    scene.frame(getCyc(), isPlaying(), .1); // keeps following the song, to know whether one plays
+    const k = Math.max(.5, Math.min(1.25, scale));
+    if (pc.width !== Math.round(1200 * k)) { pc.width = Math.round(1200 * k); pc.height = Math.round(760 * k); }
+    pg.setTransform(k, 0, 0, k, 0, 0);
+    const sh = BYID[shown], phos = sh && sh.mono ? (isHw() ? '#ffb347' : '#7dff8a') : isHw() ? '#ffb347' : '#b8ffcb', dim = isHw() ? '#b0702a' : '#3fae66';
+    const g = pg, el = t() - askAt;
+    g.fillStyle = '#020403'; g.fillRect(0, 0, 1200, 760);
+    g.shadowColor = phos; g.textBaseline = 'alphabetic';
+    const type = (txt, x, y, size, from, col = phos) => { const n = Math.max(0, Math.min(txt.length, Math.floor((el - from) * 38))); g.font = `${size}px VT323, monospace`; g.fillStyle = col; g.shadowBlur = 10; g.fillText(txt.slice(0, n), x, y); g.shadowBlur = 0; return from + txt.length / 38; };
+    optRects = [];
+    if (mode === 'bye') { type(ask.no, 120, 400, 58, 0); return pc; }
+    const song = !!scene.data;
+    let at = 0;
+    at = type(ask.head, 120, 190, 34, at, dim) + .1;
+    at = type(ask.name, 120, 270, 78, at) + .2;
+    if (!song) { at = type('NO SIGNAL · PLAY A SONG FIRST', 120, 380, 40, at) + .2; }
+    else { at = type(ask.warn, 120, 380, 34, at) + .3; at = type(ask.ask, 120, 480, 64, at) + .2; }
+    if (el > at) {
+      const opts = song ? [['YES', true], ['NO', false]] : [['OK', false]], blink = Math.floor(el * 2.4) % 2;
+      opts.forEach(([label, yes], i) => {
+        const x = 120 + i * 240, y = 560, w = 200, h = 84, sel = song ? answer === i : true;
+        g.strokeStyle = phos; g.lineWidth = 3; g.shadowBlur = sel ? 14 : 0; g.strokeRect(x, y, w, h);
+        if (sel) { g.fillStyle = phos; g.globalAlpha = blink ? 1 : .85; g.fillRect(x + 6, y + 6, w - 12, h - 12); g.globalAlpha = 1; }
+        g.shadowBlur = 0; g.font = '60px VT323, monospace'; g.fillStyle = sel ? '#020403' : phos; g.textAlign = 'center'; g.fillText(label, x + w / 2, y + 62); g.textAlign = 'left';
+        optRects.push({ x, y, w, h, yes, i });
+      });
+      g.font = '24px VT323, monospace'; g.fillStyle = dim; g.fillText(song ? '◀ ▶ TO CHOOSE · ENTER TO CONFIRM' : 'ENTER TO CLOSE', 120, 690);
+    } else if (Math.floor(el * 3) % 2) { g.fillStyle = phos; g.fillRect(120, 520, 22, 6); }
+    // CRT lines over the question
+    g.fillStyle = 'rgba(0,0,0,.25)'; for (let y = 0; y < 760; y += 3) g.fillRect(0, y, 1200, 1);
+    return pc;
+  }
+
   // ---------- frame loop (only while the bay is open or moving) ----------
   function frame() {
     raf = 0;
     const tt = t();
     layout(); drawScrew();
+    if (!tab.hidden) { const k = val('tab'); tab.style.transform = `translateX(${(1 - k) * 110}%)`; tab.style.opacity = String(clamp(k * 3)); }
     const moving = Object.values(A).some(a => tt < a.at + a.dur + .05);
-    if (open || moving) {
+    if (open || moving || tabOut) {
       if (!bay.hidden && tt - lastFrame > 1 / 30) { lastFrame = tt; syncPanel(); drawScreen(); drawSel(); }
       raf = requestAnimationFrame(frame);
     }
@@ -276,6 +365,7 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
   drawScrew();
   return {
     get open() { return open; }, get override() { return override; }, get shell() { return shell; },
-    reveal, powerOff, act, changeShell, themeChanged, cable,
+    reveal, powerOff, act, changeShell, themeChanged, cable, answer: yes => answerAsk(yes),
+    get mode() { return mode; }, get tabOut() { return tabOut; },
   };
 }

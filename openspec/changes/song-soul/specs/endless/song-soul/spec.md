@@ -49,11 +49,15 @@ The visual stage SHALL offer the soul as a scene (phase 1). The visual picker SH
 - **THEN** the stage shows the soul of the song on air
 
 ### Requirement: Soul display
-A Soul display (phase 2) SHALL show the soul independently of the visual stage: the stage can show any visual while the display shows the soul. It SHALL be hidden, as an easter egg: no button on the stage names it; a small screw in the stage's corner, unscrewed with three clicks, opens it, and so does typing "soul". The display SHALL carry its own controls: power (which closes it), full screen, previous and next view, lock and override. With override on, the visual stage SHALL show the soul; turning override or the display off SHALL bring the chosen visual back. The display SHALL offer seven shells (MISK/OS 6000, Unified terminal, Wrist-Link, Deck console, MiskVision, Pro monitor, Electronic Brain 1958), seen from the front and filling the bay, with a default per theme; a selector on the bay's bottom edge (two arrow keys side by side, then a small display with the shell's number and name) changes the shell without changing the theme.
+A Soul display (phase 2) SHALL show the soul independently of the visual stage: the stage can show any visual while the display shows the soul. It SHALL be hidden, as an easter egg: no button on the stage names it; a small screw in the stage's corner, unscrewed with three clicks (or typing "soul"), lets a "SONG SOUL ANALYZER" tab peek out of the stage's edge; its OPEN button opens the display, and the tab slides back by itself after about 20 seconds. Once on, the screen asks first ("ANALYZE NOW?" and other variants, YES or NO, by click, arrow keys and Enter, Y or N, or the display's view keys); yes reads the soul with the analyzing line, no closes the display. With no song playing it says so and offers OK. The display SHALL carry its own controls: power (which closes it), full screen, previous and next view, lock and override. With override on, the visual stage SHALL show the soul; turning override or the display off SHALL bring the chosen visual back. The display SHALL offer seven shells (MISK/OS 6000, Unified terminal, Wrist-Link, Deck console, MiskVision, Pro monitor, Electronic Brain 1958), seen from the front and filling the bay, with a default per theme; a selector on the bay's bottom edge (two arrow keys side by side, then a small display with the shell's number and name) changes the shell without changing the theme.
 
 #### Scenario: Find the display
-- **WHEN** the listener clicks the screw in the stage's corner three times
-- **THEN** the screw drops out and the display opens
+- **WHEN** the listener clicks the screw in the stage's corner three times and then OPEN on the tab
+- **THEN** the display opens and asks whether to analyze the song
+
+#### Scenario: Say no
+- **WHEN** the listener answers NO
+- **THEN** a short line shows, the display closes and the screw goes back
 
 #### Scenario: Change the shell
 - **WHEN** the listener presses the next shell key
@@ -63,7 +67,7 @@ A Soul display (phase 2) SHALL show the soul independently of the visual stage: 
 Opening the display SHALL be animated: the stage shrinks, a bay beside it slides in and opens, the display comes out and switches on. Turning it off SHALL play the reverse and screw the screw back in. With override on, a SCART cable SHALL run from a socket under the bay to a socket under the stage; the cable SHALL hang and swing like a real cable and the listener SHALL be able to drag it.
 
 #### Scenario: Open the display
-- **WHEN** the screw drops out
+- **WHEN** the listener presses OPEN on the tab
 - **THEN** the stage shrinks, the bay opens, the display comes out and switches on within about three seconds
 
 #### Scenario: Override the visual
