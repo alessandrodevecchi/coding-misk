@@ -339,6 +339,8 @@
 
 - `#46` anima nel visual principale solo col cavo collegato (richiesta del proprietario): "Anima" non è più un visual da scegliere; nel menu resta come opzione bloccata con una piccola icona a lucchetto (SVG, non emoji) come indizio, e si sblocca e si seleziona da sola quando il display dell'anima fa override col cavo. Scegliere un altro visual stacca il cavo. I brani non possono più impostare l'anima come loro visual. Anche il lucchetto delle viste sul palco ora è un'icona SVG.
 
+- Specifiche OpenSpec per `#49` (change `radio-compilation`) e `#50` (change `random-tools`) con le risposte del proprietario: compilation con pulsante a doppia spia (ogni brano, ogni 2-4 brani), configurazione salvabile come preset (movimento libero o viaggio tra generi vicini, generi, stili, artisti, artisti casuali sì o no, range delle manopole); dadi (icona disegnata) per artista, stili, genere, ogni manopola e tutte con switch "casuale / in range", e un dado "suoni" che cambia strumenti e kit dentro gli stessi stili; artista casuale con Tieni, Ancora, Scarta. Aperta `#51` (stili inventati, futuro upgrade di `#50`). Corretto anche l'aspetto disabilitato di Anima nel menu in tema HW.
+
 ## Prossimo passo
 
 Stato al 2026-10-09: `main` = `v0.5.0`; tag `v0.6.0-beta.1` su `develop` a `a87e842`; `develop` = `07a3e56` con in più console della radio (`#24`), Studio (`#28`, da rivedere, issue aperta), versioni a mano (`#33`), Impostazioni (`#31`), registrazione (`#30`), due modalità Ascolta e Groove Lab (`#42`), Generi (`#43`), strumento nuovo dalla console (`#41`). Tutti i controlli passano.
