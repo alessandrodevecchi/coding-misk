@@ -16,7 +16,7 @@ import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } f
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE, GEAR, VIDEO } from '../icons.js';
+import { DICE, GEAR } from '../icons.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -255,7 +255,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (!recipe) return;
     if (recS) stopRec();
     start({ recipe });
-    startRec();
+    startRec(player.outKind() === 'video');
   }
   // cancel: a video is dropped, nothing is saved
   async function stopRec(cancel = false) {
@@ -585,8 +585,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <button class="btn" id="radio-pause" ${on ? '' : 'disabled'} ${tip(paused ? 'tipResume' : 'tipPause')}>${paused ? '▶ ' + esc(t('radioResume')) : '❚❚ ' + esc(t('radioPause'))}</button>
           <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
           <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
-          <button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>
-          ${recS ? '' : `<button class="btn rec-btn" id="radio-vid" ${tip('tipRecVideo')}>${VIDEO} ${esc(t('recVideo'))}</button>`}
+          <span class="out-combo"><button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>${player.outKindButton()}</span>
+
           <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
           <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
         </div>
@@ -638,8 +638,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const b = e.target.closest('button'); if (!b) return;
     if (b.id === 'radio-start') return S ? stop() : start();
     if (b.id === 'radio-skip') return skip();
-    if (b.id === 'radio-rec') return recS ? stopRec() : startRec();
-    if (b.id === 'radio-vid') return startRec(true);
+    if (b.id === 'radio-rec') return recS ? stopRec() : startRec(player.outKind() === 'video');
     if (b.id === 'radio-rec-start') return recordFromStart();
     if (b.id === 'radio-mute') return player.toggleMute();
     if (b.id === 'radio-pause') return S && S.paused !== undefined ? resume() : pause();

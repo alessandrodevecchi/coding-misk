@@ -46,7 +46,7 @@ export const GUIDE = [
     title: { en: 'Songs', it: 'Brani' },
     what: { en: 'Every song: the app\'s, yours and those saved from the radio, with search, tags and favourites.', it: 'Tutti i brani: quelli dell\'app, i tuoi e quelli salvati dalla radio, con ricerca, tag e preferiti.' },
     how: { en: 'Type in the search (it understands both languages: "frigio" finds "phrygian"), tap a genre, style or kind chip, sort. ☆ adds to the favourites, [+ Playlist] adds to a playlist, [▶ Continue in radio] lets the radio go on after the song. The playlist menu on top plays one.', it: 'Scrivi nella ricerca (capisce tutte e due le lingue: "frigio" trova "phrygian"), tocca un chip di genere, stile o tipo, ordina. ☆ mette tra i preferiti, [+ Playlist] aggiunge a una playlist, [▶ Continua in radio] fa continuare la radio dopo il brano. Il menu delle playlist in alto ne suona una.' },
-    know: { en: 'A tap on a tag of a card filters by it; the legend explains the tag colours. Your songs can have their own tags. [⬇ Video] records the song as a video for YouTube (visual, code and sound, in real time); layout and quality are in Settings.', it: 'Un tocco su un tag di una card filtra per quel tag; la legenda spiega i colori. I tuoi brani possono avere tag tuoi. [⬇ Video] registra il brano in un video per YouTube (visual, codice e suono, in tempo reale); layout e qualità sono nelle Impostazioni.' },
+    know: { en: 'A tap on a tag of a card filters by it; the legend explains the tag colours. Your songs can have their own tags. [⬇ Export] saves the song as audio or as a video for YouTube: the small display next to it switches (AUDIO or VIDEO); a video records in real time, its layout and quality are in Settings.', it: 'Un tocco su un tag di una card filtra per quel tag; la legenda spiega i colori. I tuoi brani possono avere tag tuoi. [⬇ Esporta] salva il brano in audio o in video per YouTube: il piccolo display accanto cambia (AUDIO o VIDEO); il video va in tempo reale, layout e qualità sono nelle Impostazioni.' },
   },
   {
     id: 'playlists', tab: 'playlist', mode: 'ascolta', show: '#tab-playlist',
@@ -94,7 +94,7 @@ export const GUIDE = [
       {
         id: 'recording', title: { en: 'Recording', it: 'Registrazione' },
         what: { en: 'Records the radio to an audio file, with a track list and the session recipe.', it: 'Registra la radio in un file audio, con la scaletta e la ricetta della sessione.' },
-        how: { en: '[Record] starts, press again to stop and download. [Video] records a video instead, with the same track list. [Record from the start] plays the session again from its first song and records it.', it: '[Registra] parte, premi di nuovo per fermare e scaricare. [Video] registra invece un video, con la stessa scaletta. [Registra dall\'inizio] rifà la sessione dal primo brano e la registra.' },
+        how: { en: '[Record] starts, press again to stop and download. The display next to it switches between audio and video; the video has the same track list. [Record from the start] plays the session again from its first song and records it.', it: '[Registra] parte, premi di nuovo per fermare e scaricare. Il display accanto passa da audio a video; il video ha la stessa scaletta. [Registra dall\'inizio] rifà la sessione dal primo brano e la registra.' },
         know: { en: 'Pausing leaves no gap in the file. The format (WAV or Opus) is in the settings.', it: 'La pausa non lascia buchi nel file. Il formato (WAV o Opus) è nelle impostazioni.' },
       },
       {

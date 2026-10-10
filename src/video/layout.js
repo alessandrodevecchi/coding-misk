@@ -48,3 +48,9 @@ export function cardAlpha(mode, t, t0) {
 
 // a file name from a title
 export const fileName = (title, ext) => `${String(title || 'coding-misk').replace(/[^\w\- ]+/g, '').replace(/\s+/g, ' ').trim() || 'coding-misk'}.${ext}`;
+
+// one Export and one Record button for audio and video (#27): the kind is a switch shown on a small display
+export const OUT_KEY = 'coding-misk-out-kind';
+export const outKindOf = v => (v === 'video' ? 'video' : 'audio');
+// the display's text: AUDIO · WAV, AUDIO · OPUS, VIDEO · 1080p30
+export const outText = (kind, format, quality) => (kind === 'video' ? `VIDEO · ${QUALITIES[quality] ? quality : '1080p30'}` : `AUDIO · ${format === 'opus' ? 'OPUS' : 'WAV'}`);

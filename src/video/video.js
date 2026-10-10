@@ -149,19 +149,47 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
     g.fillStyle = palette().a1; g.fillText(say, cx, cy, w - 24 * u); g.restore();
   }
 
-  function frame(cyc, playing) {
-    if (!job || job.layout === 'tab') return;
-    const now = performance.now() / 1000, P = palette(), Q = job.q;
-    const soul = job.layout === 'code' ? getSoul() : null, soulMode = soul ? (opts().soulPanel ? 'open' : 'folded') : null;
-    if (!!soul !== job.soulShown) renderBar();
-    const A = layoutAreas(job.layout, Q.w, Q.h, soulMode);
+  // the stage into an area: exact while recording (the stage draws at the area's size), cropped to fill for the preview
+  function drawStage(A) {
+    const src = visuals.canvas, k = Math.max(A.w / src.width, A.h / src.height), sw = A.w / k, sh = A.h / k;
+    g.drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, A.x, A.y, A.w, A.h);
+  }
+  // the live preview in the settings (a canvas element, or null): the frame of the chosen layout, small, while it shows
+  let previewEl = null, previewAt = 0;
+  function drawPreview(cyc, playing) {
+    if (!previewEl || !previewEl.isConnected || !previewEl.offsetParent) return;
+    const now = performance.now() / 1000; if (now - previewAt < 1 / 15) return; previewAt = now;
+    const o = opts(), pg = previewEl.getContext('2d'), W = previewEl.width, H = previewEl.height;
+    if (o.layout === 'tab') {
+      // the whole tab: what the window shows; a label says so
+      const P = palette();
+      pg.fillStyle = P.bg; pg.fillRect(0, 0, W, H);
+      pg.fillStyle = P.muted; pg.font = `600 ${Math.round(H / 14)}px "JetBrains Mono", monospace`; pg.textAlign = 'center'; pg.textBaseline = 'middle';
+      pg.fillText(t('vidPreviewTab'), W / 2, H / 2, W - 24); pg.textAlign = 'start';
+      return;
+    }
+    if (cv.width !== 960 || cv.height !== 540) { cv.width = 960; cv.height = 540; }
+    compose({ layout: o.layout, q: { w: 960, h: 540 } }, cyc, playing, now);
+    pg.drawImage(cv, 0, 0, W, H);
+  }
+  function compose(J, cyc, playing, now) {
+    const P = palette(), Q = J.q;
+    const soul = J.layout === 'code' ? getSoul() : null, soulMode = soul ? (opts().soulPanel ? 'open' : 'folded') : null;
+    const A = layoutAreas(J.layout, Q.w, Q.h, soulMode);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
-    g.drawImage(visuals.canvas, A.stage.x, A.stage.y, A.stage.w, A.stage.h);
+    drawStage(A.stage);
     drawSay(A.stage);
     drawCard(A.stage, P, getInfo(cyc) || {}, now);
     if (A.soul) drawSoul(A.soul, P, soulMode === 'open', soulMode === 'open' ? soul.canvas(cyc, playing, (A.soul.w - 8) / 1200) : null);
     if (A.code) drawCode(A.code, P, now, Q.h);
+    return !!soul;
+  }
+  function frame(cyc, playing) {
+    if (!job) { drawPreview(cyc, playing); return; }
+    if (job.layout === 'tab') return;
+    const now = performance.now() / 1000;
+    if (compose(job, cyc, playing, now) !== job.soulShown) renderBar();
     // preview and time in the bar, a few times a second
     if (now - (job.barAt || 0) > .25) {
       job.barAt = now;
@@ -216,6 +244,8 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
   }
   return {
     start, end, askTab, frame, opts, setOpt,
+    // the settings' live preview: a canvas element, or null
+    preview(el) { previewEl = el; },
     pause() { if (job && !job.pauseAt) job.pauseAt = performance.now(); },
     resume() { if (job && job.pauseAt) { job.paused += performance.now() - job.pauseAt; job.pauseAt = null; } },
     get on() { return !!job; },

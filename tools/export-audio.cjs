@@ -1,4 +1,4 @@
-// Exports tracks to WAV through the app's own "Export WAV" button (real-time render).
+// Exports tracks to WAV through the app's own Export button (audio) (real-time render).
 // Usage: PLAYWRIGHT_CORE=... node tools/export-audio.cjs <out-dir> <track-id> [track-id …]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const path = require('path');

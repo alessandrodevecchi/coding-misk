@@ -27,6 +27,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setFormat'), `<select id="set-format" data-no-knob>${opt('wav', store.get('coding-misk-export-format', 'wav'), t('setWav'))}${opt('opus', store.get('coding-misk-export-format', 'wav'), t('setOpus'))}</select>`, t('setFormatHint'))}
         </div>
         <div class="card set-card"><h3>${esc(t('setVideo'))}</h3>
+          <figure class="vid-preview"><canvas id="set-vid-preview" width="480" height="270" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted">${esc(t('vidPreviewHint'))}</figcaption></figure>
           ${row(t('setVidLayout'), `<select data-vid-opt="layout" data-no-knob>${LAYOUTS.map(k => opt(k, vid.layout, t(`vidLayout:${k}`))).join('')}</select>`, t(`vidLayoutHint:${vid.layout}`))}
           ${row(t('setVidQuality'), `<select data-vid-opt="quality" data-no-knob>${Object.keys(QUALITIES).map(k => opt(k, vid.quality, t(`vidQuality:${k}`))).join('')}</select>`, t('setVidQualityHint'))}
           ${row(t('setVidCard'), `<select data-vid-opt="card" data-no-knob>${CARDS.map(k => opt(k, vid.card, t(`vidCard:${k}`))).join('')}</select>`)}
@@ -42,6 +43,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           <div class="actions"><button class="btn primary" id="set-export">${esc(t('setExport'))}</button><button class="btn" id="set-import">${esc(t('setImport'))}</button><button class="btn danger" id="set-reset">${esc(t('setReset'))}</button></div>
         </div>
       </div>`;
+    if (app.videoPreview) app.videoPreview(root.querySelector('#set-vid-preview'));
   }
 
   const setVid = (k, v) => store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}), [k]: v });

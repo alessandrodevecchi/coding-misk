@@ -3,7 +3,7 @@
 // can grab it anywhere and drag it; released, it swings back. Plugging in, the free end travels from OUT down under
 // the stage and climbs into SOUL IN; unplugging plays the reverse.
 // getEnds(): { out: { x, y }, in: { x, y } } socket mouths in viewport pixels (the plug hangs below them), or null.
-const N = 30, PLUG = 38, GRAB = 18;
+const N = 30, PLUG = 38, GRAB = 26;
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const eio = k => (k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
@@ -31,7 +31,7 @@ export function createCable({ getEnds, isHw }) {
   }
   function step(dt, E) {
     const gy = 2200 * dt * dt;
-    for (let i = 1; i < N; i++) { const p = pts[i], vx = (p.x - p.px) * .985, vy = (p.y - p.py) * .985; p.px = p.x; p.py = p.y; p.x += vx; p.y += vy + gy; }
+    for (let i = 1; i < N; i++) { const p = pts[i], vx = (p.x - p.px) * .975, vy = (p.y - p.py) * .975; p.px = p.x; p.py = p.y; p.x += vx; p.y += vy + gy; }
     const k = clamp((now() - modeAt) / 1.15), endK = mode === 'plugging' ? k : mode === 'unplugging' ? 1 - k : mode === 'in' ? 1 : null;
     for (let it = 0; it < 16; it++) {
       pts[0].x = E.out.x; pts[0].y = E.out.y + PLUG;

@@ -1021,3 +1021,15 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
   .ico-video { width: 1.15em; height: .9em; vertical-align: -1px; }
   .mini .ico-video { width: 14px; height: 11px; }
   :root[data-ui="hw"] .vid-dot { background: #ff3b30; box-shadow: none; }
+
+  /* button clusters (#27): play, pause and stop together; one Export or Record with its audio/video display */
+  .btn-cluster { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .out-combo { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); }
+  #tr-out { display: contents; }
+  .out-kind { padding: 0 3px; border: 0; background: none; cursor: pointer; }
+  .out-kind .comp-lcd { display: inline-block; min-width: 9.5em; text-align: center; }
+  .out-kind:hover:not(:disabled) .comp-lcd { color: var(--a1); }
+  .out-kind:disabled { cursor: default; opacity: .65; }
+  :root[data-ui="hw"] .out-combo { border-color: #0d0d10; border-radius: 4px; background: linear-gradient(#3b3b41, #28282d); box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 2px 0 #0d0d10; }
+  .vid-preview { margin: 0 0 4px; display: grid; gap: 4px; }
+  .vid-preview canvas { width: 100%; max-width: 100%; aspect-ratio: 16 / 9; height: auto; border-radius: 6px; border: 1px solid var(--line); background: #000; }

@@ -30,7 +30,7 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
-import { fileName } from './video/layout.js';
+import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS } from './video/layout.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
 import { LOCK } from './icons.js';
@@ -534,6 +534,11 @@ async function finishExport(r) {
   saveBlob(name, out);
   toast(t('exportDone', { name }));
 }
+// one Export and one Record for audio and video (#27): the switch is the small display next to the button
+const outKind = () => outKindOf(store.get(OUT_KEY, 'audio'));
+const outKindButton = () => `<button class="out-kind" data-out-kind title="${esc(t('outKindTip'))}" aria-label="${esc(t('outKindTip'))}"><span class="comp-lcd" data-out-lcd>${esc(outText(outKind(), store.get('coding-misk-export-format', 'wav'), (store.get('coding-misk-video', {}) || {}).quality || VIDEO_DEFAULTS.quality))}</span></button>`;
+const outCombo = btn => `<span class="out-combo">${btn}${outKindButton()}</span>`;
+document.addEventListener('click', e => { const b = e.target.closest('[data-out-kind]'); if (!b || b.disabled) return; store.set(OUT_KEY, outKind() === 'video' ? 'audio' : 'video'); });
 function saveBlob(name, blob) {
   const url = URL.createObjectURL(blob), a = document.createElement('a');
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
@@ -598,8 +603,8 @@ function wavBlob(buf) {
   for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++) { const v = Math.max(-1, Math.min(1, chans[c][i])); data.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7fff, true); o += 2; }
   return new Blob([data], { type: 'audio/wav' });
 }
-$('#tr-export').addEventListener('click', () => exportTrack(compiled, 'track'));
-$('#tr-video').addEventListener('click', () => exportTrack(compiled, 'track', true));
+$('#tr-export').addEventListener('click', () => exportTrack(compiled, 'track', outKind() === 'video'));
+$('#tr-out').innerHTML = outKindButton();
 // Continue in radio (#29): the song in Compose is song 0 of a new radio session, from the bar it is at
 const continuable = sg => (sg.tracks || []).some(x => x.type !== 'code' && x.type !== 'voice');
 function continueInRadio(sg, from = 0) {
@@ -1640,14 +1645,17 @@ function songCard({ tr, p }, i) {
       <span class="ticks">${ticks}</span><span class="head"></span>
     </div>
     <div class="songbar">
-      <button class="btn primary" data-act="play">${t('songPlay')}</button>
-      <button class="btn" data-act="pause" hidden></button>
-      <button class="btn" data-act="stop" hidden>${t('stop')}</button>
-      <button class="btn" data-act="export" data-export="${esc(tr.id)}">${t('exportWav')}</button>
-      <button class="btn" data-act="video" data-export-video="${esc(tr.id)}" title="${esc(t('vidTip'))}">${t('exportVideo')}</button>
-      <button class="btn" data-act="playlist" aria-expanded="false">${t('addToPlaylist')}</button>
-      ${composed && continuable(tr) ? `<button class="btn" data-act="radio" title="${esc(t('continueRadioTip'))}">${t('continueRadio')}</button>` : ''}
-      ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}${tr.version ? `<button class="btn danger" data-act="del-version">${t('plDelete')}</button>` : ''}`}
+      <span class="btn-cluster">
+        <button class="btn primary" data-act="play">${t('songPlay')}</button>
+        <button class="btn" data-act="pause" hidden></button>
+        <button class="btn" data-act="stop" hidden>${t('stop')}</button>
+      </span>
+      ${outCombo(`<button class="btn" data-act="export" data-export="${esc(tr.id)}">${t('exportWav')}</button>`)}
+      <span class="btn-cluster">
+        <button class="btn" data-act="playlist" aria-expanded="false">${t('addToPlaylist')}</button>
+        ${composed && continuable(tr) ? `<button class="btn" data-act="radio" title="${esc(t('continueRadioTip'))}">${t('continueRadio')}</button>` : ''}
+        ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}${tr.version ? `<button class="btn danger" data-act="del-version">${t('plDelete')}</button>` : ''}`}
+      </span>
       <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
       <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
     </div>
@@ -1842,8 +1850,8 @@ $('#songs').addEventListener('click', e => {
     if (a === 'pause') return togglePlay();
     if (a === 'stop') return stop();
     if (a === 'radio') return continueInRadio({ ...tr, tags: tr.tags || songOf({ tr, p }).tags }, 0);
-    if (a === 'export' || a === 'video') {
-      const v = a === 'video';
+    if (a === 'export') {
+      const v = outKind() === 'video';
       if (tr.kind === 'composed') { if (!rec && !loadTrack(tr)) return; return exportTrack(rec ? null : compiled, 'track', v); }
       return exportTrack(p, 'free', v);
     }
@@ -1948,8 +1956,10 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
     if (!rec.ending && !playing && !seeking && rec.recorder.state === 'recording' && performance.now() - (rec.started || (rec.started = performance.now())) > 3000) rec.ending = performance.now();
   }
   const recLabel = rec ? t('exporting', { t: clock(song && s ? song.meta.secondsAt(s.now()) : 0), total: clock(rec.total) }) : null;
-  $$('[data-export]').forEach(b => { const l = rec && !rec.video && (b.dataset.export === rec.id || b.id === 'tr-export') ? recLabel : t('exportWav'); if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!(rec && l === recLabel)); });
-  $$('[data-export-video]').forEach(b => { const l = rec && rec.video && (b.dataset.exportVideo === rec.id || b.id === 'tr-video') ? recLabel : t('exportVideo'); if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!(rec && l === recLabel)); });
+  $$('[data-export]').forEach(b => { const l = rec && (b.dataset.export === rec.id || b.id === 'tr-export') ? recLabel : t('exportWav'); if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!(rec && l === recLabel)); });
+  // the audio or video displays next to Export and Record; locked while anything records
+  { const txt = outText(outKind(), store.get('coding-misk-export-format', 'wav'), (store.get('coding-misk-video', {}) || {}).quality || VIDEO_DEFAULTS.quality), busy = !!(rec || capture);
+    $$('[data-out-lcd]').forEach(el => { if (el.textContent !== txt) el.textContent = txt; const b = el.parentElement; if (b.disabled !== busy) b.disabled = busy; }); }
   // pulsanti di trasporto
   const playBtn = $('#play'), state = playing ? 'playing' : paused ? 'paused' : 'stopped';
   if (playBtn.dataset.state !== state) {
@@ -2170,6 +2180,8 @@ radio = createRadio({
     halt: () => { const s = sched(), cyc = s ? s.now() : 0; ed.stop(); return cyc; },
     capture: () => startCapture(),
     captureVideo: o => startVideoCapture(o),
+    // Record makes audio or video, from the display next to it (#27)
+    outKind: () => outKind(), outKindButton: () => outKindButton(),
     now: () => (sched() ? sched().now() : 0),
     saveSong: sg => { user.tracks.push({ ...clone(sg), id: 'u-' + Date.now() }); saveLibrary(); renderSongs(); toast(t('trackSaved')); },
     // sessions into playlists (#38): the lists to pick from, and adding (null: a new playlist)
@@ -2220,6 +2232,8 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
   app: {
     ui: () => ui, setUi: v => setUi(v), lang: () => getLang(), setLang: l => changeLang(l),
     volume: () => volume, setVolume: v => setVolume(v),
+    // the video recorder is made after the settings: a page opened on the settings gets its preview below
+    videoPreview: el => { try { video.preview(el); } catch (e) {} },
     radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', scope: 'song' }), setRadio: (k, v) => radio && radio.setOption(k, v),
   } });
 $('#open-settings').addEventListener('click', () => showTab($('#tab-impostazioni').hidden ? 'impostazioni' : prevTab));
@@ -2306,3 +2320,4 @@ const video = createVideo({
   getSoul: () => (soulDisplay.open && soulDisplay.mode === 'soul' && !soulOverride ? { canvas: (cyc, playing, scale) => soul.frame(cyc, playing, scale) } : null),
 });
 globalThis.codingMiskVideo = video;
+if (settingsPage && !$('#tab-impostazioni').hidden) settingsPage.render();

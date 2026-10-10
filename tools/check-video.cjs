@@ -24,15 +24,21 @@ const probe = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'err
   await setVideo({ layout: 'visual', quality: '720p30', card: 'always', soulPanel: true });
   await page.reload(); await sleep(3500);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
+  // one Export with an AUDIO / VIDEO display: a tap switches it
+  const lcd = () => page.textContent('#songs [data-song-id="kellerlicht"] [data-out-lcd]');
+  check(/AUDIO/.test(await lcd()), 'Export starts on audio', await lcd());
+  await page.click('#songs [data-song-id="kellerlicht"] [data-out-kind]'); await sleep(200);
+  check(/VIDEO · 720p30/i.test(await lcd()), 'a tap on the display switches to video, with the quality', await lcd());
   const V = () => page.evaluate(() => { const v = globalThis.codingMiskVideo; return { on: v.on, layout: v.layout, w: v.canvas.width, h: v.canvas.height, bar: !document.querySelector('.video-bar').hidden }; });
   const saved = async (re, ext) => { const d = downloads.find(x => re.test(x.suggestedFilename())); if (!d) return null; const f = path.join(os.tmpdir(), `vid-${Date.now()}.${ext}`); await d.saveAs(f); return f; };
   const card = '#songs [data-song-id="kellerlicht"]';
 
   // 1. a song, Visual layout, 720p: stop from the bar saves the video
-  await page.click(`${card} [data-act="video"]`); await sleep(4500);
+  await page.click(`${card} [data-act="export"]`); await sleep(4500);
   let v = await V();
   check(v.on && v.layout === 'visual' && v.w === 1280 && v.h === 720 && v.bar, 'song video starts with the bar, frame at 1280×720', JSON.stringify(v));
-  check(/REC/.test(await page.textContent(`${card} [data-act="video"]`)), 'the card button shows the recording');
+  check(/REC/.test(await page.textContent(`${card} [data-act="export"]`)), 'the card button shows the recording');
+  check(await page.evaluate(() => document.querySelector('#songs [data-song-id="kellerlicht"] [data-out-kind]').disabled), 'the display is locked while recording');
   if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, 'video-bar.png') }); }
   await page.click('.video-bar [data-vid="stop"]'); await sleep(4500);
   v = await V();
@@ -47,7 +53,7 @@ const probe = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'err
   // 2. Visual + code, 1080p: the code is drawn beside the stage; cancel saves nothing
   await setVideo({ layout: 'code', quality: '1080p30', card: 'start', soulPanel: true });
   const before = downloads.length;
-  await page.click(`${card} [data-act="video"]`); await sleep(4000);
+  await page.click(`${card} [data-act="export"]`); await sleep(4000);
   v = await V();
   check(v.on && v.layout === 'code' && v.w === 1920 && v.h === 1080, 'code layout at 1920×1080', JSON.stringify(v));
   // the code column is not empty: bright pixels on its panel
@@ -61,7 +67,7 @@ const probe = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'err
   await setVideo({ layout: 'visual', quality: '720p30', card: 'always', soulPanel: true });
   await page.click('[data-tab="radio"]'); await sleep(300);
   await page.click('#radio-start'); await sleep(2500);
-  await page.click('#radio-vid'); await sleep(3500);
+  await page.click('#radio-rec'); await sleep(3500);
   check((await V()).on && !!(await page.evaluate(() => globalThis.codingMiskRadio.recording)), 'radio video records');
   if (SHOTS) { const png = await page.evaluate(() => globalThis.codingMiskVideo.canvas.toDataURL('image/png')); fs.writeFileSync(path.join(SHOTS, 'video-radio.png'), Buffer.from(png.split(',')[1], 'base64')); }
   const n0 = downloads.length;
@@ -78,7 +84,7 @@ const probe = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'err
   for (let i = 0; i < 3; i++) { await page.click('.soul-screw'); await sleep(i < 2 ? 350 : 1500); }
   await page.click('.soul-tab .st-open'); await sleep(8500);
   await page.keyboard.press('Enter'); await sleep(500);
-  await page.click('#radio-vid'); await sleep(3000);
+  await page.click('#radio-rec'); await sleep(3000);
   check(await page.isVisible('.video-bar [data-vid="soul"]'), 'with the soul on, the bar offers the soul panel');
   if (SHOTS) { const png = await page.evaluate(() => globalThis.codingMiskVideo.canvas.toDataURL('image/png')); fs.writeFileSync(path.join(SHOTS, 'video-soul.png'), Buffer.from(png.split(',')[1], 'base64')); }
   await page.click('.video-bar [data-vid="soul"]'); await sleep(600);
@@ -93,7 +99,7 @@ const probe = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'err
   await setVideo({ layout: 'tab', quality: '720p30', card: 'always', soulPanel: true });
   await page.click('[data-tab="brani"]'); await sleep(400);
   const n1 = downloads.length;
-  await page.click(`${card} [data-act="video"]`); await sleep(4000);
+  await page.click(`${card} [data-act="export"]`); await sleep(4000);
   v = await V();
   check(v.on && v.layout === 'tab' && !v.bar, 'whole tab layout records, without the bar in the picture', JSON.stringify(v));
   // no bar in the picture: the transport's stop ends it (or the song's end, or the browser's "stop sharing")
@@ -101,6 +107,13 @@ const probe = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'err
   const f4 = downloads.length > n1 ? await saved(/^Kellerlicht.*\.(mp4|webm)$/i, 'mp4') : null;
   if (f4) { const st = probe(f4); check(!!st && st.some(s => s.codec_type === 'video'), 'whole tab file has a video track', st ? st.map(s => s.codec_type).join(', ') : ''); }
   else check(false, 'whole tab file saved');
+
+  // the live preview in the settings
+  await setVideo({ layout: 'code', quality: '1080p30', card: 'always', soulPanel: true });
+  await page.click('#open-settings'); await sleep(1200);
+  const px = await page.evaluate(() => { const c = document.querySelector('#set-vid-preview'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 16) if (d[i] + d[i + 1] + d[i + 2] > 60) n++; return n; });
+  check(px > 2000, 'the settings show a live preview of the layout', `${px} lit samples`);
+  if (SHOTS) await (await page.$('.set-card:has(#set-vid-preview)')).screenshot({ path: path.join(SHOTS, 'settings-preview.png') });
 
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
