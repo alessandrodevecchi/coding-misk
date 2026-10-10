@@ -337,6 +337,8 @@
 
 - `#46` display, accensione rituale (proposta approvata dal proprietario): la vite caduta fa sbucare dal bordo destro del palco una linguetta "SONG SOUL ANALYZER · EXPERIMENTAL · MK-01" con OPEN lampeggiante, che rientra da sola dopo 20 secondi (e la vite torna); OPEN apre il portellone e lo schermo chiede prima di leggere ("MISK LABS · EXPERIMENTAL MK-01 / SONG SOUL ANALYZER", un avvertimento e una domanda scelti fra più varianti, YES o NO con clic, frecce e Invio, Y/N o i tasti vista del guscio). YES fa partire il caricamento con una delle frasi "analyzing" e poi l'anima; NO mostra una riga di commiato e richiude; senza brano dice "NO SIGNAL · PLAY A SONG FIRST" con OK. `check-soul-display.cjs` aggiornato (linguetta, domanda, sì e no).
 
+- `#46` anima nel visual principale solo col cavo collegato (richiesta del proprietario): "Anima" non è più un visual da scegliere; nel menu resta come opzione bloccata con una piccola icona a lucchetto (SVG, non emoji) come indizio, e si sblocca e si seleziona da sola quando il display dell'anima fa override col cavo. Scegliere un altro visual stacca il cavo. I brani non possono più impostare l'anima come loro visual. Anche il lucchetto delle viste sul palco ora è un'icona SVG.
+
 ## Prossimo passo
 
 Stato al 2026-10-09: `main` = `v0.5.0`; tag `v0.6.0-beta.1` su `develop` a `a87e842`; `develop` = `07a3e56` con in più console della radio (`#24`), Studio (`#28`, da rivedere, issue aperta), versioni a mano (`#33`), Impostazioni (`#31`), registrazione (`#30`), due modalità Ascolta e Groove Lab (`#42`), Generi (`#43`), strumento nuovo dalla console (`#41`). Tutti i controlli passano.

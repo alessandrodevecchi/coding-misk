@@ -42,11 +42,11 @@ When the soul appears or the song changes, an overlay SHALL type one line from a
 - **THEN** the view glitches briefly with a recalibrating line and redraws with the changed song
 
 ### Requirement: Scene and full screen
-The visual stage SHALL offer the soul as a scene (phase 1). The visual picker SHALL be a dropdown next to a full-screen button. The soul SHALL be viewable in full screen.
+The visual stage SHALL show the soul as a scene only while the Soul display overrides it (its cable plugged into the stage). The visual picker SHALL be a dropdown next to a full-screen button, listing Soul as a locked option (a small lock icon) until then; songs cannot pick it as their visual. Picking another visual unplugs the cable. The soul SHALL be viewable in full screen.
 
-#### Scenario: Pick the soul
-- **WHEN** the listener picks "Soul" in the visual dropdown while the radio plays
-- **THEN** the stage shows the soul of the song on air
+#### Scenario: Soul locked
+- **WHEN** the Soul display is closed or not plugged in
+- **THEN** Soul shows in the visual dropdown with a lock and cannot be picked
 
 ### Requirement: Soul display
 A Soul display (phase 2) SHALL show the soul independently of the visual stage: the stage can show any visual while the display shows the soul. It SHALL be hidden, as an easter egg: no button on the stage names it; a small screw in the stage's corner, unscrewed with three clicks (or typing "soul"), lets a "SONG SOUL ANALYZER" tab peek out of the stage's edge; its OPEN button opens the display, and the tab slides back by itself after about 20 seconds. Once on, the screen asks first ("ANALYZE NOW?" and other variants, YES or NO, by click, arrow keys and Enter, Y or N, or the display's view keys); yes reads the soul with the analyzing line, no closes the display. With no song playing it says so and offers OK. The display SHALL carry its own controls: power (which closes it), full screen, previous and next view, lock and override. With override on, the visual stage SHALL show the soul; turning override or the display off SHALL bring the chosen visual back. The display SHALL offer seven shells (MISK/OS 6000, Unified terminal, Wrist-Link, Deck console, MiskVision, Pro monitor, Electronic Brain 1958), seen from the front and filling the bay, with a default per theme; a selector on the bay's bottom edge (two arrow keys side by side, then a small display with the shell's number and name) changes the shell without changing the theme.

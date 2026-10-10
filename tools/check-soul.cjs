@@ -25,15 +25,18 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   });
   const S = () => page.evaluate(() => { const s = globalThis.codingMiskSoul; return { view: s.view, locked: s.locked, overlay: s.overlay, title: s.data && s.data.title, seed: s.data && s.data.seed }; });
 
-  check(await page.locator('select#looks option[value="soul"]').count() === 1 && await page.isVisible('#fs'), 'the visual picker is a dropdown with Soul, next to full screen');
-  await page.selectOption('#looks', 'soul'); await sleep(600);
-  check(await page.isVisible('#soul-ctl') && await page.isHidden('#readout'), 'Soul shows the view controls and hides the readout');
-  check((await pixels()).lit > 0.002, 'no song: the soul screen draws "no signal"');
-
-  await page.click('[data-tab="radio"]'); await sleep(300); await page.click('#radio-start'); await sleep(1200);
+  check(await page.locator('select#looks option[value="soul"][disabled]').count() === 1 && await page.isVisible('#fs'), 'the visual picker is a dropdown with Soul locked, next to full screen');
+  await page.click('[data-tab="radio"]'); await sleep(300); await page.click('#radio-start'); await sleep(1500);
+  // the soul reaches the stage through the Soul display: reveal, open, yes, override (the cable plugs in)
+  await page.keyboard.type('soul'); await sleep(1400); await page.click('.soul-tab .st-open'); await sleep(3600);
+  await page.evaluate(() => globalThis.codingMiskSoulDisplay.answer(true)); await sleep(1800);
+  await page.evaluate(() => globalThis.codingMiskSoulDisplay.act('override')); await sleep(1500);
+  check(await page.isVisible('#soul-ctl') && await page.isHidden('#readout') && await page.inputValue('#looks') === 'soul', 'with the display plugged in, the stage shows the soul and its view controls');
   let s = await S();
   const onAir = await page.evaluate(() => { const r = globalThis.codingMiskRadio.state; return r.stream[r.onAir].title; });
   check(s.title === onAir, 'the soul is the song on air', `${s.title} / ${onAir}`);
+  await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(300);
+  s = await S();
   check(s.overlay === 'analyzing', 'a new song is analyzed first');
   const def = await page.evaluate(async () => (await import('/src/soul/data.js')).defaultView(globalThis.codingMiskSoul.data));
   check(s.view === def, 'the song starts in its own view', `${s.view} / ${def}`);
@@ -82,12 +85,9 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(fsOn === 'stagewrap', 'full screen shows the stage with the soul', String(fsOn));
   if (fsOn) { await page.evaluate(() => document.exitFullscreen()); await sleep(300); }
 
-  // another visual and back
-  await page.selectOption('#looks', 'edgerunners'); await sleep(400);
-  check(await page.isHidden('#soul-ctl') && await page.evaluate(() => document.documentElement.dataset.look) === 'edgerunners', 'another visual hides the soul controls');
-  await page.selectOption('#looks', 'soul'); await sleep(200);
-  check(await page.evaluate(() => document.documentElement.dataset.look) === 'edgerunners' && (await S()).overlay === 'analyzing', 'Soul keeps the last visual\'s colours and types its line again');
-
+  // another visual: the cable unplugs, the soul is locked again
+  await page.selectOption('#looks', 'edgerunners'); await sleep(1500);
+  check(await page.isHidden('#soul-ctl') && await page.evaluate(() => document.documentElement.dataset.look) === 'edgerunners' && await page.locator('select#looks option[value="soul"][disabled]').count() === 1, 'another visual unplugs the cable and locks Soul again');
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `${failed} failed` : 'all passed');

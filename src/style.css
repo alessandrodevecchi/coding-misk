@@ -89,6 +89,8 @@
   .look-pick:focus-visible { outline: 2px solid var(--a1); outline-offset: 2px; }
   .soul-name { min-width: 9.5em; text-align: center; font: 600 12px var(--mono); letter-spacing: .08em; color: var(--a1); text-shadow: 0 0 8px #000; }
   .soul-ctl .chip { padding: 4px 10px; }
+  .lock-ico { width: 9px; height: 11px; vertical-align: -1px; margin-left: 4px; opacity: .75; }
+  .soul-ctl .lock-ico { margin: 0; }
   .stagewrap[data-soul="true"] .readout, .stagewrap[data-soul="true"] .say { display: none; }
   .stagewrap[data-soul="true"]::after { display: none; }
   @media (max-width: 640px) { .soul-name { display: none; } .soul-ctl .chip, .look-pick { padding: 3px 9px; font-size: 12px; } }

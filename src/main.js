@@ -125,7 +125,7 @@ let look = store.get('coding-misk-look', T.look || 'palco');
 if (!LOOKS.some(([k]) => k === look)) look = 'palco';
 // the soul scene (#46) keeps the colours of the last other visual: the app's accents and the colour views' hue
 let soulOverride = false; // the Soul display's override (#46): the stage shows the soul
-let soulBase = store.get('coding-misk-soul-base', look === 'soul' ? 'palco' : look);
+let soulBase = look;
 let compiled = playable({ ...T, kind: 'composed' });
 const saveDraft = () => store.set('coding-misk-draft', { T, sel, tk, dirty });
 const sceneStart = i => T.sections.slice(0, i).reduce((a, s) => a + s.bars, 0);
@@ -1379,11 +1379,19 @@ $('#track-panel').addEventListener('click', e => {
 let ui = store.get('coding-misk-ui', 'neon');
 const setUi = v => { ui = v === 'hw' ? 'hw' : 'neon'; store.set('coding-misk-ui', ui); syncAll(); if (globalThis.codingMiskSoulDisplay) globalThis.codingMiskSoulDisplay.themeChanged(); };
 $$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.dataset.uitheme)));
-const setLook = l => { look = l; store.set('coding-misk-look', l); if (l !== 'soul') { soulBase = l; store.set('coding-misk-soul-base', l); } syncAll(); };
+const setLook = l => { if (!LOOKS.some(([k]) => k === l)) return; look = l; soulBase = l; store.set('coding-misk-look', l); syncAll(); };
 // a song's own visual, unless the listener is watching the soul
-const songLook = l => { if (l && look !== 'soul') setLook(l); };
+const songLook = l => { if (l) setLook(l); };
+// a small lock icon for the locked Soul option and the view lock (#46)
+const LOCK_SVG = '<svg class="lock-ico" viewBox="0 0 12 14" aria-hidden="true"><path d="M3.2 6V4.2a2.8 2.8 0 0 1 5.6 0V6" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="6" width="9" height="7" rx="1.4" fill="currentColor"/></svg>';
+
 // a look picked while the radio plays becomes the radio's look (the studio by default, #28)
-$('#looks').addEventListener('change', e => { setLook(e.target.value); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', e.target.value); });
+$('#looks').addEventListener('change', e => {
+  // picking another visual while the Soul display overrides the stage unplugs the cable
+  const v = e.target.value;
+  if (v === 'soul') return;
+  if (soulOverride) soulDisplay.act('override');
+  setLook(v); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', v); });
 $('#fs').addEventListener('click', () => {
   const w = $('#stagewrap');
   try {
@@ -1413,14 +1421,16 @@ function syncSectionFields() {
   $('#sc-swing-o').textContent = `${Math.round((sc.swing || 0) * 100)}%`;
 }
 function syncAll() {
-  document.documentElement.dataset.look = look === 'soul' ? soulBase : look;
-  $('#stagewrap').dataset.soul = look === 'soul' || soulOverride;
-  $('#soul-ctl').hidden = look !== 'soul';
+  document.documentElement.dataset.look = look;
+  $('#stagewrap').dataset.soul = soulOverride;
+  $('#soul-ctl').hidden = !soulOverride;
+  // the soul shows in the visual menu, locked until the Soul display is plugged into the stage
+  { const o = $('#looks option[value="soul"]'); if (o) { o.disabled = !soulOverride; o.innerHTML = soulOverride ? esc(t('soulLook')) : `${esc(t('soulLook'))} ${LOCK_SVG}`; o.title = soulOverride ? '' : t('soulLockedHint'); } }
   document.documentElement.dataset.ui = ui;
   $$('[data-uitheme]').forEach(b => b.setAttribute('aria-pressed', ui === b.dataset.uitheme));
   syncSectionFields();
   syncTrackPanel();
-  $('#looks').value = look;
+  $('#looks').value = soulOverride ? 'soul' : look;
   $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', getLang() === b.dataset.lang));
   syncOutputs();
 }
@@ -2117,8 +2127,8 @@ function renderStatic() {
   if (stylesTab) stylesTab.render();
   if (artistsTab) artistsTab.render();
   renderArtistPick();
-  $('#looks').innerHTML = LOOKS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('');
-  $('#looks').value = look;
+  $('#looks').innerHTML = LOOKS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('') + `<option value="soul" disabled>${esc(t('soulLook'))} ${LOCK_SVG}</option>`;
+  $('#looks').value = soulOverride ? 'soul' : look;
   $('#play').dataset.state = '';
 }
 function renderAll() {
