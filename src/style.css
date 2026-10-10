@@ -82,7 +82,16 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); background: rgba(0,0,0,.45); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
   .chip[aria-pressed="true"] { border-color: var(--a1); color: var(--a1); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 50%, transparent); }
-  .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-left: auto; }
+  /* visual picker (#46): a dropdown next to full screen; the soul's view buttons under it */
+  .hud-row, .soul-ctl { display: flex; align-items: center; gap: 6px; }
+  .look-pick { border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); background: rgba(0,0,0,.55); color: var(--ink); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; }
+  .look-pick:focus-visible { outline: 2px solid var(--a1); outline-offset: 2px; }
+  .soul-name { min-width: 9.5em; text-align: center; font: 600 12px var(--mono); letter-spacing: .08em; color: var(--a1); text-shadow: 0 0 8px #000; }
+  .soul-ctl .chip { padding: 4px 10px; }
+  .stagewrap[data-soul="true"] .readout, .stagewrap[data-soul="true"] .say { display: none; }
+  .stagewrap[data-soul="true"]::after { display: none; }
+  @media (max-width: 640px) { .soul-name { display: none; } .soul-ctl .chip, .look-pick { padding: 3px 9px; font-size: 12px; } }
   .stagewrap:fullscreen .fs { display: none; }
 
   /* area di lavoro */

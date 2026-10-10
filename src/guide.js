@@ -21,6 +21,13 @@ export const GUIDE = [
     know: { en: 'Mix joins saved songs with transitions, like the radio. The volume does not change exported files.', it: 'Mix unisce i brani salvati con le transizioni, come la radio. Il volume non cambia i file esportati.' },
   },
   {
+    id: 'visuals', tab: null, mode: null, show: '#looks',
+    title: { en: 'Visuals and the song soul', it: 'Visual e anima del brano' },
+    what: { en: 'The stage at the top moves with the music. Soul shows the song playing as a retro science-fiction screen, drawn from its seed, settings, curves and instruments: every song looks different.', it: 'Il palco in alto si muove con la musica. Anima mostra il brano che suona come uno schermo di fantascienza retrò, disegnato dal suo seme, dalle impostazioni, dalle curve e dagli strumenti: ogni brano ha un aspetto diverso.' },
+    how: { en: 'Pick a visual in the menu at the top right of the stage; [Fullscreen] fills the screen. With Soul, [◀] and [▶] change the view (ten of them) and [🔒] keeps the view when the song changes.', it: 'Scegli un visual nel menu in alto a destra del palco; [Schermo intero] riempie lo schermo. Con Anima, [◀] e [▶] cambiano vista (sono dieci) e [🔒] tiene la vista al cambio di brano.' },
+    know: { en: 'Each song starts in its own view. A new song is analyzed first; a change from the radio console makes the screen glitch while it recalibrates. Soul keeps the colours of the last visual; in the HW theme the screens turn amber.', it: 'Ogni brano parte nella sua vista. Un brano nuovo viene prima analizzato; un cambio dalla console della radio fa disturbare lo schermo mentre si ricalibra. Anima tiene i colori dell\'ultimo visual; nel tema HW gli schermi diventano ambra.' },
+  },
+  {
     id: 'compose', tab: 'componi', mode: 'ascolta', show: '#arranger',
     title: { en: 'Compose', it: 'Componi' },
     what: { en: 'The workbench of a song: tracks, sections and their settings. Every change writes the Strudel code on the right.', it: 'Il banco di lavoro di un brano: tracce, sezioni e le loro impostazioni. Ogni modifica scrive il codice Strudel a destra.' },

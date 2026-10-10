@@ -218,6 +218,7 @@ GROOVES.rockChorus = [{ it: 'Rock ritornello', en: 'Rock chorus' }, { bd: 'x.x..
 export const LOOKS = [
   ['palco', { it: 'Palco', en: 'Stage' }], ['pixel', 'Pixel'], ['tramonto', { it: 'Tramonto', en: 'Sunset' }],
   ['montagne', { it: 'Montagne', en: 'Mountains' }], ['spazio', { it: 'Spazio', en: 'Space' }], ['sonar', 'Sonar'], ['edgerunners', 'Edgerunners'], ['studio', 'Studio'],
+  ['soul', { it: 'Anima', en: 'Soul' }],
 ];
 // strumenti del visual Palco, nell'ordine in cui compaiono sul palco
 export const INSTRUMENTS = ['kick', 'snare', 'hats', 'fx', 'bass', 'guitar', 'arp', 'pad', 'hook', 'riser'];

@@ -87,6 +87,16 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] "Mostrami" apre la funzione e fa lampeggiare il controllo; il "?" in ogni scheda porta alla sua card.
 - [ ] Testi chiari e giusti? Segna qui cosa manca o non torna.
 
+## Anima del brano, fase 1 (`#46`)
+
+- [ ] Il menu dei visual è a tendina accanto a "Schermo intero"; scegli "Anima" con la radio accesa: compare l'anima del brano in onda, prima con la riga "ANALYZING..." e la barra.
+- [ ] ◀ e ▶ passano per le dieci viste; ognuna si muove, segue la battuta e ha piccoli eventi suoi (glitch, lampi, impulsi).
+- [ ] Un comando della console fa disturbare lo schermo con una riga "RECALIBRATING" e l'anima si ridisegna.
+- [ ] Al brano dopo la vista cambia in quella del nuovo brano; con 🔒 resta uguale (anche dopo aver ricaricato la pagina).
+- [ ] Tema HW: viste A, B, C in ambra, le altre col filtro retro ambra e titoli leggibili.
+- [ ] Anima anche in Componi, sui brani e nelle playlist (curve misurate dalle sezioni); schermo intero; telefono.
+- [ ] Un brano con un suo visual non toglie l'Anima se la stai guardando.
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.

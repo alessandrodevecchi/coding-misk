@@ -12,7 +12,7 @@ The radio has, per song on air, the plan (energy targets, roles), the curves (`s
 
 ## Decisions
 
-- **Modules:** `src/soul/data.js` (pure: `soulData(song, plan, opts, seed)`, sigil, seeded `H32` and timed events `ev`, checkable in Node), `src/soul/views.js` (one draw function per view, ported from v3 with the canvas size as a parameter), `src/soul/overlays.js` (analyzing, interference, line lists), `src/soul/display.js` (phase 2).
+- **Modules:** `src/soul/data.js` (pure: `soulData(song, { plan, entry, opts })`, seeded `hashOf` and timed events `eventAt`, line lists, default view; checkable in Node), `src/soul/views.js` (the ten views and the two overlays, ported from v3 on an offscreen canvas of 1200×760 logical pixels, fitted into the stage), `src/soul/scene.js` (the scene: follows the song, events, view and lock), `src/soul/display.js` (phase 2).
 - **Drawing:** one 2D canvas at device pixel ratio; CRT layers (scanlines, vignette) and the HW retro filter drawn in the canvas; at most 30 frames a second while visible, paused when hidden; a lighter path on phones (fewer points).
 - **Default view:** `views[H32(seed) % 10]`; lock state and the last manual choice remembered in the browser.
 - **Neon hue:** each visual look has an accent hue; the colour views read it, plus a small seeded shift.

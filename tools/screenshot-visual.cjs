@@ -9,7 +9,7 @@ const [look, track, scene, out] = process.argv.slice(2);
   await page.goto('http://localhost:5173/'); await sleep(5000);
   await page.locator('#track-pick').selectOption(track); await page.click('#play'); await sleep(2000);
   await page.click(`[data-scene-i="${scene}"]`); await sleep(4000);
-  await page.click(`[data-look="${look}"]`); await sleep(2500);
+  await page.selectOption('#looks', look); await sleep(2500);
   await page.locator('#stagewrap').screenshot({ path: out + '-a.png' }); await sleep(370);
   await page.locator('#stagewrap').screenshot({ path: out + '-b.png' });
   console.log('errors', JSON.stringify(errs));

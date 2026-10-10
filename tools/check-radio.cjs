@@ -31,7 +31,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   // tab and controls
   check(await page.locator('#tab-radio [data-style]').count() === loadStyles().length, 'radio tab shows every style');
   check(!(await ed()).started, 'nothing plays before start');
-  check(await page.locator('#stagewrap').isVisible() && (await page.locator('#looks [data-look]').count()) > 1, 'stage on top with every visual');
+  check(await page.locator('#stagewrap').isVisible() && (await page.locator('#looks option').count()) > 1, 'stage on top with every visual');
   await pick(['jazz']);
   await page.click('[data-style="jazz"]'); await sleep(200);
   check(await page.getAttribute('[data-style="jazz"]', 'aria-pressed') === 'true', 'the last style cannot be unselected');

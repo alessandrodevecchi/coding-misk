@@ -72,6 +72,8 @@ node tools/check-endless-play.cjs [songs/endless]     # evaluate every live buil
 node tools/check-library.cjs [shots-dir]               # Styles and Artists tabs, radio artist picker, new song from artist (dev server)
 npm run check:song-filter                              # song tags, search, filters and sorting of the Songs tab (no browser)
 node tools/check-songs-tab.cjs [shots-dir]             # Songs tab in the browser: search, filters, favourites, tags, previous and next (dev server)
+npm run check:soul                                     # song soul data: same song same soul, radio souls follow the director, every built-in song drawable (no browser)
+node tools/check-soul.cjs [shots-dir]                  # soul scene in the browser: dropdown, every view draws, HW amber, analyzing, recalibrating, lock, full screen (dev server)
 npm run check:playlists                                # playlist store, play queue (shuffle, repeat), export and import (no browser)
 node tools/check-playlists.cjs [shots-dir]             # playlists in the browser: favourites migration, + Playlist, tab, auto-advance, shuffle, repeat, export and import (dev server)
 node tools/check-transitions.cjs [kind,kind…]          # radio through each transition (mix, morph, echo, break, interlude): no errors, below clipping (dev server)

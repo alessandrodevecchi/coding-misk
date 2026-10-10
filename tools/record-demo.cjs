@@ -53,7 +53,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(3000);
   await page.click('[data-scene-i="3"]'); await sleep(3000);
   await page.click('#stop'); await sleep(500);
-  await page.click('[data-look="palco"]');
+  await page.selectOption('#looks', 'palco');
   await page.locator('#track-pick').selectOption('segnale-nel-rumore');
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.mouse.move(W * .55, H * .45); await sleep(1500);
@@ -94,7 +94,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   mark('play Luci Rosse'); await click('#play'); await sleep(3500);
   mark('salto allo Scontro'); await click('[data-scene-i="3"]'); await sleep(4500);
   for (const look of ['pixel', 'tramonto', 'montagne', 'spazio', 'sonar', 'palco']) {
-    mark('visual ' + look); await click(`[data-look="${look}"]`, 250); await sleep(look === 'palco' ? 2500 : 4200);
+    mark('visual ' + look); await page.selectOption('#looks', look); await sleep(250); await sleep(look === 'palco' ? 2500 : 4200);
   }
   mark('tab Brani'); await click('.tab[data-tab="brani"]'); await sleep(1500);
   await page.mouse.move(W * .3, H * .65, { steps: 18 });

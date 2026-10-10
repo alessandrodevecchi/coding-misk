@@ -663,8 +663,17 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     return { onAir: S.paused === undefined, n: it.n + 1, title: it.song.title, artist: e.artist && e.artist.name, line: `${e.lead ? t('radioLeadShort') : e.styles.map(styleName).join(' + ')} · ${e.key}`, bar: rel, bars: barsOf(it.song), bpm: e.bpm, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at : 0 };
   }
 
+  // the song on air for its soul (#46): the song with the director's plan (steering replaces the song object),
+  // or the song alone for a lead or frozen song
+  function soulSource(cyc) {
+    if (!S) return null;
+    const it = S.stream[S.onAir], rel = Math.max(0, cyc - it.start);
+    const ctx = it.plan ? { plan: it.plan, entry: it.entry, opts: it.opts || (it.base && it.base.opts) || {}, seed: S.recipe.seed, n: it.n } : { entry: it.entry };
+    return { key: `radio:${S.recipe.seed}:${it.n}`, song: it.song, ctx, bar: rel };
+  }
+
   return {
-    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, continueSong, playSession, rebuild,
+    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, soulSource, continueSong, playSession, rebuild,
     // the session on air as a playlist item (#38)
     get sessionNow() { return S && !S.limit ? sessionItem(S.recipe, S.onAir + 1, S.stream[0].song.title) : null; },
     get steering() { if (!S) return null; const it = S.stream[S.onAir]; if (!it.plan) return { n: it.n, lead: true, commands: [], plan: null, song: it.song, recipe: clone(S.recipe) }; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },

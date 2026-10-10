@@ -4,13 +4,14 @@ import { INSTRUMENTS } from './music.js';
 // Ogni strumento suona su un analizzatore separato (.analyze("kick"), .analyze("bass"), …):
 // da lì ricaviamo un livello 0..1 per strumento e gli attacchi (onset) che accendono la scena.
 // getInfo(cyc): what plays, for the studio scene: { onAir, title, artist, line, bar, bars, bpm, say, sayAt, n }
-export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}) }) {
+// soul: the soul scene (#46), drawn when the look is 'soul'
+export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}), soul = null }) {
   const $ = (s, r = document) => r.querySelector(s);
   const cv = $('#stage'), cx = cv.getContext('2d');
-  let W = 0, H = 0;
+  let W = 0, H = 0, dpr = 1;
   const resize = () => {
     const r = cv.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
-    W = r.width; H = r.height; cv.width = Math.round(W * d); cv.height = Math.round(H * d);
+    W = r.width; H = r.height; dpr = d; cv.width = Math.round(W * d); cv.height = Math.round(H * d);
     cx.setTransform(d, 0, 0, d, 0, 0);
   };
   new ResizeObserver(resize).observe(cv); resize();
@@ -824,8 +825,9 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
     const look = getS().look, pal = PAL[look] || PAL.palco;
     cx.clearRect(0, 0, W, H);
-    (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing);
-    if (flash > .02 && !reduce) { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
+    if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
+    else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); }
+    if (flash > .02 && !reduce && look !== 'soul') { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
 
     if (logo) logo.style.setProperty('--pulse', kick.toFixed(3));
     eq.forEach((el, i) => el.style.setProperty('--l', (playing ? lv[EQ[i]] : .15 + .1 * Math.sin(now / 400 + i)).toFixed(3)));

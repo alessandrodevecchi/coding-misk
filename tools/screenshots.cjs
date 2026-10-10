@@ -9,8 +9,8 @@ const OUT = process.argv[2];
   await page.locator('#track-pick').selectOption('luci-rosse'); await page.click('#play'); await sleep(2500);
   await page.click('[data-scene-i="3"]'); await sleep(5000);
   const stage = page.locator('#stagewrap');
-  for (const look of ['palco', 'spazio', 'pixel', 'montagne']) { await page.click(`[data-look="${look}"]`); await sleep(2500); await page.screenshot({ path: `${OUT}/visual-${look}.png` }); }
-  await page.click('[data-look="palco"]'); await sleep(1500);
+  for (const look of ['palco', 'spazio', 'pixel', 'montagne']) { await page.selectOption('#looks', look); await sleep(2500); await page.screenshot({ path: `${OUT}/visual-${look}.png` }); }
+  await page.selectOption('#looks', 'palco'); await sleep(1500);
   await page.evaluate(() => document.getElementById('arranger').scrollIntoView({ block: 'start' })); await page.evaluate(() => window.scrollBy(0, -20)); await sleep(1500);
   await page.screenshot({ path: `${OUT}/compose-arranger.png` });
   await page.evaluate(() => document.getElementById('drums').scrollIntoView({ block: 'start' })); await sleep(1200);

@@ -29,6 +29,7 @@ import SONG_ORDER from '../songs/index.json';
 import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
+import { createSoulScene } from './soul/scene.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
 import { startHardware } from './hardware.js';
@@ -106,7 +107,8 @@ function playable(tr) {
     const v = tr.sections.flatMap(s => [s.bpm ?? 138, s.bpmEnd ?? s.bpm ?? 138]), lo = Math.min(...v), hi = Math.max(...v);
     meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   }
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, build };
+  // doc: the song itself (sections and tracks), for its soul (#46)
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, build, doc: tr.kind === 'composed' ? build || tr : null };
 }
 
 // ---------- brano in modifica ----------
@@ -120,6 +122,8 @@ let scope = 'track', editPat = null, panelView = store.get('coding-misk-panel', 
 let arrMode = store.get('coding-misk-arr-mode', 'timeline'), selClip = null;
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!LOOKS.some(([k]) => k === look)) look = 'palco';
+// the soul scene (#46) keeps the colours of the last other visual: the app's accents and the colour views' hue
+let soulBase = store.get('coding-misk-soul-base', look === 'soul' ? 'palco' : look);
 let compiled = playable({ ...T, kind: 'composed' });
 const saveDraft = () => store.set('coding-misk-draft', { T, sel, tk, dirty });
 const sceneStart = i => T.sections.slice(0, i).reduce((a, s) => a + s.bars, 0);
@@ -855,7 +859,7 @@ $('#track-title').addEventListener('input', e => { T.title = e.target.value; cha
 $('#track-pick').addEventListener('change', e => {
   const tr = composedTracks().find(x => x.id === e.target.value);
   if (!tr || !loadTrack(tr)) { e.target.value = T.id; return; }
-  if (tr.look) setLook(tr.look);
+  songLook(tr.look);
   if (mode !== 'track') backToTrack(); else if (ed) { if (isPlaying()) playSong(compiled, 0, 'track'); else ed.setCode(compiled.code); }
 });
 
@@ -1373,9 +1377,11 @@ $('#track-panel').addEventListener('click', e => {
 let ui = store.get('coding-misk-ui', 'neon');
 const setUi = v => { ui = v === 'hw' ? 'hw' : 'neon'; store.set('coding-misk-ui', ui); syncAll(); };
 $$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.dataset.uitheme)));
-const setLook = l => { look = l; store.set('coding-misk-look', l); syncAll(); };
+const setLook = l => { look = l; store.set('coding-misk-look', l); if (l !== 'soul') { soulBase = l; store.set('coding-misk-soul-base', l); } syncAll(); };
+// a song's own visual, unless the listener is watching the soul
+const songLook = l => { if (l && look !== 'soul') setLook(l); };
 // a look picked while the radio plays becomes the radio's look (the studio by default, #28)
-$('#looks').addEventListener('click', e => { const b = e.target.closest('[data-look]'); if (!b) return; setLook(b.dataset.look); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', b.dataset.look); });
+$('#looks').addEventListener('change', e => { setLook(e.target.value); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', e.target.value); });
 $('#fs').addEventListener('click', () => {
   const w = $('#stagewrap');
   try {
@@ -1405,12 +1411,14 @@ function syncSectionFields() {
   $('#sc-swing-o').textContent = `${Math.round((sc.swing || 0) * 100)}%`;
 }
 function syncAll() {
-  document.documentElement.dataset.look = look;
+  document.documentElement.dataset.look = look === 'soul' ? soulBase : look;
+  $('#stagewrap').dataset.soul = look === 'soul';
+  $('#soul-ctl').hidden = look !== 'soul';
   document.documentElement.dataset.ui = ui;
   $$('[data-uitheme]').forEach(b => b.setAttribute('aria-pressed', ui === b.dataset.uitheme));
   syncSectionFields();
   syncTrackPanel();
-  $$('#looks .chip').forEach(b => b.setAttribute('aria-pressed', look === b.dataset.look));
+  $('#looks').value = look;
   $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', getLang() === b.dataset.lang));
   syncOutputs();
 }
@@ -1638,7 +1646,7 @@ function startMix(id) {
   mixS = { items: [{ id, parts, part: 0, song: sg, n: ++mixN, start: 0, bars: barsOfSong(sg) }] };
   extendMix();
   mixS.p = mixPlayable();
-  if (sg.look) setLook(sg.look);
+  songLook(sg.look);
   playSong(mixS.p, 0, 'free');
   return true;
 }
@@ -1653,7 +1661,7 @@ function mixTick(cyc) {
   const p = mixPlayable();
   mixS.p = p; song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
   warmVoices(p); source = { kind: 'song', name: p.title, id: p.id }; renderSource();
-  if (mixS.items[0].song.look) setLook(mixS.items[0].song.look);
+  songLook(mixS.items[0].song.look);
   pbLast = '';
 }
 // plays a playlist (or a list of ids) from a song: ids in order, name for the player bar
@@ -1705,10 +1713,10 @@ function startCard(i, bar) {
   const { tr, p } = cards[i];
   if (tr.kind === 'composed') {
     if (!loadTrack(tr)) return;
-    if (tr.look) setLook(tr.look);
+    songLook(tr.look);
     return playSong(compiled, bar, 'track');
   }
-  if (tr.look && !(song && song.id === tr.id)) setLook(tr.look);
+  if (!(song && song.id === tr.id)) songLook(tr.look);
   playSong(p, bar, 'free');
 }
 $('#songs').addEventListener('click', e => {
@@ -1759,7 +1767,7 @@ $('#songs').addEventListener('click', e => {
     }
     if (a === 'open') {
       if (!loadTrack(tr)) return;
-      if (tr.look) setLook(tr.look);
+      songLook(tr.look);
       if (mode !== 'track') backToTrack(); else if (ed && !isPlaying()) ed.setCode(compiled.code);
       showTab('componi'); return;
     }
@@ -2051,7 +2059,7 @@ radio = createRadio({
   root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a),
   player: {
     makePlayable: sg => playable({ ...sg, kind: 'composed' }),
-    start: (p, bar) => { setLook(store.get('coding-misk-radio-look', 'studio')); return playSong(p, bar, 'radio'); },
+    start: (p, bar) => { songLook(store.get('coding-misk-radio-look', 'studio')); return playSong(p, bar, 'radio'); },
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
     // a new window while the radio plays: the code on air does not change, the steps to come do
@@ -2107,7 +2115,8 @@ function renderStatic() {
   if (stylesTab) stylesTab.render();
   if (artistsTab) artistsTab.render();
   renderArtistPick();
-  $('#looks').innerHTML = LOOKS.map(([k, l]) => `<button class="chip" data-look="${k}">${esc(tx(l))}</button>`).join('');
+  $('#looks').innerHTML = LOOKS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('');
+  $('#looks').value = look;
   $('#play').dataset.state = '';
 }
 function renderAll() {
@@ -2140,8 +2149,29 @@ if (!store.get('coding-misk-guide-v', 0)) {
 }
 { const tb = store.get('coding-misk-tab', 'componi'); if (TABS.includes(tb)) showTab(tb); }
 updateShare();
+// the soul scene (#46): the radio's song on air (with the director's plan), or the song playing elsewhere
+const soul = createSoulScene({
+  store, isHw: () => ui === 'hw', baseLook: () => soulBase,
+  getSource(cyc) {
+    if (mode === 'radio' && radio && radio.on) return radio.soulSource(cyc);
+    const it = mixActive() ? mixS.items[0] : null, sg = it ? it.song : song && song.doc;
+    if (!sg || !sg.sections || !sg.tracks) return null;
+    return { key: `song:${sg.id || sg.title}`, song: sg, ctx: {}, bar: it ? cyc - it.start : cyc };
+  },
+  onChange: () => syncSoul(),
+});
+globalThis.codingMiskSoul = soul;
+function syncSoul() {
+  $('#soul-name').textContent = soul.label;
+  $('#soul-ctl [data-soul="lock"]').setAttribute('aria-pressed', soul.locked);
+}
+$('#soul-ctl').addEventListener('click', e => {
+  const b = e.target.closest('[data-soul]'); if (!b) return;
+  if (b.dataset.soul === 'lock') soul.locked = !soul.locked; else soul[b.dataset.soul]();
+});
+syncSoul();
 startVisuals({
-  getS: () => ({ look }),
+  getS: () => ({ look }), soul,
   // the studio scene (#28): the radio's song on air, or the song playing elsewhere
   getInfo(cyc) {
     if (mode === 'radio' && radio && radio.on) return radio.info(cyc);

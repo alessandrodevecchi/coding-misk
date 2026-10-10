@@ -41,6 +41,8 @@ Modes: `track` (song from the arranger) and `free` (lessons, sounds, hand-writte
 
 `startVisuals` reads every analyser in `window.analysers`, sums them into the waveform, and keeps a normalised level and onset detector per instrument id: `kick`, `snare`, `hats`, `fx`, `bass`, `guitar`, `arp`, `pad`, `hook`, `riser` (plus `1` for untagged code). Each scene function in `SCENE_DRAW` draws one theme; see `docs/DESIGN-SYSTEM.md`.
 
+The Soul look (`#46`) is drawn by `src/soul/`: `data.js` (pure, checked in Node: `soulData(song, ctx)` builds the soul from a radio song with its plan, or measures any v2 song part by part with the radio's measures; seeded `hashOf` and timed `eventAt`; default view from the seed), `views.js` (`createSoulRenderer`, the ten views and the overlays on an offscreen canvas), `scene.js` (`createSoulScene`: follows the song playing through `getSource`, analyzes a new song, recalibrates when steering replaces the song object, view, lock, fit into the stage). The radio gives `soulSource(cyc)`; elsewhere the playing song's `doc` (or the first song of a mix) is used.
+
 ## Persistence keys
 
 `coding-misk-library`, `coding-misk-draft`, `coding-misk-look`, `coding-misk-ui`, `coding-misk-lang`, `coding-misk-tab`, `coding-misk-code-w` (code panel width), `coding-misk-code-collapsed`, `coding-misk-panel` (track panel view: `one`, `all` summary or `full`), `coding-misk-arr-mode` (arranger view: `sections` or `timeline`), `coding-misk-snd-view` (sound browser view), `coding-misk-favs` (favourite sounds), `coding-misk-live` (live build switch for songs without steps).

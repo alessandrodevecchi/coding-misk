@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230a0614%22/%3E%3Cpath d=%22M6 22V10l5 7 5-7v12M20 22v-6M24 22V10M28 22v-9%22 stroke=%22%23ff2e88%22 stroke-width=%222.5%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mr+Dafoe&family=Russo+One&family=Chakra+Petch:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=VT323&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mr+Dafoe&family=Russo+One&family=Chakra+Petch:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=VT323&family=Share+Tech+Mono&family=Space+Grotesk:wght@400;600&display=swap">
 </head>
 <body>
 <header class="bar">
@@ -33,8 +33,16 @@
   <div class="hud">
     <div class="readout" id="readout"></div>
     <div class="hud-right">
-      <div class="chips" role="group" data-i18n-aria="looks" id="looks"></div>
-      <button class="chip fs" id="fs" data-i18n="fullscreen"></button>
+      <div class="hud-row">
+        <select class="look-pick" id="looks" data-no-knob data-i18n-aria="looks"></select>
+        <button class="chip fs" id="fs" data-i18n="fullscreen"></button>
+      </div>
+      <div class="soul-ctl" id="soul-ctl" role="group" data-i18n-aria="soulViews" hidden>
+        <button class="chip" data-soul="prev" data-i18n-aria="soulPrev">◀</button>
+        <span class="soul-name" id="soul-name"></span>
+        <button class="chip" data-soul="next" data-i18n-aria="soulNext">▶</button>
+        <button class="chip" data-soul="lock" aria-pressed="false" data-i18n-aria="soulLock" data-i18n-title="soulLock">🔒</button>
+      </div>
     </div>
   </div>
 </section>
