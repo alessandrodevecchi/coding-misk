@@ -590,7 +590,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${opts.styles.includes(r.id)}" title="${esc(r.description || t('tipStyles'))}">${esc(tx(r.name))}</button>`).join('')}</div>
         </div>
         </div>
-        <div class="dice-row"><span class="lbl">${esc(t('diceKnobsLbl'))}</span><span class="dice-combo">${die('knobs', 'diceKnobs')}<button class="dice-mode" data-dice-mode ${tip(opts.diceRange ? 'diceRangeInTip' : 'diceRangeFullTip')}>${esc(opts.diceRange ? t('diceRangeIn') : t('diceRangeFull'))}<span aria-hidden="true">⇄</span></button></span>
+        <div class="dice-row"><span class="lbl">${esc(t('diceKnobsLbl'))}</span><span class="dice-combo">${die('knobs', 'diceKnobs')}<button class="dice-mode" data-dice-mode ${tip(opts.diceRange ? 'diceRangeInTip' : 'diceRangeFullTip')}><span class="comp-lcd">${esc(opts.diceRange ? t('diceRangeIn') : t('diceRangeFull'))}</span></button></span>
           <span class="dice-sounds">${die('sounds', 'diceSounds', t('diceSoundsLbl'))}${opts.sounds ? `<span class="muted small mono" title="${esc(t('diceSoundsOn'))}">${esc(opts.sounds)}</span><button class="plain" data-sounds-clear aria-label="${esc(t('diceSoundsClear'))}" title="${esc(t('diceSoundsClear'))}">×</button>` : ''}</span></div>
         <div class="ctrls four">${slider('chaos', 'radioChaos', 'tipChaos')}${slider('energy', 'radioEnergy', 'tipEnergy')}${slider('complexity', 'radioComplexity', 'tipComplexity')}${slider('talk', 'radioTalk', 'tipTalk')}</div>
         <div class="radio-how">

@@ -994,13 +994,12 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
 .comp-lcd { padding: 2px 8px; border-radius: 4px; background: #05030a; color: var(--a2); font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; box-shadow: inset 0 1px 3px rgba(0,0,0,.8); }
 :root[data-ui="hw"] .comp-setup-btn { border-radius: 4px; background: linear-gradient(#3b3b41, #28282d); border-color: #0d0d10; box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 2px 0 #0d0d10; }
 :root[data-ui="hw"] .comp-lcd { background: var(--lcd-bg); color: var(--lcd-fg); text-shadow: 0 0 6px #ff9a1f; }
-.dice-combo { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
-.dice-combo .dice { border: 0; border-radius: 0; padding: 3px 7px; }
-.dice-mode { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 0; border-left: 1px solid var(--line); background: var(--panel2); color: var(--ink); font: 600 11px var(--mono); cursor: pointer; }
-.dice-mode span { color: var(--muted); }
-.dice-mode:hover { color: var(--a1); }
-:root[data-ui="hw"] .dice-combo { border-color: #0d0d10; border-radius: 4px; }
-:root[data-ui="hw"] .dice-mode { background: var(--lcd-bg); color: var(--lcd-fg); border-left-color: #0d0d10; }
+.dice-combo { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); }
+.dice-combo .dice { border: 0; padding: 1px 3px; }
+.dice-mode { padding: 0; border: 0; background: none; cursor: pointer; }
+.dice-mode:hover .comp-lcd { color: var(--a1); }
+.dice-mode .comp-lcd { display: inline-block; min-width: 9.5em; text-align: center; }
+:root[data-ui="hw"] .dice-combo { border-color: #0d0d10; border-radius: 4px; background: linear-gradient(#3b3b41, #28282d); box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 2px 0 #0d0d10; }
 /* a range with two handles: two range inputs on one track, only the handles take the pointer */
 .comp-range { grid-template-columns: 90px 1fr 70px; }
 .dual { position: relative; height: 22px; }
