@@ -21,9 +21,9 @@
 
 - [x] 4.1 The display beside the stage: hidden screw and "soul" to open, power with on and off animations, full screen, view buttons, lock, override; seven shells with the selector; default shell per theme; phone layout.
 - [x] 4.3 SCART cable from under the bay to under the stage, with rope physics and dragging.
-- [ ] 4.2 Souls for Compose, Songs and playlists.
+- [x] 4.2 Souls for Compose, Songs and playlists (curves measured part by part from the playing song).
 
 ## 5. Checks and docs
 
-- [ ] 5.1 Browser check: scene, every view draws, full screen, display power and override.
-- [ ] 5.2 Guide card, DEVLOG, `PROVE-v0.6.0.md`, `DESIGN-SYSTEM.md`, README.
+- [x] 5.1 Browser check: scene, every view draws, full screen, display power and override (`check-soul.cjs`, `check-soul-display.cjs`).
+- [x] 5.2 Guide card, DEVLOG, `PROVE-v0.6.0.md`, `DESIGN-SYSTEM.md`, README.
