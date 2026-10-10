@@ -111,6 +111,12 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Artisti: "Artista casuale" con Tieni, Ancora, Scarta; l'artista tenuto suona in radio e si può modificare.
 - [ ] Stili e Generi: "a caso in radio".
 
+## Compilation (`#49`)
+
+- [ ] Radio: il pulsante Compilation passa da spento a "ogni brano" a "ogni 2-4 brani" (due spie); artista e stili scelti a mano vengono messi da parte.
+- [ ] ⚙ Configura: preset (Tutto, Viaggio, Club, Chill), movimento libero o viaggio, generi e artisti ammessi, artisti casuali, range delle manopole; salva un preset tuo.
+- [ ] In onda: "Compilation · prossimo cambio tra N brani"; con un artista casuale c'è "Tieni"; Riascolta rifà la stessa compilation.
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.
