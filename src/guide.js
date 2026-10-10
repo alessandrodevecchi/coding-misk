@@ -64,7 +64,7 @@ export const GUIDE = [
       {
         id: 'panel', title: { en: 'Panel', it: 'Pannello' },
         what: { en: 'Artist, styles, chaos, energy, complexity and voice are the character of the radio.', it: 'Artista, stili, caos, energia, complessità e voce sono il carattere della radio.' },
-        know: { en: 'They apply from the next song prepared: the next song is written when the one on air reaches 40 %. Touching a knob while an artist is chosen switches to Custom.', it: 'Valgono dal prossimo brano preparato: il brano dopo viene scritto quando quello in onda è al 40 %. Toccare una manopola con un artista scelto passa a Personalizzato.' },
+        know: { en: 'They apply from the next song prepared: the next song is written when the one on air reaches 40 %. Touching a knob while an artist is chosen switches to Custom. The dice draw a random artist (keep it with Keep), random styles or a genre, one knob or all of them (in range or anywhere), and new sounds: other instruments and kits in the same styles.', it: 'Valgono dal prossimo brano preparato: il brano dopo viene scritto quando quello in onda è al 40 %. Toccare una manopola con un artista scelto passa a Personalizzato. I dadi pescano un artista casuale (lo tieni con Tieni), stili o un genere a caso, una manopola o tutte (in range o ovunque) e suoni nuovi: altri strumenti e kit negli stessi stili.' },
       },
       {
         id: 'console', title: { en: 'Console', it: 'Console' },
@@ -126,21 +126,21 @@ export const GUIDE = [
     id: 'artists', tab: 'artisti', mode: 'lab', show: '#tab-artisti',
     title: { en: 'Artists', it: 'Artisti' },
     what: { en: 'The artists who make the radio\'s music: each one has favourite styles, values, quirks and transitions, so every song differs even from the same artist.', it: 'Gli artisti che fanno la musica della radio: ognuno ha stili preferiti, valori, manie e transizioni, così ogni brano è diverso anche dallo stesso artista.' },
-    how: { en: 'Open an artist to see the sheet. [New artist] makes your own. [♪ New song] on a sheet opens Compose with a new song by that artist.', it: 'Apri un artista per vedere la scheda. [Nuovo artista] ne crea uno tuo. [♪ Nuovo brano] sulla scheda apre Componi con un brano nuovo di quell\'artista.' },
+    how: { en: 'Open an artist to see the sheet. [New artist] makes your own. [♪ New song] on a sheet opens Compose with a new song by that artist. [Random artist] makes one with a name, a face and tastes: keep it, try again or discard it.', it: 'Apri un artista per vedere la scheda. [Nuovo artista] ne crea uno tuo. [♪ Nuovo brano] sulla scheda apre Componi con un brano nuovo di quell\'artista. [Artista casuale] ne crea uno con nome, faccia e gusti: tienilo, riprova o scartalo.' },
     know: { en: 'Your artists stay in this browser: export them to keep them.', it: 'I tuoi artisti restano in questo browser: esportali per tenerli.' },
   },
   {
     id: 'styles', tab: 'stili', mode: 'lab', show: '#tab-stili',
     title: { en: 'Styles', it: 'Stili' },
     what: { en: 'The recipes the radio and the artists write songs from: tempo, instruments, patterns, chords, voice, and the genre the style belongs to.', it: 'Le ricette da cui la radio e gli artisti scrivono i brani: tempo, strumenti, pattern, accordi, voce, e il genere a cui lo stile appartiene.' },
-    how: { en: 'Open a style to see how it is made. [Duplicate] a built-in one to change it, or [New style].', it: 'Apri uno stile per vedere come è fatto. [Duplica] uno incluso per cambiarlo, o [Nuovo stile].' },
+    how: { en: 'Open a style to see how it is made. [Duplicate] a built-in one to change it, or [New style]. [A random style in the radio] plays one you did not pick.', it: 'Apri uno stile per vedere come è fatto. [Duplica] uno incluso per cambiarlo, o [Nuovo stile]. [Uno stile a caso in radio] ne fa suonare uno che non hai scelto.' },
     know: { en: 'Your styles stay in this browser: export them to keep them.', it: 'I tuoi stili restano in questo browser: esportali per tenerli.' },
   },
   {
     id: 'genres', tab: 'generi', mode: 'lab', show: '#tab-generi .genre-card',
     title: { en: 'Genres', it: 'Generi' },
     what: { en: 'One card per genre: its styles, how many songs it has, the artists who love it.', it: 'Una card per genere: i suoi stili, quanti brani ha, gli artisti che lo amano.' },
-    how: { en: 'Tap a style to open it. [▶ Listen in the radio] starts the radio in that genre; [See the songs] opens Songs filtered on it.', it: 'Tocca uno stile per aprirlo. [▶ Ascolta in radio] fa partire la radio in quel genere; [Vedi i brani] apre Brani filtrata su quel genere.' },
+    how: { en: 'Tap a style to open it. [▶ Listen in the radio] starts the radio in that genre; [See the songs] opens Songs filtered on it. [A random genre in the radio] picks one for you.', it: 'Tocca uno stile per aprirlo. [▶ Ascolta in radio] fa partire la radio in quel genere; [Vedi i brani] apre Brani filtrata su quel genere. [Un genere a caso in radio] ne sceglie uno per te.' },
   },
   {
     id: 'sounds', tab: 'suoni', mode: 'lab', show: '#sounds',

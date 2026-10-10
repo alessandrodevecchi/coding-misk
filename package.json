@@ -19,7 +19,8 @@
     "check:song-filter": "node --no-warnings tools/check-song-filter.mjs",
     "check:playlists": "node --no-warnings tools/check-playlists.mjs",
     "check:guide": "node --no-warnings tools/check-guide.mjs",
-    "check:soul": "node --no-warnings tools/check-soul.mjs"
+    "check:soul": "node --no-warnings tools/check-soul.mjs",
+    "check:random": "node --no-warnings tools/check-random.mjs"
   },
   "dependencies": {
     "@strudel/repl": "1.3.0"

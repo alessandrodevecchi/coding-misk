@@ -105,6 +105,12 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Override: il cavo SCART scende da sotto il display ed entra nella presa sotto il palco, il palco mostra l'anima; il cavo si trascina e oscilla; spegnendo torna il visual.
 - [ ] Tema HW: guscio MISK/OS 6000 di default, cavo intrecciato con una spia; telefono.
 
+## Casuali (`#50`)
+
+- [ ] Radio: dado accanto ad Artista (artista nuovo con "Tieni" e ×), dadi Stili e Genere, un dado per manopola e uno per tutte con "In range / Casuale", dado Suoni (strumenti diversi dal prossimo brano, × per tornare normali). I tooltip mostrano il seme.
+- [ ] Artisti: "Artista casuale" con Tieni, Ancora, Scarta; l'artista tenuto suona in radio e si può modificare.
+- [ ] Stili e Generi: "a caso in radio".
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.

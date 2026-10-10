@@ -6,6 +6,9 @@ import { MACHINES } from '../sounds/machines.js';
 import { SPEAKERS } from '../song/build.js';
 import { GENRES } from '../song/format.js';
 import { downloadJson, pickJsonFiles, userStore, freeId, errorsByPath } from './library.js';
+import { DICE } from '../icons.js';
+import { randomStyles } from '../endless/artist-maker.js';
+import { freshSeed } from '../endless/random.js';
 
 // names a list field of an instrument offers in the form
 const CHOICES = {
@@ -16,7 +19,8 @@ const CHOICES = {
 const INSTR = Object.keys(INSTRUMENTS);
 
 // onRename(oldId, newId): a user style got a new id (song tags follow it, #34)
-export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onChange, onRename = () => {} }) {
+// onRadio(styleIds): play styles in the radio (#50: a random one)
+export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onChange, onRename = () => {}, onRadio = () => {} }) {
   const mine = userStore(store, 'coding-misk-styles');
   let open = null, editing = null, jsonView = false;
   const builtinIds = () => builtins.map(r => r.id);
@@ -97,7 +101,7 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
     if (!cur) open = null;
     const res = cur ? check(editing || cur.r) : null;
     root.innerHTML = `<p class="intro">${esc(t('introStyles'))}</p>
-    <div class="lib-top"><button class="btn" id="st-new">+ ${esc(t('libNewStyle'))}</button><button class="btn" id="st-import">${esc(t('libImport'))}</button><span class="muted small">${esc(t('libWhere'))}</span></div>
+    <div class="lib-top"><button class="btn" id="st-new">+ ${esc(t('libNewStyle'))}</button><button class="btn dice-btn" id="st-random">${DICE} ${esc(t('styleRandom'))}</button><button class="btn" id="st-import">${esc(t('libImport'))}</button><span class="muted small">${esc(t('libWhere'))}</span></div>
     <div class="lib-list">${items.map(({ r, own }) => { const bad = check(r).errors.length; return `<button class="card lib-card${r.id === open ? ' on' : ''}" data-open="${esc(r.id)}">
       <strong>${esc(tx(r.name || { en: r.id }))}</strong><span class="muted">${esc(range(r.tempo))} BPM</span>
       <span class="badges">${own ? `<span class="badge">${esc(t('mine'))}</span>` : `<span class="badge">${esc(t('libBuiltin'))}</span>`}${bad ? `<span class="badge bad">${esc(t('libInvalid'))}</span>` : ''}</span></button>`; }).join('')}</div>
@@ -114,6 +118,8 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.open) { open = b.dataset.open; editing = null; jsonView = false; render(); return; }
+    // a random style in the radio (#50)
+    if (b.id === 'st-random') { const list = usable(); if (list.length) { const one = randomStyles(freshSeed(), list.map(r => ({ id: r.id, genre: 'any' })))[0]; onRadio([one]); } return; }
     const cur = open && all().find(x => x.r.id === open);
     if (b.id === 'st-new' || b.id === 'st-dup') {
       const src = b.id === 'st-dup' && cur ? cur.r : builtins.find(r => r.id === 'synthwave') || builtins[0];

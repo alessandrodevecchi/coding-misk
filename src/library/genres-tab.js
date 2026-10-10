@@ -1,6 +1,9 @@
 // The Genres tab of the Groove Lab (#43): each genre with its styles, how many songs it has, the artists who
 // like it, and ways to hear it: the radio in its styles, or the Songs tab filtered on it.
 import { GENRES } from '../song/format.js';
+import { DICE } from '../icons.js';
+import { randomGenre } from '../endless/artist-maker.js';
+import { freshSeed } from '../endless/random.js';
 
 // styles(): every style; songs(): [{ genres }]; artists(): usable artists
 // onRadio(styleIds), onSongs(genre), onStyle(styleId), face(artist) → portrait url
@@ -26,10 +29,11 @@ export function createGenresTab({ root, t, tx, esc, styles, songs, artists, onRa
         </div>
       </article>`;
     }).join('');
-    root.innerHTML = `<p class="intro">${esc(t('genresIntro'))}</p><div class="genre-grid">${cards}</div>`;
+    root.innerHTML = `<p class="intro">${esc(t('genresIntro'))}</p><div class="lib-top"><button class="btn dice-btn" id="genre-random">${DICE} ${esc(t('genreRandom'))}</button></div><div class="genre-grid">${cards}</div>`;
   }
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'genre-random') { const all = styles().map(r => ({ id: r.id, genre: genreOfStyle(r) })), g = randomGenre(freshSeed(), all); return onRadio(all.filter(r => r.genre === g).map(r => r.id)); }
     if (b.dataset.genreStyle) return onStyle(b.dataset.genreStyle);
     if (b.dataset.genreSongs) return onSongs(b.dataset.genreSongs);
     if (b.dataset.genreRadio) { const g = b.dataset.genreRadio; return onRadio(styles().filter(r => genreOfStyle(r) === g).map(r => r.id)); }

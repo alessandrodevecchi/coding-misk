@@ -951,3 +951,20 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
 :root[data-ui="hw"] .soul-tab .st-open { border-color: #0b0b0d; background: linear-gradient(#4a4a50, #2c2c31); color: #ffb347; box-shadow: 0 2px 0 #0b0b0d; }
 @keyframes soul-blink { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .soul-tab .st-open i { animation: none; } }
+
+/* random tools (#50): dice */
+.ico-dice { width: 15px; height: 15px; vertical-align: -3px; flex: none; }
+.dice { display: inline-flex; align-items: center; gap: 5px; padding: 2px 5px; text-transform: none; letter-spacing: 0; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--muted); cursor: pointer; font: inherit; font-size: 12px; }
+.dice:hover, .dice:focus-visible { color: var(--a1); border-color: color-mix(in srgb, var(--a1) 40%, transparent); }
+.dice:active .ico { transform: rotate(-20deg) scale(.9); }
+.ctrl .row .dice { margin-left: auto; margin-right: 4px; padding: 1px 3px; }
+.dice-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dice-range { display: inline-flex; gap: 4px; }
+.dice-sounds { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.dice-btn .ico-dice { margin-right: 2px; }
+.temp-artist { display: inline-flex; align-items: center; gap: 6px; border-style: dashed; }
+.temp-artist .plain { background: none; border: 0; color: inherit; font: inherit; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.temp-artist .keep { color: var(--a1); font-weight: 600; }
+.plain { background: none; border: 0; color: inherit; font: inherit; padding: 0 2px; cursor: pointer; }
+:root[data-ui="hw"] .dice { color: #a29f97; }
+:root[data-ui="hw"] .dice:hover { color: #ffb347; border-color: #0d0d10; background: linear-gradient(#3b3b41, #28282d); }

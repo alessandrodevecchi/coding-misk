@@ -69,3 +69,7 @@ Then planning uses the shape weights, the moves get the bonus of their weights, 
 ## Keeping artists up to date
 
 When a later feature adds something an artist could prefer (for example transitions in `#23`), its change adds a field with a default, documents it here and updates the built-in artists. The format version goes up only when an old file would be read differently.
+
+## Random artists (`#50`)
+
+`src/endless/artist-maker.js` makes an artist from a seed: a name (adjective and noun, invented syllables, or a title like "DJ" or "Dr."), a pixel portrait, a short bio in English and Italian from its traits, 1 to 3 favourite styles of one genre (now and then one more), knob ranges around a centre inside the sensible ranges, shapes, moves, voice characters, 0 to 2 quirks and transitions. The same seed gives the same artist and it always passes the artist validation. It also draws random styles, a random genre and knob values (in a sensible range or the full one). The radio's dice, the Artists tab's "Random artist" and the compilation (`#49`) use it. Only existing styles are picked; inventing styles is `#51`.

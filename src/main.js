@@ -31,6 +31,7 @@ import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
+import { LOCK } from './icons.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
 import { startHardware } from './hardware.js';
@@ -1382,8 +1383,6 @@ $$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.data
 const setLook = l => { if (!LOOKS.some(([k]) => k === l)) return; look = l; soulBase = l; store.set('coding-misk-look', l); syncAll(); };
 // a song's own visual, unless the listener is watching the soul
 const songLook = l => { if (l) setLook(l); };
-// a small lock icon for the locked Soul option and the view lock (#46)
-const LOCK_SVG = '<svg class="lock-ico" viewBox="0 0 12 14" aria-hidden="true"><path d="M3.2 6V4.2a2.8 2.8 0 0 1 5.6 0V6" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="6" width="9" height="7" rx="1.4" fill="currentColor"/></svg>';
 
 // a look picked while the radio plays becomes the radio's look (the studio by default, #28)
 $('#looks').addEventListener('change', e => {
@@ -1425,7 +1424,7 @@ function syncAll() {
   $('#stagewrap').dataset.soul = soulOverride;
   $('#soul-ctl').hidden = !soulOverride;
   // the soul shows in the visual menu, locked until the Soul display is plugged into the stage
-  { const o = $('#looks option[value="soul"]'); if (o) { o.disabled = !soulOverride; o.innerHTML = soulOverride ? esc(t('soulLook')) : `${esc(t('soulLook'))} ${LOCK_SVG}`; o.title = soulOverride ? '' : t('soulLockedHint'); } }
+  { const o = $('#looks option[value="soul"]'); if (o) { o.disabled = !soulOverride; o.innerHTML = soulOverride ? esc(t('soulLook')) : `${esc(t('soulLook'))} ${LOCK}`; o.title = soulOverride ? '' : t('soulLockedHint'); } }
   document.documentElement.dataset.ui = ui;
   $$('[data-uitheme]').forEach(b => b.setAttribute('aria-pressed', ui === b.dataset.uitheme));
   syncSectionFields();
@@ -2049,6 +2048,7 @@ const RECIPES = BUILTIN_STYLES.slice();
 stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins: BUILTIN_STYLES, toast,
   onChange: () => { RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable())); if (radio) radio.render(); },
   // the user's songs tagged with a renamed style keep the link (#34)
+  onRadio: ids => { showTab('radio'); if (radio && !radio.playStyles(ids)) toast(t('genreNoStyle')); },
   onRename: (from, to) => {
     for (const tr of [...user.tracks, T]) if (tr.tags && tr.tags.styles) tr.tags.styles = tr.tags.styles.map(id => (id === from ? to : id));
     saveLibrary();
@@ -2068,7 +2068,7 @@ genresTab = createGenresTab({ root: $('#tab-generi'), t, tx, esc, face: a => art
 // preloads the spoken comments of a song, silently, as playSong does
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
 radio = createRadio({
-  root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a),
+  root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a),
   player: {
     makePlayable: sg => playable({ ...sg, kind: 'composed' }),
     start: (p, bar) => { songLook(store.get('coding-misk-radio-look', 'studio')); return playSong(p, bar, 'radio'); },
@@ -2127,7 +2127,7 @@ function renderStatic() {
   if (stylesTab) stylesTab.render();
   if (artistsTab) artistsTab.render();
   renderArtistPick();
-  $('#looks').innerHTML = LOOKS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('') + `<option value="soul" disabled>${esc(t('soulLook'))} ${LOCK_SVG}</option>`;
+  $('#looks').innerHTML = LOOKS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('') + `<option value="soul" disabled>${esc(t('soulLook'))} ${LOCK}</option>`;
   $('#looks').value = soulOverride ? 'soul' : look;
   $('#play').dataset.state = '';
 }

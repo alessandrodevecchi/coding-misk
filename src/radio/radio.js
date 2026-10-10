@@ -12,6 +12,9 @@ import { windowSong } from '../endless/join.js';
 import { validateRecipe } from '../endless/recipe.js';
 import { buildSteps, sayText } from '../song/build.js';
 import { QUIRKS } from '../endless/quirks.js';
+import { makeArtist, randomStyles, randomGenre, randomKnob, KNOBS } from '../endless/artist-maker.js';
+import { freshSeed } from '../endless/random.js';
+import { DICE } from '../icons.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -28,7 +31,8 @@ export function usableRecipes(list) {
   }).sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang, artists = () => [], face = () => '' }) {
+// keepArtist(artist): saves a random artist among the listener's, returns its id (#50)
+export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null }) {
   const ids = recipes.map(r => r.id);
   const saved = store.get('coding-misk-radio', null) || {};
   const opts = {
@@ -42,7 +46,13 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     harmony: ['artist', ...HARMONY_MODES].includes(saved.harmony) ? saved.harmony : 'artist',
     // steering (#24): commands for this song only, or for the whole session (they also move the sliders)
     scope: saved.scope === 'session' ? 'session' : 'song',
+    // random tools (#50): a random artist not kept yet, dice in the full range or in a sensible one, the sounds seed
+    temp: saved.temp && saved.temp.id ? saved.temp : null,
+    diceRange: saved.diceRange !== false,
+    sounds: typeof saved.sounds === 'string' ? saved.sounds : null,
   };
+  // the seed of the last die thrown, per die (shown in its tooltip)
+  const lastDice = {};
   if (!opts.styles.length) opts.styles = [ids.includes('synthwave') ? 'synthwave' : ids[0]];
   let history = store.get('coding-misk-radio-history', []);
   if (!Array.isArray(history)) history = [];
@@ -50,9 +60,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // the session on air: stream of songs with their start bar; onAir = index in the stream
   let S = null;
   const saveOpts = () => store.set('coding-misk-radio', opts);
-  const artistOf = id => (id ? artists().find(a => a.id === id) || null : null);
+  const artistOf = id => (id ? artists().find(a => a.id === id) || (opts.temp && opts.temp.id === id ? opts.temp : null) : null);
   // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
-  const current = () => { const a = artistOf(opts.artist), how = { transition: opts.transition, harmony: opts.harmony }; return a ? { artist: JSON.parse(JSON.stringify(a)), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how }; };
+  const current = () => { const a = artistOf(opts.artist), how = { transition: opts.transition, harmony: opts.harmony, ...(opts.sounds ? { sounds: opts.sounds } : {}) }; return a ? { artist: JSON.parse(JSON.stringify(a)), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how }; };
   const mid = r => Math.round((r[0] + r[1]) / 2 * 20) / 20;
   function pickArtist(id) {
     const a = artistOf(id);
@@ -63,6 +73,20 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     saveOpts(); render();
   }
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // the random tools (#50): every throw has its own fresh seed; changes apply from the next song, like the controls
+  function throwDice(kind, k) {
+    const seed = freshSeed();
+    lastDice[kind + (k || '')] = seed;
+    if (kind === 'artist') { opts.temp = makeArtist(seed, recipes); return pickArtist(opts.temp.id); }
+    if (kind === 'sounds') { opts.sounds = seed; saveOpts(); render(); return toast(t('diceSoundsNext')); }
+    opts.artist = null;
+    if (kind === 'styles') opts.styles = randomStyles(seed, recipes);
+    if (kind === 'genre') { const g = randomGenre(seed, recipes); opts.styles = randomStyles(seed, recipes, { genre: g }); toast(t('diceGenreNow', { g: t(`g:${g}`) })); }
+    if (kind === 'knob' && KNOBS.includes(k)) opts[k] = randomKnob(seed, k, opts.diceRange);
+    if (kind === 'knobs') for (const x of KNOBS) opts[x] = randomKnob(seed, x, opts.diceRange);
+    if (!opts.styles.length) opts.styles = [ids[0]];
+    saveOpts(); render();
+  }
 
   // ---------- stream ----------
   // options for song n: from the recipe when replaying, else the controls (recorded when they change)
@@ -499,7 +523,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function render() {
     const on = !!S;
     const paused = on && S.paused !== undefined, tip = k => `title="${esc(t(k))}"`;
-    const slider = (k, label, help) => `<div class="ctrl" ${tip(help)}><div class="row"><label class="lbl" for="radio-${k}">${esc(t(label))}</label><output>${fmt(opts[k])}</output></div><input id="radio-${k}" type="range" min="0" max="1" step="0.05" value="${opts[k]}" data-opt="${k}" ${tip(help)}></div>`;
+    // a die: kind, tooltip key, optional visible label; the tooltip adds the seed of the last throw
+    const die = (kind, key, label = '', k = '') => `<button class="dice" data-dice="${kind}"${k ? ` data-k="${k}"` : ''} title="${esc(t(key))}${lastDice[kind + k] ? ` · ${esc(t('diceSeed', { seed: lastDice[kind + k] }))}` : ''}" aria-label="${esc(t(key))}">${DICE}${label ? `<span>${esc(label)}</span>` : ''}</button>`;
+    const slider = (k, label, help) => `<div class="ctrl" ${tip(help)}><div class="row"><label class="lbl" for="radio-${k}">${esc(t(label))}</label>${die('knob', 'diceKnob', '', k)}<output>${fmt(opts[k])}</output></div><input id="radio-${k}" type="range" min="0" max="1" step="0.05" value="${opts[k]}" data-opt="${k}" ${tip(help)}></div>`;
     root.innerHTML = `<p class="intro">${esc(t('introRadio'))}</p>
     <div class="radio-grid">
       <div class="card radio-ctrls">
@@ -512,12 +538,14 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
           <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
         </div>
-        <div class="ctrl" ${tip('tipArtist')}><span class="lbl">${esc(t('radioArtist'))}</span>
-          <div class="chips artist-chips" role="group"><button class="chip" data-artist="" aria-pressed="${!opts.artist}">${esc(t('radioCustom'))}</button>${artists().map(a => `<button class="chip" data-artist="${esc(a.id)}" aria-pressed="${opts.artist === a.id}" title="${esc(tx(a.bio || {}))}"><img class="portrait tiny" src="${face(a)}" alt=""> ${esc(a.name)}</button>`).join('')}</div>
+        <div class="ctrl" ${tip('tipArtist')}><span class="lbl">${esc(t('radioArtist'))} ${die('artist', 'diceArtist')}</span>
+          <div class="chips artist-chips" role="group"><button class="chip" data-artist="" aria-pressed="${!opts.artist}">${esc(t('radioCustom'))}</button>${opts.temp ? `<span class="chip temp-artist" aria-pressed="${opts.artist === opts.temp.id}"><button class="plain" data-artist="${esc(opts.temp.id)}" title="${esc(tx(opts.temp.bio || {}))} · ${esc(t('diceSeed', { seed: opts.temp.portrait.seed.replace(/-face$/, '') }))}"><img class="portrait tiny" src="${face(opts.temp)}" alt=""> ${esc(opts.temp.name)}</button><button class="plain keep" data-keep title="${esc(t('diceKeepHint'))}">${esc(t('diceKeep'))}</button><button class="plain" data-temp-drop aria-label="${esc(t('diceDrop'))}" title="${esc(t('diceDrop'))}">×</button></span>` : ''}${artists().map(a => `<button class="chip" data-artist="${esc(a.id)}" aria-pressed="${opts.artist === a.id}" title="${esc(tx(a.bio || {}))}"><img class="portrait tiny" src="${face(a)}" alt=""> ${esc(a.name)}</button>`).join('')}</div>
         </div>
-        <div class="ctrl" ${tip('tipStyles')}><span class="lbl">${esc(t('radioStyles'))}</span>
+        <div class="ctrl" ${tip('tipStyles')}><span class="lbl">${esc(t('radioStyles'))} ${die('styles', 'diceStyles', t('diceStylesLbl'))} ${die('genre', 'diceGenre', t('diceGenreLbl'))}</span>
           <div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${opts.styles.includes(r.id)}" title="${esc(r.description || t('tipStyles'))}">${esc(tx(r.name))}</button>`).join('')}</div>
         </div>
+        <div class="dice-row"><span class="lbl">${esc(t('diceKnobsLbl'))}</span>${die('knobs', 'diceKnobs')}<span class="dice-range" role="group"><button class="chip small" data-dice-range="in" aria-pressed="${opts.diceRange}" ${tip('diceRangeInTip')}>${esc(t('diceRangeIn'))}</button><button class="chip small" data-dice-range="full" aria-pressed="${!opts.diceRange}" ${tip('diceRangeFullTip')}>${esc(t('diceRangeFull'))}</button></span>
+          <span class="dice-sounds">${die('sounds', 'diceSounds', t('diceSoundsLbl'))}${opts.sounds ? `<span class="muted small mono" title="${esc(t('diceSoundsOn'))}">${esc(opts.sounds)}</span><button class="plain" data-sounds-clear aria-label="${esc(t('diceSoundsClear'))}" title="${esc(t('diceSoundsClear'))}">×</button>` : ''}</span></div>
         <div class="ctrls four">${slider('chaos', 'radioChaos', 'tipChaos')}${slider('energy', 'radioEnergy', 'tipEnergy')}${slider('complexity', 'radioComplexity', 'tipComplexity')}${slider('talk', 'radioTalk', 'tipTalk')}</div>
         <div class="radio-how">
           <label class="ctrl" ${tip('tipTransition')}><span class="lbl">${esc(t('radioTransition'))}</span><select id="radio-transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => `<option value="${k}"${opts.transition === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtist' : `tx:${k}`))}</option>`).join('')}</select></label>
@@ -567,6 +595,11 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.histSave) return player.saveSong(history[+b.dataset.histSave].song);
     if (b.dataset.histOpen) { const sg = history[+b.dataset.histOpen].song; stop(); return player.openSong(sg); }
     if (b.dataset.artist !== undefined) return pickArtist(b.dataset.artist);
+    if (b.dataset.dice) return throwDice(b.dataset.dice, b.dataset.k);
+    if (b.dataset.diceRange) { opts.diceRange = b.dataset.diceRange === 'in'; saveOpts(); return render(); }
+    if (b.dataset.soundsClear !== undefined) { opts.sounds = null; saveOpts(); return render(); }
+    if (b.dataset.keep !== undefined && opts.temp) { const id = keepArtist(opts.temp); if (id) { opts.temp = null; opts.artist = id; saveOpts(); render(); toast(t('diceKept')); } return; }
+    if (b.dataset.tempDrop !== undefined) { if (opts.artist === (opts.temp && opts.temp.id)) opts.artist = null; opts.temp = null; saveOpts(); return render(); }
     if (b.dataset.cmd) return command({ kind: b.dataset.cmd, ...(b.dataset.type ? { type: b.dataset.type } : {}) });
     if (b.dataset.cancel) return cancel(+b.dataset.cancel);
     if (b.id === 'steer-scope') { opts.scope = opts.scope === 'session' ? 'song' : 'session'; saveOpts(); return renderSteer(true); }

@@ -5,13 +5,16 @@ import { QUIRKS } from '../endless/quirks.js';
 import { SHAPES } from '../endless/recipe.js';
 import { portraitUrl } from '../endless/portrait.js';
 import { downloadJson, pickJsonFiles, userStore, freeId, errorsByPath } from './library.js';
+import { makeArtist } from '../endless/artist-maker.js';
+import { freshSeed } from '../endless/random.js';
+import { DICE } from '../icons.js';
 
 const RANGES = ['chaos', 'energy', 'complexity', 'talk', 'pace'];
 
 // onCompose(artist): a new song by the artist in Compose (#42: from the Groove Lab to Listen)
 export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, toast, onChange, onCompose = () => {} }) {
   const mine = userStore(store, 'coding-misk-artists');
-  let open = null, editing = null, jsonView = false;
+  let open = null, editing = null, jsonView = false, preview = null;
   const faces = new Map();
   const face = a => { const k = `${a.portrait && a.portrait.seed}|${a.portrait && a.portrait.palette}`; if (!faces.has(k)) faces.set(k, portraitUrl(a.portrait ? a.portrait.seed : a.id, a.portrait ? a.portrait.palette : 'violet')); return faces.get(k); };
   const builtinIds = () => builtins.map(a => a.id);
@@ -81,7 +84,8 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
     if (!cur) open = null;
     const res = cur ? check(editing || cur.a) : null;
     root.innerHTML = `<p class="intro">${esc(t('introArtists'))}</p>
-    <div class="lib-top"><button class="btn" id="ar-new">+ ${esc(t('artNew'))}</button><button class="btn" id="ar-import">${esc(t('libImport'))}</button><span class="muted small">${esc(t('artWhere'))}</span></div>
+    <div class="lib-top"><button class="btn" id="ar-new">+ ${esc(t('artNew'))}</button><button class="btn dice-btn" id="ar-random">${DICE} ${esc(t('artRandom'))}</button><button class="btn" id="ar-import">${esc(t('libImport'))}</button><span class="muted small">${esc(t('artWhere'))}</span></div>
+    ${preview ? `<div class="card lib-sheet random-preview"><div class="sheet-head"><span class="muted small">${esc(t('artRandomFrom', { seed: preview.portrait.seed.replace(/-face$/, '') }))}</span><div class="actions"><button class="btn primary" id="ar-keep">${esc(t('diceKeep'))}</button><button class="btn dice-btn" id="ar-again">${DICE} ${esc(t('diceAgain'))}</button><button class="btn" id="ar-discard">${esc(t('diceDiscard'))}</button></div></div>${sheet(preview)}</div>` : ''}
     <div class="lib-list artists">${items.map(({ a, own }) => `<button class="card lib-card art-card${a.id === open ? ' on' : ''}" data-open="${esc(a.id)}">
       <img class="portrait" src="${face(a)}" alt=""><span><strong>${esc(a.name)}</strong><span class="muted small">${esc(Object.keys(a.styles || {}).slice(0, 3).map(styleName).join(' · '))}</span>
       <span class="badges">${own ? `<span class="badge">${esc(t('mine'))}</span>` : `<span class="badge">${esc(t('libBuiltin'))}</span>`}${check(a).errors.length ? `<span class="badge bad">${esc(t('libInvalid'))}</span>` : ''}</span></span></button>`).join('')}</div>
@@ -96,7 +100,10 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
 
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.open) { open = b.dataset.open; editing = null; jsonView = false; render(); return; }
+    if (b.dataset.open) { open = b.dataset.open; editing = null; jsonView = false; preview = null; render(); return; }
+    if (b.id === 'ar-random' || b.id === 'ar-again') { preview = makeArtist(freshSeed(), styles()); open = null; render(); const el = root.querySelector('.random-preview'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); return; }
+    if (b.id === 'ar-discard') { preview = null; render(); return; }
+    if (b.id === 'ar-keep' && preview) { const id = keep(preview); preview = null; open = id; render(); toast(t('diceKept')); return; }
     const cur = open && all().find(x => x.a.id === open);
     if (b.id === 'ar-compose' && cur) { const a = usable().find(x => x.id === cur.a.id); if (a) onCompose(a); else toast(t('artInvalid')); return; }
     if (b.id === 'ar-new' || b.id === 'ar-dup') {
@@ -134,5 +141,7 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
     if (el.id === 'ar-json-text') { try { editing = JSON.parse(el.value); } catch (err) { toast(t('libJsonBad', { msg: err.message })); } render(); }
   });
 
-  return { render, usable, face };
+  // saves a random artist among the listener's (a free id), returns the id
+  function keep(a) { const copy = { ...JSON.parse(JSON.stringify(a)), id: freeId(a.id, all().map(x => x.a.id)) }; mine.put(copy); onChange(); return copy.id; }
+  return { render, usable, face, keep };
 }

@@ -4,7 +4,7 @@
 import { BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, TEX_RHYTHMS, GROOVES, ROWS, DEFAULT, KEYS, fitSteps, meterSteps } from '../music.js';
 import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT } from '../song/format.js';
 import { stateAt, SPEAKERS } from '../song/build.js';
-import { makeRng, freshSeed } from './random.js';
+import { makeRng, freshSeed, stream } from './random.js';
 import { withDefaults, PART_NAMES } from './recipe.js';
 import { mixParts, partRecipe, partsKey, stylesOf } from './mix.js';
 import { shapePlan, LANDMARKS } from './shapes.js';
@@ -136,7 +136,9 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
   // sections: consecutive double phrases with the same role; big moments take the second progression
   const mainChords = P.pick(R.progressions), liftChords = P.chance(0.5) ? pickOther(P, R.progressions, mainChords) : mainChords;
   const sections = sectionsOf(plan, { dbl, bpm, key, meter, swing, mainChords, liftChords });
-  const tracks = candidateTracks(R, meter, opts.complexity, P, rng.mutation, opts);
+  // the listener's sounds die (#50): other instruments and kits within the same styles, from its own stream
+  const S = opts.sounds ? stream(`${opts.seed}:${opts.sounds}`, `sounds/${index}`) : null;
+  const tracks = candidateTracks(R, meter, opts.complexity, S || P, S ? S.fork('mutation') : rng.mutation, opts);
   const usual = R.tracks.usual, hardMax = opts.complexity > 0.8 ? Math.max(R.tracks.max, 8) + 2 : Math.min(R.tracks.max, 8);
   const usualHigh = clamp(usual[1] + Math.round((opts.complexity - 0.5) * 2), usual[0], hardMax);
   const voice = voiceFor(R, opts, rng.voice);
