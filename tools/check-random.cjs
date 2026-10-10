@@ -31,10 +31,10 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const before = (await opts()).styles.join();
   await page.click('#tab-radio [data-dice="styles"]'); await sleep(200);
   o = await opts();
-  check(!o.artist && o.styles.length >= 1 && o.styles.length <= 4, 'random styles', o.styles.join());
+  check(!o.artist && o.styles.length >= 2 && o.styles.length <= 3, 'random mix: 2 or 3 styles', o.styles.join());
   await page.click('#tab-radio [data-dice="genre"]'); await sleep(200);
   check((await opts()).styles.length >= 1, 'random genre gives its styles', (await opts()).styles.join());
-  await page.click('#tab-radio [data-dice-range="in"]');
+  if ((await opts()).diceRange === false) await page.click('#tab-radio [data-dice-mode]');
   for (let i = 0; i < 5; i++) { await page.click('#tab-radio [data-dice="knobs"]'); await sleep(80); }
   o = await opts();
   check(o.chaos >= .15 && o.chaos <= .7 && o.energy >= .3 && o.energy <= .9, 'all knobs in range', `${o.chaos} ${o.energy}`);

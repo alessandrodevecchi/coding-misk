@@ -12,11 +12,11 @@ import { windowSong } from '../endless/join.js';
 import { validateRecipe } from '../endless/recipe.js';
 import { buildSteps, sayText } from '../song/build.js';
 import { QUIRKS } from '../endless/quirks.js';
-import { makeArtist, randomStyles, randomGenre, randomKnob, KNOBS } from '../endless/artist-maker.js';
+import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } from '../endless/artist-maker.js';
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE } from '../icons.js';
+import { DICE, GEAR } from '../icons.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -94,7 +94,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (kind === 'sounds') { opts.sounds = seed; saveOpts(); render(); return toast(t('diceSoundsNext')); }
     opts.artist = null;
     if (kind === 'styles' || kind === 'genre') opts.compilation = 'off';
-    if (kind === 'styles') opts.styles = randomStyles(seed, recipes);
+    if (kind === 'styles') opts.styles = randomMix(seed, recipes);
     if (kind === 'genre') { const g = randomGenre(seed, recipes); opts.styles = randomStyles(seed, recipes, { genre: g }); toast(t('diceGenreNow', { g: t(`g:${g}`) })); }
     if (kind === 'knob' && KNOBS.includes(k)) opts[k] = randomKnob(seed, k, opts.diceRange);
     if (kind === 'knobs') for (const x of KNOBS) opts[x] = randomKnob(seed, x, opts.diceRange);
@@ -545,7 +545,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const tip = k => `title="${esc(t(k))}"`;
     const S0 = { ...SETUP_DEFAULT, ...opts.compSetup }, rg = { ...JSON.parse(JSON.stringify(SETUP_DEFAULT.ranges)), ...(S0.ranges || {}) }, mine = userPresets();
     const chips = (list, sel, attr, label) => list.map(x => `<button class="chip small" ${attr}="${esc(x)}" aria-pressed="${!sel || sel.includes(x)}">${esc(label(x))}</button>`).join('');
-    const knob = k => `<div class="comp-range"><span class="lbl">${esc(t({ chaos: 'radioChaos', energy: 'radioEnergy', complexity: 'radioComplexity', talk: 'radioTalk' }[k]))}</span><input type="range" min="0" max="1" step="0.05" value="${rg[k][0]}" data-comp-min="${k}" aria-label="${esc(t('compMin'))}"><input type="range" min="0" max="1" step="0.05" value="${rg[k][1]}" data-comp-max="${k}" aria-label="${esc(t('compMax'))}"><output>${rg[k][0]}–${rg[k][1]}</output></div>`;
+    // one track with two handles: the low and the high end of the knob's range
+    const knob = k => `<div class="comp-range"><span class="lbl">${esc(t({ chaos: 'radioChaos', energy: 'radioEnergy', complexity: 'radioComplexity', talk: 'radioTalk' }[k]))}</span><span class="dual" style="--lo:${rg[k][0] * 100}%;--hi:${rg[k][1] * 100}%"><span class="dual-fill"></span><input type="range" min="0" max="1" step="0.05" value="${rg[k][0]}" data-comp-min="${k}" aria-label="${esc(t('compMin'))}" data-no-knob><input type="range" min="0" max="1" step="0.05" value="${rg[k][1]}" data-comp-max="${k}" aria-label="${esc(t('compMax'))}" data-no-knob></span><output>${rg[k][0]}–${rg[k][1]}</output></div>`;
     return `<div class="card comp-setup">
       <div class="comp-line"><label class="lbl" for="comp-preset">${esc(t('compPreset'))}</label><select id="comp-preset" data-no-knob>${Object.keys(PRESETS).map(k => `<option value="${k}"${opts.compPreset === k ? ' selected' : ''}>${esc(t(`compP_${k}`))}</option>`).join('')}${Object.keys(mine).map(k => `<option value="${esc(k)}"${opts.compPreset === k ? ' selected' : ''}>${esc(k)}</option>`).join('')}${opts.compPreset === 'custom' ? `<option value="custom" selected>${esc(t('compPresetCustom'))}</option>` : ''}</select>
         <input type="text" id="comp-name" maxlength="30" placeholder="${esc(t('compSaveAs'))}"><button class="btn small" id="comp-save">${esc(t('compSave'))}</button>${mine[opts.compPreset] ? `<button class="btn small danger" id="comp-del">${esc(t('compDelete'))}</button>` : ''}</div>
@@ -577,9 +578,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
           <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
         </div>
-        <div class="comp-row"><button class="btn comp-btn" id="radio-comp" aria-pressed="${opts.compilation !== 'off'}" ${tip('compTip')}>${esc(t('compBtn'))}<span class="comp-lamps" aria-hidden="true"><i class="${opts.compilation === 'song' ? 'on' : ''}"></i><i class="${opts.compilation === 'some' ? 'on' : ''}"></i></span></button>
-          <span class="muted small">${esc(opts.compilation === 'song' ? t('compEverySong') : opts.compilation === 'some' ? t('compEverySome') : t('compOff'))}</span>
-          <button class="btn small" id="radio-comp-setup" aria-expanded="${compOpen}" ${tip('compSetupTip')}>⚙ ${esc(t('compSetup'))} · ${esc(presetName(opts.compPreset))}</button></div>
+        <div class="comp-row"><button class="btn comp-btn" id="radio-comp" aria-pressed="${opts.compilation !== 'off'}" title="${esc(t('compTip'))} · ${esc(opts.compilation === 'song' ? t('compEverySong') : opts.compilation === 'some' ? t('compEverySome') : t('compOff'))}">${esc(t('compBtn'))}<span class="comp-lamps" aria-hidden="true"><i class="${opts.compilation === 'song' ? 'on' : ''}"></i><b>1</b><i class="${opts.compilation === 'some' ? 'on' : ''}"></i><b>2–4</b></span></button>
+          <button class="comp-setup-btn" id="radio-comp-setup" aria-expanded="${compOpen}" aria-label="${esc(t('compSetup'))}" ${tip('compSetupTip')}>${GEAR}<span class="comp-lcd">${esc(presetName(opts.compPreset))}</span></button></div>
         ${compOpen ? setupPanel() : ''}
         <div class="${opts.compilation !== 'off' ? 'set-aside' : ''}">
         ${opts.compilation !== 'off' ? `<p class="hint muted small">${esc(t('compAside'))}</p>` : ''}
@@ -590,7 +590,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${opts.styles.includes(r.id)}" title="${esc(r.description || t('tipStyles'))}">${esc(tx(r.name))}</button>`).join('')}</div>
         </div>
         </div>
-        <div class="dice-row"><span class="lbl">${esc(t('diceKnobsLbl'))}</span>${die('knobs', 'diceKnobs')}<span class="dice-range" role="group"><button class="chip small" data-dice-range="in" aria-pressed="${opts.diceRange}" ${tip('diceRangeInTip')}>${esc(t('diceRangeIn'))}</button><button class="chip small" data-dice-range="full" aria-pressed="${!opts.diceRange}" ${tip('diceRangeFullTip')}>${esc(t('diceRangeFull'))}</button></span>
+        <div class="dice-row"><span class="lbl">${esc(t('diceKnobsLbl'))}</span><span class="dice-combo">${die('knobs', 'diceKnobs')}<button class="dice-mode" data-dice-mode ${tip(opts.diceRange ? 'diceRangeInTip' : 'diceRangeFullTip')}>${esc(opts.diceRange ? t('diceRangeIn') : t('diceRangeFull'))}<span aria-hidden="true">⇄</span></button></span>
           <span class="dice-sounds">${die('sounds', 'diceSounds', t('diceSoundsLbl'))}${opts.sounds ? `<span class="muted small mono" title="${esc(t('diceSoundsOn'))}">${esc(opts.sounds)}</span><button class="plain" data-sounds-clear aria-label="${esc(t('diceSoundsClear'))}" title="${esc(t('diceSoundsClear'))}">×</button>` : ''}</span></div>
         <div class="ctrls four">${slider('chaos', 'radioChaos', 'tipChaos')}${slider('energy', 'radioEnergy', 'tipEnergy')}${slider('complexity', 'radioComplexity', 'tipComplexity')}${slider('talk', 'radioTalk', 'tipTalk')}</div>
         <div class="radio-how">
@@ -652,7 +652,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.id === 'comp-save') { const name = (root.querySelector('#comp-name').value || '').trim(); if (!name || PRESETS[name]) { toast(t('compNameBad')); return; } const all = userPresets(); all[name] = JSON.parse(JSON.stringify(opts.compSetup)); store.set('coding-misk-comp-presets', all); opts.compPreset = name; saveOpts(); render(); return toast(t('compSaved', { name })); }
     if (b.id === 'comp-del') { const all = userPresets(); delete all[opts.compPreset]; store.set('coding-misk-comp-presets', all); opts.compPreset = 'custom'; saveOpts(); return render(); }
     if (b.dataset.compKeep !== undefined && S) { const it = S.stream[S.onAir]; if (it.comp && it.comp.artist) { keepArtist(it.comp.artist); toast(t('diceKept')); renderNow(); } return; }
-    if (b.dataset.diceRange) { opts.diceRange = b.dataset.diceRange === 'in'; saveOpts(); return render(); }
+    if (b.dataset.diceMode !== undefined) { opts.diceRange = !opts.diceRange; saveOpts(); return render(); }
     if (b.dataset.soundsClear !== undefined) { opts.sounds = null; saveOpts(); return render(); }
     if (b.dataset.keep !== undefined && opts.temp) { const id = keepArtist(opts.temp); if (id) { opts.temp = null; opts.artist = id; saveOpts(); render(); toast(t('diceKept')); } return; }
     if (b.dataset.tempDrop !== undefined) { if (opts.artist === (opts.temp && opts.temp.id)) opts.artist = null; opts.temp = null; saveOpts(); return render(); }

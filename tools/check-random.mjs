@@ -1,7 +1,7 @@
 // Checks for the random tools (#50): random artists are valid and repeatable, random styles and knobs stay in their
 // limits, the sounds die changes the instruments and nothing else. No browser.
 //   npm run check:random      exit 1 when any check fails
-import { makeArtist, randomStyles, randomGenre, randomKnobs, SENSIBLE, KNOBS, genresOf } from '../src/endless/artist-maker.js';
+import { makeArtist, randomStyles, randomGenre, randomKnobs, randomMix, SENSIBLE, KNOBS, genresOf } from '../src/endless/artist-maker.js';
 import { validateArtist } from '../src/endless/artist.js';
 import { createSession } from '../src/endless/director.js';
 import { withDefaults } from '../src/endless/recipe.js';
@@ -25,6 +25,9 @@ const CHECKS = {
       assert(st.length >= 1 && st.every(s => recipes.find(r => r.id === s).genre === 'jazz'), `jazz styles ${st}`);
     }
     assert(genresOf(recipes).includes(randomGenre('x', recipes)), 'a known genre');
+  },
+  'a mix takes 2 or 3 styles from different genres'() {
+    for (let i = 0; i < 50; i++) { const m = randomMix(`m-${i}`, recipes), gs = m.map(id => recipes.find(r => r.id === id).genre); assert(m.length >= 2 && m.length <= 3 && new Set(gs).size === m.length, `mix ${m}`); }
   },
   'knobs stay in range'() {
     for (let i = 0; i < 100; i++) {

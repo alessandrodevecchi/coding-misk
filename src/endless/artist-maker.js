@@ -40,6 +40,14 @@ export function randomStyles(seed, recipes, { genre = null, allowedGenres = null
   return out;
 }
 
+// a mix: 2 or 3 styles from different genres (the genre die keeps to one genre instead)
+export function randomMix(seed, recipes, { allowedStyles = null } = {}) {
+  const r = stream(seed, 'mix'), byGenre = {};
+  for (const x of recipes) if (x.genre && (!allowedStyles || allowedStyles.includes(x.id))) (byGenre[x.genre] = byGenre[x.genre] || []).push(x.id);
+  const gs = r.shuffle(Object.keys(byGenre).sort()), n = Math.min(gs.length, r.int(2, 3));
+  return gs.slice(0, n).map(g => r.pick(byGenre[g].sort()));
+}
+
 // ---------- names and bios ----------
 const ADJ = ['Velvet', 'Neon', 'Static', 'Hollow', 'Midnight', 'Chrome', 'Paper', 'Silent', 'Rust', 'Golden', 'Lunar', 'Broken', 'Glass', 'Electric', 'Distant', 'Feral', 'Pale', 'Wired', 'Low', 'Saint'];
 const NOUN = ['Monk', 'Signal', 'Harbor', 'Engine', 'Orchid', 'Circuit', 'Tide', 'Ghost', 'Choir', 'Arcade', 'Lantern', 'Vessel', 'Atlas', 'Wolves', 'Static', 'Comet', 'Machine', 'Garden', 'Satellite', 'Riot'];
