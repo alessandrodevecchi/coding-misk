@@ -49,7 +49,18 @@ The visual stage SHALL offer the soul as a scene (phase 1). The visual picker SH
 - **THEN** the stage shows the soul of the song on air
 
 ### Requirement: Soul display
-A Soul display (phase 2) SHALL show the soul independently of the visual stage: the stage can show any visual while the display shows the soul. It SHALL have a power button with switch-on and switch-off animations, a full-screen button, previous and next view buttons, a lock switch and an "override visual" lever. With the lever on, the visual stage SHALL show the soul; turning the lever or the display off SHALL bring the chosen visual back. In HW the display SHALL look like an old terminal; in neon like a retro-futuristic screen.
+A Soul display (phase 2) SHALL show the soul independently of the visual stage: the stage can show any visual while the display shows the soul. It SHALL have a power button with switch-on and switch-off animations, a full-screen button, previous and next view buttons, a lock switch and an "override visual" lever. With the lever on, the visual stage SHALL show the soul; turning the lever or the display off SHALL bring the chosen visual back. The display SHALL offer several shells (at least a sci-fi terminal, a wasteland terminal, a retro-futuristic screen and a 2000s CRT monitor), with a default per theme, and a control next to it that changes the shell without changing the theme.
+
+#### Scenario: Change the shell
+- **WHEN** the listener moves the shell lever
+- **THEN** the display goes back into its hatch and the next shell comes out and switches on, showing the same soul
+
+### Requirement: Display animations
+Opening the display SHALL be animated: the stage shrinks, a hatch beside it slides in and opens, the display comes out and switches on. Turning it off SHALL play the reverse. With the override lever on, a cable SHALL be drawn from the display to the stage while the stage shows the soul.
+
+#### Scenario: Open the display
+- **WHEN** the listener presses the power button with the display closed
+- **THEN** the stage shrinks, the hatch opens, the display comes out and switches on within about three seconds
 
 #### Scenario: Override the visual
 - **WHEN** the stage shows Edgerunners, the display is on and the listener turns the override lever on

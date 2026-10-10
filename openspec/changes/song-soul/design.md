@@ -29,6 +29,8 @@ The owner's doubts: a card in the tab, a collapsible section like the live code,
 - **A tab on the edge that slides a panel out:** global, but hidden, and the owner is not convinced.
 - **Beside the visual stage:** the stage is full width; a button shrinks it and opens the display on its right (collapsible). Global, always above the tabs, and the "override visual" lever has an obvious meaning there. On phones the display goes under the stage, closed by default.
 
+**Shells and motion (owner's request):** the display has shells, picked with a lever: a sci-fi terminal, a wasteland terminal, a retro-futuristic screen, a 2000s CRT monitor or TV; a default per theme. It lives in a hatch beside the stage: on power the stage shrinks, the hatch slides in and opens, the display comes out and switches on; a shell change sends the display back in and brings the next one out; power off plays the reverse. The override lever draws a cable from the display to the stage. These concepts get mockups (stills and a short video) before phase 2 starts.
+
 **Recommendation:** beside the visual stage. The power button is also the collapse control: off closes the display and gives the stage its full width back. A small "monitor" in the now playing card can come later as a shortcut.
 
 ## Risks / Trade-offs
