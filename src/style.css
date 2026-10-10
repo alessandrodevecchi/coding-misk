@@ -909,7 +909,8 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 :root[data-ui="hw"] .sb-door::after { height: 10px; background: repeating-linear-gradient(-45deg, #e6b400 0 8px, #111 8px 16px); box-shadow: none; }
 .sb-display { position: relative; width: 500px; height: 420px; flex: none; transform-style: preserve-3d; transform-origin: 50% 50%; }
 .sb-panel { position: absolute; inset: 0; }
-.sb-panel > svg { position: absolute; inset: 0; width: 500px; height: 420px; overflow: visible; }
+.sb-panel > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.sb-dark { position: absolute; inset: 0; z-index: 4; background: #000; opacity: 0; pointer-events: none; }
 .sb-panel [data-act] { cursor: pointer; }
 .sb-panel [data-act]:active { transform: translateY(1.5px); }
 .sb-panel [data-act]:focus-visible { outline: 2px solid var(--a1); }

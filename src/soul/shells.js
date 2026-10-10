@@ -51,7 +51,7 @@ function knob(x, y, r, cap = 'url(#sd-blackknob)', k = '', act = '', ticks = 28)
 }
 // a toggle switch seen from the front: nut, bat up or down
 function toggle(x, y, k, act, label, lc = '#222', lf = 'Share Tech Mono') {
-  return `<g data-act="${act}"><polygon points="${[0, 1, 2, 3, 4, 5].map(i => { const a = i / 6 * 6.283 + .52; return `${x + Math.cos(a) * 11},${y + Math.sin(a) * 11}`; }).join(' ')}" fill="url(#sd-chrome)" stroke="rgba(0,0,0,.4)"/><circle cx="${x}" cy="${y}" r="6" fill="#2a2a2e"/>
+  return `<g data-act="${act}"><rect x="${x - 14}" y="${y - 30}" width="${label ? 34 + label.length * 6 : 28}" height="44" fill="transparent"/><polygon points="${[0, 1, 2, 3, 4, 5].map(i => { const a = i / 6 * 6.283 + .52; return `${x + Math.cos(a) * 11},${y + Math.sin(a) * 11}`; }).join(' ')}" fill="url(#sd-chrome)" stroke="rgba(0,0,0,.4)"/><circle cx="${x}" cy="${y}" r="6" fill="#2a2a2e"/>
     <g data-bat="${k}" transform="translate(${x},${y})"><rect x="-3.2" y="-19" width="6.4" height="19" rx="3.2" fill="url(#sd-chromeV)" stroke="rgba(0,0,0,.35)" stroke-width=".6"/><circle cx="0" cy="-19" r="4.4" fill="url(#sd-chrome)"/></g>
     ${label ? T(label, x + 18, y + 3, 8, lc, lf, 'letter-spacing="1"') : ''}</g>`;
 }

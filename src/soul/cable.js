@@ -49,9 +49,10 @@ export function createCable({ getEnds, isHw }) {
   }
 
   // a SCART plug hanging from (x, y): metal shield inside the socket, body with the label, strain relief
+  // (x, y) is where the cable enters the plug; the plug points along ang (0 = up)
   function plug(x, y, ang, lit) {
     const hw = isHw();
-    g.save(); g.translate(x, y); g.rotate(ang);
+    g.save(); g.translate(x, y); g.rotate(ang); g.translate(0, -PLUG);
     g.fillStyle = '#a9abb2'; g.fillRect(-18, -6, 36, 8); g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(-18, -6, 36, 2);
     const body = g.createLinearGradient(-22, 0, 22, 0); body.addColorStop(0, hw ? '#1f1f22' : '#0f0b14'); body.addColorStop(.5, hw ? '#3a3a40' : '#241a30'); body.addColorStop(1, hw ? '#1a1a1d' : '#0c0910');
     g.fillStyle = body; g.beginPath(); g.roundRect(-22, 2, 44, 26, 4); g.fill(); g.strokeStyle = '#000'; g.lineWidth = 1; g.stroke();
@@ -81,9 +82,11 @@ export function createCable({ getEnds, isHw }) {
       if (mode === 'in') { path(); g.setLineDash([8, 22]); g.lineDashOffset = -t * 70; g.strokeStyle = '#00f0ff'; g.lineWidth = 2.4; g.shadowColor = '#00f0ff'; g.shadowBlur = 8; g.stroke(); g.setLineDash([]); g.shadowBlur = 0; }
     }
     const a = pts[0], b = pts[N - 1], b2 = pts[N - 2];
-    plug(a.x, a.y - PLUG, 0, mode === 'in');
-    const free = mode === 'plugging' || mode === 'unplugging' ? Math.atan2(b2.x - b.x, b.y - b2.y) * -1 : 0;
-    plug(b.x, b.y - PLUG, mode === 'in' ? 0 : free * .8, mode === 'in');
+    plug(a.x, a.y, 0, mode === 'in');
+    // the free plug carries on the cable's last stretch, and stands straight as it reaches the socket
+    const E = getEnds(), held = E ? Math.hypot(b.x - E.in.x, b.y - E.in.y - PLUG) : 99;
+    const free = Math.atan2(b.x - b2.x, -(b.y - b2.y)), ang = mode === 'in' ? 0 : free * clamp(held / 50);
+    plug(b.x, b.y, ang, mode === 'in');
   }
   function loop() {
     raf = 0;

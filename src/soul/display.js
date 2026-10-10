@@ -31,7 +31,7 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
   stagewrap.appendChild(screw);
   const bay = document.createElement('div');
   bay.className = 'soulbay'; bay.hidden = true;
-  bay.innerHTML = `<div class="sb-rim"></div><div class="sb-well"><div class="sb-mount"></div><div class="sb-lamp"></div><div class="sb-door top"></div><div class="sb-door bot"></div></div><div class="sb-sel"></div>`;
+  bay.innerHTML = `<div class="sb-rim"></div><div class="sb-well"><div class="sb-mount"></div><div class="sb-lamp"></div><div class="sb-dark"></div><div class="sb-door top"></div><div class="sb-door bot"></div></div><div class="sb-sel"></div>`;
   row.appendChild(bay);
   const sockIn = document.createElement('div'), sockOut = document.createElement('div');
   sockIn.className = 'soul-sock in'; sockOut.className = 'soul-sock out';
@@ -53,14 +53,15 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
   let open = false, busy = false, override = false, turns = 0, osd = null;
   let shell = store.get('coding-misk-soul-shell', '') || DEFAULT_SHELL[ui()];
   if (!BYID[shell]) shell = DEFAULT_SHELL[ui()];
-  let shown = null, panel = null, screen = null, raf = 0, lastFrame = 0;
+  let shown = null, panel = null, screen = null, raf = 0, lastFrame = 0, lastScale = 0;
   const cable = createCable({ isHw, getEnds: () => { if (!open || sockIn.style.opacity === '0') return null; const a = sockOut.getBoundingClientRect(), b = sockIn.getBoundingClientRect(); return { out: { x: a.left + a.width / 2, y: a.bottom }, in: { x: b.left + b.width / 2, y: b.bottom } }; } });
 
   function mountShell(id) {
     shown = id;
     const sh = BYID[id], [x, y, w, h, r] = sh.screen;
-    mount.innerHTML = `<div class="sb-display"><div class="sb-panel"><svg viewBox="0 0 500 420">${shellSvg(id)}</svg>
-      <div class="sb-scr ${sh.glass}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border-radius:${r}px"><canvas></canvas><div class="scan"></div><div class="glass"></div></div></div></div>`;
+    mount.innerHTML = `<div class="sb-display"><div class="sb-panel"><svg viewBox="0 0 500 420" preserveAspectRatio="xMidYMid meet">${shellSvg(id)}</svg>
+      <div class="sb-scr ${sh.glass}" style="left:${x / 5}%;top:${y / 4.2}%;width:${w / 5}%;height:${h / 4.2}%"><canvas></canvas><div class="scan"></div><div class="glass"></div></div></div></div>`;
+    lastScale = 0;
     panel = mount.querySelector('.sb-panel'); screen = mount.querySelector('canvas');
     screen.style.filter = sh.mono ? MONO[ui()] : 'none';
     panel.querySelectorAll('[data-act]').forEach(el => { el.setAttribute('role', 'button'); el.setAttribute('tabindex', '0'); el.setAttribute('aria-label', el.dataset.act); });
@@ -84,11 +85,13 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
       bay.style.cssText = `position:absolute;right:0;top:${stagewrap.offsetTop}px;width:${bayW}px;height:${h0 + (h1 - h0) * shrink}px;opacity:${clamp(shrink * 1.6)};transform:translateX(${(1 - eout(shrink)) * 120}px)`;
     }
     $('.sb-door.top').style.transform = `translateY(${-doors * 101}%)`; $('.sb-door.bot').style.transform = `translateY(${doors * 101}%)`;
-    $('.sb-lamp').style.opacity = val('lamp');
+    $('.sb-lamp').style.opacity = val('lamp'); $('.sb-dark').style.opacity = val('dark');
     const disp = mount.querySelector('.sb-display');
     if (disp) {
+      // the display takes the well's size (keeping its 500 × 420 shape); only the slide is a transform
       const well = $('.sb-well'), s = Math.min(well.clientWidth / 500, well.clientHeight / 420);
-      disp.style.transform = `translate3d(0, ${24 * (1 - out)}px, ${-520 * (1 - out)}px) rotateX(${(1 - out) * 8}deg) scale(${s})`;
+      if (Math.abs(s - lastScale) > .001) { lastScale = s; disp.style.width = `${500 * s}px`; disp.style.height = `${420 * s}px`; const scr = mount.querySelector('.sb-scr'); if (scr) scr.style.borderRadius = `${BYID[shown].screen[4] * s}px`; }
+      disp.style.transform = `translate3d(0, ${24 * (1 - out)}px, ${-520 * (1 - out)}px) rotateX(${(1 - out) * 8}deg)`;
       disp.style.filter = `brightness(${.25 + .75 * clamp(out)})`; disp.style.visibility = doors > .05 || out > .01 ? 'visible' : 'hidden';
     }
     // the sockets come out of the bottom edges
@@ -157,11 +160,11 @@ export function createSoulDisplay({ stagewrap, row, scene, store, isHw, getCyc, 
     shell = SHELL_IDS[i]; store.set('coding-misk-soul-shell', shell); pressed = { k: dir > 0 ? 'next' : 'prev', at: t() };
     if (ov) setOverride(false, true);
     go('screen', 0, t() + .15, .4, lin);
-    later(() => go('out', 0, t(), .6), .55); later(() => go('lamp', 1, t(), .2), .9);
-    later(() => { mountShell(shell); go('lamp', 0, t(), .3); }, 1.15);
-    later(() => go('out', 1, t(), .75, back), 1.25);
-    later(() => go('screen', 1, t(), 1, lin), 2.0);
-    later(() => { scene.analyze(); busy = false; if (ov) setOverride(true); }, 3.0);
+    later(() => go('out', 0, t(), .6), .55); later(() => go('dark', 1, t(), .3), .8);
+    later(() => mountShell(shell), 1.15);
+    later(() => { go('dark', 0, t(), .45); go('out', 1, t(), .75, back); }, 1.45);
+    later(() => go('screen', 1, t(), 1, lin), 2.2);
+    later(() => { scene.analyze(); busy = false; if (ov) setOverride(true); }, 3.2);
   }
   function setOverride(on, quiet = false) {
     if (on === override) return;
