@@ -46,14 +46,14 @@ export const GUIDE = [
     title: { en: 'Songs', it: 'Brani' },
     what: { en: 'Every song: the app\'s, yours and those saved from the radio, with search, tags and favourites.', it: 'Tutti i brani: quelli dell\'app, i tuoi e quelli salvati dalla radio, con ricerca, tag e preferiti.' },
     how: { en: 'Type in the search (it understands both languages: "frigio" finds "phrygian"), tap a genre, style or kind chip, sort. ☆ adds to the favourites, [+ Playlist] adds to a playlist, [▶ Continue in radio] lets the radio go on after the song. The playlist menu on top plays one.', it: 'Scrivi nella ricerca (capisce tutte e due le lingue: "frigio" trova "phrygian"), tocca un chip di genere, stile o tipo, ordina. ☆ mette tra i preferiti, [+ Playlist] aggiunge a una playlist, [▶ Continua in radio] fa continuare la radio dopo il brano. Il menu delle playlist in alto ne suona una.' },
-    know: { en: 'A tap on a tag of a card filters by it; the legend explains the tag colours. Your songs can have their own tags.', it: 'Un tocco su un tag di una card filtra per quel tag; la legenda spiega i colori. I tuoi brani possono avere tag tuoi.' },
+    know: { en: 'A tap on a tag of a card filters by it; the legend explains the tag colours. Your songs can have their own tags. [⬇ Video] records the song as a video for YouTube (visual, code and sound, in real time); layout and quality are in Settings.', it: 'Un tocco su un tag di una card filtra per quel tag; la legenda spiega i colori. I tuoi brani possono avere tag tuoi. [⬇ Video] registra il brano in un video per YouTube (visual, codice e suono, in tempo reale); layout e qualità sono nelle Impostazioni.' },
   },
   {
     id: 'playlists', tab: 'playlist', mode: 'ascolta', show: '#tab-playlist',
     title: { en: 'Playlists', it: 'Playlist' },
     what: { en: 'Lists of songs to play in a row. Favourites is the first list and fills up with the star.', it: 'Liste di brani da suonare di fila. Preferiti è la prima lista e si riempie con la stella.' },
     how: { en: '[New playlist] here, or [+ Playlist] on any song. Reorder by dragging or with the arrows, rename, delete. Play it: it moves to the next song by itself.', it: '[Nuova playlist] qui, o [+ Playlist] su un brano. Riordina trascinando o con le frecce, rinomina, elimina. Suonala: passa da sola al brano dopo.' },
-    know: { en: 'A playlist can hold radio sessions (📻): they play as you heard them, then the list moves on. After a director update a session may sound different; ❄ Freeze keeps its songs as they are. Export and import a playlist as JSON, your songs and sessions included. Shuffle, repeat and Mix are in the player bar.', it: 'Una playlist può contenere sessioni della radio (📻): suonano come le hai sentite, poi la lista va avanti. Dopo un aggiornamento del regista una sessione può suonare diversa; ❄ Congela tiene i suoi brani così come sono. Esporta e importa una playlist in JSON, con i tuoi brani e le sessioni. Casuale, ripeti e Mix sono nella barra del player.' },
+    know: { en: 'A playlist can hold radio sessions (📻): they play as you heard them, then the list moves on. After a director update a session may sound different; ❄ Freeze keeps its songs as they are. The camera button records a session as a video, to its last song. Export and import a playlist as JSON, your songs and sessions included. Shuffle, repeat and Mix are in the player bar.', it: 'Una playlist può contenere sessioni della radio (📻): suonano come le hai sentite, poi la lista va avanti. Dopo un aggiornamento del regista una sessione può suonare diversa; ❄ Congela tiene i suoi brani così come sono. Il pulsante con la videocamera registra una sessione in video, fino all\'ultimo brano. Esporta e importa una playlist in JSON, con i tuoi brani e le sessioni. Casuale, ripeti e Mix sono nella barra del player.' },
   },
   {
     id: 'radio', tab: 'radio', mode: 'ascolta', show: '#radio-start',
@@ -94,7 +94,7 @@ export const GUIDE = [
       {
         id: 'recording', title: { en: 'Recording', it: 'Registrazione' },
         what: { en: 'Records the radio to an audio file, with a track list and the session recipe.', it: 'Registra la radio in un file audio, con la scaletta e la ricetta della sessione.' },
-        how: { en: '[Record] starts, press again to stop and download. [Record from the start] plays the session again from its first song and records it.', it: '[Registra] parte, premi di nuovo per fermare e scaricare. [Registra dall\'inizio] rifà la sessione dal primo brano e la registra.' },
+        how: { en: '[Record] starts, press again to stop and download. [Video] records a video instead, with the same track list. [Record from the start] plays the session again from its first song and records it.', it: '[Registra] parte, premi di nuovo per fermare e scaricare. [Video] registra invece un video, con la stessa scaletta. [Registra dall\'inizio] rifà la sessione dal primo brano e la registra.' },
         know: { en: 'Pausing leaves no gap in the file. The format (WAV or Opus) is in the settings.', it: 'La pausa non lascia buchi nel file. Il formato (WAV o Opus) è nelle impostazioni.' },
       },
       {
@@ -163,7 +163,7 @@ export const GUIDE = [
   {
     id: 'settings', tab: 'impostazioni', mode: null, show: '#open-settings',
     title: { en: 'Settings', it: 'Impostazioni' },
-    what: { en: 'Options used less often: theme, language, the radio\'s visual and defaults, the export format, backup.', it: 'Le opzioni usate meno spesso: tema, lingua, visual e valori della radio, formato di export, backup.' },
+    what: { en: 'Options used less often: theme, language, the radio\'s visual and defaults, the export format, the video layout and quality, backup.', it: 'Le opzioni usate meno spesso: tema, lingua, visual e valori della radio, formato di export, layout e qualità dei video, backup.' },
     how: { en: 'The ⚙ gear at the top opens and closes them. [Export everything] saves your songs, playlists, artists, styles and settings to a file; [Import] brings them into another browser.', it: 'L\'ingranaggio ⚙ in alto le apre e le chiude. [Esporta tutto] salva in un file brani, playlist, artisti, stili e impostazioni; [Importa] li porta in un altro browser.' },
     know: { en: '[Reset everything] needs two presses.', it: '[Azzera tutto] vuole due pressioni.' },
   },

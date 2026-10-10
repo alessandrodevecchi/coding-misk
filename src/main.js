@@ -29,6 +29,8 @@ import SONG_ORDER from '../songs/index.json';
 import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
+import { createVideo } from './video/video.js';
+import { fileName } from './video/layout.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
 import { LOCK } from './icons.js';
@@ -489,15 +491,28 @@ function tapMaster() {
     if (node && node !== rec.node) { node.connect(rec.dest); rec.node = node; }
   } catch (e) {}
 }
-async function exportTrack(sg, as) {
+// asVideo (#27): a video of the song (frame and audio) instead of the audio alone
+async function exportTrack(sg, as, asVideo = false) {
   if (rec) { rec.cancel = true; rec.recorder.stop(); stop(); return; }
+  if (asVideo && (capture || video.on)) return toast(t('vidBusy'));
+  // the whole tab: the browser asks which tab to share, while the click still counts
+  const display = asVideo ? await video.askTab() : null;
+  if (display === false) return toast(t('vidTabRefused'));
   initAudioOnce(); await ready; await initAudioOnce();
   const ctx = globalThis.getAudioContext();
   const dest = ctx.createMediaStreamDestination();
-  // WAV (decoded after the recording) or Opus (the recording itself, much smaller), from the settings (#31)
-  const opus = store.get('coding-misk-export-format', 'wav') === 'opus', mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'].find(m => globalThis.MediaRecorder && MediaRecorder.isTypeSupported(m));
-  const recorder = opus && mime ? new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 192000 }) : new MediaRecorder(dest.stream);
-  rec = { opus: !!(opus && mime), recorder, dest, chunks: [], node: null, id: sg.id, title: sg.title, total: sg.meta.seconds, ending: 0, cancel: false };
+  let recorder, opus = false, ext = '';
+  if (asVideo) {
+    const v = video.start({ audio: dest.stream, total: sg.meta.seconds, display, onStop: () => { if (rec && !rec.ending) rec.ending = performance.now(); stop(); }, onCancel: () => { if (rec) { rec.cancel = true; rec.recorder.stop(); } stop(); } });
+    if (!v) { if (display) display.getTracks().forEach(tr => tr.stop()); return toast(t('vidNotSupported')); }
+    recorder = v.recorder; ext = v.ext;
+  } else {
+    // WAV (decoded after the recording) or Opus (the recording itself, much smaller), from the settings (#31)
+    const want = store.get('coding-misk-export-format', 'wav') === 'opus', mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'].find(m => globalThis.MediaRecorder && MediaRecorder.isTypeSupported(m));
+    recorder = want && mime ? new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 192000 }) : new MediaRecorder(dest.stream);
+    opus = !!(want && mime);
+  }
+  rec = { opus, video: asVideo, ext, recorder, dest, chunks: [], node: null, id: sg.id, title: sg.title, total: sg.meta.seconds, ending: 0, cancel: false };
   recorder.ondataavailable = e => e.data.size && rec.chunks.push(e.data);
   recorder.onstop = () => finishExport(rec);
   tapMaster();
@@ -508,17 +523,69 @@ async function exportTrack(sg, as) {
 async function finishExport(r) {
   rec = null;
   try { if (r.node) r.node.disconnect(r.dest); } catch (e) {}
-  if (r.cancel) return toast(t('exportCancel'));
+  if (r.video) video.end();
+  if (r.cancel) return toast(t(r.video ? 'vidCancelled' : 'exportCancel'));
+  if (r.video) { saveBlob(fileName(r.title, r.ext), new Blob(r.chunks, { type: r.recorder.mimeType })); return toast(t('vidSaved', { name: fileName(r.title, r.ext) })); }
   toast(t('exportWorking'));
   const blob = new Blob(r.chunks, { type: r.recorder.mimeType });
   const out = r.opus ? blob : wavBlob(await globalThis.getAudioContext().decodeAudioData(await blob.arrayBuffer()));
   const ext = r.opus ? (/ogg/.test(r.recorder.mimeType) ? 'ogg' : 'webm') : 'wav';
-  const url = URL.createObjectURL(out);
-  const a = document.createElement('a');
-  a.href = url; a.download = `${(r.title || 'coding-misk').replace(/[^\w\- ]+/g, '').replace(/\s+/g, ' ').trim() || 'coding-misk'}.${ext}`;
-  document.body.appendChild(a); a.click(); a.remove();
+  const name = fileName(r.title, ext);
+  saveBlob(name, out);
+  toast(t('exportDone', { name }));
+}
+function saveBlob(name, blob) {
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
-  toast(t('exportDone', { name: a.download }));
+}
+// a live video capture (#27) for the radio and the playlist sessions: the same interface as startCapture.
+// onStop / onCancel: the video bar's buttons. Null when the browser cannot record or the tab was not shared.
+async function startVideoCapture({ total = 0, onStop = () => {}, onCancel = () => {} } = {}) {
+  if (capture || rec || video.on) { toast(t('vidBusy')); return null; }
+  const display = await video.askTab();
+  if (display === false) { toast(t('vidTabRefused')); return null; }
+  initAudioOnce();
+  const ctx = globalThis.getAudioContext(), dest = ctx.createMediaStreamDestination();
+  const v = video.start({ audio: dest.stream, total, display, onStop, onCancel });
+  if (!v) { if (display) display.getTracks().forEach(tr => tr.stop()); toast(t('vidNotSupported')); return null; }
+  const recorder = v.recorder, chunks = [], c = { node: null, dest, recorder, video: true };
+  c.tap = () => { try { const node = globalThis.getSuperdoughAudioController().output.destinationGain; if (node && node !== c.node) { if (c.node) try { c.node.disconnect(dest); } catch (e) {} node.connect(dest); c.node = node; } } catch (e) {} };
+  recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+  c.tap(); recorder.start(1000);
+  c.pause = () => { if (recorder.state === 'recording') { recorder.pause(); video.pause(); } };
+  c.resume = () => { if (recorder.state === 'paused') { recorder.resume(); video.resume(); } };
+  // cancel: nothing is kept (resolves null)
+  c.stop = (cancel = false) => new Promise(res => {
+    recorder.onstop = () => {
+      try { if (c.node) c.node.disconnect(dest); } catch (e) {}
+      capture = null; video.end();
+      res(cancel ? null : { blob: new Blob(chunks, { type: recorder.mimeType }), ext: v.ext });
+    };
+    recorder.stop();
+  });
+  capture = c;
+  return c;
+}
+// a video of a radio session saved in a playlist (#27): the session replays and the video ends after its last song
+let sessionVid = null;
+async function recordSession(id) {
+  const s = playlists.session(id); if (!s || !radio || sessionVid) return;
+  const finish = async cancel => {
+    if (!sessionVid) return;
+    const v = sessionVid; sessionVid = null;
+    stop();
+    const out = await v.cap.stop(cancel);
+    if (!out) return toast(t('vidCancelled'));
+    const name = fileName(s.title, out.ext);
+    saveBlob(name, out.blob); toast(t('vidSaved', { name }));
+  };
+  const cap = await startVideoCapture({ onStop: () => finish(false), onCancel: () => finish(true) });
+  if (!cap) return;
+  sessionVid = { cap };
+  mixS = null; queue = null;
+  // the reverb tail of the last song stays in the video
+  radio.playSession(s, { onEnd: () => setTimeout(() => finish(false), 2500) });
 }
 function wavBlob(buf) {
   const ch = Math.min(2, buf.numberOfChannels), n = buf.length, data = new DataView(new ArrayBuffer(44 + n * ch * 2));
@@ -532,6 +599,7 @@ function wavBlob(buf) {
   return new Blob([data], { type: 'audio/wav' });
 }
 $('#tr-export').addEventListener('click', () => exportTrack(compiled, 'track'));
+$('#tr-video').addEventListener('click', () => exportTrack(compiled, 'track', true));
 // Continue in radio (#29): the song in Compose is song 0 of a new radio session, from the bar it is at
 const continuable = sg => (sg.tracks || []).some(x => x.type !== 'code' && x.type !== 'voice');
 function continueInRadio(sg, from = 0) {
@@ -1576,6 +1644,7 @@ function songCard({ tr, p }, i) {
       <button class="btn" data-act="pause" hidden></button>
       <button class="btn" data-act="stop" hidden>${t('stop')}</button>
       <button class="btn" data-act="export" data-export="${esc(tr.id)}">${t('exportWav')}</button>
+      <button class="btn" data-act="video" data-export-video="${esc(tr.id)}" title="${esc(t('vidTip'))}">${t('exportVideo')}</button>
       <button class="btn" data-act="playlist" aria-expanded="false">${t('addToPlaylist')}</button>
       ${composed && continuable(tr) ? `<button class="btn" data-act="radio" title="${esc(t('continueRadioTip'))}">${t('continueRadio')}</button>` : ''}
       ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}${tr.version ? `<button class="btn danger" data-act="del-version">${t('plDelete')}</button>` : ''}`}
@@ -1694,6 +1763,7 @@ const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, 
 playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, playlists, confirmTwice, toast,
   songs: () => [...libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: c.p.meta.seconds })),
     ...playlists.all.flatMap(l => l.songs).filter(isSession).map(id => { const s = playlists.session(id); return s && { id, title: s.title, kind: 'session', seconds: 0, count: s.count, frozen: !!s.frozen, old: !s.frozen && (s.version || 0) < DIRECTOR_VERSION }; }).filter(Boolean)],
+  video: id => recordSession(id),
   freeze: id => { const s = playlists.session(id); if (!s || !radio) return; playlists.freeze(id, radio.rebuild(s.recipe, s.count)); sessionSongs.delete(id); toast(t('plFrozen')); },
   sessionOf: id => playlists.session(id),
   play: (listId, ids, startId) => playQueue(listId, ids, startId),
@@ -1772,9 +1842,10 @@ $('#songs').addEventListener('click', e => {
     if (a === 'pause') return togglePlay();
     if (a === 'stop') return stop();
     if (a === 'radio') return continueInRadio({ ...tr, tags: tr.tags || songOf({ tr, p }).tags }, 0);
-    if (a === 'export') {
-      if (tr.kind === 'composed') { if (!rec && !loadTrack(tr)) return; return exportTrack(rec ? null : compiled, 'track'); }
-      return exportTrack(p, 'free');
+    if (a === 'export' || a === 'video') {
+      const v = a === 'video';
+      if (tr.kind === 'composed') { if (!rec && !loadTrack(tr)) return; return exportTrack(rec ? null : compiled, 'track', v); }
+      return exportTrack(p, 'free', v);
     }
     if (a === 'open') {
       if (!loadTrack(tr)) return;
@@ -1877,7 +1948,8 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
     if (!rec.ending && !playing && !seeking && rec.recorder.state === 'recording' && performance.now() - (rec.started || (rec.started = performance.now())) > 3000) rec.ending = performance.now();
   }
   const recLabel = rec ? t('exporting', { t: clock(song && s ? song.meta.secondsAt(s.now()) : 0), total: clock(rec.total) }) : null;
-  $$('[data-export]').forEach(b => { const l = rec && (b.dataset.export === rec.id || b.id === 'tr-export') ? recLabel : t('exportWav'); if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!(rec && l === recLabel)); });
+  $$('[data-export]').forEach(b => { const l = rec && !rec.video && (b.dataset.export === rec.id || b.id === 'tr-export') ? recLabel : t('exportWav'); if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!(rec && l === recLabel)); });
+  $$('[data-export-video]').forEach(b => { const l = rec && rec.video && (b.dataset.exportVideo === rec.id || b.id === 'tr-video') ? recLabel : t('exportVideo'); if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!(rec && l === recLabel)); });
   // pulsanti di trasporto
   const playBtn = $('#play'), state = playing ? 'playing' : paused ? 'paused' : 'stopped';
   if (playBtn.dataset.state !== state) {
@@ -2097,6 +2169,7 @@ radio = createRadio({
     // stops the sound and gives the bar it stopped at
     halt: () => { const s = sched(), cyc = s ? s.now() : 0; ed.stop(); return cyc; },
     capture: () => startCapture(),
+    captureVideo: o => startVideoCapture(o),
     now: () => (sched() ? sched().now() : 0),
     saveSong: sg => { user.tracks.push({ ...clone(sg), id: 'u-' + Date.now() }); saveLibrary(); renderSongs(); toast(t('trackSaved')); },
     // sessions into playlists (#38): the lists to pick from, and adding (null: a new playlist)
@@ -2189,16 +2262,18 @@ $('#soul-ctl').addEventListener('click', e => {
   if (b.dataset.soul === 'lock') soul.locked = !soul.locked; else soul[b.dataset.soul]();
 });
 syncSoul();
-startVisuals({
+// what plays, for the studio scene (#28) and the video's title card (#27): the radio's song on air, or the song playing elsewhere
+function stageInfo(cyc) {
+  if (mode === 'radio' && radio && radio.on) return radio.info(cyc);
+  if (!song || !song.meta) return { title: T.title };
+  const it = mixActive() ? mixS.items[0] : null, rel = it ? cyc - it.start : cyc;
+  const said = song.build ? buildSteps(song.build).filter(x => x.say && x.at <= cyc).pop() : null;
+  return { title: it ? it.song.title : mode === 'track' ? T.title : song.title, bar: rel, bars: it ? it.bars : song.meta.bars, bpm: Math.round((song.meta.bpm || [])[Math.max(0, Math.floor(cyc))] || 0) || undefined, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at - (it ? it.start : 0) : 0 };
+}
+const visuals = startVisuals({
   getS: () => ({ look: soulOverride ? 'soul' : look }), soul,
-  // the studio scene (#28): the radio's song on air, or the song playing elsewhere
-  getInfo(cyc) {
-    if (mode === 'radio' && radio && radio.on) return radio.info(cyc);
-    if (!song || !song.meta) return { title: T.title };
-    const it = mixActive() ? mixS.items[0] : null, rel = it ? cyc - it.start : cyc;
-    const said = song.build ? buildSteps(song.build).filter(x => x.say && x.at <= cyc).pop() : null;
-    return { title: it ? it.song.title : mode === 'track' ? T.title : song.title, bar: rel, bars: it ? it.bars : song.meta.bars, bpm: Math.round((song.meta.bpm || [])[Math.max(0, Math.floor(cyc))] || 0) || undefined, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at - (it ? it.start : 0) : 0 };
-  },
+  afterFrame: (cyc, playing) => video.frame(cyc, playing),
+  getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando
   getMode: () => (mode === 'track' && song && isPlaying() && song.meta.sectionAt(sched().now()) === sel ? 'comp' : 'free'),
@@ -2221,3 +2296,13 @@ startVisuals({
     return `${bpm} BPM  ·  ${t('rdBar')} ${String(bar + 1).padStart(3, '0')}.${(step >> 2) + 1}\n${line2}`;
   },
 });
+// the video recorder (#27): its frame is drawn after each stage frame
+const video = createVideo({
+  visuals, store, t, esc,
+  getCode: () => (ed && ed.code) || '',
+  getInfo: stageInfo,
+  getSay: () => { const el = $('#say'); return el.classList.contains('on') ? el.textContent : ''; },
+  // the soul panel: only while the Soul display is on and the stage does not already show the soul
+  getSoul: () => (soulDisplay.open && soulDisplay.mode === 'soul' && !soulOverride ? { canvas: (cyc, playing, scale) => soul.frame(cyc, playing, scale) } : null),
+});
+globalThis.codingMiskVideo = video;

@@ -115,6 +115,10 @@ The radio is a third player mode, `radio`, next to `track` and `free`. It plays 
 
 Starting any other playback, the header pause or stop, or "open in Compose" stops the radio: they share one editor and scheduler. Recipes reach the browser through `import.meta.glob('../styles/*.json')`; invalid ones are left out. Browser storage keys: `coding-misk-radio` (controls), `coding-misk-radio-history` (last 50 songs with their JSON and session recipe).
 
+## Video (`#27`)
+
+`src/video/layout.js` holds the layouts (`visual`, `code`, `tab`), qualities (16:9: 1080p30, 1080p60, 720p30), title card modes and the frame areas (pure, `npm run check:video`). `src/video/video.js` draws the frame on a hidden canvas after each stage frame (`startVisuals({ afterFrame })`): the stage, the voice line, the song card, the code typing itself and the Soul panel. While a video records, `visuals.setTarget({ w, h })` makes the scenes draw into an offscreen canvas at the video size (logical height 720, scaled), and the visible stage shows that picture fitted. The canvas track (`captureStream`) and the master audio tap (before the volume) go into one `MediaRecorder`; MP4 first, WebM as fallback. The `tab` layout records the tab through `getDisplayMedia` instead. Songs use the audio export flow (`exportTrack(sg, as, true)`); the radio and playlist sessions use `startVideoCapture()`, which has the same interface as the radio's audio capture. Settings key: `coding-misk-video`.
+
 ## Sound browser
 
 `buildCatalog(soundMap, customBanks)` reads every loaded sound. Keys in `soundMap` are lowercase and drum machines also have aliases (`tr909_bd` next to `rolandtr909_bd`): only the 71 canonical machines of `machines.js` are kept. Sample banks keep loading after start-up (the full dirt-samples archive arrives a few seconds later), so the browser re-reads the catalogue every second until it stops growing. Pads play one shot through `superdough()`; cards and lists play a looping audition through the editor. "Use" sets the kit of a drums track, the sound of a bass, arp, hook or pad track, or the sample of a texture track (the selected track first, otherwise the first suitable one).

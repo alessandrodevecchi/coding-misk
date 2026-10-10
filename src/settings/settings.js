@@ -3,6 +3,7 @@
 import { makeBackup, mergeBackup } from './backup.js';
 import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
+import { LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS } from '../video/layout.js';
 
 export const EXPORT_FORMATS = ['wav', 'opus'];
 
@@ -13,7 +14,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
 
   function render() {
     if (root.hidden) return;
-    const r = app.radioSettings();
+    const r = app.radioSettings(), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) };
     root.innerHTML = `<p class="intro">${esc(t('setIntro'))}</p>
       <div class="set-grid">
         <div class="card set-card"><h3>${esc(t('setLook'))}</h3>
@@ -24,6 +25,12 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         <div class="card set-card"><h3>${esc(t('setAudio'))}</h3>
           ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`)}
           ${row(t('setFormat'), `<select id="set-format" data-no-knob>${opt('wav', store.get('coding-misk-export-format', 'wav'), t('setWav'))}${opt('opus', store.get('coding-misk-export-format', 'wav'), t('setOpus'))}</select>`, t('setFormatHint'))}
+        </div>
+        <div class="card set-card"><h3>${esc(t('setVideo'))}</h3>
+          ${row(t('setVidLayout'), `<select data-vid-opt="layout" data-no-knob>${LAYOUTS.map(k => opt(k, vid.layout, t(`vidLayout:${k}`))).join('')}</select>`, t(`vidLayoutHint:${vid.layout}`))}
+          ${row(t('setVidQuality'), `<select data-vid-opt="quality" data-no-knob>${Object.keys(QUALITIES).map(k => opt(k, vid.quality, t(`vidQuality:${k}`))).join('')}</select>`, t('setVidQualityHint'))}
+          ${row(t('setVidCard'), `<select data-vid-opt="card" data-no-knob>${CARDS.map(k => opt(k, vid.card, t(`vidCard:${k}`))).join('')}</select>`)}
+          ${row(t('setVidSoul'), seg('data-vid-soul', [['1', t('vidSoulShown')], ['0', t('vidSoulFolded')]], vid.soulPanel ? '1' : '0'), t('setVidSoulHint'))}
         </div>
         <div class="card set-card"><h3>${esc(t('setRadio'))}</h3>
           ${row(t('radioTransition'), `<select data-radio-opt="transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => opt(k, r.transition, t(k === 'artist' ? 'byArtist' : `tx:${k}`))).join('')}</select>`)}
@@ -37,11 +44,13 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       </div>`;
   }
 
+  const setVid = (k, v) => store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}), [k]: v });
   const entries = () => { const out = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); out.push([k, store.get(k, null)]); } return out; };
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
+    if (b.dataset.vidSoul) { setVid('soulPanel', b.dataset.vidSoul === '1'); return render(); }
     if (b.id === 'set-export') { const d = new Date().toISOString().slice(0, 10); downloadJson(`coding-misk-backup-${d}`, makeBackup(entries())); toast(t('setExported')); return; }
     if (b.id === 'set-import') {
       return pickJsonFiles(data => {
@@ -64,6 +73,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (e.target.id === 'set-radio-look') store.set('coding-misk-radio-look', e.target.value);
     if (e.target.id === 'set-format') store.set('coding-misk-export-format', e.target.value);
     if (e.target.dataset.radioOpt) app.setRadio(e.target.dataset.radioOpt, e.target.value);
+    if (e.target.dataset.vidOpt) { setVid(e.target.dataset.vidOpt, e.target.value); render(); }
   });
   return { render };
 }

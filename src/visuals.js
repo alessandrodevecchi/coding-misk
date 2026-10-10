@@ -5,15 +5,29 @@ import { INSTRUMENTS } from './music.js';
 // da lì ricaviamo un livello 0..1 per strumento e gli attacchi (onset) che accendono la scena.
 // getInfo(cyc): what plays, for the studio scene: { onAir, title, artist, line, bar, bars, bpm, say, sayAt, n }
 // soul: the soul scene (#46), drawn when the look is 'soul'
-export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}), soul = null }) {
+// afterFrame(cyc, playing): called after each frame (the video recorder draws its frame there, #27)
+export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}), soul = null, afterFrame = null }) {
   const $ = (s, r = document) => r.querySelector(s);
-  const cv = $('#stage'), cx = cv.getContext('2d');
+  const cv = $('#stage'), vcx = cv.getContext('2d');
+  // the canvas the scenes draw into: the stage, or an offscreen canvas at the video size while a video records (#27)
+  let cc = cv, cx = vcx, target = null;
   let W = 0, H = 0, dpr = 1;
   const resize = () => {
     const r = cv.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
-    W = r.width; H = r.height; dpr = d; cv.width = Math.round(W * d); cv.height = Math.round(H * d);
+    cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d);
+    if (target) return;
+    W = r.width; H = r.height; dpr = d;
     cx.setTransform(d, 0, 0, d, 0, 0);
   };
+  // video target { w, h } in pixels: the scenes draw at a logical height of 720 scaled up to it; null: back to the stage
+  function setTarget(t) {
+    target = t && t.w > 0 && t.h > 0 ? t : null;
+    if (!target) { cc = cv; cx = vcx; resize(); return; }
+    if (cc === cv) { cc = document.createElement('canvas'); cx = cc.getContext('2d'); }
+    cc.width = target.w; cc.height = target.h;
+    const s = target.h / 720; W = target.w / s; H = 720; dpr = s;
+    cx.setTransform(s, 0, 0, s, 0, 0);
+  }
   new ResizeObserver(resize).observe(cv); resize();
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -478,14 +492,14 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       cx.restore();
       // glitch: fette orizzontali spostate e separazione dei canali
       if (glitch > .15 && !reduce) {
-        const d = Math.min(window.devicePixelRatio || 1, 2), cwp = cv.width, chp = cv.height;
+        const d = dpr, cwp = cc.width, chp = cc.height;
         cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0);
         for (let i = 0; i < 3 + glitch * 6; i++) {
           const y = Math.floor(Math.random() * chp), h = Math.floor((4 + Math.random() * 30) * d), off = Math.floor((Math.random() - .5) * 80 * glitch * d);
-          cx.drawImage(cv, 0, y, cwp, h, off, y, cwp, h);
+          cx.drawImage(cc, 0, y, cwp, h, off, y, cwp, h);
         }
         cx.globalCompositeOperation = 'lighter'; cx.globalAlpha = .25 * glitch;
-        cx.drawImage(cv, 6 * glitch * d, 0); cx.drawImage(cv, -6 * glitch * d, 0);
+        cx.drawImage(cc, 6 * glitch * d, 0); cx.drawImage(cc, -6 * glitch * d, 0);
         cx.restore();
       }
     },
@@ -832,9 +846,18 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (logo) logo.style.setProperty('--pulse', kick.toFixed(3));
     eq.forEach((el, i) => el.style.setProperty('--l', (playing ? lv[EQ[i]] : .15 + .1 * Math.sin(now / 400 + i)).toFixed(3)));
 
+    // recording a video: the stage shows the video picture, fitted
+    if (target) {
+      const cw = cv.width, ch = cv.height, k = Math.min(cw / cc.width, ch / cc.height), w = cc.width * k, h = cc.height * k;
+      vcx.setTransform(1, 0, 0, 1, 0, 0); vcx.fillStyle = '#000'; vcx.fillRect(0, 0, cw, ch);
+      vcx.drawImage(cc, (cw - w) / 2, (ch - h) / 2, w, h);
+    }
+    if (afterFrame) afterFrame(cyc, playing);
+
     $('#readout').textContent = readout(cyc, Math.max(0, step), playing);
     requestAnimationFrame(frame);
   }
   let idle = 0, spin = 0;
   requestAnimationFrame(frame);
+  return { setTarget, get canvas() { return cc; } };
 }

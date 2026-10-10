@@ -17,6 +17,8 @@ The audio export records the master output with `MediaRecorder` while the song p
 - **Code drawn on the canvas.** The code area draws the current text with the app's monospace font and the same token colours as the editor, scrolling to keep the typing line in view. The DOM editor is not captured.
 - **One recorder for picture and sound.** The canvas video track and the master audio track (the same tap as the audio export, before the volume) go into one `MediaStream` and one `MediaRecorder`, so they share the clock.
 - **Format choice.** Try `video/mp4;codecs=avc1,mp4a.40.2`, then `video/webm;codecs=vp9,opus`, then `video/webm;codecs=vp8,opus`. Bitrate about 8 Mbit/s for 1080p30.
+- **Whole tab through tab sharing.** The owner also wants the plain tab. It uses `getDisplayMedia` with the current tab offered first; the browser asks every time. The recording bar stays hidden in this layout so it is not in the picture; the song's end, the transport's stop or the browser's stop sharing end it.
+- **Soul panel.** Only in "Visual + code" and only while the Soul display is on and the stage does not already show the soul. A button in the recording bar folds and opens it live; the choice is remembered.
 - **Layouts as data.** A layout is a small description (areas for stage, code, card). "Visual" and "Visual + code" now; #52 adds more without changing the recorder.
 - **Recording state shared with the audio export.** One recording at a time; the same progress and cancel UI, labelled as video.
 

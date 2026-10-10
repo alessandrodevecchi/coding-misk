@@ -24,7 +24,7 @@ The app SHALL record a video of a saved song, of a radio session saved in a play
 
 ### Requirement: Composed frame
 
-The video frame SHALL be drawn by the app at 1920×1080 and 30 frames per second, independent of the window size. It SHALL NOT show browser chrome, panels or the pointer.
+For the "Visual" and "Visual + code" layouts the video frame SHALL be drawn by the app at the chosen quality (1920×1080 at 30 fps by default, 1920×1080 at 60 fps, or 1280×720 at 30 fps), independent of the window size. It SHALL NOT show browser chrome, panels or the pointer.
 
 #### Scenario: Small window
 - **WHEN** the window is small or the panels cover part of the stage
@@ -32,7 +32,7 @@ The video frame SHALL be drawn by the app at 1920×1080 and 30 frames per second
 
 ### Requirement: Layouts
 
-The listener SHALL choose a layout before recording. The layouts SHALL be "Visual" (the stage fills the frame with a small title and artist card) and "Visual + code" (the stage beside the code as it types itself). The choice SHALL be remembered.
+The listener SHALL choose a layout in the settings. The layouts SHALL be "Visual" (the stage fills the frame), "Visual + code" (the stage on the left, the code as it types itself on the right) and "Whole tab" (the browser tab as it is, shared through the browser). The choices SHALL be remembered.
 
 #### Scenario: Visual + code
 - **WHEN** the layout is "Visual + code" and the code changes during the song
@@ -40,7 +40,23 @@ The listener SHALL choose a layout before recording. The layouts SHALL be "Visua
 
 #### Scenario: Soul look
 - **WHEN** the Soul look is active during the recording
-- **THEN** the video shows the soul scene as the stage does
+- **THEN** the video shows the soul scene as the stage does, and never when the Soul look is not active
+
+#### Scenario: Soul panel
+- **WHEN** the layout is "Visual + code" and the Soul display is on
+- **THEN** a Soul panel shows above the code, and the listener can fold and open it during the recording; without the Soul display on there is no Soul panel
+
+#### Scenario: Whole tab
+- **WHEN** the layout is "Whole tab" and the listener starts a video
+- **THEN** the browser asks which tab to share; refused, no recording starts; accepted, the video shows the tab and the recording controls stay out of the picture
+
+### Requirement: Song card
+
+The video SHALL show a card with the song title and, when known, the artist and styles. The listener SHALL choose in the settings when it shows: always, for a few seconds when each song starts, or never.
+
+#### Scenario: Card at the start
+- **WHEN** the card setting is "when each song starts" and a new song starts in the video
+- **THEN** the card fades in, stays a few seconds and fades out
 
 ### Requirement: Audio in sync
 

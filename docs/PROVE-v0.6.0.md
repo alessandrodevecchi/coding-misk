@@ -117,6 +117,16 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] ⚙ Configura: preset (Tutto, Viaggio, Club, Chill), movimento libero o viaggio, generi e artisti ammessi, artisti casuali, range delle manopole; salva un preset tuo.
 - [ ] In onda: "Compilation · prossimo cambio tra N brani"; con un artista casuale c'è "Tieni"; Riascolta rifà la stessa compilation.
 
+## Video (`#27`)
+
+- [ ] Brani: "⬇ Video" registra il brano dall'inizio alla fine; la barra in basso a destra mostra anteprima e tempo; "Ferma e salva" e "Annulla" funzionano; il file si apre e ha audio.
+- [ ] Impostazioni → Video: Visual, Visual + codice (codice a destra che si scrive), Scheda intera (il browser chiede la scheda; la barra non compare nel video).
+- [ ] Visual + codice con il display dell'anima acceso: il pannello Soul sopra il codice si chiude e apre dalla barra durante la registrazione; senza display acceso non c'è.
+- [ ] Qualità 1080p 60 fps: il video è fluido (headless arrivava solo a 30 fps).
+- [ ] Scheda del brano: sempre, all'inizio di ogni brano, mai.
+- [ ] Radio: "Video" registra con scaletta e ricetta; una sessione in una playlist (videocamera) si registra fino all'ultimo brano.
+- [ ] Caricamento di prova su YouTube (privato o non in elenco).
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.

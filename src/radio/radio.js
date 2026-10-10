@@ -16,7 +16,7 @@ import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } f
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE, GEAR } from '../icons.js';
+import { DICE, GEAR, VIDEO } from '../icons.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -230,14 +230,22 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   // ---------- recording (#30) ----------
   // the session as audio, from now until stopped (pauses leave no gap), with the recipe and a track list
-  let recS = null;
+  let recS = null, startingRec = false;
   const recElapsed = () => !recS ? 0 : (performance.now() - recS.t0 - recS.paused - (recS.pauseStart ? performance.now() - recS.pauseStart : 0)) / 1000;
   const clockOf = sec => { const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s2 = Math.floor(sec % 60); return `${h ? `${h}:${String(m).padStart(2, '0')}` : String(m).padStart(2, '0')}:${String(s2).padStart(2, '0')}`; };
   const listEntry = item => ({ t: recElapsed(), title: item.song.title, artist: item.entry.artist ? item.entry.artist.name : '' });
-  function startRec() {
-    if (recS) return;
+  // video (#27): the frame and the audio; the video bar's stop and cancel end it too
+  async function startRec(video = false) {
+    if (recS || startingRec) return;
+    let cap;
+    if (video) {
+      startingRec = true;
+      cap = await player.captureVideo({ onStop: () => stopRec(), onCancel: () => stopRec(true) });
+      startingRec = false;
+      if (!cap || recS) { if (cap) cap.stop(true); return; }
+    }
     if (!S) start();
-    recS = { cap: player.capture(), t0: performance.now(), paused: 0, pauseStart: S.paused !== undefined ? performance.now() : null, list: [], seed: S.recipe.seed };
+    recS = { cap: cap || player.capture(), video, t0: performance.now(), paused: 0, pauseStart: S.paused !== undefined ? performance.now() : null, list: [], seed: S.recipe.seed };
     if (recS.pauseStart) recS.cap.pause();
     recS.list.push(listEntry(S.stream[S.onAir]));
     render();
@@ -249,16 +257,19 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     start({ recipe });
     startRec();
   }
-  async function stopRec() {
+  // cancel: a video is dropped, nothing is saved
+  async function stopRec(cancel = false) {
     if (!recS) return;
     const r = recS; recS = null; render();
     const recipe = S ? clone(S.recipe) : null, base = `coding-misk-radio-${String(r.seed).replace(/[^\w-]+/g, '-')}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}`;
-    const { blob, ext } = await r.cap.stop();
+    const out = await r.cap.stop(cancel);
+    if (!out) { toast(t('vidCancelled')); return; }
+    const { blob, ext } = out;
     saveBlob(`${base}.${ext}`, blob);
     const lines = [`coding-misk radio · seed ${r.seed} · ${new Date().toLocaleString()}`, '', ...r.list.map(x => `${clockOf(x.t)} ${x.title}${x.artist ? ` · ${x.artist}` : ''}`)];
     setTimeout(() => saveBlob(`${base}-tracklist.txt`, new Blob([lines.join('\n') + '\n'], { type: 'text/plain' })), 400);
     if (recipe) setTimeout(() => saveBlob(`${base}-recipe.json`, new Blob([JSON.stringify(recipe, null, 2) + '\n'], { type: 'application/json' })), 800);
-    toast(t('recSaved'));
+    toast(t(r.video ? 'vidRecSaved' : 'recSaved'));
   }
   function saveBlob(name, blob) {
     const url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -575,6 +586,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
           <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
           <button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>
+          ${recS ? '' : `<button class="btn rec-btn" id="radio-vid" ${tip('tipRecVideo')}>${VIDEO} ${esc(t('recVideo'))}</button>`}
           <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
           <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
         </div>
@@ -627,6 +639,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.id === 'radio-start') return S ? stop() : start();
     if (b.id === 'radio-skip') return skip();
     if (b.id === 'radio-rec') return recS ? stopRec() : startRec();
+    if (b.id === 'radio-vid') return startRec(true);
     if (b.id === 'radio-rec-start') return recordFromStart();
     if (b.id === 'radio-mute') return player.toggleMute();
     if (b.id === 'radio-pause') return S && S.paused !== undefined ? resume() : pause();

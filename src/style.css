@@ -1010,3 +1010,14 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
 .dual input::-moz-range-track { background: none; }
 .dual input::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--a1); border: 2px solid var(--bg); box-shadow: 0 0 6px color-mix(in srgb, var(--a1) 60%, transparent); cursor: pointer; }
 .dual input::-moz-range-thumb { pointer-events: auto; width: 14px; height: 14px; border-radius: 50%; background: var(--a1); border: 2px solid var(--bg); cursor: pointer; }
+
+  /* video recording (#27): a small bar with the preview, the time, the soul panel, stop and cancel */
+  .video-bar { position: fixed; z-index: 40; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; max-width: calc(100vw - 32px); padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0,0,0,.45); }
+  .video-prev { width: 128px; height: 72px; border-radius: 4px; background: #000; border: 1px solid var(--line); }
+  .vid-dot { width: 10px; height: 10px; border-radius: 50%; background: #ff2a3d; box-shadow: 0 0 8px #ff2a3d; animation: vid-blink 1s steps(2) infinite; }
+  .vid-time { font: 600 12px var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+  @keyframes vid-blink { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .vid-dot { animation: none; } }
+  .ico-video { width: 1.15em; height: .9em; vertical-align: -1px; }
+  .mini .ico-video { width: 14px; height: 11px; }
+  :root[data-ui="hw"] .vid-dot { background: #ff3b30; box-shadow: none; }

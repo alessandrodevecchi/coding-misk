@@ -21,7 +21,8 @@
     "check:guide": "node --no-warnings tools/check-guide.mjs",
     "check:soul": "node --no-warnings tools/check-soul.mjs",
     "check:random": "node --no-warnings tools/check-random.mjs",
-    "check:compilation": "node --no-warnings tools/check-compilation.mjs"
+    "check:compilation": "node --no-warnings tools/check-compilation.mjs",
+    "check:video": "node --no-warnings tools/check-video.mjs"
   },
   "dependencies": {
     "@strudel/repl": "1.3.0"
