@@ -1,38 +1,69 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<title>Soul display shells v3</title>
+<title>Soul display v4</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Special+Elite&family=Michroma&family=Chakra+Petch:wght@500;700&family=Antonio:wght@600;700&family=Oswald:wght@500;600&display=swap">
 <style>
-:root { --bg: #0b0410; --ink: #f2eaff; --a1: #fcee0a; --a2: #00f0ff; --muted: #a491c4; }
-:root[data-ui="hw"] { --bg: #141416; --ink: #e9e6de; --a1: #ffb347; --a2: #ffd27a; --muted: #a29f97; }
+:root { --bg: #0b0410; --line: #4a1f5c; --ink: #f2eaff; --a1: #fcee0a; --a2: #00f0ff; --m: #ff2a6d; }
+:root[data-ui="hw"] { --bg: #141416; --line: #3d3d43; --ink: #e9e6de; --a1: #ffb347; --a2: #ffd27a; --m: #ff6a2a; }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Space Grotesk", sans-serif; width: 1440px; }
-header { padding: 22px 32px 6px; display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
-h1 { margin: 0; font: 700 26px "Space Grotesk"; }
-p.note { margin: 0 32px 12px; color: var(--muted); max-width: 1100px; font-size: 14px; line-height: 1.45; }
-.ctl { display: flex; gap: 6px; margin-left: auto; }
-.ctl button { font: 12px "JetBrains Mono", monospace; color: var(--ink); background: #222; border: 1px solid #444; border-radius: 6px; padding: 4px 9px; cursor: pointer; }
-.ctl button[aria-pressed="true"] { border-color: var(--a1); color: var(--a1); }
-.grid { display: grid; grid-template-columns: repeat(2, 540px); gap: 26px 40px; padding: 10px 32px 40px; justify-content: center; }
-/* the bay of the app, with the display inside */
-.bay { position: relative; width: 540px; height: 470px; border-radius: 14px; background: linear-gradient(160deg, #1a0d24, #0a0510 60%, #12081b); border: 1px solid #3a1850; box-shadow: 0 0 18px rgba(0,240,255,.12); }
-.bay::before { content: ""; position: absolute; inset: 6px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--a2) 70%, transparent); box-shadow: 0 0 12px color-mix(in srgb, var(--a2) 55%, transparent); pointer-events: none; }
-:root[data-ui="hw"] .bay { border-radius: 6px; background: linear-gradient(#34343a, #1f1f23); border: 1px solid #0b0b0d; box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
-:root[data-ui="hw"] .bay::before { inset: 8px; border-radius: 3px; border: 4px solid transparent; box-shadow: none; background: repeating-linear-gradient(-45deg, #e6b400 0 10px, #111 10px 20px) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0); }
-.panel { position: absolute; left: 20px; top: 25px; width: 500px; height: 420px; }
-.panel svg { position: absolute; inset: 0; width: 500px; height: 420px; overflow: visible; }
-.panel [data-act] { cursor: pointer; }
-.panel [data-act]:active { transform: translateY(1.5px); }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Space Grotesk", sans-serif; }
+body { width: 1440px; height: 900px; position: relative; overflow: hidden; }
+img.band { position: absolute; left: 0; display: block; }
+#top { top: 0; }
+.themehit { position: absolute; top: 18px; height: 36px; width: 50px; cursor: pointer; z-index: 5; }
+#row { position: absolute; left: 16px; top: 124px; width: 1408px; height: 378px; }
+#stage { position: absolute; left: 0; top: 0; height: 100%; width: 1408px; border-radius: 14px; border: 1px solid var(--line); background: #000; }
+#stage .clip { position: absolute; inset: 0; border-radius: 13px; overflow: hidden; }
+:root[data-ui="hw"] #stage { border: 6px solid #0f0f11; border-radius: 6px; box-shadow: 0 0 0 1px #3d3d43, 0 6px 16px rgba(0,0,0,.6); }
+:root[data-ui="hw"] #stage .clip { border-radius: 2px; }
+#stage canvas { display: block; width: 100%; height: 100%; }
+.hud { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; align-items: center; z-index: 3; }
+.chip { font: 13px "Space Grotesk", sans-serif; color: var(--ink); background: rgba(0,0,0,.55); border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); border-radius: 999px; padding: 4px 12px; }
+.chip .ar { color: var(--a1); margin-left: 6px; }
+:root[data-ui="hw"] .chip { border-radius: 4px; background: linear-gradient(#3b3b41, #28282d); border: 1px solid #0d0d10; box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 2px 0 #0d0d10; }
+/* the easter egg: a small screw in the stage's corner */
+#screw { position: absolute; right: 7px; bottom: 7px; width: 11px; height: 11px; z-index: 6; cursor: default; }
+#screw:hover { cursor: pointer; filter: brightness(1.35); }
+:root[data-ui="hw"] #screw { right: -9px; bottom: -9px; }
+#screw svg { width: 100%; height: 100%; overflow: visible; }
+/* the bay */
+#bay { position: absolute; right: 0; top: 0; width: 540px; height: 100%; opacity: 0; }
+.rim { position: absolute; inset: 0; border-radius: 14px; background: linear-gradient(160deg, #1a0d24, #0a0510 60%, #12081b); border: 1px solid #3a1850; box-shadow: 0 0 18px rgba(0,240,255,.12); }
+.rim::before { content: ""; position: absolute; inset: 6px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--a2) 70%, transparent); box-shadow: 0 0 12px color-mix(in srgb, var(--a2) 55%, transparent); }
+:root[data-ui="hw"] .rim { border-radius: 6px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px), linear-gradient(#34343a, #1f1f23); border: 1px solid #0b0b0d; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 6px 16px rgba(0,0,0,.6); }
+:root[data-ui="hw"] .rim::before { inset: 8px; border-radius: 3px; border: 4px solid transparent; box-shadow: none; background: repeating-linear-gradient(-45deg, #e6b400 0 10px, #111 10px 20px) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0); }
+.well { position: absolute; left: 14px; top: 12px; right: 14px; bottom: 50px; border-radius: 8px; overflow: hidden; background: radial-gradient(ellipse at 50% 55%, #1c1030, #05020a 75%); box-shadow: inset 0 0 40px #000; perspective: 900px; perspective-origin: 50% 45%; }
+:root[data-ui="hw"] .well { border-radius: 2px; background: radial-gradient(ellipse at 50% 55%, #2a2620, #060606 75%); }
+.door { position: absolute; left: 0; right: 0; height: 50.5%; z-index: 5; background: linear-gradient(#170b22, #0d0616); }
+.door.top { top: 0; } .door.bot { bottom: 0; }
+.door::before { content: ""; position: absolute; inset: 14px 18px; border: 1px solid rgba(255,255,255,.06); border-radius: 4px; background: repeating-linear-gradient(-45deg, transparent 0 14px, color-mix(in srgb, var(--a1) 10%, transparent) 14px 16px); }
+.door.top::after, .door.bot::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: var(--a1); box-shadow: 0 0 10px var(--a1); }
+.door.top::after { bottom: 0; } .door.bot::after { top: 0; }
+:root[data-ui="hw"] .door { background: repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 1px, transparent 1px 4px), linear-gradient(#3a3a40, #26262b); }
+:root[data-ui="hw"] .door::before { background: none; border: 1px solid rgba(0,0,0,.6); }
+:root[data-ui="hw"] .door.top::after, :root[data-ui="hw"] .door.bot::after { height: 10px; background: repeating-linear-gradient(-45deg, #e6b400 0 8px, #111 8px 16px); box-shadow: none; }
+.mount { position: absolute; inset: 0; display: grid; place-items: center; transform-style: preserve-3d; z-index: 2; }
+.lamp-strip { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: var(--a2); box-shadow: 0 0 18px 4px var(--a2); opacity: 0; z-index: 1; }
+.display { position: relative; width: 500px; height: 420px; transform-style: preserve-3d; transform-origin: 50% 50%; }
+.display .panel { position: absolute; inset: 0; }
+.display .panel > svg { position: absolute; inset: 0; width: 500px; height: 420px; overflow: visible; }
+.display [data-act] { cursor: pointer; }
 .scr { position: absolute; overflow: hidden; background: #000; }
-.scr canvas { width: 100%; height: 100%; display: block; transition: opacity .25s; }
+.scr canvas { width: 100%; height: 100%; display: block; }
 .scr .scan { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px); pointer-events: none; }
 .scr .glass { position: absolute; inset: 0; pointer-events: none; }
 .scr.crt .glass { background: radial-gradient(60% 34% at 28% 14%, rgba(255,255,255,.17), transparent 70%), linear-gradient(170deg, rgba(255,255,255,.06), transparent 40%), radial-gradient(130% 120% at 50% 50%, transparent 55%, rgba(0,0,0,.7)); }
 .scr.flat .glass { background: linear-gradient(135deg, rgba(255,255,255,.07), transparent 35%), radial-gradient(150% 130% at 50% 50%, transparent 70%, rgba(0,0,0,.4)); }
-.cap { display: flex; gap: 10px; align-items: baseline; padding: 10px 4px 0; width: 540px; }
-.cap b { font: 700 16px "Space Grotesk"; color: var(--a1); }
-.cap span { font-size: 14px; }
-.cap small { margin-left: auto; color: var(--muted); font: 11px "JetBrains Mono", monospace; }
+/* the shell selector on the bay's bottom edge */
+#sel { position: absolute; left: 14px; right: 14px; bottom: 9px; height: 34px; z-index: 6; }
+#sel svg { width: 100%; height: 100%; overflow: visible; }
+#sel [data-sel], #sel [data-pick] { cursor: pointer; }
+#cable { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 20; }
+#mock { position: absolute; right: 16px; bottom: 14px; display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 10px; background: rgba(0,0,0,.78); border: 1px dashed rgba(255,255,255,.25); font: 11px "JetBrains Mono", monospace; z-index: 50; }
+#mock b { color: #9a9; font-weight: 400; margin-right: 4px; }
+#mock button { font: 11px "JetBrains Mono", monospace; color: #eee; background: #222; border: 1px solid #444; border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+#caption { position: absolute; left: 16px; bottom: 14px; padding: 6px 12px; border-radius: 8px; background: rgba(0,0,0,.82); border: 1px solid rgba(255,255,255,.2); font: 13px "JetBrains Mono", monospace; color: #fff; z-index: 50; opacity: 0; transition: opacity .2s; max-width: 900px; }
+#cursor { position: absolute; left: 0; top: 0; width: 22px; height: 22px; z-index: 60; pointer-events: none; display: none; }
 </style></head>
 <body>
 <svg width="0" height="0" style="position:absolute">
@@ -56,12 +87,25 @@ p.note { margin: 0 32px 12px; color: var(--muted); max-width: 1100px; font-size:
     <radialGradient id="ledglass" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".35" stop-color="#fff" stop-opacity="0"/></radialGradient>
   </defs>
 </svg>
-<header>
-  <h1>Soul display · shells v3</h1><span style="color:var(--muted)">#46 phase 2 · front view, in the bay</span>
-  <div class="ctl" id="ctl"></div>
-</header>
-<p class="note">Seen from the front, each display fills the bay as if it were set into the interface: no perspective, no keyboards, no stands. The controls are the display's own: power, full screen, previous and next view, lock and override. They work here: try them (the views change on every display, override lights the shell's override lamp or tally).</p>
-<div class="grid" id="grid"></div>
+<img class="band" id="top" alt="">
+<div class="themehit" style="left:1186px" data-theme="neon"></div><div class="themehit" style="left:1236px" data-theme="hw"></div>
+<div id="row">
+  <div id="stage">
+    <div class="clip"><canvas id="stagecv"></canvas></div>
+    <div class="hud"><span class="chip">Edgerunners<span class="ar">▾</span></span><span class="chip">Fullscreen</span></div>
+    <div id="screw" title=""><svg viewBox="-6 -6 12 12"><circle r="5.6" fill="rgba(0,0,0,.6)" transform="translate(.4,.8)"/><circle r="5.2" fill="url(#chrome)"/><g id="slot"><line x1="-3.6" y1="0" x2="3.6" y2="0" stroke="rgba(0,0,0,.7)" stroke-width="1.2"/></g></svg></div>
+  </div>
+  <div id="bay">
+    <div class="rim"></div>
+    <div class="well"><div class="mount" id="mount"></div><div class="lamp-strip" id="lamp"></div><div class="door top" id="doorT"></div><div class="door bot" id="doorB"></div></div>
+    <div id="sel"></div>
+  </div>
+  <svg id="cable"></svg>
+</div>
+<img class="band" id="below" alt="">
+<div id="caption"></div>
+<svg id="cursor" viewBox="0 0 22 22"><path d="M 2 1 L 2 18 L 6.5 13.8 L 9.6 20.6 L 12.4 19.4 L 9.4 12.8 L 15.6 12.8 Z" fill="#fff" stroke="#000" stroke-width="1.2"/><circle id="cring" cx="2" cy="1" r="0" fill="none" stroke="#fff" stroke-width="2"/></svg>
+<div id="mock"><b>MOCKUP</b><button data-m="demo">▶ Demo</button><button data-m="sel">Selector 2</button><button data-m="reset">Reset</button></div>
 
 <script>(() => {
 // Song soul (#46): the data the soul views draw, from a song alone (Compose, Songs, playlists, the radio's
@@ -659,11 +703,15 @@ window.SOUL = { createSoulRenderer, seedHash, VIEWS, VIEW_NAMES, PHRASES, RECAL 
 <script>
 const SONGS = [{"seed":"nostromo-6","title":"Humo Voltage","key":"F","bpm":132,"meter":"4/4","shape":"build-drop","bars":144,"phrase":8,"styles":["darksynth","industrial"],"parts":{"dominant":"darksynth","tempo":"darksynth","drums":"industrial","bass":"darksynth","harmony":"industrial","lead":"darksynth","pads":"darksynth","voice":"industrial"},"opts":{"chaos":0.5,"energy":0.75,"complexity":0.8,"talk":0.5},"roles":["intro","build","build","build","build","break","drop","drop","outro"],"energy":[0.29000000000000004,0.48000000000000004,0.57,0.66,0.75,0.34,1,1,0.54],"max":6,"density":[2,4,5,5,5,4,6,6,4],"brightness":[0.6054934158979179,0.6641933594255741,0.7558254471025754,0.7558254471025754,0.7876781841662368,0.7876781841662368,0.8195309212298981,0.8195309212298981,0.7795381871246848],"tension":[0.273,0.30160000000000003,0.24128000000000005,0.31408,0.38688000000000006,0.62768,0.5686000000000001,0.6292666666666668,0.48360000000000003],"voice":[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],"tracks":[{"id":"kick","type":"drums","name":"Kick"},{"id":"beat","type":"drums","name":"Beat"},{"id":"bass","type":"bass","name":"Bass"},{"id":"hook","type":"hook","name":"Lead"},{"id":"pad","type":"pad","name":"Pad"},{"id":"guitar","type":"guitar","name":"Guitar"},{"id":"riser","type":"riser","name":"Riser"}],"steps":[{"at":0,"add":["kick"],"kind":"add","say":"new song"},{"at":8,"add":"pad","kind":"add","say":"wider"},{"at":16,"add":"bass","kind":"add","say":"low end"},{"at":24,"add":"hook","kind":"add"},{"at":32,"add":"guitar","kind":"add","say":"guitars"},{"at":40,"kind":"set"},{"at":48,"kind":"pattern","say":"new pattern"},{"at":56,"kind":"set","say":"dirtier"},{"at":64,"kind":"set","say":"open it up"},{"at":72,"kind":"set","say":"more grit"},{"at":80,"remove":["kick"],"kind":"remove","say":"breathe"},{"at":88,"add":"riser","kind":"add","say":"here it comes"},{"at":96,"add":["kick"],"kind":"add","say":"all in"},{"at":96,"add":"beat","kind":"add"},{"at":104,"remove":"riser","kind":"remove"},{"at":104,"kind":"set"},{"at":112,"kind":"pattern","say":"new pattern"},{"at":120,"kind":"set"},{"at":128,"remove":"beat","kind":"remove","say":"last round"},{"at":128,"remove":"hook","kind":"remove"},{"at":136,"kind":"set"}],"speaker":{"speaker":"eddy","character":null}},{"seed":"lantern-5","title":"Azul Ventana","key":"D","bpm":125,"meter":"4/4","shape":"waves","bars":128,"phrase":8,"styles":["jazz","lo-fi"],"parts":{"dominant":"jazz","tempo":"jazz","drums":"jazz","bass":"jazz","harmony":"jazz","lead":"jazz","pads":"lo-fi","voice":"jazz"},"opts":{"chaos":0.6,"energy":0.35,"complexity":0.4,"talk":0.5},"roles":["intro","wave","trough","wave","trough","wave","trough","outro"],"energy":[0.15,0.65,0.30000000000000004,0.65,0.30000000000000004,0.65,0.30000000000000004,0.19999999999999998],"max":5,"density":[2,4,3,4,3,4,3,1],"brightness":[0,0.6148448832398514,0.6054934158979179,0.7087957955944051,0.5115425035433642,0.6117277274592069,0.41759159118881045,0],"tension":[0,0,0,0,0,0.065,0.08666666666666667,0.364],"voice":[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],"tracks":[{"id":"beat","type":"drums","name":"Beat"},{"id":"bass","type":"bass","name":"Bass"},{"id":"hook","type":"hook","name":"Lead"},{"id":"pad","type":"pad","name":"Pad"},{"id":"texture","type":"texture","name":"Texture"}],"steps":[{"at":0,"add":["beat"],"kind":"add","say":"new song"},{"at":8,"add":"texture","kind":"add"},{"at":16,"add":"hook","kind":"add"},{"at":16,"kind":"pattern"},{"at":24,"add":"bass","kind":"add","say":"bass in"},{"at":32,"remove":"hook","kind":"remove","say":"strip it back"},{"at":32,"kind":"pattern"},{"at":40,"remove":"bass","kind":"remove","say":"less is more"},{"at":40,"add":"pad","kind":"add"},{"at":48,"add":"hook","kind":"add","say":"now the lead"},{"at":56,"kind":"pattern","say":"new pattern"},{"at":64,"remove":"hook","kind":"remove"},{"at":64,"remove":"texture","kind":"remove"},{"at":72,"add":"bass","kind":"add"},{"at":80,"add":"hook","kind":"add","say":"now the lead"},{"at":88,"kind":"rack","say":"dirtier"},{"at":96,"remove":"hook","kind":"remove"},{"at":96,"remove":"pad","kind":"remove"},{"at":104,"add":"texture","kind":"add"},{"at":112,"remove":"bass","kind":"remove","say":"that was it"},{"at":112,"kind":"set"},{"at":120,"remove":"texture","kind":"remove","say":"make room"}],"speaker":{"speaker":"","character":null}}];
 const Q = new URLSearchParams(location.search);
-const $ = s => document.querySelector(s);
-let ui = Q.get('hw') ? 'hw' : 'neon', view = Q.get('view') || 'b', songN = 1;
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const eio = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const eout = k => 1 - Math.pow(1 - k, 3);
+const back = k => { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
+const lin = k => k;
+let ui = Q.get('hw') ? 'hw' : 'neon', selKind = Q.get('sel') === '1' ? 1 : 2;
 document.documentElement.dataset.ui = ui;
 const DATA = (() => { const s = SONGS[0], h = SOUL.seedHash(s.seed); return { ...s, hash: h, hex: h.toString(16).toUpperCase().padStart(8, '0') }; })();
-const VIEWS = SOUL.VIEWS;
 
 // ---------- drawing kit (front view, light from the top left) ----------
 let uid = 0; const id = p => `${p}${++uid}`;
@@ -924,81 +972,299 @@ const DETAIL_ANIM = {
   D: (t, el) => { const n = el.querySelector('[data-num]'); if (n) n.textContent = (47 + (t % 100) / 100).toFixed(4); },
 };
 
-// ---------- live state per display ----------
-const R = SOUL.createSoulRenderer();
-const st = {}; // id -> { on, lock, override, viewTurn }
-function build() {
-  uid = 0;
-  $('#grid').innerHTML = SHELLS.map(sh => {
-    const [x, y, w, h, r] = sh.screen;
-    st[sh.id] = st[sh.id] || { on: true, lock: false, override: false, turn: 0 };
-    return `<div><div class="bay"><div class="panel" data-id="${sh.id}"><svg viewBox="0 0 500 420">${sh.svg()}${(DETAILS[sh.id] || (() => ''))()}</svg>
-      <div class="scr ${sh.glass}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border-radius:${r}px"><canvas style="filter:${sh.mono ? (ui === 'hw' ? 'grayscale(1) sepia(1) saturate(2.6) brightness(1.05)' : 'grayscale(1) sepia(1) hue-rotate(62deg) saturate(3.2) brightness(.95)') : 'none'}"></canvas><div class="scan"></div><div class="glass"></div></div></div></div>
-      <div class="cap"><b>${sh.id}</b><span>${sh.name}</span><small>${sh.note}</small></div></div>`;
-  }).join('');
-  sync();
+
+
+const ORDER = SHELLS.map(s => s.id), DEFAULT_SHELL = { neon: 'E', hw: 'A' };
+const BYID = Object.fromEntries(SHELLS.map(s => [s.id, s]));
+
+// ---------- timeline (every value keeps its history, so any time can be drawn) ----------
+const A = {}, marks = { shell: [], view: [], analyze: [], spark: [], lock: [], osd: [], cursor: [], click: [] };
+const animAt = (n, t) => { const L = A[n]; if (!L) return null; let a = null; for (const x of L) if (x.at <= t) a = x; return a; };
+const valAt = (n, t) => { const a = animAt(n, t); if (!a) return 0; const k = clamp((t - a.at) / a.dur); return a.from + (a.to - a.from) * a.ease(k); };
+const go = (n, to, at, dur, ease = eio) => { const from = valAt(n, at); (A[n] = A[n] || []).push({ from, to, at, dur, ease }); A[n].sort((x, y) => x.at - y.at); };
+const phaseOf = (n, t) => { const a = animAt(n, t); return a ? { to: a.to, k: clamp((t - a.at) / a.dur), at: a.at, dur: a.dur } : { to: 0, k: 1, at: -99, dur: 0 }; };
+const lastMark = (list, t, d) => { let v = d; for (const m of list) if (m.at <= t) v = m; return v; };
+const mark = (list, at, v = {}) => { list.push({ at, ...v }); list.sort((a, b) => a.at - b.at); };
+
+const S = { on: false, override: false, lock: false, shell: Q.get('shell') || DEFAULT_SHELL[ui], view: 'b', screwTurns: 0, picked: !!Q.get('shell') };
+const VIEWS = SOUL.VIEWS;
+function powerOn(t) {
+  S.on = true;
+  go('shrink', 1, t, .8); go('doors', 1, t + .6, .7, eout); go('lamp', 1, t + .55, .25); go('lamp', 0, t + 1.25, .4);
+  go('out', 1, t + 1.15, .85, back); go('screen', 1, t + 2.0, 1.0, lin); mark(marks.analyze, t + 3.0); return t + 3.0;
 }
-function sync() {
-  for (const sh of SHELLS) {
-    const el = document.querySelector(`.panel[data-id="${sh.id}"]`), s = st[sh.id];
-    el.querySelectorAll('[data-led]').forEach(g => {
-      const k = g.dataset.led, col = g.dataset.col, on = k === 'power' || k === 'fs' ? s.on : k === 'lock' ? s.lock && s.on : k === 'override' ? s.override && s.on : false;
-      const lit = g.classList.contains('lit') ? g : g.querySelector('.lit');
-      if (g.dataset.mode === 'stroke') { g.setAttribute('stroke', on ? col : 'transparent'); g.setAttribute('filter', on ? 'url(#glow)' : ''); return; }
-      if (g.dataset.mode === 'tally') { g.querySelector('rect').setAttribute('fill', on ? col : '#3a0a06'); g.setAttribute('filter', on ? 'url(#glow)' : ''); return; }
-      if (lit) { lit.setAttribute('fill', on ? col : g.classList.contains('lit') && k === 'power' ? '#7a1408' : '#2a221c'); on ? lit.setAttribute('filter', 'url(#glow)') : lit.removeAttribute('filter'); }
-    });
-    el.querySelectorAll('[data-bat]').forEach(b => { b.dataset.base = b.dataset.base || b.getAttribute('transform'); const up = b.dataset.bat === 'lock' ? s.lock : s.override; b.setAttribute('transform', b.dataset.base + (up ? '' : ' scale(1,-1)')); });
-    // the guard flips up on its hinge (y 352): seen from the front it folds to a thin strip above the hinge
-    el.querySelectorAll('[data-guard]').forEach(g => g.setAttribute('transform', s.override ? 'translate(0,352) scale(1,-.28) translate(0,-352)' : ''));
-    el.querySelectorAll('[data-rot]').forEach(g => { g.dataset.base = g.dataset.base || g.getAttribute('transform'); g.setAttribute('transform', `${g.dataset.base} rotate(${g.dataset.rot === 'src' ? (s.override ? 60 : -60) : s.turn * 36})`); });
-    const m = el.querySelector('[data-meter]'); if (m) m.style.opacity = s.on ? 1 : .15;
-    el.querySelector('canvas').style.opacity = s.on ? 1 : 0;
-  }
+function powerOff(t) {
+  if (S.override) t = overrideOff(t) + .1;
+  S.on = false;
+  go('screen', 0, t, .45, lin); go('out', 0, t + .45, .7); go('lamp', 1, t + .9, .2); go('lamp', 0, t + 1.5, .3);
+  go('doors', 0, t + 1.05, .6); go('shrink', 0, t + 1.6, .8);
+  // the screw goes back in
+  go('screwOut', 0, t + 2.3, .5, eout); go('screw', 0, t + 2.8, .6); S.screwTurns = 0;
+  return t + 3.4;
 }
+function changeShell(t, d) {
+  const i = (ORDER.indexOf(S.shell) + d + ORDER.length) % ORDER.length, ov = S.override;
+  S.shell = ORDER[i]; S.picked = true;
+  go('selpos', i, t, .35, back); mark(marks.click, t, { k: d > 0 ? 'next' : 'prev' });
+  if (ov) { go('stageSoul', 0, t, .3); go('cable', 0, t + .1, .5); }
+  go('screen', 0, t + .15, .4, lin); go('out', 0, t + .55, .6); go('lamp', 1, t + .9, .2);
+  mark(marks.shell, t + 1.15, { v: S.shell });
+  go('lamp', 0, t + 1.35, .3); go('out', 1, t + 1.25, .75, back); go('screen', 1, t + 2.0, 1.0, lin); mark(marks.analyze, t + 3.0);
+  if (ov) { go('cable', 1, t + 3.0, 1.1, lin); go('stageSoul', 1, t + 4.1, .45); mark(marks.spark, t + 4.1); }
+  return t + 3.2;
+}
+function overrideOn(t) { S.override = true; go('cable', 1, t + .1, 1.1, lin); go('stageSoul', 1, t + 1.2, .45); mark(marks.spark, t + 1.2); mark(marks.osd, t, { txt: 'INPUT  ▸  STAGE' }); return t + 1.65; }
+function overrideOff(t) { S.override = false; go('stageSoul', 0, t, .35); go('cable', 0, t + .25, .8, lin); mark(marks.osd, t, { txt: 'INPUT  ▸  DISPLAY' }); return t + 1.05; }
+function stepView(t, d) { S.view = VIEWS[(VIEWS.indexOf(S.view) + d + 10) % 10]; mark(marks.view, t, { v: S.view, d }); mark(marks.analyze, t); mark(marks.osd, t, { txt: `VIEW ${VIEWS.indexOf(S.view) + 1}/10  ${SOUL.VIEW_NAMES[S.view].toUpperCase()}` }); }
+function toggleLock(t) { S.lock = !S.lock; mark(marks.lock, t, { v: S.lock }); mark(marks.osd, t, { txt: S.lock ? 'HOLD  ON' : 'HOLD  OFF' }); }
+function turnScrew(t) {
+  if (S.on) return;
+  S.screwTurns++;
+  go('screw', S.screwTurns * 130, t, .3, back);
+  if (S.screwTurns >= 3) { go('screwOut', 1, t + .3, .55, lin); powerOn(t + .75); }
+}
+function reveal(t) { if (S.on) return; S.screwTurns = 3; go('screw', 390, t, .4); go('screwOut', 1, t + .3, .55, lin); powerOn(t + .75); }
+mark(marks.shell, -99, { v: S.shell }); mark(marks.view, -99, { v: S.view }); mark(marks.lock, -99, { v: false });
+go('selpos', ORDER.indexOf(S.shell), -99, .01);
+
+// ---------- clock and actions ----------
+let t0 = performance.now(), fixedT = Q.get('t') !== null ? +Q.get('t') : null;
+const now = () => fixedT !== null ? fixedT : (performance.now() - t0) / 1000;
+function act(name) {
+  const t = now();
+  if (name === 'screw') return turnScrew(t);
+  if (name === 'power') return S.on ? powerOff(t) : powerOn(t);
+  if (!S.on) return;
+  if (name === 'override') S.override ? overrideOff(t) : overrideOn(t);
+  else if (name === 'next') stepView(t, 1);
+  else if (name === 'prev') stepView(t, -1);
+  else if (name === 'lock') toggleLock(t);
+  else if (name === 'snext') changeShell(t, 1);
+  else if (name === 'sprev') changeShell(t, -1);
+  else if (name === 'fs') { const g = $('#mount .scr'); if (g && g.requestFullscreen) g.requestFullscreen().catch(() => {}); }
+}
+let typed = '';
+document.addEventListener('keydown', e => { typed = (typed + e.key.toLowerCase()).slice(-4); if (typed === 'soul') reveal(now()); });
 document.addEventListener('click', e => {
-  const b = e.target.closest('button');
-  if (b) {
-    if (b.dataset.ui) { ui = b.dataset.ui; document.documentElement.dataset.ui = ui; build(); }
-    if (b.dataset.view) view = b.dataset.view;
-    controls(); return;
-  }
-  const a = e.target.closest('[data-act]'), p = e.target.closest('.panel'); if (!a || !p) return;
-  const s = st[p.dataset.id], act = a.dataset.act;
-  if (act === 'power') s.on = !s.on;
-  else if (!s.on) return;
-  else if (act === 'lock') s.lock = !s.lock;
-  else if (act === 'override') s.override = !s.override;
-  else if (act === 'next' || act === 'prev') { const d = act === 'next' ? 1 : -1; view = VIEWS[(VIEWS.indexOf(view) + d + 10) % 10]; s.turn += d; controls(); }
-  else if (act === 'fs') { const c = p.querySelector('.scr'); if (c.requestFullscreen) c.requestFullscreen().catch(() => {}); }
-  sync();
+  const a = e.target.closest('[data-act]'); if (a) return act(a.dataset.act);
+  const s = e.target.closest('[data-sel]'); if (s) return act(s.dataset.sel);
+  const p = e.target.closest('[data-pick]'); if (p && S.on) { const d = +p.dataset.pick - ORDER.indexOf(S.shell); if (d) changeShell(now(), d); return; }
+  if (e.target.closest('#screw')) return act('screw');
+  const th = e.target.closest('[data-theme]'); if (th) return setTheme(th.dataset.theme);
+  const m = e.target.closest('[data-m]');
+  if (m) { if (m.dataset.m === 'demo') demo(); if (m.dataset.m === 'reset') location.search = ui === 'hw' ? '?hw=1' : ''; if (m.dataset.m === 'sel') { selKind = selKind === 1 ? 2 : 1; m.textContent = `Selector ${selKind}`; } }
 });
-function controls() {
-  $('#ctl').innerHTML = ['neon', 'hw'].map(x => `<button data-ui="${x}" aria-pressed="${ui === x}">${x.toUpperCase()}</button>`).join('') + ' ' + VIEWS.map(v => `<button data-view="${v}" aria-pressed="${view === v}">${v.toUpperCase()}</button>`).join('');
+function setTheme(th) {
+  ui = th; document.documentElement.dataset.ui = ui;
+  $('#top').src = `../display-v1/assets/${ui}-top.jpg`; $('#below').src = `../display-v1/assets/${ui}-below.jpg`;
+  shownShell = null;
+  if (!S.picked && !S.on) { S.shell = DEFAULT_SHELL[ui]; mark(marks.shell, now(), { v: S.shell }); go('selpos', ORDER.indexOf(S.shell), now(), .3); }
+}
+
+// ---------- the display in the bay ----------
+let shownShell = null, screenCv = null, panelEl = null;
+function mountShell(id) {
+  shownShell = id; uid = 0;
+  const sh = BYID[id], [x, y, w, h, r] = sh.screen;
+  $('#mount').innerHTML = `<div class="display"><div class="panel" data-id="${id}"><svg viewBox="0 0 500 420">${sh.svg()}${(DETAILS[id] || (() => ''))()}</svg>
+    <div class="scr ${sh.glass}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border-radius:${r}px"><canvas style="filter:${sh.mono ? (ui === 'hw' ? 'grayscale(1) sepia(1) saturate(2.6) brightness(1.05)' : 'grayscale(1) sepia(1) hue-rotate(62deg) saturate(3.2) brightness(.95)') : 'none'}"></canvas><div class="scan"></div><div class="glass"></div></div></div></div>`;
+  panelEl = $('#mount .panel'); screenCv = $('#mount canvas');
+}
+// lamps, toggles, guard and knobs follow the state at time t
+function syncPanel(t) {
+  if (!panelEl) return;
+  const on = valAt('screen', t) > .5, lock = lastMark(marks.lock, t, { v: false }).v, ov = valAt('cable', t) > .02 || valAt('stageSoul', t) > .02 ? true : lastOverride(t);
+  panelEl.querySelectorAll('[data-led]').forEach(g => {
+    const k = g.dataset.led, col = g.dataset.col, lit = k === 'power' || k === 'fs' ? on : k === 'lock' ? lock && on : k === 'override' ? ov && on : false;
+    if (g.dataset.mode === 'stroke') { g.setAttribute('stroke', lit ? col : 'transparent'); lit ? g.setAttribute('filter', 'url(#glow)') : g.removeAttribute('filter'); return; }
+    if (g.dataset.mode === 'tally') { g.querySelector('rect').setAttribute('fill', lit ? col : '#3a0a06'); lit ? g.setAttribute('filter', 'url(#glow)') : g.removeAttribute('filter'); return; }
+    const l = g.classList.contains('lit') ? g : g.querySelector('.lit');
+    if (l) { l.setAttribute('fill', lit ? col : '#2a221c'); lit ? l.setAttribute('filter', 'url(#glow)') : l.removeAttribute('filter'); }
+  });
+  panelEl.querySelectorAll('[data-bat]').forEach(b => { b.dataset.base = b.dataset.base || b.getAttribute('transform'); const up = b.dataset.bat === 'lock' ? lock : ov; b.setAttribute('transform', b.dataset.base + (up ? '' : ' scale(1,-1)')); });
+  panelEl.querySelectorAll('[data-guard]').forEach(g => g.setAttribute('transform', ov ? 'translate(0,352) scale(1,-.28) translate(0,-352)' : ''));
+  const turn = marks.view.filter(m => m.at <= t && m.d).reduce((a, m) => a + m.d, 0);
+  panelEl.querySelectorAll('[data-rot]').forEach(g => { g.dataset.base = g.dataset.base || g.getAttribute('transform'); g.setAttribute('transform', `${g.dataset.base} rotate(${g.dataset.rot === 'src' ? (ov ? 60 : -60) : turn * 36})`); });
+  const m = panelEl.querySelector('[data-meter]'); if (m) m.style.opacity = on ? 1 : .15;
+  const sh = BYID[shownShell]; if (sh.anim) sh.anim(t, panelEl); if (DETAIL_ANIM[shownShell]) DETAIL_ANIM[shownShell](t, panelEl);
+}
+const lastOverride = t => { const a = animAt('stageSoul', t); return !!a && a.to === 1; };
+
+// ---------- the soul picture and the screen's power effects ----------
+const R = SOUL.createSoulRenderer();
+let soulCache = null, lastSoul = -1;
+function soulFrame(t, scale) {
+  const an = lastMark(marks.analyze, t, null), sp = lastMark(marks.spark, t, null);
+  let overlay;
+  if (an && t - an.at < 1.6) overlay = { analyzing: (t - an.at) / 1.6, phrase: SOUL.PHRASES[(marks.analyze.indexOf(an) * 7 + 3) % SOUL.PHRASES.length] };
+  else if (sp && t - sp.at < .6 && t >= sp.at) overlay = { glitch: (t - sp.at) / .6, word: 'SIGNAL ROUTED' };
+  const view = lastMark(marks.view, t, { v: 'b' }).v, bar = 40 + t * DATA.bpm / 240;
+  R.render({ data: DATA, view, t, bar, beat: bar * 4, bpb: 4, hw: ui === 'hw', hue: ui === 'hw' ? -150 : -120, overlay }, scale);
+  return R.canvas;
+}
+const BOOT = { A: ['MISK/OS 6000  ·  INTERFACE 2037', 'MEMORY CHECK ......... 640K OK', 'SOUL CORE ............ ONLINE', '> READING SOUL_'], B: ['MISK UNIFIED OS  MOD. 59', '> TUBE ............. WARM', '> SIGNAL ........... WEAK', '> TUNING IN_'], C: ['WRIST-LINK MODEL 59', 'LINK ......... OK', 'SOUL SCAN .... READY', '> _'] };
+function drawScreen(t) {
+  if (!screenCv) return;
+  const r = screenCv.getBoundingClientRect(), d = 2, w = Math.round(r.width * d), h = Math.round(r.height * d); if (!w || !h) return;
+  if (screenCv.width !== w || screenCv.height !== h) { screenCv.width = w; screenCv.height = h; }
+  const c = screenCv.getContext('2d'), sh = BYID[shownShell], P = phaseOf('screen', t), on = valAt('screen', t);
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.filter = 'none'; c.fillStyle = '#020302'; c.fillRect(0, 0, w, h);
+  if (P.to === 0 && P.k >= 1) return;
+  const src = soulCache;
+  const fit = (alpha = 1, sy = 1, bright = 1) => { if (!src) return; const s = Math.min(w / src.width, h / src.height), dw = src.width * s, dh = src.height * s * sy; c.save(); c.globalAlpha = alpha; if (bright !== 1) c.filter = `brightness(${bright})`; c.drawImage(src, (w - src.width * s) / 2, (h - dh) / 2, dw, dh); c.restore(); };
+  const phos = sh.mono ? (ui === 'hw' ? '#ffb347' : '#7dff8a') : ui === 'hw' ? '#ffb347' : '#b8ffcb';
+  if (P.to === 1 && P.k < 1) {
+    const k = P.k;
+    if (sh.glass === 'flat') { fit(clamp(k / .6)); const y = h * clamp(k / .7); c.fillStyle = 'rgba(255,255,255,.5)'; c.fillRect(0, y, w, 3 * d); }
+    else if (k < .12) { c.fillStyle = '#fff'; c.shadowBlur = 16 * d; c.shadowColor = '#fff'; c.beginPath(); c.arc(w / 2, h / 2, 2 * d + k / .12 * 4 * d, 0, 6.283); c.fill(); c.shadowBlur = 0; }
+    else if (k < .28) { const lw = w * eout((k - .12) / .16); c.fillStyle = '#fff'; c.shadowBlur = 18 * d; c.shadowColor = '#fff'; c.fillRect((w - lw) / 2, h / 2 - 1.5 * d, lw, 3 * d); c.shadowBlur = 0; }
+    else if (k < .42) { const sy = eout((k - .28) / .14); fit(1, Math.max(.01, sy), 2.4 - sy * 1.2); }
+    else {
+      fit(clamp((k - .42) / .2), 1, 1 + (1 - k) * .6);
+      if (BOOT[shownShell]) { const L = BOOT[shownShell], shown = Math.floor(clamp((k - .3) / .5) * (L.length + 1)), a = 1 - clamp((k - .82) / .18); c.fillStyle = `rgba(0,0,0,${.85 * a})`; c.fillRect(0, 0, w, h); c.font = `${Math.round(h / 12)}px VT323, monospace`; c.fillStyle = phos; c.globalAlpha = a; L.slice(0, shown).forEach((l, i) => c.fillText(l, w * .07, h * .18 + i * h / 9)); c.globalAlpha = 1; }
+    }
+  } else if (P.to === 0 && P.k < 1) {
+    const k = P.k;
+    if (k < .55) { const sy = 1 - eio(k / .55); fit(1, Math.max(.008, sy), 1 + k * 2.6); }
+    else { const kk = (k - .55) / .45, lw = w * (1 - eout(kk)); c.fillStyle = `rgba(255,255,255,${1 - kk * .6})`; c.shadowBlur = 16 * d; c.shadowColor = '#fff'; c.fillRect((w - lw) / 2, h / 2 - 1.5 * d, Math.max(3 * d, lw), 3 * d); c.shadowBlur = 0; }
+  } else fit();
+  const osd = lastMark(marks.osd, t, null);
+  if (shownShell === 'E' && on > .9 && osd && t - osd.at < 1.6) { c.font = `bold ${Math.round(h / 12)}px "Share Tech Mono", monospace`; c.textAlign = 'right'; c.fillStyle = '#5dff5d'; c.strokeStyle = '#000'; c.lineWidth = 3 * d; c.strokeText(osd.txt, w * .95, h * .14); c.fillText(osd.txt, w * .95, h * .14); c.textAlign = 'left'; }
+}
+
+// ---------- the shell selector (bottom edge of the bay) ----------
+function drawSel(t) {
+  const hw = ui === 'hw', W = 512, pos = valAt('selpos', t), cur = Math.round(pos), n = ORDER.length, acc = hw ? '#ffb347' : '#00f0ff';
+  const ck = lastMark(marks.click, t, null), pressed = k => ck && ck.k === k && t - ck.at < .15;
+  let s = '';
+  if (selKind === 2) {
+    // two keys and a small display with the number and the name
+    const key = (x, k, glyph) => { const p = pressed(k) ? 1.6 : 0; return `<g data-sel="s${k}"><rect x="${x}" y="${5 + 2}" width="40" height="24" rx="4" fill="rgba(0,0,0,.6)"/><rect x="${x}" y="${5 + p}" width="40" height="24" rx="4" fill="${hw ? '#3c3c42' : '#1d1028'}" stroke="${hw ? '#0d0d10' : '#3a1850'}"/><rect x="${x + 1}" y="${6 + p}" width="38" height="8" rx="3" fill="rgba(255,255,255,.08)"/><text x="${x + 20}" y="${22 + p}" text-anchor="middle" font-family="Share Tech Mono" font-size="13" fill="${pressed(k) ? acc : hw ? '#d8d4c8' : '#c9b8e8'}">${glyph}</text></g>`; };
+    s += `<text x="8" y="22" font-family="Share Tech Mono" font-size="10" letter-spacing="3" fill="${hw ? '#a29f97' : '#8a76b0'}">SHELL</text>`;
+    s += key(64, 'prev', '◀');
+    s += `<rect x="112" y="4" width="200" height="26" rx="3" fill="${hw ? '#1b1306' : '#020a0c'}" stroke="${hw ? '#000' : '#123'}"/><rect x="112" y="4" width="200" height="26" rx="3" fill="none" stroke="url(#edgeIn)"/>`;
+    s += `<text x="122" y="25" font-family="VT323" font-size="24" fill="${acc}" ${hw ? '' : 'filter="url(#glow)"'}>${String(cur + 1).padStart(2, '0')}</text><text x="150" y="23" font-family="VT323" font-size="17" fill="${acc}" opacity=".9">${BYID[ORDER[cur]].name.toUpperCase()}</text>`;
+    s += key(320, 'next', '▶');
+    for (let i = 0; i < n; i++) s += `<circle cx="${384 + i * 17}" cy="17" r="4.2" fill="${i === cur ? acc : hw ? '#2a221c' : '#1d1028'}" stroke="rgba(0,0,0,.6)" ${i === cur && !hw ? 'filter="url(#glow)"' : ''}/>`;
+  } else {
+    // a slide switch with detents, no lever
+    s += `<text x="8" y="22" font-family="Share Tech Mono" font-size="10" letter-spacing="3" fill="${hw ? '#a29f97' : '#8a76b0'}">SHELL</text>`;
+    s += `<rect x="70" y="11" width="380" height="12" rx="6" fill="#000" stroke="rgba(255,255,255,.12)"/>`;
+    for (let i = 0; i < n; i++) { const x = 84 + i * (352 / (n - 1)); s += `<g data-pick="${i}"><rect x="${x - 14}" y="0" width="28" height="34" fill="transparent"/><text x="${x}" y="34" text-anchor="middle" font-family="Share Tech Mono" font-size="8" fill="${i === cur ? acc : '#888'}">${ORDER[i]}</text></g>`; }
+    const x = 84 + pos * (352 / (n - 1));
+    s += `<rect x="${x - 15}" y="5" width="30" height="24" rx="3" fill="${hw ? '#55555c' : '#2a1838'}" stroke="#000"/>`; for (let i = 0; i < 6; i++) s += `<rect x="${x - 10 + i * 4}" y="9" width="2" height="16" fill="rgba(255,255,255,${hw ? .25 : .15})"/>`;
+    s += `<rect x="${x - 2}" y="7" width="4" height="4" rx="1" fill="${acc}"/>`;
+    s += `<text x="462" y="22" font-family="VT323" font-size="16" fill="${acc}">${BYID[ORDER[cur]].name.toUpperCase().split(' ')[0].slice(0, 9)}</text>`;
+  }
+  $('#sel').innerHTML = `<svg viewBox="0 0 ${W} 34">${s}</svg>`;
+}
+
+// ---------- SCART cable: from a socket under the display to a socket under the stage ----------
+const cableSvg = $('#cable');
+function drawCable(t) {
+  const c = valAt('cable', t), out = valAt('out', t), shrink = valAt('shrink', t);
+  const row = $('#row').getBoundingClientRect(), st = $('#stage').getBoundingClientRect(), bay = $('#bay').getBoundingClientRect();
+  const yb = row.height, hw = ui === 'hw', acc = '#00f0ff';
+  // the two sockets come out of the bottom edges when the bay is open
+  const sx = st.right - row.left - 150, bx = bay.left - row.left + 110, sOut = clamp(shrink * 2 - 1) * 12;
+  const sock = (x, label) => `<g transform="translate(${x},${yb - 2})"><rect x="-22" y="0" width="44" height="${sOut + 2}" rx="3" fill="${hw ? '#26262b' : '#140a1c'}" stroke="#000"/><path d="M -16 ${sOut - 1} h 32 l -3 3 h -26 Z" fill="#9a9aa0" opacity="${sOut > 4 ? 1 : 0}"/>${sOut > 8 ? `<text x="0" y="${sOut - 4}" text-anchor="middle" font-family="Share Tech Mono" font-size="5" fill="#888">${label}</text>` : ''}</g>`;
+  let s = sock(sx, 'SOUL IN') + sock(bx, 'OUT');
+  if (c > .001 && out > .9) {
+    // the plug leaves the display's socket, swings down and climbs into the stage's socket
+    const plugL = 42, top = yb + sOut;
+    const k1 = clamp(c / .45), k2 = clamp((c - .45) / .4), k3 = clamp((c - .85) / .15);
+    let ex, ey;
+    if (c < .45) { ex = bx + (bx - 60 - bx) * eout(k1); ey = top + plugL + 150 * eout(k1); }
+    else { ex = bx - 60 + (sx - (bx - 60)) * eio(k2); ey = top + plugL + 150 * (1 - eio(k2)) + 40 * eio(k2) - 40 * k3; }
+    if (c >= .85) { ex = sx; ey = top + plugL + 40 * (1 - eout(k3)); }
+    const sway = Math.sin(t * 1.3) * 5;
+    const d = `M ${bx} ${top} C ${bx} ${top + 120}, ${ex + 30 + sway} ${ey + 140}, ${ex} ${ey + 2}`;
+    if (hw) s += `<path d="${d}" stroke="#202024" stroke-width="16" fill="none" stroke-linecap="round"/><path d="${d}" stroke="#7a7a80" stroke-width="13" fill="none" stroke-dasharray="2.2 2.6"/><path d="${d}" stroke="#4a4a50" stroke-width="13" fill="none" stroke-dasharray="2.2 2.6" stroke-dashoffset="2.4" transform="translate(0,1.2)"/><path d="${d}" stroke="rgba(255,255,255,.18)" stroke-width="3" fill="none" transform="translate(-3,0)"/>`;
+    else { s += `<path d="${d}" stroke="#141019" stroke-width="16" fill="none" stroke-linecap="round"/><path d="${d}" stroke="#3a2a50" stroke-width="3" fill="none" transform="translate(-3,0)"/>`; if (c >= 1) s += `<path d="${d}" stroke="${acc}" stroke-width="2.4" fill="none" stroke-dasharray="8 22" stroke-dashoffset="${t * 70}" filter="url(#glow)"/>`; }
+    // the plug at the display end
+    const plug = (x, y, lit, live) => `<g transform="translate(${x},${y})"><rect x="-17" y="-${plugL}" width="34" height="8" fill="#b9b9c0" stroke="#555"/><rect x="-20" y="-${plugL - 8}" width="40" height="${plugL - 14}" rx="4" fill="${hw ? '#2a2a2e' : '#14101a'}" stroke="#000"/>${[0, 1, 2, 3, 4].map(i => `<line x1="-14" y1="${-plugL + 12 + i * 4}" x2="14" y2="${-plugL + 12 + i * 4}" stroke="rgba(255,255,255,.1)"/>`).join('')}<text x="0" y="${-plugL / 2 + 1}" text-anchor="middle" transform="rotate(-90 0 ${-plugL / 2 - 2})" font-family="Space Grotesk" font-weight="700" font-size="7" fill="#999" letter-spacing="1">SCART</text><path d="M -10 -6 L 10 -6 L 7 6 L -7 6 Z" fill="${hw ? '#222' : '#14101a'}"/>${hw ? `<circle cx="13" cy="${-plugL + 14}" r="2.4" fill="${live ? '#39ff6a' : '#1f3a22'}"/>` : lit ? `<rect x="-17" y="-${plugL - 7}" width="34" height="2.4" fill="${acc}" filter="url(#glow)"/>` : ''}</g>`;
+    s += `<g transform="translate(${bx},${top + plugL}) scale(1,-1) translate(${-bx},${-(top + plugL)})">${plug(bx, top + plugL, true, c >= 1)}</g>`;
+    s += plug(ex, ey, c >= 1, c >= 1);
+    const sp = lastMark(marks.spark, t, null);
+    if (!hw && sp && t >= sp.at && t - sp.at < .45) { const k = (t - sp.at) / .45; for (let i = 0; i < 14; i++) { const a = i / 14 * 6.283 + i; s += `<circle cx="${sx + Math.cos(a) * (6 + k * 30)}" cy="${top + Math.sin(a) * (6 + k * 30)}" r="${2 * (1 - k)}" fill="#fff" opacity="${1 - k}"/>`; } }
+  }
+  cableSvg.innerHTML = s;
+}
+
+// ---------- stage frames, or the soul when overridden ----------
+const frames = { neon: [], hw: [] };
+for (const th of ['neon', 'hw']) for (let i = 0; i < 16; i++) { const im = new Image(); im.src = `../display-v1/assets/${th}-stage-${String(i).padStart(2, '0')}.jpg`; frames[th].push(im); }
+const stagecv = $('#stagecv'), sg = stagecv.getContext('2d'), amb = document.createElement('canvas'); amb.width = 48; amb.height = 30; const ag = amb.getContext('2d');
+function drawStage(t, ss) {
+  const r = stagecv.getBoundingClientRect(), d = 1.5, w = Math.round(r.width * d), h = Math.round(r.height * d);
+  if (stagecv.width !== w || stagecv.height !== h) { stagecv.width = w; stagecv.height = h; }
+  const fr = frames[ui], n = fr.length, i = Math.floor(t * 11) % (2 * n - 2), im = fr[i < n ? i : 2 * n - 2 - i];
+  if (ss < 1 && im.complete && im.naturalWidth) { const s = Math.max(w / im.naturalWidth, h / im.naturalHeight); sg.drawImage(im, (w - im.naturalWidth * s) / 2, (h - im.naturalHeight * s) / 2, im.naturalWidth * s, im.naturalHeight * s); }
+  if (ss > 0 && soulCache) {
+    const src = soulCache, s = Math.min(w / src.width, h / src.height), dw = src.width * s, dh = src.height * s;
+    sg.save(); ag.filter = 'blur(2px)'; ag.drawImage(src, -4, -3, 56, 36); ag.filter = 'none';
+    sg.globalAlpha = ss * .4; sg.drawImage(amb, 0, 0, w, h); sg.globalAlpha = ss; sg.fillStyle = 'rgba(0,0,0,.35)'; sg.fillRect(0, 0, w, h); sg.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    if (ss < 1) for (let k = 0; k < 10; k++) { const y = Math.random() * h, hh = 4 + Math.random() * 26; sg.drawImage(stagecv, 0, y, w, hh, (Math.random() - .5) * 60 * (1 - ss), y, w, hh); }
+    sg.restore();
+  }
 }
 
 // ---------- frame ----------
-const t0 = performance.now(), fixedT = Q.get('t') !== null ? +Q.get('t') : null;
-let last = -1;
 function frame() {
-  const t = fixedT ?? (performance.now() - t0) / 1000;
-  if (t - last > 1 / 24 || fixedT !== null) {
-    last = t;
-    const bar = 40 + t * DATA.bpm / 240, src = R.render({ data: DATA, view, t, bar, beat: bar * 4, bpb: 4, hw: ui === 'hw', hue: ui === 'hw' ? -150 : -120 }, .7);
-    for (const sh of SHELLS) {
-      const el = document.querySelector(`.panel[data-id="${sh.id}"]`), cv = el.querySelector('canvas'), r = cv.getBoundingClientRect();
-      if (r.bottom < 0 || r.top > innerHeight) continue;
-      const w = Math.round(r.width * 2), h = Math.round(r.height * 2); if (cv.width !== w) { cv.width = w; cv.height = h; }
-      const g = cv.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
-      const s = Math.min(w / src.width, h / src.height), dw = src.width * s, dh = src.height * s; g.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh);
-      if (sh.anim) sh.anim(t, el);
-      if (DETAIL_ANIM[sh.id]) DETAIL_ANIM[sh.id](t, el);
-    }
-  }
+  const t = now(), shrink = valAt('shrink', t), doors = valAt('doors', t), out = valAt('out', t), ss = valAt('stageSoul', t);
+  const rowH = 378 + 92 * shrink, bayW = 540, gap = 18;
+  $('#row').style.height = rowH + 'px'; $('#below').style.top = (124 + rowH + 16) + 'px';
+  $('#stage').style.width = (1408 - (bayW + gap) * shrink) + 'px';
+  $('#bay').style.opacity = clamp(shrink * 1.6); $('#bay').style.transform = `translateX(${(1 - eout(shrink)) * 120}px)`;
+  $('#doorT').style.transform = `translateY(${-doors * 101}%)`; $('#doorB').style.transform = `translateY(${doors * 101}%)`; $('#lamp').style.opacity = valAt('lamp', t);
+  const want = lastMark(marks.shell, t, { v: S.shell }).v; if (want !== shownShell) mountShell(want);
+  const disp = $('#mount .display');
+  if (disp) { disp.style.transform = `translate3d(0, ${24 * (1 - out)}px, ${-520 * (1 - out)}px) rotateX(${(1 - out) * 8}deg) scale(.97)`; disp.style.filter = `brightness(${.25 + .75 * clamp(out)})`; disp.style.visibility = doors > .05 || out > .01 ? 'visible' : 'hidden'; }
+  // the screw: turns, then pops out and drops
+  const turn = valAt('screw', t), so = valAt('screwOut', t);
+  $('#slot').setAttribute('transform', `rotate(${turn})`);
+  $('#screw').style.transform = so > 0 ? `translate(${so * 10}px, ${so * so * 70}px) rotate(${so * 200}deg) scale(${1 + Math.sin(so * Math.PI) * .4})` : `scale(${1 + Math.min(1, turn / 390) * .25})`;
+  $('#screw').style.opacity = 1 - clamp((so - .6) / .4);
+  syncPanel(t);
+  const needD = valAt('screen', t) > 0 || phaseOf('screen', t).k < 1;
+  if ((needD || ss > 0) && (fixedT !== null || t - lastSoul > 1 / 30 || lastSoul > t)) { lastSoul = t; const st = $('#stage').getBoundingClientRect(); soulCache = soulFrame(t, ss > 0 ? Math.min(st.width / 1200, st.height / 760) * 1.5 : .7); }
+  drawScreen(t); drawStage(t, ss); drawSel(t); drawCable(t); drawCursor(t);
   requestAnimationFrame(frame);
 }
-controls(); build();
-if (Q.get('override')) { for (const k in st) st[k].override = true; sync(); }
-document.fonts.ready.then(() => { requestAnimationFrame(frame); setTimeout(() => (document.body.dataset.ready = '1'), 500); });
+
+// ---------- demo script with a visible cursor ----------
+const caps = []; window.CAPS = caps;
+function cursorTo(at, sel, dur = .6) { marks.cursor.push({ at, sel, dur }); }
+function drawCursor(t) {
+  const cur = $('#cursor'), list = marks.cursor.filter(m => m.at <= t);
+  if (!list.length) { cur.style.display = 'none'; return; }
+  const m = list[list.length - 1], prev = list[list.length - 2], pos = sel => { const el = typeof sel === 'string' ? $(sel) : null; if (!el) return null; const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+  const to = pos(m.sel) || [1300, 860], from = prev ? pos(prev.sel) || to : [1100, 700], k = eio(clamp((t - m.at) / m.dur));
+  cur.style.display = 'block'; cur.style.transform = `translate(${from[0] + (to[0] - from[0]) * k - 2}px, ${from[1] + (to[1] - from[1]) * k - 1}px)`;
+  const cl = marks.click.concat(marks.cursor.filter(x => x.click)).filter(x => x.at <= t && t - x.at < .3).pop();
+  $('#cring').setAttribute('r', cl ? 3 + (t - cl.at) * 40 : 0); $('#cring').setAttribute('opacity', cl ? 1 - (t - cl.at) / .3 : 0);
+}
+function demo(at = now() + .5) {
+  let t = at;
+  const say = (txt, d = 2.6) => caps.push({ at: t, txt, d }), click = (sel, fn, move = .7) => { cursorTo(t, sel, move); t += move + .1; marks.cursor.push({ at: t, sel, dur: .01, click: true }); fn(t); };
+  say('Hidden: a small screw in the corner of the stage. Unscrew it…', 3.4); t += .4;
+  click('#screw', x => turnScrew(x)); t += .45; click('#screw', x => turnScrew(x), .15); t += .45; click('#screw', x => turnScrew(x), .15);
+  say('…the hatch opens and the display comes out', 3); t += 3.3;
+  click('#mount [data-act="next"]', x => stepView(x, 1)); say('The display\'s own keys: view, lock, override, full screen'); t += 1.6;
+  click('#mount [data-act="lock"]', x => toggleLock(x)); t += 1.2;
+  click('#mount [data-act="override"]', x => overrideOn(x)); say('Override: the SCART cable runs from under the display to the stage\'s socket', 3.4); t += 3.6;
+  click('#mount [data-act="override"]', x => overrideOff(x)); t += 1.6;
+  for (let i = 0; i < 3; i++) { click('#sel [data-sel="snext"]', x => changeShell(x, 1), i ? .3 : .7); say(`Shell ▶: ${BYID[S.shell].name}`, 3); t += 3.4; }
+  click('#sel [data-sel="sprev"]', x => changeShell(x, -1)); say(`Shell ◀: ${BYID[S.shell].name}`, 3); t += 3.4;
+  click('#mount [data-act="override"]', x => overrideOn(x)); say('Override with another shell', 3); t += 3.4; click('#mount [data-act="override"]', x => overrideOff(x)); t += 1.4;
+  click('#mount [data-act="power"]', x => powerOff(x)); say('Power off: back into the bay, and the screw goes back in', 3.6); t += 4.2;
+  caps.push({ at: t, txt: '', d: .1 }); cursorTo(t, null, .8); window.DEMO_END = t + .8;
+}
+setInterval(() => { const t = now(), c = [...caps].reverse().find(x => x.at <= t); const el = $('#caption'); if (c && t - c.at < c.d && c.txt) { el.textContent = c.txt; el.style.opacity = 1; } else el.style.opacity = 0; }, 60);
+
+$('#top').src = `../display-v1/assets/${ui}-top.jpg`; $('#below').src = `../display-v1/assets/${ui}-below.jpg`;
+if (Q.get('state') === 'open' || Q.get('state') === 'override') { go('screw', 390, -12, .01); go('screwOut', 1, -12, .01); powerOn(-10); if (Q.get('view')) { S.view = Q.get('view'); mark(marks.view, -10, { v: S.view }); } if (Q.get('state') === 'override') overrideOn(-5); }
+if (Q.get('demo')) demo(Number(Q.get('at') || .8));
+document.fonts.ready.then(() => { requestAnimationFrame(frame); setTimeout(() => (document.body.dataset.ready = '1'), 600); });
 </script>
 </body></html>
