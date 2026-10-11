@@ -6,10 +6,11 @@ The radio can be recorded or exported to a file. The owner wants to send it out 
 
 ## What Changes
 
-- **Broadcast page:** a clean coding-misk page with only the picture (the video frame of #27 and #53: layout presets, direction, song card), loaded in OBS. Presets change inside the page with a transition, so OBS never cuts.
-- **Live tab** (Listen mode): the control room. Connection to OBS, Go live and End, the source (the radio first), presets with a preview, scenes (Live, Standby), audio levels, microphone, a pad of sound effects, overlays (song title, text banner, an animated call to follow), status (time on air, dropped frames, recording).
+- **Broadcast window:** a second, clean window of the app with only the picture (the video frame of #27 and #53: layout presets, direction, song card), captured by OBS. The radio keeps running in the app as today, so every tab and control works while live. Presets change inside the picture with a transition, so OBS never cuts.
+- **Control bar,** always visible like the player bar, in every tab: ON AIR and time, presets 1 to 5 with a preview and TAKE, Standby. It opens the full control room (a panel or its own window): connection to OBS, Go live and End, the source (the radio first), audio levels, microphone, a pad of sound effects, overlays (song title, text banner, an animated call to follow), status (dropped frames, recording).
+- **In two steps:** first the broadcast window, the minimal bar, OBS scenes and the automatic Standby, to try a private live session; then the mixer, microphone, pad, overlays and the full control room.
 - **OBS does the output:** scenes, microphone with noise suppression and ducking, sending, local recording. coding-misk drives it over OBS's local control channel (obs-websocket). A scene collection to import is provided.
-- **Safety:** a small script inside OBS watches the broadcast page; if it stops, OBS switches to Standby and reloads the page, which picks the session up again.
+- **Safety:** a small script inside OBS watches the app's heartbeat; if it stops, OBS switches to Standby (a music bed of a few coding-misk songs exported to a file, playing in OBS) and back to Live when the app returns.
 - **Presets:** visual only, visual and code, visual, code and soul, soul only, code only; each with or without the song card; transitions between them.
 - **Later:** playlists and Compose as sources, 1080p60 and 4K, a looping video for Standby, the animated call to follow drawn in the app's style.
 
