@@ -33,7 +33,9 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(o.compPreset === 'club' && o.compSetup.genres.includes('techno') && !o.compSetup.genres.includes('jazz'), 'the Club preset limits the genres');
   // only techno and industrial
   await page.click('[data-comp-all="genres"]'); await sleep(100);
-  for (const g of await page.evaluate(() => [...document.querySelectorAll('[data-comp-genre]')].map(b => b.dataset.compGenre))) if (!['techno', 'industrial'].includes(g)) { await page.click(`[data-comp-genre="${g}"]`); await sleep(40); }
+  // with All on the single chips are off: a tap picks just that genre
+  check(await page.evaluate(() => [...document.querySelectorAll('[data-comp-genre]')].every(b => b.getAttribute('aria-pressed') === 'false')), 'with All, the single genres are off');
+  for (const g of ['techno', 'industrial']) { await page.click(`[data-comp-genre="${g}"]`); await sleep(60); }
   o = await opts();
   check(JSON.stringify(o.compSetup.genres.sort()) === '["industrial","techno"]' && o.compPreset === 'custom', 'genres picked by hand', JSON.stringify(o.compSetup.genres));
   await page.fill('#comp-name', 'Notte industriale'); await page.click('#comp-save'); await sleep(200);

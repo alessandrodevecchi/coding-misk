@@ -11,9 +11,13 @@ export const GENRE_RING = ['ambient', 'jazz', 'hip-hop', 'pop', 'house', 'trance
 const ranges = () => Object.fromEntries(KNOBS.map(k => [k, SENSIBLE[k].slice()]));
 // a setup: movement, genres / styles / artists allowed (null = all), random artists, a range per knob
 export const SETUP_DEFAULT = { movement: 'journey', genres: null, styles: null, artists: null, randomArtists: true, ranges: ranges() };
+const full = () => Object.fromEntries(KNOBS.map(k => [k, [0, 1]]));
+// everything: any genre, jumps, the knobs over their whole scale; journey: neighbouring genres, sensible knobs;
+// max: jumps and the knobs high
 export const PRESETS = {
-  everything: { ...SETUP_DEFAULT, movement: 'free' },
+  everything: { ...SETUP_DEFAULT, movement: 'free', ranges: full() },
   journey: { ...SETUP_DEFAULT },
+  max: { ...SETUP_DEFAULT, movement: 'free', ranges: { chaos: [0.6, 1], energy: [0.7, 1], complexity: [0.6, 1], talk: [0.3, 0.9] } },
   club: { ...SETUP_DEFAULT, genres: ['techno', 'trance', 'house', 'drum-and-bass', 'synthwave'], ranges: { ...ranges(), energy: [0.6, 0.95] } },
   chill: { ...SETUP_DEFAULT, genres: ['ambient', 'jazz', 'hip-hop', 'synthwave'], ranges: { ...ranges(), energy: [0.2, 0.6], chaos: [0.1, 0.45] } },
 };

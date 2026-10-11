@@ -575,9 +575,10 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function setupPanel() {
     const tip = k => `title="${esc(t(k))}"`;
     const S0 = { ...SETUP_DEFAULT, ...opts.compSetup }, rg = { ...JSON.parse(JSON.stringify(SETUP_DEFAULT.ranges)), ...(S0.ranges || {}) }, mine = userPresets();
-    const chips = (list, sel, attr, label) => list.map(x => `<button class="chip small" ${attr}="${esc(x)}" aria-pressed="${!sel || sel.includes(x)}">${esc(label(x))}</button>`).join('');
+    // with "All" on, the single chips are off: a tap picks just that one
+    const chips = (list, sel, attr, label) => list.map(x => `<button class="chip small" ${attr}="${esc(x)}" aria-pressed="${!!sel && sel.includes(x)}">${esc(label(x))}</button>`).join('');
     // one track with two handles: the low and the high end of the knob's range
-    const knob = k => `<div class="comp-range"><span class="lbl">${esc(t({ chaos: 'radioChaos', energy: 'radioEnergy', complexity: 'radioComplexity', talk: 'radioTalk' }[k]))}</span><span class="dual" style="--lo:${rg[k][0] * 100}%;--hi:${rg[k][1] * 100}%"><span class="dual-fill"></span><input type="range" min="0" max="1" step="0.05" value="${rg[k][0]}" data-comp-min="${k}" aria-label="${esc(t('compMin'))}" data-no-knob><input type="range" min="0" max="1" step="0.05" value="${rg[k][1]}" data-comp-max="${k}" aria-label="${esc(t('compMax'))}" data-no-knob></span><output>${rg[k][0]}–${rg[k][1]}</output></div>`;
+    const knob = k => `<div class="comp-range" title="${esc(t({ chaos: 'tipChaos', energy: 'tipEnergy', complexity: 'tipComplexity', talk: 'tipTalk' }[k]))} · ${esc(t('compRangeTip'))}"><span class="lbl">${esc(t({ chaos: 'radioChaos', energy: 'radioEnergy', complexity: 'radioComplexity', talk: 'radioTalk' }[k]))}</span><span class="dual" style="--lo:${rg[k][0] * 100}%;--hi:${rg[k][1] * 100}%"><span class="dual-fill"></span><input type="range" min="0" max="1" step="0.05" value="${rg[k][0]}" data-comp-min="${k}" aria-label="${esc(t('compMin'))}" data-no-knob><input type="range" min="0" max="1" step="0.05" value="${rg[k][1]}" data-comp-max="${k}" aria-label="${esc(t('compMax'))}" data-no-knob></span><output>${rg[k][0]}–${rg[k][1]}</output></div>`;
     return `<div class="card comp-setup">
       <div class="comp-line"><label class="lbl" for="comp-preset">${esc(t('compPreset'))}</label><select id="comp-preset" data-no-knob>${Object.keys(PRESETS).map(k => `<option value="${k}"${opts.compPreset === k ? ' selected' : ''}>${esc(t(`compP_${k}`))}</option>`).join('')}${Object.keys(mine).map(k => `<option value="${esc(k)}"${opts.compPreset === k ? ' selected' : ''}>${esc(k)}</option>`).join('')}${opts.compPreset === 'custom' ? `<option value="custom" selected>${esc(t('compPresetCustom'))}</option>` : ''}</select>
         <input type="text" id="comp-name" maxlength="30" placeholder="${esc(t('compSaveAs'))}"><button class="btn small" id="comp-save">${esc(t('compSave'))}</button>${mine[opts.compPreset] ? `<button class="btn small danger" id="comp-del">${esc(t('compDelete'))}</button>` : ''}</div>
@@ -589,7 +590,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     </div>`;
   }
   function editSetup(fn) { const S0 = JSON.parse(JSON.stringify({ ...SETUP_DEFAULT, ...opts.compSetup })); fn(S0); opts.compSetup = S0; opts.compPreset = 'custom'; saveOpts(); render(); }
-  const toggleIn = (list, all, x) => { const cur = list || all.slice(); const next = cur.includes(x) ? cur.filter(y => y !== x) : [...cur, x]; return next.length === all.length ? null : next.length ? next : cur; };
+  const toggleIn = (list, all, x) => { const cur = list || []; const next = cur.includes(x) ? cur.filter(y => y !== x) : [...cur, x]; return next.length === all.length ? null : next.length ? next : cur; };
 
   function render() {
     const on = !!S;

@@ -363,6 +363,8 @@
 
 - Export veloce delle sessioni lunghe: ogni blocco genera solo le tracce che hanno clip nel suo tratto (più le voci), invece di tutte le tracce dei brani già passati. 60 minuti di radio in Chrome visibile: da 7 min 50 s a 6 min 9 s, picco di memoria da 1,1 GB a 550 MB; suono uguale al tempo reale (volume entro 0,24 dB). Barra della radio spenta in inglese "Standby"; scrollbar nei colori del tema. Aperta `#54` (check di tutti i suoni, suoni di riserva da macchine sorelle, nota nello strumento). Da segnare: registrazioni di ore (tempo reale in WAV, FLAC o MP3 decodifica tutto alla fine, export veloce tiene il file finale in memoria): scrivere il file su disco mentre si genera; per `#52` un test di qualche ora sulla memoria.
 
+- Compilation, Configura rivista con il proprietario: movimenti rinominati "Graduale" e "Salti" (prima "Viaggio" era sia un preset sia un movimento); preset Tutto con salti e manopole su tutta la scala, Viaggio graduale con valori sensati, nuovo Max (salti, caos 0,6-1, energia 0,7-1, complessità 0,6-1), Club e Chill come prima; con "Tutti" i chip singoli sono spenti e un tocco sceglie solo quel genere o artista; tooltip sui cursori con cosa regolano. Testi pubblici resi generici (issue, DEVLOG, guida, spec); dettagli privati in `notes/`.
+
 ## Prossimo passo
 
 Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima del brano `#46` fasi 1 e 2 con display nascosto, casuali `#50`, compilation `#49`, più le feature precedenti). Tutti i controlli passano.
