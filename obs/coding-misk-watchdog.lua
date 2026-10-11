@@ -2,12 +2,13 @@
 -- The control room writes a beat into the input "cm-heartbeat" every second while the broadcast window draws.
 -- While OBS sends its output, if the beat stops for a few seconds this script switches from the Live scene to
 -- the Standby scene, and back to Live when the beat returns (only when it was this script that switched).
+-- "Also while only recording" lets it act during a recording too, to test it without going live.
 -- Load it in OBS: Tools, Scripts, +, pick this file.
 
 obs = obslua
 
 local BEAT = "cm-heartbeat"
-local live_name, standby_name, seconds = "Live", "Standby", 5
+local live_name, standby_name, seconds, with_rec = "Live", "Standby", 5, false
 local last_beat, last_change, switched = nil, 0, false
 local beat_src = nil
 
@@ -22,6 +23,7 @@ function script_properties()
   obs.obs_properties_add_text(p, "live", "Live scene", obs.OBS_TEXT_DEFAULT)
   obs.obs_properties_add_text(p, "standby", "Standby scene", obs.OBS_TEXT_DEFAULT)
   obs.obs_properties_add_int(p, "seconds", "Seconds without the picture", 2, 30, 1)
+  obs.obs_properties_add_bool(p, "with_rec", "Also while only recording (for tests)")
   return p
 end
 
@@ -29,12 +31,14 @@ function script_defaults(s)
   obs.obs_data_set_default_string(s, "live", "Live")
   obs.obs_data_set_default_string(s, "standby", "Standby")
   obs.obs_data_set_default_int(s, "seconds", 5)
+  obs.obs_data_set_default_bool(s, "with_rec", false)
 end
 
 function script_update(s)
   live_name = obs.obs_data_get_string(s, "live")
   standby_name = obs.obs_data_get_string(s, "standby")
   seconds = obs.obs_data_get_int(s, "seconds")
+  with_rec = obs.obs_data_get_bool(s, "with_rec")
 end
 
 -- the beat input: an invisible colour source outside every scene, made here when it is missing
@@ -78,7 +82,8 @@ local function tick()
   local t = now_s()
   if b ~= last_beat then last_beat = b; last_change = t end
   local fresh = (t - last_change) < seconds
-  if not obs.obs_frontend_streaming_active() then switched = false return end
+  local active = obs.obs_frontend_streaming_active() or (with_rec and obs.obs_frontend_recording_active())
+  if not active then switched = false return end
   local name = current_scene()
   if not fresh and name == live_name then
     switch_to(standby_name); switched = true
