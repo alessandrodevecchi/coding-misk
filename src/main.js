@@ -21,6 +21,7 @@ import { createGenresTab } from './library/genres-tab.js';
 import { genresOf } from './library/song-filter.js';
 import { windowSong } from './endless/join.js';
 import { absoluteClips, playlistTransition, overlapOf } from './endless/transitions.js';
+import { joinSession } from './endless/join.js';
 import { createSession } from './endless/director.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
@@ -31,6 +32,8 @@ import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
 import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS } from './video/layout.js';
+import { encode, canEncode, formatOf } from './export/encode.js';
+import { segmentsOf, timelineOf, renderOffline } from './export/fast.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
 import { LOCK } from './icons.js';
@@ -476,7 +479,7 @@ function startCapture() {
       const raw = new Blob(chunks, { type: recorder.mimeType });
       if (c.opus) return res({ blob: raw, ext: /ogg/.test(recorder.mimeType) ? 'ogg' : 'webm' });
       toast(t('exportWorking'));
-      try { res({ blob: wavBlob(await globalThis.getAudioContext().decodeAudioData(await raw.arrayBuffer())), ext: 'wav' }); }
+      try { res(await encodeRecording(raw)); }
       catch (e) { res({ blob: raw, ext: 'webm' }); }
     };
     recorder.stop();
@@ -494,6 +497,9 @@ function tapMaster() {
 // asVideo (#27): a video of the song (frame and audio) instead of the audio alone
 async function exportTrack(sg, as, asVideo = false) {
   if (rec) { rec.cancel = true; rec.recorder.stop(); stop(); return; }
+  if (fastJob) { fastJob.cancel(); return; }
+  // audio: rendered offline in seconds (#8), unless the settings ask for real time or the render fails
+  if (!asVideo && exportSpeed() === 'fast' && await exportFast(sg)) return;
   if (asVideo && (capture || video.on)) return toast(t('vidBusy'));
   // the whole tab: the browser asks which tab to share, while the click still counts
   const display = asVideo ? await video.askTab() : null;
@@ -507,8 +513,8 @@ async function exportTrack(sg, as, asVideo = false) {
     if (!v) { if (display) display.getTracks().forEach(tr => tr.stop()); return toast(t('vidNotSupported')); }
     recorder = v.recorder; ext = v.ext;
   } else {
-    // WAV (decoded after the recording) or Opus (the recording itself, much smaller), from the settings (#31)
-    const want = store.get('coding-misk-export-format', 'wav') === 'opus', mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'].find(m => globalThis.MediaRecorder && MediaRecorder.isTypeSupported(m));
+    // Opus is the recording itself; WAV, FLAC and MP3 are encoded from the decoded recording (#31, #8)
+    const want = exportFormat() === 'opus', mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'].find(m => globalThis.MediaRecorder && MediaRecorder.isTypeSupported(m));
     recorder = want && mime ? new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 192000 }) : new MediaRecorder(dest.stream);
     opus = !!(want && mime);
   }
@@ -528,15 +534,56 @@ async function finishExport(r) {
   if (r.video) { saveBlob(fileName(r.title, r.ext), new Blob(r.chunks, { type: r.recorder.mimeType })); return toast(t('vidSaved', { name: fileName(r.title, r.ext) })); }
   toast(t('exportWorking'));
   const blob = new Blob(r.chunks, { type: r.recorder.mimeType });
-  const out = r.opus ? blob : wavBlob(await globalThis.getAudioContext().decodeAudioData(await blob.arrayBuffer()));
-  const ext = r.opus ? (/ogg/.test(r.recorder.mimeType) ? 'ogg' : 'webm') : 'wav';
-  const name = fileName(r.title, ext);
-  saveBlob(name, out);
+  const out = r.opus ? { blob, ext: /ogg/.test(r.recorder.mimeType) ? 'ogg' : 'webm' } : await encodeRecording(blob);
+  const name = fileName(r.title, out.ext);
+  saveBlob(name, out.blob);
   toast(t('exportDone', { name }));
 }
+// a real time recording decoded and encoded in the chosen format (WAV when the format cannot be made here)
+async function encodeRecording(blob) {
+  const buf = await globalThis.getAudioContext().decodeAudioData(await blob.arrayBuffer());
+  const channels = Array.from({ length: Math.min(2, buf.numberOfChannels) }, (_, c) => buf.getChannelData(c));
+  const fmt = exportFormat() === 'opus' ? 'wav' : exportFormat();
+  try { return await encode(channels, buf.sampleRate, fmt, { mp3Rate: mp3Rate() }); } catch (e) { console.warn(e); return encode(channels, buf.sampleRate, 'wav'); }
+}
+
+// ---------- fast export (#8) ----------
+// the export settings: format (wav, flac, mp3, opus), MP3 bitrate, speed (fast or real time)
+const exportFormat = () => formatOf(store.get('coding-misk-export-format', 'wav'));
+const mp3Rate = () => (store.get('coding-misk-export-mp3', 320) === 192 ? 192 : 320);
+const exportSpeed = () => (store.get('coding-misk-export-speed', 'fast') === 'real' ? 'real' : 'fast');
+// the fast export running: { id, progress 0..1, phase: load, schedule, render, encode; cancel() }
+let fastJob = null;
+// renders sg offline and saves the audio and its timeline; false when it failed (the caller records in real time)
+async function exportFast(sg, title = sg.title) {
+  if (typeof OfflineAudioContext === 'undefined') return false;
+  let fmt = exportFormat();
+  if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
+  const segments = segmentsOf(sg, codeFor);
+  const job = renderOffline({ segments, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER }, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
+  try {
+    const r = await job.promise;
+    fastJob.phase = 'encode';
+    const { blob, ext } = await encode(r.channels, r.sampleRate, fmt, { mp3Rate: mp3Rate() });
+    const name = fileName(title, ext);
+    saveBlob(name, blob);
+    const tl = timelineOf(sg, segments, r.onsets, r.channels[0].length / r.sampleRate, getLang());
+    setTimeout(() => saveBlob(fileName(title, 'timeline.json'), new Blob([JSON.stringify(tl)], { type: 'application/json' })), 400);
+    toast(t('exportDone', { name }));
+    return true;
+  } catch (e) {
+    if (e && e.cancelled) { toast(t('exportCancel')); return true; }
+    console.warn('[fast export]', e);
+    toast(t('exportFastFailed'));
+    return false;
+  } finally { fastJob = null; }
+}
+globalThis.codingMiskExport = { encode, get job() { return fastJob ? { id: fastJob.id, progress: fastJob.progress, phase: fastJob.phase } : null; } };
 // one Export and one Record for audio and video (#27): the switch is the small display next to the button
 const outKind = () => outKindOf(store.get(OUT_KEY, 'audio'));
-const outKindButton = () => `<button class="out-kind" data-out-kind title="${esc(t('outKindTip'))}" aria-label="${esc(t('outKindTip'))}"><span class="comp-lcd" data-out-lcd>${esc(outText(outKind(), store.get('coding-misk-export-format', 'wav'), (store.get('coding-misk-video', {}) || {}).quality || VIDEO_DEFAULTS.quality))}</span></button>`;
+const outLabel = () => outText(outKind(), exportFormat(), (store.get('coding-misk-video', {}) || {}).quality || VIDEO_DEFAULTS.quality, mp3Rate());
+const outKindButton = () => `<button class="out-kind" data-out-kind title="${esc(t('outKindTip'))}" aria-label="${esc(t('outKindTip'))}"><span class="comp-lcd" data-out-lcd>${esc(outLabel())}</span></button>`;
 const outCombo = btn => `<span class="out-combo">${btn}${outKindButton()}</span>`;
 document.addEventListener('click', e => { const b = e.target.closest('[data-out-kind]'); if (!b || b.disabled) return; store.set(OUT_KEY, outKind() === 'video' ? 'audio' : 'video'); });
 function saveBlob(name, blob) {
@@ -574,34 +621,40 @@ async function startVideoCapture({ total = 0, onStop = () => {}, onCancel = () =
 }
 // a video of a radio session saved in a playlist (#27): the session replays and the video ends after its last song
 let sessionVid = null;
-async function recordSession(id) {
-  const s = playlists.session(id); if (!s || !radio || sessionVid) return;
+// asVideo false: the audio in real time (the fallback of the fast export); a second tap on the row cancels
+async function recordSession(id, asVideo = true) {
+  const s = playlists.session(id); if (!s || !radio) return;
+  if (sessionVid) { if (sessionVid.id === id) sessionVid.finish(true); return; }
   const finish = async cancel => {
     if (!sessionVid) return;
     const v = sessionVid; sessionVid = null;
     stop();
     const out = await v.cap.stop(cancel);
-    if (!out) return toast(t('vidCancelled'));
+    if (!out) return toast(t(asVideo ? 'vidCancelled' : 'exportCancel'));
     const name = fileName(s.title, out.ext);
-    saveBlob(name, out.blob); toast(t('vidSaved', { name }));
+    saveBlob(name, out.blob); toast(t(asVideo ? 'vidSaved' : 'exportDone', { name }));
   };
-  const cap = await startVideoCapture({ onStop: () => finish(false), onCancel: () => finish(true) });
-  if (!cap) return;
-  sessionVid = { cap };
+  const cap = asVideo ? await startVideoCapture({ onStop: () => finish(false), onCancel: () => finish(true) }) : (capture || rec ? null : startCapture());
+  if (!cap) { if (!asVideo) toast(t('vidBusy')); return; }
+  sessionVid = { id, cap, finish };
   mixS = null; queue = null;
-  // the reverb tail of the last song stays in the video
+  // the reverb tail of the last song stays in the file
   radio.playSession(s, { onEnd: () => setTimeout(() => finish(false), 2500) });
 }
-function wavBlob(buf) {
-  const ch = Math.min(2, buf.numberOfChannels), n = buf.length, data = new DataView(new ArrayBuffer(44 + n * ch * 2));
-  const str = (o, s) => [...s].forEach((c, i) => data.setUint8(o + i, c.charCodeAt(0)));
-  str(0, 'RIFF'); data.setUint32(4, 36 + n * ch * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
-  data.setUint32(16, 16, true); data.setUint16(20, 1, true); data.setUint16(22, ch, true); data.setUint32(24, buf.sampleRate, true);
-  data.setUint32(28, buf.sampleRate * ch * 2, true); data.setUint16(32, ch * 2, true); data.setUint16(34, 16, true); str(36, 'data'); data.setUint32(40, n * ch * 2, true);
-  const chans = Array.from({ length: ch }, (_, c) => buf.getChannelData(c));
-  let o = 44;
-  for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++) { const v = Math.max(-1, Math.min(1, chans[c][i])); data.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7fff, true); o += 2; }
-  return new Blob([data], { type: 'audio/wav' });
+// the playlist row's export of a session (#8): audio rendered fast as one joined song, or a video (the Export display)
+async function exportSession(id) {
+  const s = playlists.session(id); if (!s || !radio) return;
+  if (fastJob) { if (fastJob.id === id) fastJob.cancel(); return; }
+  if (sessionVid) return recordSession(id);
+  if (outKind() === 'video') return recordSession(id, true);
+  if (exportSpeed() === 'fast') {
+    try {
+      const items = s.frozen || radio.rebuild(s.recipe, s.count);
+      const joined = joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: s.recipe.seed, options: s.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song))));
+      if (await exportFast(playable({ ...joined, kind: 'composed', id }), s.title)) return;
+    } catch (e) { console.warn('[session export]', e); toast(t('exportFastFailed')); }
+  }
+  return recordSession(id, false);
 }
 $('#tr-export').addEventListener('click', () => exportTrack(compiled, 'track', outKind() === 'video'));
 $('#tr-out').innerHTML = outKindButton();
@@ -1771,7 +1824,7 @@ const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, 
 playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, playlists, confirmTwice, toast,
   songs: () => [...libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: c.p.meta.seconds })),
     ...playlists.all.flatMap(l => l.songs).filter(isSession).map(id => { const s = playlists.session(id); return s && { id, title: s.title, kind: 'session', seconds: 0, count: s.count, frozen: !!s.frozen, old: !s.frozen && (s.version || 0) < DIRECTOR_VERSION }; }).filter(Boolean)],
-  video: id => recordSession(id),
+  video: id => exportSession(id),
   freeze: id => { const s = playlists.session(id); if (!s || !radio) return; playlists.freeze(id, radio.rebuild(s.recipe, s.count)); sessionSongs.delete(id); toast(t('plFrozen')); },
   sessionOf: id => playlists.session(id),
   play: (listId, ids, startId) => playQueue(listId, ids, startId),
@@ -1852,7 +1905,7 @@ $('#songs').addEventListener('click', e => {
     if (a === 'radio') return continueInRadio({ ...tr, tags: tr.tags || songOf({ tr, p }).tags }, 0);
     if (a === 'export') {
       const v = outKind() === 'video';
-      if (tr.kind === 'composed') { if (!rec && !loadTrack(tr)) return; return exportTrack(rec ? null : compiled, 'track', v); }
+      if (tr.kind === 'composed') { if (!rec && !fastJob && !loadTrack(tr)) return; return exportTrack(rec || fastJob ? null : compiled, 'track', v); }
       return exportTrack(p, 'free', v);
     }
     if (a === 'open') {
@@ -1955,10 +2008,13 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
     if (rec.ending && performance.now() - rec.ending > 2500 && rec.recorder.state === 'recording') rec.recorder.stop();
     if (!rec.ending && !playing && !seeking && rec.recorder.state === 'recording' && performance.now() - (rec.started || (rec.started = performance.now())) > 3000) rec.ending = performance.now();
   }
-  const recLabel = rec ? t('exporting', { t: clock(song && s ? song.meta.secondsAt(s.now()) : 0), total: clock(rec.total) }) : null;
-  $$('[data-export]').forEach(b => { const l = rec && (b.dataset.export === rec.id || b.id === 'tr-export') ? recLabel : t('exportWav'); if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!(rec && l === recLabel)); });
+  const job = rec || fastJob;
+  const recLabel = rec ? t('exporting', { t: clock(song && s ? song.meta.secondsAt(s.now()) : 0), total: clock(rec.total) })
+    : fastJob ? t(`fast:${fastJob.phase}`, { p: Math.round(fastJob.progress * 100) }) : null;
+  $$('[data-export-mini]').forEach(b => { const on = (fastJob && fastJob.id === b.dataset.exportMini) || (sessionVid && sessionVid.id === b.dataset.exportMini), l = !on ? '⬇' : fastJob ? `${Math.round(fastJob.progress * 100)}%` : '●'; if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!on); });
+  $$('[data-export]').forEach(b => { const l = job && (b.dataset.export === job.id || (b.id === 'tr-export' && (rec || fastJob.id === compiled.id))) ? recLabel : t('exportWav'); if (b.textContent !== l) b.textContent = l; b.classList.toggle('rec', !!(job && l === recLabel)); });
   // the audio or video displays next to Export and Record; locked while anything records
-  { const txt = outText(outKind(), store.get('coding-misk-export-format', 'wav'), (store.get('coding-misk-video', {}) || {}).quality || VIDEO_DEFAULTS.quality), busy = !!(rec || capture);
+  { const txt = outLabel(), busy = !!(rec || capture || fastJob);
     $$('[data-out-lcd]').forEach(el => { if (el.textContent !== txt) el.textContent = txt; const b = el.parentElement; if (b.disabled !== busy) b.disabled = busy; }); }
   // pulsanti di trasporto
   const playBtn = $('#play'), state = playing ? 'playing' : paused ? 'paused' : 'stopped';

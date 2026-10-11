@@ -129,6 +129,15 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Radio: Registra in VIDEO salva video, scaletta e ricetta; una sessione in una playlist (videocamera) si registra fino all'ultimo brano.
 - [ ] Caricamento di prova su YouTube (privato o non in elenco).
 
+## Export veloce (`#8`)
+
+- [ ] Brani: "⬇ Esporta" in AUDIO è pronto in pochi secondi; il pulsante mostra la percentuale; un tocco annulla.
+- [ ] Il file suona come l'ascolto nell'app (prova un brano con live build e voce, e uno con cambi di tempo).
+- [ ] Impostazioni → Audio: WAV, FLAC, MP3 (320 o 192 kbps), Opus; il display di Esporta mostra il formato; i file si aprono nel tuo player.
+- [ ] Accanto all'audio c'è il `.timeline.json`.
+- [ ] Playlist: ⬇ su una sessione salva un solo file con tutti i brani e le transizioni (in VIDEO la registra in video).
+- [ ] Velocità "Tempo reale" registra come prima.
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.

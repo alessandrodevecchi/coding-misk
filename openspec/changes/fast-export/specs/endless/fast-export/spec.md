@@ -16,7 +16,7 @@ Exporting a song or a saved radio session as audio SHALL render it faster than r
 
 #### Scenario: Same sound
 - **WHEN** the same song is exported fast and in real time
-- **THEN** both files have the same length within a beat, and per instrument levels within a small tolerance
+- **THEN** both files have the same length within a beat, the same loudness overall and in the low and high bands within a small tolerance, and the same loudness over time
 
 #### Scenario: Live build song
 - **WHEN** a song with live build steps is exported

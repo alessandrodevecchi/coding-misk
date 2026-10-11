@@ -4,8 +4,8 @@ import { makeBackup, mergeBackup } from './backup.js';
 import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS } from '../video/layout.js';
+import { FORMATS, MP3_RATES, formatOf } from '../export/encode.js';
 
-export const EXPORT_FORMATS = ['wav', 'opus'];
 
 export function createSettings({ root, t, tx, esc, store, looks, app, toast, confirmTwice }) {
   const opt = (v, cur, label) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
@@ -14,7 +14,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
 
   function render() {
     if (root.hidden) return;
-    const r = app.radioSettings(), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) };
+    const fmt = formatOf(store.get('coding-misk-export-format', 'wav')), r = app.radioSettings(), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) };
     root.innerHTML = `<p class="intro">${esc(t('setIntro'))}</p>
       <div class="set-grid">
         <div class="card set-card"><h3>${esc(t('setLook'))}</h3>
@@ -24,7 +24,9 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         </div>
         <div class="card set-card"><h3>${esc(t('setAudio'))}</h3>
           ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`)}
-          ${row(t('setFormat'), `<select id="set-format" data-no-knob>${opt('wav', store.get('coding-misk-export-format', 'wav'), t('setWav'))}${opt('opus', store.get('coding-misk-export-format', 'wav'), t('setOpus'))}</select>`, t('setFormatHint'))}
+          ${row(t('setFormat'), `<select id="set-format" data-no-knob>${FORMATS.map(f => opt(f, fmt, t(`set${f[0].toUpperCase()}${f.slice(1)}`))).join('')}</select>`, t('setFormatHint'))}
+          ${fmt === 'mp3' ? row(t('setMp3Rate'), seg('data-set-mp3', MP3_RATES.map(r => [String(r), `${r} kbps`]), String(store.get('coding-misk-export-mp3', 320)))) : ''}
+          ${row(t('setSpeed'), `<select id="set-speed" data-no-knob>${opt('fast', store.get('coding-misk-export-speed', 'fast'), t('setSpeedFast'))}${opt('real', store.get('coding-misk-export-speed', 'fast'), t('setSpeedReal'))}</select>`, t('setSpeedHint'))}
         </div>
         <div class="card set-card"><h3>${esc(t('setVideo'))}</h3>
           <figure class="vid-preview"><canvas id="set-vid-preview" width="480" height="270" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted">${esc(t('vidPreviewHint'))}</figcaption></figure>
@@ -52,6 +54,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
+    if (b.dataset.setMp3) { store.set('coding-misk-export-mp3', +b.dataset.setMp3); return render(); }
     if (b.dataset.vidSoul) { setVid('soulPanel', b.dataset.vidSoul === '1'); return render(); }
     if (b.id === 'set-export') { const d = new Date().toISOString().slice(0, 10); downloadJson(`coding-misk-backup-${d}`, makeBackup(entries())); toast(t('setExported')); return; }
     if (b.id === 'set-import') {
@@ -73,7 +76,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   root.addEventListener('input', e => { if (e.target.id === 'set-volume') { app.setVolume(+e.target.value); e.target.nextElementSibling.textContent = `${e.target.value}%`; } });
   root.addEventListener('change', e => {
     if (e.target.id === 'set-radio-look') store.set('coding-misk-radio-look', e.target.value);
-    if (e.target.id === 'set-format') store.set('coding-misk-export-format', e.target.value);
+    if (e.target.id === 'set-format') { store.set('coding-misk-export-format', e.target.value); render(); }
+    if (e.target.id === 'set-speed') store.set('coding-misk-export-speed', e.target.value);
     if (e.target.dataset.radioOpt) app.setRadio(e.target.dataset.radioOpt, e.target.value);
     if (e.target.dataset.vidOpt) { setVid(e.target.dataset.vidOpt, e.target.value); render(); }
   });

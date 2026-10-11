@@ -2,7 +2,6 @@
 // remove, play from a song, export and import. The store and the queue live in playlists.js.
 import { FAV_ID, exportPlaylist, importPlaylist } from './playlists.js';
 import { downloadJson, pickJsonFiles } from './library.js';
-import { VIDEO } from '../icons.js';
 
 // songs(): the library as [{ id, title, kind, seconds }]; play(listId, ids, startId): start a playlist;
 // userSong(id): the user's song with that id or null; addSongs(list): add imported user songs to the library, returns a map old → new id
@@ -26,7 +25,7 @@ export function createPlaylistsTab({ root, t, esc, clock, playlists, songs, play
           : s ? `<span class="badge kind-${s.kind}">${esc(t(`k:${s.kind}`))}</span><span class="pl-len">${clock(s.seconds)}</span>` : '<span></span><span></span>'}
         <span class="pl-acts">
           ${s ? `<button class="mini" data-pl-from="${i}" title="${esc(t('plPlayFrom'))}" aria-label="${esc(t('plPlayFrom'))}">▶</button>` : ''}
-          ${s && s.kind === 'session' ? `<button class="mini" data-pl-video="${esc(id)}" title="${esc(t('plVideoTip'))}" aria-label="${esc(t('plVideoTip'))}">${VIDEO}</button>` : ''}
+          ${s && s.kind === 'session' ? `<button class="mini" data-pl-video="${esc(id)}" data-export-mini="${esc(id)}" title="${esc(t('plExportTip'))}" aria-label="${esc(t('plExportTip'))}">⬇</button>` : ''}
           ${s && s.kind === 'session' && !s.frozen ? `<button class="mini" data-pl-freeze="${esc(id)}" title="${esc(t('plFreezeTip'))}" aria-label="${esc(t('plFreeze'))}">❄</button>` : ''}
           <button class="mini" data-pl-up="${i}" title="${esc(t('plUp'))}" aria-label="${esc(t('plUp'))}"${i ? '' : ' disabled'}>↑</button>
           <button class="mini" data-pl-down="${i}" title="${esc(t('plDown'))}" aria-label="${esc(t('plDown'))}"${i < cur.songs.length - 1 ? '' : ' disabled'}>↓</button>
