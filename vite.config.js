@@ -35,6 +35,6 @@ const customSamples = () => ({
 export default defineConfig({
   plugins: [customSamples()],
   server: { port: 5173, open: true },
-  // the fast export's hidden render page (#8)
-  build: { rollupOptions: { input: { main: 'index.html', render: 'render.html' } } },
+  // the fast export's hidden render page (#8); the live output's broadcast window and control room (#52)
+  build: { rollupOptions: { input: { main: 'index.html', render: 'render.html', broadcast: 'broadcast.html', live: 'live.html' } } },
 });

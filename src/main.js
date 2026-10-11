@@ -35,6 +35,7 @@ import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layou
 import { encode, createEncoder, canEncode, formatOf } from './export/encode.js';
 import { segmentsOf, timelineOf, renderInBlocks } from './export/fast.js';
 import { renderVideo } from './export/fast-video.js';
+import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
@@ -2413,6 +2414,7 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     volume: () => volume, setVolume: v => setVolume(v),
     // the video recorder is made after the settings: a page opened on the settings gets its preview below
     videoPreview: el => { try { video.preview(el); } catch (e) {} },
+    liveOpenWindow: () => liveLink.openWindow(), liveOpenRoom: () => liveLink.openRoom(), liveOn: () => { try { return liveLink.on; } catch (e) { return false; } },
     radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', scope: 'song' }), setRadio: (k, v) => radio && radio.setOption(k, v),
   } });
 $('#open-settings').addEventListener('click', () => showTab($('#tab-impostazioni').hidden ? 'impostazioni' : prevTab));
@@ -2467,7 +2469,7 @@ function stageInfo(cyc) {
 }
 const visuals = startVisuals({
   getS: () => ({ look: soulOverride ? 'soul' : look }), soul,
-  afterFrame: (cyc, playing) => video.frame(cyc, playing),
+  afterFrame: (cyc, playing) => { video.frame(cyc, playing); liveLink.tick(); },
   getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando
@@ -2494,6 +2496,7 @@ const visuals = startVisuals({
 // the video recorder (#27): its frame is drawn after each stage frame
 const video = createVideo({
   visuals, store, t, esc,
+  soulFrame: (cyc, playing, scale) => soul.frame(cyc, playing, scale),
   getCode: () => (fv ? fv.code : (ed && ed.code) || ''),
   getInfo: stageInfo,
   getSay: () => { if (fv) return fv.say; const el = $('#say'); return el.classList.contains('on') ? el.textContent : ''; },
@@ -2506,4 +2509,9 @@ const video = createVideo({
   },
 });
 globalThis.codingMiskVideo = video;
+// live output (#52): the broadcast window draws through this link, the control room talks to it
+const liveLink = createLiveLink({
+  video, visuals,
+  getState: () => { const i = stageInfo(isPlaying() ? sched().now() : 0) || {}; return { title: i.title || '', artist: i.artist || '', playing: isPlaying(), radio: !!(mode === 'radio' && radio && radio.on) }; },
+});
 if (settingsPage && !$('#tab-impostazioni').hidden) settingsPage.render();

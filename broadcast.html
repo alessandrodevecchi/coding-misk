@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>coding-misk broadcast</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+  p { position: fixed; inset: auto 0 45% 0; margin: 0; text-align: center; color: #a597c7; font: 600 16px/1.5 "JetBrains Mono", ui-monospace, monospace; }
+  p[hidden] { display: none; }
+</style>
+</head>
+<body>
+<!-- the broadcast window (#52): only the live picture, drawn by the app tab that opened it, for OBS to capture -->
+<canvas id="picture" width="1920" height="1080"></canvas>
+<p id="wait" hidden></p>
+<script type="module" src="/src/live/broadcast.js"></script>
+</body>
+</html>

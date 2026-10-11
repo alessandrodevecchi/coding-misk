@@ -854,8 +854,15 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
 
   function frame(now) {
     // a fast video is being drawn: the live loop waits
-    if (held) { requestAnimationFrame(frame); return; }
-    const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
+    if (!held) tick(now);
+    requestAnimationFrame(frame);
+  }
+  // one frame of the live loop; the broadcast window (#52) also calls it when this tab is hidden and its own loop stops
+  let lastRun = 0;
+  function pump() { const n = performance.now(); if (!held && n - lastRun > 50) tick(n); }
+  function tick(now) {
+    lastRun = performance.now();
+    const dt = Math.max(0, Math.min(.05, (now - lastT) / 1000)); lastT = now;
     readAudio(dt, now);
     const playing = isPlaying();
     let cyc;
@@ -873,9 +880,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (afterFrame) afterFrame(cyc, playing);
 
     $('#readout').textContent = readout(cyc, Math.max(0, step), playing);
-    requestAnimationFrame(frame);
   }
   let idle = 0, spin = 0;
   requestAnimationFrame(frame);
-  return { setTarget, drawAt, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; } };
+  return { setTarget, drawAt, pump, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; } };
 }

@@ -2,15 +2,20 @@
 // a title card) recorded together with the master audio; or the whole browser tab, captured as it is.
 // The frame is drawn after each stage frame, so it follows the music exactly as the stage does.
 import { QUALITIES, VIDEO_DEFAULTS, LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
+import { liveAreas, lerpAreas, ease, presetOf, TRANSITION } from '../live/presets.js';
 
 const KEY = 'coding-misk-video';
+const LIVE_KEY = 'coding-misk-live-preset';
 
 // visuals: { setTarget, canvas } from startVisuals; getCode(): the code in the editor; getInfo(cyc): what plays;
-// getSay(): the voice line on the stage; getSoul(): { canvas } of the soul screen when the soul is on, else null
-export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store, t, esc }) {
+// getSay(): the voice line on the stage; getSoul(): { canvas } of the soul screen when the soul is on, else null;
+// soulFrame(cyc, playing, scale): the soul screen always (the live picture's soul views, #52)
+export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFrame = null, store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });
-  const cv = document.createElement('canvas'), g = cv.getContext('2d');
+  const cv = document.createElement('canvas');
+  // the context being drawn: the video's canvas, or the live picture's while it draws
+  let g = cv.getContext('2d');
   let job = null;
 
   // ---------- the bar shown while a video records: preview, time, soul panel, stop and cancel ----------
@@ -44,7 +49,9 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
     return (colours = { bg: v('--bg') || '#0d0818', panel: v('--panel') || '#160f26', line: v('--line') || '#3a2a5c', ink: v('--ink') || '#f3ecff', muted: v('--muted') || '#a597c7', a1: v('--a1') || '#ff4fa3', a2: v('--a2') || '#ffb347' });
   }
   // the code: one colour per token kind, the last edit kept in view, a caret where it is typed
-  let code = '', lastEdit = 0, scroll = 0, editAt = -10;
+  // the scroll is kept per canvas: the live picture and the control room's small pictures scroll on their own
+  let code = '', lastEdit = 0, editAt = -10;
+  const scrolls = new WeakMap();
   function tokens(line, P) {
     const out = []; let i = 0;
     while (i < line.length) {
@@ -65,7 +72,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
       lastEdit = i; code = src; editAt = now;
     }
     const fs = Math.round(frameH / 50), lh = Math.round(fs * 1.4), padX = Math.round(fs * 1.1), head = Math.round(fs * 2.4);
-    g.save();
+    g.save(); g.globalAlpha = A.a ?? 1;
     g.fillStyle = P.panel; g.strokeStyle = P.line; g.lineWidth = 2;
     g.beginPath(); g.roundRect(A.x, A.y, A.w, A.h, 10); g.fill(); g.stroke();
     g.fillStyle = P.muted; g.font = `600 ${Math.round(fs * .8)}px "JetBrains Mono", monospace`; g.textBaseline = 'middle';
@@ -94,7 +101,8 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
     const fit = Math.floor((A.h - head) / lh);
     // the row being edited sits in the upper third, when the code is longer than the panel
     const want = Math.max(0, Math.min(rows.length - fit, caret.row - Math.floor(fit / 3)));
-    scroll += (want - scroll) * .12;
+    let scroll = scrolls.get(g.canvas) ?? want;
+    scroll += (want - scroll) * .12; scrolls.set(g.canvas, scroll);
     const y0 = A.y + head + lh * .8 - scroll * lh;
     rows.forEach((r, k) => {
       const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
@@ -113,21 +121,25 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
     g.restore();
   }
   function drawSoul(A, P, open, soulCanvas) {
-    g.save();
+    g.save(); g.globalAlpha = A.a ?? 1;
     g.fillStyle = P.panel; g.strokeStyle = P.line; g.lineWidth = 2;
     g.beginPath(); g.roundRect(A.x, A.y, A.w, A.h, 10); g.fill(); g.stroke();
     const fs = Math.round(A.head * .42);
     g.fillStyle = P.muted; g.font = `600 ${fs}px "JetBrains Mono", monospace`; g.textBaseline = 'middle';
     g.fillText(`SOUL ANALYZER ${open ? '▾' : '▸'}`, A.x + fs * 1.3, A.y + A.head / 2);
-    if (open && soulCanvas) g.drawImage(soulCanvas, A.x + 4, A.y + A.head, A.w - 8, A.h - A.head - 4);
+    // the soul screen fitted into the panel's body
+    if (open && soulCanvas) {
+      const bw = A.w - 8, bh = A.h - A.head - 4, k = Math.min(bw / soulCanvas.width, bh / soulCanvas.height), sw = soulCanvas.width * k, sh = soulCanvas.height * k;
+      g.drawImage(soulCanvas, A.x + 4 + (bw - sw) / 2, A.y + A.head + (bh - sh) / 2, sw, sh);
+    }
     g.restore();
   }
   // the title card, bottom left of the stage: title, then artist and position
   let cardKey = '', cardT0 = 0;
-  function drawCard(S, P, info, now) {
+  function drawCard(S, P, info, now, mode = opts().card, fade = 1) {
     const key = `${info.title || ''}|${info.artist || ''}|${info.n ?? ''}`;
     if (key !== cardKey) { cardKey = key; cardT0 = now; }
-    const a = cardAlpha(opts().card, now, cardT0); if (a <= 0 || !info.title) return;
+    const a = cardAlpha(mode, now, cardT0) * fade; if (a <= 0.01 || !info.title) return;
     const u = S.h / 1080, pad = 22 * u, tf = Math.round(40 * u), sf = Math.round(22 * u);
     g.save(); g.globalAlpha = a;
     g.font = `700 ${tf}px "Chakra Petch", system-ui, sans-serif`;
@@ -140,10 +152,10 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
     if (sub) { g.fillStyle = P.muted; g.font = `500 ${sf}px "JetBrains Mono", monospace`; g.fillText(sub, x + pad, y + pad + tf + sf * .4, S.w - 72 * u - pad * 2); }
     g.restore();
   }
-  function drawSay(S) {
-    const say = getSay(); if (!say) return;
+  function drawSay(S, fade = 1) {
+    const say = getSay(); if (!say || fade <= 0.01) return;
     const u = S.h / 1080, f = Math.round(44 * u);
-    g.save(); g.font = `700 ${f}px "JetBrains Mono", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.save(); g.globalAlpha = fade; g.font = `700 ${f}px "JetBrains Mono", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle';
     const w = Math.min(S.w - 64 * u, g.measureText(say).width + 40 * u), cx = S.x + S.w / 2, cy = S.y + S.h * .86;
     g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.roundRect(cx - w / 2, cy - f * .8, w, f * 1.6, 8 * u); g.fill();
     g.fillStyle = palette().a1; g.fillText(say, cx, cy, w - 24 * u); g.restore();
@@ -186,6 +198,8 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
     return !!soul;
   }
   function frame(cyc, playing) {
+    lastCyc = cyc; lastPlaying = playing;
+    liveIdle();
     if (!job) { drawPreview(cyc, playing); return; }
     if (job.layout === 'tab') return;
     const now = performance.now() / 1000;
@@ -240,10 +254,77 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
     if (!job) return;
     if (job.display) job.display.getTracks().forEach(tr => tr.stop());
     job.video.stop();
-    job = null; visuals.setTarget(null); renderBar();
+    job = null; visuals.setTarget(live ? live.q : null); renderBar();
+  }
+
+  // ---------- the live picture (#52): drawn into the broadcast window's canvas, with presets and transitions ----------
+  let lastCyc = 0, lastPlaying = false, live = null;
+  const LIVE_Q = { w: 1920, h: 1080, fps: 30 };
+  const nowS = () => performance.now() / 1000;
+  // the areas and the card's opacity now: between the preset before and the preset on air during a transition
+  function liveState(L, now, Q) {
+    const k = ease((now - L.t0) / TRANSITION), to = liveAreas(L.preset.view, Q.w, Q.h);
+    const from = L.from || to;
+    return { A: k >= 1 ? to : lerpAreas(from, to, k), card: L.cardFrom + ((L.preset.card ? 1 : 0) - L.cardFrom) * k };
+  }
+  function paintLive(A, Q, cyc, playing, now, card) {
+    const P = palette();
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
+    g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
+    if (A.stage.a > .01) { g.globalAlpha = A.stage.a; drawStage(A.stage); g.globalAlpha = 1; }
+    drawSay(A.stage, A.stage.a);
+    if (A.soul.a > .01 && A.soul.x < Q.w && soulFrame) {
+      const bw = A.soul.w - 8, bh = A.soul.h - A.soul.head - 4;
+      drawSoul(A.soul, P, true, soulFrame(cyc, playing, Math.max(.05, Math.min(bw / 1200, bh / 760))));
+    }
+    if (A.code.a > .01 && A.code.x < Q.w) drawCode(A.code, P, now, Q.h);
+    // the card: bottom left of the stage, or of the whole picture when the stage is hidden
+    drawCard(A.stage.a > .5 ? A.stage : { x: 0, y: 0, w: Q.w, h: Q.h }, P, getInfo(cyc) || {}, now, 'always', card);
+  }
+  function drawLive(target) {
+    if (!live) {
+      live = { q: LIVE_Q, preset: presetOf(store.get(LIVE_KEY, null)), from: null, t0: -10, cardFrom: 1, drawnAt: 0, frames: 0 };
+      live.cardFrom = live.preset.card ? 1 : 0;
+      if (!job) visuals.setTarget(LIVE_Q);
+    }
+    if (target.width !== LIVE_Q.w || target.height !== LIVE_Q.h) { target.width = LIVE_Q.w; target.height = LIVE_Q.h; }
+    const now = nowS(), S = liveState(live, now, LIVE_Q), keep = g;
+    g = target.getContext('2d');
+    try { paintLive(S.A, LIVE_Q, lastCyc, lastPlaying, now, S.card); }
+    finally { g = keep; }
+    live.drawnAt = now; live.frames++;
+  }
+  // a preset, small, into a canvas (the control room's Preview), or the picture on air when preset is null
+  function drawLivePreview(target, preset) {
+    const Q = { w: target.width, h: target.height }, now = nowS(), keep = g;
+    let A, card;
+    if (preset) { const p = presetOf(preset); A = liveAreas(p.view, Q.w, Q.h); card = p.card ? 1 : 0; }
+    else if (live) ({ A, card } = liveState(live, now, Q));
+    else { A = liveAreas('visual', Q.w, Q.h); card = 1; }
+    g = target.getContext('2d');
+    try { paintLive(A, Q, lastCyc, lastPlaying, now, card); }
+    finally { g = keep; }
+  }
+  // the preset on air changes: a transition from the picture of now
+  function setLivePreset(p) {
+    p = presetOf(p); store.set(LIVE_KEY, p);
+    if (!live) return p;
+    const now = nowS(), S = liveState(live, now, LIVE_Q);
+    live.from = S.A; live.cardFrom = S.card; live.preset = p; live.t0 = now;
+    return p;
+  }
+  // the broadcast window stopped drawing (closed, or the app reloaded under it): the stage goes back to its size
+  function liveIdle() {
+    if (live && nowS() - live.drawnAt > 2) { live = null; if (!job) visuals.setTarget(null); }
   }
   return {
     start, end, askTab, frame, opts, setOpt,
+    // the live picture (#52)
+    live: {
+      draw: drawLive, preview: drawLivePreview, setPreset: setLivePreset,
+      get preset() { return live ? live.preset : presetOf(store.get(LIVE_KEY, null)); },
+      get on() { return !!live; }, get frames() { return live ? live.frames : 0; },
+    },
     // the settings' live preview: a canvas element, or null
     preview(el) { previewEl = el; },
     // a frame of the fast video (#53): the layout's frame at cycle cyc and time now (seconds), into the canvas

@@ -2,10 +2,10 @@
 
 ## Step 1: minimal version, a private test
 
-- [ ] 1.1 Broadcast window: frame only at 1080p30, presets with transitions, heartbeat.
-- [ ] 1.2 Control room tab: link to the app tab (BroadcastChannel), "On air" and "Preview" monitors, presets with TAKE, Go live and End, Live and Standby.
-- [ ] 1.3 OBS client (obs-websocket): connect, go live and end, scenes, output picture, stats; heartbeat to OBS.
-- [ ] 1.4 OBS script (watchdog); Guide checklist to set OBS up by hand; Standby music bed exported from coding-misk.
+- [x] 1.1 Broadcast window: frame only at 1080p30, presets with transitions, heartbeat.
+- [x] 1.2 Control room tab: link to the app tab (BroadcastChannel), "On air" and "Preview" monitors, presets with TAKE, Go live and End, Live and Standby.
+- [x] 1.3 OBS client (obs-websocket): connect, go live and end, scenes, output picture, stats; heartbeat to OBS.
+- [x] 1.4 OBS script (watchdog); Guide checklist to set OBS up by hand; Standby music bed exported from coding-misk (a playlist of calm songs, exported from the Playlists tab).
 
 ## Step 2: full version, after the test
 
