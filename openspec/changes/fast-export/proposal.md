@@ -8,7 +8,7 @@ Exporting a song takes as long as the song, because the audio is recorded while 
 
 - **Fast export:** the song is rendered offline (faster than real time) in a hidden, separate copy of the audio engine, with the same code, tempo changes, section fades and live build steps as playback. The app keeps playing meanwhile.
 - **Progress** shown on the Export button ("Rendering 42%"), with cancel.
-- **Formats:** WAV (16 bit), FLAC (lossless, 16 bit), MP3 (320 kbps) and Opus (192 kbps), chosen in the settings and shown on the Export display ("AUDIO · FLAC").
+- **Formats:** WAV (16 bit), FLAC (lossless, 16 bit), MP3 (320 or 192 kbps) and Opus (192 kbps), chosen in the settings and shown on the Export display ("AUDIO · FLAC").
 - **Radio sessions in playlists** can be exported as one audio file the same way (the session's songs joined with their transitions).
 - **Real time stays** as a fallback: when the fast render fails, the app says so and records in real time; a setting can force real time.
 - Video and the live radio recording stay real time (the picture is drawn live).
@@ -16,7 +16,8 @@ Exporting a song takes as long as the song, because the audio is recorded while 
 ## Non-goals
 
 - Faster video export.
-- Formats beyond the four above, or bit depth and bitrate choices.
+- Formats beyond the four above, or bit depth choices.
+- Moving playback to supradough (Strudel's pure JS engine): it could render anywhere, but it sounds different from superdough and does not cover every sound yet.
 
 ## Capabilities
 

@@ -24,7 +24,7 @@ Exporting a song or a saved radio session as audio SHALL render it faster than r
 
 ### Requirement: Formats
 
-The listener SHALL choose the audio format in the settings: WAV (16 bit), FLAC (lossless, 16 bit), MP3 (320 kbps) or Opus (192 kbps). The display next to Export SHALL show the format. The file extension SHALL match the format.
+The listener SHALL choose the audio format in the settings: WAV (16 bit), FLAC (lossless, 16 bit), MP3 (320 or 192 kbps) or Opus (192 kbps). The display next to Export SHALL show the format. The file extension SHALL match the format.
 
 #### Scenario: FLAC
 - **WHEN** the format is FLAC and the listener exports a song
