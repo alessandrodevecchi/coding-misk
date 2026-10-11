@@ -10,6 +10,7 @@ Exporting a song takes as long as the song, because the audio is recorded while 
 - **Progress** shown on the Export button ("Rendering 42%"), with cancel.
 - **Formats:** WAV (16 bit), FLAC (lossless, 16 bit), MP3 (320 or 192 kbps) and Opus (192 kbps), chosen in the settings and shown on the Export display ("AUDIO · FLAC").
 - **Radio sessions in playlists** can be exported as one audio file the same way (the session's songs joined with their transitions).
+- **Timeline JSON** saved next to a fast export: tempo map, sections, code changes of the live build steps, voice lines and the onsets of each instrument with their level. A later change uses it to render the video of an exported audio file faster than real time.
 - **Real time stays** as a fallback: when the fast render fails, the app says so and records in real time; a setting can force real time.
 - Video and the live radio recording stay real time (the picture is drawn live).
 

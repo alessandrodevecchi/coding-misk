@@ -53,3 +53,11 @@ A radio session saved in a playlist SHALL be exportable as one audio file: its s
 #### Scenario: Session export
 - **WHEN** the listener exports a saved session as audio
 - **THEN** one file holds every song of the session in order, with the transitions
+
+### Requirement: Timeline
+
+A fast export SHALL also save a timeline JSON file next to the audio, with the same name. It SHALL hold the song title, the length in seconds, the tempo map, the sections with their start times, the code of each live build step with its start time, the voice lines with their times, and for each instrument its onsets with time, length and level. Times SHALL be seconds from the start of the audio file.
+
+#### Scenario: Timeline next to the audio
+- **WHEN** the listener exports a song fast as FLAC
+- **THEN** the app saves `Song.flac` and `Song.timeline.json`, and the timeline's first kick onset matches the first kick in the audio within 10 ms

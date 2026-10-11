@@ -9,6 +9,7 @@
 
 - [ ] 2.1 Export flow: fast by default, progress and cancel on the button, real time fallback and setting.
 - [ ] 2.2 Encoders: WAV, FLAC, MP3, Opus (lazy loaded); format in the settings and on the Export display.
+- [ ] 2.4 Timeline JSON next to fast exports.
 - [ ] 2.3 Saved sessions: export as one joined file from the playlist row.
 
 ## 3. Checks and docs
