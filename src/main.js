@@ -104,9 +104,11 @@ function playable(tr) {
   // live build: the code depends on the bar (steps applied up to there), with the latest comment written in
   // a song without steps can build itself too ("Live build" switch): steps derived from its clips
   const build = tr.kind !== 'composed' ? null : hasBuild(tr) ? tr : liveOn ? { ...tr, build: deriveBuild(tr) } : null;
-  const codeAt = build ? bar => {
+  // keep(track): optional, only the tracks it keeps are compiled (the fast export renders a block with the tracks that play in it)
+  const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
+  const codeAt = build ? (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
-    const c = annotate(compileSong(st.song), build, st.upTo, getLang()) + voiceCode(build, st.song, st.upTo, total, getLang(), customFiles);
+    const c = annotate(compileSong(only(st.song, keep)), build, st.upTo, getLang()) + voiceCode(build, st.song, st.upTo, total, getLang(), customFiles);
     return c.includes('$:') ? c : `${c}\n$: silence`;
   } : null;
   const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
@@ -117,7 +119,8 @@ function playable(tr) {
     meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   }
   // doc: the song itself (sections and tracks), for its soul (#46)
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, build, doc: tr.kind === 'composed' ? build || tr : null };
+  const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(tr, keep)) : null;
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, build, doc: tr.kind === 'composed' ? build || tr : null };
 }
 
 // ---------- brano in modifica ----------
@@ -169,7 +172,7 @@ ready.then(async () => {
 const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
 // code of a song at a bar, with the tempo of that bar (a live build changes code over time)
-const codeFor = (sg, bar) => withVisuals(sg.codeAt ? sg.codeAt(bar) : sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
+const codeFor = (sg, bar, keep = null) => withVisuals(sg.codeAt ? sg.codeAt(bar, keep) : keep && sg.codeKeep ? sg.codeKeep(keep) : sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
 // keeps the point being edited in view: #edhost scrolls, not CodeMirror's own scroller
 function followEdit(a, b) {
   let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
@@ -560,6 +563,18 @@ const exportSpeed = () => (store.get('coding-misk-export-speed', 'fast') === 're
 // the fast export running: { id, progress 0..1, phase: load, schedule, render, encode; cancel() }
 let fastJob = null;
 // renders sg offline and saves the audio and its timeline; false when it failed (the caller records in real time)
+// the code segments of one block of a fast export [from, to) seconds: only the tracks with a clip in it (and voices),
+// so a long session does not compute every silent track of the songs already gone (#8)
+function blockSegments(sg) {
+  const doc = sg.doc && sg.doc.tracks ? absoluteClips(clone(sg.doc)) : null, T = tempoClock(sg.meta.bpm.map(Number));
+  if (!doc) return null;
+  return (from, to) => {
+    const c0 = Math.floor(T.cycleAt(from)) - 1, c1 = Math.ceil(T.cycleAt(to)) + 1;
+    const on = new Set(doc.tracks.filter(tr => tr.type === 'voice' || (tr.clips || []).some(c => c.start < c1 && c.start + (c.bars || 1) > c0)).map(tr => tr.id));
+    const keep = tr => tr.type === 'voice' || on.has(tr.id);
+    return segmentsOf(sg, (s, bar) => codeFor(s, bar, keep)).filter(seg => seg.to > T.cycleAt(from) - 1 && seg.from < T.cycleAt(to) + 1);
+  };
+}
 // after(): called once the files are saved (the radio adds its track list and recipe)
 async function exportFast(sg, title = sg.title, after = null) {
   if (typeof OfflineAudioContext === 'undefined') return false;
@@ -567,7 +582,7 @@ async function exportFast(sg, title = sg.title, after = null) {
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
   const segments = segmentsOf(sg, codeFor);
   const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate() });
-  const job = renderInBlocks({ segments, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
     const r = await job.promise;
@@ -693,7 +708,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   });
   const own = songs ? store.get('coding-misk-radio-look', 'studio') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { segments, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0) };
+  const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0) };
   const A = layoutAreas(layout, q.w, q.h, null);
   visuals.setTarget({ w: A.stage.w, h: A.stage.h });
   visuals.hold(true);

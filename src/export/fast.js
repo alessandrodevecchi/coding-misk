@@ -59,7 +59,8 @@ export function blocksOf(total, block = BLOCK) {
   return out;
 }
 
-// renders a song block by block into sink.add(channels, startSeconds, blockOnsets). job: { segments, bpm, tail, sampleRate, gain, block? }.
+// renders a song block by block into sink.add(channels, startSeconds, blockOnsets). job: { segments, bpm, tail, sampleRate, gain, block?,
+// segmentsAt?(from, to): the segments of one block (only the tracks that play in it) }.
 // onProgress(0..1, phase). Returns { promise, cancel }: the promise gives { seconds, sampleRate, onsets }.
 export function renderInBlocks(job, sink, onProgress = () => {}) {
   let cur = null, cancelled = false;
@@ -69,7 +70,8 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
     for (let i = 0; i < blocks.length; i++) {
       if (cancelled) throw { cancelled: true };
       const [a, b] = blocks[i], last = i === blocks.length - 1, from = Math.max(0, a - LEAD);
-      cur = renderOffline({ ...job, from, to: b, tail: last ? job.tail : XF, keepFrom: a }, (p, phase) => onProgress((i + (phase === 'render' ? p : 0)) / blocks.length, i ? 'render' : phase));
+      const { segmentsAt, ...rest } = job, segments = segmentsAt ? segmentsAt(from, b) || job.segments : job.segments;
+      cur = renderOffline({ ...rest, segments, from, to: b, tail: last ? job.tail : XF, keepFrom: a }, (p, phase) => onProgress((i + (phase === 'render' ? p : 0)) / blocks.length, i ? 'render' : phase));
       const r = await cur.promise;
       sr = r.sampleRate;
       let ch = r.channels.map(c => c.subarray(Math.round((a - from) * sr)));
