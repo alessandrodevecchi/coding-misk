@@ -26,8 +26,13 @@ function loop(now) {
 }
 requestAnimationFrame(loop);
 
-// the beat: the control room relays it to OBS, whose watchdog shows Standby when it stops
-setInterval(() => { if (ok) bc.postMessage({ type: 'beat', from: 'broadcast', frames, at: Date.now() }); }, BEAT_MS);
+// the beat: the control room relays it to OBS, whose watchdog shows Standby when it stops. Only when new frames were
+// drawn since the last beat: a window the browser stopped drawing (covered, minimised) must not count as alive
+let beatFrames = 0;
+setInterval(() => {
+  if (ok && frames > beatFrames) bc.postMessage({ type: 'beat', from: 'broadcast', frames, at: Date.now() });
+  beatFrames = frames;
+}, BEAT_MS);
 addEventListener('pagehide', () => bc.postMessage({ type: 'closed', from: 'broadcast' }));
 
 // a double click fills the screen (and back), for a capture without the window's frame

@@ -42,11 +42,13 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
 
   // 2. the control room in another tab
   const room = await ctx.newPage(); watch(room, 'room');
+  // a port where no OBS answers, even when OBS runs on this computer
+  await page.evaluate(() => localStorage.setItem('coding-misk-obs', JSON.stringify({ host: '127.0.0.1', port: 4499, password: '' })));
   await room.goto('http://localhost:5173/live.html'); await sleep(3500);
   const txt = id => room.textContent(`#${id}`);
   check(/alive|vivo/i.test(await txt('lr-pic')), 'the control room sees the picture alive', await txt('lr-pic'));
   check((await txt('lr-title')).length > 0 && /radio/i.test(await txt('lr-src')), 'it shows the song on air from the radio', `${await txt('lr-src')} · ${await txt('lr-title')}`);
-  check(/not reachable|non raggiungibile|not connected|non collegato/i.test(await txt('lr-obs')) && /4455/.test(await txt('lr-obs-note')), 'without OBS it says so and how to turn the control channel on', await txt('lr-obs'));
+  check(/not reachable|non raggiungibile|not connected|non collegato/i.test(await txt('lr-obs')) && /WebSocket/.test(await txt('lr-obs-note')), 'without OBS it says so and how to turn the control channel on', await txt('lr-obs'));
   check(await room.evaluate(() => document.getElementById('lr-go').disabled), 'Go live is off without OBS');
   const src = id => room.getAttribute(`#${id}`, 'src');
   check(/^blob:/.test(await src('lr-prev') || '') && /^blob:/.test(await src('lr-air') || ''), 'Preview and the app picture arrive');
