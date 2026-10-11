@@ -160,15 +160,35 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   // a song from Compose or a song card goes on in the radio, in the styles closest to it
   // the songs of a session as heard (#38), rebuilt without playing: song 0, then each song with its steering
-  function rebuild(recipe, count) {
+  // until(out): optional, stops early once true (the radio export by length, #8)
+  function rebuild(recipe, count, until = null) {
     const L = recipe.lead, le = L ? leadEntry(L.song) : null, ses = createSession(recipes, recipe.seed, le ? { lead: le } : {});
     const out = L ? [{ song: L.song, entry: le }] : [];
-    for (let n = out.length; out.length < count; n++) {
+    for (let n = out.length; out.length < count && !(until && until(out)); n++) {
       let o = recipe.options; for (const c of recipe.changes || []) if (c.song <= n) o = c.options;
       const g = ses.next(o), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
       out.push({ song: cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song, entry: g.entry });
     }
-    return out.map(x => ({ song: x.song, transition: x.entry.transition || null }));
+    return out.map(x => ({ song: x.song, transition: x.entry.transition || null, artist: x.entry.artist ? x.entry.artist.name : '' }));
+  }
+  // ---------- fast export of the radio (#8) ----------
+  // a song's seconds from its sections (a tempo ramp counts at its middle)
+  const songSeconds = song => song.sections.reduce((a, x) => a + x.bars * 240 / (((x.bpm || 120) + (x.bpmEnd ?? x.bpm ?? 120)) / 2), 0);
+  // the songs of an export range: { kind: 'now' } from the first song to the one on air, { kind: 'songs', n } from the
+  // song on air, { kind: 'minutes', minutes } from the song on air until the length is reached. With the radio off the
+  // ranges start at the first song of a new session (the seed field and the options as they are).
+  function exportItems(range) {
+    const recipe = S ? clone(S.recipe) : { seed: createSession(recipes, seedField || undefined).seed, options: current(), changes: [] };
+    const from = S ? S.stream[S.onAir].n : 0;
+    let items;
+    if (range.kind === 'now') { if (!S) return null; items = rebuild(recipe, from + 1); }
+    else if (range.kind === 'songs') items = rebuild(recipe, from + Math.max(1, range.n | 0));
+    else {
+      const target = Math.max(1, +range.minutes || 1) * 60;
+      // the songs from the one on air, minus the bars their transitions overlap, until the target
+      items = rebuild(recipe, 1e4, out => out.length > from && out.slice(from).reduce((a, x, i, l) => a + songSeconds(x.song) - (i < l.length - 1 ? overlapOf(x.entry.transition) * 240 / (x.song.sections[x.song.sections.length - 1].bpm || 120) : 0), 0) >= target);
+    }
+    return { recipe, items: items.slice(range.kind === 'now' ? 0 : from) };
   }
   // a session item of a playlist: the songs heard so far (the one on air included)
   const sessionItem = (recipe, count, first) => ({ recipe: clone(recipe), count, title: t(count === 1 ? 'plSessionTitle1' : 'plSessionTitle', { title: first, n: count }), date: new Date().toISOString(), version: DIRECTOR_VERSION });
@@ -585,7 +605,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <button class="btn" id="radio-pause" ${on ? '' : 'disabled'} ${tip(paused ? 'tipResume' : 'tipPause')}>${paused ? '▶ ' + esc(t('radioResume')) : '❚❚ ' + esc(t('radioPause'))}</button>
           <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
           <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
-          <span class="out-combo"><button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>${player.outKindButton()}</span>
+          <span class="out-combo"><button class="btn" id="radio-export" data-export="radio" aria-expanded="false" ${tip('tipRadioExport')}>${esc(t('exportWav'))}</button><button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>${player.outKindButton()}</span>
 
           <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
           <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
@@ -639,6 +659,30 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.id === 'radio-start') return S ? stop() : start();
     if (b.id === 'radio-skip') return skip();
     if (b.id === 'radio-rec') return recS ? stopRec() : startRec(player.outKind() === 'video');
+    if (b.id === 'radio-export') {
+      // a second tap cancels an export running; otherwise the range panel opens and closes
+      if (player.exporting()) return player.exportRadio(null);
+      const old = root.querySelector('.radio-export-menu'); if (old) { old.remove(); b.setAttribute('aria-expanded', 'false'); return; }
+      const r = { kind: 'songs', n: 3, minutes: 60, ...(store.get('coding-misk-radio-export', {}) || {}) }, on = !!S;
+      if (r.kind === 'now' && !on) r.kind = 'songs';
+      const radioOpt = (k, label) => `<label class="rx-opt"><input type="radio" name="rx-kind" value="${k}"${r.kind === k ? ' checked' : ''}${k === 'now' && !on ? ' disabled' : ''}> ${label}</label>`;
+      b.closest('.out-combo').insertAdjacentHTML('afterend', `<div class="radio-export-menu card" role="dialog" aria-label="${esc(t('radioExportTitle'))}">
+        <span class="lbl">${esc(t('radioExportTitle'))}</span>
+        ${radioOpt('now', esc(on ? t('rxNow', { n: S.stream[S.onAir].n + 1 }) : t('rxNowOff')))}
+        ${radioOpt('songs', `${esc(t('rxNext'))} <input type="number" data-rx="n" min="1" max="200" value="${r.n}" aria-label="${esc(t('rxNextN'))}"> ${esc(t('rxSongs'))}`)}
+        ${radioOpt('minutes', `${esc(t('rxLength'))} <input type="number" data-rx="minutes" min="1" max="600" value="${r.minutes}" aria-label="${esc(t('rxMinutes'))}"> ${esc(t('rxMin'))}`)}
+        <p class="hint muted">${esc(on ? t('rxHintOn') : t('rxHintOff'))}</p>
+        <div class="actions"><button class="btn primary" data-rx-go>${esc(t('exportWav'))}</button></div></div>`);
+      b.setAttribute('aria-expanded', 'true');
+      return;
+    }
+    if (b.dataset.rxGo !== undefined) {
+      const m = b.closest('.radio-export-menu'), kind = (m.querySelector('input[name="rx-kind"]:checked') || {}).value || 'songs';
+      const range = { kind, n: +m.querySelector('[data-rx="n"]').value || 3, minutes: +m.querySelector('[data-rx="minutes"]').value || 60 };
+      store.set('coding-misk-radio-export', range);
+      m.remove(); const eb = root.querySelector('#radio-export'); if (eb) eb.setAttribute('aria-expanded', 'false');
+      return player.exportRadio(range);
+    }
     if (b.id === 'radio-rec-start') return recordFromStart();
     if (b.id === 'radio-mute') return player.toggleMute();
     if (b.id === 'radio-pause') return S && S.paused !== undefined ? resume() : pause();
@@ -777,7 +821,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
 
   return {
-    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, soulSource, continueSong, playSession, rebuild,
+    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, soulSource, continueSong, playSession, rebuild, exportItems,
     // the session on air as a playlist item (#38)
     get sessionNow() { return S && !S.limit ? sessionItem(S.recipe, S.onAir + 1, S.stream[0].song.title) : null; },
     get steering() { if (!S) return null; const it = S.stream[S.onAir]; if (!it.plan) return { n: it.n, lead: true, commands: [], plan: null, song: it.song, recipe: clone(S.recipe) }; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },

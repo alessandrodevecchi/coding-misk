@@ -94,7 +94,7 @@ export const GUIDE = [
       {
         id: 'recording', title: { en: 'Recording', it: 'Registrazione' },
         what: { en: 'Records the radio to an audio file, with a track list and the session recipe.', it: 'Registra la radio in un file audio, con la scaletta e la ricetta della sessione.' },
-        how: { en: '[Record] starts, press again to stop and download. The display next to it switches between audio and video; the video has the same track list. [Record from the start] plays the session again from its first song and records it.', it: '[Registra] parte, premi di nuovo per fermare e scaricare. Il display accanto passa da audio a video; il video ha la stessa scaletta. [Registra dall\'inizio] rifà la sessione dal primo brano e la registra.' },
+        how: { en: '[Record] starts, press again to stop and download. The display next to it switches between audio and video; the video has the same track list. [⬇ Export] makes a file faster than real time: up to now, the next N songs or a length in minutes, with track list and recipe. [Record from the start] plays the session again from its first song and records it.', it: '[Registra] parte, premi di nuovo per fermare e scaricare. Il display accanto passa da audio a video; il video ha la stessa scaletta. [⬇ Esporta] crea un file più veloce del tempo reale: fino a ora, i prossimi N brani o una durata in minuti, con scaletta e ricetta. [Registra dall\'inizio] rifà la sessione dal primo brano e la registra.' },
         know: { en: 'Pausing leaves no gap in the file. The format (WAV or Opus) is in the settings.', it: 'La pausa non lascia buchi nel file. Il formato (WAV o Opus) è nelle impostazioni.' },
       },
       {

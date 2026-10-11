@@ -2,11 +2,12 @@
 // fast and the real time files of the same song agree (length, loudness, low and high bands, loudness over time),
 // FLAC is lossless, MP3 and Opus open, cancel saves nothing, a saved radio session exports as one file.
 // Needs ffmpeg and ffprobe. Real time exports take as long as the songs.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-export.cjs [song-id,song-id…]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-export.cjs [song-id,song-id…] [--quick]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), { execFileSync } = require('node:child_process');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const SONGS = (process.argv[2] || 'dci-carica,neon-rush-reel,primo-segnale').split(',');
+const ARG = process.argv.slice(2).find(a => !a.startsWith('--')), SONGS = (ARG || 'dci-carica,neon-rush-reel,primo-segnale').split(',');
+const QUICK = process.argv.includes('--quick'); // skips the real time comparison
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'export-'));
@@ -66,6 +67,7 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
       const kick = (tl.instruments.kick || [])[0];
       if (kick) { const i = Math.round(kick[0] * 48000), pre = rms(F, Math.max(0, i - 2400), i), post = rms(F, i, i + 2400); check(post > pre * 1.5 || kick[0] < 0.05, `${id}: the first kick of the timeline is in the audio`, `${kick[0]} s`); }
     }
+    if (QUICK) continue;
     // the same song in real time
     await settings({ 'coding-misk-export-speed': 'real' });
     const real = await exportSong(id);
@@ -78,6 +80,26 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
     const lo = db(rms(lowpass(F.subarray(0, n), 150))) - db(rms(lowpass(Rs.subarray(0, n), 150)));
     const hi = db(rms(highpass(F.subarray(0, n), 4000))) - db(rms(highpass(Rs.subarray(0, n), 4000)));
     check(Math.abs(d0) < 1.5 && Math.abs(lo) < 2 && Math.abs(hi) < 2.5 && a.c > 0.85, `${id}: fast and real time sound the same`, `loudness ${d0.toFixed(2)} dB, low ${lo.toFixed(2)} dB, high ${hi.toFixed(2)} dB, over time r=${a.c.toFixed(3)}`);
+  }
+
+  // blocks: the same song in 10 second blocks and in one piece agree, without clicks at the cuts
+  {
+    const id = SONGS[0];
+    await settings({ 'coding-misk-export-speed': 'fast', 'coding-misk-export-format': 'wav', 'coding-misk-export-block': 0 });
+    const one = pcm(await save((await exportSong(id)).files.find(d => /\.wav$/.test(d.suggestedFilename())), 'one.wav'));
+    await settings({ 'coding-misk-export-block': 10 });
+    const bl = pcm(await save((await exportSong(id)).files.find(d => /\.wav$/.test(d.suggestedFilename())), 'blocks.wav'));
+    await settings({ 'coding-misk-export-block': 0 });
+    const n = Math.min(one.length, bl.length), r = corr(env(one.subarray(0, n)), env(bl.subarray(0, n))), dd = db(rms(bl, 0, n)) - db(rms(one, 0, n));
+    // a click: a jump between two samples at a cut much bigger than the jumps around it
+    let worst = 0;
+    for (let cut = 10 * 48000; cut < n - 4800; cut += 10 * 48000) {
+      let jump = 0, around = 1e-4;
+      for (let k = cut - 4; k < cut + 4; k++) jump = Math.max(jump, Math.abs(bl[k + 1] - bl[k]));
+      for (let k = cut - 2400; k < cut + 2400; k++) if (Math.abs(k - cut) > 8) around = Math.max(around, Math.abs(bl[k + 1] - bl[k]));
+      worst = Math.max(worst, jump / around);
+    }
+    check(Math.abs(one.length - bl.length) <= 48 && Math.abs(dd) < 0.3 && r > 0.99 && worst < 1.5, 'blocks and one piece agree, no clicks at the cuts', `length ${one.length - bl.length} samples, loudness ${dd.toFixed(2)} dB, over time r=${r.toFixed(4)}, worst cut ${worst.toFixed(2)}×`);
   }
 
   // FLAC is lossless: a known signal encodes and decodes to the same 16 bit samples
@@ -125,6 +147,31 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
     const tl2 = JSON.parse(fs.readFileSync(await save(st))), len = pcm(await save(sw, 'session.wav')).length / 48000;
     check(Math.abs(len - tl2.seconds) < 0.05 && tl2.sections.length >= 2 && (Date.now() - ts) / 1000 < tl2.seconds, 'a saved session exports as one file, faster than real time', `${tl2.seconds.toFixed(1)} s in ${((Date.now() - ts) / 1000).toFixed(1)} s, ${tl2.sections.length} sections`);
   } else check(false, 'a saved session exports as one file', downloads.slice(ns).map(d => d.suggestedFilename()).join(', '));
+  await page.click('[data-tab="brani"]'); await sleep(400);
+
+  // the radio: next 2 songs, then 5 minutes, each with audio, timeline, track list and recipe
+  await settings({ 'coding-misk-export-format': 'flac', 'coding-misk-export-speed': 'fast' });
+  await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.fill('#radio-seed', 'radio-export-check').catch(() => {}); await page.click('#radio-start'); await sleep(2500);
+  for (const [kind, fill] of [['songs', ['n', '2']], ['minutes', ['minutes', '5']]]) {
+    await page.click('#radio-export'); await sleep(200);
+    await page.check(`.radio-export-menu input[value="${kind}"]`); await page.fill(`.radio-export-menu [data-rx="${fill[0]}"]`, fill[1]);
+    const nr = downloads.length, tr0 = Date.now();
+    await page.click('.radio-export-menu [data-rx-go]'); await sleep(1500);
+    while (Date.now() - tr0 < 400000 && await job()) await sleep(500);
+    await sleep(2000);
+    const got = downloads.slice(nr), names = got.map(d => d.suggestedFilename());
+    const au = got.find(d => /\.flac$/.test(d.suggestedFilename())), tlx = got.find(d => /\.timeline\.json$/.test(d.suggestedFilename())), tlist = got.find(d => /tracklist\.txt$/.test(d.suggestedFilename()));
+    const ok4 = au && tlx && tlist && names.some(n => /recipe\.json$/.test(n));
+    let extra = names.join(', ');
+    if (ok4) {
+      const tlj = JSON.parse(fs.readFileSync(await save(tlx))), lines = fs.readFileSync(await save(tlist), 'utf8').trim().split('\n').slice(2);
+      const dur = +JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_format', '-of', 'json', await save(au)]).toString()).format.duration;
+      extra = `${lines.length} songs, ${(dur / 60).toFixed(1)} min in ${((Date.now() - tr0) / 1000).toFixed(0)} s`;
+      check((kind === 'songs' ? lines.length === 2 : dur >= 300) && Math.abs(dur - tlj.seconds) < 0.1, `radio export (${kind === 'songs' ? 'next 2 songs' : '5 minutes'}): audio, timeline, track list and recipe`, extra);
+    } else check(false, `radio export (${kind})`, extra);
+  }
+  await page.click('#radio-start'); await sleep(300);
   await page.click('[data-tab="brani"]'); await sleep(400);
 
   // cancel: a tap on Export while it renders

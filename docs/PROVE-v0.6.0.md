@@ -137,6 +137,7 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Accanto all'audio c'è il `.timeline.json`.
 - [ ] Playlist: ⬇ su una sessione salva un solo file con tutti i brani e le transizioni (in VIDEO la registra in video).
 - [ ] Velocità "Tempo reale" registra come prima.
+- [ ] Radio: "⬇ Esporta" con fino a ora, prossimi N brani e durata (prova 60 minuti); escono audio, timeline, scaletta e ricetta.
 
 ## Dopo le prove
 

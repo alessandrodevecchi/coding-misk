@@ -13,5 +13,13 @@ export function tempoClock(bpm) {
       return at[i] + (c - i) * 240 / bpm[i];
     },
     cps: c => bpm[Math.max(0, Math.min(last, Math.floor(c)))] / 240,
+    // the cycle at s seconds (the inverse of seconds)
+    cycleAt(s) {
+      if (s <= 0) return s * bpm[0] / 240;
+      if (s >= at[last + 1]) return last + 1 + (s - at[last + 1]) * bpm[last] / 240;
+      let lo = 0, hi = last + 1;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (at[m] <= s) lo = m; else hi = m; }
+      return lo + (s - at[lo]) * bpm[lo] / 240;
+    },
   };
 }
