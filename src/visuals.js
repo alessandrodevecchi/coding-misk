@@ -59,6 +59,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const lv = {}, prev = {}, norm = {}, lastOn = {};
   for (const k of INSTRUMENTS) { lv[k] = 0; prev[k] = 0; norm[k] = .05; lastOn[k] = 0; }
   let glitch = 0, shake = 0;
+  // the fast video (#53) draws frames at given times from a feed of levels instead of the analysers
+  let clock = () => performance.now(), feed = null, held = false;
   let level = 0, kick = 0, flash = 0, lastStep = -1, lastT = performance.now();
   const echoes = [], blips = [], streaks = [];
 
@@ -78,7 +80,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const A = window.analysers, fn = window.getAnalyzerData;
     const raw = {};
     wave.fill(0);
-    if (isPlaying() && A && typeof fn === 'function') {
+    if (feed) { Object.assign(raw, feed.raw); wave.set(feed.wave); hookWave.set(feed.hook); }
+    else if (isPlaying() && A && typeof fn === 'function') {
       for (const id of Object.keys(A)) {
         let d; try { d = fn('time', id); } catch (e) { continue; }
         if (!d || !d.length) continue;
@@ -549,7 +552,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       if (info.say) {
         const typed = Math.max(0, Math.min(info.say.length, Math.floor(((info.bar || 0) - (info.sayAt || 0)) * 24)));
         cx.fillStyle = '#e8fbff'; cx.font = `italic ${mono(fs * .85).replace('600 ', '600 ')}`;
-        cx.fillText(`“${info.say.slice(0, typed)}${typed < info.say.length && Math.floor(performance.now() / 300) % 2 ? '▌' : ''}${typed >= info.say.length ? '”' : ''}`.slice(0, 48), sx + fs * .6, sy + fs * 5.3);
+        cx.fillText(`“${info.say.slice(0, typed)}${typed < info.say.length && Math.floor(clock() / 300) % 2 ? '▌' : ''}${typed >= info.say.length ? '”' : ''}`.slice(0, 48), sx + fs * .6, sy + fs * 5.3);
       }
       waveLine(pal.wave, pal.wave, sy + sh - fs * 1.1, fs * .9, sx + 6, sx + sw - 6);
       cx.restore();
@@ -559,7 +562,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       const mx = W * .15, my = desk * .52, mr = Math.min(W * .045, H * .11);
       cx.strokeStyle = pal.metal; cx.lineWidth = Math.max(3, mr * .12);
       cx.beginPath(); cx.moveTo(mx, my + mr * 1.6); cx.lineTo(mx - mr * .8, desk); cx.moveTo(mx, my + mr * 1.6); cx.lineTo(mx, my + mr * 1.1); cx.stroke();
-      if (speaking) for (let i = 1; i <= 3; i++) { const ph = (performance.now() / 600 + i / 3) % 1; cx.strokeStyle = pal.amber; cx.globalAlpha = (1 - ph) * .7; cx.lineWidth = 2; cx.beginPath(); cx.arc(mx, my, mr * (1.2 + ph * 1.6), -1.1, 1.1); cx.stroke(); cx.beginPath(); cx.arc(mx, my, mr * (1.2 + ph * 1.6), Math.PI - 1.1, Math.PI + 1.1); cx.stroke(); }
+      if (speaking) for (let i = 1; i <= 3; i++) { const ph = (clock() / 600 + i / 3) % 1; cx.strokeStyle = pal.amber; cx.globalAlpha = (1 - ph) * .7; cx.lineWidth = 2; cx.beginPath(); cx.arc(mx, my, mr * (1.2 + ph * 1.6), -1.1, 1.1); cx.stroke(); cx.beginPath(); cx.arc(mx, my, mr * (1.2 + ph * 1.6), Math.PI - 1.1, Math.PI + 1.1); cx.stroke(); }
       cx.globalAlpha = 1;
       cx.fillStyle = '#26212e'; cx.beginPath(); cx.ellipse(mx, my, mr * .7, mr * 1.15, 0, 0, Math.PI * 2); cx.fill();
       cx.fillStyle = '#3c3548';
@@ -579,7 +582,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       for (let f = 88; f <= 108; f += 2) { const x = dx + 8 + (f - 88) / 20 * (dw - 16); cx.globalAlpha = .8; cx.fillRect(x, dy + dh * .55, 1.5, f % 4 === 0 ? dh * .25 : dh * .14); if (f % 4 === 0) cx.fillText(String(f), x, dy + dh * .14); }
       cx.globalAlpha = 1;
       const station = info.title ? 0.15 + hash(info.title.length, (info.n || 1) * 7.3) * .7 : .5;
-      const need = Math.max(0, Math.min(1, station + (playing ? Math.sin(cyc * .7) * .01 + (level - .3) * .015 : Math.sin(performance.now() / 2000) * .25)));
+      const need = Math.max(0, Math.min(1, station + (playing ? Math.sin(cyc * .7) * .01 + (level - .3) * .015 : Math.sin(clock() / 2000) * .25)));
       const nx = dx + 8 + need * (dw - 16);
       cx.strokeStyle = pal.red; cx.lineWidth = 2; cx.shadowColor = pal.red; cx.shadowBlur = 8;
       cx.beginPath(); cx.moveTo(nx, dy + 3); cx.lineTo(nx, dy + dh - 3); cx.stroke(); cx.shadowBlur = 0;
@@ -690,7 +693,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       glow(pal.c, 'hats'); cx.strokeStyle = lineCol(pal.c, 'hats'); cx.lineWidth = 2.5;
       cx.beginPath(); cx.ellipse(X.hats, hy, u * .32, u * .06, 0, 0, Math.PI * 2); cx.stroke();
       cx.beginPath(); cx.ellipse(X.hats, hy - hgap - u * .04, u * .32, u * .06, 0, 0, Math.PI * 2); cx.stroke();
-      const cry = Math.max(ly1 + u * .3, base - u * 1.75), crx = (X.kick + X.snare) / 2, tilt = -.3 + Math.sin(performance.now() / 40) * lv.fx * .25;
+      const cry = Math.max(ly1 + u * .3, base - u * 1.75), crx = (X.kick + X.snare) / 2, tilt = -.3 + Math.sin(clock() / 40) * lv.fx * .25;
       stand(crx, cry, base - u * 1.25);
       glow(pal.c, 'fx'); cx.strokeStyle = lineCol(pal.c, 'fx'); cx.lineWidth = 2.5;
       cx.beginPath(); cx.ellipse(crx, cry, u * .4, u * .075, tilt, 0, Math.PI * 2); cx.stroke();
@@ -729,7 +732,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       }
       // chitarra elettrica appoggiata, leggermente inclinata
       const gx = X.guitar - u * .45, gy = base - u * .5;
-      cx.save(); cx.translate(gx, gy); cx.rotate(-.18 + Math.sin(performance.now() / 60) * lv.guitar * .04);
+      cx.save(); cx.translate(gx, gy); cx.rotate(-.18 + Math.sin(clock() / 60) * lv.guitar * .04);
       glow(pal.a, 'guitar'); cx.strokeStyle = lineCol(pal.a, 'guitar'); cx.fillStyle = pal.dark; cx.lineWidth = 2.5;
       const gs = u * .5;
       cx.beginPath(); cx.moveTo(0, -gs * .55);
@@ -825,7 +828,33 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const EQ = ['kick', 'snare', 'hats', 'bass', 'guitar', 'arp', 'pad', 'hook'];
   const logo = document.querySelector('.logo');
 
+  // one picture of the scene: decays, then the look's drawing
+  function paint(look, cyc, dt, playing) {
+    if (!playing) echoes.length = 0;
+    kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
+    const pal = PAL[look] || PAL.palco;
+    cx.clearRect(0, 0, W, H);
+    if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
+    else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); }
+    if (flash > .02 && !reduce && look !== 'soul') { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
+  }
+  // the stage shows the video picture, fitted (while a video records, or is rendered)
+  function showTarget() {
+    const cw = cv.width, ch = cv.height, k = Math.min(cw / cc.width, ch / cc.height), w = cc.width * k, h = cc.height * k;
+    vcx.setTransform(1, 0, 0, 1, 0, 0); vcx.fillStyle = '#000'; vcx.fillRect(0, 0, cw, ch);
+    vcx.drawImage(cc, (cw - w) / 2, (ch - h) / 2, w, h);
+  }
+  // a frame of the fast video: at time now (ms), cycle cyc, with the look and the feed given
+  // feed: { raw: { instrument: level }, wave: Float32Array(256), hook: Float32Array(128) }
+  function drawAt({ now, cyc, look, feed: f, dt = 1 / 30, show = false }) {
+    feed = f; clock = () => now;
+    try { readAudio(dt, now); paint(look, cyc, dt, true); if (show && target) showTarget(); }
+    finally { feed = null; clock = () => performance.now(); }
+  }
+
   function frame(now) {
+    // a fast video is being drawn: the live loop waits
+    if (held) { requestAnimationFrame(frame); return; }
     const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
     readAudio(dt, now);
     const playing = isPlaying();
@@ -835,23 +864,12 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const nSteps = getSteps ? getSteps() : 16;
     const step = playing ? Math.floor(cyc * nSteps) % nSteps : -1;
     if (step !== lastStep) { lastStep = step; onStep(step); }
-    if (!playing) echoes.length = 0;
-    kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
-    const look = getS().look, pal = PAL[look] || PAL.palco;
-    cx.clearRect(0, 0, W, H);
-    if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
-    else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); }
-    if (flash > .02 && !reduce && look !== 'soul') { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
+    paint(getS().look, cyc, dt, playing);
 
     if (logo) logo.style.setProperty('--pulse', kick.toFixed(3));
     eq.forEach((el, i) => el.style.setProperty('--l', (playing ? lv[EQ[i]] : .15 + .1 * Math.sin(now / 400 + i)).toFixed(3)));
 
-    // recording a video: the stage shows the video picture, fitted
-    if (target) {
-      const cw = cv.width, ch = cv.height, k = Math.min(cw / cc.width, ch / cc.height), w = cc.width * k, h = cc.height * k;
-      vcx.setTransform(1, 0, 0, 1, 0, 0); vcx.fillStyle = '#000'; vcx.fillRect(0, 0, cw, ch);
-      vcx.drawImage(cc, (cw - w) / 2, (ch - h) / 2, w, h);
-    }
+    if (target) showTarget();
     if (afterFrame) afterFrame(cyc, playing);
 
     $('#readout').textContent = readout(cyc, Math.max(0, step), playing);
@@ -859,5 +877,5 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   }
   let idle = 0, spin = 0;
   requestAnimationFrame(frame);
-  return { setTarget, get canvas() { return cc; } };
+  return { setTarget, drawAt, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; } };
 }

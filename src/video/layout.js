@@ -12,7 +12,22 @@ export const QUALITIES = {
 // the title card: always on, for a few seconds when a song starts, or never
 export const CARDS = ['always', 'start', 'off'];
 export const CARD_SECONDS = 8;
-export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true };
+// the direction of a video (#53): visual 'song' (each song's own), 'fixed:<look>', 'song-cycle' (a new one every song),
+// 'section-cycle' (every section); soul 'auto' (the panel while the Soul display is on), 'off', 'panel', 'full'
+export const VISUALS = ['song', 'fixed', 'song-cycle', 'section-cycle'];
+export const SOULS = ['auto', 'off', 'panel', 'full'];
+export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true, visual: 'song', soul: 'auto' };
+
+// the look of the frame at a point of the song: dir { visual, soul }, looks: the list to pick from,
+// at { n: song number, section: index, own: the song's own look }
+export function lookFor(dir, looks, at) {
+  if (dir.soul === 'full') return 'soul';
+  const v = dir.visual || 'song';
+  if (v.startsWith('fixed:')) return looks.includes(v.slice(6)) ? v.slice(6) : looks[0];
+  if (v === 'song-cycle') return looks[((at.n || 1) - 1) % looks.length];
+  if (v === 'section-cycle') return looks[(at.section || 0) % looks.length];
+  return at.own && looks.includes(at.own) ? at.own : looks[0];
+}
 
 // the areas of a w×h frame: stage, and for the code layout the code and the soul panel (open or folded)
 // soul: null (no soul panel), 'open' or 'folded'

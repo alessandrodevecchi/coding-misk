@@ -31,9 +31,10 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
-import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS } from './video/layout.js';
+import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor } from './video/layout.js';
 import { encode, createEncoder, canEncode, formatOf } from './export/encode.js';
 import { segmentsOf, timelineOf, renderInBlocks } from './export/fast.js';
+import { renderVideo } from './export/fast-video.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
@@ -131,6 +132,8 @@ let arrMode = store.get('coding-misk-arr-mode', 'timeline'), selClip = null;
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!LOOKS.some(([k]) => k === look)) look = 'palco';
 // the soul scene (#46) keeps the colours of the last other visual: the app's accents and the colour views' hue
+// the fast video's frame being drawn (#53): { info, code, say, soulSrc }, read instead of the live player
+let fv = null;
 let soulOverride = false; // the Soul display's override (#46): the stage shows the soul
 let soulBase = look;
 let compiled = playable({ ...T, kind: 'composed' });
@@ -500,7 +503,8 @@ async function exportTrack(sg, as, asVideo = false) {
   if (rec) { rec.cancel = true; rec.recorder.stop(); stop(); return; }
   if (fastJob) { fastJob.cancel(); return; }
   // audio: rendered offline in seconds (#8), unless the settings ask for real time or the render fails
-  if (!asVideo && exportSpeed() === 'fast') { if (await exportFast(sg)) return; toast(t('exportFastFailed')); }
+  // audio, or a video in fast mode (#53), rendered offline unless the settings ask for real time or the render fails
+  if (exportSpeed() === 'fast' && (!asVideo || video.opts().layout !== 'tab')) { if (await (asVideo ? exportVideoFast(sg) : exportFast(sg))) return; toast(t('exportFastFailed')); }
   if (asVideo && (capture || video.on)) return toast(t('vidBusy'));
   // the whole tab: the browser asks which tab to share, while the click still counts
   const display = asVideo ? await video.askTab() : null;
@@ -648,7 +652,6 @@ async function recordSession(id, asVideo = true) {
 async function exportRadio(range) {
   if (!range) { if (fastJob) fastJob.cancel(); return; }
   if (fastJob || rec || capture) return toast(t('vidBusy'));
-  if (outKind() === 'video') return toast(t('rxVideoSoon'));
   const r = radio && radio.exportItems(range);
   if (!r || !r.items.length) return;
   const joined = joinSession({ songs: r.items.map(x => ({ transition: x.transition })), seed: r.recipe.seed, options: r.recipe.options || {} }, r.items.map(x => absoluteClips(clone(x.song))));
@@ -659,27 +662,90 @@ async function exportRadio(range) {
   for (const sec of sg.meta.sections) { const n = parseInt(sec.label, 10); if (n && starts[n] === undefined) starts[n] = T.seconds(sec.start); }
   const clock2 = x => `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
   const lines = [`coding-misk radio · seed ${r.recipe.seed} · ${new Date().toLocaleString()}`, '', ...r.items.map((x, i) => `${clock2(starts[i + 1] || 0)} ${x.song.title}${x.artist ? ` · ${x.artist}` : ''}`)];
-  const ok = await exportFast(sg, base, () => {
+  const after = () => {
     setTimeout(() => saveBlob(`${base}-tracklist.txt`, new Blob([lines.join('\n') + '\n'], { type: 'text/plain' })), 800);
     setTimeout(() => saveBlob(`${base}-recipe.json`, new Blob([JSON.stringify(r.recipe, null, 2) + '\n'], { type: 'application/json' })), 1200);
-  });
+  };
+  const songs = r.items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' }));
+  const ok = outKind() === 'video' ? await exportVideoFast(sg, base, { songs, after }) : await exportFast(sg, base, after);
   if (!ok) toast(t('rxFailed'));
+}
+// ---------- fast video (#53) ----------
+// a video of sg rendered faster than real time, following the direction in Settings → Video.
+// songs: the songs of a joined session or radio range [{ song, title, artist }], to name and dress each part.
+// Returns false when it failed (the caller records in real time), true when done or cancelled.
+async function exportVideoFast(sg, title = sg.title, { songs = null, after = null } = {}) {
+  const o = video.opts(), q = QUALITIES[o.quality], layout = o.layout === 'tab' ? 'visual' : o.layout;
+  const segments = segmentsOf(sg, codeFor), looks = LOOKS.map(l => l[0]);
+  // the parts of the file: one per song of a session ("3 Intro" belongs to song 3), or the song itself
+  const parts = [];
+  sg.meta.sections.forEach((sec, i) => {
+    const n = songs ? parseInt(sec.label, 10) || 1 : 1, last = parts[parts.length - 1];
+    if (!last || last.n !== n) parts.push({ n, start: sec.start, end: sec.start + sec.len, first: i });
+    else last.end = sec.start + sec.len;
+  });
+  const own = songs ? store.get('coding-misk-radio-look', 'studio') : sg.look || look;
+  const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
+  const job = { segments, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0) };
+  const A = layoutAreas(layout, q.w, q.h, null);
+  visuals.setTarget({ w: A.stage.w, h: A.stage.h });
+  visuals.hold(true);
+  let clockT = 0;
+  soul.setClock(() => clockT);
+  const run = renderVideo({
+    job, canvas: video.canvas, q,
+    drawFrame(t, cyc, feed, codeAt, fi) {
+      clockT = t;
+      const p = parts.find(x => cyc >= x.start && cyc < x.end) || parts[parts.length - 1], item = songs ? songs[p.n - 1] : null;
+      const section = sg.meta.sectionAt(Math.min(cyc, sg.meta.bars - .001));
+      const said = sayList.filter(x => x.bar <= cyc && cyc < x.bar + 4).pop();
+      const doc = item ? item.song : sg.doc;
+      fv = {
+        code: codeAt(cyc), say: said ? said.text : '',
+        info: { onAir: true, n: p.n, title: item ? item.title : sg.title, artist: item ? item.artist : '', bar: cyc - p.start, bars: p.end - p.start, bpm: Math.round(sg.meta.bpm[Math.min(sg.meta.bars - 1, Math.floor(cyc))]) || undefined, say: said ? said.text : '', sayAt: said ? said.bar - p.start : 0 },
+        soulSrc: doc && doc.sections && doc.tracks ? { key: `fv:${p.n}`, song: doc, ctx: {}, bar: cyc - p.start } : null,
+      };
+      visuals.drawAt({ now: t * 1000, cyc, look: lookFor(o, looks, { n: p.n, section, own }), feed, dt: 1 / q.fps, show: fi % 6 === 0 });
+      video.composeAt({ layout, q }, cyc, t);
+    },
+    onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
+  });
+  fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: run.cancel };
+  try {
+    const r = await run.promise;
+    const name = fileName(title, r.ext);
+    saveBlob(name, r.blob);
+    const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang());
+    setTimeout(() => saveBlob(fileName(title, 'timeline.json'), new Blob([JSON.stringify(tl)], { type: 'application/json' })), 400);
+    if (after) after(title);
+    toast(t('vidSaved', { name }));
+    return true;
+  } catch (e) {
+    if (e && e.cancelled) { toast(t('vidCancelled')); return true; }
+    console.warn('[fast video]', e);
+    return false;
+  } finally {
+    fastJob = null; fv = null;
+    soul.setClock(null); visuals.hold(false); visuals.setTarget(null);
+  }
 }
 // the playlist row's export of a session (#8): audio rendered fast as one joined song, or a video (the Export display)
 async function exportSession(id) {
   const s = playlists.session(id); if (!s || !radio) return;
   if (fastJob) { if (fastJob.id === id) fastJob.cancel(); return; }
   if (sessionVid) return recordSession(id);
-  if (outKind() === 'video') return recordSession(id, true);
-  if (exportSpeed() === 'fast') {
+  const asVideo = outKind() === 'video';
+  if (exportSpeed() === 'fast' && (!asVideo || video.opts().layout !== 'tab')) {
     try {
       const items = s.frozen || radio.rebuild(s.recipe, s.count);
       const joined = joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: s.recipe.seed, options: s.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song))));
-      if (await exportFast(playable({ ...joined, kind: 'composed', id }), s.title)) return;
+      const sg = playable({ ...joined, kind: 'composed', id });
+      const songs = items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' }));
+      if (await (asVideo ? exportVideoFast(sg, s.title, { songs }) : exportFast(sg, s.title))) return;
     } catch (e) { console.warn('[session export]', e); }
     toast(t('exportFastFailed'));
   }
-  return recordSession(id, false);
+  return recordSession(id, asVideo);
 }
 $('#tr-export').addEventListener('click', () => exportTrack(compiled, 'track', outKind() === 'video'));
 $('#tr-out').innerHTML = outKindButton();
@@ -2265,6 +2331,8 @@ radio = createRadio({
     outKind: () => outKind(), outKindButton: () => outKindButton(),
     // the radio's fast export (#8): a range of songs or minutes; null cancels the export running
     exporting: () => !!fastJob, exportRadio: range => exportRadio(range),
+    // the gear beside the radio's Export: Settings → Video (#53), the one place of the video settings
+    openVideoSettings: () => { showTab('impostazioni'); requestAnimationFrame(() => { const c = $('#set-video'); if (c) { c.scrollIntoView({ block: 'start', behavior: 'smooth' }); c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 1200); } }); },
     now: () => (sched() ? sched().now() : 0),
     saveSong: sg => { user.tracks.push({ ...clone(sg), id: 'u-' + Date.now() }); saveLibrary(); renderSongs(); toast(t('trackSaved')); },
     // sessions into playlists (#38): the lists to pick from, and adding (null: a new playlist)
@@ -2335,6 +2403,7 @@ updateShare();
 const soul = createSoulScene({
   store, isHw: () => ui === 'hw', baseLook: () => soulBase,
   getSource(cyc) {
+    if (fv) return fv.soulSrc;
     if (mode === 'radio' && radio && radio.on) return radio.soulSource(cyc);
     const it = mixActive() ? mixS.items[0] : null, sg = it ? it.song : song && song.doc;
     if (!sg || !sg.sections || !sg.tracks) return null;
@@ -2361,6 +2430,7 @@ $('#soul-ctl').addEventListener('click', e => {
 syncSoul();
 // what plays, for the studio scene (#28) and the video's title card (#27): the radio's song on air, or the song playing elsewhere
 function stageInfo(cyc) {
+  if (fv) return fv.info;
   if (mode === 'radio' && radio && radio.on) return radio.info(cyc);
   if (!song || !song.meta) return { title: T.title };
   const it = mixActive() ? mixS.items[0] : null, rel = it ? cyc - it.start : cyc;
@@ -2396,11 +2466,16 @@ const visuals = startVisuals({
 // the video recorder (#27): its frame is drawn after each stage frame
 const video = createVideo({
   visuals, store, t, esc,
-  getCode: () => (ed && ed.code) || '',
+  getCode: () => (fv ? fv.code : (ed && ed.code) || ''),
   getInfo: stageInfo,
-  getSay: () => { const el = $('#say'); return el.classList.contains('on') ? el.textContent : ''; },
-  // the soul panel: only while the Soul display is on and the stage does not already show the soul
-  getSoul: () => (soulDisplay.open && soulDisplay.mode === 'soul' && !soulOverride ? { canvas: (cyc, playing, scale) => soul.frame(cyc, playing, scale) } : null),
+  getSay: () => { if (fv) return fv.say; const el = $('#say'); return el.classList.contains('on') ? el.textContent : ''; },
+  // the soul panel: as the direction says ('auto': only while the Soul display is on and the stage does not show the soul)
+  getSoul: () => {
+    const d = video.opts().soul, panel = { canvas: (cyc, playing, scale) => soul.frame(cyc, playing, scale) };
+    if (fv) return d === 'panel' || (d === 'auto' && soulDisplay.open && soulDisplay.mode === 'soul') ? panel : null;
+    if (d === 'off' || soulOverride) return null;
+    return d === 'panel' || (soulDisplay.open && soulDisplay.mode === 'soul') ? panel : null;
+  },
 });
 globalThis.codingMiskVideo = video;
 if (settingsPage && !$('#tab-impostazioni').hidden) settingsPage.render();

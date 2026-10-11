@@ -139,6 +139,14 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Velocità "Tempo reale" registra come prima.
 - [ ] Radio: "⬇ Esporta" con fino a ora, prossimi N brani e durata (prova 60 minuti); escono audio, timeline, scaletta e ricetta.
 
+## Video veloce (`#53`)
+
+- [ ] Display su VIDEO e velocità veloce: "⬇ Esporta" di un brano crea l'MP4 più veloce del tempo reale; il palco mostra i fotogrammi mentre li disegna.
+- [ ] Il video è a tempo con l'audio (cassa, voce, codice che si scrive).
+- [ ] Impostazioni → Video: visual (del brano, fisso, a rotazione per brano o per sezione), anima (automatica, mai, pannello, a tutto schermo), preset salvati e ricaricati.
+- [ ] Radio: ingranaggio accanto a Esporta apre Impostazioni → Video; Esporta in VIDEO per prossimi N brani o una durata.
+- [ ] Sessione in playlist: ⬇ in VIDEO crea un solo video con i titoli di ogni brano.
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.

@@ -1037,3 +1037,7 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
   .radio-export-menu { display: grid; gap: 6px; padding: 10px 12px; max-width: 360px; }
   .rx-opt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .rx-opt input[type=number] { width: 64px; }
+  .comp-setup-btn.icon-only { padding: 5px 7px; }
+  .set-card.flash { outline: 2px solid var(--a1); outline-offset: 2px; transition: outline-color .6s; }
+  .vid-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .vid-presets input { width: 9em; }

@@ -18,7 +18,9 @@ export function createSoulScene({ getSource, store, isHw, baseLook, onChange = (
   let locked = !!store.get('coding-misk-soul-lock', false), view = store.get('coding-misk-soul-view', '');
   if (!VIEWS.includes(view)) view = '';
   let ambAt = -1, data = null, key = null, songRef = null, overlay = null, lastRender = -1, shown = false, phrase = 0, word = 0;
-  const t0 = performance.now(), now = () => (performance.now() - t0) / 1000;
+  // the clock (seconds): the fast video (#53) sets the frame's time instead
+  const t0 = performance.now();
+  let now = () => (performance.now() - t0) / 1000;
 
   const analyze = () => { overlay = { kind: 'analyzing', at: now(), phrase: PHRASES[phrase++ % PHRASES.length] }; };
   const recalibrate = () => { if (!overlay || overlay.kind !== 'analyzing') overlay = { kind: 'glitch', at: now(), word: RECAL[word++ % RECAL.length] }; };
@@ -86,6 +88,8 @@ export function createSoulScene({ getSource, store, isHw, baseLook, onChange = (
   const step = d => pick(VIEWS[(VIEWS.indexOf(view || 'a') + d + VIEWS.length) % VIEWS.length]);
   return {
     draw, frame, analyze, recalibrate,
+    // fn() in seconds, or null for the real clock (the fast video draws frames at their own time)
+    setClock(fn) { now = fn || (() => (performance.now() - t0) / 1000); lastRender = -1; overlay = null; },
     next: () => step(1), prev: () => step(-1), pick,
     // the stage stopped showing the soul: the next time it shows, it types its line again
     hide() { shown = false; },

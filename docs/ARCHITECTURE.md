@@ -125,6 +125,10 @@ Starting any other playback, the header pause or stop, or "open in Compose" stop
 
 Timeline JSON (format 1), saved as `<title>.timeline.json`: `{ format, app, title, seconds, bars, bpm[], sections[{ label, bar, bars, t }], code[{ bar, t, code }], say[{ bar, t, text }], instruments{ name: [[t, length, level]] } }`, times in seconds from the start of the audio file. It is the input of the fast video (`#53`).
 
+## Fast video (`#53`)
+
+`src/export/fast-video.js` (`renderVideo`) runs `renderInBlocks` with a sink that, for each audio block, adds the audio to a Mediabunny `AudioSampleSource` and draws the block's frames: `drawFrame(t, cyc, feed, codeAt)` in `main.js` sets `fv` (the frame's info, code, voice line and soul source, read by `stageInfo`, the soul scene and the video composer instead of the live player), calls `visuals.drawAt({ now, cyc, look, feed })` and `video.composeAt()`, then the frame goes to a `CanvasSource`. The feed (`src/video/feed.js`) has per instrument levels from the onsets (`levelsFrom`), the waveform from the rendered audio, the code typed during the bar before each step (`codeFrom`, the same `typingFrames` as live) and the voice lines (`sayFrom`). `visuals.hold(true)` pauses the live loop; `soul.setClock()` gives the soul the frame's time. The direction lives in `coding-misk-video` (`visual`, `soul`, with `lookFor`) and `coding-misk-video-presets`. MP4 (H.264 + AAC) when WebCodecs can, else WebM (VP9 + Opus).
+
 ## Sound browser
 
 `buildCatalog(soundMap, customBanks)` reads every loaded sound. Keys in `soundMap` are lowercase and drum machines also have aliases (`tr909_bd` next to `rolandtr909_bd`): only the 71 canonical machines of `machines.js` are kept. Sample banks keep loading after start-up (the full dirt-samples archive arrives a few seconds later), so the browser re-reads the catalogue every second until it stops growing. Pads play one shot through `superdough()`; cards and lists play a looping audition through the editor. "Use" sets the kit of a drums track, the sound of a bass, arp, hook or pad track, or the sample of a texture track (the selected track first, otherwise the first suitable one).

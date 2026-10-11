@@ -59,7 +59,7 @@ export function blocksOf(total, block = BLOCK) {
   return out;
 }
 
-// renders a song block by block into sink.add(channels, startSeconds). job: { segments, bpm, tail, sampleRate, gain, block? }.
+// renders a song block by block into sink.add(channels, startSeconds, blockOnsets). job: { segments, bpm, tail, sampleRate, gain, block? }.
 // onProgress(0..1, phase). Returns { promise, cancel }: the promise gives { seconds, sampleRate, onsets }.
 export function renderInBlocks(job, sink, onProgress = () => {}) {
   let cur = null, cancelled = false;
@@ -75,7 +75,7 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
       let ch = r.channels.map(c => c.subarray(Math.round((a - from) * sr)));
       if (carry) for (let c = 0; c < ch.length; c++) for (let k = 0, n = carry[c].length; k < n && k < ch[c].length; k++) { const w = k / n; ch[c][k] = ch[c][k] * w + carry[c][k] * (1 - w); }
       if (!last) { const keep = Math.round((b - a) * sr); carry = ch.map(c => c.slice(keep)); ch = ch.map(c => c.subarray(0, keep)); }
-      await sink.add(ch, frames / sr);
+      await sink.add(ch, frames / sr, r.onsets);
       frames += ch[0].length;
       for (const [k, list] of Object.entries(r.onsets)) (onsets[k] = onsets[k] || []).push(...list);
     }

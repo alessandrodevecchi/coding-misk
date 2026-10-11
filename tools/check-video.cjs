@@ -20,7 +20,7 @@ const probe = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'err
   page.on('download', d => downloads.push(d));
   await page.goto('http://localhost:5173/'); await sleep(2500);
   const setVideo = o => page.evaluate(o => localStorage.setItem('coding-misk-video', JSON.stringify(o)), o);
-  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['synthwave'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['synthwave'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); localStorage.setItem('coding-misk-export-speed', JSON.stringify('real')); });
   await setVideo({ layout: 'visual', quality: '720p30', card: 'always', soulPanel: true });
   await page.reload(); await sleep(3500);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
@@ -114,6 +114,32 @@ const probe = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'err
   const px = await page.evaluate(() => { const c = document.querySelector('#set-vid-preview'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 16) if (d[i] + d[i + 1] + d[i + 2] > 60) n++; return n; });
   check(px > 2000, 'the settings show a live preview of the layout', `${px} lit samples`);
   if (SHOTS) await (await page.$('.set-card:has(#set-vid-preview)')).screenshot({ path: path.join(SHOTS, 'settings-preview.png') });
+
+  // 6. fast video (#53): a song rendered faster than real time, picture and sound, following the direction
+  await page.evaluate(() => { localStorage.setItem('coding-misk-export-speed', JSON.stringify('fast')); localStorage.setItem('coding-misk-out-kind', JSON.stringify('video')); });
+  await setVideo({ layout: 'code', quality: '720p30', card: 'always', soulPanel: true, visual: 'fixed:pixel', soul: 'off' });
+  await page.click('[data-tab="brani"]'); await sleep(400);
+  const nf = downloads.length, tf = Date.now();
+  await page.click(`${card.replace('kellerlicht', 'dci-carica')} [data-act="export"]`); await sleep(1500);
+  while (Date.now() - tf < 300000 && await page.evaluate(() => globalThis.codingMiskExport.job)) await sleep(400);
+  await sleep(1500);
+  const fvd = downloads.slice(nf).find(d => /\.(mp4|webm)$/.test(d.suggestedFilename())), fsec = (Date.now() - tf) / 1000;
+  if (fvd) {
+    const f6 = await saved(new RegExp(fvd.suggestedFilename().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'mp4');
+    const st = probe(f6), vs = st.find(x => x.codec_type === 'video'), as = st.find(x => x.codec_type === 'audio');
+    const dur = +JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_format', '-of', 'json', f6]).toString()).format.duration;
+    check(vs && vs.width === 1280 && vs.height === 720 && as && dur > 25 && fsec < dur, 'fast video: picture and sound, faster than real time', `${vs && vs.codec_name} ${vs && vs.width}x${vs && vs.height} + ${as && as.codec_name}, ${dur.toFixed(1)} s in ${fsec.toFixed(1)} s`);
+    // the frames follow the music: the stage is not the same picture all the time
+    const png = t => execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', f6, '-frames:v', '1', '-vf', 'crop=853:720:0:0,scale=64:54', '-f', 'rawvideo', '-pix_fmt', 'gray', '-']);
+    const a6 = png(5), b6 = png(15); let diff = 0; for (let i = 0; i < a6.length; i++) diff += Math.abs(a6[i] - b6[i]);
+    check(diff / a6.length > 2, 'fast video: the stage moves', `mean difference ${(diff / a6.length).toFixed(1)}`);
+    if (SHOTS) execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '12', '-i', f6, '-frames:v', '1', path.join(SHOTS, 'fast-video.png')]);
+  } else check(false, 'fast video saved', downloads.slice(nf).map(d => d.suggestedFilename()).join(', '));
+  check(!(await page.evaluate(() => globalThis.codingMiskVideo.on)), 'the live stage is back after the fast video');
+  // the gear beside the radio's Export opens Settings → Video
+  await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.click('#radio-video-set'); await sleep(700);
+  check(await page.isVisible('#set-video') && await page.isVisible('#set-video select[data-vid-opt="visual"]'), 'the radio gear opens the video direction in the settings');
 
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();

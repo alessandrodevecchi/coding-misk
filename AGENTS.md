@@ -86,7 +86,7 @@ node tools/check-steering.cjs [shots-dir]              # radio console: queue, c
 node --no-warnings tools/check-backup.mjs            # backup of everything in the browser: export and merge on import (no browser)
 node tools/check-settings.cjs [shots-dir]              # settings page: gear, theme, language, radio defaults, Opus export, backup, reset (dev server)
 npm run check:video                                    # session video: layout areas, soul panel, MP4 or WebM, title card (no browser)
-node tools/check-video.cjs [shots-dir]                 # session video in the browser: song, code layout, cancel, radio, soul panel, whole tab; files checked with ffprobe (dev server)
+node tools/check-video.cjs [shots-dir]                 # session video in the browser: song, code layout, cancel, radio, soul panel, whole tab, fast video and its direction, the radio gear; files checked with ffprobe (dev server)
 npm run check:export                                   # fast export: tempo map, live build segments, timeline, formats (no browser)
 node tools/check-export.cjs [song,song…]                # fast export in the browser: faster than real time, same sound as real time, FLAC lossless, MP3 and Opus, cancel, saved session; needs ffmpeg (dev server)
 node tools/check-recording.cjs                         # radio recording: pause without gaps, track list, downloads, record from the start (dev server)

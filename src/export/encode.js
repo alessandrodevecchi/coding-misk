@@ -7,7 +7,7 @@ export const EXT = { wav: 'wav', flac: 'flac', mp3: 'mp3', opus: 'ogg' };
 export const formatOf = v => (FORMATS.includes(v) ? v : 'wav');
 
 // channels: Float32Array per channel (1 or 2), interleaved as 16 bit integers
-function interleave16(channels) {
+export function interleave16(channels) {
   const ch = Math.min(2, channels.length), n = channels[0].length, out = new Int16Array(n * ch);
   for (let i = 0, o = 0; i < n; i++) for (let c = 0; c < ch; c++) { const v = Math.max(-1, Math.min(1, channels[c][i])); out[o++] = Math.round(v < 0 ? v * 0x8000 : v * 0x7fff); }
   return out;

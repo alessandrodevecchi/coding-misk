@@ -246,6 +246,8 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, store,
     start, end, askTab, frame, opts, setOpt,
     // the settings' live preview: a canvas element, or null
     preview(el) { previewEl = el; },
+    // a frame of the fast video (#53): the layout's frame at cycle cyc and time now (seconds), into the canvas
+    composeAt(J, cyc, now) { if (cv.width !== J.q.w || cv.height !== J.q.h) { cv.width = J.q.w; cv.height = J.q.h; } cardKey = cardKey || ''; return compose(J, cyc, true, now); },
     pause() { if (job && !job.pauseAt) job.pauseAt = performance.now(); },
     resume() { if (job && job.pauseAt) { job.paused += performance.now() - job.pauseAt; job.pauseAt = null; } },
     get on() { return !!job; },

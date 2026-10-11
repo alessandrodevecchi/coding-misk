@@ -605,7 +605,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <button class="btn" id="radio-pause" ${on ? '' : 'disabled'} ${tip(paused ? 'tipResume' : 'tipPause')}>${paused ? '▶ ' + esc(t('radioResume')) : '❚❚ ' + esc(t('radioPause'))}</button>
           <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
           <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
-          <span class="out-combo"><button class="btn" id="radio-export" data-export="radio" aria-expanded="false" ${tip('tipRadioExport')}>${esc(t('exportWav'))}</button><button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>${player.outKindButton()}</span>
+          <span class="out-combo"><button class="btn" id="radio-export" data-export="radio" aria-expanded="false" ${tip('tipRadioExport')}>${esc(t('exportWav'))}</button><button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>${player.outKindButton()}</span><button class="comp-setup-btn icon-only" id="radio-video-set" aria-label="${esc(t('tipVideoSettings'))}" ${tip('tipVideoSettings')}>${GEAR}</button>
 
           <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
           <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
@@ -659,6 +659,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.id === 'radio-start') return S ? stop() : start();
     if (b.id === 'radio-skip') return skip();
     if (b.id === 'radio-rec') return recS ? stopRec() : startRec(player.outKind() === 'video');
+    if (b.id === 'radio-video-set') return player.openVideoSettings();
     if (b.id === 'radio-export') {
       // a second tap cancels an export running; otherwise the range panel opens and closes
       if (player.exporting()) return player.exportRadio(null);
