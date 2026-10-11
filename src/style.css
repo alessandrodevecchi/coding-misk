@@ -1051,3 +1051,7 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
   .combo-gear { display: inline-flex; align-items: center; padding: 4px 6px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
   .combo-gear:hover { color: var(--a1); }
   .comp-row .out-combo .comp-setup-btn { border: 0; background: none; box-shadow: none; }
+
+  /* scrollbars in the theme's colours */
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--a1) 45%, var(--panel2)) transparent; }
+  :root[data-ui="hw"] * { scrollbar-color: #6a6a72 #1a1a1d; }
