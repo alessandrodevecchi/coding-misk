@@ -112,27 +112,55 @@ export function tracksOfKind(R, kind, meter, complexity, rng) {
   return candidateTracks({ ...R, ...only }, meter, complexity, rng, rng, {});
 }
 
+// A clip of an exact length (#5): the bars and the tempo (beats per minute, `beats` to a bar) that make a song last
+// `seconds`, the tempo as close to the style's span as it can be; dbl: the section length that fits those bars.
+export function fitLength(seconds, beats, phrase, span) {
+  // even bar counts: a section is two phrases, so the clip's phrase is half its section
+  const step = Math.max(2, phrase / 2), mid = (span[0] + span[1]) / 2;
+  let best = null;
+  for (let bars = Math.max(2, step); bars <= 512; bars += step) {
+    const bpm = bars * beats * 60 / seconds, miss = bpm < span[0] ? span[0] - bpm : bpm > span[1] ? bpm - span[1] : 0;
+    const score = miss * 10 + Math.abs(bpm - mid) / 100;
+    if (!best || score < best.score) best = { bars, bpm, score };
+  }
+  const { bars } = best, dbl = bars >= 2 * phrase && bars % (2 * phrase) === 0 ? 2 * phrase : bars >= phrase && bars % phrase === 0 ? phrase : bars;
+  return { bars, bpm: Math.round(best.bpm * 1000) / 1000, dbl };
+}
+
 // Plan of one song: parts, tempo, key, length, sections with chords, shape, candidate tracks.
+// opts.fit: seconds, a clip of that exact length that starts at full energy (#5)
 export function planSong({ parts, byId, prev, opts, rng, index }) {
   const R = withDefaults(partRecipe(parts, byId));
   // compatible harmony (#23): a tempo a transition can ramp to, and a key a fifth away, when the style allows
   const compatible = prev && harmonyOf(opts) === 'compatible';
   const near = compatible ? [Math.max(R.tempo[0], prev.bpm - MAX_RAMP), Math.min(R.tempo[1], prev.bpm + MAX_RAMP)] : null;
   const span = near && near[0] <= near[1] ? near : R.tempo;
-  const P = rng.plan, bpm = Math.round(Math.min(span[1], P.range(span[0], span[1] + 0.999)));
+  const P = rng.plan;
+  let bpm = Math.round(Math.min(span[1], P.range(span[0], span[1] + 0.999)));
   const meter = P.pick(R.meters), swing = round(P.range(R.swing[0], R.swing[1]));
   const fifths = compatible ? R.keys.filter(k => fifthApart(k, prev.key)) : [];
   const key = fifths.length ? P.pick(fifths) : pickOther(P, R.keys, prev && prev.key);
   // an artist's favourite shapes, among those the style allows (not the previous song's when another is possible)
   const liked = opts.shapeWeights && pickWeighted(rng.artist, opts.shapeWeights, R.shapes.filter(x => x !== (prev && prev.shape)).length ? R.shapes.filter(x => x !== (prev && prev.shape)) : R.shapes);
-  const shape = liked || pickOther(P, R.shapes, prev && prev.shape);
-  const phrase = R.phrase, dbl = 2 * phrase, beats = meterSteps(meter) / 4;
-  const secondsOf = bars => bars * beats * 60 / bpm;
-  const lo = Math.max(2, R.minutes[0]), hi = Math.min(6, R.minutes[1]);
-  let bars = Math.max(2, Math.round(P.range(lo, hi) * 60 / (beats * 60 / bpm) / dbl)) * dbl;
-  while (secondsOf(bars) < 120) bars += dbl;
-  while (secondsOf(bars) > 360 && bars > 2 * dbl) bars -= dbl;
-  const doubles = bars / dbl, plan = applyPlanQuirks(shapePlan(shape, doubles, opts.energy), shape, opts);
+  let shape = liked || pickOther(P, R.shapes, prev && prev.shape);
+  let phrase = R.phrase;
+  const beats = meterSteps(meter) / 4;
+  let dbl = 2 * phrase, bars;
+  const secondsOf = b => b * beats * 60 / bpm;
+  if (opts.fit) {
+    // a clip: exact length, a steady groove at full energy from the first bar
+    const f = fitLength(opts.fit, beats, phrase, R.tempo);
+    bars = f.bars; bpm = f.bpm; dbl = f.dbl; phrase = dbl / 2; shape = 'flat-groove';
+  } else {
+    const lo = Math.max(2, R.minutes[0]), hi = Math.min(6, R.minutes[1]);
+    bars = Math.max(2, Math.round(P.range(lo, hi) * 60 / (beats * 60 / bpm) / dbl)) * dbl;
+    while (secondsOf(bars) < 120) bars += dbl;
+    while (secondsOf(bars) > 360 && bars > 2 * dbl) bars -= dbl;
+  }
+  const doubles = bars / dbl;
+  let plan = applyPlanQuirks(shapePlan(shape, doubles, opts.fit ? Math.max(opts.energy, 0.75) : opts.energy), shape, opts);
+  // a clip has no intro or outro: the groove at full energy from start to end
+  if (opts.fit) plan = plan.map(p => ({ ...p, role: 'groove', target: Math.max(p.target, 0.75) }));
   // sections: consecutive double phrases with the same role; big moments take the second progression
   const mainChords = P.pick(R.progressions), liftChords = P.chance(0.5) ? pickOther(P, R.progressions, mainChords) : mainChords;
   const sections = sectionsOf(plan, { dbl, bpm, key, meter, swing, mainChords, liftChords });
@@ -454,6 +482,13 @@ export function createSession(recipes, seed, { lead = null } = {}) {
       if (before) before.transition = planTransition(before, entry, opts, rng.transition);
       if (drawn) entry.artist = { id: options.artist.id, name: options.artist.name, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, pace: opts.pace, quirks: opts.quirks };
       entries.push(entry);
+      // a clip (#5) starts full: every track comes in on the first bar
+      // (a voice line stays where it was)
+      if (opts.fit && song.build) song.build = song.build.flatMap(st => {
+        if (st.add === undefined || st.remove || st.set || st.pattern || st.at === 0) return [st];
+        const { say, voice, ...rest } = st;
+        return say ? [{ ...rest, at: 0 }, { at: st.at, say, ...(voice ? { voice } : {}) }] : [{ ...rest, at: 0 }];
+      }).sort((x, y) => x.at - y.at);
       // plan and options stay with the song for steering (#24): the radio rewrites the song from them
       return { song, entry, plan, opts };
     },

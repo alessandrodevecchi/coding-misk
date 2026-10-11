@@ -29,7 +29,7 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {} }
     out.addVideoTrack(vs, { frameRate: q.fps });
     out.addAudioTrack(as);
     await out.start();
-    const T = tempoClock(job.bpm), total = T.seconds(job.bpm.length) + (job.tail || 0), frames = Math.ceil(total * q.fps);
+    const T = tempoClock(job.bpm), total = job.cut || T.seconds(job.bpm.length) + (job.tail || 0), frames = Math.ceil(total * q.fps);
     const onsets = {}, levelsAt = levelsFrom(onsets), codeAt = codeFrom(job.segments);
     let hist = new Float32Array(0), histAt = 0, drawn = 0, ap = 0;
     const report = phase => onProgress(Math.min(1, ap * 0.3 + drawn / frames * 0.7), phase);

@@ -166,7 +166,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const out = L ? [{ song: L.song, entry: le }] : [];
     for (let n = out.length; out.length < count && !(until && until(out)); n++) {
       let o = recipe.options; for (const c of recipe.changes || []) if (c.song <= n) o = c.options;
-      const g = ses.next(o), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
+      // a compilation draws this song's options from its setup, as the radio does (a clip keeps its length)
+      const how = { transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.fit ? { fit: o.fit } : {}) };
+      const g = ses.next(o.compilation ? compilationOptions(recipe.seed, n, o.compilation, recipes, how) : o), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
       out.push({ song: cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song, entry: g.entry });
     }
     return out.map(x => ({ song: x.song, transition: x.entry.transition || null, artist: x.entry.artist ? x.entry.artist.name : '' }));
@@ -181,6 +183,12 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const recipe = S ? clone(S.recipe) : { seed: createSession(recipes, seedField || undefined).seed, options: current(), changes: [] };
     const from = S ? S.stream[S.onAir].n : 0;
     let items;
+    // a clip (#5): one song composed to the clip's length, at full energy, from a new seed each time
+    if (range.kind === 'clip') {
+      const sec = Math.max(5, Math.min(600, +range.seconds || 30));
+      const clip = { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), fit: Math.max(4, sec - 1) }, changes: [] };
+      return { recipe: clip, items: rebuild(clip, 1) };
+    }
     if (range.kind === 'now') { if (!S) return null; items = rebuild(recipe, from + 1); }
     else if (range.kind === 'songs') items = rebuild(recipe, from + Math.max(1, range.n | 0));
     else {
@@ -674,15 +682,17 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         <span class="lbl">${esc(t('radioExportTitle'))}</span>
         ${radioOpt('now', esc(on ? t('rxNow', { n: S.stream[S.onAir].n + 1 }) : t('rxNowOff')))}
         ${radioOpt('songs', `${esc(t('rxNext'))} <input type="number" data-rx="n" min="1" max="200" value="${r.n}" aria-label="${esc(t('rxNextN'))}"> ${esc(t('rxSongs'))}`)}
-        ${radioOpt('minutes', `${esc(t('rxLength'))} <input type="number" data-rx="minutes" min="1" max="600" value="${r.minutes}" aria-label="${esc(t('rxMinutes'))}"> ${esc(t('rxMin'))}`)}
+        ${radioOpt('minutes', `${esc(t('rxLength'))} <input type="number" data-rx="minutes" min="1" max="600" value="${r.minutes}" aria-label="${esc(t('rxMinutes'))}"> ${esc(t('rxMin'))} <span class="rx-exact" title="${esc(t('rxExactTip'))}"><input type="checkbox" data-rx="exact"${r.exact !== false ? ' checked' : ''}> ${esc(t('rxExact'))}</span>`)}
+        ${radioOpt('clip', `${esc(t('rxClip'))} <input type="number" data-rx="seconds" min="5" max="600" value="${r.seconds || 30}" aria-label="${esc(t('rxSeconds'))}"> ${esc(t('rxSec'))} ${[15, 30, 60].map(n => `<button class="chip small" type="button" data-rx-sec="${n}">${n}</button>`).join('')}`)}
         <p class="hint muted">${esc(on ? t('rxHintOn') : t('rxHintOff'))}</p>
         <div class="actions"><button class="btn primary" data-rx-go>${esc(t('exportWav'))}</button></div></div>`);
       b.setAttribute('aria-expanded', 'true');
       return;
     }
+    if (b.dataset.rxSec) { const m = b.closest('.radio-export-menu'); m.querySelector('[data-rx="seconds"]').value = b.dataset.rxSec; m.querySelector('input[value="clip"]').checked = true; return; }
     if (b.dataset.rxGo !== undefined) {
       const m = b.closest('.radio-export-menu'), kind = (m.querySelector('input[name="rx-kind"]:checked') || {}).value || 'songs';
-      const range = { kind, n: +m.querySelector('[data-rx="n"]').value || 3, minutes: +m.querySelector('[data-rx="minutes"]').value || 60 };
+      const range = { kind, n: +m.querySelector('[data-rx="n"]').value || 3, minutes: +m.querySelector('[data-rx="minutes"]').value || 60, exact: m.querySelector('[data-rx="exact"]').checked, seconds: +m.querySelector('[data-rx="seconds"]').value || 30 };
       store.set('coding-misk-radio-export', range);
       m.remove(); const eb = root.querySelector('#radio-export'); if (eb) eb.setAttribute('aria-expanded', 'false');
       return player.exportRadio(range);

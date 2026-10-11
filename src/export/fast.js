@@ -65,18 +65,21 @@ export function blocksOf(total, block = BLOCK) {
 export function renderInBlocks(job, sink, onProgress = () => {}) {
   let cur = null, cancelled = false;
   const promise = (async () => {
-    const T = tempoClock(job.bpm), blocks = blocksOf(T.seconds(job.bpm.length), job.block || BLOCK), onsets = {};
+    // job.cut: the file ends exactly there, the last job.fade seconds fading out (#5); else the song plus its tail
+    const T = tempoClock(job.bpm), length = job.cut || T.seconds(job.bpm.length), blocks = blocksOf(length, job.block || BLOCK), onsets = {}, fade = job.fade || 0;
     let carry = null, frames = 0, sr = job.sampleRate || 48000;
     for (let i = 0; i < blocks.length; i++) {
       if (cancelled) throw { cancelled: true };
       const [a, b] = blocks[i], last = i === blocks.length - 1, from = Math.max(0, a - LEAD);
       const { segmentsAt, ...rest } = job, segments = segmentsAt ? segmentsAt(from, b) || job.segments : job.segments;
-      cur = renderOffline({ ...rest, segments, from, to: b, tail: last ? job.tail : XF, keepFrom: a }, (p, phase) => onProgress((i + (phase === 'render' ? p : 0)) / blocks.length, i ? 'render' : phase));
+      cur = renderOffline({ ...rest, segments, from, to: b, tail: last ? (job.cut ? 0 : job.tail) : XF, keepFrom: a }, (p, phase) => onProgress((i + (phase === 'render' ? p : 0)) / blocks.length, i ? 'render' : phase));
       const r = await cur.promise;
       sr = r.sampleRate;
       let ch = r.channels.map(c => c.subarray(Math.round((a - from) * sr)));
       if (carry) for (let c = 0; c < ch.length; c++) for (let k = 0, n = carry[c].length; k < n && k < ch[c].length; k++) { const w = k / n; ch[c][k] = ch[c][k] * w + carry[c][k] * (1 - w); }
       if (!last) { const keep = Math.round((b - a) * sr); carry = ch.map(c => c.slice(keep)); ch = ch.map(c => c.subarray(0, keep)); }
+      else if (job.cut) ch = ch.map(c => c.subarray(0, Math.round((b - a) * sr)));
+      if (job.cut && fade > 0) for (let i = 0, n = ch[0].length; i < n; i++) { const t = a + i / sr; if (t > job.cut - fade) { const g = Math.max(0, (job.cut - t) / fade); for (const c of ch) c[i] *= g; } }
       await sink.add(ch, frames / sr, r.onsets);
       frames += ch[0].length;
       for (const [k, list] of Object.entries(r.onsets)) (onsets[k] = onsets[k] || []).push(...list);

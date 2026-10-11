@@ -5,6 +5,9 @@ import { tempoClock } from '../src/render/tempo.js';
 import { segmentsOf, timelineOf } from '../src/export/fast.js';
 import { FORMATS, formatOf, EXT, MP3_RATES } from '../src/export/encode.js';
 import { outText } from '../src/video/layout.js';
+import { createSession, fitLength } from '../src/endless/director.js';
+import { withDefaults } from '../src/endless/recipe.js';
+import { loadStyles } from './styles-dir.mjs';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const near = (a, b, e = 1e-9) => Math.abs(a - b) < e;
@@ -28,6 +31,18 @@ const CHECKS = {
     assert(tl.format === 1 && tl.seconds === 11 && tl.sections[1].t === 4 && tl.code[0].t === 0, 'times');
     assert(tl.say.length === 1 && tl.say[0].t === 4 && tl.say[0].text === 'ciao', JSON.stringify(tl.say));
     assert(tl.instruments.kick[0][0] === 0, 'onsets kept');
+  },
+  'clips last exactly their length and start full (#5)'() {
+    const recipes = loadStyles().map(withDefaults);
+    for (const [style, fit] of [['synthwave', 14], ['berlin-techno', 29], ['ambient', 46], ['trance', 59], ['jazz', 19], ['drum-and-bass', 89]]) {
+      const { song } = createSession(recipes, `clip-${style}`).next({ styles: [style], fit });
+      const sec = song.sections.reduce((a, x) => a + x.bars * 240 * (parseInt(x.meter || '4/4', 10) / 4) / ((x.bpm + (x.bpmEnd ?? x.bpm)) / 2), 0);
+      assert(Math.abs(sec - fit) < 0.01, `${style} ${fit}: ${sec}`);
+      const late = (song.build || []).filter(st => st.add !== undefined && st.at > 0);
+      assert(!late.length, `${style}: every track at the first bar`);
+    }
+    const f = fitLength(30, 4, 8, [120, 130]);
+    assert(Math.abs(f.bars * 4 * 60 / f.bpm - 30) < 1e-6 && f.bpm >= 120 && f.bpm <= 130 && f.bars % 2 === 0, JSON.stringify(f));
   },
   'formats and the Export display'() {
     assert(FORMATS.join() === 'wav,flac,mp3,opus' && formatOf('xyz') === 'wav' && formatOf('opus') === 'opus' && EXT.opus === 'ogg', 'formats');

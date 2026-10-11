@@ -171,6 +171,28 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
       check((kind === 'songs' ? lines.length === 2 : dur >= 300) && Math.abs(dur - tlj.seconds) < 0.1, `radio export (${kind === 'songs' ? 'next 2 songs' : '5 minutes'}): audio, timeline, track list and recipe`, extra);
     } else check(false, `radio export (${kind})`, extra);
   }
+  // a 20 second clip and 4 exact minutes, in WAV: the files last exactly that
+  await settings({ 'coding-misk-export-format': 'wav' });
+  for (const [kind, fill, want] of [['clip', ['seconds', '20'], 20], ['minutes', ['minutes', '4'], 240]]) {
+    await page.click('#radio-export'); await sleep(200);
+    await page.check(`.radio-export-menu input[value="${kind}"]`); await page.fill(`.radio-export-menu [data-rx="${fill[0]}"]`, fill[1]);
+    if (kind === 'minutes') await page.check('.radio-export-menu [data-rx="exact"]');
+    const nx = downloads.length, tx0 = Date.now();
+    await page.click('.radio-export-menu [data-rx-go]'); await sleep(1500);
+    while (Date.now() - tx0 < 400000 && await job()) await sleep(500);
+    await sleep(1500);
+    const w = downloads.slice(nx).find(d => /\.wav$/.test(d.suggestedFilename()));
+    const len = w ? pcm(await save(w, `exact-${kind}.wav`)).length / 48000 : -1;
+    check(Math.abs(len - want) < 0.002, `${kind === 'clip' ? 'a 20 second clip' : '4 exact minutes'}: the file lasts exactly that`, `${len.toFixed(3)} s`);
+  }
+  // with the compilation on, the radio's export draws each song from the setup
+  await page.click('#radio-comp'); await sleep(300);
+  await page.click('#radio-export'); await sleep(200);
+  await page.check('.radio-export-menu input[value="songs"]'); await page.fill('.radio-export-menu [data-rx="n"]', '2');
+  { const nc = downloads.length, tc0 = Date.now(); await page.click('.radio-export-menu [data-rx-go]'); await sleep(1500);
+    while (Date.now() - tc0 < 400000 && await job()) await sleep(500); await sleep(1500);
+    check(downloads.slice(nc).some(d => /\.wav$/.test(d.suggestedFilename())), 'radio export with the compilation on'); }
+  await page.click('#radio-comp'); await sleep(100); await page.click('#radio-comp'); await sleep(100);
   await page.click('#radio-start'); await sleep(300);
   await page.click('[data-tab="brani"]'); await sleep(400);
 

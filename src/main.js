@@ -576,13 +576,14 @@ function blockSegments(sg) {
   };
 }
 // after(): called once the files are saved (the radio adds its track list and recipe)
-async function exportFast(sg, title = sg.title, after = null) {
+// cut: { cut, fade } seconds, the file ends exactly at cut with a fade-out (#5)
+async function exportFast(sg, title = sg.title, after = null, cut = null) {
   if (typeof OfflineAudioContext === 'undefined') return false;
   let fmt = exportFormat();
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
   const segments = segmentsOf(sg, codeFor);
   const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate() });
-  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
     const r = await job.promise;
@@ -673,11 +674,16 @@ async function exportRadio(range) {
   if (!r || !r.items.length) return;
   const joinOf = items => playable({ ...joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: r.recipe.seed, options: r.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song)))), kind: 'composed', id: 'radio' });
   let sg = joinOf(r.items);
-  // a length: the real joined length decides; the last song goes when the rest still reaches 90% of the target
+  // a length: the real joined length decides. Exact (#5): the songs that reach the target, cut there with a fade;
+  // else the last song goes when the rest still reaches 90% of the target. A clip: one song composed to the length.
+  let cut = null;
   if (range.kind === 'minutes') {
     const target = range.minutes * 60;
-    while (r.items.length > 1) { const less = joinOf(r.items.slice(0, -1)); if (less.meta.seconds < target * 0.9) break; r.items.pop(); sg = less; }
+    while (r.items.length > 1) { const less = joinOf(r.items.slice(0, -1)); if (less.meta.seconds < (range.exact ? target : target * 0.9)) break; r.items.pop(); sg = less; }
+    if (range.exact) cut = { cut: target, fade: Math.min(6, target / 10) };
   }
+  // the clip's song lasts a second less than the clip: its last hit rings out in that second, then the file ends
+  if (range.kind === 'clip') cut = { cut: range.seconds, fade: 0.8 };
   const base = `coding-misk-radio-${String(r.recipe.seed).replace(/[^\w-]+/g, '-')}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}`;
   // the track list: the first section of each song ("3 Intro" belongs to song 3), at its time in the file
   const T = tempoClock(sg.meta.bpm), starts = {};
@@ -689,14 +695,14 @@ async function exportRadio(range) {
     setTimeout(() => saveBlob(`${base}-recipe.json`, new Blob([JSON.stringify(r.recipe, null, 2) + '\n'], { type: 'application/json' })), 1200);
   };
   const songs = r.items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' }));
-  const ok = outKind() === 'video' ? await exportVideoFast(sg, base, { songs, after }) : await exportFast(sg, base, after);
+  const ok = outKind() === 'video' ? await exportVideoFast(sg, base, { songs, after, cut }) : await exportFast(sg, base, after, cut);
   if (!ok) toast(t('rxFailed'));
 }
 // ---------- fast video (#53) ----------
 // a video of sg rendered faster than real time, following the direction in Settings → Video.
 // songs: the songs of a joined session or radio range [{ song, title, artist }], to name and dress each part.
 // Returns false when it failed (the caller records in real time), true when done or cancelled.
-async function exportVideoFast(sg, title = sg.title, { songs = null, after = null } = {}) {
+async function exportVideoFast(sg, title = sg.title, { songs = null, after = null, cut = null } = {}) {
   const o = video.opts(), q = QUALITIES[o.quality], layout = o.layout === 'tab' ? 'visual' : o.layout;
   const segments = segmentsOf(sg, codeFor), looks = LOOKS.map(l => l[0]);
   // the parts of the file: one per song of a session ("3 Intro" belongs to song 3), or the song itself
@@ -708,7 +714,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   });
   const own = songs ? store.get('coding-misk-radio-look', 'studio') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0) };
+  const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}) };
   const A = layoutAreas(layout, q.w, q.h, null);
   visuals.setTarget({ w: A.stage.w, h: A.stage.h });
   visuals.hold(true);

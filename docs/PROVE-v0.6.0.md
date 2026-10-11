@@ -147,6 +147,11 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Radio: ingranaggio accanto a Esporta apre Impostazioni → Video; Esporta in VIDEO per prossimi N brani o una durata.
 - [ ] Sessione in playlist: ⬇ in VIDEO crea un solo video con i titoli di ogni brano.
 
+## Durata esatta (`#5`)
+
+- [ ] Radio → Esporta → Clip 15, 30, 60 secondi: il file dura esattamente quello, parte pieno e finisce con un colpo che sfuma.
+- [ ] Durata 4 minuti con "esatta": il file dura 4:00 e l'ultimo brano sfuma; senza "esatta" finisce alla fine di un brano.
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.
