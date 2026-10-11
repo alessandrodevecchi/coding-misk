@@ -13,7 +13,8 @@ The app composes a video frame (#27, #53) and renders sessions offline. A browse
 - **Microphone in OBS.** OBS's audio filters: noise suppression, a compressor, and ducking of the music while speaking (sidechain compressor keyed by the microphone).
 - **Watchdog as an OBS script.** A short Lua script in OBS checks the app's heartbeat (a custom event over obs-websocket every second); after five seconds without it, it switches to Standby, and back to Live when it returns.
 - **Scene collection to import:** Live (window capture of the broadcast window, the browser's audio, microphone), Standby (an image first, a looping video later, a line of text, a music bed: a few calm coding-misk songs exported to one file and played as a loop), Starting soon (later, with a designed countdown).
-- **Control bar** in every tab, like the player bar: presets 1 to 5 also from the keyboard, TAKE with a preview, Standby; the full control room opens from it. Settings for 1080p30 at about 6 Mbit/s.
+- **Control room in its own tab.** A second tab of the app opens as the control room and drives the app's tab through a BroadcastChannel (same browser, same origin): presets, TAKE, overlays, source commands; the app tab answers with its state. The control room talks to OBS over obs-websocket, and shows OBS's output as a picture refreshed a couple of times a second (`GetSourceScreenshot`), so what the audience sees is visible without opening OBS.
+- **Control bar** in the app (full version): ON AIR, presets 1 to 5 also from the keyboard, Standby, and a click to the control room. Settings for 1080p30 at about 6 Mbit/s.
 - **Memory over hours:** the radio's stream, history and caches get bounds; a soak test of a few hours watches the page's memory.
 
 ## Risks / Trade-offs
