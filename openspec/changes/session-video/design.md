@@ -6,9 +6,9 @@ The audio export records the master output with `MediaRecorder` while the song p
 
 ## Goals / Non-Goals
 
-**Goals:** a video file per song or session, two layouts, the frame reusable for the live stream of #52.
+**Goals:** a video file per song or session, two layouts, the frame reusable for the live output of #52.
 
-**Non-Goals:** offline rendering faster than real time, upload or live streaming, video editing.
+**Non-Goals:** offline rendering faster than real time, live output, video editing.
 
 ## Decisions
 
@@ -26,5 +26,5 @@ The audio export records the master output with `MediaRecorder` while the song p
 
 - [Heavy looks drop frames at 1080p] → measure with the heaviest looks; cap the stage render scale while recording and show a warning if frames drop.
 - [Tab in the background throttles drawing] → tell the listener to keep the tab visible; the audio keeps going, so a hidden tab gives frozen picture, not a broken file.
-- [MP4 recording not available in some browsers] → WebM fallback; YouTube accepts it.
+- [MP4 recording not available in some browsers] → WebM fallback; common players accept it.
 - [Long sessions make big files in memory] → chunks every second; about 3.6 GB per hour at 8 Mbit/s is the upper bound, so warn above one hour.

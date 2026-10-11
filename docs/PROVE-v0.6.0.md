@@ -127,7 +127,7 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Qualità 1080p 60 fps: il video è fluido (headless arrivava solo a 30 fps).
 - [ ] Scheda del brano: sempre, all'inizio di ogni brano, mai.
 - [ ] Radio: Registra in VIDEO salva video, scaletta e ricetta; una sessione in una playlist (videocamera) si registra fino all'ultimo brano.
-- [ ] Caricamento di prova su YouTube (privato o non in elenco).
+- [ ] Il video si apre in un player esterno (QuickTime, VLC) con immagine e audio.
 
 ## Export veloce (`#8`)
 

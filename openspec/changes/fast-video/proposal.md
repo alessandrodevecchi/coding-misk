@@ -10,7 +10,7 @@ A video records in real time (#27). With the fast audio export and its timeline 
 - **Direction ("regia") in Settings → Video**, extending the settings that exist (no second place): layout as now; visual: each song's own, one fixed visual, or a new one at every song or section; soul: off, as a panel beside the code, or full frame (in place of the visual); song card and quality as now. Presets with a name, like the compilation's.
 - **Shortcut:** a gear beside the radio's Export opens Settings → Video.
 - **Real time video stays** for the live radio and the whole tab layout.
-- **Noted for later:** the soul shown with its monitor shell or the bare screen; the Settings → Video preview playing the direction over time; presets shared with the YouTube live (#52).
+- **Noted for later:** the soul shown with its monitor shell or the bare screen; the Settings → Video preview playing the direction over time; presets shared with #52.
 
 ## Capabilities
 

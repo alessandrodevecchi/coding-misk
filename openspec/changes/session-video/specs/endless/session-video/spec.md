@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Record a song or a radio session as a video file, with the stage, the code and the audio, ready to upload to YouTube.
+Record a song or a radio session as a video file, with the stage, the code and the audio, ready to share.
 
 ## ADDED Requirements
 
