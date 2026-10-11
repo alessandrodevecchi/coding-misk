@@ -183,6 +183,15 @@ export const TEX_RHYTHMS = {
 };
 // drum machine senza piatto crash: il crash viene preso dalla 909
 const NO_CRASH = ['YamahaRX5', 'AlesisHR16', 'KorgMinipops'];
+// sounds a drum machine of Strudel's tidal-drum-machines bank does not have (checked against the bank's index):
+// the row plays the nearest sound the kit has instead of nothing
+const KIT_MISSING = { RolandTR808: ['rd'], RolandTR707: ['rd'], RolandTR606: ['cp', 'rd', 'rim', 'mt'], AkaiLinn: ['rim'], LinnLM1: ['rd', 'cr', 'mt'], AlesisHR16: ['rd', 'cr', 'mt'], YamahaRX5: ['cp', 'rd', 'cr', 'mt', 'ht'] };
+const NEAREST = { rd: ['cr', 'oh', 'hh'], cr: ['oh', 'hh'], cp: ['sd'], rim: ['sd'], mt: ['lt', 'ht'], ht: ['mt', 'lt'] };
+export function kitRow(kit, row) {
+  const miss = KIT_MISSING[kit] || [];
+  if (!miss.includes(row)) return row;
+  return (NEAREST[row] || []).find(r => !miss.includes(r)) || row;
+}
 export const KITS = ['RolandTR909', 'RolandTR808', 'RolandTR707', 'RolandTR606', 'LinnDrum', 'AkaiLinn', 'LinnLM1', 'OberheimDMX', 'EmuSP12', 'AkaiMPC60', 'AkaiXR10', 'AlesisHR16', 'YamahaRX5'];
 // [id campione, etichetta, moltiplicatore volume, strumento nel visual Palco]
 export const ROWS = [['bd', 'Kick', 1, 'kick'], ['cp', 'Clap', .8, 'snare'], ['sd', 'Snare', .75, 'snare'], ['hh', 'Hat', .5, 'hats'], ['oh', 'Open', .45, 'hats'], ['rd', 'Ride', .35, 'hats']];
@@ -394,7 +403,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
   if (want('drums')) for (const [id, , mult, inst] of ROWS) {
     const row = d.rows[id], on = d.on && !row.mute, steps = fitSteps(row.steps, N);
     if (!steps.includes('x') || !show(on)) continue;
-    L.push(`${lab(on)}: s("${drumPattern(id, steps)}").bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
+    L.push(`${lab(on)}: s("${drumPattern(kitRow(d.kit, id), steps)}").bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
   }
   if (want('drums') && fill && d.on) L.push(`$: s("sd*${N}").bank("${d.kit}").gain(saw.range(.15, .75)).mask("${rle(rotate([...Array(Math.max(0, bars - 1)).fill('0'), '1'], start))}")${g}${orb('drums')}.analyze("snare")`);
   if (want('drums') && crash && d.on) L.push(`$: s("cr").bank("${NO_CRASH.includes(d.kit) ? 'RolandTR909' : d.kit}").gain(.55).room(.4).mask("${rle(rotate(['1', ...Array(Math.max(0, bars - 1)).fill('0')], start))}")${g}${orb('drums')}.analyze("fx")`);

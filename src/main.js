@@ -586,6 +586,8 @@ async function exportFast(sg, title = sg.title, after = null) {
     return false;
   } finally { fastJob = null; }
 }
+// a fast export keeps going in a background tab, but the browser may slow it down: say so once per export
+document.addEventListener('visibilitychange', () => { if (document.hidden && fastJob && !fastJob.warned) { fastJob.warned = true; toast(t('exportHidden')); } });
 globalThis.codingMiskExport = { encode, get job() { return fastJob ? { id: fastJob.id, progress: fastJob.progress, phase: fastJob.phase } : null; } };
 // one Export and one Record for audio and video (#27): the switch is the small display next to the button
 const outKind = () => outKindOf(store.get(OUT_KEY, 'audio'));
@@ -654,8 +656,13 @@ async function exportRadio(range) {
   if (fastJob || rec || capture) return toast(t('vidBusy'));
   const r = radio && radio.exportItems(range);
   if (!r || !r.items.length) return;
-  const joined = joinSession({ songs: r.items.map(x => ({ transition: x.transition })), seed: r.recipe.seed, options: r.recipe.options || {} }, r.items.map(x => absoluteClips(clone(x.song))));
-  const sg = playable({ ...joined, kind: 'composed', id: 'radio' });
+  const joinOf = items => playable({ ...joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: r.recipe.seed, options: r.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song)))), kind: 'composed', id: 'radio' });
+  let sg = joinOf(r.items);
+  // a length: the real joined length decides; the last song goes when the rest still reaches 90% of the target
+  if (range.kind === 'minutes') {
+    const target = range.minutes * 60;
+    while (r.items.length > 1) { const less = joinOf(r.items.slice(0, -1)); if (less.meta.seconds < target * 0.9) break; r.items.pop(); sg = less; }
+  }
   const base = `coding-misk-radio-${String(r.recipe.seed).replace(/[^\w-]+/g, '-')}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}`;
   // the track list: the first section of each song ("3 Intro" belongs to song 3), at its time in the file
   const T = tempoClock(sg.meta.bpm), starts = {};

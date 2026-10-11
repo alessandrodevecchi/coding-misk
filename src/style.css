@@ -1041,3 +1041,13 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
   .set-card.flash { outline: 2px solid var(--a1); outline-offset: 2px; transition: outline-color .6s; }
   .vid-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .vid-presets input { width: 9em; }
+
+  /* radio panel (#53 follow-up): ON AIR as a strip along the top of the card, the export cluster on its own row */
+  .radio-ctrls { position: relative; overflow: hidden; }
+  .onair-bar { margin: -14px -14px 0; padding: 4px 14px; display: flex; justify-content: center; font: 700 11px var(--mono); letter-spacing: .3em; text-transform: uppercase; color: var(--muted); background: color-mix(in srgb, var(--panel2) 80%, #000); border-bottom: 1px solid var(--line); }
+  .onair-bar.on { color: #fff; background: linear-gradient(90deg, #8e1027, #d8203c 30%, #ff3a58 50%, #d8203c 70%, #8e1027); border-bottom-color: #ff4a66; box-shadow: 0 0 18px rgba(255, 42, 72, .55); animation: onair 2.4s ease-in-out infinite; }
+
+  .radio-out { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .combo-gear { display: inline-flex; align-items: center; padding: 4px 6px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
+  .combo-gear:hover { color: var(--a1); }
+  .comp-row .out-combo .comp-setup-btn { border: 0; background: none; box-shadow: none; }

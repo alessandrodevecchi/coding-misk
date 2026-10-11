@@ -600,18 +600,20 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     root.innerHTML = `<p class="intro">${esc(t('introRadio'))}</p>
     <div class="radio-grid">
       <div class="card radio-ctrls">
+        <div class="onair-bar ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}><span>${esc(paused ? t('radioPaused') : on ? t('radioOnAir') : t('radioOffAir'))}</span></div>
         <div class="radio-onair">
           <button class="btn primary radio-start" id="radio-start" aria-pressed="${on}" ${tip(on ? 'tipStop' : 'tipStart')}>${on ? '■ ' + esc(t('radioStop')) : '▶ ' + esc(t('radioStart'))}</button>
           <button class="btn" id="radio-pause" ${on ? '' : 'disabled'} ${tip(paused ? 'tipResume' : 'tipPause')}>${paused ? '▶ ' + esc(t('radioResume')) : '❚❚ ' + esc(t('radioPause'))}</button>
           <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
-          <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
-          <span class="out-combo"><button class="btn" id="radio-export" data-export="radio" aria-expanded="false" ${tip('tipRadioExport')}>${esc(t('exportWav'))}</button><button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>${player.outKindButton()}</span><button class="comp-setup-btn icon-only" id="radio-video-set" aria-label="${esc(t('tipVideoSettings'))}" ${tip('tipVideoSettings')}>${GEAR}</button>
-
           <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
-          <span class="onair ${on && !paused ? 'on' : ''}" ${tip('tipOnAir')}>${esc(paused ? t('radioPaused') : t('radioOnAir'))}</span>
+          <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
         </div>
-        <div class="comp-row"><button class="btn comp-btn" id="radio-comp" aria-pressed="${opts.compilation !== 'off'}" title="${esc(t('compTip'))} · ${esc(opts.compilation === 'song' ? t('compEverySong') : opts.compilation === 'some' ? t('compEverySome') : t('compOff'))}">${esc(t('compBtn'))}<span class="comp-lamps" aria-hidden="true"><i class="${opts.compilation === 'song' ? 'on' : ''}"></i><b>1</b><i class="${opts.compilation === 'some' ? 'on' : ''}"></i><b>2–4</b></span></button>
-          <button class="comp-setup-btn" id="radio-comp-setup" aria-expanded="${compOpen}" aria-label="${esc(t('compSetup'))}" ${tip('compSetupTip')}>${GEAR}<span class="comp-lcd">${esc(presetName(opts.compPreset))}</span></button></div>
+        <div class="radio-out">
+          <span class="out-combo"><button class="btn" id="radio-export" data-export="radio" aria-expanded="false" ${tip('tipRadioExport')}>${esc(t('exportWav'))}</button><button class="btn rec-btn" id="radio-rec" aria-pressed="${!!recS}" ${tip(recS ? 'tipRecStop' : 'tipRec')}>${recS ? `■ ${esc(t('recStop'))} <span class="rec-time" id="radio-rec-time">${clockOf(recElapsed())}</span>` : `● ${esc(t('recStart'))}`}</button>${player.outKindButton()}<button class="combo-gear" id="radio-video-set" aria-label="${esc(t('tipVideoSettings'))}" ${tip('tipVideoSettings')}>${GEAR}</button></span>
+
+        </div>
+        <div class="comp-row"><span class="out-combo"><button class="btn comp-btn" id="radio-comp" aria-pressed="${opts.compilation !== 'off'}" title="${esc(t('compTip'))} · ${esc(opts.compilation === 'song' ? t('compEverySong') : opts.compilation === 'some' ? t('compEverySome') : t('compOff'))}">${esc(t('compBtn'))}<span class="comp-lamps" aria-hidden="true"><i class="${opts.compilation === 'song' ? 'on' : ''}"></i><b>1</b><i class="${opts.compilation === 'some' ? 'on' : ''}"></i><b>2–4</b></span></button>
+          <button class="comp-setup-btn" id="radio-comp-setup" aria-expanded="${compOpen}" aria-label="${esc(t('compSetup'))}" ${tip('compSetupTip')}>${GEAR}<span class="comp-lcd">${esc(presetName(opts.compPreset))}</span></button></span></div>
         ${compOpen ? setupPanel() : ''}
         <div class="${opts.compilation !== 'off' ? 'set-aside' : ''}">
         ${opts.compilation !== 'off' ? `<p class="hint muted small">${esc(t('compAside'))}</p>` : ''}
