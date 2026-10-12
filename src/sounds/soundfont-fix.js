@@ -6,6 +6,9 @@ export const SOUNDFONT_FIX = [
   { name: 'gm_vibraphone', font: 0, low: 84, high: 127, use: 2 },
   // the library misspells this font's file name ("…sf2_fible"), so it never loads: the first electric bass instead
   { name: 'gm_electric_bass_finger', font: 1, use: 0 },
+  // found by the full check (#54): font files missing from the library
+  { name: 'gm_slap_bass_2', font: 2, use: 0 },
+  { name: 'gm_gunshot', font: 11, use: 3 },
 ];
 
 const NOTE = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };

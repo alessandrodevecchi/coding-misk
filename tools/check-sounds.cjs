@@ -2,13 +2,13 @@
 // sample bank in the app's sound map, fetched and decoded in the browser. A broken part is "covered" when the sound
 // guard has a stand-in for it: another font of the instrument whose zone holds the same notes, or another sample of the
 // bank that decodes. Long (thousands of files) but unattended.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-sounds.cjs [--fonts] [--samples] [--only <prefix>] [--limit <n>] [--out <file.json>] [--url <app url>]
+// Usage: PLAYWRIGHT_CORE=... node tools/check-sounds.cjs [--fonts] [--samples] [--only <prefix>] [--limit <n>] [--out <file.json>] [--url <app url>] [--banks a,b] [--width <parallel fetches>]
 //   (dev server on :5173; without --fonts or --samples both). Exit 1 when a broken part has no stand-in.
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs');
 const args = process.argv.slice(2), opt = k => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : null; };
 const wantFonts = args.includes('--fonts') || !args.includes('--samples'), wantSamples = args.includes('--samples') || !args.includes('--fonts');
-const only = opt('only') || '', limit = Number(opt('limit')) || Infinity, out = opt('out'), url = opt('url') || 'http://localhost:5173/';
+const only = opt('only') || '', limit = Number(opt('limit')) || Infinity, out = opt('out'), url = opt('url') || 'http://localhost:5173/', banks = (opt('banks') || '').split(',').filter(Boolean), width = Number(opt('width')) || 8;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
@@ -18,7 +18,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.goto(url);
   let n = 0;
   for (let i = 0; i < 40 && n < 1500; i++) { await sleep(1000); n = await page.evaluate(() => Object.keys((globalThis.soundMap && globalThis.soundMap.get()) || {}).length); }
-  const report = await page.evaluate(async ({ wantFonts, wantSamples, only, limit }) => {
+  const report = await page.evaluate(async ({ wantFonts, wantSamples, only, limit, banks, width }) => {
     const map = globalThis.soundMap.get();
     const decode = async ab => {
       const ac = new OfflineAudioContext(1, 1, 44100);
@@ -60,7 +60,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       }
     }
     if (wantSamples) {
-      const banks = Object.entries(map).filter(([k, s]) => s.data && s.data.type === 'sample' && k.startsWith(only)).slice(0, limit);
+      const banks = Object.entries(map).filter(([k, s]) => s.data && s.data.type === 'sample' && k.startsWith(only) && (!banks.length || banks.includes(k))).slice(0, limit);
       out.counts.banks = banks.length;
       for (const [name, s] of banks) {
         const list = Array.isArray(s.data.samples) ? s.data.samples : Object.values(s.data.samples || {}).flat();
@@ -71,12 +71,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
           let r;
           try { const res = await fetch(url); r = res.ok ? await decode(await res.arrayBuffer()) : `http ${res.status}`; } catch (e) { r = `network: ${e.message}`; }
           if (r === true) ok++; else bad.push({ index, url, why: r });
-        });
+        }, width);
         for (const b of bad) out.samples.push({ name, ...b, standIn: ok > 0 && Array.isArray(s.data.samples) ? 'another sample of the bank' : null });
       }
     }
     return out;
-  }, { wantFonts, wantSamples, only, limit: Number.isFinite(limit) ? limit : 1e9 });
+  }, { wantFonts, wantSamples, only, limit: Number.isFinite(limit) ? limit : 1e9, banks, width });
   await browser.close();
   const c = report.counts;
   const uncovered = [...report.fonts, ...report.samples].filter(x => x.standIn === null && !/^network/.test(x.why || ''));
