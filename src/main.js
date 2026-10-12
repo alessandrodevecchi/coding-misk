@@ -33,7 +33,7 @@ import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
 import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, fragmentOpts, fragmentSize, fragmentAreas } from './video/layout.js';
-import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMessages, shapeOf, clockOf, parseTime } from './video/fragments.js';
+import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMessages, shapeOf, clockOf, parseTime, taglineFor } from './video/fragments.js';
 import { textsFor, textFile } from './video/texts.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from './soul/data.js';
 import { hashString } from './endless/random.js';
@@ -47,7 +47,7 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK } from './icons.js';
+import { LOCK, DICE } from './icons.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
 import { startHardware } from './hardware.js';
@@ -751,7 +751,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
-  const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, msgs: frag.msgs, length: frag.end - frag.start } : null;
+  const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
   // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen
   const pickOf = (choice, list) => (choice === 'random' ? list[hashString(`${frag.code}/${list.length}`) % list.length] : list.includes(choice) ? choice : null);
   const fragLook = frag ? pickOf(frag.o.look, looks) : null;
@@ -831,7 +831,7 @@ function fragmentSource(src) {
   const c = cards.find(x => x.tr.id === src);
   if (!c) return { error: 'source' };
   const sg = c.tr.kind === 'composed' ? playable({ ...prepare(clone(c.tr)), kind: 'composed' }) : c.p;
-  return { sg, title: c.tr.title || sg.title, key: `song:${src}`, seed: String(src), songs: null };
+  return { sg, title: c.tr.title || sg.title, key: `song:${src}`, seed: String(src), songs: null, inspiration: c.tr.inspiration || null };
 }
 // the facts the texts need: song titles with their start in seconds, genres, length
 function textsInfo(src, kind, extra = {}) {
@@ -840,7 +840,7 @@ function textsInfo(src, kind, extra = {}) {
   const docs = src.songs ? src.songs.map(x => x.song) : [sg.doc || {}];
   const genres = docs.flatMap(d => (d && d.tags && (d.tags.genres || d.tags.styles)) || (d && typeof d.genre === 'string' ? [d.genre] : []));
   const seconds = src.cut ? src.cut.cut : sg.meta.seconds;
-  return { kind, title: src.title, songs: songs.filter(Boolean), genres, seconds, seed: src.seed, ...extra };
+  return { kind, title: src.title, songs: songs.filter(Boolean), genres, seconds, seed: src.seed, ...(src.inspiration ? { inspiration: src.inspiration } : {}), ...extra };
 }
 function saveTexts(info, base) {
   const tx = textsFor(info);
@@ -852,8 +852,8 @@ function saveTexts(info, base) {
 async function makeFragments(opts = {}) {
   if (fastJob || rec || capture) return { error: 'busy' };
   const src = fragmentSource(opts.source); if (src.error) return src;
-  // settings, then what the call says: format, show, aspect, bands (true/false or { tagline, fullLine, vTitle }), rotate, codeMode, label, glitch, or an old layout name
-  const pick = ['format', 'show', 'aspect', 'rotate', 'codeMode', 'label', 'glitch', 'layout', 'look', 'soulView'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
+  // settings, then what the call says: format, show, aspect, bands (true/false or { tagline, taglineMode, fullLine, vTitle }), rotate, codeMode, label, glitch, or an old layout name
+  const pick = ['format', 'show', 'aspect', 'rotate', 'codeMode', 'label', 'glitch', 'layout', 'look', 'soulView', 'tagline', 'taglineMode'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
   const bands = typeof opts.bands === 'object' && opts.bands ? opts.bands : opts.bands !== undefined ? { bands: !!opts.bands } : {};
   const o = { ...fragmentOpts({ ...(store.get(FRAG_KEY, {}) || {}), ...pick, ...bands }), stageRatio: stageRatio() };
   const shape = shapeFor(src.sg), bpm = src.sg.meta.bpm.map(Number);
@@ -866,14 +866,16 @@ async function makeFragments(opts = {}) {
   let last = null;
   for (let i = 0; i < picks.length; i++) {
     const p = picks[i], n = nextFragment(), code = fragmentCode(src.key, p.start), label = fragmentLabel(code, n);
+    // the tagline: the fixed one, or in random mode the fragment's own (the same for the same fragment)
+    const tagline = o.bands ? (o.taglineMode === 'random' ? taglineFor(code) : o.tagline) : '';
     if (opts.onProgress) opts.onProgress(i, picks.length);
     const file = `${src.title} · fragment #${String(n).padStart(3, '0')}`;
-    const name = await exportVideoFast(src.sg, src.title, { songs: src.songs, frag: { start: p.start, end: p.end, label: o.label ? label : '', code, msgs: glitchMessages(code), o, file } });
+    const name = await exportVideoFast(src.sg, src.title, { songs: src.songs, frag: { start: p.start, end: p.end, label: o.label ? label : '', code, tagline, msgs: glitchMessages(code), o, file } });
     if (name === 'cancelled') break;
     if (!name) return { error: 'render', files, items };
     store.set(FRAG_N, n + 1);
     // a session's fragment is named after the song playing at its start
-    const info = textsInfo(src, 'fragment', { fragment: { label, start: p.start, end: p.end }, fullLine: o.fullLine, seed: `${src.seed}/${code}` });
+    const info = textsInfo(src, 'fragment', { fragment: { label, start: p.start, end: p.end }, tagline, fullLine: o.fullLine, seed: `${src.seed}/${code}` });
     const at = info.songs.filter(x => x.start <= p.start + 1e-6).pop();
     const fInfo = { ...info, title: at ? at.title : info.title }, tx = saveTexts(fInfo, file);
     last = { tx, info: fInfo };
@@ -896,13 +898,16 @@ function textsBox(el, tx, info, caption = '') {
   el.innerHTML = `${caption ? `<p class="hint muted small" data-tx-cap>${esc(caption)}</p>` : ''}
     <label class="lbl">${esc(t('textsTitleLbl'))}<input data-tx-title data-no-knob></label>
     <label class="lbl">${esc(t('textsDescLbl'))}<textarea data-tx-desc rows="9" data-no-knob></textarea></label>
-    <div class="tp-actions"><button class="btn" data-tx="copy-title">${esc(t('textsCopyTitle'))}</button><button class="btn" data-tx="copy-desc">${esc(t('textsCopyDesc'))}</button><button class="btn" data-tx="draw">${esc(t('textsDraw'))}</button></div>`;
-  const fill = x => { el.querySelector('[data-tx-title]').value = x.title; el.querySelector('[data-tx-desc]').value = x.description; };
+    <div class="tp-actions"><button class="btn" data-tx="copy-title">${esc(t('textsCopyTitle'))}</button><button class="btn" data-tx="copy-desc">${esc(t('textsCopyDesc'))}</button><button class="btn" data-tx="draw">${esc(t('textsDraw'))}</button></div>
+    <div class="tx-fields">${['tags', 'hashtags', 'category'].map(k => `<label class="lbl tx-field">${esc(t(`texts:${k}`))}<span><input data-tx-${k} readonly data-no-knob><button class="chip" data-tx="copy-${k}">${esc(t('textsCopy'))}</button></span></label>`).join('')}</div>`;
+  // the upload fields (#57): tags as a comma list, hashtags spaced, the category
+  const fill = x => { el.querySelector('[data-tx-title]').value = x.title; el.querySelector('[data-tx-desc]').value = x.description;
+    el.querySelector('[data-tx-tags]').value = (x.tags || []).join(', '); el.querySelector('[data-tx-hashtags]').value = (x.hashtags || []).join(' '); el.querySelector('[data-tx-category]').value = x.category || ''; };
   fill(tx);
   el.onclick = async e => {
     const b = e.target.closest('[data-tx]'); if (!b || b.dataset.tx === 'close') return;
     if (b.dataset.tx === 'draw') { draw++; fill(textsFor({ ...info(), draw })); return; }
-    const v = el.querySelector(b.dataset.tx === 'copy-title' ? '[data-tx-title]' : '[data-tx-desc]').value;
+    const v = el.querySelector(`[data-tx-${{ 'copy-title': 'title', 'copy-desc': 'desc' }[b.dataset.tx] || b.dataset.tx.slice(5)}]`).value;
     try { await navigator.clipboard.writeText(v); toast(t('textsCopied')); } catch (err) { toast(t('textsCopyFail')); }
   };
 }
@@ -944,7 +949,8 @@ function openFragMenu(source, anchor) {
     <div class="rx-opt">${chk('fm-bands', o.bands, t('fragBands'))}${chk('fm-rotate', o.rotate, t('fragRotate'))}</div>
     <details class="fm-more"><summary>${esc(t('fragMore'))}</summary>
       <label class="rx-opt"><span>${esc(t('fragCode'))}</span>${sel('fm-code', F_CODE, o.codeMode, k => t(`fragCode:${k}`))}</label>
-      <label class="rx-opt"><span>${esc(t('setFragTagline'))}</span><input id="fm-tagline" value="${esc(o.tagline)}" maxlength="60" data-no-knob size="22"></label>
+      <div class="rx-opt"><span>${esc(t('setFragTagline'))}</span><input id="fm-tagline" value="${esc(o.tagline)}" maxlength="60" data-no-knob size="22" aria-label="${esc(t('setFragTagline'))}"${o.taglineMode === 'random' ? ' disabled' : ''}><button class="chip die-btn" data-fm-die aria-pressed="${o.taglineMode === 'random'}" title="${esc(t('fragDie'))}" aria-label="${esc(t('fragDie'))}">${DICE}</button></div>
+      <p class="hint muted small" data-fm-die-hint${o.taglineMode === 'random' ? '' : ' hidden'}>${esc(t('fragDieOn', { x: taglineFor('next') }))}</p>
       <label class="rx-opt"><span>${esc(t('setFragFull'))}</span><input id="fm-full" value="${esc(o.fullLine)}" maxlength="60" placeholder="${esc(t('setFragFullHint'))}" data-no-knob size="22"></label>
       <div class="rx-opt">${chk('fm-title', o.vTitle, t('setFragTitle'))}${chk('fm-label', o.label, t('setFragLabel'))}${chk('fm-glitch', o.glitch, t('setFragGlitch'))}</div>
       <label class="rx-opt"><span>${esc(t('fragSeed'))}</span><input id="fm-seed" placeholder="${esc(t('fragSeedHint'))}" data-no-knob size="18"></label>
@@ -956,7 +962,7 @@ function openFragMenu(source, anchor) {
   (anchor.closest('.songbar, .pl-row, .set-card') || anchor).insertAdjacentElement('afterend', el);
   // what the form says now, saved as the settings so the preview, Settings and the next fragments agree
   const v = id => el.querySelector(id), form = () => ({ format: v('#fm-format').value, show: v('#fm-show').value, aspect: v('#fm-aspect').value, look: v('#fm-look').value, soulView: v('#fm-soulview').value,
-    bands: v('#fm-bands').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
+    bands: v('#fm-bands').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, taglineMode: v('[data-fm-die]').getAttribute('aria-pressed') === 'true' ? 'random' : 'fixed', fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
   const remember = () => { const f = form(); for (const [k, x] of Object.entries(f)) setFragOpt(k, x); soul.force(previewView()); };
   // the preview shows the chosen soul view; the visual follows the stage (pick it there, or the arrows)
   const previewView = () => { const c = v('#fm-soulview').value; return c === 'random' ? SOUL_VIEWS[0] : SOUL_VIEWS.includes(c) ? c : null; };
@@ -973,6 +979,8 @@ function openFragMenu(source, anchor) {
   el.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b || b.closest('[data-fm-texts]')) return;
     if (b.dataset.fmLen) { v('#fm-len').value = b.dataset.fmLen; v('input[value="random"]').checked = true; return; }
+    // the die: one random tagline per fragment, or the fixed one
+    if (b.dataset.fmDie !== undefined) { const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on); v('#fm-tagline').disabled = on; v('[data-fm-die-hint]').hidden = !on; remember(); return; }
     if (b.dataset.fm === 'close') { closeFragMenu(); return; }
     if (b.dataset.fm !== 'go') return;
     if (fastJob) { fastJob.cancel(); return; }

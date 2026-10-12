@@ -3,6 +3,7 @@
   "version": 2,
   "id": "pioggia-sul-vetro",
   "title": "Pioggia sul vetro",
+  "inspiration": {"en": "rain on a window late at night", "it": "la pioggia sul vetro a notte fonda"},
   "look": "pixel",
   "style": {
     "it": "Lo-fi hip hop · Re minore · 78 BPM con swing · piano elettrico, contrabbasso, vibrafono, vinile",

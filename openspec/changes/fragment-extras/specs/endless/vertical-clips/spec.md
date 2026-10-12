@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Tagline pool and random mode
-The tagline setting SHALL offer a die next to the text. The die SHALL switch random mode on and off; in random mode each fragment SHALL take one phrase from the approved pool, the same phrase for the same fragment, and the menu SHALL show the phrase drawn for the next fragment. With random mode off the fixed tagline SHALL be used, as before. The pool SHALL hold the approved short phrases (code and rhythm, human and machine, soul and signal, night, ironic, devotion), never "faith in the four-on-the-floor".
+The tagline setting SHALL offer a die next to the text. The die SHALL switch random mode on and off; in random mode each fragment SHALL take one phrase from the approved pool, the same phrase for the same fragment, and the menu SHALL show an example phrase from the pool. With random mode off the fixed tagline SHALL be used, as before. The pool SHALL hold the approved short phrases (code and rhythm, human and machine, soul and signal, night, ironic, devotion), never "faith in the four-on-the-floor".
 
 #### Scenario: Random taglines
 - **WHEN** three fragments are made with random mode on

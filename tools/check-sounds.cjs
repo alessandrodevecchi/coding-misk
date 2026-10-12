@@ -2,20 +2,20 @@
 // sample bank in the app's sound map, fetched and decoded in the browser. A broken part is "covered" when the sound
 // guard has a stand-in for it: another font of the instrument whose zone holds the same notes, or another sample of the
 // bank that decodes. Long (thousands of files) but unattended.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-sounds.cjs [--fonts] [--samples] [--only <prefix>] [--limit <n>] [--out <file.json>]
+// Usage: PLAYWRIGHT_CORE=... node tools/check-sounds.cjs [--fonts] [--samples] [--only <prefix>] [--limit <n>] [--out <file.json>] [--url <app url>]
 //   (dev server on :5173; without --fonts or --samples both). Exit 1 when a broken part has no stand-in.
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs');
 const args = process.argv.slice(2), opt = k => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : null; };
 const wantFonts = args.includes('--fonts') || !args.includes('--samples'), wantSamples = args.includes('--samples') || !args.includes('--fonts');
-const only = opt('only') || '', limit = Number(opt('limit')) || Infinity, out = opt('out');
+const only = opt('only') || '', limit = Number(opt('limit')) || Infinity, out = opt('out'), url = opt('url') || 'http://localhost:5173/';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage();
   page.on('console', m => { if (m.text().startsWith('[check-sounds]')) process.stderr.write(m.text() + '\n'); });
-  await page.goto('http://localhost:5173/');
+  await page.goto(url);
   let n = 0;
   for (let i = 0; i < 40 && n < 1500; i++) { await sleep(1000); n = await page.evaluate(() => Object.keys((globalThis.soundMap && globalThis.soundMap.get()) || {}).length); }
   const report = await page.evaluate(async ({ wantFonts, wantSamples, only, limit }) => {

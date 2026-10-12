@@ -84,7 +84,7 @@ export function fragmentCode(sourceKey, start) {
 export const fragmentLabel = (code, n) => `FRAGMENT S0UL·${code} #${String(n).padStart(3, '0')}`;
 
 // the glitch frames' messages, the same for the same fragment
-export const GLITCH_OPEN = ['reading soul…', 'signal found', 'decoding rhythm…', 'tape 07 · side B', 'locking onto the groove…', 'soul trace detected', 'restoring memory banks…', 'carrier wave acquired', 'scanning frequencies…', 'boot sequence · synth core'];
+export const GLITCH_OPEN = ['reading soul…', 'signal found', 'decoding rhythm…', 'tape 07 · side B', 'locking onto the groove…', 'soul trace detected', 'restoring memory banks…', 'carrier wave acquired', 'scanning frequencies…', 'boot sequence · synth core', 'devotion detected…', 'entering the ritual…'];
 export const GLITCH_CLOSE = ['fragment recovered', 'signal lost', 'end of tape', 'soul archived', 'transmission ends', 'memory sealed', 'rewind to continue', 'link severed'];
 export function glitchMessages(code) {
   const r = stream(code, 'glitch');
@@ -104,4 +104,47 @@ export function shapeOf(doc, absolute) {
   let at = 0;
   for (const s of doc.sections) { sections.push({ label: s.name || '', start: at, len: s.bars }); at += s.bars; }
   return { bars: at, sections, tracks: abs.tracks };
+}
+
+// the taglines of the bottom band (approved by the owner): random mode gives each fragment one, the same for the same fragment
+export const TAGLINES = [
+  // code and rhythm
+  'rhythm by algorithm', 'codifying the beat', "bugs don't stop the drop", 'compiled to groove', 'one loop, infinite patterns',
+  'syntax, then sunset', 'the beat is in the source', 'no samples harmed, only patterns', 'written in code, played in neon',
+  // human and machine
+  'human pulse, machine hands', 'the machine keeps time, you keep the soul', 'typed by hand, dropped by machine', 'where the cursor meets the kick',
+  // soul and signal
+  'reading the soul of a song', 'signal found, groove recovered', 'every seed has a sound', 'fragments of an endless radio', 'tuned to frequencies no one broadcasts',
+  // night and sunset
+  'live-coded until dawn', 'bass at the edge of the grid', 'sunset in, sunrise out', 'neon nights, analog ghosts',
+  // ironic
+  'it works on my synth', 'git push --beat',
+  // devotion
+  'pure devotion', 'devotion to the sound', 'code is pure, sound is opus', 'devoted to the drop', 'rhythm is the ritual', 'a liturgy of loops',
+  'kneel before the kick', 'sermon of the subwoofer', 'bless this bassline', 'our daily beat', 'in kick we trust', 'holy compile, amen',
+];
+export const taglineFor = code => stream(code, 'tagline').pick(TAGLINES);
+
+// the tagline typed in at t seconds of a fragment: { text (with glitch characters), cursor (draw the block), glitch (0..1) }.
+// Typing starts with the label, after the opening glitch; the block blinks while typing and a little after; now and then a
+// glitch of a few frames scrambles some characters. Pure: the same frame for the same time.
+export const TYPE_RATE = 18, TYPE_START = GLITCH_SECONDS * 0.9;
+const GLYPHS = '#%&@$/\\|<>*+=?!01';
+export function taglineAt(text, t, code = '') {
+  if (!text) return { text: '', cursor: false, glitch: 0 };
+  const k = Math.floor((t - TYPE_START) * TYPE_RATE);
+  if (k < 0) return { text: '', cursor: Math.floor(t * 4) % 2 === 0 && t > TYPE_START - 0.5, glitch: 0 };
+  const typed = Math.min(text.length, k), done = TYPE_START + text.length / TYPE_RATE;
+  const cursor = t < done + 2 && (typed < text.length || Math.floor(t * 4) % 2 === 0);
+  // one short glitch in each window of 5 s after typing, at a time picked by the code and the window
+  let glitch = 0, shown = text.slice(0, typed);
+  if (typed === text.length && t > done + 1) {
+    const w = Math.floor(t / 5), at = w * 5 + 0.5 + (hashString(`${code}/tag/${w}`) % 3000) / 1000;
+    if (t >= at && t < at + 0.12) {
+      glitch = 1 - (t - at) / 0.12;
+      let h = hashString(`${code}/${Math.floor(t * 30)}`);
+      shown = [...shown].map(c => { h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; return c !== ' ' && h % 5 === 0 ? GLYPHS[h % GLYPHS.length] : c; }).join('');
+    }
+  }
+  return { text: shown, cursor, glitch };
 }

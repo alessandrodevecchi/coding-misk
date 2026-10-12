@@ -27,6 +27,7 @@ Check a file with `node --no-warnings tools/song.mjs validate songs/my-song.json
 | `look` | no | visual: `palco`, `pixel`, `tramonto`, `montagne`, `spazio`, `sonar`, `edgerunners` |
 | `style` | no | `{ "en", "it" }` description |
 | `tags` | no | `{ "genres": [...], "styles": [...], "free": [...] }`: genres from the fixed list (`techno`, `trance`, `house`, `synthwave`, `drum-and-bass`, `industrial`, `rock`, `metal`, `hip-hop`, `pop`, `jazz`, `country`, `ambient`, `experimental`), style recipe ids, free tags (lowercase, at most 24 characters). The Songs tab adds the genre of each style to the song's own genres and shows style tags with the style's current name. |
+| `inspiration` | no | `{ "en": "...", "it": "..." }`: what inspired the song, a short note per language (at most 120 characters). The texts for sharing mention it in a sentence of their own. |
 | `origin` | no | `"endless"` for songs made by the director; kept when the song is saved from the radio |
 
 ## Sections

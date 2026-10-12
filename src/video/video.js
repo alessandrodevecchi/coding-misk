@@ -4,7 +4,7 @@
 import { QUALITIES, VIDEO_DEFAULTS, LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
 import { liveAreas, lerpAreas, ease, presetOf, TRANSITION } from '../live/presets.js';
 import { fragmentAreas } from './layout.js';
-import { glitchAt, GLITCH_SECONDS } from './fragments.js';
+import { glitchAt, GLITCH_SECONDS, taglineAt, taglineFor } from './fragments.js';
 import { hashString } from '../endless/random.js';
 
 const KEY = 'coding-misk-video';
@@ -305,15 +305,29 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     for (let i = 0; i < bars; i++) { const lv = Math.max(.12, Math.min(1, (levels && levels[i]) || 0)), hgt = (16 + lv * 110) * u; g.fillRect(x0 + i * (bw + gap), base - hgt, bw, hgt); }
     g.restore();
   }
-  function drawBottomBand(A, P, o, info) {
+  // tag: the tagline typed so far ({ text, cursor, glitch }, see taglineAt), or none for the plain tagline
+  function drawBottomBand(A, P, o, info, tag = null) {
     const u = Math.min(A.h / 420, A.w / 1080, 1.15), lines = [];
     if (o.vTitle && info.title) lines.push({ text: info.title, font: `700 ${Math.round(52 * u)}px "Chakra Petch", sans-serif`, color: '#fff' });
-    if (o.tagline) lines.push({ text: o.tagline, font: `600 ${Math.round(60 * u)}px "Chakra Petch", sans-serif`, color: P.ink });
+    if (tag && o.taglineFull) lines.push({ text: tag.text, tag, font: `600 ${Math.round(60 * u)}px "Chakra Petch", sans-serif`, color: P.ink });
+    else if (o.tagline) lines.push({ text: o.tagline, font: `600 ${Math.round(60 * u)}px "Chakra Petch", sans-serif`, color: P.ink });
     if (o.fullLine) lines.push({ text: o.fullLine, font: `600 ${Math.round(42 * u)}px "JetBrains Mono", monospace`, color: P.a1 });
     if (!lines.length) return;
     g.save(); g.textAlign = 'center'; g.textBaseline = 'middle';
     const step = 92 * u, y0 = A.y + A.h / 2 - (lines.length - 1) * step / 2;
-    lines.forEach((l, i) => { g.font = l.font; g.fillStyle = l.color; g.shadowColor = l.color; g.shadowBlur = 10 * u; g.fillText(l.text, A.x + A.w / 2, y0 + i * step, A.w - 80 * u); });
+    lines.forEach((l, i) => {
+      g.font = l.font; g.fillStyle = l.color; g.shadowColor = l.color; g.shadowBlur = 10 * u;
+      const y = y0 + i * step, cx = A.x + A.w / 2, max = A.w - 80 * u;
+      if (!l.tag) { g.fillText(l.text, cx, y, max); return; }
+      // typed: the text grows from the left edge of its final place, the block follows it; a glitch shifts and splits it
+      const full = o.taglineFull || l.text, fw = Math.min(max, g.measureText(full + '█').width), sx = Math.min(1, max / g.measureText(full + '█').width);
+      g.save(); g.textAlign = 'left'; g.translate(cx - fw / 2, y); g.scale(sx, 1);
+      const k = l.tag.glitch, dx = k ? (Math.sin(y * 13 + k * 40) * 14 * u) : 0;
+      if (k) { g.globalAlpha = .7; g.fillStyle = '#00e5ff'; g.fillText(l.text, dx - 4 * u, 0); g.fillStyle = '#ff4fa3'; g.fillText(l.text, -dx + 4 * u, 0); g.globalAlpha = 1; g.fillStyle = l.color; }
+      g.fillText(l.text, dx, 0);
+      if (l.tag.cursor) g.fillText('█', dx + g.measureText(l.text).width + 4 * u, 0);
+      g.restore();
+    });
     g.restore();
   }
   // the label: an amber CRT line typed in after the opening glitch, with scanlines and a slight flicker
@@ -360,7 +374,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     const now = performance.now() / 1000; if (now - vPrevAt < 1 / 12) return; vPrevAt = now;
     const o = vPrev.opts(), t = 3 + (now % 6), f = o.size;
     const el = vPrev.el, k = Math.min(el.width / f.file.w, el.height / f.file.h);
-    composeVertical({ q: { w: Math.round(f.file.w / 2), h: Math.round(f.file.h / 2) }, comp: { w: Math.round(f.comp.w / 2), h: Math.round(f.comp.h / 2) }, o, label: o.label ? `FRAGMENT S0UL·7QX2K #${String(o.next || 1).padStart(3, '0')}` : '', code: 'PREVIEW', msgs: { open: 'reading soul…', close: 'fragment recovered' }, length: 12 }, cyc, now, t, [.4, .7, .3, .9, .5, .6, .35], vPrev.section ? vPrev.section(cyc) : -1);
+    composeVertical({ q: { w: Math.round(f.file.w / 2), h: Math.round(f.file.h / 2) }, comp: { w: Math.round(f.comp.w / 2), h: Math.round(f.comp.h / 2) }, o, label: o.label ? `FRAGMENT S0UL·7QX2K #${String(o.next || 1).padStart(3, '0')}` : '', code: 'PREVIEW', tagline: o.taglineMode === 'random' ? taglineFor('7QX2K') : o.tagline, msgs: { open: 'reading soul…', close: 'fragment recovered' }, length: 12 }, cyc, now, t, [.4, .7, .3, .9, .5, .6, .35], vPrev.section ? vPrev.section(cyc) : -1);
     const pg = el.getContext('2d'), w = f.file.w * k, h = f.file.h * k;
     pg.fillStyle = '#000'; pg.fillRect(0, 0, el.width, el.height); pg.drawImage(cv, (el.width - w) / 2, (el.height - h) / 2, w, h);
   }
@@ -380,10 +394,11 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
       if (A.soul && soulFrame) drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, Math.min((A.soul.w - 8) / 1200, (A.soul.h - 4) / 760))));
       if (A.code) drawCode(A.code, P, now, Math.min(C.w, C.h) * 1.6, { mode: o.codeMode || 'focus', progress: t / (J.length || 1), section, cyc });
       if (A.top) drawLogo(A.top, levels);
-      if (A.bottom) drawBottomBand(A.bottom, P, o, getInfo(cyc) || {});
+      const tag = J.tagline !== undefined ? taglineAt(J.tagline, t, J.code) : null, oT = tag ? { ...o, taglineFull: J.tagline } : o;
+      if (A.bottom) drawBottomBand(A.bottom, P, oT, getInfo(cyc) || {}, tag);
       if (A.strip) {
         drawLogo({ x: A.strip.x + A.strip.h * .2, y: A.strip.y, w: A.strip.h * 3.6, h: A.strip.h * 1.25 }, levels);
-        drawBottomBand({ x: A.strip.x + A.strip.w * .38, y: A.strip.y, w: A.strip.w * .6, h: A.strip.h * 1.5 }, P, o, getInfo(cyc) || {});
+        drawBottomBand({ x: A.strip.x + A.strip.w * .38, y: A.strip.y, w: A.strip.w * .6, h: A.strip.h * 1.5 }, P, oT, getInfo(cyc) || {}, tag);
       }
       const labelY = A.top ? A.top.h + Math.min(C.w, C.h) * .03 : Math.min(C.w, C.h) * .04;
       if (o.label !== false && J.label) drawLabel(C, J.label, t, labelY);

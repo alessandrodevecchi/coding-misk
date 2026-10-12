@@ -3,8 +3,8 @@
 //   npm run check:clips      exit 1 when any check fails
 import { readFileSync } from 'node:fs';
 import { F_FORMATS, F_SHOWS, F_ASPECTS, fragmentAreas, fragmentOpts, fragmentSize } from '../src/video/layout.js';
-import { pickFragments, fragmentBetween, parseTime, clockOf, barScores, sectionWeight, fragmentCode, fragmentLabel, glitchMessages, glitchAt, shapeOf } from '../src/video/fragments.js';
-import { textsFor } from '../src/video/texts.js';
+import { pickFragments, fragmentBetween, parseTime, clockOf, barScores, sectionWeight, fragmentCode, fragmentLabel, glitchMessages, glitchAt, shapeOf, TAGLINES, taglineFor, taglineAt, TYPE_START, TYPE_RATE } from '../src/video/fragments.js';
+import { textsFor, textFile } from '../src/video/texts.js';
 import { absoluteClips } from '../src/endless/transitions.js';
 import { tempoClock } from '../src/render/tempo.js';
 
@@ -112,6 +112,33 @@ const CHECKS = {
     assert(/^00:00 A$/m.test(s.description) && /^03:20 B$/m.test(s.description), 'mm:ss');
     const f = textsFor({ kind: 'fragment', title: 'Kellerlicht', fragment: { label: 'FRAGMENT S0UL·ABCDE #014', start: 40, end: 70 }, fullLine: 'Full session on the channel', seed: 'f' });
     assert(/#014/.test(f.title) && /FRAGMENT S0UL·ABCDE #014/.test(f.description) && /Full session on the channel/.test(f.description), 'fragment');
+  },
+  'tagline: pool, random by fragment, typed with a block and short glitches'() {
+    assert(TAGLINES.length >= 30 && !TAGLINES.some(x => /four-on-the-floor/.test(x)), 'pool');
+    const a = taglineFor('ABCDE'), b = taglineFor('ABCDE');
+    assert(a === b && TAGLINES.includes(a), 'same fragment, same phrase');
+    assert(new Set(['A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8'].map(taglineFor)).size >= 4, 'different fragments, different phrases');
+    assert(fragmentOpts({}).taglineMode === 'fixed' && fragmentOpts({ taglineMode: 'random' }).taglineMode === 'random' && fragmentOpts({ taglineMode: 'x' }).taglineMode === 'fixed', 'mode');
+    const text = 'music by coding';
+    assert(taglineAt(text, 0.2).text === '', 'empty at the start');
+    const mid = taglineAt(text, TYPE_START + 5 / TYPE_RATE + 0.01);
+    assert(mid.text === 'music' && mid.cursor, 'typing with the block');
+    const end = TYPE_START + text.length / TYPE_RATE;
+    assert(taglineAt(text, end + 0.05).text === text, 'typed in');
+    assert(!taglineAt(text, end + 2.6).cursor, 'block gone after typing');
+    let glitches = 0, plain = 0;
+    for (let t = end + 1.2; t < 30; t += 1 / 30) { const x = taglineAt(text, t, 'ABCDE'); if (x.glitch) glitches++; else if (x.text === text) plain++; }
+    assert(glitches > 0 && glitches < 30 && plain > 600, `short glitches (${glitches} frames)`);
+    assert(JSON.stringify(taglineAt(text, 12.34, 'Q')) === JSON.stringify(taglineAt(text, 12.34, 'Q')), 'same frame, same time');
+  },
+  'texts: tagline, inspiration and upload fields'() {
+    const f = textsFor({ kind: 'fragment', title: 'Luci Rosse', genres: ['techno', 'drum-and-bass'], tagline: 'in kick we trust', inspiration: { en: 'the Red Circle club fight', it: 'x' }, fragment: { label: 'FRAGMENT S0UL·ABCDE #001' }, seed: 'a' });
+    assert(/in kick we trust/.test(f.description) && /the Red Circle club fight\./.test(f.description), 'tagline and inspiration');
+    assert(f.tags[0] === 'techno' && f.tags.includes('drum and bass') && f.tags.includes('live coding'), 'tags');
+    assert(f.hashtags.length === 5 && f.hashtags[1] === '#DrumAndBass', 'hashtags');
+    assert(f.category === 'Music' && /Category: Music/.test(textFile(f)) && /Hashtags: #Techno/.test(textFile(f)), 'category and file');
+    const plain = textsFor({ kind: 'fragment', title: 'X', fragment: { label: 'L' }, seed: 'a' });
+    assert(!/Inspired|Born from|A nod|in mind|Somewhere in its code/.test(plain.description), 'no inspiration, no sentence');
   },
 };
 let failed = 0;

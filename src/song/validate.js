@@ -28,6 +28,12 @@ export function validateSong(song, opts = {}) {
   if (typeof song.title !== 'string' || !song.title.trim()) err('title', 'a non-empty string');
   if (song.look !== undefined && !LOOKS.some(([k]) => k === song.look)) warn('look', `unknown visual "${song.look}"; known: ${LOOKS.map(([k]) => k).join(', ')}`);
 
+  // what inspired the song (#57): a short note per language, used by the texts for sharing
+  if (song.inspiration !== undefined) {
+    const ins = song.inspiration;
+    if (!ins || typeof ins !== 'object' || Array.isArray(ins) || typeof ins.en !== 'string' || !ins.en.trim()) err('inspiration', 'an object with "en" (and "it"): short notes, for example { "en": "rain on a window" }');
+    else for (const k of Object.keys(ins)) if (!['en', 'it'].includes(k) || typeof ins[k] !== 'string' || ins[k].length > 120) err(`inspiration.${k}`, 'a note of at most 120 characters, in "en" or "it"');
+  }
   // tags and origin (song library, #34)
   if (song.origin !== undefined && !ORIGINS.includes(song.origin)) err('origin', `one of ${ORIGINS.join(', ')}, or left out`);
   if (song.tags !== undefined) {

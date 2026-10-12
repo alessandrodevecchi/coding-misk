@@ -18,7 +18,24 @@ export const MOOD = [
   'Low light, warm tape, cold logic.',
   'No two sessions alike: the seed decides, the rhythm obeys.',
   'From the first kick to the last echo, every note is a line of code.',
+  // devotion
+  'Find solace in sound devotion.',
+  'The flock gathers in devotion to the shepherd rhythm.',
+  'Every loop a prayer, every drop a revelation.',
+  'We code in silence and worship in sound.',
+  'The machine keeps the vigil, the groove keeps the faith.',
+  'Candles of neon, hymns of square waves.',
+  'A small chapel at the edge of the grid, open all night.',
+  'Devotion is a loop you choose to repeat.',
+  'Lost in the ritual, found in the rhythm.',
 ];
+// a song's inspiration in a sentence of the texts' own: {x} is the song's note (its English text)
+const INSPIRED = ['Inspired by {x}.', 'Born from {x}.', 'A nod to {x}.', 'Written with {x} in mind.', 'Somewhere in its code: {x}.'];
+// the upload fields: words every text carries, and the category
+export const TAGS = ['live coding', 'algorithmic music', 'music as code', 'strudel', 'electronic music', 'synth'];
+export const CATEGORY = 'Music';
+const tagOf = g => g.replace(/-/g, ' ').toLowerCase();
+const hashOf = w => '#' + w.replace(/[^a-z0-9 ]/gi, '').split(/\s+/).filter(Boolean).map(x => x[0].toUpperCase() + x.slice(1)).join('');
 const FRAGMENT_LINES = [
   'A fragment of the endless radio.',
   'A fragment of the song\'s soul, recovered from the tape.',
@@ -33,7 +50,7 @@ const minutes = s => `${Math.max(1, Math.round(s / 60))} min`;
 const stamp = (s, long) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = String(Math.floor(s / 60) % 60).padStart(2, '0'), x = String(s % 60).padStart(2, '0'); return long ? `${h}:${m}:${x}` : `${m}:${x}`; };
 
 // info: { kind: 'fragment' | 'video' | 'audio', title, songs: [{ title, start }], genres, seconds, seed,
-//   fragment: { label, start, end }, fullLine, draw } → { title, description }
+//   fragment: { label, start, end }, tagline, fullLine, inspiration: { en, it }, draw } → { title, description, tags, hashtags, category }
 // draw: a number that changes the mood lines and the title (the panel's "draw again"), song list and facts stay
 export function textsFor(info) {
   const r = stream(`${info.seed || 'coding-misk'}/${info.draw || 0}`, 'texts');
@@ -45,6 +62,7 @@ export function textsFor(info) {
     const num = (String(f.label || '').match(/#\d+/) || [''])[0];
     title = r.pick([`Fragment ${num} · ${info.title}`, `${info.title} · fragment ${num}`, `Fragment ${num} · soul of ${info.title}`]).replace(/\s+·\s*$/, '').trim();
     body.push(r.pick(FRAGMENT_LINES));
+    if (info.tagline) body.push(`“${info.tagline}”`);
     if (info.fullLine) body.push(info.fullLine);
     body.push('', mood[0]);
     if (f.label) body.push('', f.label);
@@ -57,11 +75,17 @@ export function textsFor(info) {
     body.push(mood[0], mood[1]);
     if (songs.length > 1) body.push('', ...songs.map(s => `${stamp(s.start || 0, long)} ${s.title}`));
   }
+  // what inspired the song (built-in songs only), in its own words
+  const insp = info.inspiration && (typeof info.inspiration === 'string' ? info.inspiration : info.inspiration.en);
+  if (insp) body.push('', r.pick(INSPIRED).replace('{x}', insp));
   const facts = [genres, info.seconds ? `Length ${clockOf(info.seconds)}` : '', info.seed ? `Seed ${info.seed}` : ''].filter(Boolean);
   if (facts.length) body.push('', facts.join(' · '));
   body.push('', 'coding with rhythm · misk \'til dusk');
-  return { title: title.slice(0, 100), description: body.join('\n').replace(/\n{3,}/g, '\n\n').trim() };
+  // tags: genres first, then the project's words; hashtags: the first five
+  const tags = [...new Set([...(info.genres || []).filter(g => typeof g === 'string' && g).map(tagOf), ...TAGS])];
+  const hashtags = tags.slice(0, 5).map(hashOf);
+  return { title: title.slice(0, 100), description: body.join('\n').replace(/\n{3,}/g, '\n\n').trim(), tags, hashtags, category: CATEGORY };
 }
 
 // the text file saved next to a video or recording
-export const textFile = t => `${t.title}\n\n${t.description}\n`;
+export const textFile = t => `${t.title}\n\n${t.description}\n${t.tags ? `\nTags: ${t.tags.join(', ')}\nHashtags: ${t.hashtags.join(' ')}\nCategory: ${t.category}\n` : ''}`;

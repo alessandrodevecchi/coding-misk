@@ -92,6 +92,12 @@ const db = (a, b) => 20 * Math.log10((a.reduce((x, y) => x + y, 0) / a.length) /
   const before = await page.inputValue(td); await page.click('.fm-texts [data-tx="draw"]');
   check((await page.inputValue(td)) !== before, 'draw again changes the texts');
   check(await page.locator('#fm-look').count() === 1 && await page.locator('#fm-soulview').count() === 1, 'the menu lets you pick the visual and the soul view');
+  check(/^#\w+ #/.test(await page.inputValue('.fm-texts [data-tx-hashtags]')) && /live coding/.test(await page.inputValue('.fm-texts [data-tx-tags]')) && (await page.inputValue('.fm-texts [data-tx-category]')) === 'Music', 'the texts have tags, hashtags and category', await page.inputValue('.fm-texts [data-tx-hashtags]'));
+  await page.click('.frag-menu .fm-more summary'); await page.click('.frag-menu [data-fm-die]'); await sleep(200);
+  const die = await page.evaluate(() => ({ pressed: document.querySelector('[data-fm-die]').getAttribute('aria-pressed'), disabled: document.querySelector('#fm-tagline').disabled, hint: !document.querySelector('[data-fm-die-hint]').hidden, mode: JSON.parse(localStorage.getItem('coding-misk-fragments') || '{}').taglineMode }));
+  check(die.pressed === 'true' && die.disabled && die.hint && die.mode === 'random', 'the die turns random taglines on', JSON.stringify(die));
+  await page.click('.frag-menu [data-fm-die]'); await sleep(100);
+  check(await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-fragments') || '{}').taglineMode) === 'fixed', 'and off again');
   if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, 'clips-menu-panel.png') }); }
 
   // 5. every visual in each vertical layout

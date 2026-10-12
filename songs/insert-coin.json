@@ -3,6 +3,7 @@
   "version": 2,
   "id": "insert-coin",
   "title": "Insert Coin",
+  "inspiration": {"en": "90s arcade brawlers like Streets of Rage", "it": "i picchiaduro da sala giochi anni 90 come Streets of Rage"},
   "look": "pixel",
   "style": {
     "it": "Arcade anni '90 · La minore, boss in tensione, ultimo livello in Si · 150 BPM · lead FM, basso a ottave, arpeggi",
