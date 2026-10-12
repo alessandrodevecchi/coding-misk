@@ -41,7 +41,7 @@ export function renderOffline(job, onProgress = () => {}) {
     function on(e) {
       if (e.source !== frame.contentWindow || !e.data || !e.data.codingMiskRender) return;
       const m = e.data;
-      if (m.ready) { clearTimeout(timer); alive(); frame.contentWindow.postMessage({ render: job }, location.origin); }
+      if (m.ready) { clearTimeout(timer); alive(); try { frame.contentWindow.postMessage({ render: job }, location.origin); } catch (err) { finish(err); } }
       else if (m.progress !== undefined) { alive(); onProgress(m.progress, m.phase); }
       else if (m.error) finish(new Error(m.error));
       else if (m.done) finish(null, { channels: m.channels, sampleRate: m.sampleRate, onsets: m.onsets, skipped: m.skipped || [] });
@@ -78,7 +78,8 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
     for (let i = 0; i < blocks.length; i++) {
       if (cancelled) throw { cancelled: true };
       const [a, b] = blocks[i], last = i === blocks.length - 1, from = Math.max(0, a - LEAD);
-      const { segmentsAt, ...rest } = job, segments = segmentsAt ? segmentsAt(from, b) || job.segments : job.segments;
+      // functions stay here: the job goes to the render page by postMessage, which cannot copy them
+      const { segmentsAt, onSkipped, ...rest } = job, segments = segmentsAt ? segmentsAt(from, b) || job.segments : job.segments;
       let r = null;
       for (let attempt = 0; !r; attempt++) {
         console.info(`[blocks] ${i + 1}/${blocks.length} ${a.toFixed(0)}-${b.toFixed(0)} s${attempt ? ` (try ${attempt + 1})` : ''}`);
