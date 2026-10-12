@@ -375,6 +375,8 @@
 
 - `#52` prova OBS completata dal proprietario: con Chrome da `tools/live-chrome.sh` la finestra coperta continua a disegnare; lo Standby automatico scatta e torna a Live da solo. Ci metteva 9-10 secondi perché la regia continuava a inoltrare il battito a OBS finché non scadeva la sua attesa di 5 secondi: ora inoltra solo i battiti nuovi della finestra, quindi restano i 5 secondi dello script. Radio lasciata andare più di tre ore senza problemi.
 
+- Visual: frecce ◀ ▶ accanto al menu del palco per passare al visual precedente o successivo (in giro sulla lista). Il visual Studio è messo da parte su richiesta del proprietario: fuori dai menu (palco, Impostazioni, regia del video); un brano o un'impostazione che lo nomina usa il Palco, che diventa anche il visual predefinito della radio. Il codice di Studio resta (`HIDDEN_LOOKS` in `src/music.js`).
+
 ## Prossimo passo
 
 Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima del brano `#46` fasi 1 e 2 con display nascosto, casuali `#50`, compilation `#49`, più le feature precedenti). Tutti i controlli passano.

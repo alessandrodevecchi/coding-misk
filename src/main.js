@@ -1,6 +1,6 @@
 import '@strudel/repl';
 import './style.css';
-import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
+import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames } from './song/typing.js';
@@ -134,7 +134,7 @@ let scope = 'track', editPat = null, panelView = store.get('coding-misk-panel', 
 // vista dell'arrangiatore: 'sections' (celle per sezione) o 'timeline' (clip liberi); selClip = indice del clip scelto nella timeline
 let arrMode = store.get('coding-misk-arr-mode', 'timeline'), selClip = null;
 let look = store.get('coding-misk-look', T.look || 'palco');
-if (!LOOKS.some(([k]) => k === look)) look = 'palco';
+if (!PICK_LOOKS.some(([k]) => k === look)) look = 'palco';
 // the soul scene (#46) keeps the colours of the last other visual: the app's accents and the colour views' hue
 // the fast video's frame being drawn (#53): { info, code, say, soulSrc }, read instead of the live player
 let fv = null;
@@ -705,7 +705,7 @@ async function exportRadio(range) {
 // Returns false when it failed (the caller records in real time), true when done or cancelled.
 async function exportVideoFast(sg, title = sg.title, { songs = null, after = null, cut = null } = {}) {
   const o = video.opts(), q = QUALITIES[o.quality], layout = o.layout === 'tab' ? 'visual' : o.layout;
-  const segments = segmentsOf(sg, codeFor), looks = LOOKS.map(l => l[0]);
+  const segments = segmentsOf(sg, codeFor), looks = PICK_LOOKS.map(l => l[0]);
   // the parts of the file: one per song of a session ("3 Intro" belongs to song 3), or the song itself
   const parts = [];
   sg.meta.sections.forEach((sec, i) => {
@@ -713,7 +713,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
     if (!last || last.n !== n) parts.push({ n, start: sec.start, end: sec.start + sec.len, first: i });
     else last.end = sec.start + sec.len;
   });
-  const own = songs ? store.get('coding-misk-radio-look', 'studio') : sg.look || look;
+  const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
   const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}) };
   const A = layoutAreas(layout, q.w, q.h, null);
@@ -1626,17 +1626,24 @@ $('#track-panel').addEventListener('click', e => {
 let ui = store.get('coding-misk-ui', 'neon');
 const setUi = v => { ui = v === 'hw' ? 'hw' : 'neon'; store.set('coding-misk-ui', ui); syncAll(); if (globalThis.codingMiskSoulDisplay) globalThis.codingMiskSoulDisplay.themeChanged(); };
 $$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.dataset.uitheme)));
-const setLook = l => { if (!LOOKS.some(([k]) => k === l)) return; look = l; soulBase = l; store.set('coding-misk-look', l); syncAll(); };
+const setLook = l => { if (HIDDEN_LOOKS.includes(l)) l = 'palco'; if (!LOOKS.some(([k]) => k === l)) return; look = l; soulBase = l; store.set('coding-misk-look', l); syncAll(); };
 // a song's own visual, unless the listener is watching the soul
 const songLook = l => { if (l) setLook(l); };
 
-// a look picked while the radio plays becomes the radio's look (the studio by default, #28)
+// a look picked while the radio plays becomes the radio's look (the stage by default; the studio, #28, is set aside)
 $('#looks').addEventListener('change', e => {
   // picking another visual while the Soul display overrides the stage unplugs the cable
   const v = e.target.value;
   if (v === 'soul') return;
   if (soulOverride) soulDisplay.act('override');
   setLook(v); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', v); });
+// the arrows beside the menu: the previous or next visual, round the list
+$$('[data-look-step]').forEach(b => b.addEventListener('click', () => {
+  const i = PICK_LOOKS.findIndex(([k]) => k === look), n = PICK_LOOKS.length;
+  const v = PICK_LOOKS[((i < 0 ? 0 : i) + +b.dataset.lookStep + n) % n][0];
+  if (soulOverride) soulDisplay.act('override');
+  setLook(v); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', v);
+}));
 $('#fs').addEventListener('click', () => {
   const w = $('#stagewrap');
   try {
@@ -2329,7 +2336,7 @@ radio = createRadio({
   root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a),
   player: {
     makePlayable: sg => playable({ ...sg, kind: 'composed' }),
-    start: (p, bar) => { songLook(store.get('coding-misk-radio-look', 'studio')); return playSong(p, bar, 'radio'); },
+    start: (p, bar) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio'); },
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
     // a new window while the radio plays: the code on air does not change, the steps to come do
@@ -2392,7 +2399,7 @@ function renderStatic() {
   if (stylesTab) stylesTab.render();
   if (artistsTab) artistsTab.render();
   renderArtistPick();
-  $('#looks').innerHTML = LOOKS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('') + `<option value="soul" disabled>${esc(t('soulLook'))} ${LOCK}</option>`;
+  $('#looks').innerHTML = PICK_LOOKS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('') + `<option value="soul" disabled>${esc(t('soulLook'))} ${LOCK}</option>`;
   $('#looks').value = soulOverride ? 'soul' : look;
   $('#play').dataset.state = '';
 }
@@ -2408,7 +2415,7 @@ function changeLang(l) {
 }
 $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.dataset.lang)));
 // settings page (#31): the gear opens it, a second press goes back to the tab before
-settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: LOOKS, toast, confirmTwice,
+settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
     ui: () => ui, setUi: v => setUi(v), lang: () => getLang(), setLang: l => changeLang(l),
     volume: () => volume, setVolume: v => setVolume(v),

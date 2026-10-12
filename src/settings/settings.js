@@ -20,7 +20,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         <div class="card set-card"><h3>${esc(t('setLook'))}</h3>
           ${row(t('setTheme'), seg('data-set-ui', [['neon', 'NEON'], ['hw', 'HW']], app.ui()))}
           ${row(t('setLang'), seg('data-set-lang', [['it', 'IT'], ['en', 'EN']], app.lang()))}
-          ${row(t('setRadioLook'), `<select id="set-radio-look" data-no-knob>${looks.map(([k, l]) => opt(k, store.get('coding-misk-radio-look', 'studio'), tx(l))).join('')}</select>`, t('setRadioLookHint'))}
+          ${row(t('setRadioLook'), `<select id="set-radio-look" data-no-knob>${looks.map(([k, l]) => opt(k, store.get('coding-misk-radio-look', 'palco'), tx(l))).join('')}</select>`, t('setRadioLookHint'))}
         </div>
         <div class="card set-card"><h3>${esc(t('setAudio'))}</h3>
           ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`)}
