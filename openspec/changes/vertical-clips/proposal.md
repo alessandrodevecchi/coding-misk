@@ -2,30 +2,32 @@
 
 ## Why
 
-A long video of a song or a radio session is hard to share in pieces. The owner wants short vertical clips (9:16) cut from it, each pointing back to the full video, made in a few clicks or asked of an agent (#57). Songs and saved sessions can be rebuilt exactly from their saved settings and seed, so any stretch can be rendered again as a clip with the fast video pipeline (#53).
+A long video of a song or a radio session is hard to share in pieces. The owner wants short vertical videos (9:16) cut from it, each pointing back to the full video, made in a few clicks or asked of an agent (#57). Songs and saved sessions can be rebuilt exactly from their saved settings and seed, so any stretch can be rendered again with the fast video pipeline (#53). Every shared video also needs a title and a description in the app's voice.
 
 ## What Changes
 
-- **Vertical layouts** for a 1080×1920 picture, built from the same parts as the horizontal video (stage, code, soul, song card): stage above and code below; stage above and soul below; stage in the middle with a band above (the coding-misk logo) and a band below (a tagline and a line pointing to the full video); soul in the middle with the bands.
-- **Extracts** from a song or a saved session (playlist session, or the recipe file saved with a radio export):
-  - **N random extracts** of a chosen length (15, 30, 60 s or any), seeded, not overlapping, preferring the lively parts;
-  - **from a time to a time**, exact, matching the times of the long video of the same song or session.
-- Each extract renders faster than real time with the fast video pipeline, starting a few seconds early so notes and effects are already sounding, with a short fade in and out, and saves one MP4 per extract plus a small list of what was cut (source, times, titles).
-- **Where:** an Extracts action on song cards and on saved sessions; the vertical layout, text bands and length in Settings → Video next to the direction it already holds.
-- **Agents:** the same functions from the browser console (`codingMiskClips`), so an agent driving the app can ask for "5 extracts of 30 s" or "from 12:40 to 13:10".
-- **Live sessions:** cut after saving the session (the radio's + Playlist), not while live.
-- **Naming:** the radio export already has "Clip" (#5, a new song composed to an exact length); these are called **Extracts** to keep the two apart.
+- **Fragments** ("Frammenti"): short vertical videos cut from a song or a saved session.
+  - **Vertical layouts** at 1080×1920, from the same parts as the horizontal video: stage above and code below; stage above and soul below; stage in the middle with a band above (the coding-misk logo) and a band below (a tagline and a line pointing to the full video); soul in the middle with the bands. No artist names; the song title only when turned on.
+  - **Fragment label:** an old CRT terminal line typed on the picture, in the mood of science-fiction computers, for example `FRAGMENT S0UL·7QX2 #014`: a code from the source and its seed, and a number that grows with every fragment made.
+  - **Glitch frames:** the fragment opens and closes with the soul's glitch and "reading" screens (#46), with messages like "reading soul…", "signal found", "fragment recovered", drawn from a pool in the same mood.
+  - **N random fragments** of a chosen length (15, 30, 60 s or any), seeded, not overlapping, starting on bar lines and preferring the lively parts; or **from a time to a time**, exact, matching the long video of the same source.
+  - Rendered faster than real time, starting a few seconds early so notes and effects already sound, with a short fade in and out; one MP4 per fragment and a list of what was cut.
+  - **Sources:** built-in and saved songs, playlist sessions, the recipe file saved with a radio export. Live sessions are cut after saving.
+- **Texts for sharing:** the app proposes a title and a description for every fragment and for every long video or recording it saves: song list with times, genres, length, seed, and a few lines from a pool in the app's mood. They are saved next to the video and shown in a small panel to copy, edit and draw again.
+- **Where:** a Fragments action on song cards and on saved sessions; the vertical layout, bands, label and default length in Settings → Video next to the direction it already holds.
+- **Agents:** the same functions from the browser console (`codingMiskClips`), so an agent driving the app can ask for "5 fragments of 30 s" or "from 12:40 to 13:10", and for the texts.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `endless/vertical-clips`: vertical extracts of a song or a saved session, random or by time, rendered faster than real time with vertical layouts and text bands.
+- `endless/vertical-clips`: vertical fragments of a song or a saved session, random or by time, with vertical layouts, label and glitch frames, rendered faster than real time.
+- `endless/share-texts`: titles and descriptions proposed for fragments, long videos and recordings.
 
 ### Modified Capabilities
 
-None. The fast video (`fast-video` change, not yet archived) is reused as it is; its block render gains a start time, an implementation detail.
+None. The fast video (`fast-video` change, not yet archived) is reused; its block render gains a start time, an implementation detail.
 
 ## Impact
 
-- Video layouts (vertical areas, text bands), frame composer, fast block render (start offset, fade in), fast video export, a pure picker for random extracts, song card and playlist session actions, Settings → Video, console API, i18n, Guide, new checks (`check:clips` pure, `check-clips.cjs` in the browser).
+- Video layouts (vertical areas, bands, label), frame composer, soul glitch frames reused in the composer, fast block render (start offset, fade in), fast video and recording exports (texts next to the file), a pure picker for random fragments, a pure text generator, song card and playlist session actions, Settings → Video, console API, i18n, Guide, new checks (`check:clips` pure, `check-clips.cjs` in the browser).
