@@ -47,6 +47,24 @@ export function layoutAreas(layout, w, h, soul = null) {
   return out;
 }
 
+// fragments (#57): vertical layouts for a 1080×1920 picture. v-code: stage above, code below; v-soul: stage above, soul below;
+// v-bands: stage in the middle, a band above (the logo) and below (tagline, full-video line); v-soul-bands: the soul in the middle
+export const V_LAYOUTS = ['v-code', 'v-soul', 'v-bands', 'v-soul-bands'];
+export const V_QUALITY = { w: 1080, h: 1920, fps: 30, bps: 8e6 };
+export const V_DEFAULTS = { vLayout: 'v-bands', tagline: 'music written as code', fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
+// the areas of a vertical w×h picture: stage, soul (with its header), code, top and bottom bands; hidden parts are absent
+export function verticalAreas(layout, w, h) {
+  const pad = Math.round(w / 40), head = Math.round(h / 48);
+  if (layout === 'v-code' || layout === 'v-soul') {
+    const top = Math.round(h / 2);
+    const lower = { x: pad, y: top + pad, w: w - 2 * pad, h: h - top - 2 * pad };
+    return layout === 'v-code' ? { stage: { x: 0, y: 0, w, h: top }, code: lower } : { stage: { x: 0, y: 0, w, h: top }, soul: { ...lower, head } };
+  }
+  const band = Math.round((h - w) / 2), mid = { x: 0, y: band, w, h: w };
+  const bands = { top: { x: 0, y: 0, w, h: band }, bottom: { x: 0, y: band + w, w, h: h - band - w } };
+  return layout === 'v-soul-bands' ? { soul: { ...mid, head: 0 }, ...bands } : { stage: mid, ...bands };
+}
+
 // the first recording format the browser supports: MP4 (H.264 + AAC), else WebM
 export const MIMES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
 export const pickMime = supported => MIMES.find(m => supported(m)) || '';

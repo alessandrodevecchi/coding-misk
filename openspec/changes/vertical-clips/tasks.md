@@ -2,10 +2,10 @@
 
 ## 1. Pure parts
 
-- [ ] 1.1 Vertical layouts in `layoutAreas` (`v-code`, `v-soul`, `v-bands`, `v-soul-bands`) and a 1080×1920 quality; checked in `check:video`.
-- [ ] 1.2 Fragment picker: bar scores from tracks playing and section kind, seeded non-overlapping windows on bar lines, "as many as fit"; times for "from a time to a time" with range checks.
-- [ ] 1.3 Fragment label code and number; glitch message pool and pick by seed.
-- [ ] 1.4 Text generator: title and description from timeline, recipe and seed; song list with times, genres, length, seed, mood lines; no artist names. New `npm run check:clips` for 1.2 to 1.4.
+- [x] 1.1 Vertical layouts in `layoutAreas` (`v-code`, `v-soul`, `v-bands`, `v-soul-bands`) and a 1080×1920 quality; checked in `check:video`.
+- [x] 1.2 Fragment picker: bar scores from tracks playing and section kind, seeded non-overlapping windows on bar lines, "as many as fit"; times for "from a time to a time" with range checks.
+- [x] 1.3 Fragment label code and number; glitch message pool and pick by seed.
+- [x] 1.4 Text generator: title and description from timeline, recipe and seed; song list with times, genres, length, seed, mood lines; no artist names. New `npm run check:clips` for 1.2 to 1.4.
 
 ## 2. Render
 

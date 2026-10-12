@@ -24,7 +24,8 @@
     "check:compilation": "node --no-warnings tools/check-compilation.mjs",
     "check:video": "node --no-warnings tools/check-video.mjs",
     "check:export": "node --no-warnings tools/check-export.mjs",
-    "check:live": "node --no-warnings tools/check-live.mjs"
+    "check:live": "node --no-warnings tools/check-live.mjs",
+    "check:clips": "node --no-warnings tools/check-clips.mjs"
   },
   "dependencies": {
     "@mediabunny/flac-encoder": "^1.61.3",
