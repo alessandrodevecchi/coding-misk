@@ -51,7 +51,7 @@ Requires Node.js 20+. Samples load from GitHub at runtime, so a network connecti
 Scripts in `tools/` drive the running dev server with Playwright and Google Chrome (headless, `channel: 'chrome'`). They need `playwright-core`; on the owner's machine it ships with `playwright-cli`:
 
 ```sh
-export PLAYWRIGHT_CORE=/opt/homebrew/Cellar/playwright-cli/0.1.21/libexec/lib/node_modules/@playwright/cli/node_modules/playwright-core
+export PLAYWRIGHT_CORE=/opt/homebrew/opt/playwright-cli/libexec/lib/node_modules/@playwright/cli/node_modules/playwright-core
 node tools/check-levels.cjs luci-rosse insert-coin    # play every scene, print errors and peak levels per instrument
 node tools/screenshot-visual.cjs edgerunners luci-rosse 3 /tmp/edge   # stage screenshots of one visual
 node tools/screenshots.cjs /tmp/shots                 # README screenshots
