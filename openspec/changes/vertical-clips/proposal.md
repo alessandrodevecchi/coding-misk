@@ -6,7 +6,7 @@ A long video of a song or a radio session is hard to share in pieces. The owner 
 
 ## What Changes
 
-- **Vertical layouts** for a 1080×1920 picture, built from the same parts as the horizontal video (stage, code, soul, song card): stage above and code below; stage above and soul below; stage in the middle with a text band above and below (title, tagline, a line pointing to the full video); soul in the middle with the bands.
+- **Vertical layouts** for a 1080×1920 picture, built from the same parts as the horizontal video (stage, code, soul, song card): stage above and code below; stage above and soul below; stage in the middle with a band above (the coding-misk logo) and a band below (a tagline and a line pointing to the full video); soul in the middle with the bands.
 - **Extracts** from a song or a saved session (playlist session, or the recipe file saved with a radio export):
   - **N random extracts** of a chosen length (15, 30, 60 s or any), seeded, not overlapping, preferring the lively parts;
   - **from a time to a time**, exact, matching the times of the long video of the same song or session.

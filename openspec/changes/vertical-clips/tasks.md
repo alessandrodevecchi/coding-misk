@@ -9,7 +9,7 @@
 
 - [ ] 2.1 `renderInBlocks` start time (`job.start`): first block from `start - LEAD`, output shifted to 0, fade in; check that a 30 s extract matches the same stretch of the full render (levels and correlation, as `check-export` does).
 - [ ] 2.2 Fast video with a source time offset: frames, code typing, voice lines, song card and soul follow `start + t`.
-- [ ] 2.3 Composer: vertical layouts and text bands (title and artist, tagline, full-video line).
+- [ ] 2.3 Composer: vertical layouts and text bands (coding-misk logo with the equaliser above; tagline, full-video line and optional song title below; no artist names).
 
 ## 3. Extracts
 

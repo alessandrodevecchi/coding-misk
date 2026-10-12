@@ -8,15 +8,19 @@ Cut short vertical videos (9:16) from a song or a saved session, at random or be
 
 ### Requirement: Vertical layouts
 
-The app SHALL render extracts at 1080×1920 in one of these layouts: stage above and code below; stage above and soul below; stage in the middle with a text band above and below; soul in the middle with the text bands. The bands SHALL show the song title and artist, a tagline and a line pointing to the full video, each editable and each possible to leave empty. The visual and soul choices of the video direction SHALL apply to extracts too.
+The app SHALL render extracts at 1080×1920 in one of these layouts: stage above and code below; stage above and soul below; stage in the middle with a text band above and below; soul in the middle with the text bands. The visual and soul choices of the video direction SHALL apply to extracts too.
 
 #### Scenario: Stage and code
 - **WHEN** an extract renders in the layout "stage above, code below"
 - **THEN** the upper half shows the stage of the song at that moment and the lower half the code typing itself, at 1080×1920
 
+### Requirement: Text bands
+
+The upper band SHALL show the coding-misk logo. The lower band SHALL show a tagline and a line pointing to the full video, each editable and each possible to leave empty. Artist names SHALL not appear in extracts; the song title SHALL appear only when the listener turns it on.
+
 #### Scenario: Text bands
 - **WHEN** the layout has bands, the tagline is "music written as code" and the full-video line is empty
-- **THEN** the upper band shows the title and artist of the song playing, the lower band the tagline, and no third line
+- **THEN** the upper band shows the coding-misk logo, the lower band the tagline, and no artist name
 
 ### Requirement: Extracts between two times
 
@@ -36,7 +40,7 @@ The listener or an agent SHALL be able to ask for N extracts of a given length f
 
 #### Scenario: Five extracts
 - **WHEN** the listener asks for 5 extracts of 30 s from a 20 minute session
-- **THEN** five 30 s videos are saved, none overlapping, with a list of their times and titles
+- **THEN** five 30 s videos are saved, none overlapping, with a list of their times
 
 #### Scenario: Too many
 - **WHEN** the source is too short for N extracts of that length
@@ -44,7 +48,7 @@ The listener or an agent SHALL be able to ask for N extracts of a given length f
 
 ### Requirement: Sources and output
 
-Extracts SHALL come from built-in and saved songs, sessions saved in playlists, and the recipe file saved with a radio export. A live radio session SHALL be cut only after it is saved. Each extract SHALL be saved as one video file, and each batch with a list of its extracts (source, start, end, titles), faster than real time.
+Extracts SHALL come from built-in and saved songs, sessions saved in playlists, and the recipe file saved with a radio export. A live radio session SHALL be cut only after it is saved. Each extract SHALL be saved as one video file, and each batch with a list of its extracts (source, start, end, song titles), faster than real time.
 
 #### Scenario: From a radio export
 - **WHEN** the listener loads the recipe file saved with a 60 minute radio export and asks for extracts
