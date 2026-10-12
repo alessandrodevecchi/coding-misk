@@ -88,15 +88,16 @@ const db = (a, b) => 20 * Math.log10((a.reduce((x, y) => x + y, 0) / a.length) /
   if (SHOTS) {
     await page.click('#songs [data-song-id="kellerlicht"] [data-act="play"]'); await sleep(3000);
     const looks = await page.$$eval('#looks option:not([disabled])', o => o.map(x => x.value));
-    for (const layout of ['v-code', 'v-soul', 'v-bands', 'v-soul-bands']) {
+    const CHOICES = { 'v-code': { show: 'visual-code', aspect: 'fill', bands: false }, 'v-soul': { show: 'visual-soul', aspect: 'fill', bands: false }, 'v-bands': { show: 'visual', aspect: '1:1', bands: true }, 'v-169-bands': { show: 'visual', aspect: '16:9', bands: true }, 'turned': { show: 'visual-code', aspect: 'fill', bands: true, rotate: true }, 'square': { format: '1:1', show: 'visual', aspect: 'fill', bands: true } };
+    for (const layout of Object.keys(CHOICES)) {
       const urls = [];
       for (const look of looks) {
         await page.selectOption('#looks', look); await sleep(700);
-        urls.push(await page.evaluate(l => { const v = globalThis.codingMiskVideo; v.composeVertical({ layout: l, q: { w: 540, h: 960 }, o: { tagline: 'music written as code', label: true, glitch: true }, label: 'FRAGMENT S0UL·7QX2K #014', code: 'X', msgs: { open: 'a', close: 'b' }, length: 30 }, 8, performance.now() / 1000, 5, [.5, .5, .5, .5, .5, .5, .5]); return v.canvas.toDataURL('image/jpeg', .8); }, layout));
+        urls.push(await page.evaluate(c => { const v = globalThis.codingMiskVideo, f = c.format === '1:1' ? { w: 540, h: 540 } : { w: 540, h: 960 }, comp = c.rotate ? { w: f.h, h: f.w } : f; v.composeVertical({ q: f, comp, o: { tagline: 'music written as code', label: true, glitch: true, codeMode: 'focus', ...c }, label: 'FRAGMENT S0UL·7QX2K #014', code: 'X', msgs: { open: 'a', close: 'b' }, length: 30 }, 40, performance.now() / 1000, 5, [.5, .5, .5, .5, .5, .5, .5], 2); return v.canvas.toDataURL('image/jpeg', .8); }, CHOICES[layout]));
       }
       urls.forEach((u, i) => fs.writeFileSync(path.join(SHOTS, `clip-${layout}-${looks[i]}.jpg`), Buffer.from(u.split(',')[1], 'base64')));
     }
-    check(true, `screenshots of ${looks.length} visuals in 4 layouts`, SHOTS);
+    check(true, `screenshots of ${looks.length} visuals in ${Object.keys(CHOICES).length} layouts`, SHOTS);
   }
   check(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();

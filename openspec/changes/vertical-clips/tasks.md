@@ -24,3 +24,10 @@
 
 - [x] 4.1 i18n (EN and IT), Guide card, DEVLOG, ARCHITECTURE, AGENTS tooling lines.
 - [x] 4.2 Browser check `tools/check-clips.cjs`: random and timed fragments from a song and a saved session, 1080×1920 files with sound (ffprobe), match with the long video, label numbers, glitch frames, every visual in each vertical layout (screenshots), texts saved, console API.
+
+## 5. Formats and content (second step)
+
+- [x] 5.1 Formats (9:16, 4:5, 1:1, 16:9), what to show, the visual's proportions, bands; areas for portrait and landscape; old layout names mapped.
+- [x] 5.2 Turned picture (composition at the swapped size, drawn rotated).
+- [x] 5.3 Code modes: focus on the part playing, scroll, follow.
+- [x] 5.4 Menu and settings: the new choices and a live preview of the composition.

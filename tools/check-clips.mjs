@@ -2,7 +2,7 @@
 // times, label and glitch messages, and the texts for sharing. No browser.
 //   npm run check:clips      exit 1 when any check fails
 import { readFileSync } from 'node:fs';
-import { V_LAYOUTS, V_QUALITY, verticalAreas } from '../src/video/layout.js';
+import { F_FORMATS, F_SHOWS, F_ASPECTS, fragmentAreas, fragmentOpts, fragmentSize } from '../src/video/layout.js';
 import { pickFragments, fragmentBetween, parseTime, clockOf, barScores, sectionWeight, fragmentCode, fragmentLabel, glitchMessages, glitchAt, shapeOf } from '../src/video/fragments.js';
 import { textsFor } from '../src/video/texts.js';
 import { absoluteClips } from '../src/endless/transitions.js';
@@ -24,15 +24,28 @@ for (let i = 0; i < 40; i++) {
 const longBpm = Array(640).fill(124);
 
 const CHECKS = {
-  'vertical layouts: parts inside 1080×1920, no overlap'() {
-    for (const l of V_LAYOUTS) {
-      const A = verticalAreas(l, V_QUALITY.w, V_QUALITY.h), parts = Object.entries(A);
-      parts.forEach(([n, a]) => assert(inside(a, 1080, 1920), `${l} ${n} inside`));
-      for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) assert(!overlap(parts[i][1], parts[j][1]), `${l} ${parts[i][0]}/${parts[j][0]}`);
+  'every format, show, proportion and band choice: parts inside, no overlap'() {
+    for (const [fk, f] of Object.entries(F_FORMATS)) for (const show of F_SHOWS) for (const aspect of F_ASPECTS) for (const bands of [true, false]) for (const rotate of [false, true]) {
+      const o = fragmentOpts({ format: fk, show, aspect, bands, rotate }), { comp } = fragmentSize(o), A = fragmentAreas(o, comp.w, comp.h), parts = Object.entries(A);
+      const tag = `${fk} ${show} ${aspect} ${bands} ${rotate}`;
+      parts.forEach(([n, a]) => assert(inside(a, comp.w, comp.h), `${tag} ${n} inside`));
+      for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) assert(!overlap(parts[i][1], parts[j][1]), `${tag} ${parts[i][0]}/${parts[j][0]}`);
+      assert(!!A.stage === show.startsWith('visual') && !!A.code === show.includes('code') && !!A.soul === show.includes('soul'), `${tag} shows ${Object.keys(A)}`);
     }
-    assert(verticalAreas('v-bands', 1080, 1920).stage.w === 1080 && verticalAreas('v-bands', 1080, 1920).stage.h === 1080, 'square stage');
-    assert(verticalAreas('v-code', 1080, 1920).code && !verticalAreas('v-code', 1080, 1920).soul, 'code below');
-    assert(verticalAreas('v-soul-bands', 1080, 1920).soul && !verticalAreas('v-soul-bands', 1080, 1920).stage, 'soul in the middle');
+  },
+  'proportions: a 16:9 visual in a 9:16 frame leaves the rest to the bands'() {
+    const o = fragmentOpts({ format: '9:16', show: 'visual', aspect: '16:9', bands: true }), A = fragmentAreas(o, 1080, 1920);
+    assert(A.stage.w === 1080 && A.stage.h === 608 && A.top.h + A.bottom.h === 1920 - 608, JSON.stringify(A));
+  },
+  'turned by 90°: a 9:16 file composed as 16:9'() {
+    const z = fragmentSize(fragmentOpts({ format: '9:16', rotate: true }));
+    assert(z.file.w === 1080 && z.file.h === 1920 && z.comp.w === 1920 && z.comp.h === 1080, JSON.stringify(z));
+    const A = fragmentAreas(fragmentOpts({ show: 'visual-code', aspect: 'fill', bands: true }), 1920, 1080);
+    assert(A.strip && A.stage.w === 1280 && A.code.x >= 1280, 'landscape: stage and code side by side, a strip below');
+  },
+  'old layout names still work'() {
+    const o = fragmentOpts({ vLayout: 'v-soul-bands' });
+    assert(o.show === 'soul' && o.bands === true, JSON.stringify(o));
   },
   'section weights: drops above verses above intros'() {
     assert(sectionWeight('3 Drop') > sectionWeight('Verse') && sectionWeight('Verse') > sectionWeight('1 Intro') && sectionWeight('Outro') < .5, 'weights');

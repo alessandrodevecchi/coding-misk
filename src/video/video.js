@@ -3,7 +3,7 @@
 // The frame is drawn after each stage frame, so it follows the music exactly as the stage does.
 import { QUALITIES, VIDEO_DEFAULTS, LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
 import { liveAreas, lerpAreas, ease, presetOf, TRANSITION } from '../live/presets.js';
-import { verticalAreas } from './layout.js';
+import { fragmentAreas } from './layout.js';
 import { glitchAt, GLITCH_SECONDS } from './fragments.js';
 import { hashString } from '../endless/random.js';
 
@@ -68,7 +68,8 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     }
     return out;
   }
-  function drawCode(A, P, now, frameH) {
+  // co: { mode: 'follow' | 'scroll' | 'focus', progress 0..1 (scroll), section: the section playing (focus), cyc }
+  function drawCode(A, P, now, frameH, co = null) {
     const src = getCode() || '';
     if (src !== code) {
       let i = 0; while (i < src.length && i < code.length && src[i] === code[i]) i++;
@@ -86,7 +87,9 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     const cw = g.measureText('M').width, cols = Math.max(20, Math.floor((A.w - padX * 2) / cw)), ind = 2;
     const rows = [];
     let pos = 0, caret = null;
-    for (const ln of code.split('\n')) {
+    const lines = code.split('\n');
+    for (let li = 0; li < lines.length; li++) {
+      const ln = lines[li];
       let i = 0;
       do {
         const first = i === 0;
@@ -95,18 +98,37 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
         if (i + len < ln.length) { const cut = Math.max(ln.lastIndexOf(' ', i + len - 1), ln.lastIndexOf(',', i + len - 1)) + 1; if (cut > i + len * .5) len = cut - i; }
         const part = ln.slice(i, i + len);
         if (caret === null && lastEdit >= pos + i && (lastEdit <= pos + i + part.length)) caret = { row: rows.length, col: (first ? 0 : ind) + lastEdit - pos - i };
-        rows.push({ line: ln, from: i, text: part, indent: first ? 0 : ind });
+        rows.push({ line: ln, li, from: i, text: part, indent: first ? 0 : ind });
         i += len;
       } while (i < ln.length);
       pos += ln.length + 1;
     }
     if (!caret) caret = { row: rows.length - 1, col: 0 };
-    const fit = Math.floor((A.h - head) / lh);
+    const fit = Math.floor((A.h - head) / lh), maxScroll = Math.max(0, rows.length - fit);
     // the row being edited sits in the upper third, when the code is longer than the panel
-    const want = Math.max(0, Math.min(rows.length - fit, caret.row - Math.floor(fit / 3)));
+    let want = Math.max(0, Math.min(maxScroll, caret.row - Math.floor(fit / 3)));
+    // fragments (#57): scroll through all the code, or focus on the lines of the section playing
+    let active = null;
+    if (co && co.mode === 'scroll') want = maxScroll * Math.max(0, Math.min(1, co.progress || 0));
+    if (co && co.mode === 'focus' && co.section >= 0) {
+      const re = new RegExp(`\\bsection${co.section + 1}\\b`), on = new Set();
+      lines.forEach((ln, i) => { if (re.test(ln) && !/^\s*const\s/.test(ln)) { on.add(i); if (i > 0 && /^\s*\/\//.test(lines[i - 1])) on.add(i - 1); } });
+      if (on.size) {
+        active = on;
+        // the blocks of the section, one after another every two bars
+        const blocks = [...on].filter(i => !on.has(i - 1)), li = blocks[Math.floor((co.cyc || 0) / 2) % blocks.length];
+        const row = rows.findIndex(r => r.li === li);
+        if (row >= 0) want = Math.max(0, Math.min(maxScroll, row - Math.floor(fit / 3)));
+      }
+    }
     let scroll = scrolls.get(g.canvas) ?? want;
     scroll += (want - scroll) * .12; scrolls.set(g.canvas, scroll);
     const y0 = A.y + head + lh * .8 - scroll * lh;
+    // the active lines glow, a little brighter on every beat
+    if (active) {
+      const beat = 1 - ((co.cyc || 0) * 4 % 1);
+      rows.forEach((r, k) => { if (!active.has(r.li)) return; const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return; g.fillStyle = P.a1; g.globalAlpha = (A.a ?? 1) * (.12 + .14 * beat); g.fillRect(A.x + 4, y - fs * 1.02, A.w - 8, lh); g.globalAlpha = A.a ?? 1; g.fillStyle = P.a1; g.fillRect(A.x + 4, y - fs * 1.02, Math.max(3, fs * .18), lh); });
+    }
     rows.forEach((r, k) => {
       const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
       // colours come from the whole line, so a string or comment cut by the wrap keeps its colour
@@ -262,7 +284,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
   // ---------- fragments (#57): the vertical picture, its bands, the CRT label and the glitch frames ----------
   // the coding-misk logo: "coding" in neon script over the chrome "MISK", with a small equaliser on the music
   function drawLogo(A, levels) {
-    const u = Math.min(A.h / 420, 1.15), cx = A.x + A.w / 2 - 60 * u, cy = A.y + A.h * .55;
+    const u = Math.min(A.h / 420, A.w / 1080, 1.15), cx = A.x + A.w / 2 - 60 * u, cy = A.y + A.h * .55;
     g.save(); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
     const chromeSize = Math.round(200 * u);
     g.font = `${chromeSize}px "Russo One", "Chakra Petch", sans-serif`;
@@ -284,7 +306,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     g.restore();
   }
   function drawBottomBand(A, P, o, info) {
-    const u = Math.min(A.h / 420, 1.15), lines = [];
+    const u = Math.min(A.h / 420, A.w / 1080, 1.15), lines = [];
     if (o.vTitle && info.title) lines.push({ text: info.title, font: `700 ${Math.round(52 * u)}px "Chakra Petch", sans-serif`, color: '#fff' });
     if (o.tagline) lines.push({ text: o.tagline, font: `600 ${Math.round(60 * u)}px "Chakra Petch", sans-serif`, color: P.ink });
     if (o.fullLine) lines.push({ text: o.fullLine, font: `600 ${Math.round(42 * u)}px "JetBrains Mono", monospace`, color: P.a1 });
@@ -298,7 +320,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
   function drawLabel(Q, text, t, y) {
     const typed = Math.max(0, Math.min(text.length, Math.floor((t - GLITCH_SECONDS * .8) * 28)));
     if (!typed) return;
-    const fs = Math.round(Q.w / 19), pad = fs * .45, shown = text.slice(0, typed) + (typed < text.length || Math.floor(t * 2) % 2 ? '█' : ' ');
+    const fs = Math.round(Math.min(Q.w, Q.h) / 19), pad = fs * .45, shown = text.slice(0, typed) + (typed < text.length || Math.floor(t * 2) % 2 ? '█' : ' ');
     g.save(); g.font = `${fs}px "VT323", "Share Tech Mono", monospace`; g.textBaseline = 'middle';
     const w = g.measureText(text + '█').width + pad * 2, h = fs * 1.25, x = (Q.w - w) / 2;
     g.fillStyle = 'rgba(8,6,2,.72)'; g.fillRect(x, y, w, h);
@@ -325,7 +347,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     g.globalAlpha = .5 * k;
     for (let i = 0; i < 260 * k; i++) { g.fillStyle = rnd() > .5 ? '#3dffb0' : '#ff4fa3'; g.fillRect(rnd() * Q.w, rnd() * Q.h, 2 + rnd() * 40, 2); }
     g.globalAlpha = Math.min(1, k * 1.6);
-    const fs = Math.round(Q.w / 15);
+    const fs = Math.round(Math.min(Q.w, Q.h) / 15);
     g.font = `${fs}px "VT323", "Share Tech Mono", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = '#3dffb0'; g.shadowColor = '#3dffb0'; g.shadowBlur = fs * .4;
     g.fillText(`> ${msg}${Math.floor(t * 4) % 2 ? '_' : ' '}`, Q.w / 2, Q.h / 2);
@@ -336,25 +358,39 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
   function drawVPreview(cyc) {
     if (!vPrev || !vPrev.el.isConnected || !vPrev.el.offsetParent) return;
     const now = performance.now() / 1000; if (now - vPrevAt < 1 / 12) return; vPrevAt = now;
-    const o = vPrev.opts(), t = 3 + (now % 6);
-    composeVertical({ layout: o.vLayout, q: { w: 540, h: 960 }, o, label: o.label ? `FRAGMENT S0UL·7QX2K #${String(o.next || 1).padStart(3, '0')}` : '', code: 'PREVIEW', msgs: { open: 'reading soul…', close: 'fragment recovered' }, length: 12 }, cyc, now, t, [.4, .7, .3, .9, .5, .6, .35]);
-    vPrev.el.getContext('2d').drawImage(cv, 0, 0, vPrev.el.width, vPrev.el.height);
+    const o = vPrev.opts(), t = 3 + (now % 6), f = o.size;
+    const el = vPrev.el, k = Math.min(el.width / f.file.w, el.height / f.file.h);
+    composeVertical({ q: { w: Math.round(f.file.w / 2), h: Math.round(f.file.h / 2) }, comp: { w: Math.round(f.comp.w / 2), h: Math.round(f.comp.h / 2) }, o, label: o.label ? `FRAGMENT S0UL·7QX2K #${String(o.next || 1).padStart(3, '0')}` : '', code: 'PREVIEW', msgs: { open: 'reading soul…', close: 'fragment recovered' }, length: 12 }, cyc, now, t, [.4, .7, .3, .9, .5, .6, .35], vPrev.section ? vPrev.section(cyc) : -1);
+    const pg = el.getContext('2d'), w = f.file.w * k, h = f.file.h * k;
+    pg.fillStyle = '#000'; pg.fillRect(0, 0, el.width, el.height); pg.drawImage(cv, (el.width - w) / 2, (el.height - h) / 2, w, h);
   }
-  // a frame of a fragment into the video canvas. J: { layout, q, o (settings), label, code, msgs, length }
-  function composeVertical(J, cyc, now, t, levels) {
-    const Q = J.q, P = palette(), o = J.o || {};
+  // a frame of a fragment into the video canvas. J: { o (settings), q: the file's size, comp: the size it is composed at
+  // (turned by 90° when o.rotate), label, code, msgs, length }; section: the index of the section playing
+  let turnCv = null;
+  function composeVertical(J, cyc, now, t, levels, section = -1) {
+    const Q = J.q, C = J.comp || Q, P = palette(), o = J.o || {};
     if (cv.width !== Q.w || cv.height !== Q.h) { cv.width = Q.w; cv.height = Q.h; }
-    const A = verticalAreas(J.layout, Q.w, Q.h);
-    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
-    g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
-    if (A.stage) { drawStage(A.stage); drawSay(A.stage); }
-    if (A.soul && soulFrame) { const bw = A.soul.w - 8, bh = A.soul.h - A.soul.head - 4; drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, Math.min(bw / 1200, bh / 760)))); }
-    if (A.code) drawCode(A.code, P, now, Q.w * 1.6);
-    if (A.top) drawLogo(A.top, levels);
-    if (A.bottom) drawBottomBand(A.bottom, P, o, getInfo(cyc) || {});
-    if (o.label !== false && J.label) drawLabel(Q, J.label, t, A.top ? A.top.h + Q.w * .03 : Q.w * .04);
-    const gl = o.glitch !== false ? glitchAt(t, J.length) : null;
-    if (gl && gl.k > 0) drawGlitch(Q, gl.k, gl.phase === 'open' ? J.msgs.open : J.msgs.close, t, J.code);
+    const turned = C.w !== Q.w, keep = g;
+    if (turned) { turnCv = turnCv || document.createElement('canvas'); if (turnCv.width !== C.w || turnCv.height !== C.h) { turnCv.width = C.w; turnCv.height = C.h; } g = turnCv.getContext('2d'); }
+    try {
+      const A = fragmentAreas(o, C.w, C.h);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
+      g.fillStyle = P.bg; g.fillRect(0, 0, C.w, C.h);
+      if (A.stage) { drawStage(A.stage); drawSay(A.stage); }
+      if (A.soul && soulFrame) drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, Math.min((A.soul.w - 8) / 1200, (A.soul.h - 4) / 760))));
+      if (A.code) drawCode(A.code, P, now, Math.min(C.w, C.h) * 1.6, { mode: o.codeMode || 'focus', progress: t / (J.length || 1), section, cyc });
+      if (A.top) drawLogo(A.top, levels);
+      if (A.bottom) drawBottomBand(A.bottom, P, o, getInfo(cyc) || {});
+      if (A.strip) {
+        drawLogo({ x: A.strip.x + A.strip.h * .2, y: A.strip.y, w: A.strip.h * 3.6, h: A.strip.h * 1.25 }, levels);
+        drawBottomBand({ x: A.strip.x + A.strip.w * .38, y: A.strip.y, w: A.strip.w * .6, h: A.strip.h * 1.5 }, P, o, getInfo(cyc) || {});
+      }
+      const labelY = A.top ? A.top.h + Math.min(C.w, C.h) * .03 : Math.min(C.w, C.h) * .04;
+      if (o.label !== false && J.label) drawLabel(C, J.label, t, labelY);
+      const gl = o.glitch !== false ? glitchAt(t, J.length) : null;
+      if (gl && gl.k > 0) drawGlitch(C, gl.k, gl.phase === 'open' ? J.msgs.open : J.msgs.close, t, J.code);
+    } finally { g = keep; }
+    if (turned) { g.setTransform(0, 1, -1, 0, Q.w, 0); g.drawImage(turnCv, 0, 0); g.setTransform(1, 0, 0, 1, 0, 0); }
   }
 
   // ---------- the live picture (#52): drawn into the broadcast window's canvas, with presets and transitions ----------
@@ -421,7 +457,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     start, end, askTab, frame, opts, setOpt,
     // a frame of a fragment (#57), and the settings' preview of one
     composeVertical,
-    previewVertical(el, opts) { vPrev = el ? { el, opts } : null; },
+    previewVertical(el, opts, section = null) { vPrev = el ? { el, opts, section } : null; },
     // the live picture (#52)
     live: {
       draw: drawLive, preview: drawLivePreview, setPreset: setLivePreset,

@@ -7,7 +7,10 @@ A long video of a song or a radio session is hard to share in pieces. The owner 
 ## What Changes
 
 - **Fragments** ("Frammenti"): short vertical videos cut from a song or a saved session.
-  - **Vertical layouts** at 1080×1920, from the same parts as the horizontal video: stage above and code below; stage above and soul below; stage in the middle with a band above (the coding-misk logo) and a band below (a tagline and a line pointing to the full video); soul in the middle with the bands. No artist names; the song title only when turned on.
+  - **Formats and content:** 9:16, 4:5, 1:1 or 16:9; showing visual, visual and code, visual and soul, soul, or code; the visual's proportions inside the format (for example a 16:9 visual in a 9:16 frame), the rest going to a band above (the coding-misk logo) and a band below (a tagline and a line pointing to the full video), or a strip in landscape. No artist names; the song title only when turned on.
+  - **Turned by 90°:** a landscape composition turned inside a vertical file, for viewers who turn the phone.
+  - **Code:** focus on the part playing (lit at every bar), scroll through all of it, or follow the edits.
+  - **Preview** of the composition in the menu and in the settings, before making.
   - **Fragment label:** an old CRT terminal line typed on the picture, in the mood of science-fiction computers, for example `FRAGMENT S0UL·7QX2 #014`: a code from the source and its seed, and a number that grows with every fragment made.
   - **Glitch frames:** the fragment opens and closes with the soul's glitch and "reading" screens (#46), with messages like "reading soul…", "signal found", "fragment recovered", drawn from a pool in the same mood.
   - **N random fragments** of a chosen length (15, 30, 60 s or any), seeded, not overlapping, starting on bar lines and preferring the lively parts; or **from a time to a time**, exact, matching the long video of the same source.

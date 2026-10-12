@@ -1036,8 +1036,12 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
   /* the radio's export range (#8) */
   .radio-export-menu { display: grid; gap: 6px; padding: 10px 12px; max-width: 360px; }
   /* fragments menu and the texts panel (#57) */
-  .vid-preview.v canvas { width: 108px; height: 192px; aspect-ratio: 9 / 16; }
-  .frag-menu { display: grid; gap: 8px; padding: 10px 12px; max-width: 460px; margin-top: 8px; }
+  .vid-preview.v canvas { width: 180px; height: 180px; aspect-ratio: 1; }
+  .frag-menu { display: grid; gap: 8px; padding: 10px 12px; max-width: 680px; margin-top: 8px; }
+  .fm-body { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+  .fm-form { display: grid; gap: 8px; flex: 1 1 300px; }
+  .fm-prev { margin: 0; display: grid; gap: 4px; justify-items: center; }
+  .fm-prev canvas { width: 135px; height: 240px; border: 1px solid var(--line); border-radius: 6px; background: #000; }
   .frag-menu .rx-opt input[type=number] { width: 58px; }
   .tp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .tp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

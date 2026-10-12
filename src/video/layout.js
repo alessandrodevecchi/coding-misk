@@ -47,23 +47,56 @@ export function layoutAreas(layout, w, h, soul = null) {
   return out;
 }
 
-// fragments (#57): vertical layouts for a 1080×1920 picture. v-code: stage above, code below; v-soul: stage above, soul below;
-// v-bands: stage in the middle, a band above (the logo) and below (tagline, full-video line); v-soul-bands: the soul in the middle
-export const V_LAYOUTS = ['v-code', 'v-soul', 'v-bands', 'v-soul-bands'];
-export const V_QUALITY = { w: 1080, h: 1920, fps: 30, bps: 8e6 };
-export const V_DEFAULTS = { vLayout: 'v-bands', tagline: 'music written as code', fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
-// the areas of a vertical w×h picture: stage, soul (with its header), code, top and bottom bands; hidden parts are absent
-export function verticalAreas(layout, w, h) {
-  const pad = Math.round(w / 40), head = Math.round(h / 48);
-  if (layout === 'v-code' || layout === 'v-soul') {
-    const top = Math.round(h / 2);
-    const lower = { x: pad, y: top + pad, w: w - 2 * pad, h: h - top - 2 * pad };
-    return layout === 'v-code' ? { stage: { x: 0, y: 0, w, h: top }, code: lower } : { stage: { x: 0, y: 0, w, h: top }, soul: { ...lower, head } };
+// fragments (#57): the picture's format, what it shows, the proportions of the visual or soul inside it, the bands
+// (logo above, tagline below; a strip at the bottom in landscape), a picture turned by 90° for a phone held sideways,
+// and how the code moves (follow the edits, scroll through all of it, or focus on the part playing)
+export const F_FORMATS = { '9:16': { w: 1080, h: 1920 }, '4:5': { w: 1080, h: 1350 }, '1:1': { w: 1080, h: 1080 }, '16:9': { w: 1920, h: 1080 } };
+export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code'];
+export const F_ASPECTS = ['fill', '16:9', '4:3', '1:1', '4:5', '9:16'];
+export const F_CODE = ['focus', 'scroll', 'follow'];
+export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', tagline: 'music written as code', fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
+// the layouts of the first version, kept for saved settings and agents
+const OLD = { 'v-code': { show: 'visual-code', aspect: 'fill', bands: false }, 'v-soul': { show: 'visual-soul', aspect: 'fill', bands: false }, 'v-bands': { show: 'visual', aspect: '1:1', bands: true }, 'v-soul-bands': { show: 'soul', aspect: 'fill', bands: true } };
+export function fragmentOpts(o = {}) {
+  const r = { ...V_DEFAULTS, ...(OLD[o.vLayout] || {}), ...(OLD[o.layout] || {}), ...o };
+  if (!F_FORMATS[r.format]) r.format = V_DEFAULTS.format;
+  if (!F_SHOWS.includes(r.show)) r.show = V_DEFAULTS.show;
+  if (!F_ASPECTS.includes(r.aspect)) r.aspect = V_DEFAULTS.aspect;
+  if (!F_CODE.includes(r.codeMode)) r.codeMode = V_DEFAULTS.codeMode;
+  return r;
+}
+// the file's size, and the size the picture is composed at (turned: the other way round)
+export const fragmentSize = o => { const f = F_FORMATS[o.format] || F_FORMATS['9:16']; return { file: { ...f, fps: 30, bps: f.w * f.h > 2e6 ? 8e6 : 6e6 }, comp: o.rotate ? { w: f.h, h: f.w } : { w: f.w, h: f.h } }; };
+const ratioOf = a => { const [x, y] = String(a).split(':').map(Number); return x / y; };
+const SOUL = 1200 / 760;
+// a box of ratio r fitted in a box of w×h at (x, y), centred
+const fit = (x, y, w, h, r) => { const bw = Math.min(w, h * r), bh = bw / r; return { x: Math.round(x + (w - bw) / 2), y: Math.round(y + (h - bh) / 2), w: Math.round(bw), h: Math.round(bh) }; };
+// the areas of a w×h picture: stage, soul (with head 0), code, and bands top and bottom (portrait) or a strip (landscape)
+export function fragmentAreas(o, w, h) {
+  const show = o.show || 'visual', main = show === 'soul' ? 'soul' : show === 'code' ? 'code' : 'stage';
+  const second = show === 'visual-code' ? 'code' : show === 'visual-soul' ? 'soul' : null;
+  const r1 = main === 'code' ? null : o.aspect && o.aspect !== 'fill' ? ratioOf(o.aspect) : main === 'soul' ? SOUL : null;
+  const pad = Math.round(Math.min(w, h) / 40), out = {};
+  const box = (kind, b) => { out[kind] = kind === 'soul' ? { ...b, head: 0 } : kind === 'code' ? { x: b.x + pad, y: b.y, w: b.w - 2 * pad, h: b.h } : b; };
+  if (h >= w) {
+    const band = o.bands ? Math.round(h * 0.13) : 0, top = band, avail = h - 2 * band;
+    let h1, h2 = 0;
+    if (main === 'code') h1 = avail;
+    else if (!r1) h1 = second ? Math.round(avail * 0.5) : avail;
+    else h1 = Math.min(Math.round(w / r1), second ? Math.round(avail * 0.62) : avail);
+    if (second === 'code') h2 = avail - h1 - pad;
+    else if (second === 'soul') h2 = Math.min(avail - h1 - pad, Math.round(w / SOUL));
+    const used = h1 + (second ? pad + h2 : 0), y0 = Math.round(top + (avail - used) / 2);
+    box(main, r1 ? fit(0, y0, w, h1, r1) : { x: 0, y: y0, w, h: h1 });
+    if (second) box(second, { x: 0, y: y0 + h1 + pad, w, h: h2 });
+    if (o.bands) { out.top = { x: 0, y: 0, w, h: y0 }; out.bottom = { x: 0, y: y0 + used, w, h: h - y0 - used }; }
+    return out;
   }
-  // the stage is square; the soul keeps its screen's 1200×760 proportions, so its bands are taller
-  const mh = layout === 'v-soul-bands' ? Math.round(w * 760 / 1200) + 8 : w, band = Math.round((h - mh) / 2), mid = { x: 0, y: band, w, h: mh };
-  const bands = { top: { x: 0, y: 0, w, h: band }, bottom: { x: 0, y: band + mh, w, h: h - band - mh } };
-  return layout === 'v-soul-bands' ? { soul: { ...mid, head: 0 }, ...bands } : { stage: mid, ...bands };
+  const strip = o.bands ? Math.round(h * 0.14) : 0, avail = h - strip, w1 = second ? Math.round(w * 2 / 3) : w;
+  box(main, r1 ? fit(0, 0, w1, avail, r1) : { x: 0, y: 0, w: w1, h: avail });
+  if (second) { const b = { x: w1, y: pad, w: w - w1, h: avail - 2 * pad }; box(second, second === 'soul' ? fit(b.x + pad, b.y, b.w - 2 * pad, b.h, SOUL) : b); }
+  if (o.bands) out.strip = { x: 0, y: avail, w, h: strip };
+  return out;
 }
 
 // the first recording format the browser supports: MP4 (H.264 + AAC), else WebM

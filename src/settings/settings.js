@@ -3,7 +3,7 @@
 import { makeBackup, mergeBackup } from './backup.js';
 import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
-import { LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, V_LAYOUTS, V_DEFAULTS } from '../video/layout.js';
+import { LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, fragmentOpts, fragmentSize } from '../video/layout.js';
 import { FORMATS, MP3_RATES, formatOf } from '../export/encode.js';
 
 
@@ -14,7 +14,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
 
   function render() {
     if (root.hidden) return;
-    const fmt = formatOf(store.get('coding-misk-export-format', 'wav')), r = app.radioSettings(), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) }, presets = store.get('coding-misk-video-presets', {}) || {}, fr = { ...V_DEFAULTS, ...(store.get('coding-misk-fragments', {}) || {}) };
+    const fmt = formatOf(store.get('coding-misk-export-format', 'wav')), r = app.radioSettings(), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) }, presets = store.get('coding-misk-video-presets', {}) || {}, fr = fragmentOpts(store.get('coding-misk-fragments', {}) || {});
     root.innerHTML = `<p class="intro">${esc(t('setIntro'))}</p>
       <div class="set-grid">
         <div class="card set-card"><h3>${esc(t('setLook'))}</h3>
@@ -40,8 +40,13 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         </div>
         <div class="card set-card" id="set-fragments"><h3>${esc(t('setVertical'))}</h3>
           <p class="muted">${esc(t('setVerticalIntro'))}</p>
-          <figure class="vid-preview v"><canvas id="set-frag-preview" width="216" height="384" aria-label="${esc(t('vidPreview'))}"></canvas></figure>
-          ${row(t('fragLayoutLbl'), `<select data-frag-opt="vLayout" data-no-knob>${V_LAYOUTS.map(k => opt(k, fr.vLayout, t(`fragLayout:${k}`))).join('')}</select>`)}
+          <figure class="vid-preview v"><canvas id="set-frag-preview" width="270" height="270" aria-label="${esc(t('vidPreview'))}"></canvas></figure>
+          ${row(t('fragFormat'), `<select data-frag-opt="format" data-no-knob>${Object.keys(F_FORMATS).map(k => opt(k, fr.format, t(`fragFormat:${k}`))).join('')}</select>`)}
+          ${row(t('fragShow'), `<select data-frag-opt="show" data-no-knob>${F_SHOWS.map(k => opt(k, fr.show, t(`fragShow:${k}`))).join('')}</select>`)}
+          ${row(t('fragAspect'), `<select data-frag-opt="aspect" data-no-knob>${F_ASPECTS.map(k => opt(k, fr.aspect, t(`fragAspect:${k}`))).join('')}</select>`, t('fragAspectHint'))}
+          ${row(t('fragBands'), seg('data-fb-bands', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bands ? '1' : '0'))}
+          ${row(t('fragRotate'), seg('data-fb-rotate', [['1', t('fragOn')], ['0', t('fragOff')]], fr.rotate ? '1' : '0'), t('fragRotateHint'))}
+          ${row(t('fragCode'), `<select data-frag-opt="codeMode" data-no-knob>${F_CODE.map(k => opt(k, fr.codeMode, t(`fragCode:${k}`))).join('')}</select>`, t(`fragCodeHint:${fr.codeMode}`))}
           ${row(t('setFragTagline'), `<input type="text" data-frag-opt="tagline" value="${esc(fr.tagline)}" maxlength="60" data-no-knob>`)}
           ${row(t('setFragFull'), `<input type="text" data-frag-opt="fullLine" value="${esc(fr.fullLine)}" maxlength="60" placeholder="${esc(t('setFragFullHint'))}" data-no-knob>`)}
           ${row(t('setFragTitle'), seg('data-fb-vtitle', [['1', t('fragOn')], ['0', t('fragOff')]], fr.vTitle ? '1' : '0'), t('setFragTitleHint'))}
@@ -67,10 +72,10 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         </div>
       </div>`;
     if (app.videoPreview) app.videoPreview(root.querySelector('#set-vid-preview'));
-    if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => ({ ...V_DEFAULTS, ...(store.get('coding-misk-fragments', {}) || {}), next: store.get('coding-misk-fragment-n', 1) }));
+    if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => { const x = fragmentOpts(store.get('coding-misk-fragments', {}) || {}); return { ...x, size: fragmentSize(x), next: store.get('coding-misk-fragment-n', 1) }; });
   }
 
-  const setFrag = (k, v) => store.set('coding-misk-fragments', { ...V_DEFAULTS, ...(store.get('coding-misk-fragments', {}) || {}), [k]: v });
+  const setFrag = (k, v) => store.set('coding-misk-fragments', { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), [k]: v });
   const setVid = (k, v) => store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}), [k]: v });
   const entries = () => { const out = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); out.push([k, store.get(k, null)]); } return out; };
   root.addEventListener('click', e => {
@@ -88,7 +93,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       const name = root.querySelector('#set-vid-preset').value; if (!name) { toast(t('vidPresetPickFirst')); return; }
       const all = { ...(store.get('coding-misk-video-presets', {}) || {}) }; delete all[name]; store.set('coding-misk-video-presets', all); return render();
     }
-    { const fb = { fbVtitle: 'vTitle', fbLabel: 'label', fbGlitch: 'glitch' }, k = Object.keys(fb).find(x => b.dataset[x] !== undefined); if (k) { setFrag(fb[k], b.dataset[k] === '1'); return render(); } }
+    { const fb = { fbVtitle: 'vTitle', fbLabel: 'label', fbGlitch: 'glitch', fbBands: 'bands', fbRotate: 'rotate' }, k = Object.keys(fb).find(x => b.dataset[x] !== undefined); if (k) { setFrag(fb[k], b.dataset[k] === '1'); return render(); } }
     if (b.id === 'set-frag-recipe') { pickJsonFiles(data => { if (data && data.seed && app.fragmentsFromRecipe) app.fragmentsFromRecipe(data, b); else toast(t('fragErr:source')); }); return; }
     if (b.id === 'set-live-window') { if (!app.liveOpenWindow()) toast(t('setLiveBlocked')); else setTimeout(render, 1500); return; }
     if (b.id === 'set-live-room') { app.liveOpenRoom(); return; }
@@ -117,7 +122,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (e.target.id === 'set-speed') store.set('coding-misk-export-speed', e.target.value);
     if (e.target.dataset.radioOpt) app.setRadio(e.target.dataset.radioOpt, e.target.value);
     if (e.target.dataset.vidOpt) { setVid(e.target.dataset.vidOpt, e.target.value); render(); }
-    if (e.target.dataset.fragOpt) setFrag(e.target.dataset.fragOpt, e.target.type === 'number' ? Math.max(5, Math.min(180, +e.target.value || 30)) : e.target.value);
+    if (e.target.dataset.fragOpt) { setFrag(e.target.dataset.fragOpt, e.target.type === 'number' ? Math.max(5, Math.min(180, +e.target.value || 30)) : e.target.value); if (e.target.tagName === 'SELECT') render(); }
     if (e.target.id === 'set-frag-n') store.set('coding-misk-fragment-n', Math.max(1, Math.round(+e.target.value || 1)));
     if (e.target.id === 'set-vid-preset' && e.target.value) { const p = (store.get('coding-misk-video-presets', {}) || {})[e.target.value]; if (p) { store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...p }); toast(t('vidPresetLoaded', { name: e.target.value })); render(); } }
   });

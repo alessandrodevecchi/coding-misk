@@ -6,13 +6,41 @@ Cut short vertical videos (9:16), called fragments, from a song or a saved sessi
 
 ## ADDED Requirements
 
-### Requirement: Vertical layouts
+### Requirement: Formats and content
 
-The app SHALL render fragments at 1080×1920 in one of these layouts: stage above and code below; stage above and soul below; stage in the middle with a text band above and below; soul in the middle with the text bands. The visual and soul choices of the video direction SHALL apply to fragments too.
+The app SHALL render fragments in a chosen format: 9:16 (1080×1920), 4:5 (1080×1350), 1:1 (1080×1080) or 16:9 (1920×1080). The listener SHALL choose what the picture shows: visual, visual and code, visual and soul, soul, or code; the proportions of the visual or soul inside the format (fill, 16:9, 4:3, 1:1, 4:5, 9:16), with the space left going to the bands; and whether the bands show. The visual and soul choices of the video direction SHALL apply to fragments too.
 
-#### Scenario: Stage and code
-- **WHEN** a fragment renders in the layout "stage above, code below"
-- **THEN** the upper half shows the stage of the song at that moment and the lower half the code typing itself, at 1080×1920
+#### Scenario: A 16:9 visual in a vertical fragment
+- **WHEN** a 9:16 fragment shows only the visual at 16:9 with bands
+- **THEN** the visual fills the width at 16:9 and the bands take the space above and below
+
+#### Scenario: Square
+- **WHEN** the format is 1:1 and the visual fills the space with bands
+- **THEN** the file is 1080×1080 with the visual between the bands
+
+### Requirement: Turned picture
+
+The listener SHALL be able to turn the picture by 90°: the composition is made in the other orientation and turned inside the file, so a viewer turning the phone sideways sees it full.
+
+#### Scenario: Turned vertical fragment
+- **WHEN** a 9:16 fragment is turned by 90°
+- **THEN** the file is 1080×1920 and holds a 1920×1080 composition turned on its side
+
+### Requirement: Code in fragments
+
+When the code shows, the listener SHALL choose how it moves: focus on the part playing (the lines of the section on air, lit at every bar, one block after another), scroll through all the code over the fragment, or follow the edits as the videos do.
+
+#### Scenario: Focus on the part playing
+- **WHEN** a fragment with code in focus mode plays the third section
+- **THEN** the code panel shows and lights the lines that play in the third section
+
+### Requirement: Preview before making
+
+The fragments menu and the settings SHALL show a live preview of the composition with the current choices, drawn from the song playing, before any fragment is made.
+
+#### Scenario: Preview follows the choices
+- **WHEN** the listener changes the format from 9:16 to 1:1 in the menu
+- **THEN** the preview shows the square composition at once
 
 ### Requirement: Text bands
 
