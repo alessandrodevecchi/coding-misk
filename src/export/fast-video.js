@@ -30,7 +30,7 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {} }
     out.addAudioTrack(as);
     await out.start();
     // a fragment (#57) starts at job.start: frame times count from 0, the song's cycle from start
-    const T = tempoClock(job.bpm), start = job.start || 0, total = (job.cut || T.seconds(job.bpm.length) + (job.tail || 0)) - start, frames = Math.ceil(total * q.fps);
+    const T = tempoClock(job.bpm), offset = job.start || 0, total = (job.cut || T.seconds(job.bpm.length) + (job.tail || 0)) - offset, frames = Math.ceil(total * q.fps);
     const onsets = {}, levelsAt = levelsFrom(onsets), codeAt = codeFrom(job.segments);
     let hist = new Float32Array(0), histAt = 0, drawn = 0, ap = 0;
     const report = phase => onProgress(Math.min(1, ap * 0.3 + drawn / frames * 0.7), phase);
@@ -57,7 +57,7 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {} }
           const wave = new Float32Array(256), hook = new Float32Array(128);
           for (let i = 0; i < 256; i++) wave[i] = hist[at - 2048 + i * 8] || 0;
           for (let i = 0; i < 128; i++) hook[i] = hist[at - 2048 + i * 16] || 0;
-          drawFrame(t, T.cycleAt(start + t), { raw: levelsAt(t), wave, hook }, codeAt, fi);
+          drawFrame(t, T.cycleAt(offset + t), { raw: levelsAt(t), wave, hook }, codeAt, fi);
           await vs.add(t, 1 / q.fps);
           drawn++;
           if (fi % 15 === 0) report('frames');

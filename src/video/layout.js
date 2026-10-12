@@ -52,7 +52,8 @@ export function layoutAreas(layout, w, h, soul = null) {
 // and how the code moves (follow the edits, scroll through all of it, or focus on the part playing)
 export const F_FORMATS = { '9:16': { w: 1080, h: 1920 }, '4:5': { w: 1080, h: 1350 }, '1:1': { w: 1080, h: 1080 }, '16:9': { w: 1920, h: 1080 } };
 export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code'];
-export const F_ASPECTS = ['fill', '16:9', '4:3', '1:1', '4:5', '9:16'];
+// whole: the stage's own proportions (o.stageRatio, the app's stage), so the whole visual shows
+export const F_ASPECTS = ['whole', 'fill', '16:9', '4:3', '1:1', '4:5', '9:16'];
 export const F_CODE = ['focus', 'scroll', 'follow'];
 export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', look: 'song', soulView: 'song', tagline: 'music written as code', fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
 // the layouts of the first version, kept for saved settings and agents
@@ -75,7 +76,7 @@ const fit = (x, y, w, h, r) => { const bw = Math.min(w, h * r), bh = bw / r; ret
 export function fragmentAreas(o, w, h) {
   const show = o.show || 'visual', main = show === 'soul' ? 'soul' : show === 'code' ? 'code' : 'stage';
   const second = show === 'visual-code' ? 'code' : show === 'visual-soul' ? 'soul' : null;
-  const r1 = main === 'code' ? null : o.aspect && o.aspect !== 'fill' ? ratioOf(o.aspect) : main === 'soul' ? SOUL : null;
+  const r1 = main === 'code' ? null : o.aspect === 'whole' ? (main === 'soul' ? SOUL : o.stageRatio || 2.4) : o.aspect && o.aspect !== 'fill' ? ratioOf(o.aspect) : main === 'soul' ? SOUL : null;
   const pad = Math.round(Math.min(w, h) / 40), out = {};
   const box = (kind, b) => { out[kind] = kind === 'soul' ? { ...b, head: 0 } : kind === 'code' ? { x: b.x + pad, y: b.y, w: b.w - 2 * pad, h: b.h } : b; };
   if (h >= w) {

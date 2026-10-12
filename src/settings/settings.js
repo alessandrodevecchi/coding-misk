@@ -75,7 +75,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         </div>
       </div>`;
     if (app.videoPreview) app.videoPreview(root.querySelector('#set-vid-preview'));
-    if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => { const x = fragmentOpts(store.get('coding-misk-fragments', {}) || {}); return { ...x, size: fragmentSize(x), next: store.get('coding-misk-fragment-n', 1) }; });
+    if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => { const x = { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), stageRatio: app.stageRatio ? app.stageRatio() : 2.4 }; return { ...x, size: fragmentSize(x), next: store.get('coding-misk-fragment-n', 1) }; });
   }
 
   const setFrag = (k, v) => store.set('coding-misk-fragments', { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), [k]: v });

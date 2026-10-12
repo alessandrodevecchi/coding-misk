@@ -59,6 +59,14 @@ const db = (a, b) => 20 * Math.log10((a.reduce((x, y) => x + y, 0) / a.length) /
     check(best[0] > 0.9 && Math.abs(d) < 1.5, 'a timed fragment sounds as the same stretch of the full song', `r ${best[0].toFixed(3)} at ${(best[1] * 1000).toFixed(0)} ms, ${d.toFixed(2)} dB`);
     check(Math.abs(B.length / 48000 - 15) < 0.2, 'from 1:00 to 1:15 lasts 15 s', (B.length / 48000).toFixed(2));
   } else check(false, 'timed fragment and full song saved', `${!!full} ${!!ft}`);
+  // the picture follows the song's time too: the frames of a fragment from 1:40 draw bars 55 and on (section 3)
+  const seen = await page.evaluate(async () => {
+    const v = globalThis.codingMiskVideo, orig = v.composeVertical, out = [];
+    v.composeVertical = (...a) => { out.push([a[1], a[5]]); return orig(...a); };
+    try { await globalThis.codingMiskClips.fragments({ source: 'kellerlicht', from: 100, to: 103, quiet: true, show: 'code' }); } finally { v.composeVertical = orig; }
+    return [out[0], out[out.length - 1]];
+  });
+  check(seen[0] && Math.abs(seen[0][0] - 55) < 0.1 && seen[0][1] === 2, 'the picture of a fragment follows the song\'s time and section', JSON.stringify(seen));
   const bad = await call({ source: 'kellerlicht', from: 60, to: 9999 });
   check(bad.error === 'range', 'past the end: nothing is cut', JSON.stringify(bad));
 

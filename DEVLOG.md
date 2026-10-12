@@ -383,6 +383,8 @@
 
 - `#57` frammenti, dopo la prova del proprietario: nel menu ✂ si sceglie il visual (del brano, a caso per frammento, o uno preciso) e la vista dell'anima (idem; l'anima ha ora una vista forzata dall'esterno per la durata del render); tutte le opzioni sono nel menu (le meno usate in "Altro": codice, slogan, riga verso il video, titolo, etichetta, glitch, seme), così non serve passare dalle Impostazioni; i testi da condividere stanno in una colonna del menu, prima quelli del video intero, dopo Crea quelli dell'ultimo frammento (il pannello flottante resta per gli export).
 
+- `#57` frammenti: proporzione "Tutto il visual" (le proporzioni del palco dell'app, così il visual si vede intero senza tagli). Corretto un errore serio trovato controllando l'evidenziazione del codice: nel video veloce una variabile locale `start` (l'inizio del blocco audio) nascondeva l'inizio del frammento, quindi immagini, codice e visual dei frammenti partivano dall'inizio del brano mentre l'audio era giusto. Il confronto audio non poteva vederlo: aggiunto un controllo che verifica tempo e sezione dei fotogrammi.
+
 ## Prossimo passo
 
 Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima del brano `#46` fasi 1 e 2 con display nascosto, casuali `#50`, compilation `#49`, più le feature precedenti). Tutti i controlli passano.

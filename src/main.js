@@ -779,7 +779,9 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
 }
 // ---------- fragments and texts for sharing (#57) ----------
 const FRAG_KEY = 'coding-misk-fragments', FRAG_N = 'coding-misk-fragment-n';
-const fragOpts = () => fragmentOpts(store.get(FRAG_KEY, {}) || {});
+// stageRatio: the app's stage, for "whole visual" (the scenes draw the same picture at the same proportions)
+const stageRatio = () => { const c = $('#stage'), r = c && c.clientHeight ? c.clientWidth / c.clientHeight : 0; return r > 1 ? Math.min(4, r) : 2.4; };
+const fragOpts = () => ({ ...fragmentOpts(store.get(FRAG_KEY, {}) || {}), stageRatio: stageRatio() });
 const setFragOpt = (k, v) => store.set(FRAG_KEY, { ...fragOpts(), [k]: v });
 const nextFragment = () => Math.max(1, +store.get(FRAG_N, 1) || 1);
 // the picker's shape: the song JSON when there is one, else the sections alone
@@ -830,7 +832,7 @@ async function makeFragments(opts = {}) {
   // settings, then what the call says: format, show, aspect, bands (true/false or { tagline, fullLine, vTitle }), rotate, codeMode, label, glitch, or an old layout name
   const pick = ['format', 'show', 'aspect', 'rotate', 'codeMode', 'label', 'glitch', 'layout', 'look', 'soulView'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
   const bands = typeof opts.bands === 'object' && opts.bands ? opts.bands : opts.bands !== undefined ? { bands: !!opts.bands } : {};
-  const o = fragmentOpts({ ...(store.get(FRAG_KEY, {}) || {}), ...pick, ...bands });
+  const o = { ...fragmentOpts({ ...(store.get(FRAG_KEY, {}) || {}), ...pick, ...bands }), stageRatio: stageRatio() };
   const shape = shapeFor(src.sg), bpm = src.sg.meta.bpm.map(Number);
   let picks;
   if (opts.from !== undefined && opts.to !== undefined) { const f = fragmentBetween(shape, bpm, +opts.from, +opts.to); if (f.error) return f; picks = [f]; }
@@ -2644,6 +2646,7 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     // the video recorder is made after the settings: a page opened on the settings gets its preview below
     videoPreview: el => { try { video.preview(el); } catch (e) {} },
     fragmentsFromRecipe: (recipe, anchor) => openFragMenu(recipe, anchor),
+    stageRatio: () => stageRatio(),
     fragPreview: (el, opts) => { try { video.previewVertical(el, opts, c => (song && song.meta ? song.meta.sectionAt(c) : -1)); } catch (e) {} },
     liveOpenWindow: () => liveLink.openWindow(), liveOpenRoom: () => liveLink.openRoom(), liveOn: () => { try { return liveLink.on; } catch (e) { return false; } },
     radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', scope: 'song' }), setRadio: (k, v) => radio && radio.setOption(k, v),
