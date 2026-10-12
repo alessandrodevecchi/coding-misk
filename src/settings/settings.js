@@ -5,6 +5,7 @@ import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, fragmentOpts, fragmentSize } from '../video/layout.js';
 import { FORMATS, MP3_RATES, formatOf } from '../export/encode.js';
+import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data.js';
 
 
 export function createSettings({ root, t, tx, esc, store, looks, app, toast, confirmTwice }) {
@@ -44,6 +45,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('fragFormat'), `<select data-frag-opt="format" data-no-knob>${Object.keys(F_FORMATS).map(k => opt(k, fr.format, t(`fragFormat:${k}`))).join('')}</select>`)}
           ${row(t('fragShow'), `<select data-frag-opt="show" data-no-knob>${F_SHOWS.map(k => opt(k, fr.show, t(`fragShow:${k}`))).join('')}</select>`)}
           ${row(t('fragAspect'), `<select data-frag-opt="aspect" data-no-knob>${F_ASPECTS.map(k => opt(k, fr.aspect, t(`fragAspect:${k}`))).join('')}</select>`, t('fragAspectHint'))}
+          ${row(t('fragLook'), `<select data-frag-opt="look" data-no-knob>${opt('song', fr.look, t('fragPick:song'))}${opt('random', fr.look, t('fragPick:random'))}${looks.map(([k, l]) => opt(k, fr.look, tx(l))).join('')}</select>`)}
+          ${row(t('fragSoulView'), `<select data-frag-opt="soulView" data-no-knob>${opt('song', fr.soulView, t('fragPick:song'))}${opt('random', fr.soulView, t('fragPick:random'))}${SOUL_VIEWS.map(k => opt(k, fr.soulView, `${k.toUpperCase()} · ${SOUL_VIEW_NAMES[k]}`)).join('')}</select>`)}
           ${row(t('fragBands'), seg('data-fb-bands', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bands ? '1' : '0'))}
           ${row(t('fragRotate'), seg('data-fb-rotate', [['1', t('fragOn')], ['0', t('fragOff')]], fr.rotate ? '1' : '0'), t('fragRotateHint'))}
           ${row(t('fragCode'), `<select data-frag-opt="codeMode" data-no-knob>${F_CODE.map(k => opt(k, fr.codeMode, t(`fragCode:${k}`))).join('')}</select>`, t(`fragCodeHint:${fr.codeMode}`))}

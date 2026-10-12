@@ -381,6 +381,8 @@
 
 - `#57` frammenti, secondo passo su richiesta del proprietario: formati 9:16, 4:5, 1:1 e 16:9; cosa mostrare (visual, visual + codice, visual + anima, anima, codice); proporzioni del visual dentro il formato (per esempio un visual 16:9 in un 9:16 con le bande sopra e sotto); bande accese o spente (striscia in basso in orizzontale); quadro ruotato di 90° dentro un file verticale, da guardare girando il telefono; codice che segue la parte che suona (le righe della sezione in onda evidenziate a ogni battuta, un blocco dopo l'altro), che scorre tutto, o che segue le modifiche. Anteprima dal vivo della composizione nel menu ✂ e nelle Impostazioni. I nomi dei layout del primo passo restano validi. Aperta `#60` (frammenti pronti per una pubblicazione programmata, generica).
 
+- `#57` frammenti, dopo la prova del proprietario: nel menu ✂ si sceglie il visual (del brano, a caso per frammento, o uno preciso) e la vista dell'anima (idem; l'anima ha ora una vista forzata dall'esterno per la durata del render); tutte le opzioni sono nel menu (le meno usate in "Altro": codice, slogan, riga verso il video, titolo, etichetta, glitch, seme), così non serve passare dalle Impostazioni; i testi da condividere stanno in una colonna del menu, prima quelli del video intero, dopo Crea quelli dell'ultimo frammento (il pannello flottante resta per gli export).
+
 ## Prossimo passo
 
 Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima del brano `#46` fasi 1 e 2 con display nascosto, casuali `#50`, compilation `#49`, più le feature precedenti). Tutti i controlli passano.

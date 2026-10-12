@@ -54,7 +54,7 @@ export const F_FORMATS = { '9:16': { w: 1080, h: 1920 }, '4:5': { w: 1080, h: 13
 export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code'];
 export const F_ASPECTS = ['fill', '16:9', '4:3', '1:1', '4:5', '9:16'];
 export const F_CODE = ['focus', 'scroll', 'follow'];
-export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', tagline: 'music written as code', fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
+export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', look: 'song', soulView: 'song', tagline: 'music written as code', fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
 // the layouts of the first version, kept for saved settings and agents
 const OLD = { 'v-code': { show: 'visual-code', aspect: 'fill', bands: false }, 'v-soul': { show: 'visual-soul', aspect: 'fill', bands: false }, 'v-bands': { show: 'visual', aspect: '1:1', bands: true }, 'v-soul-bands': { show: 'soul', aspect: 'fill', bands: true } };
 export function fragmentOpts(o = {}) {

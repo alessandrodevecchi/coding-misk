@@ -17,6 +17,8 @@ export function createSoulScene({ getSource, store, isHw, baseLook, onChange = (
   amb.width = 48; amb.height = 30;
   let locked = !!store.get('coding-misk-soul-lock', false), view = store.get('coding-misk-soul-view', '');
   if (!VIEWS.includes(view)) view = '';
+  // forced: a view set from outside for a while (a fragment, #57), over the song's own and the lock
+  let forced = null;
   let ambAt = -1, data = null, key = null, songRef = null, overlay = null, lastRender = -1, shown = false, phrase = 0, word = 0;
   // the clock (seconds): the fast video (#53) sets the frame's time instead
   const t0 = performance.now();
@@ -64,7 +66,7 @@ export function createSoulScene({ getSource, store, isHw, baseLook, onChange = (
         else o = overlay.kind === 'analyzing' ? { analyzing: k, phrase: overlay.phrase } : { glitch: k, word: overlay.word };
       }
       const D = data, bpb = D ? (parseInt(D.meter, 10) || 4) : 4, bar = src && src.bar !== undefined ? src.bar : 0;
-      R.render({ data: D, view: view || 'a', t, bar, beat: playing ? bar * bpb : undefined, bpb, hw: isHw(), hue: LOOK_HUE[baseLook()] ?? 0, overlay: o }, maxScale);
+      R.render({ data: D, view: forced || view || 'a', t, bar, beat: playing ? bar * bpb : undefined, bpb, hw: isHw(), hue: LOOK_HUE[baseLook()] ?? 0, overlay: o }, maxScale);
     }
     return R.canvas;
   }
@@ -91,6 +93,7 @@ export function createSoulScene({ getSource, store, isHw, baseLook, onChange = (
     // fn() in seconds, or null for the real clock (the fast video draws frames at their own time)
     setClock(fn) { now = fn || (() => (performance.now() - t0) / 1000); lastRender = -1; overlay = null; },
     next: () => step(1), prev: () => step(-1), pick,
+    force(v) { forced = VIEWS.includes(v) ? v : null; lastRender = -1; },
     // the stage stopped showing the soul: the next time it shows, it types its line again
     hide() { shown = false; },
     get view() { return view || 'a'; },

@@ -32,9 +32,11 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
-import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, fragmentOpts, fragmentSize, fragmentAreas } from './video/layout.js';
+import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, fragmentOpts, fragmentSize, fragmentAreas } from './video/layout.js';
 import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMessages, shapeOf, clockOf, parseTime } from './video/fragments.js';
 import { textsFor, textFile } from './video/texts.js';
+import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from './soul/data.js';
+import { hashString } from './endless/random.js';
 import { encode, createEncoder, canEncode, formatOf } from './export/encode.js';
 import { segmentsOf, timelineOf, renderInBlocks } from './export/fast.js';
 import { renderVideo } from './export/fast-video.js';
@@ -727,6 +729,10 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, msgs: frag.msgs, length: frag.end - frag.start } : null;
+  // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen
+  const pickOf = (choice, list) => (choice === 'random' ? list[hashString(`${frag.code}/${list.length}`) % list.length] : list.includes(choice) ? choice : null);
+  const fragLook = frag ? pickOf(frag.o.look, looks) : null;
+  if (frag) soul.force(pickOf(frag.o.soulView, SOUL_VIEWS));
   const EQ = ['kick', 'snare', 'hats', 'bass', 'arp', 'pad', 'hook'];
   visuals.hold(true);
   let clockT = 0;
@@ -744,7 +750,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
         info: { onAir: true, n: p.n, title: item ? item.title : sg.title, artist: item ? item.artist : '', bar: cyc - p.start, bars: p.end - p.start, bpm: Math.round(sg.meta.bpm[Math.min(sg.meta.bars - 1, Math.floor(cyc))]) || undefined, say: said ? said.text : '', sayAt: said ? said.bar - p.start : 0 },
         soulSrc: doc && doc.sections && doc.tracks ? { key: `fv:${p.n}`, song: doc, ctx: {}, bar: cyc - p.start } : null,
       };
-      visuals.drawAt({ now: t * 1000, cyc, look: lookFor(o, looks, { n: p.n, section, own }), feed, dt: 1 / q.fps, show: fi % 6 === 0 });
+      visuals.drawAt({ now: t * 1000, cyc, look: fragLook || lookFor(o, looks, { n: p.n, section, own }), feed, dt: 1 / q.fps, show: fi % 6 === 0 });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
       else video.composeAt({ layout, q }, cyc, t);
     },
@@ -768,7 +774,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
     return false;
   } finally {
     fastJob = null; fv = null;
-    soul.setClock(null); visuals.hold(false); visuals.setTarget(null);
+    soul.setClock(null); soul.force(null); visuals.hold(false); visuals.setTarget(null);
   }
 }
 // ---------- fragments and texts for sharing (#57) ----------
@@ -822,7 +828,7 @@ async function makeFragments(opts = {}) {
   if (fastJob || rec || capture) return { error: 'busy' };
   const src = fragmentSource(opts.source); if (src.error) return src;
   // settings, then what the call says: format, show, aspect, bands (true/false or { tagline, fullLine, vTitle }), rotate, codeMode, label, glitch, or an old layout name
-  const pick = ['format', 'show', 'aspect', 'rotate', 'codeMode', 'label', 'glitch', 'layout'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
+  const pick = ['format', 'show', 'aspect', 'rotate', 'codeMode', 'label', 'glitch', 'layout', 'look', 'soulView'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
   const bands = typeof opts.bands === 'object' && opts.bands ? opts.bands : opts.bands !== undefined ? { bands: !!opts.bands } : {};
   const o = fragmentOpts({ ...(store.get(FRAG_KEY, {}) || {}), ...pick, ...bands });
   const shape = shapeFor(src.sg), bpm = src.sg.meta.bpm.map(Number);
@@ -852,33 +858,40 @@ async function makeFragments(opts = {}) {
     const list = { source: typeof opts.source === 'object' ? 'recipe' : opts.source, title: src.title, seed: src.seed, format: o.format, show: o.show, aspect: o.aspect, rotate: o.rotate, items };
     setTimeout(() => saveBlob(fileName(`${src.title} · fragments`, 'json'), new Blob([JSON.stringify(list, null, 2) + '\n'], { type: 'application/json' })), 900);
     toast(t('fragSaved', { n: items.length }));
-    if (last && !opts.quiet) showTexts(last.tx, () => last.info);
+    if (last && !opts.quiet && !opts.onTexts) showTexts(last.tx, () => last.info);
+    if (last && opts.onTexts) opts.onTexts(last);
   }
   return { files, items };
 }
 // the texts of a source, without saving anything (the panel and agents)
 function sourceTexts(source, draw = 0) { const src = fragmentSource(source); return src.error ? src : textsFor({ ...textsInfo(src, 'video'), draw }); }
-// the texts panel (#57): shown after a save, with copy and draw again; info(): the facts textsFor needs
+// a texts box (#57): title and description to copy, edit and draw again; info(): the facts textsFor needs
+function textsBox(el, tx, info, caption = '') {
+  let draw = 0;
+  el.innerHTML = `${caption ? `<p class="hint muted small" data-tx-cap>${esc(caption)}</p>` : ''}
+    <label class="lbl">${esc(t('textsTitleLbl'))}<input data-tx-title data-no-knob></label>
+    <label class="lbl">${esc(t('textsDescLbl'))}<textarea data-tx-desc rows="9" data-no-knob></textarea></label>
+    <div class="tp-actions"><button class="btn" data-tx="copy-title">${esc(t('textsCopyTitle'))}</button><button class="btn" data-tx="copy-desc">${esc(t('textsCopyDesc'))}</button><button class="btn" data-tx="draw">${esc(t('textsDraw'))}</button></div>`;
+  const fill = x => { el.querySelector('[data-tx-title]').value = x.title; el.querySelector('[data-tx-desc]').value = x.description; };
+  fill(tx);
+  el.onclick = async e => {
+    const b = e.target.closest('[data-tx]'); if (!b || b.dataset.tx === 'close') return;
+    if (b.dataset.tx === 'draw') { draw++; fill(textsFor({ ...info(), draw })); return; }
+    const v = el.querySelector(b.dataset.tx === 'copy-title' ? '[data-tx-title]' : '[data-tx-desc]').value;
+    try { await navigator.clipboard.writeText(v); toast(t('textsCopied')); } catch (err) { toast(t('textsCopyFail')); }
+  };
+}
+// the texts panel (#57): shown after a save, with copy and draw again
 let textsPanel = null;
 function showTexts(tx, info) {
   if (!tx) return;
   if (textsPanel) textsPanel.remove();
-  let draw = 0;
   const el = document.createElement('div');
   el.className = 'texts-panel'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', t('textsTitle'));
-  const fill = x => { el.querySelector('[data-tx-title]').value = x.title; el.querySelector('[data-tx-desc]').value = x.description; };
-  el.innerHTML = `<div class="tp-head"><b>${esc(t('textsTitle'))}</b><button class="chip" data-tx="close" aria-label="${esc(t('close'))}">✕</button></div>
-    <label class="lbl" for="tx-title">${esc(t('textsTitleLbl'))}</label><input id="tx-title" data-tx-title data-no-knob>
-    <label class="lbl" for="tx-desc">${esc(t('textsDescLbl'))}</label><textarea id="tx-desc" data-tx-desc rows="9" data-no-knob></textarea>
-    <div class="tp-actions"><button class="btn" data-tx="copy-title">${esc(t('textsCopyTitle'))}</button><button class="btn" data-tx="copy-desc">${esc(t('textsCopyDesc'))}</button><button class="btn" data-tx="draw">${esc(t('textsDraw'))}</button></div>`;
-  document.body.appendChild(el); textsPanel = el; fill(tx);
-  el.addEventListener('click', async e => {
-    const b = e.target.closest('[data-tx]'); if (!b) return;
-    if (b.dataset.tx === 'close') { el.remove(); textsPanel = null; return; }
-    if (b.dataset.tx === 'draw') { draw++; fill(textsFor({ ...info(), draw })); return; }
-    const v = el.querySelector(b.dataset.tx === 'copy-title' ? '[data-tx-title]' : '[data-tx-desc]').value;
-    try { await navigator.clipboard.writeText(v); toast(t('textsCopied')); } catch (err) { toast(t('textsCopyFail')); }
-  });
+  el.innerHTML = `<div class="tp-head"><b>${esc(t('textsTitle'))}</b><button class="chip" data-tx-close aria-label="${esc(t('close'))}">✕</button></div><div data-tx-box></div>`;
+  document.body.appendChild(el); textsPanel = el;
+  textsBox(el.querySelector('[data-tx-box]'), tx, info);
+  el.querySelector('[data-tx-close]').addEventListener('click', () => { el.remove(); textsPanel = null; });
 }
 // the fragments menu (#57): opened by any [data-frag="<song or session id>"] (or a recipe object); random (count, length,
 // seed) or from–to; format, what to show, the visual's proportions, turned by 90°; a live preview of the composition
@@ -887,7 +900,10 @@ function openFragMenu(source, anchor) {
   if (fragMenu) { const same = fragMenu.source === source; closeFragMenu(); if (same) return; }
   const o = fragOpts(), el = document.createElement('div');
   el.className = 'frag-menu card'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', t('fragTitle'));
-  const sel = (id, list, cur, key) => `<select id="${id}" data-no-knob>${list.map(k => `<option value="${k}"${k === cur ? ' selected' : ''}>${esc(t(`${key}:${k}`))}</option>`).join('')}</select>`;
+  const sel = (id, list, cur, label) => `<select id="${id}" data-no-knob>${list.map(k => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(label(k))}</option>`).join('')}</select>`;
+  const looks = ['song', 'random', ...PICK_LOOKS.map(l => l[0])], lookName = k => (k === 'song' || k === 'random' ? t(`fragPick:${k}`) : tx((PICK_LOOKS.find(l => l[0] === k) || [k, k])[1]));
+  const views = ['song', 'random', ...SOUL_VIEWS], viewName = k => (k === 'song' || k === 'random' ? t(`fragPick:${k}`) : `${k.toUpperCase()} · ${SOUL_VIEW_NAMES[k]}`);
+  const chk = (id, on, label) => `<label class="rx-opt"><input type="checkbox" id="${id}"${on ? ' checked' : ''}> <span>${esc(label)}</span></label>`;
   el.innerHTML = `<div class="tp-head"><b>${esc(t('fragTitle'))}</b><button class="chip" data-fm="close" aria-label="${esc(t('close'))}">✕</button></div>
     <div class="fm-body"><div class="fm-form">
     <label class="rx-opt"><input type="radio" name="fm-kind" value="random" checked> <span>${esc(t('fragRandom'))}</span>
@@ -895,46 +911,66 @@ function openFragMenu(source, anchor) {
       ${[15, 30, 60].map(x => `<button class="chip" data-fm-len="${x}">${x}</button>`).join('')}</label>
     <label class="rx-opt"><input type="radio" name="fm-kind" value="between"> <span>${esc(t('fragBetween'))}</span>
       <input id="fm-from" placeholder="1:20" aria-label="${esc(t('fragFrom'))}" data-no-knob size="6"> – <input id="fm-to" placeholder="1:50" aria-label="${esc(t('fragTo'))}" data-no-knob size="6"></label>
-    <label class="rx-opt"><span>${esc(t('fragFormat'))}</span>${sel('fm-format', Object.keys(F_FORMATS), o.format, 'fragFormat')}</label>
-    <label class="rx-opt"><span>${esc(t('fragShow'))}</span>${sel('fm-show', F_SHOWS, o.show, 'fragShow')}</label>
-    <label class="rx-opt"><span>${esc(t('fragAspect'))}</span>${sel('fm-aspect', F_ASPECTS, o.aspect, 'fragAspect')}</label>
-    <label class="rx-opt"><input type="checkbox" id="fm-bands"${o.bands ? ' checked' : ''}> <span>${esc(t('fragBands'))}</span> <input type="checkbox" id="fm-rotate"${o.rotate ? ' checked' : ''}> <span>${esc(t('fragRotate'))}</span></label>
-    <label class="rx-opt"><span>${esc(t('fragSeed'))}</span><input id="fm-seed" placeholder="${esc(t('fragSeedHint'))}" data-no-knob size="18"></label>
-    <p class="hint muted small">${esc(t('fragHint', { n: String(nextFragment()).padStart(3, '0') }))}</p>
-    </div><figure class="fm-prev"><canvas id="fm-preview" width="180" height="320" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted small">${esc(t('fragPreviewHint'))}</figcaption></figure></div>
-    <div class="tp-actions"><button class="btn primary" data-fm="go">${esc(t('fragGo'))}</button><button class="btn" data-fm="texts">${esc(t('textsTitle'))}</button><span class="muted small" data-fm-status></span></div>`;
+    <label class="rx-opt"><span>${esc(t('fragFormat'))}</span>${sel('fm-format', Object.keys(F_FORMATS), o.format, k => t(`fragFormat:${k}`))}</label>
+    <label class="rx-opt"><span>${esc(t('fragShow'))}</span>${sel('fm-show', F_SHOWS, o.show, k => t(`fragShow:${k}`))}</label>
+    <label class="rx-opt"><span>${esc(t('fragAspect'))}</span>${sel('fm-aspect', F_ASPECTS, o.aspect, k => t(`fragAspect:${k}`))}</label>
+    <label class="rx-opt"><span>${esc(t('fragLook'))}</span>${sel('fm-look', looks, o.look, lookName)}</label>
+    <label class="rx-opt"><span>${esc(t('fragSoulView'))}</span>${sel('fm-soulview', views, o.soulView, viewName)}</label>
+    <div class="rx-opt">${chk('fm-bands', o.bands, t('fragBands'))}${chk('fm-rotate', o.rotate, t('fragRotate'))}</div>
+    <details class="fm-more"><summary>${esc(t('fragMore'))}</summary>
+      <label class="rx-opt"><span>${esc(t('fragCode'))}</span>${sel('fm-code', F_CODE, o.codeMode, k => t(`fragCode:${k}`))}</label>
+      <label class="rx-opt"><span>${esc(t('setFragTagline'))}</span><input id="fm-tagline" value="${esc(o.tagline)}" maxlength="60" data-no-knob size="22"></label>
+      <label class="rx-opt"><span>${esc(t('setFragFull'))}</span><input id="fm-full" value="${esc(o.fullLine)}" maxlength="60" placeholder="${esc(t('setFragFullHint'))}" data-no-knob size="22"></label>
+      <div class="rx-opt">${chk('fm-title', o.vTitle, t('setFragTitle'))}${chk('fm-label', o.label, t('setFragLabel'))}${chk('fm-glitch', o.glitch, t('setFragGlitch'))}</div>
+      <label class="rx-opt"><span>${esc(t('fragSeed'))}</span><input id="fm-seed" placeholder="${esc(t('fragSeedHint'))}" data-no-knob size="18"></label>
+    </details>
+    <p class="hint muted small" data-fm-hint>${esc(t('fragHint', { n: String(nextFragment()).padStart(3, '0') }))}</p>
+    <div class="tp-actions"><button class="btn primary" data-fm="go">${esc(t('fragGo'))}</button><span class="muted small" data-fm-status></span></div>
+    </div><figure class="fm-prev"><canvas id="fm-preview" width="180" height="320" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted small">${esc(t('fragPreviewHint'))}</figcaption></figure>
+    <section class="fm-texts" aria-label="${esc(t('textsTitle'))}"><b class="small">${esc(t('textsTitle'))}</b><div data-fm-texts></div></section></div>`;
   (anchor.closest('.songbar, .pl-row, .set-card') || anchor).insertAdjacentElement('afterend', el);
   // what the form says now, saved as the settings so the preview, Settings and the next fragments agree
-  const form = () => ({ format: el.querySelector('#fm-format').value, show: el.querySelector('#fm-show').value, aspect: el.querySelector('#fm-aspect').value, bands: el.querySelector('#fm-bands').checked, rotate: el.querySelector('#fm-rotate').checked });
-  const remember = () => { const f = form(); for (const [k, v] of Object.entries(f)) setFragOpt(k, v); };
+  const v = id => el.querySelector(id), form = () => ({ format: v('#fm-format').value, show: v('#fm-show').value, aspect: v('#fm-aspect').value, look: v('#fm-look').value, soulView: v('#fm-soulview').value,
+    bands: v('#fm-bands').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
+  const remember = () => { const f = form(); for (const [k, x] of Object.entries(f)) setFragOpt(k, x); soul.force(previewView()); };
+  // the preview shows the chosen soul view; the visual follows the stage (pick it there, or the arrows)
+  const previewView = () => { const c = v('#fm-soulview').value; return c === 'random' ? SOUL_VIEWS[0] : SOUL_VIEWS.includes(c) ? c : null; };
   el.addEventListener('change', remember);
-  video.previewVertical(el.querySelector('#fm-preview'), () => { const x = fragOpts(); return { ...x, size: fragmentSize(x), next: nextFragment() }; }, c => (song && song.meta ? song.meta.sectionAt(c) : -1));
+  el.addEventListener('input', e => { if (e.target.matches('#fm-tagline, #fm-full')) remember(); });
+  v('#fm-look').addEventListener('change', () => { const c = v('#fm-look').value; if (PICK_LOOKS.some(l => l[0] === c)) setLook(c); });
+  video.previewVertical(v('#fm-preview'), () => { const x = fragOpts(); return { ...x, size: fragmentSize(x), next: nextFragment() }; }, c => (song && song.meta ? song.meta.sectionAt(c) : -1));
+  soul.force(previewView());
+  // the texts beside the form: the source's, then the last fragment's
+  const src0 = fragmentSource(source);
+  if (!src0.error) textsBox(v('[data-fm-texts]'), textsFor(textsInfo(src0, 'video')), () => textsInfo(src0, 'video'), t('fragTextsSource'));
   fragMenu = { el, source };
-  const status = x => { el.querySelector('[data-fm-status]').textContent = x; };
+  const status = x => { v('[data-fm-status]').textContent = x; };
   el.addEventListener('click', async e => {
-    const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.fmLen) { el.querySelector('#fm-len').value = b.dataset.fmLen; el.querySelector('input[value="random"]').checked = true; return; }
+    const b = e.target.closest('button'); if (!b || b.closest('[data-fm-texts]')) return;
+    if (b.dataset.fmLen) { v('#fm-len').value = b.dataset.fmLen; v('input[value="random"]').checked = true; return; }
     if (b.dataset.fm === 'close') { closeFragMenu(); return; }
-    if (b.dataset.fm === 'texts') { const src = fragmentSource(source); if (!src.error) showTexts(textsFor(textsInfo(src, 'video')), () => textsInfo(src, 'video')); return; }
     if (b.dataset.fm !== 'go') return;
     if (fastJob) { fastJob.cancel(); return; }
     remember();
     const kind = el.querySelector('input[name="fm-kind"]:checked').value;
-    const opts = { source, seed: el.querySelector('#fm-seed').value.trim(), onProgress: (i, n) => status(t('fragProgress', { i: i + 1, n })) };
+    const opts = { source, seed: v('#fm-seed').value.trim(), onProgress: (i, n) => status(t('fragProgress', { i: i + 1, n })),
+      onTexts: last => { if (fragMenu && fragMenu.el === el) textsBox(v('[data-fm-texts]'), last.tx, () => last.info, t('fragTextsLast', { label: last.info.fragment.label })); } };
     if (kind === 'between') {
-      const from = parseTime(el.querySelector('#fm-from').value), to = parseTime(el.querySelector('#fm-to').value);
+      const from = parseTime(v('#fm-from').value), to = parseTime(v('#fm-to').value);
       if (Number.isNaN(from) || Number.isNaN(to)) { toast(t('fragBadTime')); return; }
       Object.assign(opts, { from, to });
-    } else Object.assign(opts, { n: +el.querySelector('#fm-n').value || 1, length: +el.querySelector('#fm-len').value || o.vLength });
+    } else Object.assign(opts, { n: +v('#fm-n').value || 1, length: +v('#fm-len').value || o.vLength });
     b.textContent = t('fragCancel');
     const r = await makeFragments(opts);
     b.textContent = t('fragGo');
+    soul.force(previewView());
     if (r.error) { status(''); toast(t(`fragErr:${r.error}`)); return; }
     status(t('fragDone', { n: r.items.length }));
+    v('[data-fm-hint]').textContent = t('fragHint', { n: String(nextFragment()).padStart(3, '0') });
     if (opts.n && r.items.length < opts.n) toast(t('fragFewer', { n: r.items.length }));
   });
 }
-function closeFragMenu() { if (!fragMenu) return; fragMenu.el.remove(); fragMenu = null; video.previewVertical(null); }
+function closeFragMenu() { if (!fragMenu) return; fragMenu.el.remove(); fragMenu = null; video.previewVertical(null); soul.force(null); }
 document.addEventListener('click', e => { const b = e.target.closest('[data-frag]'); if (b) { e.stopPropagation(); openFragMenu(b.dataset.frag, b); } }, true);
 globalThis.codingMiskClips = {
   fragments: opts => makeFragments(opts),

@@ -1037,9 +1037,14 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
   .radio-export-menu { display: grid; gap: 6px; padding: 10px 12px; max-width: 360px; }
   /* fragments menu and the texts panel (#57) */
   .vid-preview.v canvas { width: 180px; height: 180px; aspect-ratio: 1; }
-  .frag-menu { display: grid; gap: 8px; padding: 10px 12px; max-width: 680px; margin-top: 8px; }
+  .frag-menu { display: grid; gap: 8px; padding: 10px 12px; max-width: 1100px; margin-top: 8px; }
+  .fm-more summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .fm-more[open] { display: grid; gap: 8px; }
+  .fm-texts { flex: 1 1 230px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+  .fm-texts input, .fm-texts textarea { width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: 12.5px/1.45 var(--mono); }
+  .fm-texts label { display: grid; gap: 3px; }
   .fm-body { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
-  .fm-form { display: grid; gap: 8px; flex: 1 1 300px; }
+  .fm-form { display: grid; gap: 8px; flex: 1 1 270px; }
   .fm-prev { margin: 0; display: grid; gap: 4px; justify-items: center; }
   .fm-prev canvas { width: 135px; height: 240px; border: 1px solid var(--line); border-radius: 6px; background: #000; }
   .frag-menu .rx-opt input[type=number] { width: 58px; }

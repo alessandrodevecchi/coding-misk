@@ -79,9 +79,11 @@ const db = (a, b) => 20 * Math.log10((a.reduce((x, y) => x + y, 0) / a.length) /
   check(await page.locator('.frag-menu').isVisible(), 'the ✂ Fragments button opens the menu');
   await page.fill('#fm-n', '1'); await page.click('.frag-menu [data-fm-len="15"]'); await page.click('.frag-menu [data-fm="go"]');
   t0 = Date.now(); await sleep(1500); while (Date.now() - t0 < 120000 && await page.evaluate(() => globalThis.codingMiskClips.job)) await sleep(500); await sleep(2000);
-  check(await page.locator('.texts-panel').isVisible() && /#00\d/.test(await page.inputValue('#tx-title')), 'after the menu\'s fragment the texts panel shows its title', await page.inputValue('#tx-title').catch(() => ''));
-  const before = await page.inputValue('#tx-desc'); await page.click('.texts-panel [data-tx="draw"]');
-  check((await page.inputValue('#tx-desc')) !== before, 'draw again changes the texts');
+  const tt = '.fm-texts [data-tx-title]', td = '.fm-texts [data-tx-desc]';
+  check(/#00\d/.test(await page.inputValue(tt)), 'after the menu\'s fragment its texts show beside the form', await page.inputValue(tt).catch(() => ''));
+  const before = await page.inputValue(td); await page.click('.fm-texts [data-tx="draw"]');
+  check((await page.inputValue(td)) !== before, 'draw again changes the texts');
+  check(await page.locator('#fm-look').count() === 1 && await page.locator('#fm-soulview').count() === 1, 'the menu lets you pick the visual and the soul view');
   if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, 'clips-menu-panel.png') }); }
 
   // 5. every visual in each vertical layout
