@@ -179,10 +179,13 @@ async function poll() {
   update();
 }
 // the beat to OBS while the broadcast window draws; without the watchdog script, the control room switches scenes itself
+// only a new beat from the window is relayed, so OBS sees the picture stop at once (not after the room's own wait)
+let sentBeat = 0;
 async function beat() {
   if (!obs) return;
   const alive = picAlive();
-  if (alive) {
+  if (alive && beatAt !== sentBeat) {
+    sentBeat = beatAt;
     try { await obs.call('SetInputSettings', { inputName: BEAT_INPUT, inputSettings: { beat: Date.now() % 1e9 } }); watchdog = true; }
     catch (e) { watchdog = false; }
   }
