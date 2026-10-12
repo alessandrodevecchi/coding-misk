@@ -165,7 +165,7 @@ export const GUIDE = [
     title: { en: 'Settings', it: 'Impostazioni' },
     what: { en: 'Options used less often: theme, language, the radio\'s visual and defaults, the export format, the video layout and quality, backup.', it: 'Le opzioni usate meno spesso: tema, lingua, visual e valori della radio, formato di export, layout e qualità dei video, backup.' },
     how: { en: 'The ⚙ gear at the top opens and closes them. [Export everything] saves your songs, playlists, artists, styles and settings to a file; [Import] brings them into another browser.', it: 'L\'ingranaggio ⚙ in alto le apre e le chiude. [Esporta tutto] salva in un file brani, playlist, artisti, stili e impostazioni; [Importa] li porta in un altro browser.' },
-    know: { en: '[Reset everything] needs two presses.', it: '[Azzera tutto] vuole due pressioni.' },
+    know: { en: '[Reset everything] needs two presses. An export longer than ten minutes asks where to save it first, then writes the file while it renders, so even hours of radio fit in one file.', it: '[Azzera tutto] vuole due pressioni. Un export più lungo di dieci minuti chiede prima dove salvarlo, poi scrive il file mentre si genera, così anche ore di radio stanno in un file solo.' },
   },
   {
     id: 'fragments', tab: 'brani', mode: 'ascolta', show: '[data-frag]',

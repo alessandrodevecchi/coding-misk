@@ -6,7 +6,8 @@
 // export), tail: seconds after it, keepFrom: onsets before it belong to the block before, sampleRate, gain: the master level }
 import { repl } from '@strudel/core';
 import { transpiler } from '@strudel/transpiler';
-import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio } from '@strudel/webaudio';
+import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio, getSound, registerSound } from '@strudel/webaudio';
+import { applySoundfontFixes } from '../sounds/soundfont-fix.js';
 import { prebake } from '@strudel/repl/prebake.mjs';
 import { tempoClock } from './tempo.js';
 
@@ -18,8 +19,12 @@ async function loadSounds() {
   await prebake();
   // as the app: the whole Dirt-Samples archive and the custom samples in public/samples/
   await Promise.all([samples('github:tidalcycles/dirt-samples'), samples('/samples/strudel.json').catch(() => {})]);
+  // broken soundfont notes play from a sound font of the same instrument
+  applySoundfontFixes({ getSound, registerSound });
 }
 
+// seconds to wait for one sound to load before skipping it
+const SOUND_WAIT = 8000;
 async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1 }) {
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
   const ctx = new OfflineAudioContext(2, Math.ceil(length * sampleRate), sampleRate);
@@ -33,7 +38,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   getSuperdoughAudioController().output.destinationGain.gain.value = gain;
   post({ progress: 0, phase: 'schedule' });
   const R = repl({ transpiler, defaultOutput: () => {}, getTime: () => 0 });
-  const onsets = {};
+  const onsets = {}, skipped = new Set();
   // the haps that start in this block's window [from, end), from the segments it covers, in onset order (cut groups depend on it)
   const c0 = T.cycleAt(from), c1 = T.cycleAt(end), all = [];
   for (const seg of segments) {
@@ -57,7 +62,11 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   async function schedule(until) {
     for (; k < all.length && all[k].t - from < until; k++) {
       const { b, hap, t } = all[k], v = hap.value, d = T.seconds(hap.whole.end.valueOf()) - t;
-      try { await superdough(v, t - from, d, T.cps(b), t - from); } catch (e) { console.warn('[render]', e); }
+      // a sound that never loads (a sample that cannot be decoded) must not hold the render forever (#61): skipped
+      try {
+        const ok = await Promise.race([superdough(v, t - from, d, T.cps(b), t - from).then(() => true), new Promise(r => setTimeout(() => r(false), SOUND_WAIT))]);
+        if (!ok) { const id = `${v.bank ? `${v.bank}_` : ''}${v.s}${v.n !== undefined ? `:${v.n}` : ''}`; if (!skipped.has(id)) { skipped.add(id); console.warn(`[render] sound ${id} did not load, skipped`); } }
+      } catch (e) { console.warn('[render]', e); }
       // onsets once: the lead in of a block belongs to the block before
       if (t >= keepFrom) { const key = v.analyze || v.s || 'other'; (onsets[key] = onsets[key] || []).push([+t.toFixed(4), +d.toFixed(4), +((v.gain ?? 1) * (v.velocity ?? 1)).toFixed(3)]); }
     }
@@ -68,7 +77,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   }
   const buf = await ctx.startRendering();
   const channels = [buf.getChannelData(0).slice(), buf.getChannelData(1).slice()];
-  post({ done: true, channels, sampleRate, onsets }, channels.map(c => c.buffer));
+  post({ done: true, channels, sampleRate, onsets, skipped: [...skipped] }, channels.map(c => c.buffer));
 }
 
 addEventListener('message', e => {

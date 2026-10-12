@@ -16,14 +16,15 @@ async function pickFormat(mb, q) {
 
 // job: the audio render job (segments, bpm, tail, sampleRate, gain); canvas: the frame canvas; q: { w, h, fps, bps };
 // drawFrame(t, cyc, feed, codeAt, index): draws the frame for time t into the canvas; onProgress(0..1, phase).
-// Returns { promise, cancel }: the promise gives { blob, ext, seconds, onsets }.
-export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {} }) {
+// writable: a file to write into while rendering (#61), else the file is kept in memory.
+// Returns { promise, cancel }: the promise gives { blob (null when written to disk), ext, seconds, onsets }.
+export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, writable = null }) {
   let audio = null, cancelled = false;
   const promise = (async () => {
     const mb = await import('mediabunny');
     const f = await pickFormat(mb, q);
     if (!f) throw new Error('no video encoder in this browser');
-    const out = new mb.Output({ format: f.format, target: new mb.BufferTarget() });
+    const out = new mb.Output({ format: f.format, target: writable ? new mb.StreamTarget(writable, { chunked: true }) : new mb.BufferTarget() });
     const vs = new mb.CanvasSource(canvas, { codec: f.v, quality: new mb.Quality({ bitrate: q.bps }) });
     const as = new mb.AudioSampleSource({ codec: f.a, quality: new mb.Quality({ bitrate: 192000 }) });
     out.addVideoTrack(vs, { frameRate: q.fps });
@@ -68,7 +69,11 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {} }
     const r = await audio.promise;
     onProgress(1, 'encode');
     await out.finalize();
+    // the stream target closes the file itself when the output is finalized
+    if (writable) return { blob: null, ext: f.ext, seconds: r.seconds, onsets: r.onsets };
     return { blob: new Blob([out.target.buffer], { type: f.type }), ext: f.ext, seconds: r.seconds, onsets: r.onsets };
   })();
+  // a failed or cancelled render leaves no half file behind
+  if (writable) promise.catch(() => { try { const x = writable.abort(); if (x && x.catch) x.catch(() => {}); } catch (e) { /* locked by the output: it is dropped with it */ } });
   return { promise, cancel: () => { cancelled = true; if (audio) audio.cancel(); } };
 }

@@ -37,9 +37,11 @@ import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMess
 import { textsFor, textFile } from './video/texts.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from './soul/data.js';
 import { hashString } from './endless/random.js';
-import { encode, createEncoder, canEncode, formatOf } from './export/encode.js';
+import { encode, createEncoder, canEncode, formatOf, EXT } from './export/encode.js';
 import { segmentsOf, timelineOf, renderInBlocks } from './export/fast.js';
 import { renderVideo } from './export/fast-video.js';
+import { askDiskFile, LONG_SECONDS } from './export/disk.js';
+import { applySoundfontFixes } from './sounds/soundfont-fix.js';
 import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
@@ -163,6 +165,8 @@ const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor)
 // samples() can appear a little after the editor: wait for it, otherwise the call was skipped and only part of the archive loaded
 const whenSamples = () => new Promise(res => { const iv = setInterval(() => { if (typeof globalThis.samples === 'function') { clearInterval(iv); res(globalThis.samples); } }, 100); });
 ready.then(whenSamples).then(load => load('github:tidalcycles/dirt-samples')).catch(e => console.error(e));
+// broken soundfont notes (#54, #61) play from another font of the same instrument, once the soundfonts are registered
+{ const iv = setInterval(() => { const m = globalThis.soundMap && globalThis.soundMap.get(); if (m && m.gm_vibraphone && globalThis.registerSound) { clearInterval(iv); applySoundfontFixes({ getSound: globalThis.getSound, registerSound: globalThis.registerSound }); } }, 500); }
 // campioni personalizzati da public/samples/ (elenco generato dal plugin in vite.config.js)
 let custom = [];
 ready.then(async () => {
@@ -587,17 +591,21 @@ function blockSegments(sg) {
 async function exportFast(sg, title = sg.title, after = null, cut = null, extra = {}) {
   if (typeof OfflineAudioContext === 'undefined') return false;
   let fmt = exportFormat();
+  // a long export goes straight to a file on disk (#61): the dialog comes first, while the click still counts
+  const long = ((cut && cut.cut) || sg.meta.seconds) > LONG_SECONDS;
+  const disk = long ? await askDiskFile(fileName(title, EXT[fmt] || fmt), { wav: 'audio/wav', flac: 'audio/flac', mp3: 'audio/mpeg', opus: 'audio/ogg' }[fmt] || 'audio/wav', EXT[fmt] || fmt) : null;
+  if (disk === false) { toast(t('exportCancel')); return true; }
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
   const segments = segmentsOf(sg, codeFor);
-  const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate() });
-  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate(), writable: disk ? disk.writable : null });
+  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
     const r = await job.promise;
     fastJob.phase = 'encode';
     const { blob, ext } = await enc.finish();
-    const name = fileName(title, ext);
-    saveBlob(name, blob);
+    const name = disk ? disk.name : fileName(title, ext);
+    if (blob) saveBlob(name, blob);
     const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang());
     setTimeout(() => saveBlob(fileName(title, 'timeline.json'), new Blob([JSON.stringify(tl)], { type: 'application/json' })), 400);
     { const src = { sg, title, songs: extra.songs || null, seed: extra.seed || sg.id || title, cut }; showTexts(saveTexts(textsInfo(src, 'audio'), title), () => textsInfo(src, 'audio')); }
@@ -713,6 +721,10 @@ async function exportRadio(range) {
 // Returns false when it failed (the caller records in real time), true when done or cancelled.
 // frag (#57): a vertical fragment { start, end, layout, label, code, msgs, o, file }: the file is that stretch at 1080×1920
 async function exportVideoFast(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null } = {}) {
+  // a long video goes straight to a file on disk (#61): the dialog comes first, while the click still counts
+  const long = !frag && ((cut && cut.cut) || sg.meta.seconds) > LONG_SECONDS;
+  const disk = long ? await askDiskFile(fileName(title, 'mp4'), 'video/mp4', 'mp4') : null;
+  if (disk === false) { toast(t('vidCancelled')); return true; }
   const o = video.opts(), fsz = frag ? fragmentSize(frag.o) : null, q = frag ? fsz.file : QUALITIES[o.quality], layout = o.layout === 'tab' ? 'visual' : o.layout;
   const segments = segmentsOf(sg, codeFor), looks = PICK_LOOKS.map(l => l[0]);
   // the parts of the file: one per song of a session ("3 Intro" belongs to song 3), or the song itself
@@ -724,7 +736,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}),
+  const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
@@ -738,7 +750,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   let clockT = 0;
   soul.setClock(() => clockT);
   const run = renderVideo({
-    job, canvas: video.canvas, q,
+    job, canvas: video.canvas, q, writable: disk ? disk.writable : null,
     drawFrame(t, cyc, feed, codeAt, fi) {
       clockT = t;
       const p = parts.find(x => cyc >= x.start && cyc < x.end) || parts[parts.length - 1], item = songs ? songs[p.n - 1] : null;
@@ -760,8 +772,8 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   try {
     const r = await run.promise;
     if (frag) { const name = fileName(frag.file, r.ext); saveBlob(name, r.blob); return name; }
-    const name = fileName(title, r.ext);
-    saveBlob(name, r.blob);
+    const name = disk ? disk.name : fileName(title, r.ext);
+    if (r.blob) saveBlob(name, r.blob);
     const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang());
     setTimeout(() => saveBlob(fileName(title, 'timeline.json'), new Blob([JSON.stringify(tl)], { type: 'application/json' })), 400);
     { const src = { sg, title, songs, seed: seed || sg.id || title, cut }; showTexts(saveTexts(textsInfo(src, 'video'), title), () => textsInfo(src, 'video')); }

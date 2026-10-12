@@ -31,17 +31,20 @@ export function renderOffline(job, onProgress = () => {}) {
   frame.style.cssText = 'position:fixed;width:0;height:0;border:0;left:-10px;top:-10px;visibility:hidden';
   let done = false, finish;
   const promise = new Promise((res, rej) => {
-    const clear = () => { done = true; removeEventListener('message', on); clearTimeout(timer); frame.remove(); };
+    const clear = () => { done = true; removeEventListener('message', on); clearTimeout(timer); clearTimeout(quiet); frame.remove(); };
+    // a page that stops answering for STALL seconds while rendering counts as stuck (#61): the block is tried again
+    let quiet = 0;
+    const alive = () => { clearTimeout(quiet); quiet = setTimeout(() => finish(Object.assign(new Error('render stalled'), { stalled: true })), STALL * 1000); };
     finish = (err, val) => { if (done) return; clear(); err ? rej(err) : res(val); };
     // the page answers as soon as it is loaded
     const timer = setTimeout(() => finish(new Error('render page did not load')), 60000);
     function on(e) {
       if (e.source !== frame.contentWindow || !e.data || !e.data.codingMiskRender) return;
       const m = e.data;
-      if (m.ready) { clearTimeout(timer); frame.contentWindow.postMessage({ render: job }, location.origin); }
-      else if (m.progress !== undefined) onProgress(m.progress, m.phase);
+      if (m.ready) { clearTimeout(timer); alive(); frame.contentWindow.postMessage({ render: job }, location.origin); }
+      else if (m.progress !== undefined) { alive(); onProgress(m.progress, m.phase); }
       else if (m.error) finish(new Error(m.error));
-      else if (m.done) finish(null, { channels: m.channels, sampleRate: m.sampleRate, onsets: m.onsets });
+      else if (m.done) finish(null, { channels: m.channels, sampleRate: m.sampleRate, onsets: m.onsets, skipped: m.skipped || [] });
     }
     addEventListener('message', on);
   });
@@ -52,7 +55,7 @@ export function renderOffline(job, onProgress = () => {}) {
 
 // long exports render in blocks (memory stays flat): BLOCK seconds each, starting LEAD seconds early so notes and
 // tails cross the cut, with an XF crossfade at the cut
-export const BLOCK = 240, LEAD = 8, XF = 0.02;
+export const BLOCK = 240, LEAD = 8, XF = 0.02, STALL = 120;
 export function blocksOf(total, block = BLOCK) {
   const out = [];
   for (let a = 0; a < total - 1e-6; a += block) out.push([a, Math.min(total, a + block)]);
@@ -71,13 +74,20 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
     const T = tempoClock(job.bpm), length = job.cut || T.seconds(job.bpm.length), start = job.start || 0, onsets = {}, fade = job.fade || 0, fadeIn = job.fadeIn || 0;
     const blocks = blocksOf(length - start, job.block || BLOCK).map(([a, b]) => [a + start, b + start]);
     let carry = null, frames = 0, sr = job.sampleRate || 48000;
+    const skipped = new Set();
     for (let i = 0; i < blocks.length; i++) {
       if (cancelled) throw { cancelled: true };
       const [a, b] = blocks[i], last = i === blocks.length - 1, from = Math.max(0, a - LEAD);
       const { segmentsAt, ...rest } = job, segments = segmentsAt ? segmentsAt(from, b) || job.segments : job.segments;
-      cur = renderOffline({ ...rest, segments, from, to: b, tail: last ? (job.cut ? 0 : job.tail) : XF, keepFrom: a }, (p, phase) => onProgress((i + (phase === 'render' ? p : 0)) / blocks.length, i ? 'render' : phase));
-      const r = await cur.promise;
+      let r = null;
+      for (let attempt = 0; !r; attempt++) {
+        console.info(`[blocks] ${i + 1}/${blocks.length} ${a.toFixed(0)}-${b.toFixed(0)} s${attempt ? ` (try ${attempt + 1})` : ''}`);
+        cur = renderOffline({ ...rest, segments, from, to: b, tail: last ? (job.cut ? 0 : job.tail) : XF, keepFrom: a }, (p, phase) => onProgress((i + (phase === 'render' ? p : 0)) / blocks.length, i ? 'render' : phase));
+        try { r = await cur.promise; }
+        catch (e) { if (!(e && e.stalled) || attempt >= 2 || cancelled) throw e; console.warn(`[blocks] block ${i + 1} stalled, trying again`); }
+      }
       sr = r.sampleRate;
+      for (const x of r.skipped || []) skipped.add(x);
       let ch = r.channels.map(c => c.subarray(Math.round((a - from) * sr)));
       if (carry) for (let c = 0; c < ch.length; c++) for (let k = 0, n = carry[c].length; k < n && k < ch[c].length; k++) { const w = k / n; ch[c][k] = ch[c][k] * w + carry[c][k] * (1 - w); }
       if (!last) { const keep = Math.round((b - a) * sr); carry = ch.map(c => c.slice(keep)); ch = ch.map(c => c.subarray(0, keep)); }
@@ -90,7 +100,9 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
       frames += ch[0].length;
       for (const [k, list] of Object.entries(own)) (onsets[k] = onsets[k] || []).push(...list);
     }
-    return { seconds: frames / sr, sampleRate: sr, onsets };
+    // sounds that never loaded and were left out (#61): the app says which
+    if (skipped.size) { console.warn(`[blocks] sounds skipped: ${[...skipped].join(', ')}`); if (job.onSkipped) job.onSkipped([...skipped]); }
+    return { seconds: frames / sr, sampleRate: sr, onsets, skipped: [...skipped] };
   })();
   return { promise, cancel: () => { cancelled = true; if (cur) cur.cancel(); } };
 }

@@ -28,25 +28,41 @@ export async function canEncode(format) {
 }
 
 // a streaming encoder: add(channels) block by block, then finish() gives { blob, ext }. opts.mp3Rate in kbps.
-export async function createEncoder(format, sampleRate, { mp3Rate = 320 } = {}) {
+// writable: a file to write into while encoding (#61); finish() then gives { blob: null, ext }
+// a WAV header for 16 bit PCM
+function wavHeader(bytes, ch, sampleRate) {
+  const h = new DataView(new ArrayBuffer(44)), str = (o, x) => [...x].forEach((c, i) => h.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); h.setUint32(4, 36 + bytes, true); str(8, 'WAVE'); str(12, 'fmt ');
+  h.setUint32(16, 16, true); h.setUint16(20, 1, true); h.setUint16(22, ch, true); h.setUint32(24, sampleRate, true);
+  h.setUint32(28, sampleRate * ch * 2, true); h.setUint16(32, ch * 2, true); h.setUint16(34, 16, true); str(36, 'data'); h.setUint32(40, bytes, true);
+  return h.buffer;
+}
+export async function createEncoder(format, sampleRate, { mp3Rate = 320, writable = null } = {}) {
   format = formatOf(format);
+  if (format === 'wav' && writable) {
+    // the header (44 bytes) is written last, at the start of the file, once the length is known
+    let bytes = 0, ch = 2;
+    return {
+      async add(channels) { ch = Math.min(2, channels.length); const p = interleave16(channels); await writable.write({ type: 'write', position: 44 + bytes, data: new Uint8Array(p.buffer, p.byteOffset, p.byteLength) }); bytes += p.byteLength; },
+      async finish() {
+        await writable.write({ type: 'write', position: 0, data: new Uint8Array(wavHeader(bytes, ch, sampleRate)) });
+        await writable.close();
+        return { blob: null, ext: 'wav' };
+      },
+      abort() { try { writable.abort(); } catch (e) { /* closed */ } },
+    };
+  }
   if (format === 'wav') {
     // 16 bit parts, the header written at the end
     const parts = []; let bytes = 0, ch = 2;
     return {
       async add(channels) { ch = Math.min(2, channels.length); const p = interleave16(channels); parts.push(p); bytes += p.byteLength; },
-      async finish() {
-        const h = new DataView(new ArrayBuffer(44)), str = (o, x) => [...x].forEach((c, i) => h.setUint8(o + i, c.charCodeAt(0)));
-        str(0, 'RIFF'); h.setUint32(4, 36 + bytes, true); str(8, 'WAVE'); str(12, 'fmt ');
-        h.setUint32(16, 16, true); h.setUint16(20, 1, true); h.setUint16(22, ch, true); h.setUint32(24, sampleRate, true);
-        h.setUint32(28, sampleRate * ch * 2, true); h.setUint16(32, ch * 2, true); h.setUint16(34, 16, true); str(36, 'data'); h.setUint32(40, bytes, true);
-        return { blob: new Blob([h.buffer, ...parts], { type: 'audio/wav' }), ext: 'wav' };
-      },
+      async finish() { return { blob: new Blob([wavHeader(bytes, ch, sampleRate), ...parts], { type: 'audio/wav' }), ext: 'wav' }; },
     };
   }
   const mb = await bunny(format);
   const out = { flac: () => new mb.FlacOutputFormat(), mp3: () => new mb.Mp3OutputFormat(), opus: () => new mb.OggOutputFormat() }[format]();
-  const output = new mb.Output({ format: out, target: new mb.BufferTarget() });
+  const output = new mb.Output({ format: out, target: writable ? new mb.StreamTarget(writable, { chunked: true }) : new mb.BufferTarget() });
   const bitrate = format === 'mp3' ? (MP3_RATES.includes(mp3Rate) ? mp3Rate : 320) * 1000 : format === 'opus' ? 192000 : undefined;
   const source = new mb.AudioSampleSource({ codec: format, ...(bitrate ? { quality: new mb.Quality({ bitrate, bitrateMode: 'constant' }) } : {}) });
   output.addAudioTrack(source);
@@ -66,6 +82,7 @@ export async function createEncoder(format, sampleRate, { mp3Rate = 320 } = {}) 
     },
     async finish() {
       await output.finalize();
+      if (writable) return { blob: null, ext: EXT[format] };
       const type = { flac: 'audio/flac', mp3: 'audio/mpeg', opus: 'audio/ogg' }[format];
       return { blob: new Blob([output.target.buffer], { type }), ext: EXT[format] };
     },
