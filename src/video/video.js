@@ -3,6 +3,9 @@
 // The frame is drawn after each stage frame, so it follows the music exactly as the stage does.
 import { QUALITIES, VIDEO_DEFAULTS, LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
 import { liveAreas, lerpAreas, ease, presetOf, TRANSITION } from '../live/presets.js';
+import { verticalAreas } from './layout.js';
+import { glitchAt, GLITCH_SECONDS } from './fragments.js';
+import { hashString } from '../endless/random.js';
 
 const KEY = 'coding-misk-video';
 const LIVE_KEY = 'coding-misk-live-preset';
@@ -125,8 +128,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     g.fillStyle = P.panel; g.strokeStyle = P.line; g.lineWidth = 2;
     g.beginPath(); g.roundRect(A.x, A.y, A.w, A.h, 10); g.fill(); g.stroke();
     const fs = Math.round(A.head * .42);
-    g.fillStyle = P.muted; g.font = `600 ${fs}px "JetBrains Mono", monospace`; g.textBaseline = 'middle';
-    g.fillText(`SOUL ANALYZER ${open ? '▾' : '▸'}`, A.x + fs * 1.3, A.y + A.head / 2);
+    if (A.head) { g.fillStyle = P.muted; g.font = `600 ${fs}px "JetBrains Mono", monospace`; g.textBaseline = 'middle'; g.fillText(`SOUL ANALYZER ${open ? '▾' : '▸'}`, A.x + fs * 1.3, A.y + A.head / 2); }
     // the soul screen fitted into the panel's body
     if (open && soulCanvas) {
       const bw = A.w - 8, bh = A.h - A.head - 4, k = Math.min(bw / soulCanvas.width, bh / soulCanvas.height), sw = soulCanvas.width * k, sh = soulCanvas.height * k;
@@ -200,7 +202,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
   function frame(cyc, playing) {
     lastCyc = cyc; lastPlaying = playing;
     liveIdle();
-    if (!job) { drawPreview(cyc, playing); return; }
+    if (!job) { drawPreview(cyc, playing); drawVPreview(cyc); return; }
     if (job.layout === 'tab') return;
     const now = performance.now() / 1000;
     if (compose(job, cyc, playing, now) !== job.soulShown) renderBar();
@@ -255,6 +257,104 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     if (job.display) job.display.getTracks().forEach(tr => tr.stop());
     job.video.stop();
     job = null; visuals.setTarget(live ? live.q : null); renderBar();
+  }
+
+  // ---------- fragments (#57): the vertical picture, its bands, the CRT label and the glitch frames ----------
+  // the coding-misk logo: "coding" in neon script over the chrome "MISK", with a small equaliser on the music
+  function drawLogo(A, levels) {
+    const u = Math.min(A.h / 420, 1.15), cx = A.x + A.w / 2 - 60 * u, cy = A.y + A.h * .55;
+    g.save(); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    const chromeSize = Math.round(200 * u);
+    g.font = `${chromeSize}px "Russo One", "Chakra Petch", sans-serif`;
+    const cw = g.measureText('MISK').width;
+    const grad = g.createLinearGradient(0, cy - chromeSize * .8, 0, cy + chromeSize * .1);
+    [[0, '#ffffff'], [.28, '#d4ecff'], [.47, '#7d9fe0'], [.5, '#1a0f35'], [.53, '#ff4fa3'], [.76, '#ffc2e3'], [1, '#ffffff']].forEach(([o, c]) => grad.addColorStop(o, c));
+    g.setTransform(1, 0, -0.18, 1, cy * 0.18, 0);
+    g.shadowColor = '#ff4fa3'; g.shadowBlur = 24 * u; g.fillStyle = grad; g.fillText('MISK', cx, cy + chromeSize * .35);
+    g.shadowBlur = 0; g.lineWidth = 2 * u; g.strokeStyle = 'rgba(255,255,255,.45)'; g.strokeText('MISK', cx, cy + chromeSize * .35);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.translate(cx - cw * .32, cy - chromeSize * .42); g.rotate(-0.16);
+    g.font = `${Math.round(140 * u)}px "Mr Dafoe", "Brush Script MT", cursive`; g.fillStyle = '#fff';
+    g.shadowColor = '#00e5ff'; g.shadowBlur = 30 * u; g.fillText('coding', 0, 0); g.shadowBlur = 10 * u; g.fillText('coding', 0, 0);
+    g.restore();
+    // the equaliser, right of the word
+    const bars = 7, bw = 16 * u, gap = 9 * u, x0 = cx + cw * .55, base = cy + chromeSize * .38;
+    g.save(); g.fillStyle = '#00e5ff'; g.shadowColor = '#00e5ff'; g.shadowBlur = 12 * u;
+    for (let i = 0; i < bars; i++) { const lv = Math.max(.12, Math.min(1, (levels && levels[i]) || 0)), hgt = (16 + lv * 110) * u; g.fillRect(x0 + i * (bw + gap), base - hgt, bw, hgt); }
+    g.restore();
+  }
+  function drawBottomBand(A, P, o, info) {
+    const u = Math.min(A.h / 420, 1.15), lines = [];
+    if (o.vTitle && info.title) lines.push({ text: info.title, font: `700 ${Math.round(52 * u)}px "Chakra Petch", sans-serif`, color: '#fff' });
+    if (o.tagline) lines.push({ text: o.tagline, font: `600 ${Math.round(60 * u)}px "Chakra Petch", sans-serif`, color: P.ink });
+    if (o.fullLine) lines.push({ text: o.fullLine, font: `600 ${Math.round(42 * u)}px "JetBrains Mono", monospace`, color: P.a1 });
+    if (!lines.length) return;
+    g.save(); g.textAlign = 'center'; g.textBaseline = 'middle';
+    const step = 92 * u, y0 = A.y + A.h / 2 - (lines.length - 1) * step / 2;
+    lines.forEach((l, i) => { g.font = l.font; g.fillStyle = l.color; g.shadowColor = l.color; g.shadowBlur = 10 * u; g.fillText(l.text, A.x + A.w / 2, y0 + i * step, A.w - 80 * u); });
+    g.restore();
+  }
+  // the label: an amber CRT line typed in after the opening glitch, with scanlines and a slight flicker
+  function drawLabel(Q, text, t, y) {
+    const typed = Math.max(0, Math.min(text.length, Math.floor((t - GLITCH_SECONDS * .8) * 28)));
+    if (!typed) return;
+    const fs = Math.round(Q.w / 19), pad = fs * .45, shown = text.slice(0, typed) + (typed < text.length || Math.floor(t * 2) % 2 ? '█' : ' ');
+    g.save(); g.font = `${fs}px "VT323", "Share Tech Mono", monospace`; g.textBaseline = 'middle';
+    const w = g.measureText(text + '█').width + pad * 2, h = fs * 1.25, x = (Q.w - w) / 2;
+    g.fillStyle = 'rgba(8,6,2,.72)'; g.fillRect(x, y, w, h);
+    g.strokeStyle = 'rgba(255,179,71,.55)'; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    g.globalAlpha = .88 + .12 * Math.sin(t * 53) * Math.sin(t * 7);
+    g.fillStyle = '#ffb347'; g.shadowColor = '#ffb347'; g.shadowBlur = fs * .35; g.fillText(shown, x + pad, y + h / 2);
+    g.globalAlpha = .25; g.shadowBlur = 0; g.fillStyle = '#000';
+    for (let yy = y; yy < y + h; yy += 4) g.fillRect(x, yy, w, 1.5);
+    g.restore();
+  }
+  // the glitch frames: slices of the picture pushed sideways, colour split, noise, a dark veil and a CRT message
+  function drawGlitch(Q, k, msg, t, seed) {
+    const cvs = g.canvas, n = 18;
+    let h = hashString(`${seed}/${Math.floor(t * 24)}`);
+    const rnd = () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0) / 4294967296);
+    g.save();
+    for (let i = 0; i < n * k; i++) {
+      const y = rnd() * Q.h, hh = 8 + rnd() * Q.h / 14, dx = (rnd() - .5) * Q.w * .25 * k;
+      g.drawImage(cvs, 0, y, Q.w, hh, dx, y, Q.w, hh);
+    }
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = .18 * k;
+    g.drawImage(cvs, 8 * k, 0); g.globalCompositeOperation = 'source-over';
+    g.globalAlpha = .55 * k; g.fillStyle = '#05030a'; g.fillRect(0, 0, Q.w, Q.h);
+    g.globalAlpha = .5 * k;
+    for (let i = 0; i < 260 * k; i++) { g.fillStyle = rnd() > .5 ? '#3dffb0' : '#ff4fa3'; g.fillRect(rnd() * Q.w, rnd() * Q.h, 2 + rnd() * 40, 2); }
+    g.globalAlpha = Math.min(1, k * 1.6);
+    const fs = Math.round(Q.w / 15);
+    g.font = `${fs}px "VT323", "Share Tech Mono", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#3dffb0'; g.shadowColor = '#3dffb0'; g.shadowBlur = fs * .4;
+    g.fillText(`> ${msg}${Math.floor(t * 4) % 2 ? '_' : ' '}`, Q.w / 2, Q.h / 2);
+    g.restore();
+  }
+  // the settings' preview of a fragment's vertical picture (#57): a canvas element and the settings, or null
+  let vPrev = null, vPrevAt = 0;
+  function drawVPreview(cyc) {
+    if (!vPrev || !vPrev.el.isConnected || !vPrev.el.offsetParent) return;
+    const now = performance.now() / 1000; if (now - vPrevAt < 1 / 12) return; vPrevAt = now;
+    const o = vPrev.opts(), t = 3 + (now % 6);
+    composeVertical({ layout: o.vLayout, q: { w: 540, h: 960 }, o, label: o.label ? `FRAGMENT S0UL·7QX2K #${String(o.next || 1).padStart(3, '0')}` : '', code: 'PREVIEW', msgs: { open: 'reading soul…', close: 'fragment recovered' }, length: 12 }, cyc, now, t, [.4, .7, .3, .9, .5, .6, .35]);
+    vPrev.el.getContext('2d').drawImage(cv, 0, 0, vPrev.el.width, vPrev.el.height);
+  }
+  // a frame of a fragment into the video canvas. J: { layout, q, o (settings), label, code, msgs, length }
+  function composeVertical(J, cyc, now, t, levels) {
+    const Q = J.q, P = palette(), o = J.o || {};
+    if (cv.width !== Q.w || cv.height !== Q.h) { cv.width = Q.w; cv.height = Q.h; }
+    const A = verticalAreas(J.layout, Q.w, Q.h);
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
+    g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
+    if (A.stage) { drawStage(A.stage); drawSay(A.stage); }
+    if (A.soul && soulFrame) { const bw = A.soul.w - 8, bh = A.soul.h - A.soul.head - 4; drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, Math.min(bw / 1200, bh / 760)))); }
+    if (A.code) drawCode(A.code, P, now, Q.w * 1.6);
+    if (A.top) drawLogo(A.top, levels);
+    if (A.bottom) drawBottomBand(A.bottom, P, o, getInfo(cyc) || {});
+    if (o.label !== false && J.label) drawLabel(Q, J.label, t, A.top ? A.top.h + Q.w * .03 : Q.w * .04);
+    const gl = o.glitch !== false ? glitchAt(t, J.length) : null;
+    if (gl && gl.k > 0) drawGlitch(Q, gl.k, gl.phase === 'open' ? J.msgs.open : J.msgs.close, t, J.code);
   }
 
   // ---------- the live picture (#52): drawn into the broadcast window's canvas, with presets and transitions ----------
@@ -319,6 +419,9 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
   }
   return {
     start, end, askTab, frame, opts, setOpt,
+    // a frame of a fragment (#57), and the settings' preview of one
+    composeVertical,
+    previewVertical(el, opts) { vPrev = el ? { el, opts } : null; },
     // the live picture (#52)
     live: {
       draw: drawLive, preview: drawLivePreview, setPreset: setLivePreset,

@@ -16,6 +16,7 @@ import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS, isSession } from './library/playlists.js';
 import { DIRECTOR_VERSION } from './endless/director.js';
 import { createPlaylistsTab } from './library/playlists-tab.js';
+import { pickJsonFiles } from './library/library.js';
 import { createSettings } from './settings/settings.js';
 import { createGenresTab } from './library/genres-tab.js';
 import { genresOf } from './library/song-filter.js';
@@ -31,7 +32,9 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
-import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor } from './video/layout.js';
+import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor, V_QUALITY, V_DEFAULTS, V_LAYOUTS, verticalAreas } from './video/layout.js';
+import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMessages, shapeOf, clockOf, parseTime } from './video/fragments.js';
+import { textsFor, textFile } from './video/texts.js';
 import { encode, createEncoder, canEncode, formatOf } from './export/encode.js';
 import { segmentsOf, timelineOf, renderInBlocks } from './export/fast.js';
 import { renderVideo } from './export/fast-video.js';
@@ -578,7 +581,8 @@ function blockSegments(sg) {
 }
 // after(): called once the files are saved (the radio adds its track list and recipe)
 // cut: { cut, fade } seconds, the file ends exactly at cut with a fade-out (#5)
-async function exportFast(sg, title = sg.title, after = null, cut = null) {
+// extra: { songs, seed } for the texts saved next to the file (#57)
+async function exportFast(sg, title = sg.title, after = null, cut = null, extra = {}) {
   if (typeof OfflineAudioContext === 'undefined') return false;
   let fmt = exportFormat();
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
@@ -594,6 +598,7 @@ async function exportFast(sg, title = sg.title, after = null, cut = null) {
     saveBlob(name, blob);
     const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang());
     setTimeout(() => saveBlob(fileName(title, 'timeline.json'), new Blob([JSON.stringify(tl)], { type: 'application/json' })), 400);
+    { const src = { sg, title, songs: extra.songs || null, seed: extra.seed || sg.id || title, cut }; showTexts(saveTexts(textsInfo(src, 'audio'), title), () => textsInfo(src, 'audio')); }
     if (after) after(title);
     toast(t('exportDone', { name }));
     return true;
@@ -693,18 +698,20 @@ async function exportRadio(range) {
   const lines = [`coding-misk radio · seed ${r.recipe.seed} · ${new Date().toLocaleString()}`, '', ...r.items.map((x, i) => `${clock2(starts[i + 1] || 0)} ${x.song.title}${x.artist ? ` · ${x.artist}` : ''}`)];
   const after = () => {
     setTimeout(() => saveBlob(`${base}-tracklist.txt`, new Blob([lines.join('\n') + '\n'], { type: 'text/plain' })), 800);
-    setTimeout(() => saveBlob(`${base}-recipe.json`, new Blob([JSON.stringify(r.recipe, null, 2) + '\n'], { type: 'application/json' })), 1200);
+    // the recipe carries which songs of the session the file holds and where it was cut, so fragments (#57) find the same times
+    setTimeout(() => saveBlob(`${base}-recipe.json`, new Blob([JSON.stringify({ ...r.recipe, export: { from: r.from || 0, count: r.items.length, ...(cut || {}) } }, null, 2) + '\n'], { type: 'application/json' })), 1200);
   };
   const songs = r.items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' }));
-  const ok = outKind() === 'video' ? await exportVideoFast(sg, base, { songs, after, cut }) : await exportFast(sg, base, after, cut);
+  const ok = outKind() === 'video' ? await exportVideoFast(sg, base, { songs, after, cut, seed: String(r.recipe.seed) }) : await exportFast(sg, base, after, cut, { songs, seed: String(r.recipe.seed) });
   if (!ok) toast(t('rxFailed'));
 }
 // ---------- fast video (#53) ----------
 // a video of sg rendered faster than real time, following the direction in Settings → Video.
 // songs: the songs of a joined session or radio range [{ song, title, artist }], to name and dress each part.
 // Returns false when it failed (the caller records in real time), true when done or cancelled.
-async function exportVideoFast(sg, title = sg.title, { songs = null, after = null, cut = null } = {}) {
-  const o = video.opts(), q = QUALITIES[o.quality], layout = o.layout === 'tab' ? 'visual' : o.layout;
+// frag (#57): a vertical fragment { start, end, layout, label, code, msgs, o, file }: the file is that stretch at 1080×1920
+async function exportVideoFast(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null } = {}) {
+  const o = video.opts(), q = frag ? V_QUALITY : QUALITIES[o.quality], layout = o.layout === 'tab' ? 'visual' : o.layout;
   const segments = segmentsOf(sg, codeFor), looks = PICK_LOOKS.map(l => l[0]);
   // the parts of the file: one per song of a session ("3 Intro" belongs to song 3), or the song itself
   const parts = [];
@@ -715,9 +722,12 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}) };
-  const A = layoutAreas(layout, q.w, q.h, null);
-  visuals.setTarget({ w: A.stage.w, h: A.stage.h });
+  const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}),
+    ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
+  const A = frag ? verticalAreas(frag.layout, q.w, q.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: q.w, h: q.w };
+  visuals.setTarget({ w: stageA.w, h: stageA.h });
+  const fragJ = frag ? { layout: frag.layout, q, o: frag.o, label: frag.label, code: frag.code, msgs: frag.msgs, length: frag.end - frag.start } : null;
+  const EQ = ['kick', 'snare', 'hats', 'bass', 'arp', 'pad', 'hook'];
   visuals.hold(true);
   let clockT = 0;
   soul.setClock(() => clockT);
@@ -735,22 +745,25 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
         soulSrc: doc && doc.sections && doc.tracks ? { key: `fv:${p.n}`, song: doc, ctx: {}, bar: cyc - p.start } : null,
       };
       visuals.drawAt({ now: t * 1000, cyc, look: lookFor(o, looks, { n: p.n, section, own }), feed, dt: 1 / q.fps, show: fi % 6 === 0 });
-      video.composeAt({ layout, q }, cyc, t);
+      if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)));
+      else video.composeAt({ layout, q }, cyc, t);
     },
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
   });
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: run.cancel };
   try {
     const r = await run.promise;
+    if (frag) { const name = fileName(frag.file, r.ext); saveBlob(name, r.blob); return name; }
     const name = fileName(title, r.ext);
     saveBlob(name, r.blob);
     const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang());
     setTimeout(() => saveBlob(fileName(title, 'timeline.json'), new Blob([JSON.stringify(tl)], { type: 'application/json' })), 400);
+    { const src = { sg, title, songs, seed: seed || sg.id || title, cut }; showTexts(saveTexts(textsInfo(src, 'video'), title), () => textsInfo(src, 'video')); }
     if (after) after(title);
     toast(t('vidSaved', { name }));
     return true;
   } catch (e) {
-    if (e && e.cancelled) { toast(t('vidCancelled')); return true; }
+    if (e && e.cancelled) { if (frag) return 'cancelled'; toast(t('vidCancelled')); return true; }
     console.warn('[fast video]', e);
     return false;
   } finally {
@@ -758,6 +771,163 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
     soul.setClock(null); visuals.hold(false); visuals.setTarget(null);
   }
 }
+// ---------- fragments and texts for sharing (#57) ----------
+const FRAG_KEY = 'coding-misk-fragments', FRAG_N = 'coding-misk-fragment-n';
+const fragOpts = () => { const o = { ...V_DEFAULTS, ...(store.get(FRAG_KEY, {}) || {}) }; if (!V_LAYOUTS.includes(o.vLayout)) o.vLayout = V_DEFAULTS.vLayout; return o; };
+const setFragOpt = (k, v) => store.set(FRAG_KEY, { ...fragOpts(), [k]: v });
+const nextFragment = () => Math.max(1, +store.get(FRAG_N, 1) || 1);
+// the picker's shape: the song JSON when there is one, else the sections alone
+function shapeFor(sg) {
+  if (sg.doc && sg.doc.sections && sg.doc.tracks) return shapeOf(sg.doc, absoluteClips);
+  return { bars: sg.meta.bars, sections: sg.meta.sections.map(x => ({ label: x.label, start: x.start, len: x.len })), tracks: [{ type: 'any', clips: [{ start: 0, bars: sg.meta.bars }] }] };
+}
+// a session's songs joined into one playable song, as its export does
+const joinItems = (items, seed, options, id) => playable({ ...joinSession({ songs: items.map(x => ({ transition: x.transition })), seed, options: options || {} }, items.map(x => absoluteClips(clone(x.song)))), kind: 'composed', id });
+// a source: a song id, a playlist session id, or a recipe object (the file saved with a radio export)
+// → { sg, title, key, seed, songs, cut } or { error }
+function fragmentSource(src) {
+  if (src && typeof src === 'object') {
+    if (!radio || !src.seed) return { error: 'source' };
+    const ex = src.export || {}, from = ex.from || 0, items = radio.rebuild(src, from + (ex.count || 1)).slice(from);
+    const sg = joinItems(items, src.seed, src.options, 'recipe');
+    return { sg, title: `Radio ${src.seed}`, key: `recipe:${src.seed}:${from}`, seed: String(src.seed), songs: items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' })), cut: ex.cut ? { cut: ex.cut, fade: ex.fade || 0 } : null };
+  }
+  const s = playlists.session(src);
+  if (s && radio) {
+    const items = s.frozen || radio.rebuild(s.recipe, s.count), sg = joinItems(items, s.recipe.seed, s.recipe.options, src);
+    return { sg, title: s.title, key: `session:${src}`, seed: String(s.recipe.seed), songs: items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' })) };
+  }
+  const c = cards.find(x => x.tr.id === src);
+  if (!c) return { error: 'source' };
+  const sg = c.tr.kind === 'composed' ? playable({ ...prepare(clone(c.tr)), kind: 'composed' }) : c.p;
+  return { sg, title: c.tr.title || sg.title, key: `song:${src}`, seed: String(src), songs: null };
+}
+// the facts the texts need: song titles with their start in seconds, genres, length
+function textsInfo(src, kind, extra = {}) {
+  const sg = src.sg, T = tempoClock(sg.meta.bpm.map(Number)), songs = [];
+  if (src.songs) for (const sec of sg.meta.sections) { const n = parseInt(sec.label, 10); if (n && !songs[n - 1]) songs[n - 1] = { title: src.songs[n - 1] ? src.songs[n - 1].title : sec.label, start: T.seconds(sec.start) }; }
+  const docs = src.songs ? src.songs.map(x => x.song) : [sg.doc || {}];
+  const genres = docs.flatMap(d => (d && d.tags && (d.tags.genres || d.tags.styles)) || (d && typeof d.genre === 'string' ? [d.genre] : []));
+  const seconds = src.cut ? src.cut.cut : sg.meta.seconds;
+  return { kind, title: src.title, songs: songs.filter(Boolean), genres, seconds, seed: src.seed, ...extra };
+}
+function saveTexts(info, base) {
+  const tx = textsFor(info);
+  setTimeout(() => saveBlob(fileName(base, 'txt'), new Blob([textFile(tx)], { type: 'text/plain' })), 600);
+  return tx;
+}
+// fragments of a source: n at random (length seconds), or one from..to (seconds). Saves one video each, their texts and
+// a list. o: the vertical settings (Settings → Video) overridden by opts. Returns { files, items } or { error }.
+async function makeFragments(opts = {}) {
+  if (fastJob || rec || capture) return { error: 'busy' };
+  const src = fragmentSource(opts.source); if (src.error) return src;
+  const o = { ...fragOpts(), ...(opts.layout ? { vLayout: opts.layout } : {}), ...(opts.bands || {}), ...(opts.label === false ? { label: false } : {}), ...(opts.glitch === false ? { glitch: false } : {}) };
+  const shape = shapeFor(src.sg), bpm = src.sg.meta.bpm.map(Number);
+  let picks;
+  if (opts.from !== undefined && opts.to !== undefined) { const f = fragmentBetween(shape, bpm, +opts.from, +opts.to); if (f.error) return f; picks = [f]; }
+  else picks = pickFragments(shape, bpm, { n: Math.max(1, opts.n | 0 || 1), length: +opts.length || o.vLength, seed: `${src.seed}/${opts.seed ?? ''}` });
+  if (src.cut) picks = picks.filter(x => x.end <= src.cut.cut + 1e-6);
+  if (!picks.length) return { error: 'none' };
+  const files = [], items = [];
+  let last = null;
+  for (let i = 0; i < picks.length; i++) {
+    const p = picks[i], n = nextFragment(), code = fragmentCode(src.key, p.start), label = fragmentLabel(code, n);
+    if (opts.onProgress) opts.onProgress(i, picks.length);
+    const file = `${src.title} · fragment #${String(n).padStart(3, '0')}`;
+    const name = await exportVideoFast(src.sg, src.title, { songs: src.songs, frag: { start: p.start, end: p.end, layout: o.vLayout, label: o.label ? label : '', code, msgs: glitchMessages(code), o, file } });
+    if (name === 'cancelled') break;
+    if (!name) return { error: 'render', files, items };
+    store.set(FRAG_N, n + 1);
+    // a session's fragment is named after the song playing at its start
+    const info = textsInfo(src, 'fragment', { fragment: { label, start: p.start, end: p.end }, fullLine: o.fullLine, seed: `${src.seed}/${code}` });
+    const at = info.songs.filter(x => x.start <= p.start + 1e-6).pop();
+    const fInfo = { ...info, title: at ? at.title : info.title }, tx = saveTexts(fInfo, file);
+    last = { tx, info: fInfo };
+    files.push(name); items.push({ file: name, label, start: +p.start.toFixed(3), end: +p.end.toFixed(3), from: clockOf(p.start), to: clockOf(p.end), title: tx.title });
+  }
+  if (items.length) {
+    const list = { source: typeof opts.source === 'object' ? 'recipe' : opts.source, title: src.title, seed: src.seed, layout: o.vLayout, items };
+    setTimeout(() => saveBlob(fileName(`${src.title} · fragments`, 'json'), new Blob([JSON.stringify(list, null, 2) + '\n'], { type: 'application/json' })), 900);
+    toast(t('fragSaved', { n: items.length }));
+    if (last && !opts.quiet) showTexts(last.tx, () => last.info);
+  }
+  return { files, items };
+}
+// the texts of a source, without saving anything (the panel and agents)
+function sourceTexts(source, draw = 0) { const src = fragmentSource(source); return src.error ? src : textsFor({ ...textsInfo(src, 'video'), draw }); }
+// the texts panel (#57): shown after a save, with copy and draw again; info(): the facts textsFor needs
+let textsPanel = null;
+function showTexts(tx, info) {
+  if (!tx) return;
+  if (textsPanel) textsPanel.remove();
+  let draw = 0;
+  const el = document.createElement('div');
+  el.className = 'texts-panel'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', t('textsTitle'));
+  const fill = x => { el.querySelector('[data-tx-title]').value = x.title; el.querySelector('[data-tx-desc]').value = x.description; };
+  el.innerHTML = `<div class="tp-head"><b>${esc(t('textsTitle'))}</b><button class="chip" data-tx="close" aria-label="${esc(t('close'))}">✕</button></div>
+    <label class="lbl" for="tx-title">${esc(t('textsTitleLbl'))}</label><input id="tx-title" data-tx-title data-no-knob>
+    <label class="lbl" for="tx-desc">${esc(t('textsDescLbl'))}</label><textarea id="tx-desc" data-tx-desc rows="9" data-no-knob></textarea>
+    <div class="tp-actions"><button class="btn" data-tx="copy-title">${esc(t('textsCopyTitle'))}</button><button class="btn" data-tx="copy-desc">${esc(t('textsCopyDesc'))}</button><button class="btn" data-tx="draw">${esc(t('textsDraw'))}</button></div>`;
+  document.body.appendChild(el); textsPanel = el; fill(tx);
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('[data-tx]'); if (!b) return;
+    if (b.dataset.tx === 'close') { el.remove(); textsPanel = null; return; }
+    if (b.dataset.tx === 'draw') { draw++; fill(textsFor({ ...info(), draw })); return; }
+    const v = el.querySelector(b.dataset.tx === 'copy-title' ? '[data-tx-title]' : '[data-tx-desc]').value;
+    try { await navigator.clipboard.writeText(v); toast(t('textsCopied')); } catch (err) { toast(t('textsCopyFail')); }
+  });
+}
+// the fragments menu (#57): opened by any [data-frag="<song or session id>"]; random (count, length, seed) or from–to
+let fragMenu = null;
+function openFragMenu(source, anchor) {
+  if (fragMenu) { const same = fragMenu.source === source; fragMenu.el.remove(); fragMenu = null; if (same) return; }
+  const o = fragOpts(), el = document.createElement('div');
+  el.className = 'frag-menu card'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', t('fragTitle'));
+  const lay = V_LAYOUTS.map(k => `<option value="${k}"${k === o.vLayout ? ' selected' : ''}>${esc(t(`fragLayout:${k}`))}</option>`).join('');
+  el.innerHTML = `<div class="tp-head"><b>${esc(t('fragTitle'))}</b><button class="chip" data-fm="close" aria-label="${esc(t('close'))}">✕</button></div>
+    <label class="rx-opt"><input type="radio" name="fm-kind" value="random" checked> <span>${esc(t('fragRandom'))}</span>
+      <input type="number" id="fm-n" min="1" max="20" value="3" aria-label="${esc(t('fragCount'))}" data-no-knob> × <input type="number" id="fm-len" min="5" max="180" value="${o.vLength}" aria-label="${esc(t('fragLength'))}" data-no-knob> s
+      ${[15, 30, 60].map(x => `<button class="chip" data-fm-len="${x}">${x}</button>`).join('')}</label>
+    <label class="rx-opt"><input type="radio" name="fm-kind" value="between"> <span>${esc(t('fragBetween'))}</span>
+      <input id="fm-from" placeholder="1:20" aria-label="${esc(t('fragFrom'))}" data-no-knob size="6"> – <input id="fm-to" placeholder="1:50" aria-label="${esc(t('fragTo'))}" data-no-knob size="6"></label>
+    <label class="rx-opt"><span>${esc(t('fragLayoutLbl'))}</span><select id="fm-layout" data-no-knob>${lay}</select></label>
+    <label class="rx-opt"><span>${esc(t('fragSeed'))}</span><input id="fm-seed" placeholder="${esc(t('fragSeedHint'))}" data-no-knob size="18"></label>
+    <p class="hint muted small">${esc(t('fragHint', { n: String(nextFragment()).padStart(3, '0') }))}</p>
+    <div class="tp-actions"><button class="btn primary" data-fm="go">${esc(t('fragGo'))}</button><button class="btn" data-fm="texts">${esc(t('textsTitle'))}</button><span class="muted small" data-fm-status></span></div>`;
+  (anchor.closest('.songbar, .pl-row, .card') || anchor).insertAdjacentElement('afterend', el);
+  fragMenu = { el, source };
+  const status = x => { el.querySelector('[data-fm-status]').textContent = x; };
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.fmLen) { el.querySelector('#fm-len').value = b.dataset.fmLen; el.querySelector('input[value="random"]').checked = true; return; }
+    if (b.dataset.fm === 'close') { el.remove(); fragMenu = null; return; }
+    if (b.dataset.fm === 'texts') { const src = fragmentSource(source); if (!src.error) showTexts(textsFor(textsInfo(src, 'video')), () => textsInfo(src, 'video')); return; }
+    if (b.dataset.fm !== 'go') return;
+    if (fastJob) { fastJob.cancel(); return; }
+    const kind = el.querySelector('input[name="fm-kind"]:checked').value, layout = el.querySelector('#fm-layout').value;
+    setFragOpt('vLayout', layout);
+    const opts = { source, layout, seed: el.querySelector('#fm-seed').value.trim(), onProgress: (i, n) => status(t('fragProgress', { i: i + 1, n })) };
+    if (kind === 'between') {
+      const from = parseTime(el.querySelector('#fm-from').value), to = parseTime(el.querySelector('#fm-to').value);
+      if (Number.isNaN(from) || Number.isNaN(to)) { toast(t('fragBadTime')); return; }
+      Object.assign(opts, { from, to });
+    } else Object.assign(opts, { n: +el.querySelector('#fm-n').value || 1, length: +el.querySelector('#fm-len').value || o.vLength });
+    b.textContent = t('fragCancel');
+    const r = await makeFragments(opts);
+    b.textContent = t('fragGo');
+    if (r.error) { status(''); toast(t(`fragErr:${r.error}`)); return; }
+    status(t('fragDone', { n: r.items.length }));
+    if (opts.n && r.items.length < opts.n) toast(t('fragFewer', { n: r.items.length }));
+  });
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-frag]'); if (b) { e.stopPropagation(); openFragMenu(b.dataset.frag, b); } }, true);
+globalThis.codingMiskClips = {
+  fragments: opts => makeFragments(opts),
+  texts: ({ source, draw = 0 } = {}) => sourceTexts(source, draw),
+  sources: () => ({ songs: cards.filter(c => c.tr.kind === 'composed').map(c => ({ id: c.tr.id, title: c.tr.title })), sessions: playlists.sessions() }),
+  get job() { return fastJob ? { progress: fastJob.progress, phase: fastJob.phase } : null; },
+  next: () => nextFragment(),
+};
 // the playlist row's export of a session (#8): audio rendered fast as one joined song, or a video (the Export display)
 async function exportSession(id) {
   const s = playlists.session(id); if (!s || !radio) return;
@@ -770,7 +940,7 @@ async function exportSession(id) {
       const joined = joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: s.recipe.seed, options: s.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song))));
       const sg = playable({ ...joined, kind: 'composed', id });
       const songs = items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' }));
-      if (await (asVideo ? exportVideoFast(sg, s.title, { songs }) : exportFast(sg, s.title))) return;
+      if (await (asVideo ? exportVideoFast(sg, s.title, { songs, seed: String(s.recipe.seed) }) : exportFast(sg, s.title, null, null, { songs, seed: String(s.recipe.seed) }))) return;
     } catch (e) { console.warn('[session export]', e); }
     toast(t('exportFastFailed'));
   }
@@ -1831,6 +2001,7 @@ function songCard({ tr, p }, i) {
         <button class="btn" data-act="stop" hidden>${t('stop')}</button>
       </span>
       ${outCombo(`<button class="btn" data-act="export" data-export="${esc(tr.id)}">${t('exportWav')}</button>`)}
+      ${composed ? `<button class="btn" data-frag="${esc(tr.id)}" title="${esc(t('fragTip'))}">${esc(t('fragBtn'))}</button>` : ''}
       <span class="btn-cluster">
         <button class="btn" data-act="playlist" aria-expanded="false">${t('addToPlaylist')}</button>
         ${composed && continuable(tr) ? `<button class="btn" data-act="radio" title="${esc(t('continueRadioTip'))}">${t('continueRadio')}</button>` : ''}
@@ -2421,6 +2592,8 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     volume: () => volume, setVolume: v => setVolume(v),
     // the video recorder is made after the settings: a page opened on the settings gets its preview below
     videoPreview: el => { try { video.preview(el); } catch (e) {} },
+    fragmentsFromRecipe: (recipe, anchor) => openFragMenu(recipe, anchor),
+    fragPreview: (el, opts) => { try { video.previewVertical(el, opts); } catch (e) {} },
     liveOpenWindow: () => liveLink.openWindow(), liveOpenRoom: () => liveLink.openRoom(), liveOn: () => { try { return liveLink.on; } catch (e) { return false; } },
     radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', scope: 'song' }), setRadio: (k, v) => radio && radio.setOption(k, v),
   } });

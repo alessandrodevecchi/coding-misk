@@ -187,7 +187,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (range.kind === 'clip') {
       const sec = Math.max(5, Math.min(600, +range.seconds || 30));
       const clip = { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), fit: Math.max(4, sec - 1) }, changes: [] };
-      return { recipe: clip, items: rebuild(clip, 1) };
+      return { recipe: clip, items: rebuild(clip, 1), from: 0 };
     }
     if (range.kind === 'now') { if (!S) return null; items = rebuild(recipe, from + 1); }
     else if (range.kind === 'songs') items = rebuild(recipe, from + Math.max(1, range.n | 0));
@@ -196,7 +196,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       // the songs from the one on air, minus the bars their transitions overlap, until the target
       items = rebuild(recipe, 1e4, out => out.length > from && out.slice(from).reduce((a, x, i, l) => a + songSeconds(x.song) - (i < l.length - 1 ? overlapOf(x.entry.transition) * 240 / (x.song.sections[x.song.sections.length - 1].bpm || 120) : 0), 0) >= target);
     }
-    return { recipe, items: items.slice(range.kind === 'now' ? 0 : from) };
+    return { recipe, items: items.slice(range.kind === 'now' ? 0 : from), from: range.kind === 'now' ? 0 : from };
   }
   // a session item of a playlist: the songs heard so far (the one on air included)
   const sessionItem = (recipe, count, first) => ({ recipe: clone(recipe), count, title: t(count === 1 ? 'plSessionTitle1' : 'plSessionTitle', { title: first, n: count }), date: new Date().toISOString(), version: DIRECTOR_VERSION });

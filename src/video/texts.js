@@ -27,7 +27,7 @@ const FRAGMENT_LINES = [
   'A glimpse of the machine at work.',
 ];
 
-const genreLine = genres => [...new Set((genres || []).filter(Boolean))].map(g => g.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())).join(' · ');
+const genreLine = genres => [...new Set((genres || []).filter(g => typeof g === 'string' && g))].map(g => g.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())).join(' · ');
 const minutes = s => `${Math.max(1, Math.round(s / 60))} min`;
 // a chapter time: 03:25, or 0:03:25 when the video lasts an hour or more
 const stamp = (s, long) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = String(Math.floor(s / 60) % 60).padStart(2, '0'), x = String(s % 60).padStart(2, '0'); return long ? `${h}:${m}:${x}` : `${m}:${x}`; };

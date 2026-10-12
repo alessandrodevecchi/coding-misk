@@ -60,8 +60,9 @@ export function verticalAreas(layout, w, h) {
     const lower = { x: pad, y: top + pad, w: w - 2 * pad, h: h - top - 2 * pad };
     return layout === 'v-code' ? { stage: { x: 0, y: 0, w, h: top }, code: lower } : { stage: { x: 0, y: 0, w, h: top }, soul: { ...lower, head } };
   }
-  const band = Math.round((h - w) / 2), mid = { x: 0, y: band, w, h: w };
-  const bands = { top: { x: 0, y: 0, w, h: band }, bottom: { x: 0, y: band + w, w, h: h - band - w } };
+  // the stage is square; the soul keeps its screen's 1200×760 proportions, so its bands are taller
+  const mh = layout === 'v-soul-bands' ? Math.round(w * 760 / 1200) + 8 : w, band = Math.round((h - mh) / 2), mid = { x: 0, y: band, w, h: mh };
+  const bands = { top: { x: 0, y: 0, w, h: band }, bottom: { x: 0, y: band + mh, w, h: h - band - mh } };
   return layout === 'v-soul-bands' ? { soul: { ...mid, head: 0 }, ...bands } : { stage: mid, ...bands };
 }
 

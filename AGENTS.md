@@ -90,6 +90,8 @@ npm run check:video                                    # session video: layout a
 node tools/check-video.cjs [shots-dir]                 # session video in the browser: song, code layout, cancel, radio, soul panel, whole tab, fast video and its direction, the radio gear; files checked with ffprobe (dev server)
 npm run check:export                                   # fast export: tempo map, live build segments, timeline, formats (no browser)
 node tools/check-export.cjs [song,song…]                # fast export in the browser: faster than real time, same sound as real time, FLAC lossless, MP3 and Opus, cancel, saved session; needs ffmpeg (dev server)
+npm run check:clips                                    # fragments: vertical layouts, picker, label, glitch messages, texts for sharing (no browser)
+node tools/check-clips.cjs [shots-dir]                 # fragments in the browser: random and timed, 1080×1920 with sound, same sound as the long song, recipe source, menu and texts panel, visuals in each layout (dev server, ffmpeg)
 npm run check:live                                     # live output: preset areas and transitions, beat, OBS client against a fake OBS (no browser)
 node tools/check-live.cjs [shots-dir]                  # live output in the browser: broadcast window, control room, TAKE and transition, app loop stopped, reload, close (dev server)
 node tools/check-recording.cjs                         # radio recording: pause without gaps, track list, downloads, record from the start (dev server)

@@ -60,13 +60,16 @@ export function blocksOf(total, block = BLOCK) {
 }
 
 // renders a song block by block into sink.add(channels, startSeconds, blockOnsets). job: { segments, bpm, tail, sampleRate, gain, block?,
-// segmentsAt?(from, to): the segments of one block (only the tracks that play in it) }.
+// segmentsAt?(from, to): the segments of one block (only the tracks that play in it), start?: seconds of the song where the file
+// begins (a fragment, #57: the first block still renders from start - LEAD; times in the output, onsets included, count from start),
+// fadeIn?: seconds of fade at the start }.
 // onProgress(0..1, phase). Returns { promise, cancel }: the promise gives { seconds, sampleRate, onsets }.
 export function renderInBlocks(job, sink, onProgress = () => {}) {
   let cur = null, cancelled = false;
   const promise = (async () => {
     // job.cut: the file ends exactly there, the last job.fade seconds fading out (#5); else the song plus its tail
-    const T = tempoClock(job.bpm), length = job.cut || T.seconds(job.bpm.length), blocks = blocksOf(length, job.block || BLOCK), onsets = {}, fade = job.fade || 0;
+    const T = tempoClock(job.bpm), length = job.cut || T.seconds(job.bpm.length), start = job.start || 0, onsets = {}, fade = job.fade || 0, fadeIn = job.fadeIn || 0;
+    const blocks = blocksOf(length - start, job.block || BLOCK).map(([a, b]) => [a + start, b + start]);
     let carry = null, frames = 0, sr = job.sampleRate || 48000;
     for (let i = 0; i < blocks.length; i++) {
       if (cancelled) throw { cancelled: true };
@@ -80,9 +83,12 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
       if (!last) { const keep = Math.round((b - a) * sr); carry = ch.map(c => c.slice(keep)); ch = ch.map(c => c.subarray(0, keep)); }
       else if (job.cut) ch = ch.map(c => c.subarray(0, Math.round((b - a) * sr)));
       if (job.cut && fade > 0) for (let i = 0, n = ch[0].length; i < n; i++) { const t = a + i / sr; if (t > job.cut - fade) { const g = Math.max(0, (job.cut - t) / fade); for (const c of ch) c[i] *= g; } }
-      await sink.add(ch, frames / sr, r.onsets);
+      if (fadeIn > 0 && a - start < fadeIn) for (let i = 0, n = Math.min(ch[0].length, Math.round((fadeIn - (a - start)) * sr)); i < n; i++) { const g = (a - start + i / sr) / fadeIn; for (const c of ch) c[i] *= g; }
+      // onsets in output time
+      const own = start ? Object.fromEntries(Object.entries(r.onsets).map(([k, list]) => [k, list.map(([t, d, v]) => [+(t - start).toFixed(4), d, v])])) : r.onsets;
+      await sink.add(ch, frames / sr, own);
       frames += ch[0].length;
-      for (const [k, list] of Object.entries(r.onsets)) (onsets[k] = onsets[k] || []).push(...list);
+      for (const [k, list] of Object.entries(own)) (onsets[k] = onsets[k] || []).push(...list);
     }
     return { seconds: frames / sr, sampleRate: sr, onsets };
   })();

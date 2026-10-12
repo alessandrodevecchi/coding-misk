@@ -89,6 +89,8 @@ export function createPlaylistStore(store, now = () => Date.now()) {
       return sid;
     },
     session: sid => data.sessions[sid] || null,
+    // every saved session, for fragments (#57)
+    sessions: () => Object.entries(data.sessions).map(([id, x]) => ({ id, title: x.title })),
     // Freeze: the songs as played, so the session sounds the same whatever the director becomes
     freeze(sid, songs) { const s = data.sessions[sid]; if (!s || !Array.isArray(songs)) return false; s.frozen = songs; save(); return true; },
     // add a song at the end; false when it is already there
