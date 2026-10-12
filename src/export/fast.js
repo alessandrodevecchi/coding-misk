@@ -44,7 +44,7 @@ export function renderOffline(job, onProgress = () => {}) {
       if (m.ready) { clearTimeout(timer); alive(); try { frame.contentWindow.postMessage({ render: job }, location.origin); } catch (err) { finish(err); } }
       else if (m.progress !== undefined) { alive(); onProgress(m.progress, m.phase); }
       else if (m.error) finish(new Error(m.error));
-      else if (m.done) finish(null, { channels: m.channels, sampleRate: m.sampleRate, onsets: m.onsets, skipped: m.skipped || [] });
+      else if (m.done) finish(null, { channels: m.channels, sampleRate: m.sampleRate, onsets: m.onsets, skipped: m.skipped || [], replaced: m.replaced || [] });
     }
     addEventListener('message', on);
   });
@@ -74,7 +74,7 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
     const T = tempoClock(job.bpm), length = job.cut || T.seconds(job.bpm.length), start = job.start || 0, onsets = {}, fade = job.fade || 0, fadeIn = job.fadeIn || 0;
     const blocks = blocksOf(length - start, job.block || BLOCK).map(([a, b]) => [a + start, b + start]);
     let carry = null, frames = 0, sr = job.sampleRate || 48000;
-    const skipped = new Set();
+    const skipped = new Set(), replaced = new Set();
     for (let i = 0; i < blocks.length; i++) {
       if (cancelled) throw { cancelled: true };
       const [a, b] = blocks[i], last = i === blocks.length - 1, from = Math.max(0, a - LEAD);
@@ -89,6 +89,7 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
       }
       sr = r.sampleRate;
       for (const x of r.skipped || []) skipped.add(x);
+      for (const x of r.replaced || []) replaced.add(x);
       let ch = r.channels.map(c => c.subarray(Math.round((a - from) * sr)));
       if (carry) for (let c = 0; c < ch.length; c++) for (let k = 0, n = carry[c].length; k < n && k < ch[c].length; k++) { const w = k / n; ch[c][k] = ch[c][k] * w + carry[c][k] * (1 - w); }
       if (!last) { const keep = Math.round((b - a) * sr); carry = ch.map(c => c.slice(keep)); ch = ch.map(c => c.subarray(0, keep)); }
@@ -103,7 +104,9 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
     }
     // sounds that never loaded and were left out (#61): the app says which
     if (skipped.size) { console.warn(`[blocks] sounds skipped: ${[...skipped].join(', ')}`); if (job.onSkipped) job.onSkipped([...skipped]); }
-    return { seconds: frames / sr, sampleRate: sr, onsets, skipped: [...skipped] };
+    // broken sounds played from a stand-in (#54)
+    if (replaced.size) console.info(`[blocks] sounds replaced: ${[...replaced].join(', ')}`);
+    return { seconds: frames / sr, sampleRate: sr, onsets, skipped: [...skipped], replaced: [...replaced] };
   })();
   return { promise, cancel: () => { cancelled = true; if (cur) cur.cancel(); } };
 }

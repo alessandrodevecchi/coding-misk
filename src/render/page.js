@@ -6,8 +6,9 @@
 // export), tail: seconds after it, keepFrom: onsets before it belong to the block before, sampleRate, gain: the master level }
 import { repl } from '@strudel/core';
 import { transpiler } from '@strudel/transpiler';
-import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio, getSound, registerSound } from '@strudel/webaudio';
-import { applySoundfontFixes } from '../sounds/soundfont-fix.js';
+import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio, registerSound, soundMap } from '@strudel/webaudio';
+import { guardDecode, guardSounds, createRegister } from '../sounds/sound-guard.js';
+import soundfonts from '@strudel/soundfonts/package.json';
 import { prebake } from '@strudel/repl/prebake.mjs';
 import { tempoClock } from './tempo.js';
 
@@ -15,12 +16,15 @@ const post = (m, transfer = []) => parent.postMessage({ codingMiskRender: true, 
 // superdough's deprecation notices come once per voice: thousands of console lines slow the render down
 for (const k of ['log', 'warn']) { const f = console[k].bind(console); console[k] = (...a) => { if (typeof a[0] === 'string' && a[0].includes('Deprecation')) return; f(...a); }; }
 // the sounds load after the offline context is set, so every global effect belongs to it
+// a decode that fails ends in an error, not a wait (#54); the register of broken sounds and the stand-ins played
+guardDecode();
+const register = createRegister({ version: soundfonts.version, store: localStorage }), replaced = new Set();
 async function loadSounds() {
   await prebake();
   // as the app: the whole Dirt-Samples archive and the custom samples in public/samples/
   await Promise.all([samples('github:tidalcycles/dirt-samples'), samples('/samples/strudel.json').catch(() => {})]);
-  // broken soundfont notes play from a sound font of the same instrument
-  applySoundfontFixes({ getSound, registerSound });
+  // broken sounds play from a stand-in (#54): the register is the app's, the same origin
+  guardSounds({ soundMap, registerSound, register, onReplace: (name, from, to) => replaced.add(`${name}:${from}→${to}`) });
 }
 
 // seconds to wait for one sound to load before skipping it
@@ -55,6 +59,22 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
     }
   }
   all.sort((x, y) => x.b - y.b);
+  // pre-flight (#54): every distinct sound of the block loads once before rendering, at a time past the end (never heard),
+  // so broken sounds are replaced or left out up front and the render does not wait on them note by note
+  const idOf = v => `${v.bank ? `${v.bank}_` : ''}${v.s}${v.n !== undefined ? `:${v.n}` : ''}`;
+  const keyOf = v => `${idOf(v)}|${v.note ?? ''}|${v.freq ?? ''}`, dead = new Set(), firsts = new Map();
+  for (const x of all) { const k = keyOf(x.hap.value); if (!firsts.has(k)) firsts.set(k, x); }
+  const queue = [...firsts.entries()];
+  let loaded = 0;
+  const loadOne = async ([k, { b, hap }]) => {
+    const v = hap.value;
+    // the app counts a quiet page as stuck: the pre-flight says it is alive
+    if (++loaded % 8 === 0) post({ progress: 0, phase: 'schedule' });
+    const ok = await Promise.race([superdough({ ...v, gain: 0 }, length + 1, 0.05, T.cps(b), 0).then(() => true, () => true), new Promise(r => setTimeout(() => r(false), SOUND_WAIT))]);
+    if (!ok) { dead.add(k); if (!skipped.has(idOf(v))) { skipped.add(idOf(v)); console.warn(`[render] sound ${idOf(v)} did not load, skipped`); } }
+  };
+  await Promise.all(Array.from({ length: 12 }, async () => { while (queue.length) await loadOne(queue.shift()); }));
+  post({ progress: 0, phase: 'schedule' });
   // voices are scheduled a window ahead, as the live player does: with every voice scheduled at once the offline
   // context processes thousands of idle nodes in every block and renders slower than real time
   const W = 2;
@@ -63,7 +83,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
     for (; k < all.length && all[k].t - from < until; k++) {
       const { b, hap, t } = all[k], v = hap.value, d = T.seconds(hap.whole.end.valueOf()) - t;
       // a sound that never loads (a sample that cannot be decoded) must not hold the render forever (#61): skipped
-      try {
+      if (!dead.has(keyOf(v))) try {
         const ok = await Promise.race([superdough(v, t - from, d, T.cps(b), t - from).then(() => true), new Promise(r => setTimeout(() => r(false), SOUND_WAIT))]);
         if (!ok) { const id = `${v.bank ? `${v.bank}_` : ''}${v.s}${v.n !== undefined ? `:${v.n}` : ''}`; if (!skipped.has(id)) { skipped.add(id); console.warn(`[render] sound ${id} did not load, skipped`); } }
       } catch (e) { console.warn('[render]', e); }
@@ -77,7 +97,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   }
   const buf = await ctx.startRendering();
   const channels = [buf.getChannelData(0).slice(), buf.getChannelData(1).slice()];
-  post({ done: true, channels, sampleRate, onsets, skipped: [...skipped] }, channels.map(c => c.buffer));
+  post({ done: true, channels, sampleRate, onsets, skipped: [...skipped], replaced: [...replaced] }, channels.map(c => c.buffer));
 }
 
 addEventListener('message', e => {

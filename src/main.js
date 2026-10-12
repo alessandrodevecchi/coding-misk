@@ -41,7 +41,8 @@ import { encode, createEncoder, canEncode, formatOf, EXT } from './export/encode
 import { segmentsOf, timelineOf, renderInBlocks } from './export/fast.js';
 import { renderVideo } from './export/fast-video.js';
 import { askDiskFile, LONG_SECONDS } from './export/disk.js';
-import { applySoundfontFixes } from './sounds/soundfont-fix.js';
+import { guardDecode, guardSounds, createRegister, HEALTH_KEY, soundfontsIn, preloadFonts } from './sounds/sound-guard.js';
+import soundfonts from '@strudel/soundfonts/package.json';
 import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
@@ -165,8 +166,18 @@ const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor)
 // samples() can appear a little after the editor: wait for it, otherwise the call was skipped and only part of the archive loaded
 const whenSamples = () => new Promise(res => { const iv = setInterval(() => { if (typeof globalThis.samples === 'function') { clearInterval(iv); res(globalThis.samples); } }, 100); });
 ready.then(whenSamples).then(load => load('github:tidalcycles/dirt-samples')).catch(e => console.error(e));
-// broken soundfont notes (#54, #61) play from another font of the same instrument, once the soundfonts are registered
-{ const iv = setInterval(() => { const m = globalThis.soundMap && globalThis.soundMap.get(); if (m && m.gm_vibraphone && globalThis.registerSound) { clearInterval(iv); applySoundfontFixes({ getSound: globalThis.getSound, registerSound: globalThis.registerSound }); } }, 500); }
+// the sound guard (#54): a decode that fails ends in an error, not a silent wait; broken sounds play from a stand-in,
+// remembered in the browser (the render page of the fast export reads the same register)
+guardDecode();
+const soundRegister = createRegister({ version: soundfonts.version, store: localStorage });
+{ const seen = new Set(), iv = setInterval(() => {
+  if (!globalThis.soundMap || !globalThis.soundMap.listen || !globalThis.registerSound) return;
+  clearInterval(iv);
+  guardSounds({ soundMap: globalThis.soundMap, registerSound: globalThis.registerSound, register: soundRegister, now: () => globalThis.getAudioContext().currentTime,
+    onReplace: (name, from, to) => { const k = `${name}:${from}→${to}`; if (!seen.has(k)) { seen.add(k); console.info(`[sounds] ${name} ${from} is broken, playing ${to}`); } } });
+}, 300); }
+// what the render page learns (a preload, an export) reaches this page through localStorage
+addEventListener('storage', e => { if (e.key === HEALTH_KEY) soundRegister.reload(); });
 // campioni personalizzati da public/samples/ (elenco generato dal plugin in vite.config.js)
 let custom = [];
 ready.then(async () => {
@@ -2567,6 +2578,17 @@ genresTab = createGenresTab({ root: $('#tab-generi'), t, tx, esc, face: a => art
   onSongs: g => { songsView.onlyGenre(g); showTab('brani'); },
   onRadio: ids => { showTab('radio'); if (radio && !radio.playStyles(ids)) toast(t('genreNoStyle')); } });
 // preloads the spoken comments of a song, silently, as playSong does
+// the radio's next song (#54): every zone of its soundfonts loads, without sound, while the song on air plays, so a broken
+// zone is in the register before its first note
+let preloaded = '';
+const preloadSounds = p => {
+  const key = p && p.meta ? `${p.title}|${p.meta.bpm.length}` : '';
+  if (!key || key === preloaded || !globalThis.soundMap) return;
+  preloaded = key;
+  const names = soundfontsIn(segmentsOf(p, codeFor).map(x => x.code).join('\n'));
+  preloadFonts(names, { soundMap: globalThis.soundMap, play: v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + .2, .05) })
+    .then(n => { if (n) console.info(`[sounds] next song: ${n} soundfont zones loaded (${names.join(', ')})`); }, () => {});
+};
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
 radio = createRadio({
   root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a),
@@ -2580,7 +2602,7 @@ radio = createRadio({
       if (mode !== 'radio' || !song) return;
       const s = sched(), cyc = s ? s.now() : 0;
       song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
-      warmVoices(p); source = { kind: 'radio', name: p.title }; renderSource();
+      warmVoices(p); preloadSounds(p); source = { kind: 'radio', name: p.title }; renderSource();
     },
     // skip: the new window takes over now, its first song starts on "bar"
     jump: (p, bar) => {
