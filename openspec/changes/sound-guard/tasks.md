@@ -13,5 +13,5 @@
 ## 3. Tool and docs
 
 - [x] 3.1 `tools/check-sounds.cjs`: every soundfont zone and sample the app can call; summary and exit code.
-- [ ] 3.2 Run the full check in the background; record the results in `#54`.
-- [ ] 3.3 Guide, architecture notes and DEVLOG.
+- [x] 3.2 Run the full check in the background; record the results in `#54`.
+- [x] 3.3 Guide, architecture notes and DEVLOG.
