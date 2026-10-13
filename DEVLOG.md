@@ -440,3 +440,8 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 
 - Ricerca su three.js (versione, WebGL o WebGPU, resa toon con contorni, post-processing, particelle, cattura video, skill per agenti, modelli liberi): note locali.
 - Mockup locale in WebGL con three.js r186 e pmndrs postprocessing: la stessa scena in 3D procedurale, stile manifesto (toon a gradini, contorni, retino), pilota come sagoma semplice per valutare la resa.
+
+## 2026-10-13 sera: pilota 3D in WebGL, tasselli 0-3 e testa
+
+- Mockup locale costruito a tasselli, con piano, decisioni e ripartenza nelle note locali: base con misure in metri e controllo delle compenetrazioni, focale 58°, cabina da caccia generico della seconda guerra mondiale, cielo con nuvole soffici, testa scolpita con funzioni di distanza e pelle dipinta.
+- Il proprietario ha chiesto di completare la scena in autonomia e di riportare alla fine le scelte prese.
