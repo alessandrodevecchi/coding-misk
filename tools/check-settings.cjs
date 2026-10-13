@@ -63,7 +63,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const file = path.join(os.tmpdir(), `coding-misk-backup-${Date.now()}.json`);
   await bk.saveAs(file);
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-  check(data.format === 'coding-misk/backup' && data.data['coding-misk-library'] && !data.data['coding-misk-draft'], 'backup holds the library, not the working state');
+  check(data.format === 'coding-misk/backup' && data.data['coding-misk-library'] && !data.data['coding-misk-draft'], 'backup holds the library, not the working state', `${data.format} keys: ${Object.keys(data.data || {}).join(', ')}`);
   const p2 = await (await browser.newContext({ viewport: { width: 1300, height: 1100 } })).newPage();
   p2.on('pageerror', e => errors.push(e.message));
   await p2.goto('http://localhost:5173/'); await sleep(3000);
