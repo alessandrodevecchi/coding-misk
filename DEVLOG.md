@@ -434,3 +434,4 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Collo e attacco al corpo rifiniti nel mockup locale: collo visibile con ombra della mascella, sciarpa di seta annodata con i lembi nel giubbotto, collo di montone in due pezzi (rotolo dietro, baveri a V davanti) sopra l'imbracatura.
 - Avvio più leggero: i filtri SVG lavorano solo sulla zona di ogni strato e la cottura si distribuisce fra i fotogrammi (prima la palette visibile). Blocchi all'avvio da circa 5,5 s a 0,3 s, poi 60 fps.
 - Secondo giro sul feedback: il collo di montone diventa un pezzo unico (sparisce lo stacco fra rotolo e baveri) e il caricamento è progressivo in dissolvenza (prima cielo, cabina e pilota, poi dettagli, usura ed effetti) al posto della scritta di attesa.
+- Col teschio compaiono corna d'osso sull'elmo, con un piccolo scatto elastico (richiesta del proprietario).
