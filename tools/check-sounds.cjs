@@ -18,7 +18,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.goto(url);
   let n = 0;
   for (let i = 0; i < 40 && n < 1500; i++) { await sleep(1000); n = await page.evaluate(() => Object.keys((globalThis.soundMap && globalThis.soundMap.get()) || {}).length); }
-  const report = await page.evaluate(async ({ wantFonts, wantSamples, only, limit, banks, width }) => {
+  const report = await page.evaluate(async ({ wantFonts, wantSamples, only, limit, pick, width }) => {
     const map = globalThis.soundMap.get();
     const decode = async ab => {
       const ac = new OfflineAudioContext(1, 1, 44100);
@@ -60,7 +60,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       }
     }
     if (wantSamples) {
-      const banks = Object.entries(map).filter(([k, s]) => s.data && s.data.type === 'sample' && k.startsWith(only) && (!banks.length || banks.includes(k))).slice(0, limit);
+      const banks = Object.entries(map).filter(([k, s]) => s.data && s.data.type === 'sample' && k.startsWith(only) && (!pick.length || pick.includes(k))).slice(0, limit);
       out.counts.banks = banks.length;
       for (const [name, s] of banks) {
         const list = Array.isArray(s.data.samples) ? s.data.samples : Object.values(s.data.samples || {}).flat();
@@ -76,7 +76,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       }
     }
     return out;
-  }, { wantFonts, wantSamples, only, limit: Number.isFinite(limit) ? limit : 1e9, banks, width });
+  }, { wantFonts, wantSamples, only, limit: Number.isFinite(limit) ? limit : 1e9, pick: banks, width });
   await browser.close();
   const c = report.counts;
   const uncovered = [...report.fonts, ...report.samples].filter(x => x.standIn === null && !/^network/.test(x.why || ''));
