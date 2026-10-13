@@ -445,3 +445,10 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 
 - Mockup locale costruito a tasselli, con piano, decisioni e ripartenza nelle note locali: base con misure in metri e controllo delle compenetrazioni, focale 58°, cabina da caccia generico della seconda guerra mondiale, cielo con nuvole soffici, testa scolpita con funzioni di distanza e pelle dipinta.
 - Il proprietario ha chiesto di completare la scena in autonomia e di riportare alla fine le scelte prese.
+
+## 2026-10-13 notte: pilota 3D in WebGL, scena completa
+
+- Completata in autonomia la scena 3D locale: casco di cuoio con occhiali, giacca con spalle vere, colletto di montone e sciarpa, braccia e guanti sui comandi, cabina verniciata con usura, strumenti e spie alle pareti, animazioni a tempo, lampo con fulmini e teschio, finitura da manifesto.
+- La scultura a funzioni di distanza ora valuta la griglia fine solo vicino alla superficie: stessa mesh in meno della metà del tempo. La pagina mostra cielo e cabina subito e aggiunge i pezzi del pilota appena pronti.
+- Le scelte prese e quelle ancora aperte sono nelle note locali, per la revisione del proprietario.
+
