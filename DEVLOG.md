@@ -435,3 +435,8 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Avvio più leggero: i filtri SVG lavorano solo sulla zona di ogni strato e la cottura si distribuisce fra i fotogrammi (prima la palette visibile). Blocchi all'avvio da circa 5,5 s a 0,3 s, poi 60 fps.
 - Secondo giro sul feedback: il collo di montone diventa un pezzo unico (sparisce lo stacco fra rotolo e baveri) e il caricamento è progressivo in dissolvenza (prima cielo, cabina e pilota, poi dettagli, usura ed effetti) al posto della scritta di attesa.
 - Col teschio compaiono corna d'osso sull'elmo, con un piccolo scatto elastico (richiesta del proprietario).
+
+## 2026-10-13 sera: ricerca WebGL e primo mockup 3D del pilota
+
+- Ricerca su three.js (versione, WebGL o WebGPU, resa toon con contorni, post-processing, particelle, cattura video, skill per agenti, modelli liberi): note locali.
+- Mockup locale in WebGL con three.js r186 e pmndrs postprocessing: la stessa scena in 3D procedurale, stile manifesto (toon a gradini, contorni, retino), pilota come sagoma semplice per valutare la resa.
