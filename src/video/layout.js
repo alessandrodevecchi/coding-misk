@@ -55,7 +55,7 @@ export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code'];
 // whole: the stage's own proportions (o.stageRatio, the app's stage), so the whole visual shows
 export const F_ASPECTS = ['whole', 'fill', '16:9', '4:3', '1:1', '4:5', '9:16'];
 export const F_CODE = ['focus', 'scroll', 'follow'];
-export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', look: 'song', soulView: 'song', tagline: 'music written as code', taglineMode: 'fixed', fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
+export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', look: 'song', soulView: 'song', tagline: 'music written as code', taglineMode: 'fixed', bleed: true, fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
 // the layouts of the first version, kept for saved settings and agents
 const OLD = { 'v-code': { show: 'visual-code', aspect: 'fill', bands: false }, 'v-soul': { show: 'visual-soul', aspect: 'fill', bands: false }, 'v-bands': { show: 'visual', aspect: '1:1', bands: true }, 'v-soul-bands': { show: 'soul', aspect: 'fill', bands: true } };
 export function fragmentOpts(o = {}) {
@@ -77,9 +77,11 @@ const fit = (x, y, w, h, r) => { const bw = Math.min(w, h * r), bh = bw / r; ret
 export function fragmentAreas(o, w, h) {
   const show = o.show || 'visual', main = show === 'soul' ? 'soul' : show === 'code' ? 'code' : 'stage';
   const second = show === 'visual-code' ? 'code' : show === 'visual-soul' ? 'soul' : null;
-  // the soul as the main picture fills its box: cut to cover it, or ('whole') shown entire over a blurred copy of itself
-  const soulMode = main === 'soul' ? (o.aspect === 'whole' ? 'contain' : 'cover') : null;
-  const r1 = main === 'code' ? null : main === 'soul' ? (o.aspect && o.aspect !== 'fill' && o.aspect !== 'whole' ? ratioOf(o.aspect) : null) : o.aspect === 'whole' ? o.stageRatio || 2.4 : o.aspect && o.aspect !== 'fill' ? ratioOf(o.aspect) : null;
+  // the soul as the main picture is cut to cover its box (centred on its view's focus); 'whole' keeps all of it.
+  // bleed: the free space round a box with its own proportions is filled with a blurred copy of the picture
+  const soulMode = main === 'soul' ? 'cover' : null;
+  const r1 = main === 'code' ? null : o.aspect === 'whole' ? (main === 'soul' ? SOUL : o.stageRatio || 2.4) : o.aspect && o.aspect !== 'fill' ? ratioOf(o.aspect) : null;
+  const bleed = o.bleed !== false && r1 && main !== 'code';
   const pad = Math.round(Math.min(w, h) / 40), out = {};
   const box = (kind, b) => { out[kind] = kind === 'soul' ? { ...b, head: 0, ...(kind === main && soulMode ? { mode: soulMode } : {}) } : kind === 'code' ? { x: b.x + pad, y: b.y, w: b.w - 2 * pad, h: b.h } : b; };
   if (h >= w) {
@@ -92,16 +94,37 @@ export function fragmentAreas(o, w, h) {
     else if (second === 'soul') h2 = Math.min(avail - h1 - pad, Math.round(w / SOUL));
     const used = h1 + (second ? pad + h2 : 0), y0 = Math.round(top + (avail - used) / 2);
     box(main, r1 ? fit(0, y0, w, h1, r1) : { x: 0, y: y0, w, h: h1 });
+    if (bleed) out[main].bleed = second ? { x: 0, y: y0, w, h: h1 } : { x: 0, y: top, w, h: avail };
     if (second) box(second, { x: 0, y: y0 + h1 + pad, w, h: h2 });
     if (o.bands) { out.top = { x: 0, y: 0, w, h: y0 }; out.bottom = { x: 0, y: y0 + used, w, h: h - y0 - used }; }
     return out;
   }
   const strip = o.bands ? Math.round(h * 0.14) : 0, avail = h - strip, w1 = second ? Math.round(w * 2 / 3) : w;
   box(main, r1 ? fit(0, 0, w1, avail, r1) : { x: 0, y: 0, w: w1, h: avail });
+  if (bleed) out[main].bleed = { x: 0, y: 0, w: w1, h: avail };
   if (second) { const b = { x: w1, y: pad, w: w - w1, h: avail - 2 * pad }; box(second, second === 'soul' ? fit(b.x + pad, b.y, b.w - 2 * pad, b.h, SOUL) : b); }
   if (o.bands) out.strip = { x: 0, y: avail, w, h: strip };
   return out;
 }
+
+// where to cut a soul view so its main element stays in a fragment (logical pixels of the 1200×760 screen):
+// x, y for views with a centre (the radar, the sphere, the lattice, the aura); time(u) for views laid out along the
+// song from left to right, so the stretch of the song the fragment plays (u: its middle, 0..1 of the song) stays in sight
+export const SOUL_FOCUS = {
+  a: { x: 460, y: 410 }, c: { x: 560, y: 410 }, d: { x: 600, y: 400 }, i: { x: 620, y: 420 },
+  b: { y: 420, time: u => 640 + (u - .5) * 960 },
+  e: { y: 300, time: u => 600 + (-720 + 1380 * u) * 900 / (1800 - 700 * u) },
+  f: { y: 430, time: u => 600 + (u - .5) * 1100 },
+  g: { y: 470, time: u => 40 + u * 1120 },
+  h: { y: 420, time: u => 30 + u * 1125 },
+  j: { y: 400, time: u => 40 + u * 1120 },
+};
+export function soulFocus(view, u = .5) {
+  const f = SOUL_FOCUS[view]; if (!f) return { x: 600, y: 380 };
+  return { x: f.time ? f.time(Math.max(0, Math.min(1, u))) : f.x, y: f.y };
+}
+// the offset of a cover-cut picture (size sw×sh scaled by k) in a box of bw×bh, keeping the point fx, fy in view
+export const coverOffset = (bw, bh, sw, sh, k, fx, fy) => ({ x: Math.min(0, Math.max(bw - sw * k, bw / 2 - fx * k)), y: Math.min(0, Math.max(bh - sh * k, bh / 2 - fy * k)) });
 
 // the first recording format the browser supports: MP4 (H.264 + AAC), else WebM
 export const MIMES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];

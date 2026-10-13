@@ -97,6 +97,8 @@ export function createSoulScene({ getSource, store, isHw, baseLook, onChange = (
     // the stage stopped showing the soul: the next time it shows, it types its line again
     hide() { shown = false; },
     get view() { return view || 'a'; },
+    // the view on screen now (a forced one first)
+    get shown() { return forced || view || 'a'; },
     get label() { const v = view || 'a'; return `${v.toUpperCase()} · ${VIEW_NAMES[v]}`; },
     get locked() { return locked; },
     set locked(v) { locked = !!v; store.set('coding-misk-soul-lock', locked); if (locked) store.set('coding-misk-soul-view', view || 'a'); onChange(); },

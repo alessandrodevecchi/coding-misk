@@ -2,7 +2,7 @@
 // times, label and glitch messages, and the texts for sharing. No browser.
 //   npm run check:clips      exit 1 when any check fails
 import { readFileSync } from 'node:fs';
-import { F_FORMATS, F_SHOWS, F_ASPECTS, fragmentAreas, fragmentOpts, fragmentSize } from '../src/video/layout.js';
+import { F_FORMATS, F_SHOWS, F_ASPECTS, fragmentAreas, fragmentOpts, fragmentSize, soulFocus, coverOffset } from '../src/video/layout.js';
 import { pickFragments, fragmentBetween, parseTime, clockOf, barScores, sectionWeight, fragmentCode, fragmentLabel, glitchMessages, glitchAt, shapeOf, TAGLINES, taglineFor, nextTagline, taglineAt, TYPE_START, TYPE_RATE } from '../src/video/fragments.js';
 import { textsFor, textFile } from '../src/video/texts.js';
 import { absoluteClips } from '../src/endless/transitions.js';
@@ -113,13 +113,22 @@ const CHECKS = {
     const f = textsFor({ kind: 'fragment', title: 'Kellerlicht', fragment: { label: 'FRAGMENT S0UL·ABCDE #014', start: 40, end: 70 }, fullLine: 'Full session on the channel', seed: 'f' });
     assert(/#014/.test(f.title) && /FRAGMENT S0UL·ABCDE #014/.test(f.description) && /Full session on the channel/.test(f.description), 'fragment');
   },
-  'the soul as the main picture fills the vertical frame: cut to cover, or entire over a blurred copy'() {
+  'the soul fills a vertical frame on its focus; a blurred surround works with any proportions, visual or soul'() {
     const fill = fragmentAreas(fragmentOpts({ show: 'soul', aspect: 'fill', bands: false }), 1080, 1920).soul;
-    assert(fill.mode === 'cover' && fill.w === 1080 && fill.h === 1920, `fill ${JSON.stringify(fill)}`);
+    assert(fill.mode === 'cover' && fill.w === 1080 && fill.h === 1920 && !fill.bleed, `fill ${JSON.stringify(fill)}`);
     const whole = fragmentAreas(fragmentOpts({ show: 'soul', aspect: 'whole', bands: true }), 1080, 1920).soul;
-    assert(whole.mode === 'contain' && whole.w === 1080 && whole.h > 1080, `whole ${JSON.stringify(whole)}`);
+    assert(Math.abs(whole.w / whole.h - 1200 / 760) < .01 && whole.bleed && whole.bleed.h > whole.h, `whole ${JSON.stringify(whole)}`);
+    const st43 = fragmentAreas(fragmentOpts({ show: 'visual', aspect: '4:3', bands: true }), 1080, 1920).stage;
+    assert(st43.bleed && st43.bleed.h > st43.h, 'a 4:3 visual gets the blurred surround');
+    assert(!fragmentAreas(fragmentOpts({ show: 'visual', aspect: '4:3', bleed: false }), 1080, 1920).stage.bleed, 'and not when switched off');
     const side = fragmentAreas(fragmentOpts({ show: 'visual-soul', aspect: 'fill' }), 1080, 1920).soul;
     assert(!side.mode, 'the soul beside the visual keeps its panel');
+    // the radar of the tracker stays in a narrow cut; a view along the song keeps the fragment's stretch
+    const k = 1920 / 760, off = coverOffset(1080, 1920, 1200, 760, k, soulFocus('a').x, soulFocus('a').y);
+    const radar = 460 * k + off.x; assert(radar > 300 && radar < 780, `radar centre on screen at ${radar.toFixed(0)}`);
+    const late = soulFocus('j', .9).x * k + coverOffset(1080, 1920, 1200, 760, k, soulFocus('j', .9).x, 400).x;
+    assert(late > 300 && late < 780, `the late stretch of the spectrum in view at ${late.toFixed(0)}`);
+    assert(soulFocus('j', .1).x < soulFocus('j', .9).x, 'the timeline goes left to right');
   },
   'tagline: pool, random by fragment, typed with a block and short glitches'() {
     assert(TAGLINES.length >= 30 && !TAGLINES.some(x => /four-on-the-floor/.test(x)), 'pool');

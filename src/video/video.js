@@ -3,7 +3,7 @@
 // The frame is drawn after each stage frame, so it follows the music exactly as the stage does.
 import { QUALITIES, VIDEO_DEFAULTS, LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
 import { liveAreas, lerpAreas, ease, presetOf, TRANSITION } from '../live/presets.js';
-import { fragmentAreas } from './layout.js';
+import { fragmentAreas, soulFocus, coverOffset } from './layout.js';
 import { glitchAt, GLITCH_SECONDS, taglineAt, taglineFor } from './fragments.js';
 import { hashString } from '../endless/random.js';
 
@@ -13,7 +13,7 @@ const LIVE_KEY = 'coding-misk-live-preset';
 // visuals: { setTarget, canvas } from startVisuals; getCode(): the code in the editor; getInfo(cyc): what plays;
 // getSay(): the voice line on the stage; getSoul(): { canvas } of the soul screen when the soul is on, else null;
 // soulFrame(cyc, playing, scale): the soul screen always (the live picture's soul views, #52)
-export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFrame = null, store, t, esc }) {
+export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFrame = null, soulView = () => 'a', store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });
   const cv = document.createElement('canvas');
@@ -146,14 +146,12 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     g.restore();
   }
   function drawSoul(A, P, open, soulCanvas) {
-    // a fragment's main picture (#57): the soul screen cut to cover the box, or entire over a blurred, darker copy
+    // a fragment's main picture (#57): the soul screen cut to cover the box, kept on its view's focus (A.focus)
     if (A.mode && soulCanvas) {
-      const sw = soulCanvas.width, sh = soulCanvas.height, cover = Math.max(A.w / sw, A.h / sh), fitK = Math.min(A.w / sw, A.h / sh);
+      const sw = soulCanvas.width, sh = soulCanvas.height, k = Math.max(A.w / sw, A.h / sh), px = sw / 1200, fc = A.focus || { x: 600, y: 380 };
+      const off = coverOffset(A.w, A.h, sw, sh, k, fc.x * px, fc.y * px);
       g.save(); g.beginPath(); g.rect(A.x, A.y, A.w, A.h); g.clip();
-      if (A.mode === 'contain') { g.filter = 'blur(14px) brightness(.75) saturate(1.2)'; }
-      g.drawImage(soulCanvas, A.x + (A.w - sw * cover) / 2, A.y + (A.h - sh * cover) / 2, sw * cover, sh * cover);
-      g.filter = 'none';
-      if (A.mode === 'contain') g.drawImage(soulCanvas, A.x + (A.w - sw * fitK) / 2, A.y + (A.h - sh * fitK) / 2, sw * fitK, sh * fitK);
+      g.drawImage(soulCanvas, A.x + off.x, A.y + off.y, sw * k, sh * k);
       g.restore(); return;
     }
     g.save(); g.globalAlpha = A.a ?? 1;
@@ -391,6 +389,19 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
   // a frame of a fragment into the video canvas. J: { o (settings), q: the file's size, comp: the size it is composed at
   // (turned by 90° when o.rotate), label, code, msgs, length }; section: the index of the section playing
   let turnCv = null;
+  // the free space round a picture with its own proportions, filled with a blurred, darker copy of it (#57)
+  let bleedCv = null;
+  function bleedAround(A) {
+    if (!A || !A.bleed || A.w < 2 || A.h < 2) return;
+    const B = A.bleed; if (B.w <= A.w + 1 && B.h <= A.h + 1) return;
+    bleedCv = bleedCv || document.createElement('canvas');
+    if (bleedCv.width !== Math.round(A.w) || bleedCv.height !== Math.round(A.h)) { bleedCv.width = Math.round(A.w); bleedCv.height = Math.round(A.h); }
+    const b = bleedCv.getContext('2d'); b.clearRect(0, 0, bleedCv.width, bleedCv.height); b.drawImage(g.canvas, A.x, A.y, A.w, A.h, 0, 0, bleedCv.width, bleedCv.height);
+    const k = Math.max(B.w / A.w, B.h / A.h);
+    g.save(); g.beginPath(); g.rect(B.x, B.y, B.w, B.h); g.clip(); g.filter = 'blur(16px) brightness(.7) saturate(1.2)';
+    g.drawImage(bleedCv, B.x + (B.w - A.w * k) / 2, B.y + (B.h - A.h * k) / 2, A.w * k, A.h * k); g.filter = 'none';
+    g.drawImage(bleedCv, A.x, A.y, A.w, A.h); g.restore();
+  }
   function composeVertical(J, cyc, now, t, levels, section = -1) {
     const Q = J.q, C = J.comp || Q, P = palette(), o = J.o || {};
     if (cv.width !== Q.w || cv.height !== Q.h) { cv.width = Q.w; cv.height = Q.h; }
@@ -400,8 +411,15 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
       const A = fragmentAreas(o, C.w, C.h);
       g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
       g.fillStyle = P.bg; g.fillRect(0, 0, C.w, C.h);
-      if (A.stage) { drawStage(A.stage); drawSay(A.stage); }
-      if (A.soul && soulFrame) drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, A.soul.mode ? Math.max(A.soul.w / 1200, A.soul.h / 760) : Math.min((A.soul.w - 8) / 1200, (A.soul.h - 4) / 760))));
+      if (A.stage) { drawStage(A.stage); drawSay(A.stage); bleedAround(A.stage); }
+      if (A.soul && soulFrame) {
+        // the soul cut to fill: centred on its view's focus; a view along the song keeps the fragment's stretch in sight,
+        // its middle worked out once at the fragment's first frame
+        if (A.soul.mode && J.soulU === undefined) { const inf = getInfo(cyc) || {}; J.soulU = inf.bars ? Math.min(1, ((inf.bar || 0) + (J.length - t) / 2 * (inf.bpm || 120) / 240) / inf.bars) : .5; }
+        if (A.soul.mode) A.soul.focus = soulFocus(soulView(), J.soulU);
+        drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, A.soul.mode ? Math.max(A.soul.w / 1200, A.soul.h / 760) : Math.min((A.soul.w - 8) / 1200, (A.soul.h - 4) / 760))));
+        bleedAround(A.soul);
+      }
       if (A.code) drawCode(A.code, P, now, Math.min(C.w, C.h) * 1.6, { mode: o.codeMode || 'focus', progress: t / (J.length || 1), section, cyc });
       if (A.top) drawLogo(A.top, levels);
       const tag = J.tagline !== undefined ? taglineAt(J.tagline, t, J.code) : null, oT = tag ? { ...o, taglineFull: J.tagline } : o;

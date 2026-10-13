@@ -395,6 +395,8 @@
 
 - 2026-10-13: anima nei frammenti verticali (`feat/57-vertical-soul`): come immagine principale l'anima riempie il riquadro tagliata al centro ("riempi" o una proporzione), oppure ("tutto il visual") resta intera sopra una sua copia sfocata invece delle bande nere. Le viste dell'anima restano disegnate in 1200×760: un'impaginazione davvero verticale delle dieci viste sarebbe un lavoro a parte.
 
+- 2026-10-13: frammenti, rifiniture chieste dal proprietario (`feat/57-soul-focus`): opzione **Bordo sfocato** (attiva di default, in menu e Impostazioni) che riempie lo spazio intorno a visual o anima, con qualsiasi proporzione, con una loro copia sfocata; l'anima che riempie il riquadro si centra sul soggetto della vista (radar, sfera, reticolo, aura) e, nelle viste distese lungo la canzone (terrain, strands, landscape, particles, halftone, spectrum), su una posizione fissa scelta al primo fotogramma in cui si vede il tratto suonato dal frammento.
+
 ## Prossimo passo
 
 Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima del brano `#46` fasi 1 e 2 con display nascosto, casuali `#50`, compilation `#49`, più le feature precedenti). Tutti i controlli passano.
