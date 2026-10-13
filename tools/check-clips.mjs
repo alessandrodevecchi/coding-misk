@@ -3,7 +3,7 @@
 //   npm run check:clips      exit 1 when any check fails
 import { readFileSync } from 'node:fs';
 import { F_FORMATS, F_SHOWS, F_ASPECTS, fragmentAreas, fragmentOpts, fragmentSize } from '../src/video/layout.js';
-import { pickFragments, fragmentBetween, parseTime, clockOf, barScores, sectionWeight, fragmentCode, fragmentLabel, glitchMessages, glitchAt, shapeOf, TAGLINES, taglineFor, taglineAt, TYPE_START, TYPE_RATE } from '../src/video/fragments.js';
+import { pickFragments, fragmentBetween, parseTime, clockOf, barScores, sectionWeight, fragmentCode, fragmentLabel, glitchMessages, glitchAt, shapeOf, TAGLINES, taglineFor, nextTagline, taglineAt, TYPE_START, TYPE_RATE } from '../src/video/fragments.js';
 import { textsFor, textFile } from '../src/video/texts.js';
 import { absoluteClips } from '../src/endless/transitions.js';
 import { tempoClock } from '../src/render/tempo.js';
@@ -118,6 +118,7 @@ const CHECKS = {
     const a = taglineFor('ABCDE'), b = taglineFor('ABCDE');
     assert(a === b && TAGLINES.includes(a), 'same fragment, same phrase');
     assert(new Set(['A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8'].map(taglineFor)).size >= 4, 'different fragments, different phrases');
+    { let x = 'music by coding'; for (let i = 0; i < 20; i++) { const y = nextTagline(x); assert(y !== x && TAGLINES.includes(y), 'die: another phrase'); x = y; } }
     assert(fragmentOpts({}).taglineMode === 'fixed' && fragmentOpts({ taglineMode: 'random' }).taglineMode === 'random' && fragmentOpts({ taglineMode: 'x' }).taglineMode === 'fixed', 'mode');
     const text = 'music by coding';
     assert(taglineAt(text, 0.2).text === '', 'empty at the start');

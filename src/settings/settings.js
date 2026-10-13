@@ -3,11 +3,11 @@
 import { makeBackup, mergeBackup } from './backup.js';
 import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
-import { LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, fragmentOpts, fragmentSize } from '../video/layout.js';
+import { LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, fragmentOpts, fragmentSize, V_DEFAULTS } from '../video/layout.js';
 import { FORMATS, MP3_RATES, formatOf } from '../export/encode.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data.js';
-import { taglineFor } from '../video/fragments.js';
-import { DICE } from '../icons.js';
+import { nextTagline } from '../video/fragments.js';
+import { DICE, REVERT } from '../icons.js';
 
 
 export function createSettings({ root, t, tx, esc, store, looks, app, toast, confirmTwice }) {
@@ -52,7 +52,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('fragBands'), seg('data-fb-bands', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bands ? '1' : '0'))}
           ${row(t('fragRotate'), seg('data-fb-rotate', [['1', t('fragOn')], ['0', t('fragOff')]], fr.rotate ? '1' : '0'), t('fragRotateHint'))}
           ${row(t('fragCode'), `<select data-frag-opt="codeMode" data-no-knob>${F_CODE.map(k => opt(k, fr.codeMode, t(`fragCode:${k}`))).join('')}</select>`, t(`fragCodeHint:${fr.codeMode}`))}
-          ${row(t('setFragTagline'), `<span class="die-row"><input type="text" data-frag-opt="tagline" value="${esc(fr.tagline)}" maxlength="60" data-no-knob${fr.taglineMode === 'random' ? ' disabled' : ''}><button class="chip die-btn" data-frag-die aria-pressed="${fr.taglineMode === 'random'}" title="${esc(t('fragDie'))}" aria-label="${esc(t('fragDie'))}">${DICE}</button></span>`, fr.taglineMode === 'random' ? t('fragDieOn', { x: taglineFor('next') }) : '')}
+          ${row(t('setFragTagline'), `<span class="die-row"><input type="text" data-frag-opt="tagline" value="${esc(fr.tagline)}" maxlength="60" data-no-knob><button class="dice" data-frag-die title="${esc(t('fragDie'))}" aria-label="${esc(t('fragDie'))}">${DICE}</button>${fr.tagline !== V_DEFAULTS.tagline ? `<button class="dice" data-frag-revert title="${esc(t('fragRevert'))}" aria-label="${esc(t('fragRevert'))}">${REVERT}</button>` : ''}</span>`)}
           ${row(t('setFragFull'), `<input type="text" data-frag-opt="fullLine" value="${esc(fr.fullLine)}" maxlength="60" placeholder="${esc(t('setFragFullHint'))}" data-no-knob>`)}
           ${row(t('setFragTitle'), seg('data-fb-vtitle', [['1', t('fragOn')], ['0', t('fragOff')]], fr.vTitle ? '1' : '0'), t('setFragTitleHint'))}
           ${row(t('setFragLabel'), seg('data-fb-label', [['1', t('fragOn')], ['0', t('fragOff')]], fr.label ? '1' : '0'))}
@@ -99,7 +99,9 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       const all = { ...(store.get('coding-misk-video-presets', {}) || {}) }; delete all[name]; store.set('coding-misk-video-presets', all); return render();
     }
     { const fb = { fbVtitle: 'vTitle', fbLabel: 'label', fbGlitch: 'glitch', fbBands: 'bands', fbRotate: 'rotate' }, k = Object.keys(fb).find(x => b.dataset[x] !== undefined); if (k) { setFrag(fb[k], b.dataset[k] === '1'); return render(); } }
-    if (b.dataset.fragDie !== undefined) { setFrag('taglineMode', b.getAttribute('aria-pressed') === 'true' ? 'fixed' : 'random'); return render(); }
+    // the die puts another phrase in the tagline, the arrow brings the default back
+    if (b.dataset.fragDie !== undefined) { setFrag('tagline', nextTagline(fragmentOpts(store.get('coding-misk-fragments', {}) || {}).tagline)); setFrag('taglineMode', 'fixed'); return render(); }
+    if (b.dataset.fragRevert !== undefined) { setFrag('tagline', V_DEFAULTS.tagline); return render(); }
     if (b.id === 'set-frag-recipe') { pickJsonFiles(data => { if (data && data.seed && app.fragmentsFromRecipe) app.fragmentsFromRecipe(data, b); else toast(t('fragErr:source')); }); return; }
     if (b.id === 'set-live-window') { if (!app.liveOpenWindow()) toast(t('setLiveBlocked')); else setTimeout(render, 1500); return; }
     if (b.id === 'set-live-room') { app.liveOpenRoom(); return; }

@@ -32,8 +32,8 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
-import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, fragmentOpts, fragmentSize, fragmentAreas } from './video/layout.js';
-import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMessages, shapeOf, clockOf, parseTime, taglineFor } from './video/fragments.js';
+import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
+import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMessages, shapeOf, clockOf, parseTime, taglineFor, nextTagline } from './video/fragments.js';
 import { textsFor, textFile } from './video/texts.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from './soul/data.js';
 import { hashString } from './endless/random.js';
@@ -47,7 +47,7 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE } from './icons.js';
+import { LOCK, DICE, REVERT } from './icons.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
 import { startHardware } from './hardware.js';
@@ -949,8 +949,7 @@ function openFragMenu(source, anchor) {
     <div class="rx-opt">${chk('fm-bands', o.bands, t('fragBands'))}${chk('fm-rotate', o.rotate, t('fragRotate'))}</div>
     <details class="fm-more"><summary>${esc(t('fragMore'))}</summary>
       <label class="rx-opt"><span>${esc(t('fragCode'))}</span>${sel('fm-code', F_CODE, o.codeMode, k => t(`fragCode:${k}`))}</label>
-      <div class="rx-opt"><span>${esc(t('setFragTagline'))}</span><input id="fm-tagline" value="${esc(o.tagline)}" maxlength="60" data-no-knob size="22" aria-label="${esc(t('setFragTagline'))}"${o.taglineMode === 'random' ? ' disabled' : ''}><button class="chip die-btn" data-fm-die aria-pressed="${o.taglineMode === 'random'}" title="${esc(t('fragDie'))}" aria-label="${esc(t('fragDie'))}">${DICE}</button></div>
-      <p class="hint muted small" data-fm-die-hint${o.taglineMode === 'random' ? '' : ' hidden'}>${esc(t('fragDieOn', { x: taglineFor('next') }))}</p>
+      <div class="rx-opt"><span>${esc(t('setFragTagline'))}</span><input id="fm-tagline" value="${esc(o.tagline)}" maxlength="60" data-no-knob size="22" aria-label="${esc(t('setFragTagline'))}"><button class="dice" data-fm-die title="${esc(t('fragDie'))}" aria-label="${esc(t('fragDie'))}">${DICE}</button><button class="dice" data-fm-revert title="${esc(t('fragRevert'))}" aria-label="${esc(t('fragRevert'))}"${o.tagline === V_DEFAULTS.tagline ? ' hidden' : ''}>${REVERT}</button></div>
       <label class="rx-opt"><span>${esc(t('setFragFull'))}</span><input id="fm-full" value="${esc(o.fullLine)}" maxlength="60" placeholder="${esc(t('setFragFullHint'))}" data-no-knob size="22"></label>
       <div class="rx-opt">${chk('fm-title', o.vTitle, t('setFragTitle'))}${chk('fm-label', o.label, t('setFragLabel'))}${chk('fm-glitch', o.glitch, t('setFragGlitch'))}</div>
       <label class="rx-opt"><span>${esc(t('fragSeed'))}</span><input id="fm-seed" placeholder="${esc(t('fragSeedHint'))}" data-no-knob size="18"></label>
@@ -962,12 +961,12 @@ function openFragMenu(source, anchor) {
   (anchor.closest('.songbar, .pl-row, .set-card') || anchor).insertAdjacentElement('afterend', el);
   // what the form says now, saved as the settings so the preview, Settings and the next fragments agree
   const v = id => el.querySelector(id), form = () => ({ format: v('#fm-format').value, show: v('#fm-show').value, aspect: v('#fm-aspect').value, look: v('#fm-look').value, soulView: v('#fm-soulview').value,
-    bands: v('#fm-bands').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, taglineMode: v('[data-fm-die]').getAttribute('aria-pressed') === 'true' ? 'random' : 'fixed', fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
+    bands: v('#fm-bands').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, taglineMode: 'fixed', fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
   const remember = () => { const f = form(); for (const [k, x] of Object.entries(f)) setFragOpt(k, x); soul.force(previewView()); };
   // the preview shows the chosen soul view; the visual follows the stage (pick it there, or the arrows)
   const previewView = () => { const c = v('#fm-soulview').value; return c === 'random' ? SOUL_VIEWS[0] : SOUL_VIEWS.includes(c) ? c : null; };
   el.addEventListener('change', remember);
-  el.addEventListener('input', e => { if (e.target.matches('#fm-tagline, #fm-full')) remember(); });
+  el.addEventListener('input', e => { if (e.target.matches('#fm-tagline, #fm-full')) remember(); if (e.target.matches('#fm-tagline')) v('[data-fm-revert]').hidden = e.target.value === V_DEFAULTS.tagline; });
   v('#fm-look').addEventListener('change', () => { const c = v('#fm-look').value; if (PICK_LOOKS.some(l => l[0] === c)) setLook(c); });
   video.previewVertical(v('#fm-preview'), () => { const x = fragOpts(); return { ...x, size: fragmentSize(x), next: nextFragment() }; }, c => (song && song.meta ? song.meta.sectionAt(c) : -1));
   soul.force(previewView());
@@ -979,8 +978,8 @@ function openFragMenu(source, anchor) {
   el.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b || b.closest('[data-fm-texts]')) return;
     if (b.dataset.fmLen) { v('#fm-len').value = b.dataset.fmLen; v('input[value="random"]').checked = true; return; }
-    // the die: one random tagline per fragment, or the fixed one
-    if (b.dataset.fmDie !== undefined) { const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on); v('#fm-tagline').disabled = on; v('[data-fm-die-hint]').hidden = !on; remember(); return; }
+    // the die puts another phrase in the tagline, the arrow brings the default back
+    if (b.dataset.fmDie !== undefined || b.dataset.fmRevert !== undefined) { v('#fm-tagline').value = b.dataset.fmDie !== undefined ? nextTagline(v('#fm-tagline').value) : V_DEFAULTS.tagline; v('[data-fm-revert]').hidden = v('#fm-tagline').value === V_DEFAULTS.tagline; remember(); return; }
     if (b.dataset.fm === 'close') { closeFragMenu(); return; }
     if (b.dataset.fm !== 'go') return;
     if (fastJob) { fastJob.cancel(); return; }

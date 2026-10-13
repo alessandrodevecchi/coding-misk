@@ -966,10 +966,10 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
 .tx-fields { display: grid; gap: 6px; margin-top: 8px; }
 .tx-field span { display: flex; gap: 6px; align-items: center; }
 .tx-field input { flex: 1; min-width: 0; }
-/* the tagline die (#57): on = a random phrase per fragment */
-.die-row { display: inline-flex; gap: 6px; align-items: center; }
-.die-btn[aria-pressed="true"] { background: var(--a1); color: var(--bg); }
-.die-btn { padding: 2px 6px; }
+/* the tagline die and revert arrow (#57) */
+.die-row { display: flex; gap: 4px; align-items: center; min-width: 0; max-width: 100%; }
+.die-row input { flex: 1; min-width: 0; width: auto; }
+.ico-revert { width: 15px; height: 15px; vertical-align: -3px; flex: none; }
 .temp-artist { display: inline-flex; align-items: center; gap: 6px; border-style: dashed; }
 .temp-artist .plain { background: none; border: 0; color: inherit; font: inherit; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .temp-artist .keep { color: var(--a1); font-weight: 600; }

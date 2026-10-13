@@ -4,7 +4,7 @@ Fragments (`#57`) work, but every one carries the same tagline, the tagline appe
 
 ## What Changes
 
-- **Random tagline.** A die beside the tagline setting draws a phrase from an approved pool; in random mode each fragment gets its own phrase, the same one for the same fragment. A fixed phrase stays the default.
+- **Tagline die.** A die beside the tagline puts another phrase from an approved pool into the field at each click; an arrow brings the default back. Agents can also ask for one phrase per fragment.
 - **Typed tagline.** The tagline types itself in with a blinking block cursor and brief glitches, then stays.
 - **More voice in the texts.** The approved "devotion" lines join the description moods, and two of them join the glitch messages.
 - **Song inspiration.** Songs can carry an `inspiration` note (English and Italian); descriptions mention it with their own wording.

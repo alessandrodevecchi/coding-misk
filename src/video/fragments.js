@@ -124,6 +124,11 @@ export const TAGLINES = [
   'kneel before the kick', 'sermon of the subwoofer', 'bless this bassline', 'our daily beat', 'in kick we trust', 'holy compile, amen',
 ];
 export const taglineFor = code => stream(code, 'tagline').pick(TAGLINES);
+// the die beside the tagline: another phrase of the pool, never the one shown (rand: 0..1)
+export function nextTagline(current, rand = Math.random) {
+  const pool = TAGLINES.filter(x => x !== current);
+  return pool[Math.floor(rand() * pool.length) % pool.length];
+}
 
 // the tagline typed in at t seconds of a fragment: { text (with glitch characters), cursor (draw the block), glitch (0..1) }.
 // Typing starts with the label, after the opening glitch; the block blinks while typing and a little after; now and then a

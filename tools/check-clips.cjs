@@ -93,11 +93,14 @@ const db = (a, b) => 20 * Math.log10((a.reduce((x, y) => x + y, 0) / a.length) /
   check((await page.inputValue(td)) !== before, 'draw again changes the texts');
   check(await page.locator('#fm-look').count() === 1 && await page.locator('#fm-soulview').count() === 1, 'the menu lets you pick the visual and the soul view');
   check(/^#\w+ #/.test(await page.inputValue('.fm-texts [data-tx-hashtags]')) && /live coding/.test(await page.inputValue('.fm-texts [data-tx-tags]')) && (await page.inputValue('.fm-texts [data-tx-category]')) === 'Music', 'the texts have tags, hashtags and category', await page.inputValue('.fm-texts [data-tx-hashtags]'));
-  await page.click('.frag-menu .fm-more summary'); await page.click('.frag-menu [data-fm-die]'); await sleep(200);
-  const die = await page.evaluate(() => ({ pressed: document.querySelector('[data-fm-die]').getAttribute('aria-pressed'), disabled: document.querySelector('#fm-tagline').disabled, hint: !document.querySelector('[data-fm-die-hint]').hidden, mode: JSON.parse(localStorage.getItem('coding-misk-fragments') || '{}').taglineMode }));
-  check(die.pressed === 'true' && die.disabled && die.hint && die.mode === 'random', 'the die turns random taglines on', JSON.stringify(die));
-  await page.click('.frag-menu [data-fm-die]'); await sleep(100);
-  check(await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-fragments') || '{}').taglineMode) === 'fixed', 'and off again');
+  await page.click('.frag-menu .fm-more summary');
+  const tag0 = await page.inputValue('#fm-tagline'); await page.click('.frag-menu [data-fm-die]'); await sleep(150);
+  const tag1 = await page.inputValue('#fm-tagline'); await page.click('.frag-menu [data-fm-die]'); await sleep(150);
+  const tag2 = await page.inputValue('#fm-tagline');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-fragments') || '{}').tagline);
+  check(tag1 !== tag0 && tag2 !== tag1 && saved === tag2 && await page.isVisible('.frag-menu [data-fm-revert]'), 'the die puts another phrase in the tagline each time, the arrow shows', `${tag1} / ${tag2}`);
+  await page.click('.frag-menu [data-fm-revert]'); await sleep(150);
+  check(await page.inputValue('#fm-tagline') === 'music written as code' && !(await page.isVisible('.frag-menu [data-fm-revert]')), 'the arrow brings the default back');
   if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, 'clips-menu-panel.png') }); }
 
   // 5. every visual in each vertical layout
