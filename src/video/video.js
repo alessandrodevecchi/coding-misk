@@ -146,6 +146,16 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     g.restore();
   }
   function drawSoul(A, P, open, soulCanvas) {
+    // a fragment's main picture (#57): the soul screen cut to cover the box, or entire over a blurred, darker copy
+    if (A.mode && soulCanvas) {
+      const sw = soulCanvas.width, sh = soulCanvas.height, cover = Math.max(A.w / sw, A.h / sh), fitK = Math.min(A.w / sw, A.h / sh);
+      g.save(); g.beginPath(); g.rect(A.x, A.y, A.w, A.h); g.clip();
+      if (A.mode === 'contain') { g.filter = 'blur(14px) brightness(.75) saturate(1.2)'; }
+      g.drawImage(soulCanvas, A.x + (A.w - sw * cover) / 2, A.y + (A.h - sh * cover) / 2, sw * cover, sh * cover);
+      g.filter = 'none';
+      if (A.mode === 'contain') g.drawImage(soulCanvas, A.x + (A.w - sw * fitK) / 2, A.y + (A.h - sh * fitK) / 2, sw * fitK, sh * fitK);
+      g.restore(); return;
+    }
     g.save(); g.globalAlpha = A.a ?? 1;
     g.fillStyle = P.panel; g.strokeStyle = P.line; g.lineWidth = 2;
     g.beginPath(); g.roundRect(A.x, A.y, A.w, A.h, 10); g.fill(); g.stroke();
@@ -391,7 +401,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
       g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
       g.fillStyle = P.bg; g.fillRect(0, 0, C.w, C.h);
       if (A.stage) { drawStage(A.stage); drawSay(A.stage); }
-      if (A.soul && soulFrame) drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, Math.min((A.soul.w - 8) / 1200, (A.soul.h - 4) / 760))));
+      if (A.soul && soulFrame) drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, A.soul.mode ? Math.max(A.soul.w / 1200, A.soul.h / 760) : Math.min((A.soul.w - 8) / 1200, (A.soul.h - 4) / 760))));
       if (A.code) drawCode(A.code, P, now, Math.min(C.w, C.h) * 1.6, { mode: o.codeMode || 'focus', progress: t / (J.length || 1), section, cyc });
       if (A.top) drawLogo(A.top, levels);
       const tag = J.tagline !== undefined ? taglineAt(J.tagline, t, J.code) : null, oT = tag ? { ...o, taglineFull: J.tagline } : o;

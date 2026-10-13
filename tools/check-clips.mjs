@@ -113,6 +113,14 @@ const CHECKS = {
     const f = textsFor({ kind: 'fragment', title: 'Kellerlicht', fragment: { label: 'FRAGMENT S0UL·ABCDE #014', start: 40, end: 70 }, fullLine: 'Full session on the channel', seed: 'f' });
     assert(/#014/.test(f.title) && /FRAGMENT S0UL·ABCDE #014/.test(f.description) && /Full session on the channel/.test(f.description), 'fragment');
   },
+  'the soul as the main picture fills the vertical frame: cut to cover, or entire over a blurred copy'() {
+    const fill = fragmentAreas(fragmentOpts({ show: 'soul', aspect: 'fill', bands: false }), 1080, 1920).soul;
+    assert(fill.mode === 'cover' && fill.w === 1080 && fill.h === 1920, `fill ${JSON.stringify(fill)}`);
+    const whole = fragmentAreas(fragmentOpts({ show: 'soul', aspect: 'whole', bands: true }), 1080, 1920).soul;
+    assert(whole.mode === 'contain' && whole.w === 1080 && whole.h > 1080, `whole ${JSON.stringify(whole)}`);
+    const side = fragmentAreas(fragmentOpts({ show: 'visual-soul', aspect: 'fill' }), 1080, 1920).soul;
+    assert(!side.mode, 'the soul beside the visual keeps its panel');
+  },
   'tagline: pool, random by fragment, typed with a block and short glitches'() {
     assert(TAGLINES.length >= 30 && !TAGLINES.some(x => /four-on-the-floor/.test(x)), 'pool');
     const a = taglineFor('ABCDE'), b = taglineFor('ABCDE');

@@ -77,9 +77,11 @@ const fit = (x, y, w, h, r) => { const bw = Math.min(w, h * r), bh = bw / r; ret
 export function fragmentAreas(o, w, h) {
   const show = o.show || 'visual', main = show === 'soul' ? 'soul' : show === 'code' ? 'code' : 'stage';
   const second = show === 'visual-code' ? 'code' : show === 'visual-soul' ? 'soul' : null;
-  const r1 = main === 'code' ? null : o.aspect === 'whole' ? (main === 'soul' ? SOUL : o.stageRatio || 2.4) : o.aspect && o.aspect !== 'fill' ? ratioOf(o.aspect) : main === 'soul' ? SOUL : null;
+  // the soul as the main picture fills its box: cut to cover it, or ('whole') shown entire over a blurred copy of itself
+  const soulMode = main === 'soul' ? (o.aspect === 'whole' ? 'contain' : 'cover') : null;
+  const r1 = main === 'code' ? null : main === 'soul' ? (o.aspect && o.aspect !== 'fill' && o.aspect !== 'whole' ? ratioOf(o.aspect) : null) : o.aspect === 'whole' ? o.stageRatio || 2.4 : o.aspect && o.aspect !== 'fill' ? ratioOf(o.aspect) : null;
   const pad = Math.round(Math.min(w, h) / 40), out = {};
-  const box = (kind, b) => { out[kind] = kind === 'soul' ? { ...b, head: 0 } : kind === 'code' ? { x: b.x + pad, y: b.y, w: b.w - 2 * pad, h: b.h } : b; };
+  const box = (kind, b) => { out[kind] = kind === 'soul' ? { ...b, head: 0, ...(kind === main && soulMode ? { mode: soulMode } : {}) } : kind === 'code' ? { x: b.x + pad, y: b.y, w: b.w - 2 * pad, h: b.h } : b; };
   if (h >= w) {
     const band = o.bands ? Math.round(h * 0.13) : 0, top = band, avail = h - 2 * band;
     let h1, h2 = 0;

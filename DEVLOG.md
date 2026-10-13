@@ -393,6 +393,8 @@
 
 - 2026-10-13: `#54`, controllo per nome (`tools/check-sound-names.cjs`): compila i brani inclusi e brani generati per ogni stile e artista, estrae ogni suono, drum machine con colpo e synth dal codice e lo confronta con i suoni caricati; 139 brani, 97 nomi, nessuno mancante. Restano in `#54` i ripieghi da drum machine sorelle e l'avviso nel pannello batteria. Note sul genere glitch (attrezzatura, interviste, risposta di Google AI trascritta, spartiti Musescore non accessibili) in `notes/generi-reference.md`.
 
+- 2026-10-13: anima nei frammenti verticali (`feat/57-vertical-soul`): come immagine principale l'anima riempie il riquadro tagliata al centro ("riempi" o una proporzione), oppure ("tutto il visual") resta intera sopra una sua copia sfocata invece delle bande nere. Le viste dell'anima restano disegnate in 1200×760: un'impaginazione davvero verticale delle dieci viste sarebbe un lavoro a parte.
+
 ## Prossimo passo
 
 Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima del brano `#46` fasi 1 e 2 con display nascosto, casuali `#50`, compilation `#49`, più le feature precedenti). Tutti i controlli passano.
@@ -411,6 +413,5 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 2. Unire `feat/61-disk-exports` in `develop` dopo la sua prova (contiene `#61`, la guardia `#54` e le novità dei frammenti).
 3. Resto di `#54`: sostituti da drum machine sorelle o dalla stessa famiglia (anche per `tom_mallet`), nota "suono mancante, uso X" nel pannello batteria.
 4. `#59` (manopole con la compilation). Poi FT2 (`#16`) con calma. Audio AAC dei video 45 ms in ritardo.
-5. Anima nei frammenti verticali: oggi resta orizzontale con bande nere; serve un'impaginazione verticale dell'anima.
 6. Generi nuovi (`#7`, non ancora in programma): glitch per primo (reference in `notes/generi-reference.md`, da analizzare dall'audio che scarica il proprietario), poi sovietwave e binaural beats.
 7. Più avanti: `#63` voci da scaricare e rigenerare, `#62` spagnolo parlato; segnalazione a Strudel pronta in `notes/strudel-segnalazione.md` (quando c'è un account Codeberg).
