@@ -391,6 +391,8 @@
 
 - 2026-10-13 (pomeriggio): unito `feat/61-disk-exports` in `develop` (export su disco, guardia dei suoni `#54`, novità dei frammenti) dopo tutti i controlli. Corretto il ritardo AAC dei video (`fix/53-aac-delay`): l'audio parte 2112 campioni prima e la edit list dell'MP4 taglia il silenzio dell'encoder, scarto misurato 0 ms (era 45). `#59` (`feat/59-radio-knobs`, change `radio-knob-locks`): con la compilation le manopole mostrano i valori del brano in onda; una manopola mossa a mano (o col dado) resta tenuta con un lucchetto che la ridà alla compilation; gli intervalli della compilation valgono anche per gli artisti.
 
+- 2026-10-13: `#54`, controllo per nome (`tools/check-sound-names.cjs`): compila i brani inclusi e brani generati per ogni stile e artista, estrae ogni suono, drum machine con colpo e synth dal codice e lo confronta con i suoni caricati; 139 brani, 97 nomi, nessuno mancante. Restano in `#54` i ripieghi da drum machine sorelle e l'avviso nel pannello batteria. Note sul genere glitch (attrezzatura, interviste, risposta di Google AI trascritta, spartiti Musescore non accessibili) in `notes/generi-reference.md`.
+
 ## Prossimo passo
 
 Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima del brano `#46` fasi 1 e 2 con display nascosto, casuali `#50`, compilation `#49`, più le feature precedenti). Tutti i controlli passano.
