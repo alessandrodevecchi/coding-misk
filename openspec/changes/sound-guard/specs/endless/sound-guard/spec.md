@@ -22,6 +22,17 @@ When a sound fails to load, the system SHALL play the same note from a stand-in:
 - **WHEN** a sound cannot be fetched because the network is down
 - **THEN** it is not remembered as broken
 
+### Requirement: Sample addresses fixed before playing
+Sample addresses that cannot load as the library writes them SHALL be fixed when the bank is registered, before its first note: banks whose source server sends responses the browser refuses SHALL load from a mirror of the same files, a known wrong path SHALL be corrected, and characters that break a URL in a file name (such as "#" or a lone "%") SHALL be encoded.
+
+#### Scenario: File name with a hash
+- **WHEN** a sample whose file name contains "#" plays
+- **THEN** it loads and sounds
+
+#### Scenario: Bank refused by the browser
+- **WHEN** a VCSL snare whose folder name contains a comma plays
+- **THEN** it loads from the mirror and sounds
+
 ### Requirement: Health register
 The system SHALL remember broken sounds, fonts and zones in the browser together with the sound library version, and use the stand-in at once for every later note, live and in fast exports. A new library version SHALL start from the known list again.
 

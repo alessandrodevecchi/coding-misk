@@ -10,6 +10,8 @@
 - [x] 2.1 Pre-flight check in the render page: distinct sounds per block loaded with a time limit before rendering; replaced and skipped sounds reported to the app.
 - [x] 2.2 Radio preload of the next song's sounds.
 
+- [x] 2.3 Sample addresses fixed at registration: VCSL from jsDelivr, `tom_mallet` path, `#` and `%` encoded; checked in Node and with the full check on the affected banks.
+
 ## 3. Tool and docs
 
 - [x] 3.1 `tools/check-sounds.cjs`: every soundfont zone and sample the app can call; summary and exit code.

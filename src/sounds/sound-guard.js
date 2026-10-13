@@ -33,6 +33,29 @@ export function isBrokenError(e) {
   return /no soundfont buffer|unable to decode|decod|unexpected token|is not valid|could not load soundfont/i.test(String(e.message || e));
 }
 
+// sample addresses that never load as the library writes them (#54), fixed before the first note:
+// - the VCSL banks come from jsDelivr: raw.githubusercontent.com sends Content-Disposition twice for paths with a comma,
+//   and Chrome refuses those responses;
+// - tom_mallet's path lacks the "Membranophones/" folder;
+// - "#" and a "%" that starts no escape are encoded in the file name (Dirt-Samples mute, pluck, h).
+const VCSL_RAW = 'https://raw.githubusercontent.com/sgossner/VCSL/master/', VCSL_CDN = 'https://cdn.jsdelivr.net/gh/sgossner/VCSL@master/';
+export function fixSampleUrl(url) {
+  if (typeof url !== 'string') return url;
+  let u = url;
+  if (u.startsWith(VCSL_RAW)) u = VCSL_CDN + u.slice(VCSL_RAW.length);
+  if (u.startsWith(VCSL_CDN + 'Struck%20Membranophones/')) u = VCSL_CDN + 'Membranophones/' + u.slice(VCSL_CDN.length);
+  const i = u.lastIndexOf('/');
+  return u.slice(0, i + 1) + u.slice(i + 1).replace(/%(?![0-9A-Fa-f]{2})/g, '%25').replace(/#/g, '%23');
+}
+// fixes a sample bank's addresses in place (the sampler keeps the same list); true when one changed
+export function fixSampleBank(bank) {
+  let changed = false;
+  const fix = list => { for (let i = 0; i < list.length; i++) { const v = fixSampleUrl(list[i]); if (v !== list[i]) { list[i] = v; changed = true; } } };
+  if (Array.isArray(bank)) fix(bank);
+  else if (bank && typeof bank === 'object') for (const v of Object.values(bank)) if (Array.isArray(v)) fix(v);
+  return changed;
+}
+
 // the index a value plays among `count` fonts or samples (as Strudel's getSoundIndex)
 export const indexOf = (n, count) => { const i = Math.round(Number.isFinite(+n) ? +n : 0); return ((i % count) + count) % count; };
 
@@ -109,6 +132,7 @@ export async function preloadFonts(names, { soundMap, play, pause = 30, get = fe
 // played (on every such note). Returns a function that stops watching.
 export function guardSounds({ soundMap, registerSound, register, now = () => 0, onReplace = () => {}, zone = zoneOf }) {
   const wrapOne = (key, s) => {
+    if (s.data.type === 'sample') fixSampleBank(s.data.samples);
     const type = s.data.type, fonts = type === 'soundfont' ? s.data.fonts : null;
     const count = fonts ? fonts.length : Array.isArray(s.data.samples) ? s.data.samples.length : 1;
     const play = s.onTrigger;

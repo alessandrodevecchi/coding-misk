@@ -1,7 +1,7 @@
 // Checks for the sound guard (#54): the register of broken sounds and its stand-ins, the error kinds it learns, zone
 // learning from a font file, the sound wrapper and the decode guard. No browser.
 //   npm run check:sound-guard      exit 1 when any check fails
-import { createRegister, isBrokenError, indexOf, zoneOf, guardSounds, guardDecode, HEALTH_KEY } from '../src/sounds/sound-guard.js';
+import { createRegister, isBrokenError, indexOf, zoneOf, guardSounds, guardDecode, HEALTH_KEY, fixSampleUrl, fixSampleBank } from '../src/sounds/sound-guard.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const memStore = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
@@ -66,6 +66,17 @@ const CHECKS = {
     assert(map.get().late.data.cmGuard, 'sounds registered later are wrapped');
     assert(replaced.length >= 2, 'stand-ins reported');
     stop();
+  },
+  'sample addresses: VCSL from jsDelivr, tom_mallet path, # and % encoded'() {
+    const R = 'https://raw.githubusercontent.com/sgossner/VCSL/master/', C = 'https://cdn.jsdelivr.net/gh/sgossner/VCSL@master/';
+    assert(fixSampleUrl(R + 'Membranophones/Struck%20Membranophones/Snare%20Drum%2C%20Modern%201/a.wav') === C + 'Membranophones/Struck%20Membranophones/Snare%20Drum%2C%20Modern%201/a.wav', 'jsDelivr');
+    assert(fixSampleUrl(R + 'Struck%20Membranophones/Tom%201/Mallet/x.wav') === C + 'Membranophones/Struck%20Membranophones/Tom%201/Mallet/x.wav', 'tom_mallet');
+    const D = 'https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/';
+    assert(fixSampleUrl(D + 'mute/000_FH A#2 SCF.wav') === D + 'mute/000_FH A%232 SCF.wav', 'hash');
+    assert(fixSampleUrl(D + 'h/001_0_da0-200%_1000_0_R.wav') === D + 'h/001_0_da0-200%25_1000_0_R.wav', 'percent');
+    assert(fixSampleUrl(D + 'bd/BT0A0A7.wav') === D + 'bd/BT0A0A7.wav' && fixSampleUrl(R + 'x/a%20b.wav').endsWith('x/a%20b.wav'), 'others unchanged');
+    const bank = [D + 'mute/A#2.wav', D + 'bd/x.wav'], pitched = { c3: [D + 'p/C#3.wav'] };
+    assert(fixSampleBank(bank) && bank[0].endsWith('A%232.wav') && fixSampleBank(pitched) && pitched.c3[0].endsWith('C%233.wav') && !fixSampleBank([D + 'bd/x.wav']), 'banks in place');
   },
   async 'decode guard: a failure without an error callback reaches the success callback as null'() {
     const proto = { decodeAudioData(data, ok, err) { const p = Promise.reject(new Error('EncodingError')); if (err) p.catch(err); return p; } };
