@@ -458,3 +458,8 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Video di prova della regia con una traccia dell'app esportata a 128 BPM: i fotogrammi si generano dalla pagina a un tempo dato, poi si montano con ffmpeg.
 - Le sculture si salvano nel browser con una chiave legata al codice: dalla seconda apertura la scena è pronta in circa un secondo.
 
+## 2026-10-14 notte: pilota 3D, revisione con il proprietario
+
+- Viso rifatto per piani su indicazioni del proprietario, labbra come rilievo morbido su una mesh più fine, teschio su misure anatomiche medie, pareti come lastra unica con strumenti incassati, parabrezza a tre vetri, fusoliera raccordata al tettuccio, aereo esterno con profili alari, mimetica e dettagli, cielo con mare di nuvole sotto l'orizzonte.
+- Corretto un errore del caricamento a tappe: uno shader usava una costante definita più avanti.
+
