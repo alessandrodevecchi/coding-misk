@@ -65,6 +65,10 @@ export function fragmentOpts(o = {}) {
   if (!F_ASPECTS.includes(r.aspect)) r.aspect = V_DEFAULTS.aspect;
   if (!F_CODE.includes(r.codeMode)) r.codeMode = V_DEFAULTS.codeMode;
   if (r.taglineMode !== 'random') r.taglineMode = 'fixed';
+  // the two bands each on their own (#57): top (logo, label), bottom (tagline and lines); bands: both at once
+  const both = o.bands !== undefined ? !!o.bands : V_DEFAULTS.bands;
+  r.bandTop = o.bandTop !== undefined ? !!o.bandTop : both; r.bandBottom = o.bandBottom !== undefined ? !!o.bandBottom : both;
+  r.bands = r.bandTop || r.bandBottom;
   return r;
 }
 // the file's size, and the size the picture is composed at (turned: the other way round)
@@ -85,7 +89,7 @@ export function fragmentAreas(o, w, h) {
   const pad = Math.round(Math.min(w, h) / 40), out = {};
   const box = (kind, b) => { out[kind] = kind === 'soul' ? { ...b, head: 0, ...(kind === main && soulMode ? { mode: soulMode } : {}) } : kind === 'code' ? { x: b.x + pad, y: b.y, w: b.w - 2 * pad, h: b.h } : b; };
   if (h >= w) {
-    const band = o.bands ? Math.round(h * 0.13) : 0, top = band, avail = h - 2 * band;
+    const band = Math.round(h * 0.13), tb = o.bandTop !== false && o.bands ? band : 0, bb = o.bandBottom !== false && o.bands ? band : 0, top = tb, avail = h - tb - bb;
     let h1, h2 = 0;
     if (main === 'code') h1 = avail;
     else if (!r1) h1 = second ? Math.round(avail * 0.5) : avail;
@@ -96,7 +100,8 @@ export function fragmentAreas(o, w, h) {
     box(main, r1 ? fit(0, y0, w, h1, r1) : { x: 0, y: y0, w, h: h1 });
     if (bleed) out[main].bleed = second ? { x: 0, y: y0, w, h: h1 } : { x: 0, y: top, w, h: avail };
     if (second) box(second, { x: 0, y: y0 + h1 + pad, w, h: h2 });
-    if (o.bands) { out.top = { x: 0, y: 0, w, h: y0 }; out.bottom = { x: 0, y: y0 + used, w, h: h - y0 - used }; }
+    if (tb) out.top = { x: 0, y: 0, w, h: y0 };
+    if (bb) out.bottom = { x: 0, y: y0 + used, w, h: h - y0 - used };
     return out;
   }
   const strip = o.bands ? Math.round(h * 0.14) : 0, avail = h - strip, w1 = second ? Math.round(w * 2 / 3) : w;

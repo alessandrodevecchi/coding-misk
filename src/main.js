@@ -854,7 +854,10 @@ async function makeFragments(opts = {}) {
   const src = fragmentSource(opts.source); if (src.error) return src;
   // settings, then what the call says: format, show, aspect, bands (true/false or { tagline, taglineMode, fullLine, vTitle }), rotate, codeMode, label, glitch, or an old layout name
   const pick = ['format', 'show', 'aspect', 'rotate', 'bleed', 'codeMode', 'label', 'glitch', 'layout', 'look', 'soulView', 'tagline', 'taglineMode'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
-  const bands = typeof opts.bands === 'object' && opts.bands ? opts.bands : opts.bands !== undefined ? { bands: !!opts.bands } : {};
+  // bands: true/false for both, or { bands, bandTop, bandBottom, tagline, … }; a call's choice wins over the settings
+  const bandObj = typeof opts.bands === 'object' && opts.bands ? opts.bands : opts.bands !== undefined ? { bands: !!opts.bands } : {};
+  const bands = 'bands' in bandObj ? { bandTop: bandObj.bands, bandBottom: bandObj.bands, ...bandObj } : bandObj;
+  for (const k of ['bandTop', 'bandBottom']) if (opts[k] !== undefined) bands[k] = !!opts[k];
   const o = { ...fragmentOpts({ ...(store.get(FRAG_KEY, {}) || {}), ...pick, ...bands }), stageRatio: stageRatio() };
   const shape = shapeFor(src.sg), bpm = src.sg.meta.bpm.map(Number);
   let picks;
@@ -946,7 +949,8 @@ function openFragMenu(source, anchor) {
     <label class="rx-opt"><span>${esc(t('fragAspect'))}</span>${sel('fm-aspect', F_ASPECTS, o.aspect, k => t(`fragAspect:${k}`))}</label>
     <label class="rx-opt"><span>${esc(t('fragLook'))}</span>${sel('fm-look', looks, o.look, lookName)}</label>
     <label class="rx-opt"><span>${esc(t('fragSoulView'))}</span>${sel('fm-soulview', views, o.soulView, viewName)}</label>
-    <div class="rx-opt">${chk('fm-bands', o.bands, t('fragBands'))}${chk('fm-bleed', o.bleed, t('fragBleed'))}${chk('fm-rotate', o.rotate, t('fragRotate'))}</div>
+    <div class="rx-opt">${chk('fm-band-top', o.bandTop, t('fragBandTop'))}${chk('fm-band-bottom', o.bandBottom, t('fragBandBottom'))}</div>
+    <div class="rx-opt">${chk('fm-bleed', o.bleed, t('fragBleed'))}${chk('fm-rotate', o.rotate, t('fragRotate'))}</div>
     <details class="fm-more"><summary>${esc(t('fragMore'))}</summary>
       <label class="rx-opt"><span>${esc(t('fragCode'))}</span>${sel('fm-code', F_CODE, o.codeMode, k => t(`fragCode:${k}`))}</label>
       <div class="rx-opt"><span>${esc(t('setFragTagline'))}</span><input id="fm-tagline" value="${esc(o.tagline)}" maxlength="60" data-no-knob size="22" aria-label="${esc(t('setFragTagline'))}"><button class="dice" data-fm-die title="${esc(t('fragDie'))}" aria-label="${esc(t('fragDie'))}">${DICE}</button><button class="dice" data-fm-revert title="${esc(t('fragRevert'))}" aria-label="${esc(t('fragRevert'))}"${o.tagline === V_DEFAULTS.tagline ? ' hidden' : ''}>${REVERT}</button></div>
@@ -961,7 +965,7 @@ function openFragMenu(source, anchor) {
   (anchor.closest('.songbar, .pl-row, .set-card') || anchor).insertAdjacentElement('afterend', el);
   // what the form says now, saved as the settings so the preview, Settings and the next fragments agree
   const v = id => el.querySelector(id), form = () => ({ format: v('#fm-format').value, show: v('#fm-show').value, aspect: v('#fm-aspect').value, look: v('#fm-look').value, soulView: v('#fm-soulview').value,
-    bands: v('#fm-bands').checked, bleed: v('#fm-bleed').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, taglineMode: 'fixed', fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
+    bandTop: v('#fm-band-top').checked, bandBottom: v('#fm-band-bottom').checked, bands: v('#fm-band-top').checked || v('#fm-band-bottom').checked, bleed: v('#fm-bleed').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, taglineMode: 'fixed', fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
   const remember = () => { const f = form(); for (const [k, x] of Object.entries(f)) setFragOpt(k, x); soul.force(previewView()); };
   // the preview shows the chosen soul view; the visual follows the stage (pick it there, or the arrows)
   const previewView = () => { const c = v('#fm-soulview').value; return c === 'random' ? SOUL_VIEWS[0] : SOUL_VIEWS.includes(c) ? c : null; };

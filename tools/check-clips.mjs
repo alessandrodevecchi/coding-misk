@@ -130,6 +130,14 @@ const CHECKS = {
     assert(late > 300 && late < 780, `the late stretch of the spectrum in view at ${late.toFixed(0)}`);
     assert(soulFocus('j', .1).x < soulFocus('j', .9).x, 'the timeline goes left to right');
   },
+  'the two bands each on their own'() {
+    const only = (top, bottom) => fragmentAreas(fragmentOpts({ show: 'visual', aspect: '1:1', bandTop: top, bandBottom: bottom }), 1080, 1920);
+    const t1 = only(true, false), b1 = only(false, true), both = only(true, true), none = only(false, false);
+    assert(t1.top && !t1.bottom && b1.bottom && !b1.top && both.top && both.bottom && !none.top && !none.bottom, 'top only, bottom only, both, none');
+    assert(t1.top.h >= both.top.h && b1.bottom.h >= both.bottom.h && t1.stage.y > both.stage.y - 1, 'a band stays at least its size when the other is off (the picture is centred in the rest)');
+    assert(fragmentOpts({ bands: false }).bandTop === false && fragmentOpts({ bands: false }).bandBottom === false && fragmentOpts({}).bandTop === true, 'bands switches both');
+    assert(fragmentOpts({ bands: true, bandTop: false }).bands === true && fragmentOpts({ bandTop: false, bandBottom: false }).bands === false, 'bands is on while one band is');
+  },
   'tagline: pool, random by fragment, typed with a block and short glitches'() {
     assert(TAGLINES.length >= 30 && !TAGLINES.some(x => /four-on-the-floor/.test(x)), 'pool');
     const a = taglineFor('ABCDE'), b = taglineFor('ABCDE');

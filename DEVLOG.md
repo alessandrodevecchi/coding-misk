@@ -397,6 +397,8 @@
 
 - 2026-10-13: frammenti, rifiniture chieste dal proprietario (`feat/57-soul-focus`): opzione **Bordo sfocato** (attiva di default, in menu e Impostazioni) che riempie lo spazio intorno a visual o anima, con qualsiasi proporzione, con una loro copia sfocata; l'anima che riempie il riquadro si centra sul soggetto della vista (radar, sfera, reticolo, aura) e, nelle viste distese lungo la canzone (terrain, strands, landscape, particles, halftone, spectrum), su una posizione fissa scelta al primo fotogramma in cui si vede il tratto suonato dal frammento.
 
+- 2026-10-13: frammenti, le due bande con un'opzione ciascuna (`feat/57-band-flags`): banda sopra (logo, etichetta) e banda sotto (slogan e righe), anche una sola; `bands` resta per accenderle o spegnerle insieme (console e chiamate vecchie).
+
 ## Prossimo passo
 
 Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima del brano `#46` fasi 1 e 2 con display nascosto, casuali `#50`, compilation `#49`, più le feature precedenti). Tutti i controlli passano.

@@ -49,7 +49,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('fragAspect'), `<select data-frag-opt="aspect" data-no-knob>${F_ASPECTS.map(k => opt(k, fr.aspect, t(`fragAspect:${k}`))).join('')}</select>`, t('fragAspectHint'))}
           ${row(t('fragLook'), `<select data-frag-opt="look" data-no-knob>${opt('song', fr.look, t('fragPick:song'))}${opt('random', fr.look, t('fragPick:random'))}${looks.map(([k, l]) => opt(k, fr.look, tx(l))).join('')}</select>`)}
           ${row(t('fragSoulView'), `<select data-frag-opt="soulView" data-no-knob>${opt('song', fr.soulView, t('fragPick:song'))}${opt('random', fr.soulView, t('fragPick:random'))}${SOUL_VIEWS.map(k => opt(k, fr.soulView, `${k.toUpperCase()} · ${SOUL_VIEW_NAMES[k]}`)).join('')}</select>`)}
-          ${row(t('fragBands'), seg('data-fb-bands', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bands ? '1' : '0'))}
+          ${row(t('fragBandTop'), seg('data-fb-bandtop', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bandTop ? '1' : '0'))}
+          ${row(t('fragBandBottom'), seg('data-fb-bandbottom', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bandBottom ? '1' : '0'))}
           ${row(t('fragBleed'), seg('data-fb-bleed', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bleed ? '1' : '0'), t('fragBleedHint'))}
           ${row(t('fragRotate'), seg('data-fb-rotate', [['1', t('fragOn')], ['0', t('fragOff')]], fr.rotate ? '1' : '0'), t('fragRotateHint'))}
           ${row(t('fragCode'), `<select data-frag-opt="codeMode" data-no-knob>${F_CODE.map(k => opt(k, fr.codeMode, t(`fragCode:${k}`))).join('')}</select>`, t(`fragCodeHint:${fr.codeMode}`))}
@@ -99,7 +100,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       const name = root.querySelector('#set-vid-preset').value; if (!name) { toast(t('vidPresetPickFirst')); return; }
       const all = { ...(store.get('coding-misk-video-presets', {}) || {}) }; delete all[name]; store.set('coding-misk-video-presets', all); return render();
     }
-    { const fb = { fbVtitle: 'vTitle', fbLabel: 'label', fbGlitch: 'glitch', fbBands: 'bands', fbRotate: 'rotate', fbBleed: 'bleed' }, k = Object.keys(fb).find(x => b.dataset[x] !== undefined); if (k) { setFrag(fb[k], b.dataset[k] === '1'); return render(); } }
+    { const fb = { fbVtitle: 'vTitle', fbLabel: 'label', fbGlitch: 'glitch', fbBandtop: 'bandTop', fbBandbottom: 'bandBottom', fbRotate: 'rotate', fbBleed: 'bleed' }, k = Object.keys(fb).find(x => b.dataset[x] !== undefined); if (k) { setFrag(fb[k], b.dataset[k] === '1'); if (fb[k] === 'bandTop' || fb[k] === 'bandBottom') { const x = fragmentOpts(store.get('coding-misk-fragments', {}) || {}); setFrag('bands', x.bandTop || x.bandBottom); } return render(); } }
     // the die puts another phrase in the tagline, the arrow brings the default back
     if (b.dataset.fragDie !== undefined) { setFrag('tagline', nextTagline(fragmentOpts(store.get('coding-misk-fragments', {}) || {}).tagline)); setFrag('taglineMode', 'fixed'); return render(); }
     if (b.dataset.fragRevert !== undefined) { setFrag('tagline', V_DEFAULTS.tagline); return render(); }
