@@ -419,7 +419,12 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 2. Unire `feat/61-disk-exports` in `develop` dopo la sua prova (contiene `#61`, la guardia `#54` e le novità dei frammenti).
 3. Resto di `#54`: sostituti da drum machine sorelle o dalla stessa famiglia (anche per `tom_mallet`), nota "suono mancante, uso X" nel pannello batteria.
 4. `#59` (manopole con la compilation). Poi FT2 (`#16`) con calma. Audio AAC dei video 45 ms in ritardo.
-5. Pilota v6 (idea del proprietario, 2026-10-13): sfumature complesse e animate, filtri SVG per ruggine, sporco e metallo, luce che pulsa a tempo, raggi volumetrici, particelle; texture cotte una volta per palette, animate solo sovrapposizioni leggere. Piano in `notes/visual/idee-visual.md`; la v5 resta per il confronto.
+5. Pilota v6 fatta la sera del 2026-10-13, da valutare (resta il collo). Era: sfumature complesse e animate, filtri SVG per ruggine, sporco e metallo, luce che pulsa a tempo, raggi volumetrici, particelle; texture cotte una volta per palette, animate solo sovrapposizioni leggere. Piano in `notes/visual/idee-visual.md`; la v5 resta per il confronto.
 5b. Controllo intermittente da chiarire: in `tools/check-settings.cjs` ogni tanto falliscono "backup holds the library" e "import brings the songs into another browser" (visto 3 volte, anche prima delle spunte a tema; poi passa 3 su 3). Ora il controllo stampa le chiavi del backup: alla prossima occorrenza si vede se manca la libreria o se c'è la bozza. Prova manuale suggerita: export di backup e import in una finestra in incognito.
 6. Generi nuovi (`#7`, non ancora in programma): glitch per primo (reference in `notes/generi-reference.md`, da analizzare dall'audio che scarica il proprietario), poi sovietwave e binaural beats.
 7. Più avanti: `#63` voci da scaricare e rigenerare, `#62` spagnolo parlato; segnalazione a Strudel pronta in `notes/strudel-segnalazione.md` (quando c'è un account Codeberg).
+
+## 2026-10-13 sera: mockup del pilota v6
+
+- Nuova versione del mockup locale del visual del pilota, accanto alla v5 per il confronto. Materiali cotti una volta per palette con filtri SVG (volume, rilievo, grana, luce diffusa e speculare), usura della cabina (ruggine, sporco, colature, graffi), luce animata solo sopra (controluce, bagliore degli strumenti, raggi con pulviscolo, condensa, fumo e braci, bloom), saette durante il lampo.
+- Imparato: la luce speculare alta schiarisce anche le superfici piatte e vela tutto; bassa (22°) accende solo i bordi. Gli strati cotti in bitmap ritagliate tengono i 60 fps.
