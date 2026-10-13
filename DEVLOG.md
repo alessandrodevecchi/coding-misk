@@ -463,3 +463,8 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Viso rifatto per piani su indicazioni del proprietario, labbra come rilievo morbido su una mesh più fine, teschio su misure anatomiche medie, pareti come lastra unica con strumenti incassati, parabrezza a tre vetri, fusoliera raccordata al tettuccio, aereo esterno con profili alari, mimetica e dettagli, cielo con mare di nuvole sotto l'orizzonte.
 - Corretto un errore del caricamento a tappe: uno shader usava una costante definita più avanti.
 
+## 2026-10-14 notte: pilota 3D, chiusura del blocco in autonomia
+
+- Dettagli del corpo (pieghe e cuciture della giacca, imbracatura spessa con fibbie, guanti con nocche), interni meno giocattolo (strumenti d'epoca, spie più sobrie, rivetti verniciati, lampade di cabina, usura con ruggine e graffi), parabrezza arrotondato a tre vetri, coda raccordata, teschio con i denti superiori sopra l'osso.
+- Il teschio resta da rifinire con indicazioni precise del proprietario.
+
