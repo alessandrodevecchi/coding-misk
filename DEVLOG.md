@@ -452,3 +452,9 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - La scultura a funzioni di distanza ora valuta la griglia fine solo vicino alla superficie: stessa mesh in meno della metà del tempo. La pagina mostra cielo e cabina subito e aggiunge i pezzi del pilota appena pronti.
 - Le scelte prese e quelle ancora aperte sono nelle note locali, per la revisione del proprietario.
 
+## 2026-10-14 notte: pilota 3D, seconda passata autonoma
+
+- Mockup locale arricchito: cielo con gregari e nuvole che sfrecciano, esterno del caccia, modalità di regia che taglia a tempo tra le inquadrature, tre palette riprese dalla 2D, vetro con graffi controsole, gambe e stivali, viso corretto su indicazione del proprietario.
+- Video di prova della regia con una traccia dell'app esportata a 128 BPM: i fotogrammi si generano dalla pagina a un tempo dato, poi si montano con ffmpeg.
+- Le sculture si salvano nel browser con una chiave legata al codice: dalla seconda apertura la scena è pronta in circa un secondo.
+
