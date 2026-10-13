@@ -39,10 +39,13 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
       async add(ch, start, blockOnsets) {
         for (const [k, list] of Object.entries(blockOnsets || {})) (onsets[k] = onsets[k] || []).push(...list);
         const sr = job.sampleRate || 48000, n = ch[0].length;
+        // the AAC encoder puts 2112 samples of silence first: the audio starts that much earlier, the file's edit list
+        // trims it, and sound and picture line up
+        const lead = f.a === 'aac' ? 2112 / sr : 0;
         // the audio, a second at a time
         for (let i = 0; i < n; i += sr) {
           const part = ch.map(c => c.subarray(i, Math.min(n, i + sr)));
-          const sample = new mb.AudioSample({ data: interleave16(part), format: 's16', numberOfChannels: ch.length, sampleRate: sr, timestamp: start + i / sr });
+          const sample = new mb.AudioSample({ data: interleave16(part), format: 's16', numberOfChannels: ch.length, sampleRate: sr, timestamp: start + i / sr - lead });
           await as.add(sample); sample.close();
         }
         // a mono history for the waveform: the last 4096 samples of the block before, then this block

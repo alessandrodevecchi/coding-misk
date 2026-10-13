@@ -51,12 +51,12 @@ const db = (a, b) => 20 * Math.log10((a.reduce((x, y) => x + y, 0) / a.length) /
   r = await call({ source: 'kellerlicht', from: 60, to: 75, quiet: true }); await sleep(2500);
   const ft = await save(/fragment 003\.mp4$/, 'timed.mp4');
   if (full && ft) {
-    // 5 ms envelopes; the video's AAC starts a few tens of ms late, so the best lag within ±150 ms counts
+    // 5 ms envelopes; the best lag within ±150 ms must be about zero (the AAC priming is trimmed by the edit list)
     const A = pcm(full), B = pcm(ft), eb = env(B, 1.5, 13.5, 240);
     let best = [-1, 0];
     for (let lag = -0.15; lag <= 0.15; lag += 0.005) { const c = corr(env(A, 61.5 + lag, 73.5 + lag, 240), eb); if (c > best[0]) best = [c, lag]; }
     const d = db(eb, env(A, 61.5 + best[1], 73.5 + best[1], 240));
-    check(best[0] > 0.9 && Math.abs(d) < 1.5, 'a timed fragment sounds as the same stretch of the full song', `r ${best[0].toFixed(3)} at ${(best[1] * 1000).toFixed(0)} ms, ${d.toFixed(2)} dB`);
+    check(best[0] > 0.9 && Math.abs(d) < 1.5 && Math.abs(best[1]) <= 0.011, 'a timed fragment sounds as the same stretch of the full song, in time', `r ${best[0].toFixed(3)} at ${(best[1] * 1000).toFixed(0)} ms, ${d.toFixed(2)} dB`);
     check(Math.abs(B.length / 48000 - 15) < 0.2, 'from 1:00 to 1:15 lasts 15 s', (B.length / 48000).toFixed(2));
   } else check(false, 'timed fragment and full song saved', `${!!full} ${!!ft}`);
   // the picture follows the song's time too: the frames of a fragment from 1:40 draw bars 55 and on (section 3)
