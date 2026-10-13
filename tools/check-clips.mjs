@@ -130,6 +130,11 @@ const CHECKS = {
     assert(late > 300 && late < 780, `the late stretch of the spectrum in view at ${late.toFixed(0)}`);
     assert(soulFocus('j', .1).x < soulFocus('j', .9).x, 'the timeline goes left to right');
   },
+  'the files a fragment saves'() {
+    assert(fragmentOpts({}).files.join() === 'video,audio,texts,list', 'all by default');
+    assert(fragmentOpts({ files: ['audio', 'nope'] }).files.join() === 'audio', 'unknown ones dropped');
+    assert(fragmentOpts({ files: [] }).files.length === 4, 'none chosen: all');
+  },
   'the two bands each on their own'() {
     const only = (top, bottom) => fragmentAreas(fragmentOpts({ show: 'visual', aspect: '1:1', bandTop: top, bandBottom: bottom }), 1080, 1920);
     const t1 = only(true, false), b1 = only(false, true), both = only(true, true), none = only(false, false);

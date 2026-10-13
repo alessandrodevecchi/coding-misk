@@ -56,7 +56,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('#songs [data-song-id="u-short"] [data-act="export"]')]);
   check(/\.(webm|ogg)$/.test(dl.suggestedFilename()), 'Opus export downloads a small file', dl.suggestedFilename());
 
-  // backup: export, then import into a clean browser
+  // backup: export, then import into a clean browser (the library is saved a moment after a change: wait for it)
+  for (let i = 0; i < 40 && !(await page.evaluate(() => /u-short/.test(localStorage.getItem('coding-misk-library') || ''))); i++) await sleep(250);
   await page.click('#open-settings'); await sleep(300);
   const [bk] = await Promise.all([page.waitForEvent('download'), page.click('#set-export')]);
   const file = path.join(os.tmpdir(), `coding-misk-backup-${Date.now()}.json`);

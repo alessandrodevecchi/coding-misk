@@ -32,7 +32,7 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
-import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
+import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
 import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMessages, shapeOf, clockOf, parseTime, taglineFor, nextTagline } from './video/fragments.js';
 import { textsFor, textFile } from './video/texts.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from './soul/data.js';
@@ -598,25 +598,28 @@ function blockSegments(sg) {
 }
 // after(): called once the files are saved (the radio adds its track list and recipe)
 // cut: { cut, fade } seconds, the file ends exactly at cut with a fade-out (#5)
-// extra: { songs, seed } for the texts saved next to the file (#57)
+// extra: { songs, seed } for the texts saved next to the file (#57); extra.frag: { start, end, file } a fragment's audio
+// only (its file name, no timeline or texts here: the fragments save their own), returns the file name
 async function exportFast(sg, title = sg.title, after = null, cut = null, extra = {}) {
   if (typeof OfflineAudioContext === 'undefined') return false;
   let fmt = exportFormat();
   // a long export goes straight to a file on disk (#61): the dialog comes first, while the click still counts
-  const long = ((cut && cut.cut) || sg.meta.seconds) > LONG_SECONDS;
-  const disk = long ? await askDiskFile(fileName(title, EXT[fmt] || fmt), { wav: 'audio/wav', flac: 'audio/flac', mp3: 'audio/mpeg', opus: 'audio/ogg' }[fmt] || 'audio/wav', EXT[fmt] || fmt) : null;
+  const frag = extra.frag || null;
+  const long = (frag ? frag.end - frag.start : (cut && cut.cut) || sg.meta.seconds) > LONG_SECONDS;
+  const disk = long ? await askDiskFile(fileName(frag ? frag.file : title, EXT[fmt] || fmt), { wav: 'audio/wav', flac: 'audio/flac', mp3: 'audio/mpeg', opus: 'audio/ogg' }[fmt] || 'audio/wav', EXT[fmt] || fmt) : null;
   if (disk === false) { toast(t('exportCancel')); return true; }
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
   const segments = segmentsOf(sg, codeFor);
   const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate(), writable: disk ? disk.writable : null });
-  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
     const r = await job.promise;
     fastJob.phase = 'encode';
     const { blob, ext } = await enc.finish();
-    const name = disk ? disk.name : fileName(title, ext);
+    const name = disk ? disk.name : fileName(frag ? frag.file : title, ext);
     if (blob) saveBlob(name, blob);
+    if (frag) return name;
     const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang());
     setTimeout(() => saveBlob(fileName(title, 'timeline.json'), new Blob([JSON.stringify(tl)], { type: 'application/json' })), 400);
     { const src = { sg, title, songs: extra.songs || null, seed: extra.seed || sg.id || title, cut }; showTexts(saveTexts(textsInfo(src, 'audio'), title), () => textsInfo(src, 'audio')); }
@@ -624,7 +627,7 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
     toast(t('exportDone', { name }));
     return true;
   } catch (e) {
-    if (e && e.cancelled) { toast(t('exportCancel')); return true; }
+    if (e && e.cancelled) { toast(t('exportCancel')); return frag ? 'cancelled' : true; }
     console.warn('[fast export]', e);
     return false;
   } finally { fastJob = null; }
@@ -853,7 +856,7 @@ async function makeFragments(opts = {}) {
   if (fastJob || rec || capture) return { error: 'busy' };
   const src = fragmentSource(opts.source); if (src.error) return src;
   // settings, then what the call says: format, show, aspect, bands (true/false or { tagline, taglineMode, fullLine, vTitle }), rotate, codeMode, label, glitch, or an old layout name
-  const pick = ['format', 'show', 'aspect', 'rotate', 'bleed', 'codeMode', 'label', 'glitch', 'layout', 'look', 'soulView', 'tagline', 'taglineMode'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
+  const pick = ['format', 'show', 'aspect', 'rotate', 'bleed', 'files', 'codeMode', 'label', 'glitch', 'layout', 'look', 'soulView', 'tagline', 'taglineMode'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
   // bands: true/false for both, or { bands, bandTop, bandBottom, tagline, … }; a call's choice wins over the settings
   const bandObj = typeof opts.bands === 'object' && opts.bands ? opts.bands : opts.bands !== undefined ? { bands: !!opts.bands } : {};
   const bands = 'bands' in bandObj ? { bandTop: bandObj.bands, bandBottom: bandObj.bands, ...bandObj } : bandObj;
@@ -873,20 +876,26 @@ async function makeFragments(opts = {}) {
     const tagline = o.bands ? (o.taglineMode === 'random' ? taglineFor(code) : o.tagline) : '';
     if (opts.onProgress) opts.onProgress(i, picks.length);
     const file = `${src.title} · fragment #${String(n).padStart(3, '0')}`;
-    const name = await exportVideoFast(src.sg, src.title, { songs: src.songs, frag: { start: p.start, end: p.end, label: o.label ? label : '', code, tagline, msgs: glitchMessages(code), o, file } });
-    if (name === 'cancelled') break;
-    if (!name) return { error: 'render', files, items };
+    // the files chosen (#57): the video, the audio alone (the export format), then texts and the list below
+    const want = k => o.files.includes(k), saved = [];
+    let stop = false;
+    if (want('video')) { const name = await exportVideoFast(src.sg, src.title, { songs: src.songs, frag: { start: p.start, end: p.end, label: o.label ? label : '', code, tagline, msgs: glitchMessages(code), o, file } }); if (name === 'cancelled') stop = true; else if (!name) return { error: 'render', files, items }; else saved.push(name); }
+    if (!stop && want('audio')) { const name = await exportFast(src.sg, src.title, null, null, { frag: { start: p.start, end: p.end, file } }); if (name === 'cancelled') stop = true; else if (!name) return { error: 'render', files, items }; else saved.push(name); }
+    if (stop) break;
+    const name = saved[0] || file;
     store.set(FRAG_N, n + 1);
     // a session's fragment is named after the song playing at its start
     const info = textsInfo(src, 'fragment', { fragment: { label, start: p.start, end: p.end }, tagline, fullLine: o.fullLine, seed: `${src.seed}/${code}` });
     const at = info.songs.filter(x => x.start <= p.start + 1e-6).pop();
-    const fInfo = { ...info, title: at ? at.title : info.title }, tx = saveTexts(fInfo, file);
+    const fInfo = { ...info, title: at ? at.title : info.title }, tx = want('texts') ? saveTexts(fInfo, file) : textsFor(fInfo);
     last = { tx, info: fInfo };
-    files.push(name); items.push({ file: name, label, start: +p.start.toFixed(3), end: +p.end.toFixed(3), from: clockOf(p.start), to: clockOf(p.end), title: tx.title });
+    files.push(...saved); items.push({ file: name, files: saved, label, start: +p.start.toFixed(3), end: +p.end.toFixed(3), from: clockOf(p.start), to: clockOf(p.end), title: tx.title });
   }
   if (items.length) {
-    const list = { source: typeof opts.source === 'object' ? 'recipe' : opts.source, title: src.title, seed: src.seed, format: o.format, show: o.show, aspect: o.aspect, rotate: o.rotate, items };
-    setTimeout(() => saveBlob(fileName(`${src.title} · fragments`, 'json'), new Blob([JSON.stringify(list, null, 2) + '\n'], { type: 'application/json' })), 900);
+    if (o.files.includes('list')) {
+      const list = { source: typeof opts.source === 'object' ? 'recipe' : opts.source, title: src.title, seed: src.seed, format: o.format, show: o.show, aspect: o.aspect, rotate: o.rotate, items };
+      setTimeout(() => saveBlob(fileName(`${src.title} · fragments`, 'json'), new Blob([JSON.stringify(list, null, 2) + '\n'], { type: 'application/json' })), 900);
+    }
     toast(t('fragSaved', { n: items.length }));
     if (last && !opts.quiet && !opts.onTexts) showTexts(last.tx, () => last.info);
     if (last && opts.onTexts) opts.onTexts(last);
@@ -929,6 +938,8 @@ function showTexts(tx, info) {
 // the fragments menu (#57): opened by any [data-frag="<song or session id>"] (or a recipe object); random (count, length,
 // seed) or from–to; format, what to show, the visual's proportions, turned by 90°; a live preview of the composition
 let fragMenu = null;
+// the files a fragment saves, in a word or a list
+const filesLabel = list => (list.length === F_FILES.length ? t('fragFilesAll') : list.map(k => t(`fragFile:${k}`)).join(' · '));
 function openFragMenu(source, anchor) {
   if (fragMenu) { const same = fragMenu.source === source; closeFragMenu(); if (same) return; }
   const o = fragOpts(), el = document.createElement('div');
@@ -958,6 +969,8 @@ function openFragMenu(source, anchor) {
       <div class="rx-opt">${chk('fm-title', o.vTitle, t('setFragTitle'))}${chk('fm-label', o.label, t('setFragLabel'))}${chk('fm-glitch', o.glitch, t('setFragGlitch'))}</div>
       <label class="rx-opt"><span>${esc(t('fragSeed'))}</span><input id="fm-seed" placeholder="${esc(t('fragSeedHint'))}" data-no-knob size="18"></label>
     </details>
+    <details class="fm-files"><summary>${esc(t('fragFiles'))}: <span data-fm-files-sum>${esc(filesLabel(o.files))}</span></summary>
+      <div class="fm-files-list">${F_FILES.map(k => `<label class="rx-opt"><input type="checkbox" data-fm-file="${k}"${o.files.includes(k) ? ' checked' : ''}> <span>${esc(t(`fragFile:${k}`))}</span></label>`).join('')}</div></details>
     <p class="hint muted small" data-fm-hint>${esc(t('fragHint', { n: String(nextFragment()).padStart(3, '0') }))}</p>
     <div class="tp-actions"><button class="btn primary" data-fm="go">${esc(t('fragGo'))}</button><span class="muted small" data-fm-status></span></div>
     </div><figure class="fm-prev"><canvas id="fm-preview" width="180" height="320" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted small">${esc(t('fragPreviewHint'))}</figcaption></figure>
@@ -965,11 +978,11 @@ function openFragMenu(source, anchor) {
   (anchor.closest('.songbar, .pl-row, .set-card') || anchor).insertAdjacentElement('afterend', el);
   // what the form says now, saved as the settings so the preview, Settings and the next fragments agree
   const v = id => el.querySelector(id), form = () => ({ format: v('#fm-format').value, show: v('#fm-show').value, aspect: v('#fm-aspect').value, look: v('#fm-look').value, soulView: v('#fm-soulview').value,
-    bandTop: v('#fm-band-top').checked, bandBottom: v('#fm-band-bottom').checked, bands: v('#fm-band-top').checked || v('#fm-band-bottom').checked, bleed: v('#fm-bleed').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, taglineMode: 'fixed', fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
+    files: [...el.querySelectorAll('[data-fm-file]:checked')].map(x => x.dataset.fmFile), bandTop: v('#fm-band-top').checked, bandBottom: v('#fm-band-bottom').checked, bands: v('#fm-band-top').checked || v('#fm-band-bottom').checked, bleed: v('#fm-bleed').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, taglineMode: 'fixed', fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
   const remember = () => { const f = form(); for (const [k, x] of Object.entries(f)) setFragOpt(k, x); soul.force(previewView()); };
   // the preview shows the chosen soul view; the visual follows the stage (pick it there, or the arrows)
   const previewView = () => { const c = v('#fm-soulview').value; return c === 'random' ? SOUL_VIEWS[0] : SOUL_VIEWS.includes(c) ? c : null; };
-  el.addEventListener('change', remember);
+  el.addEventListener('change', e => { remember(); if (e.target.dataset.fmFile) v('[data-fm-files-sum]').textContent = filesLabel(fragOpts().files); });
   el.addEventListener('input', e => { if (e.target.matches('#fm-tagline, #fm-full')) remember(); if (e.target.matches('#fm-tagline')) v('[data-fm-revert]').hidden = e.target.value === V_DEFAULTS.tagline; });
   v('#fm-look').addEventListener('change', () => { const c = v('#fm-look').value; if (PICK_LOOKS.some(l => l[0] === c)) setLook(c); });
   video.previewVertical(v('#fm-preview'), () => { const x = fragOpts(); return { ...x, size: fragmentSize(x), next: nextFragment() }; }, c => (song && song.meta ? song.meta.sectionAt(c) : -1));

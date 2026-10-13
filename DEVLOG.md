@@ -399,6 +399,8 @@
 
 - 2026-10-13: frammenti, le due bande con un'opzione ciascuna (`feat/57-band-flags`): banda sopra (logo, etichetta) e banda sotto (slogan e righe), anche una sola; `bands` resta per accenderle o spegnerle insieme (console e chiamate vecchie).
 
+- 2026-10-13: frammenti, scelta dei file (`feat/57-fragment-files`, idea del proprietario): menu "File" con Video, Audio, Testi ed Elenco, tutti di default; l'audio esce nel formato di export delle impostazioni con le stesse dissolvenze, e con il solo audio il video non viene generato (caso d'uso: un tratto solo audio di un brano salvato, con "da-a"). Reso stabile il controllo del backup in `check-settings`.
+
 ## Prossimo passo
 
 Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima del brano `#46` fasi 1 e 2 con display nascosto, casuali `#50`, compilation `#49`, più le feature precedenti). Tutti i controlli passano.

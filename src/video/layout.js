@@ -55,7 +55,8 @@ export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code'];
 // whole: the stage's own proportions (o.stageRatio, the app's stage), so the whole visual shows
 export const F_ASPECTS = ['whole', 'fill', '16:9', '4:3', '1:1', '4:5', '9:16'];
 export const F_CODE = ['focus', 'scroll', 'follow'];
-export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', look: 'song', soulView: 'song', tagline: 'music written as code', taglineMode: 'fixed', bleed: true, fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
+export const F_FILES = ['video', 'audio', 'texts', 'list'];
+export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', look: 'song', soulView: 'song', tagline: 'music written as code', taglineMode: 'fixed', bleed: true, files: ['video', 'audio', 'texts', 'list'], fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
 // the layouts of the first version, kept for saved settings and agents
 const OLD = { 'v-code': { show: 'visual-code', aspect: 'fill', bands: false }, 'v-soul': { show: 'visual-soul', aspect: 'fill', bands: false }, 'v-bands': { show: 'visual', aspect: '1:1', bands: true }, 'v-soul-bands': { show: 'soul', aspect: 'fill', bands: true } };
 export function fragmentOpts(o = {}) {
@@ -65,6 +66,9 @@ export function fragmentOpts(o = {}) {
   if (!F_ASPECTS.includes(r.aspect)) r.aspect = V_DEFAULTS.aspect;
   if (!F_CODE.includes(r.codeMode)) r.codeMode = V_DEFAULTS.codeMode;
   if (r.taglineMode !== 'random') r.taglineMode = 'fixed';
+  // what a fragment saves: video, audio (the export format of the settings), texts, the list; none chosen: all
+  r.files = Array.isArray(r.files) ? F_FILES.filter(k => r.files.includes(k)) : V_DEFAULTS.files.slice();
+  if (!r.files.length) r.files = V_DEFAULTS.files.slice();
   // the two bands each on their own (#57): top (logo, label), bottom (tagline and lines); bands: both at once
   const both = o.bands !== undefined ? !!o.bands : V_DEFAULTS.bands;
   r.bandTop = o.bandTop !== undefined ? !!o.bandTop : both; r.bandBottom = o.bandBottom !== undefined ? !!o.bandBottom : both;

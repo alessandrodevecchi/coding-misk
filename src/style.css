@@ -967,6 +967,9 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
 .ctrl .row .knob-lock { margin-left: 5px; background: none; border: 1px solid var(--a1); color: var(--a1); border-radius: 4px; padding: 1px 4px; cursor: pointer; line-height: 1; }
 .ctrl .row .knob-lock .lock-ico { width: 8px; height: 10px; display: block; }
 .ctrl .row .knob-lock { padding: 1px 3px; }
+/* the files a fragment saves (#57) */
+.fm-files summary { cursor: pointer; }
+.fm-files-list { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 4px 0 0 12px; }
 /* the texts' upload fields (#57) */
 .tx-fields { display: grid; gap: 6px; margin-top: 8px; }
 .tx-field span { display: flex; gap: 6px; align-items: center; }

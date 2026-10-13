@@ -67,6 +67,14 @@ const db = (a, b) => 20 * Math.log10((a.reduce((x, y) => x + y, 0) / a.length) /
     return [out[0], out[out.length - 1]];
   });
   check(seen[0] && Math.abs(seen[0][0] - 55) < 0.1 && seen[0][1] === 2, 'the picture of a fragment follows the song\'s time and section', JSON.stringify(seen));
+  // the files a fragment saves: audio only gives one audio file of the right length, nothing else
+  await sleep(1500); downloads.length = 0;
+  r = await call({ source: 'kellerlicht', from: 12, to: 20, quiet: true, files: ['audio'] }); await sleep(2500);
+  const names = downloads.map(d => d.suggestedFilename()), wav = await save(/\.wav$/, 'audio-only.wav');
+  check(r.items && r.items.length === 1 && names.length === 1 && wav && Math.abs(pcm(wav).length / 48000 - 8) < 0.15, 'a fragment can be audio only (one file, 8 s)', `${names.join(', ')} ${wav ? (pcm(wav).length / 48000).toFixed(2) + ' s' : ''}`);
+  downloads.length = 0;
+  r = await call({ source: 'kellerlicht', from: 30, to: 33, quiet: true, files: ['video', 'texts'] }); await sleep(2500);
+  check(downloads.some(d => /\.mp4$/.test(d.suggestedFilename())) && downloads.some(d => /fragment \d+\.txt$/.test(d.suggestedFilename())) && !downloads.some(d => /\.json$/.test(d.suggestedFilename())), 'video and texts without the list', downloads.map(d => d.suggestedFilename()).join(', '));
   const bad = await call({ source: 'kellerlicht', from: 60, to: 9999 });
   check(bad.error === 'range', 'past the end: nothing is cut', JSON.stringify(bad));
 
