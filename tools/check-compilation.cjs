@@ -1,5 +1,6 @@
 // Browser checks for the radio compilation (#49): the button and its lamps, the setup (preset, genres, ranges, saved
-// presets), songs drawn within the setup, the now playing tag, Keep for a random artist, Replay gives the same songs.
+// presets), songs drawn within the setup, the now playing tag, Keep for a random artist, Replay gives the same songs,
+// knobs that follow the song on air and hold a value moved by hand (#59).
 // Usage: PLAYWRIGHT_CORE=... node tools/check-compilation.cjs [shots-dir]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -58,6 +59,17 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const recipe = await page.evaluate(() => globalThis.codingMiskRadio.state.recipe);
   check(!!recipe.options.compilation && recipe.options.compilation.every === 'song', 'the session recipe carries the compilation');
   const entries = await page.evaluate(() => globalThis.codingMiskRadio.history.slice(0, 4).map(h => (h.entry && h.entry.styles) || []));
+  // #59: the knobs show the song on air, a knob moved by hand is held for the next songs, the lock gives it back
+  const knob = () => page.evaluate(() => { const s = globalThis.codingMiskRadio.state, it = s.stream[s.onAir]; return { shown: +document.querySelector('#radio-energy').closest('.ctrl').querySelector('output').textContent, song: it.knobs ? it.knobs.energy : null, auto: !!document.querySelector('.comp-knobs-hint') && !document.querySelector('[data-unlock]') }; });
+  const k1 = await knob();
+  check(k1.auto && k1.song !== null && Math.abs(k1.shown - k1.song) < 0.011, 'during a compilation the knob shows the song on air (auto)', JSON.stringify(k1));
+  await page.evaluate(() => { const el = document.querySelector('#radio-energy'); el.value = '0.9'; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }); await sleep(200);
+  check((await opts()).compLocks.energy === 0.9 && await page.isVisible('[data-unlock="energy"]'), 'a knob moved by hand is held, with a lock');
+  for (let i = 0; i < 2; i++) { await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(1500); }
+  const held = await page.evaluate(() => { const s = globalThis.codingMiskRadio.state; return s.stream.slice(-1)[0].knobs.energy; });
+  check(Math.abs(held - 0.9) < 1e-9 && (await opts()).compilation === 'song', 'the next songs play the held value and the compilation stays on', held);
+  await page.click('[data-unlock="energy"]'); await sleep(200);
+  check(!('energy' in (await opts()).compLocks) && !(await page.isVisible('[data-unlock="energy"]')), 'the lock gives the knob back to the compilation');
   // replay: the same songs again
   await page.click('#radio-replay'); await sleep(2500);
   const first = await page.evaluate(() => globalThis.codingMiskRadio.state.stream[0].title);

@@ -71,10 +71,26 @@ export function segmentsUpTo(seed, n, comp, recipes, pool = []) {
 }
 export const segmentAt = (seed, n, comp, recipes, pool) => segmentsUpTo(seed, n, comp, recipes, pool).find(s => n >= s.start && n < s.start + s.length);
 
-// the director options of song n in a compilation (comp: { every, setup, pool }); how: transition, harmony, sounds
+// an artist inside a setup (#59): each value range intersected with the setup's (an empty intersection becomes the
+// nearest bound), a knob held by hand fixed at its value
+export function boundArtist(artist, ranges = {}, locks = {}) {
+  const out = { ...artist };
+  for (const k of KNOBS) {
+    if (typeof locks[k] === 'number') { out[k] = [locks[k], locks[k]]; continue; }
+    const a = Array.isArray(artist[k]) ? artist[k] : null, r = ranges[k];
+    if (!a || !r) continue;
+    const lo = Math.max(a[0], r[0]), hi = Math.min(a[1], r[1]);
+    out[k] = lo <= hi ? [lo, hi] : a[1] < r[0] ? [r[0], r[0]] : [r[1], r[1]];
+  }
+  return out;
+}
+
+// the director options of song n in a compilation (comp: { every, setup, pool, locks }); how: transition, harmony, sounds.
+// locks: knobs held by hand (#59), used whatever the compilation draws
 export function compilationOptions(seed, n, comp, recipes, how = {}) {
-  const seg = segmentAt(seed, n, comp, recipes, comp.pool || []);
-  if (!seg || seg.kind === 'none') return { styles: [recipes[0].id], ...how };
-  if (seg.artist) return { artist: seg.artist, ...how };
-  return { styles: seg.styles, ...seg.knobs, ...how };
+  const seg = segmentAt(seed, n, comp, recipes, comp.pool || []), locks = comp.locks || {};
+  const held = Object.fromEntries(KNOBS.filter(k => typeof locks[k] === 'number').map(k => [k, locks[k]]));
+  if (!seg || seg.kind === 'none') return { styles: [recipes[0].id], ...held, ...how };
+  if (seg.artist) return { artist: boundArtist(seg.artist, { ...ranges(), ...((comp.setup || {}).ranges || {}) }, locks), ...how };
+  return { styles: seg.styles, ...seg.knobs, ...held, ...how };
 }

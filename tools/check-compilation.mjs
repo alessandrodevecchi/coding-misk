@@ -2,7 +2,7 @@
 // random artists valid, songs play. No browser.
 //   npm run check:compilation      exit 1 when any check fails
 import fs from 'node:fs';
-import { segmentsUpTo, compilationOptions, PRESETS, GENRE_RING } from '../src/endless/compilation.js';
+import { segmentsUpTo, compilationOptions, boundArtist, PRESETS, GENRE_RING } from '../src/endless/compilation.js';
 import { validateArtist } from '../src/endless/artist.js';
 import { createSession } from '../src/endless/director.js';
 import { withDefaults } from '../src/endless/recipe.js';
@@ -48,6 +48,21 @@ const CHECKS = {
     assert(segs.some(s => s.kind === 'random') && segs.some(s => s.kind === 'artist') && segs.some(s => s.kind === 'styles'), 'all three kinds');
     const ses = createSession(recipes, 'r');
     for (let n = 0; n < 6; n++) { const g = ses.next(compilationOptions('r', n, comp, recipes)); assert(g.song && g.song.sections.length, `song ${n}`); }
+  },
+  'held knobs and the setup ranges bind every song (#59)'() {
+    const a = { id: 'x', chaos: [0.1, 0.5], energy: [0.2, 0.9], complexity: [0.4, 0.6], talk: [0.6, 0.9] };
+    const b = boundArtist(a, { chaos: [0.3, 1], energy: [0, 1], complexity: [0, 1], talk: [0, 0.3] }, { energy: 0.75 });
+    assert(b.chaos[0] === 0.3 && b.chaos[1] === 0.5, `intersection ${b.chaos}`);
+    assert(b.talk[0] === 0.3 && b.talk[1] === 0.3, `empty intersection to the nearest bound ${b.talk}`);
+    assert(b.energy[0] === 0.75 && b.energy[1] === 0.75, 'held knob fixed');
+    const comp = { every: 'song', setup: { ...PRESETS.everything, ranges: { chaos: [0, 1], energy: [0, 1], complexity: [0, 1], talk: [0, 0.3] } }, pool, locks: { energy: 0.9 } };
+    for (let n = 0; n < 30; n++) {
+      const o = compilationOptions('lk', n, comp, recipes);
+      if (o.artist) { assert(o.artist.energy[0] === 0.9 && o.artist.talk[1] <= 0.3, `artist bound ${n}`); }
+      else assert(o.energy === 0.9 && o.talk <= 0.3, `styles held ${n}`);
+    }
+    const ses = createSession(recipes, 'lk');
+    for (let n = 0; n < 4; n++) { const g = ses.next(compilationOptions('lk', n, comp, recipes)); assert(Math.abs(g.opts.energy - 0.9) < 1e-9 && g.opts.talk <= 0.3 + 1e-9, `song ${n} plays energy ${g.opts.energy}, talk ${g.opts.talk}`); }
   },
 };
 let failed = 0;

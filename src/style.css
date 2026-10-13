@@ -962,6 +962,11 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
 .dice-range { display: inline-flex; gap: 4px; }
 .dice-sounds { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .dice-btn .ico-dice { margin-right: 2px; }
+/* knobs during a compilation (#59): the song's value marked auto, a held knob with a lock that gives it back */
+.ctrl .row .comp-auto { margin-left: 5px; font-size: 8px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; line-height: 1.5; }
+.ctrl .row .knob-lock { margin-left: 5px; background: none; border: 1px solid var(--a1); color: var(--a1); border-radius: 4px; padding: 1px 4px; cursor: pointer; line-height: 1; }
+.ctrl .row .knob-lock .lock-ico { width: 8px; height: 10px; display: block; }
+.ctrl .row .knob-lock { padding: 1px 3px; }
 /* the texts' upload fields (#57) */
 .tx-fields { display: grid; gap: 6px; margin-top: 8px; }
 .tx-field span { display: flex; gap: 6px; align-items: center; }
