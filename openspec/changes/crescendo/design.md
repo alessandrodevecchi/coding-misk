@@ -102,7 +102,7 @@ The same `crescendoPath(from, to)` will run from the current state of the song o
 - **[Many steps in export]** → Fast export renders one segment per step. Check its speed on a long Crescendo build. If needed, join steps that fall in the same render block.
 - **[Determinism vs variety]** → The seed comes from the song id, so the same song always builds alike. Variety comes from different songs and, later, from reseeding.
 
-## Open Questions
+## Resolved Questions
 
-- Should hand-written `build` steps of a song be used as a hint for Crescendo (where tracks enter), instead of being ignored? Proposed: ignored in phase 1.
-- Should a muted track stay visible in the code as `_$:` (as live coders do)? Proposed: later, as its own change, because it touches the compiler.
+- Hand-written `build` steps of a song are ignored by Crescendo in phase 1 (owner, 2026-10-15).
+- Muted tracks shown in the code as `_$:` come later, as their own change, because they touch the compiler (owner, 2026-10-15).
