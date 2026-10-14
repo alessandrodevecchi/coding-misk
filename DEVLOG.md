@@ -468,3 +468,8 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Dettagli del corpo (pieghe e cuciture della giacca, imbracatura spessa con fibbie, guanti con nocche), interni meno giocattolo (strumenti d'epoca, spie più sobrie, rivetti verniciati, lampade di cabina, usura con ruggine e graffi), parabrezza arrotondato a tre vetri, coda raccordata, teschio con i denti superiori sopra l'osso.
 - Il teschio resta da rifinire con indicazioni precise del proprietario.
 
+## 2026-10-14: pilota 3D, passata finale ed esperimento chiuso
+
+- Ultima passata di correzioni chieste dal proprietario: scritte in italiano, cavi tra scatole di derivazione, collo su un perno separato, orizzonte sfumato, combattimento lontano tra due nemici, corpo più definito, interni metallici, occhiali sugli occhi, luci a ritmo visibili.
+- Il proprietario non userà questa scena: serve un altro concept per il 3D. Le lezioni utili sono nelle note locali.
+
