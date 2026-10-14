@@ -21,7 +21,7 @@
 
 ## 3. Compose UI and settings
 
-- [ ] 3.1 Live build control: off, in blocks, crescendo (`coding-misk-live`, new `coding-misk-live-grain`)
+- [ ] 3.1 Live build control: off, in blocks, crescendo (`coding-misk-live`, new `coding-misk-live-style`)
 - [ ] 3.2 "Fully narrated" toggle shown with crescendo (`coding-misk-live-narrated`)
 - [ ] 3.3 Typing animation: type the edit only on the line of the playing section, update the other section lines at once
 - [ ] 3.4 Play, seek, timeline hatching and step marks, hand takeover and resume with a Crescendo build
@@ -38,5 +38,5 @@
 ## 5. Docs
 
 - [ ] 5.1 Guide card for Crescendo in English and Italian (`src/guide.js`)
-- [ ] 5.2 `docs/COMPOSING.md` (live build grains) and `docs/SONG-FORMAT.md` (generated pattern names)
+- [ ] 5.2 `docs/COMPOSING.md` (live build build styles) and `docs/SONG-FORMAT.md` (generated pattern names)
 - [ ] 5.3 `docs/ARCHITECTURE.md` (path generator) and DEVLOG entry

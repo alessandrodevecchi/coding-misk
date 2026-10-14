@@ -2,14 +2,14 @@
 
 The live build (`src/song/build.js`) plays a song from silence by applying timed steps (`add`, `remove`, `set`, `pattern`, `rack`, `unrack`) to the song model. `stateAt(song, bar)` gives the song at any bar, the compiler turns it into code, and `typingFrames(from, to)` animates the edit in the code panel during the bar before each step. Songs without steps get a derived build (`deriveBuild`): a track comes in where its clips start and leaves where they stop, so the steps are whole tracks, one phrase or so apart.
 
-Live coding videos build in a different grain: one or a few lines every few bars, from one sound to a rich song with only 4 to 7 tracks. The owner's notes (local) and the analysis of two such videos are the reference: steps every 4 to 6 bars at 140 BPM, a track born minimal and grown by chaining functions, patterns that get longer, effects one at a time, breaks made by muting a track and bringing it back, a short spoken comment on almost every step.
+Live coding videos build in a different build style: one or a few lines every few bars, from one sound to a rich song with only 4 to 7 tracks. The owner's notes (local) and the analysis of two such videos are the reference: steps every 4 to 6 bars at 140 BPM, a track born minimal and grown by chaining functions, patterns that get longer, effects one at a time, breaks made by muting a track and bringing it back, a short spoken comment on almost every step.
 
 Patterns in our songs are of two kinds: drums have step rows (`"bd": "x...x...x...x..."`), melodic tracks name a preset (`{ "preset": "rolling" }`). Settings and rack devices compile to chained functions.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- A Crescendo grain of the live build in Compose, built on the existing step actions, so nothing downstream changes.
+- A Crescendo build style of the live build in Compose, built on the existing step actions, so nothing downstream changes.
 - One path generator, from a start state to a destination, usable by the radio in phase 2.
 - Deterministic builds (song and seed), varied length and endings, a fully narrated option.
 
@@ -87,7 +87,7 @@ When the written song has a section with fewer tracks (a break), the clips alrea
 - **Path generator:** `src/song/crescendo.js`, pure, checked in Node like `build.js`.
 - **Compose:** the "Live build" switch becomes a small control: off, in blocks, crescendo.
 - **Fully narrated:** a toggle shown when crescendo is chosen.
-- **Settings keys:** `coding-misk-live` keeps its meaning. New key `coding-misk-live-grain` (`blocks`, `crescendo`), and `coding-misk-live-narrated`.
+- **Settings keys:** `coding-misk-live` keeps its meaning. New key `coding-misk-live-style` (`blocks`, `crescendo`), and `coding-misk-live-narrated`.
 - **Seed:** derived from the song id, so a song always builds the same way. A "new build" action may reseed later; not in this change.
 
 ### D10. Radio (phase 2, for reference only)

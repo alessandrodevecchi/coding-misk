@@ -1,14 +1,14 @@
 ## ADDED Requirements
 
-### Requirement: Crescendo grain
-The live build in Compose SHALL offer two grains: "in blocks" (the current derived build, the default) and "crescendo". With the crescendo grain, a song SHALL build itself from a single sound to the song as written, through small steps, while it plays. The grain SHALL be remembered between sessions. Songs that carry their own `build` steps SHALL keep them with the "in blocks" grain; with the crescendo grain, Crescendo SHALL build toward the song as written and SHALL ignore the song's own steps.
+### Requirement: Crescendo build style
+The live build in Compose SHALL offer two build styles: "in blocks" (the current derived build, the default) and "crescendo". With the crescendo build style, a song SHALL build itself from a single sound to the song as written, through small steps, while it plays. The build style SHALL be remembered between sessions. Songs that carry their own `build` steps SHALL keep them with the "in blocks" build style; with the crescendo build style, Crescendo SHALL build toward the song as written and SHALL ignore the song's own steps.
 
 #### Scenario: Choose crescendo
 - **WHEN** the user turns on the live build in Compose, chooses "crescendo" and plays a song
 - **THEN** the song starts with one sound and grows in small steps until it sounds as written
 
 #### Scenario: Default stays the same
-- **WHEN** the user turns on the live build without choosing a grain
+- **WHEN** the user turns on the live build without choosing a build style
 - **THEN** the build is the current one, in blocks
 
 ### Requirement: Path to a destination
