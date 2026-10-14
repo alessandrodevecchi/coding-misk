@@ -473,3 +473,10 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Ultima passata di correzioni chieste dal proprietario: scritte in italiano, cavi tra scatole di derivazione, collo su un perno separato, orizzonte sfumato, combattimento lontano tra due nemici, corpo più definito, interni metallici, occhiali sugli occhi, luci a ritmo visibili.
 - Il proprietario non userà questa scena: serve un altro concept per il 3D. Le lezioni utili sono nelle note locali.
 
+## 2026-10-15: generi, Crescendo e preset con timeline (discussione e spec)
+
+- Glitch: analizzati il brano e l'album di riferimento forniti dal proprietario (note locali); i capitoli dell'album erano giusti. Due stili proposti, glitch hop e glitch cinematico; la change arriva dopo gli spartiti.
+- Crescendo (`#64`): nuova grana del live build, il brano cresce da un suono solo a piccoli passi di codice. Spec OpenSpec `crescendo` (fase 1, Compose) scritta e da rivedere: percorso verso una destinazione costruito all'indietro dal brano finito, pattern che crescono, finali vari, narrazione densa opzionale, solo funzioni e suoni dell'app. La radio è la fase 2.
+- Preset con la timeline per diretta e video: sei mockup locali, futuro nascosto per i brani live build. Issue in arrivo.
+- Regola nuova in `AGENTS.md`: lavoro definito nelle issue, idee abbozzate nel backlog locale.
+
