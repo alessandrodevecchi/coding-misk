@@ -25,7 +25,8 @@
 - [ ] 3.2 "Fully narrated" toggle shown with crescendo (`coding-misk-live-narrated`)
 - [ ] 3.3 Typing animation: type the edit only on the line of the playing section, update the other section lines at once
 - [ ] 3.4 Play, seek, timeline hatching and step marks, hand takeover and resume with a Crescendo build
-- [ ] 3.5 Audio export and fast video export of a Crescendo build (one segment per step; check speed on a long build)
+- [ ] 3.5 Audio export and fast video export of a Crescendo build (one segment per step; measure speed on a build three times the written length; join steps in the same render block if slow); typing rule of the playing section also in the video feed
+- [ ] 3.6 Fragments of a Crescendo song start on a step; random fragments prefer stretches with steps over the sparse start
 
 ## 4. Checks
 

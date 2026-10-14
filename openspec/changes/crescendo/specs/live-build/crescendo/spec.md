@@ -121,3 +121,14 @@ When a step changes a track whose code is written once per section, the typing a
 #### Scenario: One line typed
 - **WHEN** a step adds a device to a track that has lines for three sections
 - **THEN** the edit is typed on the line of the playing section only, and the other two lines change at once
+
+### Requirement: Export and fragments
+Audio export, session video and fast video SHALL work for a Crescendo build, with the typing rule of the playing section applied in videos too. A fragment of a Crescendo song SHALL start on a step, and a random fragment SHALL prefer stretches where steps happen over the sparse start.
+
+#### Scenario: Fragment starts on a step
+- **WHEN** a random fragment is cut from a Crescendo song
+- **THEN** it starts on a step bar and does not fall in the first bars where only one sound plays
+
+#### Scenario: Long build exports
+- **WHEN** a Crescendo build three times the written length is exported fast
+- **THEN** the export completes and sounds like playback
