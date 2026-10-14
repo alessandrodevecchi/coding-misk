@@ -51,11 +51,15 @@ Crescendo SHALL use these kinds of step, all expressed with the existing actions
 - **THEN** some tracks are muted for a few bars and brought back by later steps
 
 ### Requirement: Growing patterns
-For a pattern given by step rows (drums), Crescendo SHALL derive simpler variants by removing hits, keeping the strongest positions (downbeats and backbeats) last. For a pattern given by a preset (melodic tracks), Crescendo SHALL grow it with the existing `degrade` device, from a high amount down to none, since preset patterns have no rows to thin. Derived variants SHALL be added to the track's `patterns` under generated names, and the written patterns SHALL NOT change.
+Crescendo SHALL thin patterns with rows, notes or steps into simpler variants, keeping strong positions last. It SHALL grow preset-only patterns with the `degrade` device. Variants SHALL be added under generated names, leaving the written patterns unchanged.
 
 #### Scenario: Drum rows thin out
 - **WHEN** a written drums pattern has a kick on every beat and hats on every 16th
 - **THEN** its simplest variant keeps the kick on the first beat, and the variants in between add hits until the written rows
+
+#### Scenario: Written notes thin out
+- **WHEN** a bass track with written `notes` enters in a Crescendo build
+- **THEN** it plays fewer of its notes first, and later steps add them back up to the written line
 
 #### Scenario: Preset patterns grow with degrade
 - **WHEN** a bass track with a preset pattern enters in a Crescendo build
@@ -103,3 +107,17 @@ Taking over by hand and resuming SHALL work for a Crescendo build as for any liv
 #### Scenario: Resume a Crescendo build
 - **WHEN** the user takes over by hand during a Crescendo build and then resumes
 - **THEN** the build types back to its own state at that bar and goes on with its steps
+
+### Requirement: Harmony starts simple
+During the growth, Crescendo SHALL hold one chord (the first chord of the song's progression) and SHALL bring in the written progression with one step. Tempo, meter and swing SHALL stay as written in phase 1.
+
+#### Scenario: Progression comes in
+- **WHEN** a Crescendo build starts
+- **THEN** the first tracks play over one held chord, and a later step brings in the song's progression
+
+### Requirement: Typing shows the section that plays
+When a step changes a track whose code is written once per section, the typing animation SHALL show the edit on the line of the section that plays at the step's bar. The lines of other sections SHALL be updated without animation.
+
+#### Scenario: One line typed
+- **WHEN** a step adds a device to a track that has lines for three sections
+- **THEN** the edit is typed on the line of the playing section only, and the other two lines change at once

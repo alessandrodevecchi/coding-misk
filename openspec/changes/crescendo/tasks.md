@@ -9,7 +9,9 @@
 - [ ] 1.7 Breaks: one or two seeded break moves during the growth (mute drums, then bring them back), each inside a phrase
 - [ ] 1.8 Endings: strip back, blocks, or short end, drawn per song and seeded
 - [ ] 1.9 Module tracks (when the type exists): only enter, leave or mute as a whole
-- [ ] 1.10 `crescendoSong(song, { seed, narrated })`: returns the song with generated patterns, extended sections and `build`; seed from the song id
+- [ ] 1.10 Held chord during the growth (first chord of the progression in the growth sections), progression brought in by one step
+- [ ] 1.11 Thin written `notes`/`steps` of bass, arp and hook like drum rows
+- [ ] 1.12 `crescendoSong(song, { seed, narrated })`: returns the song with generated patterns, extended sections and `build`; seed from the song id
 
 ## 2. Narration
 
@@ -21,8 +23,9 @@
 
 - [ ] 3.1 Live build control: off, in blocks, crescendo (`coding-misk-live`, new `coding-misk-live-grain`)
 - [ ] 3.2 "Fully narrated" toggle shown with crescendo (`coding-misk-live-narrated`)
-- [ ] 3.3 Play, seek, timeline hatching and step marks, hand takeover and resume with a Crescendo build
-- [ ] 3.4 Audio export and fast video export of a Crescendo build (one segment per step; check speed on a long build)
+- [ ] 3.3 Typing animation: type the edit only on the line of the playing section, update the other section lines at once
+- [ ] 3.4 Play, seek, timeline hatching and step marks, hand takeover and resume with a Crescendo build
+- [ ] 3.5 Audio export and fast video export of a Crescendo build (one segment per step; check speed on a long build)
 
 ## 4. Checks
 
