@@ -8,7 +8,7 @@ The growth control SHALL offer small steps, gradual (today's natural growth, unc
 - **THEN** the growth shows gradual and sounds the same
 
 ### Requirement: Waypoints
-The natural growth SHALL draw a few waypoints at the start, small states of the song, each simple and playable, the last being the song. The build SHALL move from one waypoint to the next with small moves.
+The natural growth SHALL draw 4 to 6 waypoints at the start, small states of the song, each simple and playable, the last being the song. The build SHALL move from one waypoint to the next with small moves.
 
 #### Scenario: First waypoint
 - **WHEN** a natural growth starts
@@ -22,7 +22,7 @@ Each step SHALL be one small move: add a sound, add a function, change a number,
 - **THEN** they change over several steps of a few characters each
 
 ### Requirement: Detours
-The number of detours (a waypoint that removes or rewrites something an earlier one added) SHALL be drawn for each passage between two waypoints: none in about half of them, one in about a third, two sometimes, three rarely, and none in the first passage. Styles and artists MAY shift these chances.
+The number of detours (a waypoint that removes or rewrites something an earlier one added) SHALL be drawn for each passage between two waypoints: none in about 44% of them, one in 35%, two in 15%, three in 6%, and none in the first passage. Styles and artists MAY shift these chances.
 
 #### Scenario: A straight song
 - **WHEN** a passage draws no detour

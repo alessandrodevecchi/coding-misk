@@ -6,7 +6,7 @@
 
 ### D1. Waypoints first
 
-`waypoints(song, rng, rules)` returns 3 to 6 small states. The last is the song (or the song's first full section); the others are drawn from it with rules: fewer tracks, simpler notes (one note, short lines), fewer functions, and detours (a function present earlier and missing later, or notes rewritten) drawn for each passage between two waypoints: 0 with chance 0.5, 1 with 0.35, 2 with 0.12, 3 with 0.03, none in the first passage. With four passages a song has about two or three detours, none about one time in eight, up to five or six. The reference video has about three in six minutes (the gate commented out and back, the bass notes rewritten, a sound replaced). A style or artist may shift the chances. Each waypoint compiles and is musical by construction (a subset of the song's own material).
+`waypoints(song, rng, rules)` returns 4 to 6 small states. The last is the song (or the song's first full section); the others are drawn from it with rules: fewer tracks, simpler notes (one note, short lines), fewer functions, and detours (a function present earlier and missing later, or notes rewritten) drawn for each passage between two waypoints: 0 with chance 0.44, 1 with 0.35, 2 with 0.15, 3 with 0.06, none in the first passage. A natural growth has 4 to 6 waypoints (2 to 4 passages that draw): a song has two or three detours on average and none about one time in ten (19% with 4 waypoints, 8.5% with 5, 3.7% with 6). The reference video has about three in six minutes (the gate commented out and back, the bass notes rewritten, a sound replaced). A style or artist may shift the chances. Each waypoint compiles and is musical by construction (a subset of the song's own material).
 
 ### D2. Moves between waypoints
 
