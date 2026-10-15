@@ -1214,9 +1214,11 @@ function renderArranger() {
   const own = hasBuild(T), lt = $('#live-toggle'), lv = liveOf(T), crescendo = lv.on && lv.style === 'crescendo';
   lt.setAttribute('aria-pressed', own || lv.on); lt.disabled = own && !crescendo; lt.title = own && !crescendo ? t('liveOwn') : t('liveHint');
   const C = lv.ctl, on = own || lv.on;
-  $('#live-profile').innerHTML = PROFILE_IDS.map(id => `<option value="${id}">${esc(t(`profile:${id}`))}${C.custom && id === C.id ? ` · ${esc(t('profileCustom'))}` : ''}</option>`).join('');
-  $('#live-profile').value = C.id; $('#live-profile').disabled = !on;
+  // the profiles as presets on top of the panel; "custom" when a control below was changed by hand
+  $('#live-profile').innerHTML = PROFILE_IDS.map(id => `<button class="chip" role="radio" data-profile="${id}" aria-checked="${id === C.id}" aria-pressed="${id === C.id}" title="${esc(t(`profileHint:${id}`))}">${esc(t(`profile:${id}`))}</button>`).join('');
+  $('#live-custom').hidden = !C.custom;
   $('#live-profile').title = songProfile(T) && !liveOverride.has(T.id) ? t('profileDeclared') : t('profileHint');
+  $('#live-growth').value = C.growth;
   $('#live-style').value = lv.style; $('#live-style').disabled = !on;
   $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
   // the live build options: a panel under the "Live build" button, open while the live build is on
@@ -1414,8 +1416,9 @@ function liveChanged() {
 }
 // a profile picked: its controls as they are (the changes made by hand go); a song that names its profile is switched
 // for this session, the others change the Compose choice
-$('#live-profile').addEventListener('change', e => {
-  const id = PROFILES[e.target.value] ? e.target.value : 'classic';
+$('#live-profile').addEventListener('click', e => {
+  const b = e.target.closest('[data-profile]'); if (!b) return;
+  const id = PROFILES[b.dataset.profile] ? b.dataset.profile : 'classic';
   overrides = {};
   if (songProfile(T) || hasBuild(T)) liveOverride.set(T.id, { ...(liveOverride.get(T.id) || {}), on: true, profile: id });
   else { profileChoice = id; liveOn = true; store.set('coding-misk-live', true); }
@@ -1436,6 +1439,7 @@ $('#live-style').addEventListener('change', e => {
   liveChanged();
 });
 $('#live-gen').addEventListener('change', e => { setControl('gen', e.target.value); liveChanged(); });
+$('#live-growth').addEventListener('change', e => { setControl('growth', e.target.value); liveChanged(); });
 $('#live-code').addEventListener('change', e => { setControl('view', e.target.value); liveChanged(); });
 $('#live-comments').addEventListener('change', e => { setControl('comments', e.target.value); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { setControl('narrated', !ctlOf(T).narrated); liveChanged(); });

@@ -182,6 +182,9 @@
   /* live build options: one bordered group under the button, two columns (one on a narrow screen) */
   .live-panel { margin: 0 0 10px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; min-width: 0; }
   .live-panel[hidden] { display: none; }
+  .live-profiles { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+  .live-profiles .chips .chip { font-size: 14px; padding: 6px 16px; }
+  .live-profiles .chip[aria-checked="true"] { border-color: var(--a1); color: var(--a1); box-shadow: 0 0 0 1px var(--a1) inset; }
   .live-panel legend { padding: 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--a1); }
   .live-panel .ctrl { min-width: 0; }
   .live-panel select { width: 100%; max-width: 100%; }

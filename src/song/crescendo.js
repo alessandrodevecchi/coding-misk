@@ -126,14 +126,14 @@ function trackPlan(t, d, rng, clipKeys, rules = {}) {
     if (!(SETTING_FIELDS[t.type] || []).includes(key) || clipKeys.has(key) || pinned.includes(key)) continue;
     if (d < 3 && key === 'gain') continue;
     if (d === 1 && key !== 'cutoff') continue;
-    if (d === 0) continue;
+    if (d === 0 && !(rules.natural && key === 'cutoff')) continue;
     const v = (t.settings || {})[key], nv = neutral(key, v);
     if (nv === null) continue;
     neutralSet[key] = nv;
     const m = d < 3 ? 1 : key === 'cutoff' ? rng.int(1, 3) : key === 'gain' ? 1 : rng.int(1, 2);
     const vals = moves(key, nv, v, m);
     // a try: past the written value, then back to it
-    if (rules.natural && key !== 'gain' && rng.chance(rules.trials ?? 0.3)) vals.splice(vals.length - 1, 0, key === 'cutoff' ? Math.round(v * 1.4 / 10) * 10 : r3(v * 1.3));
+    if (rules.natural && key !== 'gain' && !(key === 'cutoff' && v >= 12000) && rng.chance(rules.trials ?? 0.3)) vals.splice(vals.length - 1, 0, key === 'cutoff' ? Math.round(v * 1.4 / 10) * 10 : r3(v * 1.3));
     const lane = vals.map(x => ({ kind: key, step: { set: { track: t.id, [key]: x } } }));
     // natural growth: a knob that moves arrives first (its function was hidden)
     if (rules.natural && HIDES[key] && HIDE_TYPES.includes(t.type)) lane.unshift({ kind: 'reveal', device: key, step: { reveal: { track: t.id, keys: key } } });
