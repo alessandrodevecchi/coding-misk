@@ -5,6 +5,7 @@ import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames, settleOthers } from './song/typing.js';
 import { crescendoSong } from './song/crescendo.js';
+import { compileCompact } from './song/compile-compact.js';
 import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
@@ -108,6 +109,8 @@ let liveOn = !!store.get('coding-misk-live', false);
 // build style of the live build (#64): "blocks" (tracks come in whole) or "crescendo" (the song grows in small steps)
 let liveStyle = store.get('coding-misk-live-style', 'blocks') === 'crescendo' ? 'crescendo' : 'blocks';
 let liveNarrated = !!store.get('coding-misk-live-narrated', false);
+// Crescendo code: compact (identical lines joined, silent tracks shown with _$:) or per section like any song
+let liveCompact = store.get('coding-misk-live-code', 'compact') !== 'sections';
 // a song may declare its build style; the Compose controls still switch it, for this session
 const liveOverride = new Map();
 const liveOf = tr => liveOverride.get(tr.id) || (tr.buildStyle ? { on: true, style: tr.buildStyle } : { on: liveOn, style: liveStyle });
@@ -132,9 +135,11 @@ function playable(tr) {
   const build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : null;
   // keep(track): optional, only the tracks it keeps are compiled (the fast export renders a block with the tracks that play in it)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
+  const compact = build && build.crescendo && liveCompact, waiting = compact ? [...new Set(buildSteps(build).flatMap(x => (x.add !== undefined ? [].concat(x.add) : [])))] : [];
+  const compile = compact ? s => compileCompact(s, { muted: waiting }) : compileSong;
   const codeAt = build ? (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
-    const c = annotate(compileSong(only(st.song, keep)), build, st.upTo, getLang()) + voiceCode(build, st.song, st.upTo, total, getLang(), customFiles);
+    const c = annotate(compile(only(st.song, keep)), build, st.upTo, getLang()) + voiceCode(build, st.song, st.upTo, total, getLang(), customFiles);
     return c.includes('$:') ? c : `${c}\n$: silence`;
   } : null;
   const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
@@ -1159,6 +1164,7 @@ function renderArranger() {
   $('#live-style').value = lv.style; $('#live-style').disabled = !own && !lv.on;
   $('#live-style').title = T.buildStyle && !liveOverride.has(T.id) ? t('liveDeclared') : t('liveStyleHint');
   $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', liveNarrated);
+  $('#live-compact').hidden = !crescendo; $('#live-compact').setAttribute('aria-pressed', liveCompact);
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
   renderRuler();
@@ -1353,6 +1359,7 @@ $('#live-style').addEventListener('change', e => {
   if (!hasBuild(T) && !T.buildStyle) { liveOn = true; store.set('coding-misk-live', true); }
   liveChanged();
 });
+$('#live-compact').addEventListener('click', () => { liveCompact = !liveCompact; store.set('coding-misk-live-code', liveCompact ? 'compact' : 'sections'); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { liveNarrated = !liveNarrated; store.set('coding-misk-live-narrated', liveNarrated); liveChanged(); });
 $('#live-toggle').addEventListener('click', () => {
   const lv = liveOf(T);

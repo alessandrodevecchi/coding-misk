@@ -11,6 +11,7 @@ import { songFiles } from './songs-dir.mjs';
 import { compileSong } from '../src/song/compile.js';
 import { fromScenes, normalizeSong } from '../src/song/format.js';
 import { pickFragments } from '../src/video/fragments.js';
+import { compileCompact, layersOf } from '../src/song/compile-compact.js';
 import { buildSteps, stateAt, checkBuild, stepTrack, buildMap } from '../src/song/build.js';
 import { crescendoSong, patternVariants, CRESCENDO_VERSION } from '../src/song/crescendo.js';
 
@@ -102,6 +103,20 @@ const CHECKS = {
       const picks = pickFragments(shape, n.sections.flatMap(x => Array(x.bars).fill(x.bpm)), { n: 2, length: 15, seed: c.id });
       const sparse = steps.find(b => b > 0) || 0;
       for (const p of picks) assert(steps.includes(p.bar) && p.bar >= sparse, `${c.id}: fragment at bar ${p.bar}`);
+    }
+  },
+  'compact code plays what the standard code plays'() {
+    // same layers (code without lane), same lane sums per bar; muted (_$:) only for tracks still to come
+    const sums = layers => { const m = new Map(); for (const l of layers) { if (l.muted) continue; const v = m.get(l.key) || l.lane.map(() => 0); l.lane.forEach((x, k) => { v[k] += x; }); m.set(l.key, v); } return m; };
+    for (const c of [...built.values()].slice(0, 12)) {
+      const waiting = [...new Set(buildSteps(c).flatMap(s => (s.add !== undefined ? [].concat(s.add) : [])))];
+      for (const bar of [...new Set(buildSteps(c).map(s => s.at))].filter((_, i) => i % 3 === 0)) {
+        const st = stateAt(c, bar).song, a = sums(layersOf(compileSong(st))), b = sums(layersOf(compileCompact(st, { muted: waiting })));
+        assert(a.size === b.size, `${c.id} bar ${bar}: ${a.size} layers, compact ${b.size}`);
+        for (const [k, v] of a) assert(b.has(k) && b.get(k).every((x, i) => Math.abs(x - v[i]) < 1e-9), `${c.id} bar ${bar}: ${k.split('\n')[1].slice(0, 60)}`);
+        const muted = layersOf(compileCompact(st, { muted: waiting })).filter(l => l.muted);
+        assert(muted.every(l => waiting.some(id => st.tracks.find(t => t.id === id && t.mute))), `${c.id} bar ${bar}: muted layer of a playing track`);
+      }
     }
   },
   'fixtures: a rules change raises CRESCENDO_VERSION'() {

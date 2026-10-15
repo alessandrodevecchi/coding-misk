@@ -16,8 +16,8 @@ const SONGS = ['ferro', 'cavo-scoperto'];
     const e = document.querySelector('strudel-editor').editor;
     return { code: e.code, err: String(e.repl.state.evalError || ''), started: e.repl.scheduler.started, cyc: e.repl.scheduler.now(), hand: !document.getElementById('hand-tag').hidden };
   });
-  // track blocks in the code, without the voice that speaks the comments
-  const tracks = code => (code.match(/^\/\/ ========== (?!.*voice ==========).*$/gm) || []).length;
+  // track blocks that play (a "$:" line; "_$:" is a track still to come), without the voice that speaks the comments
+  const tracks = code => code.split(/^\/\/ ========== /m).slice(1).filter(b => !/^[^\n]*voice ==========/.test(b) && /^\$:/m.test(b)).length;
   const seek = async k => { await page.evaluate(v => { const x = document.getElementById('pb-seek'); x.value = v; x.dispatchEvent(new Event('change')); }, k); await sleep(1500); };
 
   await page.goto('http://localhost:5173/'); await sleep(5000);
@@ -27,6 +27,13 @@ const SONGS = ['ferro', 'cavo-scoperto'];
     if ((await page.getAttribute('#live-toggle', 'aria-pressed')) !== 'true') await page.click('#live-toggle');
     await page.locator('#live-style').selectOption('crescendo'); await sleep(800);
     check(!(await page.isHidden('#live-narrated')), `${id}: "fully narrated" shows with crescendo`);
+    if (id === SONGS[0]) {
+      const c = (await st()).code;
+      check(/^_\$:/m.test(c) && !(await page.isHidden('#live-compact')), `${id}: compact code shows the tracks still to come with _$:`);
+      await page.click('#live-compact'); await sleep(600);
+      check(!/^_\$:/m.test((await st()).code), `${id}: code per section without _$:`);
+      await page.click('#live-compact'); await sleep(600);
+    }
     const first = await st();
     check(tracks(first.code) === 1, `${id}: the build starts from one sound`, `${tracks(first.code)} tracks`);
     await page.click('#play'); await sleep(9000);

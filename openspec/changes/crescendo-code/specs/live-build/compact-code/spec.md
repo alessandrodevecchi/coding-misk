@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
-### Requirement: One line per track
-For Crescendo songs the code SHALL write each track once. Differences between sections (pattern, gain, settings) SHALL be expressed inside that track's code, so a step that changes one thing edits one line.
+### Requirement: Joined lines per track
+For Crescendo songs the code SHALL join, inside each track, the lines that are identical apart from the bars they play in, under one lane that is the union of theirs, as long as those lanes never sound on the same bar. Writing per-section differences inside one line (one line per track) is left to a later change.
 
-#### Scenario: A step edits one line
-- **WHEN** a Crescendo step adds a device to a track that plays in three sections
-- **THEN** one line of the code changes
+#### Scenario: Repeated sections share a line
+- **WHEN** a track plays the same code in two sections
+- **THEN** the compact code has one line for both, with a comment listing both runs of bars
 
 ### Requirement: Muted tracks visible
 A muted track of a Crescendo song SHALL stay in the code marked as muted (`_$:`), and bringing it back SHALL remove the mark.
@@ -18,8 +18,8 @@ A muted track of a Crescendo song SHALL stay in the code marked as muted (`_$:`)
 For any song state, the compact code SHALL produce the same events (sounds, notes, timing, levels) as the standard code.
 
 #### Scenario: Equivalence check
-- **WHEN** the check compiles built-in songs and Crescendo states both ways and renders them
-- **THEN** onsets and levels per instrument match within the check's tolerance
+- **WHEN** the check compiles Crescendo states of the built-in songs both ways
+- **THEN** both have the same layers (code without its lane) and, per layer, the same lane values on every bar, which makes the sound the same
 
 ### Requirement: Scope and setting
 Only Crescendo songs SHALL use the compact code by default; every other song SHALL keep the standard code. A setting SHALL let Crescendo use the code per section instead.
