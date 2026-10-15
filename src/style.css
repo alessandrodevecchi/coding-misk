@@ -179,9 +179,14 @@
   .ruler-knob { position: absolute; top: 5px; width: 14px; height: 16px; margin-left: -7px; border-radius: 3px; background: var(--ink); box-shadow: 0 0 10px var(--a1); pointer-events: none; }
   .arr-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
   .arr-mode .hint { font-size: 11px; color: var(--muted); flex: 1 1 260px; }
-  .live-style { display: inline-flex; align-items: center; gap: 6px; }
-  .live-style .lbl { margin: 0; }
-  .live-style select:disabled { opacity: .5; }
+  /* live build options: one bordered group under the button, two columns (one on a narrow screen) */
+  .live-panel { margin: 0 0 10px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; min-width: 0; }
+  .live-panel[hidden] { display: none; }
+  .live-panel legend { padding: 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--a1); }
+  .live-panel .ctrl { min-width: 0; }
+  .live-panel select { width: 100%; max-width: 100%; }
+  .live-panel .chips { flex-wrap: wrap; }
+  @media (max-width: 700px) { .live-panel { grid-template-columns: minmax(0, 1fr); } }
   .tl-mode .arr-strip { gap: 0; }
   .tl-mode .arr-scene-btn { border-radius: 0; border-right-width: 0; }
   .tl-mode .arr-scene-btn:last-of-type { border-right-width: 1px; }

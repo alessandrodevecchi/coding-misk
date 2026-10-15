@@ -1219,11 +1219,11 @@ function renderArranger() {
   $('#live-profile').title = songProfile(T) && !liveOverride.has(T.id) ? t('profileDeclared') : t('profileHint');
   $('#live-style').value = lv.style; $('#live-style').disabled = !on;
   $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
-  $('#live-code').hidden = !crescendo; $('#live-code').value = C.view;
-  $('#live-gen').hidden = !crescendo; $('#live-gen').value = C.gen;
-  $('#live-comments').hidden = !on; $('#live-comments').value = C.comments;
-  $('#live-title').hidden = !on; $('#live-title').setAttribute('aria-pressed', C.title);
-  $('#live-hl').hidden = !on; $('#live-hl').setAttribute('aria-pressed', C.highlights);
+  // the live build options: a panel under the "Live build" button, open while the live build is on
+  $('#live-style-wrap').hidden = !on; lt.setAttribute('aria-expanded', on);
+  $$('[data-live-only="crescendo"]').forEach(el => { el.hidden = !crescendo; });
+  $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments;
+  $('#live-title').setAttribute('aria-pressed', C.title); $('#live-hl').setAttribute('aria-pressed', C.highlights);
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
   renderRuler();
