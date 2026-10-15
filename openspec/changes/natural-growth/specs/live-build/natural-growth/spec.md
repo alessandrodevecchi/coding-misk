@@ -22,7 +22,7 @@ A track's notes or hits SHALL grow from the simplest form to the written pattern
 - **THEN** its notes go from one note to a short line to the written line
 
 ### Requirement: Clones
-A new melodic track MAY be born as a copy of a playing track's block, shown at once like a paste, then changed in one or two places.
+A new melodic track MAY be born as a copy of a playing track's block; when it is, the copy SHALL appear at once like a paste and SHALL then change in one or two places.
 
 #### Scenario: Lead from the bass
 - **WHEN** a lead enters as a clone of the bass
