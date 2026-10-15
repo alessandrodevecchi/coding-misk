@@ -1,0 +1,445 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "switch-acid-prova",
+  "title": "Scatto Deriva",
+  "style": {
+    "en": "Endless · Switch · acid · E · 133 BPM · slow-burn",
+    "it": "Endless · Switch · acid · E · 133 BPM · slow-burn"
+  },
+  "tags": {
+    "styles": [
+      "switch-acid"
+    ]
+  },
+  "origin": "endless",
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 16,
+      "bpm": 133,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 96,
+      "bpm": 133,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Peak",
+      "bars": 48,
+      "bpm": 133,
+      "key": "E",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Outro",
+      "bars": 16,
+      "bpm": 133,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "kick",
+      "name": "Kick",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR808",
+        "gain": 0.85,
+        "cutoff": 20000,
+        "drive": 1.27,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x..xx.xxx...x..."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "beat",
+      "name": "Beat",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR808",
+        "gain": 0.6,
+        "cutoff": 20000,
+        "drive": 1.09,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "cp": "....x.......x..x",
+            "hh": "x.xx.x.xx.xx.x.x",
+            "oh": "..x...x...x...x.",
+            "rd": "..x...x...x...x."
+          }
+        },
+        "B": {
+          "rows": {
+            "cp": "....x.......x...",
+            "sd": "...........x....",
+            "hh": "..x...x...x...x.",
+            "oh": "..x.......x....."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.8,
+        "cutoff": 357,
+        "move": "lento",
+        "reso": 9.67,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "sub"
+        },
+        "B": {
+          "preset": "rumble"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "name": "Arp",
+      "type": "arp",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.4,
+        "cutoff": 1924,
+        "move": "lento",
+        "reso": 19.27,
+        "delay": 0.35,
+        "drive": 2.99
+      },
+      "patterns": {
+        "A": {
+          "preset": "acid",
+          "speed": "16"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "name": "Texture",
+      "type": "texture",
+      "settings": {
+        "sample": "industrial",
+        "gain": 0.4,
+        "grit": 0.7,
+        "room": 0.6
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "bar"
+        },
+        "B": {
+          "rhythm": "euclid"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "name": "Riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.25,
+        "bars": "8",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "name": "Voice",
+      "type": "voice",
+      "settings": {
+        "gain": 0.3,
+        "pitch": 0.48,
+        "tempo": 0.67,
+        "cutoff": 18000,
+        "hpf": 655,
+        "drive": 3.16,
+        "room": 0.37,
+        "delay": 0.43,
+        "speaker": "reed"
+      },
+      "patterns": {},
+      "clips": []
+    }
+  ],
+  "build": [
+    {
+      "at": 0,
+      "add": [
+        "kick"
+      ],
+      "say": {
+        "en": "here we go",
+        "it": "si parte"
+      }
+    },
+    {
+      "at": 8,
+      "add": "texture",
+      "say": {
+        "en": "noise",
+        "it": "rumore"
+      }
+    },
+    {
+      "at": 16,
+      "add": "bass"
+    },
+    {
+      "at": 24,
+      "add": "arp"
+    },
+    {
+      "at": 32,
+      "set": {
+        "track": "kick",
+        "drive": 0.57
+      },
+      "say": {
+        "en": "clean it up",
+        "it": "puliamo"
+      }
+    },
+    {
+      "at": 32,
+      "set": {
+        "track": "bass",
+        "cutoff": 223
+      }
+    },
+    {
+      "at": 40,
+      "remove": "arp"
+    },
+    {
+      "at": 40,
+      "pattern": {
+        "track": "texture",
+        "to": "B"
+      }
+    },
+    {
+      "at": 48,
+      "add": "beat"
+    },
+    {
+      "at": 56,
+      "remove": "bass",
+      "say": {
+        "en": "make room",
+        "it": "facciamo spazio"
+      }
+    },
+    {
+      "at": 56,
+      "set": {
+        "track": "kick",
+        "drive": 0
+      }
+    },
+    {
+      "at": 64,
+      "add": "arp",
+      "say": {
+        "en": "now the lead",
+        "it": "ora la melodia"
+      }
+    },
+    {
+      "at": 72,
+      "remove": "beat"
+    },
+    {
+      "at": 72,
+      "add": "bass"
+    },
+    {
+      "at": 80,
+      "set": {
+        "track": "arp",
+        "cutoff": 1203
+      },
+      "say": {
+        "en": "close the filter",
+        "it": "chiudiamo il filtro"
+      }
+    },
+    {
+      "at": 88,
+      "rack": {
+        "track": "bass",
+        "device": "distort",
+        "amount": 0.8
+      },
+      "say": {
+        "en": "more grit",
+        "it": "più grinta"
+      }
+    },
+    {
+      "at": 96,
+      "pattern": {
+        "track": "kick",
+        "to": "B"
+      }
+    },
+    {
+      "at": 104,
+      "add": "riser",
+      "say": {
+        "en": "hold on",
+        "it": "tieniti forte"
+      }
+    },
+    {
+      "at": 112,
+      "set": {
+        "track": "arp",
+        "cutoff": 1925
+      },
+      "say": {
+        "en": "open it up",
+        "it": "apriamo"
+      }
+    },
+    {
+      "at": 120,
+      "remove": "riser",
+      "say": {
+        "en": "dirtier",
+        "it": "più sporco"
+      }
+    },
+    {
+      "at": 120,
+      "set": {
+        "track": "bass",
+        "drive": 0.7
+      }
+    },
+    {
+      "at": 128,
+      "add": "beat"
+    },
+    {
+      "at": 136,
+      "remove": "texture",
+      "say": {
+        "en": "make room",
+        "it": "facciamo spazio"
+      }
+    },
+    {
+      "at": 144,
+      "set": {
+        "track": "bass",
+        "cutoff": 357
+      },
+      "say": {
+        "en": "open it up",
+        "it": "apriamo"
+      }
+    },
+    {
+      "at": 152,
+      "set": {
+        "track": "beat",
+        "drive": 1.79
+      },
+      "say": {
+        "en": "dirtier",
+        "it": "più sporco"
+      }
+    },
+    {
+      "at": 160,
+      "remove": "arp",
+      "say": {
+        "en": "last round",
+        "it": "ultimo giro"
+      }
+    },
+    {
+      "at": 168,
+      "set": {
+        "track": "bass",
+        "cutoff": 223
+      }
+    }
+  ],
+  "buildStyle": "crescendo"
+}

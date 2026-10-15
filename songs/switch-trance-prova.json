@@ -1,0 +1,420 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "switch-trance-prova",
+  "title": "Señal",
+  "style": {
+    "en": "Endless · Switch · trance · G · 140 BPM · slow-burn",
+    "it": "Endless · Switch · trance · G · 140 BPM · slow-burn"
+  },
+  "tags": {
+    "styles": [
+      "switch-trance"
+    ]
+  },
+  "origin": "endless",
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 16,
+      "bpm": 140,
+      "key": "G",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 96,
+      "bpm": 140,
+      "key": "G",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Peak",
+      "bars": 48,
+      "bpm": 140,
+      "key": "G",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Outro",
+      "bars": 16,
+      "bpm": 140,
+      "key": "G",
+      "chords": "pendolo",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "kick",
+      "name": "Kick",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85,
+        "cutoff": 20000,
+        "drive": 0.1,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x..............."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "beat",
+      "name": "Beat",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.6,
+        "cutoff": 20000,
+        "drive": 0.15,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "cp": "....x.......x...",
+            "hh": "..x...x...x...x."
+          }
+        },
+        "B": {
+          "rows": {
+            "hh": "........x......."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Bass",
+      "type": "bass",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.8,
+        "cutoff": 820,
+        "move": "lento",
+        "reso": 12.66,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "rolling"
+        },
+        "B": {
+          "preset": "offbeat"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "name": "Arp",
+      "type": "arp",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.4,
+        "cutoff": 2702,
+        "move": "lento",
+        "reso": 4,
+        "delay": 0.62,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "su",
+          "speed": "16"
+        },
+        "B": {
+          "preset": "pedale",
+          "speed": "16"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "name": "Riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.25,
+        "bars": "8",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 176,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "name": "Voice",
+      "type": "voice",
+      "settings": {
+        "gain": 0.3,
+        "pitch": 0.99,
+        "tempo": 0.98,
+        "cutoff": 18000,
+        "hpf": 481,
+        "drive": 0,
+        "room": 0.57,
+        "delay": 0.28,
+        "speaker": "flo"
+      },
+      "patterns": {},
+      "clips": [],
+      "rack": [
+        {
+          "device": "vowel",
+          "vowel": "a"
+        }
+      ]
+    }
+  ],
+  "build": [
+    {
+      "at": 0,
+      "add": [
+        "kick"
+      ],
+      "say": {
+        "en": "here we go",
+        "it": "si parte"
+      }
+    },
+    {
+      "at": 8,
+      "add": "beat",
+      "say": {
+        "en": "more rhythm",
+        "it": "più ritmo"
+      }
+    },
+    {
+      "at": 16,
+      "add": "bass"
+    },
+    {
+      "at": 24,
+      "add": "arp"
+    },
+    {
+      "at": 24,
+      "remove": "beat"
+    },
+    {
+      "at": 32,
+      "pattern": {
+        "track": "kick",
+        "to": "B"
+      },
+      "say": {
+        "en": "twist",
+        "it": "una variazione"
+      }
+    },
+    {
+      "at": 40,
+      "add": "beat"
+    },
+    {
+      "at": 48,
+      "remove": "arp"
+    },
+    {
+      "at": 48,
+      "set": {
+        "track": "bass",
+        "cutoff": 513
+      }
+    },
+    {
+      "at": 56,
+      "pattern": {
+        "track": "beat",
+        "to": "B"
+      },
+      "say": {
+        "en": "switch it up",
+        "it": "cambiamo"
+      }
+    },
+    {
+      "at": 64,
+      "add": "arp",
+      "say": {
+        "en": "a little tune",
+        "it": "un motivetto"
+      }
+    },
+    {
+      "at": 72,
+      "remove": "kick",
+      "say": {
+        "en": "make room",
+        "it": "facciamo spazio"
+      }
+    },
+    {
+      "at": 80,
+      "pattern": {
+        "track": "beat",
+        "to": "A"
+      }
+    },
+    {
+      "at": 88,
+      "add": "kick",
+      "say": {
+        "en": "drums in",
+        "it": "entra la batteria"
+      }
+    },
+    {
+      "at": 96,
+      "set": {
+        "track": "beat",
+        "drive": 0.85
+      },
+      "say": {
+        "en": "more grit",
+        "it": "più grinta"
+      }
+    },
+    {
+      "at": 104,
+      "add": "riser"
+    },
+    {
+      "at": 112,
+      "set": {
+        "track": "kick",
+        "drive": 0
+      }
+    },
+    {
+      "at": 120,
+      "remove": "riser",
+      "say": {
+        "en": "open it up",
+        "it": "apriamo"
+      }
+    },
+    {
+      "at": 120,
+      "set": {
+        "track": "arp",
+        "cutoff": 4323
+      }
+    },
+    {
+      "at": 128,
+      "pattern": {
+        "track": "kick",
+        "to": "A"
+      }
+    },
+    {
+      "at": 136,
+      "set": {
+        "track": "arp",
+        "cutoff": 6917
+      },
+      "say": {
+        "en": "brighter",
+        "it": "più luce"
+      }
+    },
+    {
+      "at": 144,
+      "set": {
+        "track": "bass",
+        "drive": 0.7
+      }
+    },
+    {
+      "at": 144,
+      "set": {
+        "track": "beat",
+        "drive": 0.15
+      }
+    },
+    {
+      "at": 152,
+      "set": {
+        "track": "kick",
+        "drive": 0.7
+      }
+    },
+    {
+      "at": 152,
+      "rack": {
+        "track": "arp",
+        "device": "delay"
+      }
+    },
+    {
+      "at": 160,
+      "set": {
+        "track": "bass",
+        "cutoff": 321
+      },
+      "say": {
+        "en": "last round",
+        "it": "ultimo giro"
+      }
+    },
+    {
+      "at": 168,
+      "set": {
+        "track": "beat",
+        "drive": 0.85
+      }
+    }
+  ],
+  "buildStyle": "crescendo"
+}
