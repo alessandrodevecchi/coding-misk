@@ -1,8 +1,9 @@
 // Video recorder (#27): a frame drawn by the app at a fixed size (the stage, the code typing itself, the soul panel,
 // a title card) recorded together with the master audio; or the whole browser tab, captured as it is.
 // The frame is drawn after each stage frame, so it follows the music exactly as the stage does.
-import { QUALITIES, VIDEO_DEFAULTS, LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
-import { liveAreas, lerpAreas, ease, presetOf, TRANSITION } from '../live/presets.js';
+import { QUALITIES, VIDEO_DEFAULTS, LAYOUTS, TIMELINE_LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
+import { liveAreas, lerpAreas, ease, presetOf, TRANSITION, timelineWindow } from '../live/presets.js';
+import { drawTimeline, drawColumn, futureShown } from '../live/timeline.js';
 import { fragmentAreas, soulFocus, coverOffset } from './layout.js';
 import { glitchAt, GLITCH_SECONDS, taglineAt, taglineFor } from './fragments.js';
 import { hashString } from '../endless/random.js';
@@ -13,7 +14,8 @@ const LIVE_KEY = 'coding-misk-live-preset';
 // visuals: { setTarget, canvas } from startVisuals; getCode(): the code in the editor; getInfo(cyc): what plays;
 // getSay(): the voice line on the stage; getSoul(): { canvas } of the soul screen when the soul is on, else null;
 // soulFrame(cyc, playing, scale): the soul screen always (the live picture's soul views, #52)
-export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFrame = null, soulView = () => 'a', store, t, esc }) {
+// getTimeline(cyc): { shape, bar, live } of the song on air, for the timeline views (#65), or null
+export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTimeline = () => null, soulFrame = null, soulView = () => 'a', store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });
   const cv = document.createElement('canvas');
@@ -217,6 +219,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     pg.drawImage(cv, 0, 0, W, H);
   }
   function compose(J, cyc, playing, now) {
+    if (TIMELINE_LAYOUTS.includes(J.layout)) { paintLive(liveAreas(J.layout, J.q.w, J.q.h), J.q, cyc, playing, now, 1, { view: J.layout, card: true }); return false; }
     const P = palette(), Q = J.q;
     const soul = J.layout === 'code' ? getSoul() : null, soulMode = soul ? (opts().soulPanel ? 'open' : 'folded') : null;
     const A = layoutAreas(J.layout, Q.w, Q.h, soulMode);
@@ -446,7 +449,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     const from = L.from || to;
     return { A: k >= 1 ? to : lerpAreas(from, to, k), card: L.cardFrom + ((L.preset.card ? 1 : 0) - L.cardFrom) * k };
   }
-  function paintLive(A, Q, cyc, playing, now, card) {
+  function paintLive(A, Q, cyc, playing, now, card, preset = null) {
     const P = palette();
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
     g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
@@ -457,8 +460,20 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
       drawSoul(A.soul, P, true, soulFrame(cyc, playing, Math.max(.05, Math.min(bw / 1200, bh / 760))));
     }
     if (A.code.a > .01 && A.code.x < Q.w) drawCode(A.code, P, now, Q.h);
+    // timeline and track column (#65): the song on air, what is coming hidden for live builds unless the preset shows it
+    const tlOn = A.timeline && A.timeline.a > .01 && A.timeline.y < Q.h, colOn = A.column && A.column.a > .01 && A.column.x < Q.w;
+    if (tlOn || colOn) {
+      const T = getTimeline(cyc), p = presetOf(preset);
+      if (T) {
+        const future = futureShown(p.future, T.live);
+        if (tlOn) drawTimeline(g, A.timeline, T.shape, T.bar, P, { window: timelineWindow(p.view), future, sayOf: T.sayOf });
+        if (colOn) drawColumn(g, A.column, T.shape, T.bar, P, { future });
+      }
+    }
     // the card: bottom left of the stage, or of the whole picture when the stage is hidden
-    drawCard(A.stage.a > .5 ? A.stage : { x: 0, y: 0, w: Q.w, h: Q.h }, P, getInfo(cyc) || {}, now, 'always', card);
+    // (above the timeline when it runs along the bottom)
+    const below = A.timeline && A.timeline.a > .5 && !A.timeline.float && A.timeline.y < Q.h ? A.timeline.y : Q.h;
+    drawCard(A.stage.a > .5 ? A.stage : { x: 0, y: 0, w: Q.w, h: below }, P, getInfo(cyc) || {}, now, 'always', card);
   }
   function drawLive(target) {
     if (!live) {
@@ -469,19 +484,19 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, soulFr
     if (target.width !== LIVE_Q.w || target.height !== LIVE_Q.h) { target.width = LIVE_Q.w; target.height = LIVE_Q.h; }
     const now = nowS(), S = liveState(live, now, LIVE_Q), keep = g;
     g = target.getContext('2d');
-    try { paintLive(S.A, LIVE_Q, lastCyc, lastPlaying, now, S.card); }
+    try { paintLive(S.A, LIVE_Q, lastCyc, lastPlaying, now, S.card, live.preset); }
     finally { g = keep; }
     live.drawnAt = now; live.frames++;
   }
   // a preset, small, into a canvas (the control room's Preview), or the picture on air when preset is null
   function drawLivePreview(target, preset) {
     const Q = { w: target.width, h: target.height }, now = nowS(), keep = g;
-    let A, card;
+    let A, card, shown = preset || (live && live.preset);
     if (preset) { const p = presetOf(preset); A = liveAreas(p.view, Q.w, Q.h); card = p.card ? 1 : 0; }
     else if (live) ({ A, card } = liveState(live, now, Q));
     else { A = liveAreas('visual', Q.w, Q.h); card = 1; }
     g = target.getContext('2d');
-    try { paintLive(A, Q, lastCyc, lastPlaying, now, card); }
+    try { paintLive(A, Q, lastCyc, lastPlaying, now, card, shown); }
     finally { g = keep; }
   }
   // the preset on air changes: a transition from the picture of now

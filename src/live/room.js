@@ -3,6 +3,7 @@
 // to OBS, whose watchdog script shows Standby when the beat stops.
 import { t } from '../i18n.js';
 import { CHANNEL, PRESETS, presetOf, isStale, liveAreas } from './presets.js';
+import { FUTURE } from './timeline.js';
 import { connectObs, OBS_DEFAULTS, SCENES, BEAT_INPUT, onAirClock } from './obs.js';
 
 const KEY = 'coding-misk-obs';
@@ -18,7 +19,8 @@ let armed = null, armedTimer = 0;
 const urls = { program: '', preview: '' };
 
 // ---------- the page ----------
-const VIEW_NAMES = { visual: 'lrViewVisual', code: 'lrViewCode', 'code-soul': 'lrViewCodeSoul', soul: 'lrViewSoul', 'code-only': 'lrViewCodeOnly' };
+const VIEW_NAMES = { visual: 'lrViewVisual', code: 'lrViewCode', 'code-soul': 'lrViewCodeSoul', soul: 'lrViewSoul', 'code-only': 'lrViewCodeOnly',
+  'visual-tl': 'lrViewVisualTl', 'visual-code-tl': 'lrViewVisualCodeTl', 'code-tl': 'lrViewCodeTl', 'soul-tl': 'lrViewSoulTl', 'visual-float': 'lrViewVisualFloat', 'visual-column': 'lrViewVisualColumn' };
 // a small drawing of a view, from the same areas the picture uses
 function thumb(view) {
   const W = 160, H = 90, A = liveAreas(view, W, H), r = (a, fill, extra = '') => (a.a > .5 && a.x < W ? `<rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}" rx="2" fill="${fill}" ${extra}/>` : '');
@@ -49,6 +51,7 @@ function build() {
         </div>
         <div class="presets" id="lr-presets">${PRESETS.map(p => `<button class="preset" data-preset="${p.id}">${thumb(p.view)}<span>${esc(t(VIEW_NAMES[p.view]))}</span><kbd>${p.id}</kbd></button>`).join('')}</div>
         <div class="row"><span class="lbl">${esc(t('lrCard'))}</span><button class="btn" id="lr-card" aria-pressed="false"></button><span class="note" style="margin:0">${esc(t('lrCardHint'))}</span></div>
+        <div class="row"><span class="lbl">${esc(t('lrFuture'))}</span><button class="btn" id="lr-future"></button><span class="note" style="margin:0">${esc(t('lrFutureHint'))}</span></div>
       </section>
       <div style="display:grid;gap:14px">
         <section class="card now" aria-labelledby="lr-h-now">
@@ -105,6 +108,7 @@ function update() {
   }
   $('lr-card').setAttribute('aria-pressed', String(cue.card));
   $('lr-card').textContent = t(cue.card ? 'lrCardOn' : 'lrCardOff');
+  $('lr-future').textContent = t(`lrFuture:${cue.future}`);
   // the source
   $('lr-src').textContent = !appAlive() ? '' : app.radio ? t('lrSrcRadio') : t('lrSrcApp');
   $('lr-title').textContent = appAlive() ? app.title || '' : '';
@@ -213,8 +217,9 @@ const endLive = () => arm('end', async () => { try { await obs.call('StopStream'
 build();
 root.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.preset) { const p = PRESETS.find(x => x.id === +b.dataset.preset); cueTo({ view: p.view, card: cue.card }); }
+  if (b.dataset.preset) { const p = PRESETS.find(x => x.id === +b.dataset.preset); cueTo({ ...cue, view: p.view }); }
   if (b.id === 'lr-card') cueTo({ ...cue, card: !cue.card });
+  if (b.id === 'lr-future') cueTo({ ...cue, future: FUTURE[(FUTURE.indexOf(cue.future) + 1) % FUTURE.length] });
   if (b.id === 'lr-take') take();
   if (b.dataset.scene) { autoStandby = false; setScene(b.dataset.scene); }
   if (b.id === 'lr-connect') { if (obs) { obs.close(); obs = null; obsErr = ''; out = null; update(); } else connect(); }
@@ -224,7 +229,8 @@ root.addEventListener('click', e => {
 root.addEventListener('dblclick', e => { const b = e.target.closest('[data-preset]'); if (b) take(); });
 addEventListener('keydown', e => {
   if (e.target.closest('input') || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (/^[1-5]$/.test(e.key)) { const p = PRESETS[+e.key - 1]; cueTo({ view: p.view, card: cue.card }); }
+  // 1 to 9, then 0 for the tenth; the eleventh by click
+  if (/^[0-9]$/.test(e.key)) { const p = PRESETS[e.key === '0' ? 9 : +e.key - 1]; if (p) cueTo({ ...cue, view: p.view }); }
   else if (e.key === 'Enter') { e.preventDefault(); take(); }
   else if (e.key === 'c' || e.key === 'C') cueTo({ ...cue, card: !cue.card });
   else if (e.key === 'b' || e.key === 'B') { autoStandby = false; setScene(scene === SCENES.standby ? 'live' : 'standby'); }

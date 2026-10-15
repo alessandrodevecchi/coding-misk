@@ -3,7 +3,9 @@
 
 // visual: the stage fills the frame; code: the stage beside the code (and the soul panel when the soul is on);
 // tab: the whole browser tab, captured as it is (the browser asks which tab to share)
-export const LAYOUTS = ['visual', 'code', 'tab'];
+// the views with a timeline of the live picture (#65) are video layouts too, drawn with the live picture's areas
+export const TIMELINE_LAYOUTS = ['visual-tl', 'visual-code-tl', 'code-tl', 'soul-tl', 'visual-float', 'visual-column'];
+export const LAYOUTS = ['visual', 'code', 'tab', ...TIMELINE_LAYOUTS];
 export const QUALITIES = {
   '1080p30': { w: 1920, h: 1080, fps: 30, bps: 8e6 },
   '1080p60': { w: 1920, h: 1080, fps: 60, bps: 12e6 },

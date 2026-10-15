@@ -2857,12 +2857,29 @@ const visuals = startVisuals({
   },
 });
 // the video recorder (#27): its frame is drawn after each stage frame
+// the timeline of the song on air (#65): the radio's song on air with its own bars, or the song playing
+const tlShapes = new WeakMap();
+function timelineShape(doc) {
+  if (!tlShapes.has(doc)) {
+    const sh = shapeOf(doc, d => absoluteClips(clone(d))), map = doc.build ? buildMap(doc, sh.bars) : {};
+    sh.tracks = sh.tracks.map(tr => ({ ...tr, off: (map[tr.id] || {}).off || [], marks: (map[tr.id] || {}).marks || [] }));
+    tlShapes.set(doc, sh);
+  }
+  return tlShapes.get(doc);
+}
+function timelineNow(cyc) {
+  let doc = song && song.doc, bar = cyc;
+  if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; if (it && it.song) { doc = it.song; bar = cyc - it.start; } }
+  if (!doc || !doc.sections || !doc.tracks) return null;
+  try { return { shape: timelineShape(doc), bar, live: Array.isArray(doc.build) && doc.build.length > 0, sayOf: s => sayText(s, getLang()) }; } catch (e) { return null; }
+}
 const video = createVideo({
   visuals, store, t, esc,
   soulFrame: (cyc, playing, scale) => soul.frame(cyc, playing, scale),
   soulView: () => soul.shown,
   getCode: () => (fv ? fv.code : (ed && ed.code) || ''),
   getInfo: stageInfo,
+  getTimeline: cyc => timelineNow(cyc),
   getSay: () => { if (fv) return fv.say; const el = $('#say'); return el.classList.contains('on') ? el.textContent : ''; },
   // the soul panel: as the direction says ('auto': only while the Soul display is on and the stage does not show the soul)
   getSoul: () => {

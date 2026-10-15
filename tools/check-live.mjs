@@ -2,7 +2,8 @@
 // the beat's staleness, and the OBS client (challenge answer, identify, requests, errors) against a fake OBS. No browser.
 //   npm run check:live      exit 1 when any check fails
 import { createHash } from 'node:crypto';
-import { VIEWS, PRESETS, presetOf, liveAreas, lerpAreas, ease, isStale, STALE } from '../src/live/presets.js';
+import { VIEWS, PRESETS, presetOf, liveAreas, lerpAreas, ease, isStale, STALE, timelineWindow } from '../src/live/presets.js';
+import { futureShown, shownRange, playingAt, drawTimeline, drawColumn } from '../src/live/timeline.js';
 import { authOf, connectObs, onAirClock } from '../src/live/obs.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -38,8 +39,8 @@ function fakeObs({ password = '', salt = 'c2FsdA==', challenge = 'Y2hhbGxlbmdl',
 }
 
 const CHECKS = {
-  'presets: five, one per view, ids 1 to 5'() {
-    assert(PRESETS.length === 5 && PRESETS.every((p, i) => p.id === i + 1), 'ids');
+  'presets: one per view, ids from 1'() {
+    assert(PRESETS.length === VIEWS.length && PRESETS.every((p, i) => p.id === i + 1), 'ids');
     assert(new Set(PRESETS.map(p => p.view)).size === VIEWS.length, 'one per view');
   },
   'presetOf keeps known values and falls back'() {
@@ -51,13 +52,17 @@ const CHECKS = {
       const A = liveAreas(v, w, h), parts = Object.entries(A).filter(([, a]) => a.a > .5 && a.x < w);
       assert(parts.length > 0, `${v} shows something`);
       parts.forEach(([n, a]) => assert(inside(a, w, h), `${v} ${n} inside at ${w}`));
-      for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) assert(!overlap(parts[i][1], parts[j][1]), `${v} ${parts[i][0]}/${parts[j][0]} overlap`);
+      // a floating area lies over the stage on purpose
+      for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) if (!parts[i][1].float && !parts[j][1].float) assert(!overlap(parts[i][1], parts[j][1]), `${v} ${parts[i][0]}/${parts[j][0]} overlap`);
     }
   },
   'views show what their names say'() {
     const s = v => Object.entries(liveAreas(v, 1920, 1080)).filter(([, a]) => shown(a)).map(([n]) => n).sort().join(',');
     assert(s('visual') === 'stage', 'visual'); assert(s('code') === 'code,stage', 'code'); assert(s('code-soul') === 'code,soul,stage', 'code-soul');
     assert(s('soul') === 'soul', 'soul'); assert(s('code-only') === 'code', 'code-only');
+    assert(s('visual-tl') === 'stage,timeline', 'visual-tl'); assert(s('visual-code-tl') === 'code,stage,timeline', 'visual-code-tl');
+    assert(s('code-tl') === 'code,timeline', 'code-tl'); assert(s('soul-tl') === 'soul,timeline', 'soul-tl');
+    assert(s('visual-float') === 'stage,timeline', 'visual-float'); assert(s('visual-column') === 'column,stage', 'visual-column');
   },
   'code-only leaves room at the bottom for the song card'() {
     const c = liveAreas('code-only', 1920, 1080).code; assert(1080 - (c.y + c.h) > 140, 'room');
@@ -74,6 +79,22 @@ const CHECKS = {
     const q = lerpAreas(a, b, .3).code;
     assert(q.y === b.code.y && q.h === b.code.h && q.w === b.code.w && q.x > b.code.x, 'slides in at its size');
     assert(ease(0) === 0 && ease(1) === 1 && ease(.5) === .5 && ease(-1) === 0 && ease(2) === 1, 'ease');
+  },
+  'timeline: future rules, window, tracks playing'() {
+    assert(futureShown('auto', false) && !futureShown('auto', true) && futureShown('show', true) && !futureShown('hide', false), 'future');
+    assert(presetOf({ view: 'code-tl' }).future === 'auto' && presetOf({ future: 'hide' }).future === 'hide' && presetOf({ future: 'x' }).future === 'auto', 'preset future');
+    const [a, b] = shownRange(100, 50, 16); assert(b - a === 16 && a < 50 && 50 < b, 'window'); assert(shownRange(100, 50, 0).join() === '0,100', 'whole');
+    assert(timelineWindow('visual-float') > 0 && timelineWindow('visual-tl') === 0, 'float scrolls');
+    const tr = { clips: [{ start: 0, bars: 8 }], off: [[0, 4]] };
+    assert(!playingAt(tr, 2) && playingAt(tr, 5) && !playingAt(tr, 9), 'playing');
+  },
+  'timeline: draws on a canvas without errors'() {
+    const calls = []; const ctx = new Proxy({}, { get: (o, k) => (k in o ? o[k] : (...a) => { calls.push(k); return { width: 10 }; }), set: (o, k, v) => { o[k] = v; return true; } });
+    const shape = { bars: 32, sections: [{ label: 'A', start: 0, len: 16 }, { label: 'B', start: 16, len: 16 }], tracks: [{ id: 'drums', type: 'drums', clips: [{ start: 0, bars: 32 }], off: [[0, 4]], marks: [{ at: 4, say: 'go' }] }] };
+    const P = { bg: '#000', panel: '#111', line: '#333', ink: '#fff', muted: '#888', a1: '#f0f', a2: '#0ff', a3: '#ff0' };
+    drawTimeline(ctx, { x: 0, y: 0, w: 1800, h: 240, a: 1 }, shape, 6, P, { future: false });
+    drawColumn(ctx, { x: 0, y: 0, w: 300, h: 900, a: 1 }, shape, 6, P);
+    assert(calls.includes('fillRect') && calls.includes('fillText'), 'drawn');
   },
   'beat: stale after STALE seconds or when none came'() {
     assert(isStale(0, 1e12) && !isStale(1000, 1000 + STALE * 1000 - 1) && isStale(1000, 1000 + STALE * 1000 + 1), 'stale');
