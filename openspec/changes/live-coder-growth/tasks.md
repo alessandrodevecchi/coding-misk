@@ -1,7 +1,7 @@
 ## 1. Engine
 
 - [ ] 1.1 Growth names: ids `crescendo`, `gradual`, `natural`; old `natural` read as `gradual`
-- [ ] 1.2 Waypoint planner (3-6 small states; detours drawn: 0 at 0.2, 1 at 0.5, 2 at 0.25, 3 at 0.05)
+- [ ] 1.2 Waypoint planner (3-6 small states; detours drawn per passage: 0 at 0.5, 1 at 0.35, 2 at 0.12, 3 at 0.03; none in the first passage)
 - [ ] 1.3 Move engine between waypoints; new actions `clone`, `comment`, `notes`
 - [ ] 1.4 Chooser interface (seeded rules now)
 - [ ] 1.5 Duration free or fitted; Switch free, Crescendo fitted

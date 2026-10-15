@@ -22,11 +22,11 @@ Each step SHALL be one small move: add a sound, add a function, change a number,
 - **THEN** they change over several steps of a few characters each
 
 ### Requirement: Detours
-The number of detours (a waypoint that removes or rewrites something an earlier one added) SHALL be drawn per song: none in about one song in five, one in about half, two in about one in four, three rarely. Styles and artists MAY shift these chances.
+The number of detours (a waypoint that removes or rewrites something an earlier one added) SHALL be drawn for each passage between two waypoints: none in about half of them, one in about a third, two sometimes, three rarely, and none in the first passage. Styles and artists MAY shift these chances.
 
 #### Scenario: A straight song
-- **WHEN** a song draws no detour
-- **THEN** its waypoints only add and grow, straight to the end
+- **WHEN** a passage draws no detour
+- **THEN** in that passage the build only adds and grows
 
 #### Scenario: Gate out and back
 - **WHEN** a gate appears in an early waypoint
