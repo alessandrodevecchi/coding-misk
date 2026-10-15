@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "songs": {
+    "ali-di-cenere": "a7dc2bb1bbd36b46",
+    "cavo-scoperto": "e0043ec37fea4d22",
+    "circuito-ruggine": "dc79ce4cb9398045",
+    "crescendo-filo-di-luce": "f2caf252a1526540",
+    "crescendo-notte-lunga": "84857f9e0bb2187e",
+    "crescendo-primo-passo": "34db2790dfc72328",
+    "dci-carica": "dece43ee0b460fc1",
+    "dci-ignition": "58b09c18fc903046",
+    "dci-rebuild": "44c4fa91bc8df3b2",
+    "demo-synth-lab": "2e07b9bf1cfb9cce",
+    "drift": "e632c5502113419c",
+    "example-first-beat": "b3a35b9f6ca48c43",
+    "example-bass-and-chords": "1a1528103410e24e",
+    "example-night-shift": "682963d0ae150558",
+    "ferro": "5572e9e6f2061390",
+    "ghost-protocol-scenes": "14aee5839e29eaac",
+    "insert-coin": "50c5a4e7645d8e26",
+    "kellerlicht": "8aed4522bb89ede4",
+    "luci-rosse": "b26d21510f54ff59",
+    "neon-ascent-scenes": "bee58b45436c3d0a",
+    "neon-rush-reel": "3bb7dbdae76d5add",
+    "next-chapter": "1cb04a7edeac9116",
+    "pioggia-sul-vetro": "233ce290e13a9bec",
+    "primo-segnale": "c4900450af8bfc53",
+    "ruggine-lenta": "95d5b857e2d55692",
+    "segnale-nel-rumore": "5909b6bd87bfb9ad",
+    "settimo-cielo": "fc7845fcbe417ee4",
+    "ten-years-rebuild": "99b1610fc7fd7fcd"
+  }
+}

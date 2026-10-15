@@ -1,0 +1,209 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "crescendo-filo-di-luce",
+  "title": "Filo di luce",
+  "look": "palco",
+  "buildStyle": "crescendo",
+  "style": {
+    "en": "Medium house groove for Crescendo · D minor · 124 BPM · bass, pad, arp and hook on presets",
+    "it": "Groove house medio per Crescendo · Re minore · 124 BPM · basso, pad, arpeggio e melodia su preset"
+  },
+  "tags": {
+    "genres": [
+      "house"
+    ],
+    "free": [
+      "crescendo"
+    ]
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 8,
+      "bpm": 124,
+      "key": "D",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Groove",
+      "bars": 16,
+      "bpm": 124,
+      "key": "D",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Break",
+      "bars": 8,
+      "bpm": 124,
+      "key": "D",
+      "chords": "ipnotica",
+      "meter": "4/4",
+      "breath": true
+    },
+    {
+      "name": "Drop",
+      "bars": 16,
+      "bpm": 124,
+      "key": "D",
+      "chords": "ipnotica",
+      "meter": "4/4",
+      "crash": true
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.8,
+        "cutoff": 20000,
+        "drive": 0
+      },
+      "patterns": {
+        "house": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "cp": "....x.......x...",
+            "hh": "..x...x...x...x.",
+            "rd": "x.x.x.x.x.x.x.x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "house"
+        },
+        {
+          "section": "Groove",
+          "pattern": "house"
+        },
+        {
+          "section": "Drop",
+          "pattern": "house"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "square",
+        "gain": 0.7,
+        "cutoff": 650,
+        "move": "lento",
+        "reso": 6,
+        "drive": 0.5
+      },
+      "patterns": {
+        "walk": {
+          "preset": "offbeat"
+        }
+      },
+      "clips": [
+        {
+          "section": "Groove",
+          "pattern": "walk"
+        },
+        {
+          "section": "Drop",
+          "pattern": "walk"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "gm_synth_strings_1",
+        "gain": 0.3,
+        "cutoff": 2000,
+        "move": "lento",
+        "room": 0.85
+      },
+      "patterns": {
+        "wash": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "wash"
+        },
+        {
+          "section": "Groove",
+          "pattern": "wash"
+        },
+        {
+          "section": "Break",
+          "pattern": "wash"
+        },
+        {
+          "section": "Drop",
+          "pattern": "wash"
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "triangle",
+        "gain": 0.35,
+        "cutoff": 2600,
+        "move": "lento",
+        "reso": 3,
+        "delay": 0.4
+      },
+      "patterns": {
+        "climb": {
+          "preset": "su",
+          "speed": "16"
+        }
+      },
+      "clips": [
+        {
+          "section": "Groove",
+          "pattern": "climb"
+        },
+        {
+          "section": "Drop",
+          "pattern": "climb"
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.28,
+        "cutoff": 3000,
+        "move": "fisso",
+        "delay": 0.4,
+        "mode": "minor",
+        "octave": "4"
+      },
+      "patterns": {
+        "call": {
+          "preset": "richiamo"
+        }
+      },
+      "clips": [
+        {
+          "section": "Break",
+          "pattern": "call"
+        },
+        {
+          "section": "Drop",
+          "pattern": "call"
+        }
+      ]
+    }
+  ]
+}

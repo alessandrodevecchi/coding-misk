@@ -54,3 +54,25 @@ export function typingFrames(from, to) {
     return out.join('\n');
   };
 }
+
+// The text half-way between two versions where every edit outside the section that plays at `bar` is already made
+// (Crescendo, #64): a track has one line per section, and only the line that plays is typed live; the others change
+// at once. An edit belongs to the section of the nearest clip comment above it ("// Drop · bars 5-9 · pattern A").
+const CLIP = /^\/\/ .* · \D*(\d+)-(\d+) · /;
+export function settleOthers(from, to, bar) {
+  const ops = lineDiff(from.split('\n'), to.split('\n')), out = [];
+  let ctx = null;
+  const look = l => { if (l.startsWith('// ==========')) ctx = null; const m = l.match(CLIP); if (m) ctx = [+m[1] - 1, +m[2]]; };
+  for (let k = 0; k < ops.length;) {
+    if (ops[k].op === 'keep') { look(ops[k].text); out.push(ops[k].text); k++; continue; }
+    const dels = [], adds = [];
+    while (k < ops.length && ops[k].op !== 'keep') (ops[k].op === 'del' ? dels : adds).push(ops[k++].text);
+    // line by line, so a run of changes across two sections splits where the second one's comment is
+    for (let p = 0; p < Math.max(dels.length, adds.length); p++) {
+      if (p < adds.length) look(adds[p]); else if (p < dels.length) look(dels[p]);
+      const playing = !ctx || (bar >= ctx[0] && bar < ctx[1]);
+      if (playing) { if (p < dels.length) out.push(dels[p]); } else if (p < adds.length) out.push(adds[p]);
+    }
+  }
+  return out.join('\n');
+}

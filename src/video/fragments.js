@@ -25,7 +25,9 @@ export function barScores(shape) {
   const playing = new Uint16Array(n);
   for (const tr of shape.tracks || []) {
     if (tr.type === 'voice' || tr.mute) continue;
-    for (const c of tr.clips || []) for (let b = Math.max(0, c.start); b < Math.min(n, c.start + (c.bars || 1)); b++) playing[b]++;
+    // off: spans where a live build keeps the track silent ([from, to) bars)
+    const off = b => (tr.off || []).some(([a, z]) => b >= a && b < z);
+    for (const c of tr.clips || []) for (let b = Math.max(0, c.start); b < Math.min(n, c.start + (c.bars || 1)); b++) if (!off(b)) playing[b]++;
   }
   for (const s of shape.sections || []) for (let b = s.start; b < Math.min(n, s.start + s.len); b++) out[b] = playing[b] * sectionWeight(s.label);
   if (n > LONG) for (let b = 0; b < n; b++) if (b < EDGE || b >= n - EDGE) out[b] = 0;
@@ -34,6 +36,7 @@ export function barScores(shape) {
 
 // N fragments of `length` seconds, on bar lines, not overlapping, the livelier the likelier, the same for the same seed.
 // bpm: per bar. Returns [{ start, end, bar }] sorted by start (as many as fit).
+// shape.steps (a Crescendo song): fragments start on a step bar, and stretches with more steps weigh more.
 export function pickFragments(shape, bpm, { n = 3, length = 30, seed = 'fragments' } = {}) {
   const T = tempoClock(bpm), total = T.seconds(shape.bars), scores = barScores(shape);
   const cands = [];
@@ -42,7 +45,13 @@ export function pickFragments(shape, bpm, { n = 3, length = 30, seed = 'fragment
     if (end > total + 1e-6) break;
     const b1 = Math.min(shape.bars, Math.ceil(T.cycleAt(end)));
     let sum = 0; for (let k = b; k < b1; k++) sum += scores[k];
-    const score = sum / Math.max(1, b1 - b);
+    let score = sum / Math.max(1, b1 - b);
+    if (shape.steps) {
+      if (!shape.steps.includes(b)) continue;
+      score *= 1 + 0.15 * shape.steps.filter(x => x >= b && x < b1).length;
+      // the first bars, where one sound plays alone: only when nothing else fits
+      if (b === 0) score *= 0.01;
+    }
     if (score > 0) cands.push({ start, end, bar: b, score });
   }
   const r = stream(seed, `fragments/${n}/${length}`), out = [];

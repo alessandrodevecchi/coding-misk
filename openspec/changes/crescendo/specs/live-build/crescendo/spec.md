@@ -77,11 +77,11 @@ Crescendo SHALL draw, per song, the number of steps, their spacing and the endin
 - **THEN** their endings are not all of the same kind
 
 ### Requirement: Narration density
-Crescendo steps SHALL carry short spoken comments that say what the step does ("more bass", "open the filter", "bring the kick back in"), in English and Italian, from a phrase list per kind of step. The voice knob SHALL keep deciding how many comments are spoken. A "fully narrated" option SHALL make almost every step speak.
+Crescendo steps SHALL carry short spoken comments that say what the step does ("more bass", "open the filter", "bring the kick back in"), in English and Italian, from a phrase list per kind of step. In Compose the key steps SHALL speak and some of the others; in the radio (phase 2) the talk amount SHALL decide. A "fully narrated" option SHALL make almost every step speak.
 
 #### Scenario: Normal narration
 - **WHEN** the fully narrated option is off
-- **THEN** comments are spoken as often as the voice knob allows
+- **THEN** the key steps speak (a track entering, a break and its return, the chords coming in, the ending) and some of the others
 
 #### Scenario: Fully narrated
 - **WHEN** the fully narrated option is on
@@ -109,7 +109,7 @@ Taking over by hand and resuming SHALL work for a Crescendo build as for any liv
 - **THEN** the build types back to its own state at that bar and goes on with its steps
 
 ### Requirement: Harmony starts simple
-During the growth, Crescendo SHALL hold one chord (the first chord of the song's progression) and SHALL bring in the written progression with one step. Tempo, meter and swing SHALL stay as written in phase 1.
+During the growth, when the song's progression starts on its tonic chord, Crescendo SHALL hold that chord and SHALL bring in the written progression with one step. Tempo, meter and swing SHALL stay as written in phase 1.
 
 #### Scenario: Progression comes in
 - **WHEN** a Crescendo build starts

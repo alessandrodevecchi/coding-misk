@@ -35,6 +35,13 @@ export const GUIDE = [
     know: { en: '[Live build] plays the song as it builds up, one change per phrase. [▶ Continue in radio] plays the song on from where it is, then the radio goes on after it. {Ctrl}+{Enter} plays from anywhere, {Ctrl}+{.} stops.', it: '[In divenire] suona il brano mentre si costruisce, un cambio per frase. [▶ Continua in radio] suona il brano da dove sei, poi la radio continua dopo di lui. {Ctrl}+{Enter} suona da qualsiasi punto, {Ctrl}+{.} ferma.' },
   },
   {
+    id: 'crescendo', tab: 'componi', mode: 'ascolta', show: '#live-style',
+    title: { en: 'Crescendo', it: 'Crescendo' },
+    what: { en: 'A build style of the live build: the song starts from one sound and grows in small steps, a line or two at a time, like a live coder, until it sounds as written.', it: 'Un andamento del brano in divenire: il brano parte da un suono solo e cresce a piccoli passi, una riga o due alla volta, come un live coder, finché suona come è scritto.' },
+    how: { en: 'Turn on [Live build], set [Build style] to crescendo and play. [Fully narrated] makes almost every step speak.', it: 'Accendi [In divenire], metti [Andamento] su crescendo e suona. [Tutto narrato] fa parlare quasi ogni passo.' },
+    know: { en: 'The growth plays the first full section over and over before the song as written, first over one held chord. A song can declare its build style and opens with it. The same song always grows the same way.', it: 'La crescita ripete la prima sezione piena prima del brano scritto, all\'inizio su un solo accordo. Un brano può dichiarare il suo andamento e si apre con quello. Lo stesso brano cresce sempre allo stesso modo.' },
+  },
+  {
     id: 'hand', tab: 'componi', mode: 'ascolta', show: '#edhost',
     title: { en: 'Code by hand', it: 'Codice a mano' },
     what: { en: 'You can write in the live code while a song or the radio plays: your code takes over.', it: 'Puoi scrivere nel codice dal vivo mentre suona un brano o la radio: il tuo codice prende il controllo.' },

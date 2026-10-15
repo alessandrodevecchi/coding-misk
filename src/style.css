@@ -179,6 +179,9 @@
   .ruler-knob { position: absolute; top: 5px; width: 14px; height: 16px; margin-left: -7px; border-radius: 3px; background: var(--ink); box-shadow: 0 0 10px var(--a1); pointer-events: none; }
   .arr-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
   .arr-mode .hint { font-size: 11px; color: var(--muted); flex: 1 1 260px; }
+  .live-style { display: inline-flex; align-items: center; gap: 6px; }
+  .live-style .lbl { margin: 0; }
+  .live-style select:disabled { opacity: .5; }
   .tl-mode .arr-strip { gap: 0; }
   .tl-mode .arr-scene-btn { border-radius: 0; border-right-width: 0; }
   .tl-mode .arr-scene-btn:last-of-type { border-right-width: 1px; }

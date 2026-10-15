@@ -480,3 +480,13 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Preset con la timeline per diretta e video: sei mockup locali, futuro nascosto per i brani live build. Issue in arrivo.
 - Regola nuova in `AGENTS.md`: lavoro definito nelle issue, idee abbozzate nel backlog locale.
 
+
+## 2026-10-15: Crescendo fase 1 in Compose
+
+- Crescendo (`#64`) implementato: `src/song/crescendo.js` calcola dal brano scritto una crescita a piccoli passi (sezione di riferimento ripetuta, prima su un accordo solo; varianti sfoltite dei pattern `A~1`, `A~2`…; filtro, drive, riverbero e delay che salgono verso il valore scritto; effetti del rack uno alla volta; una o due pause della batteria; finale sfoltito, a blocchi o come scritto). Stesso brano, stessi passi.
+- Il passo `pattern` accetta `level`: ogni clip suona la variante del suo pattern (serve ai brani con pattern diversi per sezione).
+- Compose: controllo "Andamento" (a blocchi, crescendo) accanto a "In divenire" e "Tutto narrato". Un brano può dichiarare `"buildStyle": "crescendo"` e si apre così; i controlli lo cambiano per la sessione. L'arrangiatore mostra il brano scritto; la crescita sta prima della prima sezione.
+- La digitazione scrive solo la riga della sezione che suona; le altre cambiano subito (anche nel video).
+- Tre brani di prova in `songs/`: `crescendo-primo-passo` (corto, batteria e note scritte), `crescendo-filo-di-luce` (medio, preset), `crescendo-notte-lunga` (lungo, con un arpeggio che entra tardi). Frasi parlate nuove generate con `npm run voices`.
+- Check: `npm run check:crescendo` (13 controlli, con fixture e `CRESCENDO_VERSION`) e `tools/check-crescendo-play.cjs` nel browser. Export audio veloce di `crescendo-notte-lunga` (6:14) in 96 s, livelli senza silenzi né clip. Da provare: export video veloce.
+- Prossimo: `crescendo-code` (compilatore compatto), poi `live-timeline`. Il proprietario prova i tre brani in Compose prima di `crescendo-radio`.

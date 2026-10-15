@@ -1,0 +1,301 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "crescendo-notte-lunga",
+  "title": "Notte lunga",
+  "look": "palco",
+  "buildStyle": "crescendo",
+  "style": {
+    "en": "Long techno journey for Crescendo · E minor · 128 BPM · a written bass and hook, an arp that enters in the second drop",
+    "it": "Viaggio techno lungo per Crescendo · Mi minore · 128 BPM · basso e melodia scritti, un arpeggio che entra nel secondo drop"
+  },
+  "tags": {
+    "genres": [
+      "techno"
+    ],
+    "free": [
+      "crescendo"
+    ]
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 16,
+      "bpm": 128,
+      "key": "E",
+      "chords": "notturna",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 16,
+      "bpm": 128,
+      "key": "E",
+      "chords": "notturna",
+      "meter": "4/4",
+      "fill": true
+    },
+    {
+      "name": "Drop",
+      "bars": 16,
+      "bpm": 128,
+      "key": "E",
+      "chords": "notturna",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Break",
+      "bars": 8,
+      "bpm": 128,
+      "key": "E",
+      "chords": "notturna",
+      "meter": "4/4",
+      "breath": true
+    },
+    {
+      "name": "Drop 2",
+      "bars": 16,
+      "bpm": 128,
+      "key": "E",
+      "chords": "notturna",
+      "meter": "4/4",
+      "crash": true
+    },
+    {
+      "name": "Outro",
+      "bars": 8,
+      "bpm": 128,
+      "key": "E",
+      "chords": "notturna",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85,
+        "cutoff": 20000,
+        "drive": 0.8
+      },
+      "patterns": {
+        "pulse": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "..x...x...x...x."
+          }
+        },
+        "full": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "sd": "....x.......x...",
+            "hh": "x.xxx.xxx.xxx.xx",
+            "oh": "..x...x...x...x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "pulse"
+        },
+        {
+          "section": "Build",
+          "pattern": "full"
+        },
+        {
+          "section": "Drop",
+          "pattern": "full"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "full"
+        },
+        {
+          "section": "Outro",
+          "pattern": "pulse"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.75,
+        "cutoff": 700,
+        "move": "lento",
+        "reso": 10,
+        "drive": 1.5
+      },
+      "patterns": {
+        "drive": {
+          "preset": "rolling",
+          "notes": "0 0 ~ 0 0 ~ 0 3 0 0 ~ 0 0 ~ 2 3"
+        }
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "pattern": "drive"
+        },
+        {
+          "section": "Drop",
+          "pattern": "drive"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "drive"
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.3,
+        "cutoff": 2800,
+        "move": "fisso",
+        "delay": 0.45,
+        "mode": "minor",
+        "octave": "4",
+        "drive": 0.6
+      },
+      "patterns": {
+        "theme": {
+          "notes": "<[0 ~ 2 ~ 3 ~ 2 ~] [0 ~ 2 ~ 4 ~ 3 2]>"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "theme"
+        },
+        {
+          "section": "Break",
+          "pattern": "theme"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "theme"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.25,
+        "cutoff": 1600,
+        "move": "lento",
+        "room": 0.85
+      },
+      "patterns": {
+        "air": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "air"
+        },
+        {
+          "section": "Build",
+          "pattern": "air"
+        },
+        {
+          "section": "Drop",
+          "pattern": "air"
+        },
+        {
+          "section": "Break",
+          "pattern": "air"
+        },
+        {
+          "section": "Drop 2",
+          "pattern": "air"
+        },
+        {
+          "section": "Outro",
+          "pattern": "air"
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "type": "texture",
+      "settings": {
+        "sample": "numbers",
+        "gain": 0.3,
+        "grit": 0.6,
+        "room": 0.6
+      },
+      "patterns": {
+        "dust": {
+          "rhythm": "bar"
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "dust"
+        },
+        {
+          "section": "Break",
+          "pattern": "dust"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.25,
+        "bars": "8",
+        "dir": "up"
+      },
+      "patterns": {
+        "up": {}
+      },
+      "clips": [
+        {
+          "section": "Build",
+          "start": 40,
+          "bars": 8,
+          "pattern": "up"
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.3,
+        "cutoff": 2200,
+        "move": "lento",
+        "reso": 4,
+        "delay": 0.35
+      },
+      "patterns": {
+        "spin": {
+          "preset": "su",
+          "speed": "16",
+          "notes": "0 2 3 1 3 2 0 1"
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop 2",
+          "pattern": "spin"
+        }
+      ]
+    }
+  ]
+}

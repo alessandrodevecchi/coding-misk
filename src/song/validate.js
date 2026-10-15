@@ -34,6 +34,8 @@ export function validateSong(song, opts = {}) {
     if (!ins || typeof ins !== 'object' || Array.isArray(ins) || typeof ins.en !== 'string' || !ins.en.trim()) err('inspiration', 'an object with "en" (and "it"): short notes, for example { "en": "rain on a window" }');
     else for (const k of Object.keys(ins)) if (!['en', 'it'].includes(k) || typeof ins[k] !== 'string' || ins[k].length > 120) err(`inspiration.${k}`, 'a note of at most 120 characters, in "en" or "it"');
   }
+  // build style of the live build (#64): the song opens and plays with it
+  if (song.buildStyle !== undefined && !['blocks', 'crescendo'].includes(song.buildStyle)) err('buildStyle', 'one of blocks, crescendo, or left out (the Compose setting)');
   // tags and origin (song library, #34)
   if (song.origin !== undefined && !ORIGINS.includes(song.origin)) err('origin', `one of ${ORIGINS.join(', ')}, or left out`);
   if (song.tags !== undefined) {

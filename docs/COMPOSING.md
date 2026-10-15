@@ -85,6 +85,10 @@ In the app, the arranger has two views of the same song: **Free timeline** (the 
 - Take over by hand at any moment: type in the code (a click, a selection or a copy does not count) and the steps stop, the music goes on and Ctrl+Enter plays your code, even past the end of the song. "Resume live build" types the song's code back and the steps go on: with "from where I was" (on by default) the song goes back to the bar where you started typing, otherwise it goes on from where it has got to; your code stays in "Your last code" under the editor, with "Back to this code". In the Radio, by hand holds the song on air until you resume.
 - Add a track of type `voice` and run `npm run voices` after writing new comments: each phrase becomes a spoken sample, shaped by the voice track's knobs and rack (Primo Segnale: higher pitch, distortion, low cut, delay, reverb).
 
+### Crescendo
+
+Set "Build style" to crescendo (next to "Live build") and a song grows from one sound to the song as written in small steps (#64), with no steps to write. The growth repeats the first full section, first over one held chord, then the song plays as written. Each track enters on a thinned version of its pattern, then its pattern fills up, its filter opens and its effects come in one at a time; the drums stop once or twice and come back. The ending is drawn per song: stripped back, cut in blocks, or as written. "Fully narrated" makes almost every step speak. A song file can declare `"buildStyle": "crescendo"` to open in it; the three `crescendo-*` songs in `songs/` are written for it (short, medium, long).
+
 ## Endless sessions
 
 The endless director writes songs like these on its own, from style recipes (`docs/STYLES.md`, `docs/ENDLESS.md`):

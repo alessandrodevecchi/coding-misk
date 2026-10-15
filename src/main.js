@@ -3,7 +3,8 @@ import './style.css';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf, stepKeys } from './song/build.js';
-import { typingFrames } from './song/typing.js';
+import { typingFrames, settleOthers } from './song/typing.js';
+import { crescendoSong } from './song/crescendo.js';
 import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
@@ -104,6 +105,20 @@ function composedTracks() {
 if (!Array.isArray(user.codeSongs)) user.codeSongs = [];
 const codedTracks = () => [...CODED, ...user.codeSongs.map(v => ({ ...v, kind: 'coded' }))].map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
+// build style of the live build (#64): "blocks" (tracks come in whole) or "crescendo" (the song grows in small steps)
+let liveStyle = store.get('coding-misk-live-style', 'blocks') === 'crescendo' ? 'crescendo' : 'blocks';
+let liveNarrated = !!store.get('coding-misk-live-narrated', false);
+// a song may declare its build style; the Compose controls still switch it, for this session
+const liveOverride = new Map();
+const liveOf = tr => liveOverride.get(tr.id) || (tr.buildStyle ? { on: true, style: tr.buildStyle } : { on: liveOn, style: liveStyle });
+// Crescendo builds are computed once per song version and option
+const crescendoCache = new Map();
+function crescendoOf(tr) {
+  const key = JSON.stringify([liveNarrated, tr.sections, tr.tracks, tr.id]);
+  if (!crescendoCache.has(key)) { if (crescendoCache.size > 20) crescendoCache.clear(); crescendoCache.set(key, crescendoSong(tr, { narrated: liveNarrated })); }
+  const c = crescendoCache.get(key);
+  return c.build.length ? c : null;
+}
 // the radio tab (created further down, once the player exists)
 let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, genresTab = null, prevTab = 'componi';
 // custom samples manifest (bank → files), for spoken comments
@@ -112,7 +127,9 @@ let customFiles = {};
 function playable(tr) {
   // live build: the code depends on the bar (steps applied up to there), with the latest comment written in
   // a song without steps can build itself too ("Live build" switch): steps derived from its clips
-  const build = tr.kind !== 'composed' ? null : hasBuild(tr) ? tr : liveOn ? { ...tr, build: deriveBuild(tr) } : null;
+  // Crescendo ignores the song's own steps
+  const lv = liveOf(tr);
+  const build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : null;
   // keep(track): optional, only the tracks it keeps are compiled (the fast export renders a block with the tracks that play in it)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
   const codeAt = build ? (bar, keep) => {
@@ -150,7 +167,14 @@ let soulOverride = false; // the Soul display's override (#46): the stage shows 
 let soulBase = look;
 let compiled = playable({ ...T, kind: 'composed' });
 const saveDraft = () => store.set('coding-misk-draft', { T, sel, tk, dirty });
-const sceneStart = i => T.sections.slice(0, i).reduce((a, s) => a + s.bars, 0);
+// a Crescendo build plays a growth span before the written sections (#64): the arranger shows the written song,
+// so its bars and sections are offset by the growth (bars of the played song = bars of the arranger + growBars())
+const growth = () => (compiled && compiled.build && compiled.build.crescendo) || null;
+const growBars = () => (growth() ? growth().growth : 0);
+// section of the played song → section of the arranger (-1: in the growth span or the added ending)
+const arrSec = i => { const g = growth(); if (!g || i < 0) return i; const k = i - g.sections; return k >= 0 && k < T.sections.length ? k : -1; };
+// (the first section starts the song from the top, growth included)
+const sceneStart = i => (i > 0 ? growBars() : 0) + T.sections.slice(0, i).reduce((a, s) => a + s.bars, 0);
 const SEC = () => T.sections[sel];
 
 // ---------- editor Strudel e trasporto ----------
@@ -221,7 +245,8 @@ function liveBuild(sg, s, cyc) {
   // evaluated when the next query is about to reach the step's bar: everything from the bar on comes from the new code
   const typeAt = next.at - Math.min(1, 2 * s.cps), due = s.lastEnd + .1 * s.cps >= next.at;
   if (cyc < typeAt && !due) return;
-  if (!typing) typing = { frame: typingFrames(ed.code || '', codeFor(sg, next.at)), t0: cyc, t1: next.at - .2 * s.cps, shown: '' };
+  // only the line of the section that plays at the step is typed; the other sections' lines change at once
+  if (!typing) { const to = codeFor(sg, next.at), from = settleOthers(ed.code || '', to, next.at); typing = { frame: typingFrames(from, to), t0: cyc, t1: next.at - .2 * s.cps, shown: '' }; }
   if (!due) {
     const txt = typing.frame((cyc - typing.t0) / Math.max(.01, typing.t1 - typing.t0));
     if (txt !== typing.shown) { const prev = typing.shown || ed.code || ''; typing.shown = txt; ed.setCode(txt); followEdit(prev, txt); }
@@ -351,7 +376,7 @@ async function playSong(sg, bar = 0, as = 'free', { keepHand = false } = {}) {
     ed.setCode(codeFor(sg, bar));
     sched().lastEnd = bar;
     if (loopIdx >= 0) loopIdx = m.sectionAt(bar);
-    if (as === 'track') selectScene(m.sectionAt(bar));
+    if (as === 'track') { const k = arrSec(m.sectionAt(bar)); if (k >= 0) selectScene(k); }
     await ed.evaluate();
     updateShare();
   } finally { seeking = false; }
@@ -812,6 +837,13 @@ const setFragOpt = (k, v) => store.set(FRAG_KEY, { ...fragOpts(), [k]: v });
 const nextFragment = () => Math.max(1, +store.get(FRAG_N, 1) || 1);
 // the picker's shape: the song JSON when there is one, else the sections alone
 function shapeFor(sg) {
+  if (sg.doc && sg.doc.sections && sg.doc.tracks && sg.doc.crescendo) {
+    // a Crescendo song (#64): tracks are silent until the build brings them in, and fragments start on a step
+    const sh = shapeOf(sg.doc, absoluteClips), map = buildMap(sg.doc, sh.bars);
+    sh.tracks = sh.tracks.map(t => ({ ...t, off: (map[t.id] || {}).off || [] }));
+    sh.steps = [...new Set(buildSteps(sg.doc).map(x => x.at))];
+    return sh;
+  }
   if (sg.doc && sg.doc.sections && sg.doc.tracks) return shapeOf(sg.doc, absoluteClips);
   return { bars: sg.meta.bars, sections: sg.meta.sections.map(x => ({ label: x.label, start: x.start, len: x.len })), tracks: [{ type: 'any', clips: [{ start: 0, bars: sg.meta.bars }] }] };
 }
@@ -1122,8 +1154,11 @@ function renderArranger() {
   $('#arranger').classList.toggle('tl-mode', arrMode === 'timeline');
   $$('[data-arr-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.arrMode === arrMode));
   $('#arr-mode-hint').textContent = arrMode === 'timeline' ? t('timelineHint') : '';
-  const own = hasBuild(T), lt = $('#live-toggle');
-  lt.setAttribute('aria-pressed', own || liveOn); lt.disabled = own; lt.title = own ? t('liveOwn') : t('liveHint');
+  const own = hasBuild(T), lt = $('#live-toggle'), lv = liveOf(T), crescendo = lv.on && lv.style === 'crescendo';
+  lt.setAttribute('aria-pressed', own || lv.on); lt.disabled = own && !crescendo; lt.title = own && !crescendo ? t('liveOwn') : t('liveHint');
+  $('#live-style').value = lv.style; $('#live-style').disabled = !own && !lv.on;
+  $('#live-style').title = T.buildStyle && !liveOverride.has(T.id) ? t('liveDeclared') : t('liveStyleHint');
+  $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', liveNarrated);
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
   renderRuler();
@@ -1167,7 +1202,7 @@ function renderTimeline(total) {
   $('#arr-strip').style.minWidth = $('#arr-grid').style.minWidth = minW;
   $('#arr-strip').innerHTML = `<span class="arr-corner">${t('sections')}</span>` + T.sections.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" aria-current="${i === sel}">
       <b>${esc(s.name)}</b><span>${s.bars} · ${s.bpmEnd ? `${s.bpm}→${s.bpmEnd}` : s.bpm ?? 138}</span></button>`).join('') + '<span class="head"></span>';
-  const solo = T.tracks.some(tr => tr.solo), bmap = compiled.build ? buildMap(compiled.build, total) : null;
+  const solo = T.tracks.some(tr => tr.solo), bmap = compiled.build ? shownBuildMap(total) : null;
   const lines = st.slice(1).map(b => `<i class="sec-line" style="left:${b / total * 100}%"></i>`).join('');
   $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}" style="grid-template-columns:var(--trk-col) minmax(0, 1fr)" aria-current="${i === tk}">
       <div class="trk-head" data-act-ids="${ACT_IDS[tr.type] || esc((tr.settings && tr.settings.visual) || 'fx')}">
@@ -1214,6 +1249,16 @@ $('#arr-grid').addEventListener('click', e => {
 });
 // ---------- timeline: crea, sposta e allunga i clip (si fermano sui clip vicini) ----------
 const songBars = () => T.sections.reduce((a, s) => a + s.bars, 0);
+// the live build's silent spans and step marks in the arranger's bars (a Crescendo growth is left out)
+function shownBuildMap(total) {
+  const g = growBars(), map = buildMap(compiled.build, compiled.meta.bars);
+  if (!g) return buildMap(compiled.build, total);
+  for (const m of Object.values(map)) {
+    m.off = m.off.map(([a, b]) => [Math.max(0, a - g), Math.min(total, b - g)]).filter(([a, b]) => b > a);
+    m.marks = m.marks.filter(x => x.at >= g && x.at - g < total).map(x => ({ ...x, at: x.at - g }));
+  }
+  return map;
+}
 const spanOf = (tr, c) => spans(tr).find(x => x.c === c);
 // un clip spostato o allungato smette di seguire la sua sezione e diventa a battute fisse
 const toAbs = (tr, c) => { const sp = spanOf(tr, c); delete c.section; c.start = sp.s; c.bars = sp.e - sp.s; return c; };
@@ -1295,8 +1340,26 @@ $('#track-panel').addEventListener('click', e => {
   if (!tr.pinned.length) delete tr.pinned;
   changed(); syncTrackPanel();
 });
+// the Compose controls set the live build for every song; a song that declares its build style is switched for this session
+function liveChanged() {
+  compiled = playable({ ...T, kind: 'composed' });
+  if (isPlaying() && mode === 'track') playSong(compiled, Math.min(sched().now(), compiled.meta.bars - 1), 'track');
+  else if (ed && mode === 'track') ed.setCode(compiled.code);
+  renderArranger(); if (!$('#tab-brani').hidden) renderSongs();
+}
+$('#live-style').addEventListener('change', e => {
+  liveStyle = e.target.value === 'crescendo' ? 'crescendo' : 'blocks'; store.set('coding-misk-live-style', liveStyle);
+  if (T.buildStyle || hasBuild(T)) liveOverride.set(T.id, { on: true, style: liveStyle });
+  if (!hasBuild(T) && !T.buildStyle) { liveOn = true; store.set('coding-misk-live', true); }
+  liveChanged();
+});
+$('#live-narrated').addEventListener('click', () => { liveNarrated = !liveNarrated; store.set('coding-misk-live-narrated', liveNarrated); liveChanged(); });
 $('#live-toggle').addEventListener('click', () => {
-  liveOn = !liveOn; store.set('coding-misk-live', liveOn);
+  const lv = liveOf(T);
+  // a song with its own steps in crescendo: the switch goes back to its own steps
+  if (hasBuild(T)) liveOverride.set(T.id, { on: true, style: 'blocks' });
+  else if (T.buildStyle) liveOverride.set(T.id, { on: !lv.on, style: lv.style });
+  else { liveOn = !liveOn; store.set('coding-misk-live', liveOn); }
   compiled = playable({ ...T, kind: 'composed' });
   if (isPlaying() && mode === 'track') playSong(compiled, sched().now(), 'track');
   else if (ed && mode === 'track') ed.setCode(compiled.code);
@@ -1333,13 +1396,13 @@ function renderRuler() {
 }
 // dove ripartirebbe la musica: la posizione in pausa, oppure l'inizio della sezione selezionata
 // a brano finito il cursore resta in fondo finché non si sceglie un altro punto
-const cueBar = () => (ended === compiled.id ? songBars() : paused && song && paused.id === compiled.id ? paused.cyc : sceneStart(sel));
+const cueBar = () => (ended === compiled.id ? compiled.meta.bars : paused && song && paused.id === compiled.id ? paused.cyc : sceneStart(sel));
 async function seekTo(bar) {
   ended = null;
   if (isPlaying() && mode === 'track') return playSong(compiled, bar, 'track');
   if (mode !== 'track') backToTrack();
   song = compiled; paused = { id: compiled.id, cyc: bar };
-  const i = compiled.meta.sectionAt(bar); if (i >= 0 && i !== sel) selectScene(i);
+  const i = arrSec(compiled.meta.sectionAt(bar)); if (i >= 0 && i !== sel) selectScene(i);
 }
 let rulerDrag = null;
 $('#ruler-track').addEventListener('pointerdown', e => {
@@ -1348,22 +1411,23 @@ $('#ruler-track').addEventListener('pointerdown', e => {
   $('#ruler-track').setPointerCapture(e.pointerId); e.preventDefault();
 });
 $('#ruler-track').addEventListener('pointermove', e => { if (rulerDrag) rulerDrag.bar = xToBar(rulerDrag.g, e.clientX - rulerDrag.g.tr.left); });
-$('#ruler-track').addEventListener('pointerup', () => { if (!rulerDrag) return; const b = rulerDrag.bar; rulerDrag = null; seekTo(b); });
+$('#ruler-track').addEventListener('pointerup', () => { if (!rulerDrag) return; const b = rulerDrag.bar; rulerDrag = null; seekTo(b + growBars()); });
 $('#ruler-track').addEventListener('keydown', e => {
-  const now = isPlaying() && mode === 'track' && sched() ? sched().now() : cueBar(), total = songBars();
-  const to = { ArrowLeft: Math.floor(now) - 1, ArrowRight: Math.floor(now) + 1, Home: 0, End: total - 1 }[e.key];
+  const g = growBars(), now = (isPlaying() && mode === 'track' && sched() ? sched().now() : cueBar()) - g, total = songBars();
+  const to = { ArrowLeft: Math.floor(now) - 1, ArrowRight: Math.floor(now) + 1, Home: -g, End: total - 1 }[e.key];
   if (to === undefined) return;
-  e.preventDefault(); seekTo(Math.max(0, Math.min(total - 1, to)));
+  e.preventDefault(); seekTo(g + Math.max(-g, Math.min(total - 1, to)));
 });
 // a ogni frame: cursore e tempo (durante il trascinamento segue il puntatore)
 function updateRuler(playing) {
   const knob = $('#ruler-knob'); if (!knob || !compiled) return;
   const g = rulerGeo(), s = sched();
-  const pos = rulerDrag ? rulerDrag.bar : playing && mode === 'track' && s ? Math.min(s.now(), songBars()) : cueBar();
+  const gb = growBars(), played = rulerDrag ? rulerDrag.bar + gb : playing && mode === 'track' && s ? Math.min(s.now(), compiled.meta.bars) : cueBar();
+  const pos = Math.max(0, Math.min(songBars(), played - gb));
   const x = barToX(g, pos), w = g.tr.width;
   // il cursore resta dentro la barra anche a fine brano (prima sporgeva e faceva comparire le barre di scorrimento)
   knob.style.left = `${Math.max(7, Math.min(w - 7, x))}px`; $('#ruler-fill').style.width = `${Math.max(0, Math.min(w, x))}px`;
-  const tt = `${clock(compiled.meta.secondsAt(pos))} / ${clock(compiled.meta.seconds)}`;
+  const tt = `${clock(compiled.meta.secondsAt(played))} / ${clock(compiled.meta.seconds)}`;
   if ($('#ruler-time').textContent !== tt) $('#ruler-time').textContent = tt;
   $('#ruler-track').setAttribute('aria-valuenow', Math.min(songBars(), Math.floor(pos) + 1));
 }
@@ -2397,7 +2461,7 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
     } else if (cyc >= m.bars && mode !== 'radio' && !hand && resumeTo === null && !(!rec && advance())) { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
     // segue la sezione che suona, ma non mentre si sta scrivendo in un campo del brano
     const typing = document.activeElement && document.activeElement.matches('input, select, textarea') && document.activeElement.closest('#arranger, #track-panel');
-    if (mode === 'track' && follow && !typing) { const i = m.sectionAt(cyc); if (i >= 0 && i !== sel) selectScene(i); }
+    if (mode === 'track' && follow && !typing) { const i = arrSec(m.sectionAt(cyc)); if (i >= 0 && i !== sel) selectScene(i); }
   }
   // registrazione: aggancio all'uscita master, coda di riverbero, etichette dei pulsanti
   if (capture) capture.tap();
@@ -2433,7 +2497,7 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
   if (head) {
     const trackCyc = playing && mode === 'track' && s ? s.now() : -1;
     const idx = trackCyc >= 0 ? compiled.meta.sectionAt(trackCyc) : -1;
-    const btns = $$('.arr-scene-btn'), b = btns[idx];
+    const btns = $$('.arr-scene-btn'), b = btns[arrSec(idx)];
     head.hidden = !b;
     if (b) head.style.left = `${b.offsetLeft + Math.min(1, (trackCyc - compiled.meta.sections[idx].start) / compiled.meta.sections[idx].len) * (b.offsetWidth - 2)}px`;
     const lh = $('#arr-grid .head');
@@ -2770,7 +2834,7 @@ const visuals = startVisuals({
   readout(cyc, step, playing) {
     if (!playing) return `${secFull().bpm} BPM  ·  ${paused ? t('resume').replace('▶ ', '') : t('rdPaused')}\n${t('rdHint')}`;
     const bar = Math.floor(cyc);
-    const cur = song && mode === 'track' ? T.sections[song.meta.sectionAt(cyc)] : null;
+    const cur = song && mode === 'track' ? T.sections[arrSec(song.meta.sectionAt(cyc))] : null;
     const bpm = Math.round(sched().cps * 240 * (cur ? meterSteps(cur.meter || '4/4') / 16 : 1));
     let line2 = $('#src').textContent;
     if (song) {

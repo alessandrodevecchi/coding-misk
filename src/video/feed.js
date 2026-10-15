@@ -1,6 +1,6 @@
 // The fast video's feed (#53): what the visuals read live from the analysers, made from the timeline and the
 // rendered audio instead, so a frame can be drawn at any time. Pure: checked in Node (tools/check-video.mjs).
-import { typingFrames } from '../song/typing.js';
+import { typingFrames, settleOthers } from '../song/typing.js';
 
 // how an instrument's level falls after a note starts: percussion decays (seconds), the others hold for the note
 const DECAY = { kick: 0.1, snare: 0.12, hats: 0.04, fx: 0.3 };
@@ -40,7 +40,8 @@ export function codeFrom(segments) {
     let i = 0; while (i + 1 < segments.length && segments[i + 1].from <= c) i++;
     const seg = segments[i], next = segments[i + 1];
     if (!next || c < next.from - 1) return seg.code;
-    if (!cache.has(i)) cache.set(i, typingFrames(seg.code, next.code));
+    // as live: only the line of the section that plays at the step is typed
+    if (!cache.has(i)) cache.set(i, typingFrames(settleOthers(seg.code, next.code, next.from), next.code));
     return cache.get(i)(Math.max(0, Math.min(1, (c - (next.from - 1)) / 0.9)));
   };
 }

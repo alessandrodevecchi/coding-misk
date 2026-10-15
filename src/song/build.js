@@ -28,7 +28,12 @@ function apply(song, step) {
   if (step.add !== undefined) list(step.add).forEach(id => { const t = track(id); if (t) delete t.mute; });
   if (step.remove !== undefined) list(step.remove).forEach(id => { const t = track(id); if (t) t.mute = true; });
   if (step.set) { const { track: id, ...vals } = step.set, t = track(id); if (t) t.settings = { ...t.settings, ...vals }; }
-  if (step.pattern) { const t = track(step.pattern.track); if (t && t.patterns[step.pattern.to]) t.clips = t.clips.map(c => ({ ...c, pattern: step.pattern.to })); }
+  if (step.pattern) {
+    const p = step.pattern, t = track(p.track);
+    // "level": every clip plays its own pattern's variant of that level (Crescendo, "A~2"), 0 = as written
+    if (t && p.level !== undefined) t.clips = t.clips.map(c => { const base = String(c.pattern).replace(/~\d+$/, ''), v = `${base}~${p.level}`; return { ...c, pattern: p.level && t.patterns[v] ? v : base }; });
+    else if (t && t.patterns[p.to]) t.clips = t.clips.map(c => ({ ...c, pattern: p.to }));
+  }
   if (step.rack) {
     const { track: id, ...dev } = step.rack, t = track(id);
     if (t) { const r = (t.rack || []).filter(d => d.device !== dev.device); t.rack = [...r, dev]; }
@@ -72,7 +77,7 @@ export const nextStep = (song, bar) => buildSteps(song).find(s => s.at > bar) ||
 const stepWords = s => {
   for (const k of ['add', 'remove']) if (s[k] !== undefined) return `${k} ${list(s[k]).join(' ')}`;
   if (s.set) { const { track, ...v } = s.set; return `set ${track} ${Object.entries(v).map(([k, x]) => `${k} ${x}`).join(' ')}`; }
-  if (s.pattern) return `${s.pattern.track} pattern ${s.pattern.to}`;
+  if (s.pattern) return `${s.pattern.track} pattern ${s.pattern.to ?? `level ${s.pattern.level}`}`;
   if (s.rack) return `${s.rack.track} + ${s.rack.device}`;
   if (s.unrack) return `${s.unrack.track} - ${s.unrack.device}`;
   return '';
@@ -163,7 +168,8 @@ export function checkBuild(song, total, err, warn) {
     }
     if (s.pattern) {
       const t = needTrack(`${p}.pattern.track`, s.pattern.track);
-      if (t && !(t.patterns || {})[s.pattern.to]) err(`${p}.pattern.to`, `not a pattern of ${t.id}; patterns: ${Object.keys(t.patterns || {}).join(', ')}`);
+      if (s.pattern.level !== undefined) { if (!Number.isInteger(s.pattern.level) || s.pattern.level < 0) err(`${p}.pattern.level`, 'a whole number from 0 (0: the written patterns, 1 and up: their variants "A~1", "A~2"…)'); }
+      else if (t && !(t.patterns || {})[s.pattern.to]) err(`${p}.pattern.to`, `not a pattern of ${t.id}; patterns: ${Object.keys(t.patterns || {}).join(', ')}`);
     }
     if (s.rack) { needTrack(`${p}.rack.track`, s.rack.track); const { track, ...dev } = s.rack; checkRack([dev], `${p}.rack`, (q, m) => err(q.replace(`${p}.rack[0]`, `${p}.rack`), m), (q, m) => warn(q.replace(`${p}.rack[0]`, `${p}.rack`), m)); }
     if (s.unrack) { needTrack(`${p}.unrack.track`, s.unrack.track); if (!DEVICES[s.unrack.device]) err(`${p}.unrack.device`, `one of ${Object.keys(DEVICES).join(', ')}`); }

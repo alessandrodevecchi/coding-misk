@@ -175,7 +175,7 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 | `add` | track id, or a list: the track starts playing. Tracks named by an `add` step are silent before it; the others play from the start |
 | `remove` | track id, or a list: the track stops |
 | `set` | `{ "track", …settings }`: settings of that track from now on |
-| `pattern` | `{ "track", "to" }`: every clip of the track plays pattern `to` from now on |
+| `pattern` | `{ "track", "to" }`: every clip of the track plays pattern `to` from now on. `{ "track", "level": k }`: every clip plays the variant `k` of its own pattern (`A~1`, `A~2`…, made by Crescendo), `0` the written one |
 | `rack` | `{ "track", "device", …values }`: adds a rack device (replaces one of the same kind) |
 | `unrack` | `{ "track", "device" }`: removes a rack device |
 | `say` | a short comment, or one per language (`{ "en", "it" }`): shown over the stage for 4 bars, written as `// > …` above the track it changes, and spoken by a voice track |
@@ -186,6 +186,8 @@ One step can combine several actions. Steps on the same bar apply in file order.
 **Spoken comments.** When a sample exists for a comment, it is spoken once on its step's bar by a track of type `voice`. `npm run voices` (macOS) makes one WAV per phrase and language with the system voice (`say`), in `public/samples/say_en/` and `say_it/` (git-ignored). A step speaks with the first voice track, or with the one named in its `voice` field (`{ "at": 8, "say": "more bass", "voice": "robot" }`); a song with several voice tracks can give each phrase a different sound. Without a voice track, comments use the default voice settings.
 
 A song without `build` can also build itself: the "Live build" switch above the arranger derives steps from its clips (each track comes in where its clips start and leaves where they stop, with a short comment), so it sounds exactly as written. On the timeline, a live build shows hatching where its steps keep a track silent and a diamond where a step changes it.
+
+**Build style.** `"buildStyle": "crescendo"` (or `"blocks"`) makes the song open and play with that build style of the live build; without it the song follows the Compose setting. Crescendo (`src/song/crescendo.js`) ignores the song's own `build` and computes one: it prepends growth sections (`Crescendo`, `Crescendo 2`), may append an ending section (`Strip` or `Stop`), adds pattern variants named `<pattern>~<level>` to the tracks, and writes steps with the actions above. The song file is never changed.
 
 ## Compiled code
 
