@@ -1,9 +1,10 @@
 // Browser check for the compact code of Crescendo songs (#64, crescendo-code): for states of a few songs, the events
 // Strudel makes (onset time and every value) are the same with the standard code, the joined lines and one line per
-// track (a velocity of 1 counts as no velocity: the code of the moment drops lanes that are 1). Usage: PLAYWRIGHT_CORE=... node tools/check-compact-code.cjs   (dev server on :5173)
+// track, the short patterns and the lines broken before a function (a velocity of 1 counts as no velocity: the code of
+// the moment drops lanes that are 1). Usage: PLAYWRIGHT_CORE=... node tools/check-compact-code.cjs   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-notte-lunga', 'ferro', 'cavo-scoperto'];
+const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-notte-lunga', 'ferro', 'cavo-scoperto', 'switch-prima-luce'];
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
@@ -12,7 +13,7 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
   let failed = 0;
   for (const id of SONGS) {
     const res = await page.evaluate(async id => {
-      const [{ crescendoSong }, { compileCompact, compileNow }, { compileSong }, { stateAt, buildSteps }, { idiomatic }] = await Promise.all(['/src/song/crescendo.js', '/src/song/compile-compact.js', '/src/song/compile.js', '/src/song/build.js', '/src/song/idiom.js'].map(u => import(u)));
+      const [{ crescendoSong }, { compileCompact, compileNow }, { compileSong }, { stateAt, buildSteps }, { idiomatic }, { breakLines }] = await Promise.all(['/src/song/crescendo.js', '/src/song/compile-compact.js', '/src/song/compile.js', '/src/song/build.js', '/src/song/idiom.js', '/src/song/typing.js'].map(u => import(u)));
       const song = await (await fetch(`/songs/${id}.json`)).json(), c = crescendoSong(song), total = c.sections.reduce((a, x) => a + x.bars, 0);
       const waiting = [...new Set(buildSteps(c).flatMap(s => (s.add !== undefined ? [].concat(s.add) : [])))];
       const e = document.querySelector('strudel-editor').editor;
@@ -39,6 +40,8 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
           out.push({ bar, lines: 'now', same: sameNow });
           // the idiomatic generator: same events (drum machines may take longer steps: their samples play whole)
           out.push({ bar, lines: 'idiomatic', same: a === await haps(idiomatic(compileSong(st))) });
+          // lines broken before a function (typing-lines): same events
+          out.push({ bar, lines: 'breaks', same: a === await haps(breakLines(idiomatic(compileSong(st)), 40)) });
         } catch (x) { out.push({ bar, err: x.message }); }
       }
       return out;

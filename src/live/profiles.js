@@ -12,11 +12,12 @@ export const CONTROLS = {
   title: [true, false],
   comments: ['all', 'essential', 'none'],
   highlights: [false, true],
+  wrap: [false, true],
 };
 export const PROFILES = {
-  classic: { build: 'blocks', growth: 'crescendo', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, comments: 'all', highlights: false },
-  crescendo: { build: 'crescendo', growth: 'crescendo', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, comments: 'all', highlights: false },
-  switch: { build: 'crescendo', growth: 'natural', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, comments: 'essential', highlights: true },
+  classic: { build: 'blocks', growth: 'crescendo', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, comments: 'all', highlights: false, wrap: false },
+  crescendo: { build: 'crescendo', growth: 'crescendo', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, comments: 'all', highlights: false, wrap: false },
+  switch: { build: 'crescendo', growth: 'natural', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, comments: 'essential', highlights: true, wrap: true },
 };
 export const PROFILE_IDS = Object.keys(PROFILES);
 
