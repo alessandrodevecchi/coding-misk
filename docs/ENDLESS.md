@@ -204,6 +204,7 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Comment rate and spacing                     | `director: comments about half of the boundaries, 8 bars apart`  |
 | Short phrases                                | `director: phrase pool is short and complete`                    |
 | Voice amount                                 | `director: voice amount sets how often comments are spoken`      |
+| Switch songs: one key, short progressions, crescendo | `director: Switch songs keep one key, short progressions and open in crescendo` |
 | A voice per song                             | `director: each song has its own voice`                          |
 | Artist validator                             | `artists: validator reports errors at their paths`               |
 | Songs drawn from an artist's taste           | `artists: songs draw their values from the taste`                |

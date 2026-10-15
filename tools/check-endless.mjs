@@ -27,6 +27,7 @@ import { partsKey } from '../src/endless/mix.js';
 import { allPhrases } from '../src/endless/phrases.js';
 import { GROOVES, BASS, ARPS, HOOKS } from '../src/music.js';
 
+import { PROGS } from '../src/music.js';
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const take = (s, n) => Array.from({ length: n }, () => s.next());
 
@@ -245,6 +246,17 @@ const CHECKS = {
     assert(said(0.5) === said(undefined), 'talk 0.5 differs from the default');
     for (const id of STARTING) for (const e of session({ styles: [id], minutes: 10, seed: `check-${id}`, talk: 1 }).session.songs) {
       let last = -Infinity; for (const p of e.phrases) if (p.say) { assert(p.bar - last >= 8, `talk 1: comments at bars ${last} and ${p.bar}`); last = p.bar; }
+    }
+  },
+  'director: Switch songs keep one key, short progressions and open in crescendo'() {
+    for (const st of ['switch-trance', 'switch-acid', 'switch-house']) {
+      const out = session({ styles: [st], minutes: 20, seed: `switch-${st}` });
+      for (const sg of out.songs) {
+        assert(new Set(sg.sections.map(x => x.key)).size === 1, `${st}: one key`);
+        assert(sg.sections.every(x => new Set(PROGS[x.chords][1]).size <= 4), `${st}: short progressions`);
+        assert(sg.tracks.filter(t => t.type !== 'voice').length <= 8, `${st}: few tracks`);
+        assert(sg.buildStyle === 'crescendo', `${st}: build style`);
+      }
     }
   },
   'director: each song has its own voice'() {

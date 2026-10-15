@@ -1,0 +1,181 @@
+{
+  "format": 1,
+  "id": "switch-house",
+  "family": "switch",
+  "buildStyle": "crescendo",
+  "name": {
+    "en": "Switch · house",
+    "it": "Switch · house"
+  },
+  "genre": "house",
+  "description": "Live-coded house in one minor scale: four on the floor with off-beat open hats, a chord stab on one or two chords, a bass on the root.",
+  "tempo": [
+    122,
+    126
+  ],
+  "keys": [
+    "A",
+    "D",
+    "F",
+    "G"
+  ],
+  "progressions": [
+    "drone",
+    "pendolo",
+    "dorico",
+    "ipnotica"
+  ],
+  "shapes": [
+    "slow-burn",
+    "flat-groove",
+    "build-drop"
+  ],
+  "minutes": [
+    4,
+    6
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      4,
+      5
+    ],
+    "max": 6
+  },
+  "drums": {
+    "kits": [
+      "RolandTR909"
+    ],
+    "grooves": [
+      "techno",
+      "pulse"
+    ],
+    "settings": {
+      "drive": [
+        0,
+        0.3
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "offbeat",
+      "walking",
+      "pumping"
+    ],
+    "waves": [
+      "square",
+      "sawtooth"
+    ],
+    "settings": {
+      "cutoff": [
+        400,
+        1000
+      ],
+      "reso": [
+        4,
+        8
+      ]
+    }
+  },
+  "pad": {
+    "presets": [
+      "stab",
+      "synco",
+      "staccato"
+    ],
+    "waves": [
+      "gm_drawbar_organ",
+      "supersaw",
+      "gm_epiano1"
+    ],
+    "weight": 0.9,
+    "settings": {
+      "cutoff": [
+        1200,
+        3000
+      ]
+    }
+  },
+  "hook": {
+    "presets": [
+      "eco",
+      "richiamo",
+      "pioggia"
+    ],
+    "waves": [
+      "gm_epiano1",
+      "square"
+    ],
+    "modes": [
+      "minor"
+    ],
+    "weight": 0.5,
+    "settings": {
+      "delay": [
+        0.3,
+        0.5
+      ]
+    }
+  },
+  "riser": {},
+  "voice": {
+    "speakers": [
+      "sandy",
+      "shelley"
+    ],
+    "gain": 0.3,
+    "pitch": [
+      0.9,
+      1.15
+    ],
+    "tempo": [
+      0.85,
+      1
+    ],
+    "cutoff": [
+      5000,
+      9000
+    ],
+    "room": [
+      0.4,
+      0.7
+    ],
+    "delay": [
+      0.25,
+      0.45
+    ]
+  },
+  "words": {
+    "en": [
+      "Groove",
+      "Room",
+      "Stab",
+      "Floor",
+      "Late",
+      "Warm",
+      "Night",
+      "Switch"
+    ],
+    "it": [
+      "Groove",
+      "Stanza",
+      "Accordo",
+      "Pista",
+      "Tardi",
+      "Caldo",
+      "Notte",
+      "Scatto"
+    ],
+    "es": [
+      "Groove",
+      "Sala",
+      "Golpe",
+      "Pista",
+      "Tarde",
+      "Cálido",
+      "Noche",
+      "Cambio"
+    ]
+  }
+}

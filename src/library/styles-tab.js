@@ -42,7 +42,7 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
     }).join('');
     const v = r.voice || {};
     return `<div class="sheet-grid">
-      <div class="sheet-block"><h4>${esc(t('genreLbl'))}</h4><div class="big">${esc(t(`g:${GENRES.includes(r.genre) ? r.genre : 'experimental'}`))}</div></div>
+      <div class="sheet-block"><h4>${esc(t('genreLbl'))}</h4><div class="big">${esc(t(`g:${GENRES.includes(r.genre) ? r.genre : 'experimental'}`))}</div></div>${r.family ? `<div class="sheet-block"><h4>${esc(t('familyLbl'))}</h4><div class="big">${esc(r.family[0].toUpperCase() + r.family.slice(1))}</div></div>` : ''}
       <div class="sheet-block"><h4>${esc(t('libTempo'))}</h4><div class="big">${esc(range(r.tempo))} BPM</div>
         <div><span class="lbl">${esc(t('libLength'))}</span> ${esc(range(r.minutes || [3, 5]))} min · ${esc(t('libPhrase'))} ${r.phrase || 8} · ${esc(t('libTracks'))} ${esc(range((r.tracks || {}).usual || [4, 5]))}, max ${(r.tracks || {}).max ?? 8}</div>
         <div><span class="lbl">${esc(t('libShapes'))}</span> ${tagList(r.shapes)}</div></div>

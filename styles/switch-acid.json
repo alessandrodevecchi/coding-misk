@@ -1,0 +1,195 @@
+{
+  "format": 1,
+  "id": "switch-acid",
+  "family": "switch",
+  "buildStyle": "crescendo",
+  "name": {
+    "en": "Switch · acid",
+    "it": "Switch · acid"
+  },
+  "genre": "techno",
+  "description": "Live-coded acid in one minor scale: a squelchy resonant line, a distorted kick, sparse hats and claps, built one function at a time.",
+  "tempo": [
+    128,
+    135
+  ],
+  "keys": [
+    "C",
+    "A",
+    "F",
+    "E"
+  ],
+  "progressions": [
+    "drone",
+    "pendolo",
+    "tensione"
+  ],
+  "shapes": [
+    "slow-burn",
+    "flat-groove",
+    "waves"
+  ],
+  "minutes": [
+    4,
+    6
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      4,
+      5
+    ],
+    "max": 6
+  },
+  "drums": {
+    "kits": [
+      "RolandTR909",
+      "RolandTR808"
+    ],
+    "grooves": [
+      "techno",
+      "hard"
+    ],
+    "settings": {
+      "drive": [
+        0.6,
+        1.6
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "sub",
+      "rumble"
+    ],
+    "waves": [
+      "sawtooth"
+    ],
+    "settings": {
+      "cutoff": [
+        300,
+        700
+      ],
+      "reso": [
+        8,
+        12
+      ]
+    }
+  },
+  "arp": {
+    "presets": [
+      "acid"
+    ],
+    "waves": [
+      "sawtooth",
+      "square"
+    ],
+    "speeds": [
+      "16"
+    ],
+    "weight": 0.95,
+    "settings": {
+      "cutoff": [
+        500,
+        2400
+      ],
+      "reso": [
+        14,
+        20
+      ],
+      "drive": [
+        1,
+        3
+      ]
+    }
+  },
+  "hook": {
+    "presets": [
+      "colpi",
+      "allarme"
+    ],
+    "waves": [
+      "square"
+    ],
+    "modes": [
+      "minor",
+      "phrygian"
+    ],
+    "weight": 0.3
+  },
+  "texture": {
+    "samples": [
+      "industrial",
+      "numbers"
+    ],
+    "rhythms": [
+      "euclid",
+      "bar"
+    ],
+    "weight": 0.4
+  },
+  "riser": {},
+  "voice": {
+    "speakers": [
+      "rocko",
+      "reed"
+    ],
+    "gain": 0.3,
+    "pitch": [
+      0.6,
+      0.9
+    ],
+    "tempo": [
+      0.75,
+      0.95
+    ],
+    "hpf": [
+      500,
+      1000
+    ],
+    "drive": [
+      1,
+      3
+    ],
+    "room": [
+      0.3,
+      0.55
+    ],
+    "delay": [
+      0.2,
+      0.4
+    ]
+  },
+  "words": {
+    "en": [
+      "Acid",
+      "Squelch",
+      "Wire",
+      "Resonance",
+      "Line",
+      "Bite",
+      "Drift",
+      "Switch"
+    ],
+    "it": [
+      "Acido",
+      "Fischio",
+      "Filo",
+      "Risonanza",
+      "Linea",
+      "Morso",
+      "Deriva",
+      "Scatto"
+    ],
+    "es": [
+      "Ácido",
+      "Chirrido",
+      "Cable",
+      "Resonancia",
+      "Línea",
+      "Mordida",
+      "Deriva",
+      "Cambio"
+    ]
+  }
+}

@@ -51,7 +51,7 @@ export const RECIPE_DEFAULTS = {
 };
 
 export const RECIPE_FORMAT = 1;
-export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'words', ...Object.keys(INSTRUMENTS)];
+export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'words', ...Object.keys(INSTRUMENTS)];
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const isInt = v => Number.isInteger(v);
 const knownSound = w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w);
@@ -80,6 +80,9 @@ export function validateRecipe(r) {
   if (typeof r.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(r.id)) err('id', 'lowercase letters, digits and hyphens, for example "berlin-techno"');
   for (const lang of ['en', 'it']) if (!r.name || typeof r.name[lang] !== 'string' || !r.name[lang].trim()) err(`name.${lang}`, 'the style name in English and Italian, for example {"en": "Berlin techno", "it": "Techno berlinese"}');
 
+  // a family of styles across genres (switch-styles), and the build style its songs open with in Compose
+  if (r.family !== undefined && (typeof r.family !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(r.family))) err('family', 'a family id: lowercase letters, digits and hyphens, for example "switch"');
+  if (r.buildStyle !== undefined && !['blocks', 'crescendo'].includes(r.buildStyle)) err('buildStyle', 'one of blocks, crescendo');
   // one genre of the song library (#34); a style without one is treated as experimental
   if (r.genre === undefined) warn('genre', `no genre: treated as "experimental"; genres: ${GENRES.join(', ')}`);
   else if (!GENRES.includes(r.genre)) err('genre', `a genre: ${GENRES.join(', ')}`);

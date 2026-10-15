@@ -1,0 +1,201 @@
+{
+  "format": 1,
+  "id": "switch-trance",
+  "family": "switch",
+  "buildStyle": "crescendo",
+  "name": {
+    "en": "Switch · trance",
+    "it": "Switch · trance"
+  },
+  "genre": "trance",
+  "description": "Live-coded trance in one minor scale: four on the floor, a gated supersaw bass and lead on one or two chords, a pulse riser, built step by step.",
+  "tempo": [
+    138,
+    142
+  ],
+  "keys": [
+    "G",
+    "A",
+    "F",
+    "D"
+  ],
+  "progressions": [
+    "drone",
+    "pendolo",
+    "ipnotica",
+    "epica"
+  ],
+  "shapes": [
+    "slow-burn",
+    "build-drop"
+  ],
+  "minutes": [
+    4,
+    6
+  ],
+  "phrase": 8,
+  "tracks": {
+    "usual": [
+      4,
+      5
+    ],
+    "max": 6
+  },
+  "drums": {
+    "kits": [
+      "RolandTR909"
+    ],
+    "grooves": [
+      "trance",
+      "pulse"
+    ],
+    "settings": {
+      "drive": [
+        0,
+        0.3
+      ]
+    }
+  },
+  "bass": {
+    "presets": [
+      "rolling",
+      "offbeat",
+      "pumping"
+    ],
+    "waves": [
+      "supersaw",
+      "sawtooth"
+    ],
+    "settings": {
+      "cutoff": [
+        500,
+        1400
+      ],
+      "reso": [
+        8,
+        14
+      ]
+    }
+  },
+  "arp": {
+    "presets": [
+      "su",
+      "pulsar",
+      "pedale"
+    ],
+    "waves": [
+      "supersaw"
+    ],
+    "speeds": [
+      "16"
+    ],
+    "weight": 0.7,
+    "settings": {
+      "cutoff": [
+        1200,
+        3200
+      ],
+      "delay": [
+        0.4,
+        0.7
+      ]
+    }
+  },
+  "hook": {
+    "presets": [
+      "neon",
+      "segnale",
+      "ostinato"
+    ],
+    "waves": [
+      "supersaw",
+      "square"
+    ],
+    "modes": [
+      "minor"
+    ],
+    "weight": 0.6,
+    "settings": {
+      "delay": [
+        0.4,
+        0.7
+      ]
+    }
+  },
+  "pad": {
+    "presets": [
+      "sidechain",
+      "pump"
+    ],
+    "waves": [
+      "supersaw"
+    ],
+    "weight": 0.4,
+    "settings": {
+      "cutoff": [
+        900,
+        2000
+      ]
+    }
+  },
+  "riser": {},
+  "voice": {
+    "speakers": [
+      "flo",
+      "sandy"
+    ],
+    "gain": 0.3,
+    "pitch": [
+      0.95,
+      1.2
+    ],
+    "tempo": [
+      0.85,
+      1
+    ],
+    "hpf": [
+      300,
+      600
+    ],
+    "room": [
+      0.6,
+      0.9
+    ],
+    "delay": [
+      0.35,
+      0.6
+    ]
+  },
+  "words": {
+    "en": [
+      "Gate",
+      "Pulse",
+      "Loop",
+      "Signal",
+      "Saw",
+      "Rise",
+      "Cycle",
+      "Switch"
+    ],
+    "it": [
+      "Cancello",
+      "Impulso",
+      "Giro",
+      "Segnale",
+      "Lama",
+      "Salita",
+      "Ciclo",
+      "Scatto"
+    ],
+    "es": [
+      "Puerta",
+      "Pulso",
+      "Bucle",
+      "Señal",
+      "Sierra",
+      "Subida",
+      "Ciclo",
+      "Cambio"
+    ]
+  }
+}
