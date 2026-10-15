@@ -59,6 +59,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const lv = {}, prev = {}, norm = {}, lastOn = {};
   for (const k of INSTRUMENTS) { lv[k] = 0; prev[k] = 0; norm[k] = .05; lastOn[k] = 0; }
   let glitch = 0, shake = 0;
+  // the levels of the last frame, for the lit notes of the code panel (performance-profiles)
+  let lastLevels = {};
   // the fast video (#53) draws frames at given times from a feed of levels instead of the analysers
   let clock = () => performance.now(), feed = null, held = false;
   let level = 0, kick = 0, flash = 0, lastStep = -1, lastT = performance.now();
@@ -80,6 +82,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const A = window.analysers, fn = window.getAnalyzerData;
     const raw = {};
     wave.fill(0);
+    lastLevels = raw;
     if (feed) { Object.assign(raw, feed.raw); wave.set(feed.wave); hookWave.set(feed.hook); }
     else if (isPlaying() && A && typeof fn === 'function') {
       for (const id of Object.keys(A)) {
@@ -884,5 +887,5 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   let idle = 0, spin = 0;
   requestAnimationFrame(frame);
   // levels: the current level of each instrument (analysers live, the feed in a fast video)
-  return { setTarget, drawAt, pump, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; }, get levels() { return raw; } };
+  return { setTarget, drawAt, pump, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; }, get levels() { return lastLevels; } };
 }

@@ -145,7 +145,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
         const L = layerOf[r.li]; if (!L || L.muted) return;
         const level = Math.min(1, (lv[idOf.get(L.start)] || 0) * 2.5); if (level < .05) return;
         const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
-        g.fillStyle = P.a2 || P.a1; g.globalAlpha = (A.a ?? 1) * .16 * level; g.fillRect(A.x + 4, y - fs * .95, A.w - 8, lh);
+        g.fillStyle = P.a2 || P.a1; g.globalAlpha = (A.a ?? 1) * .3 * level; g.fillRect(A.x + 4, y - fs * .95, A.w - 8, lh);
         // the step box, in the first string of the layer's first row
         if (r.li !== L.start || r.from > 0) return;
         const m = r.line.match(/"([^"<>]*)"/); if (!m || m.index >= r.text.length) return;
