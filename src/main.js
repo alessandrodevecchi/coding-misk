@@ -133,8 +133,9 @@ function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v },
 // Crescendo builds are computed once per song version and option
 const crescendoCache = new Map();
 function crescendoOf(tr) {
-  const narrated = ctlOf(tr).narrated, key = JSON.stringify([narrated, tr.sections, tr.tracks, tr.id]);
-  if (!crescendoCache.has(key)) { if (crescendoCache.size > 20) crescendoCache.clear(); crescendoCache.set(key, crescendoSong(tr, { narrated })); }
+  // the Switch profile grows with the natural rules (natural-growth)
+  const C = ctlOf(tr), narrated = C.narrated, rules = C.growth === 'natural' ? { natural: true } : {}, key = JSON.stringify([narrated, C.growth, tr.sections, tr.tracks, tr.id]);
+  if (!crescendoCache.has(key)) { if (crescendoCache.size > 20) crescendoCache.clear(); crescendoCache.set(key, crescendoSong(tr, { narrated, rules })); }
   const c = crescendoCache.get(key);
   return c.build.length ? c : null;
 }

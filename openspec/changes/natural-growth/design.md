@@ -30,6 +30,10 @@ Gaps are drawn from `spacing` (4 to 8 bars at the start, 2 to 6 later). After an
 
 With probability `trials`, a step that moves a number (cutoff, room, delay, gain) is typed as one or two tries: the typing schedule types a first value, waits for one evaluation (the bar), then edits to the next. Each try is a real step with its own bar, so the sound follows the code.
 
+### D7. What is hidden
+
+Gain stays written from the start (an absent gain would play louder than the song). With less detail fewer functions are hidden (cutoff, drive, room and delay, then only cutoff), so short songs still have room for pauses. Hide and reveal are two new build actions (`hide`, `reveal` with `keys`).
+
 ## Risks / Trade-offs
 
 - **[Longer growth]** → sparse steps and pauses make the growth longer; the limit of three times the written length holds, and short songs use fewer steps.

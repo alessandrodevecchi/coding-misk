@@ -6,7 +6,8 @@
 import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
 
-export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack'];
+// hide and reveal (natural-growth): functions of a track left out of its code until a step brings them in
+export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack', 'hide', 'reveal'];
 const clone = o => JSON.parse(JSON.stringify(o));
 const list = v => (Array.isArray(v) ? v : [v]);
 
@@ -18,7 +19,7 @@ export const hasBuild = song => buildSteps(song).length > 0;
 // the track a step works on (for comments in the code), or null
 export function stepTrack(step) {
   for (const k of ['add', 'remove']) if (step[k] !== undefined) return list(step[k])[0];
-  for (const k of ['set', 'pattern', 'rack', 'unrack']) if (step[k] && step[k].track) return step[k].track;
+  for (const k of ['set', 'pattern', 'rack', 'unrack', 'hide', 'reveal']) if (step[k] && step[k].track) return step[k].track;
   return null;
 }
 
@@ -39,6 +40,8 @@ function apply(song, step) {
     if (t) { const r = (t.rack || []).filter(d => d.device !== dev.device); t.rack = [...r, dev]; }
   }
   if (step.unrack) { const t = track(step.unrack.track); if (t) t.rack = (t.rack || []).filter(d => d.device !== step.unrack.device); }
+  if (step.hide) { const t = track(step.hide.track); if (t) t.hidden = [...new Set([...(t.hidden || []), ...list(step.hide.keys)])]; }
+  if (step.reveal) { const t = track(step.reveal.track); if (t) { t.hidden = (t.hidden || []).filter(k => !list(step.reveal.keys).includes(k)); if (!t.hidden.length) delete t.hidden; } }
 }
 
 // the song as it is at a bar: steps with "at" ≤ bar applied; "upTo" = number of steps applied
@@ -80,6 +83,7 @@ const stepWords = s => {
   if (s.pattern) return `${s.pattern.track} pattern ${s.pattern.to ?? `level ${s.pattern.level}`}`;
   if (s.rack) return `${s.rack.track} + ${s.rack.device}`;
   if (s.unrack) return `${s.unrack.track} - ${s.unrack.device}`;
+  if (s.reveal) return `${s.reveal.track} + ${list(s.reveal.keys).join(' ')}`;
   return '';
 };
 export function annotate(code, song, upTo, lang) {
@@ -173,6 +177,7 @@ export function checkBuild(song, total, err, warn) {
     }
     if (s.rack) { needTrack(`${p}.rack.track`, s.rack.track); const { track, ...dev } = s.rack; checkRack([dev], `${p}.rack`, (q, m) => err(q.replace(`${p}.rack[0]`, `${p}.rack`), m), (q, m) => warn(q.replace(`${p}.rack[0]`, `${p}.rack`), m)); }
     if (s.unrack) { needTrack(`${p}.unrack.track`, s.unrack.track); if (!DEVICES[s.unrack.device]) err(`${p}.unrack.device`, `one of ${Object.keys(DEVICES).join(', ')}`); }
+    for (const k of ['hide', 'reveal']) if (s[k]) { needTrack(`${p}.${k}.track`, s[k].track); if (!list(s[k].keys).every(x => ['cutoff', 'reso', 'drive', 'grit', 'room', 'delay', 'env'].includes(x))) err(`${p}.${k}.keys`, 'some of cutoff, reso, drive, grit, room, delay, env'); }
   });
 }
 
@@ -187,7 +192,7 @@ export function buildMap(song, total) {
     for (const s of steps) {
       if (s.add !== undefined && list(s.add).includes(t.id) && !on) { if (s.at > from) off.push([from, s.at]); on = true; }
       if (s.remove !== undefined && list(s.remove).includes(t.id) && on) { from = s.at; on = false; }
-      for (const k of ['set', 'pattern', 'rack', 'unrack']) if (s[k] && s[k].track === t.id) marks.push({ at: s.at, action: k, say: s.say });
+      for (const k of ['set', 'pattern', 'rack', 'unrack', 'reveal']) if (s[k] && s[k].track === t.id) marks.push({ at: s.at, action: k, say: s.say });
       if (t.type === 'voice' && s.say && voiceOf(song, s) === t) marks.push({ at: s.at, action: 'say', say: s.say });
     }
     if (!on && total > from) off.push([from, total]);

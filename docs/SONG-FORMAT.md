@@ -178,6 +178,8 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 | `pattern` | `{ "track", "to" }`: every clip of the track plays pattern `to` from now on. `{ "track", "level": k }`: every clip plays the variant `k` of its own pattern (`A~1`, `A~2`…, made by Crescendo), `0` the written one |
 | `rack` | `{ "track", "device", …values }`: adds a rack device (replaces one of the same kind) |
 | `unrack` | `{ "track", "device" }`: removes a rack device |
+| `hide` | `{ "track", "keys" }`: leaves out of the track's code the functions of these settings (`cutoff`, `reso`, `drive`, `grit`, `room`, `delay`, `env`), so Strudel's defaults apply (natural growth) |
+| `reveal` | `{ "track", "keys" }`: brings them back |
 | `say` | a short comment, or one per language (`{ "en", "it" }`): shown over the stage for 4 bars, written as `// > …` above the track it changes, and spoken by a voice track |
 | `voice` | id of the voice track that speaks this step's comment (default: the first one) |
 

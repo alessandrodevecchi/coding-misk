@@ -119,6 +119,28 @@ const CHECKS = {
       }
     }
   },
+  'natural growth: ends on the written song, every state compiles, short entries, pauses after entries'() {
+    for (const s of songs) {
+      const c = crescendoSong(s, { rules: { natural: true } });
+      assert(JSON.stringify(crescendoSong(s, { rules: { natural: true } }).build) === JSON.stringify(c.build), `${s.id}: same build twice`);
+      assert(compileSong(stateAt(c, c.crescendo.grown).song) === compileSong({ ...c, build: undefined }), `${s.id}: end`);
+      const steps = buildSteps(c), bars = [...new Set(steps.map(x => x.at))];
+      for (const b of bars) compileSong(stateAt(c, b).song);
+      assert(total(c) <= 3 * c.crescendo.written, `${s.id}: length ${total(c)}`);
+      if (!c.crescendo.natural) continue;
+      // a track enters without the functions it hides
+      for (const e of steps.filter(x => x.add !== undefined && x.at > 0 && x.at < c.crescendo.growth)) {
+        const st = stateAt(c, e.at).song, tr = st.tracks.find(t => t.id === e.add);
+        if (tr && tr.hidden && tr.hidden.includes('cutoff')) assert(!/\.lpf\(/.test(compileSong({ ...st, tracks: [tr] }).split('// ==========')[1] || ''), `${s.id}: ${e.add} enters with a filter`);
+      }
+      // a reveal brings one function at a time
+      assert(steps.filter(x => x.reveal).every(x => !Array.isArray(x.reveal.keys)), `${s.id}: one function per reveal`);
+      // a listening pause after most entries in the growth
+      const grow = bars.filter(b => b > 0 && b < c.crescendo.growth), entries = steps.filter(x => x.add !== undefined && x.at > 0 && x.at < c.crescendo.growth);
+      const paused = entries.filter(e => { const next = grow.find(b => b > e.at); return next === undefined || next - e.at >= 4; });
+      assert(paused.length >= entries.length * 0.7, `${s.id}: pauses after ${paused.length} of ${entries.length} entries`);
+    }
+  },
   'fixtures: a rules change raises CRESCENDO_VERSION'() {
     const now = { version: CRESCENDO_VERSION, songs: Object.fromEntries([...built].map(([id, c]) => [id, print(c)])) };
     if (process.argv.includes('--write')) { fs.mkdirSync('tools/fixtures', { recursive: true }); fs.writeFileSync(FIXTURES, JSON.stringify(now, null, 2) + '\n'); return; }

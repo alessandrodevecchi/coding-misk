@@ -7,6 +7,21 @@ import { rackCode } from './rack.js';
 
 const fadeIn = (secs, i) => i > 0 ? Math.min(secs[i].fade || 0, secs[i].bars) : 0;
 
+// natural growth (natural-growth): settings a track has not revealed yet leave their functions out of its code,
+// so Strudel's defaults apply until a step brings them in. track.hidden: keys of HIDDEN_FNS
+export const HIDDEN_FNS = { cutoff: ['lpf'], reso: ['lpq'], drive: ['distort', 'distortvol'], grit: ['crush'], room: ['room', 'roomsize'], delay: ['delay', 'delaysync', 'delayfeedback'], env: ['attack', 'decay', 'sustain', 'release'] };
+export function stripFns(line, names) {
+  let out = line;
+  for (const n of names) {
+    for (let at = out.indexOf(`.${n}(`); at >= 0; at = out.indexOf(`.${n}(`, at)) {
+      let depth = 0, k = at + n.length + 1;
+      for (; k < out.length; k++) { if (out[k] === '(') depth++; else if (out[k] === ')' && --depth === 0) break; }
+      out = out.slice(0, at) + out.slice(k + 1);
+    }
+  }
+  return out;
+}
+
 export function compileSong(input) {
   const song = normalizeSong(input);
   const secs = song.sections, total = song.total;
@@ -58,7 +73,8 @@ export function compileSong(input) {
           const lines = sceneLayers(clipState(sec, tr, clip), opts).filter(l => l !== '');
           const desc = lines[0] && lines[0].startsWith('//') ? lines.shift() : null;
           if (desc && desc !== described) { L.push(desc); described = desc; }
-          L.push(...lines);
+          const hide = (tr.hidden || []).flatMap(k => HIDDEN_FNS[k] || []);
+          L.push(...(hide.length ? lines.map(l => stripFns(l, hide)).filter(l => l.trim() !== '') : lines));
         }
       });
     }

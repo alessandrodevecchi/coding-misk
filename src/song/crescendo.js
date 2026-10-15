@@ -17,6 +17,13 @@ const ORDER = ['drums', 'bass', 'pad', 'guitar', 'arp', 'hook', 'texture', 'rise
 // tracks without rows or notes to thin grow with the "degrade" device instead
 const DEGRADE_TYPES = ['bass', 'guitar', 'arp', 'hook', 'pad', 'texture'];
 const COLOUR_KEYS = ['cutoff', 'drive', 'grit', 'room', 'delay', 'gain'];
+// natural growth: which functions a track writes, by setting (they are hidden until a step reveals them)
+const HIDE_TYPES = ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture'];
+const HIDES = {
+  cutoff: (s, type) => type !== 'texture' && Number.isFinite(s.cutoff) && s.cutoff < 18000,
+  reso: s => Number(s.reso) > 0, drive: s => Number(s.drive) > 0, grit: s => Number(s.grit) > 0,
+  room: s => Number(s.room) > 0, delay: s => Number(s.delay) > 0, env: (s, type) => ['bass', 'arp', 'hook', 'pad', 'guitar'].includes(type),
+};
 const r3 = x => Math.round(x * 1000) / 1000;
 
 // ---------- growing patterns ----------
@@ -93,7 +100,9 @@ function moves(key, from, to, m) {
 // ---------- the path ----------
 // One track's plan at a level of detail (3 full, 0 bare): the minimal state it enters with (setup) and its growth
 // units, each one small change. Units of a queue keep their order.
-function trackPlan(t, d, rng, clipKeys) {
+// rules.natural (natural-growth): the track's functions are hidden at the start and arrive one per step, some knob
+// moves are tried by ear (a value past the next one, then corrected)
+function trackPlan(t, d, rng, clipKeys, rules = {}) {
   const plan = { id: t.id, type: t.type, setup: [], fullness: [], colour: [], patterns: {} };
   if (t.type === 'code' || t.type === 'riser' || t.type === 'voice' || t.type === 'module') return plan;
   // pattern variants
@@ -122,7 +131,24 @@ function trackPlan(t, d, rng, clipKeys) {
     if (nv === null) continue;
     neutralSet[key] = nv;
     const m = d < 3 ? 1 : key === 'cutoff' ? rng.int(1, 3) : key === 'gain' ? 1 : rng.int(1, 2);
-    knobs.push(moves(key, nv, v, m).map(x => ({ kind: key, step: { set: { track: t.id, [key]: x } } })));
+    const vals = moves(key, nv, v, m);
+    // a try: past the written value, then back to it
+    if (rules.natural && key !== 'gain' && rng.chance(rules.trials ?? 0.3)) vals.splice(vals.length - 1, 0, key === 'cutoff' ? Math.round(v * 1.4 / 10) * 10 : r3(v * 1.3));
+    const lane = vals.map(x => ({ kind: key, step: { set: { track: t.id, [key]: x } } }));
+    // natural growth: a knob that moves arrives first (its function was hidden)
+    if (rules.natural && HIDES[key] && HIDE_TYPES.includes(t.type)) lane.unshift({ kind: 'reveal', device: key, step: { reveal: { track: t.id, keys: key } } });
+    knobs.push(lane);
+  }
+  // natural growth: the functions the track writes are hidden at bar 0; those without a knob arrive on their own
+  if (rules.natural && HIDE_TYPES.includes(t.type)) {
+    const set = { ...(t.settings || {}) }, moving = knobs.map(l => l[0] && l[0].step.reveal && l[0].step.reveal.keys).filter(Boolean);
+    // with less detail fewer functions arrive on their own (a long list of reveals would leave no room for pauses)
+    const may = d >= 2 ? Object.keys(HIDES) : d === 1 ? ['cutoff', 'drive', 'room', 'delay'] : ['cutoff'];
+    const hidden = Object.keys(HIDES).filter(k => (HIDES[k](set, t.type) || moving.includes(k)) && (may.includes(k) || moving.includes(k)));
+    if (hidden.length) {
+      plan.setup.push({ hide: { track: t.id, keys: hidden } });
+      for (const k of hidden) if (!knobs.some(l => l[0] && l[0].step.reveal && l[0].step.reveal.keys === k)) knobs.push([{ kind: 'reveal', device: k, step: { reveal: { track: t.id, keys: k } } }]);
+    }
   }
   if (Object.keys(neutralSet).length) plan.setup.push({ set: { track: t.id, ...neutralSet } });
   // rack devices come in one at a time, in their written order (only a tail of the chain, so the order stays)
@@ -197,6 +223,13 @@ const P = {
     off: [['double it', 'raddoppiamo']], ply: [['repeat the notes', 'ripeto le note']], jux: [['wider', 'più largo']],
     any: [['add some colour', "un po' di colore"], ['one more effect', 'un effetto in più']],
   },
+  // natural growth: a function arrives in the code
+  reveal: {
+    cutoff: [['add a filter', 'mettiamo un filtro'], ['filter it', 'filtriamolo']], reso: [['more resonance', 'più risonanza'], ['make it squelch', 'facciamolo fischiare']],
+    drive: [['some drive', "un po' di spinta"], ['distort it', 'distorciamo']], grit: [['some grit', "un po' di grana"]],
+    room: [['some room', "un po' di spazio"], ['add reverb', 'aggiungo riverbero']], delay: [['add a delay', 'aggiungo un delay'], ['echo it', 'facciamo eco']],
+    env: [['shape the notes', 'diamo forma alle note'], ['shorter notes', 'note più corte']], any: [['one more function', 'una funzione in più']],
+  },
   break: { any: [['drop the drums', 'togliamo la batteria'], ['break', 'pausa']] },
   back: { any: [['bring the kick back in', 'torna la cassa'], ['and back', 'e si riparte']] },
   harmony: { any: [['now the chords', 'ora gli accordi'], ['chords move', 'gli accordi si muovono']] },
@@ -205,7 +238,7 @@ const P = {
 };
 export const CRESCENDO_PHRASES = Object.values(P).flatMap(g => Object.values(g).flat()).map(([en, it]) => ({ en, it }));
 function phrase(kind, type, device, recent, rng) {
-  const g = P[kind] || P.device, list = (kind === 'device' ? g[device] : g[type]) || g.any || P.enter.any;
+  const g = P[kind] || P.device, list = (kind === 'device' || kind === 'reveal' ? g[device] : g[type]) || g.any || P.enter.any;
   const fresh = list.filter(([en]) => !recent.includes(en)), [en, it] = rng.pick(fresh.length ? fresh : list);
   recent.push(en); if (recent.length > 8) recent.shift();
   return { en, it };
@@ -217,9 +250,12 @@ const KEY_STEPS = ['enter', 'break', 'back', 'harmony', 'strip-first', 'last'];
 
 // song + options → the song with a growth span, generated patterns and "build". The seed defaults to the song id.
 // Songs with nothing to grow come back without steps.
-export function crescendoSong(song, { seed, narrated = false } = {}) {
+// rules: {} (Crescendo) or { natural: true, trials } (natural-growth: hidden functions, sparse steps, listening pauses)
+export function crescendoSong(song, { seed, narrated = false, rules = {} } = {}) {
   const rng = stream(String(seed ?? song.id ?? 'song'), `crescendo-${CRESCENDO_VERSION}`);
   const n = normalizeSong(song), W = n.total, secs = n.sections;
+  // a song shorter than 24 bars has no room for slow growth: it grows with the Crescendo rules
+  if (rules.natural && W < 24) rules = {};
   const over = (c, s) => c.start < s.start + s.bars && c.start + c.bars > s.start;
   const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.clips.length);
   if (!plays.length || !W) return { ...clone(song), build: [] };
@@ -234,14 +270,15 @@ export function crescendoSong(song, { seed, narrated = false } = {}) {
   const clipR = t => t.clips.find(c => over(c, R));
   const clipKeys = t => new Set(t.clips.flatMap(c => Object.keys(c.set || {})));
   // growth budget: up to twice the written length for short songs, one and a half otherwise (room for the ending)
-  const cap = W <= 20 ? 2 * W : Math.round(1.5 * W);
+  // (natural growth is slower: at most the written length, so a song does not double)
+  const cap = rules.natural ? (W < 48 ? Math.round(1.5 * W) : W) : W <= 20 ? 2 * W : Math.round(1.5 * W);
   // detail: the most that fits within three times the written length, with room between the steps
   let d = 3, plans, path;
   for (; d >= 0; d--) {
     const prng = rng.fork(`plan-${d}`);
-    plans = dest.map(t => trackPlan(t, d, prng, clipKeys(t)));
+    plans = dest.map(t => trackPlan(t, d, prng, clipKeys(t), rules));
     path = crescendoPath(plans, prng.fork('path'));
-    if (path.length * 1.5 + 4 <= cap || d === 0) break;
+    if (path.length * (rules.natural ? 3 : 1.5) + 4 <= cap || d === 0) break;
   }
 
   // harmony: the first tracks play over one held chord, one step brings in the progression
@@ -265,9 +302,19 @@ export function crescendoSong(song, { seed, narrated = false } = {}) {
     }
   });
   // bars: one step every 1 to 4 bars (1 to 2 fully narrated), squeezed when the song would get too long
-  const gaps = seq.map((u, i) => (i === 0 ? 0 : seq[i - 1].gap || gapOf(rng, narrated)));
+  // natural growth: 4 to 8 bars apart in the first part, 2 to 6 later, and a listening pause of 4 to 8 bars after a
+  // track comes in, the progression arrives or the drums come back
+  const natGap = i => (i < seq.length * 0.4 ? rng.int(4, 8) : rng.int(2, 6)) + (['enter', 'back'].includes(seq[i - 1].kind) || seq[i - 1].harmony ? rng.int(4, 8) : 0);
+  const gaps = seq.map((u, i) => (i === 0 ? 0 : seq[i - 1].gap || (rules.natural && !narrated ? natGap(i) : gapOf(rng, narrated))));
   const room = Math.max(seq.length, cap - 4);
-  for (let sum = gaps.reduce((a, b) => a + b, 0); sum > room;) { const i = gaps.indexOf(Math.max(...gaps)); if (gaps[i] <= 1) break; gaps[i]--; sum--; }
+  // squeezed from the largest gaps; natural growth keeps its listening pauses (at least 4 bars) as long as it can
+  const pause = seq.map((u, i) => rules.natural && i > 0 && (['enter', 'back'].includes(seq[i - 1].kind) || seq[i - 1].harmony));
+  for (let sum = gaps.reduce((a, b) => a + b, 0); sum > room;) {
+    let i = -1;
+    for (let k = 1; k < gaps.length; k++) if (gaps[k] > (pause[k] ? 4 : 1) && (i < 0 || gaps[k] - (pause[k] ? 4 : 0) > gaps[i] - (pause[i] ? 4 : 0))) i = k;
+    if (i < 0) { i = gaps.indexOf(Math.max(...gaps)); if (gaps[i] <= 1) break; }
+    gaps[i]--; sum--;
+  }
   let bar = 0;
   const growth = seq.map((u, i) => ({ ...u, at: (bar += gaps[i]) }));
   const lastAt = growth[growth.length - 1].at, tail = gapOf(rng, narrated);
@@ -279,7 +326,7 @@ export function crescendoSong(song, { seed, narrated = false } = {}) {
   const owner = new Map(growth.map(u => [u.at, u.track])), latePlans = [], lateSteps = [];
   for (const t of late) {
     for (let ld = Math.min(d, 1); ld >= -1; ld--) {
-      const p = ld < 0 ? { id: t.id, type: t.type, setup: [], fullness: [], colour: [], patterns: {} } : trackPlan(t, ld, rng.fork(`late-${t.id}-${ld}`), clipKeys(t));
+      const p = ld < 0 ? { id: t.id, type: t.type, setup: [], fullness: [], colour: [], patterns: {} } : trackPlan(t, ld, rng.fork(`late-${t.id}-${ld}`), clipKeys(t), rules);
       const taken = new Map(), free = at => { while (owner.has(at) || taken.has(at)) at++; taken.set(at, t.id); return at; };
       let at = free(t.clips[0].start + G);
       const mine = [{ at, kind: 'enter', type: t.type, step: { add: t.id } }];
@@ -356,6 +403,6 @@ export function crescendoSong(song, { seed, narrated = false } = {}) {
   out.build = build.map((s, i) => ({ s, i })).sort((a, b) => a.s.at - b.s.at || a.i - b.i).map(x => x.s);
   out.buildStyle = 'crescendo';
   // facts for checks and the UI: where the growth ends and which ending was drawn
-  out.crescendo = { version: CRESCENDO_VERSION, growth: G, sections: grow.length, grown: Math.max(lastGrowth, lastAt), ending, detail: d, written: W, narrated };
+  out.crescendo = { version: CRESCENDO_VERSION, growth: G, sections: grow.length, grown: Math.max(lastGrowth, lastAt), ending, detail: d, written: W, narrated, natural: !!rules.natural };
   return out;
 }
