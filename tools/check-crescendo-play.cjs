@@ -29,10 +29,12 @@ const SONGS = ['ferro', 'cavo-scoperto'];
     check(!(await page.isHidden('#live-narrated')), `${id}: "fully narrated" shows with crescendo`);
     if (id === SONGS[0]) {
       const c = (await st()).code;
-      check(/^_\$:/m.test(c) && !(await page.isHidden('#live-compact')), `${id}: compact code shows the tracks still to come with _$:`);
-      await page.click('#live-compact'); await sleep(600);
+      check(/^_\$:/m.test(c) && !(await page.isHidden('#live-code')), `${id}: compact code shows the tracks still to come with _$:`);
+      await page.locator('#live-code').selectOption('sections'); await sleep(600);
       check(!/^_\$:/m.test((await st()).code), `${id}: code per section without _$:`);
-      await page.click('#live-compact'); await sleep(600);
+      await page.locator('#live-code').selectOption('track'); await sleep(600);
+      check(/\.pick\(\[/.test((await st()).code) || (await st()).code.length < c.length, `${id}: one line per track`);
+      await page.locator('#live-code').selectOption('compact'); await sleep(600);
     }
     const first = await st();
     check(tracks(first.code) === 1, `${id}: the build starts from one sound`, `${tracks(first.code)} tracks`);

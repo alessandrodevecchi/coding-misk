@@ -54,8 +54,29 @@ const ident = id => String(id).replace(/[^a-zA-Z0-9]+(.)?/g, (_, c) => (c ? c.to
 // bars where a lane sounds, as "a-b" runs (1-based, inclusive)
 const runs = lane => { const out = []; lane.forEach((v, b) => { if (!on(v)) return; const r = out[out.length - 1]; if (r && r[1] === b) r[1] = b + 1; else out.push([b, b + 1]); }); return out; };
 
-// song (a state of a Crescendo build) → compact code. muted: ids of tracks the build keeps silent, written with `_$:`
-export function compileCompact(song, { muted = [] } = {}) {
+// ---------- one line per track ----------
+// Literals of a layer: strings and numbers. Those that name the bus, the visual or the sound bank stay as they are.
+// (FIXED looks only at a literal that is the first argument; a later one, as in range(160, 640), counts as free)
+const LIT = /"[^"]*"|(?<![\w.])-?(?:\d+\.?\d*|\.\d+)(?![\w.])/g;
+// time functions too: a patterned slow or late shifts a signal differently from a constant one (the riser's ramp)
+const FIXED = /\.(analyze|orbit|bank|mask|velocity|slow|fast|late|early|segment|ply|chop|range)\($/;
+function literals(text) {
+  const out = [];
+  for (const m of text.matchAll(LIT)) out.push({ at: m.index, v: m[0], fixed: FIXED.test(text.slice(Math.max(0, m.index - 12), m.index)) });
+  return out;
+}
+// the layer with every free literal replaced: layers with the same skeleton differ only in values
+const skeleton = text => { let o = '', last = 0; for (const l of literals(text)) { o += text.slice(last, l.at) + (l.fixed ? l.v : l.v.startsWith('"') ? '⟨s⟩' : '⟨n⟩'); last = l.at + l.v.length; } return o + text.slice(last); };
+// a number per bar → a sequence over the song ("<0.4!14 0.6!34>")
+const seqOf = vals => `"${rle(vals)}"`;
+// a string per bar → which one plays, by bar, picked from the list: "<0!14 1!34>".pick(["…", "…"]). pick keeps each
+// string's own time, so an alternation inside it ("<[a3 …] [g3 …]>", the chords) goes on as in its own line
+const pickOf = vals => { const u = [...new Set(vals)]; return `"${rle(vals.map(v => u.indexOf(v)))}".pick([${u.join(', ')}])`; };
+
+// song (a state of a Crescendo build) → compact code. muted: ids of tracks the build keeps silent, written with `_$:`.
+// lines: 'joined' (identical lines joined) or 'track' (also lines that differ only in values: numbers become sequences
+// over the bars, strings are picked by bar; one line per part of a track)
+export function compileCompact(song, { muted = [], lines = 'joined' } = {}) {
   const shown = new Set(muted.filter(id => (song.tracks || []).some(tr => tr.id === id && tr.mute)));
   const full = { ...song, tracks: song.tracks.map(tr => (shown.has(tr.id) ? { ...tr, mute: false } : tr)) };
   const p = parseCode(compileSong(full)), out = [...p.head];
@@ -72,11 +93,12 @@ export function compileCompact(song, { muted = [] } = {}) {
       if (g) { g.items.push(it); g.lane = g.lane.map((v, k) => (on(v) ? v : lane[k])); }
       else groups.push({ key, lane: lane.slice(), items: [it] });
     }
+    if (lines === 'track') mergeValues(groups);
     let n = 0, lastDesc = null;
     for (const g of groups) {
       const it = g.items[0];
       if (it.kind !== 'layer') { out.push(it.text); continue; }
-      let text = it.text, gate = it.gate;
+      let text = g.text || it.text, gate = it.gate;
       if (g.items.length > 1) {
         gate = `${ident(track ? track.id : id)}${++n}`;
         out.push(`const ${gate} = "${rle(g.lane)}"`);
@@ -84,6 +106,8 @@ export function compileCompact(song, { muted = [] } = {}) {
       }
       if (it.clip) {
         const names = [...new Set(g.items.map(x => x.clip && x.clip.names).filter(Boolean))].join(' · ');
+        const pats = [...new Set(g.items.map(x => x.clip && x.clip.rest).filter(Boolean))];
+        if (pats.length > 1) it.clip = { ...it.clip, rest: pats.join(', ') };
         const r = g.lane ? runs(g.lane) : [], bars = r.length ? t('cBars', { from: r[0][0] + 1, to: r[0][1] }) + r.slice(1).map(([a, z]) => `, ${a + 1}-${z}`).join('') : it.clip.ranges;
         const comment = `// ${names} · ${bars} · ${it.clip.rest}`;
         if (out[out.length - 1] !== comment) out.push(comment);
@@ -93,4 +117,39 @@ export function compileCompact(song, { muted = [] } = {}) {
     }
   }
   return out.join('\n');
+}
+
+// groups (in place): those with the same skeleton and lanes that never overlap become one, each differing value a sequence
+function mergeValues(groups) {
+  for (let i = 0; i < groups.length; i++) {
+    const a = groups[i];
+    if (!a.lane) continue;
+    for (let j = i + 1; j < groups.length; j++) {
+      const b = groups[j];
+      if (!b.lane || a.lane.some((v, k) => on(v) && on(b.lane[k]))) continue;
+      const ta = a.items[0].text, tb = b.items[0].text;
+      if (skeleton(ta.replace(GATE, '§')) !== skeleton(tb.replace(GATE, '§'))) continue;
+      const la = a.vals || literals(ta).map(l => ({ ...l, per: null })), lb = literals(tb);
+      // per-bar values: a's on its bars, b's on its bars
+      a.vals = la.map((l, k) => {
+        const per = l.per || a.lane.map(() => l.v);
+        return { ...l, per: per.map((x, bar) => (on(b.lane[bar]) ? lb[k].v : x)) };
+      });
+      a.lane = a.lane.map((v, k) => (on(v) ? v : b.lane[k]));
+      a.items.push(...b.items);
+      groups.splice(j--, 1);
+    }
+    if (a.vals) {
+      const t0 = a.items[0].text;
+      let o = '', last = 0;
+      for (const l of a.vals) {
+        // bars where the layer is silent take the value of the bar before, so the sequence stays short
+        const per = l.per.slice(); for (let k = 1; k < per.length; k++) if (!on(a.lane[k])) per[k] = per[k - 1];
+        const first = per.findIndex((_, k) => on(a.lane[k])); for (let k = 0; k < first; k++) per[k] = per[first];
+        o += t0.slice(last, l.at) + (new Set(per).size === 1 ? per[0] : l.v.startsWith('"') ? pickOf(per) : seqOf(per, false));
+        last = l.at + l.v.length;
+      }
+      a.text = o + t0.slice(last);
+    }
+  }
 }
