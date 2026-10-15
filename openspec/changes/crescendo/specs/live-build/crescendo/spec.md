@@ -143,3 +143,10 @@ A song file MAY declare `"buildStyle": "crescendo"` (or `"blocks"`). A song that
 #### Scenario: Play it as written
 - **WHEN** the user switches that song to "in blocks" or turns the live build off
 - **THEN** the song plays as written, since Crescendo only adds a growth in front of it
+
+### Requirement: Crescendo version
+Crescendo SHALL carry a version number. An intended change to its rules that changes the steps of any checked song SHALL raise the version, so saved sessions and playlists can warn that a song may build differently.
+
+#### Scenario: Rules change
+- **WHEN** a change to the Crescendo rules alters the steps of a checked song
+- **THEN** the Crescendo version is raised in the same change

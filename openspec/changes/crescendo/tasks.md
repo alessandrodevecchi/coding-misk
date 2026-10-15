@@ -13,6 +13,8 @@
 - [ ] 1.11 Thin written `notes`/`steps` of bass, arp and hook like drum rows
 - [ ] 1.12 `crescendoSong(song, { seed, narrated })`: returns the song with generated patterns, extended sections and `build`; seed from the song id
 
+- [ ] 1.13 `CRESCENDO_VERSION`, raised when the check's fixtures change
+
 ## 2. Narration
 
 - [ ] 2.1 Phrase list per kind of step, English and Italian, short and imperative, our own wording
