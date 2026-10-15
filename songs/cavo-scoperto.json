@@ -3,6 +3,8 @@
   "version": 2,
   "id": "cavo-scoperto",
   "title": "Cavo Scoperto",
+  "created": "2026-10-05",
+  "appVersion": "0.1.0",
   "look": "edgerunners",
   "style": {
     "en": "Dark electro techno · F# phrygian, then G in the second drop · 126 BPM · two hooks in call and response, a glitch code track, an arpeggio that enters mid-build",
@@ -237,7 +239,7 @@
         "mode": "phrygian",
         "octave": "4",
         "wave": "gm_lead_2_sawtooth",
-        "gain": 1.0,
+        "gain": 1,
         "cutoff": 3200,
         "move": "fisso",
         "delay": 0,

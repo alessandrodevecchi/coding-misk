@@ -2,7 +2,7 @@
 // The cards are rendered by the app; this module filters and orders them, and keeps the view and the
 // favourites in browser storage. Filtering logic: song-filter.js.
 import { GENRES } from '../song/format.js';
-import { KINDS, SORTS, cleanView, songEntry, filterSongs } from './song-filter.js';
+import { KINDS, SORTS, BUILDS, cleanView, songEntry, filterSongs, pageOf, viewKey } from './song-filter.js';
 
 const VIEW_KEY = 'coding-misk-songs-view';
 const STAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.9 4.2 4.6.5-3.4 3.1.9 4.5L8 11.5 4 13.8l.9-4.5L1.5 6.2l4.6-.5z"/></svg>';
@@ -14,7 +14,7 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
   let view = cleanView(store.get(VIEW_KEY, null));
   if (!playlists.get(view.list)) view.list = 'all';
   const listName = l => (l.id === 'favourites' ? t('favourites') : l.name);
-  let entries = [], timer = 0, stylesOpen = false;
+  let entries = [], timer = 0, stylesOpen = false, lastKey = viewKey(view);
 
   const styleById = () => Object.fromEntries(styles().map(r => [r.id, r]));
   // names used by search and labels; a style without a genre counts as experimental
@@ -32,7 +32,8 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
   // songs: [{ id, title, style, tags, origin, code, build, mine, bpm, seconds }] in default order
   function setSongs(songs) {
     const n = names();
-    entries = songs.map((s, i) => songEntry(s, i, n, playlists.favourites.songs));
+    const played = store.get('coding-misk-played', {}) || {};
+    entries = songs.map((s, i) => songEntry(s, i, n, playlists.favourites.songs, played));
   }
   // a picked playlist: its songs only, in its order (the default order), then search and filters
   const visible = () => {
@@ -55,29 +56,46 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
         <input type="search" class="sv-q" id="sv-q" value="${esc(view.q)}" placeholder="${esc(t('songSearch'))}" aria-label="${esc(t('songSearchAria'))}" autocomplete="off" data-no-knob>
         <label class="sv-sort"><span>${esc(t('sortLbl'))}</span><select id="sv-sort" data-no-knob>${SORTS.map(s => `<option value="${s}"${view.sort === s ? ' selected' : ''}>${esc(t(`sort:${s}`))}</option>`).join('')}</select></label>
         <span class="hand-from sv-fav"><button class="led" id="sv-fav" aria-pressed="${view.favOnly}" aria-labelledby="sv-fav-lbl"></button><span id="sv-fav-lbl">${esc(t('fFav'))}</span></span>
+        <span class="hand-from sv-fav"><button class="led" id="sv-never" aria-pressed="${view.neverPlayed}" aria-labelledby="sv-never-lbl"></button><span id="sv-never-lbl">${esc(t('fNever'))}</span></span>
       </div>
       <div class="sv-row sv-lists"><label class="sv-sort"><span class="lbl">${esc(t('playlistsLbl'))}</span><select id="sv-list" data-no-knob>${lists.map(l => `<option value="${esc(l.id)}"${view.list === l.id ? ' selected' : ''}>${esc(l.id === 'all' ? t('allSongs') : `${listName(l)} (${l.songs.length})`)}</option>`).join('')}</select></label>${view.list !== 'all' ? `<button class="btn primary sv-play-list" data-play-list="${esc(view.list)}">${esc(t('playPlaylist'))}</button>` : ''}</div>
       <div class="sv-group"><span class="lbl">${esc(t('fGenres'))}</span><div class="chips">${GENRES.filter(g => used.has(g) || view.genres.includes(g)).map(g => chip('genres', g, t(`g:${g}`))).join('')}</div></div>
       <div class="sv-group"><span class="lbl">${esc(t('fKinds'))}</span><div class="chips">${KINDS.map(k => chip('kinds', k, t(`k:${k}`))).join('')}</div></div>
+      <div class="sv-group"><span class="lbl">${esc(t('fBuilds'))}</span><div class="chips">${BUILDS.map(k => chip('builds', k, t(`b:${k}`))).join('')}</div></div>
       <details class="sv-group sv-styles"${stylesOpen || view.styles.length ? ' open' : ''}><summary class="lbl">${esc(t('fStyles'))}${view.styles.length ? ` (${view.styles.length})` : ''}</summary><div class="chips">${allStyles.map(r => chip('styles', r.id, tx(r.name))).join('')}</div></details>
       <p class="sv-legend"><span class="lbl">${esc(t('legend'))}</span> <span class="tag-chip genre">${esc(t('tagGenre'))}</span> <span class="tag-chip style">${esc(t('tagStyleShort'))}</span> <span class="tag-chip free">#${esc(t('tagFree').toLowerCase())}</span> <span class="muted">${esc(t('legendHint'))}</span></p>
-      <p class="sv-count" aria-live="polite"><span id="sv-n"></span> <button class="btn sv-clear" id="sv-clear" hidden>${esc(t('clearFilters'))}</button></p>`;
+      <p class="sv-count" aria-live="polite"><span id="sv-n"></span> <button class="btn sv-clear" id="sv-clear" hidden>${esc(t('clearFilters'))}</button></p>
+      <nav class="sv-pager" id="sv-pager" aria-label="${esc(t('pagesLbl'))}"></nav>`;
   }
 
   // hide and reorder the existing cards, without rebuilding them
+  // search, filters and sort apply to every song, then the result is cut in pages (#67); a new search or filter
+  // goes back to page 1
   function apply() {
-    const shown = visible(), cards = new Map([...list.querySelectorAll('[data-song-id]')].map(el => [el.dataset.songId, el]));
+    if (viewKey(view) !== lastKey) { lastKey = viewKey(view); view.page = 1; save(); }
+    const all = visible(), pg = pageOf(all, view.page), shown = pg.items;
+    view.page = pg.page;
+    const cards = new Map([...list.querySelectorAll('[data-song-id]')].map(el => [el.dataset.songId, el]));
     const ids = new Set(shown.map(e => e.id));
     for (const e of shown) { const el = cards.get(e.id); if (el) list.insertBefore(el, list.querySelector('.sv-none')); }
     for (const [id, el] of cards) el.hidden = !ids.has(id);
-    const filtered = view.q || view.genres.length || view.styles.length || view.kinds.length || view.favOnly || view.list !== 'all';
+    const filtered = view.q || view.genres.length || view.styles.length || view.kinds.length || view.builds.length || view.favOnly || view.neverPlayed || view.list !== 'all';
     const n = bar.querySelector('#sv-n'), clear = bar.querySelector('#sv-clear');
     const pl = view.list !== 'all' && playlists.get(view.list);
-    if (n) n.textContent = t('songCount', { n: shown.length, total: pl ? pl.songs.length : entries.length });
+    const tot = pl ? pl.songs.length : entries.length;
+    if (n) n.textContent = pg.pages > 1 && all.length === tot ? t('songPageAll', { from: pg.from, to: pg.to, n: all.length }) : pg.pages > 1 ? t('songPage', { from: pg.from, to: pg.to, n: all.length, total: pl ? pl.songs.length : entries.length }) : t('songCount', { n: all.length, total: pl ? pl.songs.length : entries.length });
+    const pager = bar.querySelector('#sv-pager');
+    if (pager) {
+      pager.hidden = pg.pages < 2;
+      const nums = Array.from({ length: pg.pages }, (_, i) => i + 1).filter(k => k === 1 || k === pg.pages || Math.abs(k - pg.page) <= 2);
+      pager.innerHTML = pg.pages < 2 ? '' : `<button class="chip small" data-sv-page="${pg.page - 1}" ${pg.page === 1 ? 'disabled' : ''} aria-label="${esc(t('pagePrev'))}">‹</button>`
+        + nums.map((k, i) => `${i && k - nums[i - 1] > 1 ? '<span class="muted">…</span>' : ''}<button class="chip small" data-sv-page="${k}" aria-current="${k === pg.page ? 'page' : 'false'}" aria-pressed="${k === pg.page}">${k}</button>`).join('')
+        + `<button class="chip small" data-sv-page="${pg.page + 1}" ${pg.page === pg.pages ? 'disabled' : ''} aria-label="${esc(t('pageNext'))}">›</button>`;
+    }
     if (clear) clear.hidden = !filtered;
     let none = list.querySelector('.sv-none');
     if (!none) { none = document.createElement('div'); none.className = 'sv-none note'; list.append(none); }
-    none.hidden = shown.length > 0;
+    none.hidden = all.length > 0;
     none.innerHTML = `${esc(t('songNone'))} <button class="btn" data-sv-clear>${esc(t('clearFilters'))}</button>`;
     onChange();
   }
@@ -105,6 +123,10 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     }
     if (e.target.closest('#sv-fav')) { view.favOnly = !view.favOnly; e.target.closest('#sv-fav').setAttribute('aria-pressed', view.favOnly); save(); apply(); return; }
     if (e.target.closest('#sv-fav-lbl')) { bar.querySelector('#sv-fav').click(); return; }
+    if (e.target.closest('#sv-never')) { view.neverPlayed = !view.neverPlayed; e.target.closest('#sv-never').setAttribute('aria-pressed', view.neverPlayed); save(); apply(); return; }
+    if (e.target.closest('#sv-never-lbl')) { bar.querySelector('#sv-never').click(); return; }
+    const pageBtn = e.target.closest('[data-sv-page]');
+    if (pageBtn && !pageBtn.disabled) { view.page = +pageBtn.dataset.svPage; save(); apply(); list.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
     if (e.target.closest('#sv-clear')) clearAll();
   });
   list.addEventListener('click', e => {

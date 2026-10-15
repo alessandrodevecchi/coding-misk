@@ -1,18 +1,18 @@
 ## 1. Metadata
 
-- [ ] 1.1 Song fields `created` and `appVersion`: validator, `docs/SONG-FORMAT.md`
-- [ ] 1.2 Written on save in Compose, from the radio and by the director
-- [ ] 1.3 `tools/song-dates.mjs` fills the songs in `songs/` from git; `package.json` version aligned with the releases
-- [ ] 1.4 Play tracking (10 seconds), `coding-misk-played`, in the settings backup
+- [x] 1.1 Song fields `created` and `appVersion`: validator, `docs/SONG-FORMAT.md`
+- [x] 1.2 Written on save in Compose, from the radio and by the director
+- [x] 1.3 `tools/song-dates.mjs` fills the songs in `songs/` from git; `package.json` version aligned with the releases
+- [x] 1.4 Play tracking (10 seconds), `coding-misk-played`, in the settings backup
 
 ## 2. Library
 
-- [ ] 2.1 Sorts: recently created, recently played; filters: never played, build style
-- [ ] 2.2 Pages of 24 after filtering, counter, page in the view state, reset on change
-- [ ] 2.3 Card: creation date, build style mark; English and Italian
+- [x] 2.1 Sorts: recently created, recently played; filters: never played, build style
+- [x] 2.2 Pages of 24 after filtering, counter, page in the view state, reset on change
+- [x] 2.3 Card: creation date, build style mark; English and Italian
 
 ## 3. Checks and docs
 
-- [ ] 3.1 `check:song-filter`: sorts, filters, pages across the whole list
-- [ ] 3.2 Backup check, `check:songs`, browser check of the Songs tab
+- [x] 3.1 `check:song-filter`: sorts, filters, pages across the whole list
+- [x] 3.2 Backup check, `check:songs`, browser check of the Songs tab
 - [ ] 3.3 Screenshots for the owner; Guide, docs, DEVLOG

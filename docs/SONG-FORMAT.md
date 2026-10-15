@@ -187,6 +187,8 @@ One step can combine several actions. Steps on the same bar apply in file order.
 
 A song without `build` can also build itself: the "Live build" switch above the arranger derives steps from its clips (each track comes in where its clips start and leaves where they stop, with a short comment), so it sounds exactly as written. On the timeline, a live build shows hatching where its steps keep a track silent and a diamond where a step changes it.
 
+**Creation date and app version.** `"created": "2026-10-16"` and `"appVersion": "0.6.0"` say when the song was made and with which version of the app (#67). The app writes them when a song is saved from Compose or the radio, `tools/endless.mjs` when it writes songs, and `tools/song-dates.mjs` filled the songs in `songs/` from git. Both are optional.
+
 **Build style.** `"buildStyle": "crescendo"` (or `"blocks"`) makes the song open and play with that build style of the live build; without it the song follows the Compose setting. Crescendo (`src/song/crescendo.js`) ignores the song's own `build` and computes one: it prepends growth sections (`Crescendo`, `Crescendo 2`), may append an ending section (`Strip` or `Stop`), adds pattern variants named `<pattern>~<level>` to the tracks, and writes steps with the actions above. The song file is never changed.
 
 ## Compiled code

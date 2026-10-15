@@ -3,7 +3,12 @@
   "version": 2,
   "id": "luci-rosse",
   "title": "Luci Rosse",
-  "inspiration": {"en": "the Red Circle club fight in John Wick", "it": "lo scontro nel club Red Circle di John Wick"},
+  "created": "2026-10-05",
+  "appVersion": "0.1.0",
+  "inspiration": {
+    "en": "the Red Circle club fight in John Wick",
+    "it": "lo scontro nel club Red Circle di John Wick"
+  },
   "look": "palco",
   "style": {
     "it": "Club scuro da film d'azione · La minore su un solo accordo · 124 BPM · riff di basso distorto, cassa, clap, pochi strati",

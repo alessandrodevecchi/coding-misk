@@ -6,7 +6,7 @@ import { GENRES } from '../src/song/format.js';
 import { validateSong } from '../src/song/validate.js';
 import { validateRecipe } from '../src/endless/recipe.js';
 import { generateSession } from '../src/endless/director.js';
-import { songEntry, filterSongs, genresOf, kindOf, cleanView, parseFree, fold } from '../src/library/song-filter.js';
+import { songEntry, filterSongs, genresOf, kindOf, cleanView, parseFree, fold, pageOf, viewKey, buildOf } from '../src/library/song-filter.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const STYLES = loadStyles();
@@ -34,6 +34,28 @@ const entries = sample.map((s, i) => songEntry(s, i, names, ['b', 'e']));
 const ids = list => list.map(e => e.id).join('');
 
 const CHECKS = {
+  'dates, plays, build styles and pages (#67)'() {
+    const songs = Array.from({ length: 61 }, (_, i) => ({ id: `s${i}`, title: `Song ${i}`, created: i % 5 ? `2026-10-${String(1 + (i % 28)).padStart(2, '0')}` : undefined, buildStyle: i % 3 === 0 ? 'crescendo' : undefined, build: i % 3 === 1, bpm: 120, seconds: 100 }));
+    const played = { s7: 3000, s9: 1000, s40: 2000 };
+    const e = songs.map((x, i) => songEntry(x, i, names, [], played));
+    assert(buildOf({ buildStyle: 'crescendo' }) === 'crescendo' && buildOf({ build: true }) === 'blocks' && buildOf({}) === 'none', 'build of');
+    const rp = filterSongs(e, { sort: 'played' });
+    assert(rp.slice(0, 3).map(x => x.id).join() === 's7,s40,s9', `played order ${rp.slice(0, 3).map(x => x.id)}`);
+    const rc = filterSongs(e, { sort: 'created' });
+    assert(rc[0].created >= rc[1].created && !rc[rc.length - 1].created, 'created: newest first, no date last');
+    assert(filterSongs(e, { neverPlayed: true }).length === 58, 'never played');
+    assert(filterSongs(e, { builds: ['crescendo'] }).every(x => x.build === 'crescendo'), 'build filter');
+    assert(filterSongs(e, { builds: ['crescendo'], neverPlayed: true }).every(x => x.build === 'crescendo' && !x.played), 'filters together');
+    const all = filterSongs(e, {}), p2 = pageOf(all, 2);
+    assert(p2.from === 25 && p2.to === 48 && p2.total === 61 && p2.pages === 3 && p2.items.length === 24, 'page 2');
+    assert(pageOf(all, 9).page === 3 && pageOf(all, 3).items.length === 13 && pageOf([], 1).from === 0, 'clamp and last page');
+    // search across pages: a song of page 3 is on page 1 of the result
+    const found = pageOf(filterSongs(e, { q: 'Song 60' }), 1).items;
+    assert(found.length === 1 && found[0].id === 's60', 'search across pages');
+    assert(viewKey({ q: 'a' }) !== viewKey({ q: 'b' }) && viewKey({ q: 'a', page: 1 }) === viewKey({ q: 'a', page: 3 }), 'page not in the key');
+    const v = cleanView({ builds: ['crescendo', 'x'], neverPlayed: 1, page: 0 });
+    assert(v.builds.join() === 'crescendo' && v.neverPlayed === true && v.page === 1, 'clean view');
+  },
   'every built-in recipe declares a valid genre': () => {
     for (const r of STYLES) {
       assert(GENRES.includes(r.genre), `${r.id}: genre ${r.genre}`);

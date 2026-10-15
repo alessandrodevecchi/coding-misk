@@ -30,7 +30,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const total = (await page.$$('#songs [data-song-id]')).length;
   check(total >= 25, `one list with every song (${total})`);
   check((await page.$$('#songs .songs-sub')).length === 0, 'no separate block for code songs');
-  check((await visible()).length === total, 'every song visible at first');
+  check((await visible()).length === Math.min(24, total), 'every song visible at first (a page of 24, #67)');
   const noGenre = await page.$$eval('#songs [data-song-id]', xs => xs.filter(x => !x.querySelector('.tag-chip.genre') && !/^endless-/.test(x.dataset.songId)).map(x => x.dataset.songId));
   check(!noGenre.length, 'every card shows at least one genre', noGenre.join(', '));
   if (shots) await page.screenshot({ path: path.join(shots, 'songs-all.png') });
@@ -80,7 +80,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.fill('#sv-q', 'zzzz nothing'); await sleep(400);
   check((await visible()).length === 0 && await page.isVisible('.sv-none'), 'nothing matches: message shown');
   await page.click('.sv-none [data-sv-clear]'); await sleep(300);
-  check((await visible()).length === total && (await page.inputValue('#sv-q')) === '', 'clear filters brings every song back');
+  check((await visible()).length === Math.min(24, total) && (await page.inputValue('#sv-q')) === '', 'clear filters brings every song back');
 
   // style tags use the current style names; style filter
   const userCard = await page.innerText('#songs [data-song-id="u-test"] .song-tags');
@@ -113,6 +113,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
 
   // tags of the user's song; built-in songs have no tag editor
   check(!(await page.$('#songs [data-song-id="kellerlicht"] [data-act="tags"]')), 'built-in songs have read-only tags');
+  // the user's song may be on a later page: the "yours" kind brings it to page 1
+  await page.click('[data-f="kinds"][data-v="mine"]'); await sleep(200);
   await page.click('#songs [data-song-id="u-test"] [data-act="tags"]'); await sleep(200);
   await page.click('#songs [data-song-id="u-test"] [data-tg="genres"][data-v="pop"]');
   await page.fill('#songs [data-song-id="u-test"] [data-tg-free]', 'Reel, notte');
@@ -123,7 +125,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(v.includes('u-test'), 'a free tag added by the user is found', v.join(', '));
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-library')).tracks[0].tags);
   check(stored && stored.genres.includes('pop') && stored.free.join() === 'reel,notte', 'tags saved with the song', JSON.stringify(stored));
-  await page.fill('#sv-q', ''); await sleep(300);
+  await page.fill('#sv-q', ''); await page.click('[data-f="kinds"][data-v="mine"]'); await sleep(300);
 
   // previous and next follow the visible list
   await page.click('[data-f="genres"][data-v="metal"]'); await page.selectOption('#sv-sort', 'title'); await sleep(300);

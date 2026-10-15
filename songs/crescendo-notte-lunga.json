@@ -3,6 +3,8 @@
   "version": 2,
   "id": "crescendo-notte-lunga",
   "title": "Notte lunga",
+  "created": "2026-10-15",
+  "appVersion": "0.5.0",
   "look": "palco",
   "buildStyle": "crescendo",
   "style": {

@@ -3,8 +3,12 @@
 import { GENRES } from '../song/format.js';
 
 export const KINDS = ['standard', 'live', 'generated', 'mine', 'code'];
-export const SORTS = ['default', 'title', 'bpm', 'length'];
-export const VIEW_DEFAULT = { q: '', genres: [], styles: [], kinds: [], favOnly: false, sort: 'default', list: 'all' };
+export const SORTS = ['default', 'title', 'bpm', 'length', 'created', 'played'];
+// build style of a song (#67): in blocks (its own steps or declared), crescendo, none
+export const BUILDS = ['blocks', 'crescendo', 'none'];
+export const PAGE_SIZE = 24;
+export const VIEW_DEFAULT = { q: '', genres: [], styles: [], kinds: [], builds: [], favOnly: false, neverPlayed: false, sort: 'default', list: 'all', page: 1 };
+export const buildOf = ({ buildStyle, build = false }) => (buildStyle === 'crescendo' ? 'crescendo' : buildStyle === 'blocks' || build ? 'blocks' : 'none');
 
 // lowercase, without accents: "Frigio" and "frìgio" match "frigio"
 export const fold = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -23,9 +27,10 @@ export function genresOf(tags, genreOf) {
   return GENRES.filter(g => out.has(g));
 }
 
-// One searchable entry. song: { id, title, style, tags, origin, code, build, mine, bpm, seconds }.
+// One searchable entry. song: { id, title, style, tags, origin, code, build, buildStyle, created, mine, bpm, seconds }.
+// played: { id: time in ms } of the last plays
 // names: { style(id) → [names in every language], genre(id) → [names in every language], genreOf(id) → genre }
-export function songEntry(song, index, names, favourites = []) {
+export function songEntry(song, index, names, favourites = [], played = {}) {
   const tags = song.tags || {};
   const genres = genresOf(tags, names.genreOf);
   const styles = [...new Set(tags.styles || [])];
@@ -36,6 +41,7 @@ export function songEntry(song, index, names, favourites = []) {
     id: song.id, index, title: song.title || '', text, genres, styles, free,
     kind: kindOf(song), mine: !!song.mine, fav: favourites.includes(song.id),
     bpm: Number(song.bpm) || 0, seconds: Number(song.seconds) || 0,
+    build: buildOf(song), created: Date.parse(song.created) || 0, played: Number(played[song.id]) || 0,
   };
 }
 
@@ -50,12 +56,17 @@ export function filterSongs(entries, view = VIEW_DEFAULT) {
     (!v.genres.length || v.genres.some(g => e.genres.includes(g))) &&
     (!v.styles.length || v.styles.some(s => e.styles.includes(s))) &&
     (!v.kinds.length || matchKinds(e, v.kinds)) &&
+    (!v.builds.length || v.builds.includes(e.build)) &&
+    (!v.neverPlayed || !e.played) &&
     (!v.favOnly || e.fav));
   const by = {
     default: (a, b) => a.index - b.index,
     title: (a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }) || a.index - b.index,
     bpm: (a, b) => a.bpm - b.bpm || a.index - b.index,
     length: (a, b) => a.seconds - b.seconds || a.index - b.index,
+    // the newest first; songs without a date or never played go last
+    created: (a, b) => (b.created || -1) - (a.created || -1) || a.index - b.index,
+    played: (a, b) => (b.played || -1) - (a.played || -1) || a.index - b.index,
   }[SORTS.includes(v.sort) ? v.sort : 'default'];
   return out.sort(by);
 }
@@ -69,7 +80,9 @@ export function cleanView(raw, { styles = [] } = {}) {
     genres: list(v.genres, g => GENRES.includes(g)),
     styles: list(v.styles, s => typeof s === 'string' && (!styles.length || styles.includes(s))),
     kinds: list(v.kinds, k => KINDS.includes(k)),
-    favOnly: !!v.favOnly,
+    builds: list(v.builds, b => BUILDS.includes(b)),
+    favOnly: !!v.favOnly, neverPlayed: !!v.neverPlayed,
+    page: Number.isInteger(v.page) && v.page > 0 ? v.page : 1,
     sort: SORTS.includes(v.sort) ? v.sort : 'default',
     list: typeof v.list === 'string' && v.list ? v.list : 'all',
   };
@@ -77,3 +90,12 @@ export function cleanView(raw, { styles = [] } = {}) {
 
 // free tags typed by the user: "Reel, night drive" → ["reel", "night drive"]
 export const parseFree = text => [...new Set(String(text || '').split(',').map(s => fold(s).trim().replace(/\s+/g, ' ').replace(/[^a-z0-9 -]/g, '').replace(/^[ -]+/, '').slice(0, 24).trim()).filter(Boolean))];
+
+// one page of a filtered list: { items, page, pages, from, to, total } (from and to count from 1; page clamped)
+export function pageOf(list, page = 1, size = PAGE_SIZE) {
+  const total = list.length, pages = Math.max(1, Math.ceil(total / size)), p = Math.min(Math.max(1, page | 0), pages);
+  const items = list.slice((p - 1) * size, p * size);
+  return { items, page: p, pages, from: total ? (p - 1) * size + 1 : 0, to: (p - 1) * size + items.length, total };
+}
+// what decides the list: when it changes, the list goes back to page 1
+export const viewKey = v => JSON.stringify([v.q, v.genres, v.styles, v.kinds, v.builds, v.favOnly, v.neverPlayed, v.sort, v.list]);

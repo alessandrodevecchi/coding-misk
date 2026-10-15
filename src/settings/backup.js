@@ -36,6 +36,11 @@ export function mergeBackup(backup, get) {
     } else if (k === 'coding-misk-styles' || k === 'coding-misk-artists') {
       values[k] = byId(get(k), v);
       counts[k === 'coding-misk-styles' ? 'styles' : 'artists'] += (Array.isArray(v) ? v.length : 0);
+    } else if (k === 'coding-misk-played') {
+      // last played (#67): every song keeps its latest time
+      const cur = get(k) && typeof get(k) === 'object' ? get(k) : {}, out = { ...cur };
+      for (const [id, at] of Object.entries(v && typeof v === 'object' ? v : {})) if (!(out[id] >= at)) out[id] = at;
+      values[k] = out;
     } else if (k === 'coding-misk-radio-history') {
       const cur = Array.isArray(get(k)) ? get(k) : [];
       values[k] = [...(Array.isArray(v) ? v : []), ...cur].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 50);

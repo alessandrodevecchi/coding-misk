@@ -3,6 +3,8 @@
   "version": 2,
   "id": "example-night-shift",
   "title": "Example 3 · Night Shift",
+  "created": "2026-10-05",
+  "appVersion": "0.1.0",
   "look": "edgerunners",
   "style": {
     "en": "Two guitars, a hook written as scale degrees with a delay rack, a clip that starts mid-section and a code track",

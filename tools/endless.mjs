@@ -73,7 +73,9 @@ const old = path.join(out, 'session.json');
 if (fs.existsSync(old)) {
   try { for (const n of JSON.parse(fs.readFileSync(old, 'utf8')).files || []) fs.rmSync(path.join(out, n), { force: true }); } catch { /* an unreadable old session is overwritten below */ }
 }
-for (const f of files) fs.writeFileSync(path.join(out, f.name), JSON.stringify(f.song, null, 2) + '\n');
+// a song's birth (#67): today and the app's version
+const appVersion = JSON.parse(fs.readFileSync('package.json', 'utf8')).version, created = new Date().toISOString().slice(0, 10);
+for (const f of files) fs.writeFileSync(path.join(out, f.name), JSON.stringify({ ...f.song, created, appVersion }, null, 2) + '\n');
 fs.writeFileSync(old, JSON.stringify({ ...session, files: files.map(f => f.name) }, null, 2) + '\n');
 
 // report

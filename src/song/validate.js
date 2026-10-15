@@ -34,6 +34,9 @@ export function validateSong(song, opts = {}) {
     if (!ins || typeof ins !== 'object' || Array.isArray(ins) || typeof ins.en !== 'string' || !ins.en.trim()) err('inspiration', 'an object with "en" (and "it"): short notes, for example { "en": "rain on a window" }');
     else for (const k of Object.keys(ins)) if (!['en', 'it'].includes(k) || typeof ins[k] !== 'string' || ins[k].length > 120) err(`inspiration.${k}`, 'a note of at most 120 characters, in "en" or "it"');
   }
+  // when the song was made and with which version of the app (#67)
+  if (song.created !== undefined && (typeof song.created !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(song.created) || Number.isNaN(Date.parse(song.created)))) err('created', 'a date, for example "2026-10-16"');
+  if (song.appVersion !== undefined && (typeof song.appVersion !== 'string' || !/^\d+\.\d+\.\d+/.test(song.appVersion))) err('appVersion', 'a version, for example "0.6.0"');
   // build style of the live build (#64): the song opens and plays with it
   if (song.buildStyle !== undefined && !['blocks', 'crescendo'].includes(song.buildStyle)) err('buildStyle', 'one of blocks, crescendo, or left out (the Compose setting)');
   // tags and origin (song library, #34)

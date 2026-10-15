@@ -21,6 +21,11 @@ const CHECKS = {
     assert(pl[0].id === 'favourites' && pl[0].songs.join() === 'a,c' && pl.map(l => l.id).join() === 'favourites,p1,p2', JSON.stringify(pl));
     assert(values['coding-misk-ui'] === 'hw' && counts.settings === 1, 'settings taken from the backup');
   },
+  'last played: the latest time of each song wins (#67)'() {
+    const { values } = mergeBackup({ format: 'coding-misk/backup', data: { 'coding-misk-played': { a: 5, b: 1 } } }, k => (k === 'coding-misk-played' ? { a: 3, b: 4, c: 2 } : null));
+    const p = values['coding-misk-played'];
+    assert(p.a === 5 && p.b === 4 && p.c === 2, JSON.stringify(p));
+  },
   'a file that is not a backup is refused'() { assert(mergeBackup({ format: 'x' }, () => null).error, 'accepted'); },
 };
 let failed = 0;

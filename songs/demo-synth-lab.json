@@ -3,6 +3,8 @@
   "version": 2,
   "id": "demo-synth-lab",
   "title": "Synth Lab Demo",
+  "created": "2026-10-05",
+  "appVersion": "0.1.0",
   "tags": {
     "genres": [
       "experimental"

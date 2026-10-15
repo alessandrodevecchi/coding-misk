@@ -7,6 +7,12 @@ import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/ty
 import { crescendoSong } from './song/crescendo.js';
 import { compileCompact, compileNow } from './song/compile-compact.js';
 import { idiomatic } from './song/idiom.js';
+import pkg from '../package.json';
+// the app's version, written in the songs it makes (#67)
+const APP_VERSION = pkg.version;
+const today = () => new Date().toISOString().slice(0, 10);
+// a song's birth: its creation date and the app version that made it, kept once set
+const stamp = (o, fresh = false) => { if (fresh || !o.created) o.created = today(); if (fresh || !o.appVersion) o.appVersion = APP_VERSION; return o; };
 import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
@@ -1566,7 +1572,7 @@ function loadTrack(tr) {
   saveDraft(); syncAll(); renderArranger(); renderTrackPanel(); renderSource();
   return true;
 }
-const asStored = () => { const o = clone(T); delete o.kind; return o; };
+const asStored = (fresh = false) => { const o = stamp(clone(T), fresh); delete o.kind; T.created = o.created; T.appVersion = o.appVersion; return o; };
 $('#tr-save').addEventListener('click', () => {
   const i = user.tracks.findIndex(u => u.id === T.id);
   if (i >= 0) user.tracks[i] = asStored(); else user.tracks.push(asStored());
@@ -1574,7 +1580,7 @@ $('#tr-save').addEventListener('click', () => {
 });
 $('#tr-saveas').addEventListener('click', () => {
   T.id = 'u-' + Date.now(); T.title = t('copyOf', { name: T.title });
-  user.tracks.push(asStored());
+  user.tracks.push(asStored(true));
   dirty = false; compiled = playable({ ...T, kind: 'composed' });
   saveLibrary(); saveDraft(); renderArranger(); renderSongs(); renderSource(); toast(t('trackSaved'));
 });
@@ -2192,11 +2198,11 @@ function songCard({ tr, p }, i) {
   const ticks = Array.from({ length: Math.max(0, Math.floor(m.bars / 4) - 1) }, (_, k) => `<i style="left:${(k + 1) * 4 / m.bars * 100}%"></i>`).join('');
   const sg = songOf({ tr, p }), kind = kindOf(sg), own = composed && !isBuiltin(tr.id);
   return `<article class="card lesson song" data-song-card="${i}" data-song-id="${esc(tr.id)}">
-    <div class="song-head"><span class="badge kind-${kind}">${t(`k:${kind}`)}</span>${sg.mine ? `<span class="badge">${t('mine')}</span>` : ''}
-      <span class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}</span>${songsView.starButton(tr.id)}</div>
+    <div class="song-head"><span class="badge kind-${kind}">${t(`k:${kind}`)}</span>${sg.mine ? `<span class="badge">${t('mine')}</span>` : ''}${sg.buildStyle === 'crescendo' ? `<span class="badge build-mark" title="${esc(t('fBuilds'))}">${esc(t('b:crescendo'))}</span>` : ''}
+      <span class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}${tr.created ? ` · ${esc(t('cardCreated', { d: new Date(tr.created).toLocaleDateString(getLang() === 'it' ? 'it-IT' : 'en-GB') }))}` : ''}</span>${songsView.starButton(tr.id)}</div>
     <h3>${esc(tr.title)}</h3>
     ${tr.style ? `<p>${esc(tx(tr.style))}</p>` : ''}
-    ${tr.version ? `<p class="note">${esc(t('versionOf', { title: tr.fromTitle || tr.from }))}</p>` : ''}
+    ${tr.version && tr.from ? `<p class="note">${esc(t('versionOf', { title: tr.fromTitle || tr.from }))}</p>` : ''}
     ${(() => { const vs = user.codeSongs.filter(v => v.from === tr.id); return vs.length ? `<div class="song-versions"><span class="lbl">${esc(t('versions'))}</span> ${vs.map(v => `<button class="chip small" data-version="${esc(v.id)}">v${v.version}</button>`).join(' ')}</div>` : ''; })()}
     <div class="song-tags">${songsView.tagsHtml(sg)}${own ? ` <button class="chip small" data-act="tags" aria-expanded="false">${t('tagsEdit')}</button>` : ''}</div>
     ${own ? '<div class="song-tags-edit" hidden></div>' : ''}
@@ -2229,7 +2235,7 @@ function songCard({ tr, p }, i) {
 function isMine(tr) { return tr.kind === 'composed' ? !isBuiltin(tr.id) || user.tracks.some(u => u.id === tr.id) : !!user.code[tr.id] || !!tr.version; }
 function songOf({ tr, p }) {
   // songs generated before #34 have no origin: their id still tells
-  return { id: tr.id, title: tr.title, style: tr.style, tags: tr.tags, origin: tr.origin || (/^endless-/.test(tr.id) ? 'endless' : undefined), code: tr.kind !== 'composed', build: tr.kind === 'composed' && hasBuild(tr),
+  return { id: tr.id, title: tr.title, style: tr.style, tags: tr.tags, origin: tr.origin || (/^endless-/.test(tr.id) ? 'endless' : undefined), code: tr.kind !== 'composed', build: tr.kind === 'composed' && hasBuild(tr), buildStyle: tr.buildStyle, created: tr.created,
     mine: isMine(tr), bpm: parseFloat(p.meta.bpmLabel) || 0, seconds: p.meta.seconds };
 }
 // every style, built-in and the user's (also the invalid ones), for tag names and filters
@@ -2338,7 +2344,7 @@ playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, pla
   play: (listId, ids, startId) => playQueue(listId, ids, startId),
   userSong: id => user.tracks.find(u => u.id === id) || null,
   newSongId: () => { let id; do id = 'u-' + Date.now().toString(36) + Math.floor(Math.random() * 1e4); while (user.tracks.some(u => u.id === id)); return id; },
-  addSongs: list => { if (!list.length) return; user.tracks.push(...list.map(clone)); saveLibrary(); cards = []; renderSongs(); },
+  addSongs: list => { if (!list.length) return; user.tracks.push(...list.map(x => stamp(clone(x)))); saveLibrary(); cards = []; renderSongs(); },
   onChange: () => { if (!$('#tab-brani').hidden) { songsView.renderBar(); songsView.apply(); } } });
 function renderSongs() {
   const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr));
@@ -2937,3 +2943,23 @@ const liveLink = createLiveLink({
   getState: () => { const i = stageInfo(isPlaying() ? sched().now() : 0) || {}; return { title: i.title || '', artist: i.artist || '', playing: isPlaying(), radio: !!(mode === 'radio' && radio && radio.on) }; },
 });
 if (settingsPage && !$('#tab-impostazioni').hidden) settingsPage.render();
+
+// last played (#67): a song counts as played after 10 seconds of playback; the radio counts the song on air
+{
+  let cur = null, since = 0, counted = false;
+  setInterval(() => {
+    let id = null;
+    try {
+      if (isPlaying()) {
+        if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; id = it && it.song ? it.song.id : null; }
+        else id = song && song.id;
+      }
+    } catch (e) { id = null; }
+    if (id !== cur) { cur = id; since = Date.now(); counted = false; return; }
+    if (id && !counted && Date.now() - since >= 10000) {
+      counted = true;
+      const played = store.get('coding-misk-played', {}) || {};
+      played[id] = Date.now(); store.set('coding-misk-played', played);
+    }
+  }, 1000);
+}
