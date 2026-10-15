@@ -6,6 +6,7 @@ import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, 
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong } from './song/crescendo.js';
 import { compileCompact, compileNow } from './song/compile-compact.js';
+import { idiomatic } from './song/idiom.js';
 import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
@@ -113,6 +114,8 @@ let liveNarrated = !!store.get('coding-misk-live-narrated', false);
 // Crescendo code: 'compact' (identical lines joined, silent tracks shown with _$:), 'track' (one line per part of a
 // track, values by bar) or 'sections' (per section, like any song)
 const CODE_VIEWS = ['now', 'compact', 'track', 'sections'];
+// code generator for Crescendo songs (idiomatic-code): 'standard' or 'idiomatic' (shorter patterns, same sound)
+let liveGen = store.get('coding-misk-live-gen', 'standard') === 'idiomatic' ? 'idiomatic' : 'standard';
 let liveCode = CODE_VIEWS.includes(store.get('coding-misk-live-code', 'now')) ? store.get('coding-misk-live-code', 'now') : 'now';
 // a song may declare its build style; the Compose controls still switch it, for this session
 const liveOverride = new Map();
@@ -153,7 +156,8 @@ function playable(tr) {
   const compile = compact ? s => compileCompact(s, { muted: waiting, lines: liveCode === 'track' ? 'track' : 'joined' }) : compileSong;
   // tracks that played before a bar and are silent at it (a break): shown muted in the code of the moment
   const played = bar => [...new Set(buildSteps(build).filter(x => x.at <= bar && x.add !== undefined).flatMap(x => [].concat(x.add)))];
-  const compileAt = (song, bar) => (now ? compileNow(song, bar, { prepare: bar >= prepFrom(boundary(bar)), shownMuted: played(bar) }) : compile(song));
+  const gen = build && build.crescendo && liveGen === 'idiomatic' ? idiomatic : c => c;
+  const compileAt = (song, bar) => gen(now ? compileNow(song, bar, { prepare: bar >= prepFrom(boundary(bar)), shownMuted: played(bar) }) : compile(song));
   const codeAt = build ? (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
     const c = annotate(compileAt(only(st.song, keep), bar), build, st.upTo, getLang()) + voiceCode(build, st.song, st.upTo, total, getLang(), customFiles);
@@ -1198,6 +1202,7 @@ function renderArranger() {
   $('#live-style').title = T.buildStyle && !liveOverride.has(T.id) ? t('liveDeclared') : t('liveStyleHint');
   $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', liveNarrated);
   $('#live-code').hidden = !crescendo; $('#live-code').value = liveCode;
+  $('#live-gen').hidden = !crescendo; $('#live-gen').value = liveGen;
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
   renderRuler();
@@ -1392,6 +1397,7 @@ $('#live-style').addEventListener('change', e => {
   if (!hasBuild(T) && !T.buildStyle) { liveOn = true; store.set('coding-misk-live', true); }
   liveChanged();
 });
+$('#live-gen').addEventListener('change', e => { liveGen = e.target.value === 'idiomatic' ? 'idiomatic' : 'standard'; store.set('coding-misk-live-gen', liveGen); liveChanged(); });
 $('#live-code').addEventListener('change', e => { liveCode = CODE_VIEWS.includes(e.target.value) ? e.target.value : 'now'; store.set('coding-misk-live-code', liveCode); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { liveNarrated = !liveNarrated; store.set('coding-misk-live-narrated', liveNarrated); liveChanged(); });
 $('#live-toggle').addEventListener('click', () => {

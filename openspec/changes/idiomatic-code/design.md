@@ -14,7 +14,11 @@ Layers come from `sceneLayers` (src/music.js): drums from step rows, bass/arp/ho
 
 For a row of 16 steps, try in order: one hit repeated (`bd*4`, `hh*16`), an off-beat (`[~ hh]*4`), a short cell repeated (`[x ~ ~ x]*2` as `bd` names), then the full row. Rows of the same bank and gain may join with `,` in one `s()`. A form is used only if it gives the same onsets.
 
-### D2. Notes: degrees and progression
+### D2. Notes: progression on top (degrees later)
+
+Done first with MIDI roots: when every group of an alternation is the same line moved to another root, the line is written once as steps from its root and the roots added on top. Scale degrees with `.scale()` stay for later, for lines that change with the chord quality.
+
+### D2b. Degrees (later)
 
 When the progression's chords are all diatonic to the song's key and scale, a melodic part is written as degrees of its first chord plus `.add("<a b c d>")` with the chord roots as degrees, and `.scale("A:minor")`. Otherwise the standard note names stay. Repeats become `!`, holds `@`.
 

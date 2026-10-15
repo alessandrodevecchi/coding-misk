@@ -14,16 +14,16 @@ With the idiomatic generator, drum rows SHALL be written in the shortest mini-no
 - **WHEN** a kick row has a hit on every beat
 - **THEN** its code is `s("bd*4")` or part of a shared line with `bd*4`
 
-### Requirement: Degrees and progression
-With the idiomatic generator, a melodic part SHALL be written as scale degrees with the progression added on top when every chord of the progression fits the key and scale; otherwise its notes SHALL stay written out.
+### Requirement: Progression on top
+With the idiomatic generator, a melodic part whose line is the same over every chord, moved to the chord's root, SHALL be written once as steps from its root with the roots added on top as an alternation (`"0 ~ 0 12".add("<55!2 57 53>")`). Other parts SHALL keep their notes, with repeated cells (`[a3 c4 e4 a4]*4`) and repeated groups (`!`) written short. Writing the line as scale degrees with `.scale()` is left for later.
 
-#### Scenario: Diatonic progression
-- **WHEN** a bass in A minor plays the progression Am F C G
-- **THEN** its code uses degrees, `.add("<…>")` and `.scale("A:minor")`
+#### Scenario: Bass on the roots
+- **WHEN** a bass plays the same line on every chord of Am F C G
+- **THEN** its code writes the line once and adds the roots with `.add("<…>")`
 
-#### Scenario: Chord outside the scale
-- **WHEN** a progression has an E major chord in A minor
-- **THEN** that part keeps its notes written out
+#### Scenario: Arpeggio that follows the chord quality
+- **WHEN** an arpeggio's intervals change with the chords
+- **THEN** its notes stay written, with repeated cells shortened
 
 ### Requirement: Same events
 The idiomatic code SHALL produce the same events as the standard code, with notes compared as pitches. A form that would not SHALL NOT be used.
@@ -38,3 +38,7 @@ With the idiomatic generator, a Crescendo step that grows a pattern SHALL change
 #### Scenario: Hats fill up
 - **WHEN** a step grows the hats from off-beats to eighths
 - **THEN** the line changes from `[~ hh]*4` to `hh*8`
+
+#### Scenario: Drum machines keep their samples
+- **WHEN** a drum row becomes a coarser form (`bd*4` instead of sixteen steps)
+- **THEN** the hits are the same and the samples play whole, as before
