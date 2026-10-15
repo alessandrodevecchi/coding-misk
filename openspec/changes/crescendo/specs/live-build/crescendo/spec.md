@@ -132,3 +132,14 @@ Audio export, session video and fast video SHALL work for a Crescendo build, wit
 #### Scenario: Long build exports
 - **WHEN** a Crescendo build three times the written length is exported fast
 - **THEN** the export completes and sounds like playback
+
+### Requirement: Song build style
+A song file MAY declare `"buildStyle": "crescendo"` (or `"blocks"`). A song that declares it SHALL open and play with that build style, from Songs and from Compose. Songs without the field SHALL follow the Compose setting. The Compose control SHALL still let the user play any song in either style.
+
+#### Scenario: A crescendo song opens in crescendo
+- **WHEN** the user opens from Songs a song with `"buildStyle": "crescendo"`
+- **THEN** it plays in crescendo without changing any setting
+
+#### Scenario: Play it as written
+- **WHEN** the user switches that song to "in blocks" or turns the live build off
+- **THEN** the song plays as written, since Crescendo only adds a growth in front of it

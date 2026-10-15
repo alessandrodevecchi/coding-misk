@@ -28,6 +28,9 @@
 - [ ] 3.5 Audio export and fast video export of a Crescendo build (one segment per step; measure speed on a build three times the written length; join steps in the same render block if slow); typing rule of the playing section also in the video feed
 - [ ] 3.6 Fragments of a Crescendo song start on a step; random fragments prefer stretches with steps over the sparse start
 
+- [ ] 3.7 Song field `buildStyle` (`crescendo`, `blocks`) in the format, validator and docs; a song that declares it opens with it
+- [ ] 3.8 Test songs of different lengths (short, medium, long) with `buildStyle: crescendo`: one with drums and written notes, one on presets
+
 ## 4. Checks
 
 - [ ] 4.1 Node check (`npm run check:crescendo`): determinism (same song and seed, same steps); every step changes one track; spacing ≥ 1 bar; every state compiles; the state after growth equals the written song; length within three times; endings vary across songs; only functions the compiler already emits
