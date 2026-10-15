@@ -204,7 +204,7 @@ let look = store.get('coding-misk-look', T.look || 'palco');
 if (!PICK_LOOKS.some(([k]) => k === look)) look = 'palco';
 // the soul scene (#46) keeps the colours of the last other visual: the app's accents and the colour views' hue
 // the fast video's frame being drawn (#53): { info, code, say, soulSrc }, read instead of the live player
-let fv = null;
+let fv = null, exportCtl = null;
 let soulOverride = false; // the Soul display's override (#46): the stage shows the soul
 let soulBase = look;
 let compiled = playable({ ...T, kind: 'composed' });
@@ -817,6 +817,8 @@ async function exportRadio(range) {
 // Returns false when it failed (the caller records in real time), true when done or cancelled.
 // frag (#57): a vertical fragment { start, end, layout, label, code, msgs, o, file }: the file is that stretch at 1080×1920
 async function exportVideoFast(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null } = {}) {
+  // the song being rendered decides the lit notes (performance-profiles), not the one in the player
+  exportCtl = sg.ctl || null;
   // a long video goes straight to a file on disk (#61): the dialog comes first, while the click still counts
   const long = !frag && ((cut && cut.cut) || sg.meta.seconds) > LONG_SECONDS;
   const disk = long ? await askDiskFile(fileName(title, 'mp4'), 'video/mp4', 'mp4') : null;
@@ -2966,7 +2968,7 @@ const video = createVideo({
   getCode: () => (fv ? fv.code : (ed && ed.code) || ''),
   getInfo: stageInfo,
   getTimeline: cyc => timelineNow(cyc),
-  getHighlights: () => !!(song && song.ctl && song.ctl.highlights),
+  getHighlights: () => !!(fv ? exportCtl && exportCtl.highlights : song && song.ctl && song.ctl.highlights),
   getSay: () => { if (fv) return fv.say; const el = $('#say'); return el.classList.contains('on') ? el.textContent : ''; },
   // the soul panel: as the direction says ('auto': only while the Soul display is on and the stage does not show the soul)
   getSoul: () => {
