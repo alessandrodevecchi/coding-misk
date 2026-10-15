@@ -5,7 +5,7 @@ The arpeggio still writes every note of every chord (16 notes per chord), so its
 ## What Changes
 
 - **Arpeggio with `.arp()`** in the short patterns generator: `note("<[a3,c4,e4,a4] [f3,a3,c4,f4] …>").arp("[0 1 2 3 2 1 0 2]*2")`, used only when every chord plays the same order of its notes; otherwise the line stays as it is.
-- **Growth of the arpeggio** in the gradual and natural growth: the order string grows (`"0*4"` → `"[0 ~ 2 ~]*2"` → the written order).
+- **Growth of the arpeggio** in the gradual and natural growth, in small moves of several kinds: the order string grows (`"0*4"` → `"[0 ~ 2 ~]*2"` → the written order); the chords grow from two notes to the full chord (`[a3,e4]` → `[a3,c4,e4,a4]`); one held chord, then the progression; its functions (filter, delay, room) arrive like those of any track.
 - **Switch · trance pure.** A new style of the Switch family without arpeggio: one or two chords, a lead written with scale degrees and the progression added on top. The current Switch · trance stays as the rich one.
 
 ## Capabilities

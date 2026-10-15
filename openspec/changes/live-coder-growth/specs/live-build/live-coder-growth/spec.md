@@ -22,7 +22,11 @@ Each step SHALL be one small move: add a sound, add a function, change a number,
 - **THEN** they change over several steps of a few characters each
 
 ### Requirement: Detours
-At least one waypoint SHALL remove or rewrite something an earlier waypoint added.
+The number of detours (a waypoint that removes or rewrites something an earlier one added) SHALL be drawn per song: none in about one song in five, one in about half, two in about one in four, three rarely. Styles and artists MAY shift these chances.
+
+#### Scenario: A straight song
+- **WHEN** a song draws no detour
+- **THEN** its waypoints only add and grow, straight to the end
 
 #### Scenario: Gate out and back
 - **WHEN** a gate appears in an early waypoint

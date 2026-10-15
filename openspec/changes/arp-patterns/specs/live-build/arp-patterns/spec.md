@@ -12,11 +12,15 @@ With the short patterns generator, an arpeggio whose chords all play the same or
 - **THEN** the arpeggio keeps its written form
 
 ### Requirement: Arpeggio growth
-In the gradual and natural growth, an arpeggio SHALL grow by its order string, from one note to the written order.
+In the gradual and natural growth, an arpeggio SHALL grow in small moves of several kinds: its order string (from one note to the written order), its chords (from two notes to the full chord), its harmony (one held chord, then the progression) and its functions, like any track.
 
 #### Scenario: First notes
 - **WHEN** an arpeggio enters
 - **THEN** its order starts from one note and grows in later steps
+
+#### Scenario: Chord fills up
+- **WHEN** the arpeggio has grown its order
+- **THEN** a later step adds the missing notes to its chords
 
 ### Requirement: Pure Switch style
 The Switch family SHALL include Switch · trance pure, without arpeggio, with one or two chords and a lead written with scale degrees; Switch · trance SHALL stay as the rich style.

@@ -7,7 +7,7 @@ The Switch growth still decomposes a complex written song backwards, so every st
 - **Growth names.** "small steps" stays; today's "natural" becomes **gradual** (same behaviour); a new value **natural (like a live coder)**.
 - **Waypoints.** At the start the growth draws a few waypoints: small states of the song, each simple (kick and one bass note; the lead cloned from the bass; the bass rewritten and the gate removed; everything with the gate back). Between two waypoints the build moves with small moves.
 - **Moves.** A vocabulary of small moves: add a sound, add a function, change a number, grow the notes inside the quotes, rewrite the notes, clone a block, mute or unmute, comment a function out or back in.
-- **Detours.** A waypoint may remove or rewrite what an earlier one added, so the build does not go straight to the end.
+- **Detours.** A waypoint may remove or rewrite what an earlier one added, so the build does not go straight to the end. The number of detours is drawn per song: none about one song in five (the coder knows exactly where to go), one in half of the songs, two in one in four, three rarely; styles and artists may shift these chances.
 - **Chooser.** The next move is picked by a chooser separate from the moves: rules and a seed now; the radio's director and steering, or a decision model, later.
 - **Duration of the growth.** Free (complex songs grow longer) or fitted (within the written length, fewer details). Free by default for Switch, fitted for Crescendo.
 - **Normal version from the waypoints.** Each waypoint can become a section of the song as written, so the normal version and the live one come from the same source.

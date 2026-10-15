@@ -1,7 +1,7 @@
 ## 1. Arpeggio
 
 - [ ] 1.1 Arpeggio form with `.arp()` in `idiomatic()` (same order for every chord, else unchanged)
-- [ ] 1.2 Order string variants for the growth
+- [ ] 1.2 Growth moves: order string variants, chords from two notes to full, held chord then progression
 
 ## 2. Style
 

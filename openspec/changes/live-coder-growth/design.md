@@ -6,7 +6,7 @@
 
 ### D1. Waypoints first
 
-`waypoints(song, rng, rules)` returns 3 to 6 small states. The last is the song (or the song's first full section); the others are drawn from it with rules: fewer tracks, simpler notes (one note, short lines), fewer functions, and at least one detour (a function present earlier and missing later, or notes rewritten). Each waypoint compiles and is musical by construction (a subset of the song's own material).
+`waypoints(song, rng, rules)` returns 3 to 6 small states. The last is the song (or the song's first full section); the others are drawn from it with rules: fewer tracks, simpler notes (one note, short lines), fewer functions, and a drawn number of detours (a function present earlier and missing later, or notes rewritten): 0 with chance 0.2, 1 with 0.5, 2 with 0.25, 3 with 0.05; a style or artist may shift the chances. Each waypoint compiles and is musical by construction (a subset of the song's own material).
 
 ### D2. Moves between waypoints
 
