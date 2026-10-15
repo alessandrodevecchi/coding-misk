@@ -34,7 +34,8 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
-import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
+import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, TIMELINE_LAYOUTS, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
+import { liveAreas } from './live/presets.js';
 import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMessages, shapeOf, clockOf, parseTime, taglineFor, nextTagline } from './video/fragments.js';
 import { textsFor, textFile } from './video/texts.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from './soul/data.js';
@@ -782,7 +783,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
   const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
-  const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
+  const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : TIMELINE_LAYOUTS.includes(layout) ? liveAreas(layout, q.w, q.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
   // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen
@@ -2869,6 +2870,8 @@ function timelineShape(doc) {
 }
 function timelineNow(cyc) {
   let doc = song && song.doc, bar = cyc;
+  // a fast video: the song (or the session's song) being rendered
+  if (fv) { if (!fv.soulSrc) return null; doc = fv.soulSrc.song; bar = fv.soulSrc.bar; }
   if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; if (it && it.song) { doc = it.song; bar = cyc - it.start; } }
   if (!doc || !doc.sections || !doc.tracks) return null;
   try { return { shape: timelineShape(doc), bar, live: Array.isArray(doc.build) && doc.build.length > 0, sayOf: s => sayText(s, getLang()) }; } catch (e) { return null; }
