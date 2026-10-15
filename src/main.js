@@ -2198,7 +2198,7 @@ function songCard({ tr, p }, i) {
   const ticks = Array.from({ length: Math.max(0, Math.floor(m.bars / 4) - 1) }, (_, k) => `<i style="left:${(k + 1) * 4 / m.bars * 100}%"></i>`).join('');
   const sg = songOf({ tr, p }), kind = kindOf(sg), own = composed && !isBuiltin(tr.id);
   return `<article class="card lesson song" data-song-card="${i}" data-song-id="${esc(tr.id)}">
-    <div class="song-head"><span class="badge kind-${kind}">${t(`k:${kind}`)}</span>${sg.mine ? `<span class="badge">${t('mine')}</span>` : ''}${sg.buildStyle === 'crescendo' ? `<span class="badge build-mark" title="${esc(t('fBuilds'))}">${esc(t('b:crescendo'))}</span>` : ''}
+    <div class="song-head"><span class="badge kind-${kind}">${t(`k:${kind}`)}</span>${sg.mine ? `<span class="badge">${t('mine')}</span>` : ''}${sg.buildStyle === 'crescendo' ? `<span class="badge build-badge" title="${esc(t('fBuilds'))}">${esc(t('b:crescendo'))}</span>` : ''}
       <span class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}${tr.created ? ` · ${esc(t('cardCreated', { d: new Date(tr.created).toLocaleDateString(getLang() === 'it' ? 'it-IT' : 'en-GB') }))}` : ''}</span>${songsView.starButton(tr.id)}</div>
     <h3>${esc(tr.title)}</h3>
     ${tr.style ? `<p>${esc(tx(tr.style))}</p>` : ''}

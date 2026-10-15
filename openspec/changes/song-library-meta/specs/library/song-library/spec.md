@@ -26,7 +26,7 @@ The song list SHALL sort by recently created and recently played, besides today'
 - **THEN** the list shows only crescendo songs that were never played
 
 ### Requirement: Pages
-The song list SHALL be split into numbered pages of 24 songs after search, filters and sorting apply to the whole list, with a counter of the songs shown. Changing search, filters or sorting SHALL go back to page 1.
+The song list SHALL be split into numbered pages of 20 songs after search, filters and sorting apply to the whole list, with a counter of the songs shown. Changing search, filters or sorting SHALL go back to page 1.
 
 #### Scenario: Search finds a song on a later page
 - **WHEN** a song is on page 3 of the full list and the user searches its title
@@ -34,7 +34,7 @@ The song list SHALL be split into numbered pages of 24 songs after search, filte
 
 #### Scenario: Counter
 - **WHEN** the user opens page 2 of 61 songs
-- **THEN** the counter shows 25-48 of 61
+- **THEN** the counter shows 21-40 of 61
 
 ### Requirement: Card details
 A song card SHALL show its creation date and a mark of its build style when it has one.

@@ -8,7 +8,7 @@ The song list keeps growing (built-in songs, songs saved from Compose and from t
 - **Last played**, kept in the browser and in the settings backup, not in the song file. A play counts after 10 seconds.
 - **Sorting:** recently created and recently played, next to today's sorts.
 - **Filters:** never played; build style (in blocks with its own steps, crescendo, none), separate from the kind (standard, generated, mine, code).
-- **Pages:** search, filters and sorting apply to every song first, then the result is split into numbered pages of 24 with a counter ("25-48 of 61"). Changing search or filters goes back to page 1; the page is remembered with the view.
+- **Pages:** search, filters and sorting apply to every song first, then the result is split into numbered pages of 20 with a counter ("21-40 of 61"). Changing search or filters goes back to page 1; the page is remembered with the view.
 - **Cards** show the creation date and a small build style mark.
 - **App version** in `package.json` aligned with the releases (0.6.0 at the next release), used for the songs' version.
 

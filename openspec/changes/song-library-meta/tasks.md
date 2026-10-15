@@ -8,7 +8,7 @@
 ## 2. Library
 
 - [x] 2.1 Sorts: recently created, recently played; filters: never played, build style
-- [x] 2.2 Pages of 24 after filtering, counter, page in the view state, reset on change
+- [x] 2.2 Pages of 20 after filtering (both above and below the list), counter, page in the view state, reset on change
 - [x] 2.3 Card: creation date, build style mark; English and Italian
 
 ## 3. Checks and docs

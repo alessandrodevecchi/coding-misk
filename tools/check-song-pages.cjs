@@ -1,4 +1,4 @@
-// Browser check of the Songs tab pages and filters (#67): pages of 24 after filtering, search across pages,
+// Browser check of the Songs tab pages and filters (#67): pages of 20 after filtering, search across pages,
 // build style filter, never played, the counter. Usage: PLAYWRIGHT_CORE=... node tools/check-song-pages.cjs [shot.png]
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -15,13 +15,13 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const visible = () => page.$$eval('#songs [data-song-id]', els => els.filter(e => !e.hidden).map(e => e.dataset.songId));
   const total = await page.$$eval('#songs [data-song-id]', els => els.length);
   const first = await visible();
-  check(total <= 24 || first.length === 24, 'first page has 24 songs', `${first.length} of ${total}`);
-  if (total > 24) {
+  check(total <= 20 || first.length === 20, 'first page has 20 songs', `${first.length} of ${total}`);
+  if (total > 20) {
     check(!(await page.isHidden('#sv-pager')), 'pager shown');
     await page.click('#sv-pager [data-sv-page="2"]'); await sleep(400);
     const second = await visible();
     check(second.length > 0 && !second.some(id => first.includes(id)), 'page 2 shows other songs');
-    check(/^25-/.test(await page.textContent('#sv-n')), 'counter', await page.textContent('#sv-n'));
+    check(/^21-/.test(await page.textContent('#sv-n')), 'counter', await page.textContent('#sv-n'));
     // a song of page 2, searched, is on page 1 of the result
     const title = await page.$eval(`#songs [data-song-id="${second[0]}"] h3`, h => h.textContent);
     await page.fill('#sv-q', title); await sleep(500);

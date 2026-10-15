@@ -56,9 +56,8 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
         <input type="search" class="sv-q" id="sv-q" value="${esc(view.q)}" placeholder="${esc(t('songSearch'))}" aria-label="${esc(t('songSearchAria'))}" autocomplete="off" data-no-knob>
         <label class="sv-sort"><span>${esc(t('sortLbl'))}</span><select id="sv-sort" data-no-knob>${SORTS.map(s => `<option value="${s}"${view.sort === s ? ' selected' : ''}>${esc(t(`sort:${s}`))}</option>`).join('')}</select></label>
         <span class="hand-from sv-fav"><button class="led" id="sv-fav" aria-pressed="${view.favOnly}" aria-labelledby="sv-fav-lbl"></button><span id="sv-fav-lbl">${esc(t('fFav'))}</span></span>
-        <span class="hand-from sv-fav"><button class="led" id="sv-never" aria-pressed="${view.neverPlayed}" aria-labelledby="sv-never-lbl"></button><span id="sv-never-lbl">${esc(t('fNever'))}</span></span>
       </div>
-      <div class="sv-row sv-lists"><label class="sv-sort"><span class="lbl">${esc(t('playlistsLbl'))}</span><select id="sv-list" data-no-knob>${lists.map(l => `<option value="${esc(l.id)}"${view.list === l.id ? ' selected' : ''}>${esc(l.id === 'all' ? t('allSongs') : `${listName(l)} (${l.songs.length})`)}</option>`).join('')}</select></label>${view.list !== 'all' ? `<button class="btn primary sv-play-list" data-play-list="${esc(view.list)}">${esc(t('playPlaylist'))}</button>` : ''}</div>
+      <div class="sv-row sv-lists"><span class="hand-from sv-fav"><button class="led" id="sv-never" aria-pressed="${view.neverPlayed}" aria-labelledby="sv-never-lbl"></button><span id="sv-never-lbl">${esc(t('fNever'))}</span></span><label class="sv-sort"><span class="lbl">${esc(t('playlistsLbl'))}</span><select id="sv-list" data-no-knob>${lists.map(l => `<option value="${esc(l.id)}"${view.list === l.id ? ' selected' : ''}>${esc(l.id === 'all' ? t('allSongs') : `${listName(l)} (${l.songs.length})`)}</option>`).join('')}</select></label>${view.list !== 'all' ? `<button class="btn primary sv-play-list" data-play-list="${esc(view.list)}">${esc(t('playPlaylist'))}</button>` : ''}</div>
       <div class="sv-group"><span class="lbl">${esc(t('fGenres'))}</span><div class="chips">${GENRES.filter(g => used.has(g) || view.genres.includes(g)).map(g => chip('genres', g, t(`g:${g}`))).join('')}</div></div>
       <div class="sv-group"><span class="lbl">${esc(t('fKinds'))}</span><div class="chips">${KINDS.map(k => chip('kinds', k, t(`k:${k}`))).join('')}</div></div>
       <div class="sv-group"><span class="lbl">${esc(t('fBuilds'))}</span><div class="chips">${BUILDS.map(k => chip('builds', k, t(`b:${k}`))).join('')}</div></div>
@@ -84,8 +83,11 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     const pl = view.list !== 'all' && playlists.get(view.list);
     const tot = pl ? pl.songs.length : entries.length;
     if (n) n.textContent = pg.pages > 1 && all.length === tot ? t('songPageAll', { from: pg.from, to: pg.to, n: all.length }) : pg.pages > 1 ? t('songPage', { from: pg.from, to: pg.to, n: all.length, total: pl ? pl.songs.length : entries.length }) : t('songCount', { n: all.length, total: pl ? pl.songs.length : entries.length });
-    const pager = bar.querySelector('#sv-pager');
-    if (pager) {
+    // the pages above the list and again below it
+    let below = list.querySelector('.sv-pager-below');
+    if (!below) { below = document.createElement('nav'); below.className = 'sv-pager sv-pager-below'; below.setAttribute('aria-label', t('pagesLbl')); list.append(below); }
+    for (const pager of [bar.querySelector('#sv-pager'), below]) {
+      if (!pager) continue;
       pager.hidden = pg.pages < 2;
       const nums = Array.from({ length: pg.pages }, (_, i) => i + 1).filter(k => k === 1 || k === pg.pages || Math.abs(k - pg.page) <= 2);
       pager.innerHTML = pg.pages < 2 ? '' : `<button class="chip small" data-sv-page="${pg.page - 1}" ${pg.page === 1 ? 'disabled' : ''} aria-label="${esc(t('pagePrev'))}">‹</button>`
@@ -94,7 +96,7 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     }
     if (clear) clear.hidden = !filtered;
     let none = list.querySelector('.sv-none');
-    if (!none) { none = document.createElement('div'); none.className = 'sv-none note'; list.append(none); }
+    if (!none) { none = document.createElement('div'); none.className = 'sv-none note'; list.insertBefore(none, below); }
     none.hidden = all.length > 0;
     none.innerHTML = `${esc(t('songNone'))} <button class="btn" data-sv-clear>${esc(t('clearFilters'))}</button>`;
     onChange();
@@ -131,6 +133,8 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
   });
   list.addEventListener('click', e => {
     if (e.target.closest('[data-sv-clear]')) return clearAll();
+    const pageBtn = e.target.closest('[data-sv-page]');
+    if (pageBtn && !pageBtn.disabled) { view.page = +pageBtn.dataset.svPage; save(); apply(); bar.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
     // a tag on a card filters by it: genre and style add their chip, a free tag goes in the search
     const tag = e.target.closest('[data-tag-f]');
     if (!tag) return;

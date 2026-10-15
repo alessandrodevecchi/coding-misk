@@ -19,7 +19,7 @@ A song counts as played when it has played 10 seconds in a row (Compose, Songs, 
 
 ### D4. Pages after the filter
 
-`viewOf(entries, state)` returns the filtered, sorted list; `pageOf(list, page, size)` returns a slice and the counter. The page number is part of the view state and resets to 1 when query, filters or sort change. Size 24.
+`viewOf(entries, state)` returns the filtered, sorted list; `pageOf(list, page, size)` returns a slice and the counter. The page number is part of the view state and resets to 1 when query, filters or sort change. Size 20.
 
 ### D5. Backfill
 

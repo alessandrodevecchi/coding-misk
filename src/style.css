@@ -627,6 +627,8 @@
 .sv-group > .lbl { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); min-width: 58px; }
 details.sv-group { display: block; }
 details.sv-group > summary { cursor: pointer; margin-bottom: 6px; }
+.sv-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.sv-pager-below { justify-content: center; margin: 12px 0 4px; }
 .sv-count { margin: 0; font: 12px var(--mono); color: var(--muted); display: flex; align-items: center; gap: 10px; min-height: 28px; }
 .sv-count .btn, .sv-none .btn { padding: 2px 10px; font-size: 12px; }
 .sv-none { padding: 16px 0; }

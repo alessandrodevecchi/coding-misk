@@ -30,7 +30,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const total = (await page.$$('#songs [data-song-id]')).length;
   check(total >= 25, `one list with every song (${total})`);
   check((await page.$$('#songs .songs-sub')).length === 0, 'no separate block for code songs');
-  check((await visible()).length === Math.min(24, total), 'every song visible at first (a page of 24, #67)');
+  check((await visible()).length === Math.min(20, total), 'every song visible at first (a page of 20, #67)');
   const noGenre = await page.$$eval('#songs [data-song-id]', xs => xs.filter(x => !x.querySelector('.tag-chip.genre') && !/^endless-/.test(x.dataset.songId)).map(x => x.dataset.songId));
   check(!noGenre.length, 'every card shows at least one genre', noGenre.join(', '));
   if (shots) await page.screenshot({ path: path.join(shots, 'songs-all.png') });
@@ -80,7 +80,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.fill('#sv-q', 'zzzz nothing'); await sleep(400);
   check((await visible()).length === 0 && await page.isVisible('.sv-none'), 'nothing matches: message shown');
   await page.click('.sv-none [data-sv-clear]'); await sleep(300);
-  check((await visible()).length === Math.min(24, total) && (await page.inputValue('#sv-q')) === '', 'clear filters brings every song back');
+  check((await visible()).length === Math.min(20, total) && (await page.inputValue('#sv-q')) === '', 'clear filters brings every song back');
 
   // style tags use the current style names; style filter
   const userCard = await page.innerText('#songs [data-song-id="u-test"] .song-tags');

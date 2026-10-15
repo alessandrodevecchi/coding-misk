@@ -6,7 +6,7 @@ export const KINDS = ['standard', 'live', 'generated', 'mine', 'code'];
 export const SORTS = ['default', 'title', 'bpm', 'length', 'created', 'played'];
 // build style of a song (#67): in blocks (its own steps or declared), crescendo, none
 export const BUILDS = ['blocks', 'crescendo', 'none'];
-export const PAGE_SIZE = 24;
+export const PAGE_SIZE = 20;
 export const VIEW_DEFAULT = { q: '', genres: [], styles: [], kinds: [], builds: [], favOnly: false, neverPlayed: false, sort: 'default', list: 'all', page: 1 };
 export const buildOf = ({ buildStyle, build = false }) => (buildStyle === 'crescendo' ? 'crescendo' : buildStyle === 'blocks' || build ? 'blocks' : 'none');
 

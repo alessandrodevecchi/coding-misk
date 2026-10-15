@@ -47,8 +47,8 @@ const CHECKS = {
     assert(filterSongs(e, { builds: ['crescendo'] }).every(x => x.build === 'crescendo'), 'build filter');
     assert(filterSongs(e, { builds: ['crescendo'], neverPlayed: true }).every(x => x.build === 'crescendo' && !x.played), 'filters together');
     const all = filterSongs(e, {}), p2 = pageOf(all, 2);
-    assert(p2.from === 25 && p2.to === 48 && p2.total === 61 && p2.pages === 3 && p2.items.length === 24, 'page 2');
-    assert(pageOf(all, 9).page === 3 && pageOf(all, 3).items.length === 13 && pageOf([], 1).from === 0, 'clamp and last page');
+    assert(p2.from === 21 && p2.to === 40 && p2.total === 61 && p2.pages === 4 && p2.items.length === 20, 'page 2');
+    assert(pageOf(all, 9).page === 4 && pageOf(all, 4).items.length === 1 && pageOf([], 1).from === 0, 'clamp and last page');
     // search across pages: a song of page 3 is on page 1 of the result
     const found = pageOf(filterSongs(e, { q: 'Song 60' }), 1).items;
     assert(found.length === 1 && found[0].id === 's60', 'search across pages');
