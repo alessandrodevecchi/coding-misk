@@ -107,7 +107,10 @@ An unknown style or a value out of range stops the command with the valid choice
 Each song has its own voice. The style that gives the voice part sets the base: a list of speakers and a range for each effect (pitch, tempo, filters, drive, reverb, delay). The song draws a speaker from the list and a value from each range. Then, now and then, it goes further:
 
 - another speaker, any of the nine (chance 0.15, up to 0.45 with chaos 1);
-- a character on top of the base (chance 0.3, up to 0.6 with chaos 1): `radio`, `robot`, `deep`, `bright`, `cathedral`, `echo`, `dirty` or `slow`, each overriding a few settings.
+- a character on top of the base (chance 0.4, up to 0.8 with chaos 1): `radio`, `robot`, `deep`, `bright`, `cathedral`, `echo`, `dirty` or `slow`, each overriding a few settings;
+- one or two rack devices on the voice (chance 0.25, up to 0.65 with chaos 1): crush, sample rate, phaser, tremolo, vowel or echo.
+
+The style's ranges are widened around their middle (1.6 times, plus the chaos), and sometimes one or two knobs the style leaves alone get a value of their own; every knob stays within `VOICE_LIMITS`, so the words stay understandable (#66).
 
 The draws use their own random stream (`voice`), so they never change the music of a seed. The session report and the recap show the speaker and the character of each song.
 

@@ -19,7 +19,7 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // talk: how often the voice speaks (0 never, 0.5 about half of the boundaries with moves, 1 almost all)
 // The director's version (#38): sessions saved in playlists record it, and warn when it changes. Bump it whenever
 // `npm run check:endless -- --write-fixtures` changes the fixtures (the same seed gives different songs).
-export const DIRECTOR_VERSION = 1;
+export const DIRECTOR_VERSION = 2;
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist' };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const round = x => (Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100);
@@ -210,20 +210,39 @@ export const VOICE_CHARACTERS = {
   dirty: { drive: 4.5, hpf: 700, pitch: 0.8 },
   slow: { tempo: 0.55, pitch: 0.85, room: 0.6 },
 };
-// The voice of one song: the style's base (ranges drawn, a speaker among the style's), sometimes another
-// speaker, sometimes a character on top. More chaos, more variety.
+// how far a voice knob may go (still understandable: the volume is applied after the effects)
+export const VOICE_LIMITS = { pitch: [0.45, 1.5], tempo: [0.5, 1.15], drive: [0, 5.5], hpf: [0, 1600], cutoff: [1800, 18000], room: [0, 0.98], delay: [0, 0.7] };
+// rack devices a voice can get, with the ranges of their values
+const VOICE_DEVICES = {
+  crush: { bits: [4, 9] }, coarse: { amount: [3, 14] }, phaser: { rate: [0.3, 4], depth: [0.4, 0.9] },
+  tremolo: { rate: [4, 16], depth: [0.4, 0.85] }, vowel: { vowel: ['a', 'e', 'i', 'o', 'u'] }, echo: { count: [2, 4], feedback: [0.3, 0.6] },
+};
+// The voice of one song: the style's base (its ranges widened, wider with more chaos; a speaker among the style's),
+// sometimes a wild value for a knob the style leaves alone, sometimes another speaker, a character on top and one or
+// two effects in its rack (#66). More chaos, more variety.
 export function voiceFor(R, opts, rng) {
-  const base = { ...VOICE_DEFAULT }, v = R.voice || {};
+  const base = { ...VOICE_DEFAULT }, v = R.voice || {}, chaos = opts.chaos ?? 0.3;
+  const clampTo = (k, x) => (VOICE_LIMITS[k] ? Math.max(VOICE_LIMITS[k][0], Math.min(VOICE_LIMITS[k][1], x)) : x);
   for (const [k, x] of Object.entries(v)) {
     if (k === 'speaker' || k === 'speakers') continue;
-    base[k] = Array.isArray(x) ? round(rng.range(x[0], x[1])) : x;
+    if (!Array.isArray(x)) { base[k] = x; continue; }
+    const c = (x[0] + x[1]) / 2, h = ((x[1] - x[0]) / 2) * (1.6 + chaos);
+    base[k] = round(clampTo(k, rng.range(c - h, c + h)));
   }
+  const free = Object.keys(VOICE_LIMITS).filter(k => !Array.isArray(v[k]));
+  for (const k of rng.shuffle(free).slice(0, rng.chance(0.3 + 0.4 * chaos) ? rng.int(1, 2) : 0)) base[k] = round(rng.range(...VOICE_LIMITS[k]));
   const own = Array.isArray(v.speakers) && v.speakers.length ? v.speakers : [v.speaker ?? ''];
   base.speaker = rng.chance(0.15 + 0.3 * opts.chaos) ? rng.pick(['', ...SPEAKERS]) : rng.pick(own);
   let character = null;
-  const chance = opts.voiceChance ?? 0.3 + 0.3 * opts.chaos;
+  const chance = opts.voiceChance ?? 0.4 + 0.4 * opts.chaos;
   if (rng.chance(chance)) { character = (opts.voiceCharacters && pickWeighted(rng, opts.voiceCharacters)) || rng.pick(Object.keys(VOICE_CHARACTERS)); Object.assign(base, VOICE_CHARACTERS[character]); }
-  return { settings: base, character };
+  const rack = [];
+  if (rng.chance(0.25 + 0.4 * chaos)) for (const name of rng.shuffle(Object.keys(VOICE_DEVICES)).slice(0, rng.int(1, 2))) {
+    const dev = { device: name };
+    for (const [k, r] of Object.entries(VOICE_DEVICES[name])) dev[k] = typeof r[0] === 'string' ? rng.pick(r) : Number.isInteger(r[0]) && Number.isInteger(r[1]) ? rng.int(r[0], r[1]) : round(rng.range(r[0], r[1]));
+    rack.push(dev);
+  }
+  return { settings: base, character, rack };
 }
 
 // ---------- moves ----------
@@ -280,6 +299,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
   const { keep = [], from = 0, forced = {}, locked = [] } = steer;
   const ctx = { usual: plan.usualHigh, weights: R.energy, hardMax: plan.hardMax };
   const voice = { id: 'voice', name: 'Voice', type: 'voice', settings: plan.voice.settings, patterns: {}, clips: [] };
+  if (plan.voice.rack && plan.voice.rack.length) voice.rack = plan.voice.rack;
   const base = { tracks: [...plan.tracks.map(t => ({ ...t, mute: true, clips: [{ start: 0, bars, pattern: 'A' }] })), voice] };
   const steps = keep.map(s => ({ ...s })), phrases = [], moved = new Map(); // track id → boundary index of its last move
   const M = rng.moves;
