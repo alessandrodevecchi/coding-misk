@@ -36,7 +36,7 @@ export function parseCode(code) {
       continue;
     }
     const m = l.match(RANGES);
-    if (m) { clip = { names: m[1], ranges: m[2], rest: m[3] }; desc = null; continue; }
+    if (m) { clip = { names: m[1], ranges: m[2], rest: m[3], raw: l }; desc = null; continue; }
     if (l.startsWith('//') && clip) { desc = l; continue; }
     if (l.startsWith('const ')) { block.items.push({ kind: 'line', text: l }); continue; }
     if (l.trim()) block.items.push({ kind: 'line', text: l });
@@ -152,4 +152,52 @@ function mergeValues(groups) {
       a.text = o + t0.slice(last);
     }
   }
+}
+
+// ---------- the code of the moment (code-now) ----------
+// Only what plays in the section that holds `bar`: the layers whose lane sounds somewhere in it (a fade from the section
+// before included), without their lane when it is 1 on every bar of the section, and the lane constants still used.
+// prepare: also the next section's new layers, muted with `_$:` under the current ones (typed before the boundary).
+// shownMuted: ids of tracks that played before and are silent now (a break), written with `_$:`.
+import { normalizeSong } from './format.js';
+export function compileNow(song, bar, { prepare = false, shownMuted = [] } = {}) {
+  const n = normalizeSong(song), secs = n.sections;
+  const i = Math.max(0, secs.findIndex(s => bar >= s.start && bar < s.start + s.bars));
+  const shown = new Set(shownMuted.filter(id => (song.tracks || []).some(tr => tr.id === id && tr.mute)));
+  const full = { ...song, tracks: song.tracks.map(tr => (shown.has(tr.id) ? { ...tr, mute: false } : tr)) };
+  const p = parseCode(compileSong(full)), used = new Set();
+  // the layers of one section, per block: [{ comment, desc, text }]
+  const layersFor = k => {
+    const s = secs[k];
+    if (!s) return null;
+    return p.blocks.map(b => b.items.filter(it => it.kind === 'layer').filter(it => !it.gate || !p.lanes[it.gate] || p.lanes[it.gate].slice(s.start, s.start + s.bars).some(on)).map(it => {
+      const lane = it.gate && p.lanes[it.gate], whole = lane && lane.slice(s.start, s.start + s.bars).every(v => Number(v) === 1);
+      const text = whole ? it.text.replace(GATE, '') : it.text;
+      return { comment: it.clip ? it.clip.raw : null, desc: it.desc, text, gate: whole ? null : it.gate };
+    }));
+  };
+  const now = layersFor(i), next = prepare ? layersFor(i + 1) : null;
+  const sec = secs[i], out = [p.head[0], `// ${sec.name} · ${t('cBars', { from: sec.start + 1, to: sec.start + sec.bars })}`, ...p.head.filter(l => l.startsWith('setcpm('))];
+  const body = [];
+  p.blocks.forEach((b, k) => {
+    const id = b.header.replace(/^\/\/ =+ /, '').replace(/ =+$/, '').split(' · ')[0];
+    const track = full.tracks.find(tr => (tr.name || tr.id) === id), silent = track && shown.has(track.id);
+    const mine = now[k], extra = next ? next[k].filter(x => !mine.some(y => y.text === x.text)) : [];
+    if (!mine.length && !extra.length) return;
+    body.push('', b.header);
+    let last = null;
+    const put = (x, muted) => {
+      if (x.comment && x.comment !== last) { body.push(x.comment); last = x.comment; }
+      if (x.desc && !body.includes(x.desc)) body.push(x.desc);
+      body.push(muted ? x.text.replace(/^\$:/, '_$:') : x.text);
+      if (x.gate) used.add(x.gate);
+    };
+    mine.forEach(x => put(x, silent));
+    extra.forEach(x => put(x, true));
+  });
+  // lane constants still referenced (fades, clips that start inside a section)
+  for (const m of body.join('\n').matchAll(/\b\w+\b/g)) if (p.lanes[m[0]]) used.add(m[0]);
+  const lanes = p.head.filter(l => { const m = l.match(LANE); return m && used.has(m[1]); });
+  for (const b of p.blocks) for (const it of b.items) if (it.kind === 'line' && it.text.startsWith('const ')) { const m = it.text.match(LANE); if (m && used.has(m[1])) lanes.push(it.text); }
+  return [...out, ...lanes, ...body].join('\n');
 }

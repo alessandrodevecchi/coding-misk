@@ -5,7 +5,7 @@ import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong } from './song/crescendo.js';
-import { compileCompact } from './song/compile-compact.js';
+import { compileCompact, compileNow } from './song/compile-compact.js';
 import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
@@ -112,8 +112,8 @@ let liveStyle = store.get('coding-misk-live-style', 'blocks') === 'crescendo' ? 
 let liveNarrated = !!store.get('coding-misk-live-narrated', false);
 // Crescendo code: 'compact' (identical lines joined, silent tracks shown with _$:), 'track' (one line per part of a
 // track, values by bar) or 'sections' (per section, like any song)
-const CODE_VIEWS = ['compact', 'track', 'sections'];
-let liveCode = CODE_VIEWS.includes(store.get('coding-misk-live-code', 'compact')) ? store.get('coding-misk-live-code', 'compact') : 'compact';
+const CODE_VIEWS = ['now', 'compact', 'track', 'sections'];
+let liveCode = CODE_VIEWS.includes(store.get('coding-misk-live-code', 'now')) ? store.get('coding-misk-live-code', 'now') : 'now';
 // a song may declare its build style; the Compose controls still switch it, for this session
 const liveOverride = new Map();
 const liveOf = tr => liveOverride.get(tr.id) || (tr.buildStyle ? { on: true, style: tr.buildStyle } : { on: liveOn, style: liveStyle });
@@ -135,18 +135,33 @@ function playable(tr) {
   // a song without steps can build itself too ("Live build" switch): steps derived from its clips
   // Crescendo ignores the song's own steps
   const lv = liveOf(tr);
-  const build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : null;
+  let build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : null;
+  // the code of the moment (code-now): each section boundary is a step, and the bars before it prepare the next
+  // section's lines (muted); the steps go first on their bar, so a comment on the same bar stays the latest
+  const now = build && build.crescendo && liveCode === 'now';
+  if (now) {
+    const extra = [];
+    let at = 0;
+    build.sections.forEach((x, k) => { if (k > 0) extra.push({ at: Math.max(at - x.bars + 1, at - (build.sections[k - 1].bars >= 4 ? 2 : 1)) }, { at }); at += x.bars; });
+    build = { ...build, build: [...extra.filter(x => x.at > 0), ...build.build] };
+  }
+  const boundary = bar => { let a = 0; for (const x of build.sections) { a += x.bars; if (a > bar) return a; } return Infinity; };
+  const prepFrom = b => { const k = build.sections.findIndex((_, j) => build.sections.slice(0, j + 1).reduce((y, z) => y + z.bars, 0) === b); return k >= 0 ? b - (build.sections[k].bars >= 4 ? 2 : 1) : Infinity; };
   // keep(track): optional, only the tracks it keeps are compiled (the fast export renders a block with the tracks that play in it)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
   const compact = build && build.crescendo && liveCode !== 'sections', waiting = compact ? [...new Set(buildSteps(build).flatMap(x => (x.add !== undefined ? [].concat(x.add) : [])))] : [];
   const compile = compact ? s => compileCompact(s, { muted: waiting, lines: liveCode === 'track' ? 'track' : 'joined' }) : compileSong;
+  // tracks that played before a bar and are silent at it (a break): shown muted in the code of the moment
+  const played = bar => [...new Set(buildSteps(build).filter(x => x.at <= bar && x.add !== undefined).flatMap(x => [].concat(x.add)))];
+  const compileAt = (song, bar) => (now ? compileNow(song, bar, { prepare: bar >= prepFrom(boundary(bar)), shownMuted: played(bar) }) : compile(song));
   const codeAt = build ? (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
-    const c = annotate(compile(only(st.song, keep)), build, st.upTo, getLang()) + voiceCode(build, st.song, st.upTo, total, getLang(), customFiles);
+    const c = annotate(compileAt(only(st.song, keep), bar), build, st.upTo, getLang()) + voiceCode(build, st.song, st.upTo, total, getLang(), customFiles);
     return c.includes('$:') ? c : `${c}\n$: silence`;
   } : null;
   const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
-  const meta = parseSong(code);
+  // the code of the moment has no sections table: the map comes from the code per section
+  const meta = parseSong(now ? compileSong(stateAt(build, 0).song) : code);
   if (tr.kind === 'composed') {
     // la mappa del tempo è in "BPM da 4/4": per l'etichetta usiamo i BPM veri delle sezioni
     const v = tr.sections.flatMap(s => [s.bpm ?? 138, s.bpmEnd ?? s.bpm ?? 138]), lo = Math.min(...v), hi = Math.max(...v);
@@ -1377,7 +1392,7 @@ $('#live-style').addEventListener('change', e => {
   if (!hasBuild(T) && !T.buildStyle) { liveOn = true; store.set('coding-misk-live', true); }
   liveChanged();
 });
-$('#live-code').addEventListener('change', e => { liveCode = CODE_VIEWS.includes(e.target.value) ? e.target.value : 'compact'; store.set('coding-misk-live-code', liveCode); liveChanged(); });
+$('#live-code').addEventListener('change', e => { liveCode = CODE_VIEWS.includes(e.target.value) ? e.target.value : 'now'; store.set('coding-misk-live-code', liveCode); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { liveNarrated = !liveNarrated; store.set('coding-misk-live-narrated', liveNarrated); liveChanged(); });
 $('#live-toggle').addEventListener('click', () => {
   const lv = liveOf(T);

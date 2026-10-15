@@ -1,6 +1,6 @@
 // Browser check for the compact code of Crescendo songs (#64, crescendo-code): for states of a few songs, the events
 // Strudel makes (onset time and every value) are the same with the standard code, the joined lines and one line per
-// track. Usage: PLAYWRIGHT_CORE=... node tools/check-compact-code.cjs   (dev server on :5173)
+// track (a velocity of 1 counts as no velocity: the code of the moment drops lanes that are 1). Usage: PLAYWRIGHT_CORE=... node tools/check-compact-code.cjs   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-notte-lunga', 'ferro', 'cavo-scoperto'];
@@ -12,15 +12,15 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
   let failed = 0;
   for (const id of SONGS) {
     const res = await page.evaluate(async id => {
-      const [{ crescendoSong }, { compileCompact }, { compileSong }, { stateAt, buildSteps }] = await Promise.all(['/src/song/crescendo.js', '/src/song/compile-compact.js', '/src/song/compile.js', '/src/song/build.js'].map(u => import(u)));
+      const [{ crescendoSong }, { compileCompact, compileNow }, { compileSong }, { stateAt, buildSteps }] = await Promise.all(['/src/song/crescendo.js', '/src/song/compile-compact.js', '/src/song/compile.js', '/src/song/build.js'].map(u => import(u)));
       const song = await (await fetch(`/songs/${id}.json`)).json(), c = crescendoSong(song), total = c.sections.reduce((a, x) => a + x.bars, 0);
       const waiting = [...new Set(buildSteps(c).flatMap(s => (s.add !== undefined ? [].concat(s.add) : [])))];
       const e = document.querySelector('strudel-editor').editor;
-      const haps = async code => {
+      const haps = async (code, a = 0, z = total) => {
         await e.repl.evaluate(code, false);
         if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
-        return e.repl.scheduler.pattern.queryArc(0, total).filter(h => h.hasOnset())
-          .map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), Object.fromEntries(Object.entries(h.value).filter(([, v]) => typeof v !== 'function').sort())])).sort().join('\n');
+        return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset())
+          .map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), Object.fromEntries(Object.entries(h.value).filter(([k, v]) => typeof v !== 'function' && !(k === 'velocity' && v === 1)).sort())])).sort().join('\n');
       };
       const out = [];
       for (const bar of [Math.round(c.crescendo.growth / 3), c.crescendo.grown]) {
@@ -28,6 +28,13 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
         try {
           const a = await haps(compileSong(st));
           for (const lines of ['joined', 'track']) out.push({ bar, lines, same: a === await haps(compileCompact(st, { muted: waiting, lines })) });
+          // the code of the moment, section by section (prepared lines included: they are muted)
+          let sameNow = true;
+          for (const sec of st.sections.reduce((acc, x) => { acc.push({ start: acc.length ? acc[acc.length - 1].start + acc[acc.length - 1].bars : 0, bars: x.bars }); return acc; }, [])) {
+            const std = await haps(compileSong(st), sec.start, sec.start + sec.bars), now = await haps(compileNow(st, sec.start, { prepare: true }), sec.start, sec.start + sec.bars);
+            if (std !== now) { sameNow = false; break; }
+          }
+          out.push({ bar, lines: 'now', same: sameNow });
         } catch (x) { out.push({ bar, err: x.message }); }
       }
       return out;
