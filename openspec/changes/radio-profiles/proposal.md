@@ -1,26 +1,29 @@
 ## Why
 
-Phase 1 of Crescendo (`#64`, change `crescendo`) builds Compose songs in small steps. The owner wants the same in the radio, where songs are written by the director and can be steered while they play, and wants artists to have their own preference for it.
+Compose now has performance profiles (Classic, Crescendo, Switch), several growths (small steps, gradual, natural like a live coder with waypoints), code views, technical functions, comments and lit notes (#64). The radio still builds every song in blocks. This change brings it all to the radio, written before the Compose updates so both stay coherent. It replaces the earlier plan `crescendo-radio`, which only chose between blocks and crescendo.
 
 ## What Changes
 
-- **Crescendo songs in the radio.** The director can make a song with the crescendo build style. Its growth is the path from the current state to the song the director planned.
-- **Steering keeps working.** Curves and steering commands change the destination; the path is recomputed from the code on air, so the build turns toward the new destination without starting over.
-- **Artists choose a build style.** A new artist field `buildStyle` gives weights (`{ "blocks": 3, "crescendo": 1 }`), plus a `crescendo` block for the artist's way of growing (step spacing, what the build starts from, breaks, endings, dense narration) and new quirks. Existing artists keep the blocks style only. Random artists draw these too. A new built-in artist builds in crescendo only.
-- **Visible in the radio.** The song card on air shows a crescendo mark; "new song from artist" in the Artists tab proposes the artist's build style.
-- **Sessions and recording.** Sessions record the build style; replays stay identical; `DIRECTOR_VERSION` is bumped. Recording and export of radio sessions with crescendo songs work as for any song.
+- **Artists choose a profile.** Artist field `profiles` with weights (`{ "classic": 3, "switch": 1 }`) plus the details of their growth (spacing, pauses, detours, how songs start, endings, narration). Existing artists stay Classic, so their sessions sound the same. Random artists draw profiles too. A new built-in artist made for Switch. The listener may force a profile in the radio settings.
+- **The three growths in the radio**, with the growth duration fitted to the song's planned length by default; an artist trait may make it free.
+- **Steering and curves as waypoints.** A command (more energy, darker, add the bass) or a curve point becomes the next waypoint: the song reaches it with small moves from the code on air. "End" leads to a last waypoint (the song's ending), not a cut.
+- **Chooser in the radio.** The radio's chooser is the director plus the listener's commands; the interface leaves room for a decision model later.
+- **The incoming song, like a DJ.** During a transition only the song on air shows in the code; the next song plays underneath from code that is evaluated but not shown, and appears whole when it goes on air. An option keeps today's behaviour (both songs visible): visible by default for Classic, hidden for the others.
+- **Mixer per song.** With technical functions at the mixer, the song on air uses the hidden mixer; the incoming song carries its levels in full on separate buses, so the two never clash.
+- **Code on air.** Code views, comments (voice code hidden for Switch), technical functions, typing and lit notes work on the song on air.
+- **Repeatable and exportable.** Sessions record profiles, waypoints and commands, and replay identically; `DIRECTOR_VERSION` goes up. Compilations play saved songs with their own profile. Recording, audio and video export of sessions work, with a speed measure on a one-hour session.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `endless/crescendo`: crescendo songs in the radio, path recomputed on steering, artist build style weights and crescendo parameters, session determinism.
+- `endless/radio-profiles`: profiles in the radio (artists, listener setting), growths, steering and curves as waypoints, the chooser, the hidden incoming song, the mixer per song, code on air, sessions and export.
 
 ### Modified Capabilities
 
-- None in their requirements; the director, steering and artists gain behavior described in the new capability.
+None in their requirements; the director, steering, artists and transitions gain behaviour described in the new capability.
 
 ## Impact
 
-- `src/endless/` (director, steering, artists), `src/song/crescendo.js` (path from any state), artist format and validator, Artists tab editor, radio song card, `docs/ENDLESS.md`, `docs/ARTISTS.md`, Guide card, `npm run check:endless` fixtures and `DIRECTOR_VERSION`.
-- Depends on the change `crescendo` (phase 1). Transitions between a blocks song and a crescendo song must keep working; if the compact compiler (change `crescendo-code`) is in place, the two codes in one window must not clash.
+- `src/endless/` (director, steering, artists, transitions, session), the growth engines, the radio code panel (shown and evaluated code), the artist format and editor, radio settings, `docs/ENDLESS.md`, `docs/ARTISTS.md`, Guide, `check:endless` fixtures and `DIRECTOR_VERSION`.
+- Depends on `performance-profiles`, `live-coder-growth`, `code-writing`, `typing-lines`.
