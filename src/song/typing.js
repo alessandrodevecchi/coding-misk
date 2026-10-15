@@ -77,3 +77,78 @@ export function settleOthers(from, to, bar) {
   }
   return out.join('\n');
 }
+
+// ---------- typing like a person (live-typing) ----------
+// Inside a changed line only the words that change are edited: the cursor goes there, deletes the old word, types the
+// new one, then moves on. Small edits go at about 8 characters a second, long ones speed up to about 30; deletes are
+// three times faster; a short pause between places. typingPlan(from, to, { speed, max }) → { total, frame(t) }: total
+// seconds at that speed (scaled down to max when it does not fit), frame(t) the text t seconds after typing starts.
+export const TYPING_SPEEDS = { slow: 0.6, normal: 1, fast: 1.6 };
+const TOK = /\s+|[A-Za-z_$][\w$]*|-?\d*\.?\d+|./g;
+const toks = s => s.match(TOK) || [];
+// token diff of two lines → segments [{ eq: text } | { old, new }]
+function tokenDiff(a, b) {
+  const x = toks(a), y = toks(b), n = x.length, m = y.length;
+  if (n * m > 250000) return [{ old: a, new: b }];
+  const L = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const segs = [];
+  let i = 0, j = 0, o = '', w = '';
+  const flush = () => { if (o || w) segs.push({ old: o, new: w }); o = ''; w = ''; };
+  while (i < n || j < m) {
+    if (i < n && j < m && x[i] === y[j]) { flush(); const last = segs[segs.length - 1]; if (last && last.eq !== undefined) last.eq += x[i]; else segs.push({ eq: x[i] }); i++; j++; }
+    else if (j < m && (i >= n || L[i][j + 1] >= L[i + 1][j])) w += y[j++];
+    else o += x[i++];
+  }
+  flush();
+  return segs;
+}
+export function typingPlan(from, to, { speed = 1, max = Infinity } = {}) {
+  const ops = lineDiff(from.split('\n'), to.split('\n')), parts = [];
+  for (let k = 0; k < ops.length;) {
+    if (ops[k].op === 'keep') { parts.push({ kind: 'keep', text: ops[k].text }); k++; continue; }
+    const dels = [], adds = [];
+    while (k < ops.length && ops[k].op === 'del') dels.push(ops[k++].text);
+    while (k < ops.length && ops[k].op === 'add') adds.push(ops[k++].text);
+    const pairs = Math.min(dels.length, adds.length);
+    for (let p = 0; p < pairs; p++) parts.push({ kind: 'edit', segs: tokenDiff(dels[p], adds[p]) });
+    dels.slice(pairs).forEach(() => parts.push({ kind: 'gone' }));
+    adds.slice(pairs).forEach(text => parts.push({ kind: 'new', segs: [{ old: '', new: text }] }));
+  }
+  // actions in reading order: delete then type, for each changed place
+  const acts = [];
+  parts.forEach((p, pi) => (p.segs || []).forEach((s, si) => { if (s.eq !== undefined) return; if (s.old) acts.push({ pi, si, del: true, n: s.old.length }); if (s.new) acts.push({ pi, si, del: false, n: s.new.length }); }));
+  const typed = acts.reduce((a, x) => a + (x.del ? 0 : x.n), 0);
+  const cps = (8 + 22 * Math.max(0, Math.min(1, (typed - 40) / 360))) * speed;
+  let t = 0, prev = null;
+  for (const a of acts) {
+    if (prev && (prev.pi !== a.pi || prev.si !== a.si)) t += a.pi === prev.pi ? 0.15 : 0.25;
+    a.t0 = t; t += a.n / (a.del ? cps * 3 : cps); a.t1 = t; prev = a;
+  }
+  const scale = t > max && t > 0 ? max / t : 1;
+  acts.forEach(a => { a.t0 *= scale; a.t1 *= scale; });
+  const total = t * scale;
+  return {
+    total,
+    frame(time) {
+      if (time >= total) return to;
+      const state = new Map();
+      for (const a of acts) { const k = `${a.pi}:${a.si}`, s = state.get(k) || { del: 0, typed: 0 }; const f = time <= a.t0 ? 0 : time >= a.t1 ? 1 : (time - a.t0) / (a.t1 - a.t0); if (a.del) s.del = Math.floor(a.n * f + 1e-9); else s.typed = Math.floor(a.n * f + 1e-9); state.set(k, s); }
+      const out = [];
+      parts.forEach((p, pi) => {
+        if (p.kind === 'keep') { out.push(p.text); return; }
+        if (p.kind === 'gone') return;
+        let line = '';
+        p.segs.forEach((s, si) => {
+          if (s.eq !== undefined) { line += s.eq; return; }
+          const st = state.get(`${pi}:${si}`) || { del: 0, typed: 0 };
+          line += st.typed > 0 || st.del >= s.old.length ? s.new.slice(0, st.typed) : s.old.slice(0, s.old.length - st.del);
+        });
+        // a new line appears once its first character is typed
+        if (p.kind === 'new' && !line) return;
+        out.push(line);
+      });
+      return out.join('\n');
+    },
+  };
+}

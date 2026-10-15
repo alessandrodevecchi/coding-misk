@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Switch style family
-The styles SHALL include a family named Switch, with one style per genre: Switch · trance (genre trance) and Switch · acid (genre techno) first. More genres MAY join the family. The style list SHALL show the family together.
+The styles SHALL include a family named Switch, with one style per genre: Switch · trance (genre trance), Switch · acid (genre techno) and Switch · house (genre house). More genres MAY join the family. The style list SHALL show the family together.
 
 #### Scenario: Family in the list
 - **WHEN** the user opens the style list

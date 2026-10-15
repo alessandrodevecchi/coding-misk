@@ -1,7 +1,7 @@
 ## 1. Recipes
 
 - [ ] 1.1 Recipe fields `family` and `buildStyle`; validator and docs (`docs/STYLES.md`)
-- [ ] 1.2 `styles/switch-trance.json` and `styles/switch-acid.json`: tempo, minor keys, short diatonic progressions, parts, voice
+- [ ] 1.2 `styles/switch-trance.json`, `styles/switch-acid.json` and `styles/switch-house.json`: tempo, minor keys, short diatonic progressions, parts, voice
 - [ ] 1.3 Names and descriptions in English and Italian; family grouped in the style list
 
 ## 2. Director

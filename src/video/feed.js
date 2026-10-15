@@ -1,6 +1,6 @@
 // The fast video's feed (#53): what the visuals read live from the analysers, made from the timeline and the
 // rendered audio instead, so a frame can be drawn at any time. Pure: checked in Node (tools/check-video.mjs).
-import { typingFrames, settleOthers } from '../song/typing.js';
+import { typingFrames, settleOthers, typingPlan } from '../song/typing.js';
 
 // how an instrument's level falls after a note starts: percussion decays (seconds), the others hold for the note
 const DECAY = { kick: 0.1, snare: 0.12, hats: 0.04, fx: 0.3 };
@@ -34,11 +34,21 @@ export function levelsFrom(onsets) {
 }
 
 // the code shown at cycle c: the segment's code, typed towards the next step during the bar before it (as live)
-export function codeFrom(segments) {
+// seconds(c): seconds at cycle c; with it the typing is a person's (live-typing), as in the app
+export function codeFrom(segments, { seconds = null, speed = 1 } = {}) {
   const cache = new Map();
   return function codeAt(c) {
     let i = 0; while (i + 1 < segments.length && segments[i + 1].from <= c) i++;
     const seg = segments[i], next = segments[i + 1];
+    if (seconds && next) {
+      if (!cache.has(i)) {
+        const end = seconds(next.from) - 0.2, from0 = seconds(seg.from + 0.5), to = next.code;
+        const plan = typingPlan(settleOthers(seg.code, to, next.from), to, { speed, max: Math.max(0.2, end - from0) });
+        cache.set(i, { plan, start: Math.max(from0, end - plan.total) });
+      }
+      const T = cache.get(i), t = seconds(c) - T.start;
+      return t < 0 ? seg.code : T.plan.frame(t);
+    }
     if (!next || c < next.from - 1) return seg.code;
     // as live: only the line of the section that plays at the step is typed
     if (!cache.has(i)) cache.set(i, typingFrames(settleOthers(seg.code, next.code, next.from), next.code));

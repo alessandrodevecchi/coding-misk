@@ -29,6 +29,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`)}
           ${row(t('setFormat'), `<select id="set-format" data-no-knob>${FORMATS.map(f => opt(f, fmt, t(`set${f[0].toUpperCase()}${f.slice(1)}`))).join('')}</select>`, t('setFormatHint'))}
           ${fmt === 'mp3' ? row(t('setMp3Rate'), seg('data-set-mp3', MP3_RATES.map(r => [String(r), `${r} kbps`]), String(store.get('coding-misk-export-mp3', 320)))) : ''}
+          ${row(t('setTyping'), `<select id="set-typing" data-no-knob>${['slow', 'normal', 'fast'].map(k => opt(k, store.get('coding-misk-typing', 'normal'), t(`setTyping:${k}`))).join('')}</select>`, t('setTypingHint'))}
           ${row(t('setSpeed'), `<select id="set-speed" data-no-knob>${opt('fast', store.get('coding-misk-export-speed', 'fast'), t('setSpeedFast'))}${opt('real', store.get('coding-misk-export-speed', 'fast'), t('setSpeedReal'))}</select>`, t('setSpeedHint'))}
         </div>
         <div class="card set-card" id="set-video"><h3>${esc(t('setVideo'))}</h3>
@@ -132,6 +133,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (e.target.id === 'set-radio-look') store.set('coding-misk-radio-look', e.target.value);
     if (e.target.id === 'set-format') { store.set('coding-misk-export-format', e.target.value); render(); }
     if (e.target.id === 'set-speed') store.set('coding-misk-export-speed', e.target.value);
+    if (e.target.id === 'set-typing') store.set('coding-misk-typing', e.target.value);
     if (e.target.dataset.radioOpt) app.setRadio(e.target.dataset.radioOpt, e.target.value);
     if (e.target.dataset.vidOpt) { setVid(e.target.dataset.vidOpt, e.target.value); render(); }
     if (e.target.dataset.fragOpt) { setFrag(e.target.dataset.fragOpt, e.target.type === 'number' ? Math.max(5, Math.min(180, +e.target.value || 30)) : e.target.value); if (e.target.tagName === 'SELECT') render(); }

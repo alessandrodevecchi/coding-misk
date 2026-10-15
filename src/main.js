@@ -3,7 +3,7 @@ import './style.css';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, buildMap, sayText, voiceCode, voiceSamples, voiceOf, stepKeys } from './song/build.js';
-import { typingFrames, settleOthers } from './song/typing.js';
+import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong } from './song/crescendo.js';
 import { compileCompact } from './song/compile-compact.js';
 import { validateSong } from './song/validate.js';
@@ -236,8 +236,16 @@ function followEdit(a, b) {
     const blk = view.lineBlockAt(Math.min(i, view.state.doc.length)), at = { top: view.documentTop + blk.top, bottom: view.documentTop + blk.bottom };
     // the visible part of the panel: it can run below the window
     const box = host.getBoundingClientRect(), top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight);
-    if (at.top < top + 8 || at.bottom > bottom - 8) host.scrollTop += at.top - top - (bottom - top) / 3;
+    // glide there (live-typing): about 0.3 s, eased; a new target replaces the old one
+    if (at.top < top + 8 || at.bottom > bottom - 8) glideTo(host, host.scrollTop + at.top - top - (bottom - top) / 3);
   } catch (e) {}
+}
+let glide = null;
+function glideTo(host, y) {
+  const from = host.scrollTop, t0 = performance.now();
+  if (glide) cancelAnimationFrame(glide);
+  const step = now => { const k = Math.min(1, (now - t0) / 300), e = k * k * (3 - 2 * k); host.scrollTop = from + (y - from) * e; glide = k < 1 ? requestAnimationFrame(step) : null; };
+  glide = requestAnimationFrame(step);
 }
 // live build in progress: steps already in the editor, and the edit being typed towards the next step
 let built = 0, typing = null;
@@ -246,20 +254,31 @@ let built = 0, typing = null;
 let hand = false, lastHand = null, resumeTo = null, handFrom = 0;
 // resume from the bar where the user took over (default) or from where the song has got to meanwhile
 let handFromHere = store.get('coding-misk-hand-from', true) !== false;
+// typing speed of the code that types itself (live-typing): slow, normal, fast
+const typingSpeed = () => TYPING_SPEEDS[store.get('coding-misk-typing', 'normal')] || 1;
+// a typing towards `to` that may start at `from0` (cycles) and must end at `end`: it starts as late as it can while
+// typing at a person's speed, faster when it does not fit
+function makeTyping(text, to, from0, end, cps) {
+  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, (end - from0) / cps) });
+  return { plan, start: Math.max(from0, end - plan.total * cps), cps, shown: '' };
+}
+function typeFrame(T, cyc) {
+  if (cyc < T.start) return;
+  const txt = T.plan.frame((cyc - T.start) / T.cps);
+  if (txt !== T.shown) { const prev = T.shown || ed.code || ''; T.shown = txt; ed.setCode(txt); followEdit(prev, txt); }
+}
 function liveBuild(sg, s, cyc) {
   const steps = buildSteps(sg.build), next = steps[built];
   if (!next) return;
-  // the change is typed during the bar before its step. Strudel schedules ahead from lastEnd, so the new code is
-  // evaluated when the next query is about to reach the step's bar: everything from the bar on comes from the new code
-  const typeAt = next.at - Math.min(1, 2 * s.cps), due = s.lastEnd + .1 * s.cps >= next.at;
-  if (cyc < typeAt && !due) return;
-  // only the line of the section that plays at the step is typed; the other sections' lines change at once
-  if (!typing) { const to = codeFor(sg, next.at), from = settleOthers(ed.code || '', to, next.at); typing = { frame: typingFrames(from, to), t0: cyc, t1: next.at - .2 * s.cps, shown: '' }; }
-  if (!due) {
-    const txt = typing.frame((cyc - typing.t0) / Math.max(.01, typing.t1 - typing.t0));
-    if (txt !== typing.shown) { const prev = typing.shown || ed.code || ''; typing.shown = txt; ed.setCode(txt); followEdit(prev, txt); }
-    return;
+  // Strudel schedules ahead from lastEnd, so the new code is evaluated when the next query is about to reach the
+  // step's bar: everything from the bar on comes from the new code. The edit may be typed from half a bar after the
+  // previous step; only the line of the section that plays at the step is typed, the other sections' lines change at once
+  const due = s.lastEnd + .1 * s.cps >= next.at;
+  if (!typing && !due) {
+    const prevAt = built > 0 && steps[built - 1] ? steps[built - 1].at : -Infinity, to = codeFor(sg, next.at);
+    typing = makeTyping(settleOthers(ed.code || '', to, next.at), to, Math.max(cyc, prevAt + .5), next.at - .2 * s.cps, s.cps);
   }
+  if (!due) { typeFrame(typing, cyc); return; }
   typing = null; built = steps.filter(x => x.at <= next.at).length;
   ed.setCode(codeFor(sg, next.at)); ed.evaluate();
 }
@@ -293,22 +312,18 @@ function resumeHand() {
   // from where I was: the song goes back to the bar where the user took over, with the code it had there
   if (handFromHere) {
     const target = Math.min(handFrom, Math.max(0, song.meta.bars - 1));
-    resumeTo = { bar, target, frame: typingFrames(ed.code || '', codeFor(song, target)), t0: cyc, t1: bar - .2 * s.cps, shown: '' };
+    resumeTo = { bar, target, ...makeTyping(ed.code || '', codeFor(song, target), cyc, bar - .2 * s.cps, s.cps) };
     return;
   }
   // the radio: when the song on air ended by hand, the next song starts on the next bar
   if (mode === 'radio' && radio && radio.afterHand(bar)) return;
   // Compose past the end of the song: start again from the top
   if (bar >= song.meta.bars) { playSong(song, 0, mode); return; }
-  resumeTo = { bar, frame: typingFrames(ed.code || '', codeFor(song, bar)), t0: cyc, t1: bar - .2 * s.cps, shown: '' };
+  resumeTo = { bar, ...makeTyping(ed.code || '', codeFor(song, bar), cyc, bar - .2 * s.cps, s.cps) };
 }
 function resumeBuild(sg, s, cyc) {
   const r = resumeTo, due = s.lastEnd + .1 * s.cps >= r.bar;
-  if (!due) {
-    const txt = r.frame((cyc - r.t0) / Math.max(.01, r.t1 - r.t0));
-    if (txt !== r.shown) { const prev = r.shown || ed.code || ''; r.shown = txt; ed.setCode(txt); followEdit(prev, txt); }
-    return;
-  }
+  if (!due) { typeFrame(r, cyc); return; }
   resumeTo = null; typing = null;
   if (r.target !== undefined) { playSong(sg, r.target, mode); return; }
   built = sg.build ? buildSteps(sg.build).filter(x => x.at <= r.bar).length : 0;
@@ -783,7 +798,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
+  const job = { typingSpeed: typingSpeed(), segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : TIMELINE_LAYOUTS.includes(layout) ? liveAreas(layout, q.w, q.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
   visuals.setTarget({ w: stageA.w, h: stageA.h });

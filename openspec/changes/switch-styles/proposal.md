@@ -4,7 +4,7 @@ Our styles make harmonically rich songs: progressions of four to eight chords, c
 
 ## What Changes
 
-- **A Switch family of styles.** Style recipes named Switch, one per genre: Switch · trance and Switch · acid (techno) first; more genres can join the family later (for example house).
+- **A Switch family of styles.** Style recipes named Switch, one per genre: Switch · trance, Switch · acid (techno) and Switch · house; more genres can join the family later (an acid techno genre is being considered).
 - **Their rules.** One key and scale per song; progressions of one to four chords, all in the scale; short patterns with repeats; four to six tracks; strong use of filter, resonance, gate and delay; a held first chord.
 - **Their build.** Songs made from a Switch style declare `"buildStyle": "crescendo"`, so they open in crescendo in Compose; with the idiomatic generator and the view now (when they exist) their code looks like a live-coding session.
 - **In the radio.** They play like any style; Crescendo in the radio stays for `crescendo-radio`.

@@ -22,7 +22,9 @@ Keys limited to minor keys; progressions from a short list of one to four diaton
 
 - Switch · trance: 138 to 142 BPM, four on the floor, gated supersaw bass and lead (degrade or gate-like rack), pulse riser, big room and delay on the lead.
 - Switch · acid: 128 to 135 BPM, acid bass with high resonance and filter movement, distortion, sparse hats, clap on 2 and 4.
-- Both: four to six tracks; patterns of 1 to 2 bars repeated.
+- Switch · house: 122 to 126 BPM, four on the floor with open hats on the off-beat, a short chord stab or organ, a walking bass on the root.
+- All: four to six tracks; patterns of 1 to 2 bars repeated.
+- Mixed songs: a song that mixes a Switch style with others builds in crescendo only when the drums part comes from the Switch style (to confirm after listening).
 
 ### D4. Build style from the recipe
 
