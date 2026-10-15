@@ -37,6 +37,8 @@ export function validateSong(song, opts = {}) {
   // when the song was made and with which version of the app (#67)
   if (song.created !== undefined && (typeof song.created !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(song.created) || Number.isNaN(Date.parse(song.created)))) err('created', 'a date, for example "2026-10-16"');
   if (song.appVersion !== undefined && (typeof song.appVersion !== 'string' || !/^\d+\.\d+\.\d+/.test(song.appVersion))) err('appVersion', 'a version, for example "0.6.0"');
+  // performance profile (performance-profiles): the song opens with it
+  if (song.profile !== undefined && !['classic', 'crescendo', 'switch'].includes(song.profile)) err('profile', 'one of classic, crescendo, switch, or left out');
   // build style of the live build (#64): the song opens and plays with it
   if (song.buildStyle !== undefined && !['blocks', 'crescendo'].includes(song.buildStyle)) err('buildStyle', 'one of blocks, crescendo, or left out (the Compose setting)');
   // tags and origin (song library, #34)

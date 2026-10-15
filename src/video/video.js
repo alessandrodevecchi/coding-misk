@@ -15,7 +15,8 @@ const LIVE_KEY = 'coding-misk-live-preset';
 // getSay(): the voice line on the stage; getSoul(): { canvas } of the soul screen when the soul is on, else null;
 // soulFrame(cyc, playing, scale): the soul screen always (the live picture's soul views, #52)
 // getTimeline(cyc): { shape, bar, live } of the song on air, for the timeline views (#65), or null
-export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTimeline = () => null, soulFrame = null, soulView = () => 'a', store, t, esc }) {
+// getHighlights(): true when the playing notes light up in the code (performance-profiles)
+export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });
   const cv = document.createElement('canvas');
@@ -130,6 +131,29 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
     if (active) {
       const beat = 1 - ((co.cyc || 0) * 4 % 1);
       rows.forEach((r, k) => { if (!active.has(r.li)) return; const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return; g.fillStyle = P.a1; g.globalAlpha = (A.a ?? 1) * (.12 + .14 * beat); g.fillRect(A.x + 4, y - fs * 1.02, A.w - 8, lh); g.globalAlpha = A.a ?? 1; g.fillStyle = P.a1; g.fillRect(A.x + 4, y - fs * 1.02, Math.max(3, fs * .18), lh); });
+    }
+    // highlights: the layers of the instruments that sound glow with their level, and the step that plays in their
+    // first pattern string gets a box, in time with the bar (as Strudel's editor marks the playing notes)
+    if (getHighlights()) {
+      const lv = (visuals && visuals.levels) || {}, cyc = lastCyc;
+      let layer = null;
+      const layerOf = [];
+      lines.forEach((ln, i) => { if (/^_?\$:/.test(ln)) layer = { start: i, muted: ln.startsWith('_') }; else if (!/^\s+\S/.test(ln)) layer = null; layerOf[i] = layer; });
+      const idOf = new Map();
+      lines.forEach((ln, i) => { const m = ln.match(/\.analyze\("([^"]+)"\)/), L = layerOf[i]; if (m && L) idOf.set(L.start, m[1]); });
+      rows.forEach((r, k) => {
+        const L = layerOf[r.li]; if (!L || L.muted) return;
+        const level = Math.min(1, (lv[idOf.get(L.start)] || 0) * 2.5); if (level < .05) return;
+        const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
+        g.fillStyle = P.a2 || P.a1; g.globalAlpha = (A.a ?? 1) * .16 * level; g.fillRect(A.x + 4, y - fs * .95, A.w - 8, lh);
+        // the step box, in the first string of the layer's first row
+        if (r.li !== L.start || r.from > 0) return;
+        const m = r.line.match(/"([^"<>]*)"/); if (!m || m.index >= r.text.length) return;
+        const toks = [...m[1].matchAll(/[^\s[\]]+/g)]; if (!toks.length) return;
+        const tk = toks[Math.floor(((cyc % 1) + 1) % 1 * toks.length)], x = A.x + padX + (m.index + 1 + tk.index) * cw;
+        g.globalAlpha = (A.a ?? 1) * (.5 + .5 * level); g.strokeStyle = P.a2 || P.a1; g.lineWidth = 1.5; g.strokeRect(x - 2, y - fs * .9, tk[0].length * cw + 4, fs * 1.15);
+      });
+      g.globalAlpha = A.a ?? 1;
     }
     rows.forEach((r, k) => {
       const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
@@ -525,7 +549,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
     // the settings' live preview: a canvas element, or null
     preview(el) { previewEl = el; },
     // a frame of the fast video (#53): the layout's frame at cycle cyc and time now (seconds), into the canvas
-    composeAt(J, cyc, now) { if (cv.width !== J.q.w || cv.height !== J.q.h) { cv.width = J.q.w; cv.height = J.q.h; } cardKey = cardKey || ''; return compose(J, cyc, true, now); },
+    composeAt(J, cyc, now) { if (cv.width !== J.q.w || cv.height !== J.q.h) { cv.width = J.q.w; cv.height = J.q.h; } cardKey = cardKey || ''; lastCyc = cyc; return compose(J, cyc, true, now); },
     pause() { if (job && !job.pauseAt) job.pauseAt = performance.now(); },
     resume() { if (job && job.pauseAt) { job.paused += performance.now() - job.pauseAt; job.pauseAt = null; } },
     get on() { return !!job; },

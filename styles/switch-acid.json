@@ -3,6 +3,7 @@
   "id": "switch-acid",
   "family": "switch",
   "buildStyle": "crescendo",
+  "profile": "switch",
   "name": {
     "en": "Switch · acid",
     "it": "Switch · acid"

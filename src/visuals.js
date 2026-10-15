@@ -883,5 +883,6 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   }
   let idle = 0, spin = 0;
   requestAnimationFrame(frame);
-  return { setTarget, drawAt, pump, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; } };
+  // levels: the current level of each instrument (analysers live, the feed in a fast video)
+  return { setTarget, drawAt, pump, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; }, get levels() { return raw; } };
 }

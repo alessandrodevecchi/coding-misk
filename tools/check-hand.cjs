@@ -79,7 +79,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const kept = (await st()).last;
   await page.click('#hand-last summary'); await page.click('#hand-back'); await sleep(800);
   s = await st();
-  check(s.hand && kept && s.code === kept && s.active === kept, 'back to this code: by hand again with the user\'s code evaluated');
+  check(s.hand && kept && s.code === kept && s.active === kept, 'back to this code: by hand again with the user\'s code evaluated', `hand ${s.hand} kept ${!!kept} code ${s.code === kept} active ${s.active === kept}`);
 
   // past the end of the song by hand: the music goes on
   // jump to the last bar with the ruler (End), take over again, let the song end
@@ -109,6 +109,8 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const card = `#songs [data-song-id="${v.id}"]`;
   check(await page.$(card) && (await page.innerText(`${card} .badge`)).toLowerCase().includes('cod'), 'the version is a code song in the Songs tab');
   check(!!(await page.$(`#songs [data-song-id="primo-segnale"] [data-version="${v.id}"]`)), 'the original lists its versions');
+  // the song list is in pages (#67): search the version so its card is on the page shown
+  await page.fill('#sv-q', v.title); await sleep(500);
   await page.click(`${card} [data-act="play"]`); await sleep(1500);
   check(!(await st()).err && (await st()).started, 'the version plays', (await st()).err);
   await page.click('#stop'); await sleep(300);

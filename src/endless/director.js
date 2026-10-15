@@ -463,8 +463,10 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
     sections: plan.sections.map(({ role, ...s }) => s), tracks, build: steps,
   };
   // the build style of the style that gives the drums (switch-styles): the song opens with it in Compose
-  const bs = byId[parts.drums] && byId[parts.drums].buildStyle;
+  const bs = byId[parts.drums] && byId[parts.drums].buildStyle, pf = byId[parts.drums] && byId[parts.drums].profile;
   if (bs) song.buildStyle = bs;
+  // and its performance profile (performance-profiles)
+  if (pf) song.profile = pf;
   // measured energy of the final song at each phrase
   for (const p of phrases) p.energy = round(measure(song, p.bar, ctx));
   const entry = { id: song.id, title, parts, styles, bars: plan.bars, seconds: Math.round(plan.seconds), bpm: plan.bpm, key: plan.key, meter: plan.meter, shape: plan.shape, phrase: plan.phrase, tracks: tracks.filter(t => t.type !== 'voice').length, voice: { speaker: plan.voice.settings.speaker, character: plan.voice.character }, usualHigh: plan.usualHigh, hardMax: plan.hardMax, phrases };

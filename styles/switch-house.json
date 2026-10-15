@@ -3,6 +3,7 @@
   "id": "switch-house",
   "family": "switch",
   "buildStyle": "crescendo",
+  "profile": "switch",
   "name": {
     "en": "Switch · house",
     "it": "Switch · house"

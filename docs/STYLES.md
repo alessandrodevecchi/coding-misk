@@ -26,6 +26,7 @@ One recipe per file, `styles/<id>.json`. Required fields are marked.
 | `genre`        | One genre of the song library: `techno`, `trance`, `house`, `synthwave`, `drum-and-bass`, `industrial`, `rock`, `metal`, `hip-hop`, `pop`, `jazz`, `country`, `ambient`, `experimental`. Songs tagged with the style count under this genre. | `experimental`, with a warning |
 | `family`       | Optional family of styles across genres, for example `switch` (Switch · trance, Switch · acid, Switch · house): shown together in the style list. |
 | `buildStyle`   | Optional `crescendo` or `blocks`: songs whose drums come from this style declare it and open with it in Compose. |
+| `profile`      | Optional performance profile (`classic`, `crescendo`, `switch`) of the songs whose drums come from this style: they open with it in Compose. |
 | `description`  | One sentence on the sound of the style, for people and agents.                             |                         |
 | `tempo`        | Required. BPM range `[low, high]`, within 40 to 240.                                       |                         |
 | `keys`         | Required. Keys the songs can use: `E F F# G A B C D`.                                      |                         |

@@ -3,6 +3,7 @@
   "id": "switch-trance",
   "family": "switch",
   "buildStyle": "crescendo",
+  "profile": "switch",
   "name": {
     "en": "Switch · trance",
     "it": "Switch · trance"

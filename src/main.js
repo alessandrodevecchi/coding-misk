@@ -6,6 +6,8 @@ import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, annotate, deriveBuild, 
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong } from './song/crescendo.js';
 import { compileCompact, compileNow } from './song/compile-compact.js';
+import { applyComments } from './song/comments.js';
+import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, migrateOld } from './live/profiles.js';
 import { idiomatic } from './song/idiom.js';
 import pkg from '../package.json';
 // the app's version, written in the songs it makes (#67)
@@ -114,23 +116,25 @@ function composedTracks() {
 if (!Array.isArray(user.codeSongs)) user.codeSongs = [];
 const codedTracks = () => [...CODED, ...user.codeSongs.map(v => ({ ...v, kind: 'coded' }))].map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
-// build style of the live build (#64): "blocks" (tracks come in whole) or "crescendo" (the song grows in small steps)
-let liveStyle = store.get('coding-misk-live-style', 'blocks') === 'crescendo' ? 'crescendo' : 'blocks';
-let liveNarrated = !!store.get('coding-misk-live-narrated', false);
-// Crescendo code: 'compact' (identical lines joined, silent tracks shown with _$:), 'track' (one line per part of a
-// track, values by bar) or 'sections' (per section, like any song)
-const CODE_VIEWS = ['now', 'compact', 'track', 'sections'];
-// code generator for Crescendo songs (idiomatic-code): 'standard' or 'idiomatic' (shorter patterns, same sound)
-let liveGen = store.get('coding-misk-live-gen', 'standard') === 'idiomatic' ? 'idiomatic' : 'standard';
-let liveCode = CODE_VIEWS.includes(store.get('coding-misk-live-code', 'now')) ? store.get('coding-misk-live-code', 'now') : 'now';
-// a song may declare its build style; the Compose controls still switch it, for this session
+// performance profiles (performance-profiles): Classic, Crescendo, Switch, each a set of controls (build style,
+// growth rules, typing, code view, generator, comments, highlights). The Compose choice, the controls changed by hand
+// (overrides, the profile becomes "custom") and, before profiles, separate settings (read once)
+const firstProfile = migrateOld(k => store.get(k, undefined));
+let profileChoice = PROFILES[store.get('coding-misk-profile', null)] ? store.get('coding-misk-profile', null) : firstProfile.id;
+let overrides = store.get('coding-misk-profile-overrides', null) || firstProfile.overrides;
+const saveProfile = () => { store.set('coding-misk-profile', profileChoice); store.set('coding-misk-profile-overrides', overrides); };
+// a song may name its profile (or its old build style); the Compose controls still switch it, for this session
 const liveOverride = new Map();
-const liveOf = tr => liveOverride.get(tr.id) || (tr.buildStyle ? { on: true, style: tr.buildStyle } : { on: liveOn, style: liveStyle });
+const profileFor = tr => { const o = liveOverride.get(tr.id); return (o && o.profile) || songProfile(tr) || profileChoice; };
+const ctlOf = tr => resolveProfile(profileFor(tr), overrides);
+const liveOf = tr => { const o = liveOverride.get(tr.id), C = ctlOf(tr); return { on: o && o.on !== undefined ? o.on : songProfile(tr) ? true : liveOn, style: C.build, ctl: C }; };
+// one control changed by hand: kept for every profile until a profile is picked again
+function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v }, PROFILES[profileFor(T)]); saveProfile(); }
 // Crescendo builds are computed once per song version and option
 const crescendoCache = new Map();
 function crescendoOf(tr) {
-  const key = JSON.stringify([liveNarrated, tr.sections, tr.tracks, tr.id]);
-  if (!crescendoCache.has(key)) { if (crescendoCache.size > 20) crescendoCache.clear(); crescendoCache.set(key, crescendoSong(tr, { narrated: liveNarrated })); }
+  const narrated = ctlOf(tr).narrated, key = JSON.stringify([narrated, tr.sections, tr.tracks, tr.id]);
+  if (!crescendoCache.has(key)) { if (crescendoCache.size > 20) crescendoCache.clear(); crescendoCache.set(key, crescendoSong(tr, { narrated })); }
   const c = crescendoCache.get(key);
   return c.build.length ? c : null;
 }
@@ -147,6 +151,7 @@ function playable(tr) {
   let build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : null;
   // the code of the moment (code-now): each section boundary is a step, and the bars before it prepare the next
   // section's lines (muted); the steps go first on their bar, so a comment on the same bar stays the latest
+  const C = lv.ctl, liveCode = C.view, liveGen = C.gen;
   const now = build && build.crescendo && liveCode === 'now';
   if (now) {
     const extra = [];
@@ -163,11 +168,14 @@ function playable(tr) {
   // tracks that played before a bar and are silent at it (a break): shown muted in the code of the moment
   const played = bar => [...new Set(buildSteps(build).filter(x => x.at <= bar && x.add !== undefined).flatMap(x => [].concat(x.add)))];
   const gen = build && build.crescendo && liveGen === 'idiomatic' ? idiomatic : c => c;
-  const compileAt = (song, bar) => gen(now ? compileNow(song, bar, { prepare: bar >= prepFrom(boundary(bar)), shownMuted: played(bar) }) : compile(song));
+  // tracks that came in by a bar: they keep their header in the code of the moment
+  const entered = bar => [...new Set([...played(bar), ...(build ? build.tracks : []).filter(x => !waiting.includes(x.id) && (x.clips || []).some(c => (c.start ?? 0) <= bar)).map(x => x.id)])];
+  const compileAt = (song, bar) => gen(now ? compileNow(song, bar, { prepare: bar >= prepFrom(boundary(bar)), shownMuted: played(bar), keepHeaders: entered(bar) }) : compile(song));
   const codeAt = build ? (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
     const c = annotate(compileAt(only(st.song, keep), bar), build, st.upTo, getLang()) + voiceCode(build, st.song, st.upTo, total, getLang(), customFiles);
-    return c.includes('$:') ? c : `${c}\n$: silence`;
+    const out = applyComments(c, C);
+    return out.includes('$:') ? out : `${out}\n$: silence`;
   } : null;
   const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
   // the code of the moment has no sections table: the map comes from the code per section
@@ -179,7 +187,7 @@ function playable(tr) {
   }
   // doc: the song itself (sections and tracks), for its soul (#46)
   const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(tr, keep)) : null;
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, build, doc: tr.kind === 'composed' ? build || tr : null };
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || tr : null };
 }
 
 // ---------- brano in modifica ----------
@@ -280,7 +288,7 @@ let hand = false, lastHand = null, resumeTo = null, handFrom = 0;
 // resume from the bar where the user took over (default) or from where the song has got to meanwhile
 let handFromHere = store.get('coding-misk-hand-from', true) !== false;
 // typing speed of the code that types itself (live-typing): slow, normal, fast
-const typingSpeed = () => TYPING_SPEEDS[store.get('coding-misk-typing', 'normal')] || 1;
+const typingSpeed = () => TYPING_SPEEDS[store.get('coding-misk-typing', null) || (song && song.ctl && song.ctl.typing) || 'normal'] || 1;
 // a typing towards `to` that may start at `from0` (cycles) and must end at `end`: it starts as late as it can while
 // typing at a person's speed, faster when it does not fit
 function makeTyping(text, to, from0, end, cps) {
@@ -1204,11 +1212,17 @@ function renderArranger() {
   $('#arr-mode-hint').textContent = arrMode === 'timeline' ? t('timelineHint') : '';
   const own = hasBuild(T), lt = $('#live-toggle'), lv = liveOf(T), crescendo = lv.on && lv.style === 'crescendo';
   lt.setAttribute('aria-pressed', own || lv.on); lt.disabled = own && !crescendo; lt.title = own && !crescendo ? t('liveOwn') : t('liveHint');
-  $('#live-style').value = lv.style; $('#live-style').disabled = !own && !lv.on;
-  $('#live-style').title = T.buildStyle && !liveOverride.has(T.id) ? t('liveDeclared') : t('liveStyleHint');
-  $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', liveNarrated);
-  $('#live-code').hidden = !crescendo; $('#live-code').value = liveCode;
-  $('#live-gen').hidden = !crescendo; $('#live-gen').value = liveGen;
+  const C = lv.ctl, on = own || lv.on;
+  $('#live-profile').innerHTML = PROFILE_IDS.map(id => `<option value="${id}">${esc(t(`profile:${id}`))}${C.custom && id === C.id ? ` · ${esc(t('profileCustom'))}` : ''}</option>`).join('');
+  $('#live-profile').value = C.id; $('#live-profile').disabled = !on;
+  $('#live-profile').title = songProfile(T) && !liveOverride.has(T.id) ? t('profileDeclared') : t('profileHint');
+  $('#live-style').value = lv.style; $('#live-style').disabled = !on;
+  $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
+  $('#live-code').hidden = !crescendo; $('#live-code').value = C.view;
+  $('#live-gen').hidden = !crescendo; $('#live-gen').value = C.gen;
+  $('#live-comments').hidden = !on; $('#live-comments').value = C.comments;
+  $('#live-title').hidden = !on; $('#live-title').setAttribute('aria-pressed', C.title);
+  $('#live-hl').hidden = !on; $('#live-hl').setAttribute('aria-pressed', C.highlights);
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
   renderRuler();
@@ -1397,20 +1411,40 @@ function liveChanged() {
   else if (ed && mode === 'track') ed.setCode(compiled.code);
   renderArranger(); if (!$('#tab-brani').hidden) renderSongs();
 }
+// a profile picked: its controls as they are (the changes made by hand go); a song that names its profile is switched
+// for this session, the others change the Compose choice
+$('#live-profile').addEventListener('change', e => {
+  const id = PROFILES[e.target.value] ? e.target.value : 'classic';
+  overrides = {};
+  if (songProfile(T) || hasBuild(T)) liveOverride.set(T.id, { ...(liveOverride.get(T.id) || {}), on: true, profile: id });
+  else { profileChoice = id; liveOn = true; store.set('coding-misk-live', true); }
+  saveProfile(); liveChanged();
+});
+// the build style: between Classic and Crescendo it picks the profile, as before profiles; in another profile it is
+// a change by hand
 $('#live-style').addEventListener('change', e => {
-  liveStyle = e.target.value === 'crescendo' ? 'crescendo' : 'blocks'; store.set('coding-misk-live-style', liveStyle);
-  if (T.buildStyle || hasBuild(T)) liveOverride.set(T.id, { on: true, style: liveStyle });
-  if (!hasBuild(T) && !T.buildStyle) { liveOn = true; store.set('coding-misk-live', true); }
+  const v = e.target.value === 'crescendo' ? 'crescendo' : 'blocks', cur = profileFor(T);
+  if (cur === 'classic' || cur === 'crescendo') {
+    const id = v === 'crescendo' ? 'crescendo' : 'classic';
+    overrides = cleanOverrides(overrides, PROFILES[id]); delete overrides.build;
+    if (songProfile(T) || hasBuild(T)) liveOverride.set(T.id, { ...(liveOverride.get(T.id) || {}), on: true, profile: id });
+    else profileChoice = id;
+    saveProfile();
+  } else setControl('build', v);
+  if (!hasBuild(T) && !songProfile(T)) { liveOn = true; store.set('coding-misk-live', true); }
   liveChanged();
 });
-$('#live-gen').addEventListener('change', e => { liveGen = e.target.value === 'idiomatic' ? 'idiomatic' : 'standard'; store.set('coding-misk-live-gen', liveGen); liveChanged(); });
-$('#live-code').addEventListener('change', e => { liveCode = CODE_VIEWS.includes(e.target.value) ? e.target.value : 'now'; store.set('coding-misk-live-code', liveCode); liveChanged(); });
-$('#live-narrated').addEventListener('click', () => { liveNarrated = !liveNarrated; store.set('coding-misk-live-narrated', liveNarrated); liveChanged(); });
+$('#live-gen').addEventListener('change', e => { setControl('gen', e.target.value); liveChanged(); });
+$('#live-code').addEventListener('change', e => { setControl('view', e.target.value); liveChanged(); });
+$('#live-comments').addEventListener('change', e => { setControl('comments', e.target.value); liveChanged(); });
+$('#live-narrated').addEventListener('click', () => { setControl('narrated', !ctlOf(T).narrated); liveChanged(); });
+$('#live-title').addEventListener('click', () => { setControl('title', !ctlOf(T).title); liveChanged(); });
+$('#live-hl').addEventListener('click', () => { setControl('highlights', !ctlOf(T).highlights); liveChanged(); });
 $('#live-toggle').addEventListener('click', () => {
   const lv = liveOf(T);
   // a song with its own steps in crescendo: the switch goes back to its own steps
-  if (hasBuild(T)) liveOverride.set(T.id, { on: true, style: 'blocks' });
-  else if (T.buildStyle) liveOverride.set(T.id, { on: !lv.on, style: lv.style });
+  if (hasBuild(T)) liveOverride.set(T.id, { on: true, profile: 'classic' });
+  else if (songProfile(T)) liveOverride.set(T.id, { ...(liveOverride.get(T.id) || {}), on: !lv.on });
   else { liveOn = !liveOn; store.set('coding-misk-live', liveOn); }
   compiled = playable({ ...T, kind: 'composed' });
   if (isPlaying() && mode === 'track') playSong(compiled, sched().now(), 'track');
@@ -2927,6 +2961,7 @@ const video = createVideo({
   getCode: () => (fv ? fv.code : (ed && ed.code) || ''),
   getInfo: stageInfo,
   getTimeline: cyc => timelineNow(cyc),
+  getHighlights: () => !!(song && song.ctl && song.ctl.highlights),
   getSay: () => { if (fv) return fv.say; const el = $('#say'); return el.classList.contains('on') ? el.textContent : ''; },
   // the soul panel: as the direction says ('auto': only while the Soul display is on and the stage does not show the soul)
   getSoul: () => {

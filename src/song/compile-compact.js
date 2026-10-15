@@ -160,7 +160,7 @@ function mergeValues(groups) {
 // prepare: also the next section's new layers, muted with `_$:` under the current ones (typed before the boundary).
 // shownMuted: ids of tracks that played before and are silent now (a break), written with `_$:`.
 import { normalizeSong } from './format.js';
-export function compileNow(song, bar, { prepare = false, shownMuted = [] } = {}) {
+export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [] } = {}) {
   const n = normalizeSong(song), secs = n.sections;
   const i = Math.max(0, secs.findIndex(s => bar >= s.start && bar < s.start + s.bars));
   const shown = new Set(shownMuted.filter(id => (song.tracks || []).some(tr => tr.id === id && tr.mute)));
@@ -183,7 +183,8 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [] } = {})
     const id = b.header.replace(/^\/\/ =+ /, '').replace(/ =+$/, '').split(' · ')[0];
     const track = full.tracks.find(tr => (tr.name || tr.id) === id), silent = track && shown.has(track.id);
     const mine = now[k], extra = next ? next[k].filter(x => !mine.some(y => y.text === x.text)) : [];
-    if (!mine.length && !extra.length) return;
+    // a track that came in before keeps its header, also when nothing of it plays now (performance-profiles)
+    if (!mine.length && !extra.length) { if (track && keepHeaders.includes(track.id)) body.push('', b.header); return; }
     body.push('', b.header);
     let last = null;
     const put = (x, muted) => {

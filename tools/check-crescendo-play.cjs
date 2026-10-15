@@ -76,6 +76,17 @@ const SONGS = ['ferro', 'cavo-scoperto'];
     await page.click('#live-toggle'); await sleep(500);
     check((await page.getAttribute('#live-toggle', 'aria-pressed')) === 'false' && tracks((await st()).code) > 1, `${declared}: plays as written with the live build off`);
   }
+  // performance profiles: Switch, a control changed by hand makes it custom, picking it again drops the change
+  await page.locator('#track-pick').selectOption('crescendo-filo-di-luce'); await sleep(600);
+  await page.locator('#live-profile').selectOption('switch'); await sleep(800);
+  let code = (await st()).code;
+  check(/^\/\/ ========== /m.test(code) && !/^\/\/ > /m.test(code) && !/ · pattern /.test(code), 'Switch: essential comments', code.split('\n').slice(0, 6).join(' / '));
+  await page.locator('#live-comments').selectOption('none'); await sleep(600);
+  code = (await st()).code;
+  check(!/^\s*\/\//m.test(code.split('\n').slice(1).join('\n')) && code.startsWith('// coding-misk') && /custom|personalizzato/.test(await page.$eval('#live-profile', s => s.selectedOptions[0].textContent)), 'no comments (the title stays), profile custom', `${(code.match(/^\s*\/\/.*$/m) || [''])[0]} | ${await page.$eval('#live-profile', s => s.selectedOptions[0].textContent)}`);
+  await page.locator('#live-profile').selectOption('switch'); await sleep(600);
+  check(!/custom|personalizzato/.test(await page.$eval('#live-profile', s => s.selectedOptions[0].textContent)) && (await page.inputValue('#live-comments')) === 'essential', 'picking the profile again drops the change');
+  await page.locator('#live-profile').selectOption('crescendo'); await sleep(400);
   check(!errors.length, 'no page errors', errors.slice(0, 2).join(' | '));
   await browser.close();
   console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed');

@@ -1,0 +1,56 @@
+// Checks for performance profiles and code comments (performance-profiles). No browser.
+//   npm run check:profiles      exit 1 when any check fails
+import fs from 'node:fs';
+import { PROFILES, resolveProfile, cleanOverrides, migrateOld, songProfile } from '../src/live/profiles.js';
+import { applyComments } from '../src/song/comments.js';
+import { crescendoSong } from '../src/song/crescendo.js';
+import { compileNow } from '../src/song/compile-compact.js';
+import { stateAt } from '../src/song/build.js';
+
+const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
+const song = id => JSON.parse(fs.readFileSync(`songs/${id}.json`, 'utf8'));
+const CHECKS = {
+  'three profiles; Classic and Crescendo keep the settings used before profiles'() {
+    assert(Object.keys(PROFILES).join() === 'classic,crescendo,switch', 'ids');
+    const c = resolveProfile('crescendo'), k = resolveProfile('classic');
+    assert(c.build === 'crescendo' && c.growth === 'crescendo' && c.view === 'now' && c.gen === 'standard' && c.comments === 'all' && !c.custom, 'crescendo');
+    assert(k.build === 'blocks' && k.comments === 'all' && k.title, 'classic');
+    const s = resolveProfile('switch');
+    assert(s.growth === 'natural' && s.gen === 'idiomatic' && s.comments === 'essential' && s.highlights, 'switch');
+  },
+  'a changed control makes the profile custom; unknown values are dropped'() {
+    const r = resolveProfile('switch', { typing: 'fast', view: 'nope', gen: 'idiomatic' });
+    assert(r.custom && r.typing === 'fast' && r.view === 'now', 'custom');
+    assert(!resolveProfile('switch', { gen: 'idiomatic' }).custom, 'same value is not a change');
+    assert(Object.keys(cleanOverrides({ x: 1, comments: 'none' }, PROFILES.classic)).join() === 'comments', 'clean');
+  },
+  'old settings become the first profile and overrides'() {
+    const old = { 'coding-misk-live-style': 'crescendo', 'coding-misk-live-code': 'compact', 'coding-misk-live-gen': 'standard' };
+    const m = migrateOld(k => old[k]);
+    assert(m.id === 'crescendo' && m.overrides.view === 'compact' && !('gen' in m.overrides), JSON.stringify(m));
+    assert(migrateOld(() => undefined).id === 'classic', 'default');
+  },
+  'songs name their profile; an old build style counts'() {
+    assert(songProfile(song('switch-acid-prova')) === 'switch' && songProfile(song('crescendo-primo-passo')) === 'crescendo', 'songs');
+    assert(songProfile({ buildStyle: 'blocks' }) === 'classic' && songProfile({}) === null, 'old field');
+  },
+  'comments: all as compiled, essential keeps title and headers, none keeps blank lines'() {
+    const code = ['// coding-misk · Prova', '// Intro · bars 1-8', 'setcpm(138/4)', 'const section1 = "<1!8>"  // Intro · 8 bars', '', '// ========== drums ==========', '// > just a kick', '// Intro · bars 1-8 · pattern A', '$: s("bd*4")', '', '// ========== bass ==========', '$: note("a1")'].join('\n');
+    assert(applyComments(code, { title: true, comments: 'all' }) === code, 'all');
+    const e = applyComments(code, { title: true, comments: 'essential' });
+    assert(e.includes('// coding-misk') && e.includes('// ========== drums') && !e.includes('// >') && !e.includes('pattern A') && !e.includes('8 bars'), e);
+    const n = applyComments(code, { title: false, comments: 'none' });
+    assert(!n.includes('//') && /\$: s\("bd\*4"\)\n\n\$: note/.test(n), n);
+    assert(!applyComments(code, { title: false, comments: 'all' }).startsWith('// coding-misk'), 'title off');
+  },
+  'a track that came in keeps its header in the code of the moment'() {
+    const c = crescendoSong(song('crescendo-notte-lunga')), bar = c.crescendo.growth + 70;
+    const st = stateAt(c, bar).song, ids = c.tracks.map(t => t.id);
+    const withH = compileNow(st, bar, { keepHeaders: ids }), without = compileNow(st, bar, {});
+    assert((withH.match(/^\/\/ =+ /gm) || []).length > (without.match(/^\/\/ =+ /gm) || []).length, 'headers kept');
+  },
+};
+let failed = 0;
+for (const [name, fn] of Object.entries(CHECKS)) { try { fn(); console.log(`ok    ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); } }
+console.log(failed ? `\n${failed} check(s) failed` : `\nall ${Object.keys(CHECKS).length} checks passed`);
+process.exit(failed ? 1 : 0);
