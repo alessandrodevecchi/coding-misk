@@ -40,8 +40,8 @@ const WORKLET_SEED = `{ let a = ${SEED} >>> 0; Math.random = () => { a = (a + 0x
 
 // seconds to wait for one sound to load before skipping it
 const SOUND_WAIT = 8000;
-async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, buses = {} }) {
-  globalThis.miskBuses = buses;
+async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, buses = {}, voices = {} }) {
+  globalThis.miskBuses = buses; globalThis.miskVoices = voices;
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
   const ctx = new OfflineAudioContext(2, Math.ceil(length * sampleRate), sampleRate);
   setAudioContext(ctx);

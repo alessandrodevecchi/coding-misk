@@ -79,14 +79,14 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
       const C = resolveProfile('switch'), mk = o => liveCode(b, { ...C, ...o }, { lang: () => 'it', files: () => files, cols: () => 48 });
       const full = mk({ functions: 'full', voice: true, wrap: false }), out = [];
       const bars = [...new Set(buildSteps(full.build).map(x => x.at))].sort((x, y) => x - y), pick = [bars[1], bars[Math.floor(bars.length / 3)], bars[Math.floor(bars.length * 2 / 3)], bars[bars.length - 1]];
-      for (const v of [{ functions: 'short' }, { functions: 'mixer' }, { functions: 'mixer', voice: false }, { functions: 'full', voice: false }]) {
+      for (const v of [{ functions: 'short' }, { functions: 'mixer' }, { functions: 'short', voice: true }, { functions: 'mixer', voice: true }, { functions: 'full', voice: false }]) {
         const L = mk(v);
         for (const bar of pick) {
           try {
             const shown = L.codeAt(bar), a = await haps(full.codeAt(bar));
-            globalThis.miskBuses = L.buses;
+            globalThis.miskBuses = L.buses; globalThis.miskVoices = L.voices;
             const z = await haps(L.run ? L.run(shown) : shown);
-            out.push({ bar, lines: `${v.functions}${v.voice === false ? ' voice hidden' : ''}`, same: a === z && (v.functions !== 'mixer' || !/\.orbit\(|\.analyze\(/.test(shown)) });
+            out.push({ bar, lines: `${v.functions}${v.voice === false ? ' voice hidden' : v.voice ? ' voice shown' : ''}`, voiceCall: /\.voice\("/.test(shown), same: a === z && (v.functions !== 'mixer' || !/\.orbit\(|\.analyze\(/.test(shown)) });
           } catch (x) { out.push({ bar, err: x.message }); }
         }
       }

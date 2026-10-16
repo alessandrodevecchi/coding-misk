@@ -1,11 +1,15 @@
 ## ADDED Requirements
 
-### Requirement: Typing starts earlier
-In human style a long edit SHALL be allowed to start from half a bar after the previous step and SHALL use part of that time, typing at a person's speed rather than at the fastest speed that fits.
+### Requirement: Listen, then type at a person's pace
+In human style the time between two steps SHALL hold a listening pause without typing, then the typing; the typing SHALL last as long as its text needs at a person's pace (pauses and typos included), not the whole time left, and SHALL end when the step plays. When the time is short the listening pause SHALL shrink first and the typing SHALL speed up only after that.
 
 #### Scenario: Long line after a quiet stretch
-- **WHEN** a step adds a long line after two minutes without changes
-- **THEN** its typing starts well before the step and lasts tens of seconds, not a few
+- **WHEN** a step adds a long line two minutes after the previous step
+- **THEN** nothing is typed for a while after the previous step, then the line is typed over tens of seconds (not a few, not two minutes) and is complete when the step plays
+
+#### Scenario: Short time
+- **WHEN** a step comes four bars after the previous one
+- **THEN** the listening pause is short and the edit is typed in the time left
 
 ### Requirement: Uneven speed and pauses
 In human style key times SHALL vary, and the typing SHALL pause before numbers, inside mini-notation groups and before string arguments, for half a second to a few seconds.

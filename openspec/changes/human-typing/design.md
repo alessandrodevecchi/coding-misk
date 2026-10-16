@@ -6,7 +6,7 @@
 
 ### D2. Time budget
 
-Human style aims at about 60% of the time from half a bar after the previous step to the step, bounded by a person's speed (3 to 12 characters a second) and the existing deadline; exact style keeps today's rule (as late as possible). Pauses and typos are added before the speed is set, so the total stays within the time.
+The typing time is what the text needs at a person's pace: about 4 to 8 characters a second for new text, faster for deletes, plus the thinking pauses, typos and changes of mind of the plan. The listening pause after the previous step is at least about a fifth of the gap (some seconds to tens of seconds). The typing ends at the step, so it starts at the step minus its time, but not before the listening pause is over; when the two do not fit, the listening pause shrinks to a few seconds first, then pauses and typos are dropped, then the speed goes up as today. Exact style keeps today's rule (as late as possible, at the fastest speed that fits).
 
 ### D3. Where typos come from
 

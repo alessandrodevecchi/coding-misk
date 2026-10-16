@@ -60,9 +60,24 @@ export function levelsOf(code) {
   return new Map([...seen].filter(([, v]) => v !== null));
 }
 
+// a voice line (voice-function): the effects between its mask and its bus become one call, .voice("flo"), named after
+// the speaker of its bank (say_it_flo → flo); voices collects name → the chain of effects
+function voiceCall(cs, voices) {
+  const head = cs[0].text.match(/s\("say_[a-z]+(?:_(\w+))?"\)/);
+  if (!head) return;
+  const at = cs.findIndex(c => c.name === 'mask'), end = cs.findIndex(c => c.name === 'orbit');
+  if (at < 0 || end < 0 || end - at < 2) return;
+  const chain = cs.slice(at + 1, end).map(c => c.text).join('');
+  let name = head[1] || 'voice';
+  for (let k = 2; voices[name] !== undefined && voices[name] !== chain; k++) name = `${head[1] || 'voice'}${k}`;
+  voices[name] = chain;
+  cs.slice(at + 2, end).forEach(c => { c.drop = true; });
+  cs[at + 1].text = `.voice("${name}")`;
+}
 // one line: { text, entry } — entry: what the mixer adds back ({ orbit, analyze, gain })
-function writeLine(line, mode, written, buses) {
+function writeLine(line, mode, written, buses, voices = {}) {
   const cs = calls(line), entry = {};
+  voiceCall(cs, voices);
   for (let i = 1; i < cs.length; i++) {
     const c = cs[i];
     // distortion with its volume: .drive(x)
@@ -99,15 +114,15 @@ export function splitVoice(code) {
 // mode: full, short or mixer; written: levelsOf the song as written; buses: busesOf it (short); voice: false hides the
 // voice code (it still plays)
 export function writeCode(code, { mode = 'full', written = new Map(), buses = {}, voice = true } = {}) {
-  const v = voice ? { shown: code, voice: '' } : splitVoice(code), table = new Map();
-  if (mode === 'full') return { code: v.shown, table, voice: v.voice };
+  const v = voice ? { shown: code, voice: '' } : splitVoice(code), table = new Map(), voices = {};
+  if (mode === 'full') return { code: v.shown, table, voice: v.voice, voices };
   const out = chainLines(v.shown).map(l => {
     if (!PATTERN.test(l)) return l;
-    const r = writeLine(l, mode, written, buses);
+    const r = writeLine(l, mode, written, buses, voices);
     if (Object.keys(r.entry).length) table.set(lineKey(r.text), r.entry);
     return r.text;
   });
-  return { code: out.join('\n'), table, voice: v.voice };
+  return { code: out.join('\n'), table, voice: v.voice, voices };
 }
 
 // the hidden tail evaluated after the code shown: the mixer (for each pattern line of the code, by the offsets of its
@@ -132,8 +147,10 @@ export function tail(shown, { table = new Map(), voice = '', like = null, offset
 
 // the same helpers as Strudel code, for the code copied or opened in Strudel: it plays there as here (single quotes
 // only: double quotes are mini-notation)
-export function preludeText(buses = {}) {
+export function preludeText(buses = {}, voices = {}) {
   return ['// coding-misk: short functions and mixer', `const miskBuses = {${Object.entries(buses).map(([k, v]) => `'${k}': ${v}`).join(', ')}}`,
+    `const miskVoices = {${Object.entries(voices).map(([k, v]) => `'${k}': p => p${v.replace(/"/g, "'")}`).join(', ')}}`,
+    "register('voice', (name, pat) => (miskVoices[name] ? miskVoices[name](pat) : pat))",
     "register('o', (name, pat) => (miskBuses[name] === undefined ? pat : pat.orbit(miskBuses[name])).analyze(name))",
     "register('drive', (x, pat) => pat.distort(x).distortvol(0.5))",
     'const miskMix = (pat, ranges) => pat.withHap(h => { const l = h.context && h.context.locations && h.context.locations[0], s = l && l.start; const r = s === undefined ? null : ranges.find(([a, b]) => s >= a && s < b); return r ? h.withValue(v => { const o = { ...v }; for (const [k, x] of Object.entries(r[2])) if (o[k] === undefined) o[k] = x; return o; }) : h; })',
@@ -145,6 +162,15 @@ export function preludeText(buses = {}) {
 export function installHelpers({ register }) {
   register('o', (name, pat) => { const n = (globalThis.miskBuses || {})[name]; return (n === undefined ? pat : pat.orbit(n)).analyze(name); });
   register('drive', (x, pat) => pat.distort(x).distortvol(0.5));
+  // the effects of a voice: globalThis.miskVoices (name → chain of calls as text), set with the buses
+  const made = new Map();
+  register('voice', (name, pat) => {
+    const chain = (globalThis.miskVoices || {})[name];
+    if (!chain) return pat;
+    // eslint-disable-next-line no-new-func
+    if (!made.has(chain)) made.set(chain, new Function('p', `return p${chain}`));
+    return made.get(chain)(pat);
+  });
   // a hap from a line of the mixer gets its bus, visual and level unless the line sets them
   globalThis.miskMix = (pat, ranges) => pat.withHap(h => {
     const loc = h.context && h.context.locations && h.context.locations[0], s = loc && loc.start;

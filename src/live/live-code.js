@@ -39,7 +39,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const compileAt = (song, bar) => gen(now ? compileNow(song, bar, { prepare: bar >= prepFrom(boundary(bar)), shownMuted: played(bar), keepHeaders: entered(bar) }) : compile(song));
   // technical functions (code-writing): the written levels and the buses come from the song as written
   const mode = C.functions || 'full', ref = mode === 'full' ? '' : compileSong({ ...build, build: undefined });
-  const written = levelsOf(ref), buses = busesOf(ref), table = new Map(), hidden = new Map();
+  const written = levelsOf(ref), buses = busesOf(ref), table = new Map(), hidden = new Map(), voices = {};
   const codeAt = (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
     const c = annotate(compileAt(only(st.song, keep), bar), build, st.upTo, lang()) + voiceCode(build, st.song, st.upTo, total, lang(), files());
@@ -47,6 +47,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     const v = C.voice === false ? splitVoice(c) : { shown: c, voice: '' }, w = writeCode(applyComments(v.shown, C), { mode, written, buses });
     w.voice = v.voice;
     w.table.forEach((e, k) => table.set(k, e));
+    Object.assign(voices, w.voices);
     let out = C.wrap ? breakLines(w.code, cols()) : w.code;
     if (!out.includes('$:')) out = `${out}\n$: silence`;
     if (w.voice) hidden.set(out, w.voice);
@@ -55,6 +56,6 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // nothing hidden: the code shown is the code evaluated
   const run = mode === 'full' && C.voice !== false ? null : shown => shown + tail(shown, { table, voice: hidden.get(shown) || '', like: lineLike });
   // the code that plays anywhere (copied, opened in Strudel): the helpers written out, the code shown, its tail
-  const standalone = run && (shown => { const pre = mode === 'full' ? '' : preludeText(buses); return pre + shown + tail(shown, { table: mode === 'full' ? new Map() : table, voice: hidden.get(shown) || '', like: lineLike, offset: pre.length }); });
-  return { build, now, codeAt, run, standalone, buses };
+  const standalone = run && (shown => { const pre = mode === 'full' ? '' : preludeText(buses, voices); return pre + shown + tail(shown, { table: mode === 'full' ? new Map() : table, voice: hidden.get(shown) || '', like: lineLike, offset: pre.length }); });
+  return { build, now, codeAt, run, standalone, buses, voices };
 }

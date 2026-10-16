@@ -4,7 +4,7 @@ In Tappe the code is typed perfectly and late: a long lead line arrives in a few
 
 ## What Changes
 
-- **Start earlier, type slower.** The typing of a step may use the time since the previous step, not only the last bars before it: a long edit starts earlier and goes slower, within a person's range.
+- **Listen first, then type at a person's pace.** After a step the coder listens and thinks for a while without typing. Then the typing takes as long as the text needs at a person's pace, with its pauses and typos (30, 60, 90 seconds for a long edit), and ends when the step plays. It does not fill all the time between two steps: when time is short the listening gets shorter first, the typing speeds up only after that.
 - **Uneven speed.** Every key has its own small delay; words come in bursts.
 - **Thinking pauses.** Pauses of half a second to a few seconds before a number, inside a mini-notation group, before a string such as a scale name; longer in long lines.
 - **Typos.** Now and then a wrong key (a neighbour on the keyboard, `<` for `!`), seen after a few keys, deleted and typed again; rarely a second typo.

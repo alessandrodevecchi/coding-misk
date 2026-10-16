@@ -175,7 +175,7 @@ function playable(tr) {
   // doc: the song itself (sections and tracks), for its soul (#46)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
   const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(plain, keep)) : null;
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, buses: live && live.buses, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, buses: live && live.buses, voices: live && live.voices, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
 }
 
 // ---------- brano in modifica ----------
@@ -220,7 +220,7 @@ const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor)
 ready.then(() => {
   const plain = ed.evaluate.bind(ed);
   ed.evaluate = async (autostart = true) => {
-    globalThis.miskBuses = (song && song.buses) || {};
+    globalThis.miskBuses = (song && song.buses) || {}; globalThis.miskVoices = (song && song.voices) || {};
     renderPrelude();
     if (!(song && song.run)) return plain(autostart);
     ed.flash();
@@ -700,7 +700,7 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
   const segments = segmentsOf(sg, codeFor);
   const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate(), writable: disk ? disk.writable : null });
-  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, voices: sg.voices || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
     const r = await job.promise;
@@ -847,7 +847,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { typingSpeed: typingSpeed(), segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
+  const job = { typingSpeed: typingSpeed(), segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, voices: sg.voices || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
