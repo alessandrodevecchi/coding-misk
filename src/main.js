@@ -4,8 +4,8 @@ import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTER
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
-import { crescendoSong } from './song/crescendo.js';
-import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, migrateOld } from './live/profiles.js';
+import { crescendoSong, waypointSong } from './song/crescendo.js';
+import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, migrateGrowth, PROFILE_STORE_VERSION, migrateOld } from './live/profiles.js';
 import { liveCode } from './live/live-code.js';
 import { installHelpers, preludeText } from './song/writer.js';
 import { COMMENT_PRESETS } from './song/comments.js';
@@ -121,8 +121,8 @@ let liveOn = !!store.get('coding-misk-live', false);
 // (overrides, the profile becomes "custom") and, before profiles, separate settings (read once)
 const firstProfile = migrateOld(k => store.get(k, undefined));
 let profileChoice = PROFILES[store.get('coding-misk-profile', null)] ? store.get('coding-misk-profile', null) : firstProfile.id;
-let overrides = store.get('coding-misk-profile-overrides', null) || firstProfile.overrides;
-const saveProfile = () => { store.set('coding-misk-profile', profileChoice); store.set('coding-misk-profile-overrides', overrides); };
+let overrides = migrateGrowth(store.get('coding-misk-profile-overrides', null), store.get('coding-misk-profile-version', 1)) || firstProfile.overrides;
+const saveProfile = () => { store.set('coding-misk-profile', profileChoice); store.set('coding-misk-profile-overrides', overrides); store.set('coding-misk-profile-version', PROFILE_STORE_VERSION); };
 // a song may name its profile (or its old build style); the Compose controls still switch it, for this session
 const liveOverride = new Map();
 const profileFor = tr => { const o = liveOverride.get(tr.id); return (o && o.profile) || songProfile(tr) || profileChoice; };
@@ -134,7 +134,7 @@ function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v },
 const crescendoCache = new Map();
 function crescendoOf(tr) {
   // the Switch profile grows with the natural rules (natural-growth)
-  const C = ctlOf(tr), narrated = C.narrated, rules = C.growth === 'natural' ? { natural: true } : {}, key = JSON.stringify([narrated, C.growth, tr.sections, tr.tracks, tr.id]);
+  const C = ctlOf(tr), narrated = C.narrated, rules = growthRules(C), key = JSON.stringify([narrated, C.growth, C.duration, tr.sections, tr.tracks, tr.id]);
   if (!crescendoCache.has(key)) { if (crescendoCache.size > 20) crescendoCache.clear(); crescendoCache.set(key, crescendoSong(tr, { narrated, rules })); }
   const c = crescendoCache.get(key);
   return c.build.length ? c : null;
@@ -145,7 +145,8 @@ let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null, sett
 let customFiles = {};
 // the width of the code panel in characters, for the line breaks of a live build (typing-lines); 80 before the editor exists
 function codeCols() {
-  try { const v = ed && ed.editor; if (v && v.defaultCharacterWidth > 0 && v.contentDOM.clientWidth > 0) return Math.max(40, Math.min(110, Math.floor((v.contentDOM.clientWidth - 24) / v.defaultCharacterWidth))); } catch (e) {}
+  // the visible width (the content grows with long lines): the scroller minus the line numbers
+  try { const v = ed && ed.editor, g = v && v.dom.querySelector('.cm-gutters'); if (v && v.defaultCharacterWidth > 0 && v.scrollDOM.clientWidth > 0) return Math.max(40, Math.min(110, Math.floor((v.scrollDOM.clientWidth - (g ? g.offsetWidth : 0) - 16) / v.defaultCharacterWidth))); } catch (e) {}
   return 80;
 }
 // oggetto riproducibile: codice + mappa di sezioni e tempo
@@ -158,7 +159,9 @@ function playable(tr) {
   const C = lv.ctl, live = build ? liveCode(build, C, { lang: getLang, files: () => customFiles, cols: codeCols }) : null, now = !!(live && live.now);
   if (live) build = live.build;
   const codeAt = live ? live.codeAt : null, run = live ? live.run : null, standalone = live ? live.standalone : null;
-  const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
+  // a song grown like a live coder can start with its waypoints when it plays without a live build (live-coder-growth)
+  const plain = tr.kind === 'composed' && !codeAt && tr.normal === 'waypoints' ? waypointSong(tr) : tr;
+  const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(plain) : tr.code;
   // the code of the moment has no sections table: the map comes from the code per section
   const meta = parseSong(now ? compileSong(stateAt(build, 0).song) : code);
   if (tr.kind === 'composed') {
@@ -168,8 +171,8 @@ function playable(tr) {
   }
   // doc: the song itself (sections and tracks), for its soul (#46)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
-  const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(tr, keep)) : null;
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, buses: live && live.buses, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || tr : null };
+  const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(plain, keep)) : null;
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, buses: live && live.buses, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
 }
 
 // ---------- brano in modifica ----------
@@ -1221,7 +1224,7 @@ function renderArranger() {
   $('#live-profile').innerHTML = PROFILE_IDS.map(id => `<button class="chip" role="radio" data-profile="${id}" aria-checked="${id === C.id}" aria-pressed="${id === C.id}" title="${esc(t(`profileHint:${id}`))}">${esc(t(`profile:${id}`))}</button>`).join('');
   $('#live-custom').hidden = !C.custom;
   $('#live-profile').title = songProfile(T) && !liveOverride.has(T.id) ? t('profileDeclared') : t('profileHint');
-  $('#live-growth').value = C.growth;
+  $('#live-growth').value = C.growth; $('#live-duration').value = C.duration; $('#live-duration').disabled = C.growth !== 'natural';
   $('#live-style').value = lv.style; $('#live-style').disabled = !on;
   $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
   // the live build options: a panel under the "Live build" button, open while the live build is on
@@ -1445,6 +1448,7 @@ $('#live-style').addEventListener('change', e => {
 });
 $('#live-gen').addEventListener('change', e => { setControl('gen', e.target.value); liveChanged(); });
 $('#live-growth').addEventListener('change', e => { setControl('growth', e.target.value); liveChanged(); });
+$('#live-duration').addEventListener('change', e => { setControl('duration', e.target.value); liveChanged(); });
 $('#live-code').addEventListener('change', e => { setControl('view', e.target.value); liveChanged(); });
 // a comments preset sets its options (code-writing)
 $('#live-comments').addEventListener('change', e => { if (COMMENT_PRESETS[e.target.value]) for (const [k, v] of Object.entries(COMMENT_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });

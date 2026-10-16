@@ -111,7 +111,8 @@ const LIKE = 0.5;
 // physical lines → lines for the typing: a continuation line ("  .gain(0.5)") joins the line above it
 export function chainLines(text) {
   const out = [];
-  for (const l of text.split('\n')) { if (out.length && /^\s+\./.test(l) && !/^\s*\/\//.test(out[out.length - 1])) out[out.length - 1] += `\n${l}`; else out.push(l); }
+  // (a line of functions commented out, "  // .lpf(800)", is part of its chain too)
+  for (const l of text.split('\n')) { if (out.length && /^\s+(\.|\/\/ \.)/.test(l) && !/^\s*\/\//.test(out[out.length - 1].split('\n')[0])) out[out.length - 1] += `\n${l}`; else out.push(l); }
   return out;
 }
 // token diff of two lines → segments [{ eq: text } | { old, new }]; the common start and end stay, so an insertion at
@@ -242,7 +243,8 @@ export function breakPoints(line) {
     if (c === '"' || c === "'" || c === '`') quote = c;
     else if ('([{'.includes(c)) depth++;
     else if (')]}'.includes(c)) depth--;
-    else if (c === '/' && line[i + 1] === '/') break;
+    // a comment: up to the end of its line (a chain goes on below it)
+    else if (c === '/' && line[i + 1] === '/') { const nl = line.indexOf('\n', i); if (nl < 0) break; i = nl; }
     else if (c === '.' && depth === 0 && i > 0 && /^\.[A-Za-z_$][\w$]*\(/.test(line.slice(i))) out.push(i);
   }
   return out;

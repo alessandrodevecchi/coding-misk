@@ -13,15 +13,25 @@ const NUM = /^-?\d*\.?\d+$/;
 function calls(line) {
   const pts = breakPoints(line), out = [{ head: true, text: line.slice(0, pts[0] ?? line.length) }];
   pts.forEach((p, i) => {
-    const raw = line.slice(p, pts[i + 1] ?? line.length), text = raw.replace(/\s+$/, ''), m = text.match(/^\.([\w$]+)\(([\s\S]*)\)$/);
+    const raw = line.slice(p, pts[i + 1] ?? line.length);
+    // a comment after the call (functions commented out) goes with the spaces after it
+    const cm = raw.match(/^(\.[^\n]*?)(\s*\/\/[^\n]*)?(\s*)$/s) || [raw, raw.replace(/\s+$/, ''), '', ''], text = cm[1], m = text.match(/^\.([\w$]+)\(([\s\S]*)\)$/);
     out.push({ name: m ? m[1] : null, args: m ? m[2] : null, text, ws: raw.slice(text.length) });
   });
   // the head keeps its own trailing spaces apart, too
   const h = out[0], ht = h.text.replace(/\s+$/, ''); h.ws = h.text.slice(ht.length); h.text = ht;
   return out;
 }
-// a call taken out leaves its line break to the call before it
-const keep = cs => { const out = []; for (const c of cs) { if (!c.drop) out.push({ ...c }); else if (c.ws.includes('\n') && out.length && !out[out.length - 1].ws.includes('\n')) out[out.length - 1].ws = c.ws; } return out; };
+// a call taken out leaves its line break and its comment to the call before it
+const keep = cs => {
+  const out = [];
+  for (const c of cs) {
+    const prev = out[out.length - 1];
+    if (!c.drop) out.push({ ...c });
+    else if (prev && !prev.ws.includes('//') && (c.ws.includes('//') || (c.ws.includes('\n') && !prev.ws.includes('\n')))) prev.ws = c.ws;
+  }
+  return out;
+};
 const join = cs => keep(cs).map(c => c.text + c.ws).join('').replace(/\n[ \t]*(?=\n|$)/g, '').replace(/[ \t]+(?=\n|$)/g, '');
 // the key of a line in the mixer: its text without the pattern sign, spaces before a call or line breaks
 export const lineKey = l => l.replace(PATTERN, '').replace(/\s*\n\s*\./g, '.').trim();

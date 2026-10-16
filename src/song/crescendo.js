@@ -6,6 +6,8 @@
 import { normalizeSong, SETTING_FIELDS } from './format.js';
 import { stream } from '../endless/random.js';
 import { PROGS } from '../music.js';
+import { coderPath } from './coder.js';
+import { stateAt } from './build.js';
 
 // raised when an intended change to the rules changes the steps of a checked song (tools/check-crescendo.mjs)
 export const CRESCENDO_VERSION = 1;
@@ -244,6 +246,12 @@ const P = {
   harmony: { any: [['now the chords', 'ora gli accordi'], ['chords move', 'gli accordi si muovono']] },
   strip: { any: [['strip it back', 'togliamo qualcosa'], ['less', 'meno'], ['winding down', 'chiudiamo']] },
   last: { any: [["that's it", 'fine'], ['and out', 'e via']] },
+  // like a live coder (live-coder-growth): a block copied, a function commented out and back, notes rewritten
+  clone: { any: [['copy that line', 'copio quella riga'], ['same line, new sound', 'stessa riga, suono nuovo']] },
+  comment: { any: [['take it out', 'lo tolgo'], ['without it', 'senza']] },
+  uncomment: { any: [['and back in', 'e lo rimetto'], ['bring it back', 'rimettiamolo']] },
+  rewrite: { any: [['new notes', 'note nuove'], ['rewrite the line', 'riscrivo la linea']] },
+  settle: { any: [['there it is', 'eccolo']] },
 };
 export const CRESCENDO_PHRASES = Object.values(P).flatMap(g => Object.values(g).flat()).map(([en, it]) => ({ en, it }));
 function phrase(kind, type, device, recent, rng) {
@@ -280,13 +288,16 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   const clipKeys = t => new Set(t.clips.flatMap(c => Object.keys(c.set || {})));
   // growth budget: up to twice the written length for short songs, one and a half otherwise (room for the ending)
   // (natural growth is slower: at most the written length, so a song does not double)
-  const cap = rules.natural ? (W < 48 ? Math.round(1.5 * W) : W) : W <= 20 ? 2 * W : Math.round(1.5 * W);
+  // (like a live coder, free duration: as long as the moves need, within twice the written length)
+  const cap = rules.coder && rules.free ? 2 * W - 4 : rules.natural ? (W < 48 ? Math.round(1.5 * W) : W) : W <= 20 ? 2 * W : Math.round(1.5 * W);
   // detail: the most that fits within three times the written length, with room between the steps
-  let d = 3, plans, path;
+  let d = 3, plans, path, coder = null;
   for (; d >= 0; d--) {
     const prng = rng.fork(`plan-${d}`);
     plans = dest.map(t => trackPlan(t, d, prng, clipKeys(t), rules));
-    path = crescendoPath(plans, prng.fork('path'));
+    // like a live coder (live-coder-growth): waypoints and small moves between them
+    if (rules.coder) { coder = coderPath(dest, plans, prng.fork('coder'), { detours: rules.detours, chooser: rules.chooser }); path = coder.path; }
+    else path = crescendoPath(plans, prng.fork('path'));
     if (path.length * (rules.natural ? 3 : 1.5) + 4 <= cap || d === 0) break;
   }
 
@@ -298,7 +309,7 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   // breaks: the drums (or the anchor) stop for a few bars and come back, once or twice
   const brk = dest.find(t => t.type === 'drums');
   const breaks = [];
-  if (brk && dest.length >= 2 && path.length >= 12) {
+  if (brk && dest.length >= 2 && path.length >= 12 && !rules.coder) {
     const k = path.length >= 24 && rng.chance(0.5) ? 2 : 1;
     for (let b = 0; b < k; b++) breaks.push(Math.round(path.length * (k === 1 ? rng.range(0.55, 0.8) : b ? rng.range(0.75, 0.88) : rng.range(0.45, 0.6))));
   }
@@ -313,11 +324,12 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   // bars: one step every 1 to 4 bars (1 to 2 fully narrated), squeezed when the song would get too long
   // natural growth: 4 to 8 bars apart in the first part, 2 to 6 later, and a listening pause of 4 to 8 bars after a
   // track comes in, the progression arrives or the drums come back
-  const natGap = i => (i < seq.length * 0.4 ? rng.int(4, 8) : rng.int(2, 6)) + (['enter', 'back'].includes(seq[i - 1].kind) || seq[i - 1].harmony ? rng.int(4, 8) : 0);
+  // (like a live coder: a pause at each waypoint too)
+  const natGap = i => (i < seq.length * 0.4 ? rng.int(4, 8) : rng.int(2, 6)) + (['enter', 'back'].includes(seq[i - 1].kind) || seq[i - 1].harmony || seq[i - 1].waypoint ? rng.int(4, 8) : 0);
   const gaps = seq.map((u, i) => (i === 0 ? 0 : seq[i - 1].gap || (rules.natural && !narrated ? natGap(i) : gapOf(rng, narrated))));
   const room = Math.max(seq.length, cap - 4);
   // squeezed from the largest gaps; natural growth keeps its listening pauses (at least 4 bars) as long as it can
-  const pause = seq.map((u, i) => rules.natural && i > 0 && (['enter', 'back'].includes(seq[i - 1].kind) || seq[i - 1].harmony));
+  const pause = seq.map((u, i) => rules.natural && i > 0 && (['enter', 'back'].includes(seq[i - 1].kind) || seq[i - 1].harmony || seq[i - 1].waypoint));
   for (let sum = gaps.reduce((a, b) => a + b, 0); sum > room;) {
     let i = -1;
     for (let k = 1; k < gaps.length; k++) if (gaps[k] > (pause[k] ? 4 : 1) && (i < 0 || gaps[k] - (pause[k] ? 4 : 0) > gaps[i] - (pause[i] ? 4 : 0))) i = k;
@@ -371,7 +383,7 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   const recent = [], say = (u, first) => {
     const keyStep = KEY_STEPS.includes(u.kind) || u.harmony || first;
     if (!narrated && !keyStep && !rng.chance(0.3)) return undefined;
-    return u.harmony ? phrase('harmony', u.type, null, recent, rng) : phrase(u.kind, u.type, u.device, recent, rng);
+    return u.harmony ? phrase('harmony', u.type, null, recent, rng) : phrase(u.clone ? 'clone' : u.kind, u.type, u.device, recent, rng);
   };
   growth.forEach((u, i) => { const s = { at: u.at, ...u.step }, t = say(u, i === 0); if (t) s.say = t; build.push(s); });
   lateSteps.forEach(u => { const st = { at: u.at, ...u.step }, x = u.kind === 'enter' ? phrase('enter', u.type, null, recent, rng) : say(u, false); if (x) st.say = x; build.push(st); });
@@ -412,6 +424,36 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   out.build = build.map((s, i) => ({ s, i })).sort((a, b) => a.s.at - b.s.at || a.i - b.i).map(x => x.s);
   out.buildStyle = 'crescendo';
   // facts for checks and the UI: where the growth ends and which ending was drawn
-  out.crescendo = { version: CRESCENDO_VERSION, growth: G, sections: grow.length, grown: Math.max(lastGrowth, lastAt), ending, detail: d, written: W, narrated, natural: !!rules.natural };
+  out.crescendo = { version: CRESCENDO_VERSION, growth: G, sections: grow.length, grown: Math.max(lastGrowth, lastAt), ending, detail: d, written: W, narrated, natural: !!rules.natural, ...(coder ? { coder: true, waypoints: growth.filter(u => u.waypoint).map(u => u.at), detours: growth.filter(u => u.detour).length } : {}) };
+  return out;
+}
+
+// The normal version of a song grown like a live coder (live-coder-growth): the waypoints of its natural growth come
+// first, one section of `bars` each (the patterns and settings of that moment; functions not shown yet play at their
+// neutral value), then the song as written. song.normal === 'waypoints' asks for it.
+const NEUTRAL = { cutoff: 20000, reso: 0, drive: 0, grit: 0, room: 0, delay: 0 };
+export function waypointSong(song, { seed, bars = 8 } = {}) {
+  const c = crescendoSong(song, { seed, rules: { natural: true, coder: true, free: true } });
+  if (!c.crescendo || !c.crescendo.coder) return song;
+  const n = normalizeSong(song), base = n.sections[0], wps = c.crescendo.waypoints.slice(0, -1);
+  const out = clone(song);
+  delete out.normal;
+  const secs = wps.map((_, i) => ({ name: `${i + 1}`, bars, bpm: base.bpm, key: base.key, chords: i < wps.length / 2 && base.chords !== 'drone' ? 'drone' : base.chords, meter: base.meter }));
+  out.sections = [...secs, ...clone(song.sections)];
+  const shift = wps.length * bars;
+  out.tracks = out.tracks.map(tr => {
+    const nt = n.tracks.find(x => x.id === tr.id), ct = c.tracks.find(x => x.id === tr.id);
+    const clips = nt.clips.map(cl => { const o = { start: cl.start + shift, bars: cl.bars, pattern: cl.pattern }; if (cl.set) o.set = clone(cl.set); return o; });
+    const own = [];
+    wps.forEach((at, i) => {
+      const st = stateAt(c, at).song.tracks.find(x => x.id === tr.id);
+      if (!st || st.mute || st.type === 'voice' || !st.clips.length) return;
+      const set = { ...(st.settings || {}) };
+      for (const k of [...(st.hidden || []), ...(st.commented || [])]) if (k in NEUTRAL) set[k] = NEUTRAL[k];
+      const fields = SETTING_FIELDS[st.type] || [];
+      own.push({ start: i * bars, bars, pattern: st.clips[0].pattern, set: Object.fromEntries(Object.entries(set).filter(([k]) => fields.includes(k))) });
+    });
+    return { ...tr, clips: [...own, ...clips], patterns: { ...(tr.patterns || {}), ...((ct && ct.patterns) || {}) } };
+  });
   return out;
 }

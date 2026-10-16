@@ -7,8 +7,11 @@ import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
 
 // hide and reveal (natural-growth): functions of a track left out of its code until a step brings them in
-export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack', 'hide', 'reveal'];
+// clone, comment, notes (live-coder-growth): a track comes in as a copy of another one; functions commented out in the
+// code and back in; a pattern's notes (or drum rows) rewritten
+export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes'];
 const clone = o => JSON.parse(JSON.stringify(o));
+const CLONE_KEYS = ['wave', 'cutoff', 'reso', 'drive', 'gain', 'room', 'delay'];
 const list = v => (Array.isArray(v) ? v : [v]);
 
 // steps sorted by bar (the file order is kept for steps on the same bar)
@@ -19,12 +22,12 @@ export const hasBuild = song => buildSteps(song).length > 0;
 // the track a step works on (for comments in the code), or null
 export function stepTrack(step) {
   for (const k of ['add', 'remove']) if (step[k] !== undefined) return list(step[k])[0];
-  for (const k of ['set', 'pattern', 'rack', 'unrack', 'hide', 'reveal']) if (step[k] && step[k].track) return step[k].track;
+  for (const k of ['set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes']) if (step[k] && step[k].track) return step[k].track;
   return null;
 }
 
 // apply one step to a song (in place)
-function apply(song, step) {
+export function applyStep(song, step) {
   const track = id => song.tracks.find(t => t.id === id);
   if (step.add !== undefined) list(step.add).forEach(id => { const t = track(id); if (t) delete t.mute; });
   if (step.remove !== undefined) list(step.remove).forEach(id => { const t = track(id); if (t) t.mute = true; });
@@ -32,7 +35,7 @@ function apply(song, step) {
   if (step.pattern) {
     const p = step.pattern, t = track(p.track);
     // "level": every clip plays its own pattern's variant of that level (Crescendo, "A~2"), 0 = as written
-    if (t && p.level !== undefined) t.clips = t.clips.map(c => { const base = String(c.pattern).replace(/~\d+$/, ''), v = `${base}~${p.level}`; return { ...c, pattern: p.level && t.patterns[v] ? v : base }; });
+    if (t && p.level !== undefined) t.clips = t.clips.map(c => { const base = String(c.pattern).replace(/~\w+$/, ''), v = `${base}~${p.level}`; return { ...c, pattern: p.level && t.patterns[v] ? v : base }; });
     else if (t && t.patterns[p.to]) t.clips = t.clips.map(c => ({ ...c, pattern: p.to }));
   }
   if (step.rack) {
@@ -42,17 +45,37 @@ function apply(song, step) {
   if (step.unrack) { const t = track(step.unrack.track); if (t) t.rack = (t.rack || []).filter(d => d.device !== step.unrack.device); }
   if (step.hide) { const t = track(step.hide.track); if (t) t.hidden = [...new Set([...(t.hidden || []), ...list(step.hide.keys)])]; }
   if (step.reveal) { const t = track(step.reveal.track); if (t) { t.hidden = (t.hidden || []).filter(k => !list(step.reveal.keys).includes(k)); if (!t.hidden.length) delete t.hidden; } }
+  // clone: the track plays, with the notes, the settings it shares and the functions shown of the "from" track
+  if (step.clone) {
+    const t = track(step.clone.track), f = track(step.clone.from);
+    if (t && f) {
+      delete t.mute;
+      const fp = (f.patterns || {})[(f.clips[0] || {}).pattern] || {};
+      if (fp.notes !== undefined) rewrite(t, { notes: fp.notes });
+      // numbers and the wave only (presets mean different things per type), and only settings the track writes itself
+      const shared = CLONE_KEYS.filter(k => (SETTING_FIELDS[t.type] || []).includes(k) && (SETTING_FIELDS[f.type] || []).includes(k) && k in (f.settings || {}) && k in (t.settings || {}) && !(t.pinned || []).includes(k));
+      t.settings = { ...t.settings, ...Object.fromEntries(shared.map(k => [k, f.settings[k]])) };
+      if (f.hidden && f.hidden.length) t.hidden = [...f.hidden]; else delete t.hidden;
+    }
+  }
+  if (step.comment) { const t = track(step.comment.track); if (t) { const k = list(step.comment.keys); t.commented = step.comment.on === false ? (t.commented || []).filter(x => !k.includes(x)) : [...new Set([...(t.commented || []), ...k])]; if (!t.commented.length) delete t.commented; } }
+  if (step.notes) { const { track: id, ...vals } = step.notes, t = track(id); if (t) rewrite(t, vals); }
+}
+// a pattern rewritten: every clip plays a copy of its pattern ("A~x") with new notes, rows or steps
+function rewrite(t, vals) {
+  t.patterns = { ...(t.patterns || {}) };
+  t.clips = t.clips.map(c => { const base = String(c.pattern).replace(/~\w+$/, ''), key = `${base}~x`; t.patterns[key] = { ...(t.patterns[c.pattern] || t.patterns[base] || {}), ...vals }; return { ...c, pattern: key }; });
 }
 
 // the song as it is at a bar: steps with "at" ≤ bar applied; "upTo" = number of steps applied
 export function stateAt(song, bar) {
   const steps = buildSteps(song), out = clone({ ...song, build: undefined });
-  const added = new Set(steps.flatMap(s => (s.add !== undefined ? list(s.add) : [])));
+  const added = new Set(steps.flatMap(s => [...(s.add !== undefined ? list(s.add) : []), ...(s.clone ? [s.clone.track] : [])]));
   out.tracks.forEach(t => { if (added.has(t.id)) t.mute = true; });
   // settings fixed by the user ("pinned" on a track) win over the steps: they keep the track's own value
   const base = Object.fromEntries(out.tracks.map(t => [t.id, { ...(t.settings || {}) }]));
   let upTo = 0;
-  for (const s of steps) { if (s.at > bar) break; apply(out, s); upTo++; }
+  for (const s of steps) { if (s.at > bar) break; applyStep(out, s); upTo++; }
   out.tracks.forEach(t => (t.pinned || []).forEach(k => { if (k in base[t.id]) t.settings[k] = base[t.id][k]; else if (t.settings) delete t.settings[k]; }));
   return { song: out, upTo };
 }
@@ -177,6 +200,9 @@ export function checkBuild(song, total, err, warn) {
     }
     if (s.rack) { needTrack(`${p}.rack.track`, s.rack.track); const { track, ...dev } = s.rack; checkRack([dev], `${p}.rack`, (q, m) => err(q.replace(`${p}.rack[0]`, `${p}.rack`), m), (q, m) => warn(q.replace(`${p}.rack[0]`, `${p}.rack`), m)); }
     if (s.unrack) { needTrack(`${p}.unrack.track`, s.unrack.track); if (!DEVICES[s.unrack.device]) err(`${p}.unrack.device`, `one of ${Object.keys(DEVICES).join(', ')}`); }
+    if (s.clone) { needTrack(`${p}.clone.track`, s.clone.track); needTrack(`${p}.clone.from`, s.clone.from); }
+    if (s.comment) { needTrack(`${p}.comment.track`, s.comment.track); if (!list(s.comment.keys).every(x => ['cutoff', 'reso', 'drive', 'grit', 'room', 'delay', 'env'].includes(x))) err(`${p}.comment.keys`, 'some of cutoff, reso, drive, grit, room, delay, env'); }
+    if (s.notes) { const t = needTrack(`${p}.notes.track`, s.notes.track); for (const k of Object.keys(s.notes)) if (!['track', 'notes', 'rows', 'steps'].includes(k)) err(`${p}.notes.${k}`, 'notes, rows (drums) or steps'); if (t && s.notes.rows !== undefined && t.type !== 'drums') err(`${p}.notes.rows`, 'rows are for drums'); }
     for (const k of ['hide', 'reveal']) if (s[k]) { needTrack(`${p}.${k}.track`, s[k].track); if (!list(s[k].keys).every(x => ['cutoff', 'reso', 'drive', 'grit', 'room', 'delay', 'env'].includes(x))) err(`${p}.${k}.keys`, 'some of cutoff, reso, drive, grit, room, delay, env'); }
   });
 }
@@ -184,7 +210,7 @@ export function checkBuild(song, total, err, warn) {
 // where each track is silent because of the build, and where a step changes it (for the timeline)
 // → { trackId: { off: [[from, to], …], marks: [{ at, action, say }] } }
 export function buildMap(song, total) {
-  const steps = buildSteps(song), added = new Set(steps.flatMap(s => (s.add !== undefined ? list(s.add) : [])));
+  const steps = buildSteps(song), added = new Set(steps.flatMap(s => [...(s.add !== undefined ? list(s.add) : []), ...(s.clone ? [s.clone.track] : [])]));
   const map = {};
   for (const t of song.tracks || []) {
     let on = !added.has(t.id), from = 0;

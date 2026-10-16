@@ -5,7 +5,10 @@ import { COMMENT_PRESETS, commentPreset } from '../song/comments.js';
 
 export const CONTROLS = {
   build: ['blocks', 'crescendo'],
-  growth: ['crescendo', 'natural'],
+  // growth (live-coder-growth): small steps, gradual (the natural growth before live-coder-growth), natural (like a live
+  // coder: waypoints and small moves); duration of the natural growth: fitted in the written length or free
+  growth: ['crescendo', 'gradual', 'natural'],
+  duration: ['fitted', 'free'],
   narrated: [false, true],
   typing: ['slow', 'normal', 'fast'],
   view: ['now', 'compact', 'track', 'sections'],
@@ -21,9 +24,9 @@ export const CONTROLS = {
   functions: ['full', 'short', 'mixer'],
 };
 export const PROFILES = {
-  classic: { build: 'blocks', growth: 'crescendo', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full' },
-  crescendo: { build: 'crescendo', growth: 'crescendo', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full' },
-  switch: { build: 'crescendo', growth: 'natural', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: true, notes: false, steps: false, voice: false, highlights: true, wrap: true, functions: 'mixer' },
+  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full' },
+  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full' },
+  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: true, notes: false, steps: false, voice: false, highlights: true, wrap: true, functions: 'mixer' },
 };
 export const PROFILE_IDS = Object.keys(PROFILES);
 
@@ -55,4 +58,17 @@ export function migrateOld(get) {
   const style = get('coding-misk-live-style'), id = style === 'crescendo' ? 'crescendo' : 'classic';
   const raw = { view: get('coding-misk-live-code'), gen: get('coding-misk-live-gen'), narrated: get('coding-misk-live-narrated') === true ? true : undefined, typing: get('coding-misk-typing') };
   return { id, overrides: cleanOverrides(raw, PROFILES[id]) };
+}
+
+// the rules of crescendoSong for a growth: gradual is the natural growth before live-coder-growth
+export function growthRules(C) {
+  if (C.growth === 'gradual') return { natural: true };
+  if (C.growth === 'natural') return { natural: true, coder: true, free: C.duration === 'free' };
+  return {};
+}
+// overrides saved before live-coder-growth: "natural" was the growth now called gradual
+export const PROFILE_STORE_VERSION = 2;
+export function migrateGrowth(overrides, version) {
+  if ((version || 1) >= 2 || !overrides || overrides.growth !== 'natural') return overrides;
+  return { ...overrides, growth: 'gradual' };
 }

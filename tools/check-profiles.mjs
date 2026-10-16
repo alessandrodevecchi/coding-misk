@@ -1,7 +1,7 @@
 // Checks for performance profiles and code comments (performance-profiles). No browser.
 //   npm run check:profiles      exit 1 when any check fails
 import fs from 'node:fs';
-import { PROFILES, resolveProfile, cleanOverrides, migrateOld, songProfile } from '../src/live/profiles.js';
+import { PROFILES, resolveProfile, cleanOverrides, migrateOld, songProfile, migrateGrowth, growthRules } from '../src/live/profiles.js';
 import { applyComments } from '../src/song/comments.js';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { compileNow } from '../src/song/compile-compact.js';
@@ -29,6 +29,13 @@ const CHECKS = {
     const m = migrateOld(k => old[k]);
     assert(m.id === 'crescendo' && m.overrides.view === 'compact' && !('gen' in m.overrides), JSON.stringify(m));
     assert(migrateOld(() => undefined).id === 'classic', 'default');
+  },
+  'growth: small steps, gradual, natural; a natural saved before is gradual'() {
+    assert(migrateGrowth({ growth: 'natural', typing: 'fast' }, undefined).growth === 'gradual' && migrateGrowth({ growth: 'natural' }, 2).growth === 'natural', 'migration');
+    assert(JSON.stringify(growthRules(resolveProfile('crescendo', { growth: 'gradual' }))) === '{"natural":true}', 'gradual is the natural growth of before');
+    const s = growthRules(resolveProfile('switch'));
+    assert(s.coder && s.free && !growthRules(resolveProfile('switch', { duration: 'fitted' })).free, 'Switch: like a live coder, free duration');
+    assert(resolveProfile('crescendo').duration === 'fitted' && resolveProfile('crescendo').growth === 'crescendo', 'Crescendo unchanged');
   },
   'songs name their profile; an old build style counts'() {
     assert(songProfile(song('switch-acid-prova')) === 'switch' && songProfile(song('crescendo-primo-passo')) === 'crescendo', 'songs');

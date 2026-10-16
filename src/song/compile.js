@@ -22,6 +22,21 @@ export function stripFns(line, names) {
   return out;
 }
 
+// the same, with the text of the functions taken out: { line, cut: ['.lpf(800)', …] }
+export function cutFns(line, names) {
+  let out = line;
+  const cut = [];
+  for (const n of names) {
+    for (let at = out.indexOf(`.${n}(`); at >= 0; at = out.indexOf(`.${n}(`, at)) {
+      if (out.lastIndexOf('//', at) >= 0) break;
+      let depth = 0, k = at + n.length + 1;
+      for (; k < out.length; k++) { if (out[k] === '(') depth++; else if (out[k] === ')' && --depth === 0) break; }
+      cut.push(out.slice(at, k + 1)); out = out.slice(0, at) + out.slice(k + 1);
+    }
+  }
+  return { line: out, cut };
+}
+
 export function compileSong(input) {
   const song = normalizeSong(input);
   const secs = song.sections, total = song.total;
@@ -73,8 +88,10 @@ export function compileSong(input) {
           const lines = sceneLayers(clipState(sec, tr, clip), opts).filter(l => l !== '');
           const desc = lines[0] && lines[0].startsWith('//') ? lines.shift() : null;
           if (desc && desc !== described) { L.push(desc); described = desc; }
-          const hide = (tr.hidden || []).flatMap(k => HIDDEN_FNS[k] || []);
-          L.push(...(hide.length ? lines.map(l => stripFns(l, hide)).filter(l => l.trim() !== '') : lines));
+          const hide = (tr.hidden || []).flatMap(k => HIDDEN_FNS[k] || []), off = (tr.commented || []).filter(k => !(tr.hidden || []).includes(k)).flatMap(k => HIDDEN_FNS[k] || []);
+          // commented out (live-coder-growth): the functions leave the chain and stay at the end of their line as a comment
+          const out = off.length ? lines.map(l => { const r = cutFns(l, off); return r.cut.length ? `${r.line.trim() ? r.line.replace(/\s+$/, '') : r.line.replace(/\S.*$/, '')} // ${r.cut.join('')}` : l; }) : lines;
+          L.push(...(hide.length ? out.map(l => stripFns(l, hide)).filter(l => l.trim() !== '') : out));
         }
       });
     }

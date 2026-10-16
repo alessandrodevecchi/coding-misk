@@ -13,7 +13,9 @@ import { fromScenes, normalizeSong } from '../src/song/format.js';
 import { pickFragments } from '../src/video/fragments.js';
 import { compileCompact, layersOf } from '../src/song/compile-compact.js';
 import { buildSteps, stateAt, checkBuild, stepTrack, buildMap } from '../src/song/build.js';
-import { crescendoSong, patternVariants, CRESCENDO_VERSION } from '../src/song/crescendo.js';
+import { crescendoSong, patternVariants, waypointSong, CRESCENDO_VERSION } from '../src/song/crescendo.js';
+import { resolveProfile, growthRules } from '../src/live/profiles.js';
+import { liveCode } from '../src/live/live-code.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const FIXTURES = 'tools/fixtures/crescendo.json';
@@ -140,6 +142,64 @@ const CHECKS = {
       const paused = entries.filter(e => { const next = grow.find(b => b > e.at); return next === undefined || next - e.at >= 4; });
       assert(paused.length >= entries.length * 0.7, `${s.id}: pauses after ${paused.length} of ${entries.length} entries`);
     }
+  },
+  'like a live coder: same build twice, ends on the written song, every state compiles, within three times'() {
+    const rules = { natural: true, coder: true, free: true };
+    for (const s of songs) {
+      const c = crescendoSong(s, { rules });
+      assert(JSON.stringify(crescendoSong(s, { rules }).build) === JSON.stringify(c.build), `${s.id}: same build twice`);
+      assert(compileSong(stateAt(c, c.crescendo.grown).song) === compileSong({ ...c, build: undefined }), `${s.id}: end`);
+      for (const b of [...new Set(buildSteps(c).map(x => x.at))]) compileSong(stateAt(c, b).song);
+      assert(total(c) <= 3 * c.crescendo.written, `${s.id}: length ${total(c)}`);
+      const errs = []; checkBuild(c, total(c), (p, m) => errs.push(`${p}: ${m}`), () => {});
+      assert(!errs.length, `${s.id}: ${errs[0]}`);
+    }
+  },
+  'like a live coder: 4 to 6 waypoints, the first with one or two tracks, detours only after the first passage'() {
+    let none = 0, all = 0, clones = 0, kinds = new Set();
+    for (const s of songs) {
+      const c = crescendoSong(s, { rules: { natural: true, coder: true, free: true } });
+      if (!c.crescendo.coder) continue;
+      all++;
+      const wp = c.crescendo.waypoints;
+      assert(wp.length >= 4 && wp.length <= 6, `${s.id}: ${wp.length} waypoints`);
+      const on = stateAt(c, wp[0]).song.tracks.filter(t => !t.mute && t.type !== 'voice');
+      assert(on.length >= 1 && on.length <= 2, `${s.id}: ${on.length} tracks at the first waypoint`);
+      const steps = buildSteps(c).filter(x => x.at > 0 && x.at <= c.crescendo.grown);
+      // no detour before the second waypoint
+      assert(!steps.some(x => x.at <= wp[1] && (x.comment || x.notes || (x.remove !== undefined && x.at < c.crescendo.growth))), `${s.id}: detour in the first passage`);
+      if (!c.crescendo.detours) none++;
+      steps.forEach(x => { if (x.clone) clones++; ['comment', 'notes', 'remove'].forEach(k => { if (x[k] !== undefined) kinds.add(k); }); });
+    }
+    assert(all >= 10 && none < all * 0.4, `straight songs ${none} of ${all}`);
+    assert(clones > 0 && kinds.size === 3, `clones ${clones}, detour kinds ${[...kinds]}`);
+  },
+  'like a live coder: small moves (a step changes a few characters, entries and clones apart)'() {
+    // measured on the code shown (the code of the moment, Switch profile): characters of the lines that change
+    const big = [], sizes = [];
+    for (const id of ['switch-prima-luce', 'switch-trance-prova', 'crescendo-notte-lunga']) {
+      const C = resolveProfile('switch'), L = liveCode(crescendoSong(songs.find(x => x.id === id), { rules: growthRules(C) }), C);
+      for (const x of buildSteps(L.build).filter(y => y.at > 0 && y.at <= L.build.crescendo.grown && !y.add && !y.clone && Object.keys(y).some(k => !['at', 'say', 'i'].includes(k)))) {
+        const a = L.codeAt(x.at - 1).split('\n'), b = L.codeAt(x.at).split('\n'), changed = b.filter(l => !a.includes(l)).join('').length;
+        sizes.push(changed);
+        if (changed > 160) big.push(`${id} ${x.at}: ${changed}`);
+      }
+    }
+    sizes.sort((p, q) => p - q);
+    assert(sizes[Math.floor(sizes.length / 2)] <= 80 && big.length <= sizes.length * 0.1, `median ${sizes[Math.floor(sizes.length / 2)]}, big steps ${big.join(', ')}`);
+  },
+  'like a live coder: the normal version starts with the waypoints, one section each'() {
+    const s = songs.find(x => x.id === 'switch-tappe'), c = crescendoSong(s, { rules: { natural: true, coder: true, free: true } }), w = waypointSong(s);
+    assert(w.sections.length === s.sections.length + c.crescendo.waypoints.length - 1, `${w.sections.length} sections`);
+    const code = compileSong(w), errs = [];
+    checkBuild(w, total(w), (p, m) => errs.push(m), () => {});
+    assert(code.includes('$:') && !errs.length && w.tracks.find(t => t.type === 'drums').clips[0].start === 0, 'the first waypoint plays the anchor');
+  },
+  'like a live coder: the chooser can be replaced'() {
+    const s = songs.find(x => x.id === 'switch-prima-luce'), first = (lanes) => lanes.findIndex(l => l.units.length);
+    const a = crescendoSong(s, { rules: { natural: true, coder: true, free: true } }), b = crescendoSong(s, { rules: { natural: true, coder: true, free: true, chooser: first } });
+    assert(JSON.stringify(a.build) !== JSON.stringify(b.build), 'same order');
+    assert(compileSong(stateAt(b, b.crescendo.grown).song) === compileSong({ ...b, build: undefined }), 'end');
   },
   'fixtures: a rules change raises CRESCENDO_VERSION'() {
     const now = { version: CRESCENDO_VERSION, songs: Object.fromEntries([...built].map(([id, c]) => [id, print(c)])) };

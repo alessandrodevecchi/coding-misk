@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { crescendoSong } from '../src/song/crescendo.js';
-import { resolveProfile } from '../src/live/profiles.js';
+import { resolveProfile, growthRules } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
 import { buildSteps, deriveBuild } from '../src/song/build.js';
 import { applyComments, commentPreset, COMMENT_PRESETS } from '../src/song/comments.js';
@@ -21,7 +21,7 @@ const song = id => JSON.parse(fs.readFileSync(`songs/${id}.json`, 'utf8'));
 // the code at every step of a song with a profile
 function codes(id, profile) {
   const s = song(id), C = resolveProfile(profile);
-  const b = C.build === 'crescendo' ? crescendoSong(s, { narrated: C.narrated, rules: C.growth === 'natural' ? { natural: true } : {} }) : { ...s, build: s.build || deriveBuild(s) };
+  const b = C.build === 'crescendo' ? crescendoSong(s, { narrated: C.narrated, rules: growthRules(C) }) : { ...s, build: s.build || deriveBuild(s) };
   const L = liveCode(b, C, { lang: () => 'it', files: () => files, cols: () => 60 });
   return [0, ...new Set(buildSteps(L.build).map(x => x.at))].map(bar => L.codeAt(bar));
 }

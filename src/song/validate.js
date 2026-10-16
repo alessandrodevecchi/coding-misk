@@ -41,6 +41,7 @@ export function validateSong(song, opts = {}) {
   if (song.profile !== undefined && !['classic', 'crescendo', 'switch'].includes(song.profile)) err('profile', 'one of classic, crescendo, switch, or left out');
   // build style of the live build (#64): the song opens and plays with it
   if (song.buildStyle !== undefined && !['blocks', 'crescendo'].includes(song.buildStyle)) err('buildStyle', 'one of blocks, crescendo, or left out (the Compose setting)');
+  if (song.normal !== undefined && song.normal !== 'waypoints') err('normal', '"waypoints" (without a live build the song starts with the waypoints of its natural growth, one section each), or left out');
   // tags and origin (song library, #34)
   if (song.origin !== undefined && !ORIGINS.includes(song.origin)) err('origin', `one of ${ORIGINS.join(', ')}, or left out`);
   if (song.tags !== undefined) {

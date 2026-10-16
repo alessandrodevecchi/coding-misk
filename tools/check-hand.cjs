@@ -79,7 +79,8 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const kept = (await st()).last;
   await page.click('#hand-last summary'); await page.click('#hand-back'); await sleep(800);
   s = await st();
-  check(s.hand && kept && s.code === kept && s.active === kept, 'back to this code: by hand again with the user\'s code evaluated', `hand ${s.hand} kept ${!!kept} code ${s.code === kept} active ${s.active === kept}`);
+  // (the code evaluated may carry a hidden tail after it: mixer and voice, code-writing)
+  check(s.hand && kept && s.code === kept && s.active.startsWith(kept), 'back to this code: by hand again with the user\'s code evaluated', `hand ${s.hand} kept ${!!kept} code ${s.code === kept} active ${s.active.startsWith(kept)}`);
 
   // past the end of the song by hand: the music goes on
   // jump to the last bar with the ruler (End), take over again, let the song end
