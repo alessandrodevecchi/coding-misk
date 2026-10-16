@@ -19,8 +19,8 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-notte-lunga', 'ferro', 'switc
 const files = { say_it: Array.from({ length: 200 }, (_, i) => `say_it/${i}.wav`), say_en: Array.from({ length: 200 }, (_, i) => `say_en/${i}.wav`) };
 const song = id => JSON.parse(fs.readFileSync(`songs/${id}.json`, 'utf8'));
 // the code at every step of a song with a profile
-function codes(id, profile) {
-  const s = song(id), C = resolveProfile(profile);
+function codes(id, profile, over = {}) {
+  const s = song(id), C = resolveProfile(profile, over);
   const b = C.build === 'crescendo' ? crescendoSong(s, { narrated: C.narrated, rules: growthRules(C) }) : { ...s, build: s.build || deriveBuild(s) };
   const L = liveCode(b, C, { lang: () => 'it', files: () => files, cols: () => 60 });
   return [0, ...new Set(buildSteps(L.build).map(x => x.at))].map(bar => L.codeAt(bar));
@@ -53,6 +53,9 @@ const CHECKS = {
     const list = codes('switch-prima-luce', 'switch'), last = list[list.length - 1];
     assert(!/\.orbit\(|\.analyze\(|\.distortvol\(/.test(list.join('\n')), 'technical functions shown');
     assert(!/say_it|say_en|spoken on bar/.test(list.join('\n')), 'voice code shown');
+    // with no comments at all the voice stays hidden too
+    const none = codes('switch-prima-luce', 'switch', { tracks: false, notes: false, steps: false });
+    assert(!/say_it|say_en/.test(none.join('\n')), 'voice code shown with no comments');
     assert(/\.drive\(/.test(last), 'drive');
     // a level that is not the written one stays on its line
     const w = writeCode('$: s("bd*4").gain(0.7).orbit(1).analyze("kick")\n$: s("hh*8").gain(0.4).orbit(1).analyze("hats")', { mode: 'mixer', written: new Map([['"kick"', 0.85], ['"hats"', 0.4]]) });

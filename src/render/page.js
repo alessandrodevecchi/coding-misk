@@ -31,6 +31,13 @@ async function loadSounds() {
 // our short functions and the mixer of the code (code-writing); the song's buses for `.o(name)` come with the job
 installHelpers({ register: strudelRegister });
 
+// repeatable renders: superdough draws random numbers (the phases of the supersaw voices, noise, the reverb's impulse),
+// so the same song rendered twice would differ a little. Every render draws from the same seeded sequence, here and in
+// the audio worklets (their own global scope)
+const SEED = 0x6d69736b;
+const seeded = seed => { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+const WORKLET_SEED = `{ let a = ${SEED} >>> 0; Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }`;
+
 // seconds to wait for one sound to load before skipping it
 const SOUND_WAIT = 8000;
 async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, buses = {} }) {
@@ -41,6 +48,8 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   // a new controller made on first use, from the same superdough copy (a separate import is a separate copy)
   setSuperdoughAudioController(null);
   // voices are scheduled two seconds ahead (the live player: a fraction of a second): no voice limit, or early voices would be cut
+  Math.random = seeded(SEED);
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET_SEED], { type: 'text/javascript' })));
   await initAudio({ maxPolyphony: 1e6 });
   await loadSounds();
   // the app's master level (the live player sets the same on its output)
@@ -75,10 +84,14 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
     const v = hap.value;
     // the app counts a quiet page as stuck: the pre-flight says it is alive
     if (++loaded % 8 === 0) post({ progress: 0, phase: 'schedule' });
-    const ok = await Promise.race([superdough({ ...v, gain: 0 }, length + 1, 0.05, T.cps(b), 0).then(() => true, () => true), new Promise(r => setTimeout(() => r(false), SOUND_WAIT))]);
+    // only the sound itself: effects (a reverb made here, in the order the loads finish) would change the render
+    const only = Object.fromEntries(['s', 'bank', 'n', 'note', 'freq', 'clip', 'begin', 'end'].filter(x => v[x] !== undefined).map(x => [x, v[x]]));
+    const ok = await Promise.race([superdough({ ...only, gain: 0 }, length + 1, 0.05, T.cps(b), 0).then(() => true, () => true), new Promise(r => setTimeout(() => r(false), SOUND_WAIT))]);
     if (!ok) { dead.add(k); if (!skipped.has(idOf(v))) { skipped.add(idOf(v)); console.warn(`[render] sound ${idOf(v)} did not load, skipped`); } }
   };
   await Promise.all(Array.from({ length: 12 }, async () => { while (queue.length) await loadOne(queue.shift()); }));
+  // the loads above finish in any order: the random sequence starts again for the render itself
+  Math.random = seeded(SEED);
   post({ progress: 0, phase: 'schedule' });
   // voices are scheduled a window ahead, as the live player does: with every voice scheduled at once the offline
   // context processes thousands of idle nodes in every block and renders slower than real time

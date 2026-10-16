@@ -43,7 +43,7 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createVideo } from './video/video.js';
-import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, TIMELINE_LAYOUTS, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
+import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, codeColsOf, TIMELINE_LAYOUTS, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
 import { liveAreas } from './live/presets.js';
 import { pickFragments, fragmentBetween, fragmentCode, fragmentLabel, glitchMessages, shapeOf, clockOf, parseTime, taglineFor, nextTagline } from './video/fragments.js';
 import { textsFor, textFile } from './video/texts.js';
@@ -144,7 +144,10 @@ let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null, sett
 // custom samples manifest (bank → files), for spoken comments
 let customFiles = {};
 // the width of the code panel in characters, for the line breaks of a live build (typing-lines); 80 before the editor exists
+let exportCols = null;
 function codeCols() {
+  // a video being exported: the width of its code panel
+  if (exportCols) return exportCols;
   // the visible width (the content grows with long lines): the scroller minus the line numbers
   try { const v = ed && ed.editor, g = v && v.dom.querySelector('.cm-gutters'); if (v && v.defaultCharacterWidth > 0 && v.scrollDOM.clientWidth > 0) return Math.max(40, Math.min(110, Math.floor((v.scrollDOM.clientWidth - (g ? g.offsetWidth : 0) - 16) / v.defaultCharacterWidth))); } catch (e) {}
   return 80;
@@ -820,7 +823,11 @@ async function exportRadio(range) {
 // songs: the songs of a joined session or radio range [{ song, title, artist }], to name and dress each part.
 // Returns false when it failed (the caller records in real time), true when done or cancelled.
 // frag (#57): a vertical fragment { start, end, layout, label, code, msgs, o, file }: the file is that stretch at 1080×1920
-async function exportVideoFast(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null } = {}) {
+// the code of the video breaks its lines at the width of the video's code panel while it is exported
+async function exportVideoFast(...args) {
+  try { return await exportVideoFastIn(...args); } finally { exportCols = null; }
+}
+async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null } = {}) {
   // the song being rendered decides the lit notes (performance-profiles), not the one in the player
   exportCtl = sg.ctl || null;
   // a long video goes straight to a file on disk (#61): the dialog comes first, while the click still counts
@@ -828,6 +835,8 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   const disk = long ? await askDiskFile(fileName(title, 'mp4'), 'video/mp4', 'mp4') : null;
   if (disk === false) { toast(t('vidCancelled')); return true; }
   const o = video.opts(), fsz = frag ? fragmentSize(frag.o) : null, q = frag ? fsz.file : QUALITIES[o.quality], layout = o.layout === 'tab' ? 'visual' : o.layout;
+  const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : TIMELINE_LAYOUTS.includes(layout) ? liveAreas(layout, q.w, q.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
+  exportCols = codeColsOf(A.code, frag ? fsz.comp.h : q.h);
   const segments = segmentsOf(sg, codeFor), looks = PICK_LOOKS.map(l => l[0]);
   // the parts of the file: one per song of a session ("3 Intro" belongs to song 3), or the song itself
   const parts = [];
@@ -840,7 +849,6 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
   const job = { typingSpeed: typingSpeed(), segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
-  const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : TIMELINE_LAYOUTS.includes(layout) ? liveAreas(layout, q.w, q.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
   // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen

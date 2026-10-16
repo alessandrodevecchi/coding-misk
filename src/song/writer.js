@@ -82,7 +82,7 @@ function writeLine(line, mode, written, buses) {
 
 // the voice of the spoken comments: its header, the quoted phrase and its line
 const VOICE_HEAD = /^\/\/ =+ (?:.* · )?voice =+$/;
-function splitVoice(code) {
+export function splitVoice(code) {
   const lines = code.split('\n'), shown = [], voice = [];
   for (let i = 0; i < lines.length; i++) {
     if (VOICE_HEAD.test(lines[i].trim())) {

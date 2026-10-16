@@ -6,7 +6,7 @@ import { compileCompact, compileNow } from '../song/compile-compact.js';
 import { applyComments } from '../song/comments.js';
 import { idiomatic } from '../song/idiom.js';
 import { breakLines, lineLike } from '../song/typing.js';
-import { writeCode, levelsOf, busesOf, tail, preludeText } from '../song/writer.js';
+import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice } from '../song/writer.js';
 
 // build: the live build (a song with steps); C: the controls; lang(): the language of the comments; files(): the
 // custom samples manifest, for the spoken comments; cols(): the width of the code panel in characters, for the line
@@ -43,7 +43,9 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const codeAt = (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
     const c = annotate(compileAt(only(st.song, keep), bar), build, st.upTo, lang()) + voiceCode(build, st.song, st.upTo, total, lang(), files());
-    const w = writeCode(applyComments(c, C), { mode, written, buses, voice: C.voice !== false });
+    // the voice is taken out before the comments go: it is found by its header
+    const v = C.voice === false ? splitVoice(c) : { shown: c, voice: '' }, w = writeCode(applyComments(v.shown, C), { mode, written, buses });
+    w.voice = v.voice;
     w.table.forEach((e, k) => table.set(k, e));
     let out = C.wrap ? breakLines(w.code, cols()) : w.code;
     if (!out.includes('$:')) out = `${out}\n$: silence`;

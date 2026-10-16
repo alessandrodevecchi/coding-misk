@@ -33,6 +33,13 @@ export function lookFor(dir, looks, at) {
 
 // the areas of a w×h frame: stage, and for the code layout the code and the soul panel (open or folded)
 // soul: null (no soul panel), 'open' or 'folded'
+// characters a line of the code panel holds (as drawCode lays it out: font at a fiftieth of the frame height, JetBrains
+// Mono about 0.6 em wide, padding on both sides), for the line breaks of the code in a video (typing-lines)
+export function codeColsOf(area, frameH) {
+  if (!area || !area.w) return null;
+  const fs = Math.round(frameH / 50), padX = Math.round(fs * 1.1);
+  return Math.max(20, Math.floor((area.w - padX * 2) / (fs * 0.6)) - 1);
+}
 export function layoutAreas(layout, w, h, soul = null) {
   if (layout !== 'code') return { stage: { x: 0, y: 0, w, h } };
   const side = Math.round(w / 3), sx = w - side, pad = Math.round(h / 54);
