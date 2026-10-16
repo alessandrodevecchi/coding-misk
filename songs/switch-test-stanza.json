@@ -1,0 +1,235 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "switch-test-stanza",
+  "title": "Stanza",
+  "created": "2026-10-16",
+  "appVersion": "0.6.0",
+  "profile": "switch",
+  "buildStyle": "crescendo",
+  "normal": "waypoints",
+  "look": "palco",
+  "style": {
+    "en": "Endless · Switch · house · D · 123 BPM · build-drop",
+    "it": "Endless · Switch · house · D · 123 BPM · build-drop"
+  },
+  "tags": {
+    "styles": [
+      "switch-house"
+    ]
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 16,
+      "bpm": 123,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 80,
+      "bpm": 123,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "4/4"
+    },
+    {
+      "name": "Break",
+      "bars": 16,
+      "bpm": 123,
+      "key": "D",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Drop",
+      "bars": 32,
+      "bpm": 123,
+      "key": "D",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Outro",
+      "bars": 16,
+      "bpm": 123,
+      "key": "D",
+      "chords": "dorico",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "kick",
+      "name": "Kick",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85,
+        "cutoff": 20000,
+        "drive": 0.08,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x..............."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "beat",
+      "name": "Beat",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.6,
+        "cutoff": 20000,
+        "drive": 0.16,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "cp": "....x.......x...",
+            "sd": "...........x....",
+            "hh": "..x...x...x...x.",
+            "oh": "..x.......x....."
+          }
+        },
+        "B": {
+          "rows": {
+            "hh": "........x......."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.8,
+        "cutoff": 870,
+        "move": "lento",
+        "reso": 7.44,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "pumping"
+        },
+        "B": {
+          "preset": "offbeat"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "name": "Pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.28,
+        "cutoff": 1492,
+        "move": "lento",
+        "room": 0.85,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "synco"
+        },
+        "B": {
+          "preset": "stab"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "name": "Riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.25,
+        "bars": "8",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "name": "Voice",
+      "type": "voice",
+      "settings": {
+        "gain": 0.3,
+        "pitch": 0.97,
+        "tempo": 0.9,
+        "cutoff": 7546,
+        "hpf": 497,
+        "drive": 1.57,
+        "room": 0.47,
+        "delay": 0.52,
+        "speaker": "sandy"
+      },
+      "patterns": {},
+      "clips": [],
+      "rack": [
+        {
+          "device": "echo",
+          "count": 3,
+          "feedback": 0.56
+        },
+        {
+          "device": "coarse",
+          "amount": 10
+        }
+      ]
+    }
+  ]
+}

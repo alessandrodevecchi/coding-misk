@@ -1,0 +1,258 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "switch-test-onda",
+  "title": "Onda",
+  "created": "2026-10-16",
+  "appVersion": "0.6.0",
+  "profile": "switch",
+  "buildStyle": "crescendo",
+  "normal": "waypoints",
+  "look": "palco",
+  "style": {
+    "en": "Endless · Switch · trance · G · 142 BPM · build-drop",
+    "it": "Endless · Switch · trance · G · 142 BPM · build-drop"
+  },
+  "tags": {
+    "styles": [
+      "switch-trance"
+    ]
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 16,
+      "bpm": 142,
+      "key": "G",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 96,
+      "bpm": 142,
+      "key": "G",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Break",
+      "bars": 16,
+      "bpm": 142,
+      "key": "G",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Drop",
+      "bars": 64,
+      "bpm": 142,
+      "key": "G",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Outro",
+      "bars": 16,
+      "bpm": 142,
+      "key": "G",
+      "chords": "ipnotica",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "kick",
+      "name": "Kick",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85,
+        "cutoff": 20000,
+        "drive": 0.2,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x..............."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 208,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "beat",
+      "name": "Beat",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.6,
+        "cutoff": 20000,
+        "drive": 0.25,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "cp": "....x.......x...",
+            "hh": "..x...x...x...x."
+          }
+        },
+        "B": {
+          "rows": {
+            "cp": "....x.......x...",
+            "hh": "..x..xx...x...x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 208,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.8,
+        "cutoff": 881,
+        "move": "lento",
+        "reso": 11.73,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "rolling"
+        },
+        "B": {
+          "preset": "pumping"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 208,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "name": "Lead",
+      "type": "hook",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.3,
+        "cutoff": 3000,
+        "move": "fisso",
+        "delay": 0.51,
+        "mode": "minor",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "segnale"
+        },
+        "B": {
+          "preset": "segnale",
+          "notes": "<[~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ 11 ~ ~ ~ ~ ~ ~]>"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 208,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "name": "Pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.28,
+        "cutoff": 1503,
+        "move": "lento",
+        "room": 0.85,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "sidechain"
+        },
+        "B": {
+          "preset": "pump"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 208,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "name": "Riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.25,
+        "bars": "8",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 208,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "name": "Voice",
+      "type": "voice",
+      "settings": {
+        "gain": 0.3,
+        "pitch": 1.21,
+        "tempo": 1,
+        "cutoff": 10549,
+        "hpf": 338,
+        "drive": 1.82,
+        "room": 0.9,
+        "delay": 0.65,
+        "speaker": "flo"
+      },
+      "patterns": {},
+      "clips": []
+    }
+  ]
+}

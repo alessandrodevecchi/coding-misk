@@ -1,0 +1,229 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "switch-test-breve",
+  "title": "Breve",
+  "created": "2026-10-16",
+  "appVersion": "0.6.0",
+  "profile": "switch",
+  "buildStyle": "crescendo",
+  "normal": "waypoints",
+  "look": "palco",
+  "style": {
+    "en": "Endless · Switch · trance pure · F · 138 BPM · build-drop",
+    "it": "Endless · Switch · trance puro · F · 138 BPM · build-drop"
+  },
+  "tags": {
+    "styles": [
+      "switch-trance-pure"
+    ]
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 16,
+      "bpm": 138,
+      "key": "F",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 64,
+      "bpm": 138,
+      "key": "F",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Break",
+      "bars": 16,
+      "bpm": 138,
+      "key": "F",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Drop",
+      "bars": 32,
+      "bpm": 138,
+      "key": "F",
+      "chords": "pendolo",
+      "meter": "4/4"
+    },
+    {
+      "name": "Outro",
+      "bars": 16,
+      "bpm": 138,
+      "key": "F",
+      "chords": "pendolo",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "kick",
+      "name": "Kick",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85,
+        "cutoff": 20000,
+        "drive": 0.15,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x..............."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 144,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "beat",
+      "name": "Beat",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.6,
+        "cutoff": 20000,
+        "drive": 0.26,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "hh": "........x......."
+          }
+        },
+        "B": {
+          "rows": {
+            "hh": ".x......xx.x...."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 144,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Bass",
+      "type": "bass",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.8,
+        "cutoff": 1162,
+        "move": "lento",
+        "reso": 11.1,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "offbeat"
+        },
+        "B": {
+          "preset": "offbeat",
+          "notes": "~ ~ 0 ~ ~ ~ 2 ~ ~ ~ 0 ~ ~ ~ 1 ~"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 144,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "name": "Lead",
+      "type": "hook",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.3,
+        "cutoff": 3000,
+        "move": "fisso",
+        "delay": 0.63,
+        "mode": "minor",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "segnale"
+        },
+        "B": {
+          "preset": "segnale",
+          "notes": "<[~ ~ ~ 14 ~ ~ ~ ~] [~ ~ ~ ~ ~ 20 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 144,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "name": "Riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.25,
+        "bars": "8",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 144,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "name": "Voice",
+      "type": "voice",
+      "settings": {
+        "gain": 0.3,
+        "pitch": 1.05,
+        "tempo": 1.01,
+        "cutoff": 18000,
+        "hpf": 400,
+        "drive": 0,
+        "room": 0.79,
+        "delay": 0.46,
+        "speaker": "flo"
+      },
+      "patterns": {},
+      "clips": []
+    }
+  ]
+}

@@ -1,0 +1,272 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "switch-test-acido",
+  "title": "Acido lento",
+  "created": "2026-10-16",
+  "appVersion": "0.6.0",
+  "profile": "switch",
+  "buildStyle": "crescendo",
+  "normal": "waypoints",
+  "look": "palco",
+  "style": {
+    "en": "Endless · Switch · acid · E · 135 BPM · waves",
+    "it": "Endless · Switch · acid · E · 135 BPM · waves"
+  },
+  "tags": {
+    "styles": [
+      "switch-acid"
+    ]
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Wave",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Trough",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Wave 2",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Trough 2",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Wave 3",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Trough 3",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Wave 4",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Trough 4",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    },
+    {
+      "name": "Outro",
+      "bars": 16,
+      "bpm": 135,
+      "key": "E",
+      "chords": "tensione",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "kick",
+      "name": "Kick",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85,
+        "cutoff": 20000,
+        "drive": 1.42,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x..."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "beat",
+      "name": "Beat",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.6,
+        "cutoff": 20000,
+        "drive": 1.59,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "cp": "....x.......x...",
+            "sd": "...........x....",
+            "hh": "..x...x...x...x.",
+            "oh": "..x.......x....."
+          }
+        },
+        "B": {
+          "rows": {
+            "cp": "....x.......x...",
+            "sd": "...........x...x",
+            "hh": "..x...x...x...x.",
+            "oh": "..........x....."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.8,
+        "cutoff": 345,
+        "move": "lento",
+        "reso": 10.07,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "sub"
+        },
+        "B": {
+          "preset": "rumble"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "name": "Arp",
+      "type": "arp",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.4,
+        "cutoff": 945,
+        "move": "lento",
+        "reso": 18.62,
+        "delay": 0.35,
+        "drive": 2.43
+      },
+      "patterns": {
+        "A": {
+          "preset": "acid",
+          "speed": "16"
+        },
+        "B": {
+          "preset": "acid",
+          "speed": "16",
+          "notes": "0 0 [3 0] 1 0 2 [0 3] 1"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "texture",
+      "name": "Texture",
+      "type": "texture",
+      "settings": {
+        "sample": "numbers",
+        "gain": 0.4,
+        "grit": 0.7,
+        "room": 0.6
+      },
+      "patterns": {
+        "A": {
+          "rhythm": "bar"
+        },
+        "B": {
+          "rhythm": "euclid"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 160,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "name": "Voice",
+      "type": "voice",
+      "settings": {
+        "gain": 0.3,
+        "pitch": 0.57,
+        "tempo": 0.95,
+        "cutoff": 18000,
+        "hpf": 499,
+        "drive": 0.76,
+        "room": 0.59,
+        "delay": 0.38,
+        "speaker": "grandpa"
+      },
+      "patterns": {},
+      "clips": []
+    }
+  ]
+}
