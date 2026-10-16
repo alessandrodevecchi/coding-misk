@@ -188,6 +188,8 @@ export function typingPlan(from, to, { speed = 1, max = Infinity } = {}) {
   const acts = [];
   parts.forEach((p, pi) => {
     if (p.paste) acts.push({ pi, si: -1, paste: true, n: 0 });
+    // an empty new line: an Enter at its turn
+    if (p.kind === 'new' && !p.text) acts.push({ pi, si: -1, paste: true, n: 0 });
     (p.segs || []).forEach((s, si) => { if (s.eq !== undefined) return; if (s.old) acts.push({ pi, si, del: true, n: s.old.length }); if (s.new) acts.push({ pi, si, del: false, n: s.new.length }); });
   });
   const typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0);
@@ -219,8 +221,8 @@ export function typingPlan(from, to, { speed = 1, max = Infinity } = {}) {
           const st = state.get(`${pi}:${si}`) || { del: 0, typed: 0 };
           line += st.typed > 0 || st.del >= s.old.length ? whole(s.new, st.typed) : whole(s.old, s.old.length - st.del);
         });
-        // a new line appears once its first character is typed
-        if (p.kind === 'new' && !p.paste && !line) return;
+        // a new line appears once its first character is typed (an empty one at its Enter)
+        if (p.kind === 'new' && !p.paste && !line && (p.text || !(time >= pasteAt.get(pi)))) return;
         out.push(line);
       });
       return out.join('\n');
@@ -231,7 +233,7 @@ export function typingPlan(from, to, { speed = 1, max = Infinity } = {}) {
 // Long lines broken before a function (typing-lines): a code line longer than cols breaks before a ".name(" outside
 // strings and brackets, at the last place that fits, and goes on indented by two spaces (a continuation line at its own); comments and lines that
 // cannot break stay as they are. Lines already broken by the compiler keep their breaks.
-function breakPoints(line) {
+export function breakPoints(line) {
   const out = [];
   let depth = 0, quote = null;
   for (let i = 0; i < line.length; i++) {

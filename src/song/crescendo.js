@@ -72,7 +72,16 @@ function density(type, pat) {
   return 0;
 }
 // n variants of a pattern, level 1 (closest to the written one) to level n (the simplest)
-export function patternVariants(type, pat, n) {
+// rules.natural (arp-patterns): an arpeggio's order grows from one note, then two notes of the chord (the root and the
+// fifth), thinned and then whole, then the written order with the whole chord
+function arpVariants(notes, n) {
+  const two = String(notes).replace(TOKEN, tok => (/^\d$/.test(tok) ? (+tok < 2 ? '0' : '2') : tok));
+  const out = [two, ...thinNotes(two, Math.max(0, n - 1))].slice(0, n);
+  if (n > 1) out[n - 1] = out[n - 1].replace(TOKEN, tok => (/^\d$/.test(tok) ? '0' : tok));
+  return out;
+}
+export function patternVariants(type, pat, n, rules = {}) {
+  if (type === 'arp' && rules.natural && pat.notes && /\d/.test(pat.notes)) return arpVariants(pat.notes, n).map(notes => ({ ...pat, notes }));
   if (type === 'drums') return thinRows(pat.rows, n).map(rows => ({ ...pat, rows }));
   if (pat.notes) return thinNotes(pat.notes, n).map(notes => ({ ...pat, notes }));
   if (pat.steps) return thinSteps(pat.steps, n).map(steps => ({ ...pat, steps }));
@@ -111,7 +120,7 @@ function trackPlan(t, d, rng, clipKeys, rules = {}) {
   n = d >= 2 ? n : d === 1 ? Math.min(n, 2) : Math.min(n, 1);
   const rack = t.rack || [];
   if (n) {
-    for (const [name, pat] of Object.entries(t.patterns || {})) patternVariants(t.type, pat, n).forEach((v, k) => { plan.patterns[`${name}~${k + 1}`] = v; });
+    for (const [name, pat] of Object.entries(t.patterns || {})) patternVariants(t.type, pat, n, rules).forEach((v, k) => { plan.patterns[`${name}~${k + 1}`] = v; });
     plan.setup.push({ pattern: { track: t.id, level: n } });
     for (let k = n - 1; k >= 0; k--) plan.fullness.push({ kind: 'grow', step: { pattern: { track: t.id, level: k } } });
   } else if (DEGRADE_TYPES.includes(t.type) && !rack.some(x => x.device === 'degrade')) {

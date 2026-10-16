@@ -4,13 +4,14 @@
 // Messages from the app: { render: job }. To the app: { ready }, { progress, phase }, { done, channels, sampleRate, onsets }, { error }.
 // job: { segments: [{ from, to, code }] in bars, bpm: per bar, from / to: the window in seconds (a block of a long
 // export), tail: seconds after it, keepFrom: onsets before it belong to the block before, sampleRate, gain: the master level }
-import { repl } from '@strudel/core';
+import { repl, register as strudelRegister } from '@strudel/core';
 import { transpiler } from '@strudel/transpiler';
 import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio, registerSound, soundMap } from '@strudel/webaudio';
 import { guardDecode, guardSounds, createRegister } from '../sounds/sound-guard.js';
 import soundfonts from '@strudel/soundfonts/package.json';
 import { prebake } from '@strudel/repl/prebake.mjs';
 import { tempoClock } from './tempo.js';
+import { installHelpers } from '../song/writer.js';
 
 const post = (m, transfer = []) => parent.postMessage({ codingMiskRender: true, ...m }, location.origin, transfer);
 // superdough's deprecation notices come once per voice: thousands of console lines slow the render down
@@ -27,9 +28,13 @@ async function loadSounds() {
   guardSounds({ soundMap, registerSound, register, onReplace: (name, from, to) => replaced.add(`${name}:${from}→${to}`) });
 }
 
+// our short functions and the mixer of the code (code-writing); the song's buses for `.o(name)` come with the job
+installHelpers({ register: strudelRegister });
+
 // seconds to wait for one sound to load before skipping it
 const SOUND_WAIT = 8000;
-async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1 }) {
+async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, buses = {} }) {
+  globalThis.miskBuses = buses;
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
   const ctx = new OfflineAudioContext(2, Math.ceil(length * sampleRate), sampleRate);
   setAudioContext(ctx);
@@ -48,7 +53,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   for (const seg of segments) {
     const a = Math.max(seg.from, c0), b = Math.min(seg.to, c1);
     if (b <= a) continue;
-    const pattern = await R.evaluate(seg.code, false);
+    const pattern = await R.evaluate(seg.run || seg.code, false);
     if (!pattern) throw new Error('evaluation failed');
     for (const hap of pattern.queryArc(a, b, { _cps: T.cps(a) })) {
       if (!hap.hasOnset()) continue;

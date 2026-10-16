@@ -3,6 +3,7 @@
 // Notes: a 16-step group becomes a repeated cell ([a3 ~ a3 a3]*4) and repeated groups of an alternation get `!`
 // (<[x] [x] [y]> → <[x]!2 [y]>); note lengths never change, so envelopes sound the same.
 // Pure text in, text out: a pattern it does not recognise stays as it is.
+import { chainLines } from './typing.js';
 
 // "[bd ~ ~ ~] [bd ~ ~ ~] ~ [bd ~ ~ ~]" → 16 tokens, or null
 function steps16(mini) {
@@ -79,9 +80,36 @@ export function progressionForm(mini) {
   for (const r of roots) { const last = rs[rs.length - 1]; if (last && last.r === r) last.n++; else rs.push({ r, n: 1 }); }
   return { steps: cellForm(t.slice(0, p), t.length / p), roots: `<${rs.map(x => (x.n > 1 ? `${x.r}!${x.n}` : x.r)).join(' ')}>` };
 }
-// a whole code text: drum sounds in s("…") followed by .bank (drum machines), notes in note("…")
+// the arpeggio with .arp() (arp-patterns): when every chord of an alternation plays its notes in the same order, the
+// chords are written once (their notes from low to high) and the order once: "<[a3,c4,e4] [f3,a3,c4]>", "[0 1 2 1]*4".
+// null when the groups play different orders, or a group plays one note only
+export function arpForm(mini) {
+  const m = mini.match(/^<(.*)>$/s);
+  if (!m) return null;
+  const groups = m[1].trim().split(/\s+(?![^[]*\])/);
+  if (groups.length < 1 || !groups.every(g => /^\[[^[\],<>]*\]$/.test(g))) return null;
+  let order = null;
+  const chords = [];
+  for (const g of groups) {
+    const t = g.slice(1, -1).trim().split(/\s+/);
+    if (t.some(x => x !== '~' && midi(x) === null)) return null;
+    const names = new Map();
+    for (const x of t) if (x !== '~' && !names.has(midi(x))) names.set(midi(x), x);
+    const up = [...names.keys()].sort((a, b) => a - b);
+    if (up.length < 2) return null;
+    const o = t.map(x => (x === '~' ? '~' : String(up.indexOf(midi(x))))).join(' ');
+    if (order !== null && order !== o) return null;
+    order = o; chords.push(`[${up.map(n => names.get(n)).join(',')}]`);
+  }
+  const t = order.split(' '), p = period(t), cs = [];
+  for (const c of chords) { const last = cs[cs.length - 1]; if (last && last.c === c) last.n++; else cs.push({ c, n: 1 }); }
+  return { chords: `<${cs.map(x => (x.n > 1 ? `${x.c}!${x.n}` : x.c)).join(' ')}>`, order: cellForm(t.slice(0, p), t.length / p) };
+}
+// a whole code text: drum sounds in s("…") followed by .bank (drum machines), notes in note("…"); the arpeggio (a line
+// with .analyze("arp")) with .arp()
 export function idiomatic(code) {
-  return code
+  const lines = chainLines(code).map(l => (/\.analyze\("arp"\)/.test(l) ? l.replace(/(\bnote\(")([^"]*)("\))/, (all, a, mini, b) => { const ar = arpForm(mini); return ar ? `${a}${ar.chords}${b}.arp("${ar.order}")` : all; }) : l));
+  return lines.join('\n')
     .replace(/(\bs\(")([^"]*)("\)\.bank\()/g, (all, a, mini, b) => a + drumForm(mini) + b)
-    .replace(/(\bnote\(")([^"]*)("\))/g, (all, a, mini, b) => { const pr = progressionForm(mini); return pr ? `${a}${pr.steps}".add("${pr.roots}"))` : a + noteForm(mini) + b; });
+    .replace(/(\bnote\(")([^"]*)("\))(?!\.arp\()/g, (all, a, mini, b) => { const pr = progressionForm(mini); return pr ? `${a}${pr.steps}".add("${pr.roots}"))` : a + noteForm(mini) + b; });
 }

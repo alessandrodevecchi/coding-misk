@@ -26,6 +26,7 @@
     "check:export": "node --no-warnings tools/check-export.mjs",
     "check:live": "node --no-warnings tools/check-live.mjs",
     "check:crescendo": "node --no-warnings tools/check-crescendo.mjs",
+    "check:live-code": "node --no-warnings tools/check-live-code.mjs",
     "check:typing": "node --no-warnings tools/check-typing.mjs",
     "check:profiles": "node --no-warnings tools/check-profiles.mjs",
     "check:clips": "node --no-warnings tools/check-clips.mjs",

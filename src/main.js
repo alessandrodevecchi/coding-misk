@@ -7,6 +7,8 @@ import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/ty
 import { crescendoSong } from './song/crescendo.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, migrateOld } from './live/profiles.js';
 import { liveCode } from './live/live-code.js';
+import { installHelpers, preludeText } from './song/writer.js';
+import { COMMENT_PRESETS } from './song/comments.js';
 import pkg from '../package.json';
 // the app's version, written in the songs it makes (#67)
 const APP_VERSION = pkg.version;
@@ -155,7 +157,7 @@ function playable(tr) {
   let build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : null;
   const C = lv.ctl, live = build ? liveCode(build, C, { lang: getLang, files: () => customFiles, cols: codeCols }) : null, now = !!(live && live.now);
   if (live) build = live.build;
-  const codeAt = live ? live.codeAt : null;
+  const codeAt = live ? live.codeAt : null, run = live ? live.run : null, standalone = live ? live.standalone : null;
   const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(tr) : tr.code;
   // the code of the moment has no sections table: the map comes from the code per section
   const meta = parseSong(now ? compileSong(stateAt(build, 0).song) : code);
@@ -167,7 +169,7 @@ function playable(tr) {
   // doc: the song itself (sections and tracks), for its soul (#46)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
   const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(tr, keep)) : null;
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || tr : null };
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, buses: live && live.buses, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || tr : null };
 }
 
 // ---------- brano in modifica ----------
@@ -207,6 +209,19 @@ const el = document.createElement('strudel-editor');
 el.innerHTML = `<!--\n${compiled.code}\n-->`;
 $('#edhost').appendChild(el);
 const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor) { clearInterval(iv); ed = el.editor; res(ed); } }, 100); });
+// code-writing: the code evaluated is the code shown and the hidden tail of the song on air (mixer, hidden voice), by
+// hand too (Ctrl+Enter); our short functions (.o, .drive) are registered once Strudel is there
+ready.then(() => {
+  const plain = ed.evaluate.bind(ed);
+  ed.evaluate = async (autostart = true) => {
+    globalThis.miskBuses = (song && song.buses) || {};
+    renderPrelude();
+    if (!(song && song.run)) return plain(autostart);
+    ed.flash();
+    await ed.repl.evaluate(song.run(ed.code || ''), autostart);
+  };
+  const iv = setInterval(() => { if (typeof globalThis.register === 'function') { clearInterval(iv); installHelpers({ register: globalThis.register }); } }, 100);
+});
 // il REPL carica solo una parte di dirt-samples: carichiamo l'archivio completo (arpy, industrial, glitch, …)
 // samples() can appear a little after the editor: wait for it, otherwise the call was skipped and only part of the archive loaded
 const whenSamples = () => new Promise(res => { const iv = setInterval(() => { if (typeof globalThis.samples === 'function') { clearInterval(iv); res(globalThis.samples); } }, 100); });
@@ -238,7 +253,7 @@ ready.then(async () => {
 const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
 // code of a song at a bar, with the tempo of that bar (a live build changes code over time)
-const codeFor = (sg, bar, keep = null) => withVisuals(sg.codeAt ? sg.codeAt(bar, keep) : keep && sg.codeKeep ? sg.codeKeep(keep) : sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
+const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.codeAt ? sg.codeAt(bar, keep) : keep && sg.codeKeep ? sg.codeKeep(keep) : sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
 // keeps the point being edited in view: #edhost scrolls, not CodeMirror's own scroller
 function followEdit(a, b) {
   let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
@@ -341,6 +356,12 @@ function resumeBuild(sg, s, cyc) {
   if (r.target !== undefined) { playSong(sg, r.target, mode); return; }
   built = sg.build ? buildSteps(sg.build).filter(x => x.at <= r.bar).length : 0;
   ed.setCode(codeFor(sg, r.bar)); ed.evaluate();
+}
+// the hidden code under the panel (code-writing): the helpers and the tail that play with the code shown
+function renderPrelude() {
+  const sg = (isPlaying() && song) || compiled, code = (ed && ed.code) || (sg && sg.code) || '', all = sg && sg.standalone ? sg.standalone(code) : '';
+  const at = all.indexOf(code), hidden = at < 0 ? '' : `${all.slice(0, at)}// … ${t('preludePanel')} …${all.slice(at + code.length)}`;
+  $('#prelude').hidden = !hidden; $('#prelude-code').textContent = hidden;
 }
 function renderHandLast() {
   $('#hand-last').hidden = !lastHand;
@@ -495,7 +516,8 @@ function renderSource() {
   $('#back').hidden = source.kind === 'track';
   $('#save-code').hidden = source.kind !== 'song';
 }
-const currentCode = () => (ed && ed.code) || compiled.code;
+// the code copied or opened in Strudel: with the hidden part written out when there is one (code-writing)
+const currentCode = () => { const c = (ed && ed.code) || compiled.code, sg = song || compiled; return sg && sg.standalone ? sg.standalone(c) : c; };
 const shareLink = code => {
   const bytes = new TextEncoder().encode(code);
   let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
@@ -672,7 +694,7 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
   const segments = segmentsOf(sg, codeFor);
   const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate(), writable: disk ? disk.writable : null });
-  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
     const r = await job.promise;
@@ -813,7 +835,7 @@ async function exportVideoFast(sg, title = sg.title, { songs = null, after = nul
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { typingSpeed: typingSpeed(), segments, segmentsAt: blockSegments(sg), bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
+  const job = { typingSpeed: typingSpeed(), segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : TIMELINE_LAYOUTS.includes(layout) ? liveAreas(layout, q.w, q.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
@@ -1205,11 +1227,13 @@ function renderArranger() {
   // the live build options: a panel under the "Live build" button, open while the live build is on
   $('#live-style-wrap').hidden = !on; lt.setAttribute('aria-expanded', on);
   $$('[data-live-only="crescendo"]').forEach(el => { el.hidden = !crescendo; });
-  $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments;
+  $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-fns').value = C.functions;
+  for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
   $('#live-title').setAttribute('aria-pressed', C.title); $('#live-hl').setAttribute('aria-pressed', C.highlights); $('#live-wrap').setAttribute('aria-pressed', C.wrap);
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
   renderRuler();
+  renderPrelude();
 }
 // vista a sezioni: una cella per traccia e sezione
 function renderCells(total) {
@@ -1422,7 +1446,10 @@ $('#live-style').addEventListener('change', e => {
 $('#live-gen').addEventListener('change', e => { setControl('gen', e.target.value); liveChanged(); });
 $('#live-growth').addEventListener('change', e => { setControl('growth', e.target.value); liveChanged(); });
 $('#live-code').addEventListener('change', e => { setControl('view', e.target.value); liveChanged(); });
-$('#live-comments').addEventListener('change', e => { setControl('comments', e.target.value); liveChanged(); });
+// a comments preset sets its options (code-writing)
+$('#live-comments').addEventListener('change', e => { if (COMMENT_PRESETS[e.target.value]) for (const [k, v] of Object.entries(COMMENT_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
+for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).addEventListener('click', () => { setControl(k, ctlOf(T)[k] === false); liveChanged(); });
+$('#live-fns').addEventListener('change', e => { setControl('functions', e.target.value); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { setControl('narrated', !ctlOf(T).narrated); liveChanged(); });
 $('#live-title').addEventListener('click', () => { setControl('title', !ctlOf(T).title); liveChanged(); });
 $('#live-hl').addEventListener('click', () => { setControl('highlights', !ctlOf(T).highlights); liveChanged(); });

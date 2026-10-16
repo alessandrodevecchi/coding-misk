@@ -4,9 +4,9 @@ The compiler writes `.orbit(n)`, `.analyze("id")`, `.velocity/mask` lanes (remov
 
 ## Decisions
 
-### D1. Prelude: evaluated, not shown
+### D1. Hidden part: helpers registered once, a tail after the code
 
-The evaluated code becomes `prelude + shown code`. The prelude registers our short functions (Strudel `register`) and, in the mixer value, sets levels and visual links by bus. Typing, hand takeover and export work on the shown code; the prelude is added at evaluation (and in the fast export's render page). By hand, Ctrl+Enter evaluates prelude + the user's code.
+The short functions are registered once in each page with Strudel (the app, the render page). The mixer and the hidden voice are a tail evaluated after the code shown: `shown code + tail`. A tail keeps the mini-notation offsets of the code shown, so the highlights in the panel stay right (CodeMirror drops the offsets past the end of the panel). Typing, hand takeover and export work on the shown code; the app's evaluation adds the tail (Ctrl+Enter by hand too), the fast export sends the code with its tail to the render page. Copy and Open in Strudel add the helpers as Strudel code before the code, so it plays anywhere.
 
 ### D2. Short functions
 
@@ -14,11 +14,11 @@ The evaluated code becomes `prelude + shown code`. The prelude registers our sho
 
 ### D3. Mixer
 
-The prelude holds a level per bus for the song on air (`all(p => p.withValue(v => …gain × level[v.orbit]…))`) and the visual link per bus. A line has no `.gain()` while its level is the track's written level; a step that changes the level writes `.gain()` on that line. A check proves the same events as the full code.
+The tail holds, for each pattern line of the code shown, its bus, its visual and its written level, found by the line's text (a line edited by hand takes the most alike line). `all(x => miskMix(x, ranges))` gives each event of a line what the line does not set itself, by the offset of its mini-notation. A line has no `.gain()` while its level is the track's written level (the level in the song as written); a step that changes the level writes `.gain()` on that line. A check proves the same events as the full code.
 
 ### D4. Comment options
 
-`{ title, tracks, sections, steps, voice }`; presets: all (all on), essential (title and tracks), none (title only, blank lines between blocks). Voice off leaves the voice layer out of the shown code (it plays from the prelude side).
+Profile controls `tracks`, `notes`, `steps` (with `title` as before) and `voice`; the preset (all, essential, none, custom) is read from them, and picking a preset sets them. A preset saved before this change stands for its options. Voice off leaves the voice layer out of the shown code; it plays from the tail.
 
 ## Risks / Trade-offs
 

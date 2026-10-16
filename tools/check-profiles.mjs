@@ -22,7 +22,7 @@ const CHECKS = {
     const r = resolveProfile('switch', { typing: 'fast', view: 'nope', gen: 'idiomatic' });
     assert(r.custom && r.typing === 'fast' && r.view === 'now', 'custom');
     assert(!resolveProfile('switch', { gen: 'idiomatic' }).custom, 'same value is not a change');
-    assert(Object.keys(cleanOverrides({ x: 1, comments: 'none' }, PROFILES.classic)).join() === 'comments', 'clean');
+    assert(Object.keys(cleanOverrides({ x: 1, comments: 'none' }, PROFILES.classic)).join() === 'tracks,notes,steps', 'clean: a preset stands for its options');
   },
   'old settings become the first profile and overrides'() {
     const old = { 'coding-misk-live-style': 'crescendo', 'coding-misk-live-code': 'compact', 'coding-misk-live-gen': 'standard' };

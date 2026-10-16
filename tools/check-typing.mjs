@@ -84,6 +84,10 @@ const CHECKS = {
     const a = '$: s("bd").gain(0.8).orbit(1)', b = '$: s("bd").gain(0.8).lpf(800)\n  .orbit(1)';
     for (const f of frames(typingPlan(a, b), 300)) assert(!/\n(?! {2}\.)/.test(f.replace(/\n {2}\./g, '')), `half a break: ${JSON.stringify(f)}`);
   },
+  'an empty new line comes at its turn, not at the end'() {
+    const p = typingPlan('a', 'a\n\n// ===== bass =====\n$: note("a1")'), mid = frames(p, 100).find(f => f.includes('note'));
+    assert(mid && mid.startsWith('a\n\n// ====='), JSON.stringify(mid));
+  },
   'an insertion at the start of a chain is typed there'() {
     const a = '$: s("supersaw").gain(0.3)', b = '$: n("0").scale("g:minor").s("supersaw").gain(0.3)', p = typingPlan(a, b);
     for (const f of frames(p, 200)) assert(f.startsWith('$: ') && f.endsWith('s("supersaw").gain(0.3)'), `rest moved: ${f}`);

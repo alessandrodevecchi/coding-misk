@@ -249,7 +249,7 @@ const CHECKS = {
     }
   },
   'director: Switch songs keep one key, short progressions and open in crescendo'() {
-    for (const st of ['switch-trance', 'switch-acid', 'switch-house']) {
+    for (const st of ['switch-trance', 'switch-trance-pure', 'switch-acid', 'switch-house']) {
       const out = session({ styles: [st], minutes: 20, seed: `switch-${st}` });
       for (const sg of out.songs) {
         assert(new Set(sg.sections.map(x => x.key)).size === 1, `${st}: one key`);
@@ -257,6 +257,14 @@ const CHECKS = {
         assert(sg.tracks.filter(t => t.type !== 'voice').length <= 8, `${st}: few tracks`);
         assert(sg.buildStyle === 'crescendo', `${st}: build style`);
       }
+    }
+  },
+  'director: Switch · trance pure has no arpeggio and at most two chords'() {
+    const out = session({ styles: ['switch-trance-pure'], minutes: 30, seed: 'switch-pure' });
+    assert(out.songs.length >= 3, 'songs');
+    for (const sg of out.songs) {
+      assert(!sg.tracks.some(t => t.type === 'arp'), `${sg.title}: arpeggio`);
+      assert(sg.sections.every(x => new Set(PROGS[x.chords][1]).size <= 2), `${sg.title}: chords`);
     }
   },
   'director: each song has its own voice'() {

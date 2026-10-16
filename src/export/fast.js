@@ -7,7 +7,8 @@ import { tempoClock } from '../render/tempo.js';
 export function segmentsOf(sg, codeFor) {
   const bars = sg.meta.bars;
   const ats = sg.build ? [...new Set([0, ...buildSteps(sg.build).map(s => s.at).filter(a => a > 0 && a < bars)])].sort((a, b) => a - b) : [0];
-  return ats.map((from, i) => ({ from, to: i + 1 < ats.length ? ats[i + 1] : bars, code: codeFor(sg, from) }));
+  // run: the code evaluated, when it is more than the code shown (hidden mixer and voice, code-writing)
+  return ats.map((from, i) => { const code = codeFor(sg, from); return { from, to: i + 1 < ats.length ? ats[i + 1] : bars, code, ...(sg.run ? { run: sg.run(code) } : {}) }; });
 }
 
 // the timeline of an exported song: times in seconds from the start of the file
