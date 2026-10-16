@@ -621,7 +621,10 @@
 .portrait.tiny { width: 20px; height: 20px; border-radius: 3px; vertical-align: middle; }
 .artist-chips .chip { display: inline-flex; align-items: center; gap: 6px; }
 .radio-artist { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-#tr-artist { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#tr-artist { max-width: 240px; white-space: nowrap; }
+/* the label gets the dots, the arrow keeps its size */
+#tr-artist::picker-icon { flex: none; }
+#tr-artist selectedcontent, #tr-artist > button { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* a long label (Italian) must not make the whole row of buttons taller */
 .arr-top .actions { align-items: center; }
 

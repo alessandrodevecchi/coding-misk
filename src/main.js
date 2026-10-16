@@ -2557,6 +2557,28 @@ $('#pb-mute').addEventListener('click', toggleMute);
 renderVolume();
 // for the browser checks (tools/check-player.cjs): the node after the master output
 globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
+// the song moves on (tempo, live build steps, radio, the end): every frame, and while the tab is in the background
+// (no frames there) from a worker's timer, which the browser does not stop
+function songTick() {
+  const s = sched();
+  if (!(song && s && isPlaying() && !seeking)) return;
+  const m = song.meta, cyc = s.now();
+  const ahead = Math.min(m.bars - 1, Math.floor(s.lastEnd + s.cps * .1));
+  const target = m.bpm[ahead] / 240;
+  if (Math.abs(s.cps - target) > 1e-6) s.setCps(target);
+  if (resumeTo !== null) resumeBuild(song, s, cyc);
+  else if (song.build && !hand) liveBuild(song, s, cyc);
+  if (mode === 'radio' && radio && !hand && resumeTo === null) radio.tick(cyc);
+  mixTick(cyc);
+  if (loopIdx >= 0) {
+    const sec = m.sections[loopIdx];
+    if (sec && cyc >= sec.start + sec.len) playSong(song, sec.start, mode);
+  } else if (cyc >= m.bars && mode !== 'radio' && !hand && resumeTo === null && !(!rec && advance())) { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
+}
+try {
+  const clock = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 100)'], { type: 'text/javascript' })));
+  clock.onmessage = () => { if (document.hidden) songTick(); };
+} catch (e) {}
 (function transport() {
   requestAnimationFrame(transport);
   try { const out = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController().output.destinationGain; if (out && out.gain.value !== MASTER) out.gain.value = MASTER; } catch (e) {}
@@ -2565,18 +2587,10 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
   const s = sched();
   const playing = isPlaying();
   if (song && s && playing && !seeking) {
+    songTick();
+  }
+  if (song && s && isPlaying() && !seeking) {
     const m = song.meta, cyc = s.now();
-    const ahead = Math.min(m.bars - 1, Math.floor(s.lastEnd + s.cps * .1));
-    const target = m.bpm[ahead] / 240;
-    if (Math.abs(s.cps - target) > 1e-6) s.setCps(target);
-    if (resumeTo !== null) resumeBuild(song, s, cyc);
-    else if (song.build && !hand) liveBuild(song, s, cyc);
-    if (mode === 'radio' && radio && !hand && resumeTo === null) radio.tick(cyc);
-    mixTick(cyc);
-    if (loopIdx >= 0) {
-      const sec = m.sections[loopIdx];
-      if (sec && cyc >= sec.start + sec.len) playSong(song, sec.start, mode);
-    } else if (cyc >= m.bars && mode !== 'radio' && !hand && resumeTo === null && !(!rec && advance())) { stop(); if (mode === 'track') ended = compiled.id; if (rec && rec.id === song.id && !rec.ending) rec.ending = performance.now(); }
     // segue la sezione che suona, ma non mentre si sta scrivendo in un campo del brano
     const typing = document.activeElement && document.activeElement.matches('input, select, textarea') && document.activeElement.closest('#arranger, #track-panel');
     if (mode === 'track' && follow && !typing) { const i = arrSec(m.sectionAt(cyc)); if (i >= 0 && i !== sel) selectScene(i); }
