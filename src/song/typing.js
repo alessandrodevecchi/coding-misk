@@ -157,13 +157,121 @@ function pairUp(dels, adds) {
   }
   return pair;
 }
+// ---------- typing like a person, with a person's mistakes (human-typing) ----------
+// Every key has its own time; the typing stops to think before a number, a group of notes or a string; now and then a
+// key next to the right one is pressed, seen a few keys later and fixed; now and then a number is typed with another
+// value first and changed. The text typed is always the edit's text at the end.
+const NEAR = { q: 'wa', w: 'qes', e: 'wrd', r: 'etf', t: 'ryg', y: 'tuh', u: 'yij', i: 'uok', o: 'ipl', p: 'ol', a: 'qsz', s: 'adw', d: 'sfe', f: 'dgr', g: 'fht', h: 'gjy', j: 'hku', k: 'jli', l: 'ko', z: 'xa', x: 'zc', c: 'xv', v: 'cb', b: 'vn', n: 'bm', m: 'n',
+  1: '2q', 2: '13', 3: '24', 4: '35', 5: '46', 6: '57', 7: '68', 8: '79', 9: '80', 0: '9', '!': '1@', '<': ',>', '>': '.<', '"': "'", '(': '9*', ')': '0(', '[': ']p', ']': '[', '~': '`', '.': ',', ',': '.', ':': ';', '*': '8(' };
+function mulberry(seedText) {
+  let h = 2166136261;
+  for (let i = 0; i < seedText.length; i++) h = Math.imul(h ^ seedText.charCodeAt(i), 16777619);
+  let a = h >>> 0;
+  return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+// the keys of a text: [{ dt, key }] (key: text added, or null for a backspace); lean: no pauses, typos or changes
+function humanKeys(text, cps, rng, lean) {
+  const keys = [], key = (k, f = 1) => keys.push({ dt: (f * (0.55 + rng() * 0.9)) / cps, key: k }), wait = s => keys.push({ dt: s, key: '' });
+  const back = n => { for (let i = 0; i < n; i++) keys.push({ dt: (0.6 + rng() * 0.5) / (cps * 2.5), key: null }); };
+  let quote = false;
+  for (let i = 0; i < text.length;) {
+    // a line break and its indent: one key
+    const nl = text.slice(i).match(/^\n[ \t]*/);
+    if (nl) { key(nl[0], 1.5); i += nl[0].length; continue; }
+    const c = text[i], before = text[i - 1] || '';
+    if (c === '"') quote = !quote;
+    if (!lean) {
+      // thinking: before a number, a group of notes, a string
+      const num = /[0-9]/.test(c) && /[\s(,!*<\[~:]/.test(before);
+      if ((num && rng() < 0.18) || (c === '[' && quote && rng() < 0.35) || (c === '"' && quote && rng() < 0.3)) wait(0.4 + rng() * (quote ? 2.2 : 1.4));
+      // a change of mind: another value first, then the right one
+      const whole = num ? text.slice(i).match(/^\d+(\.\d+)?/)[0] : '';
+      if (whole && rng() < 0.1) {
+        const d = whole.replace(/\d(?=\D*$)/, x => String((+x + 1 + Math.floor(rng() * 3)) % 10));
+        if (d !== whole) { for (const ch of d) key(ch); wait(0.5 + rng() * 1.2); back(d.length); wait(0.2 + rng() * 0.4); }
+      }
+      // a typo: a key next to the right one, seen a few keys later
+      const near = NEAR[c.toLowerCase()];
+      if (near && rng() < 1 / 55) {
+        key(near[Math.floor(rng() * near.length)]);
+        const more = Math.min(Math.floor(rng() * 3), text.length - i - 1), ahead = text.slice(i + 1, i + 1 + more).replace(/\n[\s\S]*/, '');
+        for (const ch of ahead) key(ch);
+        wait(0.25 + rng() * 0.5); back(ahead.length + 1);
+      }
+    }
+    key(c); i++;
+  }
+  return keys;
+}
+function humanPlan(parts, acts, to, { speed, max, seed }) {
+  const rng0 = mulberry(seed), typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0);
+  // a person's pace: about 5 characters a second for a few, up to 8 for a long edit
+  const cps = (5 + 3 * Math.max(0, Math.min(1, (typed - 40) / 360))) * speed;
+  const build = lean => {
+    const rng = mulberry(`${seed}/${lean ? 'lean' : 'full'}`);
+    let t = 0, prev = null;
+    const out = acts.map(a => {
+      const gap = prev && (prev.pi !== a.pi || prev.si !== a.si) ? (a.pi === prev.pi ? (prev.paste ? 0.4 : 0.25) : 0.4 + (lean ? 0 : rng() * 0.8)) : 0;
+      t += gap; prev = a;
+      const p = parts[a.pi], s = a.si >= 0 ? p.segs[a.si] : null;
+      const keys = a.paste ? [] : a.del ? Array.from({ length: a.n }, () => ({ dt: (0.6 + rng() * 0.5) / (cps * 2.5), key: null })) : humanKeys(s.new, cps, rng, lean);
+      const at = []; let u = t;
+      for (const k of keys) { u += k.dt; at.push({ t: u, key: k.key }); }
+      const r = { ...a, t0: t, keys: at };
+      t = u;
+      return r;
+    });
+    return { list: out, total: t };
+  };
+  let plan = build(false);
+  if (plan.total > max) plan = build(true);
+  const scale = plan.total > max && plan.total > 0 ? max / plan.total : 1;
+  if (scale !== 1) plan.list.forEach(a => { a.t0 *= scale; a.keys.forEach(k => { k.t *= scale; }); });
+  const total = plan.total * scale, list = plan.list;
+  void rng0;
+  const pasteAt = new Map(list.filter(a => a.paste).map(a => [a.pi, a.t0]));
+  return {
+    total,
+    frame(time) {
+      if (time >= total) return to;
+      // each changed place: the old text, its backspaces, then the keys typed (typos and their fixes included)
+      const buf = new Map();
+      for (const a of list) {
+        if (a.paste) continue;
+        const k = `${a.pi}:${a.si}`, s = parts[a.pi].segs[a.si];
+        let b = buf.has(k) ? buf.get(k) : { text: s.old, started: false };
+        for (const x of a.keys) { if (x.t > time) break; if (x.key === null) b = { text: b.text.slice(0, -1), started: b.started }; else if (x.key) b = { text: b.text + x.key, started: !a.del || b.started }; }
+        if (!a.del && a.keys.length && a.keys[0].t <= time) b.started = true;
+        buf.set(k, b);
+      }
+      const out = [];
+      parts.forEach((p, pi) => {
+        if (p.kind === 'keep') { out.push(p.text); return; }
+        if (p.kind === 'gone') return;
+        if (p.paste && time < pasteAt.get(pi)) return;
+        let line = '', any = false;
+        p.segs.forEach((s, si) => {
+          if (s.eq !== undefined) { line += s.eq; return; }
+          const b = buf.get(`${pi}:${si}`) || { text: s.old, started: false };
+          if (b.started) any = true;
+          line += b.text;
+        });
+        if (p.kind === 'new' && !p.paste && !any && (p.text || !(time >= pasteAt.get(pi)))) return;
+        out.push(line);
+      });
+      return out.join('\n');
+    },
+  };
+}
+
 // the first k characters of a text, with a line break and its indent as one key (Enter indents by itself)
 function whole(text, k) {
   let out = text.slice(0, k);
   if (k < text.length && /[ \t]/.test(text[k]) && /\n[ \t]*$/.test(out)) { while (k < text.length && /[ \t]/.test(text[k])) k++; out = text.slice(0, k); }
   return out;
 }
-export function typingPlan(from, to, { speed = 1, max = Infinity } = {}) {
+// style 'human' (human-typing): uneven keys, thinking pauses, typos and changes of mind, seeded by the two texts
+export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '' } = {}) {
   const ops = lineDiff(chainLines(from), chainLines(to)), parts = [];
   for (let k = 0; k < ops.length;) {
     if (ops[k].op === 'keep') { parts.push({ kind: 'keep', text: ops[k].text }); k++; continue; }
@@ -193,6 +301,7 @@ export function typingPlan(from, to, { speed = 1, max = Infinity } = {}) {
     if (p.kind === 'new' && !p.text) acts.push({ pi, si: -1, paste: true, n: 0 });
     (p.segs || []).forEach((s, si) => { if (s.eq !== undefined) return; if (s.old) acts.push({ pi, si, del: true, n: s.old.length }); if (s.new) acts.push({ pi, si, del: false, n: s.new.length }); });
   });
+  if (style === 'human') return humanPlan(parts, acts, to, { speed, max, seed: `${seed}\u0000${from}\u0000${to}` });
   const typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0);
   const cps = (8 + 22 * Math.max(0, Math.min(1, (typed - 40) / 360))) * speed;
   let t = 0, prev = null;

@@ -22,11 +22,13 @@ export const CONTROLS = {
   highlights: [false, true],
   wrap: [false, true],
   functions: ['full', 'short', 'mixer'],
+  // how the code is typed (human-typing): exact, or like a person with pauses, typos and changes of mind
+  typist: ['exact', 'human'],
 };
 export const PROFILES = {
-  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full' },
-  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full' },
-  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: true, notes: false, steps: false, voice: false, highlights: true, wrap: true, functions: 'mixer' },
+  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full', typist: 'exact' },
+  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full', typist: 'exact' },
+  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: true, notes: false, steps: false, voice: false, highlights: true, wrap: true, functions: 'mixer', typist: 'human' },
 };
 export const PROFILE_IDS = Object.keys(PROFILES);
 

@@ -88,6 +88,22 @@ const CHECKS = {
     const p = typingPlan('a', 'a\n\n// ===== bass =====\n$: note("a1")'), mid = frames(p, 100).find(f => f.includes('note'));
     assert(mid && mid.startsWith('a\n\n// ====='), JSON.stringify(mid));
   },
+  'human typing: same seed same plan, exact text in time, typos and pauses on the way'() {
+    const a = '$: s("bd").gain(0.8)', line = '$: n("<[0 ~ 0 2 ~ 4 ~ 7] [5 ~ 4 ~ 2 ~ 0 ~] [4 ~ 4 5 ~ 7 ~ 9] [7 ~ 5 ~ 4 2 ~ ~]>").scale("F4:minor").mask("<0!224 1 0!239>")', b = `${a}\n${line}`;
+    const p = typingPlan(a, b, { style: 'human', seed: 's' }), q = typingPlan(a, b, { style: 'human', seed: 's' }), e = typingPlan(a, b);
+    assert(p.total === q.total && frames(p, 300).join() === frames(q, 300).join(), 'same seed');
+    assert(p.frame(p.total) === b && p.total > e.total * 2, `exact at the end, slower: ${p.total.toFixed(1)} s against ${e.total.toFixed(1)} s`);
+    // typos: frames whose new line is not a start of the final line; pauses: the text stays the same for a second or more
+    let typos = 0, pauses = 0;
+    for (const seed of ['a', 'b', 'c', 'd']) {
+      const h = typingPlan(a, b, { style: 'human', seed });
+      let last = null, since = 0;
+      for (let t = 0; t < h.total; t += 0.05) { const f = (h.frame(t).split('\n')[1] || ''); if (!line.startsWith(f)) typos++; if (f === last) { since += 0.05; if (Math.abs(since - 1) < 0.026) pauses++; } else since = 0; last = f; }
+    }
+    assert(typos > 0 && pauses > 0, `typos ${typos}, pauses ${pauses}`);
+    const short = typingPlan(a, b, { style: 'human', seed: 's', max: 5 });
+    assert(Math.abs(short.total - 5) < 1e-6 && short.frame(5) === b, 'deadline');
+  },
   'an insertion at the start of a chain is typed there'() {
     const a = '$: s("supersaw").gain(0.3)', b = '$: n("0").scale("g:minor").s("supersaw").gain(0.3)', p = typingPlan(a, b);
     for (const f of frames(p, 200)) assert(f.startsWith('$: ') && f.endsWith('s("supersaw").gain(0.3)'), `rest moved: ${f}`);

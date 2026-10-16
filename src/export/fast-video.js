@@ -32,7 +32,7 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
     await out.start();
     // a fragment (#57) starts at job.start: frame times count from 0, the song's cycle from start
     const T = tempoClock(job.bpm), offset = job.start || 0, total = (job.cut || T.seconds(job.bpm.length) + (job.tail || 0)) - offset, frames = Math.ceil(total * q.fps);
-    const onsets = {}, levelsAt = levelsFrom(onsets), codeAt = codeFrom(job.segments, { seconds: c => T.seconds(c), speed: job.typingSpeed || 1 });
+    const onsets = {}, levelsAt = levelsFrom(onsets), codeAt = codeFrom(job.segments, { seconds: c => T.seconds(c), speed: job.typingSpeed || 1, style: job.typingStyle, seed: job.songId || '' });
     let hist = new Float32Array(0), histAt = 0, drawn = 0, ap = 0;
     const report = phase => onProgress(Math.min(1, ap * 0.3 + drawn / frames * 0.7), phase);
     const sink = {
