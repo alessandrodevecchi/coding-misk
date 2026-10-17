@@ -76,6 +76,14 @@ function wall(g, x, y, w, h, style, base, s) {
   } else if (style === 'shophouse') {
     px(g, r[3], x, y, w, h);
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const n = noise(xx, yy, s); if (n < 0.05 + (yy / h) * 0.08) px(g, r[2], x + xx, y + yy); }
+  } else if (style === 'glass') {
+    // a curtain wall: panes in a grid of mullions, the sky and the city mirrored in bands
+    const gl0 = mix(base, '#0a1428', 0.45);
+    for (let yy = 0; yy < h; yy++) { const band = Math.floor((yy + (s % 7) * 3) / 9) % 4; px(g, band === 0 ? mix(gl0, '#a8c8e8', 0.25) : band === 1 ? mix(gl0, '#ffffff', 0.08) : gl0, x, y + yy, w, 1); }
+    for (let k = 0; k < h + w; k += 23) for (let j = 0; j < 6; j++) { const xx = x + k - j - (h - 1); for (let yy = 0; yy < h; yy++) { const px0 = xx + yy; if (px0 >= x && px0 < x + w && (yy + j) % 2 === 0) px(g, mix(gl0, '#e8f4ff', 0.18), px0, y + yy); } }
+    for (let xx = 0; xx < w; xx += 8) px(g, r[0], x + xx, y, 1, h);
+    for (let yy = 0; yy < h; yy += 6) px(g, r[1], x, y + yy, w, 1);
+    return;
   } else {
     // metal: corrugated sheets with rivets and rust
     for (let xx = 0; xx < w; xx++) px(g, [r[2], r[3], r[2], r[1]][xx % 4], x + xx, y, 1, h);
@@ -147,7 +155,7 @@ export function facade(o) {
   const W = o.wd, H = o.ht + ROOF;
   return bake(`fac|${o.seed}|${W}|${H}|${o.style}|${o.dk}`, W + 2, H, (g, gl) => {
     const r = stream('fac', o.seed), d = o.d, x0 = 1, top = ROOF, bottom = H - SHOP;
-    const base = mix(d.wall, r.pick(['#5a4a4a', '#4a4a5a', '#5a5a4a', '#6a5a50', '#4a3a3a', '#3a4a50']), 0.45);
+    const base = mix(r.pick(d.walls || [d.wall]), r.pick(['#5a4a4a', '#4a4a5a', '#6a5a50']), 0.25);
     // body and its walls
     px(g, INK, x0 - 1, top - 1, W + 2, H - top + 1);
     wall(g, x0, top, W, bottom - top, o.style, base, o.seed);
@@ -159,6 +167,10 @@ export function facade(o) {
     const n = Math.max(2, Math.floor((W - 8) / r.pick([18, 22, 26]))), ww = r.pick([10, 12, 14]), wh = r.pick([12, 14, 15]), gap = Math.floor((W - n * ww) / (n + 1));
     const litP = r.range(0.25, 0.6);
     let floor = 0;
+    if (o.style === 'glass') {
+      // lit panes and whole lit floors behind the glass, people as shadows
+      for (let y = top + 1; y < bottom - 6; y += 6) { const on = r.chance(0.3), c = r.chance(0.8) ? '#c8e4ff' : d.b; for (let xx = x0 + 1; xx < x0 + W - 8; xx += 8) if (on ? r.chance(0.8) : r.chance(0.06)) { px(g, mix(c, '#000000', 0.25), xx, y + 1, 7, 5); gl.globalAlpha = 0.4; px(gl, c, xx, y + 1, 7, 5); gl.globalAlpha = 1; if (r.chance(0.1)) px(g, '#14182a', xx + 3, y + 2, 2, 4); } }
+    } else
     for (let y = top + 6; y + wh < bottom - 6; y += FLOOR, floor++) {
       for (let k = 0; k < n; k++) {
         const wx = x0 + gap + k * (ww + gap), lit = r.chance(litP);
@@ -199,31 +211,42 @@ export function sign(o) {
 }
 
 // ---------- a tower of the middle distance ----------
-// o: { seed, d, wd, ht, crown }
+// o: { seed, d, wd, ht, crown }: a block, a cylinder or a stepped deco tower, with a window grid, neon edges, a crown,
+// sometimes a vertical banner of glyphs, a sky bridge stub or a rooftop helipad
 export function tower(o) {
   return bake(`tow|${o.seed}|${o.wd}|${o.ht}|${o.dk}`, o.wd + 2, o.ht + 30, (g, gl) => {
-    const r = stream('tow', o.seed), d = o.d, W = o.wd, top = 30, H = o.ht;
-    const base = mix(d.wall, '#141428', 0.45), R = ramp(base, 5);
-    px(g, INK, 0, top - 1, W + 2, H + 1); px(g, R[1], 1, top, W, H);
-    px(g, R[2], 1, top, Math.floor(W * 0.3), H); px(g, R[3], 1, top, 1, H);
-    // window grid: rows of lit and dark cells, whole floors on or off
-    const cw = r.pick([2, 3]), ch = 2, gx = cw + 1, gy = r.pick([3, 4]);
-    const warm = r.pick(['#ffd98a', '#ffcf7a', '#a8e0ff', d.b]);
-    for (let y = top + 4; y < top + H - 3; y += gy) {
-      const floorOn = r.chance(0.65);
-      for (let x = 3; x < W - 2; x += gx) { const on = floorOn ? r.chance(0.7) : r.chance(0.08); px(g, on ? mix(warm, R[1], 0.25) : R[0], x, y, cw, ch); if (on) { gl.globalAlpha = 0.55; px(gl, warm, x, y, cw, ch); gl.globalAlpha = 1; } }
+    const r = stream('tow', o.seed), d = o.d, W = o.wd, top = 30, H = o.ht, kind = r.pick(['block', 'block', 'cyl', 'deco']);
+    const base = mix(r.pick(d.walls || [d.wall]), '#141428', 0.5), R = ramp(base, 6), mid = Math.floor(W / 2) + 1;
+    const warm = r.pick(['#ffd98a', '#ffcf7a', '#a8e0ff', d.b]), nc = d[r.pick(['a', 'b', 'c'])];
+    // the outline of the body, row by row (a deco tower steps in twice near the top)
+    const halfAt = y => { if (kind !== 'deco') return Math.floor(W / 2); const t = (y - top) / H; return t < 0.12 ? Math.floor(W * 0.28) : t < 0.25 ? Math.floor(W * 0.38) : Math.floor(W / 2); };
+    for (let y = top; y < top + H; y++) {
+      const hw = halfAt(y), l = mid - hw, w = hw * 2;
+      px(g, INK, l - 1, y, w + 2, 1);
+      if (kind === 'cyl') for (let x = 0; x < w; x++) { const u = x / w, i = Math.max(0, Math.min(5, Math.round((1 - Math.abs(u - 0.3) / 0.7) * 4 + (bayer(x, y) - 0.5)))); px(g, R[i], l + x, y, 1, 1); }
+      else { px(g, R[1], l, y, w, 1); px(g, R[2], l, y, Math.floor(w * 0.3), 1); px(g, R[3], l, y, 1, 1); }
     }
-    // neon edges up the corners and a band at the top
-    const nc = d[r.pick(['a', 'b', 'c'])];
-    if (r.chance(0.6)) { px(g, mix(nc, '#ffffff', 0.3), 1, top, 1, H); px(gl, nc, 1, top, 1, H); px(g, mix(nc, '#ffffff', 0.3), W, top, 1, H); px(gl, nc, W, top, 1, H); }
-    px(g, R[3], 1, top, W, 2); px(g, mix(nc, '#ffffff', 0.3), 1, top + 3, W, 1); px(gl, nc, 1, top + 3, W, 1);
-    // the crown: a stepped top, a pyramid of light, or a spire with a beacon
-    const cr = o.crown ?? r.int(0, 3), mid = Math.floor(W / 2) + 1;
-    if (cr === 0) { px(g, INK, mid - Math.floor(W / 3) - 1, top - 9, Math.floor(W / 3) * 2 + 2, 9); px(g, R[2], mid - Math.floor(W / 3), top - 8, Math.floor(W / 3) * 2, 8); px(g, INK, mid - Math.floor(W / 6) - 1, top - 16, Math.floor(W / 6) * 2 + 2, 8); px(g, R[2], mid - Math.floor(W / 6), top - 15, Math.floor(W / 6) * 2, 8); }
-    else if (cr === 1) { for (let k = 0; k < 22; k++) { const hw = Math.round((W / 2) * (k / 22)); px(g, k % 3 ? R[2] : mix(nc, R[2], 0.4), mid - hw, top - 22 + k, hw * 2, 1); gl.globalAlpha = 0.5; px(gl, nc, mid - hw, top - 22 + k, 1, 1); px(gl, nc, mid + hw - 1, top - 22 + k, 1, 1); gl.globalAlpha = 1; } }
-    else if (cr === 2) { px(g, R[2], mid - 1, 0, 2, top); px(g, R[3], mid - 1, 0, 1, top); for (let k = 6; k < top; k += 6) px(g, R[2], mid - 3, k, 6, 1); px(gl, '#ff2f3f', mid - 1, 0, 2, 2); }
-    // a vertical banner of glyphs on some towers
-    if (r.chance(0.45)) { const bx = r.chance(0.5) ? 3 : W - 9, by = top + r.int(10, 30), n = r.int(4, 8), bc = d[r.pick(['a', 'b', 'c'])]; px(g, INK, bx - 1, by - 1, 9, n * 8 + 3); px(g, '#100a1a', bx, by, 7, n * 8 + 1); for (let k = 0; k < n; k++) { glyph(g, bx + 1, by + 1 + k * 8, o.seed + k, mix(bc, '#ffffff', 0.5), 5); glyph(gl, bx + 1, by + 1 + k * 8, o.seed + k, bc, 5); } }
+    px(g, INK, mid - halfAt(top) - 1, top - 1, halfAt(top) * 2 + 2, 1);
+    // window grid: whole floors on or off; on a cylinder the windows are bands
+    const cw = r.pick([2, 3]), gy = r.pick([3, 4]);
+    for (let y = top + 4; y < top + H - 3; y += gy) {
+      const hw = halfAt(y), floorOn = r.chance(0.6);
+      if (kind === 'cyl') { if (floorOn) { px(g, mix(warm, R[1], 0.35), mid - hw + 2, y, hw * 2 - 4, 1); gl.globalAlpha = 0.45; px(gl, warm, mid - hw + 2, y, hw * 2 - 4, 1); gl.globalAlpha = 1; } continue; }
+      for (let x = mid - hw + 2; x < mid + hw - 2; x += cw + 1) { const on = floorOn ? r.chance(0.7) : r.chance(0.07); px(g, on ? mix(warm, R[1], 0.25) : R[0], x, y, cw, 2); if (on) { gl.globalAlpha = 0.55; px(gl, warm, x, y, cw, 2); gl.globalAlpha = 1; } }
+    }
+    // vertical fins on deco towers, neon edges on others
+    if (kind === 'deco') for (let x = mid - halfAt(top + H - 1) + 4; x < mid + halfAt(top + H - 1) - 3; x += 6) px(g, R[3], x, top + Math.floor(H * 0.25), 1, H - Math.floor(H * 0.25));
+    else if (r.chance(0.6)) { const hw = halfAt(top + H - 1); px(g, mix(nc, '#ffffff', 0.3), mid - hw, top, 1, H); px(gl, nc, mid - hw, top, 1, H); px(g, mix(nc, '#ffffff', 0.3), mid + hw - 1, top, 1, H); px(gl, nc, mid + hw - 1, top, 1, H); }
+    px(g, mix(nc, '#ffffff', 0.3), mid - halfAt(top), top + 3, halfAt(top) * 2, 1); px(gl, nc, mid - halfAt(top), top + 3, halfAt(top) * 2, 1);
+    // the crown: steps, a pyramid of light, a spire with a beacon, a helipad
+    const cr = o.crown ?? r.int(0, 3), hw0 = halfAt(top);
+    if (cr === 0) { px(g, INK, mid - Math.floor(hw0 * 0.6) - 1, top - 9, Math.floor(hw0 * 1.2) + 2, 9); px(g, R[2], mid - Math.floor(hw0 * 0.6), top - 8, Math.floor(hw0 * 1.2), 8); px(g, INK, mid - Math.floor(hw0 * 0.3) - 1, top - 16, Math.floor(hw0 * 0.6) + 2, 8); px(g, R[2], mid - Math.floor(hw0 * 0.3), top - 15, Math.floor(hw0 * 0.6), 8); }
+    else if (cr === 1) { for (let k = 0; k < 22; k++) { const hw = Math.round(hw0 * (k / 22)); px(g, k % 3 ? R[2] : mix(nc, R[2], 0.4), mid - hw, top - 22 + k, hw * 2, 1); gl.globalAlpha = 0.5; px(gl, nc, mid - hw, top - 22 + k, 1, 1); px(gl, nc, mid + hw - 1, top - 22 + k, 1, 1); gl.globalAlpha = 1; } }
+    else if (cr === 2) { px(g, R[2], mid - 1, 0, 2, top); px(g, R[4], mid - 1, 0, 1, top); for (let k = 6; k < top; k += 6) px(g, R[2], mid - 3, k, 6, 1); px(gl, '#ff2f3f', mid - 1, 0, 2, 2); }
+    else { px(g, R[3], mid - hw0 - 2, top - 3, hw0 * 2 + 4, 3); px(g, '#e8e4f0', mid - 3, top - 3, 6, 1); for (let k = -hw0; k < hw0; k += 4) px(gl, k % 8 ? d.c : '#ff2f3f', mid + k, top - 3, 1, 1); }
+    // a vertical banner of glyphs, a sky bridge stub
+    if (r.chance(0.45)) { const bx = r.chance(0.5) ? mid - Math.floor(W / 2) + 2 : mid + Math.floor(W / 2) - 9, by = top + r.int(14, 34), n = r.int(5, 9), bc = d[r.pick(['a', 'b', 'c'])]; px(g, INK, bx - 1, by - 1, 9, n * 8 + 3); px(g, '#100a1a', bx, by, 7, n * 8 + 1); for (let k = 0; k < n; k++) { glyph(g, bx + 1, by + 1 + k * 8, o.seed + k, mix(bc, '#ffffff', 0.5), 5); glyph(gl, bx + 1, by + 1 + k * 8, o.seed + k, bc, 5); } }
+    if (r.chance(0.25)) { const by = top + r.int(30, H - 30); px(g, INK, 0, by - 1, 3, 6); px(g, R[3], 0, by, 2, 4); px(g, mix(warm, R[1], 0.3), 0, by + 1, 2, 1); }
   });
 }
 

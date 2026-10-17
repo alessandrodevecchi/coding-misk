@@ -15,12 +15,12 @@ import { vehicle, passing } from './neon/traffic.js';
 
 const W = 384, H = 216, WALK = 170, ROAD = 176;
 export const DISTRICTS = {
-  market: { name: 'NEON MARKET', a: '#ff2fa8', b: '#29e6ff', c: '#ffd23f', rain: 0.6, haze: '#40205e', wall: '#5a3a5a', styles: ['shophouse', 'brick', 'shophouse', 'metal'] },
-  spires: { name: 'SPIRE ONE', a: '#4fc3ff', b: '#e8f4ff', c: '#9a7cff', rain: 0.2, haze: '#1a2f58', wall: '#3a4a6a', styles: ['concrete', 'concrete', 'metal'] },
-  stacks: { name: 'STACKS 9', a: '#ff8a2f', b: '#ffd23f', c: '#ff3f3f', rain: 0.1, haze: '#4e2e1c', wall: '#6a4a38', styles: ['metal', 'brick', 'metal'] },
-  oldtown: { name: 'OLD TOWN', a: '#ff3f5a', b: '#ffb43f', c: '#3fffb0', rain: 0.8, haze: '#40162e', wall: '#6a3a3a', styles: ['brick', 'shophouse', 'brick'] },
-  harbor: { name: 'HARBOR', a: '#3fffd8', b: '#2f8fff', c: '#ff6f3f', rain: 0.4, haze: '#123444', wall: '#3a5058', styles: ['metal', 'concrete', 'brick'] },
-  datacore: { name: 'DATA CORE', a: '#5aff6a', b: '#29e6ff', c: '#d0ff3f', rain: 0, haze: '#123024', wall: '#2a4a3a', styles: ['concrete', 'metal', 'concrete'] },
+  market: { name: 'NEON MARKET', a: '#ff2fa8', b: '#29e6ff', c: '#ffd23f', rain: 0.6, haze: '#40205e', wall: '#5a3a5a', walls: ['#8a4a6a', '#3a6a7a', '#7a5a8a', '#a8706a', '#4a7a6a', '#6a4a7a'], styles: ['shophouse', 'brick', 'shophouse', 'metal'] },
+  spires: { name: 'SPIRE ONE', a: '#4fc3ff', b: '#e8f4ff', c: '#9a7cff', rain: 0.2, haze: '#1a2f58', wall: '#3a4a6a', walls: ['#8a9ab8', '#5a6a8a', '#c8d0e0', '#4a5a7a'], styles: ['glass', 'concrete', 'glass', 'metal'] },
+  stacks: { name: 'STACKS 9', a: '#ff8a2f', b: '#ffd23f', c: '#ff3f3f', rain: 0.1, haze: '#4e2e1c', wall: '#6a4a38', walls: ['#8a5a3a', '#6a4a3a', '#9a6a40', '#5a4a40', '#7a3a2a'], styles: ['metal', 'brick', 'metal'] },
+  oldtown: { name: 'OLD TOWN', a: '#ff3f5a', b: '#ffb43f', c: '#3fffb0', rain: 0.8, haze: '#40162e', wall: '#6a3a3a', walls: ['#8a3a30', '#6a4a3a', '#a85a40', '#5a3a3a', '#7a5a4a'], styles: ['brick', 'shophouse', 'brick'] },
+  harbor: { name: 'HARBOR', a: '#3fffd8', b: '#2f8fff', c: '#ff6f3f', rain: 0.4, haze: '#123444', wall: '#3a5058', walls: ['#3a6a7a', '#5a6a6a', '#2a5a6a', '#6a7a7a', '#7a4a3a'], styles: ['metal', 'concrete', 'brick'] },
+  datacore: { name: 'DATA CORE', a: '#5aff6a', b: '#29e6ff', c: '#d0ff3f', rain: 0, haze: '#123024', wall: '#2a4a3a', walls: ['#2a4a3a', '#1a3a3a', '#3a5a4a', '#2a3a40'], styles: ['glass', 'metal', 'glass', 'concrete'] },
 };
 const IDS = Object.keys(DISTRICTS);
 // the mood of the night: violet, teal, amber smog → [top, middle, horizon]
@@ -86,14 +86,15 @@ export function neonCityConcept() {
         },
       },
       // the landmark of each district, colossal in the haze: it crosses the picture once while its zone goes by, so it
-      // is seen whole for a long time (a far layer that moved with its parallax would bring the next one too soon)
+      // is seen whole for a long time (a far layer that moved with its parallax would bring the next one too soon); it lingers
+      // in the middle and hurries only when the district changes
       {
         parallax: 0, chunk: 10000, haze: 0.2,
         gen() { return []; },
         before(g, env) {
           const L = env.zone(0).len, c = env.cam + env.w / 2, k0 = Math.floor(c / L);
           for (let k = k0 - 1; k <= k0 + 1; k++) {
-            const id = env.zone(k * L + 1).id, b = landmark(id, dOf(id), k), t = (c - (k + 0.5) * L) / L, x = Math.round(env.w / 2 - t * (env.w + b.w + 40) - b.w / 2), y = Math.max(WALK - b.h + 6, 6);
+            const id = env.zone(k * L + 1).id, b = landmark(id, dOf(id), k), t = (c - (k + 0.5) * L) / L, u = t * 2, x = Math.round(env.w / 2 - (0.4 * u + 0.6 * u * u * u) * (env.w + b.w + 40) / 2 - b.w / 2), y = Math.max(WALK - b.h + 6, 6);
             if (x > env.w || x + b.w < 0) continue;
             put(g, env.glow, b, x, y, { light: 0.8 + (env.lv.pad || 0) * 0.3 }); b.beat(g, env.glow, x, y, env);
           }
@@ -117,6 +118,9 @@ export function neonCityConcept() {
           if (top > 40 && r.chance(0.3)) out.push({ x: f.x + r.int(8, wd - 60), kind: 'board', top: WALK - fh - 22 - 34, wd: r.int(48, 60), ht: r.int(26, 32), show: r.int(0, 3), seed: r.int(0, 1e6), span: 64, d: z, z: -1 });
           if (r.chance(0.35)) out.push({ x: u + r.int(10, 120), kind: 'vend', seed: r.int(0, 1e6), span: 16, d: z, z: 3 });
           if (r.chance(0.4)) out.push({ x: u + r.int(0, 130), kind: 'bags', seed: r.int(0, 1e6), span: 16, d: z, z: 3 });
+          if (r.chance(0.18)) out.push({ x: u + r.int(10, 100), kind: 'cart', seed: r.int(0, 1e6), span: 40, d: z, z: 3.5 });
+          if (r.chance(0.25)) out.push({ x: u + r.int(0, 120), kind: 'bike', seed: r.int(0, 1e6), span: 20, d: z, z: 3.2 });
+          if (r.chance(0.12)) out.push({ x: u + r.int(0, 120), kind: 'dog', seed: r.int(0, 1e6), span: 16, d: z, z: 4.5 });
           return out;
         },
         draw(g, o, sx, env) {
@@ -135,6 +139,9 @@ export function neonCityConcept() {
           } else if (o.kind === 'board') billboard(g, gl, sx, o.top, o.wd, o.ht, o.show, d, env, o.seed);
           else if (o.kind === 'vend') vending(g, gl, sx, WALK + 2, d, o.seed);
           else if (o.kind === 'bags') bags(g, sx, WALK + 3, o.seed);
+          else if (o.kind === 'cart') foodCart(g, gl, sx, WALK + 3, d, env, o.seed);
+          else if (o.kind === 'bike') parkedBike(g, sx, WALK + 3, o.seed);
+          else if (o.kind === 'dog') robotDog(g, gl, sx, WALK + 3, d, env, o.seed);
         },
         before(g, env) {
           // the pavement: slabs, a kerb, moving with the street
@@ -183,7 +190,7 @@ export function neonCityConcept() {
       // a zebra crossing now and then, manholes that steam, puddles that mirror the neon
       for (let k = Math.floor(env.cam / 600) - 1; k <= Math.floor((env.cam + env.w) / 600) + 1; k++) {
         const r = n => rng('road', k, n), x0 = Math.round(k * 600 + r(1) * 300 - env.cam);
-        if (r(2) < 0.4) for (let s = 0; s < 7; s++) { const yy = ROAD + 2 + s * 5; px(g, '#6a6678', x0 + s * 2, yy, 34, 3); px(g, '#8a8698', x0 + s * 2, yy, 34, 1); }
+        if (r(2) < 0.4) for (let s = 0; s < 8; s++) for (let yy = ROAD + 2; yy < H; yy++) { const xx = x0 + s * 11 - Math.round((yy - ROAD) * 0.35); px(g, yy === ROAD + 2 ? '#a8a4b8' : '#6a6678', xx, yy, 6, 1); }
         const mx = Math.round(k * 600 + 120 + r(3) * 300 - env.cam), my = ROAD + 22;
         for (let yy = -2; yy <= 2; yy++) px(g, yy === -2 || yy === 2 ? '#0a0810' : '#2a2634', mx - 9 + Math.abs(yy), my + yy, 18 - Math.abs(yy) * 2, 1);
         for (let k2 = -6; k2 <= 6; k2 += 3) px(g, '#3a3644', mx + k2, my, 1, 1);
@@ -254,6 +261,34 @@ function vending(g, gl, x, y, d, s) {
   px(g, mix(c, '#000000', 0.3), x + 2, y - 30, 12, 16); gl.globalAlpha = 0.7; px(gl, c, x + 2, y - 30, 12, 16); gl.globalAlpha = 1;
   for (let j = 0; j < 4; j++) for (let k = 0; k < 4; k++) px(g, ['#e84a4a', '#4a8ae8', '#e8c84a', '#ffffff'][(j + k + s) % 4], x + 3 + k * 3, y - 29 + j * 4, 2, 3);
   px(g, '#1a1a2a', x + 2, y - 12, 12, 4); px(g, '#8a8aa0', x + 10, y - 10, 2, 1);
+}
+// a food cart with a lantern, a canopy, steam from the pot and a cook
+function foodCart(g, gl, x, y, d, env, s) {
+  const c = rng('fc', s) < 0.5 ? '#c83a2a' : '#2a6a8a';
+  px(g, '#07040f', x - 1, y - 16, 36, 13); px(g, shade(c, -0.2), x, y - 15, 34, 11); px(g, shade(c, 0.2), x, y - 15, 34, 1); px(g, '#e8e0d0', x + 3, y - 12, 28, 2);
+  for (const wx of [6, 27]) { disc(g, x + wx, y - 3, 3, '#07040f'); disc(g, x + wx, y - 3, 2, '#3a3a48'); }
+  px(g, '#3a2a20', x + 1, y - 34, 2, 19); px(g, '#3a2a20', x + 31, y - 34, 2, 19);
+  for (let k = 0; k < 36; k += 4) { px(g, (k / 4) % 2 ? '#e8e0d0' : c, x - 1 + k, y - 37, 4, 4); px(g, '#07040f', x - 1 + k, y - 33, 4, 1); }
+  px(g, '#5a5a6a', x + 18, y - 20, 9, 5); px(g, '#7a7a8a', x + 18, y - 20, 9, 1);
+  for (let p = 0; p < 4; p++) { const a = (env.cyc * 0.7 + p / 4) % 1; g.globalAlpha = 0.3 * (1 - a); disc(g, x + 22 + Math.sin(a * 6 + p) * 2, y - 22 - a * 14, 1 + Math.round(a * 3), '#e8e0f0'); }
+  g.globalAlpha = 1;
+  px(g, '#e8302a', x + 6, y - 32, 4, 5); px(g, '#ffd23f', x + 7, y - 31, 2, 3); gl.globalAlpha = 0.8; px(gl, '#ff6a2a', x + 4, y - 34, 8, 9); gl.globalAlpha = 1;
+  const cook = person(`cook${s}`, { hairdo: 'cap' }); dancer(g, null, cook, x + 12, y - 2, Math.floor(env.cyc * 2), { move: 0, flip: false });
+  px(g, shade(c, -0.2), x, y - 15, 34, 4); px(g, '#e8e0d0', x + 3, y - 14, 28, 1);
+}
+// a bicycle leaning on its stand
+function parkedBike(g, x, y, s) {
+  const c = ['#c83a3a', '#3a8ac8', '#e8c840', '#e8e4f0'][s % 4];
+  for (const wx of [3, 15]) { for (let a = 0; a < 24; a++) { const t = (a / 24) * Math.PI * 2; px(g, '#07040f', x + wx + Math.cos(t) * 4, y - 5 + Math.sin(t) * 4); } px(g, '#5a5a6a', x + wx, y - 5, 1, 1); }
+  px(g, c, x + 4, y - 9, 10, 1); px(g, c, x + 7, y - 9, 1, 5); px(g, c, x + 13, y - 11, 1, 6); px(g, '#14101c', x + 6, y - 11, 4, 1); px(g, '#14101c', x + 12, y - 12, 3, 1);
+}
+// a robot dog that wags its antenna and hops on the beat
+function robotDog(g, gl, x, y, d, env, s) {
+  const hop = env.beat < 0.2 ? 1 : 0, yy = y - hop;
+  px(g, '#07040f', x - 1, yy - 9, 14, 6); px(g, '#8a8aa0', x, yy - 8, 12, 4); px(g, '#c8c8d8', x, yy - 8, 12, 1);
+  for (const lx of [1, 4, 8, 10]) px(g, '#3a3a48', x + lx, yy - 4, 1, 4);
+  px(g, '#07040f', x + 10, yy - 13, 6, 5); px(g, '#a8a8b8', x + 11, yy - 12, 4, 3); px(g, d.a, x + 13, yy - 11, 2, 1); px(gl, d.a, x + 13, yy - 11, 2, 1);
+  px(g, '#5a5a6a', x - 2, yy - 9 - (Math.floor(env.cyc * 4) % 2), 1, 3);
 }
 // rubbish bags and a bin
 function bags(g, x, y, s) {
