@@ -145,8 +145,11 @@ function donkeySprite(f) {
     for (let k = 0; k < 3; k++) { disc(g, 35, o + 6 + k * 4 - bob, 1, '#f2c23a'); px(g, '#fff2a8', 35, o + 5 + k * 4 - bob, 1, 1); }
     // neck and head with a white muzzle, an eye
     px(g, c, 35, o - 5 - bob, 7, 14); px(g, cl, 36, o - 5 - bob, 2, 12);
-    px(g, c, 38, o - 9 - bob, 12, 9); px(g, belly, 44, o - 5 - bob, 6, 5); px(g, cd, 38, o - 2 - bob, 12, 2); px(g, '#2a1a18', 48, o - 4 - bob, 1, 1);
-    px(g, '#ffffff', 41, o - 7 - bob, 2, 2); px(g, '#1a1018', 42, o - 7 - bob, 1, 2);
+    px(g, c, 38, o - 10 - bob, 11, 10); px(g, cl, 39, o - 10 - bob, 8, 1);
+    px(g, belly, 45, o - 6 - bob, 6, 6); px(g, shade(belly, -0.15), 45, o - 1 - bob, 6, 1); px(g, '#4a3a34', 49, o - 5 - bob, 2, 2); px(g, '#2a1a18', 50, o - 4 - bob, 1, 1);
+    px(g, cd, 38, o - 1 - bob, 8, 2); px(g, '#2a1a18', 47, o - 1 - bob, 3, 1);
+    px(g, '#ffffff', 41, o - 8 - bob, 3, 2); px(g, '#1a1018', 43, o - 8 - bob, 1, 2); px(g, cd, 40, o - 9 - bob, 4, 1);
+    px(g, mane, 38, o - 11 - bob, 3, 2);
     // long ears, mane, tail
     for (const [ex, tilt] of [[37, 0], [40, 1]]) for (let k = 0; k < 8; k++) { px(g, k < 6 ? c : cd, ex + Math.round(k * 0.2 * tilt), o - 9 - bob - k, 3, 1); px(g, '#e8b4a0', ex + 1 + Math.round(k * 0.2 * tilt), o - 9 - bob - k, 1, 1); }
     for (let k = 0; k < 12; k++) px(g, k % 2 ? mane : shade(mane, 0.3), 34 + Math.floor(k / 3), o - 7 + k - bob, 2, 1);
@@ -191,8 +194,12 @@ function cart(g, gl, x, base, env) {
   g.drawImage(tinted('cart', cartBody(), env.night), x - 1, base - 66);
   // speakers, decks with spinning records, an amp with lights
   const bedY = base - 66 + 46 + 1;
-  speakerCab(g, x + 30, bedY - 26 - Math.round(bass), 18, 26, bass);
-  speakerCab(g, x + 62, bedY - 26 - Math.round(bass), 18, 26, bass);
+  speakerCab(g, x + 27, bedY - 26 - Math.round(bass), 18, 26, bass);
+  speakerCab(g, x + 63, bedY - 26 - Math.round(bass), 18, 26, bass);
+  // the DJ behind the decks: headphones, one hand up on the beat
+  const dj = tinted(`dj${Math.floor(env.cyc * 4) % 4}`, personSprite({ skin: 2, hair: '#2a1a14', style: 2, shirt: '#2a2a33', vest: '#f2c23a', pants: '#2a2a33', hat: null, prop: null, tall: 0, beard: true }, 'dance', Math.floor(env.cyc * 4) % 4, false), env.night);
+  g.drawImage(dj, x + 41, bedY - 43);
+  px(g, '#e2453a', x + 49, bedY - 40, 8, 2); px(g, '#e2453a', x + 48, bedY - 38, 2, 4); px(g, '#e2453a', x + 56, bedY - 38, 2, 4);
   px(g, LINE, x + 49, bedY - 15, 13, 15); px(g, '#2a2a33', x + 50, bedY - 14, 11, 14); px(g, '#4a4a58', x + 50, bedY - 14, 11, 1);
   for (const [dx, ph] of [[53, 0], [58, 2]]) { disc(g, x + dx, bedY - 10, 2, '#111116'); px(g, '#c8ccd8', x + dx + Math.round(Math.cos(env.cyc * 6.28 + ph) * 2), bedY - 10 + Math.round(Math.sin(env.cyc * 6.28 + ph) * 2), 1, 1); }
   ['kick', 'bass', 'hats', 'hook'].forEach((k, i) => { const on = (lv[k] || 0) > 0.15, c = ['#ff5a5a', '#ffb13a', '#ffe14a', '#5aff8a'][i]; px(g, on ? c : '#40404f', x + 51 + i * 2, bedY - 4, 1, 2); if (on) px(gl, c, x + 51 + i * 2, bedY - 4, 1, 2); });
@@ -285,7 +292,14 @@ function cherry(g, x, base, r) {
   for (let k = 0; k < 6; k++) px(g, '#ffe0ea', x + Math.round((r() - 0.5) * 20), base - 24 + Math.round(r() * 10), 1, 1);
 }
 function cypress(g, x, base, h) { const c = '#2f5d35'; for (let r = 0; r < h; r++) { const half = Math.round(Math.sin((r / h) * Math.PI) * 4) + 1; px(g, LINE, x - half - 1, base - h + r, half * 2 + 3, 1); px(g, r % 4 ? c : shade(c, 0.18), x - half, base - h + r, half * 2 + 1, 1); px(g, shade(c, -0.25), x - half, base - h + r, 1, 1); } }
-function pine(g, x, base) { const c = '#3f6e3a', t = '#6b4a33'; block(g, x - 1, base - 22, 3, 22, t); block(g, x - 15, base - 30, 30, 6, c); block(g, x - 10, base - 33, 20, 3, shade(c, 0.15)); }
+function pine(g, x, base) {
+  // an umbrella pine: a bent trunk, a flat crown of round clumps lit on top
+  const c = '#3f6e3a', t = '#6b4a33';
+  for (let k = 0; k < 26; k++) { const bend = Math.round(Math.sin(k / 9) * 3); px(g, LINE, x + bend - 1, base - k, 4, 1); px(g, k % 4 ? t : shade(t, -0.2), x + bend, base - k, 2, 1); }
+  for (const [dx, dy, r] of [[-12, -30, 6], [-4, -33, 7], [6, -32, 7], [13, -29, 5], [0, -29, 7]]) disc(g, x + 2 + dx, base + dy, r + 1, LINE);
+  for (const [dx, dy, r] of [[-12, -30, 6], [-4, -33, 7], [6, -32, 7], [13, -29, 5], [0, -29, 7]]) { disc(g, x + 2 + dx, base + dy, r, c); disc(g, x + 1 + dx, base + dy - 2, Math.max(1, r - 3), shade(c, 0.2)); }
+  px(g, shade(c, -0.25), x - 14, base - 27, 32, 2);
+}
 function tree(g, x, base, r) {
   const leaf = r.pick(['#4f9a3c', '#5aa847', '#3f8a3a']), t = '#6b4a33';
   block(g, x - 1, base - 12, 4, 12, t);
@@ -491,6 +505,17 @@ export function caravanConcept() {
           else tree(g, sx, base, r);
         },
       },
+      // bushes and low walls between the town and the road
+      {
+        parallax: 0.58, chunk: 70, haze: 0.05,
+        gen(i, r, env) { const z = env.zoneAt(i * 70 + 35, 0.58).id, out = []; for (let k = 0; k < 2; k++) if (r.chance(0.7)) out.push({ x: i * 70 + k * 35 + r.int(0, 20), kind: z === 'egypt' ? 'dune' : ZONES[z].city && r.chance(0.4) ? 'wall' : 'bush', seed: r.int(0, 1e6), span: 40, d: z }); return out; },
+        draw(g, o, sx) {
+          const r = stream('bush', o.seed), base = ROAD - 4;
+          if (o.kind === 'bush') { const c = mix(ZONES[o.d].grass, '#1a3a1a', 0.35); for (let k = 0; k < 4; k++) disc(g, sx + k * 6, base - 5 - r.int(0, 4), 6, LINE); for (let k = 0; k < 4; k++) { const yy = base - 5 - r.int(0, 3); disc(g, sx + k * 6, yy, 5, c); disc(g, sx + k * 6 - 1, yy - 2, 2, shade(c, 0.25)); } }
+          else if (o.kind === 'wall') { const st = ZONES[o.d].stone; block(g, sx, base - 9, 34, 9, shade(st, 0.3)); for (let k = 0; k < 34; k += 6) px(g, shade(st, 0.1), sx + k, base - 9 + (k % 12 ? 0 : 4), 1, 4); px(g, shade(st, 0.1), sx, base - 5, 34, 1); }
+          else { const c = '#e8b878'; for (let k = 0; k < 40; k++) { const hh = Math.round(Math.sin((k / 40) * Math.PI) * 8); px(g, c, sx + k, base - hh, 1, hh); px(g, shade(c, 0.15), sx + k, base - hh, 1, 1); } }
+        },
+      },
       // by the road: market stalls, lamps, fences, lanterns, cacti, the sphinx
       {
         parallax: 0.75, chunk: 110, haze: 0.03,
@@ -542,6 +567,8 @@ export function caravanConcept() {
         px(g, z.grass, x, ROAD - 8, 4, 8); if (rng('tuft', k) < 0.35) px(g, shade(z.grass, 0.2), x + 1, ROAD - 10, 1, 3); if (rng('tuft2', k) < 0.15) px(g, shade(z.grass, -0.2), x + 2, ROAD - 9, 1, 2);
         px(g, LINE, x, ROAD, 4, 1); px(g, shade(z.road, 0.15), x, ROAD + 1, 4, 1);
         px(g, z.road, x, ROAD + 2, 4, env.h - ROAD - 2);
+        if (z === ZONES.paris || z === ZONES.rome) for (let row = ROAD + 3; row < env.h; row += 4) { const off = ((row / 4) % 2) * 2; if ((x + off + Math.floor(env.cam)) % 4 < 2) px(g, shade(z.road, -0.18), x, row, 1, 3); px(g, shade(z.road, -0.12), x, row + 3, 4, 1); }
+        if (z === ZONES.egypt) for (let row = ROAD + 6; row < env.h; row += 7) px(g, shade(z.road, 0.12), x, row + Math.round(Math.sin((wx + row * 3) * 0.08) * 1.5), 4, 1);
         for (let s = 0; s < 4; s++) if (rng('stone', k, s) < 0.45) { const sy = ROAD + 4 + Math.floor(rng('sy', k, s) * (env.h - ROAD - 8)), sxx = x + Math.floor(rng('sx', k, s) * 3); px(g, z.stone, sxx, sy, 2, 1); px(g, shade(z.road, 0.18), sxx, sy - 1, 2, 1); }
       }
       // puddles: ovals that mirror the sky, with a lighter rim
@@ -559,6 +586,19 @@ export function caravanConcept() {
         if (sx < -wd - 4 || sx > env.w + 4) continue;
         block(g, sx + wd / 2 - 1, ROAD - 26, 3, 26, shade(wood, -0.25)); block(g, sx, ROAD - 38, wd, 12, wood); px(g, shade(wood, -0.3), sx + 1, ROAD - 37, wd - 2, 1);
         text(g, name, sx + 4, ROAD - 34, '#2a1a12');
+      }
+    },
+    after(g, env) {
+      const gl = env.glow;
+      // a flock of birds by day, flapping
+      if (env.night < 0.5) for (let i = 0; i < 7; i++) {
+        const span = env.w + 200, bx = ((rng('bird', Math.floor(env.cyc / 32)) * span + env.cyc * 9 + i * 9 - env.cam * 0.1) % span + span) % span - 100, by = 40 + Math.sin(env.cyc * 0.4 + i) * 6 + (i % 3) * 5, up = Math.floor(env.cyc * 8 + i) % 2;
+        px(g, '#2a2a3a', bx, by, 1, 1); px(g, '#2a2a3a', bx - 2, by - up, 2, 1); px(g, '#2a2a3a', bx + 1, by - up, 2, 1);
+      }
+      // fireflies at night in the countryside, blinking on the hats
+      if (env.night > 0.5 && env.centerZone.id === 'country') for (let i = 0; i < 18; i++) {
+        const fx = ((rng('ff', i) * env.w + Math.sin(env.cyc * 0.7 + i) * 12 - env.cam * 0.6) % env.w + env.w) % env.w, fy = ROAD - 30 + rng('ffy', i) * 40 + Math.cos(env.cyc + i) * 4;
+        if (rng('fb', i, Math.floor(env.cyc * 4)) < 0.5 + (env.lv.hats || 0) * 0.4) { px(g, '#e8ff9a', fx, fy, 1, 1); gl.globalAlpha = 0.8; px(gl, '#c8ff5a', fx - 1, fy - 1, 3, 3); gl.globalAlpha = 1; }
       }
     },
     actors(g, env) {
