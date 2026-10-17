@@ -79,13 +79,14 @@ export function outline(c, col = '#07040f', { inner = false } = {}) {
 const baked = new Map();
 export function bake(key, w, h, paint, { line } = {}) {
   let b = baked.get(key);
-  if (b) return b;
+  // least recently used goes first: a picture in use moves to the end
+  if (b) { baked.delete(key); baked.set(key, b); return b; }
   const c = canvasOf(w, h), l = canvasOf(w, h), g = c.getContext('2d'), gl = l.getContext('2d');
   g.imageSmoothingEnabled = false; gl.imageSmoothingEnabled = false;
   const extra = paint(g, gl, w, h) || {};
   if (line) outline(c, line);
   b = { c, l, w, h, ...extra };
-  if (baked.size > 160) baked.delete(baked.keys().next().value);
+  if (baked.size > 320) baked.delete(baked.keys().next().value);
   baked.set(key, b);
   return b;
 }

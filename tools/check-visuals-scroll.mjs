@@ -4,10 +4,11 @@
 import { createHash } from 'node:crypto';
 
 // a canvas that records what is drawn
-// (every canvas writes to one log: the engine draws parts apart and lays them on the picture)
+// (every canvas writes to one log: the engine draws parts apart and lays them on the picture; reading pixels gives
+// empty ones, enough for the outline of baked sprites)
 const LOG = [];
 class Rec {
-  constructor(w, h) { this.width = w; this.height = h; this.log = LOG; const self = this; this.ctx = new Proxy({ log: LOG }, { get(t, k) { if (k in t) return t[k]; return (...a) => { self.log.push(`${String(k)}(${a.map(v => (typeof v === 'object' ? 'img' : typeof v === 'number' ? Math.round(v * 100) / 100 : v)).join(',')})`); }; }, set(t, k, v) { self.log.push(`${String(k)}=${v}`); return true; } }); }
+  constructor(w, h) { this.width = w; this.height = h; this.log = LOG; const self = this; const img = (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }); this.ctx = new Proxy({ log: LOG, canvas: this, getImageData: (x, y, w, h) => img(w, h), createImageData: (w, h) => img(w, h) }, { get(t, k) { if (k in t) return t[k]; return (...a) => { self.log.push(`${String(k)}(${a.map(v => (typeof v === 'object' ? 'img' : typeof v === 'number' ? Math.round(v * 100) / 100 : v)).join(',')})`); }; }, set(t, k, v) { self.log.push(`${String(k)}=${v}`); return true; } }); }
   getContext() { return this.ctx; }
 }
 globalThis.OffscreenCanvas = Rec;
