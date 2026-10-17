@@ -185,6 +185,7 @@ export function neonCityConcept() {
           for (let k = 0; k < 2; k++) out.push({ x: u + k * 32 + r.int(0, 6), kind: 'b', wd: r.int(20, 32), top: r.int(56, 104), seed: r.int(0, 1e6), z: r(), span: 36, d: z, roof: r.int(0, 3) });
           if (r.chance(0.32)) out.push({ x: u + r.int(4, 30), kind: 'screen', wd: r.int(32, 48), ht: r.int(20, 28), top: r.int(50, 84), show: r.int(0, 2), seed: r.int(0, 1e6), z: 2, span: 52, d: z });
           if (r.chance(0.22)) out.push({ x: u + r.int(0, 60), kind: 'search', seed: r.int(0, 1e6), z: -1, span: 120, d: z });
+          if (r.chance(0.08)) out.push({ x: u + r.int(10, 50), kind: 'holo', seed: r.int(0, 1e6), z: 3, span: 50, d: z });
           return out;
         },
         draw(g, o, sx, env) {
@@ -199,6 +200,15 @@ export function neonCityConcept() {
             if (o.d === 'stacks') { px(g, c, sx + 4, o.top - 18, 6, 18); px(g, shade(c, 0.2), sx + 4, o.top - 18, 6, 1); }
             if (o.d === 'harbor' && o.seed % 3 === 0) { px(g, '#c84a2a', sx + 2, o.top - 26, 2, 26); px(g, '#c84a2a', sx + 2, o.top - 26, 30, 2); px(g, '#8a8aa0', sx + 28, o.top - 24, 1, 14); }
           } else if (o.kind === 'screen') screen(g, env.glow, sx, o.top, o.wd, o.ht, o.show, d, env, o.seed);
+          else if (o.kind === 'holo') {
+            // a hologram dancer above a projector, made of scan lines, dancing on the beat
+            const gl = env.glow, c = d[['a', 'b', 'c'][o.seed % 3]], f = Math.floor(env.cyc * 4) % 4, top = 38, sway = [0, 2, 0, -2][f], arm = f % 2;
+            px(g, '#2a2440', sx - 6, top + 62, 14, 4); px(g, INK, sx - 7, top + 61, 16, 1);
+            gl.globalAlpha = 0.12; for (let k = 0; k < 60; k++) px(gl, c, sx + 1 - k / 6, top + 61 - k, Math.max(1, k / 3), 1); gl.globalAlpha = 1;
+            const fig = [[0, 0, 4, 4], [-1, 4, 6, 10], [-1 + sway, 14, 2, 12], [3 + sway, 14, 2, 12], [arm ? -5 : -4, arm ? -2 : 5, 2, arm ? 8 : 8], [arm ? 6 : 5, arm ? 5 : -3, 2, 8]];
+            for (const [fx, fy, fw, fh] of fig) for (let yy = 0; yy < fh * 2; yy++) if (yy % 2 === 0 || rng('hs', o.seed, yy, Math.floor(env.cyc * 8)) < 0.3) { gl.globalAlpha = 0.55 + (env.lv.kick || 0) * 0.35; px(gl, c, sx + fx * 2 + sway, top + 20 + fy * 2 + yy, fw * 2, 1); }
+            gl.globalAlpha = 1;
+          }
           else if (o.kind === 'search') {
             const a = -Math.PI / 2 + Math.sin(env.cyc * 0.9 + o.seed) * 0.6, gl = env.glow;
             gl.globalAlpha = 0.05 + (env.lv.kick || 0) * 0.04;
@@ -249,10 +259,10 @@ export function neonCityConcept() {
       },
       // the street close by: brick facades, windows, fire escapes, air units, shop fronts, neon
       {
-        parallax: 0.55, chunk: 64, haze: 0.07,
+        parallax: 0.62, chunk: 76, haze: 0.07,
         gen(i, r, env) {
-          const u = i * 64, z = env.zoneAt(u + 32, 0.55).id, out = [];
-          out.push({ x: u + r.int(0, 6), kind: 'facade', wd: r.int(44, 58), top: r.int(102, 128), seed: r.int(0, 1e6), span: 62, d: z, escape: r.chance(0.5), shop: r.int(0, 3) });
+          const u = i * 76, z = env.zoneAt(u + 38, 0.62).id, out = [];
+          out.push({ x: u + r.int(0, 6), kind: 'facade', wd: r.int(56, 72), top: r.int(92, 120), seed: r.int(0, 1e6), span: 62, d: z, escape: r.chance(0.5), shop: r.int(0, 3) });
           if (r.chance(0.75)) out.push({ x: u + r.int(4, 50), kind: 'vsign', word: Array.from({ length: r.int(3, 4) }, () => r.pick([...GLYPHS])).join(''), top: r.int(106, 124), col: r.pick(['a', 'b', 'c']), seed: r.int(0, 1e6), z: 2, span: 8, d: z });
           if (r.chance(0.45)) out.push({ x: u + r.int(0, 30), kind: 'hsign', word: r.pick(['RAMEN', 'BAR', 'HOTEL', 'CLUB', 'TECH', 'NOODLE', 'KARAOKE', 'DATA', 'SUSHI', 'PAWN']), top: r.int(132, 146), col: r.pick(['a', 'b', 'c']), seed: r.int(0, 1e6), z: 2, span: 44, d: z });
           return out;
@@ -266,9 +276,14 @@ export function neonCityConcept() {
             // cornice and roof edge
             px(g, shade(c, 0.2), sx - 1, o.top, o.wd + 2, 2); px(g, shade(c, -0.4), sx - 1, o.top + 2, o.wd + 2, 1);
             // windows in rows
-            for (let y = o.top + 7; y < base - 24; y += 11) for (let k = sx + 4; k < sx + o.wd - 9; k += 11) windowAt(g, gl, k, y, 7, 7, rng('lit', o.seed, k, y) < 0.45, d, hashKey(o.seed, k, y), env);
+            for (let y = o.top + 7; y < base - 26; y += 14) for (let k = sx + 5; k < sx + o.wd - 12; k += 14) windowAt(g, gl, k, y, 9, 9, rng('lit', o.seed, k, y) < 0.45, d, hashKey(o.seed, k, y), env);
             // a fire escape: platforms and zigzag stairs
             if (o.escape) for (let y = o.top + 15; y < base - 24; y += 11) { px(g, INK, sx + o.wd - 16, y, 15, 1); for (let k = 0; k < 15; k += 2) px(g, INK, sx + o.wd - 16 + k, y - 3, 1, 3); px(g, INK, sx + o.wd - 16, y - 3, 15, 1); for (let s = 0; s < 8; s++) px(g, INK, sx + o.wd - 14 + s, y + 1 + s, 2, 1); }
+            // balconies with plants
+            for (let y = o.top + 15; y < base - 26; y += 22) { const bx = sx + 4 + (o.seed % 2) * 14; px(g, INK, bx - 1, y, 14, 1); for (let k = 0; k < 14; k += 2) px(g, INK, bx - 1 + k, y - 3, 1, 3); px(g, INK, bx - 1, y - 3, 14, 1); px(g, '#5a3a2a', bx + 2, y - 3, 3, 2); px(g, '#3f8a4a', bx + 2, y - 5, 3, 2); px(g, '#5a3a2a', bx + 9, y - 3, 3, 2); px(g, '#4f9a4a', bx + 9, y - 6, 3, 3); }
+            // a cable to the next building, with laundry or little lights
+            { const cy = o.top + 10 + (o.seed % 3) * 6; for (let k = 0; k < 64; k++) px(g, '#4a4466', sx + o.wd + k - 8, cy + Math.round(Math.sin((k / 64) * Math.PI) * 5), 1, 1);
+              for (let k = 4; k < 56; k += 8) { const yy = cy + Math.round(Math.sin(((k + 2) / 64) * Math.PI) * 5); if (o.seed % 2) { px(g, ['#c8483a', '#3a6ac8', '#e8e0d0', '#d8b43a'][k % 4], sx + o.wd + k - 8, yy + 1, 4, 5); } else { const on = (Math.floor(env.cyc * 4) + k) % 3 === 0; px(g, on ? d.c : shade(d.c, -0.5), sx + o.wd + k - 8, yy + 1, 1, 1); if (on) px(gl, d.c, sx + o.wd + k - 9, yy, 3, 3); } } }
             // air units and a pipe
             box(g, sx + 2, o.top + 18, 7, 5, '#5a5a6e', { line: INK }); px(g, '#3a3a4a', sx + 3, o.top + 20, 5, 1);
             px(g, '#3a3448', sx + o.wd - 3, o.top + 4, 2, base - o.top - 6); px(g, shade('#3a3448', 0.3), sx + o.wd - 3, o.top + 4, 1, base - o.top - 6);
@@ -339,6 +354,14 @@ export function neonCityConcept() {
       px(g, mix(d.a, '#ffffff', 0.3), 0, DECK, env.w, 1); px(gl, d.a, 0, DECK, env.w, 1); gl.globalAlpha = 0.3 + bass * 0.5; px(gl, d.a, 0, DECK + 1, env.w, 2); gl.globalAlpha = 1;
       for (let x = -(env.cam % 32); x < env.w; x += 32) { px(g, '#5a5670', x, DECK + 16, 16, 1); px(g, '#3a3650', x, DECK + 17, 16, 1); }
       for (let x = -(env.cam % 9); x < env.w; x += 9) px(g, '#1c1a2c', x, DECK + 30, 4, 1);
+      // steam rising from vents in the parapet
+      for (let k = Math.floor(env.cam / 150) - 1; k <= Math.floor((env.cam + env.w) / 150); k++) {
+        if (rng('vent', k) > 0.4) continue;
+        const vx = Math.round(k * 150 + rng('vx', k) * 100 - env.cam);
+        px(g, '#0a0812', vx, top + P - 4, 8, 3);
+        for (let p = 0; p < 6; p++) { const a = (env.cyc * 0.5 + p / 6 + rng('vp', k)) % 1; g.globalAlpha = 0.25 * (1 - a); disc(g, vx + 4 + Math.sin(a * 6 + p) * 3, top + P - 6 - a * 40, 2 + Math.round(a * 6), '#b8b0d0'); }
+        g.globalAlpha = 1;
+      }
       // the city mirrored on the wet deck: streaks of the neon colours, broken by the lanes
       if (d.rain > 0.15) for (let x = 0; x < env.w; x += 2) { const k = Math.floor((x + env.cam * 0.55) / 2); if (rng('rf', k) < 0.22) { const c = rng('rc', k) < 0.5 ? d.a : rng('rc2', k) < 0.5 ? d.b : '#ffcf7a', len = 3 + Math.floor(rng('rl', k) * 14); gl.globalAlpha = 0.12 * d.rain + 0.05; px(gl, c, x, DECK + 3, 1, len); gl.globalAlpha = 1; } }
     },
