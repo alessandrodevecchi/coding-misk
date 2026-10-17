@@ -1,6 +1,8 @@
 import { INSTRUMENTS } from './music.js';
 import { createCaravan } from './visuals/caravan.js';
 import { createNeonCity } from './visuals/neon-city.js';
+import { createCaravan as createCaravanV1 } from './visuals/v1/caravan.js';
+import { createNeonCity as createNeonCityV1 } from './visuals/v1/neon-city.js';
 
 // Visual su canvas sincronizzati con l'audio.
 // Ogni strumento suona su un analizzatore separato (.analyze("kick"), .analyze("bass"), …):
@@ -199,6 +201,9 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const SCENE_DRAW = {
     carovana: scroll('carovana', createCaravan),
     neon: scroll('neon', createNeonCity),
+    // earlier versions, kept to compare
+    'carovana-v1': scroll('carovana-v1', createCaravanV1),
+    'neon-v1': scroll('neon-v1', createNeonCityV1),
     tramonto(pal, cyc, dt) {
       const hz = H * .6, sunR = Math.min(W, H) * .3 * (1 + kick * .05);
       sky(pal, hz);
