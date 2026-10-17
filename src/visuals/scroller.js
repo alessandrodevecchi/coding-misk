@@ -10,7 +10,8 @@
 // layers: [{ parallax, chunk, gen(i, rnd, env) → [{ x, span, z, …}], before?, draw(g, o, sx, env), after?, glow?, haze?, front?, blur? }],
 // sky(g, env), ground(g, env), actors(g, env), after?(g, env), fog?(env) → colour, dayBars, dayStart, seed, post? }.
 // env: { cyc, cam, w, h, day (0..1), light (0 night, 1 noon), night, beat, lv, kick, glow (the light buffer's context),
-// zone(worldX), centerZone, zoneAt(layerX, parallax), rnd }.
+// zone(worldX), centerZone, zoneAt(layerX, parallax), rnd, picture and lights (the frame and its light buffer as drawn
+// so far, for reflections) }.
 
 // a 32-bit hash of numbers and strings; rng(…keys): a random number in [0, 1) for those keys
 export function hash(...keys) {
@@ -122,6 +123,8 @@ export function createScroller(concept, { w = 384, h = 216 } = {}) {
     const env = {
       cyc, cam, w, h, day, light, night: 1 - light, beat: ((cyc * 4) % 1 + 1) % 1, lv: f.lv || {}, kick: f.kick || 0, playing: !!f.playing,
       zone: zoneOf, centerZone: zoneOf(cam + w / 2), rnd: rng, zones: concept.zones, glow: gl,
+      // the picture and its lights as drawn so far (for reflections)
+      picture: buf, lights: glowBuf,
       // the zone a thing of a layer belongs to: the zone at the middle of the screen when it is in the middle
       zoneAt: (u, p) => zoneOf((u - w / 2) / (p || 1) + w / 2),
     };

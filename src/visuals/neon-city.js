@@ -11,6 +11,7 @@ import { facade, sign, tower, skyline, txt, FLOOR } from './neon/buildings.js';
 import { person, dancer, DANCE } from './neon/people.js';
 import { van, crewOf, VAN_W } from './neon/van.js';
 import { landmark, LANDMARKS } from './neon/landmarks.js';
+import { vehicle, passing } from './neon/traffic.js';
 
 const W = 384, H = 216, WALK = 170, ROAD = 176;
 export const DISTRICTS = {
@@ -56,17 +57,24 @@ export function neonCityConcept() {
         for (let k = 0; k < 4; k++) { const c = mix(mid, k < 2 ? top : hor, k < 2 ? 0.3 - k * 0.1 : (k - 1) * 0.25); g.globalAlpha = 0.7; px(g, c, cx + k * 4, cy + k * 2, wd - k * 8, 2); }
         g.globalAlpha = 0.5; px(g, mix(hor, d.a, 0.35), cx + 12, cy + 8, wd - 24, 1); g.globalAlpha = 1;
       }
+
+      // a blimp with a screen, drifting high
+      { const bx = Math.round(((env.cyc * 2.5 - env.cam * 0.04) % (env.w + 200) + env.w + 200) % (env.w + 200) - 100), by = 22;
+        px(g, '#07040f', bx - 1, by - 3, 74, 22); px(g, '#1c1a30', bx, by - 2, 72, 20); px(g, '#2c2a46', bx + 4, by - 2, 64, 2); px(g, '#141224', bx, by + 14, 72, 4);
+        px(g, '#07040f', bx + 66, by - 8, 8, 30); px(g, '#1c1a30', bx + 67, by - 7, 6, 28); px(g, '#141224', bx + 26, by + 18, 20, 5);
+        billboard(g, gl, bx + 10, by + 1, 50, 12, Math.floor(env.cyc / 16) % 3, d, env, 77, false);
+        px(g, env.beat < 0.25 ? '#ff2f3f' : '#4a1018', bx + 2, by + 6, 2, 2); if (env.beat < 0.25) px(gl, '#ff2f3f', bx + 1, by + 5, 4, 4); }
     },
     layers: [
       // the far skyline: strips of towers with specks of windows
       {
-        parallax: 0.12, chunk: 200, haze: 0.42,
+        parallax: 0.12, chunk: 200, haze: 0.52,
         gen(i, r, env) { const z = env.zoneAt(i * 200 + 100, 0.12).id; return [{ x: i * 200, seed: r.int(0, 1e6), z: 0, span: 200, d: z }]; },
         draw(g, o, sx, env) { const b = skyline({ seed: o.seed, d: dOf(o.d), dk: o.d, w: 204 }); put(g, env.glow, b, sx, WALK - 8 - b.h); },
       },
       // towers of the middle distance, the flying traffic in front of them
       {
-        parallax: 0.3, chunk: 80, haze: 0.24,
+        parallax: 0.3, chunk: 80, haze: 0.32,
         gen(i, r, env) { const z = env.zoneAt(i * 80 + 40, 0.3).id, out = [{ x: i * 80 + r.int(0, 30), seed: r.int(0, 1e6), wd: r.int(24, 44), ht: r.chance(0.2) ? r.int(110, 150) : r.int(60, 100), z: r(), span: 50, d: z }]; if (r.chance(0.3)) out.push({ x: i * 80 + r.int(40, 64), seed: r.int(0, 1e6), wd: r.int(18, 28), ht: r.int(60, 100), z: r() + 1, span: 40, d: z }); return out; },
         draw(g, o, sx, env) { const b = tower({ seed: o.seed, d: dOf(o.d), dk: o.d, wd: o.wd, ht: o.ht }); put(g, env.glow, b, sx, WALK + 4 - b.h); if (env.beat < 0.2 && o.seed % 3 === 0) px(env.glow, '#ff2f3f', sx + Math.floor(o.wd / 2), WALK + 4 - b.h + 1, 2, 2); },
         after(g, env) {
@@ -140,7 +148,7 @@ export function neonCityConcept() {
       // in front of everything, out of focus: tall street lamps, hanging cables with little lights, a sign post
       {
         parallax: 1.5, chunk: 260, front: true, blur: 1.2,
-        gen(i, r) { const out = []; if (r.chance(0.7)) out.push({ x: i * 260 + r.int(0, 120), kind: r.chance(0.7) ? 'lamp' : 'post', seed: r.int(0, 1e6), span: 70 }); if (r.chance(0.5)) out.push({ x: i * 260 + r.int(0, 200), kind: 'cable', seed: r.int(0, 1e6), span: 200 }); return out; },
+        gen(i, r) { const out = []; if (r.chance(0.7)) out.push({ x: i * 260 + r.int(0, 120), kind: 'lamp', seed: r.int(0, 1e6), span: 70 }); if (r.chance(0.5)) out.push({ x: i * 260 + r.int(0, 200), kind: 'cable', seed: r.int(0, 1e6), span: 200 }); return out; },
         draw(g, o, sx, env) {
           const gl = env.glow, d = DISTRICTS[env.centerZone.id];
           if (o.kind === 'lamp') {
@@ -164,6 +172,29 @@ export function neonCityConcept() {
       for (let y = ROAD + 2; y < H; y++) for (let x = -(env.cam % 6); x < env.w; x += 6) if (noise(Math.floor((x + env.cam) / 6), y, 5) < 0.08) px(g, '#26222e', x, y, 1, 1);
       if (d.rain > 0.1) for (let x = 0; x < env.w; x += 2) { const k = Math.floor((x + env.cam * 0.8) / 2); if (rng('rf', k) < 0.25) { const c = rng('rc', k) < 0.5 ? d.a : rng('rc2', k) < 0.5 ? d.b : '#ffcf7a', len = 4 + Math.floor(rng('rl', k) * 16); gl.globalAlpha = 0.1 * d.rain + 0.05; px(gl, c, x, ROAD + 2, 1, len); gl.globalAlpha = 1; } }
       gl.globalAlpha = 0.12 + bass * 0.2; px(gl, d.a, 0, ROAD, env.w, 1); gl.globalAlpha = 1;
+      // the wet road mirrors the street: the pavement, the shops and their lights, upside down and rippling
+      const wet = 0.12 + d.rain * 0.3;
+      for (let y = 0; y < H - ROAD; y += 2) {
+        const sy = ROAD - 1 - y, dx = Math.round(Math.sin(env.cyc * 3 + y * 0.7) * (1 + y / 14));
+        g.globalAlpha = wet * (1 - y / (H - ROAD)); g.drawImage(env.picture, 0, sy - 1, env.w, 2, dx, ROAD + y, env.w, 2);
+        gl.globalAlpha = (wet + 0.15) * (1 - y / (H - ROAD)); gl.drawImage(env.lights, 0, sy - 1, env.w, 2, dx, ROAD + y, env.w, 2);
+      }
+      g.globalAlpha = 1; gl.globalAlpha = 1;
+      // a zebra crossing now and then, manholes that steam, puddles that mirror the neon
+      for (let k = Math.floor(env.cam / 600) - 1; k <= Math.floor((env.cam + env.w) / 600) + 1; k++) {
+        const r = n => rng('road', k, n), x0 = Math.round(k * 600 + r(1) * 300 - env.cam);
+        if (r(2) < 0.4) for (let s = 0; s < 7; s++) { const yy = ROAD + 2 + s * 5; px(g, '#6a6678', x0 + s * 2, yy, 34, 3); px(g, '#8a8698', x0 + s * 2, yy, 34, 1); }
+        const mx = Math.round(k * 600 + 120 + r(3) * 300 - env.cam), my = ROAD + 22;
+        for (let yy = -2; yy <= 2; yy++) px(g, yy === -2 || yy === 2 ? '#0a0810' : '#2a2634', mx - 9 + Math.abs(yy), my + yy, 18 - Math.abs(yy) * 2, 1);
+        for (let k2 = -6; k2 <= 6; k2 += 3) px(g, '#3a3644', mx + k2, my, 1, 1);
+        for (let p = 0; p < 5; p++) { const a = (env.cyc * 0.6 + p / 5 + r(4)) % 1; g.globalAlpha = 0.22 * (1 - a); disc(g, mx + Math.sin(a * 6 + p) * 3, my - 2 - a * 34, 2 + Math.round(a * 7), '#b8b0d0'); }
+        g.globalAlpha = 1;
+        const qx = Math.round(k * 600 + 380 + r(5) * 160 - env.cam), qw = 30 + Math.floor(r(6) * 40);
+        if (d.rain > 0.1) { px(g, '#0a0812', qx, ROAD + 28, qw, 4); for (let x = 0; x < qw; x += 2) { const c = rng('pc', k, x) < 0.5 ? d.a : d.b; gl.globalAlpha = 0.3; px(gl, c, qx + x, ROAD + 28 + (x % 4 ? 1 : 2), 1, 1); } gl.globalAlpha = 1; px(g, '#3a3650', qx + 2, ROAD + 28, qw - 4, 1); }
+      }
+      // a vehicle coming the other way in the far lane
+      const v = passing(env.cyc, rng);
+      if (v) { const b = vehicle(v.model, v.col), x = Math.round(env.w + 20 - v.t * (env.w + b.w + 60)); put(g, gl, b, x, ROAD + 16 - b.h + 4); gl.globalAlpha = 0.1; for (let k = 0; k < 60; k++) px(gl, '#fff6d0', x - k, ROAD + 16 - 12 - k / 8, 1, 2 + k / 3); gl.globalAlpha = 1; }
     },
     actors(g, env) { van(g, env.glow, Math.round(env.w / 2) - Math.round(VAN_W / 2) - 10, 208, env, DISTRICTS[env.centerZone.id], crew); },
     after(g, env) {
@@ -194,10 +225,10 @@ function umbrella(g, gl, x, y, c) {
   px(g, '#2a2438', x, y, 1, 14);
 }
 // a billboard screen on a rooftop frame: the levels of the music, a pulsing heart, a scrolling word, a face
-function billboard(g, gl, x, y, wd, ht, kind, d, env, seed) {
+function billboard(g, gl, x, y, wd, ht, kind, d, env, seed, legs = true) {
   const lv = env.lv, glitch = (lv.snare || 0) > 0.5 && rng('gl', seed, Math.floor(env.cyc * 16)) < 0.5;
   // the frame and its legs
-  px(g, '#07040f', x + 6, y + ht, 3, 34); px(g, '#07040f', x + wd - 9, y + ht, 3, 34); for (let k = 0; k < 30; k += 6) px(g, '#1a1626', x + 6, y + ht + k, wd - 12, 1);
+  if (legs) { px(g, '#07040f', x + 6, y + ht, 3, 34); px(g, '#07040f', x + wd - 9, y + ht, 3, 34); for (let k = 0; k < 30; k += 6) px(g, '#1a1626', x + 6, y + ht + k, wd - 12, 1); }
   px(g, '#07040f', x - 3, y - 3, wd + 6, ht + 6); px(g, '#2a2438', x - 2, y - 2, wd + 4, ht + 4); px(g, '#05030c', x, y, wd, ht);
   const draw = (c, a, ...r) => { px(g, c, ...r); gl.globalAlpha = a; px(gl, c, ...r); gl.globalAlpha = 1; };
   if (kind === 0) ['kick', 'snare', 'hats', 'bass', 'hook', 'arp', 'pad', 'fx'].forEach((k, i) => { const v = Math.min(1, lv[k] || 0), bh = Math.round(v * (ht - 4)), bw = Math.max(1, Math.floor((wd - 4) / 8) - 1), bx = x + 2 + Math.floor(i * (wd - 4) / 8); for (let yy = 0; yy < bh; yy += 2) draw(yy > ht * 0.6 ? d.c : yy > ht * 0.3 ? d.b : d.a, 0.8, bx, y + ht - 2 - yy, bw, 1); });
