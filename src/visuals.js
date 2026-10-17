@@ -1,4 +1,6 @@
 import { INSTRUMENTS } from './music.js';
+import { createCaravan } from './visuals/caravan.js';
+import { createNeonCity } from './visuals/neon-city.js';
 
 // Visual su canvas sincronizzati con l'audio.
 // Ogni strumento suona su un analizzatore separato (.analyze("kick"), .analyze("bass"), …):
@@ -191,7 +193,12 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     }
   }
 
+  // endless scrolling scenes (procedural-visuals): made the first time they are shown
+  const scrollers = {};
+  const scroll = (key, make) => (pal, cyc, dt, playing) => { scrollers[key] = scrollers[key] || make(); scrollers[key].draw(cx, W, H, { cyc, lv, kick, playing }); };
   const SCENE_DRAW = {
+    carovana: scroll('carovana', createCaravan),
+    neon: scroll('neon', createNeonCity),
     tramonto(pal, cyc, dt) {
       const hz = H * .6, sunR = Math.min(W, H) * .3 * (1 + kick * .05);
       sky(pal, hz);
