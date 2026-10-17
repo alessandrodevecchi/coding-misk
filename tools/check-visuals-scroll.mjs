@@ -4,8 +4,10 @@
 import { createHash } from 'node:crypto';
 
 // a canvas that records what is drawn
+// (every canvas writes to one log: the engine draws parts apart and lays them on the picture)
+const LOG = [];
 class Rec {
-  constructor(w, h) { this.width = w; this.height = h; this.log = []; const self = this; this.ctx = new Proxy({ log: this.log }, { get(t, k) { if (k in t) return t[k]; return (...a) => { self.log.push(`${String(k)}(${a.map(v => (typeof v === 'object' ? 'img' : typeof v === 'number' ? Math.round(v * 100) / 100 : v)).join(',')})`); }; }, set(t, k, v) { self.log.push(`${String(k)}=${v}`); return true; } }); }
+  constructor(w, h) { this.width = w; this.height = h; this.log = LOG; const self = this; this.ctx = new Proxy({ log: LOG }, { get(t, k) { if (k in t) return t[k]; return (...a) => { self.log.push(`${String(k)}(${a.map(v => (typeof v === 'object' ? 'img' : typeof v === 'number' ? Math.round(v * 100) / 100 : v)).join(',')})`); }; }, set(t, k, v) { self.log.push(`${String(k)}=${v}`); return true; } }); }
   getContext() { return this.ctx; }
 }
 globalThis.OffscreenCanvas = Rec;
@@ -13,7 +15,8 @@ const { createCaravan, personFrom } = await import('../src/visuals/caravan.js');
 const { createNeonCity } = await import('../src/visuals/neon-city.js');
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
-const frame = (sc, cyc, lv = { kick: 0.7, bass: 0.5, hats: 0.4 }) => { const c = sc.canvas; c.log.length = 0; sc.render({ cyc, lv, kick: 0.5, playing: true }); return createHash('sha1').update(c.log.join(';')).digest('hex'); };
+// (rendered twice: the first render of a moment can fill caches, like the sky of that hour)
+const frame = (sc, cyc, lv = { kick: 0.7, bass: 0.5, hats: 0.4 }) => { const c = sc.canvas; sc.render({ cyc, lv, kick: 0.5, playing: true }); c.log.length = 0; sc.render({ cyc, lv, kick: 0.5, playing: true }); return createHash('sha1').update(c.log.join(';')).digest('hex'); };
 const CHECKS = {
   'the same bar draws the same frame, in a new scroller too'() {
     for (const make of [createCaravan, createNeonCity]) {
