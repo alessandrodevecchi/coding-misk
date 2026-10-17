@@ -1,0 +1,122 @@
+{
+ "format": "coding-misk/song",
+ "version": 2,
+ "id": "prova-solo-synth",
+ "title": "Solo synth",
+ "created": "2026-10-17",
+ "appVersion": "0.6.0",
+ "profile": "switch",
+ "buildStyle": "crescendo",
+ "normal": "waypoints",
+ "look": "palco",
+ "style": {
+  "en": "Prova · pad e melodia, niente batteria · 110 BPM",
+  "it": "Prova · pad e melodia, niente batteria · 110 BPM"
+ },
+ "tags": {
+  "styles": [
+   "switch-trance-pure"
+  ]
+ },
+ "sections": [
+  {
+   "name": "A",
+   "bars": 16,
+   "bpm": 110,
+   "key": "C",
+   "chords": "pendolo",
+   "meter": "4/4"
+  },
+  {
+   "name": "B",
+   "bars": 48,
+   "bpm": 110,
+   "key": "C",
+   "chords": "pendolo",
+   "meter": "4/4"
+  }
+ ],
+ "tracks": [
+  {
+   "id": "pad",
+   "name": "Pad",
+   "type": "pad",
+   "settings": {
+    "wave": "gm_epiano1",
+    "gain": 0.28,
+    "cutoff": 2316,
+    "move": "lento",
+    "room": 0.85,
+    "drive": 0
+   },
+   "patterns": {
+    "A": {
+     "preset": "stab"
+    },
+    "B": {
+     "preset": "staccato"
+    }
+   },
+   "clips": [
+    {
+     "start": 0,
+     "bars": 64,
+     "pattern": "A"
+    }
+   ]
+  },
+  {
+   "id": "hook",
+   "name": "Lead",
+   "type": "hook",
+   "settings": {
+    "wave": "supersaw",
+    "gain": 0.3,
+    "cutoff": 3000,
+    "move": "fisso",
+    "delay": 0.63,
+    "mode": "minor",
+    "fm": 0,
+    "vowel": "",
+    "grit": 0,
+    "drive": 0,
+    "harmony": "",
+    "octave": "4"
+   },
+   "patterns": {
+    "A": {
+     "preset": "segnale"
+    },
+    "B": {
+     "preset": "segnale",
+     "notes": "<[~ ~ ~ 14 ~ ~ ~ ~] [~ ~ ~ ~ ~ 20 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>"
+    }
+   },
+   "clips": [
+    {
+     "start": 8,
+     "bars": 56,
+     "pattern": "A"
+    }
+   ]
+  },
+  {
+   "id": "voice",
+   "name": "Voice",
+   "type": "voice",
+   "settings": {
+    "gain": 0.3,
+    "pitch": 1.05,
+    "tempo": 1.01,
+    "cutoff": 18000,
+    "hpf": 400,
+    "drive": 0,
+    "room": 0.79,
+    "delay": 0.46,
+    "speaker": "flo"
+   },
+   "patterns": {},
+   "clips": []
+  }
+ ]
+}

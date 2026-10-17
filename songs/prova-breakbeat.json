@@ -1,0 +1,132 @@
+{
+ "format": "coding-misk/song",
+ "version": 2,
+ "id": "prova-breakbeat",
+ "title": "Breakbeat",
+ "created": "2026-10-17",
+ "appVersion": "0.6.0",
+ "profile": "switch",
+ "buildStyle": "crescendo",
+ "normal": "waypoints",
+ "look": "palco",
+ "style": {
+  "en": "Prova · breakbeat 808 · 96 BPM",
+  "it": "Prova · breakbeat 808 · 96 BPM"
+ },
+ "tags": {
+  "styles": [
+   "switch-trance-pure"
+  ]
+ },
+ "sections": [
+  {
+   "name": "A",
+   "bars": 32,
+   "bpm": 96,
+   "key": "D",
+   "chords": "pendolo",
+   "meter": "4/4"
+  },
+  {
+   "name": "B",
+   "bars": 64,
+   "bpm": 96,
+   "key": "D",
+   "chords": "pendolo",
+   "meter": "4/4"
+  }
+ ],
+ "tracks": [
+  {
+   "id": "kick",
+   "name": "Kick",
+   "type": "drums",
+   "settings": {
+    "kit": "RolandTR808",
+    "gain": 0.85,
+    "cutoff": 20000,
+    "drive": 0.1,
+    "grit": 0
+   },
+   "patterns": {
+    "A": {
+     "rows": {
+      "bd": "x.....x...x.....",
+      "sd": "....x.......x...",
+      "hh": "x.x.x.x.x.x.x.x."
+     }
+    }
+   },
+   "clips": [
+    {
+     "start": 0,
+     "bars": 96,
+     "pattern": "A"
+    }
+   ]
+  },
+  {
+   "id": "bass",
+   "name": "Bass",
+   "type": "bass",
+   "settings": {
+    "wave": "square",
+    "gain": 0.8,
+    "cutoff": 754,
+    "move": "lento",
+    "reso": 7.45,
+    "drive": 0
+   },
+   "patterns": {
+    "A": {
+     "preset": "walking"
+    },
+    "B": {
+     "preset": "pumping"
+    }
+   },
+   "clips": [
+    {
+     "start": 0,
+     "bars": 96,
+     "pattern": "A"
+    }
+   ]
+  },
+  {
+   "id": "hook",
+   "name": "Lead",
+   "type": "hook",
+   "settings": {
+    "wave": "supersaw",
+    "gain": 0.3,
+    "cutoff": 3000,
+    "move": "fisso",
+    "delay": 0.63,
+    "mode": "minor",
+    "fm": 0,
+    "vowel": "",
+    "grit": 0,
+    "drive": 0,
+    "harmony": "",
+    "octave": "4"
+   },
+   "patterns": {
+    "A": {
+     "preset": "segnale"
+    },
+    "B": {
+     "preset": "segnale",
+     "notes": "<[~ ~ ~ 14 ~ ~ ~ ~] [~ ~ ~ ~ ~ 20 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>"
+    }
+   },
+   "clips": [
+    {
+     "start": 16,
+     "bars": 80,
+     "pattern": "A"
+    }
+   ]
+  }
+ ]
+}
