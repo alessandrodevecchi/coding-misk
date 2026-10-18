@@ -65,5 +65,7 @@ Until `radio-profiles` lands, the radio builds in blocks: a vary is one step. Wh
 
 ## Open Questions
 
+- **How much "varied patterns" varies** (owner's idea, 2026-10-18). Recommended: the existing complexity knob (0 to 1) sets the amount of variation when the source is "varied patterns": 0 keeps the patterns as written, 1 changes rhythm or pitches. No new knob; the label in the setup says what complexity does with that source.
+
 - **Vary the drums too?** Recommended: not in this change; add it after the listening test, when `material-generator` grooves have been heard.
 - **Does a varied part come back to its old notes later?** Recommended: no; the new part stays until another Vary or the song's end, like a live coder who rewrote a line.

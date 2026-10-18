@@ -36,7 +36,7 @@ export function levelsFrom(onsets) {
 // the code shown at cycle c: the segment's code, typed towards the next step during the bar before it (as live)
 // seconds(c): seconds at cycle c; with it the typing is a person's (live-typing), as in the app
 // style 'human' (human-typing): a listening pause after the step, then the typing at a person's pace, as in the app
-export function codeFrom(segments, { seconds = null, speed = 1, style = 'exact', seed = '' } = {}) {
+export function codeFrom(segments, { seconds = null, speed = 1, style = 'exact', seed = '', mistakes = true } = {}) {
   const cache = new Map();
   return function codeAt(c) {
     let i = 0; while (i + 1 < segments.length && segments[i + 1].from <= c) i++;
@@ -45,7 +45,7 @@ export function codeFrom(segments, { seconds = null, speed = 1, style = 'exact',
       if (!cache.has(i)) {
         const end = seconds(next.from) - 0.2, from0 = seconds(seg.from + 0.5), to = next.code, human = style === 'human';
         const avail = Math.max(0.2, end - from0), listenMin = human ? Math.min(avail * 0.5, 2) : 0;
-        const plan = typingPlan(settleOthers(seg.code, to, next.from), to, { speed, max: Math.max(0.2, avail - listenMin), style, seed });
+        const plan = typingPlan(settleOthers(seg.code, to, next.from), to, { speed, max: Math.max(0.2, avail - listenMin), style, seed, mistakes, stretch: Math.floor(next.from / 16) });
         const listen = human ? Math.max(listenMin, Math.min(avail * 0.2, avail - plan.total)) : 0;
         cache.set(i, { plan, start: Math.max(from0 + listen, end - plan.total) });
       }

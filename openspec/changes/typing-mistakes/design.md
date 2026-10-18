@@ -44,11 +44,11 @@ Alternative: paste only lines longer than the panel. Rejected: the panel width i
 
 ### D4. Fitting in the time
 
-`humanPlan` tries plans in this order and keeps the first that fits in `max`: full (D1, D2, D3), without whole wrong words and paste pauses, lean (as today), then lean scaled (as today). Each plan draws from its own seeded stream, as `full` and `lean` do now.
+`humanPlan` tries plans in this order and keeps the first that fits in `max`: full (D1, D2, D3), without whole wrong words, without thinking pauses (typos and changes of mind stay), lean (as today), then lean scaled (as today). Each plan draws from its own seeded stream, as `full` and `lean` do now.
 
 ### D6. A rate that changes
 
-The typo rate is not fixed. The text of a live build is split into stretches of about 20 to 60 seconds of typing; each stretch draws its rate from a range, about one typo every 25 to 120 characters, with a slight bias to careful stretches. Several mistakes may come close together in a hurried stretch; a careful stretch may have none. Changes of mind follow the same stretch (more in hurried ones). The draw uses the song seed and the stretch index, so it is repeatable.
+The typo rate is not fixed. The text of a live build is split into stretches of about 20 to 60 seconds of typing; each stretch draws its rate from a range, about one typo every 25 to 120 characters, with a slight bias to careful stretches. Several mistakes may come close together in a hurried stretch; a careful stretch may have none. Most edits change a few characters (a number), so an edit shorter than 20 characters has the typo chance of a 20-character one, and the start of an edit counts as the start of a number for changes of mind. Measured on three Switch songs: 9 to 10 mistakes per song (about one a minute of growth), each on screen 1.2 to 1.9 seconds on average. Changes of mind follow the same stretch (more in hurried ones). The draw uses the song seed and the stretch index, so it is repeatable.
 
 ### D7. Mistakes switch
 

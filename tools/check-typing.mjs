@@ -3,7 +3,7 @@
 // (typing-lines): only alike lines are edited in place, copy and change, line breaks, insertions in a chain. No browser.
 //   npm run check:typing      exit 1 when any check fails
 import fs from 'node:fs';
-import { typingPlan, TYPING_SPEEDS, settleOthers, breakLines, lineLike } from '../src/song/typing.js';
+import { typingPlan, TYPING_SPEEDS, settleOthers, breakLines, lineLike, stretchRate } from '../src/song/typing.js';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
@@ -90,7 +90,9 @@ const CHECKS = {
   },
   'human typing: same seed same plan, exact text in time, typos and pauses on the way'() {
     const a = '$: s("bd").gain(0.8)', line = '$: n("<[0 ~ 0 2 ~ 4 ~ 7] [5 ~ 4 ~ 2 ~ 0 ~] [4 ~ 4 5 ~ 7 ~ 9] [7 ~ 5 ~ 4 2 ~ ~]>").scale("F4:minor").mask("<0!224 1 0!239>")', b = `${a}\n${line}`;
-    const p = typingPlan(a, b, { style: 'human', seed: 's' }), q = typingPlan(a, b, { style: 'human', seed: 's' }), e = typingPlan(a, b);
+    // (a long new line is sometimes pasted whole: take a seed where it is typed)
+    const typedSeed = ['s', 't', 'u', 'v', 'w'].find(sd => typingPlan(a, b, { style: 'human', seed: sd }).total > 2);
+    const p = typingPlan(a, b, { style: 'human', seed: typedSeed }), q = typingPlan(a, b, { style: 'human', seed: typedSeed }), e = typingPlan(a, b);
     assert(p.total === q.total && frames(p, 300).join() === frames(q, 300).join(), 'same seed');
     assert(p.frame(p.total) === b && p.total > e.total * 2, `exact at the end, slower: ${p.total.toFixed(1)} s against ${e.total.toFixed(1)} s`);
     // typos: frames whose new line is not a start of the final line; pauses: the text stays the same for a second or more
@@ -101,8 +103,37 @@ const CHECKS = {
       for (let t = 0; t < h.total; t += 0.05) { const f = (h.frame(t).split('\n')[1] || ''); if (!line.startsWith(f)) typos++; if (f === last) { since += 0.05; if (Math.abs(since - 1) < 0.026) pauses++; } else since = 0; last = f; }
     }
     assert(typos > 0 && pauses > 0, `typos ${typos}, pauses ${pauses}`);
-    const short = typingPlan(a, b, { style: 'human', seed: 's', max: 5 });
+    const short = typingPlan(a, b, { style: 'human', seed: typedSeed, max: 5 });
     assert(Math.abs(short.total - 5) < 1e-6 && short.frame(5) === b, 'deadline');
+  },
+  'typing mistakes: seen for a while, a wrong word, a pasted line, careful and hurried stretches, switch off'() {
+    const a = '$: s("bd").gain(0.8)', line = '$: n("<[0 ~ 0 2 ~ 4 ~ 7] [5 ~ 4 ~ 2 ~ 0 ~]>").scale("g:minor").s("supersaw").lpf(800).room(0.3)', b = `${a}\n${line}`;
+    // over many seeds: typos stay at least a second, a whole wrong word appears, some lines are pasted whole
+    let longTypo = 0, wrongWord = 0, pasted = 0, typed = 0;
+    for (let k = 0; k < 24; k++) {
+      const h = typingPlan(a, b, { style: 'human', seed: `m${k}` });
+      assert(h.frame(h.total) === b, `exact at the end (seed m${k})`);
+      const fr = []; for (let t = 0; t <= h.total; t += 0.05) fr.push(h.frame(t).split('\n')[1] || '');
+      if (fr.some(f => f === line) && fr.filter(f => f && f !== line).length === 0) { pasted++; continue; }
+      typed++;
+      let off = 0; for (const f of fr) { if (f && !line.startsWith(f)) { off += 0.05; if (off >= 1) longTypo++; } else off = 0; }
+      if (fr.some(f => /\.s\("(?!s)[a-z]{3,}/.test(f) || /scale\("(?!g)[a-z]/.test(f))) wrongWord++;
+    }
+    assert(pasted > 0 && pasted < 24 && typed > 0, `pasted ${pasted} of 24`);
+    assert(longTypo > 0, 'a typo stays on screen for a second or more');
+    assert(wrongWord > 0, 'a whole wrong word appears sometimes');
+    // stretches: the rate is drawn per stretch, the same for the same song
+    const rates = [0, 1, 2, 3, 4, 5].map(k => stretchRate('song', k).typo);
+    assert(new Set(rates.map(r => r.toFixed(4))).size > 2 && rates.every(r => r <= 1 / 25 + 1e-9 && r >= 1 / 120 - 1e-9), `rates ${rates.map(r => Math.round(1 / r))}`);
+    assert(stretchRate('song', 3).typo === stretchRate('song', 3).typo, 'same stretch same rate');
+    // switch off: a person's pace, no mistakes
+    for (let k = 0; k < 12; k++) {
+      const h = typingPlan(a, b, { style: 'human', seed: `m${k}`, mistakes: false });
+      for (let t = 0; t <= h.total; t += 0.05) { const f = h.frame(t).split('\n')[1] || ''; assert(!f || line.startsWith(f), `mistake with the switch off: ${f}`); }
+    }
+    // short time: mistakes go first and the edit still ends exact on time
+    const short = typingPlan(a, b, { style: 'human', seed: 'm1', max: 3 });
+    assert(Math.abs(short.total - 3) < 1e-6 || short.total < 3, 'deadline'); assert(short.frame(3) === b, 'exact at the deadline');
   },
   'an insertion at the start of a chain is typed there'() {
     const a = '$: s("supersaw").gain(0.3)', b = '$: n("0").scale("g:minor").s("supersaw").gain(0.3)', p = typingPlan(a, b);

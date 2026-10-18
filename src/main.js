@@ -294,16 +294,21 @@ const typingSpeed = () => TYPING_SPEEDS[store.get('coding-misk-typing', null) ||
 // typing at a person's speed, faster when it does not fit
 // human (human-typing, a step of the live build in the Switch profile): first a listening pause, then the typing at a
 // person's pace ends at the step; when time is short the pause shrinks first
-function makeTyping(text, to, from0, end, cps, human = false) {
+function makeTyping(text, to, from0, end, cps, human = false, stretch = null) {
   const avail = Math.max(.2, (end - from0) / cps), listenMin = human ? Math.min(avail * .5, 2) : 0;
-  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '' });
+  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch });
   const listen = human ? Math.max(listenMin, Math.min(avail * .2, avail - plan.total)) : 0;
   return { plan, start: Math.max(from0 + listen * cps, end - plan.total * cps), cps, shown: '' };
 }
 const typingHuman = () => !!(song && song.ctl && song.ctl.typist === 'human');
+// typing mistakes on (typing-mistakes); a stretch of typing is 16 bars, so app and video draw the same mistake rate
+const typingMistakes = () => !(song && song.ctl && song.ctl.mistakes === 'off');
+const stretchOf = bar => Math.floor(bar / 16);
 function typeFrame(T, cyc) {
   if (cyc < T.start) return;
-  const txt = T.plan.frame((cyc - T.start) / T.cps);
+  const at = (cyc - T.start) / T.cps, txt = T.plan.frame(at);
+  // for browser checks (typing-mistakes): whether a mistake is on screen now
+  globalThis.codingMiskTyping = { mistake: !!(T.plan.stats && T.plan.stats.wrong.some(([a, b]) => at >= a && at < b)), stats: T.plan.stats ? { mode: T.plan.stats.mode, typos: T.plan.stats.typos, minds: T.plan.stats.minds, words: T.plan.stats.words } : null };
   if (txt !== T.shown) { const prev = T.shown || ed.code || ''; T.shown = txt; ed.setCode(txt); followEdit(prev, txt); }
 }
 function liveBuild(sg, s, cyc) {
@@ -315,7 +320,7 @@ function liveBuild(sg, s, cyc) {
   const due = s.lastEnd + .1 * s.cps >= next.at;
   if (!typing && !due) {
     const prevAt = built > 0 && steps[built - 1] ? steps[built - 1].at : -Infinity, to = codeFor(sg, next.at);
-    typing = makeTyping(settleOthers(ed.code || '', to, next.at), to, Math.max(cyc, prevAt + .5), next.at - .2 * s.cps, s.cps, typingHuman());
+    typing = makeTyping(settleOthers(ed.code || '', to, next.at), to, Math.max(cyc, prevAt + .5), next.at - .2 * s.cps, s.cps, typingHuman(), stretchOf(next.at));
   }
   if (!due) { typeFrame(typing, cyc); return; }
   typing = null; built = steps.filter(x => x.at <= next.at).length;
@@ -852,7 +857,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, voices: sg.voices || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
+  const job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, voices: sg.voices || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
@@ -1245,7 +1250,7 @@ function renderArranger() {
   $$('[data-live-only="crescendo"]').forEach(el => { el.hidden = !crescendo; });
   $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-fns').value = C.functions;
   for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
-  $('#live-title').setAttribute('aria-pressed', C.title); $('#live-hl').setAttribute('aria-pressed', C.highlights); $('#live-wrap').setAttribute('aria-pressed', C.wrap); $('#live-human').setAttribute('aria-pressed', C.typist === 'human');
+  $('#live-title').setAttribute('aria-pressed', C.title); $('#live-hl').setAttribute('aria-pressed', C.highlights); $('#live-wrap').setAttribute('aria-pressed', C.wrap); $('#live-human').setAttribute('aria-pressed', C.typist === 'human'); $('#live-mistakes').setAttribute('aria-pressed', C.mistakes !== 'off'); $('#live-mistakes').disabled = C.typist !== 'human';
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
   renderRuler();
@@ -1472,6 +1477,7 @@ $('#live-title').addEventListener('click', () => { setControl('title', !ctlOf(T)
 $('#live-hl').addEventListener('click', () => { setControl('highlights', !ctlOf(T).highlights); liveChanged(); });
 $('#live-wrap').addEventListener('click', () => { setControl('wrap', !ctlOf(T).wrap); liveChanged(); });
 $('#live-human').addEventListener('click', () => { setControl('typist', ctlOf(T).typist === 'human' ? 'exact' : 'human'); liveChanged(); });
+$('#live-mistakes').addEventListener('click', () => { setControl('mistakes', ctlOf(T).mistakes === 'off' ? 'on' : 'off'); liveChanged(); });
 $('#live-toggle').addEventListener('click', () => {
   const lv = liveOf(T);
   // a song with its own steps in crescendo: the switch goes back to its own steps

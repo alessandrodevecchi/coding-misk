@@ -169,11 +169,17 @@ function mulberry(seedText) {
   let a = h >>> 0;
   return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
-// the keys of a text: [{ dt, key }] (key: text added, or null for a backspace); lean: no pauses, typos or changes
-function humanKeys(text, cps, rng, lean) {
+// the keys of a text: [{ dt, key }] (key: text added, or null for a backspace)
+// o: { lean (no pauses or mistakes), mistakes (false: pauses but no mistakes), typo (chance per character),
+//      mind (chance per number), words (wrong words of the same kind: { string: [...], fn: [...] }), wordAt (chance) }
+// A typo stays on screen: 3 to 6 more keys are typed before it is seen, a pause, then the fix at a person's pace
+// (typing-mistakes). A whole wrong word (another word of the same song) is typed, seen and replaced, once at most.
+function humanKeys(text, cps, rng, o = {}) {
+  const lean = !!o.lean, mistakes = !lean && o.mistakes !== false;
   const keys = [], key = (k, f = 1) => keys.push({ dt: (f * (0.55 + rng() * 0.9)) / cps, key: k }), wait = s => keys.push({ dt: s, key: '' });
-  const back = n => { for (let i = 0; i < n; i++) keys.push({ dt: (0.6 + rng() * 0.5) / (cps * 2.5), key: null }); };
-  let quote = false;
+  // backspaces at a person's pace, the first one a little slower (the hand moves to the key)
+  const back = n => { for (let i = 0; i < n; i++) keys.push({ dt: (0.9 + rng() * 0.6) / cps + (i ? 0 : 0.15), key: null }); };
+  let quote = false, wordDone = false;
   for (let i = 0; i < text.length;) {
     // a line break and its indent: one key
     const nl = text.slice(i).match(/^\n[ \t]*/);
@@ -182,56 +188,92 @@ function humanKeys(text, cps, rng, lean) {
     if (c === '"') quote = !quote;
     if (!lean) {
       // thinking: before a number, a group of notes, a string
-      const num = /[0-9]/.test(c) && /[\s(,!*<\[~:]/.test(before);
-      if ((num && rng() < 0.18) || (c === '[' && quote && rng() < 0.35) || (c === '"' && quote && rng() < 0.3)) wait(0.4 + rng() * (quote ? 2.2 : 1.4));
+      // (the start of an edit counts as after a separator: number edits often start on the number itself)
+      const num = /[0-9]/.test(c) && (i === 0 || /[\s(,!*<\[~:]/.test(before));
+      if (o.think !== false && ((num && rng() < 0.18) || (c === '[' && quote && rng() < 0.35) || (c === '"' && quote && rng() < 0.3))) wait(0.4 + rng() * (quote ? 2.2 : 1.4));
       // a change of mind: another value first, then the right one
       const whole = num ? text.slice(i).match(/^\d+(\.\d+)?/)[0] : '';
-      if (whole && rng() < 0.1) {
+      if (mistakes && whole && rng() < (o.mind ?? 0.1)) {
         const d = whole.replace(/\d(?=\D*$)/, x => String((+x + 1 + Math.floor(rng() * 3)) % 10));
-        if (d !== whole) { for (const ch of d) key(ch); wait(0.5 + rng() * 1.2); back(d.length); wait(0.2 + rng() * 0.4); }
+        if (d !== whole) { for (const ch of d) key(ch); keys.push({ dt: 0, key: '', mark: 'on' }); wait(0.5 + rng() * 1.2); back(d.length); keys.push({ dt: 0, key: '', mark: 'off' }); wait(0.2 + rng() * 0.4); if (o.stats) o.stats.minds++; }
       }
-      // a typo: a key next to the right one, seen a few keys later
+      // a whole wrong word: at the start of a word in a string or of a function name, another word of the same kind
+      if (mistakes && !wordDone && /[A-Za-z]/.test(c) && !/[A-Za-z0-9_]/.test(before)) {
+        const word = text.slice(i).match(/^[A-Za-z][A-Za-z0-9_]*/)[0], kind = quote ? 'string' : before === '.' ? 'fn' : null;
+        if (kind && word.length >= 3 && rng() < (o.wordAt ?? 1 / 12)) {
+          const pool = ((o.words || {})[kind] || []).filter(w => w !== word);
+          let wrong = pool.length ? pool[Math.floor(rng() * pool.length)] : null;
+          if (!wrong) { const j = 1 + Math.floor(rng() * (word.length - 2)); wrong = word.slice(0, j - 1) + word[j] + word[j - 1] + word.slice(j + 1); }
+          if (wrong !== word) { for (const ch of wrong) key(ch); keys.push({ dt: 0, key: '', mark: 'on' }); wait(0.5 + rng() * 0.5); back(wrong.length); keys.push({ dt: 0, key: '', mark: 'off' }); wait(0.15 + rng() * 0.3); wordDone = true; if (o.stats) o.stats.words++; }
+        }
+      }
+      // a typo: a key next to the right one, seen 3 to 6 keys later, a pause, then fixed
       const near = NEAR[c.toLowerCase()];
-      if (near && rng() < 1 / 55) {
+      // a short edit has the chance of a 20-character one, so small number edits can slip too
+      if (mistakes && near && rng() < (o.typo ?? 1 / 55) * Math.max(1, 20 / text.length)) {
         key(near[Math.floor(rng() * near.length)]);
-        const more = Math.min(Math.floor(rng() * 3), text.length - i - 1), ahead = text.slice(i + 1, i + 1 + more).replace(/\n[\s\S]*/, '');
+        keys.push({ dt: 0, key: '', mark: 'on' });
+        const more = Math.min(3 + Math.floor(rng() * 4), text.length - i - 1), ahead = text.slice(i + 1, i + 1 + more).replace(/\n[\s\S]*/, '');
         for (const ch of ahead) key(ch);
-        wait(0.25 + rng() * 0.5); back(ahead.length + 1);
+        wait(0.5 + rng() * 0.5); back(ahead.length + 1); keys.push({ dt: 0, key: '', mark: 'off' });
+        if (o.stats) o.stats.typos++;
       }
     }
     key(c); i++;
   }
   return keys;
 }
-function humanPlan(parts, acts, to, { speed, max, seed }) {
-  const rng0 = mulberry(seed), typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0);
+// words of the target code a wrong word can be taken from: words inside strings, function names
+function wordsOf(code) {
+  const string = new Set(), fn = new Set();
+  for (const m of code.matchAll(/"([^"\n]*)"/g)) for (const w of m[1].matchAll(/[A-Za-z][A-Za-z0-9_]{2,}/g)) string.add(w[0]);
+  for (const m of code.matchAll(/\.([A-Za-z][A-Za-z0-9_]{2,})\(/g)) fn.add(m[1]);
+  return { string: [...string], fn: [...fn] };
+}
+// how careful a stretch of typing is (typing-mistakes): one typo every 25 to 120 characters, more often careful,
+// drawn from the song seed and the stretch (about 16 bars), so the same song has the same careful and hurried stretches
+export function stretchRate(songSeed, stretch) {
+  const r = mulberry(`${songSeed}\u0000stretch\u0000${stretch}`)(), every = 25 + 95 * Math.pow(r, 0.6);
+  return { typo: 1 / every, mind: Math.min(0.3, 0.15 * 55 / every) };
+}
+function humanPlan(parts, acts, to, { speed, max, seed, mistakes = true, rate = null }) {
+  const rng0 = mulberry(seed), typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0), words = wordsOf(to);
   // a person's pace: about 5 characters a second for a few, up to 8 for a long edit
   const cps = (5 + 3 * Math.max(0, Math.min(1, (typed - 40) / 360))) * speed;
-  const build = lean => {
-    const rng = mulberry(`${seed}/${lean ? 'lean' : 'full'}`);
+  // plans from the fullest to the leanest: full, without whole wrong words, without pauses to think (the mistakes
+  // stay), lean (no pauses or mistakes)
+  const build = mode => {
+    const lean = mode === 'lean', rng = mulberry(`${seed}/${lean ? 'lean' : 'full'}`);
+    const stats = { typos: 0, words: 0, minds: 0, mode, wrong: [] };
+    const ko = { lean, mistakes, words, wordAt: mode === 'full' ? 1 / 12 : 0, think: mode !== 'quick', stats, ...(rate || {}) };
     let t = 0, prev = null;
     const out = acts.map(a => {
       const gap = prev && (prev.pi !== a.pi || prev.si !== a.si) ? (a.pi === prev.pi ? (prev.paste ? 0.4 : 0.25) : 0.4 + (lean ? 0 : rng() * 0.8)) : 0;
       t += gap; prev = a;
       const p = parts[a.pi], s = a.si >= 0 ? p.segs[a.si] : null;
-      const keys = a.paste ? [] : a.del ? Array.from({ length: a.n }, () => ({ dt: (0.6 + rng() * 0.5) / (cps * 2.5), key: null })) : humanKeys(s.new, cps, rng, lean);
+      const keys = a.paste ? [] : a.del ? Array.from({ length: a.n }, () => ({ dt: (0.6 + rng() * 0.5) / (cps * 2.5), key: null })) : humanKeys(s.new, cps, rng, ko);
       const at = []; let u = t;
-      for (const k of keys) { u += k.dt; at.push({ t: u, key: k.key }); }
+      for (const k of keys) { u += k.dt; if (k.mark === 'on') stats.wrong.push([u, Infinity]); else if (k.mark === 'off') stats.wrong[stats.wrong.length - 1][1] = u; else at.push({ t: u, key: k.key }); }
       const r = { ...a, t0: t, keys: at };
       t = u;
       return r;
     });
-    return { list: out, total: t };
+    return { list: out, total: t, stats };
   };
-  let plan = build(false);
-  if (plan.total > max) plan = build(true);
+  let plan = build('full');
+  if (plan.total > max) plan = build('nowords');
+  if (plan.total > max) plan = build('quick');
+  if (plan.total > max) plan = build('lean');
   const scale = plan.total > max && plan.total > 0 ? max / plan.total : 1;
   if (scale !== 1) plan.list.forEach(a => { a.t0 *= scale; a.keys.forEach(k => { k.t *= scale; }); });
+  if (scale !== 1) plan.stats.wrong = plan.stats.wrong.map(([a, b]) => [a * scale, b * scale]);
   const total = plan.total * scale, list = plan.list;
   void rng0;
   const pasteAt = new Map(list.filter(a => a.paste).map(a => [a.pi, a.t0]));
   return {
     total,
+    // what the plan holds (typing-mistakes checks): typos, whole wrong words, changes of mind, which plan fitted
+    stats: plan.stats,
     frame(time) {
       if (time >= total) return to;
       // each changed place: the old text, its backspaces, then the keys typed (typos and their fixes included)
@@ -271,7 +313,7 @@ function whole(text, k) {
   return out;
 }
 // style 'human' (human-typing): uneven keys, thinking pauses, typos and changes of mind, seeded by the two texts
-export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '' } = {}) {
+export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null } = {}) {
   const ops = lineDiff(chainLines(from), chainLines(to)), parts = [];
   for (let k = 0; k < ops.length;) {
     if (ops[k].op === 'keep') { parts.push({ kind: 'keep', text: ops[k].text }); k++; continue; }
@@ -293,6 +335,12 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
     }
     if (best !== null) { p.paste = true; p.segs = tokenDiff(best, p.text); }
   });
+  // human style: a long new line unlike the others is sometimes pasted whole, as from notes (typing-mistakes);
+  // never a comment or the voice's code
+  if (style === 'human') {
+    const pr = mulberry(`${seed}\u0000${from}\u0000${to}/paste`);
+    parts.forEach(p => { if (p.kind === 'new' && !p.paste && p.text.length >= 60 && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text) && pr() < 1 / 3) { p.paste = true; p.segs = [{ eq: p.text }]; } });
+  }
   // actions in reading order: paste, then delete and type for each changed place
   const acts = [];
   parts.forEach((p, pi) => {
@@ -301,7 +349,7 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
     if (p.kind === 'new' && !p.text) acts.push({ pi, si: -1, paste: true, n: 0 });
     (p.segs || []).forEach((s, si) => { if (s.eq !== undefined) return; if (s.old) acts.push({ pi, si, del: true, n: s.old.length }); if (s.new) acts.push({ pi, si, del: false, n: s.new.length }); });
   });
-  if (style === 'human') return humanPlan(parts, acts, to, { speed, max, seed: `${seed}\u0000${from}\u0000${to}` });
+  if (style === 'human') return humanPlan(parts, acts, to, { speed, max, seed: `${seed}\u0000${from}\u0000${to}`, mistakes, rate: stretch === null ? null : stretchRate(seed, stretch) });
   const typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0);
   const cps = (8 + 22 * Math.max(0, Math.min(1, (typed - 40) / 360))) * speed;
   let t = 0, prev = null;
