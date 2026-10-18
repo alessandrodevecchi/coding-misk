@@ -138,6 +138,8 @@ The pattern panel shows an idea pattern with its step row filled from `expandIde
 
 ## Open Questions
 
+- **App helpers that hide Strudel names** (found by `strudel-catalog`): `o` (a synonym of `orbit`), `drive` (Strudel's filter overdrive) and `voice` (a Strudel control) are registered by the app over the Strudel functions, so generated code cannot use the originals. Recommended: keep `o` (same meaning as `orbit`), rename `drive` and `voice` to names that are free in the catalog before the generator needs Strudel's own, with the old names kept for saved code.
+
 - **Where the event check runs.** Recommended: in the browser through the dev server, reusing the `check-compact-code.cjs` setup, because evaluation needs the transpiler and the loaded functions. Alternative: Node with `@strudel/core`, `mini` and `tonal`, faster but it may miss functions that load with the REPL. Either choice keeps the specs and tasks.
 - **`beat` or a written cell for drum rows with 3 to 5 hits.** Recommended: the shorter text wins, a cell on a tie; `beat` needs `strudel-catalog` to confirm it ships. Can be tuned after the first snapshots.
 - **Name of the step action.** Recommended: `variant` with `use`. `prepare` or `uncomment` read worse in JSON.

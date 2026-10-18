@@ -15,6 +15,7 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 | `docs/ENDLESS.md`       | Endless director (`#18`, `#21`): sessions, energy shapes, moves, rules, checks        |
 | `docs/ARTISTS.md`       | Artists (`#35`): profile, taste with variety, quirks, built-in artists in `artists/`   |
 | `docs/STYLES.md`        | Style recipes in `styles/`: fields, mixing styles with chaos, adding a style          |
+| `docs/STRUDEL-FUNCTIONS.md` | Catalog of the installed Strudel's functions, what the app writes, notes for variety (`#69`) |
 | `docs/PLAN-TRACKS.md`   | Plan for tracks, per-instrument patterns and a timeline (proposal)                   |
 | `openspec/`             | OpenSpec specs and changes (spec-driven development, used for `#18` endless mode)     |
 | `docs/DESIGN-SYSTEM.md` | Themes, tokens, fonts, components, visuals, hardware theme                           |
@@ -102,6 +103,8 @@ node tools/check-player.cjs                            # player bar and global v
 node tools/check-hand.cjs                              # hand live coding in Compose: take over, steps held, resume, last code (dev server)
 node --no-warnings tools/check-radio.cjs [--long 30]  # radio in the browser: controls, same songs as the director, skip, history, save, open in Compose (dev server)
 node --no-warnings tools/endless-recap.mjs [songs/endless] [--lang it|en]   # Markdown recap of generated sessions, with space for listening notes
+npm run catalog:strudel                                # rebuild the Strudel function catalog and coverage (docs/strudel/, docs/STRUDEL-FUNCTIONS.md); run after updating Strudel
+npm run check:strudel                                  # generated code calls only catalog functions and app helpers, catalog matches the installed Strudel (no browser)
 ```
 
 Video recording needs Playwright's ffmpeg (`node $PLAYWRIGHT_CORE/cli.js install ffmpeg`). The demo script writes `video.webm`, `audio.webm` and `offset.txt`; merge with system ffmpeg (see `docs/ARCHITECTURE.md`).

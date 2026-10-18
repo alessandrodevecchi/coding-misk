@@ -51,6 +51,10 @@ Write a JSON file in `songs/` (see `docs/COMPOSING.md`), add its id to `songs/in
 
 Guidelines from the owner's feedback: 4 to 5 layers per section; tension over sweetness; reels start at full energy (cut them from the strongest sections of a full song); avoid hard cuts between sections; vary the material between songs.
 
+## Strudel functions
+
+Before a generator writes a Strudel function it did not write before, look it up in `docs/STRUDEL-FUNCTIONS.md` (the catalog of the installed version, with synonyms, parameters and an example) and check it is not marked undocumented or reserved by an app helper (`o`, `drive` and `voice` are registered over Strudel names). `npm run check:strudel` fails when generated code calls a name that is not in the catalog. After updating Strudel, rebuild the catalog with `npm run catalog:strudel` (the check fails until then); the hand notes in `docs/strudel/variety.json` stay.
+
 ## Strudel gotchas (learned the hard way)
 
 - `.cps()` inside a pattern recomputes queued haps with a stale reference and drops notes. Change tempo from outside with `scheduler.setCps` at bar boundaries.

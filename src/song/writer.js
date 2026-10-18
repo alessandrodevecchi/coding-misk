@@ -7,6 +7,9 @@
 import { chainLines, breakPoints } from './typing.js';
 
 export const FUNCTIONS = ['full', 'short', 'mixer'];
+// the app's own functions in the code it writes (installHelpers, preludeText): the short functions and the mixer
+// (strudel-catalog: tools/check-strudel.mjs accepts these names besides Strudel's)
+export const HELPERS = ['o', 'drive', 'voice', 'miskMix'];
 const PATTERN = /^\s*_?\$:\s*/;
 const NUM = /^-?\d*\.?\d+$/;
 // the calls of a chain: [{ name, args, text, ws }], ws the spaces after the call (a line break and its indent too)

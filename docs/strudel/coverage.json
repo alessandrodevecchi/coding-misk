@@ -1,0 +1,477 @@
+{
+  "source": {
+    "packages": {
+      "@strudel/core": "1.2.6",
+      "@strudel/mini": "1.2.6",
+      "@strudel/tonal": "1.2.6",
+      "@strudel/draw": "1.2.6",
+      "@strudel/webaudio": "1.3.0",
+      "@strudel/midi": "1.3.0",
+      "@strudel/soundfonts": "1.3.0",
+      "@strudel/repl": "1.3.0",
+      "superdough": "1.3.0"
+    },
+    "codes": 33885
+  },
+  "functions": {
+    "add": {
+      "songs": 2,
+      "live": 9,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "add"
+      ]
+    },
+    "all": {
+      "songs": 0,
+      "live": 41,
+      "radio": 60,
+      "prelude": 0,
+      "as": [
+        "all"
+      ]
+    },
+    "analyze": {
+      "songs": 41,
+      "live": 41,
+      "radio": 60,
+      "prelude": 1,
+      "as": [
+        "analyze"
+      ]
+    },
+    "arp": {
+      "songs": 0,
+      "live": 19,
+      "radio": 18,
+      "prelude": 0,
+      "as": [
+        "arp"
+      ]
+    },
+    "attack": {
+      "songs": 34,
+      "live": 34,
+      "radio": 46,
+      "prelude": 0,
+      "as": [
+        "attack"
+      ]
+    },
+    "bank": {
+      "songs": 40,
+      "live": 40,
+      "radio": 58,
+      "prelude": 0,
+      "as": [
+        "bank"
+      ]
+    },
+    "crush": {
+      "songs": 16,
+      "live": 16,
+      "radio": 24,
+      "prelude": 0,
+      "as": [
+        "crush"
+      ]
+    },
+    "decay": {
+      "songs": 40,
+      "live": 40,
+      "radio": 60,
+      "prelude": 0,
+      "as": [
+        "decay"
+      ]
+    },
+    "degradeBy": {
+      "songs": 5,
+      "live": 38,
+      "radio": 59,
+      "prelude": 0,
+      "as": [
+        "degradeBy"
+      ]
+    },
+    "delay": {
+      "songs": 36,
+      "live": 36,
+      "radio": 47,
+      "prelude": 0,
+      "as": [
+        "delay"
+      ]
+    },
+    "delayfeedback": {
+      "songs": 3,
+      "live": 5,
+      "radio": 9,
+      "prelude": 0,
+      "as": [
+        "delayfeedback"
+      ]
+    },
+    "delaysync": {
+      "songs": 3,
+      "live": 5,
+      "radio": 9,
+      "prelude": 0,
+      "as": [
+        "delaysync"
+      ]
+    },
+    "distort": {
+      "songs": 34,
+      "live": 34,
+      "radio": 53,
+      "prelude": 1,
+      "as": [
+        "distort"
+      ]
+    },
+    "distortvol": {
+      "songs": 34,
+      "live": 34,
+      "radio": 52,
+      "prelude": 1,
+      "as": [
+        "distortvol"
+      ]
+    },
+    "fmi": {
+      "songs": 5,
+      "live": 5,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "fm"
+      ]
+    },
+    "gain": {
+      "songs": 41,
+      "live": 41,
+      "radio": 60,
+      "prelude": 0,
+      "as": [
+        "gain"
+      ]
+    },
+    "hpf": {
+      "songs": 31,
+      "live": 31,
+      "radio": 46,
+      "prelude": 0,
+      "as": [
+        "hpf"
+      ]
+    },
+    "irand": {
+      "songs": 5,
+      "live": 5,
+      "radio": 3,
+      "prelude": 0,
+      "as": [
+        "irand"
+      ]
+    },
+    "jux": {
+      "songs": 8,
+      "live": 8,
+      "radio": 9,
+      "prelude": 0,
+      "as": [
+        "jux"
+      ]
+    },
+    "late": {
+      "songs": 27,
+      "live": 27,
+      "radio": 36,
+      "prelude": 0,
+      "as": [
+        "late"
+      ]
+    },
+    "lpf": {
+      "songs": 40,
+      "live": 40,
+      "radio": 60,
+      "prelude": 1,
+      "as": [
+        "lpf"
+      ]
+    },
+    "lpq": {
+      "songs": 39,
+      "live": 39,
+      "radio": 56,
+      "prelude": 0,
+      "as": [
+        "lpq"
+      ]
+    },
+    "mask": {
+      "songs": 41,
+      "live": 41,
+      "radio": 60,
+      "prelude": 0,
+      "as": [
+        "mask"
+      ]
+    },
+    "mul": {
+      "songs": 8,
+      "live": 8,
+      "radio": 9,
+      "prelude": 0,
+      "as": [
+        "mul"
+      ]
+    },
+    "n": {
+      "songs": 32,
+      "live": 32,
+      "radio": 50,
+      "prelude": 0,
+      "as": [
+        "n"
+      ]
+    },
+    "note": {
+      "songs": 40,
+      "live": 40,
+      "radio": 58,
+      "prelude": 0,
+      "as": [
+        "note"
+      ]
+    },
+    "orbit": {
+      "songs": 41,
+      "live": 41,
+      "radio": 60,
+      "prelude": 1,
+      "as": [
+        "orbit"
+      ]
+    },
+    "pan": {
+      "songs": 10,
+      "live": 10,
+      "radio": 7,
+      "prelude": 0,
+      "as": [
+        "pan"
+      ]
+    },
+    "phaser": {
+      "songs": 1,
+      "live": 1,
+      "radio": 8,
+      "prelude": 0,
+      "as": [
+        "phaser"
+      ]
+    },
+    "phaserdepth": {
+      "songs": 1,
+      "live": 1,
+      "radio": 8,
+      "prelude": 0,
+      "as": [
+        "phaserdepth"
+      ]
+    },
+    "postgain": {
+      "songs": 13,
+      "live": 13,
+      "radio": 21,
+      "prelude": 0,
+      "as": [
+        "postgain"
+      ]
+    },
+    "range": {
+      "songs": 39,
+      "live": 39,
+      "radio": 58,
+      "prelude": 0,
+      "as": [
+        "range"
+      ]
+    },
+    "register": {
+      "songs": 0,
+      "live": 0,
+      "radio": 0,
+      "prelude": 1,
+      "as": [
+        "register"
+      ]
+    },
+    "release": {
+      "songs": 34,
+      "live": 34,
+      "radio": 46,
+      "prelude": 0,
+      "as": [
+        "release"
+      ]
+    },
+    "room": {
+      "songs": 39,
+      "live": 39,
+      "radio": 59,
+      "prelude": 1,
+      "as": [
+        "room"
+      ]
+    },
+    "roomsize": {
+      "songs": 4,
+      "live": 4,
+      "radio": 9,
+      "prelude": 0,
+      "as": [
+        "roomsize"
+      ]
+    },
+    "s": {
+      "songs": 41,
+      "live": 41,
+      "radio": 60,
+      "prelude": 0,
+      "as": [
+        "s"
+      ]
+    },
+    "scale": {
+      "songs": 30,
+      "live": 30,
+      "radio": 42,
+      "prelude": 0,
+      "as": [
+        "scale"
+      ]
+    },
+    "setcpm": {
+      "songs": 41,
+      "live": 41,
+      "radio": 60,
+      "prelude": 0,
+      "as": [
+        "setcpm"
+      ]
+    },
+    "slow": {
+      "songs": 36,
+      "live": 36,
+      "radio": 58,
+      "prelude": 0,
+      "as": [
+        "slow"
+      ]
+    },
+    "struct": {
+      "songs": 35,
+      "live": 35,
+      "radio": 57,
+      "prelude": 0,
+      "as": [
+        "struct"
+      ]
+    },
+    "superimpose": {
+      "songs": 2,
+      "live": 2,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "superimpose"
+      ]
+    },
+    "sustain": {
+      "songs": 40,
+      "live": 40,
+      "radio": 60,
+      "prelude": 0,
+      "as": [
+        "sustain"
+      ]
+    },
+    "swingBy": {
+      "songs": 2,
+      "live": 2,
+      "radio": 11,
+      "prelude": 0,
+      "as": [
+        "swingBy"
+      ]
+    },
+    "transpose": {
+      "songs": 36,
+      "live": 37,
+      "radio": 51,
+      "prelude": 0,
+      "as": [
+        "transpose"
+      ]
+    },
+    "tremolodepth": {
+      "songs": 2,
+      "live": 2,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "tremolodepth"
+      ]
+    },
+    "tremolosync": {
+      "songs": 2,
+      "live": 2,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "tremolosync"
+      ]
+    },
+    "velocity": {
+      "songs": 41,
+      "live": 41,
+      "radio": 60,
+      "prelude": 0,
+      "as": [
+        "velocity"
+      ]
+    },
+    "vowel": {
+      "songs": 3,
+      "live": 3,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "vowel"
+      ]
+    },
+    "withHap": {
+      "songs": 0,
+      "live": 0,
+      "radio": 0,
+      "prelude": 1,
+      "as": [
+        "withHap"
+      ]
+    },
+    "withValue": {
+      "songs": 0,
+      "live": 0,
+      "radio": 0,
+      "prelude": 1,
+      "as": [
+        "withValue"
+      ]
+    }
+  }
+}
