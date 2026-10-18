@@ -1,5 +1,5 @@
 // Browser checks for the Songs tab (#34): search, filters, favourites, sorting, tag editing, previous and next,
-// delete, the trash and the Test chip (#68).
+// delete, the trash and the Test chip (#68), the trash icon on every card and hidden built-in songs (D3b).
 // Usage: PLAYWRIGHT_CORE=... node tools/check-songs-tab.cjs [shots-dir]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -165,6 +165,9 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const pl = JSON.parse(localStorage.getItem('coding-misk-playlists'));
     pl.lists[0].songs.push('u-del');
     pl.lists.push({ id: 'p-check', name: 'Serata', songs: ['u-del', 'drift'] });
+    // a built-in song in favourites and a playlist, hidden later
+    pl.lists[0].songs.push('prova-solo-synth');
+    pl.lists.push({ id: 'p-solo', name: 'Solo', songs: ['prova-solo-synth', 'drift'] });
     localStorage.setItem('coding-misk-playlists', JSON.stringify(pl));
   });
   await page.reload(); await sleep(3500);
@@ -173,7 +176,13 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const saved = () => page.evaluate(() => ({ lib: JSON.parse(localStorage.getItem('coding-misk-library')), pl: JSON.parse(localStorage.getItem('coding-misk-playlists')) }));
   let st = await saved();
   check(st.lib.trash.map(e => e.id).join() === 'u-recent', 'purge at start: the entry 31 days old is gone, the other stays', st.lib.trash.map(e => e.id).join());
-  check(!(await page.$('#songs [data-song-id="kellerlicht"] [data-act="delete"]')) && !(await page.$('#songs [data-song-id="ghost-protocol"] [data-act="delete"]')), 'built-in cards have no Delete');
+  // every card, built-in ones too, has Delete as a drawn trash icon in its bottom right corner
+  const bins = await page.$$eval('#songs [data-song-id]', xs => xs.map(x => {
+    const b = x.querySelector(':scope > .song-del[data-act="delete"]'); if (!b) return `${x.dataset.songId}: none`;
+    const r = b.getBoundingClientRect(), c = x.getBoundingClientRect();
+    return x.lastElementChild === b && b.querySelector('svg') && !b.textContent.trim() && b.title && /^(Delete|Elimina) /.test(b.getAttribute('aria-label')) && !x.querySelector('.songbar [data-act="delete"]') && (x.hidden || (c.right - r.right < 24 && c.bottom - r.bottom < 24)) ? '' : `${x.dataset.songId}: misplaced`;
+  }));
+  check(bins.length > 25 && bins.every(x => !x), 'a trash icon in the bottom right corner of every card, with tooltip and label', bins.filter(Boolean).slice(0, 3).join(', '));
   await clearView();
   await page.click('[data-f="kinds"][data-v="mine"]'); await sleep(300);
   v = await visible();
@@ -246,6 +255,53 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('#songs [data-song-id="prova-breakbeat"] [data-tag-f="q"][data-v="test"]'); await sleep(300);
   check((await page.getAttribute('#sv-test', 'aria-pressed')) === 'true' && (await page.inputValue('#sv-q')) === 'breakbeat', 'a #test tag on a card turns the Test chip on');
   await page.click('#sv-clear'); await sleep(200);
+
+  // a built-in song is hidden (D3b): it leaves the list, the playlists and the Compose song menu, the trash shows it
+  await clearView();
+  const solo = '#songs [data-song-id="prova-solo-synth"]', pick = () => page.$$eval('#track-pick option', xs => xs.map(x => x.value));
+  check((await pick()).includes('prova-solo-synth'), 'Solo synth in the Compose song menu');
+  await page.fill('#sv-q', 'solo synth'); await sleep(400);
+  await page.click(`${solo} .song-del`); await sleep(200);
+  check(await page.isVisible(`${solo} .song-del + .sv-confirm`), 'the trash icon of a built-in card opens the confirmation');
+  if (shots) await (await page.$(solo)).screenshot({ path: path.join(shots, 'trash-builtin-confirm.png') });
+  await page.click(`${solo} .sv-confirm [data-confirm-ok]`); await sleep(500);
+  st = await saved();
+  const sl = Object.fromEntries(st.pl.lists.map(l => [l.id, l.songs])), se = st.lib.trash.find(e => e.id === 'prova-solo-synth');
+  check(!(await page.$(solo)) && (st.lib.hidden || []).join() === 'prova-solo-synth' && se && se.kind === 'builtin' && !se.song && se.title === 'Solo synth', 'a built-in song deleted: hidden, in the trash with no copy', JSON.stringify(se));
+  check(!sl.favourites.includes('prova-solo-synth') && sl['p-solo'].join() === 'drift', 'the hidden song left favourites and the playlist', JSON.stringify(sl));
+  check(!(await pick()).includes('prova-solo-synth'), 'the hidden song left the Compose song menu');
+  await page.fill('#sv-q', ''); await sleep(400);
+  await page.click('#sv-trash'); await sleep(300);
+  const soloRow = await page.innerText('.sv-trash-row[data-trash-id="prova-solo-synth"]').catch(() => '');
+  check(/Solo synth/.test(soloRow) && /built-in song/i.test(soloRow) && /30 days left/.test(soloRow), 'the trash lists it as a built-in song', soloRow.replace(/\s+/g, ' '));
+  if (shots) await page.screenshot({ path: path.join(shots, 'trash-builtin.png') });
+  await page.click('.sv-trash-row[data-trash-id="prova-solo-synth"] [data-trash-restore]'); await sleep(400);
+  await page.click('#sv-trash-back'); await sleep(300);
+  st = await saved();
+  check(!!(await page.$(solo)) && !(st.lib.hidden || []).length && (await pick()).includes('prova-solo-synth'), 'Restore shows it again, in the list and in Compose');
+  // hidden for good: gone from the list and the trash; Settings → Library shows it again after a confirmation
+  await page.fill('#sv-q', 'solo synth'); await sleep(400);
+  await page.click(`${solo} .song-del`); await sleep(200); await page.click(`${solo} .sv-confirm [data-confirm-ok]`); await sleep(500);
+  await page.fill('#sv-q', ''); await sleep(400);
+  await page.click('#sv-trash'); await sleep(300);
+  await page.click('.sv-trash-row[data-trash-id="prova-solo-synth"] [data-trash-forget]'); await sleep(200);
+  await page.click('.sv-trash-row[data-trash-id="prova-solo-synth"] .sv-confirm [data-confirm-ok]'); await sleep(400);
+  await page.click('#sv-trash-back'); await sleep(300);
+  st = await saved();
+  check(!(await page.$(solo)) && !st.lib.trash.some(e => e.id === 'prova-solo-synth') && (st.lib.hidden || []).join() === 'prova-solo-synth', 'deleted for good: not in the list nor in the trash, still hidden');
+  await page.click('#open-settings'); await sleep(400);
+  check(/\(1\)/.test(await page.innerText('#set-show-hidden').catch(() => '')), 'Settings → Library: Show hidden built-in songs (1)');
+  await page.click('#set-show-hidden'); await sleep(200);
+  check(await page.isVisible('#set-library .sv-confirm') && (await saved()).lib.hidden.length === 1, 'it asks inside the page first');
+  if (shots) await (await page.$('#set-library')).screenshot({ path: path.join(shots, 'settings-hidden.png') });
+  await page.click('#set-library .sv-confirm [data-confirm-ok]'); await sleep(400);
+  check(!(await saved()).lib.hidden.length && !(await page.$('#set-show-hidden')), 'confirmed: no song hidden any more');
+  await page.click('#open-settings'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
+  await clearView();
+  await page.fill('#sv-q', 'solo synth'); await sleep(400);
+  check(!!(await page.$(solo)) && (await visible()).includes('prova-solo-synth'), 'the song is back in the list');
+  await page.fill('#sv-q', ''); await sleep(400);
 
   // Compose: Delete song asks under its buttons, the song goes to the trash, Compose opens another song
   await page.click('[data-f="kinds"][data-v="mine"]'); await sleep(200);

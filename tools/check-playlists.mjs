@@ -44,6 +44,12 @@ const CHECKS = {
     assert(createPlaylistStore(st).get(l.id).songs.join() === 'b,c', 'saved');
     assert(p.removeSong('zz') === 0, 'an id in no list changes nothing');
   },
+  'a hidden built-in song leaves every list too (#68, D3b)'() {
+    const st = memory(), p = createPlaylistStore(st);
+    p.toggleFav('prova-solo-synth');
+    const l = p.create('Mix', ['kellerlicht', 'prova-solo-synth', 'u-1']);
+    assert(p.removeSong('prova-solo-synth') === 2 && !p.favourites.songs.length && p.get(l.id).songs.join() === 'kellerlicht,u-1', JSON.stringify(p.all));
+  },
   'favourites always first and fixed': () => {
     const st = createPlaylistStore(memory());
     assert(st.all.length === 1 && st.all[0].id === FAV_ID, 'favourites created');

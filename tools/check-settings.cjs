@@ -53,6 +53,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
 
   // Opus export of a short song
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
+  // the user's song is past page 1 (20 songs a page, #67): a search brings it to page 1
+  await page.fill('#sv-q', 'short'); await sleep(400);
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('#songs [data-song-id="u-short"] [data-act="export"]')]);
   check(/\.(webm|ogg)$/.test(dl.suggestedFilename()), 'Opus export downloads a small file', dl.suggestedFilename());
 

@@ -1,7 +1,7 @@
 // Checks for the song trash (#68): move to the trash, restore, delete for good, empty, purge after 30 days,
-// days left, merge of two trashes. No browser, fixed dates.
+// days left, merge of two trashes, hidden built-in songs (D3b). No browser, fixed dates.
 //   npm run check:trash      exit 1 when any check fails
-import { trashSong, restoreSong, deleteForGood, emptyTrash, purgeTrash, daysLeft, trashList, mergeTrash, TRASH_DAYS } from '../src/library/trash.js';
+import { trashSong, restoreSong, deleteForGood, emptyTrash, purgeTrash, daysLeft, trashList, mergeTrash, hideSong, showHidden, hiddenIds, entryTitle, mergeHidden, TRASH_DAYS } from '../src/library/trash.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const NOW = new Date('2026-10-18T10:00:00Z');
@@ -86,6 +86,37 @@ const CHECKS = {
     const out = mergeTrash(a, b, new Set(['alive']));
     assert(out.map(e => `${e.id}@${e.deletedAt.slice(8, 10)}`).join() === 'x@05,y@02', out.map(e => e.id).join());
     assert(mergeTrash(undefined, null, new Set()).length === 0, 'missing trash');
+  },
+  'a built-in song is hidden and goes to the trash with no copy (D3b)'() {
+    const before = lib(), after = hideSong(before, 'kellerlicht', 'Kellerlicht', NOW), e = after.trash[0];
+    assert(snap(after.hidden) === '["kellerlicht"]' && hiddenIds(after).has('kellerlicht'), snap(after.hidden));
+    assert(e.id === 'kellerlicht' && e.kind === 'builtin' && !('song' in e) && entryTitle(e) === 'Kellerlicht' && e.deletedAt === NOW.toISOString(), snap(e));
+    assert(snap(after.tracks) === snap(before.tracks), 'its edit stays in tracks for a restore');
+    assert(snap(before) === snap(lib()), 'the library passed in is not changed');
+    assert(hideSong(after, 'kellerlicht', 'K', at(1)).hidden.length === 1 && hideSong(after, 'kellerlicht', 'K', at(1)).trash.length === 1, 'hidden twice: one id, one entry');
+  },
+  'restore shows a built-in song again'() {
+    let l = hideSong(hideSong(lib(), 'prova-solo-synth', 'Solo synth', NOW), 'kellerlicht', 'K', NOW);
+    l = restoreSong(l, 'prova-solo-synth');
+    assert(snap(l.hidden) === '["kellerlicht"]' && l.trash.map(e => e.id).join() === 'kellerlicht', snap(l));
+    assert(snap(l.tracks) === snap(lib().tracks), 'no song added to tracks');
+  },
+  'delete for good, empty and purge keep a built-in song hidden'() {
+    let l = hideSong(hideSong(lib(), 'a', 'A', at(-31)), 'b', 'B', NOW);
+    l = purgeTrash(l, NOW);
+    assert(l.trash.map(e => e.id).join() === 'b' && snap(l.hidden) === '["a","b"]', 'purge');
+    assert(snap(deleteForGood(l, 'b').hidden) === '["a","b"]' && snap(emptyTrash(l).hidden) === '["a","b"]', 'for good');
+  },
+  'show hidden: every built-in song back, the user songs stay in the trash'() {
+    let l = trashSong(hideSong(hideSong(lib(), 'a', 'A', NOW), 'b', 'B', NOW), 'u-1', NOW);
+    l = deleteForGood(l, 'a');
+    l = showHidden(l);
+    assert(Array.isArray(l.hidden) && !l.hidden.length && l.trash.map(e => e.id).join() === 'u-1', snap(l));
+  },
+  'merge: a hidden built-in song keeps its entry even with an edit alive; hidden as a union'() {
+    const out = mergeTrash([{ id: 'kellerlicht', kind: 'builtin', title: 'K', deletedAt: NOW.toISOString() }], [], new Set(['kellerlicht']));
+    assert(out.length === 1, 'builtin entry dropped');
+    assert(mergeHidden(['a', 'b'], ['b', 'c']).join() === 'a,b,c' && mergeHidden(undefined, null).length === 0 && mergeHidden(['a', 3, ''], ['a']).join() === 'a', 'union');
   },
 };
 

@@ -23,7 +23,7 @@ import { createRadio, usableRecipes } from './radio/radio.js';
 import { createStylesTab } from './library/styles-tab.js';
 import { createArtistsTab } from './library/artists-tab.js';
 import { createSongsView, confirmInline } from './library/songs-view.js';
-import { trashSong, restoreSong, deleteForGood, emptyTrash, purgeTrash, trashList, daysLeft } from './library/trash.js';
+import { trashSong, restoreSong, deleteForGood, emptyTrash, purgeTrash, trashList, daysLeft, hideSong, showHidden, hiddenIds, entryTitle } from './library/trash.js';
 import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS, isSession } from './library/playlists.js';
 import { DIRECTOR_VERSION } from './endless/director.js';
@@ -60,7 +60,7 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE, REVERT } from './icons.js';
+import { LOCK, DICE, REVERT, BIN } from './icons.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
 import { startHardware } from './hardware.js';
@@ -109,13 +109,15 @@ function prepare(src) {
   }
   return sg;
 }
+// built-in songs hidden in this browser (#68, D3b) are left out of the list and of every song menu
 function composedTracks() {
-  const builtins = BUILTIN.map(b => { const o = user.tracks.find(u => u.id === b.id); return o ? prepare(o) : b; });
+  const hid = hiddenIds(user);
+  const builtins = BUILTIN.filter(b => !hid.has(b.id)).map(b => { const o = user.tracks.find(u => u.id === b.id); return o ? prepare(o) : b; });
   return [...builtins, ...user.tracks.filter(u => !builtinOf(u.id)).map(prepare)].map(tr => ({ ...tr, kind: 'composed' }));
 }
 // code songs: the hand-written originals, then the versions saved from live coding by hand (#33)
 if (!Array.isArray(user.codeSongs)) user.codeSongs = [];
-const codedTracks = () => [...CODED, ...user.codeSongs.map(v => ({ ...v, kind: 'coded' }))].map(c => ({ ...c, code: user.code[c.id] || c.code }));
+const codedTracks = () => [...CODED.filter(c => !hiddenIds(user).has(c.id)), ...user.codeSongs.map(v => ({ ...v, kind: 'coded' }))].map(c => ({ ...c, code: user.code[c.id] || c.code }));
 // the trash (#68, src/library/trash.js): deleted songs wait 30 days; the purge runs at start and when the Trash view opens
 function purgeOld() {
   const n = trashList(user).length;
@@ -188,7 +190,7 @@ function playable(tr) {
 
 // ---------- brano in modifica ----------
 const draft = store.get('coding-misk-draft', null);
-let T = prepare(draft && draft.T && (draft.T.sections || draft.T.scenes) ? draft.T : BUILTIN[0]);
+let T = prepare(draft && draft.T && (draft.T.sections || draft.T.scenes) ? draft.T : composedTracks()[0] || BUILTIN[0]);
 let sel = Math.min(draft ? draft.sel || 0 : 0, T.sections.length - 1);
 let tk = Math.min(draft ? draft.tk || 0 : 0, Math.max(0, T.tracks.length - 1));
 let dirty = !!(draft && draft.dirty);
@@ -1702,7 +1704,7 @@ function newSongFromArtist(a) {
 }
 // Compose leaves the song open: the original of a built-in song, else the first song
 function leaveSong(src) {
-  T = prepare(src || composedTracks()[0]);
+  T = prepare(src || composedTracks()[0] || BUILTIN[0]);
   dirty = false; sel = 0; tk = 0; editPat = null;
   compiled = playable({ ...T, kind: 'composed' });
   saveDraft(); syncAll(); renderArranger(); renderTrackPanel(); renderSource();
@@ -1735,18 +1737,32 @@ function trashUserSong(id) {
   toast(t('trashMoved', { title: sg.title }), { label: t('trashRestore'), run: () => restoreFromTrash(id) });
   return true;
 }
+// a built-in song is hidden in this browser (D3b): to the trash with no copy, out of every playlist and song menu
+function hideBuiltinSong(id) {
+  const c = libraryCards().find(x => x.tr.id === id);
+  if (!c || !isBuiltin(id)) return false;
+  Object.assign(user, hideSong(user, id, c.tr.title, new Date()));
+  saveLibrary();
+  playlists.removeSong(id);
+  if (T.id === id) leaveSong();
+  cards = []; renderSongs(); renderTrackPick();
+  toast(t('trashMoved', { title: c.tr.title }), { label: t('trashRestore'), run: () => restoreFromTrash(id) });
+  return true;
+}
 function restoreFromTrash(id) {
   const e = trashList(user).find(x => x.id === id); if (!e) return;
   Object.assign(user, restoreSong(user, id));
-  saveLibrary(); cards = []; renderSongs();
-  toast(t('trashRestored', { title: e.song.title }));
+  saveLibrary(); cards = []; renderSongs(); renderTrackPick();
+  toast(t('trashRestored', { title: entryTitle(e) }));
 }
 function forgetFromTrash(id) {
   const e = trashList(user).find(x => x.id === id); if (!e) return;
   Object.assign(user, deleteForGood(user, id));
   saveLibrary(); renderSongs();
-  toast(t('trashGone', { title: e.song.title }));
+  toast(t('trashGone', { title: entryTitle(e) }));
 }
+// Settings → Library: every hidden built-in song back in the list (their trash entries go too)
+function showHiddenSongs() { const n = (user.hidden || []).length; Object.assign(user, showHidden(user)); saveLibrary(); cards = []; renderSongs(); renderTrackPick(); return n; }
 function emptyTheTrash() { Object.assign(user, emptyTrash(user)); saveLibrary(); renderSongs(); toast(t('trashEmptied')); }
 
 // ---------- controlli ----------
@@ -2344,7 +2360,7 @@ function songCard({ tr, p }, i) {
       <span class="btn-cluster">
         <button class="btn" data-act="playlist" aria-expanded="false">${t('addToPlaylist')}</button>
         ${composed && continuable(tr) ? `<button class="btn" data-act="radio" title="${esc(t('continueRadioTip'))}">${t('continueRadio')}</button>` : ''}
-        ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>${own ? `<button class="btn danger" data-act="delete">${t('songDelete')}</button>` : ''}` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}${tr.version ? `<button class="btn danger" data-act="delete">${t('songDelete')}</button>` : ''}`}
+        ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}`}
       </span>
       <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
       <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
@@ -2352,6 +2368,7 @@ function songCard({ tr, p }, i) {
     ${m.sections.length > 1 ? `<div class="trans"><span class="lbl">${t('transitions')}</span>
       ${m.sections.slice(1).map((sec, k) => `<button class="chip" data-seek="${Math.max(0, sec.start - 2)}">${esc(m.sections[k].label)} → ${esc(sec.label)}</button>`).join('')}
     </div>` : ''}
+    <button class="song-del" data-act="delete" title="${esc(t('songDeleteTip'))}" aria-label="${esc(t('songDeleteAria', { title: tr.title }))}">${BIN}</button>
   </article>`;
 }
 // a card as a song for search and filters (#34): kind, tags, whether it is the user's
@@ -2554,8 +2571,9 @@ $('#songs').addEventListener('click', e => {
       showTab('componi'); return;
     }
     if (a === 'code') { if (ed) ed.stop(); paused = null; song = p; mode = 'free'; source = { kind: 'song', name: tr.title, id: tr.id }; renderSource(); if (ed) ed.setCode(p.code); updateShare(); return; }
-    // the user's songs and hand-coded versions go to the trash after a confirmation in the card (#68)
-    if (a === 'delete') { songsView.confirm({ anchor: card.querySelector('.songbar'), trigger: act, key: 'delete', msg: t('trashAsk'), ok: t('songDelete'), onConfirm: () => trashUserSong(tr.id) }); return; }
+    // every song goes to the trash after a confirmation in the card (#68): the user's songs and versions with a copy,
+    // a built-in song is hidden (D3b)
+    if (a === 'delete') { songsView.confirm({ anchor: act, trigger: act, key: 'delete', msg: t('trashAsk'), ok: t('songDelete'), onConfirm: () => (isBuiltin(tr.id) ? hideBuiltinSong(tr.id) : trashUserSong(tr.id)) }); return; }
     if (a === 'restore') { if (!confirmTwice('restore-' + tr.id)) return; delete user.code[tr.id]; saveLibrary(); renderSongs(); toast(t('restored')); return; }
   }
   const chip = e.target.closest('.trans [data-seek]');
@@ -2963,6 +2981,8 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     stageRatio: () => stageRatio(),
     fragPreview: (el, opts) => { try { video.previewVertical(el, opts, c => (song && song.meta ? song.meta.sectionAt(c) : -1)); } catch (e) {} },
     liveOpenWindow: () => liveLink.openWindow(), liveOpenRoom: () => liveLink.openRoom(), liveOn: () => { try { return liveLink.on; } catch (e) { return false; } },
+    // hidden built-in songs (#68, D3b): how many, and all of them shown again
+    hiddenSongs: () => (user.hidden || []).length, showHiddenSongs: () => showHiddenSongs(),
     radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', scope: 'song' }), setRadio: (k, v) => radio && radio.setOption(k, v),
   } });
 $('#open-settings').addEventListener('click', () => showTab($('#tab-impostazioni').hidden ? 'impostazioni' : prevTab));

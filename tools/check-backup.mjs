@@ -44,6 +44,14 @@ const CHECKS = {
     const none = mergeBackup({ format: BACKUP_FORMAT, data: { 'coding-misk-library': { tracks: [{ id: 'y' }] } } }, () => null).values['coding-misk-library'];
     assert(Array.isArray(none.trash) && !none.trash.length, 'missing on both sides');
   },
+  'hidden built-in songs merge as a union and keep their trash entry (#68, D3b)'() {
+    const cur = { 'coding-misk-library': { tracks: [{ id: 'kellerlicht', title: 'edited' }], code: {}, hidden: ['a', 'kellerlicht'], trash: [{ id: 'kellerlicht', kind: 'builtin', title: 'K', deletedAt: '2026-10-10T00:00:00.000Z' }] } };
+    const lib = mergeBackup({ format: BACKUP_FORMAT, data: { 'coding-misk-library': { tracks: [], hidden: ['b', 'a'] } } }, k => cur[k]).values['coding-misk-library'];
+    assert(lib.hidden.join() === 'a,kellerlicht,b', `hidden ${lib.hidden}`);
+    assert(lib.trash.map(e => e.id).join() === 'kellerlicht', 'an edit in tracks does not drop the built-in entry');
+    const none = mergeBackup({ format: BACKUP_FORMAT, data: { 'coding-misk-library': { tracks: [] } } }, () => null).values['coding-misk-library'];
+    assert(Array.isArray(none.hidden) && !none.hidden.length, 'missing on both sides');
+  },
   'a file that is not a backup is refused'() { assert(mergeBackup({ format: 'x' }, () => null).error, 'accepted'); },
 };
 let failed = 0;

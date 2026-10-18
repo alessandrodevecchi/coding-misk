@@ -726,6 +726,12 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .sv-confirm > span { margin-right: auto; }
 .sv-confirm .btn { padding: 4px 12px; font-size: 12px; }
 .toast-act { margin-left: 8px; padding: 2px 10px; font-size: 12px; }
+.ico-bin { width: 14px; height: 14px; flex: none; }
+/* Delete on a song card: a drawn trash can in the bottom right corner, apart from the other actions */
+.song-del { justify-self: end; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin: -4px -4px -6px 0; padding: 0; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.song-del .ico-bin { width: 17px; height: 17px; }
+.song-del:hover, .song-del:focus-visible { color: #ff8ea6; border-color: var(--line); }
+.song-del + .sv-confirm { margin-top: 0; }
 .sv-trash-btn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; font-size: 12px; margin-left: auto; }
 .sv-trash-head { align-items: center; }
 .sv-trash-head h3 { margin: 0 auto 0 0; display: inline-flex; align-items: center; gap: 8px; }

@@ -1,6 +1,6 @@
 // Backup of everything the app keeps in this browser (#31): one JSON file to export, and an import that
 // merges it into what is already here. Pure: checked in Node by tools/check-backup.mjs.
-import { mergeTrash } from '../library/trash.js';
+import { mergeTrash, mergeHidden } from '../library/trash.js';
 
 export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
@@ -29,7 +29,8 @@ export function mergeBackup(backup, get) {
       const tracks = byId(cur.tracks, v.tracks), codeSongs = byId(cur.codeSongs, v.codeSongs);
       // the trash (#68) by id too; a song in the list on either side leaves it, so an import never deletes
       const trash = mergeTrash(cur.trash, v.trash, new Set([...tracks, ...codeSongs].filter(x => x && x.id).map(x => x.id)));
-      values[k] = { ...cur, tracks, codeSongs, code: { ...(cur.code || {}), ...(v.code || {}) }, trash };
+      // hidden built-in songs (#68, D3b) as a union: a song hidden on either side stays hidden
+      values[k] = { ...cur, tracks, codeSongs, code: { ...(cur.code || {}), ...(v.code || {}) }, trash, hidden: mergeHidden(cur.hidden, v.hidden) };
       counts.songs += (v.tracks || []).length; counts.versions += (v.codeSongs || []).length;
     } else if (k === 'coding-misk-playlists') {
       const cur = get(k) || { format: 1, lists: [] };

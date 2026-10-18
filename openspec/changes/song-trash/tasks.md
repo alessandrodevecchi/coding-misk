@@ -24,3 +24,10 @@
 - [x] 4.3 `docs/ARCHITECTURE.md` persistence section: the `trash` field of the library; AGENTS.md tooling list gets `npm run check:trash`
 - [x] 4.4 Run `npm run check:trash`, `npm run check:song-filter`, `npm run check:playlists`, `node --no-warnings tools/check-backup.mjs`, `npm run check:guide`, `npm run build`
 - [x] 4.5 DEVLOG entry in Italian: what changed, the test songs tagged, anything learned
+
+## 5. Built-in songs and icon (owner's feedback, 2026-10-18)
+
+- [x] 5.1 Hidden built-in songs: `hidden` list in the library (backup merge as a union), trash entries of kind `builtin` (no song copy), restore unhides, delete for good and purge keep it hidden, playlists cleaned; verify with new cases in `npm run check:trash`, `npm run check:playlists` and `node --no-warnings tools/check-backup.mjs`
+- [x] 5.2 Song list and every song menu skip hidden built-in songs; Settings → Library "Show hidden built-in songs (n)" unhides them all with an in-page confirmation; strings in English and Italian; verify in the browser
+- [x] 5.3 Delete as a drawn trash icon in the bottom right corner of every card (user and built-in), tooltip and aria-label; verify `node tools/check-songs-tab.cjs` (extended: hide a built-in song, restore it) with a screenshot
+- [x] 5.4 Guide card "Songs" (EN, IT), DEVLOG

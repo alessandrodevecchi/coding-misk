@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Delete a user song
-The app SHALL let the user delete their own songs and hand-coded versions, from the song card in the Songs tab and from Compose. A delete SHALL ask for confirmation inside the page and SHALL move the song to the trash. Built-in songs SHALL NOT be deletable.
+The app SHALL let the user delete their own songs and hand-coded versions, from the song card in the Songs tab and from Compose. A delete SHALL ask for confirmation inside the page and SHALL move the song to the trash.
 
 #### Scenario: Delete from the Songs tab
 - **WHEN** the user presses Delete on the card of one of their songs and confirms in the card
@@ -13,7 +13,7 @@ The app SHALL let the user delete their own songs and hand-coded versions, from 
 
 #### Scenario: Built-in song
 - **WHEN** the card of a built-in song is shown
-- **THEN** it has no Delete action; an edited built-in song still offers to restore the original
+- **THEN** it has the Delete action too (see "Hide a built-in song"); an edited built-in song still offers to restore the original
 
 #### Scenario: Delete from Compose
 - **WHEN** the user deletes the song open in Compose and confirms
@@ -58,3 +58,21 @@ The trash SHALL be kept in the browser with the song library, survive a reload, 
 #### Scenario: Import a backup with a trash
 - **WHEN** a backup with two songs in its trash is imported, and one of them is in the current song list
 - **THEN** the other one is added to the trash and the first one stays in the song list
+
+### Requirement: Hide a built-in song
+Built-in songs SHALL be deletable from the Songs tab: the song is hidden in this browser (the app's files do not change), goes to the trash like a user song, and leaves the playlists. Restore SHALL show it again. Delete for good and the 30-day purge SHALL keep it hidden for good, and the settings SHALL offer to show every hidden built-in song again. Hidden songs SHALL travel with the backup.
+
+#### Scenario: Hide and restore
+- **WHEN** the user deletes the built-in song Solo synth and then restores it from the trash
+- **THEN** the song leaves the list, appears in the trash, and comes back to the list after Restore
+
+#### Scenario: Hidden for good
+- **WHEN** a hidden built-in song is deleted for good
+- **THEN** it does not appear in the list or the trash; "Show hidden built-in songs" in the settings brings it back
+
+### Requirement: Delete control placement
+The Delete control on a song card SHALL be a drawn trash icon in the bottom right corner of the card, apart from the other actions, with a label for screen readers and a tooltip.
+
+#### Scenario: Icon
+- **WHEN** a song card is shown
+- **THEN** a trash icon sits in its bottom right corner, and pressing it opens the confirmation in the card

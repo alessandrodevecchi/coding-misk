@@ -8,6 +8,7 @@ import { FORMATS, MP3_RATES, formatOf } from '../export/encode.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data.js';
 import { nextTagline } from '../video/fragments.js';
 import { DICE, REVERT } from '../icons.js';
+import { confirmInline } from '../library/songs-view.js';
 
 
 export function createSettings({ root, t, tx, esc, store, looks, app, toast, confirmTwice }) {
@@ -75,6 +76,10 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('radioHarmony'), `<select data-radio-opt="harmony" data-no-knob>${['artist', ...HARMONY_MODES].map(k => opt(k, r.harmony, t(k === 'artist' ? 'byArtist' : `harmony:${k}`))).join('')}</select>`)}
           ${row(t('setScope'), `<select data-radio-opt="scope" data-no-knob>${opt('song', r.scope, t('steerScopeSong'))}${opt('session', r.scope, t('steerScopeSession'))}</select>`)}
         </div>
+        <div class="card set-card" id="set-library"><h3>${esc(t('setLibrary'))}</h3>
+          <p class="muted">${esc(t('setLibraryIntro'))}</p>
+          <div class="actions">${app.hiddenSongs && app.hiddenSongs() ? `<button class="btn" id="set-show-hidden">${esc(t('setShowHidden', { n: app.hiddenSongs() }))}</button>` : `<span class="muted">${esc(t('setHiddenNone'))}</span>`}</div>
+        </div>
         <div class="card set-card"><h3>${esc(t('setData'))}</h3>
           <p class="muted">${esc(t('setDataIntro'))}</p>
           <div class="actions"><button class="btn primary" id="set-export">${esc(t('setExport'))}</button><button class="btn" id="set-import">${esc(t('setImport'))}</button><button class="btn danger" id="set-reset">${esc(t('setReset'))}</button></div>
@@ -111,6 +116,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.id === 'set-live-window') { if (!app.liveOpenWindow()) toast(t('setLiveBlocked')); else setTimeout(render, 1500); return; }
     if (b.id === 'set-live-room') { app.liveOpenRoom(); return; }
     if (b.dataset.vidSoul) { setVid('soulPanel', b.dataset.vidSoul === '1'); return render(); }
+    // hidden built-in songs (#68, D3b): all of them back in the list, after a confirmation in the card
+    if (b.id === 'set-show-hidden') { confirmInline({ anchor: b.closest('.actions'), trigger: b, key: 'show-hidden', msg: t('setShowHiddenAsk'), ok: t('setShowHiddenOk'), t, esc, onConfirm: () => { toast(t('setShowHiddenDone', { n: app.showHiddenSongs() })); render(); } }); return; }
     if (b.id === 'set-export') { const d = new Date().toISOString().slice(0, 10); downloadJson(`coding-misk-backup-${d}`, makeBackup(entries())); toast(t('setExported')); return; }
     if (b.id === 'set-import') {
       return pickJsonFiles(data => {

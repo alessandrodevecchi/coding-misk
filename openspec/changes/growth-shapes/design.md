@@ -107,6 +107,8 @@ The `switch-*` styles (renamed in `clear-names`) get weights from the research: 
 
 ## Open Questions
 
+- **Bursts of edits** (owner, 2026-10-18): in Prima luce around 2:54 many edits come close together and the human typing speeds up to fit, so the text is typed very fast. The pace of a shape should spread such bursts (move a step a few bars later, or merge two edits of the same line) before the typing has to speed up. Labor limae, after the main work.
+
 - **Opening name "slow" next to pace "slow".** Recommended: keep the owner's names ("slow" / "Lenta") and show opening and pace as separate labelled groups in Compose, so the two never sit in one list.
 - **Should the director write `growthShape` into generated songs?** Recommended: no for now; the shape is resolved at play time from the song id and style, so the endless fixtures and `DIRECTOR_VERSION` do not move in this change.
 - **Default weights.** Recommended: the values in D1, adjusted after the owner's listening test (one exported song per opening, first two minutes).

@@ -42,6 +42,10 @@ A new module in `src/library/` with no DOM and no storage: `trashSong(lib, id, n
 
 A composed song whose id is not built-in, including songs saved from the radio and new songs from an artist. A hand-coded version (`codeSongs`). An edited built-in song keeps "Restore original", which drops only the edit, as today. The existing `del-version` action of the card goes through the trash too.
 
+### D3b. Built-in songs are hidden (owner, 2026-10-18)
+
+The owner wants Delete on every song. A built-in song lives in the app's files, so deleting it hides it in this browser: the library gets `hidden: [id]`, the trash gets `{ id, kind: 'builtin', deletedAt }` without a copy. Restore removes the id from `hidden`. Delete for good and the purge drop the trash entry but keep the id in `hidden`; Settings → Library offers "Show hidden built-in songs (n)". The backup merges `hidden` as a union (a song hidden on either side stays hidden), minus ids restored later is not tracked: restoring after an import is done by hand. Playlists are cleaned as for user songs. Delete is a drawn trash icon in the bottom right corner of each card.
+
 ### D4. Confirmation in the page
 
 Delete opens a small strip inside the card: "Move to the trash?" with [Delete] and [Cancel]. Focus moves to [Cancel]; Escape cancels. The same strip pattern serves "Delete for good" and "Empty trash" in the Trash view. Compose "Delete song" uses the same strip under its button. The toast after a delete says "Moved to the trash" with a [Restore] link while it shows.
