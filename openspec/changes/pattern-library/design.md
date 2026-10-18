@@ -95,3 +95,7 @@ New key, nothing to migrate. Rollback: remove the tab; saved patterns stay in th
 - **Default beat.** Recommended: off for grooves, on for basslines and riffs, off for the rest. A per-kind memory of the last choice is a small later addition.
 - **Chords kind source.** Recommended: progressions played with the `pad` rhythm by default and a rhythm menu with the `PADS` rhythms, rather than one card per progression and rhythm pair.
 - **Where generated parts appear.** Recommended: a "new" strip at the top of the list, cleared when the tab closes, so unsaved parts never mix with built-in ones.
+
+### Note: song functions
+
+A saved pattern keeps its effect chain written out in full. In the Patterns tab the code preview uses the Technical functions preset of the current profile. Later, with votes (D8), an effect chain that is saved and liked often can be proposed as a new entry of the function library (`song-functions`); the owner approves its name.

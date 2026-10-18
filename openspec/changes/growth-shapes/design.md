@@ -112,3 +112,7 @@ The `switch-*` styles (renamed in `clear-names`) get weights from the research: 
 - **Opening name "slow" next to pace "slow".** Recommended: keep the owner's names ("slow" / "Lenta") and show opening and pace as separate labelled groups in Compose, so the two never sit in one list.
 - **Should the director write `growthShape` into generated songs?** Recommended: no for now; the shape is resolved at play time from the song id and style, so the endless fixtures and `DIRECTOR_VERSION` do not move in this change.
 - **Default weights.** Recommended: the values in D1, adjusted after the owner's listening test (one exported song per opening, first two minutes).
+
+### Note: song functions
+
+With the compact Technical functions preset, the "parameters only" development edits the arguments of the functions in view (`.pluck(.12, 0)` to `.pluck(.3, 0)`); a step that changes a call inside a function writes that line out in full (`song-functions`).

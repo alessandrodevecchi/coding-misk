@@ -40,6 +40,7 @@ Randomness is always seeded: the same song gives the same sound, in the app, in 
 | 3 | `clear-names` | The Switch profile becomes Live coder; the four `switch-*` styles get genre names | #64 |
 | 4 | `strudel-catalog` | Catalog of every Strudel function we ship, coverage table, check on generated code | #69 |
 | 5 | `idea-model` | Parts stored as ideas; same sound, shorter code | #70 |
+| 5b | `song-functions` | Repeated effect chains as named song and library functions; our helpers never take a Strudel name | #73 |
 | 6 | `material-generator` | Melodies, basslines, arpeggios, chords, grooves and sounds composed from seed and style | #71 |
 | 7 | `pattern-library` | Patterns tab in the Groove Lab; Save as pattern in Compose | #72 |
 | 8 | `growth-shapes` | Openings, pace and development of a live build, chosen by song, style or seed | #64 |
@@ -68,6 +69,7 @@ Randomness is always seeded: the same song gives the same sound, in the app, in 
 | 1 | `song-trash`, `typing-mistakes`, `clear-names` | Delete and restore test songs; see a typo fixed; check the new names |
 | 2 | `strudel-catalog` | None: automatic checks |
 | 3 | `idea-model` | 3-4 known songs sound the same, with shorter code |
+| 3b | `song-functions` | The Ideas example and 2-3 songs in Live coder: shorter code, same sound |
 | 4 | `material-generator`, `pattern-library` | A listening session in the Patterns tab with votes; 4-5 new songs |
 | 5 | `growth-shapes` | One exported song per opening, first two minutes |
 | 6 | `voice-instrument` | 2-3 songs with a voice |

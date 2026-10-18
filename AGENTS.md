@@ -105,6 +105,8 @@ node --no-warnings tools/check-radio.cjs [--long 30]  # radio in the browser: co
 node --no-warnings tools/endless-recap.mjs [songs/endless] [--lang it|en]   # Markdown recap of generated sessions, with space for listening notes
 npm run catalog:strudel                                # rebuild the Strudel function catalog and coverage (docs/strudel/, docs/STRUDEL-FUNCTIONS.md); run after updating Strudel
 npm run check:strudel                                  # generated code calls only catalog functions and app helpers, catalog matches the installed Strudel (no browser)
+npm run check:ideas                                    # idea writer: shortest exact forms, every kind of idea, ladders, variant steps (no browser)
+node tools/check-ideas.cjs [song,song…]                # same events as the code before idea-model, every song and Crescendo states (dev server, ~8 min)
 ```
 
 Video recording needs Playwright's ffmpeg (`node $PLAYWRIGHT_CORE/cli.js install ffmpeg`). The demo script writes `video.webm`, `audio.webm` and `offset.txt`; merge with system ffmpeg (see `docs/ARCHITECTURE.md`).

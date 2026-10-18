@@ -146,3 +146,7 @@ A session (radio, compilation, generated songs) can force the source of all mate
 - **Energy for pattern B.** Recommended: target of the next big moment (drop, chorus) for B, and the quietest phrase for C. Can be tuned without changing the specs.
 - **Number shown in Compose.** Recommended: a small number field starting at 1. A word seed (like the radio) is friendlier but longer to type.
 - **Credit line for the course.** Recommended: one line in `docs/ENDLESS.md` under Material, only if a passage or a full recipe from the course is reused; general techniques need no credit.
+
+### Note: song functions
+
+After `song-functions`, the effect chains of generated sounds go through the same folding as any song: a generated sound needs no function of its own. The generator never writes app helper names; `chan` and `grit` come from the writer.
