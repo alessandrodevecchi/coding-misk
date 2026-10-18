@@ -9,11 +9,10 @@
 - [ ] 2.2 Rename the four files in `styles/` (id, name, family only); verify the recipe content is unchanged apart from those fields with a diff
 - [ ] 2.3 Stable recipe order (sorted by old id when there is one) where the app and the tools load recipes; verify with a new case in `npm run check:endless` (same session for an artist that explores, before and after)
 - [ ] 2.4 Apply `styleId` in the director, artists, song filter, Styles tab family label, radio settings, history and playlist sessions; verify with a new Node case that feeds every old id through each path
-- [ ] 2.5 Built-in songs: `tags.styles` and style texts to the new names, free tag `switch` to `live-coder`; verify `npm run check:songs`, `npm run check:code` and `npm run check:song-filter`
+- [ ] 2.5 Built-in songs: `tags.styles` and style texts to the new names, free tag `switch` to `live-coder`, artists and fixtures that name the old ids too (only the alias map keeps them); verify `npm run check:songs`, `npm run check:code` and `npm run check:song-filter`
 
 ## 3. Checks, fixtures and docs
 
-- [ ] 2.9 Repo files rewritten to the new style ids (built-in songs `tags.styles`, artists, fixtures that name them); verify with a search that no repo file outside the alias map names `switch-acid`, `switch-house`, `switch-trance`, `switch-trance-pure` (built-in songs and artists rewritten)
 - [ ] 3.1 `tools/check-endless.mjs`, `tools/check-profiles.mjs`, `tools/check-crescendo.mjs`, `tools/check-compact-code.cjs`: new style ids, check names without Switch; run `npm run check:endless`; if fixtures change, review, write them and bump `DIRECTOR_VERSION` in the same commit
 - [ ] 3.2 Docs: `docs/STYLES.md` (family and aliases), `docs/ENDLESS.md` (check names), `docs/COMPOSING.md`, `docs/SONG-FORMAT.md`; verify with a search that no doc calls the profile or the styles Switch, except the alias notes
 - [ ] 3.3 Guide: card "Crescendo" says Live coder in English and Italian; the Styles card if it names the family; verify `npm run check:guide`
