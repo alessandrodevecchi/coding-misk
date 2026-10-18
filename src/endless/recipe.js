@@ -50,6 +50,16 @@ export const RECIPE_DEFAULTS = {
   genre: 'experimental',
 };
 
+// Renamed styles (clear-names): old ids still read everywhere through styleId; recipeOrder keeps the list order the
+// styles had before the rename, so draws over the list (artist exploration) give the same songs for the same seed
+export const STYLE_ALIASES = { 'switch-acid': 'acid', 'switch-house': 'house', 'switch-trance': 'gated-trance', 'switch-trance-pure': 'pure-trance' };
+export const FAMILY_ALIASES = { switch: 'live-coder' };
+const OLD_ID = Object.fromEntries(Object.entries(STYLE_ALIASES).map(([o, n]) => [n, o]));
+export const styleId = id => STYLE_ALIASES[id] || id;
+export const familyId = id => FAMILY_ALIASES[id] || id;
+export const recipeOrder = id => OLD_ID[id] || id;
+// an object keyed by style ids (an artist's taste) with old ids renamed
+export const styleKeys = o => (o && typeof o === 'object' && !Array.isArray(o) ? Object.fromEntries(Object.entries(o).map(([k, v]) => [styleId(k), v])) : o);
 export const RECIPE_FORMAT = 1;
 export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'profile', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'words', ...Object.keys(INSTRUMENTS)];
 const isNum = v => typeof v === 'number' && Number.isFinite(v);

@@ -10,12 +10,12 @@
   "normal": "waypoints",
   "look": "palco",
   "style": {
-    "en": "Endless · Switch · acid · E · 135 BPM · waves",
-    "it": "Endless · Switch · acid · E · 135 BPM · waves"
+    "en": "Endless · Acid · E · 135 BPM · waves",
+    "it": "Endless · Acid · E · 135 BPM · waves"
   },
   "tags": {
     "styles": [
-      "switch-acid"
+      "acid"
     ]
   },
   "sections": [

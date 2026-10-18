@@ -1,0 +1,47 @@
+// coding-misk · Apre arpeggio
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(132/4)
+
+const SECTIONS = [['Intro', 32], ['Corpo', 64], ['Ritmo', 32]]
+const TEMPO = {'Intro': 132, 'Corpo': 132, 'Ritmo': 132}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!32 0!96>"  // Intro · 32 bars · 132 BPM · A · Am Am G G
+const section2 = "<0!32 1!64 0!32>"  // Corpo · 64 bars · 132 BPM · A · Am Am G G
+const section3 = "<0!96 1!32>"  // Ritmo · 32 bars · 132 BPM · A · Am Am G G
+
+// ========== Arp · arp ==========
+// Intro · bars 1-32 · pattern A
+// Arpeggio · Up, 16ths
+$: note("<[a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4] [a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4] [g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4] [g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4]>")
+  .s("supersaw").lpf(sine.range(1081, 4323).slow(8)).lpq(4)
+  .decay(.15).sustain(.15).delay(.62).gain(0.4).mask(section1).velocity(section1).orbit(3).analyze("arp")
+// Corpo · bars 33-96 · pattern A
+$: note("<[a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4] [a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4 a3 c4 e4 a4] [g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4] [g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4 g3 b3 d4 g4]>")
+  .s("supersaw").lpf(sine.range(1081, 4323).slow(8)).lpq(4)
+  .decay(.15).sustain(.15).delay(.62).gain(0.4).mask(section2).velocity(section2).orbit(3).analyze("arp")
+
+// ========== Pad · pad ==========
+const clip1 = "<0!16 1!16 0!96>"
+// Intro · bars 17-32 · pattern A
+// Pad · Stab
+$: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
+  .s("gm_epiano1").attack(.01).decay(.15).sustain(0).release(.1).lpf(sine.range(926, 3706).slow(8))
+  .room(.85).gain(0.28).mask(clip1).velocity(clip1).orbit(6).analyze("pad")
+// Corpo · bars 33-96 · pattern A
+$: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
+  .s("gm_epiano1").attack(.01).decay(.15).sustain(0).release(.1).lpf(sine.range(926, 3706).slow(8))
+  .room(.85).gain(0.28).mask(section2).velocity(section2).orbit(6).analyze("pad")
+
+// ========== Bass · bass ==========
+// Corpo · bars 33-96 · pattern A
+// Bass · Rolling
+$: note("<a1 a1 g1 g1>").struct("[~ x x x] [~ x x x] [~ x x x] [~ x x x]")
+  .s("supersaw").lpf(sine.range(328, 1312).slow(8)).lpq(12.66)
+  .decay(.12).sustain(0).gain(0.8).mask(section2).velocity(section2).orbit(2).analyze("bass")
+
+// ========== Kick · drums ==========
+// Ritmo · bars 97-128 · pattern A
+// Drums · RolandTR909
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.85).distort(0.1).distortvol(.5).mask(section3).velocity(section3).orbit(1).analyze("kick")

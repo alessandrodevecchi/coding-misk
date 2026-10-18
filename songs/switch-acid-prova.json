@@ -7,12 +7,12 @@
   "appVersion": "0.5.0",
   "profile": "switch",
   "style": {
-    "en": "Endless · Switch · acid · E · 133 BPM · slow-burn",
-    "it": "Endless · Switch · acid · E · 133 BPM · slow-burn"
+    "en": "Endless · Acid · E · 133 BPM · slow-burn",
+    "it": "Endless · Acid · E · 133 BPM · slow-burn"
   },
   "tags": {
     "styles": [
-      "switch-acid"
+      "acid"
     ]
   },
   "origin": "endless",

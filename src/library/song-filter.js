@@ -1,6 +1,7 @@
 // Search, filters and sorting of the Songs tab (#34). Pure: no DOM, no storage, testable in Node
 // (tools/check-song-filter.mjs). The app builds one entry per song card and a view state.
 import { GENRES } from '../song/format.js';
+import { styleId } from '../endless/recipe.js';
 
 export const KINDS = ['standard', 'live', 'generated', 'mine', 'code'];
 export const SORTS = ['default', 'title', 'bpm', 'length', 'created', 'played'];
@@ -23,7 +24,7 @@ export function kindOf({ code = false, origin, build = false }) {
 // genres of a song: those of its styles (genreOf: style id → genre) plus its own, without duplicates, in list order
 export function genresOf(tags, genreOf) {
   const out = new Set(((tags && tags.genres) || []).filter(g => GENRES.includes(g)));
-  for (const id of (tags && tags.styles) || []) { const g = genreOf(id); if (g) out.add(g); }
+  for (const id of (tags && tags.styles) || []) { const g = genreOf(styleId(id)); if (g) out.add(g); }
   return GENRES.filter(g => out.has(g));
 }
 
@@ -33,7 +34,7 @@ export function genresOf(tags, genreOf) {
 export function songEntry(song, index, names, favourites = [], played = {}) {
   const tags = song.tags || {};
   const genres = genresOf(tags, names.genreOf);
-  const styles = [...new Set(tags.styles || [])];
+  const styles = [...new Set((tags.styles || []).map(styleId))];
   const free = [...new Set(tags.free || [])];
   const style = song.style && typeof song.style === 'object' ? Object.values(song.style) : [song.style];
   const text = fold([song.title, ...style, ...styles.flatMap(id => [id, ...names.style(id)]), ...genres.flatMap(g => names.genre(g)), ...free].filter(Boolean).join(' \u0001 '));
@@ -78,7 +79,7 @@ export function cleanView(raw, { styles = [] } = {}) {
   return {
     q: typeof v.q === 'string' ? v.q.slice(0, 120) : '',
     genres: list(v.genres, g => GENRES.includes(g)),
-    styles: list(v.styles, s => typeof s === 'string' && (!styles.length || styles.includes(s))),
+    styles: list((Array.isArray(v.styles) ? v.styles : []).map(styleId), s => typeof s === 'string' && (!styles.length || styles.includes(s))),
     kinds: list(v.kinds, k => KINDS.includes(k)),
     builds: list(v.builds, b => BUILDS.includes(b)),
     favOnly: !!v.favOnly, neverPlayed: !!v.neverPlayed,

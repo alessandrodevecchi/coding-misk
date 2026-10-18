@@ -30,6 +30,7 @@ export const CONTROLS = {
 export const PROFILES = {
   classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full', typist: 'exact', mistakes: 'on' },
   crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, functions: 'full', typist: 'exact', mistakes: 'on' },
+  // Live coder (shown so since clear-names; the id stays switch in songs, recipes and storage)
   switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: true, notes: false, steps: false, voice: false, highlights: true, wrap: true, functions: 'mixer', typist: 'human', mistakes: 'on' },
 };
 export const PROFILE_IDS = Object.keys(PROFILES);

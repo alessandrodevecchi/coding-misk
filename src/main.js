@@ -116,7 +116,7 @@ function composedTracks() {
 if (!Array.isArray(user.codeSongs)) user.codeSongs = [];
 const codedTracks = () => [...CODED, ...user.codeSongs.map(v => ({ ...v, kind: 'coded' }))].map(c => ({ ...c, code: user.code[c.id] || c.code }));
 let liveOn = !!store.get('coding-misk-live', false);
-// performance profiles (performance-profiles): Classic, Crescendo, Switch, each a set of controls (build style,
+// performance profiles (performance-profiles): Classic, Crescendo, Live coder (id switch), each a set of controls (build style,
 // growth rules, typing, code view, generator, comments, highlights). The Compose choice, the controls changed by hand
 // (overrides, the profile becomes "custom") and, before profiles, separate settings (read once)
 const firstProfile = migrateOld(k => store.get(k, undefined));
@@ -133,7 +133,7 @@ function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v },
 // Crescendo builds are computed once per song version and option
 const crescendoCache = new Map();
 function crescendoOf(tr) {
-  // the Switch profile grows with the natural rules (natural-growth)
+  // the Live coder profile (id switch) grows with the natural rules (natural-growth)
   const C = ctlOf(tr), narrated = C.narrated, rules = growthRules(C), key = JSON.stringify([narrated, C.growth, C.duration, tr.sections, tr.tracks, tr.id]);
   if (!crescendoCache.has(key)) { if (crescendoCache.size > 20) crescendoCache.clear(); crescendoCache.set(key, crescendoSong(tr, { narrated, rules })); }
   const c = crescendoCache.get(key);
@@ -292,7 +292,7 @@ let handFromHere = store.get('coding-misk-hand-from', true) !== false;
 const typingSpeed = () => TYPING_SPEEDS[store.get('coding-misk-typing', null) || (song && song.ctl && song.ctl.typing) || 'normal'] || 1;
 // a typing towards `to` that may start at `from0` (cycles) and must end at `end`: it starts as late as it can while
 // typing at a person's speed, faster when it does not fit
-// human (human-typing, a step of the live build in the Switch profile): first a listening pause, then the typing at a
+// human (human-typing, a step of the live build in the Live coder profile): first a listening pause, then the typing at a
 // person's pace ends at the step; when time is short the pause shrinks first
 function makeTyping(text, to, from0, end, cps, human = false, stretch = null) {
   const avail = Math.max(.2, (end - from0) / cps), listenMin = human ? Math.min(avail * .5, 2) : 0;

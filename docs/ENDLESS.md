@@ -204,8 +204,9 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Comment rate and spacing                     | `director: comments about half of the boundaries, 8 bars apart`  |
 | Short phrases                                | `director: phrase pool is short and complete`                    |
 | Voice amount                                 | `director: voice amount sets how often comments are spoken`      |
-| Switch songs: one key, short progressions, crescendo | `director: Switch songs keep one key, short progressions and open in crescendo` |
-| Switch · trance pure: no arpeggio, at most two chords | `director: Switch · trance pure has no arpeggio and at most two chords` |
+| Live coder styles: one key, short progressions, crescendo | `director: Live coder styles keep one key, short progressions and open in crescendo` |
+| Pure trance: no arpeggio, at most two chords | `director: pure trance has no arpeggio and at most two chords` |
+| Renamed styles: old ids give the same songs | `renamed styles: old ids give the same songs as the new ones (sessions, artists, saved settings)` |
 | A voice per song                             | `director: each song has its own voice`                          |
 | Artist validator                             | `artists: validator reports errors at their paths`               |
 | Songs drawn from an artist's taste           | `artists: songs draw their values from the taste`                |

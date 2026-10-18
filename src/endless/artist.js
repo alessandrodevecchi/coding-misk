@@ -1,6 +1,6 @@
 // Artists (docs/ARTISTS.md): a profile and a taste that the director samples for every song.
 // An artist never fixes a value: it gives weights and ranges, so songs by the same artist differ.
-import { SHAPES } from './recipe.js';
+import { SHAPES, styleKeys } from './recipe.js';
 import { QUIRKS } from './quirks.js';
 
 export const ARTIST_FORMAT = 1;
@@ -57,7 +57,7 @@ export function validateArtist(a, styleIds = []) {
   };
   if (a.styles === undefined) err('styles', 'favourite styles with weights, for example {"berlin-techno": 3, "industrial": 1}');
   else {
-    weights('styles', a.styles, styleIds, 'styles');
+    weights('styles', styleKeys(a.styles), styleIds, 'styles');
     if (a.styles && typeof a.styles === 'object' && !Object.values(a.styles).some(w => w > 0)) err('styles', 'at least one style with a weight above 0');
   }
   if (a.explore !== undefined && (!isNum(a.explore) || a.explore < 0 || a.explore > 1)) err('explore', 'the chance of a style outside the favourites, from 0 to 1');
@@ -107,6 +107,7 @@ const round = x => Math.round(x * 100) / 100;
 // The options of one song by an artist: styles (dominant first), drawn values, taste for the director.
 export function artistSongOptions(artist, styleIds, rng) {
   const A = withArtistDefaults(artist);
+  A.styles = styleKeys(A.styles);
   const favs = Object.entries(A.styles).filter(([id, w]) => w > 0 && styleIds.includes(id));
   const others = styleIds.filter(id => !A.styles[id]);
   const dominant = others.length && rng.chance(A.explore) ? rng.pick(others) : rng.weighted(favs.map(([k]) => k), favs.map(([, w]) => w));

@@ -87,7 +87,7 @@ In the app, the arranger has two views of the same song: **Free timeline** (the 
 
 ### Profiles
 
-The Profile menu next to "Live build" picks how a song builds and looks while it plays: Classic (in blocks), Crescendo (small steps) or Switch (like a live coder: few lines, functions one at a time, pauses). Every control next to it (build style, code view, generator, comments, title, lit notes, fully narrated) can be changed by hand: the profile shows as custom until you pick a profile again. A song or a style can name its profile (`"profile": "switch"`).
+The Profile menu next to "Live build" picks how a song builds and looks while it plays: Classic (in blocks), Crescendo (small steps) or Live coder (like a live coder: few lines, functions one at a time, pauses). Every control next to it (build style, code view, generator, comments, title, lit notes, fully narrated) can be changed by hand: the profile shows as custom until you pick a profile again. A song or a style can name its profile (`"profile": "switch"` is the Live coder profile: its id stayed `switch` when it was renamed).
 
 ### Crescendo
 

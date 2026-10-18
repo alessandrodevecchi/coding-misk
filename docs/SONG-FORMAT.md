@@ -191,7 +191,7 @@ A song without `build` can also build itself: the "Live build" switch above the 
 
 **Creation date and app version.** `"created": "2026-10-16"` and `"appVersion": "0.6.0"` say when the song was made and with which version of the app (#67). The app writes them when a song is saved from Compose or the radio, `tools/endless.mjs` when it writes songs, and `tools/song-dates.mjs` filled the songs in `songs/` from git. Both are optional.
 
-**Profile.** `"profile": "switch"` (or `classic`, `crescendo`) opens the song with that performance profile in Compose; it wins over `buildStyle`.
+**Profile.** `"profile": "switch"` (the Live coder profile; or `classic`, `crescendo`) opens the song with that performance profile in Compose; it wins over `buildStyle`.
 
 **Build style.** `"buildStyle": "crescendo"` (or `"blocks"`) makes the song open and play with that build style of the live build; without it the song follows the Compose setting. Crescendo (`src/song/crescendo.js`) ignores the song's own `build` and computes one: it prepends growth sections (`Crescendo`, `Crescendo 2`), may append an ending section (`Strip` or `Stop`), adds pattern variants named `<pattern>~<level>` to the tracks, and writes steps with the actions above. The song file is never changed.
 

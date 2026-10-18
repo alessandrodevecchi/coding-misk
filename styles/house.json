@@ -1,13 +1,10 @@
 {
   "format": 1,
-  "id": "switch-house",
-  "family": "switch",
+  "id": "house",
+  "family": "live-coder",
   "buildStyle": "crescendo",
   "profile": "switch",
-  "name": {
-    "en": "Switch · house",
-    "it": "Switch · house"
-  },
+  "name": { "en": "House", "it": "House" },
   "genre": "house",
   "description": "Live-coded house in one minor scale: four on the floor with off-beat open hats, a chord stab on one or two chords, a bass on the root.",
   "tempo": [

@@ -1,15 +1,12 @@
 {
   "format": 1,
-  "id": "switch-trance-pure",
-  "family": "switch",
+  "id": "gated-trance",
+  "family": "live-coder",
   "buildStyle": "crescendo",
   "profile": "switch",
-  "name": {
-    "en": "Switch · trance pure",
-    "it": "Switch · trance puro"
-  },
+  "name": { "en": "Gated trance", "it": "Trance gated" },
   "genre": "trance",
-  "description": "Pure live-coded trance in one minor scale: four on the floor, a gated supersaw bass, one or two chords and a lead written with scale degrees, no arpeggio, built step by step.",
+  "description": "Live-coded trance in one minor scale: four on the floor, a gated supersaw bass and lead on one or two chords, a pulse riser, built step by step.",
   "tempo": [
     138,
     142
@@ -22,7 +19,9 @@
   ],
   "progressions": [
     "drone",
-    "pendolo"
+    "pendolo",
+    "ipnotica",
+    "epica"
   ],
   "shapes": [
     "slow-burn",
@@ -38,7 +37,7 @@
       4,
       5
     ],
-    "max": 5
+    "max": 6
   },
   "drums": {
     "kits": [
@@ -76,6 +75,30 @@
       ]
     }
   },
+  "arp": {
+    "presets": [
+      "su",
+      "pulsar",
+      "pedale"
+    ],
+    "waves": [
+      "supersaw"
+    ],
+    "speeds": [
+      "16"
+    ],
+    "weight": 0.7,
+    "settings": {
+      "cutoff": [
+        1200,
+        3200
+      ],
+      "delay": [
+        0.4,
+        0.7
+      ]
+    }
+  },
   "hook": {
     "presets": [
       "neon",
@@ -89,7 +112,7 @@
     "modes": [
       "minor"
     ],
-    "weight": 0.85,
+    "weight": 0.6,
     "settings": {
       "delay": [
         0.4,

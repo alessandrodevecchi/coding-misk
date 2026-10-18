@@ -9,19 +9,19 @@
   "buildStyle": "crescendo",
   "look": "palco",
   "style": {
-    "en": "Live-coded trance made for the Switch profile · G minor · 140 BPM · one held chord, then two · kick, rolling bass, lead, arp, pad",
-    "it": "Trance da live coding pensata per il profilo Switch · Sol minore · 140 BPM · un accordo tenuto, poi due · cassa, basso rotolante, melodia, arpeggio, pad"
+    "en": "Live-coded trance made for the Live coder profile · G minor · 140 BPM · one held chord, then two · kick, rolling bass, lead, arp, pad",
+    "it": "Trance da live coding pensata per il profilo Live coder · Sol minore · 140 BPM · un accordo tenuto, poi due · cassa, basso rotolante, melodia, arpeggio, pad"
   },
   "tags": {
     "genres": [
       "trance"
     ],
     "styles": [
-      "switch-trance"
+      "gated-trance"
     ],
     "free": [
       "crescendo",
-      "switch"
+      "live-coder"
     ]
   },
   "sections": [

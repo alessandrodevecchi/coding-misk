@@ -1,13 +1,10 @@
 {
   "format": 1,
-  "id": "switch-acid",
-  "family": "switch",
+  "id": "acid",
+  "family": "live-coder",
   "buildStyle": "crescendo",
   "profile": "switch",
-  "name": {
-    "en": "Switch · acid",
-    "it": "Switch · acid"
-  },
+  "name": { "en": "Acid", "it": "Acid" },
   "genre": "techno",
   "description": "Live-coded acid in one minor scale: a squelchy resonant line, a distorted kick, sparse hats and claps, built one function at a time.",
   "tempo": [

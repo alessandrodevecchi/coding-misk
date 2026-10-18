@@ -1,0 +1,34 @@
+// coding-misk · Solo synth
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(110/4)
+
+const SECTIONS = [['A', 16], ['B', 48]]
+const TEMPO = {'A': 110, 'B': 110}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!16 0!48>"  // A · 16 bars · 110 BPM · C · Cm Cm A# A#
+const section2 = "<0!16 1!48>"  // B · 48 bars · 110 BPM · C · Cm Cm A# A#
+
+// ========== Pad · pad ==========
+// A · bars 1-16 · pattern A
+// Pad · Stab
+$: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").transpose(3).struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
+  .s("gm_epiano1").attack(.01).decay(.15).sustain(0).release(.1).lpf(sine.range(926, 3706).slow(8))
+  .room(.85).gain(0.28).mask(section1).velocity(section1).orbit(6).analyze("pad")
+// B · bars 17-64 · pattern A
+$: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").transpose(3).struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
+  .s("gm_epiano1").attack(.01).decay(.15).sustain(0).release(.1).lpf(sine.range(926, 3706).slow(8))
+  .room(.85).gain(0.28).mask(section2).velocity(section2).orbit(6).analyze("pad")
+
+// ========== Lead · hook ==========
+const clip1 = "<0!8 1!8 0!48>"
+// A · bars 9-16 · pattern A
+// Hook · Signal
+$: n("<[~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>").scale("C4:minor")
+  .s("supersaw").lpf(3000)
+  .decay(.2).sustain(.3).delay(.63).room(.3).gain(0.3).mask(clip1).velocity(clip1).orbit(4).analyze("hook")
+// B · bars 17-64 · pattern A
+$: n("<[~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>").scale("C4:minor")
+  .s("supersaw").lpf(3000)
+  .decay(.2).sustain(.3).delay(.63).room(.3).gain(0.3).mask(section2).velocity(section2).orbit(4).analyze("hook")

@@ -10,12 +10,12 @@
   "normal": "waypoints",
   "look": "palco",
   "style": {
-    "en": "Switch · trance pure · F · 142 BPM",
-    "it": "Switch · trance puro · F · 142 BPM"
+    "en": "Pure trance · F · 142 BPM",
+    "it": "Trance pura · F · 142 BPM"
   },
   "tags": {
     "styles": [
-      "switch-trance-pure"
+      "pure-trance"
     ]
   },
   "sections": [

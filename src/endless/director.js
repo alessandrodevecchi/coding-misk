@@ -5,7 +5,7 @@ import { BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, TEX_RHYTHMS, GROOVES, ROWS, D
 import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT } from '../song/format.js';
 import { stateAt, SPEAKERS } from '../song/build.js';
 import { makeRng, freshSeed, stream } from './random.js';
-import { withDefaults, PART_NAMES } from './recipe.js';
+import { withDefaults, PART_NAMES, styleId } from './recipe.js';
 import { mixParts, partRecipe, partsKey, stylesOf } from './mix.js';
 import { shapePlan, LANDMARKS } from './shapes.js';
 import { energyOf, playing, curveParts } from './energy.js';
@@ -492,6 +492,8 @@ export function createSession(recipes, seed, { lead = null } = {}) {
       // with an artist, this song's styles and values come from the artist's taste
       const drawn = options && options.artist ? artistSongOptions(options.artist, Object.keys(byId), rng.artist) : null;
       const opts = { ...OPTION_DEFAULTS, ...options, ...(drawn || {}), seed };
+      // renamed styles (clear-names): saved sessions and settings may hold old ids
+      if (opts.styles) opts.styles = opts.styles.map(styleId);
       const unknown = (opts.styles || []).filter(id => !byId[id]);
       if (!opts.styles || !opts.styles.length || unknown.length) throw new Error(`unknown or missing styles: ${unknown.join(', ') || 'none'}`);
       const selected = opts.styles.map(id => byId[id]), i = entries.length;
@@ -533,7 +535,7 @@ export function leadEntry(song) {
 // else the one to three styles closest in tempo and meter. Deterministic.
 export function stylesNear(song, recipes) {
   const tags = song.tags || {}, byId = Object.fromEntries(recipes.map(r => [r.id, withDefaults(r)]));
-  const tagged = (tags.styles || []).filter(id => byId[id]);
+  const tagged = (tags.styles || []).map(styleId).filter(id => byId[id]);
   if (tagged.length) return tagged;
   const e = leadEntry(song), dist = R => (e.bpm < R.tempo[0] ? R.tempo[0] - e.bpm : e.bpm > R.tempo[1] ? e.bpm - R.tempo[1] : 0) + (R.meters.includes(e.meter) ? 0 : 30);
   const rank = list => list.map(r => byId[r.id]).sort((a, b) => dist(a) - dist(b) || (a.id < b.id ? -1 : 1));

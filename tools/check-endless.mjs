@@ -6,9 +6,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAPES, RECIPE_DEFAULTS } from '../src/endless/recipe.js';
+import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAPES, RECIPE_DEFAULTS, STYLE_ALIASES, recipeOrder } from '../src/endless/recipe.js';
 import { mixParts, stylesOf } from '../src/endless/mix.js';
 import { loadStyles } from './styles-dir.mjs';
+import { songEntry, cleanView } from '../src/library/song-filter.js';
 import { generateSession, createSession, leadEntry, stylesNear } from '../src/endless/director.js';
 import { validateArtist, ARTIST_FIELDS, PALETTES, MOVE_KINDS, VOICE_CHARACTER_NAMES } from '../src/endless/artist.js';
 import { QUIRKS } from '../src/endless/quirks.js';
@@ -248,9 +249,9 @@ const CHECKS = {
       let last = -Infinity; for (const p of e.phrases) if (p.say) { assert(p.bar - last >= 8, `talk 1: comments at bars ${last} and ${p.bar}`); last = p.bar; }
     }
   },
-  'director: Switch songs keep one key, short progressions and open in crescendo'() {
-    for (const st of ['switch-trance', 'switch-trance-pure', 'switch-acid', 'switch-house']) {
-      const out = session({ styles: [st], minutes: 20, seed: `switch-${st}` });
+  'director: Live coder styles keep one key, short progressions and open in crescendo'() {
+    for (const [st, old] of [['gated-trance', 'switch-trance'], ['pure-trance', 'switch-trance-pure'], ['acid', 'switch-acid'], ['house', 'switch-house']]) {
+      const out = session({ styles: [st], minutes: 20, seed: `switch-${old}` });
       for (const sg of out.songs) {
         assert(new Set(sg.sections.map(x => x.key)).size === 1, `${st}: one key`);
         assert(sg.sections.every(x => new Set(PROGS[x.chords][1]).size <= 4), `${st}: short progressions`);
@@ -259,13 +260,32 @@ const CHECKS = {
       }
     }
   },
-  'director: Switch · trance pure has no arpeggio and at most two chords'() {
-    const out = session({ styles: ['switch-trance-pure'], minutes: 30, seed: 'switch-pure' });
+  'director: pure trance has no arpeggio and at most two chords'() {
+    const out = session({ styles: ['pure-trance'], minutes: 30, seed: 'switch-pure' });
     assert(out.songs.length >= 3, 'songs');
     for (const sg of out.songs) {
       assert(!sg.tracks.some(t => t.type === 'arp'), `${sg.title}: arpeggio`);
       assert(sg.sections.every(x => new Set(PROGS[x.chords][1]).size <= 2), `${sg.title}: chords`);
     }
+  },
+  'renamed styles: old ids give the same songs as the new ones (sessions, artists, saved settings)'() {
+    for (const [old, now] of Object.entries(STYLE_ALIASES)) {
+      const a = session({ styles: [old], minutes: 12, seed: `alias-${old}` }), b = session({ styles: [now], minutes: 12, seed: `alias-${old}` });
+      assert(JSON.stringify(a.songs.map(x => x.tracks)) === JSON.stringify(b.songs.map(x => x.tracks)), `${old}: same songs as ${now}`);
+    }
+    // the recipe list keeps the order it had before the rename, so draws over it give the same songs
+    const ids = loadStyles().map(r => r.id), olds = ids.map(recipeOrder);
+    assert(olds.every((x, i) => !i || olds[i - 1].localeCompare(x) <= 0), `recipe order: ${ids.join(', ')}`);
+    // an artist that names an old id: valid, and plays the new style
+    const taste = { format: 1, id: 't', name: 'T', bio: { en: 'x', it: 'x' }, portrait: { seed: 't', palette: 'neon' }, styles: { 'switch-acid': 2, synthwave: 1 } };
+    assert(!validateArtist(taste, ids).errors.length, `artist with an old id: ${validateArtist(taste, ids).errors.map(e => e.msg).join('; ')}`);
+    const st = session({ artist: taste, minutes: 12, seed: 'alias-artist' }).songs.flatMap(x => (x.tags && x.tags.styles) || []);
+    assert(st.length && st.every(x => ids.includes(x)) && !st.some(x => x in STYLE_ALIASES), `artist styles: ${st.join(', ')}`);
+    // the song list: a saved song and a saved filter with an old id show the new style
+    const names = { style: id => [id], genre: g => [g], genreOf: id => (loadStyles().find(r => r.id === id) || {}).genre };
+    const e = songEntry({ id: 'x', title: 'X', tags: { styles: ['switch-acid'] } }, 0, names);
+    assert(e.styles.includes('acid') && e.genres.includes('techno'), `song entry: ${e.styles} ${e.genres}`);
+    assert(cleanView({ styles: ['switch-house'] }, { styles: ids }).styles.join() === 'house', 'saved filter');
   },
   'director: each song has its own voice'() {
     const songs = session({ styles: ['berlin-techno'], minutes: 60, seed: 'voices' });

@@ -10,12 +10,12 @@
   "normal": "waypoints",
   "look": "palco",
   "style": {
-    "en": "Endless · Switch · trance pure · F · 138 BPM · build-drop",
-    "it": "Endless · Switch · trance puro · F · 138 BPM · build-drop"
+    "en": "Endless · Pure trance · F · 138 BPM · build-drop",
+    "it": "Endless · Trance pura · F · 138 BPM · build-drop"
   },
   "tags": {
     "styles": [
-      "switch-trance-pure"
+      "pure-trance"
     ]
   },
   "sections": [

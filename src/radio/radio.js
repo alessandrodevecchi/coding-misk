@@ -9,7 +9,7 @@ import { overlapOf, extraOf } from '../endless/transitions.js';
 import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
-import { validateRecipe } from '../endless/recipe.js';
+import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
 import { buildSteps, sayText } from '../song/build.js';
 import { QUIRKS } from '../endless/quirks.js';
 import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } from '../endless/artist-maker.js';
@@ -30,7 +30,7 @@ export function usableRecipes(list) {
     const { errors } = validateRecipe(r);
     if (errors.length) console.warn(`style ${r && r.id}: ${errors.map(e => `${e.path} ${e.msg}`).join('; ')}`);
     return !errors.length;
-  }).sort((a, b) => a.id.localeCompare(b.id));
+  }).sort((a, b) => recipeOrder(a.id).localeCompare(recipeOrder(b.id)));
 }
 
 // keepArtist(artist): saves a random artist among the listener's, returns its id (#50)
@@ -38,7 +38,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const ids = recipes.map(r => r.id);
   const saved = store.get('coding-misk-radio', null) || {};
   const opts = {
-    styles: (saved.styles || []).filter(id => ids.includes(id)),
+    styles: (saved.styles || []).map(styleId).filter(id => ids.includes(id)),
     chaos: saved.chaos ?? OPTION_DEFAULTS.chaos, energy: saved.energy ?? OPTION_DEFAULTS.energy, complexity: saved.complexity ?? OPTION_DEFAULTS.complexity,
     talk: saved.talk ?? OPTION_DEFAULTS.talk,
     // the artist picked (its id), or null when the controls are set by hand ("custom")
@@ -83,7 +83,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     opts.compilation = 'off';
     if (!a) { opts.artist = null; saveOpts(); render(); return; }
     opts.artist = a.id;
-    opts.styles = Object.keys(a.styles).filter(s => a.styles[s] > 0 && recipes.some(r => r.id === s));
+    { const taste = styleKeys(a.styles); opts.styles = Object.keys(taste).filter(s => taste[s] > 0 && recipes.some(r => r.id === s)); }
     for (const k of ['chaos', 'energy', 'complexity', 'talk']) if (a[k]) opts[k] = mid(a[k]);
     saveOpts(); render();
   }

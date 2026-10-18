@@ -7,12 +7,12 @@
   "appVersion": "0.5.0",
   "profile": "switch",
   "style": {
-    "en": "Endless · Switch · trance · G · 140 BPM · slow-burn",
-    "it": "Endless · Switch · trance · G · 140 BPM · slow-burn"
+    "en": "Endless · Gated trance · G · 140 BPM · slow-burn",
+    "it": "Endless · Gated trance · G · 140 BPM · slow-burn"
   },
   "tags": {
     "styles": [
-      "switch-trance"
+      "gated-trance"
     ]
   },
   "origin": "endless",

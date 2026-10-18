@@ -10,12 +10,12 @@
   "normal": "waypoints",
   "look": "palco",
   "style": {
-    "en": "Endless · Switch · house · D · 123 BPM · build-drop",
-    "it": "Endless · Switch · house · D · 123 BPM · build-drop"
+    "en": "Endless · House · D · 123 BPM · build-drop",
+    "it": "Endless · House · D · 123 BPM · build-drop"
   },
   "tags": {
     "styles": [
-      "switch-house"
+      "house"
     ]
   },
   "sections": [

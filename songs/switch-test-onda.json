@@ -10,12 +10,12 @@
   "normal": "waypoints",
   "look": "palco",
   "style": {
-    "en": "Endless · Switch · trance · G · 142 BPM · build-drop",
-    "it": "Endless · Switch · trance · G · 142 BPM · build-drop"
+    "en": "Endless · Gated trance · G · 142 BPM · build-drop",
+    "it": "Endless · Gated trance · G · 142 BPM · build-drop"
   },
   "tags": {
     "styles": [
-      "switch-trance"
+      "gated-trance"
     ]
   },
   "sections": [
