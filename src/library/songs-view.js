@@ -5,16 +5,39 @@ import { GENRES } from '../song/format.js';
 import { KINDS, SORTS, BUILDS, cleanView, songEntry, filterSongs, pageOf, viewKey } from './song-filter.js';
 
 const VIEW_KEY = 'coding-misk-songs-view';
+// a trash can in the line style of the other icons (#68)
+const BIN = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.8 9.5h6.4L12 4M6.8 6.5v4.5M9.2 6.5v4.5"/></svg>';
 const STAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.9 4.2 4.6.5-3.4 3.1.9 4.5L8 11.5 4 13.8l.9-4.5L1.5 6.2l4.6-.5z"/></svg>';
+
+// A confirmation inside the page (#68): a strip after `anchor` with the question, [ok] and [Cancel]. Focus goes to
+// Cancel, Escape cancels; pressing the same control again closes it. key tells strips apart after one anchor.
+export function confirmInline({ anchor, trigger = null, key = 'confirm', msg, ok, t, esc, onConfirm }) {
+  const next = anchor.nextElementSibling;
+  if (next && next.matches('.sv-confirm')) { next.remove(); if (next.dataset.confirm === key) return false; }
+  anchor.insertAdjacentHTML('afterend', `<div class="sv-confirm" role="group" data-confirm="${esc(key)}" aria-label="${esc(msg)}"><span>${esc(msg)}</span><button class="btn danger" data-confirm-ok>${esc(ok)}</button><button class="btn" data-confirm-cancel>${esc(t('trashCancel'))}</button></div>`);
+  const box = anchor.nextElementSibling;
+  const close = () => { box.remove(); if (trigger && trigger.isConnected) trigger.focus(); };
+  box.addEventListener('click', e => {
+    e.stopPropagation();
+    if (e.target.closest('[data-confirm-cancel]')) close();
+    else if (e.target.closest('[data-confirm-ok]')) { box.remove(); onConfirm(); }
+  });
+  box.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+  box.querySelector('[data-confirm-cancel]').focus();
+  return true;
+}
 
 // bar: the element for the toolbar; list: the cards container; styles(): every style (built-in and the user's)
 // onChange(): called after the view changed (for the player bar's previous and next)
 // playlists: the playlist store (#36; favourites are its first list); onPlayList(listId): "Play playlist"
-export function createSongsView({ bar, list, t, tx, esc, store, styles, playlists, toast = () => {}, onPlayList = () => {}, onChange = () => {} }) {
+// trash (#68): { list() newest first, daysLeft(entry), date(iso), restore(id), forget(id), empty(), purge() }
+export function createSongsView({ bar, list, t, tx, esc, store, styles, playlists, trash = null, toast = () => {}, onPlayList = () => {}, onChange = () => {} }) {
   let view = cleanView(store.get(VIEW_KEY, null));
   if (!playlists.get(view.list)) view.list = 'all';
   const listName = l => (l.id === 'favourites' ? t('favourites') : l.name);
   let entries = [], timer = 0, stylesOpen = false, lastKey = viewKey(view);
+  // the Trash view replaces the list while open; not remembered across reloads
+  let trashOpen = false;
 
   const styleById = () => Object.fromEntries(styles().map(r => [r.id, r]));
   // names used by search and labels; a style without a genre counts as experimental
@@ -45,6 +68,7 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
 
   // toolbar: search, sort, favourites, chips for genre, kind and style
   function renderBar() {
+    if (trashOpen) { renderTrashBar(); return; }
     const allStyles = styles().slice().sort((a, b) => tx(a.name).localeCompare(tx(b.name)));
     view.styles = view.styles.filter(id => allStyles.some(r => r.id === id) || entries.some(e => e.styles.includes(id)));
     const chip = (group, val, label) => `<button class="chip small" data-f="${group}" data-v="${esc(val)}" aria-pressed="${view[group].includes(val)}">${esc(label)}</button>`;
@@ -57,9 +81,9 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
         <label class="sv-sort"><span>${esc(t('sortLbl'))}</span><select id="sv-sort" data-no-knob>${SORTS.map(s => `<option value="${s}"${view.sort === s ? ' selected' : ''}>${esc(t(`sort:${s}`))}</option>`).join('')}</select></label>
         <span class="hand-from sv-fav"><button class="led" id="sv-fav" aria-pressed="${view.favOnly}" aria-labelledby="sv-fav-lbl"></button><span id="sv-fav-lbl">${esc(t('fFav'))}</span></span>
       </div>
-      <div class="sv-row sv-lists"><span class="hand-from sv-fav"><button class="led" id="sv-never" aria-pressed="${view.neverPlayed}" aria-labelledby="sv-never-lbl"></button><span id="sv-never-lbl">${esc(t('fNever'))}</span></span><label class="sv-sort"><span class="lbl">${esc(t('playlistsLbl'))}</span><select id="sv-list" data-no-knob>${lists.map(l => `<option value="${esc(l.id)}"${view.list === l.id ? ' selected' : ''}>${esc(l.id === 'all' ? t('allSongs') : `${listName(l)} (${l.songs.length})`)}</option>`).join('')}</select></label>${view.list !== 'all' ? `<button class="btn primary sv-play-list" data-play-list="${esc(view.list)}">${esc(t('playPlaylist'))}</button>` : ''}</div>
+      <div class="sv-row sv-lists"><span class="hand-from sv-fav"><button class="led" id="sv-never" aria-pressed="${view.neverPlayed}" aria-labelledby="sv-never-lbl"></button><span id="sv-never-lbl">${esc(t('fNever'))}</span></span><label class="sv-sort"><span class="lbl">${esc(t('playlistsLbl'))}</span><select id="sv-list" data-no-knob>${lists.map(l => `<option value="${esc(l.id)}"${view.list === l.id ? ' selected' : ''}>${esc(l.id === 'all' ? t('allSongs') : `${listName(l)} (${l.songs.length})`)}</option>`).join('')}</select></label>${view.list !== 'all' ? `<button class="btn primary sv-play-list" data-play-list="${esc(view.list)}">${esc(t('playPlaylist'))}</button>` : ''}${trash ? `<button class="btn sv-trash-btn" id="sv-trash">${BIN}<span>${esc(t('trashBtn', { n: trash.list().length }))}</span></button>` : ''}</div>
       <div class="sv-group"><span class="lbl">${esc(t('fGenres'))}</span><div class="chips">${GENRES.filter(g => used.has(g) || view.genres.includes(g)).map(g => chip('genres', g, t(`g:${g}`))).join('')}</div></div>
-      <div class="sv-group"><span class="lbl">${esc(t('fKinds'))}</span><div class="chips">${KINDS.map(k => chip('kinds', k, t(`k:${k}`))).join('')}</div></div>
+      <div class="sv-group"><span class="lbl">${esc(t('fKinds'))}</span><div class="chips">${KINDS.map(k => chip('kinds', k, t(`k:${k}`))).join('')}<button class="chip small" id="sv-test" aria-pressed="${view.testOnly}" title="${esc(t('fTestTip'))}">${esc(t('fTest'))}</button></div></div>
       <div class="sv-group"><span class="lbl">${esc(t('fBuilds'))}</span><div class="chips">${BUILDS.map(k => chip('builds', k, t(`b:${k}`))).join('')}</div></div>
       <details class="sv-group sv-styles"${stylesOpen || view.styles.length ? ' open' : ''}><summary class="lbl">${esc(t('fStyles'))}${view.styles.length ? ` (${view.styles.length})` : ''}</summary><div class="chips">${allStyles.map(r => chip('styles', r.id, tx(r.name))).join('')}</div></details>
       <p class="sv-legend"><span class="lbl">${esc(t('legend'))}</span> <span class="tag-chip genre">${esc(t('tagGenre'))}</span> <span class="tag-chip style">${esc(t('tagStyleShort'))}</span> <span class="tag-chip free">#${esc(t('tagFree').toLowerCase())}</span> <span class="muted">${esc(t('legendHint'))}</span></p>
@@ -71,6 +95,8 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
   // search, filters and sort apply to every song, then the result is cut in pages (#67); a new search or filter
   // goes back to page 1
   function apply() {
+    if (trashOpen) { renderTrash(); onChange(); return; }
+    const tl = list.querySelector('.sv-trash'); if (tl) tl.hidden = true;
     if (viewKey(view) !== lastKey) { lastKey = viewKey(view); view.page = 1; save(); }
     const all = visible(), pg = pageOf(all, view.page), shown = pg.items;
     view.page = pg.page;
@@ -78,7 +104,7 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     const ids = new Set(shown.map(e => e.id));
     for (const e of shown) { const el = cards.get(e.id); if (el) list.insertBefore(el, list.querySelector('.sv-none')); }
     for (const [id, el] of cards) el.hidden = !ids.has(id);
-    const filtered = view.q || view.genres.length || view.styles.length || view.kinds.length || view.builds.length || view.favOnly || view.neverPlayed || view.list !== 'all';
+    const filtered = view.q || view.genres.length || view.styles.length || view.kinds.length || view.builds.length || view.favOnly || view.neverPlayed || view.testOnly || view.list !== 'all';
     const n = bar.querySelector('#sv-n'), clear = bar.querySelector('#sv-clear');
     const pl = view.list !== 'all' && playlists.get(view.list);
     const tot = pl ? pl.songs.length : entries.length;
@@ -101,6 +127,38 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     none.innerHTML = `${esc(t('songNone'))} <button class="btn" data-sv-clear>${esc(t('clearFilters'))}</button>`;
     onChange();
   }
+
+  // ---------- the Trash view (#68) ----------
+  function renderTrashBar() {
+    const n = trash.list().length;
+    bar.innerHTML = `
+      <div class="sv-row sv-trash-head"><h3>${BIN} ${esc(t('trashTitle'))}</h3><button class="btn" id="sv-trash-back">${esc(t('trashBack'))}</button><button class="btn danger" id="sv-trash-empty"${n ? '' : ' disabled'}>${esc(t('trashEmptyBtn'))}</button></div>
+      <p class="note sv-trash-intro">${esc(t('trashIntro'))}</p>`;
+  }
+  // the songs of the trash in place of the cards, the most recent first
+  function renderTrash() {
+    for (const el of list.querySelectorAll('[data-song-id], .sv-pager, .sv-none')) el.hidden = true;
+    let box = list.querySelector('.sv-trash');
+    if (!box) { box = document.createElement('div'); box.className = 'sv-trash'; list.prepend(box); }
+    box.hidden = false;
+    const items = trash.list();
+    box.innerHTML = items.length ? `<ul class="sv-trash-rows">${items.map(e => {
+      const d = trash.daysLeft(e);
+      return `<li class="sv-trash-row" data-trash-id="${esc(e.id)}"><span class="badge">${esc(t(`trashKind:${e.kind}`))}</span><span class="sv-trash-title">${esc(e.song.title || e.id)}</span><span class="muted">${esc(t('trashDeleted', { d: trash.date(e.deletedAt) }))} · ${esc(d === 1 ? t('trashDayLeft') : t('trashDaysLeft', { n: d }))}</span><span class="sv-trash-acts"><button class="btn" data-trash-restore>${esc(t('trashRestore'))}</button><button class="btn danger" data-trash-forget>${esc(t('trashForget'))}</button></span></li>`;
+    }).join('')}</ul>` : `<p class="note sv-trash-none">${esc(t('trashNone'))}</p>`;
+  }
+  function showTrash(on) {
+    if (on) trash.purge();
+    trashOpen = on; renderBar(); apply();
+    const focus = bar.querySelector(on ? '#sv-trash-back' : '#sv-trash'); if (focus) focus.focus();
+  }
+  list.addEventListener('click', e => {
+    const row = e.target.closest('[data-trash-id]'); if (!row) return;
+    const id = row.dataset.trashId;
+    if (e.target.closest('[data-trash-restore]')) trash.restore(id);
+    const forget = e.target.closest('[data-trash-forget]');
+    if (forget) confirmInline({ anchor: row.querySelector('.sv-trash-acts'), trigger: forget, key: 'forget', msg: t('trashForgetAsk'), ok: t('trashForget'), t, esc, onConfirm: () => trash.forget(id) });
+  });
 
   const clearAll = () => { view = cleanView(null); save(); renderBar(); apply(); };
   bar.addEventListener('input', e => {
@@ -127,6 +185,11 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     if (e.target.closest('#sv-fav-lbl')) { bar.querySelector('#sv-fav').click(); return; }
     if (e.target.closest('#sv-never')) { view.neverPlayed = !view.neverPlayed; e.target.closest('#sv-never').setAttribute('aria-pressed', view.neverPlayed); save(); apply(); return; }
     if (e.target.closest('#sv-never-lbl')) { bar.querySelector('#sv-never').click(); return; }
+    if (e.target.closest('#sv-test')) { view.testOnly = !view.testOnly; e.target.closest('#sv-test').setAttribute('aria-pressed', view.testOnly); save(); apply(); return; }
+    if (e.target.closest('#sv-trash')) { showTrash(true); return; }
+    if (e.target.closest('#sv-trash-back')) { showTrash(false); return; }
+    const empty = e.target.closest('#sv-trash-empty');
+    if (empty) { confirmInline({ anchor: bar.querySelector('.sv-trash-head'), trigger: empty, key: 'empty', msg: t('trashEmptyAsk'), ok: t('trashEmptyBtn'), t, esc, onConfirm: () => trash.empty() }); return; }
     const pageBtn = e.target.closest('[data-sv-page]');
     if (pageBtn && !pageBtn.disabled) { view.page = +pageBtn.dataset.svPage; save(); apply(); list.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
     if (e.target.closest('#sv-clear')) clearAll();
@@ -136,10 +199,12 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
     const pageBtn = e.target.closest('[data-sv-page]');
     if (pageBtn && !pageBtn.disabled) { view.page = +pageBtn.dataset.svPage; save(); apply(); bar.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
     // a tag on a card filters by it: genre and style add their chip, a free tag goes in the search
+    // (#test turns the Test chip on, #68)
     const tag = e.target.closest('[data-tag-f]');
     if (!tag) return;
     const g = tag.dataset.tagF, v = tag.dataset.v;
-    if (g === 'q') view.q = v;
+    if (g === 'q' && v === 'test') view.testOnly = true;
+    else if (g === 'q') view.q = v;
     else if (!view[g].includes(v)) view[g] = [...view[g], v];
     save(); renderBar(); apply();
     bar.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -225,5 +290,6 @@ export function createSongsView({ bar, list, t, tx, esc, store, styles, playlist
   const order = () => visible().map(e => e.id);
   // shows only one genre (from the Genres tab, #43)
   function onlyGenre(g) { view = cleanView({ genres: [g] }); save(); }
-  return { onlyGenre, setSongs, renderBar, apply, order, isFav, toggleFav, starButton, tagsHtml, tagsPanel, playlistMenu, listName, get view() { return view; } };
+  const confirm = opts => confirmInline({ t, esc, ...opts });
+  return { onlyGenre, setSongs, confirm, get trashOpen() { return trashOpen; }, renderBar, apply, order, isFav, toggleFav, starButton, tagsHtml, tagsPanel, playlistMenu, listName, get view() { return view; } };
 }

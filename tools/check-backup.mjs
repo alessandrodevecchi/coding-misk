@@ -26,6 +26,24 @@ const CHECKS = {
     const p = values['coding-misk-played'];
     assert(p.a === 5 && p.b === 4 && p.c === 2, JSON.stringify(p));
   },
+  'the trash merges by id and never deletes a song (#68)'() {
+    const cur = { 'coding-misk-library': { tracks: [{ id: 'a' }], code: {}, codeSongs: [], trash: [{ id: 'old', kind: 'track', song: { id: 'old' }, deletedAt: '2026-10-01T00:00:00.000Z' }] } };
+    const b = { format: BACKUP_FORMAT, data: { 'coding-misk-library': { tracks: [], codeSongs: [{ id: 'v1' }], trash: [
+      { id: 'a', kind: 'track', song: { id: 'a' }, deletedAt: '2026-10-02T00:00:00.000Z' }, { id: 'b', kind: 'track', song: { id: 'b' }, deletedAt: '2026-10-03T00:00:00.000Z' }] } } };
+    const lib = mergeBackup(b, k => cur[k]).values['coding-misk-library'];
+    assert(lib.trash.map(e => e.id).join() === 'old,b', `trash ${lib.trash.map(e => e.id)}`);
+    assert(lib.tracks.map(x => x.id).join() === 'a' && lib.codeSongs.map(x => x.id).join() === 'v1', 'songs kept');
+    // a song deleted here but alive in the backup comes back to the list and leaves the trash
+    const back = mergeBackup({ format: BACKUP_FORMAT, data: { 'coding-misk-library': { tracks: [{ id: 'old' }] } } }, k => cur[k]).values['coding-misk-library'];
+    assert(back.tracks.map(x => x.id).join() === 'a,old' && !back.trash.length, JSON.stringify(back.trash));
+  },
+  'an old backup without trash keeps the current trash'() {
+    const cur = { 'coding-misk-library': { tracks: [], code: {}, trash: [{ id: 'x', kind: 'track', song: { id: 'x' }, deletedAt: '2026-10-01T00:00:00.000Z' }] } };
+    const lib = mergeBackup({ format: BACKUP_FORMAT, data: { 'coding-misk-library': { tracks: [{ id: 'y' }], code: {} } } }, k => cur[k]).values['coding-misk-library'];
+    assert(lib.trash.map(e => e.id).join() === 'x', JSON.stringify(lib.trash));
+    const none = mergeBackup({ format: BACKUP_FORMAT, data: { 'coding-misk-library': { tracks: [{ id: 'y' }] } } }, () => null).values['coding-misk-library'];
+    assert(Array.isArray(none.trash) && !none.trash.length, 'missing on both sides');
+  },
   'a file that is not a backup is refused'() { assert(mergeBackup({ format: 'x' }, () => null).error, 'accepted'); },
 };
 let failed = 0;

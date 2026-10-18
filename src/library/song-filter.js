@@ -8,7 +8,7 @@ export const SORTS = ['default', 'title', 'bpm', 'length', 'created', 'played'];
 // build style of a song (#67): in blocks (its own steps or declared), crescendo, none
 export const BUILDS = ['blocks', 'crescendo', 'none'];
 export const PAGE_SIZE = 20;
-export const VIEW_DEFAULT = { q: '', genres: [], styles: [], kinds: [], builds: [], favOnly: false, neverPlayed: false, sort: 'default', list: 'all', page: 1 };
+export const VIEW_DEFAULT = { q: '', genres: [], styles: [], kinds: [], builds: [], favOnly: false, neverPlayed: false, testOnly: false, sort: 'default', list: 'all', page: 1 };
 export const buildOf = ({ buildStyle, build = false }) => (buildStyle === 'crescendo' ? 'crescendo' : buildStyle === 'blocks' || build ? 'blocks' : 'none');
 
 // lowercase, without accents: "Frigio" and "frìgio" match "frigio"
@@ -41,6 +41,8 @@ export function songEntry(song, index, names, favourites = [], played = {}) {
   return {
     id: song.id, index, title: song.title || '', text, genres, styles, free,
     kind: kindOf(song), mine: !!song.mine, fav: favourites.includes(song.id),
+    // the free tag test marks a test song (#68)
+    test: free.includes('test'),
     bpm: Number(song.bpm) || 0, seconds: Number(song.seconds) || 0,
     build: buildOf(song), created: Date.parse(song.created) || 0, played: Number(played[song.id]) || 0,
   };
@@ -59,6 +61,7 @@ export function filterSongs(entries, view = VIEW_DEFAULT) {
     (!v.kinds.length || matchKinds(e, v.kinds)) &&
     (!v.builds.length || v.builds.includes(e.build)) &&
     (!v.neverPlayed || !e.played) &&
+    (!v.testOnly || e.test) &&
     (!v.favOnly || e.fav));
   const by = {
     default: (a, b) => a.index - b.index,
@@ -82,7 +85,7 @@ export function cleanView(raw, { styles = [] } = {}) {
     styles: list((Array.isArray(v.styles) ? v.styles : []).map(styleId), s => typeof s === 'string' && (!styles.length || styles.includes(s))),
     kinds: list(v.kinds, k => KINDS.includes(k)),
     builds: list(v.builds, b => BUILDS.includes(b)),
-    favOnly: !!v.favOnly, neverPlayed: !!v.neverPlayed,
+    favOnly: !!v.favOnly, neverPlayed: !!v.neverPlayed, testOnly: !!v.testOnly,
     page: Number.isInteger(v.page) && v.page > 0 ? v.page : 1,
     sort: SORTS.includes(v.sort) ? v.sort : 'default',
     list: typeof v.list === 'string' && v.list ? v.list : 'all',
@@ -99,4 +102,4 @@ export function pageOf(list, page = 1, size = PAGE_SIZE) {
   return { items, page: p, pages, from: total ? (p - 1) * size + 1 : 0, to: (p - 1) * size + items.length, total };
 }
 // what decides the list: when it changes, the list goes back to page 1
-export const viewKey = v => JSON.stringify([v.q, v.genres, v.styles, v.kinds, v.builds, v.favOnly, v.neverPlayed, v.sort, v.list]);
+export const viewKey = v => JSON.stringify([v.q, v.genres, v.styles, v.kinds, v.builds, v.favOnly, v.neverPlayed, v.testOnly, v.sort, v.list]);

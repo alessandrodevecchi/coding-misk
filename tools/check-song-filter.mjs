@@ -56,6 +56,23 @@ const CHECKS = {
     const v = cleanView({ builds: ['crescendo', 'x'], neverPlayed: 1, page: 0 });
     assert(v.builds.join() === 'crescendo' && v.neverPlayed === true && v.page === 1, 'clean view');
   },
+  'the test tag and its filter (#68)'() {
+    const songs = [{ id: 't1', title: 'Prova', tags: { free: ['test'] } }, { id: 't2', title: 'Mine test', tags: { free: ['reel', 'test'] }, mine: true }, { id: 'n1', title: 'Normal', tags: { free: ['testing'] } }, { id: 'n2', title: 'Other', mine: true }];
+    const e = songs.map((x, i) => songEntry(x, i, names));
+    assert(e.map(x => x.test).join() === 'true,true,false,false', 'test from the free tags');
+    assert(filterSongs(e, {}).length === 4, 'the default view lists test songs');
+    assert(filterSongs(e, { testOnly: true }).map(x => x.id).join() === 't1,t2', 'test only');
+    assert(filterSongs(e, { testOnly: true, kinds: ['mine'] }).map(x => x.id).join() === 't2', 'with AND, like the other filters');
+    const v = cleanView({ testOnly: 1 });
+    assert(v.testOnly === true && cleanView({}).testOnly === false, 'clean view keeps it');
+    assert(viewKey({ testOnly: true }) !== viewKey({ testOnly: false }), 'in the key');
+    // the built-in test songs carry the tag; the reference songs of the Live coder profile do not
+    const TEST = ['prova-apre-arpeggio', 'prova-breakbeat', 'prova-drum-and-bass', 'prova-solo-synth', 'switch-test-breve', 'switch-test-onda', 'switch-test-stanza', 'switch-test-acido', 'switch-trance-prova', 'switch-acid-prova', 'switch-house-prova'];
+    const tagged = id => ((JSON.parse(fs.readFileSync(`songs/${id}.json`, 'utf8')).tags || {}).free || []).includes('test');
+    const miss = TEST.filter(id => !tagged(id));
+    assert(!miss.length, `untagged test songs: ${miss}`);
+    assert(!tagged('switch-tappe') && !tagged('switch-prima-luce'), 'reference songs tagged test');
+  },
   'every built-in recipe declares a valid genre': () => {
     for (const r of STYLES) {
       assert(GENRES.includes(r.genre), `${r.id}: genre ${r.genre}`);

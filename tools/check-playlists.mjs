@@ -35,6 +35,15 @@ const CHECKS = {
     const clash = p.create('Again', r.songs, { [sid]: { ...SESSION, count: 9 } });
     assert(clash.songs[1] !== sid && p.session(clash.songs[1]).count === 9 && p.session(sid).count === 3, 'a different session with the same id gets a new id');
   },
+  'a deleted song leaves every list, favourites included (#68)'() {
+    const st = memory(), p = createPlaylistStore(st);
+    p.toggleFav('a'); p.toggleFav('b');
+    const l = p.create('Night', ['b', 'a', 'c']), m = p.create('Other', ['c']);
+    assert(p.removeSong('a') === 2, 'two lists changed');
+    assert(p.favourites.songs.join() === 'b' && p.get(l.id).songs.join() === 'b,c' && p.get(m.id).songs.join() === 'c', JSON.stringify(p.all));
+    assert(createPlaylistStore(st).get(l.id).songs.join() === 'b,c', 'saved');
+    assert(p.removeSong('zz') === 0, 'an id in no list changes nothing');
+  },
   'favourites always first and fixed': () => {
     const st = createPlaylistStore(memory());
     assert(st.all.length === 1 && st.all[0].id === FAV_ID, 'favourites created');

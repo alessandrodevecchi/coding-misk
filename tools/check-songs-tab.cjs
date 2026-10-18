@@ -1,4 +1,5 @@
-// Browser checks for the Songs tab (#34): search, filters, favourites, sorting, tag editing, previous and next.
+// Browser checks for the Songs tab (#34): search, filters, favourites, sorting, tag editing, previous and next,
+// delete, the trash and the Test chip (#68).
 // Usage: PLAYWRIGHT_CORE=... node tools/check-songs-tab.cjs [shots-dir]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -41,6 +42,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   let tv = await visible();
   check(tv.includes('kellerlicht') && !tv.includes('drift') && (await page.getAttribute('[data-f="styles"][data-v="berlin-techno"]', 'aria-pressed')) === 'true', 'a style tag on a card filters by that style', tv.join(', '));
   await page.click('#sv-clear'); await sleep(200);
+  // neon-rush-reel is on page 2 (20 songs a page, #67): a search brings it to page 1
+  await page.fill('#sv-q', 'neon rush'); await sleep(400);
   await page.click('#songs [data-song-id="neon-rush-reel"] [data-tag-f="q"]'); await sleep(300);
   check((await page.inputValue('#sv-q')) === 'reel' && (await visible()).includes('neon-rush-reel'), 'a free tag on a card goes in the search');
   await page.click('#sv-clear'); await sleep(200);
@@ -147,6 +150,117 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const renamed = await page.innerText('#songs [data-song-id="u-test"] .song-tags');
   const tagsNow = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-library')).tracks[0].tags.styles);
   check(/Late drive|Tarda notte/.test(renamed) && tagsNow.join() === 'late-drive', 'a renamed style renames its tag', `${renamed.replace(/\n/g, ' ')} · ${tagsNow}`);
+
+  // ---------- delete and trash (#68) ----------
+  // two more songs of the user's (one in favourites and a playlist), a code version, and a trash with an entry
+  // 31 days old and one 2 days old
+  await page.evaluate(async () => {
+    const song = await (await fetch('/songs/luci-rosse.json')).json();
+    const lib = JSON.parse(localStorage.getItem('coding-misk-library'));
+    const ago = d => new Date(Date.now() - d * 864e5).toISOString();
+    lib.tracks.push({ ...song, id: 'u-del', title: 'Da eliminare', tags: { free: ['test'] } });
+    lib.codeSongs = [{ id: 'v-del', title: 'Ghost · v2', code: "const SECTIONS = [['intro', 4], ['drop', 4]]\nconst TEMPO = {'intro': 128, 'drop': 128}\nnote('c a f e').s('sawtooth')", from: 'ghost-protocol', fromTitle: 'Ghost protocol', version: 2, created: ago(1) }];
+    lib.trash = [{ id: 'u-old', kind: 'track', song: { ...song, id: 'u-old', title: 'Vecchio' }, deletedAt: ago(31) }, { id: 'u-recent', kind: 'track', song: { ...song, id: 'u-recent', title: 'Recente' }, deletedAt: ago(2) }];
+    localStorage.setItem('coding-misk-library', JSON.stringify(lib));
+    const pl = JSON.parse(localStorage.getItem('coding-misk-playlists'));
+    pl.lists[0].songs.push('u-del');
+    pl.lists.push({ id: 'p-check', name: 'Serata', songs: ['u-del', 'drift'] });
+    localStorage.setItem('coding-misk-playlists', JSON.stringify(pl));
+  });
+  await page.reload(); await sleep(3500);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
+  const clearView = async () => { await page.evaluate(() => { const b = document.querySelector('#sv-clear'); if (b && !b.hidden) b.click(); }); await sleep(200); };
+  const saved = () => page.evaluate(() => ({ lib: JSON.parse(localStorage.getItem('coding-misk-library')), pl: JSON.parse(localStorage.getItem('coding-misk-playlists')) }));
+  let st = await saved();
+  check(st.lib.trash.map(e => e.id).join() === 'u-recent', 'purge at start: the entry 31 days old is gone, the other stays', st.lib.trash.map(e => e.id).join());
+  check(!(await page.$('#songs [data-song-id="kellerlicht"] [data-act="delete"]')) && !(await page.$('#songs [data-song-id="ghost-protocol"] [data-act="delete"]')), 'built-in cards have no Delete');
+  await clearView();
+  await page.click('[data-f="kinds"][data-v="mine"]'); await sleep(300);
+  v = await visible();
+  check(v.includes('u-del') && v.includes('v-del'), 'the user\'s songs and versions are listed', v.join(', '));
+  const del = '#songs [data-song-id="u-del"] [data-act="delete"]', strip = '#songs [data-song-id="u-del"] .sv-confirm';
+  await page.click(del); await sleep(200);
+  check(await page.isVisible(strip) && await page.evaluate(() => document.activeElement.matches('[data-confirm-cancel]')), 'Delete opens a confirmation in the card, focus on Cancel');
+  if (shots) await (await page.$('#songs [data-song-id="u-del"]')).screenshot({ path: path.join(shots, 'trash-confirm.png') });
+  await page.click(`${strip} [data-confirm-cancel]`); await sleep(200);
+  check(!(await page.$(strip)) && (await visible()).includes('u-del'), 'Cancel closes it and keeps the song');
+  await page.click(del); await sleep(200); await page.keyboard.press('Escape'); await sleep(200);
+  check(!(await page.$(strip)) && (await visible()).includes('u-del'), 'Escape cancels');
+  await page.click(del); await sleep(200); await page.click(`${strip} [data-confirm-ok]`); await sleep(500);
+  st = await saved();
+  const lists = Object.fromEntries(st.pl.lists.map(l => [l.id, l.songs]));
+  check(!(await page.$('#songs [data-song-id="u-del"]')) && st.lib.trash[0].id === 'u-del' && !st.lib.tracks.some(x => x.id === 'u-del'), 'confirmed: the song leaves the list for the trash');
+  check(!lists.favourites.includes('u-del') && lists['p-check'].join() === 'drift', 'the song left favourites and the playlist', JSON.stringify(lists));
+  check(/trash/i.test(await page.innerText('.toast')) && await page.isVisible('.toast .toast-act'), 'toast with Restore');
+  await page.click('.toast .toast-act'); await sleep(500);
+  check((await visible()).includes('u-del') && !(await saved()).lib.trash.some(e => e.id === 'u-del'), 'Restore in the toast brings it back');
+  await page.click(del); await sleep(200); await page.click(`${strip} [data-confirm-ok]`); await sleep(400);
+  await page.click('#songs [data-song-id="v-del"] [data-act="delete"]'); await sleep(200);
+  await page.click('#songs [data-song-id="v-del"] .sv-confirm [data-confirm-ok]'); await sleep(400);
+  check(!(await page.$('#songs [data-song-id="v-del"]')) && (await saved()).lib.codeSongs.length === 0, 'a code version goes to the trash too');
+  check(/\(3\)/.test(await page.innerText('#sv-trash')), 'Trash (3) in the bar', await page.innerText('#sv-trash'));
+
+  // the Trash view
+  await page.click('#sv-trash'); await sleep(300);
+  const rows = () => page.$$eval('.sv-trash-row', xs => xs.map(x => x.dataset.trashId));
+  const rowText = await page.$$eval('.sv-trash-row', xs => xs.map(x => x.innerText.replace(/\s+/g, ' ')));
+  check((await rows()).join() === 'v-del,u-del,u-recent' && !(await page.$('#sv-q')) && (await visible()).length === 0, 'Trash view: newest first, search and cards hidden', (await rows()).join());
+  check(/30 days left/.test(rowText[1]) && /28 days left/.test(rowText[2]) && /code version/i.test(rowText[0]), 'kind, date and days left', rowText.join(' | '));
+  if (shots) await page.screenshot({ path: path.join(shots, 'trash-view.png') });
+  await page.click('.sv-trash-row[data-trash-id="u-del"] [data-trash-restore]'); await sleep(400);
+  check((await rows()).join() === 'v-del,u-recent', 'Restore leaves the trash');
+  await page.click('.sv-trash-row[data-trash-id="v-del"] [data-trash-forget]'); await sleep(200);
+  check(await page.isVisible('.sv-trash-row[data-trash-id="v-del"] .sv-confirm'), 'Delete for good asks first');
+  if (shots) await page.screenshot({ path: path.join(shots, 'trash-forget.png') });
+  await page.click('.sv-trash-row[data-trash-id="v-del"] .sv-confirm [data-confirm-ok]'); await sleep(400);
+  check((await rows()).join() === 'u-recent', 'deleted for good');
+  await page.click('#sv-trash-empty'); await sleep(200);
+  await page.click('.sv-trash-head + .sv-confirm [data-confirm-ok]'); await sleep(400);
+  check(await page.isVisible('.sv-trash-none') && !(await saved()).lib.trash.length, 'Empty trash: the empty state shows');
+  if (shots) await page.screenshot({ path: path.join(shots, 'trash-empty.png') });
+  await page.click('#sv-trash-back'); await sleep(300);
+  v = await visible();
+  st = await saved();
+  check(v.includes('u-del') && !st.pl.lists.some(l => l.songs.includes('u-del')), 'restored: back in the list, in no playlist', v.join(', '));
+
+  // a delete survives a reload
+  await page.click(del); await sleep(200); await page.click(`${strip} [data-confirm-ok]`); await sleep(400);
+  await page.reload(); await sleep(3500);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
+  await page.click('#sv-trash'); await sleep(300);
+  check((await rows()).join() === 'u-del', 'the trash is kept after a reload');
+  await page.click('.sv-trash-row[data-trash-id="u-del"] [data-trash-restore]'); await sleep(300);
+  await page.click('#sv-trash-back'); await sleep(300);
+
+  // the Test chip
+  await clearView();
+  await page.fill('#sv-q', 'breakbeat'); await sleep(400);
+  check((await page.getAttribute('#sv-test', 'aria-pressed')) === 'false' && (await visible()).includes('prova-breakbeat'), 'test songs listed by default');
+  await page.fill('#sv-q', ''); await sleep(400);
+  await page.click('#sv-test'); await sleep(300);
+  v = await visible();
+  const allTest = await page.$$eval('#songs [data-song-id]', xs => xs.filter(x => !x.hidden).every(x => x.querySelector('[data-tag-f="q"][data-v="test"]')));
+  check(v.includes('prova-breakbeat') && v.includes('u-del') && !v.includes('kellerlicht') && !v.includes('switch-tappe') && allTest, 'Test chip: only test songs, built-in and the user\'s', v.join(', '));
+  await page.click('#sv-test'); await sleep(200);
+  await page.fill('#sv-q', 'breakbeat'); await sleep(400);
+  await page.click('#songs [data-song-id="prova-breakbeat"] [data-tag-f="q"][data-v="test"]'); await sleep(300);
+  check((await page.getAttribute('#sv-test', 'aria-pressed')) === 'true' && (await page.inputValue('#sv-q')) === 'breakbeat', 'a #test tag on a card turns the Test chip on');
+  await page.click('#sv-clear'); await sleep(200);
+
+  // Compose: Delete song asks under its buttons, the song goes to the trash, Compose opens another song
+  await page.click('[data-f="kinds"][data-v="mine"]'); await sleep(200);
+  await page.click('#songs [data-song-id="u-del"] [data-act="open"]'); await sleep(800);
+  await page.click('#tr-del'); await sleep(200);
+  check(await page.isVisible('.actions:has(#tr-del) + .sv-confirm') && /trash/i.test(await page.innerText('.actions:has(#tr-del) + .sv-confirm')), 'Compose: the confirmation strip under the buttons');
+  if (shots) await page.screenshot({ path: path.join(shots, 'trash-compose.png') });
+  await page.click('.actions:has(#tr-del) + .sv-confirm [data-confirm-ok]'); await sleep(600);
+  st = await saved();
+  check((await page.inputValue('#track-title')) !== 'Da eliminare' && st.lib.trash.some(e => e.id === 'u-del'), 'Compose: the song is in the trash and Compose opened another', await page.inputValue('#track-title'));
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
+  await clearView();
+  await page.click('#songs [data-song-id="kellerlicht"] [data-act="open"]'); await sleep(800);
+  check((await page.innerText('#tr-del')) === 'Restore original', 'Compose: a built-in song keeps Restore original', await page.innerText('#tr-del'));
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
 
   // phone width: no horizontal scroll
   await page.setViewportSize({ width: 390, height: 900 }); await sleep(400);

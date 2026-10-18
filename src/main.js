@@ -22,7 +22,8 @@ import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { createStylesTab } from './library/styles-tab.js';
 import { createArtistsTab } from './library/artists-tab.js';
-import { createSongsView } from './library/songs-view.js';
+import { createSongsView, confirmInline } from './library/songs-view.js';
+import { trashSong, restoreSong, deleteForGood, emptyTrash, purgeTrash, trashList, daysLeft } from './library/trash.js';
 import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS, isSession } from './library/playlists.js';
 import { DIRECTOR_VERSION } from './endless/director.js';
@@ -115,6 +116,13 @@ function composedTracks() {
 // code songs: the hand-written originals, then the versions saved from live coding by hand (#33)
 if (!Array.isArray(user.codeSongs)) user.codeSongs = [];
 const codedTracks = () => [...CODED, ...user.codeSongs.map(v => ({ ...v, kind: 'coded' }))].map(c => ({ ...c, code: user.code[c.id] || c.code }));
+// the trash (#68, src/library/trash.js): deleted songs wait 30 days; the purge runs at start and when the Trash view opens
+function purgeOld() {
+  const n = trashList(user).length;
+  Object.assign(user, purgeTrash(user, new Date()));
+  if (trashList(user).length !== n) saveLibrary();
+}
+purgeOld();
 let liveOn = !!store.get('coding-misk-live', false);
 // performance profiles (performance-profiles): Classic, Crescendo, Live coder (id switch), each a set of controls (build style,
 // growth rules, typing, code view, generator, comments, highlights). The Compose choice, the controls changed by hand
@@ -544,11 +552,18 @@ $('#share').addEventListener('pointerdown', updateShare);
 $('#share').addEventListener('focus', updateShare);
 
 let toastT = 0;
-function toast(msg) {
+// action: { label, run } adds a button (Restore after a delete, #68) and keeps the toast a little longer
+function toast(msg, action = null) {
   let box = $('.toast');
   if (!box) { box = document.createElement('div'); box.className = 'toast'; box.setAttribute('role', 'status'); document.body.appendChild(box); }
   box.textContent = msg; box.hidden = false;
-  clearTimeout(toastT); toastT = setTimeout(() => box.hidden = true, 2600);
+  if (action) {
+    const b = document.createElement('button');
+    b.className = 'btn toast-act'; b.textContent = action.label;
+    b.addEventListener('click', () => { box.hidden = true; action.run(); });
+    box.append(' ', b);
+  }
+  clearTimeout(toastT); toastT = setTimeout(() => box.hidden = true, action ? 5000 : 2600);
 }
 // conferma in due tocchi
 const armed = {};
@@ -1685,18 +1700,54 @@ function newSongFromArtist(a) {
   showTab('componi');
   toast(t('newFromArtistDone', { name: a.name }));
 }
-$('#tr-del').addEventListener('click', () => {
-  if (!confirmTwice('delete')) return;
-  const orig = builtinOf(T.id);
-  user.tracks = user.tracks.filter(u => u.id !== T.id);
-  saveLibrary();
-  T = prepare(orig || composedTracks()[0]);
+// Compose leaves the song open: the original of a built-in song, else the first song
+function leaveSong(src) {
+  T = prepare(src || composedTracks()[0]);
   dirty = false; sel = 0; tk = 0; editPat = null;
   compiled = playable({ ...T, kind: 'composed' });
-  saveDraft(); syncAll(); renderArranger(); renderTrackPanel(); renderSongs(); renderSource();
+  saveDraft(); syncAll(); renderArranger(); renderTrackPanel(); renderSource();
   if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.code);
-  toast(orig ? t('restored') : t('trackDeleted'));
+}
+// "Delete song" asks in a strip under the buttons (#68): a saved song of the user's goes to the trash, an unsaved
+// one is discarded, a built-in song gets its original back
+$('#tr-del').addEventListener('click', e => {
+  const id = T.id, orig = builtinOf(id), stored = user.tracks.some(u => u.id === id);
+  confirmInline({ anchor: e.currentTarget.closest('.actions'), trigger: e.currentTarget, key: 'tr-del', t, esc,
+    msg: t(orig ? 'restoreAsk' : stored ? 'trashAsk' : 'discardAsk'), ok: t(orig ? 'restoreOrig' : 'songDelete'),
+    onConfirm: () => {
+      if (T.id !== id) return;
+      if (!orig && stored) { trashUserSong(id); return; }
+      user.tracks = user.tracks.filter(u => u.id !== id);
+      saveLibrary(); leaveSong(orig); renderSongs();
+      toast(orig ? t('restored') : t('trackDeleted'));
+    } });
 });
+// a song of the user's (composed, or a hand-coded version) to the trash: it leaves every playlist, Compose moves off it;
+// a song playing keeps playing, the queue skips it
+function trashUserSong(id) {
+  const sg = [...user.tracks, ...user.codeSongs].find(x => x.id === id);
+  if (!sg || isBuiltin(id)) return false;
+  Object.assign(user, trashSong(user, id, new Date()));
+  saveLibrary();
+  playlists.removeSong(id);
+  if (T.id === id) leaveSong();
+  cards = []; renderSongs();
+  toast(t('trashMoved', { title: sg.title }), { label: t('trashRestore'), run: () => restoreFromTrash(id) });
+  return true;
+}
+function restoreFromTrash(id) {
+  const e = trashList(user).find(x => x.id === id); if (!e) return;
+  Object.assign(user, restoreSong(user, id));
+  saveLibrary(); cards = []; renderSongs();
+  toast(t('trashRestored', { title: e.song.title }));
+}
+function forgetFromTrash(id) {
+  const e = trashList(user).find(x => x.id === id); if (!e) return;
+  Object.assign(user, deleteForGood(user, id));
+  saveLibrary(); renderSongs();
+  toast(t('trashGone', { title: e.song.title }));
+}
+function emptyTheTrash() { Object.assign(user, emptyTrash(user)); saveLibrary(); renderSongs(); toast(t('trashEmptied')); }
 
 // ---------- controlli ----------
 const opts = (box, list) => {
@@ -2293,7 +2344,7 @@ function songCard({ tr, p }, i) {
       <span class="btn-cluster">
         <button class="btn" data-act="playlist" aria-expanded="false">${t('addToPlaylist')}</button>
         ${composed && continuable(tr) ? `<button class="btn" data-act="radio" title="${esc(t('continueRadioTip'))}">${t('continueRadio')}</button>` : ''}
-        ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}${tr.version ? `<button class="btn danger" data-act="del-version">${t('plDelete')}</button>` : ''}`}
+        ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>${own ? `<button class="btn danger" data-act="delete">${t('songDelete')}</button>` : ''}` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}${tr.version ? `<button class="btn danger" data-act="delete">${t('songDelete')}</button>` : ''}`}
       </span>
       <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
       <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
@@ -2406,6 +2457,8 @@ function advanceFrom(id) {
   return false;
 }
 const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, tx, esc, store, styles: allStyles, playlists, toast,
+  trash: { list: () => trashList(user), daysLeft: e => daysLeft(e, new Date()), date: iso => new Date(iso).toLocaleDateString(getLang() === 'it' ? 'it-IT' : 'en-GB'),
+    restore: restoreFromTrash, forget: forgetFromTrash, empty: emptyTheTrash, purge: purgeOld },
   onPlayList: (listId, ids) => playQueue(listId, ids) });
 playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, playlists, confirmTwice, toast,
   songs: () => [...libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: c.p.meta.seconds })),
@@ -2501,7 +2554,8 @@ $('#songs').addEventListener('click', e => {
       showTab('componi'); return;
     }
     if (a === 'code') { if (ed) ed.stop(); paused = null; song = p; mode = 'free'; source = { kind: 'song', name: tr.title, id: tr.id }; renderSource(); if (ed) ed.setCode(p.code); updateShare(); return; }
-    if (a === 'del-version') { if (!confirmTwice('delv-' + tr.id, t('confirmAgain'))) return; user.codeSongs = user.codeSongs.filter(v => v.id !== tr.id); delete user.code[tr.id]; saveLibrary(); cards = []; renderSongs(); toast(t('trackDeleted')); return; }
+    // the user's songs and hand-coded versions go to the trash after a confirmation in the card (#68)
+    if (a === 'delete') { songsView.confirm({ anchor: card.querySelector('.songbar'), trigger: act, key: 'delete', msg: t('trashAsk'), ok: t('songDelete'), onConfirm: () => trashUserSong(tr.id) }); return; }
     if (a === 'restore') { if (!confirmTwice('restore-' + tr.id)) return; delete user.code[tr.id]; saveLibrary(); renderSongs(); toast(t('restored')); return; }
   }
   const chip = e.target.closest('.trans [data-seek]');

@@ -109,6 +109,13 @@ export function createPlaylistStore(store, now = () => Date.now()) {
       const [x] = l.songs.splice(from, 1); l.songs.splice(to, 0, x); save();
       return true;
     },
+    // a song moved to the trash (#68) leaves every list, favourites included; returns how many lists held it
+    removeSong(songId) {
+      let n = 0;
+      for (const l of data.lists) if (l.songs.includes(songId)) { l.songs = l.songs.filter(x => x !== songId); n++; }
+      if (n) save();
+      return n;
+    },
     // replace a song id everywhere (an imported song that got a new id)
     renameSong(from, to) { for (const l of data.lists) l.songs = uniq(l.songs.map(x => (x === from ? to : x))); save(); },
   };

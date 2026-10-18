@@ -13,6 +13,9 @@
   "tags": {
     "styles": [
       "acid"
+    ],
+    "free": [
+      "test"
     ]
   },
   "origin": "endless",

@@ -13,6 +13,9 @@
   "tags": {
     "styles": [
       "house"
+    ],
+    "free": [
+      "test"
     ]
   },
   "origin": "endless",
