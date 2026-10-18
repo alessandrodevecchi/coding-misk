@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readFunctions, lookup, ROOT } from './strudel-functions.mjs';
 import { collectCalls, coverageOf, KINDS, RADIO_MINUTES } from './strudel-code.mjs';
+import { LIBRARY, NAMES } from '../src/song/functions.js';
 
 export const FILES = {
   functions: path.join(ROOT, 'docs/strudel/functions.json'),
@@ -52,9 +53,21 @@ export function page(catalog, coverage, variety) {
     `- Undocumented (registered or declared with no \`@name\` comment): ${fs_.length - documented}`,
     `- Written by the app: ${written}`,
     `- Never written: ${never.length}`,
-    `- Code read for the coverage: ${coverage.source.codes} texts (every song in \`songs/\` and \`songs/examples/\`, every live build step in each profile and functions option, one ${RADIO_MINUTES}-minute radio session per style with seed \`catalog-<style>\`, the helpers prelude)`,
+    `- Code read for the coverage: ${coverage.source.codes} texts (every song in \`songs/\` and \`songs/examples/\`, every live build step in each profile and technical functions preset, one ${RADIO_MINUTES}-minute radio session per style with seed \`catalog-<style>\`, the helpers prelude)`,
     '',
     '"Written by" counts the sources that write a function: songs (compiled songs), live (songs\' live builds), radio (radio songs and their builds), prelude (the app\'s helpers prelude).',
+    '',
+    '## App functions',
+    '',
+    'Functions the app registers for the code it writes (`src/song/writer.js`, song-functions). None of them is a Strudel name or synonym: `npm run check:strudel` fails when one is. `.o()`, `.drive()` and `.voice()` are Strudel\'s again.',
+    '',
+    '| Function | What it does |',
+    '| --- | --- |',
+    '| `chan(name)` | bus and visual of a track: `.orbit(n).analyze(name)` (Technical functions: bus) |',
+    '| `crunch(x)` | distortion with its volume: `.distort(x).distortvol(.5)` (Technical functions: distortion) |',
+    ...LIBRARY.map(f => `| \`${f.name}(${f.params.join(', ')})\` | ${cell(f.about.en)}: \`${f.chain}\` (library) |`),
+    '',
+    `Song functions (Technical functions: song) fold effect chains that repeat in a song; their names come from word lists in \`src/song/functions.js\` (${Object.keys(NAMES.themes).length} themes, ${Object.keys(NAMES.tracks).length} track types, generic words), picked by the song id. Their definitions are in the hidden code and in the code copied or opened in Strudel.`,
     '',
     '## Labels',
     '',

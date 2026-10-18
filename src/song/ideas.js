@@ -300,7 +300,7 @@ export const VARIANT_FNS = ['add', 'sub', 'transpose', 'ply', 'rev', 'fast', 'sl
 export const RANDOM_FNS = ['irand', 'rand', 'perlin'];
 export const RANDOM_VALUES = ['lpf', 'hpf', 'pan', 'delay', 'room', 'gain'];
 // names the compiler uses: a shared progression cannot take them
-export const RESERVED = new Set(['SECTIONS', 'TEMPO', 'setcpm', 'setcps', 'samples', 'note', 'n', 's', 'sound', 'chord', 'stack', 'silence', 'sine', 'saw', 'rand', 'irand', 'perlin', 'all', 'register', 'mini', 'miskMix', 'miskBuses', 'miskVoices',
+export const RESERVED = new Set(['SECTIONS', 'TEMPO', 'setcpm', 'setcps', 'samples', 'note', 'n', 's', 'sound', 'chord', 'stack', 'silence', 'sine', 'saw', 'rand', 'irand', 'perlin', 'all', 'register', 'mini', 'miskMix', 'miskBuses', 'miskVoices', 'miskFns',
   'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new', 'null', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield', 'await', 'async', 'of', 'undefined', 'NaN', 'Infinity', 'arguments', 'eval']);
 export const isSharedName = name => typeof name === 'string' && /^[a-zA-Z][a-zA-Z0-9]*$/.test(name) && !RESERVED.has(name) && !/^(section|clip)\d+$/.test(name);
 // a shared progression is chord names when it starts with a letter (after "<" or "["), degrees otherwise

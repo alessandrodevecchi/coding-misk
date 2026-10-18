@@ -6,7 +6,7 @@ Three of our own helpers also take names that Strudel already uses: `o` (a synon
 
 ## What Changes
 
-- **Our helpers never use a Strudel name.** `.o("bass")` becomes `.chan("bass")`, `.drive(.6)` becomes `.grit(.6)`, `.voice("flo")` becomes a song function. A check fails when a helper name is in the Strudel catalog. No old name stays registered.
+- **Our helpers never use a Strudel name.** `.o("bass")` becomes `.chan("bass")`, `.drive(.6)` becomes `.crunch(.6)`, `.voice("flo")` becomes a song function. A check fails when a helper name is in the Strudel catalog. No old name stays registered.
 - **Song functions.** In the code shown, a repeated chain of three or more effect calls can be one call with a name, defined once in the hidden code. Values that differ between uses become parameters: `.squelch(.12, 8)`. Standard Strudel stays the main language: sounds, notes, rhythms and masks stay written out.
 - **A small library of functions.** Three or four functions for the most frequent chains (envelope, delay and reverb, filter with resonance, moving filter), with parameters. The library is a data file that grows with functions that emerge from songs and that the owner approves.
 - **Names with a theme.** Function names come from the song: its style, genre, rhythm, track or title, from word lists per style, chosen by the song seed. Short abbreviations (two or three letters, like `o` for `orbit`) only for very frequent chains; a single letter only for a small function of one song.

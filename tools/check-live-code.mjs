@@ -49,14 +49,17 @@ const CHECKS = {
     const w = writeCode(code, { mode: 'full', voice: false });
     assert(!w.code.includes('say_it') && !w.code.includes('voice') && w.voice.includes('say_it'), w.code);
   },
-  'Switch: the mixer takes bus, visual and the written level out of the lines'() {
-    const list = codes('switch-prima-luce', 'switch'), last = list[list.length - 1];
+  'Live coder: the mixer takes bus, visual and the written level out of the lines'() {
+    const list = codes('switch-prima-luce', 'switch');
     assert(!/\.orbit\(|\.analyze\(|\.distortvol\(/.test(list.join('\n')), 'technical functions shown');
     assert(!/say_it|say_en|spoken on bar/.test(list.join('\n')), 'voice code shown');
     // with no comments at all the voice stays hidden too
     const none = codes('switch-prima-luce', 'switch', { tracks: false, notes: false, steps: false });
     assert(!/say_it|say_en/.test(none.join('\n')), 'voice code shown with no comments');
-    assert(/\.drive\(/.test(last), 'drive');
+    // distortion with its volume: .crunch() (with the mixer preset; compact may fold it into a song function)
+    const mixer = codes('switch-prima-luce', 'switch', { functions: 'mixer' });
+    assert(/\.crunch\(/.test(mixer[mixer.length - 1]) && !/\.drive\(|\.o\(/.test([...list, ...mixer].join('\n')), 'crunch');
+    assert(list.join('\n').length < mixer.join('\n').length, 'compact not shorter than mixer');
     // a level that is not the written one stays on its line
     const w = writeCode('$: s("bd*4").gain(0.7).orbit(1).analyze("kick")\n$: s("hh*8").gain(0.4).orbit(1).analyze("hats")', { mode: 'mixer', written: new Map([['"kick"', 0.85], ['"hats"', 0.4]]) });
     assert(w.code === '$: s("bd*4").gain(0.7)\n$: s("hh*8")', w.code);

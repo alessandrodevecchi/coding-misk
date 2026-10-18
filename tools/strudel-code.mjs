@@ -1,6 +1,6 @@
 // The code the app generates, and the functions it calls (strudel-catalog, #69, design D3 and D4). No browser.
 // codeSet(): every song in songs/ and songs/examples/ (compileSong); every live build of those songs in each profile
-// and each `functions` option, every step (crescendoSong or the song's build, through liveCode); one radio session per
+// and each technical functions preset, every step (crescendoSong or the song's build, through liveCode); one radio session per
 // style with a fixed seed, each song compiled and built the same way; the prelude of the helpers (preludeText).
 // scanCalls(code): the names called in a code, skipping strings, template strings, comments, local names and
 // JavaScript built-ins.
@@ -12,12 +12,17 @@ import { resolveProfile, growthRules, PROFILE_IDS } from '../src/live/profiles.j
 import { liveCode } from '../src/live/live-code.js';
 import { buildSteps, deriveBuild } from '../src/song/build.js';
 import { preludeText, FUNCTIONS, HELPERS } from '../src/song/writer.js';
+import { ALL_NAMES, LIBRARY } from '../src/song/functions.js';
 import { generateSession } from '../src/endless/director.js';
 import { loadStyles } from './styles-dir.mjs';
 import { songFiles } from './songs-dir.mjs';
 import { ROOT } from './strudel-functions.mjs';
 
 export { HELPERS };
+// names the app gives: helpers, library functions, the words of song functions (a word with a number when a song
+// used up its list)
+export const APP_NAMES = [...new Set([...HELPERS, ...ALL_NAMES])];
+export const isAppName = name => APP_NAMES.includes(name) || ALL_NAMES.includes(name.replace(/\d+$/, ''));
 export const KINDS = ['songs', 'live', 'radio', 'prelude'];
 export const RADIO_MINUTES = 10;
 export const radioSeed = style => `catalog-${style}`;
@@ -77,7 +82,7 @@ const VOICE_FILES = { say_it: Array.from({ length: 200 }, (_, i) => `say_it/${i}
 // the live builds of a song: every profile and functions option, every step → [{ source, code }]
 function* liveBuilds(song, source) {
   for (const profile of PROFILE_IDS) {
-    // the build depends on the profile only: the functions option changes how it is written
+    // the build depends on the profile only: the technical functions preset changes how it is written
     const P = resolveProfile(profile);
     const b = P.build === 'crescendo' ? crescendoSong(song, { narrated: P.narrated, rules: growthRules(P) }) : { ...song, build: song.build || deriveBuild(song) };
     for (const functions of FUNCTIONS) {
@@ -108,7 +113,8 @@ export function* codeSet() {
       for (const x of liveBuilds(song, source)) yield { kind: 'radio', ...x };
     }
   }
-  yield { kind: 'prelude', source: 'preludeText', code: preludeText({ bass: 2 }, { flo: '.lpf(2000).room(0.3)' }) };
+  const lib = Object.fromEntries(LIBRARY.map(f => [f.name, { params: f.params, chain: f.chain, lib: true }]));
+  yield { kind: 'prelude', source: 'preludeText', code: preludeText({ bass: 2 }, { ...lib, mouth: { params: [], chain: '.lpf(2000).room(0.3)' } }) };
 }
 
 // every call of the code set: name → { kind → Set(source) }, plus how many codes were read
@@ -132,13 +138,13 @@ export function collectCalls(set = codeSet()) {
 
 // the coverage of a catalog: entry name → { songs, live, radio, prelude (how many sources write it), as (the names
 // written: the entry name or its synonyms) }, for the functions the code writes; unknown: names neither in the
-// catalog nor app helpers → { kind → first sources }. App helpers come first: the app registers them over any
-// Strudel function of the same name (o, drive, voice), so they never count as Strudel's.
+// catalog nor app names → { kind → first sources }. App names come first (helpers, library, song function words):
+// they never count as Strudel's, and check:strudel fails when one of them is a Strudel name.
 export function coverageOf(catalog, { calls, codes }, lookupMap) {
   const functions = {}, unknown = {};
   for (const name of [...calls.keys()].sort()) {
     const k = calls.get(name), entry = lookupMap.get(name);
-    if (HELPERS.includes(name)) continue;
+    if (isAppName(name)) continue;
     if (!entry) { unknown[name] = Object.fromEntries(KINDS.filter(x => k[x]).map(x => [x, k[x].first])); continue; }
     const f = (functions[entry] ||= { ...Object.fromEntries(KINDS.map(x => [x, new Set()])), as: new Set() });
     f.as.add(name);
@@ -151,5 +157,6 @@ export function coverageOf(catalog, { calls, codes }, lookupMap) {
   }
   return { source: { packages: catalog.source.packages, codes }, functions: out, unknown };
 }
-// app helpers with the name of a Strudel function or synonym: helper → entry name
-export const shadowed = lookupMap => Object.fromEntries(HELPERS.filter(h => lookupMap.has(h)).map(h => [h, lookupMap.get(h)]));
+// app names (helpers, library functions, song function words) with the name of a Strudel function or synonym: name →
+// entry name
+export const shadowed = lookupMap => Object.fromEntries(APP_NAMES.filter(h => lookupMap.has(h)).map(h => [h, lookupMap.get(h)]));

@@ -6,14 +6,14 @@ import { compileCompact, compileNow } from '../song/compile-compact.js';
 import { applyComments } from '../song/comments.js';
 import { idiomatic } from '../song/idiom.js';
 import { breakLines, lineLike } from '../song/typing.js';
-import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice } from '../song/writer.js';
+import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOptions, functionContext, FUNCTION_OPTIONS } from '../song/writer.js';
 
 // build: the live build (a song with steps); C: the controls; lang(): the language of the comments; files(): the
 // custom samples manifest, for the spoken comments; cols(): the width of the code panel in characters, for the line
 // breaks (typing-lines)
 // → { build (with the code-of-the-moment steps), now, codeAt(bar, keep), run(shown): the code to evaluate (the code
 // shown and its hidden tail: mixer and hidden voice, code-writing), standalone(shown): the same with the helpers written
-// out, buses (for the short `.o()`) }
+// out, buses (for `.chan()`), fns (the functions the code calls: name → { params, chain }, song-functions) }
 export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0 } = {}) {
   const liveCode = C.view, liveGen = C.gen;
   // the code of the moment (code-now): each section boundary is a step, and the bars before it prepare the next
@@ -37,25 +37,27 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // tracks that came in by a bar: they keep their header in the code of the moment
   const entered = bar => [...new Set([...played(bar), ...build.tracks.filter(x => !waiting.includes(x.id) && (x.clips || []).some(c => (c.start ?? 0) <= bar)).map(x => x.id)])];
   const compileAt = (song, bar) => gen(now ? compileNow(song, bar, { prepare: bar >= prepFrom(boundary(bar)), shownMuted: played(bar), keepHeaders: entered(bar) }) : compile(song));
-  // technical functions (code-writing): the written levels and the buses come from the song as written
-  const mode = C.functions || 'full', ref = mode === 'full' ? '' : compileSong({ ...build, build: undefined });
-  const written = levelsOf(ref), buses = busesOf(ref), table = new Map(), hidden = new Map(), voices = {};
+  // technical functions (code-writing, song-functions): the written levels, the buses and the song's functions come
+  // from the song as written
+  const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => o[k]), ref = any ? compileSong({ ...build, build: undefined }) : '';
+  const written = levelsOf(ref), buses = busesOf(ref), table = new Map(), hidden = new Map(), fns = {};
+  const fctx = any ? functionContext(ref, { id: build.id, title: build.title, tags: build.tags, profile: build.profile }, o) : null;
   const codeAt = (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
     const c = annotate(compileAt(only(st.song, keep), bar), build, st.upTo, lang()) + voiceCode(build, st.song, st.upTo, total, lang(), files());
     // the voice is taken out before the comments go: it is found by its header
-    const v = C.voice === false ? splitVoice(c) : { shown: c, voice: '' }, w = writeCode(applyComments(v.shown, C), { mode, written, buses });
+    const v = C.voice === false ? splitVoice(c) : { shown: c, voice: '' }, w = writeCode(applyComments(v.shown, C), { mode: o, written, buses, fns: fctx });
     w.voice = v.voice;
     w.table.forEach((e, k) => table.set(k, e));
-    Object.assign(voices, w.voices);
+    Object.assign(fns, w.fns);
     let out = C.wrap ? breakLines(w.code, cols()) : w.code;
     if (!out.includes('$:')) out = `${out}\n$: silence`;
     if (w.voice) hidden.set(out, w.voice);
     return out;
   };
   // nothing hidden: the code shown is the code evaluated
-  const run = mode === 'full' && C.voice !== false ? null : shown => shown + tail(shown, { table, voice: hidden.get(shown) || '', like: lineLike });
+  const run = !any && C.voice !== false ? null : shown => shown + tail(shown, { table, voice: hidden.get(shown) || '', like: lineLike });
   // the code that plays anywhere (copied, opened in Strudel): the helpers written out, the code shown, its tail
-  const standalone = run && (shown => { const pre = mode === 'full' ? '' : preludeText(buses, voices); return pre + shown + tail(shown, { table: mode === 'full' ? new Map() : table, voice: hidden.get(shown) || '', like: lineLike, offset: pre.length }); });
-  return { build, now, codeAt, run, standalone, buses, voices };
+  const standalone = run && (shown => { const pre = any ? preludeText(buses, fns) : ''; return pre + shown + tail(shown, { table: any ? table : new Map(), voice: hidden.get(shown) || '', like: lineLike, offset: pre.length }); });
+  return { build, now, codeAt, run, standalone, buses, fns };
 }

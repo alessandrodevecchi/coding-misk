@@ -9,7 +9,8 @@ import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/ty
 import { crescendoSong, waypointSong } from './song/crescendo.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, migrateGrowth, PROFILE_STORE_VERSION, migrateOld } from './live/profiles.js';
 import { liveCode } from './live/live-code.js';
-import { installHelpers, preludeText } from './song/writer.js';
+import { installHelpers, useFns, FUNCTION_PRESETS, FUNCTION_OPTIONS } from './song/writer.js';
+import { upgradeLibrary } from './library/code-upgrade.js';
 import { COMMENT_PRESETS } from './song/comments.js';
 import pkg from '../package.json';
 // the app's version, written in the songs it makes (#67)
@@ -84,6 +85,8 @@ setLang(getLang());
 // Le modifiche dell'utente vivono in localStorage e hanno la precedenza sugli originali.
 const user = store.get('coding-misk-library', { tracks: [], code: {} });
 const saveLibrary = () => store.set('coding-misk-library', user);
+// hand-coded code saved before song-functions: the new helper names, once (src/library/code-upgrade.js)
+{ const up = upgradeLibrary(user); if (up !== user) { Object.assign(user, up); saveLibrary(); } }
 const validSongs = Object.entries(import.meta.glob(['../songs/**/*.json', '!../songs/index.json', '!../songs/**/session.json'], { eager: true, import: 'default' })).flatMap(([file, sg]) => {
   const { errors } = validateSong(sg);
   if (errors.length) { console.warn(`${file}: ${errors.map(e => `${e.path} ${e.msg}`).join('; ')}`); return []; }
@@ -187,7 +190,7 @@ function playable(tr) {
   // doc: the song itself (sections and tracks), for its soul (#46)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
   const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(plain, keep)) : null;
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, buses: live && live.buses, voices: live && live.voices, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, buses: live && live.buses, fns: live && live.fns, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
 }
 
 // ---------- brano in modifica ----------
@@ -228,11 +231,12 @@ el.innerHTML = `<!--\n${compiled.code}\n-->`;
 $('#edhost').appendChild(el);
 const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor) { clearInterval(iv); ed = el.editor; res(ed); } }, 100); });
 // code-writing: the code evaluated is the code shown and the hidden tail of the song on air (mixer, hidden voice), by
-// hand too (Ctrl+Enter); our short functions (.o, .drive) are registered once Strudel is there
+// hand too (Ctrl+Enter); our helpers (.chan, .crunch), the library and the song's functions are registered once Strudel
+// is there (song-functions)
 ready.then(() => {
   const plain = ed.evaluate.bind(ed);
   ed.evaluate = async (autostart = true) => {
-    globalThis.miskBuses = (song && song.buses) || {}; globalThis.miskVoices = (song && song.voices) || {};
+    globalThis.miskBuses = (song && song.buses) || {}; useFns((song && song.fns) || {});
     renderPrelude();
     if (!(song && song.run)) return plain(autostart);
     ed.flash();
@@ -729,7 +733,7 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
   const segments = segmentsOf(sg, codeFor);
   const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate(), writable: disk ? disk.writable : null });
-  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, voices: sg.voices || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
     const r = await job.promise;
@@ -876,7 +880,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, voices: sg.voices || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
+  const job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
@@ -1269,6 +1273,7 @@ function renderArranger() {
   $$('[data-live-only="crescendo"]').forEach(el => { el.hidden = !crescendo; });
   $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-fns').value = C.functions;
   for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
+  for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).setAttribute('aria-pressed', !!C[k]);
   $('#live-title').setAttribute('aria-pressed', C.title); $('#live-hl').setAttribute('aria-pressed', C.highlights); $('#live-wrap').setAttribute('aria-pressed', C.wrap); $('#live-human').setAttribute('aria-pressed', C.typist === 'human'); $('#live-mistakes').setAttribute('aria-pressed', C.mistakes !== 'off'); $('#live-mistakes').disabled = C.typist !== 'human';
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
   renderSectionPanel(total);
@@ -1490,7 +1495,8 @@ $('#live-code').addEventListener('change', e => { setControl('view', e.target.va
 // a comments preset sets its options (code-writing)
 $('#live-comments').addEventListener('change', e => { if (COMMENT_PRESETS[e.target.value]) for (const [k, v] of Object.entries(COMMENT_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
 for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).addEventListener('click', () => { setControl(k, ctlOf(T)[k] === false); liveChanged(); });
-$('#live-fns').addEventListener('change', e => { setControl('functions', e.target.value); liveChanged(); });
+$('#live-fns').addEventListener('change', e => { if (FUNCTION_PRESETS[e.target.value]) for (const [k, v] of Object.entries(FUNCTION_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
+for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).addEventListener('click', () => { setControl(k, !ctlOf(T)[k]); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { setControl('narrated', !ctlOf(T).narrated); liveChanged(); });
 $('#live-title').addEventListener('click', () => { setControl('title', !ctlOf(T).title); liveChanged(); });
 $('#live-hl').addEventListener('click', () => { setControl('highlights', !ctlOf(T).highlights); liveChanged(); });

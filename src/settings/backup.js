@@ -1,6 +1,8 @@
 // Backup of everything the app keeps in this browser (#31): one JSON file to export, and an import that
 // merges it into what is already here. Pure: checked in Node by tools/check-backup.mjs.
 import { mergeTrash, mergeHidden } from '../library/trash.js';
+import { upgradeLibrary } from '../library/code-upgrade.js';
+import { CODE_VERSION } from '../song/writer.js';
 
 export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
@@ -22,15 +24,17 @@ const byId = (a, b) => { const out = (Array.isArray(a) ? a : []).slice(); for (c
 export function mergeBackup(backup, get) {
   if (!backup || backup.format !== BACKUP_FORMAT || !backup.data || typeof backup.data !== 'object') return { error: 'format' };
   const values = {}, counts = { songs: 0, versions: 0, playlists: 0, styles: 0, artists: 0, settings: 0 };
-  for (const [k, v] of Object.entries(backup.data)) {
+  for (let [k, v] of Object.entries(backup.data)) {
     if (!k.startsWith(PREFIX)) continue;
     if (k === 'coding-misk-library') {
+      // hand-coded code from an older backup gets the new helper names first (song-functions)
+      v = upgradeLibrary(v);
       const cur = get(k) || { tracks: [], code: {} };
       const tracks = byId(cur.tracks, v.tracks), codeSongs = byId(cur.codeSongs, v.codeSongs);
       // the trash (#68) by id too; a song in the list on either side leaves it, so an import never deletes
       const trash = mergeTrash(cur.trash, v.trash, new Set([...tracks, ...codeSongs].filter(x => x && x.id).map(x => x.id)));
       // hidden built-in songs (#68, D3b) as a union: a song hidden on either side stays hidden
-      values[k] = { ...cur, tracks, codeSongs, code: { ...(cur.code || {}), ...(v.code || {}) }, trash, hidden: mergeHidden(cur.hidden, v.hidden) };
+      values[k] = { ...cur, tracks, codeSongs, code: { ...(cur.code || {}), ...(v.code || {}) }, trash, hidden: mergeHidden(cur.hidden, v.hidden), codeVersion: CODE_VERSION };
       counts.songs += (v.tracks || []).length; counts.versions += (v.codeSongs || []).length;
     } else if (k === 'coding-misk-playlists') {
       const cur = get(k) || { format: 1, lists: [] };

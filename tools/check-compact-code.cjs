@@ -64,11 +64,12 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
     return out;
   }, arpSongs);
   for (const r of arpRes) { const ok = r.same && !r.err; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'}  ${r.id} arpeggio${r.arp ? ' with .arp()' : ' as written'}${r.err ? ` (${r.err})` : ''}`); }
-  // code-writing: technical functions full, short and mixer, with the voice code shown or hidden, play the same events
-  for (const id of ['switch-prima-luce', 'switch-acid-prova', 'crescendo-primo-passo']) {
+  // code-writing, song-functions: technical functions full, short, mixer and compact, with the voice code shown or
+  // hidden, play the same events (compact: library and song functions registered from the song's templates)
+  for (const id of ['switch-prima-luce', 'switch-acid-prova', 'crescendo-primo-passo', 'example-ideas']) {
     const res = await page.evaluate(async id => {
-      const [{ crescendoSong }, { liveCode }, { resolveProfile }, { buildSteps }] = await Promise.all(['/src/song/crescendo.js', '/src/live/live-code.js', '/src/live/profiles.js', '/src/song/build.js'].map(u => import(u)));
-      const song = await (await fetch(`/songs/${id}.json`)).json(), b = crescendoSong(song, { rules: { natural: true } }), total = b.sections.reduce((a, x) => a + x.bars, 0);
+      const [{ crescendoSong }, { liveCode }, { resolveProfile }, { buildSteps }, { useFns }] = await Promise.all(['/src/song/crescendo.js', '/src/live/live-code.js', '/src/live/profiles.js', '/src/song/build.js', '/src/song/writer.js'].map(u => import(u)));
+      const song = await (await fetch(id === 'example-ideas' ? '/songs/examples/04-ideas.json' : `/songs/${id}.json`)).json(), b = crescendoSong(song, { rules: { natural: true } }), total = b.sections.reduce((a, x) => a + x.bars, 0);
       const files = { say_it: Array.from({ length: 200 }, (_, i) => `say_it/${i}.wav`), say_en: Array.from({ length: 200 }, (_, i) => `say_en/${i}.wav`) };
       const e = document.querySelector('strudel-editor').editor;
       const haps = async code => {
@@ -76,17 +77,17 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
         if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
         return e.repl.scheduler.pattern.queryArc(0, total).filter(h => h.hasOnset()).map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), Object.fromEntries(Object.entries(h.value).filter(([, v]) => typeof v !== 'function').sort())])).sort().join('\n');
       };
-      const C = resolveProfile('switch'), mk = o => liveCode(b, { ...C, ...o }, { lang: () => 'it', files: () => files, cols: () => 48 });
+      const mk = o => liveCode(b, resolveProfile('switch', o), { lang: () => 'it', files: () => files, cols: () => 48 });
       const full = mk({ functions: 'full', voice: true, wrap: false }), out = [];
       const bars = [...new Set(buildSteps(full.build).map(x => x.at))].sort((x, y) => x - y), pick = [bars[1], bars[Math.floor(bars.length / 3)], bars[Math.floor(bars.length * 2 / 3)], bars[bars.length - 1]];
-      for (const v of [{ functions: 'short' }, { functions: 'mixer' }, { functions: 'short', voice: true }, { functions: 'mixer', voice: true }, { functions: 'full', voice: false }]) {
+      for (const v of [{ functions: 'short' }, { functions: 'mixer' }, { functions: 'compact' }, { functions: 'short', voice: true }, { functions: 'compact', voice: true }, { functions: 'full', voice: false }]) {
         const L = mk(v);
         for (const bar of pick) {
           try {
             const shown = L.codeAt(bar), a = await haps(full.codeAt(bar));
-            globalThis.miskBuses = L.buses; globalThis.miskVoices = L.voices;
+            globalThis.miskBuses = L.buses; useFns(L.fns);
             const z = await haps(L.run ? L.run(shown) : shown);
-            out.push({ bar, lines: `${v.functions}${v.voice === false ? ' voice hidden' : v.voice ? ' voice shown' : ''}`, voiceCall: /\.voice\("/.test(shown), same: a === z && (v.functions !== 'mixer' || !/\.orbit\(|\.analyze\(/.test(shown)) });
+            out.push({ bar, lines: `${v.functions}${v.voice === false ? ' voice hidden' : v.voice ? ' voice shown' : ''}`, same: a === z && (v.functions === 'full' || v.functions === 'short' || !/\.orbit\(|\.analyze\(/.test(shown)) && !/\.(o|drive|voice)\(/.test(shown) });
           } catch (x) { out.push({ bar, err: x.message }); }
         }
       }

@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Helper names never shadow Strudel
-Every function the app registers for the code SHALL have a name that is not a Strudel function or synonym in the catalog of the Strudel version we ship. The bus and visual helper SHALL be `chan`, the distortion helper `grit`. The names `o`, `drive` and `voice` SHALL NOT be registered by the app.
+Every function the app registers for the code SHALL have a name that is not a Strudel function or synonym in the catalog of the Strudel version we ship. The bus and visual helper SHALL be `chan`, the distortion helper `crunch`. The names `o`, `drive` and `voice` SHALL NOT be registered by the app.
 
 #### Scenario: Strudel's drive
 - **WHEN** code written by the user calls `.drive(2)` with a ladder filter
@@ -12,7 +12,11 @@ Every function the app registers for the code SHALL have a name that is not a St
 - **THEN** `npm run check:strudel` fails and names it
 
 ### Requirement: Song functions
-With song functions on, a run of three or more consecutive effect calls that appears on two or more lines, or a run of four or more calls on one line, SHALL be written as one call to a function of the song, defined in the hidden code. The code shown SHALL play the same events as the code written in full.
+With song functions on, a run of three or more consecutive effect calls whose call names appear on two or more lines SHALL be written as one call to a function of the song, defined in the hidden code. The copies of one line in the sections of its track SHALL count as one line, so a song function never only wraps one line; a run on one line SHALL keep only the library functions, with its values in view. The code shown SHALL play the same events as the code written in full.
+
+#### Scenario: One line keeps its knobs
+- **WHEN** only the bass line ends with `.lpf(sine.range(360, 1440).slow(8)).lpq(8).decay(.12).sustain(0)`
+- **THEN** it shows `.wob(360, 1440).lpq(8).plk(.12, 0)` and no song function
 
 #### Scenario: Repeated envelope and echo
 - **WHEN** the bass and the arp both end with `.decay(…).sustain(…).delay(…)` with different values
@@ -33,7 +37,7 @@ Values that differ between the uses of a run SHALL become parameters of its func
 - **THEN** the run stays written out on every line
 
 ### Requirement: Function library
-The app SHALL ship a library of named functions with parameters for frequent chains, starting with an envelope, a delay with reverb, a filter with resonance and a moving filter. A run that matches a library function SHALL use it before a song function. The library SHALL be a data file; adding a function SHALL need only a new entry, checked for its name, its parameters and the same events.
+The app SHALL ship a library of named functions with parameters for frequent chains, starting with an envelope, a delay with reverb, a filter with resonance and a moving filter. Library functions SHALL fold wherever they match, before song functions are found. A run of three calls inside a longer run MAY fold on its own. The library SHALL be a data file; adding a function SHALL need only a new entry, checked for its name, its parameters and the same events.
 
 #### Scenario: Library first
 - **WHEN** a line ends with `.delay(.3).room(.4)` plus a third call that the library space function covers
@@ -76,8 +80,8 @@ The definitions of song and library functions SHALL be in the hidden code shown 
 - **THEN** the definitions come before the code and it plays the same events
 
 ### Requirement: Saved code updated once
-When the app starts, saved hand-coded versions SHALL have `.o("name")` rewritten to `.chan("name")`, `.drive(x)` to `.grit(x)` and `.voice("name")` to the matching song function with its definition. The rest of the code SHALL stay unchanged, and the update SHALL run only once per version.
+When the app starts, saved hand-coded versions SHALL have `.o("name")` rewritten to `.chan("name")`, `.drive(x)` to `.crunch(x)` and `.voice("name")` to the matching song function with its definition. The rest of the code SHALL stay unchanged, and the update SHALL run only once per version.
 
 #### Scenario: Old hand-coded version
 - **WHEN** a hand-coded version saved before this change uses `.o("bass")` and `.drive(.6)`
-- **THEN** after the app starts it uses `.chan("bass")` and `.grit(.6)` and plays the same
+- **THEN** after the app starts it uses `.chan("bass")` and `.crunch(.6)` and plays the same

@@ -34,7 +34,8 @@
     "check:sound-guard": "node --no-warnings tools/check-sound-guard.mjs",
     "catalog:strudel": "node --no-warnings tools/strudel-catalog.mjs",
     "check:strudel": "node --no-warnings tools/check-strudel.mjs",
-    "check:ideas": "node --no-warnings tools/check-idea-writer.mjs"
+    "check:ideas": "node --no-warnings tools/check-idea-writer.mjs",
+    "check:functions": "node --no-warnings tools/check-functions.mjs"
   },
   "dependencies": {
     "@mediabunny/flac-encoder": "^1.61.3",

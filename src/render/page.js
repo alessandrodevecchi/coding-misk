@@ -11,7 +11,7 @@ import { guardDecode, guardSounds, createRegister } from '../sounds/sound-guard.
 import soundfonts from '@strudel/soundfonts/package.json';
 import { prebake } from '@strudel/repl/prebake.mjs';
 import { tempoClock } from './tempo.js';
-import { installHelpers } from '../song/writer.js';
+import { installHelpers, useFns } from '../song/writer.js';
 
 const post = (m, transfer = []) => parent.postMessage({ codingMiskRender: true, ...m }, location.origin, transfer);
 // superdough's deprecation notices come once per voice: thousands of console lines slow the render down
@@ -28,7 +28,8 @@ async function loadSounds() {
   guardSounds({ soundMap, registerSound, register, onReplace: (name, from, to) => replaced.add(`${name}:${from}→${to}`) });
 }
 
-// our short functions and the mixer of the code (code-writing); the song's buses for `.o(name)` come with the job
+// our helpers, the library and the mixer of the code (code-writing, song-functions); the song's buses for `.chan(name)`
+// and its functions come with the job
 installHelpers({ register: strudelRegister });
 
 // repeatable renders: superdough draws random numbers (the phases of the supersaw voices, noise, the reverb's impulse),
@@ -40,8 +41,8 @@ const WORKLET_SEED = `{ let a = ${SEED} >>> 0; Math.random = () => { a = (a + 0x
 
 // seconds to wait for one sound to load before skipping it
 const SOUND_WAIT = 8000;
-async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, buses = {}, voices = {} }) {
-  globalThis.miskBuses = buses; globalThis.miskVoices = voices;
+async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, buses = {}, fns = {} }) {
+  globalThis.miskBuses = buses; useFns(fns);
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
   const ctx = new OfflineAudioContext(2, Math.ceil(length * sampleRate), sampleRate);
   setAudioContext(ctx);

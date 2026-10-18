@@ -2,13 +2,16 @@
 // No browser.
 //   npm run check:strudel     exit 1 when any check fails
 // Fails when generated code calls a name that is neither a function or synonym in docs/strudel/functions.json nor an
-// app helper (HELPERS in src/song/writer.js), and when the catalog was made from other package versions than the
-// installed ones. Warns, without failing, on undocumented functions the app writes, on helpers named like a Strudel
-// function, on hand notes for names not in the catalog, and when docs/strudel/coverage.json is out of date.
+// app name (HELPERS in src/song/writer.js, the library and the song function words in src/song/functions.js), when
+// an app name is a Strudel function or synonym (song-functions), and when the catalog was made from other package
+// versions than the installed ones. Warns, without failing, on undocumented functions the app writes, on hand notes
+// for names not in the catalog, and when docs/strudel/coverage.json is out of date.
 import fs from 'node:fs';
 import { compileSong } from '../src/song/compile.js';
 import { installedVersions, lookup } from './strudel-functions.mjs';
-import { scanCalls, collectCalls, coverageOf, shadowed, HELPERS } from './strudel-code.mjs';
+import { scanCalls, collectCalls, coverageOf, shadowed, HELPERS, APP_NAMES } from './strudel-code.mjs';
+import { LIBRARY, NAMES } from '../src/song/functions.js';
+import { RESERVED } from '../src/song/ideas.js';
 import { FILES, json, readVariety, varietyByEntry } from './strudel-catalog.mjs';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -34,7 +37,7 @@ const CHECKS = {
     assert([...c].sort().join() === 'every,fast,s', [...c].join());
   },
   'scanner: the app helpers are not unknown'() {
-    const r = coverageOf(catalog, collectCalls([{ kind: 'songs', source: 'case', code: '$: s("bd").o("drums").drive(0.6).voice("flo")\nall(x => miskMix(x, []))' }]), L);
+    const r = coverageOf(catalog, collectCalls([{ kind: 'songs', source: 'case', code: '$: s("bd").chan("drums").crunch(0.6).wob(200, 800).squelch(.12)\nall(x => miskMix(x, []))' }]), L);
     assert(!Object.keys(r.unknown).length, `unknown: ${Object.keys(r.unknown).join()}`);
     assert(HELPERS.every(h => !L.has(h) || !r.functions[L.get(h)]), 'a helper counted as a Strudel function');
   },
@@ -44,6 +47,16 @@ const CHECKS = {
     assert(code.includes('.fooBar(2)'), 'no pattern line to change');
     const r = coverageOf(catalog, collectCalls([{ kind: 'songs', source: 'songs/ferro.json (copy)', code }]), L);
     assert(Object.keys(r.unknown).join() === 'fooBar' && r.unknown.fooBar.songs[0] === 'songs/ferro.json (copy)', JSON.stringify(r.unknown));
+  },
+  'app helpers, library functions and name words are never a Strudel name or synonym'() {
+    const sh = shadowed(L);
+    assert(!Object.keys(sh).length, `named like Strudel: ${Object.entries(sh).map(([h, e]) => (h === e ? h : `${h} (synonym of ${e})`)).join(', ')}`);
+    assert(['o', 'drive', 'voice'].every(n => !APP_NAMES.includes(n)), 'an old helper name is still an app name');
+    const bad = APP_NAMES.filter(n => n !== 'miskMix' && (!/^[a-z]{2,12}$/.test(n) || RESERVED.has(n)));
+    assert(!bad.length, `not a lowercase word of 2 to 12 letters, or reserved: ${bad.join(', ')}`);
+    const abbr = Object.values(NAMES).flatMap(x => (Array.isArray(x) ? x : Object.values(x).flat())).filter(n => n.length <= 3);
+    assert(!abbr.length, `two or three letters are for library functions only: ${abbr.join(', ')}`);
+    assert(LIBRARY.every(f => f.name.length <= 3), 'library names are abbreviations of two or three letters');
   },
   'a catalog from other package versions fails'() {
     const installed = installedVersions();
@@ -60,8 +73,6 @@ const CHECKS = {
     // warnings: undocumented functions written, helpers named like Strudel functions, stale coverage
     const undoc = Object.keys(r.functions).filter(n => !catalog.functions.find(f => f.name === n).documented);
     if (undoc.length) warnings.push(`undocumented functions the app writes: ${undoc.join(', ')}`);
-    const sh = shadowed(L);
-    if (Object.keys(sh).length) warnings.push(`app helpers registered over a Strudel name: ${Object.entries(sh).map(([h, e]) => (h === e ? h : `${h} (synonym of ${e})`)).join(', ')}`);
     const { unknown, ...stored } = r;
     const old = fs.existsSync(FILES.coverage) ? fs.readFileSync(FILES.coverage, 'utf8') : '';
     if (old !== json(stored)) warnings.push('docs/strudel/coverage.json is out of date: run npm run catalog:strudel');

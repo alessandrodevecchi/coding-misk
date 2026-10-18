@@ -106,6 +106,8 @@ node --no-warnings tools/endless-recap.mjs [songs/endless] [--lang it|en]   # Ma
 npm run catalog:strudel                                # rebuild the Strudel function catalog and coverage (docs/strudel/, docs/STRUDEL-FUNCTIONS.md); run after updating Strudel
 npm run check:strudel                                  # generated code calls only catalog functions and app helpers, catalog matches the installed Strudel (no browser)
 npm run check:ideas                                    # idea writer: shortest exact forms, every kind of idea, ladders, variant steps (no browser)
+npm run check:functions                                # song functions: every Live coder step expands back to the line written out, % shorter, names, presets, update of saved code (no browser)
+node tools/check-compact-code.cjs                      # same events for compact code, short patterns, line breaks and every technical functions preset (dev server)
 node tools/check-ideas.cjs [song,song…]                # same events as the code before idea-model, every song and Crescendo states (dev server, ~8 min)
 ```
 
