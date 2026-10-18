@@ -5,6 +5,7 @@ import { FORMAT, VERSION, GENRES, TAG_KINDS, ORIGINS, TYPES, PATTERN_FIELDS, SET
 import { checkRack } from './rack.js';
 import { checkBuild, buildMap, SPEAKERS } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
+import { checkIdea, checkShared, sharedIsChords } from './ideas.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
 export const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
 
@@ -59,6 +60,9 @@ export function validateSong(song, opts = {}) {
     }
   }
 
+  // shared progressions (idea-model): named once, read by ideas with "from"
+  checkShared(song.shared, err);
+
   // sections
   const secs = Array.isArray(song.sections) ? song.sections : [];
   if (!secs.length) err('sections', 'at least one section');
@@ -102,7 +106,12 @@ export function validateSong(song, opts = {}) {
     if (tr.pinned !== undefined && (!Array.isArray(tr.pinned) || tr.pinned.some(k => !SETTING_FIELDS[tr.type].includes(k)))) err(`${p}.pinned`, `settings fixed against the live build steps, from: ${SETTING_FIELDS[tr.type].join(', ')}`);
     const pats = tr.patterns || {};
     if (typeof pats !== 'object' || Array.isArray(pats)) err(`${p}.patterns`, 'an object of named patterns, for example {"A": {...}}');
-    for (const [k, pat] of Object.entries(pats)) checkPattern(tr.type, pat, `${p}.patterns.${k}`, err, warn);
+    // the bar lengths an idea must fit: those of the sections its clips play in
+    const meters = k => [...new Set((Array.isArray(tr.clips) ? tr.clips : []).filter(c => c && c.pattern === k).flatMap(c => {
+      const si = c.section !== undefined ? sectionOf(c.section) : -1, a = c.start ?? (si >= 0 ? starts[si] : 0), z = a + (c.bars ?? (si >= 0 ? secs[si].bars : 0));
+      return secs.filter((s, j) => s && starts[j] < z && starts[j] + (s.bars || 0) > a).map(s => meterSteps(s.meter || '4/4'));
+    }))];
+    for (const [k, pat] of Object.entries(pats)) checkPattern(tr.type, pat, `${p}.patterns.${k}`, err, warn, { shared: song.shared && typeof song.shared === 'object' ? song.shared : {}, meters: meters(k) });
     const spans = [];
     (Array.isArray(tr.clips) ? tr.clips : []).forEach((c, ci) => {
       const cp = `${p}.clips[${ci}]`;
@@ -163,12 +172,12 @@ function checkSettings(type, set, p, err, warn) {
   }
 }
 
-function checkPattern(type, pat, p, err, warn) {
+function checkPattern(type, pat, p, err, warn, opts = {}) {
   if (!pat || typeof pat !== 'object' || Array.isArray(pat)) { err(p, 'a pattern is an object'); return; }
   for (const k of Object.keys(pat)) if (!PATTERN_FIELDS[type].includes(k)) warn(`${p}.${k}`, `unknown pattern field for ${type}; fields: ${PATTERN_FIELDS[type].join(', ') || 'none'}`);
   const steps = (v, path) => { if (typeof v !== 'string' || !/^[x.]+$/.test(v)) err(path, 'steps are a string of "x" (plays) and "." (rest), one per 16th, for example "x...x...x...x..."'); };
-  if (type === 'drums') {
-    if (!pat.rows || typeof pat.rows !== 'object') { err(`${p}.rows`, `an object of drum rows: ${ROW_IDS.join(', ')}`); return; }
+  if (type === 'drums' && !(pat.idea && pat.rows === undefined)) {
+    if (!pat.rows || typeof pat.rows !== 'object') { err(`${p}.rows`, `an object of drum rows: ${ROW_IDS.join(', ')}, or an idea`); return; }
     for (const [id, v] of Object.entries(pat.rows)) { if (!ROW_IDS.includes(id)) err(`${p}.rows.${id}`, `unknown row; rows: ${ROW_IDS.join(', ')}`); steps(v, `${p}.rows.${id}`); }
   }
   if (pat.steps !== undefined) steps(pat.steps, `${p}.steps`);
@@ -186,6 +195,7 @@ function checkPattern(type, pat, p, err, warn) {
       if (bars.some(b => topLevel(b).length > per)) warn(`${p}.notes`, `${per} notes per bar in 4/4 for ${type}; extra notes are dropped (use [a b] to split one note in two, <[bar 1] [bar 2]> to alternate bars)`);
     }
   }
+  if (pat.idea !== undefined) checkIdea(type, pat.idea, `${p}.idea`, err, warn, opts);
   if (type === 'code') {
     if (typeof pat.code !== 'string' || !pat.code.trim()) err(`${p}.code`, 'Strudel code for one pattern, for example note("a2 c3").s("sawtooth")');
     else if (/^\s*\$:|setcpm|setcps/m.test(pat.code)) err(`${p}.code`, 'one pattern only: no "$:", setcpm or setcps (tempo comes from the sections)');

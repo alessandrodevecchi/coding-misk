@@ -1,0 +1,42 @@
+// coding-misk · Example 2 · Bass and chords
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(110/4)
+
+const SECTIONS = [['Verse', 8], ['Chorus', 8]]
+const TEMPO = {'Verse': 110, 'Chorus': 110}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0!8>"  // Verse · 8 bars · 110 BPM · E · Em Bm C D
+const section2 = "<0!8 1!8>"  // Chorus · 8 bars · 110 BPM · E · Em C G D
+
+// ========== drums ==========
+// Verse · bars 1-8 · pattern verse
+// Drums · RolandTR808
+$: s("[bd ~ ~ ~] [~ ~ bd ~] [~ ~ bd ~] ~").bank("RolandTR808").gain(0.9).mask(section1).velocity(section1).orbit(1).analyze("kick")
+$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR808").gain(0.72).mask(section1).velocity(section1).orbit(1).analyze("snare")
+$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("RolandTR808").gain(0.45).mask(section1).velocity(section1).orbit(1).analyze("hats")
+// Chorus · bars 9-16 · pattern chorus
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR808").gain(0.9).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR808").gain(0.72).mask(section2).velocity(section2).orbit(1).analyze("snare")
+$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("RolandTR808").gain(0.45).mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("[~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~]").bank("RolandTR808").gain(0.41).mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("cr").bank("RolandTR808").gain(.55).room(.4).mask("<1 0!7>").mask(section2).velocity(section2).orbit(1).analyze("fx")
+
+// ========== bass ==========
+// Verse · bars 1-8 · pattern walk
+// Bass · notes written by hand
+$: note("<[a3 ~ a3 e4 ~ a3 a4 ~ a3 ~ a3 e4 ~ c4 e4 ~] [g3 ~ g3 e4 ~ g3 g4 ~ g3 ~ g3 e4 ~ b3 e4 ~] [f3 ~ f3 c4 ~ f3 f4 ~ f3 ~ f3 c4 ~ a3 c4 ~] [g3 ~ g3 d4 ~ g3 g4 ~ g3 ~ g3 d4 ~ b3 d4 ~]>").transpose(-29)
+  .s("sawtooth").lpf(900).lpq(6).distort(0.5).distortvol(.5)
+  .decay(.6).sustain(.8).gain(1).mask(section1).velocity(section1).orbit(2).analyze("bass")
+// Chorus · bars 9-16 · pattern walk
+$: note("<[a3 ~ a3 e4 ~ a3 a4 ~ a3 ~ a3 e4 ~ c4 e4 ~] [f3 ~ f3 c4 ~ f3 f4 ~ f3 ~ f3 c4 ~ a3 c4 ~] [g3 ~ g3 e4 ~ g3 g4 ~ g3 ~ g3 e4 ~ c4 e4 ~] [g3 ~ g3 d4 ~ g3 g4 ~ g3 ~ g3 d4 ~ b3 d4 ~]>").transpose(-29)
+  .s("sawtooth").lpf(900).lpq(6).distort(0.5).distortvol(.5)
+  .decay(.6).sustain(.8).gain(1).mask(section2).velocity(section2).orbit(2).analyze("bass")
+
+// ========== pad ==========
+// Chorus · bars 9-16 · pattern hold
+// Pad · Sustained
+$: note("<[a2,c3,e3] [f2,a2,c3] [g2,c3,e3] [g2,b2,d3]>").transpose(-5)
+  .s("supersaw").attack(.4).release(1.2).lpf(sine.range(640, 2560).slow(8))
+  .room(.8).gain(0.22).mask(section2).velocity(section2).orbit(6).analyze("pad")

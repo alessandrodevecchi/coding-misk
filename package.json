@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "check:code": "node --no-warnings tools/snapshot-code.mjs check",
     "snapshot:code": "node --no-warnings tools/snapshot-code.mjs write",
-    "check:songs": "node --no-warnings tools/song.mjs validate songs",
+    "check:songs": "node --no-warnings tools/song.mjs validate songs && node --no-warnings tools/check-idea-errors.mjs",
     "voices": "node --no-warnings tools/voice.mjs",
     "check:endless": "node --no-warnings tools/check-endless.mjs",
     "endless": "node --no-warnings tools/endless.mjs",
@@ -33,7 +33,8 @@
     "check:clips": "node --no-warnings tools/check-clips.mjs",
     "check:sound-guard": "node --no-warnings tools/check-sound-guard.mjs",
     "catalog:strudel": "node --no-warnings tools/strudel-catalog.mjs",
-    "check:strudel": "node --no-warnings tools/check-strudel.mjs"
+    "check:strudel": "node --no-warnings tools/check-strudel.mjs",
+    "check:ideas": "node --no-warnings tools/check-idea-writer.mjs"
   },
   "dependencies": {
     "@mediabunny/flac-encoder": "^1.61.3",

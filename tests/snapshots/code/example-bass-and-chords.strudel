@@ -13,14 +13,14 @@ const section2 = "<0!8 1!8>"  // Chorus · 8 bars · 110 BPM · E · Em C G D
 // ========== drums ==========
 // Verse · bars 1-8 · pattern verse
 // Drums · RolandTR808
-$: s("[bd ~ ~ ~] [~ ~ bd ~] [~ ~ bd ~] ~").bank("RolandTR808").gain(0.9).mask(section1).velocity(section1).orbit(1).analyze("kick")
-$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR808").gain(0.72).mask(section1).velocity(section1).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("RolandTR808").gain(0.45).mask(section1).velocity(section1).orbit(1).analyze("hats")
+$: s("[bd ~] [~ bd]!2 ~").bank("RolandTR808").gain(0.9).mask(section1).velocity(section1).orbit(1).analyze("kick")
+$: s("[~ cp]*2").bank("RolandTR808").gain(0.72).mask(section1).velocity(section1).orbit(1).analyze("snare")
+$: s("hh*8").bank("RolandTR808").gain(0.45).mask(section1).velocity(section1).orbit(1).analyze("hats")
 // Chorus · bars 9-16 · pattern chorus
-$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR808").gain(0.9).mask(section2).velocity(section2).orbit(1).analyze("kick")
-$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR808").gain(0.72).mask(section2).velocity(section2).orbit(1).analyze("snare")
-$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("RolandTR808").gain(0.45).mask(section2).velocity(section2).orbit(1).analyze("hats")
-$: s("[~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~]").bank("RolandTR808").gain(0.41).mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("bd*4").bank("RolandTR808").gain(0.9).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("[~ cp]*2").bank("RolandTR808").gain(0.72).mask(section2).velocity(section2).orbit(1).analyze("snare")
+$: s("hh*16").bank("RolandTR808").gain(0.45).mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("[~ oh]*4").bank("RolandTR808").gain(0.41).mask(section2).velocity(section2).orbit(1).analyze("hats")
 $: s("cr").bank("RolandTR808").gain(.55).room(.4).mask("<1 0!7>").mask(section2).velocity(section2).orbit(1).analyze("fx")
 
 // ========== bass ==========

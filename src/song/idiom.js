@@ -3,7 +3,11 @@
 // Notes: a 16-step group becomes a repeated cell ([a3 ~ a3 a3]*4) and repeated groups of an alternation get `!`
 // (<[x] [x] [y]> → <[x]!2 [y]>); note lengths never change, so envelopes sound the same.
 // Pure text in, text out: a pattern it does not recognise stays as it is.
+// (idea-model: the compiler now writes these forms itself, src/song/ideas.js; idiomatic() stays for code it did not
+// write, hand code and code of older versions, and leaves the writer's code as it is)
 import { chainLines } from './typing.js';
+import { progressionForm, arpForm } from './ideas.js';
+export { progressionForm, arpForm };
 
 // "[bd ~ ~ ~] [bd ~ ~ ~] ~ [bd ~ ~ ~]" → 16 tokens, or null
 function steps16(mini) {
@@ -55,55 +59,6 @@ export function noteForm(mini) {
   const out = [];
   for (const g of short) { const last = out[out.length - 1]; if (last && last.g === g) last.n++; else out.push({ g, n: 1 }); }
   return `<${out.map(x => (x.n > 1 ? `${x.g}!${x.n}` : x.g)).join(' ')}>`;
-}
-// note name → MIDI number ("a3" → 57), or null
-const midi = n => { const m = String(n).match(/^([a-g])(#|b)?(-?\d)$/i); if (!m) return null; return { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }[m[1].toLowerCase()] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (+m[3] + 1) * 12; };
-// the progression on top: when every group of an alternation is the same line moved to another root, the line is
-// written once as steps from its root and the roots as an alternation added on top: "[0 ~ 0 12]".add("<55!2 57 53>")
-export function progressionForm(mini) {
-  const m = mini.match(/^<(.*)>$/s);
-  if (!m) return null;
-  const groups = m[1].trim().split(/\s+(?![^[]*\])/);
-  if (groups.length < 2 || !groups.every(g => /^\[[^[\],<>]*\]$/.test(g))) return null;
-  let shape = null;
-  const roots = [];
-  for (const g of groups) {
-    const t = g.slice(1, -1).trim().split(/\s+/), notes = t.map(x => (x === '~' ? null : midi(x)));
-    if (t.some((x, i) => x !== '~' && notes[i] === null)) return null;
-    const root = notes.find(x => x !== null);
-    if (root === undefined) return null;
-    const offs = notes.map(x => (x === null ? '~' : String(x - root))).join(' ');
-    if (shape !== null && shape !== offs) return null;
-    shape = offs; roots.push(String(root));
-  }
-  const t = shape.split(' '), p = period(t), rs = [];
-  for (const r of roots) { const last = rs[rs.length - 1]; if (last && last.r === r) last.n++; else rs.push({ r, n: 1 }); }
-  return { steps: cellForm(t.slice(0, p), t.length / p), roots: `<${rs.map(x => (x.n > 1 ? `${x.r}!${x.n}` : x.r)).join(' ')}>` };
-}
-// the arpeggio with .arp() (arp-patterns): when every chord of an alternation plays its notes in the same order, the
-// chords are written once (their notes from low to high) and the order once: "<[a3,c4,e4] [f3,a3,c4]>", "[0 1 2 1]*4".
-// null when the groups play different orders, or a group plays one note only
-export function arpForm(mini) {
-  const m = mini.match(/^<(.*)>$/s);
-  if (!m) return null;
-  const groups = m[1].trim().split(/\s+(?![^[]*\])/);
-  if (groups.length < 1 || !groups.every(g => /^\[[^[\],<>]*\]$/.test(g))) return null;
-  let order = null;
-  const chords = [];
-  for (const g of groups) {
-    const t = g.slice(1, -1).trim().split(/\s+/);
-    if (t.some(x => x !== '~' && midi(x) === null)) return null;
-    const names = new Map();
-    for (const x of t) if (x !== '~' && !names.has(midi(x))) names.set(midi(x), x);
-    const up = [...names.keys()].sort((a, b) => a - b);
-    if (up.length < 2) return null;
-    const o = t.map(x => (x === '~' ? '~' : String(up.indexOf(midi(x))))).join(' ');
-    if (order !== null && order !== o) return null;
-    order = o; chords.push(`[${up.map(n => names.get(n)).join(',')}]`);
-  }
-  const t = order.split(' '), p = period(t), cs = [];
-  for (const c of chords) { const last = cs[cs.length - 1]; if (last && last.c === c) last.n++; else cs.push({ c, n: 1 }); }
-  return { chords: `<${cs.map(x => (x.n > 1 ? `${x.c}!${x.n}` : x.c)).join(' ')}>`, order: cellForm(t.slice(0, p), t.length / p) };
 }
 // a whole code text: drum sounds in s("…") followed by .bank (drum machines), notes in note("…"); the arpeggio (a line
 // with .analyze("arp")) with .arp()

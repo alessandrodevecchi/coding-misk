@@ -4,6 +4,7 @@ import { sceneLayers, sectionLane, uniqueNames, sectionInfo, songHeader, rle, OR
 import { t } from '../i18n.js';
 import { normalizeSong, clipState } from './format.js';
 import { rackCode } from './rack.js';
+import { isSharedName } from './ideas.js';
 
 const fadeIn = (secs, i) => i > 0 ? Math.min(secs[i].fade || 0, secs[i].bars) : 0;
 
@@ -48,6 +49,9 @@ export function compileSong(input) {
   const lanes = secs.map((_, i) => sectionLane(v1secs, i));
   L.push('', `// ${t('cSections')}`);
   secs.forEach((s, i) => L.push(`const section${i + 1} = "${rle(lanes[i].map(String))}"  // ${names[i]} · ${sectionInfo({ ...v1secs[i] }, fadeIn(v1secs, i))}`));
+  // shared progressions (idea-model): written once, read by name by the tracks that use them
+  const shared = song.shared && typeof song.shared === 'object' ? Object.fromEntries(Object.entries(song.shared).filter(([k, v]) => isSharedName(k) && typeof v === 'string')) : {};
+  if (Object.keys(shared).length) { L.push('', `// ${t('cShared')}`); for (const [k, v] of Object.entries(shared)) L.push(`const ${k} = "${v}"`); }
 
   // one bus per track: the first track of a type keeps the v1 orbit, the others get new ones
   const used = new Set();
@@ -81,7 +85,7 @@ export function compileSong(input) {
           L.push(`const ${gate} = "${rle(v.map(String))}"`);
         }
         L.push(`// ${names[i]} · ${t('cBars', { from: a + 1, to: b })} · ${t('cPattern', { p: clip.pattern })}`);
-        const opts = { start: a, bars: b - a, gate, crash: sec.crash && a === sec.start, breath: sec.breath && b === sec.start + sec.bars, fill: sec.fill && b === sec.start + sec.bars, only: tr.type, orbit, rack };
+        const opts = { start: a, bars: b - a, gate, crash: sec.crash && a === sec.start, breath: sec.breath && b === sec.start + sec.bars, fill: sec.fill && b === sec.start + sec.bars, only: tr.type, orbit, rack, shared, variant: Number.isInteger(tr.variant) ? tr.variant : null };
         if (tr.type === 'code') L.push(...codeLayer(tr, clip, gate, orbit, rack));
         else {
           // the instrument comment ("// Bass · Rolling") is repeated per clip only when it changes

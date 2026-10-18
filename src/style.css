@@ -256,6 +256,7 @@
   .chsteps { display: grid; gap: 5px; margin: 2px 0 10px; }
   .chsteps .row { display: flex; align-items: center; gap: 8px; }
   .chsteps .hint { flex: 1; font-size: 11px; color: var(--muted); }
+  .idea-code { margin: 4px 0 0; font: 11px/1.4 var(--mono, ui-monospace, monospace); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
   .btn.small { padding: 3px 8px; font-size: 11px; }
   .card.off .chsteps { opacity: .45; }
   .arr-scene-btn { position: relative; min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); text-align: left; overflow: hidden; }

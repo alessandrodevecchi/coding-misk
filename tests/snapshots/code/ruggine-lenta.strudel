@@ -17,25 +17,25 @@ const section6 = "<0!40 0.33 0.67 1!2>"  // Coda · 4 bars · 84→76 BPM · D �
 // ========== drums ==========
 // Strofa · bars 5-12 · pattern half
 // Drums · AkaiMPC60
-$: s("[bd ~ ~ ~] ~ [~ ~ bd ~] ~").bank("AkaiMPC60").gain(0.5).lpf(9000).crush(12).swingBy(0.03, 8).mask(section2).velocity(section2).orbit(1).analyze("kick")
-$: s("~ ~ [sd ~ ~ ~] ~").bank("AkaiMPC60").gain(0.38).lpf(9000).crush(12).swingBy(0.03, 8).mask(section2).velocity(section2).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("AkaiMPC60").gain(0.25).lpf(9000).crush(12).swingBy(0.03, 8).mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("bd ~!9 bd ~!5").bank("AkaiMPC60").gain(0.5).lpf(9000).crush(12).swingBy(0.03, 8).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("~ sd").bank("AkaiMPC60").gain(0.38).lpf(9000).crush(12).swingBy(0.03, 8).mask(section2).velocity(section2).orbit(1).analyze("snare")
+$: s("hh*8").bank("AkaiMPC60").gain(0.25).lpf(9000).crush(12).swingBy(0.03, 8).mask(section2).velocity(section2).orbit(1).analyze("hats")
 // Muro · bars 13-20 · pattern heavy
-$: s("[bd ~ ~ ~] [~ ~ bd ~] [~ ~ bd ~] ~").bank("AkaiMPC60").gain(0.5).lpf(9000).crush(12).swingBy(0.03, 8).mask(section3).velocity(section3).orbit(1).analyze("kick")
-$: s("~ ~ [sd ~ ~ ~] ~").bank("AkaiMPC60").gain(0.38).lpf(9000).crush(12).swingBy(0.03, 8).mask(section3).velocity(section3).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("AkaiMPC60").gain(0.25).lpf(9000).crush(12).swingBy(0.03, 8).mask(section3).velocity(section3).orbit(1).analyze("hats")
-$: s("~ [~ ~ oh ~] ~ [~ ~ oh ~]").bank("AkaiMPC60").gain(0.23).lpf(9000).crush(12).swingBy(0.03, 8).mask(section3).velocity(section3).orbit(1).analyze("hats")
+$: s("[bd ~] [~ bd]!2 ~").bank("AkaiMPC60").gain(0.5).lpf(9000).crush(12).swingBy(0.03, 8).mask(section3).velocity(section3).orbit(1).analyze("kick")
+$: s("~ sd").bank("AkaiMPC60").gain(0.38).lpf(9000).crush(12).swingBy(0.03, 8).mask(section3).velocity(section3).orbit(1).analyze("snare")
+$: s("hh*8").bank("AkaiMPC60").gain(0.25).lpf(9000).crush(12).swingBy(0.03, 8).mask(section3).velocity(section3).orbit(1).analyze("hats")
+$: s("[~!6 oh ~]*2").bank("AkaiMPC60").gain(0.23).lpf(9000).crush(12).swingBy(0.03, 8).mask(section3).velocity(section3).orbit(1).analyze("hats")
 $: s("cr").bank("AkaiMPC60").gain(.55).room(.4).mask("<0!4 1 0!3>").mask(section3).velocity(section3).orbit(1).analyze("fx")
 // Muro 2 · bars 29-40 · pattern heavy
-$: s("[bd ~ ~ ~] [~ ~ bd ~] [~ ~ bd ~] ~").bank("AkaiMPC60").gain(0.5).lpf(9000).crush(12).swingBy(0.03, 8).mask(section5).velocity(section5).orbit(1).analyze("kick")
-$: s("~ ~ [sd ~ ~ ~] ~").bank("AkaiMPC60").gain(0.38).lpf(9000).crush(12).swingBy(0.03, 8).mask(section5).velocity(section5).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("AkaiMPC60").gain(0.25).lpf(9000).crush(12).swingBy(0.03, 8).mask(section5).velocity(section5).orbit(1).analyze("hats")
-$: s("~ [~ ~ oh ~] ~ [~ ~ oh ~]").bank("AkaiMPC60").gain(0.23).lpf(9000).crush(12).swingBy(0.03, 8).mask(section5).velocity(section5).orbit(1).analyze("hats")
+$: s("[bd ~] [~ bd]!2 ~").bank("AkaiMPC60").gain(0.5).lpf(9000).crush(12).swingBy(0.03, 8).mask(section5).velocity(section5).orbit(1).analyze("kick")
+$: s("~ sd").bank("AkaiMPC60").gain(0.38).lpf(9000).crush(12).swingBy(0.03, 8).mask(section5).velocity(section5).orbit(1).analyze("snare")
+$: s("hh*8").bank("AkaiMPC60").gain(0.25).lpf(9000).crush(12).swingBy(0.03, 8).mask(section5).velocity(section5).orbit(1).analyze("hats")
+$: s("[~!6 oh ~]*2").bank("AkaiMPC60").gain(0.23).lpf(9000).crush(12).swingBy(0.03, 8).mask(section5).velocity(section5).orbit(1).analyze("hats")
 $: s("cr").bank("AkaiMPC60").gain(.55).room(.4).mask("<0!4 1 0!7>").mask(section5).velocity(section5).orbit(1).analyze("fx")
 // Coda · bars 41-44 · pattern half
-$: s("[bd ~ ~ ~] ~ [~ ~ bd ~] ~").bank("AkaiMPC60").gain("<0.5 0.33 0.17 0>").lpf(9000).crush(12).mask(section6).velocity(section6).orbit(1).analyze("kick")
-$: s("~ ~ [sd ~ ~ ~] ~").bank("AkaiMPC60").gain("<0.38 0.25 0.13 0>").lpf(9000).crush(12).mask(section6).velocity(section6).orbit(1).analyze("snare")
-$: s("[hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~] [hh ~ hh ~]").bank("AkaiMPC60").gain("<0.25 0.17 0.08 0>").lpf(9000).crush(12).mask(section6).velocity(section6).orbit(1).analyze("hats")
+$: s("bd ~!9 bd ~!5").bank("AkaiMPC60").gain("<0.5 0.33 0.17 0>").lpf(9000).crush(12).mask(section6).velocity(section6).orbit(1).analyze("kick")
+$: s("~ sd").bank("AkaiMPC60").gain("<0.38 0.25 0.13 0>").lpf(9000).crush(12).mask(section6).velocity(section6).orbit(1).analyze("snare")
+$: s("hh*8").bank("AkaiMPC60").gain("<0.25 0.17 0.08 0>").lpf(9000).crush(12).mask(section6).velocity(section6).orbit(1).analyze("hats")
 
 // ========== bass ==========
 // Strofa · bars 5-12 · pattern walk
@@ -55,19 +55,19 @@ $: note("<[a3 ~ ~ a3 ~ ~ e4 ~ a3 ~ ~ ~ a4 ~ e4 ~] [g3 ~ ~ g3 ~ ~ d4 ~ g3 ~ ~ ~ g
 // ========== Clean guitar · arp ==========
 // Polvere · bars 1-4 · pattern pick
 // Arpeggio · notes written by hand, 8ths
-$: note("<[a3 c4 e4 a4 e4 c4 e4 c4] [g3 b3 d4 g4 d4 b3 d4 b3] [f3 a3 c4 f4 c4 a3 c4 a3] [g#3 b3 e4 g#4 e4 b3 e4 b3]>").transpose(5)
+$: note("<[a3,c4,e4,a4] [g3,b3,d4,g4] [f3,a3,c4,f4] [g#3,b3,e4,g#4]>").arp("0 1 2 3 2 1 2 1").transpose(5)
   .s("gm_electric_guitar_clean").lpf(5000).lpq(0)
   .decay(.15).sustain(.15).gain(0.7).room(0.45).roomsize(0.7).delay(0.25).delaysync(0.375).delayfeedback(0.35).mask(section1).velocity(section1).orbit(3).analyze("arp")
 // Strofa · bars 5-12 · pattern pick
-$: note("<[a3 c4 e4 a4 e4 c4 e4 c4] [g3 b3 d4 g4 d4 b3 d4 b3] [f3 a3 c4 f4 c4 a3 c4 a3] [g#3 b3 e4 g#4 e4 b3 e4 b3]>").transpose(5).swingBy(0.03, 8)
+$: note("<[a3,c4,e4,a4] [g3,b3,d4,g4] [f3,a3,c4,f4] [g#3,b3,e4,g#4]>").arp("0 1 2 3 2 1 2 1").transpose(5).swingBy(0.03, 8)
   .s("gm_electric_guitar_clean").lpf(5000).lpq(0)
   .decay(.15).sustain(.15).gain(0.9).room(0.45).roomsize(0.7).delay(0.25).delaysync(0.375).delayfeedback(0.35).mask(section2).velocity(section2).orbit(3).analyze("arp")
 // Vuoto · bars 21-28 · pattern pick
-$: note("<[a3 c4 e4 a4 e4 c4 e4 c4]>").transpose(5)
+$: note("a3 c4 e4 a4 e4 c4 e4 c4").transpose(5)
   .s("gm_electric_guitar_clean").lpf(5000).lpq(0)
   .decay(.15).sustain(.15).gain(0.9).room(0.45).roomsize(0.7).delay(0.25).delaysync(0.375).delayfeedback(0.35).mask(section4).velocity(section4).orbit(3).analyze("arp")
 // Coda · bars 41-44 · pattern pick
-$: note("<[a3 c4 e4 a4 e4 c4 e4 c4]>").transpose(5)
+$: note("a3 c4 e4 a4 e4 c4 e4 c4").transpose(5)
   .s("gm_electric_guitar_clean").lpf(5000).lpq(0)
   .decay(.15).sustain(.15).gain("<0.9 0.63 0.37 0.1>").room(0.45).roomsize(0.7).delay(0.25).delaysync(0.375).delayfeedback(0.35).mask(section6).velocity(section6).orbit(3).analyze("arp")
 
@@ -87,7 +87,7 @@ $: note("<[a2,e3,a3] [g2,d3,g3] [f2,c3,f3] [e2,b2,e3]>").transpose(-7)
 // ========== choir · pad ==========
 // Vuoto · bars 21-28 · pattern hold
 // Pad · Sustained
-$: note("<[a2,c3,e3]>").transpose(5)
+$: note("[a2,c3,e3]").transpose(5)
   .s("gm_choir_aahs").attack(.4).release(1.2).lpf(sine.range(1200, 4800).slow(8))
   .room(.9).gain(0.5).mask(section4).velocity(section4).orbit(6).analyze("pad")
 

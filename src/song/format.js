@@ -14,14 +14,16 @@ export const ORIGINS = ['endless'];
 
 // Fields that belong to the pattern (what and when a track plays); everything else in the
 // channel state is a track setting (how it sounds). Guitar keeps its preset in `pattern`.
+// `idea` (idea-model, #70): the part as a small musical idea (a cell, sequencer steps, degrees, chords, a seeded random
+// source, a shared progression, prepared variants), written in its shortest form; see src/song/ideas.js
 export const PATTERN_FIELDS = {
-  drums: ['rows'],
-  bass: ['preset', 'steps', 'notes'],
-  guitar: ['preset', 'steps'],
-  arp: ['preset', 'speed', 'steps', 'notes'],
-  hook: ['preset', 'steps', 'notes'],
-  pad: ['preset', 'steps'],
-  texture: ['rhythm'],
+  drums: ['rows', 'idea'],
+  bass: ['preset', 'steps', 'notes', 'idea'],
+  guitar: ['preset', 'steps', 'idea'],
+  arp: ['preset', 'speed', 'steps', 'notes', 'idea'],
+  hook: ['preset', 'steps', 'notes', 'idea'],
+  pad: ['preset', 'steps', 'idea'],
+  texture: ['rhythm', 'idea'],
   riser: [],
   code: ['code'],
   voice: [],
@@ -128,8 +130,10 @@ export function clipState(sec, tr, clip) {
   const type = tr.type, pat = (tr.patterns || {})[clip.pattern] || {};
   if (type === 'code' || type === 'voice') return st;
   const ch = { ...DEFAULT[type], ...tr.settings, ...(clip.set || {}), on: true };
-  if (type === 'drums') ch.rows = Object.fromEntries(ROWS.map(([id]) => [id, { steps: (pat.rows || {})[id] || '', mute: !(pat.rows || {})[id] }]));
+  if (type === 'drums') { ch.rows = Object.fromEntries(ROWS.map(([id]) => [id, { steps: (pat.rows || {})[id] || '', mute: !(pat.rows || {})[id] }])); if (pat.idea) ch.idea = pat.idea; }
   else for (const k of PATTERN_FIELDS[type]) if (pat[k] !== undefined) ch[stateKey(type, k)] = pat[k];
+  // an idea without a preset: no preset name in the code comment (the sound shape stays the default preset's)
+  if (pat.idea && pat.preset === undefined && PATTERN_FIELDS[type].includes('preset')) ch[stateKey(type, 'preset')] = '';
   st[type] = ch;
   return st;
 }

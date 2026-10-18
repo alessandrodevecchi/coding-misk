@@ -1,0 +1,149 @@
+// coding-misk · Kellerlicht
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(132/4)
+
+const SECTIONS = [['Tunnel', 16], ['Eingang', 16], ['Körper', 32], ['Nebel', 16], ['Druck', 32], ['Abstieg', 16], ['Druck 2', 24], ['Ausgang', 8]]
+const TEMPO = {'Tunnel': 132, 'Eingang': 132, 'Körper': 132, 'Nebel': 132, 'Druck': 132, 'Abstieg': 132, 'Druck 2': 132, 'Ausgang': 132}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!16 0!144>"  // Tunnel · 16 bars · 132 BPM · F · Fm
+const section2 = "<0!16 1!16 0!128>"  // Eingang · 16 bars · 132 BPM · F · Fm
+const section3 = "<0!32 1!32 0.67 0.33 0!94>"  // Körper · 32 bars · 132 BPM · F · Fm Fm Fm F#
+const section4 = "<0!64 0.33 0.67 1!14 0!80>"  // Nebel · 16 bars · 132 BPM · F · Fm F# Fm D# · fades in over 2 bars
+const section5 = "<0!80 1!32 0.5 0!47>"  // Druck · 32 bars · 132 BPM · F · Fm Fm Fm F#
+const section6 = "<0!112 0.5 1!15 0.5 0!31>"  // Abstieg · 16 bars · 132 BPM · F · Fm · fades in over 1 bars
+const section7 = "<0!128 0.5 1!23 0.5 0!7>"  // Druck 2 · 24 bars · 132 BPM · F · Fm C# G# D# · fades in over 1 bars
+const section8 = "<0!152 0.5 1!7>"  // Ausgang · 8 bars · 132 BPM · F · Fm · fades in over 1 bars
+
+// ========== Kick · drums ==========
+// Tunnel · bars 1-16 · pattern floor
+// Drums · RolandTR909
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).distort(0.4).distortvol(.5).mask(section1).velocity(section1).orbit(1).analyze("kick")
+// Eingang · bars 17-32 · pattern floor
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).distort(0.4).distortvol(.5).mask(section2).velocity(section2).orbit(1).analyze("kick")
+// Körper · bars 33-64 · pattern floor
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).distort(0.4).distortvol(.5).mask(section3).velocity(section3).orbit(1).analyze("kick")
+// Druck · bars 81-112 · pattern push
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ bd]").bank("RolandTR909").gain(0.9).distort(0.4).distortvol(.5).mask(section5).velocity(section5).orbit(1).analyze("kick")
+// Abstieg · bars 113-128 · pattern floor
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).distort(0.4).distortvol(.5).mask(section6).velocity(section6).orbit(1).analyze("kick")
+// Druck 2 · bars 129-152 · pattern push
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ bd]").bank("RolandTR909").gain(0.9).distort(0.4).distortvol(.5).mask(section7).velocity(section7).orbit(1).analyze("kick")
+// Ausgang · bars 153-160 · pattern floor
+$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain("<0.9 0.77 0.64 0.51 0.39 0.26 0.13 0>").distort(0.4).distortvol(.5).mask(section8).velocity(section8).orbit(1).analyze("kick")
+
+// ========== Rumble · code ==========
+// Tunnel · bars 1-16 · pattern tail
+$: (s("bd*4").bank("RolandTR909").lpf(160).distort(0.6).room(0.9).roomsize(0.95).gain(0.28))
+  .mask(section1).velocity(section1).orbit(9).analyze("bass")
+// Eingang · bars 17-32 · pattern tail
+$: (s("bd*4").bank("RolandTR909").lpf(160).distort(0.6).room(0.9).roomsize(0.95).gain(0.28))
+  .mask(section2).velocity(section2).orbit(9).analyze("bass")
+// Körper · bars 33-64 · pattern tail
+$: (s("bd*4").bank("RolandTR909").lpf(160).distort(0.6).room(0.9).roomsize(0.95).gain(0.28))
+  .mask(section3).velocity(section3).orbit(9).analyze("bass")
+// Druck · bars 81-112 · pattern tail
+$: (s("bd*4").bank("RolandTR909").lpf(160).distort(0.6).room(0.9).roomsize(0.95).gain(0.28))
+  .mask(section5).velocity(section5).orbit(9).analyze("bass")
+// Abstieg · bars 113-128 · pattern tail
+$: (s("bd*4").bank("RolandTR909").lpf(160).distort(0.6).room(0.9).roomsize(0.95).gain(0.28))
+  .mask(section6).velocity(section6).orbit(9).analyze("bass")
+// Druck 2 · bars 129-152 · pattern tail
+$: (s("bd*4").bank("RolandTR909").lpf(160).distort(0.6).room(0.9).roomsize(0.95).gain(0.28))
+  .mask(section7).velocity(section7).orbit(9).analyze("bass")
+
+// ========== Rolling bass · bass ==========
+// Eingang · bars 17-32 · pattern roll
+// Bass · Rolling
+$: note("<a1>").transpose(-4).struct("[~ x x x] [~ x x x] [~ x x x] [~ x x x]")
+  .s("sawtooth").lpf(sine.range(168, 672).slow(8)).lpq(6).distort(0.3).distortvol(.5)
+  .decay(.12).sustain(0).gain(0.7).mask(section2).velocity(section2).orbit(2).analyze("bass")
+// Körper · bars 33-64 · pattern roll
+$: note("<a1 a1 a1 a#1>").transpose(-4).struct("[~ x x x] [~ x x x] [~ x x x] [~ x x x]")
+  .s("sawtooth").lpf(sine.range(168, 672).slow(8)).lpq(6).distort(0.3).distortvol(.5)
+  .decay(.12).sustain(0).gain(0.7).mask(section3).velocity(section3).orbit(2).analyze("bass")
+// Nebel · bars 65-80 · pattern hold
+// Bass · notes written by hand
+$: note("<[a3 ~ ~ ~ ~ ~ ~ ~ a3 ~ ~ ~ ~ ~ ~ ~] [a#3 ~ ~ ~ ~ ~ ~ ~ a#3 ~ ~ ~ ~ ~ ~ ~] [a3 ~ ~ ~ ~ ~ ~ ~ a3 ~ ~ ~ ~ ~ ~ ~] [g3 ~ ~ ~ ~ ~ ~ ~ g3 ~ ~ ~ ~ ~ ~ ~]>").transpose(-28)
+  .s("sawtooth").lpf(sine.range(104, 416).slow(8)).lpq(6).distort(0.3).distortvol(.5)
+  .decay(.6).sustain(.8).gain(0.5).mask("<1!15 [1 0]>").mask(section4).velocity(section4).orbit(2).analyze("bass")
+// Druck · bars 81-112 · pattern roll
+// Bass · Rolling
+$: note("<a1 a1 a1 a#1>").transpose(-4).struct("[~ x x x] [~ x x x] [~ x x x] [~ x x x]")
+  .s("sawtooth").lpf(sine.range(168, 672).slow(8)).lpq(6).distort(0.3).distortvol(.5)
+  .decay(.12).sustain(0).gain(0.7).mask(section5).velocity(section5).orbit(2).analyze("bass")
+// Abstieg · bars 113-128 · pattern roll
+$: note("<a1>").transpose(-4).struct("[~ x x x] [~ x x x] [~ x x x] [~ x x x]")
+  .s("sawtooth").lpf(sine.range(168, 672).slow(8)).lpq(6).distort(0.3).distortvol(.5)
+  .decay(.12).sustain(0).gain(0.7).mask(section6).velocity(section6).orbit(2).analyze("bass")
+// Druck 2 · bars 129-152 · pattern octaves
+// Bass · 8th notes (rock)
+$: note("<a1 f1 c2 g1>").transpose(-4).struct("[x x] [x x] [x x] [x x]")
+  .s("sawtooth").lpf(sine.range(208, 832).slow(8)).lpq(4).distort(0.3).distortvol(.5)
+  .decay(.25).sustain(.5).gain(0.6).mask(section7).velocity(section7).orbit(2).analyze("bass")
+
+// ========== Hats and gated snare · drums ==========
+// Eingang · bars 17-32 · pattern off
+// Drums · LinnDrum
+$: s("[~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~]").bank("LinnDrum").gain(0.1).lpf(4500).crush(15).room(0.35).roomsize(0.35).mask(section2).velocity(section2).orbit(10).analyze("hats")
+// Körper · bars 33-64 · pattern off
+$: s("[~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~]").bank("LinnDrum").gain(0.1).lpf(4500).crush(15).room(0.35).roomsize(0.35).mask(section3).velocity(section3).orbit(10).analyze("hats")
+// Druck · bars 81-112 · pattern drive
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("LinnDrum").gain(0.15).lpf(4500).crush(15).room(0.35).roomsize(0.35).mask(section5).velocity(section5).orbit(10).analyze("snare")
+$: s("[~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~]").bank("LinnDrum").gain(0.1).lpf(4500).crush(15).room(0.35).roomsize(0.35).mask(section5).velocity(section5).orbit(10).analyze("hats")
+$: s("~ ~ ~ [~ ~ oh ~]").bank("LinnDrum").gain(0.09).lpf(4500).crush(15).room(0.35).roomsize(0.35).mask(section5).velocity(section5).orbit(10).analyze("hats")
+// Abstieg · bars 113-128 · pattern off
+$: s("[~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~]").bank("LinnDrum").gain(0.1).lpf(4500).crush(15).room(0.35).roomsize(0.35).mask(section6).velocity(section6).orbit(10).analyze("hats")
+// Druck 2 · bars 129-152 · pattern drive
+$: s("~ [sd ~ ~ ~] ~ [sd ~ ~ ~]").bank("LinnDrum").gain(0.15).lpf(4500).crush(15).room(0.35).roomsize(0.35).mask(section7).velocity(section7).orbit(10).analyze("snare")
+$: s("[~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~]").bank("LinnDrum").gain(0.1).lpf(4500).crush(15).room(0.35).roomsize(0.35).mask(section7).velocity(section7).orbit(10).analyze("hats")
+$: s("~ ~ ~ [~ ~ oh ~]").bank("LinnDrum").gain(0.09).lpf(4500).crush(15).room(0.35).roomsize(0.35).mask(section7).velocity(section7).orbit(10).analyze("hats")
+
+// ========== Low acid · arp ==========
+const clip1 = "<0!40 1!24 0.67 0.33 0!94>"
+// Körper · bars 41-64 · pattern line
+// Arpeggio · Acid, 16ths
+$: note("<[a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4 a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4] [a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4 a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4] [a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4 a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4] [a#3 a#3 [a#4 a#3] d4 a#3 f4 [a#3 a#4] d4 a#3 a#3 [a#4 a#3] d4 a#3 f4 [a#3 a#4] d4]>").transpose(-4)
+  .s("sawtooth").lpf("<773.91 795.65 817.39 839.13 860.87 882.61 904.35 926.09 947.83 969.57 991.3 1013.04 1034.78 1056.52 1078.26 1100 600 621.74 643.48 665.22 686.96 708.7 730.43 752.17>").lpq(12).distort(0.4).distortvol(.5)
+  .decay(.15).sustain(.15).delay(.2).gain(0.28).mask(clip1).velocity(clip1).orbit(3).analyze("arp")
+// Druck · bars 81-112 · pattern line
+$: note("<[a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4 a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4] [a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4 a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4] [a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4 a3 a3 [a4 a3] c4 a3 e4 [a3 a4] c4] [a#3 a#3 [a#4 a#3] d4 a#3 f4 [a#3 a#4] d4 a#3 a#3 [a#4 a#3] d4 a#3 f4 [a#3 a#4] d4]>").transpose(-4)
+  .s("sawtooth").lpf("<1058.06 1074.19 1090.32 1106.45 1122.58 1138.71 1154.84 1170.97 1187.1 1203.23 1219.35 1235.48 1251.61 1267.74 1283.87 1300 800 816.13 832.26 848.39 864.52 880.65 896.77 912.9 929.03 945.16 961.29 977.42 993.55 1009.68 1025.81 1041.94>").lpq(12).distort(0.4).distortvol(.5)
+  .decay(.15).sustain(.15).delay(.2).gain(0.28).mask(section5).velocity(section5).orbit(3).analyze("arp")
+
+// ========== Fog pad · pad ==========
+// Nebel · bars 65-80 · pattern bed
+// Pad · Sustained
+$: note("<[a2,c3,e3] [a#2,d3,f3] [a2,c3,e3] [g2,b2,d3]>").transpose(-4)
+  .s("supersaw").attack(.4).release(1.2).lpf(sine.range(320, 1280).slow(8))
+  .room(.9).gain(0.2).phaser(0.25).phaserdepth(0.4).mask(section4).velocity(section4).orbit(6).analyze("pad")
+// Abstieg · bars 113-128 · pattern bed
+$: note("<[a2,c3,e3]>").transpose(-4)
+  .s("supersaw").attack(.4).release(1.2).lpf(sine.range(320, 1280).slow(8))
+  .room(.9).gain(0.14).phaser(0.25).phaserdepth(0.4).mask(section6).velocity(section6).orbit(6).analyze("pad")
+// Druck 2 · bars 129-152 · pattern pump
+// Pad · Sidechain
+$: note("<[a2,c3,e3] [f2,a2,c3] [g2,c3,e3] [g2,b2,d3]>").transpose(-4).struct("[x x x x] [x x x x] [x x x x] [x x x x]")
+  .s("supersaw").attack(.01).decay(.2).sustain(.7).release(.05).lpf(sine.range(440, 1760).slow(8))
+  .room(.9).postgain("[.1 .4 .75 1] [.1 .4 .75 1] [.1 .4 .75 1] [.1 .4 .75 1]").gain(0.16).phaser(0.25).phaserdepth(0.4).mask(section7).velocity(section7).orbit(6).analyze("pad")
+
+// ========== Lamp · hook ==========
+const clip2 = "<0!68 1!12 0!80>"
+// Nebel · bars 69-80 · pattern far
+// Hook · notes written by hand
+$: n("<[0 ~ ~ ~ 1 ~ ~ ~] [0 ~ ~ ~ ~ ~ -2 ~] [0 ~ ~ ~ 1 ~ 2 ~] [1 ~ ~ ~ 0 ~ ~ ~]>").scale("F4:phrygian")
+  .s("sawtooth").lpf(1400)
+  .decay(.2).sustain(.3).delay(.5).room(.3).gain(0.3).room(0.6).roomsize(0.85).pan(sine.slow(8)).mask("<1!7 [1 0] 1!4>").mask(clip2).velocity(clip2).orbit(4).analyze("hook")
+
+// ========== Concrete · texture ==========
+// Tunnel · bars 1-16 · pattern drip
+// Texture · industrial
+$: s("industrial").n("<0 3 7 1>").crush(10).hpf(400).room(.7)
+  .gain(0.18).lpf(2500).mask(section1).velocity(section1).orbit(7).analyze("fx")
+// Nebel · bars 65-80 · pattern drip
+$: s("industrial").n("<0 3 7 1>").crush(10).hpf(400).room(.7)
+  .gain(0.18).lpf(2500).mask(section4).velocity(section4).orbit(7).analyze("fx")
+// Ausgang · bars 153-160 · pattern drip
+$: s("industrial").n("<0 3 7 1>").crush(10).hpf(400).room(.7)
+  .gain("<0.18 0.15 0.13 0.1 0.08 0.05 0.03 0>").lpf(2500).mask(section8).velocity(section8).orbit(7).analyze("fx")

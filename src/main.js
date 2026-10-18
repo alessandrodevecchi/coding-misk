@@ -1,5 +1,7 @@
 import '@strudel/repl';
 import './style.css';
+import { ideaCode } from './music.js';
+import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys } from './song/build.js';
@@ -1947,12 +1949,14 @@ function panelHtml(ti) {
   if (tr.type === 'drums') {
     editor = `<div class="ctrl"><label class="lbl" for="pt-groove">${t('groove')}</label><select id="pt-groove"></select></div>
       <div class="seq"><span></span><div class="stepnums" ${cols}>${Array.from({ length: n }, (_, i) => `<span>${i + 1}</span>`).join('')}</div>
-      ${ROWS.map(([id, label]) => `<span class="rowlbl">${label}</span><div class="steps" ${cols}>${Array.from({ length: n }, (_, i) => `<button type="button" class="step" data-g="${Math.floor(i / 4) % 4}" data-row="${id}" data-i="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('')}</div>`).join('')}</div>`;
+      ${ROWS.map(([id, label]) => `<span class="rowlbl">${label}</span><div class="steps" ${cols}>${Array.from({ length: n }, (_, i) => `<button type="button" class="step" data-g="${Math.floor(i / 4) % 4}" data-row="${id}" data-i="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('')}</div>`).join('')}</div>
+      <p class="idea-code" id="pt-idea" hidden></p>`;
   } else if (PRESET_LIST[tr.type]) {
     editor = `<div class="pt-top"><div class="ctrl"><label class="lbl" for="pt-preset">${t('preset')}</label><select id="pt-preset"></select></div>
       ${tr.type === 'arp' ? `<div class="ctrl"><label class="lbl" for="pt-speed">${t('speed')}</label><select id="pt-speed"><option value="16">${t('sixteenths')}</option><option value="8">${t('eighths')}</option></select></div>` : ''}</div>
       <div class="chsteps" data-n="${n}"${tr.type === 'hook' || tr.type === 'arp' ? ` title="${esc(t('stepsMaskHint'))}"` : ''}><div class="row"><span class="lbl">${t('chSteps')}</span><span class="hint" id="pt-steps-state"></span><button type="button" class="btn small" id="pt-steps-reset">${t('stepsReset')}</button></div>
-        <div class="steps" ${cols}>${stepBtns('data-ps', t(tr.type))}</div></div>`;
+        <div class="steps" ${cols}>${stepBtns('data-ps', t(tr.type))}</div>
+        <p class="idea-code" id="pt-idea" hidden></p></div>`;
     if (NOTE_TYPES.includes(tr.type)) {
       const nc = noteCols(tr, pat), ncols = `style="grid-template-columns:repeat(${nc}, minmax(0, 1fr))"`;
       editor += `<div class="notes"><div class="row"><span class="lbl">${t('notesLbl')}</span><span class="hint">${t(tr.type === 'hook' ? 'notesHintHook' : 'notesHintChord')}</span><button type="button" class="btn small" id="pt-notes-reset">${t('notesReset')}</button></div>
@@ -2029,7 +2033,13 @@ function syncPanel(host) {
     b.title = on ? t('pinOn') : t('pinOff', { bars });
   });
   all('[data-ctl]').forEach(x => x.classList.toggle('over', Object.keys(over).some(k => k === x.dataset.ctl || k === x.dataset.ctl + 'End')));
-  if (tr.type === 'drums') all('[data-row]').forEach(b => b.setAttribute('aria-pressed', ((pat.rows || {})[b.dataset.row] || '')[b.dataset.i] === 'x'));
+  // an idea (idea-model): the step row shows what it plays, a read-only line shows it as code
+  const drumRows = tr.type === 'drums' && pat.idea && !pat.rows ? ideaRows(pat.idea, meterSteps(secFull().meter)) : pat.rows || {};
+  if (tr.type === 'drums') all('[data-row]').forEach(b => b.setAttribute('aria-pressed', (drumRows[b.dataset.row] || '')[b.dataset.i] === 'x'));
+  if (q('pt-idea')) {
+    q('pt-idea').hidden = !pat.idea;
+    if (pat.idea) { q('pt-idea').textContent = ideaCode(patState(tr), tr.type, T.shared || {}); q('pt-idea').title = t('ideaCodeHint'); }
+  }
   if (q('pt-preset')) q('pt-preset').value = pat.preset || (DEFAULT_PATTERN[tr.type] ? DEFAULT_PATTERN[tr.type]().preset : '') || '';
   if (q('pt-speed')) q('pt-speed').value = pat.speed || '16';
   if (q('pt-rhythm')) q('pt-rhythm').value = pat.rhythm || 'bar';
@@ -2037,7 +2047,7 @@ function syncPanel(host) {
   if (host.querySelector('[data-ps]')) {
     const steps = channelSteps(patState(tr), tr.type);
     all('[data-ps]').forEach(b => b.setAttribute('aria-pressed', steps[b.dataset.ps] === 'x'));
-    q('pt-steps-state').textContent = pat.steps ? t('stepsCustom') : t('stepsPreset');
+    q('pt-steps-state').textContent = pat.steps ? t('stepsCustom') : pat.idea ? t('stepsIdea') : t('stepsPreset');
     q('pt-steps-reset').disabled = !pat.steps;
   }
   if (q('pt-notes')) {
@@ -2088,7 +2098,7 @@ $('#track-panel').addEventListener('change', e => {
     setClipSpan(tr, c, start, bars); changed(); renderTrackPanel(); return;
   }
   if (e.target.matches('select[data-dev-arg]')) { const [i, name] = e.target.dataset.devArg.split(':'); const v = e.target.value; tr.rack[+i][name] = isNaN(+v) ? v : +v; changed(); syncRack(tr, e.target.closest('[data-ptrk]')); return; }
-  if (r === 'pt-preset') editPattern(p => { p.preset = e.target.value; delete p.steps; });
+  if (r === 'pt-preset') editPattern(p => { p.preset = e.target.value; delete p.steps; delete p.idea; });
   if (r === 'pt-speed') { editPattern(p => { p.speed = e.target.value; delete p.steps; }); renderTrackPanel(); }
   if (r === 'pt-rhythm') editPattern(p => { p.rhythm = e.target.value; });
   if (r === 'pt-groove') { const g = GROOVES[e.target.value]; if (g) editPattern(p => { p.rows = Object.fromEntries(Object.entries(g[1]).filter(([, v]) => v.includes('x')).map(([k, v]) => [k, fitSteps(v, meterSteps(secFull().meter))])); }); e.target.value = ''; }
@@ -2110,8 +2120,10 @@ $('#track-panel').addEventListener('click', e => {
   const tr = curTrack(); if (!tr) return;
   const r = role(b);
   const n = meterSteps(secFull().meter);
-  if (b.dataset.row) return editPattern(p => { p.rows = p.rows || {}; const a = fitSteps(p.rows[b.dataset.row] || '', n).split(''); a[+b.dataset.i] = a[+b.dataset.i] === 'x' ? '.' : 'x'; const s = a.join(''); if (s.includes('x')) p.rows[b.dataset.row] = s; else delete p.rows[b.dataset.row]; });
-  if (b.dataset.ps !== undefined) return editPattern((p, t2) => { const a = channelSteps(patState(t2), t2.type).split(''); a[+b.dataset.ps] = a[+b.dataset.ps] === 'x' ? '.' : 'x'; p.steps = a.join(''); });
+  // editing the steps of an idea writes them out: the pattern keeps the steps, the idea goes (idea-model)
+  const writeOut = p => { if (p.idea) { delete p.idea; toast(t('ideaWrittenOut')); } };
+  if (b.dataset.row) return editPattern(p => { if (p.idea && !p.rows) p.rows = Object.fromEntries(Object.entries(ideaRows(p.idea, n)).filter(([, v]) => v.includes('x'))); writeOut(p); p.rows = p.rows || {}; const a = fitSteps(p.rows[b.dataset.row] || '', n).split(''); a[+b.dataset.i] = a[+b.dataset.i] === 'x' ? '.' : 'x'; const s = a.join(''); if (s.includes('x')) p.rows[b.dataset.row] = s; else delete p.rows[b.dataset.row]; });
+  if (b.dataset.ps !== undefined) return editPattern((p, t2) => { const a = channelSteps(patState(t2), t2.type).split(''); a[+b.dataset.ps] = a[+b.dataset.ps] === 'x' ? '.' : 'x'; p.steps = a.join(''); writeOut(p); });
   if (r === 'pt-steps-reset') return editPattern(p => { delete p.steps; });
   if (b.dataset.nd !== undefined) {
     const pat = tr.patterns[patOf(tr)] || {};

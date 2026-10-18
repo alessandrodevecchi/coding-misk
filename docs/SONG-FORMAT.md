@@ -123,13 +123,13 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 
 | Type | Pattern fields |
 | --- | --- |
-| `drums` | `rows`: `bd` kick, `cp` clap, `sd` snare, `hh` hat, `oh` open hat, `rd` ride, each a step string |
-| `bass` | `preset` (`rolling offbeat rumble galoppo ottavi walking sub pumping spirale mirino tritono ottaveArcade`), `steps`, `notes` |
-| `guitar` | `preset` (riffs `thrash gallopRiff groove djentRiff heroic stomp industrial`, rhythms `power8 chug gallop riff djent quarter held`), `steps` |
-| `arp` | `preset` (`su sugiu pulsar pedale spezzato acid`), `speed` ("16" or "8"), `steps`, `notes` |
-| `hook` | `preset` (`richiamo discesa eco ostinato domanda neon cyber decade scintilla prog assolo eroico phonk allarme colpi boss segnale anima arcade arcadeB pioggia orizzonte`), `steps`, `notes` |
-| `pad` | `preset` (`pad stab pump sidechain staccato synco comp power riff ring`), `steps` |
-| `texture` | `rhythm` (`bar euclid eighth sixteenth`) |
+| `drums` | `rows`: `bd` kick, `cp` clap, `sd` snare, `hh` hat, `oh` open hat, `rd` ride, each a step string; or `idea` with sequencer steps |
+| `bass` | `preset` (`rolling offbeat rumble galoppo ottavi walking sub pumping spirale mirino tritono ottaveArcade`), `steps`, `notes`, `idea` |
+| `guitar` | `preset` (riffs `thrash gallopRiff groove djentRiff heroic stomp industrial`, rhythms `power8 chug gallop riff djent quarter held`), `steps`, `idea` |
+| `arp` | `preset` (`su sugiu pulsar pedale spezzato acid`), `speed` ("16" or "8"), `steps`, `notes`, `idea` |
+| `hook` | `preset` (`richiamo discesa eco ostinato domanda neon cyber decade scintilla prog assolo eroico phonk allarme colpi boss segnale anima arcade arcadeB pioggia orizzonte`), `steps`, `notes`, `idea` |
+| `pad` | `preset` (`pad stab pump sidechain staccato synco comp power riff ring`), `steps`, `idea` |
+| `texture` | `rhythm` (`bar euclid eighth sixteenth`), `idea` |
 | `riser` | none (use `{}`) |
 | `code` | `code`: one Strudel pattern expression |
 | `voice` | none |
@@ -139,6 +139,56 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 - **`notes` on hook** are scale degrees of the section key in the hook `mode`: `0` is the key note, `7` the octave in a 7-note scale; negative numbers go below. 8 notes per bar (8ths).
 - **Mini-notation in `notes`:** `[a b]` splits one note in two, `<[bar 1] [bar 2]>` alternates bars, `~` rests.
 - **`code`** is plain Strudel: `note("a2 [c3 e3]").s("sawtooth").lpf(800)`. No `$:`, `setcpm` or `setcps`: tempo comes from the sections. The app adds the clip lane, the bus and `.analyze`. Inside a JSON string, write `"` as `\"`.
+
+### Ideas
+
+A pattern of a `drums`, `bass`, `guitar`, `arp`, `hook`, `pad` or `texture` track can hold an `idea` instead of written-out steps or notes: a small musical idea, the way a live coder writes it. The compiler writes it in its shortest form. A pattern that names a preset and holds no idea plays the preset's idea (every preset is stored as one); a pattern with `steps` or `notes` and no idea plays exactly as before.
+
+```json
+"patterns": {
+  "A": { "preset": "rolling" },
+  "B": { "idea": { "rhythm": "[~ x x x]*4" } },
+  "C": { "idea": { "from": "bline", "sub": 14, "variants": [{ "add": "0 0 4 0 5" }] } }
+}
+```
+
+| Field | What it says | Example | Code |
+| --- | --- | --- | --- |
+| `rhythm` | where notes start in a bar (`x` plays, `~` rests) | `"[~ x x x]*4"` | `.struct("[~ x x x]*4")` |
+| `per` | `"beat"`: `rhythm` is one cell per beat, repeated for the beats of each bar (works in every meter) | `"beat"` | |
+| `half` | with `per: "beat"`, the cell for a half beat (7/8); default the first half of the cell | `"[~ x]"` | |
+| `beat` | sequencer steps on a grid; drums: one list per row | `{ "steps": "0,4,11", "grid": 16 }`, `{ "bd": "0,4,11", "grid": 16 }` | `.beat("0,4,11",16)` |
+| `degrees` | scale degrees, counted from the key note in octave 4 (hook: its `octave`) | `"<0 2 4 ~>"` | `n("<0 2 4 ~>").scale("A4:minor")` |
+| `scale` | mode of the degrees (hook: default its `mode`); the key comes from the section | `"phrygian"` | |
+| `chords` | chord names, written in A like the progressions | `"<Am7 F^7>"` | `chord("<Am7 F^7>").voicing()` |
+| `voicing` | `{ "anchor", "mode" }`, both optional; without `chords`, the section's progression is voiced | `{ "anchor": "c5", "mode": "below" }` | `.anchor("c5").mode("below").voicing()` |
+| `index` | positions inside the voiced chord (arp); without chords, inside the chords of the progression | `"[0 1 2 3]*4"` | `n("[0 1 2 3]*4").chord(…)`, `.arp("[0 1 2 3]*4")` |
+| `random` | a seeded random source for indices (arp), sample slices (texture) or values (`on`) | `{ "fn": "irand", "max": 8, "seg": 16, "seed": 3, "cycles": 2 }` | `irand(8).seg(16).rib(3, 2)` |
+| `from` | a shared progression of the song (below) | `"bline"` | `n(bline.sub(14))` |
+| `add`, `sub` | transposition: degrees for degrees, semitones for notes; a number or a pattern | `14`, `"<0 12>"` | `.sub(14)`, `.transpose(…)` |
+| `hold` | `true` holds the chord for the bar (pad, guitar, arp) | `true` | |
+| `variants` | prepared variants, one chain function each; commented out until a `variant` step switches one on | `[{ "add": "0 0 4 0 5" }]` | `// .add("0 0 4 0 5")` |
+
+Which fields fit which track: `drums` take `beat`; `bass` rhythm, beat, degrees, scale, from, add, sub; `hook` degrees (required, or `from`), scale, rhythm, from, add, sub; `arp` index, chords, voicing, random, from, add, sub, rhythm; `pad` and `guitar` rhythm, beat, chords, voicing, add, hold; `texture` rhythm (`x` is the sample) and random. Every track takes `variants` but drums.
+
+- **Seeded randomness only.** A `random` source needs a `seed` and `cycles` (its loop length in bars): the same song plays the same notes in the app, in exports and in checks. Randomness only chooses indices inside a chord, sample slices, or the values of `lpf`, `hpf`, `pan`, `delay`, `room` or `gain` (`"on": "lpf"` with `"range": [400, 2000]`). Free melody notes are written by hand.
+- **Chord names** are those Strudel's voicings know: `Am`, `Am7`, `F^7` (not `Fmaj7`), `G7`, `Dm7b5`, `Csus`…
+- **Variants and degrees.** `add` and `sub` in a variant work on degrees (and arp indices); on notes use `transpose`. With variants, degrees are written first and turned into notes after: `bline.sub(14) // .add("0 0 4 0 5")` then `.n().scale("A4:minor")`.
+- **Compose.** The step row shows the steps an idea plays; editing it writes the steps and removes the idea from that pattern ("written out").
+
+### Shared progressions
+
+`shared` declares named progressions once; several tracks read them with `from`, each with its own transposition. A progression is scale degrees, or chord names when it starts with a letter.
+
+```json
+"shared": { "bline": "<[3 5@15] [3@12 0@4] [5 7@15] 7>" },
+"tracks": [
+  { "id": "bass", "type": "bass", "patterns": { "A": { "idea": { "from": "bline", "sub": 14, "rhythm": "[x x ~ x]*4" } } }, "clips": [{ "section": 0, "pattern": "A" }] },
+  { "id": "lead", "type": "hook", "patterns": { "A": { "idea": { "from": "bline", "sub": 7 } } }, "clips": [{ "section": 0, "pattern": "A" }] }
+]
+```
+
+The code holds `const bline = "<[3 5@15] [3@12 0@4] [5 7@15] 7>"` once, after the section lanes, and both tracks use it: `n(bline.sub(14))`, `n(bline.sub(7))`. A clip that starts inside the progression reads it with `.late(start)`. Names are letters and digits starting with a letter, not JavaScript words and not names of the compiler (`SECTIONS`, `TEMPO`, `section1`, `clip1`…).
 
 ## Clips
 
@@ -180,6 +230,7 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 | `unrack` | `{ "track", "device" }`: removes a rack device |
 | `hide` | `{ "track", "keys" }`: leaves out of the track's code the functions of these settings (`cutoff`, `reso`, `drive`, `grit`, `room`, `delay`, `env`), so Strudel's defaults apply (natural growth) |
 | `reveal` | `{ "track", "keys" }`: brings them back |
+| `variant` | `{ "track", "use": k }`: switches on the prepared variant `k` (from 0) of the track's ideas: its line loses the `//` and plays. `"use": null` switches it off |
 | `say` | a short comment, or one per language (`{ "en", "it" }`): shown over the stage for 4 bars, written as `// > …` above the track it changes, and spoken by a voice track |
 | `voice` | id of the voice track that speaks this step's comment (default: the first one) |
 
@@ -198,5 +249,7 @@ A song without `build` can also build itself: the "Live build" switch above the 
 ## Compiled code
 
 `compileSong` writes, in order: `setcpm`, `SECTIONS` and `TEMPO` (read by the player for seeking and tempo changes), one lane per section (`section1 = "<1!8 0!24>"`), then one block per track with its clips. Each clip line ends with `.mask(lane).velocity(lane).orbit(n).analyze("<instrument>")`.
+
+Each idea is written in its shortest exact form: a repeated cell with its repetition (`.struct("[~ x x x]*4")`, `s("[~ hh]*4")`), runs (`"0!6 1 0!5 3 0 1 0"`), sequencer steps when they are shorter (`s("bd").beat("0,7,10",16)`), degrees and chord names as written. Written steps and notes use the same short forms whenever they make the same events. Shared progressions come after the section lanes (`const bline = "…"`).
 
 Songs saved by older versions of the app (scenes with a full state each) are converted with `fromScenes` when loaded. The conversion was checked layer by layer against the old scene compiler before the scene model was removed.

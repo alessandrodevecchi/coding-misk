@@ -9,7 +9,8 @@ import { DEVICES, checkRack, rackCode } from './rack.js';
 // hide and reveal (natural-growth): functions of a track left out of its code until a step brings them in
 // clone, comment, notes (live-coder-growth): a track comes in as a copy of another one; functions commented out in the
 // code and back in; a pattern's notes (or drum rows) rewritten
-export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes'];
+// variant (idea-model): a prepared variant of the track's ideas switched on (its line loses the "//") or off
+export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes', 'variant'];
 const clone = o => JSON.parse(JSON.stringify(o));
 const CLONE_KEYS = ['wave', 'cutoff', 'reso', 'drive', 'gain', 'room', 'delay'];
 const list = v => (Array.isArray(v) ? v : [v]);
@@ -22,7 +23,7 @@ export const hasBuild = song => buildSteps(song).length > 0;
 // the track a step works on (for comments in the code), or null
 export function stepTrack(step) {
   for (const k of ['add', 'remove']) if (step[k] !== undefined) return list(step[k])[0];
-  for (const k of ['set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes']) if (step[k] && step[k].track) return step[k].track;
+  for (const k of ['set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes', 'variant']) if (step[k] && step[k].track) return step[k].track;
   return null;
 }
 
@@ -60,6 +61,7 @@ export function applyStep(song, step) {
   }
   if (step.comment) { const t = track(step.comment.track); if (t) { const k = list(step.comment.keys); t.commented = step.comment.on === false ? (t.commented || []).filter(x => !k.includes(x)) : [...new Set([...(t.commented || []), ...k])]; if (!t.commented.length) delete t.commented; } }
   if (step.notes) { const { track: id, ...vals } = step.notes, t = track(id); if (t) rewrite(t, vals); }
+  if (step.variant) { const t = track(step.variant.track); if (t) { if (Number.isInteger(step.variant.use)) t.variant = step.variant.use; else delete t.variant; } }
 }
 // a pattern rewritten: every clip plays a copy of its pattern ("A~x") with new notes, rows or steps
 function rewrite(t, vals) {
@@ -107,6 +109,7 @@ const stepWords = s => {
   if (s.rack) return `${s.rack.track} + ${s.rack.device}`;
   if (s.unrack) return `${s.unrack.track} - ${s.unrack.device}`;
   if (s.reveal) return `${s.reveal.track} + ${list(s.reveal.keys).join(' ')}`;
+  if (s.variant) return `${s.variant.track} variant ${s.variant.use ?? 'off'}`;
   return '';
 };
 export function annotate(code, song, upTo, lang) {
@@ -203,6 +206,12 @@ export function checkBuild(song, total, err, warn) {
     if (s.clone) { needTrack(`${p}.clone.track`, s.clone.track); needTrack(`${p}.clone.from`, s.clone.from); }
     if (s.comment) { needTrack(`${p}.comment.track`, s.comment.track); if (!list(s.comment.keys).every(x => ['cutoff', 'reso', 'drive', 'grit', 'room', 'delay', 'env'].includes(x))) err(`${p}.comment.keys`, 'some of cutoff, reso, drive, grit, room, delay, env'); }
     if (s.notes) { const t = needTrack(`${p}.notes.track`, s.notes.track); for (const k of Object.keys(s.notes)) if (!['track', 'notes', 'rows', 'steps'].includes(k)) err(`${p}.notes.${k}`, 'notes, rows (drums) or steps'); if (t && s.notes.rows !== undefined && t.type !== 'drums') err(`${p}.notes.rows`, 'rows are for drums'); }
+    if (s.variant) {
+      const t = needTrack(`${p}.variant.track`, s.variant.track), u = s.variant.use;
+      const most = t ? Math.max(0, ...Object.values(t.patterns || {}).map(x => (x && x.idea && Array.isArray(x.idea.variants) ? x.idea.variants.length : 0))) : 0;
+      if (u !== null && (!Number.isInteger(u) || u < 0)) err(`${p}.variant.use`, 'the index of a prepared variant (from 0), or null to switch it off');
+      else if (t && u !== null && u >= most) err(`${p}.variant.use`, most ? `the track's ideas prepare ${most} variant(s): 0 to ${most - 1}` : `track "${t.id}" has no idea with prepared variants`);
+    }
     for (const k of ['hide', 'reveal']) if (s[k]) { needTrack(`${p}.${k}.track`, s[k].track); if (!list(s[k].keys).every(x => ['cutoff', 'reso', 'drive', 'grit', 'room', 'delay', 'env'].includes(x))) err(`${p}.${k}.keys`, 'some of cutoff, reso, drive, grit, room, delay, env'); }
   });
 }
@@ -218,7 +227,7 @@ export function buildMap(song, total) {
     for (const s of steps) {
       if (s.add !== undefined && list(s.add).includes(t.id) && !on) { if (s.at > from) off.push([from, s.at]); on = true; }
       if (s.remove !== undefined && list(s.remove).includes(t.id) && on) { from = s.at; on = false; }
-      for (const k of ['set', 'pattern', 'rack', 'unrack', 'reveal']) if (s[k] && s[k].track === t.id) marks.push({ at: s.at, action: k, say: s.say });
+      for (const k of ['set', 'pattern', 'rack', 'unrack', 'reveal', 'variant']) if (s[k] && s[k].track === t.id) marks.push({ at: s.at, action: k, say: s.say });
       if (t.type === 'voice' && s.say && voiceOf(song, s) === t) marks.push({ at: s.at, action: 'say', say: s.say });
     }
     if (!on && total > from) off.push([from, total]);

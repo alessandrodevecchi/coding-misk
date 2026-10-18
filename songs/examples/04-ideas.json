@@ -1,0 +1,39 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "example-ideas",
+  "title": "Ideas",
+  "created": "2026-10-18",
+  "appVersion": "0.6.0",
+  "look": "sonar",
+  "style": { "en": "Parts written as ideas: steps, a shared bass line, voiced chords, a seeded arpeggio, a prepared variant", "it": "Parti scritte come idee: passi, una linea di basso condivisa, accordi con voicing, un arpeggio casuale con seme, una variante pronta" },
+  "tags": { "genres": ["techno"], "free": ["example"] },
+  "shared": { "bline": "<[0 ~ 0 3] [5 ~ 3 ~] [0 ~ 0 3] [-2 ~ 0 ~]>" },
+  "sections": [
+    { "name": "Intro", "bars": 8, "bpm": 124, "key": "A", "chords": "epica" },
+    { "name": "Drop", "bars": 32, "bpm": 124, "key": "A", "chords": "epica", "fade": 1 }
+  ],
+  "tracks": [
+    { "id": "drums", "type": "drums", "settings": { "kit": "RolandTR909", "gain": 0.85 },
+      "patterns": {
+        "A": { "idea": { "beat": { "bd": "0,4,8,12", "hh": "2,6,10,14", "grid": 16 } } },
+        "B": { "idea": { "beat": { "bd": "0,4,8,12", "cp": "4,12", "hh": "2,6,10,14", "oh": "14", "grid": 16 } } }
+      },
+      "clips": [{ "section": "Intro", "pattern": "A" }, { "section": "Drop", "pattern": "B" }] },
+    { "id": "bass", "type": "bass", "settings": { "wave": "sawtooth", "gain": 0.7, "cutoff": 900 },
+      "patterns": { "A": { "preset": "rolling", "idea": { "from": "bline", "sub": 14, "rhythm": "[x x ~ x]*4", "variants": [{ "add": "0 0 4 0 5" }] } } },
+      "clips": [{ "section": "Intro", "pattern": "A" }, { "section": "Drop", "pattern": "A" }] },
+    { "id": "arp", "type": "arp", "settings": { "wave": "triangle", "gain": 0.3, "cutoff": 2600, "delay": 0.3 },
+      "patterns": { "A": { "idea": { "chords": "<Am7 F^7 C^7 G7>", "voicing": { "anchor": "c5", "mode": "below" }, "random": { "fn": "irand", "max": 5, "seg": 16, "seed": 3, "cycles": 2 } } } },
+      "clips": [{ "section": "Drop", "pattern": "A" }] },
+    { "id": "lead", "type": "hook", "settings": { "wave": "square", "gain": 0.22, "cutoff": 2400, "octave": "4" },
+      "patterns": { "A": { "idea": { "from": "bline", "sub": 7 } } },
+      "clips": [{ "start": 24, "bars": 16, "pattern": "A" }] },
+    { "id": "pad", "type": "pad", "settings": { "wave": "supersaw", "gain": 0.2, "cutoff": 1200 },
+      "patterns": { "A": { "idea": { "voicing": { "anchor": "c4" }, "hold": true } } },
+      "clips": [{ "section": "Intro", "pattern": "A" }, { "section": "Drop", "pattern": "A" }] }
+  ],
+  "build": [
+    { "at": 16, "variant": { "track": "bass", "use": 0 }, "say": { "en": "the bass moves", "it": "il basso si muove" } }
+  ]
+}

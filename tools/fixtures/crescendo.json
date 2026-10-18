@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "songs": {
     "ali-di-cenere": "a7dc2bb1bbd36b46",
     "cavo-scoperto": "e0043ec37fea4d22",
@@ -15,6 +15,7 @@
     "example-first-beat": "b3a35b9f6ca48c43",
     "example-bass-and-chords": "1a1528103410e24e",
     "example-night-shift": "682963d0ae150558",
+    "example-ideas": "3c5c0dcb6c8d859c",
     "ferro": "5572e9e6f2061390",
     "ghost-protocol-scenes": "14aee5839e29eaac",
     "insert-coin": "50c5a4e7645d8e26",
@@ -25,12 +26,21 @@
     "next-chapter": "1cb04a7edeac9116",
     "pioggia-sul-vetro": "233ce290e13a9bec",
     "primo-segnale": "c4900450af8bfc53",
+    "prova-apre-arpeggio": "fcff7ef1c7b20dca",
+    "prova-breakbeat": "5065af3ecb36fad2",
+    "prova-drum-and-bass": "d4facc4cf2dcd5bf",
+    "prova-solo-synth": "3ed7fa525ddb2da2",
     "ruggine-lenta": "95d5b857e2d55692",
     "segnale-nel-rumore": "5909b6bd87bfb9ad",
     "settimo-cielo": "fc7845fcbe417ee4",
     "switch-acid-prova": "58d3d2eaba4abd54",
     "switch-house-prova": "baaab7fbe50eb0be",
     "switch-prima-luce": "1592e519229e09f6",
+    "switch-tappe": "e0e71de326e983fb",
+    "switch-test-acido": "963266cb74994e57",
+    "switch-test-breve": "86e256e5d634283f",
+    "switch-test-onda": "ad1994ebaedbeb5b",
+    "switch-test-stanza": "4d08728801916051",
     "switch-trance-prova": "8387de2670883a6b",
     "ten-years-rebuild": "99b1610fc7fd7fcd"
   }

@@ -13,11 +13,11 @@ const section2 = "<0!16 1!48>"  // B · 48 bars · 110 BPM · C · Cm Cm A# A#
 // ========== Pad · pad ==========
 // A · bars 1-16 · pattern A
 // Pad · Stab
-$: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").transpose(3).struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
+$: note("<[a2,c3,e3]!2 [g2,b2,d3]!2>").transpose(3).struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
   .s("gm_epiano1").attack(.01).decay(.15).sustain(0).release(.1).lpf(sine.range(926, 3706).slow(8))
   .room(.85).gain(0.28).mask(section1).velocity(section1).orbit(6).analyze("pad")
 // B · bars 17-64 · pattern A
-$: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").transpose(3).struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
+$: note("<[a2,c3,e3]!2 [g2,b2,d3]!2>").transpose(3).struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")
   .s("gm_epiano1").attack(.01).decay(.15).sustain(0).release(.1).lpf(sine.range(926, 3706).slow(8))
   .room(.85).gain(0.28).mask(section2).velocity(section2).orbit(6).analyze("pad")
 
@@ -25,10 +25,10 @@ $: note("<[a2,c3,e3] [a2,c3,e3] [g2,b2,d3] [g2,b2,d3]>").transpose(3).struct("x 
 const clip1 = "<0!8 1!8 0!48>"
 // A · bars 9-16 · pattern A
 // Hook · Signal
-$: n("<[~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>").scale("C4:minor")
+$: n("<[~ ~ ~ 12 ~!4] [~!5 19 ~ ~] [~ 12 ~!6] [~!4 15 ~ ~ ~]>").scale("C4:minor")
   .s("supersaw").lpf(3000)
   .decay(.2).sustain(.3).delay(.63).room(.3).gain(0.3).mask(clip1).velocity(clip1).orbit(4).analyze("hook")
 // B · bars 17-64 · pattern A
-$: n("<[~ ~ ~ 12 ~ ~ ~ ~] [~ ~ ~ ~ ~ 19 ~ ~] [~ 12 ~ ~ ~ ~ ~ ~] [~ ~ ~ ~ 15 ~ ~ ~]>").scale("C4:minor")
+$: n("<[~ ~ ~ 12 ~!4] [~!5 19 ~ ~] [~ 12 ~!6] [~!4 15 ~ ~ ~]>").scale("C4:minor")
   .s("supersaw").lpf(3000)
   .decay(.2).sustain(.3).delay(.63).room(.3).gain(0.3).mask(section2).velocity(section2).orbit(4).analyze("hook")

@@ -64,6 +64,17 @@ $: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.6
   "clips": [{ "section": "Intro", "pattern": "static" }, { "section": "Outro", "pattern": "static" }] }
 ```
 
+## Example 4: parts as ideas
+
+[`songs/examples/04-ideas.json`](../songs/examples/04-ideas.json) writes every part as an idea (`docs/SONG-FORMAT.md`, Ideas), the way a live coder writes it, instead of steps and notes written out:
+
+- **Drums as sequencer steps:** `{ "beat": { "bd": "0,4,8,12", "hh": "2,6,10,14", "grid": 16 } }`. The code takes the shortest form with the same hits: `s("bd*4")`, `s("[~ hh]*4")`.
+- **A shared bass line:** `"shared": { "bline": "<[0 ~ 0 3] [5 ~ 3 ~] [0 ~ 0 3] [-2 ~ 0 ~]>" }` holds scale degrees once. The bass reads it two octaves down (`"from": "bline", "sub": 14`) on its own rhythm (`"rhythm": "[x x ~ x]*4"`), the lead one octave down (`"sub": 7`). The code declares `const bline = "…"` once.
+- **Voiced chords and a seeded arpeggio:** the arp holds `"chords": "<Am7 F^7 C^7 G7>"` with `"voicing": { "anchor": "c5", "mode": "below" }`; its notes are positions inside each voiced chord chosen by `irand(5).seg(16).rib(3, 2)`: random, but the same two bars every time. The pad voices the section's progression and holds it (`"hold": true`).
+- **A prepared variant:** the bass carries `"variants": [{ "add": "0 0 4 0 5" }]`. The code shows it commented out, `// .add("0 0 4 0 5")`, until the live build step `{ "at": 16, "variant": { "track": "bass", "use": 0 } }` switches it on.
+
+Write an idea by hand when a part is a small cell that repeats or moves (a rhythm, a line of degrees, chords with a voicing); keep `steps` and `notes` for parts drawn note by note. Randomness always needs a `seed` and `cycles`, and only picks indices inside a chord, sample slices or values (a filter, the pan): melodies stay written by hand.
+
 ## The rack
 
 Each track can chain devices after the instrument: delays, reverbs, distortion, phaser, tremolo, filters, panning, and note devices that change what plays (echo, offset copies, repeats, random drops, reverse). Each device is one Strudel function, shown next to its name in the app. Example 3 gives the hook a dotted-8th delay with a slow auto-pan, and the guitar wall a large reverb with a tremolo:
@@ -91,7 +102,7 @@ The Profile menu next to "Live build" picks how a song builds and looks while it
 
 ### Crescendo
 
-Set "Build style" to crescendo (next to "Live build") and a song grows from one sound to the song as written in small steps (#64), with no steps to write. The growth repeats the first full section, first over one held chord, then the song plays as written. Each track enters on a thinned version of its pattern, then its pattern fills up, its filter opens and its effects come in one at a time; the drums stop once or twice and come back. The ending is drawn per song: stripped back, cut in blocks, or as written. "Fully narrated" makes almost every step speak. The code menu next to it picks the view: code of the moment (the default: only the section that plays, the next section's lines prepared muted before it starts), compact code ( identical lines of a track joined under one lane, the tracks still to come as `_$:` lines), one line per track (also the values that change between sections in the same line, as sequences over the bars or picked by bar), or code per section like any song. The generator menu writes the patterns standard (step by step) or short, like a live coder: `bd*4`, `[~ hh]*4`, repeated cells, equal groups with `!`, a bass line written once with its roots added on top. All views and both generators sound the same. A song file can declare `"buildStyle": "crescendo"` to open in it; the three `crescendo-*` songs in `songs/` are written for it (short, medium, long).
+Set "Build style" to crescendo (next to "Live build") and a song grows from one sound to the song as written in small steps (#64), with no steps to write. The growth repeats the first full section, first over one held chord, then the song plays as written. Each track enters on a thinned version of its pattern, then its pattern fills up, its filter opens and its effects come in one at a time; the drums stop once or twice and come back. The ending is drawn per song: stripped back, cut in blocks, or as written. "Fully narrated" makes almost every step speak. The code menu next to it picks the view: code of the moment (the default: only the section that plays, the next section's lines prepared muted before it starts), compact code ( identical lines of a track joined under one lane, the tracks still to come as `_$:` lines), one line per track (also the values that change between sections in the same line, as sequences over the bars or picked by bar), or code per section like any song. Every profile writes the patterns short, like a live coder: `bd*4`, `[~ hh]*4`, repeated cells, equal groups with `!`, a bass line written once with its roots added on top, arpeggios with `.arp()` (idea-model); the generator menu only matters for code written by older versions. All views sound the same. In the Live coder profile a part that is an idea (presets included) grows from its simple form: a bass cell from one note per beat to its written cell, an arpeggio from the chord held to root and fifth to its order, a hook from its first degree to its first bar to the whole line. A song file can declare `"buildStyle": "crescendo"` to open in it; the three `crescendo-*` songs in `songs/` are written for it (short, medium, long).
 
 ## Endless sessions
 
@@ -111,6 +122,7 @@ The command writes each song and `session.json` to `songs/endless/` (git-ignored
 - **Arp:** chord tones in a fixed order; `notes` writes your own order (`"0 2 1 3"`).
 - **Hook:** the melody. Presets cover call and response, descents, chromatic hits (`allarme`, `colpi`, `boss`); `notes` writes your own.
 - **Pad:** the harmonic bed. `pad` holds, `stab`, `pump`, `sidechain` and `synco` add rhythm.
+- **Ideas:** any of the parts above can be an `idea` instead (Example 4): a cell with its repetition, sequencer steps, degrees, chords with a voicing, a seeded random source, a shared progression, prepared variants. Presets are ideas too, so the code of every song is short: a rolling bass is `.struct("[~ x x x]*4")`.
 - **Code tracks:** anything Strudel can do inside one pattern: `note()`, `s()`, `.scale()`, `.arp()`, `.off()`, `.jux()`, `.degradeBy()`, signals like `sine` and `perlin`. Harmony is not applied: write notes in the song key yourself.
 
 ## Taste rules (from the owner)

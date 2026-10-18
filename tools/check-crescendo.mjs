@@ -63,7 +63,7 @@ const CHECKS = {
   'every state compiles and uses only functions the compiler emits'() {
     for (const c of built.values()) {
       const written = songs.find(s => s.id === c.id), known = fns(compileSong(written));
-      ['degradeBy', 'echo', 'off', 'ply', 'rev', 'jux', 'delay', 'delaysync', 'delayfeedback', 'room', 'roomsize', 'distort', 'shape', 'crush', 'coarse', 'phaser', 'phaserdepth', 'tremolosync', 'tremolodepth', 'vowel', 'hpf', 'hpq', 'lpf', 'lpq', 'pan', 'slow', 'add'].forEach(f => known.add(f));
+      ['degradeBy', 'echo', 'off', 'ply', 'rev', 'jux', 'delay', 'delaysync', 'delayfeedback', 'room', 'roomsize', 'distort', 'shape', 'crush', 'coarse', 'phaser', 'phaserdepth', 'tremolosync', 'tremolodepth', 'vowel', 'hpf', 'hpq', 'lpf', 'lpq', 'pan', 'slow', 'add', 'late'].forEach(f => known.add(f));
       for (const bar of [...new Set(buildSteps(c).map(s => s.at))]) {
         const code = compileSong(stateAt(c, bar).song);
         assert(code.includes('$:'), `${c.id} bar ${bar}: silent`);

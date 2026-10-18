@@ -12,6 +12,6 @@ const section1 = "<1!8>"  // Loop · 8 bars · 124 BPM · A · Am
 // ========== drums ==========
 // Loop · bars 1-8 · pattern A
 // Drums · RolandTR909
-$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.6).mask(section1).velocity(section1).orbit(1).analyze("kick")
-$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ ~]").bank("RolandTR909").gain(0.48).mask(section1).velocity(section1).orbit(1).analyze("snare")
-$: s("[~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~] [~ ~ hh ~]").bank("RolandTR909").gain(0.3).mask(section1).velocity(section1).orbit(1).analyze("hats")
+$: s("bd*4").bank("RolandTR909").gain(0.6).mask(section1).velocity(section1).orbit(1).analyze("kick")
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section1).velocity(section1).orbit(1).analyze("snare")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.3).mask(section1).velocity(section1).orbit(1).analyze("hats")

@@ -17,41 +17,41 @@ const section6 = "<0!16 1>"  // Hit · 1 bars · 145 BPM · E · Em C D B
 // ========== drums ==========
 // Glitch · bars 1-2 · pattern A
 // Drums · RolandTR909
-$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).lpf("<400 2200>").distort(2.5).distortvol(.5).crush(12).mask(section1).velocity(section1).orbit(1).analyze("kick")
+$: s("bd*4").bank("RolandTR909").gain(0.9).lpf("<400 2200>").distort(2.5).distortvol(.5).crush(12).mask(section1).velocity(section1).orbit(1).analyze("kick")
 // Build · bars 3-5 · pattern B
-$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain("<0.75 0.95 0.55>").lpf("<11100 20000 2200>").distort(2.5).distortvol(.5).crush(12).mask("<1 [1 0] 1>").mask(section2).velocity(section2).orbit(1).analyze("kick")
-$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("RolandTR909").gain("<0.38 0.48 0.28>").lpf("<11100 20000 2200>").distort(2.5).distortvol(.5).crush(12).mask("<1 [1 0] 1>").mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("bd*4").bank("RolandTR909").gain("<0.75 0.95 0.55>").lpf("<11100 20000 2200>").distort(2.5).distortvol(.5).crush(12).mask("<1 [1 0] 1>").mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("hh*16").bank("RolandTR909").gain("<0.38 0.48 0.28>").lpf("<11100 20000 2200>").distort(2.5).distortvol(.5).crush(12).mask("<1 [1 0] 1>").mask(section2).velocity(section2).orbit(1).analyze("hats")
 $: s("sd*16").bank("RolandTR909").gain(saw.range(.15, .75)).mask("<0 1 0>").mask(section2).velocity(section2).orbit(1).analyze("snare")
 // Drop · bars 6-13 · pattern C
-$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("kick")
-$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ cp]").bank("RolandTR909").gain(0.72).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("snare")
-$: s("[hh ~ hh hh] [~ hh ~ hh] [hh ~ hh hh] [~ hh ~ hh]").bank("RolandTR909").gain(0.45).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("hats")
-$: s("[~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~]").bank("RolandTR909").gain(0.41).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("hats")
-$: s("[~ ~ rd ~] [~ ~ rd ~] [~ ~ rd ~] [~ ~ rd ~]").bank("RolandTR909").gain(0.32).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("hats")
+$: s("bd*4").bank("RolandTR909").gain(0.9).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("kick")
+$: s("~!4 cp ~!7 cp ~ ~ cp").bank("RolandTR909").gain(0.72).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("snare")
+$: s("[hh ~ hh hh ~ hh ~ hh]*2").bank("RolandTR909").gain(0.45).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("hats")
+$: s("[~ oh]*4").bank("RolandTR909").gain(0.41).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("hats")
+$: s("[~ rd]*4").bank("RolandTR909").gain(0.32).distort(2.8).distortvol(.5).crush(10).mask(section3).velocity(section3).orbit(1).analyze("hats")
 $: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<0!5 1 0!2>").mask(section3).velocity(section3).orbit(1).analyze("fx")
 // Glitch break · bars 14-15 · pattern D
-$: s("[bd ~ ~ ~] [~ ~ bd ~] [~ ~ bd ~] [bd ~ bd bd]").bank("RolandTR909").gain(0.9).distort(3).distortvol(.5).crush(4).mask("<[1 0] 1>").mask(section4).velocity(section4).orbit(1).analyze("kick")
-$: s("[hh hh hh hh] [hh hh hh hh] [hh hh hh hh] [hh hh hh hh]").bank("RolandTR909").gain(0.45).distort(3).distortvol(.5).crush(4).mask("<[1 0] 1>").mask(section4).velocity(section4).orbit(1).analyze("hats")
+$: s("bd").beat("0,6,10,12,14,15",16).bank("RolandTR909").gain(0.9).distort(3).distortvol(.5).crush(4).mask("<[1 0] 1>").mask(section4).velocity(section4).orbit(1).analyze("kick")
+$: s("hh*16").bank("RolandTR909").gain(0.45).distort(3).distortvol(.5).crush(4).mask("<[1 0] 1>").mask(section4).velocity(section4).orbit(1).analyze("hats")
 // Final · bars 16-16 · pattern C
-$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.9).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("kick")
-$: s("~ [cp ~ ~ ~] ~ [cp ~ ~ cp]").bank("RolandTR909").gain(0.72).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("snare")
-$: s("[hh ~ hh hh] [~ hh ~ hh] [hh ~ hh hh] [~ hh ~ hh]").bank("RolandTR909").gain(0.45).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("hats")
-$: s("[~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~] [~ ~ oh ~]").bank("RolandTR909").gain(0.41).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("hats")
-$: s("[~ ~ rd ~] [~ ~ rd ~] [~ ~ rd ~] [~ ~ rd ~]").bank("RolandTR909").gain(0.32).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("hats")
+$: s("bd*4").bank("RolandTR909").gain(0.9).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("kick")
+$: s("~!4 cp ~!7 cp ~ ~ cp").bank("RolandTR909").gain(0.72).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("snare")
+$: s("[hh ~ hh hh ~ hh ~ hh]*2").bank("RolandTR909").gain(0.45).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("hats")
+$: s("[~ oh]*4").bank("RolandTR909").gain(0.41).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("hats")
+$: s("[~ rd]*4").bank("RolandTR909").gain(0.32).distort(3).distortvol(.5).crush(10).mask(section5).velocity(section5).orbit(1).analyze("hats")
 $: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<1>").mask(section5).velocity(section5).orbit(1).analyze("fx")
 
 // ========== bass ==========
 // Build · bars 3-5 · pattern A
 // Bass · Rumble
-$: note("<g1 e1 a1 f1>").transpose(-5).struct("[~ x x] [~ x x] [~ x x] [~ x x]")
+$: note("<g1 e1 a1 f1>").transpose(-5).struct("[~ x x]*4")
   .s("sawtooth").lpf("<350 500 200>").lpq(10).distort(3).distortvol(.5)
   .decay(.1).sustain(0).gain("<0.53 0.6 0.45>").mask("<1 [1 0] 1>").mask(section2).velocity(section2).orbit(2).analyze("bass")
 // Drop · bars 6-13 · pattern A
-$: note("<e1 a1 f1 g1>").transpose(-5).struct("[~ x x] [~ x x] [~ x x] [~ x x]")
+$: note("<e1 a1 f1 g1>").transpose(-5).struct("[~ x x]*4")
   .s("sawtooth").lpf(500).lpq(10).distort(4).distortvol(.5)
   .decay(.1).sustain(0).gain(0.6).mask(section3).velocity(section3).orbit(2).analyze("bass")
 // Final · bars 16-16 · pattern A
-$: note("<f1 g1 e1 a1>").transpose(-5).struct("[~ x x] [~ x x] [~ x x] [~ x x]")
+$: note("<f1 g1 e1 a1>").transpose(-5).struct("[~ x x]*4")
   .s("sawtooth").lpf(600).lpq(10).distort(4).distortvol(.5)
   .decay(.1).sustain(0).gain(0.6).mask(section5).velocity(section5).orbit(2).analyze("bass")
 // Hit · bars 17-17 · pattern B

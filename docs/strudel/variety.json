@@ -1,5 +1,5 @@
 {
-  "voicing": { "useful": true, "note": "Chord names played as voiced chords: chord(\"<Am7 Fmaj7>\").voicing() instead of written-out notes.", "changes": ["idea-model", "material-generator"] },
+  "voicing": { "useful": true, "note": "Chord names played as voiced chords: chord(\"<Am7 F^7>\").voicing() instead of written-out notes.", "changes": ["idea-model", "material-generator"] },
   "chord": { "useful": true, "note": "Chord symbols for voicing(): the progression as an idea.", "changes": ["idea-model", "material-generator"] },
   "beat": { "useful": true, "note": "Sequencer steps: beat(\"0,4,11\", 16) instead of a written-out rhythm.", "changes": ["idea-model", "material-generator"] },
   "sometimes": { "useful": true, "note": "Seeded variation on some events (an effect, a note up an octave).", "changes": ["growth-shapes", "radio-variation"] },

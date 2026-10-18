@@ -1,4 +1,6 @@
 import { t, tx } from './i18n.js';
+// the idea writer (idea-model): it reads the tables below only when it writes code, so the two modules can import each other
+import { writeIdea, expandIdea, ideaRows, seqForm, beatForm, slotTokens, altForm, stepItem, noteHead, arpForm, drumRow, topTokens as ideaTokens, STEP_FUNCTIONS } from './song/ideas.js';
 
 export const f = n => String(Math.round(n * 100) / 100).replace(/^0\./, '.');
 const num = n => String(Math.round(n * 100) / 100);
@@ -224,6 +226,30 @@ GROOVES.swing = ['Jazz swing', { bd: E16, cp: E16, sd: '..........x.....', hh: '
 // treno country: cassa su 1 e 3, rullante a ottavi, accento su 2 e 4
 GROOVES.train = [{ it: 'Treno (country)', en: 'Train beat (country)' }, { bd: 'x.......x.......', cp: '....x.......x...', sd: 'x.x.x.x.x.x.x.x.', hh: E16, oh: E16, rd: E16 }];
 GROOVES.rockChorus = [{ it: 'Rock ritornello', en: 'Rock chorus' }, { bd: 'x.x.....x.x.....', cp: E16, sd: '....x.......x...', hh: E16, oh: 'x.x.x.x.x.x.x.x.', rd: E16 }];
+// Presets as ideas (idea-model, #70): the material of each preset, read by the idea writer (src/song/ideas.js) and grown
+// by the Live coder profile. per "beat": a cell per beat (the half cell fills a half beat in 7/8); per "slot": tokens that
+// fill the note slots of each bar in turn; hold: the chord held for the bar; add per slot: a riff's semitones
+const beatIdea = ([rhythm, half]) => ({ rhythm, per: 'beat', half });
+const riffIdea = riff => ({ rhythm: riff.split(' ').map(x => (x === '~' ? '~' : 'x')).join(' '), add: riff.split(' ').map(x => (x === '~' ? '0' : x)).join(' '), per: 'slot' });
+const rhythmIdea = spec => (!spec ? { hold: true } : Array.isArray(spec) ? beatIdea(spec) : spec === 'x' ? { rhythm: 'x' } : { rhythm: spec, per: 'slot' });
+for (const v of Object.values(BASS)) v.idea = v[5] ? riffIdea(v[5]) : rhythmIdea(v[1]);
+for (const v of Object.values(ARPS)) v.idea = { index: v[1], per: 'slot' };
+for (const v of Object.values(HOOKS)) v.idea = { degrees: v[1], per: 'slot' };
+for (const v of Object.values(PADS)) v.idea = rhythmIdea(v[1]);
+for (const v of Object.values(GUITAR_PATTERNS)) v.idea = v[3] ? riffIdea(v[3]) : rhythmIdea(v[1]);
+for (const v of Object.values(GROOVES)) {
+  const grid = Object.values(v[1])[0].length, beat = { grid };
+  for (const [row, steps] of Object.entries(v[1])) { const ks = [...steps].map((c, i) => (c === 'x' ? i : -1)).filter(i => i >= 0); if (ks.length) beat[row] = ks.join(','); }
+  v.idea = { beat };
+}
+for (const v of Object.values(TEX_RHYTHMS)) v.idea = { rhythm: v[1], n: v[2] };
+// the idea a preset of a channel plays: { bass, guitar, arp, hook, pad, texture } → idea
+export function presetIdea(type, ch) {
+  const table = { bass: BASS, arp: ARPS, hook: HOOKS, pad: PADS, guitar: GUITAR_PATTERNS, texture: TEX_RHYTHMS }[type];
+  const key = type === 'guitar' ? ch.pattern : type === 'texture' ? ch.rhythm : ch.preset;
+  const fallback = { bass: 'rolling', arp: 'su', hook: 'richiamo', pad: 'pad', guitar: 'power8', texture: 'bar' }[type];
+  return (table[key] || table[fallback]).idea;
+}
 export const LOOKS = [
   ['palco', { it: 'Palco', en: 'Stage' }], ['pixel', 'Pixel'], ['tramonto', { it: 'Tramonto', en: 'Sunset' }],
   ['montagne', { it: 'Montagne', en: 'Mountains' }], ['spazio', { it: 'Spazio', en: 'Space' }], ['sonar', 'Sonar'], ['edgerunners', 'Edgerunners'], ['studio', 'Studio'],
@@ -280,6 +306,10 @@ const beatGrid = ([beat, half], n) => {
 // sedicesimi scritti per il 4/4 → n sedicesimi, ripetendo da capo
 const stepGrid = (str, n) => { const t = str.split(' '); return Array.from({ length: n }, (_, i) => t[i % t.length]).join(' '); };
 const rhythm = (spec, n) => !spec ? '' : Array.isArray(spec) ? beatGrid(spec, n) : spec === 'x' ? 'x' : stepGrid(spec, n);
+// the same rhythm in its shortest exact form (idea-model): "[~ x x x]*4" instead of the cell written four times
+const rhythmShort = (spec, n) => !spec ? '' : Array.isArray(spec) ? beatForm(spec[0], spec[1], n) : spec === 'x' ? 'x' : seqForm(slotTokens(spec, n));
+// steps 'x'/'.' as a struct or a mask in their shortest exact form ("x" or "1" plays)
+const stepsShort = (steps, on = 'x') => seqForm([...steps].map(c => (c === 'x' ? on : '~')));
 // "a [b c] d" → ["a", "[b c]", "d"]
 const topTokens = s => {
   const out = []; let depth = 0, cur = '';
@@ -319,13 +349,14 @@ const stepsStruct = (steps, legato) => {
   for (let i = lead; i < steps.length;) { let j = i + 1; while (j < steps.length && steps[j] !== 'x') j++; out.push(j - i > 1 ? `x@${j - i}` : 'x'); i = j; }
   return out.join(' ');
 };
-const stepsMask = steps => drumPattern('1', steps);
+const stepsMask = steps => stepsShort(steps, '1');
 // canali melodici con una riga di passi propria; steps vuoto = ritmo del preset
 export const RHYTHM_CHANNELS = ['bass', 'guitar', 'arp', 'hook', 'pad'];
 // passi che suonano davvero per un canale: quelli disegnati o quelli del preset
 export function channelSteps(s, ch) {
   const N = meterSteps(s.meter), c = s[ch];
   if (c && c.steps) return fitSteps(c.steps, N);
+  if (c && c.idea) return expandIdea(c.idea, { type: ch, N, ch: c }).steps;
   return presetSteps(s, ch, N);
 }
 function presetSteps(s, ch, N) {
@@ -371,7 +402,8 @@ const altItems = s => {
 // labels: true scrive anche i layer spenti come "_$:" (anteprima di una scena)
 // crash, breath: crash sul primo colpo, mezza battuta di silenzio alla fine
 // only: genera un solo strumento (compilatore v2, un clip alla volta); orbit: bus del clip
-export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, crash = false, breath = false, fill = false, only = null, orbit = null, rack = '' } = {}) {
+// shared: the song's shared progressions ({ name: text }); variant: the prepared variant switched on (index or null)
+export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, crash = false, breath = false, fill = false, only = null, orbit = null, rack = '', shared = {}, variant = null } = {}) {
   s = normalizeState(s);
   const want = ch => !only || only === ch;
   const orb = ch => `.orbit(${orbit ?? ORBITS[ch]})`;
@@ -400,71 +432,89 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
   const scaleGain = (a, b, k) => auto(a * k, b === null || b === undefined ? null : b * k);
   const breathMask = breath && bars > 0 ? `.mask("${rle(rotate([...Array(bars - 1).fill('1'), '[1 0]'], start))}")` : '';
   const L = [];
+  // an idea pattern (idea-model): its lines come from the idea writer; tail: random values, before the rack
+  const ideaCtx = (type, c, extra = {}) => ({ type, N, chords, tr, key: s.key, start, sw, ch: c, shared, variant, steps: c.steps ? fitSteps(c.steps, N) : null, ...extra });
+  const ideaLines = (on, w) => [`${lab(on)}: ${w.lines[0]}`, ...w.lines.slice(1)];
+  const named = (c, label) => (c.idea && !c.preset && !c.pattern ? t('cIdea') : label);
 
   const d = s.drums;
   if (want('drums') && show(d.on)) L.push(`// ${t('cDrums')} · ${d.kit}`);
+  // a drum idea: its rows on the bar's grid; a row keeps its step length under functions that move or cut steps
+  const irows = d.idea ? ideaRows(d.idea, N) : null, coarse = !STEP_FUNCTIONS.test(rack);
   if (want('drums')) for (const [id, , mult, inst] of ROWS) {
-    const row = d.rows[id], on = d.on && !row.mute, steps = fitSteps(row.steps, N);
+    const row = d.rows[id], on = d.on && (irows ? !!irows[id] : !row.mute), steps = irows ? irows[id] || '' : fitSteps(row.steps, N);
     if (!steps.includes('x') || !show(on)) continue;
-    L.push(`${lab(on)}: s("${drumPattern(kitRow(d.kit, id), steps)}").bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
+    L.push(`${lab(on)}: ${drumRow(kitRow(d.kit, id), steps, { coarse })}.bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
   }
   if (want('drums') && fill && d.on) L.push(`$: s("sd*${N}").bank("${d.kit}").gain(saw.range(.15, .75)).mask("${rle(rotate([...Array(Math.max(0, bars - 1)).fill('0'), '1'], start))}")${g}${orb('drums')}.analyze("snare")`);
   if (want('drums') && crash && d.on) L.push(`$: s("cr").bank("${NO_CRASH.includes(d.kit) ? 'RolandTR909' : d.kit}").gain(.55).room(.4).mask("${rle(rotate(['1', ...Array(Math.max(0, bars - 1)).fill('0')], start))}")${g}${orb('drums')}.analyze("fx")`);
 
   const b = s.bass, bp = BASS[b.preset] || BASS.rolling;
+  let bTail = '', aTail = '', hTail = '', gTail = '', pTail = '', xTail = '';
   if (want('bass') && show(b.on)) {
-    L.push('', `// ${t('cBass')} · ${b.notes ? t('cNotes') : tx(bp[0])}`);
-    const briff = bp[5] ? stepGrid(bp[5], N).split(' ') : null;
-    const bstruct = b.steps ? stepsStruct(fitSteps(b.steps, N)) : briff ? briff.map(x => x === '~' ? '~' : 'x').join(' ') : rhythm(bp[1], N);
-    const bshift = briff ? `.transpose("${briff.map(x => x === '~' ? 0 : x).join(' ')}")` : '';
-    // note per gradi dell'accordo (0-3 come l'arpeggio), due ottave sotto
-    if (b.notes) L.push(`${lab(b.on)}: note("<${chords.map(c => `[${fitTokens(b.notes, N).replace(/\d/g, i => CHORDS[c].arp[i])}]`).join(' ')}>").transpose(${tr - 24})${b.steps ? `.mask("${stepsMask(fitSteps(b.steps, N))}")` : ''}${sw}`);
-    else L.push(`${lab(b.on)}: note("<${chords.map(c => CHORDS[c].bass).join(' ')}>")${trs}.struct("${bstruct}")${bshift}${sw}`);
+    L.push('', `// ${t('cBass')} · ${named(b, b.notes ? t('cNotes') : tx(bp[0]))}`);
+    // an idea; notes as chord tones (0-3 like the arpeggio), two octaves down; the preset's idea, with the steps drawn
+    if (b.idea) bTail = (w => (L.push(...ideaLines(b.on, w)), w.tail))(writeIdea(b.idea, ideaCtx('bass', b)));
+    else if (b.notes) L.push(`${lab(b.on)}: ${noteHead('note', chords.map(c => ideaTokens(fitTokens(b.notes, N).replace(/\d/g, i => CHORDS[c].arp[i]))))}.transpose(${tr - 24})${b.steps ? `.mask("${stepsMask(fitSteps(b.steps, N))}")` : ''}${sw}`);
+    else {
+      const idea = b.steps ? { ...bp.idea, rhythm: [...fitSteps(b.steps, N)].map(c => (c === 'x' ? 'x' : '~')).join(' '), per: 'slot' } : bp.idea;
+      L.push(...ideaLines(b.on, writeIdea(idea, ideaCtx('bass', b, { steps: null }))));
+    }
     L.push(`  .s("${b.wave}")${filter(b.cutoff, b.cutoffEnd, b.move)}.lpq(${num(b.reso)})${drive(b.drive)}`);
-    L.push(`  .decay(${f(bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${rhythm(bp[4], N)}")` : ''}.gain(${auto(b.gain, b.gainEnd)})${rack}${breathMask}${g}${orb('bass')}.analyze("bass")`);
+    L.push(`  .decay(${f(bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${rhythmShort(bp[4], N)}")` : ''}.gain(${auto(b.gain, b.gainEnd)})${bTail}${rack}${breathMask}${g}${orb('bass')}.analyze("bass")`);
   }
   const a = s.arp, ap = ARPS[a.preset] || ARPS.su;
   if (want('arp') && show(a.on)) {
     const count = a.speed === '16' ? N : N / 2;
-    L.push('', `// ${t('cArp')} · ${a.notes ? t('cNotes') : tx(ap[0])}, ${a.speed === '16' ? t('c16') : t('c8')}`);
-    L.push(`${lab(a.on)}: note("<${chords.map(c => `[${fitTokens(a.notes || ap[1], count).replace(/\d/g, i => CHORDS[c].arp[i])}]`).join(' ')}>")${trs}${a.steps ? `.mask("${stepsMask(fitSteps(a.steps, N))}")` : ''}${sw}`);
+    L.push('', `// ${t('cArp')} · ${named(a, a.notes ? t('cNotes') : tx(ap[0]))}, ${a.speed === '16' ? t('c16') : t('c8')}`);
+    if (a.idea) aTail = (w => (L.push(...ideaLines(a.on, w)), w.tail))(writeIdea(a.idea, ideaCtx('arp', a)));
+    else {
+      // the notes of each chord written out, or the chords once and the order with .arp() (arp-patterns), the shorter
+      const groups = chords.map(c => ideaTokens(fitTokens(a.notes || ap[1], count).replace(/\d/g, i => CHORDS[c].arp[i])));
+      const own = noteHead('note', groups), ar = groups.every(g => !g.some(x => /[<>]/.test(x))) ? arpForm(`<${groups.map(g => `[${g.join(' ')}]`).join(' ')}>`) : null;
+      const viaArp = ar ? `note("${ar.chords}").arp("${ar.order}")` : null;
+      L.push(`${lab(a.on)}: ${viaArp && viaArp.length < own.length ? viaArp : own}${trs}${a.steps ? `.mask("${stepsMask(fitSteps(a.steps, N))}")` : ''}${sw}`);
+    }
     L.push(`  .s("${a.wave}")${filter(a.cutoff, a.cutoffEnd, a.move)}.lpq(${num(a.reso)})${drive(a.drive)}`);
-    L.push(`  .decay(.15).sustain(.15)${a.delay > 0 ? `.delay(${f(a.delay)})` : ''}.gain(${auto(a.gain, a.gainEnd)})${rack}${breathMask}${g}${orb('arp')}.analyze("arp")`);
+    L.push(`  .decay(.15).sustain(.15)${a.delay > 0 ? `.delay(${f(a.delay)})` : ''}.gain(${auto(a.gain, a.gainEnd)})${aTail}${rack}${breathMask}${g}${orb('arp')}.analyze("arp")`);
   }
   const h = s.hook, hp = HOOKS[h.preset] || HOOKS.richiamo;
   if (want('hook') && show(h.on)) {
-    const items = (altItems(h.notes || hp[1]) || [h.notes || hp[1]]).map(it => `[${fitTokens(it, Math.max(1, Math.round(N / 2)))}]`);
-    const mel = `<${rotate(items, start).join(' ')}>`;
-    L.push('', `// Hook · ${h.notes ? t('cNotes') : tx(hp[0])}`);
-    L.push(`${lab(h.on)}: n("${mel}")${h.harmony ? `.superimpose(x => x.add(${h.harmony}))` : ''}.scale("${s.key}${h.octave || 4}:${h.mode}")${h.steps ? `.mask("${stepsMask(fitSteps(h.steps, N))}")` : ''}${sw}`);
+    const items = (altItems(h.notes || hp[1]) || [h.notes || hp[1]]).map(it => stepItem(ideaTokens(fitTokens(it, Math.max(1, Math.round(N / 2))))));
+    const mel = altForm(rotate(items, start));
+    L.push('', `// Hook · ${named(h, h.notes ? t('cNotes') : tx(hp[0]))}`);
+    if (h.idea) hTail = (w => (L.push(...ideaLines(h.on, w)), w.tail))(writeIdea(h.idea, ideaCtx('hook', h)));
+    else L.push(`${lab(h.on)}: n("${mel}")${h.harmony ? `.superimpose(x => x.add(${h.harmony}))` : ''}.scale("${s.key}${h.octave || 4}:${h.mode}")${h.steps ? `.mask("${stepsMask(fitSteps(h.steps, N))}")` : ''}${sw}`);
     L.push(`  ${h.wave === 'cowbell' ? '.s("cb").bank("RolandTR808")' : `.s("${h.wave}")`}${drive(h.drive)}${h.fm > 0 ? `.fm(${num(h.fm)})` : ''}${h.vowel ? `.vowel("${h.vowel}")` : ''}${filter(h.cutoff, h.cutoffEnd, h.move)}${grit(h.grit)}`);
-    L.push(`  .decay(.2).sustain(.3).delay(${f(h.delay)}).room(.3).gain(${auto(h.gain, h.gainEnd)})${rack}${breathMask}${g}${orb('hook')}.analyze("hook")`);
+    L.push(`  .decay(.2).sustain(.3).delay(${f(h.delay)}).room(.3).gain(${auto(h.gain, h.gainEnd)})${hTail}${rack}${breathMask}${g}${orb('hook')}.analyze("hook")`);
   }
   const gt = s.guitar, gty = GUITAR_TYPES[gt.type] || GUITAR_TYPES.distorted, gpt = GUITAR_PATTERNS[gt.pattern] || GUITAR_PATTERNS.power8;
   if (want('guitar') && show(gt.on)) {
     // riff: struttura dalle note, spostamento del power chord battuta per battuta
     const riff = gpt[3] ? stepGrid(gpt[3], N).split(' ') : null;
-    const pre = riff ? riff.map(x => x === '~' ? '~' : 'x').join(' ') : rhythm(gpt[1], N), short = gt.type === 'muted' || gpt[2], held = !pre;
-    const gr = gt.steps ? stepsStruct(fitSteps(gt.steps, N), held) : pre;
-    const shift = riff ? `.transpose("${riff.map(x => x === '~' ? 0 : x).join(' ')}")` : '';
+    const pre = riff ? seqForm(riff.map(x => x === '~' ? '~' : 'x')) : rhythmShort(gpt[1], N), short = gt.type === 'muted' || gpt[2], held = !pre;
+    const gr = gt.steps ? (held ? stepsStruct(fitSteps(gt.steps, N), held) : stepsShort(fitSteps(gt.steps, N))) : pre;
+    const shift = riff ? `.transpose("${seqForm(riff.map(x => x === '~' ? '0' : x))}")` : '';
     const gtr = tr + (Number(gt.octave) || 0), dist = gty[2] + gt.drive;
     const voicing = c => gt.type === 'clean' ? CHORDS[c].pad : powerOf(c);
-    L.push('', `// ${t('cGuitar')} · ${tx(gty[0])}, ${tx(gpt[0])}${gt.octave && gt.octave !== '0' ? ` · ${t('tuning').toLowerCase()} ${gt.octave}` : ''}`);
-    L.push(`${lab(gt.on)}: note("<${chords.map(c => `[${voicing(c)}]`).join(' ')}>")${gtr ? `.transpose(${gtr})` : ''}${gr ? `.struct("${gr}")` : ''}${shift}${gr ? sw : ''}`);
+    L.push('', `// ${t('cGuitar')} · ${tx(gty[0])}, ${named(gt, tx(gpt[0]))}${gt.octave && gt.octave !== '0' ? ` · ${t('tuning').toLowerCase()} ${gt.octave}` : ''}`);
+    if (gt.idea) gTail = (w => (L.push(...ideaLines(gt.on, w)), w.tail))(writeIdea(gt.idea, ideaCtx('guitar', gt, { tr: gtr, voice: voicing, sw: gt.idea.hold ? '' : sw })));
+    else L.push(`${lab(gt.on)}: note("${altForm(chords.map(c => `[${voicing(c)}]`), { unwrap: false })}")${gtr ? `.transpose(${gtr})` : ''}${gr ? `.struct("${gr}")` : ''}${shift}${gr ? sw : ''}`);
     L.push(`  .s("${gty[1]}").attack(.003).decay(${held ? 1.5 : short ? .09 : .3}).sustain(${held ? .8 : short ? 0 : .55}).release(.08)`);
     L.push(`  ${dist > 0 ? `.distort(${num(dist)}).distortvol(.2)` : ''}.hpf(${gty[3]})${filter(gt.cutoff, gt.cutoffEnd)}${gt.width === 'double' ? '.jux(x => x.late(.012))' : ''}`);
     // il volume va dopo l'amplificatore (postgain): prima della distorsione cambierebbe solo la saturazione
     const lvl = auto(gt.gain, gt.gainEnd);
-    L.push(`  .room(${f(gt.room)}).gain(.8)${rack}${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}${orb('guitar')}.analyze("guitar")`);
+    L.push(`  .room(${f(gt.room)}).gain(.8)${gTail}${rack}${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}${orb('guitar')}.analyze("guitar")`);
   }
   const p = s.pad, pp = PADS[p.preset] || PADS.pad;
   if (want('pad') && show(p.on)) {
-    L.push('', `// ${t('cPad')} · ${tx(pp[0])}`);
+    L.push('', `// ${t('cPad')} · ${named(p, tx(pp[0]))}`);
     const voice = c => pp[7] === 'power' ? powerOf(c) : CHORDS[c].pad;
-    const pr = p.steps ? stepsStruct(fitSteps(p.steps, N), !rhythm(pp[1], N)) : rhythm(pp[1], N);
-    L.push(`${lab(p.on)}: note("<${chords.map(c => `[${voice(c)}]`).join(' ')}>")${trs}${pr ? `.struct("${pr}")` : ''}${pr ? sw : ''}`);
+    const legato = !rhythm(pp[1], N), pr = p.steps ? (legato ? stepsStruct(fitSteps(p.steps, N), true) : stepsShort(fitSteps(p.steps, N))) : rhythmShort(pp[1], N);
+    if (p.idea) pTail = (w => (L.push(...ideaLines(p.on, w)), w.tail))(writeIdea(p.idea, ideaCtx('pad', p, { voice, sw: p.idea.hold ? '' : sw })));
+    else L.push(`${lab(p.on)}: note("${altForm(chords.map(c => `[${voice(c)}]`), { unwrap: false })}")${trs}${pr ? `.struct("${pr}")` : ''}${pr ? sw : ''}`);
     L.push(`  .s("${p.wave}").attack(${f(pp[2])})${pp[3] ? `.decay(${f(pp[3])}).sustain(${f(pp[4])})` : ''}.release(${f(pp[5])})${filter(p.cutoff, p.cutoffEnd, p.move)}${drive(p.drive)}`);
-    L.push(`  .room(${f(p.room)})${pp[6] ? `.postgain("${rhythm(pp[6], N)}")` : ''}.gain(${auto(p.gain, p.gainEnd)})${rack}${g}${orb('pad')}.analyze("pad")`);
+    L.push(`  .room(${f(p.room)})${pp[6] ? `.postgain("${rhythmShort(pp[6], N)}")` : ''}.gain(${auto(p.gain, p.gainEnd)})${pTail}${rack}${g}${orb('pad')}.analyze("pad")`);
   }
   const x = s.texture, xr = TEX_RHYTHMS[x.rhythm] || TEX_RHYTHMS.bar;
   if (want('texture') && show(x.on)) {
@@ -473,6 +523,11 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
       // fruscio del vinile: impulsi di rumore brevissimi e radi
       L.push(`${lab(x.on)}: s("white*${N * 2}").degradeBy(.9).decay(.006).sustain(0).hpf(1800).pan(rand)`);
       L.push(`  .gain(${auto(x.gain * .5, x.gainEnd === null || x.gainEnd === undefined ? null : x.gainEnd * .5)})${rack}${g}${orb('texture')}.analyze("fx")`);
+    } else if (x.idea) {
+      const w = writeIdea(x.idea, ideaCtx('texture', x));
+      L.push(`${lab(x.on)}: ${w.lines[0]}${grit(x.grit)}.hpf(400).room(${f(x.room)})${/\*/.test(x.idea.rhythm || '') ? '.pan(rand)' : ''}`, ...w.lines.slice(1));
+      xTail = w.tail;
+      L.push(`  .gain(${auto(x.gain, x.gainEnd)})${xTail}${rack}${g}${orb('texture')}.analyze("fx")`);
     } else {
       const nArg = xr[2].startsWith('irand') ? xr[2] : `"${xr[2]}"`;
       const pat = xr[1].replace('*16', `*${N}`).replace('*8', `*${N / 2}`).replace('X', x.sample);
@@ -489,6 +544,19 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     L.push(`  .gain(saw.slow(${r.bars}).range(${up ? `0, ${f(r.gain)}` : `${f(r.gain)}, 0`})${late})${rack}${g}${orb('riser')}.analyze("riser")`);
   }
   return L;
+}
+
+// the code of an idea, read only (Compose, idea-model): the first line of each layer of one instrument, without its
+// label and the functions after the material
+export function ideaCode(state, type, shared = {}) {
+  const out = [];
+  let open = false;
+  for (const l of sceneLayers(state, { only: type, shared })) {
+    if (/^_?\$:/.test(l)) { out.push(l.replace(/^_?\$:\s*/, '').replace(/\.bank\(.*$/, '')); open = true; }
+    else if (open && /^\s+\./.test(l) && !/^\s+\.s\(/.test(l)) out[out.length - 1] += `\n${l}`;
+    else open = false;
+  }
+  return out.join('\n');
 }
 
 // codice di una scena sola, con i layer spenti scritti come "_$:"

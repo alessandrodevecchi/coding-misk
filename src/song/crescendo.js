@@ -5,12 +5,17 @@
 // the live build actions. Everything downstream (player, seek, typing, voice, export, hand takeover) works unchanged.
 import { normalizeSong, SETTING_FIELDS } from './format.js';
 import { stream } from '../endless/random.js';
-import { PROGS } from '../music.js';
+import { PROGS, DEFAULT, presetIdea, meterSteps } from '../music.js';
+import { ideaLadder, expandIdea, ideaRows } from './ideas.js';
 import { coderPath } from './coder.js';
 import { stateAt } from './build.js';
 
 // raised when an intended change to the rules changes the steps of a checked song (tools/check-crescendo.mjs)
-export const CRESCENDO_VERSION = 1;
+// 2 (idea-model): the Live coder's natural growth grows ideas (presets included) through simpler forms of themselves
+export const CRESCENDO_VERSION = 2;
+// the random stream keeps the name of version 1: a version raised for the Live coder rules does not move the steps of
+// Classic and Crescendo
+const STREAM = 'crescendo-1';
 export const BUILD_STYLES = ['blocks', 'crescendo'];
 export const ENDINGS = ['strip', 'blocks', 'short'];
 
@@ -67,10 +72,12 @@ const thinSteps = (steps, n) => {
   return thinHits(hits, core, n).map(keep => [...steps].map((c, i) => (c === 'x' && [...keep].some(h => h.i === i) ? 'x' : '.')).join(''));
 };
 // how much a pattern can be thinned: hits or notes it plays (0: nothing to thin)
-function density(type, pat) {
+function density(type, pat, ctx = {}) {
+  if (type === 'drums' && pat.idea && !pat.rows) return Object.values(ideaRows(pat.idea, ctx.N || 16)).join('').split('x').length - 1;
   if (type === 'drums') return Object.values(pat.rows || {}).join('').split('x').length - 1;
   if (pat.notes) return [...String(pat.notes).matchAll(TOKEN)].filter(m => !/^[~.\-_]$/.test(m[0])).length;
   if (pat.steps) return String(pat.steps).split('x').length - 1;
+  if (pat.idea) return expandIdea(pat.idea, { type, N: ctx.N || 16, ch: pat, shared: ctx.shared || {} }).steps.split('x').length - 1;
   return 0;
 }
 // n variants of a pattern, level 1 (closest to the written one) to level n (the simplest)
@@ -82,11 +89,31 @@ function arpVariants(notes, n) {
   if (n > 1) out[n - 1] = out[n - 1].replace(TOKEN, tok => (/^\d$/.test(tok) ? '0' : tok));
   return out;
 }
-export function patternVariants(type, pat, n, rules = {}) {
+// ideas (idea-model): with rules.natural (Live coder) an idea grows through simpler forms of itself (ideaLadder): a
+// preset counts as its idea. Otherwise an idea is thinned from the steps it plays, as the same written steps would be.
+// ctx: { N (16ths per bar of the reference section), shared (the song's progressions) }
+const LADDER_TYPES = ['bass', 'guitar', 'arp', 'hook', 'pad', 'drums'];
+const ideaOf = (type, pat) => pat.idea || (['bass', 'guitar', 'arp', 'hook', 'pad'].includes(type) && !pat.notes && !pat.steps ? presetIdea(type, { preset: pat.preset, pattern: pat.preset }) : null);
+export function ideaForms(type, pat, n, ctx = {}) {
+  if (!LADDER_TYPES.includes(type) || pat.notes || pat.steps || (type === 'drums' && !pat.idea)) return [];
+  const idea = ideaOf(type, pat);
+  return idea ? ideaLadder(idea, { type, N: ctx.N || 16, ch: pat, shared: ctx.shared || {} }, n) : [];
+}
+export function patternVariants(type, pat, n, rules = {}, ctx = {}) {
+  if (rules.natural) {
+    const forms = ideaForms(type, pat, n, ctx);
+    if (forms.length) {
+      // a preset keeps its name (its sound and its label); fewer forms than levels: the simplest repeats
+      const preset = pat.idea ? {} : { preset: pat.preset ?? (type === 'guitar' ? DEFAULT.guitar.pattern : DEFAULT[type].preset) };
+      return Array.from({ length: n }, (_, k) => ({ ...pat, ...preset, idea: forms[Math.min(k, forms.length - 1)] }));
+    }
+  }
   if (type === 'arp' && rules.natural && pat.notes && /\d/.test(pat.notes)) return arpVariants(pat.notes, n).map(notes => ({ ...pat, notes }));
+  if (type === 'drums' && pat.idea && !pat.rows) { const { idea, ...rest } = pat; return thinRows(ideaRows(idea, ctx.N || 16), n).map(rows => ({ ...rest, rows })); }
   if (type === 'drums') return thinRows(pat.rows, n).map(rows => ({ ...pat, rows }));
   if (pat.notes) return thinNotes(pat.notes, n).map(notes => ({ ...pat, notes }));
   if (pat.steps) return thinSteps(pat.steps, n).map(steps => ({ ...pat, steps }));
+  if (pat.idea) return thinSteps(expandIdea(pat.idea, { type, N: ctx.N || 16, ch: pat, shared: ctx.shared || {} }).steps, n).map(steps => ({ ...pat, steps }));
   return Array(n).fill(pat);
 }
 
@@ -113,16 +140,19 @@ function moves(key, from, to, m) {
 // units, each one small change. Units of a queue keep their order.
 // rules.natural (natural-growth): the track's functions are hidden at the start and arrive one per step, some knob
 // moves are tried by ear (a value past the next one, then corrected)
-function trackPlan(t, d, rng, clipKeys, rules = {}) {
+function trackPlan(t, d, rng, clipKeys, rules = {}, ctx = {}) {
   const plan = { id: t.id, type: t.type, setup: [], fullness: [], colour: [], patterns: {} };
   if (t.type === 'code' || t.type === 'riser' || t.type === 'voice' || t.type === 'module') return plan;
   // pattern variants
-  const dens = Math.max(0, ...Object.values(t.patterns || {}).map(p => density(t.type, p)));
+  const dens = Math.max(0, ...Object.values(t.patterns || {}).map(p => density(t.type, p, ctx)));
   let n = dens >= 24 ? 4 : dens >= 10 ? 3 : dens >= 2 ? 2 : 0;
+  // Live coder: an idea has as many levels as simpler forms (ideaForms), whatever its density
+  const ladder = rules.natural ? Math.max(0, ...Object.values(t.patterns || {}).map(p => ideaForms(t.type, p, 4, ctx).length)) : 0;
+  if (ladder) n = ladder;
   n = d >= 2 ? n : d === 1 ? Math.min(n, 2) : Math.min(n, 1);
   const rack = t.rack || [];
   if (n) {
-    for (const [name, pat] of Object.entries(t.patterns || {})) patternVariants(t.type, pat, n, rules).forEach((v, k) => { plan.patterns[`${name}~${k + 1}`] = v; });
+    for (const [name, pat] of Object.entries(t.patterns || {})) patternVariants(t.type, pat, n, rules, ctx).forEach((v, k) => { plan.patterns[`${name}~${k + 1}`] = v; });
     plan.setup.push({ pattern: { track: t.id, level: n } });
     for (let k = n - 1; k >= 0; k--) plan.fullness.push({ kind: 'grow', step: { pattern: { track: t.id, level: k } } });
   } else if (DEGRADE_TYPES.includes(t.type) && !rack.some(x => x.device === 'degrade')) {
@@ -269,7 +299,7 @@ const KEY_STEPS = ['enter', 'break', 'back', 'harmony', 'strip-first', 'last'];
 // Songs with nothing to grow come back without steps.
 // rules: {} (Crescendo) or { natural: true, trials } (natural-growth: hidden functions, sparse steps, listening pauses)
 export function crescendoSong(song, { seed, narrated = false, rules = {} } = {}) {
-  const rng = stream(String(seed ?? song.id ?? 'song'), `crescendo-${CRESCENDO_VERSION}`);
+  const rng = stream(String(seed ?? song.id ?? 'song'), STREAM);
   const n = normalizeSong(song), W = n.total, secs = n.sections;
   // a song shorter than 24 bars has no room for slow growth: it grows with the Crescendo rules
   if (rules.natural && W < 24) rules = {};
@@ -279,6 +309,8 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   // reference section: the first one where the most tracks play; its tracks are the destination of the growth
   const counts = secs.map(s => plays.filter(t => t.clips.some(c => over(c, s))).length);
   const R = secs[counts.indexOf(Math.max(...counts))];
+  // ideas grow and thin on the bars of the reference section, with the song's shared progressions
+  const ictx = { N: meterSteps(R.meter), shared: song.shared || {} };
   const dest = plays.filter(t => t.clips.some(c => over(c, R))), late = plays.filter(t => !dest.includes(t));
   const rank = t => { const i = ORDER.indexOf(t.type); return i < 0 ? ORDER.length : i; };
   dest.sort((a, b) => rank(a) - rank(b) || plays.indexOf(a) - plays.indexOf(b));
@@ -294,7 +326,7 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   let d = 3, plans, path, coder = null;
   for (; d >= 0; d--) {
     const prng = rng.fork(`plan-${d}`);
-    plans = dest.map(t => trackPlan(t, d, prng, clipKeys(t), rules));
+    plans = dest.map(t => trackPlan(t, d, prng, clipKeys(t), rules, ictx));
     // like a live coder (live-coder-growth): waypoints and small moves between them
     if (rules.coder) { coder = coderPath(dest, plans, prng.fork('coder'), { detours: rules.detours, chooser: rules.chooser }); path = coder.path; }
     else path = crescendoPath(plans, prng.fork('path'));
@@ -347,7 +379,7 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   const owner = new Map(growth.map(u => [u.at, u.track])), latePlans = [], lateSteps = [];
   for (const t of late) {
     for (let ld = Math.min(d, 1); ld >= -1; ld--) {
-      const p = ld < 0 ? { id: t.id, type: t.type, setup: [], fullness: [], colour: [], patterns: {} } : trackPlan(t, ld, rng.fork(`late-${t.id}-${ld}`), clipKeys(t), rules);
+      const p = ld < 0 ? { id: t.id, type: t.type, setup: [], fullness: [], colour: [], patterns: {} } : trackPlan(t, ld, rng.fork(`late-${t.id}-${ld}`), clipKeys(t), rules, ictx);
       const taken = new Map(), free = at => { while (owner.has(at) || taken.has(at)) at++; taken.set(at, t.id); return at; };
       let at = free(t.clips[0].start + G);
       const mine = [{ at, kind: 'enter', type: t.type, step: { add: t.id } }];

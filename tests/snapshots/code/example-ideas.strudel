@@ -1,0 +1,64 @@
+// coding-misk · Ideas
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(124/4)
+
+const SECTIONS = [['Intro', 8], ['Drop', 32]]
+const TEMPO = {'Intro': 124, 'Drop': 124}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0.5 0!31>"  // Intro · 8 bars · 124 BPM · A · Am F C G
+const section2 = "<0!8 0.5 1!31>"  // Drop · 32 bars · 124 BPM · A · Am F C G · fades in over 1 bars
+
+// shared progressions: written once, read by name by the tracks
+const bline = "<[0 ~ 0 3] [5 ~ 3 ~] [0 ~ 0 3] [-2 ~ 0 ~]>"
+
+// ========== drums ==========
+// Intro · bars 1-8 · pattern A
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section1).velocity(section1).orbit(1).analyze("kick")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.43).mask(section1).velocity(section1).orbit(1).analyze("hats")
+// Drop · bars 9-40 · pattern B
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.68).mask(section2).velocity(section2).orbit(1).analyze("snare")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.43).mask(section2).velocity(section2).orbit(1).analyze("hats")
+$: s("~!7 oh").bank("RolandTR909").gain(0.38).mask(section2).velocity(section2).orbit(1).analyze("hats")
+
+// ========== bass ==========
+// Intro · bars 1-8 · pattern A
+// Bass · Rolling
+$: bline.sub(14) // .add("0 0 4 0 5")
+  .n().scale("A4:minor").struct("[x x ~ x]*4")
+  .s("sawtooth").lpf(sine.range(360, 1440).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.7).mask(section1).velocity(section1).orbit(2).analyze("bass")
+// Drop · bars 9-40 · pattern A
+$: bline.sub(14) // .add("0 0 4 0 5")
+  .n().scale("A4:minor").struct("[x x ~ x]*4")
+  .s("sawtooth").lpf(sine.range(360, 1440).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.7).mask(section2).velocity(section2).orbit(2).analyze("bass")
+
+// ========== arp ==========
+// Drop · bars 9-40 · pattern A
+// Arpeggio · idea, 16ths
+$: n(irand(5).seg(16).rib(3, 2)).chord("<Am7 F^7 C^7 G7>").anchor("c5").mode("below").voicing()
+  .s("triangle").lpf(sine.range(1040, 4160).slow(8)).lpq(4)
+  .decay(.15).sustain(.15).delay(.3).gain(0.3).mask(section2).velocity(section2).orbit(3).analyze("arp")
+
+// ========== lead · hook ==========
+const clip1 = "<0!24 1!16>"
+// Drop · bars 25-40 · pattern A
+// Hook · idea
+$: n(bline.sub(7)).scale("A4:minor")
+  .s("square").lpf(2400)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.22).mask(clip1).velocity(clip1).orbit(4).analyze("hook")
+
+// ========== pad ==========
+// Intro · bars 1-8 · pattern A
+// Pad · idea
+$: chord("<Am F C G>").anchor("c4").voicing()
+  .s("supersaw").attack(.4).release(1.2).lpf(sine.range(480, 1920).slow(8))
+  .room(.85).gain(0.2).mask(section1).velocity(section1).orbit(6).analyze("pad")
+// Drop · bars 9-40 · pattern A
+$: chord("<Am F C G>").anchor("c4").voicing()
+  .s("supersaw").attack(.4).release(1.2).lpf(sine.range(480, 1920).slow(8))
+  .room(.85).gain(0.2).mask(section2).velocity(section2).orbit(6).analyze("pad")
