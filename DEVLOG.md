@@ -587,3 +587,10 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 
 - Solo analisi, niente cambiato nel motore. Su tutti i brani: si apre quasi sempre con la batteria e quasi sempre con lo stesso pattern (un colpo di cassa sul primo battito); il profilo Switch tiene la cassa sfoltita a lungo (piena dopo circa 2,5 minuti in mediana) e cambia poco nel primo minuto (5 cambiamenti, 2-3 nei brani Switch, contro 13 di Crescendo). Il primo passo suona subito alla battuta 0, già scritto; la voce non entra mai nella crescita. Cause: ordine d'ingresso fisso per tipo, sfoltimento al colpo più forte, primo passo già suonante; nei brani Switch anche pattern scritti minimi (una clip per traccia, cassa a un colpo per battuta in Tappe e Breve). Dettagli e numeri nelle note locali.
 - Quattro brani di prova per le aperture: Apre arpeggio, Breakbeat, Drum and bass, Solo synth (in libreria dopo i brani Switch). Confermano che il motore riporta tutto alla stessa apertura anche con brani diversi.
+
+## 2026-10-18: piano della varietà e dieci spec
+
+- Analisi completata (note locali): repo di riferimento, un corso di Strudel, un tutorial, cinque video e due dirette di live coder. Risultato in sintesi: il nostro materiale è scritto per esteso, i live coder scrivono idee piccole (celle ripetute, gradi, nomi di accordo con voicing, passi di beat, caso con seme, varianti pronte); da lì vengono aperture uguali, melodie ripetute tra brani, codice lungo (`.struct` espansi) e crescite che sanno solo sfoltire.
+- Nuovo `docs/VARIETY.md`: la visione che lega dieci change e l'ordine con le prove d'ascolto del proprietario.
+- Issue nuove: #68 cestino, #69 catalogo delle funzioni di Strudel, #70 parti come idee, #71 generatore di materiale, #72 libreria di pattern; commenti su #64, #67, #6, #39, #24.
+- Spec scritte (da approvare, nessun codice): `song-trash`, `typing-mistakes`, `clear-names` (profilo Switch mostrato come "Live coder", stili `switch-*` con nomi di genere), `strudel-catalog`, `idea-model`, `material-generator`, `pattern-library`, `growth-shapes`, `voice-instrument`, `radio-variation`.
