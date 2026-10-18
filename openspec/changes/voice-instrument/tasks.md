@@ -1,8 +1,9 @@
 ## 1. Track and lines
 
-- [ ] 1.1 Track type `spoken` with voice settings and rack, and line patterns (text, way, bind, once, every, slices, rhythm) in the format and validator; verify with `npm run check:songs` (wrong way, unknown bound track and lines over 12 words give errors with their paths)
-- [ ] 1.2 Compiler: entry, refrain, chop and opening resolved to bars with mask lanes, orbits 13 and 14; verify with a new Node check `tools/check-spoken.mjs` (entry lines end one beat before each entry, refrains only in quiet sections, chop slices on the rhythm's steps) and `npm run check:code` unchanged for existing songs
+- [ ] 1.1 Track type `spoken` with voice settings and rack, and line patterns (text, way, every, slices, rhythm) in the format and validator; verify with `npm run check:songs` (wrong way, unknown bound track and lines over 12 words give errors with their paths)
+- [ ] 1.2 Compiler: passage, refrain, chop and opening resolved to bars with mask lanes, orbits 13 and 14; verify with a new Node check `tools/check-spoken.mjs` (entry lines end one beat before each entry, refrains only in quiet sections, chop slices on the rhythm's steps) and `npm run check:code` unchanged for existing songs
 - [ ] 1.3 Narrator yields on shared bars (D5); verify in `tools/check-spoken.mjs` that no step comment and spoken line overlap
+- [ ] 1.4 Poetic narrator style (`narrator: explain | poetic` on song and style, poetic lines at enter and back steps, vocabulary group `poetic` in English and Italian); verify in `tools/check-spoken.mjs` that explain is unchanged and poetic speaks only at entries
 
 ## 2. Texts and samples
 

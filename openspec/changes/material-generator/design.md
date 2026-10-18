@@ -136,6 +136,10 @@ The pattern panel gets [Compose a part] with a number field and an energy knob (
 
 Add the module, then the recipe field with `preset` everywhere (fixtures unchanged), then switch recipes one family at a time and rewrite fixtures once with the version bump. Rollback: set the recipes back to `preset`.
 
+## Material source (owner, 2026-10-18)
+
+A session (radio, compilation, generated songs) can force the source of all material: `patterns` (library as written, no mutation), `varied` (library with variations, from today's light mutation to new rhythm or pitches), `composed` (generator only), `mix` (default: each recipe's `material` field). The value is stored with the session recipe and seeds, so replays match. Today's director is the light end of `varied`. "patterns" only makes sense once the library holds many patterns per kind; with today's 22 melodies it repeats. The user's saved patterns join the pool only where they fit (kind, style tag or "any style", key transposable). The control lives in the radio's compilation setup and in Settings → Radio (change `radio-variation`), not in the live console.
+
 ## Open Questions
 
 - **Share of generated material in the built-in recipes.** Recommended: `mix` with share 0.5 for lead, arp and bass; drums `mix` 0.3 so the style keeps its signature groove; pads `preset` until chord voicings are judged. Adjust after the listening test.

@@ -57,6 +57,13 @@ Composed material SHALL be seeded by the song and the command (its index among t
 - **WHEN** a session with two Vary commands is replayed from a playlist
 - **THEN** the varied parts play the same notes as when the session was heard
 
+### Requirement: Material source in the setup
+The radio's compilation setup and the radio settings SHALL offer the material source of `material-generator` (patterns, varied patterns, composed, mix; default mix). The choice SHALL NOT appear in the live console, and SHALL be saved with the session.
+
+#### Scenario: A session with patterns only
+- **WHEN** the owner sets the source to "patterns" in the compilation setup and starts the radio
+- **THEN** the songs use library patterns as written, and the saved session replays the same
+
 ### Requirement: Director version
 Because Add and More complex compose, the director version SHALL be raised in the same change. A radio session in a playlist SHALL warn that it may sound different when its director version differs from the app's, older or newer; a frozen session SHALL not warn.
 

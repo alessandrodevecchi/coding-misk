@@ -27,9 +27,10 @@ Alternative rejected: a `role` field on `voice` tracks. Every place that reads v
 
 ### D2. Lines as patterns
 
-A `spoken` track's patterns hold lines: `{ text: { en, it } | "vocab:<id>", way: "entry" | "refrain" | "chop" | "opening", bind?: trackId, once?: true, every?: bars, slices?: n, rhythm?: "0 1 0 1 2 2 3 ~" }`. Clips place them like any pattern. The compiler resolves each clip to bars:
+A `spoken` track's patterns hold lines: `{ text: { en, it } | "vocab:<id>", way: "passage" | "refrain" | "chop" | "opening", every?: bars, slices?: n, rhythm?: "0 1 0 1 2 2 3 ~" }`. Clips place them like any pattern. The compiler resolves each clip to bars:
 
-- **entry:** the line's length in beats (from the sample duration, measured by `tools/voice.mjs` and stored in the samples manifest) is placed so it ends one beat before each start of the bound track's clips; `once` keeps only the first.
+- **passage:** a longer text placed in the quietest section (fewest tracks, lowest energy) or where the song puts it; light effects only (no drive, small room), never chopped.
+- **poetic narrator:** a narrator style, not a way of the voice instrument: at steps that add a track or bring one back, the narrator speaks a short image from the song's lines, the style's `narrator.poetic` lines or the vocabulary's `poetic` group, instead of the explaining phrase. Field `narrator: "explain" | "poetic"` on the song or the style; default explain.
 - **refrain:** the line repeats every `every` bars (default 4) in sections where the number of playing tracks is at most half the song's most, or whose energy role is intro, break or outro.
 - **chop:** `s(bank).n(i).slice(slices, "<rhythm>")` on every bar of the clip, with `.clip(1)` so slices do not overlap.
 - **opening:** the line from bar 0 of its clip, once.
@@ -54,13 +55,13 @@ The track's `speaker` setting, else a draw from the style's speakers, else from 
 
 ### D7. Director
 
-Recipes gain an optional `spoken: { weight, ways: { entry, refrain, chop, opening }, lines?, speakers? }`. With a weight the director adds a `spoken` candidate track; its moves are add and remove like a texture, and its entry lines bind to the next track that enters. Styles without the field add nothing, so their fixtures do not move. The first version gives weights to two or three styles (for example dark cyberpunk, ambient, one live coder style), which changes the endless fixtures: `DIRECTOR_VERSION` goes up in the same commit. Density and energy measures leave `spoken` out, like `voice` and the riser; only chops count as a layer for the 4 to 5 layer rule.
+Recipes gain an optional `spoken: { weight, ways: { passage, refrain, chop, opening }, lines?, speakers? }`. With a weight the director adds a `spoken` candidate track; its moves are add and remove like a texture, and its entry lines bind to the next track that enters. Styles without the field add nothing, so their fixtures do not move. The first version gives weights to two or three styles (for example dark cyberpunk, ambient, one live coder style), which changes the endless fixtures: `DIRECTOR_VERSION` goes up in the same commit. Density and energy measures leave `spoken` out, like `voice` and the riser; only chops count as a layer for the 4 to 5 layer rule.
 
 ## Risks / Trade-offs
 
 - **[Samples not in the repository]** → as for the narrator, lines stay silent without samples; the Guide card says to run `npm run voices`. See Open Questions.
-- **[Sample length differs per speaker and language]** → entry lines are placed from the measured length of the sample in use; the manifest stores lengths per file.
-- **[Words lost under a full mix]** → refrains only in quiet parts; entry lines get a small duck of the other tracks only if the level check shows they are masked (later, not in this version).
+- **[Sample length differs per speaker and language]** → passages and refrains are placed from the measured length of the sample in use; the manifest stores lengths per file.
+- **[Words lost under a full mix]** → refrains and passages only in quiet parts; they get a small duck of the other tracks only if the level check shows they are masked (later, not in this version).
 - **[Generated lines sound mechanical]** → accepted for a first version; it suits the dark and machine styles; the listening test decides the vocabulary's future.
 
 ## Migration Plan
@@ -70,4 +71,4 @@ No migration: existing songs have no `spoken` tracks. Endless fixtures are rewri
 ## Open Questions
 
 - **Shipping samples.** The macOS voices may not be shared, so other machines hear no lines. Recommended: keep them git-ignored in this change, and plan a later step that makes the vocabulary and style lines with a local text to speech model under a permissive licence (see `docs/VOCALS.md`), whose files can be committed.
-- **Which styles get a weight first.** Recommended: dark cyberpunk and ambient (refrain and entry) and one live coder style (opening and chop), weight 0.3 each, adjusted after the listening test.
+- **Which styles get a weight first.** Recommended: dark cyberpunk and ambient (refrain and passage, poetic narrator) and one live coder style (opening and chop), weight 0.3 each, adjusted after the listening test.

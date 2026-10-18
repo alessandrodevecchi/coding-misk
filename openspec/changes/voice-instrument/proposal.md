@@ -6,10 +6,11 @@ Today a voice in a song only narrates: a voice track speaks the comment of a bui
 
 - **Voice instrument.** A new kind of track whose spoken lines are part of the music. It is separate from the narrator: the narrator keeps explaining build steps; the voice instrument plays in the normal song, in exports and in the live build.
 - **Four ways to speak:**
-  - **entry line:** a line that ends just before an instrument comes in;
+  - **spoken passage:** a longer text in a quiet part, clear and lightly treated (#39);
   - **refrain:** a short line repeated in the quiet parts of the song;
   - **chop:** a phrase cut into slices and repeated in time, as a rhythmic part;
   - **opening:** a spoken line that opens the song (used by the `voice` opening of `growth-shapes`).
+- **Poetic narrator.** The narrator gets a second style next to "explain": a short image that announces the element coming in ("a heartbeat under the city" before the kick). Explain stays the default; a song or a style can ask for poetic. Lines announcing an entry belong to the narrator, not to the voice instrument.
 - **Effects.** The voice instrument uses the voice settings and characters the narrator already has (pitch, tempo, filters, drive, reverb, delay, rack devices), plus slicing for chops.
 - **Texts.** Written by the song, given by the style, or generated from a small vocabulary of words and short phrases. Only public domain or our own texts.
 - **Offline samples.** Lines are spoken by the existing speakers in English and Italian and made in advance with `npm run voices`; nothing is generated or fetched at play time.
@@ -20,7 +21,7 @@ Today a voice in a song only narrates: a voice track speaks the comment of a bui
 
 ### New Capabilities
 
-- `song/voice-instrument`: the voice instrument track, its four ways to speak, texts and vocabulary, effects, samples made offline, its place in the live build and in the director, and how it stays apart from the narrator.
+- `song/voice-instrument`: the voice instrument track, its four ways to speak (passage, refrain, chop, opening), the poetic narrator style, texts and vocabulary, effects, samples made offline, its place in the live build and in the director, and how it stays apart from the narrator.
 
 ### Modified Capabilities
 

@@ -1,6 +1,6 @@
 ## Purpose
 
-The voice instrument plays spoken lines as part of a song's music: entry lines, refrains, chops and spoken openings, apart from the narrator that explains build steps.
+The voice instrument plays spoken lines as part of a song's music: refrains, chops, spoken openings and long spoken passages, apart from the narrator. The narrator gains a poetic style next to the one that explains build steps.
 
 ## ADDED Requirements
 
@@ -15,12 +15,23 @@ A song SHALL be able to hold voice instrument tracks, apart from narrator voice 
 - **WHEN** that song is exported to audio
 - **THEN** the export holds the same spoken lines at the same bars as playback
 
-### Requirement: Entry lines
-A line bound to an entry SHALL end on the beat before the bound track starts to play, and SHALL play again each time that track comes back after a break, unless the song says it plays once.
+### Requirement: Spoken passage
+A spoken passage SHALL be a longer text (a few sentences) spoken in a quiet part of the song with light effects only, so the words stay clear (#39).
 
-#### Scenario: Line before the bass
-- **WHEN** a line is bound to the bass and the bass enters at bar 33
-- **THEN** the line is heard in the bars before bar 33 and ends before the bass's first note
+#### Scenario: Passage in a breakdown
+- **WHEN** a song holds a spoken passage on its breakdown
+- **THEN** the passage is heard in the breakdown, understandable, and ends before the drop
+
+### Requirement: Poetic narrator
+The narrator SHALL have two styles: "explain" (today: it says what the step does) and "poetic" (a short image announces the element that is about to come in, for example "a heartbeat under the city" before the kick). The poetic style SHALL speak only at the steps where a track enters or comes back, with lines from the song, its style or the vocabulary, and SHALL follow the same rules as the explaining narrator (on and off, languages, speakers). Explain SHALL stay the default.
+
+#### Scenario: Poetic entry
+- **WHEN** a live build with the poetic narrator reaches the step where the bass enters
+- **THEN** a short image is spoken just before the bass is heard, instead of "here comes the bass"
+
+#### Scenario: Default unchanged
+- **WHEN** a song does not ask for the poetic style
+- **THEN** the narrator explains the steps as before
 
 ### Requirement: Refrain
 A refrain SHALL repeat a short line every few bars, only in parts of the song where few tracks play or the energy is low, and SHALL stop when the song gets full again.
@@ -79,15 +90,15 @@ Spoken samples SHALL be made in advance by `npm run voices` for every line of th
 When the narrator and a voice instrument would speak in the same bars, the narrator's comment SHALL be skipped. They SHALL play on separate orbits.
 
 #### Scenario: Same bar
-- **WHEN** a step comment falls on a bar where an entry line plays
-- **THEN** only the entry line is heard
+- **WHEN** a step comment falls on a bar where a refrain plays
+- **THEN** only the refrain is heard
 
 ### Requirement: Voice instrument in the live build
 In a live build the voice instrument track SHALL enter like a track, with its line appearing in the code when it first speaks. It SHALL NOT be the first track of a growth unless the opening is "voice".
 
-#### Scenario: Entry in the code
-- **WHEN** a live build reaches the first entry line
-- **THEN** the voice instrument line is typed into the code and the line is heard
+#### Scenario: Voice in the code
+- **WHEN** a live build reaches the first line of the voice instrument
+- **THEN** the line is typed into the code and the line is heard
 
 ### Requirement: Director
 A style recipe MAY give the voice instrument a weight, texts and ways to speak. The director SHALL add a voice instrument to a song with that weight as its chance, and SHALL NOT add one for styles without a weight. The draws SHALL be seeded so the same session gives the same voice instruments.

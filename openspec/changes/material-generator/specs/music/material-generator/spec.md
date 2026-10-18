@@ -81,3 +81,21 @@ The generator SHALL also vary a preset: keep its rhythm and compose new pitches,
 #### Scenario: Varied preset
 - **WHEN** the generator varies the bass preset `rolling` keeping its rhythm
 - **THEN** the result has the onsets of `rolling` and new pitches from the chords
+
+### Requirement: Material source choice
+A session or song SHALL be able to choose its material source: "patterns" (library as written, no mutation), "varied patterns" (library with variations, nothing composed from scratch), "composed" (generator) or "mix" (each recipe decides; the default). The choice SHALL be saved with the session so a replay gives the same songs.
+
+#### Scenario: Only patterns
+- **WHEN** a session runs with the source "patterns"
+- **THEN** every part is a library pattern as written, and no mutation is applied
+
+#### Scenario: Default
+- **WHEN** no source is chosen
+- **THEN** each instrument follows its recipe's material field
+
+### Requirement: The user's patterns in generated songs
+The user's saved patterns SHALL be drawn only for the tracks they fit: same kind of part, a style tag or the "any style" tag matching the song's style, and a key or degrees that can be transposed to the song's key.
+
+#### Scenario: A riff in the wrong style
+- **WHEN** the user saved a metal riff tagged with the style melodic metal and the session plays ambient
+- **THEN** that riff is never drawn

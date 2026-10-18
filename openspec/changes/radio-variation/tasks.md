@@ -25,3 +25,7 @@
 
 - [ ] 5.1 With `radio-profiles` and `growth-shapes` in place, a vary on air is typed as small notes edits; verify with `node tools/check-steering.cjs` on a Live coder song (skip and say so while `radio-profiles` is on hold)
 - [ ] 5.2 Owner's listening test (`docs/VARIETY.md`): a radio session steered by the owner, with Vary on each part; notes in `DEVLOG.md`
+
+## 6. Material source
+
+- [ ] 6.1 Material source choice in the compilation setup and in Settings → Radio (strings in English and Italian), saved with the session; verify in `tools/check-compilation.cjs` and `tools/check-settings.cjs`

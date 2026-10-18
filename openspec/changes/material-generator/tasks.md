@@ -32,3 +32,8 @@
 - [ ] 5.1 Run `npm run check:material`, `npm run check:endless`, `npm run check:styles`, `npm run check:songs`, `npm run check:code`, `node tools/snapshot-levels.cjs check` and `npm run build`; verify all pass and built-in songs keep their levels
 - [ ] 5.2 Add a DEVLOG entry in Italian (rules, recipe choices, measured levels, version bump)
 - [ ] 5.3 Owner's listening test (`docs/VARIETY.md`, step 4, with `pattern-library`): a listening session in the Patterns tab, with the owner's votes noted by hand until votes exist, and 4-5 new songs from the radio; record which rules stay in DEVLOG
+
+## 6. Material source
+
+- [ ] 6.1 Session material source `patterns`, `varied`, `composed`, `mix` (default), stored with the session recipe; verify in `npm run check:material` and `npm run check:endless` that "patterns" applies no mutation and that a replay matches
+- [ ] 6.2 The user's saved patterns drawn only where they fit (kind, style tag or any style, key); verify with a case where a pattern of another style is never drawn
