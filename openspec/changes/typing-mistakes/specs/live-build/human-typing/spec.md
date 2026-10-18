@@ -36,6 +36,20 @@ The code SHALL be exact when the step plays. When the time before the step is to
 - **WHEN** a long edit has only a few seconds before its step
 - **THEN** it is typed without mistakes and is exact when the step plays
 
+### Requirement: Mistake rate varies by stretch
+In human style the rate of typos and changes of mind SHALL vary between stretches of typing, within a range, drawn from the song seed and the stretch index.
+
+#### Scenario: Careful and hurried stretches
+- **WHEN** a long live build in the Switch profile is typed
+- **THEN** some stretches show several mistakes close together and others show none, and the same song shows the same stretches every time
+
+### Requirement: Mistakes switch
+The profile controls SHALL include a mistakes switch, on by default in the Switch profile. With the switch off, human typing SHALL keep its pace, pauses and pasted lines and SHALL make no typos, wrong words or changes of mind.
+
+#### Scenario: Switch off
+- **WHEN** the owner turns Typing mistakes off with Human typing on
+- **THEN** the code is typed at a person's pace with pauses and without any mistake
+
 ### Requirement: Exact style still unchanged
 Exact style SHALL type exactly as before this change; Classic and Crescendo SHALL keep using it.
 

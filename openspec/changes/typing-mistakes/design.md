@@ -46,6 +46,14 @@ Alternative: paste only lines longer than the panel. Rejected: the panel width i
 
 `humanPlan` tries plans in this order and keeps the first that fits in `max`: full (D1, D2, D3), without whole wrong words and paste pauses, lean (as today), then lean scaled (as today). Each plan draws from its own seeded stream, as `full` and `lean` do now.
 
+### D6. A rate that changes
+
+The typo rate is not fixed. The text of a live build is split into stretches of about 20 to 60 seconds of typing; each stretch draws its rate from a range, about one typo every 25 to 120 characters, with a slight bias to careful stretches. Several mistakes may come close together in a hurried stretch; a careful stretch may have none. Changes of mind follow the same stretch (more in hurried ones). The draw uses the song seed and the stretch index, so it is repeatable.
+
+### D7. Mistakes switch
+
+`CONTROLS.mistakes = ['on', 'off']` in `src/live/profiles.js`, `on` in the Switch profile; Classic and Crescendo use exact typing, where the switch has no effect. With `off`, `humanKeys` skips typos, wrong words and changes of mind but keeps key times, thinking pauses and pasted lines. The switch sits under Human typing in the Compose panel and is greyed out when Human typing is off.
+
 ### D5. Seeding
 
 Every new draw comes from the same `mulberry` stream of the plan. The seed string does not change, so a song still gives one plan. Human plans change once with this change; exact plans do not.
@@ -59,6 +67,6 @@ Every new draw comes from the same `mulberry` stream of the plan. The seed strin
 
 ## Open Questions
 
-- **Typo rate.** Recommended: keep about 1 in 55 per character. If the owner finds it too busy after seeing it, lower to 1 in 80.
+- **Typo rate.** Decided with the owner: variable by stretch (D6), one typo every 25 to 120 characters; the range can be tuned after seeing it.
 - **Pasted line chance.** Recommended: 1 in 3 for new lines of 60 characters or more. Alternative: only for lines of 100 characters or more.
-- **Toggle for mistakes.** Recommended: no new control; Human typing on or off is enough for now.
+- **Toggle for mistakes.** Decided with the owner: a separate switch, on by default (D7).

@@ -8,6 +8,8 @@ Human typing (`human-typing`) makes typos, but each one shows for well under a s
 - **Fixed at a person's pace.** The backspaces of a fix come at a person's pace, one by one, not in a burst.
 - **Sometimes a whole wrong word.** Now and then a whole word is typed wrong (another sound, another scale, another function of the same song), seen, deleted and typed again.
 - **Sometimes a long line is pasted.** Now and then a long new line arrives whole at once, as if pasted from notes.
+- **A rate that changes.** How often mistakes come varies within a range, by stretches: some passages are typed carefully, others in a hurry with several mistakes close together. Seeded, so the same song gives the same stretches.
+- **A switch for mistakes.** A new control "Typing mistakes" under Human typing, on by default where Human typing is on. Off: the typing keeps a person's pace and pauses but never makes a mistake.
 - **Unchanged:** the code is exact when the step plays; the same song gives the same typing; the exact typing style (Classic, Crescendo) does not change.
 
 ## Capabilities
@@ -22,6 +24,6 @@ None.
 
 ## Impact
 
-- **Code:** `src/song/typing.js` (`humanKeys`, `humanPlan`); the app and the fast video already share the plan, so both change together. No change to the profile table: the Switch profile already uses human typing.
+- **Code:** `src/song/typing.js` (`humanKeys`, `humanPlan`); the app and the fast video already share the plan, so both change together. Profile table: a new control `mistakes` (on, off), on in the Switch profile; Compose panel gets the switch.
 - **Checks:** `tools/check-typing.mjs` (`npm run check:typing`) gets new cases; exact style output stays identical.
 - **Docs:** Guide card "Crescendo" (Human typing) in English and Italian, DEVLOG.

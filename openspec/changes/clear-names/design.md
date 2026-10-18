@@ -67,10 +67,12 @@ Check names that say "Switch" (`director: Switch songs keep one key...`, `direct
 
 ## Migration Plan
 
-No data migration: aliases resolve old ids when read. Rollback: an older app does not know the new ids; songs saved after the change with new tags show them as unknown styles but still play.
+Files in the repo (built-in songs, artists, fixtures that name these styles) are rewritten to the new ids in the same change, so the repo shows only the new names. The user's data is not rewritten: aliases resolve old ids when read (saved songs, overrides, playlists, backups, older exported files). Rollback: an older app does not know the new ids; songs saved after the change with new tags show them as unknown styles but still play.
 
 ## Open Questions
 
-- **Name for `switch-trance`.** Recommended: `gated-trance`, "Gated trance" / "Trance gated", for its gated supersaw bass and lead. Alternatives: `trance-live` ("Live trance"), `trance-drive` (close to the existing "Driving trance", so likely confusing).
-- **Italian names.** Recommended: "Acid", "House", "Trance gated", "Trance pura"; the genre words stay in English as Italian listeners use them.
-- **Profile id migration.** Recommended: keep `switch` as the internal id (D1). Renaming it can come later if the id ever shows to users.
+Decided with the owner (2026-10-18):
+
+- **Name for `switch-trance`:** `gated-trance` ("Gated trance" / "Trance gated").
+- **Italian names:** "Acid", "House", "Trance gated", "Trance pura".
+- **Profile id:** stays `switch` internally (D1); the user only sees "Live coder". Style ids move to the new names, with repo files rewritten and the alias map for the user's data (D2).

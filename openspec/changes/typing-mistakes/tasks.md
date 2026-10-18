@@ -4,6 +4,9 @@
 - [ ] 1.2 Whole wrong word: word boundaries in strings and function names, wrong word from the same kind in the target code or two letters swapped, at most one per edit; verify with a new case (the frame shows the wrong word, the last frame is exact)
 - [ ] 1.3 Pasted long lines: new unlike lines of 60 characters or more, about 1 in 3, seeded, never comments or voice code; verify with a new case (the line appears whole in one frame)
 
+- [ ] 1.4 Variable rate by stretch (design D6), seeded; verify with a new case (two stretches of the same song have different counts, same song same counts)
+- [ ] 1.5 Mistakes switch (design D7): `CONTROLS.mistakes`, Switch on, Compose control under Human typing, `liveMistakes` strings in English and Italian; verify `npm run check:profiles` and a case with the switch off (no mistakes, same pace)
+
 ## 2. Time and seeds
 
 - [ ] 2.1 `humanPlan` fallback order: full, without wrong words and paste pauses, lean, lean scaled; verify with a new case where a long edit has 3 s and ends exact in time
