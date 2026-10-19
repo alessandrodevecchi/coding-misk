@@ -70,3 +70,29 @@ Because Add and More complex compose, the director version SHALL be raised in th
 #### Scenario: Old session
 - **WHEN** a playlist holds a session saved before this change
 - **THEN** its item shows "may sound different" and offers Freeze
+
+### Requirement: Swap a part
+The console SHALL have a Swap command next to Vary. Swap SHALL replace the chosen part, from the next phrase, with another ready part of the library (a preset or a saved pattern) that fits the song's style and key, and SHALL never compose. Vary SHALL always compose, whatever the material source.
+
+#### Scenario: Vary with the patterns source
+- **WHEN** the material source is patterns and the listener presses Vary on the lead
+- **THEN** the lead gets a newly composed melody from the next phrase
+
+#### Scenario: Swap
+- **WHEN** the listener presses Swap on the bass
+- **THEN** the bass plays another ready bassline from the next phrase, never a composed one
+
+### Requirement: Pad vary keeps the progression
+A vary of the pad SHALL keep the song's chords and change only its rhythm, register and voicing.
+
+#### Scenario: Pad
+- **WHEN** the listener varies the pad
+- **THEN** the pad plays the same chords with a new rhythm or voicing
+
+### Requirement: Material source in the console
+The radio console SHALL show the material source (patterns, varied, composed, mix) next to the complexity control. A change SHALL apply from the next song and SHALL be recorded with the session for replays. Settings → Radio SHALL keep only the default for new sessions.
+
+#### Scenario: Change on air
+- **WHEN** the listener switches the source from mix to patterns during a song
+- **THEN** the current song plays on unchanged and the next song uses ready parts only
+

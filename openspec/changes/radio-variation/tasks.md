@@ -29,3 +29,10 @@
 ## 6. Material source
 
 - [x] 6.1 Material source choice in the compilation setup and in Settings → Radio (strings in English and Italian), saved with the session; verify in `tools/check-compilation.cjs` and `tools/check-settings.cjs`
+- [ ] 6.2 Material source selector in the console next to complexity, applied from the next song and recorded for replays; Settings keeps the default; verify in `tools/check-steering.cjs`
+
+## 7. Swap
+
+- [ ] 7.1 `COMMANDS.swap` with the same part types as vary: another ready part (preset or saved pattern) that fits style and key, never composed; seeds `swap:<song>:<index>`; verify in `tools/check-endless.mjs`
+- [ ] 7.2 Swap button next to Vary, strings in English and Italian, Guide card update; verify with `tools/check-steering.cjs` and `npm run check:guide`
+
