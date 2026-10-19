@@ -204,7 +204,7 @@ function playable(tr) {
   // (whole: the song with every track, so the voice instrument's quiet sections stay the same)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep), whole: song } : song);
   const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(plain, keep)) : null;
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, buses: live && live.buses, fns: live && live.fns, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, paste: live ? live.paste : null, buses: live && live.buses, fns: live && live.fns, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
 }
 
 // ---------- brano in modifica ----------
@@ -331,9 +331,10 @@ const typingSpeed = () => TYPING_SPEEDS[store.get('coding-misk-typing', null) ||
 // typing at a person's speed, faster when it does not fit
 // human (human-typing, a step of the live build in the Live coder profile): first a listening pause, then the typing at a
 // person's pace ends at the step; when time is short the pause shrinks first
-function makeTyping(text, to, from0, end, cps, human = false, stretch = null) {
+// force: how many new lines may be pasted whole when the typing does not fit (the live build's paste rule)
+function makeTyping(text, to, from0, end, cps, human = false, stretch = null, force = Infinity) {
   const avail = Math.max(.2, (end - from0) / cps), listenMin = human ? Math.min(avail * .5, 2) : 0;
-  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch });
+  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch, force });
   const listen = human ? Math.max(listenMin, Math.min(avail * .2, avail - plan.total)) : 0;
   return { plan, start: Math.max(from0 + listen * cps, end - plan.total * cps), cps, shown: '' };
 }
@@ -357,7 +358,7 @@ function liveBuild(sg, s, cyc) {
   const due = s.lastEnd + .1 * s.cps >= next.at;
   if (!typing && !due) {
     const prevAt = built > 0 && steps[built - 1] ? steps[built - 1].at : -Infinity, to = codeFor(sg, next.at);
-    typing = makeTyping(settleOthers(ed.code || '', to, next.at), to, Math.max(cyc, prevAt + .5), next.at - .2 * s.cps, s.cps, typingHuman(), stretchOf(next.at));
+    typing = makeTyping(settleOthers(ed.code || '', to, next.at), to, Math.max(cyc, prevAt + .5), next.at - .2 * s.cps, s.cps, typingHuman(), stretchOf(next.at), sg.paste ? sg.paste(next.at) : Infinity);
   }
   if (!due) { typeFrame(typing, cyc); return; }
   typing = null; built = steps.filter(x => x.at <= next.at).length;

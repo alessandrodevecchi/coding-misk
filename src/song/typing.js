@@ -316,7 +316,9 @@ function whole(text, k) {
   return out;
 }
 // style 'human' (human-typing): uneven keys, thinking pauses, typos and changes of mind, seeded by the two texts
-export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false } = {}) {
+// force: how many new lines may be pasted whole when the typing does not fit in max (0: none, the typing speeds up
+// instead; the paste rules of a live build are in src/live/typing-load.js, pasteRule)
+export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false, force = Infinity } = {}) {
   const ops = lineDiff(chainLines(from), chainLines(to)), parts = [];
   for (let k = 0; k < ops.length;) {
     if (ops[k].op === 'keep') { parts.push({ kind: 'keep', text: ops[k].text }); k++; continue; }
@@ -361,12 +363,14 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
     // growth-shapes: a new line that cannot be typed at a person's pace in the time left is pasted whole (after the
     // short paste pause; a line copied from one above and still to edit is pasted finished), the longest first, instead
     // of typing faster; never a comment or the voice's code
-    if (Number.isFinite(max)) {
+    let forced = 0;
+    if (Number.isFinite(max) && force > 0) {
       const fits = () => humanPlan(parts, acts, to, { ...opts, lean: true, max: Infinity }).total <= max;
       const cands = parts.map((p, i) => [p, i]).filter(([p]) => p.kind === 'new' && !(p.paste && (p.segs || []).every(x => x.eq !== undefined)) && p.text.trim() && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text)).sort((a, b) => b[0].text.length - a[0].text.length || a[1] - b[1]);
-      for (const [p] of cands) { if (fits()) break; p.paste = true; p.segs = [{ eq: p.text }]; acts = actions(); }
+      for (const [p] of cands) { if (forced >= force || fits()) break; p.paste = true; p.segs = [{ eq: p.text }]; acts = actions(); forced++; }
     }
-    return humanPlan(parts, acts, to, opts);
+    // forced: the new lines pasted because the typing did not fit
+    return { ...humanPlan(parts, acts, to, opts), forced };
   }
   const typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0);
   const cps = (8 + 22 * Math.max(0, Math.min(1, (typed - 40) / 360))) * speed;

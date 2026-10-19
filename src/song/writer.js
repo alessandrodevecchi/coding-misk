@@ -377,23 +377,44 @@ export function expandLine(line, fns = {}) {
 
 // the hidden tail evaluated after the code shown: the mixer (for each pattern line of the code, by the offsets of its
 // text, what it gets back) and the hidden voice. Lines edited by hand find the most alike line of the table.
-export function tail(shown, { table = new Map(), voice = '', like = null, offset = 0 } = {}) {
+// lanes (live-coder in-place edits): for each pattern line of the code, in order, the section lanes it plays under
+// (["0!76 1!8 0.5 0!31", …], one value per bar, as `.mask(lane).velocity(lane)` would) or null; hidden: lines that
+// play without being shown (the last bar of a fade from the section before)
+export function tail(shown, { table = new Map(), voice = '', like = null, offset = 0, lanes = null, hidden = '' } = {}) {
   const ranges = [];
-  let at = offset;
+  let at = offset, k = 0;
   for (const l of chainLines(shown)) {
-    if (PATTERN.test(l) && table.size) {
-      const k = lineKey(l);
-      let e = table.get(k);
-      if (!e && like) { let best = 0.5; for (const [key, x] of table) { const s = like(key, k); if (s >= best) { best = s; e = x; } } }
+    if (PATTERN.test(l) && (table.size || lanes)) {
+      const key = lineKey(l);
+      let e = table.get(key);
+      if (!e && like && table.size) { let best = 0.5; for (const [x, v] of table) { const s = like(x, key); if (s >= best) { best = s; e = v; } } }
+      const ln = lanes && lanes[k];
+      if (ln && ln.length) e = { ...(e || {}), lanes: ln };
       if (e) ranges.push([at, at + l.length, e]);
+      k++;
     }
     at += l.length + 1;
   }
   // plain JS values: double quotes would be read as mini-notation
-  const lit = v => (typeof v === 'string' ? `'${v.replace(/[^\w-]/g, '')}'` : String(v));
+  const lit = v => (Array.isArray(v) ? `[${v.map(x => `'${String(x).replace(/[^\w.! ]/g, '')}'`).join(',')}]` : typeof v === 'string' ? `'${v.replace(/[^\w-]/g, '')}'` : String(v));
   const list = ranges.map(([a, b, e]) => `[${a},${b},{${Object.entries(e).map(([k, v]) => `${k}:${lit(v)}`).join(',')}}]`).join(',');
-  return (ranges.length ? `\n\nall(x => miskMix(x, [${list}]))` : '') + (voice ? `\n\n${voice}` : '');
+  return (ranges.length ? `\n\nall(x => miskMix(x, [${list}]))` : '') + (hidden ? `\n\n${hidden}` : '') + (voice ? `\n\n${voice}` : '');
 }
+
+// the mixer as source text, the same in the app, the render page and the code copied to Strudel (single quotes only:
+// double quotes are mini-notation there). A hap of a line gets its bus, visual and level unless the line sets them
+// (the line found by the first place of its haps); a line with section lanes (live-coder in-place edits) plays as with
+// `.mask(lane).velocity(lane)` for each lane: its haps cut at the bars, kept where the lane is not 0, the velocity
+// the lane's value (the line found by any place of its haps inside it: a shared idea's constant comes first)
+export const MIX_SOURCE = `(pat, ranges) => {
+  const cache = new Map(), lane = s => { let v = cache.get(s); if (!v) { v = []; for (const t of s.trim().split(/ +/)) { const m = t.match(/^([^!]*)(?:!(\\d+))?$/); for (let k = 0; k < (m[2] ? +m[2] : 1); k++) v.push(Number(m[1])); } cache.set(s, v); } return v; };
+  const locs = h => (h.context && h.context.locations) || [];
+  const mixOf = h => { const l = locs(h)[0], s = l && l.start; return s === undefined ? null : ranges.find(([a, b]) => s >= a && s < b); };
+  const laned = ranges.filter(r => r[2].lanes), laneOf = h => { for (const l of locs(h)) { const r = laned.find(([a, b]) => l.start >= a && l.start < b); if (r) return r; } return null; };
+  const cut = (h, list) => { const out = []; for (const s of list) { const v = lane(s); for (const sp of h.part.spanCycles) { const c = Math.floor(sp.begin.valueOf()), x = v[((c % v.length) + v.length) % v.length]; if (x) out.push(new h.constructor(h.whole, sp, { ...h.value, velocity: x }, h.context)); } } return out; };
+  const fill = h => { const r = mixOf(h); if (!r) return h; return h.withValue(v => { const o = { ...v }; for (const [k, x] of Object.entries(r[2])) if (k !== 'lanes' && o[k] === undefined) o[k] = x; return o; }); };
+  return pat.withHaps(haps => (laned.length ? haps.flatMap(h => { const r = laneOf(h); return r ? cut(h, r[2].lanes) : [h]; }) : haps).map(fill));
+}`;
 
 // the same helpers and functions as Strudel code, for the code copied or opened in Strudel: it plays there as here
 // (single quotes only: double quotes are mini-notation); fns: name → { params, chain, lib } of the functions the code
@@ -405,7 +426,7 @@ export function preludeText(buses = {}, fns = {}) {
     "register('chan', (name, pat) => (miskBuses[name] === undefined ? pat : pat.orbit(miskBuses[name])).analyze(name))",
     "register('crunch', (x, pat) => pat.distort(x).distortvol(0.5))",
     ...defs,
-    'const miskMix = (pat, ranges) => pat.withHap(h => { const l = h.context && h.context.locations && h.context.locations[0], s = l && l.start; const r = s === undefined ? null : ranges.find(([a, b]) => s >= a && s < b); return r ? h.withValue(v => { const o = { ...v }; for (const [k, x] of Object.entries(r[2])) if (o[k] === undefined) o[k] = x; return o; }) : h; })',
+    `const miskMix = ${MIX_SOURCE}`,
     '', ''].join('\n');
 }
 
@@ -430,13 +451,9 @@ export function installHelpers({ register }) {
   register('crunch', (x, pat) => pat.distort(x).distortvol(0.5));
   for (const f of LIBRARY) defineFn(f.name, f);
   useFns(globalThis.miskFns);
-  // a hap from a line of the mixer gets its bus, visual and level unless the line sets them
-  globalThis.miskMix = (pat, ranges) => pat.withHap(h => {
-    const loc = h.context && h.context.locations && h.context.locations[0], s = loc && loc.start;
-    const r = s === undefined ? null : ranges.find(([a, b]) => s >= a && s < b);
-    if (!r) return h;
-    return h.withValue(v => { const o = { ...v }; for (const [k, x] of Object.entries(r[2])) if (o[k] === undefined) o[k] = x; return o; });
-  });
+  // a hap from a line of the mixer gets its bus, visual and level unless the line sets them, and its section lanes
+  // eslint-disable-next-line no-new-func
+  globalThis.miskMix = new Function(`return ${MIX_SOURCE}`)();
 }
 // the song and voice functions of the code evaluated (name → { params, chain }), set before it is evaluated
 export function useFns(fns) {

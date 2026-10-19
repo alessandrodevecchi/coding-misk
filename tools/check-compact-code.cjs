@@ -95,6 +95,40 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
     }, id);
     for (const r of res) { const ok = r.same && !r.err; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'}  ${id} bar ${r.bar} ${r.lines || ''}${r.err ? ` (${r.err})` : ''}`); }
   }
+  // live-coder in-place edits: the Live coder code of the moment shows one line per part with no section lanes; the
+  // lanes play from the hidden mixer. At every step (and the section changes), the events from the step to the next
+  // one are those of the standard code of that state, and no line shows a lane
+  for (const id of ['example-ideas', 'switch-prima-luce', 'switch-acid-prova']) {
+    const res = await page.evaluate(async id => {
+      const [{ crescendoSong }, { liveCode }, { resolveProfile, growthRules }, { buildSteps, stateAt }, { useFns }, { compileSong }] = await Promise.all(['/src/song/crescendo.js', '/src/live/live-code.js', '/src/live/profiles.js', '/src/song/build.js', '/src/song/writer.js', '/src/song/compile.js'].map(u => import(u)));
+      const song = await (await fetch(id === 'example-ideas' ? '/songs/examples/04-ideas.json' : `/songs/${id}.json`)).json();
+      const C = resolveProfile('switch', { tracks: false, notes: false, steps: false }), c = crescendoSong(song, { rules: growthRules(C) }), L = liveCode(c, C, { cols: () => 80 });
+      const e = document.querySelector('strudel-editor').editor;
+      const midiOf = n => { const m = String(n).match(/^([a-g])(#|b)?(-?\d)$/i); return m ? { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }[m[1].toLowerCase()] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (+m[3] + 1) * 12 : null; };
+      const haps = async (code, a, z) => {
+        await e.repl.evaluate(code, false);
+        if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
+        return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset())
+          .map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), h.value.bank ? 0 : +h.duration.valueOf().toFixed(4), Object.fromEntries(Object.entries({ ...h.value, ...(typeof h.value.note === 'string' && midiOf(h.value.note) !== null ? { note: midiOf(h.value.note) } : {}) }).filter(([k, v]) => typeof v !== 'function' && !(k === 'velocity' && v === 1)).sort())])).sort().join('\n');
+      };
+      const bars = [...new Set(buildSteps(L.build).map(x => x.at))].sort((x, y) => x - y), total = L.build.sections.reduce((a, x) => a + x.bars, 0), out = [];
+      // the section changes, and every third step
+      let at = 0; const bounds = L.build.sections.map(x => (at += x.bars) - x.bars).slice(1);
+      const pick = bars.filter((b, i) => bounds.includes(b) || i % 3 === 0);
+      for (const b of pick) {
+        const n = bars.find(x => x > b) ?? total, z = Math.min(n, b + 12);
+        try {
+          const shown = L.codeAt(b);
+          if (/\.mask\((section|clip)\d+\)|const (section|clip)\d+ =/.test(shown)) { out.push({ bar: b, err: 'a section lane is shown' }); continue; }
+          globalThis.miskBuses = L.buses; useFns(L.fns);
+          const a = await haps(compileSong(stateAt(L.build, b).song), b, z), w = await haps(L.run(shown), b, z);
+          out.push({ bar: b, same: a === w, n: a.split('\n').length });
+        } catch (x) { out.push({ bar: b, err: x.message }); }
+      }
+      return out;
+    }, id);
+    for (const r of res) { const ok = r.same && !r.err; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'}  ${id} Live coder in place, bar ${r.bar}${r.n ? ` (${r.n} events)` : ''}${r.err ? ` (${r.err})` : ''}`); }
+  }
   await browser.close();
   console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed');
   process.exit(failed ? 1 : 0);

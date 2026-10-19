@@ -109,9 +109,11 @@ const SONGS = ['ferro', 'cavo-scoperto'];
   const after = await page.evaluate(L0 => { const r = document.querySelector('strudel-editor').editor.repl; return r.state.pattern ? r.state.pattern.queryArc(L0, L0 + 1).filter(h => h.hasOnset()).length : 0; }, L);
   check(!cur.err && heard(cur.code) >= 1 && after > 0, 'typed opening: the first line sounds whole on its bar', cur.err || `${after} events`);
   await page.click('#play'); await sleep(400);
-  for (const [opening, development, re] of [['muted-base', 'by-type', /^_\$:/m], ['mid-set', 'by-type', /^S\$:/m], ['slow', 'second-section', /^S\$:/m], ['slow', 'metamorphosis', /setcpm\(134\/4\)/]]) {
+  for (let [opening, development, re] of [['muted-base', 'by-type', /^_\$:/m], ['mid-set', 'by-type', /^S\$:/m], ['slow', 'second-section', /^S\$:/m], ['slow', 'metamorphosis', /setcpm\(134\/4\)/]]) {
     await page.locator('#live-opening').selectOption(opening); await page.locator('#live-development').selectOption(development); await sleep(1000);
     const c = shapeOf('switch-prima-luce', { opening, development }), steps = [...new Set(c.build.map(x => x.at))].sort((a, b) => a - b);
+    // (the second skin's tempo is drawn with the shape: read it from the build)
+    if (development === 'metamorphosis' && c.crescendo.shape.skin) re = new RegExp(`setcpm\\(${c.crescendo.shape.skin.bpm}/4\\)`);
     const total = c.sections.reduce((a, x) => a + x.bars, 0), marked = c.build.filter(x => x.solo !== undefined || x.mute !== undefined || x.unsolo !== undefined || x.unmute !== undefined || (x.pattern && x.pattern.to === 'skin')).map(x => x.at);
     await page.click('#play'); await sleep(3000);
     let ok = true, seen = false, msg = '';

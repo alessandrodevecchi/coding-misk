@@ -7,6 +7,38 @@ import { typingPlan, settleOthers } from '../song/typing.js';
 
 // seconds of one bar of the growth (the first section)
 export const barSeconds = song => { const s = song.sections[0]; return (meterSteps(s.meter || '4/4') / 4) * 60 / (s.bpm || 138); };
+// seconds from the start of a song to a bar, section by section (a ramp counts at its start tempo)
+export function secondsAt(song, bar) {
+  let t = 0, at = 0;
+  for (const s of song.sections) { const n = Math.max(0, Math.min(s.bars, bar - at)); t += n * (meterSteps(s.meter || '4/4') / 4) * 60 / (s.bpm || 138); at += s.bars; if (at >= bar) break; }
+  return t;
+}
+
+// Forced pastes (owner, 2026-10-19): when a new line cannot be typed at a person's pace before its step, the human
+// typing may paste it whole. With the free duration never: the growth leaves the time the typing needs (the build
+// gets longer). With the fitted duration it is a last resort: never in the first two minutes, at most one a minute
+// (one line). The long lines pasted from notes now and then (typing-mistakes) are not forced pastes.
+// → paste(bar): how many lines the typing towards the step on that bar may paste (0 or 1), the same in the app, the
+// video and the checks. Decided step by step in order (a step needs the decisions before it), and kept.
+export function pasteRule(L, C, { seed = '' } = {}) {
+  if (C.typist !== 'human' || C.duration === 'free' || !L.build.crescendo) return () => 0;
+  const bars = [...new Set(buildSteps(L.build).map(x => x.at))].filter(b => b >= 1).sort((a, b) => a - b), done = new Map();
+  let k = 0, prev = 0, last = -Infinity;
+  return bar => {
+    while (k < bars.length && bars[k] <= bar) {
+      const at = bars[k++], t = secondsAt(L.build, at);
+      let ok = 0;
+      if (t >= 120 && t - last >= 60) {
+        const code = L.codeAt(at), was = settleOthers(L.codeAt(prev), code, at);
+        const avail = Math.max(0.2, secondsAt(L.build, at) - secondsAt(L.build, prev + 0.5) - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
+        if (was !== code && typingPlan(was, code, { style: 'human', lean: true, seed, force: 0 }).natural > usable) { ok = 1; last = t; }
+      }
+      done.set(at, ok);
+      prev = at;
+    }
+    return done.get(bar) || 0;
+  };
+}
 
 // the typing of each step as the app plans it (makeTyping in src/main.js): from half a bar after the step before to a
 // fifth of a second before the step, a listening pause of up to 2 s first; need: the leanest human typing (no pauses,
@@ -18,8 +50,9 @@ export function typingLoad(L, { seed = '', from = 1, to = Infinity } = {}) {
   for (const at of bars) {
     const code = L.codeAt(at), was = settleOthers(L.codeAt(prev), code, at);
     const avail = Math.max(0.2, (at - prev - 0.5) * sb - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
-    // (with the time left as the limit: a new line that would not fit is pasted, as the app types it)
-    const need = was === code ? 0 : typingPlan(was, code, { style: 'human', lean: true, seed, max: usable }).natural;
+    // (with the time left as the limit: a new line that would not fit is pasted when the paste rule allows it, as the
+    // app types it)
+    const need = was === code ? 0 : typingPlan(was, code, { style: 'human', lean: true, seed, max: usable, force: L.paste ? L.paste(at) : Infinity }).natural;
     out.push({ at, seconds: at * sb, gap: (at - prev) * sb, usable, need, ratio: need / usable });
     prev = at;
   }

@@ -13,7 +13,7 @@ import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, DEFAULT
 import { placeSpoken } from './spoken.js';
 import { liveCode } from '../live/live-code.js';
 import { resolveProfile } from '../live/profiles.js';
-import { rushedSteps, rushLoad } from '../live/typing-load.js';
+import { rushedSteps, rushLoad, typingLoad, barSeconds } from '../live/typing-load.js';
 import { compileSong } from './compile.js';
 import { typingPlan } from './typing.js';
 import { writeCode, levelsOf, busesOf, functionContext, functionOptions } from './writer.js';
@@ -496,9 +496,10 @@ function skinSection(x, skin, R) {
 // Bursts of edits (owner, 2026-10-18): the human typing of the Live coder types each step between the step before
 // (half a bar after it) and the step, after a listening pause of up to 2 s; when time is short it drops its pauses and
 // mistakes, then it speeds up. Each gap is made long enough for the leanest typing of its edit (measured on the
-// growing code, the bus and visual functions left out), within the growth budget; a section boundary in the growth
-// (the progression, the second skin) is prepared two bars before it, so its step gets two bars more. The typed
-// opening's lead-in is the time the first line takes (1 to 4 bars).
+// growing code, the bus and visual functions left out), within the growth budget (with the free duration there is no
+// budget: the growth gets longer); a section boundary in the growth (the progression, the second skin) is edited in
+// place like any step (live-coder in-place edits). The typed opening's lead-in is the time the first line takes (1 to
+// 4 bars).
 const shownLike = code => code.split('\n').filter(l => !/^(const |setcpm)/.test(l) && !(/^\s*\/\//.test(l) && !l.startsWith('// =')))
   .map(l => l.replace(/\.mask\((section\d+|clip\d+)\)\.velocity\(\1\)/g, '').replace(/\.orbit\(\d+\)/g, '').replace(/\.analyze\("[^"]*"\)/g, '')).join('\n');
 // what is heard in a code: its pattern lines, without the muted ones, only the solo ones while there are some
@@ -513,7 +514,7 @@ function heard(code) {
   const solo = layers.some(x => x.solo && !x.muted);
   return layers.filter(x => !x.muted && (!solo || x.solo)).map(x => x.text.replace(/^[_S]?\$:\s*/, '')).join('\n');
 }
-function relaxGaps({ song, dest, plans, seq, gaps, R, hold, secBar, cap, shape, clipR, paceBars, paced }) {
+function relaxGaps({ song, dest, plans, seq, gaps, R, hold, secBar, cap, shape, clipR, paceBars, paced, free = false }) {
   const first = { tracks: dest.map((t, i) => { const c = clipR(t); return { ...clone(t), clips: [{ start: 0, bars: 1, pattern: c.pattern, ...(c.set ? { set: clone(c.set) } : {}) }], patterns: { ...clone(t.patterns || {}), ...clone(plans[i].patterns) }, mute: true }; }) };
   for (const p of plans) for (const st of p.setup) applyStep(first, st);
   const sec = { name: 'Crescendo', bars: 1, bpm: R.bpm, key: R.key, chords: R.chords, meter: R.meter };
@@ -564,12 +565,10 @@ function relaxGaps({ song, dest, plans, seq, gaps, R, hold, secBar, cap, shape, 
   const need = i => lean(codes[i], codes[endOf(i) + 1]);
   // the typed opening: silent while the first line is typed
   if (shape.opening === 'typed') { const t1 = lean('', codes[1]); let L = 1; while (usable(L + 0.5) < t1 && L < 4) L++; gaps[0] = L; }
-  // a section boundary in the growth is prepared by the code of the moment: the changed lines are typed again as new
-  // muted copies under the playing ones, two bars before the boundary
-  const prep = i => { const was = codes[i].split('\n'), now = codes[endOf(i) + 1].split('\n'), fresh = now.filter(l => !was.includes(l)); return lean(codes[i], `${codes[i]}\n${fresh.join('\n')}`); };
-  const extraOf = i => (seq[i].harmony || seq[i].skinStart ? 2 : 0);
+  // (a section boundary is edited in place too: no prepared copies, no extra bars)
+  const extraOf = () => 0;
   // (with a margin: the code shown wraps its lines and folds some functions differently from this estimate)
-  const want = i => (extraOf(i) ? prep(i) : need(i)) * (paced[i] ? 1 : 1.2) + (paced[i] ? 0.2 : 0.5);
+  const want = i => need(i) * (paced[i] ? 1 : 1.2) + (paced[i] ? 0.2 : 0.5);
   // the shortest gap that leaves time to type the edit (and the two bars of a boundary)
   const minGap = (i, w) => { let g = 1; while (usable(g) < w && g < 64) g++; return g + extraOf(i); };
   const mins = [], refresh = i => { mins[i] = i && gaps[i] ? minGap(i, want(i)) : 0; };
@@ -605,7 +604,11 @@ function relaxGaps({ song, dest, plans, seq, gaps, R, hold, secBar, cap, shape, 
     room += gaps[m]; gaps[m] = 0; mins[m] = 0;
     refresh(k);
   }
-  return { relaxed, short: seq.some((_, i) => i && gaps[i] && gaps[i] < mins[i]) };
+  // the free duration: past the budget and the joins, a step still short gets the bars it needs (the growth gets longer)
+  if (free) seq.forEach((_, i) => { while (i && gaps[i] && gaps[i] < mins[i]) { gaps[i]++; relaxed++; } });
+  // the bars past the budget (the free duration waits for the typing)
+  const waited = free ? Math.max(0, gaps.reduce((a, b) => a + b, 0) - (cap - 4)) : 0;
+  return { waited, relaxed, short: seq.some((_, i) => i && gaps[i] && gaps[i] < mins[i]) };
 }
 
 // ---------- the song ----------
@@ -627,11 +630,34 @@ export function crescendoSong(song, opts = {}) {
   let best = null;
   // (then the same candidates with less detail: fewer, smaller moves fit the length of the growth)
   const cands = shapeCandidates(song, shape, styles), tries = [...cands, ...[2, 1, 0].flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
+  const C = resolveProfile('switch', { duration: rules.free ? 'free' : 'fitted' });
   for (const c of tries) {
-    const out = growSong(song, { ...opts, rules: { ...rules, ...(c.maxDetail !== undefined ? { maxDetail: c.maxDetail } : {}), shape: { opening: shape.opening, pace: c.pace, development: c.development } } });
+    const r = { ...rules, ...(c.maxDetail !== undefined ? { maxDetail: c.maxDetail } : {}), shape: { opening: shape.opening, pace: c.pace, development: c.development } };
+    let out = growSong(song, { ...opts, rules: r });
     if (c.maxDetail !== undefined && out.crescendo && out.crescendo.detail > c.maxDetail) continue;
     if (!out.crescendo || !out.crescendo.shape) return out;
-    const L = liveCode(out, resolveProfile('switch'), { cols: () => 80 }), n = rushedSteps(L, song.id || '');
+    let L = liveCode(out, C, { cols: () => 80 });
+    // free duration (owner, 2026-10-19): a step the human typing cannot reach at a person's pace waits for it: the bars
+    // it needs are added before it and the growth is made again (never a forced paste)
+    if (rules.free) {
+      const extra = {};
+      for (let round = 0; round < 6; round++) {
+        const sb = barSeconds(out), units = out.crescendo.units || [];
+        const late = typingLoad(L, { seed: song.id || '', to: out.crescendo.grown }).filter(x => x.ratio > 1);
+        let added = false;
+        for (const x of late) {
+          const i = units.indexOf(x.at);
+          if (i < 0) continue;
+          const usable = g => { const a = Math.max(0.2, g - 0.5 * sb - 0.2); return a - Math.min(a * 0.5, 2); };
+          let n = 1; while (usable(x.gap + n * sb) < x.need && n < 32) n++;
+          extra[i] = (extra[i] || 0) + n; added = true;
+        }
+        if (!added) break;
+        out = growSong(song, { ...opts, rules: { ...r, extraGaps: { ...extra } } });
+        L = liveCode(out, C, { cols: () => 80 });
+      }
+    }
+    const n = rushedSteps(L, song.id || '');
     out.crescendo.shape = { ...out.crescendo.shape, from: shape.from, rushed: n, ...(c.drawn ? {} : { fallback: true }) };
     if (!n) return out;
     const load = rushLoad(L, song.id || '');
@@ -772,10 +798,14 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   squeeze();
   // growth-shapes: no rushed typing (bursts of edits): a step comes as late as a person needs to type it, and the
   // typed opening adds the bars that the first line takes; the metamorphosis changes skin on a phrase boundary
-  typing = shape ? relaxGaps({ song, dest, plans, seq, gaps, R, hold, secBar, cap, shape, clipR, paceBars, paced }) : null;
-  if (typing) squeeze();
+  // (the free duration of a Live coder growth keeps the bars the typing needs: the growth gets longer)
+  const free = !!(rules.coder && rules.free);
+  typing = shape ? relaxGaps({ song, dest, plans, seq, gaps, R, hold, secBar, cap, shape, clipR, paceBars, paced, free }) : null;
+  if (typing && !free) squeeze();
   };
   attempt(Math.min(3, rules.maxDetail ?? 3));
+  // bars added before some units, where the typing in the app still needed more time (crescendoSong, free duration)
+  for (const [i, n] of Object.entries(rules.extraGaps || {})) if (+i >= 0 && +i < gaps.length) gaps[+i] += n;
   if (skin) { let at = 0; seq.forEach((u, i) => { at += gaps[i]; if (u.skinStart) { const to = Math.max(8, Math.ceil(at / 8) * 8); gaps[i] += to - at; at = to; } }); }
   // the voice opening: the next step comes once the opening line has been said (its length, a beat to spare)
   if (voiceOpen && gaps.length > 1) {
@@ -888,7 +918,9 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   // facts for checks and the UI: where the growth ends and which ending was drawn
   out.crescendo = { version: CRESCENDO_VERSION, growth: G, sections: grow.length, grown: Math.max(lastGrowth, lastAt), ending, detail: d, written: W, narrated, natural: !!rules.natural, ...(coder ? { coder: true, waypoints: growth.filter(u => u.waypoint).map(u => u.at), detours: growth.filter(u => u.detour).length } : {}) };
   // the growth shape it followed (growth-shapes), the silent bars of a typed opening, the second skin
-  if (shape) out.crescendo.shape = { version: SHAPES_VERSION, opening: shape.opening, pace: shape.pace, development: shape.development, from: shape.from, leadIn: gaps[0], ...(skin ? { skin: { bpm: skin.bpm, key: skin.key, style: skin.style, at: skinBar } } : {}), ...(typing ? { relaxed: typing.relaxed } : {}) };
+  // (the bar of each unit of the growth, for crescendoSong: not saved with the song)
+  Object.defineProperty(out.crescendo, 'units', { value: growth.map(u => u.at), enumerable: false });
+  if (shape) out.crescendo.shape = { version: SHAPES_VERSION, opening: shape.opening, pace: shape.pace, development: shape.development, from: shape.from, leadIn: gaps[0], ...(skin ? { skin: { bpm: skin.bpm, key: skin.key, style: skin.style, at: skinBar } } : {}), ...(typing ? { relaxed: typing.relaxed } : {}), ...(typing && (typing.waited || rules.extraGaps) ? { waited: typing.waited + Object.values(rules.extraGaps || {}).reduce((a, b) => a + b, 0) } : {}) };
   return out;
 }
 

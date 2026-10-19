@@ -159,8 +159,12 @@ function mergeValues(groups) {
 // before included), without their lane when it is 1 on every bar of the section, and the lane constants still used.
 // prepare: also the next section's new layers, muted with `_$:` under the current ones (typed before the boundary).
 // shownMuted: ids of tracks that played before and are silent now (a break), written with `_$:`.
+// inPlace (Live coder): every layer keeps its lane (liftLanes takes the lanes out of the lines afterwards, so a line
+// is edited in place at a section change and its lanes play from the hidden mixer); a layer of the section before
+// that only sounds in the fade of the first bars, with no line of the same code here, goes to `hidden` (its lane
+// written out), so the code shows one line per part
 import { normalizeSong } from './format.js';
-export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [] } = {}) {
+export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [], inPlace = false, hidden = null } = {}) {
   const n = normalizeSong(song), secs = n.sections;
   const i = Math.max(0, secs.findIndex(s => bar >= s.start && bar < s.start + s.bars));
   const shown = new Set(shownMuted.filter(id => (song.tracks || []).some(tr => tr.id === id && tr.mute)));
@@ -171,9 +175,11 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
     const s = secs[k];
     if (!s) return null;
     return p.blocks.map(b => b.items.filter(it => it.kind === 'layer').filter(it => !it.gate || !p.lanes[it.gate] || p.lanes[it.gate].slice(s.start, s.start + s.bars).some(on)).map(it => {
-      const lane = it.gate && p.lanes[it.gate], whole = lane && lane.slice(s.start, s.start + s.bars).every(v => Number(v) === 1);
+      const lane = it.gate && p.lanes[it.gate], whole = !inPlace && lane && lane.slice(s.start, s.start + s.bars).every(v => Number(v) === 1);
       const text = whole ? it.text.replace(GATE, '') : it.text;
-      return { comment: it.clip ? it.clip.raw : null, desc: it.desc, text, gate: whole ? null : it.gate };
+      // (in place: a fade out of the section before, below 1 on the first bars only)
+      const fade = inPlace && lane && lane.slice(0, s.start).some(on) && lane.slice(s.start, s.start + s.bars).every((v, k) => !on(v) || (k < 2 && Number(v) < 1));
+      return { comment: it.clip ? it.clip.raw : null, desc: it.desc, text, gate: whole ? null : it.gate, fade };
     }));
   };
   const now = layersFor(i), next = prepare ? layersFor(i + 1) : null;
@@ -182,7 +188,15 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
   p.blocks.forEach((b, k) => {
     const id = b.header.replace(/^\/\/ =+ /, '').replace(/ =+$/, '').split(' · ')[0];
     const track = full.tracks.find(tr => (tr.name || tr.id) === id), silent = track && shown.has(track.id);
-    const mine = now[k], extra = next ? next[k].filter(x => !mine.some(y => y.text === x.text)) : [];
+    let mine = now[k];
+    const extra = next ? next[k].filter(x => !mine.some(y => y.text === x.text)) : [];
+    if (inPlace) {
+      const bare = x => x.text.replace(GATE, '');
+      const gone = mine.filter(x => x.fade && !mine.some(y => !y.fade && bare(y) === bare(x)));
+      mine = mine.filter(x => !gone.includes(x));
+      if (hidden && !silent) for (const x of gone) { const v = `"${rle(p.lanes[x.gate])}"`; hidden.push(x.text.replace(GATE, `.mask(${v}).velocity(${v})`)); }
+      if (hidden) for (const x of gone) for (const m of x.text.matchAll(/\b\w+\b/g)) if (p.lanes[m[0]] && m[0] !== x.gate) used.add(m[0]);
+    }
     // a track that came in before keeps its header, also when nothing of it plays now (performance-profiles)
     if (!mine.length && !extra.length) { if (track && keepHeaders.includes(track.id)) body.push('', b.header); return; }
     body.push('', b.header);
@@ -201,4 +215,35 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
   const lanes = p.head.filter(l => { const m = l.match(LANE); return m && used.has(m[1]); });
   for (const b of p.blocks) for (const it of b.items) if (it.kind === 'line' && it.text.startsWith('const ')) { const m = it.text.match(LANE); if (m && used.has(m[1])) lanes.push(it.text); }
   return [...out, ...lanes, ...body].join('\n');
+}
+
+// The lanes taken out of the code of the moment (live-coder in-place edits): every `.mask(x).velocity(x)` of a lane
+// constant leaves its line, lines that are then the same are one line with all their lanes, and the lane constants go.
+// → { code, lanes: for each pattern line, in order, its lanes ("0!76 1!8 0.5 0!31", without the brackets) or null }.
+// The hidden mixer plays each line with its lanes (writer.js tail), so the events are the same.
+export function liftLanes(code) {
+  const lines = code.split('\n'), consts = {};
+  for (const l of lines) { const m = l.match(LANE); if (m) consts[m[1]] = m[2]; }
+  const gate = /\.mask\((\w+)\)\.velocity\(\1\)/g, gates = new Set();
+  // a pattern line and its continuation lines
+  const groups = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^[_S]?\$:/.test(lines[i])) { groups.push({ text: lines[i] }); continue; }
+    let text = lines[i];
+    while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1]) && !/^\s*[_S]?\$:/.test(lines[i + 1])) text += '\n' + lines[++i];
+    const lanes = [];
+    const bare = text.replace(gate, (all, n) => (consts[n] ? (lanes.push(consts[n].replace(/^<|>$/g, '').trim()), gates.add(n), '') : all)).replace(/\n[ \t]*(?=\n|$)/g, '');
+    groups.push({ pattern: true, text: bare, lanes: lanes.length ? lanes : null });
+  }
+  // the same line twice, each under its lanes: one line under both
+  const out = [];
+  for (const g of groups) {
+    const same = g.pattern && g.lanes && out.find(x => x.pattern && x.lanes && x.text === g.text);
+    if (same) { same.lanes.push(...g.lanes); continue; }
+    out.push(g);
+  }
+  const body = out.map(g => g.text).join('\n');
+  // lane constants no line uses any more
+  const kept = out.filter(g => { const m = !g.pattern && g.text.match(LANE); return !m || !gates.has(m[1]) || new RegExp(`\\b${m[1]}\\b`).test(body.replace(g.text, '')); });
+  return { code: kept.map(g => g.text).join('\n'), lanes: kept.filter(g => g.pattern).map(g => g.lanes) };
 }
