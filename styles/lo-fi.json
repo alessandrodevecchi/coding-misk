@@ -180,5 +180,9 @@
       "Calma",
       "Domingo"
     ]
+  },
+  "growthShapes": {
+    "openings": { "pad": 2, "melodic": 2, "typed": 1 },
+    "paces": { "slow": 3, "medium": 1 }
   }
 }

@@ -178,5 +178,9 @@
       "Noche",
       "Cambio"
     ]
+  },
+  "growthShapes": {
+    "openings": { "broken": 2, "muted-base": 2, "slow": 1 },
+    "paces": { "medium": 2, "fast": 1 }
   }
 }

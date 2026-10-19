@@ -29,7 +29,7 @@ export const FUNCTIONS = FUNCTION_LEVELS;
 // library; song functions take their names from NAMES (strudel-catalog: tools/check-strudel.mjs accepts these names
 // besides Strudel's, and fails when one of them is a Strudel name)
 export const HELPERS = ['chan', 'crunch', 'miskMix', ...LIBRARY_NAMES];
-const PATTERN = /^\s*_?\$:\s*/;
+const PATTERN = /^\s*[_S]?\$:\s*/;
 const NUM = /^-?\d*\.?\d+$/;
 // the calls of a chain: [{ name, args, text, ws }], ws the spaces after the call (a line break and its indent too)
 function calls(line) {

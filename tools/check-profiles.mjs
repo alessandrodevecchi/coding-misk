@@ -37,6 +37,17 @@ const CHECKS = {
     assert(s.coder && s.free && !growthRules(resolveProfile('switch', { duration: 'fitted' })).free, 'Switch: like a live coder, free duration');
     assert(resolveProfile('crescendo').duration === 'fitted' && resolveProfile('crescendo').growth === 'crescendo', 'Crescendo unchanged');
   },
+  'growth shape controls (growth-shapes): automatic by default, a value makes the profile custom, the shape only for the natural growth'() {
+    for (const id of ['classic', 'crescendo', 'switch']) { const r = resolveProfile(id); assert(r.opening === 'auto' && r.pace === 'auto' && r.development === 'auto' && !r.custom, id); }
+    // profiles saved before growth-shapes (no shape keys) stay as they were
+    const old = { typing: 'fast', growth: 'natural' }, r = resolveProfile('switch', migrateGrowth(old, 2));
+    assert(r.opening === 'auto' && r.typing === 'fast' && r.custom, 'old overrides');
+    assert(resolveProfile('switch', { opening: 'melodic' }).custom && resolveProfile('switch', { opening: 'nope' }).opening === 'auto', 'a value makes it custom, an unknown value is dropped');
+    assert(JSON.stringify(cleanOverrides({ opening: 'auto', pace: 'fast' }, PROFILES.switch)) === '{"pace":"fast"}', 'auto is no change');
+    const g = growthRules(resolveProfile('switch', { pace: 'fast' }));
+    assert(g.shape && g.shape.pace === 'fast' && g.shape.opening === 'auto', 'natural growth carries the shape');
+    assert(!growthRules(resolveProfile('crescendo', { pace: 'fast' })).shape && !growthRules(resolveProfile('switch', { growth: 'gradual', pace: 'fast' })).shape, 'other growths take no shape');
+  },
   'songs name their profile; an old build style counts'() {
     assert(songProfile(song('switch-acid-prova')) === 'switch' && songProfile(song('crescendo-primo-passo')) === 'crescendo', 'songs');
     assert(songProfile({ buildStyle: 'blocks' }) === 'classic' && songProfile({}) === null, 'old field');

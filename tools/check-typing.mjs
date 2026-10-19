@@ -104,7 +104,13 @@ const CHECKS = {
     }
     assert(typos > 0 && pauses > 0, `typos ${typos}, pauses ${pauses}`);
     const short = typingPlan(a, b, { style: 'human', seed: typedSeed, max: 5 });
-    assert(Math.abs(short.total - 5) < 1e-6 && short.frame(5) === b, 'deadline');
+    assert(short.total <= 5 + 1e-6 && short.frame(5) === b, 'deadline');
+    // growth-shapes: a new line that cannot be typed at a person's pace in time is pasted whole, not typed faster;
+    // a deadline with room types it, and the exact style never pastes for that
+    const nl = 'a\n$: note("a1 c2 e2 g2").s("sawtooth").lpf(800).lpq(6).decay(.2).sustain(0).gain(0.5)';
+    const tight = typingPlan('a', nl, { style: 'human', seed: 's', max: 3 }), roomy = typingPlan('a', nl, { style: 'human', seed: 's', max: 60 });
+    assert(tight.frame(tight.total) === nl && tight.natural <= 3 && roomy.natural > 3, `paste when short: ${tight.natural.toFixed(1)} s, typed with room: ${roomy.natural.toFixed(1)} s`);
+    assert(typingPlan('a', nl, { max: 1 }).total <= 1 + 1e-6, 'exact style unchanged');
   },
   'typing mistakes: seen for a while, a wrong word, a pasted line, careful and hurried stretches, switch off'() {
     const a = '$: s("bd").gain(0.8)', line = '$: n("<[0 ~ 0 2 ~ 4 ~ 7] [5 ~ 4 ~ 2 ~ 0 ~]>").scale("g:minor").s("supersaw").lpf(800).room(0.3)', b = `${a}\n${line}`;

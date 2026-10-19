@@ -28,9 +28,9 @@ export function parseCode(code) {
     if (lane) lanes[lane[1]] = unrle(lane[2]);
     if (l.startsWith('// ==========')) { block = { header: l, items: [] }; blocks.push(block); clip = null; desc = null; continue; }
     if (!block) { head.push(l); continue; }
-    if (/^_?\$:/.test(l)) {
+    if (/^[_S]?\$:/.test(l)) {
       let text = l;
-      while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1]) && !/^_?\$:/.test(lines[i + 1])) text += '\n' + lines[++i];
+      while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1]) && !/^[_S]?\$:/.test(lines[i + 1])) text += '\n' + lines[++i];
       const g = text.match(GATE);
       block.items.push({ kind: 'layer', text, gate: g ? g[1] : null, clip, desc });
       continue;
@@ -113,7 +113,7 @@ export function compileCompact(song, { muted = [], lines = 'joined' } = {}) {
         if (out[out.length - 1] !== comment) out.push(comment);
       }
       if (it.desc && it.desc !== lastDesc) { out.push(it.desc); lastDesc = it.desc; }
-      out.push(silent ? text.replace(/^\$:/, '_$:') : text);
+      out.push(silent ? text.replace(/^[_S]?\$:/, '_$:') : text);
     }
   }
   return out.join('\n');
@@ -190,7 +190,7 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
     const put = (x, muted) => {
       if (x.comment && x.comment !== last) { body.push(x.comment); last = x.comment; }
       if (x.desc && !body.includes(x.desc)) body.push(x.desc);
-      body.push(muted ? x.text.replace(/^\$:/, '_$:') : x.text);
+      body.push(muted ? x.text.replace(/^[_S]?\$:/, '_$:') : x.text);
       if (x.gate) used.add(x.gate);
     };
     mine.forEach(x => put(x, silent));

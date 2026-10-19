@@ -86,6 +86,44 @@ const SONGS = ['ferro', 'cavo-scoperto'];
   check(!/^\s*\/\//m.test(code.split('\n').slice(1).join('\n')) && code.startsWith('// coding-misk') && !(await page.isHidden('#live-custom')), 'no comments (the title stays), profile custom', `${(code.match(/^\s*\/\/.*$/m) || [''])[0]} | ${await page.isHidden('#live-custom')}`);
   await page.click('#live-profile [data-profile="switch"]'); await sleep(600);
   check(!!(await page.isHidden('#live-custom')) && (await page.inputValue('#live-comments')) === 'essential', 'picking the profile again drops the change');
+  // growth shapes (growth-shapes): the typed opening is silent until its first line is typed, and the line is complete
+  // when it sounds; the muted base (_$:), mid-set (S$:) and second section states evaluate without errors
+  const ROOT = require('path').resolve(__dirname, '..'), fs = require('fs');
+  const { crescendoSong } = await import(`${ROOT}/src/song/crescendo.js`), { resolveProfile, growthRules } = await import(`${ROOT}/src/live/profiles.js`);
+  const styles = Object.fromEntries(fs.readdirSync(`${ROOT}/styles`).filter(f => f.endsWith('.json')).map(f => JSON.parse(fs.readFileSync(`${ROOT}/styles/${f}`, 'utf8'))).map(r => [r.id, r]));
+  const shapeOf = (id, over) => crescendoSong(JSON.parse(fs.readFileSync(`${ROOT}/songs/${id}.json`, 'utf8')), { rules: growthRules(resolveProfile('switch', over), { styles }) });
+  const heard = code => code.split('\n').filter(l => /^S?\$:/.test(l) && !/^\$: silence/.test(l)).length;
+  await page.locator('#track-pick').selectOption('switch-prima-luce'); await sleep(600);
+  await page.click('#live-profile [data-profile="switch"]'); await sleep(800);
+  await page.locator('#live-opening').selectOption('typed'); await sleep(1200);
+  check(!(await page.isHidden('#live-shape')) && !(await page.isHidden('#live-custom')), 'growth shape: the controls show with Live coder, a value makes the profile custom');
+  const L = shapeOf('switch-prima-luce', { opening: 'typed' }).crescendo.shape.leadIn;
+  await page.click('#play');
+  let silent = true, cur = await st();
+  for (let k = 0; k < 40; k++) { cur = await st(); if (cur.cyc >= L - 0.1) break; if (cur.err) silent = false; await sleep(150); }
+  // the evaluated code before the first step plays nothing: the scheduler's pattern has no events in the lead-in
+  const evBefore = await page.evaluate(() => { const r = document.querySelector('strudel-editor').editor.repl; const p = r.state.pattern; try { return p ? p.queryArc(0, 0.9).filter(h => h.hasOnset()).length : 0; } catch (e) { return -1; } });
+  check(silent && evBefore === 0, `typed opening: silent before the first step (lead-in ${L} bars)`, `events ${evBefore}`);
+  while ((await st()).cyc < L + 0.6) await sleep(200);
+  cur = await st();
+  const after = await page.evaluate(L0 => { const r = document.querySelector('strudel-editor').editor.repl; return r.state.pattern ? r.state.pattern.queryArc(L0, L0 + 1).filter(h => h.hasOnset()).length : 0; }, L);
+  check(!cur.err && heard(cur.code) >= 1 && after > 0, 'typed opening: the first line sounds whole on its bar', cur.err || `${after} events`);
+  await page.click('#play'); await sleep(400);
+  for (const [opening, development, re] of [['muted-base', 'by-type', /^_\$:/m], ['mid-set', 'by-type', /^S\$:/m], ['slow', 'second-section', /^S\$:/m], ['slow', 'metamorphosis', /setcpm\(134\/4\)/]]) {
+    await page.locator('#live-opening').selectOption(opening); await page.locator('#live-development').selectOption(development); await sleep(1000);
+    const c = shapeOf('switch-prima-luce', { opening, development }), steps = [...new Set(c.build.map(x => x.at))].sort((a, b) => a - b);
+    const total = c.sections.reduce((a, x) => a + x.bars, 0), marked = c.build.filter(x => x.solo !== undefined || x.mute !== undefined || x.unsolo !== undefined || x.unmute !== undefined || (x.pattern && x.pattern.to === 'skin')).map(x => x.at);
+    await page.click('#play'); await sleep(3000);
+    let ok = true, seen = false, msg = '';
+    for (const bar of [...new Set([...marked, ...steps.filter((_, i) => i % 9 === 0)])].slice(0, 10)) {
+      await seek(Math.min(999, Math.round(bar / total * 1000))); const s2 = await st();
+      if (re.test(s2.code)) seen = true;
+      if (s2.err || !s2.started) { ok = false; msg = `bar ${bar}: ${s2.err}`; break; }
+    }
+    check(ok && seen, `${opening}/${development}: every state with its marks evaluates`, msg || (seen ? '' : 'no mark seen'));
+    await page.click('#play'); await sleep(400);
+  }
+  await page.locator('#live-opening').selectOption('auto'); await page.locator('#live-development').selectOption('auto'); await sleep(400);
   await page.click('#live-profile [data-profile="crescendo"]'); await sleep(400);
   check(!errors.length, 'no page errors', errors.slice(0, 2).join(' | '));
   await browser.close();

@@ -101,7 +101,7 @@ function lcsLen(x, y) {
 // are of a different kind (a comment and code, a pattern and a constant)
 const words = s => s.match(/[A-Za-z_][\w$]*|\d*\.?\d+|~/g) || [];
 // a pattern line ("$:", muted or not), a comment, or the first word
-const lead = s => { const t = s.trim(); return t.startsWith('//') ? '//' : /^_?\$:/.test(t) ? '$:' : (t.match(/^[\w$.]+/) || [t])[0]; };
+const lead = s => { const t = s.trim(); return t.startsWith('//') ? '//' : /^[_S]?\$:/.test(t) ? '$:' : (t.match(/^[\w$.]+/) || [t])[0]; };
 export function lineLike(a, b) {
   if (lead(a) !== lead(b)) return 0;
   const x = words(a), y = words(b);
@@ -236,7 +236,7 @@ export function stretchRate(songSeed, stretch) {
   const r = mulberry(`${songSeed}\u0000stretch\u0000${stretch}`)(), every = 25 + 95 * Math.pow(r, 0.6);
   return { typo: 1 / every, mind: Math.min(0.3, 0.15 * 55 / every) };
 }
-function humanPlan(parts, acts, to, { speed, max, seed, mistakes = true, rate = null }) {
+function humanPlan(parts, acts, to, { speed, max, seed, mistakes = true, rate = null, lean = false }) {
   const rng0 = mulberry(seed), typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0), words = wordsOf(to);
   // a person's pace: about 5 characters a second for a few, up to 8 for a long edit
   const cps = (5 + 3 * Math.max(0, Math.min(1, (typed - 40) / 360))) * speed;
@@ -260,20 +260,23 @@ function humanPlan(parts, acts, to, { speed, max, seed, mistakes = true, rate = 
     });
     return { list: out, total: t, stats };
   };
-  let plan = build('full');
+  // lean: the leanest plan only (no pauses, no mistakes), the shortest time a person needs (growth-shapes: bursts)
+  let plan = build(lean ? 'lean' : 'full');
   if (plan.total > max) plan = build('nowords');
   if (plan.total > max) plan = build('quick');
   if (plan.total > max) plan = build('lean');
   const scale = plan.total > max && plan.total > 0 ? max / plan.total : 1;
   if (scale !== 1) plan.list.forEach(a => { a.t0 *= scale; a.keys.forEach(k => { k.t *= scale; }); });
   if (scale !== 1) plan.stats.wrong = plan.stats.wrong.map(([a, b]) => [a * scale, b * scale]);
-  const total = plan.total * scale, list = plan.list;
+  const total = plan.total * scale, list = plan.list, natural = plan.total;
   void rng0;
   const pasteAt = new Map(list.filter(a => a.paste).map(a => [a.pi, a.t0]));
   return {
     total,
     // what the plan holds (typing-mistakes checks): typos, whole wrong words, changes of mind, which plan fitted
     stats: plan.stats,
+    // the time the plan needs before any speeding up (growth-shapes: typing load)
+    natural,
     frame(time) {
       if (time >= total) return to;
       // each changed place: the old text, its backspaces, then the keys typed (typos and their fixes included)
@@ -313,7 +316,7 @@ function whole(text, k) {
   return out;
 }
 // style 'human' (human-typing): uneven keys, thinking pauses, typos and changes of mind, seeded by the two texts
-export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null } = {}) {
+export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false } = {}) {
   const ops = lineDiff(chainLines(from), chainLines(to)), parts = [];
   for (let k = 0; k < ops.length;) {
     if (ops[k].op === 'keep') { parts.push({ kind: 'keep', text: ops[k].text }); k++; continue; }
@@ -342,14 +345,29 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
     parts.forEach(p => { if (p.kind === 'new' && !p.paste && p.text.length >= 60 && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text) && pr() < 1 / 3) { p.paste = true; p.segs = [{ eq: p.text }]; } });
   }
   // actions in reading order: paste, then delete and type for each changed place
-  const acts = [];
-  parts.forEach((p, pi) => {
-    if (p.paste) acts.push({ pi, si: -1, paste: true, n: 0 });
-    // an empty new line: an Enter at its turn
-    if (p.kind === 'new' && !p.text) acts.push({ pi, si: -1, paste: true, n: 0 });
-    (p.segs || []).forEach((s, si) => { if (s.eq !== undefined) return; if (s.old) acts.push({ pi, si, del: true, n: s.old.length }); if (s.new) acts.push({ pi, si, del: false, n: s.new.length }); });
-  });
-  if (style === 'human') return humanPlan(parts, acts, to, { speed, max, seed: `${seed}\u0000${from}\u0000${to}`, mistakes, rate: stretch === null ? null : stretchRate(seed, stretch) });
+  const actions = () => {
+    const out = [];
+    parts.forEach((p, pi) => {
+      if (p.paste) out.push({ pi, si: -1, paste: true, n: 0 });
+      // an empty new line: an Enter at its turn
+      if (p.kind === 'new' && !p.text) out.push({ pi, si: -1, paste: true, n: 0 });
+      (p.segs || []).forEach((s, si) => { if (s.eq !== undefined) return; if (s.old) out.push({ pi, si, del: true, n: s.old.length }); if (s.new) out.push({ pi, si, del: false, n: s.new.length }); });
+    });
+    return out;
+  };
+  let acts = actions();
+  if (style === 'human') {
+    const opts = { speed, max, seed: `${seed}\u0000${from}\u0000${to}`, mistakes, rate: stretch === null ? null : stretchRate(seed, stretch), lean };
+    // growth-shapes: a new line that cannot be typed at a person's pace in the time left is pasted whole (after the
+    // short paste pause; a line copied from one above and still to edit is pasted finished), the longest first, instead
+    // of typing faster; never a comment or the voice's code
+    if (Number.isFinite(max)) {
+      const fits = () => humanPlan(parts, acts, to, { ...opts, lean: true, max: Infinity }).total <= max;
+      const cands = parts.map((p, i) => [p, i]).filter(([p]) => p.kind === 'new' && !(p.paste && (p.segs || []).every(x => x.eq !== undefined)) && p.text.trim() && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text)).sort((a, b) => b[0].text.length - a[0].text.length || a[1] - b[1]);
+      for (const [p] of cands) { if (fits()) break; p.paste = true; p.segs = [{ eq: p.text }]; acts = actions(); }
+    }
+    return humanPlan(parts, acts, to, opts);
+  }
   const typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0);
   const cps = (8 + 22 * Math.max(0, Math.min(1, (typed - 40) / 360))) * speed;
   let t = 0, prev = null;

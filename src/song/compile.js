@@ -64,6 +64,7 @@ export function compileSong(input) {
     used.add(tr.type);
     // voice tracks speak the live build comments: their code comes from the build (build.js), not from clips
     if (tr.mute || (solo && !tr.solo) || tr.type === 'voice') continue;
+    const first = L.length;
     L.push('', `// ========== ${[...new Set([tr.name || tr.id, tr.type])].join(' · ')} ==========`);
     const rack = rackCode(tr.rack, tr.type);
     let described = null;
@@ -99,8 +100,28 @@ export function compileSong(input) {
         }
       });
     }
+    if (tr.hush || tr.alone || tr.maskIdea) L.splice(first, L.length - first, ...lineMarks(L.slice(first), tr));
   }
   return L.join('\n');
+}
+
+// growth-shapes: a track's lines muted with "_$:" (hush) or played alone with "S$:" (alone), and a mask idea per phrase
+// on each of its layers (before the bus, so the bus and the visual stay last)
+export function lineMarks(lines, tr) {
+  const out = lines.slice(), label = tr.hush ? '_$:' : tr.alone ? 'S$:' : '$:';
+  for (let i = 0; i < out.length; i++) {
+    if (!/^\$:/.test(out[i])) continue;
+    out[i] = out[i].replace(/^\$:/, label);
+    if (!tr.maskIdea) continue;
+    let end = i;
+    while (end + 1 < out.length && /^\s+\S/.test(out[end + 1]) && !/^\s*\/\//.test(out[end + 1])) end++;
+    const mask = `.mask("${tr.maskIdea}")`;
+    let done = false;
+    for (let k = i; k <= end && !done; k++) { const at = out[k].indexOf('.orbit('); if (at >= 0) { out[k] = out[k].slice(0, at) + mask + out[k].slice(at); done = true; } }
+    if (!done) { const c = out[end].indexOf(' // '); out[end] = c >= 0 ? out[end].slice(0, c) + mask + out[end].slice(c) : out[end] + mask; }
+    i = end;
+  }
+  return out;
 }
 
 // code track: the pattern is plain Strudel; the app adds the lane, the bus and the visual

@@ -193,5 +193,9 @@
       "Deriva",
       "Cambio"
     ]
+  },
+  "growthShapes": {
+    "openings": { "filtered": 3, "slow": 1, "typed": 1 },
+    "paces": { "medium": 3, "slow": 1 }
   }
 }

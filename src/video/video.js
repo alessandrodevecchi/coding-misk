@@ -138,7 +138,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
       const lv = (visuals && visuals.levels) || {}, cyc = lastCyc;
       let layer = null;
       const layerOf = [];
-      lines.forEach((ln, i) => { if (/^_?\$:/.test(ln)) layer = { start: i, muted: ln.startsWith('_') }; else if (!/^\s+\S/.test(ln)) layer = null; layerOf[i] = layer; });
+      lines.forEach((ln, i) => { if (/^[_S]?\$:/.test(ln)) layer = { start: i, muted: ln.startsWith('_') }; else if (!/^\s+\S/.test(ln)) layer = null; layerOf[i] = layer; });
       const idOf = new Map();
       lines.forEach((ln, i) => { const m = ln.match(/\.analyze\("([^"]+)"\)/), L = layerOf[i]; if (m && L) idOf.set(L.start, m[1]); });
       rows.forEach((r, k) => {

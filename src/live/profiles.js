@@ -3,6 +3,7 @@
 // it "custom", based on it. Pure: checked in Node.
 import { COMMENT_PRESETS, commentPreset } from '../song/comments.js';
 import { FUNCTION_PRESETS, functionPreset } from '../song/writer.js';
+import { OPENINGS, PACES, DEVELOPMENTS } from '../song/shapes.js';
 
 export const CONTROLS = {
   build: ['blocks', 'crescendo'],
@@ -34,12 +35,16 @@ export const CONTROLS = {
   typist: ['exact', 'human'],
   // with human typing (typing-mistakes): typos, wrong words and changes of mind on or off
   mistakes: ['on', 'off'],
+  // growth shape of the natural growth (growth-shapes): automatic (song, style, seed) or one value
+  opening: ['auto', ...OPENINGS],
+  pace: ['auto', ...PACES],
+  development: ['auto', ...DEVELOPMENTS],
 };
 export const PROFILES = {
-  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, typist: 'exact', mistakes: 'on' },
-  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, typist: 'exact', mistakes: 'on' },
+  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
   // Live coder (shown so since clear-names; the id stays switch in songs, recipes and storage)
-  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: true, notes: false, steps: false, voice: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, typist: 'human', mistakes: 'on' },
+  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: true, notes: false, steps: false, voice: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, typist: 'human', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
 };
 export const PROFILE_IDS = Object.keys(PROFILES);
 
@@ -76,9 +81,11 @@ export function migrateOld(get) {
 }
 
 // the rules of crescendoSong for a growth: gradual is the natural growth before live-coder-growth
-export function growthRules(C) {
+// the natural growth follows a growth shape (growth-shapes): the controls' choices ('auto' or a value) and the known
+// style recipes ({ id: recipe }, for the weights and the metamorphosis), resolved per song by crescendoSong
+export function growthRules(C, { styles } = {}) {
   if (C.growth === 'gradual') return { natural: true };
-  if (C.growth === 'natural') return { natural: true, coder: true, free: C.duration === 'free' };
+  if (C.growth === 'natural') return { natural: true, coder: true, free: C.duration === 'free', shape: { opening: C.opening || 'auto', pace: C.pace || 'auto', development: C.development || 'auto' }, ...(styles ? { styles } : {}) };
   return {};
 }
 // overrides saved before live-coder-growth: "natural" was the growth now called gradual

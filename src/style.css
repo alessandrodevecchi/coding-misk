@@ -189,7 +189,14 @@
   .live-panel .ctrl { min-width: 0; }
   .live-panel select { width: 100%; max-width: 100%; }
   .live-panel .chips { flex-wrap: wrap; }
+  /* the growth shape (growth-shapes): opening, pace and development side by side, the shape that plays above them */
+  .live-shape { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 16px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; min-width: 0; }
+  .live-shape[hidden] { display: none; }
+  .live-shape-head { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
+  .live-shape-now { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .live-shape select { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @media (max-width: 700px) { .live-panel { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 700px) { .live-shape { grid-template-columns: minmax(0, 1fr); } }
   .tl-mode .arr-strip { gap: 0; }
   .tl-mode .arr-scene-btn { border-radius: 0; border-right-width: 0; }
   .tl-mode .arr-scene-btn:last-of-type { border-right-width: 1px; }

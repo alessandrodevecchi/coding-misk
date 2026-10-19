@@ -10,7 +10,10 @@ import { DEVICES, checkRack, rackCode } from './rack.js';
 // clone, comment, notes (live-coder-growth): a track comes in as a copy of another one; functions commented out in the
 // code and back in; a pattern's notes (or drum rows) rewritten
 // variant (idea-model): a prepared variant of the track's ideas switched on (its line loses the "//") or off
-export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes', 'variant'];
+// mute, unmute, solo, unsolo, mask (growth-shapes): a track's lines stay in the code muted with "_$:" or played alone
+// with "S$:" (Strudel plays only the "S" lines while there are some); a mask idea per phrase ("<1 1 0 1>") on its lines
+export const BUILD_ACTIONS = ['add', 'remove', 'set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes', 'variant', 'mute', 'unmute', 'solo', 'unsolo', 'mask'];
+const LINE_ACTIONS = ['mute', 'unmute', 'solo', 'unsolo'];
 const clone = o => JSON.parse(JSON.stringify(o));
 const CLONE_KEYS = ['wave', 'cutoff', 'reso', 'drive', 'gain', 'room', 'delay'];
 const list = v => (Array.isArray(v) ? v : [v]);
@@ -22,8 +25,8 @@ export const hasBuild = song => buildSteps(song).length > 0;
 
 // the track a step works on (for comments in the code), or null
 export function stepTrack(step) {
-  for (const k of ['add', 'remove']) if (step[k] !== undefined) return list(step[k])[0];
-  for (const k of ['set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes', 'variant']) if (step[k] && step[k].track) return step[k].track;
+  for (const k of ['add', 'remove', ...LINE_ACTIONS]) if (step[k] !== undefined) return list(step[k])[0];
+  for (const k of ['set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'clone', 'comment', 'notes', 'variant', 'mask']) if (step[k] && step[k].track) return step[k].track;
   return null;
 }
 
@@ -62,6 +65,12 @@ export function applyStep(song, step) {
   if (step.comment) { const t = track(step.comment.track); if (t) { const k = list(step.comment.keys); t.commented = step.comment.on === false ? (t.commented || []).filter(x => !k.includes(x)) : [...new Set([...(t.commented || []), ...k])]; if (!t.commented.length) delete t.commented; } }
   if (step.notes) { const { track: id, ...vals } = step.notes, t = track(id); if (t) rewrite(t, vals); }
   if (step.variant) { const t = track(step.variant.track); if (t) { if (Number.isInteger(step.variant.use)) t.variant = step.variant.use; else delete t.variant; } }
+  // the line stays, muted (hush) or alone (S$:)
+  if (step.mute !== undefined) list(step.mute).forEach(id => { const t = track(id); if (t) t.hush = true; });
+  if (step.unmute !== undefined) list(step.unmute).forEach(id => { const t = track(id); if (t) delete t.hush; });
+  if (step.solo !== undefined) list(step.solo).forEach(id => { const t = track(id); if (t) t.alone = true; });
+  if (step.unsolo !== undefined) list(step.unsolo).forEach(id => { const t = track(id); if (t) delete t.alone; });
+  if (step.mask) { const t = track(step.mask.track); if (t) { if (typeof step.mask.mask === 'string' && step.mask.mask) t.maskIdea = step.mask.mask; else delete t.maskIdea; } }
 }
 // a pattern rewritten: every clip plays a copy of its pattern ("A~x") with new notes, rows or steps
 function rewrite(t, vals) {
@@ -110,6 +119,8 @@ const stepWords = s => {
   if (s.unrack) return `${s.unrack.track} - ${s.unrack.device}`;
   if (s.reveal) return `${s.reveal.track} + ${list(s.reveal.keys).join(' ')}`;
   if (s.variant) return `${s.variant.track} variant ${s.variant.use ?? 'off'}`;
+  for (const k of LINE_ACTIONS) if (s[k] !== undefined) return `${k} ${list(s[k]).join(' ')}`;
+  if (s.mask) return `${s.mask.track} mask ${s.mask.mask ?? 'off'}`;
   return '';
 };
 export function annotate(code, song, upTo, lang) {
@@ -169,7 +180,9 @@ export function voiceCode(song, state, upTo, total, lang, files) {
     + (v.drive > 0 ? `.distort(${v.drive})` : '') + (v.delay > 0 ? `.delay(${v.delay}).delaysync(0.1875).delayfeedback(0.4)` : '') + (v.room > 0 ? `.room(${v.room})` : '')
     + rackCode(track && track.rack, 'voice');
   const orbit = 15 + Math.max(0, (state.tracks || []).filter(t => t.type === 'voice').indexOf(track));
-  return `\n// ========== ${track ? `${track.name || track.id} · voice` : 'voice'} ==========\n// "${text}", spoken on bar ${at + 1}\n$: s("${bank}").n(${n}).mask("${lane}")${fx}.postgain(${v.gain}).orbit(${orbit}).analyze("fx")`;
+  // a line played alone (S$:) silences the plain ones: the voice speaks alone with it
+  const label = (state.tracks || []).some(t => t.alone && !t.mute) ? 'S$:' : '$:';
+  return `\n// ========== ${track ? `${track.name || track.id} · voice` : 'voice'} ==========\n// "${text}", spoken on bar ${at + 1}\n${label} s("${bank}").n(${n}).mask("${lane}")${fx}.postgain(${v.gain}).orbit(${orbit}).analyze("fx")`;
 }
 
 // checks for the "build" list; err/warn take (path, message)
@@ -191,7 +204,8 @@ export function checkBuild(song, total, err, warn) {
     if (phrases.some(x => typeof x !== 'string' || !x.trim())) err(`${p}.say`, 'a short phrase, or one per language: { "en": "more bass", "it": "più basso" }');
     else if (phrases.some(x => x.length > 40)) warn(`${p}.say`, 'comments read best when very short (a few words)');
     if (!BUILD_ACTIONS.some(k => s[k] !== undefined) && !s.say) warn(p, `a step does nothing without one of ${BUILD_ACTIONS.join(', ')} or "say"`);
-    for (const k of ['add', 'remove']) if (s[k] !== undefined) list(s[k]).forEach(id => needTrack(`${p}.${k}`, id));
+    for (const k of ['add', 'remove', ...LINE_ACTIONS]) if (s[k] !== undefined) list(s[k]).forEach(id => needTrack(`${p}.${k}`, id));
+    if (s.mask) { needTrack(`${p}.mask.track`, s.mask.track); if (s.mask.mask !== null && (typeof s.mask.mask !== 'string' || !/^<[01 ]+>$/.test(s.mask.mask))) err(`${p}.mask.mask`, 'a mask per phrase, ones and zeros, for example "<1 1 0 1>", or null to take it away'); }
     if (s.set) {
       const t = needTrack(`${p}.set.track`, s.set.track);
       if (t) for (const k of Object.keys(s.set)) if (k !== 'track' && !(SETTING_FIELDS[t.type] || []).includes(k)) err(`${p}.set.${k}`, `not a ${t.type} setting; settings: ${(SETTING_FIELDS[t.type] || []).join(', ')}`);
@@ -205,7 +219,7 @@ export function checkBuild(song, total, err, warn) {
     if (s.unrack) { needTrack(`${p}.unrack.track`, s.unrack.track); if (!DEVICES[s.unrack.device]) err(`${p}.unrack.device`, `one of ${Object.keys(DEVICES).join(', ')}`); }
     if (s.clone) { needTrack(`${p}.clone.track`, s.clone.track); needTrack(`${p}.clone.from`, s.clone.from); }
     if (s.comment) { needTrack(`${p}.comment.track`, s.comment.track); if (!list(s.comment.keys).every(x => ['cutoff', 'reso', 'drive', 'grit', 'room', 'delay', 'env'].includes(x))) err(`${p}.comment.keys`, 'some of cutoff, reso, drive, grit, room, delay, env'); }
-    if (s.notes) { const t = needTrack(`${p}.notes.track`, s.notes.track); for (const k of Object.keys(s.notes)) if (!['track', 'notes', 'rows', 'steps'].includes(k)) err(`${p}.notes.${k}`, 'notes, rows (drums) or steps'); if (t && s.notes.rows !== undefined && t.type !== 'drums') err(`${p}.notes.rows`, 'rows are for drums'); }
+    if (s.notes) { const t = needTrack(`${p}.notes.track`, s.notes.track); for (const k of Object.keys(s.notes)) if (!['track', 'notes', 'rows', 'steps', 'idea'].includes(k)) err(`${p}.notes.${k}`, 'notes, rows (drums), steps or idea'); if (t && s.notes.rows !== undefined && t.type !== 'drums') err(`${p}.notes.rows`, 'rows are for drums'); }
     if (s.variant) {
       const t = needTrack(`${p}.variant.track`, s.variant.track), u = s.variant.use;
       const most = t ? Math.max(0, ...Object.values(t.patterns || {}).map(x => (x && x.idea && Array.isArray(x.idea.variants) ? x.idea.variants.length : 0))) : 0;

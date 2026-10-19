@@ -8,6 +8,7 @@ import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, 
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong } from './song/crescendo.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, migrateGrowth, PROFILE_STORE_VERSION, migrateOld } from './live/profiles.js';
+import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay } from './song/shapes.js';
 import { liveCode } from './live/live-code.js';
 import { installHelpers, useFns, FUNCTION_PRESETS, FUNCTION_OPTIONS, functionOptions, writeCode, levelsOf, busesOf, functionContext, tail, preludeText } from './song/writer.js';
 import { upgradeLibrary } from './library/code-upgrade.js';
@@ -151,9 +152,11 @@ const liveOf = tr => { const o = liveOverride.get(tr.id), C = ctlOf(tr); return 
 function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v }, PROFILES[profileFor(T)]); saveProfile(); }
 // Crescendo builds are computed once per song version and option
 const crescendoCache = new Map();
+// the built-in style recipes, for the weights of the growth shapes and the metamorphosis (growth-shapes)
+const SHAPE_STYLES = Object.fromEntries(Object.values(import.meta.glob('../styles/*.json', { eager: true, import: 'default' })).map(r => [r.id, r]));
 function crescendoOf(tr) {
-  // the Live coder profile (id switch) grows with the natural rules (natural-growth)
-  const C = ctlOf(tr), narrated = C.narrated, rules = growthRules(C), key = JSON.stringify([narrated, C.growth, C.duration, tr.sections, tr.tracks, tr.id]);
+  // the Live coder profile (id switch) grows with the natural rules (natural-growth) and a growth shape (growth-shapes)
+  const C = ctlOf(tr), narrated = C.narrated, rules = growthRules(C, { styles: SHAPE_STYLES }), key = JSON.stringify([narrated, C.growth, C.duration, C.opening, C.pace, C.development, tr.sections, tr.tracks, tr.id, tr.tags, tr.growthShape]);
   if (!crescendoCache.has(key)) { if (crescendoCache.size > 20) crescendoCache.clear(); crescendoCache.set(key, crescendoSong(tr, { narrated, rules })); }
   const c = crescendoCache.get(key);
   return c.build.length ? c : null;
@@ -1306,11 +1309,14 @@ function renderArranger() {
   $('#live-custom').hidden = !C.custom;
   $('#live-profile').title = songProfile(T) && !liveOverride.has(T.id) ? t('profileDeclared') : t('profileHint');
   $('#live-growth').value = C.growth; $('#live-duration').value = C.duration; $('#live-duration').disabled = C.growth !== 'natural';
+  renderShape(C, on && crescendo);
   $('#live-style').value = lv.style; $('#live-style').disabled = !on;
   $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
   // the live build options: a panel under the "Live build" button, open while the live build is on
   $('#live-style-wrap').hidden = !on; lt.setAttribute('aria-expanded', on);
   $$('[data-live-only="crescendo"]').forEach(el => { el.hidden = !crescendo; });
+  // the growth shape belongs to the natural growth (Live coder)
+  $('#live-shape').hidden = !crescendo || C.growth !== 'natural';
   $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-fns').value = C.functions;
   for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
   for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).setAttribute('aria-pressed', !!C[k]);
@@ -1319,6 +1325,25 @@ function renderArranger() {
   renderSectionPanel(total);
   renderRuler();
   renderPrelude();
+}
+// the growth shape of the song in Compose (growth-shapes): the three choices, "automatic" showing what the song draws,
+// the values it cannot play disabled, and the shape that plays with where each part comes from
+function renderShape(C, building) {
+  const T2 = { ...T, kind: 'composed' }, f = shapeFacts(T2, SHAPE_STYLES);
+  const c = building && C.growth === 'natural' ? crescendoOf(T2) : null;
+  const shape = (c && c.crescendo && c.crescendo.shape) || resolveShape(T2, { user: { opening: C.opening, pace: C.pace, development: C.development }, styles: SHAPE_STYLES });
+  // (automatic parts: what the build plays, a calmer development or pace when the drawn one would rush the typing)
+  const drawn = resolveShape(T2, { styles: SHAPE_STYLES }), auto = Object.fromEntries(['opening', 'pace', 'development'].map(p => [p, c && c.crescendo && c.crescendo.shape && (C[p] || 'auto') === 'auto' ? c.crescendo.shape[p] : drawn[p]]));
+  const fill = (part, list) => {
+    const sel = $(`#live-${part}`);
+    sel.innerHTML = [`<option value="auto">${esc(t('shapeAutoIs', { v: t(`${part}:${auto[part]}`) }))}</option>`,
+      ...list.map(v => { const ok = canPlay(part, v, f); return `<option value="${v}"${ok ? '' : ' disabled'}${ok ? '' : ` title="${esc(t('shapeCannot'))}"`}>${esc(t(`${part}:${v}`))}</option>`; })].join('');
+    sel.value = C[part] || 'auto';
+  };
+  fill('opening', OPENINGS); fill('pace', PACES); fill('development', DEVELOPMENTS);
+  const from = p => t(`shapeFrom:${(shape.from || {})[p] || 'seed'}`);
+  $('#live-shape-now').textContent = t('shapeNow', { v: ['opening', 'pace', 'development'].map(p => t(`${p}:${shape[p]}`)).join(' · ') });
+  $('#live-shape-now').title = ['opening', 'pace', 'development'].map(p => `${t(`${p}Lbl`)}: ${t(`${p}:${shape[p]}`)} (${from(p)})`).join('\n');
 }
 // vista a sezioni: una cella per traccia e sezione
 function renderCells(total) {
@@ -1531,6 +1556,8 @@ $('#live-style').addEventListener('change', e => {
 $('#live-gen').addEventListener('change', e => { setControl('gen', e.target.value); liveChanged(); });
 $('#live-growth').addEventListener('change', e => { setControl('growth', e.target.value); liveChanged(); });
 $('#live-duration').addEventListener('change', e => { setControl('duration', e.target.value); liveChanged(); });
+// the growth shape (growth-shapes): each part automatic or one value; a value makes the profile custom
+for (const k of ['opening', 'pace', 'development']) $(`#live-${k}`).addEventListener('change', e => { setControl(k, e.target.value); liveChanged(); });
 $('#live-code').addEventListener('change', e => { setControl('view', e.target.value); liveChanged(); });
 // a comments preset sets its options (code-writing)
 $('#live-comments').addEventListener('change', e => { if (COMMENT_PRESETS[e.target.value]) for (const [k, v] of Object.entries(COMMENT_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });

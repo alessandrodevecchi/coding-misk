@@ -234,6 +234,9 @@ The code holds `const bline = "<[3 5@15] [3@12 0@4] [5 7@15] 7>"` once, after th
 | `hide` | `{ "track", "keys" }`: leaves out of the track's code the functions of these settings (`cutoff`, `reso`, `drive`, `grit`, `room`, `delay`, `env`), so Strudel's defaults apply (natural growth) |
 | `reveal` | `{ "track", "keys" }`: brings them back |
 | `variant` | `{ "track", "use": k }`: switches on the prepared variant `k` (from 0) of the track's ideas: its line loses the `//` and plays. `"use": null` switches it off |
+| `mute` / `unmute` | track id, or a list: the track's lines stay in the code muted with `_$:`, or lose the `_` and play (growth shapes) |
+| `solo` / `unsolo` | track id, or a list: the track's lines play alone with `S$:` (Strudel plays only the `S` lines while there are some), or lose the `S` |
+| `mask` | `{ "track", "mask": "<1 1 0 1>" }`: a mask per phrase on the track's lines (one value per bar, 1 plays); `"mask": null` takes it away |
 | `say` | a short comment, or one per language (`{ "en", "it" }`): shown over the stage for 4 bars, written as `// > …` above the track it changes, and spoken by a voice track |
 | `voice` | id of the voice track that speaks this step's comment (default: the first one) |
 
@@ -246,6 +249,8 @@ A song without `build` can also build itself: the "Live build" switch above the 
 **Creation date and app version.** `"created": "2026-10-16"` and `"appVersion": "0.6.0"` say when the song was made and with which version of the app (#67). The app writes them when a song is saved from Compose or the radio, `tools/endless.mjs` when it writes songs, and `tools/song-dates.mjs` filled the songs in `songs/` from git. Both are optional.
 
 **Profile.** `"profile": "switch"` (the Live coder profile; or `classic`, `crescendo`) opens the song with that performance profile in Compose; it wins over `buildStyle`.
+
+**Growth shape.** `"growthShape": { "opening": "full-kick", "pace": "fast", "development": "as-written" }`, each part optional, sets how the song grows with the Live coder profile: the song's value wins over its style's weights and over the seed, and a value the song cannot play (a kick opening without drums) falls to the next rule. Openings: `slow`, `full-kick`, `typed`, `broken`, `filtered`, `melodic`, `pad`, `voice` (needs a voice instrument, not drawn yet), `muted-base`, `mid-set`; paces: `slow`, `medium`, `fast`; developments: `by-type`, `as-written`, `masks`, `parameters`, `second-section`, `metamorphosis`. The validator reports a wrong value with its path (`growthShape.opening`). A metamorphosis adds a pattern `skin` to the tracks it rewrites and changes the tempo and key of the sections after its phrase boundary.
 
 **Build style.** `"buildStyle": "crescendo"` (or `"blocks"`) makes the song open and play with that build style of the live build; without it the song follows the Compose setting. Crescendo (`src/song/crescendo.js`) ignores the song's own `build` and computes one: it prepends growth sections (`Crescendo`, `Crescendo 2`), may append an ending section (`Strip` or `Stop`), adds pattern variants named `<pattern>~<level>` to the tracks, and writes steps with the actions above. The song file is never changed.
 

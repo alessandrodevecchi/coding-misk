@@ -36,6 +36,7 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 - **Spec first.** Every feature starts with an OpenSpec change (proposal, specs, design, tasks) shown to the owner; code only after the owner says go.
 - **Keep the Guide current.** Every user-facing feature adds or updates its card in `src/guide.js`, in English and Italian, in the same change (`#48`). `npm run check:guide` fails when a tab or a console command has no card or line, a text misses a language, or an interface string exists in one language only; a part that needs no card goes in `GUIDE_EXEMPT` with a reason.
 - **Director version.** When an intended change to the director changes the endless fixtures (`npm run check:endless -- --write-fixtures`), bump `DIRECTOR_VERSION` in `src/endless/director.js` in the same commit: radio sessions saved in playlists use it to warn that they may sound different (`#38`).
+- **Shapes version.** When an intended change to the growth shapes moves the Live coder fixtures (`node tools/check-crescendo.mjs --write-fixtures`), raise `SHAPES_VERSION` in `src/song/shapes.js` in the same commit; the Crescendo fixtures (`--write`, `CRESCENDO_VERSION`) must not move with it.
 - **Fewer layers, more rhythm.** The owner prefers tracks with at most 4 to 5 layers per section, dark or tense melodic material, and variety between tracks. See `docs/CONTEXT.md`.
 
 ## Run

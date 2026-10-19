@@ -14,6 +14,8 @@ export const DEVICES = {
   degrade: { kind: 'note', label: { en: 'Random drop', it: 'Togli a caso' }, args: [['amount', 'num', 0.3, 0, 0.9, 0.05]], code: a => `.degradeBy(${f(a.amount)})` },
   rev: { kind: 'note', label: { en: 'Reverse each bar', it: 'Al contrario' }, args: [], code: () => '.rev()' },
   jux: { kind: 'note', label: { en: 'Stereo reverse', it: 'Stereo al contrario' }, args: [], code: () => '.jux(rev)' },
+  // a held chord or note sampled in steps (growth-shapes: seg(16) turns a held pad into a sixteenth rhythm)
+  seg: { kind: 'note', label: { en: 'Steps', it: 'Passi' }, args: [['steps', 'choice', 16, [4, 8, 16]]], code: a => `.seg(${f(a.steps)})` },
   // sound devices: change how it sounds
   delay: { kind: 'sound', label: { en: 'Delay', it: 'Delay' }, args: [['amount', 'num', 0.4, 0, 1, 0.05], ['time', 'choice', 0.1875, [0.0625, 0.125, 0.1875, 0.25, 0.375, 0.5]], ['feedback', 'num', 0.45, 0, 0.9, 0.05]],
     code: a => `.delay(${f(a.amount)}).delaysync(${f(a.time)}).delayfeedback(${f(a.feedback)})` },

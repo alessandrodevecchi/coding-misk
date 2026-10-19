@@ -6,6 +6,7 @@ import { checkRack } from './rack.js';
 import { checkBuild, buildMap, SPEAKERS } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
 import { checkIdea, checkShared, sharedIsChords } from './ideas.js';
+import { checkGrowthShape } from './shapes.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
 export const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
 
@@ -43,6 +44,8 @@ export function validateSong(song, opts = {}) {
   // build style of the live build (#64): the song opens and plays with it
   if (song.buildStyle !== undefined && !['blocks', 'crescendo'].includes(song.buildStyle)) err('buildStyle', 'one of blocks, crescendo, or left out (the Compose setting)');
   if (song.normal !== undefined && song.normal !== 'waypoints') err('normal', '"waypoints" (without a live build the song starts with the waypoints of its natural growth, one section each), or left out');
+  // growth shape of a Live coder build (growth-shapes): opening, pace and development the song asks for
+  checkGrowthShape(song.growthShape, err);
   // tags and origin (song library, #34)
   if (song.origin !== undefined && !ORIGINS.includes(song.origin)) err('origin', `one of ${ORIGINS.join(', ')}, or left out`);
   if (song.tags !== undefined) {

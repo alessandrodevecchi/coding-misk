@@ -553,7 +553,7 @@ export function ideaCode(state, type, shared = {}) {
   const out = [];
   let open = false;
   for (const l of sceneLayers(state, { only: type, shared })) {
-    if (/^_?\$:/.test(l)) { out.push(l.replace(/^_?\$:\s*/, '').replace(/\.bank\(.*$/, '')); open = true; }
+    if (/^[_S]?\$:/.test(l)) { out.push(l.replace(/^[_S]?\$:\s*/, '').replace(/\.bank\(.*$/, '')); open = true; }
     else if (open && /^\s+\./.test(l) && !/^\s+\.s\(/.test(l)) out[out.length - 1] += `\n${l}`;
     else open = false;
   }

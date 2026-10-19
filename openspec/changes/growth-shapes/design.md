@@ -97,6 +97,22 @@ The shape applies when the growth is `natural` (Live coder profile, or a custom 
 
 The `switch-*` styles (renamed in `clear-names`) get weights from the research: trance styles full kick and fast; acid filtered kick and medium; house broken beat or muted base. Ambient and lo-fi prefer pad, melodic and slow. Other styles get no field and use the defaults.
 
+### D11. Bursts of edits: typing never rushes
+
+Owner's note (2026-10-18): in Prima luce around 2:54 several edits came close together and the human typing sped up to fit them. A shaped growth now measures every edit as the Live coder view writes it (essential comments, idiomatic forms, technical functions folded) with the leanest human typing (no pauses, no mistakes: `typingPlan(…, { lean: true })`), and gives each step the gap the app needs to type it (`makeTyping`: half a bar after the step before, a listening pause of up to 2 s, a fifth of a second before the step):
+
+- a step that changes nothing heard shares the bar of the step before (no listening slot spent on it);
+- a section boundary inside the growth (the progression, the second skin) gets the time to type its new muted lines two bars before it, and is served first;
+- the bars come from the growth's budget, then from listening pauses longer than two bars, never from the first minute of a medium or fast pace; when none are left, a small edit of the same line joins the step before it (two edits of one line typed together);
+- with a fast pace a long edit in the first minute trades places with a later small move of another track in the same passage;
+- the second section grows by its patterns only (its colour arrives with the step that settles each track), so its solo part stays short.
+
+When the development or the pace is automatic, a drawn shape that would still rush a step is replaced, deterministically, by the next development by weight (by type last), then by type with the other paces, then the same with less detail; the first without rushed steps is kept, else the one rushed least in all. A shape part named by the song or in Compose stays.
+
+The human typing itself pastes a new line whole (a track coming in, or a line copied from one above and still to edit) when it cannot be typed at a person's pace before its step, longest first, instead of speeding up; a pasted line is not a rushed step. Only edits of lines already there can still be hurried.
+
+`tools/check-crescendo.mjs` measures the typing of every growth step (`tools/growth-measure.mjs`, `typingLoad`). Five Live coder songs: 52 steps typed faster than a person before, 8 after; Prima luce between 2:45 and 3:20 went from ×13.66 to ×0.72. Prima luce has no shape without rushed steps within its length (twice the written song): its automatic shape now falls back to by type, slow pace, 5 hurried steps, worst ×3.41 (new tracks whose first line takes about 20 s to type).
+
 ## Risks / Trade-offs
 
 - **[Silence at the start sounds broken]** → only the typed opening, 1 to 2 bars, with the typing visible; never in Classic or Crescendo.
@@ -107,7 +123,8 @@ The `switch-*` styles (renamed in `clear-names`) get weights from the research: 
 
 ## Open Questions
 
-- **Bursts of edits** (owner, 2026-10-18): in Prima luce around 2:54 many edits come close together and the human typing speeds up to fit, so the text is typed very fast. The pace of a shape should spread such bursts (move a step a few bars later, or merge two edits of the same line) before the typing has to speed up. Labor limae, after the main work.
+- **Bursts of edits** (owner, 2026-10-18): resolved in D11.
+- **Pace against typing time.** A new track's first line takes 12 to 25 s to type at a person's pace, longer than a fast step (7.6 to 9 s) or a medium step (10 to 15 s). With the rule that typing never rushes, 92% of the measured builds reach 4 to 6 changes in the first minute at medium pace (the others 3) and 58% reach 7 to 8 at fast pace (the others 5 or 6); a metamorphosis spends its first minute revealing the written song. Recommended: keep typing unhurried and accept these counts; the alternative is to let the typing speed up for entries in the first minute of a fast pace.
 
 - **Opening name "slow" next to pace "slow".** Recommended: keep the owner's names ("slow" / "Lenta") and show opening and pace as separate labelled groups in Compose, so the two never sit in one list.
 - **Should the director write `growthShape` into generated songs?** Recommended: no for now; the shape is resolved at play time from the song id and style, so the endless fixtures and `DIRECTOR_VERSION` do not move in this change.

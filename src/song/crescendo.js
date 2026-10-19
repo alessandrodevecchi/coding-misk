@@ -8,7 +8,18 @@ import { stream } from '../endless/random.js';
 import { PROGS, DEFAULT, presetIdea, meterSteps } from '../music.js';
 import { ideaLadder, expandIdea, ideaRows } from './ideas.js';
 import { coderPath } from './coder.js';
-import { stateAt } from './build.js';
+import { stateAt, applyStep } from './build.js';
+import { resolveShape, shapeFacts, canPlay, SHAPES_VERSION, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES } from './shapes.js';
+import { liveCode } from '../live/live-code.js';
+import { resolveProfile } from '../live/profiles.js';
+import { rushedSteps, rushLoad } from '../live/typing-load.js';
+import { compileSong } from './compile.js';
+import { typingPlan } from './typing.js';
+import { writeCode, levelsOf, busesOf, functionContext, functionOptions } from './writer.js';
+import { applyComments } from './comments.js';
+import { idiomatic } from './idiom.js';
+import { compose, KIND_OF_TYPE } from '../material/index.js';
+import { KEYS } from '../music.js';
 
 // raised when an intended change to the rules changes the steps of a checked song (tools/check-crescendo.mjs)
 // 2 (idea-model): the Live coder's natural growth grows ideas (presets included) through simpler forms of themselves
@@ -45,12 +56,15 @@ function thinHits(hits, core, n) {
   const rest = hits.filter(h => !core.includes(h)).sort((a, b) => a.w - b.w || a.order - b.order);
   return Array.from({ length: n }, (_, k) => new Set([...core, ...rest.slice(Math.round(rest.length * (k + 1) / n))]));
 }
-function thinRows(rows, n) {
+// growth-shapes: o.core is the core the opening asks for ('kick': every kick hit, 'broken': the kick hits off the
+// beat), o.kickFirst keeps the kick hits until last, so the kick row is whole a few levels before the rest
+function thinRows(rows, n, o = {}) {
   const hits = [];
-  Object.entries(rows || {}).forEach(([row, steps], r) => [...steps].forEach((c, i) => { if (c === 'x') hits.push({ row, i, w: strength(i) * 3 + (ROW_CLASS[row] ?? 1), order: spread(i) * 8 + r }); }));
+  Object.entries(rows || {}).forEach(([row, steps], r) => [...steps].forEach((c, i) => { if (c === 'x') hits.push({ row, i, w: strength(i) * 3 + (ROW_CLASS[row] ?? 1) + (o.kickFirst && row === 'bd' ? 100 : 0), order: spread(i) * 8 + r }); }));
   if (!hits.length) return Array(n).fill(rows);
   // the simplest variant keeps the kick on the first beat (or the strongest hit when there is no kick)
-  let core = hits.filter(h => h.row === 'bd' && h.i % 16 === 0);
+  let core = o.core === 'kick' ? hits.filter(h => h.row === 'bd') : o.core === 'broken' ? hits.filter(h => h.row === 'bd' && h.i % 4 !== 0) : [];
+  if (!core.length) core = hits.filter(h => h.row === 'bd' && h.i % 16 === 0);
   if (!core.length) { const top = Math.max(...hits.map(h => h.w)); core = [hits.find(h => h.w === top)]; }
   return thinHits(hits, core, n).map(keep => Object.fromEntries(Object.entries(rows).map(([row, steps]) =>
     [row, [...steps].map((c, i) => (c === 'x' && [...keep].some(h => h.row === row && h.i === i) ? 'x' : '.')).join('')])
@@ -99,7 +113,62 @@ export function ideaForms(type, pat, n, ctx = {}) {
   const idea = ideaOf(type, pat);
   return idea ? ideaLadder(idea, { type, N: ctx.N || 16, ch: pat, shared: ctx.shared || {} }, n) : [];
 }
+// drums under a growth shape (growth-shapes): the simplest variant is the core of the opening (D2); a beat idea grows
+// one step number at a time (an idea grows instead of being thinned); a straight kick that opens broken starts from a
+// tresillo or a two-step kick. o: { core: 'one' | 'kick' | 'broken', kickFirst, broken: rows of the broken kick }
+const BROKEN = { tresillo: 'x..x..x.x..x..x.', 'two-step': 'x.....x...x.....' };
+const offBeatKick = rows => [...String((rows || {}).bd || '')].some((c, i) => c === 'x' && i % 4 !== 0);
+export function beatForms(beat, o = {}) {
+  // (a beat is four sixteenths on a grid of sixteenths, two eighths on a grid of eighths, whatever the meter)
+  const grid = beat.grid ?? 16, onBeat = grid >= 12 ? 4 : grid >= 6 ? 2 : 1, str = k => (k % grid === 0 ? 4 : k % onBeat === 0 ? 3 : k % (onBeat / 2) === 0 ? 2 : 1);
+  const all = Object.entries(beat).filter(([r]) => r !== 'grid').flatMap(([row, list], r) => String(list).split(',').map(x => x.trim()).filter(Boolean).map(x => ({ row, k: +x, r })));
+  if (!all.length) return [];
+  let core = o.core === 'kick' ? all.filter(h => h.row === 'bd') : o.core === 'broken' ? all.filter(h => h.row === 'bd' && h.k % onBeat !== 0) : [];
+  if (!core.length) core = [all.find(h => h.row === 'bd') || all[0]];
+  const rest = all.filter(h => !core.includes(h)).sort((a, b) => (o.kickFirst ? (b.row === 'bd') - (a.row === 'bd') : 0) || str(b.k) - str(a.k) || a.r - b.r || a.k - b.k);
+  const form = hits => { const out = { grid }; for (const [row] of Object.entries(beat).filter(([r]) => r !== 'grid')) { const ks = hits.filter(h => h.row === row).map(h => h.k).sort((a, b) => a - b); if (ks.length) out[row] = ks.join(','); } return out; };
+  // from the simplest to the one before the written beat: each adds one number
+  const forms = [];
+  for (let m = 0; m < rest.length; m++) forms.push(form([...core, ...rest.slice(0, m)]));
+  return forms.reverse();
+}
+// with a medium or fast pace the drums grow one row (one line of code) at a time: the kick first (its core, then
+// whole), then the snare or clap, then the hats and the rest; the written rows last
+const ROW_ORDER = ['bd', 'sd', 'cp', 'rim', 'hh', 'oh', 'rd', 'cr', 'lt', 'mt', 'ht', 'cb', 'sh', 'perc', 'misc'];
+const rowRank = r => { const i = ROW_ORDER.indexOf(r); return i < 0 ? ROW_ORDER.length : i; };
+export function rowForms(rows, o = {}) {
+  const live = Object.entries(rows || {}).filter(([, v]) => /x/.test(v)).sort(([a], [b]) => rowRank(a) - rowRank(b));
+  if (live.length < 2 || live[0][0] !== 'bd') return [];
+  const bd = live[0][1], hits = [...bd].map((c, i) => (c === 'x' ? i : -1)).filter(i => i >= 0);
+  const coreHits = o.core === 'kick' ? hits : o.core === 'broken' ? hits.filter(i => i % 4 !== 0) : hits.filter(i => i % 16 === 0).slice(0, 1);
+  const row = keep => [...bd].map((c, i) => (keep.includes(i) ? 'x' : '.')).join('');
+  const forms = [];
+  if (coreHits.length && coreHits.length < hits.length) forms.push({ bd: row(coreHits) });
+  // a straight kick that opens broken: a tresillo or a two-step kick first
+  else if (o.core === 'broken' && !coreHits.length) forms.push({ bd: (BROKEN[o.broken] || BROKEN.tresillo).slice(0, bd.length).padEnd(bd.length, '.') });
+  for (let k = 1; k < live.length; k++) forms.push(Object.fromEntries(live.slice(0, k)));
+  return forms.reverse();
+}
+function drumVariants(pat, n, o, ctx) {
+  if (o.kickFirst && pat.rows && rowForms(pat.rows, o).length) { const forms = rowForms(pat.rows, o); return Array.from({ length: n }, (_, k) => ({ ...pat, rows: forms[Math.min(k, forms.length - 1)] })); }
+  if (pat.idea && pat.idea.beat && !pat.rows) {
+    const beat = pat.idea.beat, forms = beatForms(beat, o), grid = beat.grid ?? 16, onBeat = grid >= 12 ? 4 : grid >= 6 ? 2 : 1;
+    if (!forms.length) return Array(n).fill(pat);
+    const out = Array.from({ length: n }, (_, k) => ({ ...pat, idea: { ...pat.idea, beat: forms[Math.min(k, forms.length - 1)] } }));
+    if (o.core === 'broken' && beat.bd !== undefined && !String(beat.bd).split(',').some(x => +x % onBeat !== 0)) {
+      const steps = [...(BROKEN[o.broken] || BROKEN.tresillo)].map((c, i) => (c === 'x' ? i * (grid >= 12 ? 1 : grid / 16) : -1)).filter(i => i >= 0 && Number.isInteger(i) && i < grid);
+      out[n - 1] = { ...pat, idea: { ...pat.idea, beat: { grid, bd: steps.join(',') } } };
+    }
+    return out;
+  }
+  const rows = pat.idea && !pat.rows ? ideaRows(pat.idea, ctx.N || 16) : pat.rows, base = { ...pat };
+  if (pat.idea && !pat.rows) delete base.idea;
+  const out = thinRows(rows, n, o).map(r => ({ ...base, rows: r }));
+  if (o.core === 'broken' && n && !offBeatKick(rows) && rows && rows.bd) out[n - 1] = { ...base, rows: { bd: (BROKEN[o.broken] || BROKEN.tresillo).slice(0, String(rows.bd).length).padEnd(String(rows.bd).length, '.') } };
+  return out;
+}
 export function patternVariants(type, pat, n, rules = {}, ctx = {}) {
+  if (type === 'drums' && rules.drum) return drumVariants(pat, n, rules.drum, ctx);
   if (rules.natural) {
     const forms = ideaForms(type, pat, n, ctx);
     if (forms.length) {
@@ -149,7 +218,12 @@ function trackPlan(t, d, rng, clipKeys, rules = {}, ctx = {}) {
   // Live coder: an idea has as many levels as simpler forms (ideaForms), whatever its density
   const ladder = rules.natural ? Math.max(0, ...Object.values(t.patterns || {}).map(p => ideaForms(t.type, p, 4, ctx).length)) : 0;
   if (ladder) n = ladder;
-  n = d >= 2 ? n : d === 1 ? Math.min(n, 2) : Math.min(n, 1);
+  // growth-shapes: a beat idea grows one number per level, whatever the detail
+  // (as many levels as the forms of the pattern the growth plays, the reference section's)
+  const refPat = (t.patterns || {})[rules.ref] || null;
+  const beats = rules.drum && t.type === 'drums' ? (refPat ? [refPat] : Object.values(t.patterns || {})).reduce((m, p) => Math.max(m, p.idea && p.idea.beat && !p.rows ? beatForms(p.idea.beat, rules.drum).length : 0), 0) : 0;
+  const byRow = rules.drum && rules.drum.kickFirst && t.type === 'drums' ? Math.max(0, ...Object.values(t.patterns || {}).map(p => (p.rows ? rowForms(p.rows, rules.drum).length : 0))) : 0;
+  n = beats ? Math.min(12, beats) : byRow ? Math.min(6, byRow) : d >= 2 ? n : d === 1 ? Math.min(n, 2) : Math.min(n, 1);
   const rack = t.rack || [];
   if (n) {
     for (const [name, pat] of Object.entries(t.patterns || {})) patternVariants(t.type, pat, n, rules, ctx).forEach((v, k) => { plan.patterns[`${name}~${k + 1}`] = v; });
@@ -168,14 +242,18 @@ function trackPlan(t, d, rng, clipKeys, rules = {}, ctx = {}) {
     if (d < 3 && key === 'gain') continue;
     if (d === 1 && key !== 'cutoff') continue;
     if (d === 0 && !(rules.natural && key === 'cutoff')) continue;
+    // growth-shapes: the filtered opening moves the cutoff itself, from a closed filter
+    if (rules.filtered && key === 'cutoff') continue;
     const v = (t.settings || {})[key], nv = neutral(key, v);
     if (nv === null) continue;
     neutralSet[key] = nv;
-    const m = d < 3 ? 1 : key === 'cutoff' ? rng.int(1, 3) : key === 'gain' ? 1 : rng.int(1, 2);
+    // growth-shapes: a value that moves slowly over minutes (slide): the cutoff in five small moves
+    const slide = rules.slide && key === 'cutoff';
+    const m = slide ? 5 : rules.small && key !== 'gain' ? (key === 'cutoff' ? 3 : 2) : d < 3 ? 1 : key === 'cutoff' ? rng.int(1, 3) : key === 'gain' ? 1 : rng.int(1, 2);
     const vals = moves(key, nv, v, m);
     // a try: past the written value, then back to it
-    if (rules.natural && key !== 'gain' && !(key === 'cutoff' && v >= 12000) && rng.chance(rules.trials ?? 0.3)) vals.splice(vals.length - 1, 0, key === 'cutoff' ? Math.round(v * 1.4 / 10) * 10 : r3(v * 1.3));
-    const lane = vals.map(x => ({ kind: key, step: { set: { track: t.id, [key]: x } } }));
+    if (!slide && rules.natural && key !== 'gain' && !(key === 'cutoff' && v >= 12000) && rng.chance(rules.trials ?? 0.3)) vals.splice(vals.length - 1, 0, key === 'cutoff' ? Math.round(v * 1.4 / 10) * 10 : r3(v * 1.3));
+    const lane = vals.map(x => ({ kind: key, ...(slide ? { slide: true } : {}), step: { set: { track: t.id, [key]: x } } }));
     // natural growth: a knob that moves arrives first (its function was hidden)
     if (rules.natural && HIDES[key] && HIDE_TYPES.includes(t.type)) lane.unshift({ kind: 'reveal', device: key, step: { reveal: { track: t.id, keys: key } } });
     knobs.push(lane);
@@ -185,11 +263,18 @@ function trackPlan(t, d, rng, clipKeys, rules = {}, ctx = {}) {
     const set = { ...(t.settings || {}) }, moving = knobs.map(l => l[0] && l[0].step.reveal && l[0].step.reveal.keys).filter(Boolean);
     // with less detail fewer functions arrive on their own (a long list of reveals would leave no room for pauses)
     const may = d >= 2 ? Object.keys(HIDES) : d === 1 ? ['cutoff', 'drive', 'room', 'delay'] : ['cutoff'];
-    const hidden = Object.keys(HIDES).filter(k => (HIDES[k](set, t.type) || moving.includes(k)) && (may.includes(k) || moving.includes(k)));
+    const hidden = Object.keys(HIDES).filter(k => (HIDES[k](set, t.type) || moving.includes(k)) && (may.includes(k) || moving.includes(k)) && !(rules.filtered && k === 'cutoff'));
     if (hidden.length) {
       plan.setup.push({ hide: { track: t.id, keys: hidden } });
       for (const k of hidden) if (!knobs.some(l => l[0] && l[0].step.reveal && l[0].step.reveal.keys === k)) knobs.push([{ kind: 'reveal', device: k, step: { reveal: { track: t.id, keys: k } } }]);
     }
+  }
+  // growth-shapes, filtered opening: the kick enters behind a low-pass at 300 Hz that opens while it fills
+  if (rules.filtered) {
+    const v = Number((t.settings || {}).cutoff ?? 20000), units = moves('cutoff', 300, v, 3).map(x => ({ kind: 'cutoff', step: { set: { track: t.id, cutoff: x } } }));
+    neutralSet.cutoff = 300;
+    const f = plan.fullness; plan.fullness = [];
+    while (f.length || units.length) { if (units.length) plan.fullness.push(units.shift()); if (f.length) plan.fullness.push(f.shift()); }
   }
   if (Object.keys(neutralSet).length) plan.setup.push({ set: { track: t.id, ...neutralSet } });
   // rack devices come in one at a time, in their written order (only a tail of the chain, so the order stays)
@@ -291,6 +376,236 @@ function phrase(kind, type, device, recent, rng) {
   return { en, it };
 }
 
+// ---------- growth shapes (growth-shapes) ----------
+// the core of the drums' simplest variant per opening (D2); the pattern name of the second skin (D7)
+const CORE = { 'full-kick': 'kick', filtered: 'kick', broken: 'broken' };
+// steps that bring a track in or take a mark away keep a bar of their own (one "_" or one "S" per step)
+const MARKS = ['enter', 'unsolo', 'unmute'];
+const SKIN = 'skin';
+const kickTrack = t => t.type === 'drums' && Object.values(t.patterns || {}).some(p => (p.rows ? /x/.test(String(p.rows.bd || '')) : p.idea ? !!(p.idea.beat && p.idea.beat.bd) : true));
+// the order of entries (D4): by type as today, or as written (where each track's first clip starts); the opening names
+// the track that comes first (the kick, a melodic track, the pad)
+function orderByShape(dest, shape, srng, rank, plays) {
+  const first = t => Math.min(...t.clips.map(c => c.start));
+  if (shape.development === 'as-written') dest.sort((a, b) => first(a) - first(b) || rank(a) - rank(b) || plays.indexOf(a) - plays.indexOf(b));
+  else for (let i = 1; i < dest.length - 1; i++) if (srng.chance(0.3)) [dest[i], dest[i + 1]] = [dest[i + 1], dest[i]];
+  const o = shape.opening;
+  // a track that holds only the kick comes before a beat track
+  const kickOnly = t => kickTrack(t) && Object.values(t.patterns || {}).every(p => !p.rows || Object.keys(p.rows).every(r => r === 'bd' || !/x/.test(p.rows[r])));
+  const front = ['slow', 'full-kick', 'filtered', 'broken'].includes(o) ? dest.find(kickOnly) || dest.find(kickTrack) || dest.find(t => t.type === 'drums')
+    : o === 'melodic' ? dest.find(t => ['arp', 'hook', 'guitar'].includes(t.type))
+      : o === 'pad' ? dest.find(t => t.type === 'pad') || dest.find(t => t.type === 'texture') : null;
+  if (front) { dest.splice(dest.indexOf(front), 1); dest.unshift(front); }
+}
+// draws of the shape that the plans need: the broken kick (tresillo or two-step), the track whose cutoff slides
+function shapeExtras(dest, shape, srng) {
+  const broken = srng.pick(['tresillo', 'two-step']);
+  const cands = dest.filter((t, i) => i > 0 && t.type !== 'drums' && Number.isFinite((t.settings || {}).cutoff) && t.settings.cutoff < 18000 && !(t.pinned || []).includes('cutoff'));
+  const slide = cands.length && srng.chance(0.6) ? srng.pick(cands).id : null;
+  return { broken, slide };
+}
+// openings with the tracks written from bar 0: muted with "_$:" but one (muted base), two in solo (mid-set)
+function openingSetup(dest, plans, shape) {
+  if (shape.opening === 'muted-base') plans.forEach((p, i) => { if (i) p.setup.push({ add: dest[i].id }, { mute: dest[i].id }); });
+  if (shape.opening === 'mid-set') plans.forEach((p, i) => { if (i) p.setup.push({ add: dest[i].id }); if (i < 2) p.setup.push({ solo: dest[i].id }); });
+}
+// what the coder's path takes from the shape: the drums whole early with a medium or fast pace, masks, a passing
+// melody, the moves
+function coderShape(dest, shape) {
+  return {
+    opening: shape.opening, development: shape.development, moves: true,
+    kickEarly: shape.pace !== 'slow',
+    early: shape.pace === 'fast' ? 'all' : null,
+    masks: shape.development === 'masks',
+    passing: !['parameters'].includes(shape.development) && !['muted-base', 'mid-set'].includes(shape.opening),
+  };
+}
+// second section (D4): the first half of the tracks grows, then the others are written with "S$:" and grow alone
+// while the first part is silent, then the marks go and everything plays
+function sectionPath(dest, plans, prng, rules, shape) {
+  const cut = Math.max(1, Math.ceil(dest.length / 2)), A = dest.slice(0, cut), B = dest.slice(cut);
+  const o = { detours: rules.detours, chooser: rules.chooser };
+  const a = coderPath(A, plans.slice(0, cut), prng.fork('coder'), { ...o, shape: coderShape(A, shape) });
+  if (!B.length) return a;
+  // (the second section grows by its patterns; its colour comes with the step that settles each track, so the solo
+  // part stays short)
+  const b = coderPath(B, plans.slice(cut).map(p => ({ ...p, colour: [] })), prng.fork('coder-b'), { ...o, detours: [1, 0, 0, 0], shape: { ...coderShape(B, shape), passing: false, kickEarly: false, opening: null, moves: false } });
+  const seen = new Set();
+  const pb = b.path.map(u => {
+    const id = u.kind === 'enter' ? (u.step.add ?? (u.step.clone && u.step.clone.track) ?? u.step.unmute) : undefined;
+    if (id === undefined || Array.isArray(id) || seen.has(id)) return u;
+    seen.add(id);
+    return { ...u, second: true, step: { ...u.step, solo: id } };
+  });
+  const ids = B.map(t => t.id);
+  return { path: [...a.path, ...pb, { kind: 'unsolo', track: B[0].id, type: B[0].type, step: { unsolo: ids.length === 1 ? ids[0] : ids }, waypoint: a.waypoints + b.waypoints + 1 }], waypoints: a.waypoints + b.waypoints + 1 };
+}
+// metamorphosis (D7): the song as written in one to three steps (the anchor, then the others), the waypoint of skin 1
+function revealPath(dest, plans) {
+  const path = [];
+  const tr = (t, i) => (plans[i].setup.some(s => s.mute === t.id) ? 'unmute' : plans[i].setup.some(s => s.add === t.id) ? null : 'add');
+  const alone = dest.filter((t, i) => plans[i].setup.some(s => s.solo === t.id));
+  path.push({ kind: 'enter', track: dest[0].id, type: dest[0].type, step: { add: dest[0].id } });
+  const rest = dest.slice(1).map((t, i) => [t, tr(t, i + 1)]).filter(([, k]) => k), half = Math.ceil(rest.length / 2);
+  for (const g of rest.length > 2 ? [rest.slice(0, half), rest.slice(half)] : [rest]) {
+    if (!g.length) continue;
+    const ids = g.map(([t]) => t.id), k = g[0][1];
+    path.push({ kind: 'enter', track: ids[0], type: g[0][0].type, step: { [k]: ids.length === 1 ? ids[0] : ids } });
+  }
+  alone.slice().reverse().forEach(t => path.push({ kind: 'unsolo', track: t.id, type: t.type, step: { unsolo: t.id } }));
+  path[path.length - 1] = { ...path[path.length - 1], waypoint: 1 };
+  return { path, waypoints: 2 };
+}
+// the second skin: a new tempo (within 12 BPM, or half or double time), a key a fifth away, the parts of another
+// style of the same family composed by the material generator in the new key
+const keySemi = k => { const x = KEYS.find(y => y[0] === k); return x ? x[1] : 0; };
+const keyAt = semi => { const x = KEYS.find(y => ((y[1] - semi) % 12 + 12) % 12 === 0); return x ? x[0] : null; };
+function makeSkin(song, R, dest, shape, srng, styles) {
+  const ids = ((song.tags && song.tags.styles) || []).map(String), recipe = ids.map(id => styles[id]).find(Boolean);
+  const sibs = recipe ? Object.values(styles).filter(r => r && r.id !== recipe.id && r.family === recipe.family).sort((a, b) => a.id.localeCompare(b.id)) : [];
+  if (!sibs.length) return null;
+  const style = srng.pick(sibs), r = srng.fork('skin');
+  const bpm = R.bpm / 2 >= 70 && r.chance(0.2) ? Math.round(R.bpm / 2) : R.bpm * 2 <= 180 && r.chance(0.1) ? R.bpm * 2 : Math.max(60, Math.min(200, R.bpm + (r.chance(0.5) ? 1 : -1) * r.int(4, 12)));
+  const up = keyAt(keySemi(R.key) + 7), down = keyAt(keySemi(R.key) - 7), key = up && down ? (r.chance(0.5) ? up : down) : up || down || R.key;
+  const shift = keySemi(key) - keySemi(R.key);
+  const kickId = (dest.find(t => t.type === 'drums' && Object.values(t.patterns || {}).every(p => !p.rows || Object.keys(p.rows).every(x => x === 'bd'))) || {}).id;
+  const patterns = {};
+  for (const t of dest) {
+    const kind = KIND_OF_TYPE[t.type];
+    if (!kind) continue;
+    const part = style[t.type] || {}, harmony = { key, mode: (t.settings && t.settings.mode) || 'minor', chords: R.chords };
+    const out = compose(kind, { seed: `${song.id}:skin:${t.id}`, style: part.material || {}, harmony, meter: R.meter, energy: 0.6, type: t.type });
+    if (!out || !out.idea) continue;
+    let idea = out.idea;
+    if (t.type === 'drums' && idea.beat) { const { grid, bd, ...rest } = idea.beat; idea = { ...idea, beat: kickId === t.id ? { grid, bd: bd || '0,4,8,12' } : kickId ? { grid, ...rest } : idea.beat }; }
+    const own = (t.patterns || {})[(t.clips[0] || {}).pattern] || {};
+    patterns[t.id] = { ...(own.speed ? { speed: own.speed } : {}), idea };
+  }
+  return Object.keys(patterns).length ? { bpm, key, shift, ratio: bpm / R.bpm, style: style.id, patterns } : null;
+}
+// a written section in the second skin: its tempo scaled like the reference section's, its key moved the same way
+function skinSection(x, skin, R) {
+  const o = { ...x }, b = x.bpm ?? R.bpm;
+  o.bpm = Math.round(b * skin.ratio);
+  if (x.bpmEnd) o.bpmEnd = Math.round(x.bpmEnd * skin.ratio);
+  o.key = keyAt(keySemi(x.key ?? R.key) + skin.shift) || skin.key;
+  return o;
+}
+// Bursts of edits (owner, 2026-10-18): the human typing of the Live coder types each step between the step before
+// (half a bar after it) and the step, after a listening pause of up to 2 s; when time is short it drops its pauses and
+// mistakes, then it speeds up. Each gap is made long enough for the leanest typing of its edit (measured on the
+// growing code, the bus and visual functions left out), within the growth budget; a section boundary in the growth
+// (the progression, the second skin) is prepared two bars before it, so its step gets two bars more. The typed
+// opening's lead-in is the time the first line takes (1 to 4 bars).
+const shownLike = code => code.split('\n').filter(l => !/^(const |setcpm)/.test(l) && !(/^\s*\/\//.test(l) && !l.startsWith('// =')))
+  .map(l => l.replace(/\.mask\((section\d+|clip\d+)\)\.velocity\(\1\)/g, '').replace(/\.orbit\(\d+\)/g, '').replace(/\.analyze\("[^"]*"\)/g, '')).join('\n');
+// what is heard in a code: its pattern lines, without the muted ones, only the solo ones while there are some
+function heard(code) {
+  const layers = [];
+  let cur = null;
+  for (const l of code.split('\n')) {
+    if (/^[_S]?\$:/.test(l)) { cur = { solo: l[0] === 'S', muted: l[0] === '_', text: l.replace(/\s*\/\/.*$/, '') }; layers.push(cur); continue; }
+    if (cur && /^\s+\S/.test(l) && !/^\s*\/\//.test(l)) { cur.text += l.trim().replace(/\s*\/\/.*$/, ''); continue; }
+    cur = null;
+  }
+  const solo = layers.some(x => x.solo && !x.muted);
+  return layers.filter(x => !x.muted && (!solo || x.solo)).map(x => x.text.replace(/^[_S]?\$:\s*/, '')).join('\n');
+}
+function relaxGaps({ song, dest, plans, seq, gaps, R, hold, secBar, cap, shape, clipR, paceBars, paced }) {
+  const first = { tracks: dest.map((t, i) => { const c = clipR(t); return { ...clone(t), clips: [{ start: 0, bars: 1, pattern: c.pattern, ...(c.set ? { set: clone(c.set) } : {}) }], patterns: { ...clone(t.patterns || {}), ...clone(plans[i].patterns) }, mute: true }; }) };
+  for (const p of plans) for (const st of p.setup) applyStep(first, st);
+  const sec = { name: 'Crescendo', bars: 1, bpm: R.bpm, key: R.key, chords: R.chords, meter: R.meter };
+  // the code as the Live coder profile shows it: essential comments, idiomatic forms, technical functions folded
+  const o = functionOptions({ fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true });
+  let ref = '';
+  try { ref = compileSong(song); } catch (e) { ref = ''; }
+  const wctx = { written: levelsOf(ref), buses: busesOf(ref), fns: ref ? functionContext(ref, { id: song.id, title: song.title, tags: song.tags, profile: song.profile }, o) : null };
+  const show = code => { try { return writeCode(applyComments(idiomatic(code), { title: false, tracks: true, notes: false, steps: false }), { mode: o, ...wctx }).code; } catch (e) { return code; } };
+  const codeOf = (st, harm) => { try { return shownLike(show(compileSong({ title: song.title || '', sections: [{ ...sec, chords: hold && !harm ? 'drone' : R.chords }], tracks: st.tracks, shared: song.shared }))); } catch (e) { return ''; } };
+  // the state before unit k (and whether the progression has come in)
+  const before = k => { const st = clone(first); let harm = false; for (let i = 0; i < k; i++) { if (seq[i].harmony) harm = true; if (!seq[i].skin) applyStep(st, seq[i].step); } return { st, harm }; };
+  // codes[k]: the code before unit k; codes[k + 1]: after it
+  const codes = [];
+  const fill = (from, to) => { const b = before(from), st = b.st; let harm = b.harm; codes[from] = codeOf(st, harm); for (let i = from; i < to && i < seq.length; i++) { if (seq[i].harmony) harm = true; if (!seq[i].skin) applyStep(st, seq[i].step); codes[i + 1] = seq[i].skin ? codes[i] : codeOf(st, harm); } };
+  fill(0, seq.length);
+  const lean = (a, b) => typingPlan(a, b, { style: 'human', lean: true, seed: song.id || '' }).total;
+  // seconds a gap of g bars leaves for typing, as the app plans it (makeTyping in main.js)
+  const usable = g => { const avail = Math.max(0.2, (g - 0.5) * secBar - 0.2); return avail - Math.min(avail * 0.5, 2); };
+  // a fast pace prefers small moves in the first minute (design, Risks): a unit too long to type in its slot trades
+  // places with a later unit of the same passage, of another track, that fits (each track keeps the order of its moves)
+  if (shape.pace === 'fast') {
+    let bars = gaps[0];
+    for (let i = 1; i < seq.length && bars * secBar < 60; i++) {
+      bars += gaps[i];
+      const u = seq[i];
+      if (u.kind === 'enter' && i <= 1) continue;
+      if (lean(codes[i], codes[i + 1]) <= usable(gaps[i])) continue;
+      for (let j = i + 1; j < seq.length && !seq[j - 1].waypoint; j++) {
+        const v = seq[j];
+        if (v.waypoint || v.skin || v.harmony || v.kind === 'enter' || v.passing || seq.slice(i, j).some(x => x.track === v.track || x.harmony)) continue;
+        const b = before(i);
+        if (!v.skin) applyStep(b.st, v.step);
+        if (lean(codes[i], codeOf(b.st, b.harm)) > usable(gaps[i])) continue;
+        seq.splice(j, 1); seq.splice(i, 0, v);
+        fill(i, j + 1);
+        break;
+      }
+    }
+  }
+  // a unit that changes nothing heard (a level equal to the next, a function shown at a neutral value) shares the bar
+  // of the step before: no listening slot is spent on it, its edit is typed with that step
+  for (let i = 1; i < seq.length; i++) if (!seq[i].skin && !seq[i].waypoint && !MARKS.includes(seq[i].kind) && heard(codes[i]) === heard(codes[i + 1])) gaps[i] = 0;
+  // the first minute keeps its pace once silent units have joined the bars before them
+  if (shape.pace !== 'slow') { let t = 0; for (let i = 1; i < seq.length && t * secBar < 60; i++) { if (!gaps[i]) continue; gaps[i] = paceBars(); paced[i] = true; t += gaps[i]; } }
+  // the edit of a bar: from the code before its first unit to the code after its last
+  const endOf = i => { let j = i; while (j + 1 < seq.length && gaps[j + 1] === 0) j++; return j; };
+  const need = i => lean(codes[i], codes[endOf(i) + 1]);
+  // the typed opening: silent while the first line is typed
+  if (shape.opening === 'typed') { const t1 = lean('', codes[1]); let L = 1; while (usable(L + 0.5) < t1 && L < 4) L++; gaps[0] = L; }
+  // a section boundary in the growth is prepared by the code of the moment: the changed lines are typed again as new
+  // muted copies under the playing ones, two bars before the boundary
+  const prep = i => { const was = codes[i].split('\n'), now = codes[endOf(i) + 1].split('\n'), fresh = now.filter(l => !was.includes(l)); return lean(codes[i], `${codes[i]}\n${fresh.join('\n')}`); };
+  const extraOf = i => (seq[i].harmony || seq[i].skinStart ? 2 : 0);
+  // (with a margin: the code shown wraps its lines and folds some functions differently from this estimate)
+  const want = i => (extraOf(i) ? prep(i) : need(i)) * (paced[i] ? 1 : 1.2) + (paced[i] ? 0.2 : 0.5);
+  // the shortest gap that leaves time to type the edit (and the two bars of a boundary)
+  const minGap = (i, w) => { let g = 1; while (usable(g) < w && g < 64) g++; return g + extraOf(i); };
+  const mins = [], refresh = i => { mins[i] = i && gaps[i] ? minGap(i, want(i)) : 0; };
+  seq.forEach((_, i) => refresh(i));
+  // the budget of the growth: the squeeze leaves at most cap - 4 bars of gaps (room for the tail and the ending); past
+  // it, bars come from gaps with time to spare (a long listening pause keeps at least two bars), never from the first
+  // minute of a medium or fast pace; when none is left, a small edit joins the step before it on the same track (two
+  // edits of the same line typed together) and its bars go to the steps that need them
+  let room = cap - 4 - gaps.reduce((a, b) => a + b, 0), relaxed = 0;
+  const after = j => seq[j - 1] && (['enter', 'back'].includes(seq[j - 1].kind) || seq[j - 1].harmony || seq[j - 1].waypoint);
+  const slack = j => (j > 0 && gaps[j] && !paced[j] ? gaps[j] - Math.max(mins[j], after(j) ? 2 : 1) : 0);
+  const startOf = j => { let k = j - 1; while (k > 0 && !gaps[k]) k--; return k; };
+  const joinable = j => j > 1 && gaps[j] && !paced[j] && !seq[j].waypoint && !seq[j].harmony && !seq[j].skin && !seq[j].skinStart && !MARKS.includes(seq[j].kind) && !seq[j].passing && seq[j - 1].track === seq[j].track && startOf(j) > 0;
+  for (let round = 0; round < seq.length; round++) {
+    let short = false;
+    // a section boundary first (its new lines are typed two bars before it), then the steps in the order of the growth
+    const order = seq.map((_, i) => i).filter(i => i > 0).sort((a, b) => (extraOf(b) ? 1 : 0) - (extraOf(a) ? 1 : 0) || a - b);
+    for (const i of order) {
+      while (gaps[i] && gaps[i] < mins[i]) {
+        if (room > 0) { room--; gaps[i]++; relaxed++; continue; }
+        let j = -1;
+        for (let k = 1; k < seq.length; k++) if (k !== i && slack(k) > 0 && (j < 0 || slack(k) > slack(j))) j = k;
+        if (j < 0) { short = true; break; }
+        gaps[j]--; gaps[i]++; relaxed++;
+      }
+    }
+    if (!short) break;
+    // join the smallest edit that can go with the step before it
+    let m = -1;
+    for (let j = 2; j < seq.length; j++) if (joinable(j) && (m < 0 || mins[j] < mins[m])) m = j;
+    if (m < 0) break;
+    const k = startOf(m);
+    room += gaps[m]; gaps[m] = 0; mins[m] = 0;
+    refresh(k);
+  }
+  return { relaxed, short: seq.some((_, i) => i && gaps[i] && gaps[i] < mins[i]) };
+}
+
 // ---------- the song ----------
 const gapOf = (rng, narrated) => (narrated ? rng.weighted([1, 2], [2, 1]) : rng.weighted([1, 2, 3, 4], [1, 3, 2, 2]));
 const KEY_STEPS = ['enter', 'break', 'back', 'harmony', 'strip-first', 'last'];
@@ -298,11 +613,53 @@ const KEY_STEPS = ['enter', 'break', 'back', 'harmony', 'strip-first', 'last'];
 // song + options → the song with a growth span, generated patterns and "build". The seed defaults to the song id.
 // Songs with nothing to grow come back without steps.
 // rules: {} (Crescendo) or { natural: true, trials } (natural-growth: hidden functions, sparse steps, listening pauses)
-export function crescendoSong(song, { seed, narrated = false, rules = {} } = {}) {
+export function crescendoSong(song, opts = {}) {
+  const rules = opts.rules || {};
+  if (!(rules.coder && rules.shape)) return growSong(song, opts);
+  // growth-shapes: a shape the song or the user did not name is tried as drawn; when the Live coder typing would rush
+  // a step, the next candidate by weight is tried (by type last), and the first without rushed steps is kept (else
+  // the one rushed least in all)
+  const styles = rules.styles || {}, shape = resolveShape(song, { user: rules.shape, styles, seed: opts.seed });
+  // a development and a pace named by the song or the user stay as they are
+  if (['development', 'pace'].every(p => ['song', 'user'].includes(shape.from[p]))) return growSong(song, opts);
+  let best = null;
+  // (then the same candidates with less detail: fewer, smaller moves fit the length of the growth)
+  const cands = shapeCandidates(song, shape, styles), tries = [...cands, ...[2, 1, 0].flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
+  for (const c of tries) {
+    const out = growSong(song, { ...opts, rules: { ...rules, ...(c.maxDetail !== undefined ? { maxDetail: c.maxDetail } : {}), shape: { opening: shape.opening, pace: c.pace, development: c.development } } });
+    if (c.maxDetail !== undefined && out.crescendo && out.crescendo.detail > c.maxDetail) continue;
+    if (!out.crescendo || !out.crescendo.shape) return out;
+    const L = liveCode(out, resolveProfile('switch'), { cols: () => 80 }), n = rushedSteps(L, song.id || '');
+    out.crescendo.shape = { ...out.crescendo.shape, from: shape.from, rushed: n, ...(c.drawn ? {} : { fallback: true }) };
+    if (!n) return out;
+    const load = rushLoad(L, song.id || '');
+    if (!best || load < best.load) best = { out, load };
+  }
+  return best.out;
+}
+// the shapes to try, in order: the drawn one, then the developments by weight (by type last), then by type with the
+// other paces; parts the song or the user named stay
+function shapeCandidates(song, shape, styles) {
+  const f = shapeFacts(song, styles), fixed = p => ['song', 'user'].includes(shape.from[p]);
+  const order = (part, list) => {
+    const w = shape.from[part] === 'style' && f.recipe && f.recipe.growthShapes && f.recipe.growthShapes[RECIPE_KEYS[part]] ? { ...DEFAULT_WEIGHTS[part], ...f.recipe.growthShapes[RECIPE_KEYS[part]] } : DEFAULT_WEIGHTS[part];
+    const rest = list.filter(v => v !== shape[part] && canPlay(part, v, f)).sort((a, b) => (part === 'development' ? (a === 'by-type') - (b === 'by-type') : 0) || (w[b] || 0) - (w[a] || 0) || list.indexOf(a) - list.indexOf(b));
+    return [shape[part], ...rest];
+  };
+  const devs = fixed('development') ? [shape.development] : order('development', DEVELOPMENTS);
+  const paces = fixed('pace') ? [shape.pace] : order('pace', PACES);
+  const out = devs.map((development, i) => ({ development, pace: shape.pace, drawn: i === 0 }));
+  for (const pace of paces.slice(1)) out.push({ development: fixed('development') ? shape.development : 'by-type', pace });
+  return out;
+}
+function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   const rng = stream(String(seed ?? song.id ?? 'song'), STREAM);
   const n = normalizeSong(song), W = n.total, secs = n.sections;
   // a song shorter than 24 bars has no room for slow growth: it grows with the Crescendo rules
   if (rules.natural && W < 24) rules = {};
+  // growth shape (growth-shapes): only the natural growth like a live coder follows one; Classic and Crescendo never
+  const shape = rules.coder && rules.shape ? resolveShape(song, { user: rules.shape, styles: rules.styles || {}, seed }) : null;
+  const srng = shape ? stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_VERSION}/growth`) : null;
   const over = (c, s) => c.start < s.start + s.bars && c.start + c.bars > s.start;
   const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.clips.length);
   if (!plays.length || !W) return { ...clone(song), build: [] };
@@ -315,7 +672,9 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   const rank = t => { const i = ORDER.indexOf(t.type); return i < 0 ? ORDER.length : i; };
   dest.sort((a, b) => rank(a) - rank(b) || plays.indexOf(a) - plays.indexOf(b));
   // a little variety in who comes in after the anchor
-  for (let i = 1; i < dest.length - 1; i++) if (rng.chance(0.3)) [dest[i], dest[i + 1]] = [dest[i + 1], dest[i]];
+  if (!shape) { for (let i = 1; i < dest.length - 1; i++) if (rng.chance(0.3)) [dest[i], dest[i + 1]] = [dest[i + 1], dest[i]]; }
+  else orderByShape(dest, shape, srng, rank, plays);
+  const meta = !!shape && shape.development === 'metamorphosis';
   const clipR = t => t.clips.find(c => over(c, R));
   const clipKeys = t => new Set(t.clips.flatMap(c => Object.keys(c.set || {})));
   // growth budget: up to twice the written length for short songs, one and a half otherwise (room for the ending)
@@ -323,20 +682,37 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   // (like a live coder, free duration: as long as the moves need, within twice the written length)
   const cap = rules.coder && rules.free ? 2 * W - 4 : rules.natural ? (W < 48 ? Math.round(1.5 * W) : W) : W <= 20 ? 2 * W : Math.round(1.5 * W);
   // detail: the most that fits within three times the written length, with room between the steps
-  let d = 3, plans, path, coder = null;
-  for (; d >= 0; d--) {
+  let d = 3, plans, path, coder = null, skin = null, hold = false, harmonyAt = -1, seq = [], gaps = [], paced = [], typing = null;
+  // growth-shapes: the rules of each track (the drums' core from the opening, the kick first with a medium or fast
+  // pace, the filtered opening, one value that slides) and the shape the coder's path follows
+  const sx = shape ? shapeExtras(dest, shape, srng) : null;
+  // (a fast pace: the anchor turns its knobs in more, smaller moves, so the first minute is made of small edits)
+  const trackRules = (t, i) => (!shape ? rules : { ...rules, drum: t.type === 'drums' ? { core: i === 0 ? CORE[shape.opening] || 'one' : 'one', kickFirst: shape.pace !== 'slow', broken: sx.broken } : undefined, filtered: i === 0 && shape.opening === 'filtered' && t.type === 'drums' && !clipKeys(t).has('cutoff'), slide: t.id === sx.slide, small: i === 0 && shape.pace === 'fast', ref: (clipR(t) || {}).pattern });
+  const secBar = (meterSteps(R.meter) / 4) * 60 / R.bpm;
+  // one try at a level of detail (from `top` down): plans, path, steps and their gaps; a shaped growth whose typing does
+  // not fit its budget tries again with less detail (growth-shapes, bursts of edits)
+  const attempt = top => {
+  for (d = top; d >= 0; d--) {
     const prng = rng.fork(`plan-${d}`);
-    plans = dest.map(t => trackPlan(t, d, prng, clipKeys(t), rules, ictx));
+    plans = dest.map((t, i) => (meta ? { id: t.id, type: t.type, setup: [], fullness: [], colour: [], patterns: {} } : trackPlan(t, d, prng, clipKeys(t), trackRules(t, i), ictx)));
+    if (shape) openingSetup(dest, plans, shape);
     // like a live coder (live-coder-growth): waypoints and small moves between them
-    if (rules.coder) { coder = coderPath(dest, plans, prng.fork('coder'), { detours: rules.detours, chooser: rules.chooser }); path = coder.path; }
+    if (meta) { coder = revealPath(dest, plans); path = coder.path; }
+    else if (shape && shape.development === 'second-section') { coder = sectionPath(dest, plans, prng, rules, shape); path = coder.path; }
+    else if (rules.coder) { coder = coderPath(dest, plans, prng.fork('coder'), { detours: rules.detours, chooser: rules.chooser, shape: shape ? coderShape(dest, shape) : null }); path = coder.path; }
     else path = crescendoPath(plans, prng.fork('path'));
-    if (path.length * (rules.natural ? 3 : 1.5) + 4 <= cap || d === 0) break;
+    if (meta || path.length * (rules.natural ? 3 : 1.5) + 4 <= cap || d === 0) break;
   }
+  // metamorphosis (D7): after the reveal, a second skin: tempo and key from a phrase boundary, then each line rewritten
+  // with the parts of another style of the same family, one per step
+  skin = meta ? makeSkin(song, R, dest, shape, srng, rules.styles || {}) : null;
+  if (skin) dest.filter(t => skin.patterns[t.id]).forEach((t, i) => path.push({ kind: 'rewrite', skin: true, ...(i === 0 ? { skinStart: true } : {}), track: t.id, type: t.type, step: { pattern: { track: t.id, to: SKIN } } }));
+  if (skin && path.length) path[path.length - 1] = { ...path[path.length - 1], waypoint: 2 };
 
   // harmony: the first tracks play over one held chord, one step brings in the progression
   // (only when the progression starts on its tonic: the "drone" progression is that chord)
-  const hold = R.chords !== 'drone' && PROGS[R.chords] && PROGS[R.chords][1][0] === 'Am' && path.length >= 6;
-  const harmonyAt = hold ? Math.max(2, Math.round(path.length * rng.range(0.35, 0.55))) : -1;
+  hold = !meta && R.chords !== 'drone' && PROGS[R.chords] && PROGS[R.chords][1][0] === 'Am' && path.length >= 6;
+  harmonyAt = hold ? Math.max(2, Math.round(path.length * rng.range(0.35, 0.55))) : -1;
   if (hold) path[harmonyAt] = { ...path[harmonyAt], harmony: true };
   // breaks: the drums (or the anchor) stop for a few bars and come back, once or twice
   const brk = dest.find(t => t.type === 'drums');
@@ -345,7 +721,7 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
     const k = path.length >= 24 && rng.chance(0.5) ? 2 : 1;
     for (let b = 0; b < k; b++) breaks.push(Math.round(path.length * (k === 1 ? rng.range(0.55, 0.8) : b ? rng.range(0.75, 0.88) : rng.range(0.45, 0.6))));
   }
-  const seq = [];
+  seq = [];
   path.forEach((u, i) => {
     seq.push(u);
     if (breaks.includes(i) && i > path.findIndex(x => x.kind === 'enter' && x.track === brk.id) + 1) {
@@ -358,22 +734,47 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   // track comes in, the progression arrives or the drums come back
   // (like a live coder: a pause at each waypoint too)
   const natGap = i => (i < seq.length * 0.4 ? rng.int(4, 8) : rng.int(2, 6)) + (['enter', 'back'].includes(seq[i - 1].kind) || seq[i - 1].harmony || seq[i - 1].waypoint ? rng.int(4, 8) : 0);
-  const gaps = seq.map((u, i) => (i === 0 ? 0 : seq[i - 1].gap || (rules.natural && !narrated ? natGap(i) : gapOf(rng, narrated))));
-  const room = Math.max(seq.length, cap - 4);
+  // growth-shapes (D3): a medium or fast pace counts seconds over the first minute, then bars
+  let sumBars = 0;
+  // (never under 7.6 s fast or 10 s medium, so the first minute holds at most 8 or 6 steps)
+  const paceBars = () => { const lo = shape.pace === 'fast' ? 7.6 : 10, g = Math.max(1, Math.round((shape.pace === 'fast' ? srng.range(lo, 9) : srng.range(lo, 15)) / secBar)); return g * secBar < lo ? g + 1 : g; };
+  const paceGap = i => {
+    const pause = ['enter', 'back'].includes(seq[i - 1].kind) || seq[i - 1].harmony || seq[i - 1].waypoint;
+    if (sumBars * secBar < 60) return paceBars();
+    return shape.pace === 'fast' ? srng.int(2, 4) + (pause ? srng.int(0, 2) : 0) : srng.int(2, 6) + (pause ? srng.int(2, 4) : 0);
+  };
+  // (the steps of the first minute keep their paced gaps when the growth is squeezed)
+  paced = [];
+  gaps = seq.map((u, i) => { paced.push(!!shape && shape.pace !== 'slow' && sumBars * secBar < 60); const g = i === 0 ? 0 : seq[i - 1].gap || (shape && shape.pace !== 'slow' ? paceGap(i) : rules.natural && !narrated ? natGap(i) : gapOf(rng, narrated)); sumBars += g; return g; });
+  // (a shaped growth may put several units on one bar to stay within its budget)
+  const room = shape ? cap - 4 : Math.max(seq.length, cap - 4);
   // squeezed from the largest gaps; natural growth keeps its listening pauses (at least 4 bars) as long as it can
   const pause = seq.map((u, i) => rules.natural && i > 0 && (['enter', 'back'].includes(seq[i - 1].kind) || seq[i - 1].harmony || seq[i - 1].waypoint));
-  for (let sum = gaps.reduce((a, b) => a + b, 0); sum > room;) {
-    let i = -1;
-    for (let k = 1; k < gaps.length; k++) if (gaps[k] > (pause[k] ? 4 : 1) && (i < 0 || gaps[k] - (pause[k] ? 4 : 0) > gaps[i] - (pause[i] ? 4 : 0))) i = k;
-    if (i < 0) { i = gaps.indexOf(Math.max(...gaps)); if (gaps[i] <= 1) break; }
-    gaps[i]--; sum--;
-  }
+  const squeeze = () => {
+    for (let sum = gaps.reduce((a, b) => a + b, 0); sum > room;) {
+      let i = -1;
+      for (let k = 1; k < gaps.length; k++) if (!paced[k] && gaps[k] > (pause[k] ? 4 : 1) && (i < 0 || gaps[k] - (pause[k] ? 4 : 0) > gaps[i] - (pause[i] ? 4 : 0))) i = k;
+      // a paced growth: units after the first minute share bars before a paced gap shrinks
+      if (i < 0 && shape) for (let k = 1; k < gaps.length; k++) if (!paced[k] && gaps[k] > 0 && !MARKS.includes(seq[k].kind) && (i < 0 || gaps[k] > gaps[i])) i = k;
+      if (i < 0) { i = gaps.indexOf(Math.max(...gaps)); if (gaps[i] <= 1) break; }
+      gaps[i]--; sum--;
+    }
+  };
+  squeeze();
+  // growth-shapes: no rushed typing (bursts of edits): a step comes as late as a person needs to type it, and the
+  // typed opening adds the bars that the first line takes; the metamorphosis changes skin on a phrase boundary
+  typing = shape ? relaxGaps({ song, dest, plans, seq, gaps, R, hold, secBar, cap, shape, clipR, paceBars, paced }) : null;
+  if (typing) squeeze();
+  };
+  attempt(Math.min(3, rules.maxDetail ?? 3));
+  if (skin) { let at = 0; seq.forEach((u, i) => { at += gaps[i]; if (u.skinStart) { const to = Math.max(8, Math.ceil(at / 8) * 8); gaps[i] += to - at; at = to; } }); }
   let bar = 0;
   const growth = seq.map((u, i) => ({ ...u, at: (bar += gaps[i]) }));
   const lastAt = growth[growth.length - 1].at, tail = gapOf(rng, narrated);
   let G = lastAt + tail;
   if (Math.ceil(G / 4) * 4 <= cap) G = Math.ceil(G / 4) * 4;
   const harmonyBar = hold ? growth.find(u => u.harmony).at : 0;
+  const skinBar = skin ? growth.find(u => u.skinStart).at : 0;
   // tracks that enter later in the song: minimal where their first clip starts, then they grow over the next steps,
   // with less detail (or none) when the song ends too soon. A bar holds the steps of one track only.
   const owner = new Map(growth.map(u => [u.at, u.track])), latePlans = [], lateSteps = [];
@@ -395,8 +796,9 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   if (R.swing) base.swing = R.swing;
   const grow = hold
     ? [{ name: 'Crescendo', bars: harmonyBar, ...base, chords: 'drone' }, { name: 'Crescendo 2', bars: G - harmonyBar, ...base }]
-    : [{ name: 'Crescendo', bars: G, ...base }];
-  out.sections = [...grow, ...clone(song.sections)];
+    : skin ? [{ name: 'Crescendo', bars: skinBar, ...base }, { name: 'Crescendo 2', bars: G - skinBar, ...base, bpm: skin.bpm, key: skin.key }]
+      : [{ name: 'Crescendo', bars: G, ...base }];
+  out.sections = [...grow, ...(skin ? clone(song.sections).map(x => skinSection(x, skin, R)) : clone(song.sections))];
   // clips by bar: the written ones shifted after the growth span, the growth clip of every destination track
   out.tracks = out.tracks.map(tr => {
     const nt = n.tracks.find(x => x.id === tr.id);
@@ -405,6 +807,8 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
     if (dest.includes(nt)) { const c = clipR(nt), g = { start: 0, bars: G, pattern: c.pattern }; if (c.set) g.set = clone(c.set); t.clips = [g, ...clips]; }
     const plan = plans.find(p => p.id === tr.id) || latePlans.find(p => p.id === tr.id);
     if (plan) t.patterns = { ...(tr.patterns || {}), ...plan.patterns };
+    // the second skin: the track plays its new part from the step that rewrites it to the end of the song
+    if (skin && skin.patterns[tr.id]) { t.patterns = { ...(t.patterns || {}), [SKIN]: skin.patterns[tr.id] }; t.clips = t.clips.map(c => (c.start >= G ? { ...c, pattern: SKIN } : c)); }
     return t;
   });
 
@@ -457,6 +861,8 @@ export function crescendoSong(song, { seed, narrated = false, rules = {} } = {})
   out.buildStyle = 'crescendo';
   // facts for checks and the UI: where the growth ends and which ending was drawn
   out.crescendo = { version: CRESCENDO_VERSION, growth: G, sections: grow.length, grown: Math.max(lastGrowth, lastAt), ending, detail: d, written: W, narrated, natural: !!rules.natural, ...(coder ? { coder: true, waypoints: growth.filter(u => u.waypoint).map(u => u.at), detours: growth.filter(u => u.detour).length } : {}) };
+  // the growth shape it followed (growth-shapes), the silent bars of a typed opening, the second skin
+  if (shape) out.crescendo.shape = { version: SHAPES_VERSION, opening: shape.opening, pace: shape.pace, development: shape.development, from: shape.from, leadIn: gaps[0], ...(skin ? { skin: { bpm: skin.bpm, key: skin.key, style: skin.style, at: skinBar } } : {}), ...(typing ? { relaxed: typing.relaxed } : {}) };
   return out;
 }
 

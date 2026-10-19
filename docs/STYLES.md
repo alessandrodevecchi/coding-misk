@@ -39,9 +39,12 @@ One recipe per file, `styles/<id>.json`. Required fields are marked.
 | `tracks`       | `{ "usual": [low, high], "max": n }`: tracks playing at once, usually and at most.         | `{ usual: [4, 5], max: 8 }` |
 | `energy`       | Weights of the energy measure: `tracks`, `drums`, `filter`, `drive`, each 0 to 1.          | `0.4, 0.3, 0.2, 0.1`    |
 | `voice`        | The base of the voice: `speakers` (system voices that speak English and Italian: `eddy`, `flo`, `grandma`, `grandpa`, `reed`, `rocko`, `sandy`, `shelley`, or `""` for the default; `speaker` for just one) and the voice track settings `gain`, `pitch`, `tempo`, `cutoff`, `hpf`, `drive`, `room`, `delay`, each a number or a range `[low, high]`. Each song draws its own values; see "Voice" in `docs/ENDLESS.md`. | voice track defaults |
+| `growthShapes` | Optional weights of the growth shapes its songs draw in a Live coder build: `{ "openings": { "full-kick": 3 }, "paces": { "fast": 2 }, "developments": { "by-type": 1 } }` (see Growth shapes below). |                         |
 | `words`        | Required. Title words: `{ "en": [...], "it": [...], "es": [...] }`, at least 3 each.       |                         |
 
 Energy shapes: `build-drop`, `slow-burn`, `waves`, `flat-groove`, `verse-chorus`, `late-peak`, `descent`.
+
+Growth shapes (growth-shapes): how a song of the style opens and grows when it builds with the Live coder profile. `openings`: `slow`, `full-kick`, `typed`, `broken`, `filtered`, `melodic`, `pad`, `voice`, `muted-base`, `mid-set`; `paces`: `slow`, `medium`, `fast`; `developments`: `by-type`, `as-written`, `masks`, `parameters`, `second-section`, `metamorphosis`. Each part is drawn by weight when the song names none; a part the recipe leaves out uses the defaults (`docs/COMPOSING.md`, Growth shapes). The Live coder styles carry weights from the research: Gated trance and Pure trance a full kick and a fast pace, Acid a filtered kick and a medium pace, House a broken beat or a muted base; Ambient and Lo-fi a pad or a melody and a slow pace. The metamorphosis takes the parts of another style of the same `family`.
 
 ## Instruments
 

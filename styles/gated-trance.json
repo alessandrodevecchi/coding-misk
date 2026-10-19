@@ -199,5 +199,9 @@
       "Ciclo",
       "Cambio"
     ]
+  },
+  "growthShapes": {
+    "openings": { "full-kick": 3, "slow": 1, "mid-set": 1 },
+    "paces": { "fast": 3, "medium": 1 }
   }
 }
