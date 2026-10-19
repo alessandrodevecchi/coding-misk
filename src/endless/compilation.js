@@ -9,8 +9,9 @@ export const EVERY = ['song', 'some'];
 // neighbouring genres for the journey (a ring: the last is next to the first)
 export const GENRE_RING = ['ambient', 'jazz', 'hip-hop', 'pop', 'house', 'trance', 'techno', 'drum-and-bass', 'industrial', 'metal', 'rock', 'country', 'synthwave', 'experimental'];
 const ranges = () => Object.fromEntries(KNOBS.map(k => [k, SENSIBLE[k].slice()]));
-// a setup: movement, genres / styles / artists allowed (null = all), random artists, a range per knob
-export const SETUP_DEFAULT = { movement: 'journey', genres: null, styles: null, artists: null, randomArtists: true, ranges: ranges() };
+// a setup: movement, genres / styles / artists allowed (null = all), random artists, a range per knob; profiles
+// (radio-profiles D4): null (as the artists and styles say) or weights over the profiles of generated songs
+export const SETUP_DEFAULT = { movement: 'journey', genres: null, styles: null, artists: null, randomArtists: true, ranges: ranges(), profiles: null };
 const full = () => Object.fromEntries(KNOBS.map(k => [k, [0, 1]]));
 // everything: any genre, jumps, the knobs over their whole scale; journey: neighbouring genres, sensible knobs;
 // max: jumps and the knobs high
@@ -20,6 +21,8 @@ export const PRESETS = {
   max: { ...SETUP_DEFAULT, movement: 'free', ranges: { chaos: [0.6, 1], energy: [0.7, 1], complexity: [0.6, 1], talk: [0.3, 0.9] } },
   club: { ...SETUP_DEFAULT, genres: ['techno', 'trance', 'house', 'drum-and-bass', 'synthwave'], ranges: { ...ranges(), energy: [0.6, 0.95] } },
   chill: { ...SETUP_DEFAULT, genres: ['ambient', 'jazz', 'hip-hop', 'synthwave'], ranges: { ...ranges(), energy: [0.2, 0.6], chaos: [0.1, 0.45] } },
+  // every generated song grows like a live coder, in any genre, along the journey (radio-profiles, owner decision 8)
+  'live-coder': { ...SETUP_DEFAULT, profiles: { switch: 1 } },
 };
 const round5 = x => Math.round(x * 20) / 20;
 const genreOf = (recipes, id) => (recipes.find(r => r.id === id) || {}).genre;
@@ -87,8 +90,11 @@ export function boundArtist(artist, ranges = {}, locks = {}) {
 
 // the director options of song n in a compilation (comp: { every, setup, pool, locks }); how: transition, harmony, sounds.
 // locks: knobs held by hand (#59), used whatever the compilation draws
+// (a setup with profiles passes them as compProfiles: the director draws the song's profile from them, D1 rule 2)
 export function compilationOptions(seed, n, comp, recipes, how = {}) {
   const seg = segmentAt(seed, n, comp, recipes, comp.pool || []), locks = comp.locks || {};
+  const pf = (comp.setup || {}).profiles;
+  if (pf && typeof pf === 'object') how = { ...how, compProfiles: { ...pf } };
   const held = Object.fromEntries(KNOBS.filter(k => typeof locks[k] === 'number').map(k => [k, locks[k]]));
   if (!seg || seg.kind === 'none') return { styles: [recipes[0].id], ...held, ...how };
   if (seg.artist) return { artist: boundArtist(seg.artist, { ...ranges(), ...((comp.setup || {}).ranges || {}) }, locks), ...how };

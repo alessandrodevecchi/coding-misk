@@ -6,6 +6,7 @@ import { validateArtist } from '../src/endless/artist.js';
 import { createSession } from '../src/endless/director.js';
 import { withDefaults } from '../src/endless/recipe.js';
 import { loadStyles } from './styles-dir.mjs';
+import { hashString } from '../src/endless/random.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const recipes = loadStyles().map(withDefaults), ids = recipes.map(r => r.id);
@@ -16,6 +17,15 @@ const CHECKS = {
   'same seed, same artist'() {
     assert(JSON.stringify(makeArtist('abc', recipes)) === JSON.stringify(makeArtist('abc', recipes)), 'same artist');
     assert(makeArtist('abc', recipes).name !== makeArtist('abd', recipes).name || makeArtist('abc', recipes).id !== makeArtist('abd', recipes).id, 'other seed, other artist');
+  },
+  'random artists keep every field made before radio-profiles; profiles and growth come from their own stream'() {
+    // hashes of makeArtist before radio-profiles (2026-10-19), for three seeds
+    const before = { ombra: '400e2c8e', lampo: 'c54a8298', neve: '908e3f9f' };
+    for (const [seed, h] of Object.entries(before)) { const { profiles, growth, ...rest } = makeArtist(seed, recipes); assert(hashString(JSON.stringify(rest)).toString(16) === h, `${seed}: fields changed`); }
+    const all = Array.from({ length: 100 }, (_, i) => makeArtist(`p-${i}`, recipes));
+    const some = all.filter(a => a.profiles).length, grows = all.filter(a => a.growth).length;
+    assert(some > 20 && some < 70 && grows > 0 && grows < some, `profiles ${some}, growth ${grows} of 100`);
+    assert(all.every(a => !a.growth || !Object.keys((a.growth.developments || {})).includes('metamorphosis')), 'no metamorphosis on air');
   },
   'artists and styles keep to the allowed genres'() {
     for (let i = 0; i < 50; i++) {

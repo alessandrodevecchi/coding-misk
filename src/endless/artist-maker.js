@@ -2,7 +2,8 @@
 // gives the same result). Only existing styles and genres are picked; inventing styles is a later upgrade (#51).
 // Pure: checked in Node (tools/check-random.mjs).
 import { stream } from './random.js';
-import { PALETTES, MOVE_KINDS, VOICE_CHARACTER_NAMES, TRANSITION_KINDS } from './artist.js';
+import { PALETTES, MOVE_KINDS, VOICE_CHARACTER_NAMES, TRANSITION_KINDS, ARTIST_PROFILES } from './artist.js';
+import { OPENINGS, PACES, DEVELOPMENTS } from '../song/shapes.js';
 import { QUIRKS } from './quirks.js';
 import { SHAPES } from './recipe.js';
 
@@ -100,7 +101,7 @@ export function makeArtist(seed, recipes, { allowedGenres = null, allowedStyles 
   const quirkKeys = Object.keys(QUIRKS);
   const quirks = Object.fromEntries(r.shuffle(quirkKeys).slice(0, r.int(0, 2)).map(k => [k, round(r.range(0.3, 0.9))]));
   const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'artist'}-${String(seed).toLowerCase().replace(/[^a-z0-9]/g, '').slice(-4) || 'x'}`;
-  return {
+  const artist = {
     format: 1, id, name, bio, inspiredBy: r.pick(INSPIRED),
     portrait: { seed: `${seed}-face`, palette: r.pick(PALETTES) },
     styles: Object.fromEntries(styles.map((s, i) => [s, i === 0 ? 3 : r.int(1, 2)])),
@@ -110,4 +111,20 @@ export function makeArtist(seed, recipes, { allowedGenres = null, allowedStyles 
     quirks,
     transitions: { kinds: some(TRANSITION_KINDS, 2, 4), bars: r.pick([[4, 8], [8, 16], [16, 32]]), harmony: r.chance(0.85) ? 'compatible' : 'free' },
   };
+  return { ...artist, ...artistProfiles(seed) };
+}
+// profiles and growth of a random artist (radio-profiles D4), from their own stream: every field drawn before stays the
+// same for the same seed. Most random artists have no opinion (their songs follow the style); some weigh the profiles,
+// and some of those also like a growth (now and then free: the songs wait for their typing)
+// (metamorphosis is never drawn: it stays off on air)
+export function artistProfiles(seed) {
+  const p = stream(seed, 'artist-profile');
+  if (!p.chance(0.4)) return {};
+  const profiles = Object.fromEntries(ARTIST_PROFILES.map(k => [k, p.int(0, 3)]));
+  if (!Object.values(profiles).some(w => w > 0)) profiles[p.pick(['crescendo', 'switch'])] = 1;
+  if (!(profiles.switch > 0) || !p.chance(0.5)) return { profiles };
+  const pick = (list, lo, hi) => Object.fromEntries(p.shuffle(list).slice(0, p.int(lo, hi)).map(k => [k, p.int(1, 3)]));
+  const growth = { duration: p.chance(0.2) ? 'free' : 'fitted', openings: pick(OPENINGS.filter(x => x !== 'typed' && x !== 'voice'), 1, 3), paces: pick(PACES, 1, 2) };
+  if (p.chance(0.5)) growth.developments = pick(DEVELOPMENTS.filter(x => x !== 'metamorphosis'), 1, 2);
+  return { profiles, growth };
 }

@@ -94,6 +94,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Radio | Transitions | Transizioni | `radioTransition` |
 | Radio | Harmony | Armonia | `radioHarmony` |
 | Radio | Material | Materiale | `matSource` |
+| Radio | Profile | Profilo | `radioProfile` |
 | Radio | Mix | Mix | `tx:mix` |
 | Radio | Morph | Morph | `tx:morph` |
 | Radio | Break and riser | Break con riser | `tx:break` |

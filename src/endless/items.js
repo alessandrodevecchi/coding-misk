@@ -1,0 +1,42 @@
+// The songs of a radio session rebuilt without playing (#38, radio-profiles): song 0 (a lead from Compose), then each
+// generated song with its options (the recipe's options and changes, or the compilation's draw) and its steering. The
+// radio's replay, its exports, saved sessions and tools/check-radio-profiles.mjs build the same items from here.
+// Pure: no browser APIs.
+import { createSession, leadEntry } from './director.js';
+import { compilationOptions } from './compilation.js';
+import { steerSong } from './steering.js';
+import { recipeProfile } from './profile.js';
+import { growOnAir } from './growth.js';
+
+// the options of song n in a recipe: the first options, then every change up to n; options without the Profile option
+// (saved before radio-profiles) replay as Classic
+export function recipeOptionsAt(recipe, n) {
+  let o = recipe.options;
+  for (const c of recipe.changes || []) if (c.song <= n) o = c.options;
+  return { ...o, profile: recipeProfile(o) };
+}
+// the per-song choices a compilation keeps from the radio's controls (a clip keeps its length)
+export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}) });
+// the director options of song n: the compilation's draw, else the recipe's
+export const directorOptions = (recipes, recipe, n, o = recipeOptionsAt(recipe, n)) => (o.compilation ? compilationOptions(recipe.seed, n, o.compilation, recipes, howOf(o)) : o);
+
+// recipes: the usable style recipes; recipe: { seed, options, changes, steering, lead }; count: songs wanted
+// until(out): optional, stops early once true (the radio export by length, #8)
+// grow (radio-profiles D5): Crescendo and Live coder songs grow on air (growth.js), seeded by the song id; off until
+// the radio shows grown songs (stage 4), so the radio and its exports still play every song in blocks
+// (steering a grown song is D9: here a steered song grows from its steered written form)
+// → [{ song, entry, plan, opts }] (song 0 of a lead has only song and entry)
+export function sessionItems(recipes, recipe, count, until = null, { grow = false, styles = null } = {}) {
+  const shapes = grow ? styles || Object.fromEntries(recipes.map(r => [r.id, r])) : null;
+  const L = recipe.lead, le = L ? leadEntry(L.song) : null, ses = createSession(recipes, recipe.seed, le ? { lead: le } : {});
+  const out = L ? [{ song: L.song, entry: le }] : [];
+  for (let n = out.length; out.length < count && !(until && until(out)); n++) {
+    const g = ses.next(directorOptions(recipes, recipe, n)), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
+    let song = cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song;
+    // the transition into this song: planned on the entry before it (the lead's for the first song after it)
+    const before = out.length ? out[out.length - 1].entry : null;
+    if (grow && g.entry.profile) song = growOnAir(song, { profile: g.entry.profile, artist: g.opts.artist || null, into: before && before.transition ? before.transition.kind : null, styles: shapes, phrase: g.plan.phrase });
+    out.push({ song, entry: g.entry, plan: g.plan, opts: g.opts });
+  }
+  return out;
+}

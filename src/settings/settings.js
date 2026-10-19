@@ -74,6 +74,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         <div class="card set-card"><h3>${esc(t('setRadio'))}</h3>
           ${row(t('radioTransition'), `<select data-radio-opt="transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => opt(k, r.transition, t(k === 'artist' ? 'byArtist' : `tx:${k}`))).join('')}</select>`)}
           ${row(t('radioHarmony'), `<select data-radio-opt="harmony" data-no-knob>${['artist', ...HARMONY_MODES].map(k => opt(k, r.harmony, t(k === 'artist' ? 'byArtist' : `harmony:${k}`))).join('')}</select>`)}
+          ${row(t('radioProfile'), `<select data-radio-opt="profile" data-no-knob>${['artist', 'classic', 'crescendo', 'switch'].map(k => opt(k, r.profile || 'artist', t(k === 'artist' ? 'byArtistStyle' : `profile:${k}`))).join('')}</select>`, t('radioProfileTip'))}
           ${row(t('setScope'), `<select data-radio-opt="scope" data-no-knob>${opt('song', r.scope, t('steerScopeSong'))}${opt('session', r.scope, t('steerScopeSession'))}</select>`)}
           ${row(t('matDefault'), `<select data-radio-opt="material" data-no-knob>${['mix', 'patterns', 'varied', 'composed'].map(k => opt(k, r.material || 'mix', t(`mat:${k}`))).join('')}</select>`, `${t('matDefaultTip')} ${t('matSourceTip')} ${t('matVariedTip')}`)}
         </div>

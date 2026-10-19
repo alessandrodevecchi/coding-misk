@@ -2,26 +2,26 @@ Each stage ends with its checks green before the next starts. "Verify" names the
 
 ## 1. Baseline and guards (no change heard)
 
-- [ ] 1.1 Confirm which controls the radio's `playable()` uses today (the window song has no `profile`); give the window song explicit Classic controls so the Compose pick never reaches the radio; verify `node --no-warnings tools/check-radio.cjs` and `node tools/check-steering.cjs` pass unchanged
-- [ ] 1.2 New `npm run check:radio-profiles` (Node, `tools/check-radio-profiles.mjs`) with radio fixtures `tests/snapshots/radio-growth.json`: hashes of the radio items of three seeds in Classic; verify it passes on the current code and `npm run check:endless` fixtures do not move
+- [x] 1.1 Confirm which controls the radio's `playable()` uses today (the window song has no `profile`); give the window song explicit Classic controls so the Compose pick never reaches the radio; verify `node --no-warnings tools/check-radio.cjs` and `node tools/check-steering.cjs` pass unchanged
+- [x] 1.2 New `npm run check:radio-profiles` (Node, `tools/check-radio-profiles.mjs`) with radio fixtures `tests/snapshots/radio-growth.json`: hashes of the radio items of three seeds in Classic; verify it passes on the current code and `npm run check:endless` fixtures do not move
 
 ## 2. Profile resolution (pure, Node only)
 
-- [ ] 2.1 `src/endless/profile.js`: `songProfileOnAir` with the order of D1 (session control, compilation, artist, style, Classic), stream `profile/<n>`, `entry.profile` only when not Classic; verify `check:radio-profiles` covers each row of the D1 table and determinism, and `npm run check:endless` fixtures are unchanged (if they move, raise `DIRECTOR_VERSION` in the same commit)
-- [ ] 2.2 Saved songs (D2): the resolution for song 0, frozen songs and the Mix; verify cases in `check:radio-profiles` (declared profile wins; undeclared takes the forced profile in the radio, the player default in the Mix)
-- [ ] 2.3 Artist fields `profiles` and `growth` in `src/endless/artist.js`, validator with paths, `ARTIST_DEFAULTS` without them; verify `node --no-warnings tools/artist.mjs validate` and a broken artist case in `check:radio-profiles`
-- [ ] 2.4 Random artists draw `profiles` from stream `artist-profile`; verify `npm run check:random` (every field made before stays the same for the same seed)
-- [ ] 2.5 Compilation setup `profiles` and the built-in "Live coder" preset in `src/endless/compilation.js`; verify `npm run check:compilation` (old setups unchanged, the preset gives Live coder songs)
-- [ ] 2.6 Session option `profile` (`artist` default) in `OPTION_DEFAULTS`, recipe `changes`, Settings → Radio default; a recipe without it replays as `classic`; verify `check:radio-profiles` (old recipe replays identical to the 1.2 fixtures) and `node tools/check-settings.cjs`
+- [x] 2.1 `src/endless/profile.js`: `songProfileOnAir` with the order of D1 (session control, compilation, artist, style, Classic), stream `profile/<n>`, `entry.profile` only when not Classic; verify `check:radio-profiles` covers each row of the D1 table and determinism, and `npm run check:endless` fixtures are unchanged (if they move, raise `DIRECTOR_VERSION` in the same commit)
+- [x] 2.2 Saved songs (D2): the resolution for song 0, frozen songs and the Mix; verify cases in `check:radio-profiles` (declared profile wins; undeclared takes the forced profile in the radio, the player default in the Mix)
+- [x] 2.3 Artist fields `profiles` and `growth` in `src/endless/artist.js`, validator with paths, `ARTIST_DEFAULTS` without them; verify `node --no-warnings tools/artist.mjs validate` and a broken artist case in `check:radio-profiles`
+- [x] 2.4 Random artists draw `profiles` from stream `artist-profile`; verify `npm run check:random` (every field made before stays the same for the same seed)
+- [x] 2.5 Compilation setup `profiles` and the built-in "Live coder" preset in `src/endless/compilation.js`; verify `npm run check:compilation` (old setups unchanged, the preset gives Live coder songs)
+- [x] 2.6 Session option `profile` (`artist` default) in `OPTION_DEFAULTS`, recipe `changes`, Settings → Radio default; a recipe without it replays as `classic`; verify `check:radio-profiles` (old recipe replays identical to the 1.2 fixtures) and `node tools/check-settings.cjs`
 
 ## 3. Growth of a radio song (pure, Node only)
 
-- [ ] 3.1 `src/endless/growth.js`: written form of a director song (D5 step 1); verify in `check:radio-profiles` that the written form gives the same events as the director's song in blocks for 50 seeds over all styles
-- [ ] 3.2 Growth with Crescendo and Live coder rules from the written form, seeded by the song id; verify every step of 50 grown songs compiles (`stateAt` per step) and Classic items still match the 1.2 fixtures
-- [ ] 3.3 Shapes on air (D6): artist `growth` weights between the song and the style, metamorphosis off, typed opening only after `cut` or `interlude`, voice opening only with a spoken opening line; verify cases in `check:radio-profiles`
-- [ ] 3.4 Duration: fitted by default, free from the artist; free songs longer, next song's start moved; verify fitted songs end within one phrase of their plan and the stream starts stay contiguous
-- [ ] 3.5 Typing: `pasteRule` and the "typing never rushes" fallback per radio song; verify `rushedSteps` on 50 radio Live coder songs is no higher than on the Compose Live coder songs of `npm run check:crescendo`, and that the sound does not change between 40 and 110 columns
-- [ ] 3.6 Write the grown items into the radio fixtures; verify `npm run check:crescendo` (Crescendo and Live coder fixtures unchanged; if Live coder fixtures move, raise `SHAPES_VERSION`)
+- [x] 3.1 `src/endless/growth.js`: written form of a director song (D5 step 1); verify in `check:radio-profiles` that the written form gives the same events as the director's song in blocks for 50 seeds over all styles
+- [x] 3.2 Growth with Crescendo and Live coder rules from the written form, seeded by the song id; verify every step of 50 grown songs compiles (`stateAt` per step) and Classic items still match the 1.2 fixtures
+- [x] 3.3 Shapes on air (D6): artist `growth` weights between the song and the style, metamorphosis off, typed opening only after `cut` or `interlude`, voice opening only with a spoken opening line; verify cases in `check:radio-profiles`
+- [x] 3.4 Duration: fitted by default, free from the artist; free songs longer, next song's start moved; verify fitted songs end within one phrase of their plan and the stream starts stay contiguous
+- [x] 3.5 Typing: `pasteRule` and the "typing never rushes" fallback per radio song; verify `rushedSteps` on 50 radio Live coder songs is no higher than on the Compose Live coder songs of `npm run check:crescendo`, and that the sound does not change between 40 and 110 columns
+- [x] 3.6 Write the grown items into the radio fixtures; verify `npm run check:crescendo` (Crescendo and Live coder fixtures unchanged; if Live coder fixtures move, raise `SHAPES_VERSION`)
 
 ## 4. Code on air (browser)
 

@@ -9,6 +9,8 @@ import { overlapOf, extraOf } from '../endless/transitions.js';
 import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, VARY_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
+import { sessionItems, recipeOptionsAt, howOf } from '../endless/items.js';
+import { PROFILE_CHOICES } from '../endless/profile.js';
 import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
 import { buildSteps, sayText } from '../song/build.js';
 import { QUIRKS } from '../endless/quirks.js';
@@ -48,6 +50,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // transitions (#23): the artist's choice or always one kind; harmony: the artist's, compatible or free
     transition: ['artist', ...TRANSITION_KINDS].includes(saved.transition) ? saved.transition : 'artist',
     harmony: ['artist', ...HARMONY_MODES].includes(saved.harmony) ? saved.harmony : 'artist',
+    // profile (radio-profiles D3): as the artist and the style say, or one profile for every generated song; recorded
+    // in the recipe, so a replay gives the same profiles (Settings keeps the default for new pages)
+    profile: PROFILE_CHOICES.includes(saved.profile) ? saved.profile : OPTION_DEFAULTS.profile,
     // material (material-generator): patterns as written, varied, composed, or mix (each style's choice). The console
     // picks it for the songs to come (radio-variation); Settings keeps the default a new page starts from
     materialDefault: SESSION_SOURCES.includes(saved.materialDefault) ? saved.materialDefault : SESSION_SOURCES.includes(saved.material) ? saved.material : 'mix',
@@ -78,7 +83,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const saveOpts = () => store.set('coding-misk-radio', opts);
   const artistOf = id => (id ? artists().find(a => a.id === id) || (opts.temp && opts.temp.id === id ? opts.temp : null) : null);
   // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
-  const current = () => { const a = artistOf(opts.artist), up = userPatterns(), how = { transition: opts.transition, harmony: opts.harmony, ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}) };
+  const current = () => { const a = artistOf(opts.artist), up = userPatterns(), how = { transition: opts.transition, harmony: opts.harmony, profile: opts.profile, ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}) };
     // a compilation carries its setup and the artists it may use, so a replay draws the same songs
     if (opts.compilation !== 'off') return { compilation: { every: opts.compilation, setup: JSON.parse(JSON.stringify(opts.compSetup)), pool: JSON.parse(JSON.stringify(artists())), ...(Object.keys(opts.compLocks).length ? { locks: { ...opts.compLocks } } : {}) }, ...how };
     return a ? { artist: JSON.parse(JSON.stringify(a)), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how }; };
@@ -115,7 +120,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // ---------- stream ----------
   // options for song n: from the recipe when replaying, else the controls (recorded when they change)
   function optionsFor(n) {
-    if (S.replay) { let o = S.recipe.options; for (const c of S.recipe.changes) if (c.song <= n) o = c.options; return o; }
+    // (a recipe saved before radio-profiles replays as Classic)
+    if (S.replay) return recipeOptionsAt(S.recipe, n);
     const o = current(), last = S.lastOptions;
     if (n > 0 && !same(o, last)) S.recipe.changes.push({ song: n, options: o });
     S.lastOptions = o;
@@ -133,7 +139,6 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       return item;
     }
     const raw = optionsFor(n), comp = raw.compilation;
-    const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}) });
     const { song, entry, plan, opts: used } = S.session.next(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw);
     // the director has just planned the transition from the song before: an interlude lengthens it,
     // an overlap starts this song before it ends
@@ -172,15 +177,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // the songs of a session as heard (#38), rebuilt without playing: song 0, then each song with its steering
   // until(out): optional, stops early once true (the radio export by length, #8)
   function rebuild(recipe, count, until = null) {
-    const L = recipe.lead, le = L ? leadEntry(L.song) : null, ses = createSession(recipes, recipe.seed, le ? { lead: le } : {});
-    const out = L ? [{ song: L.song, entry: le }] : [];
-    for (let n = out.length; out.length < count && !(until && until(out)); n++) {
-      let o = recipe.options; for (const c of recipe.changes || []) if (c.song <= n) o = c.options;
-      // a compilation draws this song's options from its setup, as the radio does (a clip keeps its length)
-      const how = { transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}) };
-      const g = ses.next(o.compilation ? compilationOptions(recipe.seed, n, o.compilation, recipes, how) : o), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
-      out.push({ song: cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song, entry: g.entry });
-    }
+    const out = sessionItems(recipes, recipe, count, until);
     return out.map(x => ({ song: x.song, transition: x.entry.transition || null, artist: x.entry.artist ? x.entry.artist.name : '' }));
   }
   // ---------- fast export of the radio (#8) ----------
@@ -879,9 +876,10 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     get options() { return current(); },
     // defaults the settings page shows and changes (#31)
     // the material source here is the default for new sessions; the console changes the one on air
-    get settings() { return { transition: opts.transition, harmony: opts.harmony, scope: opts.scope, material: opts.materialDefault }; },
+    get settings() { return { transition: opts.transition, harmony: opts.harmony, profile: opts.profile, scope: opts.scope, material: opts.materialDefault }; },
     setOption(k, v) {
-      if (!['transition', 'harmony', 'scope', 'material'].includes(k)) return;
+      if (!['transition', 'harmony', 'profile', 'scope', 'material'].includes(k)) return;
+      if (k === 'profile' && !PROFILE_CHOICES.includes(v)) return;
       if (k === 'material') { if (!SESSION_SOURCES.includes(v)) return; opts.materialDefault = v; if (!S) opts.material = v; } else opts[k] = v;
       saveOpts(); if (!root.hidden) render();
     },

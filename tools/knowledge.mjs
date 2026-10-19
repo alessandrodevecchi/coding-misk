@@ -108,7 +108,7 @@ const PROFILE_NAMES = Object.fromEntries(PROFILE_IDS.map(id => [id, text(`profil
 // ---------- radio knobs: the keys of their texts ----------
 const KNOB_TEXT = {
   chaos: ['radioChaos', 'tipChaos'], energy: ['radioEnergy', 'tipEnergy'], complexity: ['radioComplexity', 'tipComplexity'], talk: ['radioTalk', 'tipTalk'],
-  transition: ['radioTransition', 'tipTransition'], harmony: ['radioHarmony', 'tipHarmony'], material: ['matSource', 'matSourceTip'],
+  transition: ['radioTransition', 'tipTransition'], harmony: ['radioHarmony', 'tipHarmony'], material: ['matSource', 'matSourceTip'], profile: ['radioProfile', 'radioProfileTip'],
 };
 
 // ---------- the example songs ----------

@@ -2,6 +2,7 @@
 // An artist never fixes a value: it gives weights and ranges, so songs by the same artist differ.
 import { SHAPES, styleKeys } from './recipe.js';
 import { QUIRKS } from './quirks.js';
+import { SHAPE_PARTS, RECIPE_KEYS } from '../song/shapes.js';
 
 export const ARTIST_FORMAT = 1;
 // palettes of the pixel-art portraits (src/endless/portrait.js)
@@ -12,6 +13,10 @@ export const VOICE_CHARACTER_NAMES = ['radio', 'robot', 'deep', 'bright', 'cathe
 // transitions between songs (#23, src/endless/transitions.js) and harmony modes for the next song
 export const TRANSITION_KINDS = ['mix', 'morph', 'break', 'echo', 'interlude', 'cut'];
 export const HARMONY_MODES = ['compatible', 'free'];
+// profiles an artist can weigh (radio-profiles D4; the ids of src/live/profiles.js, switch is the Live coder)
+export const ARTIST_PROFILES = ['classic', 'crescendo', 'switch'];
+// how the songs of an artist grow on air: the duration (fitted to the plan, or free) and growth shape weights
+export const GROWTH_DURATIONS = ['fitted', 'free'];
 
 // values used when an artist leaves a field out (also for fields added by later formats)
 export const ARTIST_DEFAULTS = {
@@ -19,7 +24,8 @@ export const ARTIST_DEFAULTS = {
   shapes: {}, pace: [0.4, 0.6], moves: {}, voice: { characters: {}, chance: 0.35 }, quirks: {},
   transitions: { kinds: { mix: 3, cut: 2, morph: 1, break: 1, echo: 1, interlude: 0.5 }, bars: [8, 16], harmony: 'compatible' },
 };
-export const ARTIST_FIELDS = ['format', 'id', 'name', 'bio', 'inspiredBy', 'portrait', 'styles', ...Object.keys(ARTIST_DEFAULTS)];
+// profiles and growth (radio-profiles) have no default: an artist without them leaves the choice to the next source
+export const ARTIST_FIELDS = ['format', 'id', 'name', 'bio', 'inspiredBy', 'portrait', 'styles', ...Object.keys(ARTIST_DEFAULTS), 'profiles', 'growth'];
 
 export const withArtistDefaults = a => {
   const out = { ...structuredClone(ARTIST_DEFAULTS), ...a };
@@ -91,6 +97,16 @@ export function validateArtist(a, styleIds = []) {
         if (Array.isArray(tr.bars) && !tr.bars.every(Number.isInteger)) err('transitions.bars', 'whole numbers of bars');
       }
       if (tr.harmony !== undefined && !HARMONY_MODES.includes(tr.harmony)) err('transitions.harmony', `one of ${HARMONY_MODES.join(', ')}`);
+    }
+  }
+  if (a.profiles !== undefined) weights('profiles', a.profiles, ARTIST_PROFILES, 'profiles');
+  if (a.growth !== undefined) {
+    const g = a.growth;
+    if (!g || typeof g !== 'object' || Array.isArray(g)) err('growth', 'an object {"duration": "fitted", "openings": {"full-kick": 2}, "paces": {"fast": 1}, "developments": {"masks": 1}}');
+    else {
+      for (const k of Object.keys(g)) if (k !== 'duration' && !Object.values(RECIPE_KEYS).includes(k)) err(`growth.${k}`, `unknown part; growth fields: duration, ${Object.values(RECIPE_KEYS).join(', ')}`);
+      if (g.duration !== undefined && !GROWTH_DURATIONS.includes(g.duration)) err('growth.duration', `one of ${GROWTH_DURATIONS.join(', ')}`);
+      for (const [part, key] of Object.entries(RECIPE_KEYS)) if (g[key] !== undefined) weights(`growth.${key}`, g[key], SHAPE_PARTS[part], key);
     }
   }
   return { errors, warnings };

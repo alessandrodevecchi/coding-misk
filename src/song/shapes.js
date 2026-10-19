@@ -84,18 +84,22 @@ export function canPlay(part, value, f) {
   return PACES.includes(value);
 }
 
-// the shape of a song: { opening, pace, development, from: { part: 'user' | 'song' | 'style' | 'seed' } }
+// the shape of a song: { opening, pace, development, from: { part: 'user' | 'song' | 'artist' | 'style' | 'seed' } }
 // user: the Compose controls ({ opening: 'auto' | value, … }); seed: defaults to the song id
-export function resolveShape(song, { user = {}, styles = {}, seed } = {}) {
+// on air (radio-profiles D6): weights, the artist's `growth` weights ({ openings, paces, developments }), drawn between the
+// song's own shape and the style's; deny: values left out before any draw ({ opening: ['typed'], development: […] })
+// (neither is given in Compose: its shapes stay as they were)
+export function resolveShape(song, { user = {}, styles = {}, seed, weights: artistWeights = null, deny = null } = {}) {
   const f = shapeFacts(song, styles), own = (song && song.growthShape) || {}, weights = (f.recipe && f.recipe.growthShapes) || {};
   const rng = stream(String(seed ?? (song && song.id) ?? 'song'), `shape-${SHAPES_VERSION}`);
   const out = { from: {} };
   for (const [part, list] of Object.entries(SHAPE_PARTS)) {
-    const ok = v => list.includes(v) && canPlay(part, v, f);
+    const ok = v => list.includes(v) && canPlay(part, v, f) && !(deny && (deny[part] || []).includes(v));
     const draw = (w, sub) => { const cands = list.filter(v => ok(v) && Number(w[v]) > 0); return cands.length ? rng.fork(`${part}-${sub}`).weighted(cands, cands.map(v => Number(w[v]))) : null; };
     let v = null, from = null;
     if (user[part] && user[part] !== 'auto' && ok(user[part])) { v = user[part]; from = 'user'; }
     else if (ok(own[part])) { v = own[part]; from = 'song'; }
+    else if (artistWeights && (v = draw(artistWeights[RECIPE_KEYS[part]] || {}, 'artist'))) from = 'artist';
     else if ((v = draw(weights[RECIPE_KEYS[part]] || {}, 'style'))) from = 'style';
     else { v = draw(DEFAULT_WEIGHTS[part], 'seed') || (part === 'opening' ? 'typed' : list[0]); from = 'seed'; }
     out[part] = v; out.from[part] = from;

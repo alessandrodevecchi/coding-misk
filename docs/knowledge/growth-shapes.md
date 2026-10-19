@@ -23,6 +23,8 @@ Shapes apply only with the Live coder profile and its natural growth. Classic an
 
 **Who chooses.** For each part: the Compose control, else the song, else the style weights, else a draw from the song's seed. Values the song cannot play are left out before any draw. The same song always draws the same shape.
 
+**On air.** A radio song has no Compose controls: the song, then the artist's `growth` weights, then the style, then the seed. The metamorphosis is never drawn (the next song is planned from the last section's tempo and key). The `typed` opening only follows a `cut` or an `interlude`, or opens a session; the `voice` opening still needs a spoken opening line ([radio.md](radio.md)).
+
 **Typing never rushes.** When development or pace is automatic and the drawn shape would make human typing rush a step, the next development by weight is tried. A value named by the song or in Compose is never replaced.
 
 **Version.** `SHAPES_VERSION` in `src/song/shapes.js` goes up when an intended change moves the Live coder fixtures. The seed name carries it, so a new version draws anew.

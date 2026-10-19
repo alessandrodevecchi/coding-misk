@@ -23,6 +23,8 @@ The changes are steps: a list of timed actions in the song's `build` field. A st
 - **Voice.** Step comments are spoken by the narrator ([narrator.md](narrator.md)).
 - **Hand coding.** Typing in the code panel stops the steps and the music goes on. "Resume live build" types the song's code back.
 
+**Growth of a radio song.** The director writes its own steps. `writtenForm` in `src/endless/growth.js` turns them into clips (same sound bar by bar; rack and comments stay steps), then `crescendoSong` grows the part from a section boundary with `budget`, `span` and `noEnding` rules, so the song keeps its planned length within a phrase ([radio.md](radio.md)).
+
 **Three growths.** `crescendo`: small steps, a change every one to four bars. `gradual`: a track enters with few lines, functions arrive one at a time. `natural`: like a live coder, four to six waypoints drawn at the start and small moves between them.
 
 **Typing.** Human typing waits, types at an uneven pace and makes mistakes it fixes. A new line that cannot be typed at a person's pace before its step is pasted whole. With free duration the step waits for the typing instead.

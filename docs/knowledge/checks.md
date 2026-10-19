@@ -73,6 +73,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-playlists.cjs` |  | dev server, Chrome | Browser checks for playlists (#36): favourites migration, "+ Playlist", the Playlists tab, auto-advance, shuffle, repeat one, export and import, phone width. |
 | `tools/check-playlists.mjs` | `npm run check:playlists` | Node | Checks for playlists (#36): store, migration of the old favourites, play queue, export and import. No browser. |
 | `tools/check-profiles.mjs` | `npm run check:profiles` | Node | Checks for performance profiles and code comments (performance-profiles). No browser. |
+| `tools/check-radio-profiles.mjs` | `npm run check:radio-profiles` | Node | Checks for profiles in the radio (radio-profiles). No browser. Radio fixtures (tests/snapshots/radio-growth.json): hashes of the radio items of three sessions in Classic (styles, an artist, a compilation), as the radio… |
 | `tools/check-radio.cjs` |  | dev server, Chrome | Browser checks for the radio (#22): tab, controls, determinism against the director, song changes, options from the next song, exclusive playback, history, save, open in Compose, replay. |
 | `tools/check-random.cjs` |  | dev server, Chrome | Browser checks for the random tools (#50): radio dice (artist with Keep, styles, genre, knobs in range, sounds), the random artist in the Artists tab (Keep, Again, Discard), random style and genre in the radio. |
 | `tools/check-random.mjs` | `npm run check:random` | Node | Checks for the random tools (#50): random artists are valid and repeatable, random styles and knobs stay in their limits, the sounds die changes the instruments and nothing else. No browser. |
@@ -105,7 +106,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 ## Fixtures and versions
 
 <!-- generated:fixtures -->
-Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/endless.json`, `tests/snapshots/levels.json`.
+Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/endless.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
 <!-- /generated -->
 
 | Fixture | Guards | Rewrite only when | Then |

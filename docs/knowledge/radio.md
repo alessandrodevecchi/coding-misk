@@ -1,8 +1,8 @@
 ---
 id: radio
 related: [radio-commands, styles, artists, material, patterns, narrator, voice, export, library, settings]
-code: [src/radio/radio.js, src/endless/director.js, src/endless/transitions.js, src/endless/compilation.js, src/endless/energy.js]
-checks: [npm run check:endless, npm run check:compilation, node --no-warnings tools/check-radio.cjs]
+code: [src/radio/radio.js, src/endless/director.js, src/endless/transitions.js, src/endless/compilation.js, src/endless/energy.js, src/endless/profile.js, src/endless/growth.js, src/endless/items.js]
+checks: [npm run check:endless, npm run check:compilation, npm run check:radio-profiles, node --no-warnings tools/check-radio.cjs]
 ---
 
 # Radio
@@ -30,6 +30,10 @@ A song on air builds itself like a live build. The listener can steer it from th
 
 **Continue in radio.** A song from Compose or the Songs tab can be song 0. The radio then goes on in the closest styles.
 
+**Profiles on air (radio-profiles, stages 1 to 3 of 8).** Every generated song gets a profile, from the first source that names one: the session option `profile`, the compilation setup's `profiles`, the artist's `profiles` weights, the declared `profile` of the style that gives the drums (the four `live-coder` family styles), else Classic (`songProfileOnAir` in `src/endless/profile.js`, stream `profile/<n>`). The director writes it as `entry.profile` only when it is not Classic. A saved song in a stream keeps its own profile, then takes the session's forced profile, then the player default (`savedSongProfile`). The radio window and its exports play with fixed Classic controls (`RADIO_LIVE` in `src/main.js`): the Compose profile, its overrides and the Live build switch never reach the radio.
+
+**Growth on air (pure, not heard yet).** `src/endless/growth.js` turns a director song into its written form (clips that follow the steps, same sound bar by bar) and grows Crescendo and Live coder songs from it with the Compose engine, seeded by the song id. Fitted duration by default: the growth replaces the bars before a section boundary from the reference section on, so the song stays within a phrase of its plan; an artist's `growth.duration: free` makes the song longer. The typed opening only after a cut or an interlude, no metamorphosis. `sessionItems(..., { grow: true })` in `src/endless/items.js` builds grown items; the radio and its exports keep `grow` off until the code on air is shown (stage 4).
+
 ## Options
 
 <!-- generated:radio-knobs -->
@@ -43,9 +47,10 @@ A song on air builds itself like a live build. The listener can steer it from th
 | `transition` | Transitions (it: Transizioni) | `artist` | How one song turns into the next: as the artist likes it, or always the same kind. Applies from the next transition. |
 | `harmony` | Harmony (it: Armonia) | `artist` | Compatible: the next song is a fifth away with a close tempo. Free: any key and tempo. |
 | `material` | Material (it: Materiale) | `mix` | Where the parts of the songs come from: the patterns as written, varied patterns, parts composed by the generator, or as each style says. |
+| `profile` | Profile (it: Profilo) | `artist` | How the radio's generated songs grow. As the artist and style say: they decide, songs of the live coder styles grow like a live coder. One profile: it applies to every generated song, with any artist, compilation or style, from the next song. Saved songs keep their own profile |
 <!-- /generated -->
 
-`minutes` is the length of a session on the command line (`--minutes`); the radio in the app plays until it is stopped. Styles, chaos, energy, complexity, voice and material apply from the next song prepared.
+`minutes` is the length of a session on the command line (`--minutes`); the radio in the app plays until it is stopped. Styles, chaos, energy, complexity, voice, material and profile apply from the next song prepared. `profile` is `artist` or one of `classic`, `crescendo`, `switch`; it overrides the artist's and the style's profile without changing which artists or styles play. A recipe saved without it replays as `classic`. Settings → Radio keeps its default.
 
 <!-- generated:transitions -->
 | Transition | Name |
@@ -69,7 +74,7 @@ Harmony modes: `compatible` Compatible (it: Compatibile), `free` Free (it: Liber
 
 The option `transition` is `artist` (the artist's weights) or one kind. `harmony` is `artist`, `compatible` or `free`.
 
-**Compilation.** The radio changes artist, genre, styles and knobs on its own, every song or every two to four songs. A setup limits genres, artists and knob ranges.
+**Compilation.** The radio changes artist, genre, styles and knobs on its own, every song or every two to four songs. A setup limits genres, artists and knob ranges. Its `profiles` is `null` (artists and styles decide) or weights over the profiles of the generated songs; the `live-coder` preset is the journey with `{ "switch": 1 }`.
 
 <!-- generated:compilation-presets -->
 Compilation: The radio changes artist, genre, styles and knobs on its own: every song, then every 2 to 4 songs, then off.
@@ -81,6 +86,7 @@ Compilation: The radio changes artist, genre, styles and knobs on its own: every
 | `max` | Max | `free` | all | chaos 0.6-1, energy 0.7-1, complexity 0.6-1, talk 0.3-0.9 |
 | `club` | Club | `journey` | techno, trance, house, drum-and-bass, synthwave | chaos 0.15-0.7, energy 0.6-0.95, complexity 0.3-0.8, talk 0.2-0.8 |
 | `chill` | Chill | `journey` | ambient, jazz, hip-hop, synthwave | chaos 0.1-0.45, energy 0.2-0.6, complexity 0.3-0.8, talk 0.2-0.8 |
+| `live-coder` | Live coder | `journey` | all | chaos 0.15-0.7, energy 0.3-0.9, complexity 0.3-0.8, talk 0.2-0.8 |
 <!-- /generated -->
 
 ## Example

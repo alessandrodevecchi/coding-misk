@@ -33,6 +33,15 @@ const CHECKS = {
     const only = segmentsUpTo('o', 30, { every: 'song', setup: { ...PRESETS.everything, artists: ['night-owl'], randomArtists: false } }, recipes, pool);
     assert(only.filter(s => s.artist).every(s => s.artist.id === 'night-owl'), 'only the allowed artist');
   },
+  'profiles (radio-profiles): the Live coder preset gives Live coder songs, a setup without profiles plays as before'() {
+    const songs = setup => { const ses = createSession(recipes, 'pf'); return Array.from({ length: 5 }, (_, n) => ses.next(compilationOptions('pf', n, { every: 'song', setup, pool }, recipes, { transition: 'artist', harmony: 'artist' })).entry); };
+    const { profiles, ...old } = PRESETS.journey;
+    assert(profiles === null && PRESETS['live-coder'].profiles.switch === 1 && PRESETS['live-coder'].movement === 'journey', 'presets');
+    const lc = songs(PRESETS['live-coder']), j = songs(old);
+    assert(lc.every(e => e.profile === 'switch'), `Live coder preset: ${lc.map(e => e.profile)}`);
+    const strip = l => JSON.stringify(l.map(({ profile: _, ...e }) => e));
+    assert(strip(lc) === strip(j) && JSON.stringify(j) === JSON.stringify(songs(PRESETS.journey)), 'the same songs as the journey, an old setup unchanged');
+  },
   'the journey moves between neighbouring genres'() {
     const segs = segmentsUpTo('j', 120, { every: 'song', setup: { ...PRESETS.journey, randomArtists: false, ranges: { chaos: [0, 0.1] } } }, recipes, pool);
     let near = 0;

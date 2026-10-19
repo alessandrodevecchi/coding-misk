@@ -100,13 +100,14 @@ A new console command that rewrites the song on air ([radio-commands.md](radio-c
 
 Any change to how radio songs are written.
 
-**Files:** `src/endless/director.js` (`DIRECTOR_VERSION`), `tests/snapshots/endless.json` (seed fixtures).
+**Files:** `src/endless/director.js` (`DIRECTOR_VERSION`), `tests/snapshots/endless.json` (seed fixtures), `tests/snapshots/radio-growth.json` (radio items, Classic and grown), `src/endless/profile.js` and `src/endless/growth.js` (profiles and growth on air).
 
 **Steps:**
 1. Run `npm run check:endless` before and after.
 2. When fixtures move on purpose, run `npm run check:endless -- --write-fixtures` and raise `DIRECTOR_VERSION` in the same commit. Playlists warn that saved sessions may sound different.
 3. Keep complexity 0 and the source `patterns` producing the old songs.
+4. Run `npm run check:radio-profiles` (a few minutes: it grows 60 songs). Its Classic fixtures must not move with a change that keeps the director's songs; rewrite them with `-- --write-fixtures` only on purpose. New randomness for profiles or growth goes in its own stream (`profile/<n>`, `artist-profile`), and `entry.profile` is written only when it is not Classic.
 
-**Checks:** `npm run check:endless`, `npm run check:compilation`, `npm run catalog:strudel`, `node tools/check-endless-play.cjs`, `node tools/check-radio.cjs`.
+**Checks:** `npm run check:endless`, `npm run check:radio-profiles`, `npm run check:compilation`, `npm run catalog:strudel`, `node tools/check-endless-play.cjs`, `node tools/check-radio.cjs`.
 
-**Mistakes:** rewriting fixtures without a version bump; new randomness drawn from an existing stream.
+**Mistakes:** rewriting fixtures without a version bump; new randomness drawn from an existing stream; a draw added to `artistSongOptions` (every later artist draw shifts); reading the Compose profile in the radio.

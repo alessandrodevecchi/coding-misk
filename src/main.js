@@ -151,6 +151,11 @@ const liveOverride = new Map();
 const profileFor = tr => { const o = liveOverride.get(tr.id); return (o && o.profile) || songProfile(tr) || profileChoice; };
 const ctlOf = tr => resolveProfile(profileFor(tr), overrides);
 const liveOf = tr => { const o = liveOverride.get(tr.id), C = ctlOf(tr); return { on: o && o.on !== undefined ? o.on : songProfile(tr) ? true : liveOn, style: C.build, ctl: C }; };
+// the radio's window and its exports (radio-profiles 1.1, owner decision 4): explicit Classic controls with the profile's
+// own display values, so neither the Compose profile, its overrides nor the Live build switch reach the radio (the
+// window song names no profile: before, a Crescendo pick with the switch on grew the window). Off: a window without
+// steps plays as written, as the radio did with the switch off
+const RADIO_LIVE = () => { const C = resolveProfile('classic'); return { on: false, style: C.build, ctl: C }; };
 // one control changed by hand: kept for every profile until a profile is picked again
 function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v }, PROFILES[profileFor(T)]); saveProfile(); }
 // Crescendo builds are computed once per song version and option
@@ -182,11 +187,12 @@ function codeCols() {
   return 80;
 }
 // oggetto riproducibile: codice + mappa di sezioni e tempo
-function playable(tr) {
+// fixed: controls that do not come from Compose (RADIO_LIVE for the radio's window and its exports)
+function playable(tr, fixed = null) {
   // live build: the code depends on the bar (steps applied up to there), with the latest comment written in
   // a song without steps can build itself too ("Live build" switch): steps derived from its clips
   // Crescendo ignores the song's own steps
-  const lv = liveOf(tr);
+  const lv = fixed || liveOf(tr);
   let build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : null;
   const C = lv.ctl, live = build ? liveCode(build, C, { lang: getLang, files: () => customFiles, cols: codeCols }) : null, now = !!(live && live.now);
   if (live) build = live.build;
@@ -882,7 +888,7 @@ async function exportRadio(range) {
   if (fastJob || rec || capture) return toast(t('vidBusy'));
   const r = radio && radio.exportItems(range);
   if (!r || !r.items.length) return;
-  const joinOf = items => playable({ ...joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: r.recipe.seed, options: r.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song)))), kind: 'composed', id: 'radio' });
+  const joinOf = items => playable({ ...joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: r.recipe.seed, options: r.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song)))), kind: 'composed', id: 'radio' }, RADIO_LIVE());
   let sg = joinOf(r.items);
   // a length: the real joined length decides. Exact (#5): the songs that reach the target, cut there with a fade;
   // else the last song goes when the rest still reaches 90% of the target. A clip: one song composed to the length.
@@ -1010,7 +1016,7 @@ function shapeFor(sg) {
   return { bars: sg.meta.bars, sections: sg.meta.sections.map(x => ({ label: x.label, start: x.start, len: x.len })), tracks: [{ type: 'any', clips: [{ start: 0, bars: sg.meta.bars }] }] };
 }
 // a session's songs joined into one playable song, as its export does
-const joinItems = (items, seed, options, id) => playable({ ...joinSession({ songs: items.map(x => ({ transition: x.transition })), seed, options: options || {} }, items.map(x => absoluteClips(clone(x.song)))), kind: 'composed', id });
+const joinItems = (items, seed, options, id) => playable({ ...joinSession({ songs: items.map(x => ({ transition: x.transition })), seed, options: options || {} }, items.map(x => absoluteClips(clone(x.song)))), kind: 'composed', id }, RADIO_LIVE());
 // a source: a song id, a playlist session id, or a recipe object (the file saved with a radio export)
 // → { sg, title, key, seed, songs, cut } or { error }
 function fragmentSource(src) {
@@ -1232,7 +1238,7 @@ async function exportSession(id) {
     try {
       const items = s.frozen || radio.rebuild(s.recipe, s.count);
       const joined = joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: s.recipe.seed, options: s.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song))));
-      const sg = playable({ ...joined, kind: 'composed', id });
+      const sg = playable({ ...joined, kind: 'composed', id }, RADIO_LIVE());
       const songs = items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' }));
       if (await (asVideo ? exportVideoFast(sg, s.title, { songs, seed: String(s.recipe.seed) }) : exportFast(sg, s.title, null, null, { songs, seed: String(s.recipe.seed) }))) return;
     } catch (e) { console.warn('[session export]', e); }
@@ -3147,7 +3153,7 @@ radio = createRadio({
   // the user's saved patterns join the songs where they fit (pattern-library; material-generator D10)
   userPatterns: () => forRadio(patternsStore.list()),
   player: {
-    makePlayable: sg => playable({ ...sg, kind: 'composed' }),
+    makePlayable: sg => playable({ ...sg, kind: 'composed' }, RADIO_LIVE()),
     start: (p, bar) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio'); },
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
@@ -3240,7 +3246,7 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     liveOpenWindow: () => liveLink.openWindow(), liveOpenRoom: () => liveLink.openRoom(), liveOn: () => { try { return liveLink.on; } catch (e) { return false; } },
     // hidden built-in songs (#68, D3b): how many, and all of them shown again
     hiddenSongs: () => (user.hidden || []).length, showHiddenSongs: () => showHiddenSongs(),
-    radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', scope: 'song', material: 'mix' }), setRadio: (k, v) => radio && radio.setOption(k, v),
+    radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', profile: 'artist', scope: 'song', material: 'mix' }), setRadio: (k, v) => radio && radio.setOption(k, v),
   } });
 $('#open-settings').addEventListener('click', () => showTab($('#tab-impostazioni').hidden ? 'impostazioni' : prevTab));
 

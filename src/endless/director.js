@@ -16,6 +16,7 @@ import { artistSongOptions, pickWeighted } from './artist.js';
 import { has, applyPlanQuirks } from './quirks.js';
 import { planTransition, MAX_RAMP } from './transitions.js';
 import { applyMaterial, sessionSource } from './material.js';
+import { songProfileOnAir } from './profile.js';
 
 export const SESSION_FORMAT = 'coding-misk/endless-session';
 // talk: how often the voice speaks (0 never, 0.5 about half of the boundaries with moves, 1 almost all)
@@ -24,7 +25,8 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // 4 (voice-instrument): styles with a voice instrument weight give some songs a spoken track and a narrator style
 export const DIRECTOR_VERSION = 5;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
-export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix' };
+// profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
+export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const round = x => (Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100);
 const cap = s => s[0].toUpperCase() + s.slice(1);
@@ -571,6 +573,10 @@ export function createSession(recipes, seed, { lead = null } = {}) {
       // the transition from the song before to this one (it needs both tempos)
       if (before) before.transition = planTransition(before, entry, opts, rng.transition);
       if (drawn) entry.artist = { id: options.artist.id, name: options.artist.name, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, pace: opts.pace, quirks: opts.quirks };
+      // the profile the song plays with (radio-profiles D1): written only when it is not Classic, so Classic sessions
+      // keep their entries as they were (compProfiles: the compilation setup's weights, when a compilation plays)
+      const pr = songProfileOnAir(i, { seed, choice: opts.profile, compilation: opts.compProfiles || null, artist: options && options.artist, style: byId[parts.drums] });
+      if (pr.profile !== 'classic') entry.profile = pr.profile;
       entries.push(entry);
       // a clip (#5) starts full: every track comes in on the first bar
       // (a voice line stays where it was)
@@ -619,7 +625,7 @@ export function generateSession(recipes, options) {
     const { song, entry } = ses.next(opts);
     songs.push(song); seconds += entry.seconds;
   }
-  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes, transition: opts.transition, harmony: opts.harmony, ...(sessionSource(opts) !== 'mix' ? { material: sessionSource(opts) } : {}), ...(opts.userPatterns ? { userPatterns: opts.userPatterns } : {}), ...(opts.artist ? { artist: opts.artist } : {}) }, seconds: Math.round(seconds), songs: ses.entries };
+  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes, transition: opts.transition, harmony: opts.harmony, ...(sessionSource(opts) !== 'mix' ? { material: sessionSource(opts) } : {}), ...(opts.userPatterns ? { userPatterns: opts.userPatterns } : {}), ...(opts.artist ? { artist: opts.artist } : {}), ...(opts.profile !== OPTION_DEFAULTS.profile ? { profile: opts.profile } : {}) }, seconds: Math.round(seconds), songs: ses.entries };
   return { session, songs };
 }
 

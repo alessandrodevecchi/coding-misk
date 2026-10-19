@@ -24,7 +24,7 @@ Built-in artists are JSON files in `artists/`. The user can make more in the Art
 
 ## Options
 
-Fields: `id`, `name`, `bio`, `portrait` (seed and palette of the pixel face), `styles`, `explore`, `chaos`, `energy`, `complexity`, `talk`, `pace`, `shapes`, `moves`, `voice`, `quirks`, `transitions`. Missing fields take the defaults of `ARTIST_DEFAULTS` in `src/endless/artist.js`.
+Fields: `id`, `name`, `bio`, `portrait` (seed and palette of the pixel face), `styles`, `explore`, `chaos`, `energy`, `complexity`, `talk`, `pace`, `shapes`, `moves`, `voice`, `quirks`, `transitions`, `profiles`, `growth`. Missing fields take the defaults of `ARTIST_DEFAULTS` in `src/endless/artist.js`; `profiles` and `growth` have none.
 
 How each field steers the director:
 
@@ -34,6 +34,10 @@ How each field steers the director:
 - `talk`: how often the narrator speaks. `pace`: below 0.3 phrases pass without moves, above 0.7 an extra move per phrase.
 - `shapes`, `moves`: weights for the energy shapes and a bonus for the moves the director scores.
 - `voice.characters`: the effects of the narrator's voice. `transitions`: how one song leaves for the next.
+- `profiles`: weights over `classic`, `crescendo` and `switch` (the Live coder) for the artist's songs in the radio, used when the radio's Profile is "as the artist" and no compilation setup names profiles ([profiles.md](profiles.md)). Missing: the style decides.
+- `growth`: `duration` (`fitted` keeps the planned length, `free` lets a song wait for its typing) and weights `openings`, `paces`, `developments` with the ids of the growth shapes, drawn after the song's own shape and before the style's ([growth-shapes.md](growth-shapes.md)).
+
+Random artists draw `profiles` (about four in ten) and sometimes `growth` from their own stream `artist-profile`, so every other field stays the same for the same seed.
 
 Quirks: `two-drops`, `long-breaks`, `no-guitars`, `texture-first`, `hard-endings`, `talks-a-lot`, `slow-builds`.
 

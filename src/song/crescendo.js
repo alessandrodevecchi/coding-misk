@@ -624,12 +624,12 @@ export function crescendoSong(song, opts = {}) {
   // growth-shapes: a shape the song or the user did not name is tried as drawn; when the Live coder typing would rush
   // a step, the next candidate by weight is tried (by type last), and the first without rushed steps is kept (else
   // the one rushed least in all)
-  const styles = rules.styles || {}, shape = resolveShape(song, { user: rules.shape, styles, seed: opts.seed });
+  const styles = rules.styles || {}, shape = resolveShape(song, { user: rules.shape, styles, seed: opts.seed, weights: rules.shapeWeights, deny: rules.deny });
   // a development and a pace named by the song or the user stay as they are
   if (['development', 'pace'].every(p => ['song', 'user'].includes(shape.from[p]))) return growSong(song, opts);
   let best = null;
   // (then the same candidates with less detail: fewer, smaller moves fit the length of the growth)
-  const cands = shapeCandidates(song, shape, styles), tries = [...cands, ...[2, 1, 0].flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
+  const cands = shapeCandidates(song, shape, styles, rules), tries = [...cands, ...[2, 1, 0].flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
   const C = resolveProfile('switch', { duration: rules.free ? 'free' : 'fitted' });
   for (const c of tries) {
     const r = { ...rules, ...(c.maxDetail !== undefined ? { maxDetail: c.maxDetail } : {}), shape: { opening: shape.opening, pace: c.pace, development: c.development } };
@@ -667,11 +667,14 @@ export function crescendoSong(song, opts = {}) {
 }
 // the shapes to try, in order: the drawn one, then the developments by weight (by type last), then by type with the
 // other paces; parts the song or the user named stay
-function shapeCandidates(song, shape, styles) {
+// (on air, radio-profiles: the artist's weights order the candidates of a part they chose; denied values are never tried)
+function shapeCandidates(song, shape, styles, rules = {}) {
   const f = shapeFacts(song, styles), fixed = p => ['song', 'user'].includes(shape.from[p]);
+  const denied = (part, v) => !!(rules.deny && (rules.deny[part] || []).includes(v));
   const order = (part, list) => {
-    const w = shape.from[part] === 'style' && f.recipe && f.recipe.growthShapes && f.recipe.growthShapes[RECIPE_KEYS[part]] ? { ...DEFAULT_WEIGHTS[part], ...f.recipe.growthShapes[RECIPE_KEYS[part]] } : DEFAULT_WEIGHTS[part];
-    const rest = list.filter(v => v !== shape[part] && canPlay(part, v, f)).sort((a, b) => (part === 'development' ? (a === 'by-type') - (b === 'by-type') : 0) || (w[b] || 0) - (w[a] || 0) || list.indexOf(a) - list.indexOf(b));
+    const aw = shape.from[part] === 'artist' && rules.shapeWeights && rules.shapeWeights[RECIPE_KEYS[part]];
+    const w = aw ? { ...DEFAULT_WEIGHTS[part], ...aw } : shape.from[part] === 'style' && f.recipe && f.recipe.growthShapes && f.recipe.growthShapes[RECIPE_KEYS[part]] ? { ...DEFAULT_WEIGHTS[part], ...f.recipe.growthShapes[RECIPE_KEYS[part]] } : DEFAULT_WEIGHTS[part];
+    const rest = list.filter(v => v !== shape[part] && canPlay(part, v, f) && !denied(part, v)).sort((a, b) => (part === 'development' ? (a === 'by-type') - (b === 'by-type') : 0) || (w[b] || 0) - (w[a] || 0) || list.indexOf(a) - list.indexOf(b));
     return [shape[part], ...rest];
   };
   const devs = fixed('development') ? [shape.development] : order('development', DEVELOPMENTS);
@@ -684,9 +687,10 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   const rng = stream(String(seed ?? song.id ?? 'song'), STREAM);
   const n = normalizeSong(song), W = n.total, secs = n.sections;
   // a song shorter than 24 bars has no room for slow growth: it grows with the Crescendo rules
-  if (rules.natural && W < 24) rules = {};
+  // (the on-air limits stay, radio-profiles: the bars the growth takes, no ending)
+  if (rules.natural && W < 24) rules = Object.fromEntries(['budget', 'span', 'noEnding'].filter(k => k in rules).map(k => [k, rules[k]]));
   // growth shape (growth-shapes): only the natural growth like a live coder follows one; Classic and Crescendo never
-  const shape = rules.coder && rules.shape ? resolveShape(song, { user: rules.shape, styles: rules.styles || {}, seed }) : null;
+  const shape = rules.coder && rules.shape ? resolveShape(song, { user: rules.shape, styles: rules.styles || {}, seed, weights: rules.shapeWeights, deny: rules.deny }) : null;
   const srng = shape ? stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_VERSION}/growth`) : null;
   const over = (c, s) => c.start < s.start + s.bars && c.start + c.bars > s.start;
   const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && t.clips.length);
@@ -715,7 +719,8 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   // growth budget: up to twice the written length for short songs, one and a half otherwise (room for the ending)
   // (natural growth is slower: at most the written length, so a song does not double)
   // (like a live coder, free duration: as long as the moves need, within twice the written length)
-  const cap = rules.coder && rules.free ? 2 * W - 4 : rules.natural ? (W < 48 ? Math.round(1.5 * W) : W) : W <= 20 ? 2 * W : Math.round(1.5 * W);
+  // (on air, radio-profiles D6: rules.budget, the bars the growth may take in the planned length)
+  const cap = rules.budget ?? (rules.coder && rules.free ? 2 * W - 4 : rules.natural ? (W < 48 ? Math.round(1.5 * W) : W) : W <= 20 ? 2 * W : Math.round(1.5 * W));
   // detail: the most that fits within three times the written length, with room between the steps
   let d = 3, plans, path, coder = null, skin = null, hold = false, harmonyAt = -1, seq = [], gaps = [], paced = [], typing = null;
   // growth-shapes: the rules of each track (the drums' core from the opening, the kick first with a medium or fast
@@ -813,17 +818,27 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
     gaps[1] = Math.max(gaps[1], Math.ceil(((p ? p.beats : bpb) + 1) / bpb));
   }
   let bar = 0;
-  const growth = seq.map((u, i) => ({ ...u, at: (bar += gaps[i]) }));
+  let growth = seq.map((u, i) => ({ ...u, at: (bar += gaps[i]) }));
   // the voice opening: the line is said just before the next track comes in (it ends a beat or more before it); the
   // bars before it are the time the next line takes to type
   let voiceAt = 0;
-  if (voiceOpen) {
+  const voiceBar = () => {
+    if (!voiceOpen) return;
     const next = growth.find((u, i) => i > 0 && u.kind === 'enter'), p = placed.find(x => x.track === voiceOpen.track.id && x.key === voiceOpen.clip.pattern), bpb = meterSteps(R.meter) / 4;
     if (next && p) voiceAt = Math.max(0, next.at - Math.ceil((p.beats + 1) / bpb));
-  }
-  const lastAt = growth[growth.length - 1].at, tail = gapOf(rng, narrated);
+  };
+  voiceBar();
+  let lastAt = growth[growth.length - 1].at;
+  const tail = gapOf(rng, narrated);
   let G = lastAt + tail;
   if (Math.ceil(G / 4) * 4 <= cap) G = Math.ceil(G / 4) * 4;
+  // on air (radio-profiles D6): rules.span, the bars the growth fills when it needs fewer: the bars left go to the gaps
+  // after the first minute, one at a time from the last, so the song keeps its planned length
+  if (rules.span && G < rules.span) {
+    const idx = gaps.map((g, i) => i).filter(i => i > 0 && !paced[i]).reverse(), all = idx.length ? idx : gaps.map((g, i) => i).filter(i => i > 0).reverse();
+    if (all.length) { for (let k = 0; k < rules.span - G; k++) gaps[all[k % all.length]]++; bar = 0; growth = seq.map((u, i) => ({ ...u, at: (bar += gaps[i]) })); voiceBar(); lastAt = growth[growth.length - 1].at; }
+    G = Math.max(rules.span, lastAt + 1);
+  }
   const harmonyBar = hold ? growth.find(u => u.harmony).at : 0;
   const skinBar = skin ? growth.find(u => u.skinStart).at : 0;
   // tracks that enter later in the song: minimal where their first clip starts, then they grow over the next steps,
@@ -897,7 +912,8 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   // the anchor plays alone for the last bars, then the song ends
   const gapsE = steps.map(() => (ending === 'strip' ? rng.int(1, 2) : rng.int(2, 4)));
   const E = gapsE.reduce((a, b) => a + b, 0) + rng.int(1, 2);
-  if (!steps.length || G + W + E > 3 * W || lastGrowth >= end) ending = 'short';
+  // (on air, radio-profiles: rules.noEnding, the director's song already ends as planned)
+  if (!steps.length || G + W + E > 3 * W || lastGrowth >= end || rules.noEnding) ending = 'short';
   if (ending !== 'short') {
     out.sections.push({ name: ending === 'strip' ? 'Strip' : 'Stop', bars: E, bpm: LS.bpm ?? R.bpm, key: LS.key ?? R.key, chords: LS.chords ?? R.chords, meter: LS.meter ?? R.meter });
     for (const t of active) {
