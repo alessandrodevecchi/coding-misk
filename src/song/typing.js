@@ -318,6 +318,8 @@ function whole(text, k) {
 // style 'human' (human-typing): uneven keys, thinking pauses, typos and changes of mind, seeded by the two texts
 // force: how many new lines may be pasted whole when the typing does not fit in max (0: none, the typing speeds up
 // instead; the paste rules of a live build are in src/live/typing-load.js, pasteRule)
+// shortest new line copied from a line above instead of typed
+const COPY_MIN = 40;
 export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false, force = Infinity } = {}) {
   const ops = lineDiff(chainLines(from), chainLines(to)), parts = [];
   for (let k = 0; k < ops.length;) {
@@ -328,9 +330,10 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
     dels.forEach((_, i) => { if (!pair.includes(i)) parts.push({ kind: 'gone' }); });
     adds.forEach((text, j) => parts.push(pair[j] >= 0 ? { kind: 'edit', segs: tokenDiff(dels[pair[j]], text) } : { kind: 'new', text, segs: [{ old: '', new: text }] }));
   }
-  // a new line like a line above it (as it is once that one is done): pasted as a copy, then edited
+  // a long new line like a line above it (as it is once that one is done): pasted as a copy, then edited; a short
+  // line is typed by hand
   parts.forEach((p, i) => {
-    if (p.kind !== 'new') return;
+    if (p.kind !== 'new' || p.text.length < COPY_MIN) return;
     let best = null, score = LIKE;
     for (let k = 0; k < i; k++) {
       const q = parts[k], txt = q.kind === 'keep' || q.kind === 'new' ? q.text : q.kind === 'edit' ? q.segs.map(s => (s.eq !== undefined ? s.eq : s.new)).join('') : null;
@@ -340,11 +343,11 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
     }
     if (best !== null) { p.paste = true; p.segs = tokenDiff(best, p.text); }
   });
-  // human style: a long new line unlike the others is sometimes pasted whole, as from notes (typing-mistakes);
+  // human style: a long new line unlike the others is now and then (1 in 8) pasted whole, as from notes (typing-mistakes);
   // never a comment or the voice's code
   if (style === 'human') {
     const pr = mulberry(`${seed}\u0000${from}\u0000${to}/paste`);
-    parts.forEach(p => { if (p.kind === 'new' && !p.paste && p.text.length >= 60 && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text) && pr() < 1 / 3) { p.paste = true; p.segs = [{ eq: p.text }]; } });
+    parts.forEach(p => { if (p.kind === 'new' && !p.paste && p.text.length >= 60 && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text) && pr() < 1 / 8) { p.paste = true; p.segs = [{ eq: p.text }]; } });
   }
   // actions in reading order: paste, then delete and type for each changed place
   const actions = () => {
