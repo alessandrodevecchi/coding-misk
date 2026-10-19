@@ -55,3 +55,45 @@ The knowledge base SHALL have a note with the important decisions and the reject
 #### Scenario: New option
 - **WHEN** a change adds a profile control
 - **THEN** the knowledge check fails until the control is described in its note
+
+### Requirement: Ready for a task
+The knowledge base SHALL let an agent with no history carry out the usual tasks on the app. It SHALL have a recipe for each of them, with the files to change, the steps, the checks to run and the mistakes to avoid: define or generate an artist, define a style, add a sound or an instrument, write a song, add a preset or a pattern, add a generator rule, add a growth opening or move, add a radio command, add a profile control or option, add a technical or library function, add a check, update Strudel, add interface text in both languages, export audio, video or fragments, fix a level or clipping problem. The index SHALL list the tasks and link each recipe.
+
+#### Scenario: Define an artist
+- **WHEN** an agent is asked to create a new artist
+- **THEN** the artist recipe says which file to write, which fields matter and how they steer the director, how to validate it and listen to it, and what not to write in it
+
+### Requirement: Inventories
+The knowledge base SHALL list, generated from the code and the shipped files: instruments and sounds (drum machines and banks, samples, synths, soundfonts, FM), sounds that styles or songs ask for and the app does not ship, presets by kind, keys, modes, scales, named progressions and meters.
+
+#### Scenario: Missing sound
+- **WHEN** a style asks for a sound that is not shipped
+- **THEN** the sounds note lists it as missing, and the list changes when the sound is added
+
+### Requirement: Areas for safe changes
+The knowledge base SHALL have notes on sound and levels (rack, devices, sound guard, level snapshots, clipping), the music engine (keys, modes, progressions, meters, presets) and visuals (themes, procedural visuals, video layout).
+
+#### Scenario: New sound
+- **WHEN** an agent adds a lead sound
+- **THEN** the sound note tells it how to measure its level and the limit it must stay under
+
+### Requirement: Checks, pitfalls, glossary and status
+The knowledge base SHALL have a map of the checks (what each covers, how long it takes, what it needs, which fixtures are never rewritten), a note of known pitfalls, an Italian and English glossary of interface terms generated from the help texts, and the current status (open changes and issues, without private details).
+
+#### Scenario: Which check
+- **WHEN** an agent changes the radio director
+- **THEN** the checks note tells it which checks to run, which need the dev server, and that a fixture change needs a director version bump
+
+### Requirement: From a reference to the app's material
+The knowledge base SHALL explain how to turn a reference (a song, a video, an audio file, a MIDI file, a score, a written description) into a style, an artist, a song or patterns: which files to ask the user for and why, what to measure (tempo, key and mode, groove, instruments and sounds, structure, energy over time, mood), which tools exist in the repo or on the machine, and worked examples from styles and songs that were made this way. It SHALL also list approaches not built yet that an agent can propose to the user (score reading, MIDI import, stem separation, automatic key and tempo detection), marked as ideas. It SHALL say where references that name real works, people or brands are kept.
+
+#### Scenario: A mood from a song
+- **WHEN** a user gives an agent an audio file and asks for a style with that mood
+- **THEN** the note tells the agent what to measure, how existing styles map to those measures, and what to ask the user if the file is not enough
+
+### Requirement: Catalog freshness
+The knowledge check SHALL fail when the Strudel coverage is older than the code the app writes, so that the list of functions not used yet is never stale.
+
+#### Scenario: New function written
+- **WHEN** a change makes the app write `rib` and the catalog is not rebuilt
+- **THEN** the knowledge check fails and asks to run `npm run catalog:strudel`

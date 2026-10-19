@@ -31,6 +31,22 @@ import { liveCode } from '../src/live/live-code.js';
 import { chainLines } from '../src/song/typing.js';
 import { loadStyles } from './styles-dir.mjs';
 import { loadArtists } from './artists-dir.mjs';
+import { songFiles } from './songs-dir.mjs';
+import { KEYS, MODES, PROGS, METERS, CHORDS, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, GROOVES, TEX_RHYTHMS, TEXTURES, KITS, ROWS, WAVES, LOOKS, HIDDEN_LOOKS, kitRow } from '../src/music.js';
+import { MODE_STEPS } from '../src/material/common.js';
+import { SHAPES as ENERGY_SHAPES } from '../src/endless/recipe.js';
+import { QUIRKS } from '../src/endless/quirks.js';
+import { SYNTHS } from '../src/song/validate.js';
+import { DEVICES } from '../src/song/rack.js';
+import { MACHINES } from '../src/sounds/machines.js';
+import { SOUNDFONT_FIX } from '../src/sounds/soundfont-fix.js';
+import { SOUND_KINDS, FM_RANGES } from '../src/material/sound.js';
+import { RULES, FAMILIES } from '../src/material/index.js';
+import { VIEW_NAMES } from '../src/soul/data.js';
+import { SHELLS } from '../src/soul/shells.js';
+import { LAYOUTS, QUALITIES, CARDS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES } from '../src/video/layout.js';
+import { FORMATS as AUDIO_FORMATS, MP3_RATES } from '../src/export/encode.js';
+import GM from '../node_modules/@strudel/soundfonts/gm.mjs';
 
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DIR = path.join(ROOT, 'docs', 'knowledge');
@@ -119,9 +135,167 @@ const jsBlock = s => ['```js', s.trimEnd(), '```'].join('\n');
 const jsonBlock = o => ['```json', JSON.stringify(o), '```'].join('\n');
 const jsonList = list => ['```json', '[', list.map(o => `  ${JSON.stringify(o)}`).join(',\n'), ']', '```'].join('\n');
 
+// ---------- Strudel names the app writes ----------
+// every name of every function the coverage counts as written: the catalog name, the spellings written (`as`) and the
+// catalog synonyms (coverage.json keys by catalog name: ribbon written as rib, segment as seg)
+export function usedStrudel() {
+  const cov = json('docs/strudel/coverage.json').functions, fns = json('docs/strudel/functions.json').functions, out = new Set();
+  for (const [k, c] of Object.entries(cov)) {
+    out.add(k);
+    for (const a of c.as || []) out.add(a);
+    const f = fns.find(x => x.name === k);
+    for (const s of (f && f.synonyms) || []) out.add(s);
+  }
+  return out;
+}
+
+// ---------- sounds: what ships and what is asked for ----------
+const LOOK = Object.fromEntries(LOOKS.map(([k, n]) => [k, n]));
+const nameOf = n => (n && typeof n === 'object' ? (n.it && n.it !== n.en ? `${n.en} (it: ${n.it})` : n.en) : String(n));
+const SONG_FILES = () => songFiles(path.join(ROOT, 'songs')).filter(f => !f.includes(`${path.sep}endless${path.sep}`)).sort();
+// KIT_MISSING is private to src/music.js: read from its source, so the list follows the code
+const KIT_MISSING = (() => {
+  const m = read('src/music.js').match(/const KIT_MISSING = (\{[^\n]*\});/);
+  return m ? Function(`return ${m[1]}`)() : {};
+})();
+// the sample banks loaded when the app starts: Strudel's own (repl prebake) and the app's
+function sampleBanks() {
+  const pre = read('node_modules/@strudel/repl/prebake.mjs'), app = read('src/main.js');
+  const vars = Object.fromEntries([...pre.matchAll(/const (\w+) = '([^']+)'/g)].map(m => [m[1], m[2]]));
+  const fromPre = [...pre.matchAll(/^\s*samples\(`\$\{(\w+)\}\/([^`]+)`\)/gm)].map(m => `${vars[m[1]].replace('https://raw.githubusercontent.com/', 'github ')}/${m[2]}`);
+  const fromApp = [...new Set([...app.matchAll(/(?:load|samples)\('((?:github:|\/samples\/)[^']+)'\)/g)].map(m => m[1]))];
+  return { fromPre, fromApp };
+}
+// a sound name → its kind, when the app ships it (null: not shipped, or a sample only the browser can confirm)
+const WAVE_IDS = WAVES.map(([k]) => k);
+function soundKind(name) {
+  if (SYNTHS.includes(name)) return 'synth';
+  if (GM[name]) return 'soundfont';
+  if (MACHINES.includes(name)) return 'drum machine';
+  if (TEXTURES.includes(name) || WAVE_IDS.includes(name)) return 'sample';
+  return null;
+}
+// every sound the styles and the songs name: name → { styles: Set, songs: Set }
+function askedSounds() {
+  const out = new Map(), add = (name, who, kind) => { if (!name) return; const e = out.get(name) || { styles: new Set(), songs: new Set() }; e[kind].add(who); out.set(name, e); };
+  for (const s of STYLES) {
+    for (const t of ['bass', 'arp', 'hook', 'pad']) for (const w of (s[t] && s[t].waves) || []) w.split(',').forEach(x => add(x, s.id, 'styles'));
+    for (const g of (s.guitar && s.guitar.types) || []) GUITAR_TYPES[g][1].split(',').forEach(x => add(x, s.id, 'styles'));
+    for (const k of (s.drums && s.drums.kits) || []) add(k, s.id, 'styles');
+    for (const x of (s.texture && s.texture.samples) || []) add(x, s.id, 'styles');
+  }
+  for (const f of SONG_FILES()) {
+    const song = JSON.parse(fs.readFileSync(f, 'utf8'));
+    for (const t of song.tracks || []) {
+      const st = t.settings || {};
+      if (typeof st.wave === 'string') st.wave.split(',').forEach(x => add(x, song.id, 'songs'));
+      if (typeof st.kit === 'string') add(st.kit, song.id, 'songs');
+      if (typeof st.sample === 'string') add(st.sample, song.id, 'songs');
+      if (t.type === 'guitar' && GUITAR_TYPES[st.type]) GUITAR_TYPES[st.type][1].split(',').forEach(x => add(x, song.id, 'songs'));
+    }
+  }
+  return out;
+}
+const who = e => [e.styles.size ? `styles: ${[...e.styles].sort().join(', ')}` : '', e.songs.size ? `${e.songs.size} song${e.songs.size > 1 ? 's' : ''}` : ''].filter(Boolean).join('; ');
+// the drum rows each kit is asked to play: styles (rows their grooves play), songs (rows with hits)
+function askedRows() {
+  const out = {}, add = (kit, row) => ((out[kit] ||= new Set()).add(row));
+  for (const s of STYLES) for (const k of (s.drums && s.drums.kits) || []) for (const g of s.drums.grooves || []) for (const [row, steps] of Object.entries((GROOVES[g] || [])[1] || {})) if (steps.includes('x')) add(k, row);
+  for (const f of SONG_FILES()) {
+    const song = JSON.parse(fs.readFileSync(f, 'utf8'));
+    for (const t of song.tracks || []) if (t.type === 'drums') for (const p of Object.values(t.patterns || {})) {
+      const kit = (t.settings && t.settings.kit) || 'RolandTR909';
+      for (const [row, steps] of Object.entries(p.rows || {})) if (/x/.test(String(steps))) add(kit, row);
+      for (const row of Object.keys((p.idea && p.idea.beat) || {})) if (row !== 'grid') add(kit, row);
+    }
+  }
+  return out;
+}
+
+// ---------- levels ----------
+function levelStats() {
+  const snap = json('tests/snapshots/levels.json'), by = {};
+  for (const scenes of Object.values(snap)) for (const sc of scenes) for (const [inst, v] of Object.entries(sc.levels || {})) (by[inst] ||= []).push(v);
+  const med = a => { const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+  return { songs: Object.keys(snap).length, rows: Object.entries(by).sort(([a], [b]) => a.localeCompare(b)).map(([k, a]) => [k, a.length, med(a), Math.max(...a)]) };
+}
+const constOf = (rel, name) => { const m = read(rel).match(new RegExp(`\\b${name}\\s*=\\s*([^,;\\n]+)`)); return m ? m[1].trim() : '?'; };
+
+// ---------- checks ----------
+// the header comment of a tool: its first sentences, without the usage lines
+function headerOf(rel) {
+  const lines = read(rel).split('\n'), out = [];
+  for (const l of lines) {
+    const m = l.match(/^\s*(?:\/\/|#|""")\s?(.*)$/);
+    if (!m) break;
+    if (/^(usage|  *npm run|  *node |\s*$)/i.test(m[1]) || /^\s+\S/.test(m[1])) { if (out.length) break; continue; }
+    out.push(m[1]);
+  }
+  const s = out.join(' ').replace(/\s+/g, ' ').trim();
+  const cut = s.length > 220 ? `${s.slice(0, 220).replace(/[ ,;:][^ ,;:]*$/, '')}…` : s;
+  return cut;
+}
+function checkTools() {
+  const pkg = json('package.json'), byFile = {};
+  for (const [k, v] of Object.entries(pkg.scripts)) { const m = v.match(/(tools\/[\w.-]+)/); if (m && (k.startsWith('check:') || k.startsWith('snapshot:'))) byFile[m[1]] = k; }
+  const files = fs.readdirSync(path.join(ROOT, 'tools')).filter(f => /^(check-|snapshot-)/.test(f)).sort().map(f => `tools/${f}`);
+  return files.map(f => ({ file: f, script: byFile[f] || null, browser: /playwright/i.test(read(f)), about: headerOf(f) }));
+}
+
+// ---------- glossary ----------
+const enBlock = () => { const s = read('src/i18n.js'); return s.slice(s.indexOf('\n  en: {')); };
+const keysLike = re => [...new Set([...enBlock().matchAll(re)].map(m => m[1]))];
+const GLOSSARY_EXTRA = ['radioArtist', 'radioCustom', 'artStyles', 'artQuirks', 'libKeys', 'libProgressions', 'libMeters', 'libShapes', 'libWords', 'favourites', 'handResume', 'handTag', 'ptSaveAs', 'player', 'compBtn', 'matSource'];
+function glossary() {
+  const groups = [
+    ['Tabs', keysLike(/[\s,{]'?(tab[A-Z]\w*)'?:/g)],
+    ['Profiles', PROFILE_IDS.map(id => `profile:${id}`)],
+    ['Live build options', Object.values(CONTROL_TEXT).map(c => c.label)],
+    ['Growth shape values', Object.entries(SHAPE_PARTS).flatMap(([p, l]) => l.map(v => `${p}:${v}`))],
+    ['Radio', Object.values(KNOB_TEXT).map(([k]) => k).concat(TRANSITION_KINDS.map(k => `tx:${k}`), SESSION_SOURCES.map(s => `matShort:${s}`))],
+    ['Console commands', Object.keys(COMMANDS).map(k => `steer:${k}`)],
+    ['Voice', WAYS.map(w => `way:${w}`)],
+    ['Other', GLOSSARY_EXTRA],
+  ];
+  const seen = new Set(), rows = [];
+  for (const [g, keys] of groups) for (const k of keys) {
+    const en = text(k, 'en'), it = text(k, 'it');
+    if (!en || !it || /\[\w+\]/.test(en) || en.split(' ').length > 5 || seen.has(`${en}|${it}`)) continue;
+    seen.add(`${en}|${it}`);
+    rows.push([g, en, it, code(k)]);
+  }
+  return rows;
+}
+
+// ---------- status ----------
+function openChanges() {
+  const dir = path.join(ROOT, 'openspec', 'changes');
+  return fs.readdirSync(dir).filter(d => d !== 'archive' && fs.existsSync(path.join(dir, d, 'tasks.md'))).sort().map(d => {
+    const t = fs.readFileSync(path.join(dir, d, 'tasks.md'), 'utf8'), all = (t.match(/^\s*- \[[ x]\]/gm) || []).length, open = (t.match(/^\s*- \[ \]/gm) || []).length;
+    return { id: d, all, open };
+  });
+}
+
 // ---------- the blocks ----------
 // note id → block name → generator
 const BLOCKS = {
+  'strudel-functions': {
+    summary() {
+      const fns = json('docs/strudel/functions.json').functions, n = Object.keys(json('docs/strudel/coverage.json').functions).length;
+      return [`Functions in the shipped Strudel: ${fns.length}. Written by the app: ${n}. Never written: ${fns.length - n}.`].join('\n');
+    },
+    unused() {
+      const v = json('docs/strudel/variety.json'), used = usedStrudel();
+      const rows = Object.entries(v).filter(([k, x]) => x.useful && !used.has(k)).map(([k, x]) => `| \`${k}\` | ${x.note.replace(/\|/g, '\\|')} |`);
+      return ['Useful for variety and not written yet by the app (a function written under any of its names counts as written):', '', '| Function | Why it is useful |', '| --- | --- |', ...rows].join('\n');
+    },
+    written() {
+      const cov = json('docs/strudel/coverage.json').functions;
+      // the catalog name, with the spellings the app writes when they differ (rib for ribbon)
+      const names = Object.keys(cov).sort().map(k => { const as = (cov[k].as || []).filter(a => a !== k); return as.length ? `${code(k)} (as ${as.map(code).join(', ')})` : code(k); });
+      return ['Written by the app today:', '', names.join(', ')].join('\n');
+    },
+  },
   strudel: {
     lessons() {
       const src = read('src/content.js'), body = src.slice(src.indexOf('export const LESSONS'), src.indexOf('];', src.indexOf('export const LESSONS')));
@@ -226,6 +400,10 @@ const BLOCKS = {
       const fams = [...new Set(STYLES.map(s => s.family).filter(Boolean))].sort();
       return [table(['Style id', 'Name', 'Genre', 'Family', 'Profile', 'BPM'], rows), '', `Families: ${fams.map(f => `${code(f)} (${STYLES.filter(s => s.family === f).map(s => s.id).sort().join(', ')})`).join('; ') || 'none'}.`].join('\n');
     },
+    'style-descriptions'() {
+      const rows = STYLES.slice().sort((a, b) => a.id.localeCompare(b.id)).map(s => [code(s.id), s.description || '', (s.keys || []).join(' '), (s.progressions || []).map(code).join(', '), (s.meters || ['4/4']).join(' ')]);
+      return table(['Style', 'Description (the recipe\'s own words)', 'Keys', 'Progressions', 'Meters'], rows);
+    },
   },
   artists: {
     artists() { return table(['Artist id', 'Name', 'Styles (weight)'], loadArtists().map(a => [code(a.id), a.name, Object.entries(a.styles || {}).map(([s, w]) => `${s} ${w}`).join(', ')])); },
@@ -266,6 +444,111 @@ const BLOCKS = {
   narrator: {
     narrator() { return [`Narrator styles: ${NARRATOR_STYLES.map(code).join(', ')}.`, '', `Speakers (\`SPEAKERS\`): ${SPEAKERS.map(code).join(', ')}.`].join('\n'); },
   },
+  sounds: {
+    synths() {
+      return [`Synths built into Strudel, accepted as \`wave\` (\`SYNTHS\` in \`src/song/validate.js\`): ${SYNTHS.map(code).join(', ')}.`, '',
+        `The sound menus of Compose (\`WAVES\` in \`src/music.js\`): ${WAVES.map(([k, n]) => `${code(k)} ${nameOf(n)}`).join(', ')}.`].join('\n');
+    },
+    soundfonts() {
+      const names = Object.keys(GM).sort(), asked = askedSounds();
+      return [`General MIDI soundfonts in the shipped \`@strudel/soundfonts\`: ${names.length}. A name in **bold** is used by a style, a song or a Compose menu.`, '',
+        names.map(n => (asked.has(n) || WAVE_IDS.includes(n) ? `**${n}**` : n)).join(', ')].join('\n');
+    },
+    'drum-machines'() {
+      return [`Drum machines (\`MACHINES\` in \`src/sounds/machines.js\`, the tidal-drum-machines bank): ${MACHINES.length}. The Compose kit menu (\`KITS\`): ${KITS.map(code).join(', ')}.`, '',
+        MACHINES.join(', '), '', `Drum rows of the step sequencer (\`ROWS\`): ${ROWS.map(([id, label]) => `${code(id)} ${label}`).join(', ')}. Ideas and grooves can also play \`rim\`, \`lt\`, \`mt\`, \`ht\`, \`cr\`.`, '',
+        'Rows a kit does not have (`KIT_MISSING` in `src/music.js`); the row plays the nearest sound the kit has:', '',
+        table(['Kit', 'Missing rows', 'Plays instead'], Object.entries(KIT_MISSING).map(([k, rows]) => [code(k), rows.map(code).join(', '), rows.map(r => `${r} → ${kitRow(k, r)}`).join(', ')]))].join('\n');
+    },
+    samples() {
+      const { fromPre, fromApp } = sampleBanks();
+      return [`Sample banks loaded at start by Strudel: ${fromPre.map(code).join(', ')}. Loaded by the app: ${fromApp.map(code).join(', ')}.`, '',
+        `Texture samples (\`TEXTURES\`, from dirt-samples; \`vinyl\` is synthetic crackle): ${TEXTURES.map(code).join(', ')}.`].join('\n');
+    },
+    'fm-and-guitars'() {
+      return [`Sound kinds of the material generator (\`SOUND_KINDS\`): ${SOUND_KINDS.map(code).join(', ')}. FM ranges (\`FM_RANGES\`): ${Object.entries(FM_RANGES).map(([k, v]) => `${k} ${Array.isArray(v) && v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number' && !['harmonicity'].includes(k) ? `${v[0]}-${v[1]}` : v.join('/')}`).join('; ')}.`, '',
+        table(['Guitar type', 'Name', 'Layered sounds', 'Base drive', 'High-pass'], Object.entries(GUITAR_TYPES).map(([k, v]) => [code(k), nameOf(v[0]), v[1].split(',').map(code).join(' + '), String(v[2]), String(v[3])]))].join('\n');
+    },
+    asked() {
+      const by = {};
+      for (const [n, e] of [...askedSounds()].sort(([a], [b]) => a.localeCompare(b))) (by[soundKind(n) || 'not shipped'] ||= []).push(`${code(n)} (${who(e)})`);
+      return Object.entries(by).sort(([a], [b]) => a.localeCompare(b)).map(([k, l]) => `- **${k}**: ${l.join(', ')}.`).join('\n');
+    },
+    missing() {
+      const lost = [...askedSounds()].filter(([n]) => !soundKind(n)).map(([n, e]) => `- ${code(n)}: not a synth, soundfont, drum machine or known sample (${who(e)}).`);
+      const rows = askedRows(), holes = [];
+      for (const [kit, set] of Object.entries(rows).sort()) for (const r of [...set].sort()) if ((KIT_MISSING[kit] || []).includes(r)) holes.push(`- ${code(kit)} has no ${code(r)}: plays ${code(kitRow(kit, r))}.`);
+      const broken = SOUNDFONT_FIX.map(x => `- ${code(x.name)} font ${x.font}${x.low !== undefined ? ` notes ${x.low}-${x.high}` : ''} is broken in the library: plays font ${x.use}.`);
+      return ['Sounds asked for and not shipped:', '', lost.length ? lost.join('\n') : '- none: every sound a style or a song names is shipped.', '',
+        'Drum rows asked for that a kit does not have:', '', holes.length ? holes.join('\n') : '- none.', '',
+        'Soundfont parts that are broken upstream (`SOUNDFONT_FIX`, played from a stand-in by the sound guard):', '', broken.join('\n')].join('\n');
+    },
+  },
+  'sound-and-levels': {
+    'rack-devices'() {
+      const arg = ([n, k, d, a, b]) => (k === 'choice' ? `${n} ${a.join('/')} (${d})` : `${n} ${a}-${b} (${d})`);
+      return table(['Device', 'Name', 'Kind', 'Arguments: range (default)'], Object.entries(DEVICES).map(([k, d]) => [code(k), nameOf(d.label), d.kind, d.args.map(arg).join('; ')]));
+    },
+    levels() {
+      const { songs, rows } = levelStats();
+      return [`Peak levels per instrument in \`tests/snapshots/levels.json\` (${songs} built-in songs, every section): how many sections, median and highest peak. 1.0 is clipping.`, '',
+        table(['Instrument', 'Sections', 'Median peak', 'Highest peak'], rows.map(([k, n, m, x]) => [code(k), String(n), String(m), String(x)])), '',
+        `Snapshot tolerance (\`tools/snapshot-levels.cjs\`): ${constOf('tools/snapshot-levels.cjs', 'TOL')} absolute, floor ${constOf('tools/snapshot-levels.cjs', 'FLOOR')}, per instrument ${constOf('tools/snapshot-levels.cjs', 'TOL_OF')}; \`fx\` is recorded, not compared. Master level: \`MASTER = ${constOf('src/main.js', 'MASTER')}\` in \`src/main.js\`.`].join('\n');
+    },
+  },
+  'music-engine': {
+    keys() {
+      return [`Keys (\`KEYS\`, everything is written in A and transposed): ${KEYS.map(([k, s, n]) => `${code(k)} (${s >= 0 ? '+' : ''}${s}, it: ${n.it})`).join(', ')}.`, '',
+        table(['Mode', 'Name', 'Scale steps (semitones)'], MODES.map(([k, n]) => [code(k), nameOf(n), MODE_STEPS[k] ? MODE_STEPS[k].join(' ') : 'semitones: numbers are half steps'])), '',
+        `Meters (\`METERS\`, sixteenth steps per bar): ${METERS.map(([m, n]) => `${code(m)} ${n}`).join(', ')}.`, '',
+        `Chord names (\`CHORDS\`, in A minor): ${Object.keys(CHORDS).map(code).join(', ')}.`].join('\n');
+    },
+    progressions() {
+      return table(['Progression', 'Name', 'Chords (in A, one per bar)'], Object.entries(PROGS).map(([k, [n, ch]]) => [code(k), nameOf(n), ch.join(' ')]));
+    },
+    presets() {
+      const kinds = [['bass', 'BASS', BASS], ['arp', 'ARPS', ARPS], ['hook', 'HOOKS', HOOKS], ['pad', 'PADS', PADS], ['guitar', 'GUITAR_PATTERNS', GUITAR_PATTERNS], ['drums', 'GROOVES', GROOVES], ['texture', 'TEX_RHYTHMS', TEX_RHYTHMS]];
+      return table(['Track type', 'Table', 'Presets'], kinds.map(([t, name, tab]) => [code(t), code(name), Object.entries(tab).map(([k, v]) => `${code(k)} ${nameOf(v[0])}`).join(', ')]));
+    },
+    'energy-shapes'() {
+      return [`Energy shapes of a song (\`SHAPES\` in \`src/endless/recipe.js\`): ${ENERGY_SHAPES.map(code).join(', ')}.`, '',
+        `Artist quirks (\`QUIRKS\`): ${Object.keys(QUIRKS).map(code).join(', ')}.`, '',
+        `Generator rules (\`RULES\`): ${Object.entries(RULES).map(([k, l]) => `${k}: ${l.map(code).join(', ')}`).join('; ')}. Groove families: ${FAMILIES.map(code).join(', ')}.`].join('\n');
+    },
+  },
+  visuals: {
+    looks() {
+      return [`Stage visuals (\`LOOKS\` in \`src/music.js\`): ${LOOKS.map(([k, n]) => `${code(k)} ${nameOf(n)}${HIDDEN_LOOKS.includes(k) ? ' (hidden)' : ''}`).join(', ')}.`, '',
+        `Soul views (\`VIEW_NAMES\` in \`src/soul/data.js\`): ${Object.entries(VIEW_NAMES).map(([k, n]) => `${code(k)} ${n}`).join(', ')}.`, '',
+        `Soul display shells (\`SHELLS\` in \`src/soul/shells.js\`): ${SHELLS.map(s => `${code(s.id)} ${s.name || ''}`.trim()).join(', ')}.`].join('\n');
+    },
+    'video-options'() {
+      return [`Video layouts (\`LAYOUTS\`): ${LAYOUTS.map(code).join(', ')}. Qualities: ${Object.keys(QUALITIES).map(code).join(', ')}. Title card: ${CARDS.map(code).join(', ')}.`, '',
+        `Fragments: formats ${Object.keys(F_FORMATS).map(code).join(', ')}; show ${F_SHOWS.map(code).join(', ')}; aspect ${F_ASPECTS.map(code).join(', ')}; code mode ${F_CODE.map(code).join(', ')}; files ${F_FILES.map(code).join(', ')}.`, '',
+        `Audio formats (\`src/export/encode.js\`): ${AUDIO_FORMATS.map(code).join(', ')}; MP3 at ${MP3_RATES.join(' or ')} kbps.`].join('\n');
+    },
+  },
+  checks: {
+    checks() {
+      return table(['Tool', 'npm script', 'Needs', 'What it covers'], checkTools().map(c => [code(c.file), c.script ? code(`npm run ${c.script}`) : '', c.browser ? 'dev server, Chrome' : 'Node', c.about]));
+    },
+    fixtures() {
+      const fx = fs.readdirSync(path.join(ROOT, 'tools', 'fixtures')).sort().map(f => `tools/fixtures/${f}`);
+      const sn = fs.readdirSync(path.join(ROOT, 'tests', 'snapshots')).sort().map(f => `tests/snapshots/${f}`);
+      return `Fixtures and snapshots in the repo: ${[...fx, ...sn].map(code).join(', ')}.`;
+    },
+  },
+  glossary: {
+    glossary() { return table(['Area', 'English', 'Italian', 'Key'], glossary()); },
+  },
+  status: {
+    changes() {
+      const all = openChanges(), open = all.filter(c => c.open), done = all.filter(c => !c.open);
+      return [`OpenSpec changes not archived: ${all.length}. With open tasks: ${open.length}. All tasks ticked, waiting to be archived: ${done.length}.`, '',
+        table(['Change', 'Open tasks', 'Tasks'], open.map(c => [`[${c.id}](../../openspec/changes/${c.id}/tasks.md)`, String(c.open), String(c.all)])), '',
+        `Ticked and not archived: ${done.map(c => code(c.id)).join(', ')}.`].join('\n');
+    },
+  },
 };
 
 // every block: { note, name, text }
@@ -301,6 +584,17 @@ export function lists() {
     { list: 'build action', note: 'live-build', items: BUILD_ACTIONS.map(a => ({ id: a, described: false })) },
     { list: 'idea field', note: 'ideas', items: [...new Set(Object.values(IDEA_KINDS).flat())].map(f => ({ id: f, described: false })) },
     { list: 'artist', note: 'artists', items: loadArtists().map(a => ({ id: a.id, described: true })) },
+    { list: 'style description', note: 'styles', items: STYLES.map(s => ({ id: s.id, described: !!s.description })) },
+    { list: 'rack device', note: 'sound-and-levels', items: Object.keys(DEVICES).map(k => ({ id: k, described: !!DEVICES[k].label })) },
+    { list: 'drum machine of the kit menu', note: 'sounds', items: KITS.map(k => ({ id: k, described: true })) },
+    { list: 'texture sample', note: 'sounds', items: TEXTURES.map(k => ({ id: k, described: true })) },
+    { list: 'progression', note: 'music-engine', items: Object.keys(PROGS).map(k => ({ id: k, described: true })) },
+    { list: 'mode', note: 'music-engine', items: MODES.map(([k]) => ({ id: k, described: true })) },
+    { list: 'meter', note: 'music-engine', items: METERS.map(([k]) => ({ id: k, described: true })) },
+    { list: 'energy shape', note: 'music-engine', items: ENERGY_SHAPES.map(k => ({ id: k, described: true })) },
+    { list: 'look', note: 'visuals', items: LOOKS.map(([k]) => ({ id: k, described: true })) },
+    { list: 'video layout', note: 'visuals', items: LAYOUTS.map(k => ({ id: k, described: true })) },
+    { list: 'check tool', note: 'checks', items: checkTools().map(c => ({ id: c.file, described: !!c.about })) },
   ];
 }
 

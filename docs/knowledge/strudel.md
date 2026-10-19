@@ -1,6 +1,6 @@
 ---
 id: strudel
-related: [songs, ideas, comments-and-functions, live-build]
+related: [strudel-functions, songs, ideas, comments-and-functions, live-build]
 code: [src/song/compile.js, src/song/writer.js, src/content.js, docs/STRUDEL-FUNCTIONS.md]
 checks: [npm run check:strudel, npm run check:code]
 ---

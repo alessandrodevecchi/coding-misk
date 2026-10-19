@@ -1,5 +1,10 @@
 // Checks the knowledge base in docs/knowledge/ (knowledge-base, #74, design D5). No browser.
 //   npm run check:knowledge     exit 1 and name the note and what is wrong
+// Ready for a task (requirements Ready for a task, Inventories, Catalog freshness): also fails when a task of the
+// spec has no recipe, a task of the index links no recipe or a recipe is not in the index, a recipe misses Files,
+// Steps, Checks or Mistakes, an inventory block is missing (or stale, like every generated block), the Strudel coverage
+// is older than its inputs (docs/strudel/inputs.json against a fresh hash), or a function the app writes under a
+// synonym is listed as not written.
 // Fails when: a note of the design is missing or not in the index; a note has no front block, a wrong id, a related
 // note, a code path or a check that does not exist, or misses a template section; a generated block is out of date
 // (tools/knowledge.mjs regenerates in memory and compares); a style, console command, profile, profile control,
@@ -12,15 +17,32 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse as parseJs } from 'acorn';
 import { parse as parseMini } from '../node_modules/@strudel/mini/krill-parser.js';
-import { generate, lists, applyBlocks, blockNames, handText, DIR, ROOT } from './knowledge.mjs';
+import { generate, lists, applyBlocks, blockNames, handText, usedStrudel, DIR, ROOT } from './knowledge.mjs';
+import { inputsStamp, FILES as CATALOG_FILES } from './strudel-catalog.mjs';
 import { scanCalls, isAppName } from './strudel-code.mjs';
 import { lookup } from './strudel-functions.mjs';
 
 // the notes of the design (D1): the concepts every agent needs
-export const NOTES = ['README', 'strudel', 'profiles', 'live-build', 'growth-shapes', 'comments-and-functions', 'songs', 'ideas', 'patterns', 'material', 'styles', 'artists', 'radio', 'radio-commands', 'voice', 'narrator', 'export', 'library', 'settings', 'decisions'];
-// notes with the template sections (D2); the index and the decisions have their own shape
+export const NOTES = ['README', 'strudel', 'strudel-functions', 'profiles', 'live-build', 'growth-shapes', 'comments-and-functions', 'songs', 'ideas', 'patterns', 'material', 'styles', 'artists', 'radio', 'radio-commands', 'voice', 'narrator', 'export', 'library', 'settings', 'decisions',
+  // ready for a task: inventories, safe-change areas, recipes, references, checks, pitfalls, glossary, status
+  'sounds', 'sound-and-levels', 'music-engine', 'visuals', 'recipes-music', 'recipes-parts', 'recipes-build', 'recipes-app', 'from-a-reference', 'checks', 'pitfalls', 'glossary', 'status'];
+// notes with the template sections (D2); the others have their own shape, checked below
 const TEMPLATE = ['What it is', 'How it connects', 'Options', 'Example', 'Where to read more'];
-const NO_TEMPLATE = ['README', 'decisions'];
+const RECIPE_NOTES = ['recipes-music', 'recipes-parts', 'recipes-build', 'recipes-app'];
+const SHAPES = {
+  'from-a-reference': ['Inputs to ask for', 'What to measure', 'Tools', 'Worked examples', 'From measures to recipe fields', 'Ideas not built yet', 'Where references are kept'],
+  checks: ['Which checks to run', 'Every check', 'Fixtures and versions'],
+  pitfalls: ['Strudel', 'Sound and levels', 'Generated code and fixtures', 'Browser checks', 'Writing'],
+  glossary: ['Words we use', 'Interface terms'],
+  status: ['Open changes', 'Open issues'],
+};
+const NO_TEMPLATE = ['README', 'decisions', ...RECIPE_NOTES, ...Object.keys(SHAPES)];
+// every recipe has these parts (Ready for a task)
+const RECIPE_PARTS = ['Files', 'Steps', 'Checks', 'Mistakes'];
+// the tasks of the spec (requirement Ready for a task): each one has a recipe under this heading
+export const REQUIRED_TASKS = ['Define an artist', 'Generate an artist', 'Define a style', 'Add a sound or an instrument', 'Write a song', 'Add a preset', 'Add a pattern', 'Add a generator rule', 'Add a growth opening or move', 'Add a radio command', 'Add a profile control or option', 'Add a technical or library function', 'Add a check', 'Update Strudel', 'Add interface text in both languages', 'Export audio, video or fragments', 'Fix a level or clipping problem'];
+// inventory blocks (requirement Inventories): they must exist; the generated-block check keeps them current
+const INVENTORY = { sounds: ['synths', 'soundfonts', 'drum-machines', 'samples', 'fm-and-guitars', 'asked', 'missing'], 'music-engine': ['keys', 'progressions', 'presets', 'energy-shapes'], 'sound-and-levels': ['rack-devices', 'levels'], visuals: ['looks', 'video-options'], glossary: ['glossary'], status: ['changes'], checks: ['checks', 'fixtures'] };
 const MAX_LINES = 150;
 
 const problems = [], warnings = [];
@@ -64,6 +86,49 @@ for (const [id, text] of Object.entries(notes)) {
   for (const c of f.code || []) if (!fs.existsSync(path.join(ROOT, c))) fail(id, `code path ${c} does not exist`);
   for (const c of f.checks || []) checkCommand(id, c);
   if (!NO_TEMPLATE.includes(id)) for (const s of TEMPLATE) if (!new RegExp(`^## ${s}$`, 'm').test(text)) fail(id, `no section "## ${s}" (note template, design D2)`);
+  for (const s of SHAPES[id] || []) if (!new RegExp(`^## ${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm').test(text)) fail(id, `no section "## ${s}"`);
+}
+
+// ---------- recipes and tasks ----------
+const slugOf = h => h.trim().toLowerCase().replace(/<[^>]+>/g, '').replace(/[`*_~]/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s/g, '-');
+// every recipe: a ### heading in a recipe note, with its parts as bold labels before the next heading
+const recipes = new Map();
+for (const id of RECIPE_NOTES) {
+  const text = notes[id] || '', parts = text.split(/^### /m).slice(1);
+  if (!parts.length) fail(id, 'has no recipe (### heading)');
+  for (const p of parts) {
+    const title = p.split('\n')[0].trim(), body = p.split(/^## /m)[0];
+    recipes.set(`${id}#${slugOf(title)}`, title);
+    for (const part of RECIPE_PARTS) if (!new RegExp(`^\\*\\*${part}[.:]?\\*\\*`, 'm').test(body)) fail(id, `recipe "${title}" has no **${part}** part`);
+  }
+}
+// the task table of the index: | Task | Recipe | with a link to note#heading
+const tasksPart = (index.split(/^## Tasks$/m)[1] || '').split(/^## /m)[0];
+if (!tasksPart) fail('README', 'has no "## Tasks" section listing the tasks and their recipes');
+const listed = new Map();
+for (const m of tasksPart.matchAll(/^\|\s*([^|]+?)\s*\|\s*\[[^\]]*\]\(([\w-]+)\.md#([\w-]+)\)/gm)) listed.set(`${m[2]}#${m[3]}`, m[1]);
+for (const [key, task] of listed) if (!recipes.has(key)) fail('README', `task "${task}" links ${key.replace('#', '.md#')}, which is not a recipe: every task needs a recipe`);
+for (const [key, title] of recipes) if (!listed.has(key)) fail('README', `recipe "${title}" (${key.replace('#', '.md#')}) is not listed in the Tasks table`);
+const titles = new Set(recipes.values());
+for (const t of REQUIRED_TASKS) if (!titles.has(t)) problems.push(`docs/knowledge: no recipe "### ${t}" (a task of the spec, requirement Ready for a task)`);
+
+// ---------- inventories ----------
+for (const [note, names] of Object.entries(INVENTORY)) for (const n of names) if (notes[note] && !blockNames(notes[note]).includes(n)) fail(note, `no inventory block "${n}" (<!-- generated:${n} -->)`);
+
+// ---------- catalog freshness ----------
+// the coverage of the Strudel catalog must be built from the code as it is: a hash of the catalog's inputs is stored
+// by npm run catalog:strudel in docs/strudel/inputs.json and computed again here
+{
+  let stored = null;
+  try { stored = JSON.parse(fs.readFileSync(CATALOG_FILES.inputs, 'utf8')); } catch (e) {}
+  const now = inputsStamp();
+  if (!stored) problems.push('docs/strudel/inputs.json is missing: run npm run catalog:strudel');
+  else if (stored.hash !== now.hash) problems.push(`the Strudel coverage is older than the code it was built from (${now.files} input files, hash changed): run npm run catalog:strudel, then npm run knowledge`);
+}
+// a function the app writes under a synonym (rib for ribbon) must not be listed as not written yet
+{
+  const used = usedStrudel(), unused = ((notes['strudel-functions'] || '').match(/<!-- generated:unused -->([\s\S]*?)<!-- \/generated -->/) || [])[1] || '';
+  for (const m of unused.matchAll(/^\| `([^`]+)` \|/gm)) if (used.has(m[1])) fail('strudel-functions', `\`${m[1]}\` is listed as not written, but the app writes it (under this name or a synonym)`);
 }
 
 // ---------- generated blocks ----------

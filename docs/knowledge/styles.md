@@ -1,6 +1,6 @@
 ---
 id: styles
-related: [radio, material, artists, profiles, growth-shapes, voice, comments-and-functions]
+related: [radio, material, artists, profiles, growth-shapes, voice, comments-and-functions, music-engine, sounds, from-a-reference, recipes-music]
 code: [styles, src/endless/recipe.js, src/endless/mix.js, tools/styles-dir.mjs]
 checks: [npm run check:styles, npm run check:endless]
 ---
@@ -53,6 +53,35 @@ Each style belongs to a genre of the song library. Some belong to a family acros
 
 Families: `live-coder` (acid, gated-trance, house, pure-trance).
 <!-- /generated -->
+
+Each recipe describes its sound in one sentence. The descriptions below come from the recipes; they may name a film or a scene as a mood reference.
+
+<!-- generated:style-descriptions -->
+| Style | Description (the recipe's own words) | Keys | Progressions | Meters |
+| --- | --- | --- | --- | --- |
+| `acid` | Live-coded acid in one minor scale: a squelchy resonant line, a distorted kick, sparse hats and claps, built one function at a time. | C A F E | `drone`, `pendolo`, `tensione` | 4/4 |
+| `ambient` | Long held chords, slow filters, distant bells and wind; very few layers, almost no drums. | D E C A | `drone`, `pendolo`, `malinconica`, `dorico` | 4/4 |
+| `berlin-techno` | Dark warehouse techno: one chord or a flat-second tension, low rolling bass, dry hats, no sweet melodies. | F E G A | `drone`, `tensione`, `ipnotica` | 4/4 |
+| `classic-rock` | Seventies and eighties rock: verse and chorus beats, overdriven power chords, organ and a guitar-like lead. | E A D G | `rock`, `dorico`, `epica`, `andalusa` | 4/4 |
+| `country` | Train beat and boom-chick bass, steel-string and banjo chords, harmonica or fiddle lines. | G D A E | `country`, `rock`, `andalusa` | 4/4 |
+| `dark-cyberpunk` | Night city at its worst: tritone riffs, glitching machines, cold stabs and a threat in every bar, in the John Wick club mood. | F E D F# | `cyber`, `tensione`, `frigio`, `notturna` | 4/4 |
+| `darksynth` | Synthwave turned to horror: driving kick, galloping octave bass, aggressive saw leads, sidechained walls and the odd distorted guitar. | E F G A | `cyber`, `frigio`, `epica`, `tensione` | 4/4 |
+| `dreamy-cyberpunk` | Rain on neon at three in the morning: slow pulse, warm pads, bells and a melancholic lead, more nostalgia than threat. | D E C A | `malinconica`, `notturna`, `pendolo`, `lofi` | 4/4 |
+| `drum-and-bass` | Fast two-step breaks over deep sub bass, dark pads and short stabs. | F E G D | `notturna`, `pendolo`, `drone`, `malinconica` | 4/4 |
+| `gated-trance` | Live-coded trance in one minor scale: four on the floor, a gated supersaw bass and lead on one or two chords, a pulse riser, built step by step. | G A F D | `drone`, `pendolo`, `ipnotica`, `epica` | 4/4 |
+| `house` | Live-coded house in one minor scale: four on the floor with off-beat open hats, a chord stab on one or two chords, a bass on the root. | A D F G | `drone`, `pendolo`, `dorico`, `ipnotica` | 4/4 |
+| `industrial` | Machines and metal: hard techno drums, stomping guitars, bit-crushed textures and tritone riffs. | E F D A | `frigio`, `tensione`, `drone` | 4/4 |
+| `jazz` | Small combo at night: swing ride, walking upright bass, comping piano and vibraphone lines. | C F D B | `jazz`, `turnaround`, `lofi` | 4/4 |
+| `lo-fi` | Slow, dusty beats with seventh chords, electric piano and vinyl crackle; sparse and calm. | C D F A | `lofi`, `jazz`, `turnaround` | 4/4 |
+| `melodic-metal` | Double kick and gallops, high-gain riffs in phrygian, heroic twin-guitar leads and choir pads. | E D F# B | `frigio`, `epica`, `andalusa`, `anthem` | 4/4 |
+| `phonk` | Drift phonk: cowbell melodies, heavy 808 sub, rolling hats and distorted drums. | F F# G E | `frigio`, `tensione`, `drone` | 4/4 |
+| `progressive-house` | Uplifting festival house: four-on-the-floor, offbeat and pumping bass, piano chords, plucked arps and a big singable lead over vi-IV-I-V. | B A G F# | `epica`, `euforica`, `anthem`, `ascesa`, `rock` | 4/4 |
+| `pure-trance` | Pure live-coded trance in one minor scale: four on the floor, a gated supersaw bass, one or two chords and a lead written with scale degrees, no arpeggio, built step by step. | G A F D | `drone`, `pendolo` | 4/4 |
+| `synthwave` | Eighties night drive: gated snare, octave bass, warm pads and a sawtooth lead, in minor. | F E A D | `epica`, `malinconica`, `cyber`, `notturna` | 4/4 |
+| `trance` | Driving trance with rolling bass, arpeggios and a big lift before the drop. | A F# G B | `epica`, `euforica`, `anthem`, `ascesa`, `ipnotica` | 4/4 |
+<!-- /generated -->
+
+To pick a style for a mood, compare tempo, keys, progressions and the description. To make a new one from a song or an audio file, see [from-a-reference.md](from-a-reference.md); the steps are in [recipes-music.md](recipes-music.md#define-a-style).
 
 Main recipe fields: `tempo`, `keys`, `progressions`, `meters`, `swing`, `shapes` (energy shapes), `minutes`, `phrase`, `tracks`, `energy`, `voice`, `spoken`, `narrator`, `growthShapes`, `words` (title words). Instrument blocks: `drums`, `bass`, `arp`, `hook`, `pad`, `guitar`, `texture`, `riser`.
 

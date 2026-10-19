@@ -30,6 +30,12 @@ Front block with `id`, `related` (note ids), `code` (paths), `checks` (commands)
 ### D6. Decisions note
 Hand-written, seeded from the DEVLOG and the variety plan: one line per decision, the reason, the source (commit, change or DEVLOG date). Old entries that no longer hold are removed, not kept.
 
+### D7. Ready for a task
+Recipes in `recipes-music.md`, `recipes-parts.md`, `recipes-build.md` and `recipes-app.md`: one `###` section per task with **Files**, **Steps**, **Checks**, **Mistakes**; the index has a Tasks table that links each one. New notes: `sounds.md`, `sound-and-levels.md`, `music-engine.md`, `visuals.md` (inventories in generated blocks), `from-a-reference.md`, `checks.md`, `pitfalls.md`, `glossary.md` (generated from `src/i18n.js`), `status.md` (open changes generated, issues by hand). The audit is in `audit.md`.
+
+### D8. Catalog freshness
+`npm run catalog:strudel` writes `docs/strudel/inputs.json`: a SHA-256 of its inputs (the JavaScript it imports, followed through relative imports, the songs except `songs/endless/`, the style recipes, `docs/strudel/variety.json`, the versions of the installed Strudel packages). `check:knowledge` computes the same hash in milliseconds and fails when it differs. Rebuilding the coverage itself takes minutes, so the check never does it. Whole-line `//` comments of the JavaScript are left out of the hash, so a comment edit does not ask for a rebuild. Any other change to code the catalog reads does, even when the coverage would stay the same: over-sensitive on purpose, never stale.
+
 ## Risks / Trade-offs
 
 - Notes drift from code → generated blocks and the coverage check.

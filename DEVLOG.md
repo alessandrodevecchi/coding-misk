@@ -763,3 +763,10 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - `npm run knowledge` riscrive solo i blocchi generati (stili, comandi, profili e controlli, funzioni tecniche, forme, helper, radio, artisti, voce; descrizioni dai testi di aiuto dell'app) e gli esempi di codice presi dai brani d'esempio.
 - `npm run check:knowledge` (senza browser) fallisce se manca una nota, un link è rotto, un blocco è vecchio, un valore del codice non è descritto o un esempio non compila.
 - Regola in `AGENTS.md`: ogni change che aggiunge un concetto o un'opzione aggiorna la sua nota. La Guida (scheda Lezioni Strudel) indica la base di conoscenza.
+
+## 2026-10-19: base di conoscenza pronta per i compiti (`knowledge-base` 5, #74)
+
+- Audit su 35 compiti che un agente esterno può ricevere (`openspec/changes/knowledge-base/audit.md`): mancavano ricette, inventari, livelli, visual, mappa dei check, trappole, glossario, stato, il percorso da una reference a uno stile.
+- Note nuove: quattro di ricette (file, passi, check, errori; 26 ricette), `sounds` (con i suoni mancanti), `sound-and-levels`, `music-engine`, `visuals` (inventari generati), `from-a-reference` (file da chiedere, misure, esempi, idee non ancora fatte), `checks`, `pitfalls`, `glossary` (da `src/i18n.js`), `status`. Le descrizioni degli stili tornano nella nota degli stili.
+- `check:knowledge` fallisce se un compito non ha ricetta, se un inventario è vecchio, se la copertura di Strudel è più vecchia del codice (hash degli input in `docs/strudel/inputs.json`, scritto da `catalog:strudel`; i testi dell'interfaccia non contano) o se una funzione scritta con un sinonimo (`rib`, `seg`, `fm2`) risulta non usata. Circa 13 secondi.
+- `docs/MUSIC-ENGINE.md` non cita più gli helper vecchi (`o`, `drive`, `voice`).

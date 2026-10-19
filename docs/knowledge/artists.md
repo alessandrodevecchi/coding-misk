@@ -1,6 +1,6 @@
 ---
 id: artists
-related: [styles, radio, narrator]
+related: [styles, radio, narrator, material, recipes-music, from-a-reference]
 code: [artists, src/endless/artist.js, src/endless/artist-maker.js, src/endless/quirks.js, src/library/artists-tab.js]
 checks: [node --no-warnings tools/artist.mjs validate, npm run check:random, npm run check:endless]
 ---
@@ -26,7 +26,18 @@ Built-in artists are JSON files in `artists/`. The user can make more in the Art
 
 Fields: `id`, `name`, `bio`, `portrait` (seed and palette of the pixel face), `styles`, `explore`, `chaos`, `energy`, `complexity`, `talk`, `pace`, `shapes`, `moves`, `voice`, `quirks`, `transitions`. Missing fields take the defaults of `ARTIST_DEFAULTS` in `src/endless/artist.js`.
 
+How each field steers the director:
+
+- `styles` and `explore`: which recipe each song comes from. One heavy weight gives a focused artist; even weights a wide one.
+- `chaos`: how much one song mixes its styles, part by part ([styles.md](styles.md)).
+- `energy` and `complexity`: busier drums, more tracks, more open filters; complexity above 0 also lets composed parts in ([material.md](material.md)).
+- `talk`: how often the narrator speaks. `pace`: below 0.3 phrases pass without moves, above 0.7 an extra move per phrase.
+- `shapes`, `moves`: weights for the energy shapes and a bonus for the moves the director scores.
+- `voice.characters`: the effects of the narrator's voice. `transitions`: how one song leaves for the next.
+
 Quirks: `two-drops`, `long-breaks`, `no-guitars`, `texture-first`, `hard-endings`, `talks-a-lot`, `slow-builds`.
+
+What not to write in an artist: real names of people or brands in `name`, `bio` or `inspiredBy` (those references are kept privately by the owner; ask first), anything about where the music is published, and fixed values where a range works. `inspiredBy` should be a scene, a place or a mood.
 
 Random artists come from a seed: a name, a portrait, a short bio, one to three styles of one genre, knob ranges. Keep saves one among the user's artists.
 

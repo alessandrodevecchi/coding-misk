@@ -1,9 +1,11 @@
 // Writes the catalog of the installed Strudel's functions (strudel-catalog, #69): docs/strudel/functions.json,
-// docs/strudel/coverage.json and docs/STRUDEL-FUNCTIONS.md. docs/strudel/variety.json is written by hand and only read.
+// docs/strudel/coverage.json, docs/STRUDEL-FUNCTIONS.md and the freshness stamp docs/strudel/inputs.json.
+// docs/strudel/variety.json is written by hand and only read.
 //   npm run catalog:strudel
 // The output depends only on the installed packages and the generated code: two runs give the same files.
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { readFunctions, lookup, ROOT } from './strudel-functions.mjs';
 import { collectCalls, coverageOf, KINDS, RADIO_MINUTES } from './strudel-code.mjs';
 import { LIBRARY, NAMES } from '../src/song/functions.js';
@@ -106,14 +108,53 @@ export function page(catalog, coverage, variety) {
   return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\n*$/, '\n');
 }
 
+// The freshness stamp (knowledge-base, catalog freshness): a hash of every input of this generator, written to
+// docs/strudel/inputs.json. npm run check:knowledge computes it again in a few milliseconds and fails when it differs, so
+// the coverage (and the list of functions not used yet) is never older than the code that writes Strudel.
+// Inputs: the JavaScript this tool imports, followed through relative imports (tools/ and src/), the songs it compiles
+// (songs/ and songs/examples/, not the git-ignored songs/endless/), the style recipes, docs/strudel/variety.json and the
+// versions of the installed Strudel packages.
+FILES.inputs = path.join(ROOT, 'docs/strudel/inputs.json');
+const IMPORT_RE = /(?:^|[\s;])(?:import|export)\s[^'"`]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)|^\s*import\s*['"]([^'"]+)['"]/gm;
+export function inputFiles() {
+  const seen = new Set(), todo = [path.join(ROOT, 'tools/strudel-catalog.mjs')];
+  while (todo.length) {
+    const f = todo.pop();
+    if (seen.has(f) || !fs.existsSync(f)) continue;
+    seen.add(f);
+    for (const m of fs.readFileSync(f, 'utf8').matchAll(IMPORT_RE)) {
+      const spec = m[1] || m[2] || m[3];
+      if (spec && spec.startsWith('.') && !spec.includes('node_modules')) todo.push(path.resolve(path.dirname(f), spec));
+    }
+  }
+  const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? (e.name === 'endless' ? [] : walk(path.join(d, e.name))) : e.name.endsWith('.json') ? [path.join(d, e.name)] : []));
+  const data = [...walk(path.join(ROOT, 'songs')), ...walk(path.join(ROOT, 'styles')), FILES.variety];
+  const pkgs = fs.readdirSync(path.join(ROOT, 'node_modules/@strudel')).map(p => path.join(ROOT, 'node_modules/@strudel', p, 'package.json')).concat(path.join(ROOT, 'node_modules/superdough/package.json')).filter(f => fs.existsSync(f));
+  // interface texts never reach the code the app writes: editing them does not ask for a rebuild
+  const TEXT_ONLY = ['src/i18n.js', 'src/guide.js'];
+  return [...seen, ...data, ...pkgs].map(f => path.relative(ROOT, f)).filter(f => !TEXT_ONLY.includes(f)).sort();
+}
+export function inputsStamp() {
+  const h = createHash('sha256'), files = inputFiles();
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    // a package counts by its name and version only; whole-line comments of the JavaScript do not count, so editing a
+    // comment does not ask for a rebuild
+    const body = f.endsWith('package.json') && f.includes('node_modules') ? JSON.parse(text).version : /\.m?js$/.test(f) ? text.replace(/^[ \t]*\/\/.*$/gm, '') : text;
+    h.update(`${f}\0${body}\0`);
+  }
+  return { hash: h.digest('hex'), files: files.length };
+}
+
 // builds everything: { catalog, coverage, files: { path → text } }
 export function build() {
   const catalog = readFunctions(), L = lookup(catalog);
   const coverage = coverageOf(catalog, collectCalls(), L);
   const { unknown, ...stored } = coverage;
+  const stamp = { note: 'Written by npm run catalog:strudel: a hash of the inputs of the catalog and coverage. npm run check:knowledge fails when the code changed since.', ...inputsStamp() };
   return {
     catalog, coverage, unknown,
-    files: { [FILES.functions]: json(catalog), [FILES.coverage]: json(stored), [FILES.page]: page(catalog, stored, readVariety()) },
+    files: { [FILES.functions]: json(catalog), [FILES.coverage]: json(stored), [FILES.page]: page(catalog, stored, readVariety()), [FILES.inputs]: json(stamp) },
   };
 }
 

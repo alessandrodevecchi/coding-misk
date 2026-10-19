@@ -68,7 +68,7 @@ Guidelines from the owner's feedback: 4 to 5 layers per section; tension over sw
 
 ## Strudel functions
 
-Before a generator writes a Strudel function it did not write before, look it up in `docs/STRUDEL-FUNCTIONS.md` (the catalog of the installed version, with synonyms, parameters and an example) and check it is not marked undocumented or reserved by an app helper (`o`, `drive` and `voice` are registered over Strudel names). `npm run check:strudel` fails when generated code calls a name that is not in the catalog. After updating Strudel, rebuild the catalog with `npm run catalog:strudel` (the check fails until then); the hand notes in `docs/strudel/variety.json` stay.
+Before a generator writes a Strudel function it did not write before, look it up in `docs/STRUDEL-FUNCTIONS.md` (the catalog of the installed version, with synonyms, parameters and an example) and check it is not marked undocumented or reserved by an app function (`chan`, `crunch`, the library functions and the song functions never take a Strudel name: `npm run check:strudel` fails if they do). `npm run check:strudel` fails when generated code calls a name that is not in the catalog. After updating Strudel, rebuild the catalog with `npm run catalog:strudel` (the check fails until then); the hand notes in `docs/strudel/variety.json` stay.
 
 ## Strudel gotchas (learned the hard way)
 
