@@ -22,7 +22,7 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // The director's version (#38): sessions saved in playlists record it, and warn when it changes. Bump it whenever
 // `npm run check:endless -- --write-fixtures` changes the fixtures (the same seed gives different songs).
 // 4 (voice-instrument): styles with a voice instrument weight give some songs a spoken track and a narrator style
-export const DIRECTOR_VERSION = 4;
+export const DIRECTOR_VERSION = 5;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix' };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -374,6 +374,8 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     const nextRole = k % 2 === 1 && d + 1 < plan.plan.length ? plan.plan[d + 1].role : null;
     // tracks that cannot move now: moved on the previous boundary, or needed by a big event on the next one
     const blocked = new Set([...[...moved].filter(([, b]) => b === k - 1).map(([id]) => id), ...locked]);
+    // a listener's kept step on this boundary (a vary, radio-variation) holds its track there
+    for (const s of keep) if (s.by === 'listener' && s.pattern && s.at === k * phrase) stepIds(s).forEach(id => blocked.add(id));
     if (nextRole === 'break' || nextRole === 'drop') base.tracks.filter(t => t.type === 'drums').forEach(t => blocked.add(t.id));
     const hardEnd = has(opts, 'hard-endings') && boundaries > 2;
     if (hardEnd && k === boundaries - 2) base.tracks.forEach(t => blocked.add(t.id));
@@ -478,7 +480,8 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     let said = null;
     const talk = curveOf(part, 'voice') ?? opts.talk ?? OPTION_DEFAULTS.talk;
     if (main && talk > 0 && at - lastSay >= 8) {
-      const kind = isEnd ? 'song-end' : main.kind;
+      // (a listener's move may name the phrase it says: an added instrument, another sound)
+      const kind = isEnd ? 'song-end' : main.phrase || main.kind;
       if (k === 0 || isEnd || ['break', 'drop'].includes(kind) || comments.chance(Math.min(1, 1.1 * talk))) said = say(kind, at);
     }
     if (said) { const first = steps.find(s => s.at === at); first.say = said; }

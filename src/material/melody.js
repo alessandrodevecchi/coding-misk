@@ -41,12 +41,13 @@ function widen(notes, min, lo, hi) {
   if (span(out) < min) { const iMax = out.indexOf(Math.max(...out)); out[iMax === iMin ? (iMin + 1) % out.length : iMax] = Math.min(hi, lo + min); }
   return out;
 }
-// onset positions among n slots: the first slot always, strong slots more often
-function positions(r, n, k) {
-  const set = new Set([0]);
+// onset positions among n slots: the first slot always, strong slots more often (less often with more syncopation,
+// sync 0 to 1, radio-variation D3)
+function positions(r, n, k, sync = 0) {
+  const set = new Set([0]), w = [3 - 2 * sync, 2 - sync, 1 + sync];
   while (set.size < Math.min(k, n)) {
     const free = [...Array(n).keys()].filter(i => !set.has(i));
-    set.add(r.weighted(free, free.map(i => (i % 4 === 0 ? 3 : i % 2 === 0 ? 2 : 1))));
+    set.add(r.weighted(free, free.map(i => (i % 4 === 0 ? w[0] : i % 2 === 0 ? w[1] : w[2]))));
   }
   return [...set].sort((a, b) => a - b);
 }
@@ -54,9 +55,13 @@ const tokensOf = (n, at, notes) => { const t = Array(n).fill('~'); at.forEach((p
 // degrees of a dark scale in semitones, for the chromatic mode (its degrees are semitones)
 const toSemis = d => 12 * Math.floor(d / 7) + modeSteps('phrygian')[((d % 7) + 7) % 7];
 
-// opts: { style (the recipe part's material), harmony { mode, chords }, meter, energy } → { idea, why, stats }
-export function melody(r, { style = {}, harmony = {}, meter, energy = 0.5 } = {}) {
+// opts: { style (the recipe part's material), harmony { mode, chords }, meter, energy, shape } → { idea, why, stats }
+// shape (radio-variation D3): density gives the onsets' band, complexity the span's band and the syncopation, register
+// moves the line up or down by up to three degrees
+export function melody(r, { style = {}, harmony = {}, meter, energy = 0.5, shape: sh = null } = {}) {
   const { N } = meterOf(meter), b = band(energy), mode = harmony.mode || 'minor', chromatic = mode === 'chromatic';
+  const bOn = sh ? band(sh.density) : b, bSpan = sh ? band(sh.complexity) : b, sync = sh ? sh.complexity : 0;
+  const off = sh ? Math.round((sh.register - 0.5) * 6) : 0;
   const rules = (style.rules || DEFAULT_RULES).filter(x => MELODY_RULES.includes(x));
   const dark = rules.includes('dark') || DARK_MODES.includes(mode);
   const why = [];
@@ -67,7 +72,7 @@ export function melody(r, { style = {}, harmony = {}, meter, energy = 0.5 } = {}
   if (new Set(roots).size > 1) { prog = altOf(roots); why.push('progression from the chords'); } else if (useStill) { prog = altOf(still); why.push('progression on a still chord'); }
   // the shape: polymetric line, repeated motif with a changed tail, or call and response
   const half = N / 2;
-  const polyGrid = b === 0 ? 0 : b === 1 ? half : N;
+  const polyGrid = bOn === 0 ? 0 : bOn === 1 ? half : N;
   const polyLens = polyGrid ? [5, 7].filter(p => p < polyGrid && polyGrid % p) : [];
   const w = {
     polymeter: rules.includes('polymeter') && polyLens.length ? 0.2 + 0.8 * energy : 0,
@@ -76,21 +81,21 @@ export function melody(r, { style = {}, harmony = {}, meter, energy = 0.5 } = {}
   };
   const shapes = Object.keys(w).filter(k => w[k] > 0);
   const shape = shapes.length ? r.weighted(shapes, shapes.map(k => w[k])) : 'tail';
-  const [s0, s1] = SPAN[b], spanWant = r.int(s0, s1), lo = -r.int(0, Math.floor(spanWant / 2)), hi = lo + spanWant;
+  const [s0, s1] = SPAN[bSpan], spanWant = r.int(s0, s1), lo = off - r.int(0, Math.floor(spanWant / 2)), hi = lo + spanWant;
   // the chromatic mode writes semitones of a dark scale
   const fix = notes => widen(notes, s0, lo, hi), semis = notes => (chromatic ? notes.map(toSemis) : notes);
   let degrees, onsets;
   if (shape === 'polymeter') {
-    const P = r.pick(polyLens), [o0, o1] = ONSETS[b];
+    const P = r.pick(polyLens), [o0, o1] = ONSETS[bOn];
     const kLo = Math.max(2, Math.ceil((o0 * P) / polyGrid)), kHi = Math.min(P, Math.floor((o1 * P) / polyGrid));
-    const k = r.int(Math.min(kLo, kHi), kHi), at = positions(r, P, k);
+    const k = r.int(Math.min(kLo, kHi), kHi), at = positions(r, P, k, sync);
     const notes = fix(walk(r, k, { lo, hi, dark }));
     degrees = `{${tokensOf(P, at, semis(notes)).join(' ')}}%${polyGrid}`;
     onsets = (polyGrid * k) / P;
     why.unshift(`polymeter ${P}/${polyGrid}`);
   } else {
-    const L = b === 0 && N % 4 === 0 && r.chance(0.5) ? N / 4 : half;
-    const [o0, o1] = ONSETS[b], k = r.int(Math.min(o0, L), Math.min(o1, L)), at = positions(r, L, k);
+    const L = bOn === 0 && N % 4 === 0 && r.chance(0.5) ? N / 4 : half;
+    const [o0, o1] = ONSETS[bOn], k = r.int(Math.min(o0, L), Math.min(o1, L)), at = positions(r, L, k, sync);
     const A = fix(walk(r, k, { lo, hi, dark }));
     const cell = notes => `[${cellText(tokensOf(L, at, semis(notes)))}]`;
     if (shape === 'tail') {

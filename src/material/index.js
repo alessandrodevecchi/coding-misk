@@ -7,6 +7,9 @@
 // kind: melody, bass, arp, chords, drums, sound. style: the recipe instrument's `material` ({ rules, families, sounds }).
 // harmony: { key, mode, chords (a PROGS name or chord names in A), shared }. energy: 0 to 1. from + keep: vary a preset
 // ('rhythm' keeps its onsets, 'notes' its pitches). Each kind draws from its own stream, "material:<kind>" of the seed.
+// shape (radio-variation D3, material composed on air): { density, register, complexity }, each 0 to 1: density sets the
+// notes per bar, register the height (from the energy target), complexity the range and the rhythmic variety. Without
+// it a part is composed exactly as before (same draws).
 import { stream } from '../endless/random.js';
 import { meterSteps } from '../music.js';
 import { melody, MELODY_RULES } from './melody.js';
@@ -30,6 +33,8 @@ export { FAMILIES, SOUND_KINDS, FM_RANGES, fmInRange, sharedRoots, modeProgressi
 // the random stream of a kind for a seed: a melody never changes the drums of the same seed
 export const materialStream = (seed, kind) => stream(String(seed), `material:${kind}`);
 
+const unit = x => Math.max(0, Math.min(1, Number(x) || 0));
+const shapeOf = s => (s ? { density: unit(s.density ?? 0.5), register: unit(s.register ?? 0.5), complexity: unit(s.complexity ?? 0.5) } : null);
 export function compose(kind, opts = {}) {
   const { seed = '', style = {}, harmony = {}, meter = '4/4', energy = 0.5, from = null, keep = null } = opts;
   const e = Math.max(0, Math.min(1, Number(energy) || 0)), N = meterSteps(meter);
@@ -41,7 +46,7 @@ export function compose(kind, opts = {}) {
     if (!v) return null;
     return { idea: v.idea, why: v.why, stats: {} };
   }
-  const o = { style: style || {}, harmony: harmony || {}, meter, energy: e, N, type };
+  const o = { style: style || {}, harmony: harmony || {}, meter, energy: e, N, type, shape: shapeOf(opts.shape) };
   if (kind === 'melody') return melody(r, o);
   if (kind === 'bass') return bassline(r, o);
   if (kind === 'arp') return arpeggio(r, o);

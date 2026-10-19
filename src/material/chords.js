@@ -37,9 +37,13 @@ export function modeProgression(r, mode = 'minor', { sevenths = false } = {}) {
   return { names, text: altOf(names), different: new Set(names).size };
 }
 
-// opts: { style, harmony { mode }, meter, energy, type: 'pad' | 'guitar' } → { idea, why, stats }
-export function chords(r, { style = {}, harmony = {}, meter, energy = 0.5, type = 'pad' } = {}) {
-  const { N } = meterOf(meter), b = band(energy), rules = style.rules || [], why = [];
+// pad anchors by register (radio-variation D3): lower, the usual, higher
+const PAD_ANCHORS = ['a3', PAD_ANCHOR, 'e4'];
+// opts: { style, harmony { mode }, meter, energy, type: 'pad' | 'guitar', shape } → { idea, why, stats }
+// shape (radio-variation D3): density gives the band of the rhythm, register the pad's anchor, complexity the chance of
+// another voicing mode (the top note above the anchor, or the anchor left out)
+export function chords(r, { style = {}, harmony = {}, meter, energy = 0.5, type = 'pad', shape = null } = {}) {
+  const { N } = meterOf(meter), b = shape ? band(shape.density) : band(energy), rules = style.rules || [], why = [];
   if (type === 'guitar') {
     // power chords with a cell of the bass families, and a riff over them with more energy
     const fams = b === 0 ? ['half', 'pulse'] : b === 1 ? ['pulse', 'offbeat', 'rolling'] : ['gallop', 'sixteenths', 'rolling'];
@@ -57,12 +61,13 @@ export function chords(r, { style = {}, harmony = {}, meter, energy = 0.5, type 
     why.push(`power chords ${c.rhythm}`);
     return { idea: cellIdea(c), why, stats: { onsets: c.on } };
   }
-  const idea = { voicing: { anchor: PAD_ANCHOR } };
+  const idea = { voicing: { anchor: shape ? PAD_ANCHORS[band(shape.register)] : PAD_ANCHOR } };
   if (rules.includes('mode')) {
     const p = modeProgression(r, harmony.mode, { sevenths: rules.includes('sevenths') });
     idea.chords = p.text;
     why.push(`progression on ${harmony.mode || 'minor'}: ${p.names.join(' ')}`);
   } else why.push("the section's chords, voiced");
+  if (shape && r.chance(shape.complexity)) idea.voicing.mode = r.pick(['above', 'duck']);
   const rh = r.pick(PAD_RHYTHMS[b]);
   if (rh) { Object.assign(idea, cellIdea(rh)); why.push(`stabs ${rh.rhythm}`); } else why.push('held');
   return { idea, why, stats: { onsets: rh ? rh.on : 1 } };

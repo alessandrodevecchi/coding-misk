@@ -19,21 +19,27 @@ export function indexText(cell, slots) {
   return `{${cell.join(' ')}}%${slots}`;
 }
 
-// opts: { style, meter, energy } → { idea, why, stats }
-export function arpeggio(r, { style = {}, meter, energy = 0.5 } = {}) {
-  const { N } = meterOf(meter), b = band(energy), why = [];
+// how varied each shape of cell is (radio-variation D3): more complexity, more skips and turns
+const VARIETY = { up: 0, pedal: 0.3, updown: 0.6, skips: 1 };
+// opts: { style, meter, energy, shape } → { idea, why, stats }
+// shape (radio-variation D3): density gives the band (sparse, 8ths, 16ths), complexity favours varied cells and random
+// indices, a high register plays an octave up
+export function arpeggio(r, { style = {}, meter, energy = 0.5, shape: sh = null } = {}) {
+  const { N } = meterOf(meter), b = sh ? band(sh.density) : band(energy), why = [];
   const rules = (style.rules || ARP_RULES).filter(x => ARP_RULES.includes(x));
-  const shapes = rules.filter(x => SHAPES[x]);
-  const shape = r.pick(shapes.length ? shapes : Object.keys(SHAPES));
+  const shapes = rules.filter(x => SHAPES[x]), list = shapes.length ? shapes : Object.keys(SHAPES);
+  const shape = sh ? r.weighted(list, list.map(x => 0.2 + 1.6 * (1 - Math.abs(VARIETY[x] - sh.complexity)))) : r.pick(list);
   let cell = r.pick(SHAPES[shape]).slice();
   // the seed moves the cell: another start, or two notes swapped
   if (r.chance(0.5)) { const k = r.int(1, cell.length - 1); cell = [...cell.slice(k), ...cell.slice(0, k)]; }
   if (r.chance(0.3)) { const i = r.int(0, cell.length - 1), j = r.int(0, cell.length - 1); [cell[i], cell[j]] = [cell[j], cell[i]]; }
   const randomOk = rules.includes('random') && b > 0, seed = r.int(0, 999), cycles = r.pick([1, 2, 4]);
   const slots = b === 2 ? N : N / 2;
-  if (randomOk && r.chance(0.25 + 0.2 * energy)) {
+  const up = sh && sh.register >= 0.75 ? { add: 12 } : {};
+  if (sh && up.add) why.push('an octave up');
+  if (randomOk && r.chance(sh ? 0.1 + 0.4 * sh.complexity : 0.25 + 0.2 * energy)) {
     why.push(`random indices seed ${seed}, ${cycles} bar${cycles > 1 ? 's' : ''}`);
-    return { idea: { random: { fn: 'irand', max: NOTES, seg: slots, seed, cycles } }, why, stats: { onsets: slots } };
+    return { idea: { random: { fn: 'irand', max: NOTES, seg: slots, seed, cycles }, ...up }, why, stats: { onsets: slots } };
   }
   let tokens = cell, onsets = slots;
   if (b === 0) {
@@ -48,5 +54,5 @@ export function arpeggio(r, { style = {}, meter, energy = 0.5 } = {}) {
     if (b === 2 && r.chance(0.3)) { const i = r.int(1, cell.length - 1); tokens = cell.map((x, j) => (j === i ? '~' : x)); onsets = Math.round((slots * (cell.length - 1)) / cell.length); }
     why.push(`${shape} ${cell.length}${slots % cell.length ? ` over ${slots}` : ''}`);
   }
-  return { idea: { index: b === 0 ? cellText(tokens) : indexText(tokens, slots) }, why, stats: { onsets } };
+  return { idea: { index: b === 0 ? cellText(tokens) : indexText(tokens, slots), ...up }, why, stats: { onsets } };
 }

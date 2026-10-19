@@ -1,14 +1,14 @@
 ## 1. Vary in the rewrite
 
-- [ ] 1.1 `COMMANDS.vary`, `VARY_TYPES` and the `pattern` step with a generated idea (D1, D2); verify with a Node check in `tools/check-endless.mjs`: the varied part differs from before, every note is in the section's scale over 200 seeds, the rest of the song is unchanged
-- [ ] 1.2 `whyNot` reason `not-playing` and `locked` for vary; verify in the same check (no arp playing gives `not-playing`)
-- [ ] 1.3 Seeds `vary:<song>:<index>`; verify that cancelling a vary and replaying a recorded session give the same notes
+- [x] 1.1 `COMMANDS.vary`, `VARY_TYPES` and the `pattern` step with a generated idea (D1, D2); verify with a Node check in `tools/check-endless.mjs`: the varied part differs from before, every note is in the section's scale over 200 seeds, the rest of the song is unchanged
+- [x] 1.2 `whyNot` reason `not-playing` and `locked` for vary; verify in the same check (no arp playing gives `not-playing`)
+- [x] 1.3 Seeds `vary:<song>:<index>`; verify that cancelling a vary and replaying a recorded session give the same notes
 
 ## 2. Composing on Add and More complex
 
-- [ ] 2.1 Add of a new track and More complex take material from the generator (D4); verify in `npm run check:endless` that new tracks play composed ideas, not presets
-- [ ] 2.2 Curves and complexity as generator inputs (D3); verify in the check: density 0.2 gives fewer notes per bar than 0.8, higher energy a higher register, higher complexity more different degrees
-- [ ] 2.3 Endless fixtures written, `DIRECTOR_VERSION` raised by one in the same commit (after `material-generator`, which raises it first); verify `npm run check:endless` passes and measure one vary under 20 ms in Node
+- [x] 2.1 Add of a new track and More complex take material from the generator (D4); verify in `npm run check:endless` that new tracks play composed ideas, not presets
+- [x] 2.2 Curves and complexity as generator inputs (D3); verify in the check: density 0.2 gives fewer notes per bar than 0.8, higher energy a higher register, higher complexity more different degrees
+- [x] 2.3 Endless fixtures written, `DIRECTOR_VERSION` raised by one in the same commit (after `material-generator`, which raises it first); verify `npm run check:endless` passes and measure one vary under 20 ms in Node (the fixtures are sessions without steering and did not change; `DIRECTOR_VERSION` raised to 5 anyway, because saved sessions with Add or More complex now sound different)
 
 ## 3. Console and playlists
 
@@ -19,7 +19,7 @@
 ## 4. Docs and Guide
 
 - [ ] 4.1 Guide card for Vary and the composed Add, in English and Italian in `src/guide.js`; verify with `npm run check:guide`
-- [ ] 4.2 `docs/ENDLESS.md` Steering table and Determinism; `DEVLOG.md` entry in Italian
+- [x] 4.2 `docs/ENDLESS.md` Steering table and Determinism; `DEVLOG.md` entry in Italian
 
 ## 5. Integration and listening test
 
@@ -28,4 +28,4 @@
 
 ## 6. Material source
 
-- [ ] 6.1 Material source choice in the compilation setup and in Settings → Radio (strings in English and Italian), saved with the session; verify in `tools/check-compilation.cjs` and `tools/check-settings.cjs`
+- [x] 6.1 Material source choice in the compilation setup and in Settings → Radio (strings in English and Italian), saved with the session; verify in `tools/check-compilation.cjs` and `tools/check-settings.cjs`

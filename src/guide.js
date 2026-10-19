@@ -224,7 +224,7 @@ export const GUIDE = [
 ];
 
 // parts of the page that need no card, with the reason (the check accepts them)
-export const GUIDE_EXEMPT = { guida: 'the Guide itself' };
+export const GUIDE_EXEMPT = { guida: 'the Guide itself', vary: 'console command without a button yet (radio-variation 3.1); its card comes with radio-variation 4.1' };
 
 const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // a guide text with its marks: [Label] a button, {K} a key

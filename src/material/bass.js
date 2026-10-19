@@ -36,11 +36,16 @@ export function toneLine(r, list, slots) {
   return cellText(Array.from({ length: slots }, (_, i) => tones[i % len]));
 }
 
-// opts: { style, harmony { chords, mode, shared }, meter, energy } → { idea, why, stats }
-export function bassline(r, { style = {}, harmony = {}, meter, energy = 0.5, N = 16 } = {}) {
+// opts: { style, harmony { chords, mode, shared }, meter, energy, shape } → { idea, why, stats }
+// shape (radio-variation D3): density gives the cell's band; complexity favours fifths (more different notes) over plain
+// roots, register favours octaves (higher)
+export function bassline(r, { style = {}, harmony = {}, meter, energy = 0.5, N = 16, shape = null } = {}) {
   const b = band(energy), rules = style.rules || [], why = [];
-  const cells = bassCells(rules, b), c = r.pick(cells);
-  const pitch = r.weighted(['roots', 'octaves', 'fifths'], [b === 0 ? 3 : 1, rules.includes('octaves') ? 3 : b === 2 ? 2 : 1, rules.includes('fifths') ? 2 : b > 0 ? 1 : 0.2]);
+  const cells = bassCells(rules, shape ? band(shape.density) : b), c = r.pick(cells);
+  const w = shape
+    ? [0.2 + 3 * (1 - shape.complexity), (rules.includes('octaves') ? 1 : 0.3) + 2.5 * shape.register, (rules.includes('fifths') ? 1 : 0.2) + 3 * shape.complexity]
+    : [b === 0 ? 3 : 1, rules.includes('octaves') ? 3 : b === 2 ? 2 : 1, rules.includes('fifths') ? 2 : b > 0 ? 1 : 0.2];
+  const pitch = r.weighted(['roots', 'octaves', 'fifths'], w);
   const idea = cellIdea(c);
   why.push(`${c.family} ${c.rhythm}`);
   // a shared progression of the song: the bass reads it with its own sub, so bass and lead change together

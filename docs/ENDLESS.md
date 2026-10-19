@@ -109,7 +109,7 @@ An unknown style or a value out of range stops the command with the valid choice
 The material generator (`src/material/`, `material-generator`, `#71`) composes parts the way a live coder writes them: small cells, summed progressions, chord indices, sequencer steps. Every part is an idea of the song format (`docs/SONG-FORMAT.md`, Ideas), so it compiles, grows in a live build and is measured like a preset. It is pure and seeded: the same inputs give the same part, in Node and in the browser.
 
 ```js
-compose(kind, { seed, style, harmony, meter, energy, from, keep, type }) // → { idea, settings, rack, why, stats }
+compose(kind, { seed, style, harmony, meter, energy, from, keep, type, shape }) // → { idea, settings, rack, why, stats }
 ```
 
 `kind` is `melody`, `bass`, `arp`, `chords`, `drums` or `sound`; `style` is the recipe instrument's `material` field (`docs/STYLES.md`); `harmony` is `{ key, mode, chords, shared }`; `energy` goes from 0 to 1; `from` and `keep` vary a preset. Each kind draws from its own stream (`material:<kind>` of the seed), so a melody never changes the drums of the same seed. `why` lists the rules used, for reports and checks.
@@ -126,6 +126,8 @@ The seed chooses among rules, never note by note in a free range:
 | Sound | The wave and an optional FM patch: `bell`, `reese`, `growl`, `dirty`, `saw`, `square` (below). |
 
 Energy steers density and range, inside the style's limits: 0 to 0.33 gives 2 to 4 onsets a bar within a fifth, 0.33 to 0.66 gives 4 to 8 within an octave, 0.66 to 1 gives 6 to 16 up to an octave and a fifth. Basslines, arpeggios and grooves follow the same bands (more hits, hats and ghost notes with energy).
+
+`shape` (`{ density, register, complexity }`, each 0 to 1) is given only by steering, for material composed on air (Steering, Composed material); without it a part is composed with the same draws as before.
 
 A preset can be varied (`from`, `keep`): `rhythm` keeps its onsets and composes new pitches (chord tones for a bass, indices for an arpeggio, degrees for a melody), `notes` keeps its pitches in their order on a new rhythm.
 
@@ -207,8 +209,9 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | Energy up, down | next phrase | targets of the remaining double phrases ±0.15 |
 | Curve | next phrase | one double phrase gets the dragged target: energy, or a curve target (`#40`) |
 | Reset a curve | next phrase | the remaining double phrases of that curve go back to automatic |
-| Add, remove a type | next phrase | a forced add of a silent track of that type (a new one from the song's style when the song has none, `#41`), or a forced remove of every playing one |
-| More, less complex | next phrase | usual track count ±1 |
+| Add, remove a type | next phrase | a forced add of a silent track of that type (a new one from the song's style when the song has none, `#41`), or a forced remove of every playing one; a track the song has not played yet gets composed material |
+| More, less complex | next phrase | usual track count ±1 and session complexity ±0.2; with More, the tracks that have not played yet get composed material |
+| Vary a part (`radio-variation`) | next phrase | a new idea for each playing, unlocked track of the part (lead, the default, bass, arp or pad), added as pattern `V<k>` with a listener's pattern step; the rest of the song stays, later pattern steps of the varied tracks go |
 | Darker, brighter, dirtier, cleaner, more space | next phrase | that move on every playing track that allows it |
 | Change instrument | next phrase | another wave, kit, guitar or texture from the style |
 | Change progression, key | next double phrase | the following sections take another progression, or a key a fifth away |
@@ -216,6 +219,14 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | Go to the drop, stay here, end | next double phrase | the plan jumps to its drop, repeats the current part, or ends with an outro |
 | Extend (`#45`) | next double phrase | one more double phrase before the ending (the closing outros, or the last part), with the role and curves of the part before it and energy a little lower, then higher, on repeated presses; disabled once the transition to the next song plays |
 | Volume, mute, lock (mixer) | next bar | pinned gain; a step plus a lock; the director stops moving the track |
+
+### Composed material
+
+Steering composes with the material generator (`radio-variation`, `airIdea` in `src/endless/material.js`), in the key and chords of the section where the material starts and with the style's rules:
+
+- **Vary** (`vary`, part in `type`, one of `VARY_TYPES`: `lead`, `bass`, `arp`, `pad`): for the lead the hook, else the guitar; the arp is a part of its own (unlike Add and Remove, where lead covers the arp). The new idea differs from every pattern the track already has; drums and textures are not varied. Later commands keep the varied part (its step is kept as the listener's), and later director moves of the track may pick it or another of its patterns. Disabled with `not-playing` when no track of the part plays at the bar where it would apply, `locked` when every one is locked. Vary always composes, whatever the session source.
+- **Add and More complex**: a melodic track (bass, arp, lead, pad, guitar) that has not played before the command and still holds presets gets composed patterns A and B. Drums and textures keep the style's presets. With the session source `patterns`, or at complexity 0, nothing is composed and the songs are the same as before; with `varied`, the track gets a variation of its preset.
+- **Inputs** (`airInputs`), at the double phrase where the material starts: density is the density target, or the tracks playing when the curve is automatic, as a share of the most the song can play, and sets the notes per bar (the generator's onsets band); the energy target sets the register (a melody moves up to three degrees up or down, a bass favours octaves, an arpeggio goes an octave up above 0.75, a pad's anchor is `a3`, `c4` or `e4`); the session complexity, moved by More and Less complex, sets the range (the span of a melody) and the rhythmic variety (syncopation, fifths in a bassline, skips and random indices in an arpeggio, voicing modes of a pad).
 
 ### Continue in radio
 
@@ -240,7 +251,7 @@ A tension of 0.7 or more gives a part the strong progression (sections split whe
 
 ## Determinism
 
-Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`, `voice`, `artist`, `transition`, and `material/<song>/<track>` for composed parts. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit.
+Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`, `voice`, `artist`, `transition`, and `material/<song>/<track>` for composed parts. Material composed on air is seeded by the song and the command's index: `vary:<song>:<index>` for Vary, `add:<song>:<index>` and `more:<song>:<index>` for Add and More complex (with the track id), so cancelling a command or replaying a recorded session gives the same notes, and no other stream moves. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit. The fixtures are sessions without steering, so composing on air did not move them and `DIRECTOR_VERSION` stays 4; steered songs at complexity 0 or with the source `patterns` are pinned by hashes recorded before `radio-variation`.
 
 ## Checks
 
@@ -291,6 +302,12 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Curves                                       | `steering: curves set density, brightness and the voice of a part` |
 | Charge before a drop                         | `steering: high tension charges the part before a drop`          |
 | Extend                                       | `steering: extend adds a part before the ending and keeps it`    |
+| Vary: new notes in key, the rest unchanged   | `steering: vary gives a part new notes in key and keeps the rest` |
+| Vary: not playing, locked, late              | `steering: vary is disabled when the part does not play or is locked` |
+| Vary: replay and cancel                      | `steering: vary replays the same, and a cancelled vary leaves the notes` |
+| Add and More complex compose; plain sessions as before | `steering: Add and More complex compose new tracks`    |
+| Curves and complexity shape composed material | `steering: curves and complexity shape composed material`       |
+| A vary under 20 ms                           | `steering: one vary takes less than 20 ms`                       |
 | Continue a Compose song                      | `radio: a session continues after a song from Compose`           |
 
 ## Artists

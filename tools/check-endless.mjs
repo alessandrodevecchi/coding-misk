@@ -18,7 +18,8 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
-import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds } from '../src/endless/steering.js';
+import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax } from '../src/endless/steering.js';
+import { expandIdea } from '../src/song/ideas.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { stateAt, buildSteps } from '../src/song/build.js';
@@ -66,6 +67,43 @@ const PLAIN_V2 = [
   { seed: 'plain-c', styles: ['trance', 'phonk', 'melodic-metal', 'drum-and-bass'], chaos: 0.6, complexity: 0, energy: 0.9, minutes: 20, songs: '13b9b2d5' },
   { seed: 'plain-d', styles: ['ambient', 'lo-fi', 'industrial', 'classic-rock', 'acid', 'house'], chaos: 0.8, complexity: 0, energy: 0.3, minutes: 20, songs: 'dc778f05' },
 ];
+// steered songs at complexity 0 and with the source "patterns" (radio-variation): Add and More complex keep today's presets.
+// Hashes recorded before radio-variation; talk 0 (a listener's Add used to fail when the voice commented it).
+const PLAIN_STEER = [
+  { seed: 'plain-steer-a', styles: ['berlin-techno'], complexity: 0, talk: 0, songs: 'c4fe1f68' },
+  { seed: 'plain-steer-b', styles: ['ambient', 'jazz'], chaos: 1, complexity: 0, talk: 0, songs: '358eb686' },
+  { seed: 'plain-steer-c', styles: ['synthwave', 'drum-and-bass'], chaos: 0.5, complexity: 0.8, material: 'patterns', talk: 0, songs: 'a78978f7' },
+  { seed: 'plain-steer-d', styles: ['trance', 'lo-fi', 'phonk'], chaos: 0.8, complexity: 0.5, material: 'patterns', talk: 0, songs: 'fb29ad65' },
+];
+// the steered songs of a PLAIN_STEER case: three songs, each with an Add of every type and a run of More complex
+function plainSteer({ seed, songs: _, ...o }) {
+  const ses = createSession(loadStyles(), seed), out = [];
+  for (let i = 0; i < 3; i++) {
+    const g = ses.next(o), go = commands => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands, seed, n: i }).song;
+    const all = ['drums', 'bass', 'lead', 'pad', 'texture'].map(type => go([{ kind: 'add', type, at: applyBar('add', 20, g.plan) }]));
+    all.push(go([{ kind: 'more-complex', at: applyBar('more-complex', 10, g.plan) }, { kind: 'more-complex', at: applyBar('more-complex', 10, g.plan) }, { kind: 'remove', type: 'drums', at: applyBar('remove', 30, g.plan) }, { kind: 'add', type: 'pad', at: applyBar('add', 40, g.plan) }]));
+    out.push(all);
+  }
+  return out;
+}
+// Varies of every part over sessions of several styles (radio-variation): { g, type, at, ids, r } for each vary that
+// applies, until `count`; n moves the command's seed, so one song gives several varies
+function varies(count) {
+  const out = [];
+  for (const [k, id] of ['synthwave', 'trance', 'berlin-techno', 'jazz', 'phonk', 'lo-fi', 'melodic-metal', 'drum-and-bass'].entries()) {
+    const ses = createSession(STYLES, `vary-${id}`);
+    for (let s = 0; s < 6 && out.length < count; s++) {
+      const g = ses.next({ styles: [id], complexity: [0.2, 0.5, 0.9][s % 3] });
+      for (const type of VARY_TYPES) for (const now of [20, 44]) {
+        const at = applyBar('vary', now, g.plan);
+        if (whyNot({ kind: 'vary', type }, g.song, g.plan, now)) continue;
+        const ids = varyTracks(playing(stateAt(g.song, at).song), type).map(t => t.id);
+        for (let n = 0; n < 3 && out.length < count; n++) out.push({ g, type, at, ids, r: steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'vary', type, at }], seed: `vary-${k}`, n: 10 * s + n }) });
+      }
+    }
+  }
+  return out;
+}
 // a composed part stays in key: hook degrees are whole numbers, bass moves only to chord tones, arp indices are chord notes
 const whole = text => String(text).replace(/[!%*@]\d+/g, '').replace(/[\s~[\]<>{}]/g, ' ').trim().split(/\s+/).filter(Boolean).every(x => /^-?\d+$/.test(x));
 function inKey(type, idea) {
@@ -671,6 +709,145 @@ const CHECKS = {
     const s = extendSeconds(g.plan);
     assert(s > 10 && s < 80, `seconds per press ${s}`);
     assert(whyNot({ kind: 'extend' }, g.song, g.plan, 10, g.plan.bars - at) === 'transition' && whyNot({ kind: 'extend' }, g.song, g.plan, 10, 0) === null, 'too late once the transition plays');
+  },
+  'steering: vary gives a part new notes in key and keeps the rest'() {
+    const all = varies(200), ideas = {}, types = {};
+    assert(all.length === 200, `only ${all.length} varies`);
+    for (const { g, type, at, ids, r } of all) {
+      types[type] = (types[type] || 0) + 1;
+      assert(!validateSong(r.song).errors.length, `vary ${type}: invalid song`);
+      // the varied tracks play a new idea from the boundary, in key; the code differs from before
+      for (const id of ids) {
+        const t = r.song.tracks.find(x => x.id === id), name = Object.keys(t.patterns).filter(x => /^V\d+$/.test(x)).pop();
+        assert(name && t.patterns[name].idea, `vary ${type}: ${id} has no new pattern`);
+        assert(inKey(t.type, t.patterns[name].idea), `vary ${type}: ${id} out of key ${JSON.stringify(t.patterns[name].idea)}`);
+        const step = r.song.build.find(s => s.at === at && s.pattern && s.pattern.track === id);
+        assert(step && step.pattern.to === name && step.by === 'listener', `vary ${type}: no listener step for ${id}`);
+        assert(!r.song.build.some(s => s.at > at && s.pattern && s.pattern.track === id), `vary ${type}: ${id} goes back to old notes`);
+        (ideas[type] = ideas[type] || new Set()).add(JSON.stringify(t.patterns[name].idea));
+      }
+      assert(compileSong(stateAt(r.song, at + 1).song) !== compileSong(stateAt(g.song, at + 1).song), `vary ${type}: same code at bar ${at + 1}`);
+      // the rest of the song is unchanged: sections, the other tracks and their steps
+      assert(JSON.stringify(r.song.sections) === JSON.stringify(g.song.sections), `vary ${type}: sections changed`);
+      const others = sg => JSON.stringify([sg.tracks.filter(t => !ids.includes(t.id)), sg.build.filter(s => !stepTracks(s).some(id => ids.includes(id))).map(({ say, voice, ...s }) => s)]);
+      assert(others(r.song) === others(g.song), `vary ${type}: other tracks or steps changed`);
+    }
+    // different parts among the varies of each part (a pad varies only its rhythm, register and voicing)
+    const share = { lead: 0.6, arp: 0.6, bass: 0.4, pad: 0.2 };
+    assert(VARY_TYPES.every(t => types[t] > 5 && ideas[t].size >= share[t] * types[t]), `different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t] && ideas[t].size} of ${types[t]}`).join(', ')}`);
+    console.log(`      200 varies, all in key; different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t].size} of ${types[t]}`).join(', ')}`);
+  },
+  'steering: vary is disabled when the part does not play or is locked'() {
+    let checked = 0, locked = 0;
+    for (const { g, type, at, ids } of varies(60)) {
+      const now = at - 1;
+      for (const other of VARY_TYPES) {
+        const on = varyTracks(playing(stateAt(g.song, at).song), other);
+        if (!on.length) { assert(whyNot({ kind: 'vary', type: other }, g.song, g.plan, now) === 'not-playing', `vary ${other}: ${whyNot({ kind: 'vary', type: other }, g.song, g.plan, now)}`); checked++; }
+      }
+      // every track of the part locked: locked; one track free: allowed
+      const plan = { ...g.plan, locked: ids };
+      assert(whyNot({ kind: 'vary', type }, g.song, plan, now) === 'locked', `vary ${type} locked`);
+      assert(whyNot({ kind: 'vary', type }, g.song, g.plan, now) === null, `vary ${type} allowed`);
+      const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'lock', track: ids[0], at: applyBar('lock', now - 1, g.plan) }, { kind: 'vary', type, at }], seed: 'vary-lock', n: 0 });
+      if (ids.length === 1) { assert(!r.song.build.some(s => s.at === at && s.pattern && s.pattern.track === ids[0] && s.by === 'listener'), `locked ${ids[0]} varied`); locked++; }
+      assert(whyNot({ kind: 'vary', type }, g.song, g.plan, g.plan.bars - 1) === 'late', 'late at the end');
+    }
+    assert(checked > 10 && locked > 5, `not-playing ${checked}, locked ${locked}`);
+  },
+  'steering: vary replays the same, and a cancelled vary leaves the notes'() {
+    const { g, type, at } = varies(1)[0], go = (commands, n = 0) => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands, seed: 'vary-replay', n });
+    const cmds = [{ kind: 'vary', type, at }, { kind: 'energy-up', at: applyBar('energy-up', at + 1, g.plan) }, { kind: 'vary', type, at: at + 2 * g.plan.phrase }];
+    const a = go(cmds), b = go(JSON.parse(JSON.stringify(cmds)));
+    assert(JSON.stringify(a.song) === JSON.stringify(b.song), 'the same varies gave different notes');
+    // a recorded session replays the same: each song by its index n
+    assert(JSON.stringify(go(cmds, 3).song) === JSON.stringify(go(cmds, 3).song) && JSON.stringify(go(cmds, 3).song) !== JSON.stringify(a.song), 'seeds by song index');
+    // the second vary adds V2; the energy change after the first keeps the varied part
+    const t = a.song.tracks.find(x => x.patterns.V2);
+    assert(t && t.patterns.V1, 'two varies give V1 and V2');
+    const on = (sg, bar) => (stateAt(sg, bar).song.tracks.find(x => x.id === t.id).clips[0] || {}).pattern;
+    assert(on(a.song, at + 1) === 'V1' && on(a.song, at + 2 * g.plan.phrase + 1) === 'V2', `patterns ${on(a.song, at + 1)} ${on(a.song, at + 2 * g.plan.phrase + 1)}`);
+    // cancelled: the song without the vary is the song as it was
+    assert(JSON.stringify(go([cmds[1]]).song) === JSON.stringify(go([cmds[1]]).song) && !go([cmds[1]]).song.tracks.some(x => x.patterns.V1), 'a cancelled vary left a pattern');
+    assert(JSON.stringify(go([]).song) === JSON.stringify(g.song), 'no command changed the song');
+  },
+  'steering: Add and More complex compose new tracks'() {
+    let added = 0, more = 0;
+    for (const id of ['synthwave', 'berlin-techno', 'trance', 'jazz', 'lo-fi']) {
+      const ses = createSession(STYLES, `compose-${id}`);
+      for (let i = 0; i < 6; i++) {
+        const g = ses.next({ styles: [id] });
+        const melodic = t => ['bass', 'arp', 'hook', 'pad', 'guitar'].includes(t.type);
+        // Add of a type the song has no track for: composed ideas, not presets (patterns: presets as before)
+        for (const type of ['bass', 'lead', 'pad']) {
+          if (whyNot({ kind: 'add', type }, g.song, g.plan, 20)) continue;
+          const at = applyBar('add', 20, g.plan), before = new Set(g.song.tracks.map(t => t.id));
+          const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'add', type, at }], seed: `compose-${id}`, n: i });
+          const parts = { bass: ['bass'], lead: ['arp', 'hook', 'guitar'], pad: ['pad'] }[type];
+          const fresh = r.song.tracks.filter(t => !before.has(t.id) && parts.includes(t.type));
+          for (const t of fresh) { assert(Object.values(t.patterns).every(p => p.idea && !p.preset) && inKey(t.type, t.patterns.A.idea), `add ${type}: ${t.id} ${JSON.stringify(t.patterns)}`); added++; }
+          // with the source "patterns" a track keeps what the plan gave it, a new one its style's presets
+          const p = steerSong({ song: g.song, plan: g.plan, opts: { ...g.opts, material: 'patterns' }, commands: [{ kind: 'add', type, at }], seed: `compose-${id}`, n: i });
+          for (const t of p.song.tracks.filter(x => !before.has(x.id) && melodic(x))) { const was = g.plan.tracks.find(x => x.id === t.id); assert(was ? JSON.stringify(t.patterns) === JSON.stringify(was.patterns) : Object.values(t.patterns).every(x => !x.idea), `patterns source composed ${t.id}`); }
+        }
+        // More complex: tracks that come in after it and had not played get composed ideas
+        const at = applyBar('more-complex', 10, g.plan);
+        const heard = new Set(g.song.build.filter(s => s.at < at).flatMap(s => listOf(s.add)));
+        const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [0, 1].map(() => ({ kind: 'more-complex', at })), seed: `compose-${id}`, n: i });
+        for (const t of r.song.tracks.filter(x => melodic(x) && !heard.has(x.id))) {
+          const was = g.plan.tracks.find(x => x.id === t.id);
+          if (Object.values(was.patterns).some(p => p.idea)) continue;
+          assert(Object.values(t.patterns).every(p => p.idea && !p.preset), `more complex: ${t.id} ${JSON.stringify(t.patterns)}`);
+          more++;
+        }
+      }
+    }
+    assert(added >= 5 && more >= 5, `composed tracks: add ${added}, more complex ${more}`);
+    for (const c of PLAIN_STEER) assert(sessionHash(plainSteer(c)) === c.songs, `${c.seed}: steered songs at complexity 0 or with patterns changed (${sessionHash(plainSteer(c))})`);
+  },
+  'steering: curves and complexity shape composed material'() {
+    const find = (seed, style, type) => { const ses = createSession(STYLES, seed); for (let i = 0; i < 30; i++) { const x = ses.next({ styles: [style] }); if (!whyNot({ kind: 'vary', type }, x.song, x.plan, 40)) return x; } return null; };
+    const N = 40, ns = [...Array(N).keys()];
+    // the new idea of a vary at bar 40 after the commands given (null when they took the part out)
+    const partOf = (g, type, seed) => (cmds, n) => { const at = applyBar('vary', 40, g.plan); const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [...cmds(at), { kind: 'vary', type, at }], seed, n }); const t = r.song.tracks.find(x => x.patterns.V1); return t ? t.patterns.V1.idea : null; };
+    const nums = text => String(text).replace(/[!%*@]\d+/g, '').match(/-?\d+/g).map(Number);
+    const perBar = idea => (expandIdea(idea, { type: 'hook', N: 16 }).steps.match(/x/g) || []).length;
+    // density: the lead of songs of several styles, varied after the next part's density was set to 0.2 or 0.8 of the
+    // most tracks (pairs where the lead still plays at 0.2)
+    const pairs = [];
+    for (const style of ['synthwave', 'trance', 'melodic-metal', 'phonk']) {
+      const ses = createSession(STYLES, `dens-${style}`);
+      for (let i = 0; i < 8; i++) {
+        const x = ses.next({ styles: [style] });
+        if (whyNot({ kind: 'vary', type: 'lead' }, x.song, x.plan, 40)) continue;
+        const lead = partOf(x, 'lead', `dens-${style}`), d = Math.floor(applyBar('vary', 40, x.plan) / (2 * x.plan.phrase)), max = densityMax(x.plan);
+        for (let n = 0; n < 3; n++) { const [a, b] = [0.2, 0.8].map(v => lead(at => [{ kind: 'curve', curve: 'density', d, value: Math.round(v * max), at }], n)); if (a && b) pairs.push([perBar(a), perBar(b)]); }
+      }
+    }
+    const lo = avg(pairs.map(p => p[0])), hi = avg(pairs.map(p => p[1]));
+    assert(pairs.length >= 20 && lo < hi, `notes per bar over ${pairs.length} leads: density 0.2 ${lo}, 0.8 ${hi}`);
+    const g = find('shape-lead', 'synthwave', 'lead');
+    assert(g, 'no song with a lead');
+    const lead = partOf(g, 'lead', 'shape-lead'), d = Math.floor(applyBar('vary', 40, g.plan) / (2 * g.plan.phrase));
+    const some = list => list.filter(Boolean);
+    const reg = v => avg(some(ns.map(n => lead(at => [{ kind: 'curve', d, value: v, at }], n))).map(i => avg(nums(i.degrees))));
+    const low = reg(0.2), high = reg(0.9);
+    assert(high > low + 1, `mean degree: energy 0.2 ${low.toFixed(2)}, 0.9 ${high.toFixed(2)}`);
+    const cx = (part, kind, read) => avg(some(ns.map(n => part(at => [0, 1, 2].map(() => ({ kind, at })), n))).map(i => new Set(read(i)).size));
+    const hookLess = cx(lead, 'less-complex', i => nums(i.degrees)), hookMore = cx(lead, 'more-complex', i => nums(i.degrees));
+    assert(hookMore > hookLess, `different degrees: less complex ${hookLess}, more complex ${hookMore}`);
+    const b = find('shape-bass', 'berlin-techno', 'bass');
+    assert(b, 'no song with a bass');
+    const bass = partOf(b, 'bass', 'shape-bass'), notes = i => nums(i.add ?? '0');
+    const bassLess = cx(bass, 'less-complex', notes), bassMore = cx(bass, 'more-complex', notes);
+    assert(bassMore > bassLess, `different bass notes: less complex ${bassLess}, more complex ${bassMore}`);
+    console.log(`      lead notes per bar ${lo.toFixed(2)} / ${hi.toFixed(2)} (density 0.2 / 0.8); mean degree ${low.toFixed(2)} / ${high.toFixed(2)} (energy 0.2 / 0.9); different degrees ${hookLess.toFixed(2)} / ${hookMore.toFixed(2)}, bass notes ${bassLess.toFixed(2)} / ${bassMore.toFixed(2)} (less / more complex)`);
+  },
+  'steering: one vary takes less than 20 ms'() {
+    const all = varies(40), times = all.map(({ g, type, at }) => { const t0 = performance.now(); steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'vary', type, at }], seed: 'vary-time', n: 1 }); return performance.now() - t0; }).sort((a, b) => a - b);
+    const median = times[Math.floor(times.length / 2)], max = times[times.length - 1];
+    assert(max < 20, `slowest vary ${max.toFixed(1)} ms`);
+    console.log(`      vary: median ${median.toFixed(2)} ms, slowest ${max.toFixed(2)} ms over ${times.length}`);
   },
   'radio: a session continues after a song from Compose'() {
     const song = JSON.parse(fs.readFileSync(new URL('../songs/ferro.json', import.meta.url), 'utf8'));

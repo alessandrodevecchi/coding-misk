@@ -14,7 +14,7 @@ for (const [k, why] of Object.entries(GUIDE_EXEMPT)) if (!why) problems.push(`ex
 
 const radio = GUIDE.find(c => c.id === 'radio');
 const named = new Set((radio && radio.parts || []).flatMap(p => p.commands || []));
-for (const kind of Object.keys(COMMANDS)) if (!named.has(kind)) problems.push(`console command "${kind}" is not in the Radio card (add it to a part's commands and explain it)`);
+for (const kind of Object.keys(COMMANDS)) if (!named.has(kind) && !GUIDE_EXEMPT[kind]) problems.push(`console command "${kind}" is not in the Radio card (add it to a part's commands and explain it)`);
 
 // every text: { en, it }, both filled
 const texts = (o, path) => {

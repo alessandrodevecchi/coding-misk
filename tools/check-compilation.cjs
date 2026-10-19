@@ -1,6 +1,7 @@
 // Browser checks for the radio compilation (#49): the button and its lamps, the setup (preset, genres, ranges, saved
 // presets), songs drawn within the setup, the now playing tag, Keep for a random artist, Replay gives the same songs,
-// knobs that follow the song on air and hold a value moved by hand (#59).
+// knobs that follow the song on air and hold a value moved by hand (#59), the material source in the setup, saved with
+// the session (material-generator, radio-variation 6.1).
 // Usage: PLAYWRIGHT_CORE=... node tools/check-compilation.cjs [shots-dir]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -41,6 +42,10 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(JSON.stringify(o.compSetup.genres.sort()) === '["industrial","techno"]' && o.compPreset === 'custom', 'genres picked by hand', JSON.stringify(o.compSetup.genres));
   await page.fill('#comp-name', 'Notte industriale'); await page.click('#comp-save'); await sleep(200);
   check(await page.evaluate(() => !!(JSON.parse(localStorage.getItem('coding-misk-comp-presets') || '{}'))['Notte industriale']) && (await opts()).compPreset === 'Notte industriale', 'a setup is saved as a preset');
+  // the material source: chips in the setup, saved in the options, never in the live console
+  await page.click('.comp-setup [data-material="patterns"]'); await sleep(150);
+  check((await opts()).material === 'patterns' && (await page.getAttribute('.comp-setup [data-material="patterns"]', 'aria-pressed')) === 'true', 'the material source is picked in the setup');
+  check(await page.evaluate(() => [...document.querySelectorAll('[data-material]')].every(b => b.closest('.comp-setup'))), 'the material source is only in the setup');
   if (shots) await page.screenshot({ path: path.join(shots, 'setup.png') });
 
   await page.click('#radio-comp'); await sleep(100); await page.click('#radio-comp'); await sleep(100); // off, then every song
@@ -58,6 +63,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const genres = await page.evaluate(() => { const r = globalThis.codingMiskRadio; return r.state.stream.slice(0, 4).map(x => x.id); });
   const recipe = await page.evaluate(() => globalThis.codingMiskRadio.state.recipe);
   check(!!recipe.options.compilation && recipe.options.compilation.every === 'song', 'the session recipe carries the compilation');
+  check(recipe.options.material === 'patterns', 'the session recipe carries the material source', JSON.stringify(recipe.options.material));
   const entries = await page.evaluate(() => globalThis.codingMiskRadio.history.slice(0, 4).map(h => (h.entry && h.entry.styles) || []));
   // #59: the knobs show the song on air, a knob moved by hand is held for the next songs, the lock gives it back
   const knob = () => page.evaluate(() => { const s = globalThis.codingMiskRadio.state, it = s.stream[s.onAir]; return { shown: +document.querySelector('#radio-energy').closest('.ctrl').querySelector('output').textContent, song: it.knobs ? it.knobs.energy : null, auto: !!document.querySelector('.comp-knobs-hint') && !document.querySelector('[data-unlock]') }; });

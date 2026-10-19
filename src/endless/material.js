@@ -88,3 +88,30 @@ export function applyMaterial(tracks, R, complexity, opts, M) {
   return used;
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// ---------- material composed on air (radio-variation, docs/ENDLESS.md "Steering") ----------
+
+// whether steering composes new tracks (Add, More complex): not for the session source "patterns", nor at complexity 0
+// (those sessions keep today's presets)
+export const composesOnAir = opts => sessionSource(opts) !== 'patterns' && (opts.complexity ?? 0.5) > 0;
+// One new idea for a track, composed while the song plays. M: { seed, key, chords, meter, energy, density, complexity,
+// source, avoid (ideas it must differ from) }. density, energy and complexity (0 to 1) shape the part (D3): notes per
+// bar, register, range and rhythmic variety. With the source "varied" a preset track gets a variation of its preset.
+// Tries a few seeds until the idea differs from every idea in avoid; null when the type has no generator (drums keep
+// their grooves, textures their rhythms).
+export function airIdea(t, R, M) {
+  const kind = KIND_OF_TYPE[t.type];
+  if (!kind || kind === 'drums') return null;
+  const harmony = { key: M.key, mode: (t.settings && t.settings.mode) || 'minor', chords: M.chords };
+  const style = (R[t.type] && R[t.type].material) || {}, shape = { density: M.density, register: M.energy, complexity: M.complexity };
+  const avoid = new Set((M.avoid || []).filter(Boolean).map(x => JSON.stringify(x)));
+  const preset = ((t.patterns || {}).A || {}).preset;
+  for (let k = 0; k < 8; k++) {
+    const seed = k ? `${M.seed}:${k + 1}` : M.seed;
+    const v = M.source === 'varied' && preset
+      ? compose(kind, { seed, type: t.type, from: preset, keep: k % 2 ? 'notes' : 'rhythm', harmony, meter: M.meter, energy: M.energy })
+      : compose(kind, { seed, style, harmony, meter: M.meter, energy: M.energy, type: t.type, shape });
+    if (v && v.idea && !avoid.has(JSON.stringify(v.idea))) return v.idea;
+  }
+  return null;
+}
