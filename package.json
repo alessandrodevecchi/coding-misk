@@ -37,7 +37,8 @@
     "check:ideas": "node --no-warnings tools/check-idea-writer.mjs",
     "check:functions": "node --no-warnings tools/check-functions.mjs",
     "check:material": "node --no-warnings tools/check-material.mjs",
-    "check:patterns": "node --no-warnings tools/check-patterns.mjs"
+    "check:patterns": "node --no-warnings tools/check-patterns.mjs",
+    "check:spoken": "node --no-warnings tools/check-spoken.mjs"
   },
   "dependencies": {
     "@mediabunny/flac-encoder": "^1.61.3",

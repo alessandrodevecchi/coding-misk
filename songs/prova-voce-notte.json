@@ -1,0 +1,71 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "prova-voce-notte",
+  "title": "Voce nella notte",
+  "created": "2026-10-19",
+  "appVersion": "0.6.0",
+  "profile": "switch",
+  "buildStyle": "crescendo",
+  "narrator": "poetic",
+  "growthShape": { "opening": "voice" },
+  "look": "edgerunners",
+  "style": {
+    "en": "Test · voice instrument: spoken opening, refrain from the style in the break, poetic narrator · 108 BPM",
+    "it": "Prova · voce strumento: apertura parlata, ritornello dallo stile nella pausa, narratore poetico · 108 BPM"
+  },
+  "tags": { "styles": ["dark-cyberpunk"], "free": ["test"] },
+  "sections": [
+    { "name": "Intro", "bars": 8, "bpm": 108, "key": "E", "chords": "frigio", "meter": "4/4" },
+    { "name": "Groove", "bars": 16, "bpm": 108, "key": "E", "chords": "cyber", "meter": "4/4" },
+    { "name": "Break", "bars": 8, "bpm": 108, "key": "E", "chords": "frigio", "meter": "4/4" },
+    { "name": "Drop", "bars": 16, "bpm": 108, "key": "E", "chords": "cyber", "meter": "4/4", "crash": true },
+    { "name": "Outro", "bars": 8, "bpm": 108, "key": "E", "chords": "frigio", "meter": "4/4" }
+  ],
+  "tracks": [
+    {
+      "id": "kick", "name": "Kick", "type": "drums",
+      "settings": { "kit": "LinnDrum", "gain": 0.85, "drive": 0.6 },
+      "patterns": { "A": { "rows": { "bd": "x...x...x...x..." } } },
+      "clips": [ { "section": "Groove", "pattern": "A" }, { "section": "Drop", "pattern": "A" } ]
+    },
+    {
+      "id": "beat", "name": "Beat", "type": "drums",
+      "settings": { "kit": "LinnDrum", "gain": 0.6 },
+      "patterns": { "A": { "rows": { "sd": "....x.......x...", "hh": "..x...x...x...x." } } },
+      "clips": [ { "section": "Drop", "pattern": "A" } ]
+    },
+    {
+      "id": "bass", "name": "Bass", "type": "bass",
+      "settings": { "wave": "square", "gain": 0.65, "cutoff": 700, "drive": 0.8 },
+      "patterns": { "A": { "preset": "spirale" } },
+      "clips": [ { "section": "Groove", "pattern": "A" }, { "section": "Drop", "pattern": "A" } ]
+    },
+    {
+      "id": "pad", "name": "Pad", "type": "pad",
+      "settings": { "wave": "supersaw", "gain": 0.25, "cutoff": 1200 },
+      "patterns": { "A": { "preset": "pad" } },
+      "clips": [ { "section": "Intro", "pattern": "A" }, { "section": "Break", "pattern": "A" }, { "section": "Outro", "pattern": "A" } ]
+    },
+    {
+      "id": "arp", "name": "Arp", "type": "arp",
+      "settings": { "wave": "sawtooth", "gain": 0.3, "cutoff": 1800 },
+      "patterns": { "A": { "preset": "pulsar", "speed": "16" } },
+      "clips": [ { "section": "Drop", "pattern": "A" } ]
+    },
+    {
+      "id": "words", "name": "Words", "type": "spoken",
+      "settings": { "speaker": "reed", "gain": 0.55, "pitch": 0.8, "room": 0.35, "cutoff": 6000 },
+      "patterns": {
+        "open": { "way": "opening", "text": { "en": "the towers never sleep", "it": "le torri non dormono mai" }, "before": "kick" },
+        "refrain": { "way": "refrain", "every": 4 }
+      },
+      "clips": [ { "section": "Intro", "pattern": "open" }, { "section": "Break", "pattern": "refrain" } ]
+    },
+    {
+      "id": "voice", "name": "Narrator", "type": "voice",
+      "settings": { "speaker": "rocko", "gain": 0.45, "room": 0.4, "cutoff": 7000 },
+      "patterns": {}, "clips": []
+    }
+  ]
+}

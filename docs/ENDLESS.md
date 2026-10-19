@@ -140,7 +140,7 @@ For each track whose type has a generator (drums, bass, arp, lead, pad, guitar),
 - A composed track gets pattern A at the target energy of the phrase where its type usually comes in (its place in the entry order), pattern B at the song's next big moment, and pattern C at the quietest phrase when complexity is above 0.6. The kick and beat tracks share one composed groove. A recipe that names `sounds` also gets a composed sound on composed tracks.
 - **The user's saved patterns** (`pattern-library`, passed as `userPatterns`) join the pool only where they fit: the same track type, a style tag of the part's style or `any`, and material that moves to the song's key.
 
-The session report (`npm run endless`) shows which tracks are composed, varied or saved. `DIRECTOR_VERSION` is 3: sessions saved by version 2 warn in the playlists.
+The session report (`npm run endless`) shows which tracks are composed, varied or saved. `DIRECTOR_VERSION` is 4 (voice-instrument, below): sessions saved by an older version warn in the playlists.
 
 The rules were written from scratch from general techniques of live coders and public courses; no passage or full recipe of a course is reused, so no credit line is needed.
 
@@ -157,6 +157,17 @@ Each song has its own voice. The style that gives the voice part sets the base: 
 The style's ranges are widened around their middle (1.6 times, plus the chaos), and sometimes one or two knobs the style leaves alone get a value of their own; every knob stays within `VOICE_LIMITS`, so the words stay understandable (#66).
 
 The draws use their own random stream (`voice`), so they never change the music of a seed. The session report and the recap show the speaker and the character of each song.
+
+### Voice instrument
+
+A style may give its songs a voice instrument (`spoken` in the recipe, `docs/STYLES.md`): a spoken track that is part of the music, apart from the narrator (voice-instrument, #39). Its `weight` is the chance that a song gets one; the way (`passage`, `refrain`, `chop`, `opening`) is drawn by the style's `ways`, the line from its `lines` for that way, else from the vocabulary (`src/song/vocabulary.js`, the style's `vocab` group); the speaker from its `speakers`, never the narrator's; sometimes a voice character on top (more often on a chop). Where it plays:
+
+- a refrain has a clip over the whole song: its lines only sound in the intro, break and outro;
+- a passage plays in the first break (else the intro, else the outro);
+- a chop plays in the first groove, drop, build or peak where fewer tracks than the usual most play (a chop counts as a layer);
+- an opening ends where the next track comes in, its line ending before it (bound with `before`).
+
+It is not one of the director's moves: it comes in with one `add` step where its clip starts, and the energy and density measures leave it out like the narrator. The draws use their own stream (`spoken`), so they never change the music of a seed, and complexity 0 gives no voice instrument (the plain songs stay those of version 2). The style's `narrator` (`"poetic"`) goes into its songs too. Dark cyberpunk and Ambient (refrains and passages, poetic narrator) and Pure trance (openings and chops) have a weight of 0.3. `npm run check:spoken` checks it.
 
 ## Comments
 

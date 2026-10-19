@@ -6,7 +6,8 @@ import { RECIPE_DEFAULTS } from './recipe.js';
 const clamp = (x, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, x));
 const MELODIC = ['bass', 'arp', 'hook', 'pad', 'guitar'];
 
-export const playing = state => (state.tracks || []).filter(t => !t.mute && t.type !== 'voice');
+// (the voice instrument, voice-instrument, is left out like the narrator: it adds no density or energy)
+export const playing = state => (state.tracks || []).filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken');
 const patternOf = t => ((t.patterns || {})[((t.clips || [])[0] || {}).pattern] || {});
 
 // hits per bar of the drum tracks playing

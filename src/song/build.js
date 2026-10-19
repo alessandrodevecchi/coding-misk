@@ -5,6 +5,7 @@
 // shown in the editor always agree. Tracks named by an "add" step are silent before it; the others play from the start.
 import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
+import { spokenBars, narratorStyle, poeticLine, enteringTrack, placeSpoken, lineTexts } from './spoken.js';
 
 // hide and reveal (natural-growth): functions of a track left out of its code until a step brings them in
 // clone, comment, notes (live-coder-growth): a track comes in as a copy of another one; functions commented out in the
@@ -148,10 +149,18 @@ const sampleIndex = (list, text) => list.findIndex(f => decodeURI(f).endsWith(`/
 // every spoken comment of a song that has a sample: [{ s, n }], to load them before they play
 export function voiceSamples(song, lang, files) {
   const out = new Map();
-  for (const st of buildSteps(song)) {
-    if (!st.say) continue;
-    const { bank, list } = bankFor(voiceOf(song, st), lang, files), n = sampleIndex(list, sayText(st.say, lang));
+  const poetic = narratorStyle(song) === 'poetic';
+  buildSteps(song).forEach((st, i) => {
+    const text = poetic ? (enteringTrack(song, st) ? sayText(poeticLine(song, st, i), lang) : '') : st.say ? sayText(st.say, lang) : '';
+    if (!text) return;
+    const { bank, list } = bankFor(voiceOf(song, st), lang, files), n = sampleIndex(list, text);
     if (n >= 0) out.set(`${bank}:${n}`, { s: bank, n });
+  });
+  // the voice instrument's lines (voice-instrument)
+  if ((song.tracks || []).some(t => t.type === 'spoken')) {
+    for (const p of placeSpoken(song, lang)) for (const text of lineTexts(p.line, lang)) {
+      for (const bank of [p.bank, sayBank(lang)]) { const n = sampleIndex((files || {})[bank] || [], text); if (n >= 0) { out.set(`${bank}:${n}`, { s: bank, n }); break; } }
+    }
   }
   return [...out.values()];
 }
@@ -165,24 +174,41 @@ function bankFor(track, lang, files) {
 // step's bar with the settings and rack of its voice track (in "state": the song at that bar, so steps can change them).
 // The volume is applied after the effects, so distortion does not make it louder.
 // files: the custom samples manifest ({ say_en: ["say_en/more_bass.wav", …] }); no file, no voice
+// voice-instrument: the poetic narrator speaks only where a track comes in, with a short image, in the bar before the
+// entry when the code of the step before is still playing there (else on the entry's bar); the narrator yields to the
+// voice instrument: a comment on a bar where a spoken line sounds is skipped (D5)
+// (the narrator never announces the voice instrument: a step that brings in a spoken track is not narrated)
+const entering = (song, step) => { const t = step && enteringTrack(song, step); return t && t.type !== 'spoken' ? t : null; };
+const bringsSpoken = (song, step) => { const t = step && enteringTrack(song, step); return !!t && t.type === 'spoken'; };
+function narration(song, upTo, lang) {
+  const steps = buildSteps(song), step = steps[upTo - 1];
+  if (narratorStyle(song) !== 'poetic') { const text = step && !bringsSpoken(song, step) && sayText(step.say, lang); return text ? [{ step, text, at: step.at }] : []; }
+  const out = [], next = steps[upTo];
+  // the entry of bar 0 (the first track), then the next entry in the bar before it
+  if (step && step.at === 0 && entering(song, step)) out.push({ step, text: sayText(poeticLine(song, step, upTo - 1), lang), at: 0 });
+  if (next && entering(song, next) && next.at > 0 && next.at - 1 >= (step ? step.at : 0) && !out.some(x => x.at === next.at - 1)) out.push({ step: next, text: sayText(poeticLine(song, next, upTo), lang), at: next.at - 1 });
+  return out.filter(x => x.text);
+}
 export function voiceCode(song, state, upTo, total, lang, files) {
-  const step = buildSteps(song)[upTo - 1], text = step && sayText(step.say, lang);
-  if (!text) return '';
-  const track = voiceOf(state, step);
-  if (track && track.mute) return '';
-  const { bank, list } = bankFor(track, lang, files), n = sampleIndex(list, text);
-  if (n < 0) return '';
-  const v = { ...VOICE_DEFAULT, ...((track && track.settings) || {}) }, at = step.at, rest = total - at - 1;
-  const lane = `<${at > 0 ? `0!${at} ` : ''}1${rest > 0 ? ` 0!${rest}` : ''}>`;
-  // speed changes length and pitch together; the phase vocoder (stretch) then moves the pitch alone to where it should be
-  const f3 = x => Math.round(x * 1000) / 1000, shift = f3(v.pitch / v.tempo);
-  const fx = (v.tempo !== 1 ? `.speed(${f3(v.tempo)})` : '') + (shift !== 1 ? `.stretch(${shift})` : '') + (v.cutoff < 18000 ? `.lpf(${v.cutoff})` : '') + (v.hpf > 0 ? `.hpf(${v.hpf})` : '')
-    + (v.drive > 0 ? `.distort(${v.drive})` : '') + (v.delay > 0 ? `.delay(${v.delay}).delaysync(0.1875).delayfeedback(0.4)` : '') + (v.room > 0 ? `.room(${v.room})` : '')
-    + rackCode(track && track.rack, 'voice');
-  const orbit = 15 + Math.max(0, (state.tracks || []).filter(t => t.type === 'voice').indexOf(track));
-  // a line played alone (S$:) silences the plain ones: the voice speaks alone with it
-  const label = (state.tracks || []).some(t => t.alone && !t.mute) ? 'S$:' : '$:';
-  return `\n// ========== ${track ? `${track.name || track.id} · voice` : 'voice'} ==========\n// "${text}", spoken on bar ${at + 1}\n${label} s("${bank}").n(${n}).mask("${lane}")${fx}.postgain(${v.gain}).orbit(${orbit}).analyze("fx")`;
+  const spokenAt = (state.tracks || []).some(t => t.type === 'spoken') ? spokenBars(state, lang) : null;
+  return narration(song, upTo, lang).map(said => {
+    const step = said.step, text = said.text, track = voiceOf(state, step);
+    if (track && track.mute) return '';
+    if (spokenAt && spokenAt.has(said.at)) return '';
+    const { bank, list } = bankFor(track, lang, files), n = sampleIndex(list, text);
+    if (n < 0) return '';
+    const v = { ...VOICE_DEFAULT, ...((track && track.settings) || {}) }, at = said.at, rest = total - at - 1;
+    const lane = `<${at > 0 ? `0!${at} ` : ''}1${rest > 0 ? ` 0!${rest}` : ''}>`;
+    // speed changes length and pitch together; the phase vocoder (stretch) then moves the pitch alone to where it should be
+    const f3 = x => Math.round(x * 1000) / 1000, shift = f3(v.pitch / v.tempo);
+    const fx = (v.tempo !== 1 ? `.speed(${f3(v.tempo)})` : '') + (shift !== 1 ? `.stretch(${shift})` : '') + (v.cutoff < 18000 ? `.lpf(${v.cutoff})` : '') + (v.hpf > 0 ? `.hpf(${v.hpf})` : '')
+      + (v.drive > 0 ? `.distort(${v.drive})` : '') + (v.delay > 0 ? `.delay(${v.delay}).delaysync(0.1875).delayfeedback(0.4)` : '') + (v.room > 0 ? `.room(${v.room})` : '')
+      + rackCode(track && track.rack, 'voice');
+    const orbit = 15 + Math.max(0, (state.tracks || []).filter(t => t.type === 'voice').indexOf(track));
+    // a line played alone (S$:) silences the plain ones: the voice speaks alone with it
+    const label = (state.tracks || []).some(t => t.alone && !t.mute) ? 'S$:' : '$:';
+    return `\n// ========== ${track ? `${track.name || track.id} · voice` : 'voice'} ==========\n// "${text}", spoken on bar ${at + 1}\n${label} s("${bank}").n(${n}).mask("${lane}")${fx}.postgain(${v.gain}).orbit(${orbit}).analyze("fx")`;
+  }).join('');
 }
 
 // checks for the "build" list; err/warn take (path, message)
@@ -257,10 +283,10 @@ export const PHRASES = {
   drums: { en: 'more rhythm', it: 'serve più ritmo' }, bass: { en: 'need bass', it: 'serve il basso' },
   guitar: { en: 'guitars!', it: 'chitarre!' }, hook: { en: 'melody!', it: 'melodia!' }, arp: { en: 'now the arp', it: "ora l'arpeggio" },
   pad: { en: 'some warmth', it: "un po' di calore" }, riser: { en: 'here it comes', it: 'sta arrivando' },
-  texture: { en: 'some dirt', it: "un po' di sporco" }, code: { en: 'something odd', it: 'qualcosa di strano' },
+  texture: { en: 'some dirt', it: "un po' di sporco" }, code: { en: 'something odd', it: 'qualcosa di strano' }, spoken: { en: 'a voice', it: 'una voce' },
   less: { en: 'strip it back', it: 'togliamo qualcosa' }, breakdown: { en: 'breakdown', it: 'pausa' }, end: { en: 'winding down', it: 'chiudiamo' },
 };
-const PRIORITY = ['drums', 'bass', 'guitar', 'hook', 'arp', 'pad', 'riser', 'texture', 'code'];
+const PRIORITY = ['drums', 'bass', 'guitar', 'hook', 'arp', 'pad', 'riser', 'texture', 'code', 'spoken'];
 export function deriveBuild(song) {
   const secs = song.sections || [], total = secs.reduce((a, s) => a + (s.bars || 0), 0);
   const startOf = ref => { const i = typeof ref === 'number' ? ref : secs.findIndex(s => s.name === ref); return secs.slice(0, i).reduce((a, s) => a + s.bars, 0); };

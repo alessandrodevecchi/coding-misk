@@ -141,6 +141,17 @@
       0.6
     ]
   },
+  "spoken": {
+    "weight": 0.3,
+    "ways": { "opening": 2, "chop": 1 },
+    "vocab": "machine",
+    "speakers": ["eddy", "reed"],
+    "lines": {
+      "opening": [
+        { "en": "system online, here we go", "it": "sistema attivo, si parte" }
+      ]
+    }
+  },
   "words": {
     "en": [
       "Gate",

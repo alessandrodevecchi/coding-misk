@@ -39,6 +39,8 @@ One recipe per file, `styles/<id>.json`. Required fields are marked.
 | `tracks`       | `{ "usual": [low, high], "max": n }`: tracks playing at once, usually and at most.         | `{ usual: [4, 5], max: 8 }` |
 | `energy`       | Weights of the energy measure: `tracks`, `drums`, `filter`, `drive`, each 0 to 1.          | `0.4, 0.3, 0.2, 0.1`    |
 | `voice`        | The base of the voice: `speakers` (system voices that speak English and Italian: `eddy`, `flo`, `grandma`, `grandpa`, `reed`, `rocko`, `sandy`, `shelley`, or `""` for the default; `speaker` for just one) and the voice track settings `gain`, `pitch`, `tempo`, `cutoff`, `hpf`, `drive`, `room`, `delay`, each a number or a range `[low, high]`. Each song draws its own values; see "Voice" in `docs/ENDLESS.md`. | voice track defaults |
+| `spoken`       | Optional voice instrument (voice-instrument): `{ "weight": 0.3, "ways": { "refrain": 2, "passage": 1 }, "lines": { "refrain": [{ "en": "…", "it": "…" }] }, "speakers": ["reed"], "vocab": "dark" }`. `weight` (0 to 1) is the chance that a song gets a spoken track; `ways` weights `passage`, `refrain`, `chop`, `opening`; `lines` the style's own lines by way (at most 12 words); `speakers` who speaks them (never the narrator's speaker of the song); `vocab` the vocabulary group of drawn lines (`dark`, `calm`, `machine`, `night`). Without it the style's songs have no voice instrument. See "Voice instrument" in `docs/ENDLESS.md`. | none |
+| `narrator`     | Optional narrator style of its songs: `"explain"` (default) or `"poetic"` (short images before each track comes in), or `{ "style": "poetic", "lines": { "bass": [{ "en": "…", "it": "…" }] } }` with the style's own images by track type. | `"explain"` |
 | `growthShapes` | Optional weights of the growth shapes its songs draw in a Live coder build: `{ "openings": { "full-kick": 3 }, "paces": { "fast": 2 }, "developments": { "by-type": 1 } }` (see Growth shapes below). |                         |
 | `words`        | Required. Title words: `{ "en": [...], "it": [...], "es": [...] }`, at least 3 each.       |                         |
 
@@ -102,7 +104,7 @@ Several styles can be selected at once, with a chaos amount from 0 to 1. Each so
 | `harmony` | `keys`, `progressions`, `meters`, `swing`                  |
 | `lead`    | `arp`, `hook`                                              |
 | `pads`    | `pad`, `guitar`, `texture`, `riser`                        |
-| `voice`   | `voice`                                                    |
+| `voice`   | `voice`, `spoken`, `narrator`                              |
 
 The rules:
 

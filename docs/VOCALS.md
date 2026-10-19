@@ -84,6 +84,12 @@ Checked in `node_modules/superdough`: `stretch` (phase-vocoder pitch shift witho
 - The vocal replaces a layer (usually the hook) to stay within 4 to 5 layers per scene.
 - Dev only; decide whether recordings in `public/samples/` stay out of git.
 
+### Spoken voices today (voice-instrument, #39)
+
+Speech is done, singing is not. The narrator speaks the comments of a live build, and the voice instrument (a `spoken` track, `docs/SONG-FORMAT.md`) plays spoken lines as music: an opening, a refrain in the quiet parts, a chopped word in rhythm, a spoken passage. Both use samples made offline by `npm run voices` with the macOS system voices (`say` and ffmpeg), git-ignored because those voices may not be shared, and the same effects: `speed` and `stretch` for tempo and pitch, filters, `distort`, `delay`, `room`, the rack devices; chops use `slice` and `clip`. Texts are the songs', the styles' or a small vocabulary written for the project (`src/song/vocabulary.js`). Nothing is generated or fetched while a song plays.
+
+Next for speech: make the vocabulary and the style lines with a local text to speech model under a permissive licence (Kokoro, Apache-2.0, above), so the samples can be committed and every machine hears them. Sung vocals stay the steps below.
+
 ## Suggested steps
 
 1. Spike: install ACE-Step 1.5 turbo and audio-separator in a uv venv outside the repo, generate one dark club vocal, extract it, cut 4 chops into `public/samples/vox/`.

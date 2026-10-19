@@ -27,11 +27,20 @@ const MELODIC_OPEN = ['arp', 'hook', 'guitar'];
 export const kickOf = pat => !!pat && (pat.rows ? /x/.test(String((pat.rows || {}).bd || '')) : pat.idea ? !!(pat.idea.beat && pat.idea.beat.bd) : true);
 const over = (c, s) => c.start < s.start + s.bars && c.start + c.bars > s.start;
 
+// the spoken track and the pattern of its first opening line (voice-instrument), or null: the voice opening plays it
+export function openingLine(n) {
+  for (const t of n.tracks) {
+    if (t.mute || t.type !== 'spoken') continue;
+    const c = t.clips.find(x => ((t.patterns || {})[x.pattern] || {}).way === 'opening');
+    if (c) return { track: t, clip: c };
+  }
+  return null;
+}
 // the facts the rules need: the tracks of the reference section (the destination of the growth), the style recipe and
 // its family. styles: { id: recipe } of the known style recipes
 export function shapeFacts(song, styles = {}) {
   const n = normalizeSong(song), secs = n.sections;
-  const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.clips.length);
+  const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && t.clips.length);
   const counts = secs.map(s => plays.filter(t => t.clips.some(c => over(c, s))).length);
   const R = secs[counts.indexOf(Math.max(0, ...counts))];
   const dest = R ? plays.filter(t => t.clips.some(c => over(c, R))) : [];
@@ -47,8 +56,9 @@ export function shapeFacts(song, styles = {}) {
     filter: dest.some(t => t.type === 'drums' && Object.values(t.patterns || {}).some(kickOf) && !t.clips.some(c => c.set && c.set.cutoff !== undefined) && !(t.pinned || []).includes('cutoff')),
     melodic: MELODIC_OPEN.some(x => types.has(x)),
     pad: types.has('pad') || types.has('texture'),
-    // a voice that is part of the music (voice-instrument, not done yet): narrator voice tracks never count
-    voice: false,
+    // a voice that is part of the music (voice-instrument): a spoken track with an opening line; narrator voice tracks
+    // never count
+    voice: !!openingLine(n),
     material: dest.some(t => ['drums', 'bass', 'arp', 'hook', 'pad', 'guitar'].includes(t.type)),
     recipe, siblings,
   };

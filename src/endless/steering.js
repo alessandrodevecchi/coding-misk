@@ -38,7 +38,7 @@ export function applyBar(kind, now, plan) {
 
 // the song with its tracks as they are at a bar (all candidate tracks, muted when not playing)
 function stateOf(song, plan, bar) {
-  const base = { tracks: [...plan.tracks.map(t => ({ ...t, mute: true, clips: [{ start: 0, bars: plan.bars, pattern: 'A' }] })), ...song.tracks.filter(t => t.type === 'voice')], build: song.build };
+  const base = { tracks: [...plan.tracks.map(t => ({ ...t, mute: true, clips: [{ start: 0, bars: plan.bars, pattern: 'A' }] })), ...song.tracks.filter(t => t.type === 'voice' || t.type === 'spoken')], build: song.build };
   return stateAt(base, bar).song;
 }
 

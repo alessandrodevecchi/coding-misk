@@ -1,0 +1,70 @@
+// coding-misk · Parola tagliata
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(138/4)
+
+const SECTIONS = [['Intro', 8], ['Build', 16], ['Break', 8], ['Drop', 16], ['Outro', 8]]
+const TEMPO = {'Intro': 138, 'Build': 138, 'Break': 138, 'Drop': 138, 'Outro': 138}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0!48>"  // Intro · 8 bars · 138 BPM · A · Am Am G G
+const section2 = "<0!8 1!16 0!32>"  // Build · 16 bars · 138 BPM · A · Am Am G G
+const section3 = "<0!24 1!8 0!24>"  // Break · 8 bars · 138 BPM · A · Am
+const section4 = "<0!32 1!16 0!8>"  // Drop · 16 bars · 138 BPM · A · Am Am G G
+const section5 = "<0!48 1!8>"  // Outro · 8 bars · 138 BPM · A · Am
+
+// ========== Drums · drums ==========
+// Build · bars 9-24 · pattern A
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("[~ oh]*4").bank("RolandTR909").gain(0.38).mask(section2).velocity(section2).orbit(1).analyze("hats")
+// Drop · bars 33-48 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section4).velocity(section4).orbit(1).analyze("kick")
+$: s("[~ oh]*4").bank("RolandTR909").gain(0.38).mask(section4).velocity(section4).orbit(1).analyze("hats")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<1 0!15>").mask(section4).velocity(section4).orbit(1).analyze("fx")
+// Outro · bars 49-56 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section5).velocity(section5).orbit(1).analyze("kick")
+$: s("[~ oh]*4").bank("RolandTR909").gain(0.38).mask(section5).velocity(section5).orbit(1).analyze("hats")
+
+// ========== Bass · bass ==========
+// Build · bars 9-24 · pattern A
+// Bass · Offbeat
+$: note("<a1 a1 g1 g1>").struct("[~ x]*4")
+  .s("sawtooth").lpf(sine.range(360, 1440).slow(8)).lpq(8)
+  .decay(.18).sustain(0).gain(0.6).mask(section2).velocity(section2).orbit(2).analyze("bass")
+// Drop · bars 33-48 · pattern A
+$: note("<a1 a1 g1 g1>").struct("[~ x]*4")
+  .s("sawtooth").lpf(sine.range(360, 1440).slow(8)).lpq(8)
+  .decay(.18).sustain(0).gain(0.6).mask(section4).velocity(section4).orbit(2).analyze("bass")
+
+// ========== Pad · pad ==========
+// Intro · bars 1-8 · pattern A
+// Pad · Sidechain
+$: note("<[a2,c3,e3]!2 [g2,b2,d3]!2>").struct("x*16")
+  .s("supersaw").attack(.01).decay(.2).sustain(.7).release(.05).lpf(sine.range(800, 3200).slow(8))
+  .room(.85).postgain("[.1 .4 .75 1]*4").gain(0.22).mask(section1).velocity(section1).orbit(6).analyze("pad")
+// Break · bars 25-32 · pattern A
+$: note("[a2,c3,e3]").struct("x*16")
+  .s("supersaw").attack(.01).decay(.2).sustain(.7).release(.05).lpf(sine.range(800, 3200).slow(8))
+  .room(.85).postgain("[.1 .4 .75 1]*4").gain(0.22).mask(section3).velocity(section3).orbit(6).analyze("pad")
+// Drop · bars 33-48 · pattern A
+$: note("<[a2,c3,e3]!2 [g2,b2,d3]!2>").struct("x*16")
+  .s("supersaw").attack(.01).decay(.2).sustain(.7).release(.05).lpf(sine.range(800, 3200).slow(8))
+  .room(.85).postgain("[.1 .4 .75 1]*4").gain(0.22).mask(section4).velocity(section4).orbit(6).analyze("pad")
+
+// ========== Lead · hook ==========
+// Drop · bars 33-48 · pattern A
+// Hook · Neon
+$: n("<[0 ~ 0 2 ~ 4 ~ 7] [5 ~ 4 ~ 2 ~ 0 ~] [4 ~ 4 5 ~ 7 ~ 9] [7 ~ 5 ~ 4 2 ~ ~]>").scale("A4:minor")
+  .s("supersaw").lpf(3000)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.2).mask(section4).velocity(section4).orbit(4).analyze("hook")
+
+// ========== Chop · spoken ==========
+// "system online, here we go" · opening · bar 1
+$: s("say_en_eddy").n(1).mask("<1 0!55>").stretch(0.7).hpf(300).distort(2).room(0.2).crush(8).postgain(0.5).orbit(13).analyze("fx")
+// "running" · chop · bar 33–48
+$: s("say_en_eddy").n(0).slice(8, "0 1 0 1 2 2 3 ~").clip(1).mask("<0!32 1!16 0!8>").stretch(0.7).hpf(300).distort(2).room(0.2).crush(8).postgain(0.5).orbit(13).analyze("fx")
+
+// ========== Story · spoken ==========
+// "reset · feedback · circuit · pulse" · spoken passage · bar 25
+$: s("say_en_flo").n("3 1 0 2").mask("<0!24 1 0!31>").room(0.3).postgain(0.55).orbit(14).analyze("fx")

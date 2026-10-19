@@ -6,6 +6,8 @@ import { SETTING_FIELDS, VOICE_DEFAULT, GENRES } from '../song/format.js';
 import { SYNTHS } from '../song/validate.js';
 import { SPEAKERS } from '../song/build.js';
 import { checkGrowthShapes } from '../song/shapes.js';
+import { WAYS, checkNarrator, MAX_WORDS } from '../song/spoken.js';
+import { VOCAB_GROUPS } from '../song/vocabulary.js';
 import { MACHINES } from '../sounds/machines.js';
 import { SOURCES, RULES, FAMILIES, SOUND_KINDS, KIND_OF_TYPE } from '../material/index.js';
 
@@ -36,7 +38,8 @@ export const PARTS = {
   harmony: ['keys', 'progressions', 'meters', 'swing'],
   lead: ['arp', 'hook'],
   pads: ['pad', 'guitar', 'texture', 'riser'],
-  voice: ['voice'],
+  // the voice instrument and the narrator style travel with the voice (voice-instrument)
+  voice: ['voice', 'spoken', 'narrator'],
 };
 export const PART_NAMES = Object.keys(PARTS);
 
@@ -63,7 +66,7 @@ export const recipeOrder = id => OLD_ID[id] || id;
 // an object keyed by style ids (an artist's taste) with old ids renamed
 export const styleKeys = o => (o && typeof o === 'object' && !Array.isArray(o) ? Object.fromEntries(Object.entries(o).map(([k, v]) => [styleId(k), v])) : o);
 export const RECIPE_FORMAT = 1;
-export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'profile', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'words', 'growthShapes', ...Object.keys(INSTRUMENTS)];
+export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'profile', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'spoken', 'narrator', 'words', 'growthShapes', ...Object.keys(INSTRUMENTS)];
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const isInt = v => Number.isInteger(v);
 const knownSound = w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w);
@@ -164,6 +167,30 @@ export function validateRecipe(r) {
       else if ((k === 'pitch' || k === 'tempo') && (x < 0.25 || x > 4)) err(`voice.${k}`, 'a number from 0.25 to 4');
     }
   }
+  // the voice instrument (voice-instrument, D7): { weight, ways: { passage, refrain, chop, opening }, lines?, speakers?, vocab? }
+  if (r.spoken !== undefined) {
+    const v = r.spoken, keys = ['weight', 'ways', 'lines', 'speakers', 'vocab'];
+    if (!v || typeof v !== 'object' || Array.isArray(v)) err('spoken', 'an object: { "weight": 0.3, "ways": { "refrain": 2, "passage": 1 } }');
+    else {
+      for (const k of Object.keys(v)) if (!keys.includes(k)) warn(`spoken.${k}`, `unknown field; fields: ${keys.join(', ')}`);
+      if (!isNum(v.weight) || v.weight < 0 || v.weight > 1) err('spoken.weight', 'how likely a song gets a voice instrument, from 0 to 1');
+      if (v.ways !== undefined) {
+        if (!v.ways || typeof v.ways !== 'object' || Array.isArray(v.ways)) err('spoken.ways', `weights by way: ${WAYS.join(', ')}`);
+        else for (const [k, x] of Object.entries(v.ways)) { if (!WAYS.includes(k)) err(`spoken.ways.${k}`, `one of ${WAYS.join(', ')}`); else if (!isNum(x) || x < 0) err(`spoken.ways.${k}`, 'a weight: a number from 0'); }
+      }
+      if (v.lines !== undefined) {
+        if (!v.lines || typeof v.lines !== 'object' || Array.isArray(v.lines)) err('spoken.lines', 'lines by way: { "refrain": [{ "en": "…", "it": "…" }] }');
+        else for (const [k, list] of Object.entries(v.lines)) {
+          if (!WAYS.includes(k)) { err(`spoken.lines.${k}`, `one of ${WAYS.join(', ')}`); continue; }
+          if (!Array.isArray(list) || !list.length) { err(`spoken.lines.${k}`, 'a non-empty list of lines'); continue; }
+          list.forEach((x, i) => { const w = s => String(s || '').trim().split(/\s+/).filter(Boolean).length; if (!x || typeof x !== 'object' || typeof x.en !== 'string' || !x.en.trim() || w(x.en) > MAX_WORDS || (x.it !== undefined && (typeof x.it !== 'string' || w(x.it) > MAX_WORDS))) err(`spoken.lines.${k}[${i}]`, `{ "en": "…", "it": "…" }, at most ${MAX_WORDS} words`); });
+        }
+      }
+      if (v.speakers !== undefined && (!Array.isArray(v.speakers) || !v.speakers.length || v.speakers.some(y => !SPEAKERS.includes(y)))) err('spoken.speakers', `a list of speakers: ${SPEAKERS.join(', ')}`);
+      if (v.vocab !== undefined && !VOCAB_GROUPS.includes(v.vocab)) err('spoken.vocab', `a vocabulary group: ${VOCAB_GROUPS.join(', ')}`);
+    }
+  }
+  checkNarrator(r.narrator, 'narrator', err);
   if (!r.words || typeof r.words !== 'object') err('words', 'title words in English, Italian and Spanish: {"en": [...], "it": [...], "es": [...]}');
   else for (const lang of ['en', 'it', 'es']) {
     const w = r.words[lang];

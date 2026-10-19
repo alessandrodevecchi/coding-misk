@@ -29,6 +29,7 @@ Check a file with `node --no-warnings tools/song.mjs validate songs/my-song.json
 | `tags` | no | `{ "genres": [...], "styles": [...], "free": [...] }`: genres from the fixed list (`techno`, `trance`, `house`, `synthwave`, `drum-and-bass`, `industrial`, `rock`, `metal`, `hip-hop`, `pop`, `jazz`, `country`, `ambient`, `experimental`), style recipe ids, free tags (lowercase, at most 24 characters). The Songs tab adds the genre of each style to the song's own genres and shows style tags with the style's current name. |
 | `inspiration` | no | `{ "en": "...", "it": "..." }`: what inspired the song, a short note per language (at most 120 characters). The texts for sharing mention it in a sentence of their own. |
 | `origin` | no | `"endless"` for songs made by the director; kept when the song is saved from the radio |
+| `narrator` | no | how the narrator speaks: `"explain"` (default, it says what each step does) or `"poetic"` (a short image before each track comes in, nothing at the other steps), or `{ "style": "poetic", "lines": { "bass": [{ "en": "…", "it": "…" }], "any": […] } }` with the song's own images by track type. See [Voice instrument](#voice-instrument) |
 
 ## Sections
 
@@ -58,7 +59,7 @@ Progressions are written in A minor and moved to `key`; see `PROGS` in `src/musi
 ```
 
 - `id`: unique in the song. `name`: label in the code and UI (defaults to `id`). `mute`, `solo`: `true` leaves the track out of the code (solo: every other track). `pinned`: settings fixed against live build steps (a list of setting names): the track's own value holds even where a `set` step would change it.
-- `type`: `drums bass guitar arp hook pad texture riser code voice`. Any number of tracks of any type.
+- `type`: `drums bass guitar arp hook pad texture riser code voice spoken`. Any number of tracks of any type (`voice` is the narrator, `spoken` the voice instrument).
 - `settings`: how the track sounds. Missing settings take the defaults below.
 - `patterns`: named patterns (`"A"`, `"verse"`, …), what the track plays.
 - `clips`: where it plays. A track plays nothing outside its clips.
@@ -115,6 +116,7 @@ Common: `gain` (about 0 to 1), `gainEnd` and `cutoffEnd` (ramp to this value ove
 | `riser` | `gain` .25, `bars` "8" (length of the sweep), `dir` up (`up` riser, `down` downlifter) |
 | `code` | `visual`: which Stage instrument lights up (`kick snare hats bass guitar arp hook pad fx riser`, default `fx`) |
 | `voice` | `gain` .6 (applied after the effects), `pitch` 1 (2 an octave up, same length), `tempo` 1 (0.5 twice as long, same pitch), `cutoff` 18000, `hpf` 0 (low cut in Hz), `drive` 0, `room` .2, `delay` 0. No patterns or clips: it speaks the `say` comments of the live build |
+| `spoken` | the `voice` settings; `speaker` `""` draws one for the song (never the narrator's). Words stay within the voice limits (pitch .45 to 1.5, tempo .5 to 1.15, drive up to 5.5, …), except in chops |
 
 `wave` takes an oscillator (`sawtooth supersaw square triangle sine`) or a General MIDI sound (`gm_epiano1`, `gm_distortion_guitar`, `gm_choir_aahs`, …; see the Sounds tab). Layer two with a comma: `"gm_distortion_guitar,sawtooth"`.
 
@@ -134,6 +136,7 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 | `riser` | none (use `{}`) |
 | `code` | `code`: one Strudel pattern expression |
 | `voice` | none |
+| `spoken` | a line: `way` (`passage refrain chop opening`), `text` (`{ "en", "it" }`, a string, or `"vocab:<group>"`), `every` (refrain), `slices` and `rhythm` (chop), `before` (passage, opening) |
 
 - **`steps`** on bass, guitar and pad replace the preset rhythm (the preset still sets the sound shape). On arp and hook they are a mask: a step can silence a note, not add one.
 - **`notes` on bass and arp** are chord tones: `0` root, `1` third, `2` fifth, `3` top note, `~` rest. They follow the chord of each bar and the key of the section. Bass plays them two octaves below the arp. 16 notes per bar (8 for arp at speed "8").
@@ -250,9 +253,42 @@ A song without `build` can also build itself: the "Live build" switch above the 
 
 **Profile.** `"profile": "switch"` (the Live coder profile; or `classic`, `crescendo`) opens the song with that performance profile in Compose; it wins over `buildStyle`.
 
-**Growth shape.** `"growthShape": { "opening": "full-kick", "pace": "fast", "development": "as-written" }`, each part optional, sets how the song grows with the Live coder profile: the song's value wins over its style's weights and over the seed, and a value the song cannot play (a kick opening without drums) falls to the next rule. Openings: `slow`, `full-kick`, `typed`, `broken`, `filtered`, `melodic`, `pad`, `voice` (needs a voice instrument, not drawn yet), `muted-base`, `mid-set`; paces: `slow`, `medium`, `fast`; developments: `by-type`, `as-written`, `masks`, `parameters`, `second-section`, `metamorphosis`. The validator reports a wrong value with its path (`growthShape.opening`). A metamorphosis adds a pattern `skin` to the tracks it rewrites and changes the tempo and key of the sections after its phrase boundary.
+**Growth shape.** `"growthShape": { "opening": "full-kick", "pace": "fast", "development": "as-written" }`, each part optional, sets how the song grows with the Live coder profile: the song's value wins over its style's weights and over the seed, and a value the song cannot play (a kick opening without drums) falls to the next rule. Openings: `slow`, `full-kick`, `typed`, `broken`, `filtered`, `melodic`, `pad`, `voice` (needs a spoken track with an opening line, never drawn without one), `muted-base`, `mid-set`; paces: `slow`, `medium`, `fast`; developments: `by-type`, `as-written`, `masks`, `parameters`, `second-section`, `metamorphosis`. The validator reports a wrong value with its path (`growthShape.opening`). A metamorphosis adds a pattern `skin` to the tracks it rewrites and changes the tempo and key of the sections after its phrase boundary.
 
 **Build style.** `"buildStyle": "crescendo"` (or `"blocks"`) makes the song open and play with that build style of the live build; without it the song follows the Compose setting. Crescendo (`src/song/crescendo.js`) ignores the song's own `build` and computes one: it prepends growth sections (`Crescendo`, `Crescendo 2`), may append an ending section (`Strip` or `Stop`), adds pattern variants named `<pattern>~<level>` to the tracks, and writes steps with the actions above. The song file is never changed.
+
+## Voice instrument
+
+A track of type `spoken` plays spoken lines as part of the music (voice-instrument, #39). It is not the narrator: the narrator (`voice` tracks) speaks the comments of a live build; a spoken track plays in the song as written, in exports and in every live build. Its patterns are lines and its clips place them:
+
+```json
+{ "id": "words", "type": "spoken", "settings": { "speaker": "reed", "gain": 0.55 },
+  "patterns": {
+    "open": { "way": "opening", "text": { "en": "the city is still awake", "it": "la città è ancora sveglia" }, "before": "drums" },
+    "chop": { "way": "chop", "text": { "en": "signal", "it": "segnale" }, "slices": 8, "rhythm": "0 ~ 1 ~ 2 3 ~ 3" },
+    "refrain": { "way": "refrain", "text": "vocab:night", "every": 2 } },
+  "clips": [{ "section": "Intro", "pattern": "open" }, { "start": 16, "bars": 8, "pattern": "chop" }, { "section": "Outro", "pattern": "refrain" }] }
+```
+
+| Field | Value |
+| --- | --- |
+| `way` | `opening`: the line once, from the clip's first bar. `passage`: a longer text (up to 12 words), once, at the start of the quietest section the clip covers, lightly treated (no drive, little room, no rack). `refrain`: the line every `every` bars (default 4) in the quiet sections of the clip, each time only if it ends before the section does. `chop`: the line cut in `slices` and played on the steps of `rhythm` on every bar of the clip |
+| `text` | `{ "en", "it" }` or a string (one language: it plays in that language). Missing: the style's lines for the way (`spoken.lines` of the song's first style that has them), else a line drawn from the vocabulary. `"vocab:<group>"` draws from one group (`dark calm machine night`). Drawn lines use the song's seed on their own stream: the same song draws the same line, and the music of a seed does not change. At most 12 words |
+| `every` | refrain: bars between two lines, 1 to 64 |
+| `slices`, `rhythm` | chop: slices (2 to 32, default 8) and their order, one token per step of the bar (`~` rests), for example `"0 1 0 1 2 2 3 ~"` |
+| `before` | passage or opening: a track id; the line ends one beat before that track's next entry (a clip that starts where the track was silent). Without such an entry the line plays from the clip's start |
+
+A **quiet section** has at most half the tracks of the fullest section (voice and spoken tracks left out), or a name with `intro`, `break`, `pausa`, `outro`, `coda` or `fine`. Lines are placed from the clips, so every state of a live build places them on the same bars.
+
+**Code.** Each way is one `$:` line with a mask lane on the bars it starts on, with the voice settings and the rack, on orbit 13 (the second spoken track 14; the narrator speaks on 15 and up): `s("say_en_reed").n(2).late(0.625).mask("<0!6 1 0!49>").stretch(0.9)…orbit(13)`. A drawn line plays its vocabulary entries one per beat: `n("3 1 ~ ~")`. A chop: `.slice(8, "0 ~ 1 ~ 2 3 ~ 3").clip(1)`. A line without its sample on this machine writes only its comment (`no sample: npm run voices`) and stays silent.
+
+**Samples.** `npm run voices` makes every line of the songs, the styles' lines, every vocabulary entry for the speakers of the styles' voice instrument, and the poetic narrator's images; it also writes `public/samples/say_lengths.json` (git-ignored), the length of each sample, used to place the lines. Without it the length is estimated from the words.
+
+**Speakers and language.** A spoken track speaks with its `speaker`, else one of its style's `spoken.speakers`, else any speaker, never the narrator's. Lines follow the app's language when they have a text in it.
+
+**Narrator.** The narrator yields: a step comment on a bar where a spoken line sounds is not spoken, and a step that brings in a spoken track is not narrated. With `"narrator": "poetic"` it speaks only where a track comes in (an `add`, a clone or an unmute), a short image from the song's `narrator.lines`, its style's, else the vocabulary's poetic group, in the bar before the entry when the code of the step before still plays there.
+
+**Live build.** A spoken track is never thinned and is not part of a Crescendo growth: it enters on the bar of its first line. With the Live coder's `voice` opening, the first spoken track with an opening line is the first sound of the build: the line is said just before the next track comes in, ending a beat or more before it (the bars before it are the time that track's line takes to type).
 
 ## Compiled code
 

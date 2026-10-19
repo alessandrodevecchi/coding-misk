@@ -285,6 +285,8 @@ const CHECKS = {
         if (opening === 'broken') assert(/x/.test(kickOf(on[0])) && [...kickOf(on[0])].some((x, i) => x === 'x' && i % 4 !== 0), `${who}: ${kickOf(on[0])}`);
         if (opening === 'melodic') assert(['arp', 'hook', 'guitar'].includes(on[0].type) && on.length === 1, `${who}: ${on.map(t => t.type)}`);
         if (opening === 'pad') assert(['pad', 'texture'].includes(on[0].type) && on.length === 1, `${who}: ${on.map(t => t.type)}`);
+        // voice-instrument: the voice opening's first sound is the spoken line, alone
+        if (opening === 'voice') assert(on.length === 1 && on[0].type === 'spoken' && at === 0, `${who}: ${on.map(t => t.type)} at ${at}`);
         if (opening === 'typed') assert(c.crescendo.shape.leadIn >= 1 && at === c.crescendo.shape.leadIn && !audible(compileSong(stateAt(c, 0).song)).trim(), `${who}: first sound at ${at}, lead-in ${c.crescendo.shape.leadIn}`);
         if (opening === 'muted-base') { const st = stateAt(c, 0).song.tracks.filter(t => !t.mute && t.type !== 'voice'); assert(st.length >= 3 && st.filter(t => t.hush).length === st.length - 1, `${who}: ${st.length} written, ${st.filter(t => t.hush).length} muted`); }
         if (opening === 'mid-set') { const st = stateAt(c, 0).song.tracks.filter(t => !t.mute && t.type !== 'voice'); assert(st.length >= 3 && st.filter(t => t.alone).length === 2 && on.length === 2, `${who}: ${st.filter(t => t.alone).length} in solo`); }

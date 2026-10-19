@@ -9,4 +9,4 @@ Metti qui i tuoi file audio: diventano suoni di Strudel senza configurazione.
 
 I campioni compaiono nel canale Texture di Componi e nel tab Suoni. Ricarica la pagina dopo averli aggiunti.
 
-Le cartelle `say_en/` e `say_it/` le crea `npm run voices` (commenti parlati dei brani in divenire, voce di sistema di macOS): non vanno nel repository.
+Le cartelle `say_en/`, `say_it/` e `say_<lingua>_<voce>/` e il file `say_lengths.json` (durata di ogni campione) li crea `npm run voices` (commenti parlati dei brani in divenire e righe della voce strumento, voci di sistema di macOS): non vanno nel repository.

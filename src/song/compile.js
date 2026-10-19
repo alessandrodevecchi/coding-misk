@@ -5,6 +5,7 @@ import { t } from '../i18n.js';
 import { normalizeSong, clipState } from './format.js';
 import { rackCode } from './rack.js';
 import { isSharedName } from './ideas.js';
+import { placeSpoken, spokenCode } from './spoken.js';
 
 const fadeIn = (secs, i) => i > 0 ? Math.min(secs[i].fade || 0, secs[i].bars) : 0;
 
@@ -58,14 +59,22 @@ export function compileSong(input) {
   let clipLanes = 0, extra = 8;
   // muto e solo: le tracce silenziate non entrano nel codice
   const solo = song.tracks.some(tr => tr.solo);
+  // voice instrument (voice-instrument): the lines of the spoken tracks, placed once for the whole song
+  const spoken = song.tracks.some(tr => tr.type === 'spoken') ? placeSpoken(input) : [];
   for (const tr of song.tracks) {
     // the bus is chosen before skipping muted tracks, so a track that comes in later (live build) does not move the others
-    const orbit = !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : ++extra;
+    // (spoken tracks have their own orbits, 13 and 14: they take no bus from the others)
+    const orbit = tr.type === 'spoken' ? null : !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : ++extra;
     used.add(tr.type);
     // voice tracks speak the live build comments: their code comes from the build (build.js), not from clips
     if (tr.mute || (solo && !tr.solo) || tr.type === 'voice') continue;
     const first = L.length;
     L.push('', `// ========== ${[...new Set([tr.name || tr.id, tr.type])].join(' · ')} ==========`);
+    if (tr.type === 'spoken') {
+      L.push(...spokenCode(spoken.filter(p => p.track === tr.id), total));
+      if (tr.hush || tr.alone || tr.maskIdea) L.splice(first, L.length - first, ...lineMarks(L.slice(first), tr));
+      continue;
+    }
     const rack = rackCode(tr.rack, tr.type);
     let described = null;
     for (const clip of tr.clips) {

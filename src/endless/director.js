@@ -2,8 +2,9 @@
 // each with live build steps that make it evolve phrase by phrase toward an energy shape.
 // Pure and deterministic: no Node or browser APIs, no Math.random (randomness comes from random.js).
 import { BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, TEX_RHYTHMS, GROOVES, ROWS, DEFAULT, KEYS, fitSteps, meterSteps } from '../music.js';
-import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT } from '../song/format.js';
+import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT, VOICE_CHARACTERS, VOICE_LIMITS } from '../song/format.js';
 import { stateAt, SPEAKERS } from '../song/build.js';
+import { VOCAB_GROUPS } from '../song/vocabulary.js';
 import { makeRng, freshSeed, stream } from './random.js';
 import { withDefaults, PART_NAMES, styleId } from './recipe.js';
 import { mixParts, partRecipe, partsKey, stylesOf } from './mix.js';
@@ -20,7 +21,8 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // talk: how often the voice speaks (0 never, 0.5 about half of the boundaries with moves, 1 almost all)
 // The director's version (#38): sessions saved in playlists record it, and warn when it changes. Bump it whenever
 // `npm run check:endless -- --write-fixtures` changes the fixtures (the same seed gives different songs).
-export const DIRECTOR_VERSION = 3;
+// 4 (voice-instrument): styles with a voice instrument weight give some songs a spoken track and a narrator style
+export const DIRECTOR_VERSION = 4;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix' };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -176,7 +178,8 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
   const usual = R.tracks.usual, hardMax = opts.complexity > 0.8 ? Math.max(R.tracks.max, 8) + 2 : Math.min(R.tracks.max, 8);
   const usualHigh = clamp(usual[1] + Math.round((opts.complexity - 0.5) * 2), usual[0], hardMax);
   const voice = voiceFor(R, opts, rng.voice);
-  return { index, parts, R, voice, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords, material };
+  const spoken = spokenFor(R, opts, voice, rng.spoken || stream(String(opts.seed), 'spoken'));
+  return { index, parts, R, voice, spoken, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords, material };
 }
 
 // A part takes the strong progression on a big moment, or when the listener set a high tension (#40).
@@ -204,20 +207,8 @@ export function sectionsOf(plan, h) {
 
 // ---------- voice ----------
 
-// Characters that take a song's voice away from its style's base, now and then (docs/ENDLESS.md "Voice").
-// Each one overrides a few settings; the rest stays as drawn from the recipe.
-export const VOICE_CHARACTERS = {
-  radio: { cutoff: 3200, hpf: 900, drive: 1.2, room: 0.15 },
-  robot: { pitch: 0.7, drive: 3.5, hpf: 400, delay: 0.1 },
-  deep: { pitch: 0.55, tempo: 0.75, cutoff: 6000, room: 0.4 },
-  bright: { pitch: 1.35, tempo: 1, hpf: 500, room: 0.35 },
-  cathedral: { room: 0.95, delay: 0.25, tempo: 0.7, cutoff: 9000 },
-  echo: { delay: 0.6, room: 0.5 },
-  dirty: { drive: 4.5, hpf: 700, pitch: 0.8 },
-  slow: { tempo: 0.55, pitch: 0.85, room: 0.6 },
-};
-// how far a voice knob may go (still understandable: the volume is applied after the effects)
-export const VOICE_LIMITS = { pitch: [0.45, 1.5], tempo: [0.5, 1.15], drive: [0, 5.5], hpf: [0, 1600], cutoff: [1800, 18000], room: [0, 0.98], delay: [0, 0.7] };
+// Characters and limits of a voice live in src/song/format.js (the voice instrument uses them too)
+export { VOICE_CHARACTERS, VOICE_LIMITS };
 // rack devices a voice can get, with the ranges of their values
 const VOICE_DEVICES = {
   crush: { bits: [4, 9] }, coarse: { amount: [3, 14] }, phaser: { rate: [0.3, 4], depth: [0.4, 0.9] },
@@ -251,6 +242,55 @@ export function voiceFor(R, opts, rng) {
   return { settings: base, character, rack };
 }
 
+// ---------- voice instrument (voice-instrument, D7) ----------
+
+// rhythms of a chopped word: slices of a phrase on the steps of a bar (eighths)
+const CHOP_RHYTHMS = ['0 1 0 1 2 2 3 ~', '0 ~ 1 ~ 2 3 ~ 3', '0 0 ~ 1 ~ 2 ~ 3', '~ 0 ~ 1 ~ 2 3 3'];
+// The voice instrument of one song, or null: drawn with the style's weight as its chance, on its own stream. One line:
+// its way by the style's weights, its text from the style's lines for that way, else the vocabulary (a group the style
+// names, else one drawn); a speaker among the style's that is not the narrator's.
+export function spokenFor(R, opts, voice, rng) {
+  const sp = R.spoken;
+  // (complexity 0 keeps the plain songs of the director's version 2: no voice instrument)
+  if (!sp || !(sp.weight > 0) || !((opts.complexity ?? OPTION_DEFAULTS.complexity) > 0) || !rng.chance(sp.weight)) return null;
+  const w = sp.ways && Object.keys(sp.ways).length ? sp.ways : { refrain: 1 }, ways = Object.keys(w).filter(k => w[k] > 0);
+  if (!ways.length) return null;
+  const way = rng.weighted(ways, ways.map(k => w[k]));
+  const lines = (sp.lines && sp.lines[way]) || [];
+  const text = lines.length ? rng.pick(lines) : `vocab:${VOCAB_GROUPS.includes(sp.vocab) ? sp.vocab : rng.pick(VOCAB_GROUPS)}`;
+  const nar = (voice && voice.settings && voice.settings.speaker) || '';
+  const own = (sp.speakers || []).filter(x => x && x !== nar), speaker = rng.pick(own.length ? own : SPEAKERS.filter(x => x !== nar));
+  const settings = { ...VOICE_DEFAULT, gain: 0.5, room: 0.3, speaker };
+  // a character now and then (more often on a chop, which may go further)
+  if (rng.chance(way === 'chop' ? 0.6 : 0.25 + 0.3 * (opts.chaos ?? 0.3))) Object.assign(settings, VOICE_CHARACTERS[rng.pick(way === 'chop' ? ['robot', 'radio', 'dirty', 'echo'] : ['radio', 'deep', 'cathedral', 'echo', 'slow'])]);
+  const pat = { way, text, ...(way === 'refrain' ? { every: rng.pick([2, 4]) } : {}), ...(way === 'chop' ? { slices: 8, rhythm: rng.pick(CHOP_RHYTHMS) } : {}) };
+  return { track: { id: 'words', name: 'Words', type: 'spoken', settings, patterns: { A: pat } }, way };
+}
+// where the voice instrument plays in a directed song: a clip and the bar it comes in. A refrain is in the whole song
+// (its lines only sound in the quiet sections); a passage in the first break (else the intro, else the outro); a chop
+// in the first groove or drop where fewer tracks than the usual most play (it counts as a layer); an opening in the
+// first section, its line ending before the next track comes in.
+function spokenPlace(plan, steps, base) {
+  const secs = []; let at = 0;
+  for (const s of plan.sections) { secs.push({ ...s, start: at }); at += s.bars; }
+  const way = plan.spoken.way, find = roles => roles.map(r => secs.find(s => s.role === r)).find(Boolean);
+  if (way === 'refrain') return { start: 0, bars: plan.bars };
+  if (way === 'opening') {
+    // the bars before the next track comes in that the line needs (its length estimated from its words, a beat to
+    // spare): the clip ends where that track enters, so the line ends before it
+    const next = steps.filter(s => s.at > 0 && s.add !== undefined).sort((a, b) => a.at - b.at)[0];
+    if (!next) return { start: 0, bars: secs[0].bars };
+    const t = plan.spoken.track.patterns.A.text, wordsOf = typeof t === 'string' ? (t.startsWith('vocab:') ? 3 : t.split(/\s+/).length) : String(t.en || '').split(/\s+/).length;
+    const bpb = meterSteps(plan.meter) / 4, beats = (wordsOf * 0.38 + 0.3) * plan.bpm / 60 / ((plan.spoken.track.settings || {}).tempo || 1);
+    const k = Math.min(next.at, Math.ceil((beats + 1) / bpb));
+    return { start: next.at - k, bars: k };
+  }
+  if (way === 'passage') { const s = find(['break', 'intro', 'outro']) || secs[0]; return { start: s.start, bars: s.bars }; }
+  const count = bar => playing(stateAt(working(base, steps), bar).song).length;
+  const s = secs.find(x => ['groove', 'drop', 'build', 'peak'].includes(x.role) && count(x.start) < plan.usualHigh) || secs.find(x => x.role !== 'intro' && x.role !== 'outro') || secs[0];
+  return { start: s.start, bars: s.bars };
+}
+
 // ---------- moves ----------
 
 const KIND_OF_ADD = { drums: 'add-drums', bass: 'add-bass', arp: 'add-lead', hook: 'add-lead', pad: 'add-pad', guitar: 'add-guitar', texture: 'add-texture', riser: 'add-riser' };
@@ -260,7 +300,7 @@ const SPACE = ['delay', 'reverb'], DIRT = ['distort', 'crush', 'phaser'];
 export function candidateMoves(state, ctx, blocked, rng) {
   const out = [], on = playing(state), byId = id => state.tracks.find(t => t.id === id);
   for (const t of state.tracks) {
-    if (t.type === 'voice' || t.type === 'riser' || blocked.has(t.id)) continue;
+    if (t.type === 'voice' || t.type === 'riser' || t.type === 'spoken' || blocked.has(t.id)) continue;
     const isOn = !t.mute;
     if (!isOn) { if (on.length < ctx.hardMax) out.push({ kind: KIND_OF_ADD[t.type], track: t.id, step: { add: t.id } }); continue; }
     const drumsOn = on.filter(x => x.type === 'drums').length;
@@ -307,6 +347,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
   const voice = { id: 'voice', name: 'Voice', type: 'voice', settings: plan.voice.settings, patterns: {}, clips: [] };
   if (plan.voice.rack && plan.voice.rack.length) voice.rack = plan.voice.rack;
   const base = { tracks: [...plan.tracks.map(t => ({ ...t, mute: true, clips: [{ start: 0, bars, pattern: 'A' }] })), voice] };
+  if (plan.spoken) base.tracks.splice(base.tracks.length - 1, 0, { ...JSON.parse(JSON.stringify(plan.spoken.track)), mute: true, clips: [{ start: 0, bars, pattern: 'A' }] });
   const steps = keep.map(s => ({ ...s })), phrases = [], moved = new Map(); // track id → boundary index of its last move
   const M = rng.moves;
   let lastKind = '', lastSay = -Infinity, brokeDrums = [];
@@ -349,7 +390,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
 
     if (k === 0 && !(forced[0] || []).length) {
       // start: the first one or two instruments in the usual entry order
-      const order = state.tracks.filter(t => t.type !== 'voice' && t.type !== 'riser').sort((a, b) => ENTRY.indexOf(a.type) - ENTRY.indexOf(b.type));
+      const order = state.tracks.filter(t => t.type !== 'voice' && t.type !== 'riser' && t.type !== 'spoken').sort((a, b) => ENTRY.indexOf(a.type) - ENTRY.indexOf(b.type));
       let first = order.slice(0, has(opts, 'slow-builds') ? 1 : target > 0.35 || order.length < 3 ? 2 : 1).map(t => t.id);
       const tex = has(opts, 'texture-first') && order.find(t => t.type === 'texture');
       if (tex && !first.includes(tex.id)) first = [...first.slice(0, 1), tex.id];
@@ -443,6 +484,14 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     if (said) { const first = steps.find(s => s.at === at); first.say = said; }
     phrases.push({ bar: at, role, target: round(target), moves: chosen.map(c => `${c.kind} ${(c.tracks || [c.track]).join('+')}`), say: said ? said.en : null });
   }
+  // the voice instrument (voice-instrument): it comes in on the bar its clip starts (kept steps stay as they are)
+  if (plan.spoken) {
+    const sp = base.tracks.find(t => t.type === 'spoken'), c = spokenPlace(plan, steps, base);
+    sp.clips = [{ start: c.start, bars: c.bars, pattern: 'A' }];
+    // an opening line ends before the next track that comes in
+    if (plan.spoken.way === 'opening') { const next = steps.filter(s => s.at > 0 && s.add !== undefined).sort((a, b) => a.at - b.at)[0]; if (next) sp.patterns = { A: { ...sp.patterns.A, before: [].concat(next.add)[0] } }; }
+    if (c.start >= from * phrase && !steps.some(s => s.add === sp.id)) steps.push({ at: c.start, add: sp.id });
+  }
   // tracks never added would play from the start: leave them out; the others need no base mute
   const used = new Set(steps.flatMap(s => (s.add === undefined ? [] : Array.isArray(s.add) ? s.add : [s.add])));
   const tracks = base.tracks.filter(t => t.type === 'voice' || used.has(t.id)).map(({ mute, ...t }) => t);
@@ -473,9 +522,12 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   if (bs) song.buildStyle = bs;
   // and its performance profile (performance-profiles)
   if (pf) song.profile = pf;
+  // the narrator style of the voice part's style (voice-instrument): poetic images instead of explanations
+  if (plan.R.narrator !== undefined && opts.complexity > 0) song.narrator = JSON.parse(JSON.stringify(plan.R.narrator));
   // measured energy of the final song at each phrase
   for (const p of phrases) p.energy = round(measure(song, p.bar, ctx));
-  const entry = { id: song.id, title, parts, styles, bars: plan.bars, seconds: Math.round(plan.seconds), bpm: plan.bpm, key: plan.key, meter: plan.meter, shape: plan.shape, phrase: plan.phrase, tracks: tracks.filter(t => t.type !== 'voice').length, voice: { speaker: plan.voice.settings.speaker, character: plan.voice.character }, usualHigh: plan.usualHigh, hardMax: plan.hardMax, phrases };
+  const entry = { id: song.id, title, parts, styles, bars: plan.bars, seconds: Math.round(plan.seconds), bpm: plan.bpm, key: plan.key, meter: plan.meter, shape: plan.shape, phrase: plan.phrase, tracks: tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken').length, voice: { speaker: plan.voice.settings.speaker, character: plan.voice.character }, usualHigh: plan.usualHigh, hardMax: plan.hardMax, phrases };
+  if (plan.spoken && tracks.some(t => t.type === 'spoken')) entry.spoken = plan.spoken.way;
   // which tracks play composed, varied or saved material (material-generator)
   if (Object.keys(plan.material || {}).length) entry.material = { ...plan.material };
   return { song, entry, plan };

@@ -1,0 +1,63 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "prova-voce-taglio",
+  "title": "Parola tagliata",
+  "created": "2026-10-19",
+  "appVersion": "0.6.0",
+  "look": "palco",
+  "style": {
+    "en": "Test · voice instrument: a chopped word in the drop, a generated passage in the break, a spoken opening · 138 BPM",
+    "it": "Prova · voce strumento: una parola tagliata nel drop, un passaggio generato nella pausa, un'apertura parlata · 138 BPM"
+  },
+  "tags": { "styles": ["pure-trance"], "free": ["test"] },
+  "sections": [
+    { "name": "Intro", "bars": 8, "bpm": 138, "key": "A", "chords": "pendolo", "meter": "4/4" },
+    { "name": "Build", "bars": 16, "bpm": 138, "key": "A", "chords": "pendolo", "meter": "4/4" },
+    { "name": "Break", "bars": 8, "bpm": 138, "key": "A", "chords": "drone", "meter": "4/4" },
+    { "name": "Drop", "bars": 16, "bpm": 138, "key": "A", "chords": "pendolo", "meter": "4/4", "crash": true },
+    { "name": "Outro", "bars": 8, "bpm": 138, "key": "A", "chords": "drone", "meter": "4/4" }
+  ],
+  "tracks": [
+    {
+      "id": "drums", "name": "Drums", "type": "drums",
+      "settings": { "kit": "RolandTR909", "gain": 0.85 },
+      "patterns": { "A": { "rows": { "bd": "x...x...x...x...", "oh": "..x...x...x...x." } } },
+      "clips": [ { "section": "Build", "pattern": "A" }, { "section": "Drop", "pattern": "A" }, { "section": "Outro", "pattern": "A" } ]
+    },
+    {
+      "id": "bass", "name": "Bass", "type": "bass",
+      "settings": { "wave": "sawtooth", "gain": 0.6, "cutoff": 900 },
+      "patterns": { "A": { "preset": "offbeat" } },
+      "clips": [ { "section": "Build", "pattern": "A" }, { "section": "Drop", "pattern": "A" } ]
+    },
+    {
+      "id": "pad", "name": "Pad", "type": "pad",
+      "settings": { "wave": "supersaw", "gain": 0.22, "cutoff": 2000 },
+      "patterns": { "A": { "preset": "sidechain" } },
+      "clips": [ { "section": "Intro", "pattern": "A" }, { "section": "Break", "pattern": "A" }, { "section": "Drop", "pattern": "A" } ]
+    },
+    {
+      "id": "lead", "name": "Lead", "type": "hook",
+      "settings": { "wave": "supersaw", "gain": 0.2, "mode": "minor" },
+      "patterns": { "A": { "preset": "neon" } },
+      "clips": [ { "section": "Drop", "pattern": "A" } ]
+    },
+    {
+      "id": "chop", "name": "Chop", "type": "spoken",
+      "settings": { "speaker": "eddy", "gain": 0.5, "pitch": 0.7, "drive": 2, "hpf": 300 },
+      "rack": [ { "device": "crush", "bits": 8 } ],
+      "patterns": {
+        "open": { "way": "opening", "text": { "en": "system online, here we go", "it": "sistema attivo, si parte" } },
+        "chop": { "way": "chop", "text": "vocab:machine", "slices": 8, "rhythm": "0 1 0 1 2 2 3 ~" }
+      },
+      "clips": [ { "start": 0, "bars": 4, "pattern": "open" }, { "section": "Drop", "pattern": "chop" } ]
+    },
+    {
+      "id": "story", "name": "Story", "type": "spoken",
+      "settings": { "speaker": "flo", "gain": 0.55, "room": 0.3 },
+      "patterns": { "passage": { "way": "passage", "text": "vocab:machine" } },
+      "clips": [ { "section": "Break", "pattern": "passage" } ]
+    }
+  ]
+}

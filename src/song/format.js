@@ -27,19 +27,35 @@ export const PATTERN_FIELDS = {
   riser: [],
   code: ['code'],
   voice: [],
+  // voice instrument (voice-instrument, #39): a pattern is a line (text, way to speak, and the values of its way)
+  spoken: ['text', 'way', 'every', 'slices', 'rhythm', 'before'],
 };
 export const TYPES = Object.keys(PATTERN_FIELDS);
 // a voice track speaks the comments of a live build: these are its settings
 // pitch and tempo are independent: tempo 0.5 lasts twice as long at the same pitch, pitch 2 is an octave up at the same length
 // speaker: '' is the default system voice, or one of SPEAKERS (song/build.js): samples in say_<lang>_<speaker>/
 export const VOICE_DEFAULT = { gain: 0.6, pitch: 1, tempo: 1, cutoff: 18000, hpf: 0, drive: 0, room: 0.2, delay: 0, speaker: '' };
+// Characters that take a voice away from its base (docs/ENDLESS.md "Voice"), for the narrator and the voice
+// instrument. Each one overrides a few settings; the rest stays as it is.
+export const VOICE_CHARACTERS = {
+  radio: { cutoff: 3200, hpf: 900, drive: 1.2, room: 0.15 },
+  robot: { pitch: 0.7, drive: 3.5, hpf: 400, delay: 0.1 },
+  deep: { pitch: 0.55, tempo: 0.75, cutoff: 6000, room: 0.4 },
+  bright: { pitch: 1.35, tempo: 1, hpf: 500, room: 0.35 },
+  cathedral: { room: 0.95, delay: 0.25, tempo: 0.7, cutoff: 9000 },
+  echo: { delay: 0.6, room: 0.5 },
+  dirty: { drive: 4.5, hpf: 700, pitch: 0.8 },
+  slow: { tempo: 0.55, pitch: 0.85, room: 0.6 },
+};
+// how far a voice knob may go (still understandable: the volume is applied after the effects)
+export const VOICE_LIMITS = { pitch: [0.45, 1.5], tempo: [0.5, 1.15], drive: [0, 5.5], hpf: [0, 1600], cutoff: [1800, 18000], room: [0, 0.98], delay: [0, 0.7] };
 const STATE_KEY = { guitar: { preset: 'pattern' } };
 const stateKey = (type, k) => (STATE_KEY[type] && STATE_KEY[type][k]) || k;
 const skip = new Set(['on', 'rows']);
 // settings of a type: the channel fields that are not pattern fields
 export const SETTING_FIELDS = Object.fromEntries(TYPES.map(type => {
   if (type === 'code') return [type, ['visual']];
-  if (type === 'voice') return [type, Object.keys(VOICE_DEFAULT)];
+  if (type === 'voice' || type === 'spoken') return [type, Object.keys(VOICE_DEFAULT)];
   const pat = new Set(PATTERN_FIELDS[type].map(k => stateKey(type, k)));
   return [type, Object.keys(DEFAULT[type]).filter(k => !skip.has(k) && !pat.has(k))];
 }));
@@ -128,7 +144,7 @@ export function clipState(sec, tr, clip) {
   const st = cloneState(DEFAULT);
   Object.assign(st, { bpm: sec.bpm, bpmEnd: sec.bpmEnd, key: sec.key, prog: sec.chords, meter: sec.meter, swing: sec.swing });
   const type = tr.type, pat = (tr.patterns || {})[clip.pattern] || {};
-  if (type === 'code' || type === 'voice') return st;
+  if (type === 'code' || type === 'voice' || type === 'spoken') return st;
   const ch = { ...DEFAULT[type], ...tr.settings, ...(clip.set || {}), on: true };
   if (type === 'drums') { ch.rows = Object.fromEntries(ROWS.map(([id]) => [id, { steps: (pat.rows || {})[id] || '', mute: !(pat.rows || {})[id] }])); if (pat.idea) ch.idea = pat.idea; }
   else for (const k of PATTERN_FIELDS[type]) if (pat[k] !== undefined) ch[stateKey(type, k)] = pat[k];

@@ -79,6 +79,12 @@ Write an idea by hand when a part is a small cell that repeats or moves (a rhyth
 
 [`songs/examples/05-material.json`](../songs/examples/05-material.json) holds parts made by the material generator (`docs/ENDLESS.md`, Material) and one test phrase for each FM sound kind at the top of its range: a melody with a changed tail, a polymetric lead in 7/8 (`"{-2 2 ~ 5 4}%14"`), basslines with an octave line as rhythm, a seeded and a polymetric arpeggio, a pad voicing the section's chords and a new progression on A phrygian, and the `fm` rack device (`{ "device": "fm", "index": 3, "harmonicity": 3.5, "decay": 0.4, "sustain": 0 }`). In Compose, [Compose a part] in a track's panel makes such a pattern for any song.
 
+## Example 6: the voice instrument
+
+[`songs/examples/06-voices.json`](../songs/examples/06-voices.json) speaks in the four ways of the voice instrument, a track of type `spoken` (`docs/SONG-FORMAT.md`, Voice instrument): an opening line in the intro that ends one beat before the drums come in (`"before": "drums"`), a chopped word in the second half of the groove (`"slices": 8, "rhythm": "0 ~ 1 ~ 2 3 ~ 3"`), a spoken passage on a second track in the break, ending before the drop, and a refrain drawn from the night vocabulary every two bars of the outro. The two spoken tracks have their own speakers, and the narrator a third; when the narrator would speak on a bar where a line sounds, it is quiet. The test songs `prova-voce-notte` (a spoken opening, a refrain from the dark cyberpunk style, the poetic narrator) and `prova-voce-taglio` (an opening, a chop with a crushed robot voice, a passage drawn from the machine vocabulary) build with the Live coder profile.
+
+Keep spoken lines in quiet parts and short: a refrain of two or three words, a passage of a few short sentences (12 words at most). A chop counts as a layer; the other ways sit on top of the 4 to 5 layers. Run `npm run voices` after adding lines: without samples the lines stay silent.
+
 ## The rack
 
 Each track can chain devices after the instrument: delays, reverbs, distortion, phaser, tremolo, filters, panning, and note devices that change what plays (echo, offset copies, repeats, random drops, reverse). Each device is one Strudel function, shown next to its name in the app. Example 3 gives the hook a dotted-8th delay with a slow auto-pan, and the guitar wall a large reverb with a tremolo:

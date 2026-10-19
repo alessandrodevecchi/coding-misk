@@ -9,7 +9,8 @@ import { PROGS, DEFAULT, presetIdea, meterSteps } from '../music.js';
 import { ideaLadder, expandIdea, ideaRows } from './ideas.js';
 import { coderPath } from './coder.js';
 import { stateAt, applyStep } from './build.js';
-import { resolveShape, shapeFacts, canPlay, SHAPES_VERSION, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES } from './shapes.js';
+import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES } from './shapes.js';
+import { placeSpoken } from './spoken.js';
 import { liveCode } from '../live/live-code.js';
 import { resolveProfile } from '../live/profiles.js';
 import { rushedSteps, rushLoad } from '../live/typing-load.js';
@@ -31,7 +32,8 @@ export const BUILD_STYLES = ['blocks', 'crescendo'];
 export const ENDINGS = ['strip', 'blocks', 'short'];
 
 const clone = o => JSON.parse(JSON.stringify(o));
-const ORDER = ['drums', 'bass', 'pad', 'guitar', 'arp', 'hook', 'texture', 'riser', 'code'];
+// (voice-instrument: a spoken track comes after the texture; it is never thinned, it enters at its first line)
+const ORDER = ['drums', 'bass', 'pad', 'guitar', 'arp', 'hook', 'texture', 'spoken', 'riser', 'code'];
 // tracks without rows or notes to thin grow with the "degrade" device instead
 const DEGRADE_TYPES = ['bass', 'guitar', 'arp', 'hook', 'pad', 'texture'];
 const COLOUR_KEYS = ['cutoff', 'drive', 'grit', 'room', 'delay', 'gain'];
@@ -211,7 +213,7 @@ function moves(key, from, to, m) {
 // moves are tried by ear (a value past the next one, then corrected)
 function trackPlan(t, d, rng, clipKeys, rules = {}, ctx = {}) {
   const plan = { id: t.id, type: t.type, setup: [], fullness: [], colour: [], patterns: {} };
-  if (t.type === 'code' || t.type === 'riser' || t.type === 'voice' || t.type === 'module') return plan;
+  if (t.type === 'code' || t.type === 'riser' || t.type === 'voice' || t.type === 'spoken' || t.type === 'module') return plan;
   // pattern variants
   const dens = Math.max(0, ...Object.values(t.patterns || {}).map(p => density(t.type, p, ctx)));
   let n = dens >= 24 ? 4 : dens >= 10 ? 3 : dens >= 2 ? 2 : 0;
@@ -327,7 +329,7 @@ const P = {
     arp: [['now the arp', "ora l'arpeggio"], ['arp in', "dentro l'arpeggio"]],
     hook: [['melody!', 'melodia!'], ['a little tune', 'una melodia']],
     texture: [['some dirt', "un po' di sporco"], ['texture in', 'entra la texture']],
-    riser: [['here it comes', 'sta arrivando']], code: [['something odd', 'qualcosa di strano']],
+    riser: [['here it comes', 'sta arrivando']], code: [['something odd', 'qualcosa di strano']], spoken: [['a voice', 'una voce'], ['someone speaks', 'qualcuno parla']],
     any: [['new sound', 'suono nuovo']],
   },
   grow: {
@@ -661,21 +663,28 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   const shape = rules.coder && rules.shape ? resolveShape(song, { user: rules.shape, styles: rules.styles || {}, seed }) : null;
   const srng = shape ? stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_VERSION}/growth`) : null;
   const over = (c, s) => c.start < s.start + s.bars && c.start + c.bars > s.start;
-  const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.clips.length);
+  const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && t.clips.length);
   if (!plays.length || !W) return { ...clone(song), build: [] };
+  // voice-instrument: spoken tracks are not part of the growth's destination; each one enters where it first speaks,
+  // except the one the voice opening puts first (its opening line is the first sound of the build)
+  const voiceOpen = shape && shape.opening === 'voice' ? openingLine(n) : null;
+  const spokenLate = n.tracks.filter(t => !t.mute && t.type === 'spoken' && t.clips.length && !(voiceOpen && voiceOpen.track === t));
+  const placed = spokenLate.length || voiceOpen ? placeSpoken(song) : [];
+  const firstLine = t => { const b = placed.filter(p => p.track === t.id).flatMap(p => p.starts.map(x => x.bar)); return b.length ? Math.min(...b) : t.clips[0].start; };
   // reference section: the first one where the most tracks play; its tracks are the destination of the growth
   const counts = secs.map(s => plays.filter(t => t.clips.some(c => over(c, s))).length);
   const R = secs[counts.indexOf(Math.max(...counts))];
   // ideas grow and thin on the bars of the reference section, with the song's shared progressions
   const ictx = { N: meterSteps(R.meter), shared: song.shared || {} };
-  const dest = plays.filter(t => t.clips.some(c => over(c, R))), late = plays.filter(t => !dest.includes(t));
+  const dest = plays.filter(t => t.clips.some(c => over(c, R))), late = [...plays.filter(t => !dest.includes(t)), ...spokenLate];
   const rank = t => { const i = ORDER.indexOf(t.type); return i < 0 ? ORDER.length : i; };
   dest.sort((a, b) => rank(a) - rank(b) || plays.indexOf(a) - plays.indexOf(b));
   // a little variety in who comes in after the anchor
   if (!shape) { for (let i = 1; i < dest.length - 1; i++) if (rng.chance(0.3)) [dest[i], dest[i + 1]] = [dest[i + 1], dest[i]]; }
   else orderByShape(dest, shape, srng, rank, plays);
+  if (voiceOpen) dest.unshift(voiceOpen.track);
   const meta = !!shape && shape.development === 'metamorphosis';
-  const clipR = t => t.clips.find(c => over(c, R));
+  const clipR = t => (voiceOpen && t === voiceOpen.track ? voiceOpen.clip : t.clips.find(c => over(c, R)));
   const clipKeys = t => new Set(t.clips.flatMap(c => Object.keys(c.set || {})));
   // growth budget: up to twice the written length for short songs, one and a half otherwise (room for the ending)
   // (natural growth is slower: at most the written length, so a song does not double)
@@ -768,8 +777,20 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   };
   attempt(Math.min(3, rules.maxDetail ?? 3));
   if (skin) { let at = 0; seq.forEach((u, i) => { at += gaps[i]; if (u.skinStart) { const to = Math.max(8, Math.ceil(at / 8) * 8); gaps[i] += to - at; at = to; } }); }
+  // the voice opening: the next step comes once the opening line has been said (its length, a beat to spare)
+  if (voiceOpen && gaps.length > 1) {
+    const p = placed.find(x => x.track === voiceOpen.track.id && x.key === voiceOpen.clip.pattern), bpb = meterSteps(R.meter) / 4;
+    gaps[1] = Math.max(gaps[1], Math.ceil(((p ? p.beats : bpb) + 1) / bpb));
+  }
   let bar = 0;
   const growth = seq.map((u, i) => ({ ...u, at: (bar += gaps[i]) }));
+  // the voice opening: the line is said just before the next track comes in (it ends a beat or more before it); the
+  // bars before it are the time the next line takes to type
+  let voiceAt = 0;
+  if (voiceOpen) {
+    const next = growth.find((u, i) => i > 0 && u.kind === 'enter'), p = placed.find(x => x.track === voiceOpen.track.id && x.key === voiceOpen.clip.pattern), bpb = meterSteps(R.meter) / 4;
+    if (next && p) voiceAt = Math.max(0, next.at - Math.ceil((p.beats + 1) / bpb));
+  }
   const lastAt = growth[growth.length - 1].at, tail = gapOf(rng, narrated);
   let G = lastAt + tail;
   if (Math.ceil(G / 4) * 4 <= cap) G = Math.ceil(G / 4) * 4;
@@ -782,7 +803,9 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
     for (let ld = Math.min(d, 1); ld >= -1; ld--) {
       const p = ld < 0 ? { id: t.id, type: t.type, setup: [], fullness: [], colour: [], patterns: {} } : trackPlan(t, ld, rng.fork(`late-${t.id}-${ld}`), clipKeys(t), rules, ictx);
       const taken = new Map(), free = at => { while (owner.has(at) || taken.has(at)) at++; taken.set(at, t.id); return at; };
-      let at = free(t.clips[0].start + G);
+      // a spoken track enters on the bar of its first line, or a free bar before it within its clip (never after it)
+      const spokenAt = () => { const want = firstLine(t) + G, lo = t.clips[0].start + G; for (let b = want; b >= lo; b--) if (!owner.has(b) && !taken.has(b)) { taken.set(b, t.id); return b; } return free(want); };
+      let at = t.type === 'spoken' ? spokenAt() : free(t.clips[0].start + G);
       const mine = [{ at, kind: 'enter', type: t.type, step: { add: t.id } }];
       for (const u of [...p.fullness, ...p.colour]) { at = free(at + rng.int(1, 3)); mine.push({ ...u, at, type: t.type }); }
       if (at < G + W - 1 || ld < 0) { latePlans.push(p); lateSteps.push(...mine); taken.forEach((v, k) => owner.set(k, v)); break; }
@@ -807,6 +830,9 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
     if (dest.includes(nt)) { const c = clipR(nt), g = { start: 0, bars: G, pattern: c.pattern }; if (c.set) g.set = clone(c.set); t.clips = [g, ...clips]; }
     const plan = plans.find(p => p.id === tr.id) || latePlans.find(p => p.id === tr.id);
     if (plan) t.patterns = { ...(tr.patterns || {}), ...plan.patterns };
+    // the voice opening: the opening line in the growth, just before the next entry, not bound to a later one (a copy of
+    // its pattern)
+    if (voiceOpen && voiceOpen.track === nt) { const k = `${voiceOpen.clip.pattern}~open`, { before, ...line } = (tr.patterns || {})[voiceOpen.clip.pattern] || {}; t.patterns = { ...(t.patterns || {}), [k]: line }; t.clips[0] = { ...t.clips[0], start: voiceAt, bars: G - voiceAt, pattern: k }; }
     // the second skin: the track plays its new part from the step that rewrites it to the end of the song
     if (skin && skin.patterns[tr.id]) { t.patterns = { ...(t.patterns || {}), [SKIN]: skin.patterns[tr.id] }; t.clips = t.clips.map(c => (c.start >= G ? { ...c, pattern: SKIN } : c)); }
     return t;
@@ -826,7 +852,7 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   const lastGrowth = Math.max(lastAt, ...lateSteps.map(u => u.at));
   // ---------- ending ----------
   const end = G + W, LS = out.sections[out.sections.length - 1], lsStart = end - LS.bars;
-  const active = out.tracks.filter(t => !t.mute && t.type !== 'voice' && t.clips.some(c => c.start < end && c.start + c.bars > lsStart));
+  const active = out.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && t.clips.some(c => c.start < end && c.start + c.bars > lsStart));
   const quiet = active.length <= 2 || /outro|coda|fine|end/i.test(LS.name || '');
   let ending = rng.weighted(ENDINGS, [2, 1.5, quiet ? 2 : 0.8]);
   const anchor = active.slice().sort((a, b) => rank(a) - rank(b))[0];
@@ -885,7 +911,7 @@ export function waypointSong(song, { seed, bars = 8 } = {}) {
     const own = [];
     wps.forEach((at, i) => {
       const st = stateAt(c, at).song.tracks.find(x => x.id === tr.id);
-      if (!st || st.mute || st.type === 'voice' || !st.clips.length) return;
+      if (!st || st.mute || st.type === 'voice' || st.type === 'spoken' || !st.clips.length) return;
       const set = { ...(st.settings || {}) };
       for (const k of [...(st.hidden || []), ...(st.commented || [])]) if (k in NEUTRAL) set[k] = NEUTRAL[k];
       const fields = SETTING_FIELDS[st.type] || [];

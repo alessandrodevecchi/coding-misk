@@ -8,6 +8,9 @@ const fs = require('node:fs'), path = require('node:path'), os = require('node:o
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ARG = process.argv.slice(2).find(a => !a.startsWith('--')), SONGS = (ARG || 'dci-carica,neon-rush-reel,primo-segnale').split(',');
 const QUICK = process.argv.includes('--quick'); // skips the real time comparison
+// song titles by id, to find a song past the first page of the Songs tab
+const songFilesIn = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? songFilesIn(path.join(d, e.name)) : e.name.endsWith('.json') && e.name !== 'index.json' && e.name !== 'session.json' ? [path.join(d, e.name)] : []));
+const TITLES = Object.fromEntries(songFilesIn(path.join(__dirname, '..', 'songs')).map(f => { try { const s = JSON.parse(fs.readFileSync(f, 'utf8')); return [s.id, s.title]; } catch (e) { return [null, null]; } }));
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'export-'));
@@ -43,6 +46,8 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
   // one export by the card button; waits for the files. Returns the new downloads.
   async function exportSong(id, { timeout = 400000 } = {}) {
     const n = downloads.length, t0 = Date.now();
+    // a song past the first page of the Songs tab: searched by its title first
+    if (!(await page.isVisible(`#songs [data-song-id="${id}"] [data-act="export"]`)) && TITLES[id]) { await page.fill('#sv-q', TITLES[id]); await sleep(800); }
     await page.click(`#songs [data-song-id="${id}"] [data-act="export"]`);
     await sleep(1500);
     while (Date.now() - t0 < timeout) {

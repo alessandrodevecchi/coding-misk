@@ -158,7 +158,7 @@ export function coderPath(dest, plans, rng, { detours = DETOURS, chooser = choos
 // one detour on the state as it is: a function commented out, notes rewritten, or a track muted; with its undo. Tracks
 // that came in on the way to the last waypoint or this one are left alone (fresh)
 function drawDetour(state, anchor, fresh, rng, { moves = false, noBreaks = false } = {}) {
-  const playing = state.tracks.filter(t => !t.mute && t.type !== 'voice' && !fresh.has(t.id));
+  const playing = state.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && !fresh.has(t.id));
   const kinds = [];
   for (const t of playing) {
     const shown = ['cutoff', 'drive', 'room', 'delay', 'reso'].filter(k => !(t.hidden || []).includes(k) && !(t.commented || []).includes(k) && Number((t.settings || {})[k] ?? (k === 'cutoff' ? 20000 : 0)) > 0 && !(k === 'cutoff' && Number(t.settings.cutoff) >= 18000));

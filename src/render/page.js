@@ -41,6 +41,8 @@ const WORKLET_SEED = `{ let a = ${SEED} >>> 0; Math.random = () => { a = (a + 0x
 
 // seconds to wait for one sound to load before skipping it
 const SOUND_WAIT = 8000;
+// seconds from the start of a render before a sound with stretch can start (measured: 0.02 is silent, 0.1 is heard)
+const STRETCH_LEAD = 0.1;
 async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, buses = {}, fns = {} }) {
   globalThis.miskBuses = buses; useFns(fns);
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
@@ -103,7 +105,10 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
       const { b, hap, t } = all[k], v = hap.value, d = T.seconds(hap.whole.end.valueOf()) - t;
       // a sound that never loads (a sample that cannot be decoded) must not hold the render forever (#61): skipped
       if (!dead.has(keyOf(v))) try {
-        const ok = await Promise.race([superdough(v, t - from, d, T.cps(b), t - from).then(() => true), new Promise(r => setTimeout(() => r(false), SOUND_WAIT))]);
+        // the phase vocoder (stretch) stays silent for a sound that starts in the first tenth of a second of a render: a
+        // voice line on bar 0 (the voice opening, voice-instrument) starts that much later, where it is heard
+        const at = v.stretch !== undefined && t - from < STRETCH_LEAD ? from + STRETCH_LEAD : t;
+        const ok = await Promise.race([superdough(v, at - from, d, T.cps(b), at - from).then(() => true), new Promise(r => setTimeout(() => r(false), SOUND_WAIT))]);
         if (!ok) { const id = `${v.bank ? `${v.bank}_` : ''}${v.s}${v.n !== undefined ? `:${v.n}` : ''}`; if (!skipped.has(id)) { skipped.add(id); console.warn(`[render] sound ${id} did not load, skipped`); } }
       } catch (e) { console.warn('[render]', e); }
       // onsets once: the lead in of a block belongs to the block before

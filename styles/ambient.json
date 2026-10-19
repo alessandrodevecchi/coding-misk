@@ -152,6 +152,18 @@
       0.65
     ]
   },
+  "spoken": {
+    "weight": 0.3,
+    "ways": { "passage": 2, "refrain": 1 },
+    "vocab": "calm",
+    "speakers": ["flo", "sandy"],
+    "lines": {
+      "passage": [
+        { "en": "The water is slow today. Let the light come in.", "it": "L'acqua è lenta oggi. Lascia entrare la luce." }
+      ]
+    }
+  },
+  "narrator": "poetic",
   "words": {
     "en": [
       "Drift",

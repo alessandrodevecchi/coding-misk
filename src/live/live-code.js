@@ -28,7 +28,8 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const boundary = bar => { let a = 0; for (const x of build.sections) { a += x.bars; if (a > bar) return a; } return Infinity; };
   const prepFrom = b => { const k = build.sections.findIndex((_, j) => build.sections.slice(0, j + 1).reduce((y, z) => y + z.bars, 0) === b); return k >= 0 ? b - (build.sections[k].bars >= 4 ? 2 : 1) : Infinity; };
   // keep(track): optional, only the tracks it keeps are compiled (the fast export renders a block with the tracks that play in it)
-  const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
+  // (whole: the song with every track, so the voice instrument's quiet sections stay the same, voice-instrument)
+  const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep), whole: song } : song);
   const compact = build.crescendo && liveCode !== 'sections', waiting = compact ? [...new Set(buildSteps(build).flatMap(x => (x.add !== undefined ? [].concat(x.add) : [])))] : [];
   const compile = compact ? s => compileCompact(s, { muted: waiting, lines: liveCode === 'track' ? 'track' : 'joined' }) : compileSong;
   // tracks that played before a bar and are silent at it (a break): shown muted in the code of the moment

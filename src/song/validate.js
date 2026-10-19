@@ -7,6 +7,7 @@ import { checkBuild, buildMap, SPEAKERS } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
 import { checkIdea, checkShared, sharedIsChords } from './ideas.js';
 import { checkGrowthShape } from './shapes.js';
+import { checkSpokenPattern, checkNarrator } from './spoken.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
 export const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
 
@@ -46,6 +47,8 @@ export function validateSong(song, opts = {}) {
   if (song.normal !== undefined && song.normal !== 'waypoints') err('normal', '"waypoints" (without a live build the song starts with the waypoints of its natural growth, one section each), or left out');
   // growth shape of a Live coder build (growth-shapes): opening, pace and development the song asks for
   checkGrowthShape(song.growthShape, err);
+  // narrator style (voice-instrument): "explain" (default) or "poetic", with the song's own short images
+  checkNarrator(song.narrator, 'narrator', err);
   // tags and origin (song library, #34)
   if (song.origin !== undefined && !ORIGINS.includes(song.origin)) err('origin', `one of ${ORIGINS.join(', ')}, or left out`);
   if (song.tags !== undefined) {
@@ -114,7 +117,12 @@ export function validateSong(song, opts = {}) {
       const si = c.section !== undefined ? sectionOf(c.section) : -1, a = c.start ?? (si >= 0 ? starts[si] : 0), z = a + (c.bars ?? (si >= 0 ? secs[si].bars : 0));
       return secs.filter((s, j) => s && starts[j] < z && starts[j] + (s.bars || 0) > a).map(s => meterSteps(s.meter || '4/4'));
     }))];
-    for (const [k, pat] of Object.entries(pats)) checkPattern(tr.type, pat, `${p}.patterns.${k}`, err, warn, { shared: song.shared && typeof song.shared === 'object' ? song.shared : {}, meters: meters(k) });
+    // a spoken track's patterns are lines (voice-instrument)
+    const trackIds = tracks.filter(x => x && typeof x.id === 'string').map(x => x.id);
+    for (const [k, pat] of Object.entries(pats)) {
+      if (tr.type === 'spoken') { if (!pat || typeof pat !== 'object' || Array.isArray(pat)) err(`${p}.patterns.${k}`, 'a line is an object, for example { "way": "refrain", "text": { "en": "…", "it": "…" } }'); else { for (const f of Object.keys(pat)) if (!PATTERN_FIELDS.spoken.includes(f)) warn(`${p}.patterns.${k}.${f}`, `unknown field for a line; fields: ${PATTERN_FIELDS.spoken.join(', ')}`); checkSpokenPattern(pat, `${p}.patterns.${k}`, trackIds, err, warn); } continue; }
+      checkPattern(tr.type, pat, `${p}.patterns.${k}`, err, warn, { shared: song.shared && typeof song.shared === 'object' ? song.shared : {}, meters: meters(k) });
+    }
     const spans = [];
     (Array.isArray(tr.clips) ? tr.clips : []).forEach((c, ci) => {
       const cp = `${p}.clips[${ci}]`;
@@ -164,7 +172,7 @@ function checkSettings(type, set, p, err, warn) {
   for (const [k, v] of Object.entries(set)) {
     if (!known.includes(k)) { warn(`${p}.${k}`, `unknown setting for ${type}; settings: ${known.join(', ')}`); continue; }
     if (/^(gain|cutoff|drive|grit|room|delay|reso|fm|swing|hpf)$/.test(k) && !isNum(v)) err(`${p}.${k}`, 'a number');
-    if ((k === 'pitch' || k === 'tempo') && type === 'voice' && (!isNum(v) || v < 0.25 || v > 4)) err(`${p}.${k}`, `a number from 0.25 to 4 (1 is the original ${k === 'pitch' ? 'pitch, 2 an octave up' : 'speed, 0.5 twice as long'})`);
+    if ((k === 'pitch' || k === 'tempo') && (type === 'voice' || type === 'spoken') && (!isNum(v) || v < 0.25 || v > 4)) err(`${p}.${k}`, `a number from 0.25 to 4 (1 is the original ${k === 'pitch' ? 'pitch, 2 an octave up' : 'speed, 0.5 twice as long'})`);
     if (/End$/.test(k) && v !== null && !isNum(v)) err(`${p}.${k}`, 'a number, or null for no automation');
     if (k === 'kit' && !MACHINES.includes(v)) warn(`${p}.kit`, `not a drum machine of tidal-drum-machines (see the Sounds tab, for example RolandTR909, LinnDrum, AkaiMPC60)`);
     if (k === 'wave' && typeof v === 'string' && !v.split(',').every(w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w))) warn(`${p}.wave`, 'unknown sound; see the Sounds tab (General MIDI instruments start with gm_)');

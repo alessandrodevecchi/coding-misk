@@ -1,0 +1,74 @@
+// coding-misk · Example 6 · Voices
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(118/4)
+
+const SECTIONS = [['Intro', 8], ['Groove', 16], ['Break', 8], ['Drop', 16], ['Outro', 8]]
+const TEMPO = {'Intro': 118, 'Groove': 118, 'Break': 118, 'Drop': 118, 'Outro': 118}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0!48>"  // Intro · 8 bars · 118 BPM · A · Am
+const section2 = "<0!8 1!16 0!32>"  // Groove · 16 bars · 118 BPM · A · Am Em F G
+const section3 = "<0!24 1!8 0!24>"  // Break · 8 bars · 118 BPM · A · Am
+const section4 = "<0!32 1!16 0!8>"  // Drop · 16 bars · 118 BPM · A · Am Em F G
+const section5 = "<0!48 1!8>"  // Outro · 8 bars · 118 BPM · A · Am
+
+// ========== drums ==========
+// Groove · bars 9-24 · pattern A
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.43).mask(section2).velocity(section2).orbit(1).analyze("hats")
+// Drop · bars 33-48 · pattern B
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section4).velocity(section4).orbit(1).analyze("kick")
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.68).mask(section4).velocity(section4).orbit(1).analyze("snare")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.43).mask(section4).velocity(section4).orbit(1).analyze("hats")
+$: s("cr").bank("RolandTR909").gain(.55).room(.4).mask("<1 0!15>").mask(section4).velocity(section4).orbit(1).analyze("fx")
+
+// ========== bass ==========
+// Groove · bars 9-24 · pattern A
+// Bass · Rolling
+$: note("<a1 e1 f1 g1>").struct("[~ x x x]*4")
+  .s("sawtooth").lpf(sine.range(360, 1440).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.7).mask(section2).velocity(section2).orbit(2).analyze("bass")
+// Drop · bars 33-48 · pattern A
+$: note("<a1 e1 f1 g1>").struct("[~ x x x]*4")
+  .s("sawtooth").lpf(sine.range(360, 1440).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.7).mask(section4).velocity(section4).orbit(2).analyze("bass")
+
+// ========== pad ==========
+// Intro · bars 1-8 · pattern A
+// Pad · Sustained
+$: note("[a2,c3,e3]")
+  .s("gm_pad_warm").attack(.4).release(1.2).lpf(sine.range(560, 2240).slow(8))
+  .room(.85).gain(0.35).mask(section1).velocity(section1).orbit(6).analyze("pad")
+// Break · bars 25-32 · pattern A
+$: note("[a2,c3,e3]")
+  .s("gm_pad_warm").attack(.4).release(1.2).lpf(sine.range(560, 2240).slow(8))
+  .room(.85).gain(0.35).mask(section3).velocity(section3).orbit(6).analyze("pad")
+// Drop · bars 33-48 · pattern A
+$: note("<[a2,c3,e3] [g2,b2,e3] [f2,a2,c3] [g2,b2,d3]>")
+  .s("gm_pad_warm").attack(.4).release(1.2).lpf(sine.range(560, 2240).slow(8))
+  .room(.85).gain(0.35).mask(section4).velocity(section4).orbit(6).analyze("pad")
+// Outro · bars 49-56 · pattern A
+$: note("[a2,c3,e3]")
+  .s("gm_pad_warm").attack(.4).release(1.2).lpf(sine.range(560, 2240).slow(8))
+  .room(.85).gain(0.35).mask(section5).velocity(section5).orbit(6).analyze("pad")
+
+// ========== hook ==========
+// Drop · bars 33-48 · pattern A
+// Hook · Call
+$: n("0 ~ 0 2 ~ 4 ~ 2").scale("A4:minor")
+  .s("gm_celesta").lpf(3000)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.18).mask(section4).velocity(section4).orbit(4).analyze("hook")
+
+// ========== Words · spoken ==========
+// "the city is still awake" · opening · bar 7
+$: s("say_en_reed").n(2).late(0.625).mask("<0!6 1 0!49>").stretch(0.9).room(0.25).postgain(0.55).orbit(13).analyze("fx")
+// "signal" · chop · bar 17–24
+$: s("say_en_reed").n(0).slice(8, "0 ~ 1 ~ 2 3 ~ 3").clip(1).mask("<0!16 1!8 0!32>").stretch(0.9).room(0.25).postgain(0.55).orbit(13).analyze("fx")
+// "the last train · stay" · refrain · bar 49, 51, 53, 55
+$: s("say_en_reed").n("3 1 ~ ~").mask("<0!48 1 0 1 0 1 0 1 0>").stretch(0.9).room(0.25).postgain(0.55).orbit(13).analyze("fx")
+
+// ========== Story · spoken ==========
+// "The rain stopped. Every window is a small light in the dark." · spoken passage · bar 25
+$: s("say_en_flo").n(0).mask("<0!24 1 0!31>").room(0.2).postgain(0.6).orbit(14).analyze("fx")

@@ -11,8 +11,8 @@
 - [x] 2.2 Typed opening: lead-in bars, silent until the first line is typed; verify in the browser with `tools/check-crescendo-play.cjs` (no sound before the first step, the line is complete when it sounds) and that fragments skip the lead-in (`npm run check:clips`)
 - [x] 2.3 Build actions `mute`, `unmute`, `solo`, `unsolo` with `_$:` and `S$:` in every code view; verify with `npm run check:code` and an evaluation of each state in `tools/check-crescendo-play.cjs`
 - [x] 2.4 Muted base and mid-set openings; verify that each step removes one `_` or one `S` and that every state evaluates without errors
-- [ ] 2.5 Voice opening with a voice instrument line (after `voice-instrument`); verify that it is never drawn for songs without one
-  - Not done: waits for `voice-instrument`. Until then `canPlay` never offers the voice opening (no song has a voice instrument; narrator voice tracks do not count), and `check:crescendo` verifies that it is never drawn.
+- [x] 2.5 Voice opening with a voice instrument line (after `voice-instrument`); verify that it is never drawn for songs without one
+  - Done with `voice-instrument`: `canPlay` offers the voice opening only to a song with a spoken track that has an opening line; the build puts that track first and says its opening line just before the next track comes in (the bars before are the time that line takes to type). `check:crescendo` (the first waypoint of each opening: the spoken line alone) and `check:spoken` verify it, and that it is never drawn without a spoken opening.
 
 ## 3. Pace
 

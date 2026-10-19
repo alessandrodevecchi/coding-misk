@@ -4,6 +4,10 @@
 // WAV per phrase, language and speaker: public/samples/say_<lang>[_<speaker>]/<slug>.wav (speaker: the voice
 // track's `speaker` setting, see SPEAKERS in src/song/build.js; none = the default voice).
 // The app plays them on the bar of their step. Files are git-ignored (Apple voices): run this again to make them.
+// Voice instrument (voice-instrument): the lines of the songs' spoken tracks, the styles' spoken lines and the
+// vocabulary (one sample per entry) for the speakers that speak them, and the poetic narrator's images (the
+// vocabulary's poetic group, the songs' and styles' own) for the narrator speakers. The length of every sample goes to
+// public/samples/say_lengths.json, so lines are placed from the length of the sample in use.
 //   node tools/voice.mjs [--en Samantha] [--it Alice] [--force]
 // Needs macOS (`say`) and ffmpeg.
 import fs from 'node:fs';
@@ -15,6 +19,9 @@ import { CRESCENDO_PHRASES } from '../src/song/crescendo.js';
 import { loadStyles } from './styles-dir.mjs';
 import { allPhrases } from '../src/endless/phrases.js';
 import { INTERLUDE_SAY } from '../src/endless/transitions.js';
+import { SPEAKERS } from '../src/song/build.js';
+import { lineOf, lineTexts, speakerOf, setSpokenContext } from '../src/song/spoken.js';
+import { vocabularyTexts, poeticTexts } from '../src/song/vocabulary.js';
 
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const DEFAULT_VOICE = { en: opt('en', 'Samantha'), it: opt('it', 'Alice') }, force = args.includes('--force');
@@ -50,6 +57,33 @@ for (const sp of songSpeakers) CRESCENDO_PHRASES.forEach(s => addSay(s, sp));
 const speakers = new Set(['', ...loadStyles().map(r => (r.voice && r.voice.speaker) || '')]);
 for (const sp of speakers) [...allPhrases(), ...INTERLUDE_SAY.map(([en, it]) => ({ en, it }))].forEach(p => addSay(p, sp));
 
+// voice instrument: each line of a song's spoken tracks with the track's speaker (its own, or the one drawn for it)
+const recipes = loadStyles();
+setSpokenContext({ styles: Object.fromEntries(recipes.map(r => [r.id, r])) });
+const songsAll = songFiles('songs').map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+const spokenSpeakers = new Set();
+for (const song of songsAll) for (const t of (song.tracks || []).filter(x => x.type === 'spoken')) {
+  const sp = speakerOf(song, t);
+  spokenSpeakers.add(sp);
+  for (const [key, pat] of Object.entries(t.patterns || {})) {
+    const line = lineOf(song, t, key, pat);
+    if (line.parts) line.parts.forEach(p => addSay(p, sp)); else addSay(line.text, sp);
+  }
+}
+// the styles' lines and the vocabulary, for the speakers of the styles' voice instrument (all speakers when a style
+// with a weight names none)
+for (const r of recipes.filter(x => x.spoken)) {
+  const list = r.spoken.speakers && r.spoken.speakers.length ? r.spoken.speakers : SPEAKERS;
+  list.forEach(sp => spokenSpeakers.add(sp));
+  for (const sp of list) Object.values(r.spoken.lines || {}).flat().forEach(p => addSay(p, sp));
+}
+for (const sp of spokenSpeakers) vocabularyTexts().forEach(p => addSay(p, sp));
+// the poetic narrator: its images for every narrator speaker (the songs' voice tracks, the styles', the default)
+const narrators = new Set([...songSpeakers, ...speakers]);
+const poetic = [...poeticTexts(), ...songsAll.flatMap(s => (s.narrator && typeof s.narrator === 'object' && s.narrator.lines ? Object.values(s.narrator.lines).flat() : [])),
+  ...recipes.flatMap(r => (r.narrator && typeof r.narrator === 'object' && r.narrator.lines ? Object.values(r.narrator.lines).flat() : []))];
+for (const sp of narrators) poetic.forEach(p => addSay(p, sp));
+
 let made = 0, kept = 0;
 const missing = new Set();
 for (const [key, set] of phrases) {
@@ -68,5 +102,24 @@ for (const [key, set] of phrases) {
     made++;
   }
 }
+// the length of every sample (seconds), read from the WAV header: { "say_en_eddy/the_city.wav": 1.42 }
+const lengths = {};
+const wavSeconds = file => {
+  const b = fs.readFileSync(file);
+  if (b.toString('ascii', 0, 4) !== 'RIFF') return null;
+  let rate = 44100, block = 2;
+  for (let at = 12; at + 8 <= b.length;) {
+    const id = b.toString('ascii', at, at + 4), size = b.readUInt32LE(at + 4);
+    if (id === 'fmt ') { rate = b.readUInt32LE(at + 12); block = b.readUInt16LE(at + 20); }
+    if (id === 'data') return Math.round((Math.min(size, b.length - at - 8) / (rate * block)) * 1000) / 1000;
+    at += 8 + size + (size % 2);
+  }
+  return null;
+};
+const root = path.join('public', 'samples');
+for (const bank of fs.readdirSync(root).filter(d => /^say_/.test(d) && fs.statSync(path.join(root, d)).isDirectory()).sort()) {
+  for (const f of fs.readdirSync(path.join(root, bank)).filter(x => x.endsWith('.wav')).sort()) { const s = wavSeconds(path.join(root, bank, f)); if (s) lengths[`${bank}/${f}`] = s; }
+}
+fs.writeFileSync(path.join(root, 'say_lengths.json'), JSON.stringify(lengths) + '\n');
 console.log(`spoken comments: ${made} made, ${kept} already there (${phrases.size} banks; default voices: en ${DEFAULT_VOICE.en}, it ${DEFAULT_VOICE.it})`);
 if (missing.size) console.log(`speakers not installed, left out: ${[...missing].join(', ')}`);

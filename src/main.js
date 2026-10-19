@@ -7,6 +7,8 @@ import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong } from './song/crescendo.js';
+import { setSpokenContext, placeSpoken, WAYS } from './song/spoken.js';
+import { VOCAB_GROUPS } from './song/vocabulary.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, migrateGrowth, PROFILE_STORE_VERSION, migrateOld } from './live/profiles.js';
 import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay } from './song/shapes.js';
 import { liveCode } from './live/live-code.js';
@@ -154,6 +156,8 @@ function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v },
 const crescendoCache = new Map();
 // the built-in style recipes, for the weights of the growth shapes and the metamorphosis (growth-shapes)
 const SHAPE_STYLES = Object.fromEntries(Object.values(import.meta.glob('../styles/*.json', { eager: true, import: 'default' })).map(r => [r.id, r]));
+// the voice instrument (voice-instrument) reads the style's lines and speakers; its samples come with the manifest below
+setSpokenContext({ files: {}, styles: SHAPE_STYLES });
 function crescendoOf(tr) {
   // the Live coder profile (id switch) grows with the natural rules (natural-growth) and a growth shape (growth-shapes)
   const C = ctlOf(tr), narrated = C.narrated, rules = growthRules(C, { styles: SHAPE_STYLES }), key = JSON.stringify([narrated, C.growth, C.duration, C.opening, C.pace, C.development, tr.sections, tr.tracks, tr.id, tr.tags, tr.growthShape]);
@@ -197,7 +201,8 @@ function playable(tr) {
     meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   }
   // doc: the song itself (sections and tracks), for its soul (#46)
-  const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep) } : song);
+  // (whole: the song with every track, so the voice instrument's quiet sections stay the same)
+  const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep), whole: song } : song);
   const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(plain, keep)) : null;
   return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, buses: live && live.buses, fns: live && live.fns, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
 }
@@ -276,6 +281,13 @@ ready.then(async () => {
     const list = await (await fetch('/samples/strudel.json')).json();
     custom = Object.keys(list).filter(k => k !== '_base');
     customFiles = list;
+    // the voice instrument's lines play once their samples are known, placed by the measured lengths (npm run voices)
+    let lengths = {};
+    try { const r = await fetch('/samples/say_lengths.json'); if (r.ok) lengths = await r.json(); } catch (e) {}
+    setSpokenContext({ files: list, lengths });
+    crescendoCache.clear();
+    compiled = playable({ ...T, kind: 'composed' });
+    if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code);
     if (!custom.length) return;
     await globalThis.samples('/samples/strudel.json');
     renderTrackPanel(); renderSounds(); syncAll();
@@ -1260,7 +1272,7 @@ function cellOf(tr, j) {
   return parts.length ? { parts } : null;
 }
 const curTrack = () => T.tracks[tk];
-const baseSettings = type => type === 'code' ? { visual: 'fx' } : type === 'voice' ? { ...VOICE_DEFAULT } : Object.fromEntries(SETTING_FIELDS[type].map(k => [k, DEFAULT[type][k]]));
+const baseSettings = type => type === 'code' ? { visual: 'fx' } : type === 'voice' || type === 'spoken' ? { ...VOICE_DEFAULT } : Object.fromEntries(SETTING_FIELDS[type].map(k => [k, DEFAULT[type][k]]));
 // impostazioni che suonano nella sezione selezionata: traccia + eventuale modifica solo per questa sezione
 // clip su cui agiscono pattern e impostazioni "solo qui": nella timeline quello scelto, altrimenti quello della sezione
 const focusClip = tr => (arrMode === 'timeline' && tr === curTrack() && selClip !== null && tr.clips[selClip]) || wholeClip(tr, sel);
@@ -1273,10 +1285,10 @@ const nextKey = tr => { for (let i = 0; i < 26; i++) { const k = String.fromChar
 const DEFAULT_PATTERN = {
   drums: () => ({ rows: Object.fromEntries(Object.entries(GROOVES.trance[1]).filter(([, v]) => v.includes('x'))) }),
   bass: () => ({ preset: 'rolling' }), guitar: () => ({ preset: 'power8' }), arp: () => ({ preset: 'su', speed: '16' }),
-  hook: () => ({ preset: 'richiamo' }), pad: () => ({ preset: 'pad' }), texture: () => ({ rhythm: 'bar' }), riser: () => ({}), voice: () => ({}),
+  hook: () => ({ preset: 'richiamo' }), pad: () => ({ preset: 'pad' }), texture: () => ({ rhythm: 'bar' }), riser: () => ({}), voice: () => ({}), spoken: () => ({ way: 'refrain', text: 'vocab:night', every: 4 }),
   code: () => ({ code: 'note("a2 ~ c3 [e3 a3]").s("triangle").lpf(1800).gain(.4)' }),
 };
-const ACT_IDS = { drums: 'kick,snare,hats', bass: 'bass', guitar: 'guitar', arp: 'arp', hook: 'hook', pad: 'pad', texture: 'fx', riser: 'riser', voice: 'fx' };
+const ACT_IDS = { drums: 'kick,snare,hats', bass: 'bass', guitar: 'guitar', arp: 'arp', hook: 'hook', pad: 'pad', texture: 'fx', riser: 'riser', voice: 'fx', spoken: 'fx' };
 const trackLabel = tr => tr.name || t(tr.type) || tr.id;
 
 function selectScene(i) {
@@ -1414,7 +1426,7 @@ function renderSectionPanel(total) {
   $('#sc-loop').checked = loopIdx >= 0 && mode === 'track';
   renderTrackPick();
 }
-const TYPE_ICON = { drums: '◉', bass: '▁', guitar: '⚡', arp: '⋰', hook: '♪', pad: '▒', texture: '∿', riser: '↗', code: '{}', voice: '❝' };
+const TYPE_ICON = { drums: '◉', bass: '▁', guitar: '⚡', arp: '⋰', hook: '♪', pad: '▒', texture: '∿', riser: '↗', code: '{}', voice: '❝', spoken: '❞' };
 
 // clic sulla griglia: nome traccia, mute, solo, cella (seleziona sezione e traccia; se suona salta lì)
 $('#arr-grid').addEventListener('click', e => {
@@ -1871,6 +1883,8 @@ const CONTROLS = {
   voice: [['select', 'speaker', 'speaker', () => [['', t('speakerDefault')], ...SPEAKERS.map(k => [k, k[0].toUpperCase() + k.slice(1)])]], ['range', 'gain', 'volume'], ['range', 'pitch', 'pitch', { min: .5, max: 2, step: .05, fmt: 'num' }], ['range', 'tempo', 'voiceTempo', { min: .25, max: 2, step: .05, fmt: 'num' }], ['cutoff', 'cutoff', 'filter'],
     ['range', 'hpf', 'lowCut', { max: 2000, step: 10, fmt: 'num' }], ['range', 'drive', 'drive', NUM4], ['range', 'room', 'reverb'], ['range', 'delay', 'delay']],
 };
+// the voice instrument (voice-instrument): the voice settings; no speaker named: one drawn, never the narrator's
+CONTROLS.spoken = [['select', 'speaker', 'speaker', () => [['', t('speakerDrawn')], ...SPEAKERS.map(k => [k, k[0].toUpperCase() + k.slice(1)])]], ...CONTROLS.voice.slice(1)];
 // suoni per strumento: quelli scelti a mano, poi tutti gli strumenti General MIDI e i synth caricati
 function allWaves() {
   const map = (globalThis.soundMap && globalThis.soundMap.get && globalThis.soundMap.get()) || {}, have = new Set(WAVES.map(([k]) => k.split(',')[0]));
@@ -2102,6 +2116,8 @@ function panelHtml(ti) {
     editor = `<div class="ctrl"><label class="lbl" for="pt-rhythm">${t('rhythm')}</label><select id="pt-rhythm"></select></div>`;
   } else if (tr.type === 'code') {
     editor = `<label class="lbl" for="pt-code">${t('codeLbl')}</label><textarea id="pt-code" rows="5" spellcheck="false"></textarea><p class="note">${t('codeHint')}</p>`;
+  } else if (tr.type === 'spoken') {
+    editor = spokenEditor(tr, key, pat);
   } else if (tr.type === 'voice') {
     // the phrases this voice speaks: the comments of the live build steps
     const steps = compiled.build ? buildSteps(compiled.build).filter(x => x.say && voiceOf(T, x) === tr) : [];
@@ -2133,6 +2149,30 @@ function panelHtml(ti) {
       <div class="rack-list">${(tr.rack || []).map((d, i) => deviceHtml(d, i, tr)).join('') || `<p class="note">${t('noDevices')}</p>`}</div>
       <div class="rack-add"><select id="rk-type" aria-label="${esc(t('addDevice'))}">${['note', 'sound'].map(kind => `<optgroup label="${esc(t(kind === 'note' ? 'devNote' : 'devSound'))}">${Object.entries(DEVICES).filter(([, d]) => d.kind === kind).map(([k, d]) => `<option value="${k}">${esc(tx(d.label))}</option>`).join('')}</optgroup>`).join('')}</select><button class="btn" id="rk-add">${t('addDevice')}</button></div>
     </div>`);
+}
+// the line of a voice instrument's pattern (voice-instrument): how it speaks, its text (own, or drawn from the
+// vocabulary), the values of its way, and where it speaks in the song with the words it says now
+function spokenEditor(tr, key, pat) {
+  const lang = getLang(), src = typeof pat.text === 'string' && pat.text.startsWith('vocab:') ? pat.text : pat.text ? 'own' : 'auto';
+  const txt = l => (!pat.text || src !== 'own' ? '' : typeof pat.text === 'string' ? (l === 'en' ? pat.text : '') : pat.text[l] || '');
+  let placed = [];
+  try { placed = placeSpoken(T, lang).filter(p => p.track === tr.id && p.key === key); } catch (e) { placed = []; }
+  const bars = [...new Set(placed.flatMap(p => p.starts.map(s => s.bar + 1)))].sort((a, b) => a - b), said = placed[0] ? placed[0].texts.join(' · ') : '';
+  const others = T.tracks.filter(x => x !== tr && x.type !== 'voice' && x.type !== 'spoken');
+  const sel = (id, label, list, v) => `<div class="ctrl"><label class="lbl" for="${id}">${esc(label)}</label><select id="${id}">${list.map(([k, l]) => `<option value="${esc(k)}"${String(v) === String(k) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
+  const way = WAYS.includes(pat.way) ? pat.way : 'passage';
+  return `<p class="note">${esc(t('spokenHint'))}</p>
+    <div class="sp-grid">
+      ${sel('sp-way', t('spokenWay'), WAYS.map(w => [w, t(`way:${w}`)]), way)}
+      ${sel('sp-src', t('spokenSource'), [['own', t('spokenOwn')], ['auto', t('spokenAuto')], ...VOCAB_GROUPS.map(g => [`vocab:${g}`, t('spokenVocab', { g: t(`vocab:${g}`) })])], src)}
+      ${way === 'refrain' ? `<div class="ctrl"><label class="lbl" for="sp-every">${esc(t('spokenEvery'))}</label><input id="sp-every" type="number" min="1" max="64" step="1" value="${pat.every || 4}"></div>` : ''}
+      ${way === 'chop' ? `<div class="ctrl"><label class="lbl" for="sp-slices">${esc(t('spokenSlices'))}</label><input id="sp-slices" type="number" min="2" max="32" step="1" value="${pat.slices || 8}"></div>
+        <div class="ctrl sp-wide"><label class="lbl" for="sp-rhythm">${esc(t('spokenRhythm'))}</label><input id="sp-rhythm" type="text" spellcheck="false" autocomplete="off" value="${esc(pat.rhythm || '0 1 2 3 4 5 6 7')}"></div>` : ''}
+      ${way === 'passage' || way === 'opening' ? sel('sp-before', t('spokenBefore'), [['', t('spokenNoBefore')], ...others.map(x => [x.id, trackLabel(x)])], pat.before || '') : ''}
+    </div>
+    ${src === 'own' ? `<div class="sp-texts"><div class="ctrl"><label class="lbl" for="sp-en">${esc(t('spokenTextEn'))}</label><input id="sp-en" type="text" maxlength="120" autocomplete="off" value="${esc(txt('en'))}"></div>
+      <div class="ctrl"><label class="lbl" for="sp-it">${esc(t('spokenTextIt'))}</label><input id="sp-it" type="text" maxlength="120" autocomplete="off" value="${esc(txt('it'))}"></div></div>` : ''}
+    <p class="note sp-where">${bars.length ? esc(t('spokenWhere', { bars: bars.join(', '), text: said })) : esc(t('spokenNowhere'))}</p>`;
 }
 const panelQ = host => name => host.querySelector(`#p${host.dataset.ptrk}_${name}`);
 // riempie i menu di un pannello e lo allinea ai dati
@@ -2238,6 +2278,21 @@ $('#track-panel').addEventListener('change', e => {
   if (r === 'pt-preset') editPattern(p => { p.preset = e.target.value; delete p.steps; delete p.idea; });
   if (r === 'pt-speed') { editPattern(p => { p.speed = e.target.value; delete p.steps; }); renderTrackPanel(); }
   if (r === 'pt-rhythm') editPattern(p => { p.rhythm = e.target.value; });
+  // the voice instrument's line (voice-instrument)
+  if (r.startsWith('sp-')) {
+    const v = e.target.value, num = Math.round(+v);
+    editPattern(p => {
+      if (r === 'sp-way') { p.way = v; if (v !== 'refrain') delete p.every; if (v !== 'chop') { delete p.slices; delete p.rhythm; } if (v !== 'passage' && v !== 'opening') delete p.before; }
+      if (r === 'sp-src') { if (v === 'own') p.text = { en: getLang() === 'it' ? '' : '…', it: getLang() === 'it' ? '…' : '' }; else if (v === 'auto') delete p.text; else p.text = v; if (p.text && typeof p.text === 'object') p.text = Object.fromEntries(Object.entries(p.text).filter(([, x]) => x)); }
+      if (r === 'sp-en' || r === 'sp-it') { const k = r.slice(3), cur = p.text && typeof p.text === 'object' ? { ...p.text } : typeof p.text === 'string' && !p.text.startsWith('vocab:') ? { en: p.text } : {}; if (v.trim()) cur[k] = v.trim(); else delete cur[k]; if (Object.keys(cur).length) p.text = cur; else delete p.text; }
+      if (r === 'sp-every' && num >= 1) p.every = Math.min(64, num);
+      if (r === 'sp-slices' && num >= 2) p.slices = Math.min(32, num);
+      if (r === 'sp-rhythm') { const ok = v.trim().split(/\s+/).every(x => x === '~' || (/^\d+$/.test(x) && +x < (p.slices || 8))); if (ok) p.rhythm = v.trim().replace(/\s+/g, ' '); else toast(t('spokenRhythmBad')); }
+      if (r === 'sp-before') { if (v) p.before = v; else delete p.before; }
+    });
+    renderTrackPanel();
+    return;
+  }
   if (r === 'pt-groove') { const g = GROOVES[e.target.value]; if (g) editPattern(p => { p.rows = Object.fromEntries(Object.entries(g[1]).filter(([, v]) => v.includes('x')).map(([k, v]) => [k, fitSteps(v, meterSteps(secFull().meter))])); }); e.target.value = ''; }
   if (r === 'tk-name' && !tr.name.trim()) { tr.name = t(tr.type); changed(); renderArranger(); }
 });
@@ -3136,7 +3191,7 @@ function renderStatic() {
   $$('[data-i18n-aria]').forEach(x => { x.setAttribute('aria-label', t(x.dataset.i18nAria)); });
   $$('[data-i18n-title]').forEach(x => { x.title = t(x.dataset.i18nTitle); });
   opts($('#key'), KEYS.map(k => [k[0], k[2]]));
-  opts($('#tk-type'), ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture', 'riser', 'code', 'voice'].map(k => [k, `${TYPE_ICON[k]}  ${t(k)}`]));
+  opts($('#tk-type'), ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture', 'riser', 'code', 'voice', 'spoken'].map(k => [k, `${TYPE_ICON[k]}  ${t(k)}`]));
   opts($('#sc-meter'), METERS.map(([k]) => [k, k]));
   opts($('#sc-fade'), [['0', t('cut')], ['1', t('fade1')], ['2', t('fadeN', { n: 2 })], ['4', t('fadeN', { n: 4 })], ['8', t('fadeN', { n: 8 })]]);
   if (radio) radio.render();
