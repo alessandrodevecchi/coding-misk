@@ -755,3 +755,11 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Guida: scheda "Varia e Scambia" nella Radio, tasti `N` e `W`, testo del Materiale aggiornato; tolta l'esenzione di `vary`.
 - Check: `check:endless` 68/68 (nuovi: Varia compone con ogni sorgente e il pad tiene gli accordi; Scambia parte pronta, replay, motivi, pattern salvati), `check-steering.cjs` (picker, coda, annulla, scorciatoie, spento con motivo, replay con le stesse note, materiale), `check-radio.cjs` e `check-transitions.cjs` con un Varia/Scambia in onda, `check-playlists.cjs` (avviso versioni; cerca i brani per titolo quando le sessioni in `songs/endless/` riempiono la prima pagina), `check-settings.cjs`, `check-compilation.cjs`.
 - Restano: 5.1 (serve `radio-profiles`, in pausa: la radio costruisce a blocchi e un Varia cambia la parte in un passo) e 5.2 (prova d'ascolto del proprietario).
+
+## 2026-10-19: base di conoscenza per gli agenti (`knowledge-base`, #74)
+
+- Nuova cartella `docs/knowledge/`: indice con ordine di lettura (`README.md`) e una nota per concetto (Strudel, brani, idee, live build, profili, forme di crescita, commenti e funzioni tecniche, stili, materiale, pattern, radio, comandi della console, artisti, voce strumento, narratore, export, libreria, impostazioni) più `decisions.md` con le scelte e i tentativi scartati, ognuno col motivo e la fonte.
+- `strudel.md` spiega le basi con parole nostre e rimanda alla documentazione ufficiale, al catalogo e alle lezioni nell'app.
+- `npm run knowledge` riscrive solo i blocchi generati (stili, comandi, profili e controlli, funzioni tecniche, forme, helper, radio, artisti, voce; descrizioni dai testi di aiuto dell'app) e gli esempi di codice presi dai brani d'esempio.
+- `npm run check:knowledge` (senza browser) fallisce se manca una nota, un link è rotto, un blocco è vecchio, un valore del codice non è descritto o un esempio non compila.
+- Regola in `AGENTS.md`: ogni change che aggiunge un concetto o un'opzione aggiorna la sua nota. La Guida (scheda Lezioni Strudel) indica la base di conoscenza.

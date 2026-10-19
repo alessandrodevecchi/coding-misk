@@ -200,6 +200,7 @@ export const GUIDE = [
     title: { en: 'Strudel lessons', it: 'Lezioni Strudel' },
     what: { en: 'Short steps to learn Strudel, the language the app writes, from the first kick to a full song.', it: 'Passi brevi per imparare Strudel, il linguaggio che l\'app scrive, dal primo colpo di cassa a un brano intero.' },
     how: { en: '[▶ Load and play] puts the example in the editor and starts it; change the code and press {Ctrl}+{Enter}.', it: '[▶ Carica e ascolta] mette l\'esempio nell\'editor e lo fa partire; cambia il codice e premi {Ctrl}+{Enter}.' },
+    know: { en: 'For developers and AI agents, the repository has a knowledge base in docs/knowledge/: Strudel basics, one note per concept of the app with its options, real code examples and the decisions taken. Start from docs/knowledge/README.md.', it: 'Per chi sviluppa e per gli agenti AI, il repository ha una base di conoscenza in docs/knowledge/: le basi di Strudel, una nota per ogni concetto dell\'app con le sue opzioni, esempi di codice veri e le decisioni prese. Si parte da docs/knowledge/README.md.' },
   },
   {
     id: 'references', tab: 'riferimenti', mode: 'lab', show: '#refs',
