@@ -27,6 +27,8 @@ Each group has presets over separate options. Changing one option makes the pres
 
 **The hidden mixer.** With `fnLevel`, bus, visual and level go to a hidden tail, `all(x => miskMix(x, [...]))`. It finds each line by the place of its text and gives its events what the line no longer writes. The Live coder's section lanes play through it too.
 
+**The radio's hidden songs (radio-profiles D7).** In the radio, the code evaluated is the panel's text, the hidden tail of the song on air, then the songs not on air in full technical form (`src/live/air-code.js`): Classic controls, no song functions and no lanes, their constants renamed with `n<k>_`, their orbits moved up by 20, their `S$:` lines played alone only within their own song. The mixer finds lines by place, so it never touches them, and the song functions of the song on air never meet theirs. The prelude panel (Hidden code) shows them too.
+
 ## Options
 
 <!-- generated:comment-presets -->

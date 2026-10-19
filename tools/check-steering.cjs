@@ -248,6 +248,30 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     await page.click('.radio-ctrls .mat-source [data-material="mix"]'); await sleep(200);
   }
 
+  // the Profile control next to Transitions and Harmony (radio-profiles 4.5): the song on air plays on, the next
+  // song takes it, the recipe records it for the replay, and a replay grows the same songs
+  await page.click('#radio-start'); await sleep(300); await page.fill('#radio-seed', 'steer-profile'); await page.click('#radio-start'); await sleep(2500);
+  {
+    check(await page.isVisible('.radio-how #radio-profile') && (await page.$$('#radio-profile option')).length === 5, 'Profile control in the console, with Custom');
+    const before = await page.evaluate(() => { const r = globalThis.codingMiskRadio.state; return { id: r.stream[r.onAir].id, n: r.onAir, profile: r.stream[r.onAir].profile }; });
+    await page.selectOption('#radio-profile', 'switch'); await sleep(300);
+    const after = await page.evaluate(() => { const r = globalThis.codingMiskRadio.state; return { id: r.stream[r.onAir].id, profile: r.stream[r.onAir].profile }; });
+    check(after.id === before.id && after.profile === before.profile, 'the song on air plays on when the profile changes', JSON.stringify([before, after]));
+    for (let k = 0; k < 2; k++) { await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(2500); }
+    const r = await page.evaluate(() => globalThis.codingMiskRadio.state), cur = r.stream[r.onAir];
+    const ch = (r.recipe.changes || []).find(c => c.options && c.options.profile === 'switch');
+    check(cur.profile === 'switch' && cur.grown, 'the next song takes the profile and grows', JSON.stringify({ profile: cur.profile, grown: cur.grown }));
+    check(!!ch && ch.song > before.n, 'the recipe records the profile from a later song', JSON.stringify((r.recipe.changes || []).map(c => [c.song, c.options.profile])));
+    check(/Live coder/.test(await page.innerText('.radio-profile-now')), 'now playing shows the profile of the song on air');
+    await page.click('#radio-replay'); await sleep(2500);
+    for (let k = 0; k < r.onAir; k++) { await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(2500); }
+    // (the songs skipped are cut where the skip came: their bars are left out, the song on air keeps its own)
+    const re = await page.evaluate(() => { const s = globalThis.codingMiskRadio.state; return s.stream.slice(0, s.onAir + 1).map((x, i) => [x.id, x.profile, i === s.onAir ? x.bars : 0, x.shape && x.shape.opening]); });
+    check(JSON.stringify(re) === JSON.stringify(r.stream.slice(0, r.onAir + 1).map((x, i) => [x.id, x.profile, i === r.onAir ? x.bars : 0, x.shape && x.shape.opening])), 'replay gives the same profiles and grown songs', JSON.stringify(re));
+    check(!(await err()), 'no evaluation error with the grown songs');
+    await page.selectOption('#radio-profile', 'artist'); await sleep(200);
+  }
+
   await page.click('#radio-start'); await sleep(300);
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();

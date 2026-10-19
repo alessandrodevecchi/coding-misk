@@ -7,7 +7,9 @@ import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong } from './song/crescendo.js';
-import { setSpokenContext, placeSpoken, WAYS } from './song/spoken.js';
+import { setSpokenContext, spokenContext, placeSpoken, WAYS } from './song/spoken.js';
+import { airCode } from './live/air-code.js';
+import { growOnAir } from './endless/growth.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, migrateGrowth, PROFILE_STORE_VERSION, migrateOld } from './live/profiles.js';
 import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay } from './song/shapes.js';
@@ -156,6 +158,34 @@ const liveOf = tr => { const o = liveOverride.get(tr.id), C = ctlOf(tr); return 
 // window song names no profile: before, a Crescendo pick with the switch on grew the window). Off: a window without
 // steps plays as written, as the radio did with the switch off
 const RADIO_LIVE = () => { const C = resolveProfile('classic'); return { on: false, style: C.build, ctl: C }; };
+// the radio's window song by song (radio-profiles D7, D8, src/live/air-code.js): the song on air with its own
+// controls, the next one shown or hidden. A window of Classic songs, all shown, plays as before (one Classic code)
+// songs: [{ n, prefix, start, song, title, profile, custom, ctl, show }] from the radio
+function radioPlayable(W, songs = null) {
+  if (!songs || songs.every(x => x.profile === 'classic' && !x.custom && x.show !== 'hidden')) return playable({ ...W, kind: 'composed' }, RADIO_LIVE());
+  const L = airCode(W, songs, { lang: getLang, files: () => customFiles, cols: codeCols });
+  const meta = parseSong(compileSong(stateAt(W, 0).song)), v = W.sections.flatMap(x => [x.bpm ?? 138, x.bpmEnd ?? x.bpm ?? 138]), lo = Math.min(...v), hi = Math.max(...v);
+  meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
+  // (soundCode: every sound of the window in one code, for the soundfonts loaded ahead; hidden: the songs not shown)
+  return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), soundCode: () => compileSong({ ...W, build: undefined }) };
+}
+// radio songs grow away from the page (radio-profiles stage 4, src/endless/grow-worker.js): the music stays on time;
+// the worker gets the voice instrument's context and the language of the page, so a song grows there as it would here
+let growWorker = null, growN = 0;
+const growWaits = new Map();
+function growAway(song, ctx) {
+  const here = () => Promise.resolve().then(() => growOnAir(song, ctx));
+  try {
+    if (!growWorker) {
+      growWorker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
+      growWorker.onmessage = e => { const w = growWaits.get(e.data && e.data.id); if (!w) return; growWaits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.song); };
+      growWorker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of growWaits.values()) w.reject(new Error('worker')); growWaits.clear(); growWorker = false; };
+    }
+    if (growWorker === false) return here();
+    const id = ++growN, spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
+    return new Promise((resolve, reject) => { growWaits.set(id, { resolve, reject }); growWorker.postMessage({ id, song, ctx, spoken }); });
+  } catch (e) { return here(); }
+}
 // one control changed by hand: kept for every profile until a profile is picked again
 function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v }, PROFILES[profileFor(T)]); saveProfile(); }
 // Crescendo builds are computed once per song version and option
@@ -261,7 +291,11 @@ ready.then(() => {
     renderPrelude();
     if (!(song && song.run)) return plain(autostart);
     ed.flash();
-    await ed.repl.evaluate(song.run(ed.code || ''), autostart);
+    // the bar the code is for (the radio's hidden songs change with their own steps): the bar just shown by the
+    // player, else the bar playing (code evaluated by hand)
+    const s = sched(), bar = codeFresh ? codeBar : Math.floor(s ? s.now() : 0);
+    codeFresh = false;
+    await ed.repl.evaluate(song.run(ed.code || '', bar), autostart);
   };
   const iv = setInterval(() => { if (typeof globalThis.register === 'function') { clearInterval(iv); installHelpers({ register: globalThis.register }); } }, 100);
 });
@@ -303,6 +337,9 @@ ready.then(async () => {
 const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
 // code of a song at a bar, with the tempo of that bar (a live build changes code over time)
+// the code the player shows at a bar to evaluate it: the evaluation knows the bar (codeBar, used once)
+let codeBar = 0, codeFresh = false;
+const codeNow = (sg, bar) => { codeBar = bar; codeFresh = true; return codeFor(sg, bar); };
 const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.codeAt ? sg.codeAt(bar, keep) : keep && sg.codeKeep ? sg.codeKeep(keep) : sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
 // keeps the point being edited in view: #edhost scrolls, not CodeMirror's own scroller
 function followEdit(a, b) {
@@ -369,7 +406,7 @@ function liveBuild(sg, s, cyc) {
   }
   if (!due) { typeFrame(typing, cyc); return; }
   typing = null; built = steps.filter(x => x.at <= next.at).length;
-  ed.setCode(codeFor(sg, next.at)); ed.evaluate();
+  ed.setCode(codeNow(sg, next.at)); ed.evaluate();
 }
 
 // ---------- hand live coding (#20) ----------
@@ -416,7 +453,7 @@ function resumeBuild(sg, s, cyc) {
   resumeTo = null; typing = null;
   if (r.target !== undefined) { playSong(sg, r.target, mode); return; }
   built = sg.build ? buildSteps(sg.build).filter(x => x.at <= r.bar).length : 0;
-  ed.setCode(codeFor(sg, r.bar)); ed.evaluate();
+  ed.setCode(codeNow(sg, r.bar)); ed.evaluate();
 }
 // the hidden code under the panel (code-writing): the helpers and the tail that play with the code shown
 function renderPrelude() {
@@ -492,7 +529,7 @@ async function playSong(sg, bar = 0, as = 'free', { keepHand = false } = {}) {
     if (sg.build) voiceSamples(sg.build, getLang(), customFiles).forEach(v => { try { globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05); } catch (e) {} });
     if (hand && keepHand) { song = sg; sched().lastEnd = bar; await ed.evaluate(); return; }
     setHand(false); resumeTo = null;
-    ed.setCode(codeFor(sg, bar));
+    ed.setCode(codeNow(sg, bar));
     sched().lastEnd = bar;
     if (loopIdx >= 0) loopIdx = m.sectionAt(bar);
     if (as === 'track') { const k = arrSec(m.sectionAt(bar)); if (k >= 0) selectScene(k); }
@@ -3143,7 +3180,7 @@ const preloadSounds = p => {
   const key = p && p.meta ? `${p.title}|${p.meta.bpm.length}` : '';
   if (!key || key === preloaded || !globalThis.soundMap) return;
   preloaded = key;
-  const names = soundfontsIn(segmentsOf(p, codeFor).map(x => x.code).join('\n'));
+  const names = soundfontsIn(p.soundCode ? p.soundCode() : segmentsOf(p, codeFor).map(x => x.code).join('\n'));
   preloadFonts(names, { soundMap: globalThis.soundMap, play: v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + .2, .05) })
     .then(n => { if (n) console.info(`[sounds] next song: ${n} soundfont zones loaded (${names.join(', ')})`); }, () => {});
 };
@@ -3153,7 +3190,9 @@ radio = createRadio({
   // the user's saved patterns join the songs where they fit (pattern-library; material-generator D10)
   userPatterns: () => forRadio(patternsStore.list()),
   player: {
-    makePlayable: sg => playable({ ...sg, kind: 'composed' }, RADIO_LIVE()),
+    makePlayable: (sg, songs) => radioPlayable(sg, songs),
+    // a radio song grows away from the page (radio-profiles stage 4)
+    grow: (song, ctx) => growAway(song, ctx),
     start: (p, bar) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio'); },
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
@@ -3161,8 +3200,12 @@ radio = createRadio({
     swap: p => {
       if (mode !== 'radio' || !song) return;
       const s = sched(), cyc = s ? s.now() : 0;
+      // (a window whose song on air changed while songs are shown one by one, radio-profiles D7: the new song's code
+      // appears whole now, in its own view)
+      const fresh = (p.air || song.air) && p.id !== song.id && !hand;
       song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
       warmVoices(p); preloadSounds(p); source = { kind: 'radio', name: p.title }; renderSource();
+      if (fresh) { ed.setCode(codeNow(p, Math.floor(cyc))); ed.evaluate(); }
     },
     // skip: the new window takes over now, its first song starts on "bar"
     jump: (p, bar) => {
@@ -3170,7 +3213,7 @@ radio = createRadio({
       setHand(false); resumeTo = null;
       song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= bar).length;
       warmVoices(p); source = { kind: 'radio', name: p.title }; renderSource();
-      ed.setCode(codeFor(p, bar)); ed.evaluate();
+      ed.setCode(codeNow(p, bar)); ed.evaluate();
     },
     stop: () => stop(),
     volume: () => ({ volume, muted }),

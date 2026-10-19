@@ -6,10 +6,11 @@
 import fs from 'node:fs';
 import { hashString } from '../src/endless/random.js';
 import { validateRecipe, recipeOrder } from '../src/endless/recipe.js';
-import { sessionItems } from '../src/endless/items.js';
+import { sessionItems, GROWTH_ON_AIR, growsOnAir } from '../src/endless/items.js';
+import { airCode, windowPart, stepRefs, HIDDEN_ORBIT } from '../src/live/air-code.js';
 import { loadStyles } from './styles-dir.mjs';
 import { loadArtists } from './artists-dir.mjs';
-import { songProfileOnAir, savedSongProfile, recipeProfile, RADIO_PROFILES, PROFILE_CHOICES } from '../src/endless/profile.js';
+import { songProfileOnAir, savedSongProfile, recipeProfile, RADIO_PROFILES, PROFILE_CHOICES, profileOptions, customControls, controlsProfile } from '../src/endless/profile.js';
 import { PROFILE_IDS } from '../src/live/profiles.js';
 import { validateArtist, ARTIST_PROFILES } from '../src/endless/artist.js';
 import { PRESETS } from '../src/endless/compilation.js';
@@ -228,6 +229,55 @@ const CHECKS = {
     let start = 0;
     const laid = items.map((x, i) => { const it = { song: x.song, n: i + 1, start, transition: x.entry.transition }; start += barsOf(x.song) + extraOf(x.entry.transition) - overlapOf(x.entry.transition); return it; });
     for (let i = 0; i + 1 < laid.length; i++) windowSong(laid.slice(i, i + 2));
+  },
+  'stage 4: windows of grown songs name only their own tracks; the code on air and the hidden song stay apart'() {
+    const items = sessionItems(RECIPES, { ...recipeOf(3, 'switch'), options: { ...recipeOf(3, 'switch').options, transition: 'mix' } }, 2, null, { grow: true });
+    let start = 24;
+    const laid = items.map((x, i) => { const it = { song: x.song, n: i + 1, start, transition: x.entry.transition }; start += barsOf(x.song) + extraOf(x.entry.transition) - overlapOf(x.entry.transition); return it; });
+    const W = windowSong(laid), total = barsOf(W), errs = [];
+    // every step names a track of the window (a grown song's line marks, hidden functions and masks too)
+    checkBuild(W, total, (p, m) => errs.push(`${p} ${m}`), () => {});
+    assert(!errs.length, `window steps: ${errs.slice(0, 3).join('; ')}`);
+    const songs = laid.map((x, i) => ({ n: x.n, prefix: `s${x.n}-`, start: x.start, song: x.song, title: x.song.title, ctl: airControls('switch'), show: i ? 'hidden' : 'air' }));
+    // the parts split the window: every track and every step in exactly one song
+    const parts = songs.map((_, k) => windowPart(W, songs, k));
+    assert(parts.reduce((a, p) => a + p.tracks.length, 0) === W.tracks.length, 'tracks split');
+    assert(parts.reduce((a, p) => a + p.build.length, 0) === W.build.length, 'steps split');
+    assert(parts.every((p, k) => p.build.every(s => stepRefs(s).every(id => id.startsWith(songs[k].prefix)))), 'steps stay with their song');
+    const L = airCode(W, songs, { cols: () => 80 }), bars = [...new Set(buildSteps(L.build).map(s => s.at))];
+    for (const b of bars.filter(x => x >= laid[1].start - 4 && x < laid[1].start + 16)) {
+      const shown = L.codeAt(b), code = L.run(shown, b), decl = [...code.matchAll(/^const (\w+) =/gm)].map(m => m[1]);
+      assert(new Set(decl).size === decl.length, `bar ${b}: a constant declared twice`);
+      assert(!shown.includes(`// ========== ${laid[1].n} `), `bar ${b}: the hidden song is in the panel`);
+      // (the hidden song starts with its own constants, renamed n2_…)
+      const hs = code.indexOf('const n2_'), hidden = hs < 0 ? '' : code.slice(hs);
+      if (b >= laid[1].start) assert(/\$:/.test(hidden), `bar ${b}: the incoming song plays no hidden code`);
+      assert([...hidden.matchAll(/\.orbit\((\d+)\)/g)].every(m => +m[1] >= HIDDEN_ORBIT), `bar ${b}: a hidden song on the orbits of the song on air`);
+      assert(!/^\s*S\$:/m.test(hidden), `bar ${b}: a hidden line played alone against the song on air`);
+    }
+  },
+  'stage 4: a recipe saved before the growth marker replays in blocks; with it, the same songs grow'() {
+    const r = GROWN[0].recipe, old = sessionItems(RECIPES, r, 2), blocks = sessionItems(RECIPES, r, 2, null, { grow: false });
+    assert(!growsOnAir(r) && growsOnAir({ ...r, growth: GROWTH_ON_AIR }), 'the marker');
+    assert(itemsHash(old) === itemsHash(blocks) && old.every(x => !x.song.crescendo), 'a recipe without the marker plays in blocks, as heard');
+    const marked = sessionItems(RECIPES, { ...r, growth: GROWTH_ON_AIR }, 2), forced = sessionItems(RECIPES, r, 2, null, { grow: true });
+    assert(marked.every(x => x.song.crescendo && x.song.onAir), 'a recipe with the marker grows its songs');
+    assert(itemsHash(marked) === itemsHash(forced), 'the marker grows the same songs as the growth of stage 3');
+    // a Classic recipe with the marker: the same items as without it (Classic songs never grow)
+    for (const { name, recipe } of CLASSIC) assert(itemsHash(sessionItems(RECIPES, { ...recipe, growth: GROWTH_ON_AIR }, SONGS)) === itemsHash(sessionItems(RECIPES, recipe, SONGS)), `${name}: the marker moves a Classic session`);
+  },
+  'stage 4: the Custom profile is saved with the session and replays the same'() {
+    const custom = { base: 'switch', controls: { tracks: false, notes: false, steps: false, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: false, fnLib: false } };
+    const po = profileOptions('custom', custom), C = customControls(po.custom);
+    assert(po.profile === 'switch' && C.comments === 'none' && C.functions === 'mixer' && C.duration === 'fitted' && controlsProfile(C) === 'switch', `custom: ${JSON.stringify(po)} → ${C.comments}, ${C.functions}, ${C.duration}`);
+    assert(profileOptions('custom', { base: 'classic', controls: {} }).profile === 'classic' && profileOptions('custom', { base: 'switch', controls: { growth: 'crescendo' } }).profile === 'crescendo', 'what a combination amounts to');
+    const rec = { seed: 'su-misura', options: { ...recipeOf(5, 'artist').options, ...po }, changes: [], growth: GROWTH_ON_AIR };
+    const a = sessionItems(RECIPES, rec, 2), b = sessionItems(RECIPES, JSON.parse(JSON.stringify(rec)), 2);
+    assert(a.every(x => x.entry.profile === 'switch' && x.song.onAir && !x.song.onAir.free), 'Custom songs grow as Live coder, fitted');
+    assert(itemsHash(a) === itemsHash(b), 'a replay gives the same songs');
+    // a free duration in the Custom controls: the song waits for its typing
+    const free = sessionItems(RECIPES, { ...rec, options: { ...rec.options, ...profileOptions('custom', { base: 'switch', controls: { duration: 'free' } }) } }, 1);
+    assert(free[0].song.onAir.free && barsOf(free[0].song) >= barsOf(a[0].song), 'Custom free duration');
   },
   'typing on air: rushed steps no more than in Compose; the sound does not depend on the panel width'() {
     const { live } = grown(), C = airControls('switch');

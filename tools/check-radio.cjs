@@ -181,6 +181,83 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     await page.click('#radio-start'); await sleep(500);
   }
 
+  // radio-profiles stage 4: a Live coder session. The song on air grows in its own view, the next one plays hidden on
+  // its own orbits and appears whole when it goes on air; a replay grows the same songs; a recipe saved before the
+  // growth marker plays in blocks; the Custom profile shows its own code
+  {
+    const code = () => page.evaluate(() => document.querySelector('strudel-editor').editor.code || '');
+    const heads = (c, n) => c.split('\n').filter(l => l.startsWith(`// ========== ${n} `)).length;
+    // the orbits of the events about to play (the hidden song's are 20 and up)
+    const orbitsAhead = () => page.evaluate(() => { const s = document.querySelector('strudel-editor').editor.repl.scheduler, c = s.now(); return [...new Set(s.pattern.queryArc(c, c + 2).filter(h => h.hasOnset()).map(h => h.value.orbit))].sort((a, b) => a - b); });
+    const waitFor = async (fn, ms = 30000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await sleep(300); } return false; };
+    await pick(['berlin-techno']); await setRange('chaos', 0.3);
+    await page.selectOption('#radio-transition', 'mix'); await page.selectOption('#radio-profile', 'switch'); await page.selectOption('#radio-incoming', 'profile');
+    await page.fill('#radio-seed', 'coder'); await page.click('#radio-start');
+    await waitFor(async () => (await R()).on, 20000); await sleep(3000);
+    r = await R();
+    const s0 = r.state.stream[0];
+    check(s0.profile === 'switch' && s0.grown && s0.shape && s0.show === 'air', 'Live coder session: the first song grows as Live coder', JSON.stringify({ profile: s0.profile, grown: s0.grown, shape: s0.shape }));
+    check(r.state.recipe.growth === 1 && r.state.recipe.options.profile === 'switch', 'the recipe records the growth marker and the profile');
+    const pl = await page.innerText('.radio-profile-now');
+    check(/^Live coder · .+ · .+ · .+$/.test(pl.trim()), 'now playing shows the profile and the growth shape', pl);
+    let e = await ed();
+    check(!e.err && e.started, 'Live coder on air: no evaluation error', e.err.slice(0, 120));
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.floor(s0.bars * 0.45));
+    const prepared = await waitFor(async () => { const st = (await R()).state; return st.stream.length > 1 && !st.stream[1].growing; }, 60000);
+    r = await R();
+    const s1 = r.state.stream[1];
+    check(prepared && s1.grown && s1.show === 'hidden', 'the next Live coder song grows away from the page and is hidden', JSON.stringify(s1 && { grown: s1.grown, show: s1.show, growing: s1.growing }));
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), s1.start - s0.start + 2); await sleep(2500);
+    e = await ed(); const c1 = await code(), ob = await orbitsAhead();
+    check(!e.err && heads(c1, 1) > 0 && heads(c1, 2) === 0, 'during the transition the panel holds only the song on air', `song 1 lines ${heads(c1, 1)}, song 2 lines ${heads(c1, 2)}, ${e.err.slice(0, 80)}`);
+    check(ob.some(o => o >= 20) && ob.some(o => o < 20), 'the incoming song plays hidden on its own orbits', `orbits ${ob.join(',')}`);
+    const on1 = await waitFor(async () => (await R()).state.onAir === 1, 60000);
+    await sleep(1500);
+    e = await ed(); const c2 = await code();
+    check(on1 && !e.err && heads(c2, 2) > 0 && heads(c2, 1) === 0, 'the next song appears whole when it goes on air', `song 1 lines ${heads(c2, 1)}, song 2 lines ${heads(c2, 2)}`);
+    // the incoming song in the panel: the visible option
+    await page.selectOption('#radio-incoming', 'visible');
+    r = await R();
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.floor(r.state.stream[1].bars * 0.45));
+    await waitFor(async () => { const st = (await R()).state; return st.stream.length > 2 && !st.stream[2].growing; }, 60000);
+    r = await R();
+    const s2 = r.state.stream[2];
+    if (s2) {
+      await page.evaluate(b => globalThis.codingMiskRadio.seek(b), s2.start - r.state.stream[1].start + 2); await sleep(2500);
+      e = await ed(); const c3 = await code();
+      check(!e.err && c3.includes('// ==> ') && heads(c3, 3) > 0, 'with the incoming song visible both songs are in the panel', `${e.err.slice(0, 80)}`);
+    } else check(false, 'a third song prepared');
+    await page.selectOption('#radio-incoming', 'profile');
+    // replay: the same songs grow the same
+    const recipe = r.state.recipe;
+    await page.click('#radio-start'); await sleep(300);
+    await page.evaluate(rc => globalThis.codingMiskRadio.start({ recipe: rc }), recipe); await sleep(5000);
+    r = await R();
+    check(r.state.stream[0].id === s0.id && r.state.stream[0].grown && JSON.stringify(r.state.stream[0].shape) === JSON.stringify(s0.shape) && r.state.stream[0].bars === s0.bars, 'replay grows the same first song');
+    // a recipe saved before the growth marker: every song in blocks, as heard
+    const old = { ...recipe }; delete old.growth;
+    await page.click('#radio-start'); await sleep(300);
+    await page.evaluate(rc => globalThis.codingMiskRadio.start({ recipe: rc }), old); await sleep(4000);
+    r = await R(); e = await ed();
+    check(r.state.stream[0].id === s0.id && !r.state.stream[0].grown && r.state.stream[0].profile === 'classic' && !e.err, 'a recipe without the growth marker replays in blocks');
+    await page.click('#radio-start'); await sleep(300);
+    // the Custom profile: no comments, functions at the mixer
+    await page.selectOption('#radio-profile', 'custom'); await sleep(200);
+    if (await page.getAttribute('#custom-toggle', 'aria-expanded') !== 'true') await page.click('#custom-toggle');
+    await page.click('[data-custom-base="switch"]'); await sleep(100);
+    await page.selectOption('[data-custom="comments"]', 'none'); await sleep(100);
+    await page.selectOption('[data-custom="functions"]', 'mixer'); await sleep(100);
+    const sum = await page.innerText('.custom-summary');
+    await page.click('#custom-toggle'); await sleep(100);
+    check(await page.getAttribute('#custom-toggle', 'aria-expanded') === 'false' && await page.isHidden('#custom-body') && (await page.innerText('.custom-summary')).length > 10, 'the Custom section folds to a summary', sum);
+    await page.fill('#radio-seed', 'coder'); await page.click('#radio-start'); await sleep(6000);
+    r = await R(); e = await ed(); const c4 = await code();
+    check(r.state.recipe.options.custom && r.state.stream[0].grown && /Custom|Personalizzato/.test(await page.innerText('.radio-profile-now')) && !e.err, 'Custom profile: the songs grow with its controls, saved in the recipe');
+    check(!c4.includes('// ========== ') && !/\.orbit\(/.test(c4), 'Custom profile: no comments and the buses in the hidden mixer');
+    await page.click('#radio-start'); await sleep(300);
+    await page.selectOption('#radio-profile', 'artist'); await sleep(200);
+  }
+
   // history limit
   await page.evaluate(() => { const h = Array.from({ length: 50 }, (_, i) => ({ title: `old ${i}`, styles: ['jazz'], seed: 'x', n: i, at: new Date().toISOString(), song: null })); localStorage.setItem('coding-misk-radio-history', JSON.stringify(h)); });
   await page.reload(); await sleep(5000); await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await page.click('#radio-start'); await sleep(4000);

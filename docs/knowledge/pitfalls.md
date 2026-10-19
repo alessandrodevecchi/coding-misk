@@ -40,6 +40,9 @@ Mistakes that cost time before. Each line says what goes wrong and what to do. T
 - **Complexity 0 and source `patterns`** must keep giving the old songs. Saved sessions and fixtures depend on it.
 - **Snapshots of code.** `npm run snapshot:code` rewrites `tests/snapshots/code/`. Do it only for an intended change, with the reason in the commit. `tests/snapshots/code-before-ideas/` is never rewritten: it is the reference of `tools/check-ideas.cjs`.
 - **The Strudel catalog.** Any change to code the catalog reads makes `npm run check:knowledge` fail until `npm run catalog:strudel` runs again (several minutes).
+- **Window steps name their tracks.** `windowSong` prefixes every track a step names (`s3-bass`): add, remove, set, pattern, rack, and the grown songs' mute, solo, hide, reveal, comment, notes, variant, mask and clone. A new step field that names a track must be added there and in `stepRefs` (`src/live/air-code.js`), or it silently does nothing on air.
+- **Old recipes replay in blocks.** A recipe without `growth: 1` must never grow its songs (`growsOnAir`); it was heard in blocks. Do not drop the marker from new recipes.
+- **Two songs in one code.** Code that sits next to the song on air must not redeclare its constants, share its orbits or solo against it: use `apart()` in `src/live/air-code.js`.
 
 ## Browser checks
 

@@ -31,3 +31,7 @@ export const ADD_TO = svg('0 0 16 16', '<path d="M2.5 9.5v4h11v-4" fill="none" s
 export const VARY = svg('0 0 16 16', '<path d="M1.5 10.5c1.6-3.2 3.2-3.2 4.6 0s3 3.2 4.6 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12.8 1.8v4.4M10.6 4h4.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>', 'ico-vary');
 // two arrows that trade places (swap a part for another ready one, radio-variation)
 export const SWAP = svg('0 0 16 16', '<path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>', 'ico-swap');
+// a chevron pointing right (a section that folds: turned down when open)
+export const CHEVRON = svg('0 0 16 16', '<path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>', 'ico-chevron');
+// three sliders (a set of controls of one's own: the radio's Custom profile)
+export const SLIDERS = svg('0 0 16 16', '<path d="M2.5 4h11M2.5 8h11M2.5 12h11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5.5" cy="4" r="1.7" fill="var(--panel, #160f26)" stroke="currentColor" stroke-width="1.3"/><circle cx="10.5" cy="8" r="1.7" fill="var(--panel, #160f26)" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="12" r="1.7" fill="var(--panel, #160f26)" stroke="currentColor" stroke-width="1.3"/>', 'ico-sliders');

@@ -121,10 +121,11 @@ export const airControls = (profile, free = false) => resolveProfile(profile, { 
 // reference section on) and fills them, so the song keeps its planned length within a phrase. Free (an artist's
 // `growth.duration`): the growth takes the bars it needs before the written form, the song gets longer.
 // → the song (a grown song carries `crescendo` facts and `onAir`: { profile, from, free })
-export function growOnAir(song, { profile = 'classic', artist = null, into = null, styles = {}, phrase = 8 } = {}) {
+// controls: the radio's Custom profile (its own growth, duration and shape choices), else the profile's own on air
+export function growOnAir(song, { profile = 'classic', artist = null, into = null, styles = {}, phrase = 8, controls = null } = {}) {
   if (profile !== 'crescendo' && profile !== 'switch') return song;
-  const g = (artist && artist.growth) || {}, free = g.duration === 'free';
-  const C = airControls(profile, free);
+  const g = (artist && artist.growth) || {}, free = controls ? controls.duration === 'free' : g.duration === 'free';
+  const C = controls || airControls(profile, free);
   const base = growthRules(C, { styles });
   // the typed opening only after a cut or an interlude, where nothing else plays; never the metamorphosis on air
   const deny = { opening: !into || into === 'cut' || into === 'interlude' ? [] : ['typed'], development: ['metamorphosis'] };

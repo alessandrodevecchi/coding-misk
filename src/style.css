@@ -792,6 +792,26 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* radio: transitions and harmony (#23) */
 .radio-how { display: flex; flex-wrap: wrap; gap: 10px 16px; }
 .radio-how .ctrl { display: grid; gap: 4px; min-width: 160px; }
+/* radio: the profile of the song on air and the Custom profile (radio-profiles 4.5, 4.6) */
+.radio-profile-now { display: flex; align-items: center; gap: 6px; margin: 2px 0 4px; font: 12px/1.4 var(--mono); color: var(--a2); }
+.radio-profile-now .ico { width: 14px; height: 14px; flex: none; }
+.radio-custom { margin-top: 10px; display: grid; gap: 8px; }
+.curves-toggle.custom-toggle { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.custom-toggle .tw { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.custom-toggle .ico { width: 14px; height: 14px; flex: none; }
+.custom-toggle .ico-chevron { transition: transform .15s ease; }
+.custom-toggle[aria-expanded="true"] .ico-chevron { transform: rotate(90deg); }
+.custom-summary { min-width: 0; overflow-wrap: anywhere; }
+.custom-toggle[aria-expanded="true"] .custom-summary { display: none; }
+.custom-body { display: grid; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
+.custom-body[hidden] { display: none; }
+.custom-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px 14px; }
+.custom-grid .ctrl, .custom-row .ctrl { display: grid; gap: 4px; min-width: 0; }
+.custom-grid select, .custom-row select { max-width: 100%; }
+.custom-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.custom-row > .ctrl { max-width: 260px; }
+.custom-row .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+@media (max-width: 640px) { .custom-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 /* hardware theme: shuffle, repeat and mix are latching keys with a lamp that lights when on */
 :root[data-ui="hw"] .pb-mode::after { content: ""; position: absolute; top: 3px; right: 3px; width: 5px; height: 5px; border-radius: 50%; background: #2a2a2e; box-shadow: inset 0 1px 1px rgba(0,0,0,.8); }
 :root[data-ui="hw"] .pb-mode[aria-pressed="true"] { color: #ffb347; text-shadow: 0 0 6px #ff9a1f; border-color: #0d0d10; box-shadow: inset 0 1px 3px rgba(0,0,0,.55), 0 1px 0 #0d0d10; transform: translateY(1px); }

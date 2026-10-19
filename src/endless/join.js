@@ -47,8 +47,11 @@ export function windowSong(items) {
     const voice = song.tracks.find(tr => tr.type === 'voice');
     for (const s of [...(song.build || []), ...parts.steps]) {
       const step = { ...s, at: s.at + start };
-      for (const k of ['add', 'remove']) if (s[k] !== undefined) step[k] = Array.isArray(s[k]) ? s[k].map(ren) : ren(s[k]);
-      for (const k of ['set', 'pattern', 'rack', 'unrack']) if (s[k]) step[k] = { ...s[k], track: ren(s[k].track) };
+      // (a grown song, radio-profiles: its line marks, hidden and commented functions, notes, clones and masks name
+      // their track too; the director's own songs only add, remove, set, pattern and rack)
+      for (const k of ['add', 'remove', 'mute', 'unmute', 'solo', 'unsolo']) if (s[k] !== undefined) step[k] = Array.isArray(s[k]) ? s[k].map(ren) : ren(s[k]);
+      for (const k of ['set', 'pattern', 'rack', 'unrack', 'hide', 'reveal', 'comment', 'notes', 'variant', 'mask']) if (s[k]) step[k] = { ...s[k], track: ren(s[k].track) };
+      if (s.clone) step.clone = { ...s.clone, track: ren(s.clone.track), from: ren(s.clone.from) };
       if (s.say && voice) step.voice = ren(s.voice || voice.id);
       build.push(step);
     }

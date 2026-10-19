@@ -25,12 +25,12 @@ Each stage ends with its checks green before the next starts. "Verify" names the
 
 ## 4. Code on air (browser)
 
-- [ ] 4.1 Per-song controls in the window: `liveCode` per song, the shown code is the song on air (D7, D8); verify `node --no-warnings tools/check-radio.cjs` with a Live coder session (no evaluation errors, the panel holds only ids of the song on air) and screenshots
-- [ ] 4.2 Hidden tail: incoming and outgoing songs in full form on their own orbits, option `radio-incoming` with defaults by profile; verify `node tools/check-transitions.cjs` for mix, morph, echo, break, interlude and cut into and out of a Live coder song (no errors, below clipping, orbit count per window reported)
-- [ ] 4.3 Same events: shown plus hidden code against the full form of the window at every step of one transition; verify with a new case in `node tools/check-compact-code.cjs`
-- [ ] 4.4 Views on air: code of the moment with lanes, compact and song functions (no name clash with hidden songs), lit notes, line breaks, human typing with mistakes; verify `npm run check:functions`, `npm run check:typing`, `npm run check:live-code`, and a browser screenshot set of one Live coder song on air
-- [ ] 4.5 Console: Profile control, now playing profile and shape, strings in English and Italian, Guide card of the Radio; verify `node tools/check-steering.cjs` (control applies from the next song, recorded for replay) and `npm run check:guide`
-- [ ] 4.6 Custom profile in the radio console: same controls as Compose in a collapsible section with a summary, saved with the session and replayed; strings in English and Italian; screenshot desktop and phone
+- [x] 4.1 Per-song controls in the window: `liveCode` per song, the shown code is the song on air (D7, D8); verify `node --no-warnings tools/check-radio.cjs` with a Live coder session (no evaluation errors, the panel holds only ids of the song on air) and screenshots
+- [x] 4.2 Hidden tail: incoming and outgoing songs in full form on their own orbits, option `radio-incoming` with defaults by profile; verify `node tools/check-transitions.cjs` for mix, morph, echo, break, interlude and cut into and out of a Live coder song (no errors, below clipping, orbit count per window reported)
+- [x] 4.3 Same events: shown plus hidden code against the full form of the window at every step of one transition; verify with a new case in `node tools/check-compact-code.cjs`
+- [x] 4.4 Views on air: code of the moment with lanes, compact and song functions (no name clash with hidden songs), lit notes, line breaks, human typing with mistakes; verify `npm run check:functions`, `npm run check:typing`, `npm run check:live-code`, and a browser screenshot set of one Live coder song on air
+- [x] 4.5 Console: Profile control, now playing profile and shape, strings in English and Italian, Guide card of the Radio; verify `node tools/check-steering.cjs` (control applies from the next song, recorded for replay) and `npm run check:guide`
+- [x] 4.6 Custom profile in the radio console: same controls as Compose in a collapsible section with a summary, saved with the session and replayed; strings in English and Italian; screenshot desktop and phone
 
 ## 5. Commands as waypoints
 

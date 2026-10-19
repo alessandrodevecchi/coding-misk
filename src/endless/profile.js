@@ -2,7 +2,7 @@
 // One precedence rule, written once, used by the director, the radio, playlists and exports. Pure and seeded: weighted
 // draws use the stream `profile/<n>` of the session seed, separate from every other stream, so nothing else moves.
 import { stream } from './random.js';
-import { songProfile } from '../live/profiles.js';
+import { songProfile, resolveProfile } from '../live/profiles.js';
 
 // the profiles a radio song can play with (the ids of src/live/profiles.js PROFILES)
 export const RADIO_PROFILES = ['classic', 'crescendo', 'switch'];
@@ -50,3 +50,24 @@ export function savedSongProfile(song, { forced = null, player = 'classic' } = {
 
 // the Profile option of a recipe's options: a recipe saved before radio-profiles replays as Classic
 export const recipeProfile = o => (o && o.profile !== undefined ? o.profile : OLD_RECIPE_PROFILE);
+
+// ---------- the Custom profile of the radio (radio-profiles, owner decision 4) ----------
+// The radio console can also play every generated song with one combination of the Compose controls: { base, controls }
+// (the profile it started from, and every control). It is saved with the session (recipe options `custom`, with the
+// profile it amounts to as `profile`), so a replay plays it the same. Without a duration of its own it is fitted, as
+// on air (D6).
+export const RADIO_CHOICES = [...PROFILE_CHOICES, 'custom'];
+export const CUSTOM_DEFAULT = { base: 'switch', controls: {} };
+export function customControls(custom) {
+  const c = custom && typeof custom === 'object' ? custom : CUSTOM_DEFAULT, base = RADIO_PROFILES.includes(c.base) ? c.base : 'switch';
+  return resolveProfile(base, { duration: 'fitted', ...(c.controls && typeof c.controls === 'object' ? c.controls : {}) });
+}
+// the profile a combination of controls amounts to: blocks are Classic, the natural growth is the Live coder's, any
+// other growth is Crescendo's
+export const controlsProfile = C => (!C || C.build !== 'crescendo' ? 'classic' : C.growth === 'natural' ? 'switch' : 'crescendo');
+// the recipe options of the Profile control: a profile, or Custom with its controls
+export function profileOptions(choice, custom) {
+  if (choice !== 'custom') return { profile: PROFILE_CHOICES.includes(choice) ? choice : 'artist' };
+  const c = custom && typeof custom === 'object' ? JSON.parse(JSON.stringify(custom)) : { ...CUSTOM_DEFAULT };
+  return { profile: controlsProfile(customControls(c)), custom: c };
+}

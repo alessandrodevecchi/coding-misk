@@ -129,6 +129,64 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
     }, id);
     for (const r of res) { const ok = r.same && !r.err; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'}  ${id} Live coder in place, bar ${r.bar}${r.n ? ` (${r.n} events)` : ''}${r.err ? ` (${r.err})` : ''}`); }
   }
+  // radio-profiles 4.3: the radio's window song by song. At every step of one transition (and the bars around it), the
+  // events of the code evaluated (the song on air shown in its own view, its hidden tail, the other song hidden or
+  // visible in full form on its own orbits) are those of the full form of the window: every track of both songs in
+  // blocks, each song's lines played alone only within its own song. Orbits are left out: the hidden song moves them on
+  // purpose, and the orbits in use per step are reported. Cases: Live coder on air into a hidden Live coder song, the
+  // same with the incoming song visible, a Classic song on air into a hidden Live coder song
+  {
+    const fs = require('node:fs');
+    const styles = fs.readdirSync('styles').filter(f => f.endsWith('.json')).map(f => JSON.parse(fs.readFileSync(`styles/${f}`, 'utf8')));
+    const res = await page.evaluate(async styles => {
+      const [{ sessionItems, GROWTH_ON_AIR }, { windowSong }, { overlapOf, extraOf }, { airCode, windowPart, localSolo }, { airControls }, { compileSong }, { stateAt, buildSteps }, { useFns }, { resolveProfile }, { validateRecipe }] = await Promise.all(['/src/endless/items.js', '/src/endless/join.js', '/src/endless/transitions.js', '/src/live/air-code.js', '/src/endless/growth.js', '/src/song/compile.js', '/src/song/build.js', '/src/song/writer.js', '/src/live/profiles.js', '/src/endless/recipe.js'].map(u => import(u)));
+      const recipes = styles.filter(r => !validateRecipe(r).errors.length);
+      const e = document.querySelector('strudel-editor').editor;
+      const midiOf = n => { const m = String(n).match(/^([a-g])(#|b)?(-?\d)$/i); return m ? { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }[m[1].toLowerCase()] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (+m[3] + 1) * 12 : null; };
+      const orbits = new Set();
+      const haps = async (code, a, z) => {
+        // (a song with nothing playing yet compiles to no line at all)
+        if (!/^\s*[_S]?\$:/m.test(code)) return [];
+        await e.repl.evaluate(code, false);
+        if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
+        return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset()).map(h => { orbits.add(h.value.orbit); return JSON.stringify([+h.whole.begin.valueOf().toFixed(4), h.value.bank ? 0 : +h.duration.valueOf().toFixed(4), Object.fromEntries(Object.entries({ ...h.value, ...(typeof h.value.note === 'string' && midiOf(h.value.note) !== null ? { note: midiOf(h.value.note) } : {}) }).filter(([k, v]) => typeof v !== 'function' && k !== 'orbit' && !(k === 'velocity' && v === 1)).sort())]); });
+      };
+      const barsOf = s => s.sections.reduce((a, x) => a + x.bars, 0);
+      const opts = profile => ({ styles: ['berlin-techno'], chaos: 0.3, energy: 0.7, complexity: 0.5, talk: 0.5, transition: 'mix', harmony: 'compatible', profile });
+      const live = sessionItems(recipes, { seed: 'air-check', options: opts('switch'), changes: [], growth: GROWTH_ON_AIR }, 2);
+      const classic = sessionItems(recipes, { seed: 'air-check', options: opts('classic'), changes: [], growth: GROWTH_ON_AIR }, 1);
+      const out = [];
+      for (const [name, pair, show, ctlA] of [['Live coder into Live coder, hidden', live, 'hidden', airControls('switch')], ['Live coder into Live coder, visible', live, 'visible', airControls('switch')], ['Classic into Live coder, hidden', [classic[0], live[1]], 'hidden', resolveProfile('classic')]]) {
+        let start = 16;
+        const laid = pair.map((x, i) => { const it = { song: x.song, n: i + 1, start, transition: i ? undefined : (pair[0].entry.transition || { kind: 'mix', bars: 8 }) }; start += barsOf(x.song) + extraOf(it.transition) - overlapOf(it.transition); return it; });
+        const W = windowSong(laid), total = barsOf(W);
+        const songs = laid.map((x, i) => ({ n: x.n, prefix: `s${x.n}-`, start: x.start, song: x.song, title: x.song.title, ctl: i ? airControls('switch') : ctlA, show: i ? show : 'air' }));
+        const L = airCode(W, songs, { lang: () => 'en', cols: () => 64 }), parts = songs.map((_, k) => windowPart(W, songs, k));
+        const bars = [...new Set(buildSteps(L.build).map(s => s.at))].sort((a, b) => a - b);
+        const end = laid[0].start + barsOf(laid[0].song), from = laid[1].start - 8;
+        const pick = [...new Set([from, laid[1].start, ...bars.filter(b => b >= from && b < end + 4)])].filter(b => b < total).sort((a, b) => a - b);
+        let same = 0, steps = 0, err = '', perStep = [];
+        for (const b of pick) {
+          const z = Math.min(total, bars.find(x => x > b) ?? total, b + 8);
+          try {
+            orbits.clear();
+            const shown = L.codeAt(b);
+            if (show === 'hidden' && shown.includes(`// ========== ${laid[1].n} `)) { err = `bar ${b}: the hidden song is shown`; break; }
+            globalThis.miskBuses = L.buses; useFns(L.fns);
+            const w = (await haps(L.run(shown, b), b, z)).sort().join('\n'), used = orbits.size;
+            // the full form: each song's state at the bar in blocks (a song not on air plays alone only within itself)
+            let ref = [];
+            for (const [k, p] of parts.entries()) { const c = compileSong(stateAt(p, b).song); ref.push(...(await haps(k ? localSolo(c) : c, b, z))); }
+            steps++; if (w === ref.sort().join('\n')) same++; else if (!err) err = `bar ${b}: the events differ (${w.split('\n').length} against ${ref.length})`;
+            perStep.push(used);
+          } catch (x) { err = `bar ${b}: ${x.message}`; break; }
+        }
+        out.push({ name, steps, same, err, orbits: perStep.length ? Math.max(...perStep) : 0 });
+      }
+      return out;
+    }, styles);
+    for (const r of res) { const ok = !r.err && r.steps > 0 && r.same === r.steps; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'}  radio window, ${r.name}: ${r.same}/${r.steps} steps the same, at most ${r.orbits} orbits in use${r.err ? ` (${r.err})` : ''}`); }
+  }
   await browser.close();
   console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed');
   process.exit(failed ? 1 : 0);

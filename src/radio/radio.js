@@ -9,8 +9,13 @@ import { overlapOf, extraOf } from '../endless/transitions.js';
 import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, VARY_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
-import { sessionItems, recipeOptionsAt, howOf } from '../endless/items.js';
-import { PROFILE_CHOICES } from '../endless/profile.js';
+import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir } from '../endless/items.js';
+import { PROFILE_CHOICES, RADIO_CHOICES, CUSTOM_DEFAULT, customControls, profileOptions } from '../endless/profile.js';
+import { growOnAir, airControls } from '../endless/growth.js';
+import { resolveProfile, CONTROLS } from '../live/profiles.js';
+import { COMMENT_PRESETS } from '../song/comments.js';
+import { FUNCTION_PRESETS, FUNCTION_OPTIONS } from '../song/writer.js';
+import { OPENINGS, PACES, DEVELOPMENTS } from '../song/shapes.js';
 import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
 import { buildSteps, sayText } from '../song/build.js';
 import { QUIRKS } from '../endless/quirks.js';
@@ -18,7 +23,7 @@ import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } f
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE, GEAR, LOCK, VARY, SWAP } from '../icons.js';
+import { DICE, GEAR, LOCK, VARY, SWAP, CHEVRON, SLIDERS } from '../icons.js';
 import { SESSION_SOURCES } from '../material/index.js';
 
 const HISTORY = 50;
@@ -52,7 +57,12 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     harmony: ['artist', ...HARMONY_MODES].includes(saved.harmony) ? saved.harmony : 'artist',
     // profile (radio-profiles D3): as the artist and the style say, or one profile for every generated song; recorded
     // in the recipe, so a replay gives the same profiles (Settings keeps the default for new pages)
-    profile: PROFILE_CHOICES.includes(saved.profile) ? saved.profile : OPTION_DEFAULTS.profile,
+    profile: RADIO_CHOICES.includes(saved.profile) ? saved.profile : OPTION_DEFAULTS.profile,
+    // the Custom profile (radio-profiles 4.6): the Compose controls the console sets, { base, controls }
+    custom: saved.custom && typeof saved.custom === 'object' && saved.custom.controls ? saved.custom : JSON.parse(JSON.stringify(CUSTOM_DEFAULT)),
+    // the next song in the code panel (radio-profiles D7): as its profile says (Classic shown, grown songs hidden), or
+    // always hidden, or always shown. It changes what is shown, never the sound
+    incoming: ['profile', 'hidden', 'visible'].includes(saved.incoming) ? saved.incoming : 'profile',
     // material (material-generator): patterns as written, varied, composed, or mix (each style's choice). The console
     // picks it for the songs to come (radio-variation); Settings keeps the default a new page starts from
     materialDefault: SESSION_SOURCES.includes(saved.materialDefault) ? saved.materialDefault : SESSION_SOURCES.includes(saved.material) ? saved.material : 'mix',
@@ -83,7 +93,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const saveOpts = () => store.set('coding-misk-radio', opts);
   const artistOf = id => (id ? artists().find(a => a.id === id) || (opts.temp && opts.temp.id === id ? opts.temp : null) : null);
   // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
-  const current = () => { const a = artistOf(opts.artist), up = userPatterns(), how = { transition: opts.transition, harmony: opts.harmony, profile: opts.profile, ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}) };
+  const current = () => { const a = artistOf(opts.artist), up = userPatterns(), how = { transition: opts.transition, harmony: opts.harmony, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}) };
     // a compilation carries its setup and the artists it may use, so a replay draws the same songs
     if (opts.compilation !== 'off') return { compilation: { every: opts.compilation, setup: JSON.parse(JSON.stringify(opts.compSetup)), pool: JSON.parse(JSON.stringify(artists())), ...(Object.keys(opts.compLocks).length ? { locks: { ...opts.compLocks } } : {}) }, ...how };
     return a ? { artist: JSON.parse(JSON.stringify(a)), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how }; };
@@ -127,7 +137,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     S.lastOptions = o;
     return o;
   }
-  function generate() {
+  // async (prepareNext): a song that grows (radio-profiles D5) grows away from the page (player.grow) and the item
+  // carries the promise in `growing`; otherwise it grows here, at once (the first song, a skip)
+  function generate(async = false) {
     const n = S.stream.length, prev = S.stream[n - 1];
     // a frozen session (#38) plays its stored songs, never regenerated
     if (S.frozen) {
@@ -142,19 +154,54 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const { song, entry, plan, opts: used } = S.session.next(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw);
     // the director has just planned the transition from the song before: an interlude lengthens it,
     // an overlap starts this song before it ends
-    if (prev && !prev.cut) prev.bars += extraOf(prev.entry.transition);
-    const item = { song, entry, n, start: prev ? prev.start + prev.bars - (prev.cut ? 0 : overlapOf(prev.entry.transition)) : 0, bars: barsOf(song), base: { song, plan, opts: used }, plan, commands: [] };
+    if (prev && !prev.cut) { prev.extra = extraOf(prev.entry.transition); prev.bars += prev.extra; }
+    const item = { song, entry, n, start: prev ? prev.start + prev.bars - (prev.cut ? 0 : overlapOf(prev.entry.transition)) : 0, bars: barsOf(song), base: { song, plan, opts: used }, plan, commands: [], plain: song };
     if (comp) item.comp = segmentAt(S.recipe.seed, n, comp, recipes, comp.pool || []);
+    // a Crescendo or Live coder song grows on air (radio-profiles D5), with the Custom controls when the session has
+    // them; a recipe saved before the radio grew its songs (no growth marker) plays every song in blocks, as heard
+    if (raw.custom) item.custom = raw.custom;
+    if (growsOnAir(S.recipe) && entry.profile) item.growCtx = { profile: entry.profile, artist: used.artist || null, into: prev && prev.entry.transition ? prev.entry.transition.kind : null, styles: shapeStyles(), phrase: plan.phrase, controls: raw.custom ? customControls(raw.custom) : null };
     S.stream.push(item);
     // a replayed session steers its songs the same way, before they play
     const recorded = (S.recipe.steering || []).filter(c => c.song === n);
-    if (S.replay && recorded.length) { item.commands = recorded.map(({ song: _, ...c }) => c); resteer(item); }
+    if (S.replay && recorded.length) { item.commands = recorded.map(({ song: _, ...c }) => c); resteer(item, { async }); }
+    else if (item.growCtx) grow(item, song, { async });
     return item;
   }
+  // the style recipes by id, for the growth shapes
+  let shapeCache = null;
+  const shapeStyles = () => shapeCache || (shapeCache = Object.fromEntries(recipes.map(r => [r.id, r])));
+  // an item's song grown from `song` (its director song, or the song as steered); a newer growth of the same item wins
+  function grow(item, song, { async = false } = {}) {
+    const token = item.growToken = (item.growToken || 0) + 1, ctx = item.growCtx;
+    const done = g => { if (item.growToken !== token) return; delete item.growing; setSong(item, g); };
+    if (!async || !player.grow) { done(growOnAir(song, ctx)); return; }
+    item.growing = player.grow(song, ctx).then(done, () => done(growOnAir(song, ctx)));
+    item.growFrom = song;
+  }
+  // a song still growing away from the page when it is needed now: it grows here
+  function growNow(item) { if (item && item.growing) grow(item, item.growFrom); }
+  // the song an item plays; its bars move the songs after it
+  function setSong(item, song) {
+    item.song = song; item.curves = null;
+    const bars = barsOf(song) + (item.cut ? 0 : item.extra || 0);
+    if (bars !== item.bars && !item.cut) { item.bars = bars; const i = S ? S.stream.indexOf(item) : -1; if (i >= 0) relayoutFrom(i); }
+  }
+  // the song to save or open in Compose: a grown song as the director wrote it (steered), with the profile it played
+  // with, so Compose grows it with its own controls (D1)
+  const songOut = item => (item && item.song && item.song.onAir ? { ...(item.plain || item.song), profile: item.song.onAir.profile } : item && item.song);
+  // the window and its songs, each with its own controls (radio-profiles D7, D8): the song on air in its profile's view,
+  // the next one shown (Classic, as before) or hidden (a grown song) as the incoming option says
   function windowPlayable() {
     const items = S.stream.slice(S.onAir, S.onAir + 2);
-    return player.makePlayable(windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut }))));
+    const W = windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut })));
+    return player.makePlayable(W, items.map((x, i) => ({ n: x.n + 1, prefix: `s${x.n + 1}-`, start: x.start, song: x.song, title: x.song.title, profile: profileOf(x), custom: !!x.custom, ctl: controlsOf(x), show: i === 0 ? 'air' : showOf(x) })));
   }
+  // the profile a song plays with: Crescendo or Live coder once grown, else Classic (blocks)
+  const profileOf = x => (x.song && x.song.onAir ? x.song.onAir.profile : 'classic');
+  // its controls: the Custom ones, else the profile's own on air (owner decision 4), else Classic
+  const controlsOf = x => (x.custom ? customControls(x.custom) : x.song && x.song.onAir ? airControls(x.song.onAir.profile, x.song.onAir.free) : resolveProfile('classic'));
+  const showOf = x => (opts.incoming !== 'profile' ? opts.incoming : profileOf(x) === 'classic' ? 'visible' : 'hidden');
   // lead (#29): { song, from } a song from Compose or the Songs tab played first (song 0, from bar "from"); the
   // radio continues after it. A recipe with a lead replays it.
   // limit and onEnd (#38): a saved session plays that many songs, then hands back; frozen: its stored songs
@@ -163,7 +210,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const s = recipe ? recipe.seed : (seed || seedField || undefined);
     const L = recipe ? recipe.lead : lead, le = L ? leadEntry(L.song) : null;
     const session = createSession(recipes, s, le ? { lead: le } : {});
-    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: current(), changes: [], ...(L ? { lead: { song: clone(L.song), from: L.from || 0 } } : {}) }, lastOptions: null, lastCard: 0 };
+    // a new session records the growth marker (radio-profiles stage 4): its Crescendo and Live coder songs grow on air,
+    // and its replays grow them the same; a recipe saved before has none and replays in blocks
+    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: current(), changes: [], growth: GROWTH_ON_AIR, ...(L ? { lead: { song: clone(L.song), from: L.from || 0 } } : {}) }, lastOptions: null, lastCard: 0 };
     S.recipe.seed = session.seed;
     if (limit) { S.limit = limit; S.onEnd = onEnd; }
     if (frozen) { S.frozen = frozen; S.replay = true; generate(); }
@@ -234,7 +283,11 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (S.stream.length > S.onAir + 1 || S.pending || cyc < cur.start + cur.bars * 0.4 || (S.limit && S.stream.length >= S.limit)) return;
     S.pending = true;
     const mine = S;
-    idle(() => { if (S !== mine) return; generate(); S.pending = false; player.swap(windowPlayable()); render(); });
+    idle(() => {
+      if (S !== mine) return;
+      const it = generate(true), ready = () => { if (S !== mine) return; S.pending = false; player.swap(windowPlayable()); render(); };
+      if (it && it.growing) it.growing.then(ready); else ready();
+    });
   }
   // called by the player every frame while the radio plays
   function tick(cyc) {
@@ -244,6 +297,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (cyc >= cur.start + cur.bars) {
       if (S.limit && S.onAir + 1 >= S.limit) return endLimited();
       if (S.stream.length <= S.onAir + 1 && !generate()) return endLimited();
+      // (a song still growing away from the page grows here: it goes on air now)
+      growNow(S.stream[S.onAir + 1]);
       S.onAir++;
       if (!S.limit) remember(S.stream[S.onAir]);
       player.swap(windowPlayable());
@@ -256,6 +311,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (S.limit && S.onAir + 1 >= S.limit) return endLimited();
     const cyc = player.now(), cur = S.stream[S.onAir], cut = Math.floor(cyc) + 1;
     if (S.stream.length <= S.onAir + 1) generate();
+    growNow(S.stream[S.onAir + 1]);
     cur.bars = Math.max(1, cut - cur.start); cur.cut = true;
     relayout();
     S.onAir++;
@@ -314,12 +370,14 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
 
   // ---------- steering (#24) ----------
   // the song of an item rebuilt from its original plus every command still standing
-  function resteer(item) {
+  // (a grown song grows again from the song as steered, away from the page when async: the window swaps when it is
+  // ready; steering a grown song with waypoints that keep its past is radio-profiles D9, stage 5)
+  function resteer(item, { async = false, then = null } = {}) {
     const r = steerSong({ ...item.base, commands: item.commands, seed: S.recipe.seed, n: item.n });
-    const extra = item.cut ? 0 : extraOf(item.entry.transition);
-    item.song = r.song; item.plan = r.plan; item.opts = r.opts; item.curves = null;
-    const bars = barsOf(r.song) + extra;
-    if (bars !== item.bars && !item.cut) { item.bars = bars; const i = S.stream.indexOf(item); if (i >= 0) relayoutFrom(i); }
+    item.plan = r.plan; item.opts = r.opts; item.plain = r.song;
+    if (!item.growCtx) { setSong(item, r.song); return; }
+    grow(item, r.song, { async });
+    if (item.growing && then) item.growing.then(() => { if (S && S.stream.includes(item)) then(); });
   }
   function relayoutFrom(i) {
     for (let k = i + 1; k < S.stream.length; k++) { const p = S.stream[k - 1]; S.stream[k].start = p.start + p.bars - (p.cut ? 0 : overlapOf(p.entry.transition)); }
@@ -345,7 +403,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     item.commands = item.commands.filter(x => !same(x));
     item.commands.push(cmd);
     S.recipe.steering = [...(S.recipe.steering || []).filter(x => !(x.song === item.n && same(x))), { song: item.n, ...cmd }];
-    resteer(item);
+    resteer(item, { async: true, then: () => { keepHistory(item); player.swap(windowPlayable()); renderNow(); } });
     keepHistory(item);
     // the whole session: energy, complexity and voice also move the sliders for the next songs
     if (opts.scope === 'session' && !opts.artist) {
@@ -364,7 +422,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const drop = x => x.id === id || (c.kind === 'extend' && x.kind === 'curve' && x.id > id && x.at > relNow() && x.d >= c.ins);
     item.commands = item.commands.filter(x => !drop(x));
     S.recipe.steering = (S.recipe.steering || []).filter(x => !(x.song === item.n && drop(x)));
-    resteer(item);
+    resteer(item, { async: true, then: () => { keepHistory(item); player.swap(windowPlayable()); renderNow(); } });
     keepHistory(item);
     player.swap(windowPlayable());
     renderNow();
@@ -372,7 +430,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // the history keeps the song as steered, so saving it from there keeps the listener's changes
   function keepHistory(item) {
     const h = history.find(x => x.n === item.n && x.seed === S.recipe.seed);
-    if (h) { h.song = item.song; h.recipe = clone(S.recipe); try { store.set('coding-misk-radio-history', history); } catch (e) {} }
+    if (h) { h.song = songOut(item); h.recipe = clone(S.recipe); try { store.set('coding-misk-radio-history', history); } catch (e) {} }
   }
   function syncSliders() {
     for (const k of ['energy', 'complexity', 'talk']) { const el = root.querySelector(`#radio-${k}`); if (el) { el.value = opts[k]; el.closest('.ctrl').querySelector('output').textContent = fmt(opts[k]); } }
@@ -389,6 +447,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const cur = S.stream[S.onAir];
     if (bar < cur.start + cur.bars) return false;
     if (S.stream.length <= S.onAir + 1) generate();
+    growNow(S.stream[S.onAir + 1]);
     cur.bars = bar - cur.start; cur.cut = true;
     relayout();
     S.onAir++;
@@ -413,7 +472,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   function remember(item) {
     if (recS && recS.list.length && recS.list[recS.list.length - 1].title !== item.song.title) recS.list.push(listEntry(item));
-    history.unshift({ title: item.song.title, styles: item.entry.styles, seed: S.recipe.seed, recipe: clone(S.recipe), n: item.n, at: new Date().toISOString(), song: item.song, entry: item.entry });
+    history.unshift({ title: item.song.title, styles: item.entry.styles, seed: S.recipe.seed, recipe: clone(S.recipe), n: item.n, at: new Date().toISOString(), song: songOut(item), entry: item.entry });
     history = history.slice(0, HISTORY);
     try { store.set('coding-misk-radio-history', history); } catch (e) { history = history.slice(0, 20); try { store.set('coding-misk-radio-history', history); } catch (e2) {} }
   }
@@ -583,6 +642,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       ${e.artist ? `<div class="radio-artist">${(() => { const a = artistOf(e.artist.id); return a ? `<img class="portrait tiny" src="${face(a)}" alt="">` : ''; })()}<span>${esc(e.artist.name)}</span>${e.artist.quirks && e.artist.quirks.length ? `<span class="muted small">· ${esc(e.artist.quirks.map(q => tx(QUIRKS[q] || { en: q })).join(', '))}</span>` : ''}</div>` : ''}
       <h3 class="radio-title">${esc(song.title)}</h3>
       <div class="radio-meta">${esc(e.key)} · ${e.bpm} BPM · ${esc(e.meter)}${e.shape ? ` · ${esc(t('shape_' + e.shape))}` : ''}</div>
+      <div class="radio-profile-now" data-profile-now="${esc(profileOf(item))}" title="${esc(t('radioProfileNowTip'))}">${profileLine(item)}</div>
       <div class="radio-parts">${esc(e.lead ? t('radioLeadParts', { styles: opts.styles.map(styleName).join(', ') }) : partsText(e))}</div>
       ${item.plan ? curvePanel(item, rel, `${sec.name} · ${t('radioBar', { n: Math.floor(rel) + 1, total: item.bars })}${item.plan.extended ? ` · ${t('radioExtended', { t: secs(item.plan.extended * extendSeconds(item.plan)) })}` : ''}`) : `<div class="radio-pos">${e.lead ? '' : curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>`}
       <div class="lbl">${esc(t('radioComing'))}</div>
@@ -614,6 +674,53 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   function editSetup(fn) { const S0 = JSON.parse(JSON.stringify({ ...SETUP_DEFAULT, ...opts.compSetup })); fn(S0); opts.compSetup = S0; opts.compPreset = 'custom'; saveOpts(); render(); }
   const toggleIn = (list, all, x) => { const cur = list || []; const next = cur.includes(x) ? cur.filter(y => y !== x) : [...cur, x]; return next.length === all.length ? null : next.length ? next : cur; };
+
+  // ---------- profile of the song on air and the Custom profile (radio-profiles D13, 4.6) ----------
+  // "Live coder · full kick · fast · masks": the profile, and the growth shape of a Live coder song
+  function profileLine(item) {
+    const p = profileOf(item), sh = item.song && item.song.crescendo && item.song.crescendo.shape;
+    const parts = [item.custom ? `${t('radioCustomProfile')} · ${t(`profile:${p}`)}` : t(`profile:${p}`)];
+    if (sh && sh.opening) parts.push(t(`opening:${sh.opening}`), t(`pace:${sh.pace}`), t(`development:${sh.development}`));
+    return `${item.custom ? SLIDERS : ''}<span>${esc(parts.join(' · '))}</span>`;
+  }
+  let customOpen = store.get('coding-misk-radio-custom-open', true) !== false;
+  const COMMENT_KEYS = ['tracks', 'notes', 'steps', 'voice'];
+  // what the Custom controls amount to, in one line (the section folded)
+  function customSummary(C) {
+    const grow = C.build === 'crescendo', natural = grow && C.growth === 'natural';
+    return [grow ? t(`growth:${C.growth}`) : t('liveBlocks'), natural ? t(`dur:${C.duration}`) : '', grow ? t({ now: 'liveCodeNow', compact: 'liveCodeCompact', track: 'liveCodeTrack', sections: 'liveCodeSections' }[C.view]) : '',
+      t(`comments:${C.comments}`), `${t('fnsLbl')}: ${t(`fns:${C.functions}`)}`, C.typist === 'human' ? t('liveHuman') : ''].filter(Boolean).join(' · ');
+  }
+  // the same controls as Compose's live build panel, for every generated song from the next one
+  function customPanel() {
+    const C = customControls(opts.custom), grow = C.build === 'crescendo', natural = grow && C.growth === 'natural';
+    const sel = (k, values, label, hint, lab) => `<label class="ctrl" title="${esc(t(hint))}"><span class="lbl">${esc(t(label))}</span><select data-custom="${k}" data-no-knob>${values.map(v => `<option value="${v}"${String(C[k]) === String(v) ? ' selected' : ''}${v === 'custom' ? ' disabled' : ''}>${esc(lab(v))}</option>`).join('')}</select></label>`;
+    const chip = (k, on, label, hint, disabled = false) => `<button class="chip small" data-custom-chip="${k}" aria-pressed="${!!on}" title="${esc(t(hint))}"${disabled ? ' disabled' : ''}>${esc(t(label))}</button>`;
+    const shape = part => sel(part, ['auto', ...({ opening: OPENINGS, pace: PACES, development: DEVELOPMENTS.filter(d => d !== 'metamorphosis') }[part])], `${part}Lbl`, `${part}Hint`, v => (v === 'auto' ? t('shapeAuto') : t(`${part}:${v}`)));
+    return `<div class="radio-custom" id="radio-custom">
+      <button class="curves-toggle custom-toggle" id="custom-toggle" aria-expanded="${customOpen}" aria-controls="custom-body" title="${esc(t('radioCustomTip'))}"><span class="tw">${CHEVRON}${SLIDERS}<span>${esc(t('radioCustomTitle'))}</span></span><span class="custom-summary">${esc(customSummary(C))}</span></button>
+      <div class="custom-body" id="custom-body" ${customOpen ? '' : 'hidden'}>
+        <div class="comp-line"><span class="lbl">${esc(t('radioCustomFrom'))}</span>${PROFILE_CHOICES.filter(k => k !== 'artist').map(k => `<button class="chip small" data-custom-base="${k}" aria-pressed="${opts.custom.base === k && !Object.keys(opts.custom.controls || {}).length}" title="${esc(t(`profileHint:${k}`))}">${esc(t(`profile:${k}`))}</button>`).join('')}</div>
+        <div class="custom-grid">
+          ${sel('build', ['blocks', 'crescendo'], 'liveStyle', 'liveStyleHint', v => t(v === 'blocks' ? 'liveBlocks' : 'liveCrescendo'))}
+          ${grow ? sel('growth', CONTROLS.growth, 'growthLbl', 'growthHint', v => t(`growth:${v}`)) : ''}
+          ${natural ? sel('duration', CONTROLS.duration, 'durLbl', 'durHint', v => t(`dur:${v}`)) : ''}
+          ${natural ? shape('opening') + shape('pace') + shape('development') : ''}
+          ${grow ? sel('view', CONTROLS.view, 'liveCodeView', 'liveCompactHint', v => t({ now: 'liveCodeNow', compact: 'liveCodeCompact', track: 'liveCodeTrack', sections: 'liveCodeSections' }[v])) : ''}
+          ${grow ? sel('gen', CONTROLS.gen, 'liveGen', 'liveGenHint', v => t(v === 'standard' ? 'liveGenStandard' : 'liveGenIdiomatic')) : ''}
+        </div>
+        <div class="custom-row">${sel('comments', [...Object.keys(COMMENT_PRESETS), ...(C.comments === 'custom' ? ['custom'] : [])], 'commentsLbl', 'commentsHint', v => t(`comments:${v}`))}<div class="chips">${COMMENT_KEYS.map(k => chip(k, C[k] !== false, `cOpt:${k}`, `cOptHint:${k}`)).join('')}</div></div>
+        <div class="custom-row">${sel('functions', [...Object.keys(FUNCTION_PRESETS), ...(C.functions === 'custom' ? ['custom'] : [])], 'fnsLbl', 'fnsHint', v => t(`fns:${v}`))}<div class="chips">${FUNCTION_OPTIONS.map(k => chip(k, C[k], `fOpt:${k}`, `fOptHint:${k}`)).join('')}</div></div>
+        <div class="custom-row"><span class="lbl">${esc(t('liveOptions'))}</span><div class="chips">${chip('title', C.title, 'liveTitle', 'liveTitleHint')}${chip('highlights', C.highlights, 'liveHl', 'liveHlHint')}${chip('wrap', C.wrap, 'liveWrap', 'liveWrapHint')}${chip('typist', C.typist === 'human', 'liveHuman', 'liveHumanHint')}${chip('mistakes', C.mistakes !== 'off', 'liveMistakes', 'liveMistakesHint', C.typist !== 'human')}${grow ? chip('narrated', C.narrated, 'liveNarrated', 'liveNarratedHint') : ''}</div></div>
+        <p class="hint muted small">${esc(t('radioCustomNext'))}</p>
+      </div>
+    </div>`;
+  }
+  // one Custom control changed: kept with the others, for the songs from the next one
+  function setCustom(changes) {
+    opts.custom = { base: opts.custom.base, controls: { ...(opts.custom.controls || {}), ...changes } };
+    saveOpts(); render();
+  }
 
   function render() {
     const on = !!S;
@@ -659,7 +766,10 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         <div class="radio-how">
           <label class="ctrl" ${tip('tipTransition')}><span class="lbl">${esc(t('radioTransition'))}</span><select id="radio-transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => `<option value="${k}"${opts.transition === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtist' : `tx:${k}`))}</option>`).join('')}</select></label>
           <label class="ctrl" ${tip('tipHarmony')}><span class="lbl">${esc(t('radioHarmony'))}</span><select id="radio-harmony" data-no-knob>${['artist', ...HARMONY_MODES].map(k => `<option value="${k}"${opts.harmony === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtist' : `harmony:${k}`))}</option>`).join('')}</select></label>
+          <label class="ctrl" ${tip('radioProfileTip')}><span class="lbl">${esc(t('radioProfile'))}</span><select id="radio-profile" data-no-knob>${RADIO_CHOICES.map(k => `<option value="${k}"${opts.profile === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtistStyle' : k === 'custom' ? 'radioCustomProfile' : `profile:${k}`))}</option>`).join('')}</select></label>
+          <label class="ctrl" ${tip('radioIncomingTip')}><span class="lbl">${esc(t('radioIncoming'))}</span><select id="radio-incoming" data-no-knob>${['profile', 'hidden', 'visible'].map(k => `<option value="${k}"${opts.incoming === k ? ' selected' : ''}>${esc(t(`incoming:${k}`))}</option>`).join('')}</select></label>
         </div>
+        ${opts.profile === 'custom' ? customPanel() : ''}
         <p class="hint muted">${esc(t('radioNextHint'))}</p>
         <div class="radio-seed">
           <div class="ctrl grow" ${tip('tipSeed')}><label class="lbl" for="radio-seed">${esc(t('radioSeed'))}</label><input id="radio-seed" type="text" maxlength="40" autocomplete="off" placeholder="${esc(t('radioSeedAuto'))}" value="${esc(on ? S.recipe.seed : seedField)}" ${on ? 'readonly' : ''}></div>
@@ -726,8 +836,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       if (recipe) start({ recipe });
       return;
     }
-    if (b.id === 'radio-save' && S) return player.saveSong(S.stream[S.onAir].song);
-    if (b.id === 'radio-open' && S) { const sg = S.stream[S.onAir].song; stop(); return player.openSong(sg); }
+    if (b.id === 'radio-save' && S) return player.saveSong(songOut(S.stream[S.onAir]));
+    if (b.id === 'radio-open' && S) { const sg = songOut(S.stream[S.onAir]); stop(); return player.openSong(sg); }
     if (b.dataset.histSave) return player.saveSong(history[+b.dataset.histSave].song);
     if (b.dataset.histOpen) { const sg = history[+b.dataset.histOpen].song; stop(); return player.openSong(sg); }
     if (b.dataset.artist !== undefined) return pickArtist(b.dataset.artist);
@@ -767,6 +877,14 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.plOk !== undefined) { const sel = b.parentNode.querySelector('select'); if (pendingSession) player.addSession(sel.value || null, pendingSession); pendingSession = null; b.parentNode.remove(); return; }
     if (b.dataset.unlock) { delete opts.compLocks[b.dataset.unlock]; saveOpts(); render(); return toast(t('compKnobBack')); }
     if (b.dataset.curveReset) return command({ kind: 'curve-reset', curve: b.dataset.curveReset });
+    if (b.id === 'custom-toggle') { customOpen = !customOpen; try { store.set('coding-misk-radio-custom-open', customOpen); } catch (err) {} return render(); }
+    if (b.dataset.customBase) { opts.custom = { base: b.dataset.customBase, controls: {} }; saveOpts(); return render(); }
+    if (b.dataset.customChip) {
+      const k = b.dataset.customChip, C = customControls(opts.custom);
+      if (k === 'typist') return setCustom({ typist: C.typist === 'human' ? 'exact' : 'human' });
+      if (k === 'mistakes') return setCustom({ mistakes: C.mistakes === 'off' ? 'on' : 'off' });
+      return setCustom({ [k]: COMMENT_KEYS.includes(k) ? C[k] === false : !C[k] });
+    }
     if (b.id === 'curves-toggle') { detailsOpen = !detailsOpen; try { store.set('coding-misk-radio-details', detailsOpen); } catch (err) {} return renderNow(); }
     if (b.dataset.style) {
       if (opts.artist) opts.artist = null;
@@ -833,6 +951,15 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (e.target.id === 'comp-preset') { const k = e.target.value, src = PRESETS[k] || userPresets()[k]; if (src) { opts.compSetup = JSON.parse(JSON.stringify(src)); opts.compPreset = k; saveOpts(); render(); } }
     if (e.target.dataset.compMin || e.target.dataset.compMax) { const k = e.target.dataset.compMin || e.target.dataset.compMax, lo = e.target.dataset.compMin ? +e.target.value : null, hi = e.target.dataset.compMax ? +e.target.value : null; editSetup(S0 => { const r = (S0.ranges && S0.ranges[k]) ? S0.ranges[k].slice() : SENSIBLE[k].slice(); if (lo !== null) r[0] = Math.min(lo, r[1]); if (hi !== null) r[1] = Math.max(hi, r[0]); S0.ranges = { ...(S0.ranges || {}), [k]: r }; }); }
     if (e.target.id === 'radio-harmony') { opts.harmony = e.target.value; saveOpts(); }
+    // the Profile control applies from the next song prepared; the incoming option changes the panel at once
+    if (e.target.id === 'radio-profile' && RADIO_CHOICES.includes(e.target.value)) { opts.profile = e.target.value; saveOpts(); render(); }
+    if (e.target.id === 'radio-incoming') { opts.incoming = e.target.value; saveOpts(); if (S && S.paused === undefined) player.swap(windowPlayable()); }
+    if (e.target.dataset.custom) {
+      const k = e.target.dataset.custom, v = e.target.value;
+      if (k === 'comments' && COMMENT_PRESETS[v]) setCustom({ ...COMMENT_PRESETS[v] });
+      else if (k === 'functions' && FUNCTION_PRESETS[v]) setCustom({ ...FUNCTION_PRESETS[v] });
+      else if (CONTROLS[k] && CONTROLS[k].map(String).includes(v)) setCustom({ [k]: CONTROLS[k].find(x => String(x) === v) });
+    }
   });
   root.addEventListener('input', e => {
     const k = e.target.dataset.opt;
@@ -871,7 +998,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },
     get on() { return !!S; },
-    get state() { return S && { paused: S.paused, seed: S.recipe.seed, recipe: clone(S.recipe), onAir: S.onAir, stream: S.stream.map(x => ({ n: x.n, start: x.start, bars: x.bars, title: x.song.title, id: x.song.id, transition: x.entry.transition || null, knobs: x.base ? Object.fromEntries(KNOBS.map(k => [k, x.base.opts[k]])) : null })), transition: S.stream[S.onAir].entry.transition || null }; },
+    get state() { return S && { paused: S.paused, seed: S.recipe.seed, recipe: clone(S.recipe), onAir: S.onAir, stream: S.stream.map(x => ({ n: x.n, start: x.start, bars: x.bars, title: x.song.title, id: x.song.id, transition: x.entry.transition || null, profile: profileOf(x), grown: !!(x.song && x.song.onAir), growing: !!x.growing, show: x === S.stream[S.onAir] ? 'air' : showOf(x), shape: x.song && x.song.crescendo && x.song.crescendo.shape ? { ...x.song.crescendo.shape } : null, knobs: x.base ? Object.fromEntries(KNOBS.map(k => [k, x.base.opts[k]])) : null })), transition: S.stream[S.onAir].entry.transition || null }; },
     get history() { return history; },
     get options() { return current(); },
     // defaults the settings page shows and changes (#31)
