@@ -37,7 +37,7 @@ How each field steers the director:
 
 Quirks: `two-drops`, `long-breaks`, `no-guitars`, `texture-first`, `hard-endings`, `talks-a-lot`, `slow-builds`.
 
-What not to write in an artist: real names of people or brands in `name`, `bio` or `inspiredBy` (those references are kept privately by the owner; ask first), anything about where the music is published, and fixed values where a range works. `inspiredBy` should be a scene, a place or a mood.
+What not to write in an artist: real names of people or brands in `name` or `bio` (those references are kept privately by the owner; ask first). `inspiredBy` may name a real artist as a genre reference, as early built-in artists do (for example `horizon`), anything about where the music is published, and fixed values where a range works. `inspiredBy` should be a scene, a place or a mood.
 
 Random artists come from a seed: a name, a portrait, a short bio, one to three styles of one genre, knob ranges. Keep saves one among the user's artists.
 
