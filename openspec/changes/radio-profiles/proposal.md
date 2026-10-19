@@ -1,29 +1,33 @@
 ## Why
 
-Compose now has performance profiles (Classic, Crescendo, Switch), several growths (small steps, gradual, natural like a live coder with waypoints), code views, technical functions, comments and lit notes (#64). The radio still builds every song in blocks. This change brings it all to the radio, written before the Compose updates so both stay coherent. It replaces the earlier plan `crescendo-radio`, which only chose between blocks and crescendo.
+The radio still builds every song in blocks. Since this change was put on hold (2026-10-16), Compose gained the Live coder growth with growth shapes (openings, paces, developments, free or fitted duration, typing that waits), the code of the moment with section lanes in the hidden mixer, compact technical functions with library and song functions, human typing with mistakes and pasting rules, the voice instrument and the poetic narrator. The radio gained the compilation, Continue in radio, sessions in playlists, the fast export, Vary, Swap and the material source in the console. `radio-variation` task 5.1 waits for this change.
+
+The owner raised three questions this rewrite answers: how profiles work when saved songs play in a stream, how a session can be "only Live coder" when artists carry profile weights, and which source wins when several name a profile.
 
 ## What Changes
 
-- **Artists choose a profile.** Artist field `profiles` with weights (`{ "classic": 3, "switch": 1 }`) plus the details of their growth (spacing, pauses, detours, how songs start, endings, narration). Existing artists stay Classic, so their sessions sound the same. Random artists draw profiles too. A new built-in artist made for Switch. The listener may force a profile in the radio settings.
-- **The three growths in the radio**, with the growth duration fitted to the song's planned length by default; an artist trait may make it free.
-- **Steering and curves as waypoints.** A command (more energy, darker, add the bass) or a curve point becomes the next waypoint: the song reaches it with small moves from the code on air. "End" leads to a last waypoint (the song's ending), not a cut.
-- **Chooser in the radio.** The radio's chooser is the director plus the listener's commands; the interface leaves room for a decision model later.
-- **The incoming song, like a DJ.** During a transition only the song on air shows in the code; the next song plays underneath from code that is evaluated but not shown, and appears whole when it goes on air. An option keeps today's behaviour (both songs visible): visible by default for Classic, hidden for the others.
-- **Mixer per song.** With technical functions at the mixer, the song on air uses the hidden mixer; the incoming song carries its levels in full on separate buses, so the two never clash.
-- **Code on air.** Code views, comments (voice code hidden for Switch), technical functions, typing and lit notes work on the song on air.
-- **Repeatable and exportable.** Sessions record profiles, waypoints and commands, and replay identically; `DIRECTOR_VERSION` goes up. Compilations play saved songs with their own profile. Recording, audio and video export of sessions work, with a speed measure on a one-hour session.
+- **One resolution rule for the profile of every radio song.** Generated songs: the session's Profile control, then the compilation setup, then the artist's weights, then the style's declared profile, then Classic. Saved songs (song 0, frozen sessions, the playlist Mix): the song's own profile, then the session's forced profile, then the player default. Draws use their own seeded stream, so nothing else moves.
+- **A session-level Profile control** next to Transitions and Harmony: "as the artist" (default) or one profile for every generated song. "Only Live coder" is this control set to Live coder. It overrides artist and style weights; it never filters artists out.
+- **Artists and compilations name profiles.** Artist fields `profiles` (weights) and `growth` (duration and shape weights). Random artists draw them. A new built-in artist made for the Live coder. The compilation setup may limit or weight profiles.
+- **Growths on air.** Crescendo and Live coder songs grow on air from the director's song, with the growth shape resolved as in Compose. Duration is fitted by default in the radio; free makes the song longer and moves the next one.
+- **The code on air.** The panel shows only the song on air, in its profile's view: code of the moment, section lanes in the hidden mixer, compact and song functions, lit notes, line breaks, human typing with mistakes. The incoming song and the tail of the outgoing one play from hidden code, in full form on their own buses; an option shows both as today.
+- **Commands become small edits.** On a grown song a command, a curve point or End becomes the next waypoint, reached by small typed moves. Vary and Swap are typed as notes edits (closes `radio-variation` 5.1). Mute is `_$:`, a volume is a `.gain()` on the line.
+- **Same session, same sound.** Recipes record the Profile option. Recipes saved before this change replay in blocks, as heard. Saved sessions record the shapes version when they hold a grown song and warn when it differs. Freeze stores grown songs as heard.
+- **Exports.** Fast export, radio ranges, session video and fast video play grown songs with the hidden code; the video shows the song on air only.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `endless/radio-profiles`: profiles in the radio (artists, listener setting), growths, steering and curves as waypoints, the chooser, the hidden incoming song, the mixer per song, code on air, sessions and export.
+- `endless/radio-profiles`: profile resolution for radio songs, the session Profile control, artist and compilation profiles, growths on air, the code on air with the hidden incoming song, commands as waypoints and small edits, saved songs in streams, replay, versions and exports.
 
 ### Modified Capabilities
 
-None in their requirements; the director, steering, artists and transitions gain behaviour described in the new capability.
+None in their requirements. Steering, compilation, artists, playlists and exports gain behaviour described in the new capability.
 
 ## Impact
 
-- `src/endless/` (director, steering, artists, transitions, session), the growth engines, the radio code panel (shown and evaluated code), the artist format and editor, radio settings, `docs/ENDLESS.md`, `docs/ARTISTS.md`, Guide, `check:endless` fixtures and `DIRECTOR_VERSION`.
-- Depends on `performance-profiles`, `live-coder-growth`, `code-writing`, `typing-lines`.
+- **Code:** new `src/endless/profile.js` (resolution) and `src/endless/growth.js` (growth of a radio song, steering as waypoints); `src/endless/director.js` (`entry.profile`), `src/endless/artist.js`, `src/endless/artist-maker.js`, `src/endless/compilation.js`, `src/endless/steering.js`, `src/endless/join.js` (per-song controls, hidden parts); `src/song/crescendo.js` and `src/song/coder.js` (given waypoints, a start state); `src/radio/radio.js` (control, now playing, queue); `src/main.js` (radio playable, shown and evaluated code, Mix); `src/render/page.js` and the video for hidden code; `src/i18n.js`, `src/guide.js`; a new artist in `artists/`.
+- **Checks:** a new `npm run check:radio-profiles` (Node), plus `check:endless`, `check:compilation`, `check:random`, `check:crescendo`, `check:typing`, `check:functions`, `check:export`, `check:video`, `check:guide`, `check:knowledge`, and the browser checks `check-radio`, `check-steering`, `check-transitions`, `check-playlists`, `check-export`, `check-video`, `check-compact-code`.
+- **Docs:** `docs/ENDLESS.md`, `docs/ARTISTS.md`, the knowledge notes listed in the design (D14), the Guide, `DEVLOG.md`.
+- **Depends on:** `growth-shapes`, `song-functions`, `material-generator`, `voice-instrument`, `radio-variation`, `radio-compilation`, `continue-in-radio`, `radio-sessions-in-playlists`, `radio-fast-export` (all in place). Replaces the 2026-10-16 version of this change.
