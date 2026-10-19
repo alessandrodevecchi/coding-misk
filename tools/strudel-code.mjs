@@ -114,7 +114,9 @@ export function* codeSet() {
     }
   }
   const lib = Object.fromEntries(LIBRARY.map(f => [f.name, { params: f.params, chain: f.chain, lib: true }]));
-  yield { kind: 'prelude', source: 'preludeText', code: preludeText({ bass: 2 }, { ...lib, mouth: { params: [], chain: '.lpf(2000).room(0.3)' } }) };
+  // the mixer (miskMix, MIX_SOURCE) is plain JavaScript over haps, not Strudel calls: left out of the scan
+  const pre = preludeText({ bass: 2 }, { ...lib, mouth: { params: [], chain: '.lpf(2000).room(0.3)' } });
+  yield { kind: 'prelude', source: 'preludeText', code: pre.slice(0, pre.indexOf('const miskMix = ')) };
 }
 
 // every call of the code set: name → { kind → Set(source) }, plus how many codes were read

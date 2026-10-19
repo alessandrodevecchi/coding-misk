@@ -616,24 +616,6 @@
       "as": [
         "vowel"
       ]
-    },
-    "withHaps": {
-      "songs": 0,
-      "live": 0,
-      "radio": 0,
-      "prelude": 1,
-      "as": [
-        "withHaps"
-      ]
-    },
-    "withValue": {
-      "songs": 0,
-      "live": 0,
-      "radio": 0,
-      "prelude": 1,
-      "as": [
-        "withValue"
-      ]
     }
   }
 }
