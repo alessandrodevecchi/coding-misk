@@ -1,9 +1,12 @@
 // Browser checks for the fast export (#8): songs export faster than real time with the timeline next to them, the
 // fast and the real time files of the same song agree (length, loudness, low and high bands, loudness over time),
-// FLAC is lossless, MP3 and Opus open, cancel saves nothing, a saved radio session exports as one file.
+// FLAC is lossless, MP3 and Opus open, cancel saves nothing, a saved radio session exports as one file. Each song's
+// file stays below full scale (level-headroom): the render's float peak and the WAV's samples, with the time of the first
+// clipped sample.
 // Needs ffmpeg and ffprobe. Real time exports take as long as the songs.
 // Usage: PLAYWRIGHT_CORE=... node tools/check-export.cjs [song-id,song-id…] [--quick]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
+const { CLIP, tapRender, renderPeak, filePeak } = require('./output-peak.cjs');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), { execFileSync } = require('node:child_process');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ARG = process.argv.slice(2).find(a => !a.startsWith('--')), SONGS = (ARG || 'dci-carica,neon-rush-reel,primo-segnale').split(',');
@@ -39,6 +42,7 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
   await page.evaluate(() => localStorage.clear());
   await settings({ 'coding-misk-export-format': 'wav', 'coding-misk-export-speed': 'fast' });
   await page.reload(); await sleep(3500);
+  await tapRender(page);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
   const save = async (d, name) => { const f = path.join(TMP, name || d.suggestedFilename()); await d.saveAs(f); return f; };
   const job = () => page.evaluate(() => globalThis.codingMiskExport.job);
@@ -61,12 +65,17 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
 
   for (const id of SONGS) {
     await settings({ 'coding-misk-export-speed': 'fast', 'coding-misk-export-format': 'wav' });
+    await renderPeak(page);
     const fast = await exportSong(id);
+    const rp = await renderPeak(page);
     const wavD = fast.files.find(d => /\.wav$/.test(d.suggestedFilename())), tlD = fast.files.find(d => /\.timeline\.json$/.test(d.suggestedFilename()));
     check(!!wavD && !!tlD, `${id}: fast export saves the WAV and the timeline`, fast.files.map(d => d.suggestedFilename()).join(', '));
     if (!wavD) continue;
     const fw = await save(wavD, `${id}-fast.wav`), tl = tlD ? JSON.parse(fs.readFileSync(await save(tlD))) : null;
     const F = pcm(fw), flen = F.length / 48000;
+    // the output limit: a 16 bit file cannot hold a sample above full scale, so a sample at full scale is clipped
+    const fp = filePeak(fw);
+    check(!fp.clipped && rp <= CLIP, `${id}: the file stays below full scale`, fp.clipped ? `${fp.clipped} samples at full scale, the first at ${fp.at.toFixed(2)} s; render peak ${rp}` : `peak ${fp.peak}, render peak ${rp}`);
     check(tl && Math.abs(flen - tl.seconds) < 0.05 && fast.secs < tl.seconds, `${id}: faster than real time, the file is the song plus its tail`, `${tl ? tl.seconds.toFixed(1) : '?'} s of audio in ${fast.secs.toFixed(1)} s`);
     if (tl) {
       const kick = (tl.instruments.kick || [])[0];

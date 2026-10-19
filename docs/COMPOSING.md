@@ -161,9 +161,9 @@ The command writes each song and `session.json` to `songs/endless/` (git-ignored
 
 ## Checking levels
 
-Target peaks around 0.5 for kick and lead parts, lower for pads and textures. General MIDI sounds differ a lot in level (organs and vibraphone are quiet, electric piano is loud): measure and adjust `gain`. The app keeps Strudel's master at 0.6, so the sum may go above 1.
+Target peaks around 0.5 for kick and lead parts, lower for pads and textures. General MIDI sounds differ a lot in level (organs and vibraphone are quiet, electric piano is loud): measure and adjust `gain`. The app keeps Strudel's master at 0.6, so the sum of the lines may go above 1 before it.
 
-Measure a song in the app with Playwright: play each section and read the analysers, as `tools/snapshot-levels.cjs` does for built-in tracks.
+Measure a song in the app with Playwright: play each section and read the analysers, as `tools/snapshot-levels.cjs` does for built-in tracks. `node tools/check-levels.cjs <song>` also prints `out=`, the peak of the master output: that is the limit, above 1.0 the output clips. A single line above 1.0 is only a warning (a style can raise it with `headroom`). For a dirtier sound use distortion and `postgain`, not more `gain`.
 
 ## Strudel details that matter
 

@@ -1,9 +1,10 @@
 // Voice instrument in the browser (voice-instrument, #39): the example song plays every section without an evaluation
-// error, its spoken lines are heard on the fx analyser below clipping, and with no spoken samples on the machine (the
+// error, its spoken lines are heard on the fx analyser, the master output stays below clipping (level-headroom), and with no spoken samples on the machine (the
 // samples manifest without the say_ banks, as when public/samples/say_* is missing) the song plays without errors and
 // without spoken lines. Screenshots of the voice instrument's panel go to the shots directory.
 // Usage: PLAYWRIGHT_CORE=... node tools/check-spoken-play.cjs [shots-dir] [song-id]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
+const { CLIP, tapOutput, outputPeak, songHeadroom } = require('./output-peak.cjs');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const SHOTS = process.argv[2] || null, ID = process.argv[3] || 'example-voices';
@@ -18,6 +19,7 @@ async function open(browser, { noSamples = false } = {}) {
   if (noSamples) await page.route('**/samples/strudel.json', async r => { const res = await r.fetch(), list = await res.json(); r.fulfill({ json: Object.fromEntries(Object.entries(list).filter(([k]) => !/^say_/.test(k))) }); });
   await page.goto('http://localhost:5173/', { timeout: 120000 }); await sleep(6000);
   await page.evaluate(() => localStorage.clear()); await page.reload({ timeout: 120000 }); await sleep(6000);
+  await tapOutput(page);
   for (let k = 0; k < 20; k++) { await page.locator('#track-pick').selectOption(ID); await sleep(500); if (await page.locator('#sc-name').inputValue() === song.sections[0].name) break; }
   return { page, errors };
 }
@@ -25,16 +27,18 @@ async function open(browser, { noSamples = false } = {}) {
 async function measure(page, i, seconds) {
   for (let k = 0; k < 6; k++) { try { await page.click(`[data-scene-i="${i}"]`, { timeout: 2000 }); break; } catch { await sleep(500); } }
   await sleep(300);
-  return page.evaluate(async ms => {
+  await outputPeak(page);
+  const r = await page.evaluate(async ms => {
     const ed = document.querySelector('strudel-editor').editor, mx = {};
     for (let t = 0; t < ms; t += 50) { for (const a of Object.keys(window.analysers || {})) { const d = getAnalyzerData('time', a); let m = 0; for (const v of d) m = Math.max(m, Math.abs(v)); mx[a] = Math.max(mx[a] || 0, m); } await new Promise(r => setTimeout(r, 50)); }
     return { err: String(ed.repl.state.evalError || ''), fx: mx.fx || 0, code: ed.code || '' };
   }, seconds * 1000);
+  return { ...r, out: await outputPeak(page) };
 }
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
-  const bar = 4 * 60 / song.sections[0].bpm;
+  const bar = 4 * 60 / song.sections[0].bpm, room = await songHeadroom(song);
   // with samples: the passage in the break and the refrain in the outro are heard, below clipping
   {
     const { page, errors } = await open(browser);
@@ -45,7 +49,9 @@ async function measure(page, i, seconds) {
     for (const [i, name] of [[2, 'Break'], [4, 'Outro'], [1, 'Groove']]) {
       const r = await measure(page, i, Math.min(16, song.sections[i].bars * bar));
       check(!r.err, `${name}: no evaluation error`, r.err);
-      check(r.fx > 0.02 && r.fx < 0.98, `${name}: the spoken line is heard below clipping`, `fx peak ${r.fx.toFixed(2)}`);
+      check(r.fx > 0.02, `${name}: the spoken line is heard`, `fx peak ${r.fx.toFixed(2)}`);
+      check(r.out <= CLIP, `${name}: the output stays below clipping`, `output ${r.out.toFixed(2)}`);
+      if (r.fx > room) console.log(`warn  ${name}: the spoken line peaks above the headroom ${room} (${r.fx.toFixed(2)})`);
     }
     await page.click('#stop'); await sleep(300);
     // the panel of the voice instrument

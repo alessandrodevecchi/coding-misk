@@ -17,6 +17,7 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 | Tempo is set by the player at bar lines, never inside a pattern | `.cps()` in a pattern recomputes queued events with a stale reference and drops notes. | [MUSIC-ENGINE](../MUSIC-ENGINE.md#strudel-gotchas-learned-the-hard-way) |
 | Strudel's master stays at 0.6 | All layers together go above 1 and clip. | [CONTEXT](../CONTEXT.md#key-decisions) |
 | Guitar level after the distortion (`postgain`) | Before heavy drive, `gain` only changes the saturation. | [CONTEXT](../CONTEXT.md#key-decisions) |
+| The output peak is the level limit, a track line is a warning | A line passes the master before the output, and browser audio is floating point: only the output and files clip. Loud styles may set `headroom` (up to 1.5) for single lines (level-headroom). | [sound-and-levels](sound-and-levels.md) |
 | Built-in songs are song files, not hand code | Every song must open and be edited in Compose. | [CONTEXT](../CONTEXT.md#key-decisions) |
 | Parts are stored as ideas, written in their shortest exact form | Short code like a live coder's, growth from an idea, variation instead of replacement. 1,071,662 events compared: no difference. | [DEVLOG](../../DEVLOG.md#2026-10-18-parti-come-idee-idea-model-70), [VARIETY](../VARIETY.md#one-root) |
 | Randomness is always seeded | The same song sounds the same in the app, exports and checks. | [VARIETY](../VARIETY.md#one-root) |

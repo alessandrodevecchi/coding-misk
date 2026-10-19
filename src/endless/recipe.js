@@ -66,7 +66,10 @@ export const recipeOrder = id => OLD_ID[id] || id;
 // an object keyed by style ids (an artist's taste) with old ids renamed
 export const styleKeys = o => (o && typeof o === 'object' && !Array.isArray(o) ? Object.fromEntries(Object.entries(o).map(([k, v]) => [styleId(k), v])) : o);
 export const RECIPE_FORMAT = 1;
-export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'profile', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'spoken', 'narrator', 'words', 'growthShapes', ...Object.keys(INSTRUMENTS)];
+export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'profile', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'spoken', 'narrator', 'words', 'growthShapes', 'headroom', ...Object.keys(INSTRUMENTS)];
+// level-headroom: the peak a track line of the style's songs may reach before the level checks warn. The output peak
+// stays the hard limit (1.0); a loud genre may let single lines go higher, since every line passes the master level first
+export const HEADROOM = { default: 1, min: 1, max: 1.5 };
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const isInt = v => Number.isInteger(v);
 const knownSound = w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w);
@@ -136,6 +139,7 @@ export function validateRecipe(r) {
   else list('shapes', r.shapes, among('shapes', SHAPES), 'shapes');
   if (r.minutes !== undefined) range('minutes', r.minutes, 2, 6);
   if (r.phrase !== undefined && ![4, 8, 16].includes(r.phrase)) err('phrase', 'the phrase length in bars: 4, 8 or 16');
+  if (r.headroom !== undefined && !(typeof r.headroom === 'number' && r.headroom >= HEADROOM.min && r.headroom <= HEADROOM.max)) err('headroom', `the peak a track line may reach before a level warning, a number from ${HEADROOM.min} to ${HEADROOM.max} (default ${HEADROOM.default})`);
   if (r.tracks !== undefined) {
     const t = r.tracks;
     if (!t || typeof t !== 'object' || Array.isArray(t)) err('tracks', 'an object {"usual": [low, high], "max": n}');

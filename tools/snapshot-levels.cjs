@@ -2,7 +2,10 @@
 // Usage: PLAYWRIGHT_CORE=... node tools/snapshot-levels.cjs write | check [track-id …]
 // Snapshot: tests/snapshots/levels.json. A level differs when it moves by more than TOL (absolute).
 // Two runs on unchanged code agree within TOL for every instrument except fx.
+// The peak of the master output is measured too (level-headroom, not stored): above 1.0 it clips and the check fails.
+// A line above the headroom of the song's styles (1.0 by default) is printed as a warning, never a failure.
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
+const { CLIP, tapOutput, outputPeak, songHeadroom } = require('./output-peak.cjs');
 const fs = require('fs');
 const path = require('path');
 const FILE = path.join(__dirname, '..', 'tests', 'snapshots', 'levels.json');
@@ -19,6 +22,10 @@ if (!['write', 'check'].includes(mode)) { console.error('usage: node tools/snaps
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
   await page.goto('http://localhost:5173/'); await sleep(5000);
+  await tapOutput(page);
+  const { songFiles } = await import('./songs-dir.mjs');
+  const songs = Object.fromEntries(songFiles('songs').map(f => JSON.parse(fs.readFileSync(f, 'utf8'))).map(sg => [sg.id, sg]));
+  let clipping = 0;
   // generated endless songs (songs/endless/, git-ignored) change with every run: no snapshots
   const ids = only.length ? only : (await page.$$eval('#track-pick option', os => os.map(o => o.value).filter(Boolean))).filter(id => !id.startsWith('endless-'));
   const old = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : {};
@@ -26,6 +33,7 @@ if (!['write', 'check'].includes(mode)) { console.error('usage: node tools/snaps
   let failed = 0;
   for (const id of ids) {
     if (!(await page.$(`#track-pick option[value="${id}"]`))) continue;
+    const room = await songHeadroom(songs[id]);
     await page.locator('#track-pick').selectOption(id); await page.click('#play'); await sleep(1500);
     // loop the section being measured: a short section (one bar at the end of a song) would otherwise end,
     // and the song stop, before the measuring window is over
@@ -34,6 +42,7 @@ if (!['write', 'check'].includes(mode)) { console.error('usage: node tools/snaps
     const scenes = [];
     for (let i = 0; i < n; i++) {
       await page.click(`[data-scene-i="${i}"]`); await sleep(1200);
+      await outputPeak(page);
       scenes.push(await page.evaluate(async () => {
         const ed = document.querySelector('strudel-editor').editor, mx = {};
         for (let k = 0; k < 40; k++) {
@@ -44,13 +53,19 @@ if (!['write', 'check'].includes(mode)) { console.error('usage: node tools/snaps
         for (const [a, v] of Object.entries(mx)) lv[a] = Math.round(v * 100) / 100;
         return { name: document.getElementById('sc-name').value, err: String(ed.repl.state.evalError || ''), lv };
       }));
+      scenes[i].out = await outputPeak(page);
     }
     await page.click('#stop'); await sleep(300);
     const lv = scenes.map(s => Object.fromEntries(Object.entries(s.lv).filter(([, v]) => v >= FLOOR)));
     const errs = scenes.filter(s => s.err).map(s => `${s.name}: ${s.err}`);
-    if (mode === 'write') { out[id] = scenes.map((s, i) => ({ name: s.name, levels: lv[i] })); console.log(`${id}: ${n} scenes${errs.length ? ' ERRORS ' + errs.join('; ') : ''}`); continue; }
+    // the output is the hard limit; a loud line alone is a warning
+    const clips = scenes.filter(s => s.out > CLIP).map(s => `${s.name} output ${s.out.toFixed(2)}`);
+    const loud = scenes.flatMap(s => Object.entries(s.lv).filter(([a, v]) => !SKIP.has(a) && v > room).map(([a, v]) => `${s.name} ${a} ${v.toFixed(2)} (output ${s.out.toFixed(2)})`));
+    const notes = [...clips.map(c => `CLIPS ${c}`), ...loud.map(w => `warning: above the headroom ${room}: ${w}`)];
+    if (clips.length) clipping++;
+    if (mode === 'write') { out[id] = scenes.map((s, i) => ({ name: s.name, levels: lv[i] })); console.log(`${id}: ${n} scenes${errs.length ? ' ERRORS ' + errs.join('; ') : ''}${notes.length ? `\n  ${notes.join('\n  ')}` : ''}`); continue; }
     const ref = old[id];
-    const diffs = [...errs.map(e => `error ${e}`)];
+    const diffs = [...errs.map(e => `error ${e}`), ...clips.map(c => `clips: ${c}`)];
     if (!ref) diffs.push('no snapshot');
     else if (ref.length !== n) diffs.push(`scenes ${ref.length} -> ${n}`);
     else ref.forEach((r, i) => {
@@ -60,11 +75,13 @@ if (!['write', 'check'].includes(mode)) { console.error('usage: node tools/snaps
         if (Math.abs(x - y) > (TOL_OF[a] ?? TOL)) diffs.push(`${r.name} ${a} ${x.toFixed(2)} -> ${y.toFixed(2)}`);
       }
     });
-    console.log(diffs.length ? `DIFF  ${id}\n  ${diffs.join('\n  ')}` : `ok    ${id}`);
+    const warns = loud.map(w => `warning: above the headroom ${room}: ${w}`);
+    console.log(diffs.length ? `DIFF  ${id}\n  ${[...diffs, ...warns].join('\n  ')}` : `ok    ${id}${warns.length ? `\n  ${warns.join('\n  ')}` : ''}`);
     if (diffs.length) failed++;
   }
   await browser.close();
   if (mode === 'write') { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(out, null, 1) + '\n'); console.log(`wrote ${FILE}`); }
-  else console.log(failed ? `${failed} track(s) differ` : 'all levels match');
-  process.exit(failed ? 1 : 0);
+  else console.log(failed ? `${failed} track(s) differ or clip` : 'all levels match, the output stays below clipping');
+  if (mode === 'write' && clipping) console.log(`${clipping} track(s) clip the output`);
+  process.exit(failed || (mode === 'write' && clipping) ? 1 : 0);
 })();

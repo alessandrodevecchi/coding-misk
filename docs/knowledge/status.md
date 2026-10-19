@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 56. With open tasks: 19. All tasks ticked, waiting to be archived: 37.
+OpenSpec changes not archived: 57. With open tasks: 19. All tasks ticked, waiting to be archived: 38.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -38,7 +38,7 @@ OpenSpec changes not archived: 56. With open tasks: 19. All tasks ticked, waitin
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 
-Ticked and not archived: `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `fragment-extras`, `human-typing`, `knowledge-base`, `live-coder-growth`, `playlists`, `procedural-visuals`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `session-video`, `song-functions`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-function`.
+Ticked and not archived: `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `fragment-extras`, `human-typing`, `knowledge-base`, `level-headroom`, `live-coder-growth`, `playlists`, `procedural-visuals`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `session-video`, `song-functions`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-function`.
 <!-- /generated -->
 
 Many open tasks are the owner's listening tests or short videos for the owner. They are not code to write: leave them open and mention them.

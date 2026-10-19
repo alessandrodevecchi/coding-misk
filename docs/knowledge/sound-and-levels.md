@@ -1,8 +1,8 @@
 ---
 id: sound-and-levels
 related: [sounds, songs, material, export, checks, pitfalls]
-code: [src/song/rack.js, src/sounds/sound-guard.js, src/sounds/soundfont-fix.js, tools/check-levels.cjs, tools/snapshot-levels.cjs, tests/snapshots/levels.json]
-checks: [node tools/check-levels.cjs, node tools/snapshot-levels.cjs, npm run check:sound-guard, node tools/check-sounds.cjs]
+code: [src/song/rack.js, src/sounds/sound-guard.js, src/sounds/soundfont-fix.js, tools/output-peak.cjs, tools/check-levels.cjs, tools/snapshot-levels.cjs, tests/snapshots/levels.json]
+checks: [node tools/check-levels.cjs, node tools/snapshot-levels.cjs, node tools/check-export.cjs, npm run check:sound-guard, node tools/check-sounds.cjs]
 ---
 
 # Sound and levels
@@ -11,7 +11,13 @@ checks: [node tools/check-levels.cjs, node tools/snapshot-levels.cjs, npm run ch
 
 How loud each part is, how the app keeps it below clipping, and the devices that shape a sound. Read this before adding a sound, a preset, a rack device or a style, and before touching gains.
 
-**Levels.** Every track line ends with `.analyze("<instrument>")`. The browser tools read those analysers and report each instrument's peak per section. The checks treat a line peak of 1.0 as clipping. All lines together go to Strudel's master, which the app keeps at 0.6, so that the sum of several loud lines stays below 1.
+**Levels.** Every track line ends with `.analyze("<instrument>")`. The browser tools read those analysers and report each instrument's peak per section, before the master. All lines together go to Strudel's master, which the app keeps at 0.6, and then to the output. The audio inside the browser is floating point: a line above 1.0 does not clip by itself. Only the output clips, and an exported file, where a sample cannot go above full scale.
+
+**Output peak.** `tools/output-peak.cjs` reads the peak of the master output (an analyser per channel after the master gain) and of the fast export's render and files. It is the hard limit: above 1.0 the level tools, `check-transitions.cjs`, `check-spoken-play.cjs` and `check-export.cjs` fail, and name the song, the section or the time.
+
+**Headroom.** A track line above the headroom of its song's styles is a warning, never a failure by itself. The headroom is 1.0 unless a style recipe sets `headroom` (1.0 to 1.5) for a loud genre; a song with several styles takes the highest. The output limit stays 1.0 whatever the headroom.
+
+**Saturation comes from the sound.** A dirty, saturated sound is made with distortion: `crunch` and `grit` on a track, the `distort` and `shape` rack devices, a driven filter (`drive`). Raising `gain` to get it is a mistake: the line gets louder, the sum at the output goes past 1.0 and the output clips, which sounds harsh and is not the sound a style asks for. Set the level after the distortion with `postgain`.
 
 **Rack.** A track can carry a chain of devices after its instrument (`rack` in the song). Note devices change what is played; sound devices change how it sounds. Each device is one or two Strudel calls.
 
@@ -53,7 +59,7 @@ How loud each part is, how the app keeps it below clipping, and the devices that
 <!-- /generated -->
 
 <!-- generated:levels -->
-Peak levels per instrument in `tests/snapshots/levels.json` (26 built-in songs, every section): how many sections, median and highest peak. 1.0 is clipping.
+Peak levels per instrument in `tests/snapshots/levels.json` (26 built-in songs, every section): how many sections, median and highest peak. A line above 1.0 is a warning (above its style's `headroom`); the master output and exported files above 1.0 clip and fail the checks.
 
 | Instrument | Sections | Median peak | Highest peak |
 | --- | --- | --- | --- |
@@ -74,12 +80,13 @@ Snapshot tolerance (`tools/snapshot-levels.cjs`): 0.12 absolute, floor 0.03, per
 Targets for a new part, from the snapshots and `docs/COMPOSING.md`:
 
 - Kick and lead parts peak around 0.5. Pads, arps and textures stay lower (0.1 to 0.3).
-- No single line above 0.9. The checks treat 1.0 as clipping (`check-transitions.cjs`, `check-spoken-play.cjs`).
+- No single line above 0.9 unless the style sets a `headroom`. Above the headroom the level tools warn.
+- The master output below 1.0 in every section, and every exported file below full scale. This is what the checks fail on.
 - 4 to 5 tracks at once. More lines raise the sum at the master.
 - General MIDI sounds differ a lot: organs and vibraphone are quiet, electric piano is loud. Measure, then set `gain`.
 - Heavy drive: set the level with `postgain` after the distortion, not with `gain`.
 
-Known outlier: the hats of `neon-rush-reel` peak at 1.18 to 1.24 in the snapshot. The level is noisy between runs.
+Measured 2026-10-19 (level-headroom): the hats of `neon-rush-reel` peak at 1.16 to 1.23, and its output peaks at 1.13 to 1.23 in the Drop, the Glitch break and the Final: that output clips. A line above 1.0 is not needed for the output to clip: `drift` and `ferro` stay below 1.0 on every line and their exports still reach 1.29 and 1.23. The full list is in `DEVLOG.md` (2026-10-19); the songs are left as they are until the owner decides.
 
 ## Example
 

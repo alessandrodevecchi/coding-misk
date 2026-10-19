@@ -1,8 +1,9 @@
 // Browser checks for transitions in the radio (#23): for each kind, the radio plays through the end of a song
-// into the next one without evaluation or page errors, with levels below clipping; a part varied before the end plays
-// into the transition (radio-variation).
+// into the next one without evaluation or page errors, with the master output below clipping (level-headroom: a track
+// line above the style's headroom is a warning); a part varied before the end plays into the transition (radio-variation).
 // Usage: PLAYWRIGHT_CORE=... node tools/check-transitions.cjs [kind,kind…]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
+const { CLIP, tapOutput, outputPeak, songHeadroom } = require('./output-peak.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
@@ -16,9 +17,13 @@ const KINDS = (process.argv[2] || 'mix,morph,echo,break,interlude').split(',');
   await page.goto('http://localhost:5173/'); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['berlin-techno'], chaos: 0.3, energy: 0.7, complexity: 0.5, talk: 0.5, artist: null, transition: 'mix', harmony: 'compatible' })); });
   await page.reload(); await sleep(3500);
+  await tapOutput(page);
+  // the radio plays berlin-techno songs: its headroom
+  const room = await songHeadroom({ tags: { styles: ['berlin-techno'] } });
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(400);
   const R = () => page.evaluate(() => globalThis.codingMiskRadio.state);
   const ed = () => page.evaluate(() => { const e = document.querySelector('strudel-editor').editor; return { err: String(e.repl.state.evalError || ''), cyc: e.repl.scheduler.now() }; });
+  // the highest track line, for the warning
   const peak = ms => page.evaluate(async ms => { let m = 0; const end = performance.now() + ms; while (performance.now() < end) { for (const a of Object.keys(window.analysers || {})) { const d = getAnalyzerData('time', a); for (const v of d) m = Math.max(m, Math.abs(v)); } await new Promise(r => setTimeout(r, 50)); } return m; }, ms);
   const waitFor = async (fn, ms = 20000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await sleep(200); } return false; };
 
@@ -45,12 +50,14 @@ const KINDS = (process.argv[2] || 'mix,morph,echo,break,interlude').split(',');
     // play the last bars of the first song, through the transition, into the next one
     const from = Math.min(s1.start, s0.start + s0.bars) - s0.start - 3;
     await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.max(0, from)); await sleep(300);
-    const p = await peak(5000);
+    await outputPeak(page);
+    const p = await peak(5000), out = await outputPeak(page);
     const switched = await waitFor(async () => (await R()).onAir === 1, 40000);
     const e = await ed();
     check(switched, `${kind}: the next song comes on air`);
     check(!e.err, `${kind}: no evaluation error`, e.err.slice(0, 120));
-    check(p > 0.02 && p < 1, `${kind}: sound below clipping during the transition`, p.toFixed(2));
+    check(out > 0.02 && out <= CLIP, `${kind}: output below clipping during the transition`, `output ${out.toFixed(2)}, loudest line ${p.toFixed(2)}`);
+    if (p > room) console.log(`warn  ${kind}: a track line above the headroom ${room} (${p.toFixed(2)}), output ${out.toFixed(2)}`);
     await page.click('#radio-start'); await sleep(500);
   }
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));

@@ -491,7 +491,7 @@ const BLOCKS = {
     },
     levels() {
       const { songs, rows } = levelStats();
-      return [`Peak levels per instrument in \`tests/snapshots/levels.json\` (${songs} built-in songs, every section): how many sections, median and highest peak. 1.0 is clipping.`, '',
+      return [`Peak levels per instrument in \`tests/snapshots/levels.json\` (${songs} built-in songs, every section): how many sections, median and highest peak. A line above 1.0 is a warning (above its style's \`headroom\`); the master output and exported files above 1.0 clip and fail the checks.`, '',
         table(['Instrument', 'Sections', 'Median peak', 'Highest peak'], rows.map(([k, n, m, x]) => [code(k), String(n), String(m), String(x)])), '',
         `Snapshot tolerance (\`tools/snapshot-levels.cjs\`): ${constOf('tools/snapshot-levels.cjs', 'TOL')} absolute, floor ${constOf('tools/snapshot-levels.cjs', 'FLOOR')}, per instrument ${constOf('tools/snapshot-levels.cjs', 'TOL_OF')}; \`fx\` is recorded, not compared. Master level: \`MASTER = ${constOf('src/main.js', 'MASTER')}\` in \`src/main.js\`.`].join('\n');
     },

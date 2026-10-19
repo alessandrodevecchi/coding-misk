@@ -89,17 +89,20 @@ Step by step for checks, Strudel updates, texts, settings, visuals, exports and 
 
 ### Fix a level or clipping problem
 
-**Files:** the song or style (`gain`, `postgain` shapes, `drive`, `rack`), sometimes a preset or `ROWS` multipliers in `src/music.js`, `tests/snapshots/levels.json`.
+**Files:** the song or style (`gain`, `postgain` shapes, `drive`, `rack`, the style's `headroom`), sometimes a preset or `ROWS` multipliers in `src/music.js`, `tests/snapshots/levels.json`.
 
 **Steps:**
-1. Measure: `node tools/check-levels.cjs <song>` (dev server). Find the line and section above target ([sound-and-levels.md](sound-and-levels.md)).
-2. Lower that line's `gain`; for driven sounds lower `postgain` after the drive. Fewer layers often fix the sum.
-3. Measure twice; noise moves guitars and `fx` between runs.
-4. When the change is intended, `node tools/snapshot-levels.cjs write <song>` and say why in the commit.
+1. Measure: `node tools/check-levels.cjs <song>` (dev server). Each section prints the line peaks and `out=`, the peak of the master output. Only the output clips: `out` above 1.0 fails. A line above the headroom is a warning ([sound-and-levels.md](sound-and-levels.md)).
+2. For a file, export it and run `node tools/check-export.cjs <song> --quick`: it names the time of the first clipped sample.
+3. Output above 1.0: lower the loudest lines in that section (`gain`; for driven sounds `postgain` after the drive). Fewer layers often fix the sum.
+4. A line above the headroom with the output below 1.0: nothing clips. Lower it if it covers the mix; for a loud genre the style may set `headroom` (up to 1.5) instead.
+5. Want a dirtier sound: add distortion (`crunch`, `grit`, the `distort` or `shape` devices, filter `drive`) and set the level after it with `postgain`. Never raise `gain` for it.
+6. Measure twice; noise moves guitars and `fx` between runs.
+7. When the change is intended, `node tools/snapshot-levels.cjs write <song>` and say why in the commit.
 
-**Checks:** `node tools/snapshot-levels.cjs check`, `npm run check:code`, `node tools/check-transitions.cjs` for the radio.
+**Checks:** `node tools/snapshot-levels.cjs check`, `npm run check:code`, `node tools/check-transitions.cjs` for the radio, `node tools/check-export.cjs` for files.
 
-**Mistakes:** raising the master; editing `src/` while the level tool runs; rewriting the snapshots of every song for one fix.
+**Mistakes:** raising the master; raising `gain` for saturation; treating a line above 1.0 as clipping while the output is fine; editing `src/` while the level tool runs; rewriting the snapshots of every song for one fix.
 
 ### Find why a sound is silent
 

@@ -83,7 +83,7 @@ Each recipe describes its sound in one sentence. The descriptions below come fro
 
 To pick a style for a mood, compare tempo, keys, progressions and the description. To make a new one from a song or an audio file, see [from-a-reference.md](from-a-reference.md); the steps are in [recipes-music.md](recipes-music.md#define-a-style).
 
-Main recipe fields: `tempo`, `keys`, `progressions`, `meters`, `swing`, `shapes` (energy shapes), `minutes`, `phrase`, `tracks`, `energy`, `voice`, `spoken`, `narrator`, `growthShapes`, `words` (title words). Instrument blocks: `drums`, `bass`, `arp`, `hook`, `pad`, `guitar`, `texture`, `riser`.
+Main recipe fields: `tempo`, `keys`, `progressions`, `meters`, `swing`, `shapes` (energy shapes), `minutes`, `phrase`, `tracks`, `energy`, `voice`, `spoken`, `narrator`, `growthShapes`, `headroom` (how loud one track line may peak before the level checks warn, 1.0 to 1.5, see [sound-and-levels.md](sound-and-levels.md)), `words` (title words). Instrument blocks: `drums`, `bass`, `arp`, `hook`, `pad`, `guitar`, `texture`, `riser`.
 
 A recipe is tested by `npm run check:styles`. `node tools/check-style-sounds.cjs` checks that every sound it names loads (dev server).
 

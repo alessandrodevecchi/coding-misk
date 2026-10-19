@@ -163,6 +163,11 @@ const CHECKS = {
     assert(errs.includes('tempo'), 'no error at tempo');
     assert(errs.includes('minutes'), 'no error at minutes');
   },
+  'recipes: headroom from 1.0 to 1.5, else an error at its path'() {
+    const r = structuredClone(loadStyles().find(x => x.id === 'phonk'));
+    for (const h of [1, 1.3, 1.5]) assert(!validateRecipe({ ...r, headroom: h }).errors.length, `headroom ${h} is invalid`);
+    for (const h of [0.9, 1.6, '1.2']) assert(validateRecipe({ ...r, headroom: h }).errors.some(e => e.path === 'headroom'), `headroom ${h} gives no error at headroom`);
+  },
   'recipes: missing optional part stays valid'() {
     const r = structuredClone(loadStyles().find(x => x.id === 'classic-rock'));
     delete r.guitar;
