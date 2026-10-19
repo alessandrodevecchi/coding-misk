@@ -6,7 +6,7 @@
 import { createSession, OPTION_DEFAULTS, leadEntry, stylesNear, DIRECTOR_VERSION } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
-import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
+import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, VARY_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
 import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
@@ -16,7 +16,7 @@ import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } f
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE, GEAR, LOCK } from '../icons.js';
+import { DICE, GEAR, LOCK, VARY, SWAP } from '../icons.js';
 import { SESSION_SOURCES } from '../material/index.js';
 
 const HISTORY = 50;
@@ -48,8 +48,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // transitions (#23): the artist's choice or always one kind; harmony: the artist's, compatible or free
     transition: ['artist', ...TRANSITION_KINDS].includes(saved.transition) ? saved.transition : 'artist',
     harmony: ['artist', ...HARMONY_MODES].includes(saved.harmony) ? saved.harmony : 'artist',
-    // material (material-generator): patterns as written, varied, composed, or mix (each style's choice)
-    material: SESSION_SOURCES.includes(saved.material) ? saved.material : 'mix',
+    // material (material-generator): patterns as written, varied, composed, or mix (each style's choice). The console
+    // picks it for the songs to come (radio-variation); Settings keeps the default a new page starts from
+    materialDefault: SESSION_SOURCES.includes(saved.materialDefault) ? saved.materialDefault : SESSION_SOURCES.includes(saved.material) ? saved.material : 'mix',
     // steering (#24): commands for this song only, or for the whole session (they also move the sliders)
     scope: saved.scope === 'session' ? 'session' : 'song',
     // random tools (#50): a random artist not kept yet, dice in the full range or in a sensible one, the sounds seed
@@ -63,6 +64,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // knobs held by hand while the compilation plays (#59): knob → value
     compLocks: saved.compLocks && typeof saved.compLocks === 'object' ? saved.compLocks : {},
   };
+  opts.material = opts.materialDefault;
   let compOpen = false;
   const userPresets = () => store.get('coding-misk-comp-presets', {}) || {};
   // the seed of the last die thrown, per die (shown in its tooltip)
@@ -341,7 +343,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // an extension remembers where its part goes, so cancelling it also drops the curve edits made on later parts
     if (c.kind === 'extend') { cmd.ins = extendIndex(item.plan, Math.ceil(at / item.plan.phrase) >> 1); cmd.s = Math.round(extendSeconds(item.plan)); }
     // a later command of the same kind on the same track (or curve part) replaces a pending one
-    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && ['volume', 'curve', 'curve-reset', 'instrument'].includes(x.kind);
+    // (two Vary or two Swap of the same part for the same boundary count as one)
+    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && (['volume', 'curve', 'curve-reset', 'instrument'].includes(x.kind) || (['vary', 'swap'].includes(x.kind) && x.type === cmd.type && x.at === cmd.at));
     item.commands = item.commands.filter(x => !same(x));
     item.commands.push(cmd);
     S.recipe.steering = [...(S.recipe.steering || []).filter(x => !(x.song === item.n && same(x))), { song: item.n, ...cmd }];
@@ -511,11 +514,13 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
 
   // ---------- console, queue and mixer (#24) ----------
   // keyboard shortcuts: a key per command (type toggles add or remove)
-  const KEYS_OF = { 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', instrument: 'i', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', extend: 'l', end: 'e' };
+  const KEYS_OF = { 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', instrument: 'i', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', extend: 'l', end: 'e', vary: 'n', swap: 'w' };
   const TYPE_KEYS = { drums: '1', bass: '2', lead: '3', pad: '4', texture: '5' };
   const keyLabel = k => ({ ArrowUp: '↑', ArrowDown: '↓', V: 'Shift+V' }[k] || k.toUpperCase());
   let steerKey = '', dragging = null, pendingSession = null;
-  const cmdLabel = c => c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : c.kind === 'add' || c.kind === 'remove' ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
+  // the part Vary and Swap act on (radio-variation D5): the lead by default, remembered while the page is open
+  let varyPart = 'lead';
+  const cmdLabel = c => c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : ['add', 'remove', 'vary', 'swap'].includes(c.kind) ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type || 'lead'}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
   function renderSteer(force = false) {
     const box = root.querySelector('#radio-steer');
     if (!box || dragging) return;
@@ -527,15 +532,17 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const ph = item.plan.phrase;
     const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel);
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => c.id).join(), (item.plan.locked || []).join(), S.paused !== undefined, opts.scope].join('|');
+    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => c.id).join(), (item.plan.locked || []).join(), S.paused !== undefined, opts.scope, varyPart].join('|');
     if (!force && key === steerKey) return;
     steerKey = key;
     const tip = k => `title="${esc(t(k))}"`;
     // a disabled button says why in its tooltip ("this song has no pad")
     const btn = (c, label) => {
-      const why = S.paused !== undefined ? 'paused' : whyNot(c, item.song, item.plan, rel, tailOf(item)), k = c.type ? TYPE_KEYS[c.type] : KEYS_OF[c.kind];
-      const tipText = `${t(`steerTip:${c.kind}`, c.vars || {})}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
-      return `<button class="btn steer-btn" data-cmd="${c.kind}"${c.type ? ` data-type="${c.type}"` : ''} ${why ? 'disabled' : ''} title="${esc(tipText)}">${esc(label || t(`steer:${c.kind}`))}</button>`;
+      const part = ['vary', 'swap'].includes(c.kind);
+      const why = S.paused !== undefined ? 'paused' : whyNot(c, item.song, item.plan, rel, tailOf(item), item.opts || (item.base && item.base.opts) || {}), k = c.type && !part ? TYPE_KEYS[c.type] : KEYS_OF[c.kind];
+      const tipText = `${t(`steerTip:${c.kind}`, { ...(c.vars || {}), ...(part ? { type: t(`steerType:${c.type}`) } : {}) })}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
+      // Vary and Swap carry their part in data-part (data-type is the Add and Remove buttons' shortcut target)
+      return `<button class="btn steer-btn${c.icon ? ' with-ico' : ''}" data-cmd="${c.kind}"${c.type ? ` data-${part ? 'part' : 'type'}="${c.type}"` : ''} ${why ? 'disabled' : ''} title="${esc(tipText)}"${why ? ` data-why="${why}"` : ''}>${c.icon || ''}${esc(label || t(`steer:${c.kind}`))}</button>`;
     };
     // the type buttons say what the next phrase can do: "+" when the type will be silent there, "−" when it will play
     const nextBar = Math.min(barsOf(item.song) - 1, applyBar('add', rel, item.plan)), onNext = stateAt(item.song, nextBar).song.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= nextBar && c.start + c.bars > nextBar));
@@ -546,6 +553,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       <div class="steer-console">
         ${group('energy', btn({ kind: 'energy-up' }) + btn({ kind: 'energy-down' }))}
         ${group('arrangement', types + btn({ kind: 'more-complex' }) + btn({ kind: 'less-complex' }))}
+        ${group('parts', `<span class="steer-part" role="radiogroup" aria-label="${esc(t('steerPartPick'))}">${VARY_TYPES.map(p => `<button class="chip small" role="radio" data-vary-part="${p}" aria-checked="${varyPart === p}" aria-pressed="${varyPart === p}" title="${esc(t('steerPartPick'))}: ${esc(t(`steerType:${p}`))}">${esc(t(`steerType:${p}`))}</button>`).join('')}</span>${btn({ kind: 'vary', type: varyPart, icon: VARY }, t('steerBtn:vary'))}${btn({ kind: 'swap', type: varyPart, icon: SWAP }, t('steerBtn:swap'))}`)}
         ${group('sound', ['darker', 'brighter', 'dirtier', 'cleaner', 'more-space', 'instrument'].map(k => btn({ kind: k })).join(''))}
         ${group('harmony', btn({ kind: 'progression' }) + btn({ kind: 'key' }))}
         ${group('voice', btn({ kind: 'talk-more' }) + btn({ kind: 'talk-less' }))}
@@ -650,6 +658,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         <div class="dice-row"><span class="lbl">${esc(t('diceKnobsLbl'))}</span><span class="dice-combo">${die('knobs', 'diceKnobs')}<button class="dice-mode" data-dice-mode ${tip(opts.diceRange ? 'diceRangeInTip' : 'diceRangeFullTip')}><span class="comp-lcd">${esc(opts.diceRange ? t('diceRangeIn') : t('diceRangeFull'))}</span></button></span>
           <span class="dice-sounds">${die('sounds', 'diceSounds', t('diceSoundsLbl'))}${opts.sounds ? `<span class="muted small mono" title="${esc(t('diceSoundsOn'))}">${esc(opts.sounds)}</span><button class="plain" data-sounds-clear aria-label="${esc(t('diceSoundsClear'))}" title="${esc(t('diceSoundsClear'))}">×</button>` : ''}</span></div>
         ${comp ? `<p class="hint muted small comp-knobs-hint">${esc(t('compKnobAutoTip'))}</p>` : ''}<div class="ctrls four">${slider('chaos', 'radioChaos', 'tipChaos')}${slider('energy', 'radioEnergy', 'tipEnergy')}${slider('complexity', 'radioComplexity', 'tipComplexity')}${slider('talk', 'radioTalk', 'tipTalk')}</div>
+        <div class="mat-source" title="${esc(t('matSourceTip'))} ${esc(t('matConsoleTip'))}"><span class="lbl" id="mat-source-lbl">${esc(t('matSource'))}</span><span class="seg" role="radiogroup" aria-labelledby="mat-source-lbl">${SESSION_SOURCES.map(m => `<button class="chip small" role="radio" data-material="${m}" aria-checked="${opts.material === m}" aria-pressed="${opts.material === m}" title="${esc(t(`mat:${m}`))}">${esc(t(`matShort:${m}`))}</button>`).join('')}</span>${opts.material !== opts.materialDefault ? `<span class="muted small">${esc(t('matDefaultIs', { m: t(`matShort:${opts.materialDefault}`) }))}</span>` : ''}</div>
         <div class="radio-how">
           <label class="ctrl" ${tip('tipTransition')}><span class="lbl">${esc(t('radioTransition'))}</span><select id="radio-transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => `<option value="${k}"${opts.transition === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtist' : `tx:${k}`))}</option>`).join('')}</select></label>
           <label class="ctrl" ${tip('tipHarmony')}><span class="lbl">${esc(t('radioHarmony'))}</span><select id="radio-harmony" data-no-knob>${['artist', ...HARMONY_MODES].map(k => `<option value="${k}"${opts.harmony === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtist' : `harmony:${k}`))}</option>`).join('')}</select></label>
@@ -729,7 +738,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.id === 'radio-comp') { opts.compilation = opts.compilation === 'off' ? 'song' : opts.compilation === 'song' ? 'some' : 'off'; saveOpts(); return render(); }
     if (b.id === 'radio-comp-setup') { compOpen = !compOpen; return render(); }
     if (b.dataset.compMove) return editSetup(S0 => { S0.movement = b.dataset.compMove; });
-    if (b.dataset.material) { opts.material = b.dataset.material; saveOpts(); render(); return; }
+    if (b.dataset.material) { const was = opts.material; opts.material = b.dataset.material; saveOpts(); render(); if (S && was !== opts.material) toast(t('matNext', { m: t(`matShort:${opts.material}`) })); return; }
     if (b.dataset.compAll) return editSetup(S0 => { S0[b.dataset.compAll] = null; });
     if (b.dataset.compGenre) return editSetup(S0 => { S0.genres = toggleIn(S0.genres, GENRE_LIST(), b.dataset.compGenre); });
     if (b.dataset.compArtist) return editSetup(S0 => { S0.artists = toggleIn(S0.artists, artists().map(a => a.id), b.dataset.compArtist); });
@@ -741,7 +750,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.soundsClear !== undefined) { opts.sounds = null; saveOpts(); return render(); }
     if (b.dataset.keep !== undefined && opts.temp) { const id = keepArtist(opts.temp); if (id) { opts.temp = null; opts.artist = id; saveOpts(); render(); toast(t('diceKept')); } return; }
     if (b.dataset.tempDrop !== undefined) { if (opts.artist === (opts.temp && opts.temp.id)) opts.artist = null; opts.temp = null; saveOpts(); return render(); }
-    if (b.dataset.cmd) return command({ kind: b.dataset.cmd, ...(b.dataset.type ? { type: b.dataset.type } : {}) });
+    if (b.dataset.varyPart) { varyPart = b.dataset.varyPart; return renderSteer(true); }
+    if (b.dataset.cmd) return command({ kind: b.dataset.cmd, ...(b.dataset.type ? { type: b.dataset.type } : {}), ...(b.dataset.part ? { type: b.dataset.part } : {}) });
     if (b.dataset.cancel) return cancel(+b.dataset.cancel);
     if (b.id === 'steer-scope') { opts.scope = opts.scope === 'session' ? 'song' : 'session'; saveOpts(); return renderSteer(true); }
     if (b.dataset.mixMute) return command({ kind: b.getAttribute('aria-pressed') === 'true' ? 'unmute' : 'mute', track: b.dataset.mixMute });
@@ -868,7 +878,12 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     get history() { return history; },
     get options() { return current(); },
     // defaults the settings page shows and changes (#31)
-    get settings() { return { transition: opts.transition, harmony: opts.harmony, scope: opts.scope, material: opts.material }; },
-    setOption(k, v) { if (!['transition', 'harmony', 'scope', 'material'].includes(k)) return; opts[k] = v; saveOpts(); if (!root.hidden) render(); },
+    // the material source here is the default for new sessions; the console changes the one on air
+    get settings() { return { transition: opts.transition, harmony: opts.harmony, scope: opts.scope, material: opts.materialDefault }; },
+    setOption(k, v) {
+      if (!['transition', 'harmony', 'scope', 'material'].includes(k)) return;
+      if (k === 'material') { if (!SESSION_SOURCES.includes(v)) return; opts.materialDefault = v; if (!S) opts.material = v; } else opts[k] = v;
+      saveOpts(); if (!root.hidden) render();
+    },
   };
 }

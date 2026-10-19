@@ -99,11 +99,14 @@ export const composesOnAir = opts => sessionSource(opts) !== 'patterns' && (opts
 // bar, register, range and rhythmic variety. With the source "varied" a preset track gets a variation of its preset.
 // Tries a few seeds until the idea differs from every idea in avoid; null when the type has no generator (drums keep
 // their grooves, textures their rhythms).
+// M.keepChords (a vary of the pad): the style's own progressions are left out, so the pad keeps the song's chords and
+// changes only its rhythm, register and voicing.
 export function airIdea(t, R, M) {
   const kind = KIND_OF_TYPE[t.type];
   if (!kind || kind === 'drums') return null;
   const harmony = { key: M.key, mode: (t.settings && t.settings.mode) || 'minor', chords: M.chords };
-  const style = (R[t.type] && R[t.type].material) || {}, shape = { density: M.density, register: M.energy, complexity: M.complexity };
+  const own = (R[t.type] && R[t.type].material) || {};
+  const style = M.keepChords && own.rules ? { ...own, rules: own.rules.filter(x => x !== 'mode') } : own, shape = { density: M.density, register: M.energy, complexity: M.complexity };
   const avoid = new Set((M.avoid || []).filter(Boolean).map(x => JSON.stringify(x)));
   const preset = ((t.patterns || {}).A || {}).preset;
   for (let k = 0; k < 8; k++) {
@@ -114,4 +117,20 @@ export function airIdea(t, R, M) {
     if (v && v.idea && !avoid.has(JSON.stringify(v.idea))) return v.idea;
   }
   return null;
+}
+
+// ---------- ready parts for Swap (radio-variation) ----------
+
+// The ready parts a track can swap to: its style's presets of the same type and the user's saved patterns that fit the
+// song's style and key (fitsTrack), never composed. Parts the track already holds are left out. An arp keeps its speed.
+// parts: the song's parts (plan.parts), for the style tags of the saved patterns.
+export function readyParts(t, R, opts = {}, parts = {}) {
+  if (!KIND_OF_TYPE[t.type] || t.type === 'drums') return [];
+  const r = R[t.type] || {}, list = t.type === 'guitar' ? r.patterns : r.presets, held = Object.values(t.patterns || {});
+  const speed = t.type === 'arp' ? ((t.patterns || {}).A || {}).speed || (r.speeds || ['16'])[0] : null;
+  const has = p => held.some(h => (p.preset !== undefined && h.preset === p.preset && !h.idea) || same(h, p));
+  const presets = (list || []).map(x => ({ preset: x, ...(speed ? { speed } : {}) }));
+  const styles = [parts && parts[PART_OF[t.type]]].filter(Boolean);
+  const mine = userPool(opts.userPatterns, { type: t.type, styles }).map(p => JSON.parse(JSON.stringify(p.pattern)));
+  return [...presets, ...mine].filter(p => !has(p));
 }

@@ -1,7 +1,7 @@
 // Browser checks for the radio compilation (#49): the button and its lamps, the setup (preset, genres, ranges, saved
 // presets), songs drawn within the setup, the now playing tag, Keep for a random artist, Replay gives the same songs,
-// knobs that follow the song on air and hold a value moved by hand (#59), the material source in the setup, saved with
-// the session (material-generator, radio-variation 6.1).
+// knobs that follow the song on air and hold a value moved by hand (#59), the material source in the setup and next to
+// the knobs, saved with the session (material-generator, radio-variation 6.1 and 6.2).
 // Usage: PLAYWRIGHT_CORE=... node tools/check-compilation.cjs [shots-dir]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -42,10 +42,10 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(JSON.stringify(o.compSetup.genres.sort()) === '["industrial","techno"]' && o.compPreset === 'custom', 'genres picked by hand', JSON.stringify(o.compSetup.genres));
   await page.fill('#comp-name', 'Notte industriale'); await page.click('#comp-save'); await sleep(200);
   check(await page.evaluate(() => !!(JSON.parse(localStorage.getItem('coding-misk-comp-presets') || '{}'))['Notte industriale']) && (await opts()).compPreset === 'Notte industriale', 'a setup is saved as a preset');
-  // the material source: chips in the setup, saved in the options, never in the live console
+  // the material source: chips in the setup and next to the knobs (radio-variation 6.2), saved in the options
   await page.click('.comp-setup [data-material="patterns"]'); await sleep(150);
   check((await opts()).material === 'patterns' && (await page.getAttribute('.comp-setup [data-material="patterns"]', 'aria-pressed')) === 'true', 'the material source is picked in the setup');
-  check(await page.evaluate(() => [...document.querySelectorAll('[data-material]')].every(b => b.closest('.comp-setup'))), 'the material source is only in the setup');
+  check(await page.evaluate(() => [...document.querySelectorAll('[data-material]')].every(b => b.closest('.comp-setup, .mat-source')) && document.querySelector('.mat-source [data-material="patterns"]').getAttribute('aria-pressed') === 'true'), 'the setup and the console show the same material source');
   if (shots) await page.screenshot({ path: path.join(shots, 'setup.png') });
 
   await page.click('#radio-comp'); await sleep(100); await page.click('#radio-comp'); await sleep(100); // off, then every song

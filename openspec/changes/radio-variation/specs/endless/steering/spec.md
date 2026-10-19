@@ -58,7 +58,7 @@ Composed material SHALL be seeded by the song and the command (its index among t
 - **THEN** the varied parts play the same notes as when the session was heard
 
 ### Requirement: Material source in the setup
-The radio's compilation setup and the radio settings SHALL offer the material source of `material-generator` (patterns, varied patterns, composed, mix; default mix). The choice SHALL NOT appear in the live console, and SHALL be saved with the session.
+The radio's compilation setup and the radio settings SHALL offer the material source of `material-generator` (patterns, varied patterns, composed, mix; default mix). The choice SHALL be saved with the session (the console also shows it, see "Material source in the console").
 
 #### Scenario: A session with patterns only
 - **WHEN** the owner sets the source to "patterns" in the compilation setup and starts the radio

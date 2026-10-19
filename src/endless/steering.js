@@ -6,7 +6,7 @@ import { stream } from './random.js';
 import { stateAt } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
 import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, meterSteps } from '../music.js';
-import { airIdea, composesOnAir, sessionSource } from './material.js';
+import { airIdea, composesOnAir, sessionSource, readyParts } from './material.js';
 import { presetOf } from '../material/index.js';
 
 // commands of the console: group, whether they change the song's structure (applied on a double phrase)
@@ -15,6 +15,8 @@ export const COMMANDS = {
   add: { group: 'arrangement' }, remove: { group: 'arrangement' }, 'more-complex': { group: 'arrangement' }, 'less-complex': { group: 'arrangement' },
   // new notes for a part (radio-variation): a pattern step from the next phrase
   vary: { group: 'arrangement' },
+  // another ready part (a preset or a saved pattern) for a part, never composed: a pattern step from the next phrase
+  swap: { group: 'arrangement' },
   darker: { group: 'sound' }, brighter: { group: 'sound' }, dirtier: { group: 'sound' }, cleaner: { group: 'sound' }, 'more-space': { group: 'sound' }, instrument: { group: 'sound' },
   progression: { group: 'harmony', structural: true }, key: { group: 'harmony', structural: true },
   'talk-more': { group: 'voice' }, 'talk-less': { group: 'voice' },
@@ -24,7 +26,7 @@ export const COMMANDS = {
   volume: { group: 'mixer', bar: true }, mute: { group: 'mixer', bar: true }, unmute: { group: 'mixer', bar: true }, lock: { group: 'mixer' }, unlock: { group: 'mixer' },
 };
 export const ARRANGE_TYPES = ['drums', 'bass', 'lead', 'pad', 'texture'];
-// the parts Vary can rewrite, lead first (the default); for vary the lead is the hook, else the guitar, and the arp is
+// the parts Vary and Swap can rewrite, lead first (the default); for vary the lead is the hook, else the guitar, and the arp is
 // a part of its own (radio-variation D1)
 export const VARY_TYPES = ['lead', 'bass', 'arp', 'pad'];
 const LEAD = ['arp', 'hook', 'guitar'];
@@ -56,9 +58,11 @@ function stateOf(song, plan, bar) {
 }
 
 // why a command cannot apply now, or null when it can (for the console: disabled buttons say why)
-//   late, no-type, all-playing, locked, last-track, no-target, no-drop, not-playing (vary: no track of the part plays)
+//   late, no-type, all-playing, locked, last-track, no-target, no-drop, not-playing (vary, swap: no track of the part
+//   plays), no-ready (swap: no other ready part fits)
 // tail: bars at the end of the song where the transition to the next song already plays (extend cannot go there)
-export function whyNot(cmd, song, plan, now, tail = 0) {
+// opts: the song's options (swap reads the user's saved patterns from them)
+export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
   const at = applyBar(cmd.kind, now, plan);
   if (at <= now || at >= plan.bars) return 'late';
   if (cmd.kind === 'extend' && at >= plan.bars - tail) return 'transition';
@@ -71,10 +75,13 @@ export function whyNot(cmd, song, plan, now, tail = 0) {
     if (!free.length) return 'all-playing';
     return free.some(t => !locked.includes(t.id)) ? null : 'locked';
   }
-  if (cmd.kind === 'vary') {
+  if (cmd.kind === 'vary' || cmd.kind === 'swap') {
     const mine = varyTracks(on, cmd.type || 'lead');
     if (!mine.length) return 'not-playing';
-    return mine.some(t => !locked.includes(t.id)) ? null : 'locked';
+    const free = mine.filter(t => !locked.includes(t.id));
+    if (!free.length) return 'locked';
+    if (cmd.kind === 'swap' && !free.some(t => readyParts(t, plan.R, opts || {}, plan.parts).length)) return 'no-ready';
+    return null;
   }
   if (cmd.kind === 'remove') {
     const mine = on.filter(t => ofType(t, cmd.type));
@@ -158,20 +165,32 @@ function composeNew(P, O, song, st, at, ids, seed) {
 }
 // Vary (D1, D2): a new idea for each playing, unlocked track of the part, added to its patterns as V<k>, and a pattern
 // step at the boundary marked as the listener's. The rest of the song stays as it was; later pattern steps of the
-// varied tracks go, so the new part stays until another command changes it.
+// varied tracks go, so the new part stays until another command changes it. Vary always composes, whatever the
+// session's material source; a pad keeps the song's chords.
+// Swap: the same, with another ready part (readyParts: a preset or a saved pattern that fits) as S<k>, never composed,
+// drawn from the stream "<track>" of the seed swap:<song>:<index>.
 function vary(song, P, O, cmd, st, seed) {
+  const swap = cmd.kind === 'swap', prefix = swap ? 'S' : 'V';
   const on = varyTracks(playing(st), cmd.type || 'lead').filter(t => !P.locked.includes(t.id));
-  const M = airInputs(P, O, st, cmd.at);
+  const M = swap ? null : { ...airInputs(P, O, st, cmd.at), source: 'composed', keepChords: true };
   let build = (song.build || []).slice();
   const tracks = song.tracks.map(t => ({ ...t }));
   on.forEach(t => {
     const own = P.tracks.find(x => x.id === t.id), mine = tracks.find(x => x.id === t.id);
     if (!own || !mine) return;
-    const idea = airIdea(own, P.R, { ...M, seed: `${seed}:${t.id}`, avoid: ideasOf(own) });
-    if (!idea) return;
-    const name = `V${Object.keys(own.patterns).filter(k => /^V\d+$/.test(k)).length + 1}`;
-    own.patterns = { ...own.patterns, [name]: { idea } };
-    mine.patterns = { ...mine.patterns, [name]: { idea } };
+    let pattern;
+    if (swap) {
+      const pool = readyParts(own, P.R, O, P.parts);
+      if (!pool.length) return;
+      pattern = JSON.parse(JSON.stringify(stream(seed, t.id).pick(pool)));
+    } else {
+      const idea = airIdea(own, P.R, { ...M, seed: `${seed}:${t.id}`, avoid: ideasOf(own) });
+      if (!idea) return;
+      pattern = { idea };
+    }
+    const name = `${prefix}${Object.keys(own.patterns).filter(k => new RegExp(`^${prefix}\\d+$`).test(k)).length + 1}`;
+    own.patterns = { ...own.patterns, [name]: pattern };
+    mine.patterns = { ...mine.patterns, [name]: JSON.parse(JSON.stringify(pattern)) };
     const step = { at: cmd.at, pattern: { track: t.id, to: name }, by: 'listener' };
     // a comment on a dropped step moves to the new one
     const gone = build.filter(s => s.at >= cmd.at && s.pattern && s.pattern.track === t.id), said = gone.find(s => s.at === cmd.at && s.say);
@@ -194,7 +213,7 @@ function rewrite(song, plan, opts, cmd, rng) {
   const d0 = Math.floor(from / 2);
   const st = stateOf(song, P, at), on = playing(st);
   const ctx = { usual: P.usualHigh, weights: P.R.energy, hardMax: P.hardMax };
-  if (cmd.kind === 'vary') return vary(song, P, O, cmd, st, `${rng.seed}:vary:${rng.n}:${rng.i}`);
+  if (cmd.kind === 'vary' || cmd.kind === 'swap') return vary(song, P, O, cmd, st, `${rng.seed}:${cmd.kind}:${rng.n}:${rng.i}`);
   switch (cmd.kind) {
     case 'energy-up': case 'energy-down':
       for (let d = d0; d < P.plan.length; d++) P.plan[d].target = round2(clamp(P.plan[d].target + (cmd.kind === 'energy-up' ? 0.15 : -0.15), 0.05, 1));
@@ -322,7 +341,8 @@ function rewrite(song, plan, opts, cmd, rng) {
 export function steerSong({ song, plan, opts, commands, seed, n }) {
   let cur = { song: clone(song), plan, opts };
   commands.forEach((cmd, i) => {
-    // (seed, n, i: composed material is seeded by the song and the command's index, vary:<song>:<index>)
+    // (seed, n, i: composed and swapped material is seeded by the song and the command's index, vary:<song>:<index>,
+    // swap:<song>:<index>)
     const rng = { moves: stream(seed, `steer:${n}:${i}:moves`), comments: stream(seed, `steer:${n}:${i}:comments`), seed: String(seed), n, i };
     cur = rewrite(cur.song, cur.plan, cur.opts, cmd, rng);
   });

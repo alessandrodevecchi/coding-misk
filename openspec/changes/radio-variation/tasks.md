@@ -12,27 +12,27 @@
 
 ## 3. Console and playlists
 
-- [ ] 3.1 "Vary" button, part picker, shortcut `n`, queue label and tooltip with the reason; strings in `src/i18n.js` in English and Italian; verify with `node tools/check-steering.cjs` (button, picker, disabled state, cancel) and screenshots
-- [ ] 3.2 Playlist warning when the saved version differs (older or newer); verify with `node tools/check-playlists.cjs`
-- [ ] 3.3 Radio plays a vary without errors; verify with `node --no-warnings tools/check-radio.cjs` and `node tools/check-transitions.cjs` (no evaluation errors, below clipping)
+- [x] 3.1 "Vary" button, part picker, shortcut `n`, queue label and tooltip with the reason; strings in `src/i18n.js` in English and Italian; verify with `node tools/check-steering.cjs` (button, picker, disabled state, cancel) and screenshots
+- [x] 3.2 Playlist warning when the saved version differs (older or newer); verify with `node tools/check-playlists.cjs`
+- [x] 3.3 Radio plays a vary without errors; verify with `node --no-warnings tools/check-radio.cjs` and `node tools/check-transitions.cjs` (no evaluation errors, below clipping)
 
 ## 4. Docs and Guide
 
-- [ ] 4.1 Guide card for Vary and the composed Add, in English and Italian in `src/guide.js`; verify with `npm run check:guide`
+- [x] 4.1 Guide card for Vary and the composed Add, in English and Italian in `src/guide.js`; verify with `npm run check:guide`
 - [x] 4.2 `docs/ENDLESS.md` Steering table and Determinism; `DEVLOG.md` entry in Italian
 
 ## 5. Integration and listening test
 
-- [ ] 5.1 With `radio-profiles` and `growth-shapes` in place, a vary on air is typed as small notes edits; verify with `node tools/check-steering.cjs` on a Live coder song (skip and say so while `radio-profiles` is on hold)
+- [ ] 5.1 With `radio-profiles` and `growth-shapes` in place, a vary on air is typed as small notes edits; verify with `node tools/check-steering.cjs` on a Live coder song (skip and say so while `radio-profiles` is on hold) — open: `radio-profiles` is on hold, so the radio still builds in blocks and a vary switches the part in one step (2026-10-19)
 - [ ] 5.2 Owner's listening test (`docs/VARIETY.md`): a radio session steered by the owner, with Vary on each part; notes in `DEVLOG.md`
 
 ## 6. Material source
 
 - [x] 6.1 Material source choice in the compilation setup and in Settings → Radio (strings in English and Italian), saved with the session; verify in `tools/check-compilation.cjs` and `tools/check-settings.cjs`
-- [ ] 6.2 Material source selector in the console next to complexity, applied from the next song and recorded for replays; Settings keeps the default; verify in `tools/check-steering.cjs`
+- [x] 6.2 Material source selector in the console next to complexity, applied from the next song and recorded for replays; Settings keeps the default; verify in `tools/check-steering.cjs`
 
 ## 7. Swap
 
-- [ ] 7.1 `COMMANDS.swap` with the same part types as vary: another ready part (preset or saved pattern) that fits style and key, never composed; seeds `swap:<song>:<index>`; verify in `tools/check-endless.mjs`
-- [ ] 7.2 Swap button next to Vary, strings in English and Italian, Guide card update; verify with `tools/check-steering.cjs` and `npm run check:guide`
+- [x] 7.1 `COMMANDS.swap` with the same part types as vary: another ready part (preset or saved pattern) that fits style and key, never composed; seeds `swap:<song>:<index>`; verify in `tools/check-endless.mjs`
+- [x] 7.2 Swap button next to Vary, strings in English and Italian, Guide card update; verify with `tools/check-steering.cjs` and `npm run check:guide`
 

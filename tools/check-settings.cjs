@@ -46,14 +46,15 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.selectOption('#tab-impostazioni [data-radio-opt="transition"]', 'morph'); await sleep(100);
   await page.selectOption('#set-radio-look', 'sonar'); await sleep(100);
   await page.selectOption('#set-format', 'opus'); await sleep(100);
-  // the material source (material-generator, radio-variation 6.1)
+  // the material source (material-generator, radio-variation 6.1): Settings keeps the default the radio starts from (6.2)
   await page.selectOption('#tab-impostazioni [data-radio-opt="material"]', 'varied'); await sleep(100);
-  check((await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').material)) === 'varied', 'the material source is saved from the settings');
+  check((await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').materialDefault)) === 'varied', 'the default material source is saved from the settings');
   const saved = await page.evaluate(() => ({ radio: JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').transition, look: JSON.parse(localStorage.getItem('coding-misk-radio-look')), fmt: JSON.parse(localStorage.getItem('coding-misk-export-format')) }));
   check(saved.radio === 'morph' && saved.look === 'sonar' && saved.fmt === 'opus', 'radio defaults and export format saved', JSON.stringify(saved));
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   check((await page.inputValue('#radio-transition')) === 'morph', 'the radio shows the default from the settings');
   check((await page.evaluate(() => globalThis.codingMiskRadio && globalThis.codingMiskRadio.settings.material)) === 'varied', 'the radio takes the material source from the settings');
+  check((await page.getAttribute('.radio-ctrls .mat-source [data-material="varied"]', 'aria-pressed')) === 'true', 'the console starts from the default of the settings');
 
   // Opus export of a short song
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);

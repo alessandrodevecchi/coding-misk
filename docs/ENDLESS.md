@@ -137,12 +137,12 @@ FM patches are a rack device (`fm`, `src/song/rack.js`), inside a range table: i
 
 For each track whose type has a generator (drums, bass, arp, lead, pad, guitar), the director asks where its material comes from, on the `material` streams of the session seed (`material/<song>/<track>`), so the other streams keep their draws:
 
-- **Session source** (option `material`, saved with the session and the radio's recipe): `patterns` plays the library as written, with no mutation; `varied` keeps presets and adds a pattern that keeps their rhythm or notes (complexity sets how often the base pattern is varied too); `composed` composes every part; `mix`, the default, asks each recipe instrument's `material` field (`preset`, `generated`, or `mix` with a `share`).
+- **Session source** (option `material`, saved with the session and the radio's recipe; in the radio it is picked in the console next to the knobs and applies from the next song prepared, recorded in the recipe's changes like the knobs, while Settings → Radio keeps the default for new sessions): `patterns` plays the library as written, with no mutation; `varied` keeps presets and adds a pattern that keeps their rhythm or notes (complexity sets how often the base pattern is varied too); `composed` composes every part; `mix`, the default, asks each recipe instrument's `material` field (`preset`, `generated`, or `mix` with a `share`).
 - **Complexity 0** keeps presets only, whatever the recipes say, and gives the same songs as director version 2 (unless the session source is `composed`).
 - A composed track gets pattern A at the target energy of the phrase where its type usually comes in (its place in the entry order), pattern B at the song's next big moment, and pattern C at the quietest phrase when complexity is above 0.6. The kick and beat tracks share one composed groove. A recipe that names `sounds` also gets a composed sound on composed tracks.
 - **The user's saved patterns** (`pattern-library`, passed as `userPatterns`) join the pool only where they fit: the same track type, a style tag of the part's style or `any`, and material that moves to the song's key.
 
-The session report (`npm run endless`) shows which tracks are composed, varied or saved. `DIRECTOR_VERSION` is 4 (voice-instrument, below): sessions saved by an older version warn in the playlists.
+The session report (`npm run endless`) shows which tracks are composed, varied or saved. `DIRECTOR_VERSION` is 5 (`radio-variation`, Add and More complex compose): sessions saved by another version, older or newer, warn in the playlists.
 
 The rules were written from scratch from general techniques of live coders and public courses; no passage or full recipe of a course is reused, so no credit line is needed.
 
@@ -212,6 +212,7 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | Add, remove a type | next phrase | a forced add of a silent track of that type (a new one from the song's style when the song has none, `#41`), or a forced remove of every playing one; a track the song has not played yet gets composed material |
 | More, less complex | next phrase | usual track count ±1 and session complexity ±0.2; with More, the tracks that have not played yet get composed material |
 | Vary a part (`radio-variation`) | next phrase | a new idea for each playing, unlocked track of the part (lead, the default, bass, arp or pad), added as pattern `V<k>` with a listener's pattern step; the rest of the song stays, later pattern steps of the varied tracks go |
+| Swap a part (`radio-variation`) | next phrase | another ready part for each playing, unlocked track of the part (a style preset or a saved pattern that fits), added as pattern `S<k>` with a listener's pattern step; never composed |
 | Darker, brighter, dirtier, cleaner, more space | next phrase | that move on every playing track that allows it |
 | Change instrument | next phrase | another wave, kit, guitar or texture from the style |
 | Change progression, key | next double phrase | the following sections take another progression, or a key a fifth away |
@@ -224,7 +225,8 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 
 Steering composes with the material generator (`radio-variation`, `airIdea` in `src/endless/material.js`), in the key and chords of the section where the material starts and with the style's rules:
 
-- **Vary** (`vary`, part in `type`, one of `VARY_TYPES`: `lead`, `bass`, `arp`, `pad`): for the lead the hook, else the guitar; the arp is a part of its own (unlike Add and Remove, where lead covers the arp). The new idea differs from every pattern the track already has; drums and textures are not varied. Later commands keep the varied part (its step is kept as the listener's), and later director moves of the track may pick it or another of its patterns. Disabled with `not-playing` when no track of the part plays at the bar where it would apply, `locked` when every one is locked. Vary always composes, whatever the session source.
+- **Vary** (`vary`, part in `type`, one of `VARY_TYPES`: `lead`, `bass`, `arp`, `pad`): for the lead the hook, else the guitar; the arp is a part of its own (unlike Add and Remove, where lead covers the arp). The new idea differs from every pattern the track already has; drums and textures are not varied. Later commands keep the varied part (its step is kept as the listener's), and later director moves of the track may pick it or another of its patterns. Disabled with `not-playing` when no track of the part plays at the bar where it would apply, `locked` when every one is locked. Vary always composes, whatever the session source; a pad keeps the song's chords (the style's own progressions are left out) and changes only its rhythm, register and voicing.
+- **Swap** (`swap`, the same parts as Vary): another ready part, never composed: `readyParts` lists the style's presets of the track's type (an arp keeps its speed) and the user's saved patterns that fit the song's style and key, without the parts the track already holds; the pick comes from the stream of the track id in the seed `swap:<song>:<index>`. Disabled with `not-playing` and `locked` as Vary, and `no-ready` when nothing else fits.
 - **Add and More complex**: a melodic track (bass, arp, lead, pad, guitar) that has not played before the command and still holds presets gets composed patterns A and B. Drums and textures keep the style's presets. With the session source `patterns`, or at complexity 0, nothing is composed and the songs are the same as before; with `varied`, the track gets a variation of its preset.
 - **Inputs** (`airInputs`), at the double phrase where the material starts: density is the density target, or the tracks playing when the curve is automatic, as a share of the most the song can play, and sets the notes per bar (the generator's onsets band); the energy target sets the register (a melody moves up to three degrees up or down, a bass favours octaves, an arpeggio goes an octave up above 0.75, a pad's anchor is `a3`, `c4` or `e4`); the session complexity, moved by More and Less complex, sets the range (the span of a melody) and the rhythmic variety (syncopation, fifths in a bassline, skips and random indices in an arpeggio, voicing modes of a pad).
 
@@ -234,7 +236,7 @@ A session can start after a song from Compose or the Songs tab (`#29`): `createS
 
 ### Sessions in playlists
 
-A radio session can be a playlist item (`#38`): the recipe (seed, options and changes, steering, song 0), the number of songs heard, a title and `DIRECTOR_VERSION`. In a playlist the radio replays it for that many songs and hands back to the queue; with Mix on its songs are rebuilt as heard and join the mix stream like saved songs. A session made with an older director version warns that it may sound different; Freeze stores its songs and transitions, and a frozen session plays them without the director. Bump `DIRECTOR_VERSION` whenever the fixtures change.
+A radio session can be a playlist item (`#38`): the recipe (seed, options and changes, steering, song 0), the number of songs heard, a title and `DIRECTOR_VERSION`. In a playlist the radio replays it for that many songs and hands back to the queue; with Mix on its songs are rebuilt as heard and join the mix stream like saved songs. A session made with another director version, older or newer, warns that it may sound different; Freeze stores its songs and transitions, and a frozen session plays them without the director. Bump `DIRECTOR_VERSION` whenever the fixtures change.
 
 ### Curves
 
@@ -251,7 +253,7 @@ A tension of 0.7 or more gives a part the strong progression (sections split whe
 
 ## Determinism
 
-Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`, `voice`, `artist`, `transition`, and `material/<song>/<track>` for composed parts. Material composed on air is seeded by the song and the command's index: `vary:<song>:<index>` for Vary, `add:<song>:<index>` and `more:<song>:<index>` for Add and More complex (with the track id), so cancelling a command or replaying a recorded session gives the same notes, and no other stream moves. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit. The fixtures are sessions without steering, so composing on air did not move them and `DIRECTOR_VERSION` stays 4; steered songs at complexity 0 or with the source `patterns` are pinned by hashes recorded before `radio-variation`.
+Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`, `voice`, `artist`, `transition`, and `material/<song>/<track>` for composed parts. Material composed on air is seeded by the song and the command's index: `vary:<song>:<index>` for Vary, `swap:<song>:<index>` for Swap, `add:<song>:<index>` and `more:<song>:<index>` for Add and More complex (with the track id), so cancelling a command or replaying a recorded session gives the same notes, and no other stream moves. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit. The fixtures are sessions without steering, so composing on air did not move them; `DIRECTOR_VERSION` went to 5 anyway, because saved sessions with Add or More complex sound different; steered songs at complexity 0 or with the source `patterns` are pinned by hashes recorded before `radio-variation`.
 
 ## Checks
 
@@ -307,6 +309,8 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Vary: replay and cancel                      | `steering: vary replays the same, and a cancelled vary leaves the notes` |
 | Add and More complex compose; plain sessions as before | `steering: Add and More complex compose new tracks`    |
 | Curves and complexity shape composed material | `steering: curves and complexity shape composed material`       |
+| Vary composes with any source; pad keeps chords | `steering: vary composes whatever the source, and a pad keeps its chords` |
+| Swap: a ready part, replays, why not, saved patterns | `steering: swap gives a part another ready part, never composed` |
 | A vary under 20 ms                           | `steering: one vary takes less than 20 ms`                       |
 | Continue a Compose song                      | `radio: a session continues after a song from Compose`           |
 

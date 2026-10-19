@@ -81,6 +81,31 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   await sleep(6000);
   check((await levels()).length > 0, 'sound after skip', await levels());
 
+  // a vary and a swap on air (radio-variation 3.3): the song plays them at their bar, no evaluation error, below clipping
+  {
+    const steered = () => page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return s.song.build.filter(x => x.by && x.pattern).map(x => ({ at: x.at, to: x.pattern.to })); });
+    // the middle of the song, where more parts play; the first part each button accepts
+    { const it = (await R()).state; await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.floor(it.stream[it.onAir].bars / 2)); await sleep(800); }
+    // (on two different parts: a swap of the varied part at the same bar would replace the vary)
+    const done = {};
+    for (const kind of ['vary', 'swap']) for (const type of ['lead', 'bass', 'arp', 'pad']) {
+      if (Object.values(done).includes(type)) continue;
+      await page.click(`#radio-steer [data-vary-part="${type}"]`); await sleep(150);
+      if (await page.$eval(`#radio-steer [data-cmd="${kind}"]`, b => b.disabled)) continue;
+      await page.click(`#radio-steer [data-cmd="${kind}"]`); await sleep(300);
+      done[kind] = type;
+      break;
+    }
+    const st = await steered(), last = Math.max(0, ...st.map(x => x.at));
+    check(done.vary && st.some(x => /^V\d+$/.test(x.to)) && (!done.swap || st.some(x => /^S\d+$/.test(x.to))), 'a vary and a swap are queued on the song on air', `${JSON.stringify(done)} ${JSON.stringify(st)}`);
+    const start = (await R()).state.stream[(await R()).state.onAir].start;
+    for (let k = 0; k < 120 && (await ed()).cyc < start + last + 1.5; k++) await sleep(250);
+    const e = await ed(), lv = await levels();
+    const top = Math.max(0, ...lv.split(' ').filter(Boolean).map(x => +x.split('=')[1]));
+    check(!e.err && e.cyc >= start + last + 1, 'the varied and swapped parts play without evaluation errors', `bar ${(e.cyc - start).toFixed(1)}, last step ${last} ${e.err.slice(0, 100)}`);
+    check(lv.length > 0 && top < 1, 'sound below clipping after the vary and swap', lv);
+  }
+
   // the voice of each song comes from its voice style, with its own speaker
   {
     const voiceBank = () => page.evaluate(() => (document.querySelector('strudel-editor').editor.code.match(/s\("(say_[a-z_]+)"\)/) || [])[1] || '');

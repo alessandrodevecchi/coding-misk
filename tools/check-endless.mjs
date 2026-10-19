@@ -87,18 +87,19 @@ function plainSteer({ seed, songs: _, ...o }) {
   return out;
 }
 // Varies of every part over sessions of several styles (radio-variation): { g, type, at, ids, r } for each vary that
-// applies, until `count`; n moves the command's seed, so one song gives several varies
-function varies(count) {
+// applies, until `count`; n moves the command's seed, so one song gives several varies. kind: vary or swap; extra:
+// more session options (material source, user patterns)
+function varies(count, kind = 'vary', extra = {}) {
   const out = [];
   for (const [k, id] of ['synthwave', 'trance', 'berlin-techno', 'jazz', 'phonk', 'lo-fi', 'melodic-metal', 'drum-and-bass'].entries()) {
     const ses = createSession(STYLES, `vary-${id}`);
     for (let s = 0; s < 6 && out.length < count; s++) {
-      const g = ses.next({ styles: [id], complexity: [0.2, 0.5, 0.9][s % 3] });
+      const g = ses.next({ styles: [id], complexity: [0.2, 0.5, 0.9][s % 3], ...extra });
       for (const type of VARY_TYPES) for (const now of [20, 44]) {
-        const at = applyBar('vary', now, g.plan);
-        if (whyNot({ kind: 'vary', type }, g.song, g.plan, now)) continue;
+        const at = applyBar(kind, now, g.plan);
+        if (whyNot({ kind, type }, g.song, g.plan, now, 0, g.opts)) continue;
         const ids = varyTracks(playing(stateAt(g.song, at).song), type).map(t => t.id);
-        for (let n = 0; n < 3 && out.length < count; n++) out.push({ g, type, at, ids, r: steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'vary', type, at }], seed: `vary-${k}`, n: 10 * s + n }) });
+        for (let n = 0; n < 3 && out.length < count; n++) out.push({ g, type, at, ids, r: steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind, type, at }], seed: `${kind}-${k}`, n: 10 * s + n }) });
       }
     }
   }
@@ -770,6 +771,57 @@ const CHECKS = {
     // cancelled: the song without the vary is the song as it was
     assert(JSON.stringify(go([cmds[1]]).song) === JSON.stringify(go([cmds[1]]).song) && !go([cmds[1]]).song.tracks.some(x => x.patterns.V1), 'a cancelled vary left a pattern');
     assert(JSON.stringify(go([]).song) === JSON.stringify(g.song), 'no command changed the song');
+  },
+  'steering: vary composes whatever the source, and a pad keeps its chords'() {
+    for (const material of ['patterns', 'varied']) {
+      const all = varies(40, 'vary', { material });
+      assert(all.length === 40, `${material}: only ${all.length} varies`);
+      for (const { type, ids, r } of all) for (const id of ids) {
+        const t = r.song.tracks.find(x => x.id === id), p = t.patterns[Object.keys(t.patterns).filter(x => /^V\d+$/.test(x)).pop()];
+        assert(p && p.idea && !p.preset && p.idea.from === undefined, `${material}: vary ${type} of ${id} did not compose ${JSON.stringify(p)}`);
+      }
+    }
+    // a pad vary keeps the song's chords: no progression of its own, only rhythm, register and voicing
+    const pads = varies(200).filter(x => x.type === 'pad');
+    assert(pads.length > 5, `only ${pads.length} pad varies`);
+    for (const { ids, r } of pads) for (const id of ids) { const t = r.song.tracks.find(x => x.id === id); assert(t.patterns.V1.idea.chords === undefined, `pad ${id} changed the chords ${JSON.stringify(t.patterns.V1.idea)}`); }
+  },
+  'steering: swap gives a part another ready part, never composed'() {
+    const all = varies(120, 'swap'), types = {};
+    assert(all.length === 120, `only ${all.length} swaps`);
+    for (const { g, type, at, ids, r } of all) {
+      types[type] = (types[type] || 0) + 1;
+      assert(!validateSong(r.song).errors.length, `swap ${type}: invalid song`);
+      for (const id of ids) {
+        const t = r.song.tracks.find(x => x.id === id), was = g.song.tracks.find(x => x.id === id), name = Object.keys(t.patterns).filter(x => /^S\d+$/.test(x)).pop();
+        const p = name && t.patterns[name], list = t.type === 'guitar' ? g.plan.R.guitar.patterns : g.plan.R[t.type].presets;
+        assert(p && !p.idea && list.includes(p.preset), `swap ${type}: ${id} got ${JSON.stringify(p)}`);
+        assert(!Object.values(was.patterns).some(x => x.preset === p.preset && !x.idea), `swap ${type}: ${id} got a part it already had (${p.preset})`);
+        const step = r.song.build.find(s => s.at === at && s.pattern && s.pattern.track === id);
+        assert(step && step.pattern.to === name && step.by === 'listener', `swap ${type}: no listener step for ${id}`);
+      }
+      const others = sg => JSON.stringify([sg.tracks.filter(t => !ids.includes(t.id)), sg.build.filter(s => !stepTracks(s).some(id => ids.includes(id))).map(({ say, voice, ...s }) => s)]);
+      assert(others(r.song) === others(g.song) && JSON.stringify(r.song.sections) === JSON.stringify(g.song.sections), `swap ${type}: the rest of the song changed`);
+    }
+    assert(VARY_TYPES.filter(t => types[t] > 0).length >= 3, `parts swapped: ${JSON.stringify(types)}`);
+    // the same commands give the same part; the song index moves the seed
+    const { g, type, at } = all[0], go = n => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'swap', type, at }, { kind: 'swap', type, at: at + 2 * g.plan.phrase }], seed: 'swap-replay', n });
+    assert(JSON.stringify(go(0).song) === JSON.stringify(go(0).song), 'the same swaps gave different parts');
+    assert(go(0).song.tracks.some(t => t.patterns.S2), 'two swaps give S1 and S2');
+    assert(new Set([0, 1, 2, 3, 4, 5].map(n => JSON.stringify(go(n).song.tracks.map(t => t.patterns.S1 || null)))).size > 1, 'the song index never moves the swap');
+    // whyNot: as vary, and no-ready when nothing else fits
+    for (const { g, type, at } of all.slice(0, 30)) {
+      const now = at - 1;
+      for (const other of VARY_TYPES) if (whyNot({ kind: 'vary', type: other }, g.song, g.plan, now) === 'not-playing') assert(whyNot({ kind: 'swap', type: other }, g.song, g.plan, now, 0, g.opts) === 'not-playing', `swap ${other} not-playing`);
+      const bare = { ...g.plan, R: Object.fromEntries(Object.entries(g.plan.R).map(([k, v]) => [k, v && typeof v === 'object' && !Array.isArray(v) ? { ...v, presets: [], patterns: [] } : v])) };
+      assert(whyNot({ kind: 'swap', type }, g.song, bare, now, 0, {}) === 'no-ready', `swap ${type}: no-ready (${whyNot({ kind: 'swap', type }, g.song, bare, now, 0, {})})`);
+    }
+    // the user's saved patterns that fit join the pool; one of another style never does
+    const line = { id: 'p-line', name: 'Line', type: 'bass', kind: 'bass', styles: ['any'], pattern: { idea: { rhythm: '[~ x]*4' } }, context: { key: 'A' } };
+    const riff = { id: 'p-riff', name: 'Riff', type: 'bass', kind: 'bass', styles: ['melodic-metal'], pattern: { idea: { rhythm: 'x*8' } }, context: { key: 'E' } };
+    const mine = varies(200, 'swap', { userPatterns: [line, riff] }).filter(x => x.type === 'bass' && x.g.plan.parts.bass !== 'melodic-metal');
+    const got = p => mine.filter(({ ids, r }) => ids.some(id => JSON.stringify(r.song.tracks.find(x => x.id === id).patterns.S1) === JSON.stringify(p.pattern))).length;
+    assert(mine.length > 5 && got(line) > 0 && got(riff) === 0, `saved patterns: ${got(line)} of ${mine.length} bass swaps took the line, ${got(riff)} the riff`);
   },
   'steering: Add and More complex compose new tracks'() {
     let added = 0, more = 0;

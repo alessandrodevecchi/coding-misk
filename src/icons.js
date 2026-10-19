@@ -27,3 +27,7 @@ export const KEEP = svg('0 0 16 16', '<rect x="1.5" y="2" width="3" height="3" r
 export const PENCIL = svg('0 0 16 16', '<path d="M3 13l.6-3 7.2-7.2 2.4 2.4L6 12.4z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M9.6 4l2.4 2.4" fill="none" stroke="currentColor" stroke-width="1.4"/>', 'ico-pencil');
 // an arrow into a box (add to the song open in Compose)
 export const ADD_TO = svg('0 0 16 16', '<path d="M2.5 9.5v4h11v-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 2v8M5 7l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>', 'ico-add');
+// a wavy line with a spark (vary a part: new notes, radio-variation)
+export const VARY = svg('0 0 16 16', '<path d="M1.5 10.5c1.6-3.2 3.2-3.2 4.6 0s3 3.2 4.6 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12.8 1.8v4.4M10.6 4h4.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>', 'ico-vary');
+// two arrows that trade places (swap a part for another ready one, radio-variation)
+export const SWAP = svg('0 0 16 16', '<path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>', 'ico-swap');

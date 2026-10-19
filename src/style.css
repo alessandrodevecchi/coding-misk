@@ -806,6 +806,14 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .steer-group { display: grid; gap: 6px; align-content: start; }
 .steer-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .steer-btn { padding: 6px 12px; font-size: 13px; }
+.steer-btn.with-ico { display: inline-flex; align-items: center; gap: 6px; }
+.steer-btn .ico { width: 14px; height: 14px; flex: none; }
+/* Vary and Swap (radio-variation): the part picker, then the two buttons */
+.steer-part { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; flex-basis: 100%; }
+.steer-btn[disabled] { cursor: help; }
+/* material source next to the knobs (radio-variation 6.2) */
+.mat-source { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.mat-source .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .steer-queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 .steer-queue .at { font: 12px var(--mono); color: var(--a1); margin-right: 6px; }
 .steer-queue .mini { margin-left: 6px; }

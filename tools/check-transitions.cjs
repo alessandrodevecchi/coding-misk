@@ -1,5 +1,6 @@
 // Browser checks for transitions in the radio (#23): for each kind, the radio plays through the end of a song
-// into the next one without evaluation or page errors, with levels below clipping.
+// into the next one without evaluation or page errors, with levels below clipping; a part varied before the end plays
+// into the transition (radio-variation).
 // Usage: PLAYWRIGHT_CORE=... node tools/check-transitions.cjs [kind,kind…]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -34,6 +35,13 @@ const KINDS = (process.argv[2] || 'mix,morph,echo,break,interlude').split(',');
     check(ready && s1, `${kind}: next song prepared`);
     if (!s1) { await page.click('#radio-start'); continue; }
     check(plan && plan.kind === kind, `${kind}: planned`, JSON.stringify(plan));
+    // a vary on the first song (radio-variation 3.3): the varied part plays into the transition
+    for (const type of ['lead', 'bass', 'arp', 'pad']) {
+      if (await page.evaluate(() => globalThis.codingMiskRadio.steering.song.build.some(x => x.by && x.pattern))) break;
+      await page.evaluate(t => globalThis.codingMiskRadio.command({ kind: 'vary', type: t }), type); await sleep(200);
+    }
+    check(await page.evaluate(() => globalThis.codingMiskRadio.steering.song.build.some(x => x.by && x.pattern && /^V\d+$/.test(x.pattern.to))), `${kind}: a part varied before the end`);
+    st = await R();
     // play the last bars of the first song, through the transition, into the next one
     const from = Math.min(s1.start, s0.start + s0.bars) - s0.start - 3;
     await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.max(0, from)); await sleep(300);

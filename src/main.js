@@ -2693,7 +2693,7 @@ const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, 
   onPlayList: (listId, ids) => playQueue(listId, ids) });
 playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, playlists, confirmTwice, toast,
   songs: () => [...libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: c.p.meta.seconds })),
-    ...playlists.all.flatMap(l => l.songs).filter(isSession).map(id => { const s = playlists.session(id); return s && { id, title: s.title, kind: 'session', seconds: 0, count: s.count, frozen: !!s.frozen, old: !s.frozen && (s.version || 0) < DIRECTOR_VERSION }; }).filter(Boolean)],
+    ...playlists.all.flatMap(l => l.songs).filter(isSession).map(id => { const s = playlists.session(id); return s && { id, title: s.title, kind: 'session', seconds: 0, count: s.count, frozen: !!s.frozen, old: !s.frozen && (s.version || 0) !== DIRECTOR_VERSION }; }).filter(Boolean)],
   video: id => exportSession(id),
   freeze: id => { const s = playlists.session(id); if (!s || !radio) return; playlists.freeze(id, radio.rebuild(s.recipe, s.count)); sessionSongs.delete(id); toast(t('plFrozen')); },
   sessionOf: id => playlists.session(id),

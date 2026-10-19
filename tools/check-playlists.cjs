@@ -42,21 +42,28 @@ async function seed(page) {
   // "+ Playlist" on a card: new playlist, then add to it
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(400);
   const card = id => `#songs [data-song-id="${id}"]`;
+  // a song past the first page of the Songs tab (sessions in songs/endless/ can fill it): searched by its title first
+  const TITLES = { 'u-s1': 'Short 1', 'u-s2': 'Short 2', 'u-s3': 'Short 3', drift: 'Drift' };
+  const show = async id => { if (!(await page.isVisible(card(id)))) { await page.fill('#sv-q', TITLES[id] || id); await sleep(500); } };
+  const clearSearch = async () => { if (await page.inputValue('#sv-q')) { await page.fill('#sv-q', ''); await sleep(500); } };
+  await show('u-s1');
   await page.click(`${card('u-s1')} [data-act="playlist"]`); await sleep(150);
   await page.selectOption(`${card('u-s1')} [data-pl-pick]`, '__new'); await sleep(100);
   await page.fill(`${card('u-s1')} [data-pl-name]`, 'Corsa'); await page.click(`${card('u-s1')} [data-pl-confirm]`); await sleep(200);
   ls = await lists();
   const corsa = ls.find(l => l.name === 'Corsa');
   check(corsa && corsa.songs.join() === 'u-s1', 'new playlist from a card', JSON.stringify(corsa));
-  const addTo = async (id, list) => { await page.click(`${card(id)} [data-act="playlist"]`); await sleep(150); await page.selectOption(`${card(id)} [data-pl-pick]`, list); await page.click(`${card(id)} [data-pl-confirm]`); await sleep(150); };
+  const addTo = async (id, list) => { await show(id); await page.click(`${card(id)} [data-act="playlist"]`); await sleep(150); await page.selectOption(`${card(id)} [data-pl-pick]`, list); await page.click(`${card(id)} [data-pl-confirm]`); await sleep(150); };
   for (const id of ['u-s2', 'u-s3']) await addTo(id, corsa.id);
   await addTo('u-s3', corsa.id);
   const menuText = await page.innerText(`${card('u-s3')} [data-pl-pick]`).catch(() => '');
   await page.$eval(`${card('u-s3')} .sv-pl-menu`, m => m.remove()).catch(() => {});
   ls = await lists();
   check(ls.find(l => l.id === corsa.id).songs.join() === 'u-s1,u-s2,u-s3', 'add to an existing playlist, only once', ls.find(l => l.id === corsa.id).songs.join());
+  await show('drift');
   await page.click(`${card('drift')} [data-star]`); await sleep(100);
   check((await lists())[0].songs.includes('drift'), 'the star adds to Favourites');
+  await clearSearch();
 
   // Songs tab playlist row
   check((await page.$$eval('#songs-bar .sv-row', rows => rows.map(r => !!r.querySelector('#sv-q')))).indexOf(true) === 0, 'search bar comes first');
@@ -96,7 +103,8 @@ async function seed(page) {
   check((await page.getAttribute('#pb-repeat', 'data-mode')) === 'one', 'repeat cycles to one');
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
   await page.selectOption('#sv-list', 'all'); await sleep(200);
-  await page.click(`${card('u-s2')} [data-act="play"]`); await sleep(4500);
+  await show('u-s2');
+  await page.click(`${card('u-s2')} [data-act="play"]`); await clearSearch(); await sleep(4000);
   check((await playing()) && (await title()) === 'Short 2', 'repeat one replays a single song', await title());
   await page.click('#stop'); await sleep(200);
   await page.click('#pb-repeat'); await sleep(100);
@@ -171,6 +179,27 @@ async function seed(page) {
   check(!err, 'no evaluation error in the mix', err.slice(0, 120));
   await page.click('#stop'); await sleep(200);
   await page.click('#pb-mix'); await sleep(100);
+
+  // radio sessions (#38, radio-variation 3.2): a session of another director version, older or newer, warns that it may
+  // sound different and offers Freeze; the same version and a frozen session do not warn
+  { const V = await page.evaluate(async () => (await import('/src/endless/director.js')).DIRECTOR_VERSION);
+    await page.evaluate(v => {
+      const pl = JSON.parse(localStorage.getItem('coding-misk-playlists'));
+      const ses = (ver, frozen) => ({ recipe: { seed: 'ver', options: { styles: ['berlin-techno'] }, changes: [] }, count: 1, title: `Ver ${ver}${frozen ? ' frozen' : ''}`, date: '2026-10-19T00:00:00.000Z', version: ver, ...(frozen ? { frozen: [] } : {}) });
+      pl.sessions = { ...(pl.sessions || {}), 'session:v-old': ses(v - 1), 'session:v-new': ses(v + 1), 'session:v-now': ses(v), 'session:v-frozen': ses(v - 1, true) };
+      pl.lists.push({ id: 'p-ver', name: 'Versions', songs: ['session:v-old', 'session:v-new', 'session:v-now', 'session:v-frozen'] });
+      localStorage.setItem('coding-misk-playlists', JSON.stringify(pl));
+    }, V);
+    await page.reload(); await sleep(3000);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(300);
+    await page.click('[data-pl-open="p-ver"]'); await sleep(300);
+    const rows = await page.$$eval('.pl-row', xs => xs.map(x => ({ title: x.querySelector('.pl-title').innerText, old: !!x.querySelector('.pl-old'), freeze: !!x.querySelector('[data-pl-freeze]') })));
+    const at = k => rows.find(r => r.title === k) || {};
+    check(at(`Ver ${V - 1}`).old && at(`Ver ${V - 1}`).freeze, 'an older session warns and offers Freeze', JSON.stringify(rows));
+    check(at(`Ver ${V + 1}`).old, 'a newer session warns too');
+    check(!at(`Ver ${V}`).old && !at(`Ver ${V - 1} frozen`).old, 'the same version and a frozen session do not warn');
+    if (shots) await page.screenshot({ path: path.join(shots, 'playlist-versions.png') });
+  }
 
   // dropdowns use the theme's colours (Chrome's customizable select)
   const appearance = await page.$eval('#sv-sort', el => getComputedStyle(el).appearance).catch(() => '');
