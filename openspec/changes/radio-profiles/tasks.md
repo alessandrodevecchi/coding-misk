@@ -30,6 +30,7 @@ Each stage ends with its checks green before the next starts. "Verify" names the
 - [ ] 4.3 Same events: shown plus hidden code against the full form of the window at every step of one transition; verify with a new case in `node tools/check-compact-code.cjs`
 - [ ] 4.4 Views on air: code of the moment with lanes, compact and song functions (no name clash with hidden songs), lit notes, line breaks, human typing with mistakes; verify `npm run check:functions`, `npm run check:typing`, `npm run check:live-code`, and a browser screenshot set of one Live coder song on air
 - [ ] 4.5 Console: Profile control, now playing profile and shape, strings in English and Italian, Guide card of the Radio; verify `node tools/check-steering.cjs` (control applies from the next song, recorded for replay) and `npm run check:guide`
+- [ ] 4.6 Custom profile in the radio console: same controls as Compose in a collapsible section with a summary, saved with the session and replayed; strings in English and Italian; screenshot desktop and phone
 
 ## 5. Commands as waypoints
 

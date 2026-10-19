@@ -158,6 +158,18 @@ Notes to update in the same change (`AGENTS.md`): `radio.md` (option `profile`, 
 - **[Orbits run out with two songs plus voices]** → the hidden songs get their own orbit range; the check counts orbits in use per window.
 - **[Export speed with many steps]** → measured on one hour; steps in one render block are joined if needed.
 
+## Owner decisions (2026-10-19)
+
+1. A forced session profile does not change saved songs that declare one. A saved radio song can be opened in Compose and played with another profile there.
+2. The session control overrides artist weights (D3, option A).
+3. Growth duration fitted by default, free only as an artist trait.
+4. The radio uses the profile's display defaults, not the Compose overrides, plus a **Custom** profile in the radio console: the same controls as Compose in a collapsible section, saved with the session (requirement "Custom profile in the radio").
+5. Incoming song hidden for Crescendo and Live coder, visible for Classic.
+6. Metamorphosis stays off on air in this change; later it may become a way to move from one song to the next.
+7. Saved library songs in a compilation: not in this change; a separate feature to analyse (for example an "include saved songs" flag in the compilation, or a radio mode that plays only saved songs).
+8. A built-in "Live coder" compilation preset: yes.
+9. Narrator style stays with the style recipe.
+
 ## Open questions
 
 1. **Does a forced session profile also override saved songs that declare one?** Recommended: no. A declared profile is part of the song as written; the console shows it. An option "force on saved songs too" can come later.

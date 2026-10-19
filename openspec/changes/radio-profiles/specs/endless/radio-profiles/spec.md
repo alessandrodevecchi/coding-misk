@@ -22,6 +22,13 @@ The radio SHALL offer a Profile control with "as the artist" (default) and one v
 - **WHEN** a compilation plays with Profile set to Live coder
 - **THEN** every generated song plays as Live coder and the compilation still draws artists, random artists and styles
 
+### Requirement: Custom profile in the radio
+The radio Profile control SHALL also offer Custom. With Custom the console SHALL show the same profile controls as Compose (build, growth, duration, growth shape, code view, generator, comments, technical functions, typing, mistakes, wrap, lit notes) in a section that can be collapsed, and the chosen combination SHALL apply to every generated song from the next song prepared. It SHALL be saved with the session and replay identically.
+
+#### Scenario: Custom combination
+- **WHEN** the listener picks Custom, sets Live coder growth with comments off and technical functions at the mixer, and collapses the section
+- **THEN** the next songs play with that combination and the section stays collapsed with a summary of the choice
+
 ### Requirement: Profile draws do not move other draws
 Weighted profile draws SHALL use their own seeded stream, so the songs' styles, knobs, parts and transitions are the same as without the draw.
 
