@@ -1,0 +1,51 @@
+---
+id: settings
+related: [export, radio, library, profiles]
+code: [src/settings/settings.js, src/settings/backup.js, src/i18n.js]
+checks: [node --no-warnings tools/check-backup.mjs, node --no-warnings tools/check-settings.cjs]
+---
+
+# Settings
+
+## What it is
+
+The settings page holds the options used less often. It opens from the gear in the top bar. Theme and language stay in the top bar too, for quick tests.
+
+Every value is saved in the browser and goes into the backup.
+
+## How it connects
+
+- **Export.** Audio format, speed, video and fragment options are read by every export ([export.md](export.md)).
+- **Radio.** Defaults for new sessions: the radio visual, transitions, harmony, material ([radio.md](radio.md)).
+- **Library.** Hidden built-in songs, backup, import and reset ([library.md](library.md)).
+- **Profiles.** The code typing speed is the profile control `typing` ([profiles.md](profiles.md)).
+
+## Options
+
+The page has eight cards:
+
+- **Appearance:** theme (NEON or HW, the hardware look), language (IT or EN), the radio visual.
+- **Audio:** volume, export format and MP3 rate, code typing speed, export speed.
+- **Video:** layout, quality, title card, visual, soul panel, video presets.
+- **Vertical fragments:** format, what to show, aspect, look, soul view, files, bands, bleed, rotation, code mode, tagline, label, glitch, length.
+- **Live output:** a window with only the picture of the session, for a capture program, and a control room in another tab.
+- **Radio:** transition, harmony, the default material source, the scope of console changes.
+- **Library:** built-in songs deleted in this browser, with restore.
+- **Data:** export everything to a file, import and merge, reset everything (press twice).
+
+Each option has its help text in `src/i18n.js`, under keys that start with `set`, `vid`, `frag` or `lr`.
+
+## Example
+
+The export format is one key in the browser:
+
+```json
+{"coding-misk-export-format": "flac"}
+```
+
+Song exports, session exports and radio recordings then write FLAC.
+
+## Where to read more
+
+- [docs/ARCHITECTURE.md](../ARCHITECTURE.md#persistence-keys): every browser key.
+- The Guide cards `settings` and `live` in `src/guide.js`.
