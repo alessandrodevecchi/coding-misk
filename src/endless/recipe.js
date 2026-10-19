@@ -70,6 +70,16 @@ export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyl
 // level-headroom: the peak a track line of the style's songs may reach before the level checks warn. The output peak
 // stays the hard limit (1.0); a loud genre may let single lines go higher, since every line passes the master level first
 export const HEADROOM = { default: 1, min: 1, max: 1.5 };
+// the push into the master limiter (src/sounds/limiter.js) of a song with these style ids: the highest `headroom` among
+// the recipes, within HEADROOM; 1 (no push) for a song without styles or whose styles set none
+export function stylePush(styles, recipes) {
+  let push = HEADROOM.default;
+  for (const id of styles || []) {
+    const r = (recipes || []).find(x => x && x.id === styleId(id));
+    if (r && isNum(r.headroom)) push = Math.max(push, Math.min(HEADROOM.max, r.headroom));
+  }
+  return push;
+}
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const isInt = v => Number.isInteger(v);
 const knownSound = w => WAVES.some(([id]) => id === w) || /^gm_/.test(w) || SYNTHS.includes(w);

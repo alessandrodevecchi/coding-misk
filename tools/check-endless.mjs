@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAPES, RECIPE_DEFAULTS, STYLE_ALIASES, recipeOrder } from '../src/endless/recipe.js';
+import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAPES, RECIPE_DEFAULTS, STYLE_ALIASES, recipeOrder, stylePush } from '../src/endless/recipe.js';
 import { mixParts, stylesOf } from '../src/endless/mix.js';
 import { loadStyles } from './styles-dir.mjs';
 import { songEntry, cleanView } from '../src/library/song-filter.js';
@@ -167,6 +167,14 @@ const CHECKS = {
     const r = structuredClone(loadStyles().find(x => x.id === 'phonk'));
     for (const h of [1, 1.3, 1.5]) assert(!validateRecipe({ ...r, headroom: h }).errors.length, `headroom ${h} is invalid`);
     for (const h of [0.9, 1.6, '1.2']) assert(validateRecipe({ ...r, headroom: h }).errors.some(e => e.path === 'headroom'), `headroom ${h} gives no error at headroom`);
+  },
+  'recipes: the push into the master limiter is the highest headroom of the song\'s styles, 1 for none'() {
+    const rs = [{ id: 'phonk', headroom: 1.3 }, { id: 'acid', headroom: 1.1 }, { id: 'jazz' }];
+    assert(stylePush(undefined, rs) === 1 && stylePush([], rs) === 1 && stylePush(['jazz'], rs) === 1, 'a song without a headroom pushes');
+    assert(stylePush(['jazz', 'phonk', 'acid'], rs) === 1.3, 'not the highest headroom');
+    assert(stylePush(['switch-acid'], rs) === 1.1, 'an old style id is not renamed');
+    assert(stylePush(['phonk'], [{ id: 'phonk', headroom: 3 }]) === 1.5, 'the push is not kept within 1.5');
+    assert(stylePush(['phonk'], loadStyles()) >= 1, 'the built-in styles give no push');
   },
   'recipes: missing optional part stays valid'() {
     const r = structuredClone(loadStyles().find(x => x.id === 'classic-rock'));

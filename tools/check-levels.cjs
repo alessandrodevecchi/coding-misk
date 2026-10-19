@@ -1,9 +1,10 @@
 // Plays every scene of the given tracks and prints errors, per-instrument peak levels and the peak of the master output.
-// The output peak (out=) is the hard limit: above 1.0 it clips and the run fails. A line above the headroom of the
+// The output peak (out=) is the hard limit: above 1.0 it clips and the run fails. in= is the level into the master
+// limiter (the output the song would have without it); above the limiter's ceiling the limiter works (limited). A line above the headroom of the
 // song's styles (1.0 by default, `headroom` in a style recipe) is printed as a warning (level-headroom).
 // Usage: PLAYWRIGHT_CORE=... node tools/check-levels.cjs <track-id> [track-id …]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
-const { CLIP, tapOutput, outputPeak, songHeadroom } = require('./output-peak.cjs');
+const { CLIP, tapOutput, outputPeak, limiterInput, songHeadroom } = require('./output-peak.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
@@ -39,16 +40,16 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       }
       if (!ok) { console.log(`${id} #${i} ${names[i] || ''} NOT REACHED (editor shows "${await page.locator('#sc-name').inputValue()}")`); continue; }
       await sleep(2400);
-      await outputPeak(page);
+      await outputPeak(page); await limiterInput(page);
       const r = await page.evaluate(async () => {
         const ed = document.querySelector('strudel-editor').editor, mx = {};
         for (let k = 0; k < 16; k++) { for (const a of Object.keys(window.analysers)) { const d = getAnalyzerData('time', a); let m = 0; for (const v of d) m = Math.max(m, Math.abs(v)); mx[a] = Math.max(mx[a] || 0, m); } await new Promise(r => setTimeout(r, 50)); }
         return { err: String(ed.repl.state.evalError || ''), name: document.getElementById('sc-name').value, mx };
       });
-      const out = await outputPeak(page);
+      const out = await outputPeak(page), pre = await limiterInput(page);
       const lv = Object.entries(r.mx).filter(([, v]) => v > .02).map(([a, b]) => `${a}=${b.toFixed(2)}`).join(' ');
       const loud = Object.entries(r.mx).filter(([, v]) => v > room).map(([a, v]) => `${a} ${v.toFixed(2)}`);
-      console.log(`${id} #${i} ${r.name}${r.err ? ' ERROR ' + r.err : ''}  ${lv}  out=${out.toFixed(2)}${out > CLIP ? ' CLIPS' : ''}`);
+      console.log(`${id} #${i} ${r.name}${r.err ? ' ERROR ' + r.err : ''}  ${lv}  out=${out.toFixed(2)} in=${pre.toFixed(2)}${pre > out + 0.01 ? ' limited' : ''}${out > CLIP ? ' CLIPS' : ''}`);
       if (loud.length) { warned++; console.log(`  warning: above the headroom ${room} (${loud.join(', ')}), output ${out.toFixed(2)}`); }
       if (out > CLIP) clipped++;
     }

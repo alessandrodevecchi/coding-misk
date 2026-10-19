@@ -30,7 +30,7 @@ Original request: "create a project `coding-misk`, take inspiration from Switch 
 - **Local app, not hosted.** A claude.ai artifact was tried and dropped: its sandbox blocks Strudel's `data:` audio worklets, so it played no sound. The artifact was deleted.
 - **Tempo is driven by the player** (`scheduler.setCps` at bar boundaries), never by `.cps()` inside patterns.
 - **Scene model over hand-written code** for all built-in tracks, so they open in Compose.
-- **Master gain 0.6** on Strudel's output to avoid clipping when all layers play.
+- **Master gain 0.6** on Strudel's output to avoid clipping when all layers play, then a look-ahead **master limiter** (ceiling 0.95) in the app and in every export, so the output never clips (level-headroom).
 - **Guitar volume after the distortion** (`postgain`), otherwise level and fades do not change.
 
 ## References

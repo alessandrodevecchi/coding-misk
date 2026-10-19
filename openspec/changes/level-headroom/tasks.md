@@ -15,3 +15,9 @@
 ## 4. Docs
 
 - [x] 4.1 `docs/knowledge/sound-and-levels.md` and the level recipe updated (headroom, saturation from the sound); `npm run knowledge`, `npm run check:knowledge`; DEVLOG entry in Italian
+
+## 5. Master limiter
+
+- [x] 5.1 Limiter on the master in the app and in the render page (fast export, radio export, video), transparent below its threshold
+- [x] 5.2 Style `headroom` sets the push into the limiter; songs without a style push none
+- [x] 5.3 Before/after audio of 2-3 songs that clipped (e.g. drift, neon-rush-reel, ferro) for the owner; output peak of every built-in song below 1.0 live and in exports; level snapshots of clean songs unchanged

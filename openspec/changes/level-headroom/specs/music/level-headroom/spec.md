@@ -27,3 +27,17 @@ The knowledge base SHALL say that a saturated sound is made with distortion devi
 #### Scenario: Dirty lead
 - **WHEN** an agent reads the sound and levels note to make a lead dirtier
 - **THEN** it learns to use distortion and keep the output below clipping
+
+### Requirement: Master limiter
+The master output SHALL pass through a limiter, in the app and in every export, so that the output stays below full scale. Below its threshold the limiter SHALL leave the sound unchanged.
+
+#### Scenario: A song that clipped
+- **WHEN** a built-in song whose mix went above full scale plays or is exported
+- **THEN** the output stays below 1.0 and only its loudest moments are reduced
+
+### Requirement: Style push into the limiter
+A style's `headroom` SHALL also set how hard its songs push into the limiter: 1.0 pushes none, higher values raise the level into the limiter for a louder, denser mix, always below full scale.
+
+#### Scenario: Loud style
+- **WHEN** a style with `headroom: 1.3` plays
+- **THEN** its mix is louder and denser than the same song at 1.0, and the output never clips

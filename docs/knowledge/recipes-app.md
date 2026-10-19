@@ -92,9 +92,9 @@ Step by step for checks, Strudel updates, texts, settings, visuals, exports and 
 **Files:** the song or style (`gain`, `postgain` shapes, `drive`, `rack`, the style's `headroom`), sometimes a preset or `ROWS` multipliers in `src/music.js`, `tests/snapshots/levels.json`.
 
 **Steps:**
-1. Measure: `node tools/check-levels.cjs <song>` (dev server). Each section prints the line peaks and `out=`, the peak of the master output. Only the output clips: `out` above 1.0 fails. A line above the headroom is a warning ([sound-and-levels.md](sound-and-levels.md)).
+1. Measure: `node tools/check-levels.cjs <song>` (dev server). Each section prints the line peaks, `out=`, the peak of the master output, and `in=`, the level into the master limiter (what the output would be without it; `limited` when the limiter acts). Only the output clips: `out` above 1.0 fails, and the limiter keeps it at 0.95. A line above the headroom is a warning ([sound-and-levels.md](sound-and-levels.md)).
 2. For a file, export it and run `node tools/check-export.cjs <song> --quick`: it names the time of the first clipped sample.
-3. Output above 1.0: lower the loudest lines in that section (`gain`; for driven sounds `postgain` after the drive). Fewer layers often fix the sum.
+3. `in` far above 0.95 (1.2 and more): the limiter squashes the peaks. Lower the loudest lines in that section (`gain`; for driven sounds `postgain` after the drive). Fewer layers often fix the sum. A loud genre that wants a denser mix sets the style's `headroom`, which pushes the whole song into the limiter.
 4. A line above the headroom with the output below 1.0: nothing clips. Lower it if it covers the mix; for a loud genre the style may set `headroom` (up to 1.5) instead.
 5. Want a dirtier sound: add distortion (`crunch`, `grit`, the `distort` or `shape` devices, filter `drive`) and set the level after it with `postgain`. Never raise `gain` for it.
 6. Measure twice; noise moves guitars and `fx` between runs.
@@ -102,7 +102,7 @@ Step by step for checks, Strudel updates, texts, settings, visuals, exports and 
 
 **Checks:** `node tools/snapshot-levels.cjs check`, `npm run check:code`, `node tools/check-transitions.cjs` for the radio, `node tools/check-export.cjs` for files.
 
-**Mistakes:** raising the master; raising `gain` for saturation; treating a line above 1.0 as clipping while the output is fine; editing `src/` while the level tool runs; rewriting the snapshots of every song for one fix.
+**Mistakes:** raising the master; leaning on the limiter instead of balancing the lines; raising `gain` for saturation; treating a line above 1.0 as clipping while the output is fine; editing `src/` while the level tool runs; rewriting the snapshots of every song for one fix.
 
 ### Find why a sound is silent
 

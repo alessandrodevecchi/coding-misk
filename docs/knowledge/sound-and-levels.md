@@ -1,7 +1,7 @@
 ---
 id: sound-and-levels
 related: [sounds, songs, material, export, checks, pitfalls]
-code: [src/song/rack.js, src/sounds/sound-guard.js, src/sounds/soundfont-fix.js, tools/output-peak.cjs, tools/check-levels.cjs, tools/snapshot-levels.cjs, tests/snapshots/levels.json]
+code: [src/song/rack.js, src/sounds/limiter.js, src/sounds/sound-guard.js, src/sounds/soundfont-fix.js, tools/output-peak.cjs, tools/check-levels.cjs, tools/snapshot-levels.cjs, tests/snapshots/levels.json]
 checks: [node tools/check-levels.cjs, node tools/snapshot-levels.cjs, node tools/check-export.cjs, npm run check:sound-guard, node tools/check-sounds.cjs]
 ---
 
@@ -13,7 +13,11 @@ How loud each part is, how the app keeps it below clipping, and the devices that
 
 **Levels.** Every track line ends with `.analyze("<instrument>")`. The browser tools read those analysers and report each instrument's peak per section, before the master. All lines together go to Strudel's master, which the app keeps at 0.6, and then to the output. The audio inside the browser is floating point: a line above 1.0 does not clip by itself. Only the output clips, and an exported file, where a sample cannot go above full scale.
 
-**Output peak.** `tools/output-peak.cjs` reads the peak of the master output (an analyser per channel after the master gain) and of the fast export's render and files. It is the hard limit: above 1.0 the level tools, `check-transitions.cjs`, `check-spoken-play.cjs` and `check-export.cjs` fail, and name the song, the section or the time.
+**Master limiter.** The last stage of the output, in the app and in every export (fast and real time, radio, video, fragments): `src/sounds/limiter.js`. The lines are summed, multiplied by the master level and the style's push, and pass a look-ahead peak limiter (an audio worklet): the sound is delayed 5 ms and the gain falls before a peak arrives, so no sample leaves above the ceiling, 0.95 (-0.45 dBFS). It releases in about 0.12 s. Below the ceiling the gain is exactly 1: the sound is unchanged, only 5 ms later (the render page removes that delay from files). A wave shaper after it, the identity up to 0.95, caps the output at 0.99 whatever happens. The limiter is a safety net: a mix that leans on it hard (the level into it far above 0.95) loses its peaks and sounds squashed.
+
+**Push.** A style's `headroom` is also how hard its songs push into the limiter: the level into it is multiplied by the headroom (1.3 is +2.3 dB), so the mix gets louder and denser and the output still stays below 0.95. A song without styles, or whose styles set no `headroom`, pushes none; a song with several styles takes the highest.
+
+**Output peak.** `tools/output-peak.cjs` reads the peak of the master output (an analyser per channel on `destinationGain`, after the limiter) and of the fast export's render and files, and the level into the limiter (`in=` in `check-levels.cjs`: the output the song would have without the limiter). The output is the hard limit: above 1.0 the level tools, `check-transitions.cjs`, `check-spoken-play.cjs` and `check-export.cjs` fail, and name the song, the section or the time. With the limiter it stays at 0.95 at most.
 
 **Headroom.** A track line above the headroom of its song's styles is a warning, never a failure by itself. The headroom is 1.0 unless a style recipe sets `headroom` (1.0 to 1.5) for a loud genre; a song with several styles takes the highest. The output limit stays 1.0 whatever the headroom.
 
@@ -28,7 +32,7 @@ How loud each part is, how the app keeps it below clipping, and the devices that
 - **Sounds** ([sounds.md](sounds.md)): the inventory, and the missing sounds the guard covers.
 - **Songs** ([songs.md](songs.md)): `gain`, `postgain` shapes, `drive`, `grit` and `rack` are track settings.
 - **Material** ([material.md](material.md)): composed FM sounds stay inside `FM_RANGES` so they stay under clipping.
-- **Export** ([export.md](export.md)): exports take the master level, so the app volume never changes a file.
+- **Export** ([export.md](export.md)): exports take the master level, the push and the limiter, so the app volume never changes a file.
 - **Checks** ([checks.md](checks.md)): level snapshots need the dev server and are never rewritten without a reason.
 
 ## Options
@@ -81,12 +85,13 @@ Targets for a new part, from the snapshots and `docs/COMPOSING.md`:
 
 - Kick and lead parts peak around 0.5. Pads, arps and textures stay lower (0.1 to 0.3).
 - No single line above 0.9 unless the style sets a `headroom`. Above the headroom the level tools warn.
-- The master output below 1.0 in every section, and every exported file below full scale. This is what the checks fail on.
+- The level into the limiter (`in=`) at or below 0.95 for a clean song: then the limiter never acts. A little above it in the loudest moments is fine; far above (1.2 and more) the peaks are squashed, so lower the loudest lines.
+- The master output below 1.0 in every section, and every exported file below full scale. The limiter makes sure of it; the checks still fail on it.
 - 4 to 5 tracks at once. More lines raise the sum at the master.
 - General MIDI sounds differ a lot: organs and vibraphone are quiet, electric piano is loud. Measure, then set `gain`.
 - Heavy drive: set the level with `postgain` after the distortion, not with `gain`.
 
-Measured 2026-10-19 (level-headroom): the hats of `neon-rush-reel` peak at 1.16 to 1.23, and its output peaks at 1.13 to 1.23 in the Drop, the Glitch break and the Final: that output clips. A line above 1.0 is not needed for the output to clip: `drift` and `ferro` stay below 1.0 on every line and their exports still reach 1.29 and 1.23. The full list is in `DEVLOG.md` (2026-10-19); the songs are left as they are until the owner decides.
+Measured 2026-10-19 (level-headroom): the hats of `neon-rush-reel` peak at 1.16 to 1.23, and before the limiter its output peaked at 1.13 to 1.23 in the Drop, the Glitch break and the Final: that output clipped. A line above 1.0 is not needed for the output to clip: `drift` and `ferro` stay below 1.0 on every line and their exports reached 1.29 and 1.23. With the limiter every built-in song stays at 0.95 at most, live and in exports; the songs themselves are unchanged. The full list is in `DEVLOG.md` (2026-10-19).
 
 ## Example
 

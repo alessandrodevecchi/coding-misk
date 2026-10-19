@@ -3,7 +3,8 @@
 // Superdough keeps one audio context and reuses audio nodes, so a fresh page renders each export.
 // Messages from the app: { render: job }. To the app: { ready }, { progress, phase }, { done, channels, sampleRate, onsets }, { error }.
 // job: { segments: [{ from, to, code }] in bars, bpm: per bar, from / to: the window in seconds (a block of a long
-// export), tail: seconds after it, keepFrom: onsets before it belong to the block before, sampleRate, gain: the master level }
+// export), tail: seconds after it, keepFrom: onsets before it belong to the block before, sampleRate, gain: the master level,
+// push: the style's push into the master limiter (level-headroom, 1 for none) }
 import { repl, register as strudelRegister } from '@strudel/core';
 import { transpiler } from '@strudel/transpiler';
 import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio, registerSound, soundMap } from '@strudel/webaudio';
@@ -12,6 +13,7 @@ import soundfonts from '@strudel/soundfonts/package.json';
 import { prebake } from '@strudel/repl/prebake.mjs';
 import { tempoClock } from './tempo.js';
 import { installHelpers, useFns } from '../song/writer.js';
+import { loadLimiter, setMasterLevel, limiterDelay } from '../sounds/limiter.js';
 
 const post = (m, transfer = []) => parent.postMessage({ codingMiskRender: true, ...m }, location.origin, transfer);
 // superdough's deprecation notices come once per voice: thousands of console lines slow the render down
@@ -43,20 +45,23 @@ const WORKLET_SEED = `{ let a = ${SEED} >>> 0; Math.random = () => { a = (a + 0x
 const SOUND_WAIT = 8000;
 // seconds from the start of a render before a sound with stretch can start (measured: 0.02 is silent, 0.1 is heard)
 const STRETCH_LEAD = 0.1;
-async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, buses = {}, fns = {} }) {
+async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, push = 1, buses = {}, fns = {} }) {
   globalThis.miskBuses = buses; useFns(fns);
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
-  const ctx = new OfflineAudioContext(2, Math.ceil(length * sampleRate), sampleRate);
+  // the master limiter delays the sound by its look-ahead: the render runs that much longer and the file starts after it
+  const lag = Math.round(limiterDelay(sampleRate) * sampleRate);
+  const ctx = new OfflineAudioContext(2, Math.ceil(length * sampleRate) + lag, sampleRate);
   setAudioContext(ctx);
   // a new controller made on first use, from the same superdough copy (a separate import is a separate copy)
   setSuperdoughAudioController(null);
   // voices are scheduled two seconds ahead (the live player: a fraction of a second): no voice limit, or early voices would be cut
   Math.random = seeded(SEED);
   await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET_SEED], { type: 'text/javascript' })));
+  if (!(await loadLimiter(ctx))) throw new Error('the master limiter did not load');
   await initAudio({ maxPolyphony: 1e6 });
   await loadSounds();
-  // the app's master level (the live player sets the same on its output)
-  getSuperdoughAudioController().output.destinationGain.gain.value = gain;
+  // the app's master level and the style's push, into the master limiter (the live player does the same on its output)
+  setMasterLevel(getSuperdoughAudioController().output, gain, push);
   post({ progress: 0, phase: 'schedule' });
   const R = repl({ transpiler, defaultOutput: () => {}, getTime: () => 0 });
   const onsets = {}, skipped = new Set();
@@ -120,7 +125,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
     ctx.suspend(s).then(async () => { await schedule(s + W); post({ progress: s / length, phase: 'render' }); ctx.resume(); });
   }
   const buf = await ctx.startRendering();
-  const channels = [buf.getChannelData(0).slice(), buf.getChannelData(1).slice()];
+  const channels = [buf.getChannelData(0).slice(lag), buf.getChannelData(1).slice(lag)];
   post({ done: true, channels, sampleRate, onsets, skipped: [...skipped], replaced: [...replaced] }, channels.map(c => c.buffer));
 }
 

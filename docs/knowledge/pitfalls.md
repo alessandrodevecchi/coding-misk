@@ -26,6 +26,7 @@ Mistakes that cost time before. Each line says what goes wrong and what to do. T
 - **Gain before drive.** Before heavy distortion `gain` only changes the saturation. Set the level after it with `postgain`.
 - **A line above 1.0 is not clipping.** Lines pass the master (0.6) first and the browser audio is floating point. Only the output and exported files clip: read `out=` in `check-levels.cjs` and the export check. The output can clip with every line below 1.0.
 - **Gain for saturation.** More `gain` does not make a sound dirty, it clips the output. Use distortion and `postgain`.
+- **The limiter hides a loud mix.** `out=` stays at 0.95 whatever the mix does. Read `in=`: far above 0.95 the peaks are squashed. A new tap on the output goes on `destinationGain`, after the limiter; the master level is the limiter's `level` node, not `destinationGain` (it stays at 1).
 - **Soundfont levels differ.** Organs and vibraphone are quiet, electric piano is loud. Measure every new `gm_` sound.
 - **Kits without a row.** Some kits have no ride, crash or clap. The compiler plays the nearest row; see [sounds.md](sounds.md#missing-sounds).
 - **Stretch at time zero.** A sound with `stretch` in the first tenth of a second of a render stayed silent. The fast export starts 0.1 s later.

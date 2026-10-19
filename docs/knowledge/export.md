@@ -1,7 +1,7 @@
 ---
 id: export
 related: [radio, library, settings, live-build, profiles]
-code: [src/export/fast.js, src/export/encode.js, src/export/fast-video.js, src/render/page.js, src/video/layout.js, src/video/fragments.js]
+code: [src/export/fast.js, src/export/encode.js, src/sounds/limiter.js, src/export/fast-video.js, src/render/page.js, src/video/layout.js, src/video/fragments.js]
 checks: [npm run check:export, npm run check:video, npm run check:clips]
 ---
 
@@ -23,6 +23,8 @@ The app turns songs and radio sessions into files: audio, video, short vertical 
 - **Radio.** A session exports up to now, the next songs or a length ([radio.md](radio.md)).
 - **Library.** Playlists and saved sessions export from the Songs tab and the Playlists tab ([library.md](library.md)).
 - **Settings.** Format, speed, video layout, quality, card, visual and the fragment layout are set once in Settings ([settings.md](settings.md)).
+
+Every export passes the master limiter, as the app does: the master level, the push of the song's style and the limiter are the same in the render page, so a file never clips and sounds as the song does live ([sound-and-levels.md](sound-and-levels.md)). The render removes the limiter's 5 ms delay, so the file and its timeline line up as before.
 
 Long exports (over 10 minutes) are written to disk while they render, so memory stays flat. A sound that fails to load is skipped and named, instead of stopping the export.
 

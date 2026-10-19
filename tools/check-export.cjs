@@ -213,6 +213,8 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
   // cancel: a tap on Export while it renders
   await settings({ 'coding-misk-export-format': 'wav' });
   const n0 = downloads.length;
+  // the search may still hold the title of a song exported above: search for this one
+  await page.fill('#sv-q', TITLES.kellerlicht || ''); await sleep(800);
   await page.click(`#songs [data-song-id="kellerlicht"] [data-act="export"]`); await sleep(2500);
   check(!!(await job()), 'a long song is rendering');
   await page.click(`#songs [data-song-id="kellerlicht"] [data-act="export"]`); await sleep(1500);

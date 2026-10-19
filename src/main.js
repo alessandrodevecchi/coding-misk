@@ -42,7 +42,8 @@ import { windowSong } from './endless/join.js';
 import { absoluteClips, playlistTransition, overlapOf } from './endless/transitions.js';
 import { joinSession } from './endless/join.js';
 import { createSession, stylesNear } from './endless/director.js';
-import { styleId } from './endless/recipe.js';
+import { styleId, stylePush } from './endless/recipe.js';
+import { loadLimiter, setMasterLevel } from './sounds/limiter.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
 import { machineLabel, prettyName } from './sounds/catalog.js';
@@ -459,7 +460,8 @@ renderHandLast();
 // Li inizializziamo noi dentro il gesto dell'utente, così funziona anche da tastiera.
 let audioInit = null;
 function initAudioOnce() {
-  if (!audioInit && typeof globalThis.initAudio === 'function') audioInit = globalThis.initAudio().catch(e => { audioInit = null; console.error(e); });
+  // the master limiter's worklet (level-headroom) loads with the others, before the first note
+  if (!audioInit && typeof globalThis.initAudio === 'function') audioInit = globalThis.initAudio().then(() => loadLimiter(globalThis.getAudioContext())).catch(e => { audioInit = null; console.error(e); });
   return audioInit;
 }
 
@@ -789,7 +791,7 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
   const segments = segmentsOf(sg, codeFor);
   const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate(), writable: disk ? disk.writable : null });
-  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
     const r = await job.promise;
@@ -936,7 +938,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
-  const job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
+  const job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
@@ -2813,6 +2815,16 @@ $('#songs').addEventListener('change', e => {
 const pauseLabel = () => isPlaying() ? t('pause') : paused ? t('resume') : t('pause');
 // volume master di Strudel a 0,6: la somma degli strumenti nei drop supera 1 e saturerebbe l'uscita
 const MASTER = .6;
+// the push of a song into the master limiter (level-headroom): the headroom of its styles, 1 when none sets it
+const songPush = sg => { try { return stylePush(sg && sg.tags && sg.tags.styles, RECIPES); } catch (e) { return 1; } };
+// the master level and the limiter on Strudel's output (src/sounds/limiter.js), installed again when Strudel makes a
+// new output; the push follows the song that plays
+function applyMaster() {
+  try {
+    const ctl = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController();
+    if (ctl && ctl.output && ctl.output.destinationGain) setMasterLevel(ctl.output, MASTER, songPush(song));
+  } catch (e) {}
+}
 // global volume (#32): a gain node after the master output, so WAV exports (taken from the master) keep their level
 let volume = Math.max(0, Math.min(100, +store.get('coding-misk-volume', 100))), muted = !!store.get('coding-misk-muted', false), volNode = null, volFor = null;
 function applyVolume() {
@@ -2871,11 +2883,11 @@ function songTick() {
 }
 try {
   const clock = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 100)'], { type: 'text/javascript' })));
-  clock.onmessage = () => { if (document.hidden) songTick(); };
+  clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); } };
 } catch (e) {}
 (function transport() {
   requestAnimationFrame(transport);
-  try { const out = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController().output.destinationGain; if (out && out.gain.value !== MASTER) out.gain.value = MASTER; } catch (e) {}
+  applyMaster();
   applyVolume();
   if (radio) renderPlayerBar();
   const s = sched();

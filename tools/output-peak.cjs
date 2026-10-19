@@ -2,9 +2,11 @@
 // level tools and the browser checks. A track line above 1.0 is not clipping by itself: every line passes the master
 // level (MASTER in src/main.js) first, and the audio graph is floating point. Only the output, and a file, can clip.
 //
-// In the page: tapOutput(page) puts one analyser per channel after Strudel's master gain (the output's
-// destinationGain, before the app's volume), and keeps the highest sample it saw. outputPeak(page) returns it and
-// starts again. renderPeak(page) does the same for the fast export: the float buffers the render page sends back,
+// In the page: tapOutput(page) puts one analyser per channel on Strudel's output (destinationGain, after the master
+// level and the master limiter, before the app's volume), and keeps the highest sample it saw. outputPeak(page)
+// returns it and starts again. limiterInput(page) does the same before the limiter (the master level times the
+// style's push, src/sounds/limiter.js): above LIMIT.ceiling the limiter works, and without it the output would clip
+// above 1.0. renderPeak(page) does the same for the fast export: the float buffers the render page sends back,
 // before they are encoded (a 16 bit file cannot hold a sample above full scale).
 // In Node: filePeak(file) reads an audio file with ffmpeg (both channels) and returns its peak, the time of the first
 // sample at full scale and how many there are. songHeadroom(song) is the line peak above which a check warns: the
@@ -18,27 +20,30 @@ const CLIP = 1, FULL = 32767 / 32768;
 async function tapOutput(page) {
   await page.evaluate(() => {
     if (globalThis.miskOutPeak) return;
-    const st = { node: null, an: [], buf: null, peak: 0 };
+    const st = { node: null, an: [], buf: new Float32Array(4096), peak: 0, pre: { node: null, an: [], peak: 0 } };
     // an analyser keeps the last fftSize samples: 4096 at 48 kHz is 85 ms, read every 40 ms, so no sample is missed
-    const hook = () => {
-      const ctl = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController();
-      const node = ctl && ctl.output && ctl.output.destinationGain;
-      if (!node || node === st.node) return;
+    const tap = (node, t) => {
       const ctx = node.context, split = ctx.createChannelSplitter(2);
       node.connect(split);
-      st.an = [0, 1].map(c => { const a = ctx.createAnalyser(); a.fftSize = 4096; split.connect(a, c); return a; });
-      st.buf = new Float32Array(4096); st.node = node;
+      t.an = [0, 1].map(c => { const a = ctx.createAnalyser(); a.fftSize = 4096; split.connect(a, c); return a; });
+      t.node = node;
     };
-    const read = () => {
-      try { hook(); } catch (e) {}
-      for (const a of st.an) { a.getFloatTimeDomainData(st.buf); for (const v of st.buf) { const x = Math.abs(v); if (x > st.peak) st.peak = x; } }
+    const hook = () => {
+      const ctl = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController();
+      const out = ctl && ctl.output, node = out && out.destinationGain, pre = out && out.miskMaster && out.miskMaster.level;
+      if (node && node !== st.node) tap(node, st);
+      if (pre && pre !== st.pre.node) tap(pre, st.pre);
     };
+    const scan = t => { for (const a of t.an) { a.getFloatTimeDomainData(st.buf); for (const v of st.buf) { const x = Math.abs(v); if (x > t.peak) t.peak = x; } } };
+    const read = () => { try { hook(); } catch (e) {} scan(st); scan(st.pre); };
     setInterval(read, 40);
-    globalThis.miskOutPeak = { read, take: () => { read(); const p = st.peak; st.peak = 0; return p; } };
+    globalThis.miskOutPeak = { read, take: () => { read(); const p = st.peak; st.peak = 0; return p; }, takePre: () => { read(); const p = st.pre.peak; st.pre.peak = 0; return p; } };
   });
 }
 // the highest output sample since the last call (or since tapOutput), rounded to 0.01; starts again
 const outputPeak = page => page.evaluate(() => Math.round((globalThis.miskOutPeak ? globalThis.miskOutPeak.take() : 0) * 100) / 100);
+// the same before the master limiter (the level into it); starts again
+const limiterInput = page => page.evaluate(() => Math.round((globalThis.miskOutPeak ? globalThis.miskOutPeak.takePre() : 0) * 100) / 100);
 
 // the fast export's float buffers, block by block, as the render page posts them to the app
 async function tapRender(page) {
@@ -78,4 +83,4 @@ async function songHeadroom(song) {
   return room;
 }
 
-module.exports = { CLIP, FULL, tapOutput, outputPeak, tapRender, renderPeak, filePeak, songHeadroom };
+module.exports = { CLIP, FULL, tapOutput, outputPeak, limiterInput, tapRender, renderPeak, filePeak, songHeadroom };
