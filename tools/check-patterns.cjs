@@ -1,0 +1,185 @@
+// Browser checks for the Patterns tab (pattern-library, #72): the tab and its groups, play and stop, a key change that
+// keeps the loop going, the beat, styles that use a pattern, New and Save, Save as pattern from Compose, rename and
+// delete after a reload, Add to song, and the three links (Compose listen button, Sounds, Styles). Screenshots of the
+// tab, a pattern playing, Save as pattern in Compose, the hardware theme and a phone.
+// Usage: PLAYWRIGHT_CORE=... node tools/check-patterns.cjs [shots-dir]   (dev server on :5173)
+const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
+const fs = require('node:fs'), path = require('node:path');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let failed = 0;
+const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
+const shots = process.argv[2];
+if (shots) fs.mkdirSync(shots, { recursive: true });
+const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, name) }) : null);
+
+(async () => {
+  const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+  const page = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  const st = () => page.evaluate(() => { const e = document.querySelector('strudel-editor').editor; return { code: e.code, err: String(e.repl.state.evalError || ''), started: e.repl.scheduler.started, cyc: e.repl.scheduler.now() }; });
+  const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-patterns') || '[]'));
+  const draft = () => page.evaluate(() => globalThis.codingMiskPatterns.compose());
+  const lab = async tab => { await page.click('[data-mode="lab"]'); await page.click(`[data-tab="${tab}"]`); await sleep(400); };
+  const kind = async k => { await page.click(`#patterns [data-pn-kind="${k}"]`); await sleep(250); };
+  const sel = async uid => { await page.click(`#patterns [data-pn-sel="${uid}"]`); await sleep(300); };
+  const selected = () => page.$eval('#patterns .pn-detail h3', el => el.textContent).catch(() => '');
+
+  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-lang', JSON.stringify('en')); });
+  await page.reload(); await sleep(3500);
+
+  // the tab, after Sounds, grouped by kind
+  await page.click('[data-mode="lab"]'); await sleep(200);
+  const tabs = await page.$$eval('.tabs .tab', xs => xs.filter(x => !x.hidden).map(x => x.dataset.tab).join());
+  check(tabs === 'artisti,stili,generi,suoni,pattern,guida,lezioni,riferimenti', 'Patterns right after Sounds', tabs);
+  await lab('pattern');
+  const groups = await page.$$eval('#patterns .pn-group h4', xs => xs.map(x => x.textContent).join());
+  check(groups === 'Melodies,Basslines,Arpeggios,Chords,Grooves,Riffs', 'built-in patterns grouped by kind', groups);
+  const canvases = await page.$$eval('#patterns canvas.pn-pv', xs => xs.length);
+  check(canvases >= 20, 'every card has a preview', `${canvases}`);
+  await shot(page, 'patterns-tab.png');
+
+  // groove grid: one row per drum sound
+  await kind('grooves'); await sel('b:grooves/breakbeat');
+  check(/Breakbeat/.test(await selected()), 'the groove breakbeat opens');
+
+  // play rolling in A at 128, then D: from the next bar, without a gap
+  await kind('basslines'); await sel('b:basslines/rolling');
+  const bpm0 = await page.$eval('#pn-bpm', el => el.value), key0 = await page.$eval('#pn-key', el => el.value);
+  check(bpm0 === '128' && key0 === 'A', 'rolling starts in A at 128 BPM', `${key0} ${bpm0}`);
+  await page.click('#patterns [data-pn-toggle]'); await sleep(3000);
+  let s = await st();
+  check(s.started && !s.err && /\/\/ Loop · 4 bars · 128 BPM · A /.test(s.code), 'rolling plays in a loop', s.err || s.code.split('\n').find(l => l.includes('section1 =')));
+  await shot(page, 'pattern-playing.png');
+  const before = s.cyc;
+  await page.selectOption('#pn-key', 'D'); await sleep(4200);
+  s = await st();
+  check(s.started && !s.err && / · D · /.test(s.code) && s.cyc > before + 1.5, 'key D from the next bar, the loop goes on', `${before.toFixed(2)} → ${s.cyc.toFixed(2)} ${s.err}`);
+  check(await page.$eval('#src', el => el.textContent) === 'Pattern: Rolling', 'the code panel says a pattern plays');
+  // styles that use rolling, and a link to one
+  const styles = await page.$$eval('#patterns [data-pn-open-style]', xs => xs.map(x => x.dataset.pnOpenStyle));
+  check(styles.includes('trance') && styles.includes('pure-trance') && styles.length >= 4, 'rolling lists the styles that use it', styles.join(','));
+
+  // the beat under a melody, quieter than it
+  await kind('melodies'); await sel('b:melodies/neon');
+  await page.click('#patterns [data-pn-toggle]'); await sleep(300);
+  await page.check('#patterns [data-pn-cfg="beat"]'); await sleep(4200);
+  s = await st();
+  check(s.started && !s.err && /beat · drums/.test(s.code) && /Neon/.test(s.code), 'neon plays over the simple beat', s.err);
+  await page.click('#patterns [data-pn-toggle]'); await sleep(400);
+  check(!(await st()).started, 'stop');
+
+  // a style opens in the Styles tab
+  await kind('basslines'); await sel('b:basslines/rolling');
+  await page.click('#patterns [data-pn-open-style="trance"]'); await sleep(400);
+  check(await page.isVisible('#tab-stili') && /Trance/.test(await page.innerText('#tab-stili .lib-sheet')), 'a style of rolling opens in the Styles tab');
+
+  // Styles → Patterns: a preset named in the sheet
+  await page.click('#tab-stili [data-pattern-link="basslines|rolling"]'); await sleep(500);
+  check(await page.isVisible('#tab-pattern') && /Rolling/.test(await selected()), 'a preset in a style card opens the pattern');
+
+  // New: a generated arpeggio, playing, then saved with its seed and why
+  await kind('arpeggios'); await sel('b:arpeggios/su');
+  await page.fill('#patterns [data-pn-num]', '7'); await page.dispatchEvent('#patterns [data-pn-num]', 'input');
+  await page.click('#patterns [data-pn-new]'); await sleep(3200);
+  s = await st();
+  const fresh = await page.$$eval('#patterns .pn-fresh [data-pn-card]', xs => xs.length);
+  check(fresh === 1 && /Arpeggios #7/.test(await selected()) && s.started && !s.err, 'New composes an arpeggio and plays it', s.err);
+  await page.click('#patterns [data-pn-save]'); await sleep(400);
+  let mine = await saved();
+  check(mine.length === 1 && mine[0].source === 'generated' && mine[0].kind === 'arpeggios' && mine[0].seed === 'pattern:arpeggios:7' && mine[0].why.length > 0, 'a saved generated pattern keeps seed and why', JSON.stringify(mine[0] || {}).slice(0, 120));
+  await page.click('#patterns [data-pn-toggle]'); await sleep(300);
+
+  // Compose: the listen button next to a preset menu
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="componi"]'); await sleep(600);
+  const host = await page.$('#track-panel [data-ptrk] [id$="_pt-preset"]');
+  const ti = await host.evaluate(el => +el.closest('[data-ptrk]').dataset.ptrk);
+  const d = await draft(), tr = d.T.tracks[ti], sec = d.T.sections[d.sel || 0];
+  await page.click(`#p${ti}_pt-listen`); await sleep(600);
+  const cfg = await page.evaluate(() => ({ key: (document.querySelector('#pn-key') || {}).value, bpm: document.querySelector('#pn-bpm').value, sound: document.querySelector('#pn-sound').value }));
+  const pat = tr.patterns[(tr.clips.find(c => c.section === sec.name) || { pattern: 'A' }).pattern] || {};
+  check(await page.isVisible('#tab-pattern') && (await page.$eval('[data-mode="lab"]', el => el.getAttribute('aria-pressed'))) === 'true', 'the listen button opens the Patterns tab in the Groove Lab');
+  check(cfg.key === (sec.key || 'A') && +cfg.bpm === Math.round(sec.bpm || 138) && (!tr.settings.wave || cfg.sound === tr.settings.wave), 'with the track\'s sound, the section\'s key and tempo', `${JSON.stringify(cfg)} ${sec.key} ${sec.bpm} ${tr.settings.wave} ${pat.preset || 'idea'}`);
+
+  // Save as pattern in Compose
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="componi"]'); await sleep(500);
+  await page.$eval(`#p${ti}_pt-savepat`, el => el.scrollIntoView({ block: 'center' }));
+  await page.click(`#p${ti}_pt-savepat`); await sleep(300);
+  await shot(page, 'compose-save-as-pattern.png');
+  mine = await saved();
+  const fromCompose = mine.find(p => p.source === 'compose');
+  check(!!fromCompose && fromCompose.type === tr.type && fromCompose.context.key === (sec.key || 'A') && fromCompose.context.bpm === sec.bpm && fromCompose.sound === (tr.settings.wave ?? fromCompose.sound), 'Save as pattern keeps the type, sound, key and tempo', JSON.stringify(fromCompose || {}).slice(0, 160));
+  await page.click('.toast .toast-act'); await sleep(500);
+  check(await page.isVisible('#tab-pattern') && (await selected()) === fromCompose.name, 'the toast opens the saved pattern');
+  await page.click('#patterns [data-pn-toggle]'); await sleep(3000);
+  s = await st();
+  check(s.started && !s.err && s.code.includes(`setcpm(${sec.bpm}/4)`), 'the saved pattern plays with the track\'s tempo', s.err);
+  await page.click('#patterns [data-pn-toggle]'); await sleep(300);
+
+  // rename and delete, after a reload
+  await page.fill('#patterns [data-pn-name]', 'My line');
+  await page.click('#patterns [data-pn-rename]'); await sleep(300);
+  await page.reload(); await sleep(3500);
+  await lab('pattern'); await page.click('#patterns [data-pn-src="mine"]'); await sleep(300);
+  const names = await page.$$eval('#patterns .pn-cbody b', xs => xs.map(x => x.textContent));
+  check(names.includes('My line'), 'the new name stays after a reload', names.join(','));
+  const uid = `u:${fromCompose.id}`;
+  await sel(uid);
+  await page.click('#patterns [data-pn-del]'); await sleep(200);
+  check((await saved()).some(p => p.id === fromCompose.id), 'one press does not delete');
+  await page.click('#patterns [data-pn-del]'); await sleep(300);
+  await page.reload(); await sleep(3500);
+  check(!(await saved()).some(p => p.id === fromCompose.id) && (await saved()).length === 1, 'a second press deletes, gone after a reload');
+  const builtinDel = await (async () => { await lab('pattern'); await kind('melodies'); await sel('b:melodies/neon'); return page.$$eval('#patterns [data-pn-del], #patterns [data-pn-rename]', xs => xs.length); })();
+  check(builtinDel === 0, 'built-in patterns cannot be renamed or deleted');
+
+  // Add to song: a new pattern letter, the others unchanged
+  const d0 = await draft(), hook0 = d0.T.tracks.find(x => x.type === 'hook');
+  await page.click('#patterns [data-pn-add]'); await sleep(500);
+  const d1 = await draft(), hook1 = d1.T.tracks.find(x => x.type === 'hook');
+  if (hook0) {
+    const keys0 = Object.keys(hook0.patterns), keys1 = Object.keys(hook1.patterns), added = keys1.find(k => !keys0.includes(k));
+    check(keys1.length === keys0.length + 1 && hook1.patterns[added].preset === 'neon' && keys0.every(k => JSON.stringify(hook0.patterns[k]) === JSON.stringify(hook1.patterns[k])), 'Add to song: a new letter on the hook track, the other patterns unchanged', `${keys0} → ${keys1}`);
+  } else check(!!hook1 && hook1.patterns.A.preset === 'neon', 'Add to song: a new hook track with the pattern');
+  check(d1.dirty === true, 'the song is marked changed, not saved');
+
+  // Sounds → Patterns: the electric piano on a chords pattern
+  await lab('suoni');
+  await page.fill('#sounds .sb-search', 'epiano'); await page.dispatchEvent('#sounds .sb-search', 'input'); await sleep(600);
+  const item = await page.$('#sounds [data-sb-item*="epiano"]');
+  if (item) {
+    await item.click(); await sleep(600);
+    await page.click('#sounds [data-sb-trypat]'); await sleep(600);
+    const sound = await page.$eval('#pn-sound', el => el.value), head = await page.$eval('#patterns .pn-detail .lbl', el => el.textContent);
+    check(await page.isVisible('#tab-pattern') && /epiano/.test(sound) && /Chords/i.test(head), 'Try on a pattern: a chords pattern with the electric piano', `${sound} ${head}`);
+    await page.click('#patterns [data-pn-toggle]'); await sleep(2500);
+    s = await st(); check(s.started && !s.err, 'the electric piano plays the pattern', s.err);
+    await page.click('#patterns [data-pn-toggle]'); await sleep(300);
+  } else check(false, 'an electric piano in the Sounds tab');
+
+  // the radio reads the saved patterns (the director draws them where they fit)
+  const ro = await page.evaluate(() => globalThis.codingMiskRadio.options.userPatterns || []);
+  const left = await saved();
+  check(ro.length === left.length && ro.every(p => p.type && p.pattern && p.styles.length), 'the radio reads the saved patterns', `${ro.length} of ${left.length}`);
+
+  // hardware theme and phone
+  await page.click('[data-uitheme="hw"]'); await sleep(400);
+  await lab('pattern'); await kind('grooves'); await sel('b:grooves/breakbeat');
+  await page.$eval('#patterns .pn-detail', el => el.scrollIntoView({ block: 'start' }));
+  await shot(page, 'patterns-hw.png');
+  await page.click('[data-uitheme="neon"]'); await sleep(300);
+  await page.setViewportSize({ width: 390, height: 900 }); await sleep(500);
+  await lab('pattern'); await kind('melodies'); await sel('b:melodies/neon');
+  const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+  check(sw <= 392, 'phone: no horizontal scroll', `${sw}px`);
+  await page.$eval('#patterns', el => el.scrollIntoView({ block: 'start' }));
+  await shot(page, 'patterns-phone.png');
+  await page.$eval('#patterns .pn-cards', el => el.scrollIntoView({ block: 'start' }));
+  await shot(page, 'patterns-phone-cards.png');
+
+  check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
+  await browser.close();
+  console.log(failed ? `${failed} failed` : 'all passed');
+  process.exit(failed ? 1 : 0);
+})();

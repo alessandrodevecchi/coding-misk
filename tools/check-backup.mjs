@@ -52,6 +52,17 @@ const CHECKS = {
     const none = mergeBackup({ format: BACKUP_FORMAT, data: { 'coding-misk-library': { tracks: [] } } }, () => null).values['coding-misk-library'];
     assert(Array.isArray(none.hidden) && !none.hidden.length, 'missing on both sides');
   },
+  'saved patterns survive export and import, merged by id (pattern-library)'() {
+    const three = [{ id: 'p-1', name: 'Bass · A', kind: 'basslines', type: 'bass', sound: 'sawtooth', pattern: { preset: 'rolling' } },
+      { id: 'p-2', name: 'Hook · B', kind: 'melodies', type: 'hook', sound: 'square', pattern: { idea: { degrees: '0 2 4' } } },
+      { id: 'p-3', name: 'Beat · C', kind: 'grooves', type: 'drums', sound: 'RolandTR808', pattern: { idea: { beat: { grid: 16, bd: '0,8' } } } }];
+    const b = makeBackup([['coding-misk-patterns', three]]);
+    const clean = mergeBackup(JSON.parse(JSON.stringify(b)), () => null);
+    const got = clean.values['coding-misk-patterns'];
+    assert(got.map(p => `${p.name}|${p.kind}|${p.sound}`).join() === three.map(p => `${p.name}|${p.kind}|${p.sound}`).join() && clean.counts.patterns === 3, JSON.stringify(got));
+    const merged = mergeBackup(b, k => (k === 'coding-misk-patterns' ? [{ id: 'p-2', name: 'old' }, { id: 'p-9', name: 'here' }] : null)).values['coding-misk-patterns'];
+    assert(merged.map(p => p.id).join() === 'p-2,p-9,p-1,p-3' && merged[0].name === 'Hook · B', merged.map(p => `${p.id}:${p.name}`).join());
+  },
   'a file that is not a backup is refused'() { assert(mergeBackup({ format: 'x' }, () => null).error, 'accepted'); },
 };
 let failed = 0;

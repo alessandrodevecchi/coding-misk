@@ -9,7 +9,8 @@ const PAD_KEYS = '1234qwerasdfzxcv';
 const PAGE = { cards: 48, list: 150 };
 const LIB = '*lib'; // group value for the library view (all instruments of a category)
 
-export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, stop, useSound, toast, scheduler }) {
+// tryPattern(it): opens a melodic sound on a pattern of its kind in the Patterns tab (pattern-library)
+export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, stop, useSound, toast, scheduler, tryPattern = null }) {
   const st = { cat: 'drums', group: LIB, qRaw: '', q: '', view: store.get('coding-misk-snd-view', 'cards'), sel: null, mode: 'auto', variant: null, limit: 0, page: 0, favs: new Set(store.get('coding-misk-favs', [])) };
   let items = [], byKey = new Map(), lastSize = 0;
   const refresh = () => {
@@ -126,7 +127,7 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
         <code>${esc(code)}</code>
         ${modes.length ? `<div class="chips">${modes.map(m => `<button class="chip" data-sb-mode="${m}" aria-pressed="${st.mode === m}">${t('sbMode_' + (m === 'auto' ? (it.cat === 'instruments' || it.cat === 'synths' ? 'chords' : 'rhythm') : m))}</button>`).join('')}${it.cat === 'drums' ? `<button class="chip" data-sb-groove="${esc(it.group)}">${t('sbGroove')}</button>` : ''}</div>` : ''}
         ${it.n > 1 ? `<div class="sb-vars"><span class="lbl">${t('sbVariantPick')}</span><div class="chips">${Array.from({ length: Math.min(it.n, 32) }, (_, i) => `<button class="chip small" data-sb-var="${i}" aria-pressed="${(st.variant || 0) === i}">${i}</button>`).join('')}</div><p class="note">${t('sbVariantHint')}</p></div>` : ''}
-        <div class="sb-actions"><button class="btn primary" data-sb-play>${t('sbPlay')}</button><button class="btn" data-sb-stop>${t('stop')}</button><button class="btn" data-sb-use>${t(use)}</button><button class="btn" data-sb-copy>${t('copy')}</button><button class="btn" data-sb-fav aria-pressed="${st.favs.has(it.key)}">${st.favs.has(it.key) ? '★' : '☆'} ${t('sbFav')}</button></div>
+        <div class="sb-actions"><button class="btn primary" data-sb-play>${t('sbPlay')}</button><button class="btn" data-sb-stop>${t('stop')}</button><button class="btn" data-sb-use>${t(use)}</button>${tryPattern && (it.cat === 'instruments' || it.cat === 'synths') && it.group !== 'Noise' ? `<button class="btn" data-sb-trypat>${t('sbTryPattern')}</button>` : ''}<button class="btn" data-sb-copy>${t('copy')}</button><button class="btn" data-sb-fav aria-pressed="${st.favs.has(it.key)}">${st.favs.has(it.key) ? '★' : '☆'} ${t('sbFav')}</button></div>
       </div>
       ${credit(it.cat, it.group)}
     </div>`;
@@ -204,6 +205,7 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     if (d.sbVar !== undefined) { st.variant = +d.sbVar || null; oneShot(it, { n: +d.sbVar }); return refreshInspector(); }
     if (d.sbPlay !== undefined) return audition(it);
     if (d.sbUse !== undefined) return toast(useSound(it));
+    if (d.sbTrypat !== undefined && tryPattern) return tryPattern(it);
     if (d.sbCopy !== undefined) { const code = usageCode(it) + (st.variant ? `.n(${st.variant})` : ''); try { navigator.clipboard.writeText(code).then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (err) { toast(t('copyNo')); } return; }
     if (d.sbFav !== undefined) { if (st.favs.has(it.key)) st.favs.delete(it.key); else st.favs.add(it.key); saveFavs(); return render(); }
   });

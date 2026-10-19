@@ -108,6 +108,8 @@ npm run check:strudel                                  # generated code calls on
 npm run check:ideas                                    # idea writer: shortest exact forms, every kind of idea, ladders, variant steps (no browser)
 npm run check:functions                                # song functions: every Live coder step expands back to the line written out, % shorter, names, presets, update of saved code (no browser)
 npm run check:material                                 # material generator: rules, determinism, variety, key, chord tones, families, energy, varied presets, FM ranges, session sources (no browser)
+npm run check:patterns                                 # Patterns tab data: every preset once, styles that use it, store, Save as pattern, loop song, Add to song, previews, radio pool, backup (no browser)
+node tools/check-patterns.cjs [shots-dir]              # Patterns tab in the browser: loop, key change, beat, New and Save, Compose listen and Save as pattern, rename, delete, Add to song, links (dev server)
 node tools/check-compact-code.cjs                      # same events for compact code, short patterns, line breaks and every technical functions preset (dev server)
 node tools/check-ideas.cjs [song,song…]                # same events as the code before idea-model, every song and Crescendo states (dev server, ~8 min)
 ```

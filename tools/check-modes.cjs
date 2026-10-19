@@ -21,7 +21,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const visibleTabs = () => page.$$eval('.tabs .tab', xs => xs.filter(x => !x.hidden).map(x => x.dataset.tab).join());
   const pressed = () => page.$$eval('.mode-btn', xs => xs.filter(x => x.getAttribute('aria-pressed') === 'true').map(x => x.dataset.mode).join());
   check((await pressed()) === 'lab' && await page.isVisible('#tab-stili'), 'an old remembered tab opens in its mode', await pressed());
-  check((await visibleTabs()) === 'artisti,stili,generi,suoni,guida,lezioni,riferimenti', 'Groove Lab tabs', await visibleTabs());
+  check((await visibleTabs()) === 'artisti,stili,generi,suoni,pattern,guida,lezioni,riferimenti', 'Groove Lab tabs', await visibleTabs());
   if (shots) await page.screenshot({ path: path.join(shots, 'lab.png') });
 
   await page.click('[data-mode="ascolta"]'); await sleep(300);
@@ -47,6 +47,12 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('#tab-artisti [data-open]'); await sleep(300);
   await page.click('#ar-compose'); await sleep(800);
   check((await pressed()) === 'ascolta' && await page.isVisible('#tab-componi'), 'new song from an artist switches to Listen and Compose');
+  // and back: the listen button next to a track's preset menu in Compose opens the Patterns tab in the Groove Lab
+  const listen = await page.$('#track-panel [id$="_pt-listen"]');
+  if (listen) { await listen.click(); await sleep(600); }
+  check(!!listen && (await pressed()) === 'lab' && await page.isVisible('#tab-pattern') && !!(await page.$('#patterns .pn-detail h3')), 'the Compose listen button opens the Patterns tab in the Groove Lab');
+  await page.click('[data-mode="ascolta"]'); await sleep(300);
+  check(await page.isVisible('#tab-componi'), 'Listen reopens Compose after the link');
 
   // reload keeps mode and tab
   await page.click('[data-mode="lab"]'); await page.click('[data-tab="guida"]'); await sleep(200);
@@ -68,7 +74,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('[data-tab="generi"]'); await sleep(300);
   await page.click('#tab-generi [data-genre-radio="trance"]'); await sleep(2500);
   const r = await page.evaluate(() => ({ on: globalThis.codingMiskRadio.on, styles: globalThis.codingMiskRadio.options.styles }));
-  check(await page.isVisible('#tab-radio') && r.on && r.styles.join() === 'trance', 'listen to a genre in the radio', JSON.stringify(r));
+  check(await page.isVisible('#tab-radio') && r.on && r.styles.length && r.styles.every(id => /trance/.test(id)), 'listen to a genre in the radio', JSON.stringify(r));
   await page.click('#radio-start'); await sleep(300);
 
   // the Guide (#48): its own tab next to the Strudel lessons; chips scroll; "Show me" opens the feature; "?" from a tab
@@ -89,7 +95,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const help = await page.$('#tab-radio .g-help');
   check(!!help, 'the Radio tab has a "?"');
   if (help) { await help.click(); await sleep(500); check((await pressed()) === 'lab' && await page.isVisible('#tab-guida') && await page.$eval('#g-radio', el => el.classList.contains('g-flash')), '"?" opens the Guide on the Radio card'); }
-  for (const tb of ['componi', 'brani', 'playlist', 'artisti', 'stili', 'generi', 'suoni', 'lezioni', 'riferimenti']) {
+  for (const tb of ['componi', 'brani', 'playlist', 'artisti', 'stili', 'generi', 'suoni', 'pattern', 'lezioni', 'riferimenti']) {
     await page.click(`[data-mode="${['componi', 'brani', 'playlist'].includes(tb) ? 'ascolta' : 'lab'}"]`); await page.click(`[data-tab="${tb}"]`); await sleep(250);
     if (!(await page.$(`#tab-${tb} .g-help`))) check(false, `the ${tb} tab has a "?"`);
   }

@@ -10,6 +10,7 @@ import { SPEAKERS } from '../song/build.js';
 import { GENRES } from '../song/format.js';
 import { downloadJson, pickJsonFiles, userStore, freeId, errorsByPath } from './library.js';
 import { DICE } from '../icons.js';
+import { kindOfPreset } from './patterns.js';
 import { randomStyles } from '../endless/artist-maker.js';
 import { freshSeed } from '../endless/random.js';
 
@@ -23,7 +24,8 @@ const INSTR = Object.keys(INSTRUMENTS);
 
 // onRename(oldId, newId): a user style got a new id (song tags follow it, #34)
 // onRadio(styleIds): play styles in the radio (#50: a random one)
-export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onChange, onRename = () => {}, onRadio = () => {} }) {
+// onPattern(kind, id): a preset named in a sheet opens in the Patterns tab (pattern-library)
+export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onChange, onRename = () => {}, onRadio = () => {}, onPattern = null }) {
   const mine = userStore(store, 'coding-misk-styles');
   let open = null, editing = null, jsonView = false;
   const builtinIds = () => builtins.map(r => r.id);
@@ -35,11 +37,14 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
   const chips = (list, on, path) => `<div class="chips">${list.map(x => `<button class="chip small" data-pick="${esc(path)}" data-val="${esc(x)}" aria-pressed="${on.includes(x)}">${esc(x)}</button>`).join('')}</div>`;
   const tagList = list => (list && list.length ? list.map(x => `<span class="tag-chip">${esc(x)}</span>`).join(' ') : `<span class="muted">${esc(t('libNone'))}</span>`);
   const range = r => (Array.isArray(r) ? `${r[0]}–${r[1]}` : r ?? '');
+  // the presets of an instrument link to the Patterns tab
+  const PATTERN_LISTS = { drums: 'grooves', bass: 'presets', arp: 'presets', hook: 'presets', pad: 'presets', guitar: 'patterns' };
+  const presetList = (type, list) => (list && list.length ? list.map(x => { const kind = kindOfPreset(type, x); return kind ? `<button class="tag-chip pat-link" data-pattern-link="${esc(kind)}|${esc(x)}" title="${esc(t('plOpen'))}">${esc(x)}</button>` : `<span class="tag-chip">${esc(x)}</span>`; }).join(' ') : `<span class="muted">${esc(t('libNone'))}</span>`);
 
   function sheet(r) {
     const prog = id => `${id} <span class="muted">${(PROGS[id] ? PROGS[id][1] : []).map(c => chordName(c, 0)).join(' ')}</span>`;
     const instr = INSTR.filter(k => r[k]).map(k => {
-      const p = r[k], lists = Object.keys(INSTRUMENTS[k]).filter(f => p[f]).map(f => `<div><span class="lbl">${esc(f)}</span> ${tagList(p[f])}</div>`).join('');
+      const p = r[k], lists = Object.keys(INSTRUMENTS[k]).filter(f => p[f]).map(f => `<div><span class="lbl">${esc(f)}</span> ${onPattern && PATTERN_LISTS[k] === f ? presetList(k, p[f]) : tagList(p[f])}</div>`).join('');
       const set = p.settings ? `<div><span class="lbl">settings</span> ${Object.entries(p.settings).map(([s, v]) => `${esc(s)} ${esc(range(v))}`).join(' · ')}</div>` : '';
       return `<div class="sheet-block"><h4>${esc(k)}${p.weight !== undefined ? ` <span class="muted">· ${esc(t('libWeight'))} ${p.weight}</span>` : ''}</h4>${lists}${set}</div>`;
     }).join('');
@@ -120,6 +125,7 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
 
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.patternLink && onPattern) { const [kind, id] = b.dataset.patternLink.split('|'); onPattern(kind, id); return; }
     if (b.dataset.open) { open = b.dataset.open; editing = null; jsonView = false; render(); return; }
     // a random style in the radio (#50)
     if (b.id === 'st-random') { const list = usable(); if (list.length) { const one = randomStyles(freshSeed(), list.map(r => ({ id: r.id, genre: 'any' })))[0]; onRadio([one]); } return; }

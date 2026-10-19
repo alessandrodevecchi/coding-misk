@@ -18,12 +18,12 @@ export function makeBackup(entries, now = new Date()) {
 
 const byId = (a, b) => { const out = (Array.isArray(a) ? a : []).slice(); for (const x of Array.isArray(b) ? b : []) { if (!x || !x.id) continue; const i = out.findIndex(y => y && y.id === x.id); if (i >= 0) out[i] = x; else out.push(x); } return out; };
 
-// Merges a backup into the current values: songs, code songs, the trash, playlists, styles and artists are added or
+// Merges a backup into the current values: songs, code songs, the trash, playlists, styles, artists and patterns are added or
 // replaced by id (nothing here is deleted); settings take the backup's value. get(key) → current value.
 // Returns { values: { key: value }, counts } or { error }.
 export function mergeBackup(backup, get) {
   if (!backup || backup.format !== BACKUP_FORMAT || !backup.data || typeof backup.data !== 'object') return { error: 'format' };
-  const values = {}, counts = { songs: 0, versions: 0, playlists: 0, styles: 0, artists: 0, settings: 0 };
+  const values = {}, counts = { songs: 0, versions: 0, playlists: 0, styles: 0, artists: 0, patterns: 0, settings: 0 };
   for (let [k, v] of Object.entries(backup.data)) {
     if (!k.startsWith(PREFIX)) continue;
     if (k === 'coding-misk-library') {
@@ -46,6 +46,10 @@ export function mergeBackup(backup, get) {
     } else if (k === 'coding-misk-styles' || k === 'coding-misk-artists') {
       values[k] = byId(get(k), v);
       counts[k === 'coding-misk-styles' ? 'styles' : 'artists'] += (Array.isArray(v) ? v.length : 0);
+    } else if (k === 'coding-misk-patterns') {
+      // the user's patterns (pattern-library) by id, like styles and artists
+      values[k] = byId(get(k), v);
+      counts.patterns += (Array.isArray(v) ? v.length : 0);
     } else if (k === 'coding-misk-played') {
       // last played (#67): every song keeps its latest time
       const cur = get(k) && typeof get(k) === 'object' ? get(k) : {}, out = { ...cur };

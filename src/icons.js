@@ -15,3 +15,15 @@ export const COMPOSE = svg('0 0 16 16', '<ellipse cx="5" cy="12.2" rx="2.4" ry="
 export const RHYTHM = svg('0 0 16 16', '<rect x="1" y="6" width="2.6" height="4" rx=".6" fill="currentColor"/><rect x="4.8" y="6" width="2.6" height="4" rx=".6" fill="none" stroke="currentColor" stroke-width="1"/><rect x="8.6" y="6" width="2.6" height="4" rx=".6" fill="currentColor"/><rect x="12.4" y="6" width="2.6" height="4" rx=".6" fill="currentColor"/>', 'ico-rhythm');
 // two notes on a beam (keep the notes)
 export const NOTES = svg('0 0 16 16', '<ellipse cx="4" cy="12" rx="2.2" ry="1.6" fill="currentColor"/><ellipse cx="11.4" cy="10.4" rx="2.2" ry="1.6" fill="currentColor"/><path d="M6 11.8V3.6l7.4-1.6v8.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>', 'ico-notes');
+// a triangle (play a pattern in a loop, pattern-library)
+export const PLAY = svg('0 0 16 16', '<path d="M4.5 2.8v10.4L13 8z" fill="currentColor"/>', 'ico-play');
+// a square (stop)
+export const STOP = svg('0 0 16 16', '<rect x="3.5" y="3.5" width="9" height="9" rx="1.2" fill="currentColor"/>', 'ico-stop');
+// headphones (listen to a track's pattern in the Patterns tab)
+export const LISTEN = svg('0 0 16 16', '<path d="M2.5 10V8a5.5 5.5 0 0 1 11 0v2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="1.8" y="9" width="3.4" height="5" rx="1.2" fill="currentColor"/><rect x="10.8" y="9" width="3.4" height="5" rx="1.2" fill="currentColor"/>', 'ico-listen');
+// a step grid with a plus (save a pattern)
+export const KEEP = svg('0 0 16 16', '<rect x="1.5" y="2" width="3" height="3" rx=".6" fill="currentColor"/><rect x="6" y="2" width="3" height="3" rx=".6" fill="none" stroke="currentColor" stroke-width="1"/><rect x="1.5" y="6.5" width="3" height="3" rx=".6" fill="none" stroke="currentColor" stroke-width="1"/><rect x="6" y="6.5" width="3" height="3" rx=".6" fill="currentColor"/><path d="M12 8.5v6M9 11.5h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>', 'ico-keep');
+// a pencil (rename)
+export const PENCIL = svg('0 0 16 16', '<path d="M3 13l.6-3 7.2-7.2 2.4 2.4L6 12.4z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M9.6 4l2.4 2.4" fill="none" stroke="currentColor" stroke-width="1.4"/>', 'ico-pencil');
+// an arrow into a box (add to the song open in Compose)
+export const ADD_TO = svg('0 0 16 16', '<path d="M2.5 9.5v4h11v-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 2v8M5 7l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>', 'ico-add');

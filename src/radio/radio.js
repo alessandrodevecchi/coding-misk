@@ -35,7 +35,8 @@ export function usableRecipes(list) {
 }
 
 // keepArtist(artist): saves a random artist among the listener's, returns its id (#50)
-export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null }) {
+// userPatterns(): the user's saved patterns as the director reads them (pattern-library): they join a song where they fit
+export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, userPatterns = () => [] }) {
   const ids = recipes.map(r => r.id);
   const saved = store.get('coding-misk-radio', null) || {};
   const opts = {
@@ -75,7 +76,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const saveOpts = () => store.set('coding-misk-radio', opts);
   const artistOf = id => (id ? artists().find(a => a.id === id) || (opts.temp && opts.temp.id === id ? opts.temp : null) : null);
   // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
-  const current = () => { const a = artistOf(opts.artist), how = { transition: opts.transition, harmony: opts.harmony, ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}) };
+  const current = () => { const a = artistOf(opts.artist), up = userPatterns(), how = { transition: opts.transition, harmony: opts.harmony, ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}) };
     // a compilation carries its setup and the artists it may use, so a replay draws the same songs
     if (opts.compilation !== 'off') return { compilation: { every: opts.compilation, setup: JSON.parse(JSON.stringify(opts.compSetup)), pool: JSON.parse(JSON.stringify(artists())), ...(Object.keys(opts.compLocks).length ? { locks: { ...opts.compLocks } } : {}) }, ...how };
     return a ? { artist: JSON.parse(JSON.stringify(a)), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how }; };
@@ -130,7 +131,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       return item;
     }
     const raw = optionsFor(n), comp = raw.compilation;
-    const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}) });
+    const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}) });
     const { song, entry, plan, opts: used } = S.session.next(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw);
     // the director has just planned the transition from the song before: an interlude lengthens it,
     // an overlap starts this song before it ends
@@ -174,7 +175,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     for (let n = out.length; out.length < count && !(until && until(out)); n++) {
       let o = recipe.options; for (const c of recipe.changes || []) if (c.song <= n) o = c.options;
       // a compilation draws this song's options from its setup, as the radio does (a clip keeps its length)
-      const how = { transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.fit ? { fit: o.fit } : {}) };
+      const how = { transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}) };
       const g = ses.next(o.compilation ? compilationOptions(recipe.seed, n, o.compilation, recipes, how) : o), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
       out.push({ song: cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song, entry: g.entry });
     }

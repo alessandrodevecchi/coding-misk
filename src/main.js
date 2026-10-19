@@ -9,7 +9,7 @@ import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/ty
 import { crescendoSong, waypointSong } from './song/crescendo.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, migrateGrowth, PROFILE_STORE_VERSION, migrateOld } from './live/profiles.js';
 import { liveCode } from './live/live-code.js';
-import { installHelpers, useFns, FUNCTION_PRESETS, FUNCTION_OPTIONS } from './song/writer.js';
+import { installHelpers, useFns, FUNCTION_PRESETS, FUNCTION_OPTIONS, functionOptions, writeCode, levelsOf, busesOf, functionContext, tail, preludeText } from './song/writer.js';
 import { upgradeLibrary } from './library/code-upgrade.js';
 import { COMMENT_PRESETS } from './song/comments.js';
 import pkg from '../package.json';
@@ -64,7 +64,9 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES } from './icons.js';
+import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP } from './icons.js';
+import { createPatternsTab } from './library/patterns-tab.js';
+import { patternStore, savedFromTrack, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
@@ -157,7 +159,9 @@ function crescendoOf(tr) {
   return c.build.length ? c : null;
 }
 // the radio tab (created further down, once the player exists)
-let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, genresTab = null, prevTab = 'componi';
+let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, genresTab = null, patternsTab = null, prevTab = 'componi', curTab = null;
+// the user's saved patterns (pattern-library): the Patterns tab, Save as pattern in Compose and the radio read them
+const patternsStore = patternStore(store);
 // custom samples manifest (bank → files), for spoken comments
 let customFiles = {};
 // the width of the code panel in characters, for the line breaks of a live build (typing-lines); 80 before the editor exists
@@ -516,6 +520,39 @@ function changed() {
   clearTimeout(evalTimer);
   if (isPlaying()) evalTimer = setTimeout(() => ed.evaluate(), 150);
 }
+// ---------- the loop of the Patterns tab (pattern-library, design D2) ----------
+// a temporary song of 4 bars (src/library/patterns.js loopSong), written with the Technical functions preset of the
+// current profile (song-functions) and played by the same player as the songs; it loops until stopped. A change while
+// it plays (sound, key, tempo, another pattern) is evaluated at the next bar (songTick). The song is never saved.
+let loopNext = null;
+function loopPlayable(sg, uid = null) {
+  const o = functionOptions(resolveProfile(profileChoice, overrides)), ref = compileSong(sg);
+  const base = { id: 'pattern-loop', title: sg.title, kind: 'pattern', loop: true, uid, meta: parseSong(ref) };
+  if (!FUNCTION_OPTIONS.some(k => o[k])) return { ...base, code: ref };
+  const buses = busesOf(ref), w = writeCode(ref, { mode: o, written: levelsOf(ref), buses, fns: functionContext(ref, { id: sg.id, title: sg.title }, o) });
+  const run = shown => shown + tail(shown, { table: w.table });
+  const standalone = shown => { const pre = preludeText(buses, w.fns); return pre + shown + tail(shown, { table: w.table, offset: pre.length }); };
+  return { ...base, code: w.code, run, standalone, buses, fns: w.fns };
+}
+async function playLoop(sg, uid, title) {
+  const p = loopPlayable({ ...sg, title }, uid);
+  if (song && song.loop && isPlaying() && !seeking) { loopNext = { p, at: Math.floor(sched().now()) + 1 }; return; }
+  loopNext = null;
+  // a song or the radio stops first
+  if (radio && radio.on) radio.stopped();
+  setHand(false); resumeTo = null; paused = null;
+  initAudioOnce();
+  await ready;
+  await initAudioOnce();
+  ed.stop(); typing = null; built = 0;
+  song = p; mode = 'free'; source = { kind: 'pattern', name: title };
+  renderSource();
+  ed.setCode(codeFor(p, 0));
+  sched().lastEnd = 0;
+  await ed.evaluate();
+  updateShare();
+}
+const loopState = () => (song && song.loop && isPlaying() ? { uid: loopNext ? loopNext.p.uid : song.uid, cycle: loopNext ? -1 : sched().now() } : null);
 async function loadFree(code, src) {
   if (radio && radio.on) radio.stopped();
   setHand(false); resumeTo = null;
@@ -543,6 +580,7 @@ function renderSource() {
     track: () => `${t('arranger')}: ${T.title}`,
     lesson: () => t('srcGuide', { name: source.name }),
     sound: () => t('srcSound', { name: source.name }),
+    pattern: () => t('srcPattern', { name: source.name }),
     song: () => t('srcSong', { name: source.name }),
     radio: () => t('srcRadio', { name: source.name }),
   };
@@ -1990,6 +2028,26 @@ function composePattern(tr, keep = null) {
   editPat = k; changed(); renderTrackPanel();
   toast(t('composedPart', { p: k, n }));
 }
+// Patterns (pattern-library, D5 and D7): the listen button next to a track's preset menu opens its pattern in the
+// Patterns tab with the track's sound, the section's key and progression and the song's tempo (the song stops); Save as
+// pattern keeps the selected pattern among the user's own, with the context of the section it first plays in
+function listenPattern(tr) {
+  const key = patOf(tr), pat = tr.patterns[key] || {}, sec = secFull(), e = eff(tr);
+  const over = { sound: e[soundKey(tr.type)], key: sec.key, chords: sec.chords, meter: sec.meter, bpm: sec.bpm, ...(tr.type === 'hook' ? { mode: e.mode } : {}), settings: { ...e } };
+  stop();
+  const plain = pat.preset && !pat.idea && !pat.steps && !pat.notes;
+  let ok = false;
+  if (plain) ok = patternsTab.open({ kind: kindOfPreset(tr.type, pat.preset), id: pat.preset, over });
+  if (!ok) {
+    const draft = savedFromTrack(T, tr, key, { name: `${trackLabel(tr)} · ${T.title}` });
+    ok = patternsTab.open({ item: { kind: draft.kind, type: tr.type, name: draft.name, pattern: draft.pattern, sound: draft.sound, settings: draft.settings, context: draft.context, defaults: { ...KIND_DEFAULTS[draft.kind] }, styles: draft.styles, draft }, over });
+  }
+  showTab('pattern');
+}
+function savePattern(tr) {
+  const saved = patternsStore.add(savedFromTrack(T, tr, patOf(tr), { name: `${trackLabel(tr)} · ${T.title}` }));
+  toast(t('ptSavedPattern', { name: saved.name }), { label: t('ptOpenTab'), run: () => { showTab('pattern'); patternsTab.open({ saved: saved.id }); } });
+}
 function panelHtml(ti) {
   const tr = T.tracks[ti];
   const key = patOf(tr), pat = tr.patterns[key] || {}, c = cellOf(tr, sel), n = meterSteps(secFull().meter);
@@ -1997,12 +2055,12 @@ function panelHtml(ti) {
   const stepBtns = (attr, label) => Array.from({ length: n }, (_, i) => `<button type="button" class="step" data-g="${Math.floor(i / 4) % 4}" ${attr}="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('');
   let editor = '';
   if (tr.type === 'drums') {
-    editor = `<div class="ctrl"><label class="lbl" for="pt-groove">${t('groove')}</label><select id="pt-groove"></select></div>
+    editor = `<div class="ctrl"><label class="lbl" for="pt-groove">${t('groove')}</label><div class="pt-presetrow"><select id="pt-groove"></select><button type="button" class="btn small icon pt-listen" id="pt-listen" title="${esc(t('ptListen'))}" aria-label="${esc(t('ptListen'))}">${LISTEN}</button></div></div>
       <div class="seq"><span></span><div class="stepnums" ${cols}>${Array.from({ length: n }, (_, i) => `<span>${i + 1}</span>`).join('')}</div>
       ${ROWS.map(([id, label]) => `<span class="rowlbl">${label}</span><div class="steps" ${cols}>${Array.from({ length: n }, (_, i) => `<button type="button" class="step" data-g="${Math.floor(i / 4) % 4}" data-row="${id}" data-i="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('')}</div>`).join('')}</div>
       <p class="idea-code" id="pt-idea" hidden></p>`;
   } else if (PRESET_LIST[tr.type]) {
-    editor = `<div class="pt-top"><div class="ctrl"><label class="lbl" for="pt-preset">${t('preset')}</label><select id="pt-preset"></select></div>
+    editor = `<div class="pt-top"><div class="ctrl"><label class="lbl" for="pt-preset">${t('preset')}</label><div class="pt-presetrow"><select id="pt-preset"></select><button type="button" class="btn small icon pt-listen" id="pt-listen" title="${esc(t('ptListen'))}" aria-label="${esc(t('ptListen'))}">${LISTEN}</button></div></div>
       ${tr.type === 'arp' ? `<div class="ctrl"><label class="lbl" for="pt-speed">${t('speed')}</label><select id="pt-speed"><option value="16">${t('sixteenths')}</option><option value="8">${t('eighths')}</option></select></div>` : ''}</div>
       <div class="chsteps" data-n="${n}"${tr.type === 'hook' || tr.type === 'arp' ? ` title="${esc(t('stepsMaskHint'))}"` : ''}><div class="row"><span class="lbl">${t('chSteps')}</span><span class="hint" id="pt-steps-state"></span><button type="button" class="btn small" id="pt-steps-reset">${t('stepsReset')}</button></div>
         <div class="steps" ${cols}>${stepBtns('data-ps', t(tr.type))}</div>
@@ -2038,7 +2096,7 @@ function panelHtml(ti) {
       <div class="chips">${custom ? `<span class="note">${t('customCell')}</span>` : `<button class="chip" data-play-pat="" aria-pressed="${!c}">${t('silent')}</button>${Object.keys(tr.patterns).map(k => `<button class="chip" data-play-pat="${esc(k)}" aria-pressed="${!!(c && c.clip && c.clip.pattern === k)}">${esc(k)}</button>`).join('')}`}</div></div>`}
     ${tr.type === 'voice' ? '' : `<div class="tp-pats"><span class="lbl">${t('patterns')}</span>
       <div class="chips">${Object.keys(tr.patterns).map(k => `<button class="chip" data-edit-pat="${esc(k)}" aria-pressed="${k === key}">${esc(k)}</button>`).join('')}
-        <button class="chip" id="pt-new">${t('newPattern')}</button><button class="chip" id="pt-del">${t('deletePattern')}</button></div>
+        <button class="chip" id="pt-new">${t('newPattern')}</button><button class="chip" id="pt-del">${t('deletePattern')}</button>${PATTERN_TYPES.includes(tr.type) ? `<button class="chip pt-savepat" id="pt-savepat" title="${esc(t('ptSaveTip'))}">${KEEP}<span>${esc(t('ptSaveAs'))}</span></button>` : ''}</div>
       <p class="note">${esc(t('editingPattern', { p: key }))}</p>${composeRow(tr, pat)}</div>`}
     <div class="tp-editor">${editor}</div>
     <div class="tp-scope"${tr.type === 'voice' ? ' hidden' : ''}><span class="lbl">${t('settingsScope')}</span>
@@ -2200,6 +2258,8 @@ $('#track-panel').addEventListener('click', e => {
     editPat = k || null; changed(); renderTrackPanel(); return;
   }
   if (r === 'pt-compose') return composePattern(tr);
+  if (r === 'pt-listen') return listenPattern(tr);
+  if (r === 'pt-savepat') return savePattern(tr);
   if (r === 'pt-keep-rhythm') return composePattern(tr, 'rhythm');
   if (r === 'pt-keep-notes') return composePattern(tr, 'notes');
   if (r === 'pt-new') { const k = nextKey(tr); tr.patterns[k] = clone(tr.patterns[patOf(tr)] || DEFAULT_PATTERN[tr.type]()); editPat = k; changed(); renderTrackPanel(); return; }
@@ -2306,10 +2366,10 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'lezioni', 'suoni', 'riferimenti'];
+const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'lezioni', 'suoni', 'pattern', 'riferimenti'];
 let cards = [];
 // two modes (#42): Listen to make and hear music, Groove Lab for its material and for learning
-const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'guida', 'lezioni', 'riferimenti'] };
+const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'pattern', 'guida', 'lezioni', 'riferimenti'] };
 const modeOf = tab => Object.keys(APP_MODES).find(m => APP_MODES[m].includes(tab)) || null;
 let modeTabs = store.get('coding-misk-mode-tabs', {});
 if (!modeTabs || typeof modeTabs !== 'object') modeTabs = {};
@@ -2326,6 +2386,10 @@ function showTab(name) {
   for (const id of TABS) $('#tab-' + id).hidden = id !== name;
   if (name === 'brani' && cards.length) renderSongs();
   if (name === 'suoni') renderSounds();
+  // the Patterns tab: shown, or closed (its new parts that were not saved go)
+  if (name === 'pattern' && patternsTab) patternsTab.render();
+  else if (curTab === 'pattern' && patternsTab) patternsTab.closed();
+  curTab = name;
   if (name === 'radio' && radio) radio.render();
   if (name === 'playlist' && playlistsTab) playlistsTab.render();
   if (name === 'impostazioni' && settingsPage) settingsPage.render();
@@ -2711,6 +2775,8 @@ function songTick() {
   const ahead = Math.min(m.bars - 1, Math.floor(s.lastEnd + s.cps * .1));
   const target = m.bpm[ahead] / 240;
   if (Math.abs(s.cps - target) > 1e-6) s.setCps(target);
+  // the loop of the Patterns tab: it never ends; a change plays from the next bar
+  if (song.loop) { if (loopNext && s.lastEnd + .1 * s.cps >= loopNext.at) { song = loopNext.p; loopNext = null; source = { kind: 'pattern', name: song.title }; renderSource(); ed.setCode(codeFor(song, 0)); ed.evaluate(); } return; }
   if (resumeTo !== null) resumeBuild(song, s, cyc);
   else if (song.build && !hand) liveBuild(song, s, cyc);
   if (mode === 'radio' && radio && !hand && resumeTo === null) radio.tick(cyc);
@@ -2812,7 +2878,15 @@ function useSound(it) {
   tr.settings[key] = value; changed(); renderTrackPanel();
   return t('sbUsed', { sound: it.cat === 'drums' ? machineLabel(it.group) : value, track: trackLabel(tr), song: T.title });
 }
-const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast, scheduler: sched });
+// "Try on a pattern" (pattern-library, D5): bass sounds on a bassline, keys and pads on chords, the rest on a melody
+function tryPattern(it) {
+  const n = `${it.name} ${prettyName(it.name)}`.toLowerCase();
+  const kind = /bass/.test(n) ? 'basslines' : /piano|organ|pad|string|choir|vibra|marimba|celesta|bell|brass|guitar|harp/.test(n) ? 'chords' : 'melodies';
+  const id = kind === 'basslines' ? 'rolling' : kind === 'chords' ? (/pad|string|choir|brass/.test(n) ? 'pad' : 'comp') : 'neon';
+  showTab('pattern');
+  patternsTab.open({ kind, id, over: { sound: it.name } });
+}
+const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast, scheduler: sched, tryPattern });
 function renderSounds() { sounds.render(); }
 
 // ---------- player bar (#32) ----------
@@ -2929,8 +3003,26 @@ stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins
   onRename: (from, to) => {
     for (const tr of [...user.tracks, T]) if (tr.tags && tr.tags.styles) tr.tags.styles = tr.tags.styles.map(id => (id === from ? to : id));
     saveLibrary();
-  } });
+  },
+  // a preset named in a style's sheet opens in the Patterns tab (pattern-library, D4)
+  onPattern: (kind, id) => { showTab('pattern'); patternsTab.open({ kind, id }); } });
 RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
+// the Patterns tab (pattern-library, #72): the loop plays through the player above; Add to song changes the song open
+// in Compose (marked changed, not saved)
+patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast, recipes: () => RECIPES,
+  loop: { play: (sg, uid, title) => playLoop(sg, uid, title), stop: () => { loopNext = null; return stop(); }, state: loopState },
+  codeOf: sg => loopPlayable(sg).code,
+  onStyle: id => { showTab('stili'); stylesTab.openStyle(id); },
+  addToSong: (it, cfg) => {
+    const res = addPatternToSong(T, it, { sound: cfg && cfg.sound, base: baseSettings(it.type), name: t(it.type), section: SEC().name });
+    tk = res.track; editPat = res.key; selClip = null;
+    // the song changes without moving the player: the loop goes on
+    if (mode === 'track') changed(); else { dirty = true; saveDraft(); compiled = playable({ ...T, kind: 'composed' }); renderArranger(); }
+    renderTrackPanel();
+    return t(res.created ? 'plAddedNew' : 'plAdded', { p: res.key, track: trackLabel(T.tracks[res.track]), song: T.title });
+  } });
+// for the browser checks (tools/check-patterns.cjs): the song open in Compose
+globalThis.codingMiskPatterns = { tab: patternsTab, compose: () => ({ T: JSON.parse(JSON.stringify(T)), sel, dirty }) };
 // artists from artists/ plus the user's (Artists tab)
 const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));
 artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onCompose: a => newSongFromArtist(a), onChange: () => { if (radio) radio.render(); renderArtistPick(); } });
@@ -2957,6 +3049,8 @@ const preloadSounds = p => {
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
 radio = createRadio({
   root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a),
+  // the user's saved patterns join the songs where they fit (pattern-library; material-generator D10)
+  userPatterns: () => forRadio(patternsStore.list()),
   player: {
     makePlayable: sg => playable({ ...sg, kind: 'composed' }),
     start: (p, bar) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio'); },
@@ -3021,6 +3115,7 @@ function renderStatic() {
   if (radio) radio.render();
   if (stylesTab) stylesTab.render();
   if (artistsTab) artistsTab.render();
+  if (patternsTab) patternsTab.render();
   renderArtistPick();
   $('#looks').innerHTML = PICK_LOOKS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('') + `<option value="soul" disabled>${esc(t('soulLook'))} ${LOCK}</option>`;
   $('#looks').value = soulOverride ? 'soul' : look;
