@@ -1,6 +1,6 @@
 // Endless sessions from the command line (docs/ENDLESS.md).
 //   node tools/endless.mjs --styles berlin-techno[,jazz…] [--chaos 0.3] [--energy 0.6] [--complexity 0.5] [--talk 0.5]
-//                          [--minutes 15] [--seed text] [--artist id|file] [--out songs/endless] [--join] [--quiet]
+//                          [--minutes 15] [--seed text] [--artist id|file] [--material mix] [--out songs/endless] [--join] [--quiet]
 // Writes one song file per song and session.json in --out, prints the seed and a report.
 // --join also writes one song with the whole session in order, to play in Compose as a single live build.
 // Run with `node --no-warnings` to hide Node's experimental localStorage warning.
@@ -13,14 +13,15 @@ import { joinSession } from '../src/endless/join.js';
 import { validateSong } from '../src/song/validate.js';
 import { findArtist, loadArtists } from './artists-dir.mjs';
 import { validateArtist } from '../src/endless/artist.js';
+import { SESSION_SOURCES } from '../src/material/index.js';
 
 const args = process.argv.slice(2);
 const fail = msg => { console.error(`error: ${msg}`); process.exit(1); };
 const opt = name => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : undefined; };
-const KNOWN = ['styles', 'artist', 'chaos', 'energy', 'complexity', 'talk', 'minutes', 'seed', 'out', 'join', 'quiet', 'help'];
+const KNOWN = ['styles', 'artist', 'chaos', 'energy', 'complexity', 'talk', 'minutes', 'seed', 'material', 'out', 'join', 'quiet', 'help'];
 for (const a of args) if (a.startsWith('--') && !KNOWN.includes(a.slice(2))) fail(`unknown option ${a}; options: ${KNOWN.map(k => `--${k}`).join(' ')}`);
 if (args.includes('--help') || !args.length) {
-  console.log('usage: node tools/endless.mjs --styles id[,id…] [--chaos 0-1] [--energy 0-1] [--complexity 0-1] [--talk 0-1] [--minutes n] [--seed text] [--out dir] [--join] [--quiet]');
+  console.log('usage: node tools/endless.mjs --styles id[,id…] [--chaos 0-1] [--energy 0-1] [--complexity 0-1] [--talk 0-1] [--minutes n] [--seed text] [--material patterns|varied|composed|mix] [--out dir] [--join] [--quiet]');
   process.exit(args.length ? 0 : 1);
 }
 
@@ -57,6 +58,11 @@ if (opt('minutes') !== undefined) {
 }
 if (opt('seed') !== undefined) options.seed = opt('seed');
 if (artist) options.artist = artist;
+// where the parts come from (material-generator): the library as written, varied, composed, or each recipe's choice
+if (opt('material') !== undefined) {
+  if (!SESSION_SOURCES.includes(opt('material'))) fail(`--material must be one of ${SESSION_SOURCES.join(', ')} (got ${opt('material')})`);
+  options.material = opt('material');
+}
 const out = opt('out') || path.join('songs', 'endless');
 
 const { session, songs } = generateSession(recipes, options);
@@ -81,12 +87,13 @@ fs.writeFileSync(old, JSON.stringify({ ...session, files: files.map(f => f.name)
 // report
 const mmss = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 console.log(`seed: ${session.seed}`);
-console.log(`styles: ${styles.join(', ')} · chaos ${options.chaos} · energy ${options.energy} · complexity ${options.complexity} · ${session.songs.length} songs · ${mmss(session.seconds)}`);
+console.log(`styles: ${styles.join(', ')} · chaos ${options.chaos} · energy ${options.energy} · complexity ${options.complexity} · material ${options.material || 'mix'} · ${session.songs.length} songs · ${mmss(session.seconds)}`);
 session.songs.forEach((e, i) => {
   const parts = Object.entries(e.parts).filter(([k]) => k !== 'dominant').map(([k, v]) => `${k}=${v}`).join(' ');
   const voice = `voice ${e.voice.speaker || 'default'}${e.voice.character ? ` (${e.voice.character})` : ''}`;
   if (e.artist) console.log(`\n${e.artist.name}: chaos ${e.artist.chaos} · energy ${e.artist.energy} · complexity ${e.artist.complexity} · talk ${e.artist.talk} · pace ${e.artist.pace}${e.artist.quirks.length ? ` · quirks ${e.artist.quirks.join(', ')}` : ''}`);
-  console.log(`\n#${i + 1} "${e.title}" · ${mmss(e.seconds)} · ${e.bpm} BPM · ${e.key} ${e.meter} · ${e.shape} · ${e.tracks} tracks · ${voice} · ${parts}`);
+  const mat = e.material ? ` · ${Object.entries(e.material).map(([k, v]) => `${k} ${v}`).join(', ')}` : '';
+  console.log(`\n#${i + 1} "${e.title}" · ${mmss(e.seconds)} · ${e.bpm} BPM · ${e.key} ${e.meter} · ${e.shape} · ${e.tracks} tracks · ${voice} · ${parts}${mat}`);
   if (args.includes('--quiet')) return;
   for (const p of e.phrases) console.log(`  bar ${String(p.bar + 1).padStart(3)}  ${p.role.padEnd(7)} target ${p.target.toFixed(2)}  energy ${p.energy.toFixed(2)}  ${p.moves.join(', ') || '-'}${p.say ? `  "${p.say}"` : ''}`);
 });

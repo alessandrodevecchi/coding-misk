@@ -40,6 +40,7 @@
     "max": 7
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "euclid"] },
     "kits": [
       "RolandTR909",
       "OberheimDMX"
@@ -60,6 +61,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["rolling", "gallop", "sixteenths", "fifths"] },
     "presets": [
       "tritono",
       "mirino",
@@ -77,6 +79,7 @@
     }
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["polymeter", "tail", "dark"] },
     "presets": [
       "allarme",
       "boss",

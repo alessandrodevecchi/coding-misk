@@ -54,6 +54,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["pulse", "half", "roots", "fifths"] },
     "presets": [
       "boomchick",
       "walking"
@@ -64,6 +65,7 @@
     ]
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response"] },
     "presets": [
       "richiamo",
       "domanda",

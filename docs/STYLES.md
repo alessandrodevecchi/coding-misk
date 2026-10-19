@@ -65,6 +65,28 @@ Every instrument also takes:
 
 `waves` accepts the instrument sounds of the Compose menus, the built-in synths (`sawtooth`, `square`, `sine`, …) and any General MIDI sound (`gm_…`).
 
+### Material
+
+`drums`, `bass`, `arp`, `hook`, `pad` and `guitar` also take `material`: where the instrument's parts come from in the songs of the style (material generator, `docs/ENDLESS.md` "Material").
+
+```json
+"hook": { "material": { "source": "mix", "share": 0.4, "rules": ["polymeter", "tail", "call-response"] }, "presets": ["neon", "pioggia"] },
+"drums": { "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "two-step"] }, "grooves": ["techno"] },
+"bass": { "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "octaves"], "sounds": ["reese", "saw"] } }
+```
+
+| Field | Value | Default |
+| --- | --- | --- |
+| `source` | `preset` (the lists above), `generated` (parts composed for each song), `mix` (some songs each) | `preset` |
+| `share` | With `mix`: the share of songs with a composed part, 0 to 1 | `0.5` |
+| `families` | Drums only: groove families the generator may use: `four-floor`, `breakbeat`, `two-step`, `half-time`, `euclid` | all |
+| `rules` | Melody (`hook`): `polymeter`, `tail`, `call-response`, `dark`. Bass: rhythm families `half`, `offbeat`, `pulse`, `rolling`, `gallop`, `sixteenths`, and `roots`, `octaves`, `fifths`, `shared`. Arp: `up`, `updown`, `pedal`, `skips`, `random`. Pad and guitar: `style`, `mode` (a new progression on the degrees of the mode), `sevenths`, `power` | all |
+| `sounds` | Melodic instruments: sound kinds for composed parts: `bell`, `reese`, `growl`, `dirty`, `saw`, `square` (FM within the generator's range table) | the recipe's `waves` |
+
+An instrument without `material` uses its presets only. The validator rejects an unknown source, family, rule or sound kind, and a share outside 0 to 1, with the JSON path and the known names. Composed parts come in only with complexity above 0, and a radio or session can override every recipe with its own material source (`patterns`, `varied`, `composed`, or `mix` to follow the recipes).
+
+The built-in styles use `mix` with a modest share (0.2 to 0.5): presets stay the larger share where a style lives on its signature grooves and riffs (live coder styles, acid, house, jazz, country, rock, metal), pads and guitars keep presets, and FM sounds are named only by drum and bass (`reese`) and darksynth (`growl`, `dirty`) basses. These values wait for the owner's listening test.
+
 ## Mixing
 
 Several styles can be selected at once, with a chaos amount from 0 to 1. Each song takes each of its parts from one style:

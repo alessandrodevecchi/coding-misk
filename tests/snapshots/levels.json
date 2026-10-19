@@ -1603,5 +1603,111 @@
     "guitar": 0.12
    }
   }
+ ],
+ "example-material": [
+  {
+   "name": "Intro",
+   "levels": {
+    "hats": 0.3,
+    "kick": 0.85,
+    "snare": 0.5
+   }
+  },
+  {
+   "name": "Lead bell",
+   "levels": {
+    "hats": 0.3,
+    "kick": 0.85,
+    "snare": 0.5,
+    "hook": 0.13,
+    "bass": 0.37
+   }
+  },
+  {
+   "name": "Lead growl",
+   "levels": {
+    "hats": 0.29,
+    "kick": 0.85,
+    "snare": 0.49,
+    "hook": 0.1,
+    "bass": 0.39
+   }
+  },
+  {
+   "name": "Lead dirty",
+   "levels": {
+    "hats": 0.29,
+    "kick": 0.85,
+    "snare": 0.49,
+    "hook": 0.13,
+    "bass": 0.37
+   }
+  },
+  {
+   "name": "Bass reese",
+   "levels": {
+    "hats": 0.29,
+    "kick": 0.85,
+    "snare": 0.49,
+    "bass": 0.39
+   }
+  },
+  {
+   "name": "Bass growl",
+   "levels": {
+    "hats": 0.3,
+    "kick": 0.85,
+    "snare": 0.5,
+    "bass": 0.43
+   }
+  },
+  {
+   "name": "Bass dirty",
+   "levels": {
+    "hats": 0.3,
+    "kick": 0.85,
+    "snare": 0.5,
+    "bass": 0.39
+   }
+  },
+  {
+   "name": "Arp bell",
+   "levels": {
+    "hats": 0.29,
+    "kick": 0.85,
+    "snare": 0.5,
+    "bass": 0.37,
+    "arp": 0.21
+   }
+  },
+  {
+   "name": "Arp growl",
+   "levels": {
+    "hats": 0.29,
+    "kick": 0.85,
+    "snare": 0.49,
+    "bass": 0.39,
+    "arp": 0.2
+   }
+  },
+  {
+   "name": "Pad chords",
+   "levels": {
+    "kick": 0.85,
+    "bass": 0.37,
+    "pad": 0.13
+   }
+  },
+  {
+   "name": "Seven eight",
+   "levels": {
+    "hats": 0.31,
+    "kick": 0.85,
+    "snare": 0.44,
+    "hook": 0.15,
+    "arp": 0.16,
+    "pad": 0.28
+   }
+  }
  ]
 }

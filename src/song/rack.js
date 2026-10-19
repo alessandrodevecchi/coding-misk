@@ -27,6 +27,10 @@ export const DEVICES = {
   vowel: { kind: 'sound', label: { en: 'Vowel filter', it: 'Filtro vocale' }, args: [['vowel', 'choice', 'a', ['a', 'e', 'i', 'o', 'u']]], code: a => `.vowel("${a.vowel}")` },
   hpf: { kind: 'sound', label: { en: 'High-pass', it: 'Passa-alto' }, args: [['cutoff', 'num', 400, 20, 8000, 10], ['reso', 'num', 0, 0, 20, 1]], code: a => `.hpf(${f(a.cutoff)})${a.reso ? `.hpq(${f(a.reso)})` : ''}` },
   lpf: { kind: 'sound', label: { en: 'Low-pass', it: 'Passa-basso' }, args: [['cutoff', 'num', 2000, 100, 18000, 10], ['reso', 'num', 0, 0, 20, 1]], code: a => `.lpf(${f(a.cutoff)})${a.reso ? `.lpq(${f(a.reso)})` : ''}` },
+  // FM (material-generator D9): two operators at most, no feedback; the second one is off at index 0
+  fm: { kind: 'sound', label: { en: 'FM', it: 'FM' }, args: [['index', 'num', 1, 0, 4, 0.05], ['harmonicity', 'choice', 1, [0.5, 1, 1.01, 2, 2.01, 3, 3.5, 4]], ['wave', 'choice', 'sine', ['sine', 'triangle', 'square', 'sawtooth', 'pink', 'brown']],
+    ['decay', 'num', 0.3, 0.05, 1, 0.05], ['sustain', 'num', 0.5, 0, 1, 0.05], ['index2', 'num', 0, 0, 3, 0.05], ['harmonicity2', 'num', 1, 1, 10, 0.5]],
+    code: a => `.fm(${f(a.index)}).fmh(${f(a.harmonicity)})${a.wave !== 'sine' ? `.fmwave("${a.wave}")` : ''}.fmdecay(${f(a.decay)}).fmsustain(${f(a.sustain)})${a.index2 > 0 ? `.fm2(${f(a.index2)}).fmh2(${f(a.harmonicity2)})` : ''}` },
   pan: { kind: 'sound', label: { en: 'Pan', it: 'Panorama' }, args: [['position', 'num', 0.5, 0, 1, 0.05], ['motion', 'choice', 'fixed', ['fixed', 'slow', 'fast']]],
     code: a => a.motion === 'fixed' ? `.pan(${f(a.position)})` : `.pan(sine.slow(${a.motion === 'slow' ? 8 : 1}))` },
 };

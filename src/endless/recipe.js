@@ -6,6 +6,7 @@ import { SETTING_FIELDS, VOICE_DEFAULT, GENRES } from '../song/format.js';
 import { SYNTHS } from '../song/validate.js';
 import { SPEAKERS } from '../song/build.js';
 import { MACHINES } from '../sounds/machines.js';
+import { SOURCES, RULES, FAMILIES, SOUND_KINDS, KIND_OF_TYPE } from '../material/index.js';
 
 // The seven energy shapes (docs/ENDLESS.md); their curves live in shapes.js.
 export const SHAPES = ['build-drop', 'slow-burn', 'waves', 'flat-groove', 'verse-chorus', 'late-peak', 'descent'];
@@ -174,7 +175,7 @@ export function validateRecipe(r) {
     instruments++;
     const p = type;
     if (!part || typeof part !== 'object' || Array.isArray(part)) { err(p, 'an object'); continue; }
-    const allowed = [...Object.keys(fields), 'settings', 'weight'];
+    const allowed = [...Object.keys(fields), 'settings', 'weight', ...(KIND_OF_TYPE[type] ? ['material'] : [])];
     for (const k of Object.keys(part)) if (!allowed.includes(k)) warn(`${p}.${k}`, `unknown field for ${type}; fields: ${allowed.join(', ')}`);
     for (const k of REQUIRED_LISTS[type]) if (part[k] === undefined) err(`${p}.${k}`, `a list of ${k}`);
     for (const [k, names] of Object.entries(fields)) {
@@ -183,6 +184,7 @@ export function validateRecipe(r) {
       else list(`${p}.${k}`, part[k], among(`${p}.${k}`, names), k);
     }
     if (part.weight !== undefined && (!isNum(part.weight) || part.weight < 0 || part.weight > 1)) err(`${p}.weight`, 'how likely the director is to use this instrument, from 0 to 1');
+    if (part.material !== undefined && KIND_OF_TYPE[type]) checkMaterial(type, part.material, `${p}.material`, err, warn);
     if (part.settings !== undefined) {
       const s = part.settings, known = SETTING_FIELDS[type];
       if (!s || typeof s !== 'object' || Array.isArray(s)) err(`${p}.settings`, 'an object of settings, each a number or a range [low, high]');
@@ -195,6 +197,28 @@ export function validateRecipe(r) {
   }
   if (!instruments) err('', `at least one instrument part: ${Object.keys(INSTRUMENTS).join(', ')}`);
   return { errors, warnings };
+}
+
+// The material choice of an instrument (material-generator, docs/STYLES.md "Material"): source, share of generated parts,
+// and the groove families, melody rules and sound kinds the generator may use for it.
+export const MATERIAL_FIELDS = ['source', 'share', 'families', 'rules', 'sounds'];
+function checkMaterial(type, m, p, err, warn) {
+  if (!m || typeof m !== 'object' || Array.isArray(m)) { err(p, 'an object, for example { "source": "mix", "share": 0.5 }'); return; }
+  for (const k of Object.keys(m)) if (!MATERIAL_FIELDS.includes(k)) warn(`${p}.${k}`, `unknown field; fields: ${MATERIAL_FIELDS.join(', ')}`);
+  if (m.source !== undefined && !SOURCES.includes(m.source)) err(`${p}.source`, `one of ${SOURCES.join(', ')}`);
+  if (m.share !== undefined && (!isNum(m.share) || m.share < 0 || m.share > 1)) err(`${p}.share`, 'the share of generated parts, from 0 to 1');
+  const names = (k, known, what) => {
+    if (m[k] === undefined) return;
+    if (!Array.isArray(m[k]) || !m[k].length) { err(`${p}.${k}`, `a non-empty list of ${what}: ${known.join(', ')}`); return; }
+    m[k].forEach((x, i) => { if (!known.includes(x)) err(`${p}.${k}[${i}]`, `unknown ${what.replace(/s$/, '')} "${x}"; known: ${known.join(', ')}`); });
+  };
+  const kind = KIND_OF_TYPE[type];
+  if (type === 'drums') names('families', FAMILIES, 'groove families');
+  else if (m.families !== undefined) err(`${p}.families`, 'groove families are for drums only');
+  if (RULES[kind]) names('rules', RULES[kind], 'rules');
+  else if (m.rules !== undefined) err(`${p}.rules`, `no rules for ${type}`);
+  if (type !== 'drums') names('sounds', SOUND_KINDS, 'sound kinds');
+  else if (m.sounds !== undefined) err(`${p}.sounds`, 'sound kinds are for melodic instruments');
 }
 
 // Every sound a recipe names (instrument waves), for the browser check.

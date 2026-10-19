@@ -50,6 +50,7 @@
     "drive": 0
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.3, "families": ["two-step", "half-time", "breakbeat"] },
     "kits": [
       "AkaiMPC60",
       "EmuSP12",
@@ -67,6 +68,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["half", "pulse", "offbeat", "roots"] },
     "presets": [
       "walking",
       "sub",
@@ -79,6 +81,7 @@
     ]
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response"] },
     "presets": [
       "pioggia",
       "anima",

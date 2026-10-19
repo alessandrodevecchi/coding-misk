@@ -41,6 +41,7 @@
     "max": 7
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.3, "families": ["four-floor"] },
     "kits": [
       "RolandTR909",
       "OberheimDMX"
@@ -58,6 +59,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "offbeat", "pulse", "octaves"] },
     "presets": [
       "rolling",
       "rumble",
@@ -80,6 +82,7 @@
     }
   },
   "arp": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["pedal", "skips", "random"] },
     "presets": [
       "acid",
       "pedale",
@@ -105,6 +108,7 @@
     }
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["polymeter", "tail", "dark"] },
     "presets": [
       "colpi",
       "segnale",

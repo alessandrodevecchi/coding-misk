@@ -11,13 +11,13 @@
       "@strudel/repl": "1.3.0",
       "superdough": "1.3.0"
     },
-    "codes": 45079
+    "codes": 45404
   },
   "functions": {
     "add": {
-      "songs": 5,
-      "live": 9,
-      "radio": 5,
+      "songs": 6,
+      "live": 10,
+      "radio": 15,
       "prelude": 0,
       "as": [
         "add"
@@ -25,7 +25,7 @@
     },
     "all": {
       "songs": 0,
-      "live": 42,
+      "live": 43,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -33,8 +33,8 @@
       ]
     },
     "analyze": {
-      "songs": 42,
-      "live": 42,
+      "songs": 43,
+      "live": 43,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -42,8 +42,8 @@
       ]
     },
     "anchor": {
-      "songs": 1,
-      "live": 1,
+      "songs": 2,
+      "live": 2,
       "radio": 0,
       "prelude": 0,
       "as": [
@@ -51,26 +51,26 @@
       ]
     },
     "arp": {
-      "songs": 14,
-      "live": 24,
-      "radio": 21,
+      "songs": 15,
+      "live": 25,
+      "radio": 20,
       "prelude": 0,
       "as": [
         "arp"
       ]
     },
     "attack": {
-      "songs": 35,
-      "live": 35,
-      "radio": 46,
+      "songs": 36,
+      "live": 36,
+      "radio": 44,
       "prelude": 0,
       "as": [
         "attack"
       ]
     },
     "bank": {
-      "songs": 41,
-      "live": 41,
+      "songs": 42,
+      "live": 42,
       "radio": 58,
       "prelude": 0,
       "as": [
@@ -87,8 +87,8 @@
       ]
     },
     "chord": {
-      "songs": 1,
-      "live": 1,
+      "songs": 2,
+      "live": 2,
       "radio": 0,
       "prelude": 0,
       "as": [
@@ -98,15 +98,15 @@
     "crush": {
       "songs": 16,
       "live": 16,
-      "radio": 24,
+      "radio": 23,
       "prelude": 0,
       "as": [
         "crush"
       ]
     },
     "decay": {
-      "songs": 41,
-      "live": 41,
+      "songs": 42,
+      "live": 42,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -116,16 +116,16 @@
     "degradeBy": {
       "songs": 5,
       "live": 39,
-      "radio": 59,
+      "radio": 57,
       "prelude": 0,
       "as": [
         "degradeBy"
       ]
     },
     "delay": {
-      "songs": 37,
-      "live": 37,
-      "radio": 47,
+      "songs": 38,
+      "live": 38,
+      "radio": 49,
       "prelude": 1,
       "as": [
         "delay"
@@ -152,7 +152,7 @@
     "distort": {
       "songs": 34,
       "live": 34,
-      "radio": 53,
+      "radio": 51,
       "prelude": 1,
       "as": [
         "distort"
@@ -161,24 +161,78 @@
     "distortvol": {
       "songs": 34,
       "live": 34,
-      "radio": 52,
+      "radio": 50,
       "prelude": 1,
       "as": [
         "distortvol"
       ]
     },
-    "fmi": {
-      "songs": 5,
-      "live": 5,
+    "fmdecay": {
+      "songs": 1,
+      "live": 1,
+      "radio": 2,
+      "prelude": 0,
+      "as": [
+        "fmdecay"
+      ]
+    },
+    "fmh": {
+      "songs": 1,
+      "live": 1,
+      "radio": 2,
+      "prelude": 0,
+      "as": [
+        "fmh"
+      ]
+    },
+    "fmh2": {
+      "songs": 1,
+      "live": 1,
       "radio": 0,
+      "prelude": 0,
+      "as": [
+        "fmh2"
+      ]
+    },
+    "fmi": {
+      "songs": 6,
+      "live": 6,
+      "radio": 2,
       "prelude": 0,
       "as": [
         "fm"
       ]
     },
+    "fmi2": {
+      "songs": 1,
+      "live": 1,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "fm2"
+      ]
+    },
+    "fmsustain": {
+      "songs": 1,
+      "live": 1,
+      "radio": 2,
+      "prelude": 0,
+      "as": [
+        "fmsustain"
+      ]
+    },
+    "fmwave": {
+      "songs": 1,
+      "live": 1,
+      "radio": 2,
+      "prelude": 0,
+      "as": [
+        "fmwave"
+      ]
+    },
     "gain": {
-      "songs": 42,
-      "live": 42,
+      "songs": 43,
+      "live": 43,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -195,9 +249,9 @@
       ]
     },
     "irand": {
-      "songs": 6,
-      "live": 6,
-      "radio": 3,
+      "songs": 7,
+      "live": 7,
+      "radio": 7,
       "prelude": 0,
       "as": [
         "irand"
@@ -213,8 +267,8 @@
       ]
     },
     "late": {
-      "songs": 27,
-      "live": 28,
+      "songs": 28,
+      "live": 29,
       "radio": 36,
       "prelude": 0,
       "as": [
@@ -222,8 +276,8 @@
       ]
     },
     "lpf": {
-      "songs": 41,
-      "live": 41,
+      "songs": 42,
+      "live": 42,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -231,8 +285,8 @@
       ]
     },
     "lpq": {
-      "songs": 40,
-      "live": 40,
+      "songs": 41,
+      "live": 41,
       "radio": 56,
       "prelude": 1,
       "as": [
@@ -240,8 +294,8 @@
       ]
     },
     "mask": {
-      "songs": 42,
-      "live": 42,
+      "songs": 43,
+      "live": 43,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -267,26 +321,26 @@
       ]
     },
     "n": {
-      "songs": 33,
-      "live": 33,
-      "radio": 50,
+      "songs": 34,
+      "live": 34,
+      "radio": 51,
       "prelude": 0,
       "as": [
         "n"
       ]
     },
     "note": {
-      "songs": 40,
-      "live": 40,
-      "radio": 58,
+      "songs": 41,
+      "live": 41,
+      "radio": 57,
       "prelude": 0,
       "as": [
         "note"
       ]
     },
     "orbit": {
-      "songs": 42,
-      "live": 42,
+      "songs": 43,
+      "live": 43,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -305,7 +359,7 @@
     "phaser": {
       "songs": 1,
       "live": 1,
-      "radio": 8,
+      "radio": 9,
       "prelude": 0,
       "as": [
         "phaser"
@@ -314,7 +368,7 @@
     "phaserdepth": {
       "songs": 1,
       "live": 1,
-      "radio": 8,
+      "radio": 9,
       "prelude": 0,
       "as": [
         "phaserdepth"
@@ -323,16 +377,16 @@
     "postgain": {
       "songs": 13,
       "live": 13,
-      "radio": 21,
+      "radio": 20,
       "prelude": 0,
       "as": [
         "postgain"
       ]
     },
     "range": {
-      "songs": 40,
-      "live": 40,
-      "radio": 58,
+      "songs": 41,
+      "live": 41,
+      "radio": 57,
       "prelude": 1,
       "as": [
         "range"
@@ -348,26 +402,26 @@
       ]
     },
     "release": {
-      "songs": 35,
-      "live": 35,
-      "radio": 46,
+      "songs": 36,
+      "live": 36,
+      "radio": 44,
       "prelude": 0,
       "as": [
         "release"
       ]
     },
     "ribbon": {
-      "songs": 1,
-      "live": 1,
-      "radio": 0,
+      "songs": 2,
+      "live": 2,
+      "radio": 4,
       "prelude": 0,
       "as": [
         "rib"
       ]
     },
     "room": {
-      "songs": 40,
-      "live": 40,
+      "songs": 41,
+      "live": 41,
       "radio": 59,
       "prelude": 1,
       "as": [
@@ -377,15 +431,15 @@
     "roomsize": {
       "songs": 4,
       "live": 4,
-      "radio": 9,
+      "radio": 13,
       "prelude": 0,
       "as": [
         "roomsize"
       ]
     },
     "s": {
-      "songs": 42,
-      "live": 42,
+      "songs": 43,
+      "live": 43,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -393,26 +447,26 @@
       ]
     },
     "scale": {
-      "songs": 31,
-      "live": 31,
-      "radio": 42,
+      "songs": 32,
+      "live": 32,
+      "radio": 43,
       "prelude": 0,
       "as": [
         "scale"
       ]
     },
     "segment": {
-      "songs": 1,
-      "live": 1,
-      "radio": 0,
+      "songs": 2,
+      "live": 2,
+      "radio": 4,
       "prelude": 0,
       "as": [
         "seg"
       ]
     },
     "setcpm": {
-      "songs": 42,
-      "live": 42,
+      "songs": 43,
+      "live": 43,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -420,18 +474,18 @@
       ]
     },
     "slow": {
-      "songs": 37,
-      "live": 37,
-      "radio": 58,
+      "songs": 38,
+      "live": 38,
+      "radio": 57,
       "prelude": 1,
       "as": [
         "slow"
       ]
     },
     "struct": {
-      "songs": 36,
-      "live": 36,
-      "radio": 57,
+      "songs": 37,
+      "live": 37,
+      "radio": 56,
       "prelude": 0,
       "as": [
         "struct"
@@ -456,8 +510,8 @@
       ]
     },
     "sustain": {
-      "songs": 41,
-      "live": 41,
+      "songs": 42,
+      "live": 42,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -474,9 +528,9 @@
       ]
     },
     "transpose": {
-      "songs": 36,
-      "live": 36,
-      "radio": 51,
+      "songs": 37,
+      "live": 37,
+      "radio": 53,
       "prelude": 0,
       "as": [
         "transpose"
@@ -501,8 +555,8 @@
       ]
     },
     "velocity": {
-      "songs": 42,
-      "live": 42,
+      "songs": 43,
+      "live": 43,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -510,8 +564,8 @@
       ]
     },
     "voicing": {
-      "songs": 1,
-      "live": 1,
+      "songs": 2,
+      "live": 2,
       "radio": 0,
       "prelude": 0,
       "as": [

@@ -95,6 +95,7 @@ Each track gets its own orbit (bus), so its delay and reverb are independent.
 | `vowel` | `vowel` a (`a e i o u`) | `.vowel()` |
 | `hpf`, `lpf` | `cutoff` (Hz), `reso` 0 | `.hpf().hpq()`, `.lpf().lpq()` |
 | `pan` | `position` 0.5, `motion` fixed (`fixed slow fast`) | `.pan()` |
+| `fm` | `index` 1 (0 to 4), `harmonicity` 1 (`0.5 1 1.01 2 2.01 3 3.5 4`), `wave` sine (`sine triangle square sawtooth pink brown`), `decay` 0.3, `sustain` 0.5, `index2` 0 (0 to 3, 0 is off), `harmonicity2` 1 (1 to 10): two operators at most | `.fm().fmh().fmwave().fmdecay().fmsustain()`, `.fm2().fmh2()` |
 
 Times are fractions of a bar: `0.0625` a 16th, `0.125` an 8th, `0.1875` a dotted 8th, `0.25` a quarter. Devices act after the instrument settings, so a rack `lpf` or `distort` replaces or adds to the track's own filter and drive.
 
@@ -168,6 +169,8 @@ A pattern of a `drums`, `bass`, `guitar`, `arp`, `hook`, `pad` or `texture` trac
 | `add`, `sub` | transposition: degrees for degrees, semitones for notes; a number or a pattern | `14`, `"<0 12>"` | `.sub(14)`, `.transpose(…)` |
 | `hold` | `true` holds the chord for the bar (pad, guitar, arp) | `true` | |
 | `variants` | prepared variants, one chain function each; commented out until a `variant` step switches one on | `[{ "add": "0 0 4 0 5" }]` | `// .add("0 0 4 0 5")` |
+
+Degrees and indices can also be a polymeter, `"{0 ~ 2 4 1}%16"`: one item per step, 16 steps a bar, so a cell of 5 or 7 values drifts against the bar and restarts at the clip start. A pattern of `add` on degrees (a progression summed over the bars, `"<0 -2 2 -1>"`) starts on its first item at the clip start, like the chords. The material generator (`docs/ENDLESS.md`, Material) writes ideas with these fields only.
 
 Which fields fit which track: `drums` take `beat`; `bass` rhythm, beat, degrees, scale, from, add, sub; `hook` degrees (required, or `from`), scale, rhythm, from, add, sub; `arp` index, chords, voicing, random, from, add, sub, rhythm; `pad` and `guitar` rhythm, beat, chords, voicing, add, hold; `texture` rhythm (`x` is the sample) and random. Every track takes `variants` but drums.
 

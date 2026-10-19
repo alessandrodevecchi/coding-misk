@@ -210,6 +210,13 @@
   .tp-head .actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .tp-plays, .tp-pats, .tp-scope { display: grid; gap: 6px; }
   .tp-pats .note, .tp-plays .note { margin: 0; }
+  /* compose a part (material-generator): action, part number, energy, keep rhythm or notes of a preset */
+  .tp-compose { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .tp-compose .btn { display: inline-flex; align-items: center; gap: 5px; }
+  .tp-compose .tp-cnum { display: inline-flex; align-items: center; gap: 4px; }
+  .tp-compose .tp-cnum input { width: 64px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); font: inherit; font-size: 12px; }
+  .tp-compose .tp-cen { flex: 0 1 150px; min-width: 110px; }
+  .ico-compose, .ico-rhythm, .ico-notes { width: 14px; height: 14px; flex: none; }
   .tp-editor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 60%, transparent); }
   .pt-top { display: flex; gap: 12px; flex-wrap: wrap; }
   .pt-top .ctrl { flex: 1 1 160px; }

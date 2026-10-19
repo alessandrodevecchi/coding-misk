@@ -34,6 +34,7 @@
   ],
   "phrase": 8,
   "drums": {
+    "material": { "source": "mix", "share": 0.3, "families": ["breakbeat", "two-step"] },
     "kits": [
       "AkaiMPC60",
       "EmuSP12",
@@ -45,6 +46,7 @@
     ]
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["half", "rolling", "offbeat", "octaves"], "sounds": ["reese", "saw"] },
     "presets": [
       "sub",
       "rumble",
@@ -64,6 +66,7 @@
     }
   },
   "arp": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["pedal", "skips", "random"] },
     "presets": [
       "pedale",
       "spezzato"
@@ -78,6 +81,7 @@
     "weight": 0.4
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["polymeter", "tail", "dark"] },
     "presets": [
       "eco",
       "segnale",

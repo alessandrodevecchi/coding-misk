@@ -40,6 +40,7 @@
     "max": 6
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
       "RolandTR909",
       "RolandTR808"
@@ -56,6 +57,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["rolling", "sixteenths", "octaves"] },
     "presets": [
       "sub",
       "rumble"
@@ -75,6 +77,7 @@
     }
   },
   "arp": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["pedal", "skips", "random"] },
     "presets": [
       "acid"
     ],
@@ -102,6 +105,7 @@
     }
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["polymeter", "tail", "dark"] },
     "presets": [
       "colpi",
       "allarme"

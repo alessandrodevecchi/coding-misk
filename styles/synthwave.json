@@ -34,6 +34,7 @@
   ],
   "phrase": 8,
   "drums": {
+    "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "half-time"] },
     "kits": [
       "LinnDrum",
       "OberheimDMX",
@@ -45,6 +46,7 @@
     ]
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["pulse", "rolling", "gallop", "octaves"] },
     "presets": [
       "ottavi",
       "spirale",
@@ -63,6 +65,7 @@
     }
   },
   "arp": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["up", "updown", "pedal", "random"] },
     "presets": [
       "su",
       "sugiu",
@@ -79,6 +82,7 @@
     "weight": 0.7
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response", "polymeter"] },
     "presets": [
       "neon",
       "orizzonte",

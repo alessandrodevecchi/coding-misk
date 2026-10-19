@@ -75,6 +75,10 @@ $: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.6
 
 Write an idea by hand when a part is a small cell that repeats or moves (a rhythm, a line of degrees, chords with a voicing); keep `steps` and `notes` for parts drawn note by note. Randomness always needs a `seed` and `cycles`, and only picks indices inside a chord, sample slices or values (a filter, the pan): melodies stay written by hand.
 
+## Example 5: composed parts and FM
+
+[`songs/examples/05-material.json`](../songs/examples/05-material.json) holds parts made by the material generator (`docs/ENDLESS.md`, Material) and one test phrase for each FM sound kind at the top of its range: a melody with a changed tail, a polymetric lead in 7/8 (`"{-2 2 ~ 5 4}%14"`), basslines with an octave line as rhythm, a seeded and a polymetric arpeggio, a pad voicing the section's chords and a new progression on A phrygian, and the `fm` rack device (`{ "device": "fm", "index": 3, "harmonicity": 3.5, "decay": 0.4, "sustain": 0 }`). In Compose, [Compose a part] in a track's panel makes such a pattern for any song.
+
 ## The rack
 
 Each track can chain devices after the instrument: delays, reverbs, distortion, phaser, tremolo, filters, panning, and note devices that change what plays (echo, offset copies, repeats, random drops, reverse). Each device is one Strudel function, shown next to its name in the app. Example 3 gives the hook a dotted-8th delay with a slow auto-pan, and the guitar wall a large reverb with a tremolo:

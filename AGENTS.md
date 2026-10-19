@@ -107,6 +107,7 @@ npm run catalog:strudel                                # rebuild the Strudel fun
 npm run check:strudel                                  # generated code calls only catalog functions and app helpers, catalog matches the installed Strudel (no browser)
 npm run check:ideas                                    # idea writer: shortest exact forms, every kind of idea, ladders, variant steps (no browser)
 npm run check:functions                                # song functions: every Live coder step expands back to the line written out, % shorter, names, presets, update of saved code (no browser)
+npm run check:material                                 # material generator: rules, determinism, variety, key, chord tones, families, energy, varied presets, FM ranges, session sources (no browser)
 node tools/check-compact-code.cjs                      # same events for compact code, short patterns, line breaks and every technical functions preset (dev server)
 node tools/check-ideas.cjs [song,song…]                # same events as the code before idea-model, every song and Crescendo states (dev server, ~8 min)
 ```
@@ -123,6 +124,7 @@ Audio analysis of reference tracks: `tools/analyze-audio.py` and `tools/zoom-aud
 - `src/sounds/`: sound browser (catalogue from the loaded sounds, pixel art drawings, free photos with credits in `public/sounds/photos/CREDITS.md`).
 - `src/song/`: song format v2 (format, converter from older scene saves, compiler, validator).
 - `src/endless/`: endless director (seeded random, recipes, mixing, shapes, energy, mutation, phrases, director, join). `styles/`: style recipes.
+- `src/material/`: material generator (melodies, basslines, arpeggios, chords, grooves, sounds composed as ideas from a seed, a style and an energy; `docs/ENDLESS.md`, Material).
 - `src/visuals.js`: canvas visuals. `src/hardware.js`: knobs and LEDs for the hardware theme.
 - `src/songs.js`: reads `SECTIONS` and `TEMPO` from track code. `src/i18n.js`: strings. `src/content.js`: lessons, sounds, references, hand-written tracks.
 - `patterns/`: hand-written Strudel files. `public/samples/`: custom samples. `docs/media/`: README media. `demo/`: local demo videos (git-ignored).

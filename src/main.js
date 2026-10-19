@@ -38,7 +38,8 @@ import { genresOf } from './library/song-filter.js';
 import { windowSong } from './endless/join.js';
 import { absoluteClips, playlistTransition, overlapOf } from './endless/transitions.js';
 import { joinSession } from './endless/join.js';
-import { createSession } from './endless/director.js';
+import { createSession, stylesNear } from './endless/director.js';
+import { styleId } from './endless/recipe.js';
 import { createSoundBrowser } from './sounds/browser.js';
 import { MACHINES } from './sounds/machines.js';
 import { machineLabel, prettyName } from './sounds/catalog.js';
@@ -63,7 +64,8 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE, REVERT, BIN } from './icons.js';
+import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES } from './icons.js';
+import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
 import { startHardware } from './hardware.js';
@@ -1946,6 +1948,48 @@ function renderTrackPanel() {
     : `<p class="note">${t('nothingPlays')}</p>`);
   $$('#track-panel [data-ptrk]').forEach(fillPanel);
 }
+// Compose a part (material-generator, D11): a new pattern from the song's key, chords, meter and style; the seed is
+// <song id>:<track id>:<number>, so the same number gives the same part. With a preset: keep its rhythm or its notes.
+const composeNums = {};
+let composeEnergy = 0.5;
+const composeNumOf = tr => composeNums[`${T.id}:${tr.id}`] || 1;
+function composeRow(tr, pat) {
+  if (!KIND_OF_TYPE[tr.type]) return '';
+  const varies = pat.preset && presetOf(tr.type, pat.preset);
+  return `<div class="tp-compose">
+      <button class="btn small" id="pt-compose" title="${esc(t('composeTip'))}">${COMPOSE}<span>${esc(t('composePart'))}</span></button>
+      <label class="tp-cnum" for="pt-cnum"><span class="lbl">#</span><input type="number" id="pt-cnum" min="1" max="9999" step="1" value="${composeNumOf(tr)}" aria-label="${esc(t('composeNum'))}" title="${esc(t('composeTip'))}"></label>
+      <div class="ctrl tp-cen" title="${esc(t('composeEnergyTip'))}"><div class="row"><label class="lbl" for="pt-cenergy">${esc(t('composeEnergy'))}</label><output id="pt-cenergy-o">${Math.round(composeEnergy * 100)}%</output></div><input type="range" id="pt-cenergy" min="0" max="1" step="0.05" value="${composeEnergy}"></div>
+      ${varies ? `<button class="btn small" id="pt-keep-rhythm" title="${esc(t('keepRhythmTip'))}">${RHYTHM}<span>${esc(t('keepRhythm'))}</span></button><button class="btn small" id="pt-keep-notes" title="${esc(t('keepNotesTip'))}">${NOTES}<span>${esc(t('keepNotes'))}</span></button>` : ''}
+    </div>`;
+}
+// the style of the song for the generator: its first style tag, else the style closest to its tempo and meter
+function composeStyle() {
+  const tag = ((T.tags || {}).styles || []).map(styleId).find(id => RECIPES.some(r => r.id === id));
+  const id = tag || (RECIPES.length ? stylesNear(T, RECIPES)[0] : null);
+  return RECIPES.find(r => r.id === id) || null;
+}
+// a new pattern on the next letter, selected; keep: null (compose), 'rhythm' or 'notes' (vary the preset)
+function composePattern(tr, keep = null) {
+  const sec = secFull(), cur = tr.patterns[patOf(tr)] || {}, n = composeNumOf(tr), kind = KIND_OF_TYPE[tr.type];
+  const R = composeStyle(), part = R && R[tr.type] ? R[tr.type] : {};
+  const ch = eff(tr), harmony = { key: sec.key, mode: (tr.type === 'hook' && ch.mode) || 'minor', chords: sec.chords, shared: T.shared || {} };
+  const out = compose(kind, { seed: `${T.id}:${tr.id}:${n}`, style: part.material || {}, harmony, meter: sec.meter, energy: composeEnergy, type: tr.type, ...(keep ? { from: cur.preset, keep } : {}) });
+  if (!out || !out.idea) { toast(t('composeNone')); return; }
+  let idea = out.idea;
+  // a drum track with only the kick (or without it) keeps its rows: the kick and the beat are often two tracks
+  if (tr.type === 'drums') {
+    const rows = cur.rows ? Object.keys(cur.rows) : cur.idea && cur.idea.beat ? Object.keys(cur.idea.beat).filter(k => k !== 'grid') : [];
+    const { grid, bd, ...rest } = idea.beat;
+    if (rows.length && rows.every(r => r === 'bd')) idea = { beat: { grid, bd } };
+    else if (rows.length && !rows.includes('bd')) idea = { beat: { grid, ...rest } };
+  }
+  const k = nextKey(tr);
+  tr.patterns[k] = { ...(tr.type === 'arp' && cur.speed ? { speed: cur.speed } : {}), idea };
+  composeNums[`${T.id}:${tr.id}`] = n + 1;
+  editPat = k; changed(); renderTrackPanel();
+  toast(t('composedPart', { p: k, n }));
+}
 function panelHtml(ti) {
   const tr = T.tracks[ti];
   const key = patOf(tr), pat = tr.patterns[key] || {}, c = cellOf(tr, sel), n = meterSteps(secFull().meter);
@@ -1995,7 +2039,7 @@ function panelHtml(ti) {
     ${tr.type === 'voice' ? '' : `<div class="tp-pats"><span class="lbl">${t('patterns')}</span>
       <div class="chips">${Object.keys(tr.patterns).map(k => `<button class="chip" data-edit-pat="${esc(k)}" aria-pressed="${k === key}">${esc(k)}</button>`).join('')}
         <button class="chip" id="pt-new">${t('newPattern')}</button><button class="chip" id="pt-del">${t('deletePattern')}</button></div>
-      <p class="note">${esc(t('editingPattern', { p: key }))}</p></div>`}
+      <p class="note">${esc(t('editingPattern', { p: key }))}</p>${composeRow(tr, pat)}</div>`}
     <div class="tp-editor">${editor}</div>
     <div class="tp-scope"${tr.type === 'voice' ? ' hidden' : ''}><span class="lbl">${t('settingsScope')}</span>
       <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}" ${focusClip(tr) ? '' : 'disabled'}>${esc(arrMode === 'timeline' && selClip !== null ? t('scopeClip') : t('scopeSection', { name: SEC().name }))}</button></div></div>
@@ -2090,6 +2134,8 @@ $('#track-panel').addEventListener('input', e => {
   const k = e.target.dataset.set;
   if (k) { let v = e.target.value; if (e.target.type === 'range') v = e.target.dataset.cut ? rangeToCut(+v) : +v; setSetting(k, v); changed(); syncTrackPanel(); return; }
   if (role(e.target) === 'tk-name') { curTrack().name = e.target.value; changed(); return; }
+  if (role(e.target) === 'pt-cnum') { const v = Math.round(+e.target.value); if (v >= 1) composeNums[`${T.id}:${curTrack().id}`] = v; return; }
+  if (role(e.target) === 'pt-cenergy') { composeEnergy = +e.target.value; const o = e.target.closest('.tp-cen').querySelector('output'); if (o) o.textContent = `${Math.round(composeEnergy * 100)}%`; return; }
   if (role(e.target) === 'pt-code') { const v = e.target.value; clearTimeout(codeTimer); codeTimer = setTimeout(() => editPattern(p => { p.code = v; }), 400); return; }
   if (role(e.target) === 'pt-notes') { const v = e.target.value.trim(); if (!v || /^[-\d~\s[\]<>]+$/.test(v)) editPattern(p => { if (v) p.notes = v; else delete p.notes; }); }
 });
@@ -2153,6 +2199,9 @@ $('#track-panel').addEventListener('click', e => {
     else tr.clips.push({ section: SEC().name, pattern: k });
     editPat = k || null; changed(); renderTrackPanel(); return;
   }
+  if (r === 'pt-compose') return composePattern(tr);
+  if (r === 'pt-keep-rhythm') return composePattern(tr, 'rhythm');
+  if (r === 'pt-keep-notes') return composePattern(tr, 'notes');
   if (r === 'pt-new') { const k = nextKey(tr); tr.patterns[k] = clone(tr.patterns[patOf(tr)] || DEFAULT_PATTERN[tr.type]()); editPat = k; changed(); renderTrackPanel(); return; }
   if (r === 'pt-del') {
     const k = patOf(tr);
@@ -3001,7 +3050,7 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     liveOpenWindow: () => liveLink.openWindow(), liveOpenRoom: () => liveLink.openRoom(), liveOn: () => { try { return liveLink.on; } catch (e) { return false; } },
     // hidden built-in songs (#68, D3b): how many, and all of them shown again
     hiddenSongs: () => (user.hidden || []).length, showHiddenSongs: () => showHiddenSongs(),
-    radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', scope: 'song' }), setRadio: (k, v) => radio && radio.setOption(k, v),
+    radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', scope: 'song', material: 'mix' }), setRadio: (k, v) => radio && radio.setOption(k, v),
   } });
 $('#open-settings').addEventListener('click', () => showTab($('#tab-impostazioni').hidden ? 'impostazioni' : prevTab));
 

@@ -14,13 +14,15 @@ import { phrase as pickPhrase } from './phrases.js';
 import { artistSongOptions, pickWeighted } from './artist.js';
 import { has, applyPlanQuirks } from './quirks.js';
 import { planTransition, MAX_RAMP } from './transitions.js';
+import { applyMaterial, sessionSource } from './material.js';
 
 export const SESSION_FORMAT = 'coding-misk/endless-session';
 // talk: how often the voice speaks (0 never, 0.5 about half of the boundaries with moves, 1 almost all)
 // The director's version (#38): sessions saved in playlists record it, and warn when it changes. Bump it whenever
 // `npm run check:endless -- --write-fixtures` changes the fixtures (the same seed gives different songs).
-export const DIRECTOR_VERSION = 2;
-export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist' };
+export const DIRECTOR_VERSION = 3;
+// material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
+export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix' };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const round = x => (Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100);
 const cap = s => s[0].toUpperCase() + s.slice(1);
@@ -49,6 +51,8 @@ function settingsFor(type, recipePart, extra, rng) {
 // candidate tracks of a song, each with a base pattern A and variations B (and C at high complexity)
 function candidateTracks(R, meter, complexity, rng, mut, opts = {}) {
   const n = meterSteps(meter), tracks = [];
+  // the session source "patterns" plays the library as written: no mutation
+  if (sessionSource(opts) === 'patterns') complexity = 0;
   const fit = rows => Object.fromEntries(Object.entries(rows).filter(([, v]) => v.includes('x')).map(([k, v]) => [k, fitSteps(v, n)]));
   const use = part => part && rng.chance(part.weight ?? 1);
   const variants = (base, mutate, others) => {
@@ -167,10 +171,12 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
   // the listener's sounds die (#50): other instruments and kits within the same styles, from its own stream
   const S = opts.sounds ? stream(`${opts.seed}:${opts.sounds}`, `sounds/${index}`) : null;
   const tracks = candidateTracks(R, meter, opts.complexity, S || P, S ? S.fork('mutation') : rng.mutation, opts);
+  // composed, varied or saved material (material-generator): from the material streams, never at complexity 0
+  const material = applyMaterial(tracks, R, opts.complexity, opts, { seed: opts.seed, index, key, chords: mainChords, meter, targets: plan.map(d => d.target), parts, entry: ENTRY });
   const usual = R.tracks.usual, hardMax = opts.complexity > 0.8 ? Math.max(R.tracks.max, 8) + 2 : Math.min(R.tracks.max, 8);
   const usualHigh = clamp(usual[1] + Math.round((opts.complexity - 0.5) * 2), usual[0], hardMax);
   const voice = voiceFor(R, opts, rng.voice);
-  return { index, parts, R, voice, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords };
+  return { index, parts, R, voice, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords, material };
 }
 
 // A part takes the strong progression on a big moment, or when the listener set a high tension (#40).
@@ -470,6 +476,8 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   // measured energy of the final song at each phrase
   for (const p of phrases) p.energy = round(measure(song, p.bar, ctx));
   const entry = { id: song.id, title, parts, styles, bars: plan.bars, seconds: Math.round(plan.seconds), bpm: plan.bpm, key: plan.key, meter: plan.meter, shape: plan.shape, phrase: plan.phrase, tracks: tracks.filter(t => t.type !== 'voice').length, voice: { speaker: plan.voice.settings.speaker, character: plan.voice.character }, usualHigh: plan.usualHigh, hardMax: plan.hardMax, phrases };
+  // which tracks play composed, varied or saved material (material-generator)
+  if (Object.keys(plan.material || {}).length) entry.material = { ...plan.material };
   return { song, entry, plan };
 }
 
@@ -556,7 +564,7 @@ export function generateSession(recipes, options) {
     const { song, entry } = ses.next(opts);
     songs.push(song); seconds += entry.seconds;
   }
-  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes, transition: opts.transition, harmony: opts.harmony, ...(opts.artist ? { artist: opts.artist } : {}) }, seconds: Math.round(seconds), songs: ses.entries };
+  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes, transition: opts.transition, harmony: opts.harmony, ...(sessionSource(opts) !== 'mix' ? { material: sessionSource(opts) } : {}), ...(opts.userPatterns ? { userPatterns: opts.userPatterns } : {}), ...(opts.artist ? { artist: opts.artist } : {}) }, seconds: Math.round(seconds), songs: ses.entries };
   return { session, songs };
 }
 

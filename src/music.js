@@ -356,7 +356,8 @@ export const RHYTHM_CHANNELS = ['bass', 'guitar', 'arp', 'hook', 'pad'];
 export function channelSteps(s, ch) {
   const N = meterSteps(s.meter), c = s[ch];
   if (c && c.steps) return fitSteps(c.steps, N);
-  if (c && c.idea) return expandIdea(c.idea, { type: ch, N, ch: c }).steps;
+  // (a drum idea has rows, not steps: a panel still drawn for another track falls back to the preset's steps)
+  if (c && c.idea) return expandIdea(c.idea, { type: ch, N, ch: c }).steps || presetSteps(s, ch, N);
   return presetSteps(s, ch, N);
 }
 function presetSteps(s, ch, N) {

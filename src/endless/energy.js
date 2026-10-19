@@ -12,7 +12,12 @@ const patternOf = t => ((t.patterns || {})[((t.clips || [])[0] || {}).pattern] |
 // hits per bar of the drum tracks playing
 export function drumHits(state) {
   let hits = 0;
-  for (const t of playing(state)) if (t.type === 'drums') for (const row of Object.values(patternOf(t).rows || {})) hits += (row.match(/x/g) || []).length * 16 / Math.max(1, row.length);
+  for (const t of playing(state)) if (t.type === 'drums') {
+    const p = patternOf(t);
+    for (const row of Object.values(p.rows || {})) hits += (row.match(/x/g) || []).length * 16 / Math.max(1, row.length);
+    // a drum idea (material-generator): sequencer steps on a grid
+    if (!p.rows && p.idea && p.idea.beat) { const { grid = 16, ...rows } = p.idea.beat; for (const list of Object.values(rows)) hits += String(list).split(',').filter(x => x.trim()).length * 16 / Math.max(1, grid); }
+  }
   return hits;
 }
 

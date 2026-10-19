@@ -47,6 +47,7 @@
     "drive": 0.05
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.3, "families": ["euclid", "half-time"] },
     "kits": [
       "RolandTR808"
     ],
@@ -62,6 +63,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["half", "roots", "fifths"] },
     "presets": [
       "sub"
     ],
@@ -72,6 +74,7 @@
     "weight": 0.6
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["polymeter", "tail", "call-response"] },
     "presets": [
       "segnale",
       "eco",

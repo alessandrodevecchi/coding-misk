@@ -42,6 +42,7 @@
     "max": 7
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
       "RolandTR909"
     ],
@@ -51,6 +52,7 @@
     ]
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["offbeat", "rolling", "octaves"] },
     "presets": [
       "offbeat",
       "pumping",
@@ -68,6 +70,7 @@
     }
   },
   "arp": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["up", "updown", "pedal", "random"] },
     "presets": [
       "sugiu",
       "su",
@@ -90,6 +93,7 @@
     }
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["polymeter", "tail", "call-response"] },
     "presets": [
       "eroico",
       "orizzonte",

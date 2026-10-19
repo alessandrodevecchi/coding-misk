@@ -12,6 +12,7 @@ The code lives in `src/endless/` and runs in Node and in the browser:
 | `shapes.js`   | The seven energy shapes                                             |
 | `energy.js`   | Measures the energy of a song state                                 |
 | `mutate.js`   | Varies drums, bass, arp and hook material                           |
+| `material.js` | Where each track's material comes from: presets, varied, composed (see Material) |
 | `phrases.js`  | Spoken comments per kind of move                                    |
 | `director.js` | Song plan, moves, titles, session                                   |
 
@@ -19,7 +20,7 @@ The code lives in `src/endless/` and runs in Node and in the browser:
 
 A session is an ordered list of songs plus session data: the seed, the options (styles, chaos, energy, complexity, minutes) and, for each song, its title, the style of each part, length, tempo, key, meter, shape, track count and one entry per phrase (role, target energy, measured energy, moves, comment), and the transition to the next song (see Transitions).
 
-Options and defaults: chaos 0.3, energy 0.6, complexity 0.5, 15 minutes, transitions and harmony from the artist (compatible harmony without one). The director adds songs until the session reaches the length.
+Options and defaults: chaos 0.3, energy 0.6, complexity 0.5, 15 minutes, transitions and harmony from the artist (compatible harmony without one), material `mix` (see Material). The director adds songs until the session reaches the length.
 
 ## Song plan
 
@@ -87,6 +88,7 @@ npm run endless -- --styles lo-fi --out /tmp/lofi --quiet
 | `--talk`       | 0 to 1: how often the voice comments                      | 0.5             |
 | `--minutes`    | Total length; songs are added until it is reached         | 15              |
 | `--seed`       | Any text; without it, a new seed is printed               | new             |
+| `--material`   | `patterns`, `varied`, `composed` or `mix` (see Material)  | `mix`           |
 | `--out`        | Output folder                                             | `songs/endless` |
 | `--join`       | Also write one song with the whole session                |                 |
 | `--quiet`      | Report one line per song only                             |                 |
@@ -98,9 +100,51 @@ An unknown style or a value out of range stops the command with the valid choice
 - Steps fall on phrase boundaries; breaks and drops on double-phrase boundaries.
 - At most one move per track on a boundary, and never on two consecutive boundaries.
 - Usually 4 to 5 tracks (fewer for sparse styles such as ambient and lo-fi). Complexity moves the usual count by up to one track. Never more than 8 tracks or the style's maximum, unless complexity is above 0.8.
-- Material starts from recipe presets. Variations come from mutation, whose amount grows with complexity; at complexity 0 there is none and variations are other presets. Bass and arp notes stay chord tones, hook notes stay scale degrees.
+- Material starts from recipe presets, composed parts or varied presets, as each recipe instrument's `material` asks (see Material). Variations come from mutation, whose amount grows with complexity, or from a part composed at another energy; at complexity 0 there is neither and variations are other presets. Bass and arp notes stay chord tones, hook notes stay scale degrees.
 - Consecutive songs never share the key or the shape, and a song never repeats the style-per-part combination of the three songs before it, unless the options leave no other choice.
 - Comments: always on the start, breaks, drops and the song end, on about half of the other boundaries with moves (option `talk`, 0 to 1, default 0.5: 0 never speaks, 1 speaks on almost every boundary), never closer than 8 bars.
+
+## Material
+
+The material generator (`src/material/`, `material-generator`, `#71`) composes parts the way a live coder writes them: small cells, summed progressions, chord indices, sequencer steps. Every part is an idea of the song format (`docs/SONG-FORMAT.md`, Ideas), so it compiles, grows in a live build and is measured like a preset. It is pure and seeded: the same inputs give the same part, in Node and in the browser.
+
+```js
+compose(kind, { seed, style, harmony, meter, energy, from, keep, type }) // → { idea, settings, rack, why, stats }
+```
+
+`kind` is `melody`, `bass`, `arp`, `chords`, `drums` or `sound`; `style` is the recipe instrument's `material` field (`docs/STYLES.md`); `harmony` is `{ key, mode, chords, shared }`; `energy` goes from 0 to 1; `from` and `keep` vary a preset. Each kind draws from its own stream (`material:<kind>` of the seed), so a melody never changes the drums of the same seed. `why` lists the rules used, for reports and checks.
+
+The seed chooses among rules, never note by note in a free range:
+
+| Kind | Rules |
+| --- | --- |
+| Melody (`hook`) | A cell of scale degrees plus a progression summed over the bars (`.add("<0 -2 2 -1>")`, the chord roots of the section, or a still line such as `<0!3 -2>` on a one-chord harmony). One shape each: a motif repeated with a changed tail (`<[A]!3 [A']>`, the fourth bar changes its last one or two notes), call and response (`<[A] [B]>`, B ends on degree 0), or a polymetric line (`{0 ~ 2 4 1}%16`, 5 or 7 values over the bar's steps, more likely with energy). Notes walk by steps and leaps up to a fifth, start and end on a stable degree more than half of the time; dark modes lean on the second and sixth degrees. One prepared variant half of the time (`// .add("0 0 4 0 5")`). |
+| Bassline | The roots of the section's chords with a rhythm cell from the style's families (`half`, `offbeat`, `pulse`, `rolling`, `gallop`, `sixteenths`), and an octave or fifth line as rhythm (`.transpose("[0 12]*4")`); with a shared progression of the song, the bass reads it three octaves down (`n(roots.sub(21))`). Every note is the root or the fifth of its bar's chord. |
+| Arpeggio | Indices into the voiced chords: a written cell (`up`, `updown`, `pedal`, `skips`) repeated over the bar or as a polymeter (`{0 1 2}%16`), or a seeded random source (`irand(4).seg(16).rib(371, 2)`). Every index is a chord tone. |
+| Chords | A pad voices the section's chords with `voicing()` (anchor `c4`), held or as stabs; with the rule `mode`, a new progression on the degrees of the mode, 1 to 4 different chords a phrase, the last one leading back (the fifth, the seventh or the flat second). A guitar plays power chords with a rhythm cell, or a riff of dark steps over them. |
+| Drums | Sequencer steps per row from a family: `four-floor` (kick on every beat), `breakbeat` (snare on 2 and 4, kick on 1 and on 6, 10 or 11), `two-step` (clap on 2 and 4, kick on 1 and one or two of 7, 10, 11), `half-time` (snare on 3, kick on 1 and 10 or 11), `euclid` (kick and rim as euclidean rhythms, rotated). Kits stay from the recipe. |
+| Sound | The wave and an optional FM patch: `bell`, `reese`, `growl`, `dirty`, `saw`, `square` (below). |
+
+Energy steers density and range, inside the style's limits: 0 to 0.33 gives 2 to 4 onsets a bar within a fifth, 0.33 to 0.66 gives 4 to 8 within an octave, 0.66 to 1 gives 6 to 16 up to an octave and a fifth. Basslines, arpeggios and grooves follow the same bands (more hits, hats and ghost notes with energy).
+
+A preset can be varied (`from`, `keep`): `rhythm` keeps its onsets and composes new pitches (chord tones for a bass, indices for an arpeggio, degrees for a melody), `notes` keeps its pitches in their order on a new rhythm.
+
+FM patches are a rack device (`fm`, `src/song/rack.js`), inside a range table: index 0 to 4 (one less per octave above 4), harmonicity from 0.5, 1, 1.01, 2, 2.01, 3, 3.5, 4, modulator wave sine, triangle, square or sawtooth (pink and brown only with an index under 0.5), decay 0.05 to 1, sustain 0 to 1, and a second operator (`fm2` 0.5 to 3, `fmh2` 1 to 10) for `growl` only. No third operator and no feedback in this first version. Every kind is measured below clipping in the browser (`songs/examples/05-material.json`).
+
+### In the director
+
+For each track whose type has a generator (drums, bass, arp, lead, pad, guitar), the director asks where its material comes from, on the `material` streams of the session seed (`material/<song>/<track>`), so the other streams keep their draws:
+
+- **Session source** (option `material`, saved with the session and the radio's recipe): `patterns` plays the library as written, with no mutation; `varied` keeps presets and adds a pattern that keeps their rhythm or notes (complexity sets how often the base pattern is varied too); `composed` composes every part; `mix`, the default, asks each recipe instrument's `material` field (`preset`, `generated`, or `mix` with a `share`).
+- **Complexity 0** keeps presets only, whatever the recipes say, and gives the same songs as director version 2 (unless the session source is `composed`).
+- A composed track gets pattern A at the target energy of the phrase where its type usually comes in (its place in the entry order), pattern B at the song's next big moment, and pattern C at the quietest phrase when complexity is above 0.6. The kick and beat tracks share one composed groove. A recipe that names `sounds` also gets a composed sound on composed tracks.
+- **The user's saved patterns** (`pattern-library`, passed as `userPatterns`) join the pool only where they fit: the same track type, a style tag of the part's style or `any`, and material that moves to the song's key.
+
+The session report (`npm run endless`) shows which tracks are composed, varied or saved. `DIRECTOR_VERSION` is 3: sessions saved by version 2 warn in the playlists.
+
+The rules were written from scratch from general techniques of live coders and public courses; no passage or full recipe of a course is reused, so no credit line is needed.
+
+`npm run check:material` checks the generator in Node: determinism, variety over 50 seeds, each rule, notes in key, chord tones, families, energy, varied presets, valid ideas in 4/4, 7/8 and 3/4, the FM range table, the session sources and the user's patterns.
 
 ## Voice
 
@@ -185,7 +229,7 @@ A tension of 0.7 or more gives a part the strong progression (sections split whe
 
 ## Determinism
 
-Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`, `voice`, `artist`, `transition`. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit.
+Everything random comes from one seed through named streams: `plan`, `moves`, `mutation`, `titles`, `comments`, `voice`, `artist`, `transition`, and `material/<song>/<track>` for composed parts. Changing how titles are drawn does not change the music. The same seed and options give the same session; a session made without a seed records the seed it used. Seed fixtures in `tests/snapshots/endless.json` catch unintended changes: after an intended change, run `npm run check:endless -- --write-fixtures` and say why in the commit.
 
 ## Checks
 
@@ -198,6 +242,9 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Build and drop shape is followed             | `director: build and drop follows its shape`                     |
 | Energy amount raises the energy              | `director: energy amount raises the measured energy`             |
 | Mutation by complexity, notes in key         | `director: complexity 0 keeps presets, complexity 1 stays in key` |
+| Complexity 0 gives the version 2 songs       | `director: complexity 0 gives the songs of director version 2`   |
+| Composed leads where the recipe asks         | `director: a recipe asking for composed leads gets them in most songs` |
+| Session material source                      | `director: material source patterns, varied, composed`           |
 | Grid, one move per track, no back to back    | `director: moves on the grid, one per track, never back to back` |
 | Track limits                                 | `director: track limits`                                         |
 | Variety between songs                        | `director: variety between songs`                                |

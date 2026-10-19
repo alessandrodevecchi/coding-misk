@@ -1,0 +1,685 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "example-material",
+  "title": "Material",
+  "created": "2026-10-19",
+  "appVersion": "0.6.0",
+  "look": "sonar",
+  "style": {
+    "en": "Composed parts and FM patches at the top of their ranges: a test phrase for each sound kind, polymeter, a voiced pad, 7/8",
+    "it": "Parti composte e patch FM al massimo dei loro intervalli: una frase di prova per ogni tipo di suono, poliritmo, un pad con voicing, 7/8"
+  },
+  "tags": {
+    "genres": [
+      "experimental"
+    ],
+    "free": [
+      "example",
+      "test"
+    ]
+  },
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 4,
+      "bpm": 124,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Lead bell",
+      "bars": 4,
+      "bpm": 124,
+      "key": "E",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Lead growl",
+      "bars": 4,
+      "bpm": 124,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Lead dirty",
+      "bars": 4,
+      "bpm": 124,
+      "key": "E",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Bass reese",
+      "bars": 4,
+      "bpm": 124,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Bass growl",
+      "bars": 4,
+      "bpm": 124,
+      "key": "E",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Bass dirty",
+      "bars": 4,
+      "bpm": 124,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Arp bell",
+      "bars": 4,
+      "bpm": 124,
+      "key": "E",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Arp growl",
+      "bars": 4,
+      "bpm": 124,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Pad chords",
+      "bars": 4,
+      "bpm": 124,
+      "key": "E",
+      "chords": "frigio",
+      "meter": "4/4"
+    },
+    {
+      "name": "Seven eight",
+      "bars": 4,
+      "bpm": 124,
+      "key": "A",
+      "chords": "epica",
+      "meter": "7/8"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "kick",
+      "name": "Kick",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85
+      },
+      "patterns": {
+        "A": {
+          "idea": {
+            "beat": {
+              "grid": 16,
+              "bd": "0,4,8,12"
+            }
+          }
+        },
+        "B": {
+          "idea": {
+            "beat": {
+              "grid": 14,
+              "bd": "0,4,8,12"
+            }
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Lead bell",
+          "pattern": "A"
+        },
+        {
+          "section": "Lead growl",
+          "pattern": "A"
+        },
+        {
+          "section": "Lead dirty",
+          "pattern": "A"
+        },
+        {
+          "section": "Bass reese",
+          "pattern": "A"
+        },
+        {
+          "section": "Bass growl",
+          "pattern": "A"
+        },
+        {
+          "section": "Bass dirty",
+          "pattern": "A"
+        },
+        {
+          "section": "Arp bell",
+          "pattern": "A"
+        },
+        {
+          "section": "Arp growl",
+          "pattern": "A"
+        },
+        {
+          "section": "Pad chords",
+          "pattern": "A"
+        },
+        {
+          "section": "Seven eight",
+          "pattern": "B"
+        }
+      ]
+    },
+    {
+      "id": "beat",
+      "name": "Beat",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.6
+      },
+      "patterns": {
+        "A": {
+          "idea": {
+            "beat": {
+              "grid": 16,
+              "cp": "4,12",
+              "hh": "0,1,2,6,7,8,10,12,13,14"
+            }
+          }
+        },
+        "B": {
+          "idea": {
+            "beat": {
+              "grid": 14,
+              "sd": "4,12",
+              "hh": "0,2,4,6,8,10,12",
+              "oh": "12"
+            }
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Intro",
+          "pattern": "A"
+        },
+        {
+          "section": "Lead bell",
+          "pattern": "A"
+        },
+        {
+          "section": "Lead growl",
+          "pattern": "A"
+        },
+        {
+          "section": "Lead dirty",
+          "pattern": "A"
+        },
+        {
+          "section": "Bass reese",
+          "pattern": "A"
+        },
+        {
+          "section": "Bass growl",
+          "pattern": "A"
+        },
+        {
+          "section": "Bass dirty",
+          "pattern": "A"
+        },
+        {
+          "section": "Arp bell",
+          "pattern": "A"
+        },
+        {
+          "section": "Arp growl",
+          "pattern": "A"
+        },
+        {
+          "section": "Seven eight",
+          "pattern": "B"
+        }
+      ]
+    },
+    {
+      "id": "lead-bell",
+      "name": "Lead bell",
+      "type": "hook",
+      "settings": {
+        "wave": "sine"
+      },
+      "rack": [
+        {
+          "device": "fm",
+          "index": 3,
+          "harmonicity": 3.5,
+          "wave": "sine",
+          "decay": 0.4,
+          "sustain": 0
+        }
+      ],
+      "patterns": {
+        "A": {
+          "idea": {
+            "degrees": "<[0 ~ 5 0 -2 ~ 0 0]!3 [0 ~ 5 0 -2 ~ -1 -1]>",
+            "add": "<0 -2 2 -1>",
+            "variants": [
+              {
+                "add": "0 3 2 4 2"
+              }
+            ]
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Lead bell",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "lead-growl",
+      "name": "Lead growl",
+      "type": "hook",
+      "settings": {
+        "wave": "sawtooth"
+      },
+      "rack": [
+        {
+          "device": "fm",
+          "index": 3,
+          "harmonicity": 2,
+          "wave": "square",
+          "decay": 0.6,
+          "sustain": 0.7,
+          "index2": 3,
+          "harmonicity2": 10
+        }
+      ],
+      "patterns": {
+        "A": {
+          "idea": {
+            "degrees": "<[0 ~ 3 1 0 -1 1 ~]!3 [0 ~ 3 1 0 -1 3 ~]>",
+            "add": "<0 -2 2 -1>",
+            "variants": [
+              {
+                "add": "0 0 2 5 3"
+              }
+            ]
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Lead growl",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "lead-dirty",
+      "name": "Lead dirty",
+      "type": "hook",
+      "settings": {
+        "wave": "square"
+      },
+      "rack": [
+        {
+          "device": "fm",
+          "index": 0.45,
+          "harmonicity": 1,
+          "wave": "pink",
+          "decay": 0.5,
+          "sustain": 0.5
+        }
+      ],
+      "patterns": {
+        "A": {
+          "idea": {
+            "degrees": "<[5 3 2 2 3 3 -2 0]!3 [5 3 2 2 3 3 -1 2]>",
+            "add": "<0 -2 2 -1>",
+            "variants": [
+              {
+                "add": "0 -1 5 3 2"
+              }
+            ]
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Lead dirty",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Bass",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth"
+      },
+      "patterns": {
+        "A": {
+          "idea": {
+            "rhythm": "[x x x x]",
+            "per": "beat",
+            "half": "[x x]",
+            "add": "0 7 7 12 -5 -5 7 12"
+          }
+        },
+        "B": {
+          "idea": {
+            "rhythm": "[x x]",
+            "per": "beat",
+            "half": "x",
+            "add": "0 12 0 0 12 0 0"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Lead bell",
+          "pattern": "A"
+        },
+        {
+          "section": "Lead growl",
+          "pattern": "A"
+        },
+        {
+          "section": "Lead dirty",
+          "pattern": "A"
+        },
+        {
+          "section": "Arp bell",
+          "pattern": "A"
+        },
+        {
+          "section": "Arp growl",
+          "pattern": "A"
+        },
+        {
+          "section": "Pad chords",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass-reese",
+      "name": "Bass reese",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth"
+      },
+      "rack": [
+        {
+          "device": "fm",
+          "index": 1.2,
+          "harmonicity": 1.01,
+          "wave": "sine",
+          "decay": 1,
+          "sustain": 1
+        }
+      ],
+      "patterns": {
+        "A": {
+          "idea": {
+            "rhythm": "[~ x x]",
+            "per": "beat",
+            "half": "[~ x]",
+            "add": "0 12 0 0 0 12!3"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Bass reese",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass-growl",
+      "name": "Bass growl",
+      "type": "bass",
+      "settings": {
+        "wave": "square"
+      },
+      "rack": [
+        {
+          "device": "fm",
+          "index": 3,
+          "harmonicity": 2,
+          "wave": "square",
+          "decay": 0.6,
+          "sustain": 0.7,
+          "index2": 3,
+          "harmonicity2": 10
+        }
+      ],
+      "patterns": {
+        "A": {
+          "idea": {
+            "rhythm": "[x ~ x x]",
+            "per": "beat",
+            "half": "[x ~]",
+            "add": "[0 12!3]*2"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Bass growl",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass-dirty",
+      "name": "Bass dirty",
+      "type": "bass",
+      "settings": {
+        "wave": "sawtooth"
+      },
+      "rack": [
+        {
+          "device": "fm",
+          "index": 0.45,
+          "harmonicity": 1,
+          "wave": "pink",
+          "decay": 0.5,
+          "sustain": 0.5
+        }
+      ],
+      "patterns": {
+        "A": {
+          "idea": {
+            "rhythm": "[~ x x]",
+            "per": "beat",
+            "half": "[~ x]",
+            "add": "[0 12]*4"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Bass dirty",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "arp-bell",
+      "name": "Arp bell",
+      "type": "arp",
+      "settings": {
+        "wave": "triangle"
+      },
+      "rack": [
+        {
+          "device": "fm",
+          "index": 3,
+          "harmonicity": 3.5,
+          "wave": "sine",
+          "decay": 0.4,
+          "sustain": 0
+        }
+      ],
+      "patterns": {
+        "A": {
+          "idea": {
+            "random": {
+              "fn": "irand",
+              "max": 4,
+              "seg": 16,
+              "seed": 7,
+              "cycles": 2
+            }
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Arp bell",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "arp-growl",
+      "name": "Arp growl",
+      "type": "arp",
+      "settings": {
+        "wave": "sawtooth"
+      },
+      "rack": [
+        {
+          "device": "fm",
+          "index": 3,
+          "harmonicity": 2,
+          "wave": "square",
+          "decay": 0.6,
+          "sustain": 0.7,
+          "index2": 3,
+          "harmonicity2": 10
+        }
+      ],
+      "patterns": {
+        "A": {
+          "idea": {
+            "index": "{2 1 0 1 2 3}%16"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Arp growl",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "name": "Pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw"
+      },
+      "patterns": {
+        "A": {
+          "idea": {
+            "voicing": {
+              "anchor": "c4"
+            },
+            "rhythm": "[~ x x]",
+            "per": "beat",
+            "half": "[~ x]"
+          }
+        },
+        "B": {
+          "idea": {
+            "voicing": {
+              "anchor": "c4"
+            },
+            "chords": "<Am7!2 A#!2>"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Pad chords",
+          "pattern": "A"
+        },
+        {
+          "section": "Seven eight",
+          "pattern": "B"
+        }
+      ]
+    },
+    {
+      "id": "lead-78",
+      "name": "Lead 7/8",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "mode": "phrygian"
+      },
+      "patterns": {
+        "A": {
+          "idea": {
+            "degrees": "{-2 2 ~ 5 4}%14",
+            "add": "<0 -2 2 -1>",
+            "variants": [
+              {
+                "add": "0 0 0 2 5"
+              }
+            ]
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Seven eight",
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "arp-78",
+      "name": "Arp 7/8",
+      "type": "arp",
+      "settings": {
+        "wave": "supersaw"
+      },
+      "patterns": {
+        "A": {
+          "idea": {
+            "index": "{0 1 2}%7"
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Seven eight",
+          "pattern": "A"
+        }
+      ]
+    }
+  ]
+}

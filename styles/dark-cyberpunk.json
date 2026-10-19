@@ -41,6 +41,7 @@
     "max": 7
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "half-time", "breakbeat"] },
     "kits": [
       "OberheimDMX",
       "LinnDrum",
@@ -59,6 +60,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "gallop", "sixteenths", "octaves"] },
     "presets": [
       "spirale",
       "mirino",
@@ -81,6 +83,7 @@
     }
   },
   "arp": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["pedal", "skips", "updown", "random"] },
     "presets": [
       "pulsar",
       "acid",
@@ -96,6 +99,7 @@
     "weight": 0.6
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["polymeter", "tail", "call-response", "dark"] },
     "presets": [
       "cyber",
       "allarme",

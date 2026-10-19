@@ -110,7 +110,7 @@ export const stepItem = tokens => { const f = seqForm(tokens); return oneStep(f)
 export function parseMini(str) {
   const s = String(str); let i = 0;
   const num = () => { const m = s.slice(i).match(/^-?\d+(\.\d+)?/); if (!m) throw new Error(`a number at ${i} in "${s}"`); i += m[0].length; return +m[0]; };
-  const word = () => { const m = s.slice(i).match(/^[^\s[\]<>*!@,()/?|:]+(?::[^\s[\]<>*!@,()/?|]+)?/); if (!m) throw new Error(`unexpected "${s[i]}" in "${s}"`); i += m[0].length; return m[0]; };
+  const word = () => { const m = s.slice(i).match(/^[^\s[\]<>{}%*!@,()/?|:]+(?::[^\s[\]<>{}%*!@,()/?|]+)?/); if (!m) throw new Error(`unexpected "${s[i]}" in "${s}"`); i += m[0].length; return m[0]; };
   function seq(close) {
     const layers = [[]];
     for (;;) {
@@ -122,6 +122,8 @@ export function parseMini(str) {
       let node;
       if (c === '[') { i++; node = seq(']'); }
       else if (c === '<') { i++; node = { ...seq('>'), alt: true }; }
+      // polymeter (material-generator): "{0 2 4 2 1}%16" plays one item per step, 16 steps per cycle
+      else if (c === '{') { i++; node = { ...seq('}'), poly: true }; if (s[i] === '%') { i++; node.steps = num(); } }
       else { const w = word(); node = isRest(w) ? { rest: true } : { v: w }; }
       let weight = 1, reps = 1;
       for (;;) {
@@ -154,6 +156,12 @@ function evNode(node, cycle, b, e, out) {
   if (node.rest) return;
   if (node.v !== undefined) { out.push({ b, e, v: node.v }); return; }
   if (node.fast) { const k = node.fast; if (!Number.isInteger(k)) throw new Error('a whole *n only'); for (let j = 0; j < k; j++) evNode(node.node, cycle * k + j, b + (j * (e - b)) / k, b + ((j + 1) * (e - b)) / k, out); return; }
+  if (node.poly) {
+    const items = node.layers[0] || [], steps = node.steps || items.length;
+    if (!items.length) return;
+    for (let k = 0; k < steps; k++) { const at = cycle * steps + k, it = items[((at % items.length) + items.length) % items.length]; evNode(it.node, Math.floor(at / items.length), b + (k * (e - b)) / steps, b + ((k + 1) * (e - b)) / steps, out); }
+    return;
+  }
   if (node.euclid) { const [k, n, r] = node.euclid, hits = bjorklund(k, n), rot = hits.map((_, j) => hits[(j + r) % n]); rot.forEach((h, j) => { if (h) evNode(node.node, cycle, b + (j * (e - b)) / n, b + ((j + 1) * (e - b)) / n, out); }); return; }
   for (const layer of node.layers) {
     if (!layer.length) continue;
@@ -320,7 +328,7 @@ export function randomCode(r) {
 const lateBy = (expr, start, text) => {
   if (!start) return expr;
   const m = String(text || '').match(/^<(.*)>$/s);
-  if (!m) return /</.test(String(text || '')) ? `${expr}.late(${start})` : expr;
+  if (!m) return /[<{]/.test(String(text || '')) ? `${expr}.late(${start})` : expr;
   let len = 0;
   for (const tk of topTokens(m[1])) { const r = tk.match(/!(\d+)$/); len += r ? +r[1] : tk.endsWith('!') ? 2 : 1; }
   return start % len ? `${expr}.late(${start})` : expr;
@@ -359,7 +367,8 @@ export function writeIdea(idea, ctx) {
   const rhythm = idea.rhythm !== undefined ? `.struct("${rhythmCode(idea, N)}")` : idea.beat ? `.beat("${idea.beat.steps}",${idea.beat.grid ?? N})` : '';
   const addSub = (expr, numeric) => {
     let out = expr;
-    if (idea.add !== undefined && !(idea.per === 'slot' && typeof idea.add === 'string')) out += numeric ? `.add(${plainNum(idea.add)})` : '';
+    // a summed progression (material-generator) starts on its first item at the clip start, like the chords
+    if (idea.add !== undefined && !(idea.per === 'slot' && typeof idea.add === 'string')) out += numeric ? `.add(${typeof idea.add === 'string' ? lateBy(`"${idea.add}"`, ctx.start, idea.add) : plainNum(idea.add)})` : '';
     if (idea.sub !== undefined) out += numeric ? `.sub(${plainNum(idea.sub)})` : '';
     return out;
   };
@@ -562,7 +571,7 @@ export function checkIdea(type, idea, p, err, warn, opts = {}) {
   if (idea.half !== undefined) str('half');
   if (idea.hold !== undefined && typeof idea.hold !== 'boolean') err(`${p}.hold`, 'true holds the chord for the bar');
   for (const k of ['degrees', 'index']) if (str(k) && reads(k, idea[k])) {
-    const bad = nonWhole(idea[k]) || (String(idea[k]).match(/[^\s\d~\-[\]<>*!@,.()]/) || [])[0];
+    const bad = nonWhole(idea[k]) || (String(idea[k]).match(/[^\s\d~\-[\]<>{}%*!@,.()]/) || [])[0];
     if (bad) err(`${p}.${k}`, `${k === 'index' ? 'indices' : 'degrees'} are whole numbers and rests, for example "0 ~ 2 <4 5>" (found "${bad}")`);
   }
   if (idea.scale !== undefined && !SCALES.includes(idea.scale)) err(`${p}.scale`, `a scale or mode: ${SCALES.join(', ')}`);

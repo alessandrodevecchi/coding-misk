@@ -75,6 +75,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('radioTransition'), `<select data-radio-opt="transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => opt(k, r.transition, t(k === 'artist' ? 'byArtist' : `tx:${k}`))).join('')}</select>`)}
           ${row(t('radioHarmony'), `<select data-radio-opt="harmony" data-no-knob>${['artist', ...HARMONY_MODES].map(k => opt(k, r.harmony, t(k === 'artist' ? 'byArtist' : `harmony:${k}`))).join('')}</select>`)}
           ${row(t('setScope'), `<select data-radio-opt="scope" data-no-knob>${opt('song', r.scope, t('steerScopeSong'))}${opt('session', r.scope, t('steerScopeSession'))}</select>`)}
+          ${row(t('matSource'), `<select data-radio-opt="material" data-no-knob>${['mix', 'patterns', 'varied', 'composed'].map(k => opt(k, r.material || 'mix', t(`mat:${k}`))).join('')}</select>`, `${t('matSourceTip')} ${t('matVariedTip')}`)}
         </div>
         <div class="card set-card" id="set-library"><h3>${esc(t('setLibrary'))}</h3>
           <p class="muted">${esc(t('setLibraryIntro'))}</p>

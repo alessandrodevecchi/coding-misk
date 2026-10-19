@@ -53,6 +53,7 @@
     ]
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["gallop", "sixteenths", "pulse", "roots"] },
     "presets": [
       "galoppo",
       "ottavi",
@@ -63,6 +64,7 @@
     ]
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response", "dark"] },
     "presets": [
       "eroico",
       "assolo",

@@ -1,0 +1,191 @@
+// coding-misk · Material
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(124/4)
+
+const SECTIONS = [['Intro', 4], ['Lead bell', 4], ['Lead growl', 4], ['Lead dirty', 4], ['Bass reese', 4], ['Bass growl', 4], ['Bass dirty', 4], ['Arp bell', 4], ['Arp growl', 4], ['Pad chords', 4], ['Seven eight', 4]]
+const TEMPO = {'Intro': 124, 'Lead bell': 124, 'Lead growl': 124, 'Lead dirty': 124, 'Bass reese': 124, 'Bass growl': 124, 'Bass dirty': 124, 'Arp bell': 124, 'Arp growl': 124, 'Pad chords': 124, 'Seven eight': 141.71}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!4 0!40>"  // Intro · 4 bars · 124 BPM · A · Am F C G
+const section2 = "<0!4 1!4 0!36>"  // Lead bell · 4 bars · 124 BPM · E · Em C G D
+const section3 = "<0!8 1!4 0!32>"  // Lead growl · 4 bars · 124 BPM · A · Am F C G
+const section4 = "<0!12 1!4 0!28>"  // Lead dirty · 4 bars · 124 BPM · E · Em C G D
+const section5 = "<0!16 1!4 0!24>"  // Bass reese · 4 bars · 124 BPM · A · Am F C G
+const section6 = "<0!20 1!4 0!20>"  // Bass growl · 4 bars · 124 BPM · E · Em C G D
+const section7 = "<0!24 1!4 0!16>"  // Bass dirty · 4 bars · 124 BPM · A · Am F C G
+const section8 = "<0!28 1!4 0!12>"  // Arp bell · 4 bars · 124 BPM · E · Em C G D
+const section9 = "<0!32 1!4 0!8>"  // Arp growl · 4 bars · 124 BPM · A · Am F C G
+const section10 = "<0!36 1!4 0!4>"  // Pad chords · 4 bars · 124 BPM · E · Em F Em D
+const section11 = "<0!40 1!4>"  // Seven eight · 4 (7/8) bars · 124 BPM · A · Am F C G
+
+// ========== Kick · drums ==========
+// Intro · bars 1-4 · pattern A
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section1).velocity(section1).orbit(1).analyze("kick")
+// Lead bell · bars 5-8 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section2).velocity(section2).orbit(1).analyze("kick")
+// Lead growl · bars 9-12 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section3).velocity(section3).orbit(1).analyze("kick")
+// Lead dirty · bars 13-16 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section4).velocity(section4).orbit(1).analyze("kick")
+// Bass reese · bars 17-20 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section5).velocity(section5).orbit(1).analyze("kick")
+// Bass growl · bars 21-24 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section6).velocity(section6).orbit(1).analyze("kick")
+// Bass dirty · bars 25-28 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section7).velocity(section7).orbit(1).analyze("kick")
+// Arp bell · bars 29-32 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section8).velocity(section8).orbit(1).analyze("kick")
+// Arp growl · bars 33-36 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section9).velocity(section9).orbit(1).analyze("kick")
+// Pad chords · bars 37-40 · pattern A
+$: s("bd*4").bank("RolandTR909").gain(0.85).mask(section10).velocity(section10).orbit(1).analyze("kick")
+// Seven eight · bars 41-44 · pattern B
+$: s("bd ~ bd ~ bd ~ bd").bank("RolandTR909").gain(0.85).mask(section11).velocity(section11).orbit(1).analyze("kick")
+
+// ========== Beat · drums ==========
+// Intro · bars 1-4 · pattern A
+// Drums · RolandTR909
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section1).velocity(section1).orbit(9).analyze("snare")
+$: s("hh!3 ~ ~ ~ hh!3 ~ hh ~ hh!3 ~").bank("RolandTR909").gain(0.3).mask(section1).velocity(section1).orbit(9).analyze("hats")
+// Lead bell · bars 5-8 · pattern A
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section2).velocity(section2).orbit(9).analyze("snare")
+$: s("hh!3 ~ ~ ~ hh!3 ~ hh ~ hh!3 ~").bank("RolandTR909").gain(0.3).mask(section2).velocity(section2).orbit(9).analyze("hats")
+// Lead growl · bars 9-12 · pattern A
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section3).velocity(section3).orbit(9).analyze("snare")
+$: s("hh!3 ~ ~ ~ hh!3 ~ hh ~ hh!3 ~").bank("RolandTR909").gain(0.3).mask(section3).velocity(section3).orbit(9).analyze("hats")
+// Lead dirty · bars 13-16 · pattern A
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section4).velocity(section4).orbit(9).analyze("snare")
+$: s("hh!3 ~ ~ ~ hh!3 ~ hh ~ hh!3 ~").bank("RolandTR909").gain(0.3).mask(section4).velocity(section4).orbit(9).analyze("hats")
+// Bass reese · bars 17-20 · pattern A
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section5).velocity(section5).orbit(9).analyze("snare")
+$: s("hh!3 ~ ~ ~ hh!3 ~ hh ~ hh!3 ~").bank("RolandTR909").gain(0.3).mask(section5).velocity(section5).orbit(9).analyze("hats")
+// Bass growl · bars 21-24 · pattern A
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section6).velocity(section6).orbit(9).analyze("snare")
+$: s("hh!3 ~ ~ ~ hh!3 ~ hh ~ hh!3 ~").bank("RolandTR909").gain(0.3).mask(section6).velocity(section6).orbit(9).analyze("hats")
+// Bass dirty · bars 25-28 · pattern A
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section7).velocity(section7).orbit(9).analyze("snare")
+$: s("hh!3 ~ ~ ~ hh!3 ~ hh ~ hh!3 ~").bank("RolandTR909").gain(0.3).mask(section7).velocity(section7).orbit(9).analyze("hats")
+// Arp bell · bars 29-32 · pattern A
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section8).velocity(section8).orbit(9).analyze("snare")
+$: s("hh!3 ~ ~ ~ hh!3 ~ hh ~ hh!3 ~").bank("RolandTR909").gain(0.3).mask(section8).velocity(section8).orbit(9).analyze("hats")
+// Arp growl · bars 33-36 · pattern A
+$: s("[~ cp]*2").bank("RolandTR909").gain(0.48).mask(section9).velocity(section9).orbit(9).analyze("snare")
+$: s("hh!3 ~ ~ ~ hh!3 ~ hh ~ hh!3 ~").bank("RolandTR909").gain(0.3).mask(section9).velocity(section9).orbit(9).analyze("hats")
+// Seven eight · bars 41-44 · pattern B
+$: s("~!4 sd ~!7 sd ~").bank("RolandTR909").gain(0.45).mask(section11).velocity(section11).orbit(9).analyze("snare")
+$: s("hh*7").bank("RolandTR909").gain(0.3).mask(section11).velocity(section11).orbit(9).analyze("hats")
+$: s("~!6 oh").bank("RolandTR909").gain(0.27).mask(section11).velocity(section11).orbit(9).analyze("hats")
+
+// ========== Lead bell · hook ==========
+// Lead bell · bars 5-8 · pattern A
+// Hook · idea
+$: "<[0 ~ 5 0 -2 ~ 0 0]!3 [0 ~ 5 0 -2 ~ -1 -1]>".add("<0 -2 2 -1>") // .add("0 3 2 4 2")
+  .n().scale("E4:minor")
+  .s("sine").lpf(3000)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.3).fm(3).fmh(3.5).fmdecay(0.4).fmsustain(0).mask(section2).velocity(section2).orbit(4).analyze("hook")
+
+// ========== Lead growl · hook ==========
+// Lead growl · bars 9-12 · pattern A
+// Hook · idea
+$: "<[0 ~ 3 1 0 -1 1 ~]!3 [0 ~ 3 1 0 -1 3 ~]>".add("<0 -2 2 -1>") // .add("0 0 2 5 3")
+  .n().scale("A4:minor")
+  .s("sawtooth").lpf(3000)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.3).fm(3).fmh(2).fmwave("square").fmdecay(0.6).fmsustain(0.7).fm2(3).fmh2(10).mask(section3).velocity(section3).orbit(10).analyze("hook")
+
+// ========== Lead dirty · hook ==========
+// Lead dirty · bars 13-16 · pattern A
+// Hook · idea
+$: "<[5 3 2 2 3 3 -2 0]!3 [5 3 2 2 3 3 -1 2]>".add("<0 -2 2 -1>") // .add("0 -1 5 3 2")
+  .n().scale("E4:minor")
+  .s("square").lpf(3000)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.3).fm(0.45).fmh(1).fmwave("pink").fmdecay(0.5).fmsustain(0.5).mask(section4).velocity(section4).orbit(11).analyze("hook")
+
+// ========== Bass · bass ==========
+// Lead bell · bars 5-8 · pattern A
+// Bass · idea
+$: note("<a1 f1 c2 g1>").transpose(-5).struct("x*16").transpose("0 7 7 12 -5 -5 7 12")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.8).mask(section2).velocity(section2).orbit(2).analyze("bass")
+// Lead growl · bars 9-12 · pattern A
+$: note("<a1 f1 c2 g1>").struct("x*16").transpose("0 7 7 12 -5 -5 7 12")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.8).mask(section3).velocity(section3).orbit(2).analyze("bass")
+// Lead dirty · bars 13-16 · pattern A
+$: note("<a1 f1 c2 g1>").transpose(-5).struct("x*16").transpose("0 7 7 12 -5 -5 7 12")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.8).mask(section4).velocity(section4).orbit(2).analyze("bass")
+// Arp bell · bars 29-32 · pattern A
+$: note("<a1 f1 c2 g1>").transpose(-5).struct("x*16").transpose("0 7 7 12 -5 -5 7 12")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.8).mask(section8).velocity(section8).orbit(2).analyze("bass")
+// Arp growl · bars 33-36 · pattern A
+$: note("<a1 f1 c2 g1>").struct("x*16").transpose("0 7 7 12 -5 -5 7 12")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.8).mask(section9).velocity(section9).orbit(2).analyze("bass")
+// Pad chords · bars 37-40 · pattern A
+$: note("<a1 a#1 a1 g1>").transpose(-5).struct("x*16").transpose("0 7 7 12 -5 -5 7 12")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.8).mask(section10).velocity(section10).orbit(2).analyze("bass")
+
+// ========== Bass reese · bass ==========
+// Bass reese · bars 17-20 · pattern A
+// Bass · idea
+$: note("<a1 f1 c2 g1>").struct("[~ x x]*4").transpose("0 12 0 0 0 12!3")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.8).fm(1.2).fmh(1.01).fmdecay(1).fmsustain(1).mask(section5).velocity(section5).orbit(12).analyze("bass")
+
+// ========== Bass growl · bass ==========
+// Bass growl · bars 21-24 · pattern A
+// Bass · idea
+$: note("<a1 f1 c2 g1>").transpose(-5).struct("[x ~ x x]*4").transpose("[0 12!3]*2")
+  .s("square").lpf(sine.range(280, 1120).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.8).fm(3).fmh(2).fmwave("square").fmdecay(0.6).fmsustain(0.7).fm2(3).fmh2(10).mask(section6).velocity(section6).orbit(13).analyze("bass")
+
+// ========== Bass dirty · bass ==========
+// Bass dirty · bars 25-28 · pattern A
+// Bass · idea
+$: note("<a1 f1 c2 g1>").struct("[~ x x]*4").transpose("[0 12]*4")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(8)
+  .decay(.12).sustain(0).gain(0.8).fm(0.45).fmh(1).fmwave("pink").fmdecay(0.5).fmsustain(0.5).mask(section7).velocity(section7).orbit(14).analyze("bass")
+
+// ========== Arp bell · arp ==========
+// Arp bell · bars 29-32 · pattern A
+// Arpeggio · idea, 16ths
+$: note("<[a3,c4,e4,a4] [f3,a3,c4,f4] [g3,c4,e4,g4] [g3,b3,d4,g4]>").transpose(-5).arp(irand(4).seg(16).rib(7, 2))
+  .s("triangle").lpf(sine.range(960, 3840).slow(8)).lpq(4)
+  .decay(.15).sustain(.15).delay(.35).gain(0.4).fm(3).fmh(3.5).fmdecay(0.4).fmsustain(0).mask(section8).velocity(section8).orbit(3).analyze("arp")
+
+// ========== Arp growl · arp ==========
+// Arp growl · bars 33-36 · pattern A
+// Arpeggio · idea, 16ths
+$: note("<[a3,c4,e4,a4] [f3,a3,c4,f4] [g3,c4,e4,g4] [g3,b3,d4,g4]>").arp("{2 1 0 1 2 3}%16")
+  .s("sawtooth").lpf(sine.range(960, 3840).slow(8)).lpq(4)
+  .decay(.15).sustain(.15).delay(.35).gain(0.4).fm(3).fmh(2).fmwave("square").fmdecay(0.6).fmsustain(0.7).fm2(3).fmh2(10).mask(section9).velocity(section9).orbit(15).analyze("arp")
+
+// ========== Pad · pad ==========
+// Pad chords · bars 37-40 · pattern A
+// Pad · idea
+$: chord("<Am A# Am G>").anchor("c4").voicing().transpose(-5).struct("[~ x x]*4")
+  .s("supersaw").attack(.4).release(1.2).lpf(sine.range(560, 2240).slow(8))
+  .room(.85).gain(0.28).mask(section10).velocity(section10).orbit(6).analyze("pad")
+// Seven eight · bars 41-44 · pattern B
+$: chord("<Am7!2 A#!2>").anchor("c4").voicing()
+  .s("supersaw").attack(.4).release(1.2).lpf(sine.range(560, 2240).slow(8))
+  .room(.85).gain(0.28).mask(section11).velocity(section11).orbit(6).analyze("pad")
+
+// ========== Lead 7/8 · hook ==========
+// Seven eight · bars 41-44 · pattern A
+// Hook · idea
+$: "{-2 2 ~ 5 4}%14".late(40).add("<0 -2 2 -1>") // .add("0 0 0 2 5")
+  .n().scale("A4:phrygian")
+  .s("square").lpf(3000)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.3).mask(section11).velocity(section11).orbit(16).analyze("hook")
+
+// ========== Arp 7/8 · arp ==========
+// Seven eight · bars 41-44 · pattern A
+// Arpeggio · idea, 16ths
+$: note("<[a3,c4,e4,a4] [f3,a3,c4,f4] [g3,c4,e4,g4] [g3,b3,d4,g4]>").arp("{0 1 2}%7")
+  .s("supersaw").lpf(sine.range(960, 3840).slow(8)).lpq(4)
+  .decay(.15).sustain(.15).delay(.35).gain(0.4).mask(section11).velocity(section11).orbit(17).analyze("arp")

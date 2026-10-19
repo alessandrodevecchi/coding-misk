@@ -41,6 +41,7 @@
     "max": 6
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
       "RolandTR909"
     ],
@@ -56,6 +57,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["offbeat", "pulse", "octaves"] },
     "presets": [
       "offbeat",
       "walking",
@@ -96,6 +98,7 @@
     }
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response"] },
     "presets": [
       "eco",
       "richiamo",

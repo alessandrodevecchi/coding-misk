@@ -41,6 +41,7 @@
     "max": 6
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.3, "families": ["half-time", "two-step"] },
     "kits": [
       "LinnDrum",
       "EmuSP12",
@@ -59,6 +60,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["half", "pulse", "offbeat", "octaves"] },
     "presets": [
       "sub",
       "ottavi",
@@ -76,6 +78,7 @@
     }
   },
   "arp": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["up", "updown", "pedal", "random"] },
     "presets": [
       "sugiu",
       "pedale"
@@ -97,6 +100,7 @@
     }
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["polymeter", "tail", "call-response"] },
     "presets": [
       "pioggia",
       "orizzonte",

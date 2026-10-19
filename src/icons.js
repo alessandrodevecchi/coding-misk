@@ -9,3 +9,9 @@ export const GEAR = svg('0 0 16 16', '<path d="M8 1.6l1.1 1.6 1.9-.4.5 1.9 1.8.8
 export const REVERT = svg('0 0 16 16', '<path d="M5.5 3.5L2.5 6.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.8 6.5h6.7a3.6 3.6 0 0 1 0 7.2H7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>', 'ico-revert');
 // a trash can (delete a song, the trash, #68)
 export const BIN = svg('0 0 16 16', '<path d="M2.5 4h11M6 4V2.5h4V4M4 4l.8 9.5h6.4L12 4M6.8 6.5v4.5M9.2 6.5v4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>', 'ico-bin');
+// a note with a spark (compose a part, material-generator)
+export const COMPOSE = svg('0 0 16 16', '<ellipse cx="5" cy="12.2" rx="2.4" ry="1.8" fill="currentColor"/><path d="M7.3 12V3.2l4.2 1.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.5 8.6v3.4M10.8 10.3h3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>', 'ico-compose');
+// steps in a row, some lit (keep the rhythm)
+export const RHYTHM = svg('0 0 16 16', '<rect x="1" y="6" width="2.6" height="4" rx=".6" fill="currentColor"/><rect x="4.8" y="6" width="2.6" height="4" rx=".6" fill="none" stroke="currentColor" stroke-width="1"/><rect x="8.6" y="6" width="2.6" height="4" rx=".6" fill="currentColor"/><rect x="12.4" y="6" width="2.6" height="4" rx=".6" fill="currentColor"/>', 'ico-rhythm');
+// two notes on a beam (keep the notes)
+export const NOTES = svg('0 0 16 16', '<ellipse cx="4" cy="12" rx="2.2" ry="1.6" fill="currentColor"/><ellipse cx="11.4" cy="10.4" rx="2.2" ry="1.6" fill="currentColor"/><path d="M6 11.8V3.6l7.4-1.6v8.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>', 'ico-notes');

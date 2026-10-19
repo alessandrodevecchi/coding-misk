@@ -59,6 +59,21 @@ const FIXTURES = [
   { seed: 'quiet', styles: ['ambient', 'lo-fi'], energy: 0.2, complexity: 0.1, minutes: 12 },
 ];
 const sessionHash = r => hashString(JSON.stringify(r)).toString(16).padStart(8, '0');
+// songs of director version 2 at complexity 0 (material-generator): complexity 0 must keep giving them
+const PLAIN_V2 = [
+  { seed: 'plain-a', styles: ['berlin-techno'], complexity: 0, songs: '2785ea56' },
+  { seed: 'plain-b', styles: ['synthwave', 'jazz', 'country'], chaos: 1, complexity: 0, songs: '33215bd9' },
+  { seed: 'plain-c', styles: ['trance', 'phonk', 'melodic-metal', 'drum-and-bass'], chaos: 0.6, complexity: 0, energy: 0.9, minutes: 20, songs: '13b9b2d5' },
+  { seed: 'plain-d', styles: ['ambient', 'lo-fi', 'industrial', 'classic-rock', 'acid', 'house'], chaos: 0.8, complexity: 0, energy: 0.3, minutes: 20, songs: 'dc778f05' },
+];
+// a composed part stays in key: hook degrees are whole numbers, bass moves only to chord tones, arp indices are chord notes
+const whole = text => String(text).replace(/[!%*@]\d+/g, '').replace(/[\s~[\]<>{}]/g, ' ').trim().split(/\s+/).filter(Boolean).every(x => /^-?\d+$/.test(x));
+function inKey(type, idea) {
+  if (type === 'hook') return idea.degrees !== undefined && whole(idea.degrees) && (idea.add === undefined || whole(idea.add)) && !idea.random;
+  if (type === 'bass') return idea.from !== undefined || idea.add === undefined || (whole(idea.add) && String(idea.add).replace(/[!%*@]\d+/g, '').match(/-?\d+/g).every(x => ['0', '7', '12', '-5'].includes(x)));
+  if (type === 'arp') return idea.random ? idea.random.max <= 4 && Number.isInteger(idea.random.seed) : String(idea.index).replace(/[!%*@]\d+/g, '').match(/-?\d+/g).every(x => /^[0-3]$/.test(x));
+  return true;
+}
 
 const CHECKS = {
   'random: same seed and stream repeat'() {
@@ -180,9 +195,11 @@ const CHECKS = {
     for (const id of STARTING) {
       for (const song of session({ styles: [id], minutes: 8, seed: 'plain', complexity: 0 }).songs) for (const t of song.tracks) for (const p of Object.values(t.patterns)) {
         assert(p.notes === undefined, `${id} ${t.id}: complexity 0 wrote notes`);
+        assert(p.idea === undefined, `${id} ${t.id}: complexity 0 composed a part`);
         for (const r of Object.values(p.rows || {})) assert(grooveRows.has(r), `${id} ${t.id}: drum row ${r} is not from a groove`);
       }
       for (const song of session({ styles: [id], minutes: 8, seed: 'wild', complexity: 1 }).songs) for (const t of song.tracks) for (const p of Object.values(t.patterns)) {
+        if (p.idea) assert(inKey(t.type, p.idea), `${id} ${t.type} composed part out of key: ${JSON.stringify(p.idea)}`);
         if (p.notes === undefined) continue;
         if (t.type === 'hook') assert(degreesOnly(p.notes), `${id} hook notes not scale degrees: ${p.notes}`);
         else assert(chordTonesOnly(p.notes), `${id} ${t.type} notes not chord tones: ${p.notes}`);
@@ -190,6 +207,30 @@ const CHECKS = {
     }
     const mutated = STARTING.flatMap(id => session({ styles: [id], minutes: 8, seed: 'wild', complexity: 1 }).songs.flatMap(s => s.tracks.flatMap(t => Object.values(t.patterns)))).filter(p => p.notes).length;
     assert(mutated > 10, `only ${mutated} mutated patterns at complexity 1`);
+  },
+  'director: complexity 0 gives the songs of director version 2'() {
+    for (const c of PLAIN_V2) { const { songs, ...opts } = c; assert(sessionHash(generateSession(loadStyles(), opts).songs) === songs, `${c.seed} (${c.styles}): complexity 0 songs changed`); }
+  },
+  'director: a recipe asking for composed leads gets them in most songs'() {
+    const recipes = loadStyles().map(r => (r.id === 'trance' ? { ...r, hook: { ...r.hook, weight: 1, material: { source: 'generated' } } } : r));
+    const ses = createSession(recipes, 'composed-leads'), leads = [];
+    for (let i = 0; i < 10; i++) { const { song } = ses.next({ styles: ['trance'], complexity: 0.5 }); const h = song.tracks.find(t => t.type === 'hook'); leads.push(h ? h.patterns.A : null); }
+    const composed = leads.filter(p => p && p.idea && !p.preset);
+    assert(composed.length >= 6, `${composed.length} of 10 songs have a composed lead`);
+    assert(new Set(composed.map(p => JSON.stringify(p))).size === composed.length, 'two songs have the same composed lead');
+    // a mix: about the share of the songs get a composed bassline
+    const mixed = loadStyles().map(r => (r.id === 'synthwave' ? { ...r, bass: { ...r.bass, material: { source: 'mix', share: 0.5 } } } : r));
+    const s2 = createSession(mixed, 'mixed-bass'), got = Array.from({ length: 40 }, () => s2.next({ styles: ['synthwave'], complexity: 0.5 }).entry).filter(e => e.material && e.material.bass === 'generated').length;
+    assert(got >= 12 && got <= 28, `${got} of 40 songs have a composed bassline with share 0.5`);
+  },
+  'director: material source patterns, varied, composed'() {
+    const run = material => session({ styles: ['synthwave', 'drum-and-bass'], chaos: 0.5, minutes: 20, seed: 'source', complexity: 0.8, material });
+    for (const sg of run('patterns').songs) for (const t of sg.tracks) for (const p of Object.values(t.patterns)) assert(p.notes === undefined && p.idea === undefined, `patterns: ${t.id} ${JSON.stringify(p)}`);
+    const varied = run('varied').session.songs.flatMap(e => Object.values(e.material || {}));
+    assert(varied.length && varied.every(m => m === 'varied'), `varied: ${varied.join(', ')}`);
+    const composed = run('composed');
+    composed.session.songs.forEach((e, i) => { const melodic = composed.songs[i].tracks.filter(t => ['drums', 'bass', 'arp', 'hook', 'pad', 'guitar'].includes(t.type)); assert(melodic.every(t => (e.material || {})[t.id] === 'generated'), `composed: song ${i} ${JSON.stringify(e.material)}`); });
+    assert(JSON.stringify(run('mix').songs) === JSON.stringify(session({ styles: ['synthwave', 'drum-and-bass'], chaos: 0.5, minutes: 20, seed: 'source', complexity: 0.8 }).songs), 'mix is not the default');
   },
   'director: moves on the grid, one per track, never back to back'() {
     every(({ session, songs }, id) => songs.forEach((song, i) => {

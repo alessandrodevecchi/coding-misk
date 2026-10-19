@@ -17,6 +17,7 @@ import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
 import { DICE, GEAR, LOCK } from '../icons.js';
+import { SESSION_SOURCES } from '../material/index.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -46,6 +47,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // transitions (#23): the artist's choice or always one kind; harmony: the artist's, compatible or free
     transition: ['artist', ...TRANSITION_KINDS].includes(saved.transition) ? saved.transition : 'artist',
     harmony: ['artist', ...HARMONY_MODES].includes(saved.harmony) ? saved.harmony : 'artist',
+    // material (material-generator): patterns as written, varied, composed, or mix (each style's choice)
+    material: SESSION_SOURCES.includes(saved.material) ? saved.material : 'mix',
     // steering (#24): commands for this song only, or for the whole session (they also move the sliders)
     scope: saved.scope === 'session' ? 'session' : 'song',
     // random tools (#50): a random artist not kept yet, dice in the full range or in a sensible one, the sounds seed
@@ -72,7 +75,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const saveOpts = () => store.set('coding-misk-radio', opts);
   const artistOf = id => (id ? artists().find(a => a.id === id) || (opts.temp && opts.temp.id === id ? opts.temp : null) : null);
   // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
-  const current = () => { const a = artistOf(opts.artist), how = { transition: opts.transition, harmony: opts.harmony, ...(opts.sounds ? { sounds: opts.sounds } : {}) };
+  const current = () => { const a = artistOf(opts.artist), how = { transition: opts.transition, harmony: opts.harmony, ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}) };
     // a compilation carries its setup and the artists it may use, so a replay draws the same songs
     if (opts.compilation !== 'off') return { compilation: { every: opts.compilation, setup: JSON.parse(JSON.stringify(opts.compSetup)), pool: JSON.parse(JSON.stringify(artists())), ...(Object.keys(opts.compLocks).length ? { locks: { ...opts.compLocks } } : {}) }, ...how };
     return a ? { artist: JSON.parse(JSON.stringify(a)), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how }; };
@@ -127,7 +130,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       return item;
     }
     const raw = optionsFor(n), comp = raw.compilation;
-    const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}) });
+    const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}) });
     const { song, entry, plan, opts: used } = S.session.next(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw);
     // the director has just planned the transition from the song before: an interlude lengthens it,
     // an overlap starts this song before it ends
@@ -171,7 +174,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     for (let n = out.length; out.length < count && !(until && until(out)); n++) {
       let o = recipe.options; for (const c of recipe.changes || []) if (c.song <= n) o = c.options;
       // a compilation draws this song's options from its setup, as the radio does (a clip keeps its length)
-      const how = { transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.fit ? { fit: o.fit } : {}) };
+      const how = { transition: o.transition, harmony: o.harmony, ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.fit ? { fit: o.fit } : {}) };
       const g = ses.next(o.compilation ? compilationOptions(recipe.seed, n, o.compilation, recipes, how) : o), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
       out.push({ song: cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song, entry: g.entry });
     }
@@ -598,6 +601,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       <div class="comp-line"><span class="lbl">${esc(t('compGenres'))}</span><button class="chip small" data-comp-all="genres" aria-pressed="${!S0.genres}">${esc(t('compAll'))}</button>${chips(GENRE_LIST(), S0.genres, 'data-comp-genre', g => t(`g:${g}`))}</div>
       <div class="comp-line"><span class="lbl">${esc(t('compArtists'))}</span><button class="chip small" data-comp-all="artists" aria-pressed="${!S0.artists}">${esc(t('compAll'))}</button>${chips(artists().map(a => a.id), S0.artists, 'data-comp-artist', id => (artists().find(a => a.id === id) || {}).name || id)}
         <button class="chip small" data-comp-random aria-pressed="${!!S0.randomArtists}" ${tip('compRandomTip')}>${DICE} ${esc(t('compRandomArtists'))}</button></div>
+      <div class="comp-line" ${tip('matSourceTip')}><span class="lbl">${esc(t('matSource'))}</span>${SESSION_SOURCES.map(m => `<button class="chip small" data-material="${m}" aria-pressed="${opts.material === m}">${esc(t(`mat:${m}`))}</button>`).join('')}</div>
+      ${opts.material === 'varied' ? `<p class="hint muted small">${esc(t('matVariedTip'))}</p>` : ''}
       <div class="comp-ranges">${['chaos', 'energy', 'complexity', 'talk'].map(knob).join('')}</div>
     </div>`;
   }
@@ -723,6 +728,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.id === 'radio-comp') { opts.compilation = opts.compilation === 'off' ? 'song' : opts.compilation === 'song' ? 'some' : 'off'; saveOpts(); return render(); }
     if (b.id === 'radio-comp-setup') { compOpen = !compOpen; return render(); }
     if (b.dataset.compMove) return editSetup(S0 => { S0.movement = b.dataset.compMove; });
+    if (b.dataset.material) { opts.material = b.dataset.material; saveOpts(); render(); return; }
     if (b.dataset.compAll) return editSetup(S0 => { S0[b.dataset.compAll] = null; });
     if (b.dataset.compGenre) return editSetup(S0 => { S0.genres = toggleIn(S0.genres, GENRE_LIST(), b.dataset.compGenre); });
     if (b.dataset.compArtist) return editSetup(S0 => { S0.artists = toggleIn(S0.artists, artists().map(a => a.id), b.dataset.compArtist); });
@@ -861,7 +867,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     get history() { return history; },
     get options() { return current(); },
     // defaults the settings page shows and changes (#31)
-    get settings() { return { transition: opts.transition, harmony: opts.harmony, scope: opts.scope }; },
-    setOption(k, v) { if (!['transition', 'harmony', 'scope'].includes(k)) return; opts[k] = v; saveOpts(); if (!root.hidden) render(); },
+    get settings() { return { transition: opts.transition, harmony: opts.harmony, scope: opts.scope, material: opts.material }; },
+    setOption(k, v) { if (!['transition', 'harmony', 'scope', 'material'].includes(k)) return; opts[k] = v; saveOpts(); if (!root.hidden) render(); },
   };
 }

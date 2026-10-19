@@ -41,6 +41,7 @@
     "max": 7
   },
   "drums": {
+    "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "half-time"] },
     "kits": [
       "LinnDrum",
       "OberheimDMX",
@@ -59,6 +60,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "gallop", "sixteenths", "octaves"], "sounds": ["growl", "dirty", "saw"] },
     "presets": [
       "ottaveArcade",
       "spirale",
@@ -81,6 +83,7 @@
     }
   },
   "arp": {
+    "material": { "source": "mix", "share": 0.5, "rules": ["up", "pedal", "skips", "random"] },
     "presets": [
       "acid",
       "pulsar"
@@ -95,6 +98,7 @@
     "weight": 0.6
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response", "dark"] },
     "presets": [
       "neon",
       "boss",

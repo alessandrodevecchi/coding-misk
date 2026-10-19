@@ -47,6 +47,7 @@
     }
   },
   "bass": {
+    "material": { "source": "mix", "share": 0.4, "rules": ["half", "rolling", "octaves"] },
     "presets": [
       "sub",
       "tritono",
@@ -64,6 +65,7 @@
     }
   },
   "hook": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["tail", "call-response", "dark"] },
     "presets": [
       "phonk",
       "colpi",
