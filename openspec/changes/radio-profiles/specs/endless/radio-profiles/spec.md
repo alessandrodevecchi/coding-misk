@@ -195,3 +195,18 @@ Fast export, radio ranges, saved sessions, session video and fast video SHALL pl
 #### Scenario: Video code
 - **WHEN** a session with a transition into a Live coder song is exported as video
 - **THEN** the code area shows only the song on air at each moment
+
+### Requirement: Display options apply on air
+Options that change only how the code looks (comments, technical functions, line breaks, lit notes, human typing, typing mistakes) SHALL apply to the song on air from its next code edit when the listener changes them, in the radio as in Compose. Options that change how a song grows SHALL apply from the next song. A replay SHALL use the display options set when it starts; it SHALL NOT record each change.
+
+#### Scenario: Comments off during a song
+- **WHEN** a Live coder song is on air with track names and the listener sets comments to none
+- **THEN** the track names leave the code at the next edit, and the sound does not change
+
+### Requirement: Live coder shows no track comments by default
+The Live coder profile SHALL show only the title as comments by default, in Compose and in the radio. Classic and Crescendo SHALL keep their comments.
+
+#### Scenario: Default
+- **WHEN** a song plays with the Live coder profile and no override
+- **THEN** its code has the title line and no track name or note comments
+
