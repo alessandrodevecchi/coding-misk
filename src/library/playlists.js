@@ -13,6 +13,16 @@ export const isSession = id => typeof id === 'string' && id.startsWith(SESSION_P
 const uniq = list => [...new Set(list.filter(x => typeof x === 'string' && x))];
 
 // A free name: "Night run" → "Night run 2" when taken.
+// The versions a session item records (#38, radio-profiles D11): the director's, and the growth shapes' and the growth's
+// when it holds a grown song (a Crescendo or Live coder song). now: { director, shapes, growth }, the app's versions
+export const sessionVersions = (now, grown) => ({ version: now.director, ...(grown ? { shapes: now.shapes, growth: now.growth } : {}) });
+// whether a saved session may sound different: any recorded version differs from the app's (a version it did not record
+// is not compared); a frozen session plays its stored songs and never warns
+export function sessionOutdated(s, now) {
+  if (!s || s.frozen) return false;
+  return (s.version || 0) !== now.director || (s.shapes !== undefined && s.shapes !== now.shapes) || (s.growth !== undefined && s.growth !== now.growth);
+}
+
 export function freeName(name, taken) {
   const base = String(name || '').trim() || 'Playlist';
   if (!taken.includes(base)) return base;
@@ -91,7 +101,8 @@ export function createPlaylistStore(store, now = () => Date.now()) {
     session: sid => data.sessions[sid] || null,
     // every saved session, for fragments (#57)
     sessions: () => Object.entries(data.sessions).map(([id, x]) => ({ id, title: x.title })),
-    // Freeze: the songs as played, so the session sounds the same whatever the director becomes
+    // Freeze: the songs as played, so the session sounds the same whatever the director becomes; a grown song is stored as
+    // heard with its mark `grown` (radio-profiles D11), never grown again
     freeze(sid, songs) { const s = data.sessions[sid]; if (!s || !Array.isArray(songs)) return false; s.frozen = songs; save(); return true; },
     // add a song at the end; false when it is already there
     add(id, songId) {

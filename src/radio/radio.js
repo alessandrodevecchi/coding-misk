@@ -9,14 +9,16 @@ import { overlapOf, extraOf } from '../endless/transitions.js';
 import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, VARY_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
-import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir } from '../endless/items.js';
+import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, holdsGrown } from '../endless/items.js';
 import { steerOnAir, airBoundaries, airOffset, directorView } from '../endless/waypoints.js';
-import { PROFILE_CHOICES, RADIO_CHOICES, CUSTOM_DEFAULT, customControls, profileOptions } from '../endless/profile.js';
-import { growOnAir, airControls } from '../endless/growth.js';
+import { PROFILE_CHOICES, RADIO_CHOICES, RADIO_PROFILES, CUSTOM_DEFAULT, customControls, profileOptions, savedSongProfile } from '../endless/profile.js';
+import { growOnAir, airControls, leadOnAir } from '../endless/growth.js';
 import { resolveProfile, CONTROLS } from '../live/profiles.js';
 import { COMMENT_PRESETS } from '../song/comments.js';
 import { FUNCTION_PRESETS, FUNCTION_OPTIONS } from '../song/writer.js';
-import { OPENINGS, PACES, DEVELOPMENTS } from '../song/shapes.js';
+import { OPENINGS, PACES, DEVELOPMENTS, SHAPES_VERSION } from '../song/shapes.js';
+import { CRESCENDO_VERSION } from '../song/crescendo.js';
+import { sessionVersions } from '../library/playlists.js';
 import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
 import { buildSteps, sayText } from '../song/build.js';
 import { QUIRKS } from '../endless/quirks.js';
@@ -148,6 +150,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       if (prev && !prev.cut) prev.bars += extraOf(prev.entry.transition);
       const entry = { ...leadEntry(f.song), lead: false, frozen: true, transition: f.transition || undefined };
       const item = { song: f.song, entry, n, start: prev ? prev.start + prev.bars - (prev.cut ? 0 : overlapOf(prev.entry.transition)) : 0, bars: barsOf(f.song), frozen: true, commands: [] };
+      // a grown song stored as heard (radio-profiles D11): never grown again, played with the controls it had
+      if (f.grown && f.grown.custom) item.custom = f.grown.custom;
+      if (f.grown && f.grown.controls) item.ctl = f.grown.controls;
       S.stream.push(item);
       return item;
     }
@@ -227,8 +232,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
   // the profile a song plays with: Crescendo or Live coder once grown, else Classic (blocks)
   const profileOf = x => (x.song && x.song.onAir ? x.song.onAir.profile : 'classic');
-  // its controls: the Custom ones, else the profile's own on air (owner decision 4), else Classic
-  const controlsOf = x => (x.custom ? customControls(x.custom) : x.song && x.song.onAir ? airControls(x.song.onAir.profile, x.song.onAir.free) : resolveProfile('classic'));
+  // its controls: the Compose ones of song 0 (D2), the Custom ones, else the profile's own on air (owner decision 4), else
+  // Classic
+  const controlsOf = x => (x.ctl ? x.ctl : x.custom ? customControls(x.custom) : x.song && x.song.onAir ? airControls(x.song.onAir.profile, x.song.onAir.free) : resolveProfile('classic'));
   const showOf = x => (opts.incoming !== 'profile' ? opts.incoming : profileOf(x) === 'classic' ? 'visible' : 'hidden');
   // lead (#29): { song, from } a song from Compose or the Songs tab played first (song 0, from bar "from"); the
   // radio continues after it. A recipe with a lead replays it.
@@ -240,14 +246,21 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const session = createSession(recipes, s, le ? { lead: le } : {});
     // a new session records the growth marker (radio-profiles stage 4): its Crescendo and Live coder songs grow on air,
     // and its replays grow them the same; a recipe saved before has none and replays in blocks
-    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: current(), changes: [], growth: GROWTH_ON_AIR, ...(L ? { lead: { song: clone(L.song), from: L.from || 0 } } : {}) }, lastOptions: null, lastCard: 0 };
+    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: current(), changes: [], growth: GROWTH_ON_AIR, ...(L ? { lead: leadRecord(L) } : {}) }, lastOptions: null, lastCard: 0 };
     S.recipe.seed = session.seed;
     if (limit) { S.limit = limit; S.onEnd = onEnd; }
     if (frozen) { S.frozen = frozen; S.replay = true; generate(); }
-    else if (L) S.stream.push({ song: L.song, entry: le, n: 0, start: 0, bars: barsOf(L.song), lead: true, commands: [] });
+    else if (L) {
+      // song 0 keeps the profile it had in Compose (radio-profiles D2): grown as there, with its controls; a Classic lead
+      // plays as written, as before. Save and Open in Compose give the song as written (plain) with that profile
+      const R = S.recipe.lead, g = leadOnAir(R, shapeStyles());
+      const it = { song: g, entry: le, n: 0, start: 0, bars: barsOf(g), lead: true, commands: [], plain: R.song };
+      if (g.onAir && R.controls) it.ctl = R.controls;
+      S.stream.push(it);
+    }
     else generate();
     if (!limit) remember(S.stream[0]);
-    player.start(windowPlayable(), L ? Math.min(L.from || 0, barsOf(L.song) - 1) : 0);
+    player.start(windowPlayable(), L ? Math.min(L.from || 0, S.stream[0].bars - 1) : 0);
     render();
   }
   // a song from Compose or a song card goes on in the radio, in the styles closest to it
@@ -255,7 +268,14 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // until(out): optional, stops early once true (the radio export by length, #8)
   function rebuild(recipe, count, until = null) {
     const out = sessionItems(recipes, recipe, count, until);
-    return out.map(x => ({ song: x.song, transition: x.entry.transition || null, artist: x.entry.artist ? x.entry.artist.name : '' }));
+    // a grown song is marked as grown, with what its controls need (Freeze, radio-profiles D11): never grown again
+    const grownOf = (x, i) => {
+      const a = x.song && x.song.onAir; if (!a) return null;
+      if (a.lead) return { profile: a.profile, free: !!a.free, ...(recipe.lead && recipe.lead.controls ? { controls: clone(recipe.lead.controls) } : {}) };
+      const custom = recipeOptionsAt(recipe, i).custom;
+      return { profile: a.profile, free: !!a.free, ...(custom ? { custom: clone(custom) } : {}) };
+    };
+    return out.map((x, i) => { const g = grownOf(x, i); return { song: x.song, transition: x.entry.transition || null, artist: x.entry.artist ? x.entry.artist.name : '', ...(g ? { grown: g } : {}) }; });
   }
   // ---------- fast export of the radio (#8) ----------
   // a song's seconds from its sections (a tempo ramp counts at its middle)
@@ -283,16 +303,25 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     return { recipe, items: items.slice(range.kind === 'now' ? 0 : from), from: range.kind === 'now' ? 0 : from };
   }
   // a session item of a playlist: the songs heard so far (the one on air included)
-  const sessionItem = (recipe, count, first) => ({ recipe: clone(recipe), count, title: t(count === 1 ? 'plSessionTitle1' : 'plSessionTitle', { title: first, n: count }), date: new Date().toISOString(), version: DIRECTOR_VERSION });
+  // (radio-profiles D11: with a grown song it also records the shapes and growth versions, so a later change warns)
+  const sessionItem = (recipe, count, first) => ({ recipe: clone(recipe), count, title: t(count === 1 ? 'plSessionTitle1' : 'plSessionTitle', { title: first, n: count }), date: new Date().toISOString(), ...sessionVersions({ director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION }, holdsGrown(recipes, recipe, count)) });
   function playSession(s, { onEnd } = {}) { start({ recipe: s.recipe, limit: s.count, onEnd, frozen: s.frozen || null }); }
   // the end of a limited session: hand back to the playlist
   function endLimited() { const cb = S.onEnd; S = null; render(); if (cb) cb(); else player.stop(); }
-  function continueSong(song, from = 0) {
+  // how (radio-profiles D2): { profile, controls } the profile and the Compose controls the song was growing with, or
+  // null when it played in blocks: then an undeclared song takes the session's forced profile (grown as a radio song), a
+  // declared or Classic one stays as written
+  function continueSong(song, from = 0, how = null) {
     opts.artist = null;
     opts.styles = stylesNear(song, recipes);
     saveOpts();
-    start({ lead: { song, from } });
+    let lead = { song, from };
+    if (how && RADIO_PROFILES.includes(how.profile) && how.profile !== 'classic') lead = { ...lead, profile: how.profile, ...(how.controls ? { controls: clone(how.controls) } : {}) };
+    else if (!how || !how.declared) { const r = savedSongProfile(song, { forced: opts.profile }); if (r.from === 'session' && r.profile !== 'classic') lead = { ...lead, profile: r.profile }; }
+    start({ lead });
   }
+  // the recipe's lead: the song as written, its bar, and the profile and controls it keeps (D2; none for Classic)
+  const leadRecord = L => ({ song: clone(L.song), from: L.from || 0, ...(L.profile ? { profile: L.profile } : {}), ...(L.controls ? { controls: clone(L.controls) } : {}) });
   function stopQuiet() { if (S) { S = null; } }
   function stop() { if (!S) return; if (recS) stopRec(); S = null; player.stop(); render(); }
   // pause keeps the session, the window and the bar; resume plays on from that bar

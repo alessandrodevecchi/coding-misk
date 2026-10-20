@@ -169,3 +169,27 @@ export function growOnAir(song, { profile = 'classic', artist = null, into = nul
 }
 // the section boundaries a fitted growth tries at most
 const TRIES = 8;
+
+// ---------- D2: song 0 (Continue in radio) ----------
+// A saved song played first in the radio keeps the profile it had there (radio-profiles D2). lead: the recipe's lead
+// { song, from, profile?, controls? }:
+//   controls (with profile): the Compose controls it was playing with (its profile and the owner's overrides); it
+//     grows as Compose grows it (crescendoSong with those controls), so the handover changes nothing on screen;
+//   profile alone: an undeclared song played in blocks, taken by the session's forced profile (D2 rule 2); it grows as
+//     a radio song (growOnAir, nothing before it);
+//   neither (a Classic lead, a recipe saved before): the song as written, in blocks.
+// styles: { id: recipe }, for the growth shapes. → the song as heard (a grown one carries `onAir` with `lead: true`)
+export function leadOnAir(lead, styles = {}) {
+  const song = lead && lead.song, p = lead && lead.profile;
+  if (!song || (p !== 'crescendo' && p !== 'switch')) return song;
+  const C = lead.controls;
+  if (!C || typeof C !== 'object') {
+    const g = growOnAir(song, { profile: p, styles });
+    return g === song ? song : { ...g, onAir: { ...g.onAir, lead: true } };
+  }
+  if (C.build !== 'crescendo') return song;
+  const c = crescendoSong(song, { narrated: C.narrated, rules: growthRules(C, { styles }) });
+  if (!c.build.length) return song;
+  c.onAir = { profile: p, from: 0, free: C.duration === 'free', lead: true };
+  return c;
+}

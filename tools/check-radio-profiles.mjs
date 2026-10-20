@@ -6,16 +6,18 @@
 import fs from 'node:fs';
 import { hashString } from '../src/endless/random.js';
 import { validateRecipe, recipeOrder } from '../src/endless/recipe.js';
-import { sessionItems, GROWTH_ON_AIR, growsOnAir } from '../src/endless/items.js';
+import { sessionItems, GROWTH_ON_AIR, growsOnAir, holdsGrown } from '../src/endless/items.js';
 import { airCode, windowPart, stepRefs, HIDDEN_ORBIT } from '../src/live/air-code.js';
 import { loadStyles } from './styles-dir.mjs';
 import { loadArtists } from './artists-dir.mjs';
 import { songProfileOnAir, savedSongProfile, recipeProfile, RADIO_PROFILES, PROFILE_CHOICES, profileOptions, customControls, controlsProfile } from '../src/endless/profile.js';
-import { PROFILE_IDS } from '../src/live/profiles.js';
+import { PROFILE_IDS, resolveProfile, growthRules } from '../src/live/profiles.js';
+import { crescendoSong } from '../src/song/crescendo.js';
+import { absoluteClips } from '../src/endless/transitions.js';
 import { validateArtist, ARTIST_PROFILES } from '../src/endless/artist.js';
 import { PRESETS } from '../src/endless/compilation.js';
 import { createSession, OPTION_DEFAULTS } from '../src/endless/director.js';
-import { writtenForm, soundAt, growOnAir, airControls } from '../src/endless/growth.js';
+import { writtenForm, soundAt, growOnAir, airControls, leadOnAir } from '../src/endless/growth.js';
 import { windowSong } from '../src/endless/join.js';
 import { overlapOf, extraOf } from '../src/endless/transitions.js';
 import { stateAt, buildSteps, checkBuild } from '../src/song/build.js';
@@ -179,6 +181,28 @@ const CHECKS = {
       [{}, {}, 'classic', 'player'],
     ];
     cases.forEach(([song, ctx, want, from], i) => { const r = savedSongProfile({ id: 'x', ...song }, ctx); assert(r.profile === want && r.from === from, `case ${i}: ${JSON.stringify(r)}`); });
+  },
+  'D2: song 0 keeps its profile and controls; holdsGrown'() {
+    // a Live coder song from Compose, with the owner's overrides (no comments, a slower typing): it grows as Compose grows it
+    const song = absoluteClips(JSON.parse(fs.readFileSync(new URL('../songs/switch-prima-luce.json', import.meta.url), 'utf8')));
+    const C = resolveProfile('switch', { comments: 'none' }), base = { seed: 'lead', options: { styles: ['berlin-techno'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, ...how, profile: 'artist' }, changes: [], growth: GROWTH_ON_AIR };
+    const plain = sessionItems(RECIPES, { ...base, lead: { song, from: 0 } }, 3), kept = sessionItems(RECIPES, { ...base, lead: { song, from: 4, profile: 'switch', controls: C } }, 3);
+    const compose = crescendoSong(song, { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
+    assert(same(plain[0].song, song), 'a lead without a profile plays as written (Classic, as before)');
+    assert(kept[0].song.onAir && kept[0].song.onAir.lead && kept[0].song.onAir.profile === 'switch', 'a Live coder lead is grown and marked');
+    assert(same(kept[0].song.build, compose.build) && same(kept[0].song.sections, compose.sections), 'song 0 grows as Compose grows it with its controls');
+    assert(same(kept.slice(1).map(x => x.song), plain.slice(1).map(x => x.song)), 'the songs after a grown lead are the same (the director follows the song as written)');
+    assert(same(leadOnAir({ song, profile: 'switch', controls: C }, STYLES), kept[0].song), 'leadOnAir is the same in the radio and in a rebuild');
+    // an undeclared song in blocks under a forced profile: grown as a radio song
+    const forced = leadOnAir({ song, profile: 'crescendo' }, STYLES);
+    assert(forced.onAir && forced.onAir.lead && forced.onAir.profile === 'crescendo' && same(forced.build, growOnAir(song, { profile: 'crescendo', styles: STYLES }).build), 'a forced profile grows song 0 as a radio song');
+    assert(same(leadOnAir({ song, profile: 'classic', controls: resolveProfile('classic') }, STYLES), song), 'a Classic lead stays as written');
+    // D11: which sessions hold a grown song
+    assert(holdsGrown(RECIPES, { ...base, lead: { song, from: 0, profile: 'switch', controls: C } }, 1), 'a grown lead holds a grown song');
+    assert(!holdsGrown(RECIPES, { ...base, lead: { song, from: 0 } }, 2), 'a Classic session with a Classic lead holds none');
+    assert(holdsGrown(RECIPES, GROWN[0].recipe.growth ? GROWN[0].recipe : { ...GROWN[0].recipe, growth: GROWTH_ON_AIR }, 1), 'a Live coder session holds one');
+    assert(!holdsGrown(RECIPES, GROWN[0].recipe.growth ? { ...GROWN[0].recipe, growth: undefined } : GROWN[0].recipe, 2), 'a recipe without the growth marker plays in blocks: none');
+    assert(!holdsGrown(RECIPES, { ...CLASSIC[0].recipe, growth: GROWTH_ON_AIR }, SONGS), 'a Classic session holds none');
   },
   'artist fields profiles and growth: a broken artist fails at its paths'() {
     const ok = { ...artist('night-owl'), profiles: { switch: 2, classic: 1 }, growth: { duration: 'free', openings: { 'full-kick': 2 }, paces: { fast: 1 }, developments: { masks: 1 } } };

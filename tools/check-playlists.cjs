@@ -180,16 +180,46 @@ async function seed(page) {
   await page.click('#stop'); await sleep(200);
   await page.click('#pb-mix'); await sleep(100);
 
+  // radio-profiles 6.1 (D2): a Mix of a Classic song and a song declaring Live coder. The Classic one plays in blocks, the
+  // Live coder one grows (hidden on its own orbits while it comes in, then alone in the panel, from a few lines)
+  await page.evaluate(() => {
+    const pl = JSON.parse(localStorage.getItem('coding-misk-playlists'));
+    pl.lists.push({ id: 'p-mix2', name: 'Mix profiles', songs: ['u-m1', 'switch-test-breve'] });
+    localStorage.setItem('coding-misk-playlists', JSON.stringify(pl));
+    localStorage.setItem('coding-misk-playlist-mix', 'true');
+  });
+  await page.reload(); await sleep(3500);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(300);
+  await page.click('[data-pl-open="p-mix2"]'); await sleep(200);
+  await page.click('#pl-play'); await sleep(800);
+  { const heads = (c, n) => c.split('\n').filter(l => new RegExp(`^// =+ ${n} `).test(l)).length;
+    // (the hidden song joins the code with its first step, in the last bar or two before it goes on air: polled often)
+    const orbitsAhead = () => page.evaluate(() => { const s = document.querySelector('strudel-editor').editor.repl.scheduler, c = s.now(); return [...new Set(s.pattern.queryArc(c, c + 2).filter(h => h.hasOnset()).map(h => h.value.orbit))]; });
+    let hidden = false, shown2 = false;
+    for (let k = 0; k < 300 && (await title()) === 'Mix 1'; k++) { const c = await code(); if (heads(c, 2)) shown2 = true; if ((await orbitsAhead()).some(o => o >= 20)) hidden = true; await sleep(40); }
+    check(hidden && !shown2, 'Mix: the Live coder song comes in hidden on its own orbits under the Classic one', `hidden ${hidden}, shown ${shown2}`);
+    let t2 = ''; for (let k = 0; k < 40 && t2 !== 'Breve'; k++) { await sleep(200); t2 = await title(); }
+    await sleep(1500);
+    const c2 = await code(), err = await page.evaluate(() => String(document.querySelector('strudel-editor').editor.repl.state.evalError || ''));
+    const full = await page.evaluate(async () => (await (await fetch('/songs/switch-test-breve.json')).json()).tracks.length);
+    const live = c2.split('\n').filter(l => l.startsWith('$:')).length;
+    check(t2 === 'Breve' && !err && heads(c2, 1) === 0 && live > 0 && live < full, 'Mix: the Live coder song grows on air from a few lines, alone in the panel', `${t2}: ${live} of ${full} tracks, ${err.slice(0, 80)}`);
+  }
+  await page.click('#stop'); await sleep(200);
+  await page.click('#pb-mix'); await sleep(100);
+
   // radio sessions (#38, radio-variation 3.2): a session of another director version, older or newer, warns that it may
   // sound different and offers Freeze; the same version and a frozen session do not warn
-  { const V = await page.evaluate(async () => (await import('/src/endless/director.js')).DIRECTOR_VERSION);
+  { const VS = await page.evaluate(async () => ({ d: (await import('/src/endless/director.js')).DIRECTOR_VERSION, s: (await import('/src/song/shapes.js')).SHAPES_VERSION, g: (await import('/src/song/crescendo.js')).CRESCENDO_VERSION })), V = VS.d;
     await page.evaluate(v => {
       const pl = JSON.parse(localStorage.getItem('coding-misk-playlists'));
       const ses = (ver, frozen) => ({ recipe: { seed: 'ver', options: { styles: ['berlin-techno'] }, changes: [] }, count: 1, title: `Ver ${ver}${frozen ? ' frozen' : ''}`, date: '2026-10-19T00:00:00.000Z', version: ver, ...(frozen ? { frozen: [] } : {}) });
-      pl.sessions = { ...(pl.sessions || {}), 'session:v-old': ses(v - 1), 'session:v-new': ses(v + 1), 'session:v-now': ses(v), 'session:v-frozen': ses(v - 1, true) };
-      pl.lists.push({ id: 'p-ver', name: 'Versions', songs: ['session:v-old', 'session:v-new', 'session:v-now', 'session:v-frozen'] });
+      // (radio-profiles 6.2: a Live coder session saved with an older shapes version)
+      const coder = { recipe: { seed: 'ver', options: { styles: ['berlin-techno'], profile: 'switch' }, changes: [], growth: 2 }, count: 1, title: 'Ver shapes', date: '2026-10-20T00:00:00.000Z', version: v.d, shapes: v.s - 1, growth: v.g };
+      pl.sessions = { ...(pl.sessions || {}), 'session:v-old': ses(v.d - 1), 'session:v-new': ses(v.d + 1), 'session:v-now': ses(v.d), 'session:v-frozen': ses(v.d - 1, true), 'session:v-shapes': coder };
+      pl.lists.push({ id: 'p-ver', name: 'Versions', songs: ['session:v-old', 'session:v-new', 'session:v-now', 'session:v-frozen', 'session:v-shapes'] });
       localStorage.setItem('coding-misk-playlists', JSON.stringify(pl));
-    }, V);
+    }, VS);
     await page.reload(); await sleep(3000);
     await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(300);
     await page.click('[data-pl-open="p-ver"]'); await sleep(300);
@@ -198,6 +228,13 @@ async function seed(page) {
     check(at(`Ver ${V - 1}`).old && at(`Ver ${V - 1}`).freeze, 'an older session warns and offers Freeze', JSON.stringify(rows));
     check(at(`Ver ${V + 1}`).old, 'a newer session warns too');
     check(!at(`Ver ${V}`).old && !at(`Ver ${V - 1} frozen`).old, 'the same version and a frozen session do not warn');
+    check(at('Ver shapes').old && at('Ver shapes').freeze, 'a Live coder session saved with an older shapes version warns and offers Freeze');
+    // Freeze stores the grown song as heard, marked as grown (radio-profiles D11)
+    await page.click('[data-pl-freeze="session:v-shapes"]'); await sleep(2500);
+    const fz = await page.evaluate(() => { const f = JSON.parse(localStorage.getItem('coding-misk-playlists')).sessions['session:v-shapes'].frozen; return f && f.map(x => ({ grown: x.grown || null, onAir: !!(x.song && x.song.onAir), steps: x.song && x.song.build ? x.song.build.length : 0 })); });
+    check(fz && fz.length === 1 && fz[0].grown && fz[0].grown.profile === 'switch' && fz[0].onAir && fz[0].steps > 0, 'Freeze stores the grown build marked as grown', JSON.stringify(fz));
+    const row = (await page.$$eval('.pl-row', xs => xs.map(x => ({ title: x.querySelector('.pl-title').innerText, old: !!x.querySelector('.pl-old') })))).find(r => r.title === 'Ver shapes') || {};
+    check(!row.old, 'the frozen Live coder session no longer warns');
     if (shots) await page.screenshot({ path: path.join(shots, 'playlist-versions.png') });
   }
 

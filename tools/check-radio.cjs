@@ -259,6 +259,31 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     await page.selectOption('#radio-profile', 'artist'); await sleep(200);
   }
 
+  // radio-profiles 6.1 (D2): Continue in radio of a song playing as Live coder in Compose. Song 0 keeps its profile and
+  // the Compose controls, grows as there (same code on screen), and a replay grows it the same
+  {
+    const edc = () => page.evaluate(() => { const e = document.querySelector('strudel-editor').editor; return { code: e.code || '', err: String(e.repl.state.evalError || ''), cyc: e.repl.scheduler.now() }; });
+    // (the code lines with their strings and numbers left out: the typing may be a little further in one of them)
+    const lines = c => c.split('\n').filter(l => l.startsWith('$:')).map(l => l.replace(/"[^"]*"?/g, '""').replace(/[\d.]+/g, '0'));
+    await page.click('[data-tab="brani"]'); await sleep(500);
+    await page.fill('#sv-q', 'Prima luce'); await sleep(600);
+    await page.click('#songs [data-song-id="switch-prima-luce"] [data-act="open"]'); await sleep(1500);
+    await page.click('#play'); await sleep(6000);
+    const a = await edc();
+    await page.click('#tr-radio'); await sleep(3000);
+    r = await R(); const b = await edc();
+    const s0 = r.state && r.state.stream[0], L = r.state && r.state.recipe.lead;
+    check(s0 && s0.profile === 'switch' && s0.grown && L && L.profile === 'switch' && L.controls && L.controls.build === 'crescendo', 'Continue in radio: song 0 keeps Live coder and the Compose controls', JSON.stringify(s0 && { profile: s0.profile, grown: s0.grown, lead: L && L.profile }));
+    check(!a.err && !b.err && lines(a.code).length > 0 && lines(a.code).join('\n') === lines(b.code).join('\n'), 'Continue in radio: the same code on screen, no evaluation error', `${lines(a.code).length} lines in Compose, ${lines(b.code).length} in the radio ${b.err.slice(0, 80)}`);
+    const recipe = r.state.recipe;
+    await page.click('#radio-start'); await sleep(300);
+    await page.evaluate(rc => globalThis.codingMiskRadio.start({ recipe: rc }), recipe); await sleep(4000);
+    r = await R();
+    check(r.state.stream[0].grown && r.state.stream[0].bars === s0.bars && JSON.stringify(r.state.stream[0].shape) === JSON.stringify(s0.shape), 'Continue in radio: a replay grows song 0 the same');
+    await page.click('#radio-start'); await sleep(300);
+    await page.click('[data-tab="radio"]'); await sleep(200);
+  }
+
   // history limit
   await page.evaluate(() => { const h = Array.from({ length: 50 }, (_, i) => ({ title: `old ${i}`, styles: ['jazz'], seed: 'x', n: i, at: new Date().toISOString(), song: null })); localStorage.setItem('coding-misk-radio-history', JSON.stringify(h)); });
   await page.reload(); await sleep(5000); await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await page.click('#radio-start'); await sleep(4000);

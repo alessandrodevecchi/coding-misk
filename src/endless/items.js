@@ -6,7 +6,7 @@ import { createSession, leadEntry } from './director.js';
 import { compilationOptions } from './compilation.js';
 import { steerSong } from './steering.js';
 import { recipeProfile, customControls } from './profile.js';
-import { growOnAir } from './growth.js';
+import { growOnAir, leadOnAir } from './growth.js';
 import { steerOnAir } from './waypoints.js';
 
 // the options of song n in a recipe: the first options, then every change up to n; options without the Profile option
@@ -39,7 +39,8 @@ export const directorOptions = (recipes, recipe, n, o = recipeOptionsAt(recipe, 
 export function sessionItems(recipes, recipe, count, until = null, { grow = growsOnAir(recipe), styles = null } = {}) {
   const shapes = grow ? styles || Object.fromEntries(recipes.map(r => [r.id, r])) : null;
   const L = recipe.lead, le = L ? leadEntry(L.song) : null, ses = createSession(recipes, recipe.seed, le ? { lead: le } : {});
-  const out = L ? [{ song: L.song, entry: le }] : [];
+  // (song 0 keeps the profile it had in Compose, or takes the forced one, radio-profiles D2: leadOnAir)
+  const out = L ? [{ song: leadOnAir(L, shapes || Object.fromEntries(recipes.map(r => [r.id, r]))), entry: le }] : [];
   for (let n = out.length; out.length < count && !(until && until(out)); n++) {
     const g = ses.next(directorOptions(recipes, recipe, n)), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
     // the transition into this song: planned on the entry before it (the lead's for the first song after it)
@@ -55,4 +56,13 @@ export function sessionItems(recipes, recipe, count, until = null, { grow = grow
     out.push({ song, entry: g.entry, plan: g.plan, opts: g.opts });
   }
   return out;
+}
+
+// D11: whether the first `count` songs of a recipe hold a grown song: a grown lead, or a Crescendo or Live coder song of a
+// recipe with the growth marker. Only the director's profiles are read (no growth), so it is quick.
+export function holdsGrown(recipes, recipe, count) {
+  const L = recipe && recipe.lead;
+  if (L && (L.profile === 'crescendo' || L.profile === 'switch')) return true;
+  if (!growsOnAir(recipe)) return false;
+  return sessionItems(recipes, { ...recipe, lead: L ? { song: L.song, from: L.from } : undefined }, count, null, { grow: false }).some(x => x.entry && x.entry.profile && !x.entry.lead);
 }

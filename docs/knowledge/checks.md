@@ -90,7 +90,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-patterns.mjs` | `npm run check:patterns` | Node | Checks for the patterns store and catalogue (pattern-library, #72). No browser. |
 | `tools/check-player.cjs` |  | dev server, Chrome | Browser checks for the player bar and the global volume (#32). |
 | `tools/check-playlists.cjs` |  | dev server, Chrome | Browser checks for playlists (#36): favourites migration, "+ Playlist", the Playlists tab, auto-advance, shuffle, repeat one, export and import, phone width. |
-| `tools/check-playlists.mjs` | `npm run check:playlists` | Node | Checks for playlists (#36): store, migration of the old favourites, play queue, export and import. No browser. |
+| `tools/check-playlists.mjs` | `npm run check:playlists` | Node | Checks for playlists (#36): store, migration of the old favourites, play queue, export and import, versions of saved sessions with grown songs (radio-profiles D11). No browser. |
 | `tools/check-pool.mjs` | `npm run check:workers` | Node | Worker processes for the slow checks (faster-checks). No browser. runPool(module, tasks) hands tasks (one song, one check) to worker processes that import the module once and call its runTask(task); the results come… |
 | `tools/check-profiles.mjs` | `npm run check:profiles` | Node | Checks for performance profiles and code comments (performance-profiles). No browser. |
 | `tools/check-radio-profiles.mjs` | `npm run check:radio-profiles` | Node | Checks for profiles in the radio (radio-profiles). No browser. Radio fixtures (tests/snapshots/radio-growth.json): hashes of the radio items of three sessions in Classic (styles, an artist, a compilation), as the radio… |

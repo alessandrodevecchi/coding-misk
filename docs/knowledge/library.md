@@ -32,6 +32,10 @@ Nothing leaves the browser unless the user exports it. A backup file holds it al
 
 **Playlists.** Favourites is a playlist. Shuffle, repeat, and Mix between songs. A radio session in a playlist replays as heard. Freeze stores its songs, so it never changes with the director.
 
+**Profiles in the Mix (radio-profiles D2).** Each saved song in the Mix plays with the profile it has alone: its own declared profile, else the Live build switch and the Compose profile. A Crescendo or Live coder song plays its grown build with the controls it has alone, in its own view, like the radio: the next song comes in hidden on its own orbits and appears whole when it goes on air. A Mix of Classic songs plays as before. The songs of a radio session in the Mix keep the controls they had on air.
+
+**Session versions (D11).** A session item records `version` (the director) and, when it holds a grown song, `shapes` and `growth`. It shows "may sound different" with Freeze when any recorded version differs from the app's; a frozen session never warns. Freeze stores grown songs as heard, marked `grown`.
+
 **Versions.** Code written by hand can be saved as a new version of a song. Old hand code is upgraded once (`upgradeCode`, `CODE_VERSION`).
 
 **Backup.** Export writes one file. Import merges it: items are joined by id, nothing is lost.

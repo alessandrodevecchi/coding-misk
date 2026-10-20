@@ -6,14 +6,15 @@ import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTER
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
-import { crescendoSong, waypointSong } from './song/crescendo.js';
+import { crescendoSong, waypointSong, CRESCENDO_VERSION } from './song/crescendo.js';
 import { setSpokenContext, spokenContext, placeSpoken, WAYS } from './song/spoken.js';
 import { airCode } from './live/air-code.js';
-import { growOnAir } from './endless/growth.js';
+import { growOnAir, airControls } from './endless/growth.js';
+import { controlsProfile, customControls } from './endless/profile.js';
 import { steerOnAir } from './endless/waypoints.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, migrateGrowth, PROFILE_STORE_VERSION, migrateOld } from './live/profiles.js';
-import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay } from './song/shapes.js';
+import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay, SHAPES_VERSION } from './song/shapes.js';
 import { liveCode } from './live/live-code.js';
 import { installHelpers, useFns, FUNCTION_PRESETS, FUNCTION_OPTIONS, functionOptions, writeCode, levelsOf, busesOf, functionContext, tail, preludeText } from './song/writer.js';
 import { upgradeLibrary } from './library/code-upgrade.js';
@@ -34,8 +35,10 @@ import { createArtistsTab } from './library/artists-tab.js';
 import { createSongsView, confirmInline } from './library/songs-view.js';
 import { trashSong, restoreSong, deleteForGood, emptyTrash, purgeTrash, trashList, daysLeft, hideSong, showHidden, hiddenIds, entryTitle } from './library/trash.js';
 import { kindOf, parseFree } from './library/song-filter.js';
-import { createPlaylistStore, createQueue, REPEATS, isSession } from './library/playlists.js';
+import { createPlaylistStore, createQueue, REPEATS, isSession, sessionOutdated } from './library/playlists.js';
 import { DIRECTOR_VERSION } from './endless/director.js';
+// the versions a saved radio session is compared with (#38, radio-profiles D11)
+const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION };
 import { createPlaylistsTab } from './library/playlists-tab.js';
 import { pickJsonFiles } from './library/library.js';
 import { createSettings } from './settings/settings.js';
@@ -1293,8 +1296,16 @@ function continueInRadio(sg, from = 0) {
   if (!radio || !continuable(sg)) { toast(t('steerWhy:lead')); return; }
   queue = null;
   const { kind, ...plain } = clone(sg);
-  radio.continueSong(absoluteClips(plain), from);
+  radio.continueSong(absoluteClips(plain), from, leadHow({ ...sg, kind: 'composed' }));
   showTab('radio');
+}
+// how a song plays here, for song 0 of the radio (radio-profiles D2): growing (Crescendo or Live coder) with its profile
+// and the controls it has (the Compose profile and overrides), so the radio grows it the same; else in blocks, with
+// `declared` when its profile or the Live build switch put it there (an undeclared song may take the radio's forced one)
+function leadHow(tr) {
+  const lv = liveOf(tr);
+  if (lv.on && lv.style === 'crescendo' && crescendoOf(tr)) return { profile: controlsProfile(lv.ctl), controls: clone(lv.ctl) };
+  return { declared: !!(songProfile(tr) || liveOverride.has(tr.id) || lv.on) };
 }
 $('#tr-radio').addEventListener('click', () => { const s = sched(); continueInRadio(T, mode === 'track' && isPlaying() && s ? Math.max(0, Math.floor(s.now())) : 0); });
 
@@ -2669,13 +2680,31 @@ function playById(id) {
 // air the window moves on, as in the radio. Code songs and the end of the queue stop the stream with a cut.
 let mixOn = !!store.get('coding-misk-playlist-mix', false), mixS = null, mixN = 0;
 const barsOfSong = sg => sg.sections.reduce((a, x) => a + x.bars, 0);
-function mixSong(id) { const c = libraryCards().find(x => x.tr.id === id); if (!c || c.tr.kind !== 'composed') return null; const { kind, ...sg } = c.tr; return absoluteClips(clone(sg)); }
+// each saved song plays with the profile it has alone (radio-profiles D2 without the radio's forced profile): its own,
+// else the Live build switch and the Compose profile; a growing one is its grown build, with the controls it has alone
+// (kept in mixCtl, by song object)
+const mixCtl = new WeakMap();
+function mixSong(id) {
+  const c = libraryCards().find(x => x.tr.id === id); if (!c || c.tr.kind !== 'composed') return null;
+  const lv = liveOf(c.tr), g = lv.on && lv.style === 'crescendo' ? crescendoOf(c.tr) : null;
+  if (!g) { const { kind, ...sg } = c.tr; return absoluteClips(clone(sg)); }
+  const { kind, ...gs } = clone(g), out = absoluteClips(gs);
+  out.onAir = { profile: controlsProfile(lv.ctl), from: 0, free: lv.ctl.duration === 'free', mix: true };
+  mixCtl.set(out, clone(lv.ctl));
+  return out;
+}
 // the songs an item brings to the mix: a saved song, or the songs of a radio session (frozen, or rebuilt as heard)
 const sessionSongs = new Map();
 function mixParts(id) {
   if (!isSession(id)) { const sg = mixSong(id); return sg ? [sg] : null; }
   const s = playlists.session(id); if (!s || !radio) return null;
-  if (!sessionSongs.has(id)) sessionSongs.set(id, (s.frozen || radio.rebuild(s.recipe, s.count)).map(x => absoluteClips(clone(x.song))));
+  // (a session's grown songs keep the controls they had on air: the Compose ones of a song 0, the Custom ones, else the
+  // profile's own on air)
+  if (!sessionSongs.has(id)) sessionSongs.set(id, (s.frozen || radio.rebuild(s.recipe, s.count)).map(x => {
+    const sg = absoluteClips(clone(x.song)), g = x.grown;
+    if (sg.onAir && g && (g.controls || g.custom)) mixCtl.set(sg, clone(g.controls || customControls(g.custom)));
+    return sg;
+  }));
   return sessionSongs.get(id);
 }
 const mixActive = () => !!(mixS && song && song === mixS.p);
@@ -2693,8 +2722,13 @@ function extendMix() {
 }
 function mixPlayable() {
   const w = windowSong(mixS.items.map(x => ({ song: x.song, n: x.n, start: x.start, transition: x.transition })));
-  const first = mixS.items[0];
-  return playable({ ...w, id: `mix-${first.id}`, title: first.song.title, kind: 'composed' });
+  const first = mixS.items[0], W = { ...w, id: `mix-${first.id}`, title: first.song.title, kind: 'composed' };
+  // a window of Classic songs plays as before; with a grown song, each song in its own view, as the radio does (the next
+  // one hidden when it grows), radio-profiles D2
+  const prof = x => (x.song.onAir ? x.song.onAir.profile : 'classic');
+  if (mixS.items.every(x => prof(x) === 'classic')) return playable(W);
+  return radioPlayable(W, mixS.items.map((x, i) => ({ n: x.n, prefix: `s${x.n}-`, start: x.start, song: x.song, title: x.song.title, profile: prof(x), custom: mixCtl.has(x.song),
+    ctl: mixCtl.get(x.song) || (x.song.onAir ? airControls(prof(x), x.song.onAir.free) : resolveProfile('classic')), show: i === 0 ? 'air' : prof(x) === 'classic' ? 'visible' : 'hidden' })));
 }
 function startMix(id) {
   const parts = mixParts(id), sg = parts && parts[0];
@@ -2714,8 +2748,10 @@ function mixTick(cyc) {
   // the queue moves on when an item ends (a session moves on after its last song)
   if (queue && mixS.items[1].id !== cur.id) queue.next({ auto: true });
   mixS.items.shift(); extendMix();
-  const p = mixPlayable();
+  const p = mixPlayable(), fresh = !!(p.air || mixS.p.air);
   mixS.p = p; song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
+  // (songs shown one by one, radio-profiles D2: the new song on air appears whole now, in its own view)
+  if (fresh) { ed.setCode(codeNow(p, Math.floor(cyc))); ed.evaluate(); }
   warmVoices(p); source = { kind: 'song', name: p.title, id: p.id }; renderSource();
   songLook(mixS.items[0].song.look);
   pbLast = '';
@@ -2740,7 +2776,7 @@ const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, 
   onPlayList: (listId, ids) => playQueue(listId, ids) });
 playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, playlists, confirmTwice, toast,
   songs: () => [...libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: c.p.meta.seconds })),
-    ...playlists.all.flatMap(l => l.songs).filter(isSession).map(id => { const s = playlists.session(id); return s && { id, title: s.title, kind: 'session', seconds: 0, count: s.count, frozen: !!s.frozen, old: !s.frozen && (s.version || 0) !== DIRECTOR_VERSION }; }).filter(Boolean)],
+    ...playlists.all.flatMap(l => l.songs).filter(isSession).map(id => { const s = playlists.session(id); return s && { id, title: s.title, kind: 'session', seconds: 0, count: s.count, frozen: !!s.frozen, old: sessionOutdated(s, APP_VERSIONS) }; }).filter(Boolean)],
   video: id => exportSession(id),
   freeze: id => { const s = playlists.session(id); if (!s || !radio) return; playlists.freeze(id, radio.rebuild(s.recipe, s.count)); sessionSongs.delete(id); toast(t('plFrozen')); },
   sessionOf: id => playlists.session(id),

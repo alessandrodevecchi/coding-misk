@@ -1,6 +1,7 @@
-// Checks for playlists (#36): store, migration of the old favourites, play queue, export and import. No browser.
+// Checks for playlists (#36): store, migration of the old favourites, play queue, export and import, versions of saved
+// sessions with grown songs (radio-profiles D11). No browser.
 //   npm run check:playlists      exit 1 when any check fails
-import { createPlaylistStore, createQueue, shuffled, exportPlaylist, importPlaylist, freeName, FAV_ID, PLAYLISTS_KEY, OLD_FAV_KEY, isSession } from '../src/library/playlists.js';
+import { createPlaylistStore, createQueue, shuffled, exportPlaylist, importPlaylist, freeName, FAV_ID, PLAYLISTS_KEY, OLD_FAV_KEY, isSession, sessionVersions, sessionOutdated } from '../src/library/playlists.js';
 import { stream } from '../src/endless/random.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -24,6 +25,23 @@ const CHECKS = {
     assert(again.session(sid) && again.session(sid).frozen, 'sessions kept in the store');
     p.removeAt(l.id, 1);
     assert(!p.session(sid), 'a session no list holds is forgotten');
+  },
+  'sessions: versions of grown songs (radio-profiles D11): recorded, compared, frozen never warns'() {
+    const now = { director: 5, shapes: 3, growth: 2 };
+    assert(JSON.stringify(sessionVersions(now, false)) === '{"version":5}', 'a session without grown songs records the director only');
+    assert(JSON.stringify(sessionVersions(now, true)) === '{"version":5,"shapes":3,"growth":2}', 'a session with a grown song records the shapes and growth versions');
+    const ses = v => ({ ...SESSION, ...v });
+    assert(!sessionOutdated(ses({ version: 5 }), now) && !sessionOutdated(ses({ version: 5, shapes: 3, growth: 2 }), now), 'the same versions do not warn');
+    assert(sessionOutdated(ses({ version: 4 }), now) && sessionOutdated(ses({ version: 6 }), now), 'another director version warns');
+    assert(sessionOutdated(ses({ version: 5, shapes: 2, growth: 2 }), now), 'an older shapes version warns');
+    assert(sessionOutdated(ses({ version: 5, shapes: 3, growth: 1 }), now), 'another growth version warns');
+    assert(!sessionOutdated(ses({ version: 4, shapes: 2, growth: 1, frozen: [] }), now), 'a frozen session never warns');
+    // Freeze stores a grown song with its mark, as heard
+    const mem = memory(), p = createPlaylistStore(mem), l = p.create('G'), sid = p.addSession(l.id, ses({ version: 5, shapes: 3, growth: 2 }));
+    const grown = { song: { id: 'g', onAir: { profile: 'switch', from: 0, free: false }, crescendo: { growth: 16 }, build: [{ at: 0 }] }, transition: null, grown: { profile: 'switch', free: false } };
+    p.freeze(sid, [grown, { song: { id: 'c' }, transition: null }]);
+    const f = createPlaylistStore(mem).session(sid).frozen;
+    assert(f[0].grown && f[0].grown.profile === 'switch' && f[0].song.onAir && f[0].song.build.length === 1 && !f[1].grown, 'a frozen session keeps the grown build and its mark');
   },
   'sessions: export and import carry them, with a new id on a clash'() {
     const p = createPlaylistStore(memory()), l = p.create('Mix', ['a']), sid = p.addSession(l.id, SESSION);

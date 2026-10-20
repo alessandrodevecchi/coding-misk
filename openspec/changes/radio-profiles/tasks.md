@@ -42,8 +42,8 @@ Each stage ends with its checks green before the next starts. "Verify" names the
 
 ## 6. Saved songs, playlists and versions
 
-- [ ] 6.1 Song 0 keeps its profile and overrides; the Mix plays each saved song with its resolved profile; verify `node --no-warnings tools/check-radio.cjs` (continue in radio) and `node tools/check-playlists.cjs` (Mix of a Live coder and a Classic song)
-- [ ] 6.2 Session items record `shapes` and `growth` versions when they hold a grown song, warn when any differs; Freeze stores grown builds marked as grown; verify `npm run check:playlists` and `node tools/check-playlists.cjs`
+- [x] 6.1 Song 0 keeps its profile and overrides; the Mix plays each saved song with its resolved profile; verify `node --no-warnings tools/check-radio.cjs` (continue in radio) and `node tools/check-playlists.cjs` (Mix of a Live coder and a Classic song)
+- [x] 6.2 Session items record `shapes` and `growth` versions when they hold a grown song, warn when any differs; Freeze stores grown builds marked as grown; verify `npm run check:playlists` and `node tools/check-playlists.cjs`
 
 ## 7. Exports
 
