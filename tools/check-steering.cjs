@@ -1,6 +1,7 @@
 // Browser checks for radio steering (#24): console commands queue and apply at their bar, cancel, the energy
 // curve drag, the mixer, the scope switch, shortcuts, length commands and replay with steering; Vary and Swap with the
-// part picker, and the material source next to the knobs (radio-variation).
+// part picker, and the material source next to the knobs (radio-variation); commands as waypoints on a Live coder song
+// (radio-profiles stage 5).
 // Usage: PLAYWRIGHT_CORE=... node tools/check-steering.cjs [shots-dir]   (dev server on :5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -269,6 +270,81 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const re = await page.evaluate(() => { const s = globalThis.codingMiskRadio.state; return s.stream.slice(0, s.onAir + 1).map((x, i) => [x.id, x.profile, i === s.onAir ? x.bars : 0, x.shape && x.shape.opening]); });
     check(JSON.stringify(re) === JSON.stringify(r.stream.slice(0, r.onAir + 1).map((x, i) => [x.id, x.profile, i === r.onAir ? x.bars : 0, x.shape && x.shape.opening])), 'replay gives the same profiles and grown songs', JSON.stringify(re));
     check(!(await err()), 'no evaluation error with the grown songs');
+    await page.selectOption('#radio-profile', 'artist'); await sleep(200);
+  }
+
+  // commands as waypoints on a Live coder song (radio-profiles stage 5): the boundary leaves time to type, the steps
+  // before it stay, the moves are the listener's, mute is typed as "_$:", a volume as ".gain()" on the line, Vary as
+  // notes edits, End takes the lines out one at a time, and a replay gives the same song
+  await page.click('#radio-start'); await sleep(300);
+  await page.selectOption('#radio-profile', 'switch'); await sleep(200);
+  await page.fill('#radio-seed', 'steer-air'); await page.click('#radio-start'); await sleep(3000);
+  {
+    const AIR = () => page.evaluate(() => { const r = globalThis.codingMiskRadio, s = r.steering, st = r.state; if (!s || !st) return null; const it = st.stream[st.onAir]; return { n: s.n, commands: s.commands, song: s.song, grown: it.grown, growing: it.growing, start: it.start, bars: it.bars, stream: st.stream.map(x => ({ start: x.start, bars: x.bars })) }; });
+    const settled = async () => { let x = null; for (let k = 0; k < 80; k++) { x = await AIR(); if (x && !x.growing && x.commands.every(c => !c.pend)) return x; await sleep(250); } return x; };
+    const code = () => page.evaluate(() => document.querySelector('strudel-editor').editor.code);
+    const mineOf = (song, from) => song.build.filter(x => x.by === 'listener' && x.at >= from);
+    const pastOf = (song, B) => JSON.stringify(song.build.filter(x => x.at < B));
+    const lastWp = song => ((song.onAir && song.onAir.waypoints) || []).slice(-1)[0];
+    const seekTo = async b => { await page.evaluate(x => globalThis.codingMiskRadio.seek(x), b); await sleep(700); };
+    const waitCode = async (bar, test) => { for (let k = 0; k < 60 && (await now()) < bar + 0.2; k++) await sleep(150); for (let k = 0; k < 20; k++) { if (test(await code())) return true; await sleep(150); } return false; };
+    let a = await settled();
+    check(a && a.grown && a.song.onAir && a.song.crescendo, 'a Live coder song grows on air', JSON.stringify(a && { grown: a.grown }));
+    if (a && a.song.crescendo) {
+      const G = a.song.crescendo.growth, total = a.song.sections.reduce((x, y) => x + y.bars, 0);
+      await seekTo(G + Math.floor((total - G) * 0.12));
+      // energy up: the boundary is a phrase of the plan, later than the bar it came; the steps before it stay
+      const before = a.song;
+      await page.click('[data-cmd="energy-up"]'); await sleep(300);
+      a = await settled();
+      const c = a.commands[a.commands.length - 1], wp = lastWp(a.song);
+      check(c && c.kind === 'energy-up' && c.at > c.q && wp && wp.at === c.at && wp.to > c.at, 'energy up on a grown song: a waypoint from its boundary', JSON.stringify({ c, wp }));
+      { const x = before.build.filter(k => k.at < c.at), y = a.song.build.filter(k => k.at < c.at), i = x.findIndex((k, j) => JSON.stringify(k) !== JSON.stringify(y[j]));
+        check(pastOf(a.song, c.at) === pastOf(before, c.at), 'the steps before the boundary stay', i < 0 ? `${x.length} / ${y.length}` : `${JSON.stringify(x[i])} / ${JSON.stringify(y[i])}`); }
+      check(mineOf(a.song, 0).every(x => x.at >= c.at && x.at < wp.to), 'the moves are the listener\'s, between the boundary and the arrival', JSON.stringify(mineOf(a.song, 0).map(x => x.at)));
+      check((await page.innerText('#radio-steer .steer-queue')).includes(String(c.at + 1)), 'the queue shows the boundary the typing needs', await page.innerText('#radio-steer .steer-queue'));
+      if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'air-queue.png') });
+      // Vary: the new part reached by notes edits of the line
+      await seekTo(wp.to + 1);
+      let varied = null;
+      for (const p of ['bass', 'lead', 'pad', 'arp']) { if (await page.evaluate(type => globalThis.codingMiskRadio.command({ kind: 'vary', type }), p)) { varied = p; break; } }
+      a = await settled();
+      const vc = a.commands.find(x => x.kind === 'vary'), vwp = lastWp(a.song);
+      const edits = vc ? a.song.build.filter(x => x.by === 'listener' && x.notes && x.at >= vc.at && x.at < vwp.to) : [];
+      check(!!varied && edits.length >= 1, 'Vary on a grown song: notes edits of the line', JSON.stringify({ varied, edits: edits.map(x => x.at), vc }));
+      check(!(await err()), 'no evaluation error after Vary', (await err()).slice(0, 120));
+      // End: the lines go one at a time, the song still ends with its outro, the next song follows it
+      const b0 = a.bars, n0 = a.n;
+      await page.click('[data-cmd="end"]'); await sleep(300);
+      a = await settled();
+      const ec = a.commands.find(x => x.kind === 'end'), ewp = lastWp(a.song), gone = ec ? a.song.build.filter(x => x.by === 'listener' && x.at >= ec.at && (x.remove !== undefined || x.mute !== undefined)) : [];
+      check(a.n === n0 && ec && ewp && ewp.kind === 'end' && a.bars <= b0 && a.song.sections.reduce((x, y) => x + y.bars, 0) > ewp.to, 'End on a grown song: a last waypoint before the outro, no cut', JSON.stringify({ ec, ewp, b0, bars: a.bars }));
+      check(new Set(gone.map(x => x.at)).size === gone.length, 'End takes the lines out one at a time', JSON.stringify(gone.map(x => x.at)));
+      check(a.stream.length < 2 || a.stream[1].start === a.stream[0].start + a.stream[0].bars, 'the next song follows the steered song', JSON.stringify(a.stream));
+      if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'air-end.png') });
+      // mute and volume on the next bars: typed in the code
+      const at = Math.floor(await now()) + 2;
+      const on = a.song.tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken' && !t.mute && t.clips.some(k => k.start <= at && at < k.start + k.bars));
+      const t1 = (on.find(t => t.type !== 'drums') || on[0] || {}).id, t2 = (on.find(t => t.id !== t1) || {}).id;
+      const nameOf = id => { const t = a.song.tracks.find(x => x.id === id); return (t && (t.name || t.id)) || id; };
+      // the lines of a track's block in the code shown (its header holds its name)
+      const block = (cd, id) => { const ls = cd.split('\n'), i = ls.findIndex(l => l.startsWith('// ==========') && l.includes(` ${nameOf(id)} `)); if (i < 0) return []; const j = ls.findIndex((l, k) => k > i && l.startsWith('// ==========')); return ls.slice(i + 1, j < 0 ? undefined : j); };
+      if (t1) await page.evaluate(track => globalThis.codingMiskRadio.command({ kind: 'volume', track, value: 0.3 }), t1);
+      if (t2) await page.evaluate(track => globalThis.codingMiskRadio.command({ kind: 'mute', track }), t2);
+      await sleep(300);
+      a = await settled();
+      const m = t2 && a.song.build.find(x => x.by === 'listener' && x.mute === t2), v = t1 && a.song.build.find(x => x.by === 'listener' && x.set && x.set.track === t1 && x.set.gain === 0.3);
+      check(!!m && !!v, 'mute and volume on a grown song: steps on the lines', JSON.stringify(mineOf(a.song, 0).slice(-5)));
+      if (v) { await seekTo(v.at - 1); check(await waitCode(v.at, cd => block(cd, t1).some(l => l.includes('.gain(0.3)'))), 'the volume shows as .gain(0.3) on the line', block(await code(), t1).join(' | ').slice(0, 200)); }
+      if (m) { await seekTo(m.at - 1); check(await waitCode(m.at, cd => block(cd, t2).some(l => /^_\$:/.test(l))), 'the muted line shows "_$:"', block(await code(), t2).join(' | ').slice(0, 200)); }
+      check(!(await err()), 'no evaluation error after the mixer commands', (await err()).slice(0, 120));
+      // replay: the same commands give the same song
+      const heard = JSON.stringify(a.song.build), kinds = a.commands.map(x => x.kind).join();
+      await page.click('#radio-replay'); await sleep(3000);
+      const r = await settled();
+      check(r && r.n === n0 && r.commands.map(x => x.kind).join() === kinds && JSON.stringify(r.song.build) === heard, 'replay gives the same waypoints', r && `${r.n} ${r.commands.map(x => x.kind).join()} / ${kinds}`);
+      check(!(await err()), 'no evaluation error with commands as waypoints', (await err()).slice(0, 120));
+    }
     await page.selectOption('#radio-profile', 'artist'); await sleep(200);
   }
 

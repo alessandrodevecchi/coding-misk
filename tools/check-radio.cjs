@@ -197,7 +197,8 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     r = await R();
     const s0 = r.state.stream[0];
     check(s0.profile === 'switch' && s0.grown && s0.shape && s0.show === 'air', 'Live coder session: the first song grows as Live coder', JSON.stringify({ profile: s0.profile, grown: s0.grown, shape: s0.shape }));
-    check(r.state.recipe.growth === 1 && r.state.recipe.options.profile === 'switch', 'the recipe records the growth marker and the profile');
+    // (growth marker 2 since commands on grown songs are waypoints, radio-profiles stage 5)
+    check(r.state.recipe.growth === 2 && r.state.recipe.options.profile === 'switch', 'the recipe records the growth marker and the profile');
     const pl = await page.innerText('.radio-profile-now');
     check(/^Live coder · .+ · .+ · .+$/.test(pl.trim()), 'now playing shows the profile and the growth shape', pl);
     let e = await ed();

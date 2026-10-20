@@ -44,7 +44,9 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const compileAt = (song, bar, hide) => gen(now ? compileNow(song, bar, { prepare: !inPlace && bar >= prepFrom(boundary(bar)), shownMuted: played(bar), keepHeaders: entered(bar), inPlace, hidden: hide }) : compile(song));
   // technical functions (code-writing, song-functions): the written levels, the buses and the song's functions come
   // from the song as written
-  const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => o[k]), ref = any ? compileSong({ ...build, build: undefined }) : '';
+  // (a radio song steered on air, radio-profiles D9, keeps the song before its commands as its reference: `codeRef`,
+  // so the code already shown keeps its functions)
+  const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => o[k]), ref = any ? compileSong({ ...(build.codeRef || build), build: undefined, codeRef: undefined }) : '';
   const written = levelsOf(ref), buses = busesOf(ref), table = new Map(), hidden = new Map(), fns = {};
   // in place: the lanes of each code shown (by its text without the tempo, which the player rewrites), and of each
   // line, for code edited by hand

@@ -34,11 +34,11 @@ Each stage ends with its checks green before the next starts. "Verify" names the
 
 ## 5. Commands as waypoints
 
-- [ ] 5.1 Steering on grown songs (D9): past steps kept, a new growth from `stateAt(grown, bar)` to the steered song, `coderPath` with a given start and destination; verify in `check:radio-profiles` that steps before the boundary never change, cancel and replay give the same steps
-- [ ] 5.2 Boundary that waits for typing, queue bar, `late` when nothing fits; verify in `check:radio-profiles` and `node tools/check-steering.cjs`
-- [ ] 5.3 Energy, sound, arrangement, curve, Extend and End as waypoints; mute as `_$:`, volume on the line; verify `check:radio-profiles` and `node tools/check-steering.cjs` on a Live coder song
-- [ ] 5.4 Vary and Swap typed as small notes edits; verify `node tools/check-steering.cjs` on a Live coder song, then tick `radio-variation` task 5.1
-- [ ] 5.5 Chooser on air (D10): listener moves first, lanes toward the coming targets; verify a case in `check:radio-profiles` where a curve point is reached sooner than with the default chooser
+- [x] 5.1 Steering on grown songs (D9): past steps kept, a new growth from `stateAt(grown, bar)` to the steered song, `coderPath` with a given start and destination; verify in `check:radio-profiles` that steps before the boundary never change, cancel and replay give the same steps
+- [x] 5.2 Boundary that waits for typing, queue bar, `late` when nothing fits; verify in `check:radio-profiles` and `node tools/check-steering.cjs`
+- [x] 5.3 Energy, sound, arrangement, curve, Extend and End as waypoints; mute as `_$:`, volume on the line; verify `check:radio-profiles` and `node tools/check-steering.cjs` on a Live coder song
+- [x] 5.4 Vary and Swap typed as small notes edits; verify `node tools/check-steering.cjs` on a Live coder song, then tick `radio-variation` task 5.1
+- [x] 5.5 Chooser on air (D10): listener moves first, lanes toward the coming targets; verify a case in `check:radio-profiles` where a curve point is reached sooner than with the default chooser
 
 ## 6. Saved songs, playlists and versions
 

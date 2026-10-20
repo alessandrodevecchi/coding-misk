@@ -65,11 +65,11 @@ A new console command that rewrites the song on air ([radio-commands.md](radio-c
 
 **Steps:**
 1. Add the command with its group; `structural` applies on a double phrase, `bar` on the next bar, else the next phrase.
-2. Write the rewrite as steps added to the song from the boundary. Draw randomness from a stream named after the command and the song (`vary:<song>:<index>`), so replay and cancel give the same song.
+2. Write the rewrite as steps added to the song from the boundary. Draw randomness from a stream named after the command and the song (`vary:<song>:<index>`), so replay and cancel give the same song. On a grown song the command becomes a waypoint by itself (`src/endless/waypoints.js` types the moves from the code on air to the rewrite); add a rule there only when the moves must be typed in another way (as mute types `_$:`).
 3. Give `whyNot` a reason when it cannot apply (`not-playing`, `locked`).
 4. Add the button, a key, a drawn icon, the texts and the Guide line.
 
-**Checks:** `npm run check:endless`, `npm run check:guide`, `node tools/check-steering.cjs`, `node tools/check-radio.cjs`, `node tools/check-transitions.cjs` (dev server).
+**Checks:** `npm run check:endless`, `npm run check:radio-profiles` (the command on grown songs: past kept, typing, arrival), `npm run check:guide`, `node tools/check-steering.cjs`, `node tools/check-radio.cjs`, `node tools/check-transitions.cjs` (dev server).
 
 **Mistakes:** a command that changes songs without commands (fixtures move); sessions saved with the command that now sound different without a `DIRECTOR_VERSION` bump; emoji icons.
 
@@ -100,7 +100,7 @@ A new console command that rewrites the song on air ([radio-commands.md](radio-c
 
 Any change to how radio songs are written.
 
-**Files:** `src/endless/director.js` (`DIRECTOR_VERSION`), `tests/snapshots/endless.json` (seed fixtures), `tests/snapshots/radio-growth.json` (radio items, Classic and grown), `src/endless/profile.js` and `src/endless/growth.js` (profiles and growth on air).
+**Files:** `src/endless/director.js` (`DIRECTOR_VERSION`), `tests/snapshots/endless.json` (seed fixtures), `tests/snapshots/radio-growth.json` (radio items, Classic and grown), `src/endless/profile.js` and `src/endless/growth.js` (profiles and growth on air), `src/endless/waypoints.js` (commands on grown songs), `src/endless/items.js` (`GROWTH_ON_AIR`).
 
 **Steps:**
 1. Run `npm run check:endless` before and after.

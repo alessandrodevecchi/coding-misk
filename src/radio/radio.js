@@ -9,7 +9,8 @@ import { overlapOf, extraOf } from '../endless/transitions.js';
 import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, VARY_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
-import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir } from '../endless/items.js';
+import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir } from '../endless/items.js';
+import { steerOnAir, airBoundaries, airOffset, directorView } from '../endless/waypoints.js';
 import { PROFILE_CHOICES, RADIO_CHOICES, CUSTOM_DEFAULT, customControls, profileOptions } from '../endless/profile.js';
 import { growOnAir, airControls } from '../endless/growth.js';
 import { resolveProfile, CONTROLS } from '../live/profiles.js';
@@ -172,15 +173,42 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   let shapeCache = null;
   const shapeStyles = () => shapeCache || (shapeCache = Object.fromEntries(recipes.map(r => [r.id, r])));
   // an item's song grown from `song` (its director song, or the song as steered); a newer growth of the same item wins
+  // (the growth of the director's song is kept as `g0`: commands on it are its waypoints, radio-profiles D9)
   function grow(item, song, { async = false } = {}) {
     const token = item.growToken = (item.growToken || 0) + 1, ctx = item.growCtx;
-    const done = g => { if (item.growToken !== token) return; delete item.growing; setSong(item, g); };
-    if (!async || !player.grow) { done(growOnAir(song, ctx)); return; }
-    item.growing = player.grow(song, ctx).then(done, () => done(growOnAir(song, ctx)));
-    item.growFrom = song;
+    const done = g => { if (item.growToken !== token) return; delete item.growing; delete item.finish; if (song === item.base.song) item.g0 = g; setSong(item, g); };
+    // (here and now: the song goes on air; the worker's answer, later, is left out)
+    item.finish = () => { done(growOnAir(song, ctx)); item.growToken++; };
+    if (!async || !player.grow) { item.finish(); return; }
+    item.growing = player.grow(song, ctx).then(done, () => { if (item.growToken === token) item.finish(); });
   }
-  // a song still growing away from the page when it is needed now: it grows here
-  function growNow(item) { if (item && item.growing) grow(item, item.growFrom); }
+  // a song still growing (or being steered) away from the page when it is needed now: it is done here
+  function growNow(item) { if (item && item.growing && item.finish) item.finish(); }
+  // commands as waypoints (radio-profiles D9): a grown song of a recipe with the growth marker 2 or more
+  const airSteer = item => !!(item && item.growCtx && S && waypointsOnAir(S.recipe));
+  // the director's view of a steered grown song (plan, options, the song as steered): the console and Save read it
+  function airView(item) {
+    const r = directorView({ song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands, seed: S.recipe.seed, n: item.n, grown: item.g0 });
+    item.plan = r.plan; item.opts = r.opts; item.plain = r.song;
+  }
+  // the commands as the steering placed them: each pending one gets the boundary that leaves time for its typing (the
+  // queue and the recipe show it); one no boundary was left for is dropped
+  function airSettle(item, resolved) {
+    const byId = new Map(resolved.map(c => [c.id, c]));
+    item.commands = item.commands.flatMap(c => { const r = byId.get(c.id); if (!r) return c.pend ? [] : [c]; const { pend, ...x } = { ...c, ...r }; return [x]; });
+    S.recipe.steering = (S.recipe.steering || []).flatMap(x => { if (x.song !== item.n) return [x]; const c = item.commands.find(y => y.id === x.id); return c ? [{ song: item.n, ...c }] : x.pend ? [] : [x]; });
+  }
+  // a grown song steered with waypoints, away from the page when async (the worker grows it first when needed)
+  function steerAir(item, { async = false, then = null } = {}) {
+    const token = item.growToken = (item.growToken || 0) + 1;
+    if (item.g0) airView(item);
+    const args = { grown: item.g0 || null, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, ctx: item.growCtx };
+    const done = r => { if (item.growToken !== token || !S) return; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); airView(item); setSong(item, r.song); };
+    item.finish = () => { done(steerOnAir(args)); item.growToken++; };
+    if (!async || !player.steer) { item.finish(); return; }
+    item.growing = player.steer(args).then(done, () => { if (item.growToken === token) item.finish(); });
+    if (then) item.growing.then(() => { if (S && S.stream.includes(item)) then(); });
+  }
   // the song an item plays; its bars move the songs after it
   function setSong(item, song) {
     item.song = song; item.curves = null;
@@ -370,9 +398,10 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
 
   // ---------- steering (#24) ----------
   // the song of an item rebuilt from its original plus every command still standing
-  // (a grown song grows again from the song as steered, away from the page when async: the window swaps when it is
-  // ready; steering a grown song with waypoints that keep its past is radio-profiles D9, stage 5)
+  // (a grown song of a recipe from stage 4, growth marker 1, grows again from the song as steered, away from the page
+  // when async: the window swaps when it is ready; since stage 5 a grown song's commands are waypoints, steerAir)
   function resteer(item, { async = false, then = null } = {}) {
+    if (airSteer(item)) return steerAir(item, { async, then });
     const r = steerSong({ ...item.base, commands: item.commands, seed: S.recipe.seed, n: item.n });
     item.plan = r.plan; item.opts = r.opts; item.plain = r.song;
     if (!item.growCtx) { setSong(item, r.song); return; }
@@ -392,14 +421,24 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (!S || S.paused !== undefined) return false;
     const item = S.stream[S.onAir], rel = relNow();
     if (!item.plan) { toast(t(item.frozen ? 'steerWhy:frozen' : 'steerWhy:lead')); return false; }
-    const at = applyBar(c.kind, rel, item.plan);
-    if (at <= rel || at >= barsOf(item.song) || (c.kind === 'extend' && whyNot(c, item.song, item.plan, rel, tailOf(item)))) { toast(t('steerLate')); return false; }
-    const cmd = { ...c, at, id: ++cmdN };
+    // a grown song (radio-profiles D9): the first boundary of the waypoint, in the grown song's bars; the steering
+    // moves it to the phrase after when its edit cannot be typed in time (pend, with the bar it came: q)
+    const air = airSteer(item) && item.g0, off = air ? airOffset(item.g0) : 0;
+    let at;
+    if (air) {
+      const cands = airBoundaries(c.kind, rel, item.plan, item.g0);
+      if (!cands.length || (c.kind === 'extend' && whyNot(c, item.plain || item.base.song, item.plan, rel - off, tailOf(item)))) { toast(t('steerLate')); return false; }
+      at = cands[0];
+    } else {
+      at = applyBar(c.kind, rel, item.plan);
+      if (at <= rel || at >= barsOf(item.song) || (c.kind === 'extend' && whyNot(c, item.song, item.plan, rel, tailOf(item)))) { toast(t('steerLate')); return false; }
+    }
+    const cmd = { ...c, at, id: ++cmdN, ...(air ? { at0: at, q: Math.round(rel * 100) / 100, pend: true } : {}) };
     // an extension remembers where its part goes, so cancelling it also drops the curve edits made on later parts
-    if (c.kind === 'extend') { cmd.ins = extendIndex(item.plan, Math.ceil(at / item.plan.phrase) >> 1); cmd.s = Math.round(extendSeconds(item.plan)); }
+    if (c.kind === 'extend') { cmd.ins = extendIndex(item.plan, Math.ceil((at - off) / item.plan.phrase) >> 1); cmd.s = Math.round(extendSeconds(item.plan)); }
     // a later command of the same kind on the same track (or curve part) replaces a pending one
     // (two Vary or two Swap of the same part for the same boundary count as one)
-    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && (['volume', 'curve', 'curve-reset', 'instrument'].includes(x.kind) || (['vary', 'swap'].includes(x.kind) && x.type === cmd.type && x.at === cmd.at));
+    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && (['volume', 'curve', 'curve-reset', 'instrument'].includes(x.kind) || (['vary', 'swap'].includes(x.kind) && x.type === cmd.type && (x.at0 ?? x.at) === (cmd.at0 ?? cmd.at)));
     item.commands = item.commands.filter(x => !same(x));
     item.commands.push(cmd);
     S.recipe.steering = [...(S.recipe.steering || []).filter(x => !(x.song === item.n && same(x))), { song: item.n, ...cmd }];
@@ -497,7 +536,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   let detailsOpen = !!store.get('coding-misk-radio-details', false), hoverD = null;
   const curveData = item => {
     const P = item.plan, max = densityMax(P);
-    if (!item.curves) item.curves = songCurves(item.song, P, item.opts || item.base.opts);
+    // (a grown song: measured on the song as the director wrote it, in the plan's bars)
+    if (!item.curves) item.curves = songCurves(item.song && item.song.onAir ? item.plain || item.base.song : item.song, P, item.opts || item.base.opts);
     const C = item.curves, val = (d, c) => C[d].set[c] ?? C[d].measured[c];
     const charge = P.plan.map((d, i) => d.role !== 'drop' && (P.plan[i + 1] || {}).role === 'drop' && (C[i].set.tension ?? 0) >= 0.7);
     return { P, C, max, val, charge };
@@ -588,14 +628,16 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const ph = item.plan.phrase;
     const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel);
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => c.id).join(), (item.plan.locked || []).join(), S.paused !== undefined, opts.scope, varyPart].join('|');
+    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), (item.plan.locked || []).join(), S.paused !== undefined, opts.scope, varyPart].join('|');
     if (!force && key === steerKey) return;
     steerKey = key;
     const tip = k => `title="${esc(t(k))}"`;
+    const air = airSteer(item) && item.g0, airOff = air ? airOffset(item.g0) : 0;
     // a disabled button says why in its tooltip ("this song has no pad")
     const btn = (c, label) => {
       const part = ['vary', 'swap'].includes(c.kind);
-      const why = S.paused !== undefined ? 'paused' : whyNot(c, item.song, item.plan, rel, tailOf(item), item.opts || (item.base && item.base.opts) || {}), k = c.type && !part ? TYPE_KEYS[c.type] : KEYS_OF[c.kind];
+      // (a grown song: the director's view in its own bars, late when no boundary is left, radio-profiles D9)
+      const why = S.paused !== undefined ? 'paused' : air && !airBoundaries(c.kind, rel, item.plan, item.g0).length ? 'late' : whyNot(c, air ? item.plain || item.base.song : item.song, item.plan, rel - airOff, tailOf(item), item.opts || (item.base && item.base.opts) || {}), k = c.type && !part ? TYPE_KEYS[c.type] : KEYS_OF[c.kind];
       const tipText = `${t(`steerTip:${c.kind}`, { ...(c.vars || {}), ...(part ? { type: t(`steerType:${c.type}`) } : {}) })}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
       // Vary and Swap carry their part in data-part (data-type is the Add and Remove buttons' shortcut target)
       return `<button class="btn steer-btn${c.icon ? ' with-ico' : ''}" data-cmd="${c.kind}"${c.type ? ` data-${part ? 'part' : 'type'}="${c.type}"` : ''} ${why ? 'disabled' : ''} title="${esc(tipText)}"${why ? ` data-why="${why}"` : ''}>${c.icon || ''}${esc(label || t(`steer:${c.kind}`))}</button>`;

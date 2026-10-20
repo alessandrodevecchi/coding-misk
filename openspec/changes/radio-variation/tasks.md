@@ -23,7 +23,7 @@
 
 ## 5. Integration and listening test
 
-- [ ] 5.1 With `radio-profiles` and `growth-shapes` in place, a vary on air is typed as small notes edits; verify with `node tools/check-steering.cjs` on a Live coder song (skip and say so while `radio-profiles` is on hold) — open: `radio-profiles` is on hold, so the radio still builds in blocks and a vary switches the part in one step (2026-10-19)
+- [x] 5.1 With `radio-profiles` and `growth-shapes` in place, a vary on air is typed as small notes edits; verify with `node tools/check-steering.cjs` on a Live coder song (skip and say so while `radio-profiles` is on hold) — done with `radio-profiles` stage 5 (2026-10-20): on a grown song Vary and Swap reach the new part by `notes` edits of the line (`ideaSteps` in `src/endless/waypoints.js`), checked by `npm run check:radio-profiles` and `node tools/check-steering.cjs`; a Classic song still switches the part in one step
 - [ ] 5.2 Owner's listening test (`docs/VARIETY.md`): a radio session steered by the owner, with Vary on each part; notes in `DEVLOG.md`
 
 ## 6. Material source

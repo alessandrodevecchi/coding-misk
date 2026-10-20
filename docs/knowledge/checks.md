@@ -19,7 +19,7 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 | The compiler, presets, ideas, `src/music.js` | `check:code`, `check:songs`, `check:ideas`, `check:patterns`, `check:crescendo`, `check:live-code` | `check-ideas.cjs`, `check-compact-code.cjs`, `snapshot-levels.cjs check` |
 | A style or an artist | `check:styles`, `check:endless`, `check:random` | `check-style-sounds.cjs`, `check-endless-play.cjs`, `check-library.cjs` |
 | The director, steering, transitions | `check:endless`, `check:compilation` | `check-radio.cjs`, `check-steering.cjs`, `check-transitions.cjs` |
-| Profiles and growth on air, the code on air (`src/endless/growth.js`, `src/endless/items.js`, `src/live/air-code.js`) | `check:radio-profiles`, `check:endless`, `check:live-code` | `check-radio.cjs`, `check-compact-code.cjs` (radio window), `check-transitions.cjs` (Live coder runs), `check-steering.cjs` |
+| Profiles and growth on air, the code on air, commands as waypoints (`src/endless/growth.js`, `src/endless/items.js`, `src/endless/waypoints.js`, `src/live/air-code.js`) | `check:radio-profiles`, `check:endless`, `check:live-code` | `check-radio.cjs`, `check-compact-code.cjs` (radio window), `check-transitions.cjs` (Live coder runs), `check-steering.cjs` (Live coder steering at its end) |
 | The material generator | `check:material`, `check:endless`, `check:patterns` | `check-patterns.cjs` |
 | Growth shapes, Crescendo, profiles, typing | `check:crescendo`, `check:profiles`, `check:live-code`, `check:typing`, `check:functions` | `check-crescendo-play.cjs`, `check-hand.cjs` |
 | App functions, the writer | `check:functions`, `check:strudel`, `check:live-code` | `check-compact-code.cjs` |

@@ -155,6 +155,21 @@ export function coderPath(dest, plans, rng, { detours = DETOURS, chooser = choos
   return { path, waypoints: K };
 }
 
+// The coder's path with a given start and destination (radio-profiles D9: a command on a grown radio song): the caller
+// builds one lane per track from the code on air to the next waypoint (a line in or out, notes, knobs, functions), and
+// the moves come in the chooser's order, as between two waypoints of coderPath. lanes: [{ kind, track, units }]
+// → [{ ...unit, track }]
+export function waypointPath(lanes, rng, { chooser = choose } = {}) {
+  const ls = lanes.map(l => ({ ...l, units: l.units.slice() })), path = [];
+  let last = null, guard = 0;
+  while (ls.some(l => l.units.length) && guard++ < 10000) {
+    const li = chooser(ls, { last, waypoint: 1 }, rng), u = ls[li].units.shift();
+    path.push({ ...u, track: ls[li].track });
+    last = ls[li].track;
+  }
+  return path;
+}
+
 // one detour on the state as it is: a function commented out, notes rewritten, or a track muted; with its undo. Tracks
 // that came in on the way to the last waypoint or this one are left alone (fresh)
 function drawDetour(state, anchor, fresh, rng, { moves = false, noBreaks = false } = {}) {

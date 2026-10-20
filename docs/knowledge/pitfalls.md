@@ -42,6 +42,8 @@ Mistakes that cost time before. Each line says what goes wrong and what to do. T
 - **The Strudel catalog.** Any change to code the catalog reads makes `npm run check:knowledge` fail until `npm run catalog:strudel` runs again (several minutes).
 - **Window steps name their tracks.** `windowSong` prefixes every track a step names (`s3-bass`): add, remove, set, pattern, rack, and the grown songs' mute, solo, hide, reveal, comment, notes, variant, mask and clone. A new step field that names a track must be added there and in `stepRefs` (`src/live/air-code.js`), or it silently does nothing on air.
 - **Old recipes replay in blocks.** A recipe without `growth: 1` must never grow its songs (`growsOnAir`); it was heard in blocks. Do not drop the marker from new recipes.
+- **Commands on a grown song keep its past.** `steerOnAir` copies the steps before the boundary verbatim and adds moves only from it; a track that came in by a step keeps an `add` (stateAt mutes every track an `add` names before its step), or it would play in the past. Commands record their boundary in the grown song's bars; the director's rewrite gets `at - airOffset`.
+- **The code of the moment lists a section's later lines.** In the Live coder view a section shows every clip line it holds, with lanes; a guitar line gated with `postgain` shows every clip of its track. A command that rewrites the future changes those lines, never the sound or the steps before its boundary.
 - **Two songs in one code.** Code that sits next to the song on air must not redeclare its constants, share its orbits or solo against it: use `apart()` in `src/live/air-code.js`.
 
 ## Browser checks

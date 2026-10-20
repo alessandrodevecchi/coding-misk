@@ -1,8 +1,8 @@
 ---
 id: radio-commands
 related: [radio, material, patterns, narrator, decisions]
-code: [src/endless/steering.js, src/endless/material.js, src/radio/radio.js, src/guide.js]
-checks: [npm run check:endless, npm run check:guide, node --no-warnings tools/check-steering.cjs]
+code: [src/endless/steering.js, src/endless/waypoints.js, src/endless/material.js, src/radio/radio.js, src/guide.js]
+checks: [npm run check:endless, npm run check:radio-profiles, npm run check:guide, node --no-warnings tools/check-steering.cjs]
 ---
 
 # Radio commands
@@ -12,6 +12,15 @@ checks: [npm run check:endless, npm run check:guide, node --no-warnings tools/ch
 The console in the Radio tab steers the song on air. Each button queues a command. A command applies on a boundary: the next bar, the next phrase or the next double phrase. Until then it can be cancelled.
 
 A command rewrites the song from its boundary. The steps before it stay. The rest is written again by the director with the listener's moves first, marked `by: "listener"`.
+
+**On a grown song (Crescendo or Live coder, radio-profiles stage 5).** A command is the next waypoint of the growth (`steerOnAir` in `src/endless/waypoints.js`). The steps and the sound before its boundary stay as they were. From the boundary, small typed moves lead from the code on air to the song as the director rewrites it: a line in (`add`, or `unmute` of a muted line) or out (`remove`), a growth level on its way down, the notes a few at a time (`notes` steps), a knob in one or two turns (`set`), a function revealed or uncommented, a device. The moves are the listener's (`by: "listener"`), the tracks the command changed come first. They end at the arrival, a phrase boundary of the written form; from there the steered written form plays as written. Classic songs keep the one-step rewrites.
+
+- **Boundary.** The first boundary (the next phrase, or the one after; the next double phrase for structural commands; the next bars for the mixer) that leaves time to type the first edit at a person's pace, measured with the typing of the app. The queue shows that bar: the console queues the first boundary, the steering (in the growth worker) moves it when the edit needs more time. No boundary left: `late`. Each later move gets the bars its typing needs; near the end of the song the moves are fewer and larger, and the typing pastes as the paste rule allows.
+- **Bars.** A command records its boundary in the grown song's bars; the director's rewrite gets it in its own bars (`airOffset`: the growth's bars minus the written bars it replaced).
+- **Mixer.** Mute types the `_` of `_$:` (a `mute` step), unmute takes it away; a volume is a `set` of `gain`, shown as `.gain()` on the line; lock changes no code.
+- **Vary and Swap.** The new part is reached by small `notes` edits of the line (`ideaSteps`: the tokens of the idea change a few at a time, a field of another shape in one edit), the last edit the new idea. A part that differs a lot is one edit, a new line typed or pasted.
+- **End.** The last waypoint is the song's ending: the lines go one at a time (at least a bar apart) during the outro's first phrase, then the last phrase plays as written and the transition follows. Not a cut.
+- **Replay and cancel.** A song is always rebuilt from its growth and every standing command, in order, with the recorded boundaries; cancelling a command gives back the song without it. A recipe of growth version 1 (stage 4) replays its steered songs grown again from the steered song, as heard then.
 
 ## How it connects
 
@@ -67,7 +76,7 @@ Commands without a help text in the app:
 - `unmute`: a muted track plays again from the next bar.
 - `unlock`: the director may change the track again.
 
-Vary and Swap take a part: lead (the default), bass, arp or pad. For Vary the lead is the hook, else the guitar.
+Vary and Swap take a part: lead (the default), bass, arp or pad. For Vary the lead is the hook, else the guitar. On a grown song both are typed as small notes edits of the line (see What it is).
 
 ## Example
 
@@ -104,3 +113,4 @@ $: note("<a1 g1 f1 g1>").transpose(-2).struct("[~ x x x]*4").transpose("[0 0 12 
 - [docs/ENDLESS.md](../ENDLESS.md#steering): the table of commands and what each changes, [composed material](../ENDLESS.md#composed-material), [curves](../ENDLESS.md#curves).
 - `COMMANDS`, `whyNot`, `steerSong` in `src/endless/steering.js`.
 - [openspec/changes/radio-variation/](../../openspec/changes/radio-variation/): Vary and Swap.
+- [openspec/changes/radio-profiles/design.md](../../openspec/changes/radio-profiles/design.md) D9, D10: commands as waypoints on grown songs, the chooser on air.

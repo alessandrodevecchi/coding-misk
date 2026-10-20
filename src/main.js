@@ -10,6 +10,7 @@ import { crescendoSong, waypointSong } from './song/crescendo.js';
 import { setSpokenContext, spokenContext, placeSpoken, WAYS } from './song/spoken.js';
 import { airCode } from './live/air-code.js';
 import { growOnAir } from './endless/growth.js';
+import { steerOnAir } from './endless/waypoints.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, migrateGrowth, PROFILE_STORE_VERSION, migrateOld } from './live/profiles.js';
 import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay } from './song/shapes.js';
@@ -173,17 +174,18 @@ function radioPlayable(W, songs = null) {
 // the worker gets the voice instrument's context and the language of the page, so a song grows there as it would here
 let growWorker = null, growN = 0;
 const growWaits = new Map();
-function growAway(song, ctx) {
-  const here = () => Promise.resolve().then(() => growOnAir(song, ctx));
+// (steering a grown song, radio-profiles stage 5: the commands as waypoints are worked out there too)
+function growAway(song, ctx, steer = null) {
+  const here = () => Promise.resolve().then(() => (steer ? (({ song: s, grown, commands }) => ({ song: s, grown, commands }))(steerOnAir(steer)) : growOnAir(song, ctx)));
   try {
     if (!growWorker) {
       growWorker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
-      growWorker.onmessage = e => { const w = growWaits.get(e.data && e.data.id); if (!w) return; growWaits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.song); };
+      growWorker.onmessage = e => { const w = growWaits.get(e.data && e.data.id); if (!w) return; growWaits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.song); };
       growWorker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of growWaits.values()) w.reject(new Error('worker')); growWaits.clear(); growWorker = false; };
     }
     if (growWorker === false) return here();
     const id = ++growN, spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
-    return new Promise((resolve, reject) => { growWaits.set(id, { resolve, reject }); growWorker.postMessage({ id, song, ctx, spoken }); });
+    return new Promise((resolve, reject) => { growWaits.set(id, { resolve, reject }); growWorker.postMessage({ id, song, ctx, spoken, steer }); });
   } catch (e) { return here(); }
 }
 // one control changed by hand: kept for every profile until a profile is picked again
@@ -3193,6 +3195,8 @@ radio = createRadio({
     makePlayable: (sg, songs) => radioPlayable(sg, songs),
     // a radio song grows away from the page (radio-profiles stage 4)
     grow: (song, ctx) => growAway(song, ctx),
+    // and a grown song is steered there (radio-profiles stage 5: commands as waypoints)
+    steer: args => growAway(null, null, args),
     start: (p, bar) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio'); },
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),

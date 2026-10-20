@@ -37,6 +37,11 @@ export function windowPart(W, songs, k, { grown = false } = {}) {
   const mine = s => { const r = stepRefs(s); return r.length ? r.some(id => id.startsWith(pre)) : owner(s.at) === k; };
   const src = me.song || {}, out = { ...W, id: src.id || W.id, title: src.title || W.title, tracks: W.tracks.filter(t => t.id.startsWith(pre)), build: (W.build || []).filter(mine) };
   for (const f of ['tags', 'profile', 'style']) if (src[f] !== undefined) out[f] = src[f];
+  // a song steered on air (radio-profiles D9): its reference for functions and levels, placed in the window like the song
+  if (src.codeRef) {
+    const ref = src.codeRef.tracks || [];
+    out.codeRef = { ...out, build: undefined, tracks: out.tracks.map(t => { const r = ref.find(x => pre + x.id === t.id); return r ? { ...t, settings: r.settings, rack: r.rack, patterns: r.patterns, clips: (r.clips || []).map(c => ({ ...c, start: c.start + me.start })) } : t; }) };
+  }
   if (grown && src.crescendo) {
     const c = { ...src.crescendo };
     if (Number.isFinite(c.grown)) c.grown += me.start;

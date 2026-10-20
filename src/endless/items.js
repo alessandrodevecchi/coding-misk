@@ -7,6 +7,7 @@ import { compilationOptions } from './compilation.js';
 import { steerSong } from './steering.js';
 import { recipeProfile, customControls } from './profile.js';
 import { growOnAir } from './growth.js';
+import { steerOnAir } from './waypoints.js';
 
 // the options of song n in a recipe: the first options, then every change up to n; options without the Profile option
 // (saved before radio-profiles) replay as Classic
@@ -17,8 +18,11 @@ export function recipeOptionsAt(recipe, n) {
 }
 // the growth marker of a recipe (radio-profiles stage 4): its version since the radio plays Crescendo and Live coder songs
 // grown; a recipe without it (saved before) replays in blocks
-export const GROWTH_ON_AIR = 1;
+// 2 (stage 5, D9): a command on a grown song is the next waypoint of its growth (waypoints.js); a recipe of version 1
+// replays its steered grown songs as they were heard then, grown again from the steered song
+export const GROWTH_ON_AIR = 2;
 export const growsOnAir = recipe => !!(recipe && Number(recipe.growth) >= 1);
+export const waypointsOnAir = recipe => !!(recipe && Number(recipe.growth) >= 2);
 // the per-song choices a compilation keeps from the radio's controls (a clip keeps its length)
 export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.custom ? { custom: o.custom } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}) });
 // the director options of song n: the compilation's draw, else the recipe's
@@ -29,7 +33,8 @@ export const directorOptions = (recipes, recipe, n, o = recipeOptionsAt(recipe, 
 // grow (radio-profiles D5): Crescendo and Live coder songs grow on air (growth.js), seeded by the song id. By default
 // a recipe grows its songs when it carries the growth marker (GROWTH_ON_AIR, recorded since the radio plays grown
 // songs); a recipe saved before has none and replays every song in blocks, as it was heard
-// (steering a grown song is D9: here a steered song grows from its steered written form)
+// (steering a grown song, D9: its commands are waypoints of the growth, past steps kept, waypoints.js; a recipe of
+// growth version 1 grows the steered song again, as the radio played it then)
 // → [{ song, entry, plan, opts }] (song 0 of a lead has only song and entry)
 export function sessionItems(recipes, recipe, count, until = null, { grow = growsOnAir(recipe), styles = null } = {}) {
   const shapes = grow ? styles || Object.fromEntries(recipes.map(r => [r.id, r])) : null;
@@ -37,11 +42,16 @@ export function sessionItems(recipes, recipe, count, until = null, { grow = grow
   const out = L ? [{ song: L.song, entry: le }] : [];
   for (let n = out.length; out.length < count && !(until && until(out)); n++) {
     const g = ses.next(directorOptions(recipes, recipe, n)), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
-    let song = cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song;
     // the transition into this song: planned on the entry before it (the lead's for the first song after it)
     const before = out.length ? out[out.length - 1].entry : null;
     const custom = recipeOptionsAt(recipe, n).custom;
-    if (grow && g.entry.profile) song = growOnAir(song, { profile: g.entry.profile, artist: g.opts.artist || null, into: before && before.transition ? before.transition.kind : null, styles: shapes, phrase: g.plan.phrase, controls: custom ? customControls(custom) : null });
+    const ctx = { profile: g.entry.profile, artist: g.opts.artist || null, into: before && before.transition ? before.transition.kind : null, styles: shapes, phrase: g.plan.phrase, controls: custom ? customControls(custom) : null };
+    let song;
+    if (grow && g.entry.profile && (!cmds.length || waypointsOnAir(recipe))) song = steerOnAir({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n, ctx }).song;
+    else {
+      song = cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song;
+      if (grow && g.entry.profile) song = growOnAir(song, ctx);
+    }
     out.push({ song, entry: g.entry, plan: g.plan, opts: g.opts });
   }
   return out;

@@ -23,6 +23,13 @@ import { compileSong } from '../src/song/compile.js';
 import { liveCode } from '../src/live/live-code.js';
 import { rushedSteps } from '../src/live/typing-load.js';
 import { resolveShape, shapeFacts, canPlay, OPENINGS } from '../src/song/shapes.js';
+import { steerOnAir, airBoundaries, airOffset, ideaSteps, directorView } from '../src/endless/waypoints.js';
+import { steerSong } from '../src/endless/steering.js';
+import { waypointsOnAir } from '../src/endless/items.js';
+import { choose } from '../src/song/coder.js';
+import { typingPlan, settleOthers } from '../src/song/typing.js';
+import { meterSteps } from '../src/music.js';
+import { energyOf } from '../src/endless/energy.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const WRITE = process.argv.includes('--write-fixtures');
@@ -59,7 +66,7 @@ const STYLES = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 const barsOf = song => song.sections.reduce((a, x) => a + x.bars, 0);
 // 50 radio songs over all styles: one session per style (a second style now and then), Live coder forced, grown; and
 // a few sessions of Crescendo songs. Built once, several checks read them
-const SEEDS = 50;
+const SEEDS = (process.env.ONLY && +process.env.SEEDS) || 50;
 const recipeOf = (i, profile, extra = {}) => ({ seed: `grow-${i}`, options: { styles: [RECIPES[i % RECIPES.length].id, ...(i % 3 === 0 ? [RECIPES[(i * 7 + 3) % RECIPES.length].id] : [])], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, ...how, profile, ...extra }, changes: [] });
 let grownCache = null;
 const grown = () => {
@@ -76,6 +83,47 @@ const grown = () => {
 const COMPOSE_RUSHED = { songs: 40, rushed: 129 };
 const noProfile = items => items.map(x => { const { profile, ...entry } = x.entry; return { song: x.song, entry }; });
 const profilesOf = items => items.map(x => x.entry.profile || 'classic');
+
+// ---------- stage 5: commands as waypoints ----------
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const AIR = airControls('switch');
+const pastSteps = (song, B) => buildSteps(song).filter(s => s.at < B).map(({ i, ...s }) => s);
+// what a song plays at a bar, by track: its pattern, the settings it writes, its rack and line marks (the written form
+// has no line marks; a grown song's are set right at the arrival)
+const heardOf = (song, bar) => soundAt(song, bar).tracks.filter(t => t.type !== 'voice').sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map(t => ({ id: t.id, pattern: t.pattern, settings: t.settings, rack: t.rack || [], marks: [!!t.hush, !!t.alone, t.maskIdea || null, (t.hidden || []).length, (t.commented || []).length, t.variant ?? null] }));
+const sectionStart = (song, bar) => { let at = 0; for (const s of song.sections) { if (bar < at + s.bars) return at; at += s.bars; } return at; };
+// the lines of a track's block in a code (from its header to the next)
+const blockOf = (code, song, id) => { const t = song.tracks.find(x => x.id === id), name = (t && (t.name || t.id)) || id, lines = code.split('\n'), i = lines.findIndex(l => l.startsWith(`// ========== ${name}`)); if (i < 0) return []; const j = lines.findIndex((l, k) => k > i && l.startsWith('// ==========')); return lines.slice(i + 1, j < 0 ? undefined : j); };
+const barSec = (song, bar) => { let at = 0; for (const s of song.sections) { if (bar < at + s.bars) return (meterSteps(s.meter || '4/4') / 4) * 60 / (s.bpm || 120); at += s.bars; } return 2; };
+const needOf = (L, song, from, to) => { const c = L.codeAt(to), was = settleOthers(L.codeAt(from), c, to); return was === c ? 0 : typingPlan(was, c, { style: 'human', lean: true, seed: song.id }).natural; };
+const usableOf = (song, from, to) => { const avail = Math.max(0.2, (to - from) * barSec(song, to) - 0.2); return Math.max(0.2, avail - Math.min(avail * 0.5, 2)); };
+const typingFits = (song, B, q) => { const L = liveCode(song, AIR, { cols: () => 80 }), bars = [...new Set(buildSteps(L.build).map(s => s.at))], prev = bars.filter(b => b < B).pop() ?? 0; return needOf(L, song, prev, B) <= usableOf(song, Math.max(prev + 0.5, q), B); };
+// grown Live coder songs with room after their growth (from the songs grown for the checks above): the director's
+// song, its plan and options, and its growth
+let airCache = null;
+const airCases = () => {
+  if (airCache) return airCache;
+  const { live } = grown();
+  airCache = [];
+  live.forEach((x, i) => {
+    const g0 = x.song;
+    if (!g0.crescendo.coder || barsOf(g0) - g0.crescendo.growth < 5 * x.plan.phrase || airCache.length >= 10) return;
+    const rec = recipeOf(i, 'switch'), g = createSession(RECIPES, rec.seed).next(rec.options);
+    airCache.push({ i, id: g0.id, seed: rec.seed, song: g.song, plan: g.plan, opts: g.opts, g0 });
+  });
+  return airCache;
+};
+// one command of each kind, asked a little after the growth (half way through what is left)
+const commandsFor = x => {
+  const G = x.g0.crescendo.growth, q = Math.floor(G + (barsOf(x.g0) - G) * 0.35) + 0.4, st = stateAt(x.g0, Math.floor(q)).song;
+  const on = st.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && (t.clips || []).some(c => c.start <= q && q < c.start + c.bars));
+  const part = ['bass', 'lead', 'pad', 'arp'].find(p => on.some(t => (p === 'lead' ? ['hook', 'guitar'].includes(t.type) : t.type === p))) || 'lead';
+  const track = (on.find(t => t.type !== 'drums') || on[0] || {}).id;
+  const d = Math.floor((q - airOffset(x.g0)) / (2 * x.plan.phrase)) + 1;
+  const list = [{ kind: 'energy-up' }, { kind: 'darker' }, { kind: 'vary', type: part }, { kind: 'swap', type: part }, { kind: 'mute', track }, { kind: 'volume', track, value: 0.3 }, { kind: 'curve', d, value: 0.95 }, { kind: 'extend' }, { kind: 'end' }, { kind: 'more-space' }];
+  return list.map((c, k) => ({ ...c, q, at: (airBoundaries(c.kind, q, x.plan, x.g0)[0] ?? 0), pend: true, id: k + 1 })).filter(c => c.at > 0);
+};
+const steer = (x, commands, o = {}) => steerOnAir({ grown: x.g0, song: x.song, plan: x.plan, opts: x.opts, commands, seed: x.seed, n: 0, ctx: { profile: 'switch', styles: STYLES, phrase: x.plan.phrase }, ...o });
 
 const CHECKS = {
   'D1: the profile of a generated song, each row of the table'() {
@@ -297,6 +345,167 @@ const CHECKS = {
       }
     }
   },
+  'stage 5 (5.1, 5.3): a command on a grown song is the next waypoint; steps and sound before its boundary stay, every step compiles, the steered song plays from the arrival'() {
+    const cs = airCases();
+    let n = 0, steps = 0;
+    for (const x of cs) for (const c of commandsFor(x)) {
+      const r = steer(x, [c]);
+      if (!r.commands.length) continue;
+      const N = r.song, B = r.commands[0].at, wp = N.onAir.waypoints[0], E = wp.to;
+      assert(wp.at === B && E > B, `${x.id} ${c.kind}: waypoint ${JSON.stringify(wp)}`);
+      assert(airBoundaries(c.kind, c.q, x.plan, x.g0).includes(B), `${x.id} ${c.kind}: boundary ${B} is not a boundary after bar ${c.q}`);
+      assert(same(pastSteps(N, B), pastSteps(x.g0, B)), `${x.id} ${c.kind}: steps before bar ${B} changed`);
+      for (let b = 0; b < B; b++) assert(same(soundAt(N, b), soundAt(x.g0, b)), `${x.id} ${c.kind}: the sound of bar ${b} changed (boundary ${B})`);
+      assert(buildSteps(N).filter(s => s.by === 'listener').every(s => s.at >= B && s.at < E), `${x.id} ${c.kind}: a move outside its waypoint`);
+      const errs = []; checkBuild(N, barsOf(N), (p, m) => errs.push(`${p}: ${m}`), () => {});
+      assert(!errs.length, `${x.id} ${c.kind}: ${errs[0]}`);
+      for (const at of [...new Set(buildSteps(N).map(s => s.at))].filter(b => b >= B - 1)) { compileSong(stateAt(N, at).song); steps++; }
+      // from the arrival the song plays the director's rewrite (its written form), bar by bar
+      const W = writtenForm(r.plain), off = airOffset(x.g0);
+      assert(barsOf(N) === barsOf(W) + off, `${x.id} ${c.kind}: ${barsOf(N)} bars, the rewrite ${barsOf(W)} + ${off}`);
+      for (let b = E; b < barsOf(N); b++) assert(same(heardOf(N, b), heardOf(W, b - off)), `${x.id} ${c.kind}: bar ${b} plays ${JSON.stringify(heardOf(N, b)).slice(0, 200)}, the rewrite ${JSON.stringify(heardOf(W, b - off)).slice(0, 200)}`);
+      // the code already on screen stays: the code of the moment of every step before the section that holds the boundary
+      const L0 = liveCode(x.g0, AIR, { cols: () => 80 }), L1 = liveCode(N, AIR, { cols: () => 80 }), sec = sectionStart(x.g0, B - 1);
+      // (a line whose lane the code of the moment does not read, a guitar's mask with postgain, shows every clip of its
+      // track at every bar: its later clips are not the past)
+      for (const b of [...new Set(buildSteps(L0.build).map(s => s.at))].filter(b => b < sec)) { const was = L0.codeAt(b); if (!/postgain\((section|clip)\d+/.test(was)) assert(was === L1.codeAt(b), `${x.id} ${c.kind}: the code of bar ${b} changed (boundary ${B})`); }
+      n++;
+    }
+    assert(n >= 30, `only ${n} commands applied`);
+    console.log(`      ${n} commands on ${cs.length} grown songs, ${steps} steps compiled`);
+  },
+  'stage 5 (5.1): cancel and replay give the same steps; the director sees the same song'() {
+    for (const x of airCases().slice(0, 4)) {
+      const [c1, c2] = [commandsFor(x).find(c => c.kind === 'energy-up'), commandsFor(x).find(c => c.kind === 'darker')];
+      const one = steer(x, [c1]), two = steer(x, [c1, { ...c2, id: 2 }]);
+      // replay: the recorded boundaries give the same song
+      assert(same(steer(x, two.commands).song, two.song), `${x.id}: a replay of two commands differs`);
+      // cancel the second: the song of the first alone
+      assert(same(steer(x, two.commands.slice(0, 1)).song, one.song), `${x.id}: cancelling a command does not give the song back`);
+      assert(same(pastSteps(two.song, two.commands[1].at), pastSteps(steer(x, two.commands.slice(0, 1)).song, two.commands[1].at)), `${x.id}: the second command changed the steps before it`);
+      const view = directorView({ song: x.song, plan: x.plan, opts: x.opts, commands: two.commands, seed: x.seed, n: 0, grown: x.g0 });
+      assert(same(view.song, two.plain) && same(view.plan, two.plan), `${x.id}: the director's view differs from the steered song`);
+    }
+  },
+  'stage 5 (5.2): the boundary waits for the typing; late when no boundary is left'() {
+    let waited = 0, rushed = 0, moves = 0, pasted = 0;
+    for (const x of airCases()) {
+      // a Vary asked a moment before a phrase: its notes cannot be typed in time, the phrase after takes it
+      const v = commandsFor(x).find(c => c.kind === 'vary');
+      if (v) {
+        const cands = airBoundaries('vary', v.q, x.plan, x.g0), late = { ...v, q: cands[0] - 0.15, at: cands[0] };
+        const r = steer(x, [late]);
+        if (r.commands.length && airBoundaries('vary', late.q, x.plan, x.g0).length > 1) {
+          const B = r.commands[0].at, fits = typingFits(r.song, B, late.q);
+          assert(B === airBoundaries('vary', late.q, x.plan, x.g0)[1] || fits, `${x.id}: a Vary 0.15 bars before its phrase applies there (${B}) without time to type it`);
+          if (B !== cands[0]) waited++;
+        }
+      }
+      // every move of a waypoint is typed at a person's pace (the boundary's edit, then each move from the one before)
+      for (const c of commandsFor(x).slice(0, 4)) {
+        const r = steer(x, [c]);
+        if (!r.commands.length) continue;
+        // (the moves and the arrival; a section boundary on the way is the written form's own edit in place, as after
+        // a growth)
+        const wp = r.song.onAir.waypoints[0], L = liveCode(r.song, AIR, { cols: () => 80 }), mine = new Set([...buildSteps(r.song).filter(s => s.by === 'listener').map(s => s.at), wp.to]);
+        const all = [...new Set(buildSteps(L.build).map(s => s.at))].filter(b => b > wp.at && b <= wp.to), bars = all.filter(b => mine.has(b));
+        // (a waypoint that reached the last phrase had no room left: its edits are pasted as the paste rule allows)
+        if (wp.to >= barsOf(r.song) - x.plan.phrase) { pasted++; continue; }
+        let from = wp.at;
+        for (const b of bars) { from = Math.max(from, ...all.filter(k => k < b)); moves++; const nd = needOf(L, r.song, from, b), us = usableOf(r.song, from + 0.5, b); if (nd > us * 1.1) { rushed++; if (rushed <= 6) console.log(`      rushed: ${x.id} ${c.kind} ${from} -> ${b} (${nd.toFixed(1)} s for ${us.toFixed(1)}), waypoint ${wp.at}-${wp.to}, song ${barsOf(r.song)}`); } from = b; }
+      }
+      // the last phrase: no boundary is left for a phrase command; the mixer still has its next bars
+      const end = barsOf(x.g0) - x.plan.phrase + 1;
+      assert(!airBoundaries('energy-up', end, x.plan, x.g0).length, `${x.id}: a boundary in the last phrase`);
+      assert(airBoundaries('mute', end, x.plan, x.g0)[0] === end + 1, `${x.id}: the mixer's next bar`);
+    }
+    console.log(`      ${waited} Vary waited for the phrase after; ${rushed} of ${moves} moves rushed; ${pasted} waypoints reached the last phrase`);
+    assert(waited >= 1, 'no command waited for its typing');
+    assert(rushed <= Math.max(2, moves * 0.1), `${rushed} of ${moves} moves rushed`);
+  },
+  'stage 5 (5.3): End leads to the ending one line at a time; mute is typed as _$:, a volume as .gain() on the line'() {
+    let ends = 0, mutes = 0, vols = 0;
+    for (const x of airCases()) {
+      const cmds = commandsFor(x);
+      const e = cmds.find(c => c.kind === 'end'), r = e && steer(x, [e]);
+      if (r && r.commands.length) {
+        const wp = r.song.onAir.waypoints[0], gone = buildSteps(r.song).filter(s => s.by === 'listener' && (s.remove !== undefined || s.mute !== undefined));
+        const W = writtenForm(r.plain);
+        assert(barsOf(r.song) === barsOf(W) + airOffset(x.g0) && barsOf(r.song) > wp.to, `${x.id}: End cut the song (${barsOf(r.song)} bars, arrival ${wp.to})`);
+        assert(new Set(gone.map(s => s.at)).size === gone.length, `${x.id}: End took out two lines on one bar`);
+        // the last waypoint is the song's ending: its last phrase as the director wrote it
+        assert(barsOf(r.song) - wp.to <= x.plan.phrase, `${x.id}: End arrives ${barsOf(r.song) - wp.to} bars before the end`);
+        ends++;
+      }
+      const m = cmds.find(c => c.kind === 'mute'), rm = m && steer(x, [m]);
+      if (rm && rm.commands.length) {
+        const st = buildSteps(rm.song).find(s => s.by === 'listener' && s.mute === m.track);
+        if (st) { const code = liveCode(rm.song, AIR, { cols: () => 80 }).codeAt(st.at); assert(blockOf(code, rm.song, m.track).some(l => /^_\$:/.test(l)), `${x.id}: the muted line has no _$: at bar ${st.at}`); mutes++; }
+      }
+      const vcmd = cmds.find(c => c.kind === 'volume'), rv = vcmd && steer(x, [vcmd]);
+      if (rv && rv.commands.length) {
+        const st = buildSteps(rv.song).find(s => s.by === 'listener' && s.set && s.set.track === vcmd.track && s.set.gain === vcmd.value);
+        if (st) { const code = liveCode(rv.song, AIR, { cols: () => 80 }).codeAt(st.at); assert(blockOf(code, rv.song, vcmd.track).some(l => l.includes(`.gain(${vcmd.value})`)), `${x.id}: the volume is not on the line at bar ${st.at}`); vols++; }
+      }
+    }
+    console.log(`      ${ends} End, ${mutes} mute, ${vols} volume`);
+    assert(ends >= 4 && mutes >= 3 && vols >= 3, 'too few cases');
+  },
+  'stage 5 (5.4): Vary and Swap are typed as small notes edits of the line, ending on the new part'() {
+    let varies = 0, multi = 0, swaps = 0;
+    // the edits of an idea: each a small step, the last the new idea
+    const a = { degrees: '<0 2 4 ~ 5 3 2 0>', scale: 'minor', per: 'slot' }, z = { degrees: '<0 3 4 5 7 3 2 ~>', scale: 'minor', per: 'slot' }, st = ideaSteps(a, z);
+    assert(st.length >= 2 && same(st[st.length - 1], z) && st.every((x, i) => !same(x, i ? st[i - 1] : a)), `ideaSteps ${JSON.stringify(st)}`);
+    for (const x of airCases()) for (const c of commandsFor(x).filter(c => c.kind === 'vary' || c.kind === 'swap')) {
+      const r = steer(x, [c]);
+      if (!r.commands.length) continue;
+      const wp = r.song.onAir.waypoints[0], W = writtenForm(r.plain), off = airOffset(x.g0);
+      // the tracks the command changed: their line plays the new part at the arrival
+      const changed = W.tracks.filter(t => { const p = (t.clips.find(k => k.start <= wp.to - off && wp.to - off < k.start + k.bars) || {}).pattern; return p && /^[VS]\d+$/.test(p); });
+      if (!changed.length) continue;
+      for (const t of changed) {
+        const edits = buildSteps(r.song).filter(s => s.by === 'listener' && s.notes && s.notes.track === t.id);
+        const heard = heardOf(r.song, wp.to).find(h => h.id === t.id), want = heardOf(W, wp.to - off).find(h => h.id === t.id);
+        assert(heard && want && same(heard.pattern, want.pattern), `${x.id} ${c.kind}: ${t.id} does not play its new part at the arrival`);
+        if (c.kind === 'vary') { assert(edits.length >= 1, `${x.id}: Vary ${t.id} typed without notes edits`); varies++; if (edits.length >= 2) multi++; }
+        else swaps++;
+      }
+    }
+    console.log(`      ${varies} Vary (${multi} in two or more edits), ${swaps} Swap`);
+    assert(varies >= 4 && multi >= 1, 'too few Vary cases');
+  },
+  'stage 5 (5.5): the chooser on air reaches a curve point sooner than the default chooser'() {
+    let air = 0, plain = 0, sooner = 0, later = 0, cases = 0;
+    for (const x of airCases()) {
+      const q = commandsFor(x)[0].q, B0 = airBoundaries('curve', q, x.plan, x.g0)[0], d = Math.floor((B0 - airOffset(x.g0)) / (2 * x.plan.phrase));
+      if (!(d < x.plan.plan.length - 1)) continue;
+      // the energy of the coming part set to the top: the moves that raise it first
+      const c = { kind: 'curve', d, value: 1, q, at: B0, pend: true, id: 1 };
+      const a = steer(x, [c]), b = steer(x, [c], { chooser: () => choose });
+      if (!a.commands.length || !b.commands.length || a.commands[0].at !== b.commands[0].at) continue;
+      const opts = { usual: a.plan.usualHigh, weights: a.plan.R.energy }, e = (song, k) => energyOf(stateAt(song, k).song, opts);
+      const reach = r => { const wp = r.song.onAir.waypoints[0], want = e(r.song, wp.to) - 0.02; for (let k = wp.at; k <= wp.to; k++) if (e(r.song, k) >= want) return k - wp.at; return wp.to - wp.at; };
+      const ra = reach(a), rb = reach(b);
+      if (ra === rb && ra === 0) continue;
+      cases++; air += ra; plain += rb; if (ra < rb) sooner++; if (ra > rb) later++;
+    }
+    console.log(`      energy point: ${cases} cases, on air ${air} bars in all, default ${plain}; sooner ${sooner}, later ${later}`);
+    assert(cases >= 3 && sooner >= 1 && air <= plain, 'the chooser on air does not reach the curve point sooner');
+  },
+  'stage 5: replays give the same songs; a recipe of growth version 1 and Classic recipes steer as before'() {
+    const x = airCases()[0], c = commandsFor(x).find(k => k.kind === 'energy-up'), r = steer(x, [c]);
+    const rec = { ...recipeOf(x.i, 'switch'), growth: GROWTH_ON_AIR, steering: r.commands.map(k => ({ song: 0, ...k })) };
+    assert(waypointsOnAir(rec) && GROWTH_ON_AIR === 2, 'growth marker 2');
+    const a = sessionItems(RECIPES, rec, 1)[0].song, b = sessionItems(RECIPES, JSON.parse(JSON.stringify(rec)), 1)[0].song;
+    assert(same(a, b) && same(a, r.song), 'a replay with the same commands gives the same song');
+    // growth version 1 (stage 4): the steered song grown again, as it was heard
+    const old = sessionItems(RECIPES, { ...rec, growth: 1 }, 1)[0].song;
+    assert(old.onAir && !old.onAir.waypoints && !same(old, a), 'growth version 1 replays its steered song grown again, without waypoints');
+    // Classic: steering as before
+    const cl = { ...CLASSIC[0].recipe, growth: GROWTH_ON_AIR, steering: [{ song: 1, kind: 'energy-up', at: 16 }, { song: 1, kind: 'mute', track: 'bass', at: 20 }] };
+    const items = sessionItems(RECIPES, cl, 2), ses = createSession(RECIPES, cl.seed); ses.next(cl.options); const g = ses.next(cl.options);
+    assert(same(items[1].song, steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cl.steering.map(({ song: _, ...k }) => k), seed: cl.seed, n: 1 }).song), 'a Classic song steers as before');
+  },
   'radio fixtures: Classic sessions rebuild the same items'() {
     for (const { name, recipe } of CLASSIC) {
       const a = sessionItems(RECIPES, recipe, SONGS), b = sessionItems(RECIPES, recipe, SONGS);
@@ -321,10 +530,13 @@ const CHECKS = {
 };
 
 let failed = 0;
+// (ONLY=text runs the checks whose name holds it, while working on one part; the fixtures are not written then)
+const ONLY = process.env.ONLY;
 for (const [name, fn] of Object.entries(CHECKS)) {
+  if (ONLY && !name.includes(ONLY)) continue;
   try { await fn(); console.log(`ok    ${name}`); }
   catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); }
 }
-if (WRITE && !failed) { fs.writeFileSync(FIXTURES_FILE, JSON.stringify({ ...(saved || {}), ...fixtures }, null, 2) + '\n'); console.log('      radio fixtures written'); }
+if (WRITE && !failed && !ONLY) { fs.writeFileSync(FIXTURES_FILE, JSON.stringify({ ...(saved || {}), ...fixtures }, null, 2) + '\n'); console.log('      radio fixtures written'); }
 console.log(failed ? `\n${failed} check(s) failed` : `\nall ${Object.keys(CHECKS).length} checks passed`);
 process.exit(failed ? 1 : 0);

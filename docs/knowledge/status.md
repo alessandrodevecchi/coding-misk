@@ -14,13 +14,14 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 57. With open tasks: 19. All tasks ticked, waiting to be archived: 38.
+OpenSpec changes not archived: 58. With open tasks: 20. All tasks ticked, waiting to be archived: 38.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
+| [faster-checks](../../openspec/changes/faster-checks/tasks.md) | 6 | 6 |
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |
 | [idea-model](../../openspec/changes/idea-model/tasks.md) | 3 | 20 |
 | [idiomatic-code](../../openspec/changes/idiomatic-code/tasks.md) | 2 | 8 |
@@ -32,8 +33,8 @@ OpenSpec changes not archived: 57. With open tasks: 19. All tasks ticked, waitin
 | [pattern-library](../../openspec/changes/pattern-library/tasks.md) | 1 | 16 |
 | [performance-profiles](../../openspec/changes/performance-profiles/tasks.md) | 1 | 9 |
 | [player-bar](../../openspec/changes/player-bar/tasks.md) | 1 | 8 |
-| [radio-profiles](../../openspec/changes/radio-profiles/tasks.md) | 14 | 34 |
-| [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 2 | 17 |
+| [radio-profiles](../../openspec/changes/radio-profiles/tasks.md) | 9 | 34 |
+| [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |

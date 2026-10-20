@@ -221,6 +221,8 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | Extend (`#45`) | next double phrase | one more double phrase before the ending (the closing outros, or the last part), with the role and curves of the part before it and energy a little lower, then higher, on repeated presses; disabled once the transition to the next song plays |
 | Volume, mute, lock (mixer) | next bar | pinned gain; a step plus a lock; the director stops moving the track |
 
+**Grown songs (`radio-profiles` stage 5, D9).** On a Crescendo or Live coder song a command becomes the next waypoint of its growth (`src/endless/waypoints.js`): the steps before its boundary are kept as they were, and from the boundary small typed moves (a line in or out, a growth level, notes a few at a time, a knob, a function, a device) lead from the code on air to the written form of the rewrite above, which plays as written from the arrival, a phrase boundary. The boundary is the first that leaves time to type the edit (the next phrase or the one after), the queue shows it; mute types `_$:`, a volume is `.gain()` on the line, Vary and Swap are notes edits, End takes the lines out one at a time during the outro. The listener's tracks move first (D10). A recipe records `growth: 2`; one of growth version 1 replays its steered songs grown again, as heard then.
+
 ### Composed material
 
 Steering composes with the material generator (`radio-variation`, `airIdea` in `src/endless/material.js`), in the key and chords of the section where the material starts and with the style's rules:
