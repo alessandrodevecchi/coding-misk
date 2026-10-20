@@ -29,17 +29,18 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const added = d.lists.find(l => l.songs.some(id => id.startsWith('session:')));
   const sid = added && added.songs.find(id => id.startsWith('session:'));
   check(sid && d.sessions[sid] && d.sessions[sid].count === 1 && d.sessions[sid].version >= 1 && d.sessions[sid].recipe.seed === 'sessions-check', 'the session on air goes into a new playlist', JSON.stringify(sid && d.sessions[sid] && { count: d.sessions[sid].count }));
-  const recipe = d.sessions[sid].recipe;
+  const recipe = d.sessions[sid].recipe, version = d.sessions[sid].version;
   await page.click('#radio-start'); await sleep(300);
 
-  // a playlist: a session of 2 songs, then a song; an older session warns
-  await page.evaluate(([recipe]) => {
+  // a playlist: a session of 2 songs, then a song; an older session warns (since radio-variation 3.2 any recorded director
+  // version other than the app's warns, a newer one too: the session made now carries the app's version and stays quiet)
+  await page.evaluate(([recipe, version]) => {
     const d = JSON.parse(localStorage.getItem('coding-misk-playlists'));
     d.lists.push({ id: 'p-check', name: 'Check', songs: ['session:two', 'primo-segnale', 'session:old'] });
-    d.sessions['session:two'] = { recipe, count: 2, title: 'Two · 2 songs', date: '2026-10-10', version: 999 };
+    d.sessions['session:two'] = { recipe, count: 2, title: 'Two · 2 songs', date: '2026-10-10', version };
     d.sessions['session:old'] = { recipe, count: 1, title: 'Old · 1 song', date: '2026-10-10', version: 0 };
     localStorage.setItem('coding-misk-playlists', JSON.stringify(d));
-  }, [recipe]);
+  }, [recipe, version]);
   await page.reload(); await sleep(3500);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(300);
   await page.click('[data-pl-open="p-check"]'); await sleep(300);

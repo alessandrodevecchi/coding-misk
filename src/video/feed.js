@@ -41,11 +41,13 @@ export function codeFrom(segments, { seconds = null, speed = 1, style = 'exact',
   return function codeAt(c) {
     let i = 0; while (i + 1 < segments.length && segments[i + 1].from <= c) i++;
     const seg = segments[i], next = segments[i + 1];
+    // a joined radio session (radio-profiles D12): the next song on air appears whole, and each song types as it does
+    if (next && next.whole) return seg.code;
     if (seconds && next) {
       if (!cache.has(i)) {
-        const end = seconds(next.from) - 0.2, from0 = seconds(seg.from + 0.5), to = next.code, human = style === 'human';
+        const end = seconds(next.from) - 0.2, from0 = seconds(seg.from + 0.5), to = next.code, human = (next.typist || style) === 'human';
         const avail = Math.max(0.2, end - from0), listenMin = human ? Math.min(avail * 0.5, 2) : 0;
-        const plan = typingPlan(settleOthers(seg.code, to, next.from), to, { speed, max: Math.max(0.2, avail - listenMin), style, seed, mistakes, stretch: Math.floor(next.from / 16), force: next.paste ?? Infinity });
+        const plan = typingPlan(settleOthers(seg.code, to, next.from), to, { speed, max: Math.max(0.2, avail - listenMin), style: next.typist || style, seed: next.seed ?? seed, mistakes: next.mistakes ?? mistakes, stretch: Math.floor(next.from / 16), force: next.paste ?? Infinity });
         const listen = human ? Math.max(listenMin, Math.min(avail * 0.2, avail - plan.total)) : 0;
         cache.set(i, { plan, start: Math.max(from0 + listen, end - plan.total) });
       }

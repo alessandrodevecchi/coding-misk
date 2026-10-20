@@ -107,13 +107,15 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   }
 
   // the voice of each song comes from its voice style, with its own speaker
+  // (the spoken line is in the code shown only around its bar: live typing removes it on the way to the next step, about
+  // a bar after a comment on bar 0, while the sound is unchanged; so the code is read every 0.2 s from the start)
   {
     const voiceBank = () => page.evaluate(() => (document.querySelector('strudel-editor').editor.code.match(/s\("(say_[a-z_]+)"\)/) || [])[1] || '');
     const banks = {};
     for (const style of ['industrial', 'country']) {
       await page.click('#radio-start'); await sleep(500);
       await pick([style]); await page.fill('#radio-seed', `voice-${style}`); await page.click('#radio-start');
-      for (let k = 0; k < 20 && !banks[style]; k++) { await sleep(1000); banks[style] = await voiceBank(); }
+      for (let k = 0; k < 100 && !banks[style]; k++) { banks[style] = await voiceBank(); if (!banks[style]) await sleep(200); }
     }
     check(banks.industrial && banks.country && banks.industrial !== banks.country, 'two styles speak with different speakers', JSON.stringify(banks));
     await page.click('#radio-start'); await sleep(500);

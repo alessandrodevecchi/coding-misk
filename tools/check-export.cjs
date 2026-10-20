@@ -1,6 +1,7 @@
 // Browser checks for the fast export (#8): songs export faster than real time with the timeline next to them, the
 // fast and the real time files of the same song agree (length, loudness, low and high bands, loudness over time),
-// FLAC is lossless, MP3 and Opus open, cancel saves nothing, a saved radio session exports as one file. Each song's
+// FLAC is lossless, MP3 and Opus open, cancel saves nothing, a saved radio session exports as one file, a saved session of
+// Live coder songs exports as the radio plays it (radio-profiles 7.1). Each song's
 // file stays below full scale (level-headroom): the render's float peak and the WAV's samples, with the time of the first
 // clipped sample.
 // Needs ffmpeg and ffprobe. Real time exports take as long as the songs.
@@ -162,6 +163,51 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
     check(Math.abs(len - tl2.seconds) < 0.05 && tl2.sections.length >= 2 && (Date.now() - ts) / 1000 < tl2.seconds, 'a saved session exports as one file, faster than real time', `${tl2.seconds.toFixed(1)} s in ${((Date.now() - ts) / 1000).toFixed(1)} s, ${tl2.sections.length} sections`);
   } else check(false, 'a saved session exports as one file', downloads.slice(ns).map(d => d.suggestedFilename()).join(', '));
   await page.click('[data-tab="brani"]'); await sleep(400);
+
+  // radio-profiles 7.1: a saved session of two Live coder songs (a mix between them: the next song grows hidden) exports
+  // as the radio plays it: the timeline holds only the code of the song on air, and the fast file sounds as the session
+  // played in real time (the real time export of a saved session replays it in the radio)
+  {
+    await settings({ 'coding-misk-export-format': 'wav', 'coding-misk-export-speed': 'fast' });
+    await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.selectOption('#radio-transition', 'mix'); await page.selectOption('#radio-profile', 'switch');
+    await page.fill('#radio-seed', 'export-coder'); await page.click('#radio-start'); await sleep(3000);
+    await page.click('#radio-pl'); await sleep(200);
+    await page.selectOption('.radio-pl-menu select', ''); await page.click('.radio-pl-menu [data-pl-ok]'); await sleep(300);
+    await page.click('#radio-start'); await sleep(300);
+    await page.selectOption('#radio-profile', 'artist'); await page.selectOption('#radio-transition', 'artist'); await sleep(200);
+    const cid = await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('coding-misk-playlists')), id = Object.keys(d.sessions).find(k => d.sessions[k].recipe.seed === 'export-coder'); d.sessions[id].count = 2; localStorage.setItem('coding-misk-playlists', JSON.stringify(d)); return id; });
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(400);
+    const cl = await page.evaluate(id => JSON.parse(localStorage.getItem('coding-misk-playlists')).lists.find(l => l.songs.includes(id)).id, cid);
+    await page.click(`[data-pl-open="${cl}"]`); await sleep(300);
+    const nf = downloads.length, tf = Date.now();
+    await page.click(`[data-export-mini="${cid}"]`); await sleep(1500);
+    while (Date.now() - tf < 600000 && await job()) await sleep(500);
+    await sleep(1500);
+    const cw = downloads.slice(nf).find(d => /\.wav$/.test(d.suggestedFilename())), ct = downloads.slice(nf).find(d => /\.timeline\.json$/.test(d.suggestedFilename()));
+    if (cw && ct) {
+      const tl3 = JSON.parse(fs.readFileSync(await save(ct, 'coder.timeline.json'))), F = pcm(await save(cw, 'coder-fast.wav')), secs = (Date.now() - tf) / 1000;
+      check(Math.abs(F.length / 48000 - tl3.seconds) < 0.05 && secs < tl3.seconds, 'a saved Live coder session exports fast', `${tl3.seconds.toFixed(1)} s in ${secs.toFixed(1)} s, ${tl3.code.length} code segments`);
+      // only the song on air: no visible next song, no hidden song's constants (renamed n<k>_) in the code shown
+      check(tl3.code.length > 20 && tl3.code.every(x => !x.code.includes('// ==> ') && !/\bn[12]_\w/.test(x.code)), 'the timeline holds only the code of the song on air');
+      if (!QUICK) {
+        await settings({ 'coding-misk-export-speed': 'real' });
+        const nr = downloads.length, tr = Date.now();
+        await page.click(`[data-export-mini="${cid}"]`); await sleep(2000);
+        while (Date.now() - tr < 1200000 && !downloads.slice(nr).some(d => /\.wav$/.test(d.suggestedFilename()))) await sleep(1000);
+        const rw = downloads.slice(nr).find(d => /\.wav$/.test(d.suggestedFilename()));
+        if (rw) {
+          const R = pcm(await save(rw, 'coder-real.wav')), off = align(F, R), Rs = R.subarray(off), n = Math.min(F.length, Rs.length, Math.floor((F.length / 48000 - 3) * 48000));
+          const c = corr(env(F.subarray(0, n)), env(Rs.subarray(0, n))), d0 = db(rms(F, 0, n)) - db(rms(Rs, 0, n));
+          const lo = db(rms(lowpass(F.subarray(0, n), 150))) - db(rms(lowpass(Rs.subarray(0, n), 150))), hi = db(rms(highpass(F.subarray(0, n), 4000))) - db(rms(highpass(Rs.subarray(0, n), 4000)));
+          check(Math.abs(d0) < 1.5 && Math.abs(lo) < 2 && Math.abs(hi) < 2.5 && c > 0.85, 'the Live coder session: fast and real time sound the same', `loudness ${d0.toFixed(2)} dB, low ${lo.toFixed(2)} dB, high ${hi.toFixed(2)} dB, over time r=${c.toFixed(3)}`);
+        } else check(false, 'the Live coder session: real time export');
+        await settings({ 'coding-misk-export-speed': 'fast' });
+      }
+    } else check(false, 'a saved Live coder session exports fast', downloads.slice(nf).map(d => d.suggestedFilename()).join(', '));
+    await page.click('[data-tab="brani"]'); await sleep(400);
+  }
 
   // the radio: next 2 songs, then 5 minutes, each with audio, timeline, track list and recipe
   await settings({ 'coding-misk-export-format': 'flac', 'coding-misk-export-speed': 'fast' });

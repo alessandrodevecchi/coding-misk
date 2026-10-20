@@ -45,7 +45,7 @@ import { createSettings } from './settings/settings.js';
 import { createGenresTab } from './library/genres-tab.js';
 import { genresOf } from './library/song-filter.js';
 import { windowSong } from './endless/join.js';
-import { absoluteClips, playlistTransition, overlapOf } from './endless/transitions.js';
+import { absoluteClips, playlistTransition, overlapOf, layout } from './endless/transitions.js';
 import { joinSession } from './endless/join.js';
 import { createSession, stylesNear } from './endless/director.js';
 import { styleId, stylePush } from './endless/recipe.js';
@@ -172,6 +172,46 @@ function radioPlayable(W, songs = null) {
   meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   // (soundCode: every sound of the window in one code, for the soundfonts loaded ahead; hidden: the songs not shown)
   return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), soundCode: () => compileSong({ ...W, build: undefined }) };
+}
+// a radio session's songs joined into one playable song, as its exports play it (radio-profiles D12). A session of
+// Classic songs is the joined song with Classic controls, as before. With a grown song (or the Custom profile) the file
+// plays what the radio plays: window by window (the song on air and the next one, radioPlayable), each song on air in
+// its own view, the next one shown or hidden as the radio shows it. A window is on air from the end of the song before
+// (its transition included) to the end of its own song, as the radio moves it; its code appears whole when its song goes
+// on air. The code shown at each bar is the song on air's (timeline, video); the code evaluated adds the hidden tail.
+// items: rebuilt songs [{ song, transition }]; air: per song { profile, custom, ctl, show } (radio.airSongs)
+function sessionPlayable(items, seed, options, id, air = null) {
+  const songs = items.map(x => absoluteClips(clone(x.song)));
+  const joined = joinSession({ songs: items.map(x => ({ transition: x.transition })), seed, options: options || {} }, songs);
+  const base = playable({ ...joined, kind: 'composed', id }, RADIO_LIVE());
+  if (!air || air.every(a => a.profile === 'classic' && !a.custom)) return base;
+  const N = songs.length, bars = songs.map(barsOfSong), trans = items.map(x => x.transition || null);
+  const starts = layout(songs.map((s, i) => ({ bars: bars[i], transition: trans[i] })), 0);
+  const ends = starts.map((s, k) => (k + 1 < N ? starts[k + 1] + overlapOf(trans[k]) : s + bars[k])), los = ends.map((e, k) => (k ? ends[k - 1] : 0));
+  const wins = songs.map((_, k) => {
+    const ks = k + 1 < N ? [k, k + 1] : [k];
+    const W = windowSong(ks.map(i => ({ song: songs[i], n: i + 1, start: starts[i], transition: trans[i] })));
+    return radioPlayable({ ...W, id }, ks.map((i, j) => ({ n: i + 1, prefix: `s${i + 1}-`, start: starts[i], song: songs[i], title: songs[i].title, profile: air[i].profile, custom: air[i].custom, ctl: air[i].ctl, show: j ? air[i].show : 'air' })));
+  });
+  const at = bar => { let k = 0; while (k + 1 < N && ends[k] <= bar) k++; return k; };
+  // the steps of each window while it is on air, and its first bar when its code appears whole (a window of Classic
+  // songs after another goes on with the code it had, as in the radio)
+  const steps = [], whole = new Set();
+  wins.forEach((P, k) => {
+    if (k && (P.air || wins[k - 1].air)) { steps.push({ at: los[k] }); whole.add(los[k]); }
+    for (const { i, ...s } of buildSteps(P.build)) if (s.at >= los[k] && s.at < ends[k]) steps.push(s);
+  });
+  steps.sort((a, b) => a.at - b.at);
+  // the code shown at a bar: as codeFor writes it for the window on air (with the visuals of a window without a tail)
+  const codeAt = (bar, keep = null) => { const P = wins[at(bar)], c = P.codeAt ? P.codeAt(bar, keep) : keep && P.codeKeep ? P.codeKeep(keep) : P.code; return P.run ? c : withVisuals(c); };
+  const run = (code, bar) => { const P = wins[at(bar)]; return P.run ? P.run(code, bar) : code; };
+  // per segment: the buses and functions of the song on air, its typing, and whether its code appears whole
+  const segmentAt = from => {
+    const k = at(from), P = wins[k], C = P.ctl;
+    return { buses: P.buses || {}, fns: P.fns || {}, seed: songs[k].id || '', ...(C ? { typist: C.typist === 'human' ? 'human' : 'exact', mistakes: C.mistakes !== 'off' } : {}), ...(P.paste && from > 0 ? { paste: P.paste(from) } : {}), ...(whole.has(from) ? { whole: true } : {}) };
+  };
+  const firstGrown = air.findIndex(a => a.profile !== 'classic' || a.custom), grown = songs.map((s, k) => (air[k].profile !== 'classic' ? starts[k] : -1)).filter(b => b >= 0);
+  return { ...base, code: codeAt(0), codeAt, codeKeep: null, run, standalone: null, paste: null, buses: {}, fns: {}, build: { ...(base.doc || joined), build: steps }, ctl: wins[firstGrown] ? air[firstGrown].ctl : base.ctl, segmentAt, session: { grown }, soundCode: () => compileSong({ ...joined, build: undefined }) };
 }
 // radio songs grow away from the page (radio-profiles stage 4, src/endless/grow-worker.js): the music stays on time;
 // the worker gets the voice instrument's context and the language of the page, so a song grows there as it would here
@@ -821,7 +861,8 @@ function blockSegments(sg) {
     const c0 = Math.floor(T.cycleAt(from)) - 1, c1 = Math.ceil(T.cycleAt(to)) + 1;
     const on = new Set(doc.tracks.filter(tr => tr.type === 'voice' || (tr.clips || []).some(c => c.start < c1 && c.start + (c.bars || 1) > c0)).map(tr => tr.id));
     const keep = tr => tr.type === 'voice' || on.has(tr.id);
-    return segmentsOf(sg, (s, bar) => codeFor(s, bar, keep)).filter(seg => seg.to > T.cycleAt(from) - 1 && seg.from < T.cycleAt(to) + 1);
+    // (only the segments of the block are written: a long session has thousands of steps)
+    return segmentsOf(sg, (s, bar) => codeFor(s, bar, keep), (a, b) => b > T.cycleAt(from) - 1 && a < T.cycleAt(to) + 1);
   };
 }
 // after(): called once the files are saved (the radio adds its track list and recipe)
@@ -930,7 +971,8 @@ async function exportRadio(range) {
   if (fastJob || rec || capture) return toast(t('vidBusy'));
   const r = radio && radio.exportItems(range);
   if (!r || !r.items.length) return;
-  const joinOf = items => playable({ ...joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: r.recipe.seed, options: r.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song)))), kind: 'composed', id: 'radio' }, RADIO_LIVE());
+  // (the length alone: the songs joined with Classic controls; the file: as the radio plays them, radio-profiles D12)
+  const joinOf = (items, full = false) => sessionPlayable(items, r.recipe.seed, r.recipe.options, 'radio', full ? radio.airSongs(items) : null);
   let sg = joinOf(r.items);
   // a length: the real joined length decides. Exact (#5): the songs that reach the target, cut there with a fade;
   // else the last song goes when the rest still reaches 90% of the target. A clip: one song composed to the length.
@@ -942,6 +984,7 @@ async function exportRadio(range) {
   }
   // the clip's song lasts a second less than the clip: its last hit rings out in that second, then the file ends
   if (range.kind === 'clip') cut = { cut: range.seconds, fade: 0.8 };
+  sg = joinOf(r.items, true);
   const base = `coding-misk-radio-${String(r.recipe.seed).replace(/[^\w-]+/g, '-')}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}`;
   // the track list: the first section of each song ("3 Intro" belongs to song 3), at its time in the file
   const T = tempoClock(sg.meta.bpm), starts = {};
@@ -1047,6 +1090,15 @@ const setFragOpt = (k, v) => store.set(FRAG_KEY, { ...fragOpts(), [k]: v });
 const nextFragment = () => Math.max(1, +store.get(FRAG_N, 1) || 1);
 // the picker's shape: the song JSON when there is one, else the sections alone
 function shapeFor(sg) {
+  if (sg.session && sg.doc && sg.doc.tracks) {
+    // a session with grown songs (radio-profiles D12): tracks are silent until the steps bring them in, fragments start on
+    // a step, and the first steps of a grown song (one sound alone, or its silent lead-in) only when nothing else fits
+    const sh = shapeOf(sg.doc, absoluteClips), map = buildMap({ tracks: sg.doc.tracks, build: buildSteps(sg.build) }, sh.bars);
+    sh.tracks = sh.tracks.map(t => ({ ...t, off: (map[t.id] || {}).off || [] }));
+    sh.steps = [...new Set(buildSteps(sg.build).map(x => x.at))];
+    sh.leads = sg.session.grown.flatMap(b => sh.steps.filter(x => x >= b).slice(0, 2));
+    return sh;
+  }
   if (sg.doc && sg.doc.sections && sg.doc.tracks && sg.doc.crescendo) {
     // a Crescendo song (#64): tracks are silent until the build brings them in, and fragments start on a step
     const sh = shapeOf(sg.doc, absoluteClips), map = buildMap(sg.doc, sh.bars);
@@ -1058,7 +1110,8 @@ function shapeFor(sg) {
   return { bars: sg.meta.bars, sections: sg.meta.sections.map(x => ({ label: x.label, start: x.start, len: x.len })), tracks: [{ type: 'any', clips: [{ start: 0, bars: sg.meta.bars }] }] };
 }
 // a session's songs joined into one playable song, as its export does
-const joinItems = (items, seed, options, id) => playable({ ...joinSession({ songs: items.map(x => ({ transition: x.transition })), seed, options: options || {} }, items.map(x => absoluteClips(clone(x.song)))), kind: 'composed', id }, RADIO_LIVE());
+// (grown songs as the radio plays them, radio-profiles D12)
+const joinItems = (items, seed, options, id) => sessionPlayable(items, seed, options, id, radio ? radio.airSongs(items) : null);
 // a source: a song id, a playlist session id, or a recipe object (the file saved with a radio export)
 // → { sg, title, key, seed, songs, cut } or { error }
 function fragmentSource(src) {
@@ -1279,8 +1332,7 @@ async function exportSession(id) {
   if (exportSpeed() === 'fast' && (!asVideo || video.opts().layout !== 'tab')) {
     try {
       const items = s.frozen || radio.rebuild(s.recipe, s.count);
-      const joined = joinSession({ songs: items.map(x => ({ transition: x.transition })), seed: s.recipe.seed, options: s.recipe.options || {} }, items.map(x => absoluteClips(clone(x.song))));
-      const sg = playable({ ...joined, kind: 'composed', id }, RADIO_LIVE());
+      const sg = joinItems(items, s.recipe.seed, s.recipe.options, id);
       const songs = items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' }));
       if (await (asVideo ? exportVideoFast(sg, s.title, { songs, seed: String(s.recipe.seed) }) : exportFast(sg, s.title, null, null, { songs, seed: String(s.recipe.seed) }))) return;
     } catch (e) { console.warn('[session export]', e); }

@@ -26,6 +26,8 @@ The app turns songs and radio sessions into files: audio, video, short vertical 
 
 Every export passes the master limiter, as the app does: the master level, the push of the song's style and the limiter are the same in the render page, so a file never clips and sounds as the song does live ([sound-and-levels.md](sound-and-levels.md)). The render removes the limiter's 5 ms delay, so the file and its timeline line up as before.
 
+**Radio sessions with grown songs (radio-profiles D12).** A radio range, a saved session, a frozen session and a fragment of either rebuild the songs as the radio played them: profile, growth, steering, the Custom controls (`rebuild`, `radio.airSongs`). A session of Classic songs exports as before, one joined song with Classic controls. With a grown song the file plays window by window, as the radio moves its window (`sessionPlayable` in `src/main.js`): the song on air in its own view, the next one shown or hidden as the radio shows it, its code appearing whole when the song goes on air. The timeline and the video show only the code shown; the render page evaluates it with the hidden tail, and each segment carries the buses and functions of its song on air (`segmentAt`). The video types each song with its own typist at the video's column width. Fragments of such a session start on a step, and the first steps of a grown song only when nothing else fits. An export started with the radio off records the growth marker in its recipe only when one of its songs grows. Measured on a one-hour Live coder session: see `DEVLOG.md` (2026-10-20).
+
 Long exports (over 10 minutes) are written to disk while they render, so memory stays flat. A sound that fails to load is skipped and named, instead of stopping the export.
 
 ## Options

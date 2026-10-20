@@ -4,12 +4,16 @@ import { buildSteps, sayText } from '../song/build.js';
 import { tempoClock } from '../render/tempo.js';
 
 // the code segments of a playable song: the whole song, or one per live build step (from its bar to the next step)
-export function segmentsOf(sg, codeFor) {
+// within(from, to): optional, only the segments it accepts are written (one block of a long export)
+export function segmentsOf(sg, codeFor, within = null) {
   const bars = sg.meta.bars;
   const ats = sg.build ? [...new Set([0, ...buildSteps(sg.build).map(s => s.at).filter(a => a > 0 && a < bars)])].sort((a, b) => a - b) : [0];
   // run: the code evaluated, when it is more than the code shown (hidden mixer and voice, code-writing)
   // paste: how many lines the typing towards this step may paste whole (the live build's paste rule, for the video)
-  return ats.map((from, i) => { const code = codeFor(sg, from); return { from, to: i + 1 < ats.length ? ats[i + 1] : bars, code, ...(sg.run ? { run: sg.run(code, from) } : {}), ...(sg.paste && from > 0 ? { paste: sg.paste(from) } : {}) }; });
+  // segmentAt(from): what a joined radio session adds per segment (radio-profiles D12): the buses and functions of the
+  // song on air, its typing, whether its code appears whole
+  const out = ats.map((from, i) => ({ from, to: i + 1 < ats.length ? ats[i + 1] : bars }));
+  return (within ? out.filter(s => within(s.from, s.to)) : out).map(({ from, to }) => { const code = codeFor(sg, from); return { from, to, code, ...(sg.run ? { run: sg.run(code, from) } : {}), ...(sg.paste && from > 0 ? { paste: sg.paste(from) } : {}), ...(sg.segmentAt ? sg.segmentAt(from) : {}) }; });
 }
 
 // the timeline of an exported song: times in seconds from the start of the file

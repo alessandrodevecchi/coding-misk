@@ -41,8 +41,13 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('#radio-start'); await sleep(400);
 
   // from a song card
+  // a known song found by its title, as tools/check-export.cjs does: the first card in the page may be on another page of
+  // the list or hidden by the search
   await page.click('[data-tab="brani"]'); await sleep(500);
-  const card = await page.$('#songs [data-song-id] [data-act="radio"]');
+  const CARD = 'primo-segnale', cardTitle = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'songs', `${CARD}.json`), 'utf8')).title;
+  const sel = `#songs [data-song-id="${CARD}"] [data-act="radio"]`;
+  if (!(await page.isVisible(sel))) { await page.fill('#sv-q', cardTitle); await sleep(800); }
+  const card = (await page.isVisible(sel)) ? await page.$(sel) : null;
   check(!!card, 'song cards have "Continue in radio"');
   if (card) {
     const id = await card.evaluate(b => b.closest('[data-song-id]').dataset.songId);

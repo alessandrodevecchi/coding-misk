@@ -47,9 +47,9 @@ Each stage ends with its checks green before the next starts. "Verify" names the
 
 ## 7. Exports
 
-- [ ] 7.1 `rebuild` and the render page with growth, steering and the hidden tail; verify `npm run check:export` and `node tools/check-export.cjs` on a saved session with Live coder songs (fast and real time sound the same)
-- [ ] 7.2 Radio fast export of a one-hour Live coder session; verify it completes and report the speed in `DEVLOG.md`
-- [ ] 7.3 Session video and fast video show only the song on air, typed with the video's width; fragments start after a lead-in; verify `npm run check:video`, `node tools/check-video.cjs`, `npm run check:clips`
+- [x] 7.1 `rebuild` and the render page with growth, steering and the hidden tail; verify `npm run check:export` and `node tools/check-export.cjs` on a saved session with Live coder songs (fast and real time sound the same)
+- [x] 7.2 Radio fast export of a one-hour Live coder session; verify it completes and report the speed in `DEVLOG.md`
+- [x] 7.3 Session video and fast video show only the song on air, typed with the video's width; fragments start after a lead-in; verify `npm run check:video`, `node tools/check-video.cjs`, `npm run check:clips`
 
 ## 8. Artist, docs and listening
 

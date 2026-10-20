@@ -153,6 +153,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       // a grown song stored as heard (radio-profiles D11): never grown again, played with the controls it had
       if (f.grown && f.grown.custom) item.custom = f.grown.custom;
       if (f.grown && f.grown.controls) item.ctl = f.grown.controls;
+      // (a song in blocks of a Custom session shows its code with the Custom controls, as it did on air)
+      if (!f.grown && f.custom) item.custom = f.custom;
       S.stream.push(item);
       return item;
     }
@@ -275,7 +277,17 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       const custom = recipeOptionsAt(recipe, i).custom;
       return { profile: a.profile, free: !!a.free, ...(custom ? { custom: clone(custom) } : {}) };
     };
-    return out.map((x, i) => { const g = grownOf(x, i); return { song: x.song, transition: x.entry.transition || null, artist: x.entry.artist ? x.entry.artist.name : '', ...(g ? { grown: g } : {}) }; });
+    // (a song in blocks of a Custom session keeps the Custom controls its code was shown with)
+    const customOf = (x, i) => (x.entry && x.entry.lead ? null : recipeOptionsAt(recipe, i).custom || null);
+    return out.map((x, i) => { const g = grownOf(x, i), c = g ? null : customOf(x, i); return { song: x.song, transition: x.entry.transition || null, artist: x.entry.artist ? x.entry.artist.name : '', ...(g ? { grown: g } : {}), ...(c ? { custom: clone(c) } : {}) }; });
+  }
+  // the songs of rebuilt items as the radio plays them (radio-profiles D12, the exports): the profile, the controls and
+  // whether a song not on air is shown, as windowPlayable gives them
+  function airSongs(items) {
+    return items.map(x => {
+      const g = x.grown || {}, y = { song: x.song, ...(g.controls ? { ctl: g.controls } : {}), ...(g.custom || x.custom ? { custom: g.custom || x.custom } : {}) };
+      return { profile: profileOf(y), custom: !!y.custom, ctl: controlsOf(y), show: showOf(y) };
+    });
   }
   // ---------- fast export of the radio (#8) ----------
   // a song's seconds from its sections (a tempo ramp counts at its middle)
@@ -284,14 +296,19 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // song on air, { kind: 'minutes', minutes } from the song on air until the length is reached. With the radio off the
   // ranges start at the first song of a new session (the seed field and the options as they are).
   function exportItems(range) {
-    const recipe = S ? clone(S.recipe) : { seed: createSession(recipes, seedField || undefined).seed, options: current(), changes: [] };
+    // with the radio off: a new session, with the growth marker when one of its songs grows (radio-profiles D12; a session
+    // of Classic songs keeps the recipe it had)
+    const recipe = S ? clone(S.recipe) : { seed: createSession(recipes, seedField || undefined).seed, options: current(), changes: [], growth: GROWTH_ON_AIR };
+    const marked = (r, items) => { if (!S && !items.some(x => x.grown)) delete r.growth; return items; };
     const from = S ? S.stream[S.onAir].n : 0;
     let items;
     // a clip (#5): one song composed to the clip's length, at full energy, from a new seed each time
     if (range.kind === 'clip') {
       const sec = Math.max(5, Math.min(600, +range.seconds || 30));
-      const clip = { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), fit: Math.max(4, sec - 1) }, changes: [] };
-      return { recipe: clip, items: rebuild(clip, 1), from: 0 };
+      const clip = { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), fit: Math.max(4, sec - 1) }, changes: [], growth: GROWTH_ON_AIR };
+      const items = rebuild(clip, 1);
+      if (!items.some(x => x.grown)) delete clip.growth;
+      return { recipe: clip, items, from: 0 };
     }
     if (range.kind === 'now') { if (!S) return null; items = rebuild(recipe, from + 1); }
     else if (range.kind === 'songs') items = rebuild(recipe, from + Math.max(1, range.n | 0));
@@ -300,6 +317,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       // the songs from the one on air, minus the bars their transitions overlap, until the target
       items = rebuild(recipe, 1e4, out => out.length > from && out.slice(from).reduce((a, x, i, l) => a + songSeconds(x.song) - (i < l.length - 1 ? overlapOf(x.entry.transition) * 240 / (x.song.sections[x.song.sections.length - 1].bpm || 120) : 0), 0) >= target);
     }
+    marked(recipe, items);
     return { recipe, items: items.slice(range.kind === 'now' ? 0 : from), from: range.kind === 'now' ? 0 : from };
   }
   // a session item of a playlist: the songs heard so far (the one on air included)
@@ -1057,7 +1075,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   }
 
   return {
-    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, soulSource, continueSong, playSession, rebuild, exportItems,
+    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, soulSource, continueSong, playSession, rebuild, exportItems, airSongs,
     // the session on air as a playlist item (#38)
     get sessionNow() { return S && !S.limit ? sessionItem(S.recipe, S.onAir + 1, S.stream[0].song.title) : null; },
     get steering() { if (!S) return null; const it = S.stream[S.onAir]; if (!it.plan) return { n: it.n, lead: true, commands: [], plan: null, song: it.song, recipe: clone(S.recipe) }; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },

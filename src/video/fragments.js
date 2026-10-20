@@ -49,8 +49,9 @@ export function pickFragments(shape, bpm, { n = 3, length = 30, seed = 'fragment
     if (shape.steps) {
       if (!shape.steps.includes(b)) continue;
       score *= 1 + 0.15 * shape.steps.filter(x => x >= b && x < b1).length;
-      // the first bars, where one sound plays alone: only when nothing else fits
-      if (b === 0) score *= 0.01;
+      // the first bars, where one sound plays alone: only when nothing else fits (in a session, the first steps of each
+      // grown song: shape.leads)
+      if (b === 0 || (shape.leads && shape.leads.includes(b))) score *= 0.01;
     }
     if (score > 0) cands.push({ start, end, bar: b, score });
   }

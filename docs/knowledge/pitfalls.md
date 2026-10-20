@@ -53,6 +53,8 @@ Mistakes that cost time before. Each line says what goes wrong and what to do. T
 - **They need the dev server** on `http://localhost:5173` and `PLAYWRIGHT_CORE` set (see `AGENTS.md`).
 - **Song lists are paged by 20.** A check that looks for a song on the first page breaks when songs are added. Search by title.
 - **The first song selection can be ignored** by a fresh page. Select again until the editor shows the song's sections.
+- **The code shown types ahead of the sound.** Live typing starts the edit toward the next step early: a spoken line on bar 0 leaves the panel about a bar later, while what plays changes only at the step. Read the code shown often (every 0.2 s) or read the code evaluated.
+- **Two fast exports are not bit-identical.** The render is seeded, but the WAV samples still differ a little from run to run. To prove an export unchanged compare the timeline, the recipe and the track list byte for byte, and the audio against the run-to-run difference.
 - **Background tabs stop animation frames.** Tempo, steps and the radio run from a worker timer when the tab is hidden; do not move them back to frames.
 
 ## Writing

@@ -2,7 +2,7 @@
 // the editor, plus the app's own samples) renders a song into an OfflineAudioContext, apart from the live audio.
 // Superdough keeps one audio context and reuses audio nodes, so a fresh page renders each export.
 // Messages from the app: { render: job }. To the app: { ready }, { progress, phase }, { done, channels, sampleRate, onsets }, { error }.
-// job: { segments: [{ from, to, code }] in bars, bpm: per bar, from / to: the window in seconds (a block of a long
+// job: { segments: [{ from, to, code, run?, buses?, fns? }] in bars, bpm: per bar, from / to: the window in seconds (a block of a long
 // export), tail: seconds after it, keepFrom: onsets before it belong to the block before, sampleRate, gain: the master level,
 // push: the style's push into the master limiter (level-headroom, 1 for none) }
 import { repl, register as strudelRegister } from '@strudel/core';
@@ -70,6 +70,8 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   for (const seg of segments) {
     const a = Math.max(seg.from, c0), b = Math.min(seg.to, c1);
     if (b <= a) continue;
+    // (a joined radio session: each segment has the buses and functions of its song on air, radio-profiles D12)
+    if (seg.buses || seg.fns) { globalThis.miskBuses = seg.buses || buses; useFns(seg.fns || fns); }
     const pattern = await R.evaluate(seg.run || seg.code, false);
     if (!pattern) throw new Error('evaluation failed');
     for (const hap of pattern.queryArc(a, b, { _cps: T.cps(a) })) {
