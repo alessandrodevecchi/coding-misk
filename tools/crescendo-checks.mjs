@@ -8,7 +8,8 @@
 //     song it covers ran (full level, or a protected check without --songs): counts and medians over the whole corpus
 //     are checked only then.
 //   protect: true marks the fixtures and the checks of the Classic and Crescendo builds (cheap), run on every song at
-//     every level. parts: a list; the check then runs as one task per song and part, each(s, part), rows in song then
+//     every level. The Live coder fixtures (costly, and they move on purpose with SHAPES_VERSION) run on the quick
+//     songs at the quick level and on every song with --full. parts: a list; the check then runs as one task per song and part, each(s, part), rows in song then
 //     part order.
 // A check prints extra lines with log() (they come back with its result).
 import fs from 'node:fs';
@@ -494,7 +495,7 @@ export const CHECKS = [
     const tot = w => rep.filter(r => r.which === w).reduce((a, r) => a + r.rushed, 0);
     assert(tot('after') * 3 <= tot('before'), `rushed steps ${tot('before')} → ${tot('after')}`);
   } },
-  { name: 'fixtures: a change to the shape rules raises SHAPES_VERSION (Live coder builds)', protect: true, songs: all, each: s => print(coder(s)),
+  { name: 'fixtures: a change to the shape rules raises SHAPES_VERSION (Live coder builds)', songs: all, each: s => print(coder(s)),
     after(rows) {
       const r = fixtures(CODER_FIXTURES, SHAPES_VERSION, rows, '--write-fixtures');
       if (!r) return;

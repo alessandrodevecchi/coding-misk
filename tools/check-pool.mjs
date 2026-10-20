@@ -27,23 +27,31 @@ const TIMINGS = path.join(CACHE_DIR, 'timings.json');
 // the workers the time rules give: { n, why }
 export function ruleWorkers(now = new Date(), cpus = os.cpus().length) {
   const h = now.getHours(), weekend = now.getDay() === 0 || now.getDay() === 6;
-  if (h >= 8 && h < 20) return weekend ? { n: Math.min(6, cpus), why: 'weekend day: 6' } : { n: Math.min(4, cpus), why: 'weekday 08:00-20:00: 4' };
-  return { n: Math.max(1, cpus - 1), why: `night: all cores but one (${cpus} - 1)` };
+  // fast: how many workers may use the performance cores (nice); the others run in the background (efficiency cores)
+  if (h >= 8 && h < 20) return weekend ? { n: Math.min(6, cpus), fast: 2, why: 'weekend day: 6, 2 fast' } : { n: Math.min(4, cpus), fast: 2, why: 'weekday 08:00-20:00: 4, 2 fast' };
+  const n = Math.max(1, cpus - 1);
+  return { n, fast: n, why: `night: all cores but one (${cpus} - 1), all fast` };
 }
 const posInt = v => (/^\s*\d+\s*$/.test(String(v ?? '')) && +v >= 1 ? +v : null);
 // the workers at start: CHECK_WORKERS or the time rules
 export function startWorkers(env = process.env, now = new Date()) {
-  const n = posInt(env.CHECK_WORKERS);
-  return n ? { n, why: `CHECK_WORKERS=${n}` } : ruleWorkers(now);
+  const n = posInt(env.CHECK_WORKERS), rule = ruleWorkers(now);
+  return n ? { n, fast: Math.min(n, rule.fast), why: `CHECK_WORKERS=${n}, ${Math.min(n, rule.fast)} fast` } : rule;
 }
 // the workers now: the control file when it holds a number, else the start number
 export function workersNow(start, file = CONTROL_FILE) {
   let v = null;
   try { v = posInt(fs.readFileSync(file, 'utf8')); } catch (e) { /* no file */ }
-  return v ? { n: v, why: `${path.basename(file)}: ${v}` } : start;
+  return v ? { n: v, fast: Math.min(v, start.fast ?? v), why: `${path.basename(file)}: ${v}` } : start;
 }
-// the command that starts a node process at low priority. CHECK_PRIORITY=nice uses nice on macOS too (the workers
-// keep the performance cores: faster, less quiet), CHECK_PRIORITY=normal starts them as they are
+// the command of a fast worker: nice (any core, below the owner's apps)
+function niceCommand() {
+  if (spawnSync('sh', ['-c', 'command -v nice'], { stdio: 'ignore' }).status === 0) return ['nice', ['-n', '10', process.execPath], 'nice -n 10'];
+  return [process.execPath, [], 'normal priority'];
+}
+// the command that starts a background worker at low priority. CHECK_PRIORITY=nice uses nice on macOS too (the workers
+// keep the performance cores: faster, less quiet), CHECK_PRIORITY=normal starts them as they are; with CHECK_PRIORITY
+// set every worker uses that command
 function lowCommand() {
   const want = process.env.CHECK_PRIORITY || 'background';
   if (want === 'background' && process.platform === 'darwin' && fs.existsSync('/usr/sbin/taskpolicy')) return ['/usr/sbin/taskpolicy', ['-b', process.execPath], 'taskpolicy -b'];
@@ -64,7 +72,8 @@ function writeTimings(name, times) {
 export function runPool(module, tasks, opts = {}) {
   const name = opts.name || path.basename(module), log = opts.log || (s => console.error(s));
   const control = opts.control || CONTROL_FILE, start = opts.start || startWorkers();
-  const [cmd, pre, how] = lowCommand();
+  const [bgCmd, bgPre, bgHow] = lowCommand(), [fastCmd, fastPre] = niceCommand();
+  const how = process.env.CHECK_PRIORITY ? bgHow : `fast workers nice, the others ${bgHow}`;
   const known = (readTimings()[name]) || {};
   // the longest tasks first (unknown ones first of all: they may be new and long)
   const queue = tasks.map((t, i) => i).sort((a, b) => (known[tasks[b].id] ?? Infinity) - (known[tasks[a].id] ?? Infinity) || a - b);
@@ -98,8 +107,10 @@ export function runPool(module, tasks, opts = {}) {
       grow();
     };
     const spawnOne = () => {
+      const fastNow = [...alive].filter(x => x.fast).length, fast = !process.env.CHECK_PRIORITY && fastNow < (workersNow(start, control).fast ?? 0);
+      const [cmd, pre] = fast ? [fastCmd, fastPre] : [bgCmd, bgPre];
       const proc = spawn(cmd, [...pre, '--no-warnings', WORKER, module], { cwd: ROOT, stdio: ['ignore', 'inherit', 'inherit', 'ipc'] });
-      const w = { proc, ready: false, task: null };
+      const w = { proc, ready: false, task: null, fast };
       alive.add(w);
       maxSeen = Math.max(maxSeen, alive.size);
       proc.on('message', m => {
@@ -159,8 +170,9 @@ async function selfTest() {
   console.log(`      ${lines.join(' | ')}`);
   const day = ruleWorkers(new Date(2026, 9, 20, 15), 10), sat = ruleWorkers(new Date(2026, 9, 24, 15), 10), night = ruleWorkers(new Date(2026, 9, 20, 23), 10), early = ruleWorkers(new Date(2026, 9, 20, 7, 59), 10);
   assert(day.n === 4 && sat.n === 6 && night.n === 9 && early.n === 9, `rules: ${day.n} ${sat.n} ${night.n} ${early.n}`);
+  assert(day.fast === 2 && sat.fast === 2 && night.fast === 9, `fast workers: ${day.fast} ${sat.fast} ${night.fast}`);
   assert(startWorkers({ CHECK_WORKERS: '8' }).n === 8 && startWorkers({ CHECK_WORKERS: 'x' }, new Date(2026, 9, 20, 15)).n === Math.min(4, os.cpus().length), 'CHECK_WORKERS');
-  console.log('ok    rules: weekday 15:00 → 4, Saturday 15:00 → 6, 23:00 and 07:59 → cores - 1, CHECK_WORKERS=8 → 8');
+  console.log('ok    rules: weekday 15:00 → 4 (2 fast), Saturday 15:00 → 6 (2 fast), 23:00 and 07:59 → cores - 1 (all fast), CHECK_WORKERS=8 → 8');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
