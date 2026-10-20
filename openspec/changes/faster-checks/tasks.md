@@ -12,3 +12,8 @@
 
 - [ ] 3.1 Stale catalog is a warning in `check:knowledge`
 - [ ] 3.2 Checks map, `AGENTS.md` (full checks before a merge and after growth changes), knowledge notes, DEVLOG entry in Italian
+
+## 4. Machine and reruns
+
+- [ ] 4.1 Low priority (`taskpolicy -b` on macOS, `nice` elsewhere) and workers: 4 by day (08:00-20:00), all cores but one at night, `CHECK_WORKERS` overrides; measure the full level by day and by night setting
+- [ ] 4.2 `--only <check>` and `--songs <list>` filters in `check:crescendo`; the rule "targeted rerun, then quick level; full level after growth changes and before merge" in the checks map and `AGENTS.md`

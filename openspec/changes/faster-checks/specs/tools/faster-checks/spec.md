@@ -31,3 +31,21 @@ The checks map and `AGENTS.md` SHALL list the full checks to run before a merge 
 #### Scenario: Before merge
 - **WHEN** an agent prepares a merge to main
 - **THEN** the checks map tells it to run the full crescendo level and rebuild the catalog
+
+### Requirement: Checks leave the machine usable
+Parallel checks SHALL run at low priority (macOS background policy where available) and SHALL use at most 4 worker processes between 08:00 and 20:00 local time and all cores but one at night. The variable `CHECK_WORKERS` SHALL override the number in both cases.
+
+#### Scenario: Day
+- **WHEN** the full crescendo check runs at 15:00 with no variable set
+- **THEN** it uses at most 4 workers at low priority
+
+#### Scenario: Night or override
+- **WHEN** it runs at 23:00, or with `CHECK_WORKERS=8`
+- **THEN** it uses all cores but one, or 8 workers
+
+### Requirement: Targeted reruns
+`check:crescendo` SHALL accept a filter by check and by song, so that a failure can be fixed and rerun on the failing songs only. After a targeted fix the quick level SHALL be enough for a commit; the full level SHALL be needed after changes to growth rules, shapes or typing, and before a merge to main.
+
+#### Scenario: One failing song
+- **WHEN** a check fails on two songs and the fix is done
+- **THEN** `check:crescendo --only <check> --songs <a,b>` reruns just that in a few minutes, then the quick level runs before the commit
