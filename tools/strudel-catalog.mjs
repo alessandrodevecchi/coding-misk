@@ -3,11 +3,14 @@
 // docs/strudel/variety.json is written by hand and only read.
 //   npm run catalog:strudel
 // The output depends only on the installed packages and the generated code: two runs give the same files.
+// The generated code comes from the shared code cache (tools/strudel-code.mjs codeScan, faster-checks); --no-cache
+// generates it all again and must write the same files.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readFunctions, lookup, ROOT } from './strudel-functions.mjs';
-import { collectCalls, coverageOf, KINDS, RADIO_MINUTES } from './strudel-code.mjs';
+import { collectCalls, collectNames, codeScan, coverageOf, KINDS, RADIO_MINUTES } from './strudel-code.mjs';
+import { cacheLine, cachePrune } from './code-cache.mjs';
 import { LIBRARY, NAMES } from '../src/song/functions.js';
 
 export const FILES = {
@@ -146,10 +149,11 @@ export function inputsStamp() {
   return { hash: h.digest('hex'), files: files.length };
 }
 
-// builds everything: { catalog, coverage, files: { path → text } }
-export function build() {
+// builds everything: { catalog, coverage, files: { path → text } } (calls: collectCalls() of the code set, or the same
+// from codeScan())
+export function build(calls = collectCalls()) {
   const catalog = readFunctions(), L = lookup(catalog);
-  const coverage = coverageOf(catalog, collectCalls(), L);
+  const coverage = coverageOf(catalog, calls, L);
   const { unknown, ...stored } = coverage;
   const stamp = { note: 'Written by npm run catalog:strudel: a hash of the inputs of the catalog and coverage. npm run check:knowledge fails when the code changed since.', ...inputsStamp() };
   return {
@@ -159,7 +163,7 @@ export function build() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
-  const t = Date.now(), { catalog, coverage, unknown, files } = build();
+  const t = Date.now(), { catalog, coverage, unknown, files } = build(collectNames(await codeScan()));
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const old = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
@@ -167,6 +171,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
     console.log(`${old === text ? 'same   ' : 'written'}  ${path.relative(ROOT, file)}`);
   }
   const fn = catalog.functions, documented = fn.filter(f => f.documented).length, written = Object.keys(coverage.functions).length;
-  console.log(`\n${fn.length} functions (${documented} documented, ${fn.length - documented} undocumented), ${written} written by the app, ${fn.length - written} never written; ${coverage.source.codes} code texts read in ${((Date.now() - t) / 1000).toFixed(1)} s`);
+  console.log(`\n${fn.length} functions (${documented} documented, ${fn.length - documented} undocumented), ${written} written by the app, ${fn.length - written} never written; ${coverage.source.codes} code texts read in ${((Date.now() - t) / 1000).toFixed(1)} s; ${cacheLine()}`);
+  cachePrune();
   if (Object.keys(unknown).length) console.log(`names not in the catalog (npm run check:strudel): ${Object.keys(unknown).join(', ')}`);
 }

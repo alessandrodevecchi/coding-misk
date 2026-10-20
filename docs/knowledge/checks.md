@@ -21,7 +21,7 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 | The director, steering, transitions | `check:endless`, `check:compilation` | `check-radio.cjs`, `check-steering.cjs`, `check-transitions.cjs` |
 | Profiles and growth on air, the code on air, commands as waypoints (`src/endless/growth.js`, `src/endless/items.js`, `src/endless/waypoints.js`, `src/live/air-code.js`) | `check:radio-profiles`, `check:endless`, `check:live-code` | `check-radio.cjs`, `check-compact-code.cjs` (radio window), `check-transitions.cjs` (Live coder runs), `check-steering.cjs` (Live coder steering at its end) |
 | The material generator | `check:material`, `check:endless`, `check:patterns` | `check-patterns.cjs` |
-| Growth shapes, Crescendo, profiles, typing | `check:crescendo`, `check:profiles`, `check:live-code`, `check:typing`, `check:functions` | `check-crescendo-play.cjs`, `check-hand.cjs` |
+| Growth shapes, Crescendo, profiles, typing | `check:crescendo -- --full`, `check:profiles`, `check:live-code`, `check:typing`, `check:functions` | `check-crescendo-play.cjs`, `check-hand.cjs` |
 | App functions, the writer | `check:functions`, `check:strudel`, `check:live-code` | `check-compact-code.cjs` |
 | The voice | `check:spoken`, `check:endless` | `check-spoken-play.cjs` |
 | Export, video, fragments | `check:export`, `check:video`, `check:clips` | `check-export.cjs`, `check-video.cjs`, `check-clips.cjs` |
@@ -29,10 +29,28 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 | Interface text or the Guide | `check:guide` | `check-modes.cjs` |
 | Anything a note or a recipe describes | `check:knowledge` | |
 | Strudel version, sounds | `catalog:strudel`, `check:strudel`, `check:sound-guard` | `check-sounds.cjs`, `check-style-sounds.cjs` |
+| The generator, app functions, the writer (Strudel the app writes) | `catalog:strudel`, then `knowledge` | |
+| The check tools themselves (`tools/check-pool.mjs`, `tools/code-cache.mjs`) | `check:workers` | |
+| Before a merge to main | `check:crescendo -- --full`, `catalog:strudel`, `knowledge`, `check:knowledge`, and the checks of every area the branch touched | the browser checks of those areas |
 
 Always run `npm run build` before handing over a change to the app.
 
-How long they take on the owner's machine (measured 2026-10-19, partly while another heavy job ran): most Node checks finish in under 2 seconds. `check:endless` about 15 s, `check:knowledge` about 13 s, `check:live-code` 2 s. Slow ones: `check:strudel` about 6 minutes, `check:functions` about 10 minutes, `catalog:strudel` about 7 minutes, `check:crescendo` more than 30 minutes. Run the slow ones when you touched their area, not on every edit. Browser checks take one to a few minutes each; `check-ideas.cjs` about 8 minutes, `check-sounds.cjs` much longer (thousands of files).
+How long they take on the owner's machine (measured 2026-10-19, partly while another heavy job ran): most Node checks finish in under 2 seconds. `check:endless` about 15 s, `check:knowledge` about 13 s, `check:live-code` 2 s. Slow ones, before faster-checks (one process, normal priority): `check:strudel` and `catalog:strudel` about 6 minutes, `check:functions` about 10 minutes, `check:crescendo` about 45 minutes. Since faster-checks (2026-10-20, 4 workers at `taskpolicy -b`, the Mac busy with other work): with nothing changed they read the cache in under a second (`catalog:strudel` 0.5 s, `check:strudel` 0.3 s, `check:functions` 0.4 s, `check:crescendo` 0.5 s). After a change to the code they import: `catalog:strudel` or `check:strudel` about 7 to 8 minutes, `check:functions` about 18 minutes, `check:crescendo` quick level about 10 minutes, full level about 45 minutes (the Live coder fixture alone, on every song, is most of the quick level). Run the slow ones when you touched their area, not on every edit. Browser checks take one to a few minutes each; `check-ideas.cjs` about 8 minutes, `check-sounds.cjs` much longer (thousands of files).
+
+### Levels, cache and workers
+
+The rule for the slow checks:
+
+1. A slow check fails: fix it, then rerun only what failed: `npm run check:crescendo -- --only <part of the check name> --songs <a,b>` (or `ONLY=` and `SONGS=`). A targeted run proves the fix, not the commit.
+2. A normal commit: the quick level, `npm run check:crescendo`. It runs the Classic, Crescendo and Live coder fixtures on every song and every other check on a fixed sample of songs (`QUICK_SONGS` in `tools/check-crescendo.mjs`). Counts and medians over the corpus (for example "more than 500 builds") are printed, not checked.
+3. After a change to growth rules, shapes or typing, and before a merge to main: the full level, `npm run check:crescendo -- --full`.
+4. When Strudel, the generator or the app functions change, and before a merge to main: `npm run catalog:strudel`, then `npm run knowledge`. A stale catalog is only a warning in `check:knowledge`.
+
+`catalog:strudel`, `check:strudel`, `check:functions` and `check:crescendo` keep what they generate in `.cache/checks/` (git-ignored, `tools/code-cache.mjs`). An item is a song with its live builds, a style's radio session, or a check's work on one song. Its key is a hash of its inputs (the song file or the recipes, the profile and options) and of the app code the tool imports, followed as `docs/strudel/inputs.json` does, plus the Strudel package versions. An edited song is generated again alone; any change to `src/` code a tool imports regenerates all of that tool's items. `--no-cache` (or `CHECK_CACHE=off`) neither reads nor writes the cache and gives the same result. Entries unused for 14 days are deleted.
+
+What is not in the cache runs in worker processes (`tools/check-pool.mjs`), one song or one fixed-song check per task, longest first, results in song order: the same result on any number of workers. Workers run at low priority (`taskpolicy -b` on macOS, `nice -n 10` elsewhere). How many: 4 on weekdays 08:00-20:00, 6 by day on Saturday and Sunday, all cores but one at night. `CHECK_WORKERS=n` overrides the time rules. A number in `.check-workers` at the repo root (git-ignored) wins over both and is read again before each task: lower it and busy workers finish their song, then stop; raise it and new workers start; delete it to go back to the rules. `node tools/check-pool.mjs` prints the number a check would use now; `npm run check:workers` tests a control file changed during a run.
+
+On the owner's Mac (Apple M4: 4 performance and 6 efficiency cores) `taskpolicy -b` keeps the workers on the efficiency cores: more than 6 workers do not run faster there.
 
 ## Every check
 
@@ -73,6 +91,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-player.cjs` |  | dev server, Chrome | Browser checks for the player bar and the global volume (#32). |
 | `tools/check-playlists.cjs` |  | dev server, Chrome | Browser checks for playlists (#36): favourites migration, "+ Playlist", the Playlists tab, auto-advance, shuffle, repeat one, export and import, phone width. |
 | `tools/check-playlists.mjs` | `npm run check:playlists` | Node | Checks for playlists (#36): store, migration of the old favourites, play queue, export and import. No browser. |
+| `tools/check-pool.mjs` | `npm run check:workers` | Node | Worker processes for the slow checks (faster-checks). No browser. runPool(module, tasks) hands tasks (one song, one check) to worker processes that import the module once and call its runTask(task); the results come… |
 | `tools/check-profiles.mjs` | `npm run check:profiles` | Node | Checks for performance profiles and code comments (performance-profiles). No browser. |
 | `tools/check-radio-profiles.mjs` | `npm run check:radio-profiles` | Node | Checks for profiles in the radio (radio-profiles). No browser. Radio fixtures (tests/snapshots/radio-growth.json): hashes of the radio items of three sessions in Classic (styles, an artist, a compilation), as the radio… |
 | `tools/check-radio.cjs` |  | dev server, Chrome | Browser checks for the radio (#22): tab, controls, determinism against the director, song changes, options from the next song, exclusive playback, history, save, open in Compose, replay. |
@@ -100,6 +119,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-typing.mjs` | `npm run check:typing` | Node | Checks for the typing of the code that types itself (live-typing): only the words that change are touched, a person's speed for small edits and faster for long ones, the last frame is the new code, a deadline is kept;… |
 | `tools/check-video.cjs` |  | dev server, Chrome | Browser checks for the session video (#27): a song records a file with a video and an audio track at the chosen size, the code layout draws the code beside the stage, cancel saves nothing, the radio records a video with… |
 | `tools/check-video.mjs` | `npm run check:video` | Node | Checks for the session video (#27): layout areas fill the frame without overlap, the soul panel keeps the soul screen's proportions, the recording format falls back to WebM, the title card modes. No browser. |
+| `tools/check-worker.mjs` |  | Node | A worker process of tools/check-pool.mjs (faster-checks): imports the module named on the command line once, then runs each task it is sent with the module's runTask(task) and sends the result back. Not run by hand. |
 | `tools/snapshot-code.mjs` | `npm run snapshot:code` | Node | Saves or checks the Strudel code generated for every song in songs/ (no browser needed). |
 | `tools/snapshot-levels.cjs` |  | dev server, Chrome | Saves or checks peak levels per instrument for every scene of every built-in track (dev server on :5173). |
 <!-- /generated -->

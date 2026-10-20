@@ -25,11 +25,11 @@ Functions in the shipped Strudel: 610. Written by the app: 67. Never written: 54
 
 ## Options
 
-There are no user options. `npm run catalog:strudel` (several minutes) writes these files after a Strudel update, and after any change to the code that writes Strudel:
+There are no user options. `npm run catalog:strudel` writes these files when Strudel, the generator or the app functions change, and before a merge to main. It reads the generated code from the shared cache in `.cache/checks/`: only songs and styles that changed are generated again, and everything after a change to the code that writes Strudel (in worker processes, see [checks.md](checks.md#levels-cache-and-workers)):
 
 - `docs/strudel/functions.json`: every function, its synonyms, parameters and description.
 - `docs/strudel/coverage.json`: which functions the app writes, counted in songs, live builds, radio songs and the hidden code.
-- `docs/strudel/inputs.json`: a hash of everything the catalog reads. `npm run check:knowledge` fails when the code no longer matches it, so the lists below are never older than the code.
+- `docs/strudel/inputs.json`: a hash of everything the catalog reads. `npm run check:knowledge` warns when the code no longer matches it, so a stale list below is never unseen.
 - `docs/strudel/variety.json` is written by hand, not generated: notes on the functions useful for variety, and the change that uses them.
 
 The coverage counts a function by its catalog name. The app may write a synonym: `rib` is `ribbon`, `seg` is `segment`, `fm2` is `fmi2`. A function written under any of its names is not listed as unused. One known hole: the code view "one line per track" writes `.pick([...])`, but the coverage does not read that view, so `pick` still shows as unused.

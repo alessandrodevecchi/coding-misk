@@ -6,10 +6,14 @@
 // an app name is a Strudel function or synonym (song-functions), and when the catalog was made from other package
 // versions than the installed ones. Warns, without failing, on undocumented functions the app writes, on hand notes
 // for names not in the catalog, and when docs/strudel/coverage.json is out of date.
+// The code set comes from the shared code cache (tools/strudel-code.mjs codeScan, faster-checks): only songs and
+// recipes that changed, or all of it after a change to the app code that writes it, are generated again, in worker
+// processes. --no-cache generates everything and must print the same result.
 import fs from 'node:fs';
 import { compileSong } from '../src/song/compile.js';
 import { installedVersions, lookup } from './strudel-functions.mjs';
-import { scanCalls, collectCalls, coverageOf, shadowed, HELPERS, APP_NAMES } from './strudel-code.mjs';
+import { scanCalls, collectCalls, collectNames, codeScan, coverageOf, shadowed, HELPERS, APP_NAMES } from './strudel-code.mjs';
+import { cacheLine, cachePrune } from './code-cache.mjs';
 import { LIBRARY, NAMES } from '../src/song/functions.js';
 import { RESERVED } from '../src/song/ideas.js';
 import { FILES, json, readVariety, varietyByEntry } from './strudel-catalog.mjs';
@@ -26,7 +30,8 @@ const unknownText = unknown => Object.entries(unknown).map(([name, by]) => `${na
 
 const warnings = [];
 let run = null;
-const full = () => (run ||= collectCalls());
+const t = Date.now(), scanned = await codeScan();
+const full = () => (run ||= collectNames(scanned));
 const CHECKS = {
   'scanner: strings, template strings and comments are skipped'() {
     const c = scanCalls('$: s("bd.fooBar(2) hh").lpf(800) // .barFoo(1)\n/* .bazQux(3) */\n$: note(`c .quxBaz(2)`).gain(\'.zip(1)\')');
@@ -84,10 +89,10 @@ const CHECKS = {
   },
 };
 
-const t = Date.now();
 let failed = 0;
 for (const [name, fn] of Object.entries(CHECKS)) { try { fn(); console.log(`ok    ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); } }
 for (const w of warnings) console.log(`warn  ${w}`);
-console.log(`\n${run ? `${run.codes} code texts read, ` : ''}${((Date.now() - t) / 1000).toFixed(1)} s`);
+console.log(`\n${run ? `${run.codes} code texts read, ` : ''}${((Date.now() - t) / 1000).toFixed(1)} s; ${cacheLine()}`);
+cachePrune();
 console.log(failed ? `${failed} check(s) failed` : `all ${Object.keys(CHECKS).length} checks passed`);
 process.exit(failed ? 1 : 0);

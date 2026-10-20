@@ -123,9 +123,10 @@ Some parts of a note sit between `<!-- generated:name -->` and `<!-- /generated 
 - a link to a file or a heading is broken;
 - a generated block is out of date, or an inventory block is missing;
 - a task of the index has no recipe, a recipe is not in the index, or a recipe misses a part;
-- the Strudel coverage is older than the code it was built from (run `npm run catalog:strudel`);
 - a function the app writes under a synonym is listed as not written;
 - a code example does not compile, or a note misses a template section.
+
+It warns, without failing, when the Strudel coverage is older than the code it was built from (run `npm run catalog:strudel` when Strudel, the generator or app functions change, and before a merge to main), and when only the list of open changes in `status.md` is out of date (run `npm run knowledge`).
 
 ## Keeping it true
 

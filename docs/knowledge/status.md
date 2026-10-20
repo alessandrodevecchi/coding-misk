@@ -14,14 +14,13 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 58. With open tasks: 20. All tasks ticked, waiting to be archived: 38.
+OpenSpec changes not archived: 58. With open tasks: 19. All tasks ticked, waiting to be archived: 39.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
-| [faster-checks](../../openspec/changes/faster-checks/tasks.md) | 9 | 9 |
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |
 | [idea-model](../../openspec/changes/idea-model/tasks.md) | 3 | 20 |
 | [idiomatic-code](../../openspec/changes/idiomatic-code/tasks.md) | 2 | 8 |
@@ -39,7 +38,7 @@ OpenSpec changes not archived: 58. With open tasks: 20. All tasks ticked, waitin
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 
-Ticked and not archived: `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `fragment-extras`, `human-typing`, `knowledge-base`, `level-headroom`, `live-coder-growth`, `playlists`, `procedural-visuals`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `session-video`, `song-functions`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-function`.
+Ticked and not archived: `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fragment-extras`, `human-typing`, `knowledge-base`, `level-headroom`, `live-coder-growth`, `playlists`, `procedural-visuals`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `session-video`, `song-functions`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-function`.
 <!-- /generated -->
 
 Many open tasks are the owner's listening tests or short videos for the owner. They are not code to write: leave them open and mention them.

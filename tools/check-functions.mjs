@@ -4,8 +4,14 @@
 // written out again is exactly the line of the same code without song and library functions; the compact code is
 // shorter (the reduction is printed). Also: names, parameters, growth, the library, the presets and the update of
 // hand-coded code saved before song-functions.
+// The checks that build songs run in worker processes (tools/check-pool.mjs), the first one song by song, and their
+// results are kept in the shared code cache (tools/code-cache.mjs) under a hash of the song files and of the app code
+// this check runs; --no-cache runs everything again and must print the same result (faster-checks).
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cacheKey, cacheGet, cachePut, cacheLine, cachePrune } from './code-cache.mjs';
+import { runPool } from './check-pool.mjs';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules, cleanOverrides, PROFILES } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
@@ -36,7 +42,8 @@ function builds(song, over = {}) {
 }
 // the song functions a build calls over all its steps: [[name, { params, chain }]]
 const songFns = B => { B.bars.forEach(b => B.c.codeAt(b)); return Object.entries(B.c.fns).filter(([, f]) => !f.lib).sort(([a], [b]) => a.localeCompare(b)); };
-const stats = { steps: 0, lines: 0, folded: 0, compact: 0, written: 0, full: 0, lastCompact: 0, lastWritten: 0, lastFull: 0, fns: 0, lib: new Set(), names: new Map() };
+const newStats = () => ({ steps: 0, lines: 0, folded: 0, compact: 0, written: 0, full: 0, lastCompact: 0, lastWritten: 0, lastFull: 0, fns: 0, lib: new Set(), names: new Map() });
+let stats = newStats();
 // every step: expansion gives the written-out line, line for line → problems
 function expandSteps(file, B, { voice = false } = {}) {
   const bad = [];
@@ -52,14 +59,31 @@ function expandSteps(file, B, { voice = false } = {}) {
   return bad;
 }
 
+// the first check on one song (a worker task): { bad, stats } with the song's share of the numbers
+function songSteps({ file, song }) {
+  stats = newStats();
+  const B = builds(song), bad = expandSteps(file, B);
+  for (const [k, f] of Object.entries(B.c.fns)) { if (f.lib) stats.lib.add(k); else { stats.fns++; stats.names.set(k, (stats.names.get(k) || 0) + 1); } }
+  return { bad, stats: { ...stats, lib: [...stats.lib], names: [...stats.names] } };
+}
+// the songs' shares, added in song order
+function addSteps(rows) {
+  stats = newStats();
+  const bad = [];
+  for (const r of rows) {
+    // a song whose build throws stops the check with its message, as one loop over the songs would
+    if (r.error) throw new Error(r.error);
+    bad.push(...r.bad);
+    for (const [k, v] of Object.entries(r.stats)) if (typeof v === 'number') stats[k] += v;
+    r.stats.lib.forEach(k => stats.lib.add(k));
+    for (const [k, n] of r.stats.names) stats.names.set(k, (stats.names.get(k) || 0) + n);
+  }
+  return bad;
+}
+let songRows = null;
 const CHECKS = {
   'every built-in song, every Live coder step: the functions written out give the line without them'() {
-    const bad = [];
-    for (const { file, song } of songs) {
-      const B = builds(song);
-      bad.push(...expandSteps(file, B));
-      for (const [k, f] of Object.entries(B.c.fns)) { if (f.lib) stats.lib.add(k); else { stats.fns++; stats.names.set(k, (stats.names.get(k) || 0) + 1); } }
-    }
+    const bad = addSteps(songRows || songs.map(songSteps));
     assert(!bad.length, `${bad.length} lines differ:\n${bad.slice(0, 6).join('\n')}`);
     assert(stats.compact < stats.written && stats.lastCompact < stats.lastWritten, `compact ${stats.compact} chars, written out ${stats.written}`);
   },
@@ -176,9 +200,31 @@ const CHECKS = {
   },
 };
 
-let failed = 0;
+// the checks that build songs: worker tasks, cached
+const FIRST = Object.keys(CHECKS)[0];
+const HEAVY = [FIRST, 'voice lines: the voice effects become a song function and expand back', 'song functions: names from the lists, unique, the same every time; at most three parameters', 'what stays written out: sound, notes, rhythm, mask, bus and level', 'the song functions of a song are found once, from the song written in full'];
+// a task: { kind: 'song', file } → songSteps; { kind: 'unit', name } → { error } (null when it passes)
+export function runTask(task) {
+  if (task.kind === 'song') { try { return songSteps(songs.find(x => x.file === task.file)); } catch (e) { return { error: e.message }; } }
+  try { CHECKS[task.name](); return { error: null }; } catch (e) { return { error: e.message }; }
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 const t0 = Date.now();
-for (const [name, fn] of Object.entries(CHECKS)) { try { fn(); console.log(`ok    ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); } }
+const ENTRY = 'tools/check-functions.mjs', texts = songs.map(x => `${x.file}\0${JSON.stringify(x.song)}`).join('\0');
+const tasks = [...songs.map(x => ({ id: x.file, kind: 'song', file: x.file })), ...HEAVY.slice(1).map(name => ({ id: `unit: ${name}`, kind: 'unit', name }))];
+const keyOf = t => (t.kind === 'song' ? cacheKey(ENTRY, 'song', t.file, JSON.stringify(songs.find(x => x.file === t.file).song)) : cacheKey(ENTRY, 'unit', t.name, texts));
+const results = tasks.map(t => cacheGet('functions', keyOf(t))), todo = tasks.map((t, i) => i).filter(i => results[i] === undefined);
+if (todo.length) {
+  const out = await runPool(fileURLToPath(import.meta.url), todo.map(i => tasks[i]), { name: 'check-functions' });
+  out.forEach((r, k) => { results[todo[k]] = r; cachePut('functions', keyOf(tasks[todo[k]]), r); });
+}
+songRows = results.filter((r, i) => tasks[i].kind === 'song');
+const unitError = name => results[tasks.findIndex(t => t.name === name)].error;
+let failed = 0;
+for (const [name, fn] of Object.entries(CHECKS)) {
+  try { if (name !== FIRST && HEAVY.includes(name)) { const e = unitError(name); if (e !== null) throw new Error(e); } else fn(); console.log(`ok    ${name}`); }
+  catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); }
+}
 const pc = (a, b) => `${(100 * (1 - a / b)).toFixed(1)}%`;
 if (stats.steps) {
   console.log(`\n${songs.length} songs, ${stats.steps} Live coder steps, ${stats.lines} lines (${stats.folded} with a function)`);
@@ -186,6 +232,8 @@ if (stats.steps) {
   console.log(`last step of each song: ${pc(stats.lastCompact, stats.lastWritten)} shorter than mixer, ${pc(stats.lastCompact, stats.lastFull)} shorter than full`);
   console.log(`library functions used: ${[...stats.lib].sort().join(', ')}; song functions: ${stats.fns} (${[...stats.names.keys()].slice(0, 12).join(', ')}…)`);
 }
-console.log(`${((Date.now() - t0) / 1000).toFixed(1)} s`);
+console.log(`${((Date.now() - t0) / 1000).toFixed(1)} s; ${cacheLine()}`);
+cachePrune();
 console.log(failed ? `\n${failed} check(s) failed` : `\nall ${Object.keys(CHECKS).length} checks passed`);
 process.exit(failed ? 1 : 0);
+}
