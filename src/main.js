@@ -636,8 +636,10 @@ function loopPlayable(sg, uid = null) {
   const base = { id: 'pattern-loop', title: sg.title, kind: 'pattern', loop: true, uid, meta: parseSong(ref) };
   if (!FUNCTION_OPTIONS.some(k => o[k])) return { ...base, code: ref };
   const buses = busesOf(ref), w = writeCode(ref, { mode: o, written: levelsOf(ref), buses, fns: functionContext(ref, { id: sg.id, title: sg.title }, o) });
-  const run = shown => shown + tail(shown, { table: w.table });
-  const standalone = shown => { const pre = preludeText(buses, w.fns); return pre + shown + tail(shown, { table: w.table, offset: pre.length }); };
+  // the code as written takes its mixer entries line by line; edited by hand, by the text of its lines
+  const entries = shown => (shown === w.code ? w.entries : null);
+  const run = shown => shown + tail(shown, { table: w.table, entries: entries(shown) });
+  const standalone = shown => { const pre = preludeText(buses, w.fns); return pre + shown + tail(shown, { table: w.table, entries: entries(shown), offset: pre.length }); };
   return { ...base, code: w.code, run, standalone, buses, fns: w.fns };
 }
 async function playLoop(sg, uid, title) {

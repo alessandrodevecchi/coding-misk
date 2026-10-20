@@ -1,15 +1,17 @@
 // Browser check for the compact code of Crescendo songs (#64, crescendo-code): for states of a few songs, the events
 // Strudel makes (onset time and every value) are the same with the standard code, the joined lines and one line per
 // track, the short patterns and the lines broken before a function (a velocity of 1 counts as no velocity: the code of
-// the moment drops lanes that are 1). Usage: PLAYWRIGHT_CORE=... node tools/check-compact-code.cjs   (dev server on :5173)
+// the moment drops lanes that are 1). Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-compact-code.cjs   (dev server on
+// PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const PORT = process.env.PORT || 5173;
 const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-notte-lunga', 'ferro', 'cavo-scoperto', 'switch-prima-luce'];
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await (await browser.newContext()).newPage();
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${PORT}/`); await sleep(5000);
   let failed = 0;
   for (const id of SONGS) {
     const res = await page.evaluate(async id => {
@@ -93,6 +95,44 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
       }
       return out;
     }, id);
+    for (const r of res) { const ok = r.same && !r.err; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'}  ${id} bar ${r.bar} ${r.lines || ''}${r.err ? ` (${r.err})` : ''}`); }
+  }
+  // the same in Classic (a live build) and Crescendo: each preset plays what the code in full plays, at a few steps and
+  // at the bars where the hidden mixer once went wrong (luci-rosse bar 39: a hap whose first place is a section lane;
+  // prova-voce-notte: two lines alike once bus and visual are out, on different orbits)
+  for (const [id, profile, extra] of [['luci-rosse', 'classic', [39]], ['luci-rosse', 'crescendo', [39]], ['ferro', 'classic', []], ['ferro', 'crescendo', []], ['prova-voce-notte', 'classic', [32]], ['prova-voce-notte', 'crescendo', [96]]]) {
+    const res = await page.evaluate(async ([id, profile, extra]) => {
+      const [{ crescendoSong }, { liveCode }, { resolveProfile, growthRules }, { buildSteps, deriveBuild }, { useFns }] = await Promise.all(['/src/song/crescendo.js', '/src/live/live-code.js', '/src/live/profiles.js', '/src/song/build.js', '/src/song/writer.js'].map(u => import(u)));
+      const song = await (await fetch(`/songs/${id}.json`)).json(), C = resolveProfile(profile);
+      const b = C.build === 'crescendo' ? crescendoSong(song, { narrated: C.narrated, rules: growthRules(C) }) : { ...song, build: song.build || deriveBuild(song) };
+      const files = { say_it: Array.from({ length: 200 }, (_, i) => `say_it/${i}.wav`), say_en: Array.from({ length: 200 }, (_, i) => `say_en/${i}.wav`) };
+      const e = document.querySelector('strudel-editor').editor;
+      const haps = async (code, a, z) => {
+        await e.repl.evaluate(code, false);
+        if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
+        return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset()).map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), Object.fromEntries(Object.entries(h.value).filter(([, v]) => typeof v !== 'function').sort())])).sort().join('\n');
+      };
+      const mk = functions => liveCode(b, resolveProfile(profile, { functions }), { lang: () => 'it', files: () => files, cols: () => 48 });
+      const full = mk('full'), out = [];
+      const bars = [...new Set(buildSteps(full.build).map(x => x.at))].sort((x, y) => x - y);
+      const pick = [...new Set([bars[1], bars[Math.floor(bars.length / 2)], bars[bars.length - 1], ...extra].filter(x => x !== undefined))].sort((x, y) => x - y);
+      for (const functions of ['short', 'mixer', 'compact']) {
+        const L = mk(functions);
+        for (const bar of pick) {
+          try {
+            globalThis.miskBuses = full.buses; useFns(full.fns);
+            const a = await haps(full.run ? full.run(full.codeAt(bar)) : full.codeAt(bar), bar, bar + 4), shown = L.codeAt(bar);
+            globalThis.miskBuses = L.buses; useFns(L.fns);
+            const z = await haps(L.run ? L.run(shown) : shown, bar, bar + 4);
+            // (the comments of Classic may name the functions: only the code counts)
+            const shownMix = functions !== 'short' && (shown.replace(/\/\/.*$/gm, '').match(/^.*\.(orbit|analyze)\(.*$/m) || [])[0];
+            const first = a === z ? '' : (() => { const x = a.split('\n'), y = z.split('\n'), i = x.findIndex((l, k) => l !== y[k]); return `${x.length} events against ${y.length}; first: ${x[i]} | ${y[i]}`; })();
+            out.push({ bar, lines: `${profile} ${functions}`, same: a === z && !shownMix, err: first || (shownMix ? `mix shown: ${shownMix.trim().slice(0, 120)}` : undefined) });
+          } catch (x) { out.push({ bar, lines: `${profile} ${functions}`, err: x.message }); }
+        }
+      }
+      return out;
+    }, [id, profile, extra]);
     for (const r of res) { const ok = r.same && !r.err; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'}  ${id} bar ${r.bar} ${r.lines || ''}${r.err ? ` (${r.err})` : ''}`); }
   }
   // live-coder in-place edits: the Live coder code of the moment shows one line per part with no section lanes; the

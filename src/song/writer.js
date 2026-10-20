@@ -56,6 +56,15 @@ const keep = cs => {
 };
 // the key of a line in the mixer: its text without the pattern sign, spaces before a call or line breaks
 export const lineKey = l => l.replace(PATTERN, '').replace(/\s*\n\s*\./g, '.').trim();
+// entries of the mixer table whose text two different lines share (two lines alike once bus, visual and level are
+// out): they keep only the values every such line agrees on, never the last line's
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// table: Map(lineKey → entry); adds an entry under a key (another entry there: only the values both agree on)
+export function addEntry(table, key, e) {
+  const old = table.get(key);
+  if (!old) table.set(key, e);
+  else if (!same(old, e)) table.set(key, Object.fromEntries(Object.entries(e).filter(([k, v]) => k in old && same(old[k], v))));
+}
 
 // written levels of a code: analyze id → gain, for lines with one constant level (several levels: none); buses: name →
 // orbit, for names on one bus only (the short `.o(name)`)
@@ -339,23 +348,24 @@ export function functionContext(ref, song = {}, o = {}) {
 const defOf = (name, ctx) => (LIB_BY[name] ? { params: LIB_BY[name].params, chain: LIB_BY[name].chain, lib: true }
   : ctx.table.some(f => f.name === name) ? (({ params, chain }) => ({ params, chain }))(ctx.table.find(f => f.name === name)) : ctx.defs[name]);
 
-// code → { code (shown), table: Map(lineKey → entry), voice (the hidden voice code), fns: name → { params, chain, lib }
-// of the functions it calls }
+// code → { code (shown), table: Map(lineKey → entry), entries (the entry of each pattern line of the code shown, in
+// order, or null), voice (the hidden voice code), fns: name → { params, chain, lib } of the functions it calls }
 // mode: a preset (full, short, mixer, compact) or the options ({ fnBus, … }); written: levelsOf the song as written;
 // buses: busesOf it (fnBus); fns: functionContext of the song (song and voice functions); voice: false hides the
 // voice code (it still plays)
 export function writeCode(code, { mode = 'full', written = new Map(), buses = {}, voice = true, fns = null } = {}) {
-  const o = functionOptions(mode), v = voice ? { shown: code, voice: '' } : splitVoice(code), table = new Map(), defs = {};
-  if (!FUNCTION_OPTIONS.some(k => o[k])) return { code: v.shown, table, voice: v.voice, fns: defs };
+  const o = functionOptions(mode), v = voice ? { shown: code, voice: '' } : splitVoice(code), table = new Map(), defs = {}, entries = [];
+  if (!FUNCTION_OPTIONS.some(k => o[k])) return { code: v.shown, table, entries, voice: v.voice, fns: defs };
   const ctx = fns || { table: [], voices: new Map(), defs: {}, song: {}, avoid: new Set() }, used = new Set();
   const out = chainLines(v.shown).map(l => {
     if (!PATTERN.test(l)) return l;
-    const r = writeLine(l, o, written, buses, ctx, used);
-    if (Object.keys(r.entry).length) table.set(lineKey(r.text), r.entry);
+    const r = writeLine(l, o, written, buses, ctx, used), has = Object.keys(r.entry).length > 0;
+    if (has) addEntry(table, lineKey(r.text), r.entry);
+    entries.push(has ? r.entry : null);
     return r.text;
   });
   for (const name of used) defs[name] = defOf(name, ctx);
-  return { code: out.join('\n'), table, voice: v.voice, fns: defs };
+  return { code: out.join('\n'), table, entries, voice: v.voice, fns: defs };
 }
 // a line with its functions written out again (fns: name → { params, chain }), for the checks
 export function expandLine(line, fns = {}) {
@@ -376,21 +386,28 @@ export function expandLine(line, fns = {}) {
 }
 
 // the hidden tail evaluated after the code shown: the mixer (for each pattern line of the code, by the offsets of its
-// text, what it gets back) and the hidden voice. Lines edited by hand find the most alike line of the table.
+// text, what it gets back) and the hidden voice. entries: the entries of a code written by writeCode (its
+// `entries`), taken by the place of each line, for the code as written; without them a line finds its entry by its
+// text in the table (an ambiguous text gives only what its lines agree on), and lines edited by hand find the most
+// alike line of the table.
 // lanes (live-coder in-place edits): for each pattern line of the code, in order, the section lanes it plays under
 // (["0!76 1!8 0.5 0!31", …], one value per bar, as `.mask(lane).velocity(lane)` would) or null; hidden: lines that
 // play without being shown (the last bar of a fade from the section before)
-export function tail(shown, { table = new Map(), voice = '', like = null, offset = 0, lanes = null, hidden = '' } = {}) {
+export function tail(shown, { table = new Map(), entries = null, voice = '', like = null, offset = 0, lanes = null, hidden = '' } = {}) {
   const ranges = [];
   let at = offset, k = 0;
   for (const l of chainLines(shown)) {
-    if (PATTERN.test(l) && (table.size || lanes)) {
-      const key = lineKey(l);
-      let e = table.get(key);
-      if (!e && like && table.size) { let best = 0.5; for (const [x, v] of table) { const s = like(x, key); if (s >= best) { best = s; e = v; } } }
+    if (PATTERN.test(l) && (table.size || entries || lanes)) {
+      let e;
+      if (entries) e = entries[k] || null;
+      else {
+        const key = lineKey(l);
+        e = table.get(key);
+        if (!e && like && table.size) { let best = 0.5; for (const [x, v] of table) { const s = like(x, key); if (s >= best) { best = s; e = v; } } }
+      }
       const ln = lanes && lanes[k];
       if (ln && ln.length) e = { ...(e || {}), lanes: ln };
-      if (e) ranges.push([at, at + l.length, e]);
+      if (e && Object.keys(e).length) ranges.push([at, at + l.length, e]);
       k++;
     }
     at += l.length + 1;

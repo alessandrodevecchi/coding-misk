@@ -115,12 +115,13 @@ npm run knowledge                                      # rewrite the generated b
 npm run check:knowledge                                # knowledge base: notes, links, generated blocks up to date, every style, command, option and helper covered, examples compile (no browser)
 npm run check:ideas                                    # idea writer: shortest exact forms, every kind of idea, ladders, variant steps (no browser)
 npm run check:functions                                # song functions: every Live coder step expands back to the line written out, % shorter, names, presets, update of saved code (no browser)
+npm run check:mixer [-- --full] [-- --only <profile|preset> --songs <a,b>]   # hidden mixer: every hap of every step with the short, mixer and compact presets has the gain, orbit, analyze, postgain and velocity of the code in full, in Classic, Crescendo and Live coder (Strudel in Node, workers, cached)
 npm run check:material                                 # material generator: rules, determinism, variety, key, chord tones, families, energy, varied presets, FM ranges, session sources (no browser)
 npm run check:spoken                                   # voice instrument: format, the four ways, narrator yields, poetic narrator, texts, speakers, growth, director (no browser)
 node tools/check-spoken-play.cjs [shots-dir]           # voice instrument in the browser: example song heard below clipping, silent and error free without samples (dev server)
 npm run check:patterns                                 # Patterns tab data: every preset once, styles that use it, store, Save as pattern, loop song, Add to song, previews, radio pool, backup (no browser)
 node tools/check-patterns.cjs [shots-dir]              # Patterns tab in the browser: loop, key change, beat, New and Save, Compose listen and Save as pattern, rename, delete, Add to song, links (dev server)
-node tools/check-compact-code.cjs                      # same events for compact code, short patterns, line breaks and every technical functions preset (dev server)
+PORT=5173 node tools/check-compact-code.cjs            # same events for compact code, short patterns, line breaks and every technical functions preset in Live coder, Classic and Crescendo (dev server on PORT, default 5173)
 node tools/check-ideas.cjs [song,song…]                # same events as the code before idea-model, every song and Crescendo states (dev server, ~8 min)
 ```
 

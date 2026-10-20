@@ -7,7 +7,7 @@ import { applyComments } from '../song/comments.js';
 import { idiomatic } from '../song/idiom.js';
 import { breakLines, lineLike, chainLines } from '../song/typing.js';
 import { pasteRule } from './typing-load.js';
-import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOptions, functionContext, FUNCTION_OPTIONS, lineKey } from '../song/writer.js';
+import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOptions, functionContext, FUNCTION_OPTIONS, lineKey, addEntry } from '../song/writer.js';
 
 // build: the live build (a song with steps); C: the controls; lang(): the language of the comments; files(): the
 // custom samples manifest, for the spoken comments; cols(): the width of the code panel in characters, for the line
@@ -47,7 +47,9 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // (a radio song steered on air, radio-profiles D9, keeps the song before its commands as its reference: `codeRef`,
   // so the code already shown keeps its functions)
   const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => o[k]), ref = any ? compileSong({ ...(build.codeRef || build), build: undefined, codeRef: undefined }) : '';
-  const written = levelsOf(ref), buses = busesOf(ref), table = new Map(), hidden = new Map(), fns = {};
+  // the mixer: the entries of each code shown, line by line in order (by its text without the tempo, as the lanes), and
+  // a table by line text for code edited by hand (a text two different lines share is ambiguous, writer addEntry)
+  const written = levelsOf(ref), buses = busesOf(ref), table = new Map(), entrySets = new Map(), hidden = new Map(), fns = {};
   // in place: the lanes of each code shown (by its text without the tempo, which the player rewrites), and of each
   // line, for code edited by hand
   const laneSets = new Map(), laneLines = new Map(), plainKey = c => c.replace(/setcpm\([^)]*\)/, 'setcpm()');
@@ -60,10 +62,11 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     const lifted = inPlace ? liftLanes(applyComments(v.shown, C)) : { code: applyComments(v.shown, C), lanes: null };
     const w = writeCode(lifted.code, { mode: o, written, buses, fns: fctx });
     w.voice = [hide && hide.length ? hide.join('\n') : '', v.voice].filter(Boolean).join('\n\n');
-    w.table.forEach((e, k) => table.set(k, e));
+    w.table.forEach((e, k) => addEntry(table, k, e));
     Object.assign(fns, w.fns);
     let out = C.wrap ? breakLines(w.code, cols()) : w.code;
     if (!out.includes('$:')) out = `${out}\n$: silence`;
+    if (any && w.entries.length === chainLines(out).filter(l => /^\s*[_S]?\$:/.test(l)).length) entrySets.set(plainKey(out), w.entries);
     if (w.voice) hidden.set(plainKey(out), w.voice);
     if (lifted.lanes) {
       laneSets.set(plainKey(out), lifted.lanes);
@@ -80,9 +83,9 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     return chainLines(shown).filter(l => /^\s*[_S]?\$:/.test(l)).map(l => laneLines.get(lineKey(l)) || null);
   };
   // nothing hidden: the code shown is the code evaluated
-  const run = !any && C.voice !== false && !inPlace ? null : shown => shown + tail(shown, { table, voice: hidden.get(plainKey(shown)) || '', like: lineLike, lanes: lanesOf(shown) });
+  const run = !any && C.voice !== false && !inPlace ? null : shown => shown + tail(shown, { table, entries: entrySets.get(plainKey(shown)) || null, voice: hidden.get(plainKey(shown)) || '', like: lineLike, lanes: lanesOf(shown) });
   // the code that plays anywhere (copied, opened in Strudel): the helpers written out, the code shown, its tail
-  const standalone = run && (shown => { const pre = any || inPlace ? preludeText(buses, fns) : ''; return pre + shown + tail(shown, { table: any ? table : new Map(), voice: hidden.get(plainKey(shown)) || '', like: lineLike, offset: pre.length, lanes: lanesOf(shown) }); });
+  const standalone = run && (shown => { const pre = any || inPlace ? preludeText(buses, fns) : ''; return pre + shown + tail(shown, { table: any ? table : new Map(), entries: any ? entrySets.get(plainKey(shown)) || null : null, voice: hidden.get(plainKey(shown)) || '', like: lineLike, offset: pre.length, lanes: lanesOf(shown) }); });
   const out = { build, now, inPlace, codeAt, run, standalone, buses, fns };
   // paste(bar): how many new lines the human typing towards a step may paste whole when it does not fit (pasteRule)
   out.paste = pasteRule(out, C, { seed: build.id || '' });
