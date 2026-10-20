@@ -53,7 +53,7 @@ Each stage ends with its checks green before the next starts. "Verify" names the
 
 ## 8. Artist, docs and listening
 
-- [ ] 8.1 Built-in Live coder artist in `artists/` (invented name and bio, the four live coder styles, `profiles: { switch: 1 }`, `growth` weights); verify `node --no-warnings tools/artist.mjs validate` and `node tools/check-library.cjs`
-- [ ] 8.2 Knowledge notes of D14, `npm run knowledge`, decisions added; verify `npm run check:knowledge`
-- [ ] 8.3 `docs/ENDLESS.md`, `docs/ARTISTS.md`, `DEVLOG.md` entry in Italian
+- [x] 8.1 Built-in Live coder artist in `artists/` (invented name and bio, the four live coder styles, `profiles: { switch: 1 }`, `growth` weights); verify `node --no-warnings tools/artist.mjs validate` and `node tools/check-library.cjs`
+- [x] 8.2 Knowledge notes of D14, `npm run knowledge`, decisions added; verify `npm run check:knowledge`
+- [x] 8.3 `docs/ENDLESS.md`, `docs/ARTISTS.md`, `DEVLOG.md` entry in Italian
 - [ ] 8.4 Owner's listening test: a session with Profile set to Live coder, one with the new artist, one compilation; steer with Vary, Swap, a curve and End; notes in `DEVLOG.md`

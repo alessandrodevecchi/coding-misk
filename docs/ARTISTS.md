@@ -67,6 +67,9 @@ Then planning uses the shape weights, the moves get the bonus of their weights, 
 | Jukebox Joe  | Every style, high chaos, hard endings now and then                                    |
 | The Purist   | Jazz, techno or lo-fi, one style at a time, flat grooves, never a guitar              |
 | Wake Horizon | Progressive house, inspired by Avicii: euphoric leads, brighter moves, sometimes two drops |
+| Cursor Bloom | The four live coder styles (acid, house, pure and gated trance); in the radio its songs grow on air, mostly as the Live coder (`profiles` switch 5, crescendo 1), with typed or filtered openings; speaks little |
+
+Cursor Bloom (`cursor-bloom`, radio-profiles) is the only built-in artist with `profiles` and `growth`: with the radio's Profile "as the artist" it gives a Live coder session without forcing the profile. Its `growth` is fitted, so songs keep their planned length; `explore` 0.05 lets a rare song out of its four styles, and that song still grows as its profile says.
 
 ## Keeping artists up to date
 

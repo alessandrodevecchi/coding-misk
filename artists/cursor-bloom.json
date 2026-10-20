@@ -1,0 +1,95 @@
+{
+  "format": 1,
+  "id": "cursor-bloom",
+  "name": "Cursor Bloom",
+  "bio": {
+    "en": "Builds every track live, one line at a time: acid, house and trance that grow from a blinking cursor.",
+    "it": "Costruisce ogni brano dal vivo, una riga alla volta: acid, house e trance che crescono da un cursore che lampeggia."
+  },
+  "inspiredBy": "late-night live coding sets in small clubs",
+  "portrait": {
+    "seed": "cursor-bloom",
+    "palette": "neon"
+  },
+  "styles": {
+    "acid": 3,
+    "house": 2,
+    "pure-trance": 2,
+    "gated-trance": 2
+  },
+  "explore": 0.05,
+  "chaos": [
+    0.1,
+    0.35
+  ],
+  "energy": [
+    0.5,
+    0.8
+  ],
+  "complexity": [
+    0.4,
+    0.7
+  ],
+  "talk": [
+    0.05,
+    0.25
+  ],
+  "shapes": {
+    "slow-burn": 3,
+    "build-drop": 2,
+    "flat-groove": 1
+  },
+  "pace": [
+    0.4,
+    0.65
+  ],
+  "moves": {
+    "variation": 2,
+    "brighter": 1,
+    "strip": 1
+  },
+  "voice": {
+    "characters": {
+      "robot": 2,
+      "echo": 1
+    },
+    "chance": 0.2
+  },
+  "quirks": {
+    "slow-builds": 0.3
+  },
+  "transitions": {
+    "kinds": {
+      "mix": 3,
+      "echo": 1,
+      "cut": 1
+    },
+    "bars": [
+      16,
+      32
+    ],
+    "harmony": "compatible"
+  },
+  "profiles": {
+    "switch": 5,
+    "crescendo": 1
+  },
+  "growth": {
+    "duration": "fitted",
+    "openings": {
+      "typed": 2,
+      "filtered": 2,
+      "full-kick": 1,
+      "broken": 1
+    },
+    "paces": {
+      "medium": 2,
+      "fast": 2
+    },
+    "developments": {
+      "by-type": 2,
+      "masks": 1,
+      "parameters": 1
+    }
+  }
+}

@@ -211,6 +211,19 @@ const CHECKS = {
     const bad = validateArtist({ ...ok, profiles: { switch: -1, jazz: 1 }, growth: { duration: 'long', paces: { warp: 1 }, size: 2 } }, ids).errors.map(e => e.path);
     for (const p of ['profiles.switch', 'profiles.jazz', 'growth.duration', 'growth.paces.warp', 'growth.size']) assert(bad.includes(p), `${p} not reported (${bad.join(', ')})`);
   },
+  'the built-in Live coder artist (8.1): valid, mostly Live coder songs that grow on air within their plan'() {
+    const cb = artist('cursor-bloom');
+    assert(cb && !validateArtist(cb, RECIPES.map(r => r.id)).errors.length, 'cursor-bloom missing or invalid');
+    assert(Object.keys(cb.styles).every(id => byStyle(id) && byStyle(id).family === 'live-coder'), 'only live coder styles');
+    const rec = { seed: 'cursore', options: { artist: cb, ...how, profile: 'artist' }, changes: [] };
+    const items = sessionItems(RECIPES, rec, 4, null, { grow: true });
+    const profs = profilesOf(items);
+    assert(profs.filter(p => p === 'switch').length >= 3 && profs.every(p => p !== 'classic'), `profiles ${profs.join(' ')}`);
+    assert(items.every(x => x.song.onAir && !x.song.onAir.free), 'grown and fitted');
+    // (explore 0.05 lets a song out of its styles now and then; the Profile still makes it a Live coder song)
+    assert(items.filter(x => Object.keys(cb.styles).includes(x.entry.parts.dominant)).length >= 3, `styles ${items.map(x => x.entry.parts.dominant).join(' ')}`);
+    assert(items.every(x => Math.abs(barsOf(x.song) - x.entry.bars) <= x.plan.phrase), `bars ${items.map(x => `${barsOf(x.song)}/${x.entry.bars}`).join(' ')}`);
+  },
   'compilation profiles: the Live coder preset, old setups as before'() {
     const comp = setup => ({ seed: 'lc', options: { compilation: { every: 'song', setup, pool: POOL }, ...how, profile: 'artist' }, changes: [] });
     const lc = sessionItems(RECIPES, comp(PRESETS['live-coder']), 6);

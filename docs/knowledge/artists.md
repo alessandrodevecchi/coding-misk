@@ -37,6 +37,8 @@ How each field steers the director:
 - `profiles`: weights over `classic`, `crescendo` and `switch` (the Live coder) for the artist's songs in the radio, used when the radio's Profile is "as the artist" and no compilation setup names profiles ([profiles.md](profiles.md)). Missing: the style decides.
 - `growth`: `duration` (`fitted` keeps the planned length, `free` lets a song wait for its typing) and weights `openings`, `paces`, `developments` with the ids of the growth shapes, drawn after the song's own shape and before the style's ([growth-shapes.md](growth-shapes.md)).
 
+The built-in Live coder artist is `cursor-bloom` (Cursor Bloom): the four `live-coder` styles, `profiles` `switch` 5 and `crescendo` 1, `growth` fitted with typed or filtered openings, medium or fast paces and `by-type` development. With the radio's Profile "as the artist" its songs grow on air, mostly as the Live coder.
+
 Random artists draw `profiles` (about four in ten) and sometimes `growth` from their own stream `artist-profile`, so every other field stays the same for the same seed.
 
 Quirks: `two-drops`, `long-breaks`, `no-guitars`, `texture-first`, `hard-endings`, `talks-a-lot`, `slow-builds`.
@@ -48,6 +50,7 @@ Random artists come from a seed: a name, a portrait, a short bio, one to three s
 <!-- generated:artists -->
 | Artist id | Name | Styles (weight) |
 | --- | --- | --- |
+| `cursor-bloom` | Cursor Bloom | acid 3, house 2, pure-trance 2, gated-trance 2 |
 | `dreamer` | Lumen Drift | ambient 3, dreamy-cyberpunk 3, lo-fi 1 |
 | `horizon` | Wake Horizon | progressive-house 5, trance 1, synthwave 1 |
 | `hype` | HYPERDROP | trance 3, drum-and-bass 2, phonk 2, progressive-house 1 |
