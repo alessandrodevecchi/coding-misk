@@ -60,6 +60,8 @@ A song on air builds itself like a live build. The listener can steer it from th
 
 The console's Profile control also offers **Custom** (owner decision 4): the same controls as Compose in a section that folds to a one-line summary. The recipe records the profile the combination amounts to (`profile`) and the combination itself (`custom: { base, controls }`, `profileOptions` and `customControls` in `src/endless/profile.js`); the songs grow and show their code with it, and a replay plays it the same. Without a duration of its own it is fitted.
 
+**Display options on air (radio-profiles 9.1).** The Custom controls that change only how the code looks (`DISPLAY_CONTROLS` in `src/live/profiles.js`: title, comments and their options, technical functions and their options, lit notes, line breaks, human typing, mistakes) also reach the song on air when the listener changes them, and the songs already prepared: each item keeps them as `display`, its controls are `withDisplay(controls, display)`, and `player.swap` hands the window over, so the change shows from the song's next code edit; the sound and the growth do not change. The growth controls (build, growth, duration, shape, code view, generator, narrated) apply from the next song. Display changes are not recorded: a replay shows the code with the console's Custom display options when it starts (`S.display`, only with Custom picked), else as recorded. The exports keep the recorded controls.
+
 **Incoming song** (`incoming`, console only, not in the recipe: it never changes the sound): `profile` (default: a Classic song is shown, a growing song is hidden), `hidden` or `visible`.
 
 <!-- generated:transitions -->

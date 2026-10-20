@@ -11,7 +11,7 @@ import { airCode, windowPart, stepRefs, HIDDEN_ORBIT } from '../src/live/air-cod
 import { loadStyles } from './styles-dir.mjs';
 import { loadArtists } from './artists-dir.mjs';
 import { songProfileOnAir, savedSongProfile, recipeProfile, RADIO_PROFILES, PROFILE_CHOICES, profileOptions, customControls, controlsProfile } from '../src/endless/profile.js';
-import { PROFILE_IDS, resolveProfile, growthRules } from '../src/live/profiles.js';
+import { PROFILE_IDS, resolveProfile, growthRules, withDisplay } from '../src/live/profiles.js';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { absoluteClips } from '../src/endless/transitions.js';
 import { validateArtist, ARTIST_PROFILES } from '../src/endless/artist.js';
@@ -88,7 +88,9 @@ const profilesOf = items => items.map(x => x.entry.profile || 'classic');
 
 // ---------- stage 5: commands as waypoints ----------
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const AIR = airControls('switch');
+// the Live coder's controls on air as the steering measures its typing: with the track names (radio-profiles 9.2: the
+// default shows only the title, display only), which the checks also use to find a track's lines
+const AIR = withDisplay(airControls('switch'), { tracks: true });
 const pastSteps = (song, B) => buildSteps(song).filter(s => s.at < B).map(({ i, ...s }) => s);
 // what a song plays at a bar, by track: its pattern, the settings it writes, its rack and line marks (the written form
 // has no line marks; a grown song's are set right at the arrival)

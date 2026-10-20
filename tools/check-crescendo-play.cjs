@@ -80,12 +80,13 @@ const SONGS = ['ferro', 'cavo-scoperto'];
   await page.locator('#track-pick').selectOption('crescendo-filo-di-luce'); await sleep(600);
   await page.click('#live-profile [data-profile="switch"]'); await sleep(800);
   let code = (await st()).code;
-  check(/^\/\/ ========== /m.test(code) && !/^\/\/ > /m.test(code) && !/ · pattern /.test(code), 'Switch: essential comments', code.split('\n').slice(0, 6).join(' / '));
-  await page.locator('#live-comments').selectOption('none'); await sleep(600);
+  // (Live coder: only the title as comments, radio-profiles 9.2)
+  check(!/^\s*\/\//m.test(code.split('\n').slice(1).join('\n')) && code.startsWith('// coding-misk'), 'Switch: only the title as comments', code.split('\n').slice(0, 6).join(' / '));
+  await page.locator('#live-comments').selectOption('essential'); await sleep(600);
   code = (await st()).code;
-  check(!/^\s*\/\//m.test(code.split('\n').slice(1).join('\n')) && code.startsWith('// coding-misk') && !(await page.isHidden('#live-custom')), 'no comments (the title stays), profile custom', `${(code.match(/^\s*\/\/.*$/m) || [''])[0]} | ${await page.isHidden('#live-custom')}`);
+  check(/^\/\/ ========== /m.test(code) && !/^\/\/ > /m.test(code) && !/ · pattern /.test(code) && !(await page.isHidden('#live-custom')), 'essential comments (track names), profile custom', `${code.split('\n').slice(0, 6).join(' / ')} | ${await page.isHidden('#live-custom')}`);
   await page.click('#live-profile [data-profile="switch"]'); await sleep(600);
-  check(!!(await page.isHidden('#live-custom')) && (await page.inputValue('#live-comments')) === 'essential', 'picking the profile again drops the change');
+  check(!!(await page.isHidden('#live-custom')) && (await page.inputValue('#live-comments')) === 'none', 'picking the profile again drops the change');
   // growth shapes (growth-shapes): the typed opening is silent until its first line is typed, and the line is complete
   // when it sounds; the muted base (_$:), mid-set (S$:) and second section states evaluate without errors
   const ROOT = require('path').resolve(__dirname, '..'), fs = require('fs');

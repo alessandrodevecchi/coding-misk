@@ -60,6 +60,6 @@ Each stage ends with its checks green before the next starts. "Verify" names the
 
 ## 9. Follow-ups from the owner's tests
 
-- [ ] 9.1 Display options (comments, technical functions, wrap, lit notes, human typing, mistakes) apply to the song on air from its next edit; growth options from the next song; the Custom hint says which is which; replay uses the display options at its start; verify in check-radio.cjs
-- [ ] 9.2 Live coder default comments: title only, in Compose and the radio; Classic and Crescendo unchanged (check-live-code fixtures); Guide and help texts updated
+- [x] 9.1 Display options (comments, technical functions, wrap, lit notes, human typing, mistakes) apply to the song on air from its next edit; growth options from the next song; the Custom hint says which is which; replay uses the display options at its start; verify in check-radio.cjs
+- [x] 9.2 Live coder default comments: title only, in Compose and the radio; Classic and Crescendo unchanged (check-live-code fixtures); Guide and help texts updated
 

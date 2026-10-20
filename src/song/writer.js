@@ -403,13 +403,14 @@ export function tail(shown, { table = new Map(), voice = '', like = null, offset
 
 // the mixer as source text, the same in the app, the render page and the code copied to Strudel (single quotes only:
 // double quotes are mini-notation there). A hap of a line gets its bus, visual and level unless the line sets them
-// (the line found by the first place of its haps); a line with section lanes (live-coder in-place edits) plays as with
+// (the line found by the first place of its haps that falls inside a line: a constant such as a section lane can
+// come first); a line with section lanes (live-coder in-place edits) plays as with
 // `.mask(lane).velocity(lane)` for each lane: its haps cut at the bars, kept where the lane is not 0, the velocity
 // the lane's value (the line found by any place of its haps inside it: a shared idea's constant comes first)
 export const MIX_SOURCE = `(pat, ranges) => {
   const cache = new Map(), lane = s => { let v = cache.get(s); if (!v) { v = []; for (const t of s.trim().split(/ +/)) { const m = t.match(/^([^!]*)(?:!(\\d+))?$/); for (let k = 0; k < (m[2] ? +m[2] : 1); k++) v.push(Number(m[1])); } cache.set(s, v); } return v; };
   const locs = h => (h.context && h.context.locations) || [];
-  const mixOf = h => { const l = locs(h)[0], s = l && l.start; return s === undefined ? null : ranges.find(([a, b]) => s >= a && s < b); };
+  const mixOf = h => { for (const l of locs(h)) { const r = ranges.find(([a, b]) => l.start >= a && l.start < b); if (r) return r; } return null; };
   const laned = ranges.filter(r => r[2].lanes), laneOf = h => { for (const l of locs(h)) { const r = laned.find(([a, b]) => l.start >= a && l.start < b); if (r) return r; } return null; };
   const cut = (h, list) => { const out = []; for (const s of list) { const v = lane(s); for (const sp of h.part.spanCycles) { const c = Math.floor(sp.begin.valueOf()), x = v[((c % v.length) + v.length) % v.length]; if (x) out.push(new h.constructor(h.whole, sp, { ...h.value, velocity: x }, h.context)); } } return out; };
   const fill = h => { const r = mixOf(h); if (!r) return h; return h.withValue(v => { const o = { ...v }; for (const [k, x] of Object.entries(r[2])) if (k !== 'lanes' && o[k] === undefined) o[k] = x; return o; }); };

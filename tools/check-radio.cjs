@@ -1,5 +1,6 @@
 // Browser checks for the radio (#22): tab, controls, determinism against the director, song changes,
-// options from the next song, exclusive playback, history, save, open in Compose, replay.
+// options from the next song, display options on air from the next edit, exclusive playback, history, save, open in
+// Compose, replay.
 // Usage: PLAYWRIGHT_CORE=... node tools/check-radio.cjs [--long minutes]   (dev server on :5173)
 // --long plays the radio for that many minutes with three styles and chaos 1, reporting every song change.
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -188,7 +189,10 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   // growth marker plays in blocks; the Custom profile shows its own code
   {
     const code = () => page.evaluate(() => document.querySelector('strudel-editor').editor.code || '');
+    // (the Live coder shows only the title as comments, radio-profiles 9.2: the song in the panel is the one its first
+    // line names; a song shown in Classic has its track names, "// ========== 3 bass ==========")
     const heads = (c, n) => c.split('\n').filter(l => l.startsWith(`// ========== ${n} `)).length;
+    const names = (c, title) => c.split('\n')[0].startsWith('// coding-misk') && c.split('\n')[0].includes(title);
     // the orbits of the events about to play (the hidden song's are 20 and up)
     const orbitsAhead = () => page.evaluate(() => { const s = document.querySelector('strudel-editor').editor.repl.scheduler, c = s.now(); return [...new Set(s.pattern.queryArc(c, c + 2).filter(h => h.hasOnset()).map(h => h.value.orbit))].sort((a, b) => a - b); });
     const waitFor = async (fn, ms = 30000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await sleep(300); } return false; };
@@ -212,12 +216,12 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     check(prepared && s1.grown && s1.show === 'hidden', 'the next Live coder song grows away from the page and is hidden', JSON.stringify(s1 && { grown: s1.grown, show: s1.show, growing: s1.growing }));
     await page.evaluate(b => globalThis.codingMiskRadio.seek(b), s1.start - s0.start + 2); await sleep(2500);
     e = await ed(); const c1 = await code(), ob = await orbitsAhead();
-    check(!e.err && heads(c1, 1) > 0 && heads(c1, 2) === 0, 'during the transition the panel holds only the song on air', `song 1 lines ${heads(c1, 1)}, song 2 lines ${heads(c1, 2)}, ${e.err.slice(0, 80)}`);
+    check(!e.err && names(c1, s0.title) && !c1.includes(s1.title) && !c1.includes('// ==> ') && !/^\/\/ ========== /m.test(c1), 'during the transition the panel holds only the song on air, with only its title as comments', `${c1.split('\n')[0]} ${e.err.slice(0, 80)}`);
     check(ob.some(o => o >= 20) && ob.some(o => o < 20), 'the incoming song plays hidden on its own orbits', `orbits ${ob.join(',')}`);
     const on1 = await waitFor(async () => (await R()).state.onAir === 1, 60000);
     await sleep(1500);
     e = await ed(); const c2 = await code();
-    check(on1 && !e.err && heads(c2, 2) > 0 && heads(c2, 1) === 0, 'the next song appears whole when it goes on air', `song 1 lines ${heads(c2, 1)}, song 2 lines ${heads(c2, 2)}`);
+    check(on1 && !e.err && names(c2, s1.title) && !c2.includes(s0.title) && /^\s*[_S]?\$:/m.test(c2), 'the next song appears whole when it goes on air', c2.split('\n')[0]);
     // the incoming song in the panel: the visible option
     await page.selectOption('#radio-incoming', 'visible');
     r = await R();
@@ -257,6 +261,53 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     r = await R(); e = await ed(); const c4 = await code();
     check(r.state.recipe.options.custom && r.state.stream[0].grown && /Custom|Personalizzato/.test(await page.innerText('.radio-profile-now')) && !e.err, 'Custom profile: the songs grow with its controls, saved in the recipe');
     check(!c4.includes('// ========== ') && !/\.orbit\(/.test(c4), 'Custom profile: no comments and the buses in the hidden mixer');
+    await page.click('#radio-start'); await sleep(300);
+    // radio-profiles 9.1: a display option changed during a Live coder song reaches it at its next code edit, and the
+    // sound does not change; a replay shows the code with the display options set when it starts
+    {
+      const tracksIn = c => /^\/\/ ========== /m.test(c);
+      if (await page.getAttribute('#custom-toggle', 'aria-expanded') !== 'true') await page.click('#custom-toggle');
+      await page.click('[data-custom-base="switch"]'); await sleep(100);
+      await page.selectOption('[data-custom="comments"]', 'essential'); await sleep(100);
+      await page.fill('#radio-seed', 'display'); await page.click('#radio-start');
+      await waitFor(async () => (await R()).on, 20000);
+      r = await R();
+      const d0 = r.state.stream[0];
+      await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.floor(d0.bars * 0.3)); await sleep(2000);
+      const before = await code();
+      check(d0.grown && d0.profile === 'switch' && tracksIn(before), 'display: a Live coder song on air with track names', before.split('\n').slice(0, 4).join(' / '));
+      await page.selectOption('[data-custom="comments"]', 'none');
+      const t0 = (await ed()).cyc;
+      const gone = await waitFor(async () => !tracksIn(await code()), 120000);
+      e = await ed(); r = await R();
+      check(gone && r.state.onAir === 0 && !e.err, 'display: comments none, the track names leave the code at the next edit of the same song', `from bar ${t0.toFixed(1)} to ${e.cyc.toFixed(1)}, on air ${r.state.onAir} ${e.err.slice(0, 80)}`);
+      // the same events with and without the track names: the window's code at the next steps of the song on air,
+      // evaluated with each display (the radio paused meanwhile)
+      await page.click('#radio-pause'); await sleep(300);
+      await page.evaluate(() => { globalThis.__dispNone = globalThis.codingMiskRadio.airPlayable; });
+      await page.selectOption('[data-custom="comments"]', 'essential'); await sleep(100);
+      const same = await page.evaluate(async from => {
+        const { useFns } = await import('/src/song/writer.js'), { buildSteps } = await import('/src/song/build.js');
+        const e = document.querySelector('strudel-editor').editor, A = globalThis.__dispNone, B = globalThis.codingMiskRadio.airPlayable;
+        const haps = async (P, b) => { globalThis.miskBuses = P.buses; useFns(P.fns); const shown = P.codeAt(b); await e.repl.evaluate(P.run ? P.run(shown, b) : shown, false); if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError)); return { shown, ev: e.repl.scheduler.pattern.queryArc(b, b + 1).filter(h => h.hasOnset()).map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), +h.duration.valueOf().toFixed(4), Object.fromEntries(Object.entries(h.value).filter(([, v]) => typeof v !== 'function').sort())])).sort().join('\n') }; };
+        const bars = [...new Set(buildSteps(A.build).map(s => s.at))].filter(b => b >= from).slice(0, 4), out = [];
+        try {
+          for (const b of bars) { const a = await haps(A, b), c = await haps(B, b); out.push({ b, same: a.ev === c.ev && a.ev.length > 0, heads: [/^\/\/ ========== /m.test(a.shown), /^\/\/ ========== /m.test(c.shown)] }); }
+        } catch (x) { return { err: x.message, out }; }
+        e.repl.stop();
+        return { out };
+      }, Math.floor(t0));
+      check(!same.err && same.out.length >= 2 && same.out.every(x => x.same && !x.heads[0] && x.heads[1]), 'display: the same events with and without the track names', JSON.stringify(same));
+      await page.click('#radio-pause'); await sleep(1500);
+      check(!(await ed()).err, 'display: the radio plays on after the check');
+      // replay with the console's comments set to none: no track names from the start, the same song
+      await page.selectOption('[data-custom="comments"]', 'none'); await sleep(100);
+      const rc = r.state.recipe;
+      await page.click('#radio-start'); await sleep(300);
+      await page.evaluate(x => globalThis.codingMiskRadio.start({ recipe: x }), rc); await sleep(5000);
+      r = await R(); const cr = await code();
+      check(r.state.stream[0].id === d0.id && r.state.stream[0].bars === d0.bars && !tracksIn(cr) && !(await ed()).err, 'display: a replay shows the display options set when it starts', cr.split('\n').slice(0, 3).join(' / '));
+    }
     await page.click('#radio-start'); await sleep(300);
     await page.selectOption('#radio-profile', 'artist'); await sleep(200);
   }

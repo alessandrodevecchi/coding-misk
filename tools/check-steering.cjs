@@ -277,7 +277,12 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // before it stay, the moves are the listener's, mute is typed as "_$:", a volume as ".gain()" on the line, Vary as
   // notes edits, End takes the lines out one at a time, and a replay gives the same song
   await page.click('#radio-start'); await sleep(300);
-  await page.selectOption('#radio-profile', 'switch'); await sleep(200);
+  // (the Live coder shows only the title as comments, radio-profiles 9.2: Custom from the Live coder with the track
+  // names, so the lines of a track can be found; the same growth, and the steering measures the typing the same way)
+  await page.selectOption('#radio-profile', 'custom'); await sleep(200);
+  if (await page.getAttribute('#custom-toggle', 'aria-expanded') !== 'true') await page.click('#custom-toggle');
+  await page.click('[data-custom-base="switch"]'); await sleep(100);
+  await page.selectOption('[data-custom="comments"]', 'essential'); await sleep(100);
   await page.fill('#radio-seed', 'steer-air'); await page.click('#radio-start'); await sleep(3000);
   {
     const AIR = () => page.evaluate(() => { const r = globalThis.codingMiskRadio, s = r.steering, st = r.state; if (!s || !st) return null; const it = st.stream[st.onAir]; return { n: s.n, commands: s.commands, song: s.song, grown: it.grown, growing: it.growing, start: it.start, bars: it.bars, stream: st.stream.map(x => ({ start: x.start, bars: x.bars })) }; });

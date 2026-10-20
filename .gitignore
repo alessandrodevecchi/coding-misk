@@ -12,3 +12,4 @@ songs/endless/
 .check-workers
 # cache of generated code and check results (tools/code-cache.mjs)
 .cache/
+.claude/worktrees/

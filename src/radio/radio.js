@@ -13,7 +13,7 @@ import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypoi
 import { steerOnAir, airBoundaries, airOffset, directorView } from '../endless/waypoints.js';
 import { PROFILE_CHOICES, RADIO_CHOICES, RADIO_PROFILES, CUSTOM_DEFAULT, customControls, profileOptions, savedSongProfile } from '../endless/profile.js';
 import { growOnAir, airControls, leadOnAir } from '../endless/growth.js';
-import { resolveProfile, CONTROLS } from '../live/profiles.js';
+import { resolveProfile, CONTROLS, displayOf, withDisplay } from '../live/profiles.js';
 import { COMMENT_PRESETS } from '../song/comments.js';
 import { FUNCTION_PRESETS, FUNCTION_OPTIONS } from '../song/writer.js';
 import { OPENINGS, PACES, DEVELOPMENTS, SHAPES_VERSION } from '../song/shapes.js';
@@ -230,7 +230,21 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function windowPlayable() {
     const items = S.stream.slice(S.onAir, S.onAir + 2);
     const W = windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut })));
-    return player.makePlayable(W, items.map((x, i) => ({ n: x.n + 1, prefix: `s${x.n + 1}-`, start: x.start, song: x.song, title: x.song.title, profile: profileOf(x), custom: !!x.custom, ctl: controlsOf(x), show: i === 0 ? 'air' : showOf(x) })));
+    return player.makePlayable(W, items.map((x, i) => ({ n: x.n + 1, prefix: `s${x.n + 1}-`, start: x.start, song: x.song, title: x.song.title, profile: profileOf(x), custom: !!x.custom || !!displayOn(x), ctl: liveControlsOf(x), show: i === 0 ? 'air' : showOf(x) })));
+  }
+  // the display controls set while the session plays (radio-profiles 9.1): those changed during a song (x.display, on
+  // the song on air and the songs already prepared) and, in a replay, the console's Custom ones when it started
+  // (S.display). They change only how the code looks, so they are never recorded
+  const displayOn = x => { const d = { ...(S && S.display), ...x.display }; return Object.keys(d).length ? d : null; };
+  const liveControlsOf = x => { const d = displayOn(x); return d ? withDisplay(controlsOf(x), d) : controlsOf(x); };
+  // display controls changed in the console: the song on air shows them from its next code edit, the songs prepared too;
+  // the sound does not change
+  function showDisplay(changes) {
+    const d = displayOf(changes);
+    if (!S || !Object.keys(d).length) return;
+    for (const x of S.stream.slice(S.onAir)) x.display = { ...x.display, ...d };
+    if (S.replay) S.display = { ...S.display, ...d };
+    if (S.paused === undefined) player.swap(windowPlayable());
   }
   // the profile a song plays with: Crescendo or Live coder once grown, else Classic (blocks)
   const profileOf = x => (x.song && x.song.onAir ? x.song.onAir.profile : 'classic');
@@ -250,6 +264,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // and its replays grow them the same; a recipe saved before has none and replays in blocks
     S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: current(), changes: [], growth: GROWTH_ON_AIR, ...(L ? { lead: leadRecord(L) } : {}) }, lastOptions: null, lastCard: 0 };
     S.recipe.seed = session.seed;
+    // a replay shows the code with the display controls set when it starts (the console's Custom profile), not with each
+    // change made while the session was heard (radio-profiles 9.1)
+    if (recipe && opts.profile === 'custom') S.display = displayOf(customControls(opts.custom));
     if (limit) { S.limit = limit; S.onEnd = onEnd; }
     if (frozen) { S.frozen = frozen; S.replay = true; generate(); }
     else if (L) {
@@ -805,10 +822,11 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       </div>
     </div>`;
   }
-  // one Custom control changed: kept with the others, for the songs from the next one
+  // one Custom control changed: kept with the others, for the songs from the next one; a display control (comments,
+  // functions, title, lit notes, line breaks, typing) also reaches the song on air from its next code edit
   function setCustom(changes) {
     opts.custom = { base: opts.custom.base, controls: { ...(opts.custom.controls || {}), ...changes } };
-    saveOpts(); render();
+    saveOpts(); showDisplay(changes); render();
   }
 
   function render() {
@@ -967,7 +985,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.unlock) { delete opts.compLocks[b.dataset.unlock]; saveOpts(); render(); return toast(t('compKnobBack')); }
     if (b.dataset.curveReset) return command({ kind: 'curve-reset', curve: b.dataset.curveReset });
     if (b.id === 'custom-toggle') { customOpen = !customOpen; try { store.set('coding-misk-radio-custom-open', customOpen); } catch (err) {} return render(); }
-    if (b.dataset.customBase) { opts.custom = { base: b.dataset.customBase, controls: {} }; saveOpts(); return render(); }
+    if (b.dataset.customBase) { opts.custom = { base: b.dataset.customBase, controls: {} }; saveOpts(); showDisplay(customControls(opts.custom)); return render(); }
     if (b.dataset.customChip) {
       const k = b.dataset.customChip, C = customControls(opts.custom);
       if (k === 'typist') return setCustom({ typist: C.typist === 'human' ? 'exact' : 'human' });
@@ -1087,6 +1105,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },
     get on() { return !!S; },
+    // the window on air as the player gets it (tools/check-radio.cjs evaluates its code at chosen bars)
+    get airPlayable() { return S ? windowPlayable() : null; },
     get state() { return S && { paused: S.paused, seed: S.recipe.seed, recipe: clone(S.recipe), onAir: S.onAir, stream: S.stream.map(x => ({ n: x.n, start: x.start, bars: x.bars, title: x.song.title, id: x.song.id, transition: x.entry.transition || null, profile: profileOf(x), grown: !!(x.song && x.song.onAir), growing: !!x.growing, show: x === S.stream[S.onAir] ? 'air' : showOf(x), shape: x.song && x.song.crescendo && x.song.crescendo.shape ? { ...x.song.crescendo.shape } : null, knobs: x.base ? Object.fromEntries(KNOBS.map(k => [k, x.base.opts[k]])) : null })), transition: S.stream[S.onAir].entry.transition || null }; },
     get history() { return history; },
     get options() { return current(); },

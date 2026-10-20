@@ -42,7 +42,12 @@ const CHECKS = {
     assert(!o({ tracks: false }).includes('=====') && o({ tracks: false }).includes('// >'), 'tracks');
     for (const k of ['all', 'essential', 'none']) assert(applyComments(code, { title: true, comments: k }) === applyComments(code, { title: true, ...COMMENT_PRESETS[k] }) && commentPreset(COMMENT_PRESETS[k]) === k, k);
     assert(commentPreset({ tracks: true, notes: false, steps: true }) === 'custom', 'custom');
-    assert(resolveProfile('switch', { steps: true }).comments === 'custom' && resolveProfile('switch').comments === 'essential', 'profile preset');
+    assert(resolveProfile('switch', { steps: true }).comments === 'custom' && resolveProfile('switch').comments === 'none', 'profile preset');
+  },
+  'Live coder: only the title as comments (radio-profiles 9.2); the track names come back with the option'() {
+    const list = codes('switch-prima-luce', 'switch'), all = list.join('\n');
+    assert(list.every(c => c.startsWith('// coding-misk')) && !/^\/\/ =+ .* =+$/m.test(all) && !/^\s*\/\/ >/m.test(all), 'comments besides the title');
+    assert(/^\/\/ =+ .* =+$/m.test(codes('switch-prima-luce', 'switch', { tracks: true }).join('\n')), 'track names with tracks on');
   },
   'voice code hidden: not in the code shown, still in what plays'() {
     const code = '$: s("bd*4").gain(0.8).orbit(1).analyze("kick")\n\n// ========== voice ==========\n// "ciao", spoken on bar 1\n$: s("say_it").n(3).mask("<1>").postgain(0.6).orbit(15).analyze("fx")';

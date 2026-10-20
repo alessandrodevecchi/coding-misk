@@ -18,6 +18,7 @@ import { topTokens } from '../song/ideas.js';
 import { presetIdea, meterSteps } from '../music.js';
 import { SETTING_FIELDS } from '../song/format.js';
 import { liveCode } from '../live/live-code.js';
+import { withDisplay } from '../live/profiles.js';
 import { typingPlan, settleOthers } from '../song/typing.js';
 
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -400,7 +401,9 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
   if (!commands.length) return { song: g0, grown: g0, commands: [], plan, opts, plain: song };
   // (a song that did not grow: the commands rewrite it as in Classic, then it grows as it can)
   if (!g0 || !g0.onAir) { const r = steerSong({ song, plan, opts, commands: commands.map(({ q, pend, at0, ...c }) => c), seed, n }); return { song: growOnAir(r.song, ctx), grown: g0, commands: commands.map(({ pend, ...c }) => c), plan: r.plan, opts: r.opts, plain: r.song }; }
-  const off = airOffset(g0), C = controls || ctx.controls || airControls(g0.onAir.profile, g0.onAir.free);
+  // (a profile's own controls with the track names, as the Live coder showed them before radio-profiles 9.2: its default
+  // comments are display only and never move the boundaries of the commands)
+  const off = airOffset(g0), C = controls || ctx.controls || withDisplay(airControls(g0.onAir.profile, g0.onAir.free), { tracks: true });
   const toDirector = c => { const { q, pend, at0, ...rest } = c; return { ...rest, at: c.at - off }; };
   let N = g0, Wprev = writtenForm(song), P = plan, R = { song, plan, opts };
   const done = [];

@@ -18,7 +18,7 @@ Each group has presets over separate options. Changing one option makes the pres
 
 ## How it connects
 
-- **Profiles.** Every option is a profile control ([profiles.md](profiles.md)). Classic and Crescendo write everything out; the Live coder writes compact code.
+- **Profiles.** Every option is a profile control ([profiles.md](profiles.md)). Classic and Crescendo write everything out; the Live coder writes compact code with only the title as comments (no track names, notes or phrases, radio-profiles 9.2).
 - **Strudel.** The app's functions are registered in Strudel before the code runs ([strudel.md](strudel.md)). Their definitions and the mixer live in the hidden code. Copy and Open in Strudel add them, so the code plays the same there.
 - **Live build.** Each step of a build is written with these options ([live-build.md](live-build.md)).
 - **Names.** No app function takes a Strudel name or synonym ([decisions.md](decisions.md)).

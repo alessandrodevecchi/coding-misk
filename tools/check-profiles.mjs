@@ -16,7 +16,7 @@ const CHECKS = {
     assert(c.build === 'crescendo' && c.growth === 'crescendo' && c.view === 'now' && c.gen === 'standard' && c.comments === 'all' && !c.custom, 'crescendo');
     assert(k.build === 'blocks' && k.comments === 'all' && k.title, 'classic');
     const s = resolveProfile('switch');
-    assert(s.growth === 'natural' && s.gen === 'idiomatic' && s.comments === 'essential' && s.highlights, 'switch');
+    assert(s.growth === 'natural' && s.gen === 'idiomatic' && s.comments === 'none' && s.title && !s.tracks && s.highlights, 'switch');
   },
   'a changed control makes the profile custom; unknown values are dropped'() {
     const r = resolveProfile('switch', { typing: 'fast', view: 'nope', gen: 'idiomatic' });

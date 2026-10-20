@@ -43,10 +43,25 @@ export const CONTROLS = {
 export const PROFILES = {
   classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
   crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
-  // Live coder (shown so since clear-names; the id stays switch in songs, recipes and storage)
-  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: true, notes: false, steps: false, voice: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, typist: 'human', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  // Live coder (shown so since clear-names; the id stays switch in songs, recipes and storage); its comments are the
+  // title only (radio-profiles 9.2): no track names, notes or phrases
+  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: false, notes: false, steps: false, voice: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, typist: 'human', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
 };
 export const PROFILE_IDS = Object.keys(PROFILES);
+// the controls that change only how the code looks, never the sound or the growth (radio-profiles 9.1): comments, technical
+// functions, the title, lit notes, line breaks, human typing and its mistakes. In the radio they apply to the song on air
+// from its next code edit; the others (build, growth, duration, shape, view, generator, narrated, typing speed) from the
+// next song
+export const DISPLAY_CONTROLS = ['title', 'tracks', 'notes', 'steps', 'voice', 'highlights', 'wrap', 'fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'typist', 'mistakes'];
+// only the display controls of a set of controls (or of overrides)
+export const displayOf = c => Object.fromEntries(DISPLAY_CONTROLS.filter(k => c && c[k] !== undefined).map(k => [k, c[k]]));
+// controls in force (resolveProfile's result) with other display controls: the growth controls stay as they are
+export function withDisplay(C, display) {
+  const d = displayOf(display);
+  if (!Object.keys(d).length) return C;
+  const { id, custom, comments, functions, ...rest } = C;
+  return resolveProfile(id, { ...rest, ...d });
+}
 
 // the profile a song names: its own `profile`, else its old `buildStyle` (crescendo or blocks), else null
 export function songProfile(song) {

@@ -19,7 +19,7 @@ The profile menu sits next to "Live build" in Compose. Changing one control make
 - **In the radio.** A generated song takes the radio's Profile option, then the compilation setup, then the artist's `profiles`, then the drums style's profile, else Classic. A saved song keeps its own, then the radio's forced one, then the player default. The radio uses each profile's own controls on air (fitted duration), never the Compose overrides, or the console's Custom profile: the same controls as Compose, saved with the session ([radio.md](radio.md)). The song on air shows its code with its own controls; a song that is not on air plays from full Classic code ([comments-and-functions.md](comments-and-functions.md)).
 - **Build.** `build` and `growth` choose between a build in blocks, Crescendo and the natural growth of the Live coder ([live-build.md](live-build.md)).
 - **Shape.** With growth `natural`, the controls `opening`, `pace` and `development` choose the growth shape ([growth-shapes.md](growth-shapes.md)).
-- **Code.** The comment options and the technical function options decide what the code panel shows ([comments-and-functions.md](comments-and-functions.md)). The sound never changes with them.
+- **Code.** The comment options and the technical function options decide what the code panel shows ([comments-and-functions.md](comments-and-functions.md)). The sound never changes with them. The Live coder shows only the title as comments (radio-profiles 9.2). These and the typing options are the display controls (`DISPLAY_CONTROLS`, `withDisplay`): in the radio they apply to the song on air from its next edit ([radio.md](radio.md)). The growth never reads them: the Live coder's shape choice measures the typing on the code with the track names (`crescendoSong`), and so does the steering on air without Custom controls (`steerOnAir`), as before 9.2.
 - **Typing.** `typist`, `mistakes` and `typing` decide how the code types itself.
 
 `resolveProfile(id, overrides)` returns the controls in force. `cleanOverrides` keeps only known controls with allowed values that differ from the profile. A comment or function preset saved by name stands for its options.
@@ -31,7 +31,7 @@ The profile menu sits next to "Live build" in Compose. Changing one control make
 | --- | --- | --- |
 | `classic` | Classic (it: Classico) | In blocks: each track comes in whole, as before Crescendo |
 | `crescendo` | Crescendo | The song grows in small steps from one sound |
-| `switch` | Live coder | Grows like a live coder: few lines, functions one at a time, listening pauses, short patterns, lit notes |
+| `switch` | Live coder | Grows like a live coder: few lines, functions one at a time, listening pauses, short patterns, lit notes, only the title as a comment |
 <!-- /generated -->
 
 Every control, its values and its default per profile. Texts come from the app's help texts.
@@ -47,7 +47,7 @@ Every control, its values and its default per profile. Texts come from the app's
 | `view` | `now` code of the moment, `compact` compact code, `track` one line per track, `sections` code per section | `sections` | `now` | `now` | Code view (it: Vista del codice): Crescendo, how the code looks. Of the moment: only the section that plays, the lines of the next section prepared muted before the change. Compact: identical lines of a track become one, tracks still to come show muted with _$:. One line per track: also the values that change between sections go in the same line. Per section: like any song. The sound is the same |
 | `gen` | `standard` standard patterns, `idiomatic` short patterns | `standard` | `standard` | `idiomatic` | Generator (it: Generatore): Crescendo, how patterns are written. Standard: step by step. Short: like a live coder (bd*4, [~ hh]*4, repeated cells, equal groups with !, the arpeggio with its chords written once and .arp()). The sound is the same |
 | `title` | `true`, `false` | `true` | `true` | `true` | Title (it: Titolo): The first line with the song title |
-| `tracks` | `true`, `false` | `true` | `true` | `true` | Tracks (it: Tracce): The track names (// ===== bass =====) |
+| `tracks` | `true`, `false` | `true` | `true` | `false` | Tracks (it: Tracce): The track names (// ===== bass =====) |
 | `notes` | `true`, `false` | `true` | `true` | `false` | Notes (it: Note): The section and pattern notes (// Intro · bars 1-8) |
 | `steps` | `true`, `false` | `true` | `true` | `false` | Phrases (it: Frasi): The step phrases (// > …) and the phrase the voice says |
 | `voice` | `true`, `false` | `true` | `true` | `false` | Voice code (it: Codice della voce): The lines that make the voice speak. Off: the voice still speaks, its code is not shown |
