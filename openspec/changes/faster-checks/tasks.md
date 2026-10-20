@@ -17,3 +17,4 @@
 
 - [ ] 4.1 Low priority (`taskpolicy -b` on macOS, `nice` elsewhere) and workers: 4 by day (08:00-20:00), all cores but one at night, `CHECK_WORKERS` overrides; measure the full level by day and by night setting
 - [ ] 4.2 `--only <check>` and `--songs <list>` filters in `check:crescendo`; the rule "targeted rerun, then quick level; full level after growth changes and before merge" in the checks map and `AGENTS.md`
+- [ ] 4.3 Weekend day default 6 workers; `.check-workers` control file read before each song (git-ignored), lowering lets workers finish their song, raising starts new ones; a test that changes it during a run
