@@ -2841,7 +2841,8 @@ playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, pla
   onChange: () => { if (!$('#tab-brani').hidden) { songsView.renderBar(); songsView.apply(); } } });
 function renderSongs() {
   const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr));
-  cards = [...composed, ...codedTracks()].map(tr => ({ tr, p: playable(tr) }));
+  // the cards only need the written song's meta: never grow every song for the list (a growth can take seconds)
+  cards = [...composed, ...codedTracks()].map(tr => ({ tr, p: playable(tr, RADIO_LIVE()) }));
   songsView.setSongs(cards.map(songOf));
   songsView.renderBar();
   $('#songs').innerHTML = cards.map(songCard).join('');
