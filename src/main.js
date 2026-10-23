@@ -80,6 +80,8 @@ import { patternStore, savedFromTrack, addToSong as addPatternToSong, kindOfPres
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
+import { durationKey, growingProfile } from './live/card-duration.js';
+import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -231,20 +233,91 @@ function growAway(song, ctx, steer = null) {
     return new Promise((resolve, reject) => { growWaits.set(id, { resolve, reject }); growWorker.postMessage({ id, song, ctx, spoken, steer }); });
   } catch (e) { return here(); }
 }
+// the page's own growths away from the page (grow-worker.js, a second worker so the radio never waits for them): the
+// song restored in Compose at start and the grown lengths of the song cards on screen. No worker: the promise fails and
+// the caller keeps what it has (a song grows in the page only when it is played or edited)
+let pageWorker = null, pageN = 0;
+const pageWaits = new Map();
+function pageAway(msg) {
+  try {
+    if (!pageWorker) {
+      pageWorker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
+      pageWorker.onmessage = e => { const w = pageWaits.get(e.data && e.data.id); if (!w) return; pageWaits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.crescendo !== undefined ? e.data.crescendo : e.data.duration); };
+      pageWorker.onerror = e => { console.warn('[songs] page worker failed', e.message || e); for (const w of pageWaits.values()) w.reject(new Error('worker')); pageWaits.clear(); pageWorker = false; };
+    }
+    if (pageWorker === false) return Promise.reject(new Error('worker'));
+    const id = ++pageN, spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
+    return new Promise((resolve, reject) => { pageWaits.set(id, { resolve, reject }); pageWorker.postMessage({ id, spoken, ...msg }); });
+  } catch (e) { return Promise.reject(e); }
+}
 // one control changed by hand: kept for every profile until a profile is picked again
 function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v }, PROFILES[profileFor(T)]); saveProfile(); }
-// Crescendo builds are computed once per song version and option
-const crescendoCache = new Map();
+// Crescendo builds are computed once per song version and option, kept for the songs used last (LRU)
+const crescendoCache = new Map(), CRESCENDO_CACHE = 48;
 // the built-in style recipes, for the weights of the growth shapes and the metamorphosis (growth-shapes)
 const SHAPE_STYLES = Object.fromEntries(Object.values(import.meta.glob('../styles/*.json', { eager: true, import: 'default' })).map(r => [r.id, r]));
 // the voice instrument (voice-instrument) reads the style's lines and speakers; its samples come with the manifest below
 setSpokenContext({ files: {}, styles: SHAPE_STYLES });
+const crescendoKey = tr => { const C = ctlOf(tr); return JSON.stringify([C.narrated, C.growth, C.duration, C.opening, C.pace, C.development, tr.sections, tr.tracks, tr.id, tr.tags, tr.growthShape]); };
+function crescendoPut(key, c) {
+  crescendoCache.delete(key); crescendoCache.set(key, c);
+  while (crescendoCache.size > CRESCENDO_CACHE) crescendoCache.delete(crescendoCache.keys().next().value);
+}
+// the rules of a Compose growth (the Live coder profile, id switch, grows with the natural rules, natural-growth, and a
+// growth shape, growth-shapes)
+const crescendoOpts = tr => { const C = ctlOf(tr); return { narrated: C.narrated, rules: growthRules(C, { styles: SHAPE_STYLES }) }; };
 function crescendoOf(tr) {
-  // the Live coder profile (id switch) grows with the natural rules (natural-growth) and a growth shape (growth-shapes)
-  const C = ctlOf(tr), narrated = C.narrated, rules = growthRules(C, { styles: SHAPE_STYLES }), key = JSON.stringify([narrated, C.growth, C.duration, C.opening, C.pace, C.development, tr.sections, tr.tracks, tr.id, tr.tags, tr.growthShape]);
-  if (!crescendoCache.has(key)) { if (crescendoCache.size > 20) crescendoCache.clear(); crescendoCache.set(key, crescendoSong(tr, { narrated, rules })); }
-  const c = crescendoCache.get(key);
+  const key = crescendoKey(tr), c = crescendoCache.get(key) || crescendoSong(tr, crescendoOpts(tr));
+  crescendoPut(key, c);
   return c.build.length ? c : null;
+}
+// ---------- grown lengths of the song cards (src/live/card-duration.js) ----------
+// Song lists never grow songs in the page: a growth takes up to a few seconds per song. A card shows the song as its
+// own profile plays it (Classic: as written); a song that declares Crescendo or Live coder shows its grown length, the
+// built-in ones from src/library/song-durations.json (tools/song-durations.mjs), the user's grown in the page worker for
+// the cards on screen and kept in this browser by key. Until then, and before the voice context is known (samples
+// manifest), a card shows the written length.
+const DUR_STORE = 'coding-misk-card-durations', DUR_MAX = 300;
+let cardDurs = store.get(DUR_STORE, {}) || {}, durReady = false, durBusy = false;
+const durWait = new Map();
+const durCtx = () => ({ files: spokenContext.files, lengths: spokenContext.lengths || {}, lang: spokenContext.lang || getLang() });
+function durOf(tr) {
+  const key = durReady && tr.kind === 'composed' && growingProfile(tr) ? durationKey(tr, durCtx()) : null;
+  return { key, dur: key ? SONG_DURATIONS.entries[key] || cardDurs[key] || null : null };
+}
+// a card: the song, its written playable (no growth) and its grown length when known
+const cardOf = tr => ({ tr, p: playable(tr, RADIO_LIVE()), ...durOf(tr) });
+// the length a card shows: { seconds, bars }
+const cardLen = c => (c.dur && c.dur.bars ? c.dur : c.p.meta);
+// the voice context is known: the cards look their grown lengths up, the ones on screen grow away
+function cardsReady() {
+  if (durReady) return;
+  durReady = true;
+  for (const c of cards) Object.assign(c, durOf(c.tr));
+  if (cards.length) { showCardLengths(); queueCardLengths(); }
+}
+function showCardLengths() {
+  cards.forEach((c, i) => { const el = c.dur && document.querySelector(`#songs [data-song-card="${i}"] .song-len`); if (el) el.textContent = songLenText(c); });
+  songsView.setSongs(cards.map(songOf));
+}
+// the cards on screen whose grown length is not known yet, grown one at a time in the page worker
+function queueCardLengths() {
+  if (!durReady || !cards.length) return;
+  for (const el of document.querySelectorAll('#songs [data-song-card]:not([hidden])')) { const c = cards[+el.dataset.songCard]; if (c && c.key && !c.dur && !durWait.has(c.key)) durWait.set(c.key, c.tr); }
+  nextCardLength();
+}
+function nextCardLength() {
+  if (durBusy || !durWait.size) return;
+  const [key, tr] = durWait.entries().next().value;
+  durBusy = true;
+  pageAway({ duration: tr }).then(d => {
+    // (a song that does not grow after all keeps its written length: bars 0)
+    delete cardDurs[key]; cardDurs[key] = d ? { seconds: d.seconds, bars: d.bars } : { seconds: 0, bars: 0 };
+    const ks = Object.keys(cardDurs); for (const k of ks.slice(0, Math.max(0, ks.length - DUR_MAX))) delete cardDurs[k];
+    store.set(DUR_STORE, cardDurs);
+    for (const c of cards) if (c.key === key) c.dur = cardDurs[key];
+    showCardLengths();
+  }, () => durWait.clear()).finally(() => { durWait.delete(key); durBusy = false; nextCardLength(); });
 }
 // the radio tab (created further down, once the player exists)
 let radio = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, genresTab = null, patternsTab = null, prevTab = 'componi', curTab = null;
@@ -305,7 +378,24 @@ if (!PICK_LOOKS.some(([k]) => k === look)) look = 'palco';
 let fv = null, exportCtl = null;
 let soulOverride = false; // the Soul display's override (#46): the stage shows the soul
 let soulBase = look;
-let compiled = playable({ ...T, kind: 'composed' });
+// at start the song restored in Compose grows away from the page (pageAway), so the page answers at once: until then
+// Compose holds it as written (`pending`); played or exported first, it grows in the page, as playing always did
+const growsInCompose = () => { const lv = liveOf(T); return lv.on && lv.style === 'crescendo' && !crescendoCache.has(crescendoKey({ ...T, kind: 'composed' })); };
+const heldCompiled = () => ({ ...playable({ ...T, kind: 'composed' }, { ...liveOf(T), on: false }), pending: true });
+const grownNow = sg => (sg === compiled && compiled.pending ? (compiled = playable({ ...T, kind: 'composed' })) : sg);
+let compiled = growsInCompose() ? heldCompiled() : playable({ ...T, kind: 'composed' });
+function growComposeAway() {
+  if (!compiled.pending) return;
+  const tr = { ...T, kind: 'composed' }, key = crescendoKey(tr);
+  const done = () => {
+    if (!compiled.pending || crescendoKey({ ...T, kind: 'composed' }) !== key) return;
+    compiled = playable({ ...T, kind: 'composed' });
+    if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code);
+    renderArranger();
+  };
+  if (crescendoCache.has(key)) return done();
+  pageAway({ crescendo: { song: tr, opts: crescendoOpts(tr) } }).then(c => { if (!crescendoCache.has(key)) crescendoPut(key, c); done(); }, e => console.warn('[compose] growth away failed', e.message));
+}
 const saveDraft = () => store.set('coding-misk-draft', { T, sel, tk, dirty });
 // a Crescendo build plays a growth span before the written sections (#64): the arranger shows the written song,
 // so its bars and sections are offset by the growth (bars of the played song = bars of the arranger + growBars())
@@ -372,12 +462,15 @@ ready.then(async () => {
     try { const r = await fetch('/samples/say_lengths.json'); if (r.ok) lengths = await r.json(); } catch (e) {}
     setSpokenContext({ files: list, lengths });
     crescendoCache.clear();
-    compiled = playable({ ...T, kind: 'composed' });
+    // (the song of Compose grows again with the new context: away from the page unless it is playing)
+    if (compiled.pending || (growsInCompose() && !(mode === 'track' && isPlaying()))) { compiled = heldCompiled(); growComposeAway(); }
+    else compiled = playable({ ...T, kind: 'composed' });
     if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code);
+    cardsReady();
     if (!custom.length) return;
     await globalThis.samples('/samples/strudel.json');
     renderTrackPanel(); renderSounds(); syncAll();
-  } catch (e) { console.warn('campioni personalizzati non disponibili', e); }
+  } catch (e) { console.warn('campioni personalizzati non disponibili', e); growComposeAway(); cardsReady(); }
 });
 const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
@@ -557,6 +650,7 @@ function initAudioOnce() {
 // da lastEnd, quindi basta impostarlo prima di avviare. Il tempo lo gestisce transport() battuta per battuta.
 async function playSong(sg, bar = 0, as = 'free', { keepHand = false } = {}) {
   if (seeking) return;
+  sg = grownNow(sg);
   seeking = true;
   try {
     if (as !== 'radio' && radio && radio.on) radio.stopped();
@@ -794,6 +888,7 @@ function tapMaster() {
 }
 // asVideo (#27): a video of the song (frame and audio) instead of the audio alone
 async function exportTrack(sg, as, asVideo = false) {
+  sg = grownNow(sg);
   if (rec) { rec.cancel = true; rec.recorder.stop(); stop(); return; }
   if (fastJob) { fastJob.cancel(); return; }
   // audio: rendered offline in seconds (#8), unless the settings ask for real time or the render fails
@@ -1455,7 +1550,8 @@ function renderArranger() {
 // the values it cannot play disabled, and the shape that plays with where each part comes from
 function renderShape(C, building) {
   const T2 = { ...T, kind: 'composed' }, f = shapeFacts(T2, SHAPE_STYLES);
-  const c = building && C.growth === 'natural' ? crescendoOf(T2) : null;
+  // (the song held as written while it grows away at start: the shape drawn, until the growth comes back)
+  const c = building && C.growth === 'natural' && !compiled.pending ? crescendoOf(T2) : null;
   const shape = (c && c.crescendo && c.crescendo.shape) || resolveShape(T2, { user: { opening: C.opening, pace: C.pace, development: C.development }, styles: SHAPE_STYLES });
   // (automatic parts: what the build plays, a calmer development or pace when the drawn one would rush the typing)
   const drawn = resolveShape(T2, { styles: SHAPE_STYLES }), auto = Object.fromEntries(['opening', 'pace', 'development'].map(p => [p, c && c.crescendo && c.crescendo.shape && (C[p] || 'auto') === 'auto' ? c.crescendo.shape[p] : drawn[p]]));
@@ -2658,13 +2754,15 @@ $('#lessons').addEventListener('click', e => {
 });
 
 // ---------- brani ----------
-function songCard({ tr, p }, i) {
-  const m = p.meta, composed = tr.kind === 'composed';
+// the card's tempo, bars and length: the length as its own profile plays it (cardLen), the timeline as written
+const songLenText = c => { const L = cardLen(c); return t('songMeta', { bpm: c.p.meta.bpmLabel, bars: L.bars, time: clock(L.seconds) }); };
+function songCard(c, i) {
+  const { tr, p } = c, m = p.meta, L = cardLen(c), composed = tr.kind === 'composed';
   const ticks = Array.from({ length: Math.max(0, Math.floor(m.bars / 4) - 1) }, (_, k) => `<i style="left:${(k + 1) * 4 / m.bars * 100}%"></i>`).join('');
-  const sg = songOf({ tr, p }), kind = kindOf(sg), own = composed && !isBuiltin(tr.id);
+  const sg = songOf(c), kind = kindOf(sg), own = composed && !isBuiltin(tr.id);
   return `<article class="card lesson song" data-song-card="${i}" data-song-id="${esc(tr.id)}">
     <div class="song-head"><span class="badge kind-${kind}">${t(`k:${kind}`)}</span>${sg.mine ? `<span class="badge">${t('mine')}</span>` : ''}${sg.buildStyle === 'crescendo' ? `<span class="badge build-badge" title="${esc(t('fBuilds'))}">${esc(t('b:crescendo'))}</span>` : ''}
-      <span class="song-meta">${t('songMeta', { bpm: m.bpmLabel, bars: m.bars, time: clock(m.seconds) })}${tr.created ? ` · ${esc(t('cardCreated', { d: new Date(tr.created).toLocaleDateString(getLang() === 'it' ? 'it-IT' : 'en-GB') }))}` : ''}</span>${songsView.starButton(tr.id)}</div>
+      <span class="song-meta"><span class="song-len">${esc(songLenText(c))}</span>${tr.created ? ` · ${esc(t('cardCreated', { d: new Date(tr.created).toLocaleDateString(getLang() === 'it' ? 'it-IT' : 'en-GB') }))}` : ''}</span>${songsView.starButton(tr.id)}</div>
     <h3>${esc(tr.title)}</h3>
     ${tr.style ? `<p>${esc(tx(tr.style))}</p>` : ''}
     ${tr.version && tr.from ? `<p class="note">${esc(t('versionOf', { title: tr.fromTitle || tr.from }))}</p>` : ''}
@@ -2688,7 +2786,7 @@ function songCard({ tr, p }, i) {
         ${composed && continuable(tr) ? `<button class="btn" data-act="radio" title="${esc(t('continueRadioTip'))}">${t('continueRadio')}</button>` : ''}
         ${composed ? `<button class="btn" data-act="open">${t('openInCompose')}</button>` : `<button class="btn" data-act="code">${t('editCode')}</button>${user.code[tr.id] && !tr.version ? `<button class="btn danger" data-act="restore">${t('restoreOrig')}</button>` : ''}`}
       </span>
-      <span class="time">${t('songTime', { t: '0:00', total: clock(m.seconds), bar: 1, bars: m.bars })}</span>
+      <span class="time">${t('songTime', { t: '0:00', total: clock(L.seconds), bar: 1, bars: L.bars })}</span>
       <label class="loop"><input type="checkbox" data-loop="${i}"> ${t('loopSection')}</label>
     </div>
     ${m.sections.length > 1 ? `<div class="trans"><span class="lbl">${t('transitions')}</span>
@@ -2699,10 +2797,11 @@ function songCard({ tr, p }, i) {
 }
 // a card as a song for search and filters (#34): kind, tags, whether it is the user's
 function isMine(tr) { return tr.kind === 'composed' ? !isBuiltin(tr.id) || user.tracks.some(u => u.id === tr.id) : !!user.code[tr.id] || !!tr.version; }
-function songOf({ tr, p }) {
+function songOf(c) {
+  const { tr, p } = c;
   // songs generated before #34 have no origin: their id still tells
   return { id: tr.id, title: tr.title, style: tr.style, tags: tr.tags, origin: tr.origin || (/^endless-/.test(tr.id) ? 'endless' : undefined), code: tr.kind !== 'composed', build: tr.kind === 'composed' && hasBuild(tr), buildStyle: tr.buildStyle, created: tr.created,
-    mine: isMine(tr), bpm: parseFloat(p.meta.bpmLabel) || 0, seconds: p.meta.seconds };
+    mine: isMine(tr), bpm: parseFloat(p.meta.bpmLabel) || 0, seconds: cardLen(c).seconds };
 }
 // every style, built-in and the user's (also the invalid ones), for tag names and filters
 function allStyles() { return [...BUILTIN_STYLES, ...((stylesTab && stylesTab.mine) || []).filter(r => r && r.id && !BUILTIN_STYLES.some(b => b.id === r.id))]; }
@@ -2827,9 +2926,9 @@ function advanceFrom(id) {
 const songsView = createSongsView({ bar: $('#songs-bar'), list: $('#songs'), t, tx, esc, store, styles: allStyles, playlists, toast,
   trash: { list: () => trashList(user), daysLeft: e => daysLeft(e, new Date()), date: iso => new Date(iso).toLocaleDateString(getLang() === 'it' ? 'it-IT' : 'en-GB'),
     restore: restoreFromTrash, forget: forgetFromTrash, empty: emptyTheTrash, purge: purgeOld },
-  onPlayList: (listId, ids) => playQueue(listId, ids) });
+  onPlayList: (listId, ids) => playQueue(listId, ids), onChange: () => queueCardLengths() });
 playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, playlists, confirmTwice, toast,
-  songs: () => [...libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: c.p.meta.seconds })),
+  songs: () => [...libraryCards().map(c => ({ id: c.tr.id, title: c.tr.title, kind: kindOf(songOf(c)), seconds: cardLen(c).seconds })),
     ...playlists.all.flatMap(l => l.songs).filter(isSession).map(id => { const s = playlists.session(id); return s && { id, title: s.title, kind: 'session', seconds: 0, count: s.count, frozen: !!s.frozen, old: sessionOutdated(s, APP_VERSIONS) }; }).filter(Boolean)],
   video: id => exportSession(id),
   freeze: id => { const s = playlists.session(id); if (!s || !radio) return; playlists.freeze(id, radio.rebuild(s.recipe, s.count)); sessionSongs.delete(id); toast(t('plFrozen')); },
@@ -2842,7 +2941,7 @@ playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, pla
 function renderSongs() {
   const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr));
   // the cards only need the written song's meta: never grow every song for the list (a growth can take seconds)
-  cards = [...composed, ...codedTracks()].map(tr => ({ tr, p: playable(tr, RADIO_LIVE()) }));
+  cards = [...composed, ...codedTracks()].map(cardOf);
   songsView.setSongs(cards.map(songOf));
   songsView.renderBar();
   $('#songs').innerHTML = cards.map(songCard).join('');
@@ -2864,7 +2963,8 @@ function startCard(i, bar) {
   if (tr.kind === 'composed') {
     if (!loadTrack(tr)) return;
     songLook(tr.look);
-    return playSong(compiled, bar, 'track');
+    // the card's timeline is the written song: a bar on it is a bar of the written part, after a growth span
+    return playSong(compiled, bar > 0 ? bar + growBars() : 0, 'track');
   }
   if (!(song && song.id === tr.id)) songLook(tr.look);
   playSong(p, bar, 'free');
@@ -3083,11 +3183,13 @@ try {
     const c = cards[+card.dataset.songCard]; if (!c) return;
     const mine = song && song.id === c.tr.id;
     const active = playing && mine, isPaused = !playing && paused && mine;
-    const m = mine ? song.meta : c.p.meta, cyc = active ? s.now() : isPaused ? paused.cyc : 0;
-    card.querySelector('.head').style.left = `${Math.min(100, cyc / m.bars * 100)}%`;
-    const cur = active || isPaused ? m.sectionAt(cyc) : -1;
+    const m = mine ? song.meta : c.p.meta, L = mine ? m : cardLen(c), cyc = active ? s.now() : isPaused ? paused.cyc : 0;
+    // (the card's timeline is the written song: a grown song in Compose plays its growth span before it)
+    const off = mine && mode === 'track' ? growBars() : 0, w = c.p.meta;
+    card.querySelector('.head').style.left = `${Math.min(100, Math.max(0, cyc - off) / w.bars * 100)}%`;
+    const cur = active || isPaused ? w.sectionAt(cyc - off) : -1;
     card.querySelectorAll('.sec').forEach((x, j) => x.classList.toggle('on', j === cur));
-    const label = t('songTime', { t: clock(m.secondsAt(cyc)), total: clock(m.seconds), bar: Math.min(m.bars, Math.floor(cyc) + 1), bars: m.bars });
+    const label = t('songTime', { t: clock(m.secondsAt(cyc)), total: clock(L.seconds), bar: Math.min(L.bars, Math.floor(cyc) + 1), bars: L.bars });
     const te = card.querySelector('.time');
     if (te.textContent !== label) te.textContent = label;
     const pb = card.querySelector('[data-act=pause]'), sb = card.querySelector('[data-act=stop]');
@@ -3122,7 +3224,7 @@ function renderSounds() { sounds.render(); }
 
 // ---------- player bar (#32) ----------
 // the library in the order of the Songs tab: composed songs, then hand-written code songs
-function libraryCards() { if (!cards.length) { const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr)); cards = [...composed, ...codedTracks()].map(tr => ({ tr, p: playable(tr) })); } return cards; }
+function libraryCards() { if (!cards.length) { const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr)); cards = [...composed, ...codedTracks()].map(cardOf); } return cards; }
 function currentSongId() { return mixActive() ? mixS.items[0].id : mode === 'track' ? T.id : mode === 'free' && song ? song.id : null; }
 function neighbour(dir) {
   if (mode === 'radio' && radio && radio.on) return dir > 0 ? radio.skip() : radio.restart();
@@ -3366,7 +3468,7 @@ function renderAll() {
 }
 function changeLang(l) {
   setLang(l);
-  compiled = playable({ ...T, kind: 'composed' });
+  compiled = compiled.pending ? heldCompiled() : playable({ ...T, kind: 'composed' });
   renderAll();
   if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.code);
 }

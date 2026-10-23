@@ -43,7 +43,9 @@
     "check:patterns": "node --no-warnings tools/check-patterns.mjs",
     "check:spoken": "node --no-warnings tools/check-spoken.mjs",
     "knowledge": "node --no-warnings tools/knowledge.mjs",
-    "check:knowledge": "node --no-warnings tools/check-knowledge.mjs"
+    "check:knowledge": "node --no-warnings tools/check-knowledge.mjs",
+    "durations": "node --no-warnings tools/song-durations.mjs write",
+    "check:durations": "node --no-warnings tools/song-durations.mjs check"
   },
   "dependencies": {
     "@mediabunny/flac-encoder": "^1.61.3",

@@ -15,18 +15,18 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 
 | You changed | Node checks | Browser checks (dev server) |
 | --- | --- | --- |
-| A song or `songs/index.json` | `check:songs`, `check:code`, `check:crescendo`, `check:strudel` | `check-levels.cjs <id>`, `snapshot-levels.cjs check` |
+| A song or `songs/index.json` | `check:songs`, `check:code`, `check:crescendo`, `check:strudel`, `check:durations` | `check-levels.cjs <id>`, `snapshot-levels.cjs check` |
 | The compiler, presets, ideas, `src/music.js` | `check:code`, `check:songs`, `check:ideas`, `check:patterns`, `check:crescendo`, `check:live-code` | `check-ideas.cjs`, `check-compact-code.cjs`, `snapshot-levels.cjs check` |
 | A style or an artist | `check:styles`, `check:endless`, `check:random` | `check-style-sounds.cjs`, `check-endless-play.cjs`, `check-library.cjs` |
 | The director, steering, transitions | `check:endless`, `check:compilation` | `check-radio.cjs`, `check-steering.cjs`, `check-transitions.cjs` |
 | Profiles and growth on air, the code on air, commands as waypoints (`src/endless/growth.js`, `src/endless/items.js`, `src/endless/waypoints.js`, `src/live/air-code.js`) | `check:radio-profiles`, `check:endless`, `check:live-code` | `check-radio.cjs`, `check-compact-code.cjs` (radio window), `check-transitions.cjs` (Live coder runs), `check-steering.cjs` (Live coder steering at its end) |
 | The material generator | `check:material`, `check:endless`, `check:patterns` | `check-patterns.cjs` |
-| Growth shapes, Crescendo, profiles, typing | `check:crescendo -- --full`, `check:profiles`, `check:live-code`, `check:typing`, `check:functions` | `check-crescendo-play.cjs`, `check-hand.cjs` |
+| Growth shapes, Crescendo, profiles, typing | `check:crescendo -- --full`, `check:profiles`, `check:live-code`, `check:typing`, `check:functions`, `check:durations` | `check-crescendo-play.cjs`, `check-hand.cjs` |
 | App functions, the writer | `check:functions`, `check:strudel`, `check:live-code` | `check-compact-code.cjs` |
 | The hidden mixer and the code views (`src/song/writer.js`, `src/live/live-code.js`, `src/live/air-code.js`, `src/song/compile-compact.js`, `compileNow`) | `check:mixer` (quick; `--full` before a merge to main), `check:live-code`, `check:functions` | `check-compact-code.cjs` |
 | The voice | `check:spoken`, `check:endless` | `check-spoken-play.cjs` |
 | Export, video, fragments | `check:export`, `check:video`, `check:clips` | `check-export.cjs`, `check-video.cjs`, `check-clips.cjs` |
-| Library, playlists, trash, settings | `check:song-filter`, `check:playlists`, `check:trash`, `check-backup.mjs` | `check-songs-tab.cjs`, `check-playlists.cjs`, `check-settings.cjs` |
+| Library, playlists, trash, settings, startup and card lengths (`src/live/card-duration.js`) | `check:durations`, `check:song-filter`, `check:playlists`, `check:trash`, `check-backup.mjs` | `check-songs-tab.cjs`, `check-playlists.cjs`, `check-settings.cjs`, `check-startup.cjs` |
 | Interface text or the Guide | `check:guide` | `check-modes.cjs` |
 | Anything a note or a recipe describes | `check:knowledge` | |
 | Strudel version, sounds | `catalog:strudel`, `check:strudel`, `check:sound-guard` | `check-sounds.cjs`, `check-style-sounds.cjs` |
@@ -115,6 +115,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-sounds.cjs` |  | dev server, Chrome | Checks every sound the app can call (#54): every zone of every General MIDI soundfont font, and every sample of every sample bank in the app's sound map, fetched and decoded in the browser. A broken part is "covered"… |
 | `tools/check-spoken-play.cjs` |  | dev server, Chrome | Voice instrument in the browser (voice-instrument, #39): the example song plays every section without an evaluation error, its spoken lines are heard on the fx analyser, the master output stays below clipping… |
 | `tools/check-spoken.mjs` | `npm run check:spoken` | Node | Checks for the voice instrument (voice-instrument, #39): spoken tracks and their lines, the four ways to speak, the narrator that yields, the poetic narrator, texts and speakers, the growth and the director. No browser. |
+| `tools/check-startup.cjs` |  | dev server, Chrome | Browser check of the startup time: the app must be interactive within 3 s, with no long task over 1.5 s, also when every song would grow (the Live build switch on with the Live coder or the Crescendo profile) and with… |
 | `tools/check-steering.cjs` |  | dev server, Chrome | Browser checks for radio steering (#24): console commands queue and apply at their bar, cancel, the energy curve drag, the mixer, the scope switch, shortcuts, length commands and replay with steering; Vary and Swap with… |
 | `tools/check-strudel.mjs` | `npm run check:strudel` | Node | Checks the code the app generates against the catalog of the installed Strudel (strudel-catalog, #69, design D5). No browser. |
 | `tools/check-style-sounds.cjs` |  | dev server, Chrome | Checks that every sound and drum machine named by the style recipes is in the app's loaded sound map. |

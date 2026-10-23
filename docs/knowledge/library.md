@@ -1,8 +1,8 @@
 ---
 id: library
 related: [songs, radio, patterns, export, settings, styles]
-code: [src/library/songs-view.js, src/library/song-filter.js, src/library/playlists.js, src/library/trash.js, src/settings/backup.js]
-checks: [npm run check:song-filter, npm run check:playlists, npm run check:trash, node --no-warnings tools/check-backup.mjs]
+code: [src/library/songs-view.js, src/library/song-filter.js, src/library/playlists.js, src/library/trash.js, src/settings/backup.js, src/live/card-duration.js]
+checks: [npm run check:song-filter, npm run check:playlists, npm run check:trash, node --no-warnings tools/check-backup.mjs, npm run check:durations]
 ---
 
 # Library
@@ -25,6 +25,8 @@ Nothing leaves the browser unless the user exports it. A backup file holds it al
 ## Options
 
 **Songs tab.** Search by title, style, key or tag. Filters: genre, style, kind, never heard, build style, favourites, the Test chip. Sorting, previous and next.
+
+**Card length.** A card shows the song as its own profile plays it, whatever the Compose settings: Classic songs as written, songs that declare Crescendo or Live coder with their grown length. Built-in lengths come from `src/library/song-durations.json` (`npm run durations`); the user's growing songs grow in the page worker when their card is on screen, and the browser keeps the length by song version. Until then the card shows the written length. The timeline of a card is the written song: a seek on it lands after the growth span.
 
 **Tags.** `genres` from a fixed list, `styles` (recipe ids), `free` tags. The free tag `test` marks test songs; the Test chip filters them.
 

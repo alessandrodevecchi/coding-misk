@@ -1,12 +1,13 @@
 // Browser checks for the Songs tab (#34): search, filters, favourites, sorting, tag editing, previous and next,
 // delete, the trash and the Test chip (#68), the trash icon on every card and hidden built-in songs (D3b).
-// Usage: PLAYWRIGHT_CORE=... node tools/check-songs-tab.cjs [shots-dir]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-songs-tab.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
 const shots = process.argv[2];
+const PORT = process.env.PORT || 5173;
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
 (async () => {
@@ -15,7 +16,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(3000);
+  await page.goto(`http://localhost:${PORT}/`); await sleep(3000);
   // one song of the user's, tagged with one of the user's styles
   await page.evaluate(async () => {
     const synth = await (await fetch('/styles/synthwave.json')).json().catch(() => null);

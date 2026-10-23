@@ -33,6 +33,12 @@ Mistakes that cost time before. Each line says what goes wrong and what to do. T
 - **Level noise.** Guitars and `fx` move between runs. Measure twice before blaming a change.
 - **Editing `src/` during a browser check.** Vite reloads the page; the rest of the run measures silence.
 
+## Page speed
+
+- **Never grow songs for a list.** A growth (`crescendoSong`, Crescendo or Live coder) takes up to a few seconds per song. Growing every song for the Songs tab froze the page for 8 s and more, and over a minute with the Live build switch on and many songs. Song cards, the playlists tab and every other list use the written song (`cardOf`, `playable(tr, RADIO_LIVE())`) and the grown length from `src/library/song-durations.json` or the page worker (`src/live/card-duration.js`). A song grows in the page only when it is played, exported or edited in Compose; the song restored in Compose at start grows in the page worker. `node tools/check-startup.cjs` fails on a long task over 1.5 s at load.
+- **A song changed means stale card lengths.** After a change to a built-in song, the growth rules, `SHAPES_VERSION` or `CRESCENDO_VERSION`, run `npm run durations`; `npm run check:durations` fails until then.
+- **The radio's grow worker is not for page work.** A growth for the page waits in a second worker (`pageAway`), so the radio never waits behind it.
+
 ## Generated code and fixtures
 
 - **Fixtures move.** A director change that moves `npm run check:endless -- --write-fixtures` needs `DIRECTOR_VERSION` raised in the same commit. A growth change that moves the Live coder fixtures needs `SHAPES_VERSION` raised; the Crescendo fixtures must not move with it.
