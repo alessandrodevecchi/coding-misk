@@ -26,6 +26,7 @@ Start here. This file and `docs/` hold everything a coding agent or a new sessio
 
 ## Rules
 
+- **Never print secrets from the environment.** The owner's shell exports tokens for other projects. Do not run `env`, `printenv`, `set` or `export -p`, and do not list processes with their full command line (`ps aux`, `ps -o command`, `pgrep -fl`). To see whether a check runs, list names and ids only (`pgrep -l`, `ps -o pid,comm`).
 - **Log every action.** After each meaningful change, append a dated entry to `DEVLOG.md`: what changed, why, and anything learned (bugs, gotchas, measurements). Keep `docs/` in sync when architecture, model, design or decisions change.
 - **Talk to the owner in Italian.** Repository docs, issues, commits and README are in English (Italian copies where they exist). `DEVLOG.md` is in Italian.
 - **Git flow.** `main` is stable, `develop` collects work in progress. One branch per issue from `develop` (`feat/<issue>-<slug>`, `fix/<issue>-<slug>`), merged back into `develop`. Merge `develop` into `main` only when the owner confirms. Never force push `main`.
