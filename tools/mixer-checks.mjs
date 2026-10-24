@@ -3,6 +3,8 @@
 // At every step of the live build the code is evaluated by Strudel in Node with each Technical functions preset
 // (short, mixer, compact: the code shown and its hidden tail, as the app evaluates it) and written in full; the haps
 // of the step's bar must carry the same mix: gain, orbit, analyze, postgain and velocity, hap by hap.
+// With Sections (code-lanes) the lines lose their section and clip lanes, which the hidden mixer plays: velocity and
+// postgain (a gated guitar) are compared like the rest.
 // Strudel in Node: @kabelsalat/web (a browser-only import of @strudel/core's repl) is stubbed by a resolve hook, and
 // @strudel/tonal does not load here (its @tonaljs files are missing), so its functions (`transpose`, `scale`,
 // `voicing`, `voicings`, `rootNotes`) are registered as the identity, the same on both sides: notes stay as written,
@@ -18,9 +20,14 @@ import { liveCode } from '../src/live/live-code.js';
 import { buildSteps, deriveBuild } from '../src/song/build.js';
 import { installHelpers, useFns } from '../src/song/writer.js';
 
-// the profiles (Classic as a live build, Crescendo, Live coder) and the presets compared with the code in full
-export const PROFILES = ['classic', 'crescendo', 'switch'];
-export const VIEWS = ['short', 'mixer', 'compact'];
+// the profiles (Classic as a live build, Classic with the Live build off: the song as written, Crescendo, Live coder)
+// and the presets compared with the code in full; sections: full with only the Sections option (code-lanes); compact
+// has it too
+export const PROFILES = ['classic', 'written', 'crescendo', 'switch'];
+export const VIEWS = ['short', 'mixer', 'compact', 'sections'];
+const OPTIONS = { short: { functions: 'short' }, mixer: { functions: 'mixer' }, compact: { functions: 'compact' }, sections: { functions: 'full', fnLanes: true }, full: { functions: 'full' } };
+// Classic with the Live build off is the profile classic on the written song with no steps (src/main.js playable)
+const profileOf = p => (p === 'written' ? 'classic' : p);
 export const FIELDS = ['gain', 'orbit', 'analyze', 'postgain', 'velocity'];
 export const STYLE_FILES = fs.readdirSync('styles').filter(f => f.endsWith('.json')).sort().map(f => `styles/${f}`);
 const styles = Object.fromEntries(STYLE_FILES.map(f => JSON.parse(fs.readFileSync(f, 'utf8'))).map(r => [r.id, r]));
@@ -57,10 +64,14 @@ async function load() {
 async function hapsOf(L, code, bar) {
   globalThis.miskBuses = L.buses; useFns(L.fns);
   const p = await (await load()).evaluate(L.run ? L.run(code) : code);
+  // (in time order: lines played without being shown, the end of a fade, come after the code shown)
+  const key = x => `${x.at.toFixed(6)} ${x.s} ${x.note} ${x.analyze} ${x.velocity} ${x.postgain} ${x.gain}`;
   return p.queryArc(bar, bar + 1).filter(h => h.hasOnset()).map(h => {
     const v = h.value && typeof h.value === 'object' ? h.value : { value: h.value };
-    return { at: h.whole.begin.valueOf(), s: v.s, note: v.note ?? v.n, ...Object.fromEntries(FIELDS.map(k => [k, v[k]])) };
-  });
+    // (a velocity of 1 is no velocity: the code of the moment in full drops a lane that is 1 on the whole section, the
+    // mixer plays it)
+    return { at: h.whole.begin.valueOf(), s: v.s, note: v.note ?? v.n, ...Object.fromEntries(FIELDS.map(k => [k, v[k]])), velocity: v.velocity ?? 1 };
+  }).sort((x, y) => (key(x) < key(y) ? -1 : key(x) > key(y) ? 1 : 0));
 }
 const close = (a, b) => a === b || (typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < 1e-9);
 const show = x => (x === undefined ? '-' : typeof x === 'number' ? String(+x.toFixed(4)) : String(x));
@@ -81,6 +92,7 @@ function diff(a, b) {
 // only evaluates again
 const stylesText = STYLE_FILES.map(f => `${f}\0${fileText(f)}`).join('\0');
 function buildOf(s, profile) {
+  if (profile === 'written') return { ...s, build: [] };
   const C = resolveProfile(profile);
   if (C.build !== 'crescendo') return { ...s, build: s.build || deriveBuild(s) };
   const key = cacheKey('src/song/crescendo.js', appHash('src/live/profiles.js'), appHash('src/song/build.js'), 'mixer build', profile, stylesText, fileText(fileOf[s.id]));
@@ -89,13 +101,15 @@ function buildOf(s, profile) {
 // task: { song, profile } → { steps, views: { short: [{ bar, diffs }], … }, error }
 export async function runTask({ song, profile }) {
   const s = songs.find(x => x.id === song), b = buildOf(s, profile);
-  const mk = functions => liveCode(b, resolveProfile(profile, { functions }), { lang: () => 'it', files: () => files, cols: () => 60 });
-  const full = mk('full'), bars = [0, ...new Set(buildSteps(full.build).map(x => x.at))].sort((x, y) => x - y);
+  const mk = view => liveCode(b, resolveProfile(profileOf(profile), OPTIONS[view]), { lang: () => 'it', files: () => files, cols: () => 60 });
+  // the steps of every view (Sections adds one at each section and clip change)
+  const full = mk('full'), Ls = Object.fromEntries(VIEWS.map(v => [v, mk(v)]));
+  const bars = [...new Set([0, ...[full, ...Object.values(Ls)].flatMap(L => buildSteps(L.build).map(x => x.at))])].sort((x, y) => x - y);
   const ref = [];
   for (const bar of bars) { try { ref.push(await hapsOf(full, full.codeAt(bar), bar)); } catch (e) { ref.push(`the code in full: evaluation failed: ${e.message}`); } }
   const views = {};
   for (const view of VIEWS) {
-    const L = mk(view), rows = [];
+    const L = Ls[view], rows = [];
     for (let i = 0; i < bars.length; i++) {
       let d;
       try { const h = await hapsOf(L, L.codeAt(bars[i]), bars[i]); d = typeof ref[i] === 'string' ? [ref[i]] : diff(ref[i], h); } catch (e) { d = [`evaluation failed: ${e.message}`]; }

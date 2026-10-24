@@ -66,6 +66,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Live build options | Voice | Voce | `fOpt:fnVoice` |
 | Live build options | Song | Del brano | `fOpt:fnSong` |
 | Live build options | Library | Libreria | `fOpt:fnLib` |
+| Live build options | Sections | Sezioni | `fOpt:fnLanes` |
 | Live build options | Opening | Apertura | `openingLbl` |
 | Live build options | Pace | Velocità | `paceLbl` |
 | Live build options | Development | Sviluppo | `developmentLbl` |

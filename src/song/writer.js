@@ -2,7 +2,8 @@
 // comments. fnBus: our own `.chan("bass")` for the bus and the visual; fnLevel: bus, visual and level in a hidden
 // mixer (`.gain()` only when the level is not the track's written one); fnCrunch: `.crunch(0.6)` for distortion with its
 // volume; fnVoice: the effects of a voice line as a song function; fnLib: the library functions (src/song/functions.js)
-// for frequent chains; fnSong: the song's own functions for chains repeated in the song. Every option plays the same
+// for frequent chains; fnSong: the song's own functions for chains repeated in the song; fnLanes (code-lanes): section
+// and clip lanes in the hidden mixer, one line per part edited in place (src/live/live-code.js). Every option plays the same
 // events: the functions are registered (installHelpers, useFns), the mixer is a hidden tail evaluated after the code
 // shown (its mini-notation offsets are past the end of the panel, so the highlights of the code shown stay where they
 // are). Pure text in, text out, apart from installHelpers and useFns.
@@ -11,7 +12,7 @@ import { EFFECTS, LIBRARY, LIBRARY_NAMES, nameOrder, NAMES } from './functions.j
 import { hashString } from '../endless/random.js';
 
 export const FUNCTION_LEVELS = ['full', 'short', 'mixer', 'compact'];
-export const FUNCTION_OPTIONS = ['fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib'];
+export const FUNCTION_OPTIONS = ['fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'fnLanes'];
 const preset = on => Object.fromEntries(FUNCTION_OPTIONS.map(k => [k, on.includes(k)]));
 export const FUNCTION_PRESETS = {
   full: preset([]),
@@ -355,7 +356,8 @@ const defOf = (name, ctx) => (LIB_BY[name] ? { params: LIB_BY[name].params, chai
 // voice code (it still plays)
 export function writeCode(code, { mode = 'full', written = new Map(), buses = {}, voice = true, fns = null } = {}) {
   const o = functionOptions(mode), v = voice ? { shown: code, voice: '' } : splitVoice(code), table = new Map(), defs = {}, entries = [];
-  if (!FUNCTION_OPTIONS.some(k => o[k])) return { code: v.shown, table, entries, voice: v.voice, fns: defs };
+  // (fnLanes is not the writer's: the lanes leave the code before it, src/live/live-code.js)
+  if (!FUNCTION_OPTIONS.some(k => k !== 'fnLanes' && o[k])) return { code: v.shown, table, entries, voice: v.voice, fns: defs };
   const ctx = fns || { table: [], voices: new Map(), defs: {}, song: {}, avoid: new Set() }, used = new Set();
   const out = chainLines(v.shown).map(l => {
     if (!PATTERN.test(l)) return l;
@@ -390,8 +392,9 @@ export function expandLine(line, fns = {}) {
 // `entries`), taken by the place of each line, for the code as written; without them a line finds its entry by its
 // text in the table (an ambiguous text gives only what its lines agree on), and lines edited by hand find the most
 // alike line of the table.
-// lanes (live-coder in-place edits): for each pattern line of the code, in order, the section lanes it plays under
-// (["0!76 1!8 0.5 0!31", …], one value per bar, as `.mask(lane).velocity(lane)` would) or null; hidden: lines that
+// lanes (live-coder in-place edits, code-lanes): for each pattern line of the code, in order, the section and clip
+// lanes it plays under (["0!76 1!8 0.5 0!31", …], one value per bar, as `.mask(lane).velocity(lane)` would; a gated
+// line "lane x n": as `.mask(lane).postgain(lane.mul(n))`, n one value or one per bar) or null; hidden: lines that
 // play without being shown (the last bar of a fade from the section before)
 export function tail(shown, { table = new Map(), entries = null, voice = '', like = null, offset = 0, lanes = null, hidden = '' } = {}) {
   const ranges = [];
@@ -423,13 +426,15 @@ export function tail(shown, { table = new Map(), entries = null, voice = '', lik
 // (the line found by the first place of its haps that falls inside a line: a constant such as a section lane can
 // come first); a line with section lanes (live-coder in-place edits) plays as with
 // `.mask(lane).velocity(lane)` for each lane: its haps cut at the bars, kept where the lane is not 0, the velocity
-// the lane's value (the line found by any place of its haps inside it: a shared idea's constant comes first)
+// the lane's value (the line found by any place of its haps inside it: a shared idea's constant comes first); a gated
+// lane ("lane x n", code-lanes) sets the postgain to the lane's value times n instead, as `.postgain(lane.mul(n))`
 export const MIX_SOURCE = `(pat, ranges) => {
   const cache = new Map(), lane = s => { let v = cache.get(s); if (!v) { v = []; for (const t of s.trim().split(/ +/)) { const m = t.match(/^([^!]*)(?:!(\\d+))?$/); for (let k = 0; k < (m[2] ? +m[2] : 1); k++) v.push(Number(m[1])); } cache.set(s, v); } return v; };
   const locs = h => (h.context && h.context.locations) || [];
   const mixOf = h => { for (const l of locs(h)) { const r = ranges.find(([a, b]) => l.start >= a && l.start < b); if (r) return r; } return null; };
   const laned = ranges.filter(r => r[2].lanes), laneOf = h => { for (const l of locs(h)) { const r = laned.find(([a, b]) => l.start >= a && l.start < b); if (r) return r; } return null; };
-  const cut = (h, list) => { const out = []; for (const s of list) { const v = lane(s); for (const sp of h.part.spanCycles) { const c = Math.floor(sp.begin.valueOf()), x = v[((c % v.length) + v.length) % v.length]; if (x) out.push(new h.constructor(h.whole, sp, { ...h.value, velocity: x }, h.context)); } } return out; };
+  const at = (v, c) => v[((c % v.length) + v.length) % v.length];
+  const cut = (h, list) => { const out = []; for (const s of list) { const [a, b] = s.split(' x '), v = lane(a), m = b === undefined ? null : lane(b); for (const sp of h.part.spanCycles) { const c = Math.floor(sp.begin.valueOf()), x = at(v, c); if (x) out.push(new h.constructor(h.whole, sp, m ? { ...h.value, postgain: x * at(m, c) } : { ...h.value, velocity: x }, h.context)); } } return out; };
   const fill = h => { const r = mixOf(h); if (!r) return h; return h.withValue(v => { const o = { ...v }; for (const [k, x] of Object.entries(r[2])) if (k !== 'lanes' && o[k] === undefined) o[k] = x; return o; }); };
   return pat.withHaps(haps => (laned.length ? haps.flatMap(h => { const r = laneOf(h); return r ? cut(h, r[2].lanes) : [h]; }) : haps).map(fill));
 }`;

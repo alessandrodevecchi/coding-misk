@@ -18,14 +18,16 @@ Each group has presets over separate options. Changing one option makes the pres
 
 ## How it connects
 
-- **Profiles.** Every option is a profile control ([profiles.md](profiles.md)). Classic and Crescendo write everything out; the Live coder writes compact code with only the title as comments (no track names, notes or phrases, radio-profiles 9.2).
+- **Profiles.** Every option is a profile control ([profiles.md](profiles.md)). Classic and Crescendo write everything out; the Live coder writes compact code (Sections included) with only the title as comments (no track names, notes or phrases, radio-profiles 9.2).
 - **Strudel.** The app's functions are registered in Strudel before the code runs ([strudel.md](strudel.md)). Their definitions and the mixer live in the hidden code. Copy and Open in Strudel add them, so the code plays the same there.
 - **Live build.** Each step of a build is written with these options ([live-build.md](live-build.md)).
 - **Names.** No app function takes a Strudel name or synonym ([decisions.md](decisions.md)).
 
 **Song functions.** With `fnSong`, an effect chain that repeats in a song becomes a function of that song. It needs three calls or more with the same names on two lines or more, and takes at most three parameters. Its name is a themed word drawn by the song id from `NAMES` in `src/song/functions.js`: theme words per style, then words per track type, then generic words.
 
-**The hidden mixer.** With `fnLevel`, bus, visual and level go to a hidden tail, `all(x => miskMix(x, [...]))`. It finds each line by the place of its text and gives its events what the line no longer writes. The Live coder's section lanes play through it too.
+**The hidden mixer.** With `fnLevel`, bus, visual and level go to a hidden tail, `all(x => miskMix(x, [...]))`. It finds each line by the place of its text and gives its events what the line no longer writes. The section and clip lanes play through it too (Sections, and the Live coder).
+
+**Sections (`fnLanes`, code-lanes).** The section and clip lanes leave the code: each part is one line, edited in place when its section or clip changes, and the section constants (`const section3 = …`, `const clip2 = …`) and the `SECTIONS` table are gone. It works with every profile and code view: `liveCode` then always writes the code of the moment in place (`compileNow` with `inPlace`, `gated`, `bounds`), with a step at each section start and at each bar inside a section where a clip starts or ends (`clipBounds` in `src/song/compile-compact.js`). `liftLanes` takes `.mask(x).velocity(x)` and, with Sections, `.mask(x).postgain(x.mul(n))` (gated guitars, n a number or a value per bar) out of each line; the mixer plays a lane as velocity, a gated lane `"lane x n"` as postgain, the lane's value times n on that bar. A Classic song with the Live build off and Sections on plays as written, every track from the start, through the same code of the moment (`playable` in `src/main.js` gives it a build with no steps). The compact preset has Sections; full, short and mixer do not, so Classic and Crescendo with full write the code they always wrote. The Live coder edits in place with or without it; without it a gated guitar still shows every clip of its track and the clips of a section are not split. The growth measures its typing on the Live coder code without Sections (`src/song/crescendo.js`), so the grown builds did not change.
 
 **The radio's hidden songs (radio-profiles D7).** In the radio, the code evaluated is the panel's text, the hidden tail of the song on air, then the songs not on air in full technical form (`src/live/air-code.js`): Classic controls, no song functions and no lanes, their constants renamed with `n<k>_`, their orbits moved up by 20, their `S$:` lines played alone only within their own song. The mixer finds lines by place, so it never touches them, and the song functions of the song on air never meet theirs. The prelude panel (Hidden code) shows them too.
 
@@ -49,14 +51,14 @@ Comments (it: Commenti): Comments in the code. Essential: the title and the trac
 <!-- /generated -->
 
 <!-- generated:function-presets -->
-Technical functions (it: Funzioni tecniche): How much technical code you see. Full: everything written. Short: .chan("bass") for bus and visual, .crunch(0.6) for distortion, the voice effects in a function. Mixer: also bus, visual and level in a hidden mixer, .gain() only when a step changes the level. Compact: also the library functions (.wob(), .plk(), .wet(), .res()) and the song functions, with a themed name, for effect chains that repeat. Sounds, notes and rhythms stay written. Changing an option makes it custom. The sound is the same.
+Technical functions (it: Funzioni tecniche): How much technical code you see. Full: everything written. Short: .chan("bass") for bus and visual, .crunch(0.6) for distortion, the voice effects in a function. Mixer: also bus, visual and level in a hidden mixer, .gain() only when a step changes the level. Compact: also the library functions (.wob(), .plk(), .wet(), .res()) and the song functions, with a themed name, for effect chains that repeat, and the sections: one line per part, changed in place at each section or clip. Sounds, notes and rhythms stay written. Changing an option makes it custom. The sound is the same.
 
-| Preset | Name | `fnBus` | `fnLevel` | `fnCrunch` | `fnVoice` | `fnSong` | `fnLib` |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `full` | full (it: per esteso) | off | off | off | off | off | off |
-| `short` | short (it: abbreviate) | on | off | on | on | off | off |
-| `mixer` | mixer (it: al mixer) | on | on | on | on | off | off |
-| `compact` | compact (it: compatte) | on | on | on | on | on | on |
+| Preset | Name | `fnBus` | `fnLevel` | `fnCrunch` | `fnVoice` | `fnSong` | `fnLib` | `fnLanes` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `full` | full (it: per esteso) | off | off | off | off | off | off | off |
+| `short` | short (it: abbreviate) | on | off | on | on | off | off | off |
+| `mixer` | mixer (it: al mixer) | on | on | on | on | off | off | off |
+| `compact` | compact (it: compatte) | on | on | on | on | on | on | on |
 
 Default preset per profile: Classic `full`, Crescendo `full`, Live coder `compact`.
 
@@ -68,6 +70,7 @@ Default preset per profile: Classic `full`, Crescendo `full`, Live coder `compac
 | `fnVoice` | Voice (it: Voce) | The voice effects in a song function |
 | `fnSong` | Song (it: Del brano) | Effect chains that repeat become song functions with a themed name; the values that change stay in the brackets |
 | `fnLib` | Library (it: Libreria) | Library functions for the most used chains: .plk(decay, sustain), .wet(delay, room), .res(lpf, lpq), .wob(from, to) for a moving filter |
+| `fnLanes` | Sections (it: Sezioni) | Section and clip lanes go to the hidden mixer: each part is one line, changed in place when its section or clip changes, no section constants. For every profile, also with the Live build off |
 <!-- /generated -->
 
 The app's own functions:

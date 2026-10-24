@@ -1,12 +1,13 @@
 // The hidden mixer plays what the code in full plays (code-writing, song-functions). No browser.
-// Every built-in song (songs/*.json, songs/examples/) × Classic (live build), Crescendo and Live coder × the
-// Technical functions presets short, mixer and compact: at every step the code shown and its hidden tail are
+// Every built-in song (songs/*.json, songs/examples/) × Classic (live build), Classic with the Live build off,
+// Crescendo and Live coder × the Technical functions presets short, mixer and compact, and full with Sections only
+// (code-lanes; compact has Sections too): at every step the code shown and its hidden tail are
 // evaluated by Strudel in Node, and each hap of the step's bar must carry the gain, orbit, analyze, postgain and
 // velocity it has with the code written in full (tools/mixer-checks.mjs). Levels (faster-checks):
 //   - quick (default): a fixed sample of songs (QUICK_SONGS) with every profile and preset;
 //   - full (--full): every song;
 //   - targeted: --songs <a,b> (or SONGS=a,b) those songs, --only <text> (or ONLY=text) the profiles or presets whose
-//     name holds the text (classic, crescendo, switch, short, mixer, compact).
+//     name holds the text (classic, written, crescendo, switch, short, mixer, compact, sections).
 // One task per song and profile, in worker processes (tools/check-pool.mjs); results cached (tools/code-cache.mjs)
 // under a hash of the song, the recipes and the app code; --no-cache ignores the cache.
 //   npm run check:mixer                 quick level, exit 1 when a hap differs
@@ -21,9 +22,10 @@ import { appHash, cacheKey, cacheGet, cachePut, cacheLine, cachePrune, fileText,
 // circuito-ruggine take 20 s to 2 minutes each at low priority: --full): sections without clips and a voice
 // (prova-solo-synth, switch-acid-prova with its own build), clips and risers (luci-rosse), gated guitars and risers
 // (neon-rush-reel, dci-carica), spoken comments (example-voices), two lines alike once the mix is out
-// (prova-voce-notte), a Live coder song with clips and lanes (switch-prima-luce)
-export const QUICK_SONGS = ['dci-carica', 'example-voices', 'luci-rosse', 'neon-rush-reel', 'prova-solo-synth', 'prova-voce-notte', 'switch-acid-prova', 'switch-prima-luce'];
-const NAMES = { classic: 'Classic', crescendo: 'Crescendo', switch: 'Live coder' };
+// (prova-voce-notte), a Live coder song with clips and lanes (switch-prima-luce), guitars gated with a level that
+// changes bar by bar (settimo-cielo, code-lanes)
+export const QUICK_SONGS = ['dci-carica', 'example-voices', 'luci-rosse', 'neon-rush-reel', 'prova-solo-synth', 'prova-voce-notte', 'settimo-cielo', 'switch-acid-prova', 'switch-prima-luce'];
+const NAMES = { classic: 'Classic', written: 'Classic (Live build off)', crescendo: 'Crescendo', switch: 'Live coder' };
 
 const args = process.argv.slice(2);
 const opt = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };

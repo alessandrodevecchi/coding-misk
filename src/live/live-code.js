@@ -2,7 +2,7 @@
 // controls in force (performance-profiles). Pure: the app and the Node checks build the same code.
 import { compileSong } from '../song/compile.js';
 import { buildSteps, stateAt, annotate, voiceCode } from '../song/build.js';
-import { compileCompact, compileNow, liftLanes } from '../song/compile-compact.js';
+import { compileCompact, compileNow, liftLanes, clipBounds } from '../song/compile-compact.js';
 import { applyComments } from '../song/comments.js';
 import { idiomatic } from '../song/idiom.js';
 import { breakLines, lineLike, chainLines } from '../song/typing.js';
@@ -17,17 +17,24 @@ import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOp
 // out, buses (for `.chan()`), fns (the functions the code calls: name → { params, chain }, song-functions) }
 export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0 } = {}) {
   const liveCode = C.view, liveGen = C.gen;
+  // technical functions (code-writing, song-functions, code-lanes): `any`, the options the writer folds (all but fnLanes)
+  const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => k !== 'fnLanes' && o[k]);
+  // the Sections option (code-lanes): in every profile and view the code of the moment, edited in place, its section
+  // and clip lanes (gated lines too) in the hidden mixer: one line per part, a step at each section and clip change
+  const lanes = !!o.fnLanes;
   // the code of the moment (code-now): each section boundary is a step, and the bars before it prepare the next
   // section's lines (muted); the steps go first on their bar, so a comment on the same bar stays the latest
-  const now = build.crescendo && liveCode === 'now';
-  // Live coder (a growth like a live coder): no prepared lines and no section lanes in the code; at a section change
-  // each line is edited in place, its lanes play from the hidden mixer (live-coder in-place edits)
-  const inPlace = !!(now && build.crescendo.coder);
+  const now = (build.crescendo && liveCode === 'now') || lanes;
+  // Live coder (a growth like a live coder), or Sections: no prepared lines and no section lanes in the code; at a
+  // section change each line is edited in place, its lanes play from the hidden mixer (live-coder in-place edits)
+  const inPlace = !!(now && ((build.crescendo && build.crescendo.coder) || lanes));
+  const bounds = lanes ? clipBounds(build) : null;
   if (now) {
     const extra = [];
     let at = 0;
     build.sections.forEach((x, k) => { if (k > 0) { if (!inPlace) extra.push({ at: Math.max(at - x.bars + 1, at - (build.sections[k - 1].bars >= 4 ? 2 : 1)) }); extra.push({ at }); } at += x.bars; });
-    build = { ...build, build: [...extra.filter(x => x.at > 0), ...build.build] };
+    if (bounds) for (const b of bounds) extra.push({ at: b });
+    build = { ...build, build: [...extra.filter(x => x.at > 0), ...(build.build || [])] };
   }
   const boundary = bar => { let a = 0; for (const x of build.sections) { a += x.bars; if (a > bar) return a; } return Infinity; };
   const prepFrom = b => { const k = build.sections.findIndex((_, j) => build.sections.slice(0, j + 1).reduce((y, z) => y + z.bars, 0) === b); return k >= 0 ? b - (build.sections[k].bars >= 4 ? 2 : 1) : Infinity; };
@@ -41,12 +48,12 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const gen = build.crescendo && liveGen === 'idiomatic' ? idiomatic : c => c;
   // tracks that came in by a bar: they keep their header in the code of the moment
   const entered = bar => [...new Set([...played(bar), ...build.tracks.filter(x => !waiting.includes(x.id) && (x.clips || []).some(c => (c.start ?? 0) <= bar)).map(x => x.id)])];
-  const compileAt = (song, bar, hide) => gen(now ? compileNow(song, bar, { prepare: !inPlace && bar >= prepFrom(boundary(bar)), shownMuted: played(bar), keepHeaders: entered(bar), inPlace, hidden: hide }) : compile(song));
+  const compileAt = (song, bar, hide) => gen(now ? compileNow(song, bar, { prepare: !inPlace && bar >= prepFrom(boundary(bar)), shownMuted: played(bar), keepHeaders: entered(bar), inPlace, hidden: hide, gated: lanes, bounds }) : compile(song));
   // technical functions (code-writing, song-functions): the written levels, the buses and the song's functions come
   // from the song as written
   // (a radio song steered on air, radio-profiles D9, keeps the song before its commands as its reference: `codeRef`,
   // so the code already shown keeps its functions)
-  const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => o[k]), ref = any ? compileSong({ ...(build.codeRef || build), build: undefined, codeRef: undefined }) : '';
+  const ref = any ? compileSong({ ...(build.codeRef || build), build: undefined, codeRef: undefined }) : '';
   // the mixer: the entries of each code shown, line by line in order (by its text without the tempo, as the lanes), and
   // a table by line text for code edited by hand (a text two different lines share is ambiguous, writer addEntry)
   const written = levelsOf(ref), buses = busesOf(ref), table = new Map(), entrySets = new Map(), hidden = new Map(), fns = {};
@@ -59,7 +66,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     const c = annotate(compileAt(only(st.song, keep), bar, hide), build, st.upTo, lang()) + voiceCode(build, st.song, st.upTo, total, lang(), files());
     // the voice is taken out before the comments go: it is found by its header
     const v = C.voice === false ? splitVoice(c) : { shown: c, voice: '' };
-    const lifted = inPlace ? liftLanes(applyComments(v.shown, C)) : { code: applyComments(v.shown, C), lanes: null };
+    const lifted = inPlace ? liftLanes(applyComments(v.shown, C), { gated: lanes }) : { code: applyComments(v.shown, C), lanes: null };
     const w = writeCode(lifted.code, { mode: o, written, buses, fns: fctx });
     w.voice = [hide && hide.length ? hide.join('\n') : '', v.voice].filter(Boolean).join('\n\n');
     w.table.forEach((e, k) => addEntry(table, k, e));

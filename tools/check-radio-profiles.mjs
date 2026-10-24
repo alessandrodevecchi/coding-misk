@@ -354,7 +354,7 @@ const CHECKS = {
     for (const { name, recipe } of CLASSIC) assert(itemsHash(sessionItems(RECIPES, { ...recipe, growth: GROWTH_ON_AIR }, SONGS)) === itemsHash(sessionItems(RECIPES, recipe, SONGS)), `${name}: the marker moves a Classic session`);
   },
   'stage 4: the Custom profile is saved with the session and replays the same'() {
-    const custom = { base: 'switch', controls: { tracks: false, notes: false, steps: false, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: false, fnLib: false } };
+    const custom = { base: 'switch', controls: { tracks: false, notes: false, steps: false, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: false, fnLib: false, fnLanes: false } };
     const po = profileOptions('custom', custom), C = customControls(po.custom);
     assert(po.profile === 'switch' && C.comments === 'none' && C.functions === 'mixer' && C.duration === 'fitted' && controlsProfile(C) === 'switch', `custom: ${JSON.stringify(po)} → ${C.comments}, ${C.functions}, ${C.duration}`);
     assert(profileOptions('custom', { base: 'classic', controls: {} }).profile === 'classic' && profileOptions('custom', { base: 'switch', controls: { growth: 'crescendo' } }).profile === 'crescendo', 'what a combination amounts to');

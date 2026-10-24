@@ -9,6 +9,8 @@ import { t } from '../i18n.js';
 
 const LANE = /^const (\w+) = "(<[^"]*>)"/;
 const GATE = /\.mask\((\w+)\)\.velocity\(\1\)/;
+// a gated line (guitars, code-lanes): the lane masks it and scales its level after the amp, `n` a number or a sequence
+const PGATE = /\.mask\((\w+)\)\.postgain\(\1\.mul\((-?[\d.]+|"<?[\d.! ]+>?")\)\)/;
 // "<1!8 0!24>" → [1, 1, …, 0, …] as strings
 export function unrle(s) {
   const out = [];
@@ -19,8 +21,9 @@ const on = v => Number(v) > 0;
 const RANGES = /^\/\/ (.*) · \D*?((?:\d+-\d+(?:, )?)+) · (.*)$/;
 
 // standard code → { head: lines before the first track, lanes: { name: [values] }, blocks: [{ header, id, items }] }
-// items: [{ kind: 'layer', text, gate, names, ranges, rest, desc } | { kind: 'line', text }]
-export function parseCode(code) {
+// items: [{ kind: 'layer', text, gate, gateText, mul, clip, desc } | { kind: 'line', text }]; gated (code-lanes): a line
+// gated with `.mask(x).postgain(x.mul(n))` has its lane too (mul: n), else it plays in every section
+export function parseCode(code, { gated = false } = {}) {
   const lines = code.split('\n'), head = [], lanes = {}, blocks = [];
   let block = null, clip = null, desc = null;
   for (let i = 0; i < lines.length; i++) {
@@ -31,8 +34,8 @@ export function parseCode(code) {
     if (/^[_S]?\$:/.test(l)) {
       let text = l;
       while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1]) && !/^[_S]?\$:/.test(lines[i + 1])) text += '\n' + lines[++i];
-      const g = text.match(GATE);
-      block.items.push({ kind: 'layer', text, gate: g ? g[1] : null, clip, desc });
+      const g = text.match(GATE) || (gated ? text.match(PGATE) : null);
+      block.items.push({ kind: 'layer', text, gate: g ? g[1] : null, gateText: g ? g[0] : null, mul: g && g[2] !== undefined ? g[2] : null, clip, desc });
       continue;
     }
     const m = l.match(RANGES);
@@ -162,24 +165,34 @@ function mergeValues(groups) {
 // inPlace (Live coder): every layer keeps its lane (liftLanes takes the lanes out of the lines afterwards, so a line
 // is edited in place at a section change and its lanes play from the hidden mixer); a layer of the section before
 // that only sounds in the fade of the first bars, with no line of the same code here, goes to `hidden` (its lane
-// written out), so the code shows one line per part
+// written out), so the code shows one line per part.
+// gated (code-lanes, the Sections option): lines gated with `.mask(x).postgain(x.mul(n))` follow their lane too;
+// bounds: bars inside a section where a clip starts or ends (code-lanes): the code shows only the part of the section
+// that holds `bar`, so a track whose clips follow each other in a section keeps one line, edited at each clip
 import { normalizeSong } from './format.js';
-export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [], inPlace = false, hidden = null } = {}) {
+export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [], inPlace = false, hidden = null, gated = false, bounds = null } = {}) {
   const n = normalizeSong(song), secs = n.sections;
   const i = Math.max(0, secs.findIndex(s => bar >= s.start && bar < s.start + s.bars));
   const shown = new Set(shownMuted.filter(id => (song.tracks || []).some(tr => tr.id === id && tr.mute)));
   const full = { ...song, tracks: song.tracks.map(tr => (shown.has(tr.id) ? { ...tr, mute: false } : tr)) };
-  const p = parseCode(compileSong(full)), used = new Set();
+  const p = parseCode(compileSong(full), { gated }), used = new Set();
+  // the bars of section k the code is for: the whole section, or (bounds) the part of it that holds `bar`
+  const win = k => {
+    const s = secs[k];
+    let a = s.start, z = s.start + s.bars;
+    if (bounds && k === i) for (const b of bounds) if (b > s.start && b < s.start + s.bars) { if (b <= bar) a = Math.max(a, b); else z = Math.min(z, b); }
+    return [a, z];
+  };
   // the layers of one section, per block: [{ comment, desc, text }]
   const layersFor = k => {
-    const s = secs[k];
-    if (!s) return null;
-    return p.blocks.map(b => b.items.filter(it => it.kind === 'layer').filter(it => !it.gate || !p.lanes[it.gate] || p.lanes[it.gate].slice(s.start, s.start + s.bars).some(on)).map(it => {
-      const lane = it.gate && p.lanes[it.gate], whole = !inPlace && lane && lane.slice(s.start, s.start + s.bars).every(v => Number(v) === 1);
+    if (!secs[k]) return null;
+    const [a, z] = win(k);
+    return p.blocks.map(b => b.items.filter(it => it.kind === 'layer').filter(it => !it.gate || !p.lanes[it.gate] || p.lanes[it.gate].slice(a, z).some(on)).map(it => {
+      const lane = it.gate && p.lanes[it.gate], whole = !inPlace && lane && lane.slice(a, z).every(v => Number(v) === 1);
       const text = whole ? it.text.replace(GATE, '') : it.text;
       // (in place: a fade out of the section before, below 1 on the first bars only)
-      const fade = inPlace && lane && lane.slice(0, s.start).some(on) && lane.slice(s.start, s.start + s.bars).every((v, k) => !on(v) || (k < 2 && Number(v) < 1));
-      return { comment: it.clip ? it.clip.raw : null, desc: it.desc, text, gate: whole ? null : it.gate, fade };
+      const fade = inPlace && lane && lane.slice(0, a).some(on) && lane.slice(a, z).every((v, k) => !on(v) || (k < 2 && Number(v) < 1));
+      return { comment: it.clip ? it.clip.raw : null, desc: it.desc, text, gate: whole ? null : it.gate, gateText: it.gateText, mul: it.mul, fade };
     }));
   };
   const now = layersFor(i), next = prepare ? layersFor(i + 1) : null;
@@ -191,10 +204,10 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
     let mine = now[k];
     const extra = next ? next[k].filter(x => !mine.some(y => y.text === x.text)) : [];
     if (inPlace) {
-      const bare = x => x.text.replace(GATE, '');
+      const bare = x => x.text.replace(x.gateText || GATE, '');
       const gone = mine.filter(x => x.fade && !mine.some(y => !y.fade && bare(y) === bare(x)));
       mine = mine.filter(x => !gone.includes(x));
-      if (hidden && !silent) for (const x of gone) { const v = `"${rle(p.lanes[x.gate])}"`; hidden.push(x.text.replace(GATE, `.mask(${v}).velocity(${v})`)); }
+      if (hidden && !silent) for (const x of gone) { const v = `"${rle(p.lanes[x.gate])}"`; hidden.push(x.text.replace(x.gateText || GATE, x.mul !== null && x.mul !== undefined ? `.mask(${v}).postgain(${v}.mul(${x.mul}))` : `.mask(${v}).velocity(${v})`)); }
       if (hidden) for (const x of gone) for (const m of x.text.matchAll(/\b\w+\b/g)) if (p.lanes[m[0]] && m[0] !== x.gate) used.add(m[0]);
     }
     // a track that came in before keeps its header, also when nothing of it plays now (performance-profiles)
@@ -219,12 +232,17 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
 
 // The lanes taken out of the code of the moment (live-coder in-place edits): every `.mask(x).velocity(x)` of a lane
 // constant leaves its line, lines that are then the same are one line with all their lanes, and the lane constants go.
+// gated (code-lanes): also `.mask(x).postgain(x.mul(n))`, its lane written "lane x n" (the level after the amp is the
+// lane's value times n on that bar, as the code in full plays it).
 // → { code, lanes: for each pattern line, in order, its lanes ("0!76 1!8 0.5 0!31", without the brackets) or null }.
 // The hidden mixer plays each line with its lanes (writer.js tail), so the events are the same.
-export function liftLanes(code) {
+const LANES = /\.mask\((\w+)\)\.velocity\(\1\)/g;
+const GATED = /\.mask\((\w+)\)\.(?:velocity\(\1\)|postgain\(\1\.mul\((-?[\d.]+|"<?[\d.! ]+>?")\)\))/g;
+const bare = v => v.trim().replace(/^"|"$/g, '').replace(/^<|>$/g, '').trim();
+export function liftLanes(code, { gated = false } = {}) {
   const lines = code.split('\n'), consts = {};
   for (const l of lines) { const m = l.match(LANE); if (m) consts[m[1]] = m[2]; }
-  const gate = /\.mask\((\w+)\)\.velocity\(\1\)/g, gates = new Set();
+  const gate = gated ? GATED : LANES, gates = new Set();
   // a pattern line and its continuation lines
   const groups = [];
   for (let i = 0; i < lines.length; i++) {
@@ -232,8 +250,8 @@ export function liftLanes(code) {
     let text = lines[i];
     while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1]) && !/^\s*[_S]?\$:/.test(lines[i + 1])) text += '\n' + lines[++i];
     const lanes = [];
-    const bare = text.replace(gate, (all, n) => (consts[n] ? (lanes.push(consts[n].replace(/^<|>$/g, '').trim()), gates.add(n), '') : all)).replace(/\n[ \t]*(?=\n|$)/g, '');
-    groups.push({ pattern: true, text: bare, lanes: lanes.length ? lanes : null });
+    const lifted = text.replace(gate, (all, n, mul) => (consts[n] ? (lanes.push(typeof mul !== 'string' ? bare(consts[n]) : `${bare(consts[n])} x ${bare(mul)}`), gates.add(n), '') : all)).replace(/\n[ \t]*(?=\n|$)/g, '');
+    groups.push({ pattern: true, text: lifted, lanes: lanes.length ? lanes : null });
   }
   // the same line twice, each under its lanes: one line under both
   const out = [];
@@ -246,4 +264,22 @@ export function liftLanes(code) {
   // lane constants no line uses any more
   const kept = out.filter(g => { const m = !g.pattern && g.text.match(LANE); return !m || !gates.has(m[1]) || new RegExp(`\\b${m[1]}\\b`).test(body.replace(g.text, '')); });
   return { code: kept.map(g => g.text).join('\n'), lanes: kept.filter(g => g.pattern).map(g => g.lanes) };
+}
+
+// bars inside a section where a clip of a song starts or ends (code-lanes: the code of the moment changes there)
+export function clipBounds(song) {
+  const n = normalizeSong(song), out = new Set();
+  for (const tr of n.tracks || []) {
+    if (tr.type === 'voice' || tr.type === 'spoken') continue;
+    for (const c of tr.clips || []) {
+      const a = c.start, z = c.start + c.bars;
+      for (const s of n.sections) {
+        const x = Math.max(a, s.start), y = Math.min(z, s.start + s.bars);
+        if (x >= y) continue;
+        if (x > s.start) out.add(x);
+        if (y < s.start + s.bars) out.add(y);
+      }
+    }
+  }
+  return [...out].sort((x, y) => x - y);
 }

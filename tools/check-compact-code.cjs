@@ -1,7 +1,8 @@
 // Browser check for the compact code of Crescendo songs (#64, crescendo-code): for states of a few songs, the events
 // Strudel makes (onset time and every value) are the same with the standard code, the joined lines and one line per
 // track, the short patterns and the lines broken before a function (a velocity of 1 counts as no velocity: the code of
-// the moment drops lanes that are 1). Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-compact-code.cjs   (dev server on
+// the moment drops lanes that are 1); the Sections option (code-lanes) in Classic, with the Live build off and on, and
+// Crescendo. Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-compact-code.cjs   (dev server on
 // PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -74,21 +75,25 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
       const song = await (await fetch(id === 'example-ideas' ? '/songs/examples/04-ideas.json' : `/songs/${id}.json`)).json(), b = crescendoSong(song, { rules: { natural: true } }), total = b.sections.reduce((a, x) => a + x.bars, 0);
       const files = { say_it: Array.from({ length: 200 }, (_, i) => `say_it/${i}.wav`), say_en: Array.from({ length: 200 }, (_, i) => `say_en/${i}.wav`) };
       const e = document.querySelector('strudel-editor').editor;
-      const haps = async code => {
+      // (from the step to the next one of the code compared: with Sections, code-lanes, the code of the moment of
+      // compact changes at each clip too, and a gated guitar shows only its section's line)
+      const haps = async (code, a = 0, z = total) => {
         await e.repl.evaluate(code, false);
         if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
-        return e.repl.scheduler.pattern.queryArc(0, total).filter(h => h.hasOnset()).map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), Object.fromEntries(Object.entries(h.value).filter(([, v]) => typeof v !== 'function').sort())])).sort().join('\n');
+        return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset()).map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), Object.fromEntries(Object.entries(h.value).filter(([k, v]) => typeof v !== 'function' && !(k === 'velocity' && v === 1)).sort())])).sort().join('\n');
       };
       const mk = o => liveCode(b, resolveProfile('switch', o), { lang: () => 'it', files: () => files, cols: () => 48 });
       const full = mk({ functions: 'full', voice: true, wrap: false }), out = [];
       const bars = [...new Set(buildSteps(full.build).map(x => x.at))].sort((x, y) => x - y), pick = [bars[1], bars[Math.floor(bars.length / 3)], bars[Math.floor(bars.length * 2 / 3)], bars[bars.length - 1]];
       for (const v of [{ functions: 'short' }, { functions: 'mixer' }, { functions: 'compact' }, { functions: 'short', voice: true }, { functions: 'compact', voice: true }, { functions: 'full', voice: false }]) {
-        const L = mk(v);
+        const L = mk(v), next = [...new Set([...buildSteps(L.build), ...buildSteps(full.build)].map(x => x.at))].sort((x, y) => x - y);
         for (const bar of pick) {
           try {
-            const shown = L.codeAt(bar), a = await haps(full.codeAt(bar));
+            const end = next.find(x => x > bar) ?? total;
+            globalThis.miskBuses = full.buses; useFns(full.fns);
+            const shown = L.codeAt(bar), a = await haps(full.run ? full.run(full.codeAt(bar)) : full.codeAt(bar), bar, end);
             globalThis.miskBuses = L.buses; useFns(L.fns);
-            const z = await haps(L.run ? L.run(shown) : shown);
+            const z = await haps(L.run ? L.run(shown) : shown, bar, end);
             out.push({ bar, lines: `${v.functions}${v.voice === false ? ' voice hidden' : v.voice ? ' voice shown' : ''}`, same: a === z && (v.functions === 'full' || v.functions === 'short' || !/\.orbit\(|\.analyze\(/.test(shown)) && !/\.(o|drive|voice)\(/.test(shown) });
           } catch (x) { out.push({ bar, err: x.message }); }
         }
@@ -110,20 +115,26 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
       const haps = async (code, a, z) => {
         await e.repl.evaluate(code, false);
         if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
-        return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset()).map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), Object.fromEntries(Object.entries(h.value).filter(([, v]) => typeof v !== 'function').sort())])).sort().join('\n');
+        // (a velocity of 1 is no velocity: the code of the moment in full drops a lane of 1, the mixer plays it)
+        return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset()).map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), Object.fromEntries(Object.entries(h.value).filter(([k, v]) => typeof v !== 'function' && !(k === 'velocity' && v === 1)).sort())])).sort().join('\n');
       };
       const mk = functions => liveCode(b, resolveProfile(profile, { functions }), { lang: () => 'it', files: () => files, cols: () => 48 });
+      const total = b.sections.reduce((a, x) => a + x.bars, 0);
       const full = mk('full'), out = [];
       const bars = [...new Set(buildSteps(full.build).map(x => x.at))].sort((x, y) => x - y);
       const pick = [...new Set([bars[1], bars[Math.floor(bars.length / 2)], bars[bars.length - 1], ...extra].filter(x => x !== undefined))].sort((x, y) => x - y);
       for (const functions of ['short', 'mixer', 'compact']) {
         const L = mk(functions);
+        // (compact has Sections, code-lanes: its code is the code of the moment, up to its next step)
+        const next = [...new Set([...buildSteps(L.build), ...buildSteps(full.build)].map(x => x.at))].sort((x, y) => x - y);
         for (const bar of pick) {
           try {
+            // (the code in full loops the song after its end: its lanes start again)
+            const end = Math.min(bar + 4, total, next.find(x => x > bar) ?? Infinity);
             globalThis.miskBuses = full.buses; useFns(full.fns);
-            const a = await haps(full.run ? full.run(full.codeAt(bar)) : full.codeAt(bar), bar, bar + 4), shown = L.codeAt(bar);
+            const a = await haps(full.run ? full.run(full.codeAt(bar)) : full.codeAt(bar), bar, end), shown = L.codeAt(bar);
             globalThis.miskBuses = L.buses; useFns(L.fns);
-            const z = await haps(L.run ? L.run(shown) : shown, bar, bar + 4);
+            const z = await haps(L.run ? L.run(shown) : shown, bar, end);
             // (the comments of Classic may name the functions: only the code counts)
             const shownMix = functions !== 'short' && (shown.replace(/\/\/.*$/gm, '').match(/^.*\.(orbit|analyze)\(.*$/m) || [])[0];
             const first = a === z ? '' : (() => { const x = a.split('\n'), y = z.split('\n'), i = x.findIndex((l, k) => l !== y[k]); return `${x.length} events against ${y.length}; first: ${x[i]} | ${y[i]}`; })();
@@ -168,6 +179,48 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
       return out;
     }, id);
     for (const r of res) { const ok = r.same && !r.err; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'}  ${id} Live coder in place, bar ${r.bar}${r.n ? ` (${r.n} events)` : ''}${r.err ? ` (${r.err})` : ''}`); }
+  }
+  // code-lanes: the Sections option (in the compact preset) in Classic with the Live build off (the song as written,
+  // every track from the start) and on, and in Crescendo. The code shows no section or clip lane, and at every step
+  // (each section and clip change included) the events up to the next step are those of the code in full of that
+  // state: section lanes, clip lanes and guitars gated with postgain play from the hidden mixer
+  for (const [id, profile, off] of [['settimo-cielo', 'classic', true], ['settimo-cielo', 'classic', false], ['luci-rosse', 'classic', true], ['cavo-scoperto', 'classic', true], ['cavo-scoperto', 'classic', false], ['settimo-cielo', 'crescendo', false], ['luci-rosse', 'crescendo', false], ['ferro', 'crescendo', false]]) {
+    const res = await page.evaluate(async ([id, profile, off]) => {
+      const [{ crescendoSong }, { liveCode }, { resolveProfile, growthRules }, { buildSteps, stateAt, deriveBuild }, { useFns }, { compileSong }] = await Promise.all(['/src/song/crescendo.js', '/src/live/live-code.js', '/src/live/profiles.js', '/src/song/build.js', '/src/song/writer.js', '/src/song/compile.js'].map(u => import(u)));
+      const song = await (await fetch(`/songs/${id}.json`)).json(), C = resolveProfile(profile, { functions: 'compact' });
+      const b = off ? { ...song, build: [] } : C.build === 'crescendo' ? crescendoSong(song, { narrated: C.narrated, rules: growthRules(C) }) : { ...song, build: song.build || deriveBuild(song) };
+      const L = liveCode(b, C, { lang: () => 'it', cols: () => 80 });
+      const e = document.querySelector('strudel-editor').editor;
+      const midiOf = n => { const m = String(n).match(/^([a-g])(#|b)?(-?\d)$/i); return m ? { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }[m[1].toLowerCase()] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (+m[3] + 1) * 12 : null; };
+      const haps = async (code, a, z) => {
+        if (!/^\s*[_S]?\$:/m.test(code)) return '';
+        await e.repl.evaluate(code, false);
+        if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
+        return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset())
+          .map(h => JSON.stringify([+h.whole.begin.valueOf().toFixed(4), h.value.bank ? 0 : +h.duration.valueOf().toFixed(4), Object.fromEntries(Object.entries({ ...h.value, ...(typeof h.value.note === 'string' && midiOf(h.value.note) !== null ? { note: midiOf(h.value.note) } : {}) }).filter(([k, v]) => typeof v !== 'function' && !(k === 'velocity' && v === 1)).sort())])).sort().join('\n');
+      };
+      const bars = [...new Set([0, ...buildSteps(L.build).map(x => x.at)])].sort((x, y) => x - y), total = L.build.sections.reduce((a, x) => a + x.bars, 0);
+      // Classic: every step; Crescendo: the section and clip changes of the written song and every fourth step
+      let at = 0; const bounds = L.build.sections.map(x => (at += x.bars) - x.bars);
+      const pick = C.build === 'crescendo' ? bars.filter((x, i) => (bounds.includes(x) && x >= (b.crescendo ? b.crescendo.growth : 0)) || i % 4 === 0) : bars;
+      let same = 0, steps = 0, err = '', lines = 0, gated = 0;
+      for (const x of pick) {
+        const z = Math.min(total, bars.find(y => y > x) ?? total, x + 12);
+        try {
+          const shown = L.codeAt(x);
+          if (/\.mask\((section|clip)\d+\)|const (section|clip)\d+ =|const SECTIONS =/.test(shown)) { err = `bar ${x}: a section or clip lane is shown`; break; }
+          lines = Math.max(lines, (shown.match(/^\s*[_S]?\$:/gm) || []).length);
+          globalThis.miskBuses = L.buses; useFns(L.fns);
+          const w = L.run(shown);
+          if (/ x [\d.]/.test(w.slice(shown.length))) gated++;
+          const a = await haps(compileSong(stateAt(L.build, x).song), x, z), y = await haps(w, x, z);
+          steps++; if (a === y) same++; else if (!err) { const p = a.split('\n'), q = y.split('\n'), i = p.findIndex((l, k) => l !== q[k]); err = `bar ${x}: ${p.length} events against ${q.length}; first: ${p[i]} | ${q[i]}`; }
+        } catch (ex) { err = `bar ${x}: ${ex.message}`; break; }
+      }
+      return { steps, same, err, lines, gated };
+    }, [id, profile, off]);
+    const ok = !res.err && res.steps > 0 && res.same === res.steps; if (!ok) failed++;
+    console.log(`${ok ? 'ok  ' : 'FAIL'}  ${id} ${profile}${off ? ' (Live build off)' : ''} Sections: ${res.same}/${res.steps} steps the same, at most ${res.lines} lines, ${res.gated} steps with gated lanes${res.err ? ` (${res.err})` : ''}`);
   }
   // radio-profiles 4.3: the radio's window song by song. At every step of one transition (and the bars around it), the
   // events of the code evaluated (the song on air shown in its own view, its hidden tail, the other song hidden or

@@ -351,7 +351,9 @@ function playable(tr, fixed = null) {
   // a song without steps can build itself too ("Live build" switch): steps derived from its clips
   // Crescendo ignores the song's own steps
   const lv = fixed || liveOf(tr);
-  let build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : null;
+  // (the Live build off with the Sections option, code-lanes: the song as written, every track from the start, its code
+  // of the moment edited in place at each section and clip change)
+  let build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : lv.ctl && lv.ctl.fnLanes ? { ...tr, build: [] } : null;
   const C = lv.ctl, live = build ? liveCode(build, C, { lang: getLang, files: () => customFiles, cols: codeCols }) : null, now = !!(live && live.now);
   if (live) build = live.build;
   const codeAt = live ? live.codeAt : null, run = live ? live.run : null, standalone = live ? live.standalone : null;

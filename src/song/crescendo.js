@@ -632,7 +632,9 @@ export function crescendoSong(song, opts = {}) {
   const cands = shapeCandidates(song, shape, styles, rules), tries = [...cands, ...[2, 1, 0].flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
   // (the typing is measured on the code with the track names, as the Live coder showed it before radio-profiles 9.2: its
   // default comments are display only, so they never change the growth; the code with them is the longer one to type)
-  const C = resolveProfile('switch', { duration: rules.free ? 'free' : 'fitted', tracks: true });
+  // (and without Sections, code-lanes: the growth measures the code it was tuned on, so the builds and their shapes
+  // stay as they were; the edits at each clip change are small and checked by the typing checks)
+  const C = resolveProfile('switch', { duration: rules.free ? 'free' : 'fitted', tracks: true, fnLanes: false });
   for (const c of tries) {
     const r = { ...rules, ...(c.maxDetail !== undefined ? { maxDetail: c.maxDetail } : {}), shape: { opening: shape.opening, pace: c.pace, development: c.development } };
     let out = growSong(song, { ...opts, rules: r });
