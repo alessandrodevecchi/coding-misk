@@ -1,29 +1,36 @@
 ## ADDED Requirements
 
-### Requirement: Own settings by default
-A song SHALL open, play and export with its declared profile and options, or, when it declares none, as Classic with the Live build off. Settings changed in Compose on another song SHALL NOT apply to it.
+### Requirement: Configuration saved with the song
+A song's configuration (profile, Live build, comments, technical functions, narrator and the other profile options) SHALL be part of the song and SHALL be how it opens, plays and exports by default. A song without one SHALL play as Classic with the Live build off.
 
 #### Scenario: Kellerlicht after another song
-- **WHEN** the owner sets Crescendo on another song and then opens kellerlicht
+- **WHEN** the owner tries Crescendo on another song and then opens kellerlicht
 - **THEN** kellerlicht opens with the Live build off and plays its written 4:50, with no narrator
 
-### Requirement: Changes are per song
-A change of profile, option or Live build switch in Compose SHALL apply to the open song only and SHALL be remembered for it, in the browser and in the backup.
+### Requirement: Trial settings stay on one song
+A change of configuration in Compose SHALL apply to the open song only, SHALL NOT change the saved song and SHALL NOT apply to any other song. The song SHALL show "configuration changed" with a ↺ "Back to the original configuration" button in Compose and on its Songs card.
 
-#### Scenario: Remembered
-- **WHEN** the owner sets Live coder on kellerlicht, opens another song and comes back
-- **THEN** kellerlicht is still Live coder and the other song kept its own settings
+#### Scenario: Back to the original
+- **WHEN** the owner tries Live coder on kellerlicht and presses ↺
+- **THEN** kellerlicht plays with its saved configuration again and the marker disappears
 
-### Requirement: Use for all songs
-The panel SHALL offer "Use for all songs", which applies the current settings to every song without its own choice, and "Back to the song's own settings", which clears the open song's changes.
+### Requirement: Trial survives a reload
+A trial configuration SHALL be kept for its song across reloads until ↺ or a save, and SHALL stay marked.
 
-#### Scenario: Back to own settings
-- **WHEN** the owner presses Back to the song's own settings on kellerlicht
-- **THEN** kellerlicht plays as written again
+#### Scenario: Reload
+- **WHEN** the owner tries Live coder on kellerlicht and reloads the page
+- **THEN** kellerlicht still plays as Live coder, marked as changed, with ↺ available
+
+### Requirement: Saving is explicit
+Save on the owner's song SHALL write the trial configuration as the song's own; Save as new SHALL create a copy with it; Save on a built-in song SHALL create the owner's version, and Restore original SHALL bring the built-in back.
+
+#### Scenario: Save as new
+- **WHEN** the owner saves kellerlicht with a Live coder trial as a new song
+- **THEN** the new song plays as Live coder by default and kellerlicht is unchanged
 
 ### Requirement: One length
-The Songs card, Compose and the radio SHALL show the same length for the same song and settings.
+The Songs card, Compose and the radio SHALL show the same length for the same song and configuration.
 
-#### Scenario: Card and Compose
-- **WHEN** a song has no own changes
-- **THEN** its card and Compose show the same length
+#### Scenario: Card with a trial
+- **WHEN** a song has a trial configuration
+- **THEN** its card shows the length with the trial and the changed marker
