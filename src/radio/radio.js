@@ -1080,7 +1080,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function info(cyc) {
     if (!S) return null;
     const it = S.stream[S.onAir], e = it.entry, rel = Math.max(0, cyc - it.start);
-    const said = buildSteps(it.song).filter(x => x.say && x.at <= rel).pop();
+    // (the narrator off for this song, profile-options: no phrase over the stage)
+    const said = liveControlsOf(it).narrator === false ? null : buildSteps(it.song).filter(x => x.say && x.at <= rel).pop();
     return { onAir: S.paused === undefined, n: it.n + 1, title: it.song.title, artist: e.artist && e.artist.name, line: `${e.lead ? t('radioLeadShort') : e.styles.map(styleName).join(' + ')} · ${e.key}`, bar: rel, bars: barsOf(it.song), bpm: e.bpm, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at : 0 };
   }
 

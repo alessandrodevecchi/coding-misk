@@ -84,7 +84,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const tip = await page.getAttribute('#cfg-reset', 'title');
   check(/saved song does not change/.test(tip || ''), 'the ↺ has its tooltip', tip);
   check(await page.evaluate(() => { const a = document.querySelector('#tr-del'), b = document.querySelector('#cfg-reset'); return a.parentElement === b.parentElement && a.parentElement.classList.contains('actions') && a.nextElementSibling === b && !!a.querySelector('svg.ico-reset') && !!b.querySelector('svg.ico-reset') && /Original song/.test(a.textContent) && /Original configuration/.test(b.textContent); }), 'both ↺ side by side in the song actions, same drawn icon: Original song, Original configuration');
-  check(s.reset && s.orig, 'with a trial both ↺ are enabled', JSON.stringify(s));
+  check(s.reset && !s.orig, 'a configuration trial alone: ↺ Original configuration enabled, ↺ Original song disabled', JSON.stringify(s));
   // the song in Compose grows away, then shows its grown length
   for (let i = 0; i < 40 && timeOf((await state()).total) === '4:50'; i++) await sleep(500);
   const composeLen = timeOf((await state()).total);
@@ -109,6 +109,26 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(s.live === 'false' && !s.marked && timeOf(s.total) === '4:50' && !tr.kellerlicht, '↺ in Compose: kellerlicht as written again, no mark', JSON.stringify(s));
   check(tr['luci-rosse'], 'the other song keeps its trial');
   check(!s.reset && !s.orig && /saved song does not change/.test(await page.getAttribute('#cfg-reset', 'title')) && /Back to the built-in song/.test(await page.getAttribute('#tr-del', 'title')), 'nothing to restore: both ↺ disabled, tooltips still there', JSON.stringify(s));
+
+  // the Live build off (profile-options): the panel keeps the code options under "Code", the profile, build style,
+  // typing and narrator controls hide; a code option is a trial and the song keeps its written length
+  const panel = () => page.evaluate(() => { const vis = sel => { const el = document.querySelector(sel); return !!el && !el.closest('[hidden]') && el.offsetParent !== null; }; return { legend: document.querySelector('#live-legend').textContent, profiles: vis('#live-profile'), style: vis('#live-style'), comments: vis('#live-comments'), fns: vis('#live-fns'), lanes: vis('#live-f-fnLanes'), title: vis('#live-title'), human: vis('#live-human'), narrator: vis('#live-narrator') }; });
+  let pn = await panel();
+  check(pn.legend === 'Code' && !pn.profiles && !pn.style && pn.comments && pn.fns && pn.lanes && pn.title && !pn.human && !pn.narrator, 'Live build off: the panel shows the code options only, under "Code"', JSON.stringify(pn));
+  await page.selectOption('#live-fns', 'compact'); await sleep(1500);
+  s = await state(); tr = await trials();
+  check(s.live === 'false' && s.marked && s.reset && !s.orig && timeOf(s.total) === '4:50' && tr.kellerlicht, 'compact functions with the Live build off: a trial, same length, only ↺ Original configuration', JSON.stringify(s));
+  if (shots) { const box = await page.evaluate(() => { const r = document.querySelector('#live-style-wrap').getBoundingClientRect(); return { x: Math.max(0, r.left - 16), y: Math.max(0, r.top + scrollY - 16), width: Math.min(1440, r.width + 32), height: r.height + 32 }; }); await page.screenshot({ path: path.join(shots, 'code-options-live-off.png'), fullPage: true, clip: box }); }
+  await page.click('#cfg-reset'); await sleep(1200);
+
+  // the narrator off: no phrase over the stage while luci-rosse grows (its trial: Crescendo, the narrator on again)
+  const sayFor = async ms => { const seen = new Set(); for (let t = 0; t < ms; t += 250) { const x = await page.evaluate(() => { const el = document.querySelector('#say'); return el.classList.contains('on') ? el.textContent : ''; }); if (x) seen.add(x); await sleep(250); } return [...seen]; };
+  await open('luci-rosse');
+  await page.click('#play'); let said = await sayFor(14000); await page.click('#stop'); await sleep(500);
+  check(said.length > 0, 'narrator on: the phrase shows over the stage', JSON.stringify(said));
+  await page.click('#live-narrator'); await sleep(1500);
+  await page.click('#play'); said = await sayFor(14000); await page.click('#stop'); await sleep(500);
+  check(said.length === 0, 'narrator off: no phrase over the stage', JSON.stringify(said));
 
   // ↺ on the card
   await songs();

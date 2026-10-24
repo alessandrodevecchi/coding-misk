@@ -1,7 +1,7 @@
 // Checks for performance profiles and code comments (performance-profiles), and the narrator switch (profile-options). No browser.
 //   npm run check:profiles      exit 1 when any check fails
 import fs from 'node:fs';
-import { PROFILES, resolveProfile, cleanOverrides, migrateOld, songProfile, migrateGrowth, growthRules } from '../src/live/profiles.js';
+import { PROFILES, resolveProfile, cleanOverrides, migrateOld, songProfile, migrateGrowth, growthRules, writtenOptions } from '../src/live/profiles.js';
 import { applyComments } from '../src/song/comments.js';
 import { baseConfig, configOf, controlsOf, setTrial, cleanTrials, withConfig, sameConfig } from '../src/live/song-config.js';
 import { growingProfile, durationKey } from '../src/live/card-duration.js';
@@ -134,6 +134,11 @@ const CHECKS = {
       assert(!/spoken on bar/.test(b), `bar ${bar}: a narrator line with the narrator off`);
     }
     assert(instrument > 0 && narrator > 0, `voice instrument lines ${instrument}, narrator lines with it on ${narrator}`);
+  },
+  'code options with the Live build off: only options away from Classic route the song as written through the live code (profile-options)'() {
+    assert(!writtenOptions(resolveProfile('classic')), 'Classic defaults');
+    assert(!writtenOptions(resolveProfile('classic', { typist: 'human', narrator: false })), 'typing and narrator do not count');
+    for (const o of [{ functions: 'short' }, { functions: 'compact' }, { notes: false }, { title: false }, { wrap: true }, { fnLanes: true }]) assert(writtenOptions(resolveProfile('classic', o)), JSON.stringify(o));
   },
   'a track that came in keeps its header in the code of the moment'() {
     const c = crescendoSong(song('crescendo-notte-lunga')), bar = c.crescendo.growth + 70;

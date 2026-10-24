@@ -13,7 +13,7 @@ import { growOnAir, airControls } from './endless/growth.js';
 import { controlsProfile, customControls } from './endless/profile.js';
 import { steerOnAir } from './endless/waypoints.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
-import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules } from './live/profiles.js';
+import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, writtenOptions } from './live/profiles.js';
 import { TRIALS_KEY, configOf, controlsOf, cleanTrials, setTrial, withConfig, compactConfig } from './live/song-config.js';
 import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay, SHAPES_VERSION } from './song/shapes.js';
 import { liveCode } from './live/live-code.js';
@@ -207,7 +207,8 @@ function sessionPlayable(items, seed, options, id, air = null) {
   const steps = [], whole = new Set();
   wins.forEach((P, k) => {
     if (k && (P.air || wins[k - 1].air)) { steps.push({ at: los[k] }); whole.add(los[k]); }
-    for (const { i, ...s } of buildSteps(P.build)) if (s.at >= los[k] && s.at < ends[k]) steps.push(s);
+    // (a song with the narrator off, profile-options: its phrases are not shown over the stage either)
+    for (const { i, ...s } of buildSteps(P.build)) if (s.at >= los[k] && s.at < ends[k]) steps.push(P.ctl && P.ctl.narrator === false ? unsaid(s) : s);
   });
   steps.sort((a, b) => a.at - b.at);
   // the code shown at a bar: as codeFor writes it for the window on air (with the visuals of a window without a tail)
@@ -344,6 +345,11 @@ function codeCols() {
   try { const v = ed && ed.editor, g = v && v.dom.querySelector('.cm-gutters'); if (v && v.defaultCharacterWidth > 0 && v.scrollDOM.clientWidth > 0) return Math.max(40, Math.min(110, Math.floor((v.scrollDOM.clientWidth - (g ? g.offsetWidth : 0) - 16) / v.defaultCharacterWidth))); } catch (e) {}
   return 80;
 }
+// the narrator off (profile-options): no step phrase over the stage, in the studio scene or in a video. A song of
+// several (radio window, mix) leaves out the phrases of each song with the narrator off when it joins their steps
+const unsaid = ({ say, ...s }) => s;
+const quietSong = sg => !!(sg && !sg.segmentAt && sg.ctl && sg.ctl.narrator === false);
+const saidSteps = sg => (sg && sg.build && !quietSong(sg) ? buildSteps(sg.build).filter(x => x.say) : []);
 // oggetto riproducibile: codice + mappa di sezioni e tempo
 // fixed: controls that do not come from Compose (RADIO_LIVE for the radio's window and its exports)
 function playable(tr, fixed = null) {
@@ -351,9 +357,10 @@ function playable(tr, fixed = null) {
   // a song without steps can build itself too ("Live build" switch): steps derived from its clips
   // Crescendo ignores the song's own steps
   const lv = fixed || liveOf(tr);
-  // (the Live build off with the Sections option, code-lanes: the song as written, every track from the start, its code
-  // of the moment edited in place at each section and clip change)
-  let build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : lv.ctl && lv.ctl.fnLanes ? { ...tr, build: [] } : null;
+  // (the Live build off with code options away from Classic's, profile-options: the song as written, every track from
+  // the start, with its comments and technical functions; with Sections, code-lanes, its code of the moment edited in
+  // place at each section and clip change)
+  let build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : writtenOptions(lv.ctl) ? { ...tr, build: [] } : null;
   const C = lv.ctl, live = build ? liveCode(build, C, { lang: getLang, files: () => customFiles, cols: codeCols }) : null, now = !!(live && live.now);
   if (live) build = live.build;
   const codeAt = live ? live.codeAt : null, run = live ? live.run : null, standalone = live ? live.standalone : null;
@@ -1137,7 +1144,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     else last.end = sec.start + sec.len;
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
-  const sayList = sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) })) : [];
+  const sayList = saidSteps(sg).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) }));
   const job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   visuals.setTarget({ w: stageA.w, h: stageA.h });
@@ -1547,8 +1554,11 @@ function renderArranger() {
   // the narrator switch (profile-options): Fully narrated belongs to it, disabled with a hint while the narrator is off
   $('#live-narrator').setAttribute('aria-pressed', C.narrator !== false);
   $('#live-narrated').disabled = C.narrator === false; $('#live-narrated').title = t(C.narrator === false ? 'liveNarratedOff' : 'liveNarratedHint');
-  // the live build options: a panel under the "Live build" button, open while the live build is on
-  $('#live-style-wrap').hidden = !on; lt.setAttribute('aria-expanded', on);
+  // the live build options: a panel under the "Live build" button; with the Live build off it keeps the code options
+  // (comments, technical functions, title, lit notes, line breaks: profile-options) under the title "Code"
+  lt.setAttribute('aria-expanded', on);
+  $('#live-legend').textContent = t(on ? 'liveBuild' : 'codeOptsLbl');
+  $$('[data-live-only="on"]').forEach(el => { el.hidden = !on; });
   $$('[data-live-only="crescendo"]').forEach(el => { el.hidden = !crescendo; });
   // the growth shape belongs to the natural growth (Live coder)
   $('#live-shape').hidden = !crescendo || C.growth !== 'natural';
@@ -1645,12 +1655,13 @@ function renderSectionPanel(total) {
   $('#dirty').textContent = dirty ? t('unsaved') : '';
   const builtin = isBuiltin(T.id), overridden = user.tracks.some(u => u.id === T.id);
   // a built-in song: ↺ Original song (notes, tracks and configuration, its trial too); one of the user's: Delete song.
-  // Disabled (aria-disabled, so the tooltip still shows) when there is nothing to restore
+  // Disabled (aria-disabled, so the tooltip still shows) when the song itself is as written: a configuration trial
+  // alone is undone by ↺ Original configuration
   if (builtin) $('#tr-del').innerHTML = `${RESET_CONFIG}<span>${esc(t('songOrig'))}</span>`; else $('#tr-del').textContent = t('deleteTrack');
   $('#tr-del').title = builtin ? t('restoreOrigTip') : '';
   $('#tr-del').classList.toggle('cfg-reset', builtin);
   $('#tr-del').disabled = false;
-  $('#tr-del').setAttribute('aria-disabled', String(builtin && !overridden && !dirty && !trialOf(T)));
+  $('#tr-del').setAttribute('aria-disabled', String(builtin && !overridden && !dirty));
   renderTrialMark();
   $('#arr-total').textContent = t('arrTotal', { scenes: T.sections.length, bars: total, time: clock(compiled.meta.seconds) });
   $('#sc-loop').checked = loopIdx >= 0 && mode === 'track';
@@ -3209,7 +3220,7 @@ try {
     $('#sc-pause').disabled = state === 'stopped';
   }
   // live build: the comment of the latest step over the stage
-  const say = playing && !hand && resumeTo === null && song && song.build && s ? sayAt(song.build, s.now(), getLang()) : '', sayEl = $('#say');
+  const say = playing && !hand && resumeTo === null && song && song.build && !quietSong(song) && s ? sayAt(song.build, s.now(), getLang()) : '', sayEl = $('#say');
   if (say && sayEl.textContent !== say) sayEl.textContent = say;
   sayEl.classList.toggle('on', !!say);
   // avanzamento nell'arrangiatore
@@ -3582,7 +3593,7 @@ function stageInfo(cyc) {
   if (mode === 'radio' && radio && radio.on) return radio.info(cyc);
   if (!song || !song.meta) return { title: T.title };
   const it = mixActive() ? mixS.items[0] : null, rel = it ? cyc - it.start : cyc;
-  const said = song.build ? buildSteps(song.build).filter(x => x.say && x.at <= cyc).pop() : null;
+  const said = saidSteps(song).filter(x => x.at <= cyc).pop();
   return { title: it ? it.song.title : mode === 'track' ? T.title : song.title, bar: rel, bars: it ? it.bars : song.meta.bars, bpm: Math.round((song.meta.bpm || [])[Math.max(0, Math.floor(cyc))] || 0) || undefined, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at - (it ? it.start : 0) : 0 };
 }
 const visuals = startVisuals({

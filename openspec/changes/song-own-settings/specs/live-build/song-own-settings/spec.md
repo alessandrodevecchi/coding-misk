@@ -45,3 +45,7 @@ The song actions row in Compose SHALL hold two buttons side by side with the sam
 #### Scenario: Original configuration with the Live build off
 - **WHEN** the owner turns the Live build off as a trial on a song saved with it on
 - **THEN** the Live build panel closes, and ↺ Original configuration in the song actions turns it back on
+
+#### Scenario: Nothing to restore
+- **WHEN** a built-in song has no saved version and no unsaved edits, and only its configuration is a trial
+- **THEN** ↺ Original song is disabled and only ↺ Original configuration is active

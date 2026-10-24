@@ -58,6 +58,10 @@ export const PROFILE_IDS = Object.keys(PROFILES);
 // from its next code edit; the others (build, growth, duration, shape, view, generator, narrator, narrated, typing speed) from the
 // next song
 export const DISPLAY_CONTROLS = ['title', 'tracks', 'notes', 'steps', 'voice', 'highlights', 'wrap', 'fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'fnLanes', 'typist', 'mistakes'];
+// the code options that also apply with the Live build off (profile-options): the song as written goes through the
+// live code when one of them is away from Classic's
+export const CODE_CONTROLS = DISPLAY_CONTROLS.filter(k => k !== 'typist' && k !== 'mistakes');
+export const writtenOptions = C => !!C && CODE_CONTROLS.some(k => (C[k] ?? PROFILES.classic[k]) !== PROFILES.classic[k]);
 // only the display controls of a set of controls (or of overrides)
 export const displayOf = c => Object.fromEntries(DISPLAY_CONTROLS.filter(k => c && c[k] !== undefined).map(k => [k, c[k]]));
 // controls in force (resolveProfile's result) with other display controls: the growth controls stay as they are

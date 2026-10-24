@@ -14,3 +14,7 @@
 
 - [x] 3.1 Browser cases: trial on one song leaves kellerlicht as written; reload keeps the trial; ↺ restores; Save and Save as new; startup check passes; Classic and Crescendo code checks unchanged
 - [x] 3.2 Knowledge notes (profiles, library, songs), Guide, DEVLOG entry in Italian
+
+## 4. Follow-ups after the owner's tests
+
+- [x] 4.1 ↺ Original song is active only when the song itself changed (saved version or unsaved edits), not for a configuration trial alone; ↺ Original configuration only with a trial

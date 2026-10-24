@@ -10,3 +10,9 @@
 ## 3. Docs
 
 - [x] 3.1 Guide card, knowledge notes (profiles, narrator), DEVLOG entry in Italian
+
+## 4. Follow-ups after the owner's tests
+
+- [x] 4.1 With the narrator off the step phrase is hidden over the stage, in the studio scene info, in the radio and in videos
+- [x] 4.2 Live build off: the panel shows the code options (comments, technical functions, title, lit notes, line breaks); the profile, build style, growth and narrator controls only with the Live build on; options away from the defaults route the song as written through the live code; check:mixer and the compact code check cover a Classic song with the Live build off and the short and mixer presets
+- [x] 4.3 Guide, knowledge notes, DEVLOG entry in Italian
