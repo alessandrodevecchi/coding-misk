@@ -47,6 +47,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Live build options | Build style | Andamento | `liveStyle` |
 | Live build options | Growth | Crescita | `growthLbl` |
 | Live build options | Growth duration | Durata della crescita | `durLbl` |
+| Live build options | Narrator voice | Voce narrante | `liveNarrator` |
 | Live build options | Fully narrated | Tutto narrato | `liveNarrated` |
 | Live build options | Code typing | Scrittura del codice | `setTyping` |
 | Live build options | Code view | Vista del codice | `liveCodeView` |

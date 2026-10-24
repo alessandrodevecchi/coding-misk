@@ -1544,6 +1544,9 @@ function renderArranger() {
   renderShape(C, on && crescendo);
   $('#live-style').value = lv.style; $('#live-style').disabled = !on;
   $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
+  // the narrator switch (profile-options): Fully narrated belongs to it, disabled with a hint while the narrator is off
+  $('#live-narrator').setAttribute('aria-pressed', C.narrator !== false);
+  $('#live-narrated').disabled = C.narrator === false; $('#live-narrated').title = t(C.narrator === false ? 'liveNarratedOff' : 'liveNarratedHint');
   // the live build options: a panel under the "Live build" button, open while the live build is on
   $('#live-style-wrap').hidden = !on; lt.setAttribute('aria-expanded', on);
   $$('[data-live-only="crescendo"]').forEach(el => { el.hidden = !crescendo; });
@@ -1816,6 +1819,7 @@ for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).addEven
 $('#live-fns').addEventListener('change', e => { if (FUNCTION_PRESETS[e.target.value]) for (const [k, v] of Object.entries(FUNCTION_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
 for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).addEventListener('click', () => { setControl(k, !ctlOf(T)[k]); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { setControl('narrated', !ctlOf(T).narrated); liveChanged(); });
+$('#live-narrator').addEventListener('click', () => { setControl('narrator', ctlOf(T).narrator === false); liveChanged(); });
 $('#live-title').addEventListener('click', () => { setControl('title', !ctlOf(T).title); liveChanged(); });
 $('#live-hl').addEventListener('click', () => { setControl('highlights', !ctlOf(T).highlights); liveChanged(); });
 $('#live-wrap').addEventListener('click', () => { setControl('wrap', !ctlOf(T).wrap); liveChanged(); });

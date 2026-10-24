@@ -85,6 +85,7 @@ const CONTROL_TEXT = {
   build: { label: 'liveStyle', hint: 'liveStyleHint', value: v => ({ blocks: 'liveBlocks', crescendo: 'liveCrescendo' })[v] },
   growth: { label: 'growthLbl', hint: 'growthHint', value: v => `growth:${v}` },
   duration: { label: 'durLbl', hint: 'durHint', value: v => `dur:${v}` },
+  narrator: { label: 'liveNarrator', hint: 'liveNarratorHint' },
   narrated: { label: 'liveNarrated', hint: 'liveNarratedHint' },
   typing: { label: 'setTyping', hint: 'setTypingHint', value: v => `setTyping:${v}` },
   view: { label: 'liveCodeView', hint: 'liveCompactHint', value: v => ({ now: 'liveCodeNow', compact: 'liveCodeCompact', track: 'liveCodeTrack', sections: 'liveCodeSections' })[v] },

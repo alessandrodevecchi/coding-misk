@@ -73,6 +73,8 @@ async function hapsOf(L, code, bar) {
     return { at: h.whole.begin.valueOf(), s: v.s, note: v.note ?? v.n, ...Object.fromEntries(FIELDS.map(k => [k, v[k]])), velocity: v.velocity ?? 1 };
   }).sort((x, y) => (key(x) < key(y) ? -1 : key(x) > key(y) ? 1 : 0));
 }
+// the same, for other checks (tools/check-profiles.mjs: the narrator switch, profile-options)
+export const hapsAt = hapsOf;
 const close = (a, b) => a === b || (typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < 1e-9);
 const show = x => (x === undefined ? '-' : typeof x === 'number' ? String(+x.toFixed(4)) : String(x));
 // what differs between the haps in full (a) and with a preset (b): short lines, one per kind of difference

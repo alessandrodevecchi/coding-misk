@@ -88,6 +88,8 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); background: rgba(0,0,0,.45); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
   .chip[aria-pressed="true"] { border-color: var(--a1); color: var(--a1); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 50%, transparent); }
+  /* a chip that cannot apply now (Fully narrated with the narrator off, mistakes without human typing): dimmed */
+  .chip:disabled { opacity: .4; cursor: default; }
   .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-left: auto; }
   /* visual picker (#46): a dropdown next to full screen; the soul's view buttons under it */
   .hud-row, .soul-ctl { display: flex; align-items: center; gap: 6px; }

@@ -817,7 +817,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         </div>
         <div class="custom-row">${sel('comments', [...Object.keys(COMMENT_PRESETS), ...(C.comments === 'custom' ? ['custom'] : [])], 'commentsLbl', 'commentsHint', v => t(`comments:${v}`))}<div class="chips">${COMMENT_KEYS.map(k => chip(k, C[k] !== false, `cOpt:${k}`, `cOptHint:${k}`)).join('')}</div></div>
         <div class="custom-row">${sel('functions', [...Object.keys(FUNCTION_PRESETS), ...(C.functions === 'custom' ? ['custom'] : [])], 'fnsLbl', 'fnsHint', v => t(`fns:${v}`))}<div class="chips">${FUNCTION_OPTIONS.map(k => chip(k, C[k], `fOpt:${k}`, `fOptHint:${k}`)).join('')}</div></div>
-        <div class="custom-row"><span class="lbl">${esc(t('liveOptions'))}</span><div class="chips">${chip('title', C.title, 'liveTitle', 'liveTitleHint')}${chip('highlights', C.highlights, 'liveHl', 'liveHlHint')}${chip('wrap', C.wrap, 'liveWrap', 'liveWrapHint')}${chip('typist', C.typist === 'human', 'liveHuman', 'liveHumanHint')}${chip('mistakes', C.mistakes !== 'off', 'liveMistakes', 'liveMistakesHint', C.typist !== 'human')}${grow ? chip('narrated', C.narrated, 'liveNarrated', 'liveNarratedHint') : ''}</div></div>
+        <div class="custom-row"><span class="lbl">${esc(t('liveOptions'))}</span><div class="chips">${chip('title', C.title, 'liveTitle', 'liveTitleHint')}${chip('highlights', C.highlights, 'liveHl', 'liveHlHint')}${chip('wrap', C.wrap, 'liveWrap', 'liveWrapHint')}${chip('typist', C.typist === 'human', 'liveHuman', 'liveHumanHint')}${chip('mistakes', C.mistakes !== 'off', 'liveMistakes', 'liveMistakesHint', C.typist !== 'human')}${chip('narrator', C.narrator !== false, 'liveNarrator', 'liveNarratorHint')}${grow ? chip('narrated', C.narrated, 'liveNarrated', C.narrator === false ? 'liveNarratedOff' : 'liveNarratedHint', C.narrator === false) : ''}</div></div>
         <p class="hint muted small">${esc(t('radioCustomNext'))}</p>
       </div>
     </div>`;
@@ -990,6 +990,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       const k = b.dataset.customChip, C = customControls(opts.custom);
       if (k === 'typist') return setCustom({ typist: C.typist === 'human' ? 'exact' : 'human' });
       if (k === 'mistakes') return setCustom({ mistakes: C.mistakes === 'off' ? 'on' : 'off' });
+      if (k === 'narrator') return setCustom({ narrator: C.narrator === false });
       return setCustom({ [k]: COMMENT_KEYS.includes(k) ? C[k] === false : !C[k] });
     }
     if (b.id === 'curves-toggle') { detailsOpen = !detailsOpen; try { store.set('coding-misk-radio-details', detailsOpen); } catch (err) {} return renderNow(); }

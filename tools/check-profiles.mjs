@@ -1,4 +1,4 @@
-// Checks for performance profiles and code comments (performance-profiles). No browser.
+// Checks for performance profiles and code comments (performance-profiles), and the narrator switch (profile-options). No browser.
 //   npm run check:profiles      exit 1 when any check fails
 import fs from 'node:fs';
 import { PROFILES, resolveProfile, cleanOverrides, migrateOld, songProfile, migrateGrowth, growthRules } from '../src/live/profiles.js';
@@ -8,10 +8,17 @@ import { growingProfile, durationKey } from '../src/live/card-duration.js';
 import { validateSong } from '../src/song/validate.js';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { compileNow } from '../src/song/compile-compact.js';
-import { stateAt } from '../src/song/build.js';
+import { stateAt, buildSteps, deriveBuild } from '../src/song/build.js';
+import { liveCode } from '../src/live/live-code.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const song = id => JSON.parse(fs.readFileSync(`songs/${id}.json`, 'utf8'));
+// every spoken phrase has a sample (as tools/check-spoken.mjs), so the narrator's lines are written when it speaks
+const ANY = new Proxy({}, { get: () => ({ findIndex: () => 0 }) });
+// the narrator's lines: a voice block of the narrator in the code, on orbit 15 and up (the voice instrument: 13, 14)
+const NARRATOR_ORBIT = 15;
+// a song as Classic with the Live build on plays it (src/main.js playable): its own steps, else steps from its clips
+const classicLive = (s, options = {}) => liveCode({ ...s, build: s.build || deriveBuild(s) }, resolveProfile('classic', options), { files: () => ANY });
 const CHECKS = {
   'three profiles; Classic and Crescendo keep the settings used before profiles'() {
     assert(Object.keys(PROFILES).join() === 'classic,crescendo,switch', 'ids');
@@ -91,6 +98,43 @@ const CHECKS = {
     assert(growingProfile(tried) === 'switch' && durationKey(tried) && durationKey(tried) !== durationKey(withConfig(k, { profile: 'switch', live: true, options: { narrated: true } })), 'key follows the trial');
     assert(sameConfig(baseConfig(k), { profile: 'classic', live: false }), 'same');
   },
+  'narrator voice: on by default in every profile; a configuration without it plays with the narrator on (profile-options)'() {
+    for (const id of Object.keys(PROFILES)) assert(resolveProfile(id).narrator === true, id);
+    assert(controlsOf(baseConfig({ config: { profile: 'crescendo', live: true, options: { narrated: true } } })).narrator === true, 'old config');
+    assert(controlsOf(configOf(song('kellerlicht'), { profile: 'switch', live: true, options: {} })).narrator === true, 'old trial');
+    const off = resolveProfile('crescendo', { narrator: false });
+    assert(off.custom && off.narrator === false && cleanOverrides({ narrator: true }, PROFILES.classic).narrator === undefined, 'a change by hand');
+    assert(!validateSong({ ...song('kellerlicht'), config: { profile: 'classic', live: true, options: { narrator: false } } }).errors.length, 'config valid');
+  },
+  async 'narrator off: luci-rosse (Classic, Live build on) speaks no phrase, same music events and length; the comments stay (profile-options)'() {
+    const s = song('luci-rosse'), on = classicLive(s), off = classicLive(s, { narrator: false });
+    const bars = [...new Set(buildSteps(on.build).map(x => x.at))];
+    assert(bars.join() === [...new Set(buildSteps(off.build).map(x => x.at))].join() && on.build.sections.reduce((a, x) => a + x.bars, 0) === off.build.sections.reduce((a, x) => a + x.bars, 0), 'same steps and length');
+    const { hapsAt } = await import('./mixer-checks.mjs');
+    let spoke = 0, haps = 0;
+    for (const bar of bars) {
+      const a = on.codeAt(bar), b = off.codeAt(bar);
+      spoke += (a.match(/spoken on bar/g) || []).length;
+      assert(!/spoken on bar|· voice =====/.test(b), `bar ${bar}: a narrator line with the narrator off`);
+      assert((a.match(/^\/\/ > /gm) || []).length === (b.match(/^\/\/ > /gm) || []).length, `bar ${bar}: the phrase comments follow their own option`);
+      const x = (await hapsAt(on, a, bar)).filter(h => !(h.orbit >= NARRATOR_ORBIT)), y = await hapsAt(off, b, bar);
+      assert(!y.some(h => h.orbit >= NARRATOR_ORBIT), `bar ${bar}: a narrator hap`);
+      assert(JSON.stringify(x) === JSON.stringify(y), `bar ${bar}: ${x.length} haps with the narrator, ${y.length} without`);
+      haps += y.length;
+    }
+    assert(spoke > 0 && haps > 0, `the narrator speaks with it on (${spoke} lines), music plays (${haps} haps)`);
+  },
+  'narrator off: prova-voce-notte keeps its voice instrument lines (profile-options)'() {
+    const s = song('prova-voce-notte'), on = classicLive(s), off = classicLive(s, { narrator: false });
+    let instrument = 0, narrator = 0;
+    for (const bar of [...new Set(buildSteps(off.build).map(x => x.at))]) {
+      const a = on.codeAt(bar), b = off.codeAt(bar), lines = c => (c.match(/· spoken =====/g) || []).length;
+      assert(lines(a) === lines(b), `bar ${bar}: voice instrument lines ${lines(a)} → ${lines(b)}`);
+      instrument += lines(b); narrator += (a.match(/spoken on bar/g) || []).length;
+      assert(!/spoken on bar/.test(b), `bar ${bar}: a narrator line with the narrator off`);
+    }
+    assert(instrument > 0 && narrator > 0, `voice instrument lines ${instrument}, narrator lines with it on ${narrator}`);
+  },
   'a track that came in keeps its header in the code of the moment'() {
     const c = crescendoSong(song('crescendo-notte-lunga')), bar = c.crescendo.growth + 70;
     const st = stateAt(c, bar).song, ids = c.tracks.map(t => t.id);
@@ -99,6 +143,6 @@ const CHECKS = {
   },
 };
 let failed = 0;
-for (const [name, fn] of Object.entries(CHECKS)) { try { fn(); console.log(`ok    ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); } }
+for (const [name, fn] of Object.entries(CHECKS)) { try { await fn(); console.log(`ok    ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); } }
 console.log(failed ? `\n${failed} check(s) failed` : `\nall ${Object.keys(CHECKS).length} checks passed`);
 process.exit(failed ? 1 : 0);

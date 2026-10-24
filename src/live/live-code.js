@@ -63,7 +63,9 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const fctx = any ? functionContext(ref, { id: build.id, title: build.title, tags: build.tags, profile: build.profile }, o) : null;
   const codeAt = (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0), hide = inPlace ? [] : null;
-    const c = annotate(compileAt(only(st.song, keep), bar, hide), build, st.upTo, lang()) + voiceCode(build, st.song, st.upTo, total, lang(), files());
+    const c = annotate(compileAt(only(st.song, keep), bar, hide), build, st.upTo, lang()) + (C.narrator === false ? '' : voiceCode(build, st.song, st.upTo, total, lang(), files()));
+    // (the narrator off, profile-options: no spoken step lines at all, neither shown nor hidden; the phrases written as
+    // comments follow the comment options, the voice instrument's lines are part of the song's code)
     // the voice is taken out before the comments go: it is found by its header
     const v = C.voice === false ? splitVoice(c) : { shown: c, voice: '' };
     const lifted = inPlace ? liftLanes(applyComments(v.shown, C), { gated: lanes }) : { code: applyComments(v.shown, C), lanes: null };

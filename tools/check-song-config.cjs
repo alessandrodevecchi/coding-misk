@@ -2,6 +2,8 @@
 // written (kellerlicht plays its written 4:50 with the Live build off), the trial survives a reload and is marked in
 // Compose and on its Songs card, ↺ Original configuration goes back, Save and Save as new write it, ↺ Original song (the
 // built-in song as it was) clears it; both ↺ sit side by side in the song actions, disabled when there is nothing to restore.
+// The narrator switch (profile-options): "Narrator voice" next to "Fully narrated", part of the trial, Fully narrated
+// disabled with its hint while it is off, kept after a reload; the same chip in the radio's Custom section.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-song-config.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -46,6 +48,23 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await pick('crescendo');
   let tr = await trials();
   check(Object.keys(tr).join() === 'luci-rosse' && tr['luci-rosse'].profile === 'crescendo', 'a Compose change is a trial on the open song only', JSON.stringify(tr));
+  // the narrator switch: on by default, off is part of the trial, Fully narrated disabled with a hint
+  const narr = () => page.evaluate(() => { const a = document.querySelector('#live-narrator'), b = document.querySelector('#live-narrated'); return { on: a.getAttribute('aria-pressed'), shown: !a.hidden && a.offsetParent !== null, next: a.nextElementSibling === b, full: b.disabled, tip: b.title, label: a.textContent }; });
+  let n = await narr();
+  check(n.on === 'true' && n.shown && n.next && !n.full && n.label === 'Narrator voice', 'Narrator voice: on by default, next to Fully narrated, which is enabled', JSON.stringify(n));
+  await page.click('#live-narrator'); await sleep(1200);
+  n = await narr(); tr = await trials();
+  check(n.on === 'false' && n.full && /Narrator voice on/.test(n.tip), 'Narrator voice off: Fully narrated disabled with its hint', JSON.stringify(n));
+  check(tr['luci-rosse'] && tr['luci-rosse'].options && tr['luci-rosse'].options.narrator === false, 'the narrator off is part of the trial', JSON.stringify(tr));
+  if (shots) { const box = await page.evaluate(() => { const r = document.querySelector('#live-narrator').closest('.ctrl').getBoundingClientRect(); return { x: Math.max(0, r.left - 16), y: Math.max(0, r.top + scrollY - 16), width: Math.min(1440 - Math.max(0, r.left - 16), r.width + 32), height: r.height + 32 }; }); await page.screenshot({ path: path.join(shots, 'narrator-off.png'), fullPage: true, clip: box }); }
+  await page.reload(); await sleep(3500);
+  await page.click('[data-mode="ascolta"]');
+  await open('luci-rosse');
+  n = await narr();
+  check(n.on === 'false' && n.full, 'after a reload the narrator is still off on luci-rosse', JSON.stringify(n));
+  await page.click('#live-narrator'); await sleep(1200);
+  n = await narr(); tr = await trials();
+  check(n.on === 'true' && !n.full && !('narrator' in ((tr['luci-rosse'] || {}).options || {})), 'Narrator voice on again: Fully narrated enabled, the option leaves the trial', JSON.stringify(tr));
   await open('kellerlicht');
   let s = await state();
   check(s.live === 'false' && !s.marked && timeOf(s.total) === '4:50', 'kellerlicht after a trial on another song: Live build off, written 4:50, not marked', JSON.stringify(s));
@@ -145,6 +164,19 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('.sv-confirm [data-confirm-ok]'); await sleep(1200);
   lib = await library(); tr = await trials(); s = await state();
   check(!lib.tracks.some(x => x.id === 'kellerlicht') && !tr.kellerlicht && s.live === 'false' && !s.marked && timeOf(s.total) === '4:50', 'Restore original: the built-in song back as written, its trial cleared', JSON.stringify(s));
+
+  // the radio's Custom section: the same chip, Fully narrated disabled while it is off
+  await page.click('[data-tab="radio"]'); await sleep(800);
+  await page.selectOption('#radio-profile', 'custom'); await sleep(600);
+  if (await page.isHidden('#custom-body')) { await page.click('#custom-toggle'); await sleep(300); }
+  const rnarr = () => page.evaluate(() => { const a = document.querySelector('[data-custom-chip="narrator"]'), b = document.querySelector('[data-custom-chip="narrated"]'); return a && b ? { on: a.getAttribute('aria-pressed'), next: a.nextElementSibling === b, full: b.disabled, tip: b.title } : null; });
+  let rn = await rnarr();
+  check(rn && rn.on === 'true' && rn.next && !rn.full, 'radio Custom: Narrator voice on, next to Fully narrated', JSON.stringify(rn));
+  await page.click('[data-custom-chip="narrator"]'); await sleep(500);
+  rn = await rnarr();
+  check(rn && rn.on === 'false' && rn.full && /Narrator voice on/.test(rn.tip), 'radio Custom: Narrator voice off, Fully narrated disabled with its hint', JSON.stringify(rn));
+  if (shots) { const el = await page.$('#radio-custom'); if (el) await el.screenshot({ path: path.join(shots, 'radio-custom-narrator-off.png') }); }
+  await page.click('[data-custom-chip="narrator"]'); await sleep(300);
 
   check(!errors.length, 'no page errors', errors.join(' | '));
   await browser.close();
