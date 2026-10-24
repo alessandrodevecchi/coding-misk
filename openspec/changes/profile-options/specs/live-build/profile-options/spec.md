@@ -18,13 +18,6 @@ The profile options SHALL include "Narrator voice", on by default in every profi
 - **WHEN** Narrator voice is off
 - **THEN** Fully narrated is disabled and its hint says to switch the narrator on
 
-### Requirement: Options in groups
-The profile options SHALL be shown in four groups with a drawn icon and a title: Growth, Code, Typing and Voice, in Compose and in the radio's Custom section. Each group SHALL say when it applies (at once, or from the next song in the radio), and SHALL fold and remember whether it is folded.
-
-#### Scenario: Voice group
-- **WHEN** the owner opens the profile panel
-- **THEN** Narrator voice, Fully narrated and Voice code are together under Voice, with a microphone icon
-
 ### Requirement: Profiles keep their sound
 Classic, Crescendo and Live coder SHALL keep their current sound and code with the narrator on; existing saved profiles without the new option SHALL load with the narrator on.
 
