@@ -21,6 +21,13 @@ const CHECKS = {
     assert(pl[0].id === 'favourites' && pl[0].songs.join() === 'a,c' && pl.map(l => l.id).join() === 'favourites,p1,p2', JSON.stringify(pl));
     assert(values['coding-misk-ui'] === 'hw' && counts.settings === 1, 'settings taken from the backup');
   },
+  'configuration trials merge by song id, the backup\'s trial wins (song-own-settings)'() {
+    const b = makeBackup([['coding-misk-song-trials', { kellerlicht: { profile: 'switch', live: true } }]]);
+    assert(b.data['coding-misk-song-trials'].kellerlicht.profile === 'switch', 'trials in the backup');
+    const { values } = mergeBackup(b, k => (k === 'coding-misk-song-trials' ? { kellerlicht: { profile: 'classic', live: true }, other: { profile: 'crescendo', live: true } } : null));
+    const tr = values['coding-misk-song-trials'];
+    assert(tr.kellerlicht.profile === 'switch' && tr.other.profile === 'crescendo', JSON.stringify(tr));
+  },
   'last played: the latest time of each song wins (#67)'() {
     const { values } = mergeBackup({ format: 'coding-misk/backup', data: { 'coding-misk-played': { a: 5, b: 1 } } }, k => (k === 'coding-misk-played' ? { a: 3, b: 4, c: 2 } : null));
     const p = values['coding-misk-played'];

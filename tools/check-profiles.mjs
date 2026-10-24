@@ -3,6 +3,9 @@
 import fs from 'node:fs';
 import { PROFILES, resolveProfile, cleanOverrides, migrateOld, songProfile, migrateGrowth, growthRules } from '../src/live/profiles.js';
 import { applyComments } from '../src/song/comments.js';
+import { baseConfig, configOf, controlsOf, setTrial, cleanTrials, withConfig, sameConfig } from '../src/live/song-config.js';
+import { growingProfile, durationKey } from '../src/live/card-duration.js';
+import { validateSong } from '../src/song/validate.js';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { compileNow } from '../src/song/compile-compact.js';
 import { stateAt } from '../src/song/build.js';
@@ -60,6 +63,33 @@ const CHECKS = {
     const n = applyComments(code, { title: false, comments: 'none' });
     assert(!n.includes('//') && /\$: s\("bd\*4"\)\n\n\$: note/.test(n), n);
     assert(!applyComments(code, { title: false, comments: 'all' }).startsWith('// coding-misk'), 'title off');
+  },
+  'a song without a configuration is Classic with the Live build off; a declared profile keeps its meaning (song-own-settings)'() {
+    const k = song('kellerlicht');
+    assert(!k.config && !songProfile(k), 'kellerlicht declares nothing');
+    const b = baseConfig(k);
+    assert(b.profile === 'classic' && b.live === false && !Object.keys(b.options).length, JSON.stringify(b));
+    assert(!growingProfile(k), 'kellerlicht does not grow on its card');
+    const d = baseConfig({ profile: 'switch' }), bs = baseConfig({ buildStyle: 'crescendo' });
+    assert(d.profile === 'switch' && d.live && bs.profile === 'crescendo' && bs.live, 'declared profile and buildStyle: on');
+    const own = baseConfig({ profile: 'switch', config: { profile: 'crescendo', live: false, options: { narrated: true, nope: 1 } } });
+    assert(own.profile === 'crescendo' && !own.live && own.options.narrated === true && !('nope' in own.options), JSON.stringify(own));
+    assert(!validateSong({ ...k, config: { profile: 'switch', live: true, options: { narrated: true } } }).errors.length, 'config valid');
+    const bad = validateSong({ ...k, config: { profile: 'x', live: 'yes', options: { narrated: 'y' } } }).errors.map(e => e.path).join();
+    assert(bad === 'config.profile,config.live,config.options.narrated', bad);
+  },
+  'a trial stays on its song, goes when equal to the song\'s own, and changes the card length key (song-own-settings)'() {
+    const k = song('kellerlicht'), other = song('crescendo-notte-lunga');
+    let trials = setTrial({}, k, { profile: 'switch', live: true, options: {} });
+    assert(Object.keys(trials).join() === 'kellerlicht', JSON.stringify(trials));
+    assert(configOf(other, trials[other.id]).profile === baseConfig(other).profile, 'other song untouched');
+    assert(controlsOf(configOf(k, trials.kellerlicht)).growth === 'natural', 'trial in force');
+    trials = setTrial(trials, k, { profile: 'classic', live: false, options: {} });
+    assert(!trials.kellerlicht, 'trial equal to the song is dropped');
+    assert(Object.keys(cleanTrials({ a: { profile: 'nope' }, b: { profile: 'crescendo', live: 1 } })).join() === 'b', 'clean');
+    const tried = withConfig(k, { profile: 'switch', live: true });
+    assert(growingProfile(tried) === 'switch' && durationKey(tried) && durationKey(tried) !== durationKey(withConfig(k, { profile: 'switch', live: true, options: { narrated: true } })), 'key follows the trial');
+    assert(sameConfig(baseConfig(k), { profile: 'classic', live: false }), 'same');
   },
   'a track that came in keeps its header in the code of the moment'() {
     const c = crescendoSong(song('crescendo-notte-lunga')), bar = c.crescendo.growth + 70;

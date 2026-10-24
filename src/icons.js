@@ -7,6 +7,8 @@ export const LOCK = svg('0 0 12 14', '<path d="M3.2 6V4.2a2.8 2.8 0 0 1 5.6 0V6"
 export const GEAR = svg('0 0 16 16', '<path d="M8 1.6l1.1 1.6 1.9-.4.5 1.9 1.8.8-.6 1.8 1.2 1.5-1.4 1.3.3 1.9-1.9.4-.8 1.8-1.8-.7L8 14.4l-1.3-1.4-1.8.7-.8-1.8-1.9-.4.3-1.9L1.1 8.3l1.2-1.5-.6-1.8 1.8-.8.5-1.9 1.9.4z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/>', 'ico-gear');
 // a curved arrow back (revert to the default)
 export const REVERT = svg('0 0 16 16', '<path d="M5.5 3.5L2.5 6.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.8 6.5h6.7a3.6 3.6 0 0 1 0 7.2H7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>', 'ico-revert');
+// a circular arrow (back to the song's own configuration, song-own-settings)
+export const RESET_CONFIG = svg('0 0 16 16', '<path d="M3.3 9.2A4.9 4.9 0 1 0 4.6 4.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4.4 1.6l.3 2.9-2.9.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>', 'ico-reset');
 // a trash can (delete a song, the trash, #68)
 export const BIN = svg('0 0 16 16', '<path d="M2.5 4h11M6 4V2.5h4V4M4 4l.8 9.5h6.4L12 4M6.8 6.5v4.5M9.2 6.5v4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>', 'ico-bin');
 // a note with a spark (compose a part, material-generator)

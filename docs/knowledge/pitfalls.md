@@ -59,6 +59,7 @@ Mistakes that cost time before. Each line says what goes wrong and what to do. T
 ## Browser checks
 
 - **They need the dev server** on `http://localhost:5173` and `PLAYWRIGHT_CORE` set (see `AGENTS.md`).
+- **No global Compose profile any more.** A check that sets `coding-misk-profile` or `coding-misk-live` changes nothing: set a trial in `coding-misk-song-trials` (`{ songId: { profile, live, options } }`) or a `config` on the song.
 - **Song lists are paged by 20.** A check that looks for a song on the first page breaks when songs are added. Search by title.
 - **The first song selection can be ignored** by a fresh page. Select again until the editor shows the song's sections.
 - **The code shown types ahead of the sound.** Live typing starts the edit toward the next step early: a spoken line on bar 0 leaves the panel about a bar later, while what plays changes only at the step. Read the code shown often (every 0.2 s) or read the code evaluated.

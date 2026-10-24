@@ -51,6 +51,8 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 | At most 4 to 5 layers, dark or tense melodies, fades over cuts | The owner's taste after listening. | [CONTEXT](../CONTEXT.md#owner-preferences-and-feedback-keep-applying-these) |
 | Material rules written from general techniques | No passage of a course is reused, so no credit line is needed. | [ENDLESS](../ENDLESS.md#material) |
 | A fast export uses a fresh render page each time | Strudel's audio layer keeps one context and pools nodes. | [ARCHITECTURE](../ARCHITECTURE.md#fast-export-8) |
+| A song's configuration is part of the song; Compose changes are trials per song (song-own-settings) | A global Compose choice made kellerlicht open as Crescendo for 7:58 while its card said 4:50, and leaked to every song. The old global keys are left unread, not migrated: no saved song changes how it plays, and the per-song switches of that time were never stored. | [song-own-settings](../../openspec/changes/song-own-settings/proposal.md) |
+| ↺ Original song and ↺ Original configuration side by side in the song actions | ↺ Original song (former Restore original) brings back a built-in song whole and clears its trial; ↺ Original configuration only undoes the trial. Both outside the Live build panel: the original configuration may be the Live build off, with the panel hidden. Disabled with their tooltip when there is nothing to restore. | [song-own-settings](../../openspec/changes/song-own-settings/specs/live-build/song-own-settings/spec.md) |
 
 ## Rejected attempts
 

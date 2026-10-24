@@ -316,7 +316,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
   await clearView();
   await page.click('#songs [data-song-id="kellerlicht"] [data-act="open"]'); await sleep(800);
-  check((await page.innerText('#tr-del')) === 'Restore original', 'Compose: a built-in song keeps Restore original', await page.innerText('#tr-del'));
+  check(/Original song/.test(await page.innerText('#tr-del')) && !!(await page.$('#tr-del svg.ico-reset')), 'Compose: a built-in song keeps ↺ Original song (former Restore original)', await page.innerText('#tr-del'));
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
 
   // phone width: no horizontal scroll

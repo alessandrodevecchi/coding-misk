@@ -1,6 +1,7 @@
 // The length a song card shows (song lists never grow songs in the page: a growth takes up to a few seconds per song).
-// A card shows the song as its own profile plays it: Classic (no growth) unless the song declares a growing profile
-// (Crescendo or Live coder, songProfile). The grown length of a built-in song is computed offline
+// A card shows the song as its own configuration plays it (song-own-settings, src/live/song-config.js): as written
+// unless the configuration grows it (the Live build on with Crescendo or Live coder). The page passes a song with a trial
+// as the song with the trial written as its config (withConfig), so the length and the key follow the trial. The grown length of a built-in song is computed offline
 // (tools/song-durations.mjs → src/library/song-durations.json); the user's songs grow in the grow worker, for the cards
 // on screen, and the page keeps the result by key. Pure: the page, the worker and the Node tool compute the same.
 import { crescendoSong, CRESCENDO_VERSION } from '../song/crescendo.js';
@@ -8,13 +9,15 @@ import { SHAPES_VERSION } from '../song/shapes.js';
 import { stateAt } from '../song/build.js';
 import { compileSong } from '../song/compile.js';
 import { parseSong } from '../songs.js';
-import { resolveProfile, growthRules, songProfile } from './profiles.js';
+import { growthRules } from './profiles.js';
+import { baseConfig, controlsOf } from './song-config.js';
 import { liveCode } from './live-code.js';
 
-// the growing profile a song declares (crescendo or switch), else null (Classic: the written song)
+// the profile of a song whose configuration grows it (the Live build on, built in Crescendo), else null (as written)
 export function growingProfile(song) {
-  const p = song ? songProfile(song) : null;
-  return p && resolveProfile(p).build === 'crescendo' ? p : null;
+  if (!song) return null;
+  const cfg = baseConfig(song);
+  return cfg.live && controlsOf(cfg).build === 'crescendo' ? cfg.profile : null;
 }
 // two FNV-1a hashes of a text, as 16 hex digits
 export function hashText(s) {
@@ -36,7 +39,7 @@ export function durationKey(song, { files = null, lengths = {}, lang = 'en' } = 
 export function grownDuration(song, styles = {}) {
   const p = growingProfile(song);
   if (!p) return null;
-  const C = resolveProfile(p);
+  const C = controlsOf(baseConfig(song));
   const c = crescendoSong(song, { narrated: C.narrated, rules: growthRules(C, { styles }) });
   if (!c.build.length) return null;
   const live = liveCode(c, C, {});

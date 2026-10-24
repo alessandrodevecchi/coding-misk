@@ -8,6 +8,7 @@ import { MACHINES } from '../sounds/machines.js';
 import { checkIdea, checkShared, sharedIsChords } from './ideas.js';
 import { checkGrowthShape } from './shapes.js';
 import { checkSpokenPattern, checkNarrator } from './spoken.js';
+import { checkConfig } from '../live/song-config.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
 export const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
 
@@ -43,7 +44,9 @@ export function validateSong(song, opts = {}) {
   // performance profile (performance-profiles): the song opens with it
   if (song.profile !== undefined && !['classic', 'crescendo', 'switch'].includes(song.profile)) err('profile', 'one of classic, crescendo, switch, or left out');
   // build style of the live build (#64): the song opens and plays with it
-  if (song.buildStyle !== undefined && !['blocks', 'crescendo'].includes(song.buildStyle)) err('buildStyle', 'one of blocks, crescendo, or left out (the Compose setting)');
+  if (song.buildStyle !== undefined && !['blocks', 'crescendo'].includes(song.buildStyle)) err('buildStyle', 'one of blocks, crescendo, or left out (Classic, the Live build off)');
+  // the song's own configuration (song-own-settings): profile, Live build switch and profile options
+  checkConfig(song.config, err, warn);
   if (song.normal !== undefined && song.normal !== 'waypoints') err('normal', '"waypoints" (without a live build the song starts with the waypoints of its natural growth, one section each), or left out');
   // growth shape of a Live coder build (growth-shapes): opening, pace and development the song asks for
   checkGrowthShape(song.growthShape, err);

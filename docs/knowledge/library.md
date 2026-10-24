@@ -26,7 +26,7 @@ Nothing leaves the browser unless the user exports it. A backup file holds it al
 
 **Songs tab.** Search by title, style, key or tag. Filters: genre, style, kind, never heard, build style, favourites, the Test chip. Sorting, previous and next.
 
-**Card length.** A card shows the song as its own profile plays it, whatever the Compose settings: Classic songs as written, songs that declare Crescendo or Live coder with their grown length. Built-in lengths come from `src/library/song-durations.json` (`npm run durations`); the user's growing songs grow in the page worker when their card is on screen, and the browser keeps the length by song version. Until then the card shows the written length. The timeline of a card is the written song: a seek on it lands after the growth span.
+**Card length.** A card shows the song as its configuration plays it, with its trial when it has one (song-own-settings): songs as written unless their configuration grows them (the Live build on with Crescendo or Live coder), those with their grown length. A song with a trial shows "configuration changed" and a ↺ next to it; its length is keyed by the song with the trial as its `config`, so it grows in the page worker. Built-in lengths come from `src/library/song-durations.json` (`npm run durations`); the user's growing songs grow in the page worker when their card is on screen, and the browser keeps the length by song version. Until then the card shows the written length. The timeline of a card is the written song: a seek on it lands after the growth span.
 
 **Tags.** `genres` from a fixed list, `styles` (recipe ids), `free` tags. The free tag `test` marks test songs; the Test chip filters them.
 
@@ -34,7 +34,7 @@ Nothing leaves the browser unless the user exports it. A backup file holds it al
 
 **Playlists.** Favourites is a playlist. Shuffle, repeat, and Mix between songs. A radio session in a playlist replays as heard. Freeze stores its songs, so it never changes with the director.
 
-**Profiles in the Mix (radio-profiles D2).** Each saved song in the Mix plays with the profile it has alone: its own declared profile, else the Live build switch and the Compose profile. A Crescendo or Live coder song plays its grown build with the controls it has alone, in its own view, like the radio: the next song comes in hidden on its own orbits and appears whole when it goes on air. A Mix of Classic songs plays as before. The songs of a radio session in the Mix keep the controls they had on air.
+**Profiles in the Mix (radio-profiles D2).** Each saved song in the Mix plays with the profile it has alone: its own configuration, or its trial (song-own-settings). A Crescendo or Live coder song plays its grown build with the controls it has alone, in its own view, like the radio: the next song comes in hidden on its own orbits and appears whole when it goes on air. A Mix of Classic songs plays as before. The songs of a radio session in the Mix keep the controls they had on air.
 
 **Session versions (D11).** A session item records `version` (the director) and, when it holds a grown song, `shapes` and `growth`. It shows "may sound different" with Freeze when any recorded version differs from the app's; a frozen session never warns. Freeze stores grown songs as heard, marked `grown`.
 

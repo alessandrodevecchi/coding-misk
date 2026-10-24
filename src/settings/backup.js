@@ -55,6 +55,11 @@ export function mergeBackup(backup, get) {
       const cur = get(k) && typeof get(k) === 'object' ? get(k) : {}, out = { ...cur };
       for (const [id, at] of Object.entries(v && typeof v === 'object' ? v : {})) if (!(out[id] >= at)) out[id] = at;
       values[k] = out;
+    } else if (k === 'coding-misk-song-trials') {
+      // configuration trials per song (song-own-settings) by song id: the backup's trial wins, the others stay
+      const cur = get(k) && typeof get(k) === 'object' && !Array.isArray(get(k)) ? get(k) : {};
+      values[k] = { ...cur, ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}) };
+      counts.settings++;
     } else if (k === 'coding-misk-radio-history') {
       const cur = Array.isArray(get(k)) ? get(k) : [];
       values[k] = [...(Array.isArray(v) ? v : []), ...cur].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 50);

@@ -17,14 +17,14 @@ Built-in songs live in `songs/`, in the order of `songs/index.json`. The example
 
 - **Code.** `compileSong` turns a song into Strudel code ([strudel.md](strudel.md)).
 - **Ideas.** A pattern can hold an idea instead of written steps ([ideas.md](ideas.md)).
-- **Live build.** The `build` field holds timed steps ([live-build.md](live-build.md)). `profile`, `buildStyle` and `growthShape` choose how the song builds ([profiles.md](profiles.md)).
+- **Live build.** The `build` field holds timed steps ([live-build.md](live-build.md)). `config`, `profile`, `buildStyle` and `growthShape` choose how the song builds; without any the song plays as written ([profiles.md](profiles.md)).
 - **Voice.** `spoken` tracks are the voice instrument ([voice.md](voice.md)); `voice` tracks and `narrator` are the narrator ([narrator.md](narrator.md)).
 - **Radio.** The director writes songs in this same format ([radio.md](radio.md)).
 - **Library.** Tags, dates and favourites drive the Songs tab ([library.md](library.md)).
 
 ## Options
 
-Song fields that change the sound: `sections`, `tracks`, `shared` (progressions read by several tracks), `build`, `profile`, `buildStyle`, `growthShape`, `narrator`. The others describe the song: `id`, `title`, `look` (the visual), `style`, `tags`, `inspiration`, `created`, `appVersion`, `origin`.
+Song fields that change the sound: `sections`, `tracks`, `shared` (progressions read by several tracks), `build`, `profile`, `buildStyle`, `config` (the song's own configuration: profile, Live build switch, profile options; song-own-settings), `growthShape`, `narrator`. The others describe the song: `id`, `title`, `look` (the visual), `style`, `tags`, `inspiration`, `created`, `appVersion`, `origin`.
 
 Section fields: `name`, `bars`, `bpm`, `bpmEnd` (a tempo ramp), `key`, `chords` (a named progression), `meter`, `swing`, `fade` (bars of crossfade), `crash`, `breath` (half a bar of silence), `fill` (a snare roll).
 

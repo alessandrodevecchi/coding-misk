@@ -13,7 +13,8 @@ import { growOnAir, airControls } from './endless/growth.js';
 import { controlsProfile, customControls } from './endless/profile.js';
 import { steerOnAir } from './endless/waypoints.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
-import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, migrateGrowth, PROFILE_STORE_VERSION, migrateOld } from './live/profiles.js';
+import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules } from './live/profiles.js';
+import { TRIALS_KEY, configOf, controlsOf, cleanTrials, setTrial, withConfig, compactConfig } from './live/song-config.js';
 import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay, SHAPES_VERSION } from './song/shapes.js';
 import { liveCode } from './live/live-code.js';
 import { installHelpers, useFns, FUNCTION_PRESETS, FUNCTION_OPTIONS, functionOptions, writeCode, levelsOf, busesOf, functionContext, tail, preludeText } from './song/writer.js';
@@ -74,7 +75,7 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP } from './icons.js';
+import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG } from './icons.js';
 import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
@@ -146,19 +147,24 @@ function purgeOld() {
   if (trashList(user).length !== n) saveLibrary();
 }
 purgeOld();
-let liveOn = !!store.get('coding-misk-live', false);
 // performance profiles (performance-profiles): Classic, Crescendo, Live coder (id switch), each a set of controls (build style,
-// growth rules, typing, code view, generator, comments, highlights). The Compose choice, the controls changed by hand
-// (overrides, the profile becomes "custom") and, before profiles, separate settings (read once)
-const firstProfile = migrateOld(k => store.get(k, undefined));
-let profileChoice = PROFILES[store.get('coding-misk-profile', null)] ? store.get('coding-misk-profile', null) : firstProfile.id;
-let overrides = migrateGrowth(store.get('coding-misk-profile-overrides', null), store.get('coding-misk-profile-version', 1)) || firstProfile.overrides;
-const saveProfile = () => { store.set('coding-misk-profile', profileChoice); store.set('coding-misk-profile-overrides', overrides); store.set('coding-misk-profile-version', PROFILE_STORE_VERSION); };
-// a song may name its profile (or its old build style); the Compose controls still switch it, for this session
-const liveOverride = new Map();
-const profileFor = tr => { const o = liveOverride.get(tr.id); return (o && o.profile) || songProfile(tr) || profileChoice; };
-const ctlOf = tr => resolveProfile(profileFor(tr), overrides);
-const liveOf = tr => { const o = liveOverride.get(tr.id), C = ctlOf(tr); return { on: o && o.on !== undefined ? o.on : songProfile(tr) ? true : liveOn, style: C.build, ctl: C }; };
+// growth rules, typing, code view, generator, comments, highlights). Since song-own-settings the configuration is part of
+// the song (`config`: profile, Live build switch, options; src/live/song-config.js): a song without one plays as its
+// declared profile says, else as Classic with the Live build off. A change in Compose is a trial for the open song only,
+// kept per song in this browser (coding-misk-song-trials, in the backup) until Save or ↺. The global choice used before
+// (coding-misk-profile, coding-misk-profile-overrides, coding-misk-live) no longer applies to any song: it is left
+// unread, so no song changes how it plays, and the per-song switches of that time lived only in the page's memory.
+let trials = cleanTrials(store.get(TRIALS_KEY, {}));
+const saveTrials = () => { if (Object.keys(trials).length) store.set(TRIALS_KEY, trials); else store.remove(TRIALS_KEY); };
+const trialOf = tr => (tr && trials[tr.id]) || null;
+const cfgOf = tr => configOf(tr, trialOf(tr));
+const profileFor = tr => cfgOf(tr).profile;
+const ctlOf = tr => controlsOf(cfgOf(tr));
+const liveOf = tr => { const c = cfgOf(tr), C = controlsOf(c); return { on: c.live, style: C.build, ctl: C }; };
+// a trial for the song in Compose: kept only while it differs from the song's own configuration
+const tryConfig = cfg => { trials = setTrial(trials, T, cfg); saveTrials(); };
+// the song as it plays with its trial (its config replaced), for the card lengths
+const asTried = tr => (trialOf(tr) ? withConfig(tr, trialOf(tr)) : tr);
 // the radio's window and its exports (radio-profiles 1.1, owner decision 4): explicit Classic controls with the profile's
 // own display values, so neither the Compose profile, its overrides nor the Live build switch reach the radio (the
 // window song names no profile: before, a Crescendo pick with the switch on grew the window). Off: a window without
@@ -250,8 +256,8 @@ function pageAway(msg) {
     return new Promise((resolve, reject) => { pageWaits.set(id, { resolve, reject }); pageWorker.postMessage({ id, spoken, ...msg }); });
   } catch (e) { return Promise.reject(e); }
 }
-// one control changed by hand: kept for every profile until a profile is picked again
-function setControl(k, v) { overrides = cleanOverrides({ ...overrides, [k]: v }, PROFILES[profileFor(T)]); saveProfile(); }
+// one control changed by hand: a trial on the song in Compose, kept until a profile is picked again
+function setControl(k, v) { const c = cfgOf(T); tryConfig({ ...c, options: cleanOverrides({ ...c.options, [k]: v }, PROFILES[c.profile]) }); }
 // Crescendo builds are computed once per song version and option, kept for the songs used last (LRU)
 const crescendoCache = new Map(), CRESCENDO_CACHE = 48;
 // the built-in style recipes, for the weights of the growth shapes and the metamorphosis (growth-shapes)
@@ -281,7 +287,9 @@ const DUR_STORE = 'coding-misk-card-durations', DUR_MAX = 300;
 let cardDurs = store.get(DUR_STORE, {}) || {}, durReady = false, durBusy = false;
 const durWait = new Map();
 const durCtx = () => ({ files: spokenContext.files, lengths: spokenContext.lengths || {}, lang: spokenContext.lang || getLang() });
+// (a song with a trial configuration: its length with the trial, song-own-settings)
 function durOf(tr) {
+  tr = asTried(tr);
   const key = durReady && tr.kind === 'composed' && growingProfile(tr) ? durationKey(tr, durCtx()) : null;
   return { key, dur: key ? SONG_DURATIONS.entries[key] || cardDurs[key] || null : null };
 }
@@ -303,7 +311,9 @@ function showCardLengths() {
 // the cards on screen whose grown length is not known yet, grown one at a time in the page worker
 function queueCardLengths() {
   if (!durReady || !cards.length) return;
-  for (const el of document.querySelectorAll('#songs [data-song-card]:not([hidden])')) { const c = cards[+el.dataset.songCard]; if (c && c.key && !c.dur && !durWait.has(c.key)) durWait.set(c.key, c.tr); }
+  // only the cards on screen now wait (a search or a filter drops the others; the length being grown finishes)
+  durWait.clear();
+  for (const el of document.querySelectorAll('#songs [data-song-card]:not([hidden])')) { const c = cards[+el.dataset.songCard]; if (c && c.key && !c.dur && !durWait.has(c.key)) durWait.set(c.key, asTried(c.tr)); }
   nextCardLength();
 }
 function nextCardLength() {
@@ -722,11 +732,11 @@ function changed() {
 }
 // ---------- the loop of the Patterns tab (pattern-library, design D2) ----------
 // a temporary song of 4 bars (src/library/patterns.js loopSong), written with the Technical functions preset of the
-// current profile (song-functions) and played by the same player as the songs; it loops until stopped. A change while
+// configuration of the song in Compose (song-functions, song-own-settings) and played by the same player as the songs; it loops until stopped. A change while
 // it plays (sound, key, tempo, another pattern) is evaluated at the next bar (songTick). The song is never saved.
 let loopNext = null;
 function loopPlayable(sg, uid = null) {
-  const o = functionOptions(resolveProfile(profileChoice, overrides)), ref = compileSong(sg);
+  const o = functionOptions(ctlOf(T)), ref = compileSong(sg);
   const base = { id: 'pattern-loop', title: sg.title, kind: 'pattern', loop: true, uid, meta: parseSong(ref) };
   if (!FUNCTION_OPTIONS.some(k => o[k])) return { ...base, code: ref };
   const buses = busesOf(ref), w = writeCode(ref, { mode: o, written: levelsOf(ref), buses, fns: functionContext(ref, { id: sg.id, title: sg.title }, o) });
@@ -1449,12 +1459,12 @@ function continueInRadio(sg, from = 0) {
   showTab('radio');
 }
 // how a song plays here, for song 0 of the radio (radio-profiles D2): growing (Crescendo or Live coder) with its profile
-// and the controls it has (the Compose profile and overrides), so the radio grows it the same; else in blocks, with
+// and the controls it has (its configuration, or its trial), so the radio grows it the same; else in blocks, with
 // `declared` when its profile or the Live build switch put it there (an undeclared song may take the radio's forced one)
 function leadHow(tr) {
   const lv = liveOf(tr);
   if (lv.on && lv.style === 'crescendo' && crescendoOf(tr)) return { profile: controlsProfile(lv.ctl), controls: clone(lv.ctl) };
-  return { declared: !!(songProfile(tr) || liveOverride.has(tr.id) || lv.on) };
+  return { declared: !!(songProfile(tr) || tr.config || trialOf(tr) || lv.on) };
 }
 $('#tr-radio').addEventListener('click', () => { const s = sched(); continueInRadio(T, mode === 'track' && isPlaying() && s ? Math.max(0, Math.floor(s.now())) : 0); });
 
@@ -1527,7 +1537,7 @@ function renderArranger() {
   // the profiles as presets on top of the panel; "custom" when a control below was changed by hand
   $('#live-profile').innerHTML = PROFILE_IDS.map(id => `<button class="chip" role="radio" data-profile="${id}" aria-checked="${id === C.id}" aria-pressed="${id === C.id}" title="${esc(t(`profileHint:${id}`))}">${esc(t(`profile:${id}`))}</button>`).join('');
   $('#live-custom').hidden = !C.custom;
-  $('#live-profile').title = songProfile(T) && !liveOverride.has(T.id) ? t('profileDeclared') : t('profileHint');
+  $('#live-profile').title = (songProfile(T) || T.config) && !trialOf(T) ? t('profileDeclared') : t('profileHint');
   $('#live-growth').value = C.growth; $('#live-duration').value = C.duration; $('#live-duration').disabled = C.growth !== 'natural';
   renderShape(C, on && crescendo);
   $('#live-style').value = lv.style; $('#live-style').disabled = !on;
@@ -1629,8 +1639,14 @@ function renderSectionPanel(total) {
   $('#sc-left').disabled = sel === 0; $('#sc-right').disabled = sel === T.sections.length - 1; $('#sc-del').disabled = T.sections.length === 1;
   $('#dirty').textContent = dirty ? t('unsaved') : '';
   const builtin = isBuiltin(T.id), overridden = user.tracks.some(u => u.id === T.id);
-  $('#tr-del').textContent = builtin ? t('restoreOrig') : t('deleteTrack');
-  $('#tr-del').disabled = builtin && !overridden && !dirty;
+  // a built-in song: ↺ Original song (notes, tracks and configuration, its trial too); one of the user's: Delete song.
+  // Disabled (aria-disabled, so the tooltip still shows) when there is nothing to restore
+  if (builtin) $('#tr-del').innerHTML = `${RESET_CONFIG}<span>${esc(t('songOrig'))}</span>`; else $('#tr-del').textContent = t('deleteTrack');
+  $('#tr-del').title = builtin ? t('restoreOrigTip') : '';
+  $('#tr-del').classList.toggle('cfg-reset', builtin);
+  $('#tr-del').disabled = false;
+  $('#tr-del').setAttribute('aria-disabled', String(builtin && !overridden && !dirty && !trialOf(T)));
+  renderTrialMark();
   $('#arr-total').textContent = t('arrTotal', { scenes: T.sections.length, bars: total, time: clock(compiled.meta.seconds) });
   $('#sc-loop').checked = loopIdx >= 0 && mode === 'track';
   renderTrackPick();
@@ -1743,37 +1759,49 @@ $('#track-panel').addEventListener('click', e => {
   if (!tr.pinned.length) delete tr.pinned;
   changed(); syncTrackPanel();
 });
-// the Compose controls set the live build for every song; a song that declares its build style is switched for this session
+// the Compose controls change the open song only, as a trial (song-own-settings): never another song, never the saved one
 function liveChanged() {
   compiled = playable({ ...T, kind: 'composed' });
   if (isPlaying() && mode === 'track') playSong(compiled, Math.min(sched().now(), compiled.meta.bars - 1), 'track');
   else if (ed && mode === 'track') ed.setCode(compiled.code);
   renderArranger(); if (!$('#tab-brani').hidden) renderSongs();
 }
-// a profile picked: its controls as they are (the changes made by hand go); a song that names its profile is switched
-// for this session, the others change the Compose choice
+// a profile picked: its controls as they are (the changes made by hand go), with the Live build on
 $('#live-profile').addEventListener('click', e => {
   const b = e.target.closest('[data-profile]'); if (!b) return;
   const id = PROFILES[b.dataset.profile] ? b.dataset.profile : 'classic';
-  overrides = {};
-  if (songProfile(T) || hasBuild(T)) liveOverride.set(T.id, { ...(liveOverride.get(T.id) || {}), on: true, profile: id });
-  else { profileChoice = id; liveOn = true; store.set('coding-misk-live', true); }
-  saveProfile(); liveChanged();
+  tryConfig({ profile: id, live: true, options: {} });
+  liveChanged();
 });
 // the build style: between Classic and Crescendo it picks the profile, as before profiles; in another profile it is
 // a change by hand
 $('#live-style').addEventListener('change', e => {
-  const v = e.target.value === 'crescendo' ? 'crescendo' : 'blocks', cur = profileFor(T);
-  if (cur === 'classic' || cur === 'crescendo') {
-    const id = v === 'crescendo' ? 'crescendo' : 'classic';
-    overrides = cleanOverrides(overrides, PROFILES[id]); delete overrides.build;
-    if (songProfile(T) || hasBuild(T)) liveOverride.set(T.id, { ...(liveOverride.get(T.id) || {}), on: true, profile: id });
-    else profileChoice = id;
-    saveProfile();
-  } else setControl('build', v);
-  if (!hasBuild(T) && !songProfile(T)) { liveOn = true; store.set('coding-misk-live', true); }
+  const v = e.target.value === 'crescendo' ? 'crescendo' : 'blocks', c = cfgOf(T);
+  if (c.profile === 'classic' || c.profile === 'crescendo') {
+    const id = v === 'crescendo' ? 'crescendo' : 'classic', options = cleanOverrides(c.options, PROFILES[id]);
+    delete options.build;
+    tryConfig({ profile: id, live: true, options });
+  } else tryConfig({ ...c, live: true, options: cleanOverrides({ ...c.options, build: v }, PROFILES[c.profile]) });
   liveChanged();
 });
+// back to the song's own configuration (↺): the trial goes
+function resetTrial(id) {
+  if (!trials[id]) return;
+  const { [id]: gone, ...rest } = trials;
+  trials = rest; saveTrials();
+  if (T.id === id) liveChanged(); else renderSongs();
+  toast(t('configBack'));
+}
+// ↺ Original configuration sits in the song actions next to ↺ Original song (outside the live build panel: the original
+// configuration may be the Live build off, with the panel closed); disabled, with its tooltip, when there is no trial
+$('#cfg-reset').addEventListener('click', () => { if ($('#cfg-reset').getAttribute('aria-disabled') !== 'true') resetTrial(T.id); });
+// the "configuration changed" mark and the ↺ in the song actions of Compose
+function renderTrialMark() {
+  const on = !!trialOf(T);
+  $('#cfg-changed').hidden = !on;
+  $('#cfg-reset').innerHTML = `${RESET_CONFIG}<span>${esc(t('configBackLbl'))}</span>`;
+  $('#cfg-reset').setAttribute('aria-disabled', String(!on));
+}
 $('#live-gen').addEventListener('change', e => { setControl('gen', e.target.value); liveChanged(); });
 $('#live-growth').addEventListener('change', e => { setControl('growth', e.target.value); liveChanged(); });
 $('#live-duration').addEventListener('change', e => { setControl('duration', e.target.value); liveChanged(); });
@@ -1792,11 +1820,10 @@ $('#live-wrap').addEventListener('click', () => { setControl('wrap', !ctlOf(T).w
 $('#live-human').addEventListener('click', () => { setControl('typist', ctlOf(T).typist === 'human' ? 'exact' : 'human'); liveChanged(); });
 $('#live-mistakes').addEventListener('click', () => { setControl('mistakes', ctlOf(T).mistakes === 'off' ? 'on' : 'off'); liveChanged(); });
 $('#live-toggle').addEventListener('click', () => {
-  const lv = liveOf(T);
+  const c = cfgOf(T);
   // a song with its own steps in crescendo: the switch goes back to its own steps
-  if (hasBuild(T)) liveOverride.set(T.id, { on: true, profile: 'classic' });
-  else if (songProfile(T)) liveOverride.set(T.id, { ...(liveOverride.get(T.id) || {}), on: !lv.on });
-  else { liveOn = !liveOn; store.set('coding-misk-live', liveOn); }
+  if (hasBuild(T)) tryConfig({ profile: 'classic', live: true, options: cleanOverrides(c.options, PROFILES.classic) });
+  else tryConfig({ ...c, live: !c.live });
   compiled = playable({ ...T, kind: 'composed' });
   if (isPlaying() && mode === 'track') playSong(compiled, sched().now(), 'track');
   else if (ed && mode === 'track') ed.setCode(compiled.code);
@@ -1958,12 +1985,22 @@ function loadTrack(tr) {
   return true;
 }
 const asStored = (fresh = false) => { const o = stamp(clone(T), fresh); delete o.kind; T.created = o.created; T.appVersion = o.appVersion; return o; };
+// the trial configuration becomes the song's own (song-own-settings); without a trial the song keeps its own
+function keepTrial() {
+  const c = trialOf(T);
+  if (!c) return;
+  T.config = compactConfig(c);
+  const { [T.id]: gone, ...rest } = trials; trials = rest; saveTrials();
+}
 $('#tr-save').addEventListener('click', () => {
+  keepTrial();
   const i = user.tracks.findIndex(u => u.id === T.id);
   if (i >= 0) user.tracks[i] = asStored(); else user.tracks.push(asStored());
   dirty = false; saveLibrary(); saveDraft(); renderArranger(); renderSongs(); toast(t('trackSaved'));
 });
 $('#tr-saveas').addEventListener('click', () => {
+  // the copy plays with the trial; the song it comes from stays as saved, its trial taken by the copy
+  keepTrial();
   T.id = 'u-' + Date.now(); T.title = t('copyOf', { name: T.title });
   user.tracks.push(asStored(true));
   dirty = false; compiled = playable({ ...T, kind: 'composed' });
@@ -2009,13 +2046,15 @@ function leaveSong(src) {
 // "Delete song" asks in a strip under the buttons (#68): a saved song of the user's goes to the trash, an unsaved
 // one is discarded, a built-in song gets its original back
 $('#tr-del').addEventListener('click', e => {
+  if (e.currentTarget.getAttribute('aria-disabled') === 'true') return;
   const id = T.id, orig = builtinOf(id), stored = user.tracks.some(u => u.id === id);
   confirmInline({ anchor: e.currentTarget.closest('.actions'), trigger: e.currentTarget, key: 'tr-del', t, esc,
-    msg: t(orig ? 'restoreAsk' : stored ? 'trashAsk' : 'discardAsk'), ok: t(orig ? 'restoreOrig' : 'songDelete'),
+    msg: t(orig ? 'restoreAsk' : stored ? 'trashAsk' : 'discardAsk'), ok: t(orig ? 'songOrig' : 'songDelete'),
     onConfirm: () => {
       if (T.id !== id) return;
       if (!orig && stored) { trashUserSong(id); return; }
       user.tracks = user.tracks.filter(u => u.id !== id);
+      if (trials[id]) { const { [id]: gone, ...rest } = trials; trials = rest; saveTrials(); }
       saveLibrary(); leaveSong(orig); renderSongs();
       toast(orig ? t('restored') : t('trackDeleted'));
     } });
@@ -2762,6 +2801,7 @@ function songCard(c, i) {
   const sg = songOf(c), kind = kindOf(sg), own = composed && !isBuiltin(tr.id);
   return `<article class="card lesson song" data-song-card="${i}" data-song-id="${esc(tr.id)}">
     <div class="song-head"><span class="badge kind-${kind}">${t(`k:${kind}`)}</span>${sg.mine ? `<span class="badge">${t('mine')}</span>` : ''}${sg.buildStyle === 'crescendo' ? `<span class="badge build-badge" title="${esc(t('fBuilds'))}">${esc(t('b:crescendo'))}</span>` : ''}
+      ${composed && trialOf(tr) ? `<span class="cfg-trial"><span class="badge cfg-changed">${esc(t('configChanged'))}</span><button class="chip small cfg-reset" data-act="cfg-reset" title="${esc(t('configBackTip'))}" aria-label="${esc(t('configBackLbl'))}">${RESET_CONFIG}</button></span>` : ''}
       <span class="song-meta"><span class="song-len">${esc(songLenText(c))}</span>${tr.created ? ` · ${esc(t('cardCreated', { d: new Date(tr.created).toLocaleDateString(getLang() === 'it' ? 'it-IT' : 'en-GB') }))}` : ''}</span>${songsView.starButton(tr.id)}</div>
     <h3>${esc(tr.title)}</h3>
     ${tr.style ? `<p>${esc(tx(tr.style))}</p>` : ''}
@@ -2834,7 +2874,7 @@ function playById(id) {
 let mixOn = !!store.get('coding-misk-playlist-mix', false), mixS = null, mixN = 0;
 const barsOfSong = sg => sg.sections.reduce((a, x) => a + x.bars, 0);
 // each saved song plays with the profile it has alone (radio-profiles D2 without the radio's forced profile): its own,
-// else the Live build switch and the Compose profile; a growing one is its grown build, with the controls it has alone
+// configuration, or its trial (song-own-settings); a growing one is its grown build, with the controls it has alone
 // (kept in mixCtl, by song object)
 const mixCtl = new WeakMap();
 function mixSong(id) {
@@ -3009,6 +3049,7 @@ $('#songs').addEventListener('click', e => {
     // a song outside the playing queue ends it; one inside moves the queue there
     if (a === 'play') { if (queue && !queue.jump(tr.id)) queue = null; return startCard(i, 0); }
     if (a === 'pause') return togglePlay();
+    if (a === 'cfg-reset') return resetTrial(tr.id);
     if (a === 'stop') return stop();
     if (a === 'radio') return continueInRadio({ ...tr, tags: tr.tags || songOf({ tr, p }).tags }, 0);
     if (a === 'export') {

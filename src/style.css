@@ -191,6 +191,13 @@
   .live-profiles { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
   .live-profiles .chips .chip { font-size: 14px; padding: 6px 16px; }
   .live-profiles .chip[aria-checked="true"] { border-color: var(--a1); color: var(--a1); box-shadow: 0 0 0 1px var(--a1) inset; }
+  /* a configuration trial on this song (song-own-settings): the mark and the circular arrow back */
+  .cfg-trial { display: inline-flex; align-items: center; gap: 6px; }
+  .cfg-trial[hidden] { display: none; }
+  .cfg-changed { border-color: var(--a2, var(--a1)); color: var(--a2, var(--a1)); }
+  .cfg-reset { display: inline-flex; align-items: center; gap: 5px; }
+  .cfg-reset[aria-disabled="true"] { opacity: .4; cursor: default; }
+  .cfg-reset .ico { width: 14px; height: 14px; flex: none; }
   .live-panel legend { padding: 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--a1); }
   .live-panel .ctrl { min-width: 0; }
   .live-panel select { width: 100%; max-width: 100%; }

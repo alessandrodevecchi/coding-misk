@@ -1,6 +1,6 @@
 // Browser check of the startup time: the app must be interactive within 3 s, with no long task over 1.5 s, also when
-// every song would grow (the Live build switch on with the Live coder or the Crescendo profile) and with many songs of
-// the user's. Song lists never grow songs: growth happens only when a song is opened in Compose or played.
+// every song would grow (a configuration trial on every song, song-own-settings: the Live build on with the Live coder
+// or the Crescendo profile) and with many songs of the user's. Song lists never grow songs: growth happens only when a song is opened in Compose or played.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-startup.cjs   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const PORT = process.env.PORT || 5173, URL = `http://localhost:${PORT}/`;
@@ -61,6 +61,7 @@ async function run(browser, name, storage, extra = null) {
   const page = await browser.newPage();
   await page.goto(URL);
   const base = await page.evaluate(async () => Promise.all(['switch-test-breve', 'luci-rosse', 'crescendo-filo-di-luce', 'kellerlicht', 'drift'].map(id => fetch(`/songs/${id}.json`).then(r => r.json()))));
+  const builtinIds = await page.evaluate(() => fetch('/songs/index.json').then(r => r.json()));
   await page.close();
   const many = Array.from({ length: 60 }, (_, i) => ({ ...base[i % base.length], id: `u-startup-${i}`, title: `Startup ${i + 1}` }));
   const written = Object.fromEntries(many.map(x => [x.id, x.sections.reduce((a, y) => a + y.bars, 0)]));
@@ -85,12 +86,15 @@ async function run(browser, name, storage, extra = null) {
     const t0 = Date.now(); await page.click('[data-tab="playlist"]'); await page.click('[data-tab="brani"]');
     check(Date.now() - t0 < 1000, `the tabs answer while the lengths grow (${Date.now() - t0} ms)`);
   };
+  // a trial on every built-in song: the cards on screen and the song in Compose grow; the user's songs keep their own
+  // configuration (two of the five copies declare a growing profile), as many grown lengths as the worker can give in time
+  const trials = (profile, ids) => ({ 'coding-misk-song-trials': Object.fromEntries(ids.map(id => [id, { profile, live: true }])) });
   const cases = [
     ['defaults', {}, grownBuiltin],
-    ['Live build + Live coder', { 'coding-misk-live': true, 'coding-misk-profile': 'switch' }],
-    ['Live build + Crescendo', { 'coding-misk-live': true, 'coding-misk-profile': 'crescendo' }],
-    ['Live coder + 60 user songs', { 'coding-misk-live': true, 'coding-misk-profile': 'switch', 'coding-misk-library': { tracks: many, code: {} } }, grownUser],
-    ['Crescendo + 60 user songs', { 'coding-misk-live': true, 'coding-misk-profile': 'crescendo', 'coding-misk-library': { tracks: many, code: {} } }],
+    ['Live coder trial on every song', trials('switch', builtinIds)],
+    ['Crescendo trial on every song', trials('crescendo', builtinIds)],
+    ['Live coder trials + 60 user songs', { ...trials('switch', builtinIds), 'coding-misk-library': { tracks: many, code: {} } }, grownUser],
+    ['Crescendo trials + 60 user songs', { ...trials('crescendo', builtinIds), 'coding-misk-library': { tracks: many, code: {} } }],
   ];
   for (const [name, s, extra] of cases) await run(browser, name, s, extra);
   await browser.close();
