@@ -108,6 +108,7 @@
     "weight": 0.7
   },
   "pad": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
     "presets": [
       "pad",
       "pump",

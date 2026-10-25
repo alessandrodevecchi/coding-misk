@@ -224,6 +224,13 @@ export function spokenCode(lines, total, lang = langOf()) {
 // ---------- poetic narrator ----------
 // the narrator style of a song: "explain" (default) or "poetic"; song.narrator is a style name or { style, lines }
 export const narratorStyle = song => { const n = song && song.narrator; const s = typeof n === 'string' ? n : n && n.style; return s === 'poetic' ? 'poetic' : 'explain'; };
+// a song with the narrator style a profile asks for (voice-controls): 'auto' (or nothing) keeps the song's own; the
+// song's own short images stay with it
+export function withNarratorStyle(song, style) {
+  if (!song || !NARRATOR_STYLES.includes(style) || narratorStyle(song) === style) return song;
+  const n = song.narrator, lines = n && typeof n === 'object' && n.lines ? n.lines : null;
+  return { ...song, narrator: lines ? { style, lines } : style };
+}
 // the track a step brings in (add, clone, unmute), or null
 export function enteringTrack(song, step) {
   const id = step.add !== undefined ? [].concat(step.add)[0] : step.clone ? step.clone.track : step.unmute !== undefined ? [].concat(step.unmute)[0] : null;

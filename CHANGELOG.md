@@ -5,6 +5,18 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- Narrator style control: automatic, explaining or poetic, for any song.
+- Voices group in Compose and in the radio Custom profile: narrator voice, narrator style and narrated growth.
+- Voice instrument controls for generated songs: phrases per song, different, repeated or mixed lines, ways and how often, with presets.
+- Voice instrument options for a new song by an artist.
+- Guide card that compares the narrator, the poetic narrator and the voice instrument.
+
+### Changed
+
+- "Fully narrated" is now "Narrated growth".
+
 ## [0.6.0-beta.2] - 2026-10-25
 
 ### Added

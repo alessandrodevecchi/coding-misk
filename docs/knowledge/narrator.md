@@ -15,8 +15,10 @@ The narrator is the voice that speaks the comments of a live build. A step can c
 
 ## How it connects
 
-- **Live build.** Phrases come from the steps ([live-build.md](live-build.md)). The profile control `narrated` makes almost every Crescendo step speak ([profiles.md](profiles.md)).
-- **Narrator switch.** The profile control `narrator` ("Narrator voice", on by default in every profile; profile-options) silences the narrator in Compose and in the radio: `liveCode` leaves out the narrator's voice lines, shown and hidden (`voiceCode` is not called). The music, the steps and the length stay the same; the phrases written as `// > …` follow the comment option `steps`; the voice instrument is a track of the song and still speaks. "Fully narrated" is disabled with a hint while the narrator is off (its value is kept, so the growth does not change). A configuration or a trial saved without the control plays with the narrator on. In the radio it is a Custom control that applies from the next song; a song not on air (hidden or shown in Classic) keeps its own switch.
+- **Live build.** Phrases come from the steps ([live-build.md](live-build.md)). The profile control `narrated` ("Narrated growth", formerly Fully narrated) makes the Crescendo steps denser, each one spoken ([profiles.md](profiles.md)).
+- **Narrator switch.** The profile control `narrator` ("Narrator voice", on by default in every profile; profile-options) silences the narrator in Compose and in the radio: `liveCode` leaves out the narrator's voice lines, shown and hidden (`voiceCode` is not called). The music, the steps and the length stay the same; the phrases written as `// > …` follow the comment option `steps`; the voice instrument is a track of the song and still speaks. "Narrated growth" and "Narrator style" are disabled with a hint while the narrator is off (its value is kept, so the growth does not change). A configuration or a trial saved without the control plays with the narrator on. In the radio it is a Custom control that applies from the next song; a song not on air (hidden or shown in Classic) keeps its own switch.
+- **Voices group (voice-controls).** Compose's live build panel and the radio Custom section group Narrator voice, Narrator style and Narrated growth under "Voices". The voice instrument's own controls live in the radio and in the new song from an artist ([voice.md](voice.md)).
+- **Narrator style control.** The profile control `narratorStyle`: `auto` (default, the song's own `narrator`, else its style's), `explain` or `poetic`. Not `auto`, it overrides the song's style in `liveCode` (`withNarratorStyle` in `src/song/spoken.js`; a song's own short images stay with it). It changes the sound, never the growth: in the radio it applies from the next song; a song not on air keeps its own (`air-code.js`).
 - **Radio.** The director comments its moves with phrases from `src/endless/phrases.js`. The knob `talk` sets how often ([radio.md](radio.md)).
 - **Voice instrument.** The narrator yields to spoken lines ([voice.md](voice.md)).
 - **Artists and styles.** A style sets the base voice; an artist can prefer voice characters ([artists.md](artists.md)).
@@ -34,6 +36,8 @@ Speakers (`SPEAKERS`): `eddy`, `flo`, `grandma`, `grandpa`, `reed`, `rocko`, `sa
 
 - `explain`: the default. It says what each step does.
 - `poetic`: a short image in the bar before each track comes in, nothing at the other steps. Lines come from the song's `narrator.lines`, its style's, else the vocabulary's poetic group.
+
+The song (`narrator`) or its style chooses the style; the profile control `narratorStyle` can override it for any song (`auto` keeps the song's).
 
 Voice characters: `radio`, `robot`, `deep`, `bright`, `cathedral`, `echo`, `dirty`, `slow`. Each overrides a few settings.
 

@@ -1,8 +1,8 @@
 ---
 id: patterns
 related: [ideas, material, radio, styles, library, comments-and-functions]
-code: [src/library/patterns.js, src/library/patterns-tab.js, src/music.js]
-checks: [npm run check:patterns]
+code: [src/library/patterns.js, src/library/patterns-tab.js, src/library/pattern-drafts.js, src/music.js]
+checks: [npm run check:patterns, node tools/check-patterns.cjs]
 ---
 
 # Patterns
@@ -16,12 +16,13 @@ Each pattern plays in a loop: a temporary song of four bars with its sound, a ke
 ## How it connects
 
 - **Ideas.** Built-in patterns are the presets of `src/music.js`, each stored as an idea ([ideas.md](ideas.md)).
-- **Material.** [New] in the detail composes a part of the same kind with the generator ([material.md](material.md)).
+- **Material.** [New] in the detail composes a part of the same kind with the generator ([material.md](material.md)). On riffs it composes a guitar riff (the guitar generator with `riff: true`, the default) or a bass riff (a bassline with the riff rules), chosen next to New.
+- **New parts.** New's parts stay under "New, not saved" until saved or discarded, across tab changes and reloads: browser key `coding-misk-pattern-drafts`, at most 30, the oldest goes first with a short note. [Discard] on a selected new part and [Discard all] on the strip ask in the app's inline confirmation strip. Patterns opened from Compose and not saved stay in memory and go when the tab closes.
 - **Compose.** Save as pattern takes a track's pattern with the context of its first section. A listen button next to a track's preset opens it here. Add to song puts a pattern on the song open in Compose.
 - **Styles.** A style sheet lists the presets it uses; each opens here ([styles.md](styles.md)).
-- **Radio.** Saved patterns join the director's pool for the styles of their tags, or every style ([radio.md](radio.md)). Swap picks among them ([radio-commands.md](radio-commands.md)).
+- **Radio.** Saved patterns join the director's pool for the styles of their tags, or every style ([radio.md](radio.md)). Swap picks among them ([radio-commands.md](radio-commands.md)). The styles are chips on a saved pattern's card (and on a new part of New): [+ Add a style] adds one, the cross removes it; none shows "every style". New links the style chosen; Save as pattern links the song's style tags, else its artist's favourite style or the styles its style line names (`fallbackStyles`).
 - **Code.** The loop is written with the technical functions preset of the current profile ([comments-and-functions.md](comments-and-functions.md)).
-- **Backup.** Saved patterns are in the backup ([library.md](library.md)).
+- **Backup.** Saved patterns and new parts are in the backup, merged by id; new parts keep the newest 30 ([library.md](library.md)).
 
 ## Options
 
@@ -38,7 +39,9 @@ Each pattern plays in a loop: a temporary song of four bars with its sound, a ke
 
 Bass riffs count as `riffs` too. In the detail: sound, key, progression, mode, tempo, meter and the beat under the pattern. They change from the next bar without stopping.
 
-A saved pattern keeps: `name`, `kind`, `type`, `pattern`, `sound`, `settings`, `context` (key, chords, meter, bpm, mode), `styles`, `source` (`compose` or `generated`), `seed` and `why` for generated ones, `created`. Browser key: `coding-misk-patterns`.
+A saved pattern keeps: `name`, `kind`, `type`, `pattern`, `sound`, `settings`, `context` (key, chords, meter, bpm, mode), `styles`, `source` (`compose` or `generated`), `seed` and `why` for generated ones, `created`. Browser key: `coding-misk-patterns`. `styles` holds style ids; `[]` (or `['any']` alone) means every style.
+
+A new part (draft) keeps: `id` (`d-…`), `kind`, `type`, `name`, `pattern`, `sound`, `context`, `styles`, `seed`, `why`, `energy`, `at` (time, newest first). Seeds: `pattern:<kind>:<n>`, and `pattern:riffs:guitar:<n>` for a guitar riff.
 
 ## Example
 
@@ -63,3 +66,4 @@ $: n(irand(5).seg(16).rib(3, 2)).chord("<Am7 F^7 C^7 G7>").anchor("c5").mode("be
 - [docs/ARCHITECTURE.md](../ARCHITECTURE.md#patterns-tab): catalogue, loop, preview, store, links.
 - [docs/COMPOSING.md](../COMPOSING.md#patterns-in-practice): which presets suit which part.
 - [openspec/changes/pattern-library/](../../openspec/changes/pattern-library/): the change, with favourites and votes for later.
+- [openspec/changes/pattern-followups/](../../openspec/changes/pattern-followups/): editable styles, kept new parts, guitar riffs (#72).

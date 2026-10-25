@@ -11,7 +11,7 @@
       "@strudel/repl": "1.3.0",
       "superdough": "1.3.0"
     },
-    "codes": 43541
+    "codes": 43093
   },
   "functions": {
     "add": {
@@ -80,7 +80,7 @@
     "beat": {
       "songs": 1,
       "live": 2,
-      "radio": 13,
+      "radio": 12,
       "prelude": 0,
       "as": [
         "beat"
@@ -278,7 +278,7 @@
     "late": {
       "songs": 30,
       "live": 31,
-      "radio": 38,
+      "radio": 42,
       "prelude": 0,
       "as": [
         "late"
@@ -466,8 +466,8 @@
     },
     "segment": {
       "songs": 2,
-      "live": 7,
-      "radio": 9,
+      "live": 10,
+      "radio": 12,
       "prelude": 0,
       "as": [
         "seg"

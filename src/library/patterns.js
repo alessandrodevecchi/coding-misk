@@ -10,15 +10,20 @@ import { BASS, ARPS, HOOKS, PADS, GROOVES, GUITAR_PATTERNS, CHORDS, ROWS, DEFAUL
 import { miniEvents, ideaRows, slotTokens, altItems, beatForm, midi } from '../song/ideas.js';
 import { normalizeSong, SECTION_DEFAULTS } from '../song/format.js';
 import { chordsOf, rootOf, modeSteps } from '../material/common.js';
+import { compose } from '../material/index.js';
 
 export const STORE_KEY = 'coding-misk-patterns';
 export const KINDS = ['melodies', 'basslines', 'arpeggios', 'chords', 'grooves', 'riffs'];
 export const SOURCES = ['builtin', 'mine'];
 // the track type a kind plays on (riffs: bass riffs on bass, guitar patterns on guitar)
 export const KIND_TYPE = { melodies: 'hook', basslines: 'bass', arpeggios: 'arp', chords: 'pad', grooves: 'drums', riffs: 'guitar' };
-// the material generator's kind for "Compose new" (riffs are basslines with octaves and fifths as rhythm)
+// the material generator's kind for "Compose new" (a bass riff: a bassline with octaves and fifths as rhythm; a guitar
+// riff comes from the guitar generator instead, see RIFF_AS)
 export const MATERIAL_KIND = { melodies: 'melody', basslines: 'bass', arpeggios: 'arp', chords: 'chords', grooves: 'drums', riffs: 'bass' };
 export const RIFF_STYLE = { rules: ['octaves', 'fifths', 'gallop', 'sixteenths'] };
+// New on riffs (pattern-followups D3): a guitar riff (the guitar generator, a riff every time, the default) or a bass
+// riff (a bassline with the riff rules)
+export const RIFF_AS = ['guitar', 'bass'];
 // the setting that holds a track's sound
 export const soundKey = type => ({ drums: 'kit', guitar: 'type' }[type] || 'wave');
 // defaults of each kind (spec "Harmony for a pattern"): a minor progression, a sound of its kind, 120 to 140 BPM
@@ -98,6 +103,14 @@ export function renamePattern(list, id, name) {
   return listPatterns(list).map(p => (p.id === id && n ? { ...p, name: n } : p));
 }
 export const removePattern = (list, id) => listPatterns(list).filter(p => p.id !== id);
+// the styles of a pattern (pattern-followups D1): ids once each; "any" (every style) only when nothing else is there,
+// and an empty list means every style too
+export function cleanStyles(styles) {
+  const ids = [...new Set((Array.isArray(styles) ? styles : []).filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()))];
+  return ids.length > 1 ? ids.filter(x => x !== 'any') : ids;
+}
+export const everyStyle = styles => !cleanStyles(styles).filter(x => x !== 'any').length;
+export const setPatternStyles = (list, id, styles) => listPatterns(list).map(p => (p.id === id ? { ...p, styles: cleanStyles(styles) } : p));
 // the store over the app's browser storage ({ get, set }); built-in patterns are not in it, so they cannot be renamed
 // or deleted
 export function patternStore(store) {
@@ -108,6 +121,7 @@ export function patternStore(store) {
     add(p) { const r = addPattern(read(), p); store.set(STORE_KEY, r.list); return r.item; },
     rename(id, name) { store.set(STORE_KEY, renamePattern(read(), id, name)); },
     remove(id) { store.set(STORE_KEY, removePattern(read(), id)); },
+    setStyles(id, styles) { store.set(STORE_KEY, setPatternStyles(read(), id, styles)); },
   };
 }
 // the user's patterns as the director reads them (material-generator D10, src/endless/material.js): type, pattern, the
@@ -123,16 +137,51 @@ export function sectionOf(song, tr, key) {
   const sec = clip ? s.sections.find(x => clip.start >= x.start && clip.start < x.start + x.bars) : null;
   return { ...SECTION_DEFAULTS, ...(sec || s.sections[0] || {}) };
 }
-// song (v2), track, pattern letter → a pattern to save (no id yet)
-export function savedFromTrack(song, tr, key, { name = null, now = new Date() } = {}) {
+// the styles of a song with no style tags (pattern-followups D1): its artist's favourite style, when the song names
+// its artist (an `artist` id, or a style line that starts with the artist's name, as a new song from an artist has),
+// else the styles its style line names ("Endless · Berlin techno + Jazz · …"). recipes: the styles; artists: the
+// artists ({ id, name, styles: { id: weight } }). → style ids, maybe none
+export function fallbackStyles(song, { recipes = [], artists = [] } = {}) {
+  const known = new Set(recipes.map(r => r && r.id).filter(Boolean));
+  const top = a => Object.entries((a && a.styles) || {}).filter(([id]) => known.has(id)).sort((x, y) => y[1] - x[1]).map(([id]) => id).slice(0, 1);
+  const line = song && song.style ? [].concat(typeof song.style === 'string' ? [song.style] : Object.values(song.style)).filter(x => typeof x === 'string') : [];
+  const aid = song && song.artist ? (typeof song.artist === 'string' ? song.artist : song.artist.id) : null;
+  const byId = aid && artists.find(a => a && a.id === aid);
+  if (byId && top(byId).length) return top(byId);
+  const byName = artists.find(a => a && a.name && line.some(l => l.toLowerCase().startsWith(`${String(a.name).toLowerCase()} ·`)));
+  if (byName && top(byName).length) return top(byName);
+  const words = line.flatMap(l => l.split(/\s+[·+]\s+/)).map(w => w.trim().toLowerCase());
+  const out = [];
+  for (const w of words) for (const r of recipes) if (r && r.name && Object.values(r.name).some(n => String(n).toLowerCase() === w) && !out.includes(r.id)) out.push(r.id);
+  return out;
+}
+// song (v2), track, pattern letter → a pattern to save (no id yet). fallback: the styles to link when the song has
+// no style tags (fallbackStyles)
+export function savedFromTrack(song, tr, key, { name = null, now = new Date(), fallback = [] } = {}) {
   const pattern = clone((tr.patterns || {})[key] || {}), sec = sectionOf(song, tr, key), settings = clone(tr.settings || {});
-  const kind = kindOfPattern(tr.type, pattern), styles = ((song.tags || {}).styles || []).slice();
+  const tagged = ((song.tags || {}).styles || []).slice();
+  const kind = kindOfPattern(tr.type, pattern), styles = cleanStyles(tagged.length ? tagged : fallback);
   const context = { key: sec.key, chords: sec.chords, meter: sec.meter, bpm: sec.bpm, mode: tr.type === 'hook' ? settings.mode || 'minor' : 'minor' };
   return { name: name || `${tr.name || tr.type} · ${song.title || ''}`.trim(), kind, type: tr.type, pattern, sound: settings[soundKey(tr.type)] ?? null, settings, context, styles, source: 'compose', seed: null, created: now.toISOString().slice(0, 10) };
 }
 // a generated part (material generator) → a pattern to save
 export function savedFromGenerated(g, { name, kind, type, sound, context, styles = [], now = new Date() }) {
   return { name, kind, type, pattern: clone(g.pattern), sound, settings: g.settings ? clone(g.settings) : {}, context: { ...context }, styles: styles.slice(), source: 'generated', seed: g.seed, why: (g.why || []).slice(), created: now.toISOString().slice(0, 10) };
+}
+
+// ---------- New in the Patterns tab ----------
+// a new part of a kind (Patterns tab, New): kind, n (the number), riffAs ('guitar' or 'bass', riffs only), recipe (the
+// style chosen, or null), harmony { key, chords, mode }, meter, energy → { type, pattern, seed, why, sound } or null.
+// The seed is "pattern:<kind>:<n>" ("pattern:riffs:guitar:<n>" for a guitar riff), so the same number gives the same part.
+export function composeNewPart({ kind, n = 1, riffAs = 'guitar', recipe = null, harmony = {}, meter = '4/4', energy = 0.5 }) {
+  const guitar = kind === 'riffs' && riffAs !== 'bass';
+  const type = kind === 'riffs' ? (guitar ? 'guitar' : 'bass') : KIND_TYPE[kind];
+  const part = recipe && recipe[type] ? recipe[type].material || {} : {};
+  const style = kind === 'riffs' && !guitar ? { ...part, rules: [...new Set([...(part.rules || []), ...RIFF_STYLE.rules])] } : part;
+  const seed = guitar ? `pattern:riffs:guitar:${n}` : `pattern:${kind}:${n}`;
+  const out = compose(guitar ? 'chords' : MATERIAL_KIND[kind], { seed, style, harmony: { key: harmony.key || 'A', mode: type === 'hook' ? harmony.mode || 'minor' : 'minor', chords: harmony.chords || 'notturna' }, meter, energy, type, ...(guitar ? { riff: true } : {}) });
+  if (!out || !out.idea) return null;
+  return { type, pattern: { ...(type === 'arp' ? { speed: '16' } : {}), idea: out.idea }, seed, why: out.why || [], sound: type === 'guitar' ? 'distorted' : KIND_DEFAULTS[kind].sound };
 }
 
 // ---------- the loop (design D2) ----------

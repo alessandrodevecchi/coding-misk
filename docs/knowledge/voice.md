@@ -1,7 +1,7 @@
 ---
 id: voice
 related: [narrator, songs, growth-shapes, styles, live-build]
-code: [src/song/spoken.js, src/song/vocabulary.js, tools/voice.mjs]
+code: [src/song/spoken.js, src/song/vocabulary.js, src/endless/director.js, src/endless/voice-options.js, src/endless/voice-panel.js, tools/voice.mjs]
 checks: [npm run check:spoken]
 ---
 
@@ -20,6 +20,7 @@ Lines are samples made on macOS by `npm run voices`. Without them the track stay
 - **Growth shapes.** The `voice` opening starts a Live coder build with the first opening line ([growth-shapes.md](growth-shapes.md)).
 - **Styles.** A recipe's `spoken` field gives the chance, the ways, lines, speakers and a vocabulary group ([styles.md](styles.md)).
 - **Live build.** A spoken track is never thinned. It enters on the bar of its first line ([live-build.md](live-build.md)).
+- **Generated songs (voice-controls).** The director gives a song at most one spoken track (`words`). The voice instrument options (`voice` in the director options, `src/endless/voice-options.js`) set how often, the ways and how many phrases; the radio and the new song from an artist show them ([radio.md](radio.md)).
 
 **Texts.** The song's own text, else the style's lines for that way, else a line from the vocabulary (`src/song/vocabulary.js`), drawn with the song's seed. At most 12 words.
 
@@ -43,6 +44,21 @@ Lines are samples made on macOS by `npm run voices`. Without them the track stay
 
 A quiet section has at most half the tracks of the fullest one, or a name like intro, break or outro. Spoken lines play on orbits 13 and 14.
 
+### Options for generated songs
+
+`voice: { phrases, kind, ways, presence }` in the director options. `voiceOption` gives `null` for the default, and the session recipe carries the options only when they are not the default, so a replay sounds the same.
+
+| Option | Values | What it does |
+| --- | --- | --- |
+| `phrases` | `1`, `2-3`, `4-5`, `6-8`, `many` (9 to 12) | How many phrases at most, drawn in the range |
+| `kind` | `different`, `repeated`, `mixed` | A new line each time; line A every time (a refrain); A, a new line, A, another one… |
+| `ways` | `null` (the style's ways and weights) or a list of `opening`, `refrain`, `chop`, `passage` | The ways a phrase may use, each as likely |
+| `presence` | `never`, `style` (the style's weight), `often` (twice the weight, at most 0.9), `always` | How often a song gets one. `always` is a single song with the voice instrument on: a style without one gets every way, a vocabulary line and a speaker of the styles that have one (their vocabulary samples exist) |
+
+Presets (`VOICE_PRESETS`): As the style (`1`, `different`, the style's ways, `style`: the default, the director's draws before voice-controls), Discreet (`1`, `different`, all four ways, `style`), Present (`2-3`, `mixed`, `often`), Obsessive (`6-8`, `repeated`, refrain and chop, `often`). A single song keeps its own on/off (`style`, `always`, `never`); the radio offers `never`, `style` and `often`. Changing a control makes it Custom (`presetOf`).
+
+Several phrases: one pattern per line (A, B, C…) and one clip per phrase, each in a quiet part: a phrase of the plan (8 bars or so) with the role intro, break or outro, or with few tracks playing (at most half the song's usual most, at least 2). Never two phrases in one part; the parts are spread over the song; a refrain only goes to an intro, a break or an outro. A phrase that finds no part is dropped: the count is a ceiling. New lines are the style's lines for their way not used yet, else vocabulary entries written out, so two lines are never the same. The draws for the extra phrases come from their own stream (`spoken-more/<index>`): the default draws exactly as before.
+
 ## Example
 
 A spoken track with a chopped word:
@@ -58,3 +74,4 @@ It plays the word in eight slices on that rhythm, every bar from bar 17 to 24. T
 - [docs/SONG-FORMAT.md](../SONG-FORMAT.md#voice-instrument): every field, the code, samples, speakers.
 - [docs/ENDLESS.md](../ENDLESS.md#voice-instrument): the voice instrument in generated songs.
 - [docs/VOCALS.md](../VOCALS.md): research on sung vocals, for later.
+- The Guide cards `voice-instrument` and `voices` (the three voices side by side) in `src/guide.js`.

@@ -2,6 +2,7 @@
 //   npm run check:material     run every check; exit 1 when any fails
 // Rules, determinism, ranges, key: every generated part is an idea that passes the song validator and compiles.
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { compose, KINDS, FAMILIES, SOUND_KINDS, fmInRange, sharedRoots, modeProgression, SESSION_SOURCES } from '../src/material/index.js';
 import { tonesOf, rootOf, modeSteps, chordsOf } from '../src/material/common.js';
 import { spanOf } from '../src/material/melody.js';
@@ -209,6 +210,22 @@ const CHECKS = {
       assert(c.songs.some(sg => sg.tracks.some(t => Object.values(t.patterns).some(p => p.idea))), `${id}: composed gave no generated part`);
     }
     assert(SESSION_SOURCES.join() === 'patterns,varied,composed,mix', 'session sources');
+  },
+  'guitar riffs on request (pattern-followups D3): riff true a riff every time, false power chords, left out unchanged'() {
+    const H2 = { key: 'A', mode: 'minor', chords: 'epica' }, isRiff = o => o.why.includes('power chord riff');
+    for (let i = 0; i < 40; i++) for (const e of [0, 0.3, 0.6, 0.9]) for (const meter of ['4/4', '7/8']) {
+      const o = { seed: `riff-${i}`, type: 'guitar', energy: e, harmony: H2, meter };
+      const yes = compose('chords', { ...o, riff: true }), no = compose('chords', { ...o, riff: false });
+      assert(isRiff(yes) && yes.idea.per === 'slot' && /x/.test(yes.idea.rhythm) && /[1-9]/.test(yes.idea.add), `riff-${i} at ${e} ${meter}: ${yes.why}`);
+      assert(!isRiff(no) && !no.idea.add, `riff-${i} at ${e}: power chords only, got ${no.why}`);
+      const v = validateSong(materialSong([{ type: 'guitar', idea: yes.idea }], { meter }));
+      assert(!v.errors.length, `riff-${i}: ${JSON.stringify(v.errors[0])}`);
+    }
+    // left out: the same parts as before the option existed (digest of 240 parts, written when riff came in)
+    const outs = [];
+    for (let i = 0; i < 60; i++) for (const e of [0, 0.3, 0.6, 0.9]) outs.push(compose('chords', { seed: 'g' + i, type: 'guitar', energy: e, harmony: H2 }));
+    const digest = crypto.createHash('sha1').update(JSON.stringify(outs)).digest('hex').slice(0, 16);
+    assert(digest === '0e5085fdaf8046d5' && outs.filter(o => o.why.includes('power chord riff')).length === 62, `guitar parts without riff moved: ${digest}`);
   },
   "user patterns: drawn only where they fit"() {
     const riff = { id: 'p-1', name: 'Riff', type: 'guitar', kind: 'chords', styles: ['melodic-metal'], pattern: { idea: { rhythm: 'x*8' } }, context: { key: 'E', mode: 'phrygian' } };

@@ -28,6 +28,8 @@ import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endles
 import { SENSIBLE } from '../endless/artist-maker.js';
 import { DICE, GEAR, LOCK, VARY, SWAP, CHEVRON, SLIDERS } from '../icons.js';
 import { SESSION_SOURCES } from '../material/index.js';
+import { cleanVoice, voiceOption } from '../endless/voice-options.js';
+import { voicePanel, voiceEvent } from '../endless/voice-panel.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -81,6 +83,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     compPreset: saved.compPreset || 'journey',
     // knobs held by hand while the compilation plays (#59): knob → value
     compLocks: saved.compLocks && typeof saved.compLocks === 'object' ? saved.compLocks : {},
+    // the voice instrument (voice-controls): phrases per song, kinds, ways and how often, for the songs to come; in the
+    // recipe only when it is not As the style, so a replay sounds the same
+    voice: cleanVoice(saved.voice && saved.voice.presence === 'always' ? { ...saved.voice, presence: 'often' } : saved.voice),
   };
   opts.material = opts.materialDefault;
   let compOpen = false;
@@ -96,7 +101,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const saveOpts = () => store.set('coding-misk-radio', opts);
   const artistOf = id => (id ? artists().find(a => a.id === id) || (opts.temp && opts.temp.id === id ? opts.temp : null) : null);
   // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
-  const current = () => { const a = artistOf(opts.artist), up = userPatterns(), how = { transition: opts.transition, harmony: opts.harmony, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}) };
+  const current = () => { const a = artistOf(opts.artist), up = userPatterns(), how = { transition: opts.transition, harmony: opts.harmony, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}) };
     // a compilation carries its setup and the artists it may use, so a replay draws the same songs
     if (opts.compilation !== 'off') return { compilation: { every: opts.compilation, setup: JSON.parse(JSON.stringify(opts.compSetup)), pool: JSON.parse(JSON.stringify(artists())), ...(Object.keys(opts.compLocks).length ? { locks: { ...opts.compLocks } } : {}) }, ...how };
     return a ? { artist: JSON.parse(JSON.stringify(a)), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how }; };
@@ -796,7 +801,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function customSummary(C) {
     const grow = C.build === 'crescendo', natural = grow && C.growth === 'natural';
     return [grow ? t(`growth:${C.growth}`) : t('liveBlocks'), natural ? t(`dur:${C.duration}`) : '', grow ? t({ now: 'liveCodeNow', compact: 'liveCodeCompact', track: 'liveCodeTrack', sections: 'liveCodeSections' }[C.view]) : '',
-      t(`comments:${C.comments}`), `${t('fnsLbl')}: ${t(`fns:${C.functions}`)}`, C.typist === 'human' ? t('liveHuman') : ''].filter(Boolean).join(' · ');
+      t(`comments:${C.comments}`), `${t('fnsLbl')}: ${t(`fns:${C.functions}`)}`, C.typist === 'human' ? t('liveHuman') : '', C.narratorStyle && C.narratorStyle !== 'auto' ? `${t('narratorStyleLbl')}: ${t(`narratorStyle:${C.narratorStyle}`)}` : ''].filter(Boolean).join(' · ');
   }
   // the same controls as Compose's live build panel, for every generated song from the next one
   function customPanel() {
@@ -818,7 +823,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         </div>
         <div class="custom-row">${sel('comments', [...Object.keys(COMMENT_PRESETS), ...(C.comments === 'custom' ? ['custom'] : [])], 'commentsLbl', 'commentsHint', v => t(`comments:${v}`))}<div class="chips">${COMMENT_KEYS.map(k => chip(k, C[k] !== false, `cOpt:${k}`, `cOptHint:${k}`)).join('')}</div></div>
         <div class="custom-row">${sel('functions', [...Object.keys(FUNCTION_PRESETS), ...(C.functions === 'custom' ? ['custom'] : [])], 'fnsLbl', 'fnsHint', v => t(`fns:${v}`))}<div class="chips">${FUNCTION_OPTIONS.map(k => chip(k, C[k], `fOpt:${k}`, `fOptHint:${k}`)).join('')}</div></div>
-        <div class="custom-row"><span class="lbl">${esc(t('liveOptions'))}</span><div class="chips">${chip('title', C.title, 'liveTitle', 'liveTitleHint')}${chip('highlights', C.highlights, 'liveHl', 'liveHlHint')}${chip('wrap', C.wrap, 'liveWrap', 'liveWrapHint')}${chip('typist', C.typist === 'human', 'liveHuman', 'liveHumanHint')}${chip('mistakes', C.mistakes !== 'off', 'liveMistakes', 'liveMistakesHint', C.typist !== 'human')}${chip('narrator', C.narrator !== false, 'liveNarrator', 'liveNarratorHint')}${grow ? chip('narrated', C.narrated, 'liveNarrated', C.narrator === false ? 'liveNarratedOff' : 'liveNarratedHint', C.narrator === false) : ''}</div></div>
+        <div class="custom-row"><span class="lbl">${esc(t('liveOptions'))}</span><div class="chips">${chip('title', C.title, 'liveTitle', 'liveTitleHint')}${chip('highlights', C.highlights, 'liveHl', 'liveHlHint')}${chip('wrap', C.wrap, 'liveWrap', 'liveWrapHint')}${chip('typist', C.typist === 'human', 'liveHuman', 'liveHumanHint')}${chip('mistakes', C.mistakes !== 'off', 'liveMistakes', 'liveMistakesHint', C.typist !== 'human')}</div></div>
+        <div class="custom-row custom-voices" id="custom-voices"><span class="lbl" title="${esc(t('voicesHint'))}">${esc(t('voicesLbl'))}</span><div class="chips">${chip('narrator', C.narrator !== false, 'liveNarrator', 'liveNarratorHint')}</div>${sel('narratorStyle', CONTROLS.narratorStyle, 'narratorStyleLbl', 'narratorStyleHint', v => t(`narratorStyle:${v}`)).replace('<select ', C.narrator === false ? '<select disabled ' : '<select ')}${grow ? `<div class="chips">${chip('narrated', C.narrated, 'liveNarrated', C.narrator === false ? 'liveNarratedOff' : 'liveNarratedHint', C.narrator === false)}</div>` : ''}</div>
         <p class="hint muted small">${esc(t('radioCustomNext'))}</p>
       </div>
     </div>`;
@@ -877,6 +883,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <label class="ctrl" ${tip('radioProfileTip')}><span class="lbl">${esc(t('radioProfile'))}</span><select id="radio-profile" data-no-knob>${RADIO_CHOICES.map(k => `<option value="${k}"${opts.profile === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtistStyle' : k === 'custom' ? 'radioCustomProfile' : `profile:${k}`))}</option>`).join('')}</select></label>
           <label class="ctrl" ${tip('radioIncomingTip')}><span class="lbl">${esc(t('radioIncoming'))}</span><select id="radio-incoming" data-no-knob>${['profile', 'hidden', 'visible'].map(k => `<option value="${k}"${opts.incoming === k ? ' selected' : ''}>${esc(t(`incoming:${k}`))}</option>`).join('')}</select></label>
         </div>
+        <div class="radio-voice" id="radio-voice"><span class="lbl" title="${esc(t('vinstHint'))}">${esc(t('vinstLbl'))}</span>${voicePanel(opts.voice, { t, esc, mode: 'radio' })}</div>
         ${opts.profile === 'custom' ? customPanel() : ''}
         <p class="hint muted">${esc(t('radioNextHint'))}</p>
         <div class="radio-seed">
@@ -989,6 +996,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.curveReset) return command({ kind: 'curve-reset', curve: b.dataset.curveReset });
     if (b.id === 'custom-toggle') { customOpen = !customOpen; try { store.set('coding-misk-radio-custom-open', customOpen); } catch (err) {} return render(); }
     if (b.dataset.customBase) { opts.custom = { base: b.dataset.customBase, controls: {} }; saveOpts(); showDisplay(customControls(opts.custom)); return render(); }
+    // the voice instrument (voice-controls): a preset or a way, from the next song
+    if (b.dataset.vinstPreset || b.dataset.vinstWay) { const v = voiceEvent(opts.voice, b, { mode: 'radio' }); if (v) { opts.voice = v; saveOpts(); render(); } return; }
     if (b.dataset.customChip) {
       const k = b.dataset.customChip, C = customControls(opts.custom);
       if (k === 'typist') return setCustom({ typist: C.typist === 'human' ? 'exact' : 'human' });
@@ -1065,6 +1074,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // the Profile control applies from the next song prepared; the incoming option changes the panel at once
     if (e.target.id === 'radio-profile' && RADIO_CHOICES.includes(e.target.value)) { opts.profile = e.target.value; saveOpts(); render(); }
     if (e.target.id === 'radio-incoming') { opts.incoming = e.target.value; saveOpts(); if (S && S.paused === undefined) player.swap(windowPlayable()); }
+    if (e.target.dataset.vinst) { const v = voiceEvent(opts.voice, e.target, { mode: 'radio' }); if (v) { opts.voice = v; saveOpts(); render(); } }
     if (e.target.dataset.custom) {
       const k = e.target.dataset.custom, v = e.target.value;
       if (k === 'comments' && COMMENT_PRESETS[v]) setCustom({ ...COMMENT_PRESETS[v] });

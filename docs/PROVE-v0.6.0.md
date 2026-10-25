@@ -152,6 +152,17 @@ Lista per il proprietario (in italiano, come il DEVLOG): cosa provare su `develo
 - [ ] Radio → Esporta → Clip 15, 30, 60 secondi: il file dura esattamente quello, parte pieno e finisce con un colpo che sfuma.
 - [ ] Durata 4 minuti con "esatta": il file dura 4:00 e l'ultimo brano sfuma; senza "esatta" finisce alla fine di un brano.
 
+## Voci (`#77`)
+
+- [ ] Componi → luci-rosse → In divenire acceso, profilo Crescendo: sotto le opzioni c'è il gruppo "Voci" con Voce narrante, Stile del narratore e Crescita raccontata.
+- [ ] Stile del narratore su "poetico" e Play: prima che entri una traccia il narratore dice una breve immagine ("passi nel buio"…) invece di spiegare il passo; su "automatico" torna a spiegare.
+- [ ] Voce narrante spenta: Stile del narratore e Crescita raccontata grigi, con il suggerimento.
+- [ ] Componi → menu "Voce strumento" accanto a "Nuovo brano dall'artista…": Nel nuovo brano "acceso", preset Ossessivo, poi scegli un artista. Il brano ha una traccia Words con una sola frase ripetuta in più parti tranquille.
+- [ ] Stesso menu, "da 4 a 5" e "diverse": il nuovo brano dice frasi diverse in intro, pause e finale, mai due nella stessa parte.
+- [ ] Radio, stili Dark cyberpunk + Ambient: blocco "Voce strumento", preset Presente (più spesso, 2-3 frasi). Dal brano dopo si sentono più frasi; cambiando un controllo il preset diventa Personalizzato.
+- [ ] Radio Personalizzato: c'è lo stesso gruppo "Voci".
+- [ ] Guida → card "Tre voci".
+
 ## Dopo le prove
 
 - [ ] Nomi degli artisti decisi.
