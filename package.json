@@ -1,7 +1,7 @@
 {
   "name": "coding-misk",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.0-beta.2",
   "type": "module",
   "description": "Synth lab locale per comporre musica con Strudel",
   "license": "AGPL-3.0-or-later",

@@ -954,3 +954,10 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - In divenire spento: il pannello resta aperto con titolo "Codice" e solo le opzioni del codice (commenti, funzioni tecniche, titolo, note accese, a capo); profilo, andamento, scrittura umana, errori e voce narrante solo con In divenire acceso. Un'opzione diversa da quelle del Classico fa passare il brano scritto dal codice in divenire senza passi (`writtenOptions` in `src/live/profiles.js`); con le opzioni del Classico il codice è quello di sempre (`check:code` 46/46).
 - ↺ Brano originale attivo solo se è cambiato il brano (versione salvata o modifiche non salvate), non per una sola prova di configurazione; ↺ Configurazione originale solo con una prova.
 - Check: `check:profiles` 14/14 (nuovo caso `writtenOptions`), `check:mixer --only written` ok (9 brani), `check-song-config` con i nuovi casi (pannello a In divenire spento, compatte senza In divenire, frase sul palco con voce accesa e spenta). Screenshot in `notes/prove-2026-10-19/fu/`.
+
+## 2026-10-25: pre-release v0.6.0-beta.2
+
+- Primo `CHANGELOG.md` (Keep a Changelog 1.1.0) con le novità da v0.5.0; `package.json` a `0.6.0-beta.2`.
+- Tag `v0.6.0-beta.2` e pre-release su GitHub con note brevi; `main` resta a v0.5.0, #68 e #69 aperte fino alla 0.6.0 stabile. Controlli completi rimandati alla prossima beta per scelta del proprietario (motore quasi invariato dalle ultime esecuzioni complete).
+- README e note di rilascio per temi rimandati alla versione stabile.
+- Lavori registrati dopo le prove: #75 (crescita lenta, tre spec), #76 (correzioni), #77 (controlli delle voci), seguiti in #72 e #71.
