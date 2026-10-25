@@ -96,24 +96,24 @@ Adding a library function or a name word is a new entry in `src/song/functions.j
 ## Example
 
 <!-- generated:example-song-function -->
-The Material example (`songs/examples/05-material.json`) in the Live coder profile folds a repeated chain into the song function `oddity`. The hidden code defines it:
+The Material example (`songs/examples/05-material.json`) in the Live coder profile folds a repeated chain into the song function `fractal`. The hidden code defines it:
 
 ```js
-register('oddity', (a, b, c, p) => p.fmh(a).fmdecay(b).fmsustain(c), false)
+register('fractal', (p) => p.wob(280, 1120).lpq(8).plk(.12, 0), false)
 ```
 
 A line that calls it:
 
 ```js
-$: note("<[a3,c4,e4,a4] [f3,a3,c4,f4] [g3,c4,e4,g4] [g3,b3,d4,g4]>").transpose(-5).arp(irand(4).seg(16).rib(7, 2))
-  .s("triangle").quirk().fm(3).oddity(3.5, 0.4, 0)
+$: note("<a1 a#1 a1 g1>").transpose(-5).struct("x*16").transpose("0 7 7 12 -5 -5 7 12")
+  .s("sawtooth").fractal()
 ```
 
 The same line with every function written out, as the check expands it:
 
 ```js
-$: note("<[a3,c4,e4,a4] [f3,a3,c4,f4] [g3,c4,e4,g4] [g3,b3,d4,g4]>").transpose(-5).arp(irand(4).seg(16).rib(7, 2))
-  .s("triangle").lpf(sine.range(960, 3840).slow(8)).lpq(4).decay(.15).sustain(.15).delay(.35).fm(3).fmh(3.5).fmdecay(0.4).fmsustain(0)
+$: note("<a1 a#1 a1 g1>").transpose(-5).struct("x*16").transpose("0 7 7 12 -5 -5 7 12")
+  .s("sawtooth").lpf(sine.range(280, 1120).slow(8)).lpq(8).decay(.12).sustain(0)
 ```
 <!-- /generated -->
 
