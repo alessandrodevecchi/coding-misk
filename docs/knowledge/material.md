@@ -20,7 +20,6 @@ The seed picks among rules, never note by note in a free range. The same seed an
 - **Radio.** The director asks where each track's material comes from ([radio.md](radio.md)). Vary, Add and More complex compose on air ([radio-commands.md](radio-commands.md)).
 - **Compose.** [Compose a part] in a track panel writes a new pattern with a number and an energy. With a preset, [Keep the rhythm] and [Keep the notes] vary it. On a guitar track, [Guitar] picks Riff (`riff: true`) or Chords (`riff: false`), remembered while the page is open.
 - **Pads in the radio.** Every built-in style with a pad composes it in about a third of its songs (`share` 0.3, rule `style`): the song's own chords voiced near `c4`, held or as stabs. The rest keep the style's pad presets.
-- **Compose.** [Compose a part] in a track panel writes a new pattern with a number and an energy. With a preset, [Keep the rhythm] and [Keep the notes] vary it.
 - **Patterns.** [New] in the Patterns tab composes one ([patterns.md](patterns.md)).
 - **Growth shapes.** The `metamorphosis` development rewrites a song with parts of a sibling style ([growth-shapes.md](growth-shapes.md)).
 
