@@ -55,11 +55,17 @@ Verified by: a pure check that the ramp gives the same value as the list at ever
 ### D9. kellerlicht at v0.5.0
 Generate kellerlicht's Live coder code with the v0.5.0 code in a separate temporary worktree (read only, removed afterwards) and say whether the long sweep line was already typed there, and how long.
 
+**Finding.** v0.5.0 had no growth (no `crescendo.js`, no Live coder): kellerlicht played as written, and its live build typed the acid lines with their sweeps as lists as long as their clips, 24 and 32 values, as Classic still does. The lists of 117 to 398 values come with the growth; before shape-search (`SHAPES_VERSION` 3) kellerlicht's growth already typed a list of 188 values.
+
 ### D10. Growth in the background check
 `check-growth-background.cjs` fails on "kellerlicht: Play during the growth shows the mark on Play". Investigate with a real recompute (the `coding-misk-growths` store cleared, other songs, other shape settings). Expected behaviour, as the owner sees it: switching Classic to Live coder keeps playing the old version until the growth is ready, then switches. If the app does that, the check is wrong and is fixed to test that behaviour; else the app is fixed. The finding is written here.
 
+**Finding.** The check was wrong. It read the mark on Play once, 150 ms after the click; since shape-search a growth often ends within that time, taking the mark with it, while Play did wait (the grown song played from its first bar). The failure reproduces on the starting code, and the corrected check passes there. The check now watches the mark in every frame, forces a real growth (Try all growth shapes keeping the best one, a key never grown) and adds the owner's case: playing, Classic to Live coder keeps the old version without the mark on Play until the growth is ready, then plays the grown song.
+
 ### D11. Radio check 5.5
 Check 5.5 ("the chooser on air reaches a curve point sooner than the default chooser") depends on one case. Rewritten over several songs and several curve points: for each pair, the bars each chooser needs to reach the point; the check passes when the on-air chooser needs fewer bars in total and is not later on most pairs. Same intent, a fair measure.
+
+**Finding.** Over 75 pairs in 20 songs (two energies, every reachable curve point, the arrival read from the side the waypoint comes from) the chooser on air needs 605 bars against 540 for the default chooser, sooner on 7 pairs and later on 27: the check fails. Without its focus or without its bias the chooser on air gives about the same (sooner 10 and later 14, sooner 6 and later 22), so the biases do not explain the difference; reading the bias from the energy on one scale did not help and was reverted. Whether the chooser on air (radio-profiles D10) or the intent of the check changes is left to the owner.
 
 ## Risks / Trade-offs
 
