@@ -11,3 +11,9 @@
 ## 3. Docs
 
 - [x] 3.1 Knowledge notes (comments and functions, decisions), Guide if the Live coder card names it, DEVLOG entry in Italian; backlog line for returning blocks as variables or functions
+
+## 4. Mute or delete, per line
+
+- [ ] 4.1 Estimate both ways for each returning line with the typing model and take the cheaper, seeded when close (D5)
+- [ ] 4.2 `check:mixer -- --full`, `check-compact-code`, `check:crescendo -- --full`, `check:typing`, `check:profiles`, `check:code`
+- [ ] 4.3 `growth:probe` section changes before and after on luci-rosse, settimo-cielo, kellerlicht; DEVLOG and knowledge notes

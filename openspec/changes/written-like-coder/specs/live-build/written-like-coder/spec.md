@@ -12,11 +12,22 @@ In code edited in place, a track with no sound in a section SHALL stay in the co
 - **THEN** its lines leave the code at the next section change
 
 ### Requirement: Returning lines are edited, not retyped
-When a muted track plays again, its lines SHALL be unmuted and edited where their values changed, and SHALL NOT be deleted and typed again.
+When a line kept muted plays again, it SHALL be unmuted and edited where its values changed, and SHALL NOT be deleted and typed again.
 
 #### Scenario: Scontro 2
 - **WHEN** luci-rosse goes from Ombra to Scontro 2
 - **THEN** the drum lines are unmuted and only `crunch` and the mask values are edited
+
+### Requirement: Mute or delete, whichever types faster
+For each line that goes silent and plays again later, the code SHALL either keep it muted and edit it on its return, or delete it and type it again on its return, whichever the typing model estimates as cheaper. When the two costs are close, the choice SHALL be drawn with a seed from the song, the track, the line and the bar it returns at, so it is not always the same way and the same song always gives the same code.
+
+#### Scenario: Acid line in Druck
+- **WHEN** kellerlicht reaches Druck as Live coder and its acid line returns with 32 values instead of 24
+- **THEN** the line is deleted when it goes silent and typed again in Druck, and the typing before Druck goes down from 120.9 s
+
+#### Scenario: Close costs
+- **WHEN** muting and deleting cost about the same for a line
+- **THEN** the choice depends on the seed, and is the same every time the song is grown
 
 ### Requirement: Same sound
 Muted lines SHALL play nothing, and the song SHALL sound and last the same as before this change, with every profile and technical functions preset.
