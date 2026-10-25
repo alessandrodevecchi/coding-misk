@@ -961,3 +961,12 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Tag `v0.6.0-beta.2` e pre-release su GitHub con note brevi; `main` resta a v0.5.0, #68 e #69 aperte fino alla 0.6.0 stabile. Controlli completi rimandati alla prossima beta per scelta del proprietario (motore quasi invariato dalle ultime esecuzioni complete).
 - README e note di rilascio per temi rimandati alla versione stabile.
 - Lavori registrati dopo le prove: #75 (crescita lenta, tre spec), #76 (correzioni), #77 (controlli delle voci), seguiti in #72 e #71.
+
+## 2026-10-25: correzioni dalle prove (#76, test-fixes)
+
+- + Playlist in radio confermava con "Add to song": due testi avevano lo stesso nome (`plAdd`), quello dei Pattern copriva quello delle playlist. Ora il pulsante dei Pattern usa `pnAddToSong`.
+- Scheda Pattern: verificate nel browser tutte le opzioni del loop (suono, tonalità, accordi, tempo, beat): funzionavano. Il tempo però valeva solo al rilascio del cursore, e Numero, Energia e Stile stavano nello stesso riquadro pur valendo solo per Nuovo. Ora il tempo segue il cursore (attesa di 250 ms) e la riga di Nuovo ha il titolo "Pattern nuovo" con la spiegazione.
+- Componi: la melodia composta dice la sua forma (coda cambiata, botta e risposta, poliritmo) nel messaggio e nel suggerimento del pattern, fino alla ricarica (fuori dal formato del brano).
+- Radio: "Armonia del brano" con suggerimento; export "Questo brano" (il brano in onda dall'inizio alla fine, come "Prossimi 1").
+- Limiter: soglia da 0,95 a 0,97 (-0,26 dBFS), scelta concordata col proprietario; documenti aggiornati. Le istantanee dei livelli misurano le tracce prima del limiter e non cambiano.
+- Check nuovo `tools/check-test-fixes.cjs` (6/6). In sospeso: il passaggio parlato di Statico che parte subito, serve il brano del proprietario.

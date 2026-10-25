@@ -125,6 +125,7 @@ npm run check:spoken                                   # voice instrument: forma
 node tools/check-spoken-play.cjs [shots-dir]           # voice instrument in the browser: example song heard below clipping, silent and error free without samples (dev server)
 npm run check:patterns                                 # Patterns tab data: every preset once, styles that use it, store, Save as pattern, loop song, Add to song, previews, radio pool, backup (no browser)
 node tools/check-patterns.cjs [shots-dir]              # Patterns tab in the browser: loop, key change, beat, New and Save, Compose listen and Save as pattern, rename, delete, Add to song, links (dev server)
+PORT=5173 node tools/check-test-fixes.cjs [shots-dir]  # fixes after the v0.6.0-beta.2 tests (#76): Patterns New row and tempo while sliding, composed melody shape, Song harmony hint, This song in the radio export (dev server on PORT)
 PORT=5173 node tools/check-compact-code.cjs            # same events for compact code, short patterns, line breaks and every technical functions preset in Live coder, Classic and Crescendo, Sections in Classic (Live build off and on) and Crescendo (dev server on PORT, default 5173)
 node tools/check-ideas.cjs [song,song…]                # same events as the code before idea-model, every song and Crescendo states (dev server, ~8 min)
 ```

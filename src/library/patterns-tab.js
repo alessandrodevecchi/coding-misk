@@ -85,7 +85,8 @@ export function createPatternsTab({ root, t, tx, esc, store, recipes, loop, code
   const numOf = k => st.nums[k] || 1;
   function genRow() {
     const k = genKind();
-    return `<div class="pn-gen"><button class="btn small" data-pn-new title="${esc(t('plNewTip'))}">${COMPOSE}<span>${esc(t('plNew', { kind: kindName(k) }))}</span></button>
+    // (number, energy and style only shape New: a heading and a hint say so, owner's tests #76)
+    return `<div class="pn-gen"><div class="pn-gen-head"><span class="lbl">${esc(t('pnNewHead'))}</span><span class="muted small">${esc(t('pnNewHint'))}</span></div><button class="btn small" data-pn-new title="${esc(t('plNewTip'))}">${COMPOSE}<span>${esc(t('plNew', { kind: kindName(k) }))}</span></button>
       <label class="tp-cnum"><span class="lbl">#</span><input type="number" data-pn-num min="1" max="9999" step="1" value="${numOf(k)}" aria-label="${esc(t('composeNum'))}"></label>
       <div class="ctrl tp-cen"><div class="row"><label class="lbl" for="pn-energy">${esc(t('composeEnergy'))}</label><output>${Math.round(st.energy * 100)}%</output></div><input type="range" id="pn-energy" data-pn-energy min="0" max="1" step="0.05" value="${st.energy}"></div>
       <div class="ctrl"><label class="lbl" for="pn-style">${esc(t('plStyle'))}</label><select id="pn-style" data-pn-style>${opt([['', t('plAnyStyle')], ...recipes().map(r => [r.id, tx(r.name || { en: r.id })])], st.style)}</select></div></div>`;
@@ -114,7 +115,7 @@ export function createPatternsTab({ root, t, tx, esc, store, recipes, loop, code
       ${it.why && it.why.length ? `<p class="note pn-why">${esc(t('plWhy', { seed: it.seed || '', why: it.why.join(' · ') }))}</p>` : ''}
       <div class="pn-styles"><span class="lbl">${esc(t('plStyles'))}</span> ${styles.length ? styles.map(id => `<button class="chip small" data-pn-open-style="${esc(id)}">${esc(styleName(id))}</button>`).join(' ') : `<span class="muted small">${esc(t(it.src === 'builtin' ? 'plNoStyles' : 'plAnyStyleUse'))}</span>`}</div>
       <div class="pn-actions">
-        <button class="btn" data-pn-add>${ADD_TO}<span>${esc(t('plAdd'))}</span></button>
+        <button class="btn" data-pn-add>${ADD_TO}<span>${esc(t('pnAddToSong'))}</span></button>
         ${it.src === 'new' ? `<button class="btn primary" data-pn-save>${KEEP}<span>${esc(t('plSave'))}</span></button>` : ''}
         ${it.src === 'mine' ? `<span class="pn-rename"><input type="text" data-pn-name maxlength="60" value="${esc(it.name)}" aria-label="${esc(t('plName'))}"><button class="btn" data-pn-rename>${PENCIL}<span>${esc(t('plRename'))}</span></button></span>
           <button class="btn danger" data-pn-del>${BIN}<span>${esc(t(del ? 'plDelSure' : 'plDel'))}</span></button>` : ''}
@@ -214,7 +215,12 @@ export function createPatternsTab({ root, t, tx, esc, store, recipes, loop, code
       const pos = el.selectionStart; render();
       const s = root.querySelector('.pn-search'); s.focus(); s.setSelectionRange(pos, pos); return;
     }
-    if (el.dataset.pnCfg === 'bpm') { const o = el.closest('.ctrl').querySelector('output'); if (o) o.textContent = `${el.value} BPM`; return; }
+    // the tempo follows the slider while it moves (a short wait so the loop is not rebuilt at every step)
+    if (el.dataset.pnCfg === 'bpm') {
+      const o = el.closest('.ctrl').querySelector('output'); if (o) o.textContent = `${el.value} BPM`;
+      clearTimeout(st.bpmTimer); st.bpmTimer = setTimeout(() => { if (!st.cfg || st.cfg.bpm === Math.round(+el.value)) return; st.cfg.bpm = Math.round(+el.value); replay(); }, 250);
+      return;
+    }
     if (el.dataset.pnEnergy !== undefined) { st.energy = +el.value; const o = el.closest('.ctrl').querySelector('output'); if (o) o.textContent = `${Math.round(st.energy * 100)}%`; return; }
     if (el.dataset.pnNum !== undefined) { const v = Math.round(+el.value); if (v >= 1) st.nums[genKind()] = v; }
   });
@@ -222,8 +228,10 @@ export function createPatternsTab({ root, t, tx, esc, store, recipes, loop, code
     const el = e.target, k = el.dataset.pnCfg;
     if (el.dataset.pnStyle !== undefined) { st.style = el.value; return; }
     if (!k || !st.cfg) return;
-    st.cfg[k] = k === 'beat' ? el.checked : k === 'bpm' ? Math.round(+el.value) : el.value;
-    refreshDetail(); replay();
+    const v = k === 'beat' ? el.checked : k === 'bpm' ? Math.round(+el.value) : el.value, same = st.cfg[k] === v;
+    if (k === 'bpm') clearTimeout(st.bpmTimer);
+    st.cfg[k] = v;
+    refreshDetail(); if (!same) replay();
   });
   root.addEventListener('toggle', e => { if (e.target.matches('.pn-codebox')) st.codeOpen = e.target.open; }, true);
   root.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.pnName !== undefined) { e.preventDefault(); root.querySelector('[data-pn-rename]').click(); } });

@@ -9,7 +9,8 @@
 // LIMIT.guard above it: it only acts if the limiter is not loaded yet, and it caps the output whatever happens.
 // A style's `headroom` (1.0 to 1.5) is the push: the level into the limiter is raised by it, for a louder, denser mix.
 
-export const LIMIT = { ceiling: 0.95, lookahead: 0.005, release: 0.12, guard: 0.99 };
+// (ceiling 0.97 since the owner's tests of v0.6.0-beta.2, #76: a little less squash, room left for lossy exports)
+export const LIMIT = { ceiling: 0.97, lookahead: 0.005, release: 0.12, guard: 0.99 };
 export const LIMITER_NAME = 'misk-limiter';
 
 // the worklet, in its own global scope. Per sample: the gain each sample needs (ceiling / peak of the channels), the

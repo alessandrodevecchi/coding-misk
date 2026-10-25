@@ -20,7 +20,7 @@ The app turns songs and radio sessions into files: audio, video, short vertical 
 ## How it connects
 
 - **Live build.** An export of a live build plays its steps; the code in a video types as in the app ([live-build.md](live-build.md)). The profile decides what the code shows ([profiles.md](profiles.md)).
-- **Radio.** A session exports up to now, the next songs or a length ([radio.md](radio.md)).
+- **Radio.** A session exports up to now, this song (the song on air, start to end), the next songs or a length ([radio.md](radio.md)).
 - **Library.** Playlists and saved sessions export from the Songs tab and the Playlists tab ([library.md](library.md)).
 - **Settings.** Format, speed, video layout, quality, card, visual and the fragment layout are set once in Settings ([settings.md](settings.md)).
 

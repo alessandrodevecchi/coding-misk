@@ -1270,3 +1270,5 @@ button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); 
 .pn-group { display: grid; gap: 6px; }
 .pn-ghead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .pn-ghead h4 { margin: 0; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+/* the New row of the Patterns tab: its own heading, apart from the loop controls (#76) */
+.pn-gen-head { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }

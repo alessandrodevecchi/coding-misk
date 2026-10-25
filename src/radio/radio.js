@@ -709,7 +709,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // the type buttons say what the next phrase can do: "+" when the type will be silent there, "−" when it will play
     const nextBar = Math.min(barsOf(item.song) - 1, applyBar('add', rel, item.plan)), onNext = stateAt(item.song, nextBar).song.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= nextBar && c.start + c.bars > nextBar));
     const types = ARRANGE_TYPES.map(type => { const playingType = onNext.some(x => (type === 'lead' ? ['arp', 'hook', 'guitar'].includes(x.type) : x.type === type)); return btn({ kind: playingType ? 'remove' : 'add', type }, t(`steer:${playingType ? 'remove' : 'add'}`, { type: t(`steerType:${type}`) })); }).join('');
-    const group = (name, html) => `<div class="steer-group"><span class="lbl">${esc(t(`steerGroup:${name}`))}</span><div class="steer-btns">${html}</div></div>`;
+    // (a group with a hint: the harmony, which changes every part with notes, owner's tests #76)
+    const group = (name, html) => `<div class="steer-group"><span class="lbl"${name === 'harmony' ? ` title="${esc(t(`steerGroupTip:${name}`))}"` : ''}>${esc(t(`steerGroup:${name}`))}</span><div class="steer-btns">${html}</div></div>`;
     box.innerHTML = `<div class="steer-head"><div class="lbl">${esc(t('steerTitle'))}</div>
         <span class="hand-from steer-scope" ${tip('steerScopeTip')}><button class="led" id="steer-scope" aria-pressed="${opts.scope === 'session'}" aria-labelledby="steer-scope-lbl"></button><span id="steer-scope-lbl">${esc(t(opts.scope === 'session' ? 'steerScopeSession' : 'steerScopeSong'))}</span></span></div>
       <div class="steer-console">
@@ -918,6 +919,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       b.closest('.out-combo').insertAdjacentHTML('afterend', `<div class="radio-export-menu card" role="dialog" aria-label="${esc(t('radioExportTitle'))}">
         <span class="lbl">${esc(t('radioExportTitle'))}</span>
         ${radioOpt('now', esc(on ? t('rxNow', { n: S.stream[S.onAir].n + 1 }) : t('rxNowOff')))}
+        ${radioOpt('this', esc(on ? t('rxThis', { title: S.stream[S.onAir].song.title }) : t('rxThisOff')))}
         ${radioOpt('songs', `${esc(t('rxNext'))} <input type="number" data-rx="n" min="1" max="200" value="${r.n}" aria-label="${esc(t('rxNextN'))}"> ${esc(t('rxSongs'))}`)}
         ${radioOpt('minutes', `${esc(t('rxLength'))} <input type="number" data-rx="minutes" min="1" max="600" value="${r.minutes}" aria-label="${esc(t('rxMinutes'))}"> ${esc(t('rxMin'))} <span class="rx-exact" title="${esc(t('rxExactTip'))}"><input type="checkbox" data-rx="exact"${r.exact !== false ? ' checked' : ''}> ${esc(t('rxExact'))}</span>`)}
         ${radioOpt('clip', `${esc(t('rxClip'))} <input type="number" data-rx="seconds" min="5" max="600" value="${r.seconds || 30}" aria-label="${esc(t('rxSeconds'))}"> ${esc(t('rxSec'))} ${[15, 30, 60].map(n => `<button class="chip small" type="button" data-rx-sec="${n}">${n}</button>`).join('')}`)}
@@ -932,7 +934,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       const range = { kind, n: +m.querySelector('[data-rx="n"]').value || 3, minutes: +m.querySelector('[data-rx="minutes"]').value || 60, exact: m.querySelector('[data-rx="exact"]').checked, seconds: +m.querySelector('[data-rx="seconds"]').value || 30 };
       store.set('coding-misk-radio-export', range);
       m.remove(); const eb = root.querySelector('#radio-export'); if (eb) eb.setAttribute('aria-expanded', 'false');
-      return player.exportRadio(range);
+      // "This song" (#76): the song on air from its start to its end, as the next one song
+      return player.exportRadio(kind === 'this' ? { ...range, kind: 'songs', n: 1 } : range);
     }
     if (b.id === 'radio-rec-start') return recordFromStart();
     if (b.id === 'radio-mute') return player.toggleMute();

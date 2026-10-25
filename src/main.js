@@ -2314,6 +2314,8 @@ function composeStyle() {
   return RECIPES.find(r => r.id === id) || null;
 }
 // a new pattern on the next letter, selected; keep: null (compose), 'rhythm' or 'notes' (vary the preset)
+const composedShapes = {};
+const melodyShapeOf = (why = []) => why.some(w => /^polymeter/.test(w)) ? 'polymeter' : why.includes("tail A A A A'") ? 'tail' : why.includes('call and response') ? 'call-response' : null;
 function composePattern(tr, keep = null) {
   const sec = secFull(), cur = tr.patterns[patOf(tr)] || {}, n = composeNumOf(tr), kind = KIND_OF_TYPE[tr.type];
   const R = composeStyle(), part = R && R[tr.type] ? R[tr.type] : {};
@@ -2331,8 +2333,12 @@ function composePattern(tr, keep = null) {
   const k = nextKey(tr);
   tr.patterns[k] = { ...(tr.type === 'arp' && cur.speed ? { speed: cur.speed } : {}), idea };
   composeNums[`${T.id}:${tr.id}`] = n + 1;
+  // the shape of a composed melody (changed tail, call and response, polymeter), shown in the toast and on the
+  // pattern's chip until the page reloads (#76: kept out of the song format)
+  const shape = melodyShapeOf(out.why);
+  if (shape) composedShapes[`${T.id}:${tr.id}:${k}`] = shape;
   editPat = k; changed(); renderTrackPanel();
-  toast(t('composedPart', { p: k, n }));
+  toast(t('composedPart', { p: k, n }) + (shape ? ` · ${t(`melodyShape:${shape}`)}` : ''));
 }
 // Patterns (pattern-library, D5 and D7): the listen button next to a track's preset menu opens its pattern in the
 // Patterns tab with the track's sound, the section's key and progression and the song's tempo (the song stops); Save as
@@ -2403,7 +2409,7 @@ function panelHtml(ti) {
     ${tr.type === 'voice' ? '' : arrMode === 'timeline' ? clipBlock(tr) : `<div class="tp-plays"><span class="lbl">${esc(t('playsIn', { name: SEC().name }))}</span>
       <div class="chips">${custom ? `<span class="note">${t('customCell')}</span>` : `<button class="chip" data-play-pat="" aria-pressed="${!c}">${t('silent')}</button>${Object.keys(tr.patterns).map(k => `<button class="chip" data-play-pat="${esc(k)}" aria-pressed="${!!(c && c.clip && c.clip.pattern === k)}">${esc(k)}</button>`).join('')}`}</div></div>`}
     ${tr.type === 'voice' ? '' : `<div class="tp-pats"><span class="lbl">${t('patterns')}</span>
-      <div class="chips">${Object.keys(tr.patterns).map(k => `<button class="chip" data-edit-pat="${esc(k)}" aria-pressed="${k === key}">${esc(k)}</button>`).join('')}
+      <div class="chips">${Object.keys(tr.patterns).map(k => { const sh = composedShapes[`${T.id}:${tr.id}:${k}`]; return `<button class="chip" data-edit-pat="${esc(k)}" aria-pressed="${k === key}"${sh ? ` title="${esc(t('melodyShapeTip', { shape: t(`melodyShape:${sh}`) }))}"` : ''}>${esc(k)}</button>`; }).join('')}
         <button class="chip" id="pt-new">${t('newPattern')}</button><button class="chip" id="pt-del">${t('deletePattern')}</button>${PATTERN_TYPES.includes(tr.type) ? `<button class="chip pt-savepat" id="pt-savepat" title="${esc(t('ptSaveTip'))}">${KEEP}<span>${esc(t('ptSaveAs'))}</span></button>` : ''}</div>
       <p class="note">${esc(t('editingPattern', { p: key }))}</p>${composeRow(tr, pat)}</div>`}
     <div class="tp-editor">${editor}</div>
