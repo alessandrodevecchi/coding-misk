@@ -53,33 +53,29 @@ Step actions (`BUILD_ACTIONS`): `add`, `remove`, `set`, `pattern`, `rack`, `unra
 ## Example
 
 <!-- generated:example-growth-step -->
-The Ideas example in the Live coder profile. Shape drawn: opening `slow`, pace `medium`, development `masks` (from opening seed, pace seed, development seed).
+The Ideas example in the Live coder profile. Shape drawn: opening `melodic`, pace `fast`, development `second-section` (from opening seed, pace seed, development seed).
 
-The pattern lines that the step at bar 96 rewrites, before:
+The pattern lines that the step at bar 6 rewrites, before:
 
 ```js
-$: bline.sub(14) // .add("0 0 4 0 5")
-  .n().scale("A4:minor").struct("x*4")
-  .s("sawtooth").wob(168, 672).lpq(8)
-  .plk(.12, 0).mask("<1 1 1 0>")
+$: chord("<Am7 F^7 C^7 G7>").anchor("c5").mode("below").voicing()
+  .s("triangle").lpq(4)
+  .plk(.15, .15).delay(.3)
 ```
 
 After:
 
 ```js
-$: bline.sub(14).add("0 0 4 0 5")
-  .n().scale("A4:minor").struct("x*4")
-  .s("sawtooth").wob(196, 784).lpq(8)
-  .plk(.12, 0).mask("<1 1 0 1>")
+$: n(irand(5).seg(16).rib(3, 2)).chord("<Am7 F^7 C^7 G7>").anchor("c5").mode("below").voicing()
+  .s("triangle").lpq(4)
+  .plk(.15, .15).delay(.3)
 ```
 
 The steps at that bar:
 
 ```json
 [
-  {"at":96,"set":{"track":"bass","cutoff":490}},
-  {"at":96,"variant":{"track":"bass","use":0}},
-  {"at":96,"mask":{"track":"bass","mask":"<1 1 0 1>"},"say":{"en":"add some colour","it":"un po' di colore"}}
+  {"at":6,"pattern":{"track":"arp","level":0}}
 ]
 ```
 <!-- /generated -->

@@ -22,7 +22,7 @@ Every value is saved in the browser and goes into the backup.
 
 ## Options
 
-The page has eight cards:
+The page has nine cards:
 
 - **Appearance:** theme (NEON or HW, the hardware look), language (IT or EN), the radio visual.
 - **Audio:** volume, export format and MP3 rate, code typing speed, export speed.
@@ -31,6 +31,7 @@ The page has eight cards:
 - **Live output:** a window with only the picture of the session, for a capture program, and a control room in another tab.
 - **Radio:** transition, harmony, profile (as the artist and style say, or one profile for every generated song, radio-profiles; Custom is set in the console only), the default material source, the scope of console changes.
 - **Library:** built-in songs deleted in this browser, with restore.
+- **Advanced:** Growth shapes tried (`coding-misk-shape-cap`, 4 to 32, default 8, the default not stored): how many shapes a Live coder growth in Compose measures before it goes on to twice as many when none has a growth without rushed steps ([growth-shapes.md](growth-shapes.md)). More shapes can find a growth with fewer rushed steps and take longer. It applies from the next growth (it is part of the Compose growth key); the radio, the song cards and the checks always use 8.
 - **Data:** export everything to a file, import and merge, reset everything (press twice).
 
 Each option has its help text in `src/i18n.js`, under keys that start with `set`, `vid`, `frag` or `lr`.
