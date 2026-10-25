@@ -121,6 +121,20 @@ const airCases = () => {
   });
   return airCache;
 };
+// the same songs as airCases and more (up to n), for check 5.5
+let wideCache = null;
+const airCasesWide = n => {
+  if (wideCache && wideCache.n === n) return wideCache.list;
+  const { live } = grown(), list = [];
+  live.forEach((x, i) => {
+    const g0 = x.song;
+    if (!g0.crescendo.coder || barsOf(g0) - g0.crescendo.growth < 5 * x.plan.phrase || list.length >= n) return;
+    const rec = recipeOf(i, 'switch'), g = createSession(RECIPES, rec.seed).next(rec.options);
+    list.push({ i, id: g0.id, seed: rec.seed, song: g.song, plan: g.plan, opts: g.opts, g0 });
+  });
+  wideCache = { n, list };
+  return list;
+};
 // one command of each kind, asked a little after the growth (half way through what is left)
 const commandsFor = x => {
   const G = x.g0.crescendo.growth, q = Math.floor(G + (barsOf(x.g0) - G) * 0.35) + 0.4, st = stateAt(x.g0, Math.floor(q)).song;
@@ -521,22 +535,30 @@ const CHECKS = {
     assert(varies >= 4 && multi >= 1, 'too few Vary cases');
   },
   'stage 5 (5.5): the chooser on air reaches a curve point sooner than the default chooser'() {
-    let air = 0, plain = 0, sooner = 0, later = 0, cases = 0;
-    for (const x of airCases()) {
-      const q = commandsFor(x)[0].q, B0 = airBoundaries('curve', q, x.plan, x.g0)[0], d = Math.floor((B0 - airOffset(x.g0)) / (2 * x.plan.phrase));
-      if (!(d < x.plan.plan.length - 1)) continue;
-      // the energy of the coming part set to the top: the moves that raise it first
-      const c = { kind: 'curve', d, value: 1, q, at: B0, pend: true, id: 1 };
-      const a = steer(x, [c]), b = steer(x, [c], { chooser: () => choose });
-      if (!a.commands.length || !b.commands.length || a.commands[0].at !== b.commands[0].at) continue;
-      const opts = { usual: a.plan.usualHigh, weights: a.plan.R.energy }, e = (song, k) => energyOf(stateAt(song, k).song, opts);
-      const reach = r => { const wp = r.song.onAir.waypoints[0], want = e(r.song, wp.to) - 0.02; for (let k = wp.at; k <= wp.to; k++) if (e(r.song, k) >= want) return k - wp.at; return wp.to - wp.at; };
-      const ra = reach(a), rb = reach(b);
-      if (ra === rb && ra === 0) continue;
-      cases++; air += ra; plain += rb; if (ra < rb) sooner++; if (ra > rb) later++;
+    // a fair measure (shape-search D11): up to 24 Live coder songs on air and every curve point after the growth that a
+    // command can still reach, each raised to two energies (0.8 and the top); for each pair, the bars each chooser needs
+    // to reach the energy asked. The chooser on air must need fewer bars in all and be later on fewer pairs than sooner.
+    let air = 0, plain = 0, sooner = 0, later = 0, cases = 0, songs = 0;
+    for (const x of airCasesWide(24)) {
+      const q = commandsFor(x)[0].q, B0 = airBoundaries('curve', q, x.plan, x.g0)[0], d0 = Math.floor((B0 - airOffset(x.g0)) / (2 * x.plan.phrase));
+      let used = false;
+      for (let d = d0; d < x.plan.plan.length - 1; d++) for (const value of [0.8, 1]) {
+        const c = { kind: 'curve', d, value, q, at: B0, pend: true, id: 1 };
+        const a = steer(x, [c]), b = steer(x, [c], { chooser: () => choose });
+        if (!a.commands.length || !b.commands.length || a.commands[0].at !== b.commands[0].at) continue;
+        const opts = { usual: a.plan.usualHigh, weights: a.plan.R.energy }, e = (song, k) => energyOf(stateAt(song, k).song, opts);
+        // (the energy of the arrival, reached from the side the waypoint comes from: a waypoint that lowers the energy
+        // reaches it when the energy comes down to it)
+        const reach = r => { const wp = r.song.onAir.waypoints[0]; if (!wp) return null; const z = e(r.song, wp.to), up = z >= e(r.song, wp.at); for (let k = wp.at; k <= wp.to; k++) if (up ? e(r.song, k) >= z - 0.02 : e(r.song, k) <= z + 0.02) return k - wp.at; return wp.to - wp.at; };
+        const ra = reach(a), rb = reach(b);
+        if (ra === null || rb === null || (ra === rb && ra === 0)) continue;
+        cases++; used = true; air += ra; plain += rb; if (ra < rb) sooner++; if (ra > rb) later++;
+      }
+      if (used) songs++;
     }
-    console.log(`      energy point: ${cases} cases, on air ${air} bars in all, default ${plain}; sooner ${sooner}, later ${later}`);
-    assert(cases >= 3 && sooner >= 1 && air <= plain, 'the chooser on air does not reach the curve point sooner');
+    console.log(`      energy points: ${cases} cases in ${songs} songs, on air ${air} bars in all, default ${plain}; sooner ${sooner}, later ${later}`);
+    assert(cases >= 10 && songs >= 4, `only ${cases} cases in ${songs} songs`);
+    assert(air <= plain && sooner >= later, 'the chooser on air does not reach the curve points sooner');
   },
   'stage 5: replays give the same songs; a recipe of growth version 1 and Classic recipes steer as before'() {
     const x = airCases()[0], c = commandsFor(x).find(k => k.kind === 'energy-up'), r = steer(x, [c]);
