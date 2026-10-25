@@ -7,7 +7,7 @@ import { compilationOptions } from './compilation.js';
 import { steerSong } from './steering.js';
 import { recipeProfile, customControls } from './profile.js';
 import { growOnAir, leadOnAir } from './growth.js';
-import { steerOnAir, AIR_CHOOSER } from './waypoints.js';
+import { steerOnAir, AIR_CHOOSER, AIR_CHOOSERS } from './waypoints.js';
 
 // the options of song n in a recipe: the first options, then every change up to n; options without the Profile option
 // (saved before radio-profiles) replay as Classic
@@ -25,7 +25,13 @@ export function recipeOptionsAt(recipe, n) {
 export const GROWTH_ON_AIR = 3;
 export const growsOnAir = recipe => !!(recipe && Number(recipe.growth) >= 1);
 export const waypointsOnAir = recipe => !!(recipe && Number(recipe.growth) >= 2);
-export const airChooserOf = recipe => (Number(recipe && recipe.growth) >= 3 ? AIR_CHOOSER : 'radio-1');
+// a recipe of a new session records its chooser when it is not the default (radio-chooser-versions D4): the recorded id
+// when it is still in the code, an id no longer there gives the default (the playlist warns, playlists.js)
+export const airChooserOf = recipe => {
+  const c = recipe && recipe.chooser;
+  if (typeof c === 'string' && Object.hasOwn(AIR_CHOOSERS, c)) return c;
+  return c === undefined && Number(recipe && recipe.growth) < 3 ? 'radio-1' : AIR_CHOOSER;
+};
 // the per-song choices a compilation keeps from the radio's controls (a clip keeps its length)
 export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.custom ? { custom: o.custom } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}), ...(o.voice ? { voice: o.voice } : {}) });
 // the director options of song n: the compilation's draw, else the recipe's

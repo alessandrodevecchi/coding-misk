@@ -11,7 +11,7 @@ import { setSpokenContext, spokenContext, placeSpoken, WAYS } from './song/spoke
 import { airCode } from './live/air-code.js';
 import { growOnAir, airControls } from './endless/growth.js';
 import { controlsProfile, customControls } from './endless/profile.js';
-import { steerOnAir } from './endless/waypoints.js';
+import { steerOnAir, AIR_CHOOSERS } from './endless/waypoints.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, writtenOptions } from './live/profiles.js';
 import { TRIALS_KEY, configOf, controlsOf, cleanTrials, setTrial, withConfig, compactConfig } from './live/song-config.js';
@@ -39,7 +39,7 @@ import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS, isSession, sessionOutdated } from './library/playlists.js';
 import { DIRECTOR_VERSION } from './endless/director.js';
 // the versions a saved radio session is compared with (#38, radio-profiles D11)
-const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION };
+const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION, choosers: Object.keys(AIR_CHOOSERS) };
 import { createPlaylistsTab } from './library/playlists-tab.js';
 import { pickJsonFiles } from './library/library.js';
 import { createSettings } from './settings/settings.js';

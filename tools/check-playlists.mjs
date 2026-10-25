@@ -36,6 +36,10 @@ const CHECKS = {
     assert(sessionOutdated(ses({ version: 5, shapes: 2, growth: 2 }), now), 'an older shapes version warns');
     assert(sessionOutdated(ses({ version: 5, shapes: 3, growth: 1 }), now), 'another growth version warns');
     assert(!sessionOutdated(ses({ version: 4, shapes: 2, growth: 1, frozen: [] }), now), 'a frozen session never warns');
+    // radio-chooser-versions D4: a recipe that names a chooser version no longer in the code warns
+    const nowC = { ...now, choosers: ['normal-1', 'radio-1'] }, withChooser = c => ({ ...ses({ version: 5, shapes: 3, growth: 2 }), recipe: { seed: 'x', chooser: c } });
+    assert(!sessionOutdated(withChooser('radio-1'), nowC) && !sessionOutdated(ses({ version: 5, shapes: 3, growth: 2 }), nowC), 'a known chooser or none does not warn');
+    assert(sessionOutdated(withChooser('radio-9'), nowC), 'an unknown chooser warns');
     // Freeze stores a grown song with its mark, as heard
     const mem = memory(), p = createPlaylistStore(mem), l = p.create('G'), sid = p.addSession(l.id, ses({ version: 5, shapes: 3, growth: 2 }));
     const grown = { song: { id: 'g', onAir: { profile: 'switch', from: 0, free: false }, crescendo: { growth: 16 }, build: [{ at: 0 }] }, transition: null, grown: { profile: 'switch', free: false } };

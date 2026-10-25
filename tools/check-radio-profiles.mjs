@@ -25,9 +25,9 @@ import { compileSong } from '../src/song/compile.js';
 import { liveCode } from '../src/live/live-code.js';
 import { typingLoad, rushedOf } from '../src/live/typing-load.js';
 import { resolveShape, shapeFacts, canPlay, OPENINGS } from '../src/song/shapes.js';
-import { steerOnAir, airBoundaries, airOffset, ideaSteps, directorView, AIR_CHOOSERS, AIR_CHOOSER } from '../src/endless/waypoints.js';
+import { steerOnAir, airBoundaries, airOffset, ideaSteps, directorView, AIR_CHOOSERS, AIR_CHOOSER, AIR_CHOOSER_NAMES, chooserOf, chooserName } from '../src/endless/waypoints.js';
 import { steerSong } from '../src/endless/steering.js';
-import { waypointsOnAir } from '../src/endless/items.js';
+import { waypointsOnAir, airChooserOf } from '../src/endless/items.js';
 import { typingPlan, settleOthers } from '../src/song/typing.js';
 import { meterSteps } from '../src/music.js';
 import { energyOf } from '../src/endless/energy.js';
@@ -574,6 +574,15 @@ const CHECKS = {
     // growth version 2: the chooser on air of then (radio-1), as it was heard
     const two = sessionItems(RECIPES, { ...rec, growth: 2 }, 1)[0].song;
     assert(same(two, steer(x, r.commands, { chooser: 'radio-1' }).song), 'growth version 2 replays with the chooser radio-1');
+    // radio-chooser-versions D4: a recipe that records its chooser replays with it; an id no longer in the code, with the
+    // default; every version has a name in both languages; an unknown setting reads as the default
+    const rec1 = sessionItems(RECIPES, { ...rec, chooser: 'radio-1' }, 1)[0].song;
+    assert(same(rec1, two), 'a recipe with chooser radio-1 replays with radio-1');
+    assert(same(sessionItems(RECIPES, { ...rec, chooser: 'radio-9' }, 1)[0].song, a), 'a recipe with an unknown chooser replays with the default');
+    assert(airChooserOf(rec) === AIR_CHOOSER && airChooserOf({ ...rec, chooser: 'radio-1' }) === 'radio-1' && airChooserOf({ ...rec, chooser: 'radio-9' }) === AIR_CHOOSER && airChooserOf({ ...rec, growth: 2 }) === 'radio-1', 'airChooserOf: recorded id, marker 3, unknown id, marker 2');
+    assert(chooserOf('radio-9') === AIR_CHOOSER && chooserOf(null) === AIR_CHOOSER && chooserOf('radio-1') === 'radio-1' && AIR_CHOOSER === 'normal-1', 'chooserOf falls back to normal-1');
+    assert(Object.keys(AIR_CHOOSERS).every(id => /^[a-z]+-\d+$/.test(id) && AIR_CHOOSER_NAMES[id] && AIR_CHOOSER_NAMES[id].en && AIR_CHOOSER_NAMES[id].it), 'every chooser version has an id <family>-<n> and a name in English and Italian');
+    console.log(`      versions: ${Object.keys(AIR_CHOOSERS).map(id => `${id} "${chooserName(id)}"`).join(', ')}`);
     // growth version 1 (stage 4): the steered song grown again, as it was heard
     const old = sessionItems(RECIPES, { ...rec, growth: 1 }, 1)[0].song;
     assert(old.onAir && !old.onAir.waypoints && !same(old, a), 'growth version 1 replays its steered song grown again, without waypoints');

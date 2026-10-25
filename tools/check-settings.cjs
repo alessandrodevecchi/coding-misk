@@ -91,6 +91,27 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.fill('#set-long-song', '15'); await page.press('#set-long-song', 'Tab'); await sleep(150);
   check((await ls('coding-misk-long-song')) === null, 'Long song from: the default is not stored');
   check(/shortest song/.test(await page.innerText('#set-advanced')), 'the hints of the new settings');
+  // the chooser on air (radio-chooser-versions): every version by name, Normal v1 by default and not stored, a choice
+  // stored and written in a new radio recipe, an unknown stored id read as the default
+  const versions = await page.evaluate(async () => Object.keys((await import('/src/endless/waypoints.js')).AIR_CHOOSERS));
+  const shown = await page.$$eval('#set-air-chooser option', o => o.map(x => [x.value, x.textContent]));
+  check(JSON.stringify(shown.map(x => x[0])) === JSON.stringify(versions) && (await page.inputValue('#set-air-chooser')) === 'normal-1' && shown[0][1] === 'Normal v1 (current)' && shown.some(x => x[1] === 'Radio chooser v1 (previous on air)'), 'Chooser on air lists every version, Normal v1 by default', JSON.stringify(shown));
+  check(/steer a grown song on the radio/.test(await page.innerText('#set-advanced')), 'its hint');
+  const clipRecipe = () => page.evaluate(() => globalThis.codingMiskRadio.exportItems({ kind: 'clip', seconds: 8 }).recipe);
+  check(!('chooser' in (await clipRecipe())), 'a new recipe with the default records no chooser');
+  await page.selectOption('#set-air-chooser', 'radio-1'); await sleep(150);
+  check((await ls('coding-misk-air-chooser')) === '"radio-1"', 'Radio chooser v1 stored', String(await ls('coding-misk-air-chooser')));
+  check((await clipRecipe()).chooser === 'radio-1', 'a new radio recipe records the chooser chosen');
+  await page.selectOption('#set-air-chooser', 'normal-1'); await sleep(150);
+  check((await ls('coding-misk-air-chooser')) === null, 'Chooser on air: the default is not stored');
+  await page.evaluate(() => localStorage.setItem('coding-misk-air-chooser', '"radio-9"'));
+  await page.click('#open-settings'); await sleep(300); await page.click('#open-settings'); await sleep(300);
+  check((await page.inputValue('#set-air-chooser')) === 'normal-1' && !('chooser' in (await clipRecipe())), 'an unknown stored chooser reads as Normal v1');
+  await page.selectOption('#set-air-chooser', 'radio-1'); await sleep(150);
+  await page.click('#tab-impostazioni [data-set-lang="it"]'); await sleep(300);
+  check((await page.$$eval('#set-air-chooser option', o => o.map(x => x.textContent))).includes('Normale v1 (attuale)') && /Scelta delle mosse in onda/i.test(await page.innerText('#set-advanced')), 'in Italian: the chooser');
+  if (shots) await (await page.$('#set-advanced')).screenshot({ path: path.join(shots, 'advanced-it.png') });
+  await page.click('#tab-impostazioni [data-set-lang="en"]'); await sleep(300);
   await page.click('#open-settings'); await sleep(300);
 
   // Opus export of a short song
@@ -107,7 +128,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const file = path.join(os.tmpdir(), `coding-misk-backup-${Date.now()}.json`);
   await bk.saveAs(file);
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-  check(data.format === 'coding-misk/backup' && data.data['coding-misk-library'] && !data.data['coding-misk-draft'], 'backup holds the library, not the working state', `${data.format} keys: ${Object.keys(data.data || {}).join(', ')}`);
+  check(data.format === 'coding-misk/backup' && data.data['coding-misk-library'] && !data.data['coding-misk-draft'] && data.data['coding-misk-air-chooser'] === 'radio-1', 'backup holds the library and the chooser on air, not the working state', `${data.format} keys: ${Object.keys(data.data || {}).join(', ')}`);
   const p2 = await (await browser.newContext({ viewport: { width: 1300, height: 1100 } })).newPage();
   p2.on('pageerror', e => errors.push(e.message));
   await p2.goto(URL); await sleep(3000);

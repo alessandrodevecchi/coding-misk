@@ -135,9 +135,19 @@ export const airChooser = (focus = [], bias = 0) => (lanes, ctx, rng) => {
 // 20 songs (check 5.5) radio-1 reached the energy later than normal-1 (605 bars against 540), so the radio plays
 // normal-1 (AIR_CHOOSER) since growth marker 3; a recipe of marker 2 replays with radio-1, as it was heard
 // (items.js airChooserOf). A version, once played, never changes: a new rule is a new id.
+// Each version has a name in English and Italian next to its rule (radio-chooser-versions D1): the Settings page lists
+// them, so a new version shows up there without other code. The default says "(current)", the one before it
+// "(previous on air)".
 export const AIR_CHOOSERS = { 'normal-1': () => choose, 'radio-1': airChooser };
+export const AIR_CHOOSER_NAMES = {
+  'normal-1': { en: 'Normal v1 (current)', it: 'Normale v1 (attuale)' },
+  'radio-1': { en: 'Radio chooser v1 (previous on air)', it: 'Scelta radio v1 (la precedente in onda)' },
+};
 export const AIR_CHOOSER = 'normal-1';
-const chooserFor = c => (typeof c === 'function' ? c : AIR_CHOOSERS[c] || AIR_CHOOSERS[AIR_CHOOSER]);
+// a version id as it is: an id no longer in AIR_CHOOSERS (a stored setting, a recipe) gives the default (D3)
+export const chooserOf = id => (typeof id === 'string' && Object.hasOwn(AIR_CHOOSERS, id) ? id : AIR_CHOOSER);
+export const chooserName = (id, lang = 'en') => { const n = AIR_CHOOSER_NAMES[chooserOf(id)] || {}; return n[lang] || n.en || chooserOf(id); };
+const chooserFor = c => (typeof c === 'function' ? c : AIR_CHOOSERS[chooserOf(c)]);
 
 // ---------- one command: the song from its boundary ----------
 // bars a move needs before the next one, at least (the typing check adds what a long edit needs); a line that comes in

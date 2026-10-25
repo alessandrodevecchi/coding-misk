@@ -10,6 +10,7 @@ import { nextTagline } from '../video/fragments.js';
 import { DICE, REVERT } from '../icons.js';
 import { confirmInline } from '../library/songs-view.js';
 import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shapeKeepOf, LONG_SONG, LONG_SONG_MIN, LONG_SONG_MAX, longSongOf } from '../song/crescendo.js';
+import { AIR_CHOOSERS, AIR_CHOOSER, chooserOf, chooserName } from '../endless/waypoints.js';
 
 
 export function createSettings({ root, t, tx, esc, store, looks, app, toast, confirmTwice }) {
@@ -90,6 +91,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setShapeKeep'), `<select id="set-shape-keep"${shapeAll ? '' : ' disabled'} data-no-knob>${SHAPE_KEEPS.map(k => opt(k, shapeKeepOf(store.get('coding-misk-shape-keep', null)), t(`setShapeKeep:${k}`))).join('')}</select>`, t('setShapeKeepHint'))}
           ${row(t('setShapeRandom'), `<label class="rx-opt"><input type="checkbox" id="set-shape-random"${store.get('coding-misk-shape-random', null) === false ? '' : ' checked'} data-no-knob> <span>${esc(t('setShapeRandomOn'))}</span></label>`, t('setShapeRandomHint'))}
           ${row(t('setLongSong'), `<input type="number" id="set-long-song" min="${LONG_SONG_MIN / 60}" max="${LONG_SONG_MAX / 60}" step="1" value="${longSongOf(store.get('coding-misk-long-song', null)) / 60}" data-no-knob> min`, t('setLongSongHint'))}
+          ${row(t('setAirChooser'), `<select id="set-air-chooser" data-no-knob>${Object.keys(AIR_CHOOSERS).map(id => opt(id, chooserOf(store.get('coding-misk-air-chooser', null)), chooserName(id, app.lang()))).join('')}</select>`, t('setAirChooserHint'))}
         </div>
         <div class="card set-card"><h3>${esc(t('setData'))}</h3>
           <p class="muted">${esc(t('setDataIntro'))}</p>
@@ -163,6 +165,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (e.target.id === 'set-shape-keep') { const v = shapeKeepOf(e.target.value); if (v === 'first') store.remove('coding-misk-shape-keep'); else store.set('coding-misk-shape-keep', v); }
     if (e.target.id === 'set-shape-random') { if (e.target.checked) store.remove('coding-misk-shape-random'); else store.set('coding-misk-shape-random', false); }
     if (e.target.id === 'set-long-song') { const v = longSongOf(60 * Math.round(+e.target.value || 0) || null); e.target.value = v / 60; if (v === LONG_SONG) store.remove('coding-misk-long-song'); else store.set('coding-misk-long-song', v); }
+    // the chooser on air (radio-chooser-versions D3): the default not stored, an unknown id read as the default
+    if (e.target.id === 'set-air-chooser') { const v = chooserOf(e.target.value); if (v === AIR_CHOOSER) store.remove('coding-misk-air-chooser'); else store.set('coding-misk-air-chooser', v); }
     if (e.target.id === 'set-frag-n') store.set('coding-misk-fragment-n', Math.max(1, Math.round(+e.target.value || 1)));
     if (e.target.id === 'set-vid-preset' && e.target.value) { const p = (store.get('coding-misk-video-presets', {}) || {})[e.target.value]; if (p) { store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...p }); toast(t('vidPresetLoaded', { name: e.target.value })); render(); } }
   });
