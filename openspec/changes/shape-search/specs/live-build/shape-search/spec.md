@@ -36,7 +36,7 @@ Crescendo growths, which do not use shapes, SHALL not change.
 - **THEN** the Crescendo fixtures do not move
 
 ### Requirement: Try all shapes and random order
-Settings, advanced, SHALL offer "Try all growth shapes" (off by default) and "Random order" (on by default), each with a hint in English and Italian. With "Try all growth shapes" on, a Compose growth SHALL measure every candidate shape, whatever their number, and keep the one that gives the shortest whole song among those that meet the target, else the one rushed least. With "Random order" off, the candidates SHALL be tried in the fixed order used before `SHAPES_VERSION` 4. Default values SHALL NOT be stored; both settings SHALL be part of the Compose growth key; the radio and the checks SHALL use the defaults.
+Settings, advanced, SHALL offer "Try all growth shapes" (off by default) with its companion "Keep" (first good one by default, or best one), and "Random order" (on by default), each with a hint in English and Italian. With "Try all growth shapes" on, a Compose growth SHALL lift the cap: with "first good one" it SHALL keep the first shape that meets the target in the chosen order, else the one rushed least; with "best one" it SHALL measure every candidate shape, whatever their number, and keep the one that gives the shortest whole song among those that meet the target, else the one rushed least. With "Random order" off, the candidates SHALL be tried in the fixed order used before `SHAPES_VERSION` 4. Default values SHALL NOT be stored; both settings SHALL be part of the Compose growth key; the radio and the checks SHALL use the defaults.
 
 #### Scenario: All shapes
 - **WHEN** "Try all growth shapes" is on and luci-rosse grows as Live coder in Compose
@@ -47,7 +47,7 @@ Settings, advanced, SHALL offer "Try all growth shapes" (off by default) and "Ra
 - **THEN** the candidates follow the fixed order (drawn development, other developments by weight, by type last, other paces, then the less detailed variants), and the same song gets the same shape
 
 ### Requirement: Long songs keep the shortest shape
-When the whole grown song (growth and written part) with the kept shape is longer than 15 minutes, the growth SHALL measure every candidate shape and keep the one that gives the shortest whole song among those that meet the target, in Compose and in the radio.
+When the whole grown song (growth and written part) with the kept shape is longer than the long-song threshold (an advanced setting in minutes, default 15; the radio and the checks use the default), the growth SHALL measure every candidate shape and keep the one that gives the shortest whole song among those that meet the target, in Compose and in the radio.
 
 #### Scenario: kellerlicht
 - **WHEN** kellerlicht grows as Live coder with the defaults

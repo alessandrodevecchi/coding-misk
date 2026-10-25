@@ -17,8 +17,8 @@
 ## 4. Follow-up (owner decisions, 2026-10-25)
 
 - [ ] 4.1 Measure before: `growth:probe` on the five songs (shape, bars, length), radio rushed growth steps (check:radio-profiles), long lists in Live coder growths of every built-in song
-- [ ] 4.2 D6: "Try all growth shapes" and "Random order" in Settings, advanced (hints EN/IT, defaults not stored, Compose growth key), `growth:probe --all --fixed`, check:settings and the Guide
-- [ ] 4.3 D7: whole songs over 15 minutes measure every shape and keep the shortest that meets the target (Compose and radio), counters
+- [ ] 4.2 D6: "Try all growth shapes" with "Keep" (first good one, best one) and "Random order" in Settings, advanced (hints EN/IT, defaults not stored, Compose growth key), `growth:probe --all --keep --fixed`, check:settings and the Guide
+- [ ] 4.3 D7: whole songs over the long-song threshold (setting, default 15 minutes) measure every shape and keep the shortest that meets the target (Compose and radio), counters
 - [ ] 4.4 D8: ramp writer for long linear lists in Live coder code; same value every bar (Strudel in Node); check:mixer, check:functions, check:strudel, levels
 - [ ] 4.5 `SHAPES_VERSION` 5: Live coder fixtures, `npm run durations`, radio growth fixtures; Crescendo fixtures and `check:code` unchanged; `check:crescendo -- --full`
 - [ ] 4.6 D9: kellerlicht at v0.5.0 (temporary worktree, read only), answer written in D9
