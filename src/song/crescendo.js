@@ -13,7 +13,7 @@ import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, DEFAULT
 import { placeSpoken } from './spoken.js';
 import { liveCode } from '../live/live-code.js';
 import { resolveProfile } from '../live/profiles.js';
-import { rushedSteps, rushLoad, typingLoad, barSeconds } from '../live/typing-load.js';
+import { growthLoad, rushedOf, loadOf, typingLoad, barSeconds } from '../live/typing-load.js';
 import { compileSong } from './compile.js';
 import { typingPlan } from './typing.js';
 import { writeCode, levelsOf, busesOf, functionContext, functionOptions } from './writer.js';
@@ -662,13 +662,17 @@ function searchShapes(song, opts, stats) {
     if (c.maxDetail !== undefined && out.crescendo && out.crescendo.detail > c.maxDetail) { if (st) stats.tried.push({ ...st, skipped: 'detail', rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); continue; }
     if (!out.crescendo || !out.crescendo.shape) { if (st) { stats.tried.push({ ...st, rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); stats.kept = stats.tried.length - 1; } return out; }
     let L = liveCode(out, C, { cols: () => 80 });
+    // one measure of the typing per grown song (growth-in-background D4): the free-duration round that adds no bars,
+    // the rushed count and the rushed load read the same list
+    let m = null;
     // free duration (owner, 2026-10-19): a step the human typing cannot reach at a person's pace waits for it: the bars
     // it needs are added before it and the growth is made again (never a forced paste)
     if (rules.free) {
       const extra = {};
       for (let round = 0; round < 6; round++) {
         const sb = barSeconds(out), units = out.crescendo.units || [];
-        const late = typingLoad(L, { seed: song.id || '', to: out.crescendo.grown }).filter(x => x.ratio > 1);
+        m = typingLoad(L, { seed: song.id || '', to: out.crescendo.grown });
+        const late = m.filter(x => x.ratio > 1);
         let added = false;
         for (const x of late) {
           const i = units.indexOf(x.at);
@@ -679,14 +683,15 @@ function searchShapes(song, opts, stats) {
         }
         if (!added) break;
         out = growSong(song, { ...opts, rules: { ...r, extraGaps: { ...extra } } });
-        L = liveCode(out, C, { cols: () => 80 });
+        L = liveCode(out, C, { cols: () => 80 }); m = null;
         if (st) st.rounds++;
       }
     }
-    const n = rushedSteps(L, song.id || '');
+    if (!m) m = growthLoad(L, song.id || '');
+    const n = rushedOf(m);
     out.crescendo.shape = { ...out.crescendo.shape, from: shape.from, rushed: n, ...(c.drawn ? {} : { fallback: true }) };
     if (!n) { if (st) { stats.tried.push({ ...st, rushed: 0, load: 0, ms: performance.now() - t0, bars: barsOf(out) }); stats.kept = stats.tried.length - 1; } return out; }
-    const load = rushLoad(L, song.id || '');
+    const load = loadOf(m);
     if (st) stats.tried.push({ ...st, rushed: n, load, ms: performance.now() - t0, bars: barsOf(out) });
     if (!best || load < best.load) best = { out, load, k: stats ? stats.tried.length - 1 : -1 };
   }

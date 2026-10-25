@@ -46,9 +46,12 @@ export function pasteRule(L, C, { seed = '' } = {}) {
 export function typingLoad(L, { seed = '', from = 1, to = Infinity } = {}) {
   const sb = barSeconds(L.build), bars = [...new Set(buildSteps(L.build).map(x => x.at))].filter(b => b >= from && b <= to);
   const out = [];
+  // the code of each bar is computed once per call (growth-in-background D4): a bar is the step and then the bar before
+  // the next step; the calls keep their order, so the code is the same as when each one was computed again
+  const memo = new Map(), codeAt = b => { if (!memo.has(b)) memo.set(b, L.codeAt(b)); return memo.get(b); };
   let prev = 0;
   for (const at of bars) {
-    const code = L.codeAt(at), was = settleOthers(L.codeAt(prev), code, at);
+    const code = codeAt(at), was = settleOthers(codeAt(prev), code, at);
     const avail = Math.max(0.2, (at - prev - 0.5) * sb - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
     // (with the time left as the limit: a new line that would not fit is pasted when the paste rule allows it, as the
     // app types it)
@@ -59,7 +62,13 @@ export function typingLoad(L, { seed = '', from = 1, to = Infinity } = {}) {
   return out;
 }
 
-// steps of the growth typed faster than a person can (ratio above 1.1); L: liveCode of the build
-export const rushedSteps = (L, seed = '') => typingLoad(L, { seed, to: L.build.crescendo ? L.build.crescendo.grown : Infinity }).filter(x => x.ratio > 1.1).length;
-// how much the growth is rushed in all: the sum of the ratios above 1.1 (a big burst weighs more than a small hurry)
-export const rushLoad = (L, seed = '') => typingLoad(L, { seed, to: L.build.crescendo ? L.build.crescendo.grown : Infinity }).filter(x => x.ratio > 1.1).reduce((a, x) => a + x.ratio - 1, 0);
+// the typing of the growth, up to its last step (the measure the rushed count and the rushed load read)
+export const growthLoad = (L, seed = '') => typingLoad(L, { seed, to: L.build.crescendo ? L.build.crescendo.grown : Infinity });
+// steps typed faster than a person can (ratio above 1.1), from a measure (typingLoad)
+export const rushedOf = load => load.filter(x => x.ratio > 1.1).length;
+// how much they are rushed in all: the sum of the ratios above 1.1 (a big burst weighs more than a small hurry)
+export const loadOf = load => load.filter(x => x.ratio > 1.1).reduce((a, x) => a + x.ratio - 1, 0);
+// steps of the growth typed faster than a person can; L: liveCode of the build
+export const rushedSteps = (L, seed = '') => rushedOf(growthLoad(L, seed));
+// how much the growth is rushed in all
+export const rushLoad = (L, seed = '') => loadOf(growthLoad(L, seed));
