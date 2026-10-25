@@ -1,10 +1,13 @@
 // Checks for the patterns store and catalogue (pattern-library, #72). No browser.
 //   npm run check:patterns     run every check; exit 1 when any fails
 // The built-in catalogue (every preset once), the styles that use each preset, the user's store (add, rename, remove,
-// built-ins protected), Save as pattern, the loop song, Add to song, the preview, the radio's pool and the backup.
+// built-ins protected), Save as pattern, the loop song, Add to song, the preview, the radio's pool and the backup; the
+// follow-ups (pattern-followups): editable styles, Save as pattern's fallback styles, new parts kept, capped and
+// discarded, their backup, and guitar riffs from New.
 import fs from 'node:fs';
 import { BASS, ARPS, HOOKS, PADS, GROOVES, GUITAR_PATTERNS } from '../src/music.js';
-import { builtinPatterns, stylesUsing, kindOfPreset, patternStore, addPattern, renamePattern, removePattern, listPatterns, savedFromTrack, savedFromGenerated, loopSong, addToSong, previewOf, forRadio, KINDS, KIND_TYPE, MATERIAL_KIND, RIFF_STYLE, BEAT_GAIN, STORE_KEY } from '../src/library/patterns.js';
+import { builtinPatterns, stylesUsing, kindOfPreset, patternStore, addPattern, renamePattern, removePattern, listPatterns, savedFromTrack, savedFromGenerated, loopSong, addToSong, previewOf, forRadio, KINDS, KIND_TYPE, MATERIAL_KIND, RIFF_STYLE, BEAT_GAIN, STORE_KEY, cleanStyles, everyStyle, fallbackStyles, composeNewPart } from '../src/library/patterns.js';
+import { draftStore, capDrafts, mergeDrafts, DRAFTS_KEY, DRAFT_CAP } from '../src/library/pattern-drafts.js';
 import { compose } from '../src/material/index.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
@@ -18,6 +21,8 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const memStore = (init = {}) => { const m = { ...init }; return { get: (k, d) => (k in m ? JSON.parse(JSON.stringify(m[k])) : d), set: (k, v) => { m[k] = JSON.parse(JSON.stringify(v)); }, m }; };
 const all = builtinPatterns(), recipes = loadStyles();
 const song = JSON.parse(fs.readFileSync(new URL('../songs/ali-di-cenere.json', import.meta.url), 'utf8'));
+const artistsDir = new URL('../artists/', import.meta.url);
+const artists = fs.readdirSync(artistsDir).filter(f => f.endsWith('.json')).map(f => JSON.parse(fs.readFileSync(new URL(f, artistsDir), 'utf8')));
 
 const CHECKS = {
   'every preset appears once, with a unique key'() {
@@ -143,6 +148,89 @@ const CHECKS = {
     const riff = { id: 'p-9', name: 'r', kind: 'riffs', type: 'guitar', pattern: { idea: { rhythm: 'x ~ x x ~ x ~ ~ x ~ x x ~ x ~ ~', add: '0 0 1 0 3 0 0 0 0 0 1 0 5 0 0 0', per: 'slot' } }, styles: ['melodic-metal'], context: { key: 'E', mode: 'minor' } };
     const has = o => generateSession(recipes, { minutes: 30, seed: 'saved', complexity: 0.6, userPatterns: forRadio([riff]), ...o }).songs.filter(sg => sg.tracks.some(t => Object.values(t.patterns).some(p => same(p, riff.pattern)))).length;
     assert(has({ styles: ['melodic-metal'] }) > 0 && has({ styles: ['ambient'] }) === 0, 'drawn in its style only');
+  },
+  'styles of a saved pattern: add and remove, "any" only alone, the radio follows (pattern-followups D1)'() {
+    assert(same(cleanStyles(['any', 'trance', 'trance', ' jazz ']), ['trance', 'jazz']) && same(cleanStyles([]), []) && same(cleanStyles(['any']), ['any']), 'clean styles');
+    assert(everyStyle([]) && everyStyle(['any']) && !everyStyle(['trance']), 'every style');
+    const s = memStore(), st = patternStore(s);
+    const riff = st.add({ name: 'Riff', kind: 'riffs', type: 'guitar', pattern: { idea: { rhythm: 'x ~ x x ~ x ~ ~ x ~ x x ~ x ~ ~', add: '0 0 1 0 3 0 0 0 0 0 1 0 5 0 0 0', per: 'slot' } }, styles: [], context: { key: 'E', mode: 'minor' } });
+    assert(same(forRadio(st.list())[0].styles, ['any']), 'no style: every style');
+    st.setStyles(riff.id, ['any', 'drum-and-bass']);
+    assert(same(st.get(riff.id).styles, ['drum-and-bass']), `added: ${st.get(riff.id).styles}`);
+    const pool = forRadio(st.list());
+    assert(userPool(pool, { type: 'guitar', styles: ['drum-and-bass'] }).length === 1 && !userPool(pool, { type: 'guitar', styles: ['ambient'] }).length, 'in the drum and bass pool only');
+    st.setStyles(riff.id, ['drum-and-bass', 'melodic-metal']);
+    st.setStyles(riff.id, ['melodic-metal']);
+    assert(same(st.get(riff.id).styles, ['melodic-metal']) && userPool(forRadio(st.list()), { type: 'guitar', styles: ['melodic-metal'] }).length === 1, 'removed one');
+    st.setStyles(riff.id, []);
+    assert(same(forRadio(st.list())[0].styles, ['any']) && st.get(riff.id).name === 'Riff', 'all removed: every style again, the rest unchanged');
+    st.setStyles('riffs/thrash', ['jazz']);
+    assert(st.list().length === 1, 'built-in keys change nothing');
+  },
+  'Save as pattern links the song\'s styles, else its artist\'s or the styles its style line names (pattern-followups D1)'() {
+    const tr = song.tracks.find(t => t.type === 'bass'), key = tr.clips[0].pattern;
+    const bare = { ...song, tags: {} }, ctx = { recipes, artists };
+    const owl = artists.find(a => a.id === 'night-owl'), top = Object.entries(owl.styles).sort((a, b) => b[1] - a[1])[0][0];
+    assert(same(savedFromTrack(song, tr, key, { fallback: ['jazz'] }).styles, cleanStyles(song.tags.styles)), 'tags win over the fallback');
+    assert(same(fallbackStyles({ ...bare, style: { en: `${owl.name} · Endless · Berlin techno`, it: `${owl.name} · Endless · Techno berlinese` } }, ctx), [top]), 'new song from an artist: the artist\'s favourite style');
+    assert(same(fallbackStyles({ ...bare, artist: 'night-owl' }, ctx), [top]), 'an artist id');
+    const two = fallbackStyles({ ...bare, style: { en: 'Endless · Berlin techno + Jazz · A · 124 BPM · arc', it: 'Endless · Techno berlinese + Jazz · A · 124 BPM · arc' } }, ctx);
+    assert(same(two, ['berlin-techno', 'jazz']), `the style line: ${two}`);
+    assert(!fallbackStyles({ ...bare, style: { en: 'Hand written', it: 'Scritto a mano' } }, ctx).length, 'nothing known: no style (every style)');
+    const p = savedFromTrack(bare, tr, key, { fallback: two });
+    assert(same(p.styles, ['berlin-techno', 'jazz']) && same(savedFromTrack(bare, tr, key).styles, []), `fallback linked: ${p.styles}`);
+  },
+  'new parts are kept across reloads, capped at 30 and discarded (pattern-followups D2)'() {
+    const s = memStore(), st = draftStore(s), t0 = Date.parse('2026-10-25T10:00:00Z');
+    const part = n => ({ kind: 'basslines', type: 'bass', name: `Basslines #${n}`, pattern: { idea: { rhythm: 'x ~ x ~' } }, sound: 'sawtooth', context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 128, mode: 'minor' }, seed: `pattern:basslines:${n}`, why: ['x'], styles: [] });
+    const a = st.add(part(1), new Date(t0)), b = st.add(part(2), new Date(t0 + 1000));
+    assert(a.item.id !== b.item.id && !a.dropped && !b.dropped, 'two drafts');
+    const again = draftStore(memStore(s.m));
+    assert(again.list().map(d => d.name).join() === 'Basslines #2,Basslines #1' && s.m[DRAFTS_KEY].length === 2, 'kept after a reload, newest first');
+    let dropped = 0;
+    for (let n = 3; n <= 31; n++) dropped += st.add(part(n), new Date(t0 + n * 1000)).dropped;
+    assert(st.list().length === DRAFT_CAP && DRAFT_CAP === 30 && dropped === 1 && !st.list().some(d => d.name === 'Basslines #1') && st.list()[0].name === 'Basslines #31', `capped: ${st.list().length}, dropped ${dropped}`);
+    const same2 = st.add(part(32), new Date(t0 + 31 * 1000)), same3 = st.add(part(33), new Date(t0 + 31 * 1000));
+    assert(same2.item.id !== same3.item.id, 'same millisecond');
+    st.update(same3.item.id, { styles: ['trance'] });
+    assert(same(st.get(same3.item.id).styles, ['trance']), 'styles of a new part');
+    st.remove(same3.item.id);
+    assert(!st.get(same3.item.id) && st.list().length === 29, 'Discard');
+    st.clear();
+    assert(!st.list().length && same(s.m[DRAFTS_KEY], []), 'Discard all');
+    assert(capDrafts([{ id: 'x' }, null, { id: 'd-1', kind: 'melodies', pattern: {} }]).list.length === 1, 'invalid drafts left out');
+  },
+  'new parts survive a backup, merged by id and capped (pattern-followups D2)'() {
+    const s = memStore(), st = draftStore(s), t0 = Date.parse('2026-10-25T10:00:00Z');
+    for (let n = 1; n <= 3; n++) st.add({ kind: 'riffs', type: 'guitar', name: `Guitar riff #${n}`, pattern: { idea: { rhythm: 'x x' } }, sound: 'distorted', styles: n === 1 ? ['trance'] : [] }, new Date(t0 + n * 1000));
+    const b = makeBackup(Object.entries(s.m));
+    assert(Array.isArray(b.data[DRAFTS_KEY]) && b.data[DRAFTS_KEY].length === 3, 'in the backup');
+    const back = mergeBackup(JSON.parse(JSON.stringify(b)), () => null);
+    const restored = draftStore(memStore(back.values));
+    assert(restored.list().map(d => `${d.name}|${d.sound}|${d.styles.join('+')}`).join() === 'Guitar riff #3|distorted|,Guitar riff #2|distorted|,Guitar riff #1|distorted|trance' && back.counts.patterns === 3, JSON.stringify(restored.list().map(d => d.name)));
+    // merged with the drafts here: by id, the backup's copy wins, at most 30, newest kept
+    const here = Array.from({ length: 29 }, (_, i) => ({ id: `d-h${i}`, kind: 'melodies', pattern: { idea: {} }, name: `here ${i}`, at: new Date(t0 - (i + 1) * 60000).toISOString() }));
+    const firstId = b.data[DRAFTS_KEY][2].id;
+    here.push({ ...b.data[DRAFTS_KEY][2], name: 'old copy' });
+    const merged = mergeBackup(b, k => (k === DRAFTS_KEY ? here : null)).values[DRAFTS_KEY];
+    assert(merged.length === 30 && merged.filter(d => d.id === firstId).length === 1 && merged.find(d => d.id === firstId).name === 'Guitar riff #1' && !merged.some(d => d.name === 'here 28'), `merged ${merged.length}`);
+    assert(mergeDrafts(null, null).length === 0, 'nothing on either side');
+  },
+  'New on riffs: a guitar riff from the guitar generator every time, or a bass riff (pattern-followups D3)'() {
+    const H = { key: 'A', chords: 'drone', mode: 'minor' };
+    for (let n = 1; n <= 20; n++) {
+      const e = (n % 5) / 4, g = composeNewPart({ kind: 'riffs', n, harmony: H, energy: e });
+      assert(g.type === 'guitar' && g.sound === 'distorted' && g.seed === `pattern:riffs:guitar:${n}` && g.why.includes('power chord riff') && g.pattern.idea.per === 'slot', `guitar riff #${n} at ${e}: ${g.why}`);
+      const loop = loopSong({ kind: 'riffs', type: g.type, pattern: g.pattern, sound: g.sound }, {});
+      assert(!validateSong(loop).errors.length && loop.tracks[0].settings.type === 'distorted' && /guitar/.test(compileSong(loop)), `guitar riff #${n} loop`);
+      assert(same(composeNewPart({ kind: 'riffs', n, harmony: H, energy: e }), g), `guitar riff #${n} repeatable`);
+      // a bass riff: the bassline with the riff rules, as New wrote riffs before
+      const b = composeNewPart({ kind: 'riffs', n, riffAs: 'bass', harmony: H, energy: e });
+      const old = compose('bass', { seed: `pattern:riffs:${n}`, style: RIFF_STYLE, harmony: { key: 'A', chords: 'drone', mode: 'minor' }, meter: '4/4', energy: e, type: 'bass' });
+      assert(b.type === 'bass' && b.seed === `pattern:riffs:${n}` && same(b.pattern.idea, old.idea), `bass riff #${n} as before`);
+    }
+    const arp = composeNewPart({ kind: 'arpeggios', n: 3, harmony: { key: 'A', chords: 'epica' }, energy: 0.4 });
+    assert(arp.type === 'arp' && arp.pattern.speed === '16' && arp.seed === 'pattern:arpeggios:3', 'other kinds as before');
   },
   'patterns survive a backup'() {
     const s = memStore(), st = patternStore(s);

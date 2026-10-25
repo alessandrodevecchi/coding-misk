@@ -2,7 +2,8 @@
 // arpeggios, chords and progressions, drum grooves and sounds from a seed, a style and an energy value, as ideas of the
 // song format (idea-model). Pure and seeded: the same inputs give the same part in Node and in the browser.
 //
-//   compose(kind, { seed, style, harmony, meter, energy, from, keep, type }) → { idea, settings, rack, why, stats }
+//   compose(kind, { seed, style, harmony, meter, energy, from, keep, type, riff }) → { idea, settings, rack, why, stats }
+// riff (guitar chords only): true a riff every time, false power chords only, left out as the style decides
 //
 // kind: melody, bass, arp, chords, drums, sound. style: the recipe instrument's `material` ({ rules, families, sounds }).
 // harmony: { key, mode, chords (a PROGS name or chord names in A), shared }. energy: 0 to 1. from + keep: vary a preset
@@ -46,7 +47,7 @@ export function compose(kind, opts = {}) {
     if (!v) return null;
     return { idea: v.idea, why: v.why, stats: {} };
   }
-  const o = { style: style || {}, harmony: harmony || {}, meter, energy: e, N, type, shape: shapeOf(opts.shape) };
+  const o = { style: style || {}, harmony: harmony || {}, meter, energy: e, N, type, shape: shapeOf(opts.shape), ...(typeof opts.riff === 'boolean' ? { riff: opts.riff } : {}) };
   if (kind === 'melody') return melody(r, o);
   if (kind === 'bass') return bassline(r, o);
   if (kind === 'arp') return arpeggio(r, o);

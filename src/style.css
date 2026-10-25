@@ -251,6 +251,8 @@
   .tp-compose .tp-cnum { display: inline-flex; align-items: center; gap: 4px; }
   .tp-compose .tp-cnum input { width: 64px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); font: inherit; font-size: 12px; }
   .tp-compose .tp-cen { flex: 0 1 150px; min-width: 110px; }
+  .tp-compose .tp-cguitar { display: inline-flex; align-items: center; gap: 4px; }
+  .tp-compose .tp-cguitar select { padding: 3px 6px; font-size: 12px; }
   .ico-compose, .ico-rhythm, .ico-notes { width: 14px; height: 14px; flex: none; }
   .tp-editor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 60%, transparent); }
   .pt-top { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -1301,3 +1303,16 @@ button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); 
 /* the New row of the Patterns tab: its own heading, apart from the loop controls (#76) */
 .pn-gen-head { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
 .vinst [data-vinst-style-ways] { font-size: 12px; }
+/* pattern-followups (#72): the New strip's header with Discard all, a saved pattern's style chips with a remove cross
+   and an add menu, the guitar or bass riff choice of New */
+.pn-fresh-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; }
+.pn-fresh-head .btn, .pn-actions .btn { display: inline-flex; align-items: center; gap: 5px; }
+.pn-fresh-head .ico-bin, .pn-actions .ico-bin { width: 13px; height: 13px; flex: none; }
+.pn-stylechip { display: inline-flex; align-items: center; }
+.pn-stylechip .chip { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
+.pn-style-x { display: grid; place-items: center; width: 22px; align-self: stretch; padding: 0; border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); border-left: 0; border-radius: 0 999px 999px 0; background: var(--panel2); color: var(--muted); cursor: pointer; }
+.pn-style-x:hover, .pn-style-x:focus-visible { color: var(--a1); border-color: var(--a1); }
+.ico-cross { width: 10px; height: 10px; }
+.pn-every { color: var(--muted); }
+.pn-style-add { max-width: 100%; padding: 2px 6px; font-size: 12px; }
+.pn-riffas { flex-basis: 100%; }

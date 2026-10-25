@@ -79,7 +79,7 @@ import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
 import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING } from './icons.js';
 import { createPatternsTab } from './library/patterns-tab.js';
-import { patternStore, savedFromTrack, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS } from './library/patterns.js';
+import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
@@ -2437,6 +2437,8 @@ function renderTrackPanel() {
 // <song id>:<track id>:<number>, so the same number gives the same part. With a preset: keep its rhythm or its notes.
 const composeNums = {};
 let composeEnergy = 0.5;
+// a guitar track composes a riff or power chords (pattern-followups D3), remembered while the page is open
+let composeGuitar = 'riff';
 const composeNumOf = tr => composeNums[`${T.id}:${tr.id}`] || 1;
 function composeRow(tr, pat) {
   if (!KIND_OF_TYPE[tr.type]) return '';
@@ -2444,6 +2446,7 @@ function composeRow(tr, pat) {
   return `<div class="tp-compose">
       <button class="btn small" id="pt-compose" title="${esc(t('composeTip'))}">${COMPOSE}<span>${esc(t('composePart'))}</span></button>
       <label class="tp-cnum" for="pt-cnum"><span class="lbl">#</span><input type="number" id="pt-cnum" min="1" max="9999" step="1" value="${composeNumOf(tr)}" aria-label="${esc(t('composeNum'))}" title="${esc(t('composeTip'))}"></label>
+      ${tr.type === 'guitar' ? `<label class="tp-cguitar" for="pt-cguitar" title="${esc(t('composeGuitarTip'))}"><span class="lbl">${esc(t('composeGuitar'))}</span><select id="pt-cguitar">${['riff', 'chords'].map(k => `<option value="${k}"${composeGuitar === k ? ' selected' : ''}>${esc(t(`composeGuitar_${k}`))}</option>`).join('')}</select></label>` : ''}
       <div class="ctrl tp-cen" title="${esc(t('composeEnergyTip'))}"><div class="row"><label class="lbl" for="pt-cenergy">${esc(t('composeEnergy'))}</label><output id="pt-cenergy-o">${Math.round(composeEnergy * 100)}%</output></div><input type="range" id="pt-cenergy" min="0" max="1" step="0.05" value="${composeEnergy}"></div>
       ${varies ? `<button class="btn small" id="pt-keep-rhythm" title="${esc(t('keepRhythmTip'))}">${RHYTHM}<span>${esc(t('keepRhythm'))}</span></button><button class="btn small" id="pt-keep-notes" title="${esc(t('keepNotesTip'))}">${NOTES}<span>${esc(t('keepNotes'))}</span></button>` : ''}
     </div>`;
@@ -2461,7 +2464,8 @@ function composePattern(tr, keep = null) {
   const sec = secFull(), cur = tr.patterns[patOf(tr)] || {}, n = composeNumOf(tr), kind = KIND_OF_TYPE[tr.type];
   const R = composeStyle(), part = R && R[tr.type] ? R[tr.type] : {};
   const ch = eff(tr), harmony = { key: sec.key, mode: (tr.type === 'hook' && ch.mode) || 'minor', chords: sec.chords, shared: T.shared || {} };
-  const out = compose(kind, { seed: `${T.id}:${tr.id}:${n}`, style: part.material || {}, harmony, meter: sec.meter, energy: composeEnergy, type: tr.type, ...(keep ? { from: cur.preset, keep } : {}) });
+  const riff = tr.type === 'guitar' && !keep ? { riff: composeGuitar === 'riff' } : {};
+  const out = compose(kind, { seed: `${T.id}:${tr.id}:${n}`, style: part.material || {}, harmony, meter: sec.meter, energy: composeEnergy, type: tr.type, ...riff, ...(keep ? { from: cur.preset, keep } : {}) });
   if (!out || !out.idea) { toast(t('composeNone')); return; }
   let idea = out.idea;
   // a drum track with only the kick (or without it) keeps its rows: the kick and the beat are often two tracks
@@ -2492,13 +2496,16 @@ function listenPattern(tr) {
   let ok = false;
   if (plain) ok = patternsTab.open({ kind: kindOfPreset(tr.type, pat.preset), id: pat.preset, over });
   if (!ok) {
-    const draft = savedFromTrack(T, tr, key, { name: `${trackLabel(tr)} · ${T.title}` });
+    const draft = savedFromTrack(T, tr, key, { name: `${trackLabel(tr)} · ${T.title}`, fallback: songStyleFallback() });
     ok = patternsTab.open({ item: { kind: draft.kind, type: tr.type, name: draft.name, pattern: draft.pattern, sound: draft.sound, settings: draft.settings, context: draft.context, defaults: { ...KIND_DEFAULTS[draft.kind] }, styles: draft.styles, draft }, over });
   }
   showTab('pattern');
 }
+// the styles a pattern saved from a song with no style tags links (pattern-followups D1): its artist's, or the styles
+// its style line names
+const songStyleFallback = () => fallbackStyles(T, { recipes: RECIPES, artists: [...BUILTIN_ARTISTS, ...(store.get('coding-misk-artists', []) || [])] });
 function savePattern(tr) {
-  const saved = patternsStore.add(savedFromTrack(T, tr, patOf(tr), { name: `${trackLabel(tr)} · ${T.title}` }));
+  const saved = patternsStore.add(savedFromTrack(T, tr, patOf(tr), { name: `${trackLabel(tr)} · ${T.title}`, fallback: songStyleFallback() }));
   toast(t('ptSavedPattern', { name: saved.name }), { label: t('ptOpenTab'), run: () => { showTab('pattern'); patternsTab.open({ saved: saved.id }); } });
 }
 function panelHtml(ti) {
@@ -2672,6 +2679,7 @@ $('#track-panel').addEventListener('input', e => {
   if (k) { let v = e.target.value; if (e.target.type === 'range') v = e.target.dataset.cut ? rangeToCut(+v) : +v; setSetting(k, v); changed(); syncTrackPanel(); return; }
   if (role(e.target) === 'tk-name') { curTrack().name = e.target.value; changed(); return; }
   if (role(e.target) === 'pt-cnum') { const v = Math.round(+e.target.value); if (v >= 1) composeNums[`${T.id}:${curTrack().id}`] = v; return; }
+  if (role(e.target) === 'pt-cguitar') { composeGuitar = e.target.value === 'chords' ? 'chords' : 'riff'; return; }
   if (role(e.target) === 'pt-cenergy') { composeEnergy = +e.target.value; const o = e.target.closest('.tp-cen').querySelector('output'); if (o) o.textContent = `${Math.round(composeEnergy * 100)}%`; return; }
   if (role(e.target) === 'pt-code') { const v = e.target.value; clearTimeout(codeTimer); codeTimer = setTimeout(() => editPattern(p => { p.code = v; }), 400); return; }
   if (role(e.target) === 'pt-notes') { const v = e.target.value.trim(); if (!v || /^[-\d~\s[\]<>]+$/.test(v)) editPattern(p => { if (v) p.notes = v; else delete p.notes; }); }
