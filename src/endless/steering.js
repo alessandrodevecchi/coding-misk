@@ -8,6 +8,7 @@ import { playing, curveParts, CURVES } from './energy.js';
 import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, meterSteps } from '../music.js';
 import { airIdea, composesOnAir, sessionSource, readyParts } from './material.js';
 import { presetOf } from '../material/index.js';
+import { rewriteSpoken, nextQuiet } from './voice-track.js';
 
 // commands of the console: group, whether they change the song's structure (applied on a double phrase)
 export const COMMANDS = {
@@ -20,6 +21,9 @@ export const COMMANDS = {
   darker: { group: 'sound' }, brighter: { group: 'sound' }, dirtier: { group: 'sound' }, cleaner: { group: 'sound' }, 'more-space': { group: 'sound' }, instrument: { group: 'sound' },
   progression: { group: 'harmony', structural: true }, key: { group: 'harmony', structural: true },
   'talk-more': { group: 'voice' }, 'talk-less': { group: 'voice' },
+  // the voice instrument of the song on air (voice-placement): its options from the next quiet part (applied on a
+  // phrase, placed on the first quiet section from there; the clips before stay)
+  voice: { group: 'voice' },
   drop: { group: 'song', structural: true }, stay: { group: 'song', structural: true }, extend: { group: 'song', structural: true }, end: { group: 'song', structural: true },
   curve: { group: 'curve' }, 'curve-reset': { group: 'curve' },
   // mixer: on the next bar
@@ -92,6 +96,12 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
   if (['darker', 'brighter', 'dirtier', 'cleaner', 'more-space'].includes(cmd.kind)) {
     const ok = candidateMoves(st, { usual: plan.usualHigh, weights: plan.R.energy, hardMax: plan.hardMax }, new Set(locked), stream('probe')).some(m => m.kind === cmd.kind);
     return ok ? null : 'no-target';
+  }
+  // the voice instrument: a quiet part must come after the bar (and a track to stop, for "never")
+  if (cmd.kind === 'voice') {
+    if (nextQuiet(song, at) === null) return 'no-quiet';
+    if (cmd.voice && cmd.voice.presence === 'never' && !song.tracks.some(t => t.type === 'spoken')) return 'no-voice';
+    return null;
   }
   if (cmd.kind === 'drop') return plan.plan.slice(Math.ceil(at / (2 * plan.phrase))).some(d => d.role === 'drop') ? null : 'no-drop';
   return null;
@@ -214,6 +224,12 @@ function rewrite(song, plan, opts, cmd, rng) {
   const st = stateOf(song, P, at), on = playing(st);
   const ctx = { usual: P.usualHigh, weights: P.R.energy, hardMax: P.hardMax };
   if (cmd.kind === 'vary' || cmd.kind === 'swap') return vary(song, P, O, cmd, st, `${rng.seed}:${cmd.kind}:${rng.n}:${rng.i}`);
+  // the voice instrument (voice-placement): kept in the plan, so later rewrites (which write the spoken track again
+  // from the plan) apply it again in order; the song is not directed again
+  if (cmd.kind === 'voice') {
+    P.voiceAir = [...(plan.voiceAir || []), { at, voice: cmd.voice || {}, seed: `${rng.seed}:voice:${rng.n}:${rng.i}` }];
+    return { song: voiceAir(song, P, [P.voiceAir[P.voiceAir.length - 1]]), plan: P, opts: O };
+  }
   switch (cmd.kind) {
     case 'energy-up': case 'energy-down':
       for (let d = d0; d < P.plan.length; d++) P.plan[d].target = round2(clamp(P.plan[d].target + (cmd.kind === 'energy-up' ? 0.15 : -0.15), 0.05, 1));
@@ -333,7 +349,20 @@ function rewrite(song, plan, opts, cmd, rng) {
     tracks: dir.tracks.map(t => { const own = P.tracks.find(x => x.id === t.id); return own && own.pinned ? { ...t, settings: { ...t.settings, ...own.settings }, pinned: own.pinned } : t; }),
     build: dir.steps,
   };
-  return { song: out, plan: P, opts: O, phrases: dir.phrases };
+  return { song: voiceAir(out, P, P.voiceAir || []), plan: P, opts: O, phrases: dir.phrases };
+}
+
+// The voice instrument changes of the listener (voice-placement), in order, on a song: each one rewrites the spoken
+// track from the first quiet part after its bar (rewriteSpoken), with the plan's style; one that finds no quiet part
+// changes nothing
+function voiceAir(song, P, list) {
+  let cur = song;
+  for (const e of list) {
+    const sp = cur.tracks.find(t => t.type === 'spoken');
+    const r = rewriteSpoken(cur, sp ? sp.id : null, e.voice, { spoken: (P.R && P.R.spoken) || null, from: e.at, seed: e.seed });
+    if (r) cur = r.song;
+  }
+  return cur;
 }
 
 // The song after every command, from the original. commands: [{ kind, at, type?, track?, d?, value? }] in order.

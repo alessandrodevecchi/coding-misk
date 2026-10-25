@@ -91,7 +91,7 @@ const secondsOf = (text, bank) => { const m = (spokenContext.lengths || {})[`${b
 // tracks that count as playing in a section: neither voice nor spoken, with a clip there (from the clips, so every
 // state of a live build places the lines on the same bars)
 const over = (c, s) => c.start < s.start + s.bars && c.start + c.bars > s.start;
-function sectionFacts(n) {
+export function sectionFacts(n) {
   const plays = n.tracks.filter(x => x.type !== 'voice' && x.type !== 'spoken' && x.clips.length);
   const counts = n.sections.map(s => plays.filter(x => x.clips.some(c => over(c, s))).length);
   const most = Math.max(0, ...counts);
@@ -101,7 +101,7 @@ const secAt = (n, bar) => n.sections.find(s => bar >= s.start && bar < s.start +
 const beatsOf = sec => meterSteps(sec.meter) / 4;
 const secPerBeat = sec => 60 / (sec.bpm || 120);
 // where a track enters at or after a bar (a clip that starts where it was not playing the bar before)
-function entryAfter(n, id, from) {
+export function entryAfter(n, id, from) {
   const tr = n.tracks.find(x => x.id === id);
   if (!tr) return null;
   const starts = tr.clips.map(c => c.start).filter(b => b > from && !tr.clips.some(c => c.start < b && c.start + c.bars >= b)).sort((a, b) => a - b);

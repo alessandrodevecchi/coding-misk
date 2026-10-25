@@ -65,7 +65,7 @@ const SONGS = ['ferro', 'cavo-scoperto'];
   await page.click('#play'); await sleep(300);
   // back to blocks
   await page.locator('#live-style').selectOption('blocks'); await sleep(800);
-  check(await page.isHidden('#live-narrated'), '"fully narrated" hides in blocks');
+  check(await page.isDisabled('#live-narrated'), '"Narrated growth" disabled in blocks (needs crescendo, voice-placement)');
   // a song that declares crescendo opens in crescendo with the live build off
   const declared = await page.$$eval('#track-pick option', os => os.map(o => o.value).find(v => v.startsWith('crescendo-')));
   if (declared) {

@@ -507,7 +507,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (c.kind === 'extend') { cmd.ins = extendIndex(item.plan, Math.ceil((at - off) / item.plan.phrase) >> 1); cmd.s = Math.round(extendSeconds(item.plan)); }
     // a later command of the same kind on the same track (or curve part) replaces a pending one
     // (two Vary or two Swap of the same part for the same boundary count as one)
-    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && (['volume', 'curve', 'curve-reset', 'instrument'].includes(x.kind) || (['vary', 'swap'].includes(x.kind) && x.type === cmd.type && (x.at0 ?? x.at) === (cmd.at0 ?? cmd.at)));
+    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && (['volume', 'curve', 'curve-reset', 'instrument', 'voice'].includes(x.kind) || (['vary', 'swap'].includes(x.kind) && x.type === cmd.type && (x.at0 ?? x.at) === (cmd.at0 ?? cmd.at)));
     item.commands = item.commands.filter(x => !same(x));
     item.commands.push(cmd);
     S.recipe.steering = [...(S.recipe.steering || []).filter(x => !(x.song === item.n && same(x))), { song: item.n, ...cmd }];
@@ -824,10 +824,39 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         <div class="custom-row">${sel('comments', [...Object.keys(COMMENT_PRESETS), ...(C.comments === 'custom' ? ['custom'] : [])], 'commentsLbl', 'commentsHint', v => t(`comments:${v}`))}<div class="chips">${COMMENT_KEYS.map(k => chip(k, C[k] !== false, `cOpt:${k}`, `cOptHint:${k}`)).join('')}</div></div>
         <div class="custom-row">${sel('functions', [...Object.keys(FUNCTION_PRESETS), ...(C.functions === 'custom' ? ['custom'] : [])], 'fnsLbl', 'fnsHint', v => t(`fns:${v}`))}<div class="chips">${FUNCTION_OPTIONS.map(k => chip(k, C[k], `fOpt:${k}`, `fOptHint:${k}`)).join('')}</div></div>
         <div class="custom-row"><span class="lbl">${esc(t('liveOptions'))}</span><div class="chips">${chip('title', C.title, 'liveTitle', 'liveTitleHint')}${chip('highlights', C.highlights, 'liveHl', 'liveHlHint')}${chip('wrap', C.wrap, 'liveWrap', 'liveWrapHint')}${chip('typist', C.typist === 'human', 'liveHuman', 'liveHumanHint')}${chip('mistakes', C.mistakes !== 'off', 'liveMistakes', 'liveMistakesHint', C.typist !== 'human')}</div></div>
-        <div class="custom-row custom-voices" id="custom-voices"><span class="lbl" title="${esc(t('voicesHint'))}">${esc(t('voicesLbl'))}</span><div class="chips">${chip('narrator', C.narrator !== false, 'liveNarrator', 'liveNarratorHint')}</div>${sel('narratorStyle', CONTROLS.narratorStyle, 'narratorStyleLbl', 'narratorStyleHint', v => t(`narratorStyle:${v}`)).replace('<select ', C.narrator === false ? '<select disabled ' : '<select ')}${grow ? `<div class="chips">${chip('narrated', C.narrated, 'liveNarrated', C.narrator === false ? 'liveNarratedOff' : 'liveNarratedHint', C.narrator === false)}</div>` : ''}</div>
+        <p class="hint muted small">${esc(t('radioCustomVoices'))}</p>
         <p class="hint muted small">${esc(t('radioCustomNext'))}</p>
       </div>
     </div>`;
+  }
+  // The Voices group (voice-placement): the narrator controls and the voice instrument together. The narrator controls
+  // are the Custom profile's (data-custom, data-custom-chip, the same handlers); with another profile they show its
+  // values, disabled, and say why. The voice instrument applies from the next song and, on air, to the song on air from
+  // its next quiet part (a steering command, recorded like the others).
+  function voicesGroup() {
+    const custom = opts.profile === 'custom', C = custom ? customControls(opts.custom) : RADIO_PROFILES.includes(opts.profile) ? customControls({ base: opts.profile, controls: {} }) : null;
+    const narOff = !!C && C.narrator === false, grow = !!C && C.build === 'crescendo', lock = custom ? '' : t(opts.profile === 'artist' ? 'radioNarratorArtist' : 'radioNarratorCustomOnly');
+    const tipOf = (k, off) => esc(lock || (off ? t(off) : t(k)));
+    const style = C ? C.narratorStyle || 'auto' : 'auto';
+    const nar = `<button class="chip small" data-custom-chip="narrator" aria-pressed="${!C || C.narrator !== false}" title="${tipOf('liveNarratorHint')}"${custom ? '' : ' disabled'}>${esc(t('liveNarrator'))}</button>`;
+    const sty = `<label class="ctrl" title="${tipOf('narratorStyleHint', narOff ? 'narratorStyleOff' : '')}"><span class="lbl">${esc(t('narratorStyleLbl'))}</span><select data-custom="narratorStyle" data-no-knob${!custom || narOff ? ' disabled' : ''}>${CONTROLS.narratorStyle.map(v => `<option value="${v}"${style === v ? ' selected' : ''}>${esc(t(`narratorStyle:${v}`))}</option>`).join('')}</select></label>`;
+    const ngr = `<button class="chip small" data-custom-chip="narrated" aria-pressed="${!!(C && C.narrated)}" title="${tipOf('liveNarratedHint', !grow ? 'narratedNeedsCrescendo' : narOff ? 'liveNarratedOff' : '')}"${!custom || !grow || narOff ? ' disabled' : ''}>${esc(t('liveNarrated'))}</button>`;
+    return `<div class="radio-voices" id="radio-voices" role="group" aria-labelledby="radio-voices-lbl"><span class="lbl" id="radio-voices-lbl" title="${esc(t('voicesHint'))}">${esc(t('voicesLbl'))}</span>
+      <div class="voices-nar" id="radio-narrator"><span class="lbl voices-sub">${esc(t('narratorLbl'))}</span><div class="chips">${nar}</div>${sty}<div class="chips">${ngr}</div></div>
+      <div class="radio-voice" id="radio-voice"><span class="lbl voices-sub" title="${esc(t('vinstHint'))}">${esc(t('vinstLbl'))}</span>${voicePanel(opts.voice, { t, esc, mode: 'radio' })}</div>
+      <p class="hint muted small" id="radio-voices-hint">${esc(t('radioVoicesHint'))}</p></div>`;
+  }
+  // a voice instrument change: kept for the next songs; on air, also a steering command on the song on air, from its
+  // next quiet part (the console's rules: not paused, not a frozen or lead song, a quiet part left)
+  function voiceChanged(v) {
+    opts.voice = v; saveOpts(); render();
+    if (!S || S.paused !== undefined) return;
+    const item = S.stream[S.onAir];
+    if (!item || !item.plan) return toast(t('vinstNextOnly'));
+    const { preset, ...voice } = cleanVoice(v), cmd = { kind: 'voice', voice };
+    const why = whyNot({ ...cmd }, item.plain || item.song, item.plan, relNow());
+    if (why) return toast(`${t('vinstNextOnly')} · ${t(`steerWhy:${why}`)}`);
+    if (command(cmd)) toast(t('vinstOnAir'));
   }
   // one Custom control changed: kept with the others, for the songs from the next one; a display control (comments,
   // functions, title, lit notes, line breaks, typing) also reaches the song on air from its next code edit
@@ -883,7 +912,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <label class="ctrl" ${tip('radioProfileTip')}><span class="lbl">${esc(t('radioProfile'))}</span><select id="radio-profile" data-no-knob>${RADIO_CHOICES.map(k => `<option value="${k}"${opts.profile === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtistStyle' : k === 'custom' ? 'radioCustomProfile' : `profile:${k}`))}</option>`).join('')}</select></label>
           <label class="ctrl" ${tip('radioIncomingTip')}><span class="lbl">${esc(t('radioIncoming'))}</span><select id="radio-incoming" data-no-knob>${['profile', 'hidden', 'visible'].map(k => `<option value="${k}"${opts.incoming === k ? ' selected' : ''}>${esc(t(`incoming:${k}`))}</option>`).join('')}</select></label>
         </div>
-        <div class="radio-voice" id="radio-voice"><span class="lbl" title="${esc(t('vinstHint'))}">${esc(t('vinstLbl'))}</span>${voicePanel(opts.voice, { t, esc, mode: 'radio' })}</div>
+        ${voicesGroup()}
         ${opts.profile === 'custom' ? customPanel() : ''}
         <p class="hint muted">${esc(t('radioNextHint'))}</p>
         <div class="radio-seed">
@@ -997,7 +1026,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.id === 'custom-toggle') { customOpen = !customOpen; try { store.set('coding-misk-radio-custom-open', customOpen); } catch (err) {} return render(); }
     if (b.dataset.customBase) { opts.custom = { base: b.dataset.customBase, controls: {} }; saveOpts(); showDisplay(customControls(opts.custom)); return render(); }
     // the voice instrument (voice-controls): a preset or a way, from the next song
-    if (b.dataset.vinstPreset || b.dataset.vinstWay) { const v = voiceEvent(opts.voice, b, { mode: 'radio' }); if (v) { opts.voice = v; saveOpts(); render(); } return; }
+    if (b.dataset.vinstPreset || b.dataset.vinstWay) { const v = voiceEvent(opts.voice, b, { mode: 'radio' }); if (v) voiceChanged(v); return; }
     if (b.dataset.customChip) {
       const k = b.dataset.customChip, C = customControls(opts.custom);
       if (k === 'typist') return setCustom({ typist: C.typist === 'human' ? 'exact' : 'human' });
@@ -1074,7 +1103,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     // the Profile control applies from the next song prepared; the incoming option changes the panel at once
     if (e.target.id === 'radio-profile' && RADIO_CHOICES.includes(e.target.value)) { opts.profile = e.target.value; saveOpts(); render(); }
     if (e.target.id === 'radio-incoming') { opts.incoming = e.target.value; saveOpts(); if (S && S.paused === undefined) player.swap(windowPlayable()); }
-    if (e.target.dataset.vinst) { const v = voiceEvent(opts.voice, e.target, { mode: 'radio' }); if (v) { opts.voice = v; saveOpts(); render(); } }
+    if (e.target.dataset.vinst) { const v = voiceEvent(opts.voice, e.target, { mode: 'radio' }); if (v) voiceChanged(v); }
     if (e.target.dataset.custom) {
       const k = e.target.dataset.custom, v = e.target.value;
       if (k === 'comments' && COMMENT_PRESETS[v]) setCustom({ ...COMMENT_PRESETS[v] });

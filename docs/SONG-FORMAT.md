@@ -136,7 +136,7 @@ Steps are one character per 16th: `x` plays, `.` rests. A 4/4 bar has 16 steps, 
 | `riser` | none (use `{}`) |
 | `code` | `code`: one Strudel pattern expression |
 | `voice` | none |
-| `spoken` | a line: `way` (`passage refrain chop opening`), `text` (`{ "en", "it" }`, a string, or `"vocab:<group>"`), `every` (refrain), `slices` and `rhythm` (chop), `before` (passage, opening) |
+| `spoken` | a line: `way` (`passage refrain chop opening`), `text` (`{ "en", "it" }`, a string, or `"vocab:<group>"`), `every` (refrain), `slices` and `rhythm` (chop), `before` (passage, opening). The track may keep `voiceOptions: { "phrases": "1" \| "2-3" \| "4-5" \| "6-8" \| "many", "kind": "different" \| "repeated" \| "mixed", "ways": [...], "draw": 0 }`, the voice instrument options it was written with in Compose (voice-placement); the app writes it, the compiler ignores it |
 
 - **`steps`** on bass, guitar and pad replace the preset rhythm (the preset still sets the sound shape). On arp and hook they are a mask: a step can silence a note, not add one.
 - **`notes` on bass and arp** are chord tones: `0` root, `1` third, `2` fifth, `3` top note, `~` rest. They follow the chord of each bar and the key of the section. Bass plays them two octaves below the arp. 16 notes per bar (8 for arp at speed "8").

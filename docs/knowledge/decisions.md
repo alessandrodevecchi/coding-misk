@@ -13,6 +13,7 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 
 | Decision | Why | Source |
 | --- | --- | --- |
+| Voice controls in one Voices group (voice-placement, #77) | Compose and the radio each have one group with the narrator and the voice instrument. Narrator controls that cannot apply are disabled with the reason, not hidden. The open song's voice instrument is changed in the group and in its track panel (the same controls); the next song's settings sit in a small row until the New song panel (#78). On air the voice instrument changes through a recorded steering command from the next quiet part; the narrator of the song on air does not change. The radio knob `talk` drives the narrator, so it is named Narrator; it does not scale the voice instrument. | [design](../../openspec/changes/voice-placement/design.md) |
 | Strudel, from npm, never forked | It runs in the browser with no install. A fork only if the audio engine itself must change. | DEVLOG 2026-10-03, [CONTEXT](../CONTEXT.md#key-decisions) |
 | Tempo is set by the player at bar lines, never inside a pattern | `.cps()` in a pattern recomputes queued events with a stale reference and drops notes. | [MUSIC-ENGINE](../MUSIC-ENGINE.md#strudel-gotchas-learned-the-hard-way) |
 | Strudel's master stays at 0.6 | All layers together go above 1 and clip. | [CONTEXT](../CONTEXT.md#key-decisions) |
