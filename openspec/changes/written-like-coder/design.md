@@ -25,6 +25,8 @@ Each way is costed on the code of its track at the bar the line returns (the lin
 
 The cheaper way is taken. When the two are within a factor of 1.35, the choice is drawn, seeded by the song, the track, the line and the bar it returns at, with the cheaper way more likely the further apart they are; so equal costs do not always go the same way, and the same song always writes the same code. The choice is made per gap, so every bar of the gap shows the same code. Known case: kellerlicht, Druck, where the acid line returns with 32 values instead of 24.
 
+Measured (growth:probe, free duration, typing at the section changes): luci-rosse 229.9 to 230.8 s, settimo-cielo 345.7 to 346.4 s, kellerlicht 266.4 s unchanged; muting is mostly the cheaper way. Druck stays at 120.9 s because the typing diff anchors on the blank lines between tracks and shifts by one track, so it retypes lines it should edit; without blank lines as anchors Druck needs 73.7 s. That is a change to the typing diff, which the growth uses too, so it is left for a separate decision.
+
 ## Risks / Trade-offs
 
 - Longer code on screen in sections with many silent tracks. D3 and the screenshots let the owner judge.

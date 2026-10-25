@@ -23,7 +23,7 @@ For each line that goes silent and plays again later, the code SHALL either keep
 
 #### Scenario: Acid line in Druck
 - **WHEN** kellerlicht reaches Druck as Live coder and its acid line returns with 32 values instead of 24
-- **THEN** the line is deleted when it goes silent and typed again in Druck, and the typing before Druck goes down from 120.9 s
+- **THEN** it is kept muted or deleted as the typing model costs the two ways on the code of its track (measured: 47 s to edit, 65 s to type again, so it stays muted)
 
 #### Scenario: Close costs
 - **WHEN** muting and deleting cost about the same for a line

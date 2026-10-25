@@ -1030,6 +1030,22 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - `check-growth-background`: tutto ok tranne "kellerlicht: Play during the growth shows the mark on Play", che fallisce uguale anche col codice prima di questa modifica (provato rimettendo i file di `src/` del commit precedente): non viene da qui, da guardare a parte.
 - Guida: una frase nella scheda di Componi (EN/IT) sulle righe che tornano spente. Schermate per il proprietario in `notes/prove-2026-10-25/scritto/` (prima e dopo, Taglio, Ombra, Scontro 2).
 - Dopo, non qui: blocchi che tornano come variabili o funzioni del brano (riga nel backlog).
+## 2026-10-25: spegnere o cancellare, riga per riga (#75, written-like-coder D5)
+
+- Decisione del proprietario: tenere una riga spenta e modificarla al ritorno, o cancellarla e riscriverla, vanno bene tutte e due; nessuna è sempre giusta. Ora `muteOrDelete` (`src/song/compile-compact.js`) stima i due costi col modello di scrittura (umano, snello, senza righe incollate dagli appunti) sul codice della sua traccia: spegnere costa `$:` → `_$:` quando tace, poi la traccia della sezione prima del ritorno, con la riga spenta al suo posto, trasformata nella traccia al ritorno; cancellare non costa nulla quando tace (le righe tolte vanno via all'inizio), poi la stessa trasformazione senza la riga (una riga lunga si può copiare da una simile sopra). Le altre righe della traccia che tornano nello stesso punto sono spente in tutti e due i casi. Vince la più economica; se i costi sono entro un fattore 1,35 si estrae con un seme (brano, traccia, riga, battuta del ritorno), più probabile la più economica. La scelta vale per tutto il silenzio, quindi il codice non cambia da una battuta all'altra.
+- Prima stimavo la riga da sola: sbagliato. L'acid di Druck da sola costa 46 s da modificare e 53 s da riscrivere, e una prima versione non cambiava nessun numero. Sul codice della traccia: 47 s contro 65 s, resta spenta.
+- Misure (`npm run growth:probe -- <brano> --duration free`, secondi necessari ai cambi di sezione, prima → dopo):
+
+  | Brano | Cambi di sezione | Tutti i passi della parte scritta | Passi di corsa (cambi) |
+  | --- | --- | --- | --- |
+  | luci-rosse | 229,9 → 230,8 s | 244,0 → 244,8 s | 6 → 6 |
+  | settimo-cielo | 345,7 → 346,4 s | 351,2 → 351,8 s | 7 → 7 |
+  | kellerlicht | 266,4 → 266,4 s | 369,4 → 369,4 s | 3 → 3 |
+
+  Per cambio: luci-rosse Ombra 28,8 → 28,1, Scontro 2 53,8 → 55,4 (charleston, open hat e crash di Scontro 2 hanno costi vicini, il seme ne fa cancellare qualcuno); settimo-cielo Strofa 7/8 26,7 → 26,8, Ponte 5/4 54,4 → 54,9; kellerlicht Druck 120,9 → 120,9. Spegnere è quasi sempre la via più economica.
+- Perché Druck resta a 120,9 s: non è l'acid. Il diff a righe della scrittura (`lineDiff` in `src/song/typing.js`, LCS di righe uguali) si aggancia alle righe vuote tra le tracce; quando una traccia cambia numero di righe (in Druck la batteria passa da 1 a 3 righe) l'allineamento scivola di una traccia e la scrittura riscrive righe che dovrebbe modificare (la riga spenta del kick risulta cancellata, quella del basso nuovo "sostituisce" il kick...). Provato senza righe vuote come ancore: Druck 120,9 → 73,7 s, kellerlicht 266,4 → 219,2, luci-rosse 229,9 → 209,1 (Uscita 35,8 → 20,6), settimo-cielo 345,7 → 336,7 (Finale 76,2 → 67,2); forme tenute uguali sui tre brani. Non incluso: cambia la scrittura anche nella crescita (carico, forme, fixture Live coder, `SHAPES_VERSION`) e si sovrappone a `shape-search`. Da decidere col proprietario.
+- Suono uguale: `check:mixer -- --full` passa (46 brani, 16928 passi, 690160 hap), `check-compact-code` passa (porta 5190). Crescita ferma: `check:crescendo -- --full` passa (38 check, fixture ferme, `SHAPES_VERSION` invariato). Altri: `check:typing` 15/15, `check:profiles` 14/14, `check:code` 46/46, `check:knowledge` ok (avviso: catalogo Strudel da rifare prima del merge in main).
+
 ## 2026-10-25 notte: controlli delle voci (#77, voice-controls)
 
 - Stile del narratore: nuovo controllo di profilo `narratorStyle` (automatico, spiega, poetico). Automatico tiene lo stile del brano o del suo stile; spiega e poetico lo sostituiscono in `liveCode` (`withNarratorStyle` in `src/song/spoken.js`, le immagini proprie del brano restano). È un controllo del suono: in radio vale dal prossimo brano, e un brano non in onda tiene il suo (`air-code.js`). Non cambia la crescita.

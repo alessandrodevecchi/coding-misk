@@ -163,7 +163,7 @@ function pairUp(dels, adds) {
 // value first and changed. The text typed is always the edit's text at the end.
 const NEAR = { q: 'wa', w: 'qes', e: 'wrd', r: 'etf', t: 'ryg', y: 'tuh', u: 'yij', i: 'uok', o: 'ipl', p: 'ol', a: 'qsz', s: 'adw', d: 'sfe', f: 'dgr', g: 'fht', h: 'gjy', j: 'hku', k: 'jli', l: 'ko', z: 'xa', x: 'zc', c: 'xv', v: 'cb', b: 'vn', n: 'bm', m: 'n',
   1: '2q', 2: '13', 3: '24', 4: '35', 5: '46', 6: '57', 7: '68', 8: '79', 9: '80', 0: '9', '!': '1@', '<': ',>', '>': '.<', '"': "'", '(': '9*', ')': '0(', '[': ']p', ']': '[', '~': '`', '.': ',', ',': '.', ':': ';', '*': '8(' };
-function mulberry(seedText) {
+export function mulberry(seedText) {
   let h = 2166136261;
   for (let i = 0; i < seedText.length; i++) h = Math.imul(h ^ seedText.charCodeAt(i), 16777619);
   let a = h >>> 0;
