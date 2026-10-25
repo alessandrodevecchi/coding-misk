@@ -9,6 +9,7 @@ import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data
 import { nextTagline } from '../video/fragments.js';
 import { DICE, REVERT } from '../icons.js';
 import { confirmInline } from '../library/songs-view.js';
+import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf } from '../song/crescendo.js';
 
 
 export function createSettings({ root, t, tx, esc, store, looks, app, toast, confirmTwice }) {
@@ -82,6 +83,10 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           <p class="muted">${esc(t('setLibraryIntro'))}</p>
           <div class="actions">${app.hiddenSongs && app.hiddenSongs() ? `<button class="btn" id="set-show-hidden">${esc(t('setShowHidden', { n: app.hiddenSongs() }))}</button>` : `<span class="muted">${esc(t('setHiddenNone'))}</span>`}</div>
         </div>
+        <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
+          <p class="muted">${esc(t('setAdvancedIntro'))}</p>
+          ${row(t('setShapeCap'), `<input type="number" id="set-shape-cap" min="${SHAPE_CAP_MIN}" max="${SHAPE_CAP_MAX}" step="1" value="${shapeCapOf(store.get('coding-misk-shape-cap', null))}" data-no-knob>`, t('setShapeCapHint'))}
+        </div>
         <div class="card set-card"><h3>${esc(t('setData'))}</h3>
           <p class="muted">${esc(t('setDataIntro'))}</p>
           <div class="actions"><button class="btn primary" id="set-export">${esc(t('setExport'))}</button><button class="btn" id="set-import">${esc(t('setImport'))}</button><button class="btn danger" id="set-reset">${esc(t('setReset'))}</button></div>
@@ -146,6 +151,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (e.target.dataset.radioOpt) app.setRadio(e.target.dataset.radioOpt, e.target.value);
     if (e.target.dataset.vidOpt) { setVid(e.target.dataset.vidOpt, e.target.value); render(); }
     if (e.target.dataset.fragOpt) { setFrag(e.target.dataset.fragOpt, e.target.type === 'number' ? Math.max(5, Math.min(180, +e.target.value || 30)) : e.target.value); if (e.target.tagName === 'SELECT') render(); }
+    // the shapes a Compose growth tries (shape-search D3): kept within 4 and 32, the default not stored
+    if (e.target.id === 'set-shape-cap') { const v = shapeCapOf(e.target.value); e.target.value = v; if (v === SHAPE_CAP) store.remove('coding-misk-shape-cap'); else store.set('coding-misk-shape-cap', v); }
     if (e.target.id === 'set-frag-n') store.set('coding-misk-fragment-n', Math.max(1, Math.round(+e.target.value || 1)));
     if (e.target.id === 'set-vid-preset' && e.target.value) { const p = (store.get('coding-misk-video-presets', {}) || {})[e.target.value]; if (p) { store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...p }); toast(t('vidPresetLoaded', { name: e.target.value })); render(); } }
   });

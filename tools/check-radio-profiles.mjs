@@ -23,7 +23,7 @@ import { overlapOf, extraOf } from '../src/endless/transitions.js';
 import { stateAt, buildSteps, checkBuild } from '../src/song/build.js';
 import { compileSong } from '../src/song/compile.js';
 import { liveCode } from '../src/live/live-code.js';
-import { rushedSteps } from '../src/live/typing-load.js';
+import { typingLoad, rushedOf } from '../src/live/typing-load.js';
 import { resolveShape, shapeFacts, canPlay, OPENINGS } from '../src/song/shapes.js';
 import { steerOnAir, airBoundaries, airOffset, ideaSteps, directorView } from '../src/endless/waypoints.js';
 import { steerSong } from '../src/endless/steering.js';
@@ -80,9 +80,13 @@ const grown = () => {
   console.log(`      ${SEEDS} Live coder and 10 Crescendo radio songs grown in ${grownCache.seconds.toFixed(0)} s`);
   return grownCache;
 };
-// rushed steps of the Live coder songs grown in Compose by npm run check:crescendo (free duration, every song in songs/,
-// measured on 2026-10-19 with tools/check-crescendo.mjs's coder()): the radio's songs may rush no more, per song
-const COMPOSE_RUSHED = { songs: 40, rushed: 129 };
+// rushed steps of the growth (before the written part, shape-search D1) of the Live coder songs grown in Compose with
+// the fitted duration, the radio's own (every song in songs/, measured on 2026-10-25 on the Live coder code, as
+// tools/check-crescendo.mjs's coder() with duration fitted): the radio's songs may rush no more, per song. (With the
+// free duration of Compose's default a growth waits for its typing: 5 rushed growth steps in 40 songs. Until
+// shape-search this check counted up to the end of the grown span, the written part included, against the free
+// duration: 129 in 40 on 2026-10-19; it passed on the written part's steps, which no shape decides.)
+const COMPOSE_RUSHED = { songs: 40, rushed: 208 };
 const noProfile = items => items.map(x => { const { profile, ...entry } = x.entry; return { song: x.song, entry }; });
 const profilesOf = items => items.map(x => x.entry.profile || 'classic');
 
@@ -366,13 +370,16 @@ const CHECKS = {
     const free = sessionItems(RECIPES, { ...rec, options: { ...rec.options, ...profileOptions('custom', { base: 'switch', controls: { duration: 'free' } }) } }, 1);
     assert(free[0].song.onAir.free && barsOf(free[0].song) >= barsOf(a[0].song), 'Custom free duration');
   },
-  'typing on air: rushed steps no more than in Compose; the sound does not depend on the panel width'() {
+  'typing on air: rushed growth steps no more than in Compose with the fitted duration; the sound does not depend on the panel width'() {
     const { live } = grown(), C = airControls('switch');
-    let rushed = 0;
-    for (const x of live) rushed += rushedSteps(liveCode(x.song, C, { cols: () => 80 }), x.song.id);
+    let rushed = 0, span = 0;
+    for (const x of live) {
+      const m = typingLoad(liveCode(x.song, C, { cols: () => 80 }), { seed: x.song.id, to: x.song.crescendo ? x.song.crescendo.grown : Infinity });
+      rushed += rushedOf(m.filter(y => !x.song.crescendo || y.at < x.song.crescendo.growth)); span += rushedOf(m);
+    }
     const per = rushed / live.length, compose = COMPOSE_RUSHED.songs ? COMPOSE_RUSHED.rushed / COMPOSE_RUSHED.songs : Infinity;
-    console.log(`      radio Live coder: ${rushed} rushed steps in ${live.length} songs (${per.toFixed(2)} a song); Compose: ${COMPOSE_RUSHED.rushed} in ${COMPOSE_RUSHED.songs} (${compose.toFixed(2)} a song)`);
-    assert(per <= compose, `radio ${per.toFixed(2)} rushed steps a song, Compose ${compose.toFixed(2)}`);
+    console.log(`      radio Live coder: ${rushed} rushed growth steps in ${live.length} songs (${per.toFixed(2)} a song; ${span} up to the end of the grown span); Compose fitted: ${COMPOSE_RUSHED.rushed} in ${COMPOSE_RUSHED.songs} (${compose.toFixed(2)} a song)`);
+    assert(per <= compose, `radio ${per.toFixed(2)} rushed growth steps a song, Compose fitted ${compose.toFixed(2)}`);
     // 40 and 110 columns: the same song, the same code but for its line breaks
     for (const x of live.slice(0, 5)) {
       const a = liveCode(x.song, C, { cols: () => 40 }), b = liveCode(x.song, C, { cols: () => 110 });

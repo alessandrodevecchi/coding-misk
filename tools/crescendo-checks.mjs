@@ -264,6 +264,29 @@ export const CHECKS = [
     for (const s of songs.slice(0, 10)) assert(!crescendoSong(s).crescendo.shape && !crescendoSong(s, { rules: growthRules(resolveProfile('crescendo')) }).crescendo.shape, s.id);
     assert(shaped(coder(byId('switch-prima-luce'))) && coder(byId('switch-prima-luce')).crescendo.shape.version === SHAPES_VERSION, 'Live coder');
   } },
+  { name: 'shape search: the drawn shape first, at most 8 shapes (16 when none of the first 8 meets the target), the same shape twice, the growth alone judged', unit(log) {
+    // shape-search D1-D3: a search with the fitted duration rushes most shapes, so it reaches the caps; the free duration
+    // usually stops early
+    const cases = [['luci-rosse', { duration: 'fitted' }], ['settimo-cielo', { duration: 'fitted' }], ['luci-rosse', {}], ['settimo-cielo', {}], ['kellerlicht', {}], ['switch-prima-luce', {}]];
+    for (const [id, over] of cases) {
+      const s = byId(id), rules = growthRules(resolveProfile('switch', over), { styles });
+      for (const cap of [undefined, 4]) {
+        const stats = {}, c = crescendoSong(s, { rules, stats, ...(cap ? { shapeCap: cap } : {}) }), k = cap || 8;
+        const measured = stats.tried.filter(t => !t.skipped), first = stats.tried[0], drawn = resolveShape(s, { user: rules.shape, styles });
+        assert(stats.cap === k, `${id}: cap ${stats.cap}`);
+        assert(first.development === drawn.development && first.pace === drawn.pace && first.maxDetail === null, `${id}: first tried ${first.development} ${first.pace} ${first.maxDetail}, drawn ${drawn.development} ${drawn.pace}`);
+        assert(measured.length <= 2 * k, `${id} cap ${k}: ${measured.length} shapes measured`);
+        if (measured.length > k) assert(measured.slice(0, k).every(t => t.rushed > 0), `${id} cap ${k}: went past ${k} although one of the first met the target`);
+        // the target and the fallback read the growth only: the kept shape's rushed count is its growth's
+        const kept = stats.tried[stats.kept];
+        assert(kept.rushed === kept.rushedGrowth && c.crescendo.shape.rushed === kept.rushedGrowth, `${id}: kept rushed ${kept.rushed}, growth ${kept.rushedGrowth}`);
+        if (measured.some(t => t.rushed === 0)) assert(kept.rushed === 0 && stats.kept === stats.tried.length - 1, `${id}: a shape met the target and the search went on`);
+        if (!cap) log(`      ${id}${over.duration ? ' (fitted)' : ''}: ${measured.length} shapes measured, kept ${kept.development} ${kept.pace}${kept.maxDetail !== null ? ` detail ${kept.maxDetail}` : ''}, ${kept.rushedGrowth} rushed growth steps, ${kept.rushedWritten} in the written part`);
+      }
+      const again = crescendoSong(s, { rules: growthRules(resolveProfile('switch', over), { styles }) }), once = crescendoSong(s, { rules });
+      assert(JSON.stringify(again.crescendo.shape) === JSON.stringify(once.crescendo.shape) && JSON.stringify(again.build) === JSON.stringify(once.build), `${id}: another shape the second time`);
+    }
+  } },
   { name: 'shapes: every build of every opening and development ends on its destination and every state compiles (medium pace)', songs: isLong, parts: OPENINGS,
     each(s, opening) {
       let n = 0;

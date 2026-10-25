@@ -1,9 +1,11 @@
 // Growth counters of one song (growth-in-background D5): the shapes a growth tried, its free-duration rounds, the
 // rushed steps and rushed load of each shape, the time spent on each and in all, and the shape kept. No browser.
+// A shape is judged on the steps of its growth (shape-search D1): the rushed steps are split into the growth and the
+// written part after it, and each rushed growth step that stays says why (fitted, not-unit, limit, rounds).
 // The growth is the one Compose makes (crescendoSong with the profile's rules and the built-in styles), with the voice
 // instrument's context of the page without measured voice lengths (the committed samples, as tools/song-durations.mjs).
 //   npm run growth:probe -- <song> [--profile switch|crescendo] [--opening x] [--pace x] [--development x]
-//                           [--duration free|fitted] [--narrated] [--lang en|it] [--json]
+//                           [--duration free|fitted] [--narrated] [--lang en|it] [--cap n] [--json]
 // <song>: an id in songs/ or songs/examples/ (luci-rosse, 04-ideas) or a path to a song file.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +20,7 @@ for (let i = 0; i < args.length; i++) {
   else if (a.startsWith('--')) flags[a.slice(2)] = args[++i];
   else rest.push(a);
 }
-const usage = 'usage: npm run growth:probe -- <song> [--profile switch|crescendo] [--opening x] [--pace x] [--development x] [--duration free|fitted] [--narrated] [--lang en|it] [--json]';
+const usage = 'usage: npm run growth:probe -- <song> [--profile switch|crescendo] [--opening x] [--pace x] [--development x] [--duration free|fitted] [--narrated] [--lang en|it] [--cap n] [--json]';
 if (!rest[0]) { console.error(usage); process.exit(2); }
 const file = [rest[0], `songs/${rest[0]}.json`, `songs/examples/${rest[0]}.json`].find(f => fs.existsSync(f) && fs.statSync(f).isFile());
 if (!file) { console.error(`no song ${rest[0]} (songs/, songs/examples/ or a path)\n${usage}`); process.exit(2); }
@@ -44,18 +46,21 @@ const song = { ...JSON.parse(fs.readFileSync(file, 'utf8')), kind: 'composed' };
 const over = Object.fromEntries(['opening', 'pace', 'development', 'duration'].filter(k => flags[k]).map(k => [k, flags[k]]));
 if (flags.narrated) over.narrated = true;
 const C = resolveProfile(profile, over), stats = {};
-const out = crescendoSong(song, { narrated: C.narrated, rules: growthRules(C, { styles }), stats });
+// --cap: the Settings value "Growth shapes tried" (shape-search D3), 8 when left out
+const out = crescendoSong(song, { narrated: C.narrated, rules: growthRules(C, { styles }), ...(flags.cap ? { shapeCap: +flags.cap } : {}), stats });
 const shape = out.crescendo && out.crescendo.shape;
 if (flags.json) { console.log(JSON.stringify({ song: song.id, profile, options: over, shape: shape || null, ...stats }, null, 1)); process.exit(0); }
 
 const sec = ms => (ms / 1000).toFixed(2);
-const rows = stats.tried.map((t, i) => [String(i + 1), t.development ?? '-', t.pace ?? '-', t.maxDetail ?? '-', String(t.rounds), t.skipped ? `skip (${t.skipped})` : t.rushed ?? '-', t.load == null ? '-' : t.load.toFixed(2), String(t.bars), sec(t.ms), i === stats.kept ? 'kept' : '']);
-const head = ['#', 'development', 'pace', 'detail', 'rounds', 'rushed', 'load', 'bars', 's', ''];
+const rows = stats.tried.map((t, i) => [String(i + 1), t.development ?? '-', t.pace ?? '-', t.maxDetail ?? '-', String(t.rounds), t.skipped ? `skip (${t.skipped})` : t.rushed ?? '-', t.rushedGrowth ?? '-', t.rushedWritten ?? '-', t.load == null ? '-' : t.load.toFixed(2), String(t.bars), sec(t.ms), i === stats.kept ? 'kept' : '']);
+const head = ['#', 'development', 'pace', 'detail', 'rounds', 'rushed', 'growth', 'written', 'load', 'bars', 's', ''];
 const w = head.map((h, k) => Math.max(h.length, ...rows.map(r => String(r[k]).length)));
 const line = r => r.map((c, k) => String(c).padEnd(w[k])).join('  ').trimEnd();
 console.log(`${song.id} · ${profile}${Object.keys(over).length ? ' ' + JSON.stringify(over) : ''}${stats.searched ? '' : ' · no search (one growth)'}`);
 console.log(line(head));
 for (const r of rows) console.log(line(r));
 const grown = stats.tried.filter(t => !t.skipped).length;
-console.log(`total ${sec(stats.ms)} s · ${stats.tried.length} shapes tried (${grown} measured) · ${stats.tried.reduce((a, t) => a + t.rounds, 0)} free-duration rounds`);
+console.log(`total ${sec(stats.ms)} s · ${stats.tried.length} shapes tried (${grown} measured, cap ${stats.cap}, at most ${2 * stats.cap}) · ${stats.tried.reduce((a, t) => a + t.rounds, 0)} free-duration rounds`);
+const kept = stats.tried[stats.kept];
+if (kept && kept.late && kept.late.length) console.log(`rushed growth steps kept: ${kept.late.map(x => `bar ${x.at} x${x.ratio} (${x.why})`).join(', ')}`);
 if (shape) console.log(`kept: opening ${shape.opening}, pace ${shape.pace}, development ${shape.development}, rushed ${shape.rushed ?? '-'}${shape.fallback ? ', fallback' : ''} · ${(out.sections || []).reduce((a, x) => a + x.bars, 0)} bars`);

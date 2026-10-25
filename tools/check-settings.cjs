@@ -1,12 +1,12 @@
 // Browser checks for the settings page (#31): gear, theme and language, radio defaults, export format
-// (Opus export of a short song), backup export and import, reset.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-settings.cjs [shots-dir]   (dev server on :5173)
+// (Opus export of a short song), the growth shapes tried (shape-search), backup export and import, reset.
+// Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-settings.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
-const shots = process.argv[2];
+const shots = process.argv[2], URL = `http://localhost:${process.env.PORT || 5173}/`;
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
 (async () => {
@@ -15,7 +15,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(URL); await sleep(2500);
   await page.evaluate(async () => {
     localStorage.clear();
     const base = await (await fetch('/songs/examples/01-first-beat.json')).json();
@@ -56,6 +56,23 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check((await page.evaluate(() => globalThis.codingMiskRadio && globalThis.codingMiskRadio.settings.material)) === 'varied', 'the radio takes the material source from the settings');
   check((await page.getAttribute('.radio-ctrls .mat-source [data-material="varied"]', 'aria-pressed')) === 'true', 'the console starts from the default of the settings');
 
+  // the growth shapes tried (shape-search D3): Advanced card, kept within 4 and 32, the default 8 not stored
+  await page.click('#open-settings'); await sleep(300);
+  check(await page.isVisible('#set-advanced #set-shape-cap') && (await page.inputValue('#set-shape-cap')) === '8', 'Growth shapes tried in Advanced, 8 by default');
+  check(/fewer rushed steps/.test(await page.innerText('#set-advanced')), 'its hint');
+  const capOf = () => page.evaluate(() => localStorage.getItem('coding-misk-shape-cap'));
+  await page.fill('#set-shape-cap', '40'); await page.press('#set-shape-cap', 'Tab'); await sleep(150);
+  check((await capOf()) === '32' && (await page.inputValue('#set-shape-cap')) === '32', 'a value over 32 is kept at 32', await capOf());
+  await page.fill('#set-shape-cap', '2'); await page.press('#set-shape-cap', 'Tab'); await sleep(150);
+  check((await capOf()) === '4', 'a value under 4 is kept at 4', await capOf());
+  await page.fill('#set-shape-cap', '8'); await page.press('#set-shape-cap', 'Tab'); await sleep(150);
+  check((await capOf()) === null, 'the default is not stored', String(await capOf()));
+  await page.fill('#set-shape-cap', '12'); await page.press('#set-shape-cap', 'Tab'); await sleep(150);
+  await page.click('#tab-impostazioni [data-set-lang="it"]'); await sleep(300);
+  check(/forme di crescita provate/i.test(await page.innerText('#set-advanced')) && (await page.inputValue('#set-shape-cap')) === '12', 'in Italian, the value kept');
+  await page.click('#tab-impostazioni [data-set-lang="en"]'); await sleep(300);
+  await page.click('#open-settings'); await sleep(300);
+
   // Opus export of a short song
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(300);
   // the user's song is past page 1 (20 songs a page, #67): a search brings it to page 1
@@ -73,7 +90,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(data.format === 'coding-misk/backup' && data.data['coding-misk-library'] && !data.data['coding-misk-draft'], 'backup holds the library, not the working state', `${data.format} keys: ${Object.keys(data.data || {}).join(', ')}`);
   const p2 = await (await browser.newContext({ viewport: { width: 1300, height: 1100 } })).newPage();
   p2.on('pageerror', e => errors.push(e.message));
-  await p2.goto('http://localhost:5173/'); await sleep(3000);
+  await p2.goto(URL); await sleep(3000);
   await p2.click('#open-settings'); await sleep(300);
   const [chooser] = await Promise.all([p2.waitForEvent('filechooser'), p2.click('#set-import')]);
   await chooser.setFiles(file); await sleep(2500);

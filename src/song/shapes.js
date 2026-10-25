@@ -8,7 +8,7 @@ import { normalizeSong } from './format.js';
 
 // raised when an intended change to the shape rules changes the steps of a checked Live coder build
 // (tools/check-crescendo.mjs, Live coder fixtures); the random stream carries it, so a new version draws anew
-export const SHAPES_VERSION = 3;
+export const SHAPES_VERSION = 4;
 export const OPENINGS = ['slow', 'full-kick', 'typed', 'broken', 'filtered', 'melodic', 'pad', 'voice', 'muted-base', 'mid-set'];
 export const PACES = ['slow', 'medium', 'fast'];
 export const DEVELOPMENTS = ['by-type', 'as-written', 'masks', 'parameters', 'second-section', 'metamorphosis'];

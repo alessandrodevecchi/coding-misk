@@ -64,14 +64,16 @@ async function songCase(browser, id, first) {
   const written = timeOf(await page.$eval('#arr-total', el => el.textContent));
   if (await page.$eval('#live-toggle', el => el.getAttribute('aria-pressed')) !== 'true') { await page.click('#live-toggle'); await sleep(800); }
   // the song as it is now: Classic, nothing growing
-  await page.evaluate(() => { window.__long = []; window.__t0 = performance.now(); });
-  // Live coder: selected within a frame, the mark shows
+  await page.evaluate(() => { window.__long = []; window.__t0 = performance.now(); window.__seen = false; });
+  // Live coder: selected within a frame, the mark shows (since shape-search a growth may end within 150 ms: the mark
+  // seen in any frame since the click counts, and so does a song already grown)
   const a = await change(page, 'click', '#live-profile [data-profile="switch"]');
   await sleep(150);
-  const markA = await markOn(page);
+  const markA = await markOn(page), seenA = await page.evaluate(() => window.__seen);
+  const doneA = !markA && secs(timeOf(await page.$eval('#arr-total', el => el.textContent))) > secs(written);
   check(a.ok && a.ms < LONG, `${id}: Live coder selected at once (${a.ms} ms to the next frame)`);
-  check(markA, `${id}: the growing mark shows next to the profiles`);
-  if (shots && first) {
+  check(markA || seenA || doneA, `${id}: the growing mark shows next to the profiles`, markA ? '' : seenA ? 'shown and gone within 150 ms' : doneA ? 'grown before the next frame' : '');
+  if (shots && first && markA) {
     const box = await page.evaluate(() => { const r = document.querySelector('.live-profiles').getBoundingClientRect(); return { x: Math.max(0, r.left - 12), y: Math.max(0, r.top - 12), width: Math.min(innerWidth, r.width + 24), height: r.height + 24 }; });
     await page.screenshot({ path: path.join(shots, 'mark-profiles.png'), clip: box });
     await page.hover('#live-growing'); await sleep(400);
