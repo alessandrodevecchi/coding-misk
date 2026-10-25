@@ -71,6 +71,26 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('#tab-impostazioni [data-set-lang="it"]'); await sleep(300);
   check(/forme di crescita provate/i.test(await page.innerText('#set-advanced')) && (await page.inputValue('#set-shape-cap')) === '12', 'in Italian, the value kept');
   await page.click('#tab-impostazioni [data-set-lang="en"]'); await sleep(300);
+  // Try all, Keep, Random order, Long song from (shape-search D6, D7): defaults not stored, Keep and the cap follow Try all
+  const ls = k => page.evaluate(x => localStorage.getItem(x), k);
+  check(!(await page.isChecked('#set-shape-all')) && (await page.isDisabled('#set-shape-keep')) && (await page.inputValue('#set-shape-keep')) === 'first', 'Try all off by default, Keep first good one and disabled');
+  check((await page.isChecked('#set-shape-random')) && (await page.inputValue('#set-long-song')) === '15', 'Random order on, Long song from 15 minutes by default');
+  await page.check('#set-shape-all'); await sleep(200);
+  check((await ls('coding-misk-shape-all')) === 'true' && !(await page.isDisabled('#set-shape-keep')) && (await page.isDisabled('#set-shape-cap')), 'Try all on: stored, Keep enabled, the cap disabled');
+  await page.selectOption('#set-shape-keep', 'best'); await sleep(150);
+  check((await ls('coding-misk-shape-keep')) === '"best"', 'Keep best one stored', String(await ls('coding-misk-shape-keep')));
+  await page.selectOption('#set-shape-keep', 'first'); await sleep(150);
+  await page.uncheck('#set-shape-all'); await sleep(200);
+  check((await ls('coding-misk-shape-all')) === null && (await ls('coding-misk-shape-keep')) === null, 'the defaults of Try all and Keep are not stored');
+  await page.uncheck('#set-shape-random'); await sleep(150);
+  check((await ls('coding-misk-shape-random')) === 'false', 'Random order off stored', String(await ls('coding-misk-shape-random')));
+  await page.check('#set-shape-random'); await sleep(150);
+  check((await ls('coding-misk-shape-random')) === null, 'Random order on not stored');
+  await page.fill('#set-long-song', '90'); await page.press('#set-long-song', 'Tab'); await sleep(150);
+  check((await ls('coding-misk-long-song')) === '3600' && (await page.inputValue('#set-long-song')) === '60', 'Long song from kept at 60 minutes, stored in seconds', String(await ls('coding-misk-long-song')));
+  await page.fill('#set-long-song', '15'); await page.press('#set-long-song', 'Tab'); await sleep(150);
+  check((await ls('coding-misk-long-song')) === null, 'Long song from: the default is not stored');
+  check(/shortest song/.test(await page.innerText('#set-advanced')), 'the hints of the new settings');
   await page.click('#open-settings'); await sleep(300);
 
   // Opus export of a short song
