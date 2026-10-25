@@ -21,7 +21,7 @@ OpenSpec changes not archived: 68. With open tasks: 22. All tasks ticked, waitin
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
-| [generator-followups](../../openspec/changes/generator-followups/tasks.md) | 3 | 3 |
+| [generator-followups](../../openspec/changes/generator-followups/tasks.md) | 2 | 3 |
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |
 | [idea-model](../../openspec/changes/idea-model/tasks.md) | 3 | 20 |
 | [idiomatic-code](../../openspec/changes/idiomatic-code/tasks.md) | 2 | 8 |

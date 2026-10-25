@@ -81,6 +81,7 @@
     ]
   },
   "pad": {
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
     "presets": [
       "stab",
       "pad"

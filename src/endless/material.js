@@ -7,7 +7,9 @@ import { compose, KIND_OF_TYPE, SESSION_SOURCES } from '../material/index.js';
 
 // the part of a song that gives each track type (mix.js parts)
 const PART_OF = { drums: 'drums', bass: 'bass', arp: 'lead', hook: 'lead', pad: 'pads', guitar: 'pads' };
-export const sessionSource = opts => (SESSION_SOURCES.includes(opts && opts.material) ? opts.material : 'mix');
+// the gain of a composed pad against the style's pad gain (measured in the browser, generator-followups)
+export const COMPOSED_PAD_GAIN = 0.6;
+export const sessionSource =opts => (SESSION_SOURCES.includes(opts && opts.material) ? opts.material : 'mix');
 // what one track plays in one song: 'preset', 'varied' or 'generated'
 export function trackSource(part, complexity, source, r) {
   if (source === 'composed') return 'generated';
@@ -78,6 +80,9 @@ export function applyMaterial(tracks, R, complexity, opts, M) {
     const A = make(E.A), B = make(E.B), C = complexity > 0.6 ? make(E.C) : null;
     t.patterns = { A: { idea: A.idea }, ...(same(B.idea, A.idea) ? {} : { B: { idea: B.idea } }), ...(C && !same(C.idea, A.idea) && !same(C.idea, B.idea) ? { C: { idea: C.idea } } : {}) };
     used[t.id] = 'generated';
+    // a composed pad voices 4 or 5 notes with no preset envelope: at the same gain it peaked 1.6 to 1.9 times higher
+    // than the preset pads (generator-followups), so it plays lower to stay under the bass
+    if (t.type === 'pad' && t.settings && typeof t.settings.gain === 'number') t.settings = { ...t.settings, gain: Math.round(t.settings.gain * COMPOSED_PAD_GAIN * 100) / 100 };
     // a generated sound when the recipe names sound kinds
     if (style.sounds && style.sounds.length) {
       const s = compose('sound', { seed, style, type: t.type, energy: E.A, octave: t.settings && t.settings.octave });

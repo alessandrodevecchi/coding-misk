@@ -24,7 +24,8 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // The director's version (#38): sessions saved in playlists record it, and warn when it changes. Bump it whenever
 // `npm run check:endless -- --write-fixtures` changes the fixtures (the same seed gives different songs).
 // 4 (voice-instrument): styles with a voice instrument weight give some songs a spoken track and a narrator style
-export const DIRECTOR_VERSION = 5;
+// 6 (generator-followups, #71): the styles' pads compose their chords in some songs (share 0.3), at a lower gain
+export const DIRECTOR_VERSION = 6;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };

@@ -78,7 +78,8 @@ Every instrument also takes:
 ```json
 "hook": { "material": { "source": "mix", "share": 0.4, "rules": ["polymeter", "tail", "call-response"] }, "presets": ["neon", "pioggia"] },
 "drums": { "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "two-step"] }, "grooves": ["techno"] },
-"bass": { "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "octaves"], "sounds": ["reese", "saw"] } }
+"bass": { "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "octaves"], "sounds": ["reese", "saw"] } },
+"pad": { "material": { "source": "mix", "share": 0.3, "rules": ["style"] }, "presets": ["pad", "stab"] }
 ```
 
 | Field | Value | Default |
@@ -91,7 +92,7 @@ Every instrument also takes:
 
 An instrument without `material` uses its presets only. The validator rejects an unknown source, family, rule or sound kind, and a share outside 0 to 1, with the JSON path and the known names. Composed parts come in only with complexity above 0, and a radio or session can override every recipe with its own material source (`patterns`, `varied`, `composed`, or `mix` to follow the recipes).
 
-The built-in styles use `mix` with a modest share (0.2 to 0.5): presets stay the larger share where a style lives on its signature grooves and riffs (live coder styles, acid, house, jazz, country, rock, metal), pads and guitars keep presets, and FM sounds are named only by drum and bass (`reese`) and darksynth (`growl`, `dirty`) basses. These values wait for the owner's listening test.
+The built-in styles use `mix` with a modest share (0.2 to 0.5): presets stay the larger share where a style lives on its signature grooves and riffs (live coder styles, acid, house, jazz, country, rock, metal), every style with a pad composes it in 0.3 of its songs with the rule `style` (the song's own chords voiced near `c4`, held or as stabs, at 0.6 of the pad gain; never `mode`, so the harmony stays the song's), guitars keep presets, and FM sounds are named only by drum and bass (`reese`) and darksynth (`growl`, `dirty`) basses. The owner approved composed pad chords after listening in Compose (`#71`); the other shares and the FM lists still wait for his listening test.
 
 ## Mixing
 
