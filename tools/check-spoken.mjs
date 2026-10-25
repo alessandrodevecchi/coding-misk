@@ -1,5 +1,7 @@
 // Checks for the voice instrument (voice-instrument, #39): spoken tracks and their lines, the four ways to speak, the
-// narrator that yields, the poetic narrator, texts and speakers, the growth and the director. No browser.
+// narrator that yields, the poetic narrator, texts and speakers, the growth and the director; the voice controls
+// (voice-controls, #77): the default unchanged, phrases per song as a ceiling, different and repeated lines, one phrase
+// per part, ways, presence, presets, the narrator style control. No browser.
 //   npm run check:spoken      exit 1 when any check fails
 import fs from 'node:fs';
 import { songFiles } from './songs-dir.mjs';
@@ -14,7 +16,10 @@ import { crescendoSong } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
 import { shapeFacts, canPlay, resolveShape } from '../src/song/shapes.js';
-import { generateSession } from '../src/endless/director.js';
+import { generateSession, createSession } from '../src/endless/director.js';
+import { VOICE_PRESETS, VOICE_PHRASES, PHRASE_RANGES, applyPreset, presetOf, cleanVoice, isDefaultVoice } from '../src/endless/voice-options.js';
+import { voiceEvent } from '../src/endless/voice-panel.js';
+import { withNarratorStyle, lineTexts } from '../src/song/spoken.js';
 import { energyOf } from '../src/endless/energy.js';
 import { meterSteps } from '../src/music.js';
 
@@ -28,6 +33,11 @@ const clone = o => JSON.parse(JSON.stringify(o));
 // every sample exists (a manifest that finds any phrase)
 const ANY = new Proxy({}, { get: () => ({ findIndex: () => 0 }) });
 const beatsPerBar = (n, bar) => meterSteps((n.sections.find(s => bar >= s.start && bar < s.start + s.bars) || n.sections[0]).meter) / 4;
+// voice-controls: sessions with the voice instrument often, on the three styles that have one
+const VOICE_STYLES = ['dark-cyberpunk', 'ambient', 'pure-trance'];
+const voiced = (voice, seed = 'vc', minutes = 60) => generateSession(recipes, { styles: VOICE_STYLES, seed, minutes, voice }).songs.filter(s => s.tracks.some(t => t.type === 'spoken'));
+const spokenOf = s => s.tracks.find(t => t.type === 'spoken');
+const lineKey = (s, t, k) => lineTexts(lineOf(s, t, k, t.patterns[k]), 'en').join(' · ');
 // the bars where a narration is spoken in a voice code: "spoken on bar N"
 const narrated = code => [...code.matchAll(/spoken on bar (\d+)/g)].map(m => +m[1] - 1);
 
@@ -246,6 +256,133 @@ const CHECKS = {
     // complexity 0 keeps the plain songs
     const zero = generateSession(recipes, { ...opts, complexity: 0 }).songs;
     assert(zero.every(s => !s.tracks.some(t => t.type === 'spoken') && !s.narrator), 'a voice instrument at complexity 0');
+  },
+
+  'voice controls: As the style (or no options) writes the same songs as before; the extra draws never touch the default'() {
+    const opts = { styles: VOICE_STYLES, seed: 'uguale', minutes: 40, chaos: 0.3 };
+    const plain = JSON.stringify(generateSession(recipes, opts));
+    for (const voice of [undefined, null, {}, applyPreset('style'), cleanVoice({ preset: 'style' })]) assert(JSON.stringify(generateSession(recipes, { ...opts, voice })) === plain, `different songs with ${JSON.stringify(voice)}`);
+    assert(isDefaultVoice(applyPreset('style')) && !isDefaultVoice(applyPreset('discreet')), 'default detection');
+    // the session records the options only when they are not the default
+    assert(!('voice' in generateSession(recipes, opts).session.options) && generateSession(recipes, { ...opts, voice: applyPreset('present') }).session.options.voice.phrases === '2-3', 'session options');
+  },
+  'voice controls: phrases per song are a ceiling; each phrase speaks; several phrases reach their count when the song has room'() {
+    const seen = {};
+    for (const phrases of VOICE_PHRASES) {
+      const [, hi] = PHRASE_RANGES[phrases], songs = voiced({ phrases, kind: 'different', presence: 'often' });
+      assert(songs.length >= 3, `${phrases}: ${songs.length} songs with a voice instrument`);
+      for (const s of songs) {
+        assert(!validateSong(s).errors.length, `${s.id}: ${JSON.stringify(validateSong(s).errors[0])}`);
+        const t = spokenOf(s), placed = placeSpoken(s, 'en');
+        assert(t.clips.length >= 1 && t.clips.length <= hi, `${phrases} ${s.id}: ${t.clips.length} phrases`);
+        // a phrase that finds no part is dropped, never written silent
+        assert(placed.length === t.clips.length && placed.every(p => p.starts.length), `${phrases} ${s.id}: a phrase without a start`);
+      }
+      seen[phrases] = Math.max(...songs.map(s => spokenOf(s).clips.length));
+    }
+    assert(seen['2-3'] >= 2 && seen['4-5'] >= 4 && seen['6-8'] >= 5, `most phrases in a song: ${JSON.stringify(seen)}`);
+    console.log(`      most phrases in a song: ${Object.entries(seen).map(([k, v]) => `${k} → ${v}`).join(', ')}`);
+  },
+  'voice controls: different lines are all different, repeated is one line, mixed is one line coming back with different ones'() {
+    let n = 0;
+    for (const s of voiced({ phrases: '4-5', kind: 'different', presence: 'often' })) {
+      const t = spokenOf(s), keys = t.clips.map(c => c.pattern), lines = keys.map(k => lineKey(s, t, k));
+      assert(new Set(keys).size === keys.length && new Set(lines).size === lines.length, `${s.id}: ${lines.join(' | ')}`);
+      if (keys.length >= 4) n++;
+    }
+    assert(n >= 1, 'no song with 4 or 5 different lines');
+    for (const s of voiced({ phrases: '6-8', kind: 'repeated', presence: 'often' })) {
+      const t = spokenOf(s);
+      assert(Object.keys(t.patterns).length === 1 && t.clips.every(c => c.pattern === 'A'), `${s.id}: ${Object.keys(t.patterns)}`);
+    }
+    let m = 0;
+    for (const s of voiced({ phrases: '4-5', kind: 'mixed', presence: 'often' })) {
+      const t = spokenOf(s), keys = t.clips.map(c => c.pattern), others = keys.filter(k => k !== 'A');
+      assert(new Set(others).size === others.length && new Set(Object.keys(t.patterns).map(k => lineKey(s, t, k))).size === Object.keys(t.patterns).length, `${s.id}: ${keys}`);
+      if (keys.filter(k => k === 'A').length >= 2 && others.length >= 1) m++;
+    }
+    assert(m >= 1, 'no mixed song with a line coming back');
+  },
+  'voice controls: never two phrases in the same part; each phrase in a quiet part (intro, break, outro or few tracks)'() {
+    let n = 0;
+    for (const kind of ['different', 'repeated', 'mixed']) {
+      const g = generateSession(recipes, { styles: VOICE_STYLES, seed: `parti-${kind}`, minutes: 60, voice: { phrases: 'many', kind, presence: 'often' } });
+      for (const s of g.songs.filter(x => x.tracks.some(t => t.type === 'spoken'))) {
+        const t = spokenOf(s), e = g.session.songs.find(x => x.id === s.id), len = e.phrase, few = Math.max(2, Math.floor(e.usualHigh / 2));
+        const parts = t.clips.map(c => Math.floor(c.start / len));
+        assert(new Set(parts).size === parts.length, `${s.id}: two phrases in one part (${parts})`);
+        const n0 = normalizeSong(s);
+        for (const c of t.clips) {
+          assert(c.start % len === 0 && c.bars <= len, `${s.id}: a clip across parts ${c.start}+${c.bars}`);
+          const sec = n0.sections.find(x => c.start >= x.start && c.start < x.start + x.bars), on = stateAt(s, c.start).song.tracks.filter(x => !x.mute && x.type !== 'voice' && x.type !== 'spoken').length;
+          assert(/intro|break|outro/i.test(sec.name) || on <= few, `${s.id}: a phrase in ${sec.name} with ${on} tracks`);
+          for (const p of placeSpoken(s, 'en').filter(x => x.key === c.pattern)) for (const st of p.starts) assert(t.clips.some(x => st.bar >= x.start && st.bar < x.start + x.bars && x.pattern === p.key), `${s.id}: a line outside its part`);
+        }
+        n++;
+      }
+    }
+    assert(n >= 6, `${n} songs`);
+  },
+  'voice controls: ways switched off are never used; How often: never, as the style says, often; a single song on or off'() {
+    for (const ways of [['chop'], ['passage', 'opening'], ['refrain']]) for (const s of voiced({ phrases: '4-5', kind: 'different', ways, presence: 'often' }, `modi-${ways}`)) {
+      const used = Object.values(spokenOf(s).patterns).map(p => p.way);
+      assert(used.every(w => ways.includes(w)), `${ways}: ${s.id} uses ${used}`);
+    }
+    assert(!voiced({ presence: 'never' }).length, 'a voice instrument with never');
+    const style = voiced({ phrases: '1', kind: 'different', ways: null, presence: 'style' }, 'quanto', 120).length, often = voiced({ presence: 'often' }, 'quanto', 120).length;
+    assert(often > style, `often ${often}, as the style ${style}`);
+    const one = (styles, presence, seed) => createSession(recipes, seed).next({ styles, voice: { presence } }).song;
+    for (let k = 0; k < 6; k++) {
+      assert(one(['berlin-techno'], 'always', `uno-${k}`).tracks.some(t => t.type === 'spoken'), 'on: a song without its voice instrument');
+      assert(!one(VOICE_STYLES, 'never', `uno-${k}`).tracks.some(t => t.type === 'spoken'), 'off: a voice instrument');
+    }
+    assert(!validateSong(one(['berlin-techno'], 'always', 'uno-0')).errors.length, 'a style without a voice instrument, on: invalid song');
+    // (its speaker is one of the styles that have a voice instrument: their vocabulary samples exist)
+    const known = new Set(recipes.flatMap(r => (r.spoken && r.spoken.speakers) || []));
+    for (let k = 0; k < 6; k++) { const sp = one(['berlin-techno'], 'always', `uno-${k}`).tracks.find(t => t.type === 'spoken').settings.speaker; assert(known.has(sp), `on: speaker ${sp} has no vocabulary samples`); }
+  },
+  'voice controls: presets set the controls together; touching one makes it Custom'() {
+    assert(VOICE_PRESETS.obsessive.kind === 'repeated' && VOICE_PRESETS.obsessive.ways.join() === 'refrain,chop' && VOICE_PRESETS.present.presence === 'often', 'presets');
+    for (const id of Object.keys(VOICE_PRESETS)) assert(presetOf(applyPreset(id)) === id, `${id} is not its own preset`);
+    const el = d => ({ dataset: d, value: d.value });
+    const a = voiceEvent(applyPreset('present'), el({ vinst: 'phrases', value: '6-8' }));
+    assert(a.preset === 'custom' && a.phrases === '6-8' && a.kind === 'mixed', JSON.stringify(a));
+    const b = voiceEvent(applyPreset('discreet'), el({ vinstWay: 'chop' }));
+    assert(b.preset === 'custom' && !b.ways.includes('chop'), JSON.stringify(b));
+    assert(voiceEvent(b, el({ vinstPreset: 'obsessive' })).preset === 'obsessive', 'back to a preset');
+    // a single song keeps its own on/off with a preset
+    const c = voiceEvent({ presence: 'always' }, el({ vinstPreset: 'obsessive' }), { mode: 'song' });
+    assert(c.presence === 'always' && c.phrases === '6-8' && presetOf(c, { presence: false }) === 'obsessive', JSON.stringify(c));
+  },
+  'voice controls: songs with several phrases grow in Crescendo and Live coder; every phrase still speaks'() {
+    let n = 0;
+    for (const s of voiced({ phrases: '4-5', kind: 'mixed', presence: 'often' }, 'cresce', 30).slice(0, 3)) {
+      const want = placeSpoken(s, 'en').length;
+      for (const id of ['crescendo', 'switch']) {
+        const C = resolveProfile(id), c = crescendoSong({ ...s, kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles }) }), L = liveCode(c, C, { files: () => ANY });
+        for (const st of buildSteps(L.build)) L.codeAt(st.at);
+        const got = placeSpoken(c, 'en');
+        assert(got.length === want && got.every(p => p.starts.length), `${s.id} ${id}: ${got.length} of ${want} phrases speak`);
+        n++;
+      }
+    }
+    assert(n >= 4, `${n} grown songs`);
+  },
+  'narrator style control: automatic keeps the song own; poetic speaks images on any song, explaining explains a poetic song'() {
+    const texts = (song, C) => {
+      const c = crescendoSong(song, { rules: growthRules(C) }), L = liveCode(c, C, { files: () => ANY }), out = [];
+      for (const st of buildSteps(L.build)) for (const m of L.codeAt(st.at).matchAll(/\/\/ "([^"]+)", spoken on bar/g)) out.push(m[1]);
+      return out;
+    };
+    const poetic = Object.values(POETIC).flat().map(x => x.en), luci = read('songs/luci-rosse.json'), notte = read('songs/prova-voce-notte.json');
+    const auto = texts(luci, resolveProfile('crescendo')), ex = texts(luci, resolveProfile('crescendo', { narratorStyle: 'explain' })), po = texts(luci, resolveProfile('crescendo', { narratorStyle: 'poetic' }));
+    assert(auto.length && JSON.stringify(auto) === JSON.stringify(ex) && !auto.some(x => poetic.includes(x)), `luci-rosse automatic: ${auto.slice(0, 3)}`);
+    assert(po.length >= 2 && po.every(x => poetic.includes(x)), `luci-rosse poetic: ${po.slice(0, 3)}`);
+    const own = notte.narrator && typeof notte.narrator === 'object' && notte.narrator.lines ? Object.values(notte.narrator.lines).flat().map(x => x.en) : [];
+    const nAuto = texts(notte, resolveProfile('crescendo')), nEx = texts(notte, resolveProfile('crescendo', { narratorStyle: 'explain' }));
+    assert(nAuto.length && nAuto.every(x => poetic.includes(x) || own.includes(x)), `prova-voce-notte automatic: ${nAuto.slice(0, 3)}`);
+    assert(nEx.length && !nEx.some(x => poetic.includes(x) || own.includes(x)), `prova-voce-notte explaining: ${nEx.slice(0, 3)}`);
+    assert(withNarratorStyle(luci, 'auto') === luci && withNarratorStyle(notte, 'poetic') === notte, 'auto and the same style keep the song');
   },
 };
 

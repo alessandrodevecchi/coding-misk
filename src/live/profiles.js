@@ -15,6 +15,8 @@ export const CONTROLS = {
   // comments are not affected); a configuration saved without it plays with the narrator on
   narrator: [true, false],
   narrated: [false, true],
+  // the narrator's style (voice-controls): automatic (the song's own, or its style's), explaining or poetic
+  narratorStyle: ['auto', 'explain', 'poetic'],
   typing: ['slow', 'normal', 'fast'],
   view: ['now', 'compact', 'track', 'sections'],
   gen: ['standard', 'idiomatic'],
@@ -46,16 +48,16 @@ export const CONTROLS = {
   development: ['auto', ...DEVELOPMENTS],
 };
 export const PROFILES = {
-  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
-  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
   // Live coder (shown so since clear-names; the id stays switch in songs, recipes and storage); its comments are the
   // title only (radio-profiles 9.2): no track names, notes or phrases
-  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrator: true, narrated: false, typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: false, notes: false, steps: false, voice: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, fnLanes: true, typist: 'human', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: false, notes: false, steps: false, voice: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, fnLanes: true, typist: 'human', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
 };
 export const PROFILE_IDS = Object.keys(PROFILES);
 // the controls that change only how the code looks, never the sound or the growth (radio-profiles 9.1): comments, technical
 // functions, the title, lit notes, line breaks, human typing and its mistakes. In the radio they apply to the song on air
-// from its next code edit; the others (build, growth, duration, shape, view, generator, narrator, narrated, typing speed) from the
+// from its next code edit; the others (build, growth, duration, shape, view, generator, narrator, narrated, narrator style, typing speed) from the
 // next song
 export const DISPLAY_CONTROLS = ['title', 'tracks', 'notes', 'steps', 'voice', 'highlights', 'wrap', 'fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'fnLanes', 'typist', 'mistakes'];
 // the code options that also apply with the Live build off (profile-options): the song as written goes through the

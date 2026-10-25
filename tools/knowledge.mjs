@@ -87,6 +87,7 @@ const CONTROL_TEXT = {
   duration: { label: 'durLbl', hint: 'durHint', value: v => `dur:${v}` },
   narrator: { label: 'liveNarrator', hint: 'liveNarratorHint' },
   narrated: { label: 'liveNarrated', hint: 'liveNarratedHint' },
+  narratorStyle: { label: 'narratorStyleLbl', hint: 'narratorStyleHint', value: v => `narratorStyle:${v}` },
   typing: { label: 'setTyping', hint: 'setTypingHint', value: v => `setTyping:${v}` },
   view: { label: 'liveCodeView', hint: 'liveCompactHint', value: v => ({ now: 'liveCodeNow', compact: 'liveCodeCompact', track: 'liveCodeTrack', sections: 'liveCodeSections' })[v] },
   gen: { label: 'liveGen', hint: 'liveGenHint', value: v => ({ standard: 'liveGenStandard', idiomatic: 'liveGenIdiomatic' })[v] },

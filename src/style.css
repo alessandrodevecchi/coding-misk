@@ -212,6 +212,11 @@
   .live-panel .ctrl { min-width: 0; }
   .live-panel select { width: 100%; max-width: 100%; }
   .live-panel .chips { flex-wrap: wrap; }
+  /* the Voices group (voice-controls): narrator voice, narrator style and narrated growth on one row */
+  .live-voices { grid-column: 1 / -1; display: grid; gap: 4px; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .live-voices[hidden] { display: none; }
+  .live-voices .chips { display: flex; align-items: center; gap: 6px 10px; }
+  .live-voices select { width: auto; max-width: 100%; }
   /* the growth shape (growth-shapes): opening, pace and development side by side, the shape that plays above them */
   .live-shape { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 16px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; min-width: 0; }
   .live-shape[hidden] { display: none; }
@@ -809,6 +814,21 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* radio: transitions and harmony (#23) */
 .radio-how { display: flex; flex-wrap: wrap; gap: 10px 16px; }
 .radio-how .ctrl { display: grid; gap: 4px; min-width: 160px; }
+/* the voice instrument (voice-controls): presets and phrase controls, in the radio and for a new song by an artist */
+.vinst { display: grid; gap: 8px; min-width: 0; }
+.vinst-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-end; }
+.vinst .ctrl { display: grid; gap: 4px; min-width: 0; }
+.vinst .chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.vinst select { max-width: 100%; }
+.radio-voice { display: grid; gap: 6px; margin-top: 10px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; }
+.vinst-new { position: relative; display: inline-block; }
+.vinst-new > summary { list-style: none; cursor: pointer; }
+.vinst-new > summary::-webkit-details-marker { display: none; }
+.vinst-now { font-size: 11px; color: var(--muted); }
+.vinst-pop { position: absolute; z-index: 30; right: 0; top: calc(100% + 6px); width: min(560px, 92vw); padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel, var(--bg)); box-shadow: 0 8px 24px rgba(0,0,0,.35); display: grid; gap: 6px; }
+.custom-row.custom-voices { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; }
+.custom-voices > .lbl { flex-basis: 100%; }
+.custom-voices > .ctrl { min-width: 140px; }
 /* radio: the profile of the song on air and the Custom profile (radio-profiles 4.5, 4.6) */
 .radio-profile-now { display: flex; align-items: center; gap: 6px; margin: 2px 0 4px; font: 12px/1.4 var(--mono); color: var(--a2); }
 .radio-profile-now .ico { width: 14px; height: 14px; flex: none; }
@@ -1280,3 +1300,4 @@ button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); 
 .pn-ghead h4 { margin: 0; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 /* the New row of the Patterns tab: its own heading, apart from the loop controls (#76) */
 .pn-gen-head { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.vinst [data-vinst-style-ways] { font-size: 12px; }

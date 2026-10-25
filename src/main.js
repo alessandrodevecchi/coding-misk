@@ -49,6 +49,8 @@ import { windowSong } from './endless/join.js';
 import { absoluteClips, playlistTransition, overlapOf, layout } from './endless/transitions.js';
 import { joinSession } from './endless/join.js';
 import { createSession, stylesNear } from './endless/director.js';
+import { cleanVoice, voiceOption, presetOf as voicePresetOf } from './endless/voice-options.js';
+import { voicePanel, voiceEvent } from './endless/voice-panel.js';
 import { styleId, stylePush } from './endless/recipe.js';
 import { loadLimiter, setMasterLevel } from './sounds/limiter.js';
 import { createSoundBrowser } from './sounds/browser.js';
@@ -1662,8 +1664,10 @@ function renderArranger() {
   renderShape(C, on && crescendo);
   $('#live-style').value = lv.style; $('#live-style').disabled = !on;
   $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
-  // the narrator switch (profile-options): Fully narrated belongs to it, disabled with a hint while the narrator is off
+  // the narrator switch (profile-options): Narrated growth belongs to it, disabled with a hint while the narrator is off
   $('#live-narrator').setAttribute('aria-pressed', C.narrator !== false);
+  // the narrator style (voice-controls), in the Voices group with the narrator: off, it has nothing to say
+  $('#live-narrator-style').value = C.narratorStyle || 'auto'; $('#live-narrator-style').disabled = C.narrator === false;
   $('#live-narrated').disabled = C.narrator === false; $('#live-narrated').title = t(C.narrator === false ? 'liveNarratedOff' : 'liveNarratedHint');
   // the live build options: a panel under the "Live build" button; with the Live build off it keeps the code options
   // (comments, technical functions, title, lit notes, line breaks: profile-options) under the title "Code"
@@ -1945,6 +1949,8 @@ $('#live-fns').addEventListener('change', e => { if (FUNCTION_PRESETS[e.target.v
 for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).addEventListener('click', () => { setControl(k, !ctlOf(T)[k]); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { setControl('narrated', !ctlOf(T).narrated); liveChanged(); });
 $('#live-narrator').addEventListener('click', () => { setControl('narrator', ctlOf(T).narrator === false); liveChanged(); });
+// the narrator style (voice-controls): automatic (the song's own), explaining or poetic
+$('#live-narrator-style').addEventListener('change', e => { setControl('narratorStyle', e.target.value); liveChanged(); });
 $('#live-title').addEventListener('click', () => { setControl('title', !ctlOf(T).title); liveChanged(); });
 $('#live-hl').addEventListener('click', () => { setControl('highlights', !ctlOf(T).highlights); liveChanged(); });
 $('#live-wrap').addEventListener('click', () => { setControl('wrap', !ctlOf(T).wrap); liveChanged(); });
@@ -2145,9 +2151,27 @@ $('#tr-new').addEventListener('click', () => {
     tracks: [{ id: 'drums', name: t('drums'), type: 'drums', settings: baseSettings('drums'), patterns: { A: DEFAULT_PATTERN.drums() }, clips: [{ section: name, pattern: 'A' }] }] });
   sel = 0; tk = 0; editPat = null; syncAll(); changed(); renderTrackPanel();
 });
+// the voice instrument of a new song by an artist (voice-controls): on, off or as the style says, and the phrase
+// controls with their presets; kept in this browser
+const ARTIST_VOICE = 'coding-misk-artist-voice';
+let artistVoice = cleanVoice(store.get(ARTIST_VOICE, null));
+function renderArtistVoice() {
+  const body = $('#tr-artist-voice-body'); if (!body) return;
+  body.innerHTML = `<p class="hint muted small">${esc(t('vinstNewHint'))}</p>${voicePanel(artistVoice, { t, esc, mode: 'song' })}`;
+  const p = voicePresetOf(artistVoice, { presence: false });
+  $('#tr-artist-voice-now').textContent = artistVoice.presence === 'never' ? t('vinstSong:never') : artistVoice.presence === 'always' ? `${t('vinstSong:always')} · ${t(`vinstPreset:${p}`)}` : t(`vinstPreset:${p}`);
+}
+function artistVoiceEvent(el) {
+  const v = voiceEvent(artistVoice, el, { mode: 'song' });
+  if (!v) return;
+  artistVoice = v; store.set(ARTIST_VOICE, artistVoice); renderArtistVoice();
+}
+$('#tr-artist-voice-body').addEventListener('click', e => { const b = e.target.closest('button'); if (b) artistVoiceEvent(b); });
+$('#tr-artist-voice-body').addEventListener('change', e => artistVoiceEvent(e.target));
 // a new live build song by an artist (#35): written by the director, opened unsaved
 function renderArtistPick() {
   const sel = $('#tr-artist'); if (!sel || !artistsTab) return;
+  renderArtistVoice();
   sel.innerHTML = `<option value="">${esc(t('newFromArtist'))}</option>` + artistsTab.usable().map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
 }
 $('#tr-artist').addEventListener('change', e => {
@@ -2158,7 +2182,9 @@ $('#tr-artist').addEventListener('change', e => {
 // also from the artist's sheet in the Groove Lab, which switches to Listen and Compose (#42)
 function newSongFromArtist(a) {
   if (dirty && !confirmTwice('new', t('loadConfirm'))) return;
-  const { song: sg } = createSession(RECIPES).next({ artist: a });
+  // (the voice instrument options, voice-controls: As the style writes the song as before)
+  const voice = voiceOption(artistVoice);
+  const { song: sg } = createSession(RECIPES).next({ artist: a, ...(voice ? { voice } : {}) });
   const tr = { ...sg, id: 'u-' + Date.now(), kind: 'composed', style: { en: `${a.name} · ${sg.style.en}`, it: `${a.name} · ${sg.style.it}` } };
   dirty = false;
   if (!loadTrack(tr)) return;
