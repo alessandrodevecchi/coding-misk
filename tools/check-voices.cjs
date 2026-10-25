@@ -5,8 +5,8 @@
 // New phrases); "In the next song" for a new song by an artist (on, off, presets; Obsessive gives one line repeated);
 // no voice instrument button in the toolbar. Radio: one Voices group with the narrator (Custom profile only, disabled
 // with the reason otherwise), the Narrator knob (in the group, same stored value) and the voice instrument (presets,
-// Custom, options in the recipe, a steering command on the song on air, recorded in the session). Italian labels.
-// Screenshots of each part when a folder is given.
+// Custom, options in the recipe; a change waits for the next song, Apply to the song on air sends a steering command on
+// the song on air, recorded in the session). Italian labels. Screenshots of each part when a folder is given.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -128,10 +128,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
 
   // the radio: one Voices group, the narrator (Custom only) and the voice instrument
   await page.click('[data-tab="radio"]'); await sleep(800);
-  const rg = () => page.evaluate(() => { const g = document.querySelector('#radio-voices'); if (!g) return null; const a = g.querySelector('[data-custom-chip="narrator"]'), st = g.querySelector('[data-custom="narratorStyle"]'), b = g.querySelector('[data-custom-chip="narrated"]'), vi = g.querySelector('#radio-voice'); return { label: g.querySelector(':scope > .lbl').textContent, together: !!(a && st && b && vi), narratorOff: a.disabled, tip: a.title, style: st.value, styleOff: st.disabled, narratedOff: b.disabled, hint: (g.querySelector('#radio-voices-hint') || {}).textContent || '', inCustom: !!document.querySelector('#custom-voices'), knobIn: !!g.querySelector('#radio-narrator #radio-talk'), knobRow: [...document.querySelectorAll('.radio-ctrls .ctrls.three input[type=range]')].map(i => i.id).join(), saved: (JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').custom || {}).controls || {} }; });
+  const rg = () => page.evaluate(() => { const g = document.querySelector('#radio-voices'); if (!g) return null; const a = g.querySelector('[data-custom-chip="narrator"]'), st = g.querySelector('[data-custom="narratorStyle"]'), b = g.querySelector('[data-custom-chip="narrated"]'), vi = g.querySelector('#radio-voice'); return { label: g.querySelector(':scope > .lbl').textContent, together: !!(a && st && b && vi), narratorOff: a.disabled, tip: a.title, style: st.value, styleOff: st.disabled, narratedOff: b.disabled, hint: (g.querySelector('#radio-voices-hint') || {}).textContent || '', inCustom: !!document.querySelector('#custom-voices'), knobIn: !!g.querySelector('#radio-narrator #radio-talk'), knobRow: [...document.querySelectorAll('.radio-ctrls .ctrls.three input[type=range]')].map(i => i.id).join(), onAir: (g.querySelector('#radio-voice [data-vinst-onair]') || {}).textContent || '', onAirOff: !!(g.querySelector('#radio-voice [data-vinst-onair]') || {}).disabled, onAirTip: (g.querySelector('#radio-voice [data-vinst-onair]') || {}).title || '', saved: (JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').custom || {}).controls || {} }; });
   let r = await rg();
   check(r && r.label === 'Voices' && r.together && r.narratorOff && r.styleOff && /Custom/.test(r.tip) && /next song/.test(r.hint) && /quiet part/.test(r.hint), 'radio: one Voices group with the narrator and the voice instrument; another profile: narrator disabled, says why', JSON.stringify(r));
   check(r.knobIn && r.knobRow === 'radio-chaos,radio-energy,radio-complexity', 'radio: the Narrator knob is in the Voices group, the knob row has Chaos, Energy and Complexity', JSON.stringify({ knobIn: r.knobIn, knobRow: r.knobRow }));
+  check(r.onAir === 'Apply to the song on air' && r.onAirOff && /song on air/.test(r.onAirTip), 'radio off: Apply to the song on air disabled, the tooltip says why', JSON.stringify({ onAir: r.onAir, off: r.onAirOff, tip: r.onAirTip }));
   // the Narrator knob keeps its option and stored key (talk)
   await page.evaluate(() => { const i = document.querySelector('#radio-talk'); i.value = '0.3'; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }); await sleep(400);
   const talk = await page.evaluate(() => ({ saved: JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').talk, opt: globalThis.codingMiskRadio.options.talk, out: document.querySelector('#radio-talk').closest('.ctrl').querySelector('output').textContent }));
@@ -160,14 +161,23 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(r.narratedOff && r.styleOff, 'radio Custom: narrator off, Narrated growth and Narrator style disabled', JSON.stringify(r));
   await page.click('#radio-voices [data-custom-chip="narrator"]'); await sleep(300);
   await shot('#radio-voices', 'radio-gruppo-voci.png');
-  // on air: a voice instrument change also steers the song on air from its next quiet part, recorded in the session
+  // on air: a voice instrument change waits for the next song; Apply to the song on air steers the song on air from its
+  // next quiet part, recorded in the session
   await page.click('#radio-start'); await sleep(5000);
   const air = () => page.evaluate(() => { const R = globalThis.codingMiskRadio.state; return R ? { steering: (R.recipe.steering || []).filter(c => c.kind === 'voice'), voice: R.recipe.options.voice || null } : null; });
-  await page.click('#radio-voice [data-vinst-preset="present"]'); await sleep(2500);
-  const a = await air();
-  const toastText = await page.evaluate(() => (document.querySelector('.toast') || {}).textContent || '');
-  check(a && a.voice && a.voice.phrases === '4-5' && (a.steering.length === 1 ? a.steering[0].voice.phrases === '2-3' : /next song/.test(toastText)), 'on air: the recipe keeps the session options; the change is a recorded steering command on the song on air (or says why not)', JSON.stringify({ a, toastText }));
+  const toastNow = () => page.evaluate(() => [...document.querySelectorAll('.toast')].map(x => x.textContent).join(' | '));
+  await page.click('#radio-voice [data-vinst-preset="present"]'); await sleep(600);
+  let a = await air(), toastText = await toastNow();
+  check(a && a.voice && a.voice.phrases === '4-5' && a.steering.length === 0 && /next song/.test(toastText), 'on air: a change is kept for the next song, no command on the song on air', JSON.stringify({ a, toastText }));
+  r = await rg();
+  check(!r.onAirOff, 'on air: Apply to the song on air enabled', JSON.stringify({ off: r.onAirOff }));
+  await page.click('#radio-voice [data-vinst-onair]'); await sleep(2000);
+  a = await air(); toastText = await toastNow();
+  check(a && a.voice && a.voice.phrases === '4-5' && (a.steering.length === 1 ? a.steering[0].voice.phrases === '2-3' && /song on air/.test(toastText) : /next song/.test(toastText)), 'Apply to the song on air: a recorded steering command on the song on air (or says why not)', JSON.stringify({ a, toastText }));
   await shot('#radio-voices', 'radio-gruppo-voci-in-onda.png');
+  await page.click('#radio-pause').catch(() => {}); await sleep(500);
+  r = await rg();
+  check(r.onAirOff, 'paused: Apply to the song on air disabled', JSON.stringify({ off: r.onAirOff, tip: r.onAirTip }));
   await page.click('#radio-start'); await sleep(800);
   await page.click('#radio-voice [data-vinst-preset="style"]'); await sleep(400);
   await page.selectOption('#radio-voices [data-custom="narratorStyle"]', 'auto'); await sleep(300);
@@ -184,6 +194,14 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(it.label === 'Voci' && it.vi === 'Voce strumento' && it.presets === 'Come lo stile,Discreto,Presente,Ossessivo' && it.knob === 'Narratore', 'Italian: Voci, Voce strumento and its presets; the Voice knob is now Narratore', JSON.stringify(it));
   await shot('#radio-voices', 'radio-gruppo-voci-it.png');
   await shot('#radio-voices', 'radio-voci-manopola.png');
+  await page.click('#radio-start'); await sleep(5000);
+  await page.click('#radio-voice [data-vinst-preset="present"]'); await sleep(400);
+  const itAir = await page.evaluate(() => { const b = document.querySelector('#radio-voice [data-vinst-onair]'); return { text: b.textContent, off: b.disabled }; });
+  check(itAir.text === 'Applica al brano in onda' && !itAir.off, 'Italian: Applica al brano in onda, enabled on air', JSON.stringify(itAir));
+  await page.click('#radio-voice [data-vinst-onair]'); await sleep(1200);
+  await shot('#radio-voices', 'radio-voci-applica.png');
+  await page.click('#radio-start'); await sleep(800);
+  await page.click('#radio-voice [data-vinst-preset="style"]'); await sleep(300);
 
   check(!errors.length, 'no page errors', errors.join(' | '));
   await browser.close();

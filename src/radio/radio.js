@@ -841,20 +841,29 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const style = C ? C.narratorStyle || 'auto' : 'auto';
     const nar = `<button class="chip small" data-custom-chip="narrator" aria-pressed="${!C || C.narrator !== false}" title="${tipOf('liveNarratorHint')}"${custom ? '' : ' disabled'}>${esc(t('liveNarrator'))}</button>`;
     const sty = `<label class="ctrl" title="${tipOf('narratorStyleHint', narOff ? 'narratorStyleOff' : '')}"><span class="lbl">${esc(t('narratorStyleLbl'))}</span><select data-custom="narratorStyle" data-no-knob${!custom || narOff ? ' disabled' : ''}>${CONTROLS.narratorStyle.map(v => `<option value="${v}"${style === v ? ' selected' : ''}>${esc(t(`narratorStyle:${v}`))}</option>`).join('')}</select></label>`;
+    // Apply to the song on air: enabled while a song plays (not paused); the tooltip says why when it is not
+    const airOk = !!S && S.paused === undefined;
+    const onAirBtn = `<button class="btn small" data-vinst-onair title="${esc(t(airOk ? 'vinstOnAirHint' : 'vinstOnAirOff'))}"${airOk ? '' : ' disabled'}>${esc(t('vinstOnAirBtn'))}</button>`;
     const ngr = `<button class="chip small" data-custom-chip="narrated" aria-pressed="${!!(C && C.narrated)}" title="${tipOf('liveNarratedHint', !grow ? 'narratedNeedsCrescendo' : narOff ? 'liveNarratedOff' : '')}"${!custom || !grow || narOff ? ' disabled' : ''}>${esc(t('liveNarrated'))}</button>`;
     return `<div class="radio-voices" id="radio-voices" role="group" aria-labelledby="radio-voices-lbl"><span class="lbl" id="radio-voices-lbl" title="${esc(t('voicesHint'))}">${esc(t('voicesLbl'))}</span>
       <div class="voices-nar" id="radio-narrator"><span class="lbl voices-sub">${esc(t('narratorLbl'))}</span><div class="ctrls voices-knob">${talkKnob}</div><div class="chips">${nar}</div>${sty}<div class="chips">${ngr}</div></div>
-      <div class="radio-voice" id="radio-voice"><span class="lbl voices-sub" title="${esc(t('vinstHint'))}">${esc(t('vinstLbl'))}</span>${voicePanel(opts.voice, { t, esc, mode: 'radio' })}</div>
+      <div class="radio-voice" id="radio-voice"><span class="lbl voices-sub" title="${esc(t('vinstHint'))}">${esc(t('vinstLbl'))}</span>${voicePanel(opts.voice, { t, esc, mode: 'radio' })}
+        <div class="voices-onair">${onAirBtn}</div></div>
       <p class="hint muted small" id="radio-voices-hint">${esc(t('radioVoicesHint'))}</p></div>`;
   }
-  // a voice instrument change: kept for the next songs; on air, also a steering command on the song on air, from its
-  // next quiet part (the console's rules: not paused, not a frozen or lead song, a quiet part left)
+  // a voice instrument change: kept for the next songs only; the song on air changes with the button Apply to the song
+  // on air (voice-placement D5b)
   function voiceChanged(v) {
     opts.voice = v; saveOpts(); render();
-    if (!S || S.paused !== undefined) return;
+    if (S) toast(t('vinstNextOnly'));
+  }
+  // Apply to the song on air: the current settings as a steering command on the song on air, from its next quiet part
+  // (the console's rules: not paused, not a frozen or lead song, a quiet part left), recorded like the others
+  function voiceOnAir() {
+    if (!S || S.paused !== undefined) return toast(t('vinstOnAirOff'));
     const item = S.stream[S.onAir];
     if (!item || !item.plan) return toast(t('vinstNextOnly'));
-    const { preset, ...voice } = cleanVoice(v), cmd = { kind: 'voice', voice };
+    const { preset, ...voice } = cleanVoice(opts.voice), cmd = { kind: 'voice', voice };
     const why = whyNot({ ...cmd }, item.plain || item.song, item.plan, relNow());
     if (why) return toast(`${t('vinstNextOnly')} · ${t(`steerWhy:${why}`)}`);
     if (command(cmd)) toast(t('vinstOnAir'));
@@ -1028,6 +1037,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.customBase) { opts.custom = { base: b.dataset.customBase, controls: {} }; saveOpts(); showDisplay(customControls(opts.custom)); return render(); }
     // the voice instrument (voice-controls): a preset or a way, from the next song
     if (b.dataset.vinstPreset || b.dataset.vinstWay) { const v = voiceEvent(opts.voice, b, { mode: 'radio' }); if (v) voiceChanged(v); return; }
+    if (b.dataset.vinstOnair !== undefined) return voiceOnAir();
     if (b.dataset.customChip) {
       const k = b.dataset.customChip, C = customControls(opts.custom);
       if (k === 'typist') return setCustom({ typist: C.typist === 'human' ? 'exact' : 'human' });
