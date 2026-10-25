@@ -40,7 +40,7 @@ Settings, advanced, SHALL offer "Try all growth shapes" (off by default) with it
 
 #### Scenario: All shapes
 - **WHEN** "Try all growth shapes" is on and luci-rosse grows as Live coder in Compose
-- **THEN** every candidate (28 today) is measured, and a growth stored with the setting off is not reused
+- **THEN** every candidate (28 on luci-rosse today, at most 32) is measured, and a growth stored with the setting off is not reused
 
 #### Scenario: Fixed order
 - **WHEN** "Random order" is off
@@ -59,3 +59,14 @@ In the code of a Live coder growth, a mini-notation list of 16 or more numeric v
 #### Scenario: kellerlicht's acid
 - **WHEN** a step of kellerlicht's growth would type `res("<708.84 712.24 …>", 12)` with over 100 values
 - **THEN** it types a ramp of a few dozen characters, and every bar plays the same cutoff as the list within 0.01
+
+### Requirement: Growth shapes available shown in Settings
+Settings, Advanced card, SHALL show near the growth-shape settings an informative line (not a control), in English and Italian, with how many growth shapes there are and the most candidates a Compose growth can measure. Every number SHALL be counted from the shape lists in `src/song/shapes.js`, never written by hand; the "Try all growth shapes" hint SHALL use the same count.
+
+#### Scenario: Today's shapes
+- **WHEN** the user opens Settings, Advanced
+- **THEN** the line reads "Growth shapes available: 18 (6 developments × 3 paces), with 10 openings. A growth in Compose tries at most 32: 8 of these shapes and 3 less detailed variants of each." ("Forme di crescita disponibili: 18 (6 sviluppi × 3 velocità), con 10 aperture. …")
+
+#### Scenario: A shape added
+- **WHEN** a development or a pace is added to `src/song/shapes.js`
+- **THEN** the line and the hint show the new counts without other changes, and `tools/check-settings.cjs` checks that the count shown equals the length of the shape list

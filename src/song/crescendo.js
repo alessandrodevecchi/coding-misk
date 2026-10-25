@@ -9,7 +9,7 @@ import { PROGS, DEFAULT, presetIdea, meterSteps } from '../music.js';
 import { ideaLadder, expandIdea, ideaRows } from './ideas.js';
 import { coderPath } from './coder.js';
 import { stateAt, applyStep } from './build.js';
-import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, SHAPES_SEED, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES } from './shapes.js';
+import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, SHAPES_SEED, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES, DETAIL_VARIANTS } from './shapes.js';
 import { placeSpoken } from './spoken.js';
 import { liveCode } from '../live/live-code.js';
 import { resolveProfile } from '../live/profiles.js';
@@ -671,7 +671,7 @@ function searchShapes(song, opts, stats) {
   // shape-search D2, D6: the seeded weighted order, or the fixed order of before SHAPES_VERSION 4
   const random = opts.shapeRandom !== false;
   const cands = shapeCandidates(song, shape, styles, rules, { fixed: !random });
-  const tries = random ? shapeOrder(song, shape, cands, opts.seed) : [...cands, ...[2, 1, 0].flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
+  const tries = random ? shapeOrder(song, shape, cands, opts.seed) : [...cands, ...DETAIL_VARIANTS.flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
   // shape-search D3: `cap` shapes measured, and when none of them meets the target up to twice as many (a less detailed
   // variant that grows the same as its shape is skipped and not counted; free-duration regrowths are not counted);
   // D6: Try all lifts the cap, and keeps the first shape that meets the target or the best one
@@ -794,9 +794,9 @@ export function shapeOrder(song, shape, cands, seed) {
   const add = c => { if (!seen.has(key(c))) { seen.add(key(c)); out.push(c); } };
   const drawn = cands.find(c => c.drawn) || cands[0];
   add(drawn);
-  for (const maxDetail of [2, 1, 0]) add({ ...drawn, drawn: false, maxDetail });
+  for (const maxDetail of DETAIL_VARIANTS) add({ ...drawn, drawn: false, maxDetail });
   const pool = [];
-  for (const c of cands) if (c !== drawn) { pool.push({ ...c, drawn: false }); for (const maxDetail of [2, 1, 0]) pool.push({ ...c, drawn: false, maxDetail, weight: c.weight / 2 }); }
+  for (const c of cands) if (c !== drawn) { pool.push({ ...c, drawn: false }); for (const maxDetail of DETAIL_VARIANTS) pool.push({ ...c, drawn: false, maxDetail, weight: c.weight / 2 }); }
   const rng = stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_SEED}/search`);
   while (pool.length) {
     const total = pool.reduce((a, c) => a + Math.max(0, c.weight || 0), 0);

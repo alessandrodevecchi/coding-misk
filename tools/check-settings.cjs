@@ -1,5 +1,6 @@
 // Browser checks for the settings page (#31): gear, theme and language, radio defaults, export format
-// (Opus export of a short song), the growth shapes tried (shape-search), backup export and import, reset.
+// (Opus export of a short song), the growth shapes tried and available (shape-search), the chooser on air
+// (radio-chooser-versions), backup export and import, reset.
 // Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-settings.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
@@ -91,6 +92,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.fill('#set-long-song', '15'); await page.press('#set-long-song', 'Tab'); await sleep(150);
   check((await ls('coding-misk-long-song')) === null, 'Long song from: the default is not stored');
   check(/shortest song/.test(await page.innerText('#set-advanced')), 'the hints of the new settings');
+  // the growth shapes available: an informative line counted from the shape list (src/song/shapes.js), never written by hand
+  const counts = await page.evaluate(async () => { const m = await import('/src/song/shapes.js'); return { len: m.GROWTH_SHAPES.length, ...m.shapeCounts() }; });
+  const countLine = await page.innerText('#set-shape-count');
+  check(counts.shapes === counts.len && (await page.getAttribute('#set-shape-count', 'data-shapes')) === String(counts.len) && countLine.startsWith(`Growth shapes available: ${counts.len} (${counts.developments} developments × ${counts.paces} paces)`) && countLine.includes(`at most ${counts.most}`), 'the shapes line shows the length of the shape list', countLine);
+  check((await page.innerText('#set-advanced')).includes(`at most ${counts.most} today`), 'the Try all hint counts the candidates from the code');
   // the chooser on air (radio-chooser-versions): every version by name, Normal v1 by default and not stored, a choice
   // stored and written in a new radio recipe, an unknown stored id read as the default
   const versions = await page.evaluate(async () => Object.keys((await import('/src/endless/waypoints.js')).AIR_CHOOSERS));
@@ -109,7 +115,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check((await page.inputValue('#set-air-chooser')) === 'normal-1' && !('chooser' in (await clipRecipe())), 'an unknown stored chooser reads as Normal v1');
   await page.selectOption('#set-air-chooser', 'radio-1'); await sleep(150);
   await page.click('#tab-impostazioni [data-set-lang="it"]'); await sleep(300);
-  check((await page.$$eval('#set-air-chooser option', o => o.map(x => x.textContent))).includes('Normale v1 (attuale)') && /Scelta delle mosse in onda/i.test(await page.innerText('#set-advanced')), 'in Italian: the chooser');
+  check((await page.innerText('#set-shape-count')).startsWith(`Forme di crescita disponibili: ${counts.len} (`) && (await page.$$eval('#set-air-chooser option', o => o.map(x => x.textContent))).includes('Normale v1 (attuale)') && /Scelta delle mosse in onda/i.test(await page.innerText('#set-advanced')), 'in Italian: the shapes line and the chooser');
   if (shots) await (await page.$('#set-advanced')).screenshot({ path: path.join(shots, 'advanced-it.png') });
   await page.click('#tab-impostazioni [data-set-lang="en"]'); await sleep(300);
   await page.click('#open-settings'); await sleep(300);

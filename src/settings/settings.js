@@ -10,6 +10,7 @@ import { nextTagline } from '../video/fragments.js';
 import { DICE, REVERT } from '../icons.js';
 import { confirmInline } from '../library/songs-view.js';
 import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shapeKeepOf, LONG_SONG, LONG_SONG_MIN, LONG_SONG_MAX, longSongOf } from '../song/crescendo.js';
+import { shapeCounts } from '../song/shapes.js';
 import { AIR_CHOOSERS, AIR_CHOOSER, chooserOf, chooserName } from '../endless/waypoints.js';
 
 
@@ -20,7 +21,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
 
   function render() {
     if (root.hidden) return;
-    const fmt = formatOf(store.get('coding-misk-export-format', 'wav')), r = app.radioSettings(), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) }, presets = store.get('coding-misk-video-presets', {}) || {}, fr = fragmentOpts(store.get('coding-misk-fragments', {}) || {}), shapeAll = store.get('coding-misk-shape-all', null) === true;
+    const fmt = formatOf(store.get('coding-misk-export-format', 'wav')), r = app.radioSettings(), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) }, presets = store.get('coding-misk-video-presets', {}) || {}, fr = fragmentOpts(store.get('coding-misk-fragments', {}) || {}), shapeAll = store.get('coding-misk-shape-all', null) === true, counts = shapeCounts();
     root.innerHTML = `<p class="intro">${esc(t('setIntro'))}</p>
       <div class="set-grid">
         <div class="card set-card"><h3>${esc(t('setLook'))}</h3>
@@ -86,8 +87,9 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         </div>
         <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
           <p class="muted">${esc(t('setAdvancedIntro'))}</p>
+          <p class="muted" id="set-shape-count" data-shapes="${counts.shapes}">${esc(t('setShapeCount', counts))}</p>
           ${row(t('setShapeCap'), `<input type="number" id="set-shape-cap" min="${SHAPE_CAP_MIN}" max="${SHAPE_CAP_MAX}" step="1" value="${shapeCapOf(store.get('coding-misk-shape-cap', null))}"${shapeAll ? ' disabled' : ''} data-no-knob>`, t('setShapeCapHint'))}
-          ${row(t('setShapeAll'), `<label class="rx-opt"><input type="checkbox" id="set-shape-all"${shapeAll ? ' checked' : ''} data-no-knob> <span>${esc(t('setShapeAllOn'))}</span></label>`, t('setShapeAllHint'))}
+          ${row(t('setShapeAll'), `<label class="rx-opt"><input type="checkbox" id="set-shape-all"${shapeAll ? ' checked' : ''} data-no-knob> <span>${esc(t('setShapeAllOn'))}</span></label>`, t('setShapeAllHint', counts))}
           ${row(t('setShapeKeep'), `<select id="set-shape-keep"${shapeAll ? '' : ' disabled'} data-no-knob>${SHAPE_KEEPS.map(k => opt(k, shapeKeepOf(store.get('coding-misk-shape-keep', null)), t(`setShapeKeep:${k}`))).join('')}</select>`, t('setShapeKeepHint'))}
           ${row(t('setShapeRandom'), `<label class="rx-opt"><input type="checkbox" id="set-shape-random"${store.get('coding-misk-shape-random', null) === false ? '' : ' checked'} data-no-knob> <span>${esc(t('setShapeRandomOn'))}</span></label>`, t('setShapeRandomHint'))}
           ${row(t('setLongSong'), `<input type="number" id="set-long-song" min="${LONG_SONG_MIN / 60}" max="${LONG_SONG_MAX / 60}" step="1" value="${longSongOf(store.get('coding-misk-long-song', null)) / 60}" data-no-knob> min`, t('setLongSongHint'))}

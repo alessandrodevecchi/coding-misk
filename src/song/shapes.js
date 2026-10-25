@@ -17,6 +17,18 @@ export const OPENINGS = ['slow', 'full-kick', 'typed', 'broken', 'filtered', 'me
 export const PACES = ['slow', 'medium', 'fast'];
 export const DEVELOPMENTS = ['by-type', 'as-written', 'masks', 'parameters', 'second-section', 'metamorphosis'];
 export const SHAPE_PARTS = { opening: OPENINGS, pace: PACES, development: DEVELOPMENTS };
+// the less detailed variants of a candidate shape the growth search also tries (crescendo.js, shape-search D2): the
+// highest level of detail its moves may use
+export const DETAIL_VARIANTS = [2, 1, 0];
+// every growth shape: a development with a pace (the opening is drawn apart and never searched)
+export const GROWTH_SHAPES = DEVELOPMENTS.flatMap(development => PACES.map(pace => ({ development, pace })));
+// the counts the Settings page shows (Advanced card), from the lists above so they follow a change of shapes: the
+// shapes, and the most candidates a growth in Compose can measure (crescendo.js shapeCandidates: every development
+// with the drawn pace, by type with each other pace; each also in its less detailed variants)
+export function shapeCounts() {
+  const tried = DEVELOPMENTS.length + PACES.length - 1;
+  return { shapes: GROWTH_SHAPES.length, developments: DEVELOPMENTS.length, paces: PACES.length, openings: OPENINGS.length, tried, details: DETAIL_VARIANTS.length, most: tried * (1 + DETAIL_VARIANTS.length) };
+}
 // the recipe field of each part: growthShapes: { openings: { id: weight }, paces: {…}, developments: {…} }
 export const RECIPE_KEYS = { opening: 'openings', pace: 'paces', development: 'developments' };
 // weights when neither the song nor its style names a part (design D1)
