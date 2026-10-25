@@ -18,3 +18,9 @@
 
 - [x] 4.1 `tools/check-voices.cjs` for the new positions; screenshots in the notes folder
 - [x] 4.2 Strings EN/IT, Guide card, knowledge notes, song format, DEVLOG entry in Italian, CHANGELOG
+
+## 5. Refinements after the owner's review
+
+- [x] 5.1 Radio: the Narrator knob moves from the knob row into the Voices group (same `talk` option, die, lock, compilation mark); labels stay in the interface strings
+- [ ] 5.2 Radio: a voice instrument change applies from the next song only; the button "Apply to the song on air" sends the `voice` steering command (disabled with the reason when nothing is on air or paused)
+- [ ] 5.3 `tools/check-voices.cjs` for the knob position and the button; Guide, knowledge, DEVLOG; screenshots in the notes folder

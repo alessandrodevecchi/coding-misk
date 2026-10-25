@@ -833,7 +833,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // are the Custom profile's (data-custom, data-custom-chip, the same handlers); with another profile they show its
   // values, disabled, and say why. The voice instrument applies from the next song and, on air, to the song on air from
   // its next quiet part (a steering command, recorded like the others).
-  function voicesGroup() {
+  // talkKnob: the Narrator knob (option talk), drawn by render's slider so its die, lock and compilation mark stay the same
+  function voicesGroup(talkKnob = '') {
     const custom = opts.profile === 'custom', C = custom ? customControls(opts.custom) : RADIO_PROFILES.includes(opts.profile) ? customControls({ base: opts.profile, controls: {} }) : null;
     const narOff = !!C && C.narrator === false, grow = !!C && C.build === 'crescendo', lock = custom ? '' : t(opts.profile === 'artist' ? 'radioNarratorArtist' : 'radioNarratorCustomOnly');
     const tipOf = (k, off) => esc(lock || (off ? t(off) : t(k)));
@@ -842,7 +843,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const sty = `<label class="ctrl" title="${tipOf('narratorStyleHint', narOff ? 'narratorStyleOff' : '')}"><span class="lbl">${esc(t('narratorStyleLbl'))}</span><select data-custom="narratorStyle" data-no-knob${!custom || narOff ? ' disabled' : ''}>${CONTROLS.narratorStyle.map(v => `<option value="${v}"${style === v ? ' selected' : ''}>${esc(t(`narratorStyle:${v}`))}</option>`).join('')}</select></label>`;
     const ngr = `<button class="chip small" data-custom-chip="narrated" aria-pressed="${!!(C && C.narrated)}" title="${tipOf('liveNarratedHint', !grow ? 'narratedNeedsCrescendo' : narOff ? 'liveNarratedOff' : '')}"${!custom || !grow || narOff ? ' disabled' : ''}>${esc(t('liveNarrated'))}</button>`;
     return `<div class="radio-voices" id="radio-voices" role="group" aria-labelledby="radio-voices-lbl"><span class="lbl" id="radio-voices-lbl" title="${esc(t('voicesHint'))}">${esc(t('voicesLbl'))}</span>
-      <div class="voices-nar" id="radio-narrator"><span class="lbl voices-sub">${esc(t('narratorLbl'))}</span><div class="chips">${nar}</div>${sty}<div class="chips">${ngr}</div></div>
+      <div class="voices-nar" id="radio-narrator"><span class="lbl voices-sub">${esc(t('narratorLbl'))}</span><div class="ctrls voices-knob">${talkKnob}</div><div class="chips">${nar}</div>${sty}<div class="chips">${ngr}</div></div>
       <div class="radio-voice" id="radio-voice"><span class="lbl voices-sub" title="${esc(t('vinstHint'))}">${esc(t('vinstLbl'))}</span>${voicePanel(opts.voice, { t, esc, mode: 'radio' })}</div>
       <p class="hint muted small" id="radio-voices-hint">${esc(t('radioVoicesHint'))}</p></div>`;
   }
@@ -904,7 +905,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         </div>
         <div class="dice-row"><span class="lbl">${esc(t('diceKnobsLbl'))}</span><span class="dice-combo">${die('knobs', 'diceKnobs')}<button class="dice-mode" data-dice-mode ${tip(opts.diceRange ? 'diceRangeInTip' : 'diceRangeFullTip')}><span class="comp-lcd">${esc(opts.diceRange ? t('diceRangeIn') : t('diceRangeFull'))}</span></button></span>
           <span class="dice-sounds">${die('sounds', 'diceSounds', t('diceSoundsLbl'))}${opts.sounds ? `<span class="muted small mono" title="${esc(t('diceSoundsOn'))}">${esc(opts.sounds)}</span><button class="plain" data-sounds-clear aria-label="${esc(t('diceSoundsClear'))}" title="${esc(t('diceSoundsClear'))}">×</button>` : ''}</span></div>
-        ${comp ? `<p class="hint muted small comp-knobs-hint">${esc(t('compKnobAutoTip'))}</p>` : ''}<div class="ctrls four">${slider('chaos', 'radioChaos', 'tipChaos')}${slider('energy', 'radioEnergy', 'tipEnergy')}${slider('complexity', 'radioComplexity', 'tipComplexity')}${slider('talk', 'radioTalk', 'tipTalk')}</div>
+        ${comp ? `<p class="hint muted small comp-knobs-hint">${esc(t('compKnobAutoTip'))}</p>` : ''}<div class="ctrls three">${slider('chaos', 'radioChaos', 'tipChaos')}${slider('energy', 'radioEnergy', 'tipEnergy')}${slider('complexity', 'radioComplexity', 'tipComplexity')}</div>
         <div class="mat-source" title="${esc(t('matSourceTip'))} ${esc(t('matConsoleTip'))}"><span class="lbl" id="mat-source-lbl">${esc(t('matSource'))}</span><span class="seg" role="radiogroup" aria-labelledby="mat-source-lbl">${SESSION_SOURCES.map(m => `<button class="chip small" role="radio" data-material="${m}" aria-checked="${opts.material === m}" aria-pressed="${opts.material === m}" title="${esc(t(`mat:${m}`))}">${esc(t(`matShort:${m}`))}</button>`).join('')}</span>${opts.material !== opts.materialDefault ? `<span class="muted small">${esc(t('matDefaultIs', { m: t(`matShort:${opts.materialDefault}`) }))}</span>` : ''}</div>
         <div class="radio-how">
           <label class="ctrl" ${tip('tipTransition')}><span class="lbl">${esc(t('radioTransition'))}</span><select id="radio-transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => `<option value="${k}"${opts.transition === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtist' : `tx:${k}`))}</option>`).join('')}</select></label>
@@ -912,7 +913,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
           <label class="ctrl" ${tip('radioProfileTip')}><span class="lbl">${esc(t('radioProfile'))}</span><select id="radio-profile" data-no-knob>${RADIO_CHOICES.map(k => `<option value="${k}"${opts.profile === k ? ' selected' : ''}>${esc(t(k === 'artist' ? 'byArtistStyle' : k === 'custom' ? 'radioCustomProfile' : `profile:${k}`))}</option>`).join('')}</select></label>
           <label class="ctrl" ${tip('radioIncomingTip')}><span class="lbl">${esc(t('radioIncoming'))}</span><select id="radio-incoming" data-no-knob>${['profile', 'hidden', 'visible'].map(k => `<option value="${k}"${opts.incoming === k ? ' selected' : ''}>${esc(t(`incoming:${k}`))}</option>`).join('')}</select></label>
         </div>
-        ${voicesGroup()}
+        ${voicesGroup(slider('talk', 'radioTalk', 'tipTalk'))}
         ${opts.profile === 'custom' ? customPanel() : ''}
         <p class="hint muted">${esc(t('radioNextHint'))}</p>
         <div class="radio-seed">

@@ -31,25 +31,33 @@ The Voices group and the panel of a voice instrument track SHALL offer the same 
 - **THEN** the track is as it was before
 
 ### Requirement: Radio Voices group
-The radio SHALL show the narrator controls and the voice instrument block together in one Voices group. The narrator controls SHALL be enabled with the Custom profile and otherwise disabled with a tooltip that says so. The group SHALL say that its settings apply from the next song, that the voice instrument also changes the song on air, and why the narrator of the song on air does not.
+The radio SHALL show the Narrator knob, the narrator controls and the voice instrument block together in one Voices group; the knob row above it SHALL hold Chaos, Energy and Complexity only. The narrator controls SHALL be enabled with the Custom profile and otherwise disabled with a tooltip that says so; the Narrator knob SHALL work with every profile, as before. The group SHALL say that its settings apply from the next song, that the voice instrument reaches the song on air only with its own button, and why the narrator of the song on air does not. Every label of the group SHALL come from the interface strings, so a rename is a change in one place.
 
 #### Scenario: Another profile
 - **WHEN** the radio profile is Live coder
 - **THEN** the narrator controls show the Live coder values, disabled, and the voice instrument controls work
 
+#### Scenario: Narrator knob in the group
+- **WHEN** the owner opens the radio
+- **THEN** the Narrator knob sits in the Voices group, its die, lock, compilation mark and stored value work as before, and the knob row shows Chaos, Energy and Complexity
+
 ### Requirement: Voice instrument of the song on air
-A voice instrument change while the radio plays SHALL also be a steering command on the song on air, recorded in the session like the other console commands, applied from the first quiet part after the next phrase; the lines before it SHALL stay. Replay and saved sessions SHALL rebuild the same song. When no quiet part is left the change SHALL apply from the next song only, and the radio SHALL say why.
+A voice instrument change in the radio SHALL apply from the next song only. A separate button, Apply to the song on air, SHALL send the current voice instrument settings to the song on air as a steering command, recorded in the session like the other console commands, applied from the first quiet part after the next phrase; the lines before it SHALL stay. Replay and saved sessions SHALL rebuild the same song. The button SHALL be disabled, with a tooltip that says why, when nothing is on air or the radio is paused. When the song on air cannot take it (no quiet part left, a frozen or lead song) the radio SHALL say why and send nothing.
+
+#### Scenario: Change waits for the next song
+- **WHEN** the owner picks Present while a generated song plays
+- **THEN** the setting is kept for the next song, the song on air does not change, no command is queued, and the radio says it applies from the next song
 
 #### Scenario: On air
-- **WHEN** the owner picks Present while a generated song plays
+- **WHEN** the owner picks Present and presses Apply to the song on air while a generated song plays
 - **THEN** the song on air speaks the new phrases from its next quiet part, the session recipe records the command, and a Replay sounds the same
 
 ### Requirement: Narrator knob
-The radio knob, compilation range, curve and console group that set how often the narrator comments SHALL be named Narrator and SHALL say that they do not change the voice instrument. Their behaviour and stored values SHALL not change.
+The radio knob, compilation range, curve and console group that set how often the narrator comments SHALL be named Narrator and SHALL say that they do not change the voice instrument. The knob SHALL sit in the radio Voices group. Their behaviour and stored values SHALL not change.
 
 #### Scenario: Knob name
 - **WHEN** the owner opens the radio
-- **THEN** the knob next to Chaos, Energy and Complexity reads Narrator, and its tooltip says it sets how often the narrator comments the changes
+- **THEN** the knob in the Voices group reads Narrator, and its tooltip says it sets how often the narrator comments the changes
 
 ### Requirement: Stored values
 Voice instrument options stored for a new song by an artist and for the radio before this change SHALL be read as before.

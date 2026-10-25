@@ -4,8 +4,9 @@
 // instrument, presets and controls that rewrite the track, the same controls in the track's panel kept in sync, Undo,
 // New phrases); "In the next song" for a new song by an artist (on, off, presets; Obsessive gives one line repeated);
 // no voice instrument button in the toolbar. Radio: one Voices group with the narrator (Custom profile only, disabled
-// with the reason otherwise) and the voice instrument (presets, Custom, options in the recipe, a steering command on
-// the song on air, recorded in the session). Italian labels. Screenshots of each part when a folder is given.
+// with the reason otherwise), the Narrator knob (in the group, same stored value) and the voice instrument (presets,
+// Custom, options in the recipe, a steering command on the song on air, recorded in the session). Italian labels.
+// Screenshots of each part when a folder is given.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -127,9 +128,15 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
 
   // the radio: one Voices group, the narrator (Custom only) and the voice instrument
   await page.click('[data-tab="radio"]'); await sleep(800);
-  const rg = () => page.evaluate(() => { const g = document.querySelector('#radio-voices'); if (!g) return null; const a = g.querySelector('[data-custom-chip="narrator"]'), st = g.querySelector('[data-custom="narratorStyle"]'), b = g.querySelector('[data-custom-chip="narrated"]'), vi = g.querySelector('#radio-voice'); return { label: g.querySelector(':scope > .lbl').textContent, together: !!(a && st && b && vi), narratorOff: a.disabled, tip: a.title, style: st.value, styleOff: st.disabled, narratedOff: b.disabled, hint: (g.querySelector('#radio-voices-hint') || {}).textContent || '', inCustom: !!document.querySelector('#custom-voices'), saved: (JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').custom || {}).controls || {} }; });
+  const rg = () => page.evaluate(() => { const g = document.querySelector('#radio-voices'); if (!g) return null; const a = g.querySelector('[data-custom-chip="narrator"]'), st = g.querySelector('[data-custom="narratorStyle"]'), b = g.querySelector('[data-custom-chip="narrated"]'), vi = g.querySelector('#radio-voice'); return { label: g.querySelector(':scope > .lbl').textContent, together: !!(a && st && b && vi), narratorOff: a.disabled, tip: a.title, style: st.value, styleOff: st.disabled, narratedOff: b.disabled, hint: (g.querySelector('#radio-voices-hint') || {}).textContent || '', inCustom: !!document.querySelector('#custom-voices'), knobIn: !!g.querySelector('#radio-narrator #radio-talk'), knobRow: [...document.querySelectorAll('.radio-ctrls .ctrls.three input[type=range]')].map(i => i.id).join(), saved: (JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').custom || {}).controls || {} }; });
   let r = await rg();
   check(r && r.label === 'Voices' && r.together && r.narratorOff && r.styleOff && /Custom/.test(r.tip) && /next song/.test(r.hint) && /quiet part/.test(r.hint), 'radio: one Voices group with the narrator and the voice instrument; another profile: narrator disabled, says why', JSON.stringify(r));
+  check(r.knobIn && r.knobRow === 'radio-chaos,radio-energy,radio-complexity', 'radio: the Narrator knob is in the Voices group, the knob row has Chaos, Energy and Complexity', JSON.stringify({ knobIn: r.knobIn, knobRow: r.knobRow }));
+  // the Narrator knob keeps its option and stored key (talk)
+  await page.evaluate(() => { const i = document.querySelector('#radio-talk'); i.value = '0.3'; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }); await sleep(400);
+  const talk = await page.evaluate(() => ({ saved: JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').talk, opt: globalThis.codingMiskRadio.options.talk, out: document.querySelector('#radio-talk').closest('.ctrl').querySelector('output').textContent }));
+  check(talk.saved === 0.3 && talk.opt === 0.3 && talk.out === '0.3', 'radio: the Narrator knob in the group sets talk, stored as before', JSON.stringify(talk));
+  await page.evaluate(() => { const i = document.querySelector('#radio-talk'); i.value = '0.5'; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }); await sleep(300);
   const rv = () => page.evaluate(() => { const b = document.querySelector('#radio-voice'); return { presence: b.querySelector('[data-vinst="presence"]').value, presences: [...b.querySelectorAll('[data-vinst="presence"] option')].map(o => o.value).join(), preset: (b.querySelector('[data-vinst-preset][aria-pressed="true"]') || {}).dataset?.vinstPreset || 'custom', phrases: b.querySelector('[data-vinst="phrases"]').value, kind: b.querySelector('[data-vinst="kind"]').value, ways: [...b.querySelectorAll('[data-vinst-way][aria-pressed="true"]')].map(x => x.dataset.vinstWay).join(), options: globalThis.codingMiskRadio.options.voice || null }; });
   let x = await rv();
   check(x.preset === 'style' && x.presence === 'style' && x.presences === 'never,style,often' && !x.options, 'radio voice instrument: As the style, nothing in the options', JSON.stringify(x));
@@ -176,6 +183,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const it = await page.evaluate(() => ({ label: document.querySelector('#radio-voices > .lbl').textContent, vi: document.querySelector('#radio-voice > .lbl').textContent, presets: [...document.querySelectorAll('#radio-voice [data-vinst-preset]')].map(x => x.textContent).join(), knob: document.querySelector('label[for="radio-talk"]').textContent }));
   check(it.label === 'Voci' && it.vi === 'Voce strumento' && it.presets === 'Come lo stile,Discreto,Presente,Ossessivo' && it.knob === 'Narratore', 'Italian: Voci, Voce strumento and its presets; the Voice knob is now Narratore', JSON.stringify(it));
   await shot('#radio-voices', 'radio-gruppo-voci-it.png');
+  await shot('#radio-voices', 'radio-voci-manopola.png');
 
   check(!errors.length, 'no page errors', errors.join(' | '));
   await browser.close();

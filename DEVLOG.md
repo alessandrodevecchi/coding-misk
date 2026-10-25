@@ -1052,3 +1052,10 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - `DIRECTOR_VERSION` 8: le fixture di `check:endless` non si muovono, ma i brani drum and bass e darksynth con un suono composto possono cambiare.
 - Docs: `docs/STYLES.md`, `docs/ENDLESS.md`, `docs/knowledge/decisions.md`, blocchi generati. Nota locale `notes/fm-per-stile.md` aggiornata.
 - Check: `check:material` 17/17 (1 nuovo: saw suona reese, stile vecchio valido con avviso), `check:endless` 70/70, `check:styles` 20/20, `check:code` 46/46, `check:songs` ok, `check:radio-profiles` 25/25, `check:knowledge` ok (avviso: catalogo Strudel da ricostruire prima di main).
+
+## 2026-10-25: manopola Narratore nel gruppo Voci della radio (#77, voices-refine)
+
+- Spec `voice-placement` aggiornata prima del codice (proposta, design D5b e D7, spec, task 5.x) per la manopola e per il pulsante "Applica al brano in onda".
+- Radio: la manopola Narratore (opzione `talk`) passa dalla riga delle manopole al gruppo Voci, prima riga sotto Narratore. Stessa funzione `slider` di prima, quindi dado, lucchetto della compilation, segno della compilation e valore salvato (`coding-misk-radio`, chiave `talk`) restano uguali. La riga delle manopole ora ha Caos, Energia e Complessità (`.ctrls.three`).
+- Etichette: nessun testo nuovo, tutte dalle stringhe di `src/i18n.js` (`radioTalk`, `narratorLbl`). Oggi il titolo della riga e la manopola dicono tutti e due "Narratore": da rivedere con le altre etichette delle voci.
+- Check: `check-voices.cjs` tutto ok (2 casi nuovi: posizione della manopola, valore salvato come prima).

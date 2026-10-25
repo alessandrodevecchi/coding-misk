@@ -531,6 +531,8 @@
 .radio-ctrls { container-type: inline-size; }
 .ctrls.four, :root[data-ui="hw"] .ctrls.four { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 @container (min-width: 620px) { .ctrls.four, :root[data-ui="hw"] .ctrls.four { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* three knobs (chaos, energy, complexity) in one row; the Narrator knob sits in the Voices group */
+.ctrls.three, :root[data-ui="hw"] .ctrls.three { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
 /* hardware theme: label above the display, so every knob has the same height */
 :root[data-ui="hw"] .radio-ctrls .ctrl .row { flex-direction: column; align-items: center; gap: 4px; }
 .radio .hint { font-size: 12px; margin: 0; }
@@ -1323,4 +1325,7 @@ button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); 
 .radio-voices .radio-voice { margin-top: 0; padding: 0; border: 0; }
 .radio-voices .voices-nar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; }
 .radio-voices .voices-nar > .ctrl { min-width: 140px; display: grid; gap: 4px; }
+/* the Narrator knob: on its own line under the Narrator title, then the narrator chips and style */
+.radio-voices .voices-nar > .voices-sub { flex: 1 1 100%; }
+.radio-voices .voices-nar > .voices-knob, :root[data-ui="hw"] .radio-voices .voices-nar > .voices-knob { display: block; flex: 1 1 100%; max-width: 320px; }
 button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); text-decoration: underline; cursor: pointer; font: inherit; }
