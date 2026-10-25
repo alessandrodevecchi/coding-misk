@@ -58,7 +58,7 @@ How loud each part is, how the app keeps it below clipping, and the devices that
 | `vowel` | Vowel filter (it: Filtro vocale) | sound | vowel a/e/i/o/u (a) |
 | `hpf` | High-pass (it: Passa-alto) | sound | cutoff 20-8000 (400); reso 0-20 (0) |
 | `lpf` | Low-pass (it: Passa-basso) | sound | cutoff 100-18000 (2000); reso 0-20 (0) |
-| `fm` | FM | sound | index 0-4 (1); harmonicity 0.5/1/1.01/2/2.01/3/3.5/4 (1); wave sine/triangle/square/sawtooth/pink/brown (sine); decay 0.05-1 (0.3); sustain 0-1 (0.5); index2 0-3 (0); harmonicity2 1-10 (1) |
+| `fm` | FM | sound | index 0-4 (1); harmonicity 0.5/0.505/1/1.005/1.01/1.015/1.02/1.41/2/2.01/2.76/3/3.5/4 (1); wave sine/triangle/square/sawtooth/pink/brown (sine); decay 0.05-1 (0.3); sustain 0-1 (0.5); index2 0-3 (0); harmonicity2 1-10 (1) |
 | `pan` | Pan (it: Panorama) | sound | position 0-1 (0.5); motion fixed/slow/fast (fixed) |
 <!-- /generated -->
 

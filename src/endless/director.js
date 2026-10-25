@@ -25,7 +25,9 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // `npm run check:endless -- --write-fixtures` changes the fixtures (the same seed gives different songs).
 // 4 (voice-instrument): styles with a voice instrument weight give some songs a spoken track and a narrator style
 // 6 (generator-followups, #71): the styles' pads compose their chords in some songs (share 0.3), at a lower gain
-export const DIRECTOR_VERSION = 6;
+// 7 (#71): a composed reese bass always beats (FM ratio just off 1 or 0.5), so drum and bass songs
+// with a composed reese sound different; the seed fixtures do not move (they draw no reese)
+export const DIRECTOR_VERSION = 7;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };

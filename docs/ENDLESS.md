@@ -123,7 +123,7 @@ The seed chooses among rules, never note by note in a free range:
 | Arpeggio | Indices into the voiced chords: a written cell (`up`, `updown`, `pedal`, `skips`) repeated over the bar or as a polymeter (`{0 1 2}%16`), or a seeded random source (`irand(4).seg(16).rib(371, 2)`). Every index is a chord tone. |
 | Chords | A pad voices the section's chords with `voicing()` (anchor `c4`), held or as stabs; with the rule `mode`, a new progression on the degrees of the mode, 1 to 4 different chords a phrase, the last one leading back (the fifth, the seventh or the flat second). A guitar plays power chords with a rhythm cell, or a riff of dark steps over them. |
 | Drums | Sequencer steps per row from a family: `four-floor` (kick on every beat), `breakbeat` (snare on 2 and 4, kick on 1 and on 6, 10 or 11), `two-step` (clap on 2 and 4, kick on 1 and one or two of 7, 10, 11), `half-time` (snare on 3, kick on 1 and 10 or 11), `euclid` (kick and rim as euclidean rhythms, rotated). Kits stay from the recipe. |
-| Sound | The wave and an optional FM patch: `bell`, `reese`, `growl`, `dirty`, `saw`, `square` (below). |
+| Sound | The wave and an optional FM patch: `bell`, `reese`, `growl`, `dirty`, `saw`, `square`, `tine`, `clang`, `sub`, `organ` (below). |
 
 Energy steers density and range, inside the style's limits: 0 to 0.33 gives 2 to 4 onsets a bar within a fifth, 0.33 to 0.66 gives 4 to 8 within an octave, 0.66 to 1 gives 6 to 16 up to an octave and a fifth. Basslines, arpeggios and grooves follow the same bands (more hits, hats and ghost notes with energy).
 
@@ -131,7 +131,23 @@ Energy steers density and range, inside the style's limits: 0 to 0.33 gives 2 to
 
 A preset can be varied (`from`, `keep`): `rhythm` keeps its onsets and composes new pitches (chord tones for a bass, indices for an arpeggio, degrees for a melody), `notes` keeps its pitches in their order on a new rhythm.
 
-FM patches are a rack device (`fm`, `src/song/rack.js`), inside a range table: index 0 to 4 (one less per octave above 4), harmonicity from 0.5, 1, 1.01, 2, 2.01, 3, 3.5, 4, modulator wave sine, triangle, square or sawtooth (pink and brown only with an index under 0.5), decay 0.05 to 1, sustain 0 to 1, and a second operator (`fm2` 0.5 to 3, `fmh2` 1 to 10) for `growl` only. No third operator and no feedback in this first version. Every kind is measured below clipping in the browser (`songs/examples/05-material.json`).
+FM patches are a rack device (`fm`, `src/song/rack.js`), inside a range table: index 0 to 4 (one less per octave above 4), harmonicity from 0.5, 0.505, 1, 1.005, 1.01, 1.015, 1.02, 1.41, 2, 2.01, 2.76, 3, 3.5, 4, modulator wave sine, triangle, square or sawtooth (pink and brown only with an index under 0.5), decay 0.05 to 1, sustain 0 to 1, and a second operator (`fm2` 0.5 to 3, `fmh2` 1 to 10) for `growl`, `tine` and `clang`. No third operator and no feedback in this first version. The second operator modulates the first one, not the note.
+
+| Kind | Wave | FM patch | Sound |
+| --- | --- | --- | --- |
+| `bell` | sine or triangle | index 1 to 3, ratio 1.01, 2.01 or 3.5, short decay, no sustain | a bell or glass pluck |
+| `reese` | sawtooth | index 0.3 to 1.2, ratio 1.005 to 1.02 or 0.505, high sustain | a wide bass that beats slowly: the ratio is never exactly 1 or 0.5 |
+| `growl` | sawtooth or square | index 1 to 3, ratio 0.5, 1 or 2, a second operator (0.5 to 3, ratio 1 to 10) | an aggressive, almost vocal growl |
+| `dirty` | sawtooth or square | pink or brown noise as the modulator, index under 0.5 | grain and noise inside the note |
+| `tine` | sine or triangle | index 1 to 2.5, ratio 1, decay 0.1 to 0.35, sustain under 0.2, a second operator (0.5 to 1.2, ratio 7 or 9) | an electric piano: a bright, metallic attack that falls to a soft tone |
+| `clang` | sine or triangle | index 2 to 3.5, ratio 1.41, 2.76 or 3.5, a second operator (0.5 to 1.5, ratio 2.5 to 6.5) | struck metal, inharmonic, a ring that fades |
+| `sub` | triangle or square | index 1 to 2.5, ratio 0.5, high sustain | a hollow growl an octave down |
+| `organ` | sine | index 0.6 to 1.4, ratio 1, 2 or 3, sustain 0.9 to 1 | steady and even, like drawbars |
+| `saw`, `square` | the wave | none | the plain wave |
+
+`tine`, `clang`, `sub` and `organ` are in no style recipe yet: a style uses them when its `sounds` names them. The first six kinds are measured below clipping in the browser (`songs/examples/05-material.json`); the four new ones were measured in fast exports of a demo song (bass alone and in a mix, peak at most -4.4 dBFS).
+
+FM changes the frequency of a synth oscillator, so it applies only to synth sounds: the basic waves (`sine`, `triangle`, `square`, `sawtooth`), `supersaw`, `pulse` and the wavetables. Samples (drum kits, the General MIDI instruments, the voices) and noise ignore it: Strudel's sampler never connects the FM operators.
 
 ### In the director
 

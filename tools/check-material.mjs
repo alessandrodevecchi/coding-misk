@@ -3,7 +3,7 @@
 // Rules, determinism, ranges, key: every generated part is an idea that passes the song validator and compiles.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { compose, KINDS, FAMILIES, SOUND_KINDS, fmInRange, sharedRoots, modeProgression, SESSION_SOURCES } from '../src/material/index.js';
+import { compose, KINDS, FAMILIES, SOUND_KINDS, FM_RANGES, fmInRange, sharedRoots, modeProgression, SESSION_SOURCES } from '../src/material/index.js';
 import { tonesOf, rootOf, modeSteps, chordsOf } from '../src/material/common.js';
 import { spanOf } from '../src/material/melody.js';
 import { miniEvents, expandIdea, unknownChords, parseMini } from '../src/song/ideas.js';
@@ -194,6 +194,19 @@ const CHECKS = {
     }
     assert(SOUND_KINDS.every(k => kinds.has(k)), `sound kinds drawn: ${[...kinds]}`);
     assert(DEVICES.fm && DEVICES.fm.kind === 'sound', 'no fm device in the rack');
+    // the rack menu offers the same ratios as the range table
+    const choice = DEVICES.fm.args.find(a => a[0] === 'harmonicity')[3];
+    assert(JSON.stringify(choice) === JSON.stringify(FM_RANGES.harmonicity), `rack ratios ${choice} differ from FM_RANGES ${FM_RANGES.harmonicity}`);
+  },
+  'sounds: a reese always beats (its ratio is never exactly 1 or 0.5, #71)'() {
+    let n = 0;
+    for (const s of seeds(200)) {
+      const p = compose('sound', { seed: s, type: 'bass', style: { sounds: ['reese'] }, energy: 0.6 });
+      const h = p.rack[0] && p.rack[0].harmonicity;
+      assert(p.rack.length === 1 && ![1, 0.5].includes(h) && (Math.abs(h - 1) < 0.021 || Math.abs(h - 0.5) < 0.011), `${s}: reese ratio ${h}`);
+      n++;
+    }
+    assert(n === 200, `${n} reese patches`);
   },
   'material source: "patterns" applies no mutation and a replay matches'() {
     const recipes = loadStyles(), grooveRows = new Set(Object.values(GROOVES).flatMap(g => Object.values(g[1])));

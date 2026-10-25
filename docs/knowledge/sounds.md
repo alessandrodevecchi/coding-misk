@@ -72,7 +72,7 @@ Texture samples (`TEXTURES`, from dirt-samples; `vinyl` is synthetic crackle): `
 Custom samples: put a folder per instrument in `public/samples/` (`voce/01.wav` plays as `s("voce").n(0)`). WAV at 44.1 kHz is best, names without spaces. The voice folders `say_*` are made by `npm run voices` and are git-ignored. The full rules are in `public/samples/README.md` (Italian).
 
 <!-- generated:fm-and-guitars -->
-Sound kinds of the material generator (`SOUND_KINDS`): `bell`, `reese`, `growl`, `dirty`, `saw`, `square`. FM ranges (`FM_RANGES`): index 0-4; harmonicity 0.5/1/1.01/2/2.01/3/3.5/4; wave sine/triangle/square/sawtooth/pink/brown; index2 0.5-3; harmonicity2 1-10; decay 0.05-1; sustain 0-1.
+Sound kinds of the material generator (`SOUND_KINDS`): `bell`, `reese`, `growl`, `dirty`, `saw`, `square`, `tine`, `clang`, `sub`, `organ`. FM ranges (`FM_RANGES`): index 0-4; harmonicity 0.5/0.505/1/1.005/1.01/1.015/1.02/1.41/2/2.01/2.76/3/3.5/4; wave sine/triangle/square/sawtooth/pink/brown; index2 0.5-3; harmonicity2 1-10; decay 0.05-1; sustain 0-1.
 
 | Guitar type | Name | Layered sounds | Base drive | High-pass |
 | --- | --- | --- | --- | --- |
