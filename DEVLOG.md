@@ -1016,3 +1016,9 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Già com'era, non toccato: la cassa drum and bass arriva a 1.18 su una riga, sopra l'headroom 1.0 dello stile, che non ne dichiara uno. Il rapporto `material` di una sessione può elencare un pad composto che il brano finale non contiene (ambient, seed `pad-ambient`, brano 1).
 - FM (2.1): ricette non toccate, la scelta resta al proprietario. Proposta per stile, sei esempi MP3 esportati dall'app e istruzioni di ascolto in `notes/fm-per-stile.md` e `notes/fm-esempi/` (ignorati da git). "Componi una parte" non cambia il suono: per sentire l'FM nell'app servono il brano di esempio "Material" o il modulo FM.
 - Check: `check:endless` 70/70, `check:styles` 20/20, `check:material` 14/14, `check:radio-profiles` 25/25 (dopo aver riscritto le fixture Classic), `check:compilation` 7/7, `check:spoken` 22/22, `check:crescendo` 37/37 (livello rapido), `check:random` 8/8, `check:patterns` 13/13, `check:soul` 6/6, `check:durations` ok. `check:knowledge` passa con tre avvisi già presenti (catalogo Strudel vecchio, `status.md`, lunghezza di `checks.md`).
+
+## 2026-10-25: strumento sulle schede dei riff (#72)
+
+- Scheda Pattern: le schede dei riff dicevano solo "Riff · incluso", senza strumento. Ora la riga dice anche chitarra o basso ("Riff · chitarra · incluso", in inglese "Riffs · guitar · built-in"), sia sulla scheda sia nel dettaglio. Anche la ricerca trova "chitarra" e "basso". Testi `plInst_guitar` e `plInst_bass` in EN e IT.
+- Screenshot prima e dopo in `notes/prove-2026-10-25/pattern/` (`riff-label-before.png`, `riff-label-after.png`, `riff-label-after-en.png`).
+- Check: `check:patterns` 18/18, `check:guide` ok.

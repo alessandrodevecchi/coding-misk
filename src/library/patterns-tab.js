@@ -32,7 +32,10 @@ export function createPatternsTab({ root, t, tx, esc, store, recipes, loop, code
   const find = uid => (uid ? freshItems().find(x => x.uid === uid) || all().find(x => x.uid === uid) || null : null);
   const kindName = k => t(`plKind_${k}`);
   const srcName = it => t(it.src === 'builtin' ? 'plSrcBuiltin' : it.src === 'mine' ? 'plSrcMine' : 'plSrcNew');
-  const matches = it => !st.q || st.q.split(/\s+/).every(w => haystack(it, it.name, kindName(it.kind)).includes(w));
+  // riffs are written for a guitar or a bass: the card says which (#72)
+  const instName = it => (it.kind === 'riffs' && (it.type === 'guitar' || it.type === 'bass') ? t(`plInst_${it.type}`) : '');
+  const kindLine = it => [kindName(it.kind), instName(it), srcName(it)].filter(Boolean).map(esc).join(' · ');
+  const matches = it => !st.q || st.q.split(/\s+/).every(w => haystack(it, it.name, `${kindName(it.kind)} ${instName(it)}`).includes(w));
   const visible = () => all().filter(it => (st.kind === 'all' || it.kind === st.kind) && (st.source === 'all' || it.src === st.source) && matches(it));
 
   // loop settings of a pattern: its own context, its kind's defaults, the values passed by a link
@@ -84,7 +87,7 @@ export function createPatternsTab({ root, t, tx, esc, store, recipes, loop, code
     const on = playing() === it.uid;
     return `<div class="pn-card${st.sel === it.uid ? ' on' : ''}" data-pn-card="${esc(it.uid)}">
       <button class="pn-cplay" data-pn-play="${esc(it.uid)}" aria-pressed="${on}" aria-label="${esc(t(on ? 'plStopAria' : 'plPlayAria', { name: it.name }))}">${on ? STOP : PLAY}</button>
-      <button class="pn-cbody" data-pn-sel="${esc(it.uid)}" aria-current="${st.sel === it.uid}"><b>${esc(it.name)}</b><small>${esc(kindName(it.kind))} · ${esc(srcName(it))}</small><canvas class="pn-pv" data-pv="${esc(it.uid)}" width="160" height="40" aria-hidden="true"></canvas></button>
+      <button class="pn-cbody" data-pn-sel="${esc(it.uid)}" aria-current="${st.sel === it.uid}"><b>${esc(it.name)}</b><small>${kindLine(it)}</small><canvas class="pn-pv" data-pv="${esc(it.uid)}" width="160" height="40" aria-hidden="true"></canvas></button>
     </div>`;
   }
   // the kind "New" composes: the selected pattern's, else the filter's, else melodies
@@ -119,7 +122,7 @@ export function createPatternsTab({ root, t, tx, esc, store, recipes, loop, code
       : `<div class="pn-styles"><span class="lbl">${esc(t('plStyles'))}</span> ${styles.length ? styles.map(id => `<button class="chip small" data-pn-open-style="${esc(id)}">${esc(styleName(id))}</button>`).join(' ') : `<span class="muted small">${esc(t(it.src === 'builtin' ? 'plNoStyles' : 'plAnyStyleUse'))}</span>`}</div>`;
     const del = st.armed && st.armed.uid === it.uid && Date.now() - st.armed.at < 4000;
     return `<div class="card pn-detail">
-      <div class="pn-dhead"><div><h3>${esc(it.name)}</h3><span class="lbl">${esc(kindName(it.kind))} · ${esc(srcName(it))}${it.src !== 'builtin' && it.created ? ` · ${esc(it.created)}` : ''}</span></div>
+      <div class="pn-dhead"><div><h3>${esc(it.name)}</h3><span class="lbl">${kindLine(it)}${it.src !== 'builtin' && it.created ? ` · ${esc(it.created)}` : ''}</span></div>
         <button class="btn primary pn-play" data-pn-toggle aria-pressed="${on}">${on ? STOP : PLAY}<span>${esc(t(on ? 'plStop' : 'plPlay'))}</span></button></div>
       <canvas class="pn-pv big" data-pv="${esc(it.uid)}" data-big="1" width="480" height="110" aria-label="${esc(t('plPreviewAria'))}"></canvas>
       <div class="pn-ctrls">
