@@ -78,7 +78,7 @@ Every instrument also takes:
 ```json
 "hook": { "material": { "source": "mix", "share": 0.4, "rules": ["polymeter", "tail", "call-response"] }, "presets": ["neon", "pioggia"] },
 "drums": { "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "two-step"] }, "grooves": ["techno"] },
-"bass": { "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "octaves"], "sounds": ["reese", "saw"] } },
+"bass": { "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "octaves"], "sounds": ["reese", "growl"] } },
 "pad": { "material": { "source": "mix", "share": 0.3, "rules": ["style"] }, "presets": ["pad", "stab"] }
 ```
 
@@ -88,7 +88,7 @@ Every instrument also takes:
 | `share` | With `mix`: the share of songs with a composed part, 0 to 1 | `0.5` |
 | `families` | Drums only: groove families the generator may use: `four-floor`, `breakbeat`, `two-step`, `half-time`, `euclid` | all |
 | `rules` | Melody (`hook`): `polymeter`, `tail`, `call-response`, `dark`. Bass: rhythm families `half`, `offbeat`, `pulse`, `rolling`, `gallop`, `sixteenths`, and `roots`, `octaves`, `fifths`, `shared`. Arp: `up`, `updown`, `pedal`, `skips`, `random`. Pad and guitar: `style`, `mode` (a new progression on the degrees of the mode), `sevenths`, `power` | all |
-| `sounds` | Melodic instruments: sound kinds for composed parts: `bell`, `reese`, `growl`, `dirty`, `saw`, `square`, `tine`, `clang`, `sub`, `organ` (FM within the generator's range table) | the recipe's `waves` |
+| `sounds` | Melodic instruments: sound kinds for composed parts: `bell`, `reese`, `growl`, `dirty`, `square`, `tine`, `clang`, `sub`, `organ` (FM within the generator's range table; the old name `saw` reads as `reese`) | the recipe's `waves` |
 
 An instrument without `material` uses its presets only. The validator rejects an unknown source, family, rule or sound kind, and a share outside 0 to 1, with the JSON path and the known names. Composed parts come in only with complexity above 0, and a radio or session can override every recipe with its own material source (`patterns`, `varied`, `composed`, or `mix` to follow the recipes).
 

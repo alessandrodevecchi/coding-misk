@@ -123,7 +123,7 @@ The seed chooses among rules, never note by note in a free range:
 | Arpeggio | Indices into the voiced chords: a written cell (`up`, `updown`, `pedal`, `skips`) repeated over the bar or as a polymeter (`{0 1 2}%16`), or a seeded random source (`irand(4).seg(16).rib(371, 2)`). Every index is a chord tone. |
 | Chords | A pad voices the section's chords with `voicing()` (anchor `c4`), held or as stabs; with the rule `mode`, a new progression on the degrees of the mode, 1 to 4 different chords a phrase, the last one leading back (the fifth, the seventh or the flat second). A guitar plays power chords with a rhythm cell, or a riff of dark steps over them. |
 | Drums | Sequencer steps per row from a family: `four-floor` (kick on every beat), `breakbeat` (snare on 2 and 4, kick on 1 and on 6, 10 or 11), `two-step` (clap on 2 and 4, kick on 1 and one or two of 7, 10, 11), `half-time` (snare on 3, kick on 1 and 10 or 11), `euclid` (kick and rim as euclidean rhythms, rotated). Kits stay from the recipe. |
-| Sound | The wave and an optional FM patch: `bell`, `reese`, `growl`, `dirty`, `saw`, `square`, `tine`, `clang`, `sub`, `organ` (below). |
+| Sound | The wave and an optional FM patch: `bell`, `reese`, `growl`, `dirty`, `square`, `tine`, `clang`, `sub`, `organ` (below; the old name `saw` reads as `reese`). |
 
 Energy steers density and range, inside the style's limits: 0 to 0.33 gives 2 to 4 onsets a bar within a fifth, 0.33 to 0.66 gives 4 to 8 within an octave, 0.66 to 1 gives 6 to 16 up to an octave and a fifth. Basslines, arpeggios and grooves follow the same bands (more hits, hats and ghost notes with energy).
 
@@ -143,7 +143,7 @@ FM patches are a rack device (`fm`, `src/song/rack.js`), inside a range table: i
 | `clang` | sine or triangle | index 2 to 3.5, ratio 1.41, 2.76 or 3.5, a second operator (0.5 to 1.5, ratio 2.5 to 6.5) | struck metal, inharmonic, a ring that fades |
 | `sub` | triangle or square | index 1 to 2.5, ratio 0.5, high sustain | a hollow growl an octave down |
 | `organ` | sine | index 0.6 to 1.4, ratio 1, 2 or 3, sustain 0.9 to 1 | steady and even, like drawbars |
-| `saw`, `square` | the wave | none | the plain wave |
+| `square` | the wave | none | the plain wave |
 
 `tine`, `clang`, `sub` and `organ` are in no style recipe yet: a style uses them when its `sounds` names them. The first six kinds are measured below clipping in the browser (`songs/examples/05-material.json`); the four new ones were measured in fast exports of a demo song (bass alone and in a mix, peak at most -4.4 dBFS).
 
@@ -158,7 +158,7 @@ For each track whose type has a generator (drums, bass, arp, lead, pad, guitar),
 - A composed track gets pattern A at the target energy of the phrase where its type usually comes in (its place in the entry order), pattern B at the song's next big moment, and pattern C at the quietest phrase when complexity is above 0.6. The kick and beat tracks share one composed groove. A recipe that names `sounds` also gets a composed sound on composed tracks. Pads compose like the other melodic parts: every built-in style with a pad has `material: { source: "mix", share: 0.3, rules: ["style"] }`, so about a third of its songs voice the song's own chords near `c4` (held or as stabs, `voicing()` below the anchor) and the rest play the style's presets. A composed pad plays at 0.6 of the pad gain drawn from the recipe (`COMPOSED_PAD_GAIN` in `src/endless/material.js`): with 4 or 5 voices and no preset envelope it peaked 1.6 to 1.9 times higher than a preset pad at the same gain. Measured in the browser on berlin techno, ambient, darksynth and drum and bass sessions (`generator-followups`): written in A, composed pads span D2 to C4 (mean E3) against about F2 to F3 for the preset pads, so they sit higher on average and reach a third lower at the bottom; the basses stay at or below A#1 except in one drum and bass song, where a preset bass reaching G2 overlaps any pad. Composed pads peak at 0.05 to 0.19 (preset pads 0.07 to 0.21, basses 0.19 to 0.43), and the master output stays at or below 0.85 with every track playing at once.
 - **The user's saved patterns** (`pattern-library`, passed as `userPatterns`) join the pool only where they fit: the same track type, a style tag of the part's style or `any`, and material that moves to the song's key.
 
-The session report (`npm run endless`) shows which tracks are composed, varied or saved. `DIRECTOR_VERSION` is 6 (`generator-followups`: pads take composed chords with the recipe's share; 5 was `radio-variation`, Add and More complex compose): sessions saved by another version, older or newer, warn in the playlists.
+The session report (`npm run endless`) shows which tracks are composed, varied or saved. `DIRECTOR_VERSION` is 8 (the sound kind `saw` is gone, styles that named it play `reese`; 7 made the reese beat; 6 was `generator-followups`: pads take composed chords with the recipe's share; 5 was `radio-variation`, Add and More complex compose): sessions saved by another version, older or newer, warn in the playlists.
 
 The rules were written from scratch from general techniques of live coders and public courses; no passage or full recipe of a course is reused, so no credit line is needed.
 

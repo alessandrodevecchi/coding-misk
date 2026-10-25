@@ -9,7 +9,7 @@ import { checkGrowthShapes } from '../song/shapes.js';
 import { WAYS, checkNarrator, MAX_WORDS } from '../song/spoken.js';
 import { VOCAB_GROUPS } from '../song/vocabulary.js';
 import { MACHINES } from '../sounds/machines.js';
-import { SOURCES, RULES, FAMILIES, SOUND_KINDS, KIND_OF_TYPE } from '../material/index.js';
+import { SOURCES, RULES, FAMILIES, SOUND_KINDS, SOUND_KIND_ALIASES, KIND_OF_TYPE } from '../material/index.js';
 
 // The seven energy shapes (docs/ENDLESS.md); their curves live in shapes.js.
 export const SHAPES = ['build-drop', 'slow-burn', 'waves', 'flat-groove', 'verse-chorus', 'late-peak', 'descent'];
@@ -254,7 +254,11 @@ function checkMaterial(type, m, p, err, warn) {
   const names = (k, known, what) => {
     if (m[k] === undefined) return;
     if (!Array.isArray(m[k]) || !m[k].length) { err(`${p}.${k}`, `a non-empty list of ${what}: ${known.join(', ')}`); return; }
-    m[k].forEach((x, i) => { if (!known.includes(x)) err(`${p}.${k}[${i}]`, `unknown ${what.replace(/s$/, '')} "${x}"; known: ${known.join(', ')}`); });
+    m[k].forEach((x, i) => {
+      // an old sound kind name plays its new kind: a warning, not an error
+      if (k === 'sounds' && SOUND_KIND_ALIASES[x]) return warn(`${p}.${k}[${i}]`, `"${x}" is now "${SOUND_KIND_ALIASES[x]}"`);
+      if (!known.includes(x)) err(`${p}.${k}[${i}]`, `unknown ${what.replace(/s$/, '')} "${x}"; known: ${known.join(', ')}`);
+    });
   };
   const kind = KIND_OF_TYPE[type];
   if (type === 'drums') names('families', FAMILIES, 'groove families');

@@ -3,11 +3,12 @@
 // Rules, determinism, ranges, key: every generated part is an idea that passes the song validator and compiles.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { compose, KINDS, FAMILIES, SOUND_KINDS, FM_RANGES, fmInRange, sharedRoots, modeProgression, SESSION_SOURCES } from '../src/material/index.js';
+import { compose, KINDS, FAMILIES, SOUND_KINDS, SOUND_KIND_ALIASES, FM_RANGES, fmInRange, sharedRoots, modeProgression, SESSION_SOURCES } from '../src/material/index.js';
 import { tonesOf, rootOf, modeSteps, chordsOf } from '../src/material/common.js';
 import { spanOf } from '../src/material/melody.js';
 import { miniEvents, expandIdea, unknownChords, parseMini } from '../src/song/ideas.js';
 import { validateSong } from '../src/song/validate.js';
+import { validateRecipe } from '../src/endless/recipe.js';
 import { compileSong } from '../src/song/compile.js';
 import { DEVICES, rackCode } from '../src/song/rack.js';
 import { PROGS, BASS, ARPS, GROOVES, meterSteps } from '../src/music.js';
@@ -197,6 +198,18 @@ const CHECKS = {
     // the rack menu offers the same ratios as the range table
     const choice = DEVICES.fm.args.find(a => a[0] === 'harmonicity')[3];
     assert(JSON.stringify(choice) === JSON.stringify(FM_RANGES.harmonicity), `rack ratios ${choice} differ from FM_RANGES ${FM_RANGES.harmonicity}`);
+  },
+  'sounds: the old kind saw plays reese, in a style and in a saved recipe (no saw kind left)'() {
+    assert(!SOUND_KINDS.includes('saw') && SOUND_KIND_ALIASES.saw === 'reese', `kinds ${SOUND_KINDS}`);
+    for (const s of seeds(20)) {
+      const a = compose('sound', { seed: s, type: 'bass', style: { sounds: ['saw'] }, energy: 0.6 });
+      const b = compose('sound', { seed: s, type: 'bass', style: { sounds: ['reese'] }, energy: 0.6 });
+      assert(JSON.stringify(a) === JSON.stringify(b) && a.why[0].startsWith('sound reese'), `${s}: saw ${a.why[0]} differs from reese ${b.why[0]}`);
+    }
+    const old = JSON.parse(fs.readFileSync('styles/drum-and-bass.json', 'utf8'));
+    old.bass.material = { ...(old.bass.material || {}), sounds: ['reese', 'saw'] };
+    const v = validateRecipe(old);
+    assert(!v.errors.length && v.warnings.some(w => /"saw" is now "reese"/.test(w.msg)), `old style with saw: ${JSON.stringify(v)}`);
   },
   'sounds: a reese always beats (its ratio is never exactly 1 or 0.5, #71)'() {
     let n = 0;

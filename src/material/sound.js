@@ -4,7 +4,10 @@
 import { band } from './common.js';
 
 // tine, clang, sub and organ (#71) are not in any style recipe yet: a style picks them by naming them in `sounds`
-export const SOUND_KINDS = ['bell', 'reese', 'growl', 'dirty', 'saw', 'square', 'tine', 'clang', 'sub', 'organ'];
+export const SOUND_KINDS = ['bell', 'reese', 'growl', 'dirty', 'square', 'tine', 'clang', 'sub', 'organ'];
+// old kind names still read (styles edited and saved before the rename): saw sounded the same as reese, so it plays reese
+export const SOUND_KIND_ALIASES = { saw: 'reese' };
+export const soundKind = k => SOUND_KIND_ALIASES[k] || k;
 // the range table: ratios just off 1 and 0.5 make the reese beat, 1.41 and 2.76 are the inharmonic ratios of clang (#71)
 export const FM_RANGES = {
   index: [0, 4], harmonicity: [0.5, 0.505, 1, 1.005, 1.01, 1.015, 1.02, 1.41, 2, 2.01, 2.76, 3, 3.5, 4], wave: ['sine', 'triangle', 'square', 'sawtooth', 'pink', 'brown'],
@@ -16,7 +19,7 @@ const round = x => Math.round(x * 100) / 100;
 
 // opts: { style (its sounds list), type, energy, octave } → { settings: { wave }, rack: [fm device] | [], why }
 export function sound(r, { style = {}, type = 'hook', energy = 0.5, octave } = {}) {
-  const kinds = (style.sounds || SOUND_KINDS).filter(k => SOUND_KINDS.includes(k));
+  const kinds = [...new Set((style.sounds || SOUND_KINDS).map(soundKind))].filter(k => SOUND_KINDS.includes(k));
   const kind = r.pick(kinds.length ? kinds : SOUND_KINDS), b = band(energy);
   const oct = Number(octave ?? OCTAVE[type] ?? 4), top = Math.max(0.5, FM_RANGES.index[1] - Math.max(0, oct - 4));
   const idx = (lo, hi) => round(Math.min(top, r.range(lo, hi)));

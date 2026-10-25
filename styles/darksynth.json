@@ -60,7 +60,7 @@
     }
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "gallop", "sixteenths", "octaves"], "sounds": ["growl", "dirty", "saw"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "gallop", "sixteenths", "octaves"], "sounds": ["growl", "dirty", "reese"] },
     "presets": [
       "ottaveArcade",
       "spirale",

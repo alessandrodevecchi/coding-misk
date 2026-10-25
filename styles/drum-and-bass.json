@@ -46,7 +46,7 @@
     ]
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["half", "rolling", "offbeat", "octaves"], "sounds": ["reese", "saw"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["half", "rolling", "offbeat", "octaves"], "sounds": ["reese"] },
     "presets": [
       "sub",
       "rumble",
