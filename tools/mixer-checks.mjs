@@ -75,6 +75,8 @@ async function hapsOf(L, code, bar) {
 }
 // the same, for other checks (tools/check-profiles.mjs: the narrator switch, profile-options)
 export const hapsAt = hapsOf;
+// Strudel in Node itself ({ evaluate(code) → pattern }), for checks that compare more than the mix (tools/check-ramps.mjs)
+export const strudelInNode = load;
 const close = (a, b) => a === b || (typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < 1e-9);
 const show = x => (x === undefined ? '-' : typeof x === 'number' ? String(+x.toFixed(4)) : String(x));
 // what differs between the haps in full (a) and with a preset (b): short lines, one per kind of difference

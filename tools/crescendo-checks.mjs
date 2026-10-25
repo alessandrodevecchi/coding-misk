@@ -24,7 +24,7 @@ import { meterSteps } from '../src/music.js';
 import { pickFragments } from '../src/video/fragments.js';
 import { compileCompact, layersOf } from '../src/song/compile-compact.js';
 import { buildSteps, stateAt, checkBuild, stepTrack, buildMap } from '../src/song/build.js';
-import { crescendoSong, patternVariants, waypointSong, CRESCENDO_VERSION } from '../src/song/crescendo.js';
+import { crescendoSong, patternVariants, waypointSong, CRESCENDO_VERSION, songSeconds } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
 import { resolveShape, shapeFacts, canPlay, SHAPES_VERSION, OPENINGS } from '../src/song/shapes.js';
@@ -280,11 +280,34 @@ export const CHECKS = [
         // the target and the fallback read the growth only: the kept shape's rushed count is its growth's
         const kept = stats.tried[stats.kept];
         assert(kept.rushed === kept.rushedGrowth && c.crescendo.shape.rushed === kept.rushedGrowth, `${id}: kept rushed ${kept.rushed}, growth ${kept.rushedGrowth}`);
-        if (measured.some(t => t.rushed === 0)) assert(kept.rushed === 0 && stats.kept === stats.tried.length - 1, `${id}: a shape met the target and the search went on`);
+        if (measured.some(t => t.rushed === 0)) assert(kept.rushed === 0 && (stats.long || stats.kept === stats.tried.length - 1), `${id}: a shape met the target and the search went on`);
         if (!cap) log(`      ${id}${over.duration ? ' (fitted)' : ''}: ${measured.length} shapes measured, kept ${kept.development} ${kept.pace}${kept.maxDetail !== null ? ` detail ${kept.maxDetail}` : ''}, ${kept.rushedGrowth} rushed growth steps, ${kept.rushedWritten} in the written part`);
       }
       const again = crescendoSong(s, { rules: growthRules(resolveProfile('switch', over), { styles }) }), once = crescendoSong(s, { rules });
       assert(JSON.stringify(again.crescendo.shape) === JSON.stringify(once.crescendo.shape) && JSON.stringify(again.build) === JSON.stringify(once.build), `${id}: another shape the second time`);
+    }
+  } },
+  { name: 'shape search settings: Try all measures every shape and keeps the first good one or the shortest, the fixed order, the long-song threshold', unit(log) {
+    // shape-search D6, D7
+    for (const id of ['luci-rosse', 'kellerlicht']) {
+      const s = byId(id), rules = growthRules(resolveProfile('switch', {}), { styles });
+      const all = {}, best = {}, fixed = {}, fixed2 = {}, first = {}, long = {};
+      crescendoSong(s, { rules, stats: first });
+      crescendoSong(s, { rules, stats: all, shapeAll: true });
+      const cb = crescendoSong(s, { rules, stats: best, shapeAll: true, shapeKeep: 'best' });
+      // Try all with the first good one keeps what the search keeps when the first shapes meet the target
+      if (first.tried[first.kept].rushed === 0) assert(JSON.stringify(all.tried[all.kept]) && all.tried[all.kept].development === first.tried[first.kept].development && all.tried[all.kept].pace === first.tried[first.kept].pace, `${id}: Try all first good one kept another shape`);
+      const measured = best.tried.filter(t => !t.skipped), ok = measured.filter(t => t.rushed === 0);
+      assert(measured.length > 16, `${id}: Try all best one measured only ${measured.length} shapes`);
+      if (ok.length) assert(best.tried[best.kept].rushed === 0 && best.tried[best.kept].seconds === Math.min(...ok.map(t => t.seconds)), `${id}: best one is not the shortest that meets the target`);
+      assert(Math.abs(best.tried[best.kept].seconds - songSeconds(cb)) < 1e-6, `${id}: the seconds counted are not the song's`);
+      crescendoSong(s, { rules, stats: fixed, shapeRandom: false }); crescendoSong(s, { rules, stats: fixed2, shapeRandom: false });
+      assert(!fixed.random && JSON.stringify(fixed.tried.map(t => [t.development, t.pace, t.maxDetail])) === JSON.stringify(fixed2.tried.map(t => [t.development, t.pace, t.maxDetail])), `${id}: the fixed order changed between two growths`);
+      // a threshold under the kept length: every shape measured, the shortest that meets the target kept
+      crescendoSong(s, { rules, stats: long, longSong: 300 });
+      const lk = long.tried[long.kept], lok = long.tried.filter(t => !t.skipped && t.rushed === 0);
+      if (first.tried[first.kept].seconds > 300) assert(long.long && (!lok.length || lk.seconds === Math.min(...lok.map(t => t.seconds))), `${id}: the long-song rule did not keep the shortest`);
+      log(`      ${id}: default ${Math.round(first.tried[first.kept].seconds)} s, Try all best ${Math.round(best.tried[best.kept].seconds)} s of ${measured.length} shapes, long from 5 min ${Math.round(lk.seconds)} s`);
     }
   } },
   { name: 'shapes: every build of every opening and development ends on its destination and every state compiles (medium pace)', songs: isLong, parts: OPENINGS,

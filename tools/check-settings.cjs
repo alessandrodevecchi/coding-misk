@@ -1,5 +1,6 @@
 // Browser checks for the settings page (#31): gear, theme and language, radio defaults, export format
-// (Opus export of a short song), the growth shapes tried (shape-search), backup export and import, reset.
+// (Opus export of a short song), the growth shapes tried and available (shape-search), the chooser on air
+// (radio-chooser-versions), backup export and import, reset.
 // Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-settings.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
@@ -71,6 +72,52 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('#tab-impostazioni [data-set-lang="it"]'); await sleep(300);
   check(/forme di crescita provate/i.test(await page.innerText('#set-advanced')) && (await page.inputValue('#set-shape-cap')) === '12', 'in Italian, the value kept');
   await page.click('#tab-impostazioni [data-set-lang="en"]'); await sleep(300);
+  // Try all, Keep, Random order, Long song from (shape-search D6, D7): defaults not stored, Keep and the cap follow Try all
+  const ls = k => page.evaluate(x => localStorage.getItem(x), k);
+  check(!(await page.isChecked('#set-shape-all')) && (await page.isDisabled('#set-shape-keep')) && (await page.inputValue('#set-shape-keep')) === 'first', 'Try all off by default, Keep first good one and disabled');
+  check((await page.isChecked('#set-shape-random')) && (await page.inputValue('#set-long-song')) === '15', 'Random order on, Long song from 15 minutes by default');
+  await page.check('#set-shape-all'); await sleep(200);
+  check((await ls('coding-misk-shape-all')) === 'true' && !(await page.isDisabled('#set-shape-keep')) && (await page.isDisabled('#set-shape-cap')), 'Try all on: stored, Keep enabled, the cap disabled');
+  await page.selectOption('#set-shape-keep', 'best'); await sleep(150);
+  check((await ls('coding-misk-shape-keep')) === '"best"', 'Keep best one stored', String(await ls('coding-misk-shape-keep')));
+  await page.selectOption('#set-shape-keep', 'first'); await sleep(150);
+  await page.uncheck('#set-shape-all'); await sleep(200);
+  check((await ls('coding-misk-shape-all')) === null && (await ls('coding-misk-shape-keep')) === null, 'the defaults of Try all and Keep are not stored');
+  await page.uncheck('#set-shape-random'); await sleep(150);
+  check((await ls('coding-misk-shape-random')) === 'false', 'Random order off stored', String(await ls('coding-misk-shape-random')));
+  await page.check('#set-shape-random'); await sleep(150);
+  check((await ls('coding-misk-shape-random')) === null, 'Random order on not stored');
+  await page.fill('#set-long-song', '90'); await page.press('#set-long-song', 'Tab'); await sleep(150);
+  check((await ls('coding-misk-long-song')) === '3600' && (await page.inputValue('#set-long-song')) === '60', 'Long song from kept at 60 minutes, stored in seconds', String(await ls('coding-misk-long-song')));
+  await page.fill('#set-long-song', '15'); await page.press('#set-long-song', 'Tab'); await sleep(150);
+  check((await ls('coding-misk-long-song')) === null, 'Long song from: the default is not stored');
+  check(/shortest song/.test(await page.innerText('#set-advanced')), 'the hints of the new settings');
+  // the growth shapes available: an informative line counted from the shape list (src/song/shapes.js), never written by hand
+  const counts = await page.evaluate(async () => { const m = await import('/src/song/shapes.js'); return { len: m.GROWTH_SHAPES.length, ...m.shapeCounts() }; });
+  const countLine = await page.innerText('#set-shape-count');
+  check(counts.shapes === counts.len && (await page.getAttribute('#set-shape-count', 'data-shapes')) === String(counts.len) && countLine.startsWith(`Growth shapes available: ${counts.len} (${counts.developments} developments × ${counts.paces} paces)`) && countLine.includes(`at most ${counts.most}`), 'the shapes line shows the length of the shape list', countLine);
+  check((await page.innerText('#set-advanced')).includes(`at most ${counts.most} today`), 'the Try all hint counts the candidates from the code');
+  // the chooser on air (radio-chooser-versions): every version by name, Normal v1 by default and not stored, a choice
+  // stored and written in a new radio recipe, an unknown stored id read as the default
+  const versions = await page.evaluate(async () => Object.keys((await import('/src/endless/waypoints.js')).AIR_CHOOSERS));
+  const shown = await page.$$eval('#set-air-chooser option', o => o.map(x => [x.value, x.textContent]));
+  check(JSON.stringify(shown.map(x => x[0])) === JSON.stringify(versions) && (await page.inputValue('#set-air-chooser')) === 'normal-1' && shown[0][1] === 'Normal v1 (current)' && shown.some(x => x[1] === 'Radio chooser v1 (previous on air)'), 'Chooser on air lists every version, Normal v1 by default', JSON.stringify(shown));
+  check(/steer a grown song on the radio/.test(await page.innerText('#set-advanced')), 'its hint');
+  const clipRecipe = () => page.evaluate(() => globalThis.codingMiskRadio.exportItems({ kind: 'clip', seconds: 8 }).recipe);
+  check(!('chooser' in (await clipRecipe())), 'a new recipe with the default records no chooser');
+  await page.selectOption('#set-air-chooser', 'radio-1'); await sleep(150);
+  check((await ls('coding-misk-air-chooser')) === '"radio-1"', 'Radio chooser v1 stored', String(await ls('coding-misk-air-chooser')));
+  check((await clipRecipe()).chooser === 'radio-1', 'a new radio recipe records the chooser chosen');
+  await page.selectOption('#set-air-chooser', 'normal-1'); await sleep(150);
+  check((await ls('coding-misk-air-chooser')) === null, 'Chooser on air: the default is not stored');
+  await page.evaluate(() => localStorage.setItem('coding-misk-air-chooser', '"radio-9"'));
+  await page.click('#open-settings'); await sleep(300); await page.click('#open-settings'); await sleep(300);
+  check((await page.inputValue('#set-air-chooser')) === 'normal-1' && !('chooser' in (await clipRecipe())), 'an unknown stored chooser reads as Normal v1');
+  await page.selectOption('#set-air-chooser', 'radio-1'); await sleep(150);
+  await page.click('#tab-impostazioni [data-set-lang="it"]'); await sleep(300);
+  check((await page.innerText('#set-shape-count')).startsWith(`Forme di crescita disponibili: ${counts.len} (`) && (await page.$$eval('#set-air-chooser option', o => o.map(x => x.textContent))).includes('Normale v1 (attuale)') && /Scelta delle mosse in onda/i.test(await page.innerText('#set-advanced')), 'in Italian: the shapes line and the chooser');
+  if (shots) await (await page.$('#set-advanced')).screenshot({ path: path.join(shots, 'advanced-it.png') });
+  await page.click('#tab-impostazioni [data-set-lang="en"]'); await sleep(300);
   await page.click('#open-settings'); await sleep(300);
 
   // Opus export of a short song
@@ -87,7 +134,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const file = path.join(os.tmpdir(), `coding-misk-backup-${Date.now()}.json`);
   await bk.saveAs(file);
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-  check(data.format === 'coding-misk/backup' && data.data['coding-misk-library'] && !data.data['coding-misk-draft'], 'backup holds the library, not the working state', `${data.format} keys: ${Object.keys(data.data || {}).join(', ')}`);
+  check(data.format === 'coding-misk/backup' && data.data['coding-misk-library'] && !data.data['coding-misk-draft'] && data.data['coding-misk-air-chooser'] === 'radio-1', 'backup holds the library and the chooser on air, not the working state', `${data.format} keys: ${Object.keys(data.data || {}).join(', ')}`);
   const p2 = await (await browser.newContext({ viewport: { width: 1300, height: 1100 } })).newPage();
   p2.on('pageerror', e => errors.push(e.message));
   await p2.goto(URL); await sleep(3000);

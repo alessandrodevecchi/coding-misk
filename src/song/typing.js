@@ -2,13 +2,17 @@
 // Lines that stay are kept; a changed line is edited in place (the different middle part is deleted, then the new
 // one typed); new lines are typed from scratch; removed lines go away at the start.
 // frames(from, to) returns f(k) → text at progress k (0 to 1).
-function lineDiff(a, b) {
+// blanks: false when blank lines must not anchor the alignment (typingPlan): the blank lines between tracks are all
+// alike, so one could be kept in the wrong place and split a track that changed from its old lines (deleted and
+// typed again instead of edited); they go with the changed lines, and pairUp pairs them up
+function lineDiff(a, b, blanks = true) {
   const n = a.length, m = b.length, L = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
-  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const same = (x, y) => x === y && (blanks || x.trim() !== '');
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = same(a[i], b[j]) ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
   const ops = [];
   let i = 0, j = 0;
   while (i < n && j < m) {
-    if (a[i] === b[j]) { ops.push({ op: 'keep', text: a[i] }); i++; j++; }
+    if (same(a[i], b[j])) { ops.push({ op: 'keep', text: a[i] }); i++; j++; }
     else if (L[i + 1][j] >= L[i][j + 1]) ops.push({ op: 'del', text: a[i++] });
     else ops.push({ op: 'add', text: b[j++] });
   }
@@ -144,9 +148,10 @@ function tokenDiff(a, b) {
   eq(X.slice(X.length - q).join(''));
   return segs;
 }
-// a run of removed lines and a run of new lines: pairs of alike lines in order (the most alike overall)
+// a run of removed lines and a run of new lines: pairs of alike lines in order (the most alike overall); two blank
+// lines pair with the least weight, so they never win over a pair of code lines
 function pairUp(dels, adds) {
-  const n = dels.length, m = adds.length, S = Array.from({ length: n + 1 }, () => new Float64Array(m + 1)), like = dels.map(d => adds.map(a => lineLike(d, a)));
+  const n = dels.length, m = adds.length, S = Array.from({ length: n + 1 }, () => new Float64Array(m + 1)), like = dels.map(d => adds.map(a => (d.trim() || a.trim() ? lineLike(d, a) : LIKE)));
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) S[i][j] = Math.max(S[i + 1][j], S[i][j + 1], like[i][j] >= LIKE ? S[i + 1][j + 1] + like[i][j] : -1);
   const pair = new Array(m).fill(-1);
   let i = 0, j = 0;
@@ -322,7 +327,7 @@ function whole(text, k) {
 const COPY_MIN = 40;
 // notes: false leaves out the lines pasted as from notes (a measure that does not move with the seed, growth:probe)
 export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false, force = Infinity, notes = true } = {}) {
-  const ops = lineDiff(chainLines(from), chainLines(to)), parts = [];
+  const ops = lineDiff(chainLines(from), chainLines(to), false), parts = [];
   for (let k = 0; k < ops.length;) {
     if (ops[k].op === 'keep') { parts.push({ kind: 'keep', text: ops[k].text }); k++; continue; }
     const dels = [], adds = [];

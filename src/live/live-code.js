@@ -8,6 +8,7 @@ import { applyComments } from '../song/comments.js';
 import { idiomatic } from '../song/idiom.js';
 import { breakLines, lineLike, chainLines } from '../song/typing.js';
 import { pasteRule } from './typing-load.js';
+import { rampLists } from '../song/ramps.js';
 import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOptions, functionContext, FUNCTION_OPTIONS, lineKey, addEntry } from '../song/writer.js';
 
 // build: the live build (a song with steps); C: the controls; lang(): the language of the comments; files(): the
@@ -16,7 +17,11 @@ import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOp
 // → { build (with the code-of-the-moment steps), now, codeAt(bar, keep), run(shown): the code to evaluate (the code
 // shown and its hidden tail: mixer and hidden voice, code-writing), standalone(shown): the same with the helpers written
 // out, buses (for `.chan()`), fns (the functions the code calls: name → { params, chain }, song-functions) }
-export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0 } = {}) {
+// ramps: false keeps long linear lists as written (tools/check-ramps.mjs compares both)
+export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0, ramps = true } = {}) {
+  // shape-search D8: in a Live coder growth, a long list that moves linearly per bar (a written sweep) is typed as a
+  // stepped ramp of signals, before the functions fold it; Classic and Crescendo code stay as written
+  const ramp = ramps && build.crescendo && build.crescendo.coder ? rampLists : c => c;
   // the narrator style of the controls (voice-controls): explaining or poetic over the song's own; automatic keeps it
   build = withNarratorStyle(build, C.narratorStyle);
   const liveCode = C.view, liveGen = C.gen;
@@ -69,7 +74,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const fctx = any ? functionContext(ref, { id: build.id, title: build.title, tags: build.tags, profile: build.profile }, o) : null;
   const codeAt = (bar, keep) => {
     const st = stateAt(build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0), hide = inPlace ? [] : null;
-    const c = annotate(compileAt(only(st.song, keep), bar, hide), build, st.upTo, lang()) + (C.narrator === false ? '' : voiceCode(build, st.song, st.upTo, total, lang(), files()));
+    const c = annotate(ramp(compileAt(only(st.song, keep), bar, hide)), build, st.upTo, lang()) + (C.narrator === false ? '' : voiceCode(build, st.song, st.upTo, total, lang(), files()));
     // (the narrator off, profile-options: no spoken step lines at all, neither shown nor hidden; the phrases written as
     // comments follow the comment options, the voice instrument's lines are part of the song's code)
     // the voice is taken out before the comments go: it is found by its header

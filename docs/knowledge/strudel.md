@@ -88,7 +88,7 @@ In `s("[~ hh]*4").bank("RolandTR909").gain(0.4)` every part is Strudel. `s` pick
 The arpeggio of the Ideas example (`songs/examples/04-ideas.json`) at the last step of its Live coder build, compact code:
 
 ```js
-$: n(irand(5).seg(16).rib(3, 2)).chord("<G7 Am7 F^7 C^7>").anchor("c5").mode("below").voicing()
+$: n(irand(5).seg(16).rib(3, 2)).chord("<Am7 F^7 C^7 G7>").anchor("c5").mode("below").voicing()
   .s("triangle").wob(1040, 4160).lpq(4)
   .plk(.15, .15).delay(.3)
 ```

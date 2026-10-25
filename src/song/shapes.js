@@ -7,12 +7,28 @@ import { stream } from '../endless/random.js';
 import { normalizeSong } from './format.js';
 
 // raised when an intended change to the shape rules changes the steps of a checked Live coder build
-// (tools/check-crescendo.mjs, Live coder fixtures); the random stream carries it, so a new version draws anew
-export const SHAPES_VERSION = 4;
+// (tools/check-crescendo.mjs, Live coder fixtures); saved growths carry it, so a new version grows them anew
+export const SHAPES_VERSION = 6;
+// salt of the shape draws (resolveShape, shape search, growth stream): fixed at the value SHAPES_VERSION 5 used, so a
+// version raised for a rule fix (v6: blank lines in the typing alignment) keeps every song's drawn shapes; change it
+// only when new draws are wanted
+export const SHAPES_SEED = 5;
 export const OPENINGS = ['slow', 'full-kick', 'typed', 'broken', 'filtered', 'melodic', 'pad', 'voice', 'muted-base', 'mid-set'];
 export const PACES = ['slow', 'medium', 'fast'];
 export const DEVELOPMENTS = ['by-type', 'as-written', 'masks', 'parameters', 'second-section', 'metamorphosis'];
 export const SHAPE_PARTS = { opening: OPENINGS, pace: PACES, development: DEVELOPMENTS };
+// the less detailed variants of a candidate shape the growth search also tries (crescendo.js, shape-search D2): the
+// highest level of detail its moves may use
+export const DETAIL_VARIANTS = [2, 1, 0];
+// every growth shape: a development with a pace (the opening is drawn apart and never searched)
+export const GROWTH_SHAPES = DEVELOPMENTS.flatMap(development => PACES.map(pace => ({ development, pace })));
+// the counts the Settings page shows (Advanced card), from the lists above so they follow a change of shapes: the
+// shapes, and the most candidates a growth in Compose can measure (crescendo.js shapeCandidates: every development
+// with the drawn pace, by type with each other pace; each also in its less detailed variants)
+export function shapeCounts() {
+  const tried = DEVELOPMENTS.length + PACES.length - 1;
+  return { shapes: GROWTH_SHAPES.length, developments: DEVELOPMENTS.length, paces: PACES.length, openings: OPENINGS.length, tried, details: DETAIL_VARIANTS.length, most: tried * (1 + DETAIL_VARIANTS.length) };
+}
 // the recipe field of each part: growthShapes: { openings: { id: weight }, paces: {…}, developments: {…} }
 export const RECIPE_KEYS = { opening: 'openings', pace: 'paces', development: 'developments' };
 // weights when neither the song nor its style names a part (design D1)
@@ -91,7 +107,7 @@ export function canPlay(part, value, f) {
 // (neither is given in Compose: its shapes stay as they were)
 export function resolveShape(song, { user = {}, styles = {}, seed, weights: artistWeights = null, deny = null } = {}) {
   const f = shapeFacts(song, styles), own = (song && song.growthShape) || {}, weights = (f.recipe && f.recipe.growthShapes) || {};
-  const rng = stream(String(seed ?? (song && song.id) ?? 'song'), `shape-${SHAPES_VERSION}`);
+  const rng = stream(String(seed ?? (song && song.id) ?? 'song'), `shape-${SHAPES_SEED}`);
   const out = { from: {} };
   for (const [part, list] of Object.entries(SHAPE_PARTS)) {
     const ok = v => list.includes(v) && canPlay(part, v, f) && !(deny && (deny[part] || []).includes(v));

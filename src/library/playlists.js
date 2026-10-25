@@ -17,10 +17,12 @@ const uniq = list => [...new Set(list.filter(x => typeof x === 'string' && x))];
 // when it holds a grown song (a Crescendo or Live coder song). now: { director, shapes, growth }, the app's versions
 export const sessionVersions = (now, grown) => ({ version: now.director, ...(grown ? { shapes: now.shapes, growth: now.growth } : {}) });
 // whether a saved session may sound different: any recorded version differs from the app's (a version it did not record
-// is not compared); a frozen session plays its stored songs and never warns
+// is not compared); a frozen session plays its stored songs and never warns. now.choosers: the chooser versions on air
+// in the code (radio-chooser-versions D4): a recipe that names one no longer there replays with the default and warns
 export function sessionOutdated(s, now) {
   if (!s || s.frozen) return false;
-  return (s.version || 0) !== now.director || (s.shapes !== undefined && s.shapes !== now.shapes) || (s.growth !== undefined && s.growth !== now.growth);
+  const chooser = s.recipe && s.recipe.chooser;
+  return (s.version || 0) !== now.director || (s.shapes !== undefined && s.shapes !== now.shapes) || (s.growth !== undefined && s.growth !== now.growth) || (chooser !== undefined && Array.isArray(now.choosers) && !now.choosers.includes(chooser));
 }
 
 export function freeName(name, taken) {

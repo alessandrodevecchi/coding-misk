@@ -11,7 +11,7 @@
       "@strudel/repl": "1.3.0",
       "superdough": "1.3.0"
     },
-    "codes": 43503
+    "codes": 41959
   },
   "functions": {
     "add": {
@@ -80,7 +80,7 @@
     "beat": {
       "songs": 1,
       "live": 2,
-      "radio": 13,
+      "radio": 11,
       "prelude": 0,
       "as": [
         "beat"
@@ -174,6 +174,15 @@
       "prelude": 1,
       "as": [
         "distortvol"
+      ]
+    },
+    "early": {
+      "songs": 0,
+      "live": 6,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "early"
       ]
     },
     "fmdecay": {
@@ -278,7 +287,7 @@
     "late": {
       "songs": 30,
       "live": 31,
-      "radio": 38,
+      "radio": 39,
       "prelude": 0,
       "as": [
         "late"
@@ -466,11 +475,12 @@
     },
     "segment": {
       "songs": 2,
-      "live": 7,
-      "radio": 9,
+      "live": 14,
+      "radio": 13,
       "prelude": 0,
       "as": [
-        "seg"
+        "seg",
+        "segment"
       ]
     },
     "setcpm": {
