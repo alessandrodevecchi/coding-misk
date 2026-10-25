@@ -5,6 +5,8 @@
 //    and the code with the lists as written are evaluated by Strudel in Node (tools/mixer-checks.mjs) and their haps
 //    compared over several bars, every field: numbers within 0.011 (the lists are rounded to 0.01), the rest equal.
 //    The typing saved is printed.
+// 3. Rewrite detours: a melody turned by whole mini-notation steps, and every notes step of every Live coder growth
+//    parses (Strudel in Node).
 import fs from 'node:fs';
 import { setSpokenContext } from '../src/song/spoken.js';
 import { crescendoSong } from '../src/song/crescendo.js';
@@ -12,6 +14,7 @@ import { resolveProfile, growthRules } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
 import { compileSong } from '../src/song/compile.js';
 import { rampLists, listValues, linearRamp, rampText, RAMP_MIN } from '../src/song/ramps.js';
+import { rotateNotes } from '../src/song/coder.js';
 import { songFiles } from './songs-dir.mjs';
 import { strudelInNode } from './mixer-checks.mjs';
 import { useFns } from '../src/song/writer.js';
@@ -83,15 +86,18 @@ const same = (x, y) => {
   return worst;
 };
 
+// the built-in songs grown in Live coder (each grown once for every check)
+const grownSongs = () => songFiles('songs').filter(x => !x.includes('/endless/')).map(f => ({ ...JSON.parse(fs.readFileSync(f, 'utf8')), kind: 'composed' }))
+  .filter(song => (!only || only.includes(song.id)) && Array.isArray(song.sections));
+const growths = new Map();
+const grow = (song, C) => { if (!growths.has(song.id)) growths.set(song.id, crescendoSong(song, { narrated: C.narrated, rules: growthRules(C, { styles }) })); return growths.get(song.id); };
+
 await check('Live coder growths: the code with ramps plays the same haps as the lists, every field', async () => {
   const S = await strudelInNode(), C = resolveProfile('switch');
   let lists = 0, saved = 0, steps = 0, worst = 0;
   const notes = [];
-  for (const f of songFiles('songs').filter(x => !x.includes('/endless/'))) {
-    const song = { ...JSON.parse(fs.readFileSync(f, 'utf8')), kind: 'composed' };
-    if (only && !only.includes(song.id)) continue;
-    if (!Array.isArray(song.sections)) continue;
-    const g = crescendoSong(song, { narrated: C.narrated, rules: growthRules(C, { styles }) });
+  for (const song of grownSongs()) {
+    const g = grow(song, C);
     if (!g.build || !g.build.length) continue;
     const R = liveCode(g, C, { cols: () => 80 }), W = liveCode(g, C, { cols: () => 80, ramps: false });
     const bars = [...new Set([0, ...R.build.build.map(x => x.at)])].sort((a, b) => a - b);
@@ -111,6 +117,37 @@ await check('Live coder growths: the code with ramps plays the same haps as the 
     if (n) notes.push(`${song.id} ${n}`);
   }
   console.log(`      ${steps} steps typed ramps (${lists} ramps in the code shown, ${saved} characters less to type); largest difference ${worst.toFixed(4)}; songs: ${notes.join(', ')}`);
+});
+
+// a rewrite detour turns a melody's halves (src/song/coder.js rotateNotes): split on spaces alone it cut
+// `<[0 ~ 2 ~ 3 ~ 2 ~] [0 ~ 2 ~ 4 ~ 3 2]>` into `[0 ~ 2 ~ 4 ~ 3 2]> <[0 ~ 2 ~ 3 ~ 2 ~]`, a mini-notation parse error at
+// every later step of crescendo-notte-lunga in Live coder (check:mixer, bar 101)
+await check('rewrite detour: melodies turned by whole steps, every Live coder notes step parses (Strudel in Node)', async () => {
+  const S = await strudelInNode(), C = resolveProfile('switch');
+  const cases = [
+    ['0 2 4 7', '4 7 0 2'],
+    ['<[0 ~ 2 ~ 3 ~ 2 ~] [0 ~ 2 ~ 4 ~ 3 2]>', '<[0 ~ 2 ~ 4 ~ 3 2] [0 ~ 2 ~ 3 ~ 2 ~]>'],
+    ['[a3 ~] ~ [a3 ~]!3 ~ [a3 ~] [e4 a4]', '~ [a3 ~] [e4 a4] [a3 ~] ~ [a3 ~]!3'],
+    ['[0 2 4 7]', '[4 7 0 2]'],
+    ['<0 2>@3 <4 7> 9', '<4 7> 9 <0 2>@3'],
+    ['[a2,c3,e3]', null], ['0 2, 4 7', null], ['0 | 2', null], ['0 . 2 4', null], ['7', null], ['[0 2', null],
+  ];
+  for (const [x, want] of cases) {
+    const got = rotateNotes(x);
+    assert(got === want, `rotateNotes("${x}") = ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`);
+    if (got) await S.evaluate(`n("${got}")`).catch(e => { throw new Error(`n("${got}") from "${x}": ${e.message}`); });
+  }
+  let n = 0;
+  for (const song of grownSongs()) {
+    const g = grow(song, C);
+    for (const st of g.build || []) {
+      if (!st.notes || typeof st.notes.notes !== 'string') continue;
+      n++;
+      await S.evaluate(`n("${st.notes.notes}")`).catch(e => { throw new Error(`${song.id} bar ${st.at}: n("${st.notes.notes}"): ${e.message}`); });
+    }
+  }
+  assert(n > 0, 'no notes step in any Live coder growth');
+  console.log(`      ${n} notes steps parsed`);
 });
 
 if (failed) { console.log(`\n${failed} check(s) failed`); process.exit(1); }
