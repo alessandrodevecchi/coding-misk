@@ -320,7 +320,8 @@ function whole(text, k) {
 // instead; the paste rules of a live build are in src/live/typing-load.js, pasteRule)
 // shortest new line copied from a line above instead of typed
 const COPY_MIN = 40;
-export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false, force = Infinity } = {}) {
+// notes: false leaves out the lines pasted as from notes (a measure that does not move with the seed, growth:probe)
+export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false, force = Infinity, notes = true } = {}) {
   const ops = lineDiff(chainLines(from), chainLines(to)), parts = [];
   for (let k = 0; k < ops.length;) {
     if (ops[k].op === 'keep') { parts.push({ kind: 'keep', text: ops[k].text }); k++; continue; }
@@ -345,7 +346,7 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
   });
   // human style: a long new line unlike the others is now and then (1 in 8) pasted whole, as from notes (typing-mistakes);
   // never a comment or the voice's code
-  if (style === 'human') {
+  if (style === 'human' && notes) {
     const pr = mulberry(`${seed}\u0000${from}\u0000${to}/paste`);
     parts.forEach(p => { if (p.kind === 'new' && !p.paste && p.text.length >= 60 && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text) && pr() < 1 / 8) { p.paste = true; p.segs = [{ eq: p.text }]; } });
   }

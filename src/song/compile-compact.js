@@ -169,8 +169,12 @@ function mergeValues(groups) {
 // gated (code-lanes, the Sections option): lines gated with `.mask(x).postgain(x.mul(n))` follow their lane too;
 // bounds: bars inside a section where a clip starts or ends (code-lanes): the code shows only the part of the section
 // that holds `bar`, so a track whose clips follow each other in a section keeps one line, edited at each clip
+// returning (written-like-coder, in place only): from this bar on, a line silent in the part of the code that sounded
+// before and sounds again later stays written, muted with `_$:`, as it last played, in its place among the lines of
+// its track; when it plays again it is unmuted and edited where its values changed. A line is known by its track, its
+// visual and its order among the lines of that visual in its clip (`returnKeys`); one that never sounds again leaves.
 import { normalizeSong } from './format.js';
-export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [], inPlace = false, hidden = null, gated = false, bounds = null } = {}) {
+export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [], inPlace = false, hidden = null, gated = false, bounds = null, returning = Infinity } = {}) {
   const n = normalizeSong(song), secs = n.sections;
   const i = Math.max(0, secs.findIndex(s => bar >= s.start && bar < s.start + s.bars));
   const shown = new Set(shownMuted.filter(id => (song.tracks || []).some(tr => tr.id === id && tr.mute)));
@@ -192,10 +196,13 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
       const text = whole ? it.text.replace(GATE, '') : it.text;
       // (in place: a fade out of the section before, below 1 on the first bars only)
       const fade = inPlace && lane && lane.slice(0, a).some(on) && lane.slice(a, z).every((v, k) => !on(v) || (k < 2 && Number(v) < 1));
-      return { comment: it.clip ? it.clip.raw : null, desc: it.desc, text, gate: whole ? null : it.gate, gateText: it.gateText, mul: it.mul, fade };
+      return { comment: it.clip ? it.clip.raw : null, desc: it.desc, text, gate: whole ? null : it.gate, gateText: it.gateText, mul: it.mul, fade, key: keys.get(it) };
     }));
   };
+  const keys = returnKeys(p);
   const now = layersFor(i), next = prepare ? layersFor(i + 1) : null;
+  // (returning) the bars of the code shown: a line sounded before them and sounds again after them
+  const [wa, wz] = win(i), keep = inPlace && bar >= returning;
   const sec = secs[i], out = [p.head[0], `// ${sec.name} · ${t('cBars', { from: sec.start + 1, to: sec.start + sec.bars })}`, ...p.head.filter(l => l.startsWith('setcpm('))];
   const body = [];
   p.blocks.forEach((b, k) => {
@@ -209,6 +216,7 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
       mine = mine.filter(x => !gone.includes(x));
       if (hidden && !silent) for (const x of gone) { const v = `"${rle(p.lanes[x.gate])}"`; hidden.push(x.text.replace(x.gateText || GATE, x.mul !== null && x.mul !== undefined ? `.mask(${v}).postgain(${v}.mul(${x.mul}))` : `.mask(${v}).velocity(${v})`)); }
       if (hidden) for (const x of gone) for (const m of x.text.matchAll(/\b\w+\b/g)) if (p.lanes[m[0]] && m[0] !== x.gate) used.add(m[0]);
+      if (keep) mine = withReturning(b, mine, keys, p.lanes, wa, wz);
     }
     // a track that came in before keeps its header, also when nothing of it plays now (performance-profiles)
     if (!mine.length && !extra.length) { if (track && keepHeaders.includes(track.id)) body.push('', b.header); return; }
@@ -220,7 +228,7 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
       body.push(muted ? x.text.replace(/^[_S]?\$:/, '_$:') : x.text);
       if (x.gate) used.add(x.gate);
     };
-    mine.forEach(x => put(x, silent));
+    mine.forEach(x => put(x, silent || x.returning));
     extra.forEach(x => put(x, true));
   });
   // lane constants still referenced (fades, clips that start inside a section)
@@ -228,6 +236,48 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
   const lanes = p.head.filter(l => { const m = l.match(LANE); return m && used.has(m[1]); });
   for (const b of p.blocks) for (const it of b.items) if (it.kind === 'line' && it.text.startsWith('const ')) { const m = it.text.match(LANE); if (m && used.has(m[1])) lanes.push(it.text); }
   return [...out, ...lanes, ...body].join('\n');
+}
+
+// (returning) each layer of the code → its key within its track: its visual and its order among the layers of that
+// visual in its clip ("hats#1": the second hats line of its clip), so the same line in two sections has the same key
+function returnKeys(p) {
+  const keys = new Map();
+  for (const b of p.blocks) {
+    let clip, seen = new Map();
+    for (const it of b.items) {
+      if (it.kind !== 'layer') continue;
+      if (it.clip !== clip) { clip = it.clip; seen = new Map(); }
+      const v = (it.text.match(/\.analyze\("([^"]*)"\)/) || [])[1] || '', n = seen.get(v) || 0;
+      seen.set(v, n + 1);
+      keys.set(it, `${v}#${n}`);
+    }
+  }
+  return keys;
+}
+// (returning) the lines of one track shown in bars a to z, with the lines that sounded before a and sound again from z
+// on, which have no line of the same key here: each as it last played, muted, before the next line of its clip that is
+// shown (else after the one before it, else at the end)
+function withReturning(b, mine, keys, lanes, a, z) {
+  const cur = new Set(mine.map(x => x.key)), layers = b.items.filter(it => it.kind === 'layer' && it.gate && lanes[it.gate]);
+  const last = new Map(), later = new Set();
+  for (const it of layers) {
+    const k = keys.get(it), lane = lanes[it.gate];
+    let lb = -1;
+    for (let j = Math.min(a, lane.length) - 1; j >= 0; j--) if (on(lane[j])) { lb = j; break; }
+    if (lb >= 0 && (!last.has(k) || lb > last.get(k).bar)) last.set(k, { it, bar: lb });
+    if (lane.slice(z).some(on)) later.add(k);
+  }
+  const back = [...last].filter(([k]) => !cur.has(k) && later.has(k)).map(([k, v]) => [k, v.it]).sort((x, y) => layers.indexOf(x[1]) - layers.indexOf(y[1]));
+  if (!back.length) return mine;
+  const out = mine.slice();
+  for (const [k, it] of back) {
+    const order = layers.filter(y => y.clip === it.clip).map(y => keys.get(y)), pos = order.indexOf(k);
+    let at = -1;
+    for (const nk of order.slice(pos + 1)) { at = out.findIndex(y => y.key === nk); if (at >= 0) break; }
+    if (at < 0) for (const pk of order.slice(0, pos).reverse()) { const j = out.findIndex(y => y.key === pk); if (j >= 0) { at = j + 1; break; } }
+    out.splice(at < 0 ? out.length : at, 0, { comment: null, desc: it.desc, text: it.text, gate: it.gate, gateText: it.gateText, mul: it.mul, fade: false, key: k, returning: true });
+  }
+  return out;
 }
 
 // The lanes taken out of the code of the moment (live-coder in-place edits): every `.mask(x).velocity(x)` of a lane

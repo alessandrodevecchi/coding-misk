@@ -48,8 +48,9 @@ setSpokenContext({ files: committedManifest(), lengths: {}, lang: flags.lang || 
 
 // The written part (written-like-coder D4): the code the profile shows (80 columns), typed as the app types it
 // (typingLoad): for each step from the bar the growth ends (crescendo.growth), the typing needed at a person's pace
-// (lean, nothing pasted), the time the step leaves (usable), the new lines pasted when it does not fit (the paste rule:
-// the fitted duration pastes at most one line a minute; the rest is typed faster, ratio above 1).
+// (lean, no line pasted as from notes: that one in eight moves with the text, so the measure would too), the time the
+// step leaves (usable), the new lines pasted when it does not fit (the paste rule: the fitted duration pastes at most
+// one line a minute, the free duration none; the rest is typed faster, ratio above 1).
 // → { from, steps: [{ at, section (name, at a section change), need, usable, pasted, ratio }], total: { … } }
 function writtenPart(build, C) {
   if (!build.crescendo || build.crescendo.growth === undefined) return null;
@@ -65,8 +66,8 @@ function writtenPart(build, C) {
     if (at >= G) {
       const code = codeAt(at), was = settleOthers(codeAt(prev), code, at);
       const avail = Math.max(0.2, (at - prev - 0.5) * sb - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
-      const need = was === code ? 0 : typingPlan(was, code, { style: 'human', lean: true, seed }).natural;
-      const plan = was === code ? { natural: 0, forced: 0 } : typingPlan(was, code, { style: 'human', lean: true, seed, max: usable, force: L.paste ? L.paste(at) : Infinity });
+      const need = was === code ? 0 : typingPlan(was, code, { style: 'human', lean: true, seed, notes: false }).natural;
+      const plan = was === code ? { natural: 0, forced: 0 } : typingPlan(was, code, { style: 'human', lean: true, seed, notes: false, max: usable, force: L.paste ? L.paste(at) : Infinity });
       steps.push({ at, section: starts.get(at) || null, need, usable, pasted: plan.forced || 0, ratio: plan.natural / usable });
     } else codeAt(at);
     prev = at;

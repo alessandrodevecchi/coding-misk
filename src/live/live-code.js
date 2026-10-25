@@ -48,7 +48,10 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const gen = build.crescendo && liveGen === 'idiomatic' ? idiomatic : c => c;
   // tracks that came in by a bar: they keep their header in the code of the moment
   const entered = bar => [...new Set([...played(bar), ...build.tracks.filter(x => !waiting.includes(x.id) && (x.clips || []).some(c => (c.start ?? 0) <= bar)).map(x => x.id)])];
-  const compileAt = (song, bar, hide) => gen(now ? compileNow(song, bar, { prepare: !inPlace && bar >= prepFrom(boundary(bar)), shownMuted: played(bar), keepHeaders: entered(bar), inPlace, hidden: hide, gated: lanes, bounds }) : compile(song));
+  // code edited in place (written-like-coder): from the written part on (the whole song without a growth), a line silent
+  // now that sounded before and sounds again later stays muted in its place; the growth's code is left as it was
+  const returning = !inPlace ? Infinity : build.crescendo ? build.crescendo.growth ?? Infinity : 0;
+  const compileAt = (song, bar, hide) => gen(now ? compileNow(song, bar, { prepare: !inPlace && bar >= prepFrom(boundary(bar)), shownMuted: played(bar), keepHeaders: entered(bar), inPlace, hidden: hide, gated: lanes, bounds, returning }) : compile(song));
   // technical functions (code-writing, song-functions): the written levels, the buses and the song's functions come
   // from the song as written
   // (a radio song steered on air, radio-profiles D9, keeps the song before its commands as its reference: `codeRef`,
