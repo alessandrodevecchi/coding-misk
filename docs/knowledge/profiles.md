@@ -2,7 +2,7 @@
 id: profiles
 related: [live-build, growth-shapes, comments-and-functions, styles, songs]
 code: [src/live/profiles.js, src/main.js, src/i18n.js]
-checks: [npm run check:profiles, npm run check:live-code, npm run check:crescendo]
+checks: [npm run check:profiles, npm run check:live-code, npm run check:crescendo, node tools/check-growth-background.cjs]
 ---
 
 # Performance profiles
@@ -22,6 +22,8 @@ The profile menu sits next to "Live build" in Compose. Changing one control make
 - **Code.** The comment options and the technical function options decide what the code panel shows ([comments-and-functions.md](comments-and-functions.md)). The sound never changes with them. The Live coder shows only the title as comments (radio-profiles 9.2). These and the typing options are the display controls (`DISPLAY_CONTROLS`, `withDisplay`): in the radio they apply to the song on air from its next edit ([radio.md](radio.md)). The growth never reads them: the Live coder's shape choice measures the typing on the code with the track names (`crescendoSong`), and so does the steering on air without Custom controls (`steerOnAir`), as before 9.2.
 - **Typing.** `typist`, `mistakes` and `typing` decide how the code types itself.
 - **Narrator.** `narrator` (on in every profile) switches the spoken step phrases on or off; `narrated` (Fully narrated) needs it on and is disabled in the panel while it is off. It changes the sound, not the growth: in the radio it applies from the next song ([narrator.md](narrator.md)). Off, the step phrase is not shown over the stage, in the studio scene or in videos either.
+
+**Growth in the background** (growth-in-background, `src/main.js`). Crescendo and Live coder grow the song before it plays; a Live coder growth takes seconds on a long song (before the change, in the page: luci-rosse 4.6 s, settimo-cielo 11.6 s, kellerlicht 22.7 s). Every Compose change that needs a growth (profile, build style, growth, duration, opening, pace, development, Fully narrated, the Live build switch, opening a song, Save as new) goes through `composeCompiled()`: the growth already in the page's cache plays at once; else the song is held as written (`heldCompiled`, `pending`) while a stored growth is looked up (IndexedDB `coding-misk-growths`, `src/live/growth-store.js`) and then grown in the Compose worker (`composeAway`, the code of `src/endless/grow-worker.js`). A newer request ends the worker and starts a new one; the answer counts only when its key is still the song's. A drawn mark (`GROWING` in `src/icons.js`, turning with CSS, still with reduced motion) shows next to the profile chips while the song grows, and on Play while Play or export waits (`grownNow`). A song playing when the change is made goes on until the grown song takes over at the same bar. Without a worker the page grows as before. A failed growth leaves the song as written with a message. `npm run growth:probe -- <song>` prints what one growth tried and how long it took.
 
 `resolveProfile(id, overrides)` returns the controls in force; `configOf(song, trial)` and `controlsOf(cfg)` give a song's configuration and its controls. `cleanOverrides` keeps only known controls with allowed values that differ from the profile. A comment or function preset saved by name stands for its options.
 

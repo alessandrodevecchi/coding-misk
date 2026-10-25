@@ -37,7 +37,8 @@ Mistakes that cost time before. Each line says what goes wrong and what to do. T
 
 - **Never grow songs for a list.** A growth (`crescendoSong`, Crescendo or Live coder) takes up to a few seconds per song. Growing every song for the Songs tab froze the page for 8 s and more, and over a minute with the Live build switch on and many songs. Song cards, the playlists tab and every other list use the written song (`cardOf`, `playable(tr, RADIO_LIVE())`) and the grown length from `src/library/song-durations.json` or the page worker (`src/live/card-duration.js`). A song grows in the page only when it is played, exported or edited in Compose; the song restored in Compose at start grows in the page worker. `node tools/check-startup.cjs` fails on a long task over 1.5 s at load.
 - **A song changed means stale card lengths.** After a change to a built-in song, the growth rules, `SHAPES_VERSION` or `CRESCENDO_VERSION`, run `npm run durations`; `npm run check:durations` fails until then.
-- **The radio's grow worker is not for page work.** A growth for the page waits in a second worker (`pageAway`), so the radio never waits behind it.
+- **The radio's grow worker is not for page work.** The song cards' lengths grow in a second worker (`pageAway`) and the Compose growths in a third (`composeAway`, growth-in-background), so the radio never waits behind them and Compose never waits behind the cards.
+- **A Compose change never grows in the page.** Use `composeCompiled()` where Compose needs the song again after a change of configuration or of the open song: it holds the song as written (`pending`) and grows it away. Play and export go through `grownNow()`, which waits for the growth. Calling `playable({ ...T, kind: 'composed' })` directly grows a Live coder song in the page and freezes it for seconds (song edits through `changed()` still do).
 
 ## Generated code and fixtures
 
