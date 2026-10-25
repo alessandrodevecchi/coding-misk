@@ -18,11 +18,13 @@ The seed picks among rules, never note by note in a free range. The same seed an
 - **Ideas.** The output is an idea ([ideas.md](ideas.md)).
 - **Styles.** Each instrument of a recipe has a `material` field: source, share, families and rules ([styles.md](styles.md)).
 - **Radio.** The director asks where each track's material comes from ([radio.md](radio.md)). Vary, Add and More complex compose on air ([radio-commands.md](radio-commands.md)).
-- **Compose.** [Compose a part] in a track panel writes a new pattern with a number and an energy. With a preset, [Keep the rhythm] and [Keep the notes] vary it.
+- **Compose.** [Compose a part] in a track panel writes a new pattern with a number and an energy. With a preset, [Keep the rhythm] and [Keep the notes] vary it. On a guitar track, [Guitar] picks Riff (`riff: true`) or Chords (`riff: false`), remembered while the page is open.
 - **Patterns.** [New] in the Patterns tab composes one ([patterns.md](patterns.md)).
 - **Growth shapes.** The `metamorphosis` development rewrites a song with parts of a sibling style ([growth-shapes.md](growth-shapes.md)).
 
 **Kinds.** `melody` (a cell of degrees plus a progression summed over the bars), `bass` (chord roots with a rhythm cell), `arp` (indices into voiced chords), `chords` (a voiced pad or guitar power chords), `drums` (steps from a family), `sound` (a wave and an optional FM patch).
+
+**Guitar riffs.** `compose('chords', { type: 'guitar', riff })`: `riff: true` writes a riff every time (16th slots, steps of `RIFF_STEPS` over the power chord, sparser at low energy), `riff: false` power chords only. Left out, a riff half the time with more energy, with the same random draws as before the option: the radio, songs and fixtures do not move (`check:material` keeps a digest).
 
 **Energy.** Low energy gives few onsets in a small range. High energy gives more onsets and a wider range.
 
