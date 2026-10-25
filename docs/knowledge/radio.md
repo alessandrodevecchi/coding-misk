@@ -18,7 +18,7 @@ A song on air builds itself like a live build. The listener can steer it from th
 - **Styles and artists.** The director picks parts from the selected styles, or from an artist's taste ([styles.md](styles.md), [artists.md](artists.md)).
 - **Material.** Each track plays a preset, a varied preset, a composed part or a saved pattern ([material.md](material.md), [patterns.md](patterns.md)).
 - **Console.** Commands rewrite the song on air from a boundary ([radio-commands.md](radio-commands.md)).
-- **Voice.** Spoken comments and the voice instrument come from the recipes ([narrator.md](narrator.md), [voice.md](voice.md)). The console's Voice instrument block (voice-controls) sets how often a song gets one, the phrases per song, different or repeated lines and the ways, with presets; the options apply from the next song and go in the session recipe only when they are not As the style.
+- **Voice.** Spoken comments and the voice instrument come from the recipes ([narrator.md](narrator.md), [voice.md](voice.md)). The Voices group (voice-placement) holds the narrator controls (the Custom profile's) and the Voice instrument block (voice-controls), which sets how often a song gets one, the phrases per song, different or repeated lines and the ways, with presets; the options apply from the next song and go in the session recipe only when they are not As the style. On air a change is also a `voice` steering command on the song on air, from its next quiet part. The knob `talk` is the narrator's, named Narrator.
 - **Out.** Sessions can be recorded, exported faster than real time, saved to playlists ([export.md](export.md), [library.md](library.md)).
 - **Defaults.** Settings keeps the radio defaults for new sessions ([settings.md](settings.md)).
 
@@ -48,7 +48,7 @@ A song on air builds itself like a live build. The listener can steer it from th
 | `chaos` | Chaos (it: Caos) | `0.3` | 0: each song in one style, taking turns. 1: drums, bass, harmony, lead, pads and voice from different styles |
 | `energy` | Energy (it: Energia) | `0.6` | Raises or lowers the energy of every song: more tracks, busier drums, more open filters, more drive |
 | `complexity` | Complexity (it: Complessità) | `0.5` | How many tracks play together and how much the material moves away from the presets |
-| `talk` | Voice (it: Voce) | `0.5` | How often the voice speaks: 0 never, 0.5 about half of the changes, 1 almost every change |
+| `talk` | Narrator (it: Narratore) | `0.5` | How often the narrator comments the changes of the song: 0 never, 0.5 about half of the changes, 1 almost every change. It does not touch the voice instrument (Voices group) |
 | `minutes` |  | `15` | no help text: described below |
 | `transition` | Transitions (it: Transizioni) | `artist` | How one song turns into the next: as the artist likes it, or always the same kind. Applies from the next transition. |
 | `harmony` | Harmony (it: Armonia) | `artist` | Compatible: the next song is a fifth away with a close tempo. Free: any key and tempo. |

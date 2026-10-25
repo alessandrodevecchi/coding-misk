@@ -27,7 +27,7 @@ A command rewrites the song from its boundary. The steps before it stay. The res
 - **Director.** A steered song is always rebuilt from its original plan plus every command still standing, in order ([radio.md](radio.md)). So cancelling or replaying gives the same song.
 - **Material.** Vary composes, Add and More complex compose for tracks that have not played yet ([material.md](material.md)). Swap never composes: it picks a preset of the style or a saved pattern ([patterns.md](patterns.md)).
 - **Seeds.** Composed and swapped parts are seeded by the song and the command's index (`vary:<song>:<index>`, `swap:<song>:<index>`).
-- **Voice.** Moves can be commented by the narrator ([narrator.md](narrator.md)).
+- **Narrator and voice instrument.** Moves can be commented by the narrator ([narrator.md](narrator.md)); Talk more and Talk less sit in the Narrator group. The `voice` command (voice-placement) comes from the Voices group, not from a console button: it rewrites the song's voice instrument from the first quiet part after the next phrase, keeps the clips before, replaces a pending one, and is applied again after every later rewrite ([voice.md](voice.md)).
 - **Guide.** Every command needs a line in the Radio card of the Guide (`npm run check:guide`).
 
 A command that cannot apply is disabled with a reason: `late`, `no-type`, `all-playing`, `locked`, `last-track`, `no-target`, `no-drop`, `not-playing`, `no-ready`, `transition`.
@@ -53,8 +53,9 @@ A command that cannot apply is disabled with a reason: `late`, `no-type`, `all-p
 | `instrument` | sound | next phrase | Change instrument (it: Cambia strumento) | Another sound for the leading instrument (or for this track) |
 | `progression` | harmony | next double phrase | Change chords (it: Cambia accordi) | Another chord progression from the next double phrase |
 | `key` | harmony | next double phrase | Change key (it: Cambia tonalità) | A key a fifth away from the next double phrase |
-| `talk-more` | voice | next phrase | Talk more (it: Parla di più) | More spoken comments |
-| `talk-less` | voice | next phrase | Talk less (it: Parla di meno) | Fewer spoken comments |
+| `talk-more` | voice | next phrase | Talk more (it: Parla di più) | The narrator comments more |
+| `talk-less` | voice | next phrase | Talk less (it: Parla di meno) | The narrator comments less |
+| `voice` | voice | next phrase | Voice instrument (it: Voce strumento) | The voice instrument of the song on air, from the next quiet part |
 | `drop` | song | next double phrase | Go to the drop (it: Vai al drop) | Jump to the drop at the next double phrase |
 | `stay` | song | next double phrase | Stay here (it: Resta qui) | Repeat the part playing once more |
 | `extend` | song | next double phrase | Extend [s] (it: Estendi [s]) | Make the song about [s] longer before its ending: a new stretch in the song's character, with its own moves; then the outro and the transition as planned. Applies at the next double phrase; press as often as you like |

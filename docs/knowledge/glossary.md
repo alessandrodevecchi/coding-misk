@@ -94,6 +94,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Radio | Chaos | Caos | `radioChaos` |
 | Radio | Energy | Energia | `radioEnergy` |
 | Radio | Complexity | Complessità | `radioComplexity` |
+| Radio | Narrator | Narratore | `radioTalk` |
 | Radio | Transitions | Transizioni | `radioTransition` |
 | Radio | Harmony | Armonia | `radioHarmony` |
 | Radio | Material | Materiale | `matSource` |
@@ -121,6 +122,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Console commands | Change key | Cambia tonalità | `steer:key` |
 | Console commands | Talk more | Parla di più | `steer:talk-more` |
 | Console commands | Talk less | Parla di meno | `steer:talk-less` |
+| Console commands | Voice instrument | Voce strumento | `steer:voice` |
 | Console commands | Go to the drop | Vai al drop | `steer:drop` |
 | Console commands | Stay here | Resta qui | `steer:stay` |
 | Console commands | End the song | Chiudi il brano | `steer:end` |

@@ -12,10 +12,18 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Voice instrument controls for generated songs: phrases per song, different, repeated or mixed lines, ways and how often, with presets.
 - Voice instrument options for a new song by an artist.
 - Guide card that compares the narrator, the poetic narrator and the voice instrument.
+- Voice instrument controls for the song being edited, in the Compose Voices group and in the voice instrument track panel, with New phrases and Undo.
+- Add a voice instrument to a song that has none, from the Compose Voices group.
+- Radio steering command that changes the voice instrument of the song on air from its next quiet part.
+- Optional `voiceOptions` field on spoken tracks.
 
 ### Changed
 
 - "Fully narrated" is now "Narrated growth".
+- The Compose Voices group is always shown; narrator controls that cannot apply are disabled with the reason.
+- New-song voice instrument settings moved from the Compose toolbar to the "In the next song" row of the Voices group.
+- The radio narrator controls and voice instrument controls are in one Voices group.
+- The radio Voice knob, compilation range, curve and console group are now named Narrator.
 
 ## [0.6.0-beta.2] - 2026-10-25
 
