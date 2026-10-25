@@ -150,6 +150,15 @@ const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, n
   const drafts = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-pattern-drafts') || '[]'));
   // New on riffs: guitar riff by default, from the guitar generator, on a distorted guitar
   await lab('pattern'); await kind('riffs'); await sel('b:riffs/thrash');
+  // riff cards and the detail name the instrument; search finds it
+  const cardLine = uid => page.$eval(`#patterns [data-pn-sel="${uid}"] small`, el => el.textContent).catch(() => '');
+  const dLine = await page.$eval('#patterns .pn-dhead .lbl', el => el.textContent).catch(() => '');
+  check(await cardLine('b:riffs/thrash') === 'Riffs · guitar · built-in' && dLine === 'Riffs · guitar · built-in', 'a guitar riff says guitar on its card and in the detail', `${await cardLine('b:riffs/thrash')} | ${dLine}`);
+  const search = async q => { await page.fill('#patterns .pn-search', q); await page.dispatchEvent('#patterns .pn-search', 'input'); await sleep(400); };
+  await search('bass');
+  const bassLines = await page.$$eval('#patterns .pn-cbody small', xs => xs.map(x => x.textContent));
+  check(bassLines.length > 0 && bassLines.every(l => l === 'Riffs · bass · built-in') && await cardLine('b:riffs/spirale') === 'Riffs · bass · built-in', 'search "bass" among riffs finds the bass riffs', `${bassLines.length}: ${[...new Set(bassLines)]}`);
+  await search('');
   const riffAs = await page.$$eval('#patterns [data-pn-riff]', xs => xs.map(x => `${x.dataset.pnRiff}:${x.getAttribute('aria-pressed')}`).join());
   check(riffAs === 'guitar:true,bass:false', 'New on riffs offers guitar riff (chosen) and bass riff', riffAs);
   await page.click('#patterns [data-pn-new]'); await sleep(3200);
