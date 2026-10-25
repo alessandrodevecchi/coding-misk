@@ -1080,3 +1080,20 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 | switch-prima-luce | 6:30 | 11:29 | 6:30 | 6:18 |
 
 - **Check.** `check:typing` 15/15, `check:live-code` 7/7, `check:ramps` tutti, `check:functions` 11/11, `check:playlists` 17/17, `check:durations` (lunghezze riscritte), `check:knowledge` (solo avvisi), `build`; nel browser (dev server sulla 5191) `check-growth-background` passa. `check:crescendo -- --full`: fixture Live coder riscritte, Crescendo ferme; **fallisce "small moves"** (passi grandi su switch-prima-luce, switch-trance-prova, crescendo-notte-lunga). Con la sola correzione a v5 passa; fallisce anche con v7: dipende dall'estrazione delle forme, non dalla correzione. `check:radio-profiles`: 5.5 sospeso come prima; **le fixture della radio non sono riscritte** (`styles-live-coder` dà `ea037ca5`, fixture `0e419f71`), perché lo script scrive solo senza fallimenti e 5.5 fallisce sempre. Da riscrivere con 5.5 sospeso, come nel seguito di shape-search.
+
+## 2026-10-25: estrazione delle forme separata dalla versione (#75)
+
+- **Problema.** `SHAPES_VERSION` era anche il sale del seme delle forme (`shape-<versione>`, la ricerca e il flusso della crescita): alzarla a 6 per la correzione di `lineDiff` estraeva forme nuove per ogni brano (switch-prima-luce 6:30 → 11:29) e faceva fallire "small moves" di `check:crescendo`, senza niente di sbagliato nella correzione.
+- **Correzione.** Nuova costante `SHAPES_SEED = 5` in `src/song/shapes.js`, usata in `resolveShape` e nei due flussi di `src/song/crescendo.js` (`/search`, `/growth`). `SHAPES_VERSION` resta 6 e invalida ancora le crescite salvate, le lunghezze delle schede e le sessioni salvate; le estrazioni restano quelle di v5. `SHAPES_SEED` si cambia solo quando si vogliono estrazioni nuove.
+- **Misure** (`growth:probe`, Live coder): identiche a v5.
+
+| Brano | di serie | tutte + migliore |
+| --- | --- | --- |
+| luci-rosse | 6:08 | 5:29 |
+| settimo-cielo | 8:37 | 7:46 |
+| kellerlicht | 13:20 | 9:25 |
+| Ideas | 5:56 | 5:56 |
+| switch-prima-luce | 6:30 | 6:30 |
+
+- **Lunghezze delle schede.** Tutte uguali a v5 tranne prova-drum-and-bass: 386 → 389 battute (8:59 → 9:03), stessa forma; la differenza viene dalla sola correzione della scrittura (verificato rimettendo il vecchio `typing.js`).
+- **Check.** `check:crescendo -- --full --write-fixtures` 39/39 (fixture Live coder riscritte, "small moves" passa), `check:typing` 15/15, `check:live-code` 7/7, `check:ramps` tutti, `check:durations` (riscritte), `check:knowledge` (solo avvisi: catalogo Strudel vecchio, `checks.md` lungo), `build`. Fixture della radio riscritte (`styles-live-coder` `c0de274f`, `compilation-live-coder` `4ab3d96a`): si muovono per la correzione della scrittura, non per il chooser (verificato con il chooser di prima). Lo script le scrive solo con tutti i check verdi, quindi sono state scritte con il cambio del chooser in onda del commit successivo, che non le tocca.

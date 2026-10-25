@@ -7,8 +7,12 @@ import { stream } from '../endless/random.js';
 import { normalizeSong } from './format.js';
 
 // raised when an intended change to the shape rules changes the steps of a checked Live coder build
-// (tools/check-crescendo.mjs, Live coder fixtures); the random stream carries it, so a new version draws anew
+// (tools/check-crescendo.mjs, Live coder fixtures); saved growths carry it, so a new version grows them anew
 export const SHAPES_VERSION = 6;
+// salt of the shape draws (resolveShape, shape search, growth stream): fixed at the value SHAPES_VERSION 5 used, so a
+// version raised for a rule fix (v6: blank lines in the typing alignment) keeps every song's drawn shapes; change it
+// only when new draws are wanted
+export const SHAPES_SEED = 5;
 export const OPENINGS = ['slow', 'full-kick', 'typed', 'broken', 'filtered', 'melodic', 'pad', 'voice', 'muted-base', 'mid-set'];
 export const PACES = ['slow', 'medium', 'fast'];
 export const DEVELOPMENTS = ['by-type', 'as-written', 'masks', 'parameters', 'second-section', 'metamorphosis'];
@@ -91,7 +95,7 @@ export function canPlay(part, value, f) {
 // (neither is given in Compose: its shapes stay as they were)
 export function resolveShape(song, { user = {}, styles = {}, seed, weights: artistWeights = null, deny = null } = {}) {
   const f = shapeFacts(song, styles), own = (song && song.growthShape) || {}, weights = (f.recipe && f.recipe.growthShapes) || {};
-  const rng = stream(String(seed ?? (song && song.id) ?? 'song'), `shape-${SHAPES_VERSION}`);
+  const rng = stream(String(seed ?? (song && song.id) ?? 'song'), `shape-${SHAPES_SEED}`);
   const out = { from: {} };
   for (const [part, list] of Object.entries(SHAPE_PARTS)) {
     const ok = v => list.includes(v) && canPlay(part, v, f) && !(deny && (deny[part] || []).includes(v));

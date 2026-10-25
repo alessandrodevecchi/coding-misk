@@ -40,170 +40,170 @@
   "587f0fd0885ab3ed": {
    "id": "prova-apre-arpeggio",
    "lang": "en",
-   "seconds": 647.2727272727299,
-   "bars": 356
+   "seconds": 661.8181818181848,
+   "bars": 364
   },
   "e1eec276d9582c19": {
    "id": "prova-apre-arpeggio",
    "lang": "it",
-   "seconds": 647.2727272727299,
-   "bars": 356
+   "seconds": 661.8181818181848,
+   "bars": 364
   },
   "1506315891e6dca0": {
    "id": "prova-breakbeat",
    "lang": "en",
-   "seconds": 337.7777777777785,
-   "bars": 149
+   "seconds": 657.5,
+   "bars": 263
   },
   "5ae2e10e7b86b0d1": {
    "id": "prova-breakbeat",
    "lang": "it",
-   "seconds": 337.7777777777785,
-   "bars": 149
+   "seconds": 657.5,
+   "bars": 263
   },
   "c89751578f58e241": {
    "id": "prova-drum-and-bass",
    "lang": "en",
-   "seconds": 594.4186046511679,
-   "bars": 426
+   "seconds": 542.7906976744229,
+   "bars": 389
   },
   "796308d13d3835f1": {
    "id": "prova-drum-and-bass",
    "lang": "it",
-   "seconds": 594.4186046511679,
-   "bars": 426
+   "seconds": 542.7906976744229,
+   "bars": 389
   },
   "a13bbc3249a25b50": {
    "id": "prova-solo-synth",
    "lang": "en",
-   "seconds": 429.8181818181826,
-   "bars": 197
+   "seconds": 434.181818181819,
+   "bars": 199
   },
   "38de5c84797dcd88": {
    "id": "prova-solo-synth",
    "lang": "it",
-   "seconds": 429.8181818181826,
-   "bars": 197
+   "seconds": 434.181818181819,
+   "bars": 199
   },
   "f53a37fb285f79bb": {
    "id": "prova-voce-notte",
    "lang": "en",
-   "seconds": 388.88888888888977,
-   "bars": 175
+   "seconds": 364.44444444444525,
+   "bars": 164
   },
   "f9712651d4a6d0d3": {
    "id": "prova-voce-notte",
    "lang": "it",
-   "seconds": 388.88888888888977,
-   "bars": 175
+   "seconds": 364.44444444444525,
+   "bars": 164
   },
   "bdc765c5ec73b21d": {
    "id": "switch-acid-prova",
    "lang": "en",
-   "seconds": 517.5089447757298,
-   "bars": 304
+   "seconds": 482.15502785741046,
+   "bars": 276
   },
   "f104d88bc60bad5f": {
    "id": "switch-acid-prova",
    "lang": "it",
-   "seconds": 517.5089447757298,
-   "bars": 304
+   "seconds": 482.15502785741046,
+   "bars": 276
   },
   "37d98cc1e4876cf1": {
    "id": "switch-house-prova",
    "lang": "en",
-   "seconds": 831.2195121951269,
-   "bars": 426
+   "seconds": 839.0243902439075,
+   "bars": 430
   },
   "a14f4d3708af86cd": {
    "id": "switch-house-prova",
    "lang": "it",
-   "seconds": 831.2195121951269,
-   "bars": 426
+   "seconds": 839.0243902439075,
+   "bars": 430
   },
   "3c20cbee3b9c1792": {
    "id": "switch-prima-luce",
    "lang": "en",
-   "seconds": 689.1428571428537,
-   "bars": 402
+   "seconds": 390.095238095237,
+   "bars": 222
   },
   "c4e6790474f4d4e5": {
    "id": "switch-prima-luce",
    "lang": "it",
-   "seconds": 689.1428571428537,
-   "bars": 402
+   "seconds": 390.095238095237,
+   "bars": 222
   },
   "eef8cfeafc3aa6f3": {
    "id": "switch-tappe",
    "lang": "en",
-   "seconds": 728.4507042253542,
-   "bars": 431
+   "seconds": 713.2394366197201,
+   "bars": 422
   },
   "453ad97042c0684f": {
    "id": "switch-tappe",
    "lang": "it",
-   "seconds": 728.4507042253542,
-   "bars": 431
+   "seconds": 713.2394366197201,
+   "bars": 422
   },
   "8294cbb248a9d9d5": {
    "id": "switch-test-acido",
    "lang": "en",
-   "seconds": 824.8888888888962,
-   "bars": 464
+   "seconds": 846.2222222222301,
+   "bars": 476
   },
   "2c91262ca6625cd6": {
    "id": "switch-test-acido",
    "lang": "it",
-   "seconds": 824.8888888888962,
-   "bars": 464
+   "seconds": 846.2222222222301,
+   "bars": 476
   },
   "e9cdf92af03dde17": {
    "id": "switch-test-breve",
    "lang": "en",
-   "seconds": 648.6956521739154,
-   "bars": 373
+   "seconds": 631.3043478260892,
+   "bars": 363
   },
   "40de0f1458ec18c5": {
    "id": "switch-test-breve",
    "lang": "it",
-   "seconds": 648.6956521739154,
-   "bars": 373
+   "seconds": 631.3043478260892,
+   "bars": 363
   },
   "822f50a7d630af26": {
    "id": "switch-test-onda",
    "lang": "en",
-   "seconds": 892.3943661971888,
-   "bars": 528
+   "seconds": 565.869245322683,
+   "bars": 320
   },
   "eb0e0f8d4f099af9": {
    "id": "switch-test-onda",
    "lang": "it",
-   "seconds": 892.3943661971888,
-   "bars": 528
+   "seconds": 565.869245322683,
+   "bars": 320
   },
   "e97504b7028fc0df": {
    "id": "switch-test-stanza",
    "lang": "en",
-   "seconds": 835.1219512195172,
-   "bars": 428
+   "seconds": 850.7317073170785,
+   "bars": 436
   },
   "6d4761697d5001e2": {
    "id": "switch-test-stanza",
    "lang": "it",
-   "seconds": 835.1219512195172,
-   "bars": 428
+   "seconds": 850.7317073170785,
+   "bars": 436
   },
   "12d1c8fda823cae2": {
    "id": "switch-trance-prova",
    "lang": "en",
-   "seconds": 429.71428571428754,
-   "bars": 264
+   "seconds": 754.285714285709,
+   "bars": 440
   },
   "873e5c8317553c04": {
    "id": "switch-trance-prova",
    "lang": "it",
-   "seconds": 429.71428571428754,
-   "bars": 264
+   "seconds": 754.285714285709,
+   "bars": 440
   }
  }
 }

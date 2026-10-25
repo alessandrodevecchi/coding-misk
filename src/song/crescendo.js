@@ -9,7 +9,7 @@ import { PROGS, DEFAULT, presetIdea, meterSteps } from '../music.js';
 import { ideaLadder, expandIdea, ideaRows } from './ideas.js';
 import { coderPath } from './coder.js';
 import { stateAt, applyStep } from './build.js';
-import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES } from './shapes.js';
+import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, SHAPES_SEED, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES } from './shapes.js';
 import { placeSpoken } from './spoken.js';
 import { liveCode } from '../live/live-code.js';
 import { resolveProfile } from '../live/profiles.js';
@@ -797,7 +797,7 @@ export function shapeOrder(song, shape, cands, seed) {
   for (const maxDetail of [2, 1, 0]) add({ ...drawn, drawn: false, maxDetail });
   const pool = [];
   for (const c of cands) if (c !== drawn) { pool.push({ ...c, drawn: false }); for (const maxDetail of [2, 1, 0]) pool.push({ ...c, drawn: false, maxDetail, weight: c.weight / 2 }); }
-  const rng = stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_VERSION}/search`);
+  const rng = stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_SEED}/search`);
   while (pool.length) {
     const total = pool.reduce((a, c) => a + Math.max(0, c.weight || 0), 0);
     let k = 0;
@@ -814,7 +814,7 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   if (rules.natural && W < 24) rules = Object.fromEntries(['budget', 'span', 'noEnding'].filter(k => k in rules).map(k => [k, rules[k]]));
   // growth shape (growth-shapes): only the natural growth like a live coder follows one; Classic and Crescendo never
   const shape = rules.coder && rules.shape ? resolveShape(song, { user: rules.shape, styles: rules.styles || {}, seed, weights: rules.shapeWeights, deny: rules.deny }) : null;
-  const srng = shape ? stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_VERSION}/growth`) : null;
+  const srng = shape ? stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_SEED}/growth`) : null;
   const over = (c, s) => c.start < s.start + s.bars && c.start + c.bars > s.start;
   const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && t.clips.length);
   if (!plays.length || !W) return { ...clone(song), build: [] };
