@@ -193,6 +193,14 @@
   .live-profiles { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
   .live-profiles .chips .chip { font-size: 14px; padding: 6px 16px; }
   .live-profiles .chip[aria-checked="true"] { border-color: var(--a1); color: var(--a1); box-shadow: 0 0 0 1px var(--a1) inset; }
+  /* growth-in-background: a song growing away from the page, next to the profiles and on Play while Play waits */
+  .growing-mark { display: inline-flex; align-items: center; color: var(--a1); cursor: help; }
+  .growing-mark[hidden] { display: none; }
+  .growing-mark .ico-growing { width: 20px; height: 20px; flex: none; }
+  .growing-mark .grow-ring { transform-box: view-box; transform-origin: 8px 8px; animation: grow-turn 1.3s linear infinite; }
+  .play-growing { margin: 0 2px; }
+  @keyframes grow-turn { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .growing-mark .grow-ring { animation: none; } }
   /* a configuration trial on this song (song-own-settings): the mark and the circular arrow back */
   .cfg-trial { display: inline-flex; align-items: center; gap: 6px; }
   .cfg-trial[hidden] { display: none; }

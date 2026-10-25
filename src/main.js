@@ -75,13 +75,15 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG } from './icons.js';
+import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING } from './icons.js';
 import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
-import { durationKey, growingProfile } from './live/card-duration.js';
+import { durationKey, growingProfile, hashText } from './live/card-duration.js';
+import { createGrowthStore } from './live/growth-store.js';
+import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
 
@@ -257,6 +259,36 @@ function pageAway(msg) {
     return new Promise((resolve, reject) => { pageWaits.set(id, { resolve, reject }); pageWorker.postMessage({ id, spoken, ...msg }); });
   } catch (e) { return Promise.reject(e); }
 }
+// Compose growths away from the page (growth-in-background D1): a third worker of the same code, so a growth in Compose
+// never waits behind the song cards. A newer request ends the worker and starts another (a growth cannot be stopped
+// from inside, and a stale one would hold the newer for seconds); the answer counts only for the request still
+// running. No worker: the promise fails with 'worker' and Compose grows in the page, as before.
+let composeWorker = null, composeJob = null, composeN = 0;
+const composeAwayOK = () => composeWorker !== false && typeof Worker !== 'undefined';
+function stopComposeGrowth() {
+  const j = composeJob;
+  if (!j) return;
+  composeJob = null;
+  if (composeWorker) { composeWorker.terminate(); composeWorker = null; }
+  j.reject(new Error('replaced'));
+}
+function composeAway(key, msg) {
+  if (composeJob && composeJob.key === key) return composeJob.promise;
+  stopComposeGrowth();
+  const job = { key, id: ++composeN };
+  job.promise = new Promise((resolve, reject) => { job.resolve = resolve; job.reject = reject; });
+  composeJob = job;
+  try {
+    if (!composeWorker) {
+      composeWorker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
+      composeWorker.onmessage = e => { const j = composeJob; if (!j || !e.data || e.data.id !== j.id) return; composeJob = null; if (e.data.error) j.reject(new Error(e.data.error)); else j.resolve(e.data.crescendo); };
+      composeWorker.onerror = e => { console.warn('[compose] growth worker failed, growing in the page', e.message || e); const j = composeJob; composeJob = null; try { composeWorker.terminate(); } catch (x) {} composeWorker = false; if (j) j.reject(new Error('worker')); };
+    }
+    const spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
+    composeWorker.postMessage({ id: job.id, spoken, ...msg });
+  } catch (e) { composeJob = null; composeWorker = false; job.reject(new Error('worker')); }
+  return job.promise;
+}
 // one control changed by hand: a trial on the song in Compose, kept until a profile is picked again
 function setControl(k, v) { const c = cfgOf(T); tryConfig({ ...c, options: cleanOverrides({ ...c.options, [k]: v }, PROFILES[c.profile]) }); }
 // Crescendo builds are computed once per song version and option, kept for the songs used last (LRU)
@@ -401,19 +433,90 @@ let soulBase = look;
 // Compose holds it as written (`pending`); played or exported first, it grows in the page, as playing always did
 const growsInCompose = () => { const lv = liveOf(T); return lv.on && lv.style === 'crescendo' && !crescendoCache.has(crescendoKey({ ...T, kind: 'composed' })); };
 const heldCompiled = () => ({ ...playable({ ...T, kind: 'composed' }, { ...liveOf(T), on: false }), pending: true });
-const grownNow = sg => (sg === compiled && compiled.pending ? (compiled = playable({ ...T, kind: 'composed' })) : sg);
+// growth-in-background (D2): every change in Compose that needs a growth goes the same way as the start. The growth
+// known (this page's cache): the song grown at once. Else the song held as written while it grows away (a stored growth
+// of this browser first, D6, then the Compose worker), with the growing mark. No worker: grown in the page, as before.
+function composeCompiled() {
+  if (growsInCompose() && composeAwayOK()) { compiled = heldCompiled(); growComposeAway(); }
+  else { stopComposeGrowth(); compiled = playable({ ...T, kind: 'composed' }); }
+  renderGrowing();
+  return compiled;
+}
+// Play and export wait for the growth (D2), with the mark on Play: → the grown song, the song as written when the growth
+// failed, or null when another song was opened meanwhile. No worker: grown in the page, as before.
+let growWait = null, growWaitId = null;
+const growWaiters = [];
+function grownNow(sg) {
+  if (!sg || sg !== compiled || !compiled.pending) return Promise.resolve(sg);
+  if (!composeAwayOK()) return Promise.resolve(compiled = playable({ ...T, kind: 'composed' }));
+  if (!growWait) {
+    growWaitId = compiled.id;
+    growWait = new Promise(res => growWaiters.push(() => res(compiled.id === growWaitId && !compiled.pending ? compiled : null)));
+    // (a growth not asked yet, the voice context known: asked now)
+    if (composeReady && !composeJob) growComposeAway();
+  }
+  renderGrowing();
+  return growWait;
+}
+// the song in Compose is grown (or failed, or another song is open): Play and export go on
+function wakeGrowWait() {
+  if (!growWait || (compiled.pending && compiled.id === growWaitId)) return;
+  growWait = null;
+  for (const f of growWaiters.splice(0)) f();
+  renderGrowing();
+}
+// the growing mark (D3): next to the profiles while the song in Compose grows away, on Play while Play waits for it
+function renderGrowing() {
+  const lm = document.getElementById('live-growing'), pm = document.getElementById('play-growing');
+  if (lm) lm.hidden = !(compiled && compiled.pending && composeJob);
+  if (pm) pm.hidden = !growWait;
+}
 let compiled = growsInCompose() ? heldCompiled() : playable({ ...T, kind: 'composed' });
+// the voice instrument's context is known (samples manifest): growths away from the page can start
+let composeReady = false;
+// stored growths (D6): by the Compose growth key, the voice instrument's context and the growth hash of the code
+const growthStore = createGrowthStore({ hash: GROWTH_HASH });
+const storedKey = key => `${hashText(key)}${hashText(JSON.stringify(durCtx()))}${GROWTH_HASH}`;
 function growComposeAway() {
   if (!compiled.pending) return;
   const tr = { ...T, kind: 'composed' }, key = crescendoKey(tr);
+  const current = () => compiled.pending && crescendoKey({ ...T, kind: 'composed' }) === key;
   const done = () => {
-    if (!compiled.pending || crescendoKey({ ...T, kind: 'composed' }) !== key) return;
+    if (!current()) return;
     compiled = playable({ ...T, kind: 'composed' });
-    if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code);
-    renderArranger();
+    afterGrowth();
   };
   if (crescendoCache.has(key)) return done();
-  pageAway({ crescendo: { song: tr, opts: crescendoOpts(tr) } }).then(c => { if (!crescendoCache.has(key)) crescendoPut(key, c); done(); }, e => console.warn('[compose] growth away failed', e.message));
+  const skey = storedKey(key);
+  growthStore.get(skey).then(c => {
+    if (c) return c;
+    // (a newer change asks for its own growth)
+    if (!current()) return null;
+    if (!composeAwayOK()) throw new Error('worker');
+    const p = composeAway(skey, { crescendo: { song: tr, opts: crescendoOpts(tr) } }).then(g => { growthStore.put(skey, g); return g; });
+    renderGrowing();
+    return p;
+  }).then(c => { if (!c) return; if (!crescendoCache.has(key)) crescendoPut(key, c); done(); }, e => {
+    if (e.message === 'replaced' || !current()) return;
+    // no worker: the song grows in the page, as before
+    if (e.message === 'worker') { compiled = playable({ ...T, kind: 'composed' }); afterGrowth(); return; }
+    // a growth that fails leaves the song as written, and says so
+    console.warn('[compose] growth away failed', e.message);
+    compiled = { ...compiled, pending: false };
+    afterGrowth();
+    toast(t('growFailed'));
+  }).finally(renderGrowing);
+}
+// the grown song takes the place of the held one: shown in the editor, or played from the same bar when a change made
+// while it played was waiting for it; Play and export waiting go on
+function afterGrowth() {
+  if (mode === 'track' && ed) {
+    if (isPlaying() && !hand && song && song.id === compiled.id && !growWait) playSong(compiled, Math.min(sched().now(), compiled.meta.bars - 1), 'track');
+    else if (!isPlaying()) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code);
+  }
+  renderArranger();
+  wakeGrowWait();
+  renderGrowing();
 }
 const saveDraft = () => store.set('coding-misk-draft', { T, sel, tk, dirty });
 // a Crescendo build plays a growth span before the written sections (#64): the arranger shows the written song,
@@ -433,6 +536,8 @@ let ended = null; // id del brano arrivato alla fine da solo
 let source = { kind: 'track' };
 const el = document.createElement('strudel-editor');
 el.innerHTML = `<!--\n${compiled.code}\n-->`;
+// the growing marks (growth-in-background D3): drawn once, shown by renderGrowing
+for (const id of ['live-growing', 'play-growing']) { const m = document.getElementById(id); if (m) m.innerHTML = GROWING; }
 $('#edhost').appendChild(el);
 const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor) { clearInterval(iv); ed = el.editor; res(ed); } }, 100); });
 // code-writing: the code evaluated is the code shown and the hidden tail of the song on air (mixer, hidden voice), by
@@ -482,6 +587,7 @@ ready.then(async () => {
     setSpokenContext({ files: list, lengths });
     crescendoCache.clear();
     // (the song of Compose grows again with the new context: away from the page unless it is playing)
+    composeReady = true;
     if (compiled.pending || (growsInCompose() && !(mode === 'track' && isPlaying()))) { compiled = heldCompiled(); growComposeAway(); }
     else compiled = playable({ ...T, kind: 'composed' });
     if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code);
@@ -489,7 +595,7 @@ ready.then(async () => {
     if (!custom.length) return;
     await globalThis.samples('/samples/strudel.json');
     renderTrackPanel(); renderSounds(); syncAll();
-  } catch (e) { console.warn('campioni personalizzati non disponibili', e); growComposeAway(); cardsReady(); }
+  } catch (e) { console.warn('campioni personalizzati non disponibili', e); composeReady = true; growComposeAway(); cardsReady(); }
 });
 const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
@@ -669,7 +775,11 @@ function initAudioOnce() {
 // da lastEnd, quindi basta impostarlo prima di avviare. Il tempo lo gestisce transport() battuta per battuta.
 async function playSong(sg, bar = 0, as = 'free', { keepHand = false } = {}) {
   if (seeking) return;
-  sg = grownNow(sg);
+  // (the song in Compose still growing: Play waits for it; a bar of the song as written moves past the growth span)
+  const held = !!(sg && sg === compiled && compiled.pending);
+  sg = await grownNow(sg);
+  if (!sg || seeking) return;
+  if (held && bar > 0 && sg.build && sg.build.crescendo) bar += sg.build.crescendo.growth;
   seeking = true;
   try {
     if (as !== 'radio' && radio && radio.on) radio.stopped();
@@ -907,7 +1017,8 @@ function tapMaster() {
 }
 // asVideo (#27): a video of the song (frame and audio) instead of the audio alone
 async function exportTrack(sg, as, asVideo = false) {
-  sg = grownNow(sg);
+  // (the song in Compose still growing: the export waits for it, growth-in-background D2)
+  if (!rec && !fastJob) { sg = await grownNow(sg); if (!sg) return; }
   if (rec) { rec.cancel = true; rec.recorder.stop(); stop(); return; }
   if (fastJob) { fastJob.cancel(); return; }
   // audio: rendered offline in seconds (#8), unless the settings ask for real time or the render fails
@@ -1776,11 +1887,14 @@ $('#track-panel').addEventListener('click', e => {
   changed(); syncTrackPanel();
 });
 // the Compose controls change the open song only, as a trial (song-own-settings): never another song, never the saved one
+// (a change that needs a growth: the choice shows at once and the song grows away, growth-in-background; while the song
+// plays, it goes on until the grown song takes over at the same bar)
 function liveChanged() {
-  compiled = playable({ ...T, kind: 'composed' });
-  if (isPlaying() && mode === 'track') playSong(compiled, Math.min(sched().now(), compiled.meta.bars - 1), 'track');
+  composeCompiled();
+  if (isPlaying() && mode === 'track') { if (!compiled.pending) playSong(compiled, Math.min(sched().now(), compiled.meta.bars - 1), 'track'); }
   else if (ed && mode === 'track') ed.setCode(compiled.code);
   renderArranger(); if (!$('#tab-brani').hidden) renderSongs();
+  wakeGrowWait();
 }
 // a profile picked: its controls as they are (the changes made by hand go), with the Live build on
 $('#live-profile').addEventListener('click', e => {
@@ -1841,10 +1955,11 @@ $('#live-toggle').addEventListener('click', () => {
   // a song with its own steps in crescendo: the switch goes back to its own steps
   if (hasBuild(T)) tryConfig({ profile: 'classic', live: true, options: cleanOverrides(c.options, PROFILES.classic) });
   else tryConfig({ ...c, live: !c.live });
-  compiled = playable({ ...T, kind: 'composed' });
-  if (isPlaying() && mode === 'track') playSong(compiled, sched().now(), 'track');
+  composeCompiled();
+  if (isPlaying() && mode === 'track') { if (!compiled.pending) playSong(compiled, sched().now(), 'track'); }
   else if (ed && mode === 'track') ed.setCode(compiled.code);
   renderArranger(); if (!$('#tab-brani').hidden) renderSongs();
+  wakeGrowWait();
 });
 $$('[data-arr-mode]').forEach(b => b.addEventListener('click', () => {
   arrMode = b.dataset.arrMode === 'timeline' ? 'timeline' : 'sections'; store.set('coding-misk-arr-mode', arrMode);
@@ -1997,7 +2112,7 @@ function loadTrack(tr) {
   if (tr.id !== T.id && dirty && !confirmTwice('load', t('loadConfirm'))) return false;
   if (tr.id !== T.id) { T = prepare(tr); dirty = false; }
   sel = 0; tk = 0; editPat = null; selClip = null; paused = null;
-  compiled = playable({ ...T, kind: 'composed' });
+  composeCompiled(); wakeGrowWait();
   saveDraft(); syncAll(); renderArranger(); renderTrackPanel(); renderSource();
   return true;
 }
@@ -2020,7 +2135,7 @@ $('#tr-saveas').addEventListener('click', () => {
   keepTrial();
   T.id = 'u-' + Date.now(); T.title = t('copyOf', { name: T.title });
   user.tracks.push(asStored(true));
-  dirty = false; compiled = playable({ ...T, kind: 'composed' });
+  dirty = false; composeCompiled(); wakeGrowWait();
   saveLibrary(); saveDraft(); renderArranger(); renderSongs(); renderSource(); toast(t('trackSaved'));
 });
 $('#tr-new').addEventListener('click', () => {
@@ -2056,7 +2171,7 @@ function newSongFromArtist(a) {
 function leaveSong(src) {
   T = prepare(src || composedTracks()[0] || BUILTIN[0]);
   dirty = false; sel = 0; tk = 0; editPat = null;
-  compiled = playable({ ...T, kind: 'composed' });
+  composeCompiled(); wakeGrowWait();
   saveDraft(); syncAll(); renderArranger(); renderTrackPanel(); renderSource();
   if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.code);
 }

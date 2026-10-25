@@ -92,7 +92,7 @@
         </div>
         <div class="arr-mode"><div class="chips" role="group" data-i18n-aria="arrView"><button class="chip" data-arr-mode="timeline" data-i18n="viewTimeline"></button><button class="chip" data-arr-mode="sections" data-i18n="viewSections"></button></div><button class="chip live-chip" id="live-toggle" aria-pressed="false" data-i18n="liveBuild"></button><span class="hint" id="arr-mode-hint"></span></div>
         <fieldset class="live-panel" id="live-style-wrap"><legend id="live-legend"></legend>
-          <div class="live-profiles" data-live-only="on"><span class="lbl" data-i18n="profileLbl" data-i18n-title="profileHint"></span><div class="chips" id="live-profile" role="radiogroup" data-i18n-aria="profileLbl"></div><span class="badge" id="live-custom" hidden data-i18n="profileCustom"></span></div>
+          <div class="live-profiles" data-live-only="on"><span class="lbl" data-i18n="profileLbl" data-i18n-title="profileHint"></span><div class="chips" id="live-profile" role="radiogroup" data-i18n-aria="profileLbl"></div><span class="badge" id="live-custom" hidden data-i18n="profileCustom"></span><span class="growing-mark" id="live-growing" role="img" hidden data-i18n-title="growingHint" data-i18n-aria="growingHint"></span></div>
           <div class="ctrl" data-live-only="on"><label class="lbl" for="live-style" data-i18n="liveStyle" data-i18n-title="liveStyleHint"></label><select id="live-style" data-no-knob data-i18n-title="liveStyleHint"><option value="blocks" data-i18n="liveBlocks"></option><option value="crescendo" data-i18n="liveCrescendo"></option></select></div>
           <div class="ctrl" data-live-only="crescendo"><label class="lbl" for="live-growth" data-i18n="growthLbl"></label><select id="live-growth" data-no-knob data-i18n-title="growthHint"><option value="crescendo" data-i18n="growth:crescendo"></option><option value="gradual" data-i18n="growth:gradual"></option><option value="natural" data-i18n="growth:natural"></option></select></div>
           <div class="ctrl" data-live-only="crescendo"><label class="lbl" for="live-duration" data-i18n="durLbl"></label><select id="live-duration" data-no-knob data-i18n-title="durHint"><option value="fitted" data-i18n="dur:fitted"></option><option value="free" data-i18n="dur:free"></option></select></div>
@@ -234,6 +234,7 @@
   <div class="pb-btns">
     <button class="pb-btn" id="pb-prev" data-i18n-aria="prevSong" data-i18n-title="prevSong">⏮</button>
     <button id="play" class="play" aria-pressed="false">▶ Play</button>
+    <span class="growing-mark play-growing" id="play-growing" role="img" hidden data-i18n-title="growingHint" data-i18n-aria="growingHint"></span>
     <button class="pb-btn stopbtn" id="stop" data-i18n-aria="stop" data-i18n-title="stop">■</button>
     <button class="pb-btn" id="pb-next" data-i18n-aria="nextSong" data-i18n-title="nextSong">⏭</button>
     <button class="pb-btn pb-mode" id="pb-shuffle" aria-pressed="false" data-i18n-aria="shuffle" data-i18n-title="shuffle"></button>
