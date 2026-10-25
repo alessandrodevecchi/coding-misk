@@ -618,15 +618,35 @@ const KEY_STEPS = ['enter', 'break', 'back', 'harmony', 'strip-first', 'last'];
 // song + options → the song with a growth span, generated patterns and "build". The seed defaults to the song id.
 // Songs with nothing to grow come back without steps.
 // rules: {} (Crescendo) or { natural: true, trials } (natural-growth: hidden functions, sparse steps, listening pauses)
+// stats (growth-in-background D5): an object to fill with what the growth did, for tools/growth-probe.mjs: `tried`, one
+// entry per shape grown ({ development, pace, maxDetail, rounds, rushed, load, ms, bars }), `kept` (the index of the
+// one returned), `searched` (false: the song grew once, without a search) and `ms` in all. Without it, no extra work.
 export function crescendoSong(song, opts = {}) {
+  if (!opts.stats || typeof opts.stats !== 'object') return searchShapes(song, opts, null);
+  const { stats, ...rest } = opts, t0 = performance.now();
+  stats.tried = []; stats.kept = -1; stats.searched = true;
+  const out = searchShapes(song, rest, stats);
+  stats.ms = performance.now() - t0;
+  return out;
+}
+const barsOf = s => (s.sections || []).reduce((a, x) => a + x.bars, 0);
+// stats only: one grown song without a search
+function grownOnce(song, opts, stats) {
+  if (!stats) return growSong(song, opts);
+  const t0 = performance.now(), out = growSong(song, opts);
+  stats.searched = false; stats.kept = 0;
+  stats.tried.push({ development: null, pace: null, maxDetail: null, rounds: 0, rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) });
+  return out;
+}
+function searchShapes(song, opts, stats) {
   const rules = opts.rules || {};
-  if (!(rules.coder && rules.shape)) return growSong(song, opts);
+  if (!(rules.coder && rules.shape)) return grownOnce(song, opts, stats);
   // growth-shapes: a shape the song or the user did not name is tried as drawn; when the Live coder typing would rush
   // a step, the next candidate by weight is tried (by type last), and the first without rushed steps is kept (else
   // the one rushed least in all)
   const styles = rules.styles || {}, shape = resolveShape(song, { user: rules.shape, styles, seed: opts.seed, weights: rules.shapeWeights, deny: rules.deny });
   // a development and a pace named by the song or the user stay as they are
-  if (['development', 'pace'].every(p => ['song', 'user'].includes(shape.from[p]))) return growSong(song, opts);
+  if (['development', 'pace'].every(p => ['song', 'user'].includes(shape.from[p]))) return grownOnce(song, opts, stats);
   let best = null;
   // (then the same candidates with less detail: fewer, smaller moves fit the length of the growth)
   const cands = shapeCandidates(song, shape, styles, rules), tries = [...cands, ...[2, 1, 0].flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
@@ -637,9 +657,10 @@ export function crescendoSong(song, opts = {}) {
   const C = resolveProfile('switch', { duration: rules.free ? 'free' : 'fitted', tracks: true, fnLanes: false });
   for (const c of tries) {
     const r = { ...rules, ...(c.maxDetail !== undefined ? { maxDetail: c.maxDetail } : {}), shape: { opening: shape.opening, pace: c.pace, development: c.development } };
+    const t0 = stats ? performance.now() : 0, st = stats ? { development: c.development, pace: c.pace, maxDetail: c.maxDetail ?? null, rounds: 0 } : null;
     let out = growSong(song, { ...opts, rules: r });
-    if (c.maxDetail !== undefined && out.crescendo && out.crescendo.detail > c.maxDetail) continue;
-    if (!out.crescendo || !out.crescendo.shape) return out;
+    if (c.maxDetail !== undefined && out.crescendo && out.crescendo.detail > c.maxDetail) { if (st) stats.tried.push({ ...st, skipped: 'detail', rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); continue; }
+    if (!out.crescendo || !out.crescendo.shape) { if (st) { stats.tried.push({ ...st, rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); stats.kept = stats.tried.length - 1; } return out; }
     let L = liveCode(out, C, { cols: () => 80 });
     // free duration (owner, 2026-10-19): a step the human typing cannot reach at a person's pace waits for it: the bars
     // it needs are added before it and the growth is made again (never a forced paste)
@@ -659,14 +680,17 @@ export function crescendoSong(song, opts = {}) {
         if (!added) break;
         out = growSong(song, { ...opts, rules: { ...r, extraGaps: { ...extra } } });
         L = liveCode(out, C, { cols: () => 80 });
+        if (st) st.rounds++;
       }
     }
     const n = rushedSteps(L, song.id || '');
     out.crescendo.shape = { ...out.crescendo.shape, from: shape.from, rushed: n, ...(c.drawn ? {} : { fallback: true }) };
-    if (!n) return out;
+    if (!n) { if (st) { stats.tried.push({ ...st, rushed: 0, load: 0, ms: performance.now() - t0, bars: barsOf(out) }); stats.kept = stats.tried.length - 1; } return out; }
     const load = rushLoad(L, song.id || '');
-    if (!best || load < best.load) best = { out, load };
+    if (st) stats.tried.push({ ...st, rushed: n, load, ms: performance.now() - t0, bars: barsOf(out) });
+    if (!best || load < best.load) best = { out, load, k: stats ? stats.tried.length - 1 : -1 };
   }
+  if (stats) stats.kept = best.k;
   return best.out;
 }
 // the shapes to try, in order: the drawn one, then the developments by weight (by type last), then by type with the
