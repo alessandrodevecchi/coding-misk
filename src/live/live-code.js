@@ -2,6 +2,7 @@
 // controls in force (performance-profiles). Pure: the app and the Node checks build the same code.
 import { compileSong } from '../song/compile.js';
 import { buildSteps, stateAt, annotate, voiceCode } from '../song/build.js';
+import { withNarratorStyle } from '../song/spoken.js';
 import { compileCompact, compileNow, liftLanes, clipBounds } from '../song/compile-compact.js';
 import { applyComments } from '../song/comments.js';
 import { idiomatic } from '../song/idiom.js';
@@ -16,6 +17,8 @@ import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOp
 // shown and its hidden tail: mixer and hidden voice, code-writing), standalone(shown): the same with the helpers written
 // out, buses (for `.chan()`), fns (the functions the code calls: name → { params, chain }, song-functions) }
 export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0 } = {}) {
+  // the narrator style of the controls (voice-controls): explaining or poetic over the song's own; automatic keeps it
+  build = withNarratorStyle(build, C.narratorStyle);
   const liveCode = C.view, liveGen = C.gen;
   // technical functions (code-writing, song-functions, code-lanes): `any`, the options the writer folds (all but fnLanes)
   const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => k !== 'fnLanes' && o[k]);

@@ -14,7 +14,7 @@
       "country"
     ],
     "chaos": 1,
-    "hash": "afadf63f"
+    "hash": "d90b77e1"
   },
   {
     "seed": "kellerlicht",
@@ -25,7 +25,7 @@
     "energy": 0.9,
     "complexity": 0.9,
     "minutes": 20,
-    "hash": "944379bd"
+    "hash": "f9d80711"
   },
   {
     "seed": "quiet",
@@ -36,6 +36,6 @@
     "energy": 0.2,
     "complexity": 0.1,
     "minutes": 12,
-    "hash": "bd215514"
+    "hash": "1478da2a"
   }
 ]

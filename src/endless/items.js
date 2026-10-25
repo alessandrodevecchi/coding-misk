@@ -24,7 +24,7 @@ export const GROWTH_ON_AIR = 2;
 export const growsOnAir = recipe => !!(recipe && Number(recipe.growth) >= 1);
 export const waypointsOnAir = recipe => !!(recipe && Number(recipe.growth) >= 2);
 // the per-song choices a compilation keeps from the radio's controls (a clip keeps its length)
-export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.custom ? { custom: o.custom } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}) });
+export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.custom ? { custom: o.custom } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}), ...(o.voice ? { voice: o.voice } : {}) });
 // the director options of song n: the compilation's draw, else the recipe's
 export const directorOptions = (recipes, recipe, n, o = recipeOptionsAt(recipe, n)) => (o.compilation ? compilationOptions(recipe.seed, n, o.compilation, recipes, howOf(o)) : o);
 

@@ -70,6 +70,17 @@ const CHECKS = {
     const merged = mergeBackup(b, k => (k === 'coding-misk-patterns' ? [{ id: 'p-2', name: 'old' }, { id: 'p-9', name: 'here' }] : null)).values['coding-misk-patterns'];
     assert(merged.map(p => p.id).join() === 'p-2,p-9,p-1,p-3' && merged[0].name === 'Hook · B', merged.map(p => `${p.id}:${p.name}`).join());
   },
+  'new parts of the Patterns tab merge by id, newest kept, at most 30 (pattern-followups)'() {
+    const d = (id, at, name = id) => ({ id, kind: 'riffs', type: 'guitar', name, pattern: { idea: { rhythm: 'x x' } }, at });
+    const b = makeBackup([['coding-misk-pattern-drafts', [d('d-2', '2026-10-25T10:02:00Z', 'new copy'), d('d-3', '2026-10-25T10:03:00Z')]]]);
+    assert(b.data['coding-misk-pattern-drafts'].length === 2, 'in the backup');
+    const cur = [d('d-1', '2026-10-25T10:01:00Z'), d('d-2', '2026-10-25T10:02:00Z', 'old copy')];
+    const got = mergeBackup(b, k => (k === 'coding-misk-pattern-drafts' ? cur : null)).values['coding-misk-pattern-drafts'];
+    assert(got.map(x => `${x.id}:${x.name}`).join() === 'd-3:d-3,d-2:new copy,d-1:d-1', got.map(x => `${x.id}:${x.name}`).join());
+    const many = Array.from({ length: 40 }, (_, i) => d(`d-m${i}`, new Date(Date.UTC(2026, 9, 25, 10, i)).toISOString()));
+    const capped = mergeBackup(makeBackup([['coding-misk-pattern-drafts', many]]), () => null).values['coding-misk-pattern-drafts'];
+    assert(capped.length === 30 && capped[0].id === 'd-m39' && !capped.some(x => x.id === 'd-m9'), `capped ${capped.length}`);
+  },
   'a file that is not a backup is refused'() { assert(mergeBackup({ format: 'x' }, () => null).error, 'accepted'); },
 };
 let failed = 0;

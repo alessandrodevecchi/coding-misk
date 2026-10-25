@@ -39,19 +39,21 @@ export function modeProgression(r, mode = 'minor', { sevenths = false } = {}) {
 
 // pad anchors by register (radio-variation D3): lower, the usual, higher
 const PAD_ANCHORS = ['a3', PAD_ANCHOR, 'e4'];
-// opts: { style, harmony { mode }, meter, energy, type: 'pad' | 'guitar', shape } → { idea, why, stats }
+// opts: { style, harmony { mode }, meter, energy, type: 'pad' | 'guitar', shape, riff } → { idea, why, stats }
+// riff (pattern-followups D3, guitar only): true always writes a riff, false always power chords; left out, a riff half
+// the time with more energy, with the same random draws as before (existing songs and fixtures do not move)
 // shape (radio-variation D3): density gives the band of the rhythm, register the pad's anchor, complexity the chance of
 // another voicing mode (the top note above the anchor, or the anchor left out)
-export function chords(r, { style = {}, harmony = {}, meter, energy = 0.5, type = 'pad', shape = null } = {}) {
+export function chords(r, { style = {}, harmony = {}, meter, energy = 0.5, type = 'pad', shape = null, riff } = {}) {
   const { N } = meterOf(meter), b = shape ? band(shape.density) : band(energy), rules = style.rules || [], why = [];
   if (type === 'guitar') {
     // power chords with a cell of the bass families, and a riff over them with more energy
     const fams = b === 0 ? ['half', 'pulse'] : b === 1 ? ['pulse', 'offbeat', 'rolling'] : ['gallop', 'sixteenths', 'rolling'];
     const cells = fams.flatMap(f => BASS_FAMILIES[f]).filter(c => (b === 0 ? c.on <= 4 : b === 1 ? c.on >= 3 && c.on <= 8 : c.on >= 8));
     const c = r.pick(cells);
-    if (b > 0 && r.chance(0.5)) {
-      // a riff: 16th slots, rests and steps of the power chord
-      const hits = Array.from({ length: N }, (_, i) => (i === 0 || r.chance(b === 2 ? 0.6 : 0.4) ? 'x' : '~'));
+    if (riff === true || (riff === undefined && b > 0 && r.chance(0.5))) {
+      // a riff: 16th slots, rests and steps of the power chord (sparser at low energy, only when asked for)
+      const hits = Array.from({ length: N }, (_, i) => (i === 0 || r.chance(b === 2 ? 0.6 : b === 1 ? 0.4 : 0.3) ? 'x' : '~'));
       const add = hits.map((h, i) => (h === '~' || i === 0 ? '0' : String(r.pick(RIFF_STEPS))));
       if (add.every(x => x === '0')) add[N - 4 > 0 ? N - 4 : 0] = '1';
       hits[N - 4 > 0 ? N - 4 : 0] = 'x';

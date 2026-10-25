@@ -1,8 +1,10 @@
 // Browser checks for the Patterns tab (pattern-library, #72): the tab and its groups, play and stop, a key change that
 // keeps the loop going, the beat, styles that use a pattern, New and Save, Save as pattern from Compose, rename and
 // delete after a reload, Add to song, and the three links (Compose listen button, Sounds, Styles). Screenshots of the
-// tab, a pattern playing, Save as pattern in Compose, the hardware theme and a phone.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-patterns.cjs [shots-dir]   (dev server on :5173)
+// tab, a pattern playing, Save as pattern in Compose, the hardware theme and a phone. The follow-ups
+// (pattern-followups): a guitar riff from New, new parts kept after a reload, Discard and Discard all with their
+// confirmation strip, the style chips of a saved pattern, riff or chords in Compose on a guitar track.
+// Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-patterns.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -25,7 +27,7 @@ const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, n
   const sel = async uid => { await page.click(`#patterns [data-pn-sel="${uid}"]`); await sleep(300); };
   const selected = () => page.$eval('#patterns .pn-detail h3', el => el.textContent).catch(() => '');
 
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-lang', JSON.stringify('en')); });
   await page.reload(); await sleep(3500);
 
@@ -143,6 +145,87 @@ const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, n
     check(keys1.length === keys0.length + 1 && hook1.patterns[added].preset === 'neon' && keys0.every(k => JSON.stringify(hook0.patterns[k]) === JSON.stringify(hook1.patterns[k])), 'Add to song: a new letter on the hook track, the other patterns unchanged', `${keys0} → ${keys1}`);
   } else check(!!hook1 && hook1.patterns.A.preset === 'neon', 'Add to song: a new hook track with the pattern');
   check(d1.dirty === true, 'the song is marked changed, not saved');
+
+  // ---------- pattern-followups (#72) ----------
+  const drafts = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-pattern-drafts') || '[]'));
+  // New on riffs: guitar riff by default, from the guitar generator, on a distorted guitar
+  await lab('pattern'); await kind('riffs'); await sel('b:riffs/thrash');
+  const riffAs = await page.$$eval('#patterns [data-pn-riff]', xs => xs.map(x => `${x.dataset.pnRiff}:${x.getAttribute('aria-pressed')}`).join());
+  check(riffAs === 'guitar:true,bass:false', 'New on riffs offers guitar riff (chosen) and bass riff', riffAs);
+  await page.click('#patterns [data-pn-new]'); await sleep(3200);
+  s = await st();
+  let dr = await drafts();
+  check(dr.length === 1 && dr[0].type === 'guitar' && dr[0].sound === 'distorted' && dr[0].why.includes('power chord riff') && s.started && !s.err && /guitar/.test(s.code) && /Guitar riff #1/.test(await selected()), 'New composes a guitar riff and plays it on a distorted guitar', `${JSON.stringify(dr[0] && dr[0].why)} ${s.err}`);
+  await shot(page, 'pattern-guitar-riff.png');
+  await page.click('#patterns [data-pn-riff="bass"]'); await sleep(200);
+  await page.click('#patterns [data-pn-new]'); await sleep(1500);
+  dr = await drafts();
+  check(dr.length === 2 && dr[0].type === 'bass' && dr[0].seed.startsWith('pattern:riffs:') && /Bass riff/.test(await selected()), 'bass riff: a bassline with the riff rules', dr[0] && dr[0].seed);
+  await page.click('#patterns [data-pn-toggle]'); await sleep(300);
+  // two basslines, then a reload: every new part is still under "New, not saved"
+  await kind('basslines'); await sel('b:basslines/rolling');
+  await page.click('#patterns [data-pn-new]'); await sleep(800);
+  await page.click('#patterns [data-pn-new]'); await sleep(800);
+  await page.click('#patterns [data-pn-toggle]'); await sleep(300);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="componi"]'); await sleep(400);
+  await page.reload(); await sleep(3500);
+  await lab('pattern');
+  const kept = await page.$$eval('#patterns .pn-fresh .pn-cbody b', xs => xs.map(x => x.textContent));
+  check(kept.length === 4 && kept.filter(x => /Basslines/.test(x)).length === 2 && kept.some(x => /Guitar riff/.test(x)), 'new parts stay after a tab change and a reload', kept.join(','));
+  await shot(page, 'pattern-new-kept.png');
+  // Discard on a selected new card: a confirmation strip, Cancel keeps it, the second time it goes
+  const firstNew = await page.$eval('#patterns .pn-fresh [data-pn-card]', el => el.dataset.pnCard);
+  await sel(firstNew);
+  await page.click('#patterns [data-pn-discard]'); await sleep(200);
+  check(await page.isVisible('#patterns .sv-confirm[data-confirm="pn-discard"]'), 'Discard asks in a strip');
+  await shot(page, 'pattern-discard-confirm.png');
+  await page.click('#patterns .sv-confirm [data-confirm-cancel]'); await sleep(200);
+  check((await drafts()).length === 4, 'Cancel keeps the part');
+  await page.click('#patterns [data-pn-discard]'); await sleep(200);
+  await page.click('#patterns .sv-confirm [data-confirm-ok]'); await sleep(300);
+  check((await drafts()).length === 3 && (await page.$$eval('#patterns .pn-fresh [data-pn-card]', xs => xs.length)) === 3, 'Discard drops the selected new part');
+  // style chips on a new part of New and on a saved pattern
+  await sel(await page.$eval('#patterns .pn-fresh [data-pn-card]', el => el.dataset.pnCard));
+  await page.click('#patterns [data-pn-save]'); await sleep(400);
+  const savedNow = (await saved()).slice(-1)[0];
+  check(await page.isVisible('#patterns .pn-styles-edit .pn-every'), 'a saved pattern with no style shows every style', JSON.stringify(savedNow.styles));
+  await page.selectOption('#patterns [data-pn-style-add]', 'drum-and-bass'); await sleep(300);
+  await page.selectOption('#patterns [data-pn-style-add]', 'melodic-metal'); await sleep(300);
+  let styled = (await saved()).find(p => p.id === savedNow.id);
+  const chips = await page.$$eval('#patterns .pn-styles-edit [data-pn-style-rm]', xs => xs.map(x => x.dataset.pnStyleRm).join());
+  check(JSON.stringify(styled.styles) === '["drum-and-bass","melodic-metal"]' && chips === 'drum-and-bass,melodic-metal', 'Add a style: chips and the saved styles', `${styled.styles} / ${chips}`);
+  await shot(page, 'pattern-styles-edit.png');
+  await page.click('#patterns [data-pn-style-rm="melodic-metal"]'); await sleep(300);
+  styled = (await saved()).find(p => p.id === savedNow.id);
+  const pool = await page.evaluate(id => (globalThis.codingMiskRadio.options.userPatterns || []).find(p => p.id === id), savedNow.id);
+  check(JSON.stringify(styled.styles) === '["drum-and-bass"]' && pool && JSON.stringify(pool.styles) === '["drum-and-bass"]', 'the cross removes a style; the radio reads the new styles', `${styled.styles} / ${pool && pool.styles}`);
+  // Discard all on the strip's header
+  await page.click('#patterns [data-pn-discard-all]'); await sleep(200);
+  check(await page.isVisible('#patterns .sv-confirm[data-confirm="pn-discard-all"]'), 'Discard all asks in a strip');
+  await page.click('#patterns .sv-confirm [data-confirm-ok]'); await sleep(300);
+  check(!(await drafts()).length && !(await page.$('#patterns .pn-fresh')), 'Discard all drops every new part');
+  // Compose on a guitar track: riff (default) or chords
+  await kind('riffs'); await sel('b:riffs/thrash');
+  await page.click('#patterns [data-pn-add]'); await sleep(500);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="componi"]'); await sleep(600);
+  const gi = await page.evaluate(() => globalThis.codingMiskPatterns.compose().T.tracks.findIndex(x => x.type === 'guitar'));
+  const host2 = await page.$(`#track-panel [data-ptrk="${gi}"]`);
+  if (host2) {
+    const gsel = `#p${gi}_pt-cguitar`;
+    check(await page.$eval(gsel, el => el.value) === 'riff', 'Compose on a guitar track offers riff (chosen) or chords');
+    await page.$eval(gsel, el => el.scrollIntoView({ block: 'center' }));
+    await shot(page, 'compose-guitar-riff-or-chords.png');
+    const pats = async () => (await draft()).T.tracks[gi].patterns;
+    const k0 = Object.keys(await pats());
+    await page.click(`#p${gi}_pt-compose`); await sleep(500);
+    let p1 = await pats(), nk = Object.keys(p1).find(k => !k0.includes(k));
+    check(!!nk && p1[nk].idea && p1[nk].idea.per === 'slot' && /[1-9]/.test(p1[nk].idea.add || ''), 'Compose a part on guitar with riff: a riff', JSON.stringify(nk && p1[nk]));
+    await page.selectOption(gsel, 'chords'); await sleep(200);
+    const k1 = Object.keys(p1);
+    await page.click(`#p${gi}_pt-compose`); await sleep(500);
+    p1 = await pats(); nk = Object.keys(p1).find(k => !k1.includes(k));
+    check(!!nk && p1[nk].idea && !p1[nk].idea.add && (await page.$eval(gsel, el => el.value)) === 'chords', 'with chords: power chords, and the choice stays', JSON.stringify(nk && p1[nk]));
+  } else check(false, 'a guitar track in Compose after Add to song');
 
   // Sounds → Patterns: the electric piano on a chords pattern
   await lab('suoni');

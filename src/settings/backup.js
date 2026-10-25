@@ -3,6 +3,7 @@
 import { mergeTrash, mergeHidden } from '../library/trash.js';
 import { upgradeLibrary } from '../library/code-upgrade.js';
 import { CODE_VERSION } from '../song/writer.js';
+import { DRAFTS_KEY, mergeDrafts } from '../library/pattern-drafts.js';
 
 export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
@@ -18,7 +19,7 @@ export function makeBackup(entries, now = new Date()) {
 
 const byId = (a, b) => { const out = (Array.isArray(a) ? a : []).slice(); for (const x of Array.isArray(b) ? b : []) { if (!x || !x.id) continue; const i = out.findIndex(y => y && y.id === x.id); if (i >= 0) out[i] = x; else out.push(x); } return out; };
 
-// Merges a backup into the current values: songs, code songs, the trash, playlists, styles, artists and patterns are added or
+// Merges a backup into the current values: songs, code songs, the trash, playlists, styles, artists, patterns and new parts are added or
 // replaced by id (nothing here is deleted); settings take the backup's value. get(key) → current value.
 // Returns { values: { key: value }, counts } or { error }.
 export function mergeBackup(backup, get) {
@@ -49,6 +50,10 @@ export function mergeBackup(backup, get) {
     } else if (k === 'coding-misk-patterns') {
       // the user's patterns (pattern-library) by id, like styles and artists
       values[k] = byId(get(k), v);
+      counts.patterns += (Array.isArray(v) ? v.length : 0);
+    } else if (k === DRAFTS_KEY) {
+      // new parts of the Patterns tab, not saved yet (pattern-followups D2): by id, newest kept up to the cap
+      values[k] = mergeDrafts(get(k), v);
       counts.patterns += (Array.isArray(v) ? v.length : 0);
     } else if (k === 'coding-misk-played') {
       // last played (#67): every song keeps its latest time
