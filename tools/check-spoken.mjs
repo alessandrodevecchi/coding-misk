@@ -12,6 +12,7 @@ import { placeSpoken, spokenBars, setSpokenContext, spokenContext, speakerOf, na
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from '../src/song/vocabulary.js';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules } from '../src/live/profiles.js';
+import { liveCode } from '../src/live/live-code.js';
 import { shapeFacts, canPlay, resolveShape } from '../src/song/shapes.js';
 import { generateSession } from '../src/endless/director.js';
 import { energyOf } from '../src/endless/energy.js';
@@ -213,6 +214,18 @@ const CHECKS = {
         const add = buildSteps(c).find(x => [].concat(x.add ?? []).includes(t.id)), first = Math.min(...placeSpoken(s, 'en').filter(p => p.track === t.id).flatMap(p => p.starts.map(x => x.bar)));
         assert(add && add.at <= first + G, `${s.id} ${t.id}: enters on bar ${add && add.at}, first line on ${first + G}`);
       }
+    }
+  },
+  'passage at its bar: a passage in the first section waits for the written part of a grown song, never plays in the growth (#76)'() {
+    const song = JSON.parse(JSON.stringify(EXAMPLE));
+    song.tracks.find(t => t.id === 'story').clips = [{ start: 0, bars: 16, pattern: 'passage' }];
+    for (const [id, o] of [['crescendo', { narrated: true }], ['switch', {}]]) {
+      const C = resolveProfile(id, o), c = crescendoSong({ ...song, kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles }) });
+      const start = c.tracks.find(t => t.id === 'story').clips[0].start, L = liveCode(c, C, {});
+      assert(start === c.crescendo.growth, `${id}: the passage clip starts at the written part (${start}, growth ${c.crescendo.growth})`);
+      for (const bar of [0, Math.floor(start / 2), start - 1]) assert(!/say_\w+_\w+"\)\.n\([^)]*\)\.mask\("<0!/.test(L.codeAt(bar)) || !L.codeAt(bar).includes(`<0!${start} 1`), `${id}: no passage line at bar ${bar}`);
+      const line = L.codeAt(start).split('\n').find(l => l.includes(`mask("<0!${start} 1 `));
+      assert(line, `${id}: the passage line at bar ${start} speaks on that bar only`);
     }
   },
   'director: styles without a weight never get a voice instrument; weighted ones sometimes, the same for the same seed; it adds no energy'() {

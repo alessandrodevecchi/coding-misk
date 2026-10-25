@@ -969,4 +969,5 @@ Stato al 2026-10-10: `main` = `v0.5.0`; tutto il lavoro è su `develop` (anima d
 - Componi: la melodia composta dice la sua forma (coda cambiata, botta e risposta, poliritmo) nel messaggio e nel suggerimento del pattern, fino alla ricarica (fuori dal formato del brano).
 - Radio: "Armonia del brano" con suggerimento; export "Questo brano" (il brano in onda dall'inizio alla fine, come "Prossimi 1").
 - Limiter: soglia da 0,95 a 0,97 (-0,26 dBFS), scelta concordata col proprietario; documenti aggiornati. Le istantanee dei livelli misurano le tracce prima del limiter e non cambiano.
-- Check nuovo `tools/check-test-fixes.cjs` (6/6). In sospeso: il passaggio parlato di Statico che parte subito, serve il brano del proprietario.
+- Check nuovo `tools/check-test-fixes.cjs` (6/6).
+- Statico (dal backup del proprietario): il passaggio parlato suona alla sua battuta in ogni profilo. In Classico (la sua configurazione) è a battuta 1 perché il generatore l'ha messo nell'Intro; in Crescendo e Live coder si sposta all'inizio del brano scritto (68 con Crescendo e Tutto narrato, 188 con Live coder) e non suona durante la crescita. Non riprodotto: probabilmente la voce sentita all'inizio era il narratore poetico dello stile Dark cyberpunk (#77 chiarisce le tre voci). Nuovo caso in `check:spoken` (14/14).
