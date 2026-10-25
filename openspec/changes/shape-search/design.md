@@ -11,7 +11,7 @@ The measure stops at the start of the written part (`crescendo.growth`, the bars
 Candidate 1 is the drawn shape (unchanged). The others: the candidate list as today, without duplicates, ordered by a weighted draw without replacement from `rng(song.id + '/shapes')`, weights from the style's or artist's `growthShapes` (default weights otherwise), with the less detailed variants (`maxDetail` 2, 1, 0) of the drawn shape placed right after it. Values denied by the radio (`deny`) stay out.
 
 ### D3. Cap
-`SHAPE_TRIES = 8`, counting each grown candidate, free-duration regrowths not counted.
+8 shapes by default, counting each grown candidate, free-duration regrowths not counted. When none of the 8 meets the target, the search goes on up to twice the cap (16), then keeps the one rushed least. The cap is a setting (Settings, advanced: "Growth shapes tried", 4 to 32, default 8) with a hint: more shapes can find a growth with fewer rushed steps, and take longer to grow. The radio and the Node checks use the default, so sessions and fixtures do not depend on a browser setting.
 
 ### D4. Free duration
 First find, with the counters, why a growth step inside the growth stays rushed on settimo-cielo (a rushed step that is not a unit, the 6 rounds, the 32-bar limit). Then fix: the bars go before the unit that owns the step. The fix is decided after that finding and written here before code.

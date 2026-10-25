@@ -8,7 +8,7 @@ Some steps inside the growth also stay rushed with the free duration (settimo-ci
 
 - **Target on the growth only.** A shape is judged on the steps of the growth, the ones its opening, pace and development decide. The written part does not count.
 - **Seeded order.** The shape drawn for the song (song, artist, style or seed) is tried first. The other candidates follow in an order drawn from the song's seed and weighted by the style's or artist's weights: the same song always gets the same shape, and the first candidates in the list are not always favoured.
-- **Cap.** At most 8 shapes are tried; the first one that meets the target is kept, else the one rushed least. The time of a growth no longer grows with the number of shapes.
+- **Cap.** At most 8 shapes are tried, up to 16 when none of the first 8 meets the target; the first one that meets it is kept, else the one rushed least. The cap is an advanced setting with a hint. The time of a growth no longer grows with the number of shapes.
 - **Free duration that reaches the target.** The free duration adds the bars a rushed growth step needs, or says why it cannot (counters).
 - **Ideas length.** The 8:27 of Ideas as Live coder is explained and, when it comes from the fallback, fixed by this change.
 

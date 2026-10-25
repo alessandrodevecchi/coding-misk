@@ -5,7 +5,7 @@
 
 ## 2. Search
 
-- [ ] 2.1 Target on growth steps only; seeded weighted order; cap of 8
+- [ ] 2.1 Target on growth steps only; seeded weighted order; cap of 8, up to 16 when none meets the target; the cap as an advanced setting with its hint (radio and checks use the default)
 - [ ] 2.2 Free-duration fix from 1.2
 - [ ] 2.3 `check:crescendo -- --full`: Crescendo fixtures unchanged; Live coder fixtures rewritten with `SHAPES_VERSION` raised; `npm run durations`; `check:endless` (raise `DIRECTOR_VERSION` if its fixtures move)
 - [ ] 2.4 New checks: at most 8 shapes per growth, same shape for the same song; probe numbers after the change

@@ -15,11 +15,11 @@ The shape drawn for the song SHALL be tried first. The other candidates SHALL fo
 - **THEN** it gets the same shape both times
 
 ### Requirement: A cap on the shapes tried
-A growth SHALL try at most 8 shapes. It SHALL keep the first that meets the target, else the one whose growth steps are rushed least.
+A growth SHALL try at most 8 shapes by default. When none meets the target it SHALL go on up to twice the cap, then keep the one whose growth steps are rushed least. The cap SHALL be a setting with a hint in English and Italian; the radio and the checks SHALL use the default.
 
 #### Scenario: More shapes later
 - **WHEN** new openings, paces or developments are added
-- **THEN** a growth still tries at most 8 shapes
+- **THEN** a growth still tries at most 8 shapes, or 16 when none of the first 8 meets the target
 
 ### Requirement: Free duration fixes rushed growth steps
 With the free duration, a rushed step of the growth SHALL get the bars it needs before it, unless the counters report why it cannot.
