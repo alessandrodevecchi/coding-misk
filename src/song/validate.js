@@ -7,6 +7,7 @@ import { checkBuild, buildMap, SPEAKERS } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
 import { checkIdea, checkShared, sharedIsChords } from './ideas.js';
 import { checkGrowthShape } from './shapes.js';
+import { VOICE_PHRASES, VOICE_KINDS, VOICE_WAYS } from '../endless/voice-options.js';
 import { checkSpokenPattern, checkNarrator } from './spoken.js';
 import { checkConfig } from '../live/song-config.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
@@ -113,6 +114,19 @@ export function validateSong(song, opts = {}) {
     if (tr.rack !== undefined) checkRack(tr.rack, `${p}.rack`, err, warn);
     for (const k of ['mute', 'solo']) if (tr[k] !== undefined && typeof tr[k] !== 'boolean') err(`${p}.${k}`, 'true or false');
     if (tr.pinned !== undefined && (!Array.isArray(tr.pinned) || tr.pinned.some(k => !SETTING_FIELDS[tr.type].includes(k)))) err(`${p}.pinned`, `settings fixed against the live build steps, from: ${SETTING_FIELDS[tr.type].join(', ')}`);
+    // the voice instrument options a spoken track was written with in Compose (voice-placement)
+    if (tr.voiceOptions !== undefined) {
+      const v = tr.voiceOptions, vp = `${p}.voiceOptions`;
+      if (tr.type !== 'spoken') warn(vp, 'only a spoken track keeps voice instrument options');
+      else if (!v || typeof v !== 'object' || Array.isArray(v)) err(vp, 'an object, for example { "phrases": "2-3", "kind": "mixed" }');
+      else {
+        if (v.phrases !== undefined && !VOICE_PHRASES.includes(String(v.phrases))) err(`${vp}.phrases`, `one of ${VOICE_PHRASES.join(', ')}`);
+        if (v.kind !== undefined && !VOICE_KINDS.includes(v.kind)) err(`${vp}.kind`, `one of ${VOICE_KINDS.join(', ')}`);
+        if (v.ways !== undefined && (!Array.isArray(v.ways) || v.ways.some(w => !VOICE_WAYS.includes(w)))) err(`${vp}.ways`, `a list from ${VOICE_WAYS.join(', ')}`);
+        if (v.draw !== undefined && !(Number.isInteger(v.draw) && v.draw >= 0)) err(`${vp}.draw`, 'a whole number, 0 or more');
+        for (const k of Object.keys(v)) if (!['phrases', 'kind', 'ways', 'draw'].includes(k)) warn(`${vp}.${k}`, 'unknown field; fields: phrases, kind, ways, draw');
+      }
+    }
     const pats = tr.patterns || {};
     if (typeof pats !== 'object' || Array.isArray(pats)) err(`${p}.patterns`, 'an object of named patterns, for example {"A": {...}}');
     // the bar lengths an idea must fit: those of the sections its clips play in

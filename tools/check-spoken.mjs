@@ -22,6 +22,8 @@ import { voiceEvent } from '../src/endless/voice-panel.js';
 import { withNarratorStyle, lineTexts } from '../src/song/spoken.js';
 import { energyOf } from '../src/endless/energy.js';
 import { meterSteps } from '../src/music.js';
+import { rewriteSpoken, trackVoice, quietParts, nextQuiet } from '../src/endless/voice-track.js';
+import { steerSong, applyBar, whyNot } from '../src/endless/steering.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -383,6 +385,60 @@ const CHECKS = {
     assert(nAuto.length && nAuto.every(x => poetic.includes(x) || own.includes(x)), `prova-voce-notte automatic: ${nAuto.slice(0, 3)}`);
     assert(nEx.length && !nEx.some(x => poetic.includes(x) || own.includes(x)), `prova-voce-notte explaining: ${nEx.slice(0, 3)}`);
     assert(withNarratorStyle(luci, 'auto') === luci && withNarratorStyle(notte, 'poetic') === notte, 'auto and the same style keep the song');
+  },
+  // voice-placement: the voice instrument of a song being edited, and of the song on air
+  'voice track rewrite: one phrase per quiet part, the count a ceiling, kinds, ways, repeatable, valid, options read back'() {
+    let tried = 0;
+    for (const seed of ['vt-a', 'vt-b', 'vt-c']) {
+      const g = createSession(recipes, seed).next({ styles: ['ambient', 'dark-cyberpunk'], chaos: 0.5 }), song = g.song;
+      const sp = song.tracks.find(t => t.type === 'spoken'), quiet = quietParts(song).map(p => p.start);
+      for (const v of [{ phrases: '4-5', kind: 'different' }, { phrases: '6-8', kind: 'repeated', ways: ['refrain', 'chop'] }, { phrases: '2-3', kind: 'mixed' }, { phrases: 'many', kind: 'different', ways: ['passage'] }]) {
+        const r = rewriteSpoken(song, sp ? sp.id : null, v, { recipes });
+        assert(r && r.placed >= 1 && r.placed <= r.asked, `${seed} ${v.phrases}: placed ${r && r.placed} of ${r && r.asked}`);
+        const starts = r.track.clips.map(c => c.start);
+        assert(new Set(starts).size === starts.length && starts.every(x => quiet.includes(x)) && r.track.clips.every(c => c.bars <= 8), `${seed} ${v.phrases}: one phrase per quiet part ${starts}`);
+        const keys = r.track.clips.map(c => c.pattern), pats = Object.values(r.track.patterns);
+        if (v.kind === 'repeated') assert(new Set(keys).size === 1, `${seed} repeated: ${keys}`);
+        if (v.kind === 'different') assert(new Set(keys).size === keys.length, `${seed} different: ${keys}`);
+        if (v.ways) assert(pats.every(p => v.ways.includes(p.way)), `${seed} ways ${v.ways}: ${pats.map(p => p.way)}`);
+        assert(JSON.stringify(rewriteSpoken(song, sp ? sp.id : null, v, { recipes })) === JSON.stringify(r), `${seed} ${v.phrases}: the same options give the same track`);
+        assert(JSON.stringify(rewriteSpoken(song, sp ? sp.id : null, { ...v, draw: 1 }, { recipes }).track.patterns) !== JSON.stringify(r.track.patterns), `${seed} ${v.phrases}: New phrases draws other lines`);
+        const errs = validateSong(r.song).errors;
+        assert(!errs.length, `${seed} ${v.phrases}: ${errs.map(e => `${e.path} ${e.message}`).join('; ')}`);
+        const back = trackVoice(r.track);
+        assert(back.phrases === v.phrases && back.kind === v.kind, `${seed}: options read back ${JSON.stringify(back)}`);
+        // the live build: the track comes in on its first clip
+        const add = r.song.build.filter(s => [].concat(s.add ?? []).includes(r.track.id)).map(s => s.at);
+        assert(add.length && Math.min(...add) <= Math.min(...starts), `${seed}: add step ${add} before the first clip ${Math.min(...starts)}`);
+        tried++;
+      }
+    }
+    assert(tried === 12, `${tried} rewrites`);
+  },
+  'voice steering on air: clips before the next quiet part stay, recorded commands replay the same song, later commands keep it'() {
+    let n = 0;
+    for (const seed of ['vs-a', 'vs-b', 'vs-c', 'vs-d']) {
+      const ses = createSession(recipes, seed);
+      for (let i = 0; i < 2; i++) {
+        const g = ses.next({ styles: ['ambient', 'pure-trance'], chaos: 0.5 });
+        const at = applyBar('voice', 4, g.plan), cmd = { kind: 'voice', at, voice: { phrases: '4-5', kind: 'different' } };
+        if (whyNot(cmd, g.song, g.plan, 4)) continue;
+        const go = cmds => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed, n: i }).song;
+        const one = go([cmd]), from = nextQuiet(g.song, at);
+        const sp0 = g.song.tracks.find(t => t.type === 'spoken'), sp1 = one.tracks.find(t => t.type === 'spoken');
+        assert(sp1 && sp1.clips.some(c => c.start >= from), `${seed}/${i}: new phrases from bar ${from}`);
+        const before = (sp0 ? sp0.clips : []).filter(c => c.start < from).map(c => `${c.pattern}@${c.start}`), kept = sp1.clips.filter(c => c.start < from).map(c => `${c.pattern}@${c.start}`);
+        assert(JSON.stringify(before) === JSON.stringify(kept), `${seed}/${i}: clips before the quiet part stay ${before} / ${kept}`);
+        assert(JSON.stringify(go([cmd])) === JSON.stringify(one), `${seed}/${i}: replayed the same`);
+        const later = go([cmd, { kind: 'energy-up', at: applyBar('energy-up', at + 1, g.plan) }]), sp2 = later.tracks.find(t => t.type === 'spoken');
+        assert(sp2 && JSON.stringify(sp2.clips.filter(c => c.start >= from)) === JSON.stringify(sp1.clips.filter(c => c.start >= from)), `${seed}/${i}: a later command keeps the listener's voice instrument`);
+        assert(!validateSong(one).errors.length && !validateSong(later).errors.length, `${seed}/${i}: valid`);
+        const off = go([{ ...cmd, voice: { presence: 'never' } }]), spOff = off.tracks.find(t => t.type === 'spoken');
+        assert(!spOff || spOff.clips.every(c => c.start < from), `${seed}/${i}: never: no phrase from the quiet part on`);
+        n++;
+      }
+    }
+    assert(n >= 4, `${n} songs steered`);
   },
 };
 

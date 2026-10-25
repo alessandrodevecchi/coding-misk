@@ -253,7 +253,7 @@ export function voiceFor(R, opts, rng) {
 // ---------- voice instrument (voice-instrument, D7) ----------
 
 // rhythms of a chopped word: slices of a phrase on the steps of a bar (eighths)
-const CHOP_RHYTHMS = ['0 1 0 1 2 2 3 ~', '0 ~ 1 ~ 2 3 ~ 3', '0 0 ~ 1 ~ 2 ~ 3', '~ 0 ~ 1 ~ 2 3 3'];
+export const CHOP_RHYTHMS = ['0 1 0 1 2 2 3 ~', '0 ~ 1 ~ 2 3 ~ 3', '0 0 ~ 1 ~ 2 ~ 3', '~ 0 ~ 1 ~ 2 3 3'];
 // The voice instrument of one song, or null: drawn with the style's weight as its chance, on its own stream. One line:
 // its way by the style's weights, its text from the style's lines for that way, else the vocabulary (a group the style
 // names, else one drawn); a speaker among the style's that is not the narrator's.
@@ -299,7 +299,7 @@ const SPOKEN_FALLBACK = { weight: 1, ways: Object.fromEntries(VOICE_WAYS.map(k =
 // A new line: one of the style's lines for its way not used yet, else a vocabulary entry not used yet (written out, so
 // two lines are never the same; a chop of A from the vocabulary is written out too, for the same reason). The lines run
 // out: fewer phrases (the count is a ceiling).
-function morePhrases(sp, V, patterns, ways, w, n, more) {
+export function morePhrases(sp, V, patterns, ways, w, n, more) {
   const A = patterns.A, keyOf = x => (typeof x === 'string' ? x : x && x.en) || '';
   const group = VOCAB_GROUPS.includes(sp.vocab) ? sp.vocab : typeof A.text === 'string' && A.text.startsWith('vocab:') ? A.text.slice(6) : more.pick(VOCAB_GROUPS);
   const used = new Set([keyOf(A.text)]), pool = more.shuffle(VOCABULARY[group]);

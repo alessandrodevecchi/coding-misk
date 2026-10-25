@@ -114,7 +114,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // typing and narrator controls hide; a code option is a trial and the song keeps its written length
   const panel = () => page.evaluate(() => { const vis = sel => { const el = document.querySelector(sel); return !!el && !el.closest('[hidden]') && el.offsetParent !== null; }; return { legend: document.querySelector('#live-legend').textContent, profiles: vis('#live-profile'), style: vis('#live-style'), comments: vis('#live-comments'), fns: vis('#live-fns'), lanes: vis('#live-f-fnLanes'), title: vis('#live-title'), human: vis('#live-human'), narrator: vis('#live-narrator') }; });
   let pn = await panel();
-  check(pn.legend === 'Code' && !pn.profiles && !pn.style && pn.comments && pn.fns && pn.lanes && pn.title && !pn.human && !pn.narrator, 'Live build off: the panel shows the code options only, under "Code"', JSON.stringify(pn));
+  check(pn.legend === 'Code' && !pn.profiles && !pn.style && pn.comments && pn.fns && pn.lanes && pn.title && !pn.human && pn.narrator && await page.isDisabled('#live-narrator'), 'Live build off: the code options under "Code", the Voices group with the narrator disabled (voice-placement)', JSON.stringify(pn));
   await page.selectOption('#live-fns', 'compact'); await sleep(1500);
   s = await state(); tr = await trials();
   check(s.live === 'false' && s.marked && s.reset && !s.orig && timeOf(s.total) === '4:50' && tr.kellerlicht, 'compact functions with the Live build off: a trial, same length, only ↺ Original configuration', JSON.stringify(s));
@@ -189,13 +189,13 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('[data-tab="radio"]'); await sleep(800);
   await page.selectOption('#radio-profile', 'custom'); await sleep(600);
   if (await page.isHidden('#custom-body')) { await page.click('#custom-toggle'); await sleep(300); }
-  const rnarr = () => page.evaluate(() => { const a = document.querySelector('[data-custom-chip="narrator"]'), b = document.querySelector('[data-custom-chip="narrated"]'); return a && b ? { on: a.getAttribute('aria-pressed'), next: !!a.closest('.custom-voices') && a.closest('.custom-voices') === b.closest('.custom-voices'), full: b.disabled, tip: b.title } : null; });
+  const rnarr = () => page.evaluate(() => { const a = document.querySelector('[data-custom-chip="narrator"]'), b = document.querySelector('[data-custom-chip="narrated"]'); return a && b ? { on: a.getAttribute('aria-pressed'), next: !!a.closest('.radio-voices') && a.closest('.radio-voices') === b.closest('.radio-voices'), full: b.disabled, tip: b.title } : null; });
   let rn = await rnarr();
   check(rn && rn.on === 'true' && rn.next && !rn.full, 'radio Custom: Narrator voice on, in the Voices group with Narrated growth', JSON.stringify(rn));
   await page.click('[data-custom-chip="narrator"]'); await sleep(500);
   rn = await rnarr();
   check(rn && rn.on === 'false' && rn.full && /Narrator voice on/.test(rn.tip), 'radio Custom: Narrator voice off, Narrated growth disabled with its hint', JSON.stringify(rn));
-  if (shots) { const el = await page.$('#radio-custom'); if (el) await el.screenshot({ path: path.join(shots, 'radio-custom-narrator-off.png') }); }
+  if (shots) { const el = await page.$('#radio-voices'); if (el) await el.screenshot({ path: path.join(shots, 'radio-custom-narrator-off.png') }); }
   await page.click('[data-custom-chip="narrator"]'); await sleep(300);
 
   check(!errors.length, 'no page errors', errors.join(' | '));

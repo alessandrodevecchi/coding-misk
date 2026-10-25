@@ -823,11 +823,7 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .vinst .chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .vinst select { max-width: 100%; }
 .radio-voice { display: grid; gap: 6px; margin-top: 10px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; }
-.vinst-new { position: relative; display: inline-block; }
-.vinst-new > summary { list-style: none; cursor: pointer; }
-.vinst-new > summary::-webkit-details-marker { display: none; }
 .vinst-now { font-size: 11px; color: var(--muted); }
-.vinst-pop { position: absolute; z-index: 30; right: 0; top: calc(100% + 6px); width: min(560px, 92vw); padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel, var(--bg)); box-shadow: 0 8px 24px rgba(0,0,0,.35); display: grid; gap: 6px; }
 .custom-row.custom-voices { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; }
 .custom-voices > .lbl { flex-basis: 100%; }
 .custom-voices > .ctrl { min-width: 140px; }
@@ -1316,3 +1312,15 @@ button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); 
 .pn-every { color: var(--muted); }
 .pn-style-add { max-width: 100%; padding: 2px 6px; font-size: 12px; }
 .pn-riffas { flex-basis: 100%; }
+/* the Voices group (voice-placement): the narrator row, the song's voice instrument, the next song's settings */
+.live-voices .voices-row { display: grid; gap: 4px; min-width: 0; }
+.live-voices .voices-row + .voices-row { padding-top: 6px; border-top: 1px dotted var(--line); }
+.voices-sub { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.voices-next > summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.voices-next[open] > summary { margin-bottom: 6px; }
+.tp-vinst { display: grid; gap: 6px; margin-bottom: 10px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; }
+.radio-voices { display: grid; gap: 8px; margin-top: 10px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; }
+.radio-voices .radio-voice { margin-top: 0; padding: 0; border: 0; }
+.radio-voices .voices-nar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; }
+.radio-voices .voices-nar > .ctrl { min-width: 140px; display: grid; gap: 4px; }
+button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); text-decoration: underline; cursor: pointer; font: inherit; }

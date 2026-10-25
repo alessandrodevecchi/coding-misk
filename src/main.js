@@ -51,6 +51,7 @@ import { joinSession } from './endless/join.js';
 import { createSession, stylesNear } from './endless/director.js';
 import { cleanVoice, voiceOption, presetOf as voicePresetOf } from './endless/voice-options.js';
 import { voicePanel, voiceEvent } from './endless/voice-panel.js';
+import { rewriteSpoken, trackVoice } from './endless/voice-track.js';
 import { styleId, stylePush } from './endless/recipe.js';
 import { loadLimiter, setMasterLevel } from './sounds/limiter.js';
 import { createSoundBrowser } from './sounds/browser.js';
@@ -1663,12 +1664,16 @@ function renderArranger() {
   $('#live-growth').value = C.growth; $('#live-duration').value = C.duration; $('#live-duration').disabled = C.growth !== 'natural';
   renderShape(C, on && crescendo);
   $('#live-style').value = lv.style; $('#live-style').disabled = !on;
-  $('#live-narrated').hidden = !crescendo; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
-  // the narrator switch (profile-options): Narrated growth belongs to it, disabled with a hint while the narrator is off
+  // the Voices group (voice-placement): always shown; a narrator control that cannot apply is disabled and says why:
+  // the song does not build live, Narrated growth outside Crescendo, the narrator off (profile-options)
+  const narOff = C.narrator === false, why = !on ? 'narratorNeedsLive' : null;
   $('#live-narrator').setAttribute('aria-pressed', C.narrator !== false);
-  // the narrator style (voice-controls), in the Voices group with the narrator: off, it has nothing to say
-  $('#live-narrator-style').value = C.narratorStyle || 'auto'; $('#live-narrator-style').disabled = C.narrator === false;
-  $('#live-narrated').disabled = C.narrator === false; $('#live-narrated').title = t(C.narrator === false ? 'liveNarratedOff' : 'liveNarratedHint');
+  $('#live-narrator').disabled = !on; $('#live-narrator').title = t(why || 'liveNarratorHint');
+  $('#live-narrator-style').value = C.narratorStyle || 'auto'; $('#live-narrator-style').disabled = !on || narOff;
+  $('#live-narrator-style').title = t(why || (narOff ? 'narratorStyleOff' : 'narratorStyleHint'));
+  $('#live-narrated').hidden = false; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
+  $('#live-narrated').disabled = !crescendo || narOff; $('#live-narrated').title = t(why || (!crescendo ? 'narratedNeedsCrescendo' : narOff ? 'liveNarratedOff' : 'liveNarratedHint'));
+  renderSongVoice();
   // the live build options: a panel under the "Live build" button; with the Live build off it keeps the code options
   // (comments, technical functions, title, lit notes, line breaks: profile-options) under the title "Code"
   lt.setAttribute('aria-expanded', on);
@@ -2151,23 +2156,62 @@ $('#tr-new').addEventListener('click', () => {
     tracks: [{ id: 'drums', name: t('drums'), type: 'drums', settings: baseSettings('drums'), patterns: { A: DEFAULT_PATTERN.drums() }, clips: [{ section: name, pattern: 'A' }] }] });
   sel = 0; tk = 0; editPat = null; syncAll(); changed(); renderTrackPanel();
 });
-// the voice instrument of a new song by an artist (voice-controls): on, off or as the style says, and the phrase
-// controls with their presets; kept in this browser
+// the voice instrument of the next new song by an artist (voice-controls; voice-placement: a secondary row of the
+// Voices group, "In the next song"): on, off or as the style says, and the phrase controls with their presets; kept in
+// this browser under the same key as before
 const ARTIST_VOICE = 'coding-misk-artist-voice';
 let artistVoice = cleanVoice(store.get(ARTIST_VOICE, null));
 function renderArtistVoice() {
-  const body = $('#tr-artist-voice-body'); if (!body) return;
+  const body = $('#live-vinst-next-body'); if (!body) return;
   body.innerHTML = `<p class="hint muted small">${esc(t('vinstNewHint'))}</p>${voicePanel(artistVoice, { t, esc, mode: 'song' })}`;
   const p = voicePresetOf(artistVoice, { presence: false });
-  $('#tr-artist-voice-now').textContent = artistVoice.presence === 'never' ? t('vinstSong:never') : artistVoice.presence === 'always' ? `${t('vinstSong:always')} · ${t(`vinstPreset:${p}`)}` : t(`vinstPreset:${p}`);
+  $('#live-vinst-next-now').textContent = artistVoice.presence === 'never' ? t('vinstSong:never') : artistVoice.presence === 'always' ? `${t('vinstSong:always')} · ${t(`vinstPreset:${p}`)}` : t(`vinstPreset:${p}`);
 }
 function artistVoiceEvent(el) {
   const v = voiceEvent(artistVoice, el, { mode: 'song' });
   if (!v) return;
   artistVoice = v; store.set(ARTIST_VOICE, artistVoice); renderArtistVoice();
 }
-$('#tr-artist-voice-body').addEventListener('click', e => { const b = e.target.closest('button'); if (b) artistVoiceEvent(b); });
-$('#tr-artist-voice-body').addEventListener('change', e => artistVoiceEvent(e.target));
+$('#live-vinst-next-body').addEventListener('click', e => { const b = e.target.closest('button'); if (b) artistVoiceEvent(b); });
+$('#live-vinst-next-body').addEventListener('change', e => artistVoiceEvent(e.target));
+// The voice instrument of the song being edited (voice-placement): the same controls in the Voices group and in the
+// panel of the voice instrument track, both drawn from the track (its voiceOptions, else what it has). A change
+// rewrites the track's lines and clips (rewriteSpoken), with Undo in the toast; a song without one can add one.
+const songSpoken = () => T.tracks.find(x => x.type === 'spoken') || null;
+function vinstSongHtml() {
+  const sp = songSpoken();
+  if (!sp) return `<span class="lbl voices-sub">${esc(t('vinstLbl'))}</span><p class="hint muted small">${esc(t('vinstNone'))}</p><button class="btn small" data-vinst-add title="${esc(t('vinstAddHint'))}">${esc(t('vinstAdd'))}</button>`;
+  const ti = T.tracks.indexOf(sp);
+  return `<span class="lbl voices-sub">${esc(t('vinstLbl'))} · ${esc(trackLabel(sp))}</span><p class="hint muted small">${esc(t('vinstSongHint2'))} <button class="plain link" data-vinst-open="${ti}">${esc(t('vinstOpenTrack'))}</button></p>${voicePanel(trackVoice(sp), { t, esc, mode: 'track', track: sp.id })}`;
+}
+function renderSongVoice() { const box = $('#live-vinst'); if (box) box.innerHTML = vinstSongHtml(); }
+function applySongVoice(id, raw) {
+  const before = { tracks: JSON.parse(JSON.stringify(T.tracks)), build: T.build === undefined ? undefined : JSON.parse(JSON.stringify(T.build)) };
+  const r = rewriteSpoken(T, id, raw, { recipes: RECIPES });
+  if (!r) return;
+  T.tracks = r.song.tracks; if (r.song.build !== undefined) T.build = r.song.build;
+  if (!id) tk = T.tracks.indexOf(r.track);
+  editPat = null; selClip = null;
+  changed(); renderTrackPanel();
+  const undo = () => { T.tracks = before.tracks; if (before.build === undefined) delete T.build; else T.build = before.build; tk = Math.min(tk, T.tracks.length - 1); editPat = null; selClip = null; changed(); renderTrackPanel(); };
+  toast(r.placed ? t(r.placed < r.asked ? 'vinstRewroteFewer' : 'vinstRewrote', { n: r.placed, asked: r.asked }) : t('vinstNoPlace'), { label: t('vinstUndo'), run: undo });
+}
+function songVoiceEvent(el) {
+  const box = el.closest('[data-vinst-track]'), add = el.closest('[data-vinst-add]'), open = el.closest('[data-vinst-open]');
+  if (add) return applySongVoice(null, { phrases: '1', kind: 'different' });
+  if (open) { panelView = 'one'; store.set('coding-misk-panel', panelView); selectTrack(+open.dataset.vinstOpen); $('#track-panel').scrollIntoView({ block: 'nearest' }); return; }
+  if (!box) return;
+  const tr = T.tracks.find(x => x.id === box.dataset.vinstTrack && x.type === 'spoken');
+  if (!tr) return;
+  const cur = trackVoice(tr);
+  if (el.dataset.vinstRedraw !== undefined) return applySongVoice(tr.id, { ...cur, draw: cur.draw + 1 });
+  const v = voiceEvent(cur, el, { mode: 'track' });
+  if (v) applySongVoice(tr.id, { ...v, draw: cur.draw });
+}
+for (const host of ['#live-vinst', '#track-panel']) {
+  $(host).addEventListener('click', e => { const b = e.target.closest('button'); if (b && (b.closest('[data-vinst-track]') || b.dataset.vinstAdd !== undefined || b.dataset.vinstOpen !== undefined)) songVoiceEvent(b); });
+  $(host).addEventListener('change', e => { if (e.target.dataset.vinst && e.target.closest('[data-vinst-track]')) songVoiceEvent(e.target); });
+}
 // a new live build song by an artist (#35): written by the director, opened unsaved
 function renderArtistPick() {
   const sel = $('#tr-artist'); if (!sel || !artistsTab) return;
@@ -2580,7 +2624,10 @@ function spokenEditor(tr, key, pat) {
   const others = T.tracks.filter(x => x !== tr && x.type !== 'voice' && x.type !== 'spoken');
   const sel = (id, label, list, v) => `<div class="ctrl"><label class="lbl" for="${id}">${esc(label)}</label><select id="${id}">${list.map(([k, l]) => `<option value="${esc(k)}"${String(v) === String(k) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
   const way = WAYS.includes(pat.way) ? pat.way : 'passage';
-  return `<p class="note">${esc(t('spokenHint'))}</p>
+  // the voice instrument of this track (voice-placement): the same controls as the Voices group; a change rewrites the
+  // track's lines and clips
+  return `<div class="tp-vinst"><span class="lbl">${esc(t('vinstLbl'))}</span><p class="hint muted small">${esc(t('vinstSongHint2'))}</p>${voicePanel(trackVoice(tr), { t, esc, mode: 'track', track: tr.id })}</div>
+    <p class="note">${esc(t('spokenHint'))}</p>
     <div class="sp-grid">
       ${sel('sp-way', t('spokenWay'), WAYS.map(w => [w, t(`way:${w}`)]), way)}
       ${sel('sp-src', t('spokenSource'), [['own', t('spokenOwn')], ['auto', t('spokenAuto')], ...VOCAB_GROUPS.map(g => [`vocab:${g}`, t('spokenVocab', { g: t(`vocab:${g}`) })])], src)}
