@@ -67,6 +67,8 @@ Check 5.5 ("the chooser on air reaches a curve point sooner than the default cho
 
 **Finding.** Over 75 pairs in 20 songs (two energies, every reachable curve point, the arrival read from the side the waypoint comes from) the chooser on air needs 605 bars against 540 for the default chooser, sooner on 7 pairs and later on 27: the check fails. Without its focus or without its bias the chooser on air gives about the same (sooner 10 and later 14, sooner 6 and later 22), so the biases do not explain the difference; reading the bias from the energy on one scale did not help and was reverted. Whether the chooser on air (radio-profiles D10) or the intent of the check changes is left to the owner.
 
+**Decision (owner).** For now the radio plays the normal chooser on air (`normal-1`, growth marker 3); the chooser of D10 stays in the code as `radio-1`, and recipes of growth marker 2 replay with it. Check 5.5 asserts that the default chooser on air needs no more bars in all than any other chooser version (`AIR_CHOOSERS` in `src/endless/waypoints.js`) and prints the bars of each: `normal-1` 540, `radio-1` 605 (sooner 7, later 27). Choosing the version in Settings: openspec/changes/radio-chooser-versions.
+
 ## Risks / Trade-offs
 
 - Saved radio sessions and Live coder songs may sound different: `SHAPES_VERSION` warns, as designed.

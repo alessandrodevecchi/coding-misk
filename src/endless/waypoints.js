@@ -13,7 +13,7 @@ import { writtenForm, growOnAir, airControls } from './growth.js';
 import { energyOf } from './energy.js';
 import { stream } from './random.js';
 import { stateAt, buildSteps } from '../song/build.js';
-import { waypointPath } from '../song/coder.js';
+import { waypointPath, choose } from '../song/coder.js';
 import { topTokens } from '../song/ideas.js';
 import { presetIdea, meterSteps } from '../music.js';
 import { SETTING_FIELDS } from '../song/format.js';
@@ -130,6 +130,14 @@ export const airChooser = (focus = [], bias = 0) => (lanes, ctx, rng) => {
   const w = pool.map(([l]) => { const u = l.units[0]; return (l.track === ctx.last ? 2 : 1) * (u.kind === 'enter' ? 1.4 : 1) * (bias && u.dir ? (u.dir === bias ? 3 : 0.5) : 1); });
   return rng.weighted(pool, w)[1];
 };
+// the chooser versions on air, by id → (focus, bias) => chooser. normal-1: the default chooser of every growth
+// (coder.js choose); radio-1: airChooser above, the chooser on air of growth marker 2. Measured over 75 curve points in
+// 20 songs (check 5.5) radio-1 reached the energy later than normal-1 (605 bars against 540), so the radio plays
+// normal-1 (AIR_CHOOSER) since growth marker 3; a recipe of marker 2 replays with radio-1, as it was heard
+// (items.js airChooserOf). A version, once played, never changes: a new rule is a new id.
+export const AIR_CHOOSERS = { 'normal-1': () => choose, 'radio-1': airChooser };
+export const AIR_CHOOSER = 'normal-1';
+const chooserFor = c => (typeof c === 'function' ? c : AIR_CHOOSERS[c] || AIR_CHOOSERS[AIR_CHOOSER]);
 
 // ---------- one command: the song from its boundary ----------
 // bars a move needs before the next one, at least (the typing check adds what a long edit needs); a line that comes in
@@ -286,7 +294,7 @@ function transitSong(prev, W, Wprev, B, off, o) {
     const count = ids.filter(id => before[id].on && st.tracks.some(t => t.id === id && t.type !== 'spoken' && t.type !== 'riser')).length;
     const now = energyOf(st, { usual: o.plan && o.plan.usualHigh, weights: o.plan && o.plan.R && o.plan.R.energy });
     const bias = dens !== null ? Math.sign(dens - count) : target && Number.isFinite(target.target) ? (target.target > now + 0.05 ? 1 : target.target < now - 0.05 ? -1 : 0) : 0;
-    const path = waypointPath(lanes, o.rng.fork('path'), { chooser: o.chooser ? o.chooser(focus, bias) : airChooser(focus, bias) });
+    const path = waypointPath(lanes, o.rng.fork('path'), { chooser: chooserFor(o.chooser)(focus, bias) });
     // (the bars the typing asked for, by move: the n-th move of a track)
     const seen = {};
     path.forEach(u => { u.key = `${u.track}:${(seen[u.track] = (seen[u.track] ?? -1) + 1)}`; });
@@ -394,7 +402,8 @@ function typingFrom(N, B, q, E, C) {
 // and the moves from the song as it was to that rewrite. A replay gives the commands their recorded boundaries.
 // grown: the grown song (grown here from `song` with ctx when missing); song, plan, opts: the director's; ctx: the
 // growth's context (growOnAir); controls: the controls the song shows its code with (the Custom ones, else the profile's
-// own on air); chooser(focus, bias): the chooser on air (airChooser by default).
+// own on air); chooser: the chooser on air, a version id of AIR_CHOOSERS (AIR_CHOOSER by default) or (focus, bias) =>
+// chooser.
 // → { song, grown, commands (with their boundaries; a command no boundary is left for is dropped), plan, opts, plain }
 export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed, n, ctx = {}, controls = null, chooser = null }) {
   const g0 = grown || growOnAir(song, ctx);

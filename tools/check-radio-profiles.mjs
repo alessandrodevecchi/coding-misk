@@ -25,10 +25,9 @@ import { compileSong } from '../src/song/compile.js';
 import { liveCode } from '../src/live/live-code.js';
 import { typingLoad, rushedOf } from '../src/live/typing-load.js';
 import { resolveShape, shapeFacts, canPlay, OPENINGS } from '../src/song/shapes.js';
-import { steerOnAir, airBoundaries, airOffset, ideaSteps, directorView } from '../src/endless/waypoints.js';
+import { steerOnAir, airBoundaries, airOffset, ideaSteps, directorView, AIR_CHOOSERS, AIR_CHOOSER } from '../src/endless/waypoints.js';
 import { steerSong } from '../src/endless/steering.js';
 import { waypointsOnAir } from '../src/endless/items.js';
-import { choose } from '../src/song/coder.js';
 import { typingPlan, settleOthers } from '../src/song/typing.js';
 import { meterSteps } from '../src/music.js';
 import { energyOf } from '../src/endless/energy.js';
@@ -534,38 +533,47 @@ const CHECKS = {
     console.log(`      ${varies} Vary (${multi} in two or more edits), ${swaps} Swap`);
     assert(varies >= 4 && multi >= 1, 'too few Vary cases');
   },
-  'stage 5 (5.5): the chooser on air reaches a curve point sooner than the default chooser'() {
+  'stage 5 (5.5): the default chooser on air reaches a curve point no later in all than any other chooser version'() {
     // a fair measure (shape-search D11): up to 24 Live coder songs on air and every curve point after the growth that a
-    // command can still reach, each raised to two energies (0.8 and the top); for each pair, the bars each chooser needs
-    // to reach the energy asked. The chooser on air must need fewer bars in all and be later on fewer pairs than sooner.
-    let air = 0, plain = 0, sooner = 0, later = 0, cases = 0, songs = 0;
+    // command can still reach, each raised to two energies (0.8 and the top); for each pair, the bars each chooser
+    // version (AIR_CHOOSERS) needs to reach the energy asked. The default (AIR_CHOOSER) must need no more bars in all
+    // than any other version. Only the pairs every version places at the same boundary count.
+    const ids = Object.keys(AIR_CHOOSERS), bars = Object.fromEntries(ids.map(id => [id, 0])), vs = Object.fromEntries(ids.map(id => [id, { sooner: 0, later: 0 }]));
+    let cases = 0, songs = 0, plainSame = true;
     for (const x of airCasesWide(24)) {
       const q = commandsFor(x)[0].q, B0 = airBoundaries('curve', q, x.plan, x.g0)[0], d0 = Math.floor((B0 - airOffset(x.g0)) / (2 * x.plan.phrase));
       let used = false;
       for (let d = d0; d < x.plan.plan.length - 1; d++) for (const value of [0.8, 1]) {
         const c = { kind: 'curve', d, value, q, at: B0, pend: true, id: 1 };
-        const a = steer(x, [c]), b = steer(x, [c], { chooser: () => choose });
-        if (!a.commands.length || !b.commands.length || a.commands[0].at !== b.commands[0].at) continue;
+        const runs = Object.fromEntries(ids.map(id => [id, steer(x, [c], { chooser: id })])), a = runs[AIR_CHOOSER];
+        if (plainSame && !same(a.song, steer(x, [c]).song)) plainSame = false;
+        if (!a.commands.length || ids.some(id => !runs[id].commands.length || runs[id].commands[0].at !== a.commands[0].at)) continue;
         const opts = { usual: a.plan.usualHigh, weights: a.plan.R.energy }, e = (song, k) => energyOf(stateAt(song, k).song, opts);
         // (the energy of the arrival, reached from the side the waypoint comes from: a waypoint that lowers the energy
         // reaches it when the energy comes down to it)
         const reach = r => { const wp = r.song.onAir.waypoints[0]; if (!wp) return null; const z = e(r.song, wp.to), up = z >= e(r.song, wp.at); for (let k = wp.at; k <= wp.to; k++) if (up ? e(r.song, k) >= z - 0.02 : e(r.song, k) <= z + 0.02) return k - wp.at; return wp.to - wp.at; };
-        const ra = reach(a), rb = reach(b);
-        if (ra === null || rb === null || (ra === rb && ra === 0)) continue;
-        cases++; used = true; air += ra; plain += rb; if (ra < rb) sooner++; if (ra > rb) later++;
+        const r = Object.fromEntries(ids.map(id => [id, reach(runs[id])]));
+        if (ids.some(id => r[id] === null) || ids.every(id => r[id] === 0)) continue;
+        cases++; used = true;
+        for (const id of ids) { bars[id] += r[id]; if (r[id] < r[AIR_CHOOSER]) vs[id].sooner++; if (r[id] > r[AIR_CHOOSER]) vs[id].later++; }
       }
       if (used) songs++;
     }
-    console.log(`      energy points: ${cases} cases in ${songs} songs, on air ${air} bars in all, default ${plain}; sooner ${sooner}, later ${later}`);
+    console.log(`      energy points: ${cases} cases in ${songs} songs; bars in all: ${ids.map(id => (id === AIR_CHOOSER ? `${id} (default) ${bars[id]}` : `${id} ${bars[id]} (sooner than the default ${vs[id].sooner}, later ${vs[id].later})`)).join(', ')}`);
+    assert(plainSame, `steerOnAir without a chooser does not use ${AIR_CHOOSER}`);
     assert(cases >= 10 && songs >= 4, `only ${cases} cases in ${songs} songs`);
-    assert(air <= plain && sooner >= later, 'the chooser on air does not reach the curve points sooner');
+    const faster = ids.filter(id => bars[id] < bars[AIR_CHOOSER]);
+    assert(!faster.length, `the default chooser on air (${AIR_CHOOSER}, ${bars[AIR_CHOOSER]} bars) is slower than ${faster.map(id => `${id} (${bars[id]})`).join(', ')}`);
   },
-  'stage 5: replays give the same songs; a recipe of growth version 1 and Classic recipes steer as before'() {
+  'stage 5: replays give the same songs; recipes of growth version 1 and 2 and Classic recipes steer as before'() {
     const x = airCases()[0], c = commandsFor(x).find(k => k.kind === 'energy-up'), r = steer(x, [c]);
     const rec = { ...recipeOf(x.i, 'switch'), growth: GROWTH_ON_AIR, steering: r.commands.map(k => ({ song: 0, ...k })) };
-    assert(waypointsOnAir(rec) && GROWTH_ON_AIR === 2, 'growth marker 2');
+    assert(waypointsOnAir(rec) && GROWTH_ON_AIR === 3, 'growth marker 3');
     const a = sessionItems(RECIPES, rec, 1)[0].song, b = sessionItems(RECIPES, JSON.parse(JSON.stringify(rec)), 1)[0].song;
     assert(same(a, b) && same(a, r.song), 'a replay with the same commands gives the same song');
+    // growth version 2: the chooser on air of then (radio-1), as it was heard
+    const two = sessionItems(RECIPES, { ...rec, growth: 2 }, 1)[0].song;
+    assert(same(two, steer(x, r.commands, { chooser: 'radio-1' }).song), 'growth version 2 replays with the chooser radio-1');
     // growth version 1 (stage 4): the steered song grown again, as it was heard
     const old = sessionItems(RECIPES, { ...rec, growth: 1 }, 1)[0].song;
     assert(old.onAir && !old.onAir.waypoints && !same(old, a), 'growth version 1 replays its steered song grown again, without waypoints');

@@ -24,4 +24,5 @@
 - [x] 4.6 D9: kellerlicht at v0.5.0 (temporary worktree, read only), answer written in D9
 - [x] 4.7 D10: growth-in-background check investigated with a real recompute; check or app fixed, finding in D10
 - [x] 4.8 D11: check 5.5 rewritten over more songs and curve points (it fails: the chooser on air is not sooner; finding in D11, decision left to the owner)
+- [x] 4.9 D11 decision: the normal chooser on air (growth marker 3, `radio-1` kept for marker 2 replays), check 5.5 compares the chooser versions, radio fixtures rewritten
 - [x] 4.9 Measure after (same as 4.1), knowledge notes, DEVLOG entry in Italian
