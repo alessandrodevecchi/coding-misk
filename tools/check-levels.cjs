@@ -2,14 +2,14 @@
 // The output peak (out=) is the hard limit: above 1.0 it clips and the run fails. in= is the level into the master
 // limiter (the output the song would have without it); above the limiter's ceiling the limiter works (limited). A line above the headroom of the
 // song's styles (1.0 by default, `headroom` in a style recipe) is printed as a warning (level-headroom).
-// Usage: PLAYWRIGHT_CORE=... node tools/check-levels.cjs <track-id> [track-id …]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-levels.cjs <track-id> [track-id …]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const { CLIP, tapOutput, outputPeak, limiterInput, songHeadroom } = require('./output-peak.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
   await tapOutput(page);
   let clipped = 0, warned = 0;
   // sections of each song from the song files: the section buttons on the page can still be the previous song's

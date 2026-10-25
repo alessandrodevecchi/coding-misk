@@ -1,5 +1,5 @@
-// Saves or checks peak levels per instrument for every scene of every built-in track (dev server on :5173).
-// Usage: PLAYWRIGHT_CORE=... node tools/snapshot-levels.cjs write | check [track-id …]
+// Saves or checks peak levels per instrument for every scene of every built-in track (dev server on PORT, default 5173).
+// Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/snapshot-levels.cjs write | check [track-id …]
 // Snapshot: tests/snapshots/levels.json. A level differs when it moves by more than TOL (absolute).
 // Two runs on unchanged code agree within TOL for every instrument except fx.
 // The peak of the master output is measured too (level-headroom, not stored): above 1.0 it clips and the check fails.
@@ -21,7 +21,7 @@ if (!['write', 'check'].includes(mode)) { console.error('usage: node tools/snaps
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
   await tapOutput(page);
   const { songFiles } = await import('./songs-dir.mjs');
   const songs = Object.fromEntries(songFiles('songs').map(f => JSON.parse(fs.readFileSync(f, 'utf8'))).map(sg => [sg.id, sg]));
