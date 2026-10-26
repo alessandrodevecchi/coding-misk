@@ -170,6 +170,32 @@ export function waypointPath(lanes, rng, { chooser = choose } = {}) {
   return path;
 }
 
+// a melody's notes with their halves swapped, step by step in the mini-notation: a bracketed group, an alternation and
+// its `!n` or `@n` stay one step; one outer `<…>` or `[…]` turns inside. null when nothing turns (one step, a stack
+// `,` or a choice `|` at the top, unbalanced brackets). Splitting on spaces alone cut `<[0 ~ 2] [0 ~ 4]>` into
+// `[0 ~ 4]> <[0 ~ 2]`, a mini-notation parse error at that step (crescendo-notte-lunga, Live coder, bar 101)
+export function rotateNotes(notes) {
+  const s = String(notes).trim(), toks = [];
+  let depth = 0, cur = '';
+  for (const ch of s) {
+    if ('[<{('.includes(ch)) depth++;
+    else if (']>})'.includes(ch) && --depth < 0) return null;
+    if (!depth && (ch === ',' || ch === '|')) return null;
+    if (!depth && /\s/.test(ch)) { if (cur) toks.push(cur); cur = ''; } else cur += ch;
+  }
+  if (depth) return null;
+  if (cur) toks.push(cur);
+  if (toks.length === 1) {
+    const m = s.match(/^(\[|<)([\s\S]*)(\]|>)$/);
+    if (!m || (m[1] === '[') !== (m[3] === ']')) return null;
+    const inner = rotateNotes(m[2]);
+    return inner === null ? null : m[1] + inner + m[3];
+  }
+  if (toks.includes('.')) return null;
+  const h = Math.floor(toks.length / 2);
+  return [...toks.slice(h), ...toks.slice(0, h)].join(' ');
+}
+
 // one detour on the state as it is: a function commented out, notes rewritten, or a track muted; with its undo. Tracks
 // that came in on the way to the last waypoint or this one are left alone (fresh)
 function drawDetour(state, anchor, fresh, rng, { moves = false, noBreaks = false } = {}) {
@@ -180,9 +206,9 @@ function drawDetour(state, anchor, fresh, rng, { moves = false, noBreaks = false
     for (const k of shown) kinds.push({ w: 1.2, make: () => ({ unit: { kind: 'comment', track: t.id, type: t.type, device: k, step: { comment: { track: t.id, keys: k } } }, undo: { kind: 'uncomment', undo: true, track: t.id, type: t.type, device: k, step: { comment: { track: t.id, keys: k, on: false } }, check: s => ((s.tracks.find(x => x.id === t.id) || {}).commented || []).includes(k) } }) });
     const pat = t.patterns[(t.clips[0] || {}).pattern] || {};
     if (MELODIC.includes(t.type) && typeof pat.notes === 'string' && /\d/.test(pat.notes)) {
-      const toks = pat.notes.trim().split(/\s+/), alt = Object.entries(t.patterns).find(([name, p]) => !/~/.test(name) && p.notes && p.notes !== pat.notes);
-      const notes = alt ? alt[1].notes : [...toks.slice(Math.floor(toks.length / 2)), ...toks.slice(0, Math.floor(toks.length / 2))].join(' ');
-      if (notes !== pat.notes) kinds.push({ w: 1, make: () => ({ unit: { kind: 'rewrite', track: t.id, type: t.type, step: { notes: { track: t.id, notes } } }, undo: { kind: 'grow', undo: true, track: t.id, type: t.type, step: { pattern: { track: t.id, level: levelOf(t) } }, check: s => /~x$/.test(((s.tracks.find(x => x.id === t.id) || {}).clips[0] || {}).pattern || '') } }) });
+      const alt =Object.entries(t.patterns).find(([name, p]) => !/~/.test(name) && p.notes && p.notes !== pat.notes);
+      const notes = alt ? alt[1].notes : rotateNotes(pat.notes);
+      if (notes && notes !== pat.notes) kinds.push({ w: 1, make: () => ({ unit: { kind: 'rewrite', track: t.id, type: t.type, step: { notes: { track: t.id, notes } } }, undo: { kind: 'grow', undo: true, track: t.id, type: t.type, step: { pattern: { track: t.id, level: levelOf(t) } }, check: s => /~x$/.test(((s.tracks.find(x => x.id === t.id) || {}).clips[0] || {}).pattern || '') } }) });
     }
     if (moves) moveKinds(t, kinds);
     if (!noBreaks && t.id !== anchor && playing.length > 2) kinds.push({ w: 0.6, make: () => ({ unit: { kind: 'break', track: t.id, type: t.type, step: { remove: t.id } }, undo: { kind: 'back', undo: true, track: t.id, type: t.type, step: { add: t.id }, check: s => !!(s.tracks.find(x => x.id === t.id) || {}).mute } }) });

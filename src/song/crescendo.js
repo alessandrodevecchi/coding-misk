@@ -9,11 +9,11 @@ import { PROGS, DEFAULT, presetIdea, meterSteps } from '../music.js';
 import { ideaLadder, expandIdea, ideaRows } from './ideas.js';
 import { coderPath } from './coder.js';
 import { stateAt, applyStep } from './build.js';
-import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES } from './shapes.js';
+import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, SHAPES_SEED, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES, DETAIL_VARIANTS } from './shapes.js';
 import { placeSpoken } from './spoken.js';
 import { liveCode } from '../live/live-code.js';
 import { resolveProfile } from '../live/profiles.js';
-import { growthLoad, rushedOf, loadOf, typingLoad, barSeconds } from '../live/typing-load.js';
+import { rushedOf, loadOf, typingLoad, barSeconds } from '../live/typing-load.js';
 import { compileSong } from './compile.js';
 import { typingPlan } from './typing.js';
 import { writeCode, levelsOf, busesOf, functionContext, functionOptions } from './writer.js';
@@ -618,18 +618,39 @@ const KEY_STEPS = ['enter', 'break', 'back', 'harmony', 'strip-first', 'last'];
 // song + options → the song with a growth span, generated patterns and "build". The seed defaults to the song id.
 // Songs with nothing to grow come back without steps.
 // rules: {} (Crescendo) or { natural: true, trials } (natural-growth: hidden functions, sparse steps, listening pauses)
+// shapeCap (shape-search D3): how many shapes a Live coder growth tries before it goes on to twice as many (4 to 32,
+// default SHAPE_CAP); only Compose passes the setting, the radio and the checks keep the default
+// shapeAll, shapeKeep, shapeRandom, longSong (shape-search D6, D7, Settings, advanced; only Compose passes them):
+// shapeAll lifts the cap; shapeKeep, with shapeAll: 'first' (the first shape that meets the target, the default) or
+// 'best' (every shape measured, the shortest whole song that meets the target); shapeRandom false: the fixed order of
+// before SHAPES_VERSION 4; longSong: seconds of the whole grown song past which every shape is measured and the shortest
+// that meets the target is kept (default LONG_SONG)
 // stats (growth-in-background D5): an object to fill with what the growth did, for tools/growth-probe.mjs: `tried`, one
-// entry per shape grown ({ development, pace, maxDetail, rounds, rushed, load, ms, bars }), `kept` (the index of the
-// one returned), `searched` (false: the song grew once, without a search) and `ms` in all. Without it, no extra work.
+// entry per shape grown ({ development, pace, maxDetail, rounds, rushed, rushedGrowth, rushedWritten, late, load, ms,
+// bars, seconds }), `kept` (the index of the one returned), `searched` (false: the song grew once, without a search),
+// `cap`, `all`, `keep`, `random`, `longSong`, `long` ({ from, to } seconds when the long-song rule measured every shape)
+// and `ms` in all. Without it, no extra work.
 export function crescendoSong(song, opts = {}) {
   if (!opts.stats || typeof opts.stats !== 'object') return searchShapes(song, opts, null);
   const { stats, ...rest } = opts, t0 = performance.now();
-  stats.tried = []; stats.kept = -1; stats.searched = true;
+  Object.assign(stats, { tried: [], kept: -1, searched: true, cap: shapeCapOf(rest.shapeCap), all: !!rest.shapeAll, keep: shapeKeepOf(rest.shapeKeep), random: rest.shapeRandom !== false, longSong: longSongOf(rest.longSong), long: null });
   const out = searchShapes(song, rest, stats);
   stats.ms = performance.now() - t0;
   return out;
 }
+// the shapes a growth tries before it goes on to twice as many (shape-search D3): the Settings value, within 4 and 32
+export const SHAPE_CAP = 8, SHAPE_CAP_MIN = 4, SHAPE_CAP_MAX = 32;
+export const shapeCapOf = v => (v !== null && v !== undefined && v !== '' && Number.isFinite(+v) ? Math.max(SHAPE_CAP_MIN, Math.min(SHAPE_CAP_MAX, Math.round(+v))) : SHAPE_CAP);
+// what Try all keeps (shape-search D6): the first shape that meets the target, or the best one
+export const SHAPE_KEEPS = ['first', 'best'];
+export const shapeKeepOf = v => (SHAPE_KEEPS.includes(v) ? v : 'first');
+// the long-song threshold (shape-search D7): seconds of the whole grown song, set in minutes within 5 and 60
+export const LONG_SONG = 900, LONG_SONG_MIN = 300, LONG_SONG_MAX = 3600;
+export const longSongOf = v => (v !== null && v !== undefined && v !== '' && Number.isFinite(+v) ? Math.max(LONG_SONG_MIN, Math.min(LONG_SONG_MAX, Math.round(+v))) : LONG_SONG);
 const barsOf = s => (s.sections || []).reduce((a, x) => a + x.bars, 0);
+// the length of a whole song in seconds, from each section's tempo and meter (a tempo ramp at its mean tempo)
+const bpmOf = x => { const a = x.bpm || DEFAULT.bpm; return x.bpmEnd ? (a + x.bpmEnd) / 2 : a; };
+export const songSeconds = s => (s.sections || []).reduce((a, x) => a + x.bars * (meterSteps(x.meter || DEFAULT.meter) / 4) * 60 / bpmOf(x), 0);
 // stats only: one grown song without a search
 function grownOnce(song, opts, stats) {
   if (!stats) return growSong(song, opts);
@@ -641,44 +662,62 @@ function grownOnce(song, opts, stats) {
 function searchShapes(song, opts, stats) {
   const rules = opts.rules || {};
   if (!(rules.coder && rules.shape)) return grownOnce(song, opts, stats);
-  // growth-shapes: a shape the song or the user did not name is tried as drawn; when the Live coder typing would rush
-  // a step, the next candidate by weight is tried (by type last), and the first without rushed steps is kept (else
-  // the one rushed least in all)
+  // growth-shapes, shape-search: a shape the song or the user did not name is tried as drawn; when the Live coder
+  // typing would rush a step of the growth, the next candidate is tried, and the first without rushed growth steps is
+  // kept (else the one whose growth is rushed least)
   const styles = rules.styles || {}, shape = resolveShape(song, { user: rules.shape, styles, seed: opts.seed, weights: rules.shapeWeights, deny: rules.deny });
   // a development and a pace named by the song or the user stay as they are
   if (['development', 'pace'].every(p => ['song', 'user'].includes(shape.from[p]))) return grownOnce(song, opts, stats);
-  let best = null;
-  // (then the same candidates with less detail: fewer, smaller moves fit the length of the growth)
-  const cands = shapeCandidates(song, shape, styles, rules), tries = [...cands, ...[2, 1, 0].flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
+  // shape-search D2, D6: the seeded weighted order, or the fixed order of before SHAPES_VERSION 4
+  const random = opts.shapeRandom !== false;
+  const cands = shapeCandidates(song, shape, styles, rules, { fixed: !random });
+  const tries = random ? shapeOrder(song, shape, cands, opts.seed) : [...cands, ...DETAIL_VARIANTS.flatMap(maxDetail => cands.map(c => ({ ...c, drawn: false, maxDetail })))];
+  // shape-search D3: `cap` shapes measured, and when none of them meets the target up to twice as many (a less detailed
+  // variant that grows the same as its shape is skipped and not counted; free-duration regrowths are not counted);
+  // D6: Try all lifts the cap, and keeps the first shape that meets the target or the best one
+  const all = !!opts.shapeAll, best = all && shapeKeepOf(opts.shapeKeep) === 'best', long = longSongOf(opts.longSong);
+  const most = all ? Infinity : 2 * shapeCapOf(opts.shapeCap);
   // (the typing is measured on the code with the track names, as the Live coder showed it before radio-profiles 9.2: its
   // default comments are display only, so they never change the growth; the code with them is the longer one to type)
   // (and without Sections, code-lanes: the growth measures the code it was tuned on, so the builds and their shapes
   // stay as they were; the edits at each clip change are small and checked by the typing checks)
   const C = resolveProfile('switch', { duration: rules.free ? 'free' : 'fitted', tracks: true, fnLanes: false });
-  for (const c of tries) {
+  // one candidate grown and measured → null (a less detailed variant that grows the same: skipped), { plain } (a growth
+  // without a shape: returned as it is) or { out, n, load, secs, k }
+  const grow = c => {
     const r = { ...rules, ...(c.maxDetail !== undefined ? { maxDetail: c.maxDetail } : {}), shape: { opening: shape.opening, pace: c.pace, development: c.development } };
     const t0 = stats ? performance.now() : 0, st = stats ? { development: c.development, pace: c.pace, maxDetail: c.maxDetail ?? null, rounds: 0 } : null;
     let out = growSong(song, { ...opts, rules: r });
-    if (c.maxDetail !== undefined && out.crescendo && out.crescendo.detail > c.maxDetail) { if (st) stats.tried.push({ ...st, skipped: 'detail', rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); continue; }
-    if (!out.crescendo || !out.crescendo.shape) { if (st) { stats.tried.push({ ...st, rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); stats.kept = stats.tried.length - 1; } return out; }
+    if (c.maxDetail !== undefined && out.crescendo && out.crescendo.detail > c.maxDetail) { if (st) stats.tried.push({ ...st, skipped: 'detail', rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); return null; }
+    if (!out.crescendo || !out.crescendo.shape) { if (st) { stats.tried.push({ ...st, rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); stats.kept = stats.tried.length - 1; } return { plain: out }; }
     let L = liveCode(out, C, { cols: () => 80 });
+    // shape-search D1: a shape is judged on the steps of its growth, before the written part (bar crescendo.growth):
+    // the section changes and the tracks entering with their first clip after it come the same with every shape. With
+    // stats the written part is measured too, for the counters only (the steps of the growth come out the same)
+    const measure = () => {
+      const G = out.crescendo.growth, all = typingLoad(L, { seed: song.id || '', to: stats ? out.crescendo.grown : G - 0.5 });
+      return { all, growth: all.filter(x => x.at < G) };
+    };
     // one measure of the typing per grown song (growth-in-background D4): the free-duration round that adds no bars,
     // the rushed count and the rushed load read the same list
     let m = null;
+    // (counters, shape-search D4: a unit that needed more than 32 bars in its last round)
+    const limited = new Set();
     // free duration (owner, 2026-10-19): a step the human typing cannot reach at a person's pace waits for it: the bars
     // it needs are added before it and the growth is made again (never a forced paste)
     if (rules.free) {
       const extra = {};
       for (let round = 0; round < 6; round++) {
         const sb = barSeconds(out), units = out.crescendo.units || [];
-        m = typingLoad(L, { seed: song.id || '', to: out.crescendo.grown });
-        const late = m.filter(x => x.ratio > 1);
+        m = measure();
+        const late = m.growth.filter(x => x.ratio > 1);
         let added = false;
         for (const x of late) {
           const i = units.indexOf(x.at);
           if (i < 0) continue;
           const usable = g => { const a = Math.max(0.2, g - 0.5 * sb - 0.2); return a - Math.min(a * 0.5, 2); };
           let n = 1; while (usable(x.gap + n * sb) < x.need && n < 32) n++;
+          if (usable(x.gap + n * sb) < x.need) limited.add(i); else limited.delete(i);
           extra[i] = (extra[i] || 0) + n; added = true;
         }
         if (!added) break;
@@ -687,33 +726,84 @@ function searchShapes(song, opts, stats) {
         if (st) st.rounds++;
       }
     }
-    if (!m) m = growthLoad(L, song.id || '');
-    const n = rushedOf(m);
+    if (!m) m = measure();
+    const n = rushedOf(m.growth);
+    if (st) {
+      // why each rushed growth step stays: the fitted duration, no unit owns it, more than 32 bars needed in one round,
+      // or the six rounds used up
+      const G = out.crescendo.growth, U = out.crescendo.units || [];
+      st.rushedGrowth = n; st.rushedWritten = rushedOf(m.all.filter(x => x.at >= G));
+      st.late = m.growth.filter(x => x.ratio > 1.1).map(x => { const i = U.indexOf(x.at); return { at: x.at, ratio: +x.ratio.toFixed(2), why: !rules.free ? 'fitted' : i < 0 ? 'not-unit' : limited.has(i) ? 'limit' : 'rounds' }; });
+    }
     out.crescendo.shape = { ...out.crescendo.shape, from: shape.from, rushed: n, ...(c.drawn ? {} : { fallback: true }) };
-    if (!n) { if (st) { stats.tried.push({ ...st, rushed: 0, load: 0, ms: performance.now() - t0, bars: barsOf(out) }); stats.kept = stats.tried.length - 1; } return out; }
-    const load = loadOf(m);
-    if (st) stats.tried.push({ ...st, rushed: n, load, ms: performance.now() - t0, bars: barsOf(out) });
-    if (!best || load < best.load) best = { out, load, k: stats ? stats.tried.length - 1 : -1 };
+    const load = n ? loadOf(m.growth) : 0, secs = songSeconds(out);
+    if (st) stats.tried.push({ ...st, rushed: n, load, ms: performance.now() - t0, bars: barsOf(out), seconds: secs });
+    return { out, n, load, secs, k: stats ? stats.tried.length - 1 : -1 };
+  };
+  const recs = [];
+  let i = 0, kept = null;
+  // the one rushed least; the shortest whole song of those that meet the target, else the one rushed least
+  const leastRushed = () => recs.reduce((a, b) => (b.load < a.load ? b : a));
+  const shortest = () => { const ok = recs.filter(x => !x.n); return ok.length ? ok.reduce((a, b) => (b.secs < a.secs ? b : a)) : leastRushed(); };
+  while (i < tries.length && recs.length < most) {
+    const x = grow(tries[i++]);
+    if (!x) continue;
+    if (x.plain) return x.plain;
+    recs.push(x);
+    // the first good one (the default): the search stops at it, unless Try all keeps the best one
+    if (!x.n && !best) { kept = x; break; }
   }
-  if (stats) stats.kept = best.k;
-  return best.out;
+  if (!kept) kept = best ? shortest() : leastRushed();
+  // shape-search D7: a whole song longer than the threshold measures every shape and keeps the shortest that meets the
+  // target (else the one rushed least)
+  if (kept.secs > long && i < tries.length) {
+    const from = kept.secs;
+    while (i < tries.length) { const x = grow(tries[i++]); if (x && !x.plain) recs.push(x); }
+    kept = shortest();
+    if (stats) stats.long = { from, to: kept.secs };
+  }
+  if (stats) stats.kept = kept.k;
+  return kept.out;
 }
-// the shapes to try, in order: the drawn one, then the developments by weight (by type last), then by type with the
+// the shapes to try, each with its weight: the drawn one, the other developments with the drawn pace, by type with the
 // other paces; parts the song or the user named stay
-// (on air, radio-profiles: the artist's weights order the candidates of a part they chose; denied values are never tried)
-function shapeCandidates(song, shape, styles, rules = {}) {
+// (on air, radio-profiles: the artist's weights weigh the candidates of a part they chose; denied values are never tried)
+// fixed (shape-search D6, Random order off): the other values sorted as before SHAPES_VERSION 4, by weight (by type last)
+function shapeCandidates(song, shape, styles, rules = {}, { fixed: sorted = false } = {}) {
   const f = shapeFacts(song, styles), fixed = p => ['song', 'user'].includes(shape.from[p]);
   const denied = (part, v) => !!(rules.deny && (rules.deny[part] || []).includes(v));
-  const order = (part, list) => {
+  const weights = part => {
     const aw = shape.from[part] === 'artist' && rules.shapeWeights && rules.shapeWeights[RECIPE_KEYS[part]];
-    const w = aw ? { ...DEFAULT_WEIGHTS[part], ...aw } : shape.from[part] === 'style' && f.recipe && f.recipe.growthShapes && f.recipe.growthShapes[RECIPE_KEYS[part]] ? { ...DEFAULT_WEIGHTS[part], ...f.recipe.growthShapes[RECIPE_KEYS[part]] } : DEFAULT_WEIGHTS[part];
-    const rest = list.filter(v => v !== shape[part] && canPlay(part, v, f) && !denied(part, v)).sort((a, b) => (part === 'development' ? (a === 'by-type') - (b === 'by-type') : 0) || (w[b] || 0) - (w[a] || 0) || list.indexOf(a) - list.indexOf(b));
-    return [shape[part], ...rest];
+    return aw ? { ...DEFAULT_WEIGHTS[part], ...aw } : shape.from[part] === 'style' && f.recipe && f.recipe.growthShapes && f.recipe.growthShapes[RECIPE_KEYS[part]] ? { ...DEFAULT_WEIGHTS[part], ...f.recipe.growthShapes[RECIPE_KEYS[part]] } : DEFAULT_WEIGHTS[part];
   };
-  const devs = fixed('development') ? [shape.development] : order('development', DEVELOPMENTS);
-  const paces = fixed('pace') ? [shape.pace] : order('pace', PACES);
+  const wd = weights('development'), wp = weights('pace');
+  const order = (part, w, list) => (a, b) => (part === 'development' ? (a === 'by-type') - (b === 'by-type') : 0) || (w[b] || 0) - (w[a] || 0) || list.indexOf(a) - list.indexOf(b);
+  const others = (part, list) => { const o = list.filter(v => v !== shape[part] && canPlay(part, v, f) && !denied(part, v)); return sorted ? o.sort(order(part, part === 'development' ? wd : wp, list)) : o; };
+  const devs = fixed('development') ? [shape.development] : [shape.development, ...others('development', DEVELOPMENTS)];
+  const paces = fixed('pace') ? [shape.pace] : [shape.pace, ...others('pace', PACES)];
   const out = devs.map((development, i) => ({ development, pace: shape.pace, drawn: i === 0 }));
   for (const pace of paces.slice(1)) out.push({ development: fixed('development') ? shape.development : 'by-type', pace });
+  return out.map(c => ({ ...c, weight: (wd[c.development] ?? 0) * (wp[c.pace] ?? 0) }));
+}
+// shape-search D2: the order of the search. The drawn shape first, then its less detailed variants (fewer, smaller
+// moves fit the length of the growth); then the other candidates and their less detailed variants (a variant weighs half
+// its shape), in a weighted draw without replacement from the song's seed: the same song always gets the same order,
+// and the first candidates of the list are not always favoured. A candidate is tried once.
+export function shapeOrder(song, shape, cands, seed) {
+  const key = c => `${c.development}|${c.pace}|${c.maxDetail ?? ''}`, seen = new Set(), out = [];
+  const add = c => { if (!seen.has(key(c))) { seen.add(key(c)); out.push(c); } };
+  const drawn = cands.find(c => c.drawn) || cands[0];
+  add(drawn);
+  for (const maxDetail of DETAIL_VARIANTS) add({ ...drawn, drawn: false, maxDetail });
+  const pool = [];
+  for (const c of cands) if (c !== drawn) { pool.push({ ...c, drawn: false }); for (const maxDetail of DETAIL_VARIANTS) pool.push({ ...c, drawn: false, maxDetail, weight: c.weight / 2 }); }
+  const rng = stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_SEED}/search`);
+  while (pool.length) {
+    const total = pool.reduce((a, c) => a + Math.max(0, c.weight || 0), 0);
+    let k = 0;
+    if (total > 0) { let x = rng.next() * total; k = pool.findIndex(c => (x -= Math.max(0, c.weight || 0)) < 0); if (k < 0) k = pool.length - 1; }
+    add(pool.splice(k, 1)[0]);
+  }
   return out;
 }
 function growSong(song, { seed, narrated = false, rules = {} } = {}) {
@@ -724,7 +814,7 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   if (rules.natural && W < 24) rules = Object.fromEntries(['budget', 'span', 'noEnding'].filter(k => k in rules).map(k => [k, rules[k]]));
   // growth shape (growth-shapes): only the natural growth like a live coder follows one; Classic and Crescendo never
   const shape = rules.coder && rules.shape ? resolveShape(song, { user: rules.shape, styles: rules.styles || {}, seed, weights: rules.shapeWeights, deny: rules.deny }) : null;
-  const srng = shape ? stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_VERSION}/growth`) : null;
+  const srng = shape ? stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_SEED}/growth`) : null;
   const over = (c, s) => c.start < s.start + s.bars && c.start + c.bars > s.start;
   const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && t.clips.length);
   if (!plays.length || !W) return { ...clone(song), build: [] };

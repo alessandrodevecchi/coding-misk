@@ -6,12 +6,12 @@ import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTER
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys } from './song/build.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
-import { crescendoSong, waypointSong, CRESCENDO_VERSION } from './song/crescendo.js';
+import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
 import { setSpokenContext, spokenContext, placeSpoken, WAYS } from './song/spoken.js';
 import { airCode } from './live/air-code.js';
 import { growOnAir, airControls } from './endless/growth.js';
 import { controlsProfile, customControls } from './endless/profile.js';
-import { steerOnAir } from './endless/waypoints.js';
+import { steerOnAir, AIR_CHOOSERS } from './endless/waypoints.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, writtenOptions } from './live/profiles.js';
 import { TRIALS_KEY, configOf, controlsOf, cleanTrials, setTrial, withConfig, compactConfig } from './live/song-config.js';
@@ -39,7 +39,7 @@ import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS, isSession, sessionOutdated } from './library/playlists.js';
 import { DIRECTOR_VERSION } from './endless/director.js';
 // the versions a saved radio session is compared with (#38, radio-profiles D11)
-const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION };
+const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION, choosers: Object.keys(AIR_CHOOSERS) };
 import { createPlaylistsTab } from './library/playlists-tab.js';
 import { pickJsonFiles } from './library/library.js';
 import { createSettings } from './settings/settings.js';
@@ -300,14 +300,19 @@ const crescendoCache = new Map(), CRESCENDO_CACHE = 48;
 const SHAPE_STYLES = Object.fromEntries(Object.values(import.meta.glob('../styles/*.json', { eager: true, import: 'default' })).map(r => [r.id, r]));
 // the voice instrument (voice-instrument) reads the style's lines and speakers; its samples come with the manifest below
 setSpokenContext({ files: {}, styles: SHAPE_STYLES });
-const crescendoKey = tr => { const C = ctlOf(tr); return JSON.stringify([C.narrated, C.growth, C.duration, C.opening, C.pace, C.development, tr.sections, tr.tracks, tr.id, tr.tags, tr.growthShape]); };
+// the shapes a Compose growth tries (shape-search D3, Settings, advanced): only Compose reads it, the radio keeps 8
+const shapeCap = () => shapeCapOf(store.get('coding-misk-shape-cap', null));
+// shape-search D6, D7 (Settings, advanced): Try all and what it keeps, the order, the long-song threshold; only Compose
+// reads them, the radio and the checks keep the defaults
+const shapeSearch = () => ({ shapeCap: shapeCap(), shapeAll: store.get('coding-misk-shape-all', null) === true, shapeKeep: shapeKeepOf(store.get('coding-misk-shape-keep', null)), shapeRandom: store.get('coding-misk-shape-random', null) !== false, longSong: longSongOf(store.get('coding-misk-long-song', null)) });
+const crescendoKey = tr => { const C = ctlOf(tr); return JSON.stringify([C.narrated, C.growth, C.duration, C.opening, C.pace, C.development, tr.sections, tr.tracks, tr.id, tr.tags, tr.growthShape, ...(C.growth === 'natural' ? Object.values(shapeSearch()) : [])]); };
 function crescendoPut(key, c) {
   crescendoCache.delete(key); crescendoCache.set(key, c);
   while (crescendoCache.size > CRESCENDO_CACHE) crescendoCache.delete(crescendoCache.keys().next().value);
 }
 // the rules of a Compose growth (the Live coder profile, id switch, grows with the natural rules, natural-growth, and a
 // growth shape, growth-shapes)
-const crescendoOpts = tr => { const C = ctlOf(tr); return { narrated: C.narrated, rules: growthRules(C, { styles: SHAPE_STYLES }) }; };
+const crescendoOpts = tr => { const C = ctlOf(tr); return { narrated: C.narrated, rules: growthRules(C, { styles: SHAPE_STYLES }), ...shapeSearch() }; };
 function crescendoOf(tr) {
   const key = crescendoKey(tr), c = crescendoCache.get(key) || crescendoSong(tr, crescendoOpts(tr));
   crescendoPut(key, c);

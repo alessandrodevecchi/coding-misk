@@ -7,7 +7,7 @@ import { compilationOptions } from './compilation.js';
 import { steerSong } from './steering.js';
 import { recipeProfile, customControls } from './profile.js';
 import { growOnAir, leadOnAir } from './growth.js';
-import { steerOnAir } from './waypoints.js';
+import { steerOnAir, AIR_CHOOSER, AIR_CHOOSERS } from './waypoints.js';
 
 // the options of song n in a recipe: the first options, then every change up to n; options without the Profile option
 // (saved before radio-profiles) replay as Classic
@@ -20,9 +20,18 @@ export function recipeOptionsAt(recipe, n) {
 // grown; a recipe without it (saved before) replays in blocks
 // 2 (stage 5, D9): a command on a grown song is the next waypoint of its growth (waypoints.js); a recipe of version 1
 // replays its steered grown songs as they were heard then, grown again from the steered song
-export const GROWTH_ON_AIR = 2;
+// 3: the moves to a waypoint come in the order of the normal chooser (AIR_CHOOSER, waypoints.js); a recipe of version 2
+// replays with the chooser on air it was heard with (radio-1)
+export const GROWTH_ON_AIR = 3;
 export const growsOnAir = recipe => !!(recipe && Number(recipe.growth) >= 1);
 export const waypointsOnAir = recipe => !!(recipe && Number(recipe.growth) >= 2);
+// a recipe of a new session records its chooser when it is not the default (radio-chooser-versions D4): the recorded id
+// when it is still in the code, an id no longer there gives the default (the playlist warns, playlists.js)
+export const airChooserOf = recipe => {
+  const c = recipe && recipe.chooser;
+  if (typeof c === 'string' && Object.hasOwn(AIR_CHOOSERS, c)) return c;
+  return c === undefined && Number(recipe && recipe.growth) < 3 ? 'radio-1' : AIR_CHOOSER;
+};
 // the per-song choices a compilation keeps from the radio's controls (a clip keeps its length)
 export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.custom ? { custom: o.custom } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}), ...(o.voice ? { voice: o.voice } : {}) });
 // the director options of song n: the compilation's draw, else the recipe's
@@ -48,7 +57,7 @@ export function sessionItems(recipes, recipe, count, until = null, { grow = grow
     const custom = recipeOptionsAt(recipe, n).custom;
     const ctx = { profile: g.entry.profile, artist: g.opts.artist || null, into: before && before.transition ? before.transition.kind : null, styles: shapes, phrase: g.plan.phrase, controls: custom ? customControls(custom) : null };
     let song;
-    if (grow && g.entry.profile && (!cmds.length || waypointsOnAir(recipe))) song = steerOnAir({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n, ctx }).song;
+    if (grow && g.entry.profile && (!cmds.length || waypointsOnAir(recipe))) song = steerOnAir({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n, ctx, chooser: airChooserOf(recipe) }).song;
     else {
       song = cmds.length ? steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n }).song : g.song;
       if (grow && g.entry.profile) song = growOnAir(song, ctx);

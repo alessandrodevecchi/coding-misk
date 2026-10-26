@@ -2,7 +2,9 @@
 // kellerlicht, picking Live coder in Compose and then changing the opening and the pace never blocks the page for more
 // than 200 ms (long tasks), each choice shows within a frame, the growing mark shows next to the profiles and goes when
 // the song is grown, Play pressed during a growth shows the mark on Play and starts the grown song from its first bar, and
-// a reload opens the grown song from the stored growths without the mark. The store of growths keeps at most its cap,
+// a reload opens the grown song from the stored growths without the mark; playing, Classic to Live coder keeps the old
+// version until the growth is ready, then plays the grown one (the Play part forces a real growth with the advanced
+// shape settings, shape-search D10). The store of growths keeps at most its cap,
 // least recently used out, and a changed growth hash empties it.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-growth-background.cjs [shots-dir] [song,song…]
 //   (dev server on PORT, default 5173; screenshots of the mark in shots-dir)
@@ -49,7 +51,7 @@ async function songCase(browser, id, first) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   await ctx.addInitScript(observe);
   // whether the growing mark showed since the page loaded (checked every frame)
-  await ctx.addInitScript(() => { window.__seen = false; const tick = () => { const m = document.getElementById('live-growing'); if (m && !m.hidden) window.__seen = true; requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
+  await ctx.addInitScript(() => { window.__seen = false; window.__playSeen = false; const tick = () => { const m = document.getElementById('live-growing'), p = document.getElementById('play-growing'); if (m && !m.hidden) window.__seen = true; if (p && !p.hidden) window.__playSeen = true; requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -64,14 +66,16 @@ async function songCase(browser, id, first) {
   const written = timeOf(await page.$eval('#arr-total', el => el.textContent));
   if (await page.$eval('#live-toggle', el => el.getAttribute('aria-pressed')) !== 'true') { await page.click('#live-toggle'); await sleep(800); }
   // the song as it is now: Classic, nothing growing
-  await page.evaluate(() => { window.__long = []; window.__t0 = performance.now(); });
-  // Live coder: selected within a frame, the mark shows
+  await page.evaluate(() => { window.__long = []; window.__t0 = performance.now(); window.__seen = false; });
+  // Live coder: selected within a frame, the mark shows (since shape-search a growth may end within 150 ms: the mark
+  // seen in any frame since the click counts, and so does a song already grown)
   const a = await change(page, 'click', '#live-profile [data-profile="switch"]');
   await sleep(150);
-  const markA = await markOn(page);
+  const markA = await markOn(page), seenA = await page.evaluate(() => window.__seen);
+  const doneA = !markA && secs(timeOf(await page.$eval('#arr-total', el => el.textContent))) > secs(written);
   check(a.ok && a.ms < LONG, `${id}: Live coder selected at once (${a.ms} ms to the next frame)`);
-  check(markA, `${id}: the growing mark shows next to the profiles`);
-  if (shots && first) {
+  check(markA || seenA || doneA, `${id}: the growing mark shows next to the profiles`, markA ? '' : seenA ? 'shown and gone within 150 ms' : doneA ? 'grown before the next frame' : '');
+  if (shots && first && markA) {
     const box = await page.evaluate(() => { const r = document.querySelector('.live-profiles').getBoundingClientRect(); return { x: Math.max(0, r.left - 12), y: Math.max(0, r.top - 12), width: Math.min(innerWidth, r.width + 24), height: r.height + 24 }; });
     await page.screenshot({ path: path.join(shots, 'mark-profiles.png'), clip: box });
     await page.hover('#live-growing'); await sleep(400);
@@ -97,13 +101,18 @@ async function songCase(browser, id, first) {
   const max = long.reduce((m, x) => Math.max(m, x.ms), 0);
   check(max <= LONG, `${id}: longest task ${max} ms while it grows (<= ${LONG})`, long.filter(x => x.ms > 50).map(x => `${x.ms}`).join(' '));
   // Play during a growth: the mark on Play, then the grown song from its first bar
-  // (the pace back to automatic: a new search over the shapes, not grown before)
+  // (the pace back to automatic with Try all growth shapes keeping the best one, shape-search D6: a new search over
+  // every shape, grown neither in this page nor in its store, so the growth really runs when Play is pressed; since
+  // shape-search one search often ends within 300 ms, and the check then had nothing to wait for)
+  await page.evaluate(() => { localStorage.setItem('coding-misk-shape-all', 'true'); localStorage.setItem('coding-misk-shape-keep', '"best"'); });
   await change(page, 'select', '#live-pace', 'auto');
-  await sleep(id === 'settimo-cielo' ? 2000 : 300);
+  await sleep(150);
   const stillGrowing = await markOn(page);
+  await page.evaluate(() => { window.__playSeen = false; });
   await page.click('#play');
   await sleep(150);
-  const playMark = await markOn(page, '#play-growing');
+  // (the mark seen in any frame since the click: a growth that ends within the 150 ms took the mark with it)
+  const playMark = (await markOn(page, '#play-growing')) || (await page.evaluate(() => window.__playSeen));
   if (shots && first && playMark) { const box = await page.evaluate(() => { const r = document.querySelector('.pb-btns').getBoundingClientRect(); return { x: Math.max(0, r.left - 12), y: Math.max(0, r.top - 12), width: r.width + 24, height: r.height + 24 }; }); await page.screenshot({ path: path.join(shots, 'mark-play.png'), clip: box }); }
   check(!stillGrowing || playMark, `${id}: Play during the growth shows the mark on Play`, stillGrowing ? '' : 'growth already done, nothing to wait for');
   await page.waitForFunction(() => document.querySelector('#play').getAttribute('aria-pressed') === 'true', null, { timeout: WAIT }).catch(() => {});
@@ -123,6 +132,24 @@ async function songCase(browser, id, first) {
   await sleep(500);
   const seen = await page.evaluate(() => window.__seen);
   check(total3 === total2 && !seen, `${id}: a reload opens the grown song (${total3}) without the mark`, seen ? 'the mark showed' : '');
+  // playing, Classic to Live coder (the owner's use): the song as it was goes on playing, without the mark on Play,
+  // until the growth is ready, then the grown song takes its place and plays on (a growth with Random order off, not
+  // grown before in this page)
+  await page.click('#live-profile [data-profile="classic"]'); await sleep(800);
+  await page.click('#play');
+  await page.waitForFunction(() => document.querySelector('#play').getAttribute('aria-pressed') === 'true', null, { timeout: WAIT }).catch(() => {});
+  await sleep(1500);
+  const before = timeOf(await page.$eval('#arr-total', el => el.textContent));
+  await page.evaluate(() => { localStorage.setItem('coding-misk-shape-random', 'false'); window.__playSeen = false; window.__seen = false; });
+  await page.click('#live-profile [data-profile="switch"]'); await sleep(150);
+  const playingOn = await page.evaluate(() => document.querySelector('#play').getAttribute('aria-pressed') === 'true');
+  const heldTotal = timeOf(await page.$eval('#arr-total', el => el.textContent)), growingNow = (await markOn(page)) || (await page.evaluate(() => window.__seen));
+  await page.waitForFunction(() => document.querySelector('#live-growing').hidden, null, { timeout: WAIT }).catch(() => {});
+  await sleep(1200);
+  const after = timeOf(await page.$eval('#arr-total', el => el.textContent));
+  const stillPlaying = await page.evaluate(() => document.querySelector('#play').getAttribute('aria-pressed') === 'true'), playSeen2 = await page.evaluate(() => window.__playSeen);
+  check(playingOn && stillPlaying && !playSeen2 && (!growingNow || heldTotal === before) && secs(after) > secs(written), `${id}: playing, Classic to Live coder keeps the old version until the growth is ready, then plays the grown one (${before} → ${after})`, `${growingNow ? 'grew away' : 'grown at once'}${playSeen2 ? ', mark on Play' : ''}`);
+  await page.click('#stop'); await sleep(300);
   check(!errors.length, `${id}: no page errors`, errors.join(' | '));
   await ctx.close();
 }

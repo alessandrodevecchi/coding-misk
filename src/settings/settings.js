@@ -9,6 +9,9 @@ import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data
 import { nextTagline } from '../video/fragments.js';
 import { DICE, REVERT } from '../icons.js';
 import { confirmInline } from '../library/songs-view.js';
+import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shapeKeepOf, LONG_SONG, LONG_SONG_MIN, LONG_SONG_MAX, longSongOf } from '../song/crescendo.js';
+import { shapeCounts } from '../song/shapes.js';
+import { AIR_CHOOSERS, AIR_CHOOSER, chooserOf, chooserName } from '../endless/waypoints.js';
 
 
 export function createSettings({ root, t, tx, esc, store, looks, app, toast, confirmTwice }) {
@@ -18,7 +21,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
 
   function render() {
     if (root.hidden) return;
-    const fmt = formatOf(store.get('coding-misk-export-format', 'wav')), r = app.radioSettings(), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) }, presets = store.get('coding-misk-video-presets', {}) || {}, fr = fragmentOpts(store.get('coding-misk-fragments', {}) || {});
+    const fmt = formatOf(store.get('coding-misk-export-format', 'wav')), r = app.radioSettings(), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) }, presets = store.get('coding-misk-video-presets', {}) || {}, fr = fragmentOpts(store.get('coding-misk-fragments', {}) || {}), shapeAll = store.get('coding-misk-shape-all', null) === true, counts = shapeCounts();
     root.innerHTML = `<p class="intro">${esc(t('setIntro'))}</p>
       <div class="set-grid">
         <div class="card set-card"><h3>${esc(t('setLook'))}</h3>
@@ -81,6 +84,16 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         <div class="card set-card" id="set-library"><h3>${esc(t('setLibrary'))}</h3>
           <p class="muted">${esc(t('setLibraryIntro'))}</p>
           <div class="actions">${app.hiddenSongs && app.hiddenSongs() ? `<button class="btn" id="set-show-hidden">${esc(t('setShowHidden', { n: app.hiddenSongs() }))}</button>` : `<span class="muted">${esc(t('setHiddenNone'))}</span>`}</div>
+        </div>
+        <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
+          <p class="muted">${esc(t('setAdvancedIntro'))}</p>
+          <p class="muted" id="set-shape-count" data-shapes="${counts.shapes}">${esc(t('setShapeCount', counts))}</p>
+          ${row(t('setShapeCap'), `<input type="number" id="set-shape-cap" min="${SHAPE_CAP_MIN}" max="${SHAPE_CAP_MAX}" step="1" value="${shapeCapOf(store.get('coding-misk-shape-cap', null))}"${shapeAll ? ' disabled' : ''} data-no-knob>`, t('setShapeCapHint'))}
+          ${row(t('setShapeAll'), `<label class="rx-opt"><input type="checkbox" id="set-shape-all"${shapeAll ? ' checked' : ''} data-no-knob> <span>${esc(t('setShapeAllOn'))}</span></label>`, t('setShapeAllHint', counts))}
+          ${row(t('setShapeKeep'), `<select id="set-shape-keep"${shapeAll ? '' : ' disabled'} data-no-knob>${SHAPE_KEEPS.map(k => opt(k, shapeKeepOf(store.get('coding-misk-shape-keep', null)), t(`setShapeKeep:${k}`))).join('')}</select>`, t('setShapeKeepHint'))}
+          ${row(t('setShapeRandom'), `<label class="rx-opt"><input type="checkbox" id="set-shape-random"${store.get('coding-misk-shape-random', null) === false ? '' : ' checked'} data-no-knob> <span>${esc(t('setShapeRandomOn'))}</span></label>`, t('setShapeRandomHint'))}
+          ${row(t('setLongSong'), `<input type="number" id="set-long-song" min="${LONG_SONG_MIN / 60}" max="${LONG_SONG_MAX / 60}" step="1" value="${longSongOf(store.get('coding-misk-long-song', null)) / 60}" data-no-knob> min`, t('setLongSongHint'))}
+          ${row(t('setAirChooser'), `<select id="set-air-chooser" data-no-knob>${Object.keys(AIR_CHOOSERS).map(id => opt(id, chooserOf(store.get('coding-misk-air-chooser', null)), chooserName(id, app.lang()))).join('')}</select>`, t('setAirChooserHint'))}
         </div>
         <div class="card set-card"><h3>${esc(t('setData'))}</h3>
           <p class="muted">${esc(t('setDataIntro'))}</p>
@@ -146,6 +159,16 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (e.target.dataset.radioOpt) app.setRadio(e.target.dataset.radioOpt, e.target.value);
     if (e.target.dataset.vidOpt) { setVid(e.target.dataset.vidOpt, e.target.value); render(); }
     if (e.target.dataset.fragOpt) { setFrag(e.target.dataset.fragOpt, e.target.type === 'number' ? Math.max(5, Math.min(180, +e.target.value || 30)) : e.target.value); if (e.target.tagName === 'SELECT') render(); }
+    // the shapes a Compose growth tries (shape-search D3): kept within 4 and 32, the default not stored
+    if (e.target.id === 'set-shape-cap') { const v = shapeCapOf(e.target.value); e.target.value = v; if (v === SHAPE_CAP) store.remove('coding-misk-shape-cap'); else store.set('coding-misk-shape-cap', v); }
+    // shape-search D6, D7: Try all, what it keeps, the order and the long-song threshold (minutes, stored in seconds),
+    // the defaults not stored
+    if (e.target.id === 'set-shape-all') { if (e.target.checked) store.set('coding-misk-shape-all', true); else store.remove('coding-misk-shape-all'); render(); }
+    if (e.target.id === 'set-shape-keep') { const v = shapeKeepOf(e.target.value); if (v === 'first') store.remove('coding-misk-shape-keep'); else store.set('coding-misk-shape-keep', v); }
+    if (e.target.id === 'set-shape-random') { if (e.target.checked) store.remove('coding-misk-shape-random'); else store.set('coding-misk-shape-random', false); }
+    if (e.target.id === 'set-long-song') { const v = longSongOf(60 * Math.round(+e.target.value || 0) || null); e.target.value = v / 60; if (v === LONG_SONG) store.remove('coding-misk-long-song'); else store.set('coding-misk-long-song', v); }
+    // the chooser on air (radio-chooser-versions D3): the default not stored, an unknown id read as the default
+    if (e.target.id === 'set-air-chooser') { const v = chooserOf(e.target.value); if (v === AIR_CHOOSER) store.remove('coding-misk-air-chooser'); else store.set('coding-misk-air-chooser', v); }
     if (e.target.id === 'set-frag-n') store.set('coding-misk-fragment-n', Math.max(1, Math.round(+e.target.value || 1)));
     if (e.target.id === 'set-vid-preset' && e.target.value) { const p = (store.get('coding-misk-video-presets', {}) || {})[e.target.value]; if (p) { store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...p }); toast(t('vidPresetLoaded', { name: e.target.value })); render(); } }
   });

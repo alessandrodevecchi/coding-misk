@@ -31,6 +31,7 @@
     "check:workers": "node --no-warnings tools/check-pool.mjs --test",
     "check:live-code": "node --no-warnings tools/check-live-code.mjs",
     "check:mixer": "node --no-warnings tools/check-mixer.mjs",
+    "check:ramps": "node --no-warnings tools/check-ramps.mjs",
     "check:typing": "node --no-warnings tools/check-typing.mjs",
     "check:profiles": "node --no-warnings tools/check-profiles.mjs",
     "check:clips": "node --no-warnings tools/check-clips.mjs",
