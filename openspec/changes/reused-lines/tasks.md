@@ -25,14 +25,14 @@
 
 ## 6. New lines typed ahead, muted (D8)
 
-- [ ] 6.1 After D1 to D4, plan lines ahead in the written part: a step with spare time of at least the line's typing plus 2 s takes one new line of a coming step (up to the next section change, at most 32 bars ahead), rushed target steps first; limits 2 ahead at once, 1 per step, 1 per track, none with 4 or more muted lines shown. The line is muted in its final form in its own place; its step only unmutes it. Verify: `growth:probe` reports lines ahead, rushed steps and most muted lines shown per song, before and after; screenshots of a song with lines ahead for the owner before tuning the limits
+- [x] 6.1 After D1 to D4, plan lines ahead in the written part: a step with spare time of at least the line's typing plus 2 s takes one new line of a coming step (up to the next section change, at most 32 bars ahead), rushed target steps first; limits 2 ahead at once, 1 per step, 1 per track, none with 4 or more muted lines shown. The line is muted in its final form in its own place; its step only unmutes it. Verify: `growth:probe` reports lines ahead, rushed steps and most muted lines shown per song, before and after; screenshots of a song with lines ahead for the owner before tuning the limits
 - [x] 6.2 Check: a case in `check:live-code` (or `check-compact-code.cjs`) on a built-in song the probe picks (a rushed section change after a step with spare time): the code shows the line muted from the earlier step, the section change only deletes its `_`, and no moment of any built-in song shows more than 2 lines ahead or adds one with 4 muted lines shown. The case fails on the code before D8
-- [ ] 6.3 `check:mixer -- --full`, `check-compact-code.cjs`, `check:typing`, `check:live-code`; screenshots for the owner of a song with lines ahead at the step that types them and at the section change
+- [x] 6.3 `check:mixer -- --full`, `check-compact-code.cjs`, `check:typing`, `check:live-code`; screenshots for the owner of a song with lines ahead at the step that types them and at the section change
 
 ## 7. Versions and after numbers (D7)
 
 - [x] 7.1 `SHAPES_VERSION` 8 with the Live coder fixtures, `npm run durations`, `check:durations`. Verify: `check:crescendo -- --full` passes
-- [ ] 7.2 After numbers in the DEVLOG (task 1.2 measures again) and screenshots of kellerlicht at Körper and Druck for the owner. Verify: reused lines fewer than 45 and none on kellerlicht's written part that was muted or shown earlier unchanged
+- [x] 7.2 After numbers in the DEVLOG (task 1.2 measures again) and screenshots of kellerlicht at Körper and Druck for the owner. Verify: reused lines fewer than 45 and none on kellerlicht's written part that was muted or shown earlier unchanged
 
 ## 8. Radio shape settings (D5, D6)
 

@@ -83,9 +83,11 @@ const CHECKS = {
   },
 };
 
-// reused-lines: a Live coder growth with the default controls, its code at the steps (80 columns)
+// reused-lines: a Live coder growth as Compose grows it (the built-in styles), with the default controls, its code at the
+// steps (80 columns)
+const STYLES = Object.fromEntries(fs.readdirSync('styles').filter(f => f.endsWith('.json')).map(f => JSON.parse(fs.readFileSync(`styles/${f}`, 'utf8'))).map(r => [r.id, r]));
 function live(id, over = {}) {
-  const C = resolveProfile('switch', over), b = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C) });
+  const C = resolveProfile('switch', over), b = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
   const L = liveCode(b, C, { lang: () => 'en', cols: () => 80 }), bars = [0, ...new Set(buildSteps(L.build).map(x => x.at))].sort((x, y) => x - y);
   return { L, bars, at: bar => chainLines(L.codeAt(bar)), before: bar => bars.filter(x => x < bar).pop() };
 }
