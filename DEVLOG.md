@@ -1271,3 +1271,9 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - Domande aperte: togliere "Mai" visto l'interruttore (consigliato sì), pesi degli stili, interruttore del narratore fuori dal profilo Personalizzato (consigliato sì), preset e Sempre.
 - Mockup iniettati nell'app vera, in italiano: `notes/prove-2026-10-26/voci-spec-2/` (5 immagini). `openspec validate voice-full-controls` ok (solo avvisi sulla lunghezza dei requisiti).
 
+
+## 2026-10-26: spec delle voci, secondo giro di risposte (#82, voice-full-controls)
+
+- "Quanto spesso" della voce traccia nella radio perde "Mai": Come dice lo stile, Spesso, Sempre. Un "Mai" salvato si legge come interruttore Voce: traccia spento (con Come dice lo stile). Spec, design e task aggiornati.
+- Approvati: pesi degli stili di D14 (da ritoccare dopo un ascolto), interruttore del narratore con ogni profilo, i preset non sostituiscono Sempre.
+- Nessuna domanda aperta. Solo spec, nessun codice cambiato.

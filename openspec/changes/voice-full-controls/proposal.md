@@ -12,7 +12,7 @@ After voice-placement (#77) the two voices still have half their controls. The s
 - **Poetic narrator with Narrated growth**: the step lines stay and the poetic images come in addition.
 - **Radio Voices group redesigned** (variant B): settings for the next songs only, two blocks "Voce: narratore" and "Voce: traccia", each with a short main row and folded parts. The "Apply to the song on air" button leaves the group.
 - **Console Voice group**: "Voce: narratore" (Talk more, Talk less) and "Voce: traccia" (phrase preset, voice style, Apply), both following the console scope switch; "Aggiungi frase": a typed line said now or placed at the next good moment.
-- **Voice track in every style and "Sempre"**: every style recipe gets a voice track chance (some very low, country zero); the radio How often gains Sempre, which gives every next song a voice track whatever the style or other settings.
+- **Voice track in every style and "Sempre"**: every style recipe gets a voice track chance (some very low, country zero); the radio How often reads Come dice lo stile, Spesso, Sempre: Sempre gives every next song a voice track whatever the style or other settings, and Mai leaves the menu (the Voce: traccia switch silences the voice track; a saved Mai reads as the switch off).
 - **Quick on/off per voice** in the title row of each Voices block (Compose and radio); off greys the block and keeps every value.
 - **Vocabularies fill the phrase list**: a "Riempi con" select, "+ Aggiungi frase" under the list and a trash button per row.
 - **Faders in the hardware theme** for the Sound parts, where knobs cost height.

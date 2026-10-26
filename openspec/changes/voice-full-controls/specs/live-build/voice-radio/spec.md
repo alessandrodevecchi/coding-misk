@@ -31,7 +31,7 @@ Every style recipe SHALL say how likely a song of that style is to have a voice 
 - **THEN** its songs have no voice track
 
 ### Requirement: How often: Sempre
-The radio How often SHALL offer Mai, Come dice lo stile, Spesso and Sempre. Sempre SHALL give every next song a voice track, whatever the style's weight, the complexity, the profile or the artist. A phrase preset SHALL change How often only when it is Come dice lo stile or Spesso. Sempre SHALL apply to the voice track only; the narrator's amount SHALL stay the narrator knob.
+The radio How often SHALL offer Come dice lo stile, Spesso and Sempre, and SHALL NOT offer Mai: the Voce: traccia switch SHALL be the only control that silences the voice track. A saved Mai SHALL read as the Voce: traccia switch off with How often Come dice lo stile. Sempre SHALL give every next song a voice track, whatever the style's weight, the complexity, the profile or the artist. A phrase preset SHALL change How often only when it is Come dice lo stile or Spesso. Sempre SHALL apply to the voice track only; the narrator's amount SHALL stay the narrator knob.
 
 #### Scenario: Sempre with a style at zero
 - **WHEN** How often is Sempre and the next song's style has weight 0
@@ -44,6 +44,10 @@ The radio How often SHALL offer Mai, Come dice lo stile, Spesso and Sempre. Semp
 #### Scenario: Saved Sempre
 - **WHEN** the owner reloads the radio after choosing Sempre
 - **THEN** How often shows Sempre
+
+#### Scenario: Saved Mai
+- **WHEN** the radio loads options saved with How often Mai
+- **THEN** How often offers no Mai and shows Come dice lo stile, the Voce: traccia switch is off, and the next songs have no voice track
 
 ### Requirement: Console Voice group
 The console SHALL have a Voice group with two rows. "Voce: narratore": Talk more and Talk less, as today. "Voce: traccia": a phrase preset picker, a voice style picker and an Apply button that sends both to the song on air as one console command, queued, recorded in the session and rebuilt by Replay: the phrases from the next quiet part (as the voice command of voice-placement), the sound from the next phrase. Every control of the group SHALL follow the console scope switch: with "This song only" (the default) it changes the song on air only; with "The whole session" it also writes the same values into the radio Voices group for the next songs, which shows them at once. When the song on air has no voice instrument, Apply SHALL be disabled with the reason, except that with the whole session it still updates the Voices group.
