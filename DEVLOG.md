@@ -1241,3 +1241,16 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - `snapshot-levels.cjs` e `check-levels.cjs` leggono la porta da `PORT` (predefinita 5173), come `check-patterns.cjs`: i check dei livelli girano anche su un server diverso da quello delle prove.
 - `tests/snapshots/levels.json`: livelli registrati per i 20 brani che non li avevano (crescendo-*, example-ideas, example-voices, prova-*, switch-*). Nessuna uscita sopra il limite. Una seconda misura con `check` sugli stessi 20 brani torna dentro la tolleranza per tutti.
 - `check-patterns.cjs`: 2 casi nuovi per l'etichetta dei riff (#72): la scheda e il dettaglio di un riff di chitarra dicono "Riffs · guitar · built-in"; la ricerca "bass" tra i riff trova solo i 5 riff di basso. Tutto ok sulla porta 5186.
+
+## 2026-10-26: spec dei controlli completi delle voci (#82, voice-full-controls)
+
+- Spec OpenSpec `voice-full-controls` (proposta, design, quattro spec, task), solo spec: nessun codice cambiato.
+- Suono delle due voci (voce che parla, volume, pitch, velocità, filtro, taglia bassi, saturazione, riverbero, delay) nel gruppo Voci di Componi e della radio, in una parte "Suono" chiusa. Unica fonte in Componi: le impostazioni della traccia della voce nel brano; gruppo, pannello e stile leggono e scrivono lo stesso valore. Un brano senza narratore mostra il suono predefinito e al primo cambio riceve una traccia "Narrator" (con Annulla).
+- Stili della voce comuni alle due voci: Chiara, Radio, Lontana, Robot, Profonda, Luminosa, Cattedrale, Eco, Sporca, Lenta (i caratteri esistenti su `VOICE_DEFAULT`, più Lontana); non toccano voce che parla e volume.
+- Elenco delle frasi della voce traccia, per battuta, testo e battute modificabili sul posto, con la battuta sentita nella crescita (Crescendo, Live coder) accanto a quella scritta. Elenco delle frasi del narratore in sola lettura per le crescite derivate.
+- "Dove parla": parti tranquille, medie, piene (medie e piene definite contando le tracce), tranquille prima; predefinito solo tranquille, fixture del regista invariate.
+- Campioni delle frasi nuove: un aiutante solo sul server di sviluppo (stesso `say` + ffmpeg di `npm run voices`, sostituibile). Web Speech API scartata come via principale: suona fuori da Web Audio, quindi niente effetti, registrazione, export né Riascolta.
+- Narratore poetico con Crescita raccontata: restano le frasi dei passi, le immagini si aggiungono.
+- Radio: gruppo Voci solo per i prossimi brani (variante B), due blocchi impilati; Console con il gruppo Voce (narratore: Parla di più/meno; traccia: preset, stile, Applica, che seguono "Vale per questo brano" / "tutta la diretta") e "Aggiungi frase" (Dilla ora, Al momento giusto).
+- Etichette "Voce: narratore" / "Voce: traccia", scheda Guida "Due voci", nelle frasi in inglese "voice track".
+- Mockup in italiano iniettati nell'app vera: `notes/prove-2026-10-26/voci-spec/` (5 immagini). `openspec validate voice-full-controls` ok (solo avvisi sulla lunghezza dei requisiti, come voice-placement).
