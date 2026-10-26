@@ -64,10 +64,11 @@ export function partHas(R, part) {
 }
 // the parts Vary and Swap can rewrite, lead first (the default); for vary the lead is the hook, else the guitar, and the arp is
 // a part of its own (radio-variation D1)
-export const VARY_TYPES = ['lead', 'bass', 'arp', 'pad'];
+export const VARY_TYPES = ['lead', 'bass', 'arp', 'pad', 'guitar'];
 const LEAD = ['arp', 'hook', 'guitar'];
 const ofType = (t, type) => (type === 'lead' ? LEAD.includes(t.type) : t.type === type);
 // the tracks a vary of a part rewrites, among the tracks given (the playing ones)
+// target (radio-arrangement D7): 'auto' or a track id narrows them to one, see targetTracks
 export function varyTracks(tracks, type = 'lead') {
   if (type !== 'lead') return tracks.filter(t => t.type === type);
   const hooks = tracks.filter(t => t.type === 'hook');
@@ -123,7 +124,9 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
     return free.some(t => !locked.includes(t.id)) ? null : 'locked';
   }
   if (cmd.kind === 'vary' || cmd.kind === 'swap') {
-    const mine = varyTracks(on, cmd.type || 'lead');
+    let mine = varyTracks(on, cmd.type || 'lead');
+    // a named target that does not play at the boundary
+    if (cmd.target && cmd.target !== 'auto') mine = mine.filter(t => t.id === cmd.target);
     if (!mine.length) return 'not-playing';
     // (a lock keeps the director out, never the listener: radio-arrangement D12)
     if (cmd.kind === 'swap' && !mine.some(t => readyParts(t, plan.R, opts || {}, plan.parts).length)) return 'no-ready';
@@ -252,7 +255,7 @@ function composeNew(P, O, song, st, at, ids, seed) {
 // drawn from the stream "<track>" of the seed swap:<song>:<index>.
 function vary(song, P, O, cmd, st, seed) {
   const swap = cmd.kind === 'swap', prefix = swap ? 'S' : 'V';
-  const on = varyTracks(playing(st), cmd.type || 'lead');
+  const on = targetTracks(song, varyTracks(playing(st), cmd.type || 'lead'), cmd, seed);
   const M = swap ? null : { ...airInputs(P, O, st, cmd.at), source: 'composed', keepChords: true };
   let build = (song.build || []).slice();
   const tracks = song.tracks.map(t => ({ ...t }));
@@ -429,6 +432,18 @@ function headroom(song, P, from) {
     }
   }
   return { ...song, build: out.map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x) };
+}
+
+// The tracks a Vary or a Swap rewrites (D7): every track of the part when the command names no target (sessions
+// recorded before radio-arrangement); with a track id that track; with 'auto' one track: the one varied or swapped least
+// recently in this song (by the listener's V<k> and S<k> steps before the boundary), ties broken by the command's stream
+export function targetTracks(song, tracks, cmd, seed) {
+  if (!cmd.target) return tracks;
+  if (cmd.target !== 'auto') return tracks.filter(t => t.id === cmd.target);
+  if (tracks.length <= 1) return tracks;
+  const last = id => Math.max(-1, ...(song.build || []).filter(s => s.by === 'listener' && s.at < cmd.at && s.pattern && s.pattern.track === id && /^[VSH]\d+$/.test(s.pattern.to)).map(s => s.at));
+  const lo = Math.min(...tracks.map(t => last(t.id))), tied = tracks.filter(t => last(t.id) === lo);
+  return [tied.length > 1 ? stream(seed, 'target').pick(tied) : tied[0]];
 }
 
 // One command applied to a song: the modified plan and options, and the rewrite from its bar.

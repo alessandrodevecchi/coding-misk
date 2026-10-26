@@ -34,12 +34,12 @@ Total about 9 to 10 days. Phases 3 and 5 depend on 1; 4 depends on 1 and 2; 6 de
 - [x] 2.2b Locks in the console next to each instrument, half state, sync with the mixer both ways; drawn lock icons (closed `LOCK`, a new open lock in `src/icons.js`) in the console and the mixer, emoji removed (D12); warning line and badge colour past the recommended count (D4)
 - [x] 2.2c Riser row: button, length and direction menus, Suono dropdown shown from the start with its one option (Fruscio), row in every style, riser lock, tooltip explaining the riser (D11); strings in English and Italian
 - [x] 2.3 Queue labels "+ arp (Arp 2)", "basso: bloccato", "riser 4 battute, sale", mixer rows for the new tracks; verify with `node tools/check-steering.cjs` (buttons per style, add twice, remove the last one, two kicks with the warning, cap at 12, cancel, lock and unlock in sync with the mixer, riser placed) and screenshots in Italian and English. Browser version of the owner's test: press "+ pad", seek two phrases on, the pad still plays and its mixer row is there
-- [ ] 2.4 `node --no-warnings tools/check-radio.cjs` and `node tools/check-transitions.cjs` with steered songs: no evaluation errors, below clipping
+- [x] 2.4 `node --no-warnings tools/check-radio.cjs` and `node tools/check-transitions.cjs` with steered songs: no evaluation errors, below clipping
 
 ## 3. Target of Vary and Swap
 
-- [ ] 3.1 `target` on vary and swap, `auto` rule (least recently rewritten, seeded), old commands rewrite every track (D7); guitar in the part picker; verify in `tools/check-endless.mjs` (two arps, two Auto varies rewrite both in turn; replay same notes)
-- [ ] 3.2 Target dropdown in the console, reset to Auto when its track stops; queue names the track; verify with `node tools/check-steering.cjs`
+- [x] 3.1 `target` on vary and swap, `auto` rule (least recently rewritten, seeded), old commands rewrite every track (D7); guitar in the part picker; verify in `tools/check-endless.mjs` (two arps, two Auto varies rewrite both in turn; replay same notes)
+- [x] 3.2 Target dropdown in the console, reset to Auto when its track stops; queue names the track; verify with `node tools/check-steering.cjs`
 
 ## 4. Add a saved pattern
 

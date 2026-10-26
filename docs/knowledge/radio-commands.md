@@ -91,7 +91,7 @@ Arrangement by instrument (radio-arrangement): the console shows a − and a + p
 
 Every `+` writes a headroom rule: on phrases where more tracks play than the song's usual count, the tracks whose gain the listener did not set play at `sqrt(usual / n)` of their gain (`set` steps on the phrase). Extra buses skip the spoken orbits (13, 14) and the narrators' (15 and up).
 
-Vary and Swap take a part: lead (the default), bass, arp or pad. For Vary the lead is the hook, else the guitar. On a grown song both are typed as small notes edits of the line (see What it is).
+Vary and Swap take a part: lead (the default), bass, arp, pad or guitar. For Vary the lead is the hook, else the guitar. A `target` (radio-arrangement D7) narrows them to one track: `auto` takes the track of the part varied or swapped least recently in the song (ties by the command's stream), a track id takes that track; a command without a target (sessions recorded before) rewrites every track of the part (`targetTracks`). On a grown song both are typed as small notes edits of the line (see What it is).
 
 ## Example
 

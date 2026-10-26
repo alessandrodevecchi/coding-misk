@@ -776,9 +776,10 @@ const CHECKS = {
       assert(others(r.song) === others(g.song), `vary ${type}: other tracks or steps changed`);
     }
     // different parts among the varies of each part (a pad varies only its rhythm, register and voicing)
-    const share = { lead: 0.6, arp: 0.6, bass: 0.4, pad: 0.2 };
-    assert(VARY_TYPES.every(t => types[t] > 5 && ideas[t].size >= share[t] * types[t]), `different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t] && ideas[t].size} of ${types[t]}`).join(', ')}`);
-    console.log(`      200 varies, all in key; different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t].size} of ${types[t]}`).join(', ')}`);
+    // (the guitar, a part of its own since radio-arrangement, plays in few styles: counted, not required)
+    const share = { lead: 0.6, arp: 0.6, bass: 0.4, pad: 0.2, guitar: 0 };
+    assert(VARY_TYPES.filter(t => t !== 'guitar').every(t => types[t] > 5 && ideas[t].size >= share[t] * types[t]), `different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t] && ideas[t].size} of ${types[t]}`).join(', ')}`);
+    console.log(`      200 varies, all in key; different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t] ? ideas[t].size : 0} of ${types[t] || 0}`).join(', ')}`);
   },
   'steering: vary is disabled when the part does not play, and reaches locked tracks'() {
     let checked = 0, locked = 0;
@@ -1154,6 +1155,36 @@ const CHECKS = {
       if (spoken) n++;
     }
     assert(n >= 3, `only ${n} songs with a spoken track`);
+  },
+  'arrangement: the target of Vary and Swap, Auto takes turns'() {
+    let n = 0, named = 0;
+    for (const g of arrSongs(40, 'arr-target')) {
+      const ph = g.plan.phrase, at = applyBar('more', 2 * ph, g.plan);
+      if (whyNot({ kind: 'more', part: 'arp' }, g.song, g.plan, at - 1)) continue;
+      // (the arps locked, so the director keeps both on the boundaries of the check; + twice: two arps at least)
+      const base = [{ kind: 'lock-part', part: 'arp', at }, { kind: 'more', part: 'arp', at }, { kind: 'more', part: 'arp', at }], two = steerArr(g, base), arps = onAt(two.song, at + ph).filter(t => t.type === 'arp').map(t => t.id);
+      if (arps.length < 2 || at + 3 * ph >= outroFrom(g.plan) * 2 * ph) continue;
+      const v1 = { kind: 'vary', type: 'arp', target: 'auto', at: at + ph }, v2 = { kind: 'vary', type: 'arp', target: 'auto', at: at + 2 * ph };
+      const r = steerArr(g, [...base, v1, v2]);
+      const hit = c => r.song.build.filter(s => s.at === c.at && s.by === 'listener' && s.pattern && /^V\d+$/.test(s.pattern.to)).map(s => s.pattern.track);
+      const a = hit(v1), b = hit(v2);
+      // (the second press takes the other arp when both play on its boundary)
+      const both = arps.every(id => onAt(r.song, v2.at).some(t => t.id === id));
+      assert(a.length === 1 && b.length === 1 && arps.includes(a[0]) && (a[0] !== b[0] || !both), `${g.style}: Auto varied ${a} then ${b} of ${arps}`);
+      if (!both) continue;
+      assert(JSON.stringify(steerArr(g, [...base, v1, v2]).song) === JSON.stringify(r.song), `${g.style}: replay of Auto varies`);
+      // a named target: that track only; a target that does not play: not-playing
+      const one = steerArr(g, [...base, { kind: 'swap', type: 'arp', target: arps[1], at: at + ph }]);
+      const sw = one.song.build.filter(s => s.at === at + ph && s.by === 'listener' && s.pattern && /^S\d+$/.test(s.pattern.to)).map(s => s.pattern.track);
+      if (!whyNot({ kind: 'swap', type: 'arp', target: arps[1] }, two.song, two.plan, at + ph - 1, 0, g.opts)) { assert(sw.length === 1 && sw[0] === arps[1], `${g.style}: Swap of ${arps[1]} rewrote ${sw}`); named++; }
+      assert(whyNot({ kind: 'vary', type: 'arp', target: 'nope' }, two.song, two.plan, at + ph - 1) === 'not-playing', `${g.style}: a target that does not play`);
+      // a command without a target rewrites every track of the part, as before
+      const all = steerArr(g, [...base, { kind: 'vary', type: 'arp', at: at + ph }]);
+      assert(all.song.build.filter(s => s.at === at + ph && s.by === 'listener' && s.pattern && /^V\d+$/.test(s.pattern.to)).length === arps.length, `${g.style}: a vary without target`);
+      n++;
+    }
+    assert(n >= 8 && named >= 3, `${n} songs with two arps, ${named} named swaps`);
+    console.log(`      ${n} songs with two arps: Auto takes them in turn, ${named} swaps of a named track`);
   },
   'steering: one vary takes less than 20 ms'() {
     const all = varies(40), times = all.map(({ g, type, at }) => { const t0 = performance.now(); steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'vary', type, at }], seed: 'vary-time', n: 1 }); return performance.now() - t0; }).sort((a, b) => a - b);

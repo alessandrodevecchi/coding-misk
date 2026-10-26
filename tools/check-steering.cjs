@@ -162,7 +162,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // Vary and Swap (radio-variation): the part picker (lead by default), the queue label, one per part and boundary,
   // cancel, the shortcut, the disabled state with its reason
   { const parts = await page.$$eval('#radio-steer [data-vary-part]', xs => xs.map(x => `${x.dataset.varyPart}:${x.getAttribute('aria-pressed')}`).join());
-    check(parts === 'lead:true,bass:false,arp:false,pad:false', 'part picker with the lead picked', parts);
+    check(parts === 'lead:true,bass:false,arp:false,pad:false,guitar:false', 'part picker with the lead picked', parts);
     check(await page.isVisible('#radio-steer [data-cmd="vary"] svg') && await page.isVisible('#radio-steer [data-cmd="swap"] svg'), 'Vary and Swap buttons with drawn icons');
     // a part that plays at the next phrase, and one that does not (its buttons say why); the middle of the song, where
     // more parts play
@@ -171,7 +171,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       for (const id of x.plan.locked) await page.evaluate(track => globalThis.codingMiskRadio.command({ kind: 'unlock', track }), id);
       await sleep(300); }
     let on = null, off = null;
-    for (const p of ['lead', 'bass', 'arp', 'pad']) {
+    for (const p of ['lead', 'bass', 'arp', 'pad', 'guitar']) {
       await page.click(`#radio-steer [data-vary-part="${p}"]`); await sleep(150);
       const d = await page.$eval('#radio-steer [data-cmd="vary"]', b => ({ dis: b.disabled, why: b.dataset.why || '', title: b.title, part: b.dataset.part }));
       if (!d.dis && !on) on = { p, ...d };
@@ -426,6 +426,29 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const r = a.s.plan.risers[0];
     check(r && r.bars === 4 && r.dir === 'up' && r.end === r.change && r.start === r.change - 4, 'a riser of 4 bars ends on the next part change', JSON.stringify(r));
     check(/riser 4 (bars|battute), (up|sale)/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "riser 4 bars, up"');
+    // the target of Vary and Swap (radio-arrangement phase 3): Auto and the pads by name; a named pad varies alone, the
+    // queue names it; the target goes back to Auto when its track stops
+    await page.click('#radio-steer [data-vary-part="pad"]'); await sleep(250);
+    const opts3 = await page.$$eval('#radio-steer [data-vary-target] option', xs => xs.map(x => [x.value, x.textContent]));
+    check(opts3[0][0] === 'auto' && opts3.filter(([v]) => /^pad/.test(v)).length >= 2, 'the target lists Auto and the pads by name', JSON.stringify(opts3));
+    const lastPad = opts3[opts3.length - 1][0];
+    await page.selectOption('#radio-steer [data-vary-target]', lastPad); await sleep(250);
+    await page.click('#radio-steer [data-cmd="vary"]'); await sleep(400);
+    a = await A();
+    const vc = a.commands.filter(c => c.kind === 'vary').pop();
+    const vsteps = a.s.song.build.filter(x => x.at === vc.at && x.by === 'listener' && x.pattern && /^V\d+$/.test(x.pattern.to)).map(x => x.pattern.track);
+    check(vc.target === lastPad && vsteps.length === 1 && vsteps[0] === lastPad, 'a named target varies that track only', JSON.stringify({ vc, vsteps }));
+    check(new RegExp(`(Vary|Varia) pad \\(${opts3[opts3.length - 1][1]}\\)`).test(await page.innerText('#radio-steer .steer-queue')), 'the queue names the target', await page.innerText('#radio-steer .steer-queue'));
+    await page.selectOption('#radio-steer [data-vary-target]', 'auto'); await sleep(200);
+    await page.click('#radio-steer [data-cmd="swap"]').catch(() => {}); await sleep(400);
+    a = await A();
+    const sc = a.commands.filter(c => c.kind === 'swap').pop();
+    if (sc) check(sc.target === 'auto' && /(Swap|Scambia) pad \(/.test(await page.innerText('#radio-steer .steer-queue')), 'Auto swaps one pad and the queue says which', JSON.stringify(sc));
+    await page.selectOption('#radio-steer [data-vary-target]', lastPad); await sleep(200);
+    await page.evaluate(p => globalThis.codingMiskRadio.command({ kind: 'less', part: 'pad' }), 'pad'); await sleep(400);
+    const tg = await page.$eval('#radio-steer [data-vary-target]', x => x.value);
+    check(tg === 'auto' || (await A()).on.includes(lastPad), 'the target goes back to Auto when its track stops', tg);
+    await page.click('#radio-steer [data-vary-part="lead"]'); await sleep(200);
     // shortcuts: a digit adds, Shift and the digit removes
     const order = await page.$$eval('#radio-steer .arr-inst', xs => xs.map(x => x.dataset.arr));
     const n0 = (await A()).commands.length;
