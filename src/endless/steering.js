@@ -18,6 +18,8 @@ export const COMMANDS = {
   // one more or one fewer track of an instrument (radio-arrangement D1, D2), a lock per instrument (D12), a riser on the
   // next part change (D11)
   more: { group: 'arrangement' }, less: { group: 'arrangement' }, 'lock-part': { group: 'arrangement' }, 'unlock-part': { group: 'arrangement' }, riser: { group: 'arrangement' },
+  // one of the listener's saved patterns on air (D9): a new track or in place of a playing one
+  pattern: { group: 'arrangement' },
   // new notes for a part (radio-variation): a pattern step from the next phrase
   vary: { group: 'arrangement' },
   // another ready part (a preset or a saved pattern) for a part, never composed: a pattern step from the next phrase
@@ -115,6 +117,11 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
     return on.filter(counted).length <= 1 ? 'last-track' : null;
   }
   if (cmd.kind === 'riser') return riserTarget(plan, at, cmd) ? null : 'late';
+  if (cmd.kind === 'pattern') {
+    if (!cmd.item || !fitsAir(cmd.item, plan, song)) return 'no-fit';
+    if (cmd.mode === 'replace') return on.some(t => t.id === cmd.target && t.type === cmd.item.type) ? null : 'not-playing';
+    return on.filter(counted).length >= TRACK_CAP ? 'cap' : null;
+  }
   if (cmd.kind === 'add') {
     const all = st.tracks.filter(t => ofType(t, cmd.type));
     // a type the song has no track for: a new one from the song's style (#41), unless the style has none
@@ -253,9 +260,12 @@ function composeNew(P, O, song, st, at, ids, seed) {
 // session's material source; a pad keeps the song's chords.
 // Swap: the same, with another ready part (readyParts: a preset or a saved pattern that fits) as S<k>, never composed,
 // drawn from the stream "<track>" of the seed swap:<song>:<index>.
+// A saved pattern in place of a playing track (radio-arrangement D9): the same, with a copy of the pattern as P<k> on the
+// target track, which keeps its sound; a melody in its own chromatic mode takes that mode with it.
 function vary(song, P, O, cmd, st, seed) {
-  const swap = cmd.kind === 'swap', prefix = swap ? 'S' : 'V';
-  const on = targetTracks(song, varyTracks(playing(st), cmd.type || 'lead'), cmd, seed);
+  const swap = cmd.kind === 'swap', saved = cmd.kind === 'pattern', prefix = saved ? 'P' : swap ? 'S' : 'V';
+  if (saved && (!cmd.item || !fitsAir(cmd.item, P, song))) return { song, plan: P, opts: O };
+  const on = saved ? playing(st).filter(t => t.id === cmd.target && t.type === cmd.item.type) : targetTracks(song, varyTracks(playing(st), cmd.type || 'lead'), cmd, seed);
   const M = swap ? null : { ...airInputs(P, O, st, cmd.at), source: 'composed', keepChords: true };
   let build = (song.build || []).slice();
   const tracks = song.tracks.map(t => ({ ...t }));
@@ -263,7 +273,8 @@ function vary(song, P, O, cmd, st, seed) {
     const own = P.tracks.find(x => x.id === t.id), mine = tracks.find(x => x.id === t.id);
     if (!own || !mine) return;
     let pattern;
-    if (swap) {
+    if (saved) pattern = clone(cmd.item.pattern);
+    else if (swap) {
       const pool = readyParts(own, P.R, O, P.parts);
       if (!pool.length) return;
       pattern = JSON.parse(JSON.stringify(stream(seed, t.id).pick(pool)));
@@ -276,6 +287,7 @@ function vary(song, P, O, cmd, st, seed) {
     own.patterns = { ...own.patterns, [name]: pattern };
     mine.patterns = { ...mine.patterns, [name]: JSON.parse(JSON.stringify(pattern)) };
     const step = { at: cmd.at, pattern: { track: t.id, to: name }, by: 'listener' };
+    if (saved && t.type === 'hook' && cmd.item.context && cmd.item.context.mode === 'chromatic' && (own.settings || {}).mode !== 'chromatic') { const m = { at: cmd.at, set: { track: t.id, mode: 'chromatic' }, by: 'listener' }; build.push(m); P.varied = [...(P.varied || []), m]; }
     // a comment on a dropped step moves to the new one
     const gone = build.filter(s => s.at >= cmd.at && s.pattern && s.pattern.track === t.id), said = gone.find(s => s.at === cmd.at && s.say);
     if (said) { step.say = said.say; if (said.voice) step.voice = said.voice; }
@@ -287,6 +299,34 @@ function vary(song, P, O, cmd, st, seed) {
 }
 
 // ---------- per-instrument arrangement (radio-arrangement) ----------
+
+// a saved pattern on air (D9): the instrument it plays (a groove with the bd row only is a kick, else a beat)
+export function patternPart(item) {
+  if (!item) return null;
+  if (item.type !== 'drums') return item.type;
+  const rows = item.pattern && (item.pattern.rows || (item.pattern.idea && item.pattern.idea.beat)) || {};
+  return Object.keys(rows).filter(k => k !== 'grid').every(k => k === 'bd') ? 'kick' : 'beat';
+}
+const AIR_TYPES = ['hook', 'bass', 'arp', 'pad', 'drums', 'guitar'];
+// A saved pattern fits the song on air (D9): its type is one of the parts with patterns, the song's style plays that
+// instrument or the song holds a track of its type, and its meter has the song's steps per bar. No style tag needed:
+// the listener picks it by hand. song: optional (the tracks it holds).
+export function fitsAir(item, plan, song = null) {
+  if (!item || !item.pattern || !AIR_TYPES.includes(item.type)) return false;
+  if (meterSteps((item.context && item.context.meter) || '4/4') !== meterSteps(plan.meter)) return false;
+  const held = [...(plan.tracks || []), ...((song && song.tracks) || [])].some(t => t.type === item.type);
+  return held || partHas(plan.R, patternPart(item));
+}
+// why a saved pattern does not fit (the console counts them): 'meter' or 'type'
+export const unfitReason = (item, plan, song = null) => (meterSteps((item.context && item.context.meter) || '4/4') !== meterSteps(plan.meter) ? 'meter' : 'type');
+// the sound a saved pattern plays as a new track (D9): its own when the app knows it, else null (a sound of the style)
+function knownSound(type, sound, R) {
+  if (!sound || typeof sound !== 'string') return null;
+  const r = R[type] || {};
+  if (type === 'drums') return KITS.includes(sound) || (r.kits || []).includes(sound) ? sound : null;
+  if (type === 'guitar') return GUITAR_TYPES[sound] ? sound : null;
+  return WAVES.some(w => w[0] === sound) || (r.waves || []).includes(sound) || /^gm_/.test(sound) ? sound : null;
+}
 
 const listOf = v => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 // the steps of a drums pattern as rows of x and dots on n steps (rows or a beat idea), for comparing grooves
@@ -460,7 +500,7 @@ function rewrite(song, plan, opts, cmd, rng) {
   const d0 = Math.floor(from / 2);
   const st = stateOf(song, P, at), on = playing(st);
   const ctx = { usual: P.usualHigh, weights: P.R.energy, hardMax: P.hardMax };
-  if (cmd.kind === 'vary' || cmd.kind === 'swap') return vary(song, P, O, cmd, st, `${rng.seed}:${cmd.kind}:${rng.n}:${rng.i}`);
+  if (cmd.kind === 'vary' || cmd.kind === 'swap' || (cmd.kind === 'pattern' && cmd.mode === 'replace')) return vary(song, P, O, cmd, st, `${rng.seed}:${cmd.kind}:${rng.n}:${rng.i}`);
   // the voice instrument (voice-placement): kept in the plan, so later rewrites (which write the spoken track again
   // from the plan) apply it again in order; the song is not directed again
   if (cmd.kind === 'voice') {
@@ -607,6 +647,25 @@ function rewrite(song, plan, opts, cmd, rng) {
       if (!id) break;
       P.added = (P.added || []).filter(a => a.id !== id);
       P.arrange = [...(P.arrange || []), { kind: 'less', track: id, at }];
+      break;
+    }
+    case 'pattern': {
+      // a new track (D9): the instrument's next track (an instance id when one is there), the pattern as A, its own sound
+      // when the app knows it, else the style's; the level as for "+"; recorded as a "+", so it stays like one
+      const it = cmd.item;
+      if (!it || cmd.mode === 'replace' || !fitsAir(it, P, song)) break;
+      const part = patternPart(it), t = newTrack(P, O, part, st, at, `${rng.seed}:pattern:${rng.n}:${rng.i}`);
+      if (!t) break;
+      t.patterns = { A: clone(it.pattern) };
+      const snd = knownSound(t.type, it.sound, P.R), key = t.type === 'drums' ? 'kit' : t.type === 'guitar' ? 'type' : 'wave';
+      if (snd) { t.settings[key] = snd; if (t.rack) delete t.rack; }
+      // a melody in its own chromatic mode keeps it (it moves by key only)
+      if (t.type === 'hook' && it.context && it.context.mode) t.settings.mode = it.context.mode;
+      P.tracks.push(t);
+      P.added = [...(P.added || []), { id: t.id, part, at, i: rng.i }];
+      P.arrange = [...(P.arrange || []), { kind: 'more', track: t.id, type: t.type, at }];
+      const n = on.filter(counted).length + 1;
+      if (n > P.hardMax) P.hardMax = n;
       break;
     }
     case 'riser': {

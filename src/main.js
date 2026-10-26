@@ -610,6 +610,9 @@ const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
 // the pattern preview of Compose (pattern-preview), made with the track panel below
 let preview = null;
+// the radio console's preview of a saved pattern (radio-arrangement D9): the same player, riding the radio with the radio
+// 12 dB lower; { item, ctx } of the pattern asked, made in createRadio's player below
+let radioPreview = null, radioPv = null;
 // code of a song at a bar, with the tempo of that bar (a live build changes code over time)
 // the code the player shows at a bar to evaluate it: the evaluation knows the bar (codeBar, used once)
 let codeBar = 0, codeFresh = false;
@@ -3446,7 +3449,7 @@ function songTick() {
 }
 try {
   const clock = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 100)'], { type: 'text/javascript' })));
-  clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); if (preview) preview.tick(); } };
+  clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); if (preview) preview.tick(); if (radioPreview) radioPreview.tick(); } };
 } catch (e) {}
 (function transport() {
   requestAnimationFrame(transport);
@@ -3459,6 +3462,7 @@ try {
     songTick();
   }
   if (preview) preview.tick();
+  if (radioPreview) radioPreview.tick();
   syncPreviewButtons();
   if (song && s && isPlaying() && !seeking) {
     const m = song.meta, cyc = s.now();
@@ -3720,11 +3724,34 @@ const preloadSounds = p => {
     .then(n => { if (n) console.info(`[sounds] next song: ${n} soundfont zones loaded (${names.join(', ')})`); }, () => {});
 };
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
+// the radio's saved pattern preview: the pattern's loop in the song's key, chords and tempo, on an orbit well above the
+// window's, the radio ducked to a quarter (12 dB) and never paused; it stops when the song on air changes
+radioPreview = createPreview({
+  sched, busy: () => !!(capture || fastJob),
+  source: (id, key) => {
+    if (!radioPv || radioPv.item.id !== id || !radio || !radio.on) return null;
+    const st = radio.state, it = st && st.stream[st.onAir];
+    if (!it || String(it.n) !== String(key)) return null;
+    const c = radioPv.ctx, item = radioPv.item;
+    const loop = loopSong({ ...item, kind: item.kind || 'basslines' }, { sound: item.sound ?? undefined, key: c.key, chords: c.chords, mode: (item.context || {}).mode || 'minor', bpm: c.bpm, meter: c.meter, beat: false, settings: item.settings });
+    return { song: `radio:${it.n}`, key: String(it.n), loop, bpm: c.bpm, shift: 0, orbit: 40, sig: JSON.stringify(loop) };
+  },
+  compile: loop => compileSong(loop), duck: () => 0.25,
+  // (the console redraws its listen buttons from the preview's state on its own)
+  onChange: () => {},
+});
+globalThis.codingMiskRadioPreview = radioPreview;
 radio = createRadio({
   root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a),
   // the user's saved patterns join the songs where they fit (pattern-library; material-generator D10)
   userPatterns: () => forRadio(patternsStore.list()),
   player: {
+    // a saved pattern heard before it goes in (radio-arrangement D9): toggle(item, { key, chords, bpm, meter, n })
+    preview: {
+      toggle: (item, ctx) => { const st = radioPreview.state; if (st && radioPv && radioPv.item.id === item.id) { radioPreview.stop(); radioPv = null; return false; } radioPv = { item, ctx }; return radioPreview.start(item.id, String(ctx.n)); },
+      stop: () => { radioPv = null; radioPreview.stop(); },
+      get on() { return radioPreview.state && radioPv ? radioPv.item.id : null; },
+    },
     makePlayable: (sg, songs) => radioPlayable(sg, songs),
     // a radio song grows away from the page (radio-profiles stage 4)
     grow: (song, ctx) => growAway(song, ctx),

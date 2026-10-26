@@ -126,8 +126,10 @@ export function patternStore(store) {
 }
 // the user's patterns as the director reads them (material-generator D10, src/endless/material.js): type, pattern, the
 // style tags it fits ("any" when it has none), the key context and the idea (a chromatic melody keeps its own mode)
+// (radio-arrangement D9: with its name, kind, sound and settings, for the console's Add a saved pattern; the context
+// holds its meter, key and tempo)
 export const forRadio = list => listPatterns(list).filter(p => p.kind !== 'grooves' || p.pattern.idea || p.pattern.rows)
-  .map(p => ({ id: p.id, type: p.type, pattern: clone(p.pattern), styles: Array.isArray(p.styles) && p.styles.length ? p.styles.slice() : ['any'], context: { ...(p.context || {}) }, ...(p.pattern.idea ? { idea: clone(p.pattern.idea) } : {}) }));
+  .map(p => ({ id: p.id, name: p.name || p.id, kind: p.kind, type: p.type, pattern: clone(p.pattern), sound: p.sound ?? null, settings: clone(p.settings || {}), styles: Array.isArray(p.styles) && p.styles.length ? p.styles.slice() : ['any'], context: { ...(p.context || {}) }, ...(p.pattern.idea ? { idea: clone(p.pattern.idea) } : {}) }));
 
 // ---------- Save as pattern (design D7) ----------
 // the section a pattern of a track plays in first (the first section when none of its clips plays it)

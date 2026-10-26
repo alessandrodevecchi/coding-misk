@@ -478,6 +478,58 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     await page.evaluate(() => localStorage.setItem('coding-misk-lang', 'en'));
   }
 
+  // ---------- Add a saved pattern (radio-arrangement phase 4) ----------
+  {
+    const mine = [
+      { id: 'p-bass', name: 'Basso mio', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: { wave: 'sawtooth', gain: 0.7 }, context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 128, mode: 'minor' }, styles: ['jazz'], source: 'compose', created: '2026-10-26' },
+      { id: 'p-hook', name: 'Melodia mia', kind: 'melodies', type: 'hook', pattern: { idea: { degrees: '<0 2 4 ~ 3 1>' } }, sound: 'square', settings: { wave: 'square', gain: 0.3 }, context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 60, mode: 'minor' }, styles: [], source: 'compose', created: '2026-10-26' },
+      { id: 'p-odd', name: 'Dispari', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: {}, context: { key: 'A', chords: 'notturna', meter: '7/8', bpm: 120, mode: 'minor' }, styles: [], source: 'compose', created: '2026-10-26' },
+    ];
+    await page.evaluate(list => { localStorage.setItem('coding-misk-patterns', JSON.stringify(list)); localStorage.setItem('coding-misk-lang', 'en'); localStorage.removeItem('coding-misk-radio-saved-open'); }, mine);
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', 'steer-saved'); await page.click('#radio-start'); await sleep(2500);
+    const head = await page.innerText('#sp-toggle');
+    check(/\(2\)/.test(head) && (await page.$$('#radio-steer .sp-list .sp-row')).length === 2 && /1 in another meter/.test(await page.innerText('#radio-steer .sp')), 'the panel lists the 2 patterns that fit, folded, and counts the 7/8 one', `${head} | ${await page.innerText('#radio-steer .sp')}`);
+    const painted = await page.$$eval('#radio-steer canvas[data-sp-pv]', cs => cs.map(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; }));
+    check(painted.length === 2 && painted.every(n => n > 20), 'each row has a preview drawing', JSON.stringify(painted));
+    await page.click('#sp-toggle'); await sleep(300);
+    check((await page.$$('#radio-steer .sp-card')).length === 2 && await page.isVisible('#radio-steer [data-sp-new="p-bass"]') && await page.isVisible('#radio-steer [data-sp-replace="p-bass"]'), 'open: cards with Add as new track and Replace');
+    check(/feel different/.test(await page.innerText('#radio-steer .sp-cards')), 'a pattern saved at 60 BPM warns about the tempo');
+    check(await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio-saved-open')) === true), 'the open panel is remembered');
+    // the preview: rides the radio, which goes on (not paused, its bars run), with the radio lower; a second press stops
+    const t0 = await now();
+    await page.click('#radio-steer [data-sp-listen="p-bass"]'); await sleep(1500);
+    const pv = await page.evaluate(() => globalThis.codingMiskRadioPreview.state);
+    const t1 = await now();
+    check(pv && pv.riding && /note|n\(/.test(pv.expr) && t1 > t0 + 0.5 && !(await page.evaluate(() => globalThis.codingMiskRadio.paused)), 'listen: the pattern rides the radio, which keeps playing', JSON.stringify({ pv: pv && { riding: pv.riding }, t0, t1 }));
+    check((await page.getAttribute('#radio-steer [data-sp-listen="p-bass"]', 'aria-pressed')) === 'true', 'the listen button shows it plays');
+    const ducked = await page.evaluate(() => { const s = document.querySelector('strudel-editor').editor.repl.scheduler, hs = s.pattern.queryArc(s.lastEnd, s.lastEnd + 1); return hs.some(h => h.value && h.value.velocity !== undefined && h.value.velocity <= 0.26 && h.value.orbit !== 40) && hs.some(h => h.value && h.value.orbit === 40); });
+    check(ducked, 'the radio plays 12 dB lower under the preview (velocity a quarter), the preview on its own bus');
+    await page.click('#radio-steer [data-sp-listen="p-hook"]'); await sleep(800);
+    check((await page.evaluate(() => globalThis.codingMiskRadioPreview.state && globalThis.codingMiskRadioPreview.state.riding)) && (await page.getAttribute('#radio-steer [data-sp-listen="p-bass"]', 'aria-pressed')) === 'false', 'another preview takes over');
+    await page.click('#radio-steer [data-sp-listen="p-hook"]'); await sleep(500);
+    check(!(await page.evaluate(() => globalThis.codingMiskRadioPreview.state)), 'a second press stops the preview');
+    // add as a new track: a bass track with the pattern; the queue names it
+    await page.click('#radio-steer [data-sp-new="p-bass"]'); await sleep(400);
+    let x = await ST();
+    const pc = x.commands.find(c => c.kind === 'pattern');
+    const added = await page.evaluate(() => globalThis.codingMiskRadio.steering.plan.added.slice(-1)[0]);
+    check(pc && pc.mode === 'new' && pc.item.name === 'Basso mio' && added && JSON.stringify(x.patterns[added.id].A) === JSON.stringify({ preset: 'rolling' }), 'Add as new track: a new bass with the saved bassline', JSON.stringify({ pc: pc && pc.mode, added }));
+    check(/\+ Basso mio \(/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "+ Basso mio (…)"', await page.innerText('#radio-steer .steer-queue'));
+    // replace: the saved melody in place of a playing track of its type, when one plays
+    const rep = await page.$('#radio-steer [data-sp-replace="p-hook"]:not([disabled])');
+    if (rep) {
+      await rep.click(); await sleep(400);
+      x = await ST();
+      const rc = x.commands.find(c => c.kind === 'pattern' && c.mode === 'replace');
+      check(rc && x.build.some(s => s.at === rc.at && s.pattern && s.pattern.track === rc.target && /^P\d+$/.test(s.pattern.to)), 'Replace: the saved melody as a P pattern on the chosen track', JSON.stringify(rc && { target: rc.target }));
+    } else check(/ · /.test(await page.getAttribute('#radio-steer [data-sp-replace="p-hook"]', 'title')), 'Replace off with its reason when no melody plays');
+    check(!(await err()), 'no evaluation error with saved patterns', (await err()).slice(0, 120));
+    if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'saved-en.png') });
+    await page.evaluate(() => localStorage.removeItem('coding-misk-patterns'));
+  }
+
   await page.click('#radio-start'); await sleep(300);
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();

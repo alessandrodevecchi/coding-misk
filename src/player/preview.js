@@ -55,20 +55,23 @@ export const miniStrings = expr => expr.replace(/"(?:[^"\\]|\\.)*"/g, m => `mini
 
 // the preview player in the page. app: { sched() → the main scheduler, busy() → an export or a recording runs,
 // source(id, key) → { song, key, loop, bpm, shift, sig } or null (the track or its pattern is gone),
-// compile(loop) → code, onChange() → the buttons are drawn again }. Strudel's functions come from the page
+// compile(loop) → code, onChange() → the buttons are drawn again, duck() → the main player's level while it rides, optional }. Strudel's functions come from the page
 // (globalThis: stack, pure, Cyclist, getTrigger, webaudioOutput, getAudioContext), the same copy the main player uses.
 export function createPreview(app, g = globalThis) {
   let on = null; // { id, key, song, sig, bpm, shift }
   let cur = null, prev = null, at = 0; // what plays from bar `at` on, what played before it
   let riding = false, free = null, hooked = null, raw, mixed = null, mixedOf = null, seen = 0, lastCheck = 0;
   const evalExpr = expr => new Function(`return (${miniStrings(expr)});`)();
+  // app.duck: a level (0 to 1) for the main player while the preview rides it (the radio, radio-arrangement D9: 12 dB
+  // lower), as a velocity on every event of the song; none in Compose
+  const duck = p => { const k = app.duck ? app.duck() : null; return k && k < 1 && p.withValue ? p.withValue(v => ({ ...v, velocity: (v.velocity ?? 1) * k })) : p; };
   // the main scheduler's pattern, with the preview stacked on it while it rides (the REPL keeps exposing the song's
   // pattern to the highlighting: exposeSchedulerPattern gets the pattern it set, not this getter's)
   const hook = s => {
     if (!s || hooked === s) return;
     raw = s.pattern;
     Object.defineProperty(s, 'pattern', { configurable: true, enumerable: true,
-      get: () => { if (!(riding && cur && raw)) return raw; if (mixedOf !== raw) { mixed = g.stack(raw, layers(true)); mixedOf = raw; } return mixed; },
+      get: () => { if (!(riding && cur && raw)) return raw; if (mixedOf !== raw) { mixed = g.stack(duck(raw), layers(true)); mixedOf = raw; } return mixed; },
       set: v => { raw = v; mixedOf = null; } });
     hooked = s;
   };

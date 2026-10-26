@@ -18,7 +18,7 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
-import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax, INSTRUMENTS as ARR_PARTS, RECOMMENDED, TRACK_CAP, instrumentOf, lockedIds, moreWarning, riserTarget, partHas } from '../src/endless/steering.js';
+import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax, INSTRUMENTS as ARR_PARTS, RECOMMENDED, TRACK_CAP, instrumentOf, lockedIds, moreWarning, riserTarget, partHas, fitsAir } from '../src/endless/steering.js';
 import { expandIdea } from '../src/song/ideas.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
@@ -1185,6 +1185,44 @@ const CHECKS = {
     }
     assert(n >= 8 && named >= 3, `${n} songs with two arps, ${named} named swaps`);
     console.log(`      ${n} songs with two arps: Auto takes them in turn, ${named} swaps of a named track`);
+  },
+  'arrangement: a saved pattern on air, new or in place of a track, in the song key, replayed as heard'() {
+    // a bassline saved in A minor (the song format writes parts in A; the compiler moves them to the section's key)
+    const item = { id: 'mine-1', name: 'Basso mio', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: { wave: 'sawtooth', gain: 0.7 }, styles: ['jazz'], context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 128, mode: 'minor' } };
+    let n = 0, rep = 0, inD = 0;
+    for (const g of arrSongs(40, 'arr-saved')) {
+      const at = applyBar('pattern', 2 * g.plan.phrase, g.plan);
+      if (!fitsAir(item, g.plan, g.song)) { assert(whyNot({ kind: 'pattern', mode: 'new', item }, g.song, g.plan, at - 1) === 'no-fit', `${g.style}: no-fit`); continue; }
+      const cmd = { kind: 'pattern', mode: 'new', item: JSON.parse(JSON.stringify(item)), at };
+      const r = steerArr(g, [cmd]), id = r.plan.added[0].id, t = r.song.tracks.find(x => x.id === id);
+      assert(t && t.type === 'bass' && JSON.stringify(t.patterns.A) === JSON.stringify(item.pattern) && t.settings.wave === 'sawtooth', `${g.style}: new bass ${JSON.stringify(t && t.patterns)}`);
+      assert(onAt(r.song, at).some(x => x.id === id) && onAt(r.song, at + 2 * g.plan.phrase).some(x => x.id === id), `${g.style}: the saved bassline does not stay`);
+      // in the song's key: the compiled bass line of the new track transposes by the section's key
+      const sec = stateAt(r.song, at + 1).song, code = compileSong(sec), key = (r.song.sections.reduce((a, s) => (a.at <= at ? { at: a.at + s.bars, s } : a), { at: 0, s: null }).s || {}).key;
+      const shift = (KEYS.find(k => k[0] === key) || [key, 0])[1];
+      const block = code.slice(code.indexOf(`// ========== ${t.name}`));
+      assert(shift === 0 || block.includes(`.transpose(${shift - 24})`) || block.includes(`transpose(${shift}`), `${g.style}: bass in ${key} not transposed (${shift}): ${block.slice(0, 200)}`);
+      if (key === 'D') inD++;
+      // the library changes later: the command holds its own copy, the replay sounds the same
+      const again = steerArr(g, [JSON.parse(JSON.stringify(cmd))]);
+      item.pattern.preset = 'gallop'; assert(JSON.stringify(steerArr(g, [JSON.parse(JSON.stringify(cmd))]).song) === JSON.stringify(again.song), `${g.style}: replay depends on the library`); item.pattern.preset = 'rolling';
+      assert(!validateSong(r.song).errors.length, `${g.style}: invalid`);
+      // in place of the playing bass: a P1 pattern on it, the track keeps its sound
+      const bass = onAt(g.song, at).find(x => x.type === 'bass');
+      if (bass) {
+        const rr = steerArr(g, [{ kind: 'pattern', mode: 'replace', target: bass.id, item: JSON.parse(JSON.stringify(item)), at }]);
+        const b2 = rr.song.tracks.find(x => x.id === bass.id), step = rr.song.build.find(s => s.at === at && s.by === 'listener' && s.pattern && s.pattern.track === bass.id);
+        assert(step && step.pattern.to === 'P1' && JSON.stringify(b2.patterns.P1) === JSON.stringify(item.pattern) && b2.settings.wave === g.song.tracks.find(x => x.id === bass.id).settings.wave, `${g.style}: replace ${JSON.stringify(step)}`);
+        assert(JSON.stringify(rr.song.sections) === JSON.stringify(g.song.sections), `${g.style}: replace changed the sections`);
+        rep++;
+      }
+      n++;
+    }
+    // a 7/8 pattern never fits a 4/4 song
+    const odd = { ...item, context: { ...item.context, meter: '7/8' } }, g0 = arrSongs(1, 'arr-saved')[0];
+    if (g0.plan.meter !== '7/8') assert(!fitsAir(odd, g0.plan, g0.song), '7/8 in 4/4');
+    assert(n >= 15 && rep >= 8, `${n} songs took the bassline, ${rep} replaced`);
+    console.log(`      ${n} songs took a saved bassline as a new track (${inD} in D), ${rep} in place of their bass; replays hold their own copy`);
   },
   'steering: one vary takes less than 20 ms'() {
     const all = varies(40), times = all.map(({ g, type, at }) => { const t0 = performance.now(); steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'vary', type, at }], seed: 'vary-time', n: 1 }); return performance.now() - t0; }).sort((a, b) => a - b);

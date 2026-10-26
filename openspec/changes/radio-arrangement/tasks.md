@@ -43,10 +43,10 @@ Total about 9 to 10 days. Phases 3 and 5 depend on 1; 4 depends on 1 and 2; 6 de
 
 ## 4. Add a saved pattern
 
-- [ ] 4.1 `forRadio` with `sound`, `settings`, meter; `fitsAir` (type and meter, no style tag needed) (D9); verify in `npm run check:patterns`
-- [ ] 4.2 Command `pattern` with a copied item, `new` and `replace`, key moves (degrees follow, fixed notes by the smallest interval, chromatic hooks keep their mode), sound rule; verify in `tools/check-endless.mjs` (an A minor bassline in D minor plays D minor notes; replay after deleting the saved pattern gives the same song)
-- [ ] 4.3 Console panel: collapsed list with mini previews, expanded cards like the Patterns tab, Add as new track, Replace with a track dropdown, the count of patterns that do not fit; strings in English and Italian
-- [ ] 4.4 Preview listen through the loop player at the song's key and tempo, radio ducked by 12 dB and never paused; verify with `node tools/check-steering.cjs` (preview starts and stops, the radio keeps its position, the recording has no gap) and screenshots
+- [x] 4.1 `forRadio` with `sound`, `settings`, meter; `fitsAir` (type and meter, no style tag needed) (D9); verify in `npm run check:patterns`
+- [x] 4.2 Command `pattern` with a copied item, `new` and `replace`, key moves (degrees follow, fixed notes by the smallest interval, chromatic hooks keep their mode), sound rule; verify in `tools/check-endless.mjs` (an A minor bassline in D minor plays D minor notes; replay after deleting the saved pattern gives the same song)
+- [x] 4.3 Console panel: collapsed list with mini previews, expanded cards like the Patterns tab, Add as new track, Replace with a track dropdown, the count of patterns that do not fit; strings in English and Italian
+- [x] 4.4 Preview listen through the loop player at the song's key and tempo, radio ducked by 12 dB and never paused; verify with `node tools/check-steering.cjs` (preview starts and stops, the radio keeps its position, the recording has no gap) and screenshots
 
 ## 5. Part harmony
 
