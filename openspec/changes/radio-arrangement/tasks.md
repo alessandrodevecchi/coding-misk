@@ -32,7 +32,7 @@ Total about 9 to 10 days. Phases 3 and 5 depend on 1; 4 depends on 1 and 2; 6 de
 - [ ] 2.1 Two-row Arrangement group with `[− name +]` pairs and count badges, only the instruments the style or the song has, More complex and Simpler kept (D1); strings in English and Italian in `src/i18n.js`
 - [ ] 2.2 Shortcuts 1 to 8 and Shift+digit; tooltips with the reasons `cap`, `no-type`, `last-track`, and the warning past the recommended count
 - [ ] 2.2b Locks in the console next to each instrument, half state, sync with the mixer both ways; drawn lock icons (closed `LOCK`, a new open lock in `src/icons.js`) in the console and the mixer, emoji removed (D12); warning line and badge colour past the recommended count (D4)
-- [ ] 2.2c Riser row: button, length and direction menus, sound menu hidden while one sound exists, riser lock, tooltip explaining the riser (D11); strings in English and Italian
+- [ ] 2.2c Riser row: button, length and direction menus, Suono dropdown shown from the start with its one option (Fruscio), row in every style, riser lock, tooltip explaining the riser (D11); strings in English and Italian
 - [ ] 2.3 Queue labels "+ arp (Arp 2)", "basso: bloccato", "riser 4 battute, sale", mixer rows for the new tracks; verify with `node tools/check-steering.cjs` (buttons per style, add twice, remove the last one, two kicks with the warning, cap at 12, cancel, lock and unlock in sync with the mixer, riser placed) and screenshots in Italian and English. Browser version of the owner's test: press "+ pad", seek two phrases on, the pad still plays and its mixer row is there
 - [ ] 2.4 `node --no-warnings tools/check-radio.cjs` and `node tools/check-transitions.cjs` with steered songs: no evaluation errors, below clipping
 

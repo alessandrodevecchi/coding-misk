@@ -148,10 +148,12 @@ What the riser is today, in plain words: a whoosh. A noise that rises (a filter 
 | "+ Riser al prossimo cambio" ("+ Riser before the next change") | button | one riser that ends on the next phrase where the part changes (the next role change; when none is left before the outro, the next double phrase) |
 | Lunghezza (Length) | Auto, 2, 4, 8 bars | Auto: the style's riser length, else 8, cut to the bars left before the change |
 | Direzione (Direction) | Sale (up), Scende (down) | up: rises into the change; down: a downlifter that starts on the change and falls after it |
-| Suono (Sound) | Fruscio (noise) | today's sound; the menu shows only when there is more than one (open question) |
+| Suono (Sound) | Fruscio (noise) | today's sound, the only option for now; the control is a real dropdown from the start, shown even with one option, so more riser sounds can be added without changing the row |
 | Lock "riser del regista" | open, closed | closed: the director places no riser in this song (the existing lock on the riser track id); the listener's risers still play |
 
 Command `riser { bars, dir, sound }`, recorded and replayed like the others; it writes a riser clip ending on the target bar, on the song's riser track (created from `music.js` defaults when the style has none) with `bars` and `dir` in the clip's settings. When the director already places a riser on that change, the command replaces it (one riser per change). With fewer than 2 bars left before the change it targets the change after (`steerWhy:late` names the bar). It is song-only whatever the scope (it marks one moment). The row shows for every style, since the noise does not depend on the style; in the 8 styles without a riser the director never adds one and only the listener's play. It does not count for the 12-track cap or density, as today.
+
+Follow-up (not in this change): more riser sounds (for example a snare roll that speeds up, or a synth sweep), and risers kept in the Pattern library (Patterns tab) as patterns the Suono dropdown can pick from.
 
 Rejected: a riser as a ninth instrument with + and −. A riser that plays on and on is noise over the song; the director already takes it out two phrases later.
 
@@ -188,8 +190,10 @@ Alternatives considered: locking every listener track by default (rejected by th
 - **Saved pattern sound** (83-6): yes, its own for a new track, the replaced track's for a replace (D9).
 - Still in force: one + and − per instrument, every instrument separate (arp, melody, guitar, not "lead" with a selector), a saved pattern picked from the console, controls shown in several places kept in sync.
 
-## Open Questions
+## Owner answers, second round (2026-10-26)
 
-- **Riser sounds.** Recommended: ship with today's noise only, length and direction; add a second sound (a snare roll that speeds up, or a synth sweep) as a follow-up issue once the owner has heard the row.
-- **Riser row in styles without a riser** (8 of 20). Recommended: show it everywhere; the noise suits any style and the director still adds none there by itself.
-- **Session lock before an instrument's first entry.** Recommended: as D10, the lock starts when the instrument first plays in a later song, so a locked instrument is not kept out of songs that open without it.
+Decided; no open questions remain.
+
+- **Riser sounds.** Only today's noise for now, but the Suono control is a real dropdown from the start, even with one option, so more risers can be added (D11). Follow-up: more riser sounds, and risers in the Pattern library (Patterns tab) as patterns to pick from.
+- **Riser row in styles without a riser** (8 of 20): approved. The row shows in every style; the director still adds no riser on its own in those 8 styles.
+- **Session lock before an instrument's first entry**: approved as D10. A whole-session lock starts in later songs when the instrument first enters, so a locked instrument is not kept out of songs that open without it.

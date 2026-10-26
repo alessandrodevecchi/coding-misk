@@ -1263,3 +1263,9 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Ambito e lucchetto (83-5).** Due domande diverse: l'ambito dice quanto dura una scelta (questo brano o tutta la diretta), il lucchetto se il regista la può cambiare. Le quattro combinazioni sono in D10; un lucchetto per tutta la diretta vale nei brani dopo da quando lo strumento entra.
 - **Confermati.** Menu dell'armonia del brano con Auto (83-4, fase 5), pattern salvato per tutta la diretta (83-5), suono del pattern salvato (83-6). Stima ora 9-10 giorni.
 - **Mockup** nella UI reale (iniettati, nessuna modifica a `src/`) in `notes/prove-2026-10-26/arrangiamento-spec-2/`: lucchetti con il basso bloccato, avviso per due casse, riga del riser.
+
+## 2026-10-26: spec dell'arrangiamento della radio, secondo giro di risposte (#83, radio-arrangement)
+
+- Riser: per ora solo il fruscio di oggi, ma "Suono" è un menu a tendina vero fin da subito, anche con una sola voce, per aggiungere altri riser. Seguito: altri suoni di riser, e riser nella libreria dei pattern (scheda Pattern) da scegliere.
+- Approvati: riga Riser in ogni stile (negli 8 stili senza riser il regista non ne aggiunge), lucchetto per tutta la diretta che parte quando lo strumento entra nei brani successivi.
+- Nessuna domanda aperta. Solo spec, nessun codice cambiato.

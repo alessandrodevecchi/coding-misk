@@ -130,7 +130,7 @@ The console SHALL offer a "Part harmony" command for one part with notes (lead, 
 - **THEN** from the next phrase the lead plays a treated line in the song's key, and the queue names the treatment chosen
 
 ### Requirement: Riser row
-The Arrangement group SHALL have a Riser row with a button "+ Riser before the next change" ("+ Riser al prossimo cambio"), a length menu (Auto, 2, 4, 8 bars), a direction menu (up, down) and a lock for the director's risers. The button SHALL place one riser that ends on the next phrase where the song's part changes (or the next double phrase when no change is left before the outro), with the chosen length and direction, replacing a riser the director placed on that change. A closed riser lock SHALL keep the director from placing risers in the song; the listener's risers SHALL still play. The row SHALL have a tooltip that says what a riser is. The riser SHALL NOT count toward the 12-track cap.
+The Arrangement group SHALL have a Riser row with a button "+ Riser before the next change" ("+ Riser al prossimo cambio"), a length menu (Auto, 2, 4, 8 bars), a direction menu (up, down), a Sound dropdown ("Suono") and a lock for the director's risers. The Sound dropdown SHALL be shown even with one option; today it SHALL offer only the noise sweep ("Fruscio"). The row SHALL show in every style; in a style without a riser the director SHALL still place none by itself. The button SHALL place one riser that ends on the next phrase where the song's part changes (or the next double phrase when no change is left before the outro), with the chosen length and direction, replacing a riser the director placed on that change. A closed riser lock SHALL keep the director from placing risers in the song; the listener's risers SHALL still play. The row SHALL have a tooltip that says what a riser is. The riser SHALL NOT count toward the 12-track cap.
 
 #### Scenario: A riser into the drop
 - **WHEN** the next part change is a drop 6 bars ahead and the listener picks 4 bars, up, and presses the button
@@ -139,6 +139,14 @@ The Arrangement group SHALL have a Riser row with a button "+ Riser before the n
 #### Scenario: No risers from the director
 - **WHEN** the listener closes the riser lock
 - **THEN** the director places no riser in the rest of the song
+
+#### Scenario: One riser sound
+- **WHEN** the listener opens the Riser row
+- **THEN** the Sound dropdown is shown with Fruscio as its only option, selected
+
+#### Scenario: A style without a riser
+- **WHEN** the song on air has a style without a riser
+- **THEN** the Riser row is shown, the director places no riser, and the listener's riser plays
 
 ### Requirement: Song harmony menu
 Song harmony SHALL offer a menu for the progression (Auto or one of the style's progressions) and for the key (Auto, a fifth up, a fifth down, the relative key), with Auto as the default. With Auto, "Change chords" and "Change key" SHALL pick as they do today; with a choice, the next press SHALL apply that progression or key.
