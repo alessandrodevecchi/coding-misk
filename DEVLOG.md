@@ -1235,3 +1235,9 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 
 - **Cosa.** Merge di `feat/75-shape-search` (1b3f0c9, `rotateNotes` e `SHAPES_VERSION` 7) in `feat/75-written-like-coder` (51f0281). Unico conflitto in `DEVLOG.md`, unito tenendo entrambe le voci; fixture Live coder, durate e fixture della radio di shape-search valgono anche qui senza riscriverle.
 - **Check.** `check:mixer -- --full` tutti i 46 brani uguali (prima del merge falliva su crescendo-notte-lunga), `check:typing` 15/15, `check:crescendo -- --full` 39/39 (fixture invariate), `check:durations`, `check:radio-profiles` 25/25, `check:ramps`, `check:live-code` 7/7, `check:knowledge` (solo avvisi), `build`.
+
+## 2026-10-25: livelli dei brani nuovi, etichetta dei riff nei check (#44, #72)
+
+- `snapshot-levels.cjs` e `check-levels.cjs` leggono la porta da `PORT` (predefinita 5173), come `check-patterns.cjs`: i check dei livelli girano anche su un server diverso da quello delle prove.
+- `tests/snapshots/levels.json`: livelli registrati per i 20 brani che non li avevano (crescendo-*, example-ideas, example-voices, prova-*, switch-*). Nessuna uscita sopra il limite. Una seconda misura con `check` sugli stessi 20 brani torna dentro la tolleranza per tutti.
+- `check-patterns.cjs`: 2 casi nuovi per l'etichetta dei riff (#72): la scheda e il dettaglio di un riff di chitarra dicono "Riffs · guitar · built-in"; la ricerca "bass" tra i riff trova solo i 5 riff di basso. Tutto ok sulla porta 5186.
