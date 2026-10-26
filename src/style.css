@@ -1343,12 +1343,9 @@ button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); 
 .voices-next[open] > summary { margin-bottom: 6px; }
 .tp-vinst { display: grid; gap: 6px; margin-bottom: 10px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; }
 .radio-voices { display: grid; gap: 8px; margin-top: 10px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; }
-.radio-voices .radio-voice { margin-top: 0; padding: 0; border: 0; }
-.radio-voices .voices-nar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; }
-.radio-voices .voices-nar > .ctrl { min-width: 140px; display: grid; gap: 4px; }
+.radio-voices .vb-main > .ctrl { min-width: 140px; display: grid; gap: 4px; }
 /* the Narrator knob: on its own line under the Narrator title, then the narrator chips and style */
-.radio-voices .voices-nar > .voices-sub { flex: 1 1 100%; }
-.radio-voices .voices-nar > .voices-knob, :root[data-ui="hw"] .radio-voices .voices-nar > .voices-knob { display: block; flex: 1 1 100%; max-width: 320px; }
+.radio-voices .vb-main > .voices-knob, :root[data-ui="hw"] .radio-voices .vb-main > .voices-knob { display: block; flex: 1 1 100%; max-width: 320px; }
 .radio-voices .voices-onair { margin-top: 8px; }
 button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); text-decoration: underline; cursor: pointer; font: inherit; }
 /* the two voice blocks (voice-full-controls): a title row with the switch, a main row, folded parts */
@@ -1407,3 +1404,13 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
   .pl-row .pl-voice { grid-column: 1 / -1; grid-row: 3; }
   .pl-cols { display: none; }
 }
+/* the radio Voices group (voice-full-controls D12): two stacked blocks */
+.radio-voices .voice-block { margin-top: 0; }
+.radio-voices .vb-parts > div { display: grid; gap: 4px; }
+/* the console's Voice group (voice-full-controls D10): a row per voice, then the typed line */
+.steer-voice { grid-column: 1 / -1; display: grid; gap: 6px; }
+.sv-row { display: grid; grid-template-columns: minmax(110px, auto) 1fr; align-items: center; gap: 6px 10px; }
+.sv-row .steer-btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sv-say input[type=text] { flex: 1 1 220px; min-width: 0; }
+.steer-voice > .hint { margin: 0; }
+@media (max-width: 560px) { .sv-row { grid-template-columns: 1fr; } }

@@ -22,10 +22,10 @@
 
 ## 5. Radio and console
 
-- [ ] 5.1 Radio options `narratorSound`, `voice.sound`, `voice.where` (D4, D7) in the director after the usual draws; session recipe only when not default; `check:endless` fixtures unchanged, `check:spoken` case for an overridden style
+- [x] 5.1 Radio options `narratorSound`, `voice.sound`, `voice.where` (D4, D7) in the director after the usual draws; session recipe only when not default; `check:endless` fixtures unchanged, `check:spoken` case for an overridden style
 - [ ] 5.2 Radio Voices group layout (D12): two blocks, folded Phrases and Sound parts remembered, one hint line, no on-air button; `check-voices.cjs` and `check-radio.cjs` updated; Italian screenshots in the notes folder
-- [ ] 5.3 Console Voice group: narrator row, voice instrument row with preset, style and Apply (`voice` + `voice-sound`, one queue entry), scope switch writing the Voices group (D10); `spokenCode` settings per bar; `tools/check-steering.cjs` cases (this song, whole session, Replay)
-- [ ] 5.4 "Aggiungi frase" with Say now and At the right moment (`say-live`, D10): queue, Cancel, stage text, narrator yields, recorded bar, Replay; disabled without the helper; `check-steering.cjs` cases with a fake helper
+- [x] 5.3 Console Voice group: narrator row, voice instrument row with preset, style and Apply (`voice` + `voice-sound`, one queue entry), scope switch writing the Voices group (D10); `spokenCode` settings per bar; `tools/check-steering.cjs` cases (this song, whole session, Replay)
+- [x] 5.4 "Aggiungi frase" with Say now and At the right moment (`say-live`, D10): queue, Cancel, stage text, narrator yields, recorded bar, Replay; disabled without the helper; `check-steering.cjs` cases with a fake helper
 
 ## 6. Samples
 

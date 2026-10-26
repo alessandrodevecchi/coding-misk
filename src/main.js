@@ -2349,7 +2349,8 @@ async function askSamples() {
 }
 // the custom samples and their lengths read again (a new sample of the voice helper): the song is written again with
 // them; while it plays, the new code is evaluated on the next bar
-async function refreshSamples() {
+// (the samples alone, for the radio's typed lines: the radio writes its songs again itself)
+async function reloadSamples() {
   const list = await (await fetch('/samples/strudel.json')).json();
   let lengths = {};
   try { const r = await fetch('/samples/say_lengths.json'); if (r.ok) lengths = await r.json(); } catch (e) {}
@@ -2357,6 +2358,9 @@ async function refreshSamples() {
   setSpokenContext({ files: list, lengths });
   crescendoCache.clear();
   if (globalThis.samples) await globalThis.samples('/samples/strudel.json');
+}
+async function refreshSamples() {
+  await reloadSamples();
   const was = dirty;
   changed();
   dirty = was; saveDraft();
@@ -4006,6 +4010,8 @@ radio = createRadio({
   root: $('#tab-radio'), t, tx, esc, store, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a),
   // the user's saved patterns join the songs where they fit (pattern-library; material-generator D10)
   userPatterns: () => forRadio(patternsStore.list()),
+  // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them
+  reloadSamples: () => reloadSamples(),
   player: {
     makePlayable: (sg, songs) => radioPlayable(sg, songs),
     // a radio song grows away from the page (radio-profiles stage 4)
