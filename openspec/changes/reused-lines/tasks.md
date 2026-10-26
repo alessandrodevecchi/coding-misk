@@ -1,7 +1,7 @@
 ## 1. Measure
 
-- [ ] 1.1 `growth:probe` reports reused lines (new pattern line, no like line among the lines it replaces, a line at least 0.8 alike shown earlier and gone): count, identical, growth or written part, typing ratio; `--json` field `reused`. Verify: on `develop` the totals over the built-in songs are 45 reused, 28 identical, 39 in the written part (design, Context)
-- [ ] 1.2 Record before numbers in the DEVLOG: reused totals, section-change typing of luci-rosse, settimo-cielo, kellerlicht, kellerlicht's written steps (274.5 s, 11 rushed). Verify: DEVLOG entry
+- [x] 1.1 `growth:probe` reports reused lines (new pattern line, no like line among the lines it replaces, a line at least 0.8 alike shown earlier and gone): count, identical, growth or written part, typing ratio; `--json` field `reused`. Verify: on `develop` the totals over the built-in songs are 45 reused, 28 identical, 39 in the written part (design, Context)
+- [x] 1.2 Record before numbers in the DEVLOG: reused totals, section-change typing of luci-rosse, settimo-cielo, kellerlicht, kellerlicht's written steps (274.5 s, 11 rushed). Verify: DEVLOG entry
 
 ## 2. Mute or delete on the code shown (D1)
 

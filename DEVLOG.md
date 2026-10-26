@@ -1412,3 +1412,9 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 
 - Approvati: con "Ordine casuale" spento anche i brani della radio provano le forme nell'ordine fisso; limiti di D8 (2 righe in anticipo, 1 per passo e per traccia, al massimo 4 righe mute, 32 battute avanti) per cominciare, da ritoccare dopo gli screenshot; righe scritte in anticipo solo nella parte scritta, non nella crescita.
 - Nessuna domanda aperta. Solo spec, nessun codice cambiato.
+
+## 2026-10-26: righe riusate, misura prima delle correzioni (#85, reused-lines 1)
+
+- **Probe.** `npm run growth:probe -- <brano>` riporta le righe riusate (riga di pattern scritta nuova, nessuna riga simile tra quelle che sostituisce, una riga simile almeno all'80% mostrata prima e uscita dal codice): quante, identiche, nella crescita o nella parte scritta, di corsa; quelle copiate da codice precedente (D3) a parte; righe scritte in anticipo, passi di corsa, massimo di righe mute a schermo. `npm run growth:probe -- all` fa tutti i 38 brani di serie e i totali; `--json` ha il campo `reused`.
+- **Prima** (`develop` ac4d238 unito, Live coder predefinito): 2148 righe nuove, 46 riusate (28 identiche, 7 nella crescita, 39 nella parte scritta, 39 di corsa, 3426 caratteri); 232 passi di corsa (199 nella parte scritta); al massimo 10 righe mute a schermo (switch-house-prova 8). L'indagine contava 45: non guardava il codice della battuta 0, il probe sì (una riga della crescita in più).
+- **Cambi di sezione, prima.** luci-rosse 206.9 s in 67.5 s (6 di corsa); settimo-cielo 332.3 s in 44.8 s (7); kellerlicht 187.2 s in 197.7 s (3), Druck 43.8 s in 2.3 s; tutti i 23 passi scritti di kellerlicht 274.5 s in 223.7 s, 11 di corsa.
