@@ -213,7 +213,7 @@ const STR = {
     composeGuitar: 'Chitarra', composeGuitarTip: 'Su una traccia di chitarra: un riff (passi veloci sopra il power chord) o solo power chord con un ritmo', composeGuitar_riff: 'Riff', composeGuitar_chords: 'Accordi',
     growingHint: 'Il brano sta crescendo: suona cresciuto tra un attimo', growFailed: 'Il brano non è riuscito a crescere: suona come è scritto',
     plAdded: 'Pattern {p} aggiunto a "{track}" in "{song}"', plAddedNew: 'Nuova traccia "{track}" con il pattern {p} in "{song}"', plOpen: 'Apri nella scheda Pattern',
-    srcPattern: 'Pattern: {name}', ptListen: 'Ascolta nella scheda Pattern', ptSaveAs: 'Salva come pattern', ptSaveTip: 'Tiene questo pattern tra i tuoi, con il suono della traccia, la tonalità e il tempo della sezione in cui suona', ptSavedPattern: 'Pattern salvato: {name}', ptOpenTab: 'Apri', sbTryPattern: 'Prova su un pattern',
+    srcPattern: 'Pattern: {name}', ptListen: 'Ascolta nella scheda Pattern', ptPreview: 'Anteprima del pattern (la traccia continua a suonare nel brano: il pulsante M la mette in muto)', ptPreviewStop: 'Ferma l\'anteprima del pattern', patsSong: 'Pattern del brano', patsMake: 'Crea pattern', pbBar: 'bar {n} / {total}', ptSaveAs: 'Salva come pattern', ptSaveTip: 'Tiene questo pattern tra i tuoi, con il suono della traccia, la tonalità e il tempo della sezione in cui suona', ptSavedPattern: 'Pattern salvato: {name}', ptOpenTab: 'Apri', sbTryPattern: 'Prova su un pattern',
   },
   en: {
     radioArtist: 'Artist', radioCustom: 'Custom', tipArtist: 'An artist picks styles and values for every song by their taste; touching styles or sliders goes back to Custom', newFromArtist: 'New song from artist…', newFromArtistDone: 'New song by {name}: listen and save it if you like it',
@@ -425,7 +425,7 @@ const STR = {
     composeGuitar: 'Guitar', composeGuitarTip: 'On a guitar track: a riff (quick steps over the power chord) or power chords only, with a rhythm', composeGuitar_riff: 'Riff', composeGuitar_chords: 'Chords',
     growingHint: 'The song is growing: it plays grown in a moment', growFailed: 'The song could not grow: it plays as written',
     plAdded: 'Pattern {p} added to "{track}" in "{song}"', plAddedNew: 'New track "{track}" with pattern {p} in "{song}"', plOpen: 'Open in the Patterns tab',
-    srcPattern: 'Pattern: {name}', ptListen: 'Listen in the Patterns tab', ptSaveAs: 'Save as pattern', ptSaveTip: 'Keeps this pattern among yours, with the track\'s sound and the key and tempo of the section it plays in', ptSavedPattern: 'Pattern saved: {name}', ptOpenTab: 'Open', sbTryPattern: 'Try on a pattern',
+    srcPattern: 'Pattern: {name}', ptListen: 'Listen in the Patterns tab', ptPreview: 'Preview the pattern (the track keeps playing in the song: the M button mutes it)', ptPreviewStop: 'Stop the pattern preview', patsSong: 'Song patterns', patsMake: 'Make patterns', pbBar: 'bar {n} / {total}', ptSaveAs: 'Save as pattern', ptSaveTip: 'Keeps this pattern among yours, with the track\'s sound and the key and tempo of the section it plays in', ptSavedPattern: 'Pattern saved: {name}', ptOpenTab: 'Open', sbTryPattern: 'Try on a pattern',
   },
 };
 

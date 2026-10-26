@@ -1,5 +1,5 @@
 // Browser checks for the player bar and the global volume (#32).
-// Usage: PLAYWRIGHT_CORE=... node tools/check-player.cjs   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-player.cjs   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
@@ -20,18 +20,20 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     pre.disconnect(a); post.disconnect(b);
     return { pre: ma, post: mb };
   });
-  const bar = () => page.evaluate(() => ({ title: document.getElementById('pb-title').textContent, pos: document.getElementById('pb-pos').textContent, onair: document.getElementById('pb-onair').classList.contains('on'),
+  const bar = () => page.evaluate(() => ({ title: document.getElementById('pb-title').textContent, pos: document.getElementById('pb-pos').textContent, barc: document.getElementById('pb-bar').textContent, now: document.querySelector('strudel-editor').editor.repl.scheduler.now(), onair: document.getElementById('pb-onair').classList.contains('on'),
     vol: +document.getElementById('pb-volume').value, muted: document.getElementById('pb-mute').getAttribute('aria-pressed') === 'true', started: document.querySelector('strudel-editor').editor.repl.scheduler.started,
     pick: document.getElementById('track-pick').value }));
   const setVol = (id, v) => page.evaluate(([id, v]) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, [id, v]);
 
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
   await page.evaluate(() => { localStorage.removeItem('coding-misk-volume'); localStorage.removeItem('coding-misk-muted'); });
   await page.reload(); await sleep(5000);
   await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(500);
   await page.click('#play'); await sleep(6000);
   let b = await bar();
   check(b.started && b.title && /\d+:\d\d \/ \d+:\d\d/.test(b.pos), 'play in the bar plays the song, with title and time', `${b.title} ${b.pos}`);
+  // the bar counter (pattern-preview): bar n / total next to the time
+  { const m = /^bar (\d+) \/ (\d+)$/.exec(b.barc); check(m && Math.abs(+m[1] - (Math.floor(b.now) + 1)) <= 1, 'the bar counter shows bar n / total', b.barc); }
 
   // volume: 20 % lowers what is heard to a fifth, the master (exports) stays the same
   const full = await levels();
@@ -77,6 +79,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   b = await bar();
   const r0 = await page.evaluate(() => codingMiskRadio.state);
   check(b.onair && b.title === r0.stream[r0.onAir].title, 'radio: ON AIR and the song on air in the bar');
+  { const it = r0.stream[r0.onAir], m = /^bar (\d+) \/ (\d+)$/.exec(b.barc); check(m && +m[2] === it.bars && Math.abs(+m[1] - (Math.floor(b.now - it.start) + 1)) <= 1 && /\d+:\d\d \/ \d+:\d\d/.test(b.pos), 'radio: the counter shows the bars of the song on air, the time stays', `${b.barc} · ${b.pos}`); }
   await page.click('#pb-next'); await sleep(4000);
   const r1 = await page.evaluate(() => codingMiskRadio.state);
   check(r1.onAir === r0.onAir + 1, 'radio: next skips to the next song');

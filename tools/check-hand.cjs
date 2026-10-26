@@ -1,5 +1,5 @@
 // Browser checks for hand live coding (#20) in Compose, on Primo Segnale (a song with its own steps).
-// Usage: PLAYWRIGHT_CORE=... node tools/check-hand.cjs   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-hand.cjs   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
@@ -19,7 +19,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   });
   const untilBar = async b => { for (let k = 0; k < 120 && (await st()).cyc < b; k++) await sleep(250); };
 
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
   await page.locator('#track-pick').selectOption('primo-segnale'); await sleep(800);
   await page.click('#play'); await sleep(3000);
   check((await st()).started && !(await st()).hand, 'live build plays, not by hand');
