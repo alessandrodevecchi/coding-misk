@@ -37,7 +37,7 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
         <div class="sheet-block"><h4>${esc(t('artStats'))}</h4>${RANGES.map(k => `<div class="wrow"><span>${esc(t('art_' + k))}</span>${bar(a[k])}</div>`).join('')}</div>
         <div class="sheet-block"><h4>${esc(t('libShapes'))}</h4>${weightsBars(a.shapes, k => t('shape_' + k))}</div>
         <div class="sheet-block"><h4>${esc(t('artMoves'))}</h4>${weightsBars(a.moves)}</div>
-        <div class="sheet-block"><h4>${esc(t('voice'))}</h4>${weightsBars(a.voice.characters)}<div class="muted small">${esc(t('artVoiceChance', { p: pct(a.voice.chance) }))}</div></div>
+        <div class="sheet-block"><h4>${esc(t('voiceTitle'))}</h4>${weightsBars(a.voice.characters)}<div class="muted small">${esc(t('artVoiceChance', { p: pct(a.voice.chance) }))}</div></div>
         <div class="sheet-block"><h4>${esc(t('artTransitions'))}</h4>${weightsBars(a.transitions.kinds, k => t(`tx:${k}`))}<div class="muted small">${esc(t('artTxBars', { a: a.transitions.bars[0], b: a.transitions.bars[1] }))} · ${esc(t('radioHarmony'))}: ${esc(t(`harmony:${a.transitions.harmony}`))}</div></div>
         <div class="sheet-block"><h4>${esc(t('artQuirks'))}</h4>${Object.entries(a.quirks).length ? Object.entries(a.quirks).map(([q, c]) => `<div class="wrow"><span>${esc(tx(QUIRKS[q] || { en: q }))}</span><span class="muted mono">${pct(c)}</span></div>`).join('') : `<span class="muted">${esc(t('libNone'))}</span>`}</div>
       </div></div>`;
@@ -62,7 +62,7 @@ export function createArtistsTab({ root, t, tx, esc, store, builtins, styles, to
       <div class="sheet-block"><h4>${esc(t('artStyles'))}</h4>${weights('styles', styleIds(), styleName)}</div>
       <div class="sheet-block"><h4>${esc(t('libShapes'))}</h4>${weights('shapes', SHAPES, k => t('shape_' + k))}</div>
       <div class="sheet-block"><h4>${esc(t('artMoves'))}</h4>${weights('moves', MOVE_KINDS)}</div>
-      <div class="sheet-block"><h4>${esc(t('voice'))}</h4><div class="ctrl"><span class="lbl">${esc(t('artVoiceChanceLbl'))}</span>${num('voice.chance', A.voice.chance)}</div>
+      <div class="sheet-block"><h4>${esc(t('voiceTitle'))}</h4><div class="ctrl"><span class="lbl">${esc(t('artVoiceChanceLbl'))}</span>${num('voice.chance', A.voice.chance)}</div>
         <div class="wgrid">${VOICE_CHARACTER_NAMES.map(k => `<label><span>${k}</span>${num(`voice.characters.${k}`, (A.voice.characters || {})[k] ?? 0, 1)}</label>`).join('')}</div>${err('voice')}</div>
       <div class="sheet-block"><h4>${esc(t('artTransitions'))}</h4>
         <div class="wgrid">${TRANSITION_KINDS.map(k => `<label><span>${esc(t(`tx:${k}`))}</span>${num(`transitions.kinds.${k}`, A.transitions.kinds[k] ?? 0, 1)}</label>`).join('')}</div>

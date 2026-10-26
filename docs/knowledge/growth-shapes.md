@@ -40,7 +40,7 @@ Shapes apply only with the Live coder profile and its natural growth. Classic an
 ## Options
 
 <!-- generated:growth-shapes -->
-**Opening (it: Apertura)** (`opening`): How it starts: one kick that grows (Slow), the full kick, silence while the first line is typed, a broken beat, a filtered kick that opens, an arpeggio or a melody, a pad or a drone, a voice, a written base kept muted and switched on line by line, two tracks already playing in solo.
+**Opening (it: Apertura)** (`opening`): How it starts: one kick that grows (Slow), the full kick, silence while the first line is typed, a broken beat, a filtered kick that opens, an arpeggio or a melody, a pad or a drone, the voice track, a written base kept muted and switched on line by line, two tracks already playing in solo.
 
 | Value | Name | Default weight |
 | --- | --- | --- |
@@ -51,7 +51,7 @@ Shapes apply only with the Live coder profile and its natural growth. Classic an
 | `filtered` | filtered kick (it: cassa filtrata) | 1 |
 | `melodic` | arpeggio or melody (it: arpeggio o melodia) | 1 |
 | `pad` | pad or drone (it: pad o bordone) | 1 |
-| `voice` | voice (it: voce) | 0.5 |
+| `voice` | voice track (it: voce traccia) | 0.5 |
 | `muted-base` | muted base (it: base muta) | 1 |
 | `mid-set` | mid-set (it: a metà set) | 1 |
 

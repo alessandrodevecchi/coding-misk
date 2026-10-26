@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import { readdirSync, statSync, existsSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { createHash } from 'node:crypto';
+import { canSpeak, makeSampleAsync, writeLengths, wavSeconds, MAX_WORDS } from './tools/voice-sample.mjs';
 
 // Campioni personalizzati: ogni cartella in public/samples/ diventa un suono (voce/01.wav → s("voce").n(0)),
 // ogni file sciolto diventa un suono col suo nome. L'elenco per Strudel si genera da solo.
@@ -30,6 +31,48 @@ const customSamples = () => ({
   },
   generateBundle() {
     this.emitFile({ type: 'asset', fileName: 'samples/strudel.json', source: JSON.stringify(samplesManifest()) });
+  },
+});
+
+// The voice helper (voice-full-controls D8), dev server only: the sample of a new or edited line, made on request with
+// the same per-line function as `npm run voices` (tools/voice-sample.mjs). GET /voice/status says whether it works
+// here (macOS `say` and ffmpeg); POST /voice/say { text, lang, speaker } makes public/samples/say_<lang>[_<speaker>]/
+// <slug>.wav, adds its length to say_lengths.json and answers { bank, n, seconds }. One request at a time (a queue);
+// at most 12 words; only from this machine. The samples folder is not a module, so a new file reloads no page.
+const SPEAKER_IDS = ['', 'eddy', 'flo', 'grandma', 'grandpa', 'reed', 'rocko', 'sandy', 'shelley'];
+const voiceHelper = () => ({
+  name: 'coding-misk-voice',
+  apply: 'serve',
+  configureServer(server) {
+    let ok = null, queue = Promise.resolve();
+    const local = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    const send = (res, code, body) => { res.statusCode = code; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)); };
+    server.middlewares.use('/voice/status', (req, res) => { if (!local(req)) return send(res, 403, { ok: false }); if (ok === null) ok = canSpeak(); send(res, 200, { ok }); });
+    server.middlewares.use('/voice/say', (req, res) => {
+      if (!local(req)) return send(res, 403, { error: 'local only' });
+      if (req.method !== 'POST') return send(res, 405, { error: 'POST' });
+      let raw = '';
+      req.on('data', c => { raw += c; if (raw.length > 4000) req.destroy(); });
+      req.on('end', () => {
+        let b = null;
+        try { b = JSON.parse(raw); } catch (e) { return send(res, 400, { error: 'json' }); }
+        const text = typeof b.text === 'string' ? b.text.trim().replace(/\s+/g, ' ') : '', lang = b.lang, speaker = typeof b.speaker === 'string' ? b.speaker : '';
+        if (!text || text.length > 160 || text.split(' ').length > MAX_WORDS) return send(res, 400, { error: 'text' });
+        if (!['en', 'it'].includes(lang) || !SPEAKER_IDS.includes(speaker)) return send(res, 400, { error: 'voice' });
+        if (ok === null) ok = canSpeak();
+        if (!ok) return send(res, 503, { error: 'no generator' });
+        const t0 = Date.now();
+        queue = queue.then(async () => {
+          try {
+            const r = await makeSampleAsync(text, lang, speaker, { root: SAMPLES_DIR });
+            if (!r) return send(res, 404, { error: 'speaker not installed' });
+            writeLengths(SAMPLES_DIR, [r.file]);
+            const files = readdirSync(join(SAMPLES_DIR, r.bank)).filter(f => AUDIO.test(f)).sort();
+            send(res, 200, { bank: r.bank, n: files.indexOf(r.file.split(sep).pop()), seconds: wavSeconds(r.file), made: r.made, ms: Date.now() - t0 });
+          } catch (e) { send(res, 500, { error: String(e && e.message || e).slice(0, 200) }); }
+        });
+      });
+    });
   },
 });
 
@@ -70,7 +113,7 @@ const growthHashModule = () => {
 };
 
 export default defineConfig({
-  plugins: [customSamples(), growthHashModule()],
+  plugins: [customSamples(), growthHashModule(), voiceHelper()],
   server: { port: 5173, open: true },
   // the fast export's hidden render page (#8); the live output's broadcast window and control room (#52)
   build: { rollupOptions: { input: { main: 'index.html', render: 'render.html', broadcast: 'broadcast.html', live: 'live.html' } } },

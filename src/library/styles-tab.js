@@ -58,7 +58,7 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
         <div class="progs">${(r.progressions || []).map(p => `<div>${prog(p)}</div>`).join('')}</div>
         <div><span class="lbl">${esc(t('libMeters'))}</span> ${tagList(r.meters || ['4/4'])}${r.swing ? ` · swing ${esc(range(r.swing))}` : ''}</div></div>
       ${instr}
-      <div class="sheet-block"><h4>${esc(t('voice'))}</h4><div><span class="lbl">${esc(t('libSpeakers'))}</span> ${tagList(v.speakers || (v.speaker !== undefined ? [v.speaker || 'default'] : []))}</div>
+      <div class="sheet-block"><h4>${esc(t('voiceTitle'))}</h4><div><span class="lbl">${esc(t('libSpeakers'))}</span> ${tagList(v.speakers || (v.speaker !== undefined ? [v.speaker || 'default'] : []))}</div>
         <div>${Object.entries(v).filter(([k]) => !['speaker', 'speakers'].includes(k)).map(([k, x]) => `${esc(k)} ${esc(range(x))}`).join(' · ')}</div></div>
       <div class="sheet-block"><h4>${esc(t('libWords'))}</h4>${['en', 'it', 'es'].map(l => `<div><span class="lbl">${l}</span> ${esc(((r.words || {})[l] || []).join(', '))}</div>`).join('')}</div>
     </div>`;
@@ -92,7 +92,7 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
           <div class="ctrl"><span class="lbl">${esc(t('libKeys'))}</span>${chips(KEYS.map(k => k[0]), r.keys || [], 'keys')}${err('keys')}</div>
           <div class="ctrl"><span class="lbl">${esc(t('libProgressions'))}</span>${chips(Object.keys(PROGS), r.progressions || [], 'progressions')}${err('progressions')}</div>
           <div class="ctrl"><span class="lbl">${esc(t('libMeters'))}</span>${chips(METERS.map(m => m[0]), r.meters || ['4/4'], 'meters')}</div></div>
-        <div class="sheet-block"><h4>${esc(t('voice'))}</h4>
+        <div class="sheet-block"><h4>${esc(t('voiceTitle'))}</h4>
           <div class="ctrl"><span class="lbl">${esc(t('libSpeakers'))}</span>${chips(['', ...SPEAKERS].map(s => s || 'default'), ((r.voice || {}).speakers || []).map(s => s || 'default'), 'voice.speakers')}</div>
           <p class="muted small">${esc(t('libVoiceJson'))}</p></div>
         ${ins}

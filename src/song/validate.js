@@ -124,7 +124,9 @@ export function validateSong(song, opts = {}) {
         if (v.kind !== undefined && !VOICE_KINDS.includes(v.kind)) err(`${vp}.kind`, `one of ${VOICE_KINDS.join(', ')}`);
         if (v.ways !== undefined && (!Array.isArray(v.ways) || v.ways.some(w => !VOICE_WAYS.includes(w)))) err(`${vp}.ways`, `a list from ${VOICE_WAYS.join(', ')}`);
         if (v.draw !== undefined && !(Number.isInteger(v.draw) && v.draw >= 0)) err(`${vp}.draw`, 'a whole number, 0 or more');
-        for (const k of Object.keys(v)) if (!['phrases', 'kind', 'ways', 'draw'].includes(k)) warn(`${vp}.${k}`, 'unknown field; fields: phrases, kind, ways, draw');
+        // where it speaks (voice-full-controls D7): quiet, medium and busy parts, one at least
+        if (v.where !== undefined && (!Array.isArray(v.where) || !v.where.length || v.where.some(w => !['quiet', 'medium', 'busy'].includes(w)))) err(`${vp}.where`, 'a list from quiet, medium, busy, one at least');
+        for (const k of Object.keys(v)) if (!['phrases', 'kind', 'ways', 'where', 'draw'].includes(k)) warn(`${vp}.${k}`, 'unknown field; fields: phrases, kind, ways, where, draw');
       }
     }
     const pats = tr.patterns || {};

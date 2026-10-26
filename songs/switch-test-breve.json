@@ -212,7 +212,7 @@
     },
     {
       "id": "voice",
-      "name": "Voice",
+      "name": "Narrator",
       "type": "voice",
       "settings": {
         "gain": 0.3,
