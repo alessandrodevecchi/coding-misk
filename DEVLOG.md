@@ -1241,3 +1241,10 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - `snapshot-levels.cjs` e `check-levels.cjs` leggono la porta da `PORT` (predefinita 5173), come `check-patterns.cjs`: i check dei livelli girano anche su un server diverso da quello delle prove.
 - `tests/snapshots/levels.json`: livelli registrati per i 20 brani che non li avevano (crescendo-*, example-ideas, example-voices, prova-*, switch-*). Nessuna uscita sopra il limite. Una seconda misura con `check` sugli stessi 20 brani torna dentro la tolleranza per tutti.
 - `check-patterns.cjs`: 2 casi nuovi per l'etichetta dei riff (#72): la scheda e il dettaglio di un riff di chitarra dicono "Riffs · guitar · built-in"; la ricerca "bass" tra i riff trova solo i 5 riff di basso. Tutto ok sulla porta 5186.
+
+## 2026-10-26: spec dell'anteprima pattern e del contatore di battute (#84)
+
+- **Cosa.** Nuovo change OpenSpec `openspec/changes/pattern-preview/` (solo spec, nessun codice): anteprima del pattern in Compose come secondo player indipendente (play/stop accanto alla cuffia del preset), righe rinominate "Pattern del brano" e "Crea pattern", contatore `bar n / totale` nella barra del player (anche Live coder, Crescendo e radio). Il salto della timeline nei profili con crescita resta un seguito (D9).
+- **Ricerca.** Un secondo `repl()` di Strudel riscrive lo stato globale dello scheduler (`setTime`, `setCpsFunc`, `setTriggerFunc`): scartato. Proposta: quando il brano suona l'anteprima si somma al pattern dello scheduler principale (`stack`, senza toccare codice ed editor), a brano fermo gira su un `Cyclist` nudo sullo stesso AudioContext; orbit dedicata, niente `.analyze`. Il loop della scheda Pattern (`playLoop`) è il player principale: si riusa solo `loopSong` e le impostazioni di `listenPattern`.
+- **Mockup.** Tre screenshot dell'app vera con la proposta iniettata nel DOM, in `notes/prove-2026-10-26/anteprima-pattern-spec/` (non versionati).
+- **Check.** `openspec validate pattern-preview --strict` ok.
