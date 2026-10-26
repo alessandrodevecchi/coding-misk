@@ -13,7 +13,7 @@
 ## 3. Where the voice instrument speaks
 
 - [x] 3.1 `partsOf(song, from, where)` (D7) in `src/endless/voice-track.js`, used by `rewriteSpoken`, the director's placement and the refrain rule in `src/song/spoken.js`; `check:spoken` cases (many phrases with quiet and medium, only busy, default identical) and `npm run check:endless` with fixtures unchanged
-- [ ] 3.2 Where chips in `voicePanel` (track, radio, new song modes), `voiceOptions.where` in the validator and `docs/SONG-FORMAT.md`; toast texts for the new kinds; `check:songs`
+- [x] 3.2 Where chips in `voicePanel` (track, radio, new song modes), `voiceOptions.where` in the validator and `docs/SONG-FORMAT.md`; toast texts for the new kinds; `check:songs`
 
 ## 4. Narrator
 
@@ -29,8 +29,8 @@
 
 ## 6. Samples
 
-- [ ] 6.1 Extract `makeSample` from `tools/voice.mjs`; `npm run voices -- --song <file>`; same output as before for `songs/` (file list compared)
-- [ ] 6.2 Dev-only voice helper plugin in `vite.config.js` (`/voice/status`, `/voice/say`, queue, argument passing, 12-word limit); the app asks for missing samples of edited and typed lines and reloads that bank; measure the time per line and check no page reload; result in the DEVLOG
+- [x] 6.1 Extract `makeSample` from `tools/voice.mjs`; `npm run voices -- --song <file>`; same output as before for `songs/` (file list compared)
+- [x] 6.2 Dev-only voice helper plugin in `vite.config.js` (`/voice/status`, `/voice/say`, queue, argument passing, 12-word limit); the app asks for missing samples of edited and typed lines and reloads that bank; measure the time per line and check no page reload; result in the DEVLOG
 
 ## 7. Owner answers of 2026-10-26
 

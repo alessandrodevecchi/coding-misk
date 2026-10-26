@@ -27,6 +27,7 @@ import { meterSteps } from '../src/music.js';
 import { rewriteSpoken, trackVoice, quietParts, nextQuiet, wherePartsOf } from '../src/endless/voice-track.js';
 import { sectionFacts } from '../src/song/spoken.js';
 import { soundPatch } from '../src/endless/voice-sound.js';
+import * as VS from './voice-sample.mjs';
 import { phraseRows, listVocab, editText, editBars, removeRow, addRow, fillRows, vocabOf } from '../src/endless/phrase-list.js';
 import { steerSong, applyBar, whyNot } from '../src/endless/steering.js';
 
@@ -624,6 +625,10 @@ const CHECKS = {
     const add = addRow(last, id, { group: 'calm' });
     assert(add.song && phraseRows(add.song, id).length === 1 && vocabOf(add.song.tracks.find(t => t.id === id).patterns.A) === 'calm', `add: ${JSON.stringify(add.error || add.start)}`);
     assert(!validateSong(f.song).errors.length && !validateSong(add.song).errors.length, 'invalid song after an edit');
+  },
+  'voice helper (D8): the sample file names and banks of tools/voice-sample.mjs are the app\'s'() {
+    for (const x of ['Serve più ritmo!', "l'ultimo treno", 'a brand new line, here']) assert(VS.saySlug(x) === saySlug(x), x);
+    assert(VS.sayBank('it', 'eddy') === 'say_it_eddy' && VS.sayBank('en', '') === 'say_en' && VS.MAX_WORDS === 12, 'banks');
   },
 };
 

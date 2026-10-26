@@ -8,11 +8,11 @@
 // vocabulary (one sample per entry) for the speakers that speak them, and the poetic narrator's images (the
 // vocabulary's poetic group, the songs' and styles' own) for the narrator speakers. The length of every sample goes to
 // public/samples/say_lengths.json, so lines are placed from the length of the sample in use.
-//   node tools/voice.mjs [--en Samantha] [--it Alice] [--force]
-// Needs macOS (`say`) and ffmpeg.
+//   node tools/voice.mjs [--en Samantha] [--it Alice] [--force] [--song file.json …] [--list]
+// --song: also a song exported from the browser (its spoken lines and steps); --list: print the samples it would
+// make, make none. Needs macOS (`say`) and ffmpeg; the per-line part is tools/voice-sample.mjs (voice-full-controls).
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { songFiles } from './songs-dir.mjs';
 import { PHRASES, saySlug, sayBank, voiceOf } from '../src/song/build.js';
 import { CRESCENDO_PHRASES } from '../src/song/crescendo.js';
@@ -23,16 +23,12 @@ import { SPEAKERS } from '../src/song/build.js';
 import { lineOf, lineTexts, speakerOf, setSpokenContext } from '../src/song/spoken.js';
 import { vocabularyTexts, poeticTexts } from '../src/song/vocabulary.js';
 
+import { systemVoice, makeSample, writeLengths } from './voice-sample.mjs';
+
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
-const DEFAULT_VOICE = { en: opt('en', 'Samantha'), it: opt('it', 'Alice') }, force = args.includes('--force');
-// system voice of a speaker for a language: "Eddy (English (US))" or "Eddy (Inglese (USA))" depending on the system language
-const installed = execFileSync('say', ['-v', '?'], { encoding: 'utf8' }).split('\n').map(l => l.match(/^(.+?)\s+([a-z]{2}_[A-Z]{2})\s+#/)).filter(Boolean).map(m => ({ name: m[1].trim(), locale: m[2] }));
-function systemVoice(lang, speaker) {
-  if (!speaker) return DEFAULT_VOICE[lang];
-  const want = lang === 'it' ? ['it_IT'] : ['en_US', 'en_GB'];
-  for (const loc of want) { const v = installed.find(x => x.locale === loc && x.name.toLowerCase().startsWith(speaker)); if (v) return v.name; }
-  return null;
-}
+const DEFAULT_VOICE = { en: opt('en', 'Samantha'), it: opt('it', 'Alice') }, force = args.includes('--force'), listOnly = args.includes('--list');
+// songs exported from the browser (--song file.json, as many times as needed)
+const extraSongs = args.flatMap((a, i) => (a === '--song' && args[i + 1] ? [args[i + 1]] : []));
 // phrases per language and speaker: "en|rocko" → Set
 const phrases = new Map();
 const addSay = (say, speaker = '') => {
@@ -45,13 +41,14 @@ const addSay = (say, speaker = '') => {
     phrases.get(key).add(text);
   }
 };
-for (const f of songFiles('songs')) {
+const allSongFiles = [...songFiles('songs'), ...extraSongs];
+for (const f of allSongFiles) {
   const song = JSON.parse(fs.readFileSync(f, 'utf8'));
   for (const s of song.build || []) { const v = voiceOf(song, s); addSay(s.say, (v && v.settings && v.settings.speaker) || ''); }
 }
 Object.values(PHRASES).forEach(s => addSay(s));
 // Crescendo builds (#64) pick their comments from their own list, spoken by the voice track of any song
-const songSpeakers = new Set(['', ...songFiles('songs').flatMap(f => (JSON.parse(fs.readFileSync(f, 'utf8')).tracks || []).filter(t => t.type === 'voice').map(t => (t.settings && t.settings.speaker) || ''))]);
+const songSpeakers = new Set(['', ...allSongFiles.flatMap(f => (JSON.parse(fs.readFileSync(f, 'utf8')).tracks || []).filter(t => t.type === 'voice').map(t => (t.settings && t.settings.speaker) || ''))]);
 for (const sp of songSpeakers) CRESCENDO_PHRASES.forEach(s => addSay(s, sp));
 // the director's pool, for the default voice and every speaker a style recipe names
 const speakers = new Set(['', ...loadStyles().map(r => (r.voice && r.voice.speaker) || '')]);
@@ -60,7 +57,7 @@ for (const sp of speakers) [...allPhrases(), ...INTERLUDE_SAY.map(([en, it]) => 
 // voice instrument: each line of a song's spoken tracks with the track's speaker (its own, or the one drawn for it)
 const recipes = loadStyles();
 setSpokenContext({ styles: Object.fromEntries(recipes.map(r => [r.id, r])) });
-const songsAll = songFiles('songs').map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+const songsAll = allSongFiles.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
 const spokenSpeakers = new Set();
 for (const song of songsAll) for (const t of (song.tracks || []).filter(x => x.type === 'spoken')) {
   const sp = speakerOf(song, t);
@@ -87,39 +84,16 @@ for (const sp of narrators) poetic.forEach(p => addSay(p, sp));
 let made = 0, kept = 0;
 const missing = new Set();
 for (const [key, set] of phrases) {
-  const [lang, speaker] = key.split('|'), voice = systemVoice(lang, speaker);
-  if (!voice) { missing.add(`${speaker} (${lang})`); continue; }
-  const dir = path.join('public', 'samples', sayBank(lang, speaker));
-  fs.mkdirSync(dir, { recursive: true });
+  const [lang, speaker] = key.split('|');
+  if (!systemVoice(lang, speaker, DEFAULT_VOICE)) { missing.add(`${speaker} (${lang})`); continue; }
   for (const text of set) {
-    const out = path.join(dir, `${saySlug(text)}.wav`);
-    if (fs.existsSync(out) && !force) { kept++; continue; }
-    const tmp = path.join(dir, '.tmp.aiff');
-    execFileSync('say', ['-v', voice, '-o', tmp, text]);
-    // cut the silence at the start, so the word lands on the beat; even loudness for every phrase
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', tmp, '-af', 'silenceremove=start_periods=1:start_threshold=-45dB,loudnorm=I=-16:TP=-1.5', '-ar', '44100', '-ac', '1', out]);
-    fs.rmSync(tmp);
-    made++;
+    if (listOnly) { console.log(path.join(sayBank(lang, speaker), `${saySlug(text)}.wav`)); continue; }
+    const r = makeSample(text, lang, speaker, { force, defaults: DEFAULT_VOICE });
+    if (r && r.made) made++; else kept++;
   }
 }
+if (listOnly) process.exit(0);
 // the length of every sample (seconds), read from the WAV header: { "say_en_eddy/the_city.wav": 1.42 }
-const lengths = {};
-const wavSeconds = file => {
-  const b = fs.readFileSync(file);
-  if (b.toString('ascii', 0, 4) !== 'RIFF') return null;
-  let rate = 44100, block = 2;
-  for (let at = 12; at + 8 <= b.length;) {
-    const id = b.toString('ascii', at, at + 4), size = b.readUInt32LE(at + 4);
-    if (id === 'fmt ') { rate = b.readUInt32LE(at + 12); block = b.readUInt16LE(at + 20); }
-    if (id === 'data') return Math.round((Math.min(size, b.length - at - 8) / (rate * block)) * 1000) / 1000;
-    at += 8 + size + (size % 2);
-  }
-  return null;
-};
-const root = path.join('public', 'samples');
-for (const bank of fs.readdirSync(root).filter(d => /^say_/.test(d) && fs.statSync(path.join(root, d)).isDirectory()).sort()) {
-  for (const f of fs.readdirSync(path.join(root, bank)).filter(x => x.endsWith('.wav')).sort()) { const s = wavSeconds(path.join(root, bank, f)); if (s) lengths[`${bank}/${f}`] = s; }
-}
-fs.writeFileSync(path.join(root, 'say_lengths.json'), JSON.stringify(lengths) + '\n');
+writeLengths(path.join('public', 'samples'));
 console.log(`spoken comments: ${made} made, ${kept} already there (${phrases.size} banks; default voices: en ${DEFAULT_VOICE.en}, it ${DEFAULT_VOICE.it})`);
 if (missing.size) console.log(`speakers not installed, left out: ${[...missing].join(', ')}`);

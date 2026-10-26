@@ -2251,6 +2251,7 @@ $('#live-voices').addEventListener('change', e => {
   if (!st || !v) return;
   const before = JSON.parse(JSON.stringify(T.build));
   st.say = typeof st.say === 'object' && st.say ? { ...st.say, [lang]: v } : lang === 'en' || !st.say ? (lang === 'en' ? v : { [lang]: v }) : { en: st.say, [lang]: v };
+  narratorEdited.add(v);
   changed(); askSamples();
   toast(t('plTextChanged'), { label: t('vinstUndo'), run: () => { T.build = before; changed(); } });
 });
@@ -2305,8 +2306,61 @@ function sampleState(sp, texts) {
   return texts.some(x => sampleAsked.has(`${bank}/${saySlug(x)}`)) ? 'wait' : 'none';
 }
 const sampleAsked = new Set();
-// the samples of new and edited lines, asked to the dev server's voice helper (voice-full-controls D8): task 6.2
-function askSamples() {}
+// The samples of new and edited lines (voice-full-controls D8): the dev server's voice helper makes them, one at a time;
+// the line is written and shown at once, silent until its sample exists, then it speaks from its next bar (the samples
+// are loaded again, no page reload). Without the helper (a built app, another system) the row says how to make it.
+let voiceHelper = null;
+const helperReady = fetch('/voice/status').then(r => (r.ok ? r.json() : { ok: false })).then(j => { voiceHelper = !!(j && j.ok); }, () => { voiceHelper = false; });
+const lineSamples = () => {
+  const out = [], lang = getLang(), files = spokenContext.files || {};
+  const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
+  for (const sp of T.tracks.filter(x => x.type === 'spoken')) {
+    const speaker = speakerOf(T, sp), bank = sayBank(lang, speaker);
+    let rows = []; try { rows = phraseRows(T, sp.id, { lang }); } catch (e) { rows = []; }
+    // (the lines written here: edited or typed; the vocabulary and the styles' lines come with npm run voices)
+    for (const r of rows) if (r.source === 'own') for (const x of r.texts) if (!has(bank, x)) out.push({ text: x, lang, speaker, bank });
+  }
+  // (the narrator's own written steps)
+  const nt = voiceOf(T), nsp = (nt && nt.settings && nt.settings.speaker) || '', nb = sayBank(lang, nsp);
+  if (hasBuild(T)) for (const st of buildSteps(T)) { const x = st.say && sayText(st.say, lang); if (x && narratorEdited.has(x) && !has(nb, x)) out.push({ text: x, lang, speaker: nsp, bank: nb }); }
+  return out.filter(x => x.text.split(/\s+/).length <= MAX_WORDS);
+};
+let samplesBusy = false;
+// the narrator lines edited in this page (their samples are asked; the song's own lines come with npm run voices)
+const narratorEdited = new Set();
+async function askSamples() {
+  await helperReady;
+  if (!voiceHelper || samplesBusy) return;
+  samplesBusy = true;
+  try {
+    let made = 0;
+    for (;;) {
+      const next = lineSamples().find(x => !sampleAsked.has(`${x.bank}/${saySlug(x.text)}`));
+      if (!next) break;
+      sampleAsked.add(`${next.bank}/${saySlug(next.text)}`);
+      renderSongVoice(); renderTrackPanel();
+      try {
+        const r = await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: next.text, lang: next.lang, speaker: next.speaker }) });
+        if (r.ok) { made++; await refreshSamples(); }
+      } catch (e) { /* the row keeps saying the sample is missing */ }
+    }
+    if (made) toast(t('plSamplesMade', { n: made }));
+  } finally { samplesBusy = false; }
+}
+// the custom samples and their lengths read again (a new sample of the voice helper): the song is written again with
+// them; while it plays, the new code is evaluated on the next bar
+async function refreshSamples() {
+  const list = await (await fetch('/samples/strudel.json')).json();
+  let lengths = {};
+  try { const r = await fetch('/samples/say_lengths.json'); if (r.ok) lengths = await r.json(); } catch (e) {}
+  custom = Object.keys(list).filter(k => k !== '_base'); customFiles = list;
+  setSpokenContext({ files: list, lengths });
+  crescendoCache.clear();
+  if (globalThis.samples) await globalThis.samples('/samples/strudel.json');
+  const was = dirty;
+  changed();
+  dirty = was; saveDraft();
+}
 const trashBtn = label => `<button class="mini pl-del" data-pl-del aria-label="${esc(label)}" title="${esc(label)}">${BIN}</button>`;
 function phraseListHtml(sp, off) {
   const h = heardBuild(), lang = getLang(), dis = off ? ' disabled' : '';
@@ -2323,12 +2377,12 @@ function phraseListHtml(sp, off) {
       <div class="pl-way">${way(r)}</div>
       <div class="pl-text"><input type="text" data-pl-text maxlength="120" autocomplete="off" spellcheck="false" value="${esc(r.texts.join(' · '))}" placeholder="${esc(t('plTextPh', { n: MAX_WORDS }))}" aria-label="${esc(t('plText'))}"${dis}><span class="pl-src">${esc(src(r))}</span></div>
       <div class="pl-voice">${sample(r)}</div>
-      <div class="pl-end">${off ? '' : trashBtn(t('plRemove'))}</div></div>`).join('');
+      <div class="pl-end">${off ? '' : trashBtn(t('vplRemove'))}</div></div>`).join('');
   const free = freeParts(T, sp.id).length > 0;
   const head = `<div class="pl-head"><label class="ctrl pl-fill" title="${esc(t('plFillHint'))}"><span class="lbl">${esc(t('vinstFillLbl'))}</span><select data-pl-fill data-no-knob${dis}><option value=""${fill === '' ? ' selected' : ''}>—</option>${fill === 'mixed' ? `<option value="mixed" selected disabled>${esc(t('plMixed'))}</option>` : ''}${FILL_GROUPS.map(g => `<option value="${g}"${fill === g ? ' selected' : ''}>${esc(t(`vocab:${g}`))}</option>`).join('')}</select></label><p class="hint muted small">${esc(t(h.G ? 'plHintGrown' : 'plHint', { g: h.G + 1 }))}</p></div>`;
   const cols = `<div class="pl-row pl-cols" aria-hidden="true"><span>${esc(t(h.G ? 'plBarHeard' : 'plBar'))}</span><span>${esc(t('plBars'))}</span><span>${esc(t('spokenWay'))}</span><span>${esc(t('plText'))}</span><span>${esc(t('plVoice'))}</span><span></span></div>`;
-  const empty = rows.length ? '' : `<p class="hint muted small pl-empty">${esc(t('plEmpty'))}</p>`;
-  const add = `<div class="pl-add"><button class="btn small" data-pl-add title="${esc(free ? t('plAddHint') : t('plNoPart'))}"${off || !free ? ' disabled' : ''}>${esc(t('plAdd'))}</button><span class="hint muted small">${esc(free ? t('plAddWhere') : t('plNoPart'))}</span></div>`;
+  const empty = rows.length ? '' : `<p class="hint muted small pl-empty">${esc(t('vplEmpty'))}</p>`;
+  const add = `<div class="pl-add"><button class="btn small" data-pl-add title="${esc(free ? t('plAddHint') : t('plNoPart'))}"${off || !free ? ' disabled' : ''}>${esc(t('vplAdd'))}</button><span class="hint muted small">${esc(free ? t('plAddWhere') : t('plNoPart'))}</span></div>`;
   return `<div class="pl" data-pl-track="${esc(sp.id)}">${head}${rows.length ? cols : ''}${body}${empty}${add}</div>`;
 }
 // one edit of the phrase list: the new song's tracks in place of the old ones, with Undo in the toast
@@ -2350,7 +2404,7 @@ function phraseListEvent(e) {
     if (el.closest('[data-pl-add]')) {
       const g = box.querySelector('[data-pl-fill]').value, r = addRow(T, id, { group: FILL_GROUPS.includes(g) ? g : null, styleWays: styleWaysOf() });
       if (r.error) { toast(t('plNoPart')); return true; }
-      phraseEdit(r.song, t('plAdded', { n: r.start + h.G + 1 }));
+      phraseEdit(r.song, t('vplAdded', { n: r.start + h.G + 1 }));
       // (the new row's text cell, focused)
       setTimeout(() => { const i = document.querySelector(`#live-vinst [data-pl-row="${r.raw}"] [data-pl-text]`); if (i) { if (!FILL_GROUPS.includes(g)) i.value = ''; i.focus(); } }, 50);
       return true;
