@@ -6,7 +6,7 @@
 import { createSession, OPTION_DEFAULTS, leadEntry, stylesNear, DIRECTOR_VERSION } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
-import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, VARY_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
+import { steerSong, applyBar, whyNot, COMMANDS, VARY_TYPES, songCurves, densityMax, extendIndex, extendSeconds, INSTRUMENTS, RECOMMENDED, TRACK_CAP, RISER_BARS, RISER_SOUNDS, instrumentOf, lockedIds, moreWarning, partHas } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
 import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, airChooserOf, holdsGrown } from '../endless/items.js';
@@ -26,7 +26,7 @@ import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } f
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE, GEAR, LOCK, VARY, SWAP, CHEVRON, SLIDERS } from '../icons.js';
+import { DICE, GEAR, LOCK, LOCK_OPEN, LOCK_HALF, VARY, SWAP, CHEVRON, SLIDERS } from '../icons.js';
 import { SESSION_SOURCES } from '../material/index.js';
 import { cleanVoice, voiceOption } from '../endless/voice-options.js';
 import { voicePanel, voiceEvent } from '../endless/voice-panel.js';
@@ -683,12 +683,27 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // ---------- console, queue and mixer (#24) ----------
   // keyboard shortcuts: a key per command (type toggles add or remove)
   const KEYS_OF = { 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', instrument: 'i', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', extend: 'l', end: 'e', vary: 'n', swap: 'w' };
-  const TYPE_KEYS = { drums: '1', bass: '2', lead: '3', pad: '4', texture: '5' };
+  // the instruments of the Arrangement group in their two rows (radio-arrangement D1): rhythm and low end, then melodic
+  // and colour parts; digits 1 to 8 add the instruments shown in this order, Shift with the digit removes one
+  const ARR_ROWS = [['kick', 'beat', 'bass', 'texture'], ['arp', 'hook', 'guitar', 'pad']];
+  // the riser row (D11): what the next press places, remembered while the page is open
+  const riserForm = { bars: 'auto', dir: 'up', sound: 'noise' };
   const keyLabel = k => ({ ArrowUp: '↑', ArrowDown: '↓', V: 'Shift+V' }[k] || k.toUpperCase());
   let steerKey = '', dragging = null, pendingSession = null;
   // the part Vary and Swap act on (radio-variation D5): the lead by default, remembered while the page is open
   let varyPart = 'lead';
-  const cmdLabel = c => c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : ['add', 'remove', 'vary', 'swap'].includes(c.kind) ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type || 'lead'}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
+  // the instrument shown on the console: its name in the language of the page
+  const instName = p => t(`inst:${p}`);
+  // the queue label of an arrangement command: "+ arp (Arp 2)", "bass: locked", "riser 4 bars, up"
+  const arrLabel = (c, item) => {
+    if (c.kind === 'more') {
+      const j = item ? item.commands.indexOf(c) : -1, a = item && item.plan && (item.plan.added || []).find(x => x.i === j), tr = a && item.song.tracks.find(x => x.id === a.id);
+      return tr ? t('steerQ:more', { part: instName(c.part), track: tr.name || tr.id }) : t('steer:more', { part: instName(c.part) });
+    }
+    if (c.kind === 'riser') return t('steerQ:riser', { bars: c.bars === 'auto' || !c.bars ? t('riserAuto') : t('riserBarsN', { n: c.bars }), dir: t(`riserDir:${c.dir === 'down' ? 'down' : 'up'}`) });
+    return t(`steer:${c.kind}`, { part: instName(c.part) });
+  };
+  const cmdLabel = (c, item) => ['more', 'less', 'lock-part', 'unlock-part', 'riser'].includes(c.kind) ? arrLabel(c, item) : c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : ['add', 'remove', 'vary', 'swap'].includes(c.kind) ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type || 'lead'}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: (item && (item.song.tracks.find(x => x.id === c.track) || {}).name) || c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
   function renderSteer(force = false) {
     const box = root.querySelector('#radio-steer');
     if (!box || dragging) return;
@@ -700,30 +715,59 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const ph = item.plan.phrase;
     const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel);
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), (item.plan.locked || []).join(), S.paused !== undefined, opts.scope, varyPart].join('|');
+    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, JSON.stringify(riserForm)].join('|');
     if (!force && key === steerKey) return;
     steerKey = key;
     const tip = k => `title="${esc(t(k))}"`;
     const air = airSteer(item) && item.g0, airOff = air ? airOffset(item.g0) : 0;
     // a disabled button says why in its tooltip ("this song has no pad")
+    // (a grown song: the director's view in its own bars, late when no boundary is left, radio-profiles D9)
+    const whyOf = c => (S.paused !== undefined ? 'paused' : air && !airBoundaries(c.kind, rel, item.plan, item.g0).length ? 'late' : whyNot(c, air ? item.plain || item.base.song : item.song, item.plan, rel - airOff, tailOf(item), item.opts || (item.base && item.base.opts) || {}));
     const btn = (c, label) => {
       const part = ['vary', 'swap'].includes(c.kind);
-      // (a grown song: the director's view in its own bars, late when no boundary is left, radio-profiles D9)
-      const why = S.paused !== undefined ? 'paused' : air && !airBoundaries(c.kind, rel, item.plan, item.g0).length ? 'late' : whyNot(c, air ? item.plain || item.base.song : item.song, item.plan, rel - airOff, tailOf(item), item.opts || (item.base && item.base.opts) || {}), k = c.type && !part ? TYPE_KEYS[c.type] : KEYS_OF[c.kind];
+      const why = whyOf(c), k = KEYS_OF[c.kind];
       const tipText = `${t(`steerTip:${c.kind}`, { ...(c.vars || {}), ...(part ? { type: t(`steerType:${c.type}`) } : {}) })}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
       // Vary and Swap carry their part in data-part (data-type is the Add and Remove buttons' shortcut target)
       return `<button class="btn steer-btn${c.icon ? ' with-ico' : ''}" data-cmd="${c.kind}"${c.type ? ` data-${part ? 'part' : 'type'}="${c.type}"` : ''} ${why ? 'disabled' : ''} title="${esc(tipText)}"${why ? ` data-why="${why}"` : ''}>${c.icon || ''}${esc(label || t(`steer:${c.kind}`))}</button>`;
     };
     // the type buttons say what the next phrase can do: "+" when the type will be silent there, "−" when it will play
     const nextBar = Math.min(barsOf(item.song) - 1, applyBar('add', rel, item.plan)), onNext = stateAt(item.song, nextBar).song.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= nextBar && c.start + c.bars > nextBar));
-    const types = ARRANGE_TYPES.map(type => { const playingType = onNext.some(x => (type === 'lead' ? ['arp', 'hook', 'guitar'].includes(x.type) : x.type === type)); return btn({ kind: playingType ? 'remove' : 'add', type }, t(`steer:${playingType ? 'remove' : 'add'}`, { type: t(`steerType:${type}`) })); }).join('');
+    // the Arrangement group (radio-arrangement): a − and a + per instrument the style or the song has, with a count badge
+    // and a lock, in two rows; a line with the tracks playing and the warning past the recommended counts; the riser row
+    const songNow = air ? item.plain || item.base.song : item.song, relNowDir = rel - airOff;
+    const shown = ARR_ROWS.map(row => row.filter(p => partHas(item.plan.R, p) || item.song.tracks.some(x => instrumentOf(x) === p)));
+    const order = shown.flat(), lk = lockedIds(item.plan);
+    const countOf = p => onNext.filter(x => instrumentOf(x) === p).length;
+    const lockOf = p => {
+      if ((item.plan.lockedParts || []).includes(p)) return { state: 'closed' };
+      const ids = item.song.tracks.filter(x => instrumentOf(x) === p).map(x => x.id), n = ids.filter(id => lk.includes(id)).length;
+      return { state: !ids.length || !n ? 'open' : n === ids.length ? 'closed' : 'half', n, m: ids.length };
+    };
+    const lockBtn = p => {
+      const L = lockOf(p), riser = p === 'riser';
+      const tip = riser ? t(L.state === 'closed' ? 'riserLockClosed' : 'riserLockOpen') : L.state === 'half' ? t('arrLockHalf', { n: L.n, m: L.m, part: instName(p) }) : t(L.state === 'closed' ? 'arrLockClosed' : 'arrLockOpen', { part: instName(p) });
+      return `<button class="mini arr-lock" data-lock-part="${p}" data-state="${L.state}" aria-pressed="${L.state === 'closed'}" aria-label="${esc(tip)}" title="${esc(tip)}"${S.paused !== undefined ? ' disabled' : ''}>${L.state === 'closed' ? LOCK : L.state === 'half' ? LOCK_HALF : LOCK_OPEN}</button>`;
+    };
+    const instBtn = (kind, p) => {
+      const c = { kind, part: p }, why = whyOf(c), name = instName(p), k = order.indexOf(p) + 1;
+      const warn = kind === 'more' && !why ? moreWarning(p, songNow, item.plan, relNowDir) : null;
+      const tip = `${t(`steerTip:${kind}`, { part: name })}${warn ? ` · ${t('arrWarn', { part: name, n: warn.count, rec: warn.rec })}` : ''} (${kind === 'less' ? 'Shift+' : ''}${k})${why ? ` · ${t(`steerWhy:${why}`, { type: name })}` : ''}`;
+      return `<button class="btn steer-btn arr-pm" data-cmd="${kind}" data-inst="${p}" aria-label="${esc(t(`steer:${kind}`, { part: name }))}" title="${esc(tip)}"${why ? ` disabled data-why="${why}"` : ''}>${kind === 'more' ? '+' : '−'}</button>`;
+    };
+    const instBox = p => { const n = countOf(p), over = n > RECOMMENDED[p]; return `<span class="arr-inst${over ? ' over' : ''}" data-arr="${p}">${instBtn('less', p)}<span class="arr-name">${esc(instName(p))}${n > 1 ? `<span class="arr-count${over ? ' warn' : ''}">×${n}</span>` : ''}</span>${instBtn('more', p)}${lockBtn(p)}</span>`; };
+    const total = onNext.filter(x => x.type !== 'riser' && x.type !== 'spoken').length;
+    const over = order.filter(p => countOf(p) > RECOMMENDED[p]);
+    const sel = (k, list, lab) => `<label class="arr-sel"><span>${esc(t(lab))}</span><select data-riser="${k}" data-no-knob>${list.map(([v, l]) => `<option value="${v}"${String(riserForm[k]) === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+    const riserRow = `<div class="arr-riser" title="${esc(t('steerTip:riser'))}">${btn({ kind: 'riser', bars: riserForm.bars, dir: riserForm.dir, sound: riserForm.sound }, t('steer:riser'))}${sel('bars', RISER_BARS.map(b => [b, b === 'auto' ? t('riserAuto') : t('riserBarsN', { n: b })]), 'riserBars')}${sel('dir', [['up', t('riserDir:up')], ['down', t('riserDir:down')]], 'riserDir')}${sel('sound', RISER_SOUNDS.map(x => [x, t(`riserSound:${x}`)]), 'riserSound')}${lockBtn('riser')}</div>`;
+    const types = `<div class="arr-rows">${shown.map((row, i) => `<div class="arr-row">${row.map(instBox).join('')}${i === 1 ? btn({ kind: 'more-complex' }) + btn({ kind: 'less-complex' }) : ''}</div>`).join('')}${riserRow}
+      <p class="arr-info muted">${esc(t('arrCount', { n: total, usual: item.plan.usualHigh, cap: TRACK_CAP }))}</p>${over.length ? `<p class="arr-warn">${esc(over.map(p => t('arrWarn', { part: instName(p), n: countOf(p), rec: RECOMMENDED[p] })).join(' · '))}. ${esc(t('arrRec'))}</p>` : ''}</div>`;
     // (a group with a hint: the harmony, which changes every part with notes, owner's tests #76)
-    const group = (name, html) => `<div class="steer-group"><span class="lbl"${name === 'harmony' ? ` title="${esc(t(`steerGroupTip:${name}`))}"` : ''}>${esc(t(`steerGroup:${name}`))}</span><div class="steer-btns">${html}</div></div>`;
+    const group = (name, html) => `<div class="steer-group${name === 'arrangement' ? ' arr' : ''}"><span class="lbl"${name === 'harmony' ? ` title="${esc(t(`steerGroupTip:${name}`))}"` : ''}>${esc(t(`steerGroup:${name}`))}</span><div class="steer-btns">${html}</div></div>`;
     box.innerHTML = `<div class="steer-head"><div class="lbl">${esc(t('steerTitle'))}</div>
         <span class="hand-from steer-scope" ${tip('steerScopeTip')}><button class="led" id="steer-scope" aria-pressed="${opts.scope === 'session'}" aria-labelledby="steer-scope-lbl"></button><span id="steer-scope-lbl">${esc(t(opts.scope === 'session' ? 'steerScopeSession' : 'steerScopeSong'))}</span></span></div>
       <div class="steer-console">
         ${group('energy', btn({ kind: 'energy-up' }) + btn({ kind: 'energy-down' }))}
-        ${group('arrangement', types + btn({ kind: 'more-complex' }) + btn({ kind: 'less-complex' }))}
+        ${group('arrangement', types)}
         ${group('parts', `<span class="steer-part" role="radiogroup" aria-label="${esc(t('steerPartPick'))}">${VARY_TYPES.map(p => `<button class="chip small" role="radio" data-vary-part="${p}" aria-checked="${varyPart === p}" aria-pressed="${varyPart === p}" title="${esc(t('steerPartPick'))}: ${esc(t(`steerType:${p}`))}">${esc(t(`steerType:${p}`))}</button>`).join('')}</span>${btn({ kind: 'vary', type: varyPart, icon: VARY }, t('steerBtn:vary'))}${btn({ kind: 'swap', type: varyPart, icon: SWAP }, t('steerBtn:swap'))}`)}
         ${group('sound', ['darker', 'brighter', 'dirtier', 'cleaner', 'more-space', 'instrument'].map(k => btn({ kind: k })).join(''))}
         ${group('harmony', btn({ kind: 'progression' }) + btn({ kind: 'key' }))}
@@ -731,12 +775,12 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         ${group('song', btn({ kind: 'drop' }) + btn({ kind: 'stay' }) + (() => { const s = `+${Math.round(extendSeconds(item.plan))} s`; return btn({ kind: 'extend', vars: { s } }, t('steer:extend', { s })); })() + btn({ kind: 'end' }))}
       </div>
       <div class="lbl">${esc(t('steerQueue'))}</div>
-      <ul class="steer-queue">${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: c.at + 1 }))}</span> ${esc(cmdLabel(c))} <button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button></li>`).join('') || `<li class="muted">${esc(t('steerQueueEmpty'))}</li>`}</ul>
+      <ul class="steer-queue">${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: c.at + 1 }))}</span> ${esc(cmdLabel(c, item))} <button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button></li>`).join('') || `<li class="muted">${esc(t('steerQueueEmpty'))}</li>`}</ul>
       <div class="lbl">${esc(t('steerMixer'))}</div>
-      <div class="steer-mixer">${[...on, ...st.tracks.filter(x => x.mute && (item.plan.locked || []).includes(x.id))].map(x => { const locked = (item.plan.locked || []).includes(x.id), g = (x.settings || {}).gain ?? 0.5; return `<div class="mix-row"><span class="mix-name">${esc(x.name || x.id)}</span>
+      <div class="steer-mixer">${[...on, ...st.tracks.filter(x => x.mute && lk.includes(x.id))].map(x => { const locked = lk.includes(x.id), g = (x.settings || {}).gain ?? 0.5; return `<div class="mix-row"><span class="mix-name">${esc(x.name || x.id)}</span>
         <input type="range" min="0" max="1.2" step="0.05" value="${g}" data-mix-vol="${esc(x.id)}" data-no-knob aria-label="${esc(t('steerVolume', { track: x.name || x.id }))}" title="${esc(t('steerVolume', { track: x.name || x.id }))}">
         <button class="mini" data-mix-mute="${esc(x.id)}" aria-pressed="${!!x.mute}" title="${esc(t('steerTip:mute'))}">M</button>
-        <button class="mini" data-mix-lock="${esc(x.id)}" aria-pressed="${locked}" title="${esc(t('steerTip:lock'))}">${locked ? '🔒' : '🔓'}</button>
+        <button class="mini" data-mix-lock="${esc(x.id)}" aria-pressed="${locked}" title="${esc(t('steerTip:lock'))}" aria-label="${esc(t('steerTip:lock'))}">${locked ? LOCK : LOCK_OPEN}</button>
         <button class="mini" data-mix-inst="${esc(x.id)}" title="${esc(t('steerTip:instrument'))}">♪</button></div>`; }).join('') || `<p class="muted">${esc(t('steerMixerEmpty'))}</p>`}</div>`;
   }
 
@@ -1017,11 +1061,14 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.keep !== undefined && opts.temp) { const id = keepArtist(opts.temp); if (id) { opts.temp = null; opts.artist = id; saveOpts(); render(); toast(t('diceKept')); } return; }
     if (b.dataset.tempDrop !== undefined) { if (opts.artist === (opts.temp && opts.temp.id)) opts.artist = null; opts.temp = null; saveOpts(); return render(); }
     if (b.dataset.varyPart) { varyPart = b.dataset.varyPart; return renderSteer(true); }
-    if (b.dataset.cmd) return command({ kind: b.dataset.cmd, ...(b.dataset.type ? { type: b.dataset.type } : {}), ...(b.dataset.part ? { type: b.dataset.part } : {}) });
+    if (b.dataset.cmd === 'riser') return command({ kind: 'riser', bars: riserForm.bars === 'auto' ? 'auto' : +riserForm.bars, dir: riserForm.dir, sound: riserForm.sound });
+    if (b.dataset.cmd) return command({ kind: b.dataset.cmd, ...(b.dataset.type ? { type: b.dataset.type } : {}), ...(b.dataset.part ? { type: b.dataset.part } : {}), ...(b.dataset.inst ? { part: b.dataset.inst } : {}) });
+    // the lock of an instrument (radio-arrangement D12): closed opens, open or half locks every track of it
+    if (b.dataset.lockPart) return command({ kind: b.dataset.state === 'closed' ? 'unlock-part' : 'lock-part', part: b.dataset.lockPart });
     if (b.dataset.cancel) return cancel(+b.dataset.cancel);
     if (b.id === 'steer-scope') { opts.scope = opts.scope === 'session' ? 'song' : 'session'; saveOpts(); return renderSteer(true); }
     if (b.dataset.mixMute) return command({ kind: b.getAttribute('aria-pressed') === 'true' ? 'unmute' : 'mute', track: b.dataset.mixMute });
-    if (b.dataset.mixLock) { const item = S && S.stream[S.onAir]; return command({ kind: item && (item.plan.locked || []).includes(b.dataset.mixLock) ? 'unlock' : 'lock', track: b.dataset.mixLock }); }
+    if (b.dataset.mixLock) { const item = S && S.stream[S.onAir]; return command({ kind: item && lockedIds(item.plan).includes(b.dataset.mixLock) ? 'unlock' : 'lock', track: b.dataset.mixLock }); }
     if (b.dataset.mixInst) return command({ kind: 'instrument', track: b.dataset.mixInst });
     // a session into a playlist (#38): a small menu next to the button
     if (b.id === 'radio-pl' || b.dataset.histPl !== undefined) {
@@ -1098,16 +1145,25 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   // shortcuts while the Radio tab is open and the radio plays (not while typing in a field)
   document.addEventListener('keydown', e => {
     if (root.hidden || !S || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, select, textarea, [contenteditable], strudel-editor, .cm-editor')) return;
+    // digits 1 to 8: + of the instruments in the console's order; with Shift: − (by the key's position, any layout)
+    const digit = /^Digit([1-8])$/.exec(e.code || '');
+    if (digit) {
+      const boxes = [...root.querySelectorAll('#radio-steer .arr-inst')], box = boxes[+digit[1] - 1];
+      if (!box) return;
+      e.preventDefault();
+      const b = box.querySelector(`[data-cmd="${e.shiftKey ? 'less' : 'more'}"]`);
+      if (b && !b.disabled) b.click();
+      return;
+    }
     const kind = Object.keys(KEYS_OF).find(k => KEYS_OF[k] === e.key);
     if (kind === 'extend' && e.repeat) return;
-    const type = Object.keys(TYPE_KEYS).find(k => TYPE_KEYS[k] === e.key);
-    if (!kind && !type) return;
+    if (!kind) return;
     e.preventDefault();
-    if (type) { const b = root.querySelector(`[data-type="${type}"]`); if (b && !b.disabled) b.click(); return; }
     const b = root.querySelector(`[data-cmd="${kind}"]`);
     if (b && !b.disabled) b.click();
   });
   root.addEventListener('change', e => {
+    if (e.target.dataset.riser) { riserForm[e.target.dataset.riser] = e.target.value; return renderSteer(true); }
     if (e.target.dataset.mixVol) command({ kind: 'volume', track: e.target.dataset.mixVol, value: +e.target.value });
     if (e.target.dataset.opt && opts.compilation !== 'off') render();
     if (e.target.id === 'radio-transition') { opts.transition = e.target.value; saveOpts(); }

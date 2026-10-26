@@ -3,6 +3,10 @@ const svg = (vb, body, cls) => `<svg class="ico ${cls}" viewBox="${vb}" aria-hid
 // a die showing five
 export const DICE = svg('0 0 16 16', '<rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5.2" cy="5.2" r="1.2" fill="currentColor"/><circle cx="10.8" cy="5.2" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="5.2" cy="10.8" r="1.2" fill="currentColor"/><circle cx="10.8" cy="10.8" r="1.2" fill="currentColor"/>', 'ico-dice');
 export const LOCK = svg('0 0 12 14', '<path d="M3.2 6V4.2a2.8 2.8 0 0 1 5.6 0V6" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="6" width="9" height="7" rx="1.4" fill="currentColor"/>', 'lock-ico');
+// an open lock: the shackle lifted (radio-arrangement D12: the director may change the instrument)
+export const LOCK_OPEN = svg('0 0 12 14', '<path d="M3.2 6V4.2a2.8 2.8 0 0 1 5.5-.7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><rect x="1.5" y="6" width="9" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/>', 'lock-ico lock-open');
+// a closed lock drawn in outline: some tracks of an instrument locked, not all (D12 half state)
+export const LOCK_HALF = svg('0 0 12 14', '<path d="M3.2 6V4.2a2.8 2.8 0 0 1 5.6 0V6" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="6" width="9" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="1.5" y="9.5" width="9" height="3.5" rx="1.2" fill="currentColor"/>', 'lock-ico lock-half');
 // a gear (settings of a feature)
 export const GEAR = svg('0 0 16 16', '<path d="M8 1.6l1.1 1.6 1.9-.4.5 1.9 1.8.8-.6 1.8 1.2 1.5-1.4 1.3.3 1.9-1.9.4-.8 1.8-1.8-.7L8 14.4l-1.3-1.4-1.8.7-.8-1.8-1.9-.4.3-1.9L1.1 8.3l1.2-1.5-.6-1.8 1.8-.8.5-1.9 1.9.4z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/>', 'ico-gear');
 // a curved arrow back (revert to the default)

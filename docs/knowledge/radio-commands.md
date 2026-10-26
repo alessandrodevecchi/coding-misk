@@ -43,11 +43,11 @@ A command that cannot apply is disabled with a reason: `late`, `no-type`, `all-p
 | `remove` | arrangement | next phrase | − [type] | Adds or removes this instrument at the next phrase |
 | `more-complex` | arrangement | next phrase | More complex (it: Più complesso) | More tracks at once |
 | `less-complex` | arrangement | next phrase | Simpler (it: Più semplice) | Fewer tracks at once |
-| `more` | arrangement | next phrase |  | no help text: described below |
-| `less` | arrangement | next phrase |  | no help text: described below |
-| `lock-part` | arrangement | next phrase |  | no help text: described below |
-| `unlock-part` | arrangement | next phrase |  | no help text: described below |
-| `riser` | arrangement | next phrase |  | no help text: described below |
+| `more` | arrangement | next phrase | + [part] | One more [part] track from the next phrase, even when one plays: another sound and pattern from the style, an octave up and a little lower; if the song has none, it takes one from its style |
+| `less` | arrangement | next phrase | − [part] | One fewer [part] track from the next phrase: the last one you added, else the last one that came in |
+| `lock-part` | arrangement | next phrase | [part]: locked (it: [part]: bloccato) | Closes the lock: the director leaves the [part] alone until the song ends (your commands still work) |
+| `unlock-part` | arrangement | next phrase | [part]: unlocked (it: [part]: sbloccato) | Opens the lock: the director may change the [part] again |
+| `riser` | arrangement | next phrase | + Riser before the next change (it: + Riser al prossimo cambio) | A riser is a noise that rises (a filter opening, a volume growing) for a few bars and ends on a change of part, to tell the ear something is coming. Up: into the change; down: starts on the change and falls after it. This song only |
 | `vary` | arrangement | next phrase | Vary [type] (it: Varia [type]) | New notes for the [type] from the next phrase: composed in the song's key and chords, with the same sound |
 | `swap` | arrangement | next phrase | Swap [type] (it: Scambia [type]) | Another ready part for the [type] from the next phrase: a preset of the style or one of your saved patterns that fits, never composed |
 | `darker` | sound | next phrase | Darker (it: Più scuro) | Closes the filters |
@@ -81,6 +81,9 @@ Commands without a help text in the app:
 - `volume`: a pinned level for a track, from the next bar.
 - `unmute`: a muted track plays again from the next bar.
 - `unlock`: the director may change the track again. A track of a locked instrument unlocked in the mixer: that track only; the instrument's other tracks stay locked one by one.
+
+Arrangement by instrument (radio-arrangement): the console shows a − and a + per instrument in two rows (kick, beat, bass, texture; arp, melody, guitar, pad) with a count badge and a lock, a line with the tracks playing, the warning past the recommended counts, and the riser row (length, direction, sound, the lock of the director's risers). Digits 1 to 8 press +, Shift with the digit presses −. The instrument lock and the mixer's locks are one state: a closed instrument lock locks every row of it, a row unlocked in the mixer gives the half state.
+
 - `more`: one more track of an instrument (`part`: kick, beat, bass, arp, hook, guitar, pad, texture) from the next phrase, even when one plays: a silent track of it the song holds, else a new one (`arp-2`, "Arp 2") from the style, with another sound and pattern, an octave up and at a lower gain (× 0.75, × 0.6 for a third one or a second bass). Up to 12 tracks play at once (`cap`); past the recommended count (kick 1, beat 2, bass 2, the others 3) it warns and never blocks (`moreWarning`). The director never strips a track the listener added before the final outro; one that sat out a break or a charge comes back on the next phrase.
 - `less`: one fewer track of an instrument: the listener's last one, else the one that came in last (`not-playing`, `last-track`).
 - `lock-part`, `unlock-part`: a lock per instrument (or the riser): the director leaves every track of it alone for the rest of the song, tracks added later included; a locked drum plays through breaks and charges. The listener's own commands still act on locked tracks. `unlock-part` also opens the per-track locks of that instrument.
