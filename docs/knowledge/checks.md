@@ -66,6 +66,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 <!-- generated:checks -->
 | Tool | npm script | Needs | What it covers |
 | --- | --- | --- | --- |
+| `tools/check-arrangement-levels.cjs` |  | dev server, Chrome | Levels and load of a radio song stacked to 12 tracks with "+" (radio-arrangement D4, D5, tasks 1.5 and 1.8): for each style, a radio session where the console adds tracks of every instrument until 12 play; then the… |
 | `tools/check-backup.mjs` |  | Node | Checks for the backup of everything in the browser (#31). No browser. |
 | `tools/check-clips.cjs` |  | dev server, Chrome | Browser checks for fragments (#57): random and timed fragments from a song and from a radio recipe, 1080×1920 files with sound, a timed fragment that sounds as the same stretch of the full song, label numbers that grow,… |
 | `tools/check-clips.mjs` | `npm run check:clips` | Node | Checks for fragments (#57): vertical layouts, the fragment picker (lively parts, no overlap, bar lines, repeatable), times, label and glitch messages, and the texts for sharing. No browser. |
@@ -101,6 +102,8 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-playlists.cjs` |  | dev server, Chrome | Browser checks for playlists (#36): favourites migration, "+ Playlist", the Playlists tab, auto-advance, shuffle, repeat one, export and import, phone width. |
 | `tools/check-playlists.mjs` | `npm run check:playlists` | Node | Checks for playlists (#36): store, migration of the old favourites, play queue, export and import, versions of saved sessions with grown songs (radio-profiles D11). No browser. |
 | `tools/check-pool.mjs` | `npm run check:workers` | Node | Worker processes for the slow checks (faster-checks). No browser. runPool(module, tasks) hands tasks (one song, one check) to worker processes that import the module once and call its runTask(task); the results come… |
+| `tools/check-preview.cjs` |  | dev server, Chrome | Browser checks for the pattern preview of Compose and the bar counter of the player bar (pattern-preview). |
+| `tools/check-preview.mjs` | `npm run check:preview` | Node | Checks for the pattern preview of Compose (pattern-preview, tasks 1.1, 1.2, 1.5). No browser. |
 | `tools/check-profiles.mjs` | `npm run check:profiles` | Node | Checks for performance profiles and code comments (performance-profiles), and the narrator switch (profile-options). No browser. |
 | `tools/check-radio-profiles.mjs` | `npm run check:radio-profiles` | Node | Checks for profiles in the radio (radio-profiles). No browser. Radio fixtures (tests/snapshots/radio-growth.json): hashes of the radio items of three sessions in Classic (styles, an artist, a compilation), as the radio… |
 | `tools/check-radio.cjs` |  | dev server, Chrome | Browser checks for the radio (#22): tab, controls, determinism against the director, song changes, options from the next song, display options on air from the next edit, exclusive playback, history, save, open in… |
@@ -132,7 +135,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-typing.mjs` | `npm run check:typing` | Node | Checks for the typing of the code that types itself (live-typing): only the words that change are touched, a person's speed for small edits and faster for long ones, the last frame is the new code, a deadline is kept;… |
 | `tools/check-video.cjs` |  | dev server, Chrome | Browser checks for the session video (#27): a song records a file with a video and an audio track at the chosen size, the code layout draws the code beside the stage, cancel saves nothing, the radio records a video with… |
 | `tools/check-video.mjs` | `npm run check:video` | Node | Checks for the session video (#27): layout areas fill the frame without overlap, the soul panel keeps the soul screen's proportions, the recording format falls back to WebM, the title card modes. No browser. |
-| `tools/check-voices.cjs` |  | dev server, Chrome | Browser checks for the voice controls (voice-controls and voice-placement, #77). Compose: one Voices group, shown with the Live build on or off: the narrator row (Narrator voice, Narrator style, Narrated growth)… |
+| `tools/check-voices.cjs` |  | dev server, Chrome | Browser checks for the voice controls (voice-controls, voice-placement and voice-full-controls, #77, #82). Compose: the Voices group with a block per voice, each with its switch (the narrator on, the voice track's mute)… |
 | `tools/check-worker.mjs` |  | Node | A worker process of tools/check-pool.mjs (faster-checks): imports the module named on the command line once, then runs each task it is sent with the module's runTask(task) and sends the result back. Not run by hand. |
 | `tools/snapshot-code.mjs` | `npm run snapshot:code` | Node | Saves or checks the Strudel code generated for every song in songs/ (no browser needed). |
 | `tools/snapshot-levels.cjs` |  | dev server, Chrome | Saves or checks peak levels per instrument for every scene of every built-in track (dev server on PORT, default 5173). |

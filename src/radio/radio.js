@@ -6,7 +6,7 @@
 import { createSession, OPTION_DEFAULTS, leadEntry, stylesNear, DIRECTOR_VERSION } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
-import { steerSong, applyBar, whyNot, COMMANDS, ARRANGE_TYPES, VARY_TYPES, songCurves, densityMax, extendIndex, extendSeconds } from '../endless/steering.js';
+import { steerSong, applyBar, whyNot, COMMANDS, VARY_TYPES, varyTracks, songCurves, densityMax, extendIndex, extendSeconds, INSTRUMENTS, RECOMMENDED, TRACK_CAP, RISER_BARS, RISER_SOUNDS, instrumentOf, lockedIds, moreWarning, partHas, fitsAir, unfitReason, patternPart, TREATMENTS, KEY_MOVES, keyTo, SESSION_KINDS, biasSong } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
 import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, airChooserOf, holdsGrown } from '../endless/items.js';
@@ -26,10 +26,17 @@ import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } f
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE, GEAR, LOCK, VARY, SWAP, CHEVRON, SLIDERS } from '../icons.js';
+import { DICE, GEAR, LOCK, LOCK_OPEN, LOCK_HALF, VARY, SWAP, CHEVRON, SLIDERS, LISTEN, STOP, POWER } from '../icons.js';
+import { previewOf } from '../library/patterns.js';
+import { PROGS } from '../music.js';
+import { paintPreview } from '../library/patterns-tab.js';
 import { SESSION_SOURCES } from '../material/index.js';
-import { cleanVoice, voiceOption } from '../endless/voice-options.js';
+import { cleanVoice, voiceOption, applyPreset, VOICE_PRESET_IDS } from '../endless/voice-options.js';
+import { VOICE_STYLE_IDS } from '../song/format.js';
+import { speakerOf, narratorSpeaker } from '../song/spoken.js';
+import { SPEAKERS } from '../song/build.js';
 import { voicePanel, voiceEvent } from '../endless/voice-panel.js';
+import { voiceSoundHtml, syncVoiceSound, soundEvent, nextSound, cleanSound, isAutoSound, soundShown } from '../endless/voice-sound.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -48,7 +55,7 @@ export function usableRecipes(list) {
 
 // keepArtist(artist): saves a random artist among the listener's, returns its id (#50)
 // userPatterns(): the user's saved patterns as the director reads them (pattern-library): they join a song where they fit
-export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, userPatterns = () => [] }) {
+export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, userPatterns = () => [], reloadSamples = async () => {} }) {
   const ids = recipes.map(r => r.id);
   const saved = store.get('coding-misk-radio', null) || {};
   const opts = {
@@ -85,8 +92,22 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     compLocks: saved.compLocks && typeof saved.compLocks === 'object' ? saved.compLocks : {},
     // the voice instrument (voice-controls): phrases per song, kinds, ways and how often, for the songs to come; in the
     // recipe only when it is not As the style, so a replay sounds the same
-    voice: cleanVoice(saved.voice && saved.voice.presence === 'always' ? { ...saved.voice, presence: 'often' } : saved.voice),
+    // (voice-full-controls D14: Sempre stays Sempre; a saved Mai reads as the Voce: traccia switch off, How often as the
+    // style says)
+    voice: cleanVoice(saved.voice && saved.voice.presence === 'never' ? { ...saved.voice, presence: 'style' } : saved.voice),
+    // the narrator's sound for the next songs (D4): as the style (each song draws it), a voice style or own values
+    narratorSound: cleanSound(saved.narratorSound),
+    // the two voices on or off for the next songs (D15), with every profile; a Custom profile saved with the narrator off
+    // reads as the narrator switch off
+    voices: {
+      narrator: !(saved.voices && saved.voices.narrator === false) && !(saved.custom && saved.custom.controls && saved.custom.controls.narrator === false),
+      track: !(saved.voices && saved.voices.track === false) && !(saved.voice && saved.voice.presence === 'never'),
+    },
   };
+  // (the narrator switch left the Custom profile: its old value moved to the switch above)
+  if (opts.custom && opts.custom.controls && opts.custom.controls.narrator !== undefined) { const { narrator: _, ...rest } = opts.custom.controls; opts.custom = { ...opts.custom, controls: rest }; store.set('coding-misk-radio', opts); }
+  // (a saved Never is stored as the switch off with As the style)
+  else if (saved.voice && saved.voice.presence === 'never') store.set('coding-misk-radio', opts);
   opts.material = opts.materialDefault;
   let compOpen = false;
   const userPresets = () => store.get('coding-misk-comp-presets', {}) || {};
@@ -104,7 +125,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const chooserRecord = () => { const c = chooserOf(store.get('coding-misk-air-chooser', null)); return c === AIR_CHOOSER ? {} : { chooser: c }; };
   const artistOf = id => (id ? artists().find(a => a.id === id) || (opts.temp && opts.temp.id === id ? opts.temp : null) : null);
   // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
-  const current = () => { const a = artistOf(opts.artist), up = userPatterns(), how = { transition: opts.transition, harmony: opts.harmony, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}) };
+  const current = () => { const a = artistOf(opts.artist), up = userPatterns(), how = { transition: opts.transition, harmony: opts.harmony, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}), ...(isAutoSound(opts.narratorSound) ? {} : { narratorSound: cleanSound(opts.narratorSound) }), ...(opts.voices.narrator && opts.voices.track ? {} : { voices: { ...(opts.voices.narrator ? {} : { narrator: false }), ...(opts.voices.track ? {} : { track: false }) } }) };
     // a compilation carries its setup and the artists it may use, so a replay draws the same songs
     if (opts.compilation !== 'off') return { compilation: { every: opts.compilation, setup: JSON.parse(JSON.stringify(opts.compSetup)), pool: JSON.parse(JSON.stringify(artists())), ...(Object.keys(opts.compLocks).length ? { locks: { ...opts.compLocks } } : {}) }, ...how };
     return a ? { artist: JSON.parse(JSON.stringify(a)), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how }; };
@@ -167,15 +188,20 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       return item;
     }
     const raw = optionsFor(n), comp = raw.compilation;
-    const { song, entry, plan, opts: used } = S.session.next(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw);
+    const g0 = S.session.next(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw);
+    // the session's choices (radio-arrangement D10) on the director's song: the base the listener's commands steer; the
+    // director's own stays as base0, so a choice given later can be put on again
+    const { song, entry, plan, opts: used } = biasSong(S.recipe, n, g0);
     // the director has just planned the transition from the song before: an interlude lengthens it,
     // an overlap starts this song before it ends
     if (prev && !prev.cut) { prev.extra = extraOf(prev.entry.transition); prev.bars += prev.extra; }
-    const item = { song, entry, n, start: prev ? prev.start + prev.bars - (prev.cut ? 0 : overlapOf(prev.entry.transition)) : 0, bars: barsOf(song), base: { song, plan, opts: used }, plan, commands: [], plain: song };
+    const item = { song, entry, n, start: prev ? prev.start + prev.bars - (prev.cut ? 0 : overlapOf(prev.entry.transition)) : 0, bars: barsOf(song), base: { song, plan, opts: used }, base0: { song: g0.song, plan: g0.plan, opts: g0.opts }, plan, commands: [], plain: song };
     if (comp) item.comp = segmentAt(S.recipe.seed, n, comp, recipes, comp.pool || []);
     // a Crescendo or Live coder song grows on air (radio-profiles D5), with the Custom controls when the session has
     // them; a recipe saved before the radio grew its songs (no growth marker) plays every song in blocks, as heard
     if (raw.custom) item.custom = raw.custom;
+    // (the Voce: narratore switch off, voice-full-controls D15: the narrator stays silent, the music is the same)
+    if (raw.voices && raw.voices.narrator === false) item.hush = true;
     if (growsOnAir(S.recipe) && entry.profile) item.growCtx = { profile: entry.profile, artist: used.artist || null, into: prev && prev.entry.transition ? prev.entry.transition.kind : null, styles: shapeStyles(), phrase: plan.phrase, controls: raw.custom ? customControls(raw.custom) : null };
     S.stream.push(item);
     // a replayed session steers its songs the same way, before they play
@@ -258,7 +284,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const profileOf = x => (x.song && x.song.onAir ? x.song.onAir.profile : 'classic');
   // its controls: the Compose ones of song 0 (D2), the Custom ones, else the profile's own on air (owner decision 4), else
   // Classic
-  const controlsOf = x => (x.ctl ? x.ctl : x.custom ? customControls(x.custom) : x.song && x.song.onAir ? airControls(x.song.onAir.profile, x.song.onAir.free) : resolveProfile('classic'));
+  const ownControls = x => (x.ctl ? x.ctl : x.custom ? customControls(x.custom) : x.song && x.song.onAir ? airControls(x.song.onAir.profile, x.song.onAir.free) : resolveProfile('classic'));
+  const controlsOf = x => (x.hush ? { ...ownControls(x), narrator: false } : ownControls(x));
   const showOf = x => (opts.incoming !== 'profile' ? opts.incoming : profileOf(x) === 'classic' ? 'visible' : 'hidden');
   // lead (#29): { song, from } a song from Compose or the Songs tab played first (song 0, from bar "from"); the
   // radio continues after it. A recipe with a lead replays it.
@@ -506,15 +533,20 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       if (at <= rel || at >= barsOf(item.song) || (c.kind === 'extend' && whyNot(c, item.song, item.plan, rel, tailOf(item)))) { toast(t('steerLate')); return false; }
     }
     const cmd = { ...c, at, id: ++cmdN, ...(air ? { at0: at, q: Math.round(rel * 100) / 100, pend: true } : {}) };
+    // the whole session (radio-arrangement D10): an arrangement command also goes to the recipe's arrange list, for the
+    // songs after this one; Vary, Swap and the riser stay on this song
+    const forSession = opts.scope === 'session' && SESSION_KINDS.includes(c.kind);
+    if (forSession) cmd.scope = 'session';
     // an extension remembers where its part goes, so cancelling it also drops the curve edits made on later parts
     if (c.kind === 'extend') { cmd.ins = extendIndex(item.plan, Math.ceil((at - off) / item.plan.phrase) >> 1); cmd.s = Math.round(extendSeconds(item.plan)); }
     // a later command of the same kind on the same track (or curve part) replaces a pending one
     // (two Vary or two Swap of the same part for the same boundary count as one)
-    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && (['volume', 'curve', 'curve-reset', 'instrument', 'voice'].includes(x.kind) || (['vary', 'swap'].includes(x.kind) && x.type === cmd.type && (x.at0 ?? x.at) === (cmd.at0 ?? cmd.at)));
+    const same = x => x.at > rel && x.kind === cmd.kind && (x.track || '') === (cmd.track || '') && (x.curve || '') === (cmd.curve || '') && (x.d ?? -1) === (cmd.d ?? -1) && (['volume', 'curve', 'curve-reset', 'instrument', 'voice'].includes(x.kind) || (['vary', 'swap'].includes(x.kind) && x.type === cmd.type && (x.target || '') === (cmd.target || '') && (x.at0 ?? x.at) === (cmd.at0 ?? cmd.at)));
     item.commands = item.commands.filter(x => !same(x));
     item.commands.push(cmd);
     S.recipe.steering = [...(S.recipe.steering || []).filter(x => !(x.song === item.n && same(x))), { song: item.n, ...cmd }];
     resteer(item, { async: true, then: () => { keepHistory(item); player.swap(windowPlayable()); renderNow(); } });
+    if (forSession) { const { at: _a, id: _i, scope: _s, at0: _b, q: _q, pend: _p, ...e } = cmd; S.recipe.arrange = [...(S.recipe.arrange || []), { song: item.n, ref: cmd.id, ...e }]; rebias(item.n); }
     keepHistory(item);
     // the whole session: energy, complexity and voice also move the sliders for the next songs
     if (opts.scope === 'session' && !opts.artist) {
@@ -525,11 +557,33 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     renderNow();
     return true;
   }
+  // the songs after song k take the session's choices again (radio-arrangement D10): from the director's song (base0)
+  // with the recipe's arrange list as it is now, then their own commands or their growth
+  function rebias(k) {
+    for (const x of S.stream) {
+      if (x.n <= k || !x.base0 || x.frozen) continue;
+      const b = biasSong(S.recipe, x.n, x.base0);
+      x.base = { song: b.song, plan: b.plan, opts: b.opts }; x.plan = b.plan; x.opts = b.opts; x.plain = b.song; delete x.g0;
+      if (x.commands.length) resteer(x, { async: true, then: () => { player.swap(windowPlayable()); renderNow(); } });
+      else if (x.growCtx) grow(x, b.song, { async: true });
+      else setSong(x, b.song);
+    }
+  }
   function cancel(id) {
     const item = S && S.stream[S.onAir];
     if (!item) return;
     const c = item.commands.find(x => x.id === id);
-    if (!c || c.at <= relNow()) return;
+    if (!c) return;
+    // a choice for the session already heard on this song: until the next song starts it can leave the session
+    if (c.at <= relNow() && c.scope === 'session') {
+      S.recipe.arrange = (S.recipe.arrange || []).filter(e => !(e.song === item.n && e.ref === id));
+      c.scope = 'song';
+      S.recipe.steering = (S.recipe.steering || []).map(x => (x.song === item.n && x.id === id ? { ...x, scope: 'song' } : x));
+      rebias(item.n); player.swap(windowPlayable()); renderSteer(true);
+      return;
+    }
+    if (c.at <= relNow()) return;
+    if (c.scope === 'session') { S.recipe.arrange = (S.recipe.arrange || []).filter(e => !(e.song === item.n && e.ref === id)); rebias(item.n); }
     const drop = x => x.id === id || (c.kind === 'extend' && x.kind === 'curve' && x.id > id && x.at > relNow() && x.d >= c.ins);
     item.commands = item.commands.filter(x => !drop(x));
     S.recipe.steering = (S.recipe.steering || []).filter(x => !(x.song === item.n && drop(x)));
@@ -682,13 +736,120 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
 
   // ---------- console, queue and mixer (#24) ----------
   // keyboard shortcuts: a key per command (type toggles add or remove)
-  const KEYS_OF = { 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', instrument: 'i', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', extend: 'l', end: 'e', vary: 'n', swap: 'w' };
-  const TYPE_KEYS = { drums: '1', bass: '2', lead: '3', pad: '4', texture: '5' };
+  const KEYS_OF = { voicing: 'a', 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', instrument: 'i', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', extend: 'l', end: 'e', vary: 'n', swap: 'w' };
+  // the instruments of the Arrangement group in their two rows (radio-arrangement D1): rhythm and low end, then melodic
+  // and colour parts; digits 1 to 8 add the instruments shown in this order, Shift with the digit removes one
+  const ARR_ROWS = [['kick', 'beat', 'bass', 'texture'], ['arp', 'hook', 'guitar', 'pad']];
+  // the riser row (D11): what the next press places, remembered while the page is open
+  const riserForm = { bars: 'auto', dir: 'up', sound: 'noise' };
   const keyLabel = k => ({ ArrowUp: '↑', ArrowDown: '↓', V: 'Shift+V' }[k] || k.toUpperCase());
   let steerKey = '', dragging = null, pendingSession = null;
   // the part Vary and Swap act on (radio-variation D5): the lead by default, remembered while the page is open
   let varyPart = 'lead';
-  const cmdLabel = c => c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : ['add', 'remove', 'vary', 'swap'].includes(c.kind) ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type || 'lead'}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
+  // the track Vary and Swap act on (radio-arrangement D7): Auto, or one playing track of the part by id; back to Auto
+  // when that track stops
+  let varyTarget = 'auto';
+  // Part harmony's treatment and the Song harmony menu (radio-arrangement D8), Auto by default
+  let voicingTreat = 'auto', harmChords = 'auto', harmKey = 'auto';
+  // Add a saved pattern (radio-arrangement D9): the panel open as cards or folded to a list (remembered in this browser),
+  // the track each pattern would replace
+  let savedOpen = false;
+  try { savedOpen = !!store.get('coding-misk-radio-saved-open', false); } catch (e) {}
+  const spTarget = {};
+  // the instrument shown on the console: its name in the language of the page
+  const instName = p => t(`inst:${p}`);
+  // the queue label of an arrangement command: "+ arp (Arp 2)", "bass: locked", "riser 4 bars, up"
+  const arrLabel = (c, item) => {
+    if (c.kind === 'more') {
+      const j = item ? item.commands.indexOf(c) : -1, a = item && item.plan && (item.plan.added || []).find(x => x.i === j), tr = a && item.song.tracks.find(x => x.id === a.id);
+      return tr ? t('steerQ:more', { part: instName(c.part), track: tr.name || tr.id }) : t('steer:more', { part: instName(c.part) });
+    }
+    if (c.kind === 'riser') return t('steerQ:riser', { bars: c.bars === 'auto' || !c.bars ? t('riserAuto') : t('riserBarsN', { n: c.bars }), dir: t(`riserDir:${c.dir === 'down' ? 'down' : 'up'}`) });
+    if (c.kind === 'pattern') {
+      const name = (c.item && c.item.name) || t('steer:pattern');
+      if (c.mode === 'replace') { const tr = item && item.song.tracks.find(x => x.id === c.target); return t('steerQ:patternReplace', { name, track: (tr && (tr.name || tr.id)) || c.target }); }
+      const j = item ? item.commands.indexOf(c) : -1, a = item && item.plan && (item.plan.added || []).find(x => x.i === j), tr = a && item.song.tracks.find(x => x.id === a.id);
+      return t('steerQ:patternNew', { name, track: tr ? tr.name || tr.id : t(`inst:${patternPart(c.item)}`) });
+    }
+    return t(`steer:${c.kind}`, { part: instName(c.part) });
+  };
+  // Vary and Swap with a target: the queue names the track ("Vary arp (Arp 2)"), with Auto the one it took
+  const varyLabel = (c, item) => {
+    const pre = c.kind === 'vary' ? 'V' : 'S', st = item && (item.song.build || []).find(s => s.at === c.at && s.by === 'listener' && s.pattern && new RegExp(`^${pre}\\d+$`).test(s.pattern.to) && (c.target === 'auto' || s.pattern.track === c.target));
+    const tr = item && st && item.song.tracks.find(x => x.id === st.pattern.track);
+    return tr ? t(`steerQ:${c.kind}`, { type: t(`steerType:${c.type || 'lead'}`), track: tr.name || tr.id }) : t(`steer:${c.kind}`, { type: t(`steerType:${c.type || 'lead'}`) });
+  };
+  // Part harmony and the Song harmony menu in the queue: the treatment (with Auto the one taken), the chords or the key
+  const harmLabel = (c, item) => {
+    if (c.kind === 'voicing') { const v = item && item.plan && (item.plan.voiced || []).filter(x => x.at === c.at && (!c.target || c.target === 'auto' || x.track === c.target)).pop(), tr = v && item.song.tracks.find(x => x.id === v.track); return v ? t('steerQ:voicing', { type: t(`steerType:${c.type || 'lead'}`), treat: t(`treat:${v.treatment}`), track: tr ? tr.name || tr.id : v.track }) : `${t('steer:voicing')} · ${t(`steerType:${c.type || 'lead'}`)}`; }
+    if (c.kind === 'progression') return t('steerQ:progression', { name: PROGS[c.chords] ? tx(PROGS[c.chords][0]) : c.chords });
+    const h = item && item.plan && (item.plan.harmony || []).find(x => x.from === c.at && x.key);
+    return t('steerQ:key', { to: t(`harmKey:${c.to}`), key: h ? h.key : '' });
+  };
+  const cmdLabel = (c, item) => c.kind === 'say-live' ? t('svCmdSay', { text: c.text }) : c.kind === 'voice' || c.kind === 'voice-sound' ? t('svCmdVoice', { what: [c.voice && c.voice.preset ? t(`vinstPreset:${c.voice.preset}`) : '', c.sound && c.sound.style ? t(`voiceStyle:${c.sound.style}`) : ''].filter(Boolean).join(', ') || t('vinstLbl') }) : c.kind === 'voicing' || (['progression', 'key'].includes(c.kind) && ((c.chords && c.chords !== 'auto') || (c.to && c.to !== 'auto'))) ? harmLabel(c, item) : ['more', 'less', 'lock-part', 'unlock-part', 'riser', 'pattern'].includes(c.kind) ? arrLabel(c, item) : ['vary', 'swap'].includes(c.kind) && c.target ? varyLabel(c, item) : c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : ['add', 'remove', 'vary', 'swap'].includes(c.kind) ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type || 'lead'}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: (item && (item.song.tracks.find(x => x.id === c.track) || {}).name) || c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
+  // ---------- the console's Voice group (voice-full-controls D10) ----------
+  // the voice helper of the dev server (D8): a typed line needs it for its sample
+  let voiceHelper = null;
+  fetch('/voice/status').then(r => (r.ok ? r.json() : { ok: false })).then(j => { voiceHelper = !!(j && j.ok); renderSteer(true); }, () => { voiceHelper = false; });
+  // the pickers of the Voce: traccia row (kept while the console redraws), the lines waiting for their sample
+  const sv = { preset: '', style: '', line: '' }, sayWait = [];
+  // the speaker a typed line speaks with: the voice track's of the song on air, else one that is not the narrator's
+  const lineSpeaker = song => { const sp = song.tracks.find(x => x.type === 'spoken'), nar = narratorSpeaker(song); return sp ? speakerOf(song, sp) : SPEAKERS.find(x => x !== nar); };
+  function voiceGroup(item, rel, btn) {
+    const song = item.plain || item.song, has = song.tracks.some(x => x.type === 'spoken'), session = opts.scope === 'session';
+    const sel = (k, list, lab, tipK) => `<select data-sv-${k} data-no-knob aria-label="${esc(t(tipK))}" title="${esc(t(tipK))}"><option value="">${esc(t('svKeep'))}</option>${list.map(v => `<option value="${v}"${sv[k] === v ? ' selected' : ''}>${esc(lab(v))}</option>`).join('')}</select>`;
+    const nothing = !sv.preset && !sv.style, why = nothing ? t('svPickFirst') : !has && !session ? t('steerWhy:no-voice') : S.paused !== undefined ? t('steerWhy:paused') : '';
+    const apply = `<button class="btn steer-btn" data-sv-apply${why ? ' disabled' : ''} title="${esc(t(session ? 'svApplySessionTip' : 'svApplyTip'))}${why ? ` · ${esc(why)}` : ''}">${esc(t('svApply'))}</button>`;
+    const helperWhy = voiceHelper === false ? t('svNoHelper') : voiceHelper === null ? t('svHelperWait') : S.paused !== undefined ? t('steerWhy:paused') : '';
+    const dis = helperWhy ? ` disabled title="${esc(t('svSayLbl'))} · ${esc(helperWhy)}"` : '';
+    return `<div class="steer-group steer-voice"><span class="lbl">${esc(t('steerGroup:voice'))}</span>
+      <div class="sv-row"><span class="lbl">${esc(t('narratorLbl'))}</span><div class="steer-btns">${btn({ kind: 'talk-more' })}${btn({ kind: 'talk-less' })}</div></div>
+      <div class="sv-row"><span class="lbl">${esc(t('vinstLbl'))}</span><div class="steer-btns">${sel('preset', VOICE_PRESET_IDS, v => t(`vinstPreset:${v}`), 'svPresetTip')}${sel('style', VOICE_STYLE_IDS, v => t(`voiceStyle:${v}`), 'svStyleTip')}${apply}</div></div>
+      <div class="sv-row sv-say"><span class="lbl">${esc(t('svSayLbl'))}</span><div class="steer-btns"><input type="text" data-sv-line maxlength="120" autocomplete="off" spellcheck="false" value="${esc(sv.line)}" placeholder="${esc(t('svSayPh'))}"${dis || ` title="${esc(t('svHint'))}"`}><button class="btn steer-btn" data-sv-say="now"${dis || ` title="${esc(t('svNowTip'))}"`}>${esc(t('svNow'))}</button><button class="btn steer-btn" data-sv-say="moment"${dis || ` title="${esc(t('svMomentTip'))}"`}>${esc(t('svMoment'))}</button></div></div>
+      <p class="hint muted small">${esc(t('svHint'))}</p></div>`;
+  }
+  // Apply: the phrase preset and the voice style on the song on air (one command, one Cancel); with the whole session
+  // they also go to the Voices group for the next songs (also with an artist: they are not an artist's traits)
+  function voiceApply() {
+    const item = S && S.stream[S.onAir]; if (!item) return;
+    const session = opts.scope === 'session', song = item.plain || item.song, has = song.tracks.some(x => x.type === 'spoken');
+    if (session) {
+      const v = sv.preset ? applyPreset(sv.preset, opts.voice, { presence: true }) : opts.voice;
+      opts.voice = cleanVoice({ ...v, sound: sv.style ? { style: sv.style } : v.sound });
+      saveOpts();
+      if (!opts.voices.track) toast(t('svTrackOff'));
+    }
+    if (has) {
+      const p = sv.preset ? cleanVoice(applyPreset(sv.preset, cleanVoice({}), { presence: false })) : null;
+      const cmd = { kind: 'voice', voice: p ? { phrases: p.phrases, kind: p.kind, ways: p.ways, presence: p.presence, preset: sv.preset } : null, ...(sv.style ? { sound: { style: sv.style } } : {}) };
+      if (command(cmd)) toast(t('svApplied'));
+    } else if (session) toast(t('svNextOnly'));
+    if (session) render();
+  }
+  // a typed line (D10): its sample first (the voice helper), then "now" on the first bar after it is ready, or "at the
+  // right moment" on the next free part where the voice track may speak; recorded like any command, so Replay says it
+  async function sayLine(mode) {
+    const item = S && S.stream[S.onAir]; if (!item || !item.plan) return;
+    const text = sv.line.trim().replace(/\s+/g, ' '), words = text ? text.split(' ').length : 0;
+    if (!text) return toast(t('plEmptyText'));
+    if (words > 12) return toast(t('plTooMany', { n: words, max: 12 }));
+    const song = item.plain || item.song, lang = getLang(), speaker = lineSpeaker(song);
+    if (mode === 'moment') {
+      const why = whyNot({ kind: 'say-live', mode }, song, item.plan, relNow());
+      if (why) return toast(t('svNoPart'));
+    }
+    sv.line = '';
+    const w = { text }; sayWait.push(w); renderSteer(true);
+    const ask = fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang, speaker }) }).then(r => r.ok);
+    // (at the right moment: the command goes now, the line waits for its part; the sample comes meanwhile)
+    if (mode === 'moment') { sayWait.splice(sayWait.indexOf(w), 1); command({ kind: 'say-live', text, lang, speaker, mode }); }
+    const ok = await ask.catch(() => false);
+    if (mode === 'now') sayWait.splice(sayWait.indexOf(w), 1);
+    if (!ok) { renderSteer(true); return toast(t('svSampleFailed')); }
+    await reloadSamples();
+    if (mode === 'now') { if (!command({ kind: 'say-live', text, lang, speaker, mode })) renderSteer(true); }
+    else if (S && S.paused === undefined) player.swap(windowPlayable());
+  }
   function renderSteer(force = false) {
     const box = root.querySelector('#radio-steer');
     if (!box || dragging) return;
@@ -699,45 +860,114 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     box.dataset.k = '';
     const ph = item.plan.phrase;
     const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
-    const pending = item.commands.filter(c => c.at > rel);
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), (item.plan.locked || []).join(), S.paused !== undefined, opts.scope, varyPart].join('|');
+    const pending = item.commands.filter(c => c.at > rel || c.scope === 'session');
+    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), savedOpen, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => x.id).join(), sv.preset, sv.style, voiceHelper, sayWait.length].join('|');
     if (!force && key === steerKey) return;
     steerKey = key;
+    const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-sv-line]') ? document.activeElement.selectionStart : null;
+    setTimeout(() => { if (typing === null) return; const i = root.querySelector('[data-sv-line]'); if (i) { i.focus(); try { i.setSelectionRange(typing, typing); } catch (e) {} } }, 0);
     const tip = k => `title="${esc(t(k))}"`;
     const air = airSteer(item) && item.g0, airOff = air ? airOffset(item.g0) : 0;
     // a disabled button says why in its tooltip ("this song has no pad")
+    // (a grown song: the director's view in its own bars, late when no boundary is left, radio-profiles D9)
+    const whyOf = c => (S.paused !== undefined ? 'paused' : air && !airBoundaries(c.kind, rel, item.plan, item.g0).length ? 'late' : whyNot(c, air ? item.plain || item.base.song : item.song, item.plan, rel - airOff, tailOf(item), item.opts || (item.base && item.base.opts) || {}));
     const btn = (c, label) => {
-      const part = ['vary', 'swap'].includes(c.kind);
-      // (a grown song: the director's view in its own bars, late when no boundary is left, radio-profiles D9)
-      const why = S.paused !== undefined ? 'paused' : air && !airBoundaries(c.kind, rel, item.plan, item.g0).length ? 'late' : whyNot(c, air ? item.plain || item.base.song : item.song, item.plan, rel - airOff, tailOf(item), item.opts || (item.base && item.base.opts) || {}), k = c.type && !part ? TYPE_KEYS[c.type] : KEYS_OF[c.kind];
-      const tipText = `${t(`steerTip:${c.kind}`, { ...(c.vars || {}), ...(part ? { type: t(`steerType:${c.type}`) } : {}) })}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
+      const part = ['vary', 'swap', 'voicing'].includes(c.kind);
+      const why = whyOf(c), k = KEYS_OF[c.kind];
+      const songOnly = opts.scope === 'session' && ['vary', 'swap', 'riser'].includes(c.kind) ? ` · ${t('steerSongOnly')}` : '';
+      const tipText = `${t(`steerTip:${c.kind}`, { ...(c.vars || {}), ...(part ? { type: t(`steerType:${c.type}`) } : {}) })}${songOnly}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
       // Vary and Swap carry their part in data-part (data-type is the Add and Remove buttons' shortcut target)
-      return `<button class="btn steer-btn${c.icon ? ' with-ico' : ''}" data-cmd="${c.kind}"${c.type ? ` data-${part ? 'part' : 'type'}="${c.type}"` : ''} ${why ? 'disabled' : ''} title="${esc(tipText)}"${why ? ` data-why="${why}"` : ''}>${c.icon || ''}${esc(label || t(`steer:${c.kind}`))}</button>`;
+      return `<button class="btn steer-btn${c.icon ? ' with-ico' : ''}" data-cmd="${c.kind}"${c.type ? ` data-${part ? 'part' : 'type'}="${c.type}"` : ''}${c.target ? ` data-target="${esc(c.target)}"` : ''}${c.treatment ? ` data-treatment="${esc(c.treatment)}"` : ''}${c.chords ? ` data-chords="${esc(c.chords)}"` : ''}${c.to ? ` data-to="${esc(c.to)}"` : ''} ${why ? 'disabled' : ''} title="${esc(tipText)}"${why ? ` data-why="${why}"` : ''}>${c.icon || ''}${esc(label || t(`steer:${c.kind}`))}</button>`;
     };
     // the type buttons say what the next phrase can do: "+" when the type will be silent there, "−" when it will play
     const nextBar = Math.min(barsOf(item.song) - 1, applyBar('add', rel, item.plan)), onNext = stateAt(item.song, nextBar).song.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= nextBar && c.start + c.bars > nextBar));
-    const types = ARRANGE_TYPES.map(type => { const playingType = onNext.some(x => (type === 'lead' ? ['arp', 'hook', 'guitar'].includes(x.type) : x.type === type)); return btn({ kind: playingType ? 'remove' : 'add', type }, t(`steer:${playingType ? 'remove' : 'add'}`, { type: t(`steerType:${type}`) })); }).join('');
+    // the Arrangement group (radio-arrangement): a − and a + per instrument the style or the song has, with a count badge
+    // and a lock, in two rows; a line with the tracks playing and the warning past the recommended counts; the riser row
+    const songNow = air ? item.plain || item.base.song : item.song, relNowDir = rel - airOff;
+    // the target of Vary and Swap: Auto or a playing track of the part at the next phrase (D7)
+    const targets = varyTracks(onNext, varyPart);
+    if (varyTarget !== 'auto' && !targets.some(x => x.id === varyTarget)) varyTarget = 'auto';
+    // Add a saved pattern (D9): the patterns that fit (type and meter), folded to a list or open as cards, each with a
+    // preview drawing and a listen; the ones that do not fit are counted
+    const saved = userPatterns(), fitting = saved.filter(x => fitsAir(x, item.plan, songNow)), unfit = saved.filter(x => !fitsAir(x, item.plan, songNow));
+    const unMeter = unfit.filter(x => unfitReason(x, item.plan) === 'meter').length, unType = unfit.length - unMeter;
+    const secNow = (() => { let a = 0, sc = item.song.sections[0]; for (const x of item.song.sections) { if (rel >= a) sc = x; a += x.bars; } return sc || {}; })();
+    const pvOn = player.preview ? player.preview.on : null;
+    const listenBtn = x => { const on = pvOn === x.id, tip = t(on ? 'savedListenStop' : 'savedListen'); return `<button class="mini sp-listen" data-sp-listen="${esc(x.id)}" aria-pressed="${on}" title="${esc(tip)}" aria-label="${esc(tip)}"${S.paused !== undefined ? ' disabled' : ''}>${on ? STOP : LISTEN}</button>`; };
+    const typeOf = x => instName(patternPart(x));
+    const spBtn = (x, mode) => {
+      const targets = onNext.filter(y => y.type === x.type), tg = spTarget[x.id] && targets.some(y => y.id === spTarget[x.id]) ? spTarget[x.id] : (targets[0] || {}).id;
+      const c = { kind: 'pattern', mode, item: x, ...(mode === 'replace' ? { target: tg } : {}) }, why = whyOf(c), label = t(mode === 'new' ? 'savedAddNew' : 'savedReplace');
+      const tip = `${t('steerTip:pattern')}${why ? ` · ${t(`steerWhy:${why}`, { type: typeOf(x) })}` : ''}`;
+      const sel = mode === 'replace' && targets.length ? `<select data-sp-target="${esc(x.id)}" data-no-knob aria-label="${esc(label)}">${targets.map(y => `<option value="${esc(y.id)}"${y.id === tg ? ' selected' : ''}>${esc(y.name || y.id)}</option>`).join('')}</select>` : '';
+      return `${sel}<button class="btn small" data-sp-${mode}="${esc(x.id)}" title="${esc(tip)}"${why ? ` disabled data-why="${why}"` : ''}>${esc(label)}</button>`;
+    };
+    const spInfo = x => { const c = x.context || {}; return t('savedInfo', { type: typeOf(x), key: c.key || 'A', bpm: c.bpm || '?' }); };
+    const tempoHint = x => { const b = Number((x.context || {}).bpm), now = Number(secNow.bpm || item.entry.bpm); return b && now && (now / b > 1.5 || b / now > 1.5) ? `<small class="sp-tempo">${esc(t('savedTempo', { bpm: b, now: Math.round(now) }))}</small>` : ''; };
+    const spRow = x => `<li class="sp-row">${listenBtn(x)}<canvas class="sp-pv" data-sp-pv="${esc(x.id)}" width="64" height="20" aria-hidden="true"></canvas><span class="sp-name">${esc(x.name || x.id)}</span><span class="chip small">${esc(typeOf(x))}</span></li>`;
+    const spCard = x => `<div class="sp-card"><div class="sp-top">${listenBtn(x)}<b>${esc(x.name || x.id)}</b></div><small class="muted">${esc(spInfo(x))}${(x.styles || []).filter(y => y !== 'any').length ? ` · ${esc(x.styles.filter(y => y !== 'any').join(', '))}` : ''}</small><canvas class="sp-pv big" data-sp-pv="${esc(x.id)}" width="220" height="44" aria-hidden="true"></canvas>${tempoHint(x)}<div class="sp-acts">${spBtn(x, 'new')}${spBtn(x, 'replace')}</div></div>`;
+    const spNote = !saved.length ? t('savedNone') : !fitting.length ? t('savedNoneFit') : '';
+    const spUnfit = [unMeter ? t('savedUnfitMeter', { n: unMeter }) : '', unType ? t('savedUnfitType', { n: unType }) : ''].filter(Boolean).join(' · ');
+    const savedPanel = `<div class="steer-group arr sp"><button class="sp-toggle lbl" id="sp-toggle" aria-expanded="${savedOpen}" title="${esc(t('savedToggleTip'))}">${CHEVRON}<span>${esc(t('savedTitle', { n: fitting.length }))}</span></button>
+      ${fitting.length ? (savedOpen ? `<div class="sp-cards">${fitting.map(spCard).join('')}</div>` : `<ul class="sp-list">${fitting.map(spRow).join('')}</ul>`) : ''}${spNote || spUnfit ? `<p class="muted small sp-note">${esc([spNote, spUnfit].filter(Boolean).join(' '))}</p>` : ''}</div>`;
+    const spPaint = () => box.querySelectorAll('canvas[data-sp-pv]').forEach(cv => { const x = fitting.find(y => y.id === cv.dataset.spPv); if (!x) return; try { paintPreview(cv, previewOf(x.type, x.pattern, { chords: (x.context || {}).chords || secNow.chords, meter: (x.context || {}).meter || '4/4', mode: (x.context || {}).mode || 'minor' }), root); } catch (e) {} });
+    // Part harmony (D8): the treatment menu and the button, on the part and track picked for Vary and Swap
+    const treatSel = `<label class="arr-sel"><span>${esc(t('voicingTreat'))}</span><select data-voicing-treat data-no-knob>${['auto', ...TREATMENTS].map(x => `<option value="${x}"${x === voicingTreat ? ' selected' : ''}>${esc(t(`treat:${x}`))}</option>`).join('')}</select></label>`;
+    const voicingRow = `<span class="steer-voicing">${treatSel}${btn({ kind: 'voicing', type: varyPart, target: varyTarget, treatment: voicingTreat }, t('steer:voicing'))}</span>`;
+    // the Song harmony menu (D8): the style's progressions by name and a key move, Auto by default
+    const curSec = (() => { let a = 0, sc = item.song.sections[0]; const b = Math.min(barsOf(item.song) - 1, applyBar('key', rel, item.plan)); for (const x of item.song.sections) { if (b >= a) sc = x; a += x.bars; } return sc || {}; })();
+    if (harmChords !== 'auto' && !(item.plan.R.progressions || []).includes(harmChords)) harmChords = 'auto';
+    const harmMenu = `<span class="steer-harm"><label class="arr-sel"><span>${esc(t('harmChords'))}</span><select data-harm-chords data-no-knob>${['auto', ...(item.plan.R.progressions || [])].map(x => `<option value="${esc(x)}"${x === harmChords ? ' selected' : ''}>${esc(x === 'auto' ? t('harmAuto') : PROGS[x] ? tx(PROGS[x][0]) : x)}</option>`).join('')}</select></label><label class="arr-sel"><span>${esc(t('harmKey'))}</span><select data-harm-key data-no-knob>${KEY_MOVES.map(x => `<option value="${x}"${x === harmKey ? ' selected' : ''}>${esc(x === 'auto' ? t('harmAuto') : `${t(`harmKey:${x}`)}${keyTo(curSec.key || item.entry.key, x) ? ` (${keyTo(curSec.key || item.entry.key, x)})` : ''}`)}</option>`).join('')}</select></label></span>`;
+    const targetSel = `<label class="arr-sel steer-target" title="${esc(t('steerTargetTip'))}"><span>${esc(t('steerTarget'))}</span><select data-vary-target data-no-knob>${[['auto', t('steerTargetAuto')], ...targets.map(x => [x.id, x.name || x.id])].map(([v, l]) => `<option value="${esc(v)}"${v === varyTarget ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+    const shown = ARR_ROWS.map(row => row.filter(p => partHas(item.plan.R, p) || item.song.tracks.some(x => instrumentOf(x) === p)));
+    const order = shown.flat(), lk = lockedIds(item.plan);
+    const countOf = p => onNext.filter(x => instrumentOf(x) === p).length;
+    const lockOf = p => {
+      if ((item.plan.lockedParts || []).includes(p)) return { state: 'closed' };
+      const ids = item.song.tracks.filter(x => instrumentOf(x) === p).map(x => x.id), n = ids.filter(id => lk.includes(id)).length;
+      return { state: !ids.length || !n ? 'open' : n === ids.length ? 'closed' : 'half', n, m: ids.length };
+    };
+    const lockBtn = p => {
+      const L = lockOf(p), riser = p === 'riser';
+      const tip = riser ? t(L.state === 'closed' ? 'riserLockClosed' : 'riserLockOpen') : L.state === 'half' ? t('arrLockHalf', { n: L.n, m: L.m, part: instName(p) }) : t(L.state === 'closed' ? 'arrLockClosed' : 'arrLockOpen', { part: instName(p) });
+      return `<button class="mini arr-lock" data-lock-part="${p}" data-state="${L.state}" aria-pressed="${L.state === 'closed'}" aria-label="${esc(tip)}" title="${esc(tip)}"${S.paused !== undefined ? ' disabled' : ''}>${L.state === 'closed' ? LOCK : L.state === 'half' ? LOCK_HALF : LOCK_OPEN}</button>`;
+    };
+    const instBtn = (kind, p) => {
+      const c = { kind, part: p }, why = whyOf(c), name = instName(p), k = order.indexOf(p) + 1;
+      const warn = kind === 'more' && !why ? moreWarning(p, songNow, item.plan, relNowDir) : null;
+      const tip = `${t(`steerTip:${kind}`, { part: name })}${warn ? ` · ${t('arrWarn', { part: name, n: warn.count, rec: warn.rec })}` : ''} (${kind === 'less' ? 'Shift+' : ''}${k})${why ? ` · ${t(`steerWhy:${why}`, { type: name })}` : ''}`;
+      return `<button class="btn steer-btn arr-pm" data-cmd="${kind}" data-inst="${p}" aria-label="${esc(t(`steer:${kind}`, { part: name }))}" title="${esc(tip)}"${why ? ` disabled data-why="${why}"` : ''}>${kind === 'more' ? '+' : '−'}</button>`;
+    };
+    const instBox = p => { const n = countOf(p), over = n > RECOMMENDED[p]; return `<span class="arr-inst${over ? ' over' : ''}" data-arr="${p}">${instBtn('less', p)}<span class="arr-name">${esc(instName(p))}${n > 1 ? `<span class="arr-count${over ? ' warn' : ''}">×${n}</span>` : ''}</span>${instBtn('more', p)}${lockBtn(p)}</span>`; };
+    const total = onNext.filter(x => x.type !== 'riser' && x.type !== 'spoken').length;
+    const over = order.filter(p => countOf(p) > RECOMMENDED[p]);
+    const sel = (k, list, lab) => `<label class="arr-sel"><span>${esc(t(lab))}</span><select data-riser="${k}" data-no-knob>${list.map(([v, l]) => `<option value="${v}"${String(riserForm[k]) === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+    const riserRow = `<div class="arr-riser" title="${esc(t('steerTip:riser'))}">${btn({ kind: 'riser', bars: riserForm.bars, dir: riserForm.dir, sound: riserForm.sound }, t('steer:riser'))}${sel('bars', RISER_BARS.map(b => [b, b === 'auto' ? t('riserAuto') : t('riserBarsN', { n: b })]), 'riserBars')}${sel('dir', [['up', t('riserDir:up')], ['down', t('riserDir:down')]], 'riserDir')}${sel('sound', RISER_SOUNDS.map(x => [x, t(`riserSound:${x}`)]), 'riserSound')}${lockBtn('riser')}</div>`;
+    const types = `<div class="arr-rows">${shown.map((row, i) => `<div class="arr-row">${row.map(instBox).join('')}${i === 1 ? btn({ kind: 'more-complex' }) + btn({ kind: 'less-complex' }) : ''}</div>`).join('')}${riserRow}
+      <p class="arr-info muted">${esc(t('arrCount', { n: total, usual: item.plan.usualHigh, cap: TRACK_CAP }))}</p>${over.length ? `<p class="arr-warn">${esc(over.map(p => t('arrWarn', { part: instName(p), n: countOf(p), rec: RECOMMENDED[p] })).join(' · '))}. ${esc(t('arrRec'))}</p>` : ''}</div>`;
     // (a group with a hint: the harmony, which changes every part with notes, owner's tests #76)
-    const group = (name, html) => `<div class="steer-group"><span class="lbl"${name === 'harmony' ? ` title="${esc(t(`steerGroupTip:${name}`))}"` : ''}>${esc(t(`steerGroup:${name}`))}</span><div class="steer-btns">${html}</div></div>`;
+    const group = (name, html) => `<div class="steer-group${name === 'arrangement' ? ' arr' : ''}"><span class="lbl"${name === 'harmony' ? ` title="${esc(t(`steerGroupTip:${name}`))}"` : ''}>${esc(t(`steerGroup:${name}`))}</span><div class="steer-btns">${html}</div></div>`;
     box.innerHTML = `<div class="steer-head"><div class="lbl">${esc(t('steerTitle'))}</div>
         <span class="hand-from steer-scope" ${tip('steerScopeTip')}><button class="led" id="steer-scope" aria-pressed="${opts.scope === 'session'}" aria-labelledby="steer-scope-lbl"></button><span id="steer-scope-lbl">${esc(t(opts.scope === 'session' ? 'steerScopeSession' : 'steerScopeSong'))}</span></span></div>
       <div class="steer-console">
         ${group('energy', btn({ kind: 'energy-up' }) + btn({ kind: 'energy-down' }))}
-        ${group('arrangement', types + btn({ kind: 'more-complex' }) + btn({ kind: 'less-complex' }))}
-        ${group('parts', `<span class="steer-part" role="radiogroup" aria-label="${esc(t('steerPartPick'))}">${VARY_TYPES.map(p => `<button class="chip small" role="radio" data-vary-part="${p}" aria-checked="${varyPart === p}" aria-pressed="${varyPart === p}" title="${esc(t('steerPartPick'))}: ${esc(t(`steerType:${p}`))}">${esc(t(`steerType:${p}`))}</button>`).join('')}</span>${btn({ kind: 'vary', type: varyPart, icon: VARY }, t('steerBtn:vary'))}${btn({ kind: 'swap', type: varyPart, icon: SWAP }, t('steerBtn:swap'))}`)}
+        ${group('arrangement', types)}
+        ${group('parts', `<span class="steer-part" role="radiogroup" aria-label="${esc(t('steerPartPick'))}">${VARY_TYPES.map(p => `<button class="chip small" role="radio" data-vary-part="${p}" aria-checked="${varyPart === p}" aria-pressed="${varyPart === p}" title="${esc(t('steerPartPick'))}: ${esc(t(`steerType:${p}`))}">${esc(t(`steerType:${p}`))}</button>`).join('')}</span>${targetSel}${btn({ kind: 'vary', type: varyPart, target: varyTarget, icon: VARY }, t('steerBtn:vary'))}${btn({ kind: 'swap', type: varyPart, target: varyTarget, icon: SWAP }, t('steerBtn:swap'))}${voicingRow}`)}
+        ${savedPanel}
         ${group('sound', ['darker', 'brighter', 'dirtier', 'cleaner', 'more-space', 'instrument'].map(k => btn({ kind: k })).join(''))}
-        ${group('harmony', btn({ kind: 'progression' }) + btn({ kind: 'key' }))}
-        ${group('voice', btn({ kind: 'talk-more' }) + btn({ kind: 'talk-less' }))}
+        ${group('harmony', harmMenu + btn({ kind: 'progression', chords: harmChords }) + btn({ kind: 'key', to: harmKey }))}
+        ${voiceGroup(item, rel, btn)}
         ${group('song', btn({ kind: 'drop' }) + btn({ kind: 'stay' }) + (() => { const s = `+${Math.round(extendSeconds(item.plan))} s`; return btn({ kind: 'extend', vars: { s } }, t('steer:extend', { s })); })() + btn({ kind: 'end' }))}
       </div>
       <div class="lbl">${esc(t('steerQueue'))}</div>
-      <ul class="steer-queue">${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: c.at + 1 }))}</span> ${esc(cmdLabel(c))} <button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button></li>`).join('') || `<li class="muted">${esc(t('steerQueueEmpty'))}</li>`}</ul>
+      <ul class="steer-queue">${sayWait.map(w => `<li><span class="at">…</span> ${esc(t('svQueueWait', { text: w.text }))}</li>`).join('')}${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: c.at + 1 }))}</span> ${esc(cmdLabel(c, item))}${c.scope === 'session' ? `<span class="muted"> · ${esc(t('steerForSession'))}</span>` : ''} <button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button></li>`).join('') || (sayWait.length ? '' : `<li class="muted">${esc(t('steerQueueEmpty'))}</li>`)}</ul>
       <div class="lbl">${esc(t('steerMixer'))}</div>
-      <div class="steer-mixer">${[...on, ...st.tracks.filter(x => x.mute && (item.plan.locked || []).includes(x.id))].map(x => { const locked = (item.plan.locked || []).includes(x.id), g = (x.settings || {}).gain ?? 0.5; return `<div class="mix-row"><span class="mix-name">${esc(x.name || x.id)}</span>
+      <div class="steer-mixer">${[...on, ...st.tracks.filter(x => x.mute && lk.includes(x.id))].map(x => { const locked = lk.includes(x.id), g = (x.settings || {}).gain ?? 0.5; return `<div class="mix-row"><span class="mix-name">${esc(x.name || x.id)}</span>
         <input type="range" min="0" max="1.2" step="0.05" value="${g}" data-mix-vol="${esc(x.id)}" data-no-knob aria-label="${esc(t('steerVolume', { track: x.name || x.id }))}" title="${esc(t('steerVolume', { track: x.name || x.id }))}">
         <button class="mini" data-mix-mute="${esc(x.id)}" aria-pressed="${!!x.mute}" title="${esc(t('steerTip:mute'))}">M</button>
-        <button class="mini" data-mix-lock="${esc(x.id)}" aria-pressed="${locked}" title="${esc(t('steerTip:lock'))}">${locked ? '🔒' : '🔓'}</button>
+        <button class="mini" data-mix-lock="${esc(x.id)}" aria-pressed="${locked}" title="${esc(t('steerTip:lock'))}" aria-label="${esc(t('steerTip:lock'))}">${locked ? LOCK : LOCK_OPEN}</button>
         <button class="mini" data-mix-inst="${esc(x.id)}" title="${esc(t('steerTip:instrument'))}">♪</button></div>`; }).join('') || `<p class="muted">${esc(t('steerMixerEmpty'))}</p>`}</div>`;
+    spPaint();
   }
 
   function renderNow(cyc) {
@@ -832,44 +1062,51 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       </div>
     </div>`;
   }
-  // The Voices group (voice-placement): the narrator controls and the voice instrument together. The narrator controls
-  // are the Custom profile's (data-custom, data-custom-chip, the same handlers); with another profile they show its
-  // values, disabled, and say why. The voice instrument applies from the next song and, on air, to the song on air from
-  // its next quiet part (a steering command, recorded like the others).
-  // talkKnob: the Narrator knob (option talk), drawn by render's slider so its die, lock and compilation mark stay the same
+  // The Voices group (voice-full-controls D12, variant B): the settings for the next songs only, in two blocks, each with
+  // its switch (D15), a main row and folded parts (Sound, and the voice track's Phrases). The song on air changes from
+  // the console. The narrator style and Narrated growth keep the Custom-only rule (voice-placement); the knob, the
+  // switches and the Sound parts work with every profile.
+  // talkKnob: the narrator knob (option talk), drawn by render's slider so its die, lock and compilation mark stay the same
+  const vfold = id => { try { return !!(JSON.parse(localStorage.getItem('coding-misk-voice-folds') || '{}') || {})[id]; } catch (e) { return false; } };
+  const vswitch = (k, on, label) => `<button class="vswitch" data-rvoice-switch="${k}" aria-pressed="${on}" title="${esc(t('voiceSwitchTip', { voice: t(label) }))}"><span class="vs-lamp" aria-hidden="true"></span>${POWER}<span class="vs-txt">${esc(t(on ? 'switchOn' : 'switchOff'))}</span></button>`;
   function voicesGroup(talkKnob = '') {
     const custom = opts.profile === 'custom', C = custom ? customControls(opts.custom) : RADIO_PROFILES.includes(opts.profile) ? customControls({ base: opts.profile, controls: {} }) : null;
-    const narOff = !!C && C.narrator === false, grow = !!C && C.build === 'crescendo', lock = custom ? '' : t(opts.profile === 'artist' ? 'radioNarratorArtist' : 'radioNarratorCustomOnly');
-    const tipOf = (k, off) => esc(lock || (off ? t(off) : t(k)));
+    const narOn = opts.voices.narrator, trOn = opts.voices.track, grow = !!C && C.build === 'crescendo', lock = custom ? '' : t(opts.profile === 'artist' ? 'radioNarratorArtist' : 'radioNarratorCustomOnly');
+    const narOff = narOn ? '' : t('voiceOffTip', { voice: t('narratorLbl') }), trOff = trOn ? '' : t('voiceOffTip', { voice: t('vinstLbl') });
+    const tipOf = (k, off) => esc(narOff || lock || (off ? t(off) : t(k)));
     const style = C ? C.narratorStyle || 'auto' : 'auto';
-    const nar = `<button class="chip small" data-custom-chip="narrator" aria-pressed="${!C || C.narrator !== false}" title="${tipOf('liveNarratorHint')}"${custom ? '' : ' disabled'}>${esc(t('liveNarrator'))}</button>`;
-    const sty = `<label class="ctrl" title="${tipOf('narratorStyleHint', narOff ? 'narratorStyleOff' : '')}"><span class="lbl">${esc(t('narratorStyleLbl'))}</span><select data-custom="narratorStyle" data-no-knob${!custom || narOff ? ' disabled' : ''}>${CONTROLS.narratorStyle.map(v => `<option value="${v}"${style === v ? ' selected' : ''}>${esc(t(`narratorStyle:${v}`))}</option>`).join('')}</select></label>`;
-    // Apply to the song on air: enabled while a song plays (not paused); the tooltip says why when it is not
-    const airOk = !!S && S.paused === undefined;
-    const onAirBtn = `<button class="btn small" data-vinst-onair title="${esc(t(airOk ? 'vinstOnAirHint' : 'vinstOnAirOff'))}"${airOk ? '' : ' disabled'}>${esc(t('vinstOnAirBtn'))}</button>`;
-    const ngr = `<button class="chip small" data-custom-chip="narrated" aria-pressed="${!!(C && C.narrated)}" title="${tipOf('liveNarratedHint', !grow ? 'narratedNeedsCrescendo' : narOff ? 'liveNarratedOff' : '')}"${!custom || !grow || narOff ? ' disabled' : ''}>${esc(t('liveNarrated'))}</button>`;
+    const sty = `<label class="ctrl" title="${tipOf('narratorStyleHint')}"><span class="lbl">${esc(t('narratorStyleLbl'))}</span><select data-custom="narratorStyle" data-no-knob${!custom || !narOn ? ' disabled' : ''}>${CONTROLS.narratorStyle.map(v => `<option value="${v}"${style === v ? ' selected' : ''}>${esc(t(`narratorStyle:${v}`))}</option>`).join('')}</select></label>`;
+    const ngr = `<button class="chip small" data-custom-chip="narrated" aria-pressed="${!!(C && C.narrated)}" title="${tipOf('liveNarratedHint', !grow ? 'narratedNeedsCrescendo' : '')}"${!custom || !grow || !narOn ? ' disabled' : ''}>${esc(t('liveNarrated'))}</button>`;
+    const narSound = voiceSoundHtml({ voice: 'narrator', settings: soundShown(opts.narratorSound), t, esc, radio: opts.narratorSound, off: narOff, open: vfold('radio-narrator-sound') });
+    const v = opts.voice, trSound = voiceSoundHtml({ voice: 'spoken', settings: soundShown(v.sound), t, esc, radio: v.sound, off: trOff, open: vfold('radio-spoken-sound') });
+    const phrases = `<details class="voice-part" data-vfold="radio-spoken-phrases"${vfold('radio-spoken-phrases') ? ' open' : ''}><summary><span class="lbl">${esc(t('vinstPhrasesPart'))}</span> <span class="vs-sum">${esc([t(`vinstPhrases:${v.phrases}`), t(`vinstKind:${v.kind}`), ...v.where.map(w => t(`vinstWhere:${w}`))].join(' · '))}</span></summary>${voicePanel(v, { t, esc, mode: 'radio', only: 'options', off: trOff })}</details>`;
     return `<div class="radio-voices" id="radio-voices" role="group" aria-labelledby="radio-voices-lbl"><span class="lbl" id="radio-voices-lbl" title="${esc(t('voicesHint'))}">${esc(t('voicesLbl'))}</span>
-      <div class="voices-nar" id="radio-narrator"><span class="lbl voices-sub">${esc(t('narratorLbl'))}</span><div class="ctrls voices-knob">${talkKnob}</div><div class="chips">${nar}</div>${sty}<div class="chips">${ngr}</div></div>
-      <div class="radio-voice" id="radio-voice"><span class="lbl voices-sub" title="${esc(t('vinstHint'))}">${esc(t('vinstLbl'))}</span>${voicePanel(opts.voice, { t, esc, mode: 'radio' })}
-        <div class="voices-onair">${onAirBtn}</div></div>
+      <div class="voice-block voices-nar${narOn ? '' : ' off'}" id="radio-narrator"><div class="vb-head"><span class="lbl voices-sub">${esc(t('narratorLbl'))}</span>${vswitch('narrator', narOn, 'narratorLbl')}</div>
+        ${narOn ? '' : `<p class="hint muted small">${esc(t('radioVoiceOffHint'))}</p>`}
+        <div class="vb-main"><div class="ctrls voices-knob">${talkKnob}</div>${sty}<div class="chips">${ngr}</div></div>
+        <div class="vb-parts" data-rsound="narrator">${narSound}</div></div>
+      <div class="voice-block radio-voice${trOn ? '' : ' off'}" id="radio-voice"><div class="vb-head"><span class="lbl voices-sub" title="${esc(t('vinstHint'))}">${esc(t('vinstLbl'))}</span>${vswitch('track', trOn, 'vinstLbl')}</div>
+        ${trOn ? '' : `<p class="hint muted small">${esc(t('radioVoiceOffHint'))}</p>`}
+        <div class="vb-main">${voicePanel(v, { t, esc, mode: 'radio', only: 'main', off: trOff })}</div>
+        <div class="vb-parts">${phrases}<div data-rsound="spoken">${trSound}</div></div></div>
       <p class="hint muted small" id="radio-voices-hint">${esc(t('radioVoicesHint'))}</p></div>`;
   }
-  // a voice instrument change: kept for the next songs only; the song on air changes with the button Apply to the song
-  // on air (voice-placement D5b)
+  // a voice change in the group: kept for the next songs only (the song on air changes from the console)
   function voiceChanged(v) {
     opts.voice = v; saveOpts(); render();
     if (S) toast(t('vinstNextOnly'));
   }
-  // Apply to the song on air: the current settings as a steering command on the song on air, from its next quiet part
-  // (the console's rules: not paused, not a frozen or lead song, a quiet part left), recorded like the others
-  function voiceOnAir() {
-    if (!S || S.paused !== undefined) return toast(t('vinstOnAirOff'));
-    const item = S.stream[S.onAir];
-    if (!item || !item.plan) return toast(t('vinstNextOnly'));
-    const { preset, ...voice } = cleanVoice(opts.voice), cmd = { kind: 'voice', voice };
-    const why = whyNot({ ...cmd }, item.plain || item.song, item.plan, relNow());
-    if (why) return toast(`${t('vinstNextOnly')} · ${t(`steerWhy:${why}`)}`);
-    if (command(cmd)) toast(t('vinstOnAir'));
+  // a Sound control of a voice: the option for the next songs, the part brought up to date without a new render (a
+  // control being dragged keeps its drag); end: the control was let go (the toast)
+  function soundChanged(el, end) {
+    const ev = soundEvent(el); if (!ev) return false;
+    const key = ev.voice === 'narrator' ? 'narratorSound' : null, cur = key ? opts.narratorSound : opts.voice.sound, next = cleanSound(nextSound(cur, ev));
+    if (key) opts.narratorSound = next; else opts.voice = cleanVoice({ ...opts.voice, sound: next });
+    saveOpts();
+    const box = root.querySelector(`[data-rsound="${ev.voice}"]`);
+    syncVoiceSound(box, { voice: ev.voice, settings: soundShown(next), t, radio: next, off: '' });
+    if (end && S) toast(t('vinstNextOnly'));
+    return true;
   }
   // one Custom control changed: kept with the others, for the songs from the next one; a display control (comments,
   // functions, title, lit notes, line breaks, typing) also reaches the song on air from its next code edit
@@ -1017,11 +1254,32 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.dataset.keep !== undefined && opts.temp) { const id = keepArtist(opts.temp); if (id) { opts.temp = null; opts.artist = id; saveOpts(); render(); toast(t('diceKept')); } return; }
     if (b.dataset.tempDrop !== undefined) { if (opts.artist === (opts.temp && opts.temp.id)) opts.artist = null; opts.temp = null; saveOpts(); return render(); }
     if (b.dataset.varyPart) { varyPart = b.dataset.varyPart; return renderSteer(true); }
-    if (b.dataset.cmd) return command({ kind: b.dataset.cmd, ...(b.dataset.type ? { type: b.dataset.type } : {}), ...(b.dataset.part ? { type: b.dataset.part } : {}) });
+    if (b.dataset.svApply !== undefined) return voiceApply();
+    if (b.dataset.svSay) { sv.line = (root.querySelector('[data-sv-line]') || { value: sv.line }).value; return sayLine(b.dataset.svSay); }
+    if (b.dataset.cmd === 'riser') return command({ kind: 'riser', bars: riserForm.bars === 'auto' ? 'auto' : +riserForm.bars, dir: riserForm.dir, sound: riserForm.sound });
+    if (b.dataset.cmd) return command({ kind: b.dataset.cmd, ...(b.dataset.type ? { type: b.dataset.type } : {}), ...(b.dataset.part ? { type: b.dataset.part } : {}), ...(b.dataset.inst ? { part: b.dataset.inst } : {}), ...(b.dataset.target ? { target: b.dataset.target } : {}), ...(b.dataset.treatment ? { treatment: b.dataset.treatment } : {}), ...(b.dataset.chords && b.dataset.chords !== 'auto' ? { chords: b.dataset.chords } : {}), ...(b.dataset.to && b.dataset.to !== 'auto' ? { to: b.dataset.to } : {}) });
+    // the lock of an instrument (radio-arrangement D12): closed opens, open or half locks every track of it
+    // Add a saved pattern (D9): fold or open the panel, listen, add as a new track or in place of a playing one
+    if (b.id === 'sp-toggle') { savedOpen = !savedOpen; try { store.set('coding-misk-radio-saved-open', savedOpen); } catch (err) {} return renderSteer(true); }
+    if (b.dataset.spListen || b.dataset.spNew || b.dataset.spReplace) {
+      const id = b.dataset.spListen || b.dataset.spNew || b.dataset.spReplace, x = userPatterns().find(y => y.id === id), it = S && S.stream[S.onAir];
+      if (!x || !it || !it.plan) return;
+      const item = JSON.parse(JSON.stringify(x));
+      if (b.dataset.spListen) {
+        let a = 0, sc = it.song.sections[0]; const rel = relNow();
+        for (const y of it.song.sections) { if (rel >= a) sc = y; a += y.bars; }
+        if (player.preview) player.preview.toggle(item, { key: sc.key, chords: sc.chords, bpm: sc.bpm || it.entry.bpm, meter: sc.meter || it.entry.meter, n: it.n });
+        return renderSteer(true);
+      }
+      if (b.dataset.spNew) return command({ kind: 'pattern', mode: 'new', item });
+      const sel = root.querySelector(`[data-sp-target="${CSS.escape(id)}"]`);
+      return command({ kind: 'pattern', mode: 'replace', target: sel ? sel.value : spTarget[id], item });
+    }
+    if (b.dataset.lockPart) return command({ kind: b.dataset.state === 'closed' ? 'unlock-part' : 'lock-part', part: b.dataset.lockPart });
     if (b.dataset.cancel) return cancel(+b.dataset.cancel);
     if (b.id === 'steer-scope') { opts.scope = opts.scope === 'session' ? 'song' : 'session'; saveOpts(); return renderSteer(true); }
     if (b.dataset.mixMute) return command({ kind: b.getAttribute('aria-pressed') === 'true' ? 'unmute' : 'mute', track: b.dataset.mixMute });
-    if (b.dataset.mixLock) { const item = S && S.stream[S.onAir]; return command({ kind: item && (item.plan.locked || []).includes(b.dataset.mixLock) ? 'unlock' : 'lock', track: b.dataset.mixLock }); }
+    if (b.dataset.mixLock) { const item = S && S.stream[S.onAir]; return command({ kind: item && lockedIds(item.plan).includes(b.dataset.mixLock) ? 'unlock' : 'lock', track: b.dataset.mixLock }); }
     if (b.dataset.mixInst) return command({ kind: 'instrument', track: b.dataset.mixInst });
     // a session into a playlist (#38): a small menu next to the button
     if (b.id === 'radio-pl' || b.dataset.histPl !== undefined) {
@@ -1039,13 +1297,13 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (b.id === 'custom-toggle') { customOpen = !customOpen; try { store.set('coding-misk-radio-custom-open', customOpen); } catch (err) {} return render(); }
     if (b.dataset.customBase) { opts.custom = { base: b.dataset.customBase, controls: {} }; saveOpts(); showDisplay(customControls(opts.custom)); return render(); }
     // the voice instrument (voice-controls): a preset or a way, from the next song
-    if (b.dataset.vinstPreset || b.dataset.vinstWay) { const v = voiceEvent(opts.voice, b, { mode: 'radio' }); if (v) voiceChanged(v); return; }
-    if (b.dataset.vinstOnair !== undefined) return voiceOnAir();
+    if (b.dataset.vinstPreset || b.dataset.vinstWay || b.dataset.vinstWhere) { const v = voiceEvent(opts.voice, b, { mode: 'radio' }); if (v) voiceChanged(v); return; }
+    // the voice switches (D15): the next songs; every value under them is kept
+    if (b.dataset.rvoiceSwitch) { const k = b.dataset.rvoiceSwitch; opts.voices = { ...opts.voices, [k]: !opts.voices[k] }; saveOpts(); render(); if (S) toast(t('vinstNextOnly')); return; }
     if (b.dataset.customChip) {
       const k = b.dataset.customChip, C = customControls(opts.custom);
       if (k === 'typist') return setCustom({ typist: C.typist === 'human' ? 'exact' : 'human' });
       if (k === 'mistakes') return setCustom({ mistakes: C.mistakes === 'off' ? 'on' : 'off' });
-      if (k === 'narrator') return setCustom({ narrator: C.narrator === false });
       return setCustom({ [k]: COMMENT_KEYS.includes(k) ? C[k] === false : !C[k] });
     }
     if (b.id === 'curves-toggle') { detailsOpen = !detailsOpen; try { store.set('coding-misk-radio-details', detailsOpen); } catch (err) {} return renderNow(); }
@@ -1096,18 +1354,34 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   root.addEventListener('pointerup', endDrag);
   root.addEventListener('pointercancel', endDrag);
   // shortcuts while the Radio tab is open and the radio plays (not while typing in a field)
+  // (Enter in the line field: Say now)
+  root.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-sv-line]')) { e.preventDefault(); sv.line = e.target.value; sayLine('now'); } });
   document.addEventListener('keydown', e => {
     if (root.hidden || !S || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, select, textarea, [contenteditable], strudel-editor, .cm-editor')) return;
+    // digits 1 to 8: + of the instruments in the console's order; with Shift: − (by the key's position, any layout)
+    const digit = /^Digit([1-8])$/.exec(e.code || '');
+    if (digit) {
+      const boxes = [...root.querySelectorAll('#radio-steer .arr-inst')], box = boxes[+digit[1] - 1];
+      if (!box) return;
+      e.preventDefault();
+      const b = box.querySelector(`[data-cmd="${e.shiftKey ? 'less' : 'more'}"]`);
+      if (b && !b.disabled) b.click();
+      return;
+    }
     const kind = Object.keys(KEYS_OF).find(k => KEYS_OF[k] === e.key);
     if (kind === 'extend' && e.repeat) return;
-    const type = Object.keys(TYPE_KEYS).find(k => TYPE_KEYS[k] === e.key);
-    if (!kind && !type) return;
+    if (!kind) return;
     e.preventDefault();
-    if (type) { const b = root.querySelector(`[data-type="${type}"]`); if (b && !b.disabled) b.click(); return; }
     const b = root.querySelector(`[data-cmd="${kind}"]`);
     if (b && !b.disabled) b.click();
   });
   root.addEventListener('change', e => {
+    if (e.target.dataset.spTarget) { spTarget[e.target.dataset.spTarget] = e.target.value; return renderSteer(true); }
+    if (e.target.dataset.voicingTreat !== undefined) { voicingTreat = e.target.value; return renderSteer(true); }
+    if (e.target.dataset.harmChords !== undefined) { harmChords = e.target.value; return renderSteer(true); }
+    if (e.target.dataset.harmKey !== undefined) { harmKey = e.target.value; return renderSteer(true); }
+    if (e.target.dataset.varyTarget !== undefined) { varyTarget = e.target.value; return renderSteer(true); }
+    if (e.target.dataset.riser) { riserForm[e.target.dataset.riser] = e.target.value; return renderSteer(true); }
     if (e.target.dataset.mixVol) command({ kind: 'volume', track: e.target.dataset.mixVol, value: +e.target.value });
     if (e.target.dataset.opt && opts.compilation !== 'off') render();
     if (e.target.id === 'radio-transition') { opts.transition = e.target.value; saveOpts(); }
@@ -1118,6 +1392,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (e.target.id === 'radio-profile' && RADIO_CHOICES.includes(e.target.value)) { opts.profile = e.target.value; saveOpts(); render(); }
     if (e.target.id === 'radio-incoming') { opts.incoming = e.target.value; saveOpts(); if (S && S.paused === undefined) player.swap(windowPlayable()); }
     if (e.target.dataset.vinst) { const v = voiceEvent(opts.voice, e.target, { mode: 'radio' }); if (v) voiceChanged(v); }
+    if (e.target.dataset.vsound || e.target.dataset.vsoundStyle) soundChanged(e.target, true);
+    if (e.target.matches('[data-sv-preset]')) { sv.preset = e.target.value; renderSteer(true); }
+    if (e.target.matches('[data-sv-style]')) { sv.style = e.target.value; renderSteer(true); }
     if (e.target.dataset.custom) {
       const k = e.target.dataset.custom, v = e.target.value;
       if (k === 'comments' && COMMENT_PRESETS[v]) setCustom({ ...COMMENT_PRESETS[v] });
@@ -1130,6 +1407,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     if (k) { if (opts.artist) { opts.artist = null; root.querySelectorAll('[data-artist]').forEach(c => c.setAttribute('aria-pressed', c.dataset.artist === '')); } opts[k] = +e.target.value; if (opts.compilation !== 'off') opts.compLocks[k] = opts[k]; saveOpts(); e.target.closest('.ctrl').querySelector('output').textContent = fmt(opts[k]); }
     if (e.target.id === 'radio-seed') seedField = e.target.value.trim();
     if (e.target.id === 'radio-volume') player.setVolume(+e.target.value);
+    if (e.target.type === 'range' && e.target.dataset.vsound) soundChanged(e.target, false);
+    if (e.target.matches('[data-sv-line]')) sv.line = e.target.value;
   });
 
   // what plays, for the studio visual (#28): song, artist, styles, bar, the last spoken comment
@@ -1154,7 +1433,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, soulSource, continueSong, playSession, rebuild, exportItems, airSongs,
     // the session on air as a playlist item (#38)
     get sessionNow() { return S && !S.limit ? sessionItem(S.recipe, S.onAir + 1, S.stream[0].song.title) : null; },
-    get steering() { if (!S) return null; const it = S.stream[S.onAir]; if (!it.plan) return { n: it.n, lead: true, commands: [], plan: null, song: it.song, recipe: clone(S.recipe) }; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [] }, song: it.song, recipe: clone(S.recipe) }; },
+    get steering() { if (!S) return null; const it = S.stream[S.onAir]; if (!it.plan) return { n: it.n, lead: true, commands: [], plan: null, song: it.song, recipe: clone(S.recipe) }; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [], lockedParts: it.plan.lockedParts || [], added: clone(it.plan.added || []), risers: clone(it.plan.risers || []), usualHigh: it.plan.usualHigh, hardMax: it.plan.hardMax }, song: it.song, recipe: clone(S.recipe) }; },
     get paused() { return !!S && S.paused !== undefined; },
     get recording() { return recS ? { seconds: recElapsed(), list: recS.list.map(x => ({ ...x })) } : null; },
     startRec, stopRec, recordFromStart,

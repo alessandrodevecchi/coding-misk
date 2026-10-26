@@ -11,7 +11,7 @@
       "@strudel/repl": "1.3.0",
       "superdough": "1.3.0"
     },
-    "codes": 41840
+    "codes": 41842
   },
   "functions": {
     "add": {
@@ -98,7 +98,7 @@
     "clip": {
       "songs": 2,
       "live": 2,
-      "radio": 0,
+      "radio": 2,
       "prelude": 0,
       "as": [
         "clip"
@@ -134,7 +134,7 @@
     "delay": {
       "songs": 41,
       "live": 41,
-      "radio": 51,
+      "radio": 52,
       "prelude": 1,
       "as": [
         "delay"
@@ -143,7 +143,7 @@
     "delayfeedback": {
       "songs": 3,
       "live": 5,
-      "radio": 11,
+      "radio": 13,
       "prelude": 0,
       "as": [
         "delayfeedback"
@@ -152,7 +152,7 @@
     "delaysync": {
       "songs": 3,
       "live": 5,
-      "radio": 11,
+      "radio": 13,
       "prelude": 0,
       "as": [
         "delaysync"
@@ -260,7 +260,7 @@
     "hpf": {
       "songs": 32,
       "live": 32,
-      "radio": 46,
+      "radio": 47,
       "prelude": 0,
       "as": [
         "hpf"
@@ -341,7 +341,7 @@
     "n": {
       "songs": 37,
       "live": 37,
-      "radio": 52,
+      "radio": 53,
       "prelude": 0,
       "as": [
         "n"
@@ -395,7 +395,7 @@
     "postgain": {
       "songs": 16,
       "live": 16,
-      "radio": 21,
+      "radio": 26,
       "prelude": 0,
       "as": [
         "postgain"
@@ -495,7 +495,7 @@
     "slice": {
       "songs": 2,
       "live": 2,
-      "radio": 0,
+      "radio": 2,
       "prelude": 0,
       "as": [
         "slice"
@@ -522,7 +522,7 @@
     "stretch": {
       "songs": 3,
       "live": 3,
-      "radio": 1,
+      "radio": 2,
       "prelude": 0,
       "as": [
         "stretch"

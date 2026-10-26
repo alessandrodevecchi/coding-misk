@@ -17,10 +17,13 @@ The owner speaks Italian; the code, the docs and this knowledge base are in Engl
 - **Pattern** and **clip**: what a track plays, and where it plays it.
 - **Idea** (it: idea): a pattern written as a small musical idea instead of every step.
 - **Live build** (it: in divenire): a song that builds itself while it plays. A **step** (it: passo) is one timed change.
-- **Narrator** (it: narratore) speaks the step comments. The **voice instrument** (it: voce strumento) speaks lines in the music.
+- **Voice: narrator** (it: Voce: narratore) speaks the step comments; **Voice: track** (it: Voce: traccia; "voice track" in sentences) speaks lines in the music (track type `spoken`, once "voice instrument"). A **voice style** (it: stile della voce) sets their sound; **Where it speaks** (it: Dove parla) picks quiet, medium and busy parts.
 - **Director** (it: regista): the code that writes radio songs. **Recipe** or **style** (it: stile): a JSON file the director reads.
 - **Live coder** is the profile shown to people; its id stays `switch`.
 - **Groove Lab** and **Listen** (it: Ascolta) are the two modes of the app.
+- **Song patterns** (it: Pattern del brano) and **Make patterns** (it: Crea pattern): the two pattern rows of a track panel.
+- **Pattern preview** (it: anteprima del pattern): the small second player of Compose, with the headphones icon. The play triangle means the player bar takes what you press; the headphones mean a preview; the flask opens the Patterns tab.
+- **bar** (the same word in both languages): the bar counter of the player bar, `bar 12 / 64`.
 
 ## Interface terms
 
@@ -47,7 +50,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Live build options | Build style | Andamento | `liveStyle` |
 | Live build options | Growth | Crescita | `growthLbl` |
 | Live build options | Growth duration | Durata della crescita | `durLbl` |
-| Live build options | Narrator voice | Voce narrante | `liveNarrator` |
+| Live build options | On | Accesa | `liveNarrator` |
 | Live build options | Narrated growth | Crescita raccontata | `liveNarrated` |
 | Live build options | Narrator style | Stile del narratore | `narratorStyleLbl` |
 | Live build options | Code typing | Scrittura del codice | `setTyping` |
@@ -60,12 +63,12 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Live build options | Typing mistakes | Errori di battitura | `liveMistakes` |
 | Live build options | Tracks | Tracce | `cOpt:tracks` |
 | Live build options | Notes | Note | `cOpt:notes` |
-| Live build options | Phrases | Frasi | `cOpt:steps` |
-| Live build options | Voice code | Codice della voce | `cOpt:voice` |
+| Live build options | Step phrases | Frasi dei passi | `cOpt:steps` |
+| Live build options | Narrator voice code | Codice voce narratore | `cOpt:voice` |
 | Live build options | Bus | Bus | `fOpt:fnBus` |
 | Live build options | Mixer | Mixer | `fOpt:fnLevel` |
 | Live build options | Distortion | Distorsione | `fOpt:fnCrunch` |
-| Live build options | Voice | Voce | `fOpt:fnVoice` |
+| Live build options | Voice effects | Effetti voci | `fOpt:fnVoice` |
 | Live build options | Song | Del brano | `fOpt:fnSong` |
 | Live build options | Library | Libreria | `fOpt:fnLib` |
 | Live build options | Sections | Sezioni | `fOpt:fnLanes` |
@@ -79,7 +82,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Growth shape values | filtered kick | cassa filtrata | `opening:filtered` |
 | Growth shape values | arpeggio or melody | arpeggio o melodia | `opening:melodic` |
 | Growth shape values | pad or drone | pad o bordone | `opening:pad` |
-| Growth shape values | voice | voce | `opening:voice` |
+| Growth shape values | voice track | voce traccia | `opening:voice` |
 | Growth shape values | muted base | base muta | `opening:muted-base` |
 | Growth shape values | mid-set | a metà set | `opening:mid-set` |
 | Growth shape values | slow | lenta | `pace:slow` |
@@ -94,7 +97,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Radio | Chaos | Caos | `radioChaos` |
 | Radio | Energy | Energia | `radioEnergy` |
 | Radio | Complexity | Complessità | `radioComplexity` |
-| Radio | Narrator | Narratore | `radioTalk` |
+| Radio | Voice: narrator | Voce: narratore | `radioTalk` |
 | Radio | Transitions | Transizioni | `radioTransition` |
 | Radio | Harmony | Armonia | `radioHarmony` |
 | Radio | Material | Materiale | `matSource` |
@@ -112,6 +115,8 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Console commands | ▼ Less energy | ▼ Meno energia | `steer:energy-down` |
 | Console commands | More complex | Più complesso | `steer:more-complex` |
 | Console commands | Simpler | Più semplice | `steer:less-complex` |
+| Console commands | Saved pattern | Pattern salvato | `steer:pattern` |
+| Console commands | Part harmony | Armonia della parte | `steer:voicing` |
 | Console commands | Darker | Più scuro | `steer:darker` |
 | Console commands | Brighter | Più brillante | `steer:brighter` |
 | Console commands | Dirtier | Più sporco | `steer:dirtier` |
@@ -122,7 +127,9 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Console commands | Change key | Cambia tonalità | `steer:key` |
 | Console commands | Talk more | Parla di più | `steer:talk-more` |
 | Console commands | Talk less | Parla di meno | `steer:talk-less` |
-| Console commands | Voice instrument | Voce strumento | `steer:voice` |
+| Console commands | Voice: track | Voce: traccia | `steer:voice` |
+| Console commands | Add a line | Aggiungi frase | `steer:say-live` |
+| Console commands | Voice style | Stile della voce | `steer:voice-sound` |
 | Console commands | Go to the drop | Vai al drop | `steer:drop` |
 | Console commands | Stay here | Resta qui | `steer:stay` |
 | Console commands | End the song | Chiudi il brano | `steer:end` |

@@ -204,5 +204,10 @@
   "growthShapes": {
     "openings": { "full-kick": 3, "slow": 1, "mid-set": 1 },
     "paces": { "fast": 3, "medium": 1 }
+  },
+  "spoken": {
+    "weight": 0.1,
+    "ways": { "refrain": 1, "chop": 1 },
+    "vocab": "machine"
   }
 }

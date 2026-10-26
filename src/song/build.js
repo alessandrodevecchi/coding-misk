@@ -161,10 +161,12 @@ export function voiceSamples(song, lang, files) {
   const out = new Map();
   const poetic = narratorStyle(song) === 'poetic';
   buildSteps(song).forEach((st, i) => {
-    const text = poetic ? (enteringTrack(song, st) ? sayText(poeticLine(song, st, i), lang) : '') : st.say ? sayText(st.say, lang) : '';
-    if (!text) return;
-    const { bank, list } = bankFor(voiceOf(song, st), lang, files), n = sampleIndex(list, text);
-    if (n >= 0) out.set(`${bank}:${n}`, { s: bank, n });
+    // (a poetic narrator says images, and with Narrated growth the step lines too)
+    const texts = poetic ? [enteringTrack(song, st) ? sayText(poeticLine(song, st, i), lang) : '', narratedGrowth(song) && st.say ? sayText(st.say, lang) : ''] : [st.say ? sayText(st.say, lang) : ''];
+    for (const text of texts.filter(Boolean)) {
+      const { bank, list } = bankFor(voiceOf(song, st), lang, files), n = sampleIndex(list, text);
+      if (n >= 0) out.set(`${bank}:${n}`, { s: bank, n });
+    }
   });
   // the voice instrument's lines (voice-instrument)
   if ((song.tracks || []).some(t => t.type === 'spoken')) {
@@ -190,6 +192,8 @@ function bankFor(track, lang, files) {
 // (the narrator never announces the voice instrument: a step that brings in a spoken track is not narrated)
 const entering = (song, step) => { const t = step && enteringTrack(song, step); return t && t.type !== 'spoken' ? t : null; };
 const bringsSpoken = (song, step) => { const t = step && enteringTrack(song, step); return !!t && t.type === 'spoken'; };
+// a growth that narrates its steps (Narrated growth, Crescendo and Live coder)
+const narratedGrowth = song => !!(song && song.crescendo && song.crescendo.narrated);
 function narration(song, upTo, lang) {
   const steps = buildSteps(song), step = steps[upTo - 1];
   if (narratorStyle(song) !== 'poetic') { const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && sayText(said.say, lang); return text ? [{ step: said, text, at: said.at }] : []; }
@@ -197,6 +201,12 @@ function narration(song, upTo, lang) {
   // the entry of bar 0 (the first track), then the next entry in the bar before it
   if (step && step.at === 0 && entering(song, step)) out.push({ step, text: sayText(poeticLine(song, step, upTo - 1), lang), at: 0 });
   if (next && entering(song, next) && next.at > 0 && next.at - 1 >= (step ? step.at : 0) && !out.some(x => x.at === next.at - 1)) out.push({ step: next, text: sayText(poeticLine(song, next, upTo), lang), at: next.at - 1 });
+  // Narrated growth with the poetic style (voice-full-controls D11): the step lines stay, the images come in addition;
+  // on a shared bar the image is said and the step keeps its line on stage
+  if (narratedGrowth(song)) {
+    const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && sayText(said.say, lang);
+    if (text && !out.some(x => x.at === said.at && x.text)) out.push({ step: said, text, at: said.at });
+  }
   return out.filter(x => x.text);
 }
 export function voiceCode(song, state, upTo, total, lang, files) {

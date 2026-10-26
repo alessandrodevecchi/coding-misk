@@ -575,6 +575,9 @@
 .pb-now { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 13px; }
 .pb-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pb-pos { font: 12px var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* the bar counter (pattern-preview, player-bar D7): its own slot at the right end, so the title and the time do not shift */
+.pb-bar { font: 12px var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; margin-left: auto; }
+.pb-bar:empty { display: none; }
 .pb-onair { display: none; font: 700 10px var(--mono); letter-spacing: .2em; padding: 2px 7px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
 .pbar.radio .pb-onair { display: inline-block; }
 .pb-onair.on { color: #fff; background: #d8203c; border-color: #ff4a66; box-shadow: 0 0 12px #ff2a48; }
@@ -595,7 +598,7 @@
 :root[data-ui="hw"] .pb-btn:active:not(:disabled), :root[data-ui="hw"] .pbar .play:active { transform: translateY(2px); box-shadow: inset 0 1px 3px rgba(0,0,0,.6), 0 0 0 #0d0d10; }
 :root[data-ui="hw"] .pbar .play[aria-pressed="true"] { color: #ffb347; text-shadow: 0 0 6px #ff9a1f; }
 :root[data-ui="hw"] .pb-now { background: #120b04; border: 1px solid #000; border-radius: 3px; padding: 4px 10px; box-shadow: inset 0 1px 4px rgba(0,0,0,.8); }
-:root[data-ui="hw"] .pb-title, :root[data-ui="hw"] .pb-pos { font-family: var(--mono); color: #ffb347; text-shadow: 0 0 6px rgba(255,154,31,.55); }
+:root[data-ui="hw"] .pb-title, :root[data-ui="hw"] .pb-pos, :root[data-ui="hw"] .pb-bar { font-family: var(--mono); color: #ffb347; text-shadow: 0 0 6px rgba(255,154,31,.55); }
 :root[data-ui="hw"] .pb-onair { border-radius: 50%; width: 12px; height: 12px; padding: 0; font-size: 0; background: #3a0d12; border-color: #000; }
 :root[data-ui="hw"] .pb-onair.on { background: radial-gradient(circle at 35% 35%, #ff8a99, #e0203a 60%, #7a0d18); box-shadow: 0 0 10px #ff2a48; }
 /* hardware: the volume is a small knob, the slider stays hidden behind it */
@@ -721,6 +724,18 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* hardware theme: the display and the timeline need more room than 52 px, or the display touches the bar's top edge */
 :root[data-ui="hw"] .pbar { height: 60px; }
 :root[data-ui="hw"] .pb-now { padding-block: 3px; }
+/* phones: the bar counter keeps its room (pattern-preview D7); the title has none left by then */
+@media (max-width: 480px) {
+  .pb-title { display: none; }
+  .pbar .pb-btns { gap: 3px; }
+  .pb-btn { min-width: 30px; padding: 0 4px; }
+  .pb-bar { flex: none; margin-left: 0; font-size: 11px; }
+  /* the hardware bar has the knob on the right: the counter keeps n / total, without the word */
+  :root[data-ui="hw"] .pb-now { padding-inline: 3px; }
+  :root[data-ui="hw"] .pb-bar { font-size: 10px; }
+  :root[data-ui="hw"] .pb-bar-w { display: none; }
+  :root[data-ui="hw"] .pb-vol .knob { width: 26px; height: 26px; margin: 0 1px; }
+}
 
 /* playlists (#36) */
 .sv-lists .chip small { font: 10px var(--mono); color: var(--muted); margin-left: 2px; }
@@ -868,6 +883,44 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* Vary and Swap (radio-variation): the part picker, then the two buttons */
 .steer-part { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; flex-basis: 100%; }
 .steer-btn[disabled] { cursor: help; }
+/* the Arrangement group by instrument (radio-arrangement): two rows of [− name + lock], the riser row, a count line */
+.steer-group.arr { grid-column: 1 / -1; }
+.arr-rows { display: grid; gap: 8px; }
+.arr-row, .arr-riser { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.arr-inst { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 60%, transparent); }
+.arr-inst.over { border-color: var(--s2); }
+.arr-inst .arr-pm { padding: 3px 10px; font: 700 14px/1 var(--mono); min-width: 30px; }
+.arr-name { display: inline-flex; align-items: baseline; gap: 3px; min-width: 62px; justify-content: center; font-size: 13px; }
+.arr-count { font: 11px var(--mono); color: var(--a1); }
+.arr-count.warn { color: var(--s2); }
+.arr-lock { display: inline-grid; place-items: center; }
+.arr-lock .ico, .mix-row .mini .ico { width: 11px; height: 13px; }
+.arr-lock[data-state="closed"], .arr-lock[data-state="half"] { color: var(--a1); border-color: var(--a1); }
+.arr-sel { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.arr-sel select { font: 12px var(--ui); padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); }
+.arr-info, .arr-warn { margin: 0; font-size: 12px; }
+.arr-warn { color: var(--s2); }
+.mix-row .mini { display: inline-grid; place-items: center; }
+/* Add a saved pattern (radio-arrangement D9): a folded list or cards, a preview drawing each */
+.steer-group.sp { gap: 8px; }
+.sp-toggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; cursor: pointer; justify-self: start; }
+.sp-toggle .ico { width: 12px; height: 12px; transition: transform .15s; }
+.sp-toggle[aria-expanded="true"] .ico { transform: rotate(90deg); }
+.sp-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 12px; }
+.sp-row { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+.sp-row .sp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-pv { width: 64px; height: 20px; flex: none; border-radius: 3px; background: var(--panel2); }
+.sp-pv.big { width: 100%; height: 44px; }
+.sp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.sp-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 60%, transparent); min-width: 0; }
+.sp-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sp-top b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sp-acts select { font: 12px var(--ui); padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); max-width: 120px; }
+.sp-tempo { color: var(--s2); }
+.sp-note { margin: 0; font-size: 12px; }
+.steer-voicing, .steer-harm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.steer-harm { flex-basis: 100%; }
 /* material source next to the knobs (radio-variation 6.2) */
 .mat-source { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .mat-source .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
@@ -1292,6 +1345,12 @@ canvas.pn-pv.big { height: 110px; margin: 0; border: 1px solid var(--line); }
 .pt-presetrow { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .pt-presetrow select { flex: 1; min-width: 0; }
 .pt-listen { flex: none; min-width: 0; padding: 4px 7px; }
+/* the pattern preview (pattern-preview D5): headphones off, stop while it plays, lit like the Patterns tab's play */
+.pt-preview { flex: none; min-width: 0; padding: 4px 7px; }
+.pt-preview[aria-pressed="true"] { color: var(--a1); border-color: var(--a1); background: color-mix(in srgb, var(--a1) 20%, var(--panel2)); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 45%, transparent); }
+:root[data-ui="hw"] .pt-preview[aria-pressed="true"] { color: var(--a1); text-shadow: 0 0 8px var(--a1); background: linear-gradient(#3b3b41, #28282d); box-shadow: inset 0 1px 3px rgba(0,0,0,.6); }
+/* the two pattern rows of the track panel (Song patterns, Make patterns) */
+.tp-pats-make { margin-top: 6px; }
 .pt-savepat { display: inline-flex; align-items: center; gap: 5px; }
 button.pat-link { cursor: pointer; background: none; color: inherit; }
 button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); color: var(--a1); }
@@ -1322,11 +1381,92 @@ button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); 
 .voices-next[open] > summary { margin-bottom: 6px; }
 .tp-vinst { display: grid; gap: 6px; margin-bottom: 10px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; }
 .radio-voices { display: grid; gap: 8px; margin-top: 10px; padding: 8px 10px 10px; border: 1px dashed var(--line); border-radius: 8px; }
-.radio-voices .radio-voice { margin-top: 0; padding: 0; border: 0; }
-.radio-voices .voices-nar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; }
-.radio-voices .voices-nar > .ctrl { min-width: 140px; display: grid; gap: 4px; }
+.radio-voices .vb-main > .ctrl { min-width: 140px; display: grid; gap: 4px; }
 /* the Narrator knob: on its own line under the Narrator title, then the narrator chips and style */
-.radio-voices .voices-nar > .voices-sub { flex: 1 1 100%; }
-.radio-voices .voices-nar > .voices-knob, :root[data-ui="hw"] .radio-voices .voices-nar > .voices-knob { display: block; flex: 1 1 100%; max-width: 320px; }
+.radio-voices .vb-main > .voices-knob, :root[data-ui="hw"] .radio-voices .vb-main > .voices-knob { display: block; flex: 1 1 100%; max-width: 320px; }
 .radio-voices .voices-onair { margin-top: 8px; }
 button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); text-decoration: underline; cursor: pointer; font: inherit; }
+/* the two voice blocks (voice-full-controls): a title row with the switch, a main row, folded parts */
+.voice-block { display: grid; gap: 6px; min-width: 0; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px; }
+.live-voices .voices-row.voice-block + .voices-row { border-top: 0; }
+.live-voices .voices-row.voice-block { padding-top: 8px; }
+.vb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.vb-head .voices-sub { overflow-wrap: anywhere; }
+.vb-main { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; min-width: 0; }
+.vb-parts, .vb-phrases, .vb-sound { display: grid; gap: 4px; min-width: 0; }
+.vswitch { display: inline-flex; align-items: center; gap: 6px; flex: none; border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); background: rgba(0,0,0,.45); color: var(--muted); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.vswitch .vs-lamp { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 25%, transparent); }
+.vswitch[aria-pressed="true"] { border-color: var(--a1); color: var(--a1); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 40%, transparent); }
+.vswitch[aria-pressed="true"] .vs-lamp { background: #3cff7a; box-shadow: 0 0 6px #3cff7a; }
+.vswitch:disabled { opacity: .45; cursor: default; }
+/* a voice switched off: every control greyed, values kept; the switch stays active */
+.voice-block.off > :not(.vb-head), .voice-block.off .vb-main { opacity: .45; }
+.voice-part { border-top: 1px dotted var(--line); padding-top: 4px; min-width: 0; }
+.voice-part > summary { cursor: pointer; font-size: 12px; color: var(--muted); list-style-position: inside; }
+.voice-part > summary .lbl { display: inline; }
+.voice-part[open] > summary { margin-bottom: 6px; }
+.vs-sum { font-size: 11px; color: var(--muted); }
+.vs-body { display: grid; gap: 8px; }
+.vs-pick { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.vs-pick .ctrl { display: grid; gap: 4px; min-width: 120px; }
+.vs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; }
+.vs-grid .ctrl { display: grid; gap: 2px; min-width: 0; }
+.vs-grid .row { display: flex; justify-content: space-between; gap: 6px; }
+.vs-grid output { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.vs-grid input[type=range] { width: 100%; }
+/* the phrase list (voice-full-controls D5): one row per clip; on a narrow screen a row wraps */
+.pl { display: grid; gap: 6px; min-width: 0; margin-bottom: 8px; }
+.pl-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; }
+.pl-head .ctrl { display: grid; gap: 4px; }
+.pl-head .hint { flex: 1 1 220px; margin: 0; }
+.pl-row { display: grid; grid-template-columns: minmax(90px, 1.1fr) 64px minmax(96px, .9fr) minmax(160px, 2.4fr) minmax(90px, .9fr) 32px; gap: 6px 10px; align-items: start; min-width: 0; }
+.pl-cols { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+.pl-row input[type=number] { width: 58px; }
+.pl-row input[type=text] { width: 100%; box-sizing: border-box; }
+.pl-row select { max-width: 100%; }
+.pl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.pl-said, .pl-src { font-size: 11px; color: var(--muted); font-family: var(--mono); overflow-wrap: anywhere; }
+.pl-text { display: grid; gap: 2px; min-width: 0; }
+.pl-sample { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); }
+.pl-sample.wait { border-color: var(--a2); color: var(--a2); }
+.pl-sample.none { opacity: .75; }
+.pl-growing .ico { width: 12px; height: 12px; vertical-align: -2px; }
+.pl-del .ico { width: 14px; height: 14px; }
+.pl-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.nl-row { grid-template-columns: minmax(70px, 110px) minmax(0, 1fr); }
+.voice-block > .btn { justify-self: start; }
+.vswitch .ico { width: 12px; height: 12px; }
+@media (max-width: 720px) {
+  .pl-row { grid-template-columns: 1fr 64px 1fr 32px; }
+  .pl-row .pl-text { grid-column: 1 / -1; grid-row: 2; }
+  .pl-row .pl-voice { grid-column: 1 / -1; grid-row: 3; }
+  .pl-cols { display: none; }
+}
+/* the radio Voices group (voice-full-controls D12): two stacked blocks */
+.radio-voices .voice-block { margin-top: 0; }
+.radio-voices .vb-parts > div { display: grid; gap: 4px; }
+/* the console's Voice group (voice-full-controls D10): a row per voice, then the typed line */
+.steer-voice { grid-column: 1 / -1; display: grid; gap: 6px; }
+.sv-row { display: grid; grid-template-columns: minmax(110px, auto) 1fr; align-items: center; gap: 6px 10px; }
+.sv-row .steer-btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sv-say input[type=text] { flex: 1 1 220px; min-width: 0; }
+.steer-voice > .hint { margin: 0; }
+@media (max-width: 560px) { .sv-row { grid-template-columns: 1fr; } }
+/* faders (voice-full-controls D17): the hardware theme's Sound parts; the slider stays for state and keyboard, hidden */
+.fader { display: none; }
+:root[data-ui="hw"] .fader { display: block; position: relative; height: 22px; min-width: 80px; cursor: ew-resize; touch-action: none; }
+:root[data-ui="hw"] .fader.dis { opacity: .45; cursor: default; }
+:root[data-ui="hw"] .fader-slot { position: absolute; left: 0; right: 0; top: 9px; height: 4px; border-radius: 2px; background: #151518; box-shadow: inset 0 1px 2px rgba(0,0,0,.8); overflow: hidden; }
+:root[data-ui="hw"] .fader-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--p, 0) * 100%); background: var(--a1); box-shadow: 0 0 6px var(--a1); }
+:root[data-ui="hw"] .fader-cap { position: absolute; top: 1px; left: calc(var(--p, 0) * (100% - 12px)); width: 12px; height: 20px; border-radius: 3px; background: linear-gradient(#77777f, #2a2a2f 55%, #1b1b1f); box-shadow: 0 2px 4px rgba(0,0,0,.7), inset 0 1px 1px rgba(255,255,255,.3); }
+:root[data-ui="hw"] .fader-cap::after { content: ""; position: absolute; left: 2px; right: 2px; top: 9px; height: 2px; background: #f4f1e8; }
+:root[data-ui="hw"] .fader.turning .fader-cap { box-shadow: 0 2px 4px rgba(0,0,0,.7), 0 0 0 2px var(--a1); }
+:root[data-ui="hw"] .vs-ctl:focus-within .fader-cap { outline: 2px solid var(--a2); outline-offset: 2px; }
+/* one control per row: label, fader, value; two columns in Compose, one in the radio column */
+:root[data-ui="hw"] .vs-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 18px; }
+:root[data-ui="hw"] .vs-grid .ctrl { grid-template-columns: 96px minmax(80px, 1fr) 64px; align-items: center; text-align: left; gap: 8px; }
+:root[data-ui="hw"] .vs-grid .ctrl .row { display: contents; }
+:root[data-ui="hw"] .vs-grid .ctrl .row label { grid-column: 1; grid-row: 1; }
+:root[data-ui="hw"] .vs-grid .ctrl .row output { grid-column: 3; grid-row: 1; text-align: right; padding: 2px 6px; border-radius: 3px; background: #0d0c08; color: var(--a1); box-shadow: inset 0 0 0 1px #2b2a24; }
+:root[data-ui="hw"] .vs-grid .ctrl .fader { grid-column: 2; grid-row: 1; }
+:root[data-ui="hw"] .radio-voices .vs-grid { grid-template-columns: 1fr; }

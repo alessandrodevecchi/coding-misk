@@ -1,6 +1,6 @@
 // Browser checks for playlists (#36): favourites migration, "+ Playlist", the Playlists tab, auto-advance,
 // shuffle, repeat one, export and import, phone width.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-playlists.cjs [shots-dir]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-playlists.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -26,7 +26,7 @@ async function seed(page) {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await seed(page);
   await page.reload(); await sleep(3500);
   const lists = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-playlists')).lists);
@@ -131,7 +131,7 @@ async function seed(page) {
   const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const p2 = await ctx2.newPage();
   p2.on('pageerror', e => errors.push(e.message));
-  await p2.goto('http://localhost:5173/'); await sleep(3000);
+  await p2.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(3000);
   await p2.click('[data-mode="ascolta"]'); await p2.click('[data-tab="playlist"]'); await sleep(300);
   const [chooser] = await Promise.all([p2.waitForEvent('filechooser'), p2.click('#pl-import')]);
   await chooser.setFiles(file); await sleep(800);

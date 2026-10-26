@@ -42,6 +42,7 @@
     "check:functions": "node --no-warnings tools/check-functions.mjs",
     "check:material": "node --no-warnings tools/check-material.mjs",
     "check:patterns": "node --no-warnings tools/check-patterns.mjs",
+    "check:preview": "node --no-warnings tools/check-preview.mjs",
     "check:spoken": "node --no-warnings tools/check-spoken.mjs",
     "knowledge": "node --no-warnings tools/knowledge.mjs",
     "check:knowledge": "node --no-warnings tools/check-knowledge.mjs",

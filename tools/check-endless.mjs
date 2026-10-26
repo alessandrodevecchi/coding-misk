@@ -18,7 +18,8 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
-import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax } from '../src/endless/steering.js';
+import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax, INSTRUMENTS as ARR_PARTS, RECOMMENDED, TRACK_CAP, instrumentOf, lockedIds, moreWarning, riserTarget, partHas, fitsAir, keyTo, sessionBias } from '../src/endless/steering.js';
+import { sessionItems } from '../src/endless/items.js';
 import { expandIdea } from '../src/song/ideas.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
@@ -60,6 +61,28 @@ const FIXTURES = [
   { seed: 'quiet', styles: ['ambient', 'lo-fi'], energy: 0.2, complexity: 0.1, minutes: 12 },
 ];
 const sessionHash = r => hashString(JSON.stringify(r)).toString(16).padStart(8, '0');
+// Songs without their voice tracks (voice-full-controls): the spoken tracks, the steps that bring them in and out, and
+// the narrator's name of before ("Voice"). Every style may now draw a voice track on its own stream; the music must not
+// move, so the old fixtures still hold on this view. narrator: also leave out the narrator track (the music alone).
+function voiceless(x, { narrator = false } = {}) {
+  const r = JSON.parse(JSON.stringify(x));
+  const strip = song => {
+    if (!song || !Array.isArray(song.tracks)) return;
+    const gone = new Set(song.tracks.filter(t => t.type === 'spoken' || (narrator && t.type === 'voice')).map(t => t.id));
+    song.tracks = song.tracks.filter(t => !gone.has(t.id));
+    for (const t of song.tracks) if (t.type === 'voice' && t.name === 'Narrator') t.name = 'Voice';
+    if (Array.isArray(song.build)) song.build = song.build.map(st => {
+      const o = { ...st };
+      for (const k of ['add', 'remove']) if (o[k] !== undefined) { const l = [].concat(o[k]).filter(id => !gone.has(id)); if (!l.length) delete o[k]; else o[k] = Array.isArray(st[k]) && l.length > 1 ? l : l.length === 1 && !Array.isArray(st[k]) ? l[0] : l; }
+      if (narrator) delete o.voice;
+      return o;
+    }).filter(st => Object.keys(st).some(k => k !== 'at' && k !== 'by'));
+  };
+  // (a session's entries say which way the voice track speaks and how many phrases: voice facts, not music)
+  const walk = v => { if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') { if (Array.isArray(v.tracks) && Array.isArray(v.sections)) strip(v); else { if (narrator) { delete v.spoken; delete v.phrasesSpoken; } Object.values(v).forEach(walk); } } };
+  walk(r);
+  return r;
+}
 // songs of director version 2 at complexity 0 (material-generator): complexity 0 must keep giving them
 const PLAIN_V2 = [
   { seed: 'plain-a', styles: ['berlin-techno'], complexity: 0, songs: '2785ea56' },
@@ -112,6 +135,35 @@ function inKey(type, idea) {
   if (type === 'bass') return idea.from !== undefined || idea.add === undefined || (whole(idea.add) && String(idea.add).replace(/[!%*@]\d+/g, '').match(/-?\d+/g).every(x => ['0', '7', '12', '-5'].includes(x)));
   if (type === 'arp') return idea.random ? idea.random.max <= 4 && Number.isInteger(idea.random.seed) : String(idea.index).replace(/[!%*@]\d+/g, '').match(/-?\d+/g).every(x => /^[0-3]$/.test(x));
   return true;
+}
+
+// ---------- radio-arrangement: songs to steer with + and − per instrument ----------
+const ALL_STYLES = STYLES.map(r => r.id);
+// n songs over every style (a style per song in turn), default options, each with its plan
+function arrSongs(n, tag = 'arr', extra = {}) {
+  const out = [];
+  for (let i = 0; out.length < n; i++) {
+    const id = ALL_STYLES[i % ALL_STYLES.length], ses = createSession(STYLES, `${tag}-${i}`);
+    out.push({ ...ses.next({ styles: [id], ...extra }), seed: `${tag}-${i}`, style: id });
+  }
+  return out;
+}
+// the closing run of outros of a plan: its first double phrase
+const outroFrom = plan => { let d = plan.plan.length; while (d > 0 && plan.plan[d - 1].role === 'outro') d--; return d; };
+const onAt = (sg, bar) => playing(stateAt(sg, bar).song);
+const steerArr = (g, commands, n = 0) => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands, seed: g.seed, n });
+// "+" on instruments in turn on one boundary until the song plays 12 tracks
+// (one command at a time on the song so far, then the whole list once: the song a replay gives)
+function stack12(g, at) {
+  const cmds = [], parts = ARR_PARTS.filter(p => partHas(g.plan.R, p));
+  let r = { song: g.song, plan: g.plan, opts: g.opts };
+  for (let j = 0; j < 40 && onAt(r.song, at).filter(t => t.type !== 'riser').length < TRACK_CAP; j++) {
+    const part = parts[j % parts.length];
+    if (whyNot({ kind: 'more', part }, r.song, r.plan, at - 1)) break;
+    cmds.push({ kind: 'more', part, at });
+    r = steerSong({ song: r.song, plan: r.plan, opts: r.opts, commands: [{ kind: 'more', part, at }], seed: g.seed, n: 100 + j });
+  }
+  return { r: steerArr(g, cmds), cmds };
 }
 
 const CHECKS = {
@@ -261,7 +313,7 @@ const CHECKS = {
     assert(mutated > 10, `only ${mutated} mutated patterns at complexity 1`);
   },
   'director: complexity 0 gives the songs of director version 2'() {
-    for (const c of PLAIN_V2) { const { songs, ...opts } = c; assert(sessionHash(generateSession(loadStyles(), opts).songs) === songs, `${c.seed} (${c.styles}): complexity 0 songs changed`); }
+    for (const c of PLAIN_V2) { const { songs, ...opts } = c; assert(sessionHash(voiceless(generateSession(loadStyles(), opts).songs)) === songs, `${c.seed} (${c.styles}): complexity 0 songs changed`); }
   },
   'director: a recipe asking for composed leads gets them in most songs'() {
     const recipes = loadStyles().map(r => (r.id === 'trance' ? { ...r, hook: { ...r.hook, weight: 1, material: { source: 'generated' } } } : r));
@@ -476,9 +528,13 @@ const CHECKS = {
     assert(JSON.stringify(again) === JSON.stringify(r), 'the recorded seed does not reproduce the session');
   },
   'determinism: seed fixtures'() {
-    const now = FIXTURES.map(f => ({ ...f, hash: sessionHash(generateSession(loadStyles(), f)) }));
-    if (process.argv.includes('--write-fixtures')) { fs.writeFileSync(FIXTURES_FILE, JSON.stringify(now, null, 2) + '\n'); console.log('      fixtures written'); return; }
-    const saved = JSON.parse(fs.readFileSync(FIXTURES_FILE, 'utf8'));
+    // (music: the same session without its voice tracks, voice-full-controls: a change to the voices alone moves the
+    // hash but never the music; --write-fixtures keeps a recorded music hash, so the music cannot move unnoticed)
+    const saved = fs.existsSync(FIXTURES_FILE) ? JSON.parse(fs.readFileSync(FIXTURES_FILE, 'utf8')) : [];
+    const now = FIXTURES.map(f => { const r = generateSession(loadStyles(), f); return { ...f, hash: sessionHash(r), music: sessionHash(voiceless(r, { narrator: true })) }; });
+    const music = (f, i) => assert(!saved[i] || !saved[i].music || saved[i].music === f.music, `seed ${f.seed} (${f.styles}): the music moved (${f.music}, fixture ${saved[i] && saved[i].music})${process.argv.includes('--force-music') ? '' : '; only the voices may change here (--force-music when the music change is intended)'}`);
+    if (process.argv.includes('--write-fixtures')) { if (!process.argv.includes('--force-music')) now.forEach(music); fs.writeFileSync(FIXTURES_FILE, JSON.stringify(now, null, 2) + '\n'); console.log('      fixtures written'); return; }
+    now.forEach(music);
     now.forEach((f, i) => assert(saved[i] && saved[i].hash === f.hash, `seed ${f.seed} (${f.styles}) gives ${f.hash}, fixture ${saved[i] && saved[i].hash}; if the change is intended, run npm run check:endless -- --write-fixtures`));
   },
   'radio: song by song equals a whole session'() {
@@ -747,11 +803,12 @@ const CHECKS = {
       assert(others(r.song) === others(g.song), `vary ${type}: other tracks or steps changed`);
     }
     // different parts among the varies of each part (a pad varies only its rhythm, register and voicing)
-    const share = { lead: 0.6, arp: 0.6, bass: 0.4, pad: 0.2 };
-    assert(VARY_TYPES.every(t => types[t] > 5 && ideas[t].size >= share[t] * types[t]), `different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t] && ideas[t].size} of ${types[t]}`).join(', ')}`);
-    console.log(`      200 varies, all in key; different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t].size} of ${types[t]}`).join(', ')}`);
+    // (the guitar, a part of its own since radio-arrangement, plays in few styles: counted, not required)
+    const share = { lead: 0.6, arp: 0.6, bass: 0.4, pad: 0.2, guitar: 0 };
+    assert(VARY_TYPES.filter(t => t !== 'guitar').every(t => types[t] > 5 && ideas[t].size >= share[t] * types[t]), `different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t] && ideas[t].size} of ${types[t]}`).join(', ')}`);
+    console.log(`      200 varies, all in key; different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t] ? ideas[t].size : 0} of ${types[t] || 0}`).join(', ')}`);
   },
-  'steering: vary is disabled when the part does not play or is locked'() {
+  'steering: vary is disabled when the part does not play, and reaches locked tracks'() {
     let checked = 0, locked = 0;
     for (const { g, type, at, ids } of varies(60)) {
       const now = at - 1;
@@ -759,12 +816,12 @@ const CHECKS = {
         const on = varyTracks(playing(stateAt(g.song, at).song), other);
         if (!on.length) { assert(whyNot({ kind: 'vary', type: other }, g.song, g.plan, now) === 'not-playing', `vary ${other}: ${whyNot({ kind: 'vary', type: other }, g.song, g.plan, now)}`); checked++; }
       }
-      // every track of the part locked: locked; one track free: allowed
+      // a lock keeps the director out, never the listener (radio-arrangement D12): a locked part can be varied
       const plan = { ...g.plan, locked: ids };
-      assert(whyNot({ kind: 'vary', type }, g.song, plan, now) === 'locked', `vary ${type} locked`);
+      assert(whyNot({ kind: 'vary', type }, g.song, plan, now) === null, `vary ${type} locked: ${whyNot({ kind: 'vary', type }, g.song, plan, now)}`);
       assert(whyNot({ kind: 'vary', type }, g.song, g.plan, now) === null, `vary ${type} allowed`);
       const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'lock', track: ids[0], at: applyBar('lock', now - 1, g.plan) }, { kind: 'vary', type, at }], seed: 'vary-lock', n: 0 });
-      if (ids.length === 1) { assert(!r.song.build.some(s => s.at === at && s.pattern && s.pattern.track === ids[0] && s.by === 'listener'), `locked ${ids[0]} varied`); locked++; }
+      if (ids.length === 1 && playing(stateAt(r.song, at).song).some(t => t.id === ids[0])) { assert(r.song.build.some(s => s.at === at && s.pattern && s.pattern.track === ids[0] && s.by === 'listener'), `locked ${ids[0]} not varied`); locked++; }
       assert(whyNot({ kind: 'vary', type }, g.song, g.plan, g.plan.bars - 1) === 'late', 'late at the end');
     }
     assert(checked > 10 && locked > 5, `not-playing ${checked}, locked ${locked}`);
@@ -868,7 +925,7 @@ const CHECKS = {
       }
     }
     assert(added >= 5 && more >= 5, `composed tracks: add ${added}, more complex ${more}`);
-    for (const c of PLAIN_STEER) assert(sessionHash(plainSteer(c)) === c.songs, `${c.seed}: steered songs at complexity 0 or with patterns changed (${sessionHash(plainSteer(c))})`);
+    for (const c of PLAIN_STEER) assert(sessionHash(voiceless(plainSteer(c))) === c.songs, `${c.seed}: steered songs at complexity 0 or with patterns changed (${sessionHash(voiceless(plainSteer(c)))})`);
   },
   'steering: curves and complexity shape composed material'() {
     const find = (seed, style, type) => { const ses = createSession(STYLES, seed); for (let i = 0; i < 30; i++) { const x = ses.next({ styles: [style] }); if (!whyNot({ kind: 'vary', type }, x.song, x.plan, 40)) return x; } return null; };
@@ -908,6 +965,388 @@ const CHECKS = {
     assert(bassMore > bassLess, `different bass notes: less complex ${bassLess}, more complex ${bassMore}`);
     console.log(`      lead notes per bar ${lo.toFixed(2)} / ${hi.toFixed(2)} (density 0.2 / 0.8); mean degree ${low.toFixed(2)} / ${high.toFixed(2)} (energy 0.2 / 0.9); different degrees ${hookLess.toFixed(2)} / ${hookMore.toFixed(2)}, bass notes ${bassLess.toFixed(2)} / ${bassMore.toFixed(2)} (less / more complex)`);
   },
+  'arrangement: old add and remove replay as before radio-arrangement'() {
+    // a recorded session with add lead, remove drums, add pad and a lock gives the songs heard before (hash recorded
+    // with the code before radio-arrangement, on develop 5c0dd4f: #82 renamed the narrator track and gave more styles a
+    // voice track, so the songs moved there, not here)
+    const out = [];
+    for (const [seed, styles] of [['old-a', ['berlin-techno']], ['old-b', ['synthwave', 'jazz']], ['old-c', ['trance', 'phonk']]]) {
+      const ses = createSession(STYLES, seed);
+      for (let i = 0; i < 2; i++) {
+        const g = ses.next({ styles });
+        const cmds = [{ kind: 'add', type: 'lead', at: applyBar('add', 20, g.plan) }, { kind: 'remove', type: 'drums', at: applyBar('remove', 36, g.plan) }, { kind: 'add', type: 'pad', at: applyBar('add', 52, g.plan) }, { kind: 'lock', track: 'bass', at: applyBar('lock', 52, g.plan) }];
+        out.push(steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed, n: i }).song);
+      }
+    }
+    const h = hashString(JSON.stringify(out)).toString(16).padStart(8, '0');
+    assert(h === 'a6e28951', `old commands give other songs: ${h}`);
+  },
+  'arrangement: + and − per instrument, several tracks of one instrument'() {
+    let checked = 0;
+    for (const g of arrSongs(30, 'arr-pm')) {
+      const at = applyBar('more', 3 * g.plan.phrase, g.plan);
+      if (at >= outroFrom(g.plan) * 2 * g.plan.phrase) continue;
+      // a song whose pad is silent: three + then one − leave two pads, the first named Pad
+      const pad = onAt(g.song, at).filter(t => instrumentOf(t) === 'pad');
+      if (!partHas(g.plan.R, 'pad')) { assert(whyNot({ kind: 'more', part: 'pad' }, g.song, g.plan, at - 1) === (g.plan.tracks.some(t => t.type === 'pad') ? null : 'no-type'), `${g.style}: + pad without pads`); continue; }
+      const cmds = [1, 2, 3].map(() => ({ kind: 'more', part: 'pad', at }));
+      const three = steerArr(g, cmds), pads = onAt(three.song, at).filter(t => instrumentOf(t) === 'pad');
+      assert(pads.length === pad.length + 3, `${g.style}: ${pad.length} pads, then ${pads.map(t => t.id)} after three +`);
+      const r = steerArr(g, [...cmds, { kind: 'less', part: 'pad', at }]), left = onAt(r.song, at).filter(t => instrumentOf(t) === 'pad').map(t => t.id);
+      assert(left.length === pad.length + 2 && !left.includes(three.plan.added[2].id), `${g.style}: − took ${JSON.stringify(left)} (last added ${three.plan.added[2].id})`);
+      if (!pad.length) assert(JSON.stringify(left) === JSON.stringify(['pad', 'pad-2']), `${g.style}: left ${left}`);
+      const p2 = r.song.tracks.find(t => t.id === left[1]);
+      assert(/^Pad \d$/.test(p2.name), `${g.style}: name ${p2.name}`);
+      assert(!validateSong(r.song).errors.length, `${g.style}: ${validateSong(r.song).errors.slice(0, 2).map(e => `${e.path}: ${e.msg}`)}`);
+      compileSong(stateAt(r.song, at + 1).song);
+      // a lock never disables + or − (D12); − on a part that does not play
+      const locked = { ...r.plan, lockedParts: ['pad'] };
+      assert(whyNot({ kind: 'more', part: 'pad' }, r.song, locked, at + 1) === null && whyNot({ kind: 'less', part: 'pad' }, r.song, locked, at + 1) === null, `${g.style}: a lock disabled + or −`);
+      const silent = ARR_PARTS.find(p => !onAt(g.song, at).some(t => instrumentOf(t) === p));
+      if (silent) assert(whyNot({ kind: 'less', part: silent }, g.song, g.plan, at - 1) === 'not-playing', `${g.style}: − ${silent}`);
+      // the same commands give the same song
+      assert(JSON.stringify(steerArr(g, [...cmds, { kind: 'less', part: 'pad', at }]).song) === JSON.stringify(r.song), `${g.style}: replay`);
+      checked++;
+    }
+    assert(checked >= 15, `only ${checked} songs`);
+  },
+  'arrangement: a second track sounds different, an octave away, in key'() {
+    let n = 0, apart = 0, octave = 0, composed = 0;
+    for (const g of arrSongs(80, 'arr-var')) {
+      for (const part of ['arp', 'hook', 'bass', 'pad', 'guitar']) {
+        const at = applyBar('more', 2 * g.plan.phrase, g.plan), first = onAt(g.song, at).filter(t => instrumentOf(t) === part);
+        if (first.length !== 1 || whyNot({ kind: 'more', part }, g.song, g.plan, at - 1)) continue;
+        const r = steerArr(g, [{ kind: 'more', part, at }]), id = r.plan.added[0].id, a = r.song.tracks.find(t => t.id === first[0].id) || g.song.tracks.find(t => t.id === first[0].id), b = r.song.tracks.find(t => t.id === id);
+        assert(b && id !== a.id && onAt(r.song, at).some(t => t.id === id), `${g.style} ${part}: no second track`);
+        const sound = t => JSON.stringify([t.settings.wave, t.settings.type, t.rack || []]), pats = t => JSON.stringify(Object.values(t.patterns));
+        if (sound(a) !== sound(b) || pats(a) !== pats(b)) apart++;
+        assert(b.settings.gain < a.settings.gain || part === 'bass' && b.settings.gain <= a.settings.gain * 0.6 + 0.01, `${g.style} ${part}: gain ${a.settings.gain} then ${b.settings.gain}`);
+        // the register: an octave up (hook octave, guitar semitones, composed ideas +12 or +7 degrees), every note in key
+        if (part === 'hook') { assert(Number(b.settings.octave) === Math.min(6, (Number(a.settings.octave) || 4) + 1), `${g.style} hook octave ${a.settings.octave} ${b.settings.octave}`); octave++; }
+        else if (part === 'guitar') { assert(Math.abs(Number(b.settings.octave) - (Number(a.settings.octave) || 0)) === 12, `guitar octave ${a.settings.octave} ${b.settings.octave}`); octave++; }
+        else if (Object.values(b.patterns).some(p => p.idea)) {
+          composed++;
+          for (const p of Object.values(b.patterns)) {
+            const i = p.idea;
+            assert(i && (typeof i.add === 'number' && i.add >= 7 || typeof i.sub === 'number' && i.sub < (part === 'bass' && i.from !== undefined ? 21 : 0)), `${g.style} ${part}: not shifted ${JSON.stringify(i)}`);
+            assert(inKey(b.type, { ...i, add: typeof i.add === 'number' ? undefined : i.add }), `${g.style} ${part}: out of key ${JSON.stringify(i)}`);
+          }
+          octave++;
+        }
+        assert(!validateSong(r.song).errors.length, `${g.style} ${part}: invalid`);
+        compileSong(stateAt(r.song, at + 1).song);
+        n++;
+      }
+    }
+    assert(n >= 50 && apart === n && octave >= n * 0.8, `${n} second tracks, ${apart} differ, ${octave} an octave away (${composed} composed)`);
+    console.log(`      ${n} second tracks, all different in sound or pattern, ${octave} an octave away, ${composed} composed`);
+  },
+  'arrangement: limits, recommended counts as warnings, two kicks on different grooves'() {
+    let kicks = 0, other = 0, capped = 0, k = 0;
+    for (const g of arrSongs(50, 'arr-lim')) {
+      k++;
+      const at = applyBar('more', 2 * g.plan.phrase, g.plan);
+      if (partHas(g.plan.R, 'kick') && onAt(g.song, at).some(t => t.id === 'kick')) {
+        const w = moreWarning('kick', g.song, g.plan, at - 1);
+        assert(w && w.count === 2 && w.rec === 1 && whyNot({ kind: 'more', part: 'kick' }, g.song, g.plan, at - 1) === null, `${g.style}: + kick ${JSON.stringify(w)}`);
+        const r = steerArr(g, [{ kind: 'more', part: 'kick', at }]), k2 = r.song.tracks.find(t => t.id === r.plan.added[0].id), k1 = r.song.tracks.find(t => t.id === 'kick');
+        // (the kick's pattern playing on the boundary against the second kick's first one)
+        const cur = stateAt(r.song, at).song.tracks.find(t => t.id === 'kick'), bdOf = p => (p.rows ? p.rows.bd : p.idea && p.idea.beat ? `${p.idea.beat.grid}:${p.idea.beat.bd}` : null);
+        const rows = t => JSON.stringify(t === k2 ? bdOf(t.patterns.A) : bdOf(t.patterns[(cur.clips[0] || {}).pattern || 'A'] || t.patterns.A));
+        const bds = new Set(g.plan.R.drums.grooves.map(x => (GROOVES[x] || [])[1]).filter(Boolean).map(x => x.bd).filter(x => x && x.includes('x')));
+        kicks++;
+        if (bds.size > 1) { assert(rows(k1) !== rows(k2), `${g.style}: two kicks on the same steps`); other++; }
+        assert(k2.settings.gain <= Math.round(k1.settings.gain * 75 + 1) / 100, `${g.style}: kick 2 gain ${k2.settings.gain}`);
+      }
+      // the cap: 12 tracks, then every + is disabled; the song's maximum follows the listener (on 15 songs)
+      if (k > 15) continue;
+      const { r } = stack12(g, at), n = onAt(r.song, at).filter(t => t.type !== 'riser').length;
+      if (n === TRACK_CAP) {
+        capped++;
+        assert(ARR_PARTS.every(p => whyNot({ kind: 'more', part: p }, r.song, r.plan, at - 1) === (r.song.tracks.some(t => instrumentOf(t) === p) || partHas(g.plan.R, p) ? 'cap' : 'no-type')), `${g.style}: + at 12 tracks`);
+        assert(r.plan.hardMax >= TRACK_CAP && densityMax(r.plan) >= Math.min(TRACK_CAP, r.plan.tracks.filter(t => t.type !== 'riser').length), `${g.style}: hardMax ${r.plan.hardMax}`);
+        assert(!validateSong(r.song).errors.length, `${g.style}: 12 tracks invalid`);
+      }
+    }
+    assert(kicks >= 20 && other >= 10 && capped >= 12, `kicks ${kicks}, on another groove ${other}, capped ${capped}`);
+    console.log(`      ${kicks} second kicks (${other} on another groove), ${capped} songs stacked to ${TRACK_CAP} tracks`);
+  },
+  "arrangement: the owner's test, a track added with + stays until the outro"() {
+    let n = 0, sat = 0;
+    for (const g of arrSongs(50, 'arr-stay')) {
+      const ph = g.plan.phrase, dbl = 2 * ph, end = outroFrom(g.plan) * dbl, rng = stream(g.seed, 'arr-stay');
+      for (const part of ARR_PARTS) {
+        if (!partHas(g.plan.R, part) && !g.plan.tracks.some(t => instrumentOf(t) === part)) continue;
+        const now = rng.int(1, Math.max(1, end / ph - 3)) * ph - 1, at = applyBar('more', now, g.plan);
+        if (at >= end - ph || whyNot({ kind: 'more', part }, g.song, g.plan, now)) continue;
+        const r = steerArr(g, [{ kind: 'more', part, at }]), id = r.plan.added[0].id;
+        const roleAt = b => r.plan.plan[Math.floor(b / dbl)].role;
+        assert(onAt(r.song, at).some(t => t.id === id), `${g.style} ${part}: not playing on the next phrase (${at})`);
+        if (at + 2 * ph < end && roleAt(at + 2 * ph) !== 'break') assert(onAt(r.song, at + 2 * ph).some(t => t.id === id), `${g.style} ${part}: gone two phrases later`);
+        for (let b = at; b < Math.min(end, r.plan.bars - ph); b += ph) {
+          const on = onAt(r.song, b).some(t => t.id === id);
+          if (roleAt(b) === 'break') { if (!on) sat++; continue; }
+          assert(on, `${g.style} ${part} ${id}: silent on bar ${b} (${roleAt(b)}), added on ${at}`);
+        }
+        n++;
+      }
+    }
+    assert(n >= 250, `only ${n} additions`);
+    console.log(`      ${n} additions over 50 songs and every style, each playing up to the outro (${sat} phrases sat out in breaks)`);
+  },
+  'arrangement: a lock per instrument'() {
+    let n = 0;
+    for (const g of arrSongs(40, 'arr-lock')) {
+      const at = applyBar('lock-part', 2 * g.plan.phrase, g.plan);
+      // (the bass playing before the boundary: a lock keeps a silent bass out, D12)
+      if (!onAt(g.song, at - 1).some(t => t.type === 'bass')) continue;
+      const r = steerArr(g, [{ kind: 'lock-part', part: 'bass', at }]), bass = onAt(g.song, at - 1).filter(t => t.type === 'bass').map(t => t.id);
+      assert(bass.every(id => lockedIds(r.plan).includes(id)), `${g.style}: bass not locked`);
+      // the director leaves the bass alone and it plays through breaks to the end
+      const touched = r.song.build.filter(s => s.at >= at && !s.by && stepTracks(s).some(id => bass.includes(id)));
+      assert(!touched.length, `${g.style}: the director moved a locked bass: ${JSON.stringify(touched[0])}`);
+      for (let b = at; b < r.plan.bars; b += g.plan.phrase) assert(bass.every(id => onAt(r.song, b).some(t => t.id === id)), `${g.style}: locked bass silent on bar ${b}`);
+      // + on a locked bass: a second bass, locked as well
+      const at2 = at + g.plan.phrase, r2 = steerArr(g, [{ kind: 'lock-part', part: 'bass', at }, { kind: 'more', part: 'bass', at: at2 }]), b2 = r2.plan.added[0].id;
+      assert(lockedIds(r2.plan).includes(b2) && onAt(r2.song, r2.plan.bars - 1).some(t => t.id === b2), `${g.style}: second bass ${b2} not locked or gone`);
+      // the mixer unlocks one track: that one only, the instrument keeps the other locked one by one
+      const r3 = steerArr(g, [{ kind: 'lock-part', part: 'bass', at }, { kind: 'more', part: 'bass', at: at2 }, { kind: 'unlock', track: b2, at: at2 }]);
+      assert(!lockedIds(r3.plan).includes(b2) && bass.every(id => lockedIds(r3.plan).includes(id)) && !(r3.plan.lockedParts || []).includes('bass'), `${g.style}: mixer unlock ${JSON.stringify([r3.plan.locked, r3.plan.lockedParts])}`);
+      const r4 = steerArr(g, [{ kind: 'lock-part', part: 'bass', at }, { kind: 'unlock-part', part: 'bass', at: at2 }]);
+      assert(!lockedIds(r4.plan).length, `${g.style}: unlock-part left ${lockedIds(r4.plan)}`);
+      n++;
+    }
+    assert(n >= 15, `only ${n} songs with a bass`);
+  },
+  'arrangement: a riser on the next part change'() {
+    let n = 0, own = 0;
+    for (const g of arrSongs(40, 'arr-riser')) {
+      const ph = g.plan.phrase, now = 2 * ph + 1, at = applyBar('riser', now, g.plan);
+      for (const [bars, dir] of [['auto', 'up'], [4, 'up'], [2, 'down']]) {
+        const cmd = { kind: 'riser', bars, dir, sound: 'noise' }, tg = riserTarget(g.plan, at, cmd);
+        if (!tg) { assert(whyNot(cmd, g.song, g.plan, now) === 'late', `${g.style}: no target, not late`); continue; }
+        const r = steerArr(g, [{ ...cmd, at }]), id = r.plan.risers[0].track;
+        const role = d => g.plan.plan[d].role, d = tg.change / (2 * ph);
+        assert(d > 0 && (role(d) !== role(d - 1) || !g.plan.plan.some((x, i) => i > 0 && i * 2 * ph - at >= 2 && x.role !== g.plan.plan[i - 1].role)), `${g.style}: change on ${tg.change} is not a part change`);
+        assert(dir === 'up' ? tg.end === tg.change && tg.start === tg.change - tg.bars : tg.start === tg.change, `${g.style}: ${JSON.stringify(tg)}`);
+        assert(onAt(r.song, tg.start).some(t => t.id === id) && onAt(r.song, tg.end - 1).some(t => t.id === id) && (tg.end >= r.plan.bars || !onAt(r.song, tg.end).some(t => t.id === id)), `${g.style}: riser not on ${tg.start} to ${tg.end}`);
+        const st = stateAt(r.song, tg.start).song.tracks.find(t => t.id === id);
+        assert(String(st.settings.bars) === String(tg.bars) && st.settings.dir === dir, `${g.style}: riser settings ${JSON.stringify(st.settings)}`);
+        // one riser per change: the director adds none in the phrase before it
+        const adds = r.song.build.filter(s => listOf(s.add).includes(id) && s.at >= tg.start - ph && s.at < tg.end);
+        assert(adds.length === 1 && adds[0].by === 'listener', `${g.style}: risers on that change ${JSON.stringify(adds)}`);
+        if (!g.plan.tracks.some(t => t.type === 'riser')) { own++; assert(r.song.build.filter(s => stepTracks(s).includes(id)).every(s => s.by === 'listener'), `${g.style}: the director used the listener's riser`); }
+        assert(!validateSong(r.song).errors.length, `${g.style}: invalid with a riser`);
+        compileSong(stateAt(r.song, tg.start).song);
+        assert(JSON.stringify(steerArr(g, [{ ...cmd, at }]).song) === JSON.stringify(r.song), `${g.style}: riser replay`);
+        n++;
+      }
+      // the riser lock keeps the director's risers out of the song
+      const riser = g.plan.tracks.find(t => t.type === 'riser');
+      if (riser) { const r = steerArr(g, [{ kind: 'lock-part', part: 'riser', at }]); assert(!r.song.build.some(s => s.at >= at && !s.by && listOf(s.add).includes(riser.id)), `${g.style}: the director placed a riser with the lock closed`); }
+    }
+    assert(n >= 60 && own >= 10, `${n} risers, ${own} in styles without one`);
+    console.log(`      ${n} risers placed (${own} in styles without a riser)`);
+  },
+  'arrangement: headroom as tracks add up, a volume set by hand kept'() {
+    let n = 0;
+    for (const g of arrSongs(12, 'arr-head')) {
+      const at = applyBar('more', 2 * g.plan.phrase, g.plan), { r, cmds } = stack12(g, at), on = onAt(r.song, at).filter(t => t.type !== 'riser');
+      if (on.length <= g.plan.usualHigh) continue;
+      const f = Math.sqrt(r.plan.usualHigh / on.length), st = stateAt(r.song, at).song;
+      for (const t of on) { const own = r.song.tracks.find(x => x.id === t.id).settings.gain; assert(Math.abs(st.tracks.find(x => x.id === t.id).settings.gain - Math.round(own * f * 100) / 100) <= 0.011, `${g.style}: ${t.id} gain ${st.tracks.find(x => x.id === t.id).settings.gain}, own ${own}, factor ${f.toFixed(2)}`); }
+      // a volume set in the mixer stays as set
+      const pin = on[0].id, v = steerArr(g, [...cmds, { kind: 'volume', track: pin, value: 0.42, at: at + 1 }]);
+      for (let b = at + g.plan.phrase; b < v.plan.bars; b += g.plan.phrase) { const x = stateAt(v.song, b).song.tracks.find(t => t.id === pin); assert(x.settings.gain === 0.42, `${g.style}: pinned gain ${x.settings.gain} on ${b}`); }
+      // fewer tracks, the gains come back
+      const last = r.song.build.filter(s => s.set && s.set.gain !== undefined && s.at > at);
+      assert(!validateSong(r.song).errors.length && last.every(s => s.set.gain <= r.song.tracks.find(t => t.id === s.set.track).settings.gain + 0.001), `${g.style}: a gain above its own`);
+      n++;
+    }
+    assert(n >= 9, `only ${n} songs`);
+  },
+  'arrangement: extra buses skip the spoken and narrator orbits, every track its own'() {
+    let n = 0;
+    for (const g of arrSongs(20, 'arr-bus', { voice: { presence: 'always' } })) {
+      const at = applyBar('more', 2 * g.plan.phrase, g.plan), { r } = stack12(g, at);
+      const song = { ...stateAt(r.song, at).song };
+      const code = compileSong(song), spoken = r.song.tracks.some(t => t.type === 'spoken');
+      const orbits = [];
+      for (const t of song.tracks.filter(x => !x.mute && x.type !== 'voice' && x.type !== 'spoken')) {
+        const i = code.indexOf(`// ========== ${[...new Set([t.name || t.id, t.type])].join(' · ')} ==========`);
+        if (i < 0) continue;
+        const m = code.slice(i).match(/\.orbit\((\d+)\)/);
+        orbits.push(Number(m[1]));
+      }
+      assert(new Set(orbits).size === orbits.length, `${g.style}: shared buses ${orbits}`);
+      assert(!orbits.some(o => o === 15 || (spoken && (o === 13 || o === 14))), `${g.style}: a track on a voice bus ${orbits}`);
+      if (spoken) n++;
+    }
+    assert(n >= 3, `only ${n} songs with a spoken track`);
+  },
+  'arrangement: the target of Vary and Swap, Auto takes turns'() {
+    let n = 0, named = 0;
+    for (const g of arrSongs(40, 'arr-target')) {
+      const ph = g.plan.phrase, at = applyBar('more', 2 * ph, g.plan);
+      if (whyNot({ kind: 'more', part: 'arp' }, g.song, g.plan, at - 1)) continue;
+      // (the arps locked, so the director keeps both on the boundaries of the check; + twice: two arps at least)
+      const base = [{ kind: 'lock-part', part: 'arp', at }, { kind: 'more', part: 'arp', at }, { kind: 'more', part: 'arp', at }], two = steerArr(g, base), arps = onAt(two.song, at + ph).filter(t => t.type === 'arp').map(t => t.id);
+      if (arps.length < 2 || at + 3 * ph >= outroFrom(g.plan) * 2 * ph) continue;
+      const v1 = { kind: 'vary', type: 'arp', target: 'auto', at: at + ph }, v2 = { kind: 'vary', type: 'arp', target: 'auto', at: at + 2 * ph };
+      const r = steerArr(g, [...base, v1, v2]);
+      const hit = c => r.song.build.filter(s => s.at === c.at && s.by === 'listener' && s.pattern && /^V\d+$/.test(s.pattern.to)).map(s => s.pattern.track);
+      const a = hit(v1), b = hit(v2);
+      // (the second press takes the other arp when both play on its boundary)
+      const both = arps.every(id => onAt(r.song, v2.at).some(t => t.id === id));
+      assert(a.length === 1 && b.length === 1 && arps.includes(a[0]) && (a[0] !== b[0] || !both), `${g.style}: Auto varied ${a} then ${b} of ${arps}`);
+      if (!both) continue;
+      assert(JSON.stringify(steerArr(g, [...base, v1, v2]).song) === JSON.stringify(r.song), `${g.style}: replay of Auto varies`);
+      // a named target: that track only; a target that does not play: not-playing
+      const one = steerArr(g, [...base, { kind: 'swap', type: 'arp', target: arps[1], at: at + ph }]);
+      const sw = one.song.build.filter(s => s.at === at + ph && s.by === 'listener' && s.pattern && /^S\d+$/.test(s.pattern.to)).map(s => s.pattern.track);
+      if (!whyNot({ kind: 'swap', type: 'arp', target: arps[1] }, two.song, two.plan, at + ph - 1, 0, g.opts)) { assert(sw.length === 1 && sw[0] === arps[1], `${g.style}: Swap of ${arps[1]} rewrote ${sw}`); named++; }
+      assert(whyNot({ kind: 'vary', type: 'arp', target: 'nope' }, two.song, two.plan, at + ph - 1) === 'not-playing', `${g.style}: a target that does not play`);
+      // a command without a target rewrites every track of the part, as before
+      const all = steerArr(g, [...base, { kind: 'vary', type: 'arp', at: at + ph }]);
+      assert(all.song.build.filter(s => s.at === at + ph && s.by === 'listener' && s.pattern && /^V\d+$/.test(s.pattern.to)).length === arps.length, `${g.style}: a vary without target`);
+      n++;
+    }
+    assert(n >= 8 && named >= 3, `${n} songs with two arps, ${named} named swaps`);
+    console.log(`      ${n} songs with two arps: Auto takes them in turn, ${named} swaps of a named track`);
+  },
+  'arrangement: a saved pattern on air, new or in place of a track, in the song key, replayed as heard'() {
+    // a bassline saved in A minor (the song format writes parts in A; the compiler moves them to the section's key)
+    const item = { id: 'mine-1', name: 'Basso mio', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: { wave: 'sawtooth', gain: 0.7 }, styles: ['jazz'], context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 128, mode: 'minor' } };
+    let n = 0, rep = 0, inD = 0;
+    for (const g of arrSongs(40, 'arr-saved')) {
+      const at = applyBar('pattern', 2 * g.plan.phrase, g.plan);
+      if (!fitsAir(item, g.plan, g.song)) { assert(whyNot({ kind: 'pattern', mode: 'new', item }, g.song, g.plan, at - 1) === 'no-fit', `${g.style}: no-fit`); continue; }
+      const cmd = { kind: 'pattern', mode: 'new', item: JSON.parse(JSON.stringify(item)), at };
+      const r = steerArr(g, [cmd]), id = r.plan.added[0].id, t = r.song.tracks.find(x => x.id === id);
+      assert(t && t.type === 'bass' && JSON.stringify(t.patterns.A) === JSON.stringify(item.pattern) && t.settings.wave === 'sawtooth', `${g.style}: new bass ${JSON.stringify(t && t.patterns)}`);
+      assert(onAt(r.song, at).some(x => x.id === id) && onAt(r.song, at + 2 * g.plan.phrase).some(x => x.id === id), `${g.style}: the saved bassline does not stay`);
+      // in the song's key: the compiled bass line of the new track transposes by the section's key
+      const sec = stateAt(r.song, at + 1).song, code = compileSong(sec), key = (r.song.sections.reduce((a, s) => (a.at <= at ? { at: a.at + s.bars, s } : a), { at: 0, s: null }).s || {}).key;
+      const shift = (KEYS.find(k => k[0] === key) || [key, 0])[1];
+      const block = code.slice(code.indexOf(`// ========== ${t.name}`));
+      assert(shift === 0 || block.includes(`.transpose(${shift - 24})`) || block.includes(`transpose(${shift}`), `${g.style}: bass in ${key} not transposed (${shift}): ${block.slice(0, 200)}`);
+      if (key === 'D') inD++;
+      // the library changes later: the command holds its own copy, the replay sounds the same
+      const again = steerArr(g, [JSON.parse(JSON.stringify(cmd))]);
+      item.pattern.preset = 'gallop'; assert(JSON.stringify(steerArr(g, [JSON.parse(JSON.stringify(cmd))]).song) === JSON.stringify(again.song), `${g.style}: replay depends on the library`); item.pattern.preset = 'rolling';
+      assert(!validateSong(r.song).errors.length, `${g.style}: invalid`);
+      // in place of the playing bass: a P1 pattern on it, the track keeps its sound
+      const bass = onAt(g.song, at).find(x => x.type === 'bass');
+      if (bass) {
+        const rr = steerArr(g, [{ kind: 'pattern', mode: 'replace', target: bass.id, item: JSON.parse(JSON.stringify(item)), at }]);
+        const b2 = rr.song.tracks.find(x => x.id === bass.id), step = rr.song.build.find(s => s.at === at && s.by === 'listener' && s.pattern && s.pattern.track === bass.id);
+        assert(step && step.pattern.to === 'P1' && JSON.stringify(b2.patterns.P1) === JSON.stringify(item.pattern) && b2.settings.wave === g.song.tracks.find(x => x.id === bass.id).settings.wave, `${g.style}: replace ${JSON.stringify(step)}`);
+        assert(JSON.stringify(rr.song.sections) === JSON.stringify(g.song.sections), `${g.style}: replace changed the sections`);
+        rep++;
+      }
+      n++;
+    }
+    // a 7/8 pattern never fits a 4/4 song
+    const odd = { ...item, context: { ...item.context, meter: '7/8' } }, g0 = arrSongs(1, 'arr-saved')[0];
+    if (g0.plan.meter !== '7/8') assert(!fitsAir(odd, g0.plan, g0.song), '7/8 in 4/4');
+    assert(n >= 15 && rep >= 8, `${n} songs took the bassline, ${rep} replaced`);
+    console.log(`      ${n} songs took a saved bassline as a new track (${inD} in D), ${rep} in place of their bass; replays hold their own copy`);
+  },
+  'arrangement: Part harmony treats one part in the song key, Auto never repeats, colour only on pads and guitars'() {
+    const kinds = {}, parts = {};
+    let n = 0;
+    for (const g of arrSongs(60, 'arr-voicing')) {
+      const at = applyBar('voicing', 3 * g.plan.phrase, g.plan);
+      for (const type of VARY_TYPES) {
+        const on = varyTracks(onAt(g.song, at), type);
+        if (!on.length || whyNot({ kind: 'voicing', type, treatment: 'auto' }, g.song, g.plan, at - 1)) continue;
+        const r = steerArr(g, [{ kind: 'voicing', type, target: 'auto', treatment: 'auto', at }]);
+        const v = r.plan.voiced && r.plan.voiced[0];
+        assert(v, `${g.style} ${type}: no treatment`);
+        const t = r.song.tracks.find(x => x.id === v.track), step = r.song.build.find(s => s.at === at && s.by === 'listener' && s.pattern && s.pattern.track === v.track);
+        assert(step && /^H\d+$/.test(step.pattern.to) && t.patterns[step.pattern.to].idea, `${g.style} ${type}: no H step`);
+        const idea = t.patterns[step.pattern.to].idea;
+        // in key: degrees moved by whole degrees, arp indices chord tones, notes by octaves, colour as sevenths
+        if (t.type === 'arp' && idea.index !== undefined) assert(String(idea.index).replace(/[!%*@]\d+/g, '').match(/-?\d+/g).every(x => /^[0-3]$/.test(x)), `${g.style}: arp index ${idea.index}`);
+        if (v.treatment === 'colour') assert(['pad', 'guitar'].includes(t.type) && /7/.test(idea.chords), `${g.style}: colour on ${t.type} ${idea.chords}`);
+        if (v.treatment === 'octave' && idea.degrees === undefined && !idea.scale) assert(Math.abs((typeof idea.add === 'number' ? idea.add : 0) - (typeof idea.sub === 'number' ? idea.sub : 0)) % 12 === 0 || typeof idea.sub === 'number', `${g.style}: octave ${JSON.stringify(idea)}`);
+        assert(!validateSong(r.song).errors.length, `${g.style} ${type} ${v.treatment}: ${validateSong(r.song).errors.slice(0, 1).map(e => e.path + ' ' + e.msg)}`);
+        compileSong(stateAt(r.song, at + 1).song);
+        // only that track changes
+        const others = sg => JSON.stringify(sg.tracks.filter(x => x.id !== v.track));
+        assert(others(r.song) === others(g.song), `${g.style} ${type}: other tracks changed`);
+        // Auto twice on the same track never repeats the treatment
+        const r2 = steerArr(g, [{ kind: 'voicing', type, target: v.track, treatment: 'auto', at }, { kind: 'voicing', type, target: v.track, treatment: 'auto', at: at + g.plan.phrase }]);
+        const vs = (r2.plan.voiced || []).filter(x => x.track === v.track);
+        if (vs.length === 2) assert(vs[0].treatment !== vs[1].treatment, `${g.style} ${type}: Auto repeated ${vs[0].treatment}`);
+        assert(JSON.stringify(steerArr(g, [{ kind: 'voicing', type, target: 'auto', treatment: 'auto', at }]).song) === JSON.stringify(r.song), `${g.style} ${type}: replay`);
+        kinds[v.treatment] = (kinds[v.treatment] || 0) + 1; parts[type] = (parts[type] || 0) + 1; n++;
+      }
+      // colour asked on a melody: off (no-target)
+      const hook = varyTracks(onAt(g.song, at), 'lead');
+      if (hook.length && hook.every(x => x.type === 'hook')) assert(whyNot({ kind: 'voicing', type: 'lead', treatment: 'colour' }, g.song, g.plan, at - 1) === 'no-target', `${g.style}: colour on a melody`);
+    }
+    assert(n >= 60 && Object.keys(kinds).length === 4, `${n} treatments: ${JSON.stringify(kinds)}`);
+    console.log(`      ${n} part harmonies: ${JSON.stringify(kinds)} over ${JSON.stringify(parts)}`);
+  },
+  'arrangement: the Song harmony menu applies a chosen progression or key, Auto as before'() {
+    let n = 0;
+    for (const g of arrSongs(20, 'arr-harmony')) {
+      const at = applyBar('progression', 2 * g.plan.phrase, g.plan), cur = g.song.sections.reduce((a, s) => (a.at <= at ? { at: a.at + s.bars, s } : a), { at: 0, s: null }).s;
+      const other = g.plan.R.progressions.find(x => x !== cur.chords) || Object.keys(PROGS).find(x => x !== cur.chords);
+      const r = steerArr(g, [{ kind: 'progression', chords: other, at }]);
+      assert(r.plan.harmony.length === 1 && r.plan.harmony[0].chords === other && r.song.sections.filter(s => s.chords === other).length, `${g.style}: chosen progression ${other}`);
+      assert(whyNot({ kind: 'progression', chords: cur.chords }, g.song, g.plan, at - 1) === 'same-chords', `${g.style}: the same progression`);
+      // Auto: the same song as a command without a choice
+      assert(JSON.stringify(steerArr(g, [{ kind: 'progression', chords: 'auto', at }]).song) === JSON.stringify(steerArr(g, [{ kind: 'progression', at }]).song), `${g.style}: Auto progression`);
+      for (const to of ['up', 'down', 'relative']) {
+        const k = keyTo(cur.key, to);
+        if (!k) { assert(whyNot({ kind: 'key', to }, g.song, g.plan, at - 1) === 'no-key', `${g.style}: ${to} from ${cur.key}`); continue; }
+        const rk = steerArr(g, [{ kind: 'key', to, at }]);
+        assert(rk.plan.harmony[0].key === k && rk.song.sections.some(s => s.key === k), `${g.style}: key ${to} ${k}`);
+      }
+      assert(JSON.stringify(steerArr(g, [{ kind: 'key', to: 'auto', at }]).song) === JSON.stringify(steerArr(g, [{ kind: 'key', at }]).song), `${g.style}: Auto key`);
+      n++;
+    }
+    assert(n === 20, `${n}`);
+  },
+  'arrangement: the whole session, scope and lock together'() {
+    // four songs of synthwave (an arp style); the listener presses "+ arp" on song 0, with each scope and lock
+    const options = { styles: ['synthwave'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'cut', harmony: 'artist' };
+    const base = { seed: 'arr-session', options, changes: [] };
+    const g0 = createSession(STYLES, 'arr-session').next(options), at = applyBar('more', 2 * g0.plan.phrase, g0.plan);
+    const song = [{ song: 0, kind: 'more', part: 'arp', at }], lock = [{ song: 0, kind: 'lock-part', part: 'arp', at }];
+    const run = r => sessionItems(STYLES, { ...base, ...r }, 4, null, { grow: false });
+    const plain = run({ steering: [] }), arps = x => x.song.tracks.filter(t => t.type === 'arp').length;
+    const songOpen = run({ steering: song }), songShut = run({ steering: [...lock, ...song] });
+    const sesOpen = run({ steering: song, arrange: song.map(({ at: _, ...e }) => e) }), sesShut = run({ steering: [...lock, ...song], arrange: [...lock, ...song].map(({ at: _, ...e }) => e) });
+    const same = (a, b, i) => JSON.stringify(a[i].song) === JSON.stringify(b[i].song);
+    // this song only: later songs as the director plans them, locked or not
+    for (const i of [1, 2, 3]) assert(same(songOpen, plain, i) && same(songShut, plain, i), `song scope changed song ${i}`);
+    const arpAt = (x, b) => onAt(x.song, b).filter(t => t.type === 'arp').length;
+    assert(arpAt(songOpen[0], at) === arpAt(plain[0], at) + 1, `song 0 has its arp: ${arpAt(songOpen[0], at)} / ${arpAt(plain[0], at)}`);
+    let more = 0;
+    for (const i of [1, 2, 3]) {
+      const bias = sessionBias({ ...base, arrange: song.map(({ at: _, ...e }) => e) }, i, { song: plain[i].song, plan: plain[i].plan });
+      if (!bias.length) continue;
+      // one arp more than the director gives the song: a "+" of the session, which stays like the listener's
+      const add = (sesOpen[i].plan.added || []).filter(a => a.part === 'arp');
+      assert(add.length >= 1 && onAt(sesOpen[i].song, add[0].at).filter(t => t.type === 'arp').length === onAt(plain[i].song, add[0].at).filter(t => t.type === 'arp').length + 1, `session open: song ${i} ${JSON.stringify(add)}`);
+      // open: the director is free; closed: the arps locked from their first entry
+      assert(!lockedIds(sesOpen[i].plan).some(id => /^arp/.test(id)), `session open: song ${i} locked`);
+      assert(sesShut[i].plan.tracks.filter(t => t.type === 'arp').every(t => lockedIds(sesShut[i].plan).includes(t.id)) && (sesShut[i].plan.lockedParts || []).includes('arp'), `session closed: song ${i} not locked`);
+      more++;
+    }
+    assert(more >= 2, `only ${more} later songs took the arp`);
+    // the same recipe gives the same songs (a replay, a playlist)
+    assert(JSON.stringify(run({ steering: song, arrange: song.map(({ at: _, ...e }) => e) }).map(x => x.song)) === JSON.stringify(sesOpen.map(x => x.song)), 'session replay');
+    // an unlock for the session ends the lock for the songs after
+    const after = sessionBias({ ...base, arrange: [{ song: 0, kind: 'lock-part', part: 'arp' }, { song: 1, kind: 'unlock-part', part: 'arp' }] }, 2, { song: plain[2].song, plan: plain[2].plan });
+    assert(!after.some(c => c.kind === 'lock-part'), 'unlock for the session');
+    // Vary, Swap and the riser never go to the session list
+    assert(!sessionBias({ ...base, arrange: [{ song: 0, kind: 'vary', type: 'lead' }, { song: 0, kind: 'riser' }] }, 2, { song: plain[2].song, plan: plain[2].plan }).length, 'vary and riser are song only');
+    console.log(`      ${more} later songs took the session's arp; song scope leaves them as planned; locked for the session from the first entry`);
+  },
   'steering: one vary takes less than 20 ms'() {
     const all = varies(40), times = all.map(({ g, type, at }) => { const t0 = performance.now(); steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'vary', type, at }], seed: 'vary-time', n: 1 }); return performance.now() - t0; }).sort((a, b) => a - b);
     const median = times[Math.floor(times.length / 2)], max = times[times.length - 1];
@@ -935,16 +1374,19 @@ const CHECKS = {
   },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');
-    const listed = [...doc.matchAll(/`((?:director|determinism|radio|artists|transitions|steering): [^`]+)`/g)].map(m => m[1]);
+    const listed = [...doc.matchAll(/`((?:director|determinism|radio|artists|transitions|steering|arrangement): [^`]+)`/g)].map(m => m[1]);
     for (const n of listed) assert(CHECKS[n], `docs/ENDLESS.md names a check that does not exist: ${n}`);
-    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists|transitions|steering):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
+    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists|transitions|steering|arrangement):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
   },
 };
 
+// --only <text>: run only the checks whose name holds the text
+const onlyArg = process.argv.indexOf('--only'), only = onlyArg >= 0 ? process.argv[onlyArg + 1] : null;
 let failed = 0;
-for (const [name, fn] of Object.entries(CHECKS)) {
-  try { fn(); console.log(`ok    ${name}`); }
-  catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); }
+for (const [name, fn] of Object.entries(CHECKS).filter(([n]) => !only || n.includes(only))) {
+  const t0 = performance.now();
+  try { fn(); console.log(`ok    ${name}${process.env.CHECK_TIME ? ` (${((performance.now() - t0) / 1000).toFixed(1)} s)` : ''}`); }
+  catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); }
 }
-console.log(`${Object.keys(CHECKS).length - failed} passed, ${failed} failed`);
+console.log(`${Object.keys(CHECKS).filter(n => !only || n.includes(only)).length - failed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
