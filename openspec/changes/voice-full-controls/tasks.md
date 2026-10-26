@@ -42,6 +42,6 @@
 
 ## 8. Labels, Guide, docs
 
-- [ ] 8.1 Strings from `notes/etichette-voci-v2.md` with "Due voci" and "voice track" (D13) in `src/i18n.js`, new `voiceTitle` key for Library blocks; `check:guide`
-- [ ] 8.2 Guide cards "Due voci" and "Voce: traccia" (switches, Sempre, Riempi con, + Aggiungi frase), console card (Voice group, Aggiungi frase); knowledge notes `voice.md`, `narrator.md`, `radio.md`, `radio-commands.md`, `profiles.md`, `glossary.md`, `decisions.md`; `npm run knowledge` and `npm run check:knowledge`
+- [x] 8.1 Strings from `notes/etichette-voci-v2.md` with "Due voci" and "voice track" (D13) in `src/i18n.js`, new `voiceTitle` key for Library blocks; `check:guide`
+- [x] 8.2 Guide cards "Due voci" and "Voce: traccia" (switches, Sempre, Riempi con, + Aggiungi frase), console card (Voice group, Aggiungi frase); knowledge notes `voice.md`, `narrator.md`, `radio.md`, `radio-commands.md`, `profiles.md`, `glossary.md`, `decisions.md`; `npm run knowledge` and `npm run check:knowledge`
 - [ ] 8.3 DEVLOG entry in Italian, CHANGELOG under Unreleased; full checks: `check:spoken`, `check:endless`, `check:code`, `check:songs`, `check:radio-profiles`, `check-voices.cjs`, `check-radio.cjs`, `check-steering.cjs`, build

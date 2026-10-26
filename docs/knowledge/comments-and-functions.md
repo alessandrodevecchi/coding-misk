@@ -48,8 +48,8 @@ Comments (it: Commenti): Comments in the code. Essential: the title and the trac
 | --- | --- | --- |
 | `tracks` | Tracks (it: Tracce) | The track names (// ===== bass =====) |
 | `notes` | Notes (it: Note) | The section and pattern notes (// Intro · bars 1-8) |
-| `steps` | Phrases (it: Frasi) | The step phrases (// > …) and the phrase the voice says |
-| `voice` | Voice code (it: Codice della voce) | The lines that make the voice speak. Off: the voice still speaks, its code is not shown |
+| `steps` | Step phrases (it: Frasi dei passi) | The step phrases (// > …) and the phrase the narrator says |
+| `voice` | Narrator voice code (it: Codice voce narratore) | The lines that make the narrator speak. Off: the narrator still speaks, its code is not shown |
 <!-- /generated -->
 
 <!-- generated:function-presets -->
@@ -69,7 +69,7 @@ Default preset per profile: Classic `full`, Crescendo `full`, Live coder `compac
 | `fnBus` | Bus | Bus and visual in short: .chan("bass") |
 | `fnLevel` | Mixer | Bus, visual and level in a hidden mixer: .gain() only when a step changes the level |
 | `fnCrunch` | Distortion (it: Distorsione) | Distortion with its volume in short: .crunch(0.6) |
-| `fnVoice` | Voice (it: Voce) | The voice effects in a song function |
+| `fnVoice` | Voice effects (it: Effetti voci) | The voice effects in a song function |
 | `fnSong` | Song (it: Del brano) | Effect chains that repeat become song functions with a themed name; the values that change stay in the brackets |
 | `fnLib` | Library (it: Libreria) | Library functions for the most used chains: .plk(decay, sustain), .wet(delay, room), .res(lpf, lpq), .wob(from, to) for a moving filter |
 | `fnLanes` | Sections (it: Sezioni) | Section and clip lanes go to the hidden mixer: each part is one line, changed in place when its section or clip changes, no section constants. For every profile, also with the Live build off |

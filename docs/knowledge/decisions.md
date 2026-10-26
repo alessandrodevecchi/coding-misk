@@ -83,12 +83,17 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 | Guitar riffs on request with `riff: true` (and `false` for power chords only); left out, the old draw (pattern-followups D3) | New on riffs composed a bassline. Leaving the default draw untouched keeps radio songs and the endless fixtures where they were; `check:material` keeps a digest of 240 guitar parts. | [pattern-followups](../../openspec/changes/pattern-followups/design.md), DEVLOG 2026-10-25 |
 | New's parts are kept in the browser, at most 30, and in the backup; parts opened from Compose stay in memory (pattern-followups D2) | New parts vanished when the tab closed. Every listen button press from Compose would pile up drafts, so only New's parts are kept. | [pattern-followups](../../openspec/changes/pattern-followups/design.md) |
 | Save as pattern from a song without style tags links its artist's favourite style or the styles its style line names, else none (every style) (pattern-followups D1) | The style closest in tempo is a guess; only known styles are linked. | [pattern-followups](../../openspec/changes/pattern-followups/design.md) |
+| A voice's sound is one value, its track's settings; a song without a narrator track gets one on the first edit (voice-full-controls D1, D2) | The Voices group, the track panel and the style pickers read and write the same place, so they never disagree; creating the track only on an edit leaves songs unchanged when looked at | [voice](voice.md) |
+| Every style has a voice track chance on its own stream; Sempre gives every song one, the switch silences it (voice-full-controls D14, D15) | The music of a session never moves with the voices (the endless fixtures keep a music hash without the voice tracks); off then on is lossless | [voice](voice.md) |
+| Console lines get real samples from a dev-server helper (voice-full-controls D8, D9) | Played by Strudel like any line: same sound chain, recorded, exported and replayed; about half a second a line | [radio-commands](radio-commands.md) |
 
 ## Rejected attempts
 
 | Attempt | Why it was dropped | Source |
 | --- | --- | --- |
 | Preview orbit 15 (pattern-preview D3, #84) | Voice tracks (the narrator) speak on orbits 15 and up, and one built-in song reaches 17: the preview takes at least 20, above every orbit of the song. | `src/player/preview.js` |
+| The browser voice (`speechSynthesis`) for console lines (voice-full-controls D9) | It plays outside Web Audio: no voice style, not in the master, the recording, the export or Replay, and off the beat. | [radio-commands](radio-commands.md) |
+| A song-level `narrator.settings` next to the narrator track (voice-full-controls D1) | Two places for the same values whenever a song has a narrator track: the divergence the owner forbids. | [narrator](narrator.md) |
 | Several phrases placed one per section (voice-controls) | Most generated songs have one to three quiet sections, so 4 to 5 phrases never fitted. Parts became phrases of the plan. | [voice](voice.md) |
 | Growing a steered radio song again from the steered song (stage 4) | The steps already heard and typed changed with every command. Replaced by waypoints (stage 5). | radio-profiles D9 |
 | Hosting the app as a web artifact | Its sandbox blocks Strudel's audio worklets loaded from `data:` URLs: no sound. | DEVLOG 2026-10-04 |
