@@ -7,15 +7,26 @@ A small second player in Compose that plays the pattern being made on a track. I
 ## ADDED Requirements
 
 ### Requirement: Preview button next to the listen button
-Each track panel that has a listen button by its preset or groove menu SHALL show a preview button right next to it. The button SHALL show play when the preview is off and stop when it plays this track's pattern. It SHALL have a label and a tooltip in both languages.
+Each track panel that has a listen button by its preset or groove menu SHALL show a preview button right next to it. The button SHALL show the headphones icon when the preview is off and stop when it plays this track's pattern. It SHALL have a label and a tooltip in both languages. The tooltip SHALL say that the track's own line keeps playing in the song and that M mutes it.
 
 #### Scenario: Button in place
 - **WHEN** the user opens Compose on a bass track
-- **THEN** a play button sits next to the listen button by the Preset menu, with the tooltip "Anteprima del pattern" in Italian and "Preview the pattern" in English
+- **THEN** a headphones button sits next to the button that opens the Patterns tab by the Preset menu, with a tooltip that starts with "Anteprima del pattern" in Italian and "Preview the pattern" in English and mentions M
 
 #### Scenario: Toggle
 - **WHEN** the user presses the preview button and then presses it again
-- **THEN** the first press starts the preview and the button shows stop, and the second press stops it and the button shows play
+- **THEN** the first press starts the preview and the button shows stop, and the second press stops it and the button shows the headphones again
+
+### Requirement: Icons tell a preview from the main player
+The play triangle SHALL mean "this becomes what the main player plays": the code is shown and the player bar takes it. A preview, a second player that leaves the main player alone, SHALL use the headphones icon, in Compose and in every later preview of the app (for example a preview in the radio console). The button that opens a pattern in the Patterns tab SHALL use a lab flask icon, and no longer the headphones.
+
+#### Scenario: Compose track panel
+- **WHEN** the user opens a track with a preset or groove menu in Compose
+- **THEN** the button that opens the Patterns tab shows the flask, and the preview button shows the headphones; no button by the menu shows the play triangle
+
+#### Scenario: Patterns tab loop
+- **WHEN** the user opens the Patterns tab
+- **THEN** its play buttons keep the play triangle, because the loop becomes what the player bar plays
 
 ### Requirement: What the preview plays
 The preview SHALL loop the pattern selected in the track panel. It SHALL use the track's sound and settings, and the key, progression, meter and tempo of the selected section. It SHALL play the pattern even when the track is muted, or when the pattern is used in no section.
@@ -40,7 +51,7 @@ Starting, playing and stopping the preview SHALL NOT change what the player bar 
 - **THEN** the player bar stays stopped, and its play button starts the song as before
 
 ### Requirement: In time with the song
-While the song plays, the preview SHALL start at the song's next bar, play at the song's tempo, and keep its bars on the song's bars. Its progression SHALL be placed so that its chords match the song's when the selected section is the one that plays.
+While the song plays, the preview SHALL start at the song's next bar (not the next phrase), play at the song's tempo, and keep its bars on the song's bars. Its progression SHALL be placed so that its chords match the song's when the selected section is the one that plays.
 
 #### Scenario: Started in the middle of a bar
 - **WHEN** the song plays at bar 12.4 and the user starts the preview
@@ -62,7 +73,11 @@ While the song is stopped or paused, the preview SHALL play on its own at the se
 - **THEN** the song starts as usual, and the preview lines up with the song's bars from the song's next bar
 
 ### Requirement: Level and output
-The preview SHALL play at the level the track has in the song. It SHALL go through the same master output, limiter and global volume as the song. Its delay and reverb SHALL NOT change the delay and reverb of the song's instruments. It SHALL NOT light instruments in the visuals, and SHALL NOT go into WAV exports or recordings.
+The preview SHALL play at the level the track has in the song, with no volume control of its own. While the song plays, the track's own line SHALL keep playing: the preview does not silence it. It SHALL go through the same master output, limiter and global volume as the song. Its delay and reverb SHALL NOT change the delay and reverb of the song's instruments. It SHALL NOT light instruments in the visuals, and SHALL NOT go into WAV exports or recordings.
+
+#### Scenario: The track keeps playing
+- **WHEN** the song plays and the user starts the preview of the bass track
+- **THEN** the song's bass line keeps playing with the preview, and pressing M on the bass track leaves only the preview of the bass heard
 
 #### Scenario: Global volume
 - **WHEN** the preview plays and the user lowers the volume in the player bar
@@ -88,7 +103,7 @@ The app SHALL play at most one preview. Starting the preview on another track SH
 - **THEN** the preview stops
 
 ### Requirement: Two named pattern rows
-The track panel SHALL show two pattern rows with their own labels. "Pattern del brano" / "Song patterns" SHALL hold the track's patterns and Delete. "Crea pattern" / "Make patterns" SHALL hold New, Save as pattern, Compose a part with its number, Energy, Keep rhythm and Keep notes.
+The track panel SHALL show two pattern rows with their own labels. "Pattern del brano" / "Song patterns" SHALL hold the track's patterns, Delete and the editing note. "Crea pattern" / "Make patterns" SHALL hold New, Save as pattern, Compose a part with its number, Energy, Keep rhythm and Keep notes.
 
 #### Scenario: Italian labels
 - **WHEN** the interface is in Italian and the user opens a track in Compose

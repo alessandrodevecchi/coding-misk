@@ -10,7 +10,8 @@
 
 ## 2. Compose
 
-- [ ] 2.1 Add the `pt-preview` button next to `pt-listen` for grooves and presets (`src/main.js:2567`, `:2572`), with icons, `aria-pressed` and both themes. Keep its state across re-renders.
+- [ ] 2.1 Add the `pt-preview` button next to `pt-listen` for grooves and presets (`src/main.js:2567`, `:2572`), with the headphones icon (STOP while it plays), `aria-pressed` and both themes, and a tooltip that hints at M. Keep its state across re-renders.
+- [ ] 2.4 Icons (D10): draw a `FLASK` icon in `src/icons.js` and use it for `pt-listen` instead of the headphones. Check that no preview button uses the play triangle and that the Patterns tab keeps it.
 - [ ] 2.2 Lifetime (D4): one preview at a time. It stops when the user leaves Compose, when another song opens, when its track or pattern is removed, and on an export or recording, where its button is also disabled. It follows the selected pattern and edits from the next bar.
 - [ ] 2.3 Split `tp-pats` (`src/main.js:2608-2611`) into "Pattern del brano" / "Song patterns" (chips, Delete, the editing note) and "Crea pattern" / "Make patterns" (New, Save as pattern, `composeRow`), per the owner's answer to open question 1. Add the strings to `src/i18n.js` in both languages.
 
@@ -24,5 +25,5 @@
 
 - [ ] 4.1 Add `tools/check-preview.cjs` for the scenarios of both specs. The main scheduler's code, the editor, the title and `isPlaying()` must not change when the preview starts. Also check the riding and free handover, the alignment, one preview at a time, stop on leaving Compose and on export, and the Italian and English labels. Update `tools/check-player.cjs` and `tools/check-radio.cjs` for the counter, and `tools/check-patterns.cjs` for the split rows.
 - [ ] 4.2 Run `npm run check:patterns`, `npm run check:guide`, `npm run check:knowledge`, `npm run build`, and the browser checks for player, radio, patterns, hand and preview.
-- [ ] 4.3 Update the Compose card in `src/guide.js` (both languages), `docs/knowledge/patterns.md`, `docs/knowledge/glossary.md` (the row names, the preview, "bar"), `docs/ARCHITECTURE.md` (the second player), `docs/knowledge/decisions.md` (D1 and its rejected options), the AGENTS.md tool list and `DEVLOG.md`.
+- [ ] 4.3 Update the Compose card in `src/guide.js` (both languages), `docs/knowledge/patterns.md`, `docs/knowledge/glossary.md` (the row names, the preview, "bar"), `docs/ARCHITECTURE.md` (the second player), `docs/knowledge/decisions.md` (D1 and its rejected options, D10 the icon rule), the AGENTS.md tool list and `DEVLOG.md`.
 - [ ] 4.4 Open a follow-up issue for the timeline jump in Live coder and Crescendo (D9), at low priority.

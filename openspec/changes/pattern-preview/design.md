@@ -28,7 +28,7 @@ What the code does today (line numbers at `develop` 72698b5):
 
 - Fixing the timeline jump in Live coder and Crescendo (D9, a follow-up).
 - A preview in the Patterns tab, in the Sounds tab or for code, texture, spoken, voice and riser tracks.
-- A preview volume control (open question 3).
+- A preview volume control (owner decision 3).
 - Changing the song format, the compiler or the levels.
 
 ## Decisions
@@ -72,9 +72,10 @@ Alternatives considered:
 
 ### D5. Placement and look
 
-- **Place.** The button `pt-preview` sits right after `pt-listen` in `.pt-presetrow`, for the groove row (`src/main.js:2567`) and the preset row (`src/main.js:2572`). It uses the PLAY and STOP icons of `src/icons.js`, the same as the Patterns tab, and `btn small icon` with `aria-pressed`.
+- **Place.** The button `pt-preview` sits right after `pt-listen` in `.pt-presetrow`, for the groove row (`src/main.js:2567`) and the preset row (`src/main.js:2572`). It uses `btn small icon` with `aria-pressed`.
+- **Icons (D10).** Off, it shows the headphones icon (`LISTEN` in `src/icons.js`); playing, it shows STOP. The button that opens the Patterns tab (`pt-listen`) moves from the headphones to a new drawn flask icon (`FLASK`).
 - **Look.** While it plays, the button is lit like `.pn-play` (neon) or shows the lit LED key (hardware).
-- **Texts.** Tooltip "Anteprima del pattern" / "Preview the pattern". The listen button's tooltip stays "Ascolta nella scheda Pattern". The two buttons are told apart by their icons: headphones open the Patterns tab, play previews in place.
+- **Texts.** Tooltip "Anteprima del pattern (la traccia continua a suonare nel brano: M la mette in muto)" / "Preview the pattern (the track keeps playing in the song: M mutes it)". The flask's tooltip stays "Ascolta nella scheda Pattern" / its English text.
 - **Why here.** The owner asked for the button by the headphones, so it reads as tied to the pattern. The preset row edits the selected pattern, the one the preview plays.
 
 ### D6. Row names
@@ -85,8 +86,8 @@ Alternatives considered:
 | B | Nel brano / In the song | Laboratorio pattern / Pattern lab | Short, but "Lab" clashes with the Groove Lab mode name |
 | C | Pattern in uso / Patterns in use | In definizione / Work in progress | Wrong when a pattern is used in no section; "in definizione" is vague |
 
-- **Choice.** Option A. "Crea pattern" fits Italian UI copy better than "Laboratorio" and does not repeat the Groove Lab.
-- **Delete.** It moves to the first row, because it deletes a song pattern (open question 1).
+- **Choice.** Option A, approved by the owner. "Crea pattern" fits Italian UI copy better than "Laboratorio" and does not repeat the Groove Lab.
+- **Delete.** It moves to the first row, because it deletes a song pattern (owner decision 1).
 - **The "Editing pattern" note.** It stays under the first row.
 
 ### D7. Bar counter
@@ -114,18 +115,30 @@ Alternatives considered:
 - **Where to look.** The ruler converts the clicked written bar with `seekTo(b + growBars())` (`src/main.js:2026`, keyboard at `:2031`). The ruler is drawn over the written sections, but the grown song repeats and reshapes sections in its growth. So a written bar plus the growth length does not match what the user sees on the ruler.
 - **Follow-up.** It should map through the grown song's sections (`arrSec`, `meta.sectionAt`), or draw the ruler over the grown song. It gets its own issue, at lower priority, as the owner asked.
 
+### D10. Icons: the triangle means "main player", the headphones mean "preview"
+
+- **Rule (owner, 2026-10-26).** The play triangle has always meant "this becomes what plays": the code is shown and the player bar takes it (song cards, the Patterns tab loop, Play in the player bar). A preview is a second player that leaves the main one alone, so it uses another icon everywhere: the headphones.
+- **Compose.** The preview button shows the headphones (and STOP while it plays). The button that opens the pattern in the Patterns tab used the headphones; it now shows a lab flask.
+- **Flask over "open in new".** The flask matches the Groove Lab mode, whose name already carries a flask mark in the mode switch, and the Patterns tab lives in that mode, so the icon says "take this to the lab". An "open in new" arrow reads as a new browser window. The flask is drawn as SVG (`FLASK` in `src/icons.js`), in `currentColor` like the other icons, so both themes work.
+- **Later previews.** Every later preview (for example in the radio console, or in the Patterns tab over a playing song, D8) uses the headphones icon, and keeps the triangle for actions that take the main player.
+- **Not changed.** The Patterns tab's play buttons keep the triangle: its loop replaces what the player bar plays.
+
 ## Risks / Trade-offs
 
 - **Two copies of Strudel's core.** If the app's import of `@strudel/core` resolved to another copy than the REPL's, `stack` would mix two `Pattern` classes. There is one copy today (`node_modules/@strudel/core`, 1.2.6, none nested under `@strudel/repl`). The check asserts that `previewPattern instanceof` the scheduler pattern's class.
 - **Wrapping `scheduler.setPattern`.** A future Strudel update could rename it. The wrapper is small, lives in one place (`src/player/preview.js`), and the browser check fails if riding breaks.
-- **Two parts at once.** While the song plays, the track's own pattern and the preview sound together. That is intended (no interference), but two basslines can clash. The tooltip hints at M (mute) to hear the preview in place of the track (open question 2).
+- **Two parts at once.** While the song plays, the track's own pattern and the preview sound together. That is intended (no interference), but two basslines can clash. The tooltip hints at M (mute) to hear the preview in place of the track (owner decision 2).
 - **Gap at a handover.** Up to one bar of silence when the song starts or stops under the preview. This is accepted to keep the engine simple.
 - **CPU.** The preview adds one track's voices. A riding preview adds no scheduler. A free one adds a 50 ms clock only while the song is stopped.
 
-## Open Questions
+## Owner Decisions (2026-10-26)
 
-1. **Where Delete goes.** Recommended: in "Pattern del brano", since it deletes a song pattern. Alternative: keep it in the creation row, as today.
-2. **The track's own line while previewing over the song.** Recommended: leave it playing (no interference), with a tooltip that suggests M. Alternative: a "replace" option that silences the track's line during the preview.
-3. **Preview level.** Recommended: the track's level, no new control. Alternative: a small level knob next to the button.
-4. **Start point while the song plays.** Recommended: the next bar. Alternative: the next 4-bar phrase, which sounds more musical but waits up to 4 bars.
-5. **Tracks without a preset menu (code, texture).** Recommended: later, in a follow-up. Alternative: a preview button in the creation row for every track type.
+The owner approved the change and answered the open questions:
+
+1. **Delete** goes in "Pattern del brano". Yes.
+2. **The track's own line while previewing over the song** keeps playing, with a tooltip that suggests M. Yes.
+3. **Preview level.** The track's level, no control of its own. Yes. The owner added the icon rule of D10.
+4. **Start point while the song plays.** The next bar. Yes.
+5. **Tracks without a preset menu (code, texture).** Later, in a follow-up.
+6. **Row names.** "Pattern del brano" and "Crea pattern". Yes.
+7. **Bar counter label.** "bar" in every language (already decided, D7).

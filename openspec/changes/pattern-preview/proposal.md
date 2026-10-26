@@ -8,11 +8,12 @@ The owner also asked (ss6) for the current bar and the total bars in the player 
 
 ## What Changes
 
-- **Pattern preview in Compose.** A play and stop button next to the listen button by the preset (or groove) menu of a track. It plays the pattern selected in the track panel in a loop, with the track's sound and settings and the harmony of the selected section.
+- **Pattern preview in Compose.** A headphones and stop button next to the listen button by the preset (or groove) menu of a track. It plays the pattern selected in the track panel in a loop, with the track's sound and settings and the harmony of the selected section.
   - It never changes what the player bar plays, shows or controls: the bar's title, position, play, pause and stop stay with the song.
   - While the song plays, the preview starts at the song's next bar, follows the song's tempo, and lines up with the song's bars.
   - While the song is stopped, the preview plays alone at the selected section's tempo.
   - One preview at a time. It follows edits of the pattern from the next bar. It stops with its own button, when another song opens, or when the user leaves Compose.
+- **Icons.** The play triangle keeps meaning "this becomes what the main player plays". Every preview, now in Compose and later elsewhere (for example the radio console), uses the headphones icon. The button that opens the pattern in the Patterns tab, which used the headphones, gets a lab flask (design D10).
 - **Two named rows of patterns in the track panel.** The row that today reads "Pattern" is split in two:
   - The track's patterns, renamed **"Pattern del brano" / "Song patterns"**.
   - The creation tools (New, Save as pattern, Compose a part, number, Energy, Keep rhythm, Keep notes), under **"Crea pattern" / "Make patterns"**.
