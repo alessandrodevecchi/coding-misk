@@ -6,15 +6,54 @@
 // Target (D5): in= at most 1.2, out= below 1.0. Load: no evaluation error, no audio underrun.
 // Usage: PORT=5183 PLAYWRIGHT_CORE=... node tools/check-arrangement-levels.cjs [style,style…] [--minutes 2] [--seed s] [--plain]
 // (--plain: no additions, the same song as the director wrote it: a baseline of the load)
+// --scenario: the owner's listening test of radio-arrangement (task 7.3) instead: two arps, three pads, two kicks, a locked
+// bass, a riser into the next change, a saved bassline as a new track and Part harmony on the pad; then every phrase up
+// to the outro: the added tracks still play (a break may take one out), no evaluation error, the output below clipping
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const { CLIP, tapOutput, outputPeak, limiterInput } = require('./output-peak.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const args = process.argv.slice(2), opt = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 const styles = (args.find(a => !a.startsWith('--') && args[args.indexOf(a) - 1] !== '--minutes' && args[args.indexOf(a) - 1] !== '--seed') || 'berlin-techno,darksynth,jazz').split(',');
-const minutes = Number(opt('--minutes') || 0), seed = opt('--seed') || 'arr-levels', plain = args.includes('--plain');
+const minutes = Number(opt('--minutes') || 0), seed = opt('--seed') || 'arr-levels', plain = args.includes('--plain'), scenario = args.includes('--scenario');
 const PORT = process.env.PORT || 5173;
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
+
+async function runScenario(page, style) {
+  const bass = { id: 'p-scenario', name: 'Bassline', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: { wave: 'sawtooth', gain: 0.7 }, context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 128, mode: 'minor' }, styles: [], source: 'compose', created: '2026-10-26' };
+  await page.evaluate(([st, b]) => { localStorage.clear(); localStorage.setItem('coding-misk-patterns', JSON.stringify([b])); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: [st], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); }, [style, bass]);
+  await page.reload(); await sleep(3500);
+  await tapOutput(page);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.fill('#radio-seed', `${seed}-scenario`); await page.click('#radio-start'); await sleep(2500);
+  const cmds = [['more', 'arp'], ['more', 'arp'], ['more', 'pad'], ['more', 'pad'], ['more', 'pad'], ['more', 'kick'], ['more', 'kick'], ['lock-part', 'bass']].map(([kind, part]) => ({ kind, part }));
+  for (const c of cmds) { await page.evaluate(c => globalThis.codingMiskRadio.command(c), c); await sleep(150); }
+  await page.evaluate(() => globalThis.codingMiskRadio.command({ kind: 'riser', bars: 'auto', dir: 'up', sound: 'noise' })); await sleep(150);
+  if ((await page.getAttribute('#sp-toggle', 'aria-expanded')) !== 'true') { await page.click('#sp-toggle'); await sleep(300); }
+  await page.click('#radio-steer [data-sp-new="p-scenario"]').catch(() => {}); await sleep(300);
+  await page.evaluate(() => globalThis.codingMiskRadio.command({ kind: 'voicing', type: 'pad', target: 'auto', treatment: 'auto' })); await sleep(300);
+  const s0 = await page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return { added: s.plan.added, risers: s.plan.risers, at: Math.min(...s.commands.map(c => c.at)), phrase: s.plan.phrase, roles: s.plan.roles, bars: s.plan.bars, kinds: s.commands.map(c => c.kind) }; });
+  console.log(`${style}: ${s0.kinds.join(', ')}; added ${s0.added.map(a => a.id).join(', ')}; riser ${JSON.stringify(s0.risers[0] || null)}`);
+  check(s0.added.length >= 8, `${style}: the additions are on the song`, `${s0.added.length}`);
+  let end = s0.roles.length; while (end > 0 && s0.roles[end - 1] === 'outro') end--;
+  const stop = Math.min(end * 2 * s0.phrase, s0.bars - s0.phrase);
+  let out = 0, pre = 0;
+  const missing = [];
+  for (let b = s0.at; b < stop; b += s0.phrase) {
+    await page.evaluate(x => globalThis.codingMiskRadio.seek(x), b + 0.5); await sleep(2200);
+    await outputPeak(page); await limiterInput(page); await sleep(1500);
+    out = Math.max(out, await outputPeak(page)); pre = Math.max(pre, await limiterInput(page));
+    const r = await page.evaluate(async b => { const { stateAt } = await import('/src/song/build.js'), s = globalThis.codingMiskRadio.steering; return { on: stateAt(s.song, b).song.tracks.filter(t => !t.mute).map(t => t.id), err: String(document.querySelector('strudel-editor').editor.repl.state.evalError || '') }; }, b + 0.5);
+    const role = s0.roles[Math.floor(b / (2 * s0.phrase))];
+    const gone = s0.added.map(a => a.id).filter(id => !r.on.includes(id));
+    console.log(`  bar ${b} (${role}): ${r.on.filter(id => id !== 'voice').join(' ')}${gone.length ? `  silent: ${gone.join(' ')}` : ''}`);
+    if (role !== 'break' && gone.length) missing.push(`${b}: ${gone.join(' ')}`);
+    check(!r.err, `${style}: no evaluation error on bar ${b}`, r.err);
+  }
+  check(!missing.length, `${style}: every added track still plays later, breaks aside`, missing.join(' | '));
+  console.log(`  levels: out=${out.toFixed(2)} in=${pre.toFixed(2)}`);
+  check(out < CLIP, `${style}: output below clipping`, out.toFixed(2));
+}
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
@@ -22,6 +61,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(`http://localhost:${PORT}/`); await sleep(2500);
+  if (scenario) { await runScenario(page, styles[0]); check(!errors.length, 'no page errors', errors.slice(0, 2).join(' | ')); await browser.close(); console.log(failed ? `${failed} check(s) failed` : 'the listening scenario passed'); process.exit(failed ? 1 : 0); }
   for (const style of styles) {
     await page.evaluate(st => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: [st], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); }, style);
     await page.reload(); await sleep(3500);

@@ -1347,9 +1347,9 @@ const CHECKS = {
   },
   'docs: ENDLESS.md has a check for every rule'() {
     const doc = fs.readFileSync(new URL('../docs/ENDLESS.md', import.meta.url), 'utf8');
-    const listed = [...doc.matchAll(/`((?:director|determinism|radio|artists|transitions|steering): [^`]+)`/g)].map(m => m[1]);
+    const listed = [...doc.matchAll(/`((?:director|determinism|radio|artists|transitions|steering|arrangement): [^`]+)`/g)].map(m => m[1]);
     for (const n of listed) assert(CHECKS[n], `docs/ENDLESS.md names a check that does not exist: ${n}`);
-    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists|transitions|steering):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
+    for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists|transitions|steering|arrangement):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
   },
 };
 

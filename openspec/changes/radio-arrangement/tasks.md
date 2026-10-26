@@ -61,6 +61,6 @@ Total about 9 to 10 days. Phases 3 and 5 depend on 1; 4 depends on 1 and 2; 6 de
 
 ## 7. Docs, Guide and listening test
 
-- [ ] 7.1 Guide cards for the per-instrument buttons and locks, the Riser row, Add a saved pattern, the target and Part harmony, the Song harmony menu, scope and lock together, English and Italian in `src/guide.js`; verify `npm run check:guide`
-- [ ] 7.2 `docs/ENDLESS.md` Steering table, `docs/knowledge/radio-commands.md` and `decisions.md` (per-part key rejected, per-instrument caps rejected for warnings, riser as a row and not an instrument, scope and lock as two separate controls); `npm run knowledge` and `npm run check:knowledge`; `DEVLOG.md` in Italian
-- [ ] 7.3 Owner's listening test: a session with two arps, three pads, two kicks, a locked bass, a riser into a drop, a saved bassline and Part harmony on the pad; check that an added instrument is still there a few seconds later; notes in `DEVLOG.md`
+- [x] 7.1 Guide cards for the per-instrument buttons and locks, the Riser row, Add a saved pattern, the target and Part harmony, the Song harmony menu, scope and lock together, English and Italian in `src/guide.js`; verify `npm run check:guide`
+- [x] 7.2 `docs/ENDLESS.md` Steering table, `docs/knowledge/radio-commands.md` and `decisions.md` (per-part key rejected, per-instrument caps rejected for warnings, riser as a row and not an instrument, scope and lock as two separate controls); `npm run knowledge` and `npm run check:knowledge`; `DEVLOG.md` in Italian
+- [ ] 7.3 (automated part done: `node tools/check-arrangement-levels.cjs <style> --scenario`; the listening itself is the owner's) Owner's listening test: a session with two arps, three pads, two kicks, a locked bass, a riser into a drop, a saved bassline and Part harmony on the pad; check that an added instrument is still there a few seconds later; notes in `DEVLOG.md`
