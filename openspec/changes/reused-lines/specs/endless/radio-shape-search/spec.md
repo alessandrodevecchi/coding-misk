@@ -1,19 +1,30 @@
 ## Purpose
 
-The growth shape settings of Settings, Advanced on air: the radio grows its Live coder songs with the shapes tried and the try-all choice the owner set, never later than the song is needed, and the same way again when a session is replayed or exported.
+The growth shape settings of Settings, Advanced on air: the radio grows its Live coder songs with the shapes tried, the try-all choice and the shape order the owner set, never later than the song is needed, and the same way again when a session is replayed or exported.
 
 ## ADDED Requirements
 
 ### Requirement: The radio follows the shape settings
-A Live coder song grown on air SHALL use the settings "Growth shapes tried" (4 to 32, default 8) and "Try all growth shapes" with its "Keep" choice, as a Compose growth does. With the default values the radio SHALL grow every song exactly as before. The hints of these settings, in English and Italian, SHALL say that they apply to Compose and to the radio. Song cards and the Node checks SHALL keep using the defaults.
+A Live coder song grown on air SHALL use the settings "Growth shapes tried" (4 to 32, default 8) and "Try all growth shapes" with its "Keep" choice, and "Random order" (default on), as a Compose growth does. With the default values the radio SHALL grow every song exactly as before, each song with its own seeded shape order. Song cards and the Node checks SHALL keep using the defaults.
 
 #### Scenario: Default unchanged
 - **WHEN** a radio session plays with the default settings
 - **THEN** every song grows as before and the radio fixtures do not move
 
+#### Scenario: Fixed order on air
+- **WHEN** "Random order" is off when a session starts
+- **THEN** the session's Live coder songs try their shapes in the fixed order, as a Compose growth with the same setting
+
 #### Scenario: Try all on air
 - **WHEN** "Try all growth shapes" is on with "Best one" and the growth is ready in time
 - **THEN** the next Live coder song on air is the growth that measured every candidate shape
+
+### Requirement: Long song from stays Compose only
+"Long song from" SHALL keep its default (15 minutes) on air for now. The hints of the shape settings, in English and Italian, SHALL say whether each applies to Compose only or to the radio too.
+
+#### Scenario: Long song threshold changed
+- **WHEN** "Long song from" is set to 30 minutes and a radio session starts
+- **THEN** the radio's songs grow with the 15-minute threshold, and the hint says the radio keeps 15
 
 ### Requirement: Settings recorded with the session
 The radio SHALL read the shape settings when a session starts and store the values that differ from the defaults in the session's recipe. A session recorded without them SHALL grow with the defaults. Changing the settings SHALL apply to sessions started after the change.
