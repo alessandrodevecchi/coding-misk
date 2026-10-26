@@ -9,7 +9,7 @@ import { songFiles } from './songs-dir.mjs';
 import { loadStyles } from './styles-dir.mjs';
 import { validateSong } from '../src/song/validate.js';
 import { compileSong } from '../src/song/compile.js';
-import { normalizeSong } from '../src/song/format.js';
+import { normalizeSong, VOICE_DEFAULT, VOICE_CHARACTERS, VOICE_LIMITS, VOICE_STYLES as SOUND_STYLES, VOICE_STYLE_IDS, VOICE_SOUND_KEYS, styleOf } from '../src/song/format.js';
 import { buildSteps, stateAt, deriveBuild, voiceCode, SPEAKERS, saySlug, sayText } from '../src/song/build.js';
 import { growOnAir } from '../src/endless/growth.js';
 import { placeSpoken, spokenBars, setSpokenContext, spokenContext, speakerOf, narratorSpeaker, lineOf, enteringTrack, WAYS } from '../src/song/spoken.js';
@@ -493,6 +493,20 @@ const CHECKS = {
       }
     }
     assert(n >= 4, `${n} grown songs with a voice instrument`);
+  },
+  'voice styles (voice-full-controls D3): each character on the default voice is its style, every style inside the voice limits, a hand edit is Custom'() {
+    for (const [id, ch] of Object.entries(VOICE_CHARACTERS)) {
+      const v = { ...VOICE_DEFAULT, ...ch };
+      assert(SOUND_STYLES[id], `no style for the character ${id}`);
+      for (const k of VOICE_SOUND_KEYS) assert(v[k] === SOUND_STYLES[id][k], `${id}.${k}: character ${v[k]}, style ${SOUND_STYLES[id][k]}`);
+      assert(styleOf(v) === id, `styleOf(${id}) is ${styleOf(v)}`);
+    }
+    for (const id of VOICE_STYLE_IDS) for (const [k, [lo, hi]] of Object.entries(VOICE_LIMITS)) assert(SOUND_STYLES[id][k] >= lo && SOUND_STYLES[id][k] <= hi, `${id}.${k} ${SOUND_STYLES[id][k]} outside ${lo}-${hi}`);
+    assert(VOICE_STYLE_IDS.length === 10 && VOICE_STYLE_IDS.includes('distant') && VOICE_STYLE_IDS.includes('clear'), 'ten styles with clear and distant');
+    assert(styleOf(VOICE_DEFAULT) === 'clear', 'the default voice is Clear');
+    const radio = { ...VOICE_DEFAULT, ...SOUND_STYLES.radio, speaker: 'shelley', gain: 0.5 };
+    assert(styleOf(radio) === 'radio', 'speaker and volume do not change the style');
+    assert(styleOf({ ...radio, room: 0.5 }) === 'custom', 'a hand edit makes the style Custom');
   },
 };
 

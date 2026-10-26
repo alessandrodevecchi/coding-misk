@@ -4,10 +4,10 @@ import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys } from './song/build.js';
+import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank } from './song/build.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
-import { setSpokenContext, spokenContext, placeSpoken, WAYS } from './song/spoken.js';
+import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORDS } from './song/spoken.js';
 import { airCode } from './live/air-code.js';
 import { growOnAir, airControls } from './endless/growth.js';
 import { controlsProfile, customControls } from './endless/profile.js';
@@ -28,7 +28,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const stamp = (o, fresh = false) => { if (fresh || !o.created) o.created = today(); if (fresh || !o.appVersion) o.appVersion = APP_VERSION; return o; };
 import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
-import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, fromScenes, clipState } from './song/format.js';
+import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, VOICE_STYLES, styleOf, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { createStylesTab } from './library/styles-tab.js';
@@ -51,6 +51,8 @@ import { joinSession } from './endless/join.js';
 import { createSession, stylesNear } from './endless/director.js';
 import { cleanVoice, voiceOption, presetOf as voicePresetOf } from './endless/voice-options.js';
 import { voicePanel, voiceEvent } from './endless/voice-panel.js';
+import { voiceSoundHtml, syncVoiceSound, soundEvent } from './endless/voice-sound.js';
+import { phraseRows, listVocab, editText, editBars, editWay, removeRow, addRow, fillRows, freeParts, FILL_GROUPS } from './endless/phrase-list.js';
 import { rewriteSpoken, trackVoice } from './endless/voice-track.js';
 import { styleId, stylePush } from './endless/recipe.js';
 import { loadLimiter, setMasterLevel } from './sounds/limiter.js';
@@ -78,7 +80,7 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING, FLASK, STOP } from './icons.js';
+import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING, FLASK, STOP, POWER } from './icons.js';
 import { createPreview, previewOrbit } from './player/preview.js';
 import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS, KIND_TYPE, loopSong } from './library/patterns.js';
@@ -1680,13 +1682,19 @@ function renderArranger() {
   // the Voices group (voice-placement): always shown; a narrator control that cannot apply is disabled and says why:
   // the song does not build live, Narrated growth outside Crescendo, the narrator off (profile-options)
   const narOff = C.narrator === false, why = !on ? 'narratorNeedsLive' : null;
+  // (voice-full-controls D15: the narrator on is a switch in the title row of its block; off greys the block)
   $('#live-narrator').setAttribute('aria-pressed', C.narrator !== false);
-  $('#live-narrator').disabled = !on; $('#live-narrator').title = t(why || 'liveNarratorHint');
+  $('#live-narrator .vs-txt').textContent = t(C.narrator !== false ? 'switchOn' : 'switchOff');
+  $('#live-narrator').disabled = !on; $('#live-narrator').title = why ? t(why) : t('voiceSwitchTip', { voice: t('narratorLbl') });
+  $('#live-narrator-row').classList.toggle('off', !on || narOff);
+  const nt = voiceOf(T);
+  $('#live-narrator-sub').textContent = nt ? `${t('narratorLbl')} · ${trackLabel(nt)}` : t('narratorLbl');
   $('#live-narrator-style').value = C.narratorStyle || 'auto'; $('#live-narrator-style').disabled = !on || narOff;
   $('#live-narrator-style').title = t(why || (narOff ? 'narratorStyleOff' : 'narratorStyleHint'));
   $('#live-narrated').hidden = false; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
   $('#live-narrated').disabled = !crescendo || narOff; $('#live-narrated').title = t(why || (!crescendo ? 'narratedNeedsCrescendo' : narOff ? 'liveNarratedOff' : 'liveNarratedHint'));
   renderSongVoice();
+  renderNarratorParts(why ? t(why) : narOff ? t('voiceOffTip', { voice: t('narratorLbl') }) : '');
   // the live build options: a panel under the "Live build" button; with the Live build off it keeps the code options
   // (comments, technical functions, title, lit notes, line breaks: profile-options) under the title "Code"
   lt.setAttribute('aria-expanded', on);
@@ -2191,13 +2199,225 @@ $('#live-vinst-next-body').addEventListener('change', e => artistVoiceEvent(e.ta
 // panel of the voice instrument track, both drawn from the track (its voiceOptions, else what it has). A change
 // rewrites the track's lines and clips (rewriteSpoken), with Undo in the toast; a song without one can add one.
 const songSpoken = () => T.tracks.find(x => x.type === 'spoken') || null;
-function vinstSongHtml() {
-  const sp = songSpoken();
-  if (!sp) return `<span class="lbl voices-sub">${esc(t('vinstLbl'))}</span><p class="hint muted small">${esc(t('vinstNone'))}</p><button class="btn small" data-vinst-add title="${esc(t('vinstAddHint'))}">${esc(t('vinstAdd'))}</button>`;
-  const ti = T.tracks.indexOf(sp);
-  return `<span class="lbl voices-sub">${esc(t('vinstLbl'))} · ${esc(trackLabel(sp))}</span><p class="hint muted small">${esc(t('vinstSongHint2'))} <button class="plain link" data-vinst-open="${ti}">${esc(t('vinstOpenTrack'))}</button></p>${voicePanel(trackVoice(sp), { t, esc, mode: 'track', track: sp.id })}`;
+// The two voice blocks of the Voices group (voice-full-controls). Each part is drawn once and then only brought up to
+// date while its signature (the track, the language, the off reason) stays the same, so a control being dragged keeps
+// its drag; folded parts remember whether they were open (in this browser).
+const VOICE_FOLDS = 'coding-misk-voice-folds';
+const foldOpen = id => !!(store.get(VOICE_FOLDS, {}) || {})[id];
+document.addEventListener('toggle', e => {
+  const d = e.target; if (!d || !d.dataset || !d.dataset.vfold) return;
+  const f = store.get(VOICE_FOLDS, {}) || {};
+  if (d.open) f[d.dataset.vfold] = true; else delete f[d.dataset.vfold];
+  store.set(VOICE_FOLDS, f);
+}, true);
+function drawPart(box, sig, html, sync = null) {
+  if (!box) return;
+  if (box.dataset.sig === sig) { if (sync) sync(box); return; }
+  box.dataset.sig = sig; box.innerHTML = html();
 }
-function renderSongVoice() { const box = $('#live-vinst'); if (box) box.innerHTML = vinstSongHtml(); }
+const narratorSettings = () => ({ ...VOICE_DEFAULT, ...((voiceOf(T) || {}).settings || {}) });
+// the narrator block's folded parts: its Sound (the narrator track's settings, the default sound without one) and the
+// list of its lines in the build that plays
+function renderNarratorParts(off) {
+  const box = $('#live-narrator-parts'); if (!box) return;
+  const tr = voiceOf(T), v = narratorSettings();
+  drawPart(box, `parts:${getLang()}`, () => '<div class="vb-sound"></div><div class="vb-nlines"></div>');
+  drawPart(box.querySelector('.vb-sound'), JSON.stringify([getLang(), off, tr ? tr.id : '']), () => voiceSoundHtml({ voice: 'narrator', settings: v, t, esc, off, open: foldOpen('compose-narrator-sound') }),
+    b => syncVoiceSound(b, { voice: 'narrator', settings: v, t, off }));
+  const el = box.querySelector('.vb-nlines'), html = narratorLinesHtml(off);
+  if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; }
+}
+// The narrator's lines (voice-full-controls, spec "Phrase list of the narrator"): the step lines of the build that
+// plays, by bar. A song with its own written steps (Classic or Live build) edits them in place; lines a build makes
+// (derived, Crescendo, Live coder) are read-only and say so.
+function narratorLines() {
+  const b = compiled && compiled.build, lv = liveOf(T), grows = lv.on && lv.style === 'crescendo';
+  const own = hasBuild(T) && !grows;
+  const steps = b && !compiled.pending ? buildSteps(b).filter(x => x.say) : [];
+  return { steps, own, grows, on: !!b };
+}
+function narratorLinesHtml(off) {
+  const { steps, own, grows, on } = narratorLines(), lang = getLang(), dis = off ? ' disabled' : '';
+  const why = !on ? t('narratorNeedsLive') : own ? t('nlOwn') : t(grows ? 'nlGrown' : 'nlDerived');
+  const rows = steps.map(x => `<div class="pl-row nl-row" data-nl-step="${x.i}"><div class="pl-bar"><span class="pl-said">${esc(t('liveMark', { n: x.at + 1 }))}</span></div>
+      <div class="pl-text">${own ? `<input type="text" data-nl-text maxlength="80" autocomplete="off" spellcheck="false" value="${esc(sayText(x.say, lang))}" aria-label="${esc(t('plText'))}"${dis}>` : `<span>${esc(sayText(x.say, lang))}</span>`}</div></div>`).join('');
+  const open = foldOpen('compose-narrator-lines');
+  return `<details class="voice-part" data-vfold="compose-narrator-lines"${open ? ' open' : ''}><summary><span class="lbl">${esc(t('nlTitle'))}</span> <span class="vs-sum">${esc(`${steps.length} · ${own ? t('nlOwnShort') : t('nlReadOnly')}`)}</span></summary>
+    <p class="hint muted small">${esc(why)}</p><div class="pl nl">${rows}</div></details>`;
+}
+$('#live-voices').addEventListener('change', e => {
+  const i = e.target.closest('[data-nl-step]'); if (!i || !e.target.matches('[data-nl-text]')) return;
+  const st = (T.build || [])[+i.dataset.nlStep], v = e.target.value.trim(), lang = getLang();
+  if (!st || !v) return;
+  const before = JSON.parse(JSON.stringify(T.build));
+  st.say = typeof st.say === 'object' && st.say ? { ...st.say, [lang]: v } : lang === 'en' || !st.say ? (lang === 'en' ? v : { [lang]: v }) : { en: st.say, [lang]: v };
+  changed(); askSamples();
+  toast(t('plTextChanged'), { label: t('vinstUndo'), run: () => { T.build = before; changed(); } });
+});
+function vinstSongHtml(sp, off) {
+  const ti = T.tracks.indexOf(sp);
+  return `<p class="hint muted small">${esc(t('vinstSongHint2'))} <button class="plain link" data-vinst-open="${ti}">${esc(t('vinstOpenTrack'))}</button></p>${voicePanel(trackVoice(sp), { t, esc, mode: 'track', track: sp.id, only: 'main', off })}`;
+}
+// the Voce: traccia block: title row with its switch (the track's mute), presets, the folded Phrases and Sound parts
+function renderSongVoice() {
+  const box = $('#live-vinst'); if (!box) return;
+  const sp = songSpoken();
+  if (!sp) {
+    box.classList.remove('off');
+    drawPart(box, `none:${getLang()}`, () => `<div class="vb-head"><span class="lbl voices-sub">${esc(t('vinstLbl'))}</span></div><p class="hint muted small">${esc(t('vinstNone'))}</p><button class="btn small" data-vinst-add title="${esc(t('vinstAddHint'))}">${esc(t('vinstAdd'))}</button>`);
+    return;
+  }
+  const muted = !!sp.mute, off = muted ? t('voiceOffTip', { voice: t('vinstLbl') }) : '';
+  box.classList.toggle('off', muted);
+  drawPart(box, `track:${sp.id}:${getLang()}`, () => `<div class="vb-head"></div><div class="vb-main"></div><div class="vb-parts"><div class="vb-phrases"></div><div class="vb-sound"></div></div>`);
+  const head = `<span class="lbl voices-sub">${esc(t('vinstLbl'))} · ${esc(trackLabel(sp))}</span><button class="vswitch" data-vinst-switch aria-pressed="${!muted}" title="${esc(t('voiceSwitchTip', { voice: t('vinstLbl') }))}"><span class="vs-lamp" aria-hidden="true"></span>${POWER}<span class="vs-txt">${esc(t(muted ? 'switchOff' : 'switchOn'))}</span></button>`;
+  const set = (sel, html) => { const el = box.querySelector(sel); if (el && el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; } };
+  set('.vb-head', head);
+  set('.vb-main', vinstSongHtml(sp, off));
+  set('.vb-phrases', phrasesPartHtml(sp, off));
+  const v = { ...VOICE_DEFAULT, ...(sp.settings || {}) };
+  drawPart(box.querySelector('.vb-sound'), JSON.stringify([sp.id, getLang(), off]), () => voiceSoundHtml({ voice: 'spoken', settings: v, t, esc, off, open: foldOpen('compose-spoken-sound') }),
+    b => syncVoiceSound(b, { voice: 'spoken', settings: v, t, off }));
+}
+// the Phrases part of the Voce: traccia block: the phrase list and the phrase options (phrases per song, kind, ways, where)
+function phrasesPartHtml(sp, off) {
+  const open = foldOpen('compose-spoken-phrases');
+  return `<details class="voice-part" data-vfold="compose-spoken-phrases"${open ? ' open' : ''}><summary><span class="lbl">${esc(t('vinstPhrasesPart'))}</span> <span class="vs-sum">${esc(phrasesSummary(sp))}</span></summary>
+    ${phraseListHtml(sp, off)}${voicePanel(trackVoice(sp), { t, esc, mode: 'track', track: sp.id, only: 'options', off })}</details>`;
+}
+// The phrase list (voice-full-controls D5, D6, D16): one row per clip of the voice track, sorted by bar, in the Voices
+// group and in the track's panel, from the same rows. Bars are shown as heard in the build that plays (Crescendo and
+// Live coder grow G bars first); a Live coder growth still on its way shows the written bars with the growing mark.
+function heardBuild() {
+  const lv = liveOf(T), grows = lv.on && lv.style === 'crescendo';
+  if (!grows) return { G: 0, song: null, growing: false };
+  if (compiled.pending) return { G: 0, song: null, growing: true };
+  const b = compiled.build, G = b && b.crescendo ? b.crescendo.growth || 0 : 0;
+  return { G, song: G > 0 ? b : null, growing: false };
+}
+// whether a line has its sample on this machine: ok, on its way (asked to the voice helper), or none
+function sampleState(sp, texts) {
+  const files = spokenContext.files, lang = getLang();
+  if (files === null) return 'ok';
+  const bank = sayBank(lang, speakerOf(T, sp));
+  const ok = x => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
+  if (texts.every(ok)) return 'ok';
+  return texts.some(x => sampleAsked.has(`${bank}/${saySlug(x)}`)) ? 'wait' : 'none';
+}
+const sampleAsked = new Set();
+// the samples of new and edited lines, asked to the dev server's voice helper (voice-full-controls D8): task 6.2
+function askSamples() {}
+const trashBtn = label => `<button class="mini pl-del" data-pl-del aria-label="${esc(label)}" title="${esc(label)}">${BIN}</button>`;
+function phraseListHtml(sp, off) {
+  const h = heardBuild(), lang = getLang(), dis = off ? ' disabled' : '';
+  let rows = [];
+  try { rows = phraseRows(T, sp.id, { heard: h.song ? { song: h.song, G: h.G } : null, lang }); } catch (e) { rows = []; }
+  const fill = listVocab(rows), barsTxt = list => { const runs = []; for (const b of list.map(x => x + 1)) { const r = runs[runs.length - 1]; if (r && r[1] === b - 1) r[1] = b; else runs.push([b, b]); } return runs.map(([a, z]) => (z > a + 1 ? `${a}–${z}` : z > a ? `${a}, ${z}` : `${a}`)).join(', '); };
+  const way = (r) => `<select data-pl-way data-no-knob aria-label="${esc(t('spokenWay'))}"${dis}>${WAYS.map(w => `<option value="${w}"${w === r.way ? ' selected' : ''}>${esc(t(`way:${w}`))}</option>`).join('')}</select>`;
+  const src = r => [r.source === 'vocab' ? t('plFromVocab', { g: t(`vocab:${r.group}`) }) : r.source === 'own' ? t('plOwn') : t('plFromStyle'), r.shared > 1 ? t('plShared', { n: r.shared }) : '', r.toTranslate ? t('plToTranslate') : ''].filter(Boolean).join(' · ');
+  const sample = r => { const st = sampleState(sp, r.texts); return `<span class="pl-sample ${st}" title="${esc(t(`plSampleTip:${st}`))}">${esc(t(`plSample:${st}`))}</span>`; };
+  const heardTxt = r => (r.heard ? t('plHeard', { bars: barsTxt(r.heard.said.length ? r.heard.said : [r.heard.start]), w: r.start + 1 }) : r.said.length ? barsTxt(r.said) : t('plSilent'));
+  const body = rows.map(r => `<div class="pl-row" data-pl-row="${r.raw}">
+      <div class="pl-bar"><input type="number" min="1" step="1" data-pl-start value="${(r.heard ? r.heard.start : r.start) + 1}" aria-label="${esc(t('plBar'))}"${dis}><span class="pl-said">${esc(heardTxt(r))}${h.growing ? ` <span class="pl-growing" title="${esc(t('plGrowingTip'))}">${GROWING}</span>` : ''}</span></div>
+      <div class="pl-len"><input type="number" min="1" step="1" data-pl-bars value="${r.bars}" aria-label="${esc(t('plBars'))}"${dis}></div>
+      <div class="pl-way">${way(r)}</div>
+      <div class="pl-text"><input type="text" data-pl-text maxlength="120" autocomplete="off" spellcheck="false" value="${esc(r.texts.join(' · '))}" placeholder="${esc(t('plTextPh', { n: MAX_WORDS }))}" aria-label="${esc(t('plText'))}"${dis}><span class="pl-src">${esc(src(r))}</span></div>
+      <div class="pl-voice">${sample(r)}</div>
+      <div class="pl-end">${off ? '' : trashBtn(t('plRemove'))}</div></div>`).join('');
+  const free = freeParts(T, sp.id).length > 0;
+  const head = `<div class="pl-head"><label class="ctrl pl-fill" title="${esc(t('plFillHint'))}"><span class="lbl">${esc(t('vinstFillLbl'))}</span><select data-pl-fill data-no-knob${dis}><option value=""${fill === '' ? ' selected' : ''}>—</option>${fill === 'mixed' ? `<option value="mixed" selected disabled>${esc(t('plMixed'))}</option>` : ''}${FILL_GROUPS.map(g => `<option value="${g}"${fill === g ? ' selected' : ''}>${esc(t(`vocab:${g}`))}</option>`).join('')}</select></label><p class="hint muted small">${esc(t(h.G ? 'plHintGrown' : 'plHint', { g: h.G + 1 }))}</p></div>`;
+  const cols = `<div class="pl-row pl-cols" aria-hidden="true"><span>${esc(t(h.G ? 'plBarHeard' : 'plBar'))}</span><span>${esc(t('plBars'))}</span><span>${esc(t('spokenWay'))}</span><span>${esc(t('plText'))}</span><span>${esc(t('plVoice'))}</span><span></span></div>`;
+  const empty = rows.length ? '' : `<p class="hint muted small pl-empty">${esc(t('plEmpty'))}</p>`;
+  const add = `<div class="pl-add"><button class="btn small" data-pl-add title="${esc(free ? t('plAddHint') : t('plNoPart'))}"${off || !free ? ' disabled' : ''}>${esc(t('plAdd'))}</button><span class="hint muted small">${esc(free ? t('plAddWhere') : t('plNoPart'))}</span></div>`;
+  return `<div class="pl" data-pl-track="${esc(sp.id)}">${head}${rows.length ? cols : ''}${body}${empty}${add}</div>`;
+}
+// one edit of the phrase list: the new song's tracks in place of the old ones, with Undo in the toast
+function phraseEdit(next, msg) {
+  if (!next) return;
+  const before = JSON.parse(JSON.stringify(T.tracks));
+  T.tracks = next.tracks;
+  editPat = null; selClip = null;
+  changed(); renderTrackPanel();
+  askSamples();
+  toast(msg, { label: t('vinstUndo'), run: () => { T.tracks = before; tk = Math.min(tk, T.tracks.length - 1); editPat = null; selClip = null; changed(); renderTrackPanel(); } });
+}
+const styleWaysOf = () => { const r = RECIPES.filter(x => ((T.tags && T.tags.styles) || []).includes(x.id) && x.spoken && x.spoken.ways); const w = {}; for (const x of r) for (const [k, v] of Object.entries(x.spoken.ways)) if (v > 0) w[k] = (w[k] || 0) + v; return Object.keys(w).sort((a, b) => w[b] - w[a]); };
+function phraseListEvent(e) {
+  const box = e.target.closest('[data-pl-track]'); if (!box) return false;
+  const id = box.dataset.plTrack, rowEl = e.target.closest('[data-pl-row]'), raw = rowEl ? +rowEl.dataset.plRow : -1, el = e.target, h = heardBuild();
+  if (e.type === 'click') {
+    if (el.closest('[data-pl-del]')) { phraseEdit(removeRow(T, id, raw), t('plRemoved')); return true; }
+    if (el.closest('[data-pl-add]')) {
+      const g = box.querySelector('[data-pl-fill]').value, r = addRow(T, id, { group: FILL_GROUPS.includes(g) ? g : null, styleWays: styleWaysOf() });
+      if (r.error) { toast(t('plNoPart')); return true; }
+      phraseEdit(r.song, t('plAdded', { n: r.start + h.G + 1 }));
+      // (the new row's text cell, focused)
+      setTimeout(() => { const i = document.querySelector(`#live-vinst [data-pl-row="${r.raw}"] [data-pl-text]`); if (i) { if (!FILL_GROUPS.includes(g)) i.value = ''; i.focus(); } }, 50);
+      return true;
+    }
+    return false;
+  }
+  if (e.type !== 'change') return false;
+  if (el.matches('[data-pl-fill]')) {
+    const r = fillRows(T, id, el.value, { styleWays: styleWaysOf() });
+    if (r.error || !r.filled) { toast(t('plNoPart')); renderSongVoice(); return true; }
+    phraseEdit(r.song, t('plFilled', { n: r.filled, g: t(`vocab:${el.value}`) })); return true;
+  }
+  if (el.matches('[data-pl-way]')) { phraseEdit(editWay(T, id, raw, el.value), t('plWayChanged')); return true; }
+  if (el.matches('[data-pl-text]')) {
+    const r = editText(T, id, raw, getLang(), el.value);
+    if (r.error) { toast(r.error === 'words' ? t('plTooMany', { n: r.n, max: MAX_WORDS }) : t('plEmptyText')); forceVoices(); return true; }
+    const tr = T.tracks.find(x => x.id === id), c = tr && tr.clips[raw], n = c ? tr.clips.filter(x => x.pattern === c.pattern).length : 1;
+    phraseEdit(r.song, n > 1 ? t('plTextShared', { n }) : t('plTextChanged')); return true;
+  }
+  if (el.matches('[data-pl-start]') || el.matches('[data-pl-bars]')) {
+    const v = Math.round(+el.value);
+    const r = el.matches('[data-pl-start]') ? editBars(T, id, raw, { start: v - 1, G: h.G }) : editBars(T, id, raw, { bars: v, G: h.G });
+    if (r.error) { toast(r.error === 'growth' ? t('plInGrowth', { n: r.first + 1 }) : r.error === 'overlap' ? t('plOverlap', { n: r.at + 1 }) : t('plBadBar')); forceVoices(); return true; }
+    phraseEdit(r.song, t('plMoved')); return true;
+  }
+  return false;
+}
+// the lists drawn again from the song (an edit refused: the old values come back)
+function forceVoices() { $$('[data-pl-track]').forEach(b => { const p = b.closest('.vb-phrases'); if (p) p.dataset.html = ''; }); renderSongVoice(); renderTrackPanel(); }
+for (const host of ['#live-voices', '#track-panel']) for (const type of ['click', 'change']) $(host).addEventListener(type, e => { if (phraseListEvent(e)) e.stopPropagation(); }, true);
+const phrasesSummary = sp => [String((sp.clips || []).length), ...trackVoice(sp).where.map(w => t(`vinstWhere:${w}`))].join(' · ');
+// One value per control (voice-full-controls D1): every place that shows a voice's sound writes its track's settings
+// here. A song without a narrator track gets one, named Narrator, on the first edit (D2), with Undo.
+const NARRATOR_NAME = 'Narrator';
+function newNarratorTrack() {
+  const ids = new Set(T.tracks.map(x => x.id));
+  let id = 'narrator', k = 2;
+  while (ids.has(id)) id = `narrator-${k++}`;
+  return { id, name: NARRATOR_NAME, type: 'voice', settings: { ...VOICE_DEFAULT }, patterns: {}, clips: [] };
+}
+function setVoiceSetting(voice, patch, { undo = false } = {}) {
+  let tr = voice === 'narrator' ? voiceOf(T) : songSpoken();
+  if (!tr && voice !== 'narrator') return;
+  const before = JSON.parse(JSON.stringify(T.tracks)), added = !tr;
+  if (!tr) { tr = newNarratorTrack(); T.tracks.push(tr); }
+  tr.settings = { ...VOICE_DEFAULT, ...(tr.settings || {}) };
+  for (const [k, v] of Object.entries(patch)) setSetting(k, v, tr);
+  changed();
+  if (added) renderTrackPanel(); else syncTrackPanel();
+  const back = () => { T.tracks = before; tk = Math.min(tk, T.tracks.length - 1); editPat = null; selClip = null; changed(); renderTrackPanel(); };
+  if (added) toast(t('narratorAdded'), { label: t('vinstUndo'), run: back });
+  else if (undo) toast(t('voiceStyleSet', { style: t(`voiceStyle:${styleOf(tr.settings)}`) }), { label: t('vinstUndo'), run: back });
+}
+// the Voce: traccia switch: the track's mute (the timeline's and the track panel's), with Undo
+function switchSongVoice() {
+  const sp = songSpoken(); if (!sp) return;
+  sp.mute = !sp.mute || undefined;
+  changed(); renderTrackPanel();
+  toast(t(sp.mute ? 'voiceTrackMuted' : 'voiceTrackOn'), { label: t('vinstUndo'), run: () => { const x = songSpoken(); if (x) { x.mute = !x.mute || undefined; changed(); renderTrackPanel(); } } });
+}
+for (const [type, fn] of [['input', e => e.target.type === 'range'], ['change', e => e.target.tagName === 'SELECT']]) {
+  $('#live-voices').addEventListener(type, e => {
+    if (!fn(e)) return;
+    const ev = soundEvent(e.target);
+    if (ev) setVoiceSetting(ev.voice, ev.patch, { undo: !!ev.style });
+  });
+}
 function applySongVoice(id, raw) {
   const before = { tracks: JSON.parse(JSON.stringify(T.tracks)), build: T.build === undefined ? undefined : JSON.parse(JSON.stringify(T.build)) };
   const r = rewriteSpoken(T, id, raw, { recipes: RECIPES });
@@ -2211,6 +2431,7 @@ function applySongVoice(id, raw) {
 }
 function songVoiceEvent(el) {
   const box = el.closest('[data-vinst-track]'), add = el.closest('[data-vinst-add]'), open = el.closest('[data-vinst-open]');
+  if (el.closest('[data-vinst-switch]')) return switchSongVoice();
   if (add) return applySongVoice(null, { phrases: '1', kind: 'different' });
   if (open) { panelView = 'one'; store.set('coding-misk-panel', panelView); selectTrack(+open.dataset.vinstOpen); $('#track-panel').scrollIntoView({ block: 'nearest' }); return; }
   if (!box) return;
@@ -2222,7 +2443,7 @@ function songVoiceEvent(el) {
   if (v) applySongVoice(tr.id, { ...v, draw: cur.draw });
 }
 for (const host of ['#live-vinst', '#track-panel']) {
-  $(host).addEventListener('click', e => { const b = e.target.closest('button'); if (b && (b.closest('[data-vinst-track]') || b.dataset.vinstAdd !== undefined || b.dataset.vinstOpen !== undefined)) songVoiceEvent(b); });
+  $(host).addEventListener('click', e => { const b = e.target.closest('button'); if (b && (b.closest('[data-vinst-track]') || b.dataset.vinstAdd !== undefined || b.dataset.vinstOpen !== undefined || b.dataset.vinstSwitch !== undefined)) songVoiceEvent(b); });
   $(host).addEventListener('change', e => { if (e.target.dataset.vinst && e.target.closest('[data-vinst-track]')) songVoiceEvent(e.target); });
 }
 // a new live build song by an artist (#35): written by the director, opened unsaved
@@ -2377,6 +2598,9 @@ function settingHtml([type, key, label, o]) {
   const end = opt.ramp ? `<div class="end" data-end-for="${key}" hidden><div class="row"><label class="lbl" for="${id}End">${esc(t('endOf', { name: t(label) }))}</label><output id="${id}End-o"></output></div>${slider(id + 'End', key + 'End')}</div>` : '';
   return `<div class="ctrl" data-ctl="${key}"><div class="row"><label class="lbl" for="${id}">${t(label)}</label>${pin}${ramp}<output id="${id}-o"></output></div>${slider(id, key)}${end}</div>`;
 }
+// the voice style picker of a voice track's panel (voice-full-controls D3): the same list as the Voices group, the
+// style the settings match, else Custom
+const vstyleHtml = () => `<div class="ctrl" data-ctl="vstyle"><label class="lbl">${esc(t('voiceStyleLbl'))}</label><select data-vstyle data-no-knob>${[...Object.keys(VOICE_STYLES), 'custom'].map(s => `<option value="${s}"${s === 'custom' ? ' disabled' : ''}>${esc(t(`voiceStyle:${s}`))}</option>`).join('')}</select></div>`;
 // note per gradi: una griglia passi × gradi (basso e arpeggio: note dell'accordo 0-3, hook: gradi della scala 0-7)
 const noteCols = (tr, pat) => { const n = meterSteps(secFull().meter); return tr.type === 'hook' || (tr.type === 'arp' && pat.speed === '8') ? n / 2 : n; };
 const noteRows = tr => tr.type === 'hook' ? [7, 6, 5, 4, 3, 2, 1, 0] : [3, 2, 1, 0];
@@ -2671,7 +2895,7 @@ function panelHtml(ti) {
     <div class="tp-editor">${editor}</div>
     <div class="tp-scope"${tr.type === 'voice' ? ' hidden' : ''}><span class="lbl">${t('settingsScope')}</span>
       <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}" ${focusClip(tr) ? '' : 'disabled'}>${esc(arrMode === 'timeline' && selClip !== null ? t('scopeClip') : t('scopeSection', { name: SEC().name }))}</button></div></div>
-    <div class="ctrls">${(CONTROLS[tr.type] || []).map(settingHtml).join('')}</div>
+    <div class="ctrls">${tr.type === 'voice' || tr.type === 'spoken' ? vstyleHtml() : ''}${(CONTROLS[tr.type] || []).map(settingHtml).join('')}</div>
     <div class="tp-rack"><div class="row"><span class="lbl">Rack</span><span class="hint">${t('rackHint')}</span></div>
       <div class="rack-list">${(tr.rack || []).map((d, i) => deviceHtml(d, i, tr)).join('') || `<p class="note">${t('noDevices')}</p>`}</div>
       <div class="rack-add"><select id="rk-type" aria-label="${esc(t('addDevice'))}">${['note', 'sound'].map(kind => `<optgroup label="${esc(t(kind === 'note' ? 'devNote' : 'devSound'))}">${Object.entries(DEVICES).filter(([, d]) => d.kind === kind).map(([k, d]) => `<option value="${k}">${esc(tx(d.label))}</option>`).join('')}</optgroup>`).join('')}</select><button class="btn" id="rk-add">${t('addDevice')}</button></div>
@@ -2690,7 +2914,7 @@ function spokenEditor(tr, key, pat) {
   const way = WAYS.includes(pat.way) ? pat.way : 'passage';
   // the voice instrument of this track (voice-placement): the same controls as the Voices group; a change rewrites the
   // track's lines and clips
-  return `<div class="tp-vinst"><span class="lbl">${esc(t('vinstLbl'))}</span><p class="hint muted small">${esc(t('vinstSongHint2'))}</p>${voicePanel(trackVoice(tr), { t, esc, mode: 'track', track: tr.id })}</div>
+  return `<div class="tp-vinst"><span class="lbl">${esc(t('vinstLbl'))}</span><p class="hint muted small">${esc(t('vinstSongHint2'))}</p>${voicePanel(trackVoice(tr), { t, esc, mode: 'track', track: tr.id })}${phraseListHtml(tr, '')}</div>
     <p class="note">${esc(t('spokenHint'))}</p>
     <div class="sp-grid">
       ${sel('sp-way', t('spokenWay'), WAYS.map(w => [w, t(`way:${w}`)]), way)}
@@ -2729,6 +2953,7 @@ function syncPanel(host) {
     const o = host.querySelector('#' + i.id + '-o');
     if (o && i.type === 'range') o.textContent = i.dataset.cut ? (v >= 18000 ? '∞' : `${v} Hz`) : i.dataset.fmt === 'num' ? String(v) : `${Math.round(v * 100)}%`;
   });
+  all('[data-vstyle]').forEach(x => { if (!active(x)) x.value = styleOf(e); });
   all('[data-set-ramp]').forEach(b => { const on = e[b.dataset.setRamp + 'End'] != null; b.setAttribute('aria-pressed', on); const end = host.querySelector(`[data-end-for="${b.dataset.setRamp}"]`); if (end) end.hidden = !on; });
   // values the live build steps change: a pin shows whether the track's own value is fixed against them
   const sk = compiled.build ? stepKeys(compiled.build, tr.id) : {};
@@ -2766,7 +2991,8 @@ function syncPanel(host) {
 // scrive un'impostazione: per tutta la traccia, o solo per il clip della sezione selezionata
 function setSetting(k, v, tr = curTrack()) {
   const c = focusClip(tr);
-  if (scope === 'section' && c) { c.set = { ...(c.set || {}), [k]: v }; return; }
+  // (a voice's sound is one value, its track's settings: never a clip's, voice-full-controls D1)
+  if (scope === 'section' && c && tr.type !== 'voice' && tr.type !== 'spoken') { c.set = { ...(c.set || {}), [k]: v }; return; }
   tr.settings[k] = v;
   if (c && c.set) { delete c.set[k]; if (!Object.keys(c.set).length) delete c.set; }
   // a value the live build steps would change: changing it fixes it, so it wins over the steps until unpinned
@@ -2800,6 +3026,8 @@ $('#track-panel').addEventListener('change', e => {
   if (!hostTrack(e)) return;
   const tr = curTrack(), r = role(e.target);
   if (e.target.matches('select[data-set]')) { setSetting(e.target.dataset.set, e.target.value); changed(); syncTrackPanel(); return; }
+  // a voice style (voice-full-controls D3): its seven values at once, speaker and volume kept
+  if (e.target.matches('select[data-vstyle]')) { const st = VOICE_STYLES[e.target.value]; if (st) { for (const [k, v] of Object.entries(st)) setSetting(k, v, tr); changed(); syncTrackPanel(); } return; }
   if ((r === 'clip-start' || r === 'clip-bars') && selClip !== null && tr.clips[selClip]) {
     const c = tr.clips[selClip], sp = spanOf(tr, c);
     const start = r === 'clip-start' ? Math.round(+e.target.value) - 1 : sp.s, bars = r === 'clip-bars' ? Math.round(+e.target.value) : sp.e - sp.s;

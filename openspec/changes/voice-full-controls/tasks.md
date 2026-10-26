@@ -1,6 +1,6 @@
 ## 1. Voice styles and sound model
 
-- [ ] 1.1 `VOICE_STYLES` (D3) and `styleOf` in `src/song/format.js`; `check:spoken` case: each character on `VOICE_DEFAULT` equals its style, every style inside `VOICE_LIMITS`, `styleOf` gives Custom after a hand edit
+- [x] 1.1 `VOICE_STYLES` (D3) and `styleOf` in `src/song/format.js`; `check:spoken` case: each character on `VOICE_DEFAULT` equals its style, every style inside `VOICE_LIMITS`, `styleOf` gives Custom after a hand edit
 - [ ] 1.2 `setVoiceSetting(trackId, patch)` in `src/main.js`: one song edit, re-render of the Voices group and the open track panel; narrator track added on the first edit of a song without one (D2), with Undo; verify in `tools/check-voices.cjs` (group to panel, panel to group, Undo, open Sound adds nothing)
 
 ## 2. Compose Voices group

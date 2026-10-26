@@ -49,6 +49,29 @@ export const VOICE_CHARACTERS = {
 };
 // how far a voice knob may go (still understandable: the volume is applied after the effects)
 export const VOICE_LIMITS = { pitch: [0.45, 1.5], tempo: [0.5, 1.15], drive: [0, 5.5], hpf: [0, 1600], cutoff: [1800, 18000], room: [0, 0.98], delay: [0, 0.7] };
+// Voice styles (voice-full-controls D3): full sets of the seven sound keys, one list for both voices. A style never
+// changes the speaker or the volume. Each is VOICE_DEFAULT with the character of the same name on top (plus
+// "distant"), so a style and a drawn character with the same name sound the same (check:spoken asserts it).
+export const VOICE_SOUND_KEYS = ['pitch', 'tempo', 'cutoff', 'hpf', 'drive', 'room', 'delay'];
+export const VOICE_STYLES = {
+  clear: { pitch: 1, tempo: 1, cutoff: 18000, hpf: 0, drive: 0, room: 0.2, delay: 0 },
+  radio: { pitch: 1, tempo: 1, cutoff: 3200, hpf: 900, drive: 1.2, room: 0.15, delay: 0 },
+  distant: { pitch: 0.95, tempo: 0.9, cutoff: 4500, hpf: 300, drive: 0, room: 0.8, delay: 0.3 },
+  robot: { pitch: 0.7, tempo: 1, cutoff: 18000, hpf: 400, drive: 3.5, room: 0.2, delay: 0.1 },
+  deep: { pitch: 0.55, tempo: 0.75, cutoff: 6000, hpf: 0, drive: 0, room: 0.4, delay: 0 },
+  bright: { pitch: 1.35, tempo: 1, cutoff: 18000, hpf: 500, drive: 0, room: 0.35, delay: 0 },
+  cathedral: { pitch: 1, tempo: 0.7, cutoff: 9000, hpf: 0, drive: 0, room: 0.95, delay: 0.25 },
+  echo: { pitch: 1, tempo: 1, cutoff: 18000, hpf: 0, drive: 0, room: 0.5, delay: 0.6 },
+  dirty: { pitch: 0.8, tempo: 1, cutoff: 18000, hpf: 700, drive: 4.5, room: 0.2, delay: 0 },
+  slow: { pitch: 0.85, tempo: 0.55, cutoff: 18000, hpf: 0, drive: 0, room: 0.6, delay: 0 },
+};
+export const VOICE_STYLE_IDS = Object.keys(VOICE_STYLES);
+// the style whose seven values match the settings (to 0.01; the filter to 1 Hz), else "custom"
+export function styleOf(settings) {
+  const v = { ...VOICE_DEFAULT, ...(settings || {}) };
+  const near = (k, a, b) => Math.abs(+a - +b) <= (k === 'cutoff' || k === 'hpf' ? 1 : 0.01);
+  return VOICE_STYLE_IDS.find(id => VOICE_SOUND_KEYS.every(k => near(k, v[k], VOICE_STYLES[id][k]))) || 'custom';
+}
 const STATE_KEY = { guitar: { preset: 'pattern' } };
 const stateKey = (type, k) => (STATE_KEY[type] && STATE_KEY[type][k]) || k;
 const skip = new Set(['on', 'rows']);
