@@ -1261,3 +1261,13 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - Radio: gruppo Voci solo per i prossimi brani (variante B), due blocchi impilati; Console con il gruppo Voce (narratore: Parla di più/meno; traccia: preset, stile, Applica, che seguono "Vale per questo brano" / "tutta la diretta") e "Aggiungi frase" (Dilla ora, Al momento giusto).
 - Etichette "Voce: narratore" / "Voce: traccia", scheda Guida "Due voci", nelle frasi in inglese "voice track".
 - Mockup in italiano iniettati nell'app vera: `notes/prove-2026-10-26/voci-spec/` (5 immagini). `openspec validate voice-full-controls` ok (solo avvisi sulla lunghezza dei requisiti, come voice-placement).
+
+## 2026-10-26: spec delle voci, risposte del proprietario (#82, voice-full-controls)
+
+- Risposte 82-1..82-5 e 81-1, 81-2 registrate nel design: niente voce del browser per le frasi della console, niente stile nella riga del narratore della console, crescita tutta poetica e frasi del narratore modificabili più avanti, etichette inglesi "Voice: narrator" / "Voice: track".
+- D14: ogni stile ha una probabilità di voce traccia (0.3 i tre di oggi, 0.15, 0.1, 0.05, country 0), solo sul flusso casuale della voce: la musica non cambia, le fixture endless dei 17 stili si muovono solo sulle tracce di voce, con `DIRECTOR_VERSION` alzato. "Quanto spesso" nella radio ha "Sempre": ogni brano ha la voce traccia, qualunque stile, complessità, profilo o artista; un preset non sostituisce Sempre né Mai. Il narratore resta con la sua manopola.
+- D15: interruttore acceso/spento nel titolo di ogni blocco delle Voci. Spento: blocco grigio, valori tenuti, riacceso torna uguale. Componi: narratore = "Accesa" del brano, voce traccia = muto della traccia; radio: due opzioni nuove `voices.narrator` e `voices.track`, con ogni profilo.
+- D16: "Riempi con" (vocabolari Scuro, Calmo, Macchina, Notte) riempie l'elenco delle frasi, modificabili; "+ Aggiungi frase" sotto l'elenco e un cestino disegnato per riga. D17: fader orizzontali nel tema hardware per le parti Suono (nella colonna della radio circa 250 px invece di 460 con le manopole).
+- Domande aperte: togliere "Mai" visto l'interruttore (consigliato sì), pesi degli stili, interruttore del narratore fuori dal profilo Personalizzato (consigliato sì), preset e Sempre.
+- Mockup iniettati nell'app vera, in italiano: `notes/prove-2026-10-26/voci-spec-2/` (5 immagini). `openspec validate voice-full-controls` ok (solo avvisi sulla lunghezza dei requisiti).
+

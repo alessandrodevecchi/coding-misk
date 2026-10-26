@@ -64,7 +64,7 @@ A Vite plugin (`configureServer`, dev only, like the samples manifest) answers `
 - **Local helper (D8).** Real samples, played by Strudel like every other line: same sound chain, recorded, exported, replayable. Needs the dev server on macOS (or another local generator). Latency: one `say` + ffmpeg run per line, expected around one to two seconds for a short line on the owner's machine (not measured yet: task 6.2 measures it).
 - **Pre-generated words.** Joining vocabulary word samples: works offline in a build, but only for known words, and the joins sound choppy. Rejected as the main path.
 
-Decision: the helper is the path for both "Say now" and "At the right moment"; without it the field is disabled with the reason. Say now therefore means "the first bar after the sample is ready", which the console shows. A `speechSynthesis` preview is left as an open question for the owner, off by default.
+Decision: the helper is the path for both "Say now" and "At the right moment"; without it the field is disabled with the reason. Say now therefore means "the first bar after the sample is ready", which the console shows. The owner confirmed that the browser voice is not used for console lines (no `speechSynthesis` preview).
 
 ### D10. Console commands
 - `voice-sound { voice: 'narrator' | 'spoken', settings }`: a `set` step on that track at the next phrase (`applyBar`). `spokenCode` is changed to read each line's settings from the state at its bar (today it reads the track's settings once), so a `set` on a spoken track takes effect from its bar; the narrator already reads the state at its step.
@@ -81,6 +81,52 @@ Two blocks stacked (the radio's settings column is about 400 px wide; the mockup
 ### D13. Labels
 Applied from `notes/etichette-voci-v2.md` (scheme A, choices 1A and 2A) with the owner's two changes: the Guide card is "Due voci" / "Two voices" (choice 3B), and the English sentence form of the voice instrument is "voice track" (not "track voice"). The new key for block titles in Library (`voiceTitle`) separates them from the track type key. `tools/check-voices.cjs` and `check:guide` follow the new strings.
 
+### D14. A voice track chance in every style, and "Sempre"
+Today only ambient, dark-cyberpunk and pure-trance have a `spoken` block (weight 0.3); the other 17 styles never get a voice track in the radio. Every style gets a `spoken` block with its own weight, a vocabulary group and its ways; a style may keep weight 0. Proposed weights (the owner tunes them after listening):
+
+| Weight | Styles | Vocabulary | Ways |
+| --- | --- | --- | --- |
+| 0.3 (unchanged) | ambient, dark-cyberpunk, pure-trance | as today | as today |
+| 0.15 | darksynth, dreamy-cyberpunk, synthwave, lo-fi, industrial | night (dreamy-cyberpunk, synthwave, lo-fi), dark (darksynth, industrial) | opening, refrain, chop |
+| 0.1 | berlin-techno, acid, trance, gated-trance, progressive-house, house, drum-and-bass, phonk | machine (berlin-techno, acid, trance, gated-trance, drum-and-bass), night (house, progressive-house), dark (phonk) | refrain, chop |
+| 0.05 | jazz, classic-rock, melodic-metal | night (jazz, classic-rock), dark (melodic-metal) | opening, passage |
+| 0 | country | none | none |
+
+A style without its own lines takes vocabulary lines; without speakers it draws any speaker that is not the narrator's (as `SPOKEN_FALLBACK` does today). The draw stays on the voice instrument's own random stream, so the music of every song is unchanged; only the songs of the 17 styles that now draw a voice track gain a Words track. The endless fixtures of those styles move: `DIRECTOR_VERSION` goes up in the same commit, and the check compares the fixtures with the voice tracks left out, which must not move.
+
+**How often** in the radio gains a fourth value, "Sempre" (`presence: 'always'`, already used by a single new song): every next song gets a voice track, whatever the style's weight (a weight 0 style uses the fallback), the complexity, the profile or the artist. The menu reads Mai, Come dice lo stile, Spesso, Sempre. The radio no longer turns a saved `always` into `often` (`radio.js` 88). Picking a phrase preset sets How often only when it is Come dice lo stile or Spesso, so a preset never replaces Sempre or Mai. Sempre is a voice track option only: the narrator's amount is the "Voce: narratore" knob (talk), and at 1 it already comments almost every change.
+
+### D15. Quick on and off per voice
+Each voice block of the Voices group has an on/off switch in its title row (a drawn switch with a lamp in the hardware theme). Off silences that voice and greys its block, like the Custom-only controls today (disabled, `opacity` lowered, tooltip "Accendi Voce: … per cambiarla"); every value under it is kept, and on brings back exactly what was there. The switch is the only control that stays active. Each switch is one existing or new variable, never a copy:
+
+| Place | Voce: narratore | Voce: traccia |
+| --- | --- | --- |
+| Compose | the song's narrator on (`ctl.narrator`, today's "Accesa" chip, moved into the title row) | the voice track's mute (`track.mute`, the same mute as the timeline and the track panel) |
+| Radio | `opts.voices.narrator` (new, default on) | `opts.voices.track` (new, default on) |
+
+Interaction with the amounts:
+- **Narrator knob (talk) in the radio.** Off keeps the knob's value, its die and its compilation range, greyed; the director draws as if the narrator were on, and the narrator only stays silent (same as `ctl.narrator === false` today), so turning it on again does not change the songs' music. Talk at 0 stays a valid "silent" value, but the switch is the quick way.
+- **How often and the preset in the radio.** Off is not `presence: 'never'`: How often keeps Spesso or Sempre, greyed, and the next songs get no voice track. The voice track draw still runs on its stream, so turning it on again gives the same songs a session would have had.
+- **Compose voice track.** Off mutes the track: phrases, bars, sound and the phrase list stay, greyed; the code keeps the track muted as the timeline mute does today. With no voice track the switch is not shown; "Aggiungi Voce: traccia" is.
+- **Profiles.** The radio narrator switch leaves the Custom profile: it works with every profile. Built-in profiles never turn the narrator off, so nothing changes for them; a Custom profile saved with the narrator off reads as the switch off. Narrator style and Narrated growth keep the Custom-only rule.
+- **Console.** The switches are for the next songs; the song on air keeps its voices. With "Tutta la diretta", Apply on Voce: traccia writes its values but does not turn the switch on; the console says the voice track is off for the next songs.
+
+Recommendation: these mappings, because each switch reuses the value that already means "silent" where one exists (narrator on, track mute) and keeps the amounts untouched, so off then on is lossless.
+
+### D16. Vocabularies fill the phrase list
+The phrase list (D5) gets, above the rows, a "Riempi con" select listing the vocabularies (Scuro, Calmo, Macchina, Notte; the poetic group is the narrator's and is not listed). A vocabulary is a quick-fill preset, not a mode: picking one is one song edit with Undo that gives each row an entry of that vocabulary not used yet (as vocabulary text, so both languages and the existing samples come with it); bars and ways stay. On an empty list it adds as many rows as Frasi per brano asks, placed by Where. The rows show the entries in the same editable text cells; editing a cell makes that line an own text. The select then shows the vocabulary all rows come from, "misto" when they mix, "—" when none.
+
+Under the list, "+ Aggiungi frase" adds a row: a new clip at the next free part allowed by Where after the last row (else the first free one), with the first allowed way, the text cell empty and focused (or the next unused entry of the vocabulary shown in the select). A row's way becomes a small select. Each row ends with a drawn trash icon button ("Togli la frase") that removes that clip in one song edit with Undo; a pattern no clip plays any more goes with it. Removing the last row keeps the track, empty, with a hint pointing to "+ Aggiungi frase" and "Riempi con". The narrator list has neither (its lines come from the steps). The console's "Aggiungi frase" stays the live line of the song on air; the list's "+ Aggiungi frase" edits the song in Compose.
+
+In the radio Phrases part (next songs) the same "Riempi con" select picks the vocabulary the next songs draw from (`opts.voice.vocab`, default "come lo stile"); the radio has no editable list.
+
+### D17. Faders in the hardware theme
+The hardware theme turns every range input into a knob. A range input may opt into a fader with `data-fader="h"` or `data-fader="v"`: `hardware.js` draws a slot with a cap and a value LED and drives the hidden input exactly as the knob does (same keyboard, same events); outside the hardware theme it is the usual slider. Used where knobs cost height:
+- **Sound parts** of both voices, in the Compose Voices group and in the radio Voices group: horizontal faders, one per row (label, fader, value), two columns in Compose, one in the radio column. In the radio column (about 400 px) the eight knobs take about 460 px of height, the eight faders about 250 px (mockup `notes/prove-2026-10-26/voci-spec-2/`, images 4 and 5).
+- **The phrase list** has no ranges and stays as it is.
+- **Knobs stay** for the narrator knob (with its die, lock and compilation range), the track panel and every other control.
+- **Vertical faders**: not used in this change; they fit a later voice mixer in the console (volume of the two voices side by side).
+
 ## Risks / Trade-offs
 
 - [A line in a busy part can be masked by the music] → quiet stays first and default; `check-spoken-play.cjs` measures the voice peak in a busy part; the owner listens. A later "voice lift" option is out of scope.
@@ -89,16 +135,29 @@ Applied from `notes/etichette-voci-v2.md` (scheme A, choices 1A and 2A) with the
 - [Editing a line, then New phrases, loses the edit] → the toast's Undo, and the row edit marks the track options as Custom.
 - [Renaming built-in narrator tracks moves code snapshots] → `npm run snapshot:code` in the same commit, levels unchanged.
 - [`spokenCode` reading settings per bar could change generated code] → only when a `set` targets a spoken track, which no built-in song or fixture has; `check:code` and `check:endless` must not move.
+- [A voice track chance in every style moves the endless fixtures of 17 styles] → only on the voice track's own stream: the check compares the fixtures without voice tracks (unchanged) and `DIRECTOR_VERSION` goes up, so saved radio sessions warn they may sound different.
+- [Mai and the switch off mean the same for the voice track] → Open Question 1.
 
 ## Migration Plan
 
-No stored data changes shape. Missing `narratorSound`, `voice.sound` and `where` read as `auto` and quiet only. Songs gain a narrator track only on an edit. Built-in narrator tracks renamed in one commit with the code snapshots.
+No stored data changes shape. Missing `narratorSound`, `voice.sound` and `where` read as `auto` and quiet only. Songs gain a narrator track only on an edit. Built-in narrator tracks renamed in one commit with the code snapshots. Missing `opts.voices` reads as both voices on; a Custom profile saved with the narrator off reads as the radio narrator switch off. A saved `voice.presence: 'always'` in the radio stays Sempre. Missing `opts.voice.vocab` reads as "come lo stile".
+
+## Owner answers (2026-10-26)
+
+- 82-1: the browser voice is not used for console lines (D9).
+- 82-2: no voice style in the console narrator row for now.
+- 82-3: a fully poetic Narrated growth comes later, after listening to D11.
+- 82-4: narrator lines of builds made by the app stay read-only for now.
+- 82-5: English labels "Voice: narrator" and "Voice: track" (D13).
+- 81-1, 81-2 (from `#81`): confirmed as recommended there.
+- 81-3: every style has a voice track chance, some very low or zero, and How often gains Sempre (D14); quick on/off per voice (D15).
+- Vocabularies fill the phrase list, with "+ Aggiungi frase" and a trash button per row (D16); HW faders where they save height (D17).
 
 ## Open Questions
 
 Each has the option the specs assume:
 
-1. **System speech preview for typed lines** without the helper: recommended no (not recorded, not in the mix); alternative: an opt-in "anteprima di sistema" clearly marked as not recorded.
-2. **Voice style in the console narrator row**: recommended no for now, as the owner described the row; alternative: the same style picker as the voice instrument row.
-3. **Fully poetic Narrated growth** as a third style: recommended later, after listening to D11.
-4. **Narrator lines of derived builds** editable through per-song overrides: recommended later; this change lists them read-only.
+1. **Mai next to the voice track switch.** The switch off and How often Mai both silence the voice track. Recommended: drop Mai from the menu and read a saved Mai as the switch off, so one control means "silent"; the specs keep Mai, as the owner listed it, until the owner chooses.
+2. **Style weights** (D14 table): recommended as proposed, tuned after a listening session; country at 0.
+3. **Radio narrator switch outside the Custom profile** (D15): recommended yes, so the quick switch works with every profile; alternative: keep it Custom-only, disabled with the reason.
+4. **Sempre and presets**: recommended that a preset never replaces Sempre or Mai; alternative: presets always set How often, as today.

@@ -5,11 +5,11 @@ The names of the two voices in the interface: one scheme with the keyword "Voce"
 ## ADDED Requirements
 
 ### Requirement: Voice labels
-Every label that names one of the two voices (titles, subtitles, switches, track types, knobs, curves, console groups and buttons, Library blocks, Guide titles) SHALL use "Voce: narratore" / "Voice: narrator" for the narrator (track type `voice`) and "Voce: traccia" / "Voice: track" for the voice instrument (track type `spoken`). Inside sentences the texts SHALL say "voce narratore" / "narrator voice" and "voce traccia" / "voice track"; "il narratore" / "the narrator" SHALL stay where the narrator is the one who speaks. The narrator switch under the "Voce: narratore" subtitle SHALL read "Accesa" / "On". Labels SHALL keep the full form in narrow places (knob, curve, console). Every label SHALL come from the interface strings, in both languages.
+Every label that names one of the two voices (titles, subtitles, switches, track types, knobs, curves, console groups and buttons, Library blocks, Guide titles) SHALL use "Voce: narratore" / "Voice: narrator" for the narrator (track type `voice`) and "Voce: traccia" / "Voice: track" for the voice instrument (track type `spoken`). Inside sentences the texts SHALL say "voce narratore" / "narrator voice" and "voce traccia" / "voice track"; "il narratore" / "the narrator" SHALL stay where the narrator is the one who speaks. The on/off switch in the title row of each voice block SHALL read "Accesa" / "On" or "Spenta" / "Off", and its tooltip SHALL name the voice ("Accendi o spegni Voce: narratore"). Labels SHALL keep the full form in narrow places (knob, curve, console). Every label SHALL come from the interface strings, in both languages.
 
 #### Scenario: Compose Voices group
 - **WHEN** the owner opens the Compose Voices group in Italian
-- **THEN** the subtitles read "Voce: narratore" and "Voce: traccia", the narrator switch reads "Accesa", and the add button reads "Aggiungi Voce: traccia"
+- **THEN** the subtitles read "Voce: narratore" and "Voce: traccia", each with its switch reading "Accesa", and the add button reads "Aggiungi Voce: traccia"
 
 #### Scenario: Track types
 - **WHEN** the owner adds a track in English

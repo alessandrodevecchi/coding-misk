@@ -32,8 +32,16 @@
 - [ ] 6.1 Extract `makeSample` from `tools/voice.mjs`; `npm run voices -- --song <file>`; same output as before for `songs/` (file list compared)
 - [ ] 6.2 Dev-only voice helper plugin in `vite.config.js` (`/voice/status`, `/voice/say`, queue, argument passing, 12-word limit); the app asks for missing samples of edited and typed lines and reloads that bank; measure the time per line and check no page reload; result in the DEVLOG
 
-## 7. Labels, Guide, docs
+## 7. Owner answers of 2026-10-26
 
-- [ ] 7.1 Strings from `notes/etichette-voci-v2.md` with "Due voci" and "voice track" (D13) in `src/i18n.js`, new `voiceTitle` key for Library blocks; `check:guide`
-- [ ] 7.2 Guide cards "Due voci" and "Voce: traccia", console card (Voice group, Aggiungi frase); knowledge notes `voice.md`, `narrator.md`, `radio.md`, `radio-commands.md`, `profiles.md`, `glossary.md`, `decisions.md`; `npm run knowledge` and `npm run check:knowledge`
-- [ ] 7.3 DEVLOG entry in Italian, CHANGELOG under Unreleased; full checks: `check:spoken`, `check:endless`, `check:code`, `check:songs`, `check:radio-profiles`, `check-voices.cjs`, `check-radio.cjs`, `check-steering.cjs`, build
+- [ ] 7.1 A `spoken` block in every style recipe (D14 table), `check:styles`; the director keeps the voice track on its own stream: `check:endless` fixtures compared without voice tracks unchanged, then `--write-fixtures` with `DIRECTOR_VERSION` raised; `check:radio-profiles`; `npm run voices` covers any new speaker and vocabulary pair
+- [ ] 7.2 Sempre in the radio How often (`RADIO_PRESENCE`, no `always` to `often` on load, presets keep Sempre and Mai); `check:spoken` cases (weight 0 style, complexity 0, artist) and `check-voices.cjs`
+- [ ] 7.3 On/off switch per voice block (D15): Compose narrator on and track mute, radio `opts.voices`, greyed blocks with kept values, Custom profile migration; `check-voices.cjs` cases (off then on restores, same music with the narrator off, mute in the timeline)
+- [ ] 7.4 "Riempi con", "+ Aggiungi frase", way select and trash button in the phrase list (D16); radio `opts.voice.vocab`; `check-voices.cjs` cases (fill, edit after fill, add at the next free part, remove, last row, Undo)
+- [ ] 7.5 `data-fader="h|v"` in `src/hardware.js` and the hardware theme styles (D17), used by the Sound parts; `tools/test-hardware-theme.cjs` case (drag, keyboard, value in sync with the track panel knob)
+
+## 8. Labels, Guide, docs
+
+- [ ] 8.1 Strings from `notes/etichette-voci-v2.md` with "Due voci" and "voice track" (D13) in `src/i18n.js`, new `voiceTitle` key for Library blocks; `check:guide`
+- [ ] 8.2 Guide cards "Due voci" and "Voce: traccia" (switches, Sempre, Riempi con, + Aggiungi frase), console card (Voice group, Aggiungi frase); knowledge notes `voice.md`, `narrator.md`, `radio.md`, `radio-commands.md`, `profiles.md`, `glossary.md`, `decisions.md`; `npm run knowledge` and `npm run check:knowledge`
+- [ ] 8.3 DEVLOG entry in Italian, CHANGELOG under Unreleased; full checks: `check:spoken`, `check:endless`, `check:code`, `check:songs`, `check:radio-profiles`, `check-voices.cjs`, `check-radio.cjs`, `check-steering.cjs`, build

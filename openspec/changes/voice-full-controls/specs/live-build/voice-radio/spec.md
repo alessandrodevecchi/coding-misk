@@ -5,7 +5,7 @@ The voices in the radio: the Voices group as the settings for the next songs, th
 ## ADDED Requirements
 
 ### Requirement: Radio Voices group for the next songs
-The radio Voices group SHALL hold the settings for the next songs only, in two blocks. "Voce: narratore": the main row with the narrator knob (with its die), On, Narrator style and Narrated growth, then a folded Sound part. "Voce: traccia": the main row with How often and Preset, then a folded Phrases part (Phrases per song, Kind of phrases, Ways, Where) and a folded Sound part. Folded parts SHALL be closed by default and SHALL remember whether the owner opened them. The group SHALL have no button that changes the song on air and SHALL say in one short line that the song on air changes from the console. The narrator's On, style and Narrated growth SHALL keep the voice-placement rule: enabled with the Custom profile, otherwise disabled with the reason; the knob and the Sound parts SHALL work with every profile.
+The radio Voices group SHALL hold the settings for the next songs only, in two blocks. "Voce: narratore": the title row with its on/off switch, the main row with the narrator knob (with its die), Narrator style and Narrated growth, then a folded Sound part. "Voce: traccia": the title row with its on/off switch, the main row with How often and Preset, then a folded Phrases part (Phrases per song, Kind of phrases, Ways, Where, and "Riempi con": the vocabulary the next songs draw from, "come lo stile" by default) and a folded Sound part. Folded parts SHALL be closed by default and SHALL remember whether the owner opened them. The group SHALL have no button that changes the song on air and SHALL say in one short line that the song on air changes from the console. The narrator's style and Narrated growth SHALL keep the voice-placement rule: enabled with the Custom profile, otherwise disabled with the reason; the knob and the Sound parts SHALL work with every profile.
 
 #### Scenario: Layout
 - **WHEN** the owner opens the radio
@@ -18,6 +18,32 @@ The radio Voices group SHALL hold the settings for the next songs only, in two b
 #### Scenario: Narrator sound for the next songs
 - **WHEN** the owner picks the Distant style for the narrator in the Voices group
 - **THEN** the next songs' narrator speaks with the Distant settings and the speaker each song draws, and "As the style" brings back the drawn sound
+
+### Requirement: A voice track chance in every style
+Every style recipe SHALL say how likely a song of that style is to have a voice track; a style MAY say 0. The draw SHALL never change the music of a song. Styles with no lines of their own SHALL use vocabulary lines and any speaker that is not the narrator's.
+
+#### Scenario: A style that had none
+- **WHEN** the radio plays many songs of a style with a weight of 0.1 and How often is Come dice lo stile
+- **THEN** about one song in ten has a voice track, and the music of every song is the same as without the voice track
+
+#### Scenario: Zero
+- **WHEN** a style has weight 0 and How often is Spesso
+- **THEN** its songs have no voice track
+
+### Requirement: How often: Sempre
+The radio How often SHALL offer Mai, Come dice lo stile, Spesso and Sempre. Sempre SHALL give every next song a voice track, whatever the style's weight, the complexity, the profile or the artist. A phrase preset SHALL change How often only when it is Come dice lo stile or Spesso. Sempre SHALL apply to the voice track only; the narrator's amount SHALL stay the narrator knob.
+
+#### Scenario: Sempre with a style at zero
+- **WHEN** How often is Sempre and the next song's style has weight 0
+- **THEN** the song has a voice track with vocabulary lines
+
+#### Scenario: Preset keeps Sempre
+- **WHEN** How often is Sempre and the owner picks the Discreto preset
+- **THEN** How often stays Sempre
+
+#### Scenario: Saved Sempre
+- **WHEN** the owner reloads the radio after choosing Sempre
+- **THEN** How often shows Sempre
 
 ### Requirement: Console Voice group
 The console SHALL have a Voice group with two rows. "Voce: narratore": Talk more and Talk less, as today. "Voce: traccia": a phrase preset picker, a voice style picker and an Apply button that sends both to the song on air as one console command, queued, recorded in the session and rebuilt by Replay: the phrases from the next quiet part (as the voice command of voice-placement), the sound from the next phrase. Every control of the group SHALL follow the console scope switch: with "This song only" (the default) it changes the song on air only; with "The whole session" it also writes the same values into the radio Voices group for the next songs, which shows them at once. When the song on air has no voice instrument, Apply SHALL be disabled with the reason, except that with the whole session it still updates the Voices group.
@@ -58,4 +84,4 @@ Radio options and saved sessions from before this change SHALL be read as before
 
 #### Scenario: Old options
 - **WHEN** the browser holds radio options saved before this change
-- **THEN** the Voices group shows them, with As the style for both sounds and quiet parts only
+- **THEN** the Voices group shows them, with As the style for both sounds and quiet parts only, both voice switches on, and the vocabulary as the style says

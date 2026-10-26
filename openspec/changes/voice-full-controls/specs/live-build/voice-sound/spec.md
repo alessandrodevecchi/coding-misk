@@ -48,6 +48,32 @@ A narrator sound control SHALL be disabled, with a tooltip that says why, when t
 - **WHEN** the Live build is off
 - **THEN** the narrator sound controls show their values, disabled, with the tooltip saying the narrator speaks only in a song that builds itself
 
+### Requirement: Quick on and off per voice
+Each voice block of the Voices group, in Compose and in the radio, SHALL have an on/off switch in its title row. Off SHALL silence that voice and grey its block like the Custom-only controls (disabled, with a tooltip that says to turn the voice on); the switch SHALL stay active. Every value under a switched-off voice SHALL be kept, and on SHALL bring back the same values. Each switch SHALL read and write one value: in Compose the song's narrator on (the former "Accesa" chip) and the voice track's mute (the same mute as the timeline and the track panel); in the radio a narrator switch and a voice track switch for the next songs, with every profile. The radio narrator knob, its die and compilation range, How often and the preset SHALL keep their values while off, and the next songs SHALL have the same music as with the voice on. Without a voice track in the open song, Compose SHALL show "Aggiungi Voce: traccia" instead of the switch.
+
+#### Scenario: Radio narrator off and on
+- **WHEN** the narrator knob is at 0.7 and the owner switches Voce: narratore off
+- **THEN** the block is greyed with the knob still at 0.7, the next songs have no narrator lines, and switching it on again gives 0.7 and the narrator back
+
+#### Scenario: Voice track off keeps the frequency
+- **WHEN** How often is Sempre and the owner switches Voce: traccia off
+- **THEN** How often still shows Sempre, greyed, and the next songs have no voice track
+
+#### Scenario: Compose mute
+- **WHEN** the owner switches Voce: traccia off in Compose
+- **THEN** the voice track is muted in the timeline and the track panel, its phrases and sound stay, greyed, and the song on Undo is as before
+
+#### Scenario: Old Custom profile
+- **WHEN** a Custom profile saved with the narrator off is loaded in the radio
+- **THEN** the narrator switch shows off
+
+### Requirement: Faders in the hardware theme
+In the hardware theme the sound controls of the Sound parts, in the Compose and radio Voices groups, SHALL be horizontal faders (one per row: label, fader, value) instead of knobs, driving the same value with the same keyboard as the knob. Outside the hardware theme they SHALL be the usual sliders. The narrator knob, the track panel and the other controls SHALL keep their knobs.
+
+#### Scenario: Hardware theme
+- **WHEN** the owner opens the narrator Sound part in the hardware theme
+- **THEN** the eight sound controls show as horizontal faders, and dragging one changes the same value the track panel knob shows
+
 ### Requirement: Voice styles
 The app SHALL offer one list of voice styles for both voices: Clear, Radio, Distant, Robot, Deep, Bright, Cathedral, Echo, Dirty and Slow. A voice style SHALL set pitch, tempo, filter, low cut, drive, reverb and delay together, within the voice limits, and SHALL NOT change the speaker or the volume. The style picker SHALL show the style whose values match the current settings, else Custom. In the radio the picker SHALL also offer "As the style" for the next songs: each song draws its voice as today.
 

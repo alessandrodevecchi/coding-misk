@@ -49,6 +49,32 @@ Bars SHALL be stored once, as bars of the song as written. In a build that moves
 - **WHEN** in that build the owner types 10
 - **THEN** the row refuses it, says the written song starts at bar 25 in this build, and keeps the old bar
 
+### Requirement: Vocabularies fill the phrase list
+The voice instrument phrase list SHALL have a "Riempi con" select listing the vocabularies (Scuro, Calmo, Macchina, Notte). A vocabulary SHALL be a quick-fill preset: picking one SHALL give each row an entry of that vocabulary not used yet, in both languages, keeping each row's bars and way, as one song edit with Undo; on an empty list it SHALL add as many rows as Frasi per brano asks, placed by Where. The entries SHALL show in the same editable text cells, and editing one SHALL make it an own text. The select SHALL show the vocabulary every row comes from, "misto" when rows mix sources, and "—" when no row comes from a vocabulary.
+
+#### Scenario: Fill
+- **WHEN** the list has three rows at bars 9, 25 and 41 and the owner picks Notte
+- **THEN** the three rows show three different Notte entries at bars 9, 25 and 41, their samples exist, and Undo brings back the old lines
+
+#### Scenario: Edit after fill
+- **WHEN** the owner then changes the text of the row at bar 25
+- **THEN** that line becomes an own text and the select shows "misto"
+
+### Requirement: Add and remove lines in the list
+Under the voice instrument phrase list SHALL be a "+ Aggiungi frase" button that adds a row: a new clip in the next free part allowed by Where after the last row (else the first free one), with the first allowed way, the text cell empty and focused, or the next unused entry of the vocabulary shown in "Riempi con". A row's way SHALL be a select. Every row SHALL end with a drawn trash icon button, "Togli la frase", that removes that clip as one song edit with Undo; a line that no clip plays any more SHALL be removed with it. Removing the last row SHALL keep the track, empty, with a hint pointing to "+ Aggiungi frase" and "Riempi con". When no free part is left the button SHALL be disabled with the reason. The narrator list SHALL have neither control.
+
+#### Scenario: Add
+- **WHEN** the last row is at bar 41, Where allows quiet parts and the next free quiet part starts at bar 57
+- **THEN** "+ Aggiungi frase" adds a row at bar 57 with its text cell focused, and the timeline shows the new clip
+
+#### Scenario: Remove
+- **WHEN** the owner presses the trash button of the row at bar 25
+- **THEN** the clip at bar 25 is gone from the list, the timeline and the code, and Undo brings it back
+
+#### Scenario: Last row
+- **WHEN** the owner removes the only row
+- **THEN** the voice track stays in the song with no clips and the list says how to add a line
+
 ### Requirement: Phrase list of the narrator
 The Voice: narratore block SHALL show a folded list of the narrator's lines of the current build, sorted by bar, with their bar. For a song with its own written steps the text SHALL be editable in place like a voice instrument line (one song edit, Undo). For steps made by the build (derived Live build, Crescendo, Live coder) the list SHALL be read-only and say that those lines come from the build.
 
@@ -69,7 +95,7 @@ The voice instrument options SHALL have a Where option with three flags, quiet p
 
 #### Scenario: Default unchanged
 - **WHEN** a song or a radio session uses the default options
-- **THEN** its phrases sit where they sat before this change, and the director fixtures do not move
+- **THEN** its phrases sit where they sat before this change, and no voice track in the director fixtures moves to another part
 
 ### Requirement: Sample of a new or edited line
 A line SHALL be shown on stage and written in the code as soon as it exists. Its audio SHALL be a sample made by the local voice generator for its text, language and speaker. When a line has no sample and the dev server's voice helper is available, the app SHALL ask for the sample at once and SHALL play the line as soon as the sample exists, without a reload. Until then the line SHALL be silent and its row SHALL say "sample on its way"; without the helper (a built app, another system) the row SHALL say how to make it (`npm run voices`). The music SHALL never wait for a sample. The generator SHALL be replaceable without changing the song format.
