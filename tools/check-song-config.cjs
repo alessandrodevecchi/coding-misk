@@ -49,12 +49,12 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   let tr = await trials();
   check(Object.keys(tr).join() === 'luci-rosse' && tr['luci-rosse'].profile === 'crescendo', 'a Compose change is a trial on the open song only', JSON.stringify(tr));
   // the narrator switch: on by default, off is part of the trial, Narrated growth disabled with a hint
-  const narr = () => page.evaluate(() => { const a = document.querySelector('#live-narrator'), b = document.querySelector('#live-narrated'); return { on: a.getAttribute('aria-pressed'), shown: !a.hidden && a.offsetParent !== null, next: !!a.closest('.live-voices') && a.closest('.live-voices') === b.closest('.live-voices'), full: b.disabled, tip: b.title, label: a.textContent }; });
+  const narr = () => page.evaluate(() => { const a = document.querySelector('#live-narrator'), b = document.querySelector('#live-narrated'); return { on: a.getAttribute('aria-pressed'), shown: !a.hidden && a.offsetParent !== null, next: !!a.closest('.live-voices') && a.closest('.live-voices') === b.closest('.live-voices'), full: b.disabled, tip: b.title, label: a.textContent.trim() }; });
   let n = await narr();
-  check(n.on === 'true' && n.shown && n.next && !n.full && n.label === 'Narrator voice', 'Narrator voice: on by default, in the Voices group with Narrated growth, which is enabled', JSON.stringify(n));
+  check(n.on === 'true' && n.shown && n.next && !n.full && n.label === 'On', 'Narrator voice (the On switch of Voice: narrator, voice-full-controls): on by default, in the Voices group with Narrated growth, which is enabled', JSON.stringify(n));
   await page.click('#live-narrator'); await sleep(1200);
   n = await narr(); tr = await trials();
-  check(n.on === 'false' && n.full && /Narrator voice on/.test(n.tip), 'Narrator voice off: Narrated growth disabled with its hint', JSON.stringify(n));
+  check(n.on === 'false' && n.full && /narrator voice on/i.test(n.tip), 'Narrator voice off: Narrated growth disabled with its hint', JSON.stringify(n));
   check(tr['luci-rosse'] && tr['luci-rosse'].options && tr['luci-rosse'].options.narrator === false, 'the narrator off is part of the trial', JSON.stringify(tr));
   if (shots) { const box = await page.evaluate(() => { const r = document.querySelector('#live-narrator').closest('.ctrl').getBoundingClientRect(); return { x: Math.max(0, r.left - 16), y: Math.max(0, r.top + scrollY - 16), width: Math.min(1440 - Math.max(0, r.left - 16), r.width + 32), height: r.height + 32 }; }); await page.screenshot({ path: path.join(shots, 'narrator-off.png'), fullPage: true, clip: box }); }
   await page.reload(); await sleep(3500);
@@ -185,18 +185,19 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   lib = await library(); tr = await trials(); s = await state();
   check(!lib.tracks.some(x => x.id === 'kellerlicht') && !tr.kellerlicht && s.live === 'false' && !s.marked && timeOf(s.total) === '4:50', 'Restore original: the built-in song back as written, its trial cleared', JSON.stringify(s));
 
-  // the radio's Custom section: the same chip, Narrated growth disabled while it is off
+  // the radio (voice-full-controls D15): the narrator switch of the Voices group works with every profile; with Custom,
+  // Narrated growth is disabled while it is off
   await page.click('[data-tab="radio"]'); await sleep(800);
   await page.selectOption('#radio-profile', 'custom'); await sleep(600);
-  if (await page.isHidden('#custom-body')) { await page.click('#custom-toggle'); await sleep(300); }
-  const rnarr = () => page.evaluate(() => { const a = document.querySelector('[data-custom-chip="narrator"]'), b = document.querySelector('[data-custom-chip="narrated"]'); return a && b ? { on: a.getAttribute('aria-pressed'), next: !!a.closest('.radio-voices') && a.closest('.radio-voices') === b.closest('.radio-voices'), full: b.disabled, tip: b.title } : null; });
+  const rnarr = () => page.evaluate(() => { const a = document.querySelector('[data-rvoice-switch="narrator"]'), b = document.querySelector('[data-custom-chip="narrated"]'); return a && b ? { on: a.getAttribute('aria-pressed'), next: !!a.closest('.radio-voices') && a.closest('.radio-voices') === b.closest('.radio-voices'), full: b.disabled, tip: b.title } : null; });
   let rn = await rnarr();
-  check(rn && rn.on === 'true' && rn.next && !rn.full, 'radio Custom: Narrator voice on, in the Voices group with Narrated growth', JSON.stringify(rn));
-  await page.click('[data-custom-chip="narrator"]'); await sleep(500);
+  check(rn && rn.on === 'true' && rn.next, 'radio: the narrator switch on, in the Voices group with Narrated growth', JSON.stringify(rn));
+  await page.click('[data-rvoice-switch="narrator"]'); await sleep(500);
   rn = await rnarr();
-  check(rn && rn.on === 'false' && rn.full && /Narrator voice on/.test(rn.tip), 'radio Custom: Narrator voice off, Narrated growth disabled with its hint', JSON.stringify(rn));
+  check(rn && rn.on === 'false' && rn.full && /narrator/i.test(rn.tip), 'radio: narrator off, Narrated growth disabled with its hint', JSON.stringify(rn));
   if (shots) { const el = await page.$('#radio-voices'); if (el) await el.screenshot({ path: path.join(shots, 'radio-custom-narrator-off.png') }); }
-  await page.click('[data-custom-chip="narrator"]'); await sleep(300);
+  await page.click('[data-rvoice-switch="narrator"]'); await sleep(300);
+  await page.selectOption('#radio-profile', 'artist'); await sleep(300);
 
   check(!errors.length, 'no page errors', errors.join(' | '));
   await browser.close();

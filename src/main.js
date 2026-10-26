@@ -2345,7 +2345,8 @@ async function askSamples() {
         if (r.ok) { made++; await refreshSamples(); }
       } catch (e) { /* the row keeps saying the sample is missing */ }
     }
-    if (made) toast(t('plSamplesMade', { n: made }));
+    // (no message of its own: the rows say sample ok, and a toast would take the place of an edit's Undo)
+    void made;
   } finally { samplesBusy = false; }
 }
 // the custom samples and their lengths read again (a new sample of the voice helper): the song is written again with

@@ -102,7 +102,9 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     },
   };
   // (the narrator switch left the Custom profile: its old value moved to the switch above)
-  if (opts.custom && opts.custom.controls && opts.custom.controls.narrator !== undefined) { const { narrator: _, ...rest } = opts.custom.controls; opts.custom = { ...opts.custom, controls: rest }; }
+  if (opts.custom && opts.custom.controls && opts.custom.controls.narrator !== undefined) { const { narrator: _, ...rest } = opts.custom.controls; opts.custom = { ...opts.custom, controls: rest }; store.set('coding-misk-radio', opts); }
+  // (a saved Never is stored as the switch off with As the style)
+  else if (saved.voice && saved.voice.presence === 'never') store.set('coding-misk-radio', opts);
   opts.material = opts.materialDefault;
   let compOpen = false;
   const userPresets = () => store.get('coding-misk-comp-presets', {}) || {};
@@ -726,7 +728,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     return `<div class="steer-group steer-voice"><span class="lbl">${esc(t('steerGroup:voice'))}</span>
       <div class="sv-row"><span class="lbl">${esc(t('narratorLbl'))}</span><div class="steer-btns">${btn({ kind: 'talk-more' })}${btn({ kind: 'talk-less' })}</div></div>
       <div class="sv-row"><span class="lbl">${esc(t('vinstLbl'))}</span><div class="steer-btns">${sel('preset', VOICE_PRESET_IDS, v => t(`vinstPreset:${v}`), 'svPresetTip')}${sel('style', VOICE_STYLE_IDS, v => t(`voiceStyle:${v}`), 'svStyleTip')}${apply}</div></div>
-      <div class="sv-row sv-say"><span class="lbl">${esc(t('svSayLbl'))}</span><div class="steer-btns"><input type="text" data-sv-line maxlength="120" autocomplete="off" spellcheck="false" value="${esc(sv.line)}" placeholder="${esc(t('svSayPh'))}"${dis}><button class="btn steer-btn" data-sv-say="now"${dis || ` title="${esc(t('svNowTip'))}"`}>${esc(t('svNow'))}</button><button class="btn steer-btn" data-sv-say="moment"${dis || ` title="${esc(t('svMomentTip'))}"`}>${esc(t('svMoment'))}</button></div></div>
+      <div class="sv-row sv-say"><span class="lbl">${esc(t('svSayLbl'))}</span><div class="steer-btns"><input type="text" data-sv-line maxlength="120" autocomplete="off" spellcheck="false" value="${esc(sv.line)}" placeholder="${esc(t('svSayPh'))}"${dis || ` title="${esc(t('svHint'))}"`}><button class="btn steer-btn" data-sv-say="now"${dis || ` title="${esc(t('svNowTip'))}"`}>${esc(t('svNow'))}</button><button class="btn steer-btn" data-sv-say="moment"${dis || ` title="${esc(t('svMomentTip'))}"`}>${esc(t('svMoment'))}</button></div></div>
       <p class="hint muted small">${esc(t('svHint'))}</p></div>`;
   }
   // Apply: the phrase preset and the voice style on the song on air (one command, one Cancel); with the whole session
