@@ -13,6 +13,8 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 
 | Decision | Why | Source |
 | --- | --- | --- |
+| Pattern preview rides the song's scheduler (pattern-preview D1, #84) | While the song plays, the preview is stacked on the main scheduler's pattern (a getter and setter on `scheduler.pattern`), so it shares its clock, tempo and bars; while it is stopped, a bare `Cyclist` plays it. A second `repl()` would overwrite Strudel's module-level scheduler state; two Cyclists cannot share a phase; writing it into the song's code would change the code shown and the live build. | `openspec/changes/pattern-preview/design.md` |
+| Triangle for the main player, headphones for a preview (pattern-preview D10, #84) | The owner: the play triangle means "this becomes what plays" (code shown, player bar). Every preview, now and later (the radio console too), uses the headphones; the button that opens the Patterns tab became a flask, which matches the Groove Lab. | `openspec/changes/pattern-preview/design.md` |
 | Voice controls in one Voices group (voice-placement, #77) | Compose and the radio each have one group with the narrator and the voice instrument. Narrator controls that cannot apply are disabled with the reason, not hidden. The open song's voice instrument is changed in the group and in its track panel (the same controls); the next song's settings sit in a small row until the New song panel (#78). On air the voice instrument changes through a recorded steering command from the next quiet part; the narrator of the song on air does not change. The radio knob `talk` drives the narrator, so it is named Narrator; it does not scale the voice instrument. | [design](../../openspec/changes/voice-placement/design.md) |
 | Strudel, from npm, never forked | It runs in the browser with no install. A fork only if the audio engine itself must change. | DEVLOG 2026-10-03, [CONTEXT](../CONTEXT.md#key-decisions) |
 | Tempo is set by the player at bar lines, never inside a pattern | `.cps()` in a pattern recomputes queued events with a stale reference and drops notes. | [MUSIC-ENGINE](../MUSIC-ENGINE.md#strudel-gotchas-learned-the-hard-way) |
@@ -86,6 +88,7 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 
 | Attempt | Why it was dropped | Source |
 | --- | --- | --- |
+| Preview orbit 15 (pattern-preview D3, #84) | Voice tracks (the narrator) speak on orbits 15 and up, and one built-in song reaches 17: the preview takes at least 20, above every orbit of the song. | `src/player/preview.js` |
 | Several phrases placed one per section (voice-controls) | Most generated songs have one to three quiet sections, so 4 to 5 phrases never fitted. Parts became phrases of the plan. | [voice](voice.md) |
 | Growing a steered radio song again from the steered song (stage 4) | The steps already heard and typed changed with every command. Replaced by waypoints (stage 5). | radio-profiles D9 |
 | Hosting the app as a web artifact | Its sandbox blocks Strudel's audio worklets loaded from `data:` URLs: no sound. | DEVLOG 2026-10-04 |

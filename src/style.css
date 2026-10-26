@@ -575,6 +575,9 @@
 .pb-now { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 13px; }
 .pb-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pb-pos { font: 12px var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* the bar counter (pattern-preview, player-bar D7): its own slot at the right end, so the title and the time do not shift */
+.pb-bar { font: 12px var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; margin-left: auto; }
+.pb-bar:empty { display: none; }
 .pb-onair { display: none; font: 700 10px var(--mono); letter-spacing: .2em; padding: 2px 7px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
 .pbar.radio .pb-onair { display: inline-block; }
 .pb-onair.on { color: #fff; background: #d8203c; border-color: #ff4a66; box-shadow: 0 0 12px #ff2a48; }
@@ -595,7 +598,7 @@
 :root[data-ui="hw"] .pb-btn:active:not(:disabled), :root[data-ui="hw"] .pbar .play:active { transform: translateY(2px); box-shadow: inset 0 1px 3px rgba(0,0,0,.6), 0 0 0 #0d0d10; }
 :root[data-ui="hw"] .pbar .play[aria-pressed="true"] { color: #ffb347; text-shadow: 0 0 6px #ff9a1f; }
 :root[data-ui="hw"] .pb-now { background: #120b04; border: 1px solid #000; border-radius: 3px; padding: 4px 10px; box-shadow: inset 0 1px 4px rgba(0,0,0,.8); }
-:root[data-ui="hw"] .pb-title, :root[data-ui="hw"] .pb-pos { font-family: var(--mono); color: #ffb347; text-shadow: 0 0 6px rgba(255,154,31,.55); }
+:root[data-ui="hw"] .pb-title, :root[data-ui="hw"] .pb-pos, :root[data-ui="hw"] .pb-bar { font-family: var(--mono); color: #ffb347; text-shadow: 0 0 6px rgba(255,154,31,.55); }
 :root[data-ui="hw"] .pb-onair { border-radius: 50%; width: 12px; height: 12px; padding: 0; font-size: 0; background: #3a0d12; border-color: #000; }
 :root[data-ui="hw"] .pb-onair.on { background: radial-gradient(circle at 35% 35%, #ff8a99, #e0203a 60%, #7a0d18); box-shadow: 0 0 10px #ff2a48; }
 /* hardware: the volume is a small knob, the slider stays hidden behind it */
@@ -721,6 +724,18 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* hardware theme: the display and the timeline need more room than 52 px, or the display touches the bar's top edge */
 :root[data-ui="hw"] .pbar { height: 60px; }
 :root[data-ui="hw"] .pb-now { padding-block: 3px; }
+/* phones: the bar counter keeps its room (pattern-preview D7); the title has none left by then */
+@media (max-width: 480px) {
+  .pb-title { display: none; }
+  .pbar .pb-btns { gap: 3px; }
+  .pb-btn { min-width: 30px; padding: 0 4px; }
+  .pb-bar { flex: none; margin-left: 0; font-size: 11px; }
+  /* the hardware bar has the knob on the right: the counter keeps n / total, without the word */
+  :root[data-ui="hw"] .pb-now { padding-inline: 3px; }
+  :root[data-ui="hw"] .pb-bar { font-size: 10px; }
+  :root[data-ui="hw"] .pb-bar-w { display: none; }
+  :root[data-ui="hw"] .pb-vol .knob { width: 26px; height: 26px; margin: 0 1px; }
+}
 
 /* playlists (#36) */
 .sv-lists .chip small { font: 10px var(--mono); color: var(--muted); margin-left: 2px; }
@@ -1292,6 +1307,12 @@ canvas.pn-pv.big { height: 110px; margin: 0; border: 1px solid var(--line); }
 .pt-presetrow { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .pt-presetrow select { flex: 1; min-width: 0; }
 .pt-listen { flex: none; min-width: 0; padding: 4px 7px; }
+/* the pattern preview (pattern-preview D5): headphones off, stop while it plays, lit like the Patterns tab's play */
+.pt-preview { flex: none; min-width: 0; padding: 4px 7px; }
+.pt-preview[aria-pressed="true"] { color: var(--a1); border-color: var(--a1); background: color-mix(in srgb, var(--a1) 20%, var(--panel2)); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 45%, transparent); }
+:root[data-ui="hw"] .pt-preview[aria-pressed="true"] { color: var(--a1); text-shadow: 0 0 8px var(--a1); background: linear-gradient(#3b3b41, #28282d); box-shadow: inset 0 1px 3px rgba(0,0,0,.6); }
+/* the two pattern rows of the track panel (Song patterns, Make patterns) */
+.tp-pats-make { margin-top: 6px; }
 .pt-savepat { display: inline-flex; align-items: center; gap: 5px; }
 button.pat-link { cursor: pointer; background: none; color: inherit; }
 button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); color: var(--a1); }

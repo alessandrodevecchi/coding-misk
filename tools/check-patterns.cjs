@@ -98,6 +98,11 @@ const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, n
   const host = await page.$('#track-panel [data-ptrk] [id$="_pt-preset"]');
   const ti = await host.evaluate(el => +el.closest('[data-ptrk]').dataset.ptrk);
   const d = await draft(), tr = d.T.tracks[ti], sec = d.T.sections[d.sel || 0];
+  // the two pattern rows (pattern-preview): the song's patterns with Delete, then the tools that make patterns; the
+  // button that opens the Patterns tab shows the flask
+  const rows = await page.$$eval(`#track-panel [data-ptrk="${ti}"] .tp-pats`, xs => xs.map(x => ({ lbl: x.querySelector(':scope > .lbl').textContent, ids: [...x.querySelectorAll('[id]')].map(e => e.id.replace(/^p\d+_/, '')) })));
+  const flask = await page.$eval(`#p${ti}_pt-listen svg`, el => el.classList.contains('ico-flask'));
+  check(rows.length === 2 && rows[0].lbl === 'Song patterns' && rows[0].ids.includes('pt-del') && !rows[0].ids.includes('pt-new') && rows[1].lbl === 'Make patterns' && ['pt-new', 'pt-savepat', 'pt-compose'].every(k => rows[1].ids.includes(k)) && flask, 'Song patterns (chips, Delete) and Make patterns (New, Save as pattern, Compose a part); the flask opens the tab', rows.map(r => `${r.lbl}: ${r.ids.join(' ')}`).join(' | '));
   await page.click(`#p${ti}_pt-listen`); await sleep(600);
   const cfg = await page.evaluate(() => ({ key: (document.querySelector('#pn-key') || {}).value, bpm: document.querySelector('#pn-bpm').value, sound: document.querySelector('#pn-sound').value }));
   const pat = tr.patterns[(tr.clips.find(c => c.section === sec.name) || { pattern: 'A' }).pattern] || {};
