@@ -1,5 +1,5 @@
 {
   "note": "Written by npm run catalog:strudel: a hash of the inputs of the catalog and coverage. npm run check:knowledge fails when the code changed since.",
-  "hash": "42ce4d510d87a37e7b2b34c18dee6facd48221183454e85ba5d77fde116216ae",
+  "hash": "2674404fe7ceca2f4712ce9be1ae069eb8e74b63c315829f43fa3ffb436ddedc",
   "files": 134
 }

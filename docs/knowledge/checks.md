@@ -135,7 +135,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-voices.cjs` |  | dev server, Chrome | Browser checks for the voice controls (voice-controls and voice-placement, #77). Compose: one Voices group, shown with the Live build on or off: the narrator row (Narrator voice, Narrator style, Narrated growth)… |
 | `tools/check-worker.mjs` |  | Node | A worker process of tools/check-pool.mjs (faster-checks): imports the module named on the command line once, then runs each task it is sent with the module's runTask(task) and sends the result back. Not run by hand. |
 | `tools/snapshot-code.mjs` | `npm run snapshot:code` | Node | Saves or checks the Strudel code generated for every song in songs/ (no browser needed). |
-| `tools/snapshot-levels.cjs` |  | dev server, Chrome | Saves or checks peak levels per instrument for every scene of every built-in track (dev server on :5173). |
+| `tools/snapshot-levels.cjs` |  | dev server, Chrome | Saves or checks peak levels per instrument for every scene of every built-in track (dev server on PORT, default 5173). |
 <!-- /generated -->
 
 ## Fixtures and versions

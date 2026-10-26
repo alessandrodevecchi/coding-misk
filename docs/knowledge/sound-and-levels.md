@@ -63,20 +63,20 @@ How loud each part is, how the app keeps it below clipping, and the devices that
 <!-- /generated -->
 
 <!-- generated:levels -->
-Peak levels per instrument in `tests/snapshots/levels.json` (26 built-in songs, every section): how many sections, median and highest peak. A line above 1.0 is a warning (above its style's `headroom`); the master output and exported files above 1.0 clip and fail the checks.
+Peak levels per instrument in `tests/snapshots/levels.json` (46 built-in songs, every section): how many sections, median and highest peak. A line above 1.0 is a warning (above its style's `headroom`); the master output and exported files above 1.0 clip and fail the checks.
 
 | Instrument | Sections | Median peak | Highest peak |
 | --- | --- | --- | --- |
-| `arp` | 69 | 0.16 | 0.51 |
-| `bass` | 126 | 0.33 | 0.94 |
-| `fx` | 74 | 0.06 | 0.62 |
+| `arp` | 94 | 0.16 | 0.79 |
+| `bass` | 179 | 0.35 | 0.94 |
+| `fx` | 93 | 0.06 | 0.62 |
 | `guitar` | 39 | 0.48 | 0.89 |
-| `hats` | 129 | 0.34 | 1.24 |
-| `hook` | 71 | 0.13 | 0.69 |
-| `kick` | 130 | 0.5 | 0.9 |
-| `pad` | 101 | 0.18 | 0.43 |
+| `hats` | 184 | 0.33 | 1.24 |
+| `hook` | 98 | 0.12 | 0.69 |
+| `kick` | 199 | 0.49 | 0.9 |
+| `pad` | 140 | 0.18 | 0.43 |
 | `riser` | 23 | 0.07 | 0.16 |
-| `snare` | 107 | 0.44 | 0.76 |
+| `snare` | 150 | 0.42 | 0.76 |
 
 Snapshot tolerance (`tools/snapshot-levels.cjs`): 0.12 absolute, floor 0.03, per instrument { guitar: 0.25 }; `fx` is recorded, not compared. Master level: `MASTER = .6` in `src/main.js`.
 <!-- /generated -->
