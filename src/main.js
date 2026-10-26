@@ -78,9 +78,10 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING } from './icons.js';
+import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING, FLASK, STOP } from './icons.js';
+import { createPreview, previewOrbit } from './player/preview.js';
 import { createPatternsTab } from './library/patterns-tab.js';
-import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS } from './library/patterns.js';
+import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS, KIND_TYPE, loopSong } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { parseSong, clock } from './songs.js';
@@ -607,6 +608,8 @@ ready.then(async () => {
 });
 const sched = () => ed && ed.repl && ed.repl.scheduler;
 const isPlaying = () => !!(sched() && sched().started);
+// the pattern preview of Compose (pattern-preview), made with the track panel below
+let preview = null;
 // code of a song at a bar, with the tempo of that bar (a live build changes code over time)
 // the code the player shows at a bar to evaluate it: the evaluation knows the bar (codeBar, used once)
 let codeBar = 0, codeFresh = false;
@@ -1013,6 +1016,7 @@ function startCapture() {
     };
     recorder.stop();
   });
+  if (preview) preview.stop();
   capture = c;
   return c;
 }
@@ -1050,6 +1054,7 @@ async function exportTrack(sg, as, asVideo = false) {
     recorder = want && mime ? new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 192000 }) : new MediaRecorder(dest.stream);
     opus = !!(want && mime);
   }
+  if (preview) preview.stop();
   rec = { opus, video: asVideo, ext, recorder, dest, chunks: [], node: null, id: sg.id, title: sg.title, total: sg.meta.seconds, ending: 0, cancel: false };
   recorder.ondataavailable = e => e.data.size && rec.chunks.push(e.data);
   recorder.onstop = () => finishExport(rec);
@@ -1116,6 +1121,7 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
   const segments = segmentsOf(sg, codeFor);
   const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate(), writable: disk ? disk.writable : null });
   const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  if (preview) preview.stop();
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
     const r = await job.promise;
@@ -1175,6 +1181,7 @@ async function startVideoCapture({ total = 0, onStop = () => {}, onCancel = () =
     };
     recorder.stop();
   });
+  if (preview) preview.stop();
   capture = c;
   return c;
 }
@@ -1295,6 +1302,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     },
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
   });
+  if (preview) preview.stop();
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: run.cancel };
   try {
     const r = await run.promise;
@@ -2537,9 +2545,14 @@ function composePattern(tr, keep = null) {
 // Patterns (pattern-library, D5 and D7): the listen button next to a track's preset menu opens its pattern in the
 // Patterns tab with the track's sound, the section's key and progression and the song's tempo (the song stops); Save as
 // pattern keeps the selected pattern among the user's own, with the context of the section it first plays in
+// the "over" settings of a track's pattern: the track's sound and settings, the selected section's key, progression,
+// meter and tempo (shared by the listen button and the pattern preview, pattern-preview D2)
+function patternOver(tr) {
+  const sec = secFull(), e = eff(tr);
+  return { sound: e[soundKey(tr.type)], key: sec.key, chords: sec.chords, meter: sec.meter, bpm: sec.bpm, ...(tr.type === 'hook' ? { mode: e.mode } : {}), settings: { ...e } };
+}
 function listenPattern(tr) {
-  const key = patOf(tr), pat = tr.patterns[key] || {}, sec = secFull(), e = eff(tr);
-  const over = { sound: e[soundKey(tr.type)], key: sec.key, chords: sec.chords, meter: sec.meter, bpm: sec.bpm, ...(tr.type === 'hook' ? { mode: e.mode } : {}), settings: { ...e } };
+  const key = patOf(tr), pat = tr.patterns[key] || {}, over = patternOver(tr);
   stop();
   const plain = pat.preset && !pat.idea && !pat.steps && !pat.notes;
   let ok = false;
@@ -2550,6 +2563,49 @@ function listenPattern(tr) {
   }
   showTab('pattern');
 }
+// ---------- the pattern preview (pattern-preview) ----------
+// a small second player for the selected pattern of a track: its 4-bar loop (loopSong, without the beat, with the
+// track's rack), with the track's sound and level and the selected section's harmony and tempo. It rides the song's
+// scheduler while the song plays and plays alone while it is stopped (src/player/preview.js); it never changes the
+// player bar. Tracks with a preset or groove menu only (code and texture tracks come later, owner decision 5).
+const PREVIEW_TYPES = tr => tr && (tr.type === 'drums' || !!PRESET_LIST[tr.type]);
+function previewSource(id, key) {
+  const tr = T.tracks.find(x => x.id === id);
+  if (!PREVIEW_TYPES(tr)) return null;
+  // (the pattern it played was deleted: it stops)
+  if (key && !tr.patterns[key]) return null;
+  // the selected pattern while its track is the one being edited, else the one it was playing
+  const k = tr === curTrack() ? patOf(tr) : key && tr.patterns[key] ? key : null;
+  if (!k || !tr.patterns[k]) return null;
+  const over = patternOver(tr);
+  const loop = loopSong({ kind: Object.keys(KIND_TYPE).find(k => KIND_TYPE[k] === tr.type), type: tr.type, pattern: tr.patterns[k], name: trackLabel(tr) }, { ...over, beat: false, rack: tr.rack });
+  // riding, the loop starts with the selected section: the compiler starts a section's progression on its first bar
+  const shift = sceneStart(sel);
+  const orbit = previewOrbit(T.tracks);
+  return { song: T.id, key: k, loop, bpm: over.bpm, shift, orbit, sig: JSON.stringify([loop, shift, orbit]) };
+}
+preview = createPreview({
+  sched, busy: () => !!(rec || capture || fastJob),
+  source: previewSource, compile: loop => compileSong(loop),
+  onChange: () => syncPreviewButtons(),
+});
+function syncPreviewButtons() {
+  if (!preview) return;
+  const st = preview.state, busy = !!(rec || capture || fastJob);
+  $$('#track-panel .pt-preview').forEach(b => {
+    const host = b.closest('[data-ptrk]'), tr = host ? T.tracks[+host.dataset.ptrk] : null, on = !!(st && tr && st.id === tr.id);
+    if (b.getAttribute('aria-pressed') !== String(on)) {
+      b.setAttribute('aria-pressed', on); b.innerHTML = on ? STOP : LISTEN;
+      const tip = t(on ? 'ptPreviewStop' : 'ptPreview'); b.title = tip; b.setAttribute('aria-label', tip);
+    }
+    if (b.disabled !== busy) b.disabled = busy;
+  });
+}
+function previewBtn(tr) { const on = !!(preview && preview.state && preview.state.id === tr.id), tip = esc(t(on ? 'ptPreviewStop' : 'ptPreview')); return `<button type="button" class="btn small icon pt-preview" id="pt-preview" aria-pressed="${on}" title="${tip}" aria-label="${tip}"${rec || capture || fastJob ? ' disabled' : ''}>${on ? STOP : LISTEN}</button>`; };
+// for the browser checks (tools/check-preview.cjs)
+globalThis.codingMiskPreview = preview;
+// (and what the bar counter counts: the song in Compose, written or grown, and the song playing)
+globalThis.codingMiskBars = () => ({ compose: { bars: compiled.meta.bars, pending: !!compiled.pending, growth: growBars(), cue: cueBar() }, song: song && song.meta ? { id: song.id, bars: song.meta.bars, loop: !!song.loop } : null });
 // the styles a pattern saved from a song with no style tags links (pattern-followups D1): its artist's, or the styles
 // its style line names
 const songStyleFallback = () => fallbackStyles(T, { recipes: RECIPES, artists: [...BUILTIN_ARTISTS, ...(store.get('coding-misk-artists', []) || [])] });
@@ -2564,12 +2620,12 @@ function panelHtml(ti) {
   const stepBtns = (attr, label) => Array.from({ length: n }, (_, i) => `<button type="button" class="step" data-g="${Math.floor(i / 4) % 4}" ${attr}="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('');
   let editor = '';
   if (tr.type === 'drums') {
-    editor = `<div class="ctrl"><label class="lbl" for="pt-groove">${t('groove')}</label><div class="pt-presetrow"><select id="pt-groove"></select><button type="button" class="btn small icon pt-listen" id="pt-listen" title="${esc(t('ptListen'))}" aria-label="${esc(t('ptListen'))}">${LISTEN}</button></div></div>
+    editor = `<div class="ctrl"><label class="lbl" for="pt-groove">${t('groove')}</label><div class="pt-presetrow"><select id="pt-groove"></select><button type="button" class="btn small icon pt-listen" id="pt-listen" title="${esc(t('ptListen'))}" aria-label="${esc(t('ptListen'))}">${FLASK}</button>${previewBtn(tr)}</div></div>
       <div class="seq"><span></span><div class="stepnums" ${cols}>${Array.from({ length: n }, (_, i) => `<span>${i + 1}</span>`).join('')}</div>
       ${ROWS.map(([id, label]) => `<span class="rowlbl">${label}</span><div class="steps" ${cols}>${Array.from({ length: n }, (_, i) => `<button type="button" class="step" data-g="${Math.floor(i / 4) % 4}" data-row="${id}" data-i="${i}" aria-label="${esc(t('stepAria', { name: label, n: i + 1 }))}"></button>`).join('')}</div>`).join('')}</div>
       <p class="idea-code" id="pt-idea" hidden></p>`;
   } else if (PRESET_LIST[tr.type]) {
-    editor = `<div class="pt-top"><div class="ctrl"><label class="lbl" for="pt-preset">${t('preset')}</label><div class="pt-presetrow"><select id="pt-preset"></select><button type="button" class="btn small icon pt-listen" id="pt-listen" title="${esc(t('ptListen'))}" aria-label="${esc(t('ptListen'))}">${LISTEN}</button></div></div>
+    editor = `<div class="pt-top"><div class="ctrl"><label class="lbl" for="pt-preset">${t('preset')}</label><div class="pt-presetrow"><select id="pt-preset"></select><button type="button" class="btn small icon pt-listen" id="pt-listen" title="${esc(t('ptListen'))}" aria-label="${esc(t('ptListen'))}">${FLASK}</button>${previewBtn(tr)}</div></div>
       ${tr.type === 'arp' ? `<div class="ctrl"><label class="lbl" for="pt-speed">${t('speed')}</label><select id="pt-speed"><option value="16">${t('sixteenths')}</option><option value="8">${t('eighths')}</option></select></div>` : ''}</div>
       <div class="chsteps" data-n="${n}"${tr.type === 'hook' || tr.type === 'arp' ? ` title="${esc(t('stepsMaskHint'))}"` : ''}><div class="row"><span class="lbl">${t('chSteps')}</span><span class="hint" id="pt-steps-state"></span><button type="button" class="btn small" id="pt-steps-reset">${t('stepsReset')}</button></div>
         <div class="steps" ${cols}>${stepBtns('data-ps', t(tr.type))}</div>
@@ -2605,10 +2661,13 @@ function panelHtml(ti) {
     </div>
     ${tr.type === 'voice' ? '' : arrMode === 'timeline' ? clipBlock(tr) : `<div class="tp-plays"><span class="lbl">${esc(t('playsIn', { name: SEC().name }))}</span>
       <div class="chips">${custom ? `<span class="note">${t('customCell')}</span>` : `<button class="chip" data-play-pat="" aria-pressed="${!c}">${t('silent')}</button>${Object.keys(tr.patterns).map(k => `<button class="chip" data-play-pat="${esc(k)}" aria-pressed="${!!(c && c.clip && c.clip.pattern === k)}">${esc(k)}</button>`).join('')}`}</div></div>`}
-    ${tr.type === 'voice' ? '' : `<div class="tp-pats"><span class="lbl">${t('patterns')}</span>
+    ${tr.type === 'voice' ? '' : `<div class="tp-pats tp-pats-song"><span class="lbl">${esc(t('patsSong'))}</span>
       <div class="chips">${Object.keys(tr.patterns).map(k => { const sh = composedShapes[`${T.id}:${tr.id}:${k}`]; return `<button class="chip" data-edit-pat="${esc(k)}" aria-pressed="${k === key}"${sh ? ` title="${esc(t('melodyShapeTip', { shape: t(`melodyShape:${sh}`) }))}"` : ''}>${esc(k)}</button>`; }).join('')}
-        <button class="chip" id="pt-new">${t('newPattern')}</button><button class="chip" id="pt-del">${t('deletePattern')}</button>${PATTERN_TYPES.includes(tr.type) ? `<button class="chip pt-savepat" id="pt-savepat" title="${esc(t('ptSaveTip'))}">${KEEP}<span>${esc(t('ptSaveAs'))}</span></button>` : ''}</div>
-      <p class="note">${esc(t('editingPattern', { p: key }))}</p>${composeRow(tr, pat)}</div>`}
+        <button class="chip" id="pt-del">${t('deletePattern')}</button></div>
+      <p class="note">${esc(t('editingPattern', { p: key }))}</p></div>
+    <div class="tp-pats tp-pats-make"><span class="lbl">${esc(t('patsMake'))}</span>
+      <div class="chips"><button class="chip" id="pt-new">${t('newPattern')}</button>${PATTERN_TYPES.includes(tr.type) ? `<button class="chip pt-savepat" id="pt-savepat" title="${esc(t('ptSaveTip'))}">${KEEP}<span>${esc(t('ptSaveAs'))}</span></button>` : ''}</div>
+      ${composeRow(tr, pat)}</div>`}
     <div class="tp-editor">${editor}</div>
     <div class="tp-scope"${tr.type === 'voice' ? ' hidden' : ''}><span class="lbl">${t('settingsScope')}</span>
       <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}" ${focusClip(tr) ? '' : 'disabled'}>${esc(arrMode === 'timeline' && selClip !== null ? t('scopeClip') : t('scopeSection', { name: SEC().name }))}</button></div></div>
@@ -2813,6 +2872,7 @@ $('#track-panel').addEventListener('click', e => {
   }
   if (r === 'pt-compose') return composePattern(tr);
   if (r === 'pt-listen') return listenPattern(tr);
+  if (r === 'pt-preview') { preview.toggle(tr.id, patOf(tr)); syncPreviewButtons(); return; }
   if (r === 'pt-savepat') return savePattern(tr);
   if (r === 'pt-keep-rhythm') return composePattern(tr, 'rhythm');
   if (r === 'pt-keep-notes') return composePattern(tr, 'notes');
@@ -2933,6 +2993,8 @@ function setMode(m) {
 }
 $$('.mode-btn').forEach(b => b.addEventListener('click', () => { const m = b.dataset.mode, last = modeTabs[m]; showTab(APP_MODES[m].includes(last) ? last : APP_MODES[m][0]); }));
 function showTab(name) {
+  // the pattern preview belongs to Compose (pattern-preview D4)
+  if (name !== 'componi' && preview) preview.stop();
   const m = modeOf(name);
   if (m) { setMode(m); modeTabs[m] = name; store.set('coding-misk-mode-tabs', modeTabs); }
   else $$('.mode-btn').forEach(b => b.setAttribute('aria-pressed', false));
@@ -3384,7 +3446,7 @@ function songTick() {
 }
 try {
   const clock = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 100)'], { type: 'text/javascript' })));
-  clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); } };
+  clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); if (preview) preview.tick(); } };
 } catch (e) {}
 (function transport() {
   requestAnimationFrame(transport);
@@ -3396,6 +3458,8 @@ try {
   if (song && s && playing && !seeking) {
     songTick();
   }
+  if (preview) preview.tick();
+  syncPreviewButtons();
   if (song && s && isPlaying() && !seeking) {
     const m = song.meta, cyc = s.now();
     // segue la sezione che suona, ma non mentre si sta scrivendo in un campo del brano
@@ -3534,19 +3598,29 @@ $('#pb-next').addEventListener('click', () => goNeighbour(1));
 var pbLast = '';
 function renderPlayerBar() {
   const s = sched(), playing = isPlaying(), onRadio = mode === 'radio' && radio && radio.on, rs = onRadio ? radio.state : null;
-  let title = T.title, pos = '';
+  let title = T.title, pos = '', bars = null;
+  // the bar counter (pattern-preview, player-bar D7): bar n / total of what plays, counted from 1
+  const count = (cyc, from, total) => ({ n: Math.max(1, Math.min(total, Math.floor(cyc - from) + 1)), total });
   if (onRadio && rs) {
     const it = rs.stream[rs.onAir], cyc = playing && s ? s.now() : rs.paused ?? it.start;
-    title = it.title; pos = t('radioBar', { n: Math.max(1, Math.floor(cyc - it.start) + 1), total: it.bars });
+    title = it.title; bars = count(cyc, it.start, it.bars);
+    // the time of the song on air
+    const m = song && song.meta;
+    if (m && m.secondsAt) { const t0 = m.secondsAt(it.start); pos = `${clock(Math.max(0, m.secondsAt(Math.min(cyc, m.bars)) - t0))} / ${clock(m.secondsAt(Math.min(m.bars, it.start + it.bars)) - t0)}`; }
   } else if (song && (playing || (paused && paused.id === song.id))) {
     const m = song.meta, cyc = playing && s ? s.now() : paused.cyc;
     title = mode === 'track' ? T.title : song.title || source.name || title;
     pos = `${clock(m.secondsAt(Math.min(cyc, m.bars)))} / ${clock(m.seconds)}`;
-    if (mixActive()) { const it = mixS.items[0], t0 = m.secondsAt(it.start); title = it.song.title; pos = `${clock(Math.max(0, m.secondsAt(Math.min(cyc, m.bars)) - t0))} / ${clock(m.secondsAt(Math.min(m.bars, it.start + it.bars)) - t0)}`; }
+    bars = song.loop ? { n: ((Math.floor(cyc) % m.bars) + m.bars) % m.bars + 1, total: m.bars } : count(cyc, 0, m.bars);
+    if (mixActive()) { const it = mixS.items[0], t0 = m.secondsAt(it.start); title = it.song.title; pos = `${clock(Math.max(0, m.secondsAt(Math.min(cyc, m.bars)) - t0))} / ${clock(m.secondsAt(Math.min(m.bars, it.start + it.bars)) - t0)}`; bars = count(cyc, it.start, it.bars); }
   } else if (mode === 'free' && source && source.name) title = source.name;
+  // stopped in Compose: the bar Play starts from, of the song in Compose (the written one while it still grows)
+  else if (mode === 'track' && compiled && compiled.meta) bars = count(cueBar(), 0, compiled.meta.bars);
   // timeline position (not while the user drags it)
   const seek = $('#pb-seek'), sr = seekRange();
   seek.disabled = !sr || (mode === 'free' && !(source && source.kind === 'song') && !onRadio);
+  // while the timeline is dragged: the bar under the thumb
+  if (pbSeeking && sr) bars = count(sr.from + +seek.value / 1000 * sr.bars, sr.from, sr.bars);
   if (!pbSeeking && sr) {
     const cyc = onRadio ? (playing && s ? s.now() : rs && rs.paused !== undefined ? rs.paused : sr.from) : playing && s ? s.now() : paused && song && paused.id === song.id ? paused.cyc : mode === 'track' ? cueBar() : 0;
     const v = Math.round(Math.max(0, Math.min(1, (cyc - sr.from) / sr.bars)) * 1000);
@@ -3555,10 +3629,11 @@ function renderPlayerBar() {
   if (!onRadio && queue && queue.current === currentSongId()) { const q = queue.position; pos = `${queue.name} · ${q.n} / ${q.total}${pos ? ` · ${pos}` : ''}`; }
   const onair = onRadio && !radio.paused;
   const canNav = onRadio || (currentSongId() !== null && (mode === 'track' || (source && source.kind === 'song')));
-  const key = [title, pos, onair, canNav, shuffleOn, repeatMode].join('|');
+  const barTxt = bars ? t('pbBar', bars) : '';
+  const key = [title, pos, barTxt, onair, canNav, shuffleOn, repeatMode].join('|');
   if (key === pbLast) return;
   pbLast = key;
-  $('#pb-title').textContent = title || ''; $('#pb-pos').textContent = pos;
+  $('#pb-title').textContent = title || ''; $('#pb-pos').textContent = pos; { const k = barTxt.indexOf(' '); $('#pb-bar').innerHTML = k > 0 ? `<span class="pb-bar-w">${esc(barTxt.slice(0, k + 1))}</span>${esc(barTxt.slice(k + 1))}` : esc(barTxt); }
   $('#pb-onair').classList.toggle('on', onair);
   $('#pbar').classList.toggle('radio', onRadio);
   $('#pb-prev').disabled = !canNav; $('#pb-next').disabled = !canNav;

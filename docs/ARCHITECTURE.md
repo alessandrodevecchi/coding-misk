@@ -112,7 +112,20 @@ Modes (`#42`): `APP_MODES` in `src/main.js` lists the tabs of Listen (`ascolta`)
 
 ## Player bar and volume
 
-The bottom bar (`#pbar`) holds `#play` and `#stop` (moved from the top bar with their handlers), previous and next, title and position, ON AIR, volume and mute. `renderPlayerBar()` runs in `transport()` and redraws only when its text changes. Previous and next walk the Songs tab order (`libraryCards()`) and play the neighbour if music was playing; in the radio they call `radio.restart()` and `radio.skip()`.
+The bottom bar (`#pbar`) holds `#play` and `#stop` (moved from the top bar with their handlers), previous and next, title and position, the bar counter, ON AIR, volume and mute. `renderPlayerBar()` runs in `transport()` and redraws only when its text changes. Previous and next walk the Songs tab order (`libraryCards()`) and play the neighbour if music was playing; in the radio they call `radio.restart()` and `radio.skip()`.
+
+The bar counter (`#pb-bar`, `pattern-preview` D7) shows `bar n / total` (the same word in both languages) at the right end of the title line: the song playing (`floor(cyc) + 1` of its `meta.bars`, so a grown song in Live coder or Crescendo counts its growth and then its written part), the song on air in the radio (from the item's start; the radio's position text is now its time), the song heard in a mix, the Patterns loop (`n / 4`), the bar under the thumb while the timeline is dragged, and stopped in Compose the cue bar of `compiled` (the written song while it still grows). `globalThis.codingMiskBars()` gives the checks what it counts.
+
+## Pattern preview
+
+`pattern-preview` (`#84`): a small second player in Compose for the pattern selected in a track panel, next to the flask that opens the Patterns tab. `src/player/preview.js` holds the pure `previewExpression(code, { orbit })` and `miniStrings` (checked in Node by `npm run check:preview`), `previewOrbit(tracks)` and the controller `createPreview(app)`; `previewSource` in `src/main.js` builds what it plays (`loopSong` of the pattern without the beat, with the track's rack and the "over" settings shared with the listen button, `patternOver`).
+
+- **Riding.** While the song plays, the preview is stacked on the main scheduler's pattern: a getter and setter on `scheduler.pattern` keep the song's pattern as set and return `stack(song, preview)` while it rides. Same scheduler, tempo and clock, so it stays on the song's bars and follows every `setCps`; the REPL keeps exposing the song's pattern to the highlighting. It starts at the next whole bar (`filterWhen`), shifted by the selected section's start (`late(sceneStart(sel))`).
+- **Alone.** While the song is stopped, a bare `Cyclist` (the page's `globalThis.Cyclist`, with `getTrigger` and `webaudioOutput`) plays it at the selected section's tempo. It is not a `repl()`: Strudel's module-level scheduler state stays with the editor.
+- **Evaluation.** Without the transpiler (it lives inside the editor's bundle): the page's Strudel globals, double-quoted strings wrapped in `mini()`. Importing `@strudel/core` in `src/` would load a second copy, since `@strudel/repl` ships a bundle.
+- **Handover and edits.** `preview.tick()` runs in `transport()` and in the background clock: it rides when the song starts, plays alone when it stops, starts again at the next bar after a jump, and every 150 ms compares the source's signature, so an edit, another selected pattern or section plays from the next bar.
+- **Orbit and output.** Its own orbit, at least 20 and above every orbit of the song (voice tracks speak on 15 and up), so its delay and reverb never touch the song's. No `.analyze`, so the visuals do not light up. It goes through the master, the limiter and the global volume. It stops on an export or recording (its button is disabled meanwhile), when Compose is left, another song opens, or its track or pattern goes.
+- **Icons.** The play triangle means the player bar takes it; a preview uses the headphones (`LISTEN`), and the Patterns tab button the flask (`FLASK`).
 
 The volume is a `GainNode` inserted once between superdough's `destinationGain` and the audio destination (`applyVolume`, checked every frame like `MASTER`). The WAV recorder taps `destinationGain`, before the volume, so exports keep their level. Keys: `coding-misk-volume` (0 to 100), `coding-misk-muted`.
 

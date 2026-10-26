@@ -17,13 +17,17 @@ export const COMPOSE = svg('0 0 16 16', '<ellipse cx="5" cy="12.2" rx="2.4" ry="
 export const RHYTHM = svg('0 0 16 16', '<rect x="1" y="6" width="2.6" height="4" rx=".6" fill="currentColor"/><rect x="4.8" y="6" width="2.6" height="4" rx=".6" fill="none" stroke="currentColor" stroke-width="1"/><rect x="8.6" y="6" width="2.6" height="4" rx=".6" fill="currentColor"/><rect x="12.4" y="6" width="2.6" height="4" rx=".6" fill="currentColor"/>', 'ico-rhythm');
 // two notes on a beam (keep the notes)
 export const NOTES = svg('0 0 16 16', '<ellipse cx="4" cy="12" rx="2.2" ry="1.6" fill="currentColor"/><ellipse cx="11.4" cy="10.4" rx="2.2" ry="1.6" fill="currentColor"/><path d="M6 11.8V3.6l7.4-1.6v8.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>', 'ico-notes');
-// a triangle (play a pattern in a loop, pattern-library)
+// a triangle: this becomes what the main player plays (play a pattern in a loop, pattern-library; pattern-preview D10)
 export const PLAY = svg('0 0 16 16', '<path d="M4.5 2.8v10.4L13 8z" fill="currentColor"/>', 'ico-play');
 // a square (stop)
 export const STOP = svg('0 0 16 16', '<rect x="3.5" y="3.5" width="9" height="9" rx="1.2" fill="currentColor"/>', 'ico-stop');
-// headphones (listen to a track's pattern in the Patterns tab)
+// headphones: a preview, a second player that leaves the main one alone (pattern-preview D10)
 export const LISTEN = svg('0 0 16 16', '<path d="M2.5 10V8a5.5 5.5 0 0 1 11 0v2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="1.8" y="9" width="3.4" height="5" rx="1.2" fill="currentColor"/><rect x="10.8" y="9" width="3.4" height="5" rx="1.2" fill="currentColor"/>', 'ico-listen');
 // a step grid with a plus (save a pattern)
+// the button that opens a pattern in the Patterns tab, in the Groove Lab (pattern-preview D10: the headphones mean a
+// preview, a second player that leaves the main one alone)
+export const FLASK = svg('0 0 16 16', '<path d="M6 1.8h4M6.6 1.8v4.4L2.6 12.6a1.1 1.1 0 0 0 .9 1.6h9a1.1 1.1 0 0 0 .9-1.6L9.4 6.2V1.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.4 10h7.2l1.4 2.6a.6.6 0 0 1-.5.9H3.5a.6.6 0 0 1-.5-.9z" fill="currentColor"/>', 'ico-flask');
+
 export const KEEP = svg('0 0 16 16', '<rect x="1.5" y="2" width="3" height="3" rx=".6" fill="currentColor"/><rect x="6" y="2" width="3" height="3" rx=".6" fill="none" stroke="currentColor" stroke-width="1"/><rect x="1.5" y="6.5" width="3" height="3" rx=".6" fill="none" stroke="currentColor" stroke-width="1"/><rect x="6" y="6.5" width="3" height="3" rx=".6" fill="currentColor"/><path d="M12 8.5v6M9 11.5h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>', 'ico-keep');
 // a pencil (rename)
 export const PENCIL = svg('0 0 16 16', '<path d="M3 13l.6-3 7.2-7.2 2.4 2.4L6 12.4z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M9.6 4l2.4 2.4" fill="none" stroke="currentColor" stroke-width="1.4"/>', 'ico-pencil');
