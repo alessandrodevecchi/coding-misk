@@ -335,7 +335,7 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Charge before a drop                         | `steering: high tension charges the part before a drop`          |
 | Extend                                       | `steering: extend adds a part before the ending and keeps it`    |
 | Vary: new notes in key, the rest unchanged   | `steering: vary gives a part new notes in key and keeps the rest` |
-| Vary: not playing, locked, late              | `steering: vary is disabled when the part does not play or is locked` |
+| Vary: not playing, locked, late              | `steering: vary is disabled when the part does not play, and reaches locked tracks` |
 | Vary: replay and cancel                      | `steering: vary replays the same, and a cancelled vary leaves the notes` |
 | Add and More complex compose; plain sessions as before | `steering: Add and More complex compose new tracks`    |
 | Curves and complexity shape composed material | `steering: curves and complexity shape composed material`       |

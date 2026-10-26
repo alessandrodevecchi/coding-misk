@@ -14,18 +14,18 @@ Total about 9 to 10 days. Phases 3 and 5 depend on 1; 4 depends on 1 and 2; 6 de
 
 ## 1. Track instances, limits and headroom (engine)
 
-- [ ] 1.1 `INSTRUMENTS`, command kinds `more` and `less` with `part` (D1); old `add` and `remove` kept for replay; verify in `tools/check-endless.mjs` that a recorded session with `add lead` and `remove drums` gives the same song as before
-- [ ] 1.2 Track instances `<base>-<k>` with `by: 'listener'` and command index; `less` removes the last one added (D2); verify: three `more pad` then one `less pad` leaves `pad`, `pad-2` playing
-- [ ] 1.3 `trackFor` variety: sound, pattern, register, level, pan (D3); verify over 50 seeds that a second arp differs from the first in sound or pattern and sits an octave away, every note in the section's scale
-- [ ] 1.4 Limits: console cap 12, no per-instrument cap, recommended counts returned as a warning (not a `whyNot` reason), `hardMax` raised by `more`, director strips skip listener tracks until the outro, unlocked listener tracks may sit out a break or charge and come back (D4); verify in the check, and two kicks take different grooves over 50 seeds
-- [ ] 1.4b Owner's test, automated: over 50 seeds and every style, press `more` on each instrument at a random phrase; the added track plays at the next phrase, two phrases later, and in every phrase up to the outro except break and charge phrases, where it is back at the phrase after (`tools/check-endless.mjs`)
-- [ ] 1.4c Lock per instrument: `lock-part`/`unlock-part`, `plan.lockedParts`, locked ids include tracks added later (D12); verify: a locked bass is never stripped, varied or reshaped by the director, plays through breaks, and `more bass` on a locked bass gives a locked second bass
-- [ ] 1.4d Riser command `riser { bars, dir, sound }` ending on the next part change, replacing the director's riser there, riser track created when the style has none, late rule; riser lock keeps the director's risers out (D11); verify in `tools/check-endless.mjs` over 20 seeds: the clip ends on the change bar, one riser per change, replay same
-- [ ] 1.5 Headroom scaling past `usualHigh`, pinned gains kept (D5); verify with `node tools/check-levels.cjs` on a steered song with 12 tracks in three styles: `in=` at most 1.2, output below 1.0
-- [ ] 1.6 Extra buses skip orbits 13 and 14 (D6); verify `npm run check:code` (snapshots unchanged) and a 12-track song with a voice track compiles with distinct orbits
-- [ ] 1.7 Crescendo and Live coder growth on a song with two drums and two pads; verify `npm run check:radio-profiles` and `npm run check:crescendo`
-- [ ] 1.8 CPU at 12 tracks: radio plays a 12-track song for 2 minutes without scheduler underruns; lower the cap if it fails
-- [ ] 1.9 `DIRECTOR_VERSION` to 9; verify `npm run check:endless` (seed fixtures unchanged)
+- [x] 1.1 `INSTRUMENTS`, command kinds `more` and `less` with `part` (D1); old `add` and `remove` kept for replay; verify in `tools/check-endless.mjs` that a recorded session with `add lead` and `remove drums` gives the same song as before
+- [x] 1.2 Track instances `<base>-<k>` with `by: 'listener'` and command index; `less` removes the last one added (D2); verify: three `more pad` then one `less pad` leaves `pad`, `pad-2` playing
+- [x] 1.3 `trackFor` variety: sound, pattern, register, level, pan (D3); verify over 50 seeds that a second arp differs from the first in sound or pattern and sits an octave away, every note in the section's scale
+- [x] 1.4 Limits: console cap 12, no per-instrument cap, recommended counts returned as a warning (not a `whyNot` reason), `hardMax` raised by `more`, director strips skip listener tracks until the outro, unlocked listener tracks may sit out a break or charge and come back (D4); verify in the check, and two kicks take different grooves over 50 seeds
+- [x] 1.4b Owner's test, automated: over 50 seeds and every style, press `more` on each instrument at a random phrase; the added track plays at the next phrase, two phrases later, and in every phrase up to the outro except break and charge phrases, where it is back at the phrase after (`tools/check-endless.mjs`)
+- [x] 1.4c Lock per instrument: `lock-part`/`unlock-part`, `plan.lockedParts`, locked ids include tracks added later (D12); verify: a locked bass is never stripped, varied or reshaped by the director, plays through breaks, and `more bass` on a locked bass gives a locked second bass
+- [x] 1.4d Riser command `riser { bars, dir, sound }` ending on the next part change, replacing the director's riser there, riser track created when the style has none, late rule; riser lock keeps the director's risers out (D11); verify in `tools/check-endless.mjs` over 20 seeds: the clip ends on the change bar, one riser per change, replay same
+- [x] 1.5 Headroom scaling past `usualHigh`, pinned gains kept (D5); verify with `node tools/check-levels.cjs` on a steered song with 12 tracks in three styles: `in=` at most 1.2, output below 1.0
+- [x] 1.6 Extra buses skip orbits 13 and 14 (D6); verify `npm run check:code` (snapshots unchanged) and a 12-track song with a voice track compiles with distinct orbits
+- [x] 1.7 Crescendo and Live coder growth on a song with two drums and two pads; verify `npm run check:radio-profiles` and `npm run check:crescendo`
+- [x] 1.8 CPU at 12 tracks: radio plays a 12-track song for 2 minutes without scheduler underruns; lower the cap if it fails
+- [x] 1.9 `DIRECTOR_VERSION` to 9; verify `npm run check:endless` (seed fixtures unchanged)
 
 ## 2. Console: one + and − per instrument
 

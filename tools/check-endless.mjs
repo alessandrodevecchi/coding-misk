@@ -18,7 +18,7 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
-import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax } from '../src/endless/steering.js';
+import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax, INSTRUMENTS as ARR_PARTS, RECOMMENDED, TRACK_CAP, instrumentOf, lockedIds, moreWarning, riserTarget, partHas } from '../src/endless/steering.js';
 import { expandIdea } from '../src/song/ideas.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
@@ -112,6 +112,35 @@ function inKey(type, idea) {
   if (type === 'bass') return idea.from !== undefined || idea.add === undefined || (whole(idea.add) && String(idea.add).replace(/[!%*@]\d+/g, '').match(/-?\d+/g).every(x => ['0', '7', '12', '-5'].includes(x)));
   if (type === 'arp') return idea.random ? idea.random.max <= 4 && Number.isInteger(idea.random.seed) : String(idea.index).replace(/[!%*@]\d+/g, '').match(/-?\d+/g).every(x => /^[0-3]$/.test(x));
   return true;
+}
+
+// ---------- radio-arrangement: songs to steer with + and − per instrument ----------
+const ALL_STYLES = STYLES.map(r => r.id);
+// n songs over every style (a style per song in turn), default options, each with its plan
+function arrSongs(n, tag = 'arr', extra = {}) {
+  const out = [];
+  for (let i = 0; out.length < n; i++) {
+    const id = ALL_STYLES[i % ALL_STYLES.length], ses = createSession(STYLES, `${tag}-${i}`);
+    out.push({ ...ses.next({ styles: [id], ...extra }), seed: `${tag}-${i}`, style: id });
+  }
+  return out;
+}
+// the closing run of outros of a plan: its first double phrase
+const outroFrom = plan => { let d = plan.plan.length; while (d > 0 && plan.plan[d - 1].role === 'outro') d--; return d; };
+const onAt = (sg, bar) => playing(stateAt(sg, bar).song);
+const steerArr = (g, commands, n = 0) => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands, seed: g.seed, n });
+// "+" on instruments in turn on one boundary until the song plays 12 tracks
+// (one command at a time on the song so far, then the whole list once: the song a replay gives)
+function stack12(g, at) {
+  const cmds = [], parts = ARR_PARTS.filter(p => partHas(g.plan.R, p));
+  let r = { song: g.song, plan: g.plan, opts: g.opts };
+  for (let j = 0; j < 40 && onAt(r.song, at).filter(t => t.type !== 'riser').length < TRACK_CAP; j++) {
+    const part = parts[j % parts.length];
+    if (whyNot({ kind: 'more', part }, r.song, r.plan, at - 1)) break;
+    cmds.push({ kind: 'more', part, at });
+    r = steerSong({ song: r.song, plan: r.plan, opts: r.opts, commands: [{ kind: 'more', part, at }], seed: g.seed, n: 100 + j });
+  }
+  return { r: steerArr(g, cmds), cmds };
 }
 
 const CHECKS = {
@@ -751,7 +780,7 @@ const CHECKS = {
     assert(VARY_TYPES.every(t => types[t] > 5 && ideas[t].size >= share[t] * types[t]), `different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t] && ideas[t].size} of ${types[t]}`).join(', ')}`);
     console.log(`      200 varies, all in key; different parts: ${VARY_TYPES.map(t => `${t} ${ideas[t].size} of ${types[t]}`).join(', ')}`);
   },
-  'steering: vary is disabled when the part does not play or is locked'() {
+  'steering: vary is disabled when the part does not play, and reaches locked tracks'() {
     let checked = 0, locked = 0;
     for (const { g, type, at, ids } of varies(60)) {
       const now = at - 1;
@@ -759,12 +788,12 @@ const CHECKS = {
         const on = varyTracks(playing(stateAt(g.song, at).song), other);
         if (!on.length) { assert(whyNot({ kind: 'vary', type: other }, g.song, g.plan, now) === 'not-playing', `vary ${other}: ${whyNot({ kind: 'vary', type: other }, g.song, g.plan, now)}`); checked++; }
       }
-      // every track of the part locked: locked; one track free: allowed
+      // a lock keeps the director out, never the listener (radio-arrangement D12): a locked part can be varied
       const plan = { ...g.plan, locked: ids };
-      assert(whyNot({ kind: 'vary', type }, g.song, plan, now) === 'locked', `vary ${type} locked`);
+      assert(whyNot({ kind: 'vary', type }, g.song, plan, now) === null, `vary ${type} locked: ${whyNot({ kind: 'vary', type }, g.song, plan, now)}`);
       assert(whyNot({ kind: 'vary', type }, g.song, g.plan, now) === null, `vary ${type} allowed`);
       const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'lock', track: ids[0], at: applyBar('lock', now - 1, g.plan) }, { kind: 'vary', type, at }], seed: 'vary-lock', n: 0 });
-      if (ids.length === 1) { assert(!r.song.build.some(s => s.at === at && s.pattern && s.pattern.track === ids[0] && s.by === 'listener'), `locked ${ids[0]} varied`); locked++; }
+      if (ids.length === 1 && playing(stateAt(r.song, at).song).some(t => t.id === ids[0])) { assert(r.song.build.some(s => s.at === at && s.pattern && s.pattern.track === ids[0] && s.by === 'listener'), `locked ${ids[0]} not varied`); locked++; }
       assert(whyNot({ kind: 'vary', type }, g.song, g.plan, g.plan.bars - 1) === 'late', 'late at the end');
     }
     assert(checked > 10 && locked > 5, `not-playing ${checked}, locked ${locked}`);
@@ -908,6 +937,224 @@ const CHECKS = {
     assert(bassMore > bassLess, `different bass notes: less complex ${bassLess}, more complex ${bassMore}`);
     console.log(`      lead notes per bar ${lo.toFixed(2)} / ${hi.toFixed(2)} (density 0.2 / 0.8); mean degree ${low.toFixed(2)} / ${high.toFixed(2)} (energy 0.2 / 0.9); different degrees ${hookLess.toFixed(2)} / ${hookMore.toFixed(2)}, bass notes ${bassLess.toFixed(2)} / ${bassMore.toFixed(2)} (less / more complex)`);
   },
+  'arrangement: old add and remove replay as before radio-arrangement'() {
+    // a recorded session with add lead, remove drums, add pad and a lock gives the songs heard before (hash recorded
+    // with the code before radio-arrangement)
+    const out = [];
+    for (const [seed, styles] of [['old-a', ['berlin-techno']], ['old-b', ['synthwave', 'jazz']], ['old-c', ['trance', 'phonk']]]) {
+      const ses = createSession(STYLES, seed);
+      for (let i = 0; i < 2; i++) {
+        const g = ses.next({ styles });
+        const cmds = [{ kind: 'add', type: 'lead', at: applyBar('add', 20, g.plan) }, { kind: 'remove', type: 'drums', at: applyBar('remove', 36, g.plan) }, { kind: 'add', type: 'pad', at: applyBar('add', 52, g.plan) }, { kind: 'lock', track: 'bass', at: applyBar('lock', 52, g.plan) }];
+        out.push(steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed, n: i }).song);
+      }
+    }
+    const h = hashString(JSON.stringify(out)).toString(16).padStart(8, '0');
+    assert(h === '9475a713', `old commands give other songs: ${h}`);
+  },
+  'arrangement: + and − per instrument, several tracks of one instrument'() {
+    let checked = 0;
+    for (const g of arrSongs(30, 'arr-pm')) {
+      const at = applyBar('more', 3 * g.plan.phrase, g.plan);
+      if (at >= outroFrom(g.plan) * 2 * g.plan.phrase) continue;
+      // a song whose pad is silent: three + then one − leave two pads, the first named Pad
+      const pad = onAt(g.song, at).filter(t => instrumentOf(t) === 'pad');
+      if (!partHas(g.plan.R, 'pad')) { assert(whyNot({ kind: 'more', part: 'pad' }, g.song, g.plan, at - 1) === (g.plan.tracks.some(t => t.type === 'pad') ? null : 'no-type'), `${g.style}: + pad without pads`); continue; }
+      const cmds = [1, 2, 3].map(() => ({ kind: 'more', part: 'pad', at }));
+      const three = steerArr(g, cmds), pads = onAt(three.song, at).filter(t => instrumentOf(t) === 'pad');
+      assert(pads.length === pad.length + 3, `${g.style}: ${pad.length} pads, then ${pads.map(t => t.id)} after three +`);
+      const r = steerArr(g, [...cmds, { kind: 'less', part: 'pad', at }]), left = onAt(r.song, at).filter(t => instrumentOf(t) === 'pad').map(t => t.id);
+      assert(left.length === pad.length + 2 && !left.includes(three.plan.added[2].id), `${g.style}: − took ${JSON.stringify(left)} (last added ${three.plan.added[2].id})`);
+      if (!pad.length) assert(JSON.stringify(left) === JSON.stringify(['pad', 'pad-2']), `${g.style}: left ${left}`);
+      const p2 = r.song.tracks.find(t => t.id === left[1]);
+      assert(/^Pad \d$/.test(p2.name), `${g.style}: name ${p2.name}`);
+      assert(!validateSong(r.song).errors.length, `${g.style}: ${validateSong(r.song).errors.slice(0, 2).map(e => `${e.path}: ${e.msg}`)}`);
+      compileSong(stateAt(r.song, at + 1).song);
+      // a lock never disables + or − (D12); − on a part that does not play
+      const locked = { ...r.plan, lockedParts: ['pad'] };
+      assert(whyNot({ kind: 'more', part: 'pad' }, r.song, locked, at + 1) === null && whyNot({ kind: 'less', part: 'pad' }, r.song, locked, at + 1) === null, `${g.style}: a lock disabled + or −`);
+      const silent = ARR_PARTS.find(p => !onAt(g.song, at).some(t => instrumentOf(t) === p));
+      if (silent) assert(whyNot({ kind: 'less', part: silent }, g.song, g.plan, at - 1) === 'not-playing', `${g.style}: − ${silent}`);
+      // the same commands give the same song
+      assert(JSON.stringify(steerArr(g, [...cmds, { kind: 'less', part: 'pad', at }]).song) === JSON.stringify(r.song), `${g.style}: replay`);
+      checked++;
+    }
+    assert(checked >= 15, `only ${checked} songs`);
+  },
+  'arrangement: a second track sounds different, an octave away, in key'() {
+    let n = 0, apart = 0, octave = 0, composed = 0;
+    for (const g of arrSongs(80, 'arr-var')) {
+      for (const part of ['arp', 'hook', 'bass', 'pad', 'guitar']) {
+        const at = applyBar('more', 2 * g.plan.phrase, g.plan), first = onAt(g.song, at).filter(t => instrumentOf(t) === part);
+        if (first.length !== 1 || whyNot({ kind: 'more', part }, g.song, g.plan, at - 1)) continue;
+        const r = steerArr(g, [{ kind: 'more', part, at }]), id = r.plan.added[0].id, a = r.song.tracks.find(t => t.id === first[0].id) || g.song.tracks.find(t => t.id === first[0].id), b = r.song.tracks.find(t => t.id === id);
+        assert(b && id !== a.id && onAt(r.song, at).some(t => t.id === id), `${g.style} ${part}: no second track`);
+        const sound = t => JSON.stringify([t.settings.wave, t.settings.type, t.rack || []]), pats = t => JSON.stringify(Object.values(t.patterns));
+        if (sound(a) !== sound(b) || pats(a) !== pats(b)) apart++;
+        assert(b.settings.gain < a.settings.gain || part === 'bass' && b.settings.gain <= a.settings.gain * 0.6 + 0.01, `${g.style} ${part}: gain ${a.settings.gain} then ${b.settings.gain}`);
+        // the register: an octave up (hook octave, guitar semitones, composed ideas +12 or +7 degrees), every note in key
+        if (part === 'hook') { assert(Number(b.settings.octave) === Math.min(6, (Number(a.settings.octave) || 4) + 1), `${g.style} hook octave ${a.settings.octave} ${b.settings.octave}`); octave++; }
+        else if (part === 'guitar') { assert(Math.abs(Number(b.settings.octave) - (Number(a.settings.octave) || 0)) === 12, `guitar octave ${a.settings.octave} ${b.settings.octave}`); octave++; }
+        else if (Object.values(b.patterns).some(p => p.idea)) {
+          composed++;
+          for (const p of Object.values(b.patterns)) {
+            const i = p.idea;
+            assert(i && (typeof i.add === 'number' && i.add >= 7 || typeof i.sub === 'number' && i.sub < (part === 'bass' && i.from !== undefined ? 21 : 0)), `${g.style} ${part}: not shifted ${JSON.stringify(i)}`);
+            assert(inKey(b.type, { ...i, add: typeof i.add === 'number' ? undefined : i.add }), `${g.style} ${part}: out of key ${JSON.stringify(i)}`);
+          }
+          octave++;
+        }
+        assert(!validateSong(r.song).errors.length, `${g.style} ${part}: invalid`);
+        compileSong(stateAt(r.song, at + 1).song);
+        n++;
+      }
+    }
+    assert(n >= 50 && apart === n && octave >= n * 0.8, `${n} second tracks, ${apart} differ, ${octave} an octave away (${composed} composed)`);
+    console.log(`      ${n} second tracks, all different in sound or pattern, ${octave} an octave away, ${composed} composed`);
+  },
+  'arrangement: limits, recommended counts as warnings, two kicks on different grooves'() {
+    let kicks = 0, other = 0, capped = 0, k = 0;
+    for (const g of arrSongs(50, 'arr-lim')) {
+      k++;
+      const at = applyBar('more', 2 * g.plan.phrase, g.plan);
+      if (partHas(g.plan.R, 'kick') && onAt(g.song, at).some(t => t.id === 'kick')) {
+        const w = moreWarning('kick', g.song, g.plan, at - 1);
+        assert(w && w.count === 2 && w.rec === 1 && whyNot({ kind: 'more', part: 'kick' }, g.song, g.plan, at - 1) === null, `${g.style}: + kick ${JSON.stringify(w)}`);
+        const r = steerArr(g, [{ kind: 'more', part: 'kick', at }]), k2 = r.song.tracks.find(t => t.id === r.plan.added[0].id), k1 = r.song.tracks.find(t => t.id === 'kick');
+        // (the kick's pattern playing on the boundary against the second kick's first one)
+        const cur = stateAt(r.song, at).song.tracks.find(t => t.id === 'kick'), bdOf = p => (p.rows ? p.rows.bd : p.idea && p.idea.beat ? `${p.idea.beat.grid}:${p.idea.beat.bd}` : null);
+        const rows = t => JSON.stringify(t === k2 ? bdOf(t.patterns.A) : bdOf(t.patterns[(cur.clips[0] || {}).pattern || 'A'] || t.patterns.A));
+        const bds = new Set(g.plan.R.drums.grooves.map(x => (GROOVES[x] || [])[1]).filter(Boolean).map(x => x.bd).filter(x => x && x.includes('x')));
+        kicks++;
+        if (bds.size > 1) { assert(rows(k1) !== rows(k2), `${g.style}: two kicks on the same steps`); other++; }
+        assert(k2.settings.gain <= Math.round(k1.settings.gain * 75 + 1) / 100, `${g.style}: kick 2 gain ${k2.settings.gain}`);
+      }
+      // the cap: 12 tracks, then every + is disabled; the song's maximum follows the listener (on 15 songs)
+      if (k > 15) continue;
+      const { r } = stack12(g, at), n = onAt(r.song, at).filter(t => t.type !== 'riser').length;
+      if (n === TRACK_CAP) {
+        capped++;
+        assert(ARR_PARTS.every(p => whyNot({ kind: 'more', part: p }, r.song, r.plan, at - 1) === (r.song.tracks.some(t => instrumentOf(t) === p) || partHas(g.plan.R, p) ? 'cap' : 'no-type')), `${g.style}: + at 12 tracks`);
+        assert(r.plan.hardMax >= TRACK_CAP && densityMax(r.plan) >= Math.min(TRACK_CAP, r.plan.tracks.filter(t => t.type !== 'riser').length), `${g.style}: hardMax ${r.plan.hardMax}`);
+        assert(!validateSong(r.song).errors.length, `${g.style}: 12 tracks invalid`);
+      }
+    }
+    assert(kicks >= 20 && other >= 10 && capped >= 12, `kicks ${kicks}, on another groove ${other}, capped ${capped}`);
+    console.log(`      ${kicks} second kicks (${other} on another groove), ${capped} songs stacked to ${TRACK_CAP} tracks`);
+  },
+  "arrangement: the owner's test, a track added with + stays until the outro"() {
+    let n = 0, sat = 0;
+    for (const g of arrSongs(50, 'arr-stay')) {
+      const ph = g.plan.phrase, dbl = 2 * ph, end = outroFrom(g.plan) * dbl, rng = stream(g.seed, 'arr-stay');
+      for (const part of ARR_PARTS) {
+        if (!partHas(g.plan.R, part) && !g.plan.tracks.some(t => instrumentOf(t) === part)) continue;
+        const now = rng.int(1, Math.max(1, end / ph - 3)) * ph - 1, at = applyBar('more', now, g.plan);
+        if (at >= end - ph || whyNot({ kind: 'more', part }, g.song, g.plan, now)) continue;
+        const r = steerArr(g, [{ kind: 'more', part, at }]), id = r.plan.added[0].id;
+        const roleAt = b => r.plan.plan[Math.floor(b / dbl)].role;
+        assert(onAt(r.song, at).some(t => t.id === id), `${g.style} ${part}: not playing on the next phrase (${at})`);
+        if (at + 2 * ph < end && roleAt(at + 2 * ph) !== 'break') assert(onAt(r.song, at + 2 * ph).some(t => t.id === id), `${g.style} ${part}: gone two phrases later`);
+        for (let b = at; b < Math.min(end, r.plan.bars - ph); b += ph) {
+          const on = onAt(r.song, b).some(t => t.id === id);
+          if (roleAt(b) === 'break') { if (!on) sat++; continue; }
+          assert(on, `${g.style} ${part} ${id}: silent on bar ${b} (${roleAt(b)}), added on ${at}`);
+        }
+        n++;
+      }
+    }
+    assert(n >= 250, `only ${n} additions`);
+    console.log(`      ${n} additions over 50 songs and every style, each playing up to the outro (${sat} phrases sat out in breaks)`);
+  },
+  'arrangement: a lock per instrument'() {
+    let n = 0;
+    for (const g of arrSongs(40, 'arr-lock')) {
+      const at = applyBar('lock-part', 2 * g.plan.phrase, g.plan);
+      // (the bass playing before the boundary: a lock keeps a silent bass out, D12)
+      if (!onAt(g.song, at - 1).some(t => t.type === 'bass')) continue;
+      const r = steerArr(g, [{ kind: 'lock-part', part: 'bass', at }]), bass = onAt(g.song, at - 1).filter(t => t.type === 'bass').map(t => t.id);
+      assert(bass.every(id => lockedIds(r.plan).includes(id)), `${g.style}: bass not locked`);
+      // the director leaves the bass alone and it plays through breaks to the end
+      const touched = r.song.build.filter(s => s.at >= at && !s.by && stepTracks(s).some(id => bass.includes(id)));
+      assert(!touched.length, `${g.style}: the director moved a locked bass: ${JSON.stringify(touched[0])}`);
+      for (let b = at; b < r.plan.bars; b += g.plan.phrase) assert(bass.every(id => onAt(r.song, b).some(t => t.id === id)), `${g.style}: locked bass silent on bar ${b}`);
+      // + on a locked bass: a second bass, locked as well
+      const at2 = at + g.plan.phrase, r2 = steerArr(g, [{ kind: 'lock-part', part: 'bass', at }, { kind: 'more', part: 'bass', at: at2 }]), b2 = r2.plan.added[0].id;
+      assert(lockedIds(r2.plan).includes(b2) && onAt(r2.song, r2.plan.bars - 1).some(t => t.id === b2), `${g.style}: second bass ${b2} not locked or gone`);
+      // the mixer unlocks one track: that one only, the instrument keeps the other locked one by one
+      const r3 = steerArr(g, [{ kind: 'lock-part', part: 'bass', at }, { kind: 'more', part: 'bass', at: at2 }, { kind: 'unlock', track: b2, at: at2 }]);
+      assert(!lockedIds(r3.plan).includes(b2) && bass.every(id => lockedIds(r3.plan).includes(id)) && !(r3.plan.lockedParts || []).includes('bass'), `${g.style}: mixer unlock ${JSON.stringify([r3.plan.locked, r3.plan.lockedParts])}`);
+      const r4 = steerArr(g, [{ kind: 'lock-part', part: 'bass', at }, { kind: 'unlock-part', part: 'bass', at: at2 }]);
+      assert(!lockedIds(r4.plan).length, `${g.style}: unlock-part left ${lockedIds(r4.plan)}`);
+      n++;
+    }
+    assert(n >= 15, `only ${n} songs with a bass`);
+  },
+  'arrangement: a riser on the next part change'() {
+    let n = 0, own = 0;
+    for (const g of arrSongs(40, 'arr-riser')) {
+      const ph = g.plan.phrase, now = 2 * ph + 1, at = applyBar('riser', now, g.plan);
+      for (const [bars, dir] of [['auto', 'up'], [4, 'up'], [2, 'down']]) {
+        const cmd = { kind: 'riser', bars, dir, sound: 'noise' }, tg = riserTarget(g.plan, at, cmd);
+        if (!tg) { assert(whyNot(cmd, g.song, g.plan, now) === 'late', `${g.style}: no target, not late`); continue; }
+        const r = steerArr(g, [{ ...cmd, at }]), id = r.plan.risers[0].track;
+        const role = d => g.plan.plan[d].role, d = tg.change / (2 * ph);
+        assert(d > 0 && (role(d) !== role(d - 1) || !g.plan.plan.some((x, i) => i > 0 && i * 2 * ph - at >= 2 && x.role !== g.plan.plan[i - 1].role)), `${g.style}: change on ${tg.change} is not a part change`);
+        assert(dir === 'up' ? tg.end === tg.change && tg.start === tg.change - tg.bars : tg.start === tg.change, `${g.style}: ${JSON.stringify(tg)}`);
+        assert(onAt(r.song, tg.start).some(t => t.id === id) && onAt(r.song, tg.end - 1).some(t => t.id === id) && (tg.end >= r.plan.bars || !onAt(r.song, tg.end).some(t => t.id === id)), `${g.style}: riser not on ${tg.start} to ${tg.end}`);
+        const st = stateAt(r.song, tg.start).song.tracks.find(t => t.id === id);
+        assert(String(st.settings.bars) === String(tg.bars) && st.settings.dir === dir, `${g.style}: riser settings ${JSON.stringify(st.settings)}`);
+        // one riser per change: the director adds none in the phrase before it
+        const adds = r.song.build.filter(s => listOf(s.add).includes(id) && s.at >= tg.start - ph && s.at < tg.end);
+        assert(adds.length === 1 && adds[0].by === 'listener', `${g.style}: risers on that change ${JSON.stringify(adds)}`);
+        if (!g.plan.tracks.some(t => t.type === 'riser')) { own++; assert(r.song.build.filter(s => stepTracks(s).includes(id)).every(s => s.by === 'listener'), `${g.style}: the director used the listener's riser`); }
+        assert(!validateSong(r.song).errors.length, `${g.style}: invalid with a riser`);
+        compileSong(stateAt(r.song, tg.start).song);
+        assert(JSON.stringify(steerArr(g, [{ ...cmd, at }]).song) === JSON.stringify(r.song), `${g.style}: riser replay`);
+        n++;
+      }
+      // the riser lock keeps the director's risers out of the song
+      const riser = g.plan.tracks.find(t => t.type === 'riser');
+      if (riser) { const r = steerArr(g, [{ kind: 'lock-part', part: 'riser', at }]); assert(!r.song.build.some(s => s.at >= at && !s.by && listOf(s.add).includes(riser.id)), `${g.style}: the director placed a riser with the lock closed`); }
+    }
+    assert(n >= 60 && own >= 10, `${n} risers, ${own} in styles without one`);
+    console.log(`      ${n} risers placed (${own} in styles without a riser)`);
+  },
+  'arrangement: headroom as tracks add up, a volume set by hand kept'() {
+    let n = 0;
+    for (const g of arrSongs(12, 'arr-head')) {
+      const at = applyBar('more', 2 * g.plan.phrase, g.plan), { r, cmds } = stack12(g, at), on = onAt(r.song, at).filter(t => t.type !== 'riser');
+      if (on.length <= g.plan.usualHigh) continue;
+      const f = Math.sqrt(r.plan.usualHigh / on.length), st = stateAt(r.song, at).song;
+      for (const t of on) { const own = r.song.tracks.find(x => x.id === t.id).settings.gain; assert(Math.abs(st.tracks.find(x => x.id === t.id).settings.gain - Math.round(own * f * 100) / 100) <= 0.011, `${g.style}: ${t.id} gain ${st.tracks.find(x => x.id === t.id).settings.gain}, own ${own}, factor ${f.toFixed(2)}`); }
+      // a volume set in the mixer stays as set
+      const pin = on[0].id, v = steerArr(g, [...cmds, { kind: 'volume', track: pin, value: 0.42, at: at + 1 }]);
+      for (let b = at + g.plan.phrase; b < v.plan.bars; b += g.plan.phrase) { const x = stateAt(v.song, b).song.tracks.find(t => t.id === pin); assert(x.settings.gain === 0.42, `${g.style}: pinned gain ${x.settings.gain} on ${b}`); }
+      // fewer tracks, the gains come back
+      const last = r.song.build.filter(s => s.set && s.set.gain !== undefined && s.at > at);
+      assert(!validateSong(r.song).errors.length && last.every(s => s.set.gain <= r.song.tracks.find(t => t.id === s.set.track).settings.gain + 0.001), `${g.style}: a gain above its own`);
+      n++;
+    }
+    assert(n >= 9, `only ${n} songs`);
+  },
+  'arrangement: extra buses skip the spoken and narrator orbits, every track its own'() {
+    let n = 0;
+    for (const g of arrSongs(20, 'arr-bus', { voice: { presence: 'always' } })) {
+      const at = applyBar('more', 2 * g.plan.phrase, g.plan), { r } = stack12(g, at);
+      const song = { ...stateAt(r.song, at).song };
+      const code = compileSong(song), spoken = r.song.tracks.some(t => t.type === 'spoken');
+      const orbits = [];
+      for (const t of song.tracks.filter(x => !x.mute && x.type !== 'voice' && x.type !== 'spoken')) {
+        const i = code.indexOf(`// ========== ${[...new Set([t.name || t.id, t.type])].join(' · ')} ==========`);
+        if (i < 0) continue;
+        const m = code.slice(i).match(/\.orbit\((\d+)\)/);
+        orbits.push(Number(m[1]));
+      }
+      assert(new Set(orbits).size === orbits.length, `${g.style}: shared buses ${orbits}`);
+      assert(!orbits.some(o => o === 15 || (spoken && (o === 13 || o === 14))), `${g.style}: a track on a voice bus ${orbits}`);
+      if (spoken) n++;
+    }
+    assert(n >= 3, `only ${n} songs with a spoken track`);
+  },
   'steering: one vary takes less than 20 ms'() {
     const all = varies(40), times = all.map(({ g, type, at }) => { const t0 = performance.now(); steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'vary', type, at }], seed: 'vary-time', n: 1 }); return performance.now() - t0; }).sort((a, b) => a - b);
     const median = times[Math.floor(times.length / 2)], max = times[times.length - 1];
@@ -941,10 +1188,13 @@ const CHECKS = {
   },
 };
 
+// --only <text>: run only the checks whose name holds the text
+const onlyArg = process.argv.indexOf('--only'), only = onlyArg >= 0 ? process.argv[onlyArg + 1] : null;
 let failed = 0;
-for (const [name, fn] of Object.entries(CHECKS)) {
-  try { fn(); console.log(`ok    ${name}`); }
-  catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); }
+for (const [name, fn] of Object.entries(CHECKS).filter(([n]) => !only || n.includes(only))) {
+  const t0 = performance.now();
+  try { fn(); console.log(`ok    ${name}${process.env.CHECK_TIME ? ` (${((performance.now() - t0) / 1000).toFixed(1)} s)` : ''}`); }
+  catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); if (process.env.CHECK_STACK) console.log(e.stack); }
 }
-console.log(`${Object.keys(CHECKS).length - failed} passed, ${failed} failed`);
+console.log(`${Object.keys(CHECKS).filter(n => !only || n.includes(only)).length - failed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

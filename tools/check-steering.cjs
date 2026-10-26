@@ -2,7 +2,7 @@
 // curve drag, the mixer, the scope switch, shortcuts, length commands and replay with steering; Vary and Swap with the
 // part picker, and the material source next to the knobs (radio-variation); commands as waypoints on a Live coder song
 // (radio-profiles stage 5).
-// Usage: PLAYWRIGHT_CORE=... node tools/check-steering.cjs [shots-dir]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-steering.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -16,7 +16,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const page = await (await browser.newContext({ viewport: { width: 1300, height: 1300 } })).newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['berlin-techno'], chaos: 0.3, energy: 0.5, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); });
   await page.reload(); await sleep(3500);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);

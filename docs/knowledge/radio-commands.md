@@ -30,7 +30,7 @@ A command rewrites the song from its boundary. The steps before it stay. The res
 - **Narrator and voice instrument.** Moves can be commented by the narrator ([narrator.md](narrator.md)); Talk more and Talk less sit in the Narrator group. The `voice` command (voice-placement) comes from the button Apply to the song on air in the Voices group, not from the console: it rewrites the song's voice instrument from the first quiet part after the next phrase, keeps the clips before, replaces a pending one, and is applied again after every later rewrite ([voice.md](voice.md)).
 - **Guide.** Every command needs a line in the Radio card of the Guide (`npm run check:guide`).
 
-A command that cannot apply is disabled with a reason: `late`, `no-type`, `all-playing`, `locked`, `last-track`, `no-target`, `no-drop`, `not-playing`, `no-ready`, `transition`.
+A command that cannot apply is disabled with a reason: `late`, `no-type`, `all-playing`, `locked`, `last-track`, `no-target`, `no-drop`, `not-playing`, `no-ready`, `transition`, `cap`. A lock never disables a listener's command (radio-arrangement D12): Vary, Swap and the sound commands reach locked tracks; only `add` and `remove`, kept for sessions recorded before, still skip them.
 
 ## Options
 
@@ -43,6 +43,11 @@ A command that cannot apply is disabled with a reason: `late`, `no-type`, `all-p
 | `remove` | arrangement | next phrase | − [type] | Adds or removes this instrument at the next phrase |
 | `more-complex` | arrangement | next phrase | More complex (it: Più complesso) | More tracks at once |
 | `less-complex` | arrangement | next phrase | Simpler (it: Più semplice) | Fewer tracks at once |
+| `more` | arrangement | next phrase |  | no help text: described below |
+| `less` | arrangement | next phrase |  | no help text: described below |
+| `lock-part` | arrangement | next phrase |  | no help text: described below |
+| `unlock-part` | arrangement | next phrase |  | no help text: described below |
+| `riser` | arrangement | next phrase |  | no help text: described below |
 | `vary` | arrangement | next phrase | Vary [type] (it: Varia [type]) | New notes for the [type] from the next phrase: composed in the song's key and chords, with the same sound |
 | `swap` | arrangement | next phrase | Swap [type] (it: Scambia [type]) | Another ready part for the [type] from the next phrase: a preset of the style or one of your saved patterns that fits, never composed |
 | `darker` | sound | next phrase | Darker (it: Più scuro) | Closes the filters |
@@ -75,7 +80,13 @@ Commands without a help text in the app:
 - `curve-reset`: the remaining double phrases of that curve go back to automatic.
 - `volume`: a pinned level for a track, from the next bar.
 - `unmute`: a muted track plays again from the next bar.
-- `unlock`: the director may change the track again.
+- `unlock`: the director may change the track again. A track of a locked instrument unlocked in the mixer: that track only; the instrument's other tracks stay locked one by one.
+- `more`: one more track of an instrument (`part`: kick, beat, bass, arp, hook, guitar, pad, texture) from the next phrase, even when one plays: a silent track of it the song holds, else a new one (`arp-2`, "Arp 2") from the style, with another sound and pattern, an octave up and at a lower gain (× 0.75, × 0.6 for a third one or a second bass). Up to 12 tracks play at once (`cap`); past the recommended count (kick 1, beat 2, bass 2, the others 3) it warns and never blocks (`moreWarning`). The director never strips a track the listener added before the final outro; one that sat out a break or a charge comes back on the next phrase.
+- `less`: one fewer track of an instrument: the listener's last one, else the one that came in last (`not-playing`, `last-track`).
+- `lock-part`, `unlock-part`: a lock per instrument (or the riser): the director leaves every track of it alone for the rest of the song, tracks added later included; a locked drum plays through breaks and charges. The listener's own commands still act on locked tracks. `unlock-part` also opens the per-track locks of that instrument.
+- `riser`: a noise sweep (`bars`: auto, 2, 4 or 8; `dir`: up or down; `sound`: noise) that ends on the next part change (up) or starts on it (down), replacing the director's riser there; in a style without a riser the song gets one only the listener uses (`riserTarget`; `late` when no change is 2 bars away).
+
+Every `+` writes a headroom rule: on phrases where more tracks play than the song's usual count, the tracks whose gain the listener did not set play at `sqrt(usual / n)` of their gain (`set` steps on the phrase). Extra buses skip the spoken orbits (13, 14) and the narrators' (15 and up).
 
 Vary and Swap take a part: lead (the default), bass, arp or pad. For Vary the lead is the hook, else the guitar. On a grown song both are typed as small notes edits of the line (see What it is).
 

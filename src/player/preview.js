@@ -3,6 +3,7 @@
 // the song is stopped it plays on a bare Cyclist of its own. The pure part (previewExpression) runs in Node.
 
 import { ORBIT_OF } from '../music.js';
+import { extraOrbits } from '../song/compile.js';
 
 // its own orbit, above the song's, so its delay and reverb never retune the song's (design D3): the compiler gives 1-8
 // by type and extra tracks 9 and up, spoken tracks 13 and 14, voice tracks (the narrator) 15 and up
@@ -10,12 +11,14 @@ import { ORBIT_OF } from '../music.js';
 export const PREVIEW_ORBIT = 20;
 export function previewOrbit(tracks = []) {
   let top = 0, extra = 8, voices = 0;
-  const used = new Set();
+  const used = new Set(), next = extraOrbits(tracks);
+  // (as the compiler: extra buses skip the spoken and the narrators' orbits, radio-arrangement D6)
+  const nextExtra = () => (extra = next(extra));
   for (const tr of tracks) {
     // (a voice track takes a bus number like an extra track, as in the compiler, and speaks on 15 and up)
-    if (tr.type === 'voice') { top = Math.max(top, 15 + voices++, ++extra); continue; }
+    if (tr.type === 'voice') { top = Math.max(top, 15 + voices++, nextExtra()); continue; }
     if (tr.type === 'spoken') { top = Math.max(top, 14); continue; }
-    top = Math.max(top, !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : ++extra);
+    top = Math.max(top, !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : nextExtra());
     used.add(tr.type);
   }
   return Math.max(PREVIEW_ORBIT, top + 1);

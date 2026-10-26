@@ -3,7 +3,7 @@
 // line above the style's headroom is a warning); a part varied before the end plays into the transition (radio-variation).
 // Then the same with Profile set to Live coder (radio-profiles 4.2), cut included: each transition goes into and out of a
 // Live coder song grown on air, the incoming song hidden on its own orbits; the orbits in use per window are reported.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-transitions.cjs [kind,kind…] [--classic | --coder]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-transitions.cjs [kind,kind…] [--classic | --coder]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const { CLIP, tapOutput, outputPeak, songHeadroom } = require('./output-peak.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -17,7 +17,7 @@ const RUNS = [...(argv.includes('--coder') ? [] : [{ profile: 'artist', kinds: K
   const page = await (await browser.newContext({ viewport: { width: 1300, height: 1000 } })).newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['berlin-techno'], chaos: 0.3, energy: 0.7, complexity: 0.5, talk: 0.5, artist: null, transition: 'mix', harmony: 'compatible' })); });
   await page.reload(); await sleep(3500);
   await tapOutput(page);

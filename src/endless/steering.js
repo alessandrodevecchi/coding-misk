@@ -1,19 +1,23 @@
 // Radio steering (#24, docs/ENDLESS.md "Steering"): the listener's commands turn into a rewrite of the song on
 // air from a boundary. A song is always rebuilt from its original plan plus every command still standing,
 // in order, so cancelling a command or replaying a session gives exactly the same song.
-import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, liftOf, OPTION_DEFAULTS } from './director.js';
+import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, trackForPart, liftOf, OPTION_DEFAULTS } from './director.js';
 import { stream } from './random.js';
-import { stateAt } from '../song/build.js';
+import { stateAt, buildSteps } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
-import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, meterSteps } from '../music.js';
+import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, GROOVES, meterSteps, fitSteps } from '../music.js';
 import { airIdea, composesOnAir, sessionSource, readyParts } from './material.js';
-import { presetOf } from '../material/index.js';
+import { presetOf, compose } from '../material/index.js';
 import { rewriteSpoken, nextQuiet } from './voice-track.js';
 
 // commands of the console: group, whether they change the song's structure (applied on a double phrase)
 export const COMMANDS = {
   'energy-up': { group: 'energy' }, 'energy-down': { group: 'energy' },
+  // (add and remove of a coarse type: kept for the sessions recorded before radio-arrangement, no longer in the console)
   add: { group: 'arrangement' }, remove: { group: 'arrangement' }, 'more-complex': { group: 'arrangement' }, 'less-complex': { group: 'arrangement' },
+  // one more or one fewer track of an instrument (radio-arrangement D1, D2), a lock per instrument (D12), a riser on the
+  // next part change (D11)
+  more: { group: 'arrangement' }, less: { group: 'arrangement' }, 'lock-part': { group: 'arrangement' }, 'unlock-part': { group: 'arrangement' }, riser: { group: 'arrangement' },
   // new notes for a part (radio-variation): a pattern step from the next phrase
   vary: { group: 'arrangement' },
   // another ready part (a preset or a saved pattern) for a part, never composed: a pattern step from the next phrase
@@ -30,6 +34,34 @@ export const COMMANDS = {
   volume: { group: 'mixer', bar: true }, mute: { group: 'mixer', bar: true }, unmute: { group: 'mixer', bar: true }, lock: { group: 'mixer' }, unlock: { group: 'mixer' },
 };
 export const ARRANGE_TYPES = ['drums', 'bass', 'lead', 'pad', 'texture'];
+// The instruments of the console (radio-arrangement D1): a + and a − each. kick is a drums track holding the bd row, beat
+// a drums track holding the other rows; hook is the melody.
+export const INSTRUMENTS = ['kick', 'beat', 'bass', 'arp', 'hook', 'guitar', 'pad', 'texture'];
+// the parts a lock can hold: the instruments and the riser (D11, D12)
+export const LOCK_PARTS = [...INSTRUMENTS, 'riser'];
+// recommended tracks per instrument (D4): past it the console warns, it never blocks
+export const RECOMMENDED = { kick: 1, beat: 2, bass: 2, arp: 3, hook: 3, guitar: 3, pad: 3, texture: 3 };
+// the most tracks a song plays at once from the console (riser and voices not counted, D4)
+export const TRACK_CAP = 12;
+// the riser row (D11): lengths and sounds
+export const RISER_BARS = ['auto', 2, 4, 8];
+export const RISER_SOUNDS = ['noise'];
+// the instrument of a track: kick and beat for drums (by id: kick, kick-2…), else its type; null for voices
+export function instrumentOf(t) {
+  if (!t) return null;
+  if (t.type === 'drums') return /^kick(-\d+)?$/.test(t.id) ? 'kick' : 'beat';
+  return ['bass', 'arp', 'hook', 'guitar', 'pad', 'texture', 'riser'].includes(t.type) ? t.type : null;
+}
+// the tracks a lock holds: the mixer's per-track locks and every track of a locked instrument (D12)
+export const lockedIds = plan => [...new Set([...(plan.locked || []), ...(plan.tracks || []).filter(t => (plan.lockedParts || []).includes(instrumentOf(t))).map(t => t.id)])];
+// the tracks the console counts (the riser marks a moment and is left out, D4)
+const counted = t => t.type !== 'riser';
+// whether the song's style can play an instrument: kick and beat need a groove with those rows; the riser always can
+export function partHas(R, part) {
+  if (part === 'riser') return true;
+  if (part === 'kick' || part === 'beat') return !!(R.drums && (R.drums.grooves || []).some(g => Object.entries((GROOVES[g] || [])[1] || {}).some(([k, v]) => (part === 'kick' ? k === 'bd' : k !== 'bd') && String(v).includes('x'))));
+  return !!R[part];
+}
 // the parts Vary and Swap can rewrite, lead first (the default); for vary the lead is the hook, else the guitar, and the arp is
 // a part of its own (radio-variation D1)
 export const VARY_TYPES = ['lead', 'bass', 'arp', 'pad'];
@@ -70,7 +102,18 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
   const at = applyBar(cmd.kind, now, plan);
   if (at <= now || at >= plan.bars) return 'late';
   if (cmd.kind === 'extend' && at >= plan.bars - tail) return 'transition';
-  const st = stateOf(song, plan, at), on = playing(st), locked = plan.locked || [];
+  const st = stateOf(song, plan, at), on = playing(st), locked = lockedIds(plan);
+  // one more track of an instrument: the style has it or the song holds one, below the cap (a lock never blocks the
+  // listener, D12; past the recommended count it warns, moreWarning)
+  if (cmd.kind === 'more') {
+    if (!st.tracks.some(t => instrumentOf(t) === cmd.part) && !partHas(plan.R, cmd.part)) return 'no-type';
+    return on.filter(counted).length >= TRACK_CAP ? 'cap' : null;
+  }
+  if (cmd.kind === 'less') {
+    if (!on.some(t => instrumentOf(t) === cmd.part)) return 'not-playing';
+    return on.filter(counted).length <= 1 ? 'last-track' : null;
+  }
+  if (cmd.kind === 'riser') return riserTarget(plan, at, cmd) ? null : 'late';
   if (cmd.kind === 'add') {
     const all = st.tracks.filter(t => ofType(t, cmd.type));
     // a type the song has no track for: a new one from the song's style (#41), unless the style has none
@@ -82,9 +125,8 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
   if (cmd.kind === 'vary' || cmd.kind === 'swap') {
     const mine = varyTracks(on, cmd.type || 'lead');
     if (!mine.length) return 'not-playing';
-    const free = mine.filter(t => !locked.includes(t.id));
-    if (!free.length) return 'locked';
-    if (cmd.kind === 'swap' && !free.some(t => readyParts(t, plan.R, opts || {}, plan.parts).length)) return 'no-ready';
+    // (a lock keeps the director out, never the listener: radio-arrangement D12)
+    if (cmd.kind === 'swap' && !mine.some(t => readyParts(t, plan.R, opts || {}, plan.parts).length)) return 'no-ready';
     return null;
   }
   if (cmd.kind === 'remove') {
@@ -94,7 +136,7 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
     return mine.some(t => !locked.includes(t.id)) ? null : 'locked';
   }
   if (['darker', 'brighter', 'dirtier', 'cleaner', 'more-space'].includes(cmd.kind)) {
-    const ok = candidateMoves(st, { usual: plan.usualHigh, weights: plan.R.energy, hardMax: plan.hardMax }, new Set(locked), stream('probe')).some(m => m.kind === cmd.kind);
+    const ok = candidateMoves(st, { usual: plan.usualHigh, weights: plan.R.energy, hardMax: plan.hardMax }, new Set(), stream('probe')).some(m => m.kind === cmd.kind);
     return ok ? null : 'no-target';
   }
   // the voice instrument: a quiet part must come after the bar (and a track to stop, for "never")
@@ -107,6 +149,35 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
   return null;
 }
 export const canApply = (cmd, song, plan, now) => !whyNot(cmd, song, plan, now);
+
+// The tracks of an instrument playing at the bar where a command given now applies, and whether one more goes past the
+// recommended count (D4): { part, count (after the press), rec } or null
+export function partCount(song, plan, now, part) {
+  const at = Math.min(plan.bars - 1, applyBar('more', now, plan));
+  return playing(stateOf(song, plan, at)).filter(t => instrumentOf(t) === part).length;
+}
+export function moreWarning(part, song, plan, now) {
+  const n = partCount(song, plan, now, part) + 1;
+  return n > RECOMMENDED[part] ? { part, count: n, rec: RECOMMENDED[part] } : null;
+}
+
+// The riser of a command given at bar `at` (D11): it ends on the next part change (a double phrase where the role
+// changes; when none is left, the next double phrase), at least 2 bars ahead; up: the bars before the change, down: the
+// bars after it. bars: auto (the style's riser length, else 8), 2, 4 or 8, never more than the bars there are, and a
+// length the change bar divides, so the sweep starts on its first bar. → { change, start, end, bars, dir, sound } or null
+export function riserTarget(plan, at, cmd = {}) {
+  const dbl = 2 * plan.phrase, dir = cmd.dir === 'down' ? 'down' : 'up', roles = plan.plan.map(d => d.role);
+  const ok = d => d > 0 && d < roles.length && d * dbl - at >= 2;
+  let d = roles.findIndex((r, i) => ok(i) && r !== roles[i - 1]);
+  if (d < 0) d = roles.findIndex((r, i) => ok(i));
+  if (d < 0) return null;
+  const change = d * dbl, room = dir === 'up' ? change - at : plan.bars - change;
+  const own = Number(((plan.R && plan.R.riser && plan.R.riser.settings) || {}).bars) || 8;
+  const want = Number.isFinite(Number(cmd.bars)) && Number(cmd.bars) > 0 ? Number(cmd.bars) : own;
+  const bars = [want, 8, 4, 2].find(b => b <= want && b <= room && change % b === 0);
+  if (!bars) return null;
+  return { change, start: dir === 'up' ? change - bars : change, end: dir === 'up' ? change : change + bars, bars, dir, sound: RISER_SOUNDS.includes(cmd.sound) ? cmd.sound : 'noise' };
+}
 
 const KIND_OF = { drums: ['drums'], bass: ['bass'], lead: ['hook', 'arp', 'guitar'], pad: ['pad'], texture: ['texture'] };
 const styleHas = (plan, type) => (KIND_OF[type] || []).some(k => plan.R[k]);
@@ -181,7 +252,7 @@ function composeNew(P, O, song, st, at, ids, seed) {
 // drawn from the stream "<track>" of the seed swap:<song>:<index>.
 function vary(song, P, O, cmd, st, seed) {
   const swap = cmd.kind === 'swap', prefix = swap ? 'S' : 'V';
-  const on = varyTracks(playing(st), cmd.type || 'lead').filter(t => !P.locked.includes(t.id));
+  const on = varyTracks(playing(st), cmd.type || 'lead');
   const M = swap ? null : { ...airInputs(P, O, st, cmd.at), source: 'composed', keepChords: true };
   let build = (song.build || []).slice();
   const tracks = song.tracks.map(t => ({ ...t }));
@@ -212,10 +283,161 @@ function vary(song, P, O, cmd, st, seed) {
   return { song: { ...song, tracks, build }, plan: P, opts: O };
 }
 
+// ---------- per-instrument arrangement (radio-arrangement) ----------
+
+const listOf = v => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
+// the steps of a drums pattern as rows of x and dots on n steps (rows or a beat idea), for comparing grooves
+function rowsOf(p, n) {
+  if (!p) return {};
+  if (p.rows) return Object.fromEntries(Object.entries(p.rows).map(([k, v]) => [k, fitSteps(v, n)]));
+  const beat = p.idea && p.idea.beat;
+  if (!beat) return {};
+  const grid = beat.grid || n;
+  return Object.fromEntries(Object.entries(beat).filter(([k]) => k !== 'grid').map(([k, v]) => { const on = new Set(String(v).split(',').map(Number)); return [k, fitSteps(Array.from({ length: grid }, (_, i) => (on.has(i) ? 'x' : '.')).join(''), n)]; }));
+}
+// an idea an octave up (semitones on notes; 7 degrees on scale degrees), through a numeric add, else a numeric sub
+function shiftIdea(idea, semis) {
+  if (!idea || !semis) return idea;
+  const n = idea.degrees !== undefined || (idea.from !== undefined && idea.scale) ? Math.round(semis / 12) * 7 : semis;
+  if (idea.add === undefined || typeof idea.add === 'number') return { ...idea, add: (idea.add || 0) + n };
+  if (idea.sub === undefined || typeof idea.sub === 'number') return { ...idea, sub: (idea.sub || 0) - n };
+  return idea;
+}
+// A new track of an instrument (D2, D3): the style's track for it, with an instance id and name when the song holds the
+// instrument already, and then a sound, a pattern, a register and a level that differ from the tracks of the
+// instrument in the song. Seeded by the command (seed), so a replay gives the same track.
+function newTrack(P, O, part, st, at, seed) {
+  const r = stream(seed, 'track'), R = P.R;
+  const same = P.tracks.filter(t => instrumentOf(t) === part), ids = new Set(P.tracks.map(t => t.id));
+  // (a song holding an instrument its style does not give, a mix of styles: a copy of its own track)
+  const tpl = trackForPart(R, part, P.meter, complexityOf(P, O), r) || (same.length ? JSON.parse(JSON.stringify({ ...same[0], id: same[0].id.replace(/-\d+$/, ''), name: String(same[0].name || same[0].id).replace(/ \d+$/, '') })) : null);
+  if (!tpl) return null;
+  let id = tpl.id, k = 1;
+  while (ids.has(id)) id = `${tpl.id}-${++k}`;
+  const t = { ...tpl, id, name: k > 1 ? `${tpl.name} ${k}` : tpl.name, settings: { ...tpl.settings }, ...(tpl.rack ? { rack: tpl.rack.slice() } : {}) };
+  const n = meterSteps(P.meter), compose_ = composesOnAir(O) && part !== 'texture';
+  // the pattern: drums from a groove of the style the instrument does not play yet, composed parts that differ from the
+  // instrument's ideas, else a preset it does not hold
+  if (t.type === 'drums') {
+    const held = new Set(same.flatMap(x => Object.values(x.patterns || {})).map(p => JSON.stringify(rowsOf(p, n))));
+    const others = new Set(same.flatMap(x => Object.values(x.patterns || {})).flatMap(p => Object.keys(rowsOf(p, n))));
+    const pick = [];
+    for (const g of r.shuffle((R.drums.grooves || []).slice())) {
+      let rows = Object.fromEntries(Object.entries((GROOVES[g] || [])[1] || {}).filter(([k, v]) => String(v).includes('x') && (part === 'kick' ? k === 'bd' : k !== 'bd')).map(([k, v]) => [k, fitSteps(v, n)]));
+      // a second beat keeps the rows the other beats do not play, when it can (hats against percussion)
+      if (part === 'beat' && same.length) { const own = Object.fromEntries(Object.entries(rows).filter(([k]) => !others.has(k))); if (Object.keys(own).length) rows = own; }
+      if (Object.keys(rows).length && !pick.some(x => JSON.stringify(x) === JSON.stringify(rows))) pick.push(rows);
+    }
+    // (another groove than every pattern of the instrument; else than the ones playing on the boundary)
+    const now = new Set(same.map(x => { const y = st.tracks.find(z => z.id === x.id); return y ? JSON.stringify(rowsOf((x.patterns || {})[(y.clips[0] || {}).pattern || 'A'], n)) : ''; }));
+    const fresh = pick.filter(x => !held.has(JSON.stringify(x))), notNow = pick.filter(x => !now.has(JSON.stringify(x)));
+    const list = fresh.length ? fresh : notNow.length ? notNow : pick;
+    if (list.length) t.patterns = { A: { rows: list[0] }, ...(list[1] ? { B: { rows: list[1] } } : {}) };
+  } else if (compose_ && KIND_OF_TYPE_MELODIC.includes(t.type)) {
+    const M = airInputs(P, O, st, at), avoid = same.flatMap(ideasOf);
+    const A = airIdea(t, R, { ...M, seed: `${seed}:A`, avoid });
+    const B = A && airIdea(t, R, { ...M, seed: `${seed}:B`, avoid: [...avoid, A] });
+    if (A) t.patterns = { A: { idea: A }, ...(B ? { B: { idea: B } } : {}) };
+  } else if (same.length) {
+    const rr = R[t.type] || {}, list = t.type === 'guitar' ? rr.patterns : t.type === 'texture' ? rr.rhythms : rr.presets;
+    const key = t.type === 'texture' ? 'rhythm' : 'preset', held = new Set(same.flatMap(x => Object.values(x.patterns || {})).map(p => p[key]));
+    const rest = (list || []).filter(x => !held.has(x));
+    if (rest.length) { const a = (t.patterns.A || {}).speed; t.patterns = { A: { [key]: r.pick(rest), ...(a ? { speed: a } : {}) } }; }
+  }
+  if (!same.length) return t;
+  // the sound: one of the style's the instrument does not use, a composed one when the style names sound kinds
+  const rr = R[t.type] || {}, s = t.settings;
+  const other = (list, key) => { const used = new Set(same.map(x => (x.settings || {})[key])), rest = (list || []).filter(x => !used.has(x)); return rest.length ? r.pick(rest) : (list && list.length ? r.pick(list) : s[key]); };
+  if (t.type === 'drums') s.kit = other(rr.kits && rr.kits.length ? rr.kits : KITS, 'kit');
+  else if (t.type === 'guitar') s.type = other(rr.types && rr.types.length ? rr.types : Object.keys(GUITAR_TYPES), 'type');
+  else if (t.type === 'texture') s.sample = other(rr.samples && rr.samples.length ? rr.samples : TEXTURES, 'sample');
+  else if (s.wave !== undefined) {
+    const kinds = rr.material && rr.material.sounds && rr.material.sounds.length;
+    const used = new Set(same.map(x => (x.settings || {}).wave));
+    let done = false;
+    for (let j = 0; kinds && j < 4 && !done; j++) {
+      const c = compose('sound', { seed: `${seed}:sound:${j}`, style: rr.material, type: t.type, energy: 0.5, octave: s.octave });
+      if (c && c.settings && !used.has(c.settings.wave)) { Object.assign(s, c.settings); if (c.rack && c.rack.length) t.rack = c.rack.slice(); done = true; }
+    }
+    if (!done) s.wave = other(rr.waves && rr.waves.length ? rr.waves : WAVES.map(x => x[0]), 'wave');
+  }
+  // the register: an octave above the highest of the instrument (melodic parts; a second bass plays as a mid bass)
+  if (t.type === 'hook') s.octave = String(Math.min(6, Math.max(...same.map(x => Number((x.settings || {}).octave) || 4)) + 1));
+  else if (t.type === 'guitar') { const top = Math.max(...same.map(x => Number((x.settings || {}).octave) || 0)); s.octave = String(top + 12 <= 12 ? top + 12 : top - 12); }
+  else if (['arp', 'bass', 'pad'].includes(t.type)) t.patterns = Object.fromEntries(Object.entries(t.patterns).map(([key, p]) => [key, p.idea ? { ...p, idea: shiftIdea(p.idea, 12) } : p]));
+  // the level: under the instrument's loudest track (x 0.75 for a second one, x 0.6 for a third or a second bass) (the headroom rule scales the whole song)
+  const gains = same.map(x => (x.settings || {}).gain).filter(Number.isFinite);
+  if (Number.isFinite(s.gain)) s.gain = round2((gains.length ? Math.max(...gains) : s.gain) * (same.length === 1 && part !== 'bass' ? 0.75 : 0.6));
+  return t;
+}
+const KIND_OF_TYPE_MELODIC = ['bass', 'arp', 'hook', 'pad', 'guitar'];
+// The track "−" takes away (D2): among the playing tracks of the instrument, the listener's last one, else the one
+// whose add step is latest, else the last in the song's order
+function lastAdded(P, song, on, part, at) {
+  const mine = on.filter(t => instrumentOf(t) === part);
+  if (!mine.length) return null;
+  const lis = (P.added || []).map((a, j) => ({ ...a, j })).filter(a => mine.some(t => t.id === a.id)).sort((a, b) => b.i - a.i || b.j - a.j)[0];
+  if (lis) return lis.id;
+  const addAt = id => Math.max(-1, ...(song.build || []).filter(s => s.at <= at && listOf(s.add).includes(id)).map(s => s.at));
+  const order = id => P.tracks.findIndex(x => x.id === id);
+  return mine.slice().sort((a, b) => addAt(b.id) - addAt(a.id) || order(b.id) - order(a.id))[0].id;
+}
+// The listener's risers (D11) on a directed song, from bar `from` on: on its first bar the riser track takes the length
+// and direction and comes in, on its last it goes and takes back its own values. The riser track joins the song when
+// the director did not use it.
+function placeRisers(song, P, from) {
+  let tracks = song.tracks;
+  const steps = (song.build || []).slice(), bars = P.bars;
+  for (const r of P.risers) {
+    const own = P.tracks.find(x => x.id === r.track);
+    if (!own) continue;
+    if (!tracks.some(x => x.id === r.track)) {
+      const t = { ...JSON.parse(JSON.stringify(own)), clips: [{ start: 0, bars, pattern: 'A' }] }, v = tracks.findIndex(x => x.type === 'voice' || x.type === 'spoken');
+      tracks = v < 0 ? [...tracks, t] : [...tracks.slice(0, v), t, ...tracks.slice(v)];
+    }
+    const base = own.settings || {}, back = { bars: base.bars ?? '8', dir: base.dir ?? 'up' };
+    if (r.start >= from) steps.push({ at: r.start, set: { track: r.track, bars: String(r.bars), dir: r.dir }, by: 'listener' }, { at: r.start, add: r.track, by: 'listener' });
+    if (r.end >= from && r.end < bars) steps.push({ at: r.end, remove: r.track, by: 'listener' }, { at: r.end, set: { track: r.track, ...back }, by: 'listener' });
+  }
+  return { ...song, tracks, build: steps.map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x) };
+}
+// Headroom (D5): from bar `from`, on each phrase where more tracks play than the song's usual count, every track whose
+// gain the listener did not set plays at sqrt(usual / n) of its own gain (equal power), as set steps on the phrase; back
+// to its gain when the count comes down. Only in songs where the listener added tracks.
+function headroom(song, P, from) {
+  const ph = P.phrase, usual = Math.max(1, P.usualHigh), all = buildSteps(song);
+  const own = Object.fromEntries(song.tracks.filter(t => counted(t) && t.type !== 'voice' && t.type !== 'spoken' && t.settings && Number.isFinite(t.settings.gain) && !(t.pinned || []).includes('gain')).map(t => [t.id, t.settings.gain]));
+  const types = Object.fromEntries(song.tracks.map(t => [t.id, t.type]));
+  // (the song walked bar by bar without copies: which tracks play and the gain each one has)
+  const brought = new Set(all.flatMap(s => [...listOf(s.add), ...(s.clone ? [s.clone.track] : [])]));
+  const on = new Map(song.tracks.map(t => [t.id, !brought.has(t.id)])), gain = new Map(song.tracks.map(t => [t.id, (t.settings || {}).gain]));
+  const apply = s => {
+    listOf(s.add).forEach(id => on.set(id, true)); listOf(s.remove).forEach(id => on.set(id, false));
+    if (s.clone) on.set(s.clone.track, true);
+    if (s.set && s.set.gain !== undefined) gain.set(s.set.track, s.set.gain);
+  };
+  const out = (song.build || []).slice();
+  let j = 0;
+  for (let at = Math.ceil(from / ph) * ph; at < P.bars; at += ph) {
+    while (j < all.length && all[j].at <= at) apply(all[j++]);
+    const n = [...on].filter(([id, v]) => v && types[id] !== 'riser' && types[id] !== 'voice' && types[id] !== 'spoken').length;
+    const f = n > usual ? Math.sqrt(usual / n) : 1;
+    for (const [id, g] of Object.entries(own)) {
+      const want = round2(g * f);
+      // (a silent track takes its gain on the phrase it comes in)
+      if (on.get(id) && Math.abs(gain.get(id) - want) > 0.004) { out.push({ at, set: { track: id, gain: want }, by: 'listener' }); gain.set(id, want); }
+    }
+  }
+  return { ...song, build: out.map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x) };
+}
+
 // One command applied to a song: the modified plan and options, and the rewrite from its bar.
 function rewrite(song, plan, opts, cmd, rng) {
   const P = { ...plan, plan: plan.plan.map(d => ({ ...d, ...(d.curves ? { curves: { ...d.curves } } : {}) })), tracks: plan.tracks.map(t => ({ ...t, settings: { ...(t.settings || {}) } })), harmony: (plan.harmony || []).slice(), locked: (plan.locked || []).slice() };
   if (plan.varied) P.varied = plan.varied.slice();
+  // radio-arrangement: the listener's tracks (added), their + and − on the boundaries (arrange), the locked instruments
+  // and the listener's risers; written back only when used, so the plans of other songs keep their fields
+  for (const k of ['added', 'arrange', 'lockedParts', 'risers']) if (plan[k]) P[k] = plan[k].slice();
   const O = { ...opts };
   const ph = P.phrase, dbl = 2 * ph, at = cmd.at;
   const extra = [], forced = [];
@@ -278,13 +500,14 @@ function rewrite(song, plan, opts, cmd, rng) {
       break;
     case 'darker': case 'brighter': case 'dirtier': case 'cleaner': case 'more-space': {
       const seen = new Set();
-      for (const m of candidateMoves(st, ctx, new Set(P.locked), rng.moves)) if (m.kind === cmd.kind && !seen.has(m.track)) { seen.add(m.track); forced.push(m); }
+      // (the listener's sound commands reach locked tracks too, radio-arrangement D12)
+      for (const m of candidateMoves(st, ctx, new Set(), rng.moves)) if (m.kind === cmd.kind && !seen.has(m.track)) { seen.add(m.track); forced.push({ ...m, mixer: true }); }
       break;
     }
     case 'instrument': {
       const t = cmd.track ? st.tracks.find(x => x.id === cmd.track) : on.filter(x => ['hook', 'arp', 'guitar', 'pad', 'bass'].includes(x.type)).sort((a, b) => ['hook', 'arp', 'guitar', 'pad', 'bass'].indexOf(a.type) - ['hook', 'arp', 'guitar', 'pad', 'bass'].indexOf(b.type))[0];
       const set = t && otherSound(t, P.R, rng.moves);
-      if (set) forced.push({ kind: 'instrument', phrase: 'variation', track: t.id, mixer: !!cmd.track, step: { set: { track: t.id, ...set } } });
+      if (set) forced.push({ kind: 'instrument', phrase: 'variation', track: t.id, mixer: true, step: { set: { track: t.id, ...set } } });
       break;
     }
     case 'progression': {
@@ -333,22 +556,81 @@ function rewrite(song, plan, opts, cmd, rng) {
       if (cmd.kind === 'mute') P.locked = [...new Set([...P.locked, cmd.track])]; else P.locked = P.locked.filter(x => x !== cmd.track);
       break;
     case 'lock': P.locked = [...new Set([...P.locked, cmd.track])]; break;
-    case 'unlock': P.locked = P.locked.filter(x => x !== cmd.track); break;
+    case 'unlock': {
+      // a track of a locked instrument unlocked in the mixer: that track only; the instrument keeps its other tracks
+      // locked one by one (the console shows the half state, D12)
+      const part = instrumentOf(P.tracks.find(x => x.id === cmd.track));
+      if (part && (P.lockedParts || []).includes(part)) {
+        P.lockedParts = P.lockedParts.filter(x => x !== part);
+        P.locked = [...new Set([...P.locked, ...P.tracks.filter(x => instrumentOf(x) === part && x.id !== cmd.track).map(x => x.id)])];
+      }
+      P.locked = P.locked.filter(x => x !== cmd.track);
+      break;
+    }
+    case 'lock-part': if (LOCK_PARTS.includes(cmd.part)) P.lockedParts = [...new Set([...(P.lockedParts || []), cmd.part])]; break;
+    case 'unlock-part':
+      P.lockedParts = (P.lockedParts || []).filter(x => x !== cmd.part);
+      P.locked = P.locked.filter(id => instrumentOf(P.tracks.find(x => x.id === id)) !== cmd.part);
+      break;
+    case 'more': {
+      if (!INSTRUMENTS.includes(cmd.part)) break;
+      // a silent track of the instrument the song holds (not one the listener added, nor one muted in the mixer), else a
+      // new one from the style that differs from the instrument's tracks (D2, D3)
+      const added = P.added || [];
+      let t = st.tracks.filter(x => x.mute && instrumentOf(x) === cmd.part && !added.some(a => a.id === x.id) && !P.locked.includes(x.id)).sort((a, b) => ENTRY.indexOf(a.type) - ENTRY.indexOf(b.type))[0];
+      if (!t) { t = newTrack(P, O, cmd.part, st, at, `${rng.seed}:more:${rng.n}:${rng.i}`); if (t) P.tracks.push(t); }
+      if (!t) break;
+      P.added = [...added, { id: t.id, part: cmd.part, at, i: rng.i }];
+      P.arrange = [...(P.arrange || []), { kind: 'more', track: t.id, type: t.type, at }];
+      // past the style's maximum the song's maximum follows, so the director does not undo it (D4)
+      const n = on.filter(counted).length + 1;
+      if (n > P.hardMax) P.hardMax = n;
+      break;
+    }
+    case 'less': {
+      const id = lastAdded(P, song, on, cmd.part, at);
+      if (!id) break;
+      P.added = (P.added || []).filter(a => a.id !== id);
+      P.arrange = [...(P.arrange || []), { kind: 'less', track: id, at }];
+      break;
+    }
+    case 'riser': {
+      const r = riserTarget(P, at, cmd);
+      if (!r) break;
+      let tr = P.tracks.find(x => x.type === 'riser');
+      // a style without a riser: the listener's own, which the director never uses (D11)
+      if (!tr) { tr = trackForPart(P.R, 'riser', P.meter, 0.5, rng.moves); P.tracks.push(tr); P.ownRiser = tr.id; }
+      // one riser per change: a later command on the same change replaces the earlier one
+      P.risers = [...(P.risers || []).filter(x => x.change !== r.change), { ...r, track: tr.id }];
+      break;
+    }
     default: break;
   }
-  if (forced.length) from = Math.round(at / ph);
+  // the listener's + and − on the boundaries from here (radio-arrangement): forced again on every rewrite, so a later
+  // command never drops them (each boundary in their order)
+  const arranged = (P.arrange || []).filter(e => e.at >= Math.round(at / ph) * ph && e.at < P.plan.length * dbl);
+  if (forced.length || arranged.length) from = Math.round(at / ph);
   P.bars = P.plan.length * dbl;
   P.sections = sectionsWith(P);
+  if (P.risers) P.risers = P.risers.filter(r => r.end <= P.bars && r.change < P.bars);
+  const forcedAt = forced.length ? { [from]: forced } : {};
+  for (const e of arranged) {
+    const k = e.at / ph;
+    (forcedAt[k] = forcedAt[k] || []).push(e.kind === 'more' ? { kind: 'add', phrase: ADD_PHRASE[e.type] || 'add-lead', track: e.track, mixer: true, step: { add: e.track } } : { kind: 'strip', track: e.track, mixer: true, step: { remove: e.track } });
+  }
   // varied parts stay: their steps from the boundary on are kept as the listener's
   const varied = (P.varied || []).filter(s => s.at >= from * ph).map(s => ({ ...s }));
   const keep = [...(song.build || []).filter(s => s.at < from * ph), ...extra, ...varied].sort((a, b) => a.at - b.at);
-  const dir = directSong(P, O, rng, rng.comments, { keep, from, forced: forced.length ? { [from]: forced } : {}, locked: P.locked });
-  const out = {
+  const locked = [...lockedIds(P), ...(P.ownRiser ? [P.ownRiser] : [])];
+  const dir = directSong(P, O, rng, rng.comments, { keep, from, forced: forcedAt, locked, protect: (P.added || []).map(a => ({ id: a.id, at: a.at })), hold: (P.risers || []).map(r => [r.start, r.end]) });
+  let out = {
     ...song,
     sections: P.sections.map(({ role, ...s }) => s),
     tracks: dir.tracks.map(t => { const own = P.tracks.find(x => x.id === t.id); return own && own.pinned ? { ...t, settings: { ...t.settings, ...own.settings }, pinned: own.pinned } : t; }),
     build: dir.steps,
   };
+  if (P.risers && P.risers.length) out = placeRisers(out, P, from * ph);
+  if ((P.arrange || []).some(e => e.kind === 'more')) out = headroom(out, P, from * ph);
   return { song: voiceAir(out, P, P.voiceAir || []), plan: P, opts: O, phrases: dir.phrases };
 }
 

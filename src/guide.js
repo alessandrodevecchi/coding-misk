@@ -262,7 +262,7 @@ export const GUIDE = [
 ];
 
 // parts of the page that need no card, with the reason (the check accepts them)
-export const GUIDE_EXEMPT = { guida: 'the Guide itself' };
+export const GUIDE_EXEMPT = { guida: 'the Guide itself', ...Object.fromEntries(['more', 'less', 'lock-part', 'unlock-part', 'riser'].map(k => [k, 'engine only: its console buttons come with radio-arrangement phase 2'])) };
 
 const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // a guide text with its marks: [Label] a button, {K} a key
