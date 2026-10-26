@@ -6,7 +6,7 @@
 import { createSession, OPTION_DEFAULTS, leadEntry, stylesNear, DIRECTOR_VERSION } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
-import { steerSong, applyBar, whyNot, COMMANDS, VARY_TYPES, varyTracks, songCurves, densityMax, extendIndex, extendSeconds, INSTRUMENTS, RECOMMENDED, TRACK_CAP, RISER_BARS, RISER_SOUNDS, instrumentOf, lockedIds, moreWarning, partHas, fitsAir, unfitReason, patternPart, TREATMENTS, KEY_MOVES, keyTo } from '../endless/steering.js';
+import { steerSong, applyBar, whyNot, COMMANDS, VARY_TYPES, varyTracks, songCurves, densityMax, extendIndex, extendSeconds, INSTRUMENTS, RECOMMENDED, TRACK_CAP, RISER_BARS, RISER_SOUNDS, instrumentOf, lockedIds, moreWarning, partHas, fitsAir, unfitReason, patternPart, TREATMENTS, KEY_MOVES, keyTo, SESSION_KINDS, biasSong } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
 import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, airChooserOf, holdsGrown } from '../endless/items.js';
@@ -170,11 +170,14 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       return item;
     }
     const raw = optionsFor(n), comp = raw.compilation;
-    const { song, entry, plan, opts: used } = S.session.next(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw);
+    const g0 = S.session.next(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw);
+    // the session's choices (radio-arrangement D10) on the director's song: the base the listener's commands steer; the
+    // director's own stays as base0, so a choice given later can be put on again
+    const { song, entry, plan, opts: used } = biasSong(S.recipe, n, g0);
     // the director has just planned the transition from the song before: an interlude lengthens it,
     // an overlap starts this song before it ends
     if (prev && !prev.cut) { prev.extra = extraOf(prev.entry.transition); prev.bars += prev.extra; }
-    const item = { song, entry, n, start: prev ? prev.start + prev.bars - (prev.cut ? 0 : overlapOf(prev.entry.transition)) : 0, bars: barsOf(song), base: { song, plan, opts: used }, plan, commands: [], plain: song };
+    const item = { song, entry, n, start: prev ? prev.start + prev.bars - (prev.cut ? 0 : overlapOf(prev.entry.transition)) : 0, bars: barsOf(song), base: { song, plan, opts: used }, base0: { song: g0.song, plan: g0.plan, opts: g0.opts }, plan, commands: [], plain: song };
     if (comp) item.comp = segmentAt(S.recipe.seed, n, comp, recipes, comp.pool || []);
     // a Crescendo or Live coder song grows on air (radio-profiles D5), with the Custom controls when the session has
     // them; a recipe saved before the radio grew its songs (no growth marker) plays every song in blocks, as heard
@@ -509,6 +512,10 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       if (at <= rel || at >= barsOf(item.song) || (c.kind === 'extend' && whyNot(c, item.song, item.plan, rel, tailOf(item)))) { toast(t('steerLate')); return false; }
     }
     const cmd = { ...c, at, id: ++cmdN, ...(air ? { at0: at, q: Math.round(rel * 100) / 100, pend: true } : {}) };
+    // the whole session (radio-arrangement D10): an arrangement command also goes to the recipe's arrange list, for the
+    // songs after this one; Vary, Swap and the riser stay on this song
+    const forSession = opts.scope === 'session' && SESSION_KINDS.includes(c.kind);
+    if (forSession) cmd.scope = 'session';
     // an extension remembers where its part goes, so cancelling it also drops the curve edits made on later parts
     if (c.kind === 'extend') { cmd.ins = extendIndex(item.plan, Math.ceil((at - off) / item.plan.phrase) >> 1); cmd.s = Math.round(extendSeconds(item.plan)); }
     // a later command of the same kind on the same track (or curve part) replaces a pending one
@@ -518,6 +525,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     item.commands.push(cmd);
     S.recipe.steering = [...(S.recipe.steering || []).filter(x => !(x.song === item.n && same(x))), { song: item.n, ...cmd }];
     resteer(item, { async: true, then: () => { keepHistory(item); player.swap(windowPlayable()); renderNow(); } });
+    if (forSession) { const { at: _a, id: _i, scope: _s, at0: _b, q: _q, pend: _p, ...e } = cmd; S.recipe.arrange = [...(S.recipe.arrange || []), { song: item.n, ref: cmd.id, ...e }]; rebias(item.n); }
     keepHistory(item);
     // the whole session: energy, complexity and voice also move the sliders for the next songs
     if (opts.scope === 'session' && !opts.artist) {
@@ -528,11 +536,33 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     renderNow();
     return true;
   }
+  // the songs after song k take the session's choices again (radio-arrangement D10): from the director's song (base0)
+  // with the recipe's arrange list as it is now, then their own commands or their growth
+  function rebias(k) {
+    for (const x of S.stream) {
+      if (x.n <= k || !x.base0 || x.frozen) continue;
+      const b = biasSong(S.recipe, x.n, x.base0);
+      x.base = { song: b.song, plan: b.plan, opts: b.opts }; x.plan = b.plan; x.opts = b.opts; x.plain = b.song; delete x.g0;
+      if (x.commands.length) resteer(x, { async: true, then: () => { player.swap(windowPlayable()); renderNow(); } });
+      else if (x.growCtx) grow(x, b.song, { async: true });
+      else setSong(x, b.song);
+    }
+  }
   function cancel(id) {
     const item = S && S.stream[S.onAir];
     if (!item) return;
     const c = item.commands.find(x => x.id === id);
-    if (!c || c.at <= relNow()) return;
+    if (!c) return;
+    // a choice for the session already heard on this song: until the next song starts it can leave the session
+    if (c.at <= relNow() && c.scope === 'session') {
+      S.recipe.arrange = (S.recipe.arrange || []).filter(e => !(e.song === item.n && e.ref === id));
+      c.scope = 'song';
+      S.recipe.steering = (S.recipe.steering || []).map(x => (x.song === item.n && x.id === id ? { ...x, scope: 'song' } : x));
+      rebias(item.n); player.swap(windowPlayable()); renderSteer(true);
+      return;
+    }
+    if (c.at <= relNow()) return;
+    if (c.scope === 'session') { S.recipe.arrange = (S.recipe.arrange || []).filter(e => !(e.song === item.n && e.ref === id)); rebias(item.n); }
     const drop = x => x.id === id || (c.kind === 'extend' && x.kind === 'curve' && x.id > id && x.at > relNow() && x.d >= c.ins);
     item.commands = item.commands.filter(x => !drop(x));
     S.recipe.steering = (S.recipe.steering || []).filter(x => !(x.song === item.n && drop(x)));
@@ -746,7 +776,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     box.dataset.k = '';
     const ph = item.plan.phrase;
     const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
-    const pending = item.commands.filter(c => c.at > rel);
+    const pending = item.commands.filter(c => c.at > rel || c.scope === 'session');
     const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), savedOpen, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => x.id).join()].join('|');
     if (!force && key === steerKey) return;
     steerKey = key;
@@ -758,7 +788,8 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     const btn = (c, label) => {
       const part = ['vary', 'swap', 'voicing'].includes(c.kind);
       const why = whyOf(c), k = KEYS_OF[c.kind];
-      const tipText = `${t(`steerTip:${c.kind}`, { ...(c.vars || {}), ...(part ? { type: t(`steerType:${c.type}`) } : {}) })}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
+      const songOnly = opts.scope === 'session' && ['vary', 'swap', 'riser'].includes(c.kind) ? ` · ${t('steerSongOnly')}` : '';
+      const tipText = `${t(`steerTip:${c.kind}`, { ...(c.vars || {}), ...(part ? { type: t(`steerType:${c.type}`) } : {}) })}${songOnly}${k ? ` (${keyLabel(k)})` : ''}${why ? ` · ${t(`steerWhy:${why}`, { type: c.type ? t(`steerType:${c.type}`) : '' })}` : ''}`;
       // Vary and Swap carry their part in data-part (data-type is the Add and Remove buttons' shortcut target)
       return `<button class="btn steer-btn${c.icon ? ' with-ico' : ''}" data-cmd="${c.kind}"${c.type ? ` data-${part ? 'part' : 'type'}="${c.type}"` : ''}${c.target ? ` data-target="${esc(c.target)}"` : ''}${c.treatment ? ` data-treatment="${esc(c.treatment)}"` : ''}${c.chords ? ` data-chords="${esc(c.chords)}"` : ''}${c.to ? ` data-to="${esc(c.to)}"` : ''} ${why ? 'disabled' : ''} title="${esc(tipText)}"${why ? ` data-why="${why}"` : ''}>${c.icon || ''}${esc(label || t(`steer:${c.kind}`))}</button>`;
     };
@@ -843,7 +874,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
         ${group('song', btn({ kind: 'drop' }) + btn({ kind: 'stay' }) + (() => { const s = `+${Math.round(extendSeconds(item.plan))} s`; return btn({ kind: 'extend', vars: { s } }, t('steer:extend', { s })); })() + btn({ kind: 'end' }))}
       </div>
       <div class="lbl">${esc(t('steerQueue'))}</div>
-      <ul class="steer-queue">${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: c.at + 1 }))}</span> ${esc(cmdLabel(c, item))} <button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button></li>`).join('') || `<li class="muted">${esc(t('steerQueueEmpty'))}</li>`}</ul>
+      <ul class="steer-queue">${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: c.at + 1 }))}</span> ${esc(cmdLabel(c, item))}${c.scope === 'session' ? `<span class="muted"> · ${esc(t('steerForSession'))}</span>` : ''} <button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button></li>`).join('') || `<li class="muted">${esc(t('steerQueueEmpty'))}</li>`}</ul>
       <div class="lbl">${esc(t('steerMixer'))}</div>
       <div class="steer-mixer">${[...on, ...st.tracks.filter(x => x.mute && lk.includes(x.id))].map(x => { const locked = lk.includes(x.id), g = (x.settings || {}).gain ?? 0.5; return `<div class="mix-row"><span class="mix-name">${esc(x.name || x.id)}</span>
         <input type="range" min="0" max="1.2" step="0.05" value="${g}" data-mix-vol="${esc(x.id)}" data-no-knob aria-label="${esc(t('steerVolume', { track: x.name || x.id }))}" title="${esc(t('steerVolume', { track: x.name || x.id }))}">

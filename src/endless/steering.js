@@ -763,6 +763,54 @@ function voiceAir(song, P, list) {
   return cur;
 }
 
+// ---------- the whole session (radio-arrangement D10) ----------
+
+// the commands a listener can give for the whole session: they go to the recipe's `arrange` list too
+export const SESSION_KINDS = ['more', 'less', 'pattern', 'voicing', 'lock-part', 'unlock-part'];
+// The commands the session's choices give song n (D10): each entry of `recipe.arrange` from an earlier song, as a
+// command on its own boundary of this song: "+" where the instrument first plays (or on the first phrase, when the
+// director never brings it in), "−" where it first plays, a saved pattern as a new track on the first part after the
+// intro (when it fits), Part harmony where the part first plays, and the instruments still locked for the session
+// (lock-part and unlock-part in order) locked from their first entry. g: the director's { song, plan }.
+export function sessionBias(recipe, n, g) {
+  const list = ((recipe && recipe.arrange) || []).filter(e => e.song < n && SESSION_KINDS.includes(e.kind));
+  if (!list.length || !g || !g.plan) return [];
+  const P = g.plan, ph = P.phrase, dbl = 2 * ph, last = P.bars - ph;
+  const firstOf = test => { for (let b = ph; b <= last; b += ph) if (playing(stateAt(g.song, b).song).some(test)) return b; return null; };
+  const holds = part => partHas(P.R, part) || P.tracks.some(t => instrumentOf(t) === part);
+  const out = [], locks = [];
+  for (const e of list) {
+    if (e.kind === 'lock-part') { if (!locks.includes(e.part)) locks.push(e.part); continue; }
+    if (e.kind === 'unlock-part') { const i = locks.indexOf(e.part); if (i >= 0) locks.splice(i, 1); continue; }
+    let at = null, cmd = null;
+    if (e.kind === 'more' && holds(e.part)) {
+      at = firstOf(t => instrumentOf(t) === e.part) ?? ph;
+      // (on the boundary where the director brings the instrument in, the rewrite starts there: a first "+" takes the
+      // director's own track, a second one adds the extra; when it plays already, one "+" adds it)
+      if (at && !playing(stateAt(g.song, at - 1).song).some(t => instrumentOf(t) === e.part) && firstOf(t => instrumentOf(t) === e.part) !== null) out.push({ kind: 'more', part: e.part, at, session: true });
+      cmd = { kind: 'more', part: e.part };
+    }
+    if (e.kind === 'less') { at = firstOf(t => instrumentOf(t) === e.part); cmd = { kind: 'less', part: e.part }; }
+    if (e.kind === 'pattern' && e.item && fitsAir(e.item, P, g.song)) { const d = Math.max(1, P.plan.findIndex(x => x.role !== 'intro')); at = Math.min(last, d * dbl); cmd = { kind: 'pattern', mode: 'new', item: e.item }; }
+    if (e.kind === 'voicing') { at = firstOf(t => varyTracks([t], e.type || 'lead').length > 0); cmd = { kind: 'voicing', type: e.type || 'lead', target: 'auto', treatment: e.treatment || 'auto' }; }
+    if (cmd && at !== null && at > 0 && at <= last) out.push({ ...cmd, at, session: true });
+  }
+  // (an instrument the director never brings in but a session "+" does: locked from that "+")
+  for (const part of locks) {
+    const at = firstOf(t => instrumentOf(t) === part) ?? Math.min(Infinity, ...out.filter(c => c.part === part || (c.item && patternPart(c.item) === part)).map(c => c.at));
+    if (Number.isFinite(at)) out.push({ kind: 'lock-part', part, at, session: true });
+  }
+  return out;
+}
+// The director's song n with the session's choices on it (D10), as the base the listener's own commands steer: the
+// same commands give the same song, live and in a replay. → { ...g, song, plan, opts, bias } or g when there is none
+export function biasSong(recipe, n, g) {
+  const cmds = sessionBias(recipe, n, g);
+  if (!cmds.length) return g;
+  const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n: `${n}:session` });
+  return { ...g, song: r.song, plan: r.plan, opts: r.opts, bias: cmds };
+}
+
 // The song after every command, from the original. commands: [{ kind, at, type?, track?, d?, value? }] in order.
 // seed and n name the random streams, so the same commands always give the same song.
 export function steerSong({ song, plan, opts, commands, seed, n }) {

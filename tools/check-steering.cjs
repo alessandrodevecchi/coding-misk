@@ -566,6 +566,36 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'harmony-en.png') });
   }
 
+  // ---------- the whole session (radio-arrangement phase 6) ----------
+  await page.click('#radio-start'); await sleep(300); await page.fill('#radio-seed', 'steer-session'); await page.click('#radio-start'); await sleep(2500);
+  {
+    if ((await page.getAttribute('#steer-scope', 'aria-pressed')) !== 'true') { await page.click('#steer-scope'); await sleep(200); }
+    const plus = await page.$('#radio-steer [data-cmd="more"]:not([disabled])'), part = plus && await plus.getAttribute('data-inst');
+    await plus.click(); await sleep(400);
+    let x = await ST();
+    const c = x.commands.slice(-1)[0];
+    check(c && c.kind === 'more' && c.scope === 'session' && (x.recipe.arrange || []).length === 1 && x.recipe.arrange[0].part === part, `"+ ${part}" for the session goes to the recipe`, JSON.stringify(x.recipe.arrange));
+    check(/for the session|per tutta la diretta/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "for the session"');
+    const tipV = await page.getAttribute('#radio-steer [data-cmd="vary"]', 'title');
+    check(/this song only|solo per questo brano/.test(tipV), 'Vary says it is for this song only in session scope', tipV);
+    await page.click(`#radio-steer [data-cancel="${c.id}"]`); await sleep(400);
+    x = await ST();
+    check(!(x.recipe.arrange || []).length, 'cancel takes it out of the session');
+    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]`); await sleep(400);
+    // the next song gets one more track of that instrument from the session
+    await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(3000);
+    x = await ST();
+    check(x.n === 1 && (x.plan.added || []).some(a => a.part === part), `the next song plays one more ${part} from the session`, JSON.stringify({ n: x.n, added: x.plan.added }));
+    check(!(await err()), 'no evaluation error with session choices', (await err()).slice(0, 120));
+    // a replay of the session gives the same next song
+    const heard = JSON.stringify(x.song.build);
+    await page.click('#radio-replay'); await sleep(3000);
+    await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(3000);
+    const y = await ST();
+    check(y.n === 1 && JSON.stringify(y.song.build) === heard, 'replay gives the next song the same session choice');
+    await page.click('#steer-scope'); await sleep(200);
+  }
+
   await page.click('#radio-start'); await sleep(300);
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();

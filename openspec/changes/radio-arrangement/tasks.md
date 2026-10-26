@@ -56,8 +56,8 @@ Total about 9 to 10 days. Phases 3 and 5 depend on 1; 4 depends on 1 and 2; 6 de
 
 ## 6. Session scope
 
-- [ ] 6.1 `S.recipe.arrange` and `arrangeBias` for `more`, `less`, `pattern`, `voicing`, `lock-part`, `unlock-part` in session scope, a session lock starting at the instrument's first entry (D10); Vary, Swap and the riser song-only with the tooltip; verify the four scope and lock combinations of D10; verify in `tools/check-endless.mjs` that a session with "+ arp" for the session gives later songs one arp more, and that song by song equals a whole session
-- [ ] 6.2 Queue items "for the session", cancellable until the next song; saved sessions and playlists replay them; verify with `node tools/check-playlists.cjs` and `node tools/check-steering.cjs`
+- [x] 6.1 `S.recipe.arrange` and `arrangeBias` for `more`, `less`, `pattern`, `voicing`, `lock-part`, `unlock-part` in session scope, a session lock starting at the instrument's first entry (D10); Vary, Swap and the riser song-only with the tooltip; verify the four scope and lock combinations of D10; verify in `tools/check-endless.mjs` that a session with "+ arp" for the session gives later songs one arp more, and that song by song equals a whole session
+- [x] 6.2 Queue items "for the session", cancellable until the next song; saved sessions and playlists replay them; verify with `node tools/check-playlists.cjs` and `node tools/check-steering.cjs`
 
 ## 7. Docs, Guide and listening test
 

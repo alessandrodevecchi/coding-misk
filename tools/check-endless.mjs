@@ -18,7 +18,8 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
-import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax, INSTRUMENTS as ARR_PARTS, RECOMMENDED, TRACK_CAP, instrumentOf, lockedIds, moreWarning, riserTarget, partHas, fitsAir, keyTo } from '../src/endless/steering.js';
+import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax, INSTRUMENTS as ARR_PARTS, RECOMMENDED, TRACK_CAP, instrumentOf, lockedIds, moreWarning, riserTarget, partHas, fitsAir, keyTo, sessionBias } from '../src/endless/steering.js';
+import { sessionItems } from '../src/endless/items.js';
 import { expandIdea } from '../src/song/ideas.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
@@ -1281,6 +1282,43 @@ const CHECKS = {
       n++;
     }
     assert(n === 20, `${n}`);
+  },
+  'arrangement: the whole session, scope and lock together'() {
+    // four songs of synthwave (an arp style); the listener presses "+ arp" on song 0, with each scope and lock
+    const options = { styles: ['synthwave'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'cut', harmony: 'artist' };
+    const base = { seed: 'arr-session', options, changes: [] };
+    const g0 = createSession(STYLES, 'arr-session').next(options), at = applyBar('more', 2 * g0.plan.phrase, g0.plan);
+    const song = [{ song: 0, kind: 'more', part: 'arp', at }], lock = [{ song: 0, kind: 'lock-part', part: 'arp', at }];
+    const run = r => sessionItems(STYLES, { ...base, ...r }, 4, null, { grow: false });
+    const plain = run({ steering: [] }), arps = x => x.song.tracks.filter(t => t.type === 'arp').length;
+    const songOpen = run({ steering: song }), songShut = run({ steering: [...lock, ...song] });
+    const sesOpen = run({ steering: song, arrange: song.map(({ at: _, ...e }) => e) }), sesShut = run({ steering: [...lock, ...song], arrange: [...lock, ...song].map(({ at: _, ...e }) => e) });
+    const same = (a, b, i) => JSON.stringify(a[i].song) === JSON.stringify(b[i].song);
+    // this song only: later songs as the director plans them, locked or not
+    for (const i of [1, 2, 3]) assert(same(songOpen, plain, i) && same(songShut, plain, i), `song scope changed song ${i}`);
+    const arpAt = (x, b) => onAt(x.song, b).filter(t => t.type === 'arp').length;
+    assert(arpAt(songOpen[0], at) === arpAt(plain[0], at) + 1, `song 0 has its arp: ${arpAt(songOpen[0], at)} / ${arpAt(plain[0], at)}`);
+    let more = 0;
+    for (const i of [1, 2, 3]) {
+      const bias = sessionBias({ ...base, arrange: song.map(({ at: _, ...e }) => e) }, i, { song: plain[i].song, plan: plain[i].plan });
+      if (!bias.length) continue;
+      // one arp more than the director gives the song: a "+" of the session, which stays like the listener's
+      const add = (sesOpen[i].plan.added || []).filter(a => a.part === 'arp');
+      assert(add.length >= 1 && onAt(sesOpen[i].song, add[0].at).filter(t => t.type === 'arp').length === onAt(plain[i].song, add[0].at).filter(t => t.type === 'arp').length + 1, `session open: song ${i} ${JSON.stringify(add)}`);
+      // open: the director is free; closed: the arps locked from their first entry
+      assert(!lockedIds(sesOpen[i].plan).some(id => /^arp/.test(id)), `session open: song ${i} locked`);
+      assert(sesShut[i].plan.tracks.filter(t => t.type === 'arp').every(t => lockedIds(sesShut[i].plan).includes(t.id)) && (sesShut[i].plan.lockedParts || []).includes('arp'), `session closed: song ${i} not locked`);
+      more++;
+    }
+    assert(more >= 2, `only ${more} later songs took the arp`);
+    // the same recipe gives the same songs (a replay, a playlist)
+    assert(JSON.stringify(run({ steering: song, arrange: song.map(({ at: _, ...e }) => e) }).map(x => x.song)) === JSON.stringify(sesOpen.map(x => x.song)), 'session replay');
+    // an unlock for the session ends the lock for the songs after
+    const after = sessionBias({ ...base, arrange: [{ song: 0, kind: 'lock-part', part: 'arp' }, { song: 1, kind: 'unlock-part', part: 'arp' }] }, 2, { song: plain[2].song, plan: plain[2].plan });
+    assert(!after.some(c => c.kind === 'lock-part'), 'unlock for the session');
+    // Vary, Swap and the riser never go to the session list
+    assert(!sessionBias({ ...base, arrange: [{ song: 0, kind: 'vary', type: 'lead' }, { song: 0, kind: 'riser' }] }, 2, { song: plain[2].song, plan: plain[2].plan }).length, 'vary and riser are song only');
+    console.log(`      ${more} later songs took the session's arp; song scope leaves them as planned; locked for the session from the first entry`);
   },
   'steering: one vary takes less than 20 ms'() {
     const all = varies(40), times = all.map(({ g, type, at }) => { const t0 = performance.now(); steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'vary', type, at }], seed: 'vary-time', n: 1 }); return performance.now() - t0; }).sort((a, b) => a - b);
