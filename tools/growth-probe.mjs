@@ -6,9 +6,11 @@
 // instrument's context of the page without measured voice lengths (the committed samples, as tools/song-durations.mjs).
 //   npm run growth:probe -- <song> [--profile switch|crescendo] [--opening x] [--pace x] [--development x]
 //                           [--duration free|fitted] [--narrated] [--lang en|it] [--cap n] [--all] [--keep first|best]
-//                           [--fixed] [--long minutes] [--json]
+//                           [--fixed] [--long minutes] [--ahead '{"bars":64,"muted":"off"}'] [--json]
 // --all, --keep, --fixed, --long: the advanced settings Try all growth shapes, Keep, Random order off and Long song from
 // (shape-search D6, D7)
+// --ahead: the limits of the lines typed ahead (reused-lines D8) for this run, over AHEAD in src/live/written-plan.js
+// (as globalThis.codingMiskAhead): atOnce, bars, muted ("off": no limit), margin, section
 // <song>: an id in songs/ or songs/examples/ (luci-rosse, 04-ideas) or a path to a song file; `all`: every built-in song
 // (songs/index.json), one line each and the totals (reused lines, lines ahead, rushed steps, most muted lines shown).
 import fs from 'node:fs';
@@ -28,8 +30,17 @@ for (let i = 0; i < args.length; i++) {
   else if (a.startsWith('--')) flags[a.slice(2)] = args[++i];
   else rest.push(a);
 }
-const usage = 'usage: npm run growth:probe -- <song> [--profile switch|crescendo] [--opening x] [--pace x] [--development x] [--duration free|fitted] [--narrated] [--lang en|it] [--cap n] [--all] [--keep first|best] [--fixed] [--long minutes] [--json]   (<song>: an id, a path or all)';
+const usage = 'usage: npm run growth:probe -- <song> [--profile switch|crescendo] [--opening x] [--pace x] [--development x] [--duration free|fitted] [--narrated] [--lang en|it] [--cap n] [--all] [--keep first|best] [--fixed] [--long minutes] [--ahead json] [--json]   (<song>: an id, a path or all)';
 if (!rest[0]) { console.error(usage); process.exit(2); }
+let ahead = null;
+if (flags.ahead) {
+  try { ahead = JSON.parse(flags.ahead); } catch { console.error(`--ahead must be a JSON object, e.g. '{"bars":64,"margin":0}'\n${usage}`); process.exit(2); }
+  const KEYS = ['atOnce', 'bars', 'muted', 'margin', 'section'];
+  const bad = Object.keys(ahead).filter(k => !KEYS.includes(k));
+  if (bad.length) { console.error(`--ahead: unknown ${bad.join(', ')} (${KEYS.join(', ')})\n${usage}`); process.exit(2); }
+  if (ahead.muted === 'off' || ahead.muted === null) ahead.muted = Infinity;
+  globalThis.codingMiskAhead = ahead;
+}
 const fileOf = id => [id, `songs/${id}.json`, `songs/examples/${id}.json`].find(f => fs.existsSync(f) && fs.statSync(f).isFile());
 const every = rest[0] === 'all', file = every ? null : fileOf(rest[0]);
 if (!every && !file) { console.error(`no song ${rest[0]} (songs/, songs/examples/ or a path)\n${usage}`); process.exit(2); }
@@ -117,9 +128,12 @@ function reusedLines(build, C) {
     prev = at;
   }
   const typed = list.filter(x => !x.copied);
-  return { lines, reused: typed.length, scratch: typed.filter(x => !x.how || x.how === 'typed').length, identical: typed.filter(x => x.identical).length, growth: typed.filter(x => !x.written).length, written: typed.filter(x => x.written).length, rushed: typed.filter(x => x.ratio > 1.1).length, copied: list.length - typed.length, chars: typed.reduce((a, x) => a + x.len, 0), maxRatio: Math.max(0, ...typed.map(x => x.ratio)), ahead: L.ahead ? L.ahead().length : 0, rushedSteps, mostMuted, list };
+  // lines typed ahead: from, to, bars and seconds shown muted, muted lines shown at `from` (with it), its length
+  const aheadList = (L.ahead ? L.ahead() : []).map(a => ({ header: a.header, from: a.from, to: a.to, bars: a.to - a.from, seconds: +(sb(a.to) - sb(a.from)).toFixed(1), muted: chainLines(codeAt(a.from)).filter(l => /^\s*_\$:/.test(l)).length, len: L.shownLine(a.text).length, line: L.shownLine(a.text).slice(0, 120) }));
+  return { aheadList, lines, reused: typed.length, scratch: typed.filter(x => !x.how || x.how === 'typed').length, identical: typed.filter(x => x.identical).length, growth: typed.filter(x => !x.written).length, written: typed.filter(x => x.written).length, rushed: typed.filter(x => x.ratio > 1.1).length, copied: list.length - typed.length, chars: typed.reduce((a, x) => a + x.len, 0), maxRatio: Math.max(0, ...typed.map(x => x.ratio)), ahead: L.ahead ? L.ahead().length : 0, rushedSteps, mostMuted, list };
 }
 
+if (ahead) console.error(`ahead limits: ${JSON.stringify(ahead, (k, v) => (v === Infinity ? 'off' : v))}`);
 const over = Object.fromEntries(['opening', 'pace', 'development', 'duration'].filter(k => flags[k]).map(k => [k, flags[k]]));
 if (flags.narrated) over.narrated = true;
 const C = resolveProfile(profile, over);
@@ -137,10 +151,11 @@ if (every) {
     const p = probe(fileOf(id)), r = p.reused;
     if (!r) continue;
     const row = { id, ...Object.fromEntries(Object.keys(T).filter(k => k in r).map(k => [k, r[k]])), writtenRushed: p.written ? p.written.total.all.rushed : 0, shape: p.shape ? `${p.shape.opening}/${p.shape.pace}/${p.shape.development}` : null, bars: (p.out.sections || []).reduce((a, x) => a + x.bars, 0) };
-    rows.push(flags.json ? { ...row, list: r.list } : row);
+    rows.push(flags.json ? { ...row, list: r.list, aheadList: r.aheadList, changes: p.written ? p.written.total.changes : null, writtenAll: p.written ? p.written.total.all : null } : row);
     T.songs++;
     for (const k of Object.keys(T)) if (k !== 'songs') T[k] = k === 'mostMuted' ? Math.max(T[k], row[k]) : T[k] + row[k];
     if (!flags.json) console.log(`${id}: reused ${row.reused} (key by key ${row.scratch}, identical ${row.identical}, growth ${row.growth}, written ${row.written}, rushed ${row.rushed}), copied ${row.copied}, ahead ${row.ahead}, rushed steps ${row.rushedSteps} (written ${row.writtenRushed}), most muted ${row.mostMuted} · ${row.shape} ${row.bars} bars`);
+    if (!flags.json) for (const x of r.aheadList) console.log(`  ahead ${x.header}: bar ${x.from} → ${x.to} (${x.bars} bars, ${x.seconds} s muted, ${x.muted} muted shown, ${x.len} chars)`);
   }
   if (flags.json) console.log(JSON.stringify({ profile, options: over, songs: rows, total: T }, null, 1));
   else console.log(`total over ${T.songs} songs: ${T.lines} new pattern lines; reused ${T.reused} (key by key ${T.scratch}, identical ${T.identical}, growth ${T.growth}, written ${T.written}, rushed ${T.rushed}, ${T.chars} characters); copied from earlier code ${T.copied}; lines ahead ${T.ahead}; rushed steps ${T.rushedSteps} (written part ${T.writtenRushed}); most muted lines shown ${T.mostMuted}`);
@@ -178,5 +193,6 @@ if (written) {
 }
 if (reused) {
   console.log(`reused lines (typed new though a line at least 0.8 alike was shown earlier): ${reused.reused} of ${reused.lines} new pattern lines (key by key ${reused.scratch}, identical ${reused.identical}, growth ${reused.growth}, written ${reused.written}, rushed ${reused.rushed}); copied from earlier code ${reused.copied}; lines ahead ${reused.ahead}; rushed steps ${reused.rushedSteps}; most muted lines shown ${reused.mostMuted}`);
+  for (const x of reused.aheadList) console.log(`  ahead ${x.header}: bar ${x.from} → ${x.to} (${x.bars} bars, ${x.seconds} s muted, ${x.muted} muted shown, ${x.len} chars): ${x.line}`);
   for (const x of reused.list) console.log(`  bar ${x.at}${x.written ? ' (written)' : ''} like ${x.like}${x.identical ? ' identical' : ''} ratio ${x.ratio} ${x.how || 'typed'}: ${x.line.slice(0, 90)}`);
 }
