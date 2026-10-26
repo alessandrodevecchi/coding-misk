@@ -12,7 +12,7 @@
 
 ## 3. Where the voice instrument speaks
 
-- [ ] 3.1 `partsOf(song, from, where)` (D7) in `src/endless/voice-track.js`, used by `rewriteSpoken`, the director's placement and the refrain rule in `src/song/spoken.js`; `check:spoken` cases (many phrases with quiet and medium, only busy, default identical) and `npm run check:endless` with fixtures unchanged
+- [x] 3.1 `partsOf(song, from, where)` (D7) in `src/endless/voice-track.js`, used by `rewriteSpoken`, the director's placement and the refrain rule in `src/song/spoken.js`; `check:spoken` cases (many phrases with quiet and medium, only busy, default identical) and `npm run check:endless` with fixtures unchanged
 - [ ] 3.2 Where chips in `voicePanel` (track, radio, new song modes), `voiceOptions.where` in the validator and `docs/SONG-FORMAT.md`; toast texts for the new kinds; `check:songs`
 
 ## 4. Narrator
@@ -34,7 +34,7 @@
 
 ## 7. Owner answers of 2026-10-26
 
-- [ ] 7.1 A `spoken` block in every style recipe (D14 table), `check:styles`; the director keeps the voice track on its own stream: `check:endless` fixtures compared without voice tracks unchanged, then `--write-fixtures` with `DIRECTOR_VERSION` raised; `check:radio-profiles`; `npm run voices` covers any new speaker and vocabulary pair
+- [x] 7.1 A `spoken` block in every style recipe (D14 table), `check:styles`; the director keeps the voice track on its own stream: `check:endless` fixtures compared without voice tracks unchanged, then `--write-fixtures` with `DIRECTOR_VERSION` raised; `check:radio-profiles`; `npm run voices` covers any new speaker and vocabulary pair
 - [ ] 7.2 Radio How often reads Come dice lo stile, Spesso, Sempre (`RADIO_PRESENCE` without `never`, no `always` to `often` on load, presets keep Sempre); a saved `never` reads as `voices.track` off with How often `style`; `check:spoken` cases (weight 0 style, complexity 0, artist) and `check-voices.cjs` (menu without Mai, saved Mai)
 - [ ] 7.3 On/off switch per voice block (D15): Compose narrator on and track mute, radio `opts.voices`, greyed blocks with kept values, Custom profile migration; `check-voices.cjs` cases (off then on restores, same music with the narrator off, mute in the timeline)
 - [ ] 7.4 "Riempi con", "+ Aggiungi frase", way select and trash button in the phrase list (D16); radio `opts.voice.vocab`; `check-voices.cjs` cases (fill, edit after fill, add at the next free part, remove, last row, Undo)

@@ -32,7 +32,9 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // darksynth songs with a composed sound may differ; the seed fixtures do not move
 // 9 (voice-full-controls): the narrator track is named "Narrator" (was "Voice"); the music does not move (the fixtures
 // keep a music hash without the voice tracks)
-export const DIRECTOR_VERSION = 9;
+// 10 (voice-full-controls D14): every style has a voice track chance (some low, country none), so songs of 17 more
+// styles may get a Words track; the music does not move
+export const DIRECTOR_VERSION = 10;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };
@@ -625,6 +627,9 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       if (plan.spoken.way === 'opening') { const next = steps.filter(s => s.at > 0 && s.add !== undefined).sort((a, b) => a.at - b.at)[0]; if (next) sp.patterns = { A: { ...sp.patterns.A, before: [].concat(next.add)[0] } }; }
       if (c.start >= from * phrase && !steps.some(s => s.add === sp.id)) steps.push({ at: c.start, add: sp.id });
     }
+    // (the step that brings it in goes in bar order, as a steering rewrite sorts the steps: voice-full-controls, now that
+    // every style may draw a voice track)
+    steps.sort((a, b) => a.at - b.at);
   }
   // tracks never added would play from the start: leave them out; the others need no base mute
   const used = new Set(steps.flatMap(s => (s.add === undefined ? [] : Array.isArray(s.add) ? s.add : [s.add])));

@@ -163,5 +163,6 @@
       "Carreta",
       "Frontera"
     ]
-  }
+  },
+  "spoken": { "weight": 0 }
 }

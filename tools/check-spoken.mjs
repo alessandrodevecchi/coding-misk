@@ -24,7 +24,10 @@ import { voiceEvent } from '../src/endless/voice-panel.js';
 import { withNarratorStyle, lineTexts, narratorStyle } from '../src/song/spoken.js';
 import { energyOf } from '../src/endless/energy.js';
 import { meterSteps } from '../src/music.js';
-import { rewriteSpoken, trackVoice, quietParts, nextQuiet } from '../src/endless/voice-track.js';
+import { rewriteSpoken, trackVoice, quietParts, nextQuiet, wherePartsOf } from '../src/endless/voice-track.js';
+import { sectionFacts } from '../src/song/spoken.js';
+import { soundPatch } from '../src/endless/voice-sound.js';
+import { phraseRows, listVocab, editText, editBars, removeRow, addRow, fillRows, vocabOf } from '../src/endless/phrase-list.js';
 import { steerSong, applyBar, whyNot } from '../src/endless/steering.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -242,9 +245,9 @@ const CHECKS = {
       assert(line, `${id}: the passage line at bar ${start} speaks on that bar only`);
     }
   },
-  'director: styles without a weight never get a voice instrument; weighted ones sometimes, the same for the same seed; it adds no energy'() {
-    const plain = generateSession(recipes, { styles: ['berlin-techno', 'synthwave'], seed: 'senza', minutes: 30 }).songs;
-    assert(plain.every(s => !s.tracks.some(t => t.type === 'spoken') && !s.narrator), 'a voice instrument without a weight');
+  'director: a style with weight 0 never gets a voice instrument; weighted ones sometimes, the same for the same seed; it adds no energy'() {
+    const plain = generateSession(recipes, { styles: ['country'], seed: 'senza', minutes: 30 }).songs;
+    assert(plain.every(s => !s.tracks.some(t => t.type === 'spoken') && !s.narrator), 'a voice instrument with weight 0');
     const opts = { styles: ['dark-cyberpunk', 'ambient', 'pure-trance'], seed: 'con', minutes: 60, chaos: 0 };
     const a = generateSession(recipes, opts), b = generateSession(recipes, opts);
     assert(JSON.stringify(a) === JSON.stringify(b), 'same seed, different songs');
@@ -342,7 +345,8 @@ const CHECKS = {
     }
     assert(!validateSong(one(['berlin-techno'], 'always', 'uno-0')).errors.length, 'a style without a voice instrument, on: invalid song');
     // (its speaker is one of the styles that have a voice instrument: their vocabulary samples exist)
-    const known = new Set(recipes.flatMap(r => (r.spoken && r.spoken.speakers) || []));
+    // (npm run voices makes the vocabulary for every speaker when a style with a voice track names none, D14)
+    const known = new Set([...recipes.flatMap(r => (r.spoken && r.spoken.speakers) || []), ...(recipes.some(r => r.spoken && !(r.spoken.speakers && r.spoken.speakers.length)) ? SPEAKERS : [])]);
     for (let k = 0; k < 6; k++) { const sp = one(['berlin-techno'], 'always', `uno-${k}`).tracks.find(t => t.type === 'spoken').settings.speaker; assert(known.has(sp), `on: speaker ${sp} has no vocabulary samples`); }
   },
   'voice controls: presets set the controls together; touching one makes it Custom'() {
@@ -531,6 +535,95 @@ const CHECKS = {
     const only = run(resolveProfile('crescendo', { narratorStyle: 'poetic' }), false).out;
     assert(only.length && only.every(x => poetic.includes(x.text)), 'poetic without Narrated growth: images only, as before');
     console.log(`      ${images.length} images and ${lines.length} step lines; ${plain.length - lines.length} step lines give their bar to an image`);
+  },
+  'where it speaks (voice-full-controls D7): quiet first then medium, only busy, the default identical'() {
+    const luci = read('songs/ferro.json'), N = normalizeSong(luci), facts = sectionFacts(N);
+    const quiet = wherePartsOf(luci, 0, ['quiet']), medium = wherePartsOf(luci, 0, ['medium']), busy = wherePartsOf(luci, 0, ['busy']);
+    assert(JSON.stringify(quiet.map(p => p.start)) === JSON.stringify(quietParts(luci).map(p => p.start)), 'quiet only is quietParts');
+    const sp = rewriteSpoken(luci, null, { phrases: 'many', kind: 'different', where: ['quiet', 'medium'], draw: 0 }, { recipes }).song.tracks.find(t => t.type === 'spoken');
+    const kindAt = b => facts.kinds[N.sections.findIndex(x => b >= x.start && b < x.start + x.bars)];
+    const kinds = sp.clips.map(c => kindAt(c.start));
+    assert(kinds.filter(k => k === 'quiet').length === Math.min(quiet.length, sp.clips.length), `quiet parts filled first: ${kinds}`);
+    assert(medium.length && sp.clips.length === Math.min(12, quiet.length + medium.length) && kinds.filter(k => k === 'medium').length === sp.clips.length - quiet.length, `quiet and medium give more phrases: ${sp.clips.length} (quiet ${quiet.length}, medium ${medium.length})`);
+    assert(new Set(sp.clips.map(c => c.start)).size === sp.clips.length, 'two phrases in one part');
+    if (busy.length) {
+      const b = rewriteSpoken(luci, null, { phrases: '4-5', kind: 'different', where: ['busy'], draw: 0 }, { recipes }).song.tracks.find(t => t.type === 'spoken');
+      assert(b.clips.length && b.clips.every(c => kindAt(c.start) === 'busy'), `only busy: ${b.clips.map(c => kindAt(c.start))}`);
+    }
+    // the director: the default options keep their places (the fixtures check the rest), busy only goes to busy parts
+    const a = voiced({ phrases: '4-5', kind: 'different', presence: 'often' }, 'dove', 30), d = voiced({ phrases: '4-5', kind: 'different', presence: 'often', where: ['quiet'] }, 'dove', 30);
+    assert(JSON.stringify(a) === JSON.stringify(d), 'where quiet only changes the director songs');
+    const nb = voiced({ phrases: '4-5', kind: 'different', presence: 'often', where: ['busy'] }, 'dove-piene', 30);
+    let busyClips = 0;
+    for (const s of nb) { const n = normalizeSong(s), f = sectionFacts(n), t = n.tracks.find(x => x.type === 'spoken'); for (const c of t.clips) { const k = f.kinds[n.sections.findIndex(x => c.start >= x.start && c.start < x.start + x.bars)]; if (k !== 'quiet') busyClips++; } }
+    assert(nb.length && busyClips > 0, `radio busy only: ${busyClips} clips outside quiet parts in ${nb.length} songs`);
+    console.log(`      ferro: ${quiet.length} quiet, ${medium.length} medium, ${busy.length} busy parts; quiet and medium: ${sp.clips.length} phrases`);
+  },
+  'voice track chance in every style (D14) and Sempre: weight 0 and complexity 0 and an artist with Sempre, Spesso on weight 0'() {
+    const ids = recipes.map(r => r.id), zero = recipes.filter(r => r.spoken && r.spoken.weight === 0).map(r => r.id);
+    assert(recipes.every(r => r.spoken && Number.isFinite(r.spoken.weight)), `a style without a spoken block: ${recipes.filter(r => !r.spoken).map(r => r.id)}`);
+    assert(zero.join() === 'country', `weight 0: ${zero}`);
+    const one = (styles, voice, seed, extra = {}) => createSession(recipes, seed).next({ styles, voice, ...extra }).song;
+    let n = 0;
+    for (let k = 0; k < 8; k++) {
+      assert(one(['country'], { presence: 'always' }, `sempre-${k}`).tracks.some(t => t.type === 'spoken'), 'Sempre on a weight 0 style');
+      assert(one(['berlin-techno'], { presence: 'always' }, `sempre-c0-${k}`, { complexity: 0 }).tracks.some(t => t.type === 'spoken'), 'Sempre at complexity 0');
+      assert(!one(['country'], { presence: 'often' }, `spesso-${k}`).tracks.some(t => t.type === 'spoken'), 'Spesso on a weight 0 style');
+      const art = JSON.parse(fs.readFileSync('artists/dreamer.json', 'utf8'));
+      assert(createSession(recipes, `sempre-art-${k}`).next({ artist: art, voice: { presence: 'always' } }).song.tracks.some(t => t.type === 'spoken'), 'Sempre with an artist');
+      n++;
+    }
+    // a style of weight 0.1: about one song in ten, the music the same without the voice track
+    const songs = generateSession(recipes, { styles: ['berlin-techno'], seed: 'peso', minutes: 240 }).songs, got = songs.filter(s => s.tracks.some(t => t.type === 'spoken')).length;
+    assert(got >= 1 && got / songs.length < 0.3, `berlin-techno (0.1): ${got} of ${songs.length}`);
+    // the Voce: traccia switch off: no voice track, the same songs otherwise
+    const on = generateSession(recipes, { styles: ['ambient'], seed: 'interr', minutes: 40, voice: { presence: 'always' } }).songs;
+    const off = generateSession(recipes, { styles: ['ambient'], seed: 'interr', minutes: 40, voice: { presence: 'always' }, voices: { track: false } }).songs;
+    const strip = s => JSON.stringify({ ...s, tracks: s.tracks.filter(t => t.type !== 'spoken'), build: s.build.filter(x => !(x.add === 'words')) });
+    assert(off.every(s => !s.tracks.some(t => t.type === 'spoken')) && on.length === off.length && on.every((s, i) => strip(s) === strip(off[i])), 'the switch off changes more than the voice track');
+    console.log(`      berlin-techno: ${got} of ${songs.length} songs with a voice track; ${n} Sempre cases; ${ids.length} styles`);
+  },
+  'radio sound for the next songs (D4): a style over the drawn voice, the speaker kept or set, auto unchanged'() {
+    const base = generateSession(recipes, { styles: ['dark-cyberpunk'], seed: 'suono', minutes: 20 }).songs;
+    const auto = generateSession(recipes, { styles: ['dark-cyberpunk'], seed: 'suono', minutes: 20, narratorSound: { style: 'auto' } }).songs;
+    assert(JSON.stringify(base) === JSON.stringify(auto), 'auto changes the songs');
+    const dist = generateSession(recipes, { styles: ['dark-cyberpunk'], seed: 'suono', minutes: 20, narratorSound: { style: 'distant' } }).songs;
+    for (let i = 0; i < base.length; i++) {
+      const a = base[i].tracks.find(t => t.type === 'voice'), b = dist[i].tracks.find(t => t.type === 'voice');
+      for (const [k, v] of Object.entries(soundPatch({ style: 'distant' }))) assert(b.settings[k] === v, `${k}: ${b.settings[k]}`);
+      assert(b.settings.speaker === a.settings.speaker && b.settings.gain === a.settings.gain && JSON.stringify(a.rack) === JSON.stringify(b.rack), 'speaker, volume or rack moved');
+      const strip = s => JSON.stringify({ ...s, tracks: s.tracks.filter(t => t.type !== 'voice') });
+      assert(strip(base[i]) === strip(dist[i]), 'the music moved');
+    }
+    const sp = generateSession(recipes, { styles: ['ambient'], seed: 'suono-t', minutes: 40, voice: { presence: 'always', sound: { style: 'robot', speaker: 'shelley' } } }).songs.map(s => s.tracks.find(t => t.type === 'spoken'));
+    assert(sp.length && sp.every(t => t.settings.speaker === 'shelley' && t.settings.drive === 3.5 && t.settings.pitch === 0.7), 'voice track sound');
+  },
+  'phrase list (D5, D6, D16): sorted rows, heard bars, text and bars edits, fill, add, remove'() {
+    const ex = EXAMPLE, id = ex.tracks.find(t => t.type === 'spoken').id;
+    const rows = phraseRows(ex, id, { lang: 'en' });
+    assert(rows.length === 3 && rows.every((r, i) => !i || rows[i - 1].start <= r.start), `rows sorted by bar: ${rows.map(r => r.start)}`);
+    const ref = rows.find(r => r.way === 'refrain');
+    assert(ref && ref.said.length > 1 && ref.said.every((b, i) => !i || b > ref.said[i - 1]), `refrain bars: ${ref && ref.said}`);
+    const G = 24, heard = phraseRows(ex, id, { lang: 'en', heard: { song: { ...ex, sections: [{ name: 'Crescendo', bars: G, bpm: ex.sections[0].bpm, key: ex.sections[0].key, chords: ex.sections[0].chords, meter: ex.sections[0].meter }, ...ex.sections], tracks: ex.tracks.map(t => ({ ...t, clips: normalizeSong(ex).tracks.find(x => x.id === t.id).clips.map(c => ({ start: c.start + G, bars: c.bars, pattern: c.pattern })) })) }, G } });
+    assert(heard.every((r, i) => r.heard && r.heard.start === rows[i].start + G), 'heard bars are written + G');
+    const r2 = rows[1], moved = editBars(ex, id, r2.raw, { start: r2.start + G + 8, G });
+    assert(moved.song && phraseRows(moved.song, id).find(r => r.raw === r2.raw).start === r2.start + 8, 'a typed heard bar is stored as written');
+    assert(editBars(ex, id, r2.raw, { start: 3, G }).error === 'growth', 'a bar in the growth is refused');
+    const t1 = editText(ex, id, rows[0].raw, 'en', 'the signal is late');
+    assert(t1.song && phraseRows(t1.song, id).find(r => r.raw === rows[0].raw).texts[0] === 'the signal is late', 'text edit');
+    assert(editText(ex, id, rows[0].raw, 'en', 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen').error === 'words', '15 words refused');
+    const f = fillRows(ex, id, 'night');
+    const fr = phraseRows(f.song, id, { lang: 'en' });
+    assert(f.filled === 3 && listVocab(fr) === 'night' && new Set(fr.map(r => r.texts.join())).size === 3 && fr.map(r => r.start).join() === rows.map(r => r.start).join(), `fill: ${fr.map(r => r.texts)}`);
+    const e = editText(f.song, id, fr[1].raw, 'en', 'my own line');
+    assert(listVocab(phraseRows(e.song, id, { lang: 'en' })) === 'mixed', 'edit after fill: mixed');
+    const rm = removeRow(ex, id, rows[1].raw);
+    assert(phraseRows(rm, id).length === 2 && !Object.keys(rm.tracks.find(t => t.id === id).patterns).includes(rows[1].key), 'remove a row and its line');
+    let last = ex; for (const r of rows) last = removeRow(last, id, phraseRows(last, id)[0].raw);
+    assert(last.tracks.some(t => t.id === id) && !phraseRows(last, id).length, 'the last row: the track stays, empty');
+    const add = addRow(last, id, { group: 'calm' });
+    assert(add.song && phraseRows(add.song, id).length === 1 && vocabOf(add.song.tracks.find(t => t.id === id).patterns.A) === 'calm', `add: ${JSON.stringify(add.error || add.start)}`);
+    assert(!validateSong(f.song).errors.length && !validateSong(add.song).errors.length, 'invalid song after an edit');
   },
 };
 

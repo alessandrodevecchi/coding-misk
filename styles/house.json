@@ -183,5 +183,10 @@
   "growthShapes": {
     "openings": { "broken": 2, "muted-base": 2, "slow": 1 },
     "paces": { "medium": 2, "fast": 1 }
+  },
+  "spoken": {
+    "weight": 0.1,
+    "ways": { "refrain": 1, "chop": 1 },
+    "vocab": "night"
   }
 }

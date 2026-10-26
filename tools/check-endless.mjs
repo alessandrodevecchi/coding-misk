@@ -77,7 +77,8 @@ function voiceless(x, { narrator = false } = {}) {
       return o;
     }).filter(st => Object.keys(st).some(k => k !== 'at' && k !== 'by'));
   };
-  const walk = v => { if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') { if (Array.isArray(v.tracks) && Array.isArray(v.sections)) strip(v); else Object.values(v).forEach(walk); } };
+  // (a session's entries say which way the voice track speaks and how many phrases: voice facts, not music)
+  const walk = v => { if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') { if (Array.isArray(v.tracks) && Array.isArray(v.sections)) strip(v); else { if (narrator) { delete v.spoken; delete v.phrasesSpoken; } Object.values(v).forEach(walk); } } };
   walk(r);
   return r;
 }
