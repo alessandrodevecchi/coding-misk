@@ -5,7 +5,7 @@ import { t } from '../i18n.js';
 import { normalizeSong, clipState } from './format.js';
 import { rackCode } from './rack.js';
 import { isSharedName } from './ideas.js';
-import { placeSpoken, spokenCode } from './spoken.js';
+import { placeSpoken, spokenCode, SPOKEN_ORBIT } from './spoken.js';
 
 const fadeIn = (secs, i) => i > 0 ? Math.min(secs[i].fade || 0, secs[i].bars) : 0;
 
@@ -54,9 +54,11 @@ export function compileSong(input) {
   const shared = song.shared && typeof song.shared === 'object' ? Object.fromEntries(Object.entries(song.shared).filter(([k, v]) => isSharedName(k) && typeof v === 'string')) : {};
   if (Object.keys(shared).length) { L.push('', `// ${t('cShared')}`); for (const [k, v] of Object.entries(shared)) L.push(`const ${k} = "${v}"`); }
 
-  // one bus per track: the first track of a type keeps the v1 orbit, the others get new ones
+  // one bus per track: the first track of a type keeps the v1 orbit, the others get new ones (9 and up, past the spoken
+  // orbits 13 and 14 when the song has a spoken track and the narrators' from 15, radio-arrangement D6)
   const used = new Set();
   let clipLanes = 0, extra = 8;
+  const nextExtra = extraOrbits(song.tracks), nextBus = () => (extra = nextExtra(extra));
   // muto e solo: le tracce silenziate non entrano nel codice
   const solo = song.tracks.some(tr => tr.solo);
   // voice instrument (voice-instrument): the lines of the spoken tracks, placed once for the whole song
@@ -64,7 +66,7 @@ export function compileSong(input) {
   for (const tr of song.tracks) {
     // the bus is chosen before skipping muted tracks, so a track that comes in later (live build) does not move the others
     // (spoken tracks have their own orbits, 13 and 14: they take no bus from the others)
-    const orbit = tr.type === 'spoken' ? null : !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : ++extra;
+    const orbit = tr.type === 'spoken' ? null : !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : nextBus();
     used.add(tr.type);
     // voice tracks speak the live build comments: their code comes from the build (build.js), not from clips
     if (tr.mute || (solo && !tr.solo) || tr.type === 'voice') continue;
@@ -134,6 +136,13 @@ export function lineMarks(lines, tr) {
 }
 
 // code track: the pattern is plain Strudel; the app adds the lane, the bus and the visual
+// The next extra bus after `o` for a song's tracks (D6): the spoken orbits (13 and 14) are skipped when a spoken track
+// speaks there, and the narrators' (15 and up, one per voice track) always
+export function extraOrbits(tracks = []) {
+  const spoken = tracks.some(tr => tr.type === 'spoken'), voices = tracks.filter(tr => tr.type === 'voice').length;
+  const taken = o => (spoken && (o === SPOKEN_ORBIT || o === SPOKEN_ORBIT + 1)) || (o >= 15 && o < 15 + voices);
+  return o => { let n = o + 1; while (taken(n)) n++; return n; };
+}
 function codeLayer(tr, clip, gate, orbit, rack = '') {
   const pat = (tr.patterns || {})[clip.pattern] || {};
   const code = String(pat.code || 'silence').trim().replace(/;\s*$/, '');

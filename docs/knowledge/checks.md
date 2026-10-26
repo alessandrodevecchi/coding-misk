@@ -66,6 +66,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 <!-- generated:checks -->
 | Tool | npm script | Needs | What it covers |
 | --- | --- | --- | --- |
+| `tools/check-arrangement-levels.cjs` |  | dev server, Chrome | Levels and load of a radio song stacked to 12 tracks with "+" (radio-arrangement D4, D5, tasks 1.5 and 1.8): for each style, a radio session where the console adds tracks of every instrument until 12 play; then the… |
 | `tools/check-backup.mjs` |  | Node | Checks for the backup of everything in the browser (#31). No browser. |
 | `tools/check-clips.cjs` |  | dev server, Chrome | Browser checks for fragments (#57): random and timed fragments from a song and from a radio recipe, 1080×1920 files with sound, a timed fragment that sounds as the same stretch of the full song, label numbers that grow,… |
 | `tools/check-clips.mjs` | `npm run check:clips` | Node | Checks for fragments (#57): vertical layouts, the fragment picker (lively parts, no overlap, bar lines, repeatable), times, label and glitch messages, and the texts for sharing. No browser. |

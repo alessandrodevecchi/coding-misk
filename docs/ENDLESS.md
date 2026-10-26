@@ -229,17 +229,24 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 | Energy up, down | next phrase | targets of the remaining double phrases ±0.15 |
 | Curve | next phrase | one double phrase gets the dragged target: energy, or a curve target (`#40`) |
 | Reset a curve | next phrase | the remaining double phrases of that curve go back to automatic |
-| Add, remove a type | next phrase | a forced add of a silent track of that type (a new one from the song's style when the song has none, `#41`), or a forced remove of every playing one; a track the song has not played yet gets composed material |
+| + and − of an instrument (`radio-arrangement`) | next phrase | `more`: one more track of kick, beat, bass, arp, melody, guitar, pad or texture, even when one plays: a silent one the song holds, else a new instance (`arp-2`, "Arp 2") from the style with another sound and pattern, an octave up, gain × 0.75 (× 0.6 for a third or a second bass); it stays until the final outro (a break or a charge may take it out for a phrase). `less`: the listener's last one, else the one that came in last. Up to 12 tracks (`cap`), recommended counts (kick 1, beat 2, bass 2, the others 3) only warn. Past the song's usual count every track the listener did not set plays at `sqrt(usual / n)` of its gain |
+| Lock an instrument | next phrase | `lock-part`, `unlock-part`: every track of the instrument, those added later included, is kept from the director's moves for the rest of the song; a locked drum plays through breaks. The listener's commands still act on locked tracks. The same state as the mixer's locks |
+| Riser before the next change | next phrase | `riser`: a noise sweep of 2, 4, 8 bars (auto: the style's length) up into the next part change, or down from it, replacing the director's riser there; its lock keeps the director's risers out |
+| Add a saved pattern | next phrase | `pattern`: a copy of the saved pattern as a new track (its own sound) or in place of a playing track (`P<k>`, the track's sound); it fits by type and meter, in the song's key and tempo |
+| Part harmony | next phrase | `voicing`: one track of the part (target as Vary) in thirds, an octave away, with chord colour or another inversion, or Auto (`H<k>`); the song's key and chords stay |
+| Add, remove a type (sessions recorded before `radio-arrangement`) | next phrase | a forced add of a silent track of that type (a new one from the song's style when the song has none, `#41`), or a forced remove of every playing one; a track the song has not played yet gets composed material |
 | More, less complex | next phrase | usual track count ±1 and session complexity ±0.2; with More, the tracks that have not played yet get composed material |
-| Vary a part (`radio-variation`) | next phrase | a new idea for each playing, unlocked track of the part (lead, the default, bass, arp or pad), added as pattern `V<k>` with a listener's pattern step; the rest of the song stays, later pattern steps of the varied tracks go |
+| Vary a part (`radio-variation`) | next phrase | a new idea for one track of the part chosen by `target` (Auto: the one changed least recently; or a track by id) or, without a target, for every playing track of the part (lead, the default, bass, arp, pad or guitar), added as pattern `V<k>` with a listener's pattern step; the rest of the song stays, later pattern steps of the varied tracks go |
 | Swap a part (`radio-variation`) | next phrase | another ready part for each playing, unlocked track of the part (a style preset or a saved pattern that fits), added as pattern `S<k>` with a listener's pattern step; never composed |
 | Darker, brighter, dirtier, cleaner, more space | next phrase | that move on every playing track that allows it |
 | Change instrument | next phrase | another wave, kit, guitar or texture from the style |
-| Change progression, key | next double phrase | the following sections take another progression, or a key a fifth away |
+| Change progression, key | next double phrase | the following sections take another progression, or a key a fifth away; with the menu, the progression chosen by name or a fifth up, a fifth down, the relative key |
 | Talk more, less | next phrase | voice amount ±0.2 for the rest of the song |
 | Go to the drop, stay here, end | next double phrase | the plan jumps to its drop, repeats the current part, or ends with an outro |
 | Extend (`#45`) | next double phrase | one more double phrase before the ending (the closing outros, or the last part), with the role and curves of the part before it and energy a little lower, then higher, on repeated presses; disabled once the transition to the next song plays |
 | Volume, mute, lock (mixer) | next bar | pinned gain; a step plus a lock; the director stops moving the track |
+
+**Scope.** With the switch on the whole session, the arrangement commands (`more`, `less`, `pattern`, `voicing`, `lock-part`, `unlock-part`) also go to the recipe's `arrange` list; each later song is planned and then takes them as commands on its own boundaries (`biasSong`), before the listener's own (D10 of `radio-arrangement`). Vary, Swap and the riser stay on the song on air.
 
 **Grown songs (`radio-profiles` stage 5, D9).** On a Crescendo or Live coder song a command becomes the next waypoint of its growth (`src/endless/waypoints.js`): the steps before its boundary are kept as they were, and from the boundary small typed moves (a line in or out, a growth level, notes a few at a time, a knob, a function, a device) lead from the code on air to the written form of the rewrite above, which plays as written from the arrival, a phrase boundary. The boundary is the first that leaves time to type the edit (the next phrase or the one after), the queue shows it; mute types `_$:`, a volume is `.gain()` on the line, Vary and Swap are notes edits, End takes the lines out one at a time during the outro. The listener's tracks move first (D10). A recipe records `growth: 2`; one of growth version 1 replays its steered songs grown again, as heard then.
 
@@ -247,8 +254,8 @@ The listener can change the song on air from the Radio tab (`#24`). `src/endless
 
 Steering composes with the material generator (`radio-variation`, `airIdea` in `src/endless/material.js`), in the key and chords of the section where the material starts and with the style's rules:
 
-- **Vary** (`vary`, part in `type`, one of `VARY_TYPES`: `lead`, `bass`, `arp`, `pad`): for the lead the hook, else the guitar; the arp is a part of its own (unlike Add and Remove, where lead covers the arp). The new idea differs from every pattern the track already has; drums and textures are not varied. Later commands keep the varied part (its step is kept as the listener's), and later director moves of the track may pick it or another of its patterns. Disabled with `not-playing` when no track of the part plays at the bar where it would apply, `locked` when every one is locked. Vary always composes, whatever the session source; a pad keeps the song's chords (the style's own progressions are left out) and changes only its rhythm, register and voicing.
-- **Swap** (`swap`, the same parts as Vary): another ready part, never composed: `readyParts` lists the style's presets of the track's type (an arp keeps its speed) and the user's saved patterns that fit the song's style and key, without the parts the track already holds; the pick comes from the stream of the track id in the seed `swap:<song>:<index>`. Disabled with `not-playing` and `locked` as Vary, and `no-ready` when nothing else fits.
+- **Vary** (`vary`, part in `type`, one of `VARY_TYPES`: `lead`, `bass`, `arp`, `pad`, `guitar`; a `target`, `radio-arrangement` D7): for the lead the hook, else the guitar; the arp is a part of its own (unlike Add and Remove, where lead covers the arp). The new idea differs from every pattern the track already has; drums and textures are not varied. Later commands keep the varied part (its step is kept as the listener's), and later director moves of the track may pick it or another of its patterns. Disabled with `not-playing` when no track of the part (or the target) plays at the bar where it would apply; a lock never disables it (`radio-arrangement` D12). Vary always composes, whatever the session source; a pad keeps the song's chords (the style's own progressions are left out) and changes only its rhythm, register and voicing.
+- **Swap** (`swap`, the same parts as Vary): another ready part, never composed: `readyParts` lists the style's presets of the track's type (an arp keeps its speed) and the user's saved patterns that fit the song's style and key, without the parts the track already holds; the pick comes from the stream of the track id in the seed `swap:<song>:<index>`. Disabled with `not-playing` as Vary, and `no-ready` when nothing else fits.
 - **Add and More complex**: a melodic track (bass, arp, lead, pad, guitar) that has not played before the command and still holds presets gets composed patterns A and B. Drums and textures keep the style's presets. With the session source `patterns`, or at complexity 0, nothing is composed and the songs are the same as before; with `varied`, the track gets a variation of its preset.
 - **Inputs** (`airInputs`), at the double phrase where the material starts: density is the density target, or the tracks playing when the curve is automatic, as a share of the most the song can play, and sets the notes per bar (the generator's onsets band); the energy target sets the register (a melody moves up to three degrees up or down, a bass favours octaves, an arpeggio goes an octave up above 0.75, a pad's anchor is `a3`, `c4` or `e4`); the session complexity, moved by More and Less complex, sets the range (the span of a melody) and the rhythmic variety (syncopation, fifths in a bassline, skips and random indices in an arpeggio, voicing modes of a pad).
 
@@ -337,13 +344,27 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Charge before a drop                         | `steering: high tension charges the part before a drop`          |
 | Extend                                       | `steering: extend adds a part before the ending and keeps it`    |
 | Vary: new notes in key, the rest unchanged   | `steering: vary gives a part new notes in key and keeps the rest` |
-| Vary: not playing, locked, late              | `steering: vary is disabled when the part does not play or is locked` |
+| Vary: not playing, locked, late              | `steering: vary is disabled when the part does not play, and reaches locked tracks` |
 | Vary: replay and cancel                      | `steering: vary replays the same, and a cancelled vary leaves the notes` |
 | Add and More complex compose; plain sessions as before | `steering: Add and More complex compose new tracks`    |
 | Curves and complexity shape composed material | `steering: curves and complexity shape composed material`       |
 | Vary composes with any source; pad keeps chords | `steering: vary composes whatever the source, and a pad keeps its chords` |
 | Swap: a ready part, replays, why not, saved patterns | `steering: swap gives a part another ready part, never composed` |
 | A vary under 20 ms                           | `steering: one vary takes less than 20 ms`                       |
+| Old add and remove replay as before          | `arrangement: old add and remove replay as before radio-arrangement` |
+| + and −, several tracks of one instrument    | `arrangement: + and − per instrument, several tracks of one instrument` |
+| A second track differs and fits              | `arrangement: a second track sounds different, an octave away, in key` |
+| Limits and warnings, two kicks               | `arrangement: limits, recommended counts as warnings, two kicks on different grooves` |
+| Added tracks stay (the owner's test)         | `arrangement: the owner's test, a track added with + stays until the outro` |
+| A lock per instrument                        | `arrangement: a lock per instrument`                             |
+| Riser on the next change                     | `arrangement: a riser on the next part change`                   |
+| Headroom as tracks add up                    | `arrangement: headroom as tracks add up, a volume set by hand kept` |
+| Extra buses                                  | `arrangement: extra buses skip the spoken and narrator orbits, every track its own` |
+| Target of Vary and Swap                      | `arrangement: the target of Vary and Swap, Auto takes turns`     |
+| A saved pattern on air                       | `arrangement: a saved pattern on air, new or in place of a track, in the song key, replayed as heard` |
+| Part harmony                                 | `arrangement: Part harmony treats one part in the song key, Auto never repeats, colour only on pads and guitars` |
+| Song harmony menu                            | `arrangement: the Song harmony menu applies a chosen progression or key, Auto as before` |
+| The whole session                            | `arrangement: the whole session, scope and lock together`        |
 | Continue a Compose song                      | `radio: a session continues after a song from Compose`           |
 
 ## Artists

@@ -46,8 +46,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(st.commands.length === 0 && JSON.stringify(st.plan.targets) === JSON.stringify(t0), 'cancel restores the song');
 
   // an arrangement command applies at its bar, marked as the listener's, shown in the code
-  const typeBtn = await page.$('#radio-steer [data-cmd="remove"]:not([disabled])') || await page.$('#radio-steer [data-cmd="add"]:not([disabled])');
-  const kind = await typeBtn.getAttribute('data-cmd'), type = await typeBtn.getAttribute('data-type');
+  const typeBtn = await page.$('#radio-steer [data-cmd="less"]:not([disabled])') || await page.$('#radio-steer [data-cmd="more"]:not([disabled])');
+  const kind = await typeBtn.getAttribute('data-cmd'), type = await typeBtn.getAttribute('data-inst');
   await typeBtn.click(); await sleep(300);
   st = await ST();
   const cmd = st.commands[0];
@@ -167,7 +167,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // Vary and Swap (radio-variation): the part picker (lead by default), the queue label, one per part and boundary,
   // cancel, the shortcut, the disabled state with its reason
   { const parts = await page.$$eval('#radio-steer [data-vary-part]', xs => xs.map(x => `${x.dataset.varyPart}:${x.getAttribute('aria-pressed')}`).join());
-    check(parts === 'lead:true,bass:false,arp:false,pad:false', 'part picker with the lead picked', parts);
+    check(parts === 'lead:true,bass:false,arp:false,pad:false,guitar:false', 'part picker with the lead picked', parts);
     check(await page.isVisible('#radio-steer [data-cmd="vary"] svg') && await page.isVisible('#radio-steer [data-cmd="swap"] svg'), 'Vary and Swap buttons with drawn icons');
     // a part that plays at the next phrase, and one that does not (its buttons say why); the middle of the song, where
     // more parts play
@@ -176,7 +176,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       for (const id of x.plan.locked) await page.evaluate(track => globalThis.codingMiskRadio.command({ kind: 'unlock', track }), id);
       await sleep(300); }
     let on = null, off = null;
-    for (const p of ['lead', 'bass', 'arp', 'pad']) {
+    for (const p of ['lead', 'bass', 'arp', 'pad', 'guitar']) {
       await page.click(`#radio-steer [data-vary-part="${p}"]`); await sleep(150);
       const d = await page.$eval('#radio-steer [data-cmd="vary"]', b => ({ dis: b.disabled, why: b.dataset.why || '', title: b.title, part: b.dataset.part }));
       if (!d.dis && !on) on = { p, ...d };
@@ -358,6 +358,250 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     await page.selectOption('#radio-profile', 'artist'); await sleep(200);
   }
 
+
+  // ---------- arrangement by instrument (radio-arrangement phase 2) ----------
+  // (a fresh session in berlin-techno; the plan and the song from the page's own modules)
+  await page.click('#radio-start'); await sleep(300); await page.fill('#radio-seed', 'steer-arr'); await page.click('#radio-start'); await sleep(2500);
+  {
+    const A = () => page.evaluate(async () => {
+      const R = globalThis.codingMiskRadio, s = R.steering, { stateAt } = await import('/src/song/build.js'), S = await import('/src/endless/steering.js');
+      const st = R.state, it = st.stream[st.onAir], rel = document.querySelector('strudel-editor').editor.repl.scheduler.now() - it.start;
+      const at = Math.min(s.plan.bars - 1, S.applyBar('more', rel, s.plan));
+      const on = b => stateAt(s.song, b).song.tracks.filter(t => !t.mute && !['voice', 'spoken'].includes(t.type)).map(t => t.id);
+      return { s, at, rel, on: on(at), commands: s.commands };
+    });
+    const onAt = (b) => page.evaluate(async b => { const { stateAt } = await import('/src/song/build.js'), s = globalThis.codingMiskRadio.steering; return stateAt(s.song, b).song.tracks.filter(t => !t.mute && !['voice', 'spoken'].includes(t.type)).map(t => t.id); }, b);
+    const shownParts = await page.$$eval('#radio-steer .arr-inst', xs => xs.map(x => x.dataset.arr));
+    check(shownParts.length >= 5 && shownParts.every(p => ['kick', 'beat', 'bass', 'texture', 'arp', 'hook', 'guitar', 'pad'].includes(p)) && !shownParts.includes('guitar'), 'one − and + per instrument of the style, no guitar in berlin-techno', shownParts.join());
+    check((await page.$$('#radio-steer .arr-row')).length === 2 && await page.isVisible('#radio-steer .arr-riser [data-cmd="riser"]'), 'two rows of instruments and the riser row');
+    check(!(await page.$('#radio-steer [data-cmd="add"]')) && !(await page.$('#radio-steer [data-cmd="remove"]')), 'the coarse drums and lead buttons are gone');
+    check((await page.$$('#radio-steer .arr-lock svg')).length === shownParts.length + 1 && !(await page.innerText('#radio-steer')).match(/🔒|🔓/), 'drawn lock icons, no emoji');
+    // + pad twice: two pads more, the queue names the tracks; − takes the last one added
+    const p0 = (await A()).on.filter(id => /^pad/.test(id)).length;
+    await page.click('#radio-steer [data-cmd="more"][data-inst="pad"]'); await sleep(250);
+    await page.click('#radio-steer [data-cmd="more"][data-inst="pad"]'); await sleep(300);
+    let a = await A();
+    const at = a.commands[a.commands.length - 1].at, pads = (await onAt(at)).filter(id => /^pad/.test(id));
+    check(pads.length === p0 + 2, '+ pad twice: two more pads from the next phrase', `${p0} → ${pads}`);
+    const q = await page.innerText('#radio-steer .steer-queue');
+    check(/\+ pad \(Pad( \d)?\)/.test(q), 'the queue names the track: "+ pad (Pad 2)"', q.replace(/\n/g, ' | '));
+    await page.click('#radio-steer [data-cmd="less"][data-inst="pad"]'); await sleep(300);
+    a = await A();
+    const left = (await onAt(at)).filter(id => /^pad/.test(id));
+    check(left.length === p0 + 1 && !left.includes(a.s.plan.added[a.s.plan.added.length - 1] && a.s.plan.added.slice(-1)[0].id === pads[pads.length - 1] ? 'x' : pads[pads.length - 1]), '− pad takes the last one added', `${pads} → ${left}`);
+    // cancel the −: both pads again
+    const lessId = a.commands.find(c => c.kind === 'less').id;
+    await page.click(`#radio-steer [data-cancel="${lessId}"]`); await sleep(300);
+    check((await onAt(at)).filter(id => /^pad/.test(id)).length === p0 + 2, 'cancel brings the pad back');
+    // two kicks: the badge and the warning line
+    await page.click('#radio-steer [data-cmd="more"][data-inst="kick"]'); await sleep(300);
+    a = await A();
+    const kicks = (await onAt(at)).filter(id => /^kick/.test(id)).length;
+    const badge = await page.$eval('#radio-steer [data-arr="kick"]', x => ({ over: x.classList.contains('over'), n: (x.querySelector('.arr-count') || {}).textContent || '' })).catch(() => ({}));
+    const warn = await page.isVisible('#radio-steer .arr-warn') ? await page.innerText('#radio-steer .arr-warn') : '';
+    // (the badge counts the next phrase; the + applies there)
+    check(kicks >= 2, 'a second kick plays', `${kicks}`);
+    // the owner's test in the browser: seek two phrases past the + pad, the pads still play and have mixer rows
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), at + 2 * a.s.plan.phrase + 0.3); await sleep(1500);
+    const later = (await onAt(at + 2 * a.s.plan.phrase)).filter(id => /^pad/.test(id));
+    const rows = await page.$$eval('#radio-steer [data-mix-vol]', xs => xs.map(x => x.dataset.mixVol));
+    check(later.length === p0 + 2 && later.every(id => rows.includes(id)), "owner's test: two phrases later the added pads still play, with their mixer rows", `${later} / ${rows}`);
+    const b2 = await page.$eval('#radio-steer [data-arr="kick"]', x => ({ over: x.classList.contains('over'), n: (x.querySelector('.arr-count') || {}).textContent || '' })).catch(() => ({}));
+    const w2 = await page.isVisible('#radio-steer .arr-warn') ? await page.innerText('#radio-steer .arr-warn') : '';
+    check(b2.over && /×2/.test(b2.n) && /1/.test(w2) && /kick|cassa/i.test(w2), 'two kicks: the badge in the warning colour and a line with the recommended values', JSON.stringify({ badge, warn, b2, w2 }));
+    const tipPlus = await page.getAttribute('#radio-steer [data-cmd="more"][data-inst="kick"]', 'title');
+    check(/×3/.test(tipPlus), 'the + tooltip warns before the press', tipPlus);
+    // lock the pad: the mixer rows of the pads lock too; unlocking one row gives the half state
+    await page.click('#radio-steer [data-lock-part="pad"]'); await sleep(300);
+    a = await A();
+    const padRows = await page.$$eval('#radio-steer [data-mix-lock]', xs => xs.filter(x => /^pad/.test(x.dataset.mixLock)).map(x => [x.dataset.mixLock, x.getAttribute('aria-pressed')]));
+    check(a.s.plan.lockedParts.includes('pad') && padRows.length >= 2 && padRows.every(([, p]) => p === 'true') && (await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'data-state')) === 'closed', 'locking the pad locks its mixer rows', JSON.stringify(padRows));
+    await page.click(`#radio-steer [data-mix-lock="${padRows[padRows.length - 1][0]}"]`); await sleep(300);
+    check((await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'data-state')) === 'half' && /1|2/.test(await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'title')), 'unlocking one row in the mixer shows the half state', await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'title'));
+    await page.click('#radio-steer [data-lock-part="pad"]'); await sleep(300);
+    check((await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'data-state')) === 'closed', 'a click on the half lock locks them all');
+    check(/pad: (locked|bloccato)/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "pad: locked"');
+    await page.click('#radio-steer [data-lock-part="pad"]'); await sleep(300);
+    check((await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'data-state')) === 'open', 'the lock opens again');
+    // the riser row: 4 bars, up; placed on the next part change
+    await page.selectOption('#radio-steer [data-riser="bars"]', '4'); await sleep(200);
+    check((await page.$$eval('#radio-steer [data-riser="sound"] option', xs => xs.length)) === 1, 'the Sound dropdown shows its one option');
+    await page.click('#radio-steer [data-cmd="riser"]'); await sleep(300);
+    a = await A();
+    const r = a.s.plan.risers[0];
+    check(r && r.bars === 4 && r.dir === 'up' && r.end === r.change && r.start === r.change - 4, 'a riser of 4 bars ends on the next part change', JSON.stringify(r));
+    check(/riser 4 (bars|battute), (up|sale)/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "riser 4 bars, up"');
+    // the target of Vary and Swap (radio-arrangement phase 3): Auto and the pads by name; a named pad varies alone, the
+    // queue names it; the target goes back to Auto when its track stops
+    await page.click('#radio-steer [data-vary-part="pad"]'); await sleep(250);
+    const opts3 = await page.$$eval('#radio-steer [data-vary-target] option', xs => xs.map(x => [x.value, x.textContent]));
+    check(opts3[0][0] === 'auto' && opts3.filter(([v]) => /^pad/.test(v)).length >= 2, 'the target lists Auto and the pads by name', JSON.stringify(opts3));
+    const lastPad = opts3[opts3.length - 1][0];
+    await page.selectOption('#radio-steer [data-vary-target]', lastPad); await sleep(250);
+    await page.click('#radio-steer [data-cmd="vary"]'); await sleep(400);
+    a = await A();
+    const vc = a.commands.filter(c => c.kind === 'vary').pop();
+    const vsteps = a.s.song.build.filter(x => x.at === vc.at && x.by === 'listener' && x.pattern && /^V\d+$/.test(x.pattern.to)).map(x => x.pattern.track);
+    check(vc.target === lastPad && vsteps.length === 1 && vsteps[0] === lastPad, 'a named target varies that track only', JSON.stringify({ vc, vsteps }));
+    check(new RegExp(`(Vary|Varia) pad \\(${opts3[opts3.length - 1][1]}\\)`).test(await page.innerText('#radio-steer .steer-queue')), 'the queue names the target', await page.innerText('#radio-steer .steer-queue'));
+    await page.selectOption('#radio-steer [data-vary-target]', 'auto'); await sleep(200);
+    await page.click('#radio-steer [data-cmd="swap"]').catch(() => {}); await sleep(400);
+    a = await A();
+    const sc = a.commands.filter(c => c.kind === 'swap').pop();
+    if (sc) check(sc.target === 'auto' && /(Swap|Scambia) pad \(/.test(await page.innerText('#radio-steer .steer-queue')), 'Auto swaps one pad and the queue says which', JSON.stringify(sc));
+    await page.selectOption('#radio-steer [data-vary-target]', lastPad); await sleep(200);
+    await page.evaluate(p => globalThis.codingMiskRadio.command({ kind: 'less', part: 'pad' }), 'pad'); await sleep(400);
+    const tg = await page.$eval('#radio-steer [data-vary-target]', x => x.value);
+    check(tg === 'auto' || (await A()).on.includes(lastPad), 'the target goes back to Auto when its track stops', tg);
+    await page.click('#radio-steer [data-vary-part="lead"]'); await sleep(200);
+    // shortcuts: a digit adds, Shift and the digit removes
+    const order = await page.$$eval('#radio-steer .arr-inst', xs => xs.map(x => x.dataset.arr));
+    const n0 = (await A()).commands.length;
+    await page.mouse.click(5, 5); await page.keyboard.press('Digit3'); await sleep(300);
+    a = await A();
+    const last = a.commands[a.commands.length - 1];
+    check(a.commands.length === n0 + 1 && last.kind === 'more' && last.part === order[2], 'shortcut 3 adds the third instrument', JSON.stringify(last));
+    await page.keyboard.press('Shift+Digit3'); await sleep(300);
+    a = await A();
+    check(a.commands[a.commands.length - 1].kind === 'less' && a.commands[a.commands.length - 1].part === order[2], 'Shift+3 removes one', JSON.stringify(a.commands.slice(-1)));
+    // the cap: 12 tracks, then every + is off with its reason
+    for (let k = 0; k < 16; k++) { const s2 = await A(); if (s2.on.filter(id => !/riser/.test(id)).length >= 12) break; await page.evaluate(p => globalThis.codingMiskRadio.command({ kind: 'more', part: p }), order[k % order.length]); await sleep(150); }
+    await sleep(400);
+    const plus = await page.$$eval('#radio-steer [data-cmd="more"]', xs => xs.map(x => [x.disabled, x.dataset.why]));
+    const n12 = (await A()).on.filter(id => !/riser/.test(id)).length;
+    check(n12 === 12 && plus.every(([d, w]) => d && w === 'cap'), 'at 12 tracks every + is off: cap', `${n12} ${JSON.stringify(plus)}`);
+    check(/12/.test(await page.innerText('#radio-steer .arr-info')), 'the count line shows the cap');
+    check(!(await err()), 'no evaluation error with 12 tracks', (await err()).slice(0, 120));
+    if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'arrangement-en.png') });
+    // labels in Italian
+    await page.evaluate(() => localStorage.setItem('coding-misk-lang', 'it')); await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', 'steer-arr'); await page.click('#radio-start'); await sleep(2500);
+    const labels = await page.$$eval('#radio-steer .arr-pm', xs => xs.map(x => x.getAttribute('aria-label')));
+    check(['+ cassa', '− cassa', '+ ritmica', '+ basso'].every(x => labels.includes(x)) && /Riser al prossimo cambio/.test(await page.innerText('#radio-steer .arr-riser')), 'Italian labels: "+ cassa", "− cassa", "+ ritmica", "+ basso", riser row', labels.join(', '));
+    if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'arrangement-it.png') });
+    await page.evaluate(() => localStorage.setItem('coding-misk-lang', 'en'));
+  }
+
+  // ---------- Add a saved pattern (radio-arrangement phase 4) ----------
+  {
+    const mine = [
+      { id: 'p-bass', name: 'Basso mio', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: { wave: 'sawtooth', gain: 0.7 }, context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 128, mode: 'minor' }, styles: ['jazz'], source: 'compose', created: '2026-10-26' },
+      { id: 'p-hook', name: 'Melodia mia', kind: 'melodies', type: 'hook', pattern: { idea: { degrees: '<0 2 4 ~ 3 1>' } }, sound: 'square', settings: { wave: 'square', gain: 0.3 }, context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 60, mode: 'minor' }, styles: [], source: 'compose', created: '2026-10-26' },
+      { id: 'p-odd', name: 'Dispari', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: {}, context: { key: 'A', chords: 'notturna', meter: '7/8', bpm: 120, mode: 'minor' }, styles: [], source: 'compose', created: '2026-10-26' },
+    ];
+    await page.evaluate(list => { localStorage.setItem('coding-misk-patterns', JSON.stringify(list)); localStorage.setItem('coding-misk-lang', 'en'); localStorage.removeItem('coding-misk-radio-saved-open'); }, mine);
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', 'steer-saved'); await page.click('#radio-start'); await sleep(2500);
+    const head = await page.innerText('#sp-toggle');
+    check(/\(2\)/.test(head) && (await page.$$('#radio-steer .sp-list .sp-row')).length === 2 && /1 in another meter/.test(await page.innerText('#radio-steer .sp')), 'the panel lists the 2 patterns that fit, folded, and counts the 7/8 one', `${head} | ${await page.innerText('#radio-steer .sp')}`);
+    const painted = await page.$$eval('#radio-steer canvas[data-sp-pv]', cs => cs.map(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; }));
+    check(painted.length === 2 && painted.every(n => n > 20), 'each row has a preview drawing', JSON.stringify(painted));
+    await page.click('#sp-toggle'); await sleep(300);
+    check((await page.$$('#radio-steer .sp-card')).length === 2 && await page.isVisible('#radio-steer [data-sp-new="p-bass"]') && await page.isVisible('#radio-steer [data-sp-replace="p-bass"]'), 'open: cards with Add as new track and Replace');
+    check(/feel different/.test(await page.innerText('#radio-steer .sp-cards')), 'a pattern saved at 60 BPM warns about the tempo');
+    check(await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio-saved-open')) === true), 'the open panel is remembered');
+    // the preview: rides the radio, which goes on (not paused, its bars run), with the radio lower; a second press stops
+    const t0 = await now();
+    await page.click('#radio-steer [data-sp-listen="p-bass"]'); await sleep(1500);
+    const pv = await page.evaluate(() => globalThis.codingMiskRadioPreview.state);
+    const t1 = await now();
+    check(pv && pv.riding && /note|n\(/.test(pv.expr) && t1 > t0 + 0.5 && !(await page.evaluate(() => globalThis.codingMiskRadio.paused)), 'listen: the pattern rides the radio, which keeps playing', JSON.stringify({ pv: pv && { riding: pv.riding }, t0, t1 }));
+    check((await page.getAttribute('#radio-steer [data-sp-listen="p-bass"]', 'aria-pressed')) === 'true', 'the listen button shows it plays');
+    const ducked = await page.evaluate(() => { const s = document.querySelector('strudel-editor').editor.repl.scheduler, hs = s.pattern.queryArc(s.lastEnd, s.lastEnd + 1); return hs.some(h => h.value && h.value.velocity !== undefined && h.value.velocity <= 0.26 && h.value.orbit !== 40) && hs.some(h => h.value && h.value.orbit === 40); });
+    check(ducked, 'the radio plays 12 dB lower under the preview (velocity a quarter), the preview on its own bus');
+    await page.click('#radio-steer [data-sp-listen="p-hook"]'); await sleep(800);
+    check((await page.evaluate(() => globalThis.codingMiskRadioPreview.state && globalThis.codingMiskRadioPreview.state.riding)) && (await page.getAttribute('#radio-steer [data-sp-listen="p-bass"]', 'aria-pressed')) === 'false', 'another preview takes over');
+    await page.click('#radio-steer [data-sp-listen="p-hook"]'); await sleep(500);
+    check(!(await page.evaluate(() => globalThis.codingMiskRadioPreview.state)), 'a second press stops the preview');
+    // add as a new track: a bass track with the pattern; the queue names it
+    await page.click('#radio-steer [data-sp-new="p-bass"]'); await sleep(400);
+    let x = await ST();
+    const pc = x.commands.find(c => c.kind === 'pattern');
+    const added = await page.evaluate(() => globalThis.codingMiskRadio.steering.plan.added.slice(-1)[0]);
+    check(pc && pc.mode === 'new' && pc.item.name === 'Basso mio' && added && JSON.stringify(x.patterns[added.id].A) === JSON.stringify({ preset: 'rolling' }), 'Add as new track: a new bass with the saved bassline', JSON.stringify({ pc: pc && pc.mode, added }));
+    check(/\+ Basso mio \(/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "+ Basso mio (…)"', await page.innerText('#radio-steer .steer-queue'));
+    // replace: the saved melody in place of a playing track of its type, when one plays
+    const rep = await page.$('#radio-steer [data-sp-replace="p-hook"]:not([disabled])');
+    if (rep) {
+      await rep.click(); await sleep(400);
+      x = await ST();
+      const rc = x.commands.find(c => c.kind === 'pattern' && c.mode === 'replace');
+      check(rc && x.build.some(s => s.at === rc.at && s.pattern && s.pattern.track === rc.target && /^P\d+$/.test(s.pattern.to)), 'Replace: the saved melody as a P pattern on the chosen track', JSON.stringify(rc && { target: rc.target }));
+    } else check(/ · /.test(await page.getAttribute('#radio-steer [data-sp-replace="p-hook"]', 'title')), 'Replace off with its reason when no melody plays');
+    check(!(await err()), 'no evaluation error with saved patterns', (await err()).slice(0, 120));
+    if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'saved-en.png') });
+    await page.evaluate(() => localStorage.removeItem('coding-misk-patterns'));
+  }
+
+  // ---------- Part harmony and the Song harmony menu (radio-arrangement phase 5) ----------
+  await page.click('#radio-start'); await sleep(300); await page.fill('#radio-seed', 'steer-harm'); await page.click('#radio-start'); await sleep(2500);
+  {
+    const s0 = await ST(); await page.evaluate(b => globalThis.codingMiskRadio.seek(b), 2 * s0.plan.phrase + 1); await sleep(800);
+    check(await page.isVisible('#radio-steer [data-cmd="voicing"]') && (await page.$$('#radio-steer [data-voicing-treat] option')).length === 5, 'Part harmony in the Parts group with Auto and four treatments');
+    let done = null;
+    for (const p of ['pad', 'bass', 'arp', 'lead', 'guitar']) {
+      await page.click(`#radio-steer [data-vary-part="${p}"]`); await sleep(200);
+      if (!(await page.$('#radio-steer [data-cmd="voicing"]:not([disabled])'))) continue;
+      await page.click('#radio-steer [data-cmd="voicing"]'); await sleep(400);
+      done = p; break;
+    }
+    const x = await ST(), vc = x.commands.find(c => c.kind === 'voicing');
+    const q = await page.innerText('#radio-steer .steer-queue');
+    check(!!done && vc && vc.treatment === 'auto' && x.build.some(b => b.at === vc.at && b.pattern && /^H\d+$/.test(b.pattern.to)) && /(Harmony|Armonia) \S+: (In thirds|Octave|Chord colour|Inversion)/.test(q), 'Part harmony Auto: an H pattern, the queue names the treatment', `${done} ${q.replace(/\n/g, ' | ')}`);
+    // colour on a melody is off with its reason
+    await page.click('#radio-steer [data-vary-part="lead"]'); await sleep(200);
+    await page.selectOption('#radio-steer [data-voicing-treat]', 'colour'); await sleep(250);
+    const lb = await page.$eval('#radio-steer [data-cmd="voicing"]', b => ({ dis: b.disabled, title: b.title }));
+    check(lb.dis && / · /.test(lb.title), 'chord colour on the melody is off, with the reason', lb.title);
+    await page.selectOption('#radio-steer [data-voicing-treat]', 'auto'); await sleep(200);
+    // the Song harmony menu: a progression by name and a key a fifth up
+    const progs = await page.$$eval('#radio-steer [data-harm-chords] option', xs => xs.map(o => o.value));
+    check(progs[0] === 'auto' && progs.length >= 2, 'the Chords menu: Auto and the style\'s progressions', progs.join());
+    const n0 = (await ST()).commands.length;
+    await page.selectOption('#radio-steer [data-harm-chords]', progs[progs.length - 1]); await sleep(250);
+    const chBtn = await page.$('#radio-steer [data-cmd="progression"]:not([disabled])');
+    if (chBtn) { await chBtn.click(); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'progression' && c.chords === progs[progs.length - 1] && /(Change chords|Cambia accordi): /.test(await page.innerText('#radio-steer .steer-queue')), 'a chosen progression is recorded and named in the queue', JSON.stringify(c)); }
+    else check(/ · /.test(await page.getAttribute('#radio-steer [data-cmd="progression"]', 'title')), 'Change chords off with its reason (already playing those chords)');
+    await page.selectOption('#radio-steer [data-harm-key]', 'up'); await sleep(250);
+    const kb = await page.$('#radio-steer [data-cmd="key"]:not([disabled])');
+    if (kb) { await kb.click(); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'key' && c.to === 'up' && /(a fifth up|una quinta sopra)/.test(await page.innerText('#radio-steer .steer-queue')), 'a key a fifth up from the menu', JSON.stringify(c)); }
+    check((await ST()).commands.length > n0 && !(await err()), 'no evaluation error with the harmony menu', (await err()).slice(0, 120));
+    if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'harmony-en.png') });
+  }
+
+  // ---------- the whole session (radio-arrangement phase 6) ----------
+  await page.click('#radio-start'); await sleep(300); await page.fill('#radio-seed', 'steer-session'); await page.click('#radio-start'); await sleep(2500);
+  {
+    if ((await page.getAttribute('#steer-scope', 'aria-pressed')) !== 'true') { await page.click('#steer-scope'); await sleep(200); }
+    const plus = await page.$('#radio-steer [data-cmd="more"]:not([disabled])'), part = plus && await plus.getAttribute('data-inst');
+    await plus.click(); await sleep(400);
+    let x = await ST();
+    const c = x.commands.slice(-1)[0];
+    check(c && c.kind === 'more' && c.scope === 'session' && (x.recipe.arrange || []).length === 1 && x.recipe.arrange[0].part === part, `"+ ${part}" for the session goes to the recipe`, JSON.stringify(x.recipe.arrange));
+    check(/for the session|per tutta la diretta/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "for the session"');
+    const tipV = await page.getAttribute('#radio-steer [data-cmd="vary"]', 'title');
+    check(/this song only|solo per questo brano/.test(tipV), 'Vary says it is for this song only in session scope', tipV);
+    await page.click(`#radio-steer [data-cancel="${c.id}"]`); await sleep(400);
+    x = await ST();
+    check(!(x.recipe.arrange || []).length, 'cancel takes it out of the session');
+    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]`); await sleep(400);
+    // the next song gets one more track of that instrument from the session
+    await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(3000);
+    x = await ST();
+    check(x.n === 1 && (x.plan.added || []).some(a => a.part === part), `the next song plays one more ${part} from the session`, JSON.stringify({ n: x.n, added: x.plan.added }));
+    check(!(await err()), 'no evaluation error with session choices', (await err()).slice(0, 120));
+    // a replay of the session gives the same next song
+    const heard = JSON.stringify(x.song.build);
+    await page.click('#radio-replay'); await sleep(3000);
+    await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(3000);
+    const y = await ST();
+    check(y.n === 1 && JSON.stringify(y.song.build) === heard, 'replay gives the next song the same session choice');
+    await page.click('#steer-scope'); await sleep(200);
+  }
+
+  await page.click('#radio-start'); await sleep(300);
   // ---------- the console's Voice group (voice-full-controls D10) ----------
   // a fake voice helper: the status says yes, a line's sample "is made" at once (the file does not exist: the line is
   // written and silent, which is what this check needs)

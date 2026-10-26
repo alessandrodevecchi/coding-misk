@@ -12,6 +12,8 @@ import { compose } from '../src/material/index.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { userPool } from '../src/endless/material.js';
+import { fitsAir, unfitReason } from '../src/endless/steering.js';
+import { createSession } from '../src/endless/director.js';
 import { generateSession } from '../src/endless/director.js';
 import { makeBackup, mergeBackup } from '../src/settings/backup.js';
 import { loadStyles } from './styles-dir.mjs';
@@ -231,6 +233,21 @@ const CHECKS = {
     }
     const arp = composeNewPart({ kind: 'arpeggios', n: 3, harmony: { key: 'A', chords: 'epica' }, energy: 0.4 });
     assert(arp.type === 'arp' && arp.pattern.speed === '16' && arp.seed === 'pattern:arpeggios:3', 'other kinds as before');
+  },
+  'the radio console reads saved patterns with name, sound and meter, and fits them by type and meter (radio-arrangement D9)'() {
+    const st = patternStore(memStore());
+    const tr = song.tracks.find(t => t.type === 'bass');
+    const bass = st.add(savedFromTrack(song, tr, Object.keys(tr.patterns)[0], { name: 'Basso mio' }));
+    const odd = st.add({ ...savedFromTrack(song, tr, Object.keys(tr.patterns)[0], { name: 'Dispari' }), context: { key: 'A', meter: '7/8', bpm: 120, mode: 'minor' } });
+    const list = forRadio(st.list()), b = list.find(x => x.id === bass.id);
+    assert(b.name === 'Basso mio' && b.kind && b.sound === tr.settings.wave && b.settings && b.context.meter, `forRadio fields ${JSON.stringify(Object.keys(b))}`);
+    // a song in 4/4 of a style with a bass; no style tag needed (the listener picks it by hand)
+    const g = createSession(recipes, 'fits-air').next({ styles: ['berlin-techno'] });
+    const tagged = { ...b, styles: ['jazz'] };
+    assert(g.plan.meter === '4/4' && fitsAir(tagged, g.plan, g.song), 'a 4/4 bassline fits a 4/4 berlin-techno song whatever its style tags');
+    assert(!fitsAir(list.find(x => x.id === odd.id), g.plan, g.song) && unfitReason(list.find(x => x.id === odd.id), g.plan) === 'meter', 'a 7/8 pattern does not fit a 4/4 song');
+    const guitar = { ...b, type: 'guitar' };
+    assert(!fitsAir(guitar, g.plan, g.song) && unfitReason(guitar, g.plan) === 'type', 'a guitar pattern does not fit a style without guitars');
   },
   'patterns survive a backup'() {
     const s = memStore(), st = patternStore(s);

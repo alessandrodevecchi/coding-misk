@@ -602,6 +602,38 @@ const CHECKS = {
     assert(saved && saved.classic, 'no radio fixtures: run npm run check:radio-profiles -- --write-fixtures');
     for (const [name, h] of Object.entries(fixtures.classic)) assert(saved.classic[name] === h, `${name} gives ${h}, fixture ${saved.classic[name]}; if the change is intended, run with --write-fixtures`);
   },
+  'radio-arrangement 1.7: songs with two kicks, two beats and three pads grow in Crescendo and Live coder'() {
+    let n = 0, steps = 0;
+    for (const id of ['berlin-techno', 'synthwave', 'trance', 'lo-fi', 'drum-and-bass', 'phonk', 'house', 'darksynth']) {
+      const g = createSession(RECIPES, `arr-grow-${id}`).next({ styles: [id] }), at = 2 * g.plan.phrase;
+      const cmds = ['kick', 'beat', 'pad', 'pad'].map(part => ({ kind: 'more', part, at }));
+      const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: `arr-grow-${id}`, n: 0 });
+      assert(r.song.tracks.filter(t => t.type === 'drums').length >= 3 && r.song.tracks.filter(t => t.type === 'pad').length >= 2, `${id}: ${r.song.tracks.map(t => t.id)}`);
+      for (const profile of ['crescendo', 'switch']) {
+        const G = growOnAir(r.song, { profile, styles: STYLES, phrase: g.plan.phrase });
+        assert(G.onAir && G.onAir.profile === profile, `${id} ${profile}: not grown`);
+        const errs = []; checkBuild(G, barsOf(G), (q, m) => errs.push(`${q}: ${m}`), () => {});
+        assert(!errs.length, `${id} ${profile}: ${errs[0]}`);
+        for (const b of [...new Set(buildSteps(G).map(s => s.at))]) { compileSong(stateAt(G, b).song); steps++; }
+        // every added track is heard in the grown song
+        for (const a of r.plan.added) assert(Array.from({ length: barsOf(G) }, (_, b) => b).some(b => soundAt(G, b).tracks.some(t => t.id === a.id)), `${id} ${profile}: ${a.id} never plays`);
+        n++;
+      }
+    }
+    // a + on a grown Live coder song is a waypoint like the others
+    let w = 0;
+    for (const x of airCases().slice(0, 4)) {
+      const G = x.g0.crescendo.growth, q = Math.floor(G + (barsOf(x.g0) - G) * 0.35) + 0.4;
+      const at = airBoundaries('more', q, x.plan, x.g0)[0];
+      if (at === undefined) continue;
+      const r = steer(x, [{ kind: 'more', part: 'pad', q, at, pend: true, id: 1 }]);
+      if (!r.commands.length) continue;
+      const errs = []; checkBuild(r.song, barsOf(r.song), (p2, m) => errs.push(`${p2}: ${m}`), () => {});
+      assert(!errs.length, `${x.id}: ${errs[0]}`);
+      w++;
+    }
+    console.log(`      ${n} grown songs with extra tracks, ${steps} steps compiled, ${w} + as waypoints`);
+  },
   'radio fixtures: grown sessions (Live coder, Crescendo, Live coder compilation) rebuild the same items'() {
     for (const { name, recipe } of GROWN) {
       const a = sessionItems(RECIPES, recipe, 2, null, { grow: true });

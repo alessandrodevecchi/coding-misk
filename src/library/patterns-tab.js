@@ -156,29 +156,7 @@ export function createPatternsTab({ root, t, tx, esc, store, recipes, loop, code
     return pvCache.get(k);
   }
   const lit = new Map();
-  function paint(cv, pv, step = -1) {
-    const css = getComputedStyle(root), col = n => css.getPropertyValue(n).trim() || '#888';
-    const dpr = Math.min(2, globalThis.devicePixelRatio || 1), w = cv.clientWidth || cv.width, h = cv.clientHeight || cv.height;
-    if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
-    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
-    const line = col('--line'), a1 = col('--a1'), a2 = col('--a2'), ink = col('--ink');
-    const bars = pv.grid ? 1 : pv.bars, cols = pv.N * bars, cw = w / cols;
-    // beats and bars
-    for (let k = 0; k <= cols; k += 4) { g.fillStyle = line; g.globalAlpha = k % pv.N === 0 ? 0.9 : 0.4; g.fillRect(Math.min(w - 1, k * cw), 0, 1, h); }
-    g.globalAlpha = 1;
-    if (step >= 0) { g.fillStyle = a2; g.globalAlpha = 0.22; g.fillRect(step * cw, 0, cw, h); g.globalAlpha = 1; }
-    if (pv.grid) {
-      const rows = pv.rows.length || 1, rh = h / rows;
-      pv.rows.forEach(([, steps], r) => { for (let k = 0; k < pv.N; k++) if (steps[k] === 'x') { g.fillStyle = k === step ? ink : a1; g.fillRect(k * cw + 1, r * rh + 1.5, Math.max(1, cw - 2), Math.max(1, rh - 3)); } });
-      return;
-    }
-    // one row per semitone over at least an octave, centred; a note is at least 2 px high and stays inside the canvas
-    const range = pv.hi - pv.lo + 1, span = Math.max(12, range), pad = 3, nh = (h - 2 * pad) / span, nhh = Math.max(2, nh - 1);
-    for (const n of pv.notes) {
-      const x = n.b * pv.N * cw, ww = Math.max(2, (n.e - n.b) * pv.N * cw - 1), on = step >= 0 && step >= Math.floor(n.b * pv.N + 1e-6) && step < Math.ceil(n.e * pv.N - 1e-6);
-      for (const p of n.p) { const y = Math.max(0, Math.min(h - nhh, h - pad - (p - pv.lo + 1 + (span - range) / 2) * nh)); g.fillStyle = on ? ink : a1; g.fillRect(x, y, ww, nhh); }
-    }
-  }
+  const paint = (cv, pv, step = -1) => paintPreview(cv, pv, root, step);
   function draw() {
     root.querySelectorAll('canvas[data-pv]').forEach(cv => {
       const it = find(cv.dataset.pv); if (!it) return;
@@ -331,4 +309,30 @@ export function createPatternsTab({ root, t, tx, esc, store, recipes, loop, code
     kindOfPreset,
     get selected() { return find(st.sel); },
   };
+}
+
+// A pattern's preview drawn on a canvas (design D3): notes against time, or a step grid, in the theme's colours read
+// from `root`; `step` lights the step playing. The Patterns tab and the radio console's saved patterns use it.
+export function paintPreview(cv, pv, root, step = -1) {
+  const css = getComputedStyle(root || cv), col = n => css.getPropertyValue(n).trim() || '#888';
+  const dpr = Math.min(2, globalThis.devicePixelRatio || 1), w = cv.clientWidth || cv.width, h = cv.clientHeight || cv.height;
+  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const line = col('--line'), a1 = col('--a1'), a2 = col('--a2'), ink = col('--ink');
+  const bars = pv.grid ? 1 : pv.bars, cols = pv.N * bars, cw = w / cols;
+  // beats and bars
+  for (let k = 0; k <= cols; k += 4) { g.fillStyle = line; g.globalAlpha = k % pv.N === 0 ? 0.9 : 0.4; g.fillRect(Math.min(w - 1, k * cw), 0, 1, h); }
+  g.globalAlpha = 1;
+  if (step >= 0) { g.fillStyle = a2; g.globalAlpha = 0.22; g.fillRect(step * cw, 0, cw, h); g.globalAlpha = 1; }
+  if (pv.grid) {
+    const rows = pv.rows.length || 1, rh = h / rows;
+    pv.rows.forEach(([, steps], r) => { for (let k = 0; k < pv.N; k++) if (steps[k] === 'x') { g.fillStyle = k === step ? ink : a1; g.fillRect(k * cw + 1, r * rh + 1.5, Math.max(1, cw - 2), Math.max(1, rh - 3)); } });
+    return;
+  }
+  // one row per semitone over at least an octave, centred; a note is at least 2 px high and stays inside the canvas
+  const range = pv.hi - pv.lo + 1, span = Math.max(12, range), pad = 3, nh = (h - 2 * pad) / span, nhh = Math.max(2, nh - 1);
+  for (const n of pv.notes) {
+    const x = n.b * pv.N * cw, ww = Math.max(2, (n.e - n.b) * pv.N * cw - 1), on = step >= 0 && step >= Math.floor(n.b * pv.N + 1e-6) && step < Math.ceil(n.e * pv.N - 1e-6);
+    for (const p of n.p) { const y = Math.max(0, Math.min(h - nhh, h - pad - (p - pv.lo + 1 + (span - range) / 2) * nh)); g.fillStyle = on ? ink : a1; g.fillRect(x, y, ww, nhh); }
+  }
 }

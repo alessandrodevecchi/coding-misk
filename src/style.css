@@ -883,6 +883,44 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* Vary and Swap (radio-variation): the part picker, then the two buttons */
 .steer-part { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; flex-basis: 100%; }
 .steer-btn[disabled] { cursor: help; }
+/* the Arrangement group by instrument (radio-arrangement): two rows of [− name + lock], the riser row, a count line */
+.steer-group.arr { grid-column: 1 / -1; }
+.arr-rows { display: grid; gap: 8px; }
+.arr-row, .arr-riser { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.arr-inst { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 60%, transparent); }
+.arr-inst.over { border-color: var(--s2); }
+.arr-inst .arr-pm { padding: 3px 10px; font: 700 14px/1 var(--mono); min-width: 30px; }
+.arr-name { display: inline-flex; align-items: baseline; gap: 3px; min-width: 62px; justify-content: center; font-size: 13px; }
+.arr-count { font: 11px var(--mono); color: var(--a1); }
+.arr-count.warn { color: var(--s2); }
+.arr-lock { display: inline-grid; place-items: center; }
+.arr-lock .ico, .mix-row .mini .ico { width: 11px; height: 13px; }
+.arr-lock[data-state="closed"], .arr-lock[data-state="half"] { color: var(--a1); border-color: var(--a1); }
+.arr-sel { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.arr-sel select { font: 12px var(--ui); padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); }
+.arr-info, .arr-warn { margin: 0; font-size: 12px; }
+.arr-warn { color: var(--s2); }
+.mix-row .mini { display: inline-grid; place-items: center; }
+/* Add a saved pattern (radio-arrangement D9): a folded list or cards, a preview drawing each */
+.steer-group.sp { gap: 8px; }
+.sp-toggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; cursor: pointer; justify-self: start; }
+.sp-toggle .ico { width: 12px; height: 12px; transition: transform .15s; }
+.sp-toggle[aria-expanded="true"] .ico { transform: rotate(90deg); }
+.sp-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 12px; }
+.sp-row { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+.sp-row .sp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-pv { width: 64px; height: 20px; flex: none; border-radius: 3px; background: var(--panel2); }
+.sp-pv.big { width: 100%; height: 44px; }
+.sp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.sp-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 60%, transparent); min-width: 0; }
+.sp-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sp-top b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sp-acts select { font: 12px var(--ui); padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); max-width: 120px; }
+.sp-tempo { color: var(--s2); }
+.sp-note { margin: 0; font-size: 12px; }
+.steer-voicing, .steer-harm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.steer-harm { flex-basis: 100%; }
 /* material source next to the knobs (radio-variation 6.2) */
 .mat-source { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .mat-source .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
