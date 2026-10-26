@@ -197,5 +197,10 @@
   "growthShapes": {
     "openings": { "filtered": 3, "slow": 1, "typed": 1 },
     "paces": { "medium": 3, "slow": 1 }
+  },
+  "spoken": {
+    "weight": 0.1,
+    "ways": { "refrain": 1, "chop": 1 },
+    "vocab": "machine"
   }
 }

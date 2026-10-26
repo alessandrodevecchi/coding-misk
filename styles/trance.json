@@ -184,5 +184,10 @@
       "Luz",
       "Impulso"
     ]
+  },
+  "spoken": {
+    "weight": 0.1,
+    "ways": { "refrain": 1, "chop": 1 },
+    "vocab": "machine"
   }
 }

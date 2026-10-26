@@ -21,6 +21,8 @@ export const MAX_WORDS = 12;
 const SECONDS_PER_WORD = 0.38;
 // sections whose role is quiet (intro, break, outro), by name; the director names its sections after their role
 const QUIET_NAME = /intro|break|pausa|outro|coda|fine/i;
+// sections whose role is busy (voice-full-controls D7): a drop or a peak
+const BUSY_NAME = /drop|peak|picco|climax/i;
 export const SPOKEN_ORBIT = 13;
 
 // What the compiler knows about the samples on this machine. files: the custom samples manifest ({ bank: [files] });
@@ -95,8 +97,14 @@ export function sectionFacts(n) {
   const plays = n.tracks.filter(x => x.type !== 'voice' && x.type !== 'spoken' && x.clips.length);
   const counts = n.sections.map(s => plays.filter(x => x.clips.some(c => over(c, s))).length);
   const most = Math.max(0, ...counts);
-  return { counts, quiet: n.sections.map((s, i) => counts[i] <= most / 2 || QUIET_NAME.test(s.name || '')) };
+  const quiet = n.sections.map((s, i) => counts[i] <= most / 2 || QUIET_NAME.test(s.name || ''));
+  // the kind of each section (D7): quiet (as before), busy (three quarters of the most tracks at least, or a drop or a
+  // peak), medium (the rest)
+  const kinds = n.sections.map((s, i) => (quiet[i] ? 'quiet' : counts[i] >= most * 0.75 || BUSY_NAME.test(s.name || '') ? 'busy' : 'medium'));
+  return { counts, quiet, kinds };
 }
+// the kinds a spoken track may speak in (voiceOptions.where), quiet only by default
+export const whereOfTrack = tr => { const w = tr && tr.voiceOptions && Array.isArray(tr.voiceOptions.where) ? ['quiet', 'medium', 'busy'].filter(x => tr.voiceOptions.where.includes(x)) : []; return w.length ? w : ['quiet']; };
 const secAt = (n, bar) => n.sections.find(s => bar >= s.start && bar < s.start + s.bars) || n.sections[n.sections.length - 1];
 const beatsOf = sec => meterSteps(sec.meter) / 4;
 const secPerBeat = sec => 60 / (sec.bpm || 120);
@@ -119,11 +127,11 @@ export function placeSpoken(input, lang = langOf()) {
   n.tracks.forEach((tr, ti) => {
     if (!isSpoken(tr)) return;
     const orbit = SPOKEN_ORBIT + Math.min(1, k++), speaker = speakerOf(input, tr), v = { ...VOICE_DEFAULT, ...(tr.settings || {}) };
-    for (const clip of tr.clips) {
+    tr.clips.forEach((clip, ci) => {
       const pat = (tr.patterns || {})[clip.pattern];
-      if (!pat || !WAYS.includes(pat.way)) continue;
+      if (!pat || !WAYS.includes(pat.way)) return;
       const line = lineOf(input, tr, clip.pattern, pat), texts = lineTexts(line, lang);
-      if (!texts.length) continue;
+      if (!texts.length) return;
       const bank = sayBank(lang, speaker), first = secAt(n, clip.start);
       // length in beats: the sample (or the entries one beat apart) slowed or sped up by the voice tempo
       const sec = line.parts ? (texts.length - 1) * secPerBeat(first) + secondsOf(texts[texts.length - 1], bank) : secondsOf(texts[0], bank);
@@ -149,16 +157,18 @@ export function placeSpoken(input, lang = langOf()) {
           starts.push({ bar: Math.max(clip.start, best.s.start), late: 0 });
         }
       } else if (pat.way === 'refrain') {
-        const every = Number.isInteger(pat.every) && pat.every > 0 ? pat.every : 4;
+        const every = Number.isInteger(pat.every) && pat.every > 0 ? pat.every : 4, kinds = whereOfTrack(tr);
         n.sections.forEach((s, i) => {
-          if (!facts.quiet[i]) return;
+          // (a refrain repeats in the sections of the kinds its track may speak in, quiet only by default, D7)
+          if (!kinds.includes(facts.kinds[i])) return;
           const a = Math.max(s.start, clip.start), z = Math.min(s.start + s.bars, end);
           // the line ends before the section does: it stops when the song gets full again
           for (let b = a; b < z; b += every) if (b + Math.ceil(lenBars(b) - 1e-9) <= s.start + s.bars) starts.push({ bar: b, late: 0 });
         });
       } else if (pat.way === 'chop') for (let b = clip.start; b < end; b++) starts.push({ bar: b, late: 0 });
-      if (starts.length) out.push({ track: tr.id, name: tr.name || tr.id, ti, orbit, key: clip.pattern, way: pat.way, pat, line, speaker, bank, texts, beats, starts, settings: v, rack: tr.rack, mute: !!tr.mute });
-    }
+      // (ci: the clip's index among the track's clips sorted by bar, for the phrase list)
+      if (starts.length) out.push({ track: tr.id, name: tr.name || tr.id, ti, ci, orbit, key: clip.pattern, way: pat.way, pat, line, speaker, bank, texts, beats, starts, settings: v, rack: tr.rack, mute: !!tr.mute });
+    });
   });
   return out;
 }

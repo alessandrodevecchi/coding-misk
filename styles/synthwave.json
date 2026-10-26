@@ -175,5 +175,10 @@
       "Reflejo",
       "Noche"
     ]
+  },
+  "spoken": {
+    "weight": 0.15,
+    "ways": { "opening": 1, "refrain": 1, "chop": 1 },
+    "vocab": "night"
   }
 }

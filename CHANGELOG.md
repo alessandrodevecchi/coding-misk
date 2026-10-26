@@ -18,6 +18,18 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Optional `voiceOptions` field on spoken tracks.
 - Pattern preview in Compose: a headphones button next to a track's preset or groove menu plays the selected pattern in a loop, on the song's bars while the song plays, alone while it is stopped.
 - Bar counter in the player bar: `bar n / total` of what plays, grown songs included.
+- Sound controls for both voices (voice style, speaker, volume, pitch, speed, filter, low cut, drive, reverb, delay) in the Compose and radio Voices groups.
+- Voice styles: Clear, Radio, Distant, Robot, Deep, Bright, Cathedral, Echo, Dirty, Slow.
+- Phrase list of the voice track with bars, way and text editable in place, heard bars in Crescendo and Live coder, Fill with, + Add line and a remove button per row.
+- Narrator lines list in the Compose Voices group.
+- Where the voice track speaks: quiet, medium and busy parts.
+- On/off switch for each voice in the Compose and radio Voices groups.
+- How often Always for the radio voice track.
+- A voice track chance in every style.
+- Console Voice group: phrase preset and voice style for the song on air, and a typed line said now or at the right moment.
+- Dev-server voice helper that makes the samples of new and edited lines.
+- `npm run voices -- --song <file>` and `--list`.
+- Faders for the voice Sound controls in the hardware theme.
 
 ### Changed
 
@@ -29,6 +41,16 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - The track panel splits its pattern row into "Song patterns" (patterns and Delete) and "Make patterns" (New, Save as pattern, Compose a part).
 - The button that opens a track's pattern in the Patterns tab shows a flask instead of headphones.
 - The player bar shows the time of the radio song on air; its bars moved to the bar counter.
+- The voices are labelled "Voice: narrator" and "Voice: track"; the Guide card is "Two voices".
+- The radio Voices group holds the settings for the next songs only; the song on air changes from the console.
+- The radio How often menu no longer offers Never; a saved Never reads as the voice track switch off.
+- The radio narrator switch works with every profile.
+- The poetic narrator keeps the step lines with Narrated growth.
+- The narrator track of generated and built-in songs is named Narrator.
+
+### Removed
+
+- The radio button Apply to the song on air (the console's Voice group replaces it).
 
 ## [0.6.0-beta.2] - 2026-10-25
 

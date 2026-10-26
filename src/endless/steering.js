@@ -8,7 +8,10 @@ import { playing, curveParts, CURVES } from './energy.js';
 import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, GROOVES, PROGS, meterSteps, fitSteps } from '../music.js';
 import { airIdea, composesOnAir, sessionSource, readyParts } from './material.js';
 import { presetOf, compose } from '../material/index.js';
-import { rewriteSpoken, nextQuiet } from './voice-track.js';
+import { rewriteSpoken, nextQuiet, newSpokenTrack, wherePartsOf } from './voice-track.js';
+import { whereOfTrack } from '../song/spoken.js';
+import { normalizeSong, VOICE_STYLES } from '../song/format.js';
+import { SPEAKERS } from '../song/build.js';
 import { treat, treatmentsFor, TREATMENTS } from './part-harmony.js';
 export { TREATMENTS };
 
@@ -34,6 +37,9 @@ export const COMMANDS = {
   // the voice instrument of the song on air (voice-placement): its options from the next quiet part (applied on a
   // phrase, placed on the first quiet section from there; the clips before stay)
   voice: { group: 'voice' },
+  // a line typed in the console (voice-full-controls D10): said on a bar (now) or on the next free part where the voice
+  // track may speak (moment); the voice track's sound from the next phrase
+  'say-live': { group: 'voice', bar: true }, 'voice-sound': { group: 'voice' },
   drop: { group: 'song', structural: true }, stay: { group: 'song', structural: true }, extend: { group: 'song', structural: true }, end: { group: 'song', structural: true },
   curve: { group: 'curve' }, 'curve-reset': { group: 'curve' },
   // mixer: on the next bar
@@ -171,6 +177,8 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
     return ok ? null : 'no-target';
   }
   // the voice instrument: a quiet part must come after the bar (and a track to stop, for "never")
+  if (cmd.kind === 'say-live') return cmd.mode === 'moment' && sayBar(song, at) === null ? 'no-part' : null;
+  if (cmd.kind === 'voice-sound' || (cmd.kind === 'voice' && !cmd.voice)) return song.tracks.some(t => t.type === 'spoken') ? null : 'no-voice';
   if (cmd.kind === 'voice') {
     if (nextQuiet(song, at) === null) return 'no-quiet';
     if (cmd.voice && cmd.voice.presence === 'never' && !song.tracks.some(t => t.type === 'spoken')) return 'no-voice';
@@ -541,9 +549,17 @@ function rewrite(song, plan, opts, cmd, rng) {
   if (cmd.kind === 'vary' || cmd.kind === 'swap' || cmd.kind === 'voicing' || (cmd.kind === 'pattern' && cmd.mode === 'replace')) return vary(song, P, O, cmd, st, `${rng.seed}:${cmd.kind}:${rng.n}:${rng.i}`);
   // the voice instrument (voice-placement): kept in the plan, so later rewrites (which write the spoken track again
   // from the plan) apply it again in order; the song is not directed again
-  if (cmd.kind === 'voice') {
-    P.voiceAir = [...(plan.voiceAir || []), { at, voice: cmd.voice || {}, seed: `${rng.seed}:voice:${rng.n}:${rng.i}` }];
-    return { song: voiceAir(song, P, [P.voiceAir[P.voiceAir.length - 1]]), plan: P, opts: O };
+  // (voice-full-controls: the console's Apply carries the phrases and the sound in one command; a sound alone is
+  // voice-sound; a typed line is say-live; all kept in the plan, so later rewrites apply them again in order)
+  if (cmd.kind === 'voice' || cmd.kind === 'voice-sound') {
+    const e = { at, voice: cmd.kind === 'voice' && cmd.voice ? cmd.voice : null, ...(cmd.sound ? { sound: cmd.sound } : {}), seed: `${rng.seed}:voice:${rng.n}:${rng.i}` };
+    P.voiceAir = [...(plan.voiceAir || []), e];
+    return { song: voiceAir(song, P, [e]), plan: P, opts: O };
+  }
+  if (cmd.kind === 'say-live') {
+    const e = { at, text: cmd.text, lang: cmd.lang, speaker: cmd.speaker || '', mode: cmd.mode === 'moment' ? 'moment' : 'now' };
+    P.sayAir = [...(plan.sayAir || []), e];
+    return { song: sayAir(song, [e]), plan: P, opts: O };
   }
   switch (cmd.kind) {
     case 'energy-up': case 'energy-down':
@@ -747,7 +763,7 @@ function rewrite(song, plan, opts, cmd, rng) {
   };
   if (P.risers && P.risers.length) out = placeRisers(out, P, from * ph);
   if ((P.arrange || []).some(e => e.kind === 'more')) out = headroom(out, P, from * ph);
-  return { song: voiceAir(out, P, P.voiceAir || []), plan: P, opts: O, phrases: dir.phrases };
+  return { song: sayAir(voiceAir(out, P, P.voiceAir || []), P.sayAir || []), plan: P, opts: O, phrases: dir.phrases };
 }
 
 // The voice instrument changes of the listener (voice-placement), in order, on a song: each one rewrites the spoken
@@ -757,8 +773,58 @@ function voiceAir(song, P, list) {
   let cur = song;
   for (const e of list) {
     const sp = cur.tracks.find(t => t.type === 'spoken');
-    const r = rewriteSpoken(cur, sp ? sp.id : null, e.voice, { spoken: (P.R && P.R.spoken) || null, from: e.at, seed: e.seed });
-    if (r) cur = r.song;
+    if (e.voice) {
+      const r = rewriteSpoken(cur, sp ? sp.id : null, e.voice, { spoken: (P.R && P.R.spoken) || null, from: e.at, seed: e.seed });
+      if (r) cur = r.song;
+    }
+    // the sound: a set step on the voice track from the command's bar (the voice style's values, speaker and volume kept)
+    const now = cur.tracks.find(t => t.type === 'spoken');
+    if (e.sound && now) {
+      const vals = VOICE_STYLES[e.sound.style] ? { ...VOICE_STYLES[e.sound.style] } : e.sound.settings && typeof e.sound.settings === 'object' ? { ...e.sound.settings } : null;
+      if (vals) cur = { ...cur, build: [...(cur.build || []), { at: e.at, set: { track: now.id, ...vals }, by: 'listener' }].map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x) };
+    }
+  }
+  return cur;
+}
+// The bar a typed line goes to with "at the right moment": the first part from the next phrase after `from` of the
+// kinds the voice track may speak in (quiet first by bar), where no line of the track plays; null when none is left
+export function sayBar(song, from) {
+  const sp = song.tracks.find(t => t.type === 'spoken'), N = normalizeSong(song), clips = sp ? N.tracks.find(t => t.id === sp.id).clips : [];
+  const parts = wherePartsOf(song, from, whereOfTrack(sp)).filter(p => !clips.some(c => c.start < p.start + p.bars && c.start + c.bars > p.start)).sort((a, b) => a.start - b.start);
+  return parts.length ? parts[0].start : null;
+}
+// Lines typed in the console (voice-full-controls D10), in order: each one a clip of its own (an own text, spoken as a
+// passage) on the voice track of the song, from its bar; a song without one gets a Words track, silent until the line,
+// with a speaker that is not the narrator's and the Clear sound
+function sayAir(song, list) {
+  let cur = song;
+  for (const e of list) {
+    if (!e.text || !e.lang) continue;
+    const at = e.mode === 'moment' ? sayBar(cur, e.at) : e.at;
+    if (at === null || at === undefined) continue;
+    const total = normalizeSong(cur).total;
+    if (at >= total) continue;
+    const tracks = cur.tracks.map(t => t);
+    let ti = tracks.findIndex(t => t.type === 'spoken'), build = (cur.build || []).slice();
+    if (ti < 0) {
+      const nar = (tracks.find(t => t.type === 'voice') || { settings: {} }).settings.speaker || '';
+      const t = newSpokenTrack(cur);
+      t.settings = { ...t.settings, ...VOICE_STYLES.clear, speaker: e.speaker && e.speaker !== nar ? e.speaker : SPEAKERS.find(x => x !== nar) };
+      const v = tracks.findIndex(x => x.type === 'voice');
+      tracks.splice(v >= 0 ? v : tracks.length, 0, t); ti = tracks.indexOf(t);
+      build.push({ at, add: t.id, by: 'listener' });
+    } else {
+      // (a voice track that comes in later, or left: in from the line's bar)
+      const id = tracks[ti].id, st = stateAt({ ...cur, build }, at).song.tracks.find(x => x.id === id);
+      if (st && st.mute) build.push({ at, add: id, by: 'listener' });
+    }
+    const t = JSON.parse(JSON.stringify(tracks[ti])), keys = new Set(Object.keys(t.patterns || {}));
+    let key = 'L1'; for (let k = 2; keys.has(key); k++) key = `L${k}`;
+    t.patterns = { ...(t.patterns || {}), [key]: { way: 'passage', text: { [e.lang]: e.text } } };
+    t.clips = [...(t.clips || []), { start: at, bars: Math.min(2, total - at), pattern: key }];
+    tracks[ti] = t;
+    build = build.map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x);
+    cur = { ...cur, tracks, build };
   }
   return cur;
 }

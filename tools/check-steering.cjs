@@ -2,7 +2,9 @@
 // curve drag, the mixer, the scope switch, shortcuts, length commands and replay with steering; Vary and Swap with the
 // part picker, and the material source next to the knobs (radio-variation); commands as waypoints on a Live coder song
 // (radio-profiles stage 5).
-// Usage: PLAYWRIGHT_CORE=... node tools/check-steering.cjs [shots-dir]   (dev server on PORT, default 5173)
+// The console's Voice group (voice-full-controls): Apply on this song and on the whole session, typed lines (Say now, At
+// the right moment, Cancel, Replay) with a fake voice helper, the line field disabled without the helper.
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-steering.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -59,7 +61,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check((await page.$$('#radio-steer .steer-queue [data-cancel]')).length === 0, 'applied commands leave the queue', `${await page.innerText('#radio-steer .steer-queue')} now ${(await now()).toFixed(1)}`);
 
   // the curve: drag the last handle down
-  await page.$eval('#radio-now', el => el.scrollIntoView({ block: 'center' })); await sleep(300);
+  // (the curve itself in view: the card is as tall as the controls column, taller than the window with the Voices group)
+  await page.$eval('#radio-now svg.steer', el => el.scrollIntoView({ block: 'center' })); await sleep(300);
   // the card redraws four times a second: take the handle and its box in one go, retrying until both are there
   let handle = null, d = -1, box = null, svg = null;
   for (let k = 0; k < 10 && !box; k++) {
@@ -81,13 +84,15 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('#curves-toggle'); await sleep(300);
   check(await page.isVisible('#radio-now .radio-lanes') && await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio-details')) === true), 'the toggle opens the details and is remembered');
   // hover: a line in every curve and the values box
-  { const sv = await page.$('#radio-now svg.steer'), bb = sv && await sv.boundingBox();
+  { await page.$eval('#radio-now svg.steer', el => el.scrollIntoView({ block: 'center' })); await sleep(200);
+    const sv = await page.$('#radio-now svg.steer'), bb = sv && await sv.boundingBox();
     if (bb) { await page.mouse.move(bb.x + bb.width * 0.7, bb.y + bb.height * 0.4); await sleep(400); }
     const tip = await page.evaluate(() => { const el = document.querySelector('.curve-tip'); return el && !el.hidden ? el.querySelectorAll('[data-lane]').length : 0; });
     check(tip === 5 && (await page.$$('#radio-now line.hover')).length === 5, 'hover shows a line in every curve and the values of the part', `${tip}`);
     await page.mouse.move(5, 5); await sleep(300); }
   check((await page.$$eval('#radio-now .radio-lanes .radio-lane', xs => xs.map(x => x.dataset.lane).join())) === 'density,brightness,tension,voice', 'four curve lanes under the energy curve');
   check(await page.$$eval('#radio-now .radio-lanes .radio-lane', xs => xs.every(x => x.title.length > 40)) && /main|principale/i.test(await page.$eval('#radio-now svg.steer > title', x => x.textContent)), 'tooltips explain the curves, energy first');
+  await page.$eval('#radio-now [data-lane="density"]', el => el.scrollIntoView({ block: 'center' })).catch(() => {}); await sleep(200);
   let lh = null, lbox = null, lsvg = null, ld = -1;
   for (let k = 0; k < 10 && !lbox; k++) {
     lh = (await page.$$('#radio-now [data-lane="density"] rect.handle')).pop();
@@ -597,6 +602,76 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   }
 
   await page.click('#radio-start'); await sleep(300);
+  // ---------- the console's Voice group (voice-full-controls D10) ----------
+  // a fake voice helper: the status says yes, a line's sample "is made" at once (the file does not exist: the line is
+  // written and silent, which is what this check needs)
+  await page.route('**/voice/status', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
+  await page.route('**/voice/say', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"bank":"say_en","n":0,"seconds":1,"made":true}' }));
+  await page.evaluate(() => { const o = JSON.parse(localStorage.getItem('coding-misk-radio') || '{}'); localStorage.setItem('coding-misk-radio', JSON.stringify({ ...o, styles: ['ambient'], voice: { presence: 'always', phrases: '1' }, scope: 'song', profile: 'artist', artist: null, compilation: 'off' })); });
+  await page.reload(); await sleep(3500);
+  await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+  await page.fill('#radio-seed', 'steer-voice'); await page.click('#radio-start'); await sleep(3000);
+  {
+    const ST = () => page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return s && { n: s.n, commands: s.commands, recipe: s.recipe, song: { tracks: s.song.tracks, build: s.song.build } }; });
+    const vopts = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').voice || {});
+    check(await page.isVisible('#radio-steer .steer-voice [data-sv-apply]') && await page.isVisible('#radio-steer .steer-voice [data-sv-line]'), 'console Voice group: the narrator row, the voice track row with Apply, the line field');
+    const v0 = JSON.stringify(await vopts());
+    await page.selectOption('#radio-steer [data-sv-preset]', 'present'); await page.selectOption('#radio-steer [data-sv-style]', 'radio'); await sleep(200);
+    const nq = (await ST()).commands.length;
+    await page.click('#radio-steer [data-sv-apply]'); await sleep(800);
+    let st = await ST(), c = st.commands.find(x => x.kind === 'voice');
+    const setStep = c && st.song.build.find(x => x.by === 'listener' && x.set && x.at === c.at);
+    check(c && c.voice && c.voice.preset === 'present' && c.sound && c.sound.style === 'radio' && st.commands.length === nq + 1, 'Apply (this song): one command with the preset and the style', JSON.stringify(c));
+    check(setStep && setStep.set.hpf === 900 && setStep.set.cutoff === 3200, 'the Radio sound on the voice track from the next phrase', JSON.stringify(setStep));
+    check(JSON.stringify(await vopts()) === v0, 'this song only: the Voices group is unchanged');
+    // the whole session: the same values go to the Voices group too
+    await page.click('#steer-scope'); await sleep(200);
+    await page.selectOption('#radio-steer [data-sv-preset]', 'obsessive'); await page.selectOption('#radio-steer [data-sv-style]', 'deep'); await sleep(200);
+    await page.click('#radio-steer [data-sv-apply]'); await sleep(800);
+    const vo = await vopts(), shown = await page.evaluate(() => ({ preset: document.querySelector('#radio-voices [data-vinst="preset"]').value, style: document.querySelector('#radio-voices [data-vsound-style="spoken"]').value }));
+    check(vo.preset === 'obsessive' && vo.sound && vo.sound.style === 'deep' && shown.preset === 'obsessive' && shown.style === 'deep', 'Apply (whole session): the Voices group shows the preset and the style for the next songs', JSON.stringify(shown));
+    await page.click('#steer-scope'); await sleep(200);
+    // a typed line, Say now: queued on the next bar, written on the voice track, recorded
+    await page.fill('#radio-steer [data-sv-line]', 'stay with me'); await page.click('#radio-steer [data-sv-say="now"]'); await sleep(250);
+    // (a line on the next bar leaves the queue as soon as it sounds: the queue is read at once)
+    const q = await page.innerText('#radio-steer .steer-queue');
+    await sleep(900);
+    st = await ST();
+    const say = st.commands.find(x => x.kind === 'say-live' && x.mode === 'now'), n1 = await now();
+    const sp = st.song.tracks.find(t => t.type === 'spoken'), pat = sp && Object.entries(sp.patterns).find(([, p]) => p.text && p.text.en === 'stay with me');
+    check(say && say.at > n1 - 2 && pat && sp.clips.some(k => k.pattern === pat[0] && k.start === say.at), 'Say now: the line on the next bar of the voice track', JSON.stringify(say));
+    check(st.recipe.steering.some(x => x.kind === 'say-live' && x.text === 'stay with me' && x.at === say.at), 'the session records the line with its bar');
+    check(/stay with me/.test(q), 'the queue shows the line', q.replace(/\n/g, ' | '));
+    // At the right moment: on a free part where the voice track may speak, over no other line; Cancel takes it away
+    await page.fill('#radio-steer [data-sv-line]', 'the night goes on'); await page.click('#radio-steer [data-sv-say="moment"]'); await sleep(1200);
+    st = await ST();
+    const mo = st.commands.find(x => x.kind === 'say-live' && x.mode === 'moment');
+    const sp2 = st.song.tracks.find(t => t.type === 'spoken'), key = sp2 && Object.keys(sp2.patterns).find(k => sp2.patterns[k].text && sp2.patterns[k].text.en === 'the night goes on'), clip = key && sp2.clips.find(k => k.pattern === key);
+    if (mo) {
+      check(clip && clip.start >= mo.at && !sp2.clips.some(k => k !== clip && k.start < clip.start + clip.bars && k.start + (k.bars || 1) > clip.start), 'At the right moment: a free part after the command, over no other line', JSON.stringify(clip));
+      await page.click(`#radio-steer [data-cancel="${mo.id}"]`); await sleep(600);
+      st = await ST();
+      check(!st.commands.some(x => x.id === mo.id) && !st.song.tracks.find(t => t.type === 'spoken').clips.some(k => k.pattern === key), 'Cancel takes the line away');
+    } else check(/parte libera|free part/.test(await page.evaluate(() => (document.querySelector('.toast') || {}).textContent || '')), 'no free part left: the console says why');
+    check(!(await err()), 'no evaluation error with the voice commands', (await err()).slice(0, 120));
+    // Replay: the same voice commands again
+    const kinds = st.recipe.steering.filter(x => x.song === st.n).map(x => x.kind).join();
+    await page.click('#radio-replay'); await sleep(3500);
+    st = await ST();
+    const sp3 = st.song.tracks.find(t => t.type === 'spoken');
+    check(st.commands.map(x => x.kind).join() === kinds && sp3 && Object.values(sp3.patterns).some(p => p.text && p.text.en === 'stay with me'), 'Replay says the line at the same bar', `${st.commands.map(x => x.kind).join()} / ${kinds}`);
+    if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'console-voce.png') });
+    await page.click('#radio-start'); await sleep(300);
+    // without the helper: the field and its buttons are disabled with the reason
+    await page.unroute('**/voice/status'); await page.route('**/voice/status', r => r.fulfill({ status: 404, body: '' }));
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.click('#radio-start'); await sleep(2500);
+    const off = await page.evaluate(() => { const i = document.querySelector('#radio-steer [data-sv-line]'), b = document.querySelector('#radio-steer [data-sv-say="now"]'); return i && { dis: i.disabled && b.disabled, title: b.title }; });
+    check(off && off.dis && /helper|aiutante/.test(off.title), 'without the voice helper the line field is disabled and says why', off && off.title);
+    await page.click('#radio-start'); await sleep(300);
+  }
+
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `${failed} failed` : 'all passed');

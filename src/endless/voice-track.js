@@ -7,11 +7,11 @@
 // draw }); draw counts "New phrases", and the same options and draw give the same lines. Pure: the app, the radio
 // steering and the Node checks rewrite the same way.
 import { normalizeSong, VOICE_DEFAULT } from '../song/format.js';
-import { sectionFacts, entryAfter } from '../song/spoken.js';
+import { sectionFacts, entryAfter, whereOfTrack } from '../song/spoken.js';
 import { VOCABULARY, VOCAB_GROUPS } from '../song/vocabulary.js';
 import { stream } from './random.js';
 import { morePhrases, CHOP_RHYTHMS } from './director.js';
-import { cleanVoice, presetOf, PHRASE_RANGES, VOICE_WAYS } from './voice-options.js';
+import { cleanVoice, presetOf, PHRASE_RANGES, VOICE_WAYS, VOICE_WHERE, whereOf, isQuietOnly } from './voice-options.js';
 
 // the phrases-per-song choice a number of clips falls in
 const bucketOf = n => (n <= 1 ? '1' : n <= 3 ? '2-3' : n <= 5 ? '4-5' : n <= 8 ? '6-8' : 'many');
@@ -19,13 +19,14 @@ const bucketOf = n => (n <= 1 ? '1' : n <= 3 ? '2-3' : n <= 5 ? '4-5' : n <= 8 ?
 // different lines), so a generated song opens on what it speaks. { preset, phrases, kind, ways, draw }
 export function trackVoice(tr) {
   const own = tr && tr.voiceOptions;
-  if (own && typeof own === 'object') {
+  // (a generated song may carry only where its track speaks, voice-full-controls D7: the rest is read from its clips)
+  if (own && typeof own === 'object' && own.phrases !== undefined) {
     const v = cleanVoice({ ...own, presence: 'style' });
     return { ...v, preset: presetOf(v, { presence: false }), draw: Number.isInteger(own.draw) && own.draw > 0 ? own.draw : 0 };
   }
   const clips = (tr && tr.clips) || [], n = Math.max(1, clips.length), keys = new Set(clips.map(c => c.pattern));
   const kind = n > 1 && keys.size === 1 ? 'repeated' : keys.size >= n ? 'different' : 'mixed';
-  const v = cleanVoice({ phrases: bucketOf(n), kind, ways: null, presence: 'style' });
+  const v = cleanVoice({ phrases: bucketOf(n), kind, ways: null, presence: 'style', where: whereOfTrack(tr) });
   return { ...v, preset: presetOf(v, { presence: false }), draw: 0 };
 }
 
@@ -53,8 +54,31 @@ export function quietParts(song, from = 0) {
   const N = normalizeSong(song), facts = sectionFacts(N);
   return N.sections.flatMap((s, i) => (facts.quiet[i] ? partsOf(s, i) : [])).filter(p => p.start >= from);
 }
-// the bar where a change from `from` starts: the first quiet section at or after it, or null
-export function nextQuiet(song, from) { const p = quietParts(song, from)[0]; return p ? p.start : null; }
+// The parts of the kinds `where` allows (voice-full-controls D7), from a bar on, ordered by kind (quiet, medium, busy)
+// then by bar: [{ start, bars, i, kind }]. Quiet only gives the quiet parts, as quietParts.
+export function wherePartsOf(song, from = 0, where = ['quiet']) {
+  const N = normalizeSong(song), facts = sectionFacts(N), w = whereOf(where);
+  const all = N.sections.flatMap((s, i) => (w.includes(facts.kinds[i]) ? partsOf(s, i).map(p => ({ ...p, kind: facts.kinds[i] })) : [])).filter(p => p.start >= from);
+  return VOICE_WHERE.flatMap(k => all.filter(p => p.kind === k));
+}
+// the bar where a change from `from` starts: the first quiet section at or after it (the first part of the kinds
+// allowed, with where), or null
+export function nextQuiet(song, from, where = null) {
+  if (where && !isQuietOnly(where)) { const l = wherePartsOf(song, from, where).sort((a, b) => a.start - b.start); return l.length ? l[0].start : null; }
+  const p = quietParts(song, from)[0]; return p ? p.start : null;
+}
+// k parts among the parts given (ordered by kind): the first kinds first, each kind spread over the song as before,
+// never two in one part; sorted by bar
+export function pickParts(parts, k) {
+  const out = [];
+  for (const kind of VOICE_WHERE) {
+    const list = parts.filter(p => (p.kind || 'quiet') === kind), need = k - out.length;
+    if (need <= 0) break;
+    const idx = list.length <= need ? list.map((_, i) => i) : Array.from({ length: need }, (_, j) => Math.round(j * (list.length - 1) / Math.max(1, need - 1)));
+    out.push(...idx.map(i => list[i]));
+  }
+  return out.sort((a, b) => a.start - b.start);
+}
 
 // a new voice instrument track for a song that has none: the default voice settings, the speaker drawn when it plays
 export function newSpokenTrack(song) {
@@ -77,8 +101,9 @@ export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null,
   const old = ti >= 0 ? tracks[ti] : newSpokenTrack(song), id = old.id;
   const v = cleanVoice({ ...(raw || {}), presence: 'style' }), never = raw && raw.presence === 'never';
   const draw = Number.isInteger(raw && raw.draw) && raw.draw > 0 ? raw.draw : 0;
-  // where the change starts: the whole song, or the next quiet part from a bar
-  const start = from > 0 ? nextQuiet(song, from) : 0;
+  // where the change starts: the whole song, or the next quiet part (the next part of the kinds allowed) from a bar
+  const where = whereOf(raw && raw.where);
+  const start = from > 0 ? nextQuiet(song, from, where) : 0;
   if (start === null) return null;
   const N = normalizeSong(song), oldN = ti >= 0 ? N.tracks[ti] : { clips: [] };
   const kept = from > 0 ? oldN.clips.filter(c => c.start < start).map(c => ({ start: c.start, bars: Math.min(c.bars, start - c.start), pattern: c.pattern })) : [];
@@ -96,14 +121,14 @@ export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null,
     const [lo, hi] = PHRASE_RANGES[v.phrases] || [1, 1], n = r.int(lo, hi);
     const list = n > 1 ? morePhrases({ ...sp, vocab: group }, v, patterns, ways, w, n, r) : [{ key: 'A', way }];
     asked = list.length;
-    // places: the quiet parts (in Compose, else the phrases of the section with the fewest tracks), spread, one phrase each
-    let parts = quietParts(song, start);
+    // places: the parts of the kinds allowed, quiet first (in Compose, else the phrases of the section with the fewest
+    // tracks), each kind spread, one phrase each
+    let parts = wherePartsOf(song, start, where);
     if (!parts.length && !(from > 0) && N.sections.length) { const facts = sectionFacts(N), least = Math.min(...facts.counts), i = facts.counts.indexOf(least); parts = partsOf(N.sections[i], i); }
     if (list.length === 1 && way === 'refrain') clips = [{ start, bars: N.total - start, pattern: 'A' }];
     else {
-      const k = Math.min(list.length, parts.length);
-      const chosen = parts.length <= k ? parts.map((_, i) => i) : Array.from({ length: k }, (_, j) => Math.round(j * (parts.length - 1) / Math.max(1, k - 1)));
-      clips = chosen.map((p, j) => ({ start: parts[p].start, bars: parts[p].bars, pattern: list[j].key }));
+      const chosen = pickParts(parts, Math.min(list.length, parts.length));
+      clips = chosen.map((p, j) => ({ start: p.start, bars: p.bars, pattern: list[j].key }));
     }
     // an opening line ends before the first track that comes in within its clip
     for (const c of clips) {
@@ -124,7 +149,9 @@ export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null,
   }
   const keepPats = Object.fromEntries(Object.entries(old.patterns || {}).filter(([key]) => keptKeys.has(key)));
   const track = { ...JSON.parse(JSON.stringify(old)), patterns: { ...JSON.parse(JSON.stringify(keepPats)), ...patterns }, clips: [...kept, ...clips] };
-  if (!(from > 0)) { track.voiceOptions = { phrases: v.phrases, kind: v.kind, ...(v.ways ? { ways: v.ways } : {}), draw }; }
+  if (!(from > 0)) { track.voiceOptions = { phrases: v.phrases, kind: v.kind, ...(v.ways ? { ways: v.ways } : {}), ...(isQuietOnly(where) ? {} : { where }), draw }; }
+  // (from a bar, radio steering: the Where of the command reaches the refrains of the track)
+  else if (!isQuietOnly(where)) track.voiceOptions = { ...(track.voiceOptions || {}), where };
   if (ti >= 0) tracks[ti] = track;
   else { const nar = tracks.findIndex(x => x.type === 'voice'); tracks.splice(nar >= 0 ? nar : tracks.length, 0, track); ti = tracks.indexOf(track); }
   // the live build: the track comes in on its first new clip (in Compose an add step that came later moves there)

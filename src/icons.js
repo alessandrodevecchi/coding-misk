@@ -49,3 +49,5 @@ export const SLIDERS = svg('0 0 16 16', '<path d="M2.5 4h11M2.5 8h11M2.5 12h11" 
 export const GROWING = svg('0 0 16 16', '<path class="grow-ring" d="M8 1.4a6.6 6.6 0 1 1-6.2 4.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M8 11.8V7.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M8 8.4c0-1.7 1.2-2.7 2.9-2.7 0 1.7-1.2 2.7-2.9 2.7z" fill="currentColor"/><path d="M8 9.7c0-1.3-.9-2.1-2.3-2.1 0 1.3.9 2.1 2.3 2.1z" fill="currentColor"/>', 'ico-growing');
 // a small cross (remove a style from a pattern, pattern-followups)
 export const CROSS = svg('0 0 16 16', '<path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>', 'ico-cross');
+// a power symbol (the on/off switch of a voice, voice-full-controls D15)
+export const POWER = svg('0 0 16 16', '<path d="M8 2v5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.6 4.2a5 5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>', 'ico-power');

@@ -13,8 +13,34 @@ function setValue(input, v) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+// A fader (voice-full-controls D17): a range input with data-fader="h" (or "v") becomes a slot with a cap, driving the
+// hidden input exactly as a knob does (the same value, the same keyboard, the same input events). Used where knobs
+// cost height (the Sound parts of the voices); outside the hardware theme it is the usual slider.
+function attachFader(input) {
+  input.dataset.knob = '1';
+  const vert = input.dataset.fader === 'v', fader = document.createElement('div');
+  fader.className = `fader${vert ? ' v' : ''}`;
+  fader.setAttribute('aria-hidden', 'true');
+  fader.innerHTML = '<span class="fader-slot"><i class="fader-fill"></i></span><span class="fader-cap"></span>';
+  input.insertAdjacentElement('afterend', fader);
+  const at = e => {
+    const r = fader.getBoundingClientRect(), min = +input.min || 0, max = +input.max || 1;
+    const p = vert ? 1 - (e.clientY - r.top) / (r.height || 1) : (e.clientX - r.left) / (r.width || 1);
+    setValue(input, min + Math.max(0, Math.min(1, p)) * (max - min));
+  };
+  fader.addEventListener('pointerdown', e => {
+    if (input.disabled) return;
+    e.preventDefault(); input.focus({ preventScroll: true });
+    fader.setPointerCapture(e.pointerId); fader.classList.add('turning'); at(e);
+  });
+  fader.addEventListener('pointermove', e => { if (fader.hasPointerCapture(e.pointerId)) at(e); });
+  const end = e => { if (fader.hasPointerCapture(e.pointerId)) { fader.releasePointerCapture(e.pointerId); input.dispatchEvent(new Event('change', { bubbles: true })); } fader.classList.remove('turning'); };
+  fader.addEventListener('pointerup', end); fader.addEventListener('pointercancel', end);
+}
+
 function attachKnob(input) {
   if (input.dataset.knob) return;
+  if (input.dataset.fader) return attachFader(input);
   input.dataset.knob = '1';
   const knob = document.createElement('div');
   knob.className = 'knob';
@@ -63,11 +89,12 @@ export function startHardware() {
     requestAnimationFrame(frame);
     if (document.documentElement.dataset.ui !== 'hw') return;
     document.querySelectorAll('input[data-knob]').forEach(input => {
-      const k = input.nextElementSibling; if (!k || !k.classList.contains('knob')) return;
+      const k = input.nextElementSibling; if (!k || !(k.classList.contains('knob') || k.classList.contains('fader'))) return;
       const min = +input.min || 0, max = +input.max || 1, p = ((+input.value) - min) / (max - min || 1);
       const s = p.toFixed(3);
       if (k.dataset.p !== s) { k.dataset.p = s; k.style.setProperty('--p', s); }
       k.classList.toggle('off', input.closest('.end')?.hidden || false);
+      k.classList.toggle('dis', input.disabled);
     });
     const A = window.analysers;
     document.querySelectorAll('[data-act-ids]').forEach(head => {

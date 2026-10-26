@@ -159,5 +159,10 @@
       "Fuego",
       "Ruta"
     ]
+  },
+  "spoken": {
+    "weight": 0.05,
+    "ways": { "opening": 1, "passage": 1 },
+    "vocab": "night"
   }
 }
