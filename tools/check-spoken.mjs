@@ -508,6 +508,30 @@ const CHECKS = {
     assert(styleOf(radio) === 'radio', 'speaker and volume do not change the style');
     assert(styleOf({ ...radio, room: 0.5 }) === 'custom', 'a hand edit makes the style Custom');
   },
+  'poetic narrator with Narrated growth (voice-full-controls D11): the step lines stay, the images come in addition, an image wins a shared bar'() {
+    const poetic = Object.values(POETIC).flat().map(x => x.en), luci = read('songs/luci-rosse.json');
+    const run = (C, narrated) => {
+      const c = crescendoSong(luci, { narrated, rules: growthRules(C) }), L = liveCode(c, C, { files: () => ANY }), out = [];
+      for (const st of buildSteps(L.build)) {
+        const code = L.codeAt(st.at), bars = narrated ? [...code.matchAll(/spoken on bar (\d+)/g)].map(m => +m[1]) : [];
+        assert(new Set(bars).size === bars.length, `two narrator lines on one bar: ${bars}`);
+        for (const m of code.matchAll(/\/\/ "([^"]+)", spoken on bar (\d+)/g)) out.push({ text: m[1], bar: +m[2] - 1 });
+      }
+      return { out, c };
+    };
+    const both = run(resolveProfile('crescendo', { narratorStyle: 'poetic', narrated: true }), true);
+    const images = both.out.filter(x => poetic.includes(x.text)), lines = both.out.filter(x => !poetic.includes(x.text));
+    assert(images.length >= 2 && lines.length >= 4, `poetic and narrated: ${images.length} images, ${lines.length} step lines`);
+    const plain = run(resolveProfile('crescendo', { narrated: true }), true).out;
+    assert(plain.length && !plain.some(x => poetic.includes(x.text)), 'explaining with Narrated growth: no images');
+    // every step line the explaining narration says is said with the poetic style too, unless an image takes its bar
+    const imageBars = new Set(images.map(x => x.bar));
+    const missing = plain.filter(x => !imageBars.has(x.bar) && !lines.some(y => y.bar === x.bar && y.text === x.text));
+    assert(!missing.length, `step lines lost: ${missing.slice(0, 3).map(x => `${x.bar + 1} ${x.text}`)}`);
+    const only = run(resolveProfile('crescendo', { narratorStyle: 'poetic' }), false).out;
+    assert(only.length && only.every(x => poetic.includes(x.text)), 'poetic without Narrated growth: images only, as before');
+    console.log(`      ${images.length} images and ${lines.length} step lines; ${plain.length - lines.length} step lines give their bar to an image`);
+  },
 };
 
 let failed = 0;

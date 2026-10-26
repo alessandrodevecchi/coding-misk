@@ -30,7 +30,9 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // with a composed reese sound different; the seed fixtures do not move (they draw no reese)
 // 8: the sound kind saw is gone (it sounded like reese): the styles that named it play reese, so drum and bass and
 // darksynth songs with a composed sound may differ; the seed fixtures do not move
-export const DIRECTOR_VERSION = 8;
+// 9 (voice-full-controls): the narrator track is named "Narrator" (was "Voice"); the music does not move (the fixtures
+// keep a music hash without the voice tracks)
+export const DIRECTOR_VERSION = 9;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };
@@ -464,7 +466,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
   const { phrase, bars, R } = plan;
   const { keep = [], from = 0, forced = {}, locked = [] } = steer;
   const ctx = { usual: plan.usualHigh, weights: R.energy, hardMax: plan.hardMax };
-  const voice = { id: 'voice', name: 'Voice', type: 'voice', settings: plan.voice.settings, patterns: {}, clips: [] };
+  const voice = { id: 'voice', name: 'Narrator', type: 'voice', settings: plan.voice.settings, patterns: {}, clips: [] };
   if (plan.voice.rack && plan.voice.rack.length) voice.rack = plan.voice.rack;
   const base = { tracks: [...plan.tracks.map(t => ({ ...t, mute: true, clips: [{ start: 0, bars, pattern: 'A' }] })), voice] };
   if (plan.spoken) base.tracks.splice(base.tracks.length - 1, 0, { ...JSON.parse(JSON.stringify(plan.spoken.track)), mute: true, clips: [{ start: 0, bars, pattern: 'A' }] });

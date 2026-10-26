@@ -17,8 +17,8 @@
 
 ## 4. Narrator
 
-- [ ] 4.1 Poetic style with Narrated growth (D11) in `narration`; `check:spoken` cases (both lines, image wins a shared bar, poetic without Narrated growth unchanged); `npm run voices` covers any new line
-- [ ] 4.2 Fixed name "Narrator" in the director and in the 10 built-in songs named "Voice"; `npm run snapshot:code` and `check:code`, `node tools/snapshot-levels.cjs check` on those songs (levels unchanged)
+- [x] 4.1 Poetic style with Narrated growth (D11) in `narration`; `check:spoken` cases (both lines, image wins a shared bar, poetic without Narrated growth unchanged); `npm run voices` covers any new line
+- [x] 4.2 Fixed name "Narrator" in the director and in the 10 built-in songs named "Voice"; `npm run snapshot:code` and `check:code`, `node tools/snapshot-levels.cjs check` on those songs (levels unchanged)
 
 ## 5. Radio and console
 

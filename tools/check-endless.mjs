@@ -60,6 +60,27 @@ const FIXTURES = [
   { seed: 'quiet', styles: ['ambient', 'lo-fi'], energy: 0.2, complexity: 0.1, minutes: 12 },
 ];
 const sessionHash = r => hashString(JSON.stringify(r)).toString(16).padStart(8, '0');
+// Songs without their voice tracks (voice-full-controls): the spoken tracks, the steps that bring them in and out, and
+// the narrator's name of before ("Voice"). Every style may now draw a voice track on its own stream; the music must not
+// move, so the old fixtures still hold on this view. narrator: also leave out the narrator track (the music alone).
+function voiceless(x, { narrator = false } = {}) {
+  const r = JSON.parse(JSON.stringify(x));
+  const strip = song => {
+    if (!song || !Array.isArray(song.tracks)) return;
+    const gone = new Set(song.tracks.filter(t => t.type === 'spoken' || (narrator && t.type === 'voice')).map(t => t.id));
+    song.tracks = song.tracks.filter(t => !gone.has(t.id));
+    for (const t of song.tracks) if (t.type === 'voice' && t.name === 'Narrator') t.name = 'Voice';
+    if (Array.isArray(song.build)) song.build = song.build.map(st => {
+      const o = { ...st };
+      for (const k of ['add', 'remove']) if (o[k] !== undefined) { const l = [].concat(o[k]).filter(id => !gone.has(id)); if (!l.length) delete o[k]; else o[k] = Array.isArray(st[k]) && l.length > 1 ? l : l.length === 1 && !Array.isArray(st[k]) ? l[0] : l; }
+      if (narrator) delete o.voice;
+      return o;
+    }).filter(st => Object.keys(st).some(k => k !== 'at' && k !== 'by'));
+  };
+  const walk = v => { if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') { if (Array.isArray(v.tracks) && Array.isArray(v.sections)) strip(v); else Object.values(v).forEach(walk); } };
+  walk(r);
+  return r;
+}
 // songs of director version 2 at complexity 0 (material-generator): complexity 0 must keep giving them
 const PLAIN_V2 = [
   { seed: 'plain-a', styles: ['berlin-techno'], complexity: 0, songs: '2785ea56' },
@@ -261,7 +282,7 @@ const CHECKS = {
     assert(mutated > 10, `only ${mutated} mutated patterns at complexity 1`);
   },
   'director: complexity 0 gives the songs of director version 2'() {
-    for (const c of PLAIN_V2) { const { songs, ...opts } = c; assert(sessionHash(generateSession(loadStyles(), opts).songs) === songs, `${c.seed} (${c.styles}): complexity 0 songs changed`); }
+    for (const c of PLAIN_V2) { const { songs, ...opts } = c; assert(sessionHash(voiceless(generateSession(loadStyles(), opts).songs)) === songs, `${c.seed} (${c.styles}): complexity 0 songs changed`); }
   },
   'director: a recipe asking for composed leads gets them in most songs'() {
     const recipes = loadStyles().map(r => (r.id === 'trance' ? { ...r, hook: { ...r.hook, weight: 1, material: { source: 'generated' } } } : r));
@@ -476,9 +497,13 @@ const CHECKS = {
     assert(JSON.stringify(again) === JSON.stringify(r), 'the recorded seed does not reproduce the session');
   },
   'determinism: seed fixtures'() {
-    const now = FIXTURES.map(f => ({ ...f, hash: sessionHash(generateSession(loadStyles(), f)) }));
-    if (process.argv.includes('--write-fixtures')) { fs.writeFileSync(FIXTURES_FILE, JSON.stringify(now, null, 2) + '\n'); console.log('      fixtures written'); return; }
-    const saved = JSON.parse(fs.readFileSync(FIXTURES_FILE, 'utf8'));
+    // (music: the same session without its voice tracks, voice-full-controls: a change to the voices alone moves the
+    // hash but never the music; --write-fixtures keeps a recorded music hash, so the music cannot move unnoticed)
+    const saved = fs.existsSync(FIXTURES_FILE) ? JSON.parse(fs.readFileSync(FIXTURES_FILE, 'utf8')) : [];
+    const now = FIXTURES.map(f => { const r = generateSession(loadStyles(), f); return { ...f, hash: sessionHash(r), music: sessionHash(voiceless(r, { narrator: true })) }; });
+    const music = (f, i) => assert(!saved[i] || !saved[i].music || saved[i].music === f.music, `seed ${f.seed} (${f.styles}): the music moved (${f.music}, fixture ${saved[i] && saved[i].music})${process.argv.includes('--force-music') ? '' : '; only the voices may change here (--force-music when the music change is intended)'}`);
+    if (process.argv.includes('--write-fixtures')) { if (!process.argv.includes('--force-music')) now.forEach(music); fs.writeFileSync(FIXTURES_FILE, JSON.stringify(now, null, 2) + '\n'); console.log('      fixtures written'); return; }
+    now.forEach(music);
     now.forEach((f, i) => assert(saved[i] && saved[i].hash === f.hash, `seed ${f.seed} (${f.styles}) gives ${f.hash}, fixture ${saved[i] && saved[i].hash}; if the change is intended, run npm run check:endless -- --write-fixtures`));
   },
   'radio: song by song equals a whole session'() {
@@ -868,7 +893,7 @@ const CHECKS = {
       }
     }
     assert(added >= 5 && more >= 5, `composed tracks: add ${added}, more complex ${more}`);
-    for (const c of PLAIN_STEER) assert(sessionHash(plainSteer(c)) === c.songs, `${c.seed}: steered songs at complexity 0 or with patterns changed (${sessionHash(plainSteer(c))})`);
+    for (const c of PLAIN_STEER) assert(sessionHash(voiceless(plainSteer(c))) === c.songs, `${c.seed}: steered songs at complexity 0 or with patterns changed (${sessionHash(voiceless(plainSteer(c)))})`);
   },
   'steering: curves and complexity shape composed material'() {
     const find = (seed, style, type) => { const ses = createSession(STYLES, seed); for (let i = 0; i < 30; i++) { const x = ses.next({ styles: [style] }); if (!whyNot({ kind: 'vary', type }, x.song, x.plan, 40)) return x; } return null; };
