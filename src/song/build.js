@@ -107,6 +107,15 @@ export function sayAt(song, bar, lang, hold = 4) {
   const s = buildSteps(song).filter(x => x.say && x.at <= bar && bar < x.at + hold).pop();
   return s ? sayText(s.say, lang) : '';
 }
+// the step whose comment is said with the first `upTo` steps applied: the latest one with "say" on the bar of the latest
+// step. Several steps may share a bar (the director puts its comment on the first move of a boundary, #81), so the
+// latest step alone would leave the comment unsaid.
+export function sayStep(steps, upTo) {
+  const last = steps[upTo - 1];
+  if (!last) return null;
+  for (let i = upTo - 1; i >= 0 && steps[i].at === last.at; i--) if (steps[i].say) return steps[i];
+  return null;
+}
 // the next step after a bar (strictly later), or null
 export const nextStep = (song, bar) => buildSteps(song).find(s => s.at > bar) || null;
 
@@ -125,16 +134,17 @@ const stepWords = s => {
   return '';
 };
 export function annotate(code, song, upTo, lang) {
-  const step = buildSteps(song)[upTo - 1];
-  if (!step || (!step.say && !buildSteps(song).slice(0, upTo).some(x => x.at === step.at && x.by === 'listener'))) return code;
-  const tr = stepTrack(step), t = tr && song.tracks.find(x => x.id === tr);
+  const steps = buildSteps(song), step = steps[upTo - 1], said = sayStep(steps, upTo);
+  if (!step || (!said && !steps.slice(0, upTo).some(x => x.at === step.at && x.by === 'listener'))) return code;
+  // (the comment of the bar goes above the track of the step that says it)
+  const tr = stepTrack(said || step), t = tr && song.tracks.find(x => x.id === tr);
   const lines = code.split('\n');
   const head = t ? lines.findIndex(l => l.startsWith('// ==========') && l.includes(` ${t.name || t.id} `)) : -1;
   const at = head >= 0 ? head + 1 : Math.max(0, lines.findIndex(l => l.startsWith('// ==========')));
   // the listener's changes from the radio console (#24) are marked "you:"
   // every listener's change on this bar, not only the last step applied
-  const mine = buildSteps(song).slice(0, upTo).filter(x => x.at === step.at && x.by === 'listener');
-  const add = [...mine.map(x => `// you: ${stepWords(x)}`), step.say ? `// > ${sayText(step.say, lang)}` : null].filter(Boolean);
+  const mine = steps.slice(0, upTo).filter(x => x.at === step.at && x.by === 'listener');
+  const add = [...mine.map(x => `// you: ${stepWords(x)}`), said ? `// > ${sayText(said.say, lang)}` : null].filter(Boolean);
   lines.splice(at, 0, ...add);
   return lines.join('\n');
 }
@@ -182,7 +192,7 @@ const entering = (song, step) => { const t = step && enteringTrack(song, step); 
 const bringsSpoken = (song, step) => { const t = step && enteringTrack(song, step); return !!t && t.type === 'spoken'; };
 function narration(song, upTo, lang) {
   const steps = buildSteps(song), step = steps[upTo - 1];
-  if (narratorStyle(song) !== 'poetic') { const text = step && !bringsSpoken(song, step) && sayText(step.say, lang); return text ? [{ step, text, at: step.at }] : []; }
+  if (narratorStyle(song) !== 'poetic') { const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && sayText(said.say, lang); return text ? [{ step: said, text, at: said.at }] : []; }
   const out = [], next = steps[upTo];
   // the entry of bar 0 (the first track), then the next entry in the bar before it
   if (step && step.at === 0 && entering(song, step)) out.push({ step, text: sayText(poeticLine(song, step, upTo - 1), lang), at: 0 });

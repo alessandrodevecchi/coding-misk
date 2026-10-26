@@ -1,7 +1,8 @@
 // Checks for the voice instrument (voice-instrument, #39): spoken tracks and their lines, the four ways to speak, the
 // narrator that yields, the poetic narrator, texts and speakers, the growth and the director; the voice controls
 // (voice-controls, #77): the default unchanged, phrases per song as a ceiling, different and repeated lines, one phrase
-// per part, ways, presence, presets, the narrator style control. No browser.
+// per part, ways, presence, presets, the narrator style control; every comment the radio lists spoken on its bar and the
+// voice instrument kept in songs grown on air (#81). No browser.
 //   npm run check:spoken      exit 1 when any check fails
 import fs from 'node:fs';
 import { songFiles } from './songs-dir.mjs';
@@ -9,7 +10,8 @@ import { loadStyles } from './styles-dir.mjs';
 import { validateSong } from '../src/song/validate.js';
 import { compileSong } from '../src/song/compile.js';
 import { normalizeSong } from '../src/song/format.js';
-import { buildSteps, stateAt, deriveBuild, voiceCode, SPEAKERS, saySlug } from '../src/song/build.js';
+import { buildSteps, stateAt, deriveBuild, voiceCode, SPEAKERS, saySlug, sayText } from '../src/song/build.js';
+import { growOnAir } from '../src/endless/growth.js';
 import { placeSpoken, spokenBars, setSpokenContext, spokenContext, speakerOf, narratorSpeaker, lineOf, enteringTrack, WAYS } from '../src/song/spoken.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from '../src/song/vocabulary.js';
 import { crescendoSong } from '../src/song/crescendo.js';
@@ -19,7 +21,7 @@ import { shapeFacts, canPlay, resolveShape } from '../src/song/shapes.js';
 import { generateSession, createSession } from '../src/endless/director.js';
 import { VOICE_PRESETS, VOICE_PHRASES, PHRASE_RANGES, applyPreset, presetOf, cleanVoice, isDefaultVoice } from '../src/endless/voice-options.js';
 import { voiceEvent } from '../src/endless/voice-panel.js';
-import { withNarratorStyle, lineTexts } from '../src/song/spoken.js';
+import { withNarratorStyle, lineTexts, narratorStyle } from '../src/song/spoken.js';
 import { energyOf } from '../src/endless/energy.js';
 import { meterSteps } from '../src/music.js';
 import { rewriteSpoken, trackVoice, quietParts, nextQuiet } from '../src/endless/voice-track.js';
@@ -439,6 +441,58 @@ const CHECKS = {
       }
     }
     assert(n >= 4, `${n} songs steered`);
+  },
+  // #81: the director puts a boundary's comment on its first move; the narrator spoke only the latest step of a bar
+  'narrator: every comment the radio lists in Next changes is spoken on its bar, also with several moves on one boundary (#81)'() {
+    // a hand-made build: the comment on the first of two steps of bar 4
+    const song = clone(EXAMPLE);
+    song.tracks = song.tracks.filter(t => t.type !== 'spoken');
+    delete song.narrator;
+    const ids = song.tracks.filter(t => t.type !== 'voice').map(t => t.id);
+    song.build = [{ at: 0, add: ids[0], say: 'go' }, { at: 4, add: ids[1], say: 'more bass' }, { at: 4, set: { track: ids[0], gain: 0.5 } }];
+    const C = resolveProfile('classic'), L = liveCode(song, C, { files: () => ANY, lang: () => 'en' });
+    assert(/"more bass", spoken on bar 5/.test(L.codeAt(4)), 'the comment of the first step of bar 4 is not spoken');
+    assert(L.codeAt(4).includes('// > more bass'), 'the comment of the first step of bar 4 is not written in the code');
+    // radio songs over every style, in blocks and grown on air: the latest comment of each bar is spoken on it, unless
+    // a line of the voice instrument sounds there (the narrator yields); poetic narrators speak images instead
+    let says = 0, multi = 0;
+    const styleIds = recipes.map(r => r.id);
+    for (let i = 0; i < 24; i++) {
+      const g = createSession(recipes, `say-${i}`).next({ styles: [styleIds[i % styleIds.length]] });
+      const grown = g.entry.profile === 'crescendo' || g.entry.profile === 'switch';
+      const s = grown ? growOnAir(g.song, { profile: g.entry.profile, styles, phrase: g.plan.phrase }) : g.song;
+      if (narratorStyle(s) === 'poetic') continue;
+      const P = s.onAir ? resolveProfile(s.onAir.profile, { duration: 'fitted' }) : C, LL = liveCode(s, P, { files: () => ANY, lang: () => 'en' });
+      const heard = new Set();
+      for (const b of new Set(buildSteps(LL.build).map(x => x.at))) {
+        const shown = LL.codeAt(b), all = LL.run ? LL.run(shown) : shown;
+        for (const m of all.matchAll(/\/\/ "([^"]+)", spoken on bar (\d+)/g)) heard.add(`${+m[2] - 1}|${m[1]}`);
+      }
+      const yields = s.tracks.some(t => t.type === 'spoken') ? spokenBars(s, 'en') : new Set(), steps = buildSteps(s);
+      for (const b of new Set(steps.filter(x => x.say).map(x => x.at))) {
+        const last = steps.filter(x => x.at === b && x.say).pop();
+        if (steps.filter(x => x.at === b).length > 1) multi++;
+        if (yields.has(b)) continue;
+        says++;
+        assert(heard.has(`${b}|${sayText(last.say, 'en')}`), `${s.id} (${s.onAir ? s.onAir.profile : 'classic'}): "${sayText(last.say, 'en')}" on bar ${b + 1} is not spoken`);
+      }
+    }
+    console.log(`      ${says} comments spoken on their bar, ${multi} on bars with several moves`);
+    assert(says > 100 && multi > 10, `${says} comments, ${multi} on bars with several moves`);
+  },
+  'voice instrument on air: a song that grows on the radio keeps its spoken track and its line (#81)'() {
+    let n = 0;
+    for (let i = 0; i < 30 && n < 4; i++) {
+      const g = createSession(recipes, `grow-voice-${i}`).next({ styles: ['pure-trance'], voice: { presence: 'always' } });
+      if (!g.song.tracks.some(t => t.type === 'spoken')) continue;
+      for (const profile of ['switch', 'crescendo']) {
+        const s = growOnAir(g.song, { profile, styles, phrase: g.plan.phrase });
+        if (!s.onAir) continue;
+        assert(s.tracks.some(t => t.type === 'spoken') && placeSpoken(s, 'en').some(p => p.starts.length), `${g.song.id} ${profile} (${g.entry.spoken}): the voice instrument left the grown song`);
+        n++;
+      }
+    }
+    assert(n >= 4, `${n} grown songs with a voice instrument`);
   },
 };
 

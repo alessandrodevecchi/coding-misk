@@ -1,9 +1,10 @@
 // Browser checks for the radio (#22): tab, controls, determinism against the director, song changes,
 // options from the next song, display options on air from the next edit, exclusive playback, history, save, open in
 // Compose, replay.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-radio.cjs [--long minutes]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-radio.cjs [--long minutes]   (dev server on PORT, default 5173)
 // --long plays the radio for that many minutes with three styles and chaos 1, reporting every song change.
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
+const PORT = process.env.PORT || 5173;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const args = process.argv.slice(2), long = args.includes('--long') ? +args[args.indexOf('--long') + 1] : 0;
 let failed = 0;
@@ -26,7 +27,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   };
   const setRange = (k, v) => page.evaluate(([k, v]) => { const el = document.getElementById(`radio-${k}`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, [k, v]);
 
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${PORT}/`); await sleep(5000);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
 
   // tab and controls
