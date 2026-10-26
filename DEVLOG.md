@@ -1440,3 +1440,11 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Misura** (Node, 16 brani radio, macchina occupata dai check nel browser): di serie mediana 0.85 s, massimo 4.46 s; Prova tutte (prima buona) 1.44 s, 7.57 s; Prova tutte (migliore) 1.79 s, 7.72 s; ordine fisso 0.83 s. Nel worker del browser non misurato a parte: in `check-radio.cjs` la crescita più ampia del secondo brano arriva in tempo.
 - **Check.** `check:radio-profiles` 27/27 (nuovo caso: impostazioni lette, Prova tutte e ordine fisso cambiano 1 e 2 brani su 3, un brano registrato `default` si riascolta di serie, fixture invariate); `check-radio.cjs` 62/62 sulla porta 5185 (due casi nuovi: impostazioni registrate, secondo brano `wide`); `check-settings.cjs` 42/42; `check:endless` 84/84, `check:spoken` 33/33, `check:crescendo` rapido 39/39, `check:guide`, `check:knowledge`, `check:durations`, `npm run build`, `npm run catalog:strudel`.
 - **Note di conoscenza.** `radio.md`, `settings.md`, `growth-shapes.md`, `decisions.md` (D1, D2, D6, D8, riferimento Live coder; scartato il limite di tempo dentro la ricerca), seguiti in `status.md` ("Brano lungo da" in radio, limiti di D8 da ritoccare).
+
+## 2026-10-26: spec del pannello Nuovo brano (#78, new-song-panel)
+
+- **Proposta.** Change OpenSpec `new-song-panel`: "Nuovo brano" in Compose apre un pannello con riga rapida (Artista, Preset, Seme, Genera, Brano vuoto) e cinque sezioni chiuse con riassunto (Stile e genere, Profilo e crescita, Voci, Materiale, Durata).
+- **Stessi valori della radio.** Un solo store delle opzioni (`src/endless/song-options.js`) e gli stessi controlli spostati da `radio.js` in `src/radio/song-controls.js`: cambiare un valore nel pannello cambia anche i prossimi brani della radio e viceversa. Il vecchio `coding-misk-artist-voice` sparisce.
+- **Durata.** Nuova opzione `length` del direttore (breve, media, lunga, minuti esatti), mai inviata dalla radio: fixture invariate, `DIRECTOR_VERSION` invariata.
+- **Mockup** (UI italiana, NEON, HW con fader, telefono 400 px) in `notes/prove-2026-10-26/nuovo-brano-spec/`. Al telefono le tre manopole vanno una per riga.
+- **Domande aperte** Q1-Q6 con l'opzione consigliata in `design.md`. Stima circa 18 ore agente. Solo spec, nessun codice cambiato.
