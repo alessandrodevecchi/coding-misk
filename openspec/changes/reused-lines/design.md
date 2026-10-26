@@ -49,7 +49,7 @@ A line keeps its key; when another pattern of the same track takes the key at a 
 For a returning line kept muted whose return form differs, the code of the moment shows it in its return form, still muted, from the step inside its silence whose typing leaves the most spare time (usable minus need, measured as `typingLoad` does), the first one on a tie. When no step inside the silence has spare time, the edit stays at the return.
 
 ### D5. Radio search settings in the recipe
-At session start the radio reads `coding-misk-shape-cap`, `-shape-all`, `-shape-keep` and stores the non-default ones in the recipe (`options.shapeSearch`). `growOnAir` passes them to `crescendoSong`. A recipe without them grows with the defaults, so old sessions and the fixtures do not move. It also reads `coding-misk-shape-random`: "Random order" applies on air too (owner, 2026-10-26), stored only when off; with it on, as by default, each radio song draws its shape order from its seed, so songs of one session do not share the same shapes. "Long song from" stays Compose only for now; the radio keeps 15 minutes (follow-up below). The cap (default 8) and try all were the owner's earlier request; this change is where they reach the radio.
+At session start the radio reads `coding-misk-shape-cap`, `-shape-all`, `-shape-keep` and stores the non-default ones in the recipe (`options.shapeSearch`). `growOnAir` passes them to `crescendoSong`. A recipe without them grows with the defaults, so old sessions and the fixtures do not move. It also reads `coding-misk-shape-random`: "Random order" applies on air too (owner, 2026-10-26), stored only when off, and then every radio song tries its shapes in the fixed order, as in Compose (owner, 2026-10-26); with it on, as by default, each radio song draws its shape order from its seed, so songs of one session do not share the same shapes. "Long song from" stays Compose only for now; the radio keeps 15 minutes (follow-up below). The cap (default 8) and try all were the owner's earlier request; this change is where they reach the radio.
 
 ### D6. Default first, wider second
 For a song with non-default search, the worker grows the default growth first (as today) and answers; then it grows the wider one. The wider growth replaces the default one when it arrives before the song's limit (its start on air minus 20 s, at most 60 s after its default growth) and the song has no commands. `growNow`, steering and the page fallback use the default search. The result is recorded per song (`options.shapeSearch.played[n] = 'wide' | 'default'`), and a replay or an export grows each song as recorded. Alternative: one growth with a time budget inside the search; rejected, a growth cut by the clock is not repeatable.
@@ -62,10 +62,10 @@ In the written part, a new pattern line (typed new after D2 and D3: no like line
 
 - **When there is time.** A step can take a line ahead only if its typing leaves spare time (usable minus need, measured as `typingLoad` does) of at least the ahead line's typing plus 2 s. Quiet bars and long gaps between changes are such steps; a step that is itself rushed never takes one.
 - **Which line.** Candidates are the new lines of the steps up to the next section change included and at most 32 bars ahead. A rushed target step comes first (need over usable, largest gap first), then the longest line. A line whose step changes its form again before it plays is not a candidate.
-- **Limits.** At most 2 lines ahead in the code at any moment, at most 1 typed ahead per step, at most 1 per track; none when the code of the moment already shows 4 or more muted lines (returning lines of D1, D2 and D4 included). The probe reports the most muted lines shown per song.
+- **Limits.** At most 2 lines ahead in the code at any moment, at most 1 typed ahead per step, at most 1 per track; none when the code of the moment already shows 4 or more muted lines (returning lines of D1, D2 and D4 included). The probe reports the most muted lines shown per song. The owner approved these limits to start with (2026-10-26); they are tuned after the screenshots.
 - **Same sound.** The ahead line is muted until its step; every hap stays the same, and the hidden mixer must find it (`check:mixer -- --full`).
 
-Spare time before the crowded section changes of luci-rosse and settimo-cielo is close to zero, so D8 shortens rushed steps where quiet bars come first and leaves the general speed of the written part out of scope. Alternative: no ahead lines (the earlier recommendation, to measure D1 to D4 first); the owner chose to include them (2026-10-26). Alternative: also in the growth; rejected for now, the growth's steps and the shape search rest on its typing measure, and D8 would change every growth's shape.
+Spare time before the crowded section changes of luci-rosse and settimo-cielo is close to zero, so D8 shortens rushed steps where quiet bars come first and leaves the general speed of the written part out of scope. Alternative: no ahead lines (the earlier recommendation, to measure D1 to D4 first); the owner chose to include them (2026-10-26). Alternative: also in the growth; rejected for this change (owner, 2026-10-26), the growth's steps and the shape search rest on its typing measure, and D8 would change every growth's shape.
 
 ## Risks / Trade-offs
 
@@ -91,8 +91,10 @@ Saved growths, card lengths and saved sessions with `SHAPES_VERSION` 7 grow agai
 
 - "Long song from" on the radio: a radio song that is extended several times (continue in radio) can grow long, so the rule may matter there later. Not in this change.
 
-## Open Questions
+## Owner answers, second round (2026-10-26)
 
-1. "Random order" off on the radio: should the radio follow it (every radio song tries shapes in the fixed order) or keep the random order whatever the setting? Recommended: follow it, as the other shape settings; the default (on) keeps the variation.
-2. D8 limits (2 lines ahead, 1 per step and per track, 4 muted lines at most, 32 bars of look-ahead): are these right for the screen? Recommended: start with them and look at the screenshots before tuning.
-3. D8 in the growth too? Recommended: not in this change; measure it on the written part first.
+Decided; no open questions remain.
+
+1. "Random order" off on the radio: the radio follows it, so every radio song tries its shapes in the fixed order (D5). The default (on) keeps the variation.
+2. D8 limits (2 lines ahead, 1 per step and per track, 4 muted lines at most, 32 bars of look-ahead): approved to start with, tuned after the screenshots.
+3. D8 in the growth: not in this change. Lines are typed ahead only in the written part.

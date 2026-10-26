@@ -1263,3 +1263,8 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Risposte.** Il sorteggio tra tenere muta e cancellare resta quando costano quasi uguale; la copia da codice precedente vale anche nella crescita (un solo modo di scrivere, la forma tenuta da qualche brano può cambiare); la radio segue anche "Ordine casuale"; "Brano lungo da" resta solo in Compose (seguito annotato: un brano radio esteso più volte può diventare lungo). Forme provate (8 di serie) e "Prova tutte" in radio erano già nella spec (D5, D6).
 - **Nuovo in scope (D8).** Righe nuove scritte prima, mute: in un passo con tempo libero (battute tranquille, lunga attesa prima del cambio) il coder scrive in anticipo una riga di un passo che arriva, prima i cambi di sezione di corsa; il passo poi toglie solo `_`. Limiti: fino al prossimo cambio di sezione e al massimo 32 battute avanti, 2 righe in anticipo alla volta, 1 per passo e per traccia, nessuna con 4 o più righe mute a schermo. Nuovo caso di check e conteggi nel probe (righe in anticipo, passi di corsa, massimo di righe mute).
 - **Check.** `openspec validate reused-lines --strict` valido. Solo spec, nessun codice dell'app cambiato.
+
+## 2026-10-26: spec delle righe riusate, secondo giro di risposte (#85, reused-lines)
+
+- Approvati: con "Ordine casuale" spento anche i brani della radio provano le forme nell'ordine fisso; limiti di D8 (2 righe in anticipo, 1 per passo e per traccia, al massimo 4 righe mute, 32 battute avanti) per cominciare, da ritoccare dopo gli screenshot; righe scritte in anticipo solo nella parte scritta, non nella crescita.
+- Nessuna domanda aperta. Solo spec, nessun codice cambiato.
