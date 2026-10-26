@@ -187,7 +187,7 @@ function radioPlayable(W, songs = null) {
   const meta = parseSong(compileSong(stateAt(W, 0).song)), v = W.sections.flatMap(x => [x.bpm ?? 138, x.bpmEnd ?? x.bpm ?? 138]), lo = Math.min(...v), hi = Math.max(...v);
   meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   // (soundCode: every sound of the window in one code, for the soundfonts loaded ahead; hidden: the songs not shown)
-  return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), soundCode: () => compileSong({ ...W, build: undefined }) };
+  return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, earlier: L.earlier, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), soundCode: () => compileSong({ ...W, build: undefined }) };
 }
 // a radio session's songs joined into one playable song, as its exports play it (radio-profiles D12). A session of
 // Classic songs is the joined song with Classic controls, as before. With a grown song (or the Custom profile) the file
@@ -225,7 +225,7 @@ function sessionPlayable(items, seed, options, id, air = null) {
   // per segment: the buses and functions of the song on air, its typing, and whether its code appears whole
   const segmentAt = from => {
     const k = at(from), P = wins[k], C = P.ctl;
-    return { buses: P.buses || {}, fns: P.fns || {}, seed: songs[k].id || '', ...(C ? { typist: C.typist === 'human' ? 'human' : 'exact', mistakes: C.mistakes !== 'off' } : {}), ...(P.paste && from > 0 ? { paste: P.paste(from) } : {}), ...(whole.has(from) ? { whole: true } : {}) };
+    return { buses: P.buses || {}, fns: P.fns || {}, seed: songs[k].id || '', ...(C ? { typist: C.typist === 'human' ? 'human' : 'exact', mistakes: C.mistakes !== 'off' } : {}), ...(P.paste && from > 0 ? { paste: P.paste(from) } : {}), ...(P.earlier && from > 0 ? { earlier: P.earlier(from) } : {}), ...(whole.has(from) ? { whole: true } : {}) };
   };
   const firstGrown = air.findIndex(a => a.profile !== 'classic' || a.custom), grown = songs.map((s, k) => (air[k].profile !== 'classic' ? starts[k] : -1)).filter(b => b >= 0);
   return { ...base, code: codeAt(0), codeAt, codeKeep: null, run, standalone: null, paste: null, buses: {}, fns: {}, build: { ...(base.doc || joined), build: steps }, ctl: wins[firstGrown] ? air[firstGrown].ctl : base.ctl, segmentAt, session: { grown }, soundCode: () => compileSong({ ...joined, build: undefined }) };
@@ -421,7 +421,7 @@ function playable(tr, fixed = null) {
   // (whole: the song with every track, so the voice instrument's quiet sections stay the same)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep), whole: song } : song);
   const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(plain, keep)) : null;
-  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, paste: live ? live.paste : null, buses: live && live.buses, fns: live && live.fns, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
+  return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, paste: live ? live.paste : null, earlier: live ? live.earlier : null, buses: live && live.buses, fns: live && live.fns, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
 }
 
 // ---------- brano in modifica ----------
@@ -655,9 +655,9 @@ const typingSpeed = () => TYPING_SPEEDS[store.get('coding-misk-typing', null) ||
 // human (human-typing, a step of the live build in the Live coder profile): first a listening pause, then the typing at a
 // person's pace ends at the step; when time is short the pause shrinks first
 // force: how many new lines may be pasted whole when the typing does not fit (the live build's paste rule)
-function makeTyping(text, to, from0, end, cps, human = false, stretch = null, force = Infinity) {
+function makeTyping(text, to, from0, end, cps, human = false, stretch = null, force = Infinity, earlier = null) {
   const avail = Math.max(.2, (end - from0) / cps), listenMin = human ? Math.min(avail * .5, 2) : 0;
-  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch, force });
+  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch, force, earlier });
   const listen = human ? Math.max(listenMin, Math.min(avail * .2, avail - plan.total)) : 0;
   return { plan, start: Math.max(from0 + listen * cps, end - plan.total * cps), cps, shown: '' };
 }
@@ -681,7 +681,7 @@ function liveBuild(sg, s, cyc) {
   const due = s.lastEnd + .1 * s.cps >= next.at;
   if (!typing && !due) {
     const prevAt = built > 0 && steps[built - 1] ? steps[built - 1].at : -Infinity, to = codeFor(sg, next.at);
-    typing = makeTyping(settleOthers(ed.code || '', to, next.at), to, Math.max(cyc, prevAt + .5), next.at - .2 * s.cps, s.cps, typingHuman(), stretchOf(next.at), sg.paste ? sg.paste(next.at) : Infinity);
+    typing = makeTyping(settleOthers(ed.code || '', to, next.at), to, Math.max(cyc, prevAt + .5), next.at - .2 * s.cps, s.cps, typingHuman(), stretchOf(next.at), sg.paste ? sg.paste(next.at) : Infinity, sg.earlier ? sg.earlier(next.at) : null);
   }
   if (!due) { typeFrame(typing, cyc); return; }
   typing = null; built = steps.filter(x => x.at <= next.at).length;

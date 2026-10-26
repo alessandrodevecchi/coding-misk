@@ -47,7 +47,7 @@ export function codeFrom(segments, { seconds = null, speed = 1, style = 'exact',
       if (!cache.has(i)) {
         const end = seconds(next.from) - 0.2, from0 = seconds(seg.from + 0.5), to = next.code, human = (next.typist || style) === 'human';
         const avail = Math.max(0.2, end - from0), listenMin = human ? Math.min(avail * 0.5, 2) : 0;
-        const plan = typingPlan(settleOthers(seg.code, to, next.from), to, { speed, max: Math.max(0.2, avail - listenMin), style: next.typist || style, seed: next.seed ?? seed, mistakes: next.mistakes ?? mistakes, stretch: Math.floor(next.from / 16), force: next.paste ?? Infinity });
+        const plan = typingPlan(settleOthers(seg.code, to, next.from), to, { speed, max: Math.max(0.2, avail - listenMin), style: next.typist || style, seed: next.seed ?? seed, mistakes: next.mistakes ?? mistakes, stretch: Math.floor(next.from / 16), force: next.paste ?? Infinity, earlier: next.earlier || null });
         const listen = human ? Math.max(listenMin, Math.min(avail * 0.2, avail - plan.total)) : 0;
         cache.set(i, { plan, start: Math.max(from0 + listen, end - plan.total) });
       }

@@ -8,7 +8,7 @@ import { normalizeSong } from './format.js';
 
 // raised when an intended change to the shape rules changes the steps of a checked Live coder build
 // (tools/check-crescendo.mjs, Live coder fixtures); saved growths carry it, so a new version grows them anew
-export const SHAPES_VERSION = 7;
+export const SHAPES_VERSION = 8;
 // salt of the shape draws (resolveShape, shape search, growth stream): fixed at the value SHAPES_VERSION 5 used, so a
 // version raised for a rule fix (v6: blank lines in the typing alignment; v7: a melody rewrite turned by whole
 // mini-notation steps) keeps every song's drawn shapes; change it only when new draws are wanted

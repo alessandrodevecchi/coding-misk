@@ -27,7 +27,9 @@ The changes are steps: a list of timed actions in the song's `build` field. A st
 
 **Three growths.** `crescendo`: small steps, a change every one to four bars. `gradual`: a track enters with few lines, functions arrive one at a time. `natural`: like a live coder, four to six waypoints drawn at the start and small moves between them.
 
-**Typing.** Human typing waits, types at an uneven pace and makes mistakes it fixes. A new line that cannot be typed at a person's pace before its step is pasted whole. With free duration the step waits for the typing instead.
+**Typing.** Human typing waits, types at an uneven pace and makes mistakes it fixes. A new line that cannot be typed at a person's pace before its step is pasted whole. With free duration the step waits for the typing instead. A long new line (40 characters or more) like a line above it is pasted as a copy and edited; since reused-lines (D3) one like a line the code showed earlier in the song and no longer shows is copied from that earlier code the same way, after a short pause to look it up (`typingPlan(…, { earlier })`, `L.earlier(bar)` in `src/live/live-code.js`), in the growth and in the written part.
+
+**Lines kept for later (reused-lines).** In the written part of a Live coder growth a line that goes silent and comes back stays muted when that is cheaper to type (costed on the code as shown, the line's own share), a line replaced by another pattern of its track stays muted above it until it returns, a muted line that returns changed is edited while still muted at the quiet step of its silence, and a new line of a crowded coming step may be typed ahead, muted (`src/live/written-plan.js`). Details in [comments-and-functions.md](comments-and-functions.md).
 
 ## Options
 

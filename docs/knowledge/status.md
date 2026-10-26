@@ -37,7 +37,7 @@ OpenSpec changes not archived: 74. With open tasks: 23. All tasks ticked, waitin
 | [radio-arrangement](../../openspec/changes/radio-arrangement/tasks.md) | 1 | 32 |
 | [radio-profiles](../../openspec/changes/radio-profiles/tasks.md) | 1 | 36 |
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
-| [reused-lines](../../openspec/changes/reused-lines/tasks.md) | 21 | 21 |
+| [reused-lines](../../openspec/changes/reused-lines/tasks.md) | 9 | 21 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |

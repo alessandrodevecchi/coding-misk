@@ -71,8 +71,9 @@ function writtenPart(build, C) {
     if (at >= G) {
       const code = codeAt(at), was = settleOthers(codeAt(prev), code, at);
       const avail = Math.max(0.2, (at - prev - 0.5) * sb - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
-      const need = was === code ? 0 : typingPlan(was, code, { style: 'human', lean: true, seed, notes: false }).natural;
-      const plan = was === code ? { natural: 0, forced: 0 } : typingPlan(was, code, { style: 'human', lean: true, seed, notes: false, max: usable, force: L.paste ? L.paste(at) : Infinity });
+      const earlier = L.earlier ? L.earlier(at) : null;
+      const need = was === code ? 0 : typingPlan(was, code, { style: 'human', lean: true, seed, notes: false, earlier }).natural;
+      const plan = was === code ? { natural: 0, forced: 0 } : typingPlan(was, code, { style: 'human', lean: true, seed, notes: false, max: usable, force: L.paste ? L.paste(at) : Infinity, earlier });
       steps.push({ at, section: starts.get(at) || null, need, usable, pasted: plan.forced || 0, ratio: plan.natural / usable });
     } else codeAt(at);
     prev = at;
@@ -86,7 +87,8 @@ function writtenPart(build, C) {
 // lineLike below 0.5) although a line at least 0.8 alike was shown at an earlier step and has left the code. Pasted
 // from earlier code (reused-lines D3) it is counted as copied, not as reused. Also, per song: the lines typed ahead,
 // muted (D8), the rushed steps (ratio above 1.1) and the most muted lines the code shows at once.
-// → { lines, reused, identical, growth, written, rushed, copied, chars, maxRatio, ahead, rushedSteps, mostMuted, list }
+// scratch: those typed key by key (not copied from a like line above: too short, under 40 characters).
+// → { lines, reused, scratch, identical, growth, written, rushed, copied, chars, maxRatio, ahead, rushedSteps, mostMuted, list }
 function reusedLines(build, C) {
   const L = liveCode(build, C, { cols: () => 80 }), seed = build.id || '', G = build.crescendo && build.crescendo.growth !== undefined ? build.crescendo.growth : Infinity;
   const bars = [...new Set(buildSteps(L.build).map(x => x.at))].filter(b => b >= 1).sort((x, y) => x - y), memo = new Map();
@@ -109,13 +111,13 @@ function reusedLines(build, C) {
       const b = body(l);
       let inWas = 0; for (const w of W) { if (nB.has(body(w))) continue; inWas = Math.max(inWas, lineLike(w, l)); }
       let past = 0, pastB = null; for (const h of shown) { if (wasB.has(h)) continue; const v = lineLike(`$: ${h}`, `$: ${b}`); if (v > past) { past = v; pastB = h; } }
-      if (past >= 0.8 && inWas < 0.5) list.push({ at, written: at >= G, len: b.length, like: +past.toFixed(2), identical: pastB === b, ratio: +ratio.toFixed(2), copied: how.get(b) === 'earlier', line: b });
+      if (past >= 0.8 && inWas < 0.5) list.push({ at, written: at >= G, len: b.length, like: +past.toFixed(2), identical: pastB === b, ratio: +ratio.toFixed(2), copied: how.get(b) === 'earlier', how: how.get(b) || null, line: b });
     }
     for (const l of N) { if (!shown.has(body(l))) earlier.push(l); shown.add(body(l)); }
     prev = at;
   }
   const typed = list.filter(x => !x.copied);
-  return { lines, reused: typed.length, identical: typed.filter(x => x.identical).length, growth: typed.filter(x => !x.written).length, written: typed.filter(x => x.written).length, rushed: typed.filter(x => x.ratio > 1.1).length, copied: list.length - typed.length, chars: typed.reduce((a, x) => a + x.len, 0), maxRatio: Math.max(0, ...typed.map(x => x.ratio)), ahead: L.ahead ? L.ahead().length : 0, rushedSteps, mostMuted, list };
+  return { lines, reused: typed.length, scratch: typed.filter(x => !x.how || x.how === 'typed').length, identical: typed.filter(x => x.identical).length, growth: typed.filter(x => !x.written).length, written: typed.filter(x => x.written).length, rushed: typed.filter(x => x.ratio > 1.1).length, copied: list.length - typed.length, chars: typed.reduce((a, x) => a + x.len, 0), maxRatio: Math.max(0, ...typed.map(x => x.ratio)), ahead: L.ahead ? L.ahead().length : 0, rushedSteps, mostMuted, list };
 }
 
 const over = Object.fromEntries(['opening', 'pace', 'development', 'duration'].filter(k => flags[k]).map(k => [k, flags[k]]));
@@ -130,7 +132,7 @@ function probe(f) {
 }
 if (every) {
   const ids = JSON.parse(fs.readFileSync('songs/index.json', 'utf8')).map(x => (typeof x === 'string' ? x : x.id)), rows = [];
-  const T = { songs: 0, lines: 0, reused: 0, identical: 0, growth: 0, written: 0, rushed: 0, copied: 0, chars: 0, ahead: 0, rushedSteps: 0, mostMuted: 0, writtenRushed: 0 };
+  const T = { songs: 0, lines: 0, reused: 0, scratch: 0, identical: 0, growth: 0, written: 0, rushed: 0, copied: 0, chars: 0, ahead: 0, rushedSteps: 0, mostMuted: 0, writtenRushed: 0 };
   for (const id of ids) {
     const p = probe(fileOf(id)), r = p.reused;
     if (!r) continue;
@@ -138,10 +140,10 @@ if (every) {
     rows.push(flags.json ? { ...row, list: r.list } : row);
     T.songs++;
     for (const k of Object.keys(T)) if (k !== 'songs') T[k] = k === 'mostMuted' ? Math.max(T[k], row[k]) : T[k] + row[k];
-    if (!flags.json) console.log(`${id}: reused ${row.reused} (identical ${row.identical}, growth ${row.growth}, written ${row.written}, rushed ${row.rushed}), copied ${row.copied}, ahead ${row.ahead}, rushed steps ${row.rushedSteps} (written ${row.writtenRushed}), most muted ${row.mostMuted} · ${row.shape} ${row.bars} bars`);
+    if (!flags.json) console.log(`${id}: reused ${row.reused} (key by key ${row.scratch}, identical ${row.identical}, growth ${row.growth}, written ${row.written}, rushed ${row.rushed}), copied ${row.copied}, ahead ${row.ahead}, rushed steps ${row.rushedSteps} (written ${row.writtenRushed}), most muted ${row.mostMuted} · ${row.shape} ${row.bars} bars`);
   }
   if (flags.json) console.log(JSON.stringify({ profile, options: over, songs: rows, total: T }, null, 1));
-  else console.log(`total over ${T.songs} songs: ${T.lines} new pattern lines; reused ${T.reused} (identical ${T.identical}, growth ${T.growth}, written ${T.written}, rushed ${T.rushed}, ${T.chars} characters); copied from earlier code ${T.copied}; lines ahead ${T.ahead}; rushed steps ${T.rushedSteps} (written part ${T.writtenRushed}); most muted lines shown ${T.mostMuted}`);
+  else console.log(`total over ${T.songs} songs: ${T.lines} new pattern lines; reused ${T.reused} (key by key ${T.scratch}, identical ${T.identical}, growth ${T.growth}, written ${T.written}, rushed ${T.rushed}, ${T.chars} characters); copied from earlier code ${T.copied}; lines ahead ${T.ahead}; rushed steps ${T.rushedSteps} (written part ${T.writtenRushed}); most muted lines shown ${T.mostMuted}`);
   process.exit(0);
 }
 const { song, out, stats, shape, written, reused } = probe(file);
@@ -175,6 +177,6 @@ if (written) {
   console.log(`section changes: need ${f(c.need)} s in ${f(c.usable)} s, ${c.pasted} pasted, ${c.rushed} rushed · every written step (${a.steps}): need ${f(a.need)} s in ${f(a.usable)} s, ${a.pasted} pasted, ${a.rushed} rushed`);
 }
 if (reused) {
-  console.log(`reused lines (typed new though a line at least 0.8 alike was shown earlier): ${reused.reused} of ${reused.lines} new pattern lines (identical ${reused.identical}, growth ${reused.growth}, written ${reused.written}, rushed ${reused.rushed}); copied from earlier code ${reused.copied}; lines ahead ${reused.ahead}; rushed steps ${reused.rushedSteps}; most muted lines shown ${reused.mostMuted}`);
-  for (const x of reused.list) console.log(`  bar ${x.at}${x.written ? ' (written)' : ''} like ${x.like}${x.identical ? ' identical' : ''} ratio ${x.ratio}${x.copied ? ' copied' : ''}: ${x.line.slice(0, 90)}`);
+  console.log(`reused lines (typed new though a line at least 0.8 alike was shown earlier): ${reused.reused} of ${reused.lines} new pattern lines (key by key ${reused.scratch}, identical ${reused.identical}, growth ${reused.growth}, written ${reused.written}, rushed ${reused.rushed}); copied from earlier code ${reused.copied}; lines ahead ${reused.ahead}; rushed steps ${reused.rushedSteps}; most muted lines shown ${reused.mostMuted}`);
+  for (const x of reused.list) console.log(`  bar ${x.at}${x.written ? ' (written)' : ''} like ${x.like}${x.identical ? ' identical' : ''} ratio ${x.ratio} ${x.how || 'typed'}: ${x.line.slice(0, 90)}`);
 }

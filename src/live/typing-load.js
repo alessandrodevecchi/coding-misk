@@ -3,7 +3,7 @@
 // tools/check-crescendo.mjs reports it.
 import { buildSteps } from '../song/build.js';
 import { meterSteps } from '../music.js';
-import { typingPlan, settleOthers } from '../song/typing.js';
+import { typingPlan, settleOthers, chainLines } from '../song/typing.js';
 
 // seconds of one bar of the growth (the first section)
 export const barSeconds = song => { const s = song.sections[0]; return (meterSteps(s.meter || '4/4') / 4) * 60 / (s.bpm || 138); };
@@ -31,7 +31,7 @@ export function pasteRule(L, C, { seed = '' } = {}) {
       if (t >= 120 && t - last >= 60) {
         const code = L.codeAt(at), was = settleOthers(L.codeAt(prev), code, at);
         const avail = Math.max(0.2, secondsAt(L.build, at) - secondsAt(L.build, prev + 0.5) - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
-        if (was !== code && typingPlan(was, code, { style: 'human', lean: true, seed, force: 0 }).natural > usable) { ok = 1; last = t; }
+        if (was !== code && typingPlan(was, code, { style: 'human', lean: true, seed, force: 0, earlier: L.earlier ? L.earlier(at) : null }).natural > usable) { ok = 1; last = t; }
       }
       done.set(at, ok);
       prev = at;
@@ -49,13 +49,18 @@ export function typingLoad(L, { seed = '', from = 1, to = Infinity } = {}) {
   // the code of each bar is computed once per call (growth-in-background D4): a bar is the step and then the bar before
   // the next step; the calls keep their order, so the code is the same as when each one was computed again
   const memo = new Map(), codeAt = b => { if (!memo.has(b)) memo.set(b, L.codeAt(b)); return memo.get(b); };
+  // reused-lines D3: the pattern lines shown at the steps before, for the typing to copy from (as L.earlier)
+  const seen = new Map(), show = c => { for (const l of chainLines(c)) if (/^\s*[_S]?\$:/.test(l)) { seen.delete(l); seen.set(l, true); } };
+  if (from > 1) for (const b of [...new Set(buildSteps(L.build).map(x => x.at))].filter(b => b >= 1 && b < from).sort((a, b) => a - b)) show(codeAt(b));
   let prev = 0;
+  show(codeAt(0));
   for (const at of bars) {
     const code = codeAt(at), was = settleOthers(codeAt(prev), code, at);
     const avail = Math.max(0.2, (at - prev - 0.5) * sb - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
     // (with the time left as the limit: a new line that would not fit is pasted when the paste rule allows it, as the
     // app types it)
-    const need = was === code ? 0 : typingPlan(was, code, { style: 'human', lean: true, seed, max: usable, force: L.paste ? L.paste(at) : Infinity }).natural;
+    const need = was === code ? 0 : typingPlan(was, code, { style: 'human', lean: true, seed, max: usable, force: L.paste ? L.paste(at) : Infinity, earlier: [...seen.keys()] }).natural;
+    show(code);
     out.push({ at, seconds: at * sb, gap: (at - prev) * sb, usable, need, ratio: need / usable });
     prev = at;
   }

@@ -369,7 +369,9 @@ function transitSong(prev, W, Wprev, B, off, o) {
   N.build = [...N.build, ...fix].map((s, i) => ({ s, i })).sort((a, b) => a.s.at - b.s.at || a.i - b.i).map(x => x.s);
   // the code keeps the functions and levels of the song before its commands (song functions, written levels): the code
   // already shown stays as it was
-  N.codeRef = prev.codeRef || { ...clone({ ...prev, build: undefined, codeRef: undefined }) };
+  // (reused-lines: `until`, the first command's boundary: before the section that holds it the code of the moment is
+  // written from this song, so the lines it keeps muted for later do not follow the commands)
+  N.codeRef = prev.codeRef || { ...clone({ ...prev, build: undefined, codeRef: undefined }), until: B };
   N.onAir = { ...(prev.onAir || {}), waypoints: [...((prev.onAir && prev.onAir.waypoints) || []), { kind: o.kind, at: B, to: E }] };
   return { song: N, B, E, units, focus: p.focus };
 }

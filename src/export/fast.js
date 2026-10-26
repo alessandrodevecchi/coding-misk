@@ -13,7 +13,7 @@ export function segmentsOf(sg, codeFor, within = null) {
   // segmentAt(from): what a joined radio session adds per segment (radio-profiles D12): the buses and functions of the
   // song on air, its typing, whether its code appears whole
   const out = ats.map((from, i) => ({ from, to: i + 1 < ats.length ? ats[i + 1] : bars }));
-  return (within ? out.filter(s => within(s.from, s.to)) : out).map(({ from, to }) => { const code = codeFor(sg, from); return { from, to, code, ...(sg.run ? { run: sg.run(code, from) } : {}), ...(sg.paste && from > 0 ? { paste: sg.paste(from) } : {}), ...(sg.segmentAt ? sg.segmentAt(from) : {}) }; });
+  return (within ? out.filter(s => within(s.from, s.to)) : out).map(({ from, to }) => { const code = codeFor(sg, from); return { from, to, code, ...(sg.run ? { run: sg.run(code, from) } : {}), ...(sg.paste && from > 0 ? { paste: sg.paste(from) } : {}), ...(sg.earlier && from > 0 ? { earlier: sg.earlier(from) } : {}), ...(sg.segmentAt ? sg.segmentAt(from) : {}) }; });
 }
 
 // the timeline of an exported song: times in seconds from the start of the file
