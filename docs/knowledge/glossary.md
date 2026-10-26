@@ -116,6 +116,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Console commands | More complex | Più complesso | `steer:more-complex` |
 | Console commands | Simpler | Più semplice | `steer:less-complex` |
 | Console commands | Saved pattern | Pattern salvato | `steer:pattern` |
+| Console commands | Part harmony | Armonia della parte | `steer:voicing` |
 | Console commands | Darker | Più scuro | `steer:darker` |
 | Console commands | Brighter | Più brillante | `steer:brighter` |
 | Console commands | Dirtier | Più sporco | `steer:dirtier` |

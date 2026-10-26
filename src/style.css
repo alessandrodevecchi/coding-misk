@@ -918,7 +918,9 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .sp-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .sp-acts select { font: 12px var(--ui); padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); max-width: 120px; }
 .sp-tempo { color: var(--s2); }
-.sp-note { margin: 0; }
+.sp-note { margin: 0; font-size: 12px; }
+.steer-voicing, .steer-harm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.steer-harm { flex-basis: 100%; }
 /* material source next to the knobs (radio-variation 6.2) */
 .mat-source { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .mat-source .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }

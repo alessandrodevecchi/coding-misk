@@ -5,10 +5,12 @@ import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, trackForPa
 import { stream } from './random.js';
 import { stateAt, buildSteps } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
-import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, GROOVES, meterSteps, fitSteps } from '../music.js';
+import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, GROOVES, PROGS, meterSteps, fitSteps } from '../music.js';
 import { airIdea, composesOnAir, sessionSource, readyParts } from './material.js';
 import { presetOf, compose } from '../material/index.js';
 import { rewriteSpoken, nextQuiet } from './voice-track.js';
+import { treat, treatmentsFor, TREATMENTS } from './part-harmony.js';
+export { TREATMENTS };
 
 // commands of the console: group, whether they change the song's structure (applied on a double phrase)
 export const COMMANDS = {
@@ -20,6 +22,8 @@ export const COMMANDS = {
   more: { group: 'arrangement' }, less: { group: 'arrangement' }, 'lock-part': { group: 'arrangement' }, 'unlock-part': { group: 'arrangement' }, riser: { group: 'arrangement' },
   // one of the listener's saved patterns on air (D9): a new track or in place of a playing one
   pattern: { group: 'arrangement' },
+  // how one part sits on the chords (D8): in thirds, an octave away, chord colour, another inversion, or Auto
+  voicing: { group: 'arrangement' },
   // new notes for a part (radio-variation): a pattern step from the next phrase
   vary: { group: 'arrangement' },
   // another ready part (a preset or a saved pattern) for a part, never composed: a pattern step from the next phrase
@@ -80,6 +84,15 @@ const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const clone = o => JSON.parse(JSON.stringify(o));
 const round2 = x => Math.round(x * 100) / 100;
 const semis = k => (KEYS.find(x => x[0] === k) || [k, 0])[1];
+// the key the Song harmony menu asks for (D8): a fifth up (7 semitones), a fifth down (5), the relative major (3), among
+// the app's keys; null when that key is not one of them
+export const KEY_MOVES = ['auto', 'up', 'down', 'relative'];
+export function keyTo(cur, to) {
+  const d = { up: 7, down: 5, relative: 3 }[to];
+  if (d === undefined) return null;
+  const k = KEYS.find(x => ((x[1] - semis(cur)) % 12 + 12) % 12 === d);
+  return k ? k[0] : null;
+}
 
 // The bar where a command applies, given the bar now: the next phrase, the next double phrase for structural
 // commands, the next bar for the mixer. Never past the song's last phrase.
@@ -130,6 +143,14 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
     if (!free.length) return 'all-playing';
     return free.some(t => !locked.includes(t.id)) ? null : 'locked';
   }
+  if (cmd.kind === 'voicing') {
+    let mine = varyTracks(on, cmd.type || 'lead');
+    if (cmd.target && cmd.target !== 'auto') mine = mine.filter(t => t.id === cmd.target);
+    if (!mine.length) return 'not-playing';
+    const chords = (sectionAt(plan, at) || {}).chords || plan.mainChords;
+    const ok = mine.some(t => { const av = treatmentsFor(t.type, currentIdea(t), { chords }); return cmd.treatment && cmd.treatment !== 'auto' ? av.includes(cmd.treatment) : av.length > 0; });
+    return ok ? null : 'no-target';
+  }
   if (cmd.kind === 'vary' || cmd.kind === 'swap') {
     let mine = varyTracks(on, cmd.type || 'lead');
     // a named target that does not play at the boundary
@@ -155,6 +176,8 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
     if (cmd.voice && cmd.voice.presence === 'never' && !song.tracks.some(t => t.type === 'spoken')) return 'no-voice';
     return null;
   }
+  if (cmd.kind === 'key' && cmd.to && cmd.to !== 'auto') return keyTo((sectionAt(plan, at) || {}).key || plan.key, cmd.to) ? null : 'no-key';
+  if (cmd.kind === 'progression' && cmd.chords && cmd.chords !== 'auto') return (sectionAt(plan, at) || {}).chords === cmd.chords ? 'same-chords' : null;
   if (cmd.kind === 'drop') return plan.plan.slice(Math.ceil(at / (2 * plan.phrase))).some(d => d.role === 'drop') ? null : 'no-drop';
   return null;
 }
@@ -263,9 +286,10 @@ function composeNew(P, O, song, st, at, ids, seed) {
 // A saved pattern in place of a playing track (radio-arrangement D9): the same, with a copy of the pattern as P<k> on the
 // target track, which keeps its sound; a melody in its own chromatic mode takes that mode with it.
 function vary(song, P, O, cmd, st, seed) {
-  const swap = cmd.kind === 'swap', saved = cmd.kind === 'pattern', prefix = saved ? 'P' : swap ? 'S' : 'V';
+  const swap = cmd.kind === 'swap', saved = cmd.kind === 'pattern', voiced = cmd.kind === 'voicing', prefix = saved ? 'P' : voiced ? 'H' : swap ? 'S' : 'V';
+  const chords = voiced ? (sectionAt(P, cmd.at) || {}).chords || P.mainChords : null;
   if (saved && (!cmd.item || !fitsAir(cmd.item, P, song))) return { song, plan: P, opts: O };
-  const on = saved ? playing(st).filter(t => t.id === cmd.target && t.type === cmd.item.type) : targetTracks(song, varyTracks(playing(st), cmd.type || 'lead'), cmd, seed);
+  const on = saved ? playing(st).filter(t => t.id === cmd.target && t.type === cmd.item.type) : targetTracks(song, varyTracks(playing(st), cmd.type || 'lead'), voiced && !cmd.target ? { ...cmd, target: 'auto' } : cmd, seed);
   const M = swap ? null : { ...airInputs(P, O, st, cmd.at), source: 'composed', keepChords: true };
   let build = (song.build || []).slice();
   const tracks = song.tracks.map(t => ({ ...t }));
@@ -273,7 +297,15 @@ function vary(song, P, O, cmd, st, seed) {
     const own = P.tracks.find(x => x.id === t.id), mine = tracks.find(x => x.id === t.id);
     if (!own || !mine) return;
     let pattern;
-    if (saved) pattern = clone(cmd.item.pattern);
+    if (voiced) {
+      // Part harmony: the treatment asked, or with Auto one the track can take other than its last one
+      const cur = (t.patterns || {})[(t.clips[0] || {}).pattern] || {}, idea = currentIdea(t), av = treatmentsFor(t.type, idea, { chords });
+      const last = ((P.voiced || []).filter(v => v.track === t.id).pop() || {}).treatment;
+      const pick = cmd.treatment && cmd.treatment !== 'auto' ? (av.includes(cmd.treatment) ? cmd.treatment : null) : (av.filter(x => x !== last).length ? stream(seed, `${t.id}:treatment`).pick(av.filter(x => x !== last)) : null);
+      if (!pick) return;
+      pattern = { ...(cur.speed ? { speed: cur.speed } : {}), idea: treat(t.type, idea, pick, { chords }) };
+      P.voiced = [...(P.voiced || []), { at: cmd.at, track: t.id, treatment: pick }];
+    } else if (saved) pattern = clone(cmd.item.pattern);
     else if (swap) {
       const pool = readyParts(own, P.R, O, P.parts);
       if (!pool.length) return;
@@ -474,6 +506,12 @@ function headroom(song, P, from) {
   return { ...song, build: out.map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x) };
 }
 
+// the idea a track plays now (a preset read through its idea)
+function currentIdea(t) {
+  const p = (t.patterns || {})[(t.clips && t.clips[0] || {}).pattern] || (t.patterns || {}).A || {};
+  return p.idea || (p.preset ? presetOf(t.type, p.preset) : null);
+}
+
 // The tracks a Vary or a Swap rewrites (D7): every track of the part when the command names no target (sessions
 // recorded before radio-arrangement); with a track id that track; with 'auto' one track: the one varied or swapped least
 // recently in this song (by the listener's V<k> and S<k> steps before the boundary), ties broken by the command's stream
@@ -492,7 +530,7 @@ function rewrite(song, plan, opts, cmd, rng) {
   if (plan.varied) P.varied = plan.varied.slice();
   // radio-arrangement: the listener's tracks (added), their + and − on the boundaries (arrange), the locked instruments
   // and the listener's risers; written back only when used, so the plans of other songs keep their fields
-  for (const k of ['added', 'arrange', 'lockedParts', 'risers']) if (plan[k]) P[k] = plan[k].slice();
+  for (const k of ['added', 'arrange', 'lockedParts', 'risers', 'voiced']) if (plan[k]) P[k] = plan[k].slice();
   const O = { ...opts };
   const ph = P.phrase, dbl = 2 * ph, at = cmd.at;
   const extra = [], forced = [];
@@ -500,7 +538,7 @@ function rewrite(song, plan, opts, cmd, rng) {
   const d0 = Math.floor(from / 2);
   const st = stateOf(song, P, at), on = playing(st);
   const ctx = { usual: P.usualHigh, weights: P.R.energy, hardMax: P.hardMax };
-  if (cmd.kind === 'vary' || cmd.kind === 'swap' || (cmd.kind === 'pattern' && cmd.mode === 'replace')) return vary(song, P, O, cmd, st, `${rng.seed}:${cmd.kind}:${rng.n}:${rng.i}`);
+  if (cmd.kind === 'vary' || cmd.kind === 'swap' || cmd.kind === 'voicing' || (cmd.kind === 'pattern' && cmd.mode === 'replace')) return vary(song, P, O, cmd, st, `${rng.seed}:${cmd.kind}:${rng.n}:${rng.i}`);
   // the voice instrument (voice-placement): kept in the plan, so later rewrites (which write the spoken track again
   // from the plan) apply it again in order; the song is not directed again
   if (cmd.kind === 'voice') {
@@ -567,12 +605,16 @@ function rewrite(song, plan, opts, cmd, rng) {
     }
     case 'progression': {
       const cur = (sectionsWith(P).reduce((acc, s) => (acc.at <= at ? { at: acc.at + s.bars, s } : acc), { at: 0, s: null }).s || {}).chords;
+      // (the Song harmony menu, radio-arrangement D8: a progression chosen by name; Auto draws as before)
+      if (cmd.chords && cmd.chords !== 'auto') { if (cmd.chords !== cur && PROGS[cmd.chords]) P.harmony.push({ from: at, chords: cmd.chords }); break; }
       const rest = P.R.progressions.filter(x => x !== cur);
       if (rest.length) P.harmony.push({ from: at, chords: rng.moves.pick(rest) });
       break;
     }
     case 'key': {
       const cur = (sectionsWith(P).reduce((acc, s) => (acc.at <= at ? { at: acc.at + s.bars, s } : acc), { at: 0, s: null }).s || {}).key || P.key;
+      // (the menu: a fifth up, a fifth down or the relative key; Auto draws a key a fifth away as before)
+      if (cmd.to && cmd.to !== 'auto') { const k = keyTo(cur, cmd.to); if (k) P.harmony.push({ from: at, key: k }); break; }
       const fifths = KEYS.map(k => k[0]).filter(k => [5, 7].includes(((semis(k) - semis(cur)) % 12 + 12) % 12));
       if (fifths.length) P.harmony.push({ from: at, key: rng.moves.pick(fifths) });
       break;

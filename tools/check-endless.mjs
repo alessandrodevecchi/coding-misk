@@ -18,7 +18,7 @@ import { loadArtists } from './artists-dir.mjs';
 import { windowSong } from '../src/endless/join.js';
 import { planTransition, layout, overlapOf, extraOf, TRANSITION_KINDS, MAX_RAMP } from '../src/endless/transitions.js';
 import { KEYS } from '../src/music.js';
-import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax, INSTRUMENTS as ARR_PARTS, RECOMMENDED, TRACK_CAP, instrumentOf, lockedIds, moreWarning, riserTarget, partHas, fitsAir } from '../src/endless/steering.js';
+import { steerSong, applyBar, COMMANDS, canApply, whyNot, songCurves, extendIndex, extendSeconds, VARY_TYPES, varyTracks, densityMax, INSTRUMENTS as ARR_PARTS, RECOMMENDED, TRACK_CAP, instrumentOf, lockedIds, moreWarning, riserTarget, partHas, fitsAir, keyTo } from '../src/endless/steering.js';
 import { expandIdea } from '../src/song/ideas.js';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
@@ -1223,6 +1223,64 @@ const CHECKS = {
     if (g0.plan.meter !== '7/8') assert(!fitsAir(odd, g0.plan, g0.song), '7/8 in 4/4');
     assert(n >= 15 && rep >= 8, `${n} songs took the bassline, ${rep} replaced`);
     console.log(`      ${n} songs took a saved bassline as a new track (${inD} in D), ${rep} in place of their bass; replays hold their own copy`);
+  },
+  'arrangement: Part harmony treats one part in the song key, Auto never repeats, colour only on pads and guitars'() {
+    const kinds = {}, parts = {};
+    let n = 0;
+    for (const g of arrSongs(60, 'arr-voicing')) {
+      const at = applyBar('voicing', 3 * g.plan.phrase, g.plan);
+      for (const type of VARY_TYPES) {
+        const on = varyTracks(onAt(g.song, at), type);
+        if (!on.length || whyNot({ kind: 'voicing', type, treatment: 'auto' }, g.song, g.plan, at - 1)) continue;
+        const r = steerArr(g, [{ kind: 'voicing', type, target: 'auto', treatment: 'auto', at }]);
+        const v = r.plan.voiced && r.plan.voiced[0];
+        assert(v, `${g.style} ${type}: no treatment`);
+        const t = r.song.tracks.find(x => x.id === v.track), step = r.song.build.find(s => s.at === at && s.by === 'listener' && s.pattern && s.pattern.track === v.track);
+        assert(step && /^H\d+$/.test(step.pattern.to) && t.patterns[step.pattern.to].idea, `${g.style} ${type}: no H step`);
+        const idea = t.patterns[step.pattern.to].idea;
+        // in key: degrees moved by whole degrees, arp indices chord tones, notes by octaves, colour as sevenths
+        if (t.type === 'arp' && idea.index !== undefined) assert(String(idea.index).replace(/[!%*@]\d+/g, '').match(/-?\d+/g).every(x => /^[0-3]$/.test(x)), `${g.style}: arp index ${idea.index}`);
+        if (v.treatment === 'colour') assert(['pad', 'guitar'].includes(t.type) && /7/.test(idea.chords), `${g.style}: colour on ${t.type} ${idea.chords}`);
+        if (v.treatment === 'octave' && idea.degrees === undefined && !idea.scale) assert(Math.abs((typeof idea.add === 'number' ? idea.add : 0) - (typeof idea.sub === 'number' ? idea.sub : 0)) % 12 === 0 || typeof idea.sub === 'number', `${g.style}: octave ${JSON.stringify(idea)}`);
+        assert(!validateSong(r.song).errors.length, `${g.style} ${type} ${v.treatment}: ${validateSong(r.song).errors.slice(0, 1).map(e => e.path + ' ' + e.msg)}`);
+        compileSong(stateAt(r.song, at + 1).song);
+        // only that track changes
+        const others = sg => JSON.stringify(sg.tracks.filter(x => x.id !== v.track));
+        assert(others(r.song) === others(g.song), `${g.style} ${type}: other tracks changed`);
+        // Auto twice on the same track never repeats the treatment
+        const r2 = steerArr(g, [{ kind: 'voicing', type, target: v.track, treatment: 'auto', at }, { kind: 'voicing', type, target: v.track, treatment: 'auto', at: at + g.plan.phrase }]);
+        const vs = (r2.plan.voiced || []).filter(x => x.track === v.track);
+        if (vs.length === 2) assert(vs[0].treatment !== vs[1].treatment, `${g.style} ${type}: Auto repeated ${vs[0].treatment}`);
+        assert(JSON.stringify(steerArr(g, [{ kind: 'voicing', type, target: 'auto', treatment: 'auto', at }]).song) === JSON.stringify(r.song), `${g.style} ${type}: replay`);
+        kinds[v.treatment] = (kinds[v.treatment] || 0) + 1; parts[type] = (parts[type] || 0) + 1; n++;
+      }
+      // colour asked on a melody: off (no-target)
+      const hook = varyTracks(onAt(g.song, at), 'lead');
+      if (hook.length && hook.every(x => x.type === 'hook')) assert(whyNot({ kind: 'voicing', type: 'lead', treatment: 'colour' }, g.song, g.plan, at - 1) === 'no-target', `${g.style}: colour on a melody`);
+    }
+    assert(n >= 60 && Object.keys(kinds).length === 4, `${n} treatments: ${JSON.stringify(kinds)}`);
+    console.log(`      ${n} part harmonies: ${JSON.stringify(kinds)} over ${JSON.stringify(parts)}`);
+  },
+  'arrangement: the Song harmony menu applies a chosen progression or key, Auto as before'() {
+    let n = 0;
+    for (const g of arrSongs(20, 'arr-harmony')) {
+      const at = applyBar('progression', 2 * g.plan.phrase, g.plan), cur = g.song.sections.reduce((a, s) => (a.at <= at ? { at: a.at + s.bars, s } : a), { at: 0, s: null }).s;
+      const other = g.plan.R.progressions.find(x => x !== cur.chords) || Object.keys(PROGS).find(x => x !== cur.chords);
+      const r = steerArr(g, [{ kind: 'progression', chords: other, at }]);
+      assert(r.plan.harmony.length === 1 && r.plan.harmony[0].chords === other && r.song.sections.filter(s => s.chords === other).length, `${g.style}: chosen progression ${other}`);
+      assert(whyNot({ kind: 'progression', chords: cur.chords }, g.song, g.plan, at - 1) === 'same-chords', `${g.style}: the same progression`);
+      // Auto: the same song as a command without a choice
+      assert(JSON.stringify(steerArr(g, [{ kind: 'progression', chords: 'auto', at }]).song) === JSON.stringify(steerArr(g, [{ kind: 'progression', at }]).song), `${g.style}: Auto progression`);
+      for (const to of ['up', 'down', 'relative']) {
+        const k = keyTo(cur.key, to);
+        if (!k) { assert(whyNot({ kind: 'key', to }, g.song, g.plan, at - 1) === 'no-key', `${g.style}: ${to} from ${cur.key}`); continue; }
+        const rk = steerArr(g, [{ kind: 'key', to, at }]);
+        assert(rk.plan.harmony[0].key === k && rk.song.sections.some(s => s.key === k), `${g.style}: key ${to} ${k}`);
+      }
+      assert(JSON.stringify(steerArr(g, [{ kind: 'key', to: 'auto', at }]).song) === JSON.stringify(steerArr(g, [{ kind: 'key', at }]).song), `${g.style}: Auto key`);
+      n++;
+    }
+    assert(n === 20, `${n}`);
   },
   'steering: one vary takes less than 20 ms'() {
     const all = varies(40), times = all.map(({ g, type, at }) => { const t0 = performance.now(); steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'vary', type, at }], seed: 'vary-time', n: 1 }); return performance.now() - t0; }).sort((a, b) => a - b);

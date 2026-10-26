@@ -50,9 +50,9 @@ Total about 9 to 10 days. Phases 3 and 5 depend on 1; 4 depends on 1 and 2; 6 de
 
 ## 5. Part harmony
 
-- [ ] 5.1 Command `voicing` with treatments thirds, octave, colour, inversion and `auto` (D8); `H<k>` pattern and step; verify in `tools/check-endless.mjs`: every note in the song's scale, colour only on pad and guitar, Auto never repeats the current treatment, replay same notes
-- [ ] 5.2 Console: Part harmony button in the Parts group with a treatment dropdown, sharing part and target; queue names the treatment; verify with `node tools/check-steering.cjs`
-- [ ] 5.3 Song harmony menu (progression and key, default Auto), confirmed by the owner (D8); verify in `tools/check-endless.mjs` (a chosen progression applies, Auto unchanged) and `node tools/check-steering.cjs`
+- [x] 5.1 Command `voicing` with treatments thirds, octave, colour, inversion and `auto` (D8); `H<k>` pattern and step; verify in `tools/check-endless.mjs`: every note in the song's scale, colour only on pad and guitar, Auto never repeats the current treatment, replay same notes
+- [x] 5.2 Console: Part harmony button in the Parts group with a treatment dropdown, sharing part and target; queue names the treatment; verify with `node tools/check-steering.cjs`
+- [x] 5.3 Song harmony menu (progression and key, default Auto), confirmed by the owner (D8); verify in `tools/check-endless.mjs` (a chosen progression applies, Auto unchanged) and `node tools/check-steering.cjs`
 
 ## 6. Session scope
 

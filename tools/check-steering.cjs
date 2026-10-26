@@ -530,6 +530,42 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     await page.evaluate(() => localStorage.removeItem('coding-misk-patterns'));
   }
 
+  // ---------- Part harmony and the Song harmony menu (radio-arrangement phase 5) ----------
+  await page.click('#radio-start'); await sleep(300); await page.fill('#radio-seed', 'steer-harm'); await page.click('#radio-start'); await sleep(2500);
+  {
+    const s0 = await ST(); await page.evaluate(b => globalThis.codingMiskRadio.seek(b), 2 * s0.plan.phrase + 1); await sleep(800);
+    check(await page.isVisible('#radio-steer [data-cmd="voicing"]') && (await page.$$('#radio-steer [data-voicing-treat] option')).length === 5, 'Part harmony in the Parts group with Auto and four treatments');
+    let done = null;
+    for (const p of ['pad', 'bass', 'arp', 'lead', 'guitar']) {
+      await page.click(`#radio-steer [data-vary-part="${p}"]`); await sleep(200);
+      if (!(await page.$('#radio-steer [data-cmd="voicing"]:not([disabled])'))) continue;
+      await page.click('#radio-steer [data-cmd="voicing"]'); await sleep(400);
+      done = p; break;
+    }
+    const x = await ST(), vc = x.commands.find(c => c.kind === 'voicing');
+    const q = await page.innerText('#radio-steer .steer-queue');
+    check(!!done && vc && vc.treatment === 'auto' && x.build.some(b => b.at === vc.at && b.pattern && /^H\d+$/.test(b.pattern.to)) && /(Harmony|Armonia) \S+: (In thirds|Octave|Chord colour|Inversion)/.test(q), 'Part harmony Auto: an H pattern, the queue names the treatment', `${done} ${q.replace(/\n/g, ' | ')}`);
+    // colour on a melody is off with its reason
+    await page.click('#radio-steer [data-vary-part="lead"]'); await sleep(200);
+    await page.selectOption('#radio-steer [data-voicing-treat]', 'colour'); await sleep(250);
+    const lb = await page.$eval('#radio-steer [data-cmd="voicing"]', b => ({ dis: b.disabled, title: b.title }));
+    check(lb.dis && / · /.test(lb.title), 'chord colour on the melody is off, with the reason', lb.title);
+    await page.selectOption('#radio-steer [data-voicing-treat]', 'auto'); await sleep(200);
+    // the Song harmony menu: a progression by name and a key a fifth up
+    const progs = await page.$$eval('#radio-steer [data-harm-chords] option', xs => xs.map(o => o.value));
+    check(progs[0] === 'auto' && progs.length >= 2, 'the Chords menu: Auto and the style\'s progressions', progs.join());
+    const n0 = (await ST()).commands.length;
+    await page.selectOption('#radio-steer [data-harm-chords]', progs[progs.length - 1]); await sleep(250);
+    const chBtn = await page.$('#radio-steer [data-cmd="progression"]:not([disabled])');
+    if (chBtn) { await chBtn.click(); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'progression' && c.chords === progs[progs.length - 1] && /(Change chords|Cambia accordi): /.test(await page.innerText('#radio-steer .steer-queue')), 'a chosen progression is recorded and named in the queue', JSON.stringify(c)); }
+    else check(/ · /.test(await page.getAttribute('#radio-steer [data-cmd="progression"]', 'title')), 'Change chords off with its reason (already playing those chords)');
+    await page.selectOption('#radio-steer [data-harm-key]', 'up'); await sleep(250);
+    const kb = await page.$('#radio-steer [data-cmd="key"]:not([disabled])');
+    if (kb) { await kb.click(); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'key' && c.to === 'up' && /(a fifth up|una quinta sopra)/.test(await page.innerText('#radio-steer .steer-queue')), 'a key a fifth up from the menu', JSON.stringify(c)); }
+    check((await ST()).commands.length > n0 && !(await err()), 'no evaluation error with the harmony menu', (await err()).slice(0, 120));
+    if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'harmony-en.png') });
+  }
+
   await page.click('#radio-start'); await sleep(300);
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
