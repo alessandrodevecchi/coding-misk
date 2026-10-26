@@ -13,6 +13,11 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 
 | Decision | Why | Source |
 | --- | --- | --- |
+| Mute or delete costed on the code shown, on the line's own share (reused-lines D1, #85) | Costed on the raw list of about 130 values the two ways read 51.2 s against 51.0 s and a draw deleted kellerlicht's acid line; on the code shown, 7.2 s against 41.1 s. The typing of the track without the line is common to both ways and pulled the ratio into the seeded band. The band (1.35) stays: the owner wants some variation on close calls. | design reused-lines, owner 2026-10-26 |
+| A line replaced by an unlike pattern of its track is its own line (reused-lines D2, #85) | One key per place made the old line be replaced, never kept, and retyped on its return (20 of the 45 reused lines). Lines the typing would not edit into each other (`lineLike` below 0.5) get their own key. | design reused-lines |
+| Choices of the code edited in place made on the default Live coder code (reused-lines, #85) | Costed on each profile's own code, the comment and function presets showed different lines (`check:functions` failed); one reference keeps the lines the same and lets each preset only write them differently. | DEVLOG 2026-10-26 |
+| Radio: default growth first, wider one after, recorded per song (reused-lines D6, #85) | A song must never wait for a wider search, and a replay or export must grow what was heard. | design reused-lines |
+| Lines typed ahead within tight limits (reused-lines D8, #85) | The owner approved 2 at once, 1 per step and per track, 4 muted lines at most, 32 bars and the next section change, to keep the screen readable; with them no built-in song has one yet (tune after the screenshots). | owner 2026-10-26, DEVLOG |
 | One + and − per instrument, several tracks each (radio-arrangement D1, D2, #83) | The listener asked for a second arp or a third pad; "lead" and "drums" hid several instruments. Tracks the listener adds stay until the final outro; a lock per instrument keeps the director away, and the listener's own commands still reach locked tracks. | [openspec/changes/radio-arrangement](../../openspec/changes/radio-arrangement/design.md) |
 | Recommended counts warn, never block; one cap of 12 tracks (radio-arrangement D4) | The owner wants two kicks to be possible. The cap stays for CPU and headroom (measured: 0 underruns in 2 minutes at 12 tracks). | [openspec/changes/radio-arrangement](../../openspec/changes/radio-arrangement/design.md) |
 | Scope and lock are two controls (radio-arrangement D10) | The scope says how long a choice lasts (this song or the whole session), the lock whether the director may change it; every choice has both. | [openspec/changes/radio-arrangement](../../openspec/changes/radio-arrangement/design.md) |
@@ -94,6 +99,7 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 
 | Attempt | Why it was dropped | Source |
 | --- | --- | --- |
+| One radio growth with a time budget inside the shape search (reused-lines D6, #85) | A growth cut by the clock is not repeatable: a replay or an export could grow another song. The radio grows the default search first and the wider one after, and records which one played. | design reused-lines |
 | Preview orbit 15 (pattern-preview D3, #84) | Voice tracks (the narrator) speak on orbits 15 and up, and one built-in song reaches 17: the preview takes at least 20, above every orbit of the song. | `src/player/preview.js` |
 | The browser voice (`speechSynthesis`) for console lines (voice-full-controls D9) | It plays outside Web Audio: no voice style, not in the master, the recording, the export or Replay, and off the beat. | [radio-commands](radio-commands.md) |
 | A song-level `narrator.settings` next to the narrator track (voice-full-controls D1) | Two places for the same values whenever a song has a narrator track: the divergence the owner forbids. | [narrator](narrator.md) |

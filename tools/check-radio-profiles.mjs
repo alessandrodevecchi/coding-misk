@@ -17,7 +17,7 @@ import { absoluteClips } from '../src/endless/transitions.js';
 import { validateArtist, ARTIST_PROFILES } from '../src/endless/artist.js';
 import { PRESETS } from '../src/endless/compilation.js';
 import { createSession, OPTION_DEFAULTS } from '../src/endless/director.js';
-import { writtenForm, soundAt, growOnAir, airControls, leadOnAir } from '../src/endless/growth.js';
+import { writtenForm, soundAt, growOnAir, airControls, leadOnAir, shapeSearchSetting, searchOf, playedOf } from '../src/endless/growth.js';
 import { windowSong } from '../src/endless/join.js';
 import { overlapOf, extraOf } from '../src/endless/transitions.js';
 import { stateAt, buildSteps, checkBuild } from '../src/song/build.js';
@@ -633,6 +633,28 @@ const CHECKS = {
       w++;
     }
     console.log(`      ${n} grown songs with extra tracks, ${steps} steps compiled, ${w} + as waypoints`);
+  },
+  'reused-lines D5, D6: the radio grows with the shape settings recorded in its session, a song recorded with its default growth replays it'() {
+    // the settings read: only the values that differ from the defaults
+    const get = o => (k, f) => (k in o ? o[k] : f);
+    assert(shapeSearchSetting(get({})) === null && shapeSearchSetting(get({ 'coding-misk-shape-cap': 8, 'coding-misk-shape-random': true })) === null, 'defaults recorded');
+    assert(JSON.stringify(shapeSearchSetting(get({ 'coding-misk-shape-cap': 12, 'coding-misk-shape-all': true, 'coding-misk-shape-keep': 'best', 'coding-misk-shape-random': false, 'coding-misk-long-song': 30 }))) === '{"cap":12,"all":true,"keep":"best","random":false}', 'settings recorded (Long song from left out)');
+    const r0 = GROWN[0].recipe, N = 3, grow = { grow: true };
+    const withS = s => ({ ...r0, options: { ...r0.options, shapeSearch: s } });
+    const base = sessionItems(RECIPES, r0, N, null, grow);
+    const all = sessionItems(RECIPES, withS({ all: true, keep: 'best' }), N, null, grow), fixed = sessionItems(RECIPES, withS({ random: false }), N, null, grow);
+    const moved = a => a.filter((x, i) => JSON.stringify(x.song) !== JSON.stringify(base[i].song)).length;
+    assert(moved(all) > 0, 'Try all with Best one grows the same songs as the default search');
+    assert(moved(fixed) > 0, 'Random order off grows the same songs as the default search');
+    assert(searchOf(withS({ all: true, played: { 1: 'wide' } })).all && !('played' in searchOf(withS({ all: true, played: { 1: 'wide' } }))) && playedOf(withS({ all: true, played: { 1: 'wide' } }), 1) === 'wide', 'searchOf, playedOf');
+    // the song that played its default growth on air (the wider one was late) replays and exports it; the others keep
+    // the settings; a replay gives the same songs
+    const late = sessionItems(RECIPES, withS({ all: true, keep: 'best', played: { 0: 'default', 1: 'default', 2: 'default' } }), N, null, grow);
+    assert(itemsHash(late) === itemsHash(base), 'songs recorded with their default growth do not replay as heard');
+    const one = sessionItems(RECIPES, withS({ all: true, keep: 'best', played: { 1: 'default' } }), N, null, grow);
+    assert(one.every((x, i) => JSON.stringify(x.song) === JSON.stringify((i === 1 ? base : all)[i].song)), 'a song recorded with its default growth among wider ones');
+    assert(itemsHash(sessionItems(RECIPES, JSON.parse(JSON.stringify(withS({ all: true, keep: 'best' }))), N, null, grow)) === itemsHash(all), 'a replay grows other songs');
+    console.log(`      ${moved(all)} of ${N} songs grow otherwise with Try all (Best one), ${moved(fixed)} with the fixed order`);
   },
   'radio fixtures: grown sessions (Live coder, Crescendo, Live coder compilation) rebuild the same items'() {
     for (const { name, recipe } of GROWN) {

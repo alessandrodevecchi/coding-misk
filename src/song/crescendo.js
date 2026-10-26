@@ -620,7 +620,8 @@ const KEY_STEPS = ['enter', 'break', 'back', 'harmony', 'strip-first', 'last'];
 // rules: {} (Crescendo) or { natural: true, trials } (natural-growth: hidden functions, sparse steps, listening pauses)
 // shapeCap (shape-search D3): how many shapes a Live coder growth tries before it goes on to twice as many (4 to 32,
 // default SHAPE_CAP); only Compose passes the setting, the radio and the checks keep the default
-// shapeAll, shapeKeep, shapeRandom, longSong (shape-search D6, D7, Settings, advanced; only Compose passes them):
+// shapeAll, shapeKeep, shapeRandom, longSong (shape-search D6, D7, Settings, advanced; Compose passes them, the radio
+// all but longSong, reused-lines D5):
 // shapeAll lifts the cap; shapeKeep, with shapeAll: 'first' (the first shape that meets the target, the default) or
 // 'best' (every shape measured, the shortest whole song that meets the target); shapeRandom false: the fixed order of
 // before SHAPES_VERSION 4; longSong: seconds of the whole grown song past which every shape is measured and the shortest

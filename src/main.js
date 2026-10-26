@@ -303,10 +303,11 @@ const crescendoCache = new Map(), CRESCENDO_CACHE = 48;
 const SHAPE_STYLES = Object.fromEntries(Object.values(import.meta.glob('../styles/*.json', { eager: true, import: 'default' })).map(r => [r.id, r]));
 // the voice instrument (voice-instrument) reads the style's lines and speakers; its samples come with the manifest below
 setSpokenContext({ files: {}, styles: SHAPE_STYLES });
-// the shapes a Compose growth tries (shape-search D3, Settings, advanced): only Compose reads it, the radio keeps 8
+// the shapes a Compose growth tries (shape-search D3, Settings, advanced); the radio records it with a new session
+// (reused-lines D5, shapeSearchSetting in src/endless/growth.js)
 const shapeCap = () => shapeCapOf(store.get('coding-misk-shape-cap', null));
-// shape-search D6, D7 (Settings, advanced): Try all and what it keeps, the order, the long-song threshold; only Compose
-// reads them, the radio and the checks keep the defaults
+// shape-search D6, D7 (Settings, advanced): Try all and what it keeps, the order, the long-song threshold; the radio
+// follows all but the long-song threshold (reused-lines D5), the checks keep the defaults
 const shapeSearch = () => ({ shapeCap: shapeCap(), shapeAll: store.get('coding-misk-shape-all', null) === true, shapeKeep: shapeKeepOf(store.get('coding-misk-shape-keep', null)), shapeRandom: store.get('coding-misk-shape-random', null) !== false, longSong: longSongOf(store.get('coding-misk-long-song', null)) });
 const crescendoKey = tr => { const C = ctlOf(tr); return JSON.stringify([C.narrated, C.growth, C.duration, C.opening, C.pace, C.development, tr.sections, tr.tracks, tr.id, tr.tags, tr.growthShape, ...(C.growth === 'natural' ? Object.values(shapeSearch()) : [])]); };
 function crescendoPut(key, c) {

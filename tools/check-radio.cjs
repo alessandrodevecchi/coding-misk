@@ -267,6 +267,22 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     check(r.state.recipe.options.custom && r.state.stream[0].grown && /Custom|Personalizzato/.test(await page.innerText('.radio-profile-now')) && !e.err, 'Custom profile: the songs grow with its controls, saved in the recipe');
     check(!c4.includes('// ========== ') && !/\.orbit\(/.test(c4), 'Custom profile: no comments and the buses in the hidden mixer');
     await page.click('#radio-start'); await sleep(300);
+    // reused-lines D5, D6: the growth shape settings of Settings, Advanced recorded with a new session; the first song
+    // grows at once with the default search, the next one with the default search and then, when in time, the wider one
+    await page.evaluate(() => { localStorage.setItem('coding-misk-shape-all', 'true'); localStorage.setItem('coding-misk-shape-keep', '"best"'); });
+    await page.selectOption('#radio-profile', 'switch'); await sleep(200);
+    await page.fill('#radio-seed', 'coder'); await page.click('#radio-start');
+    await waitFor(async () => (await R()).on, 20000); await sleep(2000);
+    r = await R();
+    const ss0 = r.state.recipe.options.shapeSearch;
+    check(ss0 && ss0.all === true && ss0.keep === 'best' && !('cap' in ss0) && ss0.played && ss0.played[0] === 'default', 'the shape settings are recorded in the session, the first song with its default growth', JSON.stringify(ss0));
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.floor(r.state.stream[0].bars * 0.45));
+    const ready = await waitFor(async () => { const st = (await R()).state; const p = st.recipe.options.shapeSearch.played || {}; return st.stream.length > 1 && !st.stream[1].growing && p[1] === 'wide'; }, 60000);
+    r = await R(); e = await ed();
+    check(ready && !e.err, 'the next song takes its wider growth when it is ready in time', JSON.stringify(r.state.recipe.options.shapeSearch));
+    await page.click('#radio-start'); await sleep(300);
+    await page.evaluate(() => { localStorage.removeItem('coding-misk-shape-all'); localStorage.removeItem('coding-misk-shape-keep'); });
+    await page.selectOption('#radio-profile', 'custom'); await sleep(200);
     // radio-profiles 9.1: a display option changed during a Live coder song reaches it at its next code edit, and the
     // sound does not change; a replay shows the code with the display options set when it starts
     {

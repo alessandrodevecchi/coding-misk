@@ -6,7 +6,7 @@ import { createSession, leadEntry } from './director.js';
 import { compilationOptions } from './compilation.js';
 import { steerSong, biasSong } from './steering.js';
 import { recipeProfile, customControls } from './profile.js';
-import { growOnAir, leadOnAir } from './growth.js';
+import { growOnAir, leadOnAir, searchOf, playedOf } from './growth.js';
 import { steerOnAir, AIR_CHOOSER, AIR_CHOOSERS } from './waypoints.js';
 
 // the options of song n in a recipe: the first options, then every change up to n; options without the Profile option
@@ -56,7 +56,10 @@ export function sessionItems(recipes, recipe, count, until = null, { grow = grow
     // the transition into this song: planned on the entry before it (the lead's for the first song after it)
     const before = out.length ? out[out.length - 1].entry : null;
     const custom = recipeOptionsAt(recipe, n).custom;
-    const ctx = { profile: g.entry.profile, artist: g.opts.artist || null, into: before && before.transition ? before.transition.kind : null, styles: shapes, phrase: g.plan.phrase, controls: custom ? customControls(custom) : null };
+    // (reused-lines D5, D6: the session's shape settings; a song grows with them unless it played its default growth on
+    // air; its commands steer the growth it had)
+    const search = searchOf(recipe), wide = !!search && playedOf(recipe, n) !== 'default';
+    const ctx = { profile: g.entry.profile, artist: g.opts.artist || null, into: before && before.transition ? before.transition.kind : null, styles: shapes, phrase: g.plan.phrase, controls: custom ? customControls(custom) : null, ...(search ? { search, wide } : {}) };
     let song;
     if (grow && g.entry.profile && (!cmds.length || waypointsOnAir(recipe))) song = steerOnAir({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n, ctx, chooser: airChooserOf(recipe) }).song;
     else {

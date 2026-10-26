@@ -2,7 +2,7 @@
 // director's song, with the growth engine of Compose (crescendoSong). Pure and seeded by the song id: the same session
 // grows the same songs, in the app, in exports and in Node (tools/check-radio-profiles.mjs).
 import { stateAt, buildSteps } from '../song/build.js';
-import { crescendoSong } from '../song/crescendo.js';
+import { crescendoSong, shapeCapOf, shapeKeepOf, SHAPE_CAP } from '../song/crescendo.js';
 import { resolveProfile, growthRules } from '../live/profiles.js';
 
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -121,6 +121,22 @@ function referenceStart(wf) {
 // for free); never the Compose overrides (owner decision 4)
 export const airControls = (profile, free = false) => resolveProfile(profile, { duration: free ? 'free' : 'fitted' });
 
+// ---------- reused-lines D5, D6: the growth shape settings on air ----------
+// The settings of Settings, Advanced the radio follows (get(key, fallback): the app's store): "Growth shapes tried",
+// "Try all growth shapes" with "Keep", "Random order". → the values that differ from the defaults ({ cap, all, keep,
+// random: false }), or null. "Long song from" stays Compose only (the radio keeps 15 minutes).
+export function shapeSearchSetting(get) {
+  const cap = shapeCapOf(get('coding-misk-shape-cap', null)), all = get('coding-misk-shape-all', null) === true, keep = shapeKeepOf(get('coding-misk-shape-keep', null)), random = get('coding-misk-shape-random', null) !== false;
+  const out = { ...(cap !== SHAPE_CAP ? { cap } : {}), ...(all ? { all: true, ...(keep !== 'first' ? { keep } : {}) } : {}), ...(random ? {} : { random: false }) };
+  return Object.keys(out).length ? out : null;
+}
+// a recipe's shape settings (options.shapeSearch), without the record of what each song played
+export const searchOf = recipe => { const s = recipe && recipe.options && recipe.options.shapeSearch; if (!s) return null; const { played: _, ...v } = s; return Object.keys(v).length ? v : null; };
+// which growth song n played on air ('wide': with the settings, 'default': the default search), or null when unknown
+export const playedOf = (recipe, n) => { const s = recipe && recipe.options && recipe.options.shapeSearch; return (s && s.played && s.played[n]) || null; };
+// the options of crescendoSong for a search
+const searchOptions = s => ({ ...(s.cap ? { shapeCap: s.cap } : {}), shapeAll: !!s.all, ...(s.keep ? { shapeKeep: s.keep } : {}), shapeRandom: s.random !== false });
+
 // The song a radio song plays: Classic keeps the director's song; Crescendo and Live coder grow from its written form.
 // ctx: profile ('classic' | 'crescendo' | 'switch'); artist (the artist on air: its `growth`); into (the kind of the
 // transition into this song, null when nothing plays before it); styles ({ id: recipe }, for the growth shapes)
@@ -129,7 +145,9 @@ export const airControls = (profile, free = false) => resolveProfile(profile, { 
 // `growth.duration`): the growth takes the bars it needs before the written form, the song gets longer.
 // → the song (a grown song carries `crescendo` facts and `onAir`: { profile, from, free })
 // controls: the radio's Custom profile (its own growth, duration and shape choices), else the profile's own on air
-export function growOnAir(song, { profile = 'classic', artist = null, into = null, styles = {}, phrase = 8, controls = null } = {}) {
+// search, wide (reused-lines D5, D6): the session's shape settings (searchOf) and whether this growth uses them; the
+// default search otherwise (the first growth of a song, steering, a growth that cannot wait)
+export function growOnAir(song, { profile = 'classic', artist = null, into = null, styles = {}, phrase = 8, controls = null, search = null, wide = false } = {}) {
   if (profile !== 'crescendo' && profile !== 'switch') return song;
   const g = (artist && artist.growth) || {}, free = controls ? controls.duration === 'free' : g.duration === 'free';
   const C = controls || airControls(profile, free);
@@ -141,7 +159,7 @@ export function growOnAir(song, { profile = 'classic', artist = null, into = nul
   const wf = writtenForm(song), total = barsOf(wf);
   const grow = (from, extra) => {
     const t = tailOf(wf, from);
-    const c = crescendoSong(t.song, { seed: song.id, narrated: C.narrated, rules: { ...rules, ...extra } });
+    const c = crescendoSong(t.song, { seed: song.id, narrated: C.narrated, rules: { ...rules, ...extra }, ...(wide && search && base.coder ? searchOptions(search) : {}) });
     if (!c.build.length) return null;
     const G = c.crescendo.growth;
     // the written form's own steps (rack, comments) after the growth, where they were

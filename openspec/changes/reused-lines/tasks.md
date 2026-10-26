@@ -36,12 +36,12 @@
 
 ## 8. Radio shape settings (D5, D6)
 
-- [ ] 8.1 Session start stores the non-default shape settings (shapes tried, try all with Keep, random order off) in the recipe; "Long song from" stays at its default on air; `growOnAir` passes them to the growth. Verify: `check:radio-profiles` with the radio fixtures unchanged, and new cases (a recipe with `shapeSearch` grows with it, one with random order off tries the fixed order, one without grows as before)
-- [ ] 8.2 Worker: default growth first, wider growth after; the wider one replaces the default one before the song's limit when the song has no commands; `growNow`, steering and the page fallback use the default; the choice is recorded per song and replays and exports follow it. Verify: `check:radio-profiles` case with a forced late wider growth (recorded `default`, replayed the same)
-- [ ] 8.3 Settings hints in English and Italian say the radio follows the shapes tried, try all and random order, and that "Long song from" is Compose only; Guide card and `check:guide`; `tools/check-settings.cjs` and `tools/check-radio.cjs` on their own dev server port
-- [ ] 8.4 Measure in the browser worker the time of the default and of the try-all growth on a few radio songs (`check-radio.cjs` or a probe), DEVLOG
+- [x] 8.1 Session start stores the non-default shape settings (shapes tried, try all with Keep, random order off) in the recipe; "Long song from" stays at its default on air; `growOnAir` passes them to the growth. Verify: `check:radio-profiles` with the radio fixtures unchanged, and new cases (a recipe with `shapeSearch` grows with it, one with random order off tries the fixed order, one without grows as before)
+- [x] 8.2 Worker: default growth first, wider growth after; the wider one replaces the default one before the song's limit when the song has no commands; `growNow`, steering and the page fallback use the default; the choice is recorded per song and replays and exports follow it. Verify: `check:radio-profiles` case with a forced late wider growth (recorded `default`, replayed the same)
+- [x] 8.3 Settings hints in English and Italian say the radio follows the shapes tried, try all and random order, and that "Long song from" is Compose only; Guide card and `check:guide`; `tools/check-settings.cjs` and `tools/check-radio.cjs` on their own dev server port
+- [x] 8.4 Measure in the browser worker the time of the default and of the try-all growth on a few radio songs (`check-radio.cjs` or a probe), DEVLOG
 
 ## 9. Docs
 
-- [ ] 9.1 Knowledge notes: `growth-shapes.md` (radio and settings, copy from earlier code), `live-build.md` (typing), `comments-and-functions.md` if muted lines are named there, `radio.md`, `settings.md`, `decisions.md` (D1, D2, D6, D8 and the rejected time budget), the "Long song from" radio follow-up in `status.md` or the backlog; `npm run knowledge`, `check:knowledge`
-- [ ] 9.2 DEVLOG entry in Italian for each stage; `npm run check:crescendo` quick level before each commit
+- [x] 9.1 Knowledge notes: `growth-shapes.md` (radio and settings, copy from earlier code), `live-build.md` (typing), `comments-and-functions.md` if muted lines are named there, `radio.md`, `settings.md`, `decisions.md` (D1, D2, D6, D8 and the rejected time budget), the "Long song from" radio follow-up in `status.md` or the backlog; `npm run knowledge`, `check:knowledge`
+- [x] 9.2 DEVLOG entry in Italian for each stage; `npm run check:crescendo` quick level before each commit
