@@ -1685,6 +1685,7 @@ function renderArranger() {
   // (voice-full-controls D15: the narrator on is a switch in the title row of its block; off greys the block)
   $('#live-narrator').setAttribute('aria-pressed', C.narrator !== false);
   $('#live-narrator .vs-txt').textContent = t(C.narrator !== false ? 'switchOn' : 'switchOff');
+  if (!$('#live-narrator .ico')) $('#live-narrator .vs-lamp').insertAdjacentHTML('afterend', POWER);
   $('#live-narrator').disabled = !on; $('#live-narrator').title = why ? t(why) : t('voiceSwitchTip', { voice: t('narratorLbl') });
   $('#live-narrator-row').classList.toggle('off', !on || narOff);
   const nt = voiceOf(T);
