@@ -593,11 +593,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(x.n === 1 && (x.plan.added || []).some(a => a.part === part), `the next song plays one more ${part} from the session`, JSON.stringify({ n: x.n, added: x.plan.added }));
     check(!(await err()), 'no evaluation error with session choices', (await err()).slice(0, 120));
     // a replay of the session gives the same next song
-    const heard = JSON.stringify(x.song.build);
+    const heard = JSON.stringify(x.build);
     await page.click('#radio-replay'); await sleep(3000);
     await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(3000);
     const y = await ST();
-    check(y.n === 1 && JSON.stringify(y.song.build) === heard, 'replay gives the next song the same session choice');
+    check(y.n === 1 && JSON.stringify(y.build) === heard, 'replay gives the next song the same session choice');
     await page.click('#steer-scope'); await sleep(200);
   }
 
