@@ -12,6 +12,7 @@ import { applyComments, commentPreset, COMMENT_PRESETS } from '../src/song/comme
 import { writeCode } from '../src/song/writer.js';
 import { arpForm } from '../src/song/idiom.js';
 import { patternVariants } from '../src/song/crescendo.js';
+import { chainLines, typingPlan, settleOthers } from '../src/song/typing.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const FIXTURES = 'tools/fixtures/live-code.json';
@@ -81,6 +82,60 @@ const CHECKS = {
     assert(patternVariants('arp', { notes: '0 1 2 3 2 1 0 2' }, 3)[0].notes !== v[0], 'Crescendo keeps its own variants');
   },
 };
+
+// reused-lines: a Live coder growth as Compose grows it (the built-in styles), with the default controls, its code at the
+// steps (80 columns)
+const STYLES = Object.fromEntries(fs.readdirSync('styles').filter(f => f.endsWith('.json')).map(f => JSON.parse(fs.readFileSync(`styles/${f}`, 'utf8'))).map(r => [r.id, r]));
+function live(id, over = {}) {
+  const C = resolveProfile('switch', over), b = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
+  const L = liveCode(b, C, { lang: () => 'en', cols: () => 80 }), bars = [0, ...new Set(buildSteps(L.build).map(x => x.at))].sort((x, y) => x - y);
+  return { L, bars, at: bar => chainLines(L.codeAt(bar)), before: bar => bars.filter(x => x < bar).pop() };
+}
+const muted = l => /^\s*_\$:/.test(l), unmute = l => l.replace(/^(\s*)_\$:/, '$1$:');
+const CHECKS_REUSED = {
+  'reused-lines D1, D4: kellerlicht keeps its acid line muted from bar 280 and edits it while muted, bar 320 only unmutes it'() {
+    const K = live('kellerlicht'), acid = l => l.includes('[a4 a3] c4');
+    const a280 = K.at(280).filter(acid), a312 = K.at(312).filter(acid), a320 = K.at(320).filter(acid);
+    assert(a280.length === 1 && muted(a280[0]), `bar 280: ${a280.join(' | ').slice(0, 200)}`);
+    assert(a312.length === 1 && muted(a312[0]) && a320.length === 1 && !muted(a320[0]) && unmute(a312[0]) === a320[0], `bar 312 should show the bar-320 form muted:\n${a312[0]}\n${a320[0]}`);
+    assert(a280[0] !== a312[0], 'the line is not edited while muted');
+  },
+  'reused-lines D2: kellerlicht keeps the rolling bass muted beside the held bass and unmutes it at Druck (bar 360)'() {
+    const K = live('kellerlicht'), roll = l => /note\("<a1!3 a#1>"\)/.test(l), hold = l => l.includes('"<57 58 57 55>"');
+    const n = K.at(344), d = K.at(360);
+    assert(n.some(l => roll(l) && muted(l)) && n.some(l => hold(l) && !muted(l)), `Nebel (bar 344): ${n.filter(l => roll(l) || hold(l)).join(' | ').slice(0, 300)}`);
+    const r344 = n.find(roll), r360 = d.find(roll);
+    assert(r360 && !muted(r360) && n.indexOf(r344) < n.indexOf(n.find(hold)), 'the rolling bass above the held bass, unmuted at Druck');
+    const p = typingPlan(settleOthers(K.L.codeAt(K.before(360)), K.L.codeAt(360), 360), K.L.codeAt(360), { style: 'human', lean: true, seed: 'kellerlicht', notes: false });
+    assert(!p.lines.some(x => roll(x.text) && x.how === 'typed'), 'the rolling bass is typed again at Druck');
+  },
+  'reused-lines D8: a line typed ahead shows muted from its step, its own step only unmutes it; the limits hold'() {
+    // the approved limits find no line ahead in the built-in songs (DEVLOG 2026-10-26): wider ones for the mechanism
+    globalThis.codingMiskAhead = { bars: 64, margin: 0, section: false };
+    try {
+      const S = live('switch-prima-luce'), a = S.L.ahead();
+      assert(a.length >= 1, 'no line typed ahead on switch-prima-luce with the wider limits');
+      for (const x of a) {
+        const to = S.at(x.to), from = S.at(x.from), prev = S.at(S.before(x.from));
+        const line = from.filter(muted).find(l => to.includes(unmute(l)) && !prev.some(p => unmute(p) === unmute(l)));
+        assert(line, `bar ${x.from}: no muted line that plays at bar ${x.to}`);
+        for (const b of S.bars.filter(b => b >= x.from && b < x.to)) assert(S.at(b).includes(line), `bar ${b}: the line ahead is not shown muted`);
+        const p = typingPlan(settleOthers(S.L.codeAt(S.before(x.to)), S.L.codeAt(x.to), x.to), S.L.codeAt(x.to), { style: 'human', lean: true, seed: 'switch-prima-luce', notes: false });
+        assert(!p.lines.some(y => unmute(y.text) === unmute(line)), `bar ${x.to} types the line again`);
+      }
+      // limits: at most 2 at once, one per track; none added on a step that shows 4 or more muted lines
+      for (const id of ['switch-prima-luce', 'kellerlicht', 'luci-rosse', 'crescendo-filo-di-luce']) {
+        const T = id === 'switch-prima-luce' ? S : live(id), A = T.L.ahead();
+        for (const b of T.bars) {
+          const on = A.filter(x => x.from <= b && b < x.to);
+          assert(on.length <= 2 && new Set(on.map(x => x.header)).size === on.length, `${id} bar ${b}: ${on.length} lines ahead`);
+        }
+        for (const x of A) assert(T.at(x.from).filter(muted).length - A.filter(y => y.from <= x.from && x.from < y.to).length < 4, `${id} bar ${x.from}: a line ahead with 4 muted lines shown`);
+      }
+    } finally { delete globalThis.codingMiskAhead; }
+  },
+};
+Object.assign(CHECKS, CHECKS_REUSED);
 let failed = 0;
 for (const [name, fn] of Object.entries(CHECKS)) { try { fn(); console.log(`ok    ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); } }
 console.log(failed ? `\n${failed} check(s) failed` : `\nall ${Object.keys(CHECKS).length} checks passed`);

@@ -6,7 +6,7 @@
 import { compileSong } from './compile.js';
 import { rle } from '../music.js';
 import { t } from '../i18n.js';
-import { typingPlan, mulberry } from './typing.js';
+import { typingPlan, mulberry, lineLike } from './typing.js';
 
 const LANE = /^const (\w+) = "(<[^"]*>)"/;
 const GATE = /\.mask\((\w+)\)\.velocity\(\1\)/;
@@ -176,7 +176,14 @@ function mergeValues(groups) {
 // keep muted and edit (the typing model, `muteOrDelete`) leaves instead and is typed again on its return. A line is known by its track, its
 // visual and its order among the lines of that visual in its clip (`returnKeys`); one that never sounds again leaves.
 import { normalizeSong } from './format.js';
-export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [], inPlace = false, hidden = null, gated = false, bounds = null, returning = Infinity } = {}) {
+// shownText (reused-lines D1, D2): a line (its lanes left out) as the code shows it (idiomatic forms, long linear lists
+// written as ramps in a Live coder growth, technical functions folded), so the choice between muting and deleting a
+// line is costed on the line as it is typed, and two lines are told apart as the typing tells them.
+// plan (reused-lines D4, D8, Live coder): { edits: Map(id → bar), ahead: [{ header, text, from, to }] }: a muted returning
+// line (id: its track's header, its key and the bar it returns at) shown in its return form from that bar on; a layer
+// of a block typed ahead, muted, from `from` until it sounds at `to`. info: an array filled with the pattern lines of
+// the code ({ kind: 'play' | 'return' | 'ahead', header, key, text, id?, was?, ret? }), for the plan (live-code.js).
+export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [], inPlace = false, hidden = null, gated = false, bounds = null, returning = Infinity, shownText = x => x, plan = null, info = null } = {}) {
   const n = normalizeSong(song), secs = n.sections;
   const i = Math.max(0, secs.findIndex(s => bar >= s.start && bar < s.start + s.bars));
   const shown = new Set(shownMuted.filter(id => (song.tracks || []).some(tr => tr.id === id && tr.mute)));
@@ -201,12 +208,12 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
       return { comment: it.clip ? it.clip.raw : null, desc: it.desc, text, gate: whole ? null : it.gate, gateText: it.gateText, mul: it.mul, fade, key: keys.get(it) };
     }));
   };
-  const keys = returnKeys(p);
   // (returning) the bars of the section that holds a bar
   const sectionSpan = x => { const s = secs.find(q => x >= q.start && x < q.start + q.bars) || secs[secs.length - 1]; return [s.start, s.start + s.bars]; };
-  const now = layersFor(i), next = prepare ? layersFor(i + 1) : null;
   // (returning) the bars of the code shown: a line sounded before them and sounds again after them
   const [wa, wz] = win(i), keep = inPlace && bar >= returning;
+  const keys = keep ? returnKeys(p, shownText) : new Map();
+  const now = layersFor(i), next = prepare ? layersFor(i + 1) : null;
   const sec = secs[i], out = [p.head[0], `// ${sec.name} · ${t('cBars', { from: sec.start + 1, to: sec.start + sec.bars })}`, ...p.head.filter(l => l.startsWith('setcpm('))];
   const body = [];
   p.blocks.forEach((b, k) => {
@@ -220,7 +227,16 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
       mine = mine.filter(x => !gone.includes(x));
       if (hidden && !silent) for (const x of gone) { const v = `"${rle(p.lanes[x.gate])}"`; hidden.push(x.text.replace(x.gateText || GATE, x.mul !== null && x.mul !== undefined ? `.mask(${v}).postgain(${v}.mul(${x.mul}))` : `.mask(${v}).velocity(${v})`)); }
       if (hidden) for (const x of gone) for (const m of x.text.matchAll(/\b\w+\b/g)) if (p.lanes[m[0]] && m[0] !== x.gate) used.add(m[0]);
-      if (keep) mine = withReturning(b, mine, keys, p.lanes, wa, wz, `${song.id ?? song.title ?? ''}\u0000${id}`, sectionSpan);
+      if (keep) mine = withReturning(b, mine, keys, p.lanes, wa, wz, `${song.id ?? song.title ?? ''}\u0000${id}`, sectionSpan, shownText, { bar, plan, info });
+      // (reused-lines D8) lines typed ahead, muted, in the place they take at their step
+      if (keep && plan && plan.ahead) for (const a of plan.ahead) {
+        if (a.header !== b.header || bar < a.from || bar >= a.to) continue;
+        const it = b.items.find(x => x.kind === 'layer' && x.text === a.text);
+        if (!it || mine.some(x => x.key === keys.get(it) || x.text === it.text)) continue;
+        const layers = b.items.filter(x => x.kind === 'layer' && x.gate && p.lanes[x.gate]);
+        placeMuted(mine = mine.slice(), layers, keys, it, { comment: null, desc: it.desc, text: it.text, gate: it.gate, gateText: it.gateText, mul: it.mul, fade: false, key: keys.get(it), returning: true, ahead: true });
+      }
+      if (keep && info) for (const x of mine) info.push({ kind: x.ahead ? 'ahead' : x.returning ? 'return' : 'play', header: b.header, key: x.key, text: x.text, id: x.id, was: x.was, ret: x.ret, retBar: x.retBar });
     }
     // a track that came in before keeps its header, also when nothing of it plays now (performance-profiles)
     if (!mine.length && !extra.length) { if (track && keepHeaders.includes(track.id)) body.push('', b.header); return; }
@@ -243,9 +259,13 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
 }
 
 // (returning) each layer of the code → its key within its track: its visual and its order among the layers of that
-// visual in its clip ("hats#1": the second hats line of its clip), so the same line in two sections has the same key
-function returnKeys(p) {
-  const keys = new Map();
+// visual in its clip ("hats#1": the second hats line of its clip), so the same line in two sections has the same key.
+// (reused-lines D2) Layers of one key that the typing would not edit into each other (lineLike below 0.5 on the code
+// shown, lanes left out) are different lines: the first keeps the key, a later unlike one gets "hats#1~1", so a line
+// replaced by another pattern of its track keeps its own place and can stay muted beside it. A layer joins the line of
+// its key it is most like (compared with the last layer of that line, in the order the layers first sound).
+function returnKeys(p, shownText = x => x) {
+  const keys = new Map(), base = new Map();
   for (const b of p.blocks) {
     let clip, seen = new Map();
     for (const it of b.items) {
@@ -253,7 +273,18 @@ function returnKeys(p) {
       if (it.clip !== clip) { clip = it.clip; seen = new Map(); }
       const v = (it.text.match(/\.analyze\("([^"]*)"\)/) || [])[1] || '', n = seen.get(v) || 0;
       seen.set(v, n + 1);
-      keys.set(it, `${v}#${n}`);
+      base.set(it, `${v}#${n}`);
+    }
+    const first = it => { const lane = it.gate && p.lanes[it.gate]; const j = lane ? lane.findIndex(on) : -1; return j < 0 ? Infinity : j; };
+    const items = b.items.filter(it => it.kind === 'layer').map((it, i) => ({ it, i, at: first(it) })).sort((x, y) => x.at - y.at || x.i - y.i);
+    const lines = new Map();
+    for (const { it } of items) {
+      const k = base.get(it), text = shownText(it.text.replace(it.gateText || GATE, '')), own = lines.get(k) || [];
+      let best = -1, score = 0.5;
+      own.forEach((l, j) => { const v = l.text === text ? 1 : lineLike(l.text, text); if (v >= score) { best = j; score = v; } });
+      if (best < 0) { best = own.length; own.push({ text }); } else own[best].text = text;
+      lines.set(k, own);
+      keys.set(it, best ? `${k}~${best}` : k);
     }
   }
   return keys;
@@ -276,6 +307,9 @@ function returningAt(layers, keys, lanes, a, z, cur) {
 // (returning) a muted line `x` of layer `it` put among the lines `out` of its track: before the next line of its clip
 // there, else after the one before it, else at the end
 function placeMuted(out, layers, keys, it, x) {
+  // (reused-lines D2) a line replaced by another pattern of its track: above the line that replaced it
+  const root = k => String(k).replace(/~\d+$/, ''), twin = out.findIndex(y => y.key !== undefined && root(y.key) === root(x.key) && y.key !== x.key);
+  if (twin >= 0) { out.splice(twin, 0, x); return; }
   const order = layers.filter(y => y.clip === it.clip).map(y => keys.get(y)), pos = order.indexOf(x.key);
   let at = -1;
   for (const nk of order.slice(pos + 1)) { at = out.findIndex(y => y.key === nk); if (at >= 0) break; }
@@ -286,12 +320,17 @@ function placeMuted(out, layers, keys, it, x) {
 // on, which have no line of the same key here and are cheaper to keep muted than to type again (`muteOrDelete`): each
 // as it last played, muted, in its place (`placeMuted`). seed: the song and the track, for the choice when the two ways
 // cost about the same; span: the bars of the section that holds a bar
-function withReturning(b, mine, keys, lanes, a, z, seed = '', span = x => [x, x + 1]) {
+// (reused-lines D4) plan.edits: a line whose id (its track's header, its key, the bar it returns at) is planned from a
+// bar shows its return form, still muted, from that bar on
+function withReturning(b, mine, keys, lanes, a, z, seed = '', span = x => [x, x + 1], shownText = x => x, { bar = 0, plan = null } = {}) {
   const layers = b.items.filter(it => it.kind === 'layer' && it.gate && lanes[it.gate]);
-  const back = [...returningAt(layers, keys, lanes, a, z, new Set(mine.map(x => x.key)))].filter(([k, v]) => muteOrDelete(layers, keys, lanes, k, v, seed, span) === 'mute');
+  const back = [...returningAt(layers, keys, lanes, a, z, new Set(mine.map(x => x.key)))].filter(([k, v]) => muteOrDelete(layers, keys, lanes, k, v, seed, span, shownText) === 'mute');
   if (!back.length) return mine;
   const out = mine.slice();
-  for (const [k, { was: it }] of back) placeMuted(out, layers, keys, it, { comment: null, desc: it.desc, text: it.text, gate: it.gate, gateText: it.gateText, mul: it.mul, fade: false, key: k, returning: true });
+  for (const [k, { was: it, ret }] of back) {
+    const id = `${b.header}\u0000${k}\u0000${ret.bar}`, from = plan && plan.edits ? plan.edits.get(id) : undefined, now = from !== undefined && bar >= from ? ret.it : it;
+    placeMuted(out, layers, keys, it, { comment: null, desc: it.desc, text: now.text, gate: now.gate, gateText: now.gateText, mul: now.mul, fade: false, key: k, returning: true, id, was: it.text.replace(it.gateText || GATE, ''), ret: ret.it.text.replace(ret.it.gateText || GATE, ''), retBar: ret.bar });
+  }
   return out;
 }
 
@@ -310,8 +349,8 @@ function typeCost(from, to, seed) {
   if (!costs.has(k)) { if (costs.size > 20000) costs.clear(); costs.set(k, typingPlan(from, to, { style: 'human', lean: true, notes: false, seed }).natural); }
   return costs.get(k);
 }
-function muteOrDelete(layers, keys, lanes, k, v, seed, span) {
-  const bare = it => it.text.replace(it.gateText || GATE, ''), mute = x => x.replace(/^[_S]?\$:/, '_$:');
+function muteOrDelete(layers, keys, lanes, k, v, seed, span, shownText = x => x) {
+  const bare = it => shownText(it.text.replace(it.gateText || GATE, '')), mute = x => x.replace(/^[_S]?\$:/, '_$:');
   const [ra, rz] = span(v.ret.bar), [pa, pz] = span(Math.max(0, ra - 1));
   // the lines of the track that sound in bars a to z, in their order (one line per text), without a fade out of the
   // section before (below 1 on the first two bars only: compileNow leaves it out of the code)
@@ -323,9 +362,13 @@ function muteOrDelete(layers, keys, lanes, k, v, seed, span) {
   for (const [j, w] of returningAt(layers, keys, lanes, pa, pz, new Set(before.map(x => x.key)))) if (j !== k && w.ret.bar < rz) placeMuted(others, layers, keys, w.was, { key: j, text: mute(bare(w.was)) });
   const withLine = others.slice(), L = bare(v.was);
   placeMuted(withLine, layers, keys, v.was, { key: k, text: mute(L) });
-  const kept = typeCost(L, mute(L), seed) + typeCost(withLine.map(x => x.text).join('\n'), after, seed);
-  const typed = typeCost(others.map(x => x.text).join('\n'), after, seed);
-  if (kept <= 0 || typed <= 0) return kept <= typed ? 'mute' : 'delete';
+  const kept0 = typeCost(L, mute(L), seed) + typeCost(withLine.map(x => x.text).join('\n'), after, seed);
+  const typed0 = typeCost(others.map(x => x.text).join('\n'), after, seed);
+  // (reused-lines D1) the line's own share: the typing of the track without the line on both sides is common to both
+  // ways, so it leaves the comparison
+  const base = Math.min(kept0, typed0, typeCost(others.map(x => x.text).join('\n'), shown(ra, rz).filter(x => x.key !== k).map(x => x.text).join('\n'), seed));
+  const kept = kept0 - base, typed = typed0 - base;
+  if (kept <= 0.05 || typed <= 0.05) return kept <= typed ? 'mute' : 'delete';
   const q = Math.log(kept / typed), band = Math.log(CLOSE);
   if (q <= -band) return 'mute';
   if (q >= band) return 'delete';

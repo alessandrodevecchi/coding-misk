@@ -255,6 +255,8 @@ function humanPlan(parts, acts, to, { speed, max, seed, mistakes = true, rate = 
     const out = acts.map(a => {
       const gap = prev && (prev.pi !== a.pi || prev.si !== a.si) ? (a.pi === prev.pi ? (prev.paste ? 0.4 : 0.25) : 0.4 + (lean ? 0 : rng() * 0.8)) : 0;
       t += gap; prev = a;
+      // (reused-lines D3) looking the earlier line up before pasting it
+      if (a.look) t += lean ? LOOK_UP.lean : LOOK_UP.human * (0.8 + rng() * 0.4);
       const p = parts[a.pi], s = a.si >= 0 ? p.segs[a.si] : null;
       const keys = a.paste ? [] : a.del ? Array.from({ length: a.n }, () => ({ dt: (0.6 + rng() * 0.5) / (cps * 2.5), key: null })) : humanKeys(s.new, cps, rng, ko);
       const at = []; let u = t;
@@ -325,8 +327,17 @@ function whole(text, k) {
 // instead; the paste rules of a live build are in src/live/typing-load.js, pasteRule)
 // shortest new line copied from a line above instead of typed
 const COPY_MIN = 40;
+// seconds to find a line in the earlier code before pasting it (reused-lines D3): a person, the leanest typing, the
+// exact style
+const LOOK_UP = { human: 1, lean: 0.4, exact: 0.3 };
+// the new lines of a plan and how each one comes (typed, copied from above or from earlier code, pasted from notes or
+// forced)
+const newLines = parts => parts.filter(p => p.kind === 'new').map(p => ({ text: p.text, how: p.how || 'typed' }));
 // notes: false leaves out the lines pasted as from notes (a measure that does not move with the seed, growth:probe)
-export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false, force = Infinity, notes = true } = {}) {
+// earlier (reused-lines D3): lines the code showed earlier in the song (pattern lines of the code at the steps before);
+// a long new line with no like line above it is pasted as a copy of the most alike of them and edited, after a pause
+// to look it up (LOOK_UP). → also lines: for each new line, { text, how: 'typed' | 'above' | 'earlier' | 'notes' | 'forced' }
+export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false, force = Infinity, notes = true, earlier = null } = {}) {
   const ops = lineDiff(chainLines(from), chainLines(to), false), parts = [];
   for (let k = 0; k < ops.length;) {
     if (ops[k].op === 'keep') { parts.push({ kind: 'keep', text: ops[k].text }); k++; continue; }
@@ -347,19 +358,29 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
       const v = lineLike(txt, p.text);
       if (v >= score) { best = txt; score = v; }
     }
-    if (best !== null) { p.paste = true; p.segs = tokenDiff(best, p.text); }
+    if (best !== null) { p.paste = true; p.how = 'above'; p.segs = tokenDiff(best, p.text); }
   });
+  // reused-lines D3: a long new line still to type, like a line shown earlier in the song (gone from the code): copied
+  // from the earlier code, then edited; never a comment or the voice's code
+  if (earlier && earlier.length) {
+    parts.forEach(p => {
+      if (p.kind !== 'new' || p.paste || p.text.length < COPY_MIN || /^\s*\/\//.test(p.text) || /say_|\.voice\(/.test(p.text)) return;
+      let best = null, score = LIKE;
+      for (let k = earlier.length - 1; k >= 0; k--) { const e = earlier[k]; if (!e || /^\s*\/\//.test(e) || /say_|\.voice\(/.test(e)) continue; const v = e === p.text ? 1 : lineLike(e, p.text); if (v > score || (v === score && best === null)) { best = e; score = v; } }
+      if (best !== null) { p.paste = true; p.look = true; p.how = 'earlier'; p.segs = tokenDiff(best, p.text); }
+    });
+  }
   // human style: a long new line unlike the others is now and then (1 in 8) pasted whole, as from notes (typing-mistakes);
   // never a comment or the voice's code
   if (style === 'human' && notes) {
     const pr = mulberry(`${seed}\u0000${from}\u0000${to}/paste`);
-    parts.forEach(p => { if (p.kind === 'new' && !p.paste && p.text.length >= 60 && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text) && pr() < 1 / 8) { p.paste = true; p.segs = [{ eq: p.text }]; } });
+    parts.forEach(p => { if (p.kind === 'new' && !p.paste && p.text.length >= 60 && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text) && pr() < 1 / 8) { p.paste = true; p.how = 'notes'; p.segs = [{ eq: p.text }]; } });
   }
   // actions in reading order: paste, then delete and type for each changed place
   const actions = () => {
     const out = [];
     parts.forEach((p, pi) => {
-      if (p.paste) out.push({ pi, si: -1, paste: true, n: 0 });
+      if (p.paste) out.push({ pi, si: -1, paste: true, n: 0, look: !!p.look });
       // an empty new line: an Enter at its turn
       if (p.kind === 'new' && !p.text) out.push({ pi, si: -1, paste: true, n: 0 });
       (p.segs || []).forEach((s, si) => { if (s.eq !== undefined) return; if (s.old) out.push({ pi, si, del: true, n: s.old.length }); if (s.new) out.push({ pi, si, del: false, n: s.new.length }); });
@@ -376,16 +397,17 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
     if (Number.isFinite(max) && force > 0) {
       const fits = () => humanPlan(parts, acts, to, { ...opts, lean: true, max: Infinity }).total <= max;
       const cands = parts.map((p, i) => [p, i]).filter(([p]) => p.kind === 'new' && !(p.paste && (p.segs || []).every(x => x.eq !== undefined)) && p.text.trim() && !/^\s*\/\//.test(p.text) && !/say_|\.voice\(/.test(p.text)).sort((a, b) => b[0].text.length - a[0].text.length || a[1] - b[1]);
-      for (const [p] of cands) { if (forced >= force || fits()) break; p.paste = true; p.segs = [{ eq: p.text }]; acts = actions(); forced++; }
+      for (const [p] of cands) { if (forced >= force || fits()) break; p.paste = true; p.look = false; p.how = 'forced'; p.segs = [{ eq: p.text }]; acts = actions(); forced++; }
     }
     // forced: the new lines pasted because the typing did not fit
-    return { ...humanPlan(parts, acts, to, opts), forced };
+    return { ...humanPlan(parts, acts, to, opts), forced, lines: newLines(parts) };
   }
   const typed = acts.reduce((a, x) => a + (x.del || x.paste ? 0 : x.n), 0);
   const cps = (8 + 22 * Math.max(0, Math.min(1, (typed - 40) / 360))) * speed;
   let t = 0, prev = null;
   for (const a of acts) {
     if (prev && (prev.pi !== a.pi || prev.si !== a.si)) t += a.pi === prev.pi ? (prev.paste ? 0.3 : 0.15) : 0.25;
+    if (a.look) t += LOOK_UP.exact;
     a.t0 = t; t += a.paste ? 0 : a.n / (a.del ? cps * 3 : cps); a.t1 = t; prev = a;
   }
   const scale = t > max && t > 0 ? max / t : 1;
@@ -394,6 +416,7 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
   const pasteAt = new Map(acts.filter(a => a.paste).map(a => [a.pi, a.t0]));
   return {
     total,
+    lines: newLines(parts),
     frame(time) {
       if (time >= total) return to;
       const state = new Map();

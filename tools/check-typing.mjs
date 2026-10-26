@@ -141,6 +141,24 @@ const CHECKS = {
     const short = typingPlan(a, b, { style: 'human', seed: 'm1', max: 3 });
     assert(Math.abs(short.total - 3) < 1e-6 || short.total < 3, 'deadline'); assert(short.frame(3) === b, 'exact at the deadline');
   },
+  'copy from earlier code (reused-lines D3): an identical line is pasted, a near copy pasted and edited, a short one typed'() {
+    const bass = '$: note("<a1!3 a#1>").transpose(-4).struct("[~ x x x]*4").s("sawtooth").lpf(400)';
+    const kick = '$: s("bd*4").bank("RolandTR909")', from = kick, to = `${kick}\n${bass}`;
+    // identical: pasted after a look-up pause, no key typed
+    const same = typingPlan(from, to, { style: 'human', lean: true, earlier: [bass] }), cold = typingPlan(from, to, { style: 'human', lean: true });
+    assert(same.lines.length === 1 && same.lines[0].how === 'earlier' && cold.lines[0].how === 'typed', JSON.stringify([same.lines, cold.lines]));
+    assert(same.natural >= 0.4 && same.natural < 1 && same.natural < cold.natural / 5, `pasted ${same.natural.toFixed(2)} s, typed ${cold.natural.toFixed(2)} s`);
+    const mid = frames(typingPlan(from, to, { earlier: [bass] }), 200);
+    assert(mid.every(f => f === from || f === to), 'an identical line appears whole');
+    // near: the earlier line is pasted, then only its difference is typed
+    const near = bass.replace('lpf(400)', 'lpf(900)'), p = typingPlan(from, `${kick}\n${near}`, { earlier: ['$: s("hh*8")', bass] });
+    assert(p.lines[0].how === 'earlier' && frames(p, 300).some(f => f.endsWith(bass)), 'the near copy is not pasted from the earlier line');
+    // a short line, or one unlike every earlier line, is typed
+    assert(typingPlan(from, `${kick}\n$: s("cp*2")`, { earlier: ['$: s("cp*2")'] }).lines[0].how === 'typed', 'a short line copied');
+    assert(typingPlan(from, to, { earlier: ['$: s("[~ hh]*4").bank("LinnDrum").gain(0.1).lpf(4500).room(0.35)'] }).lines[0].how === 'typed', 'an unlike line copied');
+    // a line like one above it is still copied from above
+    assert(typingPlan(bass, `${bass}\n${near}`, { earlier: [bass] }).lines[0].how === 'above', 'copy from above first');
+  },
   'an insertion at the start of a chain is typed there'() {
     const a = '$: s("supersaw").gain(0.3)', b = '$: n("0").scale("g:minor").s("supersaw").gain(0.3)', p = typingPlan(a, b);
     for (const f of frames(p, 200)) assert(f.startsWith('$: ') && f.endsWith('s("supersaw").gain(0.3)'), `rest moved: ${f}`);

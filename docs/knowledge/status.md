@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 73. With open tasks: 22. All tasks ticked, waiting to be archived: 51.
+OpenSpec changes not archived: 74. With open tasks: 22. All tasks ticked, waiting to be archived: 52.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ OpenSpec changes not archived: 73. With open tasks: 22. All tasks ticked, waitin
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 
-Ticked and not archived: `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `live-coder-growth`, `pattern-followups`, `playlists`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `test-fixes`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `written-like-coder`.
+Ticked and not archived: `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `live-coder-growth`, `pattern-followups`, `playlists`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `test-fixes`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `written-like-coder`.
 <!-- /generated -->
 
 Many open tasks are the owner's listening tests or short videos for the owner. They are not code to write: leave them open and mention them.
@@ -58,3 +58,8 @@ Snapshot of 2026-10-19 (`gh issue list`). Well-defined work lives in GitHub issu
 - **Later or concept:** `#7` more genres, `#16` tracker module track, `#19` device panels, `#26` MCP server (builds on this knowledge base), `#37` use from any device, `#41` add an instrument the song lacks, `#46` song soul, `#47` curves look, `#50` random tools, `#51` invented styles, `#58` new visual scenes.
 
 Many issues stay open after their feature shipped, until the owner tests it and the release goes to `main`.
+
+## Follow-ups
+
+- "Long song from" on the radio (reused-lines, `#85`): the radio keeps 15 minutes for now; a radio song extended several times (continue in radio) can grow long, so the rule may matter there later.
+- Lines typed ahead (reused-lines D8, `#85`): with the approved limits no built-in song has one; tune the limits after the owner sees the screenshots (`AHEAD` in `src/live/written-plan.js`).

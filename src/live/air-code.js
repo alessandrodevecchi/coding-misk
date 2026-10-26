@@ -41,6 +41,7 @@ export function windowPart(W, songs, k, { grown = false } = {}) {
   if (src.codeRef) {
     const ref = src.codeRef.tracks || [];
     out.codeRef = { ...out, build: undefined, tracks: out.tracks.map(t => { const r = ref.find(x => pre + x.id === t.id); return r ? { ...t, settings: r.settings, rack: r.rack, patterns: r.patterns, clips: (r.clips || []).map(c => ({ ...c, start: c.start + me.start })) } : t; }) };
+    if (Number.isFinite(src.codeRef.until)) out.codeRef.until = src.codeRef.until + me.start;
   }
   if (grown && src.crescendo) {
     const c = { ...src.crescendo };
