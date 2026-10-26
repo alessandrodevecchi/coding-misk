@@ -111,8 +111,8 @@ npm run check:live                                     # live output: preset are
 node tools/check-live.cjs [shots-dir]                  # live output in the browser: broadcast window, control room, TAKE and transition, app loop stopped, reload, close (dev server)
 node tools/check-recording.cjs                         # radio recording: pause without gaps, track list, downloads, record from the start (dev server)
 node tools/check-modes.cjs [shots-dir]                 # the two modes: tabs, memory per mode, old remembered tab, link across modes, phone (dev server)
-node tools/check-player.cjs                            # player bar and global volume: modes, previous and next, volume after the master, layout (dev server)
-node tools/check-hand.cjs                              # hand live coding in Compose: take over, steps held, resume, last code (dev server)
+PORT=5173 node tools/check-player.cjs                  # player bar and global volume: modes, previous and next, bar counter, volume after the master, layout (dev server on PORT, default 5173)
+PORT=5173 node tools/check-hand.cjs                    # hand live coding in Compose: take over, steps held, resume, last code (dev server on PORT, default 5173)
 PORT=5173 node --no-warnings tools/check-radio.cjs [--long 30]  # radio in the browser: controls, same songs as the director, skip, history, save, open in Compose (dev server on PORT, default 5173)
 node --no-warnings tools/endless-recap.mjs [songs/endless] [--lang it|en]   # Markdown recap of generated sessions, with space for listening notes
 npm run catalog:strudel                                # rebuild the Strudel function catalog and coverage (docs/strudel/, docs/STRUDEL-FUNCTIONS.md); run when Strudel, the generator or app functions change, and before a merge to main (check:knowledge warns while it is stale); cached in .cache/checks/
@@ -129,6 +129,8 @@ npm run check:spoken                                   # voice instrument: forma
 node tools/check-spoken-play.cjs [shots-dir]           # voice instrument in the browser: example song heard below clipping, silent and error free without samples (dev server)
 npm run check:patterns                                 # Patterns tab data: every preset once, styles that use it, store, Save as pattern, loop song, Add to song, previews, radio pool, backup; edited styles, fallback styles, new parts kept, capped and discarded, guitar riffs from New (no browser)
 PORT=5173 node tools/check-patterns.cjs [shots-dir]    # Patterns tab in the browser: loop, key change, beat, New and Save, Compose listen and Save as pattern, rename, delete, Add to song, links; guitar riff from New, new parts after a reload, Discard and Discard all, style chips, riff or chords in Compose (dev server on PORT, default 5173)
+npm run check:preview                                  # pattern preview: one clean expression per pattern on its own orbit, same haps as the transpiled code, orbit above every song's, loopSong rack (no browser)
+PORT=5173 node tools/check-preview.cjs [shots-dir]     # pattern preview and bar counter in the browser: headphones and flask, the two pattern rows in both languages, alone and riding the song (main player untouched, next bar, same bars), edits, Delete, one at a time, volume, echo kept apart, export, leaving Compose, another song; the counter in Compose, dragging, Patterns loop, Live coder and Crescendo, 400 px (dev server on PORT, default 5173)
 PORT=5173 node tools/check-test-fixes.cjs [shots-dir]  # fixes after the v0.6.0-beta.2 tests (#76): Patterns New row and tempo while sliding, composed melody shape, Song harmony hint, This song in the radio export (dev server on PORT)
 PORT=5173 node tools/check-compact-code.cjs            # same events for compact code, short patterns, line breaks and every technical functions preset in Live coder, Classic and Crescendo, Sections in Classic (Live build off and on) and Crescendo (dev server on PORT, default 5173)
 node tools/check-ideas.cjs [song,song…]                # same events as the code before idea-model, every song and Crescendo states (dev server, ~8 min)
@@ -147,6 +149,7 @@ Audio analysis of reference tracks: `tools/analyze-audio.py` and `tools/zoom-aud
 - `src/song/`: song format v2 (format, converter from older scene saves, compiler, validator).
 - `src/endless/`: endless director (seeded random, recipes, mixing, shapes, energy, mutation, phrases, director, join). `styles/`: style recipes.
 - `src/material/`: material generator (melodies, basslines, arpeggios, chords, grooves, sounds composed as ideas from a seed, a style and an energy; `docs/ENDLESS.md`, Material).
+- `src/player/preview.js`: the pattern preview of Compose, a second player that rides the song's scheduler or plays alone (`pattern-preview`).
 - `src/visuals.js`: canvas visuals. `src/hardware.js`: knobs and LEDs for the hardware theme.
 - `src/songs.js`: reads `SECTIONS` and `TEMPO` from track code. `src/i18n.js`: strings. `src/content.js`: lessons, sounds, references, hand-written tracks.
 - `patterns/`: hand-written Strudel files. `public/samples/`: custom samples. `docs/media/`: README media. `demo/`: local demo videos (git-ignored).

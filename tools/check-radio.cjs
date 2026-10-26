@@ -54,6 +54,9 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const card = await page.innerText('#radio-now');
   check(card.includes(want1.title) && card.includes(`${want1.sections[0].bpm} BPM`), 'now playing card shows the song on air');
   check(!(await ed()).err, 'no evaluation error at start');
+  // the bar counter of the player bar (pattern-preview): the bars of the song on air, in place of "bar n of total"
+  { const e = await ed(), rs = (await R()).state, it = rs.stream[rs.onAir], txt = await page.innerText('#pb-bar'), pos = await page.innerText('#pb-pos'), m = /^bar (\d+) \/ (\d+)$/.exec(txt);
+    check(m && +m[2] === it.bars && Math.abs(+m[1] - (Math.floor(e.cyc - it.start) + 1)) <= 1 && !/ of /.test(pos), 'the player bar counts the bars of the song on air', `${txt} · ${pos}`); }
 
   // pause and resume from the same bar
   await sleep(2000);

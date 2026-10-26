@@ -37,8 +37,8 @@ What the code does today (line numbers at `develop` 72698b5):
 
 The preview is one Strudel `Pattern`, built once per edit (D2). It is played in one of two ways:
 
-- **With the song (riding).** The preview is stacked into the main scheduler at the scheduler level: `scheduler.pattern = stack(songPattern, previewPattern)`. The song's code, the editor and the evaluated song stay as they are. A small wrapper around `ed.repl.scheduler.setPattern` keeps the song's own pattern as `base`, so each new evaluation (live build steps, edits, hand live coding) keeps the preview on top. The REPL exposes the song pattern, not the stack, to the highlighting (`exposeSchedulerPattern` in `repl.mjs`), so the preview never lights the editor code. The scheduler, the tempo and the clock are the song's own, so the preview lands on the song's bars with no drift and follows every `setCps`.
-- **Alone (free).** A bare `Cyclist` from `@strudel/core` with `onTrigger: getTrigger({ defaultOutput: webaudioOutput, getTime })` on the shared AudioContext. It is not a `repl()`, so the module-level scheduler state stays with the main REPL. Its cps is the selected section's tempo (`bpm / 240`, the same rule as `songTick`).
+- **With the song (riding).** The preview is stacked into the main scheduler at the scheduler level: `scheduler.pattern = stack(songPattern, previewPattern)`. The song's code, the editor and the evaluated song stay as they are. A getter and setter on the scheduler's `pattern` property (`Object.defineProperty`, `src/player/preview.js`) keep the song's own pattern as set, and return it stacked with the preview while the preview rides, so each new evaluation (live build steps, edits, hand live coding) keeps the preview on top. (Implementation note: a property catches every way the pattern is set; a wrapper of `setPattern` would miss a direct assignment.) The REPL exposes the song pattern, not the stack, to the highlighting (`exposeSchedulerPattern` in `repl.mjs`), so the preview never lights the editor code. The scheduler, the tempo and the clock are the song's own, so the preview lands on the song's bars with no drift and follows every `setCps`.
+- **Alone (free).** A bare `Cyclist` (the page's copy, `globalThis.Cyclist`, put there by the REPL's `evalScope`; importing `@strudel/core` in `src/` would load a second copy, because `@strudel/repl` ships a bundle) with `onTrigger: getTrigger({ defaultOutput: webaudioOutput, getTime })` on the shared AudioContext. It is not a `repl()`, so the module-level scheduler state stays with the main REPL. Its cps is the selected section's tempo (`bpm / 240`, the same rule as `songTick`).
 - **Handover.** A preview controller is called from the existing frame loop (`transport`, `src/main.js:3389`) and from the background clock. When `isPlaying()` turns on, it stops the free Cyclist and rides from the song's next whole bar (`filterWhen(t => t >= k)`). When `isPlaying()` turns off (stop, pause, end of song), it starts the free Cyclist at the next whole cycle. The gap is under one bar, as the spec allows. Watching state in the frame loop catches every way the song can start or stop (Play, the timeline, hand live coding, the end of the song) with no hook in each path.
 
 Alternatives considered:
@@ -53,14 +53,14 @@ Alternatives considered:
 - **Settings.** `listenPattern`'s "over" settings (sound, key, progression, meter, tempo, settings) move into a shared helper, so the listen button and the preview use the same settings.
 - **Code.** `loopSong(item, over)` makes the 4-bar loop with the beat off. `compileSong` compiles it with no technical function options. The pure helper `previewExpression(code, { orbit })` in `src/player/preview.js` turns the compiled track line into one expression. It drops `setcpm`, `$:`, `.analyze(...)` and `.mask(section1).velocity(section1)`, and sets `.orbit(PREVIEW_ORBIT)`. It can be tested in Node.
 - **Rack.** `loopSong` gets an optional `rack`, so the preview carries the track's rack devices. The loop in the Patterns tab passes none, so it does not change.
-- **Evaluation.** Strudel's `evaluate` with the transpiler (as `src/render/page.js` imports them) turns the expression into a `Pattern`. `evaluate` writes no scheduler state.
+- **Evaluation.** The page's transpiler lives inside the editor's bundle, so the expression is evaluated as plain JavaScript over the page's Strudel globals, with its double-quoted strings wrapped in `mini()` by hand (`miniStrings`), as the transpiler does. It writes no scheduler state. `npm run check:preview` confirms, for 479 patterns, that this gives the same haps as the transpiled expression.
 - **Edits.** An edit of the track (`changed()`, `src/main.js:843`) rebuilds the expression when the preview plays. The new pattern takes over at the next bar.
-- **Phase.** While riding, the loop is shifted by the selected section's start modulo the loop length (`late`), so its chords match the song's when that section plays.
+- **Phase.** While riding, the loop is shifted by the selected section's start in the played song (`late(sceneStart(sel))`), so its chords match the song's when that section plays: the compiler starts a section's progression on its first bar (`rotate` in `src/music.js`).
 
 ### D3. Level, orbit and output
 
 - **Level.** The preview plays at the track's level, through superdough. So it goes through the master, the limiter and the global volume like the song.
-- **Orbit.** It gets its own orbit, `PREVIEW_ORBIT = 15`, above the compiler's range (1-8 by type, extra tracks from 9, spoken 13 and 14). Its delay and reverb then never retune the song's. The check confirms that superdough sets no orbit cap, and that no built-in song reaches orbit 15. If one does, the preview takes the first orbit above the song's highest.
+- **Orbit.** It gets its own orbit, at least `PREVIEW_ORBIT = 20`, above the song's (`previewOrbit(tracks)`): the compiler gives 1-8 by type and extra tracks 9 and up, spoken tracks 13 and 14, and voice tracks (the narrator) speak on 15 and up (`src/song/build.js`). A song that reaches 20 moves the preview to the first orbit above its highest. Its delay and reverb then never retune the song's. Superdough creates orbits on demand with no cap (`getOrbit`). (Implementation note: the first draft picked 15, which is the narrator's orbit; one built-in song reaches 17.)
 - **Visuals.** No `.analyze`, so the Stage visual and the hardware LEDs do not light up for the preview. The soul and the scopes read the master and hear it, which is expected.
 - **Exports.** A real-time WAV export or recording taps the master, so the preview stops and its button is disabled while `rec || capture || fastJob` (`src/main.js:3412`). The fast export renders on its own page and never hears the preview.
 
@@ -75,7 +75,7 @@ Alternatives considered:
 - **Place.** The button `pt-preview` sits right after `pt-listen` in `.pt-presetrow`, for the groove row (`src/main.js:2567`) and the preset row (`src/main.js:2572`). It uses `btn small icon` with `aria-pressed`.
 - **Icons (D10).** Off, it shows the headphones icon (`LISTEN` in `src/icons.js`); playing, it shows STOP. The button that opens the Patterns tab (`pt-listen`) moves from the headphones to a new drawn flask icon (`FLASK`).
 - **Look.** While it plays, the button is lit like `.pn-play` (neon) or shows the lit LED key (hardware).
-- **Texts.** Tooltip "Anteprima del pattern (la traccia continua a suonare nel brano: M la mette in muto)" / "Preview the pattern (the track keeps playing in the song: M mutes it)". The flask's tooltip stays "Ascolta nella scheda Pattern" / its English text.
+- **Texts.** Tooltip "Anteprima del pattern (la traccia continua a suonare nel brano: il pulsante M la mette in muto)" / "Preview the pattern (the track keeps playing in the song: the M button mutes it)". The flask's tooltip stays "Ascolta nella scheda Pattern" / its English text.
 - **Why here.** The owner asked for the button by the headphones, so it reads as tied to the pattern. The preset row edits the selected pattern, the one the preview plays.
 
 ### D6. Row names
@@ -101,7 +101,7 @@ Alternatives considered:
   - Mix: the item heard.
   - Patterns loop: `floor(cyc) mod 4 + 1 / 4`.
   - While the timeline is dragged: the bar under the thumb.
-  - Below 480 px the total time hides first, then the counter keeps `bar n / total`.
+  - On narrow screens the time hides (below 640 px, as before) and the counter keeps `bar n / total`. Below 480 px the title hides; in the hardware theme, whose volume knob takes the right end, the counter shows `n / total` without the word (implementation note: at 400 px the hardware bar leaves about 55 px).
 
 ### D8. Reuse of the Patterns tab
 

@@ -16,6 +16,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Add a voice instrument to a song that has none, from the Compose Voices group.
 - Radio steering command that changes the voice instrument of the song on air from its next quiet part.
 - Optional `voiceOptions` field on spoken tracks.
+- Pattern preview in Compose: a headphones button next to a track's preset or groove menu plays the selected pattern in a loop, on the song's bars while the song plays, alone while it is stopped.
+- Bar counter in the player bar: `bar n / total` of what plays, grown songs included.
 
 ### Changed
 
@@ -24,6 +26,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - New-song voice instrument settings moved from the Compose toolbar to the "In the next song" row of the Voices group.
 - The radio narrator controls and voice instrument controls are in one Voices group.
 - The radio Voice knob, compilation range, curve and console group are now named Narrator.
+- The track panel splits its pattern row into "Song patterns" (patterns and Delete) and "Make patterns" (New, Save as pattern, Compose a part).
+- The button that opens a track's pattern in the Patterns tab shows a flask instead of headphones.
+- The player bar shows the time of the radio song on air; its bars moved to the bar counter.
 
 ## [0.6.0-beta.2] - 2026-10-25
 

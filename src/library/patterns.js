@@ -204,7 +204,8 @@ export function loopSong(item, o = {}) {
   if (sound) settings[soundKey(type)] = sound;
   if (type === 'hook') settings.mode = o.mode || d.mode || 'minor';
   const sec = { name: 'Loop', bars: 4, bpm: Math.round(o.bpm || d.bpm || 128), key: o.key || d.key || 'A', chords: o.chords || d.chords || 'notturna', meter };
-  const tracks = [{ id: type, name: type, type, settings, patterns: { A: clone(item.pattern) }, clips: [{ section: 'Loop', pattern: 'A' }] }];
+  // (o.rack: the devices of the track the pattern comes from, for the pattern preview of Compose; the Patterns tab passes none)
+  const tracks = [{ id: type, name: type, type, settings, patterns: { A: clone(item.pattern) }, clips: [{ section: 'Loop', pattern: 'A' }], ...(o.rack && o.rack.length ? { rack: clone(o.rack) } : {}) }];
   if (o.beat ?? d.beat) tracks.push({ id: 'beat', name: 'beat', type: 'drums', settings: { kit: type === 'drums' ? settings.kit || 'RolandTR909' : 'RolandTR909', gain: beatGain(settings.gain ?? (DEFAULT[type] || {}).gain) }, patterns: { A: { idea: beatIdea(meter) } }, clips: [{ section: 'Loop', pattern: 'A' }] });
   return { format: 'coding-misk/song', version: 2, id: 'pattern-loop', title: o.title || item.name || item.id || 'Pattern', sections: [sec], tracks };
 }
