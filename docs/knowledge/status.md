@@ -14,11 +14,11 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 77. With open tasks: 25. All tasks ticked, waiting to be archived: 52.
+OpenSpec changes not archived: 77. With open tasks: 24. All tasks ticked, waiting to be archived: 53.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
-| [after-tests-oct28](../../openspec/changes/after-tests-oct28/tasks.md) | 36 | 44 |
+| [after-tests-oct28](../../openspec/changes/after-tests-oct28/tasks.md) | 24 | 44 |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
@@ -27,7 +27,6 @@ OpenSpec changes not archived: 77. With open tasks: 25. All tasks ticked, waitin
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |
 | [idea-model](../../openspec/changes/idea-model/tasks.md) | 3 | 20 |
 | [idiomatic-code](../../openspec/changes/idiomatic-code/tasks.md) | 2 | 8 |
-| [lines-ahead-balanced](../../openspec/changes/lines-ahead-balanced/tasks.md) | 11 | 14 |
 | [live-output](../../openspec/changes/live-output/tasks.md) | 5 | 9 |
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |
@@ -44,7 +43,7 @@ OpenSpec changes not archived: 77. With open tasks: 25. All tasks ticked, waitin
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 
-Ticked and not archived: `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `live-coder-growth`, `pattern-followups`, `playlists`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `test-fixes`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `written-like-coder`.
+Ticked and not archived: `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `pattern-followups`, `playlists`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `test-fixes`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `written-like-coder`.
 <!-- /generated -->
 
 Many open tasks are the owner's listening tests or short videos for the owner. They are not code to write: leave them open and mention them.
@@ -65,4 +64,4 @@ Many issues stay open after their feature shipped, until the owner tests it and 
 ## Follow-ups
 
 - "Long song from" on the radio (reused-lines, `#85`): the radio keeps 15 minutes for now; a radio song extended several times (continue in radio) can grow long, so the rule may matter there later.
-- Lines typed ahead (reused-lines D8, `#85`): the Balanced limits give 2 lines over the built-in songs, both in the written part; lines typed ahead at growth steps are step 2 of `lines-ahead-balanced`, not done yet (`AHEAD` in `src/live/written-plan.js`).
+- Lines typed ahead (reused-lines D8, `#85`): the Balanced limits, in the growth and in the written part (lines-ahead-balanced), give 16 lines over the built-in songs, 14 at growth steps, muted at most 58 s; the limits are to be tuned after the owner's screenshots (`AHEAD` in `src/live/written-plan.js`).
