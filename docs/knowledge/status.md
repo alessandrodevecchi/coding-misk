@@ -14,10 +14,11 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 74. With open tasks: 22. All tasks ticked, waiting to be archived: 52.
+OpenSpec changes not archived: 76. With open tasks: 24. All tasks ticked, waiting to be archived: 52.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
+| [after-tests-oct28](../../openspec/changes/after-tests-oct28/tasks.md) | 44 | 44 |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
@@ -25,6 +26,7 @@ OpenSpec changes not archived: 74. With open tasks: 22. All tasks ticked, waitin
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |
 | [idea-model](../../openspec/changes/idea-model/tasks.md) | 3 | 20 |
 | [idiomatic-code](../../openspec/changes/idiomatic-code/tasks.md) | 2 | 8 |
+| [lines-ahead-balanced](../../openspec/changes/lines-ahead-balanced/tasks.md) | 11 | 14 |
 | [live-output](../../openspec/changes/live-output/tasks.md) | 5 | 9 |
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |

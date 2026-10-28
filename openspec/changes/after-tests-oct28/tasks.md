@@ -17,17 +17,17 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 1. Step labels
 
-- [ ] 1.1 `stepText` labels for all 17 `BUILD_ACTIONS` with track names, strings in `src/i18n.js` (it, en); rows without action and words left out (D1)
-- [ ] 1.2 Check in `tools/check-radio-profiles.mjs` (or a new `labels` case of `check:spoken`): for every step of 10 grown radio songs (Crescendo and Live coder, three styles) the label is non-empty, has no "undefined", and names a track of the song; a `{ at }` step gives no row
-- [ ] 1.3 Browser: `check-radio.cjs` reads "Next changes" of a Live coder song and finds no "undefined" and no empty row
+- [x] 1.1 `stepText` labels for all 17 `BUILD_ACTIONS` with track names, strings in `src/i18n.js` (it, en); rows without action and words left out (D1)
+- [x] 1.2 Check in `tools/check-radio-profiles.mjs` (or a new `labels` case of `check:spoken`): for every step of 10 grown radio songs (Crescendo and Live coder, three styles) the label is non-empty, has no "undefined", and names a track of the song; a `{ at }` step gives no row
+- [x] 1.3 Browser: `check-radio.cjs` reads "Next changes" of a Live coder song and finds no "undefined" and no empty row
 
 ## 2. V:N and V:T with the spoken text
 
-- [ ] 2.1 `spokenSchedule(song, C, lang, files)` in `src/song/build.js`; `voiceCode` built on it (D2)
-- [ ] 2.2 `renderNow`: tags, italic text from the schedule, rows for voice-track lines alone, tooltips; strings in both languages
-- [ ] 2.3 Check in `check:spoken`: over 20 radio songs (Classic, Crescendo, Live coder; poetic and explaining; Narrated growth on and off; narrator off) every `V:N` text equals the line in the code's `// "…", spoken on bar N` comment on that bar, and every `V:T` text equals the line of a `$:` voice-track line that plays on that bar; no `V:N` on a bar of `spokenBars`; narrator off gives no `V:N`
-- [ ] 2.4 Browser: `check-radio.cjs` with the narrator and the voice track on: the list shows `V:N` and `V:T` rows, and a `V:T` row for a line with no step on its bar
-- [ ] 2.5 Guide card for the radio's Next changes: what V:N and V:T mean (`src/guide.js`, `npm run check:guide`)
+- [x] 2.1 `spokenSchedule(song, C, lang, files)` in `src/song/build.js`; `voiceCode` built on it (D2)
+- [x] 2.2 `renderNow`: tags, italic text from the schedule, rows for voice-track lines alone, tooltips; strings in both languages
+- [x] 2.3 Check in `check:spoken`: over 20 radio songs (Classic, Crescendo, Live coder; poetic and explaining; Narrated growth on and off; narrator off) every `V:N` text equals the line in the code's `// "…", spoken on bar N` comment on that bar, and every `V:T` text equals the line of a `$:` voice-track line that plays on that bar; no `V:N` on a bar of `spokenBars`; narrator off gives no `V:N`
+- [x] 2.4 Browser: `check-radio.cjs` with the narrator and the voice track on: the list shows `V:N` and `V:T` rows, and a `V:T` row for a line with no step on its bar
+- [x] 2.5 Guide card for the radio's Next changes: what V:N and V:T mean (`src/guide.js`, `npm run check:guide`)
 
 ## 3. Voice track in grown songs
 

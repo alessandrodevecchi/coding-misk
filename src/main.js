@@ -4036,6 +4036,8 @@ radio = createRadio({
   userPatterns: () => forRadio(patternsStore.list()),
   // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them
   reloadSamples: () => reloadSamples(),
+  // the samples manifest, for the voices of Next changes (after-tests-oct28 D2)
+  voiceFiles: () => customFiles,
   player: {
     // a saved pattern heard before it goes in (radio-arrangement D9): toggle(item, { key, chords, bpm, meter, n })
     preview: {

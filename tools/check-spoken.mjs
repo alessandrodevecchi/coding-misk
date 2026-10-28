@@ -30,6 +30,13 @@ import { soundPatch } from '../src/endless/voice-sound.js';
 import * as VS from './voice-sample.mjs';
 import { phraseRows, listVocab, editText, editBars, removeRow, addRow, fillRows, vocabOf } from '../src/endless/phrase-list.js';
 import { steerSong, applyBar, whyNot } from '../src/endless/steering.js';
+import { spokenSchedule, BUILD_ACTIONS } from '../src/song/build.js';
+import { liveBuildOf } from '../src/live/live-code.js';
+import { stepLabel, nextRows } from '../src/radio/next-changes.js';
+import { sessionItems, GROWTH_ON_AIR } from '../src/endless/items.js';
+import { airControls } from '../src/endless/growth.js';
+import { validateRecipe, recipeOrder } from '../src/endless/recipe.js';
+import { setLang } from '../src/i18n.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -48,6 +55,20 @@ const spokenOf = s => s.tracks.find(t => t.type === 'spoken');
 const lineKey = (s, t, k) => lineTexts(lineOf(s, t, k, t.patterns[k]), 'en').join(' · ');
 // the bars where a narration is spoken in a voice code: "spoken on bar N"
 const narrated = code => [...code.matchAll(/spoken on bar (\d+)/g)].map(m => +m[1] - 1);
+
+// radio songs as the radio plays them (after-tests-oct28): sessions grown on air in a profile, three songs each, with
+// the controls the radio gives each song (Classic, or the profile's own on air)
+const RADIO_RECIPES = recipes.filter(r => !validateRecipe(r).errors.length).sort((a, b) => recipeOrder(a.id).localeCompare(recipeOrder(b.id)));
+const radioMemo = new Map();
+function radioSongs(profile, style, seed, n = 3) {
+  const k = `${profile}|${style}|${seed}|${n}`;
+  if (!radioMemo.has(k)) {
+    const rec = { seed, options: { styles: [style], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile, voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR };
+    radioMemo.set(k, sessionItems(RADIO_RECIPES, rec, n).map(it => ({ song: it.song, C: it.song.onAir ? airControls(it.song.onAir.profile, it.song.onAir.free) : resolveProfile('classic') })));
+  }
+  return radioMemo.get(k);
+}
+const withLang = (l, fn) => { const d = globalThis.document; globalThis.document = { documentElement: {} }; try { setLang(l); return fn(); } finally { setLang('en'); globalThis.document = d; } };
 
 const CHECKS = {
   'format: a spoken track validates; a wrong way, an unknown bound track and a line over 12 words are errors with their paths'() {
@@ -629,6 +650,84 @@ const CHECKS = {
   'voice helper (D8): the sample file names and banks of tools/voice-sample.mjs are the app\'s'() {
     for (const x of ['Serve più ritmo!', "l'ultimo treno", 'a brand new line, here']) assert(VS.saySlug(x) === saySlug(x), x);
     assert(VS.sayBank('it', 'eddy') === 'say_it_eddy' && VS.sayBank('en', '') === 'say_en' && VS.MAX_WORDS === 12, 'banks');
+  },
+  'next changes (after-tests-oct28 D1): every step of grown radio songs has a label naming its track, no "undefined", a section step has no row'() {
+    const pat = { track: 'kick', level: 1 }, song0 = { tracks: [{ id: 'kick', name: 'kick' }] };
+    assert(stepLabel({ at: 4, pattern: pat }, song0) === 'kick: variant 1', `en: ${stepLabel({ at: 4, pattern: pat }, song0)}`);
+    assert(withLang('it', () => stepLabel({ at: 4, pattern: pat }, song0)) === 'kick: variante 1', 'it: variante 1');
+    assert(stepLabel({ at: 4, pattern: { track: 'kick', level: 0 } }, song0) === 'kick: as written', 'level 0');
+    assert(!nextRows({ ...song0, build: [{ at: 88 }] }, [], 0).length, 'a section step with no words has a row');
+    let steps = 0, songs = 0;
+    const seen = new Set();
+    for (const profile of ['crescendo', 'switch']) for (const style of ['pure-trance', 'berlin-techno', 'synthwave']) for (const { song, C } of radioSongs(profile, style, `labels-${style}`, 2)) {
+      if (!song.onAir) continue;
+      songs++;
+      const names = song.tracks.map(t => t.name || t.id), B = liveBuildOf(song, C);
+      for (const st of buildSteps(B)) {
+        const acts = BUILD_ACTIONS.filter(k => st[k] !== undefined);
+        acts.forEach(k => seen.add(k));
+        for (const l of ['en', 'it']) {
+          const lab = withLang(l, () => stepLabel(st, song));
+          if (!acts.length) { assert(lab === '', `${song.id}: a step with no action has the label "${lab}"`); continue; }
+          steps++;
+          assert(lab && !/undefined|null|NaN/.test(lab), `${song.id} (${l}): "${lab}" for ${JSON.stringify(st)}`);
+          assert(names.some(n => lab.includes(n)), `${song.id} (${l}): "${lab}" names no track`);
+        }
+      }
+      const rows = nextRows(B, [], -1, 1e9);
+      assert(rows.every(r => r.labels.length && r.labels.every(Boolean)), `${song.id}: an empty row`);
+    }
+    console.log(`      ${songs} grown songs, ${steps} labels, actions seen: ${[...seen].sort().join(' ')}`);
+    assert(songs >= 10, `${songs} grown songs`);
+  },
+  'next changes (after-tests-oct28 D2): V:N is the narrator line the code speaks on that bar, V:T a voice-track line that plays there; none on a voice bar, none with the narrator off'() {
+    let songs = 0, ns = 0, ts = 0, off = 0, poetic = 0;
+    const cases = [];
+    for (const profile of ['classic', 'crescendo', 'switch']) for (const style of ['pure-trance', 'dark-cyberpunk', 'ambient']) for (const x of radioSongs(profile, style, `vtags-${profile}`, 3)) cases.push({ ...x, variant: cases.length % 4 });
+    for (const { song, C: C0, variant } of cases) {
+      // explaining, poetic, poetic with Narrated growth (the song grown that way stays as the director grew it), narrator off
+      const C = variant === 1 ? { ...C0, narratorStyle: 'poetic' } : variant === 2 ? { ...C0, narratorStyle: 'poetic' } : variant === 3 ? { ...C0, narrator: false } : C0;
+      const s = variant === 2 && song.crescendo ? { ...song, crescendo: { ...song.crescendo, narrated: true } } : song;
+      songs++;
+      const B = liveBuildOf(s, C), sch = spokenSchedule(B, C, 'en', ANY), L = liveCode(s, C, { files: () => ANY, lang: () => 'en' });
+      if (variant === 3) { off++; assert(!sch.some(x => x.voice === 'N'), `${s.id}: V:N with the narrator off`); }
+      if (C.narratorStyle === 'poetic') poetic++;
+      // every narrator line the code speaks, in every state it is written in
+      const heard = new Set();
+      for (const b of new Set([0, ...buildSteps(L.build).map(x => x.at)])) {
+        const shown = L.codeAt(b), all = L.run ? L.run(shown) : shown;
+        for (const m of all.matchAll(/\/\/ "([^"]+)", spoken on bar (\d+)/g)) heard.add(`${+m[2] - 1}|${m[1]}`);
+      }
+      const listed = new Set(sch.filter(x => x.voice === 'N').map(x => `${x.at}|${x.text}`));
+      for (const k of listed) assert(heard.has(k), `${s.id} (${variant}): V:N "${k}" is not spoken in the code`);
+      for (const k of heard) assert(listed.has(k), `${s.id} (${variant}): "${k}" is spoken but not listed`);
+      ns += listed.size;
+      const voiceBars = s.tracks.some(t => t.type === 'spoken') ? spokenBars(s, 'en') : new Set();
+      for (const x of sch.filter(y => y.voice === 'N')) assert(!voiceBars.has(x.at), `${s.id}: V:N on a voice-track bar ${x.at}`);
+      // every voice-track line listed plays on its bar: its comment in the code of that bar, with a sample, its track on
+      for (const x of sch.filter(y => y.voice === 'T')) {
+        const st = stateAt(B, x.at).song, code = compileSong(st), quote = `// "${x.text.replace(/"/g, "'")}"`;
+        const line = code.split('\n').find(l => l.startsWith(quote));
+        assert(line && !line.includes('no sample'), `${s.id}: V:T "${x.text}" at ${x.at} is not in the code of its bar`);
+        const tr = st.tracks.find(t => t.id === x.track);
+        assert(tr && !tr.mute, `${s.id}: V:T "${x.text}" at ${x.at} on a silent track`);
+        ts++;
+      }
+    }
+    console.log(`      ${songs} radio songs (${poetic} poetic, ${off} narrator off): ${ns} V:N, ${ts} V:T lines`);
+    assert(songs >= 20 && ns > 50 && ts > 5, `${songs} songs, ${ns} V:N, ${ts} V:T`);
+  },
+  'next changes (after-tests-oct28 D2): a voice-track line with no step on its bar has a row of its own; a step on a voice bar shows V:T and no V:N'() {
+    const song = clone(EXAMPLE), C = resolveProfile('classic'), B = liveBuildOf(song, C), sch = spokenSchedule(B, C, 'en', ANY);
+    const stepBars = new Set(buildSteps(B).map(x => x.at)), alone = sch.find(x => x.voice === 'T' && !stepBars.has(x.at));
+    assert(alone, 'the example has no voice-track line away from the steps');
+    const row = nextRows(B, sch, alone.at - 1, 1)[0];
+    assert(row && row.at === alone.at && !row.labels.length && row.voices.some(v => v.voice === 'T' && v.text === alone.text), `no row of its own at ${alone.at}: ${JSON.stringify(row)}`);
+    const yields = spokenBars(song, 'en'), shared = buildSteps(B).find(x => x.say && yields.has(x.at));
+    if (shared) {
+      const r = nextRows(B, sch, shared.at - 1, 1)[0];
+      assert(r && r.voices.every(v => v.voice !== 'N'), `V:N on the voice bar ${shared.at}`);
+    }
   },
 };
 

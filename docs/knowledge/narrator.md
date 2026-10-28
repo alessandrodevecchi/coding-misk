@@ -24,6 +24,7 @@ The narrator, labelled "Voice: narrator" (it: "Voce: narratore"), is the voice t
 - **Narrator lines.** The Voice: narrator block lists the lines of the build that plays; a song's own written steps are editable in place, lines a build makes are read-only.
 - **Radio.** The director comments its moves with phrases from `src/endless/phrases.js`. The knob `talk`, named Voice: narrator (Narrator after voice-placement, Voice before), sets how often: the chance that a phrase boundary gets a comment; the Narrator curve sets it per part, Talk more and Talk less move it by 0.2, the compilation has a range for it, and an artist a `talk` range. It never touches the voice instrument ([radio.md](radio.md)).
 - **Voice instrument.** The narrator yields to spoken lines ([voice.md](voice.md)).
+- **One schedule (after-tests-oct28 D2).** `narratorLines` gives the lines a state's code speaks, after the filters (narrator track muted, a voice-track bar, no sample); `voiceCode` writes them and `spokenSchedule` lists them for the whole song with the voice track's lines, for the radio's Coming next ([radio.md](radio.md)). The code and the list cannot disagree.
 - **Artists and styles.** A style sets the base voice; an artist can prefer voice characters ([artists.md](artists.md)).
 - **Songs.** The voice track's settings shape the sound: pitch, tempo, filters, drive, reverb, delay ([songs.md](songs.md)).
 
