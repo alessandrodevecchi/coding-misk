@@ -549,6 +549,12 @@
 .radio-next { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 .radio-next li { display: block; background: none; padding: 0; }
 .radio-next .at { font: 11px var(--mono); color: var(--a2); margin-right: 6px; }
+.radio-next .vtag { display: inline-block; font: 10px/1 var(--mono); letter-spacing: .04em; padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px; vertical-align: 1px; }
+.radio-next .vtag-n { color: var(--a1); }
+.radio-next .vtag-t { color: var(--s3); }
+.radio-next em { color: var(--muted); }
+:root[data-ui="hw"] .radio-next .vtag-n { color: var(--lcd-fg); }
+:root[data-ui="hw"] .radio-next .vtag-t { color: var(--led); }
 .radio-after { font-size: 12px; }
 .radio-hist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; max-height: 320px; overflow: auto; }
 .radio-hist li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; font-size: 13px; }

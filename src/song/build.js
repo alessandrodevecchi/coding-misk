@@ -5,7 +5,7 @@
 // shown in the editor always agree. Tracks named by an "add" step are silent before it; the others play from the start.
 import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
-import { spokenBars, narratorStyle, poeticLine, enteringTrack, placeSpoken, lineTexts } from './spoken.js';
+import { spokenBars, narratorStyle, poeticLine, enteringTrack, placeSpoken, lineTexts, lineSounds, withNarratorStyle } from './spoken.js';
 
 // hide and reveal (natural-growth): functions of a track left out of its code until a step brings them in
 // clone, comment, notes (live-coder-growth): a track comes in as a copy of another one; functions commented out in the
@@ -209,15 +209,23 @@ function narration(song, upTo, lang) {
   }
   return out.filter(x => x.text);
 }
-export function voiceCode(song, state, upTo, total, lang, files) {
+// the narrator's lines in the code of a state (the first `upTo` steps applied): [{ at, voice: 'N', text, step, track,
+// bank, n }], after the filters of the code: its voice track muted, a bar where the voice instrument sounds (the
+// narrator yields), no sample. voiceCode writes these lines and spokenSchedule lists them, so they cannot disagree
+export function narratorLines(song, state, upTo, lang, files) {
   const spokenAt = (state.tracks || []).some(t => t.type === 'spoken') ? spokenBars(state, lang) : null;
-  return narration(song, upTo, lang).map(said => {
+  return narration(song, upTo, lang).flatMap(said => {
     const step = said.step, text = said.text, track = voiceOf(state, step);
-    if (track && track.mute) return '';
-    if (spokenAt && spokenAt.has(said.at)) return '';
+    if (track && track.mute) return [];
+    if (spokenAt && spokenAt.has(said.at)) return [];
     const { bank, list } = bankFor(track, lang, files), n = sampleIndex(list, text);
-    if (n < 0) return '';
-    const v = { ...VOICE_DEFAULT, ...((track && track.settings) || {}) }, at = said.at, rest = total - at - 1;
+    if (n < 0) return [];
+    return [{ at: said.at, voice: 'N', text, step, track, bank, n }];
+  });
+}
+export function voiceCode(song, state, upTo, total, lang, files) {
+  return narratorLines(song, state, upTo, lang, files).map(({ at, text, track, bank, n }) => {
+    const v = { ...VOICE_DEFAULT, ...((track && track.settings) || {}) }, rest = total - at - 1;
     const lane = `<${at > 0 ? `0!${at} ` : ''}1${rest > 0 ? ` 0!${rest}` : ''}>`;
     // speed changes length and pitch together; the phase vocoder (stretch) then moves the pitch alone to where it should be
     const f3 = x => Math.round(x * 1000) / 1000, shift = f3(v.pitch / v.tempo);
@@ -229,6 +237,38 @@ export function voiceCode(song, state, upTo, total, lang, files) {
     const label = (state.tracks || []).some(t => t.alone && !t.mute) ? 'S$:' : '$:';
     return `\n// ========== ${track ? `${track.name || track.id} · voice` : 'voice'} ==========\n// "${text}", spoken on bar ${at + 1}\n${label} s("${bank}").n(${n}).mask("${lane}")${fx}.postgain(${v.gain}).orbit(${orbit}).analyze("fx")`;
   }).join('');
+}
+// What each voice says and where, over the whole song (after-tests-oct28 D2): [{ at, voice: 'N' | 'T', text, step?,
+// track? }], sorted by bar, the narrator first. song: the live build as liveCode builds it (liveBuildOf: the narrator
+// style of the controls and the code-of-the-moment steps); C: the controls (narrator off: no N). N: the narrator's lines
+// of every state the code is written in (narratorLines). T: every start of every voice-track line with its texts joined
+// by " · ", when the line has a sample (the samples of spokenContext, as the compiler) and its track sounds on that bar.
+export function spokenSchedule(song, C = {}, lang = 'en', files = {}) {
+  const s = withNarratorStyle(song, C && C.narratorStyle), out = [], seen = new Set();
+  const steps = buildSteps(s), states = new Map();
+  const state = bar => { if (!states.has(bar)) states.set(bar, stateAt(s, bar)); return states.get(bar); };
+  if (!C || C.narrator !== false) {
+    for (const bar of [...new Set([0, ...steps.map(x => x.at)])].sort((a, b) => a - b)) {
+      const st = state(bar);
+      for (const x of narratorLines(s, st.song, st.upTo, lang, files)) {
+        const k = `${x.at}|${x.text}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push({ at: x.at, voice: 'N', text: x.text, step: x.step, track: x.track ? x.track.id : null });
+      }
+    }
+  }
+  if ((s.tracks || []).some(t => t.type === 'spoken')) {
+    for (const p of placeSpoken(s, lang)) {
+      if (!lineSounds(p)) continue;
+      for (const st of p.starts) {
+        const tracks = state(st.bar).song.tracks, tr = tracks.find(x => x.id === p.track), solo = tracks.some(x => x.alone && !x.mute);
+        if (!tr || tr.mute || tr.hush || (solo && !tr.alone)) continue;
+        out.push({ at: st.bar, voice: 'T', text: p.texts.join(' · '), track: p.track });
+      }
+    }
+  }
+  return out.sort((a, b) => a.at - b.at || (a.voice === b.voice ? 0 : a.voice === 'N' ? -1 : 1));
 }
 
 // checks for the "build" list; err/warn take (path, message)

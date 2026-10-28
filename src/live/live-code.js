@@ -21,23 +21,19 @@ import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOp
 // out, buses (for `.chan()`), fns (the functions the code calls: name → { params, chain }, song-functions) }
 // ramps: false keeps long linear lists as written (tools/check-ramps.mjs compares both)
 // canon (reused-lines): this is the reference instance the choices of the code edited in place are made on
-export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0, ramps = true, canon = false } = {}) {
-  const input = build;
-  let self = null;
-  // shape-search D8: in a Live coder growth, a long list that moves linearly per bar (a written sweep) is typed as a
-  // stepped ramp of signals, before the functions fold it; Classic and Crescendo code stay as written
-  const ramp = ramps && build.crescendo && build.crescendo.coder ? rampLists : c => c;
-  // the narrator style of the controls (voice-controls): explaining or poetic over the song's own; automatic keeps it
+// the live build as the code is written from it (after-tests-oct28 D2: the radio lists its voices from the same
+// build): the narrator style of the controls (voice-controls) over the song's own, and in the code of the moment one
+// step at each section boundary (and clip change with Sections), with the bars that prepare it
+// → { build, lanes, now, inPlace, bounds }
+function momentOf(build, C) {
   build = withNarratorStyle(build, C.narratorStyle);
-  const liveCode = C.view, liveGen = C.gen;
-  // technical functions (code-writing, song-functions, code-lanes): `any`, the options the writer folds (all but fnLanes)
-  const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => k !== 'fnLanes' && o[k]);
+  const o = functionOptions(C);
   // the Sections option (code-lanes): in every profile and view the code of the moment, edited in place, its section
   // and clip lanes (gated lines too) in the hidden mixer: one line per part, a step at each section and clip change
   const lanes = !!o.fnLanes;
   // the code of the moment (code-now): each section boundary is a step, and the bars before it prepare the next
   // section's lines (muted); the steps go first on their bar, so a comment on the same bar stays the latest
-  const now = (build.crescendo && liveCode === 'now') || lanes;
+  const now = (build.crescendo && C.view === 'now') || lanes;
   // Live coder (a growth like a live coder), or Sections: no prepared lines and no section lanes in the code; at a
   // section change each line is edited in place, its lanes play from the hidden mixer (live-coder in-place edits)
   const inPlace = !!(now && ((build.crescendo && build.crescendo.coder) || lanes));
@@ -49,6 +45,22 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     if (bounds) for (const b of bounds) extra.push({ at: b });
     build = { ...build, build: [...extra.filter(x => x.at > 0), ...(build.build || [])] };
   }
+  return { build, lanes, now, inPlace, bounds };
+}
+export const liveBuildOf = (build, C) => momentOf(build, C).build;
+export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0, ramps = true, canon = false } = {}) {
+  const input = build;
+  let self = null;
+  // shape-search D8: in a Live coder growth, a long list that moves linearly per bar (a written sweep) is typed as a
+  // stepped ramp of signals, before the functions fold it; Classic and Crescendo code stay as written
+  const ramp = ramps && build.crescendo && build.crescendo.coder ? rampLists : c => c;
+  // the narrator style of the controls (voice-controls): explaining or poetic over the song's own; automatic keeps it
+  const M = momentOf(build, C);
+  build = M.build;
+  const liveCode = C.view, liveGen = C.gen;
+  // technical functions (code-writing, song-functions, code-lanes): `any`, the options the writer folds (all but fnLanes)
+  const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => k !== 'fnLanes' && o[k]);
+  const { lanes, now, inPlace, bounds } = M;
   const boundary = bar => { let a = 0; for (const x of build.sections) { a += x.bars; if (a > bar) return a; } return Infinity; };
   const prepFrom = b => { const k = build.sections.findIndex((_, j) => build.sections.slice(0, j + 1).reduce((y, z) => y + z.bars, 0) === b); return k >= 0 ? b - (build.sections[k].bars >= 4 ? 2 : 1) : Infinity; };
   // keep(track): optional, only the tracks it keeps are compiled (the fast export renders a block with the tracks that play in it)

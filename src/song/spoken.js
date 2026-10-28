@@ -86,6 +86,9 @@ function sampleOf(text, bank, virtual) {
   }
   return null;
 }
+// a placed line (placeSpoken) with a sample for at least one of its texts: the compiler writes code for it (without
+// one it writes only the comment, "no sample"); with files null every sample exists
+export const lineSounds = p => spokenContext.files === null || p.texts.some(x => !!sampleOf(x, p.bank, new Map()));
 // a text's length in seconds: measured by tools/voice.mjs, else estimated from its words
 const secondsOf = (text, bank) => { const m = (spokenContext.lengths || {})[`${bank}/${saySlug(text)}.wav`]; return Number.isFinite(m) && m > 0 ? m : words(text) * SECONDS_PER_WORD + 0.3; };
 
