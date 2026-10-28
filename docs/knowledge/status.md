@@ -14,13 +14,14 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 74. With open tasks: 22. All tasks ticked, waiting to be archived: 52.
+OpenSpec changes not archived: 75. With open tasks: 23. All tasks ticked, waiting to be archived: 52.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
+| [fm-groove-lab](../../openspec/changes/fm-groove-lab/tasks.md) | 2 | 16 |
 | [generator-followups](../../openspec/changes/generator-followups/tasks.md) | 2 | 3 |
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |
 | [idea-model](../../openspec/changes/idea-model/tasks.md) | 3 | 20 |
