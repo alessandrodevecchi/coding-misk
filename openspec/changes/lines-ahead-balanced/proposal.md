@@ -14,7 +14,7 @@ The growth part of a Live coder song is where most quiet steps are. A partial me
 
 ## Non-goals
 
-- Crescendo and Classic: no lines typed ahead there.
+- Crescendo and Classic: no lines typed ahead there. Crescendo is a possible follow-up. Its code is not edited in place, so the plan would need its own pass, and the Crescendo fixtures and `CRESCENDO_VERSION` would move (about 8 to 12 agent hours). Measured gain with the Balanced limits (D8 rules simulated on Crescendo steps, 2026-10-28): 1 line over 38 songs (prova-apre-arpeggio), 0 rushed steps fewer, 0 lines in the rr3 passage of kellerlicht (design, "Prova sul passaggio di rr3").
 - Typing one line ahead in pieces over several quiet steps (lever 1 of the analysis).
 - Preparing a big edit of a playing line on a muted copy and swapping at the step (lever 2).
 - The case left out on prova-apre-arpeggio (252 to 332): a line whose text holds the gate of another section is not found in the code of the step that would type it ahead (lever 3). Fix: find the line by key and show it with the gate of its arrival section.

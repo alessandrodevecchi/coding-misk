@@ -53,6 +53,25 @@ The shape search scores each tried shape on its growth without lines ahead, as t
 
 Saved growths, card lengths and saved sessions with the previous `SHAPES_VERSION` grow again (existing mechanism).
 
+## Prova sul passaggio di rr3
+
+The owner's test rr3 (kellerlicht, Live coder: Nebel at bar 344, Druck at 360) shows many edits in a few seconds. Measured on 2026-10-28 as `growth:probe` measures the written part (written part from bar 280):
+
+| bars | steps | lines changed | typing needed | usable | rushed steps |
+|---|---|---|---|---|---|
+| 320-376 | 14 | 25 | 116.5 s | 65.1 s | 7 |
+| 344-360 | 10 in 16 bars | 24 | 116.2 s | 50.7 s | 7 |
+| 348-352 | 5, one a bar | 5 | 41.9 s | 2.0 s | 5 |
+
+The busiest step is bar 348: a new pluck line needs 23.3 s in 0.4 s. Bars 349 to 357 edit the pad and the pluck at every bar, and Druck (360) changes 9 lines (21.5 s in 2.3 s).
+
+- **Today, Balanced and wider limits** (`atOnce: 4, bars: 64, muted: off, margin: 0`): 0 lines ahead in kellerlicht, the same numbers.
+- **With D2 (growth steps host lines)**, simulated: 2 lines in the growth (58 to 73, 73 to 93), none in this passage; the song's rushed steps stay at 10.
+
+Lines ahead do not smooth this passage. It has one new line (bar 348, 22.8 s of typing), and no step in the 32 bars before has that much spare time (312: 7.9 s, 320: 11.1 s, 347: 2.3 s). The other 23 changes edit lines already shown, which lines ahead do not cover. Bars 312 to 360 have 21.9 s to spare in all against 68.4 s of overrun, so preparing every edit ahead (lever 2) would cover at most a third. The rush comes from the song's written changes one bar apart, not from the limits.
+
+Crescendo, same passage (bars 162-180, Nebel at 164, Druck at 180): 11 steps, 21 lines changed, 193.3 s of typing needed in 62.7 s usable, 8 rushed steps. D8 rules simulated on Crescendo steps give 0 lines on kellerlicht. Over the 38 built-in songs they give 1 line (prova-apre-arpeggio 154 to 156), with 0 rushed steps fewer.
+
 ## Future work
 
 Measured in the analysis (estimates, upper bounds), not in this change:
