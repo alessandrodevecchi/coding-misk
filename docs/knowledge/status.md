@@ -18,7 +18,7 @@ OpenSpec changes not archived: 75. With open tasks: 23. All tasks ticked, waitin
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
-| [after-tests-oct28](../../openspec/changes/after-tests-oct28/tasks.md) | 24 | 44 |
+| [after-tests-oct28](../../openspec/changes/after-tests-oct28/tasks.md) | 7 | 44 |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |

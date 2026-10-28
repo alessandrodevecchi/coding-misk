@@ -76,8 +76,8 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 9. Growth duration label
 
-- [ ] 9.1 `dur:fitted` reads "Al massimo quanto il brano scritto" / "At most as long as the written song"; `durHint` uses the same words; label only (D10)
-- [ ] 9.2 Places that quote the old label follow (Guide, knowledge); `npm run check:guide`, `npm run knowledge`, `npm run check:knowledge`; the i18n check finds both languages
+- [x] 9.1 `dur:fitted` reads "Al massimo quanto il brano scritto" / "At most as long as the written song"; `durHint` uses the same words; label only (D10)
+- [x] 9.2 Places that quote the old label follow (Guide, knowledge); `npm run check:guide`, `npm run knowledge`, `npm run check:knowledge`; the i18n check finds both languages
 
 ## 10. 12 tracks at every bar (ar4, low priority)
 
