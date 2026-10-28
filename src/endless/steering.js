@@ -1,7 +1,7 @@
 // Radio steering (#24, docs/ENDLESS.md "Steering"): the listener's commands turn into a rewrite of the song on
 // air from a boundary. A song is always rebuilt from its original plan plus every command still standing,
 // in order, so cancelling a command or replaying a session gives exactly the same song.
-import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, trackForPart, liftOf, OPTION_DEFAULTS } from './director.js';
+import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, trackForPart, liftOf, OPTION_DEFAULTS, TRACK_CAP } from './director.js';
 import { stream } from './random.js';
 import { stateAt, buildSteps } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
@@ -53,8 +53,9 @@ export const INSTRUMENTS = ['kick', 'beat', 'bass', 'arp', 'hook', 'guitar', 'pa
 export const LOCK_PARTS = [...INSTRUMENTS, 'riser'];
 // recommended tracks per instrument (D4): past it the console warns, it never blocks
 export const RECOMMENDED = { kick: 1, beat: 2, bass: 2, arp: 3, hook: 3, guitar: 3, pad: 3, texture: 3 };
-// the most tracks a song plays at once from the console (riser and voices not counted, D4)
-export const TRACK_CAP = 12;
+// the most tracks a song plays at once from the console (riser and voices not counted, D4); the director holds it at
+// every bar (after-tests-oct28 D8), so it lives there
+export { TRACK_CAP };
 // the riser row (D11): lengths and sounds
 export const RISER_BARS = ['auto', 2, 4, 8];
 export const RISER_SOUNDS = ['noise'];
@@ -118,6 +119,13 @@ function stateOf(song, plan, bar) {
   return stateAt(base, bar).song;
 }
 
+// the most tracks the song plays at once from a bar to its end (after-tests-oct28 D8): a track brought in plays on, so
+// "+" is off when 12 already play at any later bar, not only at the command's
+function mostFrom(song, plan, at) {
+  const bars = [...new Set([at, ...((song && song.build) || []).map(s => s.at).filter(b => b > at && b < plan.bars)])];
+  // (on the steered song itself: its tracks include the ones the listener added, which the plan's base does not hold)
+  return Math.max(0, ...bars.map(b => Math.max(playing(stateOf(song, plan, b)).filter(counted).length, playing(stateAt(song, b).song).filter(counted).length)));
+}
 // why a command cannot apply now, or null when it can (for the console: disabled buttons say why)
 //   late, no-type, all-playing, locked, last-track, no-target, no-drop, not-playing (vary, swap: no track of the part
 //   plays), no-ready (swap: no other ready part fits)
@@ -132,7 +140,7 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
   // listener, D12; past the recommended count it warns, moreWarning)
   if (cmd.kind === 'more') {
     if (!st.tracks.some(t => instrumentOf(t) === cmd.part) && !partHas(plan.R, cmd.part)) return 'no-type';
-    return on.filter(counted).length >= TRACK_CAP ? 'cap' : null;
+    return mostFrom(song, plan, at) >= TRACK_CAP ? 'cap' : null;
   }
   if (cmd.kind === 'less') {
     if (!on.some(t => instrumentOf(t) === cmd.part)) return 'not-playing';
@@ -142,7 +150,7 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
   if (cmd.kind === 'pattern') {
     if (!cmd.item || !fitsAir(cmd.item, plan, song)) return 'no-fit';
     if (cmd.mode === 'replace') return on.some(t => t.id === cmd.target && t.type === cmd.item.type) ? null : 'not-playing';
-    return on.filter(counted).length >= TRACK_CAP ? 'cap' : null;
+    return mostFrom(song, plan, at) >= TRACK_CAP ? 'cap' : null;
   }
   if (cmd.kind === 'add') {
     const all = st.tracks.filter(t => ofType(t, cmd.type));

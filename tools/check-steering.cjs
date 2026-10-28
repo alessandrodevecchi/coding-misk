@@ -5,7 +5,7 @@
 // The console's Voice group (voice-full-controls): Apply on this song and on the whole session, typed lines (Say now, At
 // the right moment, Cancel, Replay) with a fake voice helper, the line field disabled without the helper.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-steering.cjs [shots-dir] [--typed]   (dev server on PORT, default 5173;
-// --typed runs only the typed lines with the real voice helper)
+// --typed runs only the typed lines with the real voice helper, --lock only the locked kick)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -77,6 +77,43 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     }
     check(!(await err()), 'typed lines: no evaluation error', (await err()).slice(0, 120));
     await page.click('#radio-start'); await sleep(300);
+  }
+
+  // a locked kick sits out the break and comes back at the drop (after-tests-oct28 D7): a Classic dark-cyberpunk song
+  // with a break and a drop; the song's steps, then the code on air in the break and at the drop
+  async function lockedKick() {
+    await page.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['dark-cyberpunk'], chaos: 0.3, energy: 0.5, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: 'classic', compilation: 'off' })); });
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', 'lock-a'); await page.click('#radio-start'); await sleep(3000);
+    const S = () => page.evaluate(() => globalThis.codingMiskRadio.steering);
+    const on = b => page.evaluate(async b => { const { stateAt } = await import('/src/song/build.js'), s = globalThis.codingMiskRadio.steering; return stateAt(s.song, b).song.tracks.filter(t => !t.mute && !['voice', 'spoken'].includes(t.type)).map(t => t.id); }, b);
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), (await S()).plan.phrase + 0.3); await sleep(1200);
+    await page.click('#radio-steer [data-lock-part="kick"]'); await sleep(400);
+    const st = await S(), P = st.plan, ph = P.phrase, R = P.roles, cur = await now();
+    const d = R.findIndex((x, i) => i > 0 && x === 'break' && R[i - 1] !== 'break' && i * 2 * ph > cur + ph);
+    const dr = d > 0 ? R.findIndex((x, i) => i > d && x === 'drop' && R[i - 1] !== 'drop') : -1;
+    if (!(d > 0 && dr > 0)) { check(false, 'locked kick: the song has a break and a drop ahead', JSON.stringify(R)); return; }
+    const brk = d * 2 * ph, drop = dr * 2 * ph, before = (await on(brk - 1)).filter(id => /^kick/.test(id));
+    const inBreak = (await on(brk)).filter(id => /^kick/.test(id)), atDrop = (await on(drop)).filter(id => /^kick/.test(id));
+    check(P.lockedParts.includes('kick') && before.length && !inBreak.length && before.every(id => atDrop.includes(id)), 'a locked kick sits out the break and comes back at the drop', `before ${before}, break ${inBreak}, drop ${atDrop}`);
+    const names = await page.evaluate(ids => ids.map(id => { const t = globalThis.codingMiskRadio.steering.song.tracks.find(x => x.id === id); return (t && t.name) || id; }), before);
+    // (headers read "// ========== 1 Kick · drums ==========")
+    const has = (c, i) => new RegExp(`========== (\\d+ )?${names[i]} ·`).test(c);
+    const codeAt = async b => { await page.evaluate(x => globalThis.codingMiskRadio.seek(x), b); await sleep(1500); return page.evaluate(() => document.querySelector('strudel-editor').editor.code); };
+    const cb = await codeAt(brk + 0.3), cd = await codeAt(drop + 0.3);
+    check(before.every((_, i) => !has(cb, i) && has(cd, i)), 'the code on air: no kick in the break, the kick again at the drop', before.map((id, i) => `${id}: break ${has(cb, i)}, drop ${has(cd, i)}`).join('; '));
+    check(!(await err()), 'no evaluation error around the break and the drop', (await err()).slice(0, 120));
+    await page.click('#radio-start'); await sleep(300);
+  }
+  const lockOnly = process.argv.includes('--lock');
+  if (lockOnly) {
+    await lockedKick();
+    check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
+    await browser.close();
+    console.log(failed ? `${failed} failed` : 'all passed');
+    process.exit(failed ? 1 : 0);
   }
   if (typedOnly) {
     await typedLines();
@@ -731,6 +768,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   }
 
   await typedLines();
+  await lockedKick();
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `${failed} failed` : 'all passed');
