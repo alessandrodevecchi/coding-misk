@@ -2,7 +2,7 @@
 // presets), songs drawn within the setup, the now playing tag, Keep for a random artist, Replay gives the same songs,
 // knobs that follow the song on air and hold a value moved by hand (#59), the material source in the setup and next to
 // the knobs, saved with the session (material-generator, radio-variation 6.1 and 6.2).
-// Usage: PLAYWRIGHT_CORE=... node tools/check-compilation.cjs [shots-dir]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-compilation.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -16,7 +16,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const page = await (await browser.newContext({ viewport: { width: 1300, height: 1200 } })).newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => localStorage.clear()); await page.reload(); await sleep(3500);
   const opts = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio') || '{}'));
   await page.click('[data-tab="radio"]'); await sleep(300);

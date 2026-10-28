@@ -59,6 +59,8 @@ Random artists come from a seed: a name, a portrait, a short bio, one to three s
 | `purist` | The Purist | jazz 2, berlin-techno 2, lo-fi 1 |
 <!-- /generated -->
 
+**New song from an artist (new-song-panel D7).** "♪ Nuovo brano" on a sheet opens Compose with the New song panel open, the artist picked in its quick row, and a song by that artist generated with the panel's other values ([live-build.md](live-build.md)). The panel's Artista select and die do the same in Compose.
+
 ## Example
 
 ```json

@@ -1535,3 +1535,61 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
   .fm-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   :root[data-ui="hw"] .fm-amount { grid-template-columns: minmax(0, 1fr); justify-content: stretch; }
 }
+/* the New song panel of Compose (new-song-panel D3, D4, D5, D10): an inline card under the title row */
+.ns-btn { display: inline-flex; align-items: center; gap: 6px; }
+.ns-btn .ico { width: 14px; height: 14px; flex: none; }
+.ns-btn .ico-chevron { transition: transform .15s ease; }
+.ns-btn[aria-expanded="true"] .ico-chevron { transform: rotate(90deg); }
+.new-song { display: grid; gap: 10px; margin-top: 10px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); min-width: 0; }
+.new-song[hidden] { display: none; }
+.ns-head { display: flex; align-items: center; gap: 10px; }
+.ns-head .ns-for { flex: 1 1 auto; min-width: 0; }
+.ns-close { padding: 4px; line-height: 0; color: var(--muted); }
+.ns-close:hover { color: var(--a1); }
+.ns-close .ico { width: 14px; height: 14px; }
+.ns-quick { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }
+.ns-quick .ctrl { display: grid; gap: 4px; min-width: 0; }
+.ns-div { align-self: stretch; width: 1px; background: var(--line); }
+.ns-inline { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.ns-inline select { max-width: 200px; }
+.ns-inline .btn.icon { padding: 4px 6px; line-height: 0; }
+.ns-inline .btn.icon .ico { width: 15px; height: 15px; }
+.ns-seed input { width: 9em; }
+.ns-surprise { display: inline-flex; align-items: center; gap: 6px; }
+.ns-surprise .ico { width: 15px; height: 15px; }
+.ns-saveas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ns-saveas input { flex: 0 1 220px; min-width: 0; }
+.ns-secs { display: grid; gap: 8px; }
+.ns-sec { display: grid; gap: 6px; min-width: 0; }
+.ns-sec > .custom-toggle { width: 100%; text-align: left; }
+.ns-sec .custom-summary { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ns-row { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.ns-row .ctrl { display: grid; gap: 4px; min-width: 160px; }
+.ns-custom { margin-top: 0; }
+.new-song .radio-voices { margin-top: 0; }
+.ns-length { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 18px; }
+.ns-length .ctrl { display: grid; gap: 4px; min-width: 0; }
+.ns-length .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ns-min input { width: 4.5em; }
+.ns-min[hidden] { display: none; }
+.ns-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.genre-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+/* the knobs as faders in the hardware theme (D10): label, fader, value on one line */
+:root[data-ui="hw"] .new-song .ctrls.three { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 18px; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) { display: grid; grid-template-columns: 96px minmax(80px, 1fr) 64px; align-items: center; gap: 8px; text-align: left; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .row { display: contents; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .row label { grid-column: 1; grid-row: 1; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .row .dice { grid-column: 3; grid-row: 2; justify-self: end; margin: 0; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .row output { grid-column: 3; grid-row: 1; text-align: right; padding: 2px 6px; border-radius: 3px; background: #0d0c08; color: var(--a1); box-shadow: inset 0 0 0 1px #2b2a24; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .fader { grid-column: 2; grid-row: 1; }
+:root[data-ui="hw"] .new-song { background: linear-gradient(#26262b, #1d1d21); border-color: #0d0d10; }
+/* a phone (D10): the quick row wraps, the knobs one per line, one control per line in the sections */
+@media (max-width: 560px) {
+  .new-song .ctrls.three, :root[data-ui="hw"] .new-song .ctrls.three { grid-template-columns: minmax(0, 1fr); }
+  .ns-div { display: none; }
+  .ns-quick { gap: 8px; }
+  .ns-inline select { max-width: 150px; }
+  .ns-seed input { width: 7em; }
+  .new-song .custom-grid { grid-template-columns: minmax(0, 1fr); }
+  .ns-row .ctrl { min-width: 0; flex: 1 1 100%; }
+}

@@ -10,7 +10,9 @@ export const CONTROLS = {
   // growth (live-coder-growth): small steps, gradual (the natural growth before live-coder-growth), natural (like a live
   // coder: waypoints and small moves); duration of the natural growth: fitted in the written length or free
   growth: ['crescendo', 'gradual', 'natural'],
-  duration: ['fitted', 'free'],
+  // planned (new-song-panel D12): inside the song's length target, as the radio grows a song on air; only a song with a
+  // length target carries it (song-config.js)
+  duration: ['fitted', 'free', 'planned'],
   // the narrator (profile-options): on, the step phrases are spoken; off, they are not (the voice instrument and the
   // comments are not affected); a configuration saved without it plays with the narrator on
   narrator: [true, false],

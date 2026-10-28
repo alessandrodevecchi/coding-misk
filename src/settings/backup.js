@@ -8,7 +8,8 @@ import { DRAFTS_KEY, mergeDrafts } from '../library/pattern-drafts.js';
 export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
 // working state that does not belong in a backup
-const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel', 'coding-misk-code-w', 'coding-misk-code-collapsed']);
+// (coding-misk-artist-voice: the old voice of the next song by an artist, no longer read since new-song-panel D9)
+const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel', 'coding-misk-code-w', 'coding-misk-code-collapsed', 'coding-misk-artist-voice']);
 
 // entries: [[key, value]] of the browser storage (values parsed). Returns the backup object.
 export function makeBackup(entries, now = new Date()) {
@@ -65,6 +66,13 @@ export function mergeBackup(backup, get) {
       const cur = get(k) && typeof get(k) === 'object' && !Array.isArray(get(k)) ? get(k) : {};
       values[k] = { ...cur, ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}) };
       counts.settings++;
+    } else if (k === 'coding-misk-song-presets') {
+      // the owner's presets of the New song panel (new-song-panel D6) by name: the backup's wins, the others stay
+      const cur = get(k) && typeof get(k) === 'object' && !Array.isArray(get(k)) ? get(k) : {};
+      values[k] = { ...cur, ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}) };
+      counts.settings++;
+    } else if (k === 'coding-misk-artist-voice') {
+      continue;
     } else if (k === 'coding-misk-radio-history') {
       const cur = Array.isArray(get(k)) ? get(k) : [];
       values[k] = [...(Array.isArray(v) ? v : []), ...cur].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 50);

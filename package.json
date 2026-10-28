@@ -49,6 +49,7 @@
     "check:knowledge": "node --no-warnings tools/check-knowledge.mjs",
     "durations": "node --no-warnings tools/song-durations.mjs write",
     "check:durations": "node --no-warnings tools/song-durations.mjs check",
+    "check:song-options": "node --no-warnings tools/check-song-options.mjs",
     "growth:probe": "node --no-warnings tools/growth-probe.mjs"
   },
   "dependencies": {

@@ -51,3 +51,7 @@ export const GROWING = svg('0 0 16 16', '<path class="grow-ring" d="M8 1.4a6.6 6
 export const CROSS = svg('0 0 16 16', '<path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>', 'ico-cross');
 // a power symbol (the on/off switch of a voice, voice-full-controls D15)
 export const POWER = svg('0 0 16 16', '<path d="M8 2v5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.6 4.2a5 5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>', 'ico-power');
+// a plus (make something new: the New song button, new-song-panel D11)
+export const PLUS = svg('0 0 16 16', '<path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>', 'ico-plus');
+// a floppy disk outline (save the values as a preset, new-song-panel D11)
+export const SAVE = svg('0 0 16 16', '<path d="M2.5 2.5h8.6l2.4 2.4v8.6h-11z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5 2.5v3.5h5V2.5M5 13.5V9.5h6v4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>', 'ico-save');

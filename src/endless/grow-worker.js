@@ -6,8 +6,7 @@
 // The page's own work runs here too, in a second worker so the radio never waits for it: the growth of the song
 // restored in Compose at start (crescendo: crescendoSong with the Compose rules) and the grown length of a song card
 // (duration: src/live/card-duration.js). Song lists never grow songs in the page.
-import { growOnAir } from './growth.js';
-import { crescendoSong } from '../song/crescendo.js';
+import { growOnAir, composeGrowth } from './growth.js';
 import { grownDuration } from '../live/card-duration.js';
 import { steerOnAir } from './waypoints.js';
 import { setSpokenContext, spokenContext } from '../song/spoken.js';
@@ -16,7 +15,7 @@ self.onmessage = e => {
   const { id, song, ctx, spoken, steer, crescendo, duration } = e.data || {};
   try {
     if (spoken) setSpokenContext(spoken);
-    if (crescendo) { self.postMessage({ id, crescendo: crescendoSong(crescendo.song, crescendo.opts) }); return; }
+    if (crescendo) { self.postMessage({ id, crescendo: composeGrowth(crescendo.song, crescendo.opts) }); return; }
     if (duration) { self.postMessage({ id, duration: grownDuration(duration, spokenContext.styles) }); return; }
     if (steer) { const r = steerOnAir(steer); self.postMessage({ id, steered: { song: r.song, grown: r.grown, commands: r.commands } }); return; }
     self.postMessage({ id, song: growOnAir(song, ctx) });

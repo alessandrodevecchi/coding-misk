@@ -1470,6 +1470,42 @@ const CHECKS = {
   console.log(`      ${songs} songs, ${presses} "+" pressed, at most ${worst} tracks at a bar`);
   assert(worst === TRACK_CAP, `the cap was never reached (${worst})`);
 },
+'song length (new-song-panel D8): ranges, exact minutes, the draws before it unchanged, fit wins': () => {
+  const secsOf = (g) => g.song.sections.reduce((a, x) => a + x.bars * (Number(x.meter.split('/')[0]) * 4 / Number(x.meter.split('/')[1])) * 60 / x.bpm, 0);
+  const dblOf = g => 2 * g.plan.phrase, barSec = g => secsOf(g) / g.plan.bars;
+  const ranges = { short: [120, 150], medium: [180, 240], long: [300, 360] };
+  let exact120 = 0;
+  for (let i = 0; i < 24; i++) {
+    const seed = `len-${i}`, styles = [STARTING[i % STARTING.length]];
+    const base = createSession(STYLES, seed).next({ styles });
+    for (const [L, [lo, hi]] of Object.entries(ranges)) {
+      const g = createSession(STYLES, seed).next({ styles, length: L });
+      // the draws made before the length: styles, tempo, meter, key
+      assert(g.plan.bpm === base.plan.bpm && g.plan.meter === base.plan.meter && g.plan.key === base.plan.key && JSON.stringify(g.entry.styles) === JSON.stringify(base.entry.styles), `${seed} ${L}: earlier draws moved`);
+      const s = secsOf(g), d = dblOf(g) * barSec(g);
+      assert(g.plan.bars % dblOf(g) === 0, `${seed} ${L}: ${g.plan.bars} bars not whole double phrases`);
+      assert(s >= lo - d / 2 - 0.01 && s <= hi + d / 2 + 0.01, `${seed} ${L}: ${s.toFixed(1)} s outside ${lo}-${hi} s`);
+      // the length heard (D12): one phrase shorter written
+      const h = createSession(STYLES, seed).next({ styles, length: L, lengthHeard: true }), ph = g.plan.phrase * barSec(h);
+      assert(secsOf(h) >= lo - ph - d / 2 - 0.01 && secsOf(h) <= hi - ph + d / 2 + 0.01, `${seed} ${L} heard: ${secsOf(h).toFixed(1)} s`);
+    }
+    const e = createSession(STYLES, seed).next({ styles, length: 3 }), d = dblOf(e) * barSec(e);
+    assert(Math.abs(secsOf(e) - 180) <= d / 2 + 0.01, `${seed} 3 minutes: ${secsOf(e).toFixed(1)} s`);
+    if (e.plan.bpm === 120 && e.plan.meter === '4/4' && e.plan.phrase === 8) { assert(e.plan.bars === 96, `${seed}: 3 minutes at 120 bpm gave ${e.plan.bars} bars, not 96`); exact120++; }
+    // fit wins over length
+    const f = createSession(STYLES, seed).next({ styles, length: 'long', fit: 30 });
+    assert(Math.abs(secsOf(f) - 30) < 2, `${seed}: fit with a length lasts ${secsOf(f).toFixed(1)} s`);
+  }
+  // the spec's example: a 120 bpm 4/4 song with phrases of 8 bars, searched among seeds
+  for (let i = 0; !exact120 && i < 400; i++) {
+    for (const st of STARTING) {
+      const e = createSession(STYLES, `len120-${i}`).next({ styles: [st], length: 3 });
+      if (e.plan.bpm === 120 && e.plan.meter === '4/4' && e.plan.phrase === 8) { assert(e.plan.bars === 96, `3 minutes at 120 bpm gave ${e.plan.bars} bars`); exact120++; break; }
+    }
+  }
+  assert(exact120 > 0, 'no 120 bpm 4/4 song found for the exact case');
+  console.log(`      ${exact120} songs at 120 bpm with length 3: 96 bars`);
+},
 };
 
 // --only <text>: run only the checks whose name holds the text

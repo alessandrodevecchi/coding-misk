@@ -165,6 +165,15 @@ export function fitLength(seconds, beats, phrase, span) {
   return { bars, bpm: Math.round(best.bpm * 1000) / 1000, dbl };
 }
 
+// The song length option (new-song-panel D8): absent or 'style' (the style's minutes), 'short' (2 to 2.5 minutes),
+// 'medium' (3 to 4), 'long' (5 to 6), or a number of minutes (1 to 12). → [lo, hi] minutes, or null for the style's
+export const LENGTH_RANGES = { short: [2, 2.5], medium: [3, 4], long: [5, 6] };
+export function lengthOf(v) {
+  if (LENGTH_RANGES[v]) return LENGTH_RANGES[v];
+  const n = typeof v === 'number' ? v : NaN;
+  return Number.isFinite(n) ? [Math.min(12, Math.max(1, n)), Math.min(12, Math.max(1, n))] : null;
+}
+
 // Plan of one song: parts, tempo, key, length, sections with chords, shape, candidate tracks.
 // opts.fit: seconds, a clip of that exact length that starts at full energy (#5)
 export function planSong({ parts, byId, prev, opts, rng, index }) {
@@ -191,9 +200,24 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
     bars = f.bars; bpm = f.bpm; dbl = f.dbl; phrase = dbl / 2; shape = 'flat-groove';
   } else {
     const lo = Math.max(2, R.minutes[0]), hi = Math.min(6, R.minutes[1]);
-    bars = Math.max(2, Math.round(P.range(lo, hi) * 60 / (beats * 60 / bpm) / dbl)) * dbl;
-    while (secondsOf(bars) < 120) bars += dbl;
-    while (secondsOf(bars) > 360 && bars > 2 * dbl) bars -= dbl;
+    // the song length (new-song-panel D8): a range in place of the style's, or exact minutes; the draw is made in every
+    // case, so the draws after it stay aligned. lengthHeard (D12): the length is the length heard, growth included: the
+    // written song is drawn one phrase shorter (a grown song lasts about one phrase more than written)
+    const L = lengthOf(opts.length), cut = L && opts.lengthHeard ? phrase * beats * 60 / bpm : 0;
+    if (!L) {
+      bars = Math.max(2, Math.round(P.range(lo, hi) * 60 / (beats * 60 / bpm) / dbl)) * dbl;
+      while (secondsOf(bars) < 120) bars += dbl;
+      while (secondsOf(bars) > 360 && bars > 2 * dbl) bars -= dbl;
+    } else {
+      const drawn = P.range(L[0], L[1]), sLo = L[0] * 60 - cut, sHi = L[1] * 60 - cut;
+      // a range: the drawn minutes in whole double phrases, kept inside the range when a whole number of them fits;
+      // exact minutes: the whole number of double phrases nearest to them
+      bars = Math.max(1, Math.round((drawn * 60 - cut) / secondsOf(dbl))) * dbl;
+      if (L[0] !== L[1]) {
+        while (secondsOf(bars) < sLo && secondsOf(bars + dbl) <= sHi) bars += dbl;
+        while (secondsOf(bars) > sHi && bars > dbl && secondsOf(bars - dbl) >= sLo) bars -= dbl;
+      }
+    }
   }
   const doubles = bars / dbl;
   let plan = applyPlanQuirks(shapePlan(shape, doubles, opts.fit ? Math.max(opts.energy, 0.75) : opts.energy), shape, opts);
