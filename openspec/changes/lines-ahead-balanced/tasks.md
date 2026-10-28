@@ -17,7 +17,7 @@
 ## 4. Checks (D5)
 
 - [x] 4.1 `check:live-code` D8 case: a line ahead hosted by a growth step on a song the probe picks shows muted from its step to its target, and the target does not type it again; the limits hold at every step of every built-in song (at once, one per track, one per step, muted lines, not at bar 0, not at a rushed step, look-ahead). Verify: the case fails on the code before task 3.2
-- [ ] 4.2 `check:typing`, `check:mixer -- --full`, `check-compact-code.cjs` (own dev server port, `BROWSER=none --strictPort`), `check:code` (Classic unchanged), `check:strudel`. 2026-10-28: all pass except `check-compact-code.cjs`, not run (port 5193 taken by another worktree's dev server)
+- [x] 4.2 `check:typing`, `check:mixer -- --full`, `check-compact-code.cjs` (own dev server port, `BROWSER=none --strictPort`), `check:code` (Classic unchanged), `check:strudel`. 2026-10-28: all pass, `check-compact-code.cjs` on port 5194
 
 ## 5. Versions and fixtures
 
@@ -27,5 +27,5 @@
 ## 6. Docs and after numbers
 
 - [x] 6.1 Knowledge base: `live-build.md` (lines ahead in the growth), `decisions.md` (Balanced limits row; remove "also in the growth" as rejected), `status.md` (the D8 line), `checks.md` (probe fields); `npm run knowledge`, `npm run check:knowledge`
-- [ ] 6.2 `growth:probe -- all` after: lines ahead in total and per song, before and after, in the DEVLOG (Italian); screenshots for the owner of a growth step with a line ahead and its target step. 2026-10-28: numbers in the DEVLOG; screenshots not taken (port 5193 taken), the code of the steps saved as text in the owner's notes
+- [x] 6.2 `growth:probe -- all` after: lines ahead in total and per song, before and after, in the DEVLOG (Italian); screenshots for the owner of a growth step with a line ahead and its target step. 2026-10-28: numbers in the DEVLOG; screenshots (crescendo-notte-lunga 22 to 38, settimo-cielo 119 to 138) in the owner's notes
 - [x] 6.3 `npm run check:crescendo` quick level before each commit
