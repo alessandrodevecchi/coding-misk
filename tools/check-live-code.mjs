@@ -13,6 +13,8 @@ import { writeCode } from '../src/song/writer.js';
 import { arpForm } from '../src/song/idiom.js';
 import { patternVariants } from '../src/song/crescendo.js';
 import { chainLines, typingPlan, settleOthers } from '../src/song/typing.js';
+import { AHEAD } from '../src/live/written-plan.js';
+import { barSeconds } from '../src/live/typing-load.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const FIXTURES = 'tools/fixtures/live-code.json';
@@ -110,29 +112,44 @@ const CHECKS_REUSED = {
     assert(!p.lines.some(x => roll(x.text) && x.how === 'typed'), 'the rolling bass is typed again at Druck');
   },
   'reused-lines D8: a line typed ahead shows muted from its step, its own step only unmutes it; the limits hold'() {
-    // the approved limits find no line ahead in the built-in songs (DEVLOG 2026-10-26): wider ones for the mechanism
-    globalThis.codingMiskAhead = { bars: 64, margin: 0, section: false };
-    try {
-      const S = live('switch-prima-luce'), a = S.L.ahead();
-      assert(a.length >= 1, 'no line typed ahead on switch-prima-luce with the wider limits');
+    // the default limits (AHEAD, Balanced: lines-ahead-balanced D1) type ahead in the written part of switch-prima-luce
+    // and crescendo-filo-di-luce, and at a growth step of crescendo-notte-lunga (D2)
+    assert(!globalThis.codingMiskAhead, 'the check runs with the default limits');
+    let inGrowth = 0;
+    for (const id of ['switch-prima-luce', 'crescendo-filo-di-luce', 'crescendo-notte-lunga']) {
+      const S = live(id), a = S.L.ahead(), G = S.L.build.crescendo.growth;
+      assert(a.length >= 1, `no line typed ahead on ${id} with the default limits`);
       for (const x of a) {
+        if (x.from < G) inGrowth++;
         const to = S.at(x.to), from = S.at(x.from), prev = S.at(S.before(x.from));
         const line = from.filter(muted).find(l => to.includes(unmute(l)) && !prev.some(p => unmute(p) === unmute(l)));
-        assert(line, `bar ${x.from}: no muted line that plays at bar ${x.to}`);
-        for (const b of S.bars.filter(b => b >= x.from && b < x.to)) assert(S.at(b).includes(line), `bar ${b}: the line ahead is not shown muted`);
-        const p = typingPlan(settleOthers(S.L.codeAt(S.before(x.to)), S.L.codeAt(x.to), x.to), S.L.codeAt(x.to), { style: 'human', lean: true, seed: 'switch-prima-luce', notes: false });
-        assert(!p.lines.some(y => unmute(y.text) === unmute(line)), `bar ${x.to} types the line again`);
+        assert(line, `${id} bar ${x.from}: no muted line that plays at bar ${x.to}`);
+        for (const b of S.bars.filter(b => b >= x.from && b < x.to)) assert(S.at(b).includes(line), `${id} bar ${b}: the line ahead is not shown muted`);
+        const p = typingPlan(settleOthers(S.L.codeAt(S.before(x.to)), S.L.codeAt(x.to), x.to), S.L.codeAt(x.to), { style: 'human', lean: true, seed: id, notes: false });
+        assert(!p.lines.some(y => unmute(y.text) === unmute(line)), `${id} bar ${x.to} types the line again`);
       }
-      // limits: at most 2 at once, one per track; none added on a step that shows 4 or more muted lines
-      for (const id of ['switch-prima-luce', 'kellerlicht', 'luci-rosse', 'crescendo-filo-di-luce']) {
-        const T = id === 'switch-prima-luce' ? S : live(id), A = T.L.ahead();
-        for (const b of T.bars) {
-          const on = A.filter(x => x.from <= b && b < x.to);
-          assert(on.length <= 2 && new Set(on.map(x => x.header)).size === on.length, `${id} bar ${b}: ${on.length} lines ahead`);
-        }
-        for (const x of A) assert(T.at(x.from).filter(muted).length - A.filter(y => y.from <= x.from && x.from < y.to).length < 4, `${id} bar ${x.from}: a line ahead with 4 muted lines shown`);
+    }
+    assert(inGrowth >= 1, 'no line typed ahead at a growth step (lines-ahead-balanced D2)');
+    // limits, at every step of every built-in song: at most AHEAD.atOnce at once, one per track and per step, not at bar
+    // 0, at most AHEAD.bars ahead, none added on a step that shows AHEAD.muted or more muted lines, none on a rushed step
+    // (the step's typing with the line ahead fits its time)
+    const ids = JSON.parse(fs.readFileSync('songs/index.json', 'utf8')).map(x => (typeof x === 'string' ? x : x.id));
+    for (const id of ids) {
+      const T = live(id), A = T.L.ahead(), sb = barSeconds(T.L.build);
+      for (const b of T.bars) {
+        const on = A.filter(x => x.from <= b && b < x.to);
+        assert(on.length <= AHEAD.atOnce && new Set(on.map(x => x.header)).size === on.length, `${id} bar ${b}: ${on.length} lines ahead`);
       }
-    } finally { delete globalThis.codingMiskAhead; }
+      assert(new Set(A.map(x => x.from)).size === A.length, `${id}: two lines ahead added at one step`);
+      for (const x of A) {
+        assert(x.from > 0 && x.to > x.from && x.to - x.from <= AHEAD.bars, `${id}: a line ahead from ${x.from} to ${x.to}`);
+        assert(T.at(x.from).filter(muted).length - A.filter(y => y.from <= x.from && x.from < y.to).length < AHEAD.muted, `${id} bar ${x.from}: a line ahead with ${AHEAD.muted} muted lines shown`);
+        const prev = T.before(x.from), code = T.L.codeAt(x.from), was = settleOthers(T.L.codeAt(prev), code, x.from);
+        const avail = Math.max(0.2, (x.from - prev - 0.5) * sb - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
+        const need = typingPlan(was, code, { style: 'human', lean: true, seed: id, notes: false }).natural;
+        assert(need / usable <= 1.1, `${id} bar ${x.from}: a line ahead on a rushed step (${need.toFixed(1)} s in ${usable.toFixed(1)} s)`);
+      }
+    }
   },
 };
 Object.assign(CHECKS, CHECKS_REUSED);

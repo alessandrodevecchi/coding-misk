@@ -21,8 +21,10 @@ The owner speaks Italian; the code, the docs and this knowledge base are in Engl
 - **Director** (it: regista): the code that writes radio songs. **Recipe** or **style** (it: stile): a JSON file the director reads.
 - **Live coder** is the profile shown to people; its id stays `switch`.
 - **Groove Lab** and **Listen** (it: Ascolta) are the two modes of the app.
-- **Song patterns** (it: Pattern del brano) and **Make patterns** (it: Crea pattern): the two pattern rows of a track panel.
+- **Patterns in this song** (it: Pattern disponibili nel brano) and **Make** (it: Crea): the pattern row of a track panel, with its marks and status line, and the row of the tools that make patterns.
 - **Pattern preview** (it: anteprima del pattern): the small second player of Compose, with the headphones icon. The play triangle means the player bar takes what you press; the headphones mean a preview; the flask opens the Patterns tab.
+- **FM amount** (it: quantità FM): the FM index of an FM card in the Sounds tab, from 0 to the card's maximum; a slider, a horizontal fader in the hardware theme.
+- **Lab preview** (it: ascolto da solo): the third preview player, for the FM cards of the Sounds tab; with the headphones, like the pattern preview. Its listening modes: **Phrase** (it: Frase), **Held note** (it: Nota tenuta), **FM rise** (it: Salita FM).
 - **bar** (the same word in both languages): the bar counter of the player bar, `bar 12 / 64`.
 
 ## Interface terms

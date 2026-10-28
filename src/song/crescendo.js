@@ -691,7 +691,9 @@ function searchShapes(song, opts, stats) {
     let out = growSong(song, { ...opts, rules: r });
     if (c.maxDetail !== undefined && out.crescendo && out.crescendo.detail > c.maxDetail) { if (st) stats.tried.push({ ...st, skipped: 'detail', rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); return null; }
     if (!out.crescendo || !out.crescendo.shape) { if (st) { stats.tried.push({ ...st, rushed: null, load: null, ms: performance.now() - t0, bars: barsOf(out) }); stats.kept = stats.tried.length - 1; } return { plain: out }; }
-    let L = liveCode(out, C, { cols: () => 80 });
+    // (lines-ahead-balanced D4: each shape is measured without lines typed ahead in its growth, so the kept shape and
+    // the free-duration rounds stay as they were; lines ahead are planned on the kept growth only)
+    let L = liveCode(out, C, { cols: () => 80, growthAhead: false });
     // shape-search D1: a shape is judged on the steps of its growth, before the written part (bar crescendo.growth):
     // the section changes and the tracks entering with their first clip after it come the same with every shape. With
     // stats the written part is measured too, for the counters only (the steps of the growth come out the same)
@@ -723,7 +725,7 @@ function searchShapes(song, opts, stats) {
         }
         if (!added) break;
         out = growSong(song, { ...opts, rules: { ...r, extraGaps: { ...extra } } });
-        L = liveCode(out, C, { cols: () => 80 }); m = null;
+        L = liveCode(out, C, { cols: () => 80, growthAhead: false }); m = null;
         if (st) st.rounds++;
       }
     }

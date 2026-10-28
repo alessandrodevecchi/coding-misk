@@ -59,7 +59,7 @@ export function sessionItems(recipes, recipe, count, until = null, { grow = grow
     // (reused-lines D5, D6: the session's shape settings; a song grows with them unless it played its default growth on
     // air; its commands steer the growth it had)
     const search = searchOf(recipe), wide = !!search && playedOf(recipe, n) !== 'default';
-    const ctx = { profile: g.entry.profile, artist: g.opts.artist || null, into: before && before.transition ? before.transition.kind : null, styles: shapes, phrase: g.plan.phrase, controls: custom ? customControls(custom) : null, ...(search ? { search, wide } : {}) };
+    const ctx = { profile: g.entry.profile, artist: g.opts.artist || null, into: before && before.transition ? before.transition.kind : null, styles: shapes, phrase: g.plan.phrase, controls: custom ? customControls(custom) : null, ...(search ? { search, wide } : {}), ...(g.opts.length && g.opts.length !== 'style' ? { fitted: true } : {}) };
     let song;
     if (grow && g.entry.profile && (!cmds.length || waypointsOnAir(recipe))) song = steerOnAir({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: recipe.seed, n, ctx, chooser: airChooserOf(recipe) }).song;
     else {

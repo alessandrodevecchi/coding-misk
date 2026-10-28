@@ -4,13 +4,14 @@
 // as the song with the trial written as its config (withConfig), so the length and the key follow the trial. The grown length of a built-in song is computed offline
 // (tools/song-durations.mjs → src/library/song-durations.json); the user's songs grow in the grow worker, for the cards
 // on screen, and the page keeps the result by key. Pure: the page, the worker and the Node tool compute the same.
-import { crescendoSong, CRESCENDO_VERSION } from '../song/crescendo.js';
+import { CRESCENDO_VERSION } from '../song/crescendo.js';
+import { composeGrowth } from '../endless/growth.js';
 import { SHAPES_VERSION } from '../song/shapes.js';
 import { stateAt } from '../song/build.js';
 import { compileSong } from '../song/compile.js';
 import { parseSong } from '../songs.js';
 import { growthRules } from './profiles.js';
-import { baseConfig, controlsOf } from './song-config.js';
+import { baseConfig, controlsOf, plannedOf } from './song-config.js';
 import { liveCode } from './live-code.js';
 
 // the profile of a song whose configuration grows it (the Live build on, built in Crescendo), else null (as written)
@@ -40,7 +41,7 @@ export function grownDuration(song, styles = {}) {
   const p = growingProfile(song);
   if (!p) return null;
   const C = controlsOf(baseConfig(song));
-  const c = crescendoSong(song, { narrated: C.narrated, rules: growthRules(C, { styles }) });
+  const cfg = baseConfig(song), c = composeGrowth(song, { narrated: C.narrated, rules: growthRules(C, { styles }), planned: plannedOf(cfg, C, styles) });
   if (!c.build.length) return null;
   const live = liveCode(c, C, {});
   const meta = parseSong(live.now ? compileSong(stateAt(live.build, 0).song) : live.codeAt(0));

@@ -10,7 +10,8 @@
 // --all, --keep, --fixed, --long: the advanced settings Try all growth shapes, Keep, Random order off and Long song from
 // (shape-search D6, D7)
 // <song>: an id in songs/ or songs/examples/ (luci-rosse, 04-ideas) or a path to a song file; `all`: every built-in song
-// (songs/index.json), one line each and the totals (reused lines, lines ahead, rushed steps, most muted lines shown).
+// (songs/index.json), one line each and the totals (reused lines, lines ahead by the part that types them and the longest
+// muted wait, rushed steps, most muted lines shown).
 import fs from 'node:fs';
 import path from 'node:path';
 import { setSpokenContext } from '../src/song/spoken.js';
@@ -117,7 +118,10 @@ function reusedLines(build, C) {
     prev = at;
   }
   const typed = list.filter(x => !x.copied);
-  return { lines, reused: typed.length, scratch: typed.filter(x => !x.how || x.how === 'typed').length, identical: typed.filter(x => x.identical).length, growth: typed.filter(x => !x.written).length, written: typed.filter(x => x.written).length, rushed: typed.filter(x => x.ratio > 1.1).length, copied: list.length - typed.length, chars: typed.reduce((a, x) => a + x.len, 0), maxRatio: Math.max(0, ...typed.map(x => x.ratio)), ahead: L.ahead ? L.ahead().length : 0, rushedSteps, mostMuted, list };
+  // (lines-ahead-balanced 3.4) the lines typed ahead, by the part of the step that types them, and the longest time one
+  // stays muted on screen
+  const ahead = (L.ahead ? L.ahead() : []).map(a => ({ ...a, part: a.from < G ? 'growth' : 'written', wait: +(sb(a.to) - sb(a.from)).toFixed(1) }));
+  return { aheadList: ahead, aheadGrowth: ahead.filter(a => a.part === 'growth').length, aheadWritten: ahead.filter(a => a.part === 'written').length, longestWait: Math.max(0, ...ahead.map(a => a.wait)), lines, reused: typed.length, scratch: typed.filter(x => !x.how || x.how === 'typed').length, identical: typed.filter(x => x.identical).length, growth: typed.filter(x => !x.written).length, written: typed.filter(x => x.written).length, rushed: typed.filter(x => x.ratio > 1.1).length, copied: list.length - typed.length, chars: typed.reduce((a, x) => a + x.len, 0), maxRatio: Math.max(0, ...typed.map(x => x.ratio)), ahead: ahead.length, rushedSteps, mostMuted, list };
 }
 
 const over = Object.fromEntries(['opening', 'pace', 'development', 'duration'].filter(k => flags[k]).map(k => [k, flags[k]]));
@@ -132,18 +136,18 @@ function probe(f) {
 }
 if (every) {
   const ids = JSON.parse(fs.readFileSync('songs/index.json', 'utf8')).map(x => (typeof x === 'string' ? x : x.id)), rows = [];
-  const T = { songs: 0, lines: 0, reused: 0, scratch: 0, identical: 0, growth: 0, written: 0, rushed: 0, copied: 0, chars: 0, ahead: 0, rushedSteps: 0, mostMuted: 0, writtenRushed: 0 };
+  const T = { songs: 0, lines: 0, reused: 0, scratch: 0, identical: 0, growth: 0, written: 0, rushed: 0, copied: 0, chars: 0, ahead: 0, aheadGrowth: 0, aheadWritten: 0, longestWait: 0, rushedSteps: 0, mostMuted: 0, writtenRushed: 0 };
   for (const id of ids) {
     const p = probe(fileOf(id)), r = p.reused;
     if (!r) continue;
     const row = { id, ...Object.fromEntries(Object.keys(T).filter(k => k in r).map(k => [k, r[k]])), writtenRushed: p.written ? p.written.total.all.rushed : 0, shape: p.shape ? `${p.shape.opening}/${p.shape.pace}/${p.shape.development}` : null, bars: (p.out.sections || []).reduce((a, x) => a + x.bars, 0) };
-    rows.push(flags.json ? { ...row, list: r.list } : row);
+    rows.push(flags.json ? { ...row, list: r.list, aheadList: r.aheadList } : row);
     T.songs++;
-    for (const k of Object.keys(T)) if (k !== 'songs') T[k] = k === 'mostMuted' ? Math.max(T[k], row[k]) : T[k] + row[k];
-    if (!flags.json) console.log(`${id}: reused ${row.reused} (key by key ${row.scratch}, identical ${row.identical}, growth ${row.growth}, written ${row.written}, rushed ${row.rushed}), copied ${row.copied}, ahead ${row.ahead}, rushed steps ${row.rushedSteps} (written ${row.writtenRushed}), most muted ${row.mostMuted} · ${row.shape} ${row.bars} bars`);
+    for (const k of Object.keys(T)) if (k !== 'songs') T[k] = ['mostMuted', 'longestWait'].includes(k) ? Math.max(T[k], row[k]) : T[k] + row[k];
+    if (!flags.json) console.log(`${id}: reused ${row.reused} (key by key ${row.scratch}, identical ${row.identical}, growth ${row.growth}, written ${row.written}, rushed ${row.rushed}), copied ${row.copied}, ahead ${row.ahead} (growth ${row.aheadGrowth}, written ${row.aheadWritten}${row.ahead ? `, longest muted ${row.longestWait} s: ${r.aheadList.map(a => `${a.from}→${a.to}`).join(' ')}` : ''}), rushed steps ${row.rushedSteps} (written ${row.writtenRushed}), most muted ${row.mostMuted} · ${row.shape} ${row.bars} bars`);
   }
   if (flags.json) console.log(JSON.stringify({ profile, options: over, songs: rows, total: T }, null, 1));
-  else console.log(`total over ${T.songs} songs: ${T.lines} new pattern lines; reused ${T.reused} (key by key ${T.scratch}, identical ${T.identical}, growth ${T.growth}, written ${T.written}, rushed ${T.rushed}, ${T.chars} characters); copied from earlier code ${T.copied}; lines ahead ${T.ahead}; rushed steps ${T.rushedSteps} (written part ${T.writtenRushed}); most muted lines shown ${T.mostMuted}`);
+  else console.log(`total over ${T.songs} songs: ${T.lines} new pattern lines; reused ${T.reused} (key by key ${T.scratch}, identical ${T.identical}, growth ${T.growth}, written ${T.written}, rushed ${T.rushed}, ${T.chars} characters); copied from earlier code ${T.copied}; lines ahead ${T.ahead} (growth ${T.aheadGrowth}, written ${T.aheadWritten}, longest muted ${T.longestWait} s); rushed steps ${T.rushedSteps} (written part ${T.writtenRushed}); most muted lines shown ${T.mostMuted}`);
   process.exit(0);
 }
 const { song, out, stats, shape, written, reused } = probe(file);
@@ -177,6 +181,7 @@ if (written) {
   console.log(`section changes: need ${f(c.need)} s in ${f(c.usable)} s, ${c.pasted} pasted, ${c.rushed} rushed · every written step (${a.steps}): need ${f(a.need)} s in ${f(a.usable)} s, ${a.pasted} pasted, ${a.rushed} rushed`);
 }
 if (reused) {
-  console.log(`reused lines (typed new though a line at least 0.8 alike was shown earlier): ${reused.reused} of ${reused.lines} new pattern lines (key by key ${reused.scratch}, identical ${reused.identical}, growth ${reused.growth}, written ${reused.written}, rushed ${reused.rushed}); copied from earlier code ${reused.copied}; lines ahead ${reused.ahead}; rushed steps ${reused.rushedSteps}; most muted lines shown ${reused.mostMuted}`);
+  console.log(`reused lines (typed new though a line at least 0.8 alike was shown earlier): ${reused.reused} of ${reused.lines} new pattern lines (key by key ${reused.scratch}, identical ${reused.identical}, growth ${reused.growth}, written ${reused.written}, rushed ${reused.rushed}); copied from earlier code ${reused.copied}; lines ahead ${reused.ahead} (growth ${reused.aheadGrowth}, written ${reused.aheadWritten}, longest muted ${reused.longestWait} s); rushed steps ${reused.rushedSteps}; most muted lines shown ${reused.mostMuted}`);
+  for (const a of reused.aheadList) console.log(`  ahead ${a.from} → ${a.to} (${a.part}, muted ${a.wait} s): ${a.text.split('\n')[0].slice(0, 90)}`);
   for (const x of reused.list) console.log(`  bar ${x.at}${x.written ? ' (written)' : ''} like ${x.like}${x.identical ? ' identical' : ''} ratio ${x.ratio} ${x.how || 'typed'}: ${x.line.slice(0, 90)}`);
 }

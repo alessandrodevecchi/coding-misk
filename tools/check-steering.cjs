@@ -4,13 +4,15 @@
 // (radio-profiles stage 5).
 // The console's Voice group (voice-full-controls): Apply on this song and on the whole session, typed lines (Say now, At
 // the right moment, Cancel, Replay) with a fake voice helper, the line field disabled without the helper.
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-steering.cjs [shots-dir]   (dev server on PORT, default 5173)
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-steering.cjs [shots-dir] [--typed]   (dev server on PORT, default 5173;
+// --typed runs only the typed lines with the real voice helper, --lock only the locked kick)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
-const shots = process.argv[2];
+const shots = process.argv.slice(2).find(a => !a.startsWith('--'));
+const typedOnly = process.argv.includes('--typed');
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
 (async () => {
@@ -27,6 +29,99 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const ST = () => page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return s && { n: s.n, commands: s.commands, plan: s.plan, recipe: s.recipe, build: s.song.build.filter(x => x.by).map(x => ({ at: x.at, add: x.add, remove: x.remove, set: x.set, pattern: x.pattern })), patterns: Object.fromEntries(s.song.tracks.map(t => [t.id, t.patterns])) }; });
   const now = () => page.evaluate(() => { const r = globalThis.codingMiskRadio.state, it = r.stream[r.onAir]; return document.querySelector('strudel-editor').editor.repl.scheduler.now() - it.start; });
   const err = () => page.evaluate(() => String(document.querySelector('strudel-editor').editor.repl.state.evalError || ''));
+
+  // typed lines with the real voice helper (after-tests-oct28 D4): on a song whose voice track already plays, Say now
+  // and At the right moment are evaluated on their bar (an evaluation on that bar whose code holds the line) and the
+  // fx analyser peaks there, with no seek after the command
+  async function typedLines() {
+    await page.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['pure-trance'], chaos: 0.3, energy: 0.5, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: 'classic', compilation: 'off', voice: { presence: 'always' } })); });
+    await page.reload(); await sleep(3500);
+    const helper = await page.evaluate(() => fetch('/voice/status').then(r => r.ok).catch(() => false));
+    if (!helper) { check(false, 'typed lines: the real voice helper of the dev server answers'); return; }
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', 'typed-b'); await page.click('#radio-start'); await sleep(3000);
+    // two bars after the voice track's first line, where it plays
+    const first = await page.evaluate(() => { const s = globalThis.codingMiskRadio.steering, sp = s.song.tracks.find(t => t.type === 'spoken'); return sp && sp.clips.length ? Math.min(...sp.clips.map(c => c.start)) : null; });
+    if (first === null) { check(false, 'typed lines: the song has a voice track'); return; }
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), first + 2); await sleep(1500);
+    await page.evaluate(() => {
+      const repl = document.querySelector('strudel-editor').editor.repl, orig = repl.evaluate.bind(repl);
+      const rel = () => { const r = globalThis.codingMiskRadio.state, it = r.stream[r.onAir]; return repl.scheduler.now() - it.start; };
+      window.__evals = []; window.__fx = {};
+      repl.evaluate = (code, ...a) => { window.__evals.push({ bar: rel(), code }); return orig(code, ...a); };
+      setInterval(() => { try { const d = getAnalyzerData('time', 'fx'); let m = 0; for (const v of d) m = Math.max(m, Math.abs(v)); const b = Math.floor(rel()); window.__fx[b] = Math.max(window.__fx[b] || 0, m); } catch (e) {} }, 40);
+    });
+    const lineOf = text => page.evaluate(t => { const s = globalThis.codingMiskRadio.steering, sp = s.song.tracks.find(x => x.type === 'spoken'), k = sp && Object.keys(sp.patterns).find(q => sp.patterns[q].text && Object.values(sp.patterns[q].text).includes(t)); return k ? sp.clips.find(c => c.pattern === k) : null; }, text);
+    const waitBar = async b => { for (let k = 0; k < 400 && (await now()) < b; k++) await sleep(250); };
+    for (const [mode, text] of [['now', 'the lamps are low tonight'], ['moment', 'we keep on walking slowly']]) {
+      if (mode === 'moment') {
+        // (the next free part where the voice track may speak, reached in a few bars: the seek comes before the command)
+        const p = await page.evaluate(async () => { const { sayBar } = await import('/src/endless/steering.js'); const r = globalThis.codingMiskRadio.state, it = r.stream[r.onAir]; const s = globalThis.codingMiskRadio.steering; return sayBar(s.song, Math.ceil(document.querySelector('strudel-editor').editor.repl.scheduler.now() - it.start + 0.5)); });
+        if (p === null) { check(false, 'At the right moment: a free part is left'); continue; }
+        if (p - (await now()) > 6) { await page.evaluate(b => globalThis.codingMiskRadio.seek(b), p - 4); await sleep(1500); }
+      }
+      await page.evaluate(() => { window.__evals = []; window.__fx = {}; });
+      await page.fill('#radio-steer [data-sv-line]', text); await page.click(`#radio-steer [data-sv-say="${mode}"]`);
+      let clip = null;
+      for (let k = 0; k < 80 && !clip; k++) { await sleep(250); clip = await lineOf(text); }
+      if (!clip) { check(false, `${mode}: the line reached the song`); continue; }
+      await waitBar(clip.start + 2.5);
+      const r = await page.evaluate(() => ({ evals: window.__evals.map(e => ({ bar: e.bar, has: e.code })), fx: window.__fx }));
+      const onBar = r.evals.filter(e => e.bar >= clip.start - 0.25 && e.bar < clip.start + 0.75 && e.has.includes(text.replace(/"/g, "'")));
+      // (the fx analyser also hears the narrator and the voice track's other lines, and it holds a level for bars after a
+      // sound: its peak is printed, not judged; the evaluation on the bar is what the radio missed, vo15)
+      const peak = Math.max(r.fx[clip.start] || 0, r.fx[clip.start + 1] || 0);
+      check(onBar.length > 0, `${mode}: the code is evaluated on the line's bar ${clip.start + 1} with the line in it`, r.evals.map(e => e.bar.toFixed(2)).join(' '));
+      console.log(`      ${mode}: fx on the line's bar ${clip.start + 1}: ${peak.toFixed(2)}; ${Object.entries(r.fx).filter(([, v]) => v > 0.02).map(([b, v]) => `${+b + 1}=${v.toFixed(2)}`).join(' ')}`);
+    }
+    check(!(await err()), 'typed lines: no evaluation error', (await err()).slice(0, 120));
+    await page.click('#radio-start'); await sleep(300);
+  }
+
+  // a locked kick sits out the break and comes back at the drop (after-tests-oct28 D7): a Classic dark-cyberpunk song
+  // with a break and a drop; the song's steps, then the code on air in the break and at the drop
+  async function lockedKick() {
+    await page.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['dark-cyberpunk'], chaos: 0.3, energy: 0.5, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: 'classic', compilation: 'off' })); });
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', 'lock-a'); await page.click('#radio-start'); await sleep(3000);
+    const S = () => page.evaluate(() => globalThis.codingMiskRadio.steering);
+    const on = b => page.evaluate(async b => { const { stateAt } = await import('/src/song/build.js'), s = globalThis.codingMiskRadio.steering; return stateAt(s.song, b).song.tracks.filter(t => !t.mute && !['voice', 'spoken'].includes(t.type)).map(t => t.id); }, b);
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), (await S()).plan.phrase + 0.3); await sleep(1200);
+    await page.click('#radio-steer [data-lock-part="kick"]'); await sleep(400);
+    const st = await S(), P = st.plan, ph = P.phrase, R = P.roles, cur = await now();
+    const d = R.findIndex((x, i) => i > 0 && x === 'break' && R[i - 1] !== 'break' && i * 2 * ph > cur + ph);
+    const dr = d > 0 ? R.findIndex((x, i) => i > d && x === 'drop' && R[i - 1] !== 'drop') : -1;
+    if (!(d > 0 && dr > 0)) { check(false, 'locked kick: the song has a break and a drop ahead', JSON.stringify(R)); return; }
+    const brk = d * 2 * ph, drop = dr * 2 * ph, before = (await on(brk - 1)).filter(id => /^kick/.test(id));
+    const inBreak = (await on(brk)).filter(id => /^kick/.test(id)), atDrop = (await on(drop)).filter(id => /^kick/.test(id));
+    check(P.lockedParts.includes('kick') && before.length && !inBreak.length && before.every(id => atDrop.includes(id)), 'a locked kick sits out the break and comes back at the drop', `before ${before}, break ${inBreak}, drop ${atDrop}`);
+    const names = await page.evaluate(ids => ids.map(id => { const t = globalThis.codingMiskRadio.steering.song.tracks.find(x => x.id === id); return (t && t.name) || id; }), before);
+    // (headers read "// ========== 1 Kick · drums ==========")
+    const has = (c, i) => new RegExp(`========== (\\d+ )?${names[i]} ·`).test(c);
+    const codeAt = async b => { await page.evaluate(x => globalThis.codingMiskRadio.seek(x), b); await sleep(1500); return page.evaluate(() => document.querySelector('strudel-editor').editor.code); };
+    const cb = await codeAt(brk + 0.3), cd = await codeAt(drop + 0.3);
+    check(before.every((_, i) => !has(cb, i) && has(cd, i)), 'the code on air: no kick in the break, the kick again at the drop', before.map((id, i) => `${id}: break ${has(cb, i)}, drop ${has(cd, i)}`).join('; '));
+    check(!(await err()), 'no evaluation error around the break and the drop', (await err()).slice(0, 120));
+    await page.click('#radio-start'); await sleep(300);
+  }
+  const lockOnly = process.argv.includes('--lock');
+  if (lockOnly) {
+    await lockedKick();
+    check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
+    await browser.close();
+    console.log(failed ? `${failed} failed` : 'all passed');
+    process.exit(failed ? 1 : 0);
+  }
+  if (typedOnly) {
+    await typedLines();
+    check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
+    await browser.close();
+    console.log(failed ? `${failed} failed` : 'all passed');
+    process.exit(failed ? 1 : 0);
+  }
 
   check(await page.isVisible('#radio-steer .steer-console'), 'console shown while the radio plays');
   const tips = await page.$$eval('#radio-steer .steer-btn[disabled]', xs => xs.map(x => x.title));
@@ -672,6 +767,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     await page.click('#radio-start'); await sleep(300);
   }
 
+  await typedLines();
+  await lockedKick();
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `${failed} failed` : 'all passed');

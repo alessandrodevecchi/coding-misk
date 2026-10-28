@@ -549,6 +549,12 @@
 .radio-next { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 .radio-next li { display: block; background: none; padding: 0; }
 .radio-next .at { font: 11px var(--mono); color: var(--a2); margin-right: 6px; }
+.radio-next .vtag { display: inline-block; font: 10px/1 var(--mono); letter-spacing: .04em; padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px; vertical-align: 1px; }
+.radio-next .vtag-n { color: var(--a1); }
+.radio-next .vtag-t { color: var(--s3); }
+.radio-next em { color: var(--muted); }
+:root[data-ui="hw"] .radio-next .vtag-n { color: var(--lcd-fg); }
+:root[data-ui="hw"] .radio-next .vtag-t { color: var(--led); }
 .radio-after { font-size: 12px; }
 .radio-hist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; max-height: 320px; overflow: auto; }
 .radio-hist li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; font-size: 13px; }
@@ -1349,8 +1355,28 @@ canvas.pn-pv.big { height: 110px; margin: 0; border: 1px solid var(--line); }
 .pt-preview { flex: none; min-width: 0; padding: 4px 7px; }
 .pt-preview[aria-pressed="true"] { color: var(--a1); border-color: var(--a1); background: color-mix(in srgb, var(--a1) 20%, var(--panel2)); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 45%, transparent); }
 :root[data-ui="hw"] .pt-preview[aria-pressed="true"] { color: var(--a1); text-shadow: 0 0 8px var(--a1); background: linear-gradient(#3b3b41, #28282d); box-shadow: inset 0 1px 3px rgba(0,0,0,.6); }
-/* the two pattern rows of the track panel (Song patterns, Make patterns) */
+/* the pattern rows of the track panel (Patterns in this song, Make) */
 .tp-pats-make { margin-top: 6px; }
+/* the one pattern row (after-tests-oct28 D9): marks on the chips, a status line, a legend */
+:root { --mark: #2fd8ff; }
+.tp-pats-song .pat-hint { margin: -2px 0 0; }
+.pat-chip { display: inline-flex; align-items: center; gap: 5px; }
+.pat-chip .pat-k { font-weight: 600; }
+.pat-badge { display: inline-block; font: 600 9px/1 var(--mono); letter-spacing: .06em; padding: 3px 4px; border-radius: 3px; background: var(--mark); color: #041018; }
+.pat-used { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--mark); box-sizing: border-box; }
+.pat-pv { display: inline-flex; color: var(--mark); }
+.pat-pv svg { width: 13px; height: 13px; }
+.pat-edit { display: inline-block; width: 14px; height: 10px; border: 1.5px solid var(--a1); border-radius: 3px; box-sizing: border-box; vertical-align: -1px; }
+.pat-status { margin: 0; font-size: 13px; }
+.pat-status .pat-how { display: block; margin-top: 2px; }
+.pat-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.pat-legend { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--muted); }
+.pat-leg { display: inline-flex; align-items: center; gap: 4px; }
+.pat-leg .pat-badge { font-size: 8px; padding: 2px 3px; }
+#track-panel .chip[disabled] { opacity: .45; cursor: not-allowed; }
+:root[data-ui="hw"] .pat-badge { background: var(--mark); color: #041018; text-shadow: none; }
+:root[data-ui="hw"] .pat-status { font-family: var(--mono); font-size: 12px; }
+:root[data-ui="hw"] .pat-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--a1), 0 2px 0 #000; }
 .pt-savepat { display: inline-flex; align-items: center; gap: 5px; }
 button.pat-link { cursor: pointer; background: none; color: inherit; }
 button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); color: var(--a1); }
@@ -1470,3 +1496,105 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 :root[data-ui="hw"] .vs-grid .ctrl .row output { grid-column: 3; grid-row: 1; text-align: right; padding: 2px 6px; border-radius: 3px; background: #0d0c08; color: var(--a1); box-shadow: inset 0 0 0 1px #2b2a24; }
 :root[data-ui="hw"] .vs-grid .ctrl .fader { grid-column: 2; grid-row: 1; }
 :root[data-ui="hw"] .radio-voices .vs-grid { grid-template-columns: 1fr; }
+/* the FM lab (fm-groove-lab): FM cards with a wave thumbnail and headphones, a detail with the listening modes, four
+   drawings against the FM amount, the amount (a horizontal fader, centred and narrow, in the hardware theme), the scope */
+.fm-intro { margin: 0 0 8px; }
+.fm-cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.fm-card { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.fm-pick { display: grid; gap: 5px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.fm-thumb { display: block; width: 100%; height: 40px; border-radius: 6px; background: #0e0a1a; }
+.fm-card .fm-listen { align-self: start; }
+.fm-card .sb-cname small { white-space: normal; }
+.fm-card .sb-star { top: auto; bottom: 6px; right: 9px; }
+.sb-insp.fm-insp { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.fm-top { display: flex; align-items: center; gap: 10px; }
+.fm-title { display: grid; gap: 2px; min-width: 0; }
+.fm-modes { display: grid; gap: 4px; }
+.fm-mode-line { margin: 0; font-size: 12px; }
+.fm-draws { display: grid; gap: 8px; }
+.fm-waves { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.fm-wave { margin: 0; display: grid; gap: 3px; padding: 4px; border: 1px solid var(--line); border-radius: 7px; background: #0e0a1a; }
+.fm-wave[aria-current="true"] { border-color: var(--a1); box-shadow: 0 0 0 1px var(--a1); }
+.fm-wave canvas { display: block; width: 100%; height: 56px; }
+.fm-wave figcaption { font: 10px var(--mono); color: var(--muted); text-align: center; }
+.fm-wave[aria-current="true"] figcaption { color: var(--a1); }
+.fm-amount { display: grid; grid-template-columns: auto minmax(0, 1fr) 48px; align-items: center; gap: 10px; }
+.fm-amount input[type=range] { width: 100%; }
+.fm-amount output { font: 12px var(--mono); color: var(--a1); text-align: right; }
+.fm-scope { display: grid; gap: 4px; }
+.fm-scope canvas { display: block; width: 100%; height: 80px; border: 1px solid var(--line); border-radius: 7px; background: #0e0a1a; }
+.fm-insp code { font: 12px var(--mono); color: var(--a2); overflow-wrap: anywhere; }
+/* hardware theme: the fader is centred under the drawings, at most 320 px wide; the slider stays, hidden, for the keyboard */
+:root[data-ui="hw"] .fm-amount { grid-template-columns: minmax(0, 320px); justify-content: center; justify-items: center; gap: 4px; }
+:root[data-ui="hw"] .fm-amount .fader { width: 100%; }
+:root[data-ui="hw"] .fm-amount output { padding: 2px 6px; border-radius: 3px; background: #0d0c08; box-shadow: inset 0 0 0 1px #2b2a24; }
+:root[data-ui="hw"] .fm-amount input[type=range][data-knob] { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+:root[data-ui="hw"] .fm-amount:focus-within .fader-cap { outline: 2px solid var(--a2); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .fm-waves { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fm-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root[data-ui="hw"] .fm-amount { grid-template-columns: minmax(0, 1fr); justify-content: stretch; }
+}
+/* the New song panel of Compose (new-song-panel D3, D4, D5, D10): an inline card under the title row */
+.ns-btn { display: inline-flex; align-items: center; gap: 6px; }
+.ns-btn .ico { width: 14px; height: 14px; flex: none; }
+.ns-btn .ico-chevron { transition: transform .15s ease; }
+.ns-btn[aria-expanded="true"] .ico-chevron { transform: rotate(90deg); }
+.new-song { display: grid; gap: 10px; margin-top: 10px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); min-width: 0; }
+.new-song[hidden] { display: none; }
+.ns-head { display: flex; align-items: center; gap: 10px; }
+.ns-head .ns-for { flex: 1 1 auto; min-width: 0; }
+.ns-close { padding: 4px; line-height: 0; color: var(--muted); }
+.ns-close:hover { color: var(--a1); }
+.ns-close .ico { width: 14px; height: 14px; }
+.ns-quick { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }
+.ns-quick .ctrl { display: grid; gap: 4px; min-width: 0; }
+.ns-div { align-self: stretch; width: 1px; background: var(--line); }
+.ns-inline { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.ns-inline select { max-width: 200px; }
+.ns-inline .btn.icon { padding: 4px 6px; line-height: 0; }
+.ns-inline .btn.icon .ico { width: 15px; height: 15px; }
+.ns-seed input { width: 9em; }
+.ns-surprise { display: inline-flex; align-items: center; gap: 6px; }
+.ns-surprise .ico { width: 15px; height: 15px; }
+.ns-saveas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ns-saveas input { flex: 0 1 220px; min-width: 0; }
+.ns-secs { display: grid; gap: 8px; }
+.ns-sec { display: grid; gap: 6px; min-width: 0; }
+.ns-sec > .custom-toggle { width: 100%; text-align: left; }
+.ns-sec .custom-summary { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ns-row { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.ns-row .ctrl { display: grid; gap: 4px; min-width: 160px; }
+.ns-custom { margin-top: 0; }
+.new-song .radio-voices { margin-top: 0; }
+.ns-length { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 18px; }
+.ns-length .ctrl { display: grid; gap: 4px; min-width: 0; }
+.ns-length .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ns-min input { width: 4.5em; }
+.ns-min[hidden] { display: none; }
+.ns-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.genre-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+/* the knobs as faders in the hardware theme (D10): label, fader, value on one line */
+:root[data-ui="hw"] .new-song .ctrls.three { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 18px; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) { display: grid; grid-template-columns: 96px minmax(80px, 1fr) 64px; align-items: center; gap: 8px; text-align: left; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .row { display: contents; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .row label { grid-column: 1; grid-row: 1; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .row .dice { grid-column: 3; grid-row: 2; justify-self: end; margin: 0; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .row output { grid-column: 3; grid-row: 1; text-align: right; padding: 2px 6px; border-radius: 3px; background: #0d0c08; color: var(--a1); box-shadow: inset 0 0 0 1px #2b2a24; }
+:root[data-ui="hw"] .new-song .ctrls .ctrl:has(> input[data-fader]) .fader { grid-column: 2; grid-row: 1; }
+:root[data-ui="hw"] .new-song { background: linear-gradient(#26262b, #1d1d21); border-color: #0d0d10; }
+/* a phone (D10): the quick row wraps, the knobs one per line, one control per line in the sections */
+@media (max-width: 560px) {
+  .new-song .ctrls.three, :root[data-ui="hw"] .new-song .ctrls.three { grid-template-columns: minmax(0, 1fr); }
+  .ns-div { display: none; }
+  .ns-quick { gap: 8px; }
+  .ns-inline select { max-width: 150px; }
+  .ns-seed input { width: 7em; }
+  .new-song .custom-grid { grid-template-columns: minmax(0, 1fr); }
+  .ns-row .ctrl { min-width: 0; flex: 1 1 100%; }
+}
+/* the radio's Durata for its next songs (new-song-panel phase 8) */
+.radio-length { display: grid; gap: 4px; margin-top: 10px; }
+.radio-length .ctrl { display: grid; gap: 4px; }
+.radio-length .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.radio-length .hint { margin: 0; }

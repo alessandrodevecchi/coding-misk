@@ -1,8 +1,8 @@
 ---
 id: live-build
 related: [profiles, growth-shapes, songs, ideas, narrator, comments-and-functions]
-code: [src/song/build.js, src/song/crescendo.js, src/song/coder.js, src/live/live-code.js, src/song/typing.js]
-checks: [npm run check:crescendo, npm run check:live-code, npm run check:typing, npm run check:functions]
+code: [src/song/build.js, src/song/crescendo.js, src/song/coder.js, src/live/live-code.js, src/song/typing.js, src/live/new-song-panel.js, src/endless/new-song.js]
+checks: [npm run check:crescendo, npm run check:live-code, npm run check:typing, npm run check:functions, npm run check:song-options, node tools/check-new-song.cjs]
 ---
 
 # Live build
@@ -29,7 +29,7 @@ The changes are steps: a list of timed actions in the song's `build` field. A st
 
 **Typing.** Human typing waits, types at an uneven pace and makes mistakes it fixes. A new line that cannot be typed at a person's pace before its step is pasted whole. With free duration the step waits for the typing instead. A long new line (40 characters or more) like a line above it is pasted as a copy and edited; since reused-lines (D3) one like a line the code showed earlier in the song and no longer shows is copied from that earlier code the same way, after a short pause to look it up (`typingPlan(…, { earlier })`, `L.earlier(bar)` in `src/live/live-code.js`), in the growth and in the written part.
 
-**Lines kept for later (reused-lines).** In the written part of a Live coder growth a line that goes silent and comes back stays muted when that is cheaper to type (costed on the code as shown, the line's own share), a line replaced by another pattern of its track stays muted above it until it returns, a muted line that returns changed is edited while still muted at the quiet step of its silence, and a new line of a crowded coming step may be typed ahead, muted (`src/live/written-plan.js`). Details in [comments-and-functions.md](comments-and-functions.md).
+**Lines kept for later (reused-lines).** In the written part of a Live coder growth a line that goes silent and comes back stays muted when that is cheaper to type (costed on the code as shown, the line's own share), a line replaced by another pattern of its track stays muted above it until it returns, a muted line that returns changed is edited while still muted at the quiet step of its silence, and a new line of a crowded coming step may be typed ahead, muted, at a quiet step of the written part or of the growth (lines-ahead-balanced D2; never at bar 0 or a rushed step; `src/live/written-plan.js`). Details in [comments-and-functions.md](comments-and-functions.md).
 
 ## Options
 
@@ -51,6 +51,10 @@ Step actions (`BUILD_ACTIONS`): `add`, `remove`, `set`, `pattern`, `rack`, `unra
 - `mute` and `unmute`: the line stays in the code with `_$:`, or loses the `_`.
 - `solo` and `unsolo`: the line plays alone with `S$:`, or loses the `S`.
 - `mask`: a mask per phrase on a track's lines, such as `"<1 1 0 1>"`.
+
+**New song panel (new-song-panel, #78).** Nuovo brano in the Compose title row opens an inline panel (`src/live/new-song-panel.js`) under it; × or Esc closes it, and it stays open across reloads (`coding-misk-new-song-open`). The quick row: Da zero (the empty song with one drum track, no configuration of its own), Artista (with its die), Preset (with save and delete), Seme (empty: a new one; after Genera it shows the seed used), Genera and Sorprendimi. Five folded sections with a summary each (`coding-misk-new-song-folds`): Stile e genere (genre chips, styles, dice, the three knobs), Profilo e crescita (Profile and every Custom control; touching one turns the profile into Custom based on it, Live coder for the artist's choice), Voci (the radio's two voice blocks), Materiale (the material and the Generator, disabled in blocks), Durata (Come lo stile, Breve, Media, Lunga, Esatta in minutes, next to Durata della crescita). The controls are the radio's own functions (`src/radio/song-controls.js`) on the panel's own values (`coding-misk-new-song`, [radio.md](radio.md)). Genera (`generateSong` in `src/endless/new-song.js`) makes one director song from them and opens it unsaved with the chosen profile as its own configuration ([profiles.md](profiles.md), song-own-settings). Sorprendimi (`surpriseValues`) draws every value from one seed, writes them into the panel and generates with that seed: the same seed gives the same values and song.
+
+**Length target (D12).** With a Durata the director draws the written song one phrase shorter than the range (`length`, `lengthHeard`), and the song keeps `config.durationTarget` (`{ length, phrase }`). While it holds, a growing build grows with the growth duration `planned` (`controlsOf` in `src/live/song-config.js`): `composeGrowth` in `src/endless/growth.js` grows it as the radio grows a song on air (the growth takes the written bars before a section boundary), in the page, the Compose worker, the card length and the exports alike; Classic plays the written song. So a profile switch in Compose keeps the heard length within a phrase. Libera (or the fitted growth) in Durata della crescita removes the target (`setDuration`), with the line "La durata scelta non vale più". A song the growth cannot plan grows fitted. Songs without a target grow as before.
 
 ## Example
 

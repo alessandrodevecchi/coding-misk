@@ -35,9 +35,12 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // 10 (voice-full-controls D14): every style has a voice track chance (some low, country none), so songs of 17 more
 // styles may get a Words track; the music does not move
 // 11 (radio-arrangement): steered songs change: + and − per instrument, tracks the listener added stay, a lock per
-// instrument (a locked drum plays through breaks; the listener's commands reach locked tracks), headroom as tracks add
+// instrument (a locked drum played through breaks until version 12; the listener's commands reach locked tracks), headroom as tracks add
 // up, the listener's risers; the seed fixtures do not move (they have no commands)
-export const DIRECTOR_VERSION = 11;
+// 12 (after-tests-oct28 D7): a locked drum sits out breaks and the charge before a drop and comes back at the drop,
+// like an unlocked one; other locked instruments still play through; a steered song never plays more than 12 tracks at
+// a bar (D8: the director's adds, the returns after a break and the drop stop at the cap, its own tracks leave past it)
+export const DIRECTOR_VERSION = 12;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };
@@ -162,6 +165,15 @@ export function fitLength(seconds, beats, phrase, span) {
   return { bars, bpm: Math.round(best.bpm * 1000) / 1000, dbl };
 }
 
+// The song length option (new-song-panel D8): absent or 'style' (the style's minutes), 'short' (2 to 2.5 minutes),
+// 'medium' (3 to 4), 'long' (5 to 6), or a number of minutes (1 to 12). → [lo, hi] minutes, or null for the style's
+export const LENGTH_RANGES = { short: [2, 2.5], medium: [3, 4], long: [5, 6] };
+export function lengthOf(v) {
+  if (LENGTH_RANGES[v]) return LENGTH_RANGES[v];
+  const n = typeof v === 'number' ? v : NaN;
+  return Number.isFinite(n) ? [Math.min(12, Math.max(1, n)), Math.min(12, Math.max(1, n))] : null;
+}
+
 // Plan of one song: parts, tempo, key, length, sections with chords, shape, candidate tracks.
 // opts.fit: seconds, a clip of that exact length that starts at full energy (#5)
 export function planSong({ parts, byId, prev, opts, rng, index }) {
@@ -188,9 +200,24 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
     bars = f.bars; bpm = f.bpm; dbl = f.dbl; phrase = dbl / 2; shape = 'flat-groove';
   } else {
     const lo = Math.max(2, R.minutes[0]), hi = Math.min(6, R.minutes[1]);
-    bars = Math.max(2, Math.round(P.range(lo, hi) * 60 / (beats * 60 / bpm) / dbl)) * dbl;
-    while (secondsOf(bars) < 120) bars += dbl;
-    while (secondsOf(bars) > 360 && bars > 2 * dbl) bars -= dbl;
+    // the song length (new-song-panel D8): a range in place of the style's, or exact minutes; the draw is made in every
+    // case, so the draws after it stay aligned. lengthHeard (D12): the length is the length heard, growth included: the
+    // written song is drawn one phrase shorter (a grown song lasts about one phrase more than written)
+    const L = lengthOf(opts.length), cut = L && opts.lengthHeard ? phrase * beats * 60 / bpm : 0;
+    if (!L) {
+      bars = Math.max(2, Math.round(P.range(lo, hi) * 60 / (beats * 60 / bpm) / dbl)) * dbl;
+      while (secondsOf(bars) < 120) bars += dbl;
+      while (secondsOf(bars) > 360 && bars > 2 * dbl) bars -= dbl;
+    } else {
+      const drawn = P.range(L[0], L[1]), sLo = L[0] * 60 - cut, sHi = L[1] * 60 - cut;
+      // a range: the drawn minutes in whole double phrases, kept inside the range when a whole number of them fits;
+      // exact minutes: the whole number of double phrases nearest to them
+      bars = Math.max(1, Math.round((drawn * 60 - cut) / secondsOf(dbl))) * dbl;
+      if (L[0] !== L[1]) {
+        while (secondsOf(bars) < sLo && secondsOf(bars + dbl) <= sHi) bars += dbl;
+        while (secondsOf(bars) > sHi && bars > dbl && secondsOf(bars - dbl) >= sLo) bars -= dbl;
+      }
+    }
   }
   const doubles = bars / dbl;
   let plan = applyPlanQuirks(shapePlan(shape, doubles, opts.fit ? Math.max(opts.energy, 0.75) : opts.energy), shape, opts);
@@ -436,13 +463,17 @@ function spokenParts(plan, steps, base) {
 const KIND_OF_ADD = { drums: 'add-drums', bass: 'add-bass', arp: 'add-lead', hook: 'add-lead', pad: 'add-pad', guitar: 'add-guitar', texture: 'add-texture', riser: 'add-riser' };
 const SPACE = ['delay', 'reverb'], DIRT = ['distort', 'crush', 'phaser'];
 
+// the most tracks a steered song plays at once, at every bar (the riser and the voices not counted): the console's
+// cap (radio-arrangement D4), held by the director too (after-tests-oct28 D8)
+export const TRACK_CAP = 12;
+const countedOn = state => playing(state).filter(t => t.type !== 'riser');
 // every move allowed on a boundary, given the current state
 export function candidateMoves(state, ctx, blocked, rng) {
-  const out = [], on = playing(state), byId = id => state.tracks.find(t => t.id === id);
+  const out = [], on = playing(state), byId = id => state.tracks.find(t => t.id === id), room = countedOn(state).length < TRACK_CAP;
   for (const t of state.tracks) {
     if (t.type === 'voice' || t.type === 'riser' || t.type === 'spoken' || blocked.has(t.id)) continue;
     const isOn = !t.mute;
-    if (!isOn) { if (on.length < ctx.hardMax) out.push({ kind: KIND_OF_ADD[t.type], track: t.id, step: { add: t.id } }); continue; }
+    if (!isOn) { if (on.length < ctx.hardMax && room) out.push({ kind: KIND_OF_ADD[t.type], track: t.id, step: { add: t.id } }); continue; }
     const drumsOn = on.filter(x => x.type === 'drums').length;
     // (tracks the listener added stay until the song's final outro, radio-arrangement D4)
     if (on.length > 1 && !(ctx.protect && ctx.protect.has(t.id))) out.push({ kind: 'strip', track: t.id, step: { remove: t.id }, lastDrum: t.type === 'drums' && drumsOn === 1 });
@@ -498,7 +529,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
   if (plan.spoken) base.tracks.splice(base.tracks.length - 1, 0, { ...JSON.parse(JSON.stringify(plan.spoken.track)), mute: true, clips: [{ start: 0, bars, pattern: 'A' }] });
   const steps = keep.map(s => ({ ...s })), phrases = [], moved = new Map(); // track id → boundary index of its last move
   const M = rng.moves;
-  let lastKind = '', lastSay = -Infinity, brokeDrums = [];
+  let lastKind = '', lastSay = -Infinity, brokeDrums = [], waitDrums = [];
   // the memory of the loop, from the kept steps
   for (const s of steps) { for (const id of stepIds(s)) moved.set(id, Math.floor(s.at / phrase)); if (s.say) lastSay = Math.max(lastSay, s.at); }
   if (from > 0) {
@@ -545,7 +576,8 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     state = stateAt(working(base, steps), at).song;
     // the listener's tracks that sat out a break or a charge come back on the next phrase (D4)
     if (protect.length && k > 0 && role !== 'break' && !(charge && !isDouble) && d < outroFrom) {
-      const back = protect.filter(p => p.at < at && !locked.includes(p.id) && (state.tracks.find(t => t.id === p.id) || {}).mute).map(p => p.id);
+      // (only as many as fit under the cap at this bar, in the order they came in; the others wait for a later phrase, D8)
+      const back = protect.filter(p => p.at < at && !locked.includes(p.id) && (state.tracks.find(t => t.id === p.id) || {}).mute).map(p => p.id).slice(0, Math.max(0, TRACK_CAP - countedOn(state).length));
       if (back.length) { take({ kind: 'back', phrase: KIND_OF_ADD[(state.tracks.find(t => t.id === back[0]) || {}).type] || 'drop', track: back[0], tracks: back, step: { add: back }, quiet: true }); state = stateAt(working(base, steps), at).song; }
     }
 
@@ -560,13 +592,20 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       const all = playing(state).filter(t => t.type !== 'voice').map(t => t.id);
       if (all.length) take({ kind: 'song-end', track: all[0], tracks: all, step: { remove: all } });
     } else if (landmark && role === 'break') {
-      // (a locked drum plays through the break, radio-arrangement D12)
-      const drums = playing(state).filter(t => t.type === 'drums' && !locked.includes(t.id) && !brought.has(t.id)).map(t => t.id);
+      // (a locked drum sits out the break too and comes back at the drop, after-tests-oct28 D7; the lock keeps its sound
+      // and pattern. Locked tracks of the other instruments play through, radio-arrangement D12)
+      const drums = playing(state).filter(t => t.type === 'drums' && !brought.has(t.id)).map(t => t.id);
       if (drums.length && playing(state).length > drums.length) { brokeDrums = drums; take({ kind: 'break', track: drums[0], tracks: drums, step: { remove: drums } }); }
     } else if (landmark && role === 'drop' && brokeDrums.length) {
-      const back = brokeDrums.filter(id => state.tracks.find(t => t.id === id).mute);
+      // (as many as fit under the cap; the others come back on a later phrase where they fit, D8)
+      const muted = brokeDrums.filter(id => state.tracks.find(t => t.id === id).mute), back = muted.slice(0, Math.max(0, TRACK_CAP - countedOn(state).length));
       if (back.length) take({ kind: 'drop', track: back[0], tracks: back, step: { add: back } });
+      waitDrums = muted.filter(id => !back.includes(id));
       brokeDrums = [];
+    } else if (waitDrums.length && role !== 'break' && !charge && k > 0 && d < outroFrom) {
+      const muted = waitDrums.filter(id => (state.tracks.find(t => t.id === id) || {}).mute), back = muted.slice(0, Math.max(0, TRACK_CAP - countedOn(state).length));
+      if (back.length) take({ kind: 'drop', track: back[0], tracks: back, step: { add: back }, quiet: true });
+      waitDrums = muted.filter(id => !back.includes(id));
     }
     const riser = base.tracks.find(t => t.type === 'riser');
     // the charge before a drop: the riser from the first phrase, fewer drums on the last one (the drop brings them back)
@@ -575,7 +614,8 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       const r = riser && state.tracks.find(t => t.id === riser.id);
       if (isDouble && r && r.mute && !locked.includes(riser.id) && !held) take({ kind: 'add-riser', track: riser.id, step: { add: riser.id } });
       if (!isDouble) {
-        const drums = playing(state).filter(t => t.type === 'drums' && !locked.includes(t.id) && !brought.has(t.id));
+        // (locked drums too, after-tests-oct28 D7: the drop brings them back)
+        const drums = playing(state).filter(t => t.type === 'drums' && !brought.has(t.id));
         if (drums.length) { const out = drums[drums.length - 1].id; brokeDrums = [...new Set([...brokeDrums, out])]; take({ kind: 'charge', track: out, step: { remove: out } }); }
       }
       state = stateAt(working(base, steps), at).song;
@@ -633,6 +673,19 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       }
       take(best);
       lastKind = best.kind;
+    }
+    // the cap at every bar (after-tests-oct28 D8): with the listener's tracks the director may keep more than 12 playing
+    // where it would have stripped some before; its own tracks leave, the last that came in first (never a listener's
+    // track before the final outro, where they leave with the rest, nor a locked one or one brought in on this
+    // boundary). Songs with no commands never reach it
+    {
+      state = stateAt(working(base, steps), at).song;
+      let over = countedOn(state).length - TRACK_CAP;
+      if (over > 0) {
+        const entry = id => { const i = steps.findIndex(x => stepIds(x).includes(id) && (x.add !== undefined)); return i < 0 ? -1 : i; };
+        const out = countedOn(state).filter(t => !(d < outroFrom && guard.has(t.id)) && !locked.includes(t.id) && !brought.has(t.id) && !chosen.some(c => c.step && c.step.add !== undefined && [].concat(c.step.add).includes(t.id))).sort((x, y) => entry(y.id) - entry(x.id)).slice(0, over).map(t => t.id);
+        if (out.length) take({ kind: 'strip', track: out[0], tracks: out, step: { remove: out }, quiet: true });
+      }
     }
     // comment: always on the start, big events and the song end; about half of the other boundaries; never closer than 8 bars
     const main = chosen.find(c => !c.quiet) || chosen[0];

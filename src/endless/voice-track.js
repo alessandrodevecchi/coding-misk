@@ -7,7 +7,9 @@
 // draw }); draw counts "New phrases", and the same options and draw give the same lines. Pure: the app, the radio
 // steering and the Node checks rewrite the same way.
 import { normalizeSong, VOICE_DEFAULT } from '../song/format.js';
-import { sectionFacts, entryAfter, whereOfTrack } from '../song/spoken.js';
+import { sectionFacts, entryAfter, whereOfTrack, placeSpoken } from '../song/spoken.js';
+import { stateAt, buildSteps } from '../song/build.js';
+import { meterSteps } from '../music.js';
 import { VOCABULARY, VOCAB_GROUPS } from '../song/vocabulary.js';
 import { stream } from './random.js';
 import { morePhrases, CHOP_RHYTHMS } from './director.js';
@@ -172,4 +174,113 @@ export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null,
   }
   const out = { ...song, tracks, ...(build !== undefined ? { build } : {}) };
   return { song: out, track, asked, placed: clips.length, from: start };
+}
+
+// ---------- after-tests-oct28 D3: the voice track of a song grown on air ----------
+// tracks that sound at a bar of a live build: on (stateAt), a clip there, neither voice nor spoken; with lines played
+// alone, only those
+export function soundingAt(song, bar) {
+  const st = stateAt(song, bar).song, on = st.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && (t.clips || []).some(c => (c.start ?? 0) <= bar && bar < (c.start ?? 0) + c.bars));
+  return on.some(t => t.alone) ? on.filter(t => t.alone) : on;
+}
+// the first bar a track sounds at in a live build (its clips and its steps), or null
+export function firstSound(song, id) {
+  const tr = song.tracks.find(t => t.id === id);
+  if (!tr) return null;
+  const bars = [...new Set([...(tr.clips || []).map(c => c.start ?? 0), ...buildSteps(song).map(s => s.at)])].sort((a, b) => a - b);
+  for (const b of bars) if (soundingAt(song, b).some(t => t.id === id)) return b;
+  return null;
+}
+// The parts of a grown song where a voice track may speak: the written part's parts of the kinds `where` allows (by its
+// clips, wherePartsOf), and in the growth (bars before `growth`) the phrases where few tracks play, by the state of the
+// build at their bars (the growth's clips run under its steps, so its sections all look busy by clips). growth: the bars
+// of the growth; quiet: at most half the most tracks the song plays in a section. Ordered by kind, then by bar.
+export function grownParts(song, growth, where = ['quiet']) {
+  const N = normalizeSong(song), facts = sectionFacts(N), most = Math.max(0, ...facts.counts), w = whereOf(where);
+  const written = wherePartsOf(song, growth, where).filter(p => p.start >= growth);
+  const grown = [];
+  if (w.includes('quiet')) {
+    const steps = buildSteps(song).map(s => s.at);
+    N.sections.forEach((s, i) => {
+      for (const p of partsOf(s, i)) {
+        if (p.start >= growth) continue;
+        const end = Math.min(p.start + p.bars, growth), bars = [...new Set([p.start, ...steps.filter(b => b > p.start && b < end)])];
+        // (at least one track: a line over silence would be the voice alone)
+        const n = bars.map(b => soundingAt(song, b).length), hi = Math.max(...n), lo = Math.min(...n);
+        if (hi <= most / 2 && lo >= 1) grown.push({ ...p, bars: end - p.start, kind: 'quiet' });
+      }
+    });
+  }
+  const all = [...grown, ...written];
+  return VOICE_WHERE.flatMap(k => all.filter(p => p.kind === k).sort((a, b) => a.start - b.start));
+}
+// The spoken tracks of a song grown on air, placed again over the whole grown song (D3). grown: the growth (its spoken
+// clips are where the tail left them); written: the director's song as written (writtenForm), whose spoken tracks keep
+// their patterns and their number of clips; growth: the growth's bars. Entry lines (a pattern with "before") go before
+// their bound track's first sound in the grown song; the others take parts of the kinds the track may speak in, quiet
+// first, spread like rewriteSpoken's (pickParts), the growth's quiet phrases included (a refrain in the growth
+// part as well: placeSpoken lets a refrain repeat in the growth of a song grown on air). The add step that brings the
+// track in moves to its first clip, with its comment. → the grown song with its spoken tracks re-placed
+export function placeGrownSpoken(grown, written, growth) {
+  const spoken = (written.tracks || []).filter(t => t.type === 'spoken' && (t.clips || []).length);
+  if (!spoken.length) return grown;
+  let out = { ...grown, tracks: grown.tracks.map(t => t), build: Array.isArray(grown.build) ? grown.build.map(s => ({ ...s })) : grown.build };
+  const Wn = normalizeSong(written), lens = new Map();
+  for (const p of placeSpoken(written)) if (!lens.has(`${p.track}:${p.key}`)) lens.set(`${p.track}:${p.key}`, p.beats);
+  for (const w of spoken) {
+    const id = w.id, wn = Wn.tracks.find(t => t.id === id), clips0 = [...wn.clips].sort((a, b) => a.start - b.start);
+    const patterns = JSON.parse(JSON.stringify(w.patterns || {})), where = whereOfTrack(w);
+    // the song without this track, so its own clips count nowhere
+    const base = { ...out, tracks: out.tracks.filter(t => t.id !== id) }, N = normalizeSong(base);
+    const bpbAt = bar => { const sec = N.sections.find(s => bar >= s.start && bar < s.start + s.bars) || N.sections[N.sections.length - 1]; return meterSteps(sec.meter) / 4; };
+    const clips = [], rest = [];
+    for (const c of clips0) {
+      const pat = patterns[c.pattern] || {}, e = pat.before !== undefined ? firstSound(base, pat.before) : null;
+      if (e === null) { rest.push(c); continue; }
+      // (ends a beat before the bound track sounds; the compiler places it exactly when the clips say the same entry)
+      const beats = lens.get(`${id}:${c.pattern}`) || 4, L = Math.max(1, Math.ceil((beats + 1) / bpbAt(Math.max(0, e - 1)) - 1e-9));
+      const start = Math.max(0, e - L);
+      if (entryAfter(N, pat.before, start) !== e) { const { before: _, ...p } = pat; patterns[c.pattern] = p; }
+      clips.push({ start, bars: Math.max(1, e - start), pattern: c.pattern });
+    }
+    const clear = p => !clips.some(c => c.start < p.start + p.bars && c.start + c.bars > p.start);
+    const free = grownParts(base, growth, where).filter(clear);
+    const chosen = pickParts(free, Math.min(rest.length, free.length));
+    // too few parts of the kinds allowed: the quietest of the others (fewest tracks, then the earliest), so the song
+    // keeps its number of lines (in the written part by its sections' clips, in the growth by what plays)
+    if (chosen.length < rest.length) {
+      const facts = sectionFacts(N), steps = buildSteps(base).map(x => x.at);
+      const others = N.sections.flatMap((sec, i) => partsOf(sec, i)).map(p => {
+        if (p.start >= growth) return { ...p, n: facts.counts[p.i] };
+        const end = Math.min(p.start + p.bars, growth), at = [...new Set([p.start, ...steps.filter(b => b > p.start && b < end)])];
+        return { ...p, bars: end - p.start, n: Math.max(...at.map(b => soundingAt(base, b).length)) };
+      }).filter(p => clear(p) && !chosen.some(c => c.start === p.start)).sort((a, b) => a.n - b.n || a.start - b.start);
+      chosen.push(...others.slice(0, rest.length - chosen.length));
+      chosen.sort((a, b) => a.start - b.start);
+    }
+    chosen.forEach((p, j) => clips.push({ start: p.start, bars: p.bars, pattern: rest[j].pattern }));
+    clips.sort((a, b) => a.start - b.start);
+    const used = new Set(clips.map(c => c.pattern));
+    const track = { ...JSON.parse(JSON.stringify(w)), patterns: Object.fromEntries(Object.entries(patterns).filter(([k]) => used.has(k))), clips };
+    const at = out.tracks.findIndex(t => t.id === id);
+    if (at >= 0) out.tracks[at] = track;
+    else { const nar = out.tracks.findIndex(t => t.type === 'voice'); out.tracks.splice(nar >= 0 ? nar : out.tracks.length, 0, track); }
+    // the add step moves to the first clip, with the comment of the step it leaves when that step has nothing else
+    if (Array.isArray(out.build) && clips.length) {
+      const first = clips[0].start, adds = s => (s.add === undefined ? [] : [].concat(s.add));
+      let say;
+      out.build = out.build.flatMap(s => {
+        if (!adds(s).includes(id)) return [s];
+        const left = adds(s).filter(x => x !== id), y = { ...s };
+        if (left.length) { y.add = left.length === 1 ? left[0] : left; return [y]; }
+        delete y.add;
+        if (Object.keys(y).some(k => !['at', 'say', 'voice', 'by'].includes(k))) return [y];
+        if (say === undefined && y.say) say = y.say;
+        return [];
+      });
+      out.build.push({ at: first, add: id, ...(say ? { say } : {}) });
+      out.build = out.build.map((s, i) => ({ s, i })).sort((a, b) => a.s.at - b.s.at || a.i - b.i).map(o => o.s);
+    }
+  }
+  return out;
 }

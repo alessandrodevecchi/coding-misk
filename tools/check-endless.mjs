@@ -1118,6 +1118,48 @@ const CHECKS = {
     }
     assert(n >= 15, `only ${n} songs with a bass`);
   },
+  'arrangement: a locked kick sits out breaks and the charge, back at the drop, never varied (after-tests-oct28 D7)'() {
+    let breaks = 0, charges = 0, drops = 0, n = 0;
+    for (const g of arrSongs(40, 'arr-lock-kick')) {
+      const ph = g.plan.phrase, at = applyBar('lock-part', 2 * ph, g.plan), P = g.plan.plan;
+      const kicks = onAt(g.song, at - 1).filter(t => instrumentOf(t) === 'kick').map(t => t.id);
+      if (!kicks.length) continue;
+      const r = steerArr(g, [{ kind: 'lock-part', part: 'kick', at }]);
+      assert(kicks.every(id => lockedIds(r.plan).includes(id)), `${g.style}: kick not locked`);
+      // the director only takes the locked kick out and brings it back: no variation, filter, drive or effect
+      const moves = r.song.build.filter(s => s.at >= at && !s.by && stepTracks(s).some(id => kicks.includes(id)));
+      assert(moves.every(s => !s.set && !s.pattern && !s.rack && !s.unrack), `${g.style}: the director changed a locked kick: ${JSON.stringify(moves.find(s => s.set || s.pattern || s.rack || s.unrack))}`);
+      const chargeOf = d => d + 1 < P.length && P[d + 1].role === 'drop' && P[d].role !== 'drop' && (P[d].tension ?? 0) >= 0.7;
+      let out = false;
+      for (let d = 1; d < P.length; d++) {
+        const bar = d * 2 * ph;
+        if (bar <= at) continue;
+        const on = onAt(r.song, bar).map(t => t.id), others = onAt(r.song, bar).filter(t => t.type !== 'voice' && !kicks.includes(t.id));
+        // a break (its first bar, when something else plays there)
+        if (P[d].role === 'break' && P[d - 1].role !== 'break' && others.length) { assert(kicks.every(id => !on.includes(id)), `${g.style}: locked kick plays in the break at ${bar}`); breaks++; out = true; }
+        // the drop brings it back
+        if (P[d].role === 'drop' && P[d - 1].role !== 'drop' && (out || charges)) { assert(kicks.every(id => on.includes(id)), `${g.style}: locked kick not back at the drop ${bar}`); drops++; out = false; }
+      }
+      // a charge before a drop (tension 0.9 on the part before it, a break in these plans): the locked kick is out on
+      // its last phrase too, and back at the drop
+      const dd = P.findIndex((x, d) => d > 0 && x.role === 'drop' && P[d - 1].role !== 'drop' && (d - 1) * 2 * ph > at);
+      if (dd > 0) {
+        const rc = steerArr(g, [{ kind: 'lock-part', part: 'kick', at }, { kind: 'curve', curve: 'tension', d: dd - 1, value: 0.9, at }]);
+        const from = (dd - 1) * 2 * ph, last = from + ph, ids = kicks.filter(id => onAt(rc.song, from - 1).some(t => t.id === id));
+        if (ids.length) {
+          assert(ids.every(id => !onAt(rc.song, last).some(t => t.id === id)), `${g.style}: locked kick plays in the charge at ${last}`);
+          assert(ids.every(id => onAt(rc.song, dd * 2 * ph).some(t => t.id === id)), `${g.style}: locked kick not back after the charge`);
+          charges++;
+        }
+      }
+      // the sound and the pattern stay: the kick's settings and clips as written
+      const k0 = r.song.tracks.find(t => t.id === kicks[0]), w0 = g.song.tracks.find(t => t.id === kicks[0]);
+      assert(JSON.stringify(k0.patterns) === JSON.stringify(w0.patterns) && JSON.stringify(k0.settings) === JSON.stringify(w0.settings), `${g.style}: the locked kick changed its sound or pattern`);
+      n++;
+    }
+    console.log(`      ${n} songs with a locked kick: ${breaks} breaks without it, ${charges} charges, ${drops} drops that bring it back`);
+    assert(n >= 15 && breaks >= 5 && drops >= 5 && charges >= 5, `${n} songs, ${breaks} breaks, ${charges} charges, ${drops} drops`);
+  },
   'arrangement: a riser on the next part change'() {
     let n = 0, own = 0;
     for (const g of arrSongs(40, 'arr-riser')) {
@@ -1378,6 +1420,92 @@ const CHECKS = {
     for (const n of listed) assert(CHECKS[n], `docs/ENDLESS.md names a check that does not exist: ${n}`);
     for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists|transitions|steering|arrangement):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
   },
+'typed lines (after-tests-oct28 D4): a line on a playing voice track adds a build step on its bar, the sound of the tracks unchanged, Replay the same song; Say now at least half a bar after the sample'() {
+  const P = { bars: 128, phrase: 8 };
+  assert(applyBar('say-live', 10.2, P) === 11 && applyBar('say-live', 10.8, P) === 12 && applyBar('say-live', 10.5, P) === 11, `say now bars ${applyBar('say-live', 10.2, P)} ${applyBar('say-live', 10.8, P)}`);
+  let n = 0;
+  for (let i = 0; i < 30 && n < 6; i++) {
+    const g = createSession(loadStyles(), `typed-${i}`).next({ styles: [['pure-trance', 'dark-cyberpunk', 'ambient'][i % 3]], voice: { presence: 'always' } });
+    const sp = g.song.tracks.find(t => t.type === 'spoken');
+    if (!sp) continue;
+    const total = g.plan.bars, bar = Array.from({ length: total - 4 }, (_, b) => b + 2).find(b => { const t = stateAt(g.song, b).song.tracks.find(x => x.id === sp.id); return t && !t.mute && !buildSteps(g.song).some(x => x.at === b); });
+    if (bar === undefined) continue;
+    for (const mode of ['now', 'moment']) {
+      const cmd = { kind: 'say-live', text: 'stay with me', lang: 'en', speaker: '', mode, at: bar };
+      const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [cmd], seed: `typed-${i}`, n: 0 }).song;
+      const tr = r.tracks.find(t => t.id === sp.id), key = Object.keys(tr.patterns).find(k => tr.patterns[k].text && tr.patterns[k].text.en === 'stay with me'), clip = tr.clips.find(c => c.pattern === key);
+      if (!clip) { assert(mode === 'moment', `${g.song.id}: no clip for the line said now`); continue; }
+      const step = buildSteps(r).find(x => x.at === clip.start && x.by === 'listener' && ([].concat(x.add ?? []).includes(sp.id) || [].concat(x.unmute ?? []).includes(sp.id)));
+      assert(step, `${g.song.id} (${mode}): no build step on the line's bar ${clip.start}`);
+      // the step changes nothing: every bar plays the same tracks with and without it
+      const without = { ...r, build: r.build.filter(x => x !== r.build.find(y => y.at === step.at && y.by === 'listener' && (y.add === step.add && y.unmute === step.unmute))) };
+      for (let b = 0; b < total; b += 1) {
+        const a = stateAt(r, b).song.tracks.map(t => `${t.id}:${!!t.mute}:${!!t.hush}`).join(), z = stateAt(without, b).song.tracks.map(t => `${t.id}:${!!t.mute}:${!!t.hush}`).join();
+        assert(a === z, `${g.song.id} (${mode}): bar ${b} plays differently with the step`);
+      }
+      const again = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [cmd], seed: `typed-${i}`, n: 0 }).song;
+      assert(JSON.stringify(again) === JSON.stringify(r), `${g.song.id} (${mode}): Replay gives another song`);
+      n++;
+    }
+  }
+  assert(n >= 6, `${n} typed lines checked`);
+},
+'arrangement: twelve tracks at every bar (after-tests-oct28 D8): "+" on every instrument in turn every two bars never takes a song past 12'() {
+  const shown = (song, bar) => playing(stateAt(song, bar).song).filter(t => t.type !== 'riser');
+  let worst = 0, presses = 0, songs = 0;
+  for (const id of ['berlin-techno', 'pure-trance', 'synthwave', 'dark-cyberpunk', 'drum-and-bass']) for (let k = 0; k < 3; k++) {
+    const g = createSession(STYLES, `ar4-${id}-${k}`).next({ styles: [id], complexity: 0.5 });
+    const parts = ARR_PARTS.filter(p => partHas(g.plan.R, p)), cmds = [];
+    let r = g, j = 0;
+    for (let now = 8; now < g.plan.bars - 2 * g.plan.phrase; now += 2) {
+      const part = parts[j++ % parts.length];
+      if (whyNot({ kind: 'more', part }, r.song, r.plan, now)) continue;
+      cmds.push({ kind: 'more', part, at: applyBar('more', now, r.plan) });
+      r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: `ar4-${id}-${k}`, n: 1 });
+    }
+    const total = r.song.sections.reduce((a, x) => a + x.bars, 0);
+    for (let b = 0; b < total; b++) { const n = shown(r.song, b).length; worst = Math.max(worst, n); assert(n <= TRACK_CAP, `${id} #${k}: ${n} tracks at bar ${b}`); }
+    presses += cmds.length; songs++;
+  }
+  console.log(`      ${songs} songs, ${presses} "+" pressed, at most ${worst} tracks at a bar`);
+  assert(worst === TRACK_CAP, `the cap was never reached (${worst})`);
+},
+'song length (new-song-panel D8): ranges, exact minutes, the draws before it unchanged, fit wins': () => {
+  const secsOf = (g) => g.song.sections.reduce((a, x) => a + x.bars * (Number(x.meter.split('/')[0]) * 4 / Number(x.meter.split('/')[1])) * 60 / x.bpm, 0);
+  const dblOf = g => 2 * g.plan.phrase, barSec = g => secsOf(g) / g.plan.bars;
+  const ranges = { short: [120, 150], medium: [180, 240], long: [300, 360] };
+  let exact120 = 0;
+  for (let i = 0; i < 24; i++) {
+    const seed = `len-${i}`, styles = [STARTING[i % STARTING.length]];
+    const base = createSession(STYLES, seed).next({ styles });
+    for (const [L, [lo, hi]] of Object.entries(ranges)) {
+      const g = createSession(STYLES, seed).next({ styles, length: L });
+      // the draws made before the length: styles, tempo, meter, key
+      assert(g.plan.bpm === base.plan.bpm && g.plan.meter === base.plan.meter && g.plan.key === base.plan.key && JSON.stringify(g.entry.styles) === JSON.stringify(base.entry.styles), `${seed} ${L}: earlier draws moved`);
+      const s = secsOf(g), d = dblOf(g) * barSec(g);
+      assert(g.plan.bars % dblOf(g) === 0, `${seed} ${L}: ${g.plan.bars} bars not whole double phrases`);
+      assert(s >= lo - d / 2 - 0.01 && s <= hi + d / 2 + 0.01, `${seed} ${L}: ${s.toFixed(1)} s outside ${lo}-${hi} s`);
+      // the length heard (D12): one phrase shorter written
+      const h = createSession(STYLES, seed).next({ styles, length: L, lengthHeard: true }), ph = g.plan.phrase * barSec(h);
+      assert(secsOf(h) >= lo - ph - d / 2 - 0.01 && secsOf(h) <= hi - ph + d / 2 + 0.01, `${seed} ${L} heard: ${secsOf(h).toFixed(1)} s`);
+    }
+    const e = createSession(STYLES, seed).next({ styles, length: 3 }), d = dblOf(e) * barSec(e);
+    assert(Math.abs(secsOf(e) - 180) <= d / 2 + 0.01, `${seed} 3 minutes: ${secsOf(e).toFixed(1)} s`);
+    if (e.plan.bpm === 120 && e.plan.meter === '4/4' && e.plan.phrase === 8) { assert(e.plan.bars === 96, `${seed}: 3 minutes at 120 bpm gave ${e.plan.bars} bars, not 96`); exact120++; }
+    // fit wins over length
+    const f = createSession(STYLES, seed).next({ styles, length: 'long', fit: 30 });
+    assert(Math.abs(secsOf(f) - 30) < 2, `${seed}: fit with a length lasts ${secsOf(f).toFixed(1)} s`);
+  }
+  // the spec's example: a 120 bpm 4/4 song with phrases of 8 bars, searched among seeds
+  for (let i = 0; !exact120 && i < 400; i++) {
+    for (const st of STARTING) {
+      const e = createSession(STYLES, `len120-${i}`).next({ styles: [st], length: 3 });
+      if (e.plan.bpm === 120 && e.plan.meter === '4/4' && e.plan.phrase === 8) { assert(e.plan.bars === 96, `3 minutes at 120 bpm gave ${e.plan.bars} bars`); exact120++; break; }
+    }
+  }
+  assert(exact120 > 0, 'no 120 bpm 4/4 song found for the exact case');
+  console.log(`      ${exact120} songs at 120 bpm with length 3: 96 bars`);
+},
 };
 
 // --only <text>: run only the checks whose name holds the text

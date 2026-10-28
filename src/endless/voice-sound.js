@@ -56,7 +56,9 @@ export function soundSummary(settings, { t, radio = null, voice = 'narrator' }) 
 // The Sound part of a voice: a <details> folded by default (open: its remembered state), with the style picker, the
 // speaker and the eight controls. voice: 'narrator' | 'spoken'; settings: the values shown; radio: the radio option
 // (the picker then offers "As the style"); off: the reason the controls are disabled (a tooltip), or ''.
-export function voiceSoundHtml({ voice, settings, t, esc, radio = null, off = '', open = false, fold = '' }) {
+// tag: the end of the controls' ids, so two views of the same voice keep apart ids (new-song-panel: the radio '-r')
+export function voiceSoundHtml({ voice, settings, t, esc, radio = null, off = '', open = false, fold = '', tag = null }) {
+  const idEnd = tag !== null ? tag : radio ? '-r' : '';
   const v = { ...VOICE_DEFAULT, ...(settings || {}) }, dis = off ? ' disabled' : '', tip = off ? ` title="${esc(off)}"` : '';
   const style = radio ? cleanSound(radio).style : styleOf(v);
   const styles = [...(radio ? ['auto'] : []), ...VOICE_STYLE_IDS, 'custom'];
@@ -66,7 +68,7 @@ export function voiceSoundHtml({ voice, settings, t, esc, radio = null, off = ''
   const spkSel = `<label class="ctrl vs-speaker"${tip}><span class="lbl">${esc(t('speaker'))}</span><select data-vsound="${voice}:speaker" data-no-knob title="${esc(off || t('speaker'))}"${dis}><option value="">${esc(first)}</option>${SPEAKERS.map(k => `<option value="${k}"${k === sp ? ' selected' : ''}>${esc(speakerName(k))}</option>`).join('')}</select></label>`;
   const ranges = SOUND_CONTROLS.map(([k, label, min, max, step]) => {
     const val = k === 'cutoff' ? cutToRange(v[k]) : v[k];
-    return `<div class="ctrl vs-ctl" data-vs-ctl="${k}"${tip}><div class="row"><label class="lbl" for="vs-${voice}-${k}${radio ? '-r' : ''}">${esc(t(label))}</label><output data-vsound-out="${voice}:${k}">${esc(soundText(k, v[k]))}</output></div><input type="range" id="vs-${voice}-${k}${radio ? '-r' : ''}" data-vsound="${voice}:${k}" data-fader="h" min="${min}" max="${max}" step="${step}" value="${val}" title="${esc(off || t(label))}"${dis}></div>`;
+    return `<div class="ctrl vs-ctl" data-vs-ctl="${k}"${tip}><div class="row"><label class="lbl" for="vs-${voice}-${k}${idEnd}">${esc(t(label))}</label><output data-vsound-out="${voice}:${k}">${esc(soundText(k, v[k]))}</output></div><input type="range" id="vs-${voice}-${k}${idEnd}" data-vsound="${voice}:${k}" data-fader="h" min="${min}" max="${max}" step="${step}" value="${val}" title="${esc(off || t(label))}"${dis}></div>`;
   }).join('');
   return `<details class="voice-part vs-part" data-vfold="${esc(fold || `${radio ? 'radio' : 'compose'}-${voice}-sound`)}"${open ? ' open' : ''}><summary><span class="lbl">${esc(t('soundLbl'))}</span> <span class="vs-sum" data-vsound-sum="${voice}">${esc(soundSummary(v, { t, radio, voice }))}</span></summary>
     <div class="vs-body"><div class="vs-pick">${styleSel}${spkSel}</div><div class="vs-grid">${ranges}</div></div></details>`;

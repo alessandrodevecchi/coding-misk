@@ -4,7 +4,7 @@
 // edits, a Narrator track added on the first edit with Undo, looking adds nothing), disabled with the reason; the phrase
 // list of the voice track (sorted rows, text and bars edited in place with Undo, Fill with, + Add line, the bin, the
 // last row) with heard bars in Crescendo (a typed bar stored as written, a bar in the growth refused); the narrator's
-// lines (read-only in Crescendo, editable for written steps); Where; In the next song. Radio: the Voices group for the
+// lines (read-only in Crescendo, editable for written steps); Where; no "In the next song" row (new-song-panel D9: the New song panel has its own Voci). Radio: the Voices group for the
 // next songs (two blocks, switches, How often without Mai and with Sempre, a saved Mai and an old Custom profile with
 // the narrator off, presets that keep Sempre, the Sound parts, Fill with, no on-air button). Italian labels.
 // Screenshots of each part when a folder is given.
@@ -53,7 +53,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // ---------- Compose: the narrator block ----------
   await open('luci-rosse');
   let v = await voices();
-  check(v.shown && v.label === 'Voices' && v.sub === 'Voice: narrator' && v.switchTxt === 'On' && v.vinst && v.next, 'Live build off: the Voices group shows the Voice: narrator block with its On switch, the voice track and the next song', JSON.stringify(v));
+  check(v.shown && v.label === 'Voices' && v.sub === 'Voice: narrator' && v.switchTxt === 'On' && v.vinst && !v.next, 'Live build off: the Voices group shows the Voice: narrator block with its On switch and the voice track, without the next song row', JSON.stringify(v));
   check(v.narratorOff && v.styleOff && v.narratedOff && v.soundOff && /Live build/.test(v.narratorTip) && /Live build/.test(v.soundTip), 'Live build off: the switch, the style, Narrated growth and the Sound controls are disabled, the tooltip says the song does not build live', `${v.narratorTip} | ${v.soundTip}`);
   await shot('#live-voices', 'compose-voci-live-spento.png');
   await live('classic');
@@ -203,12 +203,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const own = await page.evaluate(() => ({ n: document.querySelectorAll('#live-narrator-parts [data-nl-text]').length, hint: (document.querySelector('#live-narrator-parts .vb-nlines .hint') || {}).textContent, live: document.querySelector('#live-toggle').getAttribute('aria-pressed') }));
   check(own.n > 0, 'a song with its own written steps: the narrator lines are editable', JSON.stringify(own));
 
-  // In the next song: the stored options of voice-controls
-  await open('luci-rosse');
-  const nextOpen = async () => { if (!(await page.evaluate(() => document.querySelector('#live-vinst-next').open))) { await page.click('#live-vinst-next > summary'); await sleep(300); } };
-  await nextOpen();
-  const n = await page.evaluate(() => { const b = document.querySelector('#live-vinst-next-body'); return { presence: b.querySelector('[data-vinst="presence"]').value, presences: [...b.querySelectorAll('[data-vinst="presence"] option')].map(o => o.value).join(), phrases: b.querySelector('[data-vinst="phrases"]').value, where: !!b.querySelector('[data-vinst-where]') }; });
-  check(n.presence === 'always' && n.presences === 'style,always,never' && n.phrases === '2-3' && n.where, 'In the next song: the options stored before are read as they were, with Where', JSON.stringify(n));
+  // the old voice of the next song by an artist (coding-misk-artist-voice) is no longer read (new-song-panel D9)
+  check(!(await page.$('#live-vinst-next')), 'Compose has no "In the next song" row: the New song panel holds the voices of a new song');
 
   // ---------- radio ----------
   await page.click('[data-tab="radio"]'); await sleep(800);

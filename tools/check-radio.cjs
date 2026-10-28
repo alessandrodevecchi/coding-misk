@@ -168,6 +168,28 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   check(!(await R()).on && (await ed()).started, 'Compose playback stops the radio');
   await page.click('#stop'); await sleep(500);
 
+  // the radio's Durata (new-song-panel phase 8): kept, sent to the director only when set, the song on air lasts it as
+  // heard; a free growth in the Custom profile turns it off with its line; As the style sends nothing
+  {
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]');
+    if ((await R()).on) await page.click('#radio-start');
+    await page.click('[data-song-length="medium"]'); await sleep(300);
+    const o = (await R()).options, kept = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio')).length);
+    check(kept === 'medium' && o.length === 'medium' && o.lengthHeard === true && /next songs/.test(await page.innerText('#radio-length-line')), 'Durata Media: kept, sent to the director, its line', JSON.stringify({ kept, length: o.length }));
+    await page.selectOption('#radio-profile', 'switch'); await sleep(300);
+    await pick(['synthwave']); await page.fill('#radio-seed', 'durata'); await page.click('#radio-start'); await sleep(6000);
+    const d = await R(), it = d.state.stream[0], pos = await page.innerText('#pb-pos'), m = /\/\s*(\d+):(\d\d)/.exec(pos), sec = m ? +m[1] * 60 + +m[2] : NaN;
+    check(d.state.recipe.options.length === 'medium' && it.grown && sec >= 180 - 40 && sec <= 240 + 40, 'a Live coder song on air with Media lasts 3 to 4 minutes, give or take a phrase', `${pos}, grown ${it.grown}`);
+    await page.click('#radio-start'); await sleep(500);
+    await page.selectOption('#radio-profile', 'custom'); await sleep(300);
+    if ((await page.getAttribute('#custom-toggle', 'aria-expanded')) !== 'true') { await page.click('#custom-toggle'); await sleep(200); }
+    const planned = await page.evaluate(() => { const s = document.querySelector('#radio-custom [data-custom="duration"]'); return s ? s.value : null; });
+    await page.selectOption('#radio-custom [data-custom="duration"]', 'free'); await sleep(300);
+    const o2 = (await R()).options;
+    check(planned === 'planned' && !o2.length && await page.isVisible('#radio-target-off') && (await page.getAttribute('[data-song-length="style"]', 'aria-pressed')) === 'true', 'the Custom free growth turns the Durata off, with its line', JSON.stringify({ planned, length: o2.length }));
+    await page.selectOption('#radio-profile', 'artist'); await sleep(300);
+  }
+
   // by hand the song on air is held past its end; resume starts the next song on the next bar
   {
     await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]');
@@ -356,6 +378,43 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     check(r.state.stream[0].grown && r.state.stream[0].bars === s0.bars && JSON.stringify(r.state.stream[0].shape) === JSON.stringify(s0.shape), 'Continue in radio: a replay grows song 0 the same');
     await page.click('#radio-start'); await sleep(300);
     await page.click('[data-tab="radio"]'); await sleep(200);
+  }
+
+  // Next changes (after-tests-oct28 1.3, 2.4): a Live coder song with the narrator and the voice track. Every row has a
+  // label or a voice, none reads "undefined"; V:N and V:T rows; a V:T row of its own where no step falls
+  {
+    await page.evaluate(() => { const el = document.querySelector('#radio-voice [data-vinst="presence"]'); if (el) { el.value = 'always'; el.dispatchEvent(new Event('change', { bubbles: true })); } }); await sleep(200);
+    const rows = () => page.$$eval('#radio-now .radio-next li', xs => xs.filter(x => !x.classList.contains('muted')).map(x => ({ at: +x.dataset.at, text: x.innerText, step: !!x.querySelector('.nx-step'), n: x.querySelectorAll('.vtag-n').length, t: x.querySelectorAll('.vtag-t').length, tip: [...x.querySelectorAll('.vtag')].map(v => v.title).join() })));
+    // (a Live coder song, then a Classic one: its steps are sparser, so a voice-track line can fall where no step does)
+    const seen = { rows: 0, bad: [], n: 0, t: 0, alone: 0, tips: new Set() };
+    let it = null, e = null;
+    // (dark-cyberpunk in Classic: its first song speaks its voice-track lines away from the steps)
+    for (const [profile, style] of [['switch', 'pure-trance'], ['classic', 'dark-cyberpunk']]) {
+    await pick([style]);
+    await page.selectOption('#radio-profile', profile); await sleep(200);
+    await page.fill('#radio-seed', 'next-changes'); await page.click('#radio-start');
+    for (let k = 0; k < 120; k++) { const q = await R(); if (q.state && (profile === 'classic' || q.state.stream[q.state.onAir].grown)) break; await sleep(500); }
+    const q = (await R()).state, cur = q.stream[q.onAir];
+    if (profile === 'switch') it = cur;
+    for (let b = 0; b < cur.bars - 2; b += 3) {
+      await page.evaluate(x => globalThis.codingMiskRadio.seek(x), b); await sleep(350);
+      for (const r of await rows()) {
+        seen.rows++;
+        if (/undefined/.test(r.text) || (!r.step && !r.n && !r.t)) seen.bad.push(`${r.at}: ${r.text}`);
+        if (r.n) seen.n++;
+        if (r.t) { seen.t++; if (!r.step) seen.alone++; }
+        if (r.tip) r.tip.split(',').forEach(x => seen.tips.add(x));
+      }
+    }
+    e = await ed();
+    if (e.err) break;
+    await page.click('#radio-start'); await sleep(300);
+    }
+    check(it.profile === 'switch' && it.grown && seen.rows > 20 && !seen.bad.length, 'Next changes: every row of a Live coder song has a label or a voice, no "undefined"', `${seen.rows} rows ${seen.bad.slice(0, 3).join(' | ')}`);
+    check(seen.n > 0 && seen.t > 0 && seen.alone > 0, 'Next changes: V:N and V:T rows, and a V:T row where no step falls', `V:N ${seen.n}, V:T ${seen.t}, alone ${seen.alone}`);
+    check(seen.tips.has('Voice: narrator') && seen.tips.has('Voice: track'), 'Next changes: the tags name the voice in their tooltip', [...seen.tips].join(', '));
+    check(!e.err, 'Next changes: no evaluation error while seeking', e.err.slice(0, 100));
+    await page.selectOption('#radio-profile', 'classic').catch(() => {}); await sleep(200);
   }
 
   // history limit
