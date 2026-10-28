@@ -1378,6 +1378,36 @@ const CHECKS = {
     for (const n of listed) assert(CHECKS[n], `docs/ENDLESS.md names a check that does not exist: ${n}`);
     for (const n of Object.keys(CHECKS).filter(k => /^(director|determinism|radio|artists|transitions|steering|arrangement):/.test(k))) assert(listed.includes(n), `check not listed in docs/ENDLESS.md: ${n}`);
   },
+'typed lines (after-tests-oct28 D4): a line on a playing voice track adds a build step on its bar, the sound of the tracks unchanged, Replay the same song; Say now at least half a bar after the sample'() {
+  const P = { bars: 128, phrase: 8 };
+  assert(applyBar('say-live', 10.2, P) === 11 && applyBar('say-live', 10.8, P) === 12 && applyBar('say-live', 10.5, P) === 11, `say now bars ${applyBar('say-live', 10.2, P)} ${applyBar('say-live', 10.8, P)}`);
+  let n = 0;
+  for (let i = 0; i < 30 && n < 6; i++) {
+    const g = createSession(loadStyles(), `typed-${i}`).next({ styles: [['pure-trance', 'dark-cyberpunk', 'ambient'][i % 3]], voice: { presence: 'always' } });
+    const sp = g.song.tracks.find(t => t.type === 'spoken');
+    if (!sp) continue;
+    const total = g.plan.bars, bar = Array.from({ length: total - 4 }, (_, b) => b + 2).find(b => { const t = stateAt(g.song, b).song.tracks.find(x => x.id === sp.id); return t && !t.mute && !buildSteps(g.song).some(x => x.at === b); });
+    if (bar === undefined) continue;
+    for (const mode of ['now', 'moment']) {
+      const cmd = { kind: 'say-live', text: 'stay with me', lang: 'en', speaker: '', mode, at: bar };
+      const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [cmd], seed: `typed-${i}`, n: 0 }).song;
+      const tr = r.tracks.find(t => t.id === sp.id), key = Object.keys(tr.patterns).find(k => tr.patterns[k].text && tr.patterns[k].text.en === 'stay with me'), clip = tr.clips.find(c => c.pattern === key);
+      if (!clip) { assert(mode === 'moment', `${g.song.id}: no clip for the line said now`); continue; }
+      const step = buildSteps(r).find(x => x.at === clip.start && x.by === 'listener' && ([].concat(x.add ?? []).includes(sp.id) || [].concat(x.unmute ?? []).includes(sp.id)));
+      assert(step, `${g.song.id} (${mode}): no build step on the line's bar ${clip.start}`);
+      // the step changes nothing: every bar plays the same tracks with and without it
+      const without = { ...r, build: r.build.filter(x => x !== r.build.find(y => y.at === step.at && y.by === 'listener' && (y.add === step.add && y.unmute === step.unmute))) };
+      for (let b = 0; b < total; b += 1) {
+        const a = stateAt(r, b).song.tracks.map(t => `${t.id}:${!!t.mute}:${!!t.hush}`).join(), z = stateAt(without, b).song.tracks.map(t => `${t.id}:${!!t.mute}:${!!t.hush}`).join();
+        assert(a === z, `${g.song.id} (${mode}): bar ${b} plays differently with the step`);
+      }
+      const again = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [cmd], seed: `typed-${i}`, n: 0 }).song;
+      assert(JSON.stringify(again) === JSON.stringify(r), `${g.song.id} (${mode}): Replay gives another song`);
+      n++;
+    }
+  }
+  assert(n >= 6, `${n} typed lines checked`);
+},
 };
 
 // --only <text>: run only the checks whose name holds the text

@@ -98,6 +98,7 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 | Every style has a voice track chance on its own stream; Sempre gives every song one, the switch silences it (voice-full-controls D14, D15) | The music of a session never moves with the voices (the endless fixtures keep a music hash without the voice tracks); off then on is lossless | [voice](voice.md) |
 | Console lines get real samples from a dev-server helper (voice-full-controls D8, D9) | Played by Strudel like any line: same sound chain, recorded, exported and replayed; about half a second a line | [radio-commands](radio-commands.md) |
 | The voice track placed again over a song grown on air, the growth included (after-tests-oct28 D3) | Keeping the written clips left the first line at two thirds of a Live coder song; the growth's quiet phrases are judged by what the build plays there, not by clips. Rejected: shifting the clips before the growth's start into its bars (the growth's bars do not match the written ones). | [design](../../openspec/changes/after-tests-oct28/design.md) |
+| A typed line gets a build step on its bar (after-tests-oct28 D4) | The radio evaluates its code only at steps, so a line on a voice track that already played was never heard. Rejected: evaluating the code again after the sample arrives (it changes the code on air outside a step and restarts typed lines). | [design](../../openspec/changes/after-tests-oct28/design.md) |
 
 ## Rejected attempts
 

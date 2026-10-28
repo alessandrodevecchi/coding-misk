@@ -38,9 +38,9 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 4. Typed lines always sound
 
-- [ ] 4.1 `sayAir` writes `{ at, add: <spoken id>, by: 'listener' }` on the line's bar also when the track plays; Say now picks the first bar at least half a bar after the sample is ready (D4)
-- [ ] 4.2 Check in `check:endless`: a typed line on a playing voice track adds a step on its bar, the song sounds the same, Replay gives the same song
-- [ ] 4.3 Browser: `check-steering.cjs` with the real voice helper (or a sample made before) on a song whose voice track already plays: Say now and At the right moment are evaluated on their bar (an evaluation whose code holds the line before the bar) and the `fx` analyser peaks on the line's bar, with no seek
+- [x] 4.1 `sayAir` writes `{ at, add: <spoken id>, by: 'listener' }` on the line's bar also when the track plays; Say now picks the first bar at least half a bar after the sample is ready (D4)
+- [x] 4.2 Check in `check:endless`: a typed line on a playing voice track adds a step on its bar, the song sounds the same, Replay gives the same song
+- [x] 4.3 Browser: `check-steering.cjs` with the real voice helper (or a sample made before) on a song whose voice track already plays: Say now and At the right moment are evaluated on their bar (an evaluation whose code holds the line before the bar) and the `fx` analyser peaks on the line's bar, with no seek
 
 ## 5. Poetic images at every entry
 
