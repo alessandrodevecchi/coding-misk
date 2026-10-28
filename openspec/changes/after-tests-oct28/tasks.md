@@ -63,16 +63,16 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 8. One pattern row in Compose (pp1, #84)
 
-- [ ] 8.1 Archive pattern-preview before this change, since the REMOVED requirement "Two named pattern rows" needs `openspec/specs/app/pattern-preview`
-- [ ] 8.2 One row "Pattern disponibili nel brano" / "Patterns in this song" with its hint, Niente, the patterns, + Nuovo and Elimina; "Crea" / "Make" row below; same row in Sections and Free timeline (D9)
-- [ ] 8.3 Marks: "NEL BRANO" badge on the chosen section's or clip's pattern, hollow circle for patterns used elsewhere, headphones in preview, pink border while edited; legend; CSS for neon and hardware
-- [ ] 8.4 Whole track selected (no section, no clip): no badge, the row says how to choose one
-- [ ] 8.5 Status line with "Usa D in «sezione»" and Undo; "Prova su una copia" (copy to the next free letter, editing moves to it); "Sostituisci B con D" with Undo; "Ripristina B" (per-pattern undo to the state when editing started); editing stays live, no Save
-- [ ] 8.6 Elimina disabled on patterns in use, with the reason in the tooltip; preview unchanged (the track keeps playing its song pattern)
-- [ ] 8.7 Strings in `src/i18n.js` (it, en); Guide card for the pattern row (`src/guide.js`, `npm run check:guide`)
-- [ ] 8.8 `PORT=… node tools/check-patterns.cjs`: one row in both languages, marks for Scontro on Luci Rosse, Use in section, Try on a copy, Replace, Restore, Delete disabled in use, Free timeline with and without a clip
-- [ ] 8.9 `PORT=… node tools/check-preview.cjs`: the two-row case becomes the one-row case; headphones on the previewed chip; the song's line still plays under the preview; `npm run check:preview` and `npm run check:patterns` pass
-- [ ] 8.10 Screenshots of the row in both themes and both languages (one pattern in the song, a copy in preview, the copy used in the section, no clip chosen)
+- [x] 8.1 Archive pattern-preview before this change, since the REMOVED requirement "Two named pattern rows" needs `openspec/specs/app/pattern-preview`
+- [x] 8.2 One row "Pattern disponibili nel brano" / "Patterns in this song" with its hint, Niente, the patterns, + Nuovo and Elimina; "Crea" / "Make" row below; same row in Sections and Free timeline (D9)
+- [x] 8.3 Marks: "NEL BRANO" badge on the chosen section's or clip's pattern, hollow circle for patterns used elsewhere, headphones in preview, pink border while edited; legend; CSS for neon and hardware
+- [x] 8.4 Whole track selected (no section, no clip): no badge, the row says how to choose one
+- [x] 8.5 Status line with "Usa D in «sezione»" and Undo; "Prova su una copia" (copy to the next free letter, editing moves to it); "Sostituisci B con D" with Undo; "Ripristina B" (per-pattern undo to the state when editing started); editing stays live, no Save
+- [x] 8.6 Elimina disabled on patterns in use, with the reason in the tooltip; preview unchanged (the track keeps playing its song pattern)
+- [x] 8.7 Strings in `src/i18n.js` (it, en); Guide card for the pattern row (`src/guide.js`, `npm run check:guide`)
+- [x] 8.8 `PORT=… node tools/check-patterns.cjs`: one row in both languages, marks for Scontro on Luci Rosse, Use in section, Try on a copy, Replace, Restore, Delete disabled in use, Free timeline with and without a clip
+- [x] 8.9 `PORT=… node tools/check-preview.cjs`: the two-row case becomes the one-row case; headphones on the previewed chip; the song's line still plays under the preview; `npm run check:preview` and `npm run check:patterns` pass
+- [x] 8.10 Screenshots of the row in both themes and both languages (one pattern in the song, a copy in preview, the copy used in the section, no clip chosen)
 
 ## 9. Growth duration label
 

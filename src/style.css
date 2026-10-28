@@ -1355,8 +1355,28 @@ canvas.pn-pv.big { height: 110px; margin: 0; border: 1px solid var(--line); }
 .pt-preview { flex: none; min-width: 0; padding: 4px 7px; }
 .pt-preview[aria-pressed="true"] { color: var(--a1); border-color: var(--a1); background: color-mix(in srgb, var(--a1) 20%, var(--panel2)); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 45%, transparent); }
 :root[data-ui="hw"] .pt-preview[aria-pressed="true"] { color: var(--a1); text-shadow: 0 0 8px var(--a1); background: linear-gradient(#3b3b41, #28282d); box-shadow: inset 0 1px 3px rgba(0,0,0,.6); }
-/* the two pattern rows of the track panel (Song patterns, Make patterns) */
+/* the pattern rows of the track panel (Patterns in this song, Make) */
 .tp-pats-make { margin-top: 6px; }
+/* the one pattern row (after-tests-oct28 D9): marks on the chips, a status line, a legend */
+:root { --mark: #2fd8ff; }
+.tp-pats-song .pat-hint { margin: -2px 0 0; }
+.pat-chip { display: inline-flex; align-items: center; gap: 5px; }
+.pat-chip .pat-k { font-weight: 600; }
+.pat-badge { display: inline-block; font: 600 9px/1 var(--mono); letter-spacing: .06em; padding: 3px 4px; border-radius: 3px; background: var(--mark); color: #041018; }
+.pat-used { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--mark); box-sizing: border-box; }
+.pat-pv { display: inline-flex; color: var(--mark); }
+.pat-pv svg { width: 13px; height: 13px; }
+.pat-edit { display: inline-block; width: 14px; height: 10px; border: 1.5px solid var(--a1); border-radius: 3px; box-sizing: border-box; vertical-align: -1px; }
+.pat-status { margin: 0; font-size: 13px; }
+.pat-status .pat-how { display: block; margin-top: 2px; }
+.pat-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.pat-legend { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--muted); }
+.pat-leg { display: inline-flex; align-items: center; gap: 4px; }
+.pat-leg .pat-badge { font-size: 8px; padding: 2px 3px; }
+#track-panel .chip[disabled] { opacity: .45; cursor: not-allowed; }
+:root[data-ui="hw"] .pat-badge { background: var(--mark); color: #041018; text-shadow: none; }
+:root[data-ui="hw"] .pat-status { font-family: var(--mono); font-size: 12px; }
+:root[data-ui="hw"] .pat-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--a1), 0 2px 0 #000; }
 .pt-savepat { display: inline-flex; align-items: center; gap: 5px; }
 button.pat-link { cursor: pointer; background: none; color: inherit; }
 button.pat-link:hover, button.pat-link:focus-visible { border-color: var(--a1); color: var(--a1); }
