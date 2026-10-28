@@ -39,7 +39,8 @@ import { speakerOf, narratorSpeaker } from '../song/spoken.js';
 import { SPEAKERS } from '../song/build.js';
 import { voicePanel, voiceEvent } from '../endless/voice-panel.js';
 import { voiceSoundHtml, syncVoiceSound, soundEvent, nextSound, cleanSound, isAutoSound, soundShown } from '../endless/voice-sound.js';
-import { dieHtml, knobSlider, artistChips, styleChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent } from './song-controls.js';
+import { dieHtml, knobSlider, artistChips, styleChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, lengthChips } from './song-controls.js';
+import { hasLength } from '../endless/song-options.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -85,6 +86,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   const comp = { off: () => { opts.compilation = 'off'; }, lock: keys => { if (opts.compilation !== 'off') for (const x of keys) opts.compLocks[x] = opts[x]; } };
   const ctl = { options, recipes, artists, keepArtist: a => keepArtist(a), toast: (...a) => toast(...a), t, lastDice, root, comp, onCustom: changes => showDisplay(changes) };
   const sc = { state: opts, t, tx, esc, prefix: 'radio', lastDice };
+  // the Custom controls shown: with a Durata a growing build grows inside it (phase 8, D12: "in the chosen length")
+  const radioCustomC = () => { const C = customControls(opts.custom); return hasLength(opts.length) && C.build === 'crescendo' ? { C: { ...C, duration: 'planned' }, planned: true } : { C }; };
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const vfold = id => { try { return !!(JSON.parse(localStorage.getItem('coding-misk-voice-folds') || '{}') || {})[id]; } catch (e) { return false; } };
 
@@ -131,7 +134,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (raw.custom) item.custom = raw.custom;
     // (the Voce: narratore switch off, voice-full-controls D15: the narrator stays silent, the music is the same)
     if (raw.voices && raw.voices.narrator === false) item.hush = true;
-    if (growsOnAir(S.recipe) && entry.profile) item.growCtx = { profile: entry.profile, artist: used.artist || null, into: prev && prev.entry.transition ? prev.entry.transition.kind : null, styles: shapeStyles(), phrase: plan.phrase, controls: raw.custom ? customControls(raw.custom) : null, ...(searchOf(S.recipe) ? { search: searchOf(S.recipe) } : {}) };
+    if (growsOnAir(S.recipe) && entry.profile) item.growCtx = { profile: entry.profile, artist: used.artist || null, into: prev && prev.entry.transition ? prev.entry.transition.kind : null, styles: shapeStyles(), phrase: plan.phrase, controls: raw.custom ? customControls(raw.custom) : null, ...(searchOf(S.recipe) ? { search: searchOf(S.recipe) } : {}) , ...(raw.length && raw.length !== 'style' ? { fitted: true } : {}) };
     S.stream.push(item);
     // a replayed session steers its songs the same way, before they play
     const recorded = (S.recipe.steering || []).filter(c => c.song === n);
@@ -1042,8 +1045,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
           ${profileSelect(sc)}
           <label class="ctrl" ${tip('radioIncomingTip')}><span class="lbl">${esc(t('radioIncoming'))}</span><select id="radio-incoming" data-no-knob>${['profile', 'hidden', 'visible'].map(k => `<option value="${k}"${opts.incoming === k ? ' selected' : ''}>${esc(t(`incoming:${k}`))}</option>`).join('')}</select></label>
         </div>
+        <div class="radio-length">${lengthChips(sc)}<p class="hint muted small" id="radio-length-line">${esc(t(hasLength(opts.length) ? 'radioLenOn' : 'radioLenOff'))}</p>${ctl.freed ? `<p class="hint muted small" id="radio-target-off">${esc(t('radioTargetOff'))}</p>` : ''}</div>
         ${voicesGroup(sc, { talkKnob: slider('talk', 'radioTalk', 'tipTalk'), vfold })}
-        ${opts.profile === 'custom' ? customPanel(sc, { open: customOpen }) : ''}
+        ${opts.profile === 'custom' ? customPanel(sc, { open: customOpen, ...radioCustomC() }) : ''}
         <p class="hint muted">${esc(t('radioNextHint'))}</p>
         <div class="radio-seed">
           <div class="ctrl grow" ${tip('tipSeed')}><label class="lbl" for="radio-seed">${esc(t('radioSeed'))}</label><input id="radio-seed" type="text" maxlength="40" autocomplete="off" placeholder="${esc(t('radioSeedAuto'))}" value="${esc(on ? S.recipe.seed : seedField)}" ${on ? 'readonly' : ''}></div>
@@ -1119,7 +1123,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // the song controls (new-song-panel D2): the shared rules; the radio draws again, tells what applies from the next
     // song, and redraws when a style ends a compilation
     { const wasComp = opts.compilation !== 'off', r = songControlEvent(ctl, b, 'click');
-      if (r) { if (r.render || (wasComp && opts.compilation === 'off')) render(); if (S && (r.keys.includes('voice') || r.keys.includes('voices'))) toast(t('vinstNextOnly')); if (S && r.keys.includes('material')) toast(t('matNext', { m: t(`matShort:${opts.material}`) })); return; } }
+      if (r) { if (r.render || (wasComp && opts.compilation === 'off')) render(); if (S && (r.keys.includes('voice') || r.keys.includes('voices'))) toast(t('vinstNextOnly')); if (S && r.keys.includes('material')) toast(t('matNext', { m: t(`matShort:${opts.material}`) })); if (S && r.keys.includes('length')) toast(t('radioLenNext')); return; } }
     if (b.id === 'radio-comp') { opts.compilation = opts.compilation === 'off' ? 'song' : opts.compilation === 'song' ? 'some' : 'off'; saveOpts(); return render(); }
     if (b.id === 'radio-comp-setup') { compOpen = !compOpen; return render(); }
     if (b.dataset.compMove) return editSetup(S0 => { S0.movement = b.dataset.compMove; });

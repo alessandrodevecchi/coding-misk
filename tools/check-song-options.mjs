@@ -28,6 +28,7 @@ import { parseSong } from '../src/songs.js';
 import { liveCode } from '../src/live/live-code.js';
 import { stateAt } from '../src/song/build.js';
 import { BUILTIN_PRESETS, presetValues } from '../src/endless/song-presets.js';
+import { sessionItems, GROWTH_ON_AIR } from '../src/endless/items.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -121,13 +122,18 @@ const CHECKS = {
   assert(panel.state.compilation === 'off', 'Prendi dalla radio copied the compilation');
   assert(SONG_KEYS.every(k => !['transition', 'harmony', 'incoming', 'compilation', 'compSetup', 'compPreset', 'compLocks', 'scope', 'diceRange'].includes(k)), 'a session field in SONG_KEYS');
 },
-'length only with use new-song, and equal director options otherwise (D1, D8)': () => {
+'length only when set, and equal director options otherwise (D1, D8, phase 8)': () => {
   const st = memStore({ [RADIO_KEY]: SAVED[1] }), radio = radioOf(st), panel = panelOf(st, radio);
   const a = JSON.stringify(radio.directorOptions({ use: 'radio' })), b = JSON.stringify(panel.directorOptions({ use: 'new-song' }));
   assert(a === b, 'same values, different director options');
   panel.set({ length: 'short' });
   const p = panel.directorOptions({ use: 'new-song' });
-  assert(p.length === 'short' && p.lengthHeard === true && !('length' in panel.directorOptions({ use: 'radio' })), 'length in the wrong place');
+  assert(p.length === 'short' && p.lengthHeard === true && !('length' in radio.directorOptions({ use: 'radio' })), 'length in the wrong place');
+  radio.set({ length: 'medium' });
+  const r = radio.directorOptions({ use: 'radio' });
+  assert(r.length === 'medium' && r.lengthHeard === true && radioOf(st).state.length === 'medium', 'the radio\'s Durata is not sent or not kept');
+  radio.set({ length: 'style' });
+  assert(!('length' in radio.directorOptions({ use: 'radio' })), 'As the style still sends a length');
   const { length: _, lengthHeard: __, ...rest } = p;
   assert(JSON.stringify(rest) === a, 'the panel options differ by more than the length');
 },
@@ -206,6 +212,26 @@ const CHECKS = {
   const old = JSON.parse(fs.readFileSync('songs/kellerlicht.json', 'utf8')), s = { ...old, config: { profile: 'switch', live: true } }, C = controlsOf(baseConfig(s));
   assert(C.duration === 'free' && !plannedOf(baseConfig(s), C), 'an old song switched to Live coder is planned');
 },
+'the radio Durata: songs grown on air stay in the length, even with an artist who grows freely (phase 8, D12)': () => {
+  const free = { ...clone(ARTISTS[0]), id: 'free-grower', name: 'Free Grower', growth: { duration: 'free' }, profiles: { switch: 1 } };
+  const asked = [];
+  for (const [length, [lo, hi]] of [['medium', RANGE.medium], ['long', RANGE.long]]) {
+    for (const opts of [{ artist: free }, { styles: ['synthwave', 'berlin-techno'], ...profileOptions('custom', { base: 'switch', controls: { duration: 'free' } }) }]) {
+      const base = { ...opts, ...(opts.artist ? { profile: 'artist' } : {}), transition: 'artist', harmony: 'artist' };
+      const recipe = l => ({ seed: `rl-${length}`, options: { ...base, ...(l ? { length: l, lengthHeard: true } : {}) }, changes: [], growth: GROWTH_ON_AIR });
+      const items = sessionItems(RECIPES, recipe(length), 3), plain = sessionItems(RECIPES, recipe(null), 3);
+      for (const [i, x] of items.entries()) {
+        const s = songSecs(x.song), ph = phraseSecs(x.song, x.plan.phrase);
+        assert(x.song.onAir && !x.song.onAir.free, `${length} ${opts.artist ? 'artist' : 'custom'} song ${i}: ${x.song.onAir ? 'grew free' : 'did not grow'}`);
+        assert(s >= lo - ph - 1 && s <= hi + ph + 1, `${length} ${opts.artist ? 'artist' : 'custom'} song ${i}: ${s.toFixed(0)} s outside ${lo}-${hi} s within a phrase`);
+        asked.push(Math.round(s));
+      }
+      // without a Durata the free growth stays free, as before
+      assert(plain.some(x => x.song.onAir && x.song.onAir.free), 'without a Durata the free growth changed');
+    }
+  }
+  console.log(`      heard: ${asked.join(', ')} s`);
+},
 'Sorprendimi: the same seed gives the same values and the same song, the radio unchanged (D13)': () => {
   const st = memStore({ [RADIO_KEY]: SAVED[1] }), radio = radioOf(st), before = JSON.stringify(st.raw[RADIO_KEY]);
   const seen = new Set();
@@ -234,6 +260,7 @@ const CHECKS = {
 },
 };
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
+const songSecs = song => song.sections.reduce((a, x) => a + x.bars * 240 / (((x.bpm || 120) + (x.bpmEnd ?? x.bpm ?? 120)) / 2) * (Number((x.meter || '4/4').split('/')[0]) / Number((x.meter || '4/4').split('/')[1])), 0);
 
 const onlyArg = process.argv.indexOf('--only'), only = onlyArg >= 0 ? process.argv[onlyArg + 1] : null;
 let failed = 0;

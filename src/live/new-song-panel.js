@@ -4,7 +4,7 @@
 // song-controls.js) on the panel's own store (src/endless/song-options.js); the page makes the songs (onScratch,
 // onGenerate, onSurprise).
 import { CHEVRON, SLIDERS, DICE, CROSS, SAVE, BIN } from '../icons.js';
-import { dieHtml, knobSlider, artistSelect, styleChips, genreChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, pickArtist, idOf } from '../radio/song-controls.js';
+import { dieHtml, knobSlider, artistSelect, styleChips, genreChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, pickArtist, idOf, lengthChips } from '../radio/song-controls.js';
 import { panelControls, baseDuration } from '../endless/new-song.js';
 import { hasLength, cleanLength, LENGTHS, LENGTH_MINUTES } from '../endless/song-options.js';
 import { LENGTH_RANGES } from '../endless/director.js';
@@ -22,19 +22,14 @@ const clock = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(
 export function createNewSongPanel({ root, button, t, tx, esc, store, options, radioOptions, recipes, artists, face = () => '', keepArtist = () => null, toast, getLang, userPatterns = () => [], onScratch, onGenerate, onSurprise }) {
   const opts = options.state, lastDice = {};
   let open = store.get(NS_OPEN, false) === true, folds = store.get(NS_FOLDS, {}) || {};
-  let seedShown = '', busy = false, saving = false, freed = false;
+  let seedShown = '', busy = false, saving = false;
   const vfold = id => { try { return !!(JSON.parse(localStorage.getItem('coding-misk-voice-folds') || '{}') || {})[id]; } catch (e) { return false; } };
   const ctl = {
     options, recipes, artists, keepArtist, toast, t, lastDice, root, comp: null, panel: true,
     controls: () => panelControls(opts),
     baseControls: base => baseDuration(base),
-    // the growth duration (D12): Libera or the fitted growth with a Durata turns the Durata off, with its line
-    customHook: (k, v) => {
-      if (k !== 'duration') return null;
-      if (v === 'planned') return { keys: [], render: true };
-      if (hasLength(opts.length)) { opts.length = 'style'; freed = true; }
-      return null;
-    },
+    // (the growth duration with a Durata, D12: lengthHook in song-controls.js; freed: its line shows)
+    freed: false,
   };
   const sc = { state: opts, t, tx, esc, prefix: P, lastDice, recipes };
   const tip = k => `title="${esc(t(k))}"`;
@@ -79,14 +74,13 @@ export function createNewSongPanel({ root, button, t, tx, esc, store, options, r
     }
     if (k === 'length') {
       const L = cleanLength(opts.length), exact = typeof L === 'number', C = panelControls(opts), natural = C.build === 'crescendo' && C.growth === 'natural';
-      const chip = v => `<button class="chip small" data-ns-length="${v}" aria-pressed="${v === 'exact' ? exact : L === v}" title="${esc(t(`nsLenTip:${v}`))}">${esc(t(`nsLen:${v}`))}</button>`;
       const durs = C.duration === 'planned' ? ['planned', 'fitted', 'free'] : ['fitted', 'free'];
       const line = !hasLength(L) ? (C.build === 'crescendo' ? t('nsLineStyleGrow') : '') : C.build === 'crescendo' ? t('nsLineGrow') : t('nsLineClassic');
       return `<div class="ns-length">
-        <div class="ctrl"><span class="lbl">${esc(t('nsLength'))}</span><div class="chips" role="group">${[...LENGTHS, 'exact'].map(chip).join('')}<label class="ns-min"${exact ? '' : ' hidden'}><input type="number" data-ns-minutes min="${LENGTH_MINUTES[0]}" max="${LENGTH_MINUTES[1]}" step="0.5" value="${exact ? L : 3}" aria-label="${esc(t('nsMinutesLbl'))}"> ${esc(t('rxMin'))}</label></div></div>
+        ${lengthChips(sc)}
         <label class="ctrl" title="${esc(t('durHint'))}"><span class="lbl">${esc(t('durLbl'))}</span><select data-custom="duration" data-no-knob${natural || C.duration === 'planned' ? '' : ' disabled'}>${durs.map(v => `<option value="${v}"${C.duration === v ? ' selected' : ''}>${esc(t(`dur:${v}`))}</option>`).join('')}</select></label></div>
         ${line ? `<p class="hint muted small" id="ns-length-line">${esc(line)}</p>` : ''}
-        ${freed ? `<p class="hint muted small" id="ns-target-off">${esc(t('targetOff'))}</p>` : ''}`;
+        ${ctl.freed ? `<p class="hint muted small" id="ns-target-off">${esc(t('targetOff'))}</p>` : ''}`;
     }
     return '';
   }
@@ -130,14 +124,6 @@ export function createNewSongPanel({ root, button, t, tx, esc, store, options, r
   });
 
   function setOpen(v) { open = !!v; store.set(NS_OPEN, open); render(); }
-  function setLength(v) {
-    const L = cleanLength(v);
-    // (a Durata makes the growth duration grow inside it: a Custom free growth gives way, D12)
-    const patch = { length: L };
-    if (hasLength(L) && opts.profile === 'custom' && opts.custom.controls && opts.custom.controls.duration === 'free') { const { duration: _, ...rest } = opts.custom.controls; patch.custom = { ...opts.custom, controls: rest }; }
-    if (hasLength(L)) freed = false;
-    options.set(patch);
-  }
   const seedNow = () => { const el = root.querySelector('#ns-seed'); return el ? el.value.trim() : seedShown; };
 
   root.addEventListener('click', e => {
@@ -152,7 +138,6 @@ export function createNewSongPanel({ root, button, t, tx, esc, store, options, r
     if (b.id === 'ns-save-ok') return saveNow(b);
     if (b.id === 'ns-del') { const n = opts.preset; if (deletePreset(store, n)) { opts.preset = ''; options.save(['preset']); toast(t('nsDeleted', { name: n })); } return; }
     if (b.dataset.nsFold) { const k = b.dataset.nsFold; folds = { ...folds, [k]: !folds[k] }; store.set(NS_FOLDS, folds); return render(); }
-    if (b.dataset.nsLength) { const v = b.dataset.nsLength; if (v === 'exact') { const i = root.querySelector('[data-ns-minutes]'); return setLength(i ? +i.value || 3 : 3); } return setLength(v); }
     busy = true;
     let r = null;
     try { r = songControlEvent(ctl, b, 'click'); } finally { busy = false; }
@@ -165,7 +150,6 @@ export function createNewSongPanel({ root, button, t, tx, esc, store, options, r
       if (p) { options.set({ ...presetValues(p, opts), preset: el.value }); toast(t('nsPresetPicked', { name: presetName() })); }
       return;
     }
-    if (el.dataset.nsMinutes !== undefined) return setLength(+el.value || 3);
     if (el.dataset.opt) return render();
     busy = true;
     let r = null;

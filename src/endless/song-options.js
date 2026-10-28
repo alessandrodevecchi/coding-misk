@@ -17,7 +17,7 @@ export const NEW_SONG_KEY = 'coding-misk-new-song';
 // the values of how a song is made: what the panel copies from the radio ("Prendi dalla radio", the first open) and
 // what a preset may hold (with `length`). Everything else in the radio's store is about the session on air
 // (transition, harmony, incoming, compilation, scope, the dice range, the material default)
-export const SONG_KEYS = ['styles', 'chaos', 'energy', 'complexity', 'talk', 'artist', 'temp', 'sounds', 'profile', 'custom', 'material', 'voice', 'voices', 'narratorSound'];
+export const SONG_KEYS = ['styles', 'chaos', 'energy', 'complexity', 'talk', 'artist', 'temp', 'sounds', 'profile', 'custom', 'material', 'voice', 'voices', 'narratorSound', 'length'];
 // the song length of the director (D8): as the style, or a range, or exact minutes (1 to 12, step 0.5)
 export const LENGTHS = ['style', 'short', 'medium', 'long'];
 export const LENGTH_MINUTES = [1, 12];
@@ -106,8 +106,9 @@ export function createSongOptions({ store, key = RADIO_KEY, recipes = [], artist
   // the material: the radio starts each page from its default (Settings); the panel keeps the one picked
   if (panel && saved && SESSION_SOURCES.includes(saved.material)) opts.material = saved.material;
   else opts.material = opts.materialDefault;
-  // the panel's own values: the song length (D8), the preset picked last (D6)
-  if (panel) { opts.length = cleanLength(saved && saved.length); opts.preset = saved && typeof saved.preset === 'string' ? saved.preset : ''; }
+  // the song length (D8; the radio's Durata since phase 8), the preset picked last (the panel, D6)
+  opts.length = cleanLength(saved && saved.length);
+  if (panel) opts.preset = saved && typeof saved.preset === 'string' ? saved.preset : '';
   if (!opts.styles.length) opts.styles = [ids.includes('synthwave') ? 'synthwave' : ids[0]];
   const listeners = [];
   // what is kept: the radio its whole state, as before; the panel its song values, the length, the preset, the dice range
@@ -123,13 +124,14 @@ export function createSongOptions({ store, key = RADIO_KEY, recipes = [], artist
     on(fn) { listeners.push(fn); return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; },
     artistOf,
     // The director options of the next song (the radio's current() moved here): with an artist, its whole taste goes to
-    // the director (and into the session recipe); the controls only show its centre. use: 'radio' never sends `length`;
-    // 'new-song' adds it when it is not As the style (D8), with `lengthHeard` (D12: the length heard, the written song
-    // one phrase shorter)
+    // the director (and into the session recipe); the controls only show its centre. Both stores add
+    // `length` when it is not As the style (D8; the radio's Durata since phase 8), with `lengthHeard` (D12: the length
+    // heard, the written song one phrase shorter); use: 'radio' or 'new-song', kept for the callers
     directorOptions({ use = 'radio' } = {}) {
       const a = artistOf(opts.artist), up = userPatterns();
       const how = { transition: opts.transition, harmony: opts.harmony, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}), ...(isAutoSound(opts.narratorSound) ? {} : { narratorSound: cleanSound(opts.narratorSound) }), ...(opts.voices.narrator && opts.voices.track ? {} : { voices: { ...(opts.voices.narrator ? {} : { narrator: false }), ...(opts.voices.track ? {} : { track: false }) } }) };
-      const len = use === 'new-song' && hasLength(opts.length) ? { length: cleanLength(opts.length), lengthHeard: true } : {};
+      // (the radio sends it only when its Durata is set, so its recipes and the endless fixtures stay as before without it)
+      const len = hasLength(opts.length) ? { length: cleanLength(opts.length), lengthHeard: true } : {};
       // a compilation carries its setup and the artists it may use, so a replay draws the same songs
       if (opts.compilation !== 'off') return { compilation: { every: opts.compilation, setup: clone(opts.compSetup), pool: clone(artists()), ...(Object.keys(opts.compLocks).length ? { locks: { ...opts.compLocks } } : {}) }, ...how, ...len };
       return a ? { artist: clone(a), ...how, ...len } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how, ...len };

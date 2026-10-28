@@ -1593,3 +1593,8 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
   .new-song .custom-grid { grid-template-columns: minmax(0, 1fr); }
   .ns-row .ctrl { min-width: 0; flex: 1 1 100%; }
 }
+/* the radio's Durata for its next songs (new-song-panel phase 8) */
+.radio-length { display: grid; gap: 4px; margin-top: 10px; }
+.radio-length .ctrl { display: grid; gap: 4px; }
+.radio-length .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.radio-length .hint { margin: 0; }

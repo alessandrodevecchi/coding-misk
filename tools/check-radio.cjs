@@ -168,6 +168,28 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   check(!(await R()).on && (await ed()).started, 'Compose playback stops the radio');
   await page.click('#stop'); await sleep(500);
 
+  // the radio's Durata (new-song-panel phase 8): kept, sent to the director only when set, the song on air lasts it as
+  // heard; a free growth in the Custom profile turns it off with its line; As the style sends nothing
+  {
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]');
+    if ((await R()).on) await page.click('#radio-start');
+    await page.click('[data-song-length="medium"]'); await sleep(300);
+    const o = (await R()).options, kept = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio')).length);
+    check(kept === 'medium' && o.length === 'medium' && o.lengthHeard === true && /next songs/.test(await page.innerText('#radio-length-line')), 'Durata Media: kept, sent to the director, its line', JSON.stringify({ kept, length: o.length }));
+    await page.selectOption('#radio-profile', 'switch'); await sleep(300);
+    await pick(['synthwave']); await page.fill('#radio-seed', 'durata'); await page.click('#radio-start'); await sleep(6000);
+    const d = await R(), it = d.state.stream[0], pos = await page.innerText('#pb-pos'), m = /\/\s*(\d+):(\d\d)/.exec(pos), sec = m ? +m[1] * 60 + +m[2] : NaN;
+    check(d.state.recipe.options.length === 'medium' && it.grown && sec >= 180 - 40 && sec <= 240 + 40, 'a Live coder song on air with Media lasts 3 to 4 minutes, give or take a phrase', `${pos}, grown ${it.grown}`);
+    await page.click('#radio-start'); await sleep(500);
+    await page.selectOption('#radio-profile', 'custom'); await sleep(300);
+    if ((await page.getAttribute('#custom-toggle', 'aria-expanded')) !== 'true') { await page.click('#custom-toggle'); await sleep(200); }
+    const planned = await page.evaluate(() => { const s = document.querySelector('#radio-custom [data-custom="duration"]'); return s ? s.value : null; });
+    await page.selectOption('#radio-custom [data-custom="duration"]', 'free'); await sleep(300);
+    const o2 = (await R()).options;
+    check(planned === 'planned' && !o2.length && await page.isVisible('#radio-target-off') && (await page.getAttribute('[data-song-length="style"]', 'aria-pressed')) === 'true', 'the Custom free growth turns the Durata off, with its line', JSON.stringify({ planned, length: o2.length }));
+    await page.selectOption('#radio-profile', 'artist'); await sleep(300);
+  }
+
   // by hand the song on air is held past its end; resume starts the next song on the next bar
   {
     await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]');

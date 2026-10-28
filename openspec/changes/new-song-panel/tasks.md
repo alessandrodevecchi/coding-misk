@@ -41,4 +41,4 @@
 
 ## 8. Durata in the radio (optional, only if the owner confirms design Q3)
 
-- [ ] 8.1 A Durata row in the radio for its next songs (the radio's own store), `length` sent with `use: 'radio'` only when set; the exclusion with an artist's or the Custom profile's free growth (D12); `check:endless` fixtures unchanged without it; `tools/check-radio.cjs` case
+- [x] 8.1 A Durata row in the radio for its next songs (the radio's own store), `length` sent with `use: 'radio'` only when set; the exclusion with an artist's or the Custom profile's free growth (D12); `check:endless` fixtures unchanged without it; `tools/check-radio.cjs` case

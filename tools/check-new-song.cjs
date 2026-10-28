@@ -138,7 +138,7 @@ const secs = s => { const m = /(\d+):(\d\d)\s*$/.exec(s || ''); return m ? +m[1]
   await fold('profile');
   await page.selectOption('#ns-profile', 'switch'); await sleep(200);
   await page.selectOption('#ns-custom [data-custom="opening"]', 'full-kick'); await sleep(200);
-  await fold('length'); await page.click('[data-ns-length="style"]'); await sleep(200);
+  await fold('length'); await page.click('[data-song-length="style"]'); await sleep(200);
   await generate('ns-custom');
   t1 = await T();
   check(t1.T.config && t1.T.config.live && t1.T.config.options && t1.T.config.options.opening === 'full-kick' && (await page.getAttribute('#live-toggle', 'aria-pressed')) === 'true' && await page.isHidden('#cfg-changed'), 'Custom Live coder with an opening: Live build on, the opening, no configuration changed mark', JSON.stringify(t1.T.config));
@@ -151,13 +151,13 @@ const secs = s => { const m = /(\d+):(\d\d)\s*$/.exec(s || ''); return m ? +m[1]
   check(t1.T.tracks.some(x => JSON.stringify(x.patterns || {}).length > 20), 'Composti: the song has its parts');
   // Breve in Classic
   await fold('profile'); await page.selectOption('#ns-profile', 'classic'); await sleep(200);
-  await page.click('[data-ns-length="short"]'); await sleep(200);
+  await page.click('[data-song-length="short"]'); await sleep(200);
   await generate('ns-short');
   let h = await heard();
   check(h >= 120 - 48 && h <= 150 + 16, 'Breve in Classic: 2 to 2.5 minutes, give or take a phrase', `${h} s`);
   // Media in Live coder, then the profile switched in Compose both ways
   await page.selectOption('#ns-profile', 'switch'); await sleep(200);
-  await page.click('[data-ns-length="medium"]'); await sleep(200);
+  await page.click('[data-song-length="medium"]'); await sleep(200);
   const durSel = await page.evaluate(() => { const s = document.querySelector('[data-ns-sec="length"] [data-custom="duration"]'); return s ? s.value : null; });
   const lsum = await page.textContent('[data-ns-fold="length"] .custom-summary');
   check(durSel === 'planned' && /3:00–4:00/.test(lsum), 'Media with Live coder: Durata della crescita "nella durata scelta" beside it, the summary 3 to 4 minutes', `${durSel} · ${lsum}`);
@@ -182,7 +182,7 @@ const secs = s => { const m = /(\d+):(\d\d)\s*$/.exec(s || ''); return m ? +m[1]
   await fold('length');
   await page.selectOption('[data-ns-sec="length"] [data-custom="duration"]', 'free'); await sleep(300);
   check((await panel()).length === 'style' && await page.isVisible('#ns-target-off'), 'Libera in the panel turns the Durata to Come lo stile, with its line');
-  await page.click('[data-ns-length="long"]'); await sleep(300);
+  await page.click('[data-song-length="long"]'); await sleep(300);
   check(await page.evaluate(() => document.querySelector('[data-ns-sec="length"] [data-custom="duration"]').value) === 'planned', 'choosing a Durata again: the growth duration is in the chosen length');
 
   // ---------- Sorprendimi ----------
