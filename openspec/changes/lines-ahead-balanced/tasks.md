@@ -1,11 +1,11 @@
 ## 1. Measure before
 
-- [ ] 1.1 `growth:probe -- all` on `develop`: lines typed ahead in total and per song, rushed steps (growth and written part), most muted lines shown, the shape kept per song. Verify: DEVLOG entry with the numbers (0 lines ahead expected)
+- [x] 1.1 `growth:probe -- all` on `develop`: lines typed ahead in total and per song, rushed steps (growth and written part), most muted lines shown, the shape kept per song. Verify: DEVLOG entry with the numbers (0 lines ahead expected)
 
 ## 2. Balanced default limits (D1)
 
-- [ ] 2.1 `AHEAD` in `src/live/written-plan.js` becomes `{ atOnce: 2, bars: 32, muted: 8, margin: 2, section: false }`; the `globalThis.codingMiskAhead` override stays. Verify: `growth:probe -- all` gives 2 lines (switch-prima-luce 176 to 192, crescendo-filo-di-luce 182 to 190)
-- [ ] 2.2 The D8 case of `check:live-code` reads its limits from `AHEAD` (no limit 4 written in the check) and finds a line ahead with the default limits, without the override. Verify: `check:live-code` passes, and fails with the old `AHEAD`
+- [x] 2.1 `AHEAD` in `src/live/written-plan.js` becomes `{ atOnce: 2, bars: 32, muted: 8, margin: 2, section: false }`; the `globalThis.codingMiskAhead` override stays. Verify: `growth:probe -- all` gives 2 lines (switch-prima-luce 176 to 192, crescendo-filo-di-luce 182 to 190)
+- [x] 2.2 The D8 case of `check:live-code` reads its limits from `AHEAD` (no limit 4 written in the check) and finds a line ahead with the default limits, without the override. Verify: `check:live-code` passes, and fails with the old `AHEAD`
 
 ## 3. Lines typed ahead in the growth (D2, D3, D4)
 

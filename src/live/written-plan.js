@@ -7,10 +7,10 @@ import { buildSteps } from '../song/build.js';
 import { typingPlan, settleOthers, chainLines } from '../song/typing.js';
 import { barSeconds } from './typing-load.js';
 
-// D8 limits (owner, 2026-10-26: to start with, tuned after the screenshots): lines ahead in the code at once, bars of
-// look-ahead (and never past the next section change: `section`), muted lines shown at which no line is typed ahead, the seconds a
-// step keeps to spare beyond the line's typing
-export const AHEAD = { atOnce: 2, bars: 32, muted: 4, margin: 2, section: true };
+// D8 limits, the Balanced level (owner, lines-ahead-balanced D1, 2026-10-28): lines ahead in the code at once, bars of
+// look-ahead (`section: true` would also stop it at the next section change), muted lines shown at which no line is typed
+// ahead, the seconds a step keeps to spare beyond the line's typing
+export const AHEAD = { atOnce: 2, bars: 32, muted: 8, margin: 2, section: false };
 // (browser checks and screenshots may widen them for a page: globalThis.codingMiskAhead, read when a plan is made)
 
 const PATTERN = /^\s*[_S]?\$:/;
