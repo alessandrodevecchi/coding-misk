@@ -16,7 +16,7 @@ Compose can make a new song only from an artist (the "New song from artist…" s
 - **Presets.** Named snapshots of those options: five built-in ones as a guide and the owner's own, which he can save, overwrite and delete.
 - **Generated song.** Written by the same director call as a radio song, opened unsaved in Compose with the chosen profile and controls as its own configuration (song-own-settings), so it plays as chosen and Save keeps it.
 - **Song length in the director.** A new `length` option for one song: short, medium, long or exact minutes. Without it, songs are drawn as today.
-- **Growth inside the plan.** With Crescendo or Live coder and a Durata, the song grows as the radio grows it (the growth takes the written bars before a section boundary), through a new growth duration `planned`; measured on 8 songs, the heard length stays within one phrase of the plan, where Compose's growth today doubles it (fitted) or triples it (free). A Durata and the free growth exclude each other (design D12).
+- **Growth inside the plan.** With Crescendo or Live coder and a Durata, the song grows as the radio grows it (the growth takes the written bars before a section boundary), through a new growth duration `planned`; measured on 8 songs, the heard length stays within one phrase of the plan, where Compose's growth today doubles it (fitted) or triples it (free). The song keeps the chosen Durata as a target, so switching profile in Compose keeps the heard length within a phrase; Libera turns the target off; songs without a target behave as today (design D12).
 - **Artists tab.** "♪ Nuovo brano" opens Compose with the panel open and the artist picked, and generates as today.
 - **Hardware theme.** The panel's knobs (chaos, energy, complexity, narrator) are faders, as in the voices' Sound parts.
 - **Guide.** A "Nuovo brano" card in English and Italian.
@@ -41,4 +41,4 @@ None in `openspec/specs/`. The radio Voices group of voice-full-controls (not ar
 
 ## Estimate
 
-About 23 agent hours (design, Estimate); Durata in the radio, if the owner confirms it (design Q3), 2 to 3 more.
+About 24 agent hours (design, Estimate); Durata in the radio, if the owner confirms it (design Q3), 2 to 3 more.

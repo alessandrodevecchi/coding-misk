@@ -58,3 +58,28 @@ A Crescendo or Live coder song SHALL be able to carry the growth duration `plann
 #### Scenario: Other songs
 - **WHEN** a song without `planned` grows in Compose
 - **THEN** it grows as before this change and its card length does not move
+
+### Requirement: The song keeps its length target
+A song MAY carry a length target in its configuration. While it does, the song SHALL keep its heard length within one phrase of the target in every profile: Classic SHALL play the written song, Crescendo and Live coder SHALL grow with the growth duration `planned`, whatever the profile's own growth duration. A profile switch SHALL NOT change the written music; only the growth SHALL be made again inside the same length.
+
+#### Scenario: Classic to Live coder
+- **WHEN** a song with a Media target plays in Classic and the user switches it to Live coder in Compose
+- **THEN** it grows inside the target and its heard length stays within one phrase of the target, not about three times the written song
+
+#### Scenario: Live coder to Classic
+- **WHEN** the same song is switched back to Classic
+- **THEN** it plays the same written song, within one phrase of the target
+
+### Requirement: Libera clears the target
+Choosing the free growth duration on a song with a length target SHALL remove the target from its configuration, and a muted line SHALL say that the chosen length no longer holds: the song lasts as long as its growth.
+
+#### Scenario: Libera chosen in Compose
+- **WHEN** a Live coder song with a target is open in Compose and the user sets Durata della crescita to Libera
+- **THEN** the target is removed, the line shows, and the song grows freely as Live coder songs do today
+
+### Requirement: Songs without a target unchanged
+A song without a length target SHALL grow and last exactly as before this change, in every profile.
+
+#### Scenario: Old song
+- **WHEN** a song saved before this change is switched from Classic to Live coder
+- **THEN** it grows as before this change and its card length is the same as before
