@@ -1,6 +1,6 @@
 ## Context
 
-The owner tested the radio on 2026-10-28. This change fixes what the tests found. The measurements come from scratch scripts in Node (radio sessions built with `sessionItems`, windows with `windowSong` and `windowPart`, code with `liveCode` and `voiceCode`) and from a browser probe on a dev server. The probe recorded every evaluation of the radio's code and the peak of the `fx` analyser (narrator and voice track) per bar.
+The owner tested the radio and Compose on 2026-10-28. This change fixes what the tests found. The owner's answers to the first proposal are folded in: the voice track may speak during the growth, the lock change is for drums only, poetic movement lines are a later change, and the pattern row of Compose (pp1, #84) and a growth duration label join this change. The measurements come from scratch scripts in Node (radio sessions built with `sessionItems`, windows with `windowSong` and `windowPart`, code with `liveCode` and `voiceCode`) and from a browser probe on a dev server. The probe recorded every evaluation of the radio's code and the peak of the `fx` analyser (narrator and voice track) per bar.
 
 | Item | Finding |
 | --- | --- |
@@ -8,13 +8,15 @@ The owner tested the radio on 2026-10-28. This change fixes what the tests found
 | vo15 | Say now at bar 10.8: clip at bar 11, no step from bar 7 to bar 15, no evaluation in between, no `fx` peak at bars 11 and 12. At the right moment: clip at bar 112, a director step at 112, heard (`fx` 0.31). |
 | vo1 | Custom profile, poetic. Compose, luci-rosse Crescendo with Narrated growth: 5 images, 31 step lines, entries at 56 and 78 lost (section boundaries). Radio, Live coder with Narrated growth: 0 to 7 images, 18 to 28 step lines per song. Crescendo: 5 to 8 images, 32 to 37 step lines. The window loses the first image of every song but the first. A mid-set opening (all tracks added at bar 0, brought in by `unsolo`) has one image. |
 | ar4 | "+" every two bars, Classic, three styles: 13 to 16 tracks at some bars, inside one song. |
+| pp1 | Code read on `develop` 83f16bb, Luci Rosse, Bass track, section Scontro (plays B). Three rows: the song's row (`In "Scontro" suona`, or `Clip` in Free timeline, chips only after a clip is clicked), "Song patterns" (picks the pattern to edit and preview, the song does not change) and "Make patterns". Both chosen chips are pink. Pressing C in "Song patterns" leaves B in the song. Mockups in the owner's local notes. |
 
 ## Goals / Non-Goals
 
-**Goals:** fix the eight items in the proposal, each with a check that fails today.
+**Goals:** fix the ten items in the proposal, each with a check that fails today (the label change of D10 has its string checks).
 
 **Non-Goals:**
-- More poetic lines between entries with Narrated growth on. That is a new feature for the owner to decide (see Open Questions).
+- Poetic "movement" lines at steps without an entry, with Narrated growth on. The owner moved them to a separate later change (see Follow-ups).
+- A preview that silences the track's own line while it plays. The track keeps playing its song pattern under the preview, as today.
 - A narrator track always shown on the timeline (an idea in the owner's backlog).
 
 ## Decisions
@@ -55,7 +57,7 @@ Alternative rejected: a speaker icon per row. The owner asked for the two tags, 
 
 In `growOnAir`, once the growth `c` is chosen, each spoken track of the written form is placed again over the whole grown song:
 - the same patterns (texts, ways, extras) and the same number of clips as the director's song;
-- placed with the helpers of `voice-track.js` (`wherePartsOf` with the track's `where`, then `pickParts`), on the grown song's sections. The growth's sections count as quiet where few tracks play, by the state of the build at each part (`stateAt`), not only by clips;
+- placed with the helpers of `voice-track.js` (`wherePartsOf` with the track's `where`, then `pickParts`), on the grown song's sections, the growth included. The voice track may speak during the growth, in its quiet parts only: a growth part counts as quiet where few tracks play, by the state of the build at each part (`stateAt`), not only by clips. A busy growth part gets no line;
 - an entry line (`before`) keeps its bound track and is placed before that track's first entry in the grown song;
 - an add step brings the track in at its first clip when the song builds live, as `rewriteSpoken` does.
 
@@ -87,6 +89,8 @@ Narrated growth stays as decided in D11: step lines plus images.
 
 The break and the charge in `directSong` drop every playing drum track, locked or not, except the drums the listener brought in on that boundary. The drop brings them back (`brokeDrums`, as for unlocked drums). The lock still keeps the director away from the instrument: no add of a silent locked track, no strip for good, no variation, filter, drive or effect move, no reshaping by the outro. Only drums change: a locked bass, pad or arp still plays through breaks.
 
+The owner confirmed the scope: the change applies to drums only. A locked bass, pad, arp, lead or any other non-drum instrument keeps playing through breaks and the charge, as radio-arrangement D12 says today.
+
 radio-arrangement D12 now reads: "on one that plays, it keeps it playing as it is until the song ends, past the outro's strips; a locked drum still sits out a break and the charge before a drop and comes back at the drop". Its spec scenario "Locked bass" is kept. A scenario for a locked kick is added. The endless fixtures move: `DIRECTOR_VERSION` goes up (AGENTS.md rule).
 
 ### D8. The cap at every bar (low priority)
@@ -98,13 +102,56 @@ radio-arrangement D12 now reads: "on one that plays, it keeps it playing as it i
 
 The console count uses the same rule as the cap: tracks of the song on air at the next bar, without the riser and the voice track.
 
+### D9. One pattern row in the Compose track panel (pp1, #84)
+
+The song's row and "Song patterns" become one compact row in the track panel. It updates pattern-preview's requirement "Two named pattern rows".
+
+**Layout.** One row titled "Pattern disponibili nel brano" ("Patterns in this song"), with the hint "Modifica e ascolta i pattern inclusi in questo brano" ("Edit and listen to the patterns in this song"). The chips are Niente (first, silences the track in the chosen section or clip), then every pattern of the track, then + Nuovo and Elimina. The rest of "Crea pattern" (Save as pattern, Compose a part with its number, Energy, Keep rhythm, Keep notes) stays below in a row titled "Crea" ("Make"). A short legend line under the status line explains the marks.
+
+**Marks on the chips:**
+
+| Mark | Meaning |
+| --- | --- |
+| Filled cyan badge "NEL BRANO" ("IN THE SONG") | The pattern plays in the chosen section, or in the chosen clip in Free timeline |
+| Hollow cyan circle | The pattern is used in other sections or clips |
+| No mark | The pattern is used nowhere: a trial that can be deleted |
+| Headphones | The pattern in preview |
+| Pink border | The pattern being edited |
+
+**No section or clip chosen.** When the whole track is selected, in Free timeline with no clip chosen and no section, the row shows no "NEL BRANO" badge and says how to choose one: click a clip in the timeline or a section in the arranger. The hollow circles still show where patterns are used.
+
+**Status line.** Under the row, one line in plain words says what the user edits and what the song plays:
+- editing a pattern in the song: "Stai modificando B, quello che suona nel brano: ogni modifica si sente dove è usato";
+- editing a pattern used nowhere: "Stai modificando D: lo senti solo in anteprima. Il brano suona ancora B", with the button "Usa D in «sezione»" ("Use D in «section»"), «sezione» being the chosen section or clip. A click puts D there, with Undo in the notice.
+
+**Editing stays live.** No Save button. An edit to a pattern applies everywhere the pattern is used, from the next bar, as today.
+
+**"Prova su una copia" ("Try on a copy").** Shown on the status line when the edited pattern is used in the song. It copies the pattern to the next free letter (B → D), used nowhere, and switches editing to the copy. The status line then offers two buttons:
+- "Usa D in «sezione»": D takes B's place in the chosen section or clip only;
+- "Sostituisci B con D" ("Replace B with D"): every section and clip that uses B uses D instead. B stays in the list, used nowhere, and can be deleted.
+
+**"Ripristina B" ("Restore B").** Shown on the status line once B has changed since the user started editing it (chose its chip). It brings B back to how it was at that moment: an undo per pattern, kept while the song stays open in Compose. Restore is itself undoable from the notice.
+
+**Delete.** Disabled on a pattern that is in use, in the song or in the chosen clip, with a tooltip that says where it is used. Enabled on a pattern used nowhere.
+
+**Preview.** Unchanged from pattern-preview: the headphones button plays the edited pattern, and the track keeps playing its song pattern under the preview. The status line does not mute the track. The tooltip keeps "M mutes it".
+
+**Strings** in Italian and English in `src/i18n.js`, CSS for both themes (neon and hardware). Alternative rejected: two rows with different names and colours ("In the song" and "On trial"). It keeps two lists with the same letters, which is what confused the owner.
+
+### D10. Growth duration label
+
+The Compose value `dur:fitted` reads "Al massimo quanto il brano scritto" ("At most as long as the written song") in place of "Nella lunghezza del brano" ("Within the song length"). `durHint` uses the same words. Label only: the option's id, its behaviour and saved songs do not change. Every other place that quotes the label (Guide, knowledge notes) follows.
+
 ## Risks / Trade-offs
 
 - **[D3 moves the voice track of saved grown songs]** A frozen session stores its songs as heard, so it does not move. A replayed session grows again and gets the new places. That is wanted.
 - **[D7 moves the director fixtures]** `DIRECTOR_VERSION` goes up, and saved sessions warn that they may sound different (#38).
 - **[D4 adds steps to the build]** The step's comment is empty and the code shows no change. `check:endless` and the replay check confirm that a replayed line gives the same song.
-- **[D5 says more images]** A song gets one image per entry, as the style promised. With Narrated growth the step lines still outnumber the images (Open Questions).
+- **[D5 says more images]** A song gets one image per entry, as the style promised. With Narrated growth the step lines still outnumber the images (Follow-ups).
+- **[D3 speaks during the growth]** A line could land in a growth part that later fills up. The quiet test uses the build state at the part's own bars, so a part counts by what plays there.
+- **[D9 Replace B with D]** It changes several sections at once. It is one undoable action, and B stays in the list until deleted.
+- **[D9 changes the panel the preview checks read]** `check-preview.cjs` and `check-patterns.cjs` look for the two rows today, so they move with the change.
 
-## Open Questions
+## Follow-ups
 
-- Should the poetic narrator with Narrated growth say a short "movement" line at steps without an entry, instead of the plain step line? This needs a new POETIC group and its samples (`npm run voices`). Measured today: about 5 images against 25 step lines per Live coder song.
+- **Poetic movement lines (separate later change).** The poetic narrator with Narrated growth could say a short "movement" line at steps without an entry, instead of the plain step line. This needs a new POETIC group and its samples (`npm run voices`). Measured today: about 5 images against 25 step lines per Live coder song. Out of scope here, by the owner's choice.

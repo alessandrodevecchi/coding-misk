@@ -1,11 +1,15 @@
 ## ADDED Requirements
 
 ### Requirement: The voice track in songs grown on air
-A Crescendo or Live coder song grown on air SHALL keep its voice track's lines and their number, placed over the whole grown song on parts of the kinds the track may speak in, the growth included. An entry line SHALL stay before its bound track's first entry. When the song builds live, the voice track SHALL come in at its first line.
+A Crescendo or Live coder song grown on air SHALL keep its voice track's lines and their number, placed over the whole grown song on parts of the kinds the track may speak in, the growth included. During the growth, the voice track SHALL speak only in quiet parts, where few tracks play at those bars. An entry line SHALL stay before its bound track's first entry. When the song builds live, the voice track SHALL come in at its first line.
 
 #### Scenario: Live coder song with a voice track
 - **WHEN** a pure-trance Live coder song grows on air and its director's song has one voice-track line
 - **THEN** the grown song has one line too, and it sounds in the first third of the song when a part of the allowed kinds is there
+
+#### Scenario: A line in the growth
+- **WHEN** the growth of a Live coder song has a quiet part with two tracks and a busy part with eight, and the voice track may speak in quiet parts
+- **THEN** a line may fall in the quiet part, and no line falls in the busy part
 
 #### Scenario: Same lines
 - **WHEN** the director's song has a refrain "stay with me" and a passage
