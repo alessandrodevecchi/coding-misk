@@ -12,7 +12,7 @@ import { stream } from '../endless/random.js';
 import { rackCode } from './rack.js';
 import { getLang, t } from '../i18n.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from './vocabulary.js';
-import { SPEAKERS, saySlug, sayBank } from './build.js';
+import { SPEAKERS, saySlug, sayBank, buildSteps } from './build.js';
 
 export const WAYS = ['passage', 'refrain', 'chop', 'opening'];
 export const NARRATOR_STYLES = ['explain', 'poetic'];
@@ -247,10 +247,41 @@ export function withNarratorStyle(song, style) {
   const n = song.narrator, lines = n && typeof n === 'object' && n.lines ? n.lines : null;
   return { ...song, narrator: lines ? { style, lines } : style };
 }
-// the track a step brings in (add, clone, unmute), or null
+// the track a step brings in (add, clone, unmute), or null. The unsolo of the last line played alone (after-tests-oct28
+// D5) brings in every track that was on and silenced by the solo: the first of them in the order they came in
 export function enteringTrack(song, step) {
   const id = step.add !== undefined ? [].concat(step.add)[0] : step.clone ? step.clone.track : step.unmute !== undefined ? [].concat(step.unmute)[0] : null;
-  return id === null || id === undefined ? null : (song.tracks || []).find(x => x.id === id) || null;
+  if (id === null || id === undefined) return step.unsolo !== undefined ? releasedTrack(song, step) : null;
+  return (song.tracks || []).find(x => x.id === id) || null;
+}
+// (kept per song and step: the narrator asks for every step of every state)
+const releasedMemo = new WeakMap();
+function releasedTrack(song, step) {
+  const key = `${step.i}|${step.at}|${JSON.stringify(step.unsolo)}`, memo = releasedMemo.get(song) || new Map();
+  releasedMemo.set(song, memo);
+  if (!memo.has(key)) memo.set(key, releasedNow(song, step));
+  return memo.get(key);
+}
+function releasedNow(song, step) {
+  const steps = buildSteps(song), k = Number.isInteger(step.i) ? steps.findIndex(x => x.i === step.i) : steps.findIndex(x => x.at === step.at && JSON.stringify(x.unsolo) === JSON.stringify(step.unsolo));
+  if (k < 0) return null;
+  const added = new Set(steps.flatMap(x => [...(x.add !== undefined ? [].concat(x.add) : []), ...(x.clone ? [x.clone.track] : [])]));
+  const on = new Map((song.tracks || []).filter(t => !added.has(t.id) && !t.mute).map((t, n) => [t.id, -1 - n])), alone = new Set((song.tracks || []).filter(t => t.alone).map(t => t.id));
+  for (let j = 0; j <= k; j++) {
+    const x = steps[j], ids = v => (v === undefined ? [] : [].concat(v));
+    if (j === k) {
+      const left = new Set([...alone].filter(id => !ids(x.unsolo).includes(id)));
+      if (!alone.size || left.size) return null;
+      const freed = [...on.entries()].filter(([id]) => !alone.has(id)).sort((p, q) => p[1] - q[1]).map(([id]) => (song.tracks || []).find(t => t.id === id));
+      return freed.find(t => t && t.type !== 'voice' && t.type !== 'spoken') || null;
+    }
+    ids(x.add).forEach(id => { if (!on.has(id)) on.set(id, j); });
+    if (x.clone && !on.has(x.clone.track)) on.set(x.clone.track, j);
+    ids(x.remove).forEach(id => on.delete(id));
+    ids(x.solo).forEach(id => alone.add(id));
+    ids(x.unsolo).forEach(id => alone.delete(id));
+  }
+  return null;
 }
 // a short image for a track that comes in: the song's lines for its type, the style's, else the vocabulary's
 export function poeticLine(song, step, index) {

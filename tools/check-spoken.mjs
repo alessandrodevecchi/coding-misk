@@ -26,6 +26,9 @@ import { energyOf } from '../src/endless/energy.js';
 import { meterSteps } from '../src/music.js';
 import { rewriteSpoken, trackVoice, quietParts, nextQuiet, wherePartsOf, grownParts, soundingAt, firstSound } from '../src/endless/voice-track.js';
 import { writtenForm } from '../src/endless/growth.js';
+import { windowSong } from '../src/endless/join.js';
+import { layout } from '../src/endless/transitions.js';
+import { windowPart } from '../src/live/air-code.js';
 import { sectionFacts, whereOfTrack } from '../src/song/spoken.js';
 import { soundPatch } from '../src/endless/voice-sound.js';
 import * as VS from './voice-sample.mjs';
@@ -793,6 +796,54 @@ const CHECKS = {
     }
     console.log(`      ${res.switch.length} Live coder and ${res.crescendo.length} Crescendo radio songs; ${early} first lines in the first third; ${inGrowth} line starts in the growth (${fallback} past the quiet limit, too few quiet parts); ${same} grown tracks with the director's lines; ${entries} entry lines`);
     assert(res.switch.length >= 20 && res.crescendo.length >= 20 && same >= 8, `${res.switch.length} Live coder, ${res.crescendo.length} Crescendo, ${same} tracks`);
+  },
+  'poetic images at every entry (after-tests-oct28 D5): one image per entry of three songs with and without Narrated growth, every song of a radio window opens with one, a mid-set opening at its last unsolo'() {
+    const enters = (song, st) => { const t = enteringTrack(song, st); return t && t.type !== 'spoken' && t.type !== 'voice'; };
+    // the images of a live build: narrator lines for an entering step, not its own step line
+    const imagesOf = (B, C) => spokenSchedule(B, C, 'en', ANY).filter(x => x.voice === 'N' && x.step && enters(B, x.step) && x.text !== sayText(x.step.say, 'en'));
+    const report = [];
+    for (const id of ['luci-rosse', 'kellerlicht', 'settimo-cielo']) {
+      const song = read(`songs/${id}.json`);
+      for (const profile of ['crescendo', 'switch']) for (const narrated of [false, true]) {
+        const C = resolveProfile(profile, { narratorStyle: 'poetic', narrated }), c = crescendoSong(song, { narrated, rules: growthRules(C) }), B = liveBuildOf(c, C);
+        const yields = c.tracks.some(t => t.type === 'spoken') ? spokenBars(c, 'en') : new Set();
+        const bars = [...new Set(buildSteps(B).filter(st => enters(B, st)).map(st => st.at))], imgs = imagesOf(B, C);
+        for (const e of bars) {
+          const got = imgs.filter(x => x.step.at === e);
+          if (yields.has(e - 1 >= 0 ? e - 1 : e)) continue;
+          assert(got.length === 1 && (got[0].at === e - 1 || got[0].at === e), `${id} ${profile}${narrated ? ' narrated' : ''}: entry at ${e} has ${got.length} images (${got.map(x => x.at)})`);
+        }
+        report.push(`${id} ${profile}${narrated ? '+narrated' : ''} ${imgs.length}/${bars.length}`);
+      }
+    }
+    console.log(`      images/entries: ${report.join(', ')}`);
+    // a radio window: every song opens with an image on its first bar (the song before plays the bar before it)
+    let opened = 0;
+    for (const profile of ['crescendo', 'switch']) {
+      const rec = { seed: 'd5-window', options: { styles: ['berlin-techno'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'cut', harmony: 'artist', profile }, changes: [], growth: GROWTH_ON_AIR };
+      const items = sessionItems(RADIO_RECIPES, rec, 3), starts = layout(items.map(x => ({ bars: normalizeSong(x.song).total, transition: x.entry.transition })), 0);
+      for (let k = 1; k < items.length; k++) {
+        const ks = k + 1 < items.length ? [k, k + 1] : [k], W = windowSong(ks.map(i => ({ song: items[i].song, n: i + 1, start: starts[i], transition: items[i].entry.transition })));
+        const songs = ks.map(i => ({ n: i + 1, prefix: `s${i + 1}-`, start: starts[i], song: items[i].song }));
+        const part = windowPart(W, songs, 0, { grown: true }), C = resolveProfile(profile, { narratorStyle: 'poetic', duration: 'fitted' }), B = liveBuildOf(part, C);
+        const first = buildSteps(B).filter(st => st.at >= starts[k] && enters(B, st))[0];
+        if (!first || first.at !== starts[k]) continue;
+        assert(imagesOf(B, C).some(x => x.step.at === first.at && x.at === starts[k]), `${profile} song ${k + 1}: no image on its first bar ${starts[k]}`);
+        opened++;
+      }
+    }
+    assert(opened >= 2, `${opened} radio songs checked for their opening image`);
+    // a mid-set opening: the last unsolo brings the silent tracks in, with an image
+    let midset = 0;
+    for (const style of ['berlin-techno', 'pure-trance', 'synthwave', 'dark-cyberpunk']) for (const { song } of radioSongs('switch', style, `d5-mid-${style}`, 3)) {
+      const C = resolveProfile('switch', { narratorStyle: 'poetic', duration: 'fitted' }), B = liveBuildOf(song, C), imgs = imagesOf(B, C);
+      for (const st of buildSteps(B).filter(x => x.unsolo !== undefined && enters(B, x))) {
+        assert(imgs.some(x => x.step.at === st.at && (x.at === st.at - 1 || x.at === st.at)), `${song.id}: the last unsolo at ${st.at} has no image`);
+        midset++;
+      }
+    }
+    console.log(`      ${opened} radio songs open with an image; ${midset} mid-set releases with an image`);
+    assert(midset >= 1, 'no mid-set opening found');
   },
 };
 

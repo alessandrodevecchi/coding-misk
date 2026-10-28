@@ -37,6 +37,9 @@ export function windowPart(W, songs, k, { grown = false } = {}) {
   const mine = s => { const r = stepRefs(s); return r.length ? r.some(id => id.startsWith(pre)) : owner(s.at) === k; };
   const src = me.song || {}, out = { ...W, id: src.id || W.id, title: src.title || W.title, tracks: W.tracks.filter(t => t.id.startsWith(pre)), build: (W.build || []).filter(mine) };
   for (const f of ['tags', 'profile', 'style']) if (src[f] !== undefined) out[f] = src[f];
+  // the song's first bar in the window: the poetic narrator says the image of an entry there on that bar, as on bar 0
+  // of a song alone (after-tests-oct28 D5)
+  out.start = me.start || 0;
   // a song steered on air (radio-profiles D9): its reference for functions and levels, placed in the window like the song
   if (src.codeRef) {
     const ref = src.codeRef.tracks || [];

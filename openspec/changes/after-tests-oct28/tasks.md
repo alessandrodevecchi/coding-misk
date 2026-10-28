@@ -44,9 +44,9 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 5. Poetic images at every entry
 
-- [ ] 5.1 `narration()`: next entering step after the current bar, image on the entry's bar when the bar before belongs to an earlier step, song start in the window; `enteringTrack` with the last `unsolo` (D5)
-- [ ] 5.2 Check in `check:spoken` ("poetic narrator"): with Narrated growth on and off, every entry of luci-rosse, kellerlicht and settimo-cielo (Crescendo and Live coder) gets one image; in a radio window of three songs every song gets its opening image; a mid-set opening gets an image at its last unsolo
-- [ ] 5.3 Report per song the images and the step lines before and after (luci-rosse Crescendo with Narrated growth: 5 images before, 7 expected after)
+- [x] 5.1 `narration()`: next entering step after the current bar, image on the entry's bar when the bar before belongs to an earlier step, song start in the window; `enteringTrack` with the last `unsolo` (D5)
+- [x] 5.2 Check in `check:spoken` ("poetic narrator"): with Narrated growth on and off, every entry of luci-rosse, kellerlicht and settimo-cielo (Crescendo and Live coder) gets one image; in a radio window of three songs every song gets its opening image; a mid-set opening gets an image at its last unsolo
+- [x] 5.3 Report per song the images and the step lines before and after (luci-rosse Crescendo with Narrated growth: 5 images before, 7 expected after)
 
 ## 6. Narrator yields only to lines that sound
 

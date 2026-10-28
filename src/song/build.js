@@ -197,10 +197,22 @@ const narratedGrowth = song => !!(song && song.crescendo && song.crescendo.narra
 function narration(song, upTo, lang) {
   const steps = buildSteps(song), step = steps[upTo - 1];
   if (narratorStyle(song) !== 'poetic') { const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && sayText(said.say, lang); return text ? [{ step: said, text, at: said.at }] : []; }
-  const out = [], next = steps[upTo];
-  // the entry of bar 0 (the first track), then the next entry in the bar before it
-  if (step && step.at === 0 && entering(song, step)) out.push({ step, text: sayText(poeticLine(song, step, upTo - 1), lang), at: 0 });
-  if (next && entering(song, next) && next.at > 0 && next.at - 1 >= (step ? step.at : 0) && !out.some(x => x.at === next.at - 1)) out.push({ step: next, text: sayText(poeticLine(song, next, upTo), lang), at: next.at - 1 });
+  // after-tests-oct28 D5: an image for every entry. This state's code plays from its bar `a` to the next step's bar
+  // `b`; it says the image of each entry whose image bar falls there: the bar before the entry, or the entry's own bar
+  // when the bar before is not the song's (its first bar: bar 0, or its start in the radio window, `song.start`). An
+  // entry that shares its bar with other steps (a section step, the growth's steps) keeps its image; several entries on
+  // one bar get one image, for the first of them
+  const out = [], start = Number.isFinite(song.start) ? song.start : 0;
+  const a = step ? step.at : start, later = steps.slice(upTo).find(x => x.at > a), b = later ? later.at : Infinity;
+  const seen = new Set();
+  steps.forEach((x, i) => {
+    if (x.at < a || seen.has(x.at) || !entering(song, x)) return;
+    const at = x.at - 1 >= start ? x.at - 1 : x.at;
+    // (an entry on this state's own bar is said here only on the song's first bar; later ones were said the bar before)
+    if (at < a || at >= b || (x.at === a && at !== a)) return;
+    seen.add(x.at);
+    out.push({ step: x, text: sayText(poeticLine(song, x, i), lang), at });
+  });
   // Narrated growth with the poetic style (voice-full-controls D11): the step lines stay, the images come in addition;
   // on a shared bar the image is said and the step keeps its line on stage
   if (narratedGrowth(song)) {
