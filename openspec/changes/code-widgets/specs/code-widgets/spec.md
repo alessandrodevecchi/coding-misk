@@ -2,17 +2,26 @@
 
 ### Requirement: Code widgets option
 
-The app SHALL offer "Code widgets" (it: "Widget nel codice"): an on/off option with a number of widgets on screen together, default off and default number 3, with no maximum other than the number of tracks. The option SHALL apply to every profile, to the radio, to code shown in Compose and to songs that do not grow. With the option off, the shown code, the evaluated code, the typing, the growth and every fixture SHALL be identical to the code without this change.
+The app SHALL offer "Code widgets" (it: "Widget nel codice"): an on/off option with a maximum number of widgets on screen together, default off and default maximum 3. The option SHALL apply to every profile, to the radio, to code shown in Compose and to songs that do not grow. With the option off, the shown code, the evaluated code, the typing, the growth and every fixture SHALL be identical to the code without this change.
 
 #### Scenario: Off by default
 
 - **WHEN** a user opens the app for the first time and plays a Live coder song
 - **THEN** no widget call appears in the code and the code text is the same as before this change
 
-#### Scenario: Number of widgets
+#### Scenario: Maximum of widgets
 
-- **WHEN** the option is on with the number 2 and five tracks play
+- **WHEN** the option is on with the maximum 2 and five tracks play
 - **THEN** at most two widget calls are in the shown code at any time
+
+### Requirement: The number of widgets varies
+
+The maximum SHALL be a ceiling, not a fixed count. The number of widgets on screen SHALL vary over the song, chosen per section (or growth part) by the song seed from 1 to the maximum. The same song with the same settings SHALL always give the same widgets.
+
+#### Scenario: The number varies
+
+- **WHEN** a song with at least four sections and at least three tracks per section plays with the default maximum 3
+- **THEN** the number of widgets on screen is not the same in every section, and never above 3
 
 #### Scenario: Every profile
 
@@ -21,7 +30,7 @@ The app SHALL offer "Code widgets" (it: "Widget nel codice"): an on/off option w
 
 ### Requirement: Code widgets settings card
 
-The Settings page SHALL have one card "Code widgets" with collapsible sections for: the option and the number; each widget on or off; each widget on or off per instrument, with the primary and secondary widget of each instrument and the choice between pianoroll and punchcard; selected parameters on or off; and sizes. The settings SHALL be saved with the other settings and included in the backup, in English and Italian.
+The Settings page SHALL have one card "Code widgets" with collapsible sections: general (option, maximum, slot order, secondary share, "Widget notes", pianoroll or punchcard), muted lines, widgets on or off, instruments (on or off, primary and secondary widgets), parameters and sizes. The settings SHALL be saved with the other settings and included in the backup, in English and Italian.
 
 #### Scenario: Turning off a widget
 
@@ -37,6 +46,78 @@ The Settings page SHALL have one card "Code widgets" with collapsible sections f
 
 - **WHEN** the user exports a backup with changed widget settings and imports it in a fresh browser
 - **THEN** the card shows the same settings
+
+#### Scenario: Slot order
+
+- **WHEN** the user moves `drums` to the top of the slot order, the maximum is 1 and bass and drums play
+- **THEN** the widget goes to the drums line
+
+#### Scenario: Default slot order
+
+- **WHEN** the option is on with default settings and more tracks play than the target allows
+- **THEN** slots go in the order bass, lead, drums, arp, hats, pad, then fx and voice
+
+### Requirement: Secondary widgets for variety
+
+A line SHALL usually get its instrument's primary widget, and with a share set in the card (default 25%) a secondary widget that is on, chosen by the song seed.
+
+#### Scenario: Default share
+
+- **WHEN** the option is on with default settings and the built-in songs are grown
+- **THEN** about one widget in four is a secondary widget, and the rest are primary
+
+#### Scenario: Share zero
+
+- **WHEN** the user sets the share to 0%
+- **THEN** every widget is its instrument's primary, or the first secondary that is on when the primary is off
+
+### Requirement: Widgets on muted lines
+
+A widget on a muted line (`_$:`) SHALL count toward the maximum. A muted line SHALL keep or get a widget only if it returns within N bars, where N is a setting with the values 8, 16, 32 and always, default 16. Until the line returns, its widget SHALL be drawn dimmed (grey, semi-transparent, with a dashed frame like the muted code lines) by app styling on the widget element, for every widget. A setting SHALL turn the dimmed look on or off, default on.
+
+#### Scenario: Muted widget counts
+
+- **WHEN** the maximum is 2, a muted bass line carries `._scope()` and a lead and drums play
+- **THEN** only one of lead and drums has a widget
+
+#### Scenario: Return within the window
+
+- **WHEN** a track with a widget is muted and returns 12 bars later with the default window of 16 bars
+- **THEN** the widget stays on its line during the silence
+
+#### Scenario: Return beyond the window
+
+- **WHEN** a track with a widget is muted for 24 bars with the default window of 16 bars
+- **THEN** its widget is removed and its slot goes to another track
+
+#### Scenario: Always
+
+- **WHEN** the window is "always" and a track with a widget is muted for 64 bars
+- **THEN** the widget stays on its line during the silence
+
+#### Scenario: Dimmed look
+
+- **WHEN** a muted line carries `._pianoroll()` with default settings
+- **THEN** the widget is grey, semi-transparent and has a dashed frame until the line returns, and looks normal from the evaluation that unmutes it
+
+#### Scenario: Dimmed look off
+
+- **WHEN** the user turns the dimmed look off
+- **THEN** a widget on a muted line looks as Strudel draws it
+
+### Requirement: Widget notes
+
+The card SHALL have a setting "Widget notes" (it: "Note dei widget") with the values "follow the volume" (it: "come il volume"), where note opacity follows the note's gain, and "always full" (it: "sempre piene"), where notes are drawn at full opacity. The setting SHALL change only the drawing, never the sound. Its default SHALL be chosen after measuring the real track volumes of the built-in songs and looking at screenshots of both values.
+
+#### Scenario: Always full
+
+- **WHEN** "Widget notes" is "always full" and a quiet pad line with gain 0.1 carries `._pianoroll()`
+- **THEN** its notes are drawn at full opacity
+
+#### Scenario: Same sound
+
+- **WHEN** the same song plays with "follow the volume" and with "always full"
+- **THEN** every hap has the same gain, orbit, analyze, postgain and velocity
 
 ### Requirement: Available widgets
 
@@ -107,6 +188,11 @@ Every update of the panel's code while a song plays SHALL replace only the chang
 - **WHEN** the Live coder types a new line letter by letter while three widgets are shown
 - **THEN** the three widgets stay at every typed frame, and the text equals the text the full replacement would give
 
+#### Scenario: Text change without evaluation
+
+- **WHEN** the app changes the text of one line while a song plays and does not evaluate
+- **THEN** the widgets on every other line stay, instead of all being removed until the next evaluation
+
 ### Requirement: Scope and spectrum keep the instrument
 
 `_scope` and `_spectrum` SHALL keep the line's `analyze` value, and SHALL draw that instrument's analyser, in both Strudel copies of the app, without changes to superdough.
@@ -147,7 +233,7 @@ In profiles that type the code, the coder SHALL add a widget when writing the li
 
 ### Requirement: Classic widgets follow the playing line
 
-In Classic, where lines of past sections stay in the code, a widget SHALL sit only on the line of its track that plays now. At a section change it SHALL move to the track's new line, it SHALL be removed when the track is silent, and it SHALL stay on a muted line that returns within 8 bars.
+In Classic, where lines of past sections stay in the code, a widget SHALL sit only on the line of its track that plays now. At a section change it SHALL move to the track's new line, it SHALL be removed when the track is silent, and it SHALL stay on a muted line that returns within the return window of muted lines (N bars, default 16).
 
 #### Scenario: Section change
 
@@ -161,7 +247,7 @@ In Classic, where lines of past sections stay in the code, a widget SHALL sit on
 
 #### Scenario: Long silence
 
-- **WHEN** a track with a widget is silent for 16 bars
+- **WHEN** a track with a widget is silent for 24 bars with the default window of 16 bars
 - **THEN** its widget is removed and its slot goes to another playing track
 
 ### Requirement: Songs that do not grow
@@ -185,7 +271,7 @@ In songs that do not grow, widgets SHALL change at once at each section change, 
 
 ### Requirement: Widgets in videos and the live output
 
-The session video, the vertical fragments with code and the live output SHALL draw the widgets below their lines, in new "Code + widgets" scenes; existing scenes SHALL stay unchanged.
+The session video, the vertical fragments with code and the live output SHALL draw the widgets below their lines, in new "Code + widgets" scenes; existing scenes SHALL stay unchanged. Widgets on muted lines SHALL keep the dimmed look in every video when it is on.
 
 #### Scenario: Session video
 
@@ -197,19 +283,33 @@ The session video, the vertical fragments with code and the live output SHALL dr
 - **WHEN** a session video is recorded with an existing code scene and the option on
 - **THEN** the frames are the same as without the option
 
+#### Scenario: Dimmed in the video
+
+- **WHEN** a session video with a "Code + widgets" scene shows a widget on a muted line, with the dimmed look on
+- **THEN** the frames show that widget grey, semi-transparent and with a dashed frame
+
 ### Requirement: Widgets in the fast video
 
-The fast video SHALL redraw note widgets (`_pianoroll`, `_punchcard`, `_spiral`, `_pitchwheel`) from the haps of each line, and SHALL draw `_scope` and `_spectrum` from one extra offline render per track with a widget. When the extra renders are too slow, the fast video SHALL fall back to the master waveform and spectrum for those widgets.
+The fast video SHALL redraw note widgets (`_pianoroll`, `_punchcard`, `_spiral`, `_pitchwheel`) from the haps of each line, and SHALL draw `_scope` and `_spectrum` from one extra offline render per track with a widget.
 
 #### Scenario: Fast video scope
 
 - **WHEN** a fast video is exported with two tracks carrying `_scope`
 - **THEN** each scope draws the wave of its own track, from two extra renders
 
+### Requirement: Fast video scope and spectrum setting
+
+A video setting "Real scope and spectrum in the fast video" (it: "Scope e spectrum veri nel video veloce") SHALL have two values: "Automatic" (default), which falls back to the master waveform and spectrum for those widgets when the export would take more than twice as long as without the extra renders; and "Always real", which always uses the per-track renders, even if slower.
+
 #### Scenario: Fallback
 
-- **WHEN** the extra renders would pass the time limit
-- **THEN** the scopes draw the master waveform and the export finishes
+- **WHEN** the setting is "Automatic" and the extra renders would make the export more than twice as long
+- **THEN** the scopes draw the master waveform, the export log says so, and the export finishes
+
+#### Scenario: Always real
+
+- **WHEN** the setting is "Always real" and the extra renders would make the export more than twice as long
+- **THEN** each scope still draws the wave of its own track
 
 ### Requirement: Checks know the widgets
 
