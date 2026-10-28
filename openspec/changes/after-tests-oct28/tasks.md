@@ -31,10 +31,10 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 3. Voice track in grown songs
 
-- [ ] 3.1 Re-place the spoken tracks in `growOnAir` after the growth (D3), helper in `src/endless/voice-track.js`; remove the lone-clip rule of `tailOf`
-- [ ] 3.2 Check in `check:spoken` ("the voice instrument kept in songs grown on air"): for 20 Live coder and 20 Crescendo radio songs with a voice track, the grown song has the director's number of lines and the same texts; the first line falls in the first third when an allowed part is there (today: 65% to 71% in pure-trance); lines in the growth fall only in quiet parts (few tracks at those bars); entry lines end before their bound track's first entry
-- [ ] 3.3 Fixtures: `node --no-warnings tools/check-radio-profiles.mjs --write-fixtures` only for the voice-track moves, with the reason in the commit; `npm run check:crescendo` unchanged
-- [ ] 3.4 Browser: probe a pure-trance Live coder session with both voices on; the `fx` analyser peaks on the voice track's first line within the first third of the song, and on narrator lines before it
+- [x] 3.1 Re-place the spoken tracks in `growOnAir` after the growth (D3), helper in `src/endless/voice-track.js`; remove the lone-clip rule of `tailOf`
+- [x] 3.2 Check in `check:spoken` ("the voice instrument kept in songs grown on air"): for 20 Live coder and 20 Crescendo radio songs with a voice track, the grown song has the director's number of lines and the same texts; the first line falls in the first third when an allowed part is there (today: 65% to 71% in pure-trance); lines in the growth fall only in quiet parts (few tracks at those bars); entry lines end before their bound track's first entry
+- [x] 3.3 Fixtures: `node --no-warnings tools/check-radio-profiles.mjs --write-fixtures` only for the voice-track moves, with the reason in the commit; `npm run check:crescendo` unchanged
+- [x] 3.4 Browser: probe a pure-trance Live coder session with both voices on; the `fx` analyser peaks on the voice track's first line within the first third of the song, and on narrator lines before it
 
 ## 4. Typed lines always sound
 

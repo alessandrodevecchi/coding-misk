@@ -24,8 +24,9 @@ import { voiceEvent } from '../src/endless/voice-panel.js';
 import { withNarratorStyle, lineTexts, narratorStyle } from '../src/song/spoken.js';
 import { energyOf } from '../src/endless/energy.js';
 import { meterSteps } from '../src/music.js';
-import { rewriteSpoken, trackVoice, quietParts, nextQuiet, wherePartsOf } from '../src/endless/voice-track.js';
-import { sectionFacts } from '../src/song/spoken.js';
+import { rewriteSpoken, trackVoice, quietParts, nextQuiet, wherePartsOf, grownParts, soundingAt, firstSound } from '../src/endless/voice-track.js';
+import { writtenForm } from '../src/endless/growth.js';
+import { sectionFacts, whereOfTrack } from '../src/song/spoken.js';
 import { soundPatch } from '../src/endless/voice-sound.js';
 import * as VS from './voice-sample.mjs';
 import { phraseRows, listVocab, editText, editBars, removeRow, addRow, fillRows, vocabOf } from '../src/endless/phrase-list.js';
@@ -728,6 +729,70 @@ const CHECKS = {
       const r = nextRows(B, sch, shared.at - 1, 1)[0];
       assert(r && r.voices.every(v => v.voice !== 'N'), `V:N on the voice bar ${shared.at}`);
     }
+  },
+  'voice track in songs grown on air (after-tests-oct28 D3): the director\'s lines and texts, the first in the first third when a part allows it, growth lines in quiet bars, entry lines before their track'() {
+    const res = { switch: [], crescendo: [] };
+    let early = 0, inGrowth = 0, entries = 0, fallback = 0;
+    for (const profile of ['switch', 'crescendo']) for (const style of ['pure-trance', 'dark-cyberpunk', 'ambient']) for (let k = 0; k < 6 && res[profile].length < 20; k++) {
+      const rec = { seed: `d3-${style}-${k}`, options: { styles: [style], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile, voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR };
+      const items = sessionItems(RADIO_RECIPES, rec, 3);
+      for (const it of items) {
+        const s = it.song;
+        if (!s.onAir || !s.tracks.some(t => t.type === 'spoken')) continue;
+        // the director's song as written: the song before the growth (writtenForm of the plain song the radio keeps)
+        const plain = it.plain || null;
+        res[profile].push(s.id);
+        const G = s.crescendo.growth, total = normalizeSong(s).total, most = Math.max(0, ...sectionFacts(normalizeSong(s)).counts);
+        for (const tr of s.tracks.filter(t => t.type === 'spoken')) {
+          const placed = placeSpoken(s, 'en').filter(p => p.track === tr.id);
+          assert(placed.length === tr.clips.length && placed.length > 0, `${s.id}: ${tr.clips.length} clips, ${placed.length} lines placed`);
+          const first = Math.min(...placed.flatMap(p => p.starts.map(x => x.bar)));
+          const base = { ...s, tracks: s.tracks.filter(t => t.id !== tr.id) }, parts = grownParts(base, G, whereOfTrack(tr));
+          const kind0 = parts.length ? parts[0].kind : null, allowedEarly = parts.some(p => p.kind === kind0 && p.start < total / 3);
+          // (an entry line goes before its bound track, wherever that comes in: openings and lines with "before" are left out)
+          if (allowedEarly && !tr.clips.some(c => (tr.patterns[c.pattern] || {}).before !== undefined || (tr.patterns[c.pattern] || {}).way === 'opening')) { assert(first < total / 3, `${s.id} (${profile}): first line at ${first} of ${total}, a part in the first third allowed it`); early++; }
+          for (const p of placed) for (const st of p.starts.filter(x => x.bar < G)) {
+            inGrowth++;
+            const n = soundingAt(base, st.bar).length;
+            if (n > most / 2) fallback++;
+            assert(n >= 1, `${s.id}: a line at ${st.bar} over silence`);
+          }
+          // the add step brings the track in at its first clip
+          const add = buildSteps(s).filter(x => [].concat(x.add ?? []).includes(tr.id)).map(x => x.at);
+          assert(add.length === 1 && add[0] === Math.min(...tr.clips.map(c => c.start)), `${s.id}: add at ${add}, first clip ${Math.min(...tr.clips.map(c => c.start))}`);
+        }
+      }
+    }
+    // the same lines as the director's song, and entry lines before their bound track: growOnAir on director songs
+    let same = 0;
+    for (let i = 0; i < 24; i++) {
+      const g = createSession(recipes, `grow-voice-${i}`).next({ styles: [['pure-trance', 'dark-cyberpunk', 'ambient'][i % 3]], voice: { presence: 'always' } });
+      const wf = writtenForm(g.song), sp = wf.tracks.filter(t => t.type === 'spoken');
+      if (!sp.length) continue;
+      for (const profile of ['switch', 'crescendo']) {
+        const s = growOnAir(g.song, { profile, styles, phrase: g.plan.phrase });
+        if (!s.onAir) continue;
+        for (const w of sp) {
+          const tr = s.tracks.find(t => t.id === w.id);
+          assert(tr && tr.clips.length === w.clips.length, `${g.song.id} ${profile}: ${w.clips.length} lines written, ${tr ? tr.clips.length : 0} grown`);
+          const texts = x => placeSpoken(x, 'en').filter(p => p.track === w.id).map(p => p.texts.join(' · ')).sort().join(' | ');
+          assert(texts(s) === texts(wf), `${g.song.id} ${profile}: texts ${texts(s)} vs ${texts(wf)}`);
+          same++;
+          for (const c of w.clips) {
+            const bound = (w.patterns[c.pattern] || {}).before;
+            if (bound === undefined) continue;
+            const e = firstSound({ ...s, tracks: s.tracks.filter(t => t.id !== w.id) }, bound), n = normalizeSong(s);
+            if (e === null) continue;
+            const p = placeSpoken(s, 'en').find(x => x.track === w.id && x.key === c.pattern), st = p.starts[0];
+            const bpb = beatsPerBar(n, st.bar), endBeat = st.bar * bpb + st.late * bpb + p.beats;
+            assert(endBeat <= e * beatsPerBar(n, e) + 1e-6, `${g.song.id} ${profile}: entry line ends at beat ${endBeat}, ${bound} sounds at bar ${e}`);
+            entries++;
+          }
+        }
+      }
+    }
+    console.log(`      ${res.switch.length} Live coder and ${res.crescendo.length} Crescendo radio songs; ${early} first lines in the first third; ${inGrowth} line starts in the growth (${fallback} past the quiet limit, too few quiet parts); ${same} grown tracks with the director's lines; ${entries} entry lines`);
+    assert(res.switch.length >= 20 && res.crescendo.length >= 20 && same >= 8, `${res.switch.length} Live coder, ${res.crescendo.length} Crescendo, ${same} tracks`);
   },
 };
 

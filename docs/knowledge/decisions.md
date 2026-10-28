@@ -97,6 +97,7 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 | A voice's sound is one value, its track's settings; a song without a narrator track gets one on the first edit (voice-full-controls D1, D2) | The Voices group, the track panel and the style pickers read and write the same place, so they never disagree; creating the track only on an edit leaves songs unchanged when looked at | [voice](voice.md) |
 | Every style has a voice track chance on its own stream; Sempre gives every song one, the switch silences it (voice-full-controls D14, D15) | The music of a session never moves with the voices (the endless fixtures keep a music hash without the voice tracks); off then on is lossless | [voice](voice.md) |
 | Console lines get real samples from a dev-server helper (voice-full-controls D8, D9) | Played by Strudel like any line: same sound chain, recorded, exported and replayed; about half a second a line | [radio-commands](radio-commands.md) |
+| The voice track placed again over a song grown on air, the growth included (after-tests-oct28 D3) | Keeping the written clips left the first line at two thirds of a Live coder song; the growth's quiet phrases are judged by what the build plays there, not by clips. Rejected: shifting the clips before the growth's start into its bars (the growth's bars do not match the written ones). | [design](../../openspec/changes/after-tests-oct28/design.md) |
 
 ## Rejected attempts
 

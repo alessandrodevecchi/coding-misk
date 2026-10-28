@@ -126,6 +126,7 @@ export function entryAfter(n, id, from) {
 export function placeSpoken(input, lang = langOf()) {
   const n = normalizeSong(input), ref = input.whole ? normalizeSong(input.whole) : n;
   const facts = sectionFacts(ref), out = [];
+  const growthBars = input.onAir && input.crescendo && Number.isFinite(input.crescendo.growth) ? input.crescendo.growth : 0;
   let k = 0;
   n.tracks.forEach((tr, ti) => {
     if (!isSpoken(tr)) return;
@@ -163,7 +164,9 @@ export function placeSpoken(input, lang = langOf()) {
         const every = Number.isInteger(pat.every) && pat.every > 0 ? pat.every : 4, kinds = whereOfTrack(tr);
         n.sections.forEach((s, i) => {
           // (a refrain repeats in the sections of the kinds its track may speak in, quiet only by default, D7)
-          if (!kinds.includes(facts.kinds[i])) return;
+          // (in a song grown on air the growth's sections look busy by their clips, which run under its steps: a refrain
+          // the radio placed in a quiet phrase of the growth repeats there, after-tests-oct28 D3)
+          if (!kinds.includes(facts.kinds[i]) && !(growthBars > 0 && s.start < growthBars)) return;
           const a = Math.max(s.start, clip.start), z = Math.min(s.start + s.bars, end);
           // the line ends before the section does: it stops when the song gets full again
           for (let b = a; b < z; b += every) if (b + Math.ceil(lenBars(b) - 1e-9) <= s.start + s.bars) starts.push({ bar: b, late: 0 });
