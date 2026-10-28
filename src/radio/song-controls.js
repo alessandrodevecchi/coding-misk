@@ -15,6 +15,7 @@ import { freshSeed } from '../endless/random.js';
 import { voicePanel, voiceEvent } from '../endless/voice-panel.js';
 import { voiceSoundHtml, syncVoiceSound, soundEvent, nextSound, cleanSound, soundShown } from '../endless/voice-sound.js';
 import { cleanVoice } from '../endless/voice-options.js';
+import { LENGTHS, LENGTH_MINUTES, cleanLength, hasLength } from '../endless/song-options.js';
 
 export const fmt = n => (Math.round(n * 100) / 100).toString();
 // an id of a view: the radio keeps the ids it had (radio-chaos, custom-toggle…), the panel gets its own (ns-chaos…)
@@ -132,6 +133,32 @@ export function voicesGroup({ state, t, esc, prefix }, { talkKnob = '', vfold = 
       <p class="hint muted small" id="${idOf(prefix, 'voices-hint')}">${esc(t(hint))}</p></div>`;
 }
 
+// The Durata chips (new-song-panel D5, D12; the radio's Durata since phase 8): As the style, Short, Medium, Long, Exact
+// with its minutes. The length is the length heard, growth included
+export function lengthChips({ state, t, esc, prefix }) {
+  const L = cleanLength(state.length), exact = typeof L === 'number';
+  const chip = v => `<button class="chip small" data-song-length="${v}" aria-pressed="${v === 'exact' ? exact : L === v}" title="${esc(t(`nsLenTip:${v}`))}">${esc(t(`nsLen:${v}`))}</button>`;
+  return `<div class="ctrl song-length" id="${idOf(prefix, 'length')}"><span class="lbl">${esc(t('nsLength'))}</span><div class="chips" role="group">${[...LENGTHS, 'exact'].map(chip).join('')}<label class="ns-min"${exact ? '' : ' hidden'}><input type="number" data-song-minutes min="${LENGTH_MINUTES[0]}" max="${LENGTH_MINUTES[1]}" step="0.5" value="${exact ? L : 3}" aria-label="${esc(t('nsMinutesLbl'))}" title="${esc(t('nsLenTip:exact'))}"> ${esc(t('rxMin'))}</label></div></div>`;
+}
+// a Durata picked: a Custom free growth gives way (D12: they exclude each other); ctx.freed: the line saying the length
+// was turned off by a free growth goes
+export function setLength(ctx, v) {
+  const opts = ctx.options.state, L = cleanLength(v), patch = { length: L };
+  if (hasLength(L) && opts.custom && opts.custom.controls && opts.custom.controls.duration === 'free') { const { duration: _, ...rest } = opts.custom.controls; patch.custom = { ...opts.custom, controls: rest }; }
+  if (hasLength(L)) ctx.freed = false;
+  Object.assign(opts, JSON.parse(JSON.stringify(patch)));
+  ctx.options.save(Object.keys(patch));
+  return { keys: ['length'], render: true };
+}
+// the growth duration picked with a Durata (D12): "in the chosen length" changes nothing; Libera or the fitted growth
+// turns the Durata off (ctx.freed: its line shows)
+export function lengthHook(ctx, k, v) {
+  if (k !== 'duration') return null;
+  if (v === 'planned') return { keys: [], render: true };
+  if (hasLength(ctx.options.state.length)) { ctx.options.state.length = 'style'; ctx.freed = true; }
+  return null;
+}
+
 // ---------- events ----------
 // The rules every view follows when a song control changes: picking an artist sets the styles and knobs to its centre;
 // touching the styles or a knob with an artist picked goes back to Custom; a die throws a fresh seed. The state is
@@ -204,6 +231,7 @@ export function songControlEvent(ctx, el, type) {
       if (k === 'mistakes') return setCustom(ctx, { mistakes: C.mistakes === 'off' ? 'on' : 'off' });
       return setCustom(ctx, { [k]: COMMENT_KEYS.includes(k) ? C[k] === false : !C[k] });
     }
+    if (d.songLength) { if (d.songLength === 'exact') { const i = ctx.root && ctx.root.querySelector('[data-song-minutes]'); return setLength(ctx, i ? +i.value || 3 : 3); } return setLength(ctx, d.songLength); }
     if (d.genrePick) {
       // a genre picks its styles; a second press on a genre whose styles are all picked takes them out (one style stays)
       const ids = recipes.filter(r => r.genre === d.genrePick).map(r => r.id);
@@ -230,11 +258,13 @@ export function songControlEvent(ctx, el, type) {
   }
   if (type === 'change') {
     if (d.artistPick !== undefined) return pickArtist(ctx, el.value);
+    if (d.songMinutes !== undefined) return setLength(ctx, +el.value || 3);
     if (d.songProfile !== undefined) { if (!RADIO_CHOICES.includes(el.value)) return null; opts.profile = el.value; options.save(['profile']); return { keys: ['profile'], render: true }; }
     if (d.vinst) { const v = voiceEvent(opts.voice, el, { mode: 'radio' }); if (!v) return { keys: [], render: false }; opts.voice = v; options.save(['voice']); return { keys: ['voice'], render: true }; }
     if (d.vsound || d.vsoundStyle) return soundChanged(ctx, el) ? { keys: ['sound'], render: false, end: true } : null;
     if (d.custom) {
       const k = d.custom, v = el.value;
+      { const r = lengthHook(ctx, k, v); if (r) return r; }
       if (ctx.customHook) { const r = ctx.customHook(k, v); if (r) return r; }
       if (k === 'comments' && COMMENT_PRESETS[v]) return setCustom(ctx, { ...COMMENT_PRESETS[v] });
       if (k === 'functions' && FUNCTION_PRESETS[v]) return setCustom(ctx, { ...FUNCTION_PRESETS[v] });

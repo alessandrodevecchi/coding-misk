@@ -144,10 +144,12 @@ const searchOptions = s => ({ ...(s.cap ? { shapeCap: s.cap } : {}), shapeAll: !
 // default search otherwise (the first growth of a song, steering, a growth that cannot wait)
 // phrases (new-song-panel D12, the planned growth in Compose only): the phrase boundaries are tried too, so a song of one
 // long section (a slow style) still grows inside its plan; the radio never passes it
-export function growOnAir(song, { profile = 'classic', artist = null, into = null, styles = {}, phrase = 8, controls = null, search = null, wide = false, phrases = false } = {}) {
+// fitted (new-song-panel D12, phase 8): the song was drawn with a length (the radio's Durata): it grows inside it, even
+// when the artist or the Custom profile asks for a free growth
+export function growOnAir(song, { profile = 'classic', artist = null, into = null, styles = {}, phrase = 8, controls = null, search = null, wide = false, phrases = false, fitted = false } = {}) {
   if (profile !== 'crescendo' && profile !== 'switch') return song;
-  const g = (artist && artist.growth) || {}, free = controls ? controls.duration === 'free' : g.duration === 'free';
-  const C = controls || airControls(profile, free);
+  const g = (artist && artist.growth) || {}, free = !fitted && (controls ? controls.duration === 'free' : g.duration === 'free');
+  const C = controls ? (fitted && controls.duration === 'free' ? { ...controls, duration: 'fitted' } : controls) : airControls(profile, free);
   const base = growthRules(C, { styles });
   // the typed opening only after a cut or an interlude, where nothing else plays; never the metamorphosis on air
   const deny = { opening: !into || into === 'cut' || into === 'interlude' ? [] : ['typed'], development: ['metamorphosis'] };
