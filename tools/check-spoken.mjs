@@ -845,6 +845,22 @@ const CHECKS = {
     console.log(`      ${opened} radio songs open with an image; ${midset} mid-set releases with an image`);
     assert(midset >= 1, 'no mid-set opening found');
   },
+  'narrator yields only to lines that sound (after-tests-oct28 D6): a voice-track line with no sample leaves its bar to the narrator; with every sample it yields as before'() {
+    const song = clone(EXAMPLE);
+    delete song.narrator;
+    const placed = placeSpoken(song, 'en'), p = placed.find(x => x.way === 'passage' || x.way === 'opening') || placed[0], bar = p.starts[0].bar;
+    const ids = song.tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken').map(t => t.id);
+    song.build = [{ at: 0, add: ids[0], say: 'go' }, { at: bar, set: { track: ids[0], gain: 0.5 }, say: 'here we are' }];
+    // a manifest with every line's sample, then one without this line's
+    const all = {};
+    for (const q of placed) for (const x of q.texts) (all[q.bank] = all[q.bank] || []).includes(`${q.bank}/${saySlug(x)}.wav`) || all[q.bank].push(`${q.bank}/${saySlug(x)}.wav`);
+    const without = Object.fromEntries(Object.entries(all).map(([b, l]) => [b, b === p.bank ? l.filter(f => !p.texts.some(x => f.endsWith(`/${saySlug(x)}.wav`))) : l]));
+    const saved = spokenContext.files, said = files => { setSpokenContext({ files }); const st = stateAt(song, bar); return voiceCode(song, st.song, st.upTo, normalizeSong(song).total, 'en', ANY); };
+    try {
+      assert(!/"here we are", spoken on bar/.test(said(all)) && spokenBars(song, 'en').has(bar), 'with every sample the narrator yields to the voice track');
+      assert(new RegExp(`"here we are", spoken on bar ${bar + 1}`).test(said(without)) && !spokenBars(song, 'en').has(bar), `without the line's sample the narrator is silent on bar ${bar + 1}`);
+    } finally { setSpokenContext({ files: saved }); }
+  },
 };
 
 let failed = 0;

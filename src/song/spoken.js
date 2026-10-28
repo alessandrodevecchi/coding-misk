@@ -180,11 +180,12 @@ export function placeSpoken(input, lang = langOf()) {
 }
 
 // the bars where spoken lines sound: { bar: true }, for the narrator to yield (D5). Tracks muted in the state are
-// silent; a line sounds from the bar it starts on to the bar its last beat falls in
+// silent, and lines with no sample; a line sounds from the bar it starts on to the bar its last beat falls in
 export function spokenBars(input, lang = langOf()) {
   const n = normalizeSong(input), out = new Set();
   for (const p of placeSpoken(input, lang)) {
-    if (p.mute) continue;
+    // (a line with no sample compiles to nothing: the narrator does not yield to it, after-tests-oct28 D6)
+    if (p.mute || !lineSounds(p)) continue;
     for (const s of p.starts) {
       const bpb = beatsOf(secAt(n, s.bar)), last = s.bar + Math.max(0, Math.ceil((s.late * bpb + (p.way === 'chop' ? bpb : p.beats)) / bpb - 1e-9) - 1);
       for (let b = s.bar; b <= last; b++) out.add(b);

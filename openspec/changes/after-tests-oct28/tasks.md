@@ -50,8 +50,8 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 6. Narrator yields only to lines that sound
 
-- [ ] 6.1 `spokenBars` leaves out lines without a sample (D6)
-- [ ] 6.2 Check in `check:spoken`: with a manifest missing one voice-track line, the narrator line on that bar is in the code; with every sample, it yields as today
+- [x] 6.1 `spokenBars` leaves out lines without a sample (D6)
+- [x] 6.2 Check in `check:spoken`: with a manifest missing one voice-track line, the narrator line on that bar is in the code; with every sample, it yields as today
 
 ## 7. Locked drums in breaks
 
