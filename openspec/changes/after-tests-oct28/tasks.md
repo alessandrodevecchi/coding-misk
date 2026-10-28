@@ -87,7 +87,7 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 11. Docs and wrap-up
 
-- [ ] 11.1 `docs/knowledge/narrator.md`, `radio.md`, `radio-commands.md` (locks, typed lines), the patterns and preview note (pattern row), `decisions.md` (D3, D4, D7, D9); `npm run knowledge`, `npm run check:knowledge`
-- [ ] 11.2 Follow-up noted for the owner: poetic "movement" lines at steps without an entry, a separate later change (design, Follow-ups)
-- [ ] 11.3 `DEVLOG.md` entry (Italian) with the measurements before and after
-- [ ] 11.4 Full runs: `npm run check:spoken`, `npm run check:endless`, `node --no-warnings tools/check-radio-profiles.mjs`, `npm run check:crescendo`, `npm run check:code`, `npm run check:preview`, `npm run check:patterns`, `PORT=… node tools/check-steering.cjs`, `PORT=… node --no-warnings tools/check-radio.cjs`, `PORT=… node tools/check-patterns.cjs`, `PORT=… node tools/check-preview.cjs`
+- [x] 11.1 `docs/knowledge/narrator.md`, `radio.md`, `radio-commands.md` (locks, typed lines), the patterns and preview note (pattern row), `decisions.md` (D3, D4, D7, D9); `npm run knowledge`, `npm run check:knowledge`
+- [x] 11.2 Follow-up noted for the owner: poetic "movement" lines at steps without an entry, a separate later change (design, Follow-ups)
+- [x] 11.3 `DEVLOG.md` entry (Italian) with the measurements before and after
+- [x] 11.4 Full runs: `npm run check:spoken`, `npm run check:endless`, `node --no-warnings tools/check-radio-profiles.mjs`, `npm run check:crescendo`, `npm run check:code`, `npm run check:preview`, `npm run check:patterns`, `PORT=… node tools/check-steering.cjs`, `PORT=… node --no-warnings tools/check-radio.cjs`, `PORT=… node tools/check-patterns.cjs`, `PORT=… node tools/check-preview.cjs`
