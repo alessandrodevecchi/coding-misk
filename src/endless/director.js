@@ -35,9 +35,11 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // 10 (voice-full-controls D14): every style has a voice track chance (some low, country none), so songs of 17 more
 // styles may get a Words track; the music does not move
 // 11 (radio-arrangement): steered songs change: + and − per instrument, tracks the listener added stay, a lock per
-// instrument (a locked drum plays through breaks; the listener's commands reach locked tracks), headroom as tracks add
+// instrument (a locked drum played through breaks until version 12; the listener's commands reach locked tracks), headroom as tracks add
 // up, the listener's risers; the seed fixtures do not move (they have no commands)
-export const DIRECTOR_VERSION = 11;
+// 12 (after-tests-oct28 D7): a locked drum sits out breaks and the charge before a drop and comes back at the drop,
+// like an unlocked one; other locked instruments still play through
+export const DIRECTOR_VERSION = 12;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };
@@ -560,8 +562,9 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       const all = playing(state).filter(t => t.type !== 'voice').map(t => t.id);
       if (all.length) take({ kind: 'song-end', track: all[0], tracks: all, step: { remove: all } });
     } else if (landmark && role === 'break') {
-      // (a locked drum plays through the break, radio-arrangement D12)
-      const drums = playing(state).filter(t => t.type === 'drums' && !locked.includes(t.id) && !brought.has(t.id)).map(t => t.id);
+      // (a locked drum sits out the break too and comes back at the drop, after-tests-oct28 D7; the lock keeps its sound
+      // and pattern. Locked tracks of the other instruments play through, radio-arrangement D12)
+      const drums = playing(state).filter(t => t.type === 'drums' && !brought.has(t.id)).map(t => t.id);
       if (drums.length && playing(state).length > drums.length) { brokeDrums = drums; take({ kind: 'break', track: drums[0], tracks: drums, step: { remove: drums } }); }
     } else if (landmark && role === 'drop' && brokeDrums.length) {
       const back = brokeDrums.filter(id => state.tracks.find(t => t.id === id).mute);
@@ -575,7 +578,8 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       const r = riser && state.tracks.find(t => t.id === riser.id);
       if (isDouble && r && r.mute && !locked.includes(riser.id) && !held) take({ kind: 'add-riser', track: riser.id, step: { add: riser.id } });
       if (!isDouble) {
-        const drums = playing(state).filter(t => t.type === 'drums' && !locked.includes(t.id) && !brought.has(t.id));
+        // (locked drums too, after-tests-oct28 D7: the drop brings them back)
+        const drums = playing(state).filter(t => t.type === 'drums' && !brought.has(t.id));
         if (drums.length) { const out = drums[drums.length - 1].id; brokeDrums = [...new Set([...brokeDrums, out])]; take({ kind: 'charge', track: out, step: { remove: out } }); }
       }
       state = stateAt(working(base, steps), at).song;

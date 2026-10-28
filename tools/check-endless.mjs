@@ -1118,6 +1118,48 @@ const CHECKS = {
     }
     assert(n >= 15, `only ${n} songs with a bass`);
   },
+  'arrangement: a locked kick sits out breaks and the charge, back at the drop, never varied (after-tests-oct28 D7)'() {
+    let breaks = 0, charges = 0, drops = 0, n = 0;
+    for (const g of arrSongs(40, 'arr-lock-kick')) {
+      const ph = g.plan.phrase, at = applyBar('lock-part', 2 * ph, g.plan), P = g.plan.plan;
+      const kicks = onAt(g.song, at - 1).filter(t => instrumentOf(t) === 'kick').map(t => t.id);
+      if (!kicks.length) continue;
+      const r = steerArr(g, [{ kind: 'lock-part', part: 'kick', at }]);
+      assert(kicks.every(id => lockedIds(r.plan).includes(id)), `${g.style}: kick not locked`);
+      // the director only takes the locked kick out and brings it back: no variation, filter, drive or effect
+      const moves = r.song.build.filter(s => s.at >= at && !s.by && stepTracks(s).some(id => kicks.includes(id)));
+      assert(moves.every(s => !s.set && !s.pattern && !s.rack && !s.unrack), `${g.style}: the director changed a locked kick: ${JSON.stringify(moves.find(s => s.set || s.pattern || s.rack || s.unrack))}`);
+      const chargeOf = d => d + 1 < P.length && P[d + 1].role === 'drop' && P[d].role !== 'drop' && (P[d].tension ?? 0) >= 0.7;
+      let out = false;
+      for (let d = 1; d < P.length; d++) {
+        const bar = d * 2 * ph;
+        if (bar <= at) continue;
+        const on = onAt(r.song, bar).map(t => t.id), others = onAt(r.song, bar).filter(t => t.type !== 'voice' && !kicks.includes(t.id));
+        // a break (its first bar, when something else plays there)
+        if (P[d].role === 'break' && P[d - 1].role !== 'break' && others.length) { assert(kicks.every(id => !on.includes(id)), `${g.style}: locked kick plays in the break at ${bar}`); breaks++; out = true; }
+        // the drop brings it back
+        if (P[d].role === 'drop' && P[d - 1].role !== 'drop' && (out || charges)) { assert(kicks.every(id => on.includes(id)), `${g.style}: locked kick not back at the drop ${bar}`); drops++; out = false; }
+      }
+      // a charge before a drop (tension 0.9 on the part before it, a break in these plans): the locked kick is out on
+      // its last phrase too, and back at the drop
+      const dd = P.findIndex((x, d) => d > 0 && x.role === 'drop' && P[d - 1].role !== 'drop' && (d - 1) * 2 * ph > at);
+      if (dd > 0) {
+        const rc = steerArr(g, [{ kind: 'lock-part', part: 'kick', at }, { kind: 'curve', curve: 'tension', d: dd - 1, value: 0.9, at }]);
+        const from = (dd - 1) * 2 * ph, last = from + ph, ids = kicks.filter(id => onAt(rc.song, from - 1).some(t => t.id === id));
+        if (ids.length) {
+          assert(ids.every(id => !onAt(rc.song, last).some(t => t.id === id)), `${g.style}: locked kick plays in the charge at ${last}`);
+          assert(ids.every(id => onAt(rc.song, dd * 2 * ph).some(t => t.id === id)), `${g.style}: locked kick not back after the charge`);
+          charges++;
+        }
+      }
+      // the sound and the pattern stay: the kick's settings and clips as written
+      const k0 = r.song.tracks.find(t => t.id === kicks[0]), w0 = g.song.tracks.find(t => t.id === kicks[0]);
+      assert(JSON.stringify(k0.patterns) === JSON.stringify(w0.patterns) && JSON.stringify(k0.settings) === JSON.stringify(w0.settings), `${g.style}: the locked kick changed its sound or pattern`);
+      n++;
+    }
+    console.log(`      ${n} songs with a locked kick: ${breaks} breaks without it, ${charges} charges, ${drops} drops that bring it back`);
+    assert(n >= 15 && breaks >= 5 && drops >= 5 && charges >= 5, `${n} songs, ${breaks} breaks, ${charges} charges, ${drops} drops`);
+  },
   'arrangement: a riser on the next part change'() {
     let n = 0, own = 0;
     for (const g of arrSongs(40, 'arr-riser')) {

@@ -99,6 +99,7 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 | Console lines get real samples from a dev-server helper (voice-full-controls D8, D9) | Played by Strudel like any line: same sound chain, recorded, exported and replayed; about half a second a line | [radio-commands](radio-commands.md) |
 | The voice track placed again over a song grown on air, the growth included (after-tests-oct28 D3) | Keeping the written clips left the first line at two thirds of a Live coder song; the growth's quiet phrases are judged by what the build plays there, not by clips. Rejected: shifting the clips before the growth's start into its bars (the growth's bars do not match the written ones). | [design](../../openspec/changes/after-tests-oct28/design.md) |
 | A typed line gets a build step on its bar (after-tests-oct28 D4) | The radio evaluates its code only at steps, so a line on a voice track that already played was never heard. Rejected: evaluating the code again after the sample arrives (it changes the code on air outside a step and restarts typed lines). | [design](../../openspec/changes/after-tests-oct28/design.md) |
+| A locked drum sits out breaks and the charge, back at the drop (after-tests-oct28 D7, director version 12) | The owner wants breaks to breathe also with the kick locked; the lock keeps its sound and pattern. Drums only: a locked bass, pad or arp still plays through. | [design](../../openspec/changes/after-tests-oct28/design.md) |
 
 ## Rejected attempts
 

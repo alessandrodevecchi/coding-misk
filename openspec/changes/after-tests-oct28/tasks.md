@@ -55,11 +55,11 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 7. Locked drums in breaks
 
-- [ ] 7.1 `directSong` break and charge drop locked drums too, the drop brings them back; drums only: other locked instruments keep playing through breaks; the lock still blocks the other moves (D7)
-- [ ] 7.2 Check in `check:endless` (replaces the 1.4c case of radio-arrangement): a locked kick is silent in the break and the charge, back at the drop with the same pattern and settings, never varied; a locked bass still plays through the break
-- [ ] 7.3 `npm run check:endless -- --write-fixtures`, raise `DIRECTOR_VERSION` in the same commit
-- [ ] 7.4 Update radio-arrangement: D12 in `design.md`, the lock requirement in its `specs/endless/steering/spec.md` and the tooltip strings (`arrLockClosed`) that say the drum plays through; archive radio-arrangement before this change, since the MODIFIED lock requirement needs `openspec/specs/endless/steering`
-- [ ] 7.5 Browser: `check-steering.cjs` locks the kick, reaches a break, and finds the kick muted there and back at the drop
+- [x] 7.1 `directSong` break and charge drop locked drums too, the drop brings them back; drums only: other locked instruments keep playing through breaks; the lock still blocks the other moves (D7)
+- [x] 7.2 Check in `check:endless` (replaces the 1.4c case of radio-arrangement): a locked kick is silent in the break and the charge, back at the drop with the same pattern and settings, never varied; a locked bass still plays through the break
+- [x] 7.3 `npm run check:endless -- --write-fixtures`, raise `DIRECTOR_VERSION` in the same commit
+- [x] 7.4 Update radio-arrangement: D12 in `design.md`, the lock requirement in its `specs/endless/steering/spec.md` and the tooltip strings (`arrLockClosed`) that say the drum plays through; archive radio-arrangement before this change, since the MODIFIED lock requirement needs `openspec/specs/endless/steering`
+- [x] 7.5 Browser: `check-steering.cjs` locks the kick, reaches a break, and finds the kick muted there and back at the drop
 
 ## 8. One pattern row in Compose (pp1, #84)
 
