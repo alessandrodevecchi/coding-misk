@@ -42,12 +42,23 @@ A playing card SHALL stop when the user presses its button again, when the user 
 - **WHEN** a card plays and the user opens another tab
 - **THEN** the card stops
 
-### Requirement: Play modes
-The card detail SHALL offer three modes: Phrase (the card's part, the default), Held note (one note per bar) and FM rise (the FM amount rising from 0 to the card's maximum over 4 bars). A change of mode SHALL play from the next bar, without stopping.
+### Requirement: Listening modes
+The card detail SHALL offer a selector with three listening modes: Phrase (the card's part), Held note (one note held for each bar) and FM rise (one note repeated while the FM amount rises from 0 to the card's maximum over 4 bars). A change of mode SHALL play from the next bar, without stopping.
 
 #### Scenario: FM rise
 - **WHEN** the user picks FM rise on a playing card
 - **THEN** from the next bar the FM amount of its notes rises from 0 at the first sixteenth to the card's maximum at the last sixteenth of 4 bars, and starts again
+
+### Requirement: Mode selector state and help
+Phrase SHALL be selected when the Sounds tab opens. The selected mode SHALL stay when the user picks another card. A line under the selector SHALL say what the selected mode plays, in the interface language.
+
+#### Scenario: Default mode
+- **WHEN** the user opens the FM category and presses the headphones of Campana
+- **THEN** the selector shows Phrase, Campana plays its arpeggio, and the line under the selector explains Phrase
+
+#### Scenario: Mode kept across cards
+- **WHEN** Held note is selected on Campana and the user picks Organo
+- **THEN** the selector still shows Held note and Organo plays one held note per bar
 
 ### Requirement: Wave drawing and FM amount
 The card detail SHALL draw the card's wave at FM amounts 0, 1, 2 and 3 (no higher than the card's maximum), computed with the same FM formula the audio engine uses, and SHALL light the drawing nearest the current amount. An "FM amount" control SHALL go from 0 to the card's maximum; moving it SHALL redraw the waves at once and change the sound from the next bar. At FM amount 0 the drawing SHALL be the plain carrier wave.
@@ -58,7 +69,9 @@ The card detail SHALL draw the card's wave at FM amounts 0, 1, 2 and 3 (no highe
 
 #### Scenario: Hardware theme
 - **WHEN** the hardware theme is on
-- **THEN** the FM amount shows as a knob, like the other ranges of that theme
+- **THEN** the FM amount shows as a horizontal fader, not a knob, centred under the drawings and no wider than 320 px on a wide window
+- **WHEN** the user drags the fader or presses the arrow keys on it
+- **THEN** the amount, the lit drawing and the sound change as with the slider of the other theme
 
 ### Requirement: Live scope
 While a card plays, the card detail SHALL draw a scope of the card's own sound, not the song's, steadied on a rising zero crossing. When the card stops, the scope SHALL stop and say so. The card's sound SHALL NOT move the stage visual.
