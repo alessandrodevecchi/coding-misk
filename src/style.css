@@ -1470,3 +1470,42 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 :root[data-ui="hw"] .vs-grid .ctrl .row output { grid-column: 3; grid-row: 1; text-align: right; padding: 2px 6px; border-radius: 3px; background: #0d0c08; color: var(--a1); box-shadow: inset 0 0 0 1px #2b2a24; }
 :root[data-ui="hw"] .vs-grid .ctrl .fader { grid-column: 2; grid-row: 1; }
 :root[data-ui="hw"] .radio-voices .vs-grid { grid-template-columns: 1fr; }
+/* the FM lab (fm-groove-lab): FM cards with a wave thumbnail and headphones, a detail with the listening modes, four
+   drawings against the FM amount, the amount (a horizontal fader, centred and narrow, in the hardware theme), the scope */
+.fm-intro { margin: 0 0 8px; }
+.fm-cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.fm-card { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.fm-pick { display: grid; gap: 5px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.fm-thumb { display: block; width: 100%; height: 40px; border-radius: 6px; background: #0e0a1a; }
+.fm-card .fm-listen { align-self: start; }
+.fm-card .sb-cname small { white-space: normal; }
+.fm-card .sb-star { top: auto; bottom: 6px; right: 9px; }
+.sb-insp.fm-insp { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.fm-top { display: flex; align-items: center; gap: 10px; }
+.fm-title { display: grid; gap: 2px; min-width: 0; }
+.fm-modes { display: grid; gap: 4px; }
+.fm-mode-line { margin: 0; font-size: 12px; }
+.fm-draws { display: grid; gap: 8px; }
+.fm-waves { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.fm-wave { margin: 0; display: grid; gap: 3px; padding: 4px; border: 1px solid var(--line); border-radius: 7px; background: #0e0a1a; }
+.fm-wave[aria-current="true"] { border-color: var(--a1); box-shadow: 0 0 0 1px var(--a1); }
+.fm-wave canvas { display: block; width: 100%; height: 56px; }
+.fm-wave figcaption { font: 10px var(--mono); color: var(--muted); text-align: center; }
+.fm-wave[aria-current="true"] figcaption { color: var(--a1); }
+.fm-amount { display: grid; grid-template-columns: auto minmax(0, 1fr) 48px; align-items: center; gap: 10px; }
+.fm-amount input[type=range] { width: 100%; }
+.fm-amount output { font: 12px var(--mono); color: var(--a1); text-align: right; }
+.fm-scope { display: grid; gap: 4px; }
+.fm-scope canvas { display: block; width: 100%; height: 80px; border: 1px solid var(--line); border-radius: 7px; background: #0e0a1a; }
+.fm-insp code { font: 12px var(--mono); color: var(--a2); overflow-wrap: anywhere; }
+/* hardware theme: the fader is centred under the drawings, at most 320 px wide; the slider stays, hidden, for the keyboard */
+:root[data-ui="hw"] .fm-amount { grid-template-columns: minmax(0, 320px); justify-content: center; justify-items: center; gap: 4px; }
+:root[data-ui="hw"] .fm-amount .fader { width: 100%; }
+:root[data-ui="hw"] .fm-amount output { padding: 2px 6px; border-radius: 3px; background: #0d0c08; box-shadow: inset 0 0 0 1px #2b2a24; }
+:root[data-ui="hw"] .fm-amount input[type=range][data-knob] { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+:root[data-ui="hw"] .fm-amount:focus-within .fader-cap { outline: 2px solid var(--a2); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .fm-waves { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fm-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root[data-ui="hw"] .fm-amount { grid-template-columns: minmax(0, 1fr); justify-content: stretch; }
+}

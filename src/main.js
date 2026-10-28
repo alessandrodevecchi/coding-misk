@@ -57,6 +57,7 @@ import { rewriteSpoken, trackVoice } from './endless/voice-track.js';
 import { styleId, stylePush } from './endless/recipe.js';
 import { loadLimiter, setMasterLevel } from './sounds/limiter.js';
 import { createSoundBrowser } from './sounds/browser.js';
+import { cardCode, cardDevice, LAB_ORBIT, LAB_ANALYZER } from './sounds/fm-lab.js';
 import { MACHINES } from './sounds/machines.js';
 import { machineLabel, prettyName } from './sounds/catalog.js';
 import SONG_ORDER from '../songs/index.json';
@@ -616,6 +617,8 @@ let preview = null;
 // the radio console's preview of a saved pattern (radio-arrangement D9): the same player, riding the radio with the radio
 // 12 dB lower; { item, ctx } of the pattern asked, made in createRadio's player below
 let radioPreview = null, radioPv = null;
+// the FM lab's preview (fm-groove-lab D3): the FM cards of the Sounds tab, made with the sound browser below
+let labPreview = null;
 // code of a song at a bar, with the tempo of that bar (a live build changes code over time)
 // the code the player shows at a bar to evaluate it: the evaluation knows the bar (codeBar, used once)
 let codeBar = 0, codeFresh = false;
@@ -3164,7 +3167,7 @@ $('#track-panel').addEventListener('click', e => {
   }
   if (r === 'pt-compose') return composePattern(tr);
   if (r === 'pt-listen') return listenPattern(tr);
-  if (r === 'pt-preview') { preview.toggle(tr.id, patOf(tr)); syncPreviewButtons(); return; }
+  if (r === 'pt-preview') { if (labPreview) labPreview.stop(); preview.toggle(tr.id, patOf(tr)); syncPreviewButtons(); return; }
   if (r === 'pt-savepat') return savePattern(tr);
   if (r === 'pt-keep-rhythm') return composePattern(tr, 'rhythm');
   if (r === 'pt-keep-notes') return composePattern(tr, 'notes');
@@ -3287,6 +3290,8 @@ $$('.mode-btn').forEach(b => b.addEventListener('click', () => { const m = b.dat
 function showTab(name) {
   // the pattern preview belongs to Compose (pattern-preview D4)
   if (name !== 'componi' && preview) preview.stop();
+  // and the FM lab's to the Sounds tab (fm-groove-lab D3)
+  if (name !== 'suoni' && labPreview) labPreview.stop();
   const m = modeOf(name);
   if (m) { setMode(m); modeTabs[m] = name; store.set('coding-misk-mode-tabs', modeTabs); }
   else $$('.mode-btn').forEach(b => b.setAttribute('aria-pressed', false));
@@ -3738,7 +3743,7 @@ function songTick() {
 }
 try {
   const clock = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 100)'], { type: 'text/javascript' })));
-  clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); if (preview) preview.tick(); if (radioPreview) radioPreview.tick(); } };
+  clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); if (preview) preview.tick(); if (radioPreview) radioPreview.tick(); if (labPreview) labPreview.tick(); } };
 } catch (e) {}
 (function transport() {
   requestAnimationFrame(transport);
@@ -3752,6 +3757,7 @@ try {
   }
   if (preview) preview.tick();
   if (radioPreview) radioPreview.tick();
+  if (labPreview) { labPreview.tick(); if (curTab === 'suoni') sounds.syncLab(); }
   syncPreviewButtons();
   if (song && s && isPlaying() && !seeking) {
     const m = song.meta, cyc = s.now();
@@ -3841,8 +3847,47 @@ function tryPattern(it) {
   showTab('pattern');
   patternsTab.open({ kind, id, over: { sound: it.name } });
 }
-const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast, scheduler: sched, tryPattern });
+// the FM cards (fm-groove-lab): heard through their own preview, never the player bar; "Use in track" puts the card's
+// wave and FM device on the melodic track selected in Compose
+const fmTarget = () => { const c = curTrack(); return c && ['bass', 'arp', 'hook', 'pad'].includes(c.type) ? c : null; };
+function useFm(card, amount) {
+  const tr = fmTarget();
+  if (!tr) return t('fmUseNone');
+  tr.settings.wave = card.carrier;
+  tr.rack = [...(tr.rack || []).filter(d => d && d.device !== 'fm'), cardDevice(card, amount)];
+  changed(); renderTrackPanel();
+  return t('sbUsed', { sound: tx(card.name), track: trackLabel(tr), song: T.title });
+}
+// one preview at a time (fm-groove-lab D3): a card stops the Compose preview and the radio's
+function labStart(kind) {
+  if (preview) preview.stop();
+  if (radioPreview && radioPreview.state) { radioPv = null; radioPreview.stop(); }
+  return labPreview.start(kind, kind);
+}
+const fmLab = {
+  toggle: kind => { const st = labPreview.state; if (st && st.id === kind) { labPreview.stop(); return false; } return labStart(kind); },
+  play: kind => labStart(kind),
+  playing: () => (labPreview && labPreview.state ? labPreview.state.id : null),
+  busy: () => !!(rec || capture || fastJob),
+  target: () => { const tr = fmTarget(); return tr ? trackLabel(tr) : null; },
+  use: useFm,
+};
+const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast, scheduler: sched, tryPattern, fmLab });
 function renderSounds() { sounds.render(); }
+// the lab preview: the card's code (its tempo and one line), its own orbit and analyser for the scope; the mode and
+// the FM amount play from the next bar (a new sig), and the FM rise starts on the bar it starts from (align)
+labPreview = createPreview({
+  sched, busy: () => !!(rec || capture || fastJob),
+  source: kind => {
+    const x = sounds.lab(kind);
+    if (!x) return null;
+    return { song: 'fmlab', key: kind, loop: cardCode(x.card, x.mode, x.amount), bpm: x.card.bpm, shift: 0, orbit: LAB_ORBIT, analyze: LAB_ANALYZER, align: true, sig: JSON.stringify([kind, x.mode, x.amount]) };
+  },
+  compile: loop => (typeof loop === 'string' ? loop : compileSong(loop)),
+  onChange: () => sounds.syncLab(),
+});
+// for the browser checks (tools/check-fm-lab.cjs)
+globalThis.codingMiskLabPreview = labPreview;
 
 // ---------- player bar (#32) ----------
 // the library in the order of the Songs tab: composed songs, then hand-written code songs
