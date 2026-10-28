@@ -18,7 +18,7 @@ OpenSpec changes not archived: 77. With open tasks: 25. All tasks ticked, waitin
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
-| [after-tests-oct28](../../openspec/changes/after-tests-oct28/tasks.md) | 36 | 44 |
+| [after-tests-oct28](../../openspec/changes/after-tests-oct28/tasks.md) | 24 | 44 |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
@@ -27,7 +27,7 @@ OpenSpec changes not archived: 77. With open tasks: 25. All tasks ticked, waitin
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |
 | [idea-model](../../openspec/changes/idea-model/tasks.md) | 3 | 20 |
 | [idiomatic-code](../../openspec/changes/idiomatic-code/tasks.md) | 2 | 8 |
-| [lines-ahead-balanced](../../openspec/changes/lines-ahead-balanced/tasks.md) | 11 | 14 |
+| [lines-ahead-balanced](../../openspec/changes/lines-ahead-balanced/tasks.md) | 2 | 14 |
 | [live-output](../../openspec/changes/live-output/tasks.md) | 5 | 9 |
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |
@@ -65,4 +65,4 @@ Many issues stay open after their feature shipped, until the owner tests it and 
 ## Follow-ups
 
 - "Long song from" on the radio (reused-lines, `#85`): the radio keeps 15 minutes for now; a radio song extended several times (continue in radio) can grow long, so the rule may matter there later.
-- Lines typed ahead (reused-lines D8, `#85`): the Balanced limits give 2 lines over the built-in songs, both in the written part; lines typed ahead at growth steps are step 2 of `lines-ahead-balanced`, not done yet (`AHEAD` in `src/live/written-plan.js`).
+- Lines typed ahead (reused-lines D8, `#85`): the Balanced limits, in the growth and in the written part (lines-ahead-balanced), give 16 lines over the built-in songs, 14 at growth steps, muted at most 58 s; the limits are to be tuned after the owner's screenshots (`AHEAD` in `src/live/written-plan.js`).

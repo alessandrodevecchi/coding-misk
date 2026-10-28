@@ -48,7 +48,9 @@ function momentOf(build, C) {
   return { build, lanes, now, inPlace, bounds };
 }
 export const liveBuildOf = (build, C) => momentOf(build, C).build;
-export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0, ramps = true, canon = false } = {}) {
+// growthAhead: false plans lines typed ahead in the written part only (the shape search measures the growth without
+// lines ahead, lines-ahead-balanced D4)
+export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0, ramps = true, canon = false, growthAhead = true } = {}) {
   const input = build;
   let self = null;
   // shape-search D8: in a Live coder growth, a long list that moves linearly per bar (a written sweep) is typed as a
@@ -98,7 +100,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   let ref0 = null;
   const refC = resolveProfile('switch', { fnLanes: lanes, duration: C.duration === 'free' ? 'free' : 'fitted' });
   if (!canon && JSON.stringify(refC) === JSON.stringify(C)) canon = true;
-  const reference = () => (canon ? self : (ref0 = ref0 || referenceCode(input, refC, { lang, files, ramps, canon: true })));
+  const reference = () => (canon ? self : (ref0 = ref0 || referenceCode(input, refC, { lang, files, ramps, canon: true, growthAhead })));
   const refLine = text => (canon ? shownLine(text) : reference().shownLine(text));
   const compileAt = (song, bar, hide, plan = null, info = null) => gen(now ? compileNow(song, bar, { prepare: !inPlace && bar >= prepFrom(boundary(bar)), shownMuted: played(bar), keepHeaders: entered(bar), inPlace, hidden: hide, gated: lanes, bounds, returning, shownText: refLine, plan, info }) : compile(song));
   // technical functions (code-writing, song-functions): the written levels, the buses and the song's functions come
@@ -115,9 +117,48 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const fctx = any ? functionContext(ref, { id: build.id, title: build.title, tags: build.tags, profile: build.profile }, o) : null;
   // the code at a bar; plan, info (reused-lines D4, D8): the plan of the written part and the lines it fills in;
   // wrap: false leaves the long lines unbroken (the plan does not depend on the width of the panel)
+  // (lines-ahead-balanced D2) a line typed ahead at a step before its track comes in: the track is compiled as it is at
+  // the line's step, only for that line (`aheadOnly`, compileNow shows nothing else of it); the code is kept only when
+  // every other line stays as it was without it (else the line is not shown, and the plan leaves it out)
+  const stateMemo = new Map();
+  const stateOf = (src, b) => { const k = `${src === refBuild ? 'r' : 'b'}${b}`; if (!stateMemo.has(k)) { if (stateMemo.size > 200) stateMemo.clear(); stateMemo.set(k, stateAt(src, b)); } return stateMemo.get(k); };
+  const headerName = h => h.replace(/^\/\/ =+ /, '').replace(/ =+$/, '').split(' · ')[0];
+  const aheadSong = (src, song, bar, plan) => {
+    if (!inPlace || !plan || !plan.ahead || !plan.ahead.length) return null;
+    let out = null;
+    for (const a of plan.ahead) {
+      if (bar < a.from || bar >= a.to) continue;
+      const tracks = (out || song).tracks, k = tracks.findIndex(tr => (tr.name || tr.id) === headerName(a.header));
+      if (k < 0 || !tracks[k].mute || tracks[k].aheadOnly || played(bar).includes(tracks[k].id)) continue;
+      const then = stateOf(src, a.to).song.tracks.find(tr => tr.id === tracks[k].id);
+      if (!then || then.mute) continue;
+      out = { ...(out || song), tracks: tracks.map((tr, j) => (j === k ? { ...then, aheadOnly: true } : tr)) };
+    }
+    return out;
+  };
+  const isPat = l => /^\s*[_S]?\$:/.test(l);
+  // the code with the tracks compiled for lines ahead keeps every line of the code without them, in order; it only adds
+  // headers, comments, lane constants and muted lines
+  const onlyAdds = (base, more) => {
+    const B = chainLines(base), M = chainLines(more);
+    let i = 0;
+    for (const l of M) { if (i < B.length && l === B[i]) { i++; continue; } if (!(/^\s*_\$:/.test(l) || /^\s*\/\//.test(l) || /^const \w+ = /.test(l) || !l.trim())) return false; }
+    return i === B.length;
+  };
   const codeWith = (bar, keep, { plan = null, info = null, wrap = true } = {}) => {
-    const st = stateAt(refBuild && bar < refUntil ? refBuild : build, bar), total = build.sections.reduce((a, x) => a + x.bars, 0), hide = inPlace ? [] : null;
-    const c = annotate(ramp(compileAt(only(st.song, keep), bar, hide, plan, info)), build, st.upTo, lang()) + (C.narrator === false ? '' : voiceCode(build, st.song, st.upTo, total, lang(), files()));
+    const src = refBuild && bar < refUntil ? refBuild : build, st = stateAt(src, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
+    let hide = inPlace ? [] : null;
+    const voice = () => (C.narrator === false ? '' : voiceCode(build, st.song, st.upTo, total, lang(), files()));
+    let c;
+    const more = aheadSong(src, st.song, bar, plan);
+    if (more) {
+      const info2 = info ? [] : null, hide2 = inPlace ? [] : null;
+      const withAhead = annotate(ramp(compileAt(only(more, keep), bar, hide2, plan, info2)), build, st.upTo, lang());
+      const base = annotate(ramp(compileAt(only(st.song, keep), bar, hide, plan, null)), build, st.upTo, lang());
+      if (onlyAdds(base, withAhead) && JSON.stringify(hide) === JSON.stringify(hide2)) { c = withAhead; if (info) info.push(...info2); }
+      else { hide = inPlace ? [] : null; c = annotate(ramp(compileAt(only(st.song, keep), bar, hide, plan, info)), build, st.upTo, lang()); }
+      c += voice();
+    } else c = annotate(ramp(compileAt(only(st.song, keep), bar, hide, plan, info)), build, st.upTo, lang()) + voice();
     // (the narrator off, profile-options: no spoken step lines at all, neither shown nor hidden; the phrases written as
     // comments follow the comment options, the voice instrument's lines are part of the song's code)
     // the voice is taken out before the comments go: it is found by its header
@@ -144,10 +185,11 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const planOf = () => {
     if (!canon) return reference().plan();
     const k = lang();
-    if (!planMemo || planMemo.k !== k) planMemo = { k, plan: planWritten(codeWith, build, returning, shownLine) };
+    if (!planMemo || planMemo.k !== k) planMemo = { k, plan: planWritten(codeWith, build, returning, shownLine, { growth: growthAhead }) };
     return planMemo.plan;
   };
-  const codeAt = (bar, keep) => codeWith(bar, keep, { plan: planOn && bar >= returning ? planOf() : null });
+  // (lines-ahead-balanced D2) the plan from the first step after bar 0: lines ahead are typed at growth steps too
+  const codeAt = (bar, keep) => codeWith(bar, keep, { plan: planOn && bar >= (growthAhead ? 1 : returning) ? planOf() : null });
   // the lanes of a code: those of the code shown at a step, else line by line (code edited by hand)
   const lanesOf = shown => {
     if (!inPlace) return null;
