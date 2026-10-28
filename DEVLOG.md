@@ -1507,3 +1507,4 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 
 - **D6.** `spokenBars` salta le frasi della voce traccia senza campione (`lineSounds`, come il compilatore che per loro scrive solo il commento "nessun campione"): il narratore non tace più su una battuta dove non suona niente. Nei check Node (`files` null) ogni campione esiste, quindi nulla cambia lì.
 - **Check.** Nuovo caso in `check:spoken` (39/39): con tutti i campioni il narratore cede alla voce traccia; togliendo il campione di quella frase dal manifest la sua battuta torna al narratore. Con lo `spoken.js` di prima il caso fallisce. `check:code` 46 uguali.
+- **Check finali dei gruppi voce (D3-D6).** `check:endless` 85/85; nel browser (porta 5192) `check-steering.cjs` (con le frasi scritte e l'aiutante voce vero), `check-radio.cjs`, `check-voices.cjs`, `check-spoken-play.cjs` tutti passati.
