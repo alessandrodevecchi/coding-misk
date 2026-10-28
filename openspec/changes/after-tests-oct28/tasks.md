@@ -31,27 +31,27 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 3. Voice track in grown songs
 
-- [ ] 3.1 Re-place the spoken tracks in `growOnAir` after the growth (D3), helper in `src/endless/voice-track.js`; remove the lone-clip rule of `tailOf`
-- [ ] 3.2 Check in `check:spoken` ("the voice instrument kept in songs grown on air"): for 20 Live coder and 20 Crescendo radio songs with a voice track, the grown song has the director's number of lines and the same texts; the first line falls in the first third when an allowed part is there (today: 65% to 71% in pure-trance); lines in the growth fall only in quiet parts (few tracks at those bars); entry lines end before their bound track's first entry
-- [ ] 3.3 Fixtures: `node --no-warnings tools/check-radio-profiles.mjs --write-fixtures` only for the voice-track moves, with the reason in the commit; `npm run check:crescendo` unchanged
-- [ ] 3.4 Browser: probe a pure-trance Live coder session with both voices on; the `fx` analyser peaks on the voice track's first line within the first third of the song, and on narrator lines before it
+- [x] 3.1 Re-place the spoken tracks in `growOnAir` after the growth (D3), helper in `src/endless/voice-track.js`; remove the lone-clip rule of `tailOf`
+- [x] 3.2 Check in `check:spoken` ("the voice instrument kept in songs grown on air"): for 20 Live coder and 20 Crescendo radio songs with a voice track, the grown song has the director's number of lines and the same texts; the first line falls in the first third when an allowed part is there (today: 65% to 71% in pure-trance); lines in the growth fall only in quiet parts (few tracks at those bars); entry lines end before their bound track's first entry
+- [x] 3.3 Fixtures: `node --no-warnings tools/check-radio-profiles.mjs --write-fixtures` only for the voice-track moves, with the reason in the commit; `npm run check:crescendo` unchanged
+- [x] 3.4 Browser: probe a pure-trance Live coder session with both voices on; the `fx` analyser peaks on the voice track's first line within the first third of the song, and on narrator lines before it
 
 ## 4. Typed lines always sound
 
-- [ ] 4.1 `sayAir` writes `{ at, add: <spoken id>, by: 'listener' }` on the line's bar also when the track plays; Say now picks the first bar at least half a bar after the sample is ready (D4)
-- [ ] 4.2 Check in `check:endless`: a typed line on a playing voice track adds a step on its bar, the song sounds the same, Replay gives the same song
-- [ ] 4.3 Browser: `check-steering.cjs` with the real voice helper (or a sample made before) on a song whose voice track already plays: Say now and At the right moment are evaluated on their bar (an evaluation whose code holds the line before the bar) and the `fx` analyser peaks on the line's bar, with no seek
+- [x] 4.1 `sayAir` writes `{ at, add: <spoken id>, by: 'listener' }` on the line's bar also when the track plays; Say now picks the first bar at least half a bar after the sample is ready (D4)
+- [x] 4.2 Check in `check:endless`: a typed line on a playing voice track adds a step on its bar, the song sounds the same, Replay gives the same song
+- [x] 4.3 Browser: `check-steering.cjs` with the real voice helper (or a sample made before) on a song whose voice track already plays: Say now and At the right moment are evaluated on their bar (an evaluation whose code holds the line before the bar) and the `fx` analyser peaks on the line's bar, with no seek
 
 ## 5. Poetic images at every entry
 
-- [ ] 5.1 `narration()`: next entering step after the current bar, image on the entry's bar when the bar before belongs to an earlier step, song start in the window; `enteringTrack` with the last `unsolo` (D5)
-- [ ] 5.2 Check in `check:spoken` ("poetic narrator"): with Narrated growth on and off, every entry of luci-rosse, kellerlicht and settimo-cielo (Crescendo and Live coder) gets one image; in a radio window of three songs every song gets its opening image; a mid-set opening gets an image at its last unsolo
-- [ ] 5.3 Report per song the images and the step lines before and after (luci-rosse Crescendo with Narrated growth: 5 images before, 7 expected after)
+- [x] 5.1 `narration()`: next entering step after the current bar, image on the entry's bar when the bar before belongs to an earlier step, song start in the window; `enteringTrack` with the last `unsolo` (D5)
+- [x] 5.2 Check in `check:spoken` ("poetic narrator"): with Narrated growth on and off, every entry of luci-rosse, kellerlicht and settimo-cielo (Crescendo and Live coder) gets one image; in a radio window of three songs every song gets its opening image; a mid-set opening gets an image at its last unsolo
+- [x] 5.3 Report per song the images and the step lines before and after (luci-rosse Crescendo with Narrated growth: 5 images before, 7 expected after)
 
 ## 6. Narrator yields only to lines that sound
 
-- [ ] 6.1 `spokenBars` leaves out lines without a sample (D6)
-- [ ] 6.2 Check in `check:spoken`: with a manifest missing one voice-track line, the narrator line on that bar is in the code; with every sample, it yields as today
+- [x] 6.1 `spokenBars` leaves out lines without a sample (D6)
+- [x] 6.2 Check in `check:spoken`: with a manifest missing one voice-track line, the narrator line on that bar is in the code; with every sample, it yields as today
 
 ## 7. Locked drums in breaks
 

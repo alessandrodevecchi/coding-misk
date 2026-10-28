@@ -104,6 +104,9 @@ export function keyTo(cur, to) {
 // commands, the next bar for the mixer. Never past the song's last phrase.
 export function applyBar(kind, now, plan) {
   const ph = plan.phrase, dbl = 2 * ph, last = plan.bars - ph;
+  // (a typed line said now: the first bar that starts at least half a bar after the sample is ready, so its step is not
+  // already past when the command lands, after-tests-oct28 D4)
+  if (kind === 'say-live') return Math.min(plan.bars - 1, Math.ceil(now + 0.5));
   if (COMMANDS[kind] && COMMANDS[kind].bar) return Math.min(plan.bars - 1, Math.floor(now) + 1);
   const step = COMMANDS[kind] && COMMANDS[kind].structural ? dbl : ph;
   return Math.min(last, (Math.floor(now / step) + 1) * step);
@@ -814,9 +817,15 @@ function sayAir(song, list) {
       tracks.splice(v >= 0 ? v : tracks.length, 0, t); ti = tracks.indexOf(t);
       build.push({ at, add: t.id, by: 'listener' });
     } else {
-      // (a voice track that comes in later, or left: in from the line's bar)
+      // a step on the line's bar, also when the voice track already plays (after-tests-oct28 D4): it brings in a track
+      // that comes in later or left, and on a playing track it changes nothing in the sound but is a build step, so the
+      // radio evaluates the code on that bar and the new line sounds there. An add, as for a track a step brought in; a
+      // track that plays from the start (no add step: an add would silence it before) gets an unmute, which changes
+      // nothing either unless the listener muted it (then the line stays silent, as the track)
       const id = tracks[ti].id, st = stateAt({ ...cur, build }, at).song.tracks.find(x => x.id === id);
-      if (st && st.mute) build.push({ at, add: id, by: 'listener' });
+      const added = build.some(x => x.add !== undefined && [].concat(x.add).includes(id));
+      if (!st || st.mute || added) build.push({ at, add: id, by: 'listener' });
+      else if (!st.hush) build.push({ at, unmute: id, by: 'listener' });
     }
     const t = JSON.parse(JSON.stringify(tracks[ti])), keys = new Set(Object.keys(t.patterns || {}));
     let key = 'L1'; for (let k = 2; keys.has(key); k++) key = `L${k}`;

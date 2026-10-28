@@ -12,7 +12,7 @@ import { stream } from '../endless/random.js';
 import { rackCode } from './rack.js';
 import { getLang, t } from '../i18n.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from './vocabulary.js';
-import { SPEAKERS, saySlug, sayBank } from './build.js';
+import { SPEAKERS, saySlug, sayBank, buildSteps } from './build.js';
 
 export const WAYS = ['passage', 'refrain', 'chop', 'opening'];
 export const NARRATOR_STYLES = ['explain', 'poetic'];
@@ -126,6 +126,7 @@ export function entryAfter(n, id, from) {
 export function placeSpoken(input, lang = langOf()) {
   const n = normalizeSong(input), ref = input.whole ? normalizeSong(input.whole) : n;
   const facts = sectionFacts(ref), out = [];
+  const growthBars = input.onAir && input.crescendo && Number.isFinite(input.crescendo.growth) ? input.crescendo.growth : 0;
   let k = 0;
   n.tracks.forEach((tr, ti) => {
     if (!isSpoken(tr)) return;
@@ -163,7 +164,9 @@ export function placeSpoken(input, lang = langOf()) {
         const every = Number.isInteger(pat.every) && pat.every > 0 ? pat.every : 4, kinds = whereOfTrack(tr);
         n.sections.forEach((s, i) => {
           // (a refrain repeats in the sections of the kinds its track may speak in, quiet only by default, D7)
-          if (!kinds.includes(facts.kinds[i])) return;
+          // (in a song grown on air the growth's sections look busy by their clips, which run under its steps: a refrain
+          // the radio placed in a quiet phrase of the growth repeats there, after-tests-oct28 D3)
+          if (!kinds.includes(facts.kinds[i]) && !(growthBars > 0 && s.start < growthBars)) return;
           const a = Math.max(s.start, clip.start), z = Math.min(s.start + s.bars, end);
           // the line ends before the section does: it stops when the song gets full again
           for (let b = a; b < z; b += every) if (b + Math.ceil(lenBars(b) - 1e-9) <= s.start + s.bars) starts.push({ bar: b, late: 0 });
@@ -177,11 +180,12 @@ export function placeSpoken(input, lang = langOf()) {
 }
 
 // the bars where spoken lines sound: { bar: true }, for the narrator to yield (D5). Tracks muted in the state are
-// silent; a line sounds from the bar it starts on to the bar its last beat falls in
+// silent, and lines with no sample; a line sounds from the bar it starts on to the bar its last beat falls in
 export function spokenBars(input, lang = langOf()) {
   const n = normalizeSong(input), out = new Set();
   for (const p of placeSpoken(input, lang)) {
-    if (p.mute) continue;
+    // (a line with no sample compiles to nothing: the narrator does not yield to it, after-tests-oct28 D6)
+    if (p.mute || !lineSounds(p)) continue;
     for (const s of p.starts) {
       const bpb = beatsOf(secAt(n, s.bar)), last = s.bar + Math.max(0, Math.ceil((s.late * bpb + (p.way === 'chop' ? bpb : p.beats)) / bpb - 1e-9) - 1);
       for (let b = s.bar; b <= last; b++) out.add(b);
@@ -244,10 +248,41 @@ export function withNarratorStyle(song, style) {
   const n = song.narrator, lines = n && typeof n === 'object' && n.lines ? n.lines : null;
   return { ...song, narrator: lines ? { style, lines } : style };
 }
-// the track a step brings in (add, clone, unmute), or null
+// the track a step brings in (add, clone, unmute), or null. The unsolo of the last line played alone (after-tests-oct28
+// D5) brings in every track that was on and silenced by the solo: the first of them in the order they came in
 export function enteringTrack(song, step) {
   const id = step.add !== undefined ? [].concat(step.add)[0] : step.clone ? step.clone.track : step.unmute !== undefined ? [].concat(step.unmute)[0] : null;
-  return id === null || id === undefined ? null : (song.tracks || []).find(x => x.id === id) || null;
+  if (id === null || id === undefined) return step.unsolo !== undefined ? releasedTrack(song, step) : null;
+  return (song.tracks || []).find(x => x.id === id) || null;
+}
+// (kept per song and step: the narrator asks for every step of every state)
+const releasedMemo = new WeakMap();
+function releasedTrack(song, step) {
+  const key = `${step.i}|${step.at}|${JSON.stringify(step.unsolo)}`, memo = releasedMemo.get(song) || new Map();
+  releasedMemo.set(song, memo);
+  if (!memo.has(key)) memo.set(key, releasedNow(song, step));
+  return memo.get(key);
+}
+function releasedNow(song, step) {
+  const steps = buildSteps(song), k = Number.isInteger(step.i) ? steps.findIndex(x => x.i === step.i) : steps.findIndex(x => x.at === step.at && JSON.stringify(x.unsolo) === JSON.stringify(step.unsolo));
+  if (k < 0) return null;
+  const added = new Set(steps.flatMap(x => [...(x.add !== undefined ? [].concat(x.add) : []), ...(x.clone ? [x.clone.track] : [])]));
+  const on = new Map((song.tracks || []).filter(t => !added.has(t.id) && !t.mute).map((t, n) => [t.id, -1 - n])), alone = new Set((song.tracks || []).filter(t => t.alone).map(t => t.id));
+  for (let j = 0; j <= k; j++) {
+    const x = steps[j], ids = v => (v === undefined ? [] : [].concat(v));
+    if (j === k) {
+      const left = new Set([...alone].filter(id => !ids(x.unsolo).includes(id)));
+      if (!alone.size || left.size) return null;
+      const freed = [...on.entries()].filter(([id]) => !alone.has(id)).sort((p, q) => p[1] - q[1]).map(([id]) => (song.tracks || []).find(t => t.id === id));
+      return freed.find(t => t && t.type !== 'voice' && t.type !== 'spoken') || null;
+    }
+    ids(x.add).forEach(id => { if (!on.has(id)) on.set(id, j); });
+    if (x.clone && !on.has(x.clone.track)) on.set(x.clone.track, j);
+    ids(x.remove).forEach(id => on.delete(id));
+    ids(x.solo).forEach(id => alone.add(id));
+    ids(x.unsolo).forEach(id => alone.delete(id));
+  }
+  return null;
 }
 // a short image for a track that comes in: the song's lines for its type, the style's, else the vocabulary's
 export function poeticLine(song, step, index) {

@@ -24,8 +24,12 @@ import { voiceEvent } from '../src/endless/voice-panel.js';
 import { withNarratorStyle, lineTexts, narratorStyle } from '../src/song/spoken.js';
 import { energyOf } from '../src/endless/energy.js';
 import { meterSteps } from '../src/music.js';
-import { rewriteSpoken, trackVoice, quietParts, nextQuiet, wherePartsOf } from '../src/endless/voice-track.js';
-import { sectionFacts } from '../src/song/spoken.js';
+import { rewriteSpoken, trackVoice, quietParts, nextQuiet, wherePartsOf, grownParts, soundingAt, firstSound } from '../src/endless/voice-track.js';
+import { writtenForm } from '../src/endless/growth.js';
+import { windowSong } from '../src/endless/join.js';
+import { layout } from '../src/endless/transitions.js';
+import { windowPart } from '../src/live/air-code.js';
+import { sectionFacts, whereOfTrack } from '../src/song/spoken.js';
 import { soundPatch } from '../src/endless/voice-sound.js';
 import * as VS from './voice-sample.mjs';
 import { phraseRows, listVocab, editText, editBars, removeRow, addRow, fillRows, vocabOf } from '../src/endless/phrase-list.js';
@@ -728,6 +732,134 @@ const CHECKS = {
       const r = nextRows(B, sch, shared.at - 1, 1)[0];
       assert(r && r.voices.every(v => v.voice !== 'N'), `V:N on the voice bar ${shared.at}`);
     }
+  },
+  'voice track in songs grown on air (after-tests-oct28 D3): the director\'s lines and texts, the first in the first third when a part allows it, growth lines in quiet bars, entry lines before their track'() {
+    const res = { switch: [], crescendo: [] };
+    let early = 0, inGrowth = 0, entries = 0, fallback = 0;
+    for (const profile of ['switch', 'crescendo']) for (const style of ['pure-trance', 'dark-cyberpunk', 'ambient']) for (let k = 0; k < 6 && res[profile].length < 20; k++) {
+      const rec = { seed: `d3-${style}-${k}`, options: { styles: [style], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile, voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR };
+      const items = sessionItems(RADIO_RECIPES, rec, 3);
+      for (const it of items) {
+        const s = it.song;
+        if (!s.onAir || !s.tracks.some(t => t.type === 'spoken')) continue;
+        // the director's song as written: the song before the growth (writtenForm of the plain song the radio keeps)
+        const plain = it.plain || null;
+        res[profile].push(s.id);
+        const G = s.crescendo.growth, total = normalizeSong(s).total, most = Math.max(0, ...sectionFacts(normalizeSong(s)).counts);
+        for (const tr of s.tracks.filter(t => t.type === 'spoken')) {
+          const placed = placeSpoken(s, 'en').filter(p => p.track === tr.id);
+          assert(placed.length === tr.clips.length && placed.length > 0, `${s.id}: ${tr.clips.length} clips, ${placed.length} lines placed`);
+          const first = Math.min(...placed.flatMap(p => p.starts.map(x => x.bar)));
+          const base = { ...s, tracks: s.tracks.filter(t => t.id !== tr.id) }, parts = grownParts(base, G, whereOfTrack(tr));
+          const kind0 = parts.length ? parts[0].kind : null, allowedEarly = parts.some(p => p.kind === kind0 && p.start < total / 3);
+          // (an entry line goes before its bound track, wherever that comes in: openings and lines with "before" are left out)
+          if (allowedEarly && !tr.clips.some(c => (tr.patterns[c.pattern] || {}).before !== undefined || (tr.patterns[c.pattern] || {}).way === 'opening')) { assert(first < total / 3, `${s.id} (${profile}): first line at ${first} of ${total}, a part in the first third allowed it`); early++; }
+          for (const p of placed) for (const st of p.starts.filter(x => x.bar < G)) {
+            inGrowth++;
+            const n = soundingAt(base, st.bar).length;
+            if (n > most / 2) fallback++;
+            assert(n >= 1, `${s.id}: a line at ${st.bar} over silence`);
+          }
+          // the add step brings the track in at its first clip
+          const add = buildSteps(s).filter(x => [].concat(x.add ?? []).includes(tr.id)).map(x => x.at);
+          assert(add.length === 1 && add[0] === Math.min(...tr.clips.map(c => c.start)), `${s.id}: add at ${add}, first clip ${Math.min(...tr.clips.map(c => c.start))}`);
+        }
+      }
+    }
+    // the same lines as the director's song, and entry lines before their bound track: growOnAir on director songs
+    let same = 0;
+    for (let i = 0; i < 24; i++) {
+      const g = createSession(recipes, `grow-voice-${i}`).next({ styles: [['pure-trance', 'dark-cyberpunk', 'ambient'][i % 3]], voice: { presence: 'always' } });
+      const wf = writtenForm(g.song), sp = wf.tracks.filter(t => t.type === 'spoken');
+      if (!sp.length) continue;
+      for (const profile of ['switch', 'crescendo']) {
+        const s = growOnAir(g.song, { profile, styles, phrase: g.plan.phrase });
+        if (!s.onAir) continue;
+        for (const w of sp) {
+          const tr = s.tracks.find(t => t.id === w.id);
+          assert(tr && tr.clips.length === w.clips.length, `${g.song.id} ${profile}: ${w.clips.length} lines written, ${tr ? tr.clips.length : 0} grown`);
+          const texts = x => placeSpoken(x, 'en').filter(p => p.track === w.id).map(p => p.texts.join(' · ')).sort().join(' | ');
+          assert(texts(s) === texts(wf), `${g.song.id} ${profile}: texts ${texts(s)} vs ${texts(wf)}`);
+          same++;
+          for (const c of w.clips) {
+            const bound = (w.patterns[c.pattern] || {}).before;
+            if (bound === undefined) continue;
+            const e = firstSound({ ...s, tracks: s.tracks.filter(t => t.id !== w.id) }, bound), n = normalizeSong(s);
+            if (e === null) continue;
+            const p = placeSpoken(s, 'en').find(x => x.track === w.id && x.key === c.pattern), st = p.starts[0];
+            const bpb = beatsPerBar(n, st.bar), endBeat = st.bar * bpb + st.late * bpb + p.beats;
+            assert(endBeat <= e * beatsPerBar(n, e) + 1e-6, `${g.song.id} ${profile}: entry line ends at beat ${endBeat}, ${bound} sounds at bar ${e}`);
+            entries++;
+          }
+        }
+      }
+    }
+    console.log(`      ${res.switch.length} Live coder and ${res.crescendo.length} Crescendo radio songs; ${early} first lines in the first third; ${inGrowth} line starts in the growth (${fallback} past the quiet limit, too few quiet parts); ${same} grown tracks with the director's lines; ${entries} entry lines`);
+    assert(res.switch.length >= 20 && res.crescendo.length >= 20 && same >= 8, `${res.switch.length} Live coder, ${res.crescendo.length} Crescendo, ${same} tracks`);
+  },
+  'poetic images at every entry (after-tests-oct28 D5): one image per entry of three songs with and without Narrated growth, every song of a radio window opens with one, a mid-set opening at its last unsolo'() {
+    const enters = (song, st) => { const t = enteringTrack(song, st); return t && t.type !== 'spoken' && t.type !== 'voice'; };
+    // the images of a live build: narrator lines for an entering step, not its own step line
+    const imagesOf = (B, C) => spokenSchedule(B, C, 'en', ANY).filter(x => x.voice === 'N' && x.step && enters(B, x.step) && x.text !== sayText(x.step.say, 'en'));
+    const report = [];
+    for (const id of ['luci-rosse', 'kellerlicht', 'settimo-cielo']) {
+      const song = read(`songs/${id}.json`);
+      for (const profile of ['crescendo', 'switch']) for (const narrated of [false, true]) {
+        const C = resolveProfile(profile, { narratorStyle: 'poetic', narrated }), c = crescendoSong(song, { narrated, rules: growthRules(C) }), B = liveBuildOf(c, C);
+        const yields = c.tracks.some(t => t.type === 'spoken') ? spokenBars(c, 'en') : new Set();
+        const bars = [...new Set(buildSteps(B).filter(st => enters(B, st)).map(st => st.at))], imgs = imagesOf(B, C);
+        for (const e of bars) {
+          const got = imgs.filter(x => x.step.at === e);
+          if (yields.has(e - 1 >= 0 ? e - 1 : e)) continue;
+          assert(got.length === 1 && (got[0].at === e - 1 || got[0].at === e), `${id} ${profile}${narrated ? ' narrated' : ''}: entry at ${e} has ${got.length} images (${got.map(x => x.at)})`);
+        }
+        report.push(`${id} ${profile}${narrated ? '+narrated' : ''} ${imgs.length}/${bars.length}`);
+      }
+    }
+    console.log(`      images/entries: ${report.join(', ')}`);
+    // a radio window: every song opens with an image on its first bar (the song before plays the bar before it)
+    let opened = 0;
+    for (const profile of ['crescendo', 'switch']) {
+      const rec = { seed: 'd5-window', options: { styles: ['berlin-techno'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'cut', harmony: 'artist', profile }, changes: [], growth: GROWTH_ON_AIR };
+      const items = sessionItems(RADIO_RECIPES, rec, 3), starts = layout(items.map(x => ({ bars: normalizeSong(x.song).total, transition: x.entry.transition })), 0);
+      for (let k = 1; k < items.length; k++) {
+        const ks = k + 1 < items.length ? [k, k + 1] : [k], W = windowSong(ks.map(i => ({ song: items[i].song, n: i + 1, start: starts[i], transition: items[i].entry.transition })));
+        const songs = ks.map(i => ({ n: i + 1, prefix: `s${i + 1}-`, start: starts[i], song: items[i].song }));
+        const part = windowPart(W, songs, 0, { grown: true }), C = resolveProfile(profile, { narratorStyle: 'poetic', duration: 'fitted' }), B = liveBuildOf(part, C);
+        const first = buildSteps(B).filter(st => st.at >= starts[k] && enters(B, st))[0];
+        if (!first || first.at !== starts[k]) continue;
+        assert(imagesOf(B, C).some(x => x.step.at === first.at && x.at === starts[k]), `${profile} song ${k + 1}: no image on its first bar ${starts[k]}`);
+        opened++;
+      }
+    }
+    assert(opened >= 2, `${opened} radio songs checked for their opening image`);
+    // a mid-set opening: the last unsolo brings the silent tracks in, with an image
+    let midset = 0;
+    for (const style of ['berlin-techno', 'pure-trance', 'synthwave', 'dark-cyberpunk']) for (const { song } of radioSongs('switch', style, `d5-mid-${style}`, 3)) {
+      const C = resolveProfile('switch', { narratorStyle: 'poetic', duration: 'fitted' }), B = liveBuildOf(song, C), imgs = imagesOf(B, C);
+      for (const st of buildSteps(B).filter(x => x.unsolo !== undefined && enters(B, x))) {
+        assert(imgs.some(x => x.step.at === st.at && (x.at === st.at - 1 || x.at === st.at)), `${song.id}: the last unsolo at ${st.at} has no image`);
+        midset++;
+      }
+    }
+    console.log(`      ${opened} radio songs open with an image; ${midset} mid-set releases with an image`);
+    assert(midset >= 1, 'no mid-set opening found');
+  },
+  'narrator yields only to lines that sound (after-tests-oct28 D6): a voice-track line with no sample leaves its bar to the narrator; with every sample it yields as before'() {
+    const song = clone(EXAMPLE);
+    delete song.narrator;
+    const placed = placeSpoken(song, 'en'), p = placed.find(x => x.way === 'passage' || x.way === 'opening') || placed[0], bar = p.starts[0].bar;
+    const ids = song.tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken').map(t => t.id);
+    song.build = [{ at: 0, add: ids[0], say: 'go' }, { at: bar, set: { track: ids[0], gain: 0.5 }, say: 'here we are' }];
+    // a manifest with every line's sample, then one without this line's
+    const all = {};
+    for (const q of placed) for (const x of q.texts) (all[q.bank] = all[q.bank] || []).includes(`${q.bank}/${saySlug(x)}.wav`) || all[q.bank].push(`${q.bank}/${saySlug(x)}.wav`);
+    const without = Object.fromEntries(Object.entries(all).map(([b, l]) => [b, b === p.bank ? l.filter(f => !p.texts.some(x => f.endsWith(`/${saySlug(x)}.wav`))) : l]));
+    const saved = spokenContext.files, said = files => { setSpokenContext({ files }); const st = stateAt(song, bar); return voiceCode(song, st.song, st.upTo, normalizeSong(song).total, 'en', ANY); };
+    try {
+      assert(!/"here we are", spoken on bar/.test(said(all)) && spokenBars(song, 'en').has(bar), 'with every sample the narrator yields to the voice track');
+      assert(new RegExp(`"here we are", spoken on bar ${bar + 1}`).test(said(without)) && !spokenBars(song, 'en').has(bar), `without the line's sample the narrator is silent on bar ${bar + 1}`);
+    } finally { setSpokenContext({ files: saved }); }
   },
 };
 
