@@ -1450,6 +1450,26 @@ const CHECKS = {
   }
   assert(n >= 6, `${n} typed lines checked`);
 },
+'arrangement: twelve tracks at every bar (after-tests-oct28 D8): "+" on every instrument in turn every two bars never takes a song past 12'() {
+  const shown = (song, bar) => playing(stateAt(song, bar).song).filter(t => t.type !== 'riser');
+  let worst = 0, presses = 0, songs = 0;
+  for (const id of ['berlin-techno', 'pure-trance', 'synthwave', 'dark-cyberpunk', 'drum-and-bass']) for (let k = 0; k < 3; k++) {
+    const g = createSession(STYLES, `ar4-${id}-${k}`).next({ styles: [id], complexity: 0.5 });
+    const parts = ARR_PARTS.filter(p => partHas(g.plan.R, p)), cmds = [];
+    let r = g, j = 0;
+    for (let now = 8; now < g.plan.bars - 2 * g.plan.phrase; now += 2) {
+      const part = parts[j++ % parts.length];
+      if (whyNot({ kind: 'more', part }, r.song, r.plan, now)) continue;
+      cmds.push({ kind: 'more', part, at: applyBar('more', now, r.plan) });
+      r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed: `ar4-${id}-${k}`, n: 1 });
+    }
+    const total = r.song.sections.reduce((a, x) => a + x.bars, 0);
+    for (let b = 0; b < total; b++) { const n = shown(r.song, b).length; worst = Math.max(worst, n); assert(n <= TRACK_CAP, `${id} #${k}: ${n} tracks at bar ${b}`); }
+    presses += cmds.length; songs++;
+  }
+  console.log(`      ${songs} songs, ${presses} "+" pressed, at most ${worst} tracks at a bar`);
+  assert(worst === TRACK_CAP, `the cap was never reached (${worst})`);
+},
 };
 
 // --only <text>: run only the checks whose name holds the text

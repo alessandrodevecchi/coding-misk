@@ -81,9 +81,9 @@ Order set by the owner: the step labels and the V:N / V:T tags first, so the voi
 
 ## 10. 12 tracks at every bar (ar4, low priority)
 
-- [ ] 10.1 Cap in `candidateMoves`, in the `back` and drop returns, and in `whyNot` for `more` and `pattern` over the rest of the song (D8)
-- [ ] 10.2 Check in `check:endless`: "+" on every instrument in turn every two bars, five styles, three seeds: at no bar do more than 12 tracks play (today 13 to 16 in berlin-techno, pure-trance and synthwave)
-- [ ] 10.3 `check-arrangement-levels.cjs`: the 12-track scenario keeps `in=` at most 1.2 and the output below 1.0
+- [x] 10.1 Cap in `candidateMoves`, in the `back` and drop returns, and in `whyNot` for `more` and `pattern` over the rest of the song (D8)
+- [x] 10.2 Check in `check:endless`: "+" on every instrument in turn every two bars, five styles, three seeds: at no bar do more than 12 tracks play (today 13 to 16 in berlin-techno, pure-trance and synthwave)
+- [x] 10.3 `check-arrangement-levels.cjs`: the 12-track scenario keeps `in=` at most 1.2 and the output below 1.0
 
 ## 11. Docs and wrap-up
 

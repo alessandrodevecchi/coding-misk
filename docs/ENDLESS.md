@@ -358,6 +358,7 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | Added tracks stay (the owner's test)         | `arrangement: the owner's test, a track added with + stays until the outro` |
 | A lock per instrument                        | `arrangement: a lock per instrument`                             |
 | A locked kick sits out breaks and the charge | `arrangement: a locked kick sits out breaks and the charge, back at the drop, never varied (after-tests-oct28 D7)` |
+| Twelve tracks at every bar | `arrangement: twelve tracks at every bar (after-tests-oct28 D8): "+" on every instrument in turn every two bars never takes a song past 12` |
 | Riser on the next change                     | `arrangement: a riser on the next part change`                   |
 | Headroom as tracks add up                    | `arrangement: headroom as tracks add up, a volume set by hand kept` |
 | Extra buses                                  | `arrangement: extra buses skip the spoken and narrator orbits, every track its own` |
