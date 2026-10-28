@@ -142,7 +142,9 @@ const searchOptions = s => ({ ...(s.cap ? { shapeCap: s.cap } : {}), shapeAll: !
 // controls: the radio's Custom profile (its own growth, duration and shape choices), else the profile's own on air
 // search, wide (reused-lines D5, D6): the session's shape settings (searchOf) and whether this growth uses them; the
 // default search otherwise (the first growth of a song, steering, a growth that cannot wait)
-export function growOnAir(song, { profile = 'classic', artist = null, into = null, styles = {}, phrase = 8, controls = null, search = null, wide = false } = {}) {
+// phrases (new-song-panel D12, the planned growth in Compose only): the phrase boundaries are tried too, so a song of one
+// long section (a slow style) still grows inside its plan; the radio never passes it
+export function growOnAir(song, { profile = 'classic', artist = null, into = null, styles = {}, phrase = 8, controls = null, search = null, wide = false, phrases = false } = {}) {
   if (profile !== 'crescendo' && profile !== 'switch') return song;
   const g = (artist && artist.growth) || {}, free = controls ? controls.duration === 'free' : g.duration === 'free';
   const C = controls || airControls(profile, free);
@@ -170,6 +172,7 @@ export function growOnAir(song, { profile = 'classic', artist = null, into = nul
   // leaves less of the song as written)
   const starts = []; let at = 0;
   for (const s of wf.sections) { at += s.bars; starts.push(at); }
+  if (phrases) { for (let b = phrase; b < total; b += phrase) if (!starts.includes(b)) starts.push(b); starts.sort((a, b) => a - b); }
   // (a Live coder growth needs 24 bars of written song after it, else it grows with the Crescendo rules)
   const left = base.natural ? Math.max(2 * phrase, 24) : 2 * phrase;
   const ref = referenceStart(wf), cands = starts.filter(b => b >= Math.max(ref, phrase) && total - b >= left);
@@ -190,6 +193,29 @@ export function growOnAir(song, { profile = 'classic', artist = null, into = nul
 }
 // the section boundaries a fitted growth tries at most
 const TRIES = 8;
+
+// ---------- new-song-panel D12: the growth inside the planned length, in Compose ----------
+// A song with the growth duration 'planned' (a generated song with a length target, grown with Crescendo or Live
+// coder) grows in Compose, on its card and in the exports as the radio grows a song on air with the fitted duration:
+// the growth takes the written bars before a section boundary, so the song lasts its written length plus at most one
+// phrase. C: the controls in force (their duration 'planned'); phrase: the song's phrase (its length target keeps it).
+// → the grown song, or null when the song cannot be planned this way (no sections, or no boundary leaves room for a
+// growth): it then grows with the fitted duration, as before
+export function plannedGrowth(song, C, { phrase = 8, styles = {} } = {}) {
+  if (!song || !Array.isArray(song.sections) || !song.sections.length || !C || C.build !== 'crescendo') return null;
+  const profile = C.growth === 'natural' ? 'switch' : 'crescendo';
+  const g = growOnAir(song, { profile, controls: { ...C, duration: 'fitted' }, styles, phrase, phrases: true });
+  if (g === song || !g.crescendo) return null;
+  // (grown in Compose: no session on air, the song keeps its own controls)
+  delete g.onAir;
+  return g;
+}
+// Compose's growth of a song (crescendoSong's options), with the planned growth first when opts.planned holds
+// { controls, phrase, styles }: one function for the page, the Compose worker and the card lengths
+export function composeGrowth(song, { planned = null, ...opts } = {}) {
+  if (planned) { const g = plannedGrowth(song, planned.controls, planned); if (g) return g; }
+  return crescendoSong(song, opts);
+}
 
 // ---------- D2: song 0 (Continue in radio) ----------
 // A saved song played first in the radio keeps the profile it had there (radio-profiles D2). lead: the recipe's lead

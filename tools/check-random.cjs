@@ -1,6 +1,6 @@
 // Browser checks for the random tools (#50): radio dice (artist with Keep, styles, genre, knobs in range, sounds),
 // the random artist in the Artists tab (Keep, Again, Discard), random style and genre in the radio.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-random.cjs [shots-dir]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-random.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -14,7 +14,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const page = await (await browser.newContext({ viewport: { width: 1300, height: 1100 } })).newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => localStorage.clear()); await page.reload(); await sleep(3500);
   const opts = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio') || '{}'));
   await page.click('[data-tab="radio"]'); await sleep(400);

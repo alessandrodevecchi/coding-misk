@@ -1,5 +1,5 @@
 // Browser checks for the Styles and Artists tabs (#35).
-// Usage: PLAYWRIGHT_CORE=... node tools/check-library.cjs [shots-dir]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-library.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -13,7 +13,7 @@ const shots = process.argv[2];
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(4000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(4000);
   await page.evaluate(() => { localStorage.removeItem('coding-misk-styles'); localStorage.removeItem('coding-misk-artists'); });
   await page.reload(); await sleep(4000);
 
@@ -55,7 +55,7 @@ const shots = process.argv[2];
   const file = path.join(os.tmpdir(), `style-${Date.now()}.json`); await dl.saveAs(file);
   const exported = JSON.parse(fs.readFileSync(file, 'utf8'));
   const page2 = await (await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
-  await page2.goto('http://localhost:5173/'); await sleep(4000); await page2.click('[data-mode="lab"]'); await page2.click('[data-tab="stili"]');
+  await page2.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(4000); await page2.click('[data-mode="lab"]'); await page2.click('[data-tab="stili"]');
   const [chooser] = await Promise.all([page2.waitForEvent('filechooser'), page2.click('#st-import')]);
   await chooser.setFiles(file); await sleep(500);
   const imported = await page2.evaluate(id => (JSON.parse(localStorage.getItem('coding-misk-styles') || '[]')).find(x => x.id === id), exported.id);
@@ -96,7 +96,9 @@ const shots = process.argv[2];
 
   // Compose: a new song from an artist opens unsaved, plays as a live build, and can be saved
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="componi"]'); await sleep(300);
-  await page.selectOption('#tr-artist', 'dreamer'); await sleep(800);
+  // (new-song-panel: Nuovo brano opens the panel; the artist in its quick row, then Genera)
+  if ((await page.getAttribute('#tr-new', 'aria-expanded')) !== 'true') { await page.click('#tr-new'); await sleep(300); }
+  await page.selectOption('#ns-artist', 'dreamer'); await sleep(200); await page.click('#ns-generate'); await sleep(1200);
   const title = await page.inputValue('#track-title'), dirtyTxt = await page.innerText('#dirty');
   check(title && dirtyTxt.trim().length > 0, 'a new song from an artist opens in Compose, unsaved', `${title} · ${dirtyTxt}`);
   await page.click('#play'); await sleep(5000);

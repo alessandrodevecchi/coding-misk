@@ -1,7 +1,7 @@
 ---
 id: settings
 related: [export, radio, library, profiles]
-code: [src/settings/settings.js, src/settings/backup.js, src/i18n.js]
+code: [src/settings/settings.js, src/settings/backup.js, src/i18n.js, src/endless/song-presets.js]
 checks: [node --no-warnings tools/check-backup.mjs, node --no-warnings tools/check-settings.cjs]
 ---
 
@@ -35,6 +35,8 @@ The page has nine cards:
 - **Data:** export everything to a file, import and merge, reset everything (press twice).
 
 Each option has its help text in `src/i18n.js`, under keys that start with `set`, `vid`, `frag` or `lr`.
+
+**New song presets (new-song-panel D6).** The owner's presets of the New song panel (`coding-misk-song-presets`, `{ name: values }`, `src/endless/song-presets.js`) and the panel's values (`coding-misk-new-song`) go into the backup; an import merges presets by name, the backup's winning. The five built-in presets live in the code. The old voice of the next song by an artist (`coding-misk-artist-voice`) is no longer read and stays out of the backup (D9).
 
 ## Example
 

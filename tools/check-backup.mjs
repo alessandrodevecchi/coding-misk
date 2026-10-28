@@ -28,6 +28,13 @@ const CHECKS = {
     const tr = values['coding-misk-song-trials'];
     assert(tr.kellerlicht.profile === 'switch' && tr.other.profile === 'crescendo', JSON.stringify(tr));
   },
+  'New song presets merge by name, the old artist voice stays out (new-song-panel D6, D9)'() {
+    const b = makeBackup([['coding-misk-song-presets', { Notte: { length: 'medium', profile: 'switch' } }], ['coding-misk-artist-voice', { preset: 'present' }], ['coding-misk-new-song', { length: 'short' }]]);
+    assert(b.data['coding-misk-song-presets'].Notte.length === 'medium' && !('coding-misk-artist-voice' in b.data) && b.data['coding-misk-new-song'], 'presets in the backup, the old artist voice out');
+    const { values } = mergeBackup({ ...b, data: { ...b.data, 'coding-misk-artist-voice': { preset: 'present' } } }, k => (k === 'coding-misk-song-presets' ? { Notte: { length: 'long' }, Alba: { chaos: 0.2 } } : null));
+    const pr = values['coding-misk-song-presets'];
+    assert(pr.Notte.length === 'medium' && pr.Alba.chaos === 0.2 && !('coding-misk-artist-voice' in values), JSON.stringify(values));
+  },
   'last played: the latest time of each song wins (#67)'() {
     const { values } = mergeBackup({ format: 'coding-misk/backup', data: { 'coding-misk-played': { a: 5, b: 1 } } }, k => (k === 'coding-misk-played' ? { a: 3, b: 4, c: 2 } : null));
     const p = values['coding-misk-played'];

@@ -1,8 +1,8 @@
 ---
 id: radio
 related: [radio-commands, styles, artists, material, patterns, narrator, voice, export, library, settings]
-code: [src/radio/radio.js, src/endless/director.js, src/endless/transitions.js, src/endless/compilation.js, src/endless/energy.js, src/endless/profile.js, src/endless/growth.js, src/endless/items.js, src/endless/waypoints.js]
-checks: [npm run check:endless, npm run check:compilation, npm run check:radio-profiles, node --no-warnings tools/check-radio.cjs]
+code: [src/radio/radio.js, src/endless/director.js, src/endless/transitions.js, src/endless/compilation.js, src/endless/energy.js, src/endless/profile.js, src/endless/growth.js, src/endless/items.js, src/endless/waypoints.js, src/endless/song-options.js, src/radio/song-controls.js]
+checks: [npm run check:endless, npm run check:compilation, npm run check:radio-profiles, node --no-warnings tools/check-radio.cjs, npm run check:song-options]
 ---
 
 # Radio
@@ -43,6 +43,8 @@ A song on air builds itself like a live build. The listener can steer it from th
 **Coming next (after-tests-oct28 D1, D2).** Under the song on air, "Coming next" lists the next three bars where something changes (`nextRows` in `src/radio/next-changes.js`). Each row names its steps with a label per build action (`stepLabel`: "+ Bass", "Kick: variant 1", "Pad: with the others", tracks by name), then the voices: `V:N` (narrator) or `V:T` (voice track) with the words heard on that bar in italics. The words come from `spokenSchedule` in `src/song/build.js`, the same narrator lines `voiceCode` writes (`narratorLines`), built from the song on air as its code is (`liveBuildOf`: the controls' narrator style and the code-of-the-moment steps). A step's own phrase is never quoted: a poetic image, a narrator that yields to the voice track or is off, a line without a sample read as they sound. A voice-track line has a row of its own where no step falls; a section step with no words has no row.
 
 **Code on air (D7, D8).** The window song is split by song (`src/live/air-code.js`): each song's tracks and steps (`windowPart`) keep the window's sections, so lanes and bars stay the same. The song on air is written with its own controls: Classic, the profile's own on air (`airControls`, never the Compose overrides) or the Custom ones. The panel shows it; the next song is shown after a `// ==> title` line when `incoming` says so, or plays hidden. A hidden (or shown) song that is not on air is written in full technical form with Classic controls, its constants renamed (`n<k>_section1`), its orbits moved up by 20 (`HIDDEN_ORBIT`, past the voice instrument's 13 and 14 and the narrator's 15 and up), and its `S$:` lines played alone only within itself. The code evaluated is the panel's text, the song on air's hidden tail (mixer, lanes, voice), then the hidden songs at the bar the player shows (`run(shown, bar)`). When the song on air changes, the new song's code appears whole at once.
+
+**Shared options (new-song-panel D1, D2).** The options of how a song is made live in `src/endless/song-options.js`: `createSongOptions` reads and migrates a stored options object and builds the director options (`directorOptions`). Two instances: the radio's under `coding-misk-radio` (the same values as before) and the New song panel's under `coding-misk-new-song`, started from a copy of the radio's song values (`SONG_KEYS`, never the session fields: transition, harmony, incoming, compilation, scope, dice range); "Prendi dalla radio" copies them again. A change in one never changes the other. `length` goes to the director only with `use: 'new-song'`. The controls (artist, styles, genre chips, knobs with dice, sounds die, material, Profile, Custom profile, Voices group) are drawn and handled by `src/radio/song-controls.js` for both views, with a `prefix` for the ids (`radio` keeps the old ones).
 
 ## Options
 
