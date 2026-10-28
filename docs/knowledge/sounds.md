@@ -1,8 +1,8 @@
 ---
 id: sounds
 related: [sound-and-levels, styles, songs, material, strudel, from-a-reference]
-code: [src/music.js, src/sounds/machines.js, src/sounds/catalog.js, src/song/validate.js, src/material/sound.js, src/sounds/soundfont-fix.js, public/samples/README.md]
-checks: [npm run check:styles, npm run check:songs, node tools/check-style-sounds.cjs, node tools/check-sounds.cjs]
+code: [src/music.js, src/sounds/machines.js, src/sounds/catalog.js, src/sounds/fm-lab.js, src/song/validate.js, src/material/sound.js, src/sounds/soundfont-fix.js, public/samples/README.md]
+checks: [npm run check:styles, npm run check:songs, npm run check:fm-lab, node tools/check-fm-lab.cjs, node tools/check-style-sounds.cjs, node tools/check-sounds.cjs]
 ---
 
 # Sounds and instruments
@@ -24,6 +24,7 @@ A sound is a name for `s()` or a track's `wave`. There are five kinds:
 - **Styles** name sounds in `waves`, `kits`, guitar `types` and texture `samples` ([styles.md](styles.md)).
 - **Songs** name them in track settings: `wave`, `kit`, `sample`, `type` ([songs.md](songs.md)).
 - **Material** composes sound kinds (`bell`, `reese`) as a wave plus an FM patch ([material.md](material.md)).
+- **FM lab.** The FM category of the Sounds tab plays one fixed patch per FM kind on its own (see FM lab below).
 - **Levels.** A new sound must be measured before it ships ([sound-and-levels.md](sound-and-levels.md)).
 - **The sound guard** replaces a broken soundfont part or a missing drum row with a stand-in, so a song never goes silent.
 
@@ -122,6 +123,20 @@ What Strudel does not have at all, and how the app gets close:
 - **Real amp guitars.** Guitars are a soundfont layered with a sawtooth and driven ([music-engine.md](music-engine.md)).
 - **Orchestral sections.** Only single GM instruments (`gm_string_ensemble_1`, `gm_brass_section`) and the VCSL bank.
 - **Many soundfonts are never used.** Names not in bold above are free to try: sitar, koto, kalimba, steel drums, saxophones, harpsichord.
+
+## FM lab
+
+The FM category of the Sounds tab (`fm-groove-lab`, `#80`) has one card per FM kind of the material generator (every kind of `SOUND_KINDS` but `square`): Campana (bell), Reese, Ringhio (growl), Sporco (dirty), Piano elettrico (tine), Metallo (clang), Sub, Organo (organ). `FM_CARDS` in `src/sounds/fm-lab.js` holds each card's fixed patch (inside its kind's rule in `sound()`, near the middle of the ranges), carrier wave, part (a preset of a pattern kind) and tempo. A new FM kind without a card fails `npm run check:fm-lab`.
+
+- **Playing.** The headphones play a card through the lab preview, a third `createPreview` instance (`labPreview` in `src/main.js`, orbit 30, analyser `fmlab`): alone at the card's tempo, or on the playing song's next bar. It never changes the player bar. Starting a card stops the Compose and radio previews; leaving the Sounds tab, an export or a recording stops it.
+- **Modes.** Phrase (the card's part through `loopSong` with the FM device in the rack, the default when the page opens), Held note (one note per bar, the part's root) and FM rise (that note on sixteenths, `.fm(saw.slow(4).range(0, top))` written by `fmRise`, from 0 at the first sixteenth to the top at the last of 4 bars). The mode stays across cards; mode and FM amount play from the next bar.
+- **FM amount.** From 0 to the card's maximum (the index range capped one step per octave above 4, as in `sound()`). In the hardware theme it is a horizontal fader (`data-fader="h"`), centred and at most 320 px wide.
+- **Drawing.** `fmWave(card, index)` integrates the carrier's phase as superdough's `applyFM` drives it, in cycles of the note: `dφc = (1 + I·h·m1(φ1))·du`, `dφ1 = (h + I2·h2·m2(φ2))·du`, `dφ2 = h2·du`, with `I` and `I2` scaled by the FM envelope at a time in the note; the carrier shape is applied to `φc`. The second operator runs at the note × `fmh2` and swings the first modulator by `fm2` × its own frequency. Noise modulators (`pink`, `brown`) use a seeded noise, so Sporco's drawing is indicative. Four drawings at FM 0, 1, 2 and 3 light the one nearest the amount (halfway rounds up).
+- **Scope.** The lab expression keeps `.analyze("fmlab")`; the Sounds tab draws one window of it, started on a rising zero crossing. The stage visual skips analysers whose id starts with `fmlab`.
+- **Shape against the scope.** An FM wave's zero crossings depend on the modulator's phase when the note starts, and superdough does not fix it (the modulator starts when the note is scheduled, the carrier at the note's time): the same organ patch gives 1 or 3 crossings per cycle. The browser check compares the scope's RMS frequency (`rmsFreq`) with the range the formula gives over start phases and envelope times (`briRange`).
+- **Use in track.** Sets the selected Compose track's `wave` to the card's carrier and replaces its `fm` device with the card's (`cardDevice`). Disabled, with the reason, when the selected track is not bass, arp, hook or pad.
+
+Riser sounds and FM-like effects for every sound are follow-ups (design D9, D10 of `fm-groove-lab`).
 
 ## Example
 

@@ -80,6 +80,8 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-endless.mjs` | `npm run check:endless` | Node | Checks for the endless director and style recipes (docs/ENDLESS.md, docs/STYLES.md). |
 | `tools/check-export.cjs` |  | dev server, Chrome | Browser checks for the fast export (#8): songs export faster than real time with the timeline next to them, the fast and the real time files of the same song agree (length, loudness, low and high bands, loudness over… |
 | `tools/check-export.mjs` | `npm run check:export` | Node | Checks for the fast export (#8): time from the tempo map, code segments of live build songs, the timeline, formats and the Export display. No browser. |
+| `tools/check-fm-lab.cjs` |  | dev server, Chrome | Browser checks for the FM lab of the Sounds tab (fm-groove-lab). |
+| `tools/check-fm-lab.mjs` | `npm run check:fm-lab` | Node | Checks for the FM lab of the Sounds tab (fm-groove-lab, task 1.3). No browser. |
 | `tools/check-functions.mjs` | `npm run check:functions` | Node | Checks for song functions (song-functions). No browser. |
 | `tools/check-growth-background.cjs` |  | dev server, Chrome | Browser check of the growth in the background (growth-in-background, #75): on luci-rosse, settimo-cielo and kellerlicht, picking Live coder in Compose and then changing the opening and the pace never blocks the page for… |
 | `tools/check-guide.mjs` | `npm run check:guide` | Node | Checks that the Guide (#48, src/guide.js) covers the app: every tab in the page has a card (or an exemption with a reason), every console command is named in the Radio card, every guide text has English and Italian, and… |
