@@ -20,7 +20,9 @@ import { OPENINGS, PACES, DEVELOPMENTS, SHAPES_VERSION } from '../song/shapes.js
 import { CRESCENDO_VERSION } from '../song/crescendo.js';
 import { sessionVersions } from '../library/playlists.js';
 import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
-import { buildSteps, sayText } from '../song/build.js';
+import { buildSteps, sayText, spokenSchedule } from '../song/build.js';
+import { liveBuildOf } from '../live/live-code.js';
+import { nextRows } from './next-changes.js';
 import { QUIRKS } from '../endless/quirks.js';
 import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } from '../endless/artist-maker.js';
 import { freshSeed } from '../endless/random.js';
@@ -41,7 +43,6 @@ import { voiceSoundHtml, syncVoiceSound, soundEvent, nextSound, cleanSound, isAu
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
 const fmt = n => (Math.round(n * 100) / 100).toString();
-const listOf = v => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 const idle = fn => (globalThis.requestIdleCallback ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 50));
 
 // Valid recipes only: an invalid one is left out with a warning.
@@ -55,7 +56,7 @@ export function usableRecipes(list) {
 
 // keepArtist(artist): saves a random artist among the listener's, returns its id (#50)
 // userPatterns(): the user's saved patterns as the director reads them (pattern-library): they join a song where they fit
-export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, userPatterns = () => [], reloadSamples = async () => {} }) {
+export function createRadio({ root, t, tx, esc, store, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, userPatterns = () => [], reloadSamples = async () => {}, voiceFiles = () => ({}) }) {
   const ids = recipes.map(r => r.id);
   const saved = store.get('coding-misk-radio', null) || {};
   const opts = {
@@ -658,7 +659,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   function seek(rel) {
     if (!S) return;
     const it = S.stream[S.onAir], bar = it.start + Math.max(0, Math.min(it.bars - .25, rel));
-    if (S.paused !== undefined) { S.paused = bar; return; }
+    if (S.paused !== undefined) { S.paused = bar; renderNow(); return; }
     player.start(windowPlayable(), bar);
   }
   // previous in the player bar: the song on air from its first bar
@@ -677,15 +678,21 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
   const clone = o => JSON.parse(JSON.stringify(o));
 
   // ---------- view ----------
-  const stepText = s => {
-    const parts = [];
-    for (const k of ['add', 'remove']) if (s[k] !== undefined) parts.push(`${k === 'add' ? '+' : '−'} ${listOf(s[k]).join(', ')}`);
-    if (s.set) { const { track, ...v } = s.set; parts.push(`${track}: ${Object.entries(v).map(([k, x]) => `${k} ${x}`).join(', ')}`); }
-    if (s.pattern) parts.push(`${s.pattern.track} → ${s.pattern.to}`);
-    if (s.rack) parts.push(`${s.rack.track} + ${s.rack.device}`);
-    if (s.unrack) parts.push(`${s.unrack.track} − ${s.unrack.device}`);
-    return parts.join(' · ');
+  // what each voice says in the song on air (after-tests-oct28 D2): the schedule of its code, from the live build of its
+  // controls; kept per song, language, controls and samples manifest (Next changes is drawn four times a second)
+  const scheduleMemo = new WeakMap();
+  const scheduleOf = item => {
+    const C = liveControlsOf(item), lang = getLang(), files = voiceFiles(), key = `${lang}|${JSON.stringify(C)}`;
+    const m = scheduleMemo.get(item.song);
+    if (m && m.key === key && m.files === files) return m.list;
+    let list = [];
+    try { list = spokenSchedule(liveBuildOf(item.song, C), C, lang, files); } catch (e) { list = []; }
+    scheduleMemo.set(item.song, { key, files, list });
+    return list;
   };
+  const voiceTag = v => `<span class="vtag vtag-${v.voice === 'N' ? 'n' : 't'}" title="${esc(t(v.voice === 'N' ? 'narratorLbl' : 'vinstLbl'))}">V:${v.voice}</span> <em>“${esc(v.text)}”</em>`;
+  // (a bar with many moves, the opening of a growth: the first four, the rest in the tooltip)
+  const nextRow = r => `<li data-at="${r.at}"><span class="at">${esc(t('radioBarShort', { n: r.at + 1 }))}</span> ${r.labels.length ? `<span class="nx-step"${r.labels.length > 4 ? ` title="${esc(r.labels.join(' · '))}"` : ''}>${esc(r.labels.slice(0, 4).join(' · '))}${r.labels.length > 4 ? ' …' : ''}</span>` : ''}${r.voices.map(v => ` ${voiceTag(v)}`).join('')}</li>`;
   // ---------- curves of the song on air (#24, #40, look #47) ----------
   // energy is the main curve, on top; the four detail lanes fold under a summary line. Every curve: one small
   // square per double phrase (filled when the listener set it), a solid line, a glow on set parts, the parts
@@ -1010,10 +1017,11 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
     renderSteer();
     if (!S) { box.innerHTML = `<div class="lbl">${esc(t('radioNow'))}</div><p class="muted">${esc(t('radioIdle'))}</p>`; return; }
     const item = S.stream[S.onAir], song = item.song, e = item.entry;
-    const rel = Math.max(0, (cyc ?? player.now()) - item.start);
+    // (paused: the bar it stopped on, the player's clock no longer runs)
+    const rel = Math.max(0, (cyc ?? (S.paused !== undefined ? S.paused : player.now())) - item.start);
     let acc = 0, sec = song.sections[0];
     for (const s of song.sections) { if (rel >= acc) sec = s; acc += s.bars; }
-    const next = buildSteps(song).filter(s => s.at > rel).slice(0, 3);
+    const next = nextRows(song, scheduleOf(item), rel, 3);
     const nextSong = S.stream[S.onAir + 1];
     box.innerHTML = `<div class="lbl">${esc(t('radioNow'))} · ${esc(e.lead ? t('radioLeadShort') : t('radioSongN', { n: item.n + 1 }))}</div>
       ${item.comp ? `<div class="comp-tag"><span class="chip small">${esc(item.comp.start + item.comp.length - item.n <= 1 ? t('compNextOne') : t('compNext', { n: item.comp.start + item.comp.length - item.n }))}</span>${item.comp.kind === 'random' && !artists().some(a => a.name === item.comp.artist.name) ? `<button class="chip small" data-comp-keep title="${esc(t('diceKeepHint'))}">${esc(t('diceKeep'))} ${esc(item.comp.artist.name)}</button>` : ''}</div>` : ''}
@@ -1024,7 +1032,7 @@ export function createRadio({ root, t, tx, esc, store, recipes, player, toast, g
       <div class="radio-parts">${esc(e.lead ? t('radioLeadParts', { styles: opts.styles.map(styleName).join(', ') }) : partsText(e))}</div>
       ${item.plan ? curvePanel(item, rel, `${sec.name} · ${t('radioBar', { n: Math.floor(rel) + 1, total: item.bars })}${item.plan.extended ? ` · ${t('radioExtended', { t: secs(item.plan.extended * extendSeconds(item.plan)) })}` : ''}`) : `<div class="radio-pos">${e.lead ? '' : curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>`}
       <div class="lbl">${esc(t('radioComing'))}</div>
-      <ul class="radio-next">${next.map(s => `<li><span class="at">${esc(t('radioBarShort', { n: s.at + 1 }))}</span> ${esc(stepText(s))}${s.say ? ` <em>“${esc(sayText(s.say, getLang()))}”</em>` : ''}</li>`).join('') || `<li class="muted">${esc(t('radioNoChanges'))}</li>`}</ul>
+      <ul class="radio-next">${next.map(nextRow).join('') || `<li class="muted">${esc(t('radioNoChanges'))}</li>`}</ul>
       <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) : esc(t('radioPreparing'))}${nextSong && e.transition && !item.cut ? ` · ${esc(e.transition.kind === 'cut' ? t('radioNextTxCut') : t('radioNextTx', { kind: t(`tx:${e.transition.kind}`), bars: e.transition.bars }))}` : ''}</div>`;
   }
 

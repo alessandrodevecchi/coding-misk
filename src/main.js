@@ -57,6 +57,7 @@ import { rewriteSpoken, trackVoice } from './endless/voice-track.js';
 import { styleId, stylePush } from './endless/recipe.js';
 import { loadLimiter, setMasterLevel } from './sounds/limiter.js';
 import { createSoundBrowser } from './sounds/browser.js';
+import { cardCode, cardDevice, LAB_ORBIT, LAB_ANALYZER } from './sounds/fm-lab.js';
 import { MACHINES } from './sounds/machines.js';
 import { machineLabel, prettyName } from './sounds/catalog.js';
 import SONG_ORDER from '../songs/index.json';
@@ -616,6 +617,8 @@ let preview = null;
 // the radio console's preview of a saved pattern (radio-arrangement D9): the same player, riding the radio with the radio
 // 12 dB lower; { item, ctx } of the pattern asked, made in createRadio's player below
 let radioPreview = null, radioPv = null;
+// the FM lab's preview (fm-groove-lab D3): the FM cards of the Sounds tab, made with the sound browser below
+let labPreview = null;
 // code of a song at a bar, with the tempo of that bar (a live build changes code over time)
 // the code the player shows at a bar to evaluate it: the evaluation knows the bar (codeBar, used once)
 let codeBar = 0, codeFresh = false;
@@ -2711,13 +2714,12 @@ function highlightTrack() {
 // pannello traccia nella timeline: il clip scelto (battute, pattern, elimina) o come aggiungerne uno
 function clipBlock(tr) {
   const c = selClip !== null && tr.clips[selClip];
-  if (!c) return `<div class="tp-plays"><span class="lbl">${t('clipLbl')}</span><p class="note">${t('timelineHint')}</p></div>`;
+  if (!c) return '';
   const sp = spans(tr).find(x => x.c === c);
   return `<div class="tp-plays"><span class="lbl">${esc(t('clipInfo', { from: sp.s + 1, to: sp.e }))}</span>
     <div class="clip-ctl"><div class="ctrl"><label class="lbl" for="clip-start">${t('clipStart')}</label><input id="clip-start" type="number" min="1" step="1" value="${sp.s + 1}"></div>
       <div class="ctrl"><label class="lbl" for="clip-bars">${t('clipBars')}</label><input id="clip-bars" type="number" min="1" step="1" value="${sp.e - sp.s}"></div>
-      <button class="btn danger" id="clip-del">${t('clipDelete')}</button></div>
-    <div class="chips">${Object.keys(tr.patterns).map(k => `<button class="chip" data-clip-pat="${esc(k)}" aria-pressed="${c.pattern === k}">${esc(k)}</button>`).join('')}</div></div>`;
+      <button class="btn danger" id="clip-del">${t('clipDelete')}</button></div></div>`;
 }
 const viewSwitch = () => `<div class="tp-view chips" role="group" aria-label="${esc(t('panelView'))}"><button class="chip" data-view="full" aria-pressed="${panelView === 'full'}">${esc(t('viewFull', { name: SEC().name }))}</button><button class="chip" data-view="one" aria-pressed="${panelView === 'one'}">${t('viewOne')}</button><button class="chip" data-view="all" aria-pressed="${panelView === 'all'}">${t('viewAll')}</button></div>`;
 // ogni pannello traccia ha identificativi propri (p<indice>_nome): nella vista estesa ce ne sono molti insieme
@@ -2888,6 +2890,16 @@ function syncPreviewButtons() {
     }
     if (b.disabled !== busy) b.disabled = busy;
   });
+  // the headphones on the pattern in preview (after-tests-oct28 D9)
+  $$('#track-panel [data-ptrk]').forEach(host => {
+    const tr = T.tracks[+host.dataset.ptrk];
+    host.querySelectorAll('.pat-chip').forEach(ch => {
+      const on = !!(st && tr && st.id === tr.id && st.key === ch.dataset.editPat), icon = ch.querySelector('.pat-pv');
+      ch.classList.toggle('pv', on);
+      if (on && !icon) ch.insertAdjacentHTML('afterbegin', `<span class="pat-pv">${LISTEN}</span>`);
+      else if (!on && icon) icon.remove();
+    });
+  });
 }
 function previewBtn(tr) { const on = !!(preview && preview.state && preview.state.id === tr.id), tip = esc(t(on ? 'ptPreviewStop' : 'ptPreview')); return `<button type="button" class="btn small icon pt-preview" id="pt-preview" aria-pressed="${on}" title="${tip}" aria-label="${tip}"${rec || capture || fastJob ? ' disabled' : ''}>${on ? STOP : LISTEN}</button>`; };
 // for the browser checks (tools/check-preview.cjs)
@@ -2900,6 +2912,75 @@ const songStyleFallback = () => fallbackStyles(T, { recipes: RECIPES, artists: [
 function savePattern(tr) {
   const saved = patternsStore.add(savedFromTrack(T, tr, patOf(tr), { name: `${trackLabel(tr)} · ${T.title}`, fallback: songStyleFallback() }));
   toast(t('ptSavedPattern', { name: saved.name }), { label: t('ptOpenTab'), run: () => { showTab('pattern'); patternsTab.open({ saved: saved.id }); } });
+}
+
+// ---------- one pattern row (after-tests-oct28 D9, pp1 #84) ----------
+// The patterns of the track in one row: Niente, the patterns with marks (in the chosen section or clip, used elsewhere,
+// in preview, being edited), + New and Delete; a status line says what is edited and what the song plays there, with
+// Use in section, Try on a copy, Replace and Restore. Editing stays live: a change is heard wherever the pattern is used.
+// per pattern, while the song stays open: the pattern when editing it started (Restore) and the pattern it copies
+const patSnaps = new Map(), patCopies = new Map();
+const patKey = (tr, k) => `${T.id}:${tr.id}:${k}`;
+// where the panel's choices land: the chosen section (its whole clip, or partial clips), or the chosen clip in Free
+// timeline; null in Free timeline with no clip chosen
+function patTarget(tr) {
+  if (arrMode === 'timeline') {
+    const c = tr === curTrack() && selClip !== null && tr.clips[selClip];
+    if (!c) return null;
+    const sp = spans(tr).find(x => x.c === c);
+    return { clip: c, name: t('patClipName', { from: sp ? sp.s + 1 : 1, to: sp ? sp.e : 1 }) };
+  }
+  const cell = cellOf(tr, sel);
+  return { clip: (cell && cell.clip) || null, custom: !!(cell && cell.parts), name: SEC().name };
+}
+// the places a pattern plays, by section name (Free timeline: the clip's bars)
+function patPlaces(tr, k, skip = null) {
+  const st = starts(), out = [];
+  for (const sp of spans(tr)) {
+    if (sp.c.pattern !== k || sp.c === skip) continue;
+    const names = T.sections.filter((sec, j) => st[j] < sp.e && sp.s < st[j] + sec.bars).map(sec => sec.name);
+    out.push(arrMode === 'timeline' || !names.length ? t('patClipName', { from: sp.s + 1, to: sp.e }) : names.join(', '));
+  }
+  return [...new Set(out)];
+}
+function snapOf(tr, k) {
+  const id = patKey(tr, k);
+  if (!patSnaps.has(id) && tr.patterns[k]) patSnaps.set(id, clone(tr.patterns[k]));
+  return patSnaps.get(id);
+}
+function patternRow(tr, key) {
+  const tg = patTarget(tr), here = tg && tg.clip ? tg.clip.pattern : null, pv = preview && preview.state && preview.state.id === tr.id ? preview.state.key : null;
+  const used = k => tr.clips.some(c => c.pattern === k), elsewhere = k => tr.clips.some(c => c.pattern === k && c !== (tg && tg.clip));
+  const chip = k => {
+    const sh = composedShapes[`${T.id}:${tr.id}:${k}`], inSong = here === k, other = !inSong && elsewhere(k);
+    const tip = [inSong ? `${t('patInSong')}: «${tg.name}»` : '', other ? `${t('patLegUsed')}: ${patPlaces(tr, k).join(' · ')}` : '', sh ? t('melodyShapeTip', { shape: t(`melodyShape:${sh}`) }) : ''].filter(Boolean).join(' · ');
+    return `<button class="chip pat-chip${inSong ? ' in-song' : ''}${other ? ' used' : ''}${pv === k ? ' pv' : ''}" data-edit-pat="${esc(k)}" aria-pressed="${k === key}"${tip ? ` title="${esc(tip)}"` : ''}>${pv === k ? `<span class="pat-pv">${LISTEN}</span>` : ''}<span class="pat-k">${esc(k)}</span>${inSong ? `<span class="pat-badge">${esc(t('patInSong'))}</span>` : other ? '<span class="pat-used" aria-hidden="true"></span>' : ''}</button>`;
+  };
+  const nothingOn = !!(tg && !tg.custom && !tg.clip);
+  const silentChip = tg && tg.custom ? '' : `<button class="chip pat-none" data-play-pat="" aria-pressed="${nothingOn}"${tg ? ` title="${esc(t('patSilentTip', { where: tg.name }))}"` : ' disabled'}>${t('silent')}</button>`;
+  const inUse = used(key), last = Object.keys(tr.patterns).length === 1;
+  const delTip = inUse ? t('patDelInUse', { p: key, where: patPlaces(tr, key).join(' · ') }) : last ? t('lastPattern') : t('patDelTip', { p: key });
+  // the status line
+  let status = '';
+  const btn = (id, label, tip = '') => `<button class="btn small" id="${id}"${tip ? ` title="${esc(tip)}"` : ''}>${esc(label)}</button>`;
+  const acts = [];
+  if (!tg) status = inUse ? t('patStatusUsedLoose', { p: key }) : t('patStatusLoose', { p: key });
+  else if (tg.custom) status = t('patCustomCell', { where: tg.name });
+  else if (here === key) status = t('patStatusSong', { p: key });
+  else if (inUse) status = here ? t('patStatusElse', { p: key, where: tg.name, q: here }) : t('patStatusElseNone', { p: key, where: tg.name });
+  else status = here ? t('patStatusFree', { p: key, q: here }) : t('patStatusFreeNone', { p: key, where: tg.name });
+  if (tg && !tg.custom && here !== key) acts.push(btn('pat-use', t('patUseIn', { p: key, where: tg.name })));
+  const src = patCopies.get(patKey(tr, key));
+  if (src && tr.patterns[src] && !inUse && used(src)) acts.push(btn('pat-replace', t('patReplace', { a: src, b: key }), t('patReplaceTip', { a: src, b: key })));
+  if (inUse) acts.push(btn('pat-copy', t('patTryCopy'), t('patTryCopyTip', { p: key })));
+  const snap = snapOf(tr, key);
+  if (snap && JSON.stringify(snap) !== JSON.stringify(tr.patterns[key])) acts.push(btn('pat-restore', t('patRestore', { p: key }), t('patRestoreTip', { p: key })));
+  const legend = `<span class="pat-leg"><span class="pat-badge">${esc(t('patInSong'))}</span> ${esc(t('patLegIn'))}</span><span class="pat-leg"><span class="pat-used"></span> ${esc(t('patLegUsed'))}</span><span class="pat-leg">${esc(t('patLegFree'))}</span><span class="pat-leg"><span class="pat-pv">${LISTEN}</span> ${esc(t('patLegPv'))}</span><span class="pat-leg"><span class="pat-edit"></span> ${esc(t('patLegEdit'))}</span>`;
+  return `<div class="tp-pats tp-pats-song"><span class="lbl">${esc(t('patsSong'))}</span><p class="hint pat-hint">${esc(t('patsSongHint'))}</p>
+      <div class="chips">${silentChip}${Object.keys(tr.patterns).map(chip).join('')}<button class="chip" id="pt-new">${t('newPattern')}</button><button class="chip" id="pt-del"${inUse || last ? ' disabled' : ''} title="${esc(delTip)}">${t('deletePattern')}</button></div>
+      <p class="pat-status${tg ? '' : ' pat-notarget'}">${esc(status)}${tg ? '' : `<span class="muted pat-how">${esc(t('patNoTarget'))}</span>`}</p>
+      ${acts.length ? `<div class="pat-acts">${acts.join('')}</div>` : ''}
+      <p class="pat-legend">${legend}</p></div>`;
 }
 function panelHtml(ti) {
   const tr = T.tracks[ti];
@@ -2935,7 +3016,6 @@ function panelHtml(ti) {
     const steps = compiled.build ? buildSteps(compiled.build).filter(x => x.say && voiceOf(T, x) === tr) : [];
     editor = `<p class="note">${t('voiceHint')}</p>${steps.length ? `<ul class="voice-lines">${steps.map(x => `<li><b>${t('liveMark', { n: x.at + 1 })}</b> ${esc(sayText(x.say, getLang()))}</li>`).join('')}</ul>` : `<p class="note">${t('voiceNone')}</p>`}`;
   } else editor = `<p class="note">${t('riserHint')}</p>`;
-  const custom = c && c.parts;
   return pfx(ti, `
     <div class="tp-head">
       <span class="trk-type big">${esc(TYPE_ICON[tr.type] || '·')}</span>
@@ -2947,14 +3027,10 @@ function panelHtml(ti) {
         <button class="btn danger" id="tk-del">${t('removeTrack')}</button>
       </div>
     </div>
-    ${tr.type === 'voice' ? '' : arrMode === 'timeline' ? clipBlock(tr) : `<div class="tp-plays"><span class="lbl">${esc(t('playsIn', { name: SEC().name }))}</span>
-      <div class="chips">${custom ? `<span class="note">${t('customCell')}</span>` : `<button class="chip" data-play-pat="" aria-pressed="${!c}">${t('silent')}</button>${Object.keys(tr.patterns).map(k => `<button class="chip" data-play-pat="${esc(k)}" aria-pressed="${!!(c && c.clip && c.clip.pattern === k)}">${esc(k)}</button>`).join('')}`}</div></div>`}
-    ${tr.type === 'voice' ? '' : `<div class="tp-pats tp-pats-song"><span class="lbl">${esc(t('patsSong'))}</span>
-      <div class="chips">${Object.keys(tr.patterns).map(k => { const sh = composedShapes[`${T.id}:${tr.id}:${k}`]; return `<button class="chip" data-edit-pat="${esc(k)}" aria-pressed="${k === key}"${sh ? ` title="${esc(t('melodyShapeTip', { shape: t(`melodyShape:${sh}`) }))}"` : ''}>${esc(k)}</button>`; }).join('')}
-        <button class="chip" id="pt-del">${t('deletePattern')}</button></div>
-      <p class="note">${esc(t('editingPattern', { p: key }))}</p></div>
+    ${tr.type === 'voice' ? '' : arrMode === 'timeline' ? clipBlock(tr) : ''}
+    ${tr.type === 'voice' ? '' : `${patternRow(tr, key)}
     <div class="tp-pats tp-pats-make"><span class="lbl">${esc(t('patsMake'))}</span>
-      <div class="chips"><button class="chip" id="pt-new">${t('newPattern')}</button>${PATTERN_TYPES.includes(tr.type) ? `<button class="chip pt-savepat" id="pt-savepat" title="${esc(t('ptSaveTip'))}">${KEEP}<span>${esc(t('ptSaveAs'))}</span></button>` : ''}</div>
+      <div class="chips">${PATTERN_TYPES.includes(tr.type) ? `<button class="chip pt-savepat" id="pt-savepat" title="${esc(t('ptSaveTip'))}">${KEEP}<span>${esc(t('ptSaveAs'))}</span></button>` : ''}</div>
       ${composeRow(tr, pat)}</div>`}
     <div class="tp-editor">${editor}</div>
     <div class="tp-scope"${tr.type === 'voice' ? ' hidden' : ''}><span class="lbl">${t('settingsScope')}</span>
@@ -3010,6 +3086,10 @@ function syncPanel(host) {
   const tr = T.tracks[+host.dataset.ptrk], q = panelQ(host); if (!tr || !q('tk-name')) return;
   const key = patOf(tr), pat = tr.patterns[key] || {}, e = eff(tr), c = focusClip(tr), over = (c && c.set) || {};
   const all = sel2 => host.querySelectorAll(sel2), active = el => document.activeElement === el;
+  // the pattern row follows the edits (Restore appears once the pattern changed, after-tests-oct28 D9); replaced only
+  // when its markup changes
+  const prow = host.querySelector('.tp-pats-song');
+  if (prow && tr.type !== 'voice') { const html = pfx(+host.dataset.ptrk, patternRow(tr, key)); if (prow._html !== html) { prow.outerHTML = html; const nr = host.querySelector('.tp-pats-song'); if (nr) nr._html = html; } }
   if (!active(q('tk-name'))) q('tk-name').value = trackLabel(tr);
   all('[data-set]').forEach(i => {
     const v = e[i.dataset.set]; if (v === null || v === undefined) return;
@@ -3147,33 +3227,65 @@ $('#track-panel').addEventListener('click', e => {
   }
   if (r === 'pt-notes-reset') return editPattern(p => { delete p.notes; });
   if (r === 'clip-del') { tr.clips.splice(selClip, 1); selClip = null; changed(); renderTrackPanel(); return; }
-  if (b.dataset.clipPat !== undefined) { const c = tr.clips[selClip]; if (c) { c.pattern = b.dataset.clipPat; editPat = c.pattern; changed(); renderTrackPanel(); } return; }
   if (r === 'rk-add') { tr.rack = [...(tr.rack || []), newDevice(($('#p' + tk + '_rk-type') || {}).value)]; changed(); renderTrackPanel(); return; }
   if (b.dataset.devOn !== undefined) { const d = tr.rack[+b.dataset.devOn]; if (d.on === false) delete d.on; else d.on = false; changed(); renderTrackPanel(); return; }
   if (b.dataset.devDel !== undefined) { tr.rack.splice(+b.dataset.devDel, 1); if (!tr.rack.length) delete tr.rack; changed(); renderTrackPanel(); return; }
   if (b.dataset.devMove) { const [i, d] = b.dataset.devMove.split(':').map(Number), j = i + d; if (j < 0 || j >= tr.rack.length) return; [tr.rack[i], tr.rack[j]] = [tr.rack[j], tr.rack[i]]; changed(); renderTrackPanel(); return; }
   if (b.dataset.setRamp) { const k = b.dataset.setRamp + 'End', ev = eff(tr); setSetting(k, ev[k] == null ? ev[b.dataset.setRamp] : null); changed(); syncTrackPanel(); return; }
   if (b.dataset.scope) { scope = b.dataset.scope; renderTrackPanel(); return; }
-  if (b.dataset.editPat !== undefined) { editPat = b.dataset.editPat; renderTrackPanel(); return; }
+  // the pattern row (after-tests-oct28 D9): a chip chooses what to edit and preview, the song does not change; editing
+  // starts there (Restore brings the pattern back to this moment)
+  if (b.dataset.editPat !== undefined) { const k = b.dataset.editPat; editPat = k; if (tr.patterns[k]) patSnaps.set(patKey(tr, k), clone(tr.patterns[k])); renderTrackPanel(); return; }
+  // Niente: the track is silent in the chosen section, or the chosen clip goes
   if (b.dataset.playPat !== undefined) {
-    const k = b.dataset.playPat, c = wholeClip(tr, sel);
-    if (!k) tr.clips = tr.clips.filter(x => x !== c);
-    else if (c) c.pattern = k;
-    else tr.clips.push({ section: SEC().name, pattern: k });
-    editPat = k || null; changed(); renderTrackPanel(); return;
+    if (arrMode === 'timeline') { if (selClip !== null && tr.clips[selClip]) { tr.clips.splice(selClip, 1); selClip = null; changed(); renderTrackPanel(); } return; }
+    const c = wholeClip(tr, sel);
+    tr.clips = tr.clips.filter(x => x !== c); changed(); renderTrackPanel(); return;
+  }
+  if (r === 'pat-use') {
+    const k = patOf(tr), tg = patTarget(tr), before = clone(tr.clips);
+    if (!tg || tg.custom) return;
+    if (arrMode === 'timeline') tr.clips[selClip].pattern = k;
+    else { const c = wholeClip(tr, sel); if (c) c.pattern = k; else tr.clips.push({ section: SEC().name, pattern: k }); }
+    const who = tr;
+    changed(); renderTrackPanel();
+    toast(t('patUsedIn', { p: k, where: tg.name }), { label: t('patUndo'), run: () => { who.clips = before; changed(); renderTrackPanel(); } });
+    return;
+  }
+  if (r === 'pat-copy') {
+    const k = patOf(tr), k2 = nextKey(tr);
+    tr.patterns[k2] = clone(tr.patterns[k]); patCopies.set(patKey(tr, k2), k); patSnaps.set(patKey(tr, k2), clone(tr.patterns[k2]));
+    editPat = k2; changed(); renderTrackPanel();
+    toast(t('patCopied', { a: k, b: k2 }));
+    return;
+  }
+  if (r === 'pat-replace') {
+    const k = patOf(tr), from = patCopies.get(patKey(tr, k)), before = clone(tr.clips), who = tr;
+    if (!from) return;
+    tr.clips.forEach(c => { if (c.pattern === from) c.pattern = k; });
+    changed(); renderTrackPanel();
+    toast(t('patReplaced', { a: from, b: k }), { label: t('patUndo'), run: () => { who.clips = before; changed(); renderTrackPanel(); } });
+    return;
+  }
+  if (r === 'pat-restore') {
+    const k = patOf(tr), snap = patSnaps.get(patKey(tr, k)), before = clone(tr.patterns[k]), who = tr;
+    if (!snap) return;
+    tr.patterns[k] = clone(snap); changed(); renderTrackPanel();
+    toast(t('patRestored', { p: k }), { label: t('patUndo'), run: () => { who.patterns[k] = before; changed(); renderTrackPanel(); } });
+    return;
   }
   if (r === 'pt-compose') return composePattern(tr);
   if (r === 'pt-listen') return listenPattern(tr);
-  if (r === 'pt-preview') { preview.toggle(tr.id, patOf(tr)); syncPreviewButtons(); return; }
+  if (r === 'pt-preview') { if (labPreview) labPreview.stop(); preview.toggle(tr.id, patOf(tr)); syncPreviewButtons(); return; }
   if (r === 'pt-savepat') return savePattern(tr);
   if (r === 'pt-keep-rhythm') return composePattern(tr, 'rhythm');
   if (r === 'pt-keep-notes') return composePattern(tr, 'notes');
-  if (r === 'pt-new') { const k = nextKey(tr); tr.patterns[k] = clone(tr.patterns[patOf(tr)] || DEFAULT_PATTERN[tr.type]()); editPat = k; changed(); renderTrackPanel(); return; }
+  if (r === 'pt-new') { const k = nextKey(tr); tr.patterns[k] = clone(tr.patterns[patOf(tr)] || DEFAULT_PATTERN[tr.type]()); patSnaps.set(patKey(tr, k), clone(tr.patterns[k])); editPat = k; changed(); renderTrackPanel(); return; }
   if (r === 'pt-del') {
     const k = patOf(tr);
     if (Object.keys(tr.patterns).length === 1) return toast(t('lastPattern'));
     if (tr.clips.some(c => c.pattern === k)) return toast(t('patternInUse', { p: k }));
-    delete tr.patterns[k]; editPat = null; changed(); renderTrackPanel(); return;
+    delete tr.patterns[k]; patCopies.delete(patKey(tr, k)); patSnaps.delete(patKey(tr, k)); editPat = null; changed(); renderTrackPanel(); return;
   }
   if (r === 'tk-dup') { const copy = clone(tr); const ids = new Set(T.tracks.map(x => x.id)); let id = tr.id + '-2', k = 3; while (ids.has(id)) id = `${tr.id}-${k++}`; copy.id = id; copy.name = t('copyOf', { name: trackLabel(tr) }); delete copy.solo; T.tracks.splice(tk + 1, 0, copy); tk += 1; changed(); renderTrackPanel(); return; }
   if (r === 'tk-up' || r === 'tk-down') { const j = tk + (r === 'tk-up' ? -1 : 1); if (j < 0 || j >= T.tracks.length) return; [T.tracks[tk], T.tracks[j]] = [T.tracks[j], T.tracks[tk]]; tk = j; changed(); renderTrackPanel(); return; }
@@ -3287,6 +3399,8 @@ $$('.mode-btn').forEach(b => b.addEventListener('click', () => { const m = b.dat
 function showTab(name) {
   // the pattern preview belongs to Compose (pattern-preview D4)
   if (name !== 'componi' && preview) preview.stop();
+  // and the FM lab's to the Sounds tab (fm-groove-lab D3)
+  if (name !== 'suoni' && labPreview) labPreview.stop();
   const m = modeOf(name);
   if (m) { setMode(m); modeTabs[m] = name; store.set('coding-misk-mode-tabs', modeTabs); }
   else $$('.mode-btn').forEach(b => b.setAttribute('aria-pressed', false));
@@ -3738,7 +3852,7 @@ function songTick() {
 }
 try {
   const clock = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 100)'], { type: 'text/javascript' })));
-  clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); if (preview) preview.tick(); if (radioPreview) radioPreview.tick(); } };
+  clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); if (preview) preview.tick(); if (radioPreview) radioPreview.tick(); if (labPreview) labPreview.tick(); } };
 } catch (e) {}
 (function transport() {
   requestAnimationFrame(transport);
@@ -3752,6 +3866,7 @@ try {
   }
   if (preview) preview.tick();
   if (radioPreview) radioPreview.tick();
+  if (labPreview) { labPreview.tick(); if (curTab === 'suoni') sounds.syncLab(); }
   syncPreviewButtons();
   if (song && s && isPlaying() && !seeking) {
     const m = song.meta, cyc = s.now();
@@ -3841,8 +3956,47 @@ function tryPattern(it) {
   showTab('pattern');
   patternsTab.open({ kind, id, over: { sound: it.name } });
 }
-const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast, scheduler: sched, tryPattern });
+// the FM cards (fm-groove-lab): heard through their own preview, never the player bar; "Use in track" puts the card's
+// wave and FM device on the melodic track selected in Compose
+const fmTarget = () => { const c = curTrack(); return c && ['bass', 'arp', 'hook', 'pad'].includes(c.type) ? c : null; };
+function useFm(card, amount) {
+  const tr = fmTarget();
+  if (!tr) return t('fmUseNone');
+  tr.settings.wave = card.carrier;
+  tr.rack = [...(tr.rack || []).filter(d => d && d.device !== 'fm'), cardDevice(card, amount)];
+  changed(); renderTrackPanel();
+  return t('sbUsed', { sound: tx(card.name), track: trackLabel(tr), song: T.title });
+}
+// one preview at a time (fm-groove-lab D3): a card stops the Compose preview and the radio's
+function labStart(kind) {
+  if (preview) preview.stop();
+  if (radioPreview && radioPreview.state) { radioPv = null; radioPreview.stop(); }
+  return labPreview.start(kind, kind);
+}
+const fmLab = {
+  toggle: kind => { const st = labPreview.state; if (st && st.id === kind) { labPreview.stop(); return false; } return labStart(kind); },
+  play: kind => labStart(kind),
+  playing: () => (labPreview && labPreview.state ? labPreview.state.id : null),
+  busy: () => !!(rec || capture || fastJob),
+  target: () => { const tr = fmTarget(); return tr ? trackLabel(tr) : null; },
+  use: useFm,
+};
+const sounds = createSoundBrowser({ root: $('#sounds'), store, t, tx, esc, getCustom: () => custom, play: (code, name) => loadFree(code, { kind: 'sound', name }), stop, useSound, toast, scheduler: sched, tryPattern, fmLab });
 function renderSounds() { sounds.render(); }
+// the lab preview: the card's code (its tempo and one line), its own orbit and analyser for the scope; the mode and
+// the FM amount play from the next bar (a new sig), and the FM rise starts on the bar it starts from (align)
+labPreview = createPreview({
+  sched, busy: () => !!(rec || capture || fastJob),
+  source: kind => {
+    const x = sounds.lab(kind);
+    if (!x) return null;
+    return { song: 'fmlab', key: kind, loop: cardCode(x.card, x.mode, x.amount), bpm: x.card.bpm, shift: 0, orbit: LAB_ORBIT, analyze: LAB_ANALYZER, align: true, sig: JSON.stringify([kind, x.mode, x.amount]) };
+  },
+  compile: loop => (typeof loop === 'string' ? loop : compileSong(loop)),
+  onChange: () => sounds.syncLab(),
+});
+// for the browser checks (tools/check-fm-lab.cjs)
+globalThis.codingMiskLabPreview = labPreview;
 
 // ---------- player bar (#32) ----------
 // the library in the order of the Songs tab: composed songs, then hand-written code songs
@@ -4036,6 +4190,8 @@ radio = createRadio({
   userPatterns: () => forRadio(patternsStore.list()),
   // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them
   reloadSamples: () => reloadSamples(),
+  // the samples manifest, for the voices of Next changes (after-tests-oct28 D2)
+  voiceFiles: () => customFiles,
   player: {
     // a saved pattern heard before it goes in (radio-arrangement D9): toggle(item, { key, chords, bpm, meter, n })
     preview: {

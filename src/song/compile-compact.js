@@ -10,6 +10,8 @@ import { typingPlan, mulberry, lineLike } from './typing.js';
 
 const LANE = /^const (\w+) = "(<[^"]*>)"/;
 const GATE = /\.mask\((\w+)\)\.velocity\(\1\)/;
+// (lines-ahead-balanced D2) either gate, for a line found by its text without its lane
+const GATE_ANY = /\.mask\((\w+)\)\.(?:velocity\(\1\)|postgain\(\1\.mul\((?:-?[\d.]+|"<?[\d.! ]+>?")\)\))/;
 // a gated line (guitars, code-lanes): the lane masks it and scales its level after the amp, `n` a number or a sequence
 const PGATE = /\.mask\((\w+)\)\.postgain\(\1\.mul\((-?[\d.]+|"<?[\d.! ]+>?")\)\)/;
 // "<1!8 0!24>" → [1, 1, …, 0, …] as strings
@@ -212,31 +214,40 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
   const sectionSpan = x => { const s = secs.find(q => x >= q.start && x < q.start + q.bars) || secs[secs.length - 1]; return [s.start, s.start + s.bars]; };
   // (returning) the bars of the code shown: a line sounded before them and sounds again after them
   const [wa, wz] = win(i), keep = inPlace && bar >= returning;
-  const keys = keep ? returnKeys(p, shownText) : new Map();
+  // (reused-lines D8, lines-ahead-balanced D2, D3) lines typed ahead also at growth steps: the keys and the line info
+  // for the growth's code too
+  const aheadNow = inPlace && plan && plan.ahead ? plan.ahead.filter(a => a.from <= bar && bar < a.to) : [];
+  const keys = keep || (inPlace && (info || aheadNow.length)) ? returnKeys(p, shownText) : new Map();
   const now = layersFor(i), next = prepare ? layersFor(i + 1) : null;
   const sec = secs[i], out = [p.head[0], `// ${sec.name} · ${t('cBars', { from: sec.start + 1, to: sec.start + sec.bars })}`, ...p.head.filter(l => l.startsWith('setcpm('))];
   const body = [];
   p.blocks.forEach((b, k) => {
     const id = b.header.replace(/^\/\/ =+ /, '').replace(/ =+$/, '').split(' · ')[0];
     const track = full.tracks.find(tr => (tr.name || tr.id) === id), silent = track && shown.has(track.id);
-    let mine = now[k];
-    const extra = next ? next[k].filter(x => !mine.some(y => y.text === x.text)) : [];
+    // (lines-ahead-balanced D2) a track that has not come in yet, compiled only for a line typed ahead: none of its
+    // lines plays or shows, only the line ahead, muted
+    const only = !!(track && track.aheadOnly);
+    let mine = only ? [] : now[k];
+    const extra = next && !only ? next[k].filter(x => !mine.some(y => y.text === x.text)) : [];
     if (inPlace) {
       const bare = x => x.text.replace(x.gateText || GATE, '');
       const gone = mine.filter(x => x.fade && !mine.some(y => !y.fade && bare(y) === bare(x)));
       mine = mine.filter(x => !gone.includes(x));
-      if (hidden && !silent) for (const x of gone) { const v = `"${rle(p.lanes[x.gate])}"`; hidden.push(x.text.replace(x.gateText || GATE, x.mul !== null && x.mul !== undefined ? `.mask(${v}).postgain(${v}.mul(${x.mul}))` : `.mask(${v}).velocity(${v})`)); }
+      if (hidden && !silent && !only) for (const x of gone) { const v = `"${rle(p.lanes[x.gate])}"`; hidden.push(x.text.replace(x.gateText || GATE, x.mul !== null && x.mul !== undefined ? `.mask(${v}).postgain(${v}.mul(${x.mul}))` : `.mask(${v}).velocity(${v})`)); }
       if (hidden) for (const x of gone) for (const m of x.text.matchAll(/\b\w+\b/g)) if (p.lanes[m[0]] && m[0] !== x.gate) used.add(m[0]);
       if (keep) mine = withReturning(b, mine, keys, p.lanes, wa, wz, `${song.id ?? song.title ?? ''}\u0000${id}`, sectionSpan, shownText, { bar, plan, info });
       // (reused-lines D8) lines typed ahead, muted, in the place they take at their step
-      if (keep && plan && plan.ahead) for (const a of plan.ahead) {
-        if (a.header !== b.header || bar < a.from || bar >= a.to) continue;
-        const it = b.items.find(x => x.kind === 'layer' && x.text === a.text);
+      // (lines-ahead-balanced D2: at growth steps too; the line is found by its text without its lane, since the
+      // lanes of a growth's code are named in the order the tracks came in)
+      for (const a of aheadNow) {
+        if (a.header !== b.header) continue;
+        const bareA = a.text.replace(GATE_ANY, '');
+        const it = b.items.find(x => x.kind === 'layer' && x.text === a.text) || b.items.find(x => x.kind === 'layer' && x.text.replace(GATE_ANY, '') === bareA);
         if (!it || mine.some(x => x.key === keys.get(it) || x.text === it.text)) continue;
         const layers = b.items.filter(x => x.kind === 'layer' && x.gate && p.lanes[x.gate]);
         placeMuted(mine = mine.slice(), layers, keys, it, { comment: null, desc: it.desc, text: it.text, gate: it.gate, gateText: it.gateText, mul: it.mul, fade: false, key: keys.get(it), returning: true, ahead: true });
       }
-      if (keep && info) for (const x of mine) info.push({ kind: x.ahead ? 'ahead' : x.returning ? 'return' : 'play', header: b.header, key: x.key, text: x.text, id: x.id, was: x.was, ret: x.ret, retBar: x.retBar });
+      if (info) for (const x of mine) info.push({ kind: x.ahead ? 'ahead' : x.returning ? 'return' : 'play', header: b.header, key: x.key, text: x.text, id: x.id, was: x.was, ret: x.ret, retBar: x.retBar });
     }
     // a track that came in before keeps its header, also when nothing of it plays now (performance-profiles)
     if (!mine.length && !extra.length) { if (track && keepHeaders.includes(track.id)) body.push('', b.header); return; }

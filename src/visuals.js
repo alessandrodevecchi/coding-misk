@@ -86,6 +86,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (feed) { Object.assign(raw, feed.raw); wave.set(feed.wave); hookWave.set(feed.hook); }
     else if (isPlaying() && A && typeof fn === 'function') {
       for (const id of Object.keys(A)) {
+        // (the FM lab's scope has its own analyser: a card heard over the song does not move the stage, fm-groove-lab D6)
+        if (String(id).startsWith('fmlab')) continue;
         let d; try { d = fn('time', id); } catch (e) { continue; }
         if (!d || !d.length) continue;
         const step = Math.floor(d.length / N); let sum = 0;

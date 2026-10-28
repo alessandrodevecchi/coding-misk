@@ -27,7 +27,9 @@ export function previewOrbit(tracks = []) {
 // the compiled code of a pattern's loop song (src/library/patterns.js loopSong, compiled with compileSong) → one Strudel
 // expression: the `$:` lines joined in a stack, without setcpm, the section lanes, .analyze (the visuals stay dark) and
 // the track's orbit, which becomes the preview's. Continuation lines (starting with a dot) join their line.
-export function previewExpression(code, { orbit = PREVIEW_ORBIT } = {}) {
+// analyze: an analyser id kept on the expression (the FM lab's scope, fm-groove-lab D6); none by default, so the
+// visuals stay dark for the Compose and radio previews
+export function previewExpression(code, { orbit = PREVIEW_ORBIT, analyze = null } = {}) {
   const blocks = [];
   let cur = null;
   for (const line of String(code || '').split('\n')) {
@@ -44,7 +46,7 @@ export function previewExpression(code, { orbit = PREVIEW_ORBIT } = {}) {
     .replace(/section\d+\.mul\(([^()]*)\)/g, '$1')
     .replace(/\bsection\d+\b/g, 'pure(1)')
     .replace(/\.orbit\([^()]*\)/g, '') + `.orbit(${orbit})`;
-  const parts = blocks.map(clean).filter(b => b !== `.orbit(${orbit})`);
+  const parts = blocks.map(clean).filter(b => b !== `.orbit(${orbit})`).map(b => (analyze ? `${b}.analyze("${analyze}")` : b));
   if (!parts.length) return null;
   return parts.length === 1 ? parts[0] : `stack(${parts.join(', ')})`;
 }
@@ -67,26 +69,32 @@ export function createPreview(app, g = globalThis) {
   const duck = p => { const k = app.duck ? app.duck() : null; return k && k < 1 && p.withValue ? p.withValue(v => ({ ...v, velocity: (v.velocity ?? 1) * k })) : p; };
   // the main scheduler's pattern, with the preview stacked on it while it rides (the REPL keeps exposing the song's
   // pattern to the highlighting: exposeSchedulerPattern gets the pattern it set, not this getter's)
+  // (another preview may hook the same scheduler after this one, fm-groove-lab: then this one hooks again when it
+  // rides, reading the song's pattern through the other's getter, which gives it back untouched while that one is off)
+  const getP = () => { if (!(riding && cur && raw)) return raw; if (mixedOf !== raw) { mixed = g.stack(duck(raw), layers(true)); mixedOf = raw; } return mixed; };
+  const setP = v => { raw = v; mixedOf = null; };
   const hook = s => {
-    if (!s || hooked === s) return;
-    raw = s.pattern;
-    Object.defineProperty(s, 'pattern', { configurable: true, enumerable: true,
-      get: () => { if (!(riding && cur && raw)) return raw; if (mixedOf !== raw) { mixed = g.stack(duck(raw), layers(true)); mixedOf = raw; } return mixed; },
-      set: v => { raw = v; mixedOf = null; } });
+    if (!s) return;
+    const d = Object.getOwnPropertyDescriptor(s, 'pattern');
+    if (hooked === s && d && d.get === getP) return;
+    raw = s.pattern; mixedOf = null;
+    Object.defineProperty(s, 'pattern', { configurable: true, enumerable: true, get: getP, set: setP });
     hooked = s;
   };
   // the preview's pattern: before `at` the previous version, from `at` the current one; riding, shifted to the
   // selected section's start so its chords meet the song's
-  const layer = (x, ride) => (ride && x.shift ? x.pat.late(x.shift) : x.pat);
+  // (src.align: the pattern starts on the bar it starts playing from, so the FM rise climbs from 0 there, fm-groove-lab D4)
+  const layer = (x, ride) => { const p = x.align && x.at0 ? x.pat.late(x.at0) : x.pat; return ride && x.shift ? p.late(x.shift) : p; };
+  const setAt = v => { at = v; if (cur) cur.at0 = v; };
   const layers = ride => {
     const a = layer(cur, ride).filterWhen(t => t >= at);
     return prev ? g.stack(layer(prev, ride).filterWhen(t => t < at), a) : a;
   };
   const dirty = () => { mixedOf = null; if (free && !riding) free.setPattern(layers(false)); };
   const build = src => {
-    const expr = previewExpression(app.compile(src.loop), { orbit: src.orbit || PREVIEW_ORBIT });
+    const expr = previewExpression(app.compile(src.loop), { orbit: src.orbit || PREVIEW_ORBIT, analyze: src.analyze || null });
     if (!expr) return null;
-    return { pat: evalExpr(expr), shift: src.shift || 0, expr };
+    return { pat: evalExpr(expr), shift: src.shift || 0, expr, align: !!src.align, at0: 0 };
   };
   const makeFree = () => {
     if (free) return free;
@@ -95,8 +103,8 @@ export function createPreview(app, g = globalThis) {
     return free;
   };
   const nextBar = s => Math.ceil(s.lastEnd + 1e-9);
-  const ride = () => { const s = app.sched(); hook(s); if (free && free.started) free.stop(); riding = true; prev = null; at = nextBar(s); seen = s.lastEnd; dirty(); };
-  const alone = () => { riding = false; prev = null; at = 0; mixedOf = null; const f = makeFree(); f.setCps(on.bpm / 240); f.setPattern(layers(false)); if (!f.started) f.start(); };
+  const ride = () => { const s = app.sched(); hook(s); if (free && free.started) free.stop(); riding = true; prev = null; setAt(nextBar(s)); seen = s.lastEnd; dirty(); };
+  const alone = () => { riding = false; prev = null; setAt(0); mixedOf = null; const f = makeFree(); f.setCps(on.bpm / 240); f.setPattern(layers(false)); if (!f.started) f.start(); };
   const mainPlays = () => { const s = app.sched(); return !!(s && s.started); };
   function stop() {
     if (!on) return;
@@ -124,7 +132,7 @@ export function createPreview(app, g = globalThis) {
     try { x = build(src); } catch (e) { console.warn('[preview]', e); return; }
     if (!x) return stop();
     const s = riding ? app.sched() : free;
-    prev = cur; cur = x; at = s ? nextBar(s) : 0;
+    prev = cur; cur = x; setAt(s ? nextBar(s) : 0);
     on = { ...on, key: src.key, sig: src.sig, bpm: src.bpm, shift: src.shift };
     if (!riding && free) free.setCps(src.bpm / 240);
     dirty();
@@ -140,7 +148,7 @@ export function createPreview(app, g = globalThis) {
     else if (riding) {
       // a jump of the song (the timeline, a section played again) starts the preview again at the next bar
       const s = app.sched();
-      if (s.lastEnd < seen - .5 || s.lastEnd > seen + 2) { prev = null; at = nextBar(s); dirty(); }
+      if (s.lastEnd < seen - .5 || s.lastEnd > seen + 2) { prev = null; setAt(nextBar(s)); dirty(); }
       seen = s.lastEnd;
     }
     if (prev && (riding ? app.sched().lastEnd : free ? free.lastEnd : 0) > at + 1) { prev = null; dirty(); }

@@ -4,13 +4,15 @@
 // tab, a pattern playing, Save as pattern in Compose, the hardware theme and a phone. The follow-ups
 // (pattern-followups): a guitar riff from New, new parts kept after a reload, Discard and Discard all with their
 // confirmation strip, the style chips of a saved pattern, riff or chords in Compose on a guitar track.
-// Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-patterns.cjs [shots-dir]   (dev server on PORT, default 5173)
+// Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-patterns.cjs [shots-dir] [--row]   (dev server on PORT, default 5173;
+// --row runs only the pattern row of Compose, after-tests-oct28 D9)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
-const shots = process.argv[2];
+const shots = process.argv.slice(2).find(a => !a.startsWith('--'));
+const rowOnly = process.argv.includes('--row');
 if (shots) fs.mkdirSync(shots, { recursive: true });
 const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, name) }) : null);
 
@@ -27,6 +29,108 @@ const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, n
   const sel = async uid => { await page.click(`#patterns [data-pn-sel="${uid}"]`); await sleep(300); };
   const selected = () => page.$eval('#patterns .pn-detail h3', el => el.textContent).catch(() => '');
 
+
+  // ---------- the one pattern row of Compose (after-tests-oct28 D9, pp1 #84) ----------
+  async function patternRow() {
+    page.on('dialog', d => d.accept().catch(() => {}));
+    const open = async (lang, mode) => {
+      await page.evaluate(([l, m]) => { localStorage.setItem('coding-misk-lang', l); localStorage.setItem('coding-misk-arr-mode', JSON.stringify(m)); }, [lang, mode]);
+      await page.reload(); await sleep(4000);
+      await page.click('[data-mode="ascolta"]').catch(() => {}); await page.click('[data-tab="componi"]'); await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(1500);
+    };
+    await page.setViewportSize({ width: 1400, height: 1000 });
+    // (from a clean page: the steps before leave a draft and a phone width)
+    await page.evaluate(() => localStorage.clear());
+    await open('en', 'sections');
+    const D = await draft(), ti = D.T.tracks.findIndex(x => x.type === 'bass'), sj = D.T.sections.findIndex(x => x.name === 'Scontro');
+    await page.click('#track-panel [data-view="one"]').catch(() => {}); await sleep(200);
+    await page.click(`[data-cell="${ti}:${sj}"]`); await sleep(500);
+    const R = `#track-panel [data-ptrk="${ti}"]`, chip = k => `${R} .pat-chip[data-edit-pat="${k}"]`, id = r => `#p${ti}_${r}`;
+    const marks = () => page.$$eval(`${R} .pat-chip`, xs => Object.fromEntries(xs.map(x => [x.dataset.editPat, { song: x.classList.contains('in-song'), used: x.classList.contains('used'), pv: x.classList.contains('pv'), edit: x.getAttribute('aria-pressed') === 'true' }])));
+    const plays = async name => { const d = await draft(), tr = d.T.tracks[ti], c = tr.clips.find(x => x.section === name); return c ? c.pattern : null; };
+    const row = () => page.$eval(`${R} .tp-pats-song`, x => ({ lbl: x.querySelector(':scope > .lbl').textContent, hint: x.querySelector('.pat-hint').textContent, txt: [...x.querySelectorAll('.chips > button')].map(b => (b.querySelector('.pat-k') || b).textContent).join(' ') + ' | ' + x.textContent.replace(/\s+/g, ' '), status: x.querySelector('.pat-status').textContent }));
+    const make = () => page.$eval(`${R} .tp-pats-make`, x => ({ lbl: x.querySelector(':scope > .lbl').textContent, txt: x.textContent.replace(/\s+/g, ' ') }));
+    let r = await row(), m = await marks();
+    check(r.lbl === 'Patterns in this song' && r.hint === 'Edit and listen to the patterns in this song' && /^Nothing A B C \+ New Delete \|/.test(r.txt) && (await page.$$eval(`${R} .tp-pats`, xs => xs.length)) === 2, 'one row "Patterns in this song" with Nothing, A, B, C, + New and Delete', r.txt.slice(0, 120));
+    const mk = await make();
+    check(mk.lbl === 'Make' && /Save as pattern/.test(mk.txt) && /Compose a part/.test(mk.txt) && /Energy/.test(mk.txt), 'the Make row below it', mk.txt.slice(0, 120));
+    check(m.B.song && m.B.edit && m.A.used && m.C.used && !m.A.song && !m.C.song, 'Scontro plays B: the IN THE SONG badge on B, hollow circles on A and C, B edited', JSON.stringify(m));
+    const del = await page.$eval(id('pt-del'), b => ({ dis: b.disabled, tip: b.title }));
+    check(del.dis && /used/.test(del.tip) && /Scontro/.test(del.tip), 'Delete is disabled on B, used in the song, with the reason', del.tip);
+    // a chip chooses what to edit only
+    await page.click(chip('C')); await sleep(300);
+    m = await marks();
+    check(m.C.edit && m.B.song && (await plays('Scontro')) === 'B', 'choosing C edits C; Scontro still plays B');
+    // Try on a copy of B
+    await page.click(chip('B')); await sleep(300);
+    await page.click(id('pat-copy')); await sleep(400);
+    m = await marks();
+    check(m.D && m.D.edit && !m.D.song && !m.D.used && (await plays('Scontro')) === 'B' && JSON.stringify((await draft()).T.tracks[ti].patterns.D) === JSON.stringify((await draft()).T.tracks[ti].patterns.B), 'Try on a copy: D is a copy of B with no mark, edited; the song still plays B', JSON.stringify(m.D));
+    r = await row();
+    check(/only in the preview/.test(r.status) && await page.isVisible(id('pat-use')) && await page.isVisible(id('pat-replace')), 'the status line offers Use D in «Scontro» and Replace B with D', r.status);
+    await page.click(id('pt-preview')); await sleep(1200);
+    m = await marks();
+    check(m.D.pv && !m.B.pv, 'the headphones on D in preview');
+    if (shots) { await page.$eval(`${R} .tp-pats-song`, x => x.scrollIntoView({ block: 'center' })); await shot(page, 'pattern-row-copy-preview.png'); }
+    await page.click(id('pt-preview')); await sleep(300);
+    // Use D in Scontro, then Undo
+    await page.click(id('pat-use')); await sleep(400);
+    m = await marks();
+    check((await plays('Scontro')) === 'D' && m.D.song && !m.B.song, 'Use D in «Scontro»: Scontro plays D, the badge moves to D', JSON.stringify(m));
+    const undo = await page.$('.toast .toast-act');
+    check(!!undo && /Undo/.test(await undo.textContent()), 'the notice offers Undo');
+    await undo.click(); await sleep(400);
+    check((await plays('Scontro')) === 'B', 'Undo: Scontro plays B again');
+    // Replace B with D: every clip of B plays D, B stays with no mark
+    const usesB = (await draft()).T.tracks[ti].clips.filter(c => c.pattern === 'B').length;
+    await page.click(id('pat-replace')); await sleep(400);
+    const after = (await draft()).T.tracks[ti];
+    m = await marks();
+    check(usesB > 0 && !after.clips.some(c => c.pattern === 'B') && after.clips.filter(c => c.pattern === 'D').length === usesB && after.patterns.B && !m.B.song && !m.B.used && m.D.song, 'Replace B with D: the sections of B play D, B stays in the row with no mark');
+    // Restore: choose A, change three steps, Restore brings it back
+    await page.click(chip('A')); await sleep(300);
+    const a0 = JSON.stringify((await draft()).T.tracks[ti].patterns.A);
+    for (const i of [0, 3, 6]) { await page.click(`${R} [data-ps="${i}"]`); await sleep(150); }
+    const a1 = JSON.stringify((await draft()).T.tracks[ti].patterns.A);
+    check(a1 !== a0 && await page.isVisible(id('pat-restore')), 'three steps change A; the status line offers Restore A');
+    await page.click(id('pat-restore')); await sleep(400);
+    check(JSON.stringify((await draft()).T.tracks[ti].patterns.A) === a0 && !(await page.isVisible(id('pat-restore'))), 'Restore A: A as it was when editing started');
+    // Delete only a pattern used nowhere
+    await page.click(id('pt-new')); await sleep(300);
+    const fresh = (await marks());
+    const k = Object.keys(fresh).find(x => fresh[x].edit);
+    check(k === 'E' && !(await page.$eval(id('pt-del'), b => b.disabled)), 'a new pattern E, used nowhere: Delete is enabled', k);
+    await page.click(id('pt-del')); await sleep(300);
+    check(!(await draft()).T.tracks[ti].patterns.E, 'Delete removes E');
+    // Free timeline: no clip chosen, then a clip
+    await page.click('[data-arr-mode="timeline"]'); await sleep(500);
+    await page.evaluate(ti => { const n = document.querySelector(`.trk-name[data-trk="${ti}"]`); if (n) n.click(); }, ti); await sleep(400);
+    m = await marks(); r = await row();
+    check(!Object.values(m).some(x => x.song) && Object.values(m).some(x => x.used) && /Click a clip in the timeline/.test(r.txt), 'Free timeline with no clip: no badge, the row says how to choose one, circles where patterns are used', r.status);
+    if (shots) { await page.$eval(`${R} .tp-pats-song`, x => x.scrollIntoView({ block: 'center' })); await shot(page, 'pattern-row-no-clip.png'); }
+    const ck = (await draft()).T.tracks[ti].clips.findIndex(c => c.pattern === 'C');
+    await page.click(`[data-clip="${ti}:${ck}"]`); await sleep(500);
+    m = await marks();
+    check(m.C && m.C.song, 'a clip chosen in the timeline: the badge on its pattern', JSON.stringify(m));
+    // Italian
+    await open('it', 'sections');
+    await page.click('#track-panel [data-view="one"]').catch(() => {}); await sleep(200);
+    await page.click(`[data-cell="${ti}:${sj}"]`); await sleep(500);
+    r = await row();
+    const mi = await make();
+    check(r.lbl === 'Pattern disponibili nel brano' && r.hint === 'Modifica e ascolta i pattern inclusi in questo brano' && /^Niente A B C D \+ Nuovo Elimina \|/.test(r.txt) && /NEL BRANO/.test(r.txt) && mi.lbl === 'Crea' && /Salva come pattern/.test(mi.txt) && /Componi una parte/.test(mi.txt) && /Energia/.test(mi.txt), 'Italian: "Pattern disponibili nel brano", its hint, NEL BRANO, the Crea row', `${r.lbl} | ${mi.lbl}`);
+    if (shots) { await page.$eval(`${R} .tp-pats-song`, x => x.scrollIntoView({ block: 'center' })); await shot(page, 'pattern-row-it.png'); }
+    await page.evaluate(() => { localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-arr-mode', JSON.stringify('timeline')); });
+  }
+  if (rowOnly) {
+    await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
+    await page.evaluate(() => localStorage.clear());
+    await patternRow();
+    check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
+    await browser.close();
+    console.log(failed ? `${failed} failed` : 'all passed');
+    process.exit(failed ? 1 : 0);
+  }
   await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-lang', JSON.stringify('en')); });
   await page.reload(); await sleep(3500);
@@ -98,11 +202,11 @@ const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, n
   const host = await page.$('#track-panel [data-ptrk] [id$="_pt-preset"]');
   const ti = await host.evaluate(el => +el.closest('[data-ptrk]').dataset.ptrk);
   const d = await draft(), tr = d.T.tracks[ti], sec = d.T.sections[d.sel || 0];
-  // the two pattern rows (pattern-preview): the song's patterns with Delete, then the tools that make patterns; the
-  // button that opens the Patterns tab shows the flask
+  // the pattern row (after-tests-oct28 D9): the song's patterns with + New and Delete, then the Make row; the button
+  // that opens the Patterns tab shows the flask
   const rows = await page.$$eval(`#track-panel [data-ptrk="${ti}"] .tp-pats`, xs => xs.map(x => ({ lbl: x.querySelector(':scope > .lbl').textContent, ids: [...x.querySelectorAll('[id]')].map(e => e.id.replace(/^p\d+_/, '')) })));
   const flask = await page.$eval(`#p${ti}_pt-listen svg`, el => el.classList.contains('ico-flask'));
-  check(rows.length === 2 && rows[0].lbl === 'Song patterns' && rows[0].ids.includes('pt-del') && !rows[0].ids.includes('pt-new') && rows[1].lbl === 'Make patterns' && ['pt-new', 'pt-savepat', 'pt-compose'].every(k => rows[1].ids.includes(k)) && flask, 'Song patterns (chips, Delete) and Make patterns (New, Save as pattern, Compose a part); the flask opens the tab', rows.map(r => `${r.lbl}: ${r.ids.join(' ')}`).join(' | '));
+  check(rows.length === 2 && rows[0].lbl === 'Patterns in this song' && ['pt-new', 'pt-del'].every(k => rows[0].ids.includes(k)) && rows[1].lbl === 'Make' && ['pt-savepat', 'pt-compose'].every(k => rows[1].ids.includes(k)) && flask, 'Patterns in this song (chips, New, Delete) and Make (Save as pattern, Compose a part); the flask opens the tab', rows.map(r => `${r.lbl}: ${r.ids.join(',')}`).join(' | '));
   await page.click(`#p${ti}_pt-listen`); await sleep(600);
   const cfg = await page.evaluate(() => ({ key: (document.querySelector('#pn-key') || {}).value, bpm: document.querySelector('#pn-bpm').value, sound: document.querySelector('#pn-sound').value }));
   const pat = tr.patterns[(tr.clips.find(c => c.section === sec.name) || { pattern: 'A' }).pattern] || {};
@@ -275,6 +379,7 @@ const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, n
   await page.$eval('#patterns .pn-cards', el => el.scrollIntoView({ block: 'start' }));
   await shot(page, 'patterns-phone-cards.png');
 
+  await patternRow();
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `${failed} failed` : 'all passed');

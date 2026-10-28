@@ -1,7 +1,7 @@
 // Radio steering (#24, docs/ENDLESS.md "Steering"): the listener's commands turn into a rewrite of the song on
 // air from a boundary. A song is always rebuilt from its original plan plus every command still standing,
 // in order, so cancelling a command or replaying a session gives exactly the same song.
-import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, trackForPart, liftOf, OPTION_DEFAULTS } from './director.js';
+import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, trackForPart, liftOf, OPTION_DEFAULTS, TRACK_CAP } from './director.js';
 import { stream } from './random.js';
 import { stateAt, buildSteps } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
@@ -53,8 +53,9 @@ export const INSTRUMENTS = ['kick', 'beat', 'bass', 'arp', 'hook', 'guitar', 'pa
 export const LOCK_PARTS = [...INSTRUMENTS, 'riser'];
 // recommended tracks per instrument (D4): past it the console warns, it never blocks
 export const RECOMMENDED = { kick: 1, beat: 2, bass: 2, arp: 3, hook: 3, guitar: 3, pad: 3, texture: 3 };
-// the most tracks a song plays at once from the console (riser and voices not counted, D4)
-export const TRACK_CAP = 12;
+// the most tracks a song plays at once from the console (riser and voices not counted, D4); the director holds it at
+// every bar (after-tests-oct28 D8), so it lives there
+export { TRACK_CAP };
 // the riser row (D11): lengths and sounds
 export const RISER_BARS = ['auto', 2, 4, 8];
 export const RISER_SOUNDS = ['noise'];
@@ -104,6 +105,9 @@ export function keyTo(cur, to) {
 // commands, the next bar for the mixer. Never past the song's last phrase.
 export function applyBar(kind, now, plan) {
   const ph = plan.phrase, dbl = 2 * ph, last = plan.bars - ph;
+  // (a typed line said now: the first bar that starts at least half a bar after the sample is ready, so its step is not
+  // already past when the command lands, after-tests-oct28 D4)
+  if (kind === 'say-live') return Math.min(plan.bars - 1, Math.ceil(now + 0.5));
   if (COMMANDS[kind] && COMMANDS[kind].bar) return Math.min(plan.bars - 1, Math.floor(now) + 1);
   const step = COMMANDS[kind] && COMMANDS[kind].structural ? dbl : ph;
   return Math.min(last, (Math.floor(now / step) + 1) * step);
@@ -115,6 +119,13 @@ function stateOf(song, plan, bar) {
   return stateAt(base, bar).song;
 }
 
+// the most tracks the song plays at once from a bar to its end (after-tests-oct28 D8): a track brought in plays on, so
+// "+" is off when 12 already play at any later bar, not only at the command's
+function mostFrom(song, plan, at) {
+  const bars = [...new Set([at, ...((song && song.build) || []).map(s => s.at).filter(b => b > at && b < plan.bars)])];
+  // (on the steered song itself: its tracks include the ones the listener added, which the plan's base does not hold)
+  return Math.max(0, ...bars.map(b => Math.max(playing(stateOf(song, plan, b)).filter(counted).length, playing(stateAt(song, b).song).filter(counted).length)));
+}
 // why a command cannot apply now, or null when it can (for the console: disabled buttons say why)
 //   late, no-type, all-playing, locked, last-track, no-target, no-drop, not-playing (vary, swap: no track of the part
 //   plays), no-ready (swap: no other ready part fits)
@@ -129,7 +140,7 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
   // listener, D12; past the recommended count it warns, moreWarning)
   if (cmd.kind === 'more') {
     if (!st.tracks.some(t => instrumentOf(t) === cmd.part) && !partHas(plan.R, cmd.part)) return 'no-type';
-    return on.filter(counted).length >= TRACK_CAP ? 'cap' : null;
+    return mostFrom(song, plan, at) >= TRACK_CAP ? 'cap' : null;
   }
   if (cmd.kind === 'less') {
     if (!on.some(t => instrumentOf(t) === cmd.part)) return 'not-playing';
@@ -139,7 +150,7 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
   if (cmd.kind === 'pattern') {
     if (!cmd.item || !fitsAir(cmd.item, plan, song)) return 'no-fit';
     if (cmd.mode === 'replace') return on.some(t => t.id === cmd.target && t.type === cmd.item.type) ? null : 'not-playing';
-    return on.filter(counted).length >= TRACK_CAP ? 'cap' : null;
+    return mostFrom(song, plan, at) >= TRACK_CAP ? 'cap' : null;
   }
   if (cmd.kind === 'add') {
     const all = st.tracks.filter(t => ofType(t, cmd.type));
@@ -814,9 +825,15 @@ function sayAir(song, list) {
       tracks.splice(v >= 0 ? v : tracks.length, 0, t); ti = tracks.indexOf(t);
       build.push({ at, add: t.id, by: 'listener' });
     } else {
-      // (a voice track that comes in later, or left: in from the line's bar)
+      // a step on the line's bar, also when the voice track already plays (after-tests-oct28 D4): it brings in a track
+      // that comes in later or left, and on a playing track it changes nothing in the sound but is a build step, so the
+      // radio evaluates the code on that bar and the new line sounds there. An add, as for a track a step brought in; a
+      // track that plays from the start (no add step: an add would silence it before) gets an unmute, which changes
+      // nothing either unless the listener muted it (then the line stays silent, as the track)
       const id = tracks[ti].id, st = stateAt({ ...cur, build }, at).song.tracks.find(x => x.id === id);
-      if (st && st.mute) build.push({ at, add: id, by: 'listener' });
+      const added = build.some(x => x.add !== undefined && [].concat(x.add).includes(id));
+      if (!st || st.mute || added) build.push({ at, add: id, by: 'listener' });
+      else if (!st.hush) build.push({ at, unmute: id, by: 'listener' });
     }
     const t = JSON.parse(JSON.stringify(tracks[ti])), keys = new Set(Object.keys(t.patterns || {}));
     let key = 'L1'; for (let k = 2; keys.has(key); k++) key = `L${k}`;

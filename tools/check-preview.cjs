@@ -54,7 +54,8 @@ const shot = async (page, name) => { if (shots) await page.screenshot({ path: pa
   check(!b.on && b.icon === 'ico-listen' && listenIcon === 'ico-flask' && tri === 0, 'preview button with the headphones next to the flask, no triangle by the preset menu', `${b.icon} ${listenIcon} ${tri}`);
   check(/^Anteprima del pattern/.test(b.title) && /\bM\b/.test(b.title), 'Italian tooltip with the hint about M', b.title);
   const rows = await page.$$eval(`#track-panel [data-ptrk="${bass}"] .tp-pats`, xs => xs.map(x => ({ lbl: x.querySelector(':scope > .lbl').textContent, txt: x.textContent.replace(/\s+/g, ' ') })));
-  check(rows.length === 2 && rows[0].lbl === 'Pattern del brano' && /Elimina/.test(rows[0].txt) && !/Nuovo/.test(rows[0].txt) && rows[1].lbl === 'Crea pattern' && /\+ Nuovo/.test(rows[1].txt) && /Salva come pattern/.test(rows[1].txt) && /Componi una parte/.test(rows[1].txt) && /Energia/.test(rows[1].txt), 'two rows: Pattern del brano (chips, Elimina) and Crea pattern (Nuovo, Salva, Componi, Energia)', rows.map(r => r.lbl).join(' | '));
+  // (one pattern row since after-tests-oct28 D9: the patterns with + Nuovo and Elimina, then Crea)
+  check(rows.length === 2 && rows[0].lbl === 'Pattern disponibili nel brano' && /Elimina/.test(rows[0].txt) && /\+ Nuovo/.test(rows[0].txt) && /NEL BRANO/.test(rows[0].txt) && rows[1].lbl === 'Crea' && /Salva come pattern/.test(rows[1].txt) && /Componi una parte/.test(rows[1].txt) && /Energia/.test(rows[1].txt), 'one pattern row (Pattern disponibili nel brano: chips, Nuovo, Elimina) and Crea (Salva, Componi, Energia)', rows.map(r => r.lbl).join(' | '));
   await shot(page, 'it-panel-rows.png');
 
   // ---- alone: the main player stays stopped
@@ -145,6 +146,8 @@ const shot = async (page, name) => { if (shots) await page.screenshot({ path: pa
   await page.click(btn(bass, 'pt-preview')); await sleep(800);
   p = await pv();
   check(!used && p && p.key === k && p.id === tb.id, 'Compose a part makes a pattern used nowhere, and the preview plays it', `${k} ${p && p.key} ${errors.slice(-2).join(' | ')}`);
+  // (the headphones on the previewed chip, after-tests-oct28 D9)
+  check(await page.$eval(`#track-panel [data-ptrk="${bass}"] .pat-chip[data-edit-pat="${k}"]`, x => x.classList.contains('pv') && !!x.querySelector('.pat-pv svg')).catch(() => false), 'the headphones on the chip in preview');
   await page.click(btn(bass, 'pt-del')); await sleep(800);
   check(!(await pv()), 'deleting the pattern stops its preview');
 
@@ -197,7 +200,7 @@ const shot = async (page, name) => { if (shots) await page.screenshot({ path: pa
   await onePanel(bass);
   b = await pressed(bass);
   const rowsEn = await page.$$eval(`#track-panel [data-ptrk="${bass}"] .tp-pats > .lbl`, xs => xs.map(x => x.textContent));
-  check(rowsEn.join('|') === 'Song patterns|Make patterns' && /^Preview the pattern/.test(b.title), 'English: Song patterns, Make patterns, Preview the pattern', rowsEn.join('|'));
+  check(rowsEn.join('|') === 'Patterns in this song|Make' && /^Preview the pattern/.test(b.title), 'English: Patterns in this song, Make, Preview the pattern', rowsEn.join('|'));
   await page.click('#play'); await sleep(2500);
   m1 = await main();
   check(/^bar \d+ \/ \d+$/.test(m1.bar), 'English: the same bar n / total', m1.bar);

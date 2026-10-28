@@ -4,6 +4,7 @@
 import { stateAt, buildSteps } from '../song/build.js';
 import { crescendoSong, shapeCapOf, shapeKeepOf, SHAPE_CAP } from '../song/crescendo.js';
 import { resolveProfile, growthRules } from '../live/profiles.js';
+import { placeGrownSpoken } from './voice-track.js';
 
 const clone = o => JSON.parse(JSON.stringify(o));
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -93,13 +94,7 @@ function tailOf(wf, from) {
     const s = st.tracks.find(x => x.id === t.id) || t, nt = { ...clone(t) };
     for (const k of ['rack', 'hush', 'alone']) { if (s[k] !== undefined) nt[k] = clone(s[k]); else delete nt[k]; }
     nt.clips = t.clips.flatMap(c => { const a = Math.max(c.start, from), b = c.start + c.bars; return b > a ? [{ ...clone(c), start: a - from, bars: b - a }] : []; });
-    // the voice instrument (#81): a spoken track whose clips all end before `from` (an opening, a chop in the first
-    // groove, a passage in the intro) would leave the song; its first clip moves to the start of the tail instead, so
-    // the growth brings it in where it first speaks, as Compose does
-    if (t.type === 'spoken' && !nt.clips.length && t.clips.length && from > 0) {
-      const c = t.clips[0];
-      nt.clips = [{ ...clone(c), start: 0, bars: Math.min(c.bars, barsOf(out)) }];
-    }
+    // (the voice instrument is placed again over the whole grown song afterwards: placeGrownSpoken, after-tests-oct28 D3)
     return nt;
   }).filter(t => t.clips.length || t.type === 'voice');
   const steps = buildSteps(wf).filter(s => s.at >= from).map(s => ({ ...clone(s), at: s.at - from }));
@@ -165,7 +160,8 @@ export function growOnAir(song, { profile = 'classic', artist = null, into = nul
     // the written form's own steps (rack, comments) after the growth, where they were
     c.build = [...c.build, ...t.steps.map(s => ({ ...s, at: s.at + G }))].map((s, i) => ({ s, i })).sort((a, b) => a.s.at - b.s.at || a.i - b.i).map(x => x.s);
     c.onAir = { profile, from, free };
-    return c;
+    // the voice instrument over the whole grown song, the growth included (after-tests-oct28 D3)
+    return placeGrownSpoken(c, wf, G);
   };
   if (free) return grow(0, {}) || song;
   // fitted: the section boundaries from the reference on (at least a phrase in, at least two phrases left), nearest

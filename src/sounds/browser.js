@@ -4,14 +4,24 @@
 import { CATEGORIES, buildCatalog, auditionCode, usageCode, grooveCode, machineLabel, prettyName } from './catalog.js';
 import { artFor, groupArt, pixelArt } from './art.js';
 import { PHOTOS } from './photos.js';
+import { FM_CARDS, LAB_MODES, LAB_ANALYZER, cardOf, cardMax, drawAmounts, litAmount, cardHaystack, favKey, fmWave, cardLine } from './fm-lab.js';
+import { drawWave, drawScope, themeColors } from './fm-draw.js';
+import { LISTEN, STOP } from '../icons.js';
 
 const PAD_KEYS = '1234qwerasdfzxcv';
 const PAGE = { cards: 48, list: 150 };
 const LIB = '*lib'; // group value for the library view (all instruments of a category)
 
 // tryPattern(it): opens a melodic sound on a pattern of its kind in the Patterns tab (pattern-library)
-export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, stop, useSound, toast, scheduler, tryPattern = null }) {
+// fmLab (fm-groove-lab): the lab preview of the FM cards: { toggle(kind) → playing, play(kind), playing() → kind or null,
+// busy() → an export or a recording runs, target() → the label of the melodic track selected in Compose or null,
+// use(card, amount) → a message }
+export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, stop, useSound, toast, scheduler, tryPattern = null, fmLab = null }) {
   const st = { cat: 'drums', group: LIB, qRaw: '', q: '', view: store.get('coding-misk-snd-view', 'cards'), sel: null, mode: 'auto', variant: null, limit: 0, page: 0, favs: new Set(store.get('coding-misk-favs', [])) };
+  // the FM category (fm-groove-lab D1, D4): the selected card, the listening mode (Phrase when the page opens, kept
+  // across cards, not stored) and the FM amount of each card (its own index until moved)
+  const fm = { sel: null, mode: 'phrase', amount: {} };
+  const amountOf = card => fm.amount[card.kind] ?? card.fm.index;
   let items = [], byKey = new Map(), lastSize = 0;
   const refresh = () => {
     const map = globalThis.soundMap && globalThis.soundMap.get ? globalThis.soundMap.get() : {};
@@ -43,7 +53,9 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     if (st.cat === 'favs') return items.filter(it => st.favs.has(it.key));
     return items.filter(it => it.cat === st.cat && it.group === st.group);
   }
-  const libraryMode = () => !st.q && st.cat !== 'favs' && st.group === LIB;
+  const libraryMode = () => !st.q && st.cat !== 'favs' && st.cat !== 'fm' && st.group === LIB;
+  // the FM cards the results show: all of them in the FM category, the matches of a search, the favourites
+  const fmVisible = () => (st.q ? FM_CARDS.filter(c => st.q.split(/\s+/).every(w => cardHaystack(c).includes(w))) : st.cat === 'fm' ? FM_CARDS : st.cat === 'favs' ? FM_CARDS.filter(c => st.favs.has(favKey(c))) : []);
   const px = (it, w) => it ? `<img class="px" alt="" data-art="${esc(it.key)}" data-w="${w}">` : '';
   // a machine, family or kind has its own picture
   const groupPx = (cat, g, w) => `<img class="px" alt="" data-gart="${esc(cat)}|${esc(g)}" data-w="${w}">`;
@@ -55,23 +67,90 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     const counts = Object.fromEntries(CATEGORIES.map(c => [c, items.filter(it => it.cat === c).length]));
     const gs = st.cat === 'favs' || st.q ? [] : groups();
     if (gs.length && st.group !== LIB && !gs.some(([g]) => g === st.group)) st.group = LIB;
-    const lib = libraryMode(), list = lib ? [] : visible();
+    const lib = libraryMode(), list = lib || (st.cat === 'fm' && !st.q) ? [] : visible(), fmList = fmVisible();
     const libLabel = t('sbLib_' + st.cat) || t('sbLibrary');
     root.innerHTML = `
       <div class="sb-top">
         <input class="sb-search" type="search" value="${esc(st.qRaw)}" placeholder="${esc(t('sbSearch', { n: items.length.toLocaleString() }))}" aria-label="${esc(t('sbSearchAria'))}">
         <div class="chips" role="group" aria-label="${esc(t('sbView'))}">${['cards', 'list', 'pads'].map(v => `<button class="chip" data-sb-view="${v}" aria-pressed="${st.view === v}">${t('sbView_' + v)}</button>`).join('')}</div>
       </div>
-      ${st.q ? `<p class="lbl sb-found">${t('sbFound', { n: list.length, q: esc(st.q) })}</p>` : ''}
-      <div class="chips sb-cats">${CATEGORIES.map(c => `<button class="chip" data-sb-cat="${c}" aria-pressed="${!st.q && st.cat === c}">${t('sbCat_' + c)} <small>${counts[c]}</small></button>`).join('')}<button class="chip" data-sb-cat="favs" aria-pressed="${!st.q && st.cat === 'favs'}">★ ${t('sbFavs')} <small>${st.favs.size}</small></button></div>
+      ${st.q ? `<p class="lbl sb-found">${t('sbFound', { n: list.length + fmList.length, q: esc(st.q) })}</p>` : ''}
+      <div class="chips sb-cats">${CATEGORIES.map(c => `<button class="chip" data-sb-cat="${c}" aria-pressed="${!st.q && st.cat === c}">${t('sbCat_' + c)} <small>${counts[c]}</small></button>`).join('')}<button class="chip" data-sb-cat="fm" aria-pressed="${!st.q && st.cat === 'fm'}">${t('sbCat_fm')} <small>${FM_CARDS.length}</small></button><button class="chip" data-sb-cat="favs" aria-pressed="${!st.q && st.cat === 'favs'}">★ ${t('sbFavs')} <small>${st.favs.size}</small></button></div>
       <div class="sb-body${gs.length ? '' : ' nogroups'}">
         ${gs.length ? `<div class="sb-groups" role="list"><button class="sb-group lib" data-sb-group="${LIB}" aria-current="${st.group === LIB}"><span>▦</span>${esc(libLabel)}<small>${gs.length}</small></button>${gs.map(([g, n]) => `<button class="sb-group" data-sb-group="${esc(g)}" aria-current="${st.group === g}"><span>${groupPx(st.cat, g, 24)}</span>${esc(groupLabel(st.cat, g))}<small>${n}</small></button>`).join('')}</div>` : ''}
-        <div class="sb-results">${lib ? library(gs) : results(list)}</div>
+        <div class="sb-results">${st.cat === 'fm' && !st.q ? fmResults(fmList) : `${fmList.length ? fmResults(fmList) : ''}${lib ? library(gs) : fmList.length && !list.length ? '' : results(list)}`}</div>
       </div>
       ${inspector()}`;
     hydrate();
-    if (!lib && !st.q && st.cat !== 'favs') warmGroup(st.cat, st.group);
+    if (!lib && !st.q && st.cat !== 'favs' && st.cat !== 'fm') warmGroup(st.cat, st.group);
   }
+  // ---------- the FM cards (fm-groove-lab) ----------
+  const fmPlaying = () => (fmLab ? fmLab.playing() : null);
+  const fmBusy = () => !!(fmLab && fmLab.busy());
+  const listenBtn = (card, big = false) => {
+    const on = fmPlaying() === card.kind, tip = esc(t(on ? 'fmListenStop' : 'fmListen'));
+    return `<button type="button" class="btn ${big ? '' : 'small '}icon fm-listen" data-fm-listen="${card.kind}" aria-pressed="${on}" title="${tip}" aria-label="${tip}"${fmBusy() ? ' disabled' : ''}>${on ? STOP : LISTEN}</button>`;
+  };
+  const cardMeta = card => `${card.carrier} · FM ${amountOf(card)} · ${t('fmPart_' + card.part[0])}`;
+  function fmResults(list) {
+    return `${st.cat === 'fm' && !st.q ? `<p class="note fm-intro">${esc(t('fmIntro'))}</p>` : ''}<div class="sb-cards fm-cards">${list.map(c => `<div class="sb-card fm-card" data-fm-card="${c.kind}" aria-current="${fm.sel === c.kind && !st.sel}">
+      <button type="button" class="fm-pick" data-fm-pick="${c.kind}" aria-label="${esc(tx(c.name))}"><canvas class="fm-thumb" data-fm-thumb="${c.kind}" aria-hidden="true"></canvas>
+      <span class="sb-cname"><b>${esc(tx(c.name))}</b><small>${esc(cardMeta(c))}</small></span></button>${listenBtn(c)}${st.favs.has(favKey(c)) ? '<span class="sb-star">★</span>' : ''}</div>`).join('')}</div>`;
+  }
+  function fmInspector(card) {
+    if (!card) return `<div class="card sb-insp empty"><p class="note">${esc(t('fmPick'))}</p></div>`;
+    const a = amountOf(card), max = cardMax(card), lit = litAmount(card, a), on = fmPlaying() === card.kind, target = fmLab ? fmLab.target() : null;
+    const noise = ['pink', 'brown'].includes(card.fm.wave);
+    return `<div class="card sb-insp fm-insp" data-fm-insp="${card.kind}">
+      <div class="fm-top">${listenBtn(card, true)}<div class="fm-title"><b>${esc(tx(card.name))}</b><span class="lbl">FM · ${esc(card.carrier)} · ${esc(t('fmPart_' + card.part[0]))} · ${card.bpm} BPM</span></div></div>
+      <div class="fm-modes"><div class="chips" role="group" aria-label="${esc(t('fmModes'))}">${LAB_MODES.map(m => `<button type="button" class="chip" data-fm-mode="${m}" aria-pressed="${fm.mode === m}">${esc(t('fmMode_' + m))}</button>`).join('')}</div>
+        <p class="note fm-mode-line" id="fm-mode-line">${esc(t('fmModeLine_' + fm.mode))}</p></div>
+      <div class="fm-draws"><span class="lbl">${esc(t('fmWaves'))}${noise ? ` · ${esc(t('fmNoise'))}` : ''}</span>
+        <div class="fm-waves">${drawAmounts(card).map(x => `<figure class="fm-wave" data-fm-at="${x}" aria-current="${lit === x}"><canvas data-fm-draw="${x}" aria-hidden="true"></canvas><figcaption>FM ${x}</figcaption></figure>`).join('')}</div>
+        <div class="fm-amount"><label class="lbl" for="fm-amount">${esc(t('fmAmount'))}</label><input type="range" id="fm-amount" data-fader="h" min="0" max="${max}" step="0.05" value="${a}"><output id="fm-amount-out" for="fm-amount">${a.toFixed(2)}</output></div></div>
+      <div class="fm-scope"><span class="lbl">${esc(t('fmScope'))} · <span id="fm-scope-state">${esc(t(on ? 'fmScopeOn' : 'fmScopeOff'))}</span></span><canvas id="fm-scope" aria-hidden="true"></canvas></div>
+      <code id="fm-code">${esc(cardLine(card, fm.mode, a))}</code>
+      <div class="sb-actions"><button type="button" class="btn" data-fm-use="${card.kind}"${target ? '' : ` disabled title="${esc(t('fmUseNone'))}"`}>${esc(t('fmUse'))}</button><button type="button" class="btn" data-fm-copy="${card.kind}">${t('copy')}</button><button type="button" class="btn" data-fm-fav="${card.kind}" aria-pressed="${st.favs.has(favKey(card))}">${st.favs.has(favKey(card)) ? '★' : '☆'} ${t('sbFav')}</button></div>
+    </div>`;
+  }
+  // the canvases: each card's thumbnail at its own amount, the four drawings with the one nearest the amount lit
+  function drawFm() {
+    if (!root.querySelector('canvas[data-fm-thumb], canvas[data-fm-draw]')) return;
+    const colors = themeColors();
+    root.querySelectorAll('canvas[data-fm-thumb]').forEach(cv => { const c = cardOf(cv.dataset.fmThumb); if (c) drawWave(cv, fmWave(c, amountOf(c), { points: 160 }), { lit: fm.sel === c.kind, colors, width: 1.3 }); });
+    const ins = root.querySelector('.fm-insp'), card = ins && cardOf(ins.dataset.fmInsp);
+    if (!card) return;
+    const lit = litAmount(card, amountOf(card));
+    ins.querySelectorAll('.fm-wave').forEach(f => { const x = +f.dataset.fmAt; f.setAttribute('aria-current', lit === x); drawWave(f.querySelector('canvas'), fmWave(card, x, { points: 240 }), { lit: lit === x, colors }); });
+    scopeIdle = false;
+  }
+  // the buttons, the scope's word and the code line follow the lab preview (called by the app when it starts or stops)
+  function syncLab() {
+    const on = fmPlaying(), busy = fmBusy();
+    root.querySelectorAll('[data-fm-listen]').forEach(b => {
+      const mine = on === b.dataset.fmListen;
+      if (b.getAttribute('aria-pressed') !== String(mine)) { b.setAttribute('aria-pressed', mine); b.innerHTML = mine ? STOP : LISTEN; const tip = t(mine ? 'fmListenStop' : 'fmListen'); b.title = tip; b.setAttribute('aria-label', tip); }
+      if (b.disabled !== busy) b.disabled = busy;
+    });
+    const ins = root.querySelector('.fm-insp'), word = root.querySelector('#fm-scope-state');
+    if (word) { const w = t(ins && on === ins.dataset.fmInsp ? 'fmScopeOn' : 'fmScopeOff'); if (word.textContent !== w) word.textContent = w; }
+  }
+  // the scope: while the card in the detail plays, one window of its own analyser every frame
+  let scopeIdle = false;
+  (function scope() {
+    requestAnimationFrame(scope);
+    const cv = root.offsetParent ? root.querySelector('#fm-scope') : null;
+    if (!cv) return;
+    const ins = root.querySelector('.fm-insp'), on = fmPlaying();
+    if (!(ins && on === ins.dataset.fmInsp) || typeof globalThis.getAnalyzerData !== 'function') { if (!scopeIdle) { drawScope(cv, null); scopeIdle = true; } return; }
+    let d = null; try { d = globalThis.getAnalyzerData('time', LAB_ANALYZER); } catch (e) { d = null; }
+    scopeIdle = false;
+    cv.dataset.samples = drawScope(cv, d);
+  })();
+  // a theme or look change redraws the canvases in the new colours
+  new MutationObserver(() => { if (root.offsetParent) { scopeIdle = false; drawFm(); } }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-ui', 'data-look', 'data-theme'] });
+  const fmSelect = kind => { fm.sel = kind; st.sel = null; };
+  const fmRefresh = () => { refreshInspector(); root.querySelectorAll('.fm-card').forEach(x => x.setAttribute('aria-current', x.dataset.fmCard === fm.sel && !st.sel)); drawFm(); };
   // the library: every instrument of the category as a card (photo or pixel art) or a row
   function library(gs) {
     if (!gs.length) return `<p class="note">${t(items.length ? 'sbNone' : 'sbLoading')}</p>`;
@@ -100,6 +179,8 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
   function inspector() {
     const it = st.sel && byKey.get(st.sel);
     if (it) return soundInspector(it);
+    if (st.cat === 'fm' && !st.q) return fmInspector(cardOf(fm.sel));
+    if (fm.sel && fmVisible().some(c => c.kind === fm.sel)) return fmInspector(cardOf(fm.sel));
     if (!st.q && st.cat !== 'favs' && st.group !== LIB) return groupInspector(st.cat, st.group);
     return `<div class="card sb-insp empty"><p class="note">${t(libraryMode() ? 'sbPickLib' : 'sbPick')}</p></div>`;
   }
@@ -133,6 +214,7 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     </div>`;
   }
   function hydrate() {
+    drawFm();
     root.querySelectorAll('img.px[data-gart]:not([src])').forEach(img => {
       const [cat, g] = img.dataset.gart.split('|');
       pixelArt(`group:${cat}:${g}`, groupArt(cat, g, items.find(x => x.cat === cat && x.group === g)), +img.dataset.w).then(src => { if (src) img.src = src; });
@@ -177,6 +259,15 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
 
   root.addEventListener('pointerover', e => { const el = e.target.closest('[data-sb-item], [data-sb-pad], [data-sb-shot]'); if (!el) return; const it = byKey.get(el.dataset.sbItem || el.dataset.sbPad || el.dataset.sbShot); if (it && globalThis.getAudioContext && globalThis.getAudioContext().state === 'running') warm(it); });
   root.addEventListener('input', e => {
+    // the FM amount: the drawings and the code line at once, the sound from the next bar (the app's lab preview reads it)
+    if (e.target.id === 'fm-amount') {
+      const ins = e.target.closest('.fm-insp'), card = ins && cardOf(ins.dataset.fmInsp); if (!card) return;
+      const a = Math.round(+e.target.value * 100) / 100; fm.amount[card.kind] = a;
+      const out = root.querySelector('#fm-amount-out'); if (out) out.textContent = a.toFixed(2);
+      const code = root.querySelector('#fm-code'); if (code) code.textContent = cardLine(card, fm.mode, a);
+      root.querySelectorAll(`.fm-card[data-fm-card="${card.kind}"] .sb-cname small`).forEach(x => { x.textContent = cardMeta(card); });
+      return drawFm();
+    }
     if (!e.target.matches('.sb-search')) return;
     // the field keeps what is typed (spaces too); matching uses the trimmed text
     st.qRaw = e.target.value; st.q = st.qRaw.trim().toLowerCase(); st.limit = 0; st.page = 0;
@@ -193,12 +284,19 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     if (d.sbMore !== undefined) { st.limit += PAGE[st.view]; return render(); }
     if (d.sbPage) { st.page += +d.sbPage; return render(); }
     if (d.sbZoom) return zoom(d.sbZoom);
+    // the FM cards: pick (a card playing hands over to the picked one), headphones, modes and actions
+    if (d.fmPick) { const was = fmPlaying(); fmSelect(d.fmPick); if (was && was !== d.fmPick && fmLab) fmLab.play(d.fmPick); return fmRefresh(); }
+    if (d.fmListen) { fmSelect(d.fmListen); if (fmLab) fmLab.toggle(d.fmListen); fmRefresh(); return syncLab(); }
+    if (d.fmMode) { fm.mode = d.fmMode; return fmRefresh(); }
+    if (d.fmUse) { const c = cardOf(d.fmUse); return c && fmLab && toast(fmLab.use(c, amountOf(c))); }
+    if (d.fmCopy) { const c = cardOf(d.fmCopy), code = cardLine(c, fm.mode, amountOf(c)); try { navigator.clipboard.writeText(code).then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (err) { toast(t('copyNo')); } return; }
+    if (d.fmFav) { const k = favKey(cardOf(d.fmFav)); if (st.favs.has(k)) st.favs.delete(k); else st.favs.add(k); saveFavs(); return render(); }
     // the groove plays the crash and the tom fill once every 4 bars: load every sound first, so none is skipped as late
     if (d.sbGroove) { const items = groupItems('drums', d.sbGroove); return Promise.all(items.map(x => warm(x))).then(() => play(grooveCode(d.sbGroove, items.map(x => x.name)), machineLabel(d.sbGroove))); }
     if (d.sbUsekit) { const first = groupItems('drums', d.sbUsekit)[0]; return first && toast(useSound(first)); }
     if (d.sbShot) return oneShot(byKey.get(d.sbShot));
     if (d.sbStop !== undefined) return stop();
-    if (d.sbItem) return select(d.sbItem, audition);
+    if (d.sbItem) { fm.sel = null; return select(d.sbItem, audition); }
     if (d.sbPad) { const it = byKey.get(d.sbPad); oneShot(it); st.sel = it.key; st.variant = null; root.querySelectorAll('.sb-pad').forEach(p => p.setAttribute('aria-current', p === b)); b.classList.add('hit'); setTimeout(() => b.classList.remove('hit'), 120); return refreshInspector(); }
     const it = st.sel && byKey.get(st.sel); if (!it) return;
     if (d.sbMode) { st.mode = d.sbMode; audition(it); return refreshInspector(); }
@@ -232,5 +330,11 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
     const pad = root.querySelectorAll('.sb-pad')[i]; if (!pad) return;
     e.preventDefault(); pad.click();
   });
-  return { render, refresh };
+  return {
+    render, refresh, syncLab,
+    // what the lab preview plays: the card, the listening mode and the card's FM amount
+    lab: kind => { const c = cardOf(kind); return c ? { card: c, mode: fm.mode, amount: amountOf(c) } : null; },
+    // the selected FM card, for the app's checks
+    get fmSel() { return fm.sel; },
+  };
 }
