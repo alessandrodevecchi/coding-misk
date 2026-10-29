@@ -35,7 +35,7 @@ The app SHALL offer two new looks, "Monitor" and "Rullo" (en: "Roll"), in every 
 
 ### Requirement: Layer over the other looks
 
-The app SHALL offer a layer of widget panels over the other looks, with the values off, strip and Palco, default off. Strip SHALL draw up to the strip limit (default 3) small panels in a corner of the stage over the playing look. Palco SHALL draw up to 4 panels inside the Palco look's big screen, and behave as strip on the other looks. The layer SHALL NOT be drawn on the full-screen widget looks or on the soul.
+The app SHALL offer a layer of widget panels over the other looks, with the values off, strip and Palco, default off. Strip SHALL draw up to the strip limit (1 to 4, default 4) small see-through panels over the playing look: on a wide stage two per side, stacked around the middle, so the centre stays free; on a tall stage a centred row at the bottom (4 as 2×2). Palco SHALL draw up to 4 panels inside the Palco look's big screen, and behave as strip on the other looks. The layer SHALL NOT be drawn on the full-screen widget looks or on the soul.
 
 #### Scenario: Off by default
 
@@ -45,7 +45,17 @@ The app SHALL offer a layer of widget panels over the other looks, with the valu
 #### Scenario: Strip over a look
 
 - **WHEN** the layer is "strip" and the Tramonto look plays a song with bass, lead and hats
-- **THEN** three panels are drawn over the Tramonto look, in the stage, the session video and the live output
+- **THEN** three panels are drawn over the Tramonto look, two on the left and one on the right, in the stage, the session video and the live output
+
+#### Scenario: Strip on a tall stage
+
+- **WHEN** the layer is "strip" and a 9:16 fragment plays four instruments
+- **THEN** four panels are drawn as two rows of two, centred at the bottom of the stage box
+
+#### Scenario: Palco screen
+
+- **WHEN** the layer is "Palco" and the Palco look plays four instruments
+- **THEN** four panels fill the Palco look's big screen
 
 ### Requirement: Instruments and widgets of the panels
 
@@ -99,7 +109,7 @@ In the fast video, notes per instrument SHALL come from the render page. Scope a
 
 ### Requirement: Stage widgets settings card
 
-The Settings page SHALL have a card "Stage widgets" (it: "Widget sul palco") with the layer, the panel limits, instruments and widgets (same as code widgets or own), colours, silent instruments, each widget kind on or off (spiral and pitchwheel off by default), saved, in the backup and reset to defaults, in English and Italian, with a Guide card.
+The Settings page SHALL have a card "Stage widgets" (it: "Widget sul palco") with the layer, the panel limits (Monitor 2 to 6, default 6; strip 1 to 4, default 4), instruments and widgets (same as code widgets or own), colours, silent instruments, each widget kind on or off (spiral and pitchwheel off by default), saved, in the backup and reset to defaults, in English and Italian, with a Guide card.
 
 #### Scenario: Backup
 
