@@ -21,6 +21,7 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 | The director, steering, transitions | `check:endless`, `check:compilation` | `check-radio.cjs`, `check-steering.cjs`, `check-transitions.cjs` |
 | Profiles and growth on air, the code on air, commands as waypoints (`src/endless/growth.js`, `src/endless/items.js`, `src/endless/waypoints.js`, `src/live/air-code.js`) | `check:radio-profiles`, `check:endless`, `check:live-code` | `check-radio.cjs`, `check-compact-code.cjs` (radio window), `check-transitions.cjs` (Live coder runs), `check-steering.cjs` (Live coder steering at its end) |
 | The material generator | `check:material`, `check:endless`, `check:patterns` | `check-patterns.cjs` |
+| Rack devices (`src/song/rack.js`), the FM-like effects | `check:fm-effects`, `check:songs`, `check:endless`, `check:strudel` | `check-fm-effects.cjs` |
 | Growth shapes, Crescendo, profiles, typing, growth in Compose (`composeCompiled`, the Compose worker, `src/live/growth-store.js`, the growth hash in `vite.config.js`) | `check:crescendo -- --full`, `check:profiles`, `check:live-code`, `check:typing`, `check:functions`, `check:durations`; `growth:probe` to measure | `check-crescendo-play.cjs`, `check-hand.cjs`, `check-growth-background.cjs`, `check-startup.cjs` |
 | App functions, the writer | `check:functions`, `check:strudel`, `check:live-code` | `check-compact-code.cjs` |
 | The hidden mixer and the code views (`src/song/writer.js`, `src/live/live-code.js`, `src/live/air-code.js`, `src/song/compile-compact.js`, `compileNow`) | `check:mixer` (quick; `--full` before a merge to main), `check:live-code`, `check:functions` | `check-compact-code.cjs` |
@@ -82,6 +83,8 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-endless.mjs` | `npm run check:endless` | Node | Checks for the endless director and style recipes (docs/ENDLESS.md, docs/STYLES.md). |
 | `tools/check-export.cjs` |  | dev server, Chrome | Browser checks for the fast export (#8): songs export faster than real time with the timeline next to them, the fast and the real time files of the same song agree (length, loudness, low and high bands, loudness over… |
 | `tools/check-export.mjs` | `npm run check:export` | Node | Checks for the fast export (#8): time from the tempo map, code segments of live build songs, the timeline, formats and the Export display. No browser. |
+| `tools/check-fm-effects.cjs` |  | dev server, Chrome | Browser check and cost measure of the FM-like rack effects (fm-like-effects, #90, design D4). Dev server on PORT. 1. Sound and level in the page: a drum sample, a voice sample and a synth pad played plain, with Fold… |
+| `tools/check-fm-effects.mjs` | `npm run check:fm-effects` | Node | Checks for the FM-like rack effects (fm-like-effects, #90, design D7). No browser. |
 | `tools/check-fm-lab.cjs` |  | dev server, Chrome | Browser checks for the FM lab of the Sounds tab (fm-groove-lab). |
 | `tools/check-fm-lab.mjs` | `npm run check:fm-lab` | Node | Checks for the FM lab of the Sounds tab (fm-groove-lab, task 1.3). No browser. |
 | `tools/check-functions.mjs` | `npm run check:functions` | Node | Checks for song functions (song-functions). No browser. |
