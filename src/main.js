@@ -97,6 +97,7 @@ import { createGrowthStore } from './live/growth-store.js';
 import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
+import { CW_KEY, widgetSettings, placeWidgets, widgetOptions, linkAnalysers } from './live/widgets.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -108,6 +109,8 @@ const store = {
   remove(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
 setLang(getLang());
+// code widgets (code-widgets): the settings of the Settings card, read each time a code is shown
+const cwSettings = () => widgetSettings(store.get(CW_KEY, null));
 
 // ---------- libreria dei brani ----------
 // "composed": brani v2 (sezioni e tracce, file JSON in songs/), si aprono nell'arrangiatore.
@@ -188,7 +191,7 @@ const RADIO_LIVE = () => { const C = resolveProfile('classic'); return { on: fal
 // songs: [{ n, prefix, start, song, title, profile, custom, ctl, show }] from the radio
 function radioPlayable(W, songs = null) {
   if (!songs || songs.every(x => x.profile === 'classic' && !x.custom && x.show !== 'hidden')) return playable({ ...W, kind: 'composed' }, RADIO_LIVE());
-  const L = airCode(W, songs, { lang: getLang, files: () => customFiles, cols: codeCols });
+  const L = airCode(W, songs, { lang: getLang, files: () => customFiles, cols: codeCols, widgets: cwSettings });
   const meta = parseSong(compileSong(stateAt(W, 0).song)), v = W.sections.flatMap(x => [x.bpm ?? 138, x.bpmEnd ?? x.bpm ?? 138]), lo = Math.min(...v), hi = Math.max(...v);
   meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   // (soundCode: every sound of the window in one code, for the soundfonts loaded ahead; hidden: the songs not shown)
@@ -415,7 +418,7 @@ function playable(tr, fixed = null) {
   // the start, with its comments and technical functions; with Sections, code-lanes, its code of the moment edited in
   // place at each section and clip change)
   let build = tr.kind !== 'composed' ? null : lv.on && lv.style === 'crescendo' && crescendoOf(tr) ? crescendoOf(tr) : hasBuild(tr) ? tr : lv.on ? { ...tr, build: deriveBuild(tr) } : writtenOptions(lv.ctl) ? { ...tr, build: [] } : null;
-  const C = lv.ctl, live = build ? liveCode(build, C, { lang: getLang, files: () => customFiles, cols: codeCols }) : null, now = !!(live && live.now);
+  const C = lv.ctl, live = build ? liveCode(build, C, { lang: getLang, files: () => customFiles, cols: codeCols, widgets: cwSettings }) : null, now = !!(live && live.now);
   if (live) build = live.build;
   const codeAt = live ? live.codeAt : null, run = live ? live.run : null, standalone = live ? live.standalone : null;
   // a song grown like a live coder can start with its waypoints when it plays without a live build (live-coder-growth)
@@ -569,7 +572,11 @@ ready.then(() => {
   const plain = ed.evaluate.bind(ed);
   ed.evaluate = async (autostart = true) => {
     globalThis.miskBuses = (song && song.buses) || {}; useFns((song && song.fns) || {});
+    globalThis.miskWidgets = widgetGroups();
     renderPrelude();
+    try { return await evalInner(autostart); } finally { markMuted(); requestAnimationFrame(markMuted); }
+  };
+  const evalInner = async autostart => {
     if (!(song && song.run)) return plain(autostart);
     ed.flash();
     // the bar the code is for (the radio's hidden songs change with their own steps): the bar just shown by the
@@ -579,6 +586,8 @@ ready.then(() => {
     await ed.repl.evaluate(song.run(ed.code || '', bar), autostart);
   };
   const iv = setInterval(() => { if (typeof globalThis.register === 'function') { clearInterval(iv); installHelpers({ register: globalThis.register }); } }, 100);
+  // code widgets D4: a scope or spectrum widget reads its line's instrument
+  linkAnalysers({ pattern: () => sched() && sched().pattern, now: () => (sched() ? sched().now() : 0), active: () => isPlaying() && /\._(?:scope|spectrum)\(/.test(ed.code || '') });
 });
 // il REPL carica solo una parte di dirt-samples: carichiamo l'archivio completo (arpy, industrial, glitch, …)
 // samples() can appear a little after the editor: wait for it, otherwise the call was skipped and only part of the archive loaded
@@ -632,7 +641,60 @@ let labPreview = null;
 // the code the player shows at a bar to evaluate it: the evaluation knows the bar (codeBar, used once)
 let codeBar = 0, codeFresh = false;
 const codeNow = (sg, bar) => { codeBar = bar; codeFresh = true; return codeFor(sg, bar); };
-const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.codeAt ? sg.codeAt(bar, keep) : keep && sg.codeKeep ? sg.codeKeep(keep) : sg.code).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
+// (a song without a code of the moment, played as written, gets its code widgets here, at the bar's section: code-widgets D10)
+const plainWidgets = (sg, bar, c) => { const S = cwSettings(); return S.on && !sg.loop && sg.meta ? placeWidgets(c, { S, bar, section: Math.max(0, sg.meta.sectionAt(bar)), sections: sg.meta.sections.length, seed: sg.id || '' }) : c; };
+const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.codeAt ? sg.codeAt(bar, keep) : keep && sg.codeKeep ? sg.codeKeep(keep) : plainWidgets(sg, bar, sg.code)).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
+// code-widgets D6: the code of a playing song changed only between its equal start and end, in one transaction, so the
+// widgets and the lit notes of the lines left as they were stay (a full replacement removes every widget until the
+// next evaluation); a new song and hand code keep the full replacement (ed.setCode)
+function setCodeRange(txt) {
+  const view = ed && ed.editor;
+  if (!view) { if (ed) ed.setCode(txt); return; }
+  const cur = view.state.doc.toString();
+  if (cur === txt) return;
+  const n = Math.min(cur.length, txt.length);
+  let a = 0; while (a < n && cur.charCodeAt(a) === txt.charCodeAt(a)) a++;
+  let b = 0; while (b < n - a && cur.charCodeAt(cur.length - 1 - b) === txt.charCodeAt(txt.length - 1 - b)) b++;
+  view.dispatch({ changes: { from: a, to: cur.length - b, insert: txt.slice(a, txt.length - b) } });
+  markMuted();
+}
+// code-widgets D14: the widget of a muted line (`_$:`) dimmed by a class on its element, set after each evaluation and
+// each change of the code; off with the setting
+function markMuted() {
+  const view = ed && ed.editor;
+  if (!view) return;
+  const S = cwSettings(), doc = view.state.doc;
+  for (const el of view.contentDOM.querySelectorAll('[id*="_widget_"]')) {
+    let muted = false;
+    if (S.on && S.dim) {
+      try {
+        let ln = doc.lineAt(view.posAtDOM(el)).number;
+        while (ln > 1 && /^\s+\./.test(doc.line(ln).text)) ln--;
+        muted = /^\s*_\$:/.test(doc.line(ln).text);
+      } catch (e) {}
+    }
+    el.classList.toggle('cw-muted', muted);
+  }
+}
+// code-widgets D4, D5: the hidden parameter groups of the widgets, from the settings, the theme's colours and the panel
+function widgetGroups() {
+  const S = cwSettings(), cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim();
+  const host = $('#edhost');
+  return widgetOptions(S, { fg: v('--ink'), accent: v('--a1'), accent2: v('--a2'), muted: v('--muted') }, host ? host.clientWidth - 72 : 500);
+}
+// code-widgets D9, D10: at a section boundary without a step the widgets move (a song as written, Classic's past
+// sections): the code of the boundary and one evaluation, as a step does. A typing in progress keeps its code: the
+// next step brings the widgets
+let cwAt = 0;
+function widgetTick(sg, s) {
+  if (!sg || !sg.meta || hand || resumeTo !== null || typing || sg.loop || !cwSettings().on) return;
+  const ahead = s.lastEnd + .1 * s.cps, b = sg.meta.sections.map(x => x.start).filter(x => x > cwAt && x <= ahead).pop();
+  if (b === undefined) return;
+  cwAt = b;
+  const txt = codeNow(sg, b);
+  if (txt === (ed.code || '')) { codeFresh = false; return; }
+  setCodeRange(txt); ed.evaluate();
+}
 // keeps the point being edited in view: #edhost scrolls, not CodeMirror's own scroller
 function followEdit(a, b) {
   let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
@@ -683,7 +745,7 @@ function typeFrame(T, cyc) {
   const at = (cyc - T.start) / T.cps, txt = T.plan.frame(at);
   // for browser checks (typing-mistakes): whether a mistake is on screen now
   globalThis.codingMiskTyping = { mistake: !!(T.plan.stats && T.plan.stats.wrong.some(([a, b]) => at >= a && at < b)), stats: T.plan.stats ? { mode: T.plan.stats.mode, typos: T.plan.stats.typos, minds: T.plan.stats.minds, words: T.plan.stats.words } : null };
-  if (txt !== T.shown) { const prev = T.shown || ed.code || ''; T.shown = txt; ed.setCode(txt); followEdit(prev, txt); }
+  if (txt !== T.shown) { const prev = T.shown || ed.code || ''; T.shown = txt; setCodeRange(txt); followEdit(prev, txt); }
 }
 function liveBuild(sg, s, cyc) {
   const steps = buildSteps(sg.build), next = steps[built];
@@ -698,7 +760,7 @@ function liveBuild(sg, s, cyc) {
   }
   if (!due) { typeFrame(typing, cyc); return; }
   typing = null; built = steps.filter(x => x.at <= next.at).length;
-  ed.setCode(codeNow(sg, next.at)); ed.evaluate();
+  setCodeRange(codeNow(sg, next.at)); ed.evaluate();
 }
 
 // ---------- hand live coding (#20) ----------
@@ -745,7 +807,7 @@ function resumeBuild(sg, s, cyc) {
   resumeTo = null; typing = null;
   if (r.target !== undefined) { playSong(sg, r.target, mode); return; }
   built = sg.build ? buildSteps(sg.build).filter(x => x.at <= r.bar).length : 0;
-  ed.setCode(codeNow(sg, r.bar)); ed.evaluate();
+  setCodeRange(codeNow(sg, r.bar)); ed.evaluate();
 }
 // the hidden code under the panel (code-writing): the helpers and the tail that play with the code shown
 function renderPrelude() {
@@ -821,7 +883,7 @@ async function playSong(sg, bar = 0, as = 'free', { keepHand = false } = {}) {
     source = as === 'track' ? { kind: 'track' } : as === 'radio' ? { kind: 'radio', name: sg.title } : { kind: 'song', name: sg.title, id: sg.id };
     renderSource();
     ed.stop();
-    typing = null; built = sg.build ? buildSteps(sg.build).filter(x => x.at <= bar).length : 0;
+    typing = null; built = sg.build ? buildSteps(sg.build).filter(x => x.at <= bar).length : 0; cwAt = bar;
     // spoken comments load the first time they play, too late for that hit: load them all now, silently
     if (sg.build) voiceSamples(sg.build, getLang(), customFiles).forEach(v => { try { globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05); } catch (e) {} });
     if (hand && keepHand) { song = sg; sched().lastEnd = bar; await ed.evaluate(); return; }
@@ -3856,6 +3918,7 @@ function songTick() {
   if (resumeTo !== null) resumeBuild(song, s, cyc);
   else if (song.build && !hand) liveBuild(song, s, cyc);
   if (mode === 'radio' && radio && !hand && resumeTo === null) radio.tick(cyc);
+  widgetTick(song, s);
   mixTick(cyc);
   if (loopIdx >= 0) {
     const sec = m.sections[loopIdx];
@@ -4310,6 +4373,9 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
   app: {
     ui: () => ui, setUi: v => setUi(v), lang: () => getLang(), setLang: l => changeLang(l),
     volume: () => volume, setVolume: v => setVolume(v),
+    // code widgets (code-widgets D1): a stopped song shows its code with the new settings; a playing one takes them at
+    // its next step, section or evaluation
+    widgetsChanged: () => { if (ed && !isPlaying() && mode === 'track' && compiled) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code); markMuted(); },
     // the video recorder is made after the settings: a page opened on the settings gets its preview below
     videoPreview: el => { try { video.preview(el); } catch (e) {} },
     fragmentsFromRecipe: (recipe, anchor) => openFragMenu(recipe, anchor),

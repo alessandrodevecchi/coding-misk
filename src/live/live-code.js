@@ -11,6 +11,7 @@ import { pasteRule } from './typing-load.js';
 import { planWritten } from './written-plan.js';
 import { resolveProfile } from './profiles.js';
 import { rampLists } from '../song/ramps.js';
+import { placeWidgets, stripWidgets, instrumentOf, widgetSettings } from './widgets.js';
 import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOptions, functionContext, FUNCTION_OPTIONS, lineKey, addEntry } from '../song/writer.js';
 
 // build: the live build (a song with steps); C: the controls; lang(): the language of the comments; files(): the
@@ -50,7 +51,9 @@ function momentOf(build, C) {
 export const liveBuildOf = (build, C) => momentOf(build, C).build;
 // growthAhead: false plans lines typed ahead in the written part only (the shape search measures the growth without
 // lines ahead, lines-ahead-balanced D4)
-export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0, ramps = true, canon = false, growthAhead = true } = {}) {
+// widgets(): the code widgets' settings (code-widgets), read each time a code is shown; null or off: no widget. Only
+// `codeAt` writes them: the plan, the lines typed ahead, earlier lines and the paste rule see the code without them
+export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols = () => 0, ramps = true, canon = false, growthAhead = true, widgets = null } = {}) {
   const input = build;
   let self = null;
   // shape-search D8: in a Live coder growth, a long list that moves linearly per bar (a written sweep) is typed as a
@@ -113,7 +116,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const written = levelsOf(ref), buses = busesOf(ref), table = new Map(), entrySets = new Map(), hidden = new Map(), fns = {};
   // in place: the lanes of each code shown (by its text without the tempo, which the player rewrites), and of each
   // line, for code edited by hand
-  const laneSets = new Map(), laneLines = new Map(), plainKey = c => c.replace(/setcpm\([^)]*\)/, 'setcpm()');
+  const laneSets = new Map(), laneLines = new Map(), plainKey = c => stripWidgets(c).replace(/setcpm\([^)]*\)/, 'setcpm()');
   const fctx = any ? functionContext(ref, { id: build.id, title: build.title, tags: build.tags, profile: build.profile }, o) : null;
   // the code at a bar; plan, info (reused-lines D4, D8): the plan of the written part and the lines it fills in;
   // wrap: false leaves the long lines unbroken (the plan does not depend on the width of the panel)
@@ -145,7 +148,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     for (const l of M) { if (i < B.length && l === B[i]) { i++; continue; } if (!(/^\s*_\$:/.test(l) || /^\s*\/\//.test(l) || /^const \w+ = /.test(l) || !l.trim())) return false; }
     return i === B.length;
   };
-  const codeWith = (bar, keep, { plan = null, info = null, wrap = true } = {}) => {
+  const codeWith = (bar, keep, { plan = null, info = null, wrap = true, widgets: wOn = false } = {}) => {
     const src = refBuild && bar < refUntil ? refBuild : build, st = stateAt(src, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
     let hide = inPlace ? [] : null;
     const voice = () => (C.narrator === false ? '' : voiceCode(build, st.song, st.upTo, total, lang(), files()));
@@ -168,7 +171,10 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     w.voice = [hide && hide.length ? hide.join('\n') : '', v.voice].filter(Boolean).join('\n\n');
     w.table.forEach((e, k) => addEntry(table, k, e));
     Object.assign(fns, w.fns);
-    let out = C.wrap && wrap ? breakLines(w.code, cols()) : w.code;
+    // code widgets (D4): the calls after the folding, before the line breaks and the hidden tail
+    const S = wOn && !keep ? widgetsNow() : null;
+    const shown = S ? placeWidgets(w.code, { S, bar, section: sectionAt(bar), sections: build.sections.length, seed: build.id || '', insts: instsOf(lifted.code, w.code), returns: l => returnsWithin(l, bar, S.window) }) : w.code;
+    let out = C.wrap && wrap ? breakLines(shown, cols()) : shown;
     if (!out.includes('$:')) out = `${out}\n$: silence`;
     if (any && w.entries.length === chainLines(out).filter(l => /^\s*[_S]?\$:/.test(l)).length) entrySets.set(plainKey(out), w.entries);
     if (w.voice) hidden.set(plainKey(out), w.voice);
@@ -189,7 +195,29 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     return planMemo.plan;
   };
   // (lines-ahead-balanced D2) the plan from the first step after bar 0: lines ahead are typed at growth steps too
-  const codeAt = (bar, keep) => codeWith(bar, keep, { plan: planOn && bar >= (growthAhead ? 1 : returning) ? planOf() : null });
+  const planAt = bar => (planOn && bar >= (growthAhead ? 1 : returning) ? planOf() : null);
+  const codeRaw = (bar, keep) => codeWith(bar, keep, { plan: planAt(bar) });
+  const codeAt = (bar, keep) => codeWith(bar, keep, { plan: planAt(bar), widgets: true });
+  // code widgets: the settings now, the section of a bar, the instrument of each pattern line (from the code before the
+  // writer takes the visuals out), and whether a muted line returns within the window (the code at the next steps)
+  const widgetsNow = () => { const S = typeof widgets === 'function' ? widgets() : widgets; return S && S.on ? widgetSettings(S) : null; };
+  const sectionAt = bar => { let a = 0; for (let k = 0; k < build.sections.length; k++) { a += build.sections[k].bars; if (bar < a) return k; } return Math.max(0, build.sections.length - 1); };
+  const isLine = l => /^\s*[_S]?\$:/.test(l);
+  const instsOf = (before, after) => { const a = chainLines(before).filter(isLine), n = chainLines(after).filter(isLine).length; return a.length === n ? a.map(instrumentOf) : null; };
+  const rawMemo = new Map(), unmuted = l => stripWidgets(l).replace(/^(\s*)_\$:/, '$1$:').replace(/\s+/g, '');
+  const rawLines = b => { const k = `${b}\u0000${lang()}`; if (!rawMemo.has(k)) { if (rawMemo.size > 400) rawMemo.clear(); rawMemo.set(k, new Set(chainLines(codeWith(b, null, { plan: planAt(b), wrap: false })).filter(l => isLine(l) && !/^\s*_\$:/.test(l)).map(unmuted))); } return rawMemo.get(k); };
+  // (a line edited while muted, reused-lines D4, returns in another form: a line of the next steps like it, by words,
+  // that does not play now, counts as its return)
+  const returnsWithin = (line, bar, win) => {
+    const key = unmuted(line), last = win === 'always' ? Infinity : bar + win, now = rawLines(bar);
+    for (const b of stepBars()) {
+      if (b <= bar || b > last) continue;
+      const L = rawLines(b);
+      if (L.has(key)) return true;
+      for (const x of L) if (!now.has(x) && lineLike(key, x) >= 0.75) return true;
+    }
+    return false;
+  };
   // the lanes of a code: those of the code shown at a step, else line by line (code edited by hand)
   const lanesOf = shown => {
     if (!inPlace) return null;
@@ -216,12 +244,12 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     for (const b of stepBars()) {
       if (b >= bar) break;
       const k = `${b}\u0000${key}`;
-      if (!earlierMemo.has(k)) { if (earlierMemo.size > 2000) earlierMemo.clear(); earlierMemo.set(k, chainLines(codeAt(b)).filter(l => /^\s*[_S]?\$:/.test(l))); }
+      if (!earlierMemo.has(k)) { if (earlierMemo.size > 2000) earlierMemo.clear(); earlierMemo.set(k, chainLines(codeRaw(b)).filter(l => /^\s*[_S]?\$:/.test(l))); }
       for (const l of earlierMemo.get(k)) { lines.delete(l); lines.set(l, true); }
     }
     return [...lines.keys()];
   };
-  out.paste = pasteRule(out, C, { seed: build.id || '' });
+  out.paste = pasteRule({ ...out, codeAt: codeRaw }, C, { seed: build.id || '' });
   return out;
 }
 // (inside liveCode the name `liveCode` is the view of the controls)

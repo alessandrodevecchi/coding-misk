@@ -24,8 +24,9 @@ import { installHelpers, useFns } from '../src/song/writer.js';
 // and the presets compared with the code in full; sections: full with only the Sections option (code-lanes); compact
 // has it too
 export const PROFILES = ['classic', 'written', 'crescendo', 'switch'];
-export const VIEWS = ['short', 'mixer', 'compact', 'sections'];
-const OPTIONS = { short: { functions: 'short' }, mixer: { functions: 'mixer' }, compact: { functions: 'compact' }, sections: { functions: 'full', fnLanes: true }, full: { functions: 'full' } };
+// widgets: the short preset with the code widgets on, every widget and up to 8 lines (code-widgets D12)
+export const VIEWS = ['short', 'mixer', 'compact', 'sections', 'widgets'];
+const OPTIONS = { widgets: { functions: 'short' }, short: { functions: 'short' }, mixer: { functions: 'mixer' }, compact: { functions: 'compact' }, sections: { functions: 'full', fnLanes: true }, full: { functions: 'full' } };
 // Classic with the Live build off is the profile classic on the written song with no steps (src/main.js playable)
 const profileOf = p => (p === 'written' ? 'classic' : p);
 export const FIELDS = ['gain', 'orbit', 'analyze', 'postgain', 'velocity'];
@@ -52,7 +53,7 @@ async function load() {
     const core = await import('@strudel/core'), mini = await import('@strudel/mini'), { transpiler } = await import('@strudel/transpiler');
     await core.evalScope(core, mini);
     for (const name of ['transpose', 'scale', 'voicing', 'voicings', 'rootNotes']) if (!(name in core.Pattern.prototype)) core.register(name, (x, pat) => pat);
-    installHelpers({ register: core.register });
+    installHelpers({ register: core.register, Pattern: core.Pattern });
     let error = null;
     const R = core.repl({ transpiler, defaultOutput: () => {}, getTime: () => 0, onEvalError: e => { error = e; } });
     strudel = { evaluate: async code => { error = null; const p = await R.evaluate(code, false); if (!p || error) throw new Error((error && error.message) || 'evaluation failed'); return p; } };
@@ -105,7 +106,8 @@ function buildOf(s, profile) {
 // task: { song, profile } → { steps, views: { short: [{ bar, diffs }], … }, error }
 export async function runTask({ song, profile }) {
   const s = songs.find(x => x.id === song), b = buildOf(s, profile);
-  const mk = view => liveCode(b, resolveProfile(profileOf(profile), OPTIONS[view]), { lang: () => 'it', files: () => files, cols: () => 60 });
+  const W = { on: true, max: 8, widgets: { spiral: true, pitchwheel: true }, instruments: { fx: { on: true }, voice: { on: true } } };
+  const mk = view => liveCode(b, resolveProfile(profileOf(profile), OPTIONS[view]), { lang: () => 'it', files: () => files, cols: () => 60, widgets: view === 'widgets' ? () => W : null });
   // the steps of every view (Sections adds one at each section and clip change)
   const full = mk('full'), Ls = Object.fromEntries(VIEWS.map(v => [v, mk(v)]));
   const bars = [...new Set([0, ...[full, ...Object.values(Ls)].flatMap(L => buildSteps(L.build).map(x => x.at))])].sort((x, y) => x - y);

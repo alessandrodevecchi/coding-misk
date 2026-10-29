@@ -8,6 +8,7 @@
 // shown (its mini-notation offsets are past the end of the panel, so the highlights of the code shown stay where they
 // are). Pure text in, text out, apart from installHelpers and useFns.
 import { chainLines, breakPoints } from './typing.js';
+import { stripWidgets, installWidgets } from '../live/widgets.js';
 import { EFFECTS, LIBRARY, LIBRARY_NAMES, nameOrder, NAMES } from './functions.js';
 import { hashString } from '../endless/random.js';
 
@@ -56,7 +57,7 @@ const keep = cs => {
   return out;
 };
 // the key of a line in the mixer: its text without the pattern sign, spaces before a call or line breaks
-export const lineKey = l => l.replace(PATTERN, '').replace(/\s*\n\s*\./g, '.').trim();
+export const lineKey = l => stripWidgets(l).replace(PATTERN, '').replace(/\s*\n\s*\./g, '.').trim();
 // entries of the mixer table whose text two different lines share (two lines alike once bus, visual and level are
 // out): they keep only the values every such line agrees on, never the last line's
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -468,8 +469,11 @@ function defineFn(name, f) {
   // eslint-disable-next-line no-new-func
   r(name, new Function(...f.params, 'p', `return p${f.chain}`), false);
 }
-export function installHelpers({ register }) {
+// Pattern: Strudel's Pattern class of that copy (globalThis.Pattern in a page); the code widgets' `_` methods are wrapped
+// there, or stubbed where Strudel's editor is not loaded (Node, the render page), code-widgets D4, D12
+export function installHelpers({ register, Pattern = globalThis.Pattern }) {
   reg = register;
+  installWidgets(Pattern);
   register('chan', (name, pat) => { const n = (globalThis.miskBuses || {})[name]; return (n === undefined ? pat : pat.orbit(n)).analyze(name); });
   register('crunch', (x, pat) => pat.distort(x).distortvol(0.5));
   for (const f of LIBRARY) defineFn(f.name, f);

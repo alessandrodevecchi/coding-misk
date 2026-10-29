@@ -19,6 +19,7 @@ import { resolveProfile, growthRules, PROFILE_IDS } from '../src/live/profiles.j
 import { liveCode } from '../src/live/live-code.js';
 import { buildSteps, deriveBuild } from '../src/song/build.js';
 import { preludeText, FUNCTIONS, HELPERS } from '../src/song/writer.js';
+import { WIDGETS } from '../src/live/widgets.js';
 import { ALL_NAMES, LIBRARY } from '../src/song/functions.js';
 import { generateSession } from '../src/endless/director.js';
 import { loadStyles } from './styles-dir.mjs';
@@ -29,7 +30,9 @@ export { HELPERS };
 // names the app gives: helpers, library functions, the words of song functions (a word with a number when a song
 // used up its list)
 export const APP_NAMES = [...new Set([...HELPERS, ...ALL_NAMES])];
-export const isAppName = name => APP_NAMES.includes(name) || ALL_NAMES.includes(name.replace(/\d+$/, ''));
+// Strudel's inline widgets the app writes (code-widgets D12): registered by @strudel/codemirror, not in the catalog
+export const WIDGET_CALLS = WIDGETS.map(w => `_${w}`);
+export const isAppName = name => APP_NAMES.includes(name) || WIDGET_CALLS.includes(name) || ALL_NAMES.includes(name.replace(/\d+$/, ''));
 export const KINDS = ['songs', 'live', 'radio', 'prelude'];
 export const RADIO_MINUTES = 10;
 export const radioSeed = style => `catalog-${style}`;

@@ -12,6 +12,11 @@ import { confirmInline } from '../library/songs-view.js';
 import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shapeKeepOf, LONG_SONG, LONG_SONG_MIN, LONG_SONG_MAX, longSongOf } from '../song/crescendo.js';
 import { shapeCounts } from '../song/shapes.js';
 import { AIR_CHOOSERS, AIR_CHOOSER, chooserOf, chooserName } from '../endless/waypoints.js';
+import { CW_KEY, CW_DEFAULTS, CW_INSTRUMENTS, CW_WINDOWS, CW_PARAMS, CW_SIZE_LIMITS, WIDGETS, widgetSettings } from '../live/widgets.js';
+
+// the code widgets card (code-widgets D2): the sections left open, remembered in this browser
+const CW_OPEN = 'coding-misk-cw-open';
+const ARROW = d => `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${d === 'up' ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'}"/></svg>`;
 
 
 export function createSettings({ root, t, tx, esc, store, looks, app, toast, confirmTwice }) {
@@ -85,6 +90,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           <p class="muted">${esc(t('setLibraryIntro'))}</p>
           <div class="actions">${app.hiddenSongs && app.hiddenSongs() ? `<button class="btn" id="set-show-hidden">${esc(t('setShowHidden', { n: app.hiddenSongs() }))}</button>` : `<span class="muted">${esc(t('setHiddenNone'))}</span>`}</div>
         </div>
+        ${widgetsCard()}
         <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
           <p class="muted">${esc(t('setAdvancedIntro'))}</p>
           <p class="muted" id="set-shape-count" data-shapes="${counts.shapes}">${esc(t('setShapeCount', counts))}</p>
@@ -104,6 +110,36 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => { const x = { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), stageRatio: app.stageRatio ? app.stageRatio() : 2.4 }; return { ...x, size: fragmentSize(x), next: store.get('coding-misk-fragment-n', 1) }; });
   }
 
+  // code widgets (code-widgets D2): one card, sections that open and close
+  function widgetsCard() {
+    const S = widgetSettings(store.get(CW_KEY, null)), open = new Set(store.get(CW_OPEN, ['general']) || []);
+    const sec = (id, body) => `<details class="cw-sec" data-cw-sec="${id}"${open.has(id) ? ' open' : ''}><summary>${esc(t(`cwSec:${id}`))}</summary>${body}</details>`;
+    const check = (attr, on, label) => `<label class="rx-opt"><input type="checkbox" ${attr}${on ? ' checked' : ''} data-no-knob> <span>${esc(label)}</span></label>`;
+    const order = `<ol class="cw-order">${S.order.map((k, i) => `<li><span>${esc(t(`cwInst:${k}`))}</span><button class="icon-btn" data-cw-move="${k}" data-dir="-1" title="${esc(t('cwUp'))}" aria-label="${esc(`${t('cwUp')}: ${t(`cwInst:${k}`)}`)}"${i === 0 ? ' disabled' : ''}>${ARROW('up')}</button><button class="icon-btn" data-cw-move="${k}" data-dir="1" title="${esc(t('cwDown'))}" aria-label="${esc(`${t('cwDown')}: ${t(`cwInst:${k}`)}`)}"${i === S.order.length - 1 ? ' disabled' : ''}>${ARROW('down')}</button></li>`).join('')}</ol>`;
+    const inst = CW_INSTRUMENTS.map(k => { const I = S.instruments[k]; return `<div class="cw-inst" data-cw-inst="${k}">
+      ${check(`data-cw-inst-on="${k}"`, I.on, t(`cwInst:${k}`))}
+      <label class="cw-prim"><span class="muted">${esc(t('cwPrimary'))}</span> <select data-cw-prim="${k}" data-no-knob>${WIDGETS.map(w => opt(w, I.primary, w)).join('')}</select></label>
+      <span class="chips" role="group" aria-label="${esc(t('cwSecondary'))}"><span class="muted">${esc(t('cwSecondary'))}</span> ${WIDGETS.filter(w => w !== I.primary).map(w => `<button class="chip" data-cw-sec2="${k}" data-w="${w}" aria-pressed="${I.secondary.includes(w)}">${w}</button>`).join('')}</span>
+    </div>`; }).join('');
+    return `<div class="card set-card" id="set-widgets"><h3>${esc(t('setCw'))}</h3>
+      <p class="muted">${esc(t('setCwIntro'))}</p>
+      ${row(t('cwOn'), seg('data-cw-on', [['1', t('cwYes')], ['0', t('cwNo')]], S.on ? '1' : '0'), t('cwOnHint'))}
+      ${sec('general', `${row(t('cwMax'), `<input type="number" data-cw-num="max" min="1" max="8" step="1" value="${S.max}" data-no-knob>`, t('cwMaxHint'))}
+        ${row(t('cwRoll'), seg('data-cw-roll', [['pianoroll', 'pianoroll'], ['punchcard', 'punchcard']], S.roll))}
+        ${row(t('cwOrder'), order, t('cwOrderHint'))}
+        ${row(t('cwShare'), `<span class="cw-unit"><input type="number" data-cw-num="share" min="0" max="100" step="5" value="${S.share}" data-no-knob> %</span>`, t('cwShareHint'))}
+        ${row(t('cwNotes'), seg('data-cw-notes', [['volume', t('cwNotes:volume')], ['full', t('cwNotes:full')]], S.notes), t('cwNotesHint'))}`)}
+      ${sec('muted', `${row(t('cwWindow'), `<select data-cw-window data-no-knob>${CW_WINDOWS.map(w => opt(String(w), String(S.window), w === 'always' ? t('cwWindow:always') : t('cwWindow:n', { n: w }))).join('')}</select>`, t('cwWindowHint'))}
+        ${row(t('cwDim'), seg('data-cw-dim', [['1', t('cwYes')], ['0', t('cwNo')]], S.dim ? '1' : '0'), t('cwDimHint'))}`)}
+      ${sec('widgets', `<p class="hint muted">${esc(t('cwWidgetsHint'))}</p><div class="cw-checks">${WIDGETS.map(w => check(`data-cw-widget="${w}"`, S.widgets[w], w)).join('')}</div>`)}
+      ${sec('instruments', `<p class="hint muted">${esc(t('cwInstHint'))}</p>${inst}`)}
+      ${sec('params', `<p class="hint muted">${esc(t('cwParamsHint'))}</p><div class="cw-checks">${CW_PARAMS.map(k => check(`data-cw-param="${k}"`, S.params[k], k)).join('')}</div>`)}
+      ${sec('sizes', `<p class="hint muted">${esc(t('cwSizesHint'))}</p>${Object.keys(CW_DEFAULTS.sizes).map(k => row(t(`cwSize:${k}`), `<span class="cw-unit"><input type="number" data-cw-size="${k}" min="${CW_SIZE_LIMITS[k][0]}" max="${CW_SIZE_LIMITS[k][1]}" step="2" value="${S.sizes[k]}" data-no-knob> px</span>`)).join('')}`)}
+      <div class="actions"><button class="btn" id="set-cw-defaults">${esc(t('cwDefaults'))}</button></div>
+    </div>`;
+  }
+  // a change of the code widgets' settings, stored whole (the defaults filled in)
+  const setCw = f => { const S = widgetSettings(store.get(CW_KEY, null)); f(S); store.set(CW_KEY, widgetSettings(S)); if (app.widgetsChanged) app.widgetsChanged(); };
   const setFrag = (k, v) => store.set('coding-misk-fragments', { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), [k]: v });
   const setVid = (k, v) => store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}), [k]: v });
   const entries = () => { const out = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); out.push([k, store.get(k, null)]); } return out; };
@@ -111,6 +147,14 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
+    // code widgets (code-widgets D2)
+    if (b.dataset.cwOn) { setCw(S => { S.on = b.dataset.cwOn === '1'; }); return render(); }
+    if (b.dataset.cwRoll) { setCw(S => { S.roll = b.dataset.cwRoll; }); return render(); }
+    if (b.dataset.cwNotes) { setCw(S => { S.notes = b.dataset.cwNotes; }); return render(); }
+    if (b.dataset.cwDim) { setCw(S => { S.dim = b.dataset.cwDim === '1'; }); return render(); }
+    if (b.dataset.cwMove) { const k = b.dataset.cwMove, d = +b.dataset.dir; setCw(S => { const i = S.order.indexOf(k), j = i + d; if (i >= 0 && j >= 0 && j < S.order.length) [S.order[i], S.order[j]] = [S.order[j], S.order[i]]; }); render(); const f = root.querySelector(`[data-cw-move="${k}"][data-dir="${d}"]:not([disabled])`) || root.querySelector(`[data-cw-move="${k}"]:not([disabled])`); if (f) f.focus(); return; }
+    if (b.dataset.cwSec2) { const k = b.dataset.cwSec2, w = b.dataset.w; setCw(S => { const I = S.instruments[k], has = I.secondary.includes(w); I.secondary = has ? I.secondary.filter(x => x !== w) : [...I.secondary, w]; }); return render(); }
+    if (b.id === 'set-cw-defaults') { const on = widgetSettings(store.get(CW_KEY, null)).on; store.set(CW_KEY, { ...widgetSettings(null), on }); if (app.widgetsChanged) app.widgetsChanged(); toast(t('cwDefaultsDone')); return render(); }
     if (b.dataset.setMp3) { store.set('coding-misk-export-mp3', +b.dataset.setMp3); return render(); }
     // direction presets (#53): the whole video setting under a name
     if (b.id === 'set-vid-preset-save') {
@@ -151,7 +195,18 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     }
   });
   root.addEventListener('input', e => { if (e.target.id === 'set-volume') { app.setVolume(+e.target.value); e.target.nextElementSibling.textContent = `${e.target.value}%`; } });
+  // the sections of the code widgets card left open
+  root.addEventListener('toggle', e => { const d = e.target; if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
   root.addEventListener('change', e => {
+    { const x = e.target, d = x.dataset || {};
+      if (d.cwNum) { setCw(S => { S[d.cwNum] = +x.value; }); x.value = widgetSettings(store.get(CW_KEY, null))[d.cwNum]; return; }
+      if (d.cwWindow !== undefined) { setCw(S => { S.window = x.value === 'always' ? 'always' : +x.value; }); return; }
+      if (d.cwWidget) { setCw(S => { S.widgets[d.cwWidget] = x.checked; }); return; }
+      if (d.cwParam) { setCw(S => { S.params[d.cwParam] = x.checked; }); return; }
+      if (d.cwSize) { setCw(S => { S.sizes[d.cwSize] = +x.value; }); x.value = widgetSettings(store.get(CW_KEY, null)).sizes[d.cwSize]; return; }
+      if (d.cwInstOn) { setCw(S => { S.instruments[d.cwInstOn].on = x.checked; }); return; }
+      if (d.cwPrim) { setCw(S => { const I = S.instruments[d.cwPrim], old = I.primary; I.primary = x.value; I.secondary = [...I.secondary.filter(w => w !== x.value), ...(old !== x.value && !I.secondary.includes(old) ? [old] : [])]; }); return render(); }
+    }
     if (e.target.id === 'set-radio-look') store.set('coding-misk-radio-look', e.target.value);
     if (e.target.id === 'set-format') { store.set('coding-misk-export-format', e.target.value); render(); }
     if (e.target.id === 'set-speed') store.set('coding-misk-export-speed', e.target.value);

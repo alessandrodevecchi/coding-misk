@@ -82,13 +82,14 @@ const plays = c => /^\s*[_S]?\$:(?!\s*silence\s*$)/m.test(c);
 // → like liveCode: { build, codeAt(bar, keep), run(shown, bar), standalone(shown, bar), buses, fns, paste, ctl, parts }
 // run and standalone take the bar the code is for (the hidden songs change with their own steps); without it, the bar
 // of the latest codeAt
-export function airCode(W, songs, { lang = () => 'en', files = () => ({}), cols = () => 0 } = {}) {
+// widgets(): the code widgets' settings, for the song on air only (code-widgets)
+export function airCode(W, songs, { lang = () => 'en', files = () => ({}), cols = () => 0, widgets = null } = {}) {
   // (a song not on air keeps its own narrator switch, profile-options: with the narrator off it never speaks its steps;
   // and its narrator style, voice-controls)
   const classic = resolveProfile('classic');
   const ownVoice = C => (C ? { ...(C.narrator === false ? { narrator: false } : {}), ...(C.narratorStyle && C.narratorStyle !== 'auto' ? { narratorStyle: C.narratorStyle } : {}) } : {});
   const k0 = Math.max(0, songs.findIndex(s => s.show === 'air')), A = songs[k0];
-  const LA = liveCode(windowPart(W, songs, k0, { grown: true }), A.ctl, { lang, files, cols });
+  const LA = liveCode(windowPart(W, songs, k0, { grown: true }), A.ctl, { lang, files, cols, widgets });
   const others = songs.map((s, k) => ({ ...s, k })).filter(s => s.k !== k0).map(s => ({ ...s, tag: `n${s.n}_`, L: liveCode(windowPart(W, songs, s.k), Object.keys(ownVoice(s.ctl)).length ? resolveProfile('classic', ownVoice(s.ctl)) : classic, { lang, files }) }));
   const codeOf = (p, bar, keep) => apart(p.L.run ? p.L.run(p.L.codeAt(bar, keep)) : p.L.codeAt(bar, keep), p.tag);
   let lastBar = 0;

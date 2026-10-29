@@ -9,7 +9,7 @@ export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
 // working state that does not belong in a backup
 // (coding-misk-artist-voice: the old voice of the next song by an artist, no longer read since new-song-panel D9)
-const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel', 'coding-misk-code-w', 'coding-misk-code-collapsed', 'coding-misk-artist-voice']);
+const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel', 'coding-misk-code-w', 'coding-misk-code-collapsed', 'coding-misk-artist-voice', 'coding-misk-cw-open']);
 
 // entries: [[key, value]] of the browser storage (values parsed). Returns the backup object.
 export function makeBackup(entries, now = new Date()) {

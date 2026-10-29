@@ -3,6 +3,13 @@
 import { makeBackup, mergeBackup, BACKUP_FORMAT } from '../src/settings/backup.js';
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const CHECKS = {
+  'code widgets settings travel in the backup, the open sections of their card do not (code-widgets 2.2)'() {
+    const w = { on: true, max: 2, window: 32, order: ['drums', 'bass'] };
+    const b = makeBackup([['coding-misk-code-widgets', w], ['coding-misk-cw-open', ['general']]]);
+    assert(JSON.stringify(b.data['coding-misk-code-widgets']) === JSON.stringify(w) && !('coding-misk-cw-open' in b.data), Object.keys(b.data).join());
+    const { values } = mergeBackup(b, () => null);
+    assert(JSON.stringify(values['coding-misk-code-widgets']) === JSON.stringify(w), 'imported');
+  },
   'backup keeps the app keys and leaves working state out'() {
     const b = makeBackup([['coding-misk-library', { tracks: [] }], ['coding-misk-draft', { x: 1 }], ['other', 1], ['coding-misk-ui', 'hw']]);
     assert(b.format === BACKUP_FORMAT && Object.keys(b.data).join() === 'coding-misk-library,coding-misk-ui', Object.keys(b.data).join());
