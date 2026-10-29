@@ -1900,3 +1900,12 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Stima:** circa 22 ore agente (da 17 a 28), dopo `spoken-text-on-stage`. 13 domande per il proprietario, ognuna con la risposta consigliata, in fondo a `design.md`.
 - **Immagini (git-ignorate):** `notes/prove-2026-10-29/mie-frasi/`, 8 schermate in italiano con il DOM iniettato sulla porta 5224: elenco (neon), modifica, vocabolari inclusi, voci e banco di prova, campioni e spazio (HW), impostazioni, telefono HW, telefono chiaro con la domanda dalla radio.
 - **Esiti:** `openspec validate my-phrases --strict` passa.
+
+## 2026-10-29: spec per completare la modifica in corso alla presa di controllo (takeover-pending-edit)
+
+- **Cosa:** change OpenSpec `takeover-pending-edit` (proposta, spec delta `live-build/hand-takeover`, design con domande tk1-tk6 e risposta consigliata, compiti con stime). Solo pianificazione, nessun codice dell'app.
+- **Oggi, letto nel codice:** il divenire digita un intero piano per passo (`typingPlan`, `src/song/typing.js:342`), mostrato fotogramma per fotogramma da `typeFrame` (`src/main.js:805`). `takeOver()` (`src/main.js:835`) mette `typing = null` e lascia nell'editor il testo mezzo digitato; il primo Ctrl+Invio dà errore. Stesso problema durante la digitazione di «Riprendi» (`resumeTo`), in Componi con ogni profilo e nella radio, e anche per seek o colonna di crescita (#88) a mano e per la ripresa dopo pausa, che valutano il codice dell'editor.
+- **Proposta (scelta del proprietario):** alla presa di controllo la modifica in corso si completa subito (`plan.frame(Infinity)` è già il testo di arrivo), prima del tasto dell'utente; nessuna valutazione automatica; i passi successivi restano come oggi. Una digitazione non ancora cominciata non cambia nulla.
+- **Check previsto:** `check-hand.cjs` prende il controllo a metà di una modifica (tasto, incolla, Backspace, durante «Riprendi») e Ctrl+Invio deve valutare senza errore; prima deve fallire su develop.
+- **Stima:** circa 4 ore agente (da 3 a 6).
+- **Esiti:** `openspec validate takeover-pending-edit --strict` passa; `npm run knowledge` e `npm run check:knowledge` ok.

@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 89. With open tasks: 27. All tasks ticked, waiting to be archived: 62.
+OpenSpec changes not archived: 91. With open tasks: 29. All tasks ticked, waiting to be archived: 62.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -33,6 +33,7 @@ OpenSpec changes not archived: 89. With open tasks: 27. All tasks ticked, waitin
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |
 | [material-generator](../../openspec/changes/material-generator/tasks.md) | 1 | 22 |
+| [my-phrases](../../openspec/changes/my-phrases/tasks.md) | 29 | 29 |
 | [natural-growth](../../openspec/changes/natural-growth/tasks.md) | 2 | 10 |
 | [new-song-panel](../../openspec/changes/new-song-panel/tasks.md) | 1 | 21 |
 | [pattern-library](../../openspec/changes/pattern-library/tasks.md) | 1 | 16 |
@@ -41,8 +42,9 @@ OpenSpec changes not archived: 89. With open tasks: 27. All tasks ticked, waitin
 | [radio-profiles](../../openspec/changes/radio-profiles/tasks.md) | 1 | 36 |
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
-| [spoken-text-on-stage](../../openspec/changes/spoken-text-on-stage/tasks.md) | 18 | 18 |
+| [spoken-text-on-stage](../../openspec/changes/spoken-text-on-stage/tasks.md) | 30 | 30 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
+| [takeover-pending-edit](../../openspec/changes/takeover-pending-edit/tasks.md) | 11 | 11 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 | [widget-render-styles](../../openspec/changes/widget-render-styles/tasks.md) | 2 | 21 |
 
