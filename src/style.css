@@ -330,6 +330,22 @@
   .x-on { position: absolute; top: 5px; bottom: 5px; border-radius: 2px; background: color-mix(in srgb, var(--a1) 55%, var(--panel2)); pointer-events: none; }
   .x-step { position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); opacity: .85; pointer-events: none; }
   .grow-hidden .xcell.x-grow i { display: none; }
+  /* the narrator in the timeline (narrator-ghost-row): a ghost row after the tracks, dashed and read-only, its lines as
+     counts per section, ticks in the growth and the ending, round marks on the timeline lane (the narrator track too) */
+  .ghost-head { padding-right: 0; }
+  .trk-name.ghost-name { border: 1px dashed color-mix(in srgb, var(--a2) 55%, var(--line)); color: var(--muted); font-weight: 500; }
+  .trk-name.ghost-name i { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .trk-name.ghost-name:hover, .trk-name.ghost-name:focus-visible { border-color: var(--a2); color: var(--ink); }
+  .trk-cell.ncell:not(.xcell) { background: transparent; border: 1px dashed color-mix(in srgb, var(--a2) 30%, transparent); color: var(--a2); }
+  .trk-cell.ncell.on:not(.xcell) { border-color: color-mix(in srgb, var(--a2) 75%, transparent); background: color-mix(in srgb, var(--a2) 10%, transparent); }
+  .x-step.n-step { width: 2px; background: var(--a2); opacity: 1; }
+  .trk-lane.n-lane { cursor: pointer; border: 1px dashed color-mix(in srgb, var(--a2) 30%, transparent); background: none; }
+  .n-mark { position: absolute; top: 50%; z-index: 3; width: 10px; height: 10px; margin: -5px 0 0 -5px; padding: 0; border-radius: 50%; border: 1px solid #000; background: var(--a2); cursor: pointer; }
+  .n-mark:hover, .n-mark:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .trk-row.ghost.silent .ghost-name, .trk-row.ghost.silent .n-lane { opacity: .45; }
+  .trk-row.flash .trk-name { animation: trk-flash 1.2s ease-out; }
+  @keyframes trk-flash { from { outline: 2px solid var(--a2); outline-offset: -1px; } to { outline: 2px solid transparent; outline-offset: -1px; } }
+  @media (prefers-reduced-motion: reduce) { .trk-row.flash .trk-name { animation: none; outline: 2px solid var(--a2); outline-offset: -1px; } }
   .ruler-ticks i.r-min { top: 1px; bottom: auto; height: 12px; padding-left: 2px; border-left-color: var(--a2); color: var(--a2); }
   .ruler-ticks i.r-step { top: auto; height: 7px; border-left: 2px solid var(--a2); }
   .arr-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -541,6 +557,9 @@
 :root[data-ui="hw"] .arr-xcol { background: repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 5px, transparent 5px 10px), linear-gradient(#2c2c31, #202024); border: 1px dashed #4a4a52; box-shadow: 0 2px 0 #000; }
 :root[data-ui="hw"] .arr-xcol.playing::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--led); box-shadow: 0 0 8px var(--led); }
 :root[data-ui="hw"] .trk-cell.xcell { border: 1px dashed #3a3a40; }
+:root[data-ui="hw"] .trk-name.ghost-name, :root[data-ui="hw"] .trk-cell.ncell:not(.xcell), :root[data-ui="hw"] .trk-lane.n-lane { border: 1px dashed #3a3a40; }
+:root[data-ui="hw"] .trk-cell.ncell.on:not(.xcell) { border-color: #4a4a52; color: var(--led); background: rgba(57, 255, 106, .05); }
+:root[data-ui="hw"] .x-step.n-step, :root[data-ui="hw"] .n-mark { background: var(--led); box-shadow: 0 0 6px color-mix(in srgb, var(--led) 60%, transparent); }
 :root[data-ui="hw"] .edhost, :root[data-ui="hw"] .stagewrap { border: 6px solid #0f0f11; box-shadow: 0 0 0 1px #3d3d43, 0 6px 16px rgba(0,0,0,.6); }
 
 /* radio (#22) */
@@ -1458,7 +1477,10 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .vswitch[aria-pressed="true"] .vs-lamp { background: #3cff7a; box-shadow: 0 0 6px #3cff7a; }
 .vswitch:disabled { opacity: .45; cursor: default; }
 /* a voice switched off: every control greyed, values kept; the switch stays active */
-.voice-block.off > :not(.vb-head), .voice-block.off .vb-main { opacity: .45; }
+.voice-block.off > :not(.vb-head):not(.vb-note), .voice-block.off .vb-main { opacity: .45; }
+/* the Live build off: the narrator block says why it is silent (narrator-ghost-row) */
+.vb-note { margin: 0; color: var(--a2); }
+.vb-note[hidden] { display: none; }
 .voice-part { border-top: 1px dotted var(--line); padding-top: 4px; min-width: 0; }
 .voice-part > summary { cursor: pointer; font-size: 12px; color: var(--muted); list-style-position: inside; }
 .voice-part > summary .lbl { display: inline; }

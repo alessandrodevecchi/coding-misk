@@ -291,6 +291,13 @@ export function spokenSchedule(song, C = {}, lang = 'en', files = {}) {
   }
   return out.sort((a, b) => a.at - b.at || (a.voice === b.voice ? 0 : a.voice === 'N' ? -1 : 1));
 }
+// Where the narrator speaks, for the Compose timeline (narrator-ghost-row D2): [{ at, text, track }] from spokenSchedule,
+// so the marks are what is heard (the poetic images, no line where the voice instrument speaks, none from a muted
+// narrator track, none without a sample). The narrator switched off is counted as on: its dimmed row still shows where
+// it would speak. track: the narrator track's id, null when the song has none (the ghost row).
+export function narratorMarks(song, C = {}, lang = 'en', files = {}) {
+  return spokenSchedule(song, { ...(C || {}), narrator: true }, lang, files).filter(x => x.voice === 'N').map(({ at, text, track }) => ({ at, text, track }));
+}
 
 // checks for the "build" list; err/warn take (path, message)
 export function checkBuild(song, total, err, warn) {

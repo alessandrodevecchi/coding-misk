@@ -4,7 +4,11 @@
 // ruler (clicks in the growth and in the written part, the knob during the growth), the strip (growth to bar 0, first
 // written section to the written part), a growth cell (the track's step, the track selected), the keys (arrows,
 // Page Up and Page Down, Home, End with the added ending), the Crescendo ending column, a waypoint song in Classic
-// with the live build off (the section clicked is the section heard), a Classic song unchanged, and the arranger
+// with the live build off (the section clicked is the section heard), a Classic song unchanged, the ghost narrator row
+// (narrator-ghost-row: last row in both views, aligned, its marks the narrator lines of the schedule, tooltips, clicks
+// to the nearest line without selecting a track, the name opening the narrator's Sound, dimmed when the narrator is
+// off, the Narrator track in its place on the first sound edit and the ghost back on Undo, none with the Live build
+// off, hardware theme, 400 px), and the arranger
 // following the playing knob (D7: page follow in the open view and the timeline view, held by the user's scroll, resumed
 // after 3 s or on a seek, off with Follow playback off, a jump with reduced motion, never in a compact view that fits).
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-timeline.cjs [shots-dir]
@@ -26,7 +30,8 @@ const bars = page => page.evaluate(() => globalThis.codingMiskBars().compose);
 const compose = page => page.evaluate(() => globalThis.codingMiskPatterns.compose());
 async function openSong(page, id, profile) {
   await page.click('[data-tab="componi"]'); await sleep(300);
-  await page.selectOption('#track-pick', id); await sleep(1200);
+  // (a song with changes asks to press twice before another one opens)
+  for (let k = 0; k < 3; k++) { await page.selectOption('#track-pick', id); await sleep(1200); if ((await compose(page)).T.id === id) break; }
   if (profile) {
     if (await page.$eval('#live-toggle', el => el.getAttribute('aria-pressed')) !== 'true') { await page.click('#live-toggle'); await sleep(600); }
     await page.$eval(`#live-profile [data-profile="${profile}"]`, el => el.click());
@@ -44,11 +49,19 @@ const boxes = page => page.evaluate(() => {
     grow: r(document.querySelector('#arr-strip .arr-xcol.x-grow')), end: r(document.querySelector('#arr-strip .arr-xcol.x-end')),
     first: r(document.querySelector('#arr-strip .arr-scene-btn')), secs: [...document.querySelectorAll('#arr-strip .arr-scene-btn')].map(r),
     gcells: [...document.querySelectorAll('#arr-grid .xcell.x-grow')].map(r), ecells: [...document.querySelectorAll('#arr-grid .xcell.x-ending')].map(r),
-    firstCells: [...document.querySelectorAll('#arr-grid .trk-row')].map(row => r(row.querySelector('[data-cell$=":0"], .trk-lane'))),
+    firstCells: [...document.querySelectorAll('#arr-grid .trk-row')].map(row => r(row.querySelector('[data-cell$=":0"], [data-ncell="sec"], .trk-lane'))),
     ruler: r(document.querySelector('#ruler-track')), knob: r(document.querySelector('#ruler-knob')),
     scroll: (s => ({ sw: s.scrollWidth, cw: s.clientWidth }))(document.querySelector('.arr-scroll')),
     eye: !!document.querySelector('.grow-eye'), sections: document.querySelectorAll('.arr-scene-btn').length,
   };
+});
+// the ghost narrator row (narrator-ghost-row): where it is, its cells, ticks, marks and tooltips
+const ghost = page => page.evaluate(() => {
+  const r = document.querySelector('#arr-grid [data-ghost]'); if (!r) return null;
+  const rows = [...document.querySelectorAll('#arr-grid .trk-row')], gc = r.querySelector('.ncell.x-grow'), nm = r.querySelector('.ghost-name');
+  return { last: rows[rows.length - 1] === r, muteSolo: !!r.querySelector('[data-mute], [data-solo]'), name: nm.querySelector('i').textContent.trim(), nameTip: nm.title, nameFits: nm.querySelector('i').scrollWidth <= nm.querySelector('i').clientWidth + 1, silent: r.classList.contains('silent'),
+    grow: gc ? gc.dataset.ticks : '', growSteps: gc ? gc.querySelectorAll('.n-step').length : 0, secs: [...r.querySelectorAll('[data-ncell="sec"]')].map(c => c.textContent.trim()), secTicks: [...r.querySelectorAll('[data-ncell="sec"]')].map(c => c.dataset.ticks),
+    dots: [...r.querySelectorAll('[data-nmark]')].map(d => +d.dataset.nmark), tips: [...r.querySelectorAll('[data-ncell]')].map(c => c.title) };
 });
 // a click on the ruler at a bar of the played song inside a column (fraction of its width)
 async function clickRuler(page, colSel, frac) {
@@ -108,6 +121,7 @@ async function shot(page, name) {
   await openSong(page, 'luci-rosse', null);
   let b = await boxes(page), m = (await bars(page)).map;
   check(!b.grow && !b.end && !b.eye && m.G === 0, 'Classic song: no growth column, no toggle', `G ${m.G}`);
+  check(!(await ghost(page)) && !(await bars(page)).narrator.ghost, 'Live build off: no ghost narrator row');
   await clickRuler(page, '#arr-strip .arr-scene-btn[data-scene-i="2"]', 0.02);
   { const c = (await bars(page)).cue, at = (await compose(page)).T.sections.slice(0, 2).reduce((a, s) => a + s.bars, 0); check(near(c, at, 0.5), 'Classic song: the ruler seeks in written bars', `bar ${c}, third section at ${at}`); }
 
@@ -123,6 +137,76 @@ async function shot(page, name) {
   const ons = await page.$$eval('#arr-grid .xcell.x-grow', els => els.map(e => e.querySelectorAll('.x-on').length));
   check(ticks[0] > 0 && ons[0] > 0, 'drums row: where it plays in the growth and its steps', `ticks per row ${ticks.join(',')}, spans ${ons.join(',')}`);
   await shot(page, 'fatto-1-compatta-neon.png');
+
+  // ---------- the ghost narrator row (narrator-ghost-row) ----------
+  {
+    const nar = async () => (await bars(page)).narrator;
+    const N = await nar(), G = m.G;
+    let g = await ghost(page);
+    const inG = N.marks.filter(x => x.at < G).map(x => x.at), written = N.marks.filter(x => x.at >= G).map(x => x.at);
+    check(N.ghost && g && g.last && !g.muteSolo && g.name === 'Narrator' && !g.silent, 'ghost row: the last row, named Narrator, no Mute or Solo, not dimmed', JSON.stringify(g && { last: g.last, name: g.name }));
+    check(N.marks.length === 19 && inG.length === 17 && N.marks.every(x => x.track === null), 'ghost row: 19 narrator lines heard on luci-rosse in Live coder, 17 of them in the growth (spokenSchedule)', `${N.marks.length} lines, ${inG.length} in the growth`);
+    check(g.grow === inG.join(',') && g.growSteps === inG.length, 'ghost growth cell: a tick per narrator line of the growth, at its bar', `${g.growSteps} ticks`);
+    check(JSON.stringify(g.secTicks.filter(Boolean).join(',').split(',').filter(Boolean).map(Number)) === JSON.stringify(written) && g.secs.filter(Boolean).every(x => /^❝ \d+$/.test(x)), 'ghost sections: the count of the lines in each written section, at the bars of the schedule', `${g.secs.join('|')}`);
+    const t149 = g.tips.find(x => /battuta 149/.test(x));
+    check(t149 && /«sta arrivando»/.test(t149) && /Sola lettura/.test(t149), 'ghost section tooltip: the section, "battuta 149" with its line, read-only', t149 && t149.replace(/\n/g, ' / '));
+    check(/19 frasi/.test(g.nameTip) && /traccia Narrator/.test(g.nameTip), 'ghost name tooltip: how many lines, the track it becomes', g.nameTip.replace(/\n/g, ' / '));
+    check(aligned(await boxes(page)), 'ghost row: its growth cell and first section aligned with the rows above (sections view)');
+    // clicks: the nearest line, no track selected
+    const tk0 = (await bars(page)).map.tk;
+    const gc = await page.$eval('#arr-grid [data-ghost] .ncell.x-grow', e => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * 0.5, y: r.top + r.height / 2, w: r.width }; });
+    await page.mouse.click(gc.x, gc.y); await sleep(500);
+    let cue = (await bars(page)).cue;
+    const want = inG.reduce((p, q) => (Math.abs(q - G * 0.5) < Math.abs(p - G * 0.5) ? q : p));
+    check(near(cue, want, 6) && inG.includes(cue) && (await bars(page)).map.tk === tk0, 'ghost growth cell: goes to the nearest narrator line, the selected track stays', `bar ${cue}, nearest ${want}, track ${(await bars(page)).map.tk}`);
+    const si = g.secTicks.findIndex(x => x === '148');
+    { const p = await page.$$eval('#arr-grid [data-ghost] [data-ncell="sec"]', (els, i) => { const r = els[i].getBoundingClientRect(); return { x: r.left + r.width * 0.8, y: r.top + r.height / 2 }; }, si); await page.mouse.click(p.x, p.y); }
+    await sleep(500);
+    cue = (await bars(page)).cue;
+    check(cue === 148 && (await bars(page)).map.tk === tk0, 'ghost section cell: goes to its line at bar 149', `bar ${cue + 1}`);
+    // keys: Enter on a cell acts as a click
+    await page.focus('#arr-grid [data-ghost] .ncell.x-grow'); await page.keyboard.press('Enter'); await sleep(400);
+    check(inG.includes((await bars(page)).cue), 'ghost cell from the keyboard: Enter goes to a narrator line', `bar ${(await bars(page)).cue}`);
+    // the name: Voice: narrator in view, Sound open and focused
+    await page.click('#arr-grid [data-ghost] [data-nghost]'); await sleep(900);
+    const vs = await page.evaluate(() => { const row = document.querySelector('#live-narrator-row'), r = row.getBoundingClientRect(), d = row.querySelector('details.vs-part'); return { seen: r.top < innerHeight && r.bottom > 0, open: !!d && d.open, focus: !!document.activeElement && !!document.activeElement.closest('#live-narrator-row details.vs-part') }; });
+    check(vs.seen && vs.open && vs.focus, 'ghost name: Voice: narrator in view, its Sound unfolded and focused', JSON.stringify(vs));
+    if (shots) { await page.evaluate(() => document.querySelector('#live-narrator-row').scrollIntoView({ block: 'center' })); await sleep(300); await page.screenshot({ path: path.join(shots, 'fatto-narratore-voce-aperta.png') }); }
+    await shot(page, 'fatto-narratore-sezioni-neon.png');
+    // switched off: dimmed, says why; the marks stay
+    await page.$eval('#live-narrator', el => el.click()); await sleep(1200);
+    g = await ghost(page);
+    check(g && g.silent && /spenta/.test(g.nameTip) && g.growSteps === inG.length, 'narrator off: the ghost row stays, dimmed, the tooltip says the narrator is off, the marks stay', g && g.nameTip.split('\n').pop());
+    await shot(page, 'fatto-narratore-spento.png');
+    await page.$eval('#live-narrator', el => el.click()); await sleep(1200);
+    check(!(await ghost(page)).silent, 'narrator on again: the ghost row is not dimmed');
+    // the first sound edit: the Narrator track in its place, the same marks; Undo brings the ghost back
+    const n0 = (await compose(page)).T.tracks.length;
+    await page.evaluate(() => { const d = document.querySelector('#live-narrator-parts details.vs-part'); d.open = true; }); await sleep(200);
+    await page.selectOption('#live-narrator-parts [data-vsound-style="narrator"]', 'deep'); await sleep(400);
+    const real = await page.evaluate(() => { const rows = [...document.querySelectorAll('#arr-grid .trk-row')], last = rows[rows.length - 1], x = last.querySelector('.xcell.x-grow'); return { ghost: !!document.querySelector('#arr-grid [data-ghost]'), name: last.querySelector('.trk-name').textContent.trim(), flash: last.classList.contains('flash'), grow: x ? [...x.querySelectorAll('.x-step')].length : -1, ticks: x ? x.dataset.ticks : '', secs: [...last.querySelectorAll('.trk-cell.voice')].map(c => c.textContent.trim()) }; });
+    const N2 = await nar(), tid = (await compose(page)).T.tracks.find(x => x.type === 'voice');
+    check(!real.ghost && /Narrator/.test(real.name) && real.flash && real.ticks === inG.join(',') && JSON.stringify(real.secs) === JSON.stringify(g.secs) && N2.marks.length === N.marks.length && N2.marks.every(x => x.track === (tid && tid.id)), 'first sound edit: the Narrator track takes the ghost row\'s place with the same marks, highlighted', JSON.stringify({ name: real.name, flash: real.flash, ticks: real.grow }));
+    await sleep(1400);
+    check(!(await page.$('#arr-grid .trk-row.flash')), 'the highlight goes after 1.2 s');
+    await page.click('.toast .toast-act'); await sleep(1500);
+    check((await compose(page)).T.tracks.length === n0 && !!(await ghost(page)), 'Undo: no narrator track, the ghost row is back');
+    await page.evaluate(() => { const d = document.querySelector('#live-narrator-parts details.vs-part'); d.open = false; }); await sleep(200);
+    // the timeline view: marks on the lane, aligned, a mark seeks, the lane adds nothing
+    await page.click('[data-arr-mode="timeline"]'); await sleep(900);
+    g = await ghost(page);
+    b = await boxes(page);
+    check(g && g.last && JSON.stringify(g.dots) === JSON.stringify(written) && g.growSteps === inG.length && aligned(b), 'timeline view: the ghost row last, a mark per line of the written part, the growth ticks, aligned', `${g && g.dots.join(',')}`);
+    const dot = await page.$eval('#arr-grid [data-ghost] [data-nmark]', e => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, at: +e.dataset.nmark }; });
+    await page.mouse.click(dot.x, dot.y); await sleep(500);
+    check((await bars(page)).cue === dot.at, 'timeline view: a mark goes to its line', `bar ${(await bars(page)).cue}, mark ${dot.at}`);
+    const lane = await page.$eval('#arr-grid [data-ghost] .n-lane', e => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width * 0.03, y: r.top + r.height / 2 }; });
+    const before = JSON.stringify((await compose(page)).T.tracks);
+    await page.mouse.click(lane.x, lane.y); await sleep(500);
+    check(JSON.stringify((await compose(page)).T.tracks) === before && written.includes((await bars(page)).cue), 'timeline view: a click on the ghost lane adds no clip and goes to the nearest line', `bar ${(await bars(page)).cue}`);
+    await shot(page, 'fatto-narratore-timeline-neon.png');
+    await page.click('[data-arr-mode="sections"]'); await sleep(800);
+  }
 
   // seek mapping, stopped
   await clickRuler(page, '#arr-strip .arr-xcol.x-grow', 0.5);
@@ -265,6 +349,9 @@ async function shot(page, name) {
   await page.click('[data-tab="componi"]');
   await page.waitForFunction(() => { const b = globalThis.codingMiskBars().compose; return !b.pending && b.map.G > 0; }, null, { timeout: WAIT }); await sleep(800);
   check(aligned(await boxes(page)), 'hardware theme: growth column aligned');
+  { const g = await ghost(page); check(g && g.last && g.growSteps > 0 && aligned(await boxes(page)), 'hardware theme: the ghost row with its ticks, aligned'); }
+  await shot(page, 'fatto-narratore-hw.png');
+  await page.click('[data-arr-mode="timeline"]'); await sleep(800); await shot(page, 'fatto-narratore-timeline-hw.png'); await page.click('[data-arr-mode="sections"]'); await sleep(800);
   await shot(page, 'fatto-5-compatta-hw.png');
   await page.click('.grow-eye'); await sleep(600); await shot(page, 'fatto-6-intera-hw.png');
   await page.click('.grow-eye'); await sleep(600); await shot(page, 'fatto-7-nascosta-hw.png');
@@ -306,6 +393,11 @@ async function shot(page, name) {
   await openSong(pp, 'luci-rosse', 'switch');
   b = await boxes(pp);
   check(near(b.grow.w, 96, 2) && aligned(b), 'phone: compact growth 96 px, aligned', `${b.grow && b.grow.w} px`);
+  { const g = await ghost(pp); check(g && g.name === 'Narrator' && g.nameFits && g.last, 'phone: the ghost row\'s name Narrator fits its head, aligned', JSON.stringify(g && { fits: g.nameFits }));
+    const c = await pp.$eval('#arr-grid [data-ghost] .ncell.x-grow', e => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width * 0.3, y: r.top + r.height / 2, ticks: e.dataset.ticks.split(',').map(Number) }; });
+    await pp.touchscreen.tap(c.x, c.y); await sleep(600);
+    check(c.ticks.includes((await bars(pp)).cue), 'phone: a tap on the ghost growth cell goes to a narrator line', `bar ${(await bars(pp)).cue}`); }
+  await shot(pp, 'fatto-narratore-telefono.png');
   await shot(pp, 'fatto-9-telefono-compatta.png');
   await pp.click('.grow-eye'); await sleep(600);
   b = await boxes(pp);

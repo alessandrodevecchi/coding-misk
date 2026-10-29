@@ -34,7 +34,7 @@ import { soundPatch } from '../src/endless/voice-sound.js';
 import * as VS from './voice-sample.mjs';
 import { phraseRows, listVocab, editText, editBars, removeRow, addRow, fillRows, vocabOf } from '../src/endless/phrase-list.js';
 import { steerSong, applyBar, whyNot } from '../src/endless/steering.js';
-import { spokenSchedule, BUILD_ACTIONS } from '../src/song/build.js';
+import { spokenSchedule, narratorMarks, BUILD_ACTIONS } from '../src/song/build.js';
 import { liveBuildOf } from '../src/live/live-code.js';
 import { stepLabel, nextRows } from '../src/radio/next-changes.js';
 import { sessionItems, GROWTH_ON_AIR } from '../src/endless/items.js';
@@ -872,6 +872,28 @@ const CHECKS = {
     }
     console.log(`      ${opened} radio songs open with an image; ${midset} mid-set releases with an image`);
     assert(midset >= 1, 'no mid-set opening found');
+  },
+  'narrator marks (narrator-ghost-row D2): the narrator lines of spokenSchedule (explaining and poetic), the narrator off counted as on, none on a voice-track bar, none from a muted narrator track, the same marks once the Narrator track is added; luci-rosse in Live coder: 19 lines heard, 17 in the growth'() {
+    const pairs = l => JSON.stringify(l.map(x => [x.at, x.text]));
+    const C = resolveProfile('switch'), grown = crescendoSong({ ...read('songs/luci-rosse.json'), kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles: recipes }) });
+    const B = liveBuildOf(grown, C), G = grown.crescendo.growth, m = narratorMarks(B, C, 'it', ANY);
+    assert(m.length === 19 && m.filter(x => x.at < G).length === 17, `luci-rosse: ${m.length} lines, ${m.filter(x => x.at < G).length} in the ${G} bars of the growth`);
+    assert(m.every(x => x.track === null), 'a song without a narrator track: marks with no track');
+    assert(pairs(m) === pairs(spokenSchedule(B, C, 'it', ANY).filter(x => x.voice === 'N')), 'the marks are not the narrator lines of the schedule');
+    assert(pairs(narratorMarks(B, { ...C, narrator: false }, 'it', ANY)) === pairs(m) && !spokenSchedule(B, { ...C, narrator: false }, 'it', ANY).some(x => x.voice === 'N'), 'the narrator off: the schedule has no line, the marks stay');
+    // poetic: the images the code says
+    const Cp = { ...C, narratorStyle: 'poetic' }, Bp = liveBuildOf(grown, Cp), mp = narratorMarks(Bp, Cp, 'en', ANY);
+    assert(mp.length && pairs(mp) === pairs(spokenSchedule(Bp, Cp, 'en', ANY).filter(x => x.voice === 'N')) && pairs(mp) !== pairs(narratorMarks(B, C, 'en', ANY)), 'poetic: the marks are the poetic lines of the schedule');
+    // the first sound edit adds a Narrator track: the same marks, on it; muted, none
+    const withN = { ...B, tracks: [...B.tracks, { id: 'narrator', name: 'Narrator', type: 'voice', settings: { ...VOICE_DEFAULT, pitch: 0.55 }, patterns: {}, clips: [] }] };
+    const mn = narratorMarks(withN, C, 'it', ANY);
+    assert(pairs(mn) === pairs(m) && mn.every(x => x.track === 'narrator'), 'the Narrator track added: other marks');
+    assert(!narratorMarks({ ...withN, tracks: withN.tracks.map(t => (t.type === 'voice' ? { ...t, mute: true } : t)) }, C, 'it', ANY).length, 'a muted narrator track still has marks');
+    // the voice instrument speaks: the narrator yields, no mark on its bars
+    const E = clone(EXAMPLE), CE = resolveProfile('classic'), BE = liveBuildOf({ ...E, build: deriveBuild(E) }, CE), me = narratorMarks(BE, CE, 'en', ANY), yields = spokenBars(E, 'en');
+    const said = buildSteps(BE).filter(x => x.say);
+    assert(me.length && !me.some(x => yields.has(x.at)) && said.some(x => yields.has(x.at)), `marks ${me.map(x => x.at)} on the voice instrument's bars, or no step line left to it`);
+    console.log(`      luci-rosse Live coder: ${m.length} lines (${m.filter(x => x.at < G).length} in the growth), poetic ${mp.length}; example: ${me.length} marks, ${said.filter(x => yields.has(x.at)).length} step lines left to the voice instrument`);
   },
   'narrator yields only to lines that sound (after-tests-oct28 D6): a voice-track line with no sample leaves its bar to the narrator; with every sample it yields as before'() {
     const song = clone(EXAMPLE);
