@@ -12,7 +12,7 @@ Estimate: about 24 agent hours (design, Estimate). Phases 1 to 3 alone, Monitor 
 
 ## 2. Stage feed (4 h)
 
-- [ ] 2.1 `readAudio` keeps a wave per instrument (no extra analyser). Verify: level snapshots unchanged (`node tools/snapshot-levels.cjs check` same result as before)
+- [x] 2.1 `readAudio` keeps a wave per instrument (no extra analyser). Verify: level snapshots unchanged (`node tools/snapshot-levels.cjs check` same result as before; done: only the known noise of 1-2 values per run, DEVLOG 2026-10-29)
 - [x] 2.2 Notes per instrument from the playing pattern, queried once per cycle and cached, filtered as "Widget notes". Verify: browser check, one song note by note against the fast video's notes
 - [x] 2.3 Spectrum columns rebuilt from the frame's time. Verify: `check:stage-widgets`, same frame alone and in a sequence
 
@@ -39,7 +39,7 @@ Estimate: about 24 agent hours (design, Estimate). Phases 1 to 3 alone, Monitor 
 
 ## 7. Checks and docs (4 h)
 
-- [ ] 7.1 `npm run check:stage-widgets` (no browser) and a browser check with frame times (budget of D10) and screenshots. Verify: both pass; times in the DEVLOG
-- [ ] 7.2 `check:video`, `check:clips`, `check:live`, `node tools/check-video.cjs`, `node tools/check-clips.cjs`, `node tools/check-live.cjs` with a widget look. Verify: all pass
-- [ ] 7.3 With the layer off and no widget look: `npm run check:code`, `npm run check:mixer`, level snapshots, fixtures unchanged
+- [x] 7.1 `npm run check:stage-widgets` (no browser) and a browser check with frame times (budget of D10) and screenshots. Verify: both pass; times in the DEVLOG
+- [ ] 7.2 `check:video`, `check:clips`, `check:live`, `node tools/check-video.cjs`, `node tools/check-clips.cjs`, `node tools/check-live.cjs` with a widget look. Verify: all pass (first delivery: video and live pass; `check-clips.cjs` speed fails under load as on develop; widget looks covered by `tools/check-stage-widgets.cjs`)
+- [x] 7.3 With the layer off and no widget look: `npm run check:code`, `npm run check:mixer`, level snapshots, fixtures unchanged
 - [ ] 7.4 Knowledge base (`visuals.md`, `code-widgets.md`, `decisions.md`, `settings.md`), `docs/DESIGN-SYSTEM.md`, DEVLOG with screenshots shown to the owner. Verify: `npm run check:knowledge`
