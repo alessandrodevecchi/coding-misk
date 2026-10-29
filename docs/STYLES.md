@@ -43,6 +43,7 @@ One recipe per file, `styles/<id>.json`. Required fields are marked.
 | `narrator`     | Optional narrator style of its songs: `"explain"` (default) or `"poetic"` (short images before each track comes in), or `{ "style": "poetic", "lines": { "bass": [{ "en": "…", "it": "…" }] } }` with the style's own images by track type. | `"explain"` |
 | `growthShapes` | Optional weights of the growth shapes its songs draw in a Live coder build: `{ "openings": { "full-kick": 3 }, "paces": { "fast": 2 }, "developments": { "by-type": 1 } }` (see Growth shapes below). |                         |
 | `headroom`     | Optional. The peak a track line of the style's songs may reach before the level checks warn, 1.0 to 1.5. A loud genre may let single lines go higher, because every line passes the master level first. It is also the push into the master limiter: the song's level into it is raised by the headroom (1.3 is +2.3 dB), for a louder, denser mix; the highest among a song's styles counts, 1.0 pushes none. The master output and exported files never go above 1.0, whatever the headroom; make a dirtier sound with distortion (`crunch`, `shape`, filter drive), not with more gain. | `1.0` |
+| `invented`     | Optional, written by the style maker (invented-styles). `{ "seed": "k3x9q2", "maker": 1, "from": { "tempo": "berlin-techno", "drums": "lo-fi", … }, "closest": "berlin-techno", "edited": false }`: the seed, the maker's version, the style each part came from, the closest existing style, and whether the style was edited after keeping. The director ignores it. | |
 | `words`        | Required. Title words: `{ "en": [...], "it": [...], "es": [...] }`, at least 3 each.       |                         |
 
 Energy shapes: `build-drop`, `slow-burn`, `waves`, `flat-groove`, `verse-chorus`, `late-peak`, `descent`.
@@ -116,6 +117,23 @@ The rules:
 - In between, the rotating style dominates, and each part comes from another selected style with probability `chaos × (n − 1) / n`, where `n` is the number of styles.
 - A part taken from a style that lacks it stays empty: jazz pads with no `guitar` give no guitar track.
 - Title words come from every style the song uses.
+
+## Inventing a style
+
+Words, with one meaning each: a **genre** is a broad family of music (a fixed list, never invented); a **style** is a precise recipe inside one genre (what this section invents); an **artist** is an invented name that mixes styles.
+
+The style maker (`src/endless/style-maker.js`, invented-styles, `#51`) makes a new recipe from a seed, from the built-in styles only:
+
+- One style is the **base**: it gives the `tempo` part (tempo, shapes, minutes, phrase, tracks, energy) and `headroom`. One or two **donors** lend whole parts (`drums`, `bass`, `harmony`, `lead`, `pads`, `voice`); a donor is near the base (same genre, or tempo within 15 BPM) 65 % of the time. At least two parts come from donors and two from the base.
+- Lists are **trimmed** to a few items of their source (kits 1 to 2, grooves 1 to 2, presets 1 to 3, progressions 2 to 3, keys 2 to 4). `tracks.usual` stays within 4 to 5.
+- **Coherence rules** read the built-in styles as pairs that already work: two building blocks fit when one built-in style uses both. A groove keeps its home tempo (the tempo ranges of the styles that play it, widened by 8 BPM), so the drum-and-bass grooves never play at 120 BPM; a kit must have played one of the grooves; swing only with a groove a swinging style plays and a swinging source; hook modes only over progressions some style pairs them with; guitar types only at their tempos; energy shapes the base shares with a donor; 4/4; at most 6 instruments.
+- A draw that breaks a rule, fails validation or comes within 0.8 similarity of a style (built-in or kept) is drawn again, at most 8 times; then the base with one donor part is returned.
+- The **name** comes from fixed bilingual word lists (`Rust Tide` / `Marea di ruggine`, `Fogstep`), never a real genre, a style or an artist name; the id is its slug plus four seed characters. The **genre** is the closest one (mean similarity of its two closest styles), `experimental` when nothing is close; a Genres card asks for its genre and the style lands in it. The description names the source of each part.
+- The same seed gives the same style. `STYLE_MAKER_VERSION` rises when an intended change moves the seed fixtures (`npm run check:invent -- --write-fixtures`); a kept style is stored whole, so a new maker never changes it.
+
+In the app an invented style first plays **on trial** (radio Styles row, New song panel, Styles tab card, Genres cards): Keep stores it among the user's styles with its `invented` field, Again draws another, × gives back the styles from before. The trial reaches the director as an extra style (`createSession(recipes, seed, { extra })`), which the artist exploration never draws from, so every other draw stays the same; a session saved during a trial embeds it in `extraStyles`. With the compilation setup switch Invented styles (off by default), a segment may play a style invented in its genre from the session seed, with Keep on the now playing tag.
+
+Check with `npm run check:invent` (no browser) and `PORT=5173 node tools/check-invented.cjs` (dev server).
 
 ## Adding a style
 

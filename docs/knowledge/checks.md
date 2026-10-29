@@ -17,7 +17,8 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 | --- | --- | --- |
 | A song or `songs/index.json` | `check:songs`, `check:code`, `check:crescendo`, `check:strudel`, `check:durations` | `check-levels.cjs <id>`, `snapshot-levels.cjs check` |
 | The compiler, presets, ideas, `src/music.js` | `check:code`, `check:songs`, `check:ideas`, `check:patterns`, `check:crescendo`, `check:live-code` | `check-ideas.cjs`, `check-compact-code.cjs`, `snapshot-levels.cjs check` |
-| A style or an artist | `check:styles`, `check:endless`, `check:random` | `check-style-sounds.cjs`, `check-endless-play.cjs`, `check-library.cjs` |
+| A style or an artist | `check:styles`, `check:endless`, `check:random`, `check:invent` | `check-style-sounds.cjs`, `check-endless-play.cjs`, `check-library.cjs`, `check-invented.cjs` |
+| The style maker (`src/endless/style-maker.js`) | `check:invent` (seed fixtures: raise `STYLE_MAKER_VERSION` with `--write-fixtures`), `check:endless` (fixtures must not move) | `check-invented.cjs` |
 | The director, steering, transitions | `check:endless`, `check:compilation` | `check-radio.cjs`, `check-steering.cjs`, `check-transitions.cjs` |
 | Profiles and growth on air, the code on air, commands as waypoints (`src/endless/growth.js`, `src/endless/items.js`, `src/endless/waypoints.js`, `src/live/air-code.js`) | `check:radio-profiles`, `check:endless`, `check:live-code` | `check-radio.cjs`, `check-compact-code.cjs` (radio window), `check-transitions.cjs` (Live coder runs), `check-steering.cjs` (Live coder steering at its end) |
 | The material generator | `check:material`, `check:endless`, `check:patterns` | `check-patterns.cjs` |
@@ -94,6 +95,8 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-idea-errors.mjs` |  | Node | Small bad songs for the idea validator (idea-model, #70): each one must fail with an error at the expected JSON path and a message that names the problem. Run by npm run check:songs after the songs. No browser. |
 | `tools/check-idea-writer.mjs` | `npm run check:ideas` | Node | Unit cases for the idea writer (idea-model, #70): writeIdea, expandIdea, ideaLadder and the shortest exact forms, for every kind of idea, in 4/4 and 7/8. No browser (the events themselves: tools/check-ideas.cjs). |
 | `tools/check-ideas.cjs` |  | dev server, Chrome | Event-equivalence check of the idea model (idea-model, #70, design D8): for every song in songs/ and songs/examples/, the code saved before the change (tests/snapshots/code-before-ideas/.strudel) and the code the… |
+| `tools/check-invent.mjs` | `npm run check:invent` | Node | Checks for the style maker (invented-styles, #51): invented styles are valid, coherent, not copies, well named, in the asked genre, repeatable (seed fixtures), and play in the director without moving any other draw. No… |
+| `tools/check-invented.cjs` |  | dev server, Chrome | Browser checks for invented styles (invented-styles, #51): the radio's invent die and trial chip, three invented styles played two songs each (no evalError, the output below clipping), Ancora, ×, a reload during a trial… |
 | `tools/check-knowledge.mjs` | `npm run check:knowledge` | Node | Checks the knowledge base in docs/knowledge/ (knowledge-base, #74, design D5). No browser. |
 | `tools/check-levels.cjs` |  | dev server, Chrome | Plays every scene of the given tracks and prints errors, per-instrument peak levels and the peak of the master output. The output peak (out=) is the hard limit: above 1.0 it clips and the run fails. in= is the level… |
 | `tools/check-library.cjs` |  | dev server, Chrome | Browser checks for the Styles and Artists tabs (#35). |
@@ -154,7 +157,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 ## Fixtures and versions
 
 <!-- generated:fixtures -->
-Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/endless.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
+Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/endless.json`, `tests/snapshots/invented-styles.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
 <!-- /generated -->
 
 | Fixture | Guards | Rewrite only when | Then |

@@ -1,8 +1,8 @@
 ---
 id: styles
 related: [radio, material, artists, profiles, growth-shapes, voice, comments-and-functions, music-engine, sounds, from-a-reference, recipes-music]
-code: [styles, src/endless/recipe.js, src/endless/mix.js, tools/styles-dir.mjs]
-checks: [npm run check:styles, npm run check:endless]
+code: [styles, src/endless/recipe.js, src/endless/mix.js, src/endless/style-maker.js, tools/styles-dir.mjs]
+checks: [npm run check:styles, npm run check:endless, npm run check:invent]
 ---
 
 # Style recipes
@@ -22,6 +22,7 @@ Each style belongs to a genre of the song library. Some belong to a family acros
 - **Voice.** `voice`, `spoken` and `narrator` set the narrator's voice and the voice instrument ([narrator.md](narrator.md), [voice.md](voice.md)).
 - **Function names.** A style id picks the theme of song function names ([comments-and-functions.md](comments-and-functions.md)).
 - **Library.** Songs tagged with a style count under its genre in the Songs tab ([library.md](library.md)).
+- **Invented styles.** The style maker (`src/endless/style-maker.js`, `#51`) mixes a new recipe from the built-in styles: a base gives the tempo part, one or two donors lend whole parts, coherence rules keep only pairs some built-in style already uses. It plays on trial in the radio or the New song panel (an extra style of the session, which the artist exploration never draws), then Keep stores it among the user's styles with an `invented` field. Genre = broad family, style = precise recipe inside a genre, artist = invented name that mixes styles: only styles are invented. See [docs/STYLES.md](../STYLES.md#inventing-a-style).
 
 **Mixing.** Each song takes each of its parts from one style: tempo, drums, bass, harmony, lead, pads, voice. Chaos 0 keeps a song in one style and rotates the selection. Chaos 1 draws each part on its own.
 

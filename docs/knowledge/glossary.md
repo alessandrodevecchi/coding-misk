@@ -11,6 +11,8 @@ The owner speaks Italian; the code, the docs and this knowledge base are in Engl
 
 ## Words we use
 
+**Genre, style, artist.** The owner mixes them up, so the app and the docs keep one meaning each: a **genre** (genere) is a broad family of music, a fixed list (Techno); a **style** (stile) is a precise recipe inside one genre (Techno berlinese); an **artist** (artista) is an invented name with a taste that mixes styles (Velvet Monk). The app invents styles and artists, never genres (invented-styles, `#51`).
+
 - **Song** (it: brano): the whole piece. Not "composition", which sits too close to the Compose tab.
 - **Track** (it: traccia): one row of the arranger, an instrument with its settings, rack, patterns and clips.
 - **Section** (it: sezione): a part of the song, like an intro or a drop. The word "scene" is no longer used in the interface; old code and saves still say scene.

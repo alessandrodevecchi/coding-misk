@@ -97,7 +97,7 @@ A new optional top field, accepted by the validator (format stays 1):
 ### D11. Artists and compilations
 
 - Kept invented styles are in `RECIPES`, so the artist editor offers them, random artists may pick them (`makeArtist` draws over `RECIPES`), and the compilation setup lists them under their genre.
-- **Phase 2:** compilation setup switch "Stili inventati" (off by default). When on, `drawSegment` adds the segment kind `invented`: `inventStyle(`${seed}/compilation/${i}`, builtins, { genre })` in the segment's genre, knobs as for `styles`. The now playing tag shows Tieni, as for a random artist. Same session seed, same segments.
+- **Phase 2:** compilation setup switch "Stili inventati" (off by default; a setup without the field reads as off, so saved setups draw the same segments). When on, `drawSegment` adds the segment kind `invented`: `inventStyle(`${seed}/compilation/${i}`, pool, { genre })` in the segment's genre, knobs as for `styles`. The pool is the list the compilation already draws from (the usable styles within the setup) without invented styles, like the rest of the compilation. The segment's style travels in the director options (`inventedStyle`), and the session adds it as an extra style. The now playing tag shows Tieni, as for a random artist. Same session seed, same segments.
 
 ### D12. Determinism, fixtures, versions
 
