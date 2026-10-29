@@ -32,6 +32,7 @@ import { DICE, GEAR, LOCK, LOCK_OPEN, LOCK_HALF, VARY, SWAP, CHEVRON, SLIDERS, L
 import { previewOf } from '../library/patterns.js';
 import { PROGS } from '../music.js';
 import { paintPreview } from '../library/patterns-tab.js';
+import { savedView, cleanView, daysAgo, SAVED_GROUP } from './saved-view.js';
 import { SESSION_SOURCES } from '../material/index.js';
 import { cleanVoice, voiceOption, applyPreset, VOICE_PRESET_IDS } from '../endless/voice-options.js';
 import { VOICE_STYLE_IDS } from '../song/format.js';
@@ -58,7 +59,7 @@ export function usableRecipes(list) {
 
 // keepArtist(artist): saves a random artist among the listener's, returns its id (#50)
 // userPatterns(): the user's saved patterns as the director reads them (pattern-library): they join a song where they fit
-export function createRadio({ root, t, tx, esc, store, options, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, userPatterns = () => [], reloadSamples = async () => {}, voiceFiles = () => ({}) }) {
+export function createRadio({ root, t, tx, esc, store, options, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, userPatterns = () => [], onPatternUsed = () => {}, reloadSamples = async () => {}, voiceFiles = () => ({}) }) {
   const ids = recipes.map(r => r.id);
   // the options of how the next songs are made (new-song-panel D1): read, migrated and saved by the shared store under
   // coding-misk-radio, as before; the New song panel of Compose keeps its own values in a second instance
@@ -729,6 +730,13 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   let savedOpen = false;
   try { savedOpen = !!store.get('coding-misk-radio-saved-open', false); } catch (e) {}
   const spTarget = {};
+  // the panel among many saved patterns (saved-patterns-list D1): its view (instrument chip, Fit this song, style, sort,
+  // collapsed groups) remembered in this browser; the search, the scroll position and the last context of the console
+  // kept here, so the console's rebuild at every phrase does not lose them
+  let spView = cleanView(null);
+  try { spView = cleanView(store.get('coding-misk-radio-saved-view', null)); } catch (e) {}
+  let spQ = '', spScroll = 0, spCtx = null, spHtml = '';
+  const spSaveView = () => { try { const { inst, fit, style, sort, closed } = spView; store.set('coding-misk-radio-saved-view', { inst, fit, style, sort, closed }); } catch (e) {} };
   // the instrument shown on the console: its name in the language of the page
   const instName = p => t(`inst:${p}`);
   // the queue label of an arrangement command: "+ arp (Arp 2)", "bass: locked", "riser 4 bars, up"
@@ -834,7 +842,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const ph = item.plan.phrase;
     const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel || c.scope === 'session');
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), savedOpen, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => x.id).join(), sv.preset, sv.style, voiceHelper, sayWait.length].join('|');
+    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), savedOpen, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => `${x.id}:${x.uses || 0}`).join(), sv.preset, sv.style, voiceHelper, sayWait.length].join('|');
     if (!force && key === steerKey) return;
     steerKey = key;
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-sv-line]') ? document.activeElement.selectionStart : null;
@@ -868,22 +876,31 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const pvOn = player.preview ? player.preview.on : null;
     const listenBtn = x => { const on = pvOn === x.id, tip = t(on ? 'savedListenStop' : 'savedListen'); return `<button class="mini sp-listen" data-sp-listen="${esc(x.id)}" aria-pressed="${on}" title="${esc(tip)}" aria-label="${esc(tip)}"${S.paused !== undefined ? ' disabled' : ''}>${on ? STOP : LISTEN}</button>`; };
     const typeOf = x => instName(patternPart(x));
+    const whyMemo = new Map();
     const spBtn = (x, mode) => {
       const targets = onNext.filter(y => y.type === x.type), tg = spTarget[x.id] && targets.some(y => y.id === spTarget[x.id]) ? spTarget[x.id] : (targets[0] || {}).id;
-      const c = { kind: 'pattern', mode, item: x, ...(mode === 'replace' ? { target: tg } : {}) }, why = whyOf(c), label = t(mode === 'new' ? 'savedAddNew' : 'savedReplace');
+      // (every pattern listed fits, so the reason depends only on the mode, the type and the target: worked out once per
+      // render, not per card, saved-patterns-list D4)
+      const c = { kind: 'pattern', mode, item: x, ...(mode === 'replace' ? { target: tg } : {}) }, wk = `${mode}|${x.type}|${tg || ''}`, label = t(mode === 'new' ? 'savedAddNew' : 'savedReplace');
+      if (!whyMemo.has(wk)) whyMemo.set(wk, whyOf(c));
+      const why = whyMemo.get(wk);
       const tip = `${t('steerTip:pattern')}${why ? ` · ${t(`steerWhy:${why}`, { type: typeOf(x) })}` : ''}`;
       const sel = mode === 'replace' && targets.length ? `<select data-sp-target="${esc(x.id)}" data-no-knob aria-label="${esc(label)}">${targets.map(y => `<option value="${esc(y.id)}"${y.id === tg ? ' selected' : ''}>${esc(y.name || y.id)}</option>`).join('')}</select>` : '';
       return `${sel}<button class="btn small" data-sp-${mode}="${esc(x.id)}" title="${esc(tip)}"${why ? ` disabled data-why="${why}"` : ''}>${esc(label)}</button>`;
     };
     const spInfo = x => { const c = x.context || {}; return t('savedInfo', { type: typeOf(x), key: c.key || 'A', bpm: c.bpm || '?' }); };
     const tempoHint = x => { const b = Number((x.context || {}).bpm), now = Number(secNow.bpm || item.entry.bpm); return b && now && (now / b > 1.5 || b / now > 1.5) ? `<small class="sp-tempo">${esc(t('savedTempo', { bpm: b, now: Math.round(now) }))}</small>` : ''; };
-    const spRow = x => `<li class="sp-row">${listenBtn(x)}<canvas class="sp-pv" data-sp-pv="${esc(x.id)}" width="64" height="20" aria-hidden="true"></canvas><span class="sp-name">${esc(x.name || x.id)}</span><span class="chip small">${esc(typeOf(x))}</span></li>`;
-    const spCard = x => `<div class="sp-card"><div class="sp-top">${listenBtn(x)}<b>${esc(x.name || x.id)}</b></div><small class="muted">${esc(spInfo(x))}${(x.styles || []).filter(y => y !== 'any').length ? ` · ${esc(x.styles.filter(y => y !== 'any').join(', '))}` : ''}</small><canvas class="sp-pv big" data-sp-pv="${esc(x.id)}" width="220" height="44" aria-hidden="true"></canvas>${tempoHint(x)}<div class="sp-acts">${spBtn(x, 'new')}${spBtn(x, 'replace')}</div></div>`;
+    // (a drawing carries the values it was drawn with, so a console rebuild can keep it: saved-patterns-list D4)
+    const pvKey = x => { const c = x.context || {}; return `${c.chords || secNow.chords || ''}|${c.meter || '4/4'}|${c.mode || 'minor'}`; };
+    const spCanvas = (x, big) => `<canvas class="sp-pv${big ? ' big' : ''}" data-sp-pv="${esc(x.id)}" data-sp-k="${esc(pvKey(x))}" width="${big ? 220 : 64}" height="${big ? 44 : 20}" aria-hidden="true"></canvas>`;
+    const spRow = x => `<li class="sp-row">${listenBtn(x)}${spCanvas(x, false)}<span class="sp-name">${esc(x.name || x.id)}</span><span class="chip small">${esc(typeOf(x))}</span></li>`;
+    // with the toolbar (more than 8 patterns), a card says how often the pattern was used (D5)
+    const spUses = x => { const n = Number(x.uses) || 0, d = daysAgo(x.lastUsed); return !n ? t('savedNeverUsed') : `${t(n === 1 ? 'savedUsedOnce' : 'savedUsedN', { n })}${d === null ? '' : ` · ${d === 0 ? t('savedToday') : d === 1 ? t('savedYesterday') : t('savedDaysAgo', { d })}`}`; };
+    const spCard = (x, uses = false) => `<div class="sp-card"><div class="sp-top">${listenBtn(x)}<b>${esc(x.name || x.id)}</b></div><small class="muted">${esc(spInfo(x))}${(x.styles || []).filter(y => y !== 'any').length ? ` · ${esc(x.styles.filter(y => y !== 'any').join(', '))}` : ''}</small>${uses ? `<small class="muted sp-uses">${esc(spUses(x))}</small>` : ''}${spCanvas(x, true)}${tempoHint(x)}<div class="sp-acts">${spBtn(x, 'new')}${spBtn(x, 'replace')}</div></div>`;
     const spNote = !saved.length ? t('savedNone') : !fitting.length ? t('savedNoneFit') : '';
     const spUnfit = [unMeter ? t('savedUnfitMeter', { n: unMeter }) : '', unType ? t('savedUnfitType', { n: unType }) : ''].filter(Boolean).join(' · ');
-    const savedPanel = `<div class="steer-group arr sp"><button class="sp-toggle lbl" id="sp-toggle" aria-expanded="${savedOpen}" title="${esc(t('savedToggleTip'))}">${CHEVRON}<span>${esc(t('savedTitle', { n: fitting.length }))}</span></button>
-      ${fitting.length ? (savedOpen ? `<div class="sp-cards">${fitting.map(spCard).join('')}</div>` : `<ul class="sp-list">${fitting.map(spRow).join('')}</ul>`) : ''}${spNote || spUnfit ? `<p class="muted small sp-note">${esc([spNote, spUnfit].filter(Boolean).join(' '))}</p>` : ''}</div>`;
-    const spPaint = () => box.querySelectorAll('canvas[data-sp-pv]').forEach(cv => { const x = fitting.find(y => y.id === cv.dataset.spPv); if (!x) return; try { paintPreview(cv, previewOf(x.type, x.pattern, { chords: (x.context || {}).chords || secNow.chords, meter: (x.context || {}).meter || '4/4', mode: (x.context || {}).mode || 'minor' }), root); } catch (e) {} });
+    spCtx = { fitting, spRow, spCard, song: { styles: item.entry.styles || [], bpm: Number(secNow.bpm || item.entry.bpm) || 0 }, note: [spNote, spUnfit].filter(Boolean).join(' ') };
+    const savedPanel = spPanelHtml();
     // Part harmony (D8): the treatment menu and the button, on the part and track picked for Vary and Swap
     const treatSel = `<label class="arr-sel"><span>${esc(t('voicingTreat'))}</span><select data-voicing-treat data-no-knob>${['auto', ...TREATMENTS].map(x => `<option value="${x}"${x === voicingTreat ? ' selected' : ''}>${esc(t(`treat:${x}`))}</option>`).join('')}</select></label>`;
     const voicingRow = `<span class="steer-voicing">${treatSel}${btn({ kind: 'voicing', type: varyPart, target: varyTarget, treatment: voicingTreat }, t('steer:voicing'))}</span>`;
@@ -920,13 +937,16 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       <p class="arr-info muted">${esc(t('arrCount', { n: total, usual: item.plan.usualHigh, cap: TRACK_CAP }))}</p>${over.length ? `<p class="arr-warn">${esc(over.map(p => t('arrWarn', { part: instName(p), n: countOf(p), rec: RECOMMENDED[p] })).join(' · '))}. ${esc(t('arrRec'))}</p>` : ''}</div>`;
     // (a group with a hint: the harmony, which changes every part with notes, owner's tests #76)
     const group = (name, html) => `<div class="steer-group${name === 'arrangement' ? ' arr' : ''}"><span class="lbl"${name === 'harmony' ? ` title="${esc(t(`steerGroupTip:${name}`))}"` : ''}>${esc(t(`steerGroup:${name}`))}</span><div class="steer-btns">${html}</div></div>`;
+    // the saved patterns panel survives the rebuild (D1): the same node when nothing in it changed, else a new one that
+    // takes the drawings already made; then its scroll, the focus and the search's caret come back
+    const spOld = box.querySelector('.sp'), spFocus = spFocusOf(spOld);
     box.innerHTML = `<div class="steer-head"><div class="lbl">${esc(t('steerTitle'))}</div>
         <span class="hand-from steer-scope" ${tip('steerScopeTip')}><button class="led" id="steer-scope" aria-pressed="${opts.scope === 'session'}" aria-labelledby="steer-scope-lbl"></button><span id="steer-scope-lbl">${esc(t(opts.scope === 'session' ? 'steerScopeSession' : 'steerScopeSong'))}</span></span></div>
       <div class="steer-console">
         ${group('energy', btn({ kind: 'energy-up' }) + btn({ kind: 'energy-down' }))}
         ${group('arrangement', types)}
         ${group('parts', `<span class="steer-part" role="radiogroup" aria-label="${esc(t('steerPartPick'))}">${VARY_TYPES.map(p => `<button class="chip small" role="radio" data-vary-part="${p}" aria-checked="${varyPart === p}" aria-pressed="${varyPart === p}" title="${esc(t('steerPartPick'))}: ${esc(t(`steerType:${p}`))}">${esc(t(`steerType:${p}`))}</button>`).join('')}</span>${targetSel}${btn({ kind: 'vary', type: varyPart, target: varyTarget, icon: VARY }, t('steerBtn:vary'))}${btn({ kind: 'swap', type: varyPart, target: varyTarget, icon: SWAP }, t('steerBtn:swap'))}${voicingRow}`)}
-        ${savedPanel}
+        <div class="sp-slot"></div>
         ${group('sound', ['darker', 'brighter', 'dirtier', 'cleaner', 'more-space', 'instrument'].map(k => btn({ kind: k })).join(''))}
         ${group('harmony', harmMenu + btn({ kind: 'progression', chords: harmChords }) + btn({ kind: 'key', to: harmKey }))}
         ${voiceGroup(item, rel, btn)}
@@ -940,7 +960,122 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         <button class="mini" data-mix-mute="${esc(x.id)}" aria-pressed="${!!x.mute}" title="${esc(t('steerTip:mute'))}">M</button>
         <button class="mini" data-mix-lock="${esc(x.id)}" aria-pressed="${locked}" title="${esc(t('steerTip:lock'))}" aria-label="${esc(t('steerTip:lock'))}">${locked ? LOCK : LOCK_OPEN}</button>
         <button class="mini" data-mix-inst="${esc(x.id)}" title="${esc(t('steerTip:instrument'))}">♪</button></div>`; }).join('') || `<p class="muted">${esc(t('steerMixerEmpty'))}</p>`}</div>`;
-    spPaint();
+    spMount(box.querySelector('.sp-slot'), spOld, savedPanel, spFocus);
+  }
+
+  // ---------- saved patterns among many (saved-patterns-list) ----------
+  const SP_SORT_LABEL = { saved: 'savedSort_saved', recent: 'savedSort_recent', used: 'savedSort_used', name: 'savedSort_name', tempo: 'savedSort_tempo' };
+  // the panel's HTML from the last console context and the view: the title, the toolbar (more than 8 patterns), the
+  // instrument chips, the line of what is shown, the scroll area with groups or one list, the note of unfit patterns
+  function spParts() {
+    const c = spCtx, open = savedOpen;
+    const v = savedView(c.fitting, { ...spView, q: spQ }, c.song, { inst: instName, style: styleName });
+    const list = items => (open ? `<div class="sp-cards">${items.map(x => c.spCard(x, v.toolbar)).join('')}</div>` : `<ul class="sp-list">${items.map(c.spRow).join('')}</ul>`);
+    const head = `<button class="sp-toggle lbl" id="sp-toggle" aria-expanded="${open}" title="${esc(t('savedToggleTip'))}">${CHEVRON}<span>${esc(t('savedTitle', { n: c.fitting.length }))}</span></button>`;
+    if (!v.toolbar) return { v, head, tools: '', body: c.fitting.length ? list(c.fitting) : '' };
+    const opt = (val, cur, label) => `<option value="${esc(val)}"${val === cur ? ' selected' : ''}>${esc(label)}</option>`;
+    const styles = v.styles.includes(spView.style) || spView.style === 'all' ? v.styles : [...v.styles, spView.style];
+    const tools = `<div class="sp-tools"><input type="search" class="sb-search sp-search" data-sp-q value="${esc(spQ)}" placeholder="${esc(t('savedSearch', { n: v.total }))}" aria-label="${esc(t('savedSearchAria'))}" aria-keyshortcuts="P" title="${esc(t('savedSearchTip'))}" autocomplete="off" spellcheck="false">
+      <button class="chip sp-fit" data-sp-fit aria-pressed="${spView.fit}" title="${esc(t('savedFitTip'))}">${esc(t('savedFit'))}</button>
+      <label class="arr-sel"><span>${esc(t('savedStyle'))}</span><select data-sp-style data-no-knob>${opt('all', spView.style, t('savedStyleAll'))}${styles.map(id => opt(id, spView.style, styleName(id))).join('')}</select></label>
+      <label class="arr-sel"><span>${esc(t('savedSort'))}</span><select data-sp-sort data-no-knob>${Object.keys(SP_SORT_LABEL).map(k => opt(k, spView.sort, t(SP_SORT_LABEL[k]))).join('')}</select></label></div>`;
+    const parts = v.inst !== 'all' && !v.parts.includes(v.inst) ? [...v.parts, v.inst] : v.parts;
+    const all = Object.values(v.counts).reduce((a, b) => a + b, 0);
+    const chips = `<div class="chips sp-insts" role="group" aria-label="${esc(t('savedInsts'))}"><button class="chip small" data-sp-inst="all" aria-pressed="${v.inst === 'all'}">${esc(t('savedAll'))} <small>${all}</small></button>${parts.map(p => `<button class="chip small" data-sp-inst="${esc(p)}" aria-pressed="${v.inst === p}">${esc(instName(p))} <small>${v.counts[p] || 0}</small></button>`).join('')}</div>`;
+    const sum = v.grouped ? '' : `<p class="muted small sp-sum" aria-live="polite">${esc([t('savedShown', { n: v.shown, total: v.total }), spQ.trim() ? `“${spQ.trim()}”` : '', v.inst !== 'all' ? instName(v.inst) : '', spView.fit ? t('savedFit').toLowerCase() : '', spView.style !== 'all' ? styleName(spView.style) : '', spView.sort !== 'saved' ? t(SP_SORT_LABEL[spView.sort]).toLowerCase() : ''].filter(Boolean).join(' · '))}</p>`;
+    const inner = !v.shown ? `<p class="sp-none">${esc(t('savedNoMatch'))} <button class="btn small" data-sp-clear>${esc(t('savedClear'))}</button></p>`
+      : v.grouped ? v.groups.map(g => `<section class="sp-group"><button class="sp-ghead" data-sp-group="${esc(g.inst)}" aria-expanded="${g.open}">${CHEVRON}<b>${esc(instName(g.inst))}</b> <small>${g.n}</small></button>${g.open ? `${list(g.items)}${g.n > SAVED_GROUP ? `<button class="btn small sp-all" data-sp-inst="${esc(g.inst)}">${esc(t('savedShowAll', { n: g.n }))}</button>` : ''}` : ''}</section>`).join('')
+      : list(v.items);
+    return { v, head, tools, body: `${chips}${sum}<div class="sp-scroll${open ? ' open' : ''}">${inner}</div>` };
+  }
+  function spPanelHtml() {
+    const p = spParts();
+    return `<div class="steer-group arr sp${p.v.toolbar ? ' many' : ''}">${p.head}${p.tools}<div class="sp-body">${p.body}</div>${spCtx.note ? `<p class="muted small sp-note">${esc(spCtx.note)}</p>` : ''}</div>`;
+  }
+  // what had the focus inside the panel: a selector by its data attribute, and the caret of the search
+  const SP_FOCUS = ['data-sp-q', 'data-sp-listen', 'data-sp-new', 'data-sp-replace', 'data-sp-target', 'data-sp-inst', 'data-sp-group', 'data-sp-fit', 'data-sp-style', 'data-sp-sort', 'data-sp-clear', 'id'];
+  function spFocusOf(panel) {
+    const a = document.activeElement;
+    if (!panel || !a || !panel.contains(a)) return null;
+    const at = SP_FOCUS.find(k => a.hasAttribute(k));
+    if (!at) return null;
+    const val = a.getAttribute(at);
+    return { sel: at === 'id' ? `#${CSS.escape(val)}` : val ? `[${at}="${CSS.escape(val)}"]` : `[${at}]`, start: a.selectionStart ?? null, end: a.selectionEnd ?? null };
+  }
+  const themeKey = () => `${document.documentElement.dataset.ui || ''}|${document.documentElement.dataset.look || ''}`;
+  // puts the panel in the slot: the old node when its HTML is the same, else a new one with the old drawings moved in
+  function spMount(slot, old, html, focus) {
+    if (!slot) return;
+    let el = old;
+    if (!old || html !== spHtml) {
+      const tmp = document.createElement('div'); tmp.innerHTML = html; el = tmp.firstElementChild;
+      if (old) spKeepDrawings(old, el);
+    }
+    spHtml = html;
+    slot.replaceWith(el);
+    spRestore(el, focus);
+    spObserve(el);
+  }
+  // the drawings of the old panel go into the new one where the pattern, the size, the values and the theme are the same
+  function spKeepDrawings(from, to) {
+    const tk = themeKey(), byKey = new Map();
+    from.querySelectorAll('canvas[data-sp-pv][data-painted]').forEach(cv => { if (cv.dataset.painted === tk) byKey.set(`${cv.dataset.spPv}|${cv.className}|${cv.dataset.spK}`, cv); });
+    to.querySelectorAll('canvas[data-sp-pv]').forEach(cv => { const k = `${cv.dataset.spPv}|${cv.className}|${cv.dataset.spK}`, o = byKey.get(k); if (o) { byKey.delete(k); cv.replaceWith(o); } });
+  }
+  function spRestore(el, focus) {
+    const area = el.querySelector('.sp-scroll');
+    if (area && spScroll) area.scrollTop = spScroll;
+    // (measured after the frame's layout, not forced here)
+    if (area) requestAnimationFrame(() => spFade(area));
+    if (!focus) return;
+    const f = el.querySelector(focus.sel);
+    if (!f) return;
+    try { f.focus({ preventScroll: true }); } catch (e) { f.focus(); }
+    if (focus.start !== null && f.setSelectionRange) try { f.setSelectionRange(focus.start, focus.end ?? focus.start); } catch (e) {}
+  }
+  // the soft fade at the bottom says there is more below (D4)
+  const spFade = area => { if (area) area.classList.toggle('more', area.scrollHeight - area.scrollTop - area.clientHeight > 4); };
+  // the drawings are painted when they scroll into view (D4); a drawing's data is kept while the pattern does not change
+  const spPvData = new Map();
+  let spIo = null, spIoRoot = null;
+  function spPaintOne(cv) {
+    const c = spCtx, x = c && c.fitting.find(y => y.id === cv.dataset.spPv);
+    if (!x) return;
+    const k = `${x.id}|${JSON.stringify(x.pattern).length}|${cv.dataset.spK}`;
+    if (!spPvData.has(k)) {
+      if (spPvData.size > 600) spPvData.clear();
+      const [chords, meter, mode] = (cv.dataset.spK || '').split('|');
+      try { spPvData.set(k, previewOf(x.type, x.pattern, { chords: chords || undefined, meter: meter || '4/4', mode: mode || 'minor' })); } catch (e) { spPvData.set(k, null); }
+    }
+    const pv = spPvData.get(k);
+    if (!pv) return;
+    try { paintPreview(cv, pv, root); cv.dataset.painted = themeKey(); } catch (e) {}
+  }
+  function spObserve(panel) {
+    const area = panel && panel.querySelector('.sp-scroll'), list = panel ? [...panel.querySelectorAll('canvas[data-sp-pv]:not([data-painted])')] : [];
+    if (!area || typeof IntersectionObserver === 'undefined') { list.forEach(spPaintOne); return; }
+    if (spIoRoot !== area) {
+      if (spIo) spIo.disconnect();
+      spIoRoot = area;
+      spIo = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { spIo.unobserve(e.target); spPaintOne(e.target); } }), { root: area, rootMargin: '160px 0px' });
+    }
+    list.forEach(cv => spIo.observe(cv));
+  }
+  // a chip, a menu or the search draws only the panel's body again, not the console (D1)
+  function spRenderBody({ top = false } = {}) {
+    const el = root.querySelector('#radio-steer .sp'), body = el && el.querySelector('.sp-body');
+    if (!el || !body || !spCtx) return;
+    if (top) spScroll = 0;
+    const p = spParts(), focus = spFocusOf(body);
+    const tmp = document.createElement('div'); tmp.innerHTML = p.body;
+    spKeepDrawings(body, tmp);
+    body.replaceChildren(...tmp.childNodes);
+    el.classList.toggle('many', p.v.toolbar);
+    const fit = el.querySelector('[data-sp-fit]'); if (fit) fit.setAttribute('aria-pressed', spView.fit);
+    spHtml = spPanelHtml();
+    if (top) { const area = el.querySelector('.sp-scroll'); if (area) area.scrollTop = 0; }
+    spRestore(el, focus);
+    spObserve(el);
   }
 
   function renderNow(cyc) {
@@ -1145,7 +1280,12 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (b.dataset.cmd) return command({ kind: b.dataset.cmd, ...(b.dataset.type ? { type: b.dataset.type } : {}), ...(b.dataset.part ? { type: b.dataset.part } : {}), ...(b.dataset.inst ? { part: b.dataset.inst } : {}), ...(b.dataset.target ? { target: b.dataset.target } : {}), ...(b.dataset.treatment ? { treatment: b.dataset.treatment } : {}), ...(b.dataset.chords && b.dataset.chords !== 'auto' ? { chords: b.dataset.chords } : {}), ...(b.dataset.to && b.dataset.to !== 'auto' ? { to: b.dataset.to } : {}) });
     // the lock of an instrument (radio-arrangement D12): closed opens, open or half locks every track of it
     // Add a saved pattern (D9): fold or open the panel, listen, add as a new track or in place of a playing one
-    if (b.id === 'sp-toggle') { savedOpen = !savedOpen; try { store.set('coding-misk-radio-saved-open', savedOpen); } catch (err) {} return renderSteer(true); }
+    if (b.id === 'sp-toggle') { savedOpen = !savedOpen; spScroll = 0; try { store.set('coding-misk-radio-saved-open', savedOpen); } catch (err) {} return renderSteer(true); }
+    // the panel among many (saved-patterns-list): instrument chips and "Show all", Fit this song, groups, clear filters
+    if (b.dataset.spInst) { const all = b.classList.contains('sp-all'); spView.inst = b.dataset.spInst; spSaveView(); spRenderBody({ top: true }); if (all) { const f = root.querySelector(`#radio-steer .sp-insts [data-sp-inst="${CSS.escape(spView.inst)}"]`); if (f) f.focus(); } return; }
+    if (b.dataset.spFit !== undefined) { spView.fit = !spView.fit; spSaveView(); return spRenderBody({ top: true }); }
+    if (b.dataset.spGroup) { const g = b.dataset.spGroup; spView.closed = spView.closed.includes(g) ? spView.closed.filter(x => x !== g) : [...spView.closed, g]; spSaveView(); return spRenderBody(); }
+    if (b.dataset.spClear !== undefined) { spQ = ''; spView = { ...spView, inst: 'all', fit: false, style: 'all' }; spScroll = 0; spSaveView(); renderSteer(true); const q = root.querySelector('#radio-steer [data-sp-q]'); if (q) q.focus(); return; }
     if (b.dataset.spListen || b.dataset.spNew || b.dataset.spReplace) {
       const id = b.dataset.spListen || b.dataset.spNew || b.dataset.spReplace, x = userPatterns().find(y => y.id === id), it = S && S.stream[S.onAir];
       if (!x || !it || !it.plan) return;
@@ -1156,9 +1296,13 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         if (player.preview) player.preview.toggle(item, { key: sc.key, chords: sc.chords, bpm: sc.bpm || it.entry.bpm, meter: sc.meter || it.entry.meter, n: it.n });
         return renderSteer(true);
       }
-      if (b.dataset.spNew) return command({ kind: 'pattern', mode: 'new', item });
-      const sel = root.querySelector(`[data-sp-target="${CSS.escape(id)}"]`);
-      return command({ kind: 'pattern', mode: 'replace', target: sel ? sel.value : spTarget[id], item });
+      // the command carries the pattern without the console's counters, so a replay is as before; a queued add or
+      // replace counts as one use (saved-patterns-list D5)
+      delete item.created; delete item.uses; delete item.lastUsed;
+      const sel = b.dataset.spNew ? null : root.querySelector(`[data-sp-target="${CSS.escape(id)}"]`);
+      const ok = b.dataset.spNew ? command({ kind: 'pattern', mode: 'new', item }) : command({ kind: 'pattern', mode: 'replace', target: sel ? sel.value : spTarget[id], item });
+      if (ok) { onPatternUsed(id); renderSteer(true); }
+      return ok;
     }
     if (b.dataset.lockPart) return command({ kind: b.dataset.state === 'closed' ? 'unlock-part' : 'lock-part', part: b.dataset.lockPart });
     if (b.dataset.cancel) return cancel(+b.dataset.cancel);
@@ -1220,6 +1364,14 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // shortcuts while the Radio tab is open and the radio plays (not while typing in a field)
   // (Enter in the line field: Say now)
   root.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-sv-line]')) { e.preventDefault(); sv.line = e.target.value; sayLine('now'); } });
+  // the panel's search (saved-patterns-list): Escape clears it, a second Escape leaves it; the down arrow goes to the
+  // first pattern's listen button
+  root.addEventListener('keydown', e => {
+    if (!e.target.matches || !e.target.matches('[data-sp-q]')) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (e.target.value) { e.target.value = ''; spQ = ''; spRenderBody({ top: true }); } else e.target.blur(); return; }
+    if (e.key === 'ArrowDown') { const f = root.querySelector('#radio-steer .sp-scroll [data-sp-listen]:not([disabled])') || root.querySelector('#radio-steer .sp-scroll button:not([disabled])'); if (f) { e.preventDefault(); f.focus(); } }
+  });
+  root.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('sp-scroll')) { spScroll = e.target.scrollTop; spFade(e.target); } }, true);
   document.addEventListener('keydown', e => {
     if (root.hidden || !S || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, select, textarea, [contenteditable], strudel-editor, .cm-editor')) return;
     // digits 1 to 8: + of the instruments in the console's order; with Shift: − (by the key's position, any layout)
@@ -1232,6 +1384,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       if (b && !b.disabled) b.click();
       return;
     }
+    // P: the search of the saved patterns (saved-patterns-list), when the panel shows it
+    if (e.key === 'p' || e.key === 'P') { const q = root.querySelector('#radio-steer [data-sp-q]'); if (q) { e.preventDefault(); q.focus(); q.select(); } return; }
     const kind = Object.keys(KEYS_OF).find(k => KEYS_OF[k] === e.key);
     if (kind === 'extend' && e.repeat) return;
     if (!kind) return;
@@ -1241,6 +1395,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   });
   root.addEventListener('change', e => {
     if (e.target.dataset.spTarget) { spTarget[e.target.dataset.spTarget] = e.target.value; return renderSteer(true); }
+    if (e.target.dataset.spStyle !== undefined) { spView.style = e.target.value; spSaveView(); return spRenderBody({ top: true }); }
+    if (e.target.dataset.spSort !== undefined) { spView.sort = e.target.value; spSaveView(); return spRenderBody({ top: true }); }
     if (e.target.dataset.voicingTreat !== undefined) { voicingTreat = e.target.value; return renderSteer(true); }
     if (e.target.dataset.harmChords !== undefined) { harmChords = e.target.value; return renderSteer(true); }
     if (e.target.dataset.harmKey !== undefined) { harmKey = e.target.value; return renderSteer(true); }
@@ -1264,6 +1420,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (e.target.id === 'radio-seed') seedField = e.target.value.trim();
     if (e.target.id === 'radio-volume') player.setVolume(+e.target.value);
     if (e.target.matches('[data-sv-line]')) sv.line = e.target.value;
+    if (e.target.matches('[data-sp-q]')) { spQ = e.target.value; spRenderBody({ top: true }); }
   });
 
   // what plays, for the studio visual (#28): song, artist, styles, bar, the last spoken comment

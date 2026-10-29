@@ -39,7 +39,7 @@ Each pattern plays in a loop: a temporary song of four bars with its sound, a ke
 
 Bass riffs count as `riffs` too. In the detail: sound, key, progression, mode, tempo, meter and the beat under the pattern. They change from the next bar without stopping.
 
-A saved pattern keeps: `name`, `kind`, `type`, `pattern`, `sound`, `settings`, `context` (key, chords, meter, bpm, mode), `styles`, `source` (`compose` or `generated`), `seed` and `why` for generated ones, `created`. Browser key: `coding-misk-patterns`. `styles` holds style ids; `[]` (or `['any']` alone) means every style.
+A saved pattern keeps: `name`, `kind`, `type`, `pattern`, `sound`, `settings`, `context` (key, chords, meter, bpm, mode), `styles`, `source` (`compose` or `generated`), `seed` and `why` for generated ones, `created`, and once brought into a song `uses` and `lastUsed` (ISO time; saved-patterns-list D5: the console's Add as new track and Replace and the Patterns tab's Add to song count, a listen or a replay does not; a backup keeps the larger count and the newer use). Browser key: `coding-misk-patterns`. `forRadio(list)` gives the director's pool without the counters; `forRadio(list, { meta: true })` adds `created`, `uses` and `lastUsed` for the console. The Patterns tab lists the saved patterns in the order they were saved (no sort), and the console's default sort follows it. `styles` holds style ids; `[]` (or `['any']` alone) means every style.
 
 A new part (draft) keeps: `id` (`d-…`), `kind`, `type`, `name`, `pattern`, `sound`, `context`, `styles`, `seed`, `why`, `energy`, `at` (time, newest first). Seeds: `pattern:<kind>:<n>`, and `pattern:riffs:guitar:<n>` for a guitar riff.
 

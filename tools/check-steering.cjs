@@ -4,6 +4,9 @@
 // (radio-profiles stage 5).
 // The console's Voice group (voice-full-controls): Apply on this song and on the whole session, typed lines (Say now, At
 // the right moment, Cancel, Replay) with a fake voice helper, the line field disabled without the helper.
+// The saved patterns among many (saved-patterns-list): 10, 40 and 120 seeded patterns, the toolbar, groups, search
+// kept across the console's rebuilds, scroll kept, filters, sorts, use counts, P and Escape, 400 px, hardware theme.
+// Usage of the many-patterns part alone: ... node tools/check-steering.cjs [shots-dir] --many
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-steering.cjs [shots-dir] [--typed]   (dev server on PORT, default 5173;
 // --typed runs only the typed lines with the real voice helper, --lock only the locked kick)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -12,7 +15,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
 const shots = process.argv.slice(2).find(a => !a.startsWith('--'));
-const typedOnly = process.argv.includes('--typed');
+const typedOnly = process.argv.includes('--typed'), manyOnly = process.argv.includes('--many');
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
 (async () => {
@@ -107,6 +110,142 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(!(await err()), 'no evaluation error around the break and the drop', (await err()).slice(0, 120));
     await page.click('#radio-start'); await sleep(300);
   }
+  // ---------- the saved patterns among many (saved-patterns-list, #83) ----------
+  // seeded from the built-in catalogue: mixed instruments, tempos and styles, one in 12 in 7/8
+  async function seedMany(n, lang = 'en') {
+    await page.evaluate(async ({ n, lang }) => {
+      const { builtinPatterns } = await import('/src/library/patterns.js');
+      const all = builtinPatterns(), word = ['notturno', 'scuro', 'teso', 'lento', 'rotto', 'acido', 'pieno', 'vuoto', 'storto'];
+      const head = { hook: 'Melodia', bass: 'Basso', arp: 'Arpeggio', pad: 'Pad', drums: 'Groove', guitar: 'Riff' };
+      const list = Array.from({ length: n }, (_, i) => { const b = all[(i * 7) % all.length]; return { id: `p-m${i}`, name: `${head[b.type] || b.type} ${word[i % 9]} ${i + 1}`, kind: b.kind, type: b.type, pattern: JSON.parse(JSON.stringify(b.pattern)), sound: null, settings: {}, context: { key: ['A', 'C#', 'F#', 'D'][i % 4], chords: 'notturna', meter: i % 12 === 5 ? '7/8' : (b.defaults.meter || '4/4'), bpm: [70, 90, 110, 124, 128, 140][i % 6], mode: 'minor' }, styles: i % 3 === 0 ? ['berlin-techno'] : i % 3 === 1 ? [] : ['jazz'], source: 'compose', created: `2026-10-${String(1 + (i % 28)).padStart(2, '0')}` }; });
+      localStorage.setItem('coding-misk-patterns', JSON.stringify(list)); localStorage.setItem('coding-misk-lang', lang);
+      localStorage.removeItem('coding-misk-radio-saved-open'); localStorage.removeItem('coding-misk-radio-saved-view');
+    }, { n, lang });
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', 'steer-many'); await page.click('#radio-start'); await sleep(2500);
+  }
+  const spBox = sel => page.evaluate(s => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top + scrollY), bottom: Math.round(r.bottom + scrollY) }; }, sel);
+  // a phrase change: the console is rebuilt
+  const nextPhrase = async () => { const s0 = await ST(), k0 = await page.evaluate(() => document.querySelector('#radio-steer .steer-head') && document.querySelector('#radio-steer .steer-console')); const b = (Math.floor((await now()) / s0.plan.phrase) + 1) * s0.plan.phrase; await page.evaluate(x => globalThis.codingMiskRadio.seek(x), b + 0.2); await sleep(900); return k0; };
+  const rebuilt = () => page.evaluate(() => { const c = document.querySelector('#radio-steer .steer-console'); const was = window.__spConsole; window.__spConsole = c; return !!was && was !== c; });
+  async function manyPatterns() {
+    for (const n of [10, 40]) {
+      await seedMany(n);
+      const fit = +(/\((\d+)\)/.exec(await page.innerText('#sp-toggle')) || [])[1];
+      const t0 = await page.evaluate(() => { const t = performance.now(); document.querySelector('#sp-toggle').click(); return performance.now() - t; });
+      const open = await spBox('#radio-steer .sp');
+      check(fit > 8 && await page.isVisible('#radio-steer .sp-tools') && (await page.$$('#radio-steer .sp-group')).length >= 2 && open.h < 760, `${n} saved: toolbar and groups, open panel ${open.h} px, render ${t0.toFixed(0)} ms`, `fit ${fit}`);
+      await page.click('#sp-toggle'); await sleep(200);
+    }
+    await seedMany(120);
+    const fit = +(/\((\d+)\)/.exec(await page.innerText('#sp-toggle')) || [])[1];
+    const closed = await spBox('#radio-steer .sp');
+    const groups = await page.$$eval('#radio-steer .sp-group', gs => gs.map(g => ({ n: +g.querySelector('.sp-ghead small').textContent, rows: g.querySelectorAll('.sp-row').length, all: !!g.querySelector('.sp-all') })));
+    check(fit > 60 && closed.h < 560 && groups.length >= 3 && groups.every(g => g.rows === Math.min(4, g.n) && g.all === g.n > 4), `120 saved (${fit} fit): closed panel ${closed.h} px, groups of at most 4 with Show all`, JSON.stringify(groups));
+    check(/As in Patterns/.test(await page.$eval('#radio-steer [data-sp-sort]', s => s.selectedOptions[0].textContent)), 'the default sort is As in Patterns (the order they were saved)');
+    const order = await page.$$eval('#radio-steer .sp-group .sp-row [data-sp-listen]', bs => bs.map(b => +b.dataset.spListen.slice(3)));
+    const byGroup = await page.$$eval('#radio-steer .sp-group', gs => gs.map(g => [...g.querySelectorAll('[data-sp-listen]')].map(b => +b.dataset.spListen.slice(3))));
+    check(byGroup.every(g => g.every((x, i) => !i || x > g[i - 1])) && order.length, 'each group in the order the patterns were saved, as the Patterns tab', JSON.stringify(byGroup));
+    // (the whole console's rebuild, measured on the toggle 8 times: the median of the open and of the folded panel)
+    const times = await page.evaluate(async () => { const out = [[], []]; for (let k = 0; k < 8; k++) { const t = performance.now(); document.querySelector('#sp-toggle').click(); out[k % 2].push(performance.now() - t); await new Promise(r => setTimeout(r, 250)); } return out.map(l => l.sort((a, b) => a - b)[l.length >> 1]); });
+    console.log(`      console render with 120 saved (median): open ${times[0].toFixed(0)} ms, folded ${times[1].toFixed(0)} ms (205 ms before)`);
+    check(Math.max(...times) < 60, 'console render with 120 saved patterns below 60 ms', times.map(x => x.toFixed(0)).join(' / '));
+    await page.click('#sp-toggle'); await sleep(300);
+    const openBox = await spBox('#radio-steer .sp'), area = await spBox('#radio-steer .sp-scroll');
+    check(area.h <= 442 && openBox.h < 700, `open as cards: scroll area ${area.h} px, panel ${openBox.h} px`);
+    const painted = await page.$$eval('#radio-steer canvas[data-sp-pv]', cs => ({ all: cs.length, done: cs.filter(c => c.dataset.painted).length }));
+    check(painted.done > 0 && painted.done < painted.all, 'only the drawings in view are painted', JSON.stringify(painted));
+    // scroll kept across a phrase change
+    await page.$eval('#radio-steer .sp-scroll', e => { e.scrollTop = 260; e.dispatchEvent(new Event('scroll')); }); await sleep(100);
+    await rebuilt(); await nextPhrase();
+    check(await rebuilt(), 'the console was rebuilt at the phrase change');
+    const top = await page.$eval('#radio-steer .sp-scroll', e => e.scrollTop);
+    check(Math.abs(top - 260) < 3, 'the scroll position is kept across the rebuild', String(top));
+    // P, typing, focus and caret across a rebuild
+    await page.click('#radio-steer .steer-head .lbl'); await page.keyboard.press('p'); await sleep(100);
+    check(await page.evaluate(() => document.activeElement && document.activeElement.matches('[data-sp-q]')), 'P moves the focus to the search');
+    await page.keyboard.type('bas'); await sleep(200);
+    const names = await page.$$eval('#radio-steer .sp-scroll .sp-card b', bs => bs.map(b => b.textContent));
+    check(names.length > 0 && names.every(x => /bas/i.test(x)) && !(await page.$('#radio-steer .sp-group')), 'the search lists only the matching patterns, one list', `${names.length}: ${names.slice(0, 4).join(', ')}`);
+    await page.keyboard.press('ArrowLeft'); await rebuilt(); await nextPhrase();
+    const kept = await page.evaluate(() => { const a = document.activeElement; return { q: a && a.matches('[data-sp-q]'), v: a && a.value, c: a && a.selectionStart }; });
+    check(await rebuilt() && kept.q && kept.v === 'bas' && kept.c === 2, 'the search keeps its text, its caret and the focus across the rebuild', JSON.stringify(kept));
+    check(/of \d+ · “bas”/.test(await page.innerText('#radio-steer .sp-sum')), 'a line says how many are shown and what is applied', await page.innerText('#radio-steer .sp-sum'));
+    // Escape clears, a second Escape leaves
+    await page.keyboard.press('Escape'); await sleep(150);
+    const esc1 = await page.evaluate(() => ({ v: document.querySelector('#radio-steer [data-sp-q]').value, f: document.activeElement.matches('[data-sp-q]') }));
+    await page.keyboard.press('Escape'); await sleep(150);
+    const esc2 = await page.evaluate(() => document.activeElement.matches('[data-sp-q]'));
+    check(esc1.v === '' && esc1.f && !esc2 && !!(await page.$('#radio-steer .sp-group')), 'Escape clears the search, a second Escape leaves it, the groups come back');
+    // Show all: the instrument's chip and its patterns
+    const g0 = await page.$eval('#radio-steer .sp-group:has(.sp-all)', g => ({ inst: g.querySelector('.sp-all').dataset.spInst, n: +g.querySelector('.sp-ghead small').textContent }));
+    await page.click(`#radio-steer .sp-all[data-sp-inst="${g0.inst}"]`); await sleep(200);
+    check((await page.getAttribute(`#radio-steer .sp-insts [data-sp-inst="${g0.inst}"]`, 'aria-pressed')) === 'true' && (await page.$$('#radio-steer .sp-scroll .sp-card')).length === g0.n, `Show all (${g0.n}) picks the ${g0.inst} chip and shows them all`);
+    // a group collapsed and remembered
+    await page.click('#radio-steer .sp-insts [data-sp-inst="all"]'); await sleep(150);
+    await page.click(`#radio-steer [data-sp-group="${g0.inst}"]`); await sleep(150);
+    check((await page.getAttribute(`#radio-steer [data-sp-group="${g0.inst}"]`, 'aria-expanded')) === 'false' && await page.evaluate(i => JSON.parse(localStorage.getItem('coding-misk-radio-saved-view')).closed.includes(i), g0.inst), 'a group collapses and is remembered');
+    await page.click(`#radio-steer [data-sp-group="${g0.inst}"]`); await sleep(150);
+    // use counts: two adds of one pattern and one of another, then Most used
+    const two = await page.$$eval('#radio-steer .sp-scroll [data-sp-new]:not([disabled])', bs => bs.slice(0, 2).map(b => b.dataset.spNew));
+    if (two.length === 2) {
+      await page.click(`#radio-steer [data-sp-new="${two[1]}"]`); await sleep(400);
+      await page.click(`#radio-steer [data-sp-new="${two[1]}"]`); await sleep(400);
+      await page.click(`#radio-steer [data-sp-new="${two[0]}"]`); await sleep(400);
+      await page.click(`#radio-steer [data-sp-listen="${two[0]}"]`); await sleep(300); await page.click(`#radio-steer [data-sp-listen="${two[0]}"]`); await sleep(200);
+      const u = await page.evaluate(ids => { const l = JSON.parse(localStorage.getItem('coding-misk-patterns')); return ids.map(id => l.find(p => p.id === id).uses || 0); }, two);
+      await page.selectOption('#radio-steer [data-sp-sort]', 'used'); await sleep(200);
+      const first = await page.$$eval('#radio-steer .sp-scroll .sp-card', cs => cs.slice(0, 2).map(c => ({ id: c.querySelector('[data-sp-listen]').dataset.spListen, uses: c.querySelector('.sp-uses').textContent })));
+      check(u[0] === 1 && u[1] === 2 && first[0].id === two[1] && first[1].id === two[0] && /used 2 times · today/.test(first[0].uses), 'two adds and one add, a listen not counted; Most used puts them first with "used 2 times · today"', JSON.stringify({ u, first }));
+    } else check(false, 'two patterns can be added');
+    // no match and Clear filters; Fit this song
+    await page.click('#radio-steer [data-sp-fit]'); await sleep(150);
+    const fitN = (await page.$$('#radio-steer .sp-scroll .sp-card')).length;
+    check(fitN > 0 && fitN < fit && /fit this song/.test(await page.innerText('#radio-steer .sp-sum')), `Fit this song narrows to ${fitN}`);
+    await page.fill('#radio-steer [data-sp-q]', 'zzzz'); await sleep(200);
+    check(/No pattern matches/.test(await page.innerText('#radio-steer .sp-scroll')), 'no match: says so and offers Clear filters');
+    await page.click('#radio-steer [data-sp-clear]'); await sleep(300);
+    check((await page.inputValue('#radio-steer [data-sp-q]')) === '' && (await page.getAttribute('#radio-steer [data-sp-fit]', 'aria-pressed')) === 'false' && (await page.$$('#radio-steer .sp-scroll .sp-card')).length === fit, 'Clear filters clears the search and the filters, the sort stays');
+    // keyboard only: P, a name, the down arrow, Enter plays the preview
+    await page.selectOption('#radio-steer [data-sp-sort]', 'saved'); await sleep(150);
+    const target = await page.$eval('#radio-steer .sp-scroll [data-sp-listen]', b => ({ id: b.dataset.spListen, name: b.closest('.sp-card').querySelector('b').textContent }));
+    await page.click('#radio-steer .steer-head .lbl'); await page.keyboard.press('p'); await page.keyboard.type(target.name); await sleep(200);
+    await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await sleep(900);
+    const pv = await page.evaluate(() => globalThis.codingMiskRadioPreview.state);
+    check(pv && (await page.getAttribute(`#radio-steer [data-sp-listen="${target.id}"]`, 'aria-pressed')) === 'true', 'P, the name, the down arrow and Enter play the pattern in preview');
+    await page.click(`#radio-steer [data-sp-listen="${target.id}"]`); await sleep(200);
+    await page.keyboard.press('Escape');
+    check(!(await err()), 'no evaluation error with 120 saved patterns', (await err()).slice(0, 120));
+    // Italian, the shots: neon desktop (groups and a search sorted by Most used), the hardware theme, a phone
+    await page.evaluate(() => { localStorage.setItem('coding-misk-lang', 'it'); localStorage.setItem('coding-misk-radio-saved-view', JSON.stringify({ inst: 'all', fit: false, style: 'all', sort: 'saved', closed: [] })); localStorage.setItem('coding-misk-radio-saved-open', 'false'); });
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', 'steer-many'); await page.click('#radio-start'); await sleep(2500);
+    // (the panel brought near the top of the window, clear of the sticky header and the player bar)
+    const shot = async (name, full = false) => { if (!shots) return; await page.evaluate(() => { const e = document.querySelector('#radio-steer .sp'); const hd = [...document.querySelectorAll('header, .topbar, .app-head')].filter(h => ['sticky', 'fixed'].includes(getComputedStyle(h).position)).reduce((m, h) => Math.max(m, h.getBoundingClientRect().bottom), 0); scrollTo(0, e.getBoundingClientRect().top + scrollY - Math.max(hd, innerWidth < 500 ? 300 : 140) - 10); }); await sleep(500); if (full) await page.screenshot({ path: path.join(shots, name) }); else await (await page.$('#radio-steer .sp')).screenshot({ path: path.join(shots, name) }); };
+    check(/Cerca tra \d+ pattern/.test(await page.getAttribute('#radio-steer [data-sp-q]', 'placeholder')) && /Come nei Pattern/.test(await page.$eval('#radio-steer [data-sp-sort]', s => s.selectedOptions[0].textContent)), 'Italian: "Cerca tra n pattern", "Come nei Pattern"');
+    await shot('fatto-gruppi.png');
+    await page.click('#sp-toggle'); await sleep(200);
+    await page.fill('#radio-steer [data-sp-q]', 'basso'); await page.selectOption('#radio-steer [data-sp-sort]', 'used'); await sleep(300);
+    await shot('fatto-cerca-piu-usati.png');
+    await page.click('[data-uitheme="hw"]'); await sleep(600);
+    const hwPainted = await page.$$eval('#radio-steer canvas[data-sp-pv][data-painted]', cs => cs.length);
+    await shot('fatto-hw.png');
+    await page.setViewportSize({ width: 400, height: 860 }); await sleep(800);
+    const phone = await page.evaluate(() => { const a = document.querySelector('#radio-steer .sp-scroll').getBoundingClientRect(), snd = [...document.querySelectorAll('#radio-steer .steer-group')].find(g => /Suono/.test(g.querySelector('.lbl') ? g.querySelector('.lbl').textContent : '')); return { over: document.scrollingElement.scrollWidth - innerWidth, h: a.height, gap: snd ? snd.getBoundingClientRect().top - a.bottom : null }; });
+    check(phone.over <= 0 && phone.h <= 0.6 * 860 + 1 && phone.gap !== null && phone.gap < 860, `400 px: no horizontal scroll, scroll area ${Math.round(phone.h)} px, Sound ${Math.round(phone.gap)} px below it`, JSON.stringify(phone));
+    await shot('fatto-telefono-hw.png', true);
+    await page.click('[data-uitheme="neon"]'); await sleep(300);
+    await shot('fatto-telefono.png', true);
+    await page.setViewportSize({ width: 1300, height: 1300 });
+    check(hwPainted > 0, 'the hardware theme paints the drawings again in its colours');
+    await page.evaluate(() => { localStorage.removeItem('coding-misk-patterns'); localStorage.setItem('coding-misk-lang', 'en'); localStorage.removeItem('coding-misk-radio-saved-view'); });
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+  }
+  if (manyOnly) { await manyPatterns(); await browser.close(); console.log(failed ? `${failed} failed` : 'all ok'); process.exit(failed ? 1 : 0); }
+
   const lockOnly = process.argv.includes('--lock');
   if (lockOnly) {
     await lockedKick();
@@ -626,9 +765,14 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       check(rc && x.build.some(s => s.at === rc.at && s.pattern && s.pattern.track === rc.target && /^P\d+$/.test(s.pattern.to)), 'Replace: the saved melody as a P pattern on the chosen track', JSON.stringify(rc && { target: rc.target }));
     } else check(/ · /.test(await page.getAttribute('#radio-steer [data-sp-replace="p-hook"]', 'title')), 'Replace off with its reason when no melody plays');
     check(!(await err()), 'no evaluation error with saved patterns', (await err()).slice(0, 120));
+    check(!(await page.$('#radio-steer .sp-tools')) && !(await page.$('#radio-steer .sp-group')) && !(await page.$('#radio-steer .sp-uses')), 'few saved patterns: no toolbar, no groups, no use line, as before (saved-patterns-list D3)');
+    const uses = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-patterns')).map(p => `${p.id}:${p.uses || 0}`).join());
+    check(/p-bass:1/.test(uses) && /p-odd:0/.test(uses), 'Add as new track counts one use, the preview listen none (saved-patterns-list D5)', uses);
     if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'saved-en.png') });
     await page.evaluate(() => localStorage.removeItem('coding-misk-patterns'));
   }
+  await manyPatterns();
+  await page.fill('#radio-seed', 'steer-check'); await page.click('#radio-start'); await sleep(2500);
 
   // ---------- Part harmony and the Song harmony menu (radio-arrangement phase 5) ----------
   await page.click('#radio-start'); await sleep(300); await page.fill('#radio-seed', 'steer-harm'); await page.click('#radio-start'); await sleep(2500);

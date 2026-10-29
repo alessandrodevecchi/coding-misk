@@ -3,7 +3,8 @@
 // The built-in catalogue (every preset once), the styles that use each preset, the user's store (add, rename, remove,
 // built-ins protected), Save as pattern, the loop song, Add to song, the preview, the radio's pool and the backup; the
 // follow-ups (pattern-followups): editable styles, Save as pattern's fallback styles, new parts kept, capped and
-// discarded, their backup, and guitar riffs from New.
+// discarded, their backup, and guitar riffs from New; the radio console's saved patterns among many (saved-patterns-list):
+// use counts, their backup, search, filters, sorts and groups.
 import fs from 'node:fs';
 import { BASS, ARPS, HOOKS, PADS, GROOVES, GUITAR_PATTERNS } from '../src/music.js';
 import { builtinPatterns, stylesUsing, kindOfPreset, patternStore, addPattern, renamePattern, removePattern, listPatterns, savedFromTrack, savedFromGenerated, loopSong, addToSong, previewOf, forRadio, KINDS, KIND_TYPE, MATERIAL_KIND, RIFF_STYLE, BEAT_GAIN, STORE_KEY, cleanStyles, everyStyle, fallbackStyles, composeNewPart } from '../src/library/patterns.js';
@@ -17,6 +18,7 @@ import { createSession } from '../src/endless/director.js';
 import { generateSession } from '../src/endless/director.js';
 import { makeBackup, mergeBackup } from '../src/settings/backup.js';
 import { loadStyles } from './styles-dir.mjs';
+import { savedView, cleanView, fitsSong, daysAgo, SAVED_TOOLBAR, SAVED_GROUP, VIEW_DEFAULT } from '../src/radio/saved-view.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -248,6 +250,63 @@ const CHECKS = {
     assert(!fitsAir(list.find(x => x.id === odd.id), g.plan, g.song) && unfitReason(list.find(x => x.id === odd.id), g.plan) === 'meter', 'a 7/8 pattern does not fit a 4/4 song');
     const guitar = { ...b, type: 'guitar' };
     assert(!fitsAir(guitar, g.plan, g.song) && unfitReason(guitar, g.plan) === 'type', 'a guitar pattern does not fit a style without guitars');
+  },
+  'use counts: Add as a new track, Replace and Add to song count, the director reads none (saved-patterns-list D5)'() {
+    const s = memStore(), st = patternStore(s);
+    const a = st.add({ name: 'Basso rotto 5', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' } }), b = st.add({ name: 'Basso teso 23', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' } });
+    assert(!('uses' in st.get(a.id)) && forRadio(st.list(), { meta: true })[0].uses === 0 && forRadio(st.list(), { meta: true })[0].lastUsed === null, 'an older pattern reads as never used');
+    for (let i = 0; i < 4; i++) st.markUsed(a.id, new Date(Date.UTC(2026, 9, 20 + i)));
+    st.markUsed(b.id, new Date(Date.UTC(2026, 9, 28)));
+    assert(st.get(a.id).uses === 4 && st.get(a.id).lastUsed.startsWith('2026-10-23') && st.get(b.id).uses === 1, JSON.stringify(st.list()));
+    const plain = forRadio(st.list());
+    assert(plain.every(x => !('uses' in x) && !('lastUsed' in x) && !('created' in x)), 'the director pool carries no counters, so recipes stay as before');
+    const used = savedView(forRadio(st.list(), { meta: true }).concat(Array.from({ length: 8 }, (_, i) => ({ id: `f${i}`, name: `F${i}`, type: 'hook', kind: 'melodies', pattern: { preset: 'x' }, styles: ['any'], context: {} }))), { sort: 'used' }, {});
+    assert(used.items[0].name === 'Basso rotto 5' && used.items[1].name === 'Basso teso 23', used.items.map(x => x.name).join());
+  },
+  'use counts survive a backup: the larger count and the newer use win (saved-patterns-list D5)'() {
+    const mine = [{ id: 'p-1', name: 'A', kind: 'basslines', type: 'bass', pattern: { preset: 'p' }, uses: 2, lastUsed: '2026-10-20T10:00:00.000Z' }, { id: 'p-2', name: 'B', kind: 'basslines', type: 'bass', pattern: { preset: 'p' }, uses: 5, lastUsed: '2026-10-01T10:00:00.000Z' }];
+    const theirs = [{ id: 'p-1', name: 'A2', kind: 'basslines', type: 'bass', pattern: { preset: 'p' }, uses: 3, lastUsed: '2026-10-10T10:00:00.000Z' }, { id: 'p-2', name: 'B', kind: 'basslines', type: 'bass', pattern: { preset: 'p' } }];
+    const got = mergeBackup(makeBackup([['coding-misk-patterns', theirs]]), k => (k === 'coding-misk-patterns' ? mine : null)).values['coding-misk-patterns'];
+    const a = got.find(x => x.id === 'p-1'), b = got.find(x => x.id === 'p-2');
+    assert(a.name === 'A2' && a.uses === 3 && a.lastUsed.startsWith('2026-10-20') && b.uses === 5 && b.lastUsed.startsWith('2026-10-01'), JSON.stringify(got));
+  },
+  'saved patterns among many: threshold, groups, search, fit, style and the five sorts (saved-patterns-list D2, D3)'() {
+    const P = (id, name, type, extra = {}) => ({ id, name, type, kind: type === 'hook' ? 'melodies' : type === 'bass' ? 'basslines' : type === 'drums' ? 'grooves' : 'arpeggios', pattern: type === 'drums' ? { rows: { bd: 'x...', hh: '..x.' } } : { preset: 'x' }, styles: ['any'], context: { bpm: 124 }, ...extra });
+    const few = Array.from({ length: SAVED_TOOLBAR }, (_, i) => P(`p${i}`, `Z${i}`, 'bass', { styles: ['jazz'] }));
+    const v8 = savedView(few, { q: 'nothing', fit: true, sort: 'name' }, { styles: ['berlin-techno'], bpm: 124 });
+    assert(!v8.toolbar && !v8.grouped && v8.shown === 8 && v8.items.map(x => x.id).join() === few.map(x => x.id).join(), '8 fitting patterns: as before, no toolbar, every pattern in the saved order');
+    const list = [
+      P('a', 'Melodia notturno 1', 'hook', { created: '2026-10-01' }), P('b', 'Basso rotto 5', 'bass', { created: '2026-10-02', styles: ['acid-house'], context: { bpm: 90 } }),
+      P('c', 'Melodia scura 2', 'hook', { created: '2026-10-03', uses: 2, lastUsed: '2026-10-27T09:00:00.000Z' }), P('d', 'Basso acido 17', 'bass', { created: '2026-10-04', styles: ['berlin-techno'], context: { bpm: 70 } }),
+      P('e', 'Groove pieno 8', 'drums', { created: '2026-10-05' }), P('f', 'Melodia teso 3', 'hook', { created: '2026-10-06' }), P('g', 'Melodia lenta 4', 'hook', { created: '2026-10-07' }),
+      P('h', 'Melodia 10', 'hook', { created: '2026-10-08' }), P('i', 'Arpa', 'arp', { created: '2026-10-09', context: { bpm: 130 } }), P('j', 'Città', 'bass', { created: '2026-10-10', styles: ['berlin-techno'] }),
+    ];
+    const song = { styles: ['berlin-techno'], bpm: 124 }, names = { inst: p => ({ hook: 'melodia', bass: 'basso', beat: 'ritmica', arp: 'arpeggio' }[p] || p), style: id => id };
+    const g = savedView(list, VIEW_DEFAULT, song, names);
+    assert(g.toolbar && g.grouped && g.groups.map(x => `${x.inst}:${x.n}`).join() === 'beat:1,bass:3,arp:1,hook:5', g.groups.map(x => `${x.inst}:${x.n}`).join());
+    const mel = g.groups.find(x => x.inst === 'hook');
+    assert(mel.items.length === SAVED_GROUP && mel.items.map(x => x.id).join() === 'a,c,f,g', 'groups list the first 4 in the saved order, as the Patterns tab');
+    const shown = savedView(list, { inst: 'hook' }, song, names);
+    assert(!shown.grouped && shown.shown === 5 && shown.filtered, '"Show all" picks the instrument chip: one list of 5');
+    assert(savedView(list, { q: 'citta' }, song, names).items.map(x => x.id).join() === 'j', 'the search folds accents');
+    assert(savedView(list, { q: 'MELODIA scur' }, song, names).items.map(x => x.id).join() === 'c', 'every word must match, case ignored');
+    assert(savedView(list, { q: 'basso acid' }, song, names).items.map(x => x.id).join() === 'b,d', 'the search reads instrument names and style ids');
+    const fit = savedView(list, { fit: true }, song, names).items.map(x => x.id);
+    assert(!fit.includes('b') && !fit.includes('d') && fit.includes('j') && fit.includes('a'), `fit: the song's style or none, tempo within 1.5 times (${fit})`);
+    assert(fitsSong(P('t', 't', 'bass', { context: {} }), song) && !fitsSong(P('t', 't', 'bass', { context: { bpm: 200 } }), song), 'no tempo saved fits; 200 against 124 does not');
+    assert(savedView(list, { style: 'berlin-techno' }, song, names).items.map(x => x.id).join() === 'd,j', 'the style menu keeps the patterns tagged with it');
+    assert(savedView(list, { sort: 'recent' }, song, names).items.map(x => x.id).slice(0, 3).join() === 'c,j,i', 'Recent: the later of the last use and the save date');
+    const byName = savedView(list, { sort: 'name' }, song, names).items.map(x => x.id).join();
+    assert(byName === 'i,d,b,j,e,h,g,a,c,f', `Name: folded, accents ignored (${byName})`);
+    const nums = savedView([...Array.from({ length: 8 }, (_, i) => P(`n${i}`, `Pad ${i + 3}`, 'arp')), P('n10', 'Pad 10', 'arp')], { sort: 'name' }, song, names).items.map(x => x.name);
+    assert(nums.indexOf('Pad 10') > nums.indexOf('Pad 9'), 'Name: numbers in order');
+    assert(savedView(list, { sort: 'tempo' }, song, names).items.slice(-2).map(x => x.id).join() === 'b,d', 'Closest tempo: the farthest last');
+    assert(!savedView(list, { sort: 'used' }, song, names).grouped, 'another sort: one list');
+    assert(savedView(list, { closed: ['hook'] }, song, names).groups.find(x => x.inst === 'hook').open === false, 'a collapsed group stays collapsed');
+    const none = savedView(list, { q: 'zzz' }, song, names);
+    assert(none.shown === 0 && none.filtered && none.total === 10, 'no match');
+    assert(same(cleanView({ sort: 'bogus', inst: 7, closed: ['hook', 'hook', 3] }), { inst: 'all', fit: false, style: 'all', sort: 'saved', closed: ['hook'] }), 'a stored view read back safely');
+    assert(daysAgo('2026-10-24T23:00:00.000Z', new Date(2026, 9, 29, 12)) >= 4 && daysAgo(null) === null, 'days ago');
   },
   'patterns survive a backup'() {
     const s = memStore(), st = patternStore(s);
