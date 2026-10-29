@@ -130,7 +130,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // backup: export, then import into a clean browser (the library is saved a moment after a change: wait for it)
   for (let i = 0; i < 40 && !(await page.evaluate(() => /u-short/.test(localStorage.getItem('coding-misk-library') || ''))); i++) await sleep(250);
   await page.click('#open-settings'); await sleep(300);
-  const [bk] = await Promise.all([page.waitForEvent('download'), page.click('#set-export')]);
+  // (the export above also saves its timeline, a JSON file, 400 ms after the audio: the backup is taken by its name)
+  const [bk] = await Promise.all([page.waitForEvent('download', { predicate: d => /backup/.test(d.suggestedFilename()), timeout: 30000 }), page.click('#set-export')]);
   const file = path.join(os.tmpdir(), `coding-misk-backup-${Date.now()}.json`);
   await bk.saveAs(file);
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -140,8 +141,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await p2.goto(URL); await sleep(3000);
   await p2.click('#open-settings'); await sleep(300);
   const [chooser] = await Promise.all([p2.waitForEvent('filechooser'), p2.click('#set-import')]);
-  await chooser.setFiles(file); await sleep(2500);
-  const lib2 = await p2.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-library') || '{}'));
+  await chooser.setFiles(file);
+  // the import writes the storage, then reloads the page: read it until the songs are there (a read during the reload
+  // throws and is tried again)
+  let lib2 = {};
+  for (let i = 0; i < 60 && !(lib2.tracks && lib2.tracks.some(x => x.id === 'u-short')); i++) { await sleep(250); lib2 = await p2.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-library') || '{}')).catch(() => ({})); }
   check(lib2.tracks && lib2.tracks.some(x => x.id === 'u-short'), 'import brings the songs into another browser');
   await p2.context().close();
 
