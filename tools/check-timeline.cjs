@@ -4,7 +4,9 @@
 // ruler (clicks in the growth and in the written part, the knob during the growth), the strip (growth to bar 0, first
 // written section to the written part), a growth cell (the track's step, the track selected), the keys (arrows,
 // Page Up and Page Down, Home, End with the added ending), the Crescendo ending column, a waypoint song in Classic
-// with the live build off (the section clicked is the section heard) and a Classic song unchanged.
+// with the live build off (the section clicked is the section heard), a Classic song unchanged, and the arranger
+// following the playing knob (D7: page follow in the open view and the timeline view, held by the user's scroll, resumed
+// after 3 s or on a seek, off with Follow playback off, a jump with reduced motion, never in a compact view that fits).
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-timeline.cjs [shots-dir]
 //   (dev server on PORT, default 5173; with shots-dir: the three views in neon and hardware, and at phone width)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -55,6 +57,31 @@ async function clickRuler(page, colSel, frac) {
   await page.mouse.click(p.x, p.y); await sleep(500);
 }
 const key = async (page, k) => { await page.focus('#ruler-track'); await page.keyboard.press(k); await sleep(400); return (await bars(page)).cue; };
+// following the knob (D7): the scroller, whether the knob is in its visible part, the follow state
+const fol = page => page.evaluate(() => {
+  const s = document.querySelector('.arr-scroll'), r = s.getBoundingClientRect(), k = document.querySelector('#ruler-knob').getBoundingClientRect(), c = k.left + k.width / 2;
+  return { left: Math.round(s.scrollLeft), max: s.scrollWidth - s.clientWidth, seen: c >= r.left && c <= r.right, ...globalThis.codingMiskBars().compose.follow };
+});
+// the user scrolls the arranger sideways with the wheel (to the start)
+async function wheelAway(page) {
+  const p = await page.evaluate(() => { const s = document.querySelector('.arr-scroll'); s.scrollIntoView({ block: 'center' }); const r = s.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height - 20 }; });
+  await page.mouse.move(p.x, p.y); await page.mouse.wheel(-20000, 0);
+  // the wheel scrolls smoothly: wait until it settles
+  let last = -1;
+  for (let k = 0; k < 20; k++) { await sleep(150); const l = await page.$eval('.arr-scroll', el => el.scrollLeft); if (l === last) break; last = l; }
+}
+// wait (up to ms) until the knob is in sight and the scroll settled
+async function untilSeen(page, ms = 3000) {
+  let f = await fol(page), last = -1;
+  for (let k = 0; k < ms / 250; k++) { await sleep(250); f = await fol(page); if (f.seen && f.left === last) break; last = f.left; }
+  return f;
+}
+// near the end of the played song while it plays: End, then back to the start of a section with some bars left
+async function nearEnd(page, m) {
+  await key(page, 'End'); let at = await key(page, 'PageUp');
+  if (m.bars - at < 10) at = await key(page, 'PageUp');
+  return at;
+}
 const aligned = (b, d = 1) => b.grow && b.gcells.length && b.gcells.every(c => near(c.l, b.grow.l, d) && near(c.w, b.grow.w, d)) && b.firstCells.every(c => c && near(c.l, b.first.l, d));
 
 async function shot(page, name) {
@@ -162,6 +189,61 @@ async function shot(page, name) {
   await page.click('.grow-eye'); await sleep(600);
   check((await bars(page)).map.view === 'compact', 'the toggle comes back to compact');
 
+  // ---------- following the knob (D7) ----------
+  {
+    const f0 = await fol(page);
+    await key(page, 'Home'); await page.click('#play'); await sleep(2500);
+    let f = await fol(page);
+    check(f.max <= 1 && f.left === 0 && f.scrolls === f0.scrolls && f.seen, 'follow: the compact arranger fits and never scrolls while playing', `max ${f.max}, left ${f.left}`);
+    await page.click('#stop'); await sleep(400);
+    await page.click('.grow-eye'); await sleep(600);
+    await page.evaluate(() => { document.querySelector('.arr-scroll').scrollLeft = 0; });
+    await key(page, 'Home'); await page.click('#play'); await sleep(1500);
+    f = await fol(page);
+    check(f.max > 50 && f.left === 0 && f.seen && f.on, 'follow: open view, the knob at the start in sight, no scroll', `max ${f.max}, left ${f.left}`);
+    // the knob crosses the right edge while it plays: one page turn
+    { const p = await page.evaluate(() => { const s = document.querySelector('.arr-scroll').getBoundingClientRect(), r = document.querySelector('#ruler-track').getBoundingClientRect(); return { x: s.left + s.width * .88, y: r.top + r.height / 2 }; });
+      const before = (await fol(page)).scrolls;
+      await page.mouse.click(p.x, p.y);
+      for (let k = 0; k < 40; k++) { await sleep(250); f = await fol(page); if (f.scrolls > before && f.left > 0) break; }
+      f = await untilSeen(page);
+      check(f.scrolls === before + 1 && f.left > 0 && f.seen, 'follow: crossing the right edge while playing turns one page', `left ${f.left}, ${f.scrolls - before} scroll`); }
+    const at = await nearEnd(page, m);
+    f = await untilSeen(page);
+    check(f.left > 0 && f.seen && !f.held, 'follow: a knob out of sight brings the arranger to it', `bar ${at}, left ${f.left} of ${f.max}`);
+    await wheelAway(page);
+    const away = await fol(page);
+    await sleep(1500);
+    f = await fol(page);
+    check(away.held && away.left < 50 && !away.seen && near(f.left, away.left, 2) && !f.seen, 'follow: the user\'s scroll holds it, the arranger stays where the user left it', `left ${away.left} then ${f.left}`);
+    await sleep(1500);
+    f = await untilSeen(page);
+    check(f.seen && !f.held && f.left > away.left, 'follow: back on the knob after 3 s without scrolling', `left ${f.left}`);
+    await wheelAway(page);
+    await key(page, 'ArrowLeft');
+    f = await untilSeen(page, 2000);
+    check(f.seen && !f.held, 'follow: a seek resumes it at once', JSON.stringify(f));
+    // Follow playback off: the arranger stays put
+    await page.$eval('#sc-follow', el => { el.checked = false; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await key(page, 'Home'); await sleep(1500);
+    f = await fol(page);
+    check(!f.on && !f.seen && f.left > 0, 'follow: Follow playback off, the arranger does not scroll to the knob', `left ${f.left}`);
+    await page.$eval('#sc-follow', el => { el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    f = await untilSeen(page, 4000);
+    check(f.on && f.seen && f.left < 300, 'follow: Follow playback on again, back to the knob', JSON.stringify(f));
+    // reduced motion: one jump, no smooth scroll
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(() => { globalThis.__scrolls = 0; document.querySelector('.arr-scroll').addEventListener('scroll', () => globalThis.__scrolls++); });
+    await nearEnd(page, m); await sleep(1200);
+    f = await fol(page);
+    const n = await page.evaluate(() => globalThis.__scrolls);
+    check(f.seen && f.left > 0 && n >= 1 && n <= 3, 'follow: reduced motion jumps to the knob', `${n} scroll events, left ${f.left}`);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.click('#stop'); await sleep(400);
+    await page.click('.grow-eye'); await sleep(400); await page.click('.grow-eye'); await sleep(600);
+    check((await bars(page)).map.view === 'compact', 'follow: back to the compact view');
+  }
+
   // timeline view: same columns
   await page.click('[data-arr-mode="timeline"]'); await sleep(800);
   b = await boxes(page);
@@ -169,6 +251,14 @@ async function shot(page, name) {
   await clickRuler(page, '#arr-strip .arr-xcol.x-grow', 0.5);
   check((await bars(page)).cue < m.G, 'timeline view: the ruler seeks into the growth');
   await shot(page, 'fatto-4-timeline-compatta-neon.png');
+  // timeline view, open growth: the arranger follows the knob too
+  await page.click('.grow-eye'); await sleep(600);
+  await page.evaluate(() => { document.querySelector('.arr-scroll').scrollLeft = 0; });
+  await key(page, 'Home'); await page.click('#play'); await sleep(1000);
+  await nearEnd(page, m);
+  { const f = await untilSeen(page); check(f.max > 50 && f.left > 0 && f.seen, 'follow: timeline view, open growth, the arranger follows the knob', `left ${f.left} of ${f.max}`); }
+  await page.click('#stop'); await sleep(400);
+  await page.click('.grow-eye'); await sleep(400); await page.click('.grow-eye'); await sleep(600);
   // hardware theme: the three views
   await page.evaluate(() => { localStorage.setItem('coding-misk-ui', '"hw"'); localStorage.setItem('coding-misk-arr-mode', '"sections"'); });
   await page.reload(); await page.waitForFunction(() => document.querySelectorAll('#songs [data-song-id]').length > 0, null, { timeout: WAIT });
