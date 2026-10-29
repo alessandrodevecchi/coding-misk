@@ -88,6 +88,8 @@ Alternatives: one store per kind (rejected, three merges for one concept); phras
 
 The tag is a guess the user can change. "Moments" of the explaining narrator unify the two pools: the 14 kinds of `PHRASES` and the 18 move kinds of `POOL` map onto one list of 21 moments (`start`, `end`, `drums`, `bass`, `lead`, `pad`, `guitar`, `arp`, `texture`, `riser`, `code`, `voice`, `less`, `variation`, `brighter`, `darker`, `dirtier`, `cleaner`, `space`, `breakdown`, `drop`), so one phrase serves both Compose and the radio. The map lives next to the pools and `check:phrases` asserts every pool key maps to a moment.
 
+**Open point (owner, round 5): one list or several.** The owner approved the single shared list but is not sure, and may later want several lists, kept the same between Compose and the radio. The design allows it without a change to the store: a phrase's tag stays a moment, and "several lists" become groups of moments over the same shared map (for example tracks that come in, changes of energy or colour, structure), so Compose and the radio still read the same lists. Recommended: build the one list of 21 moments now, and show it in the tab grouped in those three families; split only if listening shows that a phrase written for a Compose step sounds wrong on a radio move. To confirm with the owner before task 1.2.
+
 Lines of built-in songs, lines the director wrote, and lines the user did not type are never captured.
 
 ### D3. Save policy
@@ -112,7 +114,8 @@ A phrase of mine can take the place of a line that comes from a **built-in pool*
 | Explaining narrator, `PHRASES` (Compose growth) or `POOL` (radio move) | kind `explain`, tag equal to the moment or null |
 | Poetic image, `POETIC[type]` or `POETIC.move` | kind `poetic`, tag equal to the type, `move`, or null |
 
-- **How often.** `coding-misk-phrase-settings.share`: Mai 0, Ogni tanto 0.25 (default), Spesso 0.5, Molto 0.8. For each pool line with at least one candidate, a draw on its own stream (`mine/<kind>/<n>`, seeded by the song's seed) decides whether a phrase of mine replaces it, and which one (least used first among ties, so the collection rotates).
+- **How often.** `coding-misk-phrase-settings.share`: Mai 0, Ogni tanto 0.25 (default), Spesso 0.5, Molto 0.8, Sempre 1 (owner, round 5). For each pool line with at least one candidate, a draw on its own stream (`mine/<kind>/<n>`, seeded by the song's seed) decides whether a phrase of mine replaces it, and which one (least used first among ties, so the collection rotates).
+- **Sempre** replaces every replaceable line: every line from a built-in pool that has at least one candidate. It still never touches a song's or a style's own lines (D4 table), and a pool line with no candidate (other kind, tag, language or style) stays the built-in one.
 - **Determinism.** The pool draw happens first and unchanged; the substitution is a second draw on another stream. With Mai, or no candidate, the stream is not even read: director fixtures, growth fixtures, `check:spoken` and `check:endless` stay as they are, with no `DIRECTOR_VERSION` or `SHAPES_VERSION` bump.
 - **Radio.** The substitution is written into the song the director makes (texts written out, as `morePhrases` already does), so the song on air, Replay and a session saved in a playlist play the same lines even after the collection changes. The session recipe records `mine: share` only when not Mai.
 - **Compose.** Explaining and poetic lines are substituted in the narration layer (`narration()`, `narratorLines` in `src/song/spoken.js`), not in the growth: the growth, its cache and its fixtures do not change, only what the narrator says. The voice track gets mine through "Fill with" (a new entry, "Le mie frasi") and "New phrases" (the same share). A song's own steps and its written phrase list are never touched.
@@ -183,17 +186,19 @@ Alternatives: a Voci page inside Settings (rejected: it is a place to browse and
 - **Shared slugs.** Two texts with the same slug share a file (`saySlug` keeps 48 characters, letters and digits). Protection is by slug, so a shared file is kept if any user of it remains.
 - **Disk.** My phrases are small (about 80 KB a sample, so 100 phrases over 3 voices and 2 languages are about 50 MB at most); the built-in banks hold nearly all of the space and are not touched by the cleanup.
 - **Privacy of typed lines.** They stay in the browser and in the backup file; nothing leaves the machine.
-- **A collection that sounds samey.** "Least used first" and the share keep variety; Molto at 0.8 can still repeat a short collection, which the hint says.
+- **A collection that sounds samey.** "Least used first" and the share keep variety; Molto at 0.8 and Sempre can still repeat a short collection, which the hint says.
 
-## Open questions for the owner (each with a recommendation)
+## Owner answers, round 5 (2026-10-30)
+
+The owner approved every recommended answer below. Two notes: question 4 gains a fifth level, Sempre (D4), and question 7 stays open (D2). The list keeps each question with its answer.
 
 1. **Save policy and default.** Salva sempre, Chiedi ogni volta, Non salvare mai, with Salva sempre as default and a toast with Annulla? Recommended: yes, and Chiedi as a toast that never blocks (No after 10 s).
 2. **A fourth option, "Salva quelle che riusi"?** Recommended: not now (D3); a line typed once on air would be lost.
 3. **Lifetime of unsaved samples:** A fine brano, Dopo 24 ore, Dopo 7 giorni, default Dopo 24 ore? Recommended: Dopo 24 ore, so a Replay or a reopened session the same evening still finds them.
-4. **How often the director uses my phrases:** Mai, Ogni tanto (1 in 4), Spesso (1 in 2), Molto (4 in 5), default Ogni tanto? Recommended: Ogni tanto.
+4. **How often the director uses my phrases:** Mai, Ogni tanto (1 in 4), Spesso (1 in 2), Molto (4 in 5), Sempre (every replaceable line, added by the owner in round 5), default Ogni tanto? Decided: Ogni tanto by default, with Sempre as a fifth level.
 5. **Which lines my phrases may replace:** only lines from built-in pools (vocabulary, explaining pools, poetic images), never a song's or a style's own lines? Recommended: yes. This includes the generated narrator lines of built-in songs in Live coder and Crescendo; Mai turns it off.
 6. **Grouping:** by kind, then by tag (mood, moment, entering track), with styles as an optional filter rather than a group? Recommended: yes; styles as groups would split a small collection into many one-line groups.
-7. **One list of moments for the explaining narrator** (21 moments covering Compose steps and radio moves)? Recommended: yes, so one phrase serves both.
+7. **One list of moments for the explaining narrator** (21 moments covering Compose steps and radio moves)? Approved, with a doubt: "maybe still several lists, but the same between Compose and the radio". Still open (D2): recommended one list now, shown in three groups, split later only if listening asks for it; the lists stay identical between Compose and the radio either way.
 8. **Built-in vocabularies:** read-only with "Copia nelle mie frasi", or editable in place? Recommended: read-only and copy, as built-in styles; editing in place would change every user's fixtures.
 9. **Orphan cleanup:** manual with a list first, or automatic? Recommended: manual; an orphan may be a sample made by hand.
 10. **Tab position:** Voci after Suoni in the Groove Lab, Settings card in Settings, the Voices groups unchanged? Recommended: yes.

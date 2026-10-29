@@ -73,27 +73,40 @@ Why: `spokenSchedule` already makes the code and Coming next agree; the captions
 
 ### D2. The step line becomes a tag
 
-The step line is still the clearest account of what the coder does. It shows as a small tag (`passo · ritmo più fitto`) at the top right of the stage, only when it differs from the caption heard on the same bar, so the explaining style shows a single line as today. A step line with no sample or skipped by the narrator shows only as a tag. The setting can hide the tag or bring back the old behaviour (step line as the caption).
+The step line is still the clearest account of what the coder does. It shows as a small tag (`ritmo più fitto`) below the spoken line, in the same box (owner, rounds 2 and 5), only when it differs from the caption heard on the same bar, so the explaining style shows a single line as today. A step line that is still unspoken after D10 (no sample could be made, or the narrator yields to the voice track) shows only as this small tag, never as a spoken caption. The setting can hide the tag or bring back the old behaviour (step line as the caption).
 
 ### D3. Three designs considered
 
-**A. One lane, what is heard, labelled by speaker** (`proposta-A1`, `proposta-A2`). The caption lane at the bottom of the stage, as today, with a speaker chip: NARRATORE (cyan, mono) or VOCE (magenta, display face, in quotes). One line at a time; when two speakers overlap (a long voice-track passage across a narrator line, rare because the narrator yields), the second stacks above. Smallest change, one place to read.
+**A. One lane, what is heard, labelled by speaker** (`proposta-A1`, `proposta-A2`). The caption lane at the bottom of the stage, as today, with a speaker chip: NARRATORE (cyan, mono) or VOCE (magenta, display face, in quotes); the chips became the per-voice mark of D12 in round 2 and round 5. One line at a time; when two speakers overlap (a long voice-track passage across a narrator line, rare because the narrator yields), the second stacks above. Smallest change, one place to read.
 
 **B. Two lanes** (`proposta-B`). The narrator as a lower third on the left, the voice track as subtitles at the bottom centre (karaoke later), the step line as the tag. Clearer roles, but two places to look, and a lower third covers the left instruments of Palco and the panes of Monitor.
 
 **C. Placement per look** (`proposta-C1`, `proposta-C2`, `proposta-E`). The looks that are text interfaces place the words in their own idiom: "Claude" in its transcript, the Studio monitor in its screen; the others use lane A.
 
-**Recommendation: A for every look, C for "Claude" and Studio.** A gives one rule and one renderer for the stage and the videos; C lets the two text looks speak in their own idiom, which is what the owner asked for "Claude".
+**Decided (owner, round 5): A for every look, C for "Claude" and Studio.** A gives one rule and one renderer for the stage and the videos; C lets the two text looks speak in their own idiom, which is what the owner asked for "Claude".
 
-### D4. The "Claude" look as a conversation (C1, recommended)
+### D4. The "Claude" look as a conversation (C1 by default, C2 as an option)
+
+The owner chose both C1 and C2 (round 5). They coexist: C1 is always on, C2 is an option of the look that adds the history.
+
+**C1, the reply block (default).**
 
 - The prompt box types the step line (or the section-change line) as the user's input, as today, over the step's first bar.
 - When the line is spoken, the prompt clears (`> ▌`) and a block appears above it: the user's line on a highlighted background (`> ritmo più fitto`), then `● la città respira` with the ● in orange, typed at speech speed (the characters spread over the sample's length), then a dim `⎿ narratore · battuta 8`.
-- A voice-track line is a tool-output line: `♪ voce «le torri non dormono mai»` in magenta.
+- A voice-track line is a tool-output line: the voice track's icon (D11) and `«le torri non dormono mai»` in magenta.
 - The block keeps the last two exchanges and takes rows from the lower panes (the large pane keeps its size).
-- The page caption `#say` is hidden on this look (today it draws the same line a second time).
+- The page caption `#say` (the pink caption above the scene) is hidden on this look (today it draws the same line a second time).
 
-Alternatives: **C2**, a transcript pane on the right with the history (`proposta-C2`): richer, but it narrows the panes and reads small in 9:16. **C3**, reply on the prompt's own line (`> ritmo più fitto  ● la città respira`): cheapest, cramped with long lines.
+**C2, the transcript pane (option of the look).**
+
+- A pane on the right of the look, about 28 % of its width, holds the session's history: every exchange older than the two in the reply block, newest at the bottom, each with its bar number and speaker mark (D12). Nothing shows twice: an exchange moves from the block to the pane when a third one arrives.
+- The pane takes its width from the lower panes; the large pane and the prompt keep their size.
+- **Option**, `Trascrizione` in the look's own settings (the look menu, with the render), off by default, stored with the look's settings and in the backup.
+- **Hidden in 9:16** (fragments, phone portrait, 9:16 videos), where a third column reads too small: the look draws C1 alone there, whatever the option says. 16:9 videos and the live output follow the option.
+
+**Prompt lines invented by the look.** When no step line exists, the look writes its own prompt from the section change (`bring in…`, `drop…`, `keep the groove`), as today. These lines are the user's side of the conversation: they are never spoken, never captioned on the stage, and get no reply block of their own; a spoken line that follows them is the reply.
+
+Rejected: **C3**, reply on the prompt's own line (`> ritmo più fitto  ● la città respira`): cheapest, cramped with long lines.
 
 ### D5. Timing and language
 
@@ -103,23 +116,25 @@ Alternatives: **C2**, a transcript pane on the right with the history (`proposta
 
 ### D6. Videos and live output
 
-One canvas renderer, `drawCaptions(g, area, captions, palette, scale)`, used by the session video, the live output (both through the stage caption of the moment), the fast video and fragments (from `captionSchedule` of the exported song, replacing `sayList`), and the timeline layout (the heard line beside the playhead, the step line no longer). 9:16 fragments place the lane in the lower third above the safe area, two lines at most, the chip above the text (`proposta-D`).
+One canvas renderer, `drawCaptions(g, area, captions, palette, scale)`, used by the session video, the live output (both through the stage caption of the moment), the fast video and fragments (from `captionSchedule` of the exported song, replacing `sayList`), and the timeline layout (the heard line beside the playhead, the step line no longer). 9:16 fragments place the lane in the lower third above the safe area, two lines at most, the speaker mark above the text (`proposta-D`).
 
 ### D7. Settings
 
-A "Testi sul palco" card in Settings → Appearance (`proposta-F`), stored in `coding-misk-captions`, in the backup:
+A "Testi sul palco" card in Settings → Appearance (`proposta-F`), stored in `coding-misk-captions`, in the backup. One switch on top, with the choices of what to show under it (owner, round 5):
 
-- Show spoken texts (on).
-- Who: Narrator, Voice: track, Lines typed in the console (all on).
-- Step line: hidden, small tag (default), instead of the spoken line (the old behaviour).
-- Where: as the look says (default), bottom, top.
-- In videos: on; the videos follow the stage.
+- **Testi sul palco**: on (default) or off. Off hides every text below on the stage, in the looks and in every video; the choices under it stay as set and come back when it is on again. Under the switch, folded while it is off:
+  - **What to show**, each on by default: Narrator; Voice: track; Lines typed in the console; Step lines; Replies in the "Claude" look (off: the "Claude" look keeps its prompt and draws no reply block or transcript pane, and the lane of D3 shows the spoken line instead).
+  - **Step line**: small tag below the spoken line (default), instead of the spoken line (the old behaviour). Turning Step lines off above hides it.
+  - **How each voice is marked** (D12), one row per speaker kind.
+  - **Where**: as the look says (default), bottom, top.
+  - **In videos too**: on (default). On, the session video, the fast video, fragments, the timeline layout and the live output show the same choices as the stage; off, they show no text at all.
+- The fast video and fragment export panels show the switch's state with a link to the card, and can turn texts off for that one export.
 
 The narrator switch keeps its meaning: off, the narrator is silent, so its lines do not show; the voice track still shows because it is still heard.
 
 ### D8. Hardware theme and phone
 
-HW: the lane is an amber display with one light per speaker that glows while it speaks (`proposta-E`). Phone (400 px): font 17 px, chip above, two lines, no ellipsis cut mid-word.
+HW: the lane is an amber display with one light per speaker that glows while it speaks (`proposta-E`). Phone (400 px): font 17 px, speaker mark above, two lines, no ellipsis cut mid-word.
 
 ### D9. Samples prepared ahead (owner decision, round 3)
 
@@ -137,8 +152,8 @@ For each line, in order:
 
 1. the speaker's own sample (`say_<lang>_<speaker>/<slug>.wav`);
 2. the default voice's sample of the same line (`say_<lang>/<slug>.wav`), with the speaker's sound settings still applied;
-3. a sample made on the fly by the voice helper, if there is time before the line's bar (the line plays from its next repeat or is skipped this time);
-4. only if all fail: no sound, and the text shows as the step tag (D2), never as a spoken caption.
+3. a sample made on the fly by the dev voice helper (about 1 s a line), then spoken (owner, round 5): the line waits for its sample instead of being dropped, plays as soon as the sample is there (on the next beat of its bar, else on the next bar, while no line of a higher rank sounds), and is captioned when it plays;
+4. only if all fail (no helper, or the helper fails): no sound, and the text shows only as the small step tag (D2), never as a spoken caption.
 
 Step 2 already happens for voice-track lines (`voiceSamples` tries the speaker's bank then `sayBank(lang)`); narrator lines today use `bankFor`, which falls back only when the speaker has no bank at all, not per line. D10 makes it per line for both. Known issue `#63`: speaker variants that were not downloaded fall back silently at generation, so variants sound the same; the chain makes the fallback visible (a dev-console note and a count in `check:samples`) without fixing `#63` itself.
 
@@ -147,16 +162,38 @@ Step 2 already happens for voice-track lines (`voiceSamples` tries the speaker's
 A singing voice is in the backlog, not built. To avoid reworking captions and precedence later, the speakers become a registry, `SPEAKER_KINDS` in `src/song/speakers.js`:
 
 ```js
-{ narrator: { rank: 1, icon: 'mic', style: 'italic', colour: 'cyan', perBar: 1 },
-  voice:    { rank: 2, icon: 'wave', style: 'quoted', colour: 'magenta' },
-  singing:  { rank: 3, icon: 'note', style: 'sung', colour: 'amber', future: true } }
+{ narrator: { rank: 1, icon: 'mic', style: 'italic', colour: 'cyan', mark: 'icon+style', perBar: 1 },
+  voice:    { rank: 2, icon: 'wave', style: 'quoted', colour: 'magenta', mark: 'icon+style' },
+  singing:  { rank: 3, icon: 'note', style: 'sung', colour: 'amber', mark: 'icon+style', future: true,
+              exclusive: false, multiCaption: false } }
 ```
 
-- **Rank** decides who yields. Today's rules stay as they are: the voice track wins over the narrator on its bars (the narrator yields), and the narrator says one line per bar.
-- **Flag `exclusive`** (singing takes precedence): off by default. When on for a kind, lower ranks go silent while it sounds. When off, the default, voices overlap and the singing is mixed louder.
-- **Flag `multiCaption`** (several captions at once): one caption row per active speaker, ordered by rank, at most three; off means the highest rank's line only.
-- **Icon and style** come from the registry (D3 and question 6), so a new kind gets its caption look by adding one entry.
+- **Rank** decides who yields. Precedence, confirmed in round 5: the voice track beats the narrator on its bars (the narrator yields); the narrator says at most one line per bar; the step's `say` line comes after both (it is the narrator's explaining line when nothing outranks it, else only the small tag of D2). These are today's rules, read from the registry instead of written in the code.
+- **Groundwork for a future singing voice, no singing now.** The `singing` entry is marked `future` and nothing plays it. Two flags are built and tested with a fake kind, so a singing track later needs no rework:
+  - **`exclusive`**, "when singing is on, the other voices go quiet": off by default. When on for a kind, lower ranks go silent while it sounds. When off, voices overlap and the singing is mixed louder.
+  - **`multiCaption`**, "several texts at once": one caption row per active speaker, ordered by rank, at most three; off means the highest rank's line only.
+- **Icon, style and default mark** come from the registry (D12), so a new kind gets its caption look by adding one entry.
 - `spokenSchedule` keeps its output (`voice: 'N' | 'T'`), and the registry maps `N` and `T` to kinds. A future singing track adds `S` and an entry, not a new caption path.
+
+**Personal vocabulary.** The user's own phrases, which the director may say in place of built-in lines, are the `my-phrases` change. It builds on this change (`spokenNeeds`, D9, D10, `check:samples`, this registry) and adds nothing to the captions: a phrase of mine is captioned like any other line of its speaker.
+
+### D12. How each voice is marked (owner, round 5)
+
+The owner approved the icon per voice with a style (narrator in italics, voice track in quotes, the voice's name only on hover), and asked for it to be a setting per voice. Each speaker kind of the registry (D11) gets one choice in the card:
+
+| Choice | On the stage |
+| --- | --- |
+| Niente | the text alone, no icon, upright, no quotes |
+| Solo formattazione | the kind's style only (narrator italic, voice track in quotes) |
+| Etichetta | a short text label before the line (`Narratore`, `Voce`), in the app language, upright text |
+| Icona | the kind's drawn icon before the line, upright text |
+| Icona e formattazione (default) | the icon and the style |
+
+- The kind's colour stays with every choice except Niente, where the text takes the lane's ink.
+- The voice's name (Reed, Flo) shows on hover with every choice, and in the Guide.
+- The "Claude" look applies the same choice to its reply block and pane; its ● reply marker stays whatever the choice, because it marks the reply, not the speaker.
+- 1-bit, LED and the amber hardware display lose colour: with Niente the speakers can no longer be told apart there, and the card says so under the choice.
+- The defaults come from the registry (`mark: 'icon+style'`), so a future kind gets its default by its entry.
 
 ## Risks / Trade-offs
 
@@ -168,21 +205,19 @@ A singing voice is in the backlog, not built. To avoid reworking captions and pr
 - **Fast video cost.** The schedule is computed once per export; drawing is the same cost as `drawSay` today.
 - **Two speakers overlapping** are rare (the narrator yields to the voice track by bar); a passage longer than a bar can still meet the next narrator line, so the lane stacks two rows.
 
-## Open questions for the owner (each with a recommendation)
+## Owner answers, round 5 (2026-10-30)
 
-1. **The step line:** hidden, small tag only when it differs, or kept as the caption? Recommended: small tag only when it differs.
-   - **1b. Where the tag goes (owner, round 2):** beside the spoken line (after a thin divider) or below it, in the same box (`giro2-tp1-accanto-16x9`, `giro2-tp1-sotto-16x9`, `giro2-tp1-accanto-9x16`, `giro2-tp1-sotto-9x16`). Recommended: below. It keeps the spoken line centred and alone on its row, it does not make the box wider, and it is the only layout that holds in 9:16, where "beside" wraps below anyway. This replaces the top-right tag of D2.
-2. **A line with no sample** (silent): show it? Decided (round 3): samples are made ahead (D9) and fall back (D10); a line that fails every step shows only as the tag.
-3. **Design for the other looks:** A (one lane) or B (two lanes)? Recommended: A.
-4. **The "Claude" look:** C1 reply block, C2 transcript pane, or C3 same line? Recommended: C1, keeping the last two exchanges.
-5. **Karaoke for the voice track** (words lit as they are said)? Recommended: not now; the typed reveal over the sample length gives most of it without word timing.
-6. **How the speaker is marked (owner, round 2: text labels on the stage do not convince).** Four ways on the same scene and the same two lines (`giro2-voci-a-icone`, `giro2-voci-b-stile`, `giro2-voci-c-colore`, `giro2-voci-d-etichette`):
-   - a) a drawn line icon per voice: a microphone for the narrator, a wave for the voice track, a wave in a circle or a square for a second or third voice, with each voice in its own colour;
-   - b) style only: the narrator in italics, the voice track upright and in quotes;
-   - c) colour only: the narrator in cyan, the voice track in magenta;
-   - d) the text labels of round 1, for comparison.
+Every recommended answer was approved. Notes where the owner added something:
 
-   Recommended: a with b (`giro2-voci-consigliata`). The icon tells the speaker apart without words and works for N voices. Italics and quotes still work where colour is lost: the 1-bit and LED renders, the amber hardware theme and colour-blind viewers. Colour alone is not enough, and labels cost width, take a language, and read as an interface rather than a voice. The speaker's voice name (Reed, Flo) shows only in the tooltip and the Guide. The same icons go in the "Claude" look, where ● remains the narrator's reply and the wave icon replaces ♪ for the voice track. This replaces the chips of D3 A.
-7. **While the user types by hand:** show the voice-track lines that still play? Recommended: yes; the narrator is silent then, so nothing of it shows.
-8. **Videos:** one setting with the stage, or a separate switch per video kind? Recommended: one setting; a fragment that needs no text can turn it off in the card for that export.
-9. **Default:** on for everyone, or off until chosen? Recommended: on.
+- **tp1, the step line:** a small tag below the spoken line, not repeated when equal (D2).
+- **tp2, step lines that are never spoken** (from the chat): a missing sample is made on the fly by the dev voice helper (about 1 s) and then spoken (D10, step 3); a line still unspoken shows only as the small tag (D2). Precedence: the voice track beats the narrator, the narrator says at most one line per bar, the step's `say` line comes after them (D11). Groundwork for a future singing voice: the flags "when singing is on, the other voices go quiet" (`exclusive`) and "several texts at once" (`multiCaption`), no singing now (D11). The "Claude" look's prompt lines invented from the section change are never spoken (D4). The personal vocabulary is the `my-phrases` change (D11).
+- **tp3, other looks:** A, one lane; a second row only when two voices overlap (D3).
+- **tp4, the "Claude" look:** both C1 and C2. C1 by default; C2 is an option of the look, hidden in 9:16 (D4).
+- **tp5, karaoke:** not now; the line is typed while it is heard (D5).
+- **tp6, who is speaking:** icon per voice plus style, name on hover, as a setting per voice: Niente, Solo formattazione, Etichetta, Icona, Icona e formattazione (default) (D12).
+- **tp7, while the user types by hand:** the voice track's lines still show.
+- **tp8, one switch for stage and videos:** one switch with the choices under it, videos included (D7).
+- **tp9, default:** on.
+- **tp10, the speaker registry** and **tp11, samples prepared ahead and the fallback chain:** confirmed as written (D9 to D11).
+
+No open questions remain.

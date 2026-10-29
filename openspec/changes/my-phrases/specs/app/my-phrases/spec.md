@@ -58,7 +58,7 @@ Where a line comes from a built-in pool (the voice track vocabulary, the explain
 
 ### Requirement: How often my phrases are used
 
-A setting SHALL set how often a candidate replaces a pool line: Mai, Ogni tanto (default, 0.25), Spesso (0.5), Molto (0.8). The replacement SHALL be drawn on its own random stream after the pool's draw.
+A setting SHALL set how often a candidate replaces a pool line: Mai, Ogni tanto (default, 0.25), Spesso (0.5), Molto (0.8), Sempre (1: every replaceable line). The replacement SHALL be drawn on its own random stream after the pool's draw.
 
 #### Scenario: Never, or no phrases
 
@@ -69,6 +69,11 @@ A setting SHALL set how often a candidate replaces a pool line: Mai, Ogni tanto 
 
 - **WHEN** the setting is Spesso and the collection has three voice phrases tagged night
 - **THEN** about half of the night vocabulary lines of the next songs are phrases of mine, written out in the songs
+
+#### Scenario: Always
+
+- **WHEN** the setting is Sempre, the collection has one voice phrase tagged night, and a radio song has a written phrase list and night vocabulary lines
+- **THEN** every night vocabulary line of the song is that phrase, and the song's written phrases are unchanged
 
 #### Scenario: Replay after the collection changed
 

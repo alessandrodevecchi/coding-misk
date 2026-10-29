@@ -40,16 +40,26 @@ A caption SHALL appear on the bar its line is spoken and SHALL stay for the leng
 
 ### Requirement: Speaker of a caption
 
-Each caption SHALL mark its speaker without words on the stage: a drawn line icon and a colour per voice (narrator, voice track, further voices), the narrator's text in italics and the voice track's text upright in quotes. The speaker's name SHALL be available in the tooltip, in Italian and English.
+Each caption SHALL mark its speaker. By default the mark SHALL be a drawn line icon and a colour per voice (narrator, voice track, further voices), with the narrator's text in italics and the voice track's text upright in quotes. A setting per speaker kind SHALL choose the mark among: nothing, formatting only, label, icon, and icon and formatting (the default). The speaker's name SHALL be available in the tooltip with every choice, in Italian and English.
 
 #### Scenario: Two speakers
 
-- **WHEN** the narrator speaks and later the voice track speaks
+- **WHEN** the narrator speaks and later the voice track speaks, with the default marks
 - **THEN** the first caption carries the narrator's icon with italic text, the second the voice track's icon with its text in quotes
+
+#### Scenario: Label for the voice track
+
+- **WHEN** the user sets the voice track's mark to label and leaves the narrator's at the default
+- **THEN** the voice track's caption starts with the label "Voce" in upright text, and the narrator's caption keeps its icon and italics
+
+#### Scenario: Nothing
+
+- **WHEN** the user sets the narrator's mark to nothing
+- **THEN** the narrator's caption shows its text alone, upright, with no icon, and its name still shows on hover
 
 ### Requirement: Step line tag
 
-When the step line of a bar differs from the line heard on that bar, the stage SHALL show the step line as a small secondary tag, unless the setting hides it. When they are equal only the caption SHALL show.
+When the step line of a bar differs from the line heard on that bar, the stage SHALL show the step line as a small secondary tag below the spoken line, in the same box, unless the setting hides it. When they are equal only the caption SHALL show. A step line that is not spoken SHALL show only as this tag.
 
 #### Scenario: Explaining style
 
@@ -58,12 +68,35 @@ When the step line of a bar differs from the line heard on that bar, the stage S
 
 ### Requirement: The "Claude" look replies
 
-In the "Claude" look the step line (or the section-change line) SHALL be typed in the prompt as the user's input, and the spoken line SHALL appear above the prompt as Claude's reply, with a ● marker, typed over the length of its sample. A voice-track line SHALL appear as a separate line marked as the voice. The page caption SHALL NOT be drawn over this look.
+In the "Claude" look the step line (or the section-change line) SHALL be typed in the prompt as the user's input, and the spoken line SHALL appear in a reply block by the prompt as Claude's reply, with a ● marker, typed over the length of its sample; the block SHALL keep the last two exchanges. A voice-track line SHALL appear as a separate line marked as the voice. The page caption SHALL NOT be drawn over this look.
 
 #### Scenario: Reply to a step
 
 - **WHEN** the "Claude" look shows luci-rosse in the poetic style on bar 8
-- **THEN** the transcript shows "> ritmo più fitto" as the user's line and "● la città respira" as the reply, and the page caption is hidden
+- **THEN** the reply block shows "> ritmo più fitto" as the user's line and "● la città respira" as the reply, and the page caption is hidden
+
+### Requirement: The "Claude" look's transcript pane
+
+An option of the "Claude" look SHALL add a transcript pane on the right with the exchanges older than those of the reply block. The pane SHALL be off by default and SHALL NOT show in 9:16 frames.
+
+#### Scenario: Transcript pane
+
+- **WHEN** the transcript option is on, the look is shown at 16:9, and a third exchange arrives
+- **THEN** the oldest exchange of the reply block moves to the pane on the right, and no exchange shows twice
+
+#### Scenario: Transcript pane in 9:16
+
+- **WHEN** the transcript option is on and a 9:16 fragment of the "Claude" look is exported
+- **THEN** the fragment shows the reply block only, with no pane
+
+### Requirement: Invented prompt lines are not spoken
+
+The prompt lines the "Claude" look writes from a section change SHALL NOT be spoken or captioned.
+
+#### Scenario: Invented prompt line
+
+- **WHEN** a section change has no step line and the look writes "drop…" in the prompt
+- **THEN** nothing says "drop…" and no caption shows it
 
 ### Requirement: Captions in videos and live output
 
@@ -76,7 +109,21 @@ The session video, the fast video, fragments, the timeline layout and the live o
 
 ### Requirement: Caption settings
 
-Settings SHALL offer a "Testi sul palco" card: captions on or off (on by default), which speakers (Narrator, Voice: track, console lines), the step line (hidden, small tag, or as the caption), the placement (as the look says, bottom, top) and captions in videos. The choices SHALL be stored and included in the backup.
+Settings SHALL offer a "Testi sul palco" card with one switch, on by default, that turns the texts on and off on the stage, in the looks and in every video. The choices under it SHALL be kept while the switch is off, stored, and included in the backup.
+
+#### Scenario: Switch off
+
+- **WHEN** the user turns the switch off
+- **THEN** no text shows on the stage, in the looks or in a video exported after that, and turning it on again brings back the same choices
+
+### Requirement: Choices under the switch
+
+Under the switch the card SHALL offer: narrator, voice track, console lines, step lines and the "Claude" look's replies, each on or off; how each voice is marked; the step line's form (small tag or as the caption); the placement (as the look says, bottom, top); and in videos too.
+
+#### Scenario: Narrator only
+
+- **WHEN** the switch is on and the user turns off voice track, console lines, step lines and the "Claude" look's replies
+- **THEN** only the narrator's lines show, on the stage and in videos
 
 #### Scenario: Old behaviour
 
@@ -99,7 +146,12 @@ When a song is prepared (opened, generated or regrown in Compose, or prepared as
 
 ### Requirement: Fallback chain for a missing sample
 
-At play time a line SHALL use, in order: the speaker's own sample, the default voice's sample of the same line with the speaker's sound settings, a sample made on the fly when there is time before its bar, and only when all fail no sound, its text shown as the step tag and never as a spoken caption.
+At play time a line SHALL use, in order: the speaker's own sample, the default voice's sample of the same line with the speaker's sound settings, a sample made on the fly by the voice helper and then spoken as soon as it is ready, and only when all fail no sound, its text shown as the step tag and never as a spoken caption.
+
+#### Scenario: Sample made on the fly
+
+- **WHEN** a narrator line has no sample in any bank and the voice helper runs
+- **THEN** the helper makes the sample, the line is spoken when it is ready, and it is captioned when it is spoken
 
 #### Scenario: Speaker variant missing
 
@@ -117,14 +169,23 @@ A command SHALL list the lines without a sample over the built-in songs, the exa
 
 ### Requirement: Speaker registry
 
-Speakers SHALL be kinds in one registry, each with a precedence rank, an icon, a text style, a colour and two flags: `exclusive` (lower ranks go silent while it sounds, off by default) and `multiCaption` (one caption row per active speaker). The registry SHALL keep today's rules: the voice track wins over the narrator on its bars, and the narrator says at most one line per bar. A new kind of speaker SHALL need only a registry entry and its schedule lines to be captioned.
-
-#### Scenario: Today's voices through the registry
-
-- **WHEN** a song has a narrator and a voice track speaking on the same bar
-- **THEN** the voice track speaks and is captioned, the narrator is silent on that bar, as before this change
+Speakers SHALL be kinds in one registry, each with a precedence rank, an icon, a text style, a colour, a default mark and two flags: `exclusive` (lower ranks go silent while it sounds, off by default) and `multiCaption` (one caption row per active speaker). A new kind of speaker SHALL need only a registry entry and its schedule lines to be captioned. No singing voice SHALL play in this change.
 
 #### Scenario: Several captions at once
 
 - **WHEN** `multiCaption` is on and two kinds sound at the same time
 - **THEN** each shows its own caption row, ordered by rank
+
+#### Scenario: A kind that silences the others
+
+- **WHEN** a test kind ranked above the voice track has `exclusive` on and sounds on a bar
+- **THEN** the voice track and the narrator are silent on that bar and only the test kind is captioned
+
+### Requirement: Speaker precedence
+
+The registry SHALL keep today's rules: the voice track wins over the narrator on its bars, the narrator says at most one line per bar, and the step's own line comes after both.
+
+#### Scenario: Today's voices through the registry
+
+- **WHEN** a song has a narrator and a voice track speaking on the same bar
+- **THEN** the voice track speaks and is captioned, the narrator is silent on that bar, as before this change
