@@ -1,8 +1,8 @@
 ---
 id: visuals
 related: [export, radio, settings, songs, live-build]
-code: [src/visuals.js, src/hardware.js, src/soul/data.js, src/soul/views.js, src/soul/shells.js, src/video/layout.js, src/live/timeline.js, src/style.css]
-checks: [npm run check:soul, npm run check:video, npm run check:clips, node tools/check-soul.cjs, node tools/screenshot-visual.cjs]
+code: [src/visuals.js, src/visuals/widget-looks.js, src/visuals/stage-feed.js, src/visuals/widget-painters.js, src/visuals/widget-palettes.js, src/hardware.js, src/soul/data.js, src/soul/views.js, src/soul/shells.js, src/video/layout.js, src/live/timeline.js, src/style.css]
+checks: [npm run check:soul, npm run check:video, npm run check:clips, npm run check:stage-widgets, node tools/check-soul.cjs, node tools/check-stage-widgets.cjs, node tools/screenshot-visual.cjs]
 ---
 
 # Visuals
@@ -13,6 +13,7 @@ What the app draws while music plays, and how video files are laid out.
 
 - **Themes.** Two interface themes: `neon` (default) and `hw`, a hardware look with knobs and LEDs (`data-ui="hw"`, stored in `coding-misk-ui`). Tokens and components are in `docs/DESIGN-SYSTEM.md`.
 - **Looks.** Canvas visuals on the stage, one per look, drawn by `src/visuals.js`. Each look reacts to the level and the onsets of every instrument (`.analyze()` names).
+- **Widget looks** (`#79`, OpenSpec change `widgets-on-stage`). Monitor (a panel per playing instrument, up to 6, each with its code widget, name, level bar and onset flash, dimmed while silent) and Rullo (en: Roll; the melodic instruments on one pitch axis around a playhead, a legend, kick, snare and hats as lanes of dots). Drawn by `src/visuals/widget-looks.js` with the shared painters of `src/visuals/widget-painters.js`, from the stage feed of `src/visuals/stage-feed.js` and a palette of `src/visuals/widget-palettes.js` (neon or hardware, one colour per instrument). Instruments and widgets come from the Code widgets card, whether or not it is on; the panels change only at a section start, with a short fade. Monitor's grid: `monitorLayout` (1 to 6 panels; 3 or fewer bigger and centred; 3×2 on a wide stage, 2×3 on a tall one).
 - **Song soul.** A science fiction screen of the song playing: ten views, drawn from the song's own data, inside a choice of device shells. It opens from a hidden screw on the stage (an easter egg).
 - **Procedural visuals.** Endless scrolling scenes were built and then moved out of the app at the owner's request. They live in the owner's local notes; the repo keeps the tags `visuals-v1` to `visuals-v3`.
 - **Video layouts.** Where the visual, the code, the soul and the timeline sit in an exported video, and the vertical fragments.
@@ -24,12 +25,12 @@ What the app draws while music plays, and how video files are laid out.
 - **Live build** decides the code shown in video layouts with code ([live-build.md](live-build.md)).
 - **Settings** keep the video layout, quality, card, visual and fragment options ([settings.md](settings.md)).
 
-A frame must depend on the bar and the levels only, never on wall time. Then the live player, the fast video and the checks draw the same thing.
+A frame must depend on the bar and the levels only, never on wall time. Then the live player, the fast video and the checks draw the same thing. The widget looks go one step further: their levels, onsets and silences come from the notes (queried live from the playing pattern once per cycle, cached; sent by the render page in the fast video), and the spectrum's columns are kept by their time slot, so a frame drawn alone is the same as one drawn in a sequence (`npm run check:stage-widgets`, `node tools/check-stage-widgets.cjs`). Live, the scope reads the instrument's own analyser; in the fast video the code widgets' renders of an instrument when there are some, else the song's wave scaled by the instrument's level (said in the export log).
 
 ## Options
 
 <!-- generated:looks -->
-Stage visuals (`LOOKS` in `src/music.js`): `palco` Stage (it: Palco), `pixel` Pixel, `tramonto` Sunset (it: Tramonto), `montagne` Mountains (it: Montagne), `spazio` Space (it: Spazio), `sonar` Sonar, `edgerunners` Edgerunners, `studio` Studio (hidden).
+Stage visuals (`LOOKS` in `src/music.js`): `palco` Stage (it: Palco), `pixel` Pixel, `tramonto` Sunset (it: Tramonto), `montagne` Mountains (it: Montagne), `spazio` Space (it: Spazio), `sonar` Sonar, `edgerunners` Edgerunners, `studio` Studio (hidden), `monitor` Monitor, `rullo` Roll (it: Rullo).
 
 Soul views (`VIEW_NAMES` in `src/soul/data.js`): `a` Tracker, `b` Terrain, `c` Sphere, `d` Lattice, `e` Strands, `f` Landscape, `g` Particles, `h` Halftone, `i` Aura, `j` Spectrum.
 

@@ -68,7 +68,7 @@ export const hasWidget = text => HAS_CALL.test(text);
 
 // D3: the instrument of a line, from its visual (`.analyze("…")` or `.chan("…")`), the same names the stage uses;
 // a spoken line is the voice; an unknown visual is a lead
-const BY_VISUAL = { kick: 'drums', snare: 'drums', beat: 'drums', perc: 'drums', drums: 'drums', hats: 'hats', bass: 'bass', arp: 'arp', pad: 'pad', texture: 'pad', fx: 'fx', riser: 'fx', hook: 'lead', guitar: 'lead', lead: 'lead' };
+export const BY_VISUAL = { kick: 'drums', snare: 'drums', beat: 'drums', perc: 'drums', drums: 'drums', hats: 'hats', bass: 'bass', arp: 'arp', pad: 'pad', texture: 'pad', fx: 'fx', riser: 'fx', hook: 'lead', guitar: 'lead', lead: 'lead' };
 export function instrumentOf(line) {
   if (/\bsay_/.test(line)) return 'voice';
   const m = line.match(/\.(?:analyze|chan)\(\s*["']([\w-]+)["']\s*\)/);
