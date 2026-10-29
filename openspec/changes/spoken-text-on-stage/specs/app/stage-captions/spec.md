@@ -82,3 +82,49 @@ Settings SHALL offer a "Testi sul palco" card: captions on or off (on by default
 
 - **WHEN** the user picks "al posto del parlato" for the step line
 - **THEN** the stage shows the step line for 4 bars as before this change
+
+### Requirement: Samples prepared ahead
+
+When a song is prepared (opened, generated or regrown in Compose, or prepared as the next song in the radio), the app SHALL list every line the song would speak if every sample existed, including lines typed in the radio console, and SHALL ask the voice helper for each missing sample before the line plays. After new samples arrive, the song SHALL be compiled again so the lines are in its code and its captions.
+
+#### Scenario: Next radio song
+
+- **WHEN** the radio prepares the next song and three of its poetic images have no sample
+- **THEN** the helper makes the three samples before the song goes on air, and the three images are heard and captioned
+
+#### Scenario: No helper
+
+- **WHEN** the app runs without the voice helper
+- **THEN** no sample is made, the fallback chain applies, and the Voices group lists the lines without a sample
+
+### Requirement: Fallback chain for a missing sample
+
+At play time a line SHALL use, in order: the speaker's own sample, the default voice's sample of the same line with the speaker's sound settings, a sample made on the fly when there is time before its bar, and only when all fail no sound, its text shown as the step tag and never as a spoken caption.
+
+#### Scenario: Speaker variant missing
+
+- **WHEN** a narrator line has a sample in the default voice but not in the song's speaker
+- **THEN** the default voice's sample plays with the speaker's settings, and the line is captioned
+
+### Requirement: Missing samples check
+
+A command SHALL list the lines without a sample over the built-in songs, the example songs, the style recipes and the vocabularies, per language and speaker bank, and SHALL fail in strict mode when any is missing.
+
+#### Scenario: Strict run
+
+- **WHEN** `npm run check:samples -- --strict` finds a vocabulary line with no sample for the speaker `reed` in Italian
+- **THEN** it prints the bank and the line and exits with a failure
+
+### Requirement: Speaker registry
+
+Speakers SHALL be kinds in one registry, each with a precedence rank, an icon, a text style, a colour and two flags: `exclusive` (lower ranks go silent while it sounds, off by default) and `multiCaption` (one caption row per active speaker). The registry SHALL keep today's rules: the voice track wins over the narrator on its bars, and the narrator says at most one line per bar. A new kind of speaker SHALL need only a registry entry and its schedule lines to be captioned.
+
+#### Scenario: Today's voices through the registry
+
+- **WHEN** a song has a narrator and a voice track speaking on the same bar
+- **THEN** the voice track speaks and is captioned, the narrator is silent on that bar, as before this change
+
+#### Scenario: Several captions at once
+
+- **WHEN** `multiCaption` is on and two kinds sound at the same time
+- **THEN** each shows its own caption row, ordered by rank
