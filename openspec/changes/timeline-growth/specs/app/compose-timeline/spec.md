@@ -47,3 +47,26 @@ The ruler knob, the time label, clicks, dragging and keys SHALL follow the playe
 #### Scenario: End key
 - **WHEN** the user presses End on the ruler of a Crescendo song with a "Stop" ending
 - **THEN** the song seeks to the last bar of "Stop"
+
+### Requirement: The arranger follows the knob
+When the arranger is wider than the screen (the open growth view, a long timeline), it SHALL scroll horizontally while the song plays so the knob stays visible, a page at a time like a DAW, and only when "Follow playback" is on. Scrolling SHALL be smooth, and a jump when the viewer prefers reduced motion. Following SHALL pause while the user scrolls the arranger or drags the knob, and SHALL resume on the next play or seek, or after 3 seconds without user scrolling. An arranger that fits the screen SHALL never scroll.
+
+#### Scenario: Page follow in the open view
+- **WHEN** the growth is open, the arranger scrolls, and the playing knob reaches the right edge of the visible part
+- **THEN** the arranger scrolls so the knob stands near the left of the visible part
+
+#### Scenario: The user scrolls away
+- **WHEN** the user scrolls the arranger away from the knob while the song plays
+- **THEN** the arranger stays where the user left it, and follows the knob again after 3 seconds without scrolling or at the next seek
+
+#### Scenario: Follow playback off
+- **WHEN** "Follow playback" is off and the knob leaves the visible part
+- **THEN** the arranger does not scroll
+
+#### Scenario: Reduced motion
+- **WHEN** the viewer prefers reduced motion and the arranger follows the knob
+- **THEN** it jumps to the new position without a smooth scroll
+
+#### Scenario: Compact view
+- **WHEN** the growth is compact or hidden and the arranger fits the screen
+- **THEN** the arranger never scrolls while the song plays

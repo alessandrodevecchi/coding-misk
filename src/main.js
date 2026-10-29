@@ -903,7 +903,7 @@ async function playSong(sg, bar = 0, as = 'free', { keepHand = false } = {}) {
   sg = await grownNow(sg);
   if (!sg || seeking) return;
   if (held && bar > 0 && sg.build && sg.build.crescendo) bar += sg.build.crescendo.growth;
-  seeking = true;
+  seeking = true; followClear();
   try {
     if (as !== 'radio' && radio && radio.on) radio.stopped();
     initAudioOnce();
@@ -2276,7 +2276,7 @@ function renderRuler() {
 // a brano finito il cursore resta in fondo finché non si sceglie un altro punto
 const cueBar = () => (ended === compiled.id ? compiled.meta.bars : paused && song && paused.id === compiled.id ? paused.cyc : sceneStart(sel));
 async function seekTo(bar) {
-  ended = null;
+  ended = null; followClear();
   if (isPlaying() && mode === 'track') return playSong(compiled, bar, 'track');
   if (mode !== 'track') backToTrack();
   song = compiled; paused = { id: compiled.id, cyc: bar };
@@ -2313,6 +2313,41 @@ function updateRuler(playing) {
   const tt = `${clock(compiled.meta.secondsAt(played))} / ${clock(compiled.meta.seconds)}`;
   if ($('#ruler-time').textContent !== tt) $('#ruler-time').textContent = tt;
   $('#ruler-track').setAttribute('aria-valuenow', Math.min(P.bars, Math.floor(pos) + 1));
+  if (playing && mode === 'track' && s) followKnob(g.tr.left + x);
+}
+// the arranger follows the playing knob a page at a time (timeline-growth D7): only when it is wider than the screen
+// and Follow playback is on; the user's scrolling or a knob drag holds it for 3 s, play and seek clear the hold
+const FOLLOW_HOLD = 3000, FOLLOW_AT = .12, FOLLOW_EDGE = .92;
+const knobFollow = { hold: 0, ours: 0, to: null, input: 0, scrolls: 0 };
+const followClear = () => { knobFollow.hold = 0; };
+const followHeld = () => !!rulerDrag || performance.now() < knobFollow.hold;
+function followKnob(kx) {
+  const sc = $('.arr-scroll'); if (!sc || !follow || followHeld() || (knobFollow.to !== null && performance.now() < knobFollow.ours)) return;
+  const max = sc.scrollWidth - sc.clientWidth; if (max <= 1) return;
+  const w = sc.clientWidth, at = kx - sc.getBoundingClientRect().left;
+  if (at >= 0 && at <= w * FOLLOW_EDGE) return;
+  const left = Math.max(0, Math.min(max, Math.round(sc.scrollLeft + at - w * FOLLOW_AT)));
+  if (Math.abs(left - sc.scrollLeft) < 2) return;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  knobFollow.to = left; knobFollow.ours = performance.now() + (reduce ? 300 : 2000); knobFollow.scrolls++;
+  sc.scrollTo({ left, behavior: reduce ? 'auto' : 'smooth' });
+}
+{
+  const sc = $('.arr-scroll'), hold = () => { knobFollow.hold = performance.now() + FOLLOW_HOLD; knobFollow.to = null; };
+  const mark = () => { knobFollow.input = performance.now(); };
+  // a horizontal wheel or a touch on the arranger, a pointer on its scrollbar (the scroller itself is the target)
+  sc.addEventListener('wheel', e => { if (e.deltaX || e.shiftKey) hold(); }, { passive: true });
+  sc.addEventListener('touchstart', () => { mark(); }, { passive: true });
+  sc.addEventListener('pointerdown', e => { mark(); if (e.target === sc) hold(); });
+  sc.addEventListener('keydown', mark);
+  // a scroll the app did not start (ours lasts until 200 ms after it reaches its target, 2 s at most), right after an input of the
+  // user's: a re-render alone never holds
+  sc.addEventListener('scroll', () => {
+    const now = performance.now();
+    if (knobFollow.to !== null && now < knobFollow.ours) { if (Math.abs(sc.scrollLeft - knobFollow.to) < 2) knobFollow.ours = Math.min(knobFollow.ours, now + 200); return; }
+    knobFollow.to = null;
+    if (now - knobFollow.input < 1500) hold();
+  }, { passive: true });
 }
 
 $('#arr-strip').addEventListener('click', e => {
@@ -3156,7 +3191,7 @@ function previewBtn(tr) { const on = !!(preview && preview.state && preview.stat
 // for the browser checks (tools/check-preview.cjs)
 globalThis.codingMiskPreview = preview;
 // (and what the bar counter counts: the song in Compose, written or grown, and the song playing)
-globalThis.codingMiskBars = () => ({ compose: { bars: compiled.meta.bars, pending: !!compiled.pending, growth: growBars(), cue: cueBar(), map: (({ pre, G, W, end, bars, ending, steps }) => ({ pre, G, W, end, bars, ending, steps, view: growView, sel, tk }))(playMap()) }, song: song && song.meta ? { id: song.id, bars: song.meta.bars, loop: !!song.loop } : null });
+globalThis.codingMiskBars = () => ({ compose: { bars: compiled.meta.bars, pending: !!compiled.pending, growth: growBars(), cue: cueBar(), map: (({ pre, G, W, end, bars, ending, steps }) => ({ pre, G, W, end, bars, ending, steps, view: growView, sel, tk }))(playMap()), follow: { on: follow, held: followHeld(), scrolls: knobFollow.scrolls } }, song: song && song.meta ? { id: song.id, bars: song.meta.bars, loop: !!song.loop } : null });
 // the styles a pattern saved from a song with no style tags links (pattern-followups D1): its artist's, or the styles
 // its style line names
 const songStyleFallback = () => fallbackStyles(T, { recipes: RECIPES, artists: [...BUILTIN_ARTISTS, ...(store.get('coding-misk-artists', []) || [])] });
