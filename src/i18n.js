@@ -90,7 +90,7 @@ const STR = {
     savedAddNew: 'Aggiungi come traccia nuova', savedReplace: 'Sostituisci', savedListen: 'Ascolta nella tonalità e nel tempo del brano, con la radio più bassa', savedListenStop: 'Ferma l\'ascolto',
     savedInfo: '{type} · {key} · {bpm} BPM', savedTempo: 'salvato a {bpm} BPM: al tempo del brano ({now}) suonerà diverso',
     // the saved patterns among many (saved-patterns-list, #83)
-    savedSearch: 'Cerca tra {n} pattern (nome, strumento, stile)', savedSearchAria: 'Cerca tra i pattern salvati', savedSearchTip: 'Cerca per nome, strumento o stile (tasto P; Esc svuota, di nuovo Esc esce, freccia giù va al primo pattern)',
+    savedSearch: 'Cerca tra {n} pattern', savedSearchAria: 'Cerca tra i pattern salvati', savedSearchTip: 'Cerca per nome, strumento o stile (tasto P; Esc svuota, di nuovo Esc esce, freccia giù va al primo pattern)',
     savedFit: 'Adatti al brano', savedFitTip: 'Solo i pattern dello stile del brano o senza stile, con un tempo vicino a quello del brano (entro 1,5 volte)',
     savedStyle: 'Stile', savedStyleAll: 'Tutti', savedSort: 'Ordina', savedSort_saved: 'Come nei Pattern', savedSort_recent: 'Recenti', savedSort_used: 'Più usati', savedSort_name: 'Nome', savedSort_tempo: 'Tempo vicino',
     savedInsts: 'Strumenti dei pattern salvati', savedAll: 'Tutti', savedShowAll: 'Mostra tutti ({n})', savedShown: '{n} di {total}',
@@ -398,7 +398,7 @@ const STR = {
     savedAddNew: 'Add as new track', savedReplace: 'Replace', savedListen: 'Listen in the song\'s key and tempo, with the radio lower', savedListenStop: 'Stop listening',
     savedInfo: '{type} · {key} · {bpm} BPM', savedTempo: 'saved at {bpm} BPM: at the song\'s tempo ({now}) it will feel different',
     // the saved patterns among many (saved-patterns-list, #83)
-    savedSearch: 'Search {n} patterns (name, instrument, style)', savedSearchAria: 'Search the saved patterns', savedSearchTip: 'Search by name, instrument or style (key P; Esc clears, Esc again leaves, down arrow goes to the first pattern)',
+    savedSearch: 'Search {n} patterns', savedSearchAria: 'Search the saved patterns', savedSearchTip: 'Search by name, instrument or style (key P; Esc clears, Esc again leaves, down arrow goes to the first pattern)',
     savedFit: 'Fit this song', savedFitTip: 'Only the patterns of the song\'s style or with no style, at a tempo close to the song\'s (within 1.5 times)',
     savedStyle: 'Style', savedStyleAll: 'All', savedSort: 'Sort', savedSort_saved: 'As in Patterns', savedSort_recent: 'Recent', savedSort_used: 'Most used', savedSort_name: 'Name', savedSort_tempo: 'Closest tempo',
     savedInsts: 'Instruments of the saved patterns', savedAll: 'All', savedShowAll: 'Show all ({n})', savedShown: '{n} of {total}',
