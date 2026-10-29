@@ -37,7 +37,7 @@ function namesIn(code) {
 
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage();
-  await page.goto('http://localhost:5173/');
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`);
   let keys = [];
   for (let i = 0; i < 40 && keys.length < 1500; i++) { await sleep(1000); keys = await page.evaluate(() => Object.keys((globalThis.soundMap && globalThis.soundMap.get()) || {})); }
   await browser.close();

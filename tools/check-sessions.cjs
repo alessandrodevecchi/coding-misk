@@ -14,7 +14,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const page = await (await browser.newContext({ viewport: { width: 1300, height: 1200 }, acceptDownloads: true })).newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['synthwave'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); });
   await page.reload(); await sleep(3500);
   const lists = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-playlists') || '{}'));

@@ -14,7 +14,7 @@ const files = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isD
   page.on('console', m => { if (m.type() === 'error') logs.push(m.text()); });
   const pageErrors = [];
   page.on('pageerror', e => pageErrors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(6000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(6000);
   let errors = 0;
   for (const song of songs) {
     const r = await page.evaluate(async song => {

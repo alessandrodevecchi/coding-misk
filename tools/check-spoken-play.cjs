@@ -17,7 +17,7 @@ async function open(browser, { noSamples = false } = {}) {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   if (noSamples) await page.route('**/samples/strudel.json', async r => { const res = await r.fetch(), list = await res.json(); r.fulfill({ json: Object.fromEntries(Object.entries(list).filter(([k]) => !/^say_/.test(k))) }); });
-  await page.goto('http://localhost:5173/', { timeout: 120000 }); await sleep(6000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`, { timeout: 120000 }); await sleep(6000);
   await page.evaluate(() => localStorage.clear()); await page.reload({ timeout: 120000 }); await sleep(6000);
   await tapOutput(page);
   for (let k = 0; k < 20; k++) { await page.locator('#track-pick').selectOption(ID); await sleep(500); if (await page.locator('#sc-name').inputValue() === song.sections[0].name) break; }

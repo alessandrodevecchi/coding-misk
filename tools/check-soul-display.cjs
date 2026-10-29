@@ -14,7 +14,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => localStorage.clear()); await page.reload(); await sleep(3500);
   const D = () => page.evaluate(() => { const d = globalThis.codingMiskSoulDisplay; return { open: d.open, override: d.override, shell: d.shell }; });
   const stageW = () => page.evaluate(() => document.querySelector('#stagewrap').getBoundingClientRect().width);

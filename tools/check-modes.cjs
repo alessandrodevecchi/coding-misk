@@ -14,7 +14,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const page = await (await browser.newContext({ viewport: { width: 1300, height: 1000 } })).newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   // a tab remembered from before the modes existed
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-tab', JSON.stringify('stili')); });
   await page.reload(); await sleep(3500);

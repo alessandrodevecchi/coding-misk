@@ -14,7 +14,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const page = await (await browser.newContext({ viewport: { width: 1300, height: 1200 } })).newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => localStorage.clear()); await page.reload(); await sleep(3500);
   const R = () => page.evaluate(() => { const r = globalThis.codingMiskRadio, s = r.state; return s && { onAir: s.onAir, n: s.stream.length, first: s.stream[0], lead: !!(s.recipe && s.recipe.lead), styles: r.options.styles, steering: r.steering && { lead: !!r.steering.lead, plan: !!r.steering.plan } }; });
 
