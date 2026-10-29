@@ -1,7 +1,7 @@
 ---
 id: code-widgets
 related: [live-build, profiles, settings, visuals, strudel]
-code: [src/live/widgets.js, src/video/widget-frames.js, src/live/live-code.js, src/live/air-code.js, src/song/writer.js, src/main.js, src/settings/settings.js, src/style.css]
+code: [src/live/widgets.js, src/video/widget-frames.js, src/visuals/widget-painters.js, src/live/live-code.js, src/live/air-code.js, src/song/writer.js, src/main.js, src/settings/settings.js, src/style.css]
 checks: [npm run check:live-code, npm run check:mixer, npm run check:strudel, npm run check:video, node tools/check-code-widgets.cjs]
 ---
 
@@ -29,6 +29,8 @@ Strudel's inline widgets (`._scope()`, `._pianoroll()`, `._punchcard()`, `._spec
 - **Classic silences (D9).** A track silent now keeps its widget on the line it played last while one of its lines plays again within the window (tracks found by their header, else by instrument and visual).
 - **Videos (D11).** The scenes "Visual + code + widgets" (session video, `code-widgets`), the live output's views 12 and 13 and the fragments' "Visual + code + widgets" and "Code + widgets" draw the widgets below their lines, dimmed on muted lines; the other scenes are unchanged. In real time they copy the page's widget canvases (`globalThis.miskWidgetCanvases`, kept by id by the wrapper).
 - **Fast video and fragments (D11, `src/video/widget-frames.js`).** They render offline, so the app draws the widgets itself. Note widgets: the render page sends back the notes of the lines with a note widget (`wlines` on each segment, keyed by the line without its call, two cycles ahead of each block), and `fastWidgets` draws a pianoroll, punchcard, spiral or pitchwheel from them. Scope and spectrum: each instrument with one (its visual written in the line, or the hidden mixer's entry) is rendered alone first (`only` on the render job, mono at 12 kHz), and the widget draws that sound. Setting "Real scope and spectrum in the fast video": Automatic weighs the renders left after the first against one render and the frames (about 5 ms each); over that it uses the whole song's wave and says so (export log, toast); Always real never falls back.
+
+- **On the stage (widgets-on-stage).** The looks Monitor and Rullo draw the same pictures on the stage with the app's painters (`src/visuals/widget-painters.js`, shared with `fastWidgets`, identical pixels), one panel per playing instrument up to 6. They follow this card's slot order, instruments on, primary and secondary widget, share and Widget notes, whether or not the code widgets are on; "dimmed look" decides whether a silent instrument keeps a dimmed panel. See [visuals.md](visuals.md).
 
 ## Options
 

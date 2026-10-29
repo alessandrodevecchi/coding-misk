@@ -14,6 +14,7 @@ import { prebake } from '@strudel/repl/prebake.mjs';
 import { tempoClock } from './tempo.js';
 import { installHelpers, useFns } from '../song/writer.js';
 import { loadLimiter, setMasterLevel, limiterDelay } from '../sounds/limiter.js';
+import { noteOf } from '../visuals/stage-feed.js';
 
 const post = (m, transfer = []) => parent.postMessage({ codingMiskRender: true, ...m }, location.origin, transfer);
 // superdough's deprecation notices come once per voice: thousands of console lines slow the render down
@@ -49,7 +50,9 @@ const STRETCH_LEAD = 0.1;
 // A segment's wlines ([{ a, b, key }], places in its code) are the lines with a note widget: their notes come back by key,
 // [begin, end, pitch, gain × velocity] in cycles, for the fast video to draw the widget
 const pitchOf = v => { try { if (typeof v.note === 'number') return v.note; if (typeof v.note === 'string') return noteToMidi(v.note); if (typeof v.n === 'number' && !v.s) return v.n; if (v.freq) return 12 * Math.log2(v.freq / 440) + 69; } catch (e) {} return String(v.s ?? v.n ?? '?'); };
-async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, push = 1, buses = {}, fns = {}, only = null }) {
+// stageNotes (widgets-on-stage D2): the notes of every instrument (`analyze`) that start in the block, [begin, end, pitch,
+// gain × velocity] in cycles, for the widget looks of the fast video; read from the haps scheduled anyway (no extra query)
+async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, push = 1, buses = {}, fns = {}, only = null, stageNotes = false }) {
   globalThis.miskBuses = buses; useFns(fns);
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
   // the master limiter delays the sound by its look-ahead: the render runs that much longer and the file starts after it
@@ -68,7 +71,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   setMasterLevel(getSuperdoughAudioController().output, gain, push);
   post({ progress: 0, phase: 'schedule' });
   const R = repl({ transpiler, defaultOutput: () => {}, getTime: () => 0 });
-  const onsets = {}, skipped = new Set(), notes = {};
+  const onsets = {}, skipped = new Set(), notes = {}, stage = stageNotes ? {} : null;
   // the haps that start in this block's window [from, end), from the segments it covers, in onset order (cut groups depend on it)
   const c0 = T.cycleAt(from), c1 = T.cycleAt(end), all = [];
   for (const seg of segments) {
@@ -92,6 +95,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
       const hb = hap.whole.begin.valueOf();
       if (hb < a || hb >= b) continue;
       hap.ensureObjectValue();
+      if (stage && hap.value.analyze !== undefined && hb >= T.cycleAt(keepFrom)) (stage[hap.value.analyze] ||= []).push(noteOf(hb, hap.whole.end.valueOf(), hap.value));
       if (only !== null && hap.value.analyze !== only) continue;
       all.push({ b: hb, hap, t: T.seconds(hb) });
     }
@@ -142,7 +146,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   }
   const buf = await ctx.startRendering();
   const channels = [buf.getChannelData(0).slice(lag), buf.getChannelData(1).slice(lag)];
-  post({ done: true, channels, sampleRate, onsets, notes, skipped: [...skipped], replaced: [...replaced] }, channels.map(c => c.buffer));
+  post({ done: true, channels, sampleRate, onsets, notes, stageNotes: stage, skipped: [...skipped], replaced: [...replaced] }, channels.map(c => c.buffer));
 }
 
 addEventListener('message', e => {

@@ -64,7 +64,7 @@ What the owner sees: 12 patterns per page, "1-12 di 97" and the pager (‹ 1 2 3
 
 ### C. Search, filters, sort and groups (recommended)
 
-What the owner sees: when more than 8 patterns fit, a toolbar with a search field ("Cerca tra 97 pattern"), a chip "Adatti al brano", a Stile menu and an Ordina menu (Recenti, Più usati, Nome, Tempo vicino); instrument chips with counts. With no filter and no search, one collapsible group per instrument with its count, its first 4 patterns and "Mostra tutti (n)" (as the Patterns tab groups its kinds). With a filter, a search or a sort other than the default, one flat list, closed as rows or open as cards, with a line "6 di 97 · basso · adatti al brano · più usati". The list and the cards sit in a scroll area of fixed height. Open cards show "usato 4 volte · 5 giorni fa". Mockups: `C1-cerca-filtri-gruppi.png`, `C2-cerca-piu-usati-schede.png`, `C3-telefono-hw.png` (phone, hardware theme).
+What the owner sees: when more than 8 patterns fit, a toolbar with a search field ("Cerca tra 97 pattern"), a chip "Adatti al brano", a Stile menu and an Ordina menu (Come nei Pattern, Recenti, Più usati, Nome, Tempo vicino); instrument chips with counts. With no filter and no search, one collapsible group per instrument with its count, its first 4 patterns and "Mostra tutti (n)" (as the Patterns tab groups its kinds). With a filter, a search or a sort other than the default, one flat list, closed as rows or open as cards, with a line "6 di 97 · basso · adatti al brano · più usati". The list and the cards sit in a scroll area of fixed height. Open cards show "usato 4 volte · 5 giorni fa". Mockups: `C1-cerca-filtri-gruppi.png`, `C2-cerca-piu-usati-schede.png`, `C3-telefono-hw.png` (phone, hardware theme).
 
 - Phone: toolbar wraps to two lines (search and the fit chip, then the two menus); chips wrap; the scroll area is at most 60 % of the screen; groups keep the closed panel short even with no filter.
 - Hardware theme: search as a dark LCD field with the accent text, menus as the amber LCD selects already used in the console, the scroll area as a recessed well (see `C3`).
@@ -105,11 +105,11 @@ If time is short, A is a safe first step: C's scroll area and chips are A, and t
 
 ### D1. State of the panel
 
-Kept in the radio's closure, not in the console's HTML: `q` (search), `inst` (instrument chip, `all` by default), `fit` (bool), `style` (`all` or a style id), `sort` (`recent`, `used`, `name`, `tempo`), `closedGroups` (instruments collapsed), `scrollTop`. `inst`, `fit`, `style`, `sort` and `closedGroups` are remembered in `coding-misk-radio-saved-view` (like the open state); `q` lives while the page is open. A chip, a menu or the search re-renders only the panel's body, not the console. After a console rebuild the panel restores `scrollTop`, the search text and its caret, and the focused element by its data attribute.
+Kept in the radio's closure, not in the console's HTML: `q` (search), `inst` (instrument chip, `all` by default), `fit` (bool), `style` (`all` or a style id), `sort` (`saved` by default, `recent`, `used`, `name`, `tempo`), `closedGroups` (instruments collapsed), `scrollTop`. `inst`, `fit`, `style`, `sort` and `closedGroups` are remembered in `coding-misk-radio-saved-view` (like the open state); `q` lives while the page is open. A chip, a menu or the search re-renders only the panel's body, not the console. After a console rebuild the panel restores `scrollTop`, the search text and its caret, and the focused element by its data attribute.
 
 ### D2. Filter and sort, pure
 
-A new module `src/radio/saved-view.js` (no DOM): `savedView(patterns, view, song)` returns `{ groups | items, total, shown }`. Search: accent-folded words (the Songs tab's `fold`), each word in the name, the instrument name, the kind or a style. Fit chip: a style tag equal to the song's style or no style tag (`any`), and the saved tempo within 1.5 times the song's tempo (the threshold of today's tempo hint). Key is not a filter: a saved pattern always moves to the song's key. Sorts: Recenti by the later of `lastUsed` and `created`, then name; Più usati by `uses`, then Recenti; Nome by the folded name; Tempo vicino by the ratio to the song's tempo. Groups: instruments in the console's order (ARR_ROWS), a group only when it has patterns.
+A new module `src/radio/saved-view.js` (no DOM): `savedView(patterns, view, song)` returns `{ groups | items, total, shown }`. Search: accent-folded words (the Songs tab's `fold`), each word in the name, the instrument name, the kind or a style. Fit chip: a style tag equal to the song's style or no style tag (`any`), and the saved tempo within 1.5 times the song's tempo (the threshold of today's tempo hint). Key is not a filter: a saved pattern always moves to the song's key. Sorts: Come nei Pattern (the default) keeps the order the patterns were saved in, oldest first, as the Patterns tab of the Groove Lab and today's panel list them; Recenti by the later of `lastUsed` and `created`, then name; Più usati by `uses`, then Recenti; Nome by the folded name; Tempo vicino by the ratio to the song's tempo. Groups: instruments in the console's order (ARR_ROWS), a group only when it has patterns.
 
 ### D3. When the toolbar shows
 
@@ -129,7 +129,7 @@ Closed list: `max-height` 320 px (about 11 rows in two columns); open cards: 440
 
 ### D7. Texts (Italian and English)
 
-Cerca tra {n} pattern / Search {n} patterns; Adatti al brano / Fit this song; Stile / Style; Ordina / Sort; Recenti / Recent; Più usati / Most used; Nome / Name; Tempo vicino / Closest tempo; Mostra tutti ({n}) / Show all ({n}); {n} di {total} / {n} of {total}; usato {n} volte · {d} giorni fa / used {n} times · {d} days ago; mai usato / never used; Nessun pattern con questi filtri / No pattern matches these filters; Togli i filtri / Clear filters. The Guide card of the console gains a line for the panel's search and the P key.
+Cerca tra {n} pattern / Search {n} patterns; Adatti al brano / Fit this song; Stile / Style; Ordina / Sort; Come nei Pattern / As in Patterns; Recenti / Recent; Più usati / Most used; Nome / Name; Tempo vicino / Closest tempo; Mostra tutti ({n}) / Show all ({n}); {n} di {total} / {n} of {total}; usato {n} volte · {d} giorni fa / used {n} times · {d} days ago; mai usato / never used; Nessun pattern con questi filtri / No pattern matches these filters; Togli i filtri / Clear filters. The Guide card of the console gains a line for the panel's search and the P key.
 
 ## Risks / Trade-offs
 
@@ -143,10 +143,10 @@ Each with the recommended answer.
 
 1. **Which option?** Recommended: C, in one change. Alternative: A now (about 3 hours) and C later on top of it.
 2. **From how many patterns do the toolbar and groups show?** Recommended: from 9 (up to 8 the panel stays as today).
-3. **Default sort?** Recommended: Recenti (saved or used most recently), since use counts start at zero.
+3. **Default sort?** Recommended: Recenti (saved or used most recently), since use counts start at zero. **Owner's answer:** the same order as the Patterns tab of the Groove Lab, so the two lists do not disagree. That tab does not sort: it lists the saved patterns in the order they were saved, oldest first (by kind, after the built-in ones), and the panel did the same. The default is that order ("Come nei Pattern"); Recenti, Più usati, Nome and Tempo vicino stay in the menu.
 4. **What counts as a use?** Recommended: Aggiungi come traccia nuova and Sostituisci in the console, and Add to song in Compose; not a preview listen, not a replay.
 5. **Should the instrument chip follow the part picked in Parti (melodia, basso, ...)?** Recommended: no, independent and remembered, so a choice in Parti for Vary does not hide patterns.
 6. **"Adatti al brano" on by default?** Recommended: off, so every saved pattern that fits stays visible, as the owner likes today.
 7. **Shortcut for the search?** Recommended: P (free in the console); "/" as a second key is possible.
 8. **Groups: open or closed at first?** Recommended: open with 4 patterns each; collapsed groups are remembered.
-9. **The same Più usati and Recenti sort in the Patterns tab?** Recommended: yes, but as a separate follow-up issue, not in this change.
+9. **The same Più usati and Recenti sort in the Patterns tab?** Recommended: yes, but as a separate follow-up issue, not in this change. **Owner's answer:** a separate follow-up, not in this change.

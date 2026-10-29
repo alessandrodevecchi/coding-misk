@@ -6,6 +6,8 @@
 
 // the instrument of each line with a scope or spectrum, from the code shown and the code evaluated: the line's own visual,
 // else the hidden mixer's entry for the line (`miskMix(x, [[from, to, { analyze: '…' }], …])`)
+import * as paint from '../visuals/widget-painters.js';
+
 const CALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/;
 const NOTE = ['pianoroll', 'punchcard', 'spiral', 'pitchwheel'];
 // a widget call at the end of a line (one level of nested brackets), with its line break before it
@@ -47,21 +49,10 @@ export function widgetPlan(segments) {
   return { noteKeys, instOf, instruments: [...new Set(instOf.values())] };
 }
 
-// a small DFT of n samples → magnitudes in dB for the bins 1 … n/2
-function spectrumOf(x) {
-  const n = x.length, out = new Float32Array(n / 2);
-  for (let k = 1; k <= n / 2; k++) {
-    let re = 0, im = 0;
-    for (let i = 0; i < n; i++) { const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1)), a = (2 * Math.PI * k * i) / n; re += x[i] * w * Math.cos(a); im -= x[i] * w * Math.sin(a); }
-    out[k - 1] = 20 * Math.log10(Math.sqrt(re * re + im * im) / n + 1e-9);
-  }
-  return out;
-}
-
 // notes: key → [[begin, end, pitch, level]] (cycles); waves: instrument → { sr, data } (mono, the instrument alone);
 // instOf: key → instrument; S: the code widgets' settings; P: colours { ink, muted, a1, a2 }
 // → { canvas(type, index, key, cyc, t, master) }: a canvas with the widget at that moment (master: the song's wave, for
-// the fallback)
+// the fallback). The pictures come from the shared painters (src/visuals/widget-painters.js, widgets-on-stage D1).
 export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P }) {
   const cache = new Map(), Z = S.sizes, full = S.notes === 'full', DPR = 2;
   const canvasFor = (id, w, h) => {
@@ -72,46 +63,23 @@ export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P }
     }
     return c;
   };
-  const window = (list, cyc, span) => list.filter(n => n[1] > cyc - span / 2 && n[0] < cyc + span / 2);
+  const whole = c => ({ x: 0, y: 0, w: c.width, h: c.height });
   function roll(c, list, cyc, punch) {
-    const g = c.getContext('2d'), W = c.width, H = c.height, span = 4;
-    g.clearRect(0, 0, W, H);
-    // fold: only the pitches used by the line, low at the bottom
-    const pitches = [...new Set(list.map(n => n[2]))].sort((a, b) => (typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b))));
-    const rows = Math.max(1, pitches.length), rh = H / rows;
-    const shown = window(list, cyc, span);
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    const shown = paint.roll(g, whole(c), list, cyc, { span: 4, punch, full, on: P.a1, off: P.muted, head: P.ink, px: DPR });
     // (for the checks: the most notes a note widget has drawn at once)
-    globalThis.codingMiskFastNotes = Math.max(globalThis.codingMiskFastNotes || 0, shown.length);
-    for (const n of shown) {
-      const x = ((n[0] - (cyc - span / 2)) / span) * W, w = Math.max(2, ((n[1] - n[0]) / span) * W), y = H - (pitches.indexOf(n[2]) + 1) * rh;
-      const on = n[0] <= cyc && cyc < n[1];
-      g.globalAlpha = full ? 1 : Math.max(0, Math.min(1, n[3]));
-      g.fillStyle = on ? P.a1 : P.muted;
-      if (punch) { g.beginPath(); g.arc(x + w / 2, y + rh / 2, Math.min(w, rh) * 0.4, 0, Math.PI * 2); g.fill(); } else g.fillRect(x, y + 1, w - 1, Math.max(1, rh - 2));
-    }
-    g.globalAlpha = 1; g.fillStyle = P.ink; g.fillRect(W / 2, 0, 1.5 * DPR, H);
+    globalThis.codingMiskFastNotes = Math.max(globalThis.codingMiskFastNotes || 0, shown);
   }
   function wheel(c, list, cyc) {
-    const g = c.getContext('2d'), W = c.width, H = c.height, r = Math.min(W, H) * 0.42;
-    g.clearRect(0, 0, W, H); g.strokeStyle = P.muted; g.lineWidth = DPR; g.beginPath(); g.arc(W / 2, H / 2, r, 0, Math.PI * 2); g.stroke();
-    for (const n of list.filter(n => n[0] <= cyc && cyc < n[1] && typeof n[2] === 'number')) {
-      const a = ((n[2] % 12) / 12) * Math.PI * 2 - Math.PI / 2;
-      g.globalAlpha = full ? 1 : Math.max(0, Math.min(1, n[3])); g.fillStyle = P.a2;
-      g.beginPath(); g.arc(W / 2 + Math.cos(a) * r, H / 2 + Math.sin(a) * r, r * 0.12, 0, Math.PI * 2); g.fill();
-    }
-    g.globalAlpha = 1;
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    paint.wheel(g, whole(c), list, cyc, { full, ring: P.muted, dot: P.a2, px: DPR });
   }
   function spiral(c, list, cyc) {
-    const g = c.getContext('2d'), W = c.width, H = c.height, R = Math.min(W, H) * 0.45;
-    g.clearRect(0, 0, W, H); g.lineCap = 'round';
-    for (const n of window(list, cyc, 4)) {
-      const on = n[0] <= cyc && cyc < n[1], rad = b => R * (0.25 + 0.75 * Math.max(0, Math.min(1, (b - (cyc - 2)) / 4))), ang = b => b * Math.PI * 2 - Math.PI / 2;
-      g.globalAlpha = full ? 1 : Math.max(0, Math.min(1, n[3])); g.strokeStyle = on ? P.a1 : P.muted; g.lineWidth = 4 * DPR;
-      g.beginPath();
-      for (let k = 0; k <= 8; k++) { const b = n[0] + ((n[1] - n[0]) * k) / 8, x = W / 2 + Math.cos(ang(b)) * rad(b), y = H / 2 + Math.sin(ang(b)) * rad(b); if (k) g.lineTo(x, y); else g.moveTo(x, y); }
-      g.stroke();
-    }
-    g.globalAlpha = 1;
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    paint.spiral(g, whole(c), list, cyc, { full, on: P.a1, off: P.muted, px: DPR });
   }
   // the samples of the instrument alone at t (the last n), else the song's wave
   const samples = (inst, t, n, master) => {
@@ -122,22 +90,16 @@ export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P }
     return out;
   };
   function scope(c, d) {
-    const g = c.getContext('2d'), W = c.width, H = c.height;
-    g.clearRect(0, 0, W, H); g.strokeStyle = P.a1; g.lineWidth = 2 * DPR; g.beginPath();
-    if (!d) { g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke(); return; }
-    let t0 = Array.from(d).findIndex((v, i, a) => i && a[i - 1] > 0 && v <= 0); t0 = Math.max(0, Math.min(d.length / 2, t0));
-    const n = d.length - t0;
-    for (let i = 0; i < n; i++) { const x = (i / n) * W, y = (0.5 - d[t0 + i]) * H; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
-    g.stroke();
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    paint.scope(g, whole(c), d, { color: P.a1, px: DPR });
   }
+  // the code widget's spectrum scrolls frame after frame, as Strudel's does (the stage rebuilds its columns instead)
   function spectrum(c, d) {
     const g = c.getContext('2d'), W = c.width, H = c.height, speed = DPR;
     if (!d) return;
     const img = g.getImageData(0, 0, W, H); g.clearRect(0, 0, W, H); g.putImageData(img, -speed, 0);
-    const mags = spectrumOf(d.length >= 256 ? d.slice(d.length - 256) : d), m = mags.length;
-    g.fillStyle = P.a2;
-    for (let i = 0; i < m; i++) { g.globalAlpha = Math.max(0, Math.min(1, (mags[i] + 80) / 80)); g.fillRect(W - speed, H - (Math.log(i + 1) / Math.log(m)) * H, speed, 2 * DPR); }
-    g.globalAlpha = 1;
+    paint.spectrumColumn(g, whole(c), W - speed, speed, paint.spectrumOf(d.length >= 256 ? d.slice(d.length - 256) : d), { color: P.a2, px: DPR });
   }
   return {
     canvas(type, index, key, cyc, t, master = null) {

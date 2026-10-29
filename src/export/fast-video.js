@@ -19,7 +19,11 @@ async function pickFormat(mb, q) {
 // writable: a file to write into while rendering (#61), else the file is kept in memory.
 // Returns { promise, cancel }: the promise gives { blob (null when written to disk), ext, seconds, onsets }.
 // onNotes(notes): the notes of the lines with a note widget of each block, before its frames (code-widgets D11)
-export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, writable = null, onNotes = null }) {
+// onStageNotes(notes): the notes of every instrument of each block, before its frames (widgets-on-stage D2)
+// The feed of a frame also has waveAt(t, n): n samples of the song's wave ending at t seconds (at a quarter of the sample
+// rate), for the widget looks' spectrum columns, up to HISTORY seconds back
+const HISTORY = 2;
+export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, writable = null, onNotes = null, onStageNotes = null }) {
   let audio = null, cancelled = false;
   const promise = (async () => {
     const mb = await import('mediabunny');
@@ -37,8 +41,9 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
     let hist = new Float32Array(0), histAt = 0, drawn = 0, ap = 0;
     const report = phase => onProgress(Math.min(1, ap * 0.3 + drawn / frames * 0.7), phase);
     const sink = {
-      async add(ch, start, blockOnsets, notes) {
+      async add(ch, start, blockOnsets, notes, stageNotes) {
         if (onNotes && notes) onNotes(notes);
+        if (onStageNotes && stageNotes) onStageNotes(stageNotes);
         for (const [k, list] of Object.entries(blockOnsets || {})) (onsets[k] = onsets[k] || []).push(...list);
         const sr = job.sampleRate || 48000, n = ch[0].length;
         // the AAC encoder puts 2112 samples of silence first: the audio starts that much earlier, the file's edit list
@@ -50,8 +55,8 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
           const sample = new mb.AudioSample({ data: interleave16(part), format: 's16', numberOfChannels: ch.length, sampleRate: sr, timestamp: start + i / sr - lead });
           await as.add(sample); sample.close();
         }
-        // a mono history for the waveform: the last 4096 samples of the block before, then this block
-        const keep = hist.subarray(Math.max(0, hist.length - 4096)), mono = new Float32Array(keep.length + n);
+        // a mono history for the waveform: the last HISTORY seconds of the block before, then this block
+        const keep = hist.subarray(Math.max(0, hist.length - Math.max(4096, Math.ceil(HISTORY * sr)))), mono = new Float32Array(keep.length + n);
         mono.set(keep);
         for (let i = 0; i < n; i++) mono[keep.length + i] = (ch[0][i] + (ch[1] || ch[0])[i]) / 2;
         histAt = Math.round(start * sr) - keep.length; hist = mono;
@@ -63,7 +68,8 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
           const wave = new Float32Array(256), hook = new Float32Array(128);
           for (let i = 0; i < 256; i++) wave[i] = hist[at - 2048 + i * 8] || 0;
           for (let i = 0; i < 128; i++) hook[i] = hist[at - 2048 + i * 16] || 0;
-          drawFrame(t, T.cycleAt(offset + t), { raw: levelsAt(t), wave, hook }, codeAt, fi);
+          const waveAt = (at, m = 128) => { const e = Math.round(at * sr) - histAt, out = new Float32Array(m); for (let i = 0; i < m; i++) out[i] = hist[e - (m - i) * 4] || 0; return out; };
+          drawFrame(t, T.cycleAt(offset + t), { raw: levelsAt(t), wave, hook, waveAt }, codeAt, fi);
           await vs.add(t, 1 / q.fps);
           drawn++;
           if (fi % 15 === 0) report('frames');

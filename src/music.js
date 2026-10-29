@@ -253,6 +253,8 @@ export function presetIdea(type, ch) {
 export const LOOKS = [
   ['palco', { it: 'Palco', en: 'Stage' }], ['pixel', 'Pixel'], ['tramonto', { it: 'Tramonto', en: 'Sunset' }],
   ['montagne', { it: 'Montagne', en: 'Mountains' }], ['spazio', { it: 'Spazio', en: 'Space' }], ['sonar', 'Sonar'], ['edgerunners', 'Edgerunners'], ['studio', 'Studio'],
+  // the widget looks (widgets-on-stage): the code widgets' pictures of each instrument, drawn by the app on the stage
+  ['monitor', 'Monitor'], ['rullo', { it: 'Rullo', en: 'Roll' }],
 ];
 // looks set aside for now: not in the menus, a song or setting that names one falls back to the stage
 export const HIDDEN_LOOKS = ['studio'];
