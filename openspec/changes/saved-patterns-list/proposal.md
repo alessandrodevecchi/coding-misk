@@ -18,7 +18,7 @@ With 120 saved patterns the open panel is taller than 8 desktop screens, the con
 
 The recommended option (C in the design) keeps the panel in the console and makes it findable:
 
-- **A toolbar** when more than 8 patterns fit: a search field (name, instrument, style), a chip "Adatti al brano" (the song's style or no style, tempo within 1.5 times), a Stile menu and an Ordina menu (Recenti, Più usati, Nome, Tempo vicino).
+- **A toolbar** when more than 8 patterns fit: a search field (name, instrument, style), a chip "Adatti al brano" (the song's style or no style, tempo within 1.5 times), a Stile menu and an Ordina menu (Come nei Pattern, Recenti, Più usati, Nome, Tempo vicino). The default order is the one the Patterns tab of the Groove Lab uses, the order the patterns were saved in (owner's answer to Q3).
 - **Instrument chips** with counts (only the instruments present), like the Patterns tab kind chips.
 - **Groups by instrument** when no filter or search is set: a collapsible header per instrument with its count, the first 4 patterns and "Mostra tutti (n)", as the Patterns tab groups its kinds. With a filter, a search or another sort, one flat list.
 - **A scroll area of fixed height** around the list and the cards, so the panel never grows past about one screen; the rest of the console stays in place.

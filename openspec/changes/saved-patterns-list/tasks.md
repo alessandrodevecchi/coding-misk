@@ -10,7 +10,7 @@ Option C of the design. Estimates in agent hours. Total: about 8 (7 to 10). Opti
 
 ## 2. Filter and sort (about 1.5)
 
-- [ ] 2.1 `src/radio/saved-view.js`: search with folded words, instrument, fit (style or none, tempo within 1.5 times), style, the four sorts, groups in the console's instrument order (D2)
+- [ ] 2.1 `src/radio/saved-view.js`: search with folded words, instrument, fit (style or none, tempo within 1.5 times), style, the five sorts (saved order by default, as the Patterns tab; owner's answer to Q3), groups in the console's instrument order (D2)
 - [ ] 2.2 Node checks in `npm run check:patterns`: search with accents, fit chip, each sort, groups with 4 and "Mostra tutti", threshold of 8 (D3)
 
 ## 3. Panel (about 3)

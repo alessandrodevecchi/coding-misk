@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Find a saved pattern among many
-When more than 8 saved patterns fit the song on air, the "Add a saved pattern" panel SHALL offer a search field, instrument chips with counts, a "Fit this song" chip, a style menu and a sort menu (Recent, Most used, Name, Closest tempo). The search SHALL match every typed word, ignoring case and accents, in the pattern's name, instrument, kind or styles. "Fit this song" SHALL keep the patterns tagged with the song's style or with no style whose saved tempo is within 1.5 times the song's tempo; it SHALL be off by default. With no search, no filter and the default sort, the panel SHALL group the patterns by instrument, each group collapsible, with its count, its first 4 patterns and a "Show all (n)" button that picks that instrument's chip. Otherwise it SHALL show one list in the chosen order with a line saying how many of the fitting patterns are shown. The list and the cards SHALL sit in a scroll area of fixed height, so the console's other groups stay in place. With 8 fitting patterns or fewer the panel SHALL look as before. The panel's title SHALL keep counting every fitting pattern.
+When more than 8 saved patterns fit the song on air, the "Add a saved pattern" panel SHALL offer a search field, instrument chips with counts, a "Fit this song" chip, a style menu and a sort menu (As in Patterns, Recent, Most used, Name, Closest tempo). The default sort SHALL be the order the Patterns tab lists the saved patterns in, the order they were saved, oldest first. The search SHALL match every typed word, ignoring case and accents, in the pattern's name, instrument, kind or styles. "Fit this song" SHALL keep the patterns tagged with the song's style or with no style whose saved tempo is within 1.5 times the song's tempo; it SHALL be off by default. With no search, no filter and the default sort, the panel SHALL group the patterns by instrument, each group collapsible, with its count, its first 4 patterns and a "Show all (n)" button that picks that instrument's chip. Otherwise it SHALL show one list in the chosen order with a line saying how many of the fitting patterns are shown. The list and the cards SHALL sit in a scroll area of fixed height, so the console's other groups stay in place. With 8 fitting patterns or fewer the panel SHALL look as before. The panel's title SHALL keep counting every fitting pattern.
 
 #### Scenario: Search while the song plays
 - **WHEN** 97 saved patterns fit, the listener presses P, types "bas" and the song moves to its next phrase
@@ -21,12 +21,16 @@ When more than 8 saved patterns fit the song on air, the "Add a saved pattern" p
 - **WHEN** the filters leave no pattern
 - **THEN** the panel says no pattern matches and offers a button that clears the search and the filters
 
+#### Scenario: Default order as in the Patterns tab
+- **WHEN** 97 saved patterns fit and the listener has not picked a sort
+- **THEN** each instrument group lists its patterns in the order they were saved, as the Patterns tab does
+
 #### Scenario: Few patterns
 - **WHEN** 6 saved patterns fit
 - **THEN** the panel shows them as before, with no toolbar and no groups
 
 ### Requirement: Use counts of saved patterns
-A saved pattern SHALL record how many times it was brought into a song and the date of the last time: adding it as a new track or replacing a track from the console, and adding it to a song in Compose, SHALL each count once; a preview listen and a session replay SHALL NOT count. The "Most used" sort SHALL order by that count and the "Recent" sort by the later of the last use and the save date. The open cards SHALL show the count and how long ago the last use was, or "never used". The counts SHALL be kept in the backup; patterns saved before this change SHALL read as never used.
+A saved pattern SHALL record how many times it was brought into a song and the date of the last time: adding it as a new track or replacing a track from the console, and adding it to a song in Compose, SHALL each count once; a preview listen and a session replay SHALL NOT count. The "Most used" sort SHALL order by that count and the "Recent" sort by the later of the last use and the save date, newest first. The open cards SHALL show the count and how long ago the last use was, or "never used". The counts SHALL be kept in the backup; patterns saved before this change SHALL read as never used.
 
 #### Scenario: Most used first
 - **WHEN** the listener has added "Basso rotto 5" four times and "Basso teso 23" once, and sorts by Most used
