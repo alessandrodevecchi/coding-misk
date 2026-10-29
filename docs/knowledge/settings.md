@@ -1,8 +1,8 @@
 ---
 id: settings
 related: [export, radio, library, profiles]
-code: [src/settings/settings.js, src/settings/backup.js, src/i18n.js, src/endless/song-presets.js, src/code-themes/themes.js, src/code-themes/install.js]
-checks: [node --no-warnings tools/check-backup.mjs, node --no-warnings tools/check-settings.cjs, npm run check:code-themes, node tools/check-code-themes.cjs]
+code: [src/theme-light.css, src/settings/settings.js, src/settings/backup.js, src/i18n.js, src/endless/song-presets.js, src/code-themes/themes.js, src/code-themes/install.js]
+checks: [node --no-warnings tools/check-backup.mjs, node --no-warnings tools/check-settings.cjs, npm run check:code-themes, node tools/check-code-themes.cjs, npm run check:light-theme, node tools/check-light-theme.cjs]
 ---
 
 # Settings
@@ -24,7 +24,7 @@ Every value is saved in the browser and goes into the backup.
 
 The page has nine cards:
 
-- **Appearance:** theme (NEON or HW, the hardware look), language (IT or EN), the radio visual, and the code theme: Code theme, Code font, Code size, Dim muted lines (see Code themes below).
+- **Appearance:** theme (NEON, HW, the hardware look, or LIGHT, it: CHIARO, the light variant of neon; `coding-misk-ui`), Follow the system (`coding-misk-ui-follow`, off by default: LIGHT or NEON from the system's light or dark preference, turned off by pressing a theme; see `docs/DESIGN-SYSTEM.md`, Light theme), language (IT or EN), the radio visual, and the code theme: Code theme, Code font, Code size, Dim muted lines (see Code themes below).
 - **Audio:** volume, export format and MP3 rate, code typing speed, export speed.
 - **Video:** layout, quality, title card, Code colours (the code theme's, or the app theme's colours), visual, soul panel, video presets.
 - **Vertical fragments:** format, what to show, aspect, look, soul view, files, bands, bleed, rotation, code mode, tagline, label, glitch, length.
@@ -43,7 +43,7 @@ Each option has its help text in `src/i18n.js`, under keys that start with `set`
 
 The colours and the font of the code panel and of the code drawn in videos (`code-themes`). One key, `coding-misk-code-theme`: `{ theme, font, size, dim }` (`src/code-themes/themes.js`, `codeThemeSettings` fills the defaults).
 
-- **Theme.** `auto` (default) follows the app theme through one table keyed by `data-ui` (`AUTO`: `neon` → Neon, `hw` → Amber, and already `light` → Light high contrast for the light app theme to come). The app's own themes: Neon (its colours from the look's tokens, so it changes with the look), Amber, Terminal, High contrast dark, Light high contrast. Strudel's themes, curated: `strudelTheme` (the panel's look of before), `teletext`, `blackscreen`, `whitescreen`, `bluescreen`.
+- **Theme.** `auto` (default) follows the app theme through one table keyed by `data-ui` (`AUTO`: `neon` → Neon, `hw` → Amber, `light` → Light high contrast). The app's own themes: Neon (its colours from the look's tokens, so it changes with the look), Amber, Terminal, High contrast dark, Light high contrast. Strudel's themes, curated: `strudelTheme` (the panel's look of before), `teletext`, `blackscreen`, `whitescreen`, `bluescreen`.
 - **Roles.** A theme is a set of resolved colours: ground, text, comment, string, number, label, keyword, variable, method, punctuation, caret, selection, line numbers, playing-note outline, flash, video border, and widget colours (ink, accent, second accent, muted). The same roles feed the editor, the widgets (`widgetGroups`) and `drawCode` in videos.
 - **Font and size.** JetBrains Mono (default), Share Tech Mono, VT323 (drawn 1.3 times larger), the system monospace; Small 13, Medium 14 (default), Large 16 px, one step larger in the full view. A change moves where the long lines of a live build break (`codeCols` reads the editor's character width), never the sound.
 - **Dim muted lines** (on by default): the text of a `_$:` line and its indented lines at 55 %, in the panel (a line decoration, class `ct-muted`) and in videos.

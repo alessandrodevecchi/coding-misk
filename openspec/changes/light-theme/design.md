@@ -55,7 +55,7 @@ About 16 agent hours (tasks): tokens and accents 2, fixed colours 4, stage 1.5, 
 
 ## Open Questions
 
-Each with a recommended answer.
+Each with a recommended answer. Answered on 2026-10-29: the owner approved every recommendation (third button LIGHT/CHIARO, dark stage, Follow the system off by default, hand-picked accents, no light videos, Light high contrast on Automatic, after `code-themes`).
 
 1. **A third theme next to NEON and HW, or a separate light/dark switch?** Recommended: a third button, LIGHT (it: CHIARO), a light variant of neon; hardware stays dark.
 2. **Does the stage stay dark?** Recommended: yes; the looks are designed on dark, and the stage reads as a screen inside the light page.
