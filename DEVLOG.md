@@ -1691,3 +1691,12 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Seme e versioni.** Stesso seme, stesso stile, solo dagli stili inclusi. `STYLE_MAKER_VERSION` con fixture proprie; il regista non cambia, `DIRECTOR_VERSION` resta 12.
 - **Domande aperte** per il proprietario nel design, ognuna con la risposta consigliata. Stima circa 25 ore agente (fase 1 senza compilation circa 21).
 - **Mockup** (DOM iniettato, interfaccia italiana) in `notes/prove-2026-10-29/stili-inventati/`: `01-radio-dado-inventa.png`, `02-stili-scheda-prova.png`, `03-generi-inventa.png`. `openspec validate invented-styles` passa.
+
+## 2026-10-29: proposta per tanti pattern salvati nella console radio (#83, saved-patterns-list)
+
+- **Spec, nessun codice.** Nuova change OpenSpec `openspec/changes/saved-patterns-list` (proposta, design con 4 opzioni confrontate, spec, task) dopo la nota della prova ar9: "Aggiungi un pattern salvato (n)" mostra solo i salvati, ma con tanti pattern serve scorrere o sfogliare.
+- **Misure oggi** (server di prova sulla porta 5208, profilo del browser temporaneo, pattern finti dal catalogo, radio berlin-techno): con 120 salvati ne entrano 97; pannello chiuso 1345 px su desktop e 2635 px a 400 px, aperto 8423 px e 15593 px; la console si ricostruisce in 205 ms (18 ms senza pattern) e lo fa a ogni frase, quindi una ricerca o uno scorrimento dentro il pannello si perderebbero.
+- **Opzioni.** A scorrimento in un riquadro più chip per strumento (circa 3 ore agente); B pagine come la scheda Brani (circa 3); C ricerca, "Adatti al brano", Stile, Ordina (Recenti, Più usati, Nome, Tempo vicino), gruppi per strumento richiudibili come la scheda Pattern, dentro un riquadro che scorre (circa 8); D sei suggeriti nella console e "Sfoglia tutti" in una finestra (circa 11).
+- **Consiglio: C.** Comprende A, usa le parole e i chip delle schede Pattern e Brani, conta gli usi di ogni pattern salvato (console e Componi, non l'ascolto) per Più usati e Recenti; tasto P per la ricerca; telefono e tema HW previsti.
+- **Domande aperte** per il proprietario nel design, ognuna con la risposta consigliata.
+- **Mockup** (DOM iniettato, interfaccia italiana) in `notes/prove-2026-10-29/pattern-salvati-radio/`: `oggi-120-pattern-chiuso.png`, `oggi-120-pattern-aperto.png`, `oggi-120-pattern-telefono.png`, `A1`, `A2`, `B1`, `B2`, `B3-telefono`, `C1`, `C2`, `C3-telefono-hw`, `D1`, `D2`. `openspec validate saved-patterns-list` passa (due avvisi sulla lunghezza dei requisiti).
