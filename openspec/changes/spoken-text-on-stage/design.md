@@ -121,10 +121,50 @@ The narrator switch keeps its meaning: off, the narrator is silent, so its lines
 
 HW: the lane is an amber display with one light per speaker that glows while it speaks (`proposta-E`). Phone (400 px): font 17 px, chip above, two lines, no ellipsis cut mid-word.
 
+### D9. Samples prepared ahead (owner decision, round 3)
+
+Today a line without a sample is left out of the code (`narratorLines` returns nothing when `sampleIndex` fails; `spokenSchedule` keeps a voice-track line only when `lineSounds`). It is never heard and, with this change, never captioned. The owner wants no line dropped for a missing file.
+
+- **What is collected.** `spokenNeeds(song, C, lang)` in `src/song/build.js`: the lines `spokenSchedule` would list if every sample existed. It covers narrator lines (explaining lines, poetic entry images, movement images), voice-track lines of every way, and lines typed in the radio console. Each line comes with its bank (`say_<lang>[_<speaker>]`) and its text. It is `spokenSchedule` without the sample filter, so the two lists cannot drift: one function with a `needSamples` switch.
+- **When.** When a song is prepared: Compose open, Generate, a regrowth (profile, narrator style, Narrated growth, voice-track edits), and in the radio when the next song is prepared (the same moment its Coming next list is built), before it goes on air.
+- **How.** The missing lines go to the dev-server voice helper (`POST /voice/say`, about 1 s a line, one at a time, the next song's first lines first). The manifest is read again after each batch and the song is recompiled, so the code and the captions include the new lines. A small "voci in preparazione 3/7" note shows in the Voices group and the radio's Coming next while it runs. A song plays before its samples are ready if the user presses Play: the lines that are not ready yet follow D10.
+- **Without the helper** (a build without the dev server, or a non-macOS machine): nothing is generated, D10 applies, and the Voices group says which lines have no sample and how to make them (`npm run voices`).
+- **Check.** `npm run check:samples` (`tools/check-samples.mjs`, no browser) lists every line without a sample over the built-in songs, the example songs, the style recipes' lines and the vocabularies, in both languages and for every speaker the songs and styles name. It reports per bank and exits non-zero in `--strict` mode for CI-like runs; `--make` calls `tools/voice-sample.mjs` for the missing ones (macOS only).
+
+### D10. Fallback chain at play time (owner decision, round 3)
+
+For each line, in order:
+
+1. the speaker's own sample (`say_<lang>_<speaker>/<slug>.wav`);
+2. the default voice's sample of the same line (`say_<lang>/<slug>.wav`), with the speaker's sound settings still applied;
+3. a sample made on the fly by the voice helper, if there is time before the line's bar (the line plays from its next repeat or is skipped this time);
+4. only if all fail: no sound, and the text shows as the step tag (D2), never as a spoken caption.
+
+Step 2 already happens for voice-track lines (`voiceSamples` tries the speaker's bank then `sayBank(lang)`); narrator lines today use `bankFor`, which falls back only when the speaker has no bank at all, not per line. D10 makes it per line for both. Known issue `#63`: speaker variants that were not downloaded fall back silently at generation, so variants sound the same; the chain makes the fallback visible (a dev-console note and a count in `check:samples`) without fixing `#63` itself.
+
+### D11. Speakers registry, groundwork for a singing voice (owner decision, round 3)
+
+A singing voice is in the backlog, not built. To avoid reworking captions and precedence later, the speakers become a registry, `SPEAKER_KINDS` in `src/song/speakers.js`:
+
+```js
+{ narrator: { rank: 1, icon: 'mic', style: 'italic', colour: 'cyan', perBar: 1 },
+  voice:    { rank: 2, icon: 'wave', style: 'quoted', colour: 'magenta' },
+  singing:  { rank: 3, icon: 'note', style: 'sung', colour: 'amber', future: true } }
+```
+
+- **Rank** decides who yields. Today's rules stay as they are: the voice track wins over the narrator on its bars (the narrator yields), and the narrator says one line per bar.
+- **Flag `exclusive`** (singing takes precedence): off by default. When on for a kind, lower ranks go silent while it sounds. When off, the default, voices overlap and the singing is mixed louder.
+- **Flag `multiCaption`** (several captions at once): one caption row per active speaker, ordered by rank, at most three; off means the highest rank's line only.
+- **Icon and style** come from the registry (D3 and question 6), so a new kind gets its caption look by adding one entry.
+- `spokenSchedule` keeps its output (`voice: 'N' | 'T'`), and the registry maps `N` and `T` to kinds. A future singing track adds `S` and an entry, not a new caption path.
+
 ## Risks / Trade-offs
 
+- **Preparation time.** A poetic song with Narrated growth has about 40 lines; with no samples, about 40 s of helper work. The next radio song is prepared minutes ahead, so it is in time; in Compose, Play does not wait (D9).
+- **Disk.** Generated samples go to the git-ignored `public/samples/say_*`, as the helper does today.
+
 - **Fewer captions with the poetic style.** Lines never heard disappear; the tag keeps the step visible. If the stage feels empty, the setting brings back the old caption.
-- **Samples missing on a machine.** No sample, no sound, no caption: the same rule as the code. Without `say_lengths.json` a caption holds 2 bars.
+- **Samples missing on a machine.** D9 and D10 make them first, then fall back; only a line that fails every step plays silent, shown as the tag. Without `say_lengths.json` a caption holds 2 bars.
 - **Fast video cost.** The schedule is computed once per export; drawing is the same cost as `drawSay` today.
 - **Two speakers overlapping** are rare (the narrator yields to the voice track by bar); a passage longer than a bar can still meet the next narrator line, so the lane stacks two rows.
 
@@ -132,7 +172,7 @@ HW: the lane is an amber display with one light per speaker that glows while it 
 
 1. **The step line:** hidden, small tag only when it differs, or kept as the caption? Recommended: small tag only when it differs.
    - **1b. Where the tag goes (owner, round 2):** beside the spoken line (after a thin divider) or below it, in the same box (`giro2-tp1-accanto-16x9`, `giro2-tp1-sotto-16x9`, `giro2-tp1-accanto-9x16`, `giro2-tp1-sotto-9x16`). Recommended: below. It keeps the spoken line centred and alone on its row, it does not make the box wider, and it is the only layout that holds in 9:16, where "beside" wraps below anyway. This replaces the top-right tag of D2.
-2. **A line with no sample** (silent): show it? Recommended: only as the tag, never as a spoken caption.
+2. **A line with no sample** (silent): show it? Decided (round 3): samples are made ahead (D9) and fall back (D10); a line that fails every step shows only as the tag.
 3. **Design for the other looks:** A (one lane) or B (two lanes)? Recommended: A.
 4. **The "Claude" look:** C1 reply block, C2 transcript pane, or C3 same line? Recommended: C1, keeping the last two exchanges.
 5. **Karaoke for the voice track** (words lit as they are said)? Recommended: not now; the typed reveal over the sample length gives most of it without word timing.
