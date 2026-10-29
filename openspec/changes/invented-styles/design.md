@@ -52,7 +52,7 @@ The draw is checked by `validateRecipe` (no errors, no unknown sound warnings) a
 
 ### D5. Closest genre and style
 
-The closest style is the one with the highest similarity. The genre is the genre with the highest summed similarity over its three closest styles. Below 0.25 the genre is `experimental`. With an asked genre (Genres tab) the result must land in it, or it is drawn again. The recipe stores `genre`; `invented.closest` keeps the closest style id.
+The closest style is the one with the highest similarity. The genre is the genre with the highest mean similarity over its (up to) two closest styles: a mean, not a sum, so a genre with one style (jazz, rock) is not outweighed by a genre with three. Below 0.25 the genre is `experimental`. With an asked genre (Genres tab) the result must land in it, or it is drawn again. The recipe stores `genre`; `invented.closest` keeps the closest style id.
 
 The description is generated: "Base Techno berlinese; batteria da Lo-fi, armonia e pad da Synthwave." (`description` is one language today; it is written in the language of the app at invention time, and the sheet rebuilds it from `invented.from` in the current language.)
 
@@ -76,12 +76,12 @@ A new optional top field, accepted by the validator (format stays 1):
 - **Styles tab**, top row: "Inventa uno stile". It opens a **trial card** above the list: the sheet of the invented style, the origin per part (chips of the source styles), genre and closest style, and the buttons Ascolta in radio, Ancora, Tieni, Scarta.
 - **Genres tab**: each card with styles gets "Inventa uno stile di questo genere" (base and result in that genre); it sends the style to the radio trial.
 - **Random tools** (#50): `invent` is a die kind in `throwDice`, with `lastDice.invent` and the seed tooltip.
-- The New song panel (Compose) shares `song-controls.js`; the die is left out of it in this change (Open question 4).
+- **New song panel** (Compose), Styles row: the same die after Mix and Genre (owner's answer to Open question 4). The panel shares `song-controls.js`, so the trial chip, Tieni, Ancora and × are the same code as in the radio; the trial lives in the panel's own store (`coding-misk-new-song`), apart from the radio's. Genera uses the trial style like any selected style. The panel has no compilation, so there is nothing to turn off.
 
 ### D9. Trial in the radio
 
 - `opts.tempStyle` holds the trial recipe in the radio options (saved, so it survives a reload), like `opts.temp` for the random artist. `opts.trialBefore` keeps the styles, artist and compilation state before the trial.
-- The radio's recipe list is `RECIPES` plus `opts.tempStyle` at the end. Artist exploration, the dice for existing styles and the compilation draws skip the trial style, so they give the same results as without it.
+- The radio's recipe list stays `RECIPES`; the trial reaches the director as an **extra style**: `createSession(recipes, seed, { extra })` adds it to the styles a song may use, and `session.addStyle(recipe)` adds it to a session already on air. Artist exploration draws only over `recipes`, and the dice for existing styles and the compilation draws read `RECIPES`, so they give the same results as without it. With no extra style the director is exactly as before (fixtures unchanged).
 - Starting a trial sets `opts.styles = [trial.id]`, artist Custom, compilation off, from the next song (like every die; Skip plays it now). The toast says "Stile inventato in prova dal prossimo brano".
 - The chip: "Marea di ruggine · in prova" with Tieni, Ancora, ×. The now playing tag and Coming next mark its songs "stile in prova".
 - **Ancora** replaces the trial with a new one from a fresh seed. **Tieni** (D10). **×** removes it and restores `opts.trialBefore`.
@@ -92,7 +92,7 @@ A new optional top field, accepted by the validator (format stays 1):
 - **Keep** puts the recipe in `coding-misk-styles` through the Styles tab store (`userStore.put`), refreshes `RECIPES`, clears `opts.tempStyle`, keeps the selection. Toast: "Stile salvato tra i tuoi (Styles)".
 - A kept style is a user style: form, JSON view, duplicate, rename (song tags follow, #34), delete, export and import, `tools/style.mjs validate` once copied into `styles/`.
 - **Backup:** `coding-misk-styles` is already in the backup and merged by id; nothing new. The trial itself is in the radio options (a `coding-misk-` key), so a backup taken during a trial keeps it.
-- **Saving during a trial:** a song saved from the radio carries its own content and keeps the trial id in `tags.styles`; when that id is unknown the song falls back to its genre (`stylesNear`), so nothing breaks. A **session** saved to a playlist embeds the trial recipe (`styles: [recipe]` in the session item) so Replay makes the same songs after a discard or in another browser; Replay adds embedded recipes to its pool only for that session.
+- **Saving during a trial:** a song saved from the radio carries its own content and keeps the trial id in `tags.styles`; when that id is unknown the song falls back to its genre (`stylesNear`), so nothing breaks. A **session** saved to a playlist embeds the trial recipe (`extraStyles: [recipe]` in the session recipe, which the playlist item copies) so Replay makes the same songs after a discard or in another browser; Replay and the exports pass embedded recipes as extra styles only for that session.
 
 ### D11. Artists and compilations
 
@@ -120,12 +120,12 @@ A new optional top field, accepted by the validator (format stays 1):
 
 ## Open questions
 
-Each with a recommended answer.
+Each with a recommended answer. **Owner's answers (2026-10-29):** every recommendation approved (1 to 10), except 4: the die also goes in the New song panel now. Phase 2 (compilation switch, off by default) approved.
 
 1. **Which styles can be ingredients?** Recommended: built-in styles only, so a seed gives the same style everywhere and invented styles do not breed from each other. (Alternative: also the user's styles, behind a switch.)
 2. **How bold?** Recommended: a base plus 1 or 2 donors, donors near the base 65% of the time, no extra control. A "boldness" slider can come later if the owner wants more surprise.
 3. **When does the trial start?** Recommended: from the next song, like every die, with the toast; Skip plays it now. (Alternative: skip automatically.)
-4. **Where are the buttons?** Recommended: radio Styles row, Styles tab, Genres cards. Not in the New song panel for now; it can come later with no engine work.
+4. **Where are the buttons?** Recommended: radio Styles row, Styles tab, Genres cards. Not in the New song panel for now; it can come later with no engine work. **Owner (2026-10-29): also in the New song panel now** (D8).
 5. **Should the compilation invent styles?** Recommended: yes, as phase 2, behind a setup switch that is off by default.
 6. **Saving a song or session during a trial:** keep the style automatically? Recommended: no; the session embeds the recipe, the song falls back to its genre. Keeping stays a choice.
 7. **After editing a kept invented style:** keep the badge and origin? Recommended: yes, as "Inventato, modificato".

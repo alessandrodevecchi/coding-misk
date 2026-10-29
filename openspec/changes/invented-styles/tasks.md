@@ -27,10 +27,11 @@ Estimates in agent hours. Total: about 25 (20 to 30). Phase 1 (sections 1 to 5 a
 - [ ] 4.1 "Inventa uno stile" and the trial card (sheet, origin chips, genre, closest style, Ascolta in radio, Ancora, Tieni, Scarta)
 - [ ] 4.2 "Inventato" badge and origin in the sheet; `edited` on save
 - [ ] 4.3 Genres card button "Inventa uno stile di questo genere"; the genre, style, artist line in the Styles intro (D1)
+- [ ] 4.4 New song panel: the invent die in its Styles row, the trial chip in the panel's own store, Genera with the trial style (owner's answer to Open question 4)
 
 ## 5. Browser checks (about 2)
 
-- [ ] 5.1 `tools/check-invented.cjs` (D13): radio, three seeds played with levels, keep, discard, reload, edit, session replay, backup, Genres card, both languages, 400 px
+- [ ] 5.1 `tools/check-invented.cjs` (D13): radio, three seeds played with levels, keep, discard, reload, edit, session replay, backup, Genres card, New song panel, both languages, 400 px
 - [ ] 5.2 `check-random.cjs`, `check-library.cjs`, `check-style-sounds.cjs` with kept styles, `tools/check-backup.mjs`
 
 ## 6. Compilation, phase 2 (about 4)

@@ -19,7 +19,8 @@ An invented style is a style: it belongs to exactly one genre (the closest one) 
 - **Invent a style** (button "Inventa uno stile", a drawn die with a spark, not an emoji):
   - in the radio, in the Styles row next to the Mix and Genre dice;
   - in the Styles tab, next to New style and "A random style in the radio";
-  - on each card of the Genres tab ("Inventa uno stile di questo genere": the new style must land in that genre).
+  - on each card of the Genres tab ("Inventa uno stile di questo genere": the new style must land in that genre);
+  - in the New song panel of Compose, in its Styles row next to the Mix and Genre dice (the owner's answer to Open question 4: now, not later).
 - **How a style is invented:** one existing style is the base (tempo and energy shape), one or two others lend whole parts (drums, bass, harmony, lead, pads, voice). Lists are trimmed to a few items. Coherence rules keep it musical: a groove only at tempos where some style already plays it, a drum machine that some style already pairs with that groove, swing only with swinging grooves, melody modes that fit the chords, 4 to 5 layers as usual. A draw that breaks a rule, fails validation or copies an existing style is drawn again.
 - **Name and genre:** a generated name in English and Italian from fixed word lists (never a real genre, brand or person, never the name of an existing style or artist), the closest genre, the closest existing style, and a one-line description saying which style gave each part.
 - **Trial in the radio:** the invented style shows as a chip "in prova" with Tieni (keep), Ancora (again) and × (discard). It plays from the next song, alone, with the artist set to Custom. It survives a reload until kept or discarded.
@@ -41,6 +42,6 @@ None as spec deltas: the Styles tab (#35), the random tools (#50) and the compil
 ## Impact
 
 - New pure module `src/endless/style-maker.js` and its Node check; `src/endless/recipe.js` (optional `invented` field).
-- Radio (`src/radio/radio.js`, `src/radio/song-controls.js`), Styles and Genres tabs, the playlist session item (embedded trial style), `src/i18n.js`, `src/icons.js`, the Guide, `docs/STYLES.md`, `docs/knowledge/`.
-- The director does not change: `DIRECTOR_VERSION` and the endless fixtures stay as they are.
+- Radio (`src/radio/radio.js`, `src/radio/song-controls.js`), the New song panel (`src/live/new-song-panel.js`, `src/endless/new-song.js`, `src/endless/song-options.js`), Styles and Genres tabs, the playlist session item (embedded trial style), `src/i18n.js`, `src/icons.js`, the Guide, `docs/STYLES.md`, `docs/knowledge/`.
+- The director's songs do not change: `DIRECTOR_VERSION` and the endless fixtures stay as they are. `createSession` only learns to take extra styles that the artist exploration does not draw from (D9).
 - Estimate: about 25 agent hours (20 to 30); phase 1 without the compilation switch about 21.
