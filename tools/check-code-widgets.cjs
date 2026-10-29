@@ -170,6 +170,10 @@ const calls = code => (code.match(CALL) || []).length;
     const { page, errors } = await open(browser, { widgets: { on: true } });
     await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(800);
     await page.click('#play'); await sleep(4000);
+    // (under load the song can start late: wait until it plays and its widgets have canvases, else both scenes match)
+    const ready = () => page.evaluate(() => { const s = document.querySelector('strudel-editor').editor.repl.scheduler, M = globalThis.miskWidgetCanvases; return !!(s && s.started && s.now() > 1 && M && [...M.values()].some(c => c && c.width)); });
+    for (let k = 0; k < 40 && !(await ready()); k++) await sleep(500);
+    check(await ready(), 'session video: the song plays and its widgets are drawn before the frames are compared');
     const frame = layout => page.evaluate(L => {
       const V = globalThis.codingMiskVideo; V.setOpt('layout', L);
       const c = document.createElement('canvas'); c.width = 960; c.height = 540; document.body.appendChild(c); c.style.position = 'absolute'; c.style.top = '0'; c.style.left = '0';

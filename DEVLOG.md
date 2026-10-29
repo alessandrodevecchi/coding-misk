@@ -1821,3 +1821,11 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - `apply()` si ferma subito se tema dell'app, look, impostazioni e schermo intero non sono cambiati: l'app riscrive `data-look` a ogni `syncAll`.
 - **Sono rimasti uguali** il codice generato (`check:code` 46 su 46) e il suono: il tema non tocca né codice né eventi.
 - Schermate in `notes/prove-2026-10-29/temi-codice/fatto-*.png` (luci-rosse, Crescendo, battuta 38, riga dell'hook silenziata a mano, interfaccia in italiano; telefono; scheda Impostazioni).
+
+## 2026-10-29: check dei widget nel codice, scena video con i widget (fix/code-widgets-video)
+
+- **Sintomo su develop c3e0bc4:** `check-code-widgets.cjs` trovava la scena "Visual + codice + widget" identica a "Visual + codice" (stessa somma, 2806081). Somma identica vuol dire anche palco identico: il brano non suonava ancora e nessun widget aveva un canvas. Il check aspettava 4 s fissi dopo Play; con la macchina carica (carico medio 6-7) il brano parte più tardi.
+- **Non è una regressione** del disegno del codice nei video: su questo ramo la scena con i widget disegna di più (3246328 → 3363382) in tre giri.
+- **Correzione:** il check aspetta (fino a 20 s) che il brano suoni e che almeno un widget abbia il suo canvas, e lo dice in una riga sua prima del confronto.
+- Il sottogiro "nessun underrun ai confini di sezione" (1 underrun contro 0) non si è ripetuto in due giri: effetto del carico.
+- Check: `check-code-widgets` due volte, `check-code-themes`, `check-stage-widgets`, `check-video`, `check:video`: tutti ok.
