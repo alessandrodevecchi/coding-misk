@@ -20,6 +20,6 @@
 
 ## 5. Follow the knob (follow-up)
 
-- [ ] 5.1 Page follow of the arranger while playing (Follow playback on), smooth or a jump with reduced motion, held by user scrolling or a knob drag, cleared by play and seek, resumed after 3 s idle
-- [ ] 5.2 `tools/check-timeline.cjs`: follow cases (open view, user scroll held, idle and seek resume, Follow playback off, reduced motion, compact never scrolls, timeline view)
-- [ ] 5.3 Guide card IT/EN, knowledge note, DEVLOG
+- [x] 5.1 Page follow of the arranger while playing (Follow playback on), smooth or a jump with reduced motion, held by user scrolling or a knob drag, cleared by play and seek, resumed after 3 s idle
+- [x] 5.2 `tools/check-timeline.cjs`: follow cases (open view, user scroll held, idle and seek resume, Follow playback off, reduced motion, compact never scrolls, timeline view)
+- [x] 5.3 Guide card IT/EN, knowledge note, DEVLOG

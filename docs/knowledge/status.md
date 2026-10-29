@@ -14,12 +14,12 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 78. With open tasks: 24. All tasks ticked, waiting to be archived: 54.
+OpenSpec changes not archived: 80. With open tasks: 25. All tasks ticked, waiting to be archived: 55.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
-| [code-widgets](../../openspec/changes/code-widgets/tasks.md) | 9 | 31 |
+| [code-widgets](../../openspec/changes/code-widgets/tasks.md) | 3 | 31 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
 | [fm-groove-lab](../../openspec/changes/fm-groove-lab/tasks.md) | 1 | 16 |
@@ -31,6 +31,7 @@ OpenSpec changes not archived: 78. With open tasks: 24. All tasks ticked, waitin
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |
 | [material-generator](../../openspec/changes/material-generator/tasks.md) | 1 | 22 |
+| [narrator-ghost-row](../../openspec/changes/narrator-ghost-row/tasks.md) | 13 | 13 |
 | [natural-growth](../../openspec/changes/natural-growth/tasks.md) | 2 | 10 |
 | [new-song-panel](../../openspec/changes/new-song-panel/tasks.md) | 1 | 21 |
 | [pattern-library](../../openspec/changes/pattern-library/tasks.md) | 1 | 16 |
@@ -40,10 +41,10 @@ OpenSpec changes not archived: 78. With open tasks: 24. All tasks ticked, waitin
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
-| [timeline-growth](../../openspec/changes/timeline-growth/tasks.md) | 8 | 8 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
+| [widgets-on-stage](../../openspec/changes/widgets-on-stage/tasks.md) | 20 | 20 |
 
-Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `pattern-followups`, `playlists`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `test-fixes`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `written-like-coder`.
+Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `pattern-followups`, `playlists`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `test-fixes`, `timeline-growth`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `written-like-coder`.
 <!-- /generated -->
 
 Many open tasks are the owner's listening tests or short videos for the owner. They are not code to write: leave them open and mention them.
