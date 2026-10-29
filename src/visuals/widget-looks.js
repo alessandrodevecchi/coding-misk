@@ -74,7 +74,9 @@ export function drawPanel(g, box, p, F) {
   const nameW = g.measureText(`${F.label(p.inst).toUpperCase()} `).width;
   g.fillStyle = quiet ? pal.dim : pal.label; g.fillText(`· ${p.widget}`, box.x + pad + nameW, box.y + pad * 0.8);
   // level bar, top right
-  const bw = Math.min(box.w * 0.16, 64), bh = Math.max(3, fs * 0.32), bx = box.x + box.w - pad - bw, by = box.y + pad * 0.8 + fs * 0.35;
+  // (never over the header's text: a narrow panel of the layer gets a shorter bar)
+  const textW = nameW + g.measureText(`· ${p.widget}`).width;
+  const bw = Math.max(0, Math.min(box.w * 0.16, 64, box.w - 2 * pad - textW - fs * 0.6)), bh = Math.max(3, fs * 0.32), bx = box.x + box.w - pad - bw, by = box.y + pad * 0.8 + fs * 0.35;
   g.fillStyle = pal.edge; g.fillRect(bx, by, bw, bh);
   g.fillStyle = col; g.fillRect(bx, by, bw * lv, bh);
   // the widget
