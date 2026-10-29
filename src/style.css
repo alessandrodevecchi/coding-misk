@@ -756,7 +756,7 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .pl-card { display: grid; gap: 2px; text-align: left; padding: 10px 12px; cursor: pointer; color: var(--ink); font: inherit; }
 .pl-card[aria-pressed="true"] { border-color: var(--a1); box-shadow: 0 0 10px color-mix(in srgb, var(--a1) 35%, transparent); }
 .pl-card .muted { font: 11px var(--mono); }
-.pl-open { min-width: 0; }
+.pl-open { min-width: 0; container-type: inline-size; }
 .pl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; }
 .pl-head h3 { margin: 0; }
 .pl-head .muted { font: 12px var(--mono); }
@@ -771,6 +771,13 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .pl-n, .pl-len { font: 12px var(--mono); color: var(--muted); }
 .pl-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-acts { display: flex; gap: 4px; }
+/* a narrow open playlist (the code panel beside it, a radio session row with seven buttons): the buttons take their own line, so the title stays readable */
+@media (min-width: 701px) {
+  @container (max-width: 640px) {
+    .pl-open .pl-row { grid-template-columns: 16px 24px minmax(0, 1fr) auto auto; }
+    .pl-open .pl-row .pl-acts { grid-column: 1 / -1; justify-content: flex-end; flex-wrap: wrap; }
+  }
+}
 @media (max-width: 700px) {
   .pl-layout { grid-template-columns: minmax(0, 1fr); }
   .pl-lists { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
@@ -1440,16 +1447,17 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .vs-grid .row { display: flex; justify-content: space-between; gap: 6px; }
 .vs-grid output { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .vs-grid input[type=range] { width: 100%; }
-/* the phrase list (voice-full-controls D5): one row per clip; on a narrow screen a row wraps */
+/* the phrase list (voice-full-controls D5): one row per clip; on a narrow screen a row wraps. Scoped to .pl: the
+   Playlists tab uses the same .pl-row and .pl-head classes, and a global rule here pushed its buttons under the code panel */
 .pl { display: grid; gap: 6px; min-width: 0; margin-bottom: 8px; }
-.pl-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; }
-.pl-head .ctrl { display: grid; gap: 4px; }
-.pl-head .hint { flex: 1 1 220px; margin: 0; }
-.pl-row { display: grid; grid-template-columns: minmax(90px, 1.1fr) 64px minmax(96px, .9fr) minmax(160px, 2.4fr) minmax(90px, .9fr) 32px; gap: 6px 10px; align-items: start; min-width: 0; }
+.pl .pl-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 12px; }
+.pl .pl-head .ctrl { display: grid; gap: 4px; }
+.pl .pl-head .hint { flex: 1 1 220px; margin: 0; }
+.pl .pl-row { display: grid; grid-template-columns: minmax(90px, 1.1fr) 64px minmax(96px, .9fr) minmax(160px, 2.4fr) minmax(90px, .9fr) 32px; gap: 6px 10px; align-items: start; min-width: 0; }
 .pl-cols { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 3px; }
-.pl-row input[type=number] { width: 58px; }
-.pl-row input[type=text] { width: 100%; box-sizing: border-box; }
-.pl-row select { max-width: 100%; }
+.pl .pl-row input[type=number] { width: 58px; }
+.pl .pl-row input[type=text] { width: 100%; box-sizing: border-box; }
+.pl .pl-row select { max-width: 100%; }
 .pl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .pl-said, .pl-src { font-size: 11px; color: var(--muted); font-family: var(--mono); overflow-wrap: anywhere; }
 .pl-text { display: grid; gap: 2px; min-width: 0; }
@@ -1459,13 +1467,13 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .pl-growing .ico { width: 12px; height: 12px; vertical-align: -2px; }
 .pl-del .ico { width: 14px; height: 14px; }
 .pl-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-.nl-row { grid-template-columns: minmax(70px, 110px) minmax(0, 1fr); }
+.pl .nl-row { grid-template-columns: minmax(70px, 110px) minmax(0, 1fr); }
 .voice-block > .btn { justify-self: start; }
 .vswitch .ico { width: 12px; height: 12px; }
 @media (max-width: 720px) {
-  .pl-row { grid-template-columns: 1fr 64px 1fr 32px; }
-  .pl-row .pl-text { grid-column: 1 / -1; grid-row: 2; }
-  .pl-row .pl-voice { grid-column: 1 / -1; grid-row: 3; }
+  .pl .pl-row { grid-template-columns: 1fr 64px 1fr 32px; }
+  .pl .pl-row .pl-text { grid-column: 1 / -1; grid-row: 2; }
+  .pl .pl-row .pl-voice { grid-column: 1 / -1; grid-row: 3; }
   .pl-cols { display: none; }
 }
 /* the radio Voices group (voice-full-controls D12): two stacked blocks */
