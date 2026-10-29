@@ -13,6 +13,7 @@ import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shape
 import { shapeCounts } from '../song/shapes.js';
 import { AIR_CHOOSERS, AIR_CHOOSER, chooserOf, chooserName } from '../endless/waypoints.js';
 import { CW_KEY, CW_DEFAULTS, CW_INSTRUMENTS, CW_WINDOWS, CW_PARAMS, CW_SIZE_LIMITS, WIDGETS, widgetSettings } from '../live/widgets.js';
+import { SW_KEY, SW_OPEN, SW_LAYERS, SW_MAPPINGS, SW_COLOURS, SW_SILENT, SW_LIMITS, stageSettings } from '../visuals/stage-settings.js';
 
 // the code widgets card (code-widgets D2): the sections left open, remembered in this browser
 const CW_OPEN = 'coding-misk-cw-open';
@@ -92,6 +93,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           <div class="actions">${app.hiddenSongs && app.hiddenSongs() ? `<button class="btn" id="set-show-hidden">${esc(t('setShowHidden', { n: app.hiddenSongs() }))}</button>` : `<span class="muted">${esc(t('setHiddenNone'))}</span>`}</div>
         </div>
         ${widgetsCard()}
+        ${stageCard()}
         <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
           <p class="muted">${esc(t('setAdvancedIntro'))}</p>
           <p class="muted" id="set-shape-count" data-shapes="${counts.shapes}">${esc(t('setShapeCount', counts))}</p>
@@ -139,6 +141,33 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       <div class="actions"><button class="btn" id="set-cw-defaults">${esc(t('cwDefaults'))}</button></div>
     </div>`;
   }
+  // stage widgets (widgets-on-stage D9): the layer over the scene, then sections that open and close, like the code
+  // widgets card
+  function stageCard() {
+    const W = stageSettings(store.get(SW_KEY, null)), open = new Set(store.get(SW_OPEN, ['general']) || []), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) };
+    const sec = (id, body) => `<details class="cw-sec" data-sw-sec="${id}"${open.has(id) ? ' open' : ''}><summary>${esc(t(`swSec:${id}`))}</summary>${body}</details>`;
+    const check = (attr, on, label) => `<label class="rx-opt"><input type="checkbox" ${attr}${on ? ' checked' : ''} data-no-knob> <span>${esc(label)}</span></label>`;
+    const inst = W.mapping === 'own' ? CW_INSTRUMENTS.map(k => { const I = W.instruments[k]; return `<div class="cw-inst" data-sw-inst="${k}">
+      ${check(`data-sw-inst-on="${k}"`, I.on, t(`cwInst:${k}`))}
+      <label class="cw-prim"><span class="muted">${esc(t('cwPrimary'))}</span> <select data-sw-prim="${k}" data-no-knob>${WIDGETS.map(w => opt(w, I.primary, w)).join('')}</select></label>
+      <span class="chips" role="group" aria-label="${esc(t('cwSecondary'))}"><span class="muted">${esc(t('cwSecondary'))}</span> ${WIDGETS.filter(w => w !== I.primary).map(w => `<button class="chip" data-sw-sec2="${k}" data-w="${w}" aria-pressed="${I.secondary.includes(w)}">${w}</button>`).join('')}</span>
+    </div>`; }).join('') : '';
+    return `<div class="card set-card" id="set-stage-widgets"><h3>${esc(t('setSw'))}</h3>
+      <p class="muted">${esc(t('setSwIntro'))}</p>
+      ${row(t('swLayer'), seg('data-sw-layer', SW_LAYERS.map(k => [k, t(`swLayer:${k}`)]), W.layer), t('swLayerHint'))}
+      ${sec('general', `${row(t('swMonitor'), `<input type="number" data-sw-num="monitor" min="${SW_LIMITS.monitor[0]}" max="${SW_LIMITS.monitor[1]}" step="1" value="${W.monitor}" data-no-knob>`, t('swMonitorHint'))}
+        ${row(t('swStrip'), `<input type="number" data-sw-num="strip" min="${SW_LIMITS.strip[0]}" max="${SW_LIMITS.strip[1]}" step="1" value="${W.strip}" data-no-knob>`, t('swStripHint'))}
+        ${row(t('swMapping'), seg('data-sw-mapping', SW_MAPPINGS.map(k => [k, t(`swMapping:${k}`)]), W.mapping), t('swMappingHint'))}
+        ${row(t('swColours'), `<select data-sw-colours data-no-knob>${SW_COLOURS.map(k => opt(k, W.colours, t(`swColours:${k}`))).join('')}</select>`, t('swColoursHint'))}
+        ${row(t('swSilent'), seg('data-sw-silent', SW_SILENT.map(k => [k, t(`swSilent:${k}`)]), W.silent), t('swSilentHint'))}`)}
+      ${sec('widgets', `<p class="hint muted">${esc(t('swWidgetsHint'))}</p><div class="cw-checks">${WIDGETS.map(w => check(`data-sw-widget="${w}"`, W.widgets[w], w)).join('')}</div>`)}
+      ${sec('instruments', W.mapping === 'own' ? `<p class="hint muted">${esc(t('swInstHint'))}</p>${inst}` : `<p class="hint muted" data-sw-same>${esc(t('swInstSame'))}</p>`)}
+      ${sec('video', `<p class="hint muted">${esc(t('swVideoHint', { value: t(`vidRealScope:${vid.realScope}`) }))}</p>`)}
+      <div class="actions"><button class="btn" id="set-sw-defaults">${esc(t('cwDefaults'))}</button></div>
+    </div>`;
+  }
+  // a change of the stage widgets' settings, stored whole (the defaults filled in)
+  const setSw = f => { const W = stageSettings(store.get(SW_KEY, null)); f(W); store.set(SW_KEY, stageSettings(W)); };
   // a change of the code widgets' settings, stored whole (the defaults filled in)
   const setCw = f => { const S = widgetSettings(store.get(CW_KEY, null)); f(S); store.set(CW_KEY, widgetSettings(S)); if (app.widgetsChanged) app.widgetsChanged(); };
   const setFrag = (k, v) => store.set('coding-misk-fragments', { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), [k]: v });
@@ -156,6 +185,13 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.dataset.cwMove) { const k = b.dataset.cwMove, d = +b.dataset.dir; setCw(S => { const i = S.order.indexOf(k), j = i + d; if (i >= 0 && j >= 0 && j < S.order.length) [S.order[i], S.order[j]] = [S.order[j], S.order[i]]; }); render(); const f = root.querySelector(`[data-cw-move="${k}"][data-dir="${d}"]:not([disabled])`) || root.querySelector(`[data-cw-move="${k}"]:not([disabled])`); if (f) f.focus(); return; }
     if (b.dataset.cwSec2) { const k = b.dataset.cwSec2, w = b.dataset.w; setCw(S => { const I = S.instruments[k], has = I.secondary.includes(w); I.secondary = has ? I.secondary.filter(x => x !== w) : [...I.secondary, w]; }); return render(); }
     if (b.id === 'set-cw-defaults') { const on = widgetSettings(store.get(CW_KEY, null)).on; store.set(CW_KEY, { ...widgetSettings(null), on }); if (app.widgetsChanged) app.widgetsChanged(); toast(t('cwDefaultsDone')); return render(); }
+    // stage widgets (widgets-on-stage D9)
+    if (b.dataset.swLayer) { setSw(W => { W.layer = b.dataset.swLayer; }); return render(); }
+    if (b.dataset.swSilent) { setSw(W => { W.silent = b.dataset.swSilent; }); return render(); }
+    // the stage's own instruments start as a copy of the code widgets' ones (unless the stage's copy was already edited)
+    if (b.dataset.swMapping) { setSw(W => { W.mapping = b.dataset.swMapping; if (W.mapping === 'own' && JSON.stringify(W.instruments) === JSON.stringify(stageSettings(null).instruments)) W.instruments = widgetSettings(store.get(CW_KEY, null)).instruments; }); return render(); }
+    if (b.dataset.swSec2) { const k = b.dataset.swSec2, w = b.dataset.w; setSw(W => { const I = W.instruments[k], has = I.secondary.includes(w); I.secondary = has ? I.secondary.filter(x => x !== w) : [...I.secondary, w]; }); return render(); }
+    if (b.id === 'set-sw-defaults') { store.set(SW_KEY, stageSettings(null)); toast(t('swDefaultsDone')); return render(); }
     if (b.dataset.setMp3) { store.set('coding-misk-export-mp3', +b.dataset.setMp3); return render(); }
     // direction presets (#53): the whole video setting under a name
     if (b.id === 'set-vid-preset-save') {
@@ -197,7 +233,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   });
   root.addEventListener('input', e => { if (e.target.id === 'set-volume') { app.setVolume(+e.target.value); e.target.nextElementSibling.textContent = `${e.target.value}%`; } });
   // the sections of the code widgets card left open
-  root.addEventListener('toggle', e => { const d = e.target; if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
+  root.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.swSec) { const open = new Set(store.get(SW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.swSec); else open.delete(d.dataset.swSec); store.set(SW_OPEN, [...open]); return; } if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
   root.addEventListener('change', e => {
     { const x = e.target, d = x.dataset || {};
       if (d.cwNum) { setCw(S => { S[d.cwNum] = +x.value; }); x.value = widgetSettings(store.get(CW_KEY, null))[d.cwNum]; return; }
@@ -206,6 +242,11 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       if (d.cwParam) { setCw(S => { S.params[d.cwParam] = x.checked; }); return; }
       if (d.cwSize) { setCw(S => { S.sizes[d.cwSize] = +x.value; }); x.value = widgetSettings(store.get(CW_KEY, null)).sizes[d.cwSize]; return; }
       if (d.cwInstOn) { setCw(S => { S.instruments[d.cwInstOn].on = x.checked; }); return; }
+      if (d.swNum) { setSw(W => { W[d.swNum] = +x.value; }); x.value = stageSettings(store.get(SW_KEY, null))[d.swNum]; return; }
+      if (d.swColours !== undefined) { setSw(W => { W.colours = x.value; }); return; }
+      if (d.swWidget) { setSw(W => { W.widgets[d.swWidget] = x.checked; }); return; }
+      if (d.swInstOn) { setSw(W => { W.instruments[d.swInstOn].on = x.checked; }); return; }
+      if (d.swPrim) { setSw(W => { const I = W.instruments[d.swPrim], old = I.primary; I.primary = x.value; I.secondary = [...I.secondary.filter(w => w !== x.value), ...(old !== x.value && !I.secondary.includes(old) ? [old] : [])]; }); return render(); }
       if (d.cwPrim) { setCw(S => { const I = S.instruments[d.cwPrim], old = I.primary; I.primary = x.value; I.secondary = [...I.secondary.filter(w => w !== x.value), ...(old !== x.value && !I.secondary.includes(old) ? [old] : [])]; }); return render(); }
     }
     if (e.target.id === 'set-radio-look') store.set('coding-misk-radio-look', e.target.value);
