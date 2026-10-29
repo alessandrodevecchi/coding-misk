@@ -21,7 +21,7 @@ The changes are steps: a list of timed actions in the song's `build` field. A st
 - **Ideas.** In the Live coder growth a part written as an idea grows from its simple form: a bass from one note per beat to its cell ([ideas.md](ideas.md)).
 - **Code.** `liveCode` writes the code of each step with the comment and function options ([comments-and-functions.md](comments-and-functions.md)).
 - **Voice.** Step comments are spoken by the narrator ([narrator.md](narrator.md)).
-- **Hand coding.** Typing in the code panel stops the steps and the music goes on. "Resume live build" types the song's code back.
+- **Hand coding.** Typing in the code panel stops the steps and the music goes on. "Resume live build" types the song's code back. When the code was typing a change at that moment, the change is completed at once (its lines flash for about a second) and the key, paste, cut or drop applies to the completed code; nothing is evaluated until Ctrl+Enter, and Ctrl+Z never brings back half-typed code (the code the app writes is not in the undo history).
 
 **Growth of a radio song.** The director writes its own steps. `writtenForm` in `src/endless/growth.js` turns them into clips (same sound bar by bar; rack and comments stay steps), then `crescendoSong` grows the part from a section boundary with `budget`, `span` and `noEnding` rules, so the song keeps its planned length within a phrase ([radio.md](radio.md)).
 

@@ -1727,5 +1727,9 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 @keyframes ct-show { to { visibility: visible; } }
 #edhost.ct-dim .ct-muted { opacity: .55; }
 #edhost [style*="rgba(255,255,255, .4)"] { background-color: var(--code-flash, rgba(255,255,255,.4)) !important; }
+/* the lines a takeover completed (takeover-pending-edit tk3): lit about a second, none with reduced motion */
+#edhost .takeover-flash { position: absolute; left: 0; pointer-events: none; z-index: 2; background: var(--code-flash, rgba(255,255,255,.3)); animation: takeover-flash 1s ease-out forwards; }
+@keyframes takeover-flash { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #edhost .takeover-flash { display: none; } }
 .cw-unit { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .cw-unit input { width: 90px; }
