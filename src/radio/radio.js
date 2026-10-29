@@ -169,7 +169,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       player.swap(windowPlayable()); render();
     }, () => {});
   }
-  function grow(item, song, { async = false } = {}) {
+  // then: called once the growth away from the page is ready (the window on air swaps to the grown song)
+  function grow(item, song, { async = false, then = null } = {}) {
     const token = item.growToken = (item.growToken || 0) + 1, ctx = item.growCtx;
     const recorded = S && S.replay ? playedOf(S.recipe, item.n) : null;
     const done = g => {
@@ -185,6 +186,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     item.finish = () => { done(growOnAir(song, ctx)); item.growToken++; };
     if (!async || !player.grow) { item.finish(); return; }
     item.growing = player.grow(song, ctx).then(done, () => { if (item.growToken === token) item.finish(); });
+    if (then) item.growing.then(() => { if (S && S.stream.includes(item)) then(); });
   }
   // a song still growing (or being steered) away from the page when it is needed now: it is done here
   function growNow(item) { if (item && item.growing && item.finish) item.finish(); }
@@ -467,8 +469,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const r = steerSong({ ...item.base, commands: item.commands, seed: S.recipe.seed, n: item.n });
     item.plan = r.plan; item.opts = r.opts; item.plain = r.song;
     if (!item.growCtx) { setSong(item, r.song); return; }
-    grow(item, r.song, { async });
-    if (item.growing && then) item.growing.then(() => { if (S && S.stream.includes(item)) then(); });
+    grow(item, r.song, { async, then });
   }
   function relayoutFrom(i) {
     for (let k = i + 1; k < S.stream.length; k++) { const p = S.stream[k - 1]; S.stream[k].start = p.start + p.bars - (p.cut ? 0 : overlapOf(p.entry.transition)); }
@@ -521,14 +522,17 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     return true;
   }
   // the songs after song k take the session's choices again (radio-arrangement D10): from the director's song (base0)
-  // with the recipe's arrange list as it is now, then their own commands or their growth
+  // with the recipe's arrange list as it is now, then their own commands or their growth; a song that grows or is
+  // steered again away from the page swaps the window on air when it is ready, so the song being prepared plays the
+  // choice (#86)
   function rebias(k) {
+    const swap = () => { player.swap(windowPlayable()); renderNow(); };
     for (const x of S.stream) {
       if (x.n <= k || !x.base0 || x.frozen) continue;
       const b = biasSong(S.recipe, x.n, x.base0);
       x.base = { song: b.song, plan: b.plan, opts: b.opts }; x.plan = b.plan; x.opts = b.opts; x.plain = b.song; delete x.g0;
-      if (x.commands.length) resteer(x, { async: true, then: () => { player.swap(windowPlayable()); renderNow(); } });
-      else if (x.growCtx) grow(x, b.song, { async: true });
+      if (x.commands.length) resteer(x, { async: true, then: swap });
+      else if (x.growCtx) grow(x, b.song, { async: true, then: swap });
       else setSong(x, b.song);
     }
   }

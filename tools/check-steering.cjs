@@ -695,6 +695,33 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(y.n === 1 && JSON.stringify(y.build) === heard, 'replay gives the next song the same session choice');
     await page.click('#steer-scope'); await sleep(200);
   }
+  // a choice for the session given while the next song still grows away from the page (#86): the song being prepared
+  // takes it, and the window the player holds gets that song once its growth is ready (Live coder songs)
+  await page.click('#radio-start'); await sleep(300);
+  await page.selectOption('#radio-profile', 'switch'); await sleep(200);
+  await page.fill('#radio-seed', 'session-prep'); await page.click('#radio-start'); await sleep(3000);
+  {
+    if ((await page.getAttribute('#steer-scope', 'aria-pressed')) !== 'true') { await page.click('#steer-scope'); await sleep(200); }
+    const RS = () => page.evaluate(() => { const r = globalThis.codingMiskRadio.state; return { onAir: r.onAir, stream: r.stream.map(x => ({ n: x.n, growing: x.growing, grown: x.grown })) }; });
+    const bars0 = await page.evaluate(() => globalThis.codingMiskRadio.state.stream[0].bars);
+    // (past 40 % of the song on air the next one is prepared)
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.floor(bars0 * 0.45));
+    let r = await RS();
+    for (let t0 = Date.now(); r.stream.length < 2 && Date.now() - t0 < 15000; r = await RS()) await sleep(20);
+    check(r.stream.length === 2 && r.stream[1].growing, 'the next song is still growing when the choice is given', JSON.stringify(r.stream));
+    // (the console renders again while the song grows: the button is found by its instrument)
+    const part = await page.getAttribute('#radio-steer [data-cmd="more"]:not([disabled])', 'data-inst');
+    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]`);
+    for (let t0 = Date.now(); Date.now() - t0 < 90000; ) { await sleep(500); r = await RS(); if (r.stream.every(x => !x.growing)) break; }
+    const win = await page.evaluate(() => ({ fresh: globalThis.codingMiskRadio.airPlayable.meta.bars, player: globalThis.codingMiskBars().song.bars }));
+    check(r.stream.length === 2 && r.stream[1].grown && win.player === win.fresh, 'the window on air holds the song being prepared with the session choice', JSON.stringify({ stream: r.stream, ...win }));
+    await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(3000);
+    const x = await page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return { n: s.n, added: s.plan.added, tracks: s.song.tracks.map(t => t.id) }; });
+    check(x.n === 1 && (x.added || []).some(a => a.part === part && x.tracks.includes(a.id)), `the song being prepared plays one more ${part} from the session`, JSON.stringify(x));
+    check(!(await err()), 'no evaluation error with a session choice on a song being prepared', (await err()).slice(0, 120));
+    await page.click('#steer-scope'); await sleep(200);
+    await page.selectOption('#radio-profile', 'artist'); await sleep(200);
+  }
 
   await page.click('#radio-start'); await sleep(300);
   // ---------- the console's Voice group (voice-full-controls D10) ----------
