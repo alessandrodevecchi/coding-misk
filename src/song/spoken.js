@@ -294,6 +294,16 @@ export function poeticLine(song, step, index) {
   const list = pools.map(p => p[tr.type] || null).find(x => x && x.length) || pools.map(p => p.any || null).find(x => x && x.length) || POETIC.any;
   return rngOf(song, `poetic:${index}`).pick(list);
 }
+// poetic-steps: a short image of movement for a step that brings no track in (poetic style with Narrated growth): the
+// song's "move" lines, the style's, else the vocabulary's. A start drawn with the song's seed plus the step's index, so
+// consecutive steps take consecutive lines and a line comes back only after the whole list
+export function movementLine(song, index) {
+  const own = song.narrator && typeof song.narrator === 'object' && song.narrator.lines ? song.narrator.lines : {};
+  const style = styleRecipes(song).map(x => (x.narrator && typeof x.narrator === 'object' && x.narrator.lines) || {});
+  const list = [own, ...style, POETIC].map(p => p.move || null).find(x => x && x.length) || POETIC.move;
+  const start = rngOf(song, 'poetic-move').int(0, list.length - 1);
+  return list[(start + Math.max(0, index)) % list.length];
+}
 // every poetic line a song writes itself (for tools/voice.mjs)
 export function songPoeticTexts(song) {
   const own = song.narrator && typeof song.narrator === 'object' && song.narrator.lines ? Object.values(song.narrator.lines).flat() : [];

@@ -538,8 +538,8 @@ const CHECKS = {
     assert(styleOf(radio) === 'radio', 'speaker and volume do not change the style');
     assert(styleOf({ ...radio, room: 0.5 }) === 'custom', 'a hand edit makes the style Custom');
   },
-  'poetic narrator with Narrated growth (voice-full-controls D11): the step lines stay, the images come in addition, an image wins a shared bar'() {
-    const poetic = Object.values(POETIC).flat().map(x => x.en), luci = read('songs/luci-rosse.json');
+  'poetic narrator with Narrated growth (voice-full-controls D11, poetic-steps): entry steps keep their lines, the other steps say movement images, the images come in addition, an image wins a shared bar'() {
+    const poetic = Object.values(POETIC).flat().map(x => x.en), move = POETIC.move.map(x => x.en), luci = read('songs/luci-rosse.json');
     const run = (C, narrated) => {
       const c = crescendoSong(luci, { narrated, rules: growthRules(C) }), L = liveCode(c, C, { files: () => ANY }), out = [];
       for (const st of buildSteps(L.build)) {
@@ -550,17 +550,45 @@ const CHECKS = {
       return { out, c };
     };
     const both = run(resolveProfile('crescendo', { narratorStyle: 'poetic', narrated: true }), true);
-    const images = both.out.filter(x => poetic.includes(x.text)), lines = both.out.filter(x => !poetic.includes(x.text));
-    assert(images.length >= 2 && lines.length >= 4, `poetic and narrated: ${images.length} images, ${lines.length} step lines`);
+    const images = both.out.filter(x => poetic.includes(x.text) && !move.includes(x.text)), moves = both.out.filter(x => move.includes(x.text)), lines = both.out.filter(x => !poetic.includes(x.text));
+    assert(images.length >= 2 && moves.length >= 4 && lines.length >= 1, `poetic and narrated: ${images.length} images, ${moves.length} movement images, ${lines.length} step lines`);
     const plain = run(resolveProfile('crescendo', { narrated: true }), true).out;
     assert(plain.length && !plain.some(x => poetic.includes(x.text)), 'explaining with Narrated growth: no images');
-    // every step line the explaining narration says is said with the poetic style too, unless an image takes its bar
+    // every bar the explaining narration speaks on is spoken with the poetic style too: its step line, a movement
+    // image in its place, or an image that takes its bar
     const imageBars = new Set(images.map(x => x.bar));
-    const missing = plain.filter(x => !imageBars.has(x.bar) && !lines.some(y => y.bar === x.bar && y.text === x.text));
+    const missing = plain.filter(x => !imageBars.has(x.bar) && !lines.some(y => y.bar === x.bar && y.text === x.text) && !moves.some(y => y.bar === x.bar));
     assert(!missing.length, `step lines lost: ${missing.slice(0, 3).map(x => `${x.bar + 1} ${x.text}`)}`);
     const only = run(resolveProfile('crescendo', { narratorStyle: 'poetic' }), false).out;
-    assert(only.length && only.every(x => poetic.includes(x.text)), 'poetic without Narrated growth: images only, as before');
-    console.log(`      ${images.length} images and ${lines.length} step lines; ${plain.length - lines.length} step lines give their bar to an image`);
+    assert(only.length && only.every(x => poetic.includes(x.text) && !move.includes(x.text)), 'poetic without Narrated growth: images only, as before');
+    console.log(`      ${images.length} images, ${moves.length} movement images and ${lines.length} step lines; ${plain.length - lines.length - moves.length} step lines give their bar to an image`);
+  },
+  'poetic steps: with the poetic style and Narrated growth a step without an entry says a movement image in English and Italian, not its step line; entry steps keep theirs; samples for every movement image'() {
+    const enters = (B, st) => { const t = enteringTrack(B, st); return !!t && t.type !== 'spoken'; };
+    let checked = 0;
+    for (const id of ['luci-rosse', 'kellerlicht']) {
+      const song = read(`songs/${id}.json`);
+      for (const lang of ['en', 'it']) {
+        const move = POETIC.move.map(x => x[lang]);
+        const C = resolveProfile('crescendo', { narratorStyle: 'poetic', narrated: true }), c = crescendoSong(song, { narrated: true, rules: growthRules(C) }), B = liveBuildOf(c, C), steps = buildSteps(B);
+        const entryBars = new Set(steps.filter(st => enters(B, st)).map(st => st.at));
+        const said = spokenSchedule(B, C, lang, ANY).filter(x => x.voice === 'N' && x.step && x.step.say && x.at === x.step.at);
+        const free = said.filter(x => !entryBars.has(x.at)), atEntry = said.filter(x => entryBars.has(x.at));
+        assert(free.length >= 4, `${id} ${lang}: ${free.length} steps without an entry`);
+        for (const x of free) assert(move.includes(x.text) && x.text !== sayText(x.step.say, lang), `${id} ${lang} bar ${x.at + 1}: "${x.text}" for "${sayText(x.step.say, lang)}"`);
+        for (const x of atEntry) assert(!move.includes(x.text), `${id} ${lang} bar ${x.at + 1}: a movement image on an entry's bar`);
+        for (let i = 1; i < free.length; i++) assert(free[i].text !== free[i - 1].text, `${id} ${lang}: "${free[i].text}" twice in a row`);
+        // the explaining style keeps every step line
+        const E = resolveProfile('crescendo', { narratorStyle: 'explain', narrated: true }), e = crescendoSong(song, { narrated: true, rules: growthRules(E) }), EB = liveBuildOf(e, E);
+        assert(!spokenSchedule(EB, E, lang, ANY).some(x => move.includes(x.text)), `${id} ${lang}: a movement image with the explaining style`);
+        if (id === 'luci-rosse') console.log(`      ${lang}: ${free.slice(0, 3).map(x => `bar ${x.at + 1} "${x.text}" (was "${sayText(x.step.say, lang)}")`).join(', ')}`);
+        checked += free.length;
+      }
+    }
+    const dir = 'public/samples';
+    if (!fs.existsSync(`${dir}/say_lengths.json`)) { console.log('      (no samples on this machine: npm run voices)'); return; }
+    for (const lang of ['en', 'it']) for (const x of POETIC.move) assert(fs.existsSync(`${dir}/say_${lang}/${saySlug(x[lang])}.wav`), `say_${lang}/${saySlug(x[lang])}.wav: no sample (npm run voices)`);
+    console.log(`      ${checked} steps without an entry say a movement image`);
   },
   'where it speaks (voice-full-controls D7): quiet first then medium, only busy, the default identical'() {
     const luci = read('songs/ferro.json'), N = normalizeSong(luci), facts = sectionFacts(N);
