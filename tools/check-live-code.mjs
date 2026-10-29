@@ -15,6 +15,9 @@ import { patternVariants } from '../src/song/crescendo.js';
 import { chainLines, typingPlan, settleOthers } from '../src/song/typing.js';
 import { AHEAD } from '../src/live/written-plan.js';
 import { barSeconds } from '../src/live/typing-load.js';
+import { widgetSettings, placeWidgets, stripWidgets, instrumentOf } from '../src/live/widgets.js';
+import { lineKey } from '../src/song/writer.js';
+import { compileSong } from '../src/song/compile.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const FIXTURES = 'tools/fixtures/live-code.json';
@@ -152,7 +155,99 @@ const CHECKS_REUSED = {
     }
   },
 };
-Object.assign(CHECKS, CHECKS_REUSED);
+// code widgets (code-widgets): which lines get a widget, how many, which widget; the code without widgets unchanged
+const WCALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(\)/g;
+const calls = code => [...code.matchAll(WCALL)].map(m => m[1]);
+function widgetCodes(id, profile, over = {}, opts = {}) {
+  const s = song(id), C = resolveProfile(profile), S = { on: true, ...over };
+  const b = C.build === 'crescendo' ? crescendoSong(s, { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) }) : { ...s, build: s.build || deriveBuild(s) };
+  const W = liveCode(b, C, { lang: () => 'en', cols: () => 80, widgets: () => S }), P = liveCode(b, C, { lang: () => 'en', cols: () => 80 });
+  const bars = opts.bars || [0, ...new Set(buildSteps(W.build).map(x => x.at))].sort((x, y) => x - y);
+  return { W, P, bars, at: bar => W.codeAt(bar), plain: bar => P.codeAt(bar), build: W.build };
+}
+const sectionStarts = b => { const out = []; let a = 0; for (const x of b.sections) { out.push(a); a += x.bars; } return out; };
+const CHECKS_WIDGETS = {
+  'code widgets: off by default, the code without widgets is the code of before, line keys ignore the calls'() {
+    assert(widgetSettings(null).on === false && widgetSettings(null).max === 3 && widgetSettings(null).share === 25 && widgetSettings(null).window === 16, 'defaults');
+    const T = widgetCodes('luci-rosse', 'classic');
+    for (const b of T.bars) assert(stripWidgets(T.at(b)) === T.plain(b), `luci-rosse bar ${b}: stripping the widgets does not give the code without them`);
+    assert(liveCode({ ...song('luci-rosse'), build: deriveBuild(song('luci-rosse')) }, resolveProfile('classic'), { widgets: () => ({ on: false }) }).codeAt(0) === T.plain(0), 'off');
+    assert(lineKey('$: s("bd*4")._scope()') === lineKey('$: s("bd*4")') && lineKey('$: s("bd*4")\n  ._pianoroll({ labels: 1 })') === lineKey('$: s("bd*4")'), 'lineKey');
+  },
+  'code widgets: same song same widgets; the count varies by section and never passes the maximum'() {
+    for (const [id, profile] of [['luci-rosse', 'classic'], ['kellerlicht', 'switch'], ['crescendo-notte-lunga', 'crescendo']]) {
+      for (const max of [2, 3]) {
+        const T = widgetCodes(id, profile, { max }), T2 = widgetCodes(id, profile, { max }), counts = new Set();
+        for (const b of sectionStarts(T.build)) {
+          const c = T.at(b), n = calls(c).length;
+          assert(c === T2.at(b), `${id} bar ${b}: not repeatable`);
+          assert(n <= max, `${id} ${profile} bar ${b}: ${n} widgets over ${max}`);
+          counts.add(n);
+        }
+        assert(counts.size > 1, `${id} ${profile} max ${max}: the same count in every section (${[...counts]})`);
+      }
+    }
+  },
+  'code widgets: default mapping and slot order; fx and voice off; spiral and pitchwheel off'() {
+    const one = (line, S = {}) => calls(placeWidgets(line, { S: widgetSettings({ on: true, share: 0, ...S }) }));
+    assert(one('$: note("a1").s("sawtooth").analyze("bass")')[0] === 'scope', 'bass scope');
+    assert(one('$: note("a4").s("square").analyze("hook")')[0] === 'pianoroll', 'lead pianoroll');
+    assert(one('$: s("hh*8").analyze("hats")')[0] === 'pianoroll' && one('$: s("bd*4").analyze("kick")')[0] === 'scope', 'hats and drums');
+    assert(!one('$: s("cr").analyze("fx")').length && !one('$: s("say_it").n(3).analyze("fx")').length, 'fx and voice off');
+    assert(one('$: note("a4").s("square").analyze("hook")', { widgets: { pianoroll: false } })[0] === 'scope', 'lead with pianoroll off takes scope');
+    assert(one('$: note("a4").s("square").analyze("hook")', { roll: 'punchcard' })[0] === 'punchcard', 'punchcard');
+    const S = widgetSettings({ on: true, share: 0 }), all = ['drums', 'hats', 'bass', 'lead', 'arp', 'pad'].flatMap(k => [S.instruments[k].primary, ...S.instruments[k].secondary]);
+    assert(!all.includes('spiral') && !all.includes('pitchwheel') && !S.params.labels && !S.params.smear, 'spiral, pitchwheel, labels, smear off');
+    assert(one('$: note("c4 e4").analyze("arp")', { widgets: { spiral: true }, instruments: { arp: { on: true, primary: 'spiral', secondary: ['scope'] } } })[0] === 'spiral', 'spiral as the arp\'s primary');
+    const code = ['$: note("a4").analyze("hook")', '$: s("bd*4").analyze("kick")', '$: note("a1").analyze("bass")', '$: s("hh*8").analyze("hats")', '$: note("c4").analyze("pad")'].join('\n');
+    const lines = (S2, n = 5) => placeWidgets(code, { S: widgetSettings({ on: true, max: n, share: 0, ...S2 }), sections: 1, seed: 'x' }).split('\n').filter(l => WCALL.test(l) && !(WCALL.lastIndex = 0)).map(l => l.match(/analyze\("(\w+)"\)/)[1]);
+    // the first section's count is drawn by the seed: compare orders with a song of one section and the maximum 1
+    assert(lines({}, 1).join() === 'bass', `max 1 goes to bass: ${lines({}, 1)}`);
+    assert(lines({ order: ['drums', 'bass'] }, 1).join() === 'kick', `drums first in the order: ${lines({ order: ['drums', 'bass'] }, 1)}`);
+    assert(!lines({ instruments: { bass: { on: false } } }, 1).includes('bass'), 'bass off gives its slot away');
+    assert(!lines({ instruments: { hats: { on: false } } }, 5).includes('hats'), 'hats off');
+  },
+  'code widgets: about one widget in four is secondary over the built-in songs; none with share 0'() {
+    const ids = JSON.parse(fs.readFileSync('songs/index.json', 'utf8')).map(x => (typeof x === 'string' ? x : x.id)).slice(0, 14);
+    let prim = 0, sec = 0, sec0 = 0;
+    for (const id of ids) {
+      const s = song(id); if (s.kind && s.kind !== 'composed' && !s.tracks) continue;
+      const code = compileSong(s), S = widgetSettings({ on: true, max: 8 }), S0 = widgetSettings({ on: true, max: 8, share: 0 });
+      const meta = { sections: s.sections.length };
+      for (let k = 0, a = 0; k < s.sections.length; a += s.sections[k].bars, k++) {
+        const one = (SS) => chainLinesW(placeWidgets(code, { S: SS, bar: a, section: k, sections: meta.sections, seed: id })).filter(l => WCALL.test(l) && !(WCALL.lastIndex = 0));
+        for (const l of one(S)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w === S.instruments[inst].primary) prim++; else sec++; }
+        for (const l of one(S0)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w !== S0.instruments[inst].primary) sec0++; }
+      }
+    }
+    const share = sec / (prim + sec);
+    assert(prim + sec > 40 && share > 0.12 && share < 0.4, `secondary share ${(share * 100).toFixed(0)}% of ${prim + sec}`);
+    assert(sec0 === 0, `share 0 gave ${sec0} secondary widgets`);
+  },
+  'code widgets: Classic puts a widget only on the line of its track that plays now'() {
+    const T = widgetCodes('luci-rosse', 'classic', { max: 8 });
+    for (const [b, k] of sectionStarts(T.build).map((b, k) => [b, k + 1])) {
+      for (const l of chainLinesW(T.at(b)).filter(l => WCALL.test(l) && !(WCALL.lastIndex = 0))) {
+        const m = l.match(/\.mask\((section\d+)\)/);
+        assert(!m || m[1] === `section${k}`, `bar ${b}: a widget on a line of ${m && m[1]}`);
+      }
+    }
+  },
+  'code widgets: a muted line keeps its widget only when it returns within the window, and takes a slot'() {
+    // kellerlicht in Live coder: the acid line is muted from bar 280 and returns at 320 (reused-lines D1)
+    const acid = l => l.includes('[a4 a3] c4');
+    const at = (win, bar) => { const T = widgetCodes('kellerlicht', 'switch', { max: 8, window: win, order: ['lead', 'arp', 'bass', 'drums', 'hats', 'pad', 'fx', 'voice'] }, { bars: [bar] }); return chainLinesW(T.at(bar)).filter(acid); };
+    const has = (win, bar) => at(win, bar).some(l => WCALL.test(l) && !(WCALL.lastIndex = 0));
+    assert(at(16, 312).every(l => /^\s*_\$:/.test(l)) && at(16, 312).length, 'bar 312: the acid line is muted');
+    assert(has(16, 312) && !has(8, 296) && has('always', 296), `windows: 16 at 312 ${has(16, 312)}, 8 at 296 ${has(8, 296)}, always at 296 ${has('always', 296)}`);
+    assert(has(32, 296) && !has(16, 296), 'window 32 keeps it 24 bars before, 16 does not');
+    const muted = '_$: note("a1").analyze("bass")\n$: note("a4").analyze("hook")\n$: s("bd*4").analyze("kick")';
+    const n = placeWidgets(muted, { S: widgetSettings({ on: true, max: 2, share: 0 }), sections: 1, seed: 'a', returns: () => true });
+    assert(calls(n).length <= 2 && /^_\$:.*_scope\(\)/m.test(n) && calls(n).length === Math.min(2, calls(n).length), `muted bass takes a slot: ${n}`);
+  },
+};
+const chainLinesW = c => chainLines(c);
+Object.assign(CHECKS, CHECKS_REUSED, CHECKS_WIDGETS);
 let failed = 0;
 for (const [name, fn] of Object.entries(CHECKS)) { try { fn(); console.log(`ok    ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); } }
 console.log(failed ? `\n${failed} check(s) failed` : `\nall ${Object.keys(CHECKS).length} checks passed`);

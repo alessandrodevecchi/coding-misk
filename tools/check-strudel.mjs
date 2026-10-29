@@ -46,6 +46,10 @@ const CHECKS = {
     assert(!Object.keys(r.unknown).length, `unknown: ${Object.keys(r.unknown).join()}`);
     assert(HELPERS.every(h => !L.has(h) || !r.functions[L.get(h)]), 'a helper counted as a Strudel function');
   },
+  'the code widgets\' calls are not unknown (code-widgets D12)'() {
+    const r = coverageOf(catalog, collectCalls([{ kind: 'songs', source: 'case', code: '$: s("bd")._scope()\n$: note("c4")\n  ._pianoroll()\n$: n("0 2")._punchcard()._spectrum()._spiral()._pitchwheel()' }]), L);
+    assert(!Object.keys(r.unknown).length, `unknown: ${Object.keys(r.unknown).join()}`);
+  },
   'an unknown function in a copy of a song fails, with the song that writes it'() {
     const song = JSON.parse(fs.readFileSync('songs/ferro.json', 'utf8'));
     const code = compileSong(song).replace(/^(\$: [^\n]*)$/m, '$1.fooBar(2)');

@@ -5,7 +5,7 @@
 // job: { segments: [{ from, to, code, run?, buses?, fns? }] in bars, bpm: per bar, from / to: the window in seconds (a block of a long
 // export), tail: seconds after it, keepFrom: onsets before it belong to the block before, sampleRate, gain: the master level,
 // push: the style's push into the master limiter (level-headroom, 1 for none) }
-import { repl, register as strudelRegister } from '@strudel/core';
+import { repl, register as strudelRegister, Pattern } from '@strudel/core';
 import { transpiler } from '@strudel/transpiler';
 import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio, registerSound, soundMap } from '@strudel/webaudio';
 import { guardDecode, guardSounds, createRegister } from '../sounds/sound-guard.js';
@@ -32,7 +32,7 @@ async function loadSounds() {
 
 // our helpers, the library and the mixer of the code (code-writing, song-functions); the song's buses for `.chan(name)`
 // and its functions come with the job
-installHelpers({ register: strudelRegister });
+installHelpers({ register: strudelRegister, Pattern });
 
 // repeatable renders: superdough draws random numbers (the phases of the supersaw voices, noise, the reverb's impulse),
 // so the same song rendered twice would differ a little. Every render draws from the same seeded sequence, here and in
