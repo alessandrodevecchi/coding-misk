@@ -48,14 +48,32 @@ One object per frame, the same shape live and in the fast video:
 
 ### D3. Full-screen looks
 
-- **Monitor** (it: Monitor). A grid of panels, one per instrument chosen by D5: 3×2 on a wide stage, 2×3 on a tall one (9:16 fragments), 2×2 for 4 or fewer. Each panel: the instrument's name and widget kind (as in mockup 01), a level bar, the widget. The grid changes only at section boundaries, with a short fade.
+- **Monitor** (it: Monitor). A grid of panels, one per instrument chosen by D5, each with the instrument's name and widget kind (as in mockup 01), a level bar, the widget. The grid changes only at section boundaries, with a short fade (a quarter of a bar).
+- **Monitor layouts** (owner's note on the counts, 2026-10-29: up to 6 panels, independent of the code widgets' maximum; 3 or fewer centred and bigger). `monitorLayout(n, W, H)` tries every column count and keeps the grid that gives each panel the most area, with panels between a width / height of 1.15 and 3 (0.75 to 3 on a tall stage), the last row centred and the grid centred; no empty cells. Result:
+
+  | Panels | 16:9 | 9:16 |
+  | --- | --- | --- |
+  | 1 | one large panel, centred (at most 82% × 80% of the stage) | one large panel |
+  | 2 | side by side | stacked |
+  | 3 | two over one, the one centred | a column of three |
+  | 4 | 2×2 | 2×2 |
+  | 5 | three over two, centred | 2 + 2 + 1, centred |
+  | 6 | 3×2 | 2×3 |
+
+  On a wide stage the top keeps room for the readout and the look buttons (at least 9% of the height, up to 64 px).
 - **Rullo** (en: Roll). One large piano roll across the stage: the melodic instruments (lead, arp, bass, pad, guitar) on one pitch axis, each in its colour, with a legend; the drums (kick, snare, hats) as punchcard lanes at the bottom; a playhead at the middle. A track with a scope or spectrum widget in the code shows notes here; this look has no wave.
 - A third look with spiral and pitchwheel (Orbita) waits for the owner's tests of those widgets in the code; both are off by default there.
 
-### D4. The layer over the other looks
+### D4. The layer over the other looks (next delivery)
 
 - A setting, off by default, with three values: off, strip, Palco.
-- **Strip:** up to 3 small panels at the bottom right of the stage, over the look that plays (mockup 03). Height about a fifth of the stage. Each panel has a dark see-through background, so the look stays visible.
+- **Strip:** small panels over the look that plays. Each panel has a dark see-through background, so the look stays visible.
+- **Strip layout, decided 2026-10-29 for the next delivery** (the owner asked: centred, right corner, or two per side, up to 4). Three layouts were drawn over Tramonto and Palco (`notes/prove-2026-10-29/widget-palco/striscia-*.png`):
+  - *Right corner stack*: rejected. It covers the right side, where Montagne and Edgerunners put their moon, the look buttons of the app and the code panel's side in the code videos; on a tall stage it leaves panels too narrow.
+  - *Centred row at the bottom*: good on a tall stage and on looks with an empty floor (Tramonto, Montagne, Sonar), but it covers the bottom centre, where Palco's instruments and their labels and Pixel's car are.
+  - *Two per side* (up to 4): **recommended on a wide stage.** The centre stays free, where almost every look puts its focus (the sun, the radar, Palco's LED wall, the typed comment of the live build); it is symmetric and fits the owner's 4. Panels about a fifth of the width and of the height each, stacked two per side around the middle; with 3 panels, two on the left and one on the right at the same top; 1 panel on the left.
+  - **On a tall stage** (9:16 fragments, sides too narrow) the strip falls back to the centred row at the bottom, up to 3 in a row, 4 as 2×2.
+  - The strip limit becomes 1 to 4, default 4 (it was 3).
 - **Palco:** on the Palco look only, the panels fill its big screen above the instruments (mockup 04), up to 4. On other looks this value behaves as the strip.
 - The layer is drawn after the look in `paint`, before the flash, so it is in every video and in the live output with the look.
 - On the full-screen looks and on the soul the layer is not drawn.
@@ -64,7 +82,7 @@ One object per frame, the same shape live and in the fast video:
 
 - Default "same as code widgets": the slot order, the instruments switched on, the primary and secondary widget, the secondary share and "Widget notes" of the code widgets card. The stage does not need the code widgets option to be on.
 - An instrument gets a panel when it plays in the section, or returns within the code widgets' return window (dimmed until then).
-- The count: Monitor up to 6 (setting 2 to 6), strip up to 3 (setting 1 to 4), Palco up to 4. Unlike the code widgets, the count is not varied by the seed: the stage shows every playing instrument up to the limit.
+- The count: Monitor up to 6 (setting 2 to 6, independent of the code widgets' maximum, which is about the code panel), strip up to 4 (setting 1 to 4, D4), Palco up to 4. Unlike the code widgets, the count is not varied by the seed: the stage shows every playing instrument up to the limit.
 - "Own" setting: the stage uses its own copy of the instruments section (on, primary, secondary), edited in its card.
 - The choice is made per section from the song and the seed, the same in the live picture and the fast video.
 
@@ -108,6 +126,17 @@ Measured with the browser check on the owner's machine class, 1080p video target
 - Fast video: no extra render beyond the code widgets' ones; total export time grows at most 10% with a widget look against the Palco look.
 - Live output: one stage frame, as today; no second loop.
 
+## As built (first delivery: phases 1 to 3, 2026-10-29)
+
+- **Modules.** `src/visuals/widget-painters.js` (painters: `roll`, `wheel`, `spiral`, `scope`, `spectrumColumn`, `spectrogram`, `spectrumOf`; each draws in a box of the context it is given, with the colours it is given), `src/visuals/widget-palettes.js` (neon and hardware palettes, one colour per instrument; `scenePalette` for the layer), `src/visuals/stage-feed.js` (note store, live notes, panels per section, levels, flashes, silences, spectrum columns), `src/visuals/widget-looks.js` (`monitorLayout`, `drawMonitor`, `drawRullo`). A later render style (ASCII, dither, terminal) can pass another palette or another context, or post-process the box.
+- **Levels, onsets, silences from the notes** (D6 refined): the panels read them from the notes of the feed (gain × velocity, drums decay, the others hold for the note), not from the analysers, so the stage and the fast video agree frame for frame. Live, the scope reads the instrument's own analyser (`readAudio` keeps each analyser's wave, no extra analyser).
+- **Live notes:** one cycle at a time from the playing pattern, the window of the playhead first (up to three cycles a frame), then the rest of the section ahead (one a frame, up to 24 cycles); a new pattern drops the notes from the current cycle on. **Fast video notes:** the render page collects them from the haps it schedules anyway (no extra query) and sends them with each block (`stageNotes`). Checked note by note on luci-rosse.
+- **Panels of a section:** the instruments with a note in the section, in the code widgets' slot order, every playing instrument first up to 6; an instrument that played within the window before the section and is silent in it keeps a dimmed panel (the code widgets' "dimmed look" off hides it). Live, the panels are decided during the section's first bar while its notes come in, then kept. An instrument that only enters after a Live coder step in the middle of a section waits for the next section live, while the fast video, which knows the whole song, shows it dimmed from the section start.
+- **Spectrum:** a scrolling grid of 32 columns, 20 a second, 24 bands; each column is the spectrum of its own time slot (128 samples at a quarter of the sample rate), kept by slot. The fast video keeps 2 s of the song's wave for it.
+- **Colours:** the app theme on the two looks (setting "colours" waits for the Settings card, phase 6).
+- **Budget measured** (headless Chrome on the owner's machine class, 1080p target, 6 instruments): command time per frame Monitor 0.4 ms, Rullo 0.1 ms, Palco 0.4 ms (the timer's step is 0.1 ms); with the drawing waited for on a CPU canvas Monitor 7 ms, Rullo 4.2 ms, Palco 11 ms. Live on two songs: median 0.1 to 0.2 ms. Fast video fragments of 10 s: Monitor and Rullo 3.5 to 4.3 s against Palco 5.7 to 8.5 s.
+- **Not in this delivery:** the layer (strip, Palco screen), the Settings card (phase 6), "Always real" scopes with a widget look checked with both `realScope` values (5.2 in part: the code widgets' renders are reused when the code widgets make them, else the fallback, said in the export log).
+
 ## Risks / Trade-offs
 
 - **Notes of quiet lines look faint** (the pianoroll's opacity follows gain). Mitigation: the "Widget notes" setting of the code widgets, shared.
@@ -134,7 +163,7 @@ Phases 1 to 3 alone (Monitor and Rullo without the layer) are about 12 hours and
 
 ## Open Questions
 
-Each with a recommended answer.
+Each with a recommended answer. **Owner, 2026-10-29: every recommendation approved**, with one note on the counts: Monitor shows up to 6 panels whatever the code widgets' maximum; 3 or fewer centred and bigger; think about the strip (centred, right corner, or two per side up to 4). Answered in D3 (Monitor layouts) and D4 (strip layout).
 
 1. **Approach B as the base, Strudel's full-screen functions not used?** Recommended: yes. Only the app's painters reach the stage canvas, every video and the fast video with the same picture.
 2. **Which full-screen looks first?** Recommended: Monitor and Rullo. Orbita (spiral, pitchwheel) after your tests of those widgets in the code.
