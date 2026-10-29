@@ -18,6 +18,7 @@ export const TERM_WORDS = {
   enter: 'enter', next: 'next', inBars: 'in {n} bars', silent: 'silent', tracks: 'tracks', bringIn: 'bring in {list}', drop: 'drop {list}',
   keep: 'keep the groove', playing: 'playing', paused: 'paused', stage: 'stage', code: 'code', scope: 'scope', spectrum: 'spectrum', level: 'lvl',
   waiting: 'waiting for the music', shortcuts: '? for shortcuts', mode: 'auto-play on', modeHint: '(shift+tab to cycle)', rest: 'rest',
+  'kind:narrator': 'narrator', 'kind:voice': 'voice', 'kind:singing': 'singing', barNo: 'bar {n}', transcript: 'transcript',
 };
 const wordOf = info => (k, vars = {}) => {
   const s = (info && info.word && info.word(k, vars)) || TERM_WORDS[k] || k;
@@ -316,6 +317,23 @@ export function promptLine(F, info, word = wordOf(info)) {
   const shown = Math.floor(clamp(since, 0, 1) * [...text].length);
   return { text, shown };
 }
+// The "Claude" look as a conversation (spoken-text-on-stage D4): the exchanges so far from the captions' history, each a
+// spoken line with the step line it answers (the prompt; none when it is the same words, or for the voice track). The
+// mark of each speaker follows the card's choice (D12): a glyph for the icon, the voice track's quotes for the style, a
+// label; the ● marks the reply whatever the choice.
+const KIND_GLYPH = { mic: '◉', wave: '≋', note: '♪' }, KIND_STYLE = { narrator: { glyph: '◉', quote: false }, voice: { glyph: '≋', quote: true }, singing: { glyph: '♪', quote: false } };
+export function claudeExchanges(info) {
+  const c = info && info.captions;
+  if (!c || !Array.isArray(c.history)) return [];
+  return c.history.filter(r => r.kind !== 'step').map(r => ({ row: r, prompt: r.kind === 'narrator' && r.step && r.step !== r.text ? r.step : '' }));
+}
+const exchangeRows = e => (e.row.kind === 'voice' ? 1 : (e.prompt ? 1 : 0) + 2);
+function markText(e, marks, word) {
+  const k = e.row.kind, m = (marks && marks[k]) || 'icon+style', st = KIND_STYLE[k] || { glyph: '·', quote: false };
+  const text = st.quote && (m === 'style' || m === 'icon+style') ? `«${e.row.text}»` : e.row.text;
+  const head = m === 'icon' || m === 'icon+style' ? `${st.glyph} ` : m === 'label' ? `${word(`kind:${k}`)}: ` : '';
+  return { head, text, coloured: m !== 'none' };
+}
 export function drawClaude(g, W, H, F, T, info = {}) {
   const G = gridBelow(W, H, 18, 22, 36), t = termGrid(g, G, T), word = wordOf(info), { cols, rows } = G;
   g.fillStyle = T.bg; g.fillRect(0, 0, W, H);
@@ -333,8 +351,16 @@ export function drawClaude(g, W, H, F, T, info = {}) {
   t.put(ex, ey, '⎿', T.dim); t.put(ex + 2, ey, `${word('enter')}: ${names || '—'}`.slice(0, room), names ? T.fg : T.dim);
   t.put(ex, ey + 1, '⎿', T.dim);
   t.put(ex + 2, ey + 1, (info.next ? `${word('next')}: ${String(info.next).toLowerCase()} ${word('inBars', { n: Math.max(0, Math.ceil(info.nextIn || 0)) })}` : `${word('next')}: —`).slice(0, room), T.dim);
+  // the reply block above the prompt (C1, the last two exchanges) and the transcript pane on the right (C2, an option of
+  // the look, never in 9:16): they take their room from the lower panes
+  const exs = claudeExchanges(info), block = exs.slice(-2), word0 = word;
+  // (a short stage keeps the last exchange only, so the panes keep five rows)
+  const blockRoom = rows - 8 - ((wide ? 5 : 7) + 5), sizeOf = l => (l.length ? l.reduce((a, e) => a + exchangeRows(e), 0) + 1 : 0);
+  while (block.length > 1 && sizeOf(block) > blockRoom) block.shift();
+  const older = exs.slice(0, exs.length - block.length), blockRows = sizeOf(block);
+  const paneW = info.captions && info.captions.transcript && wide && !info.tall ? Math.max(18, Math.round(cols * 0.28)) : 0;
   // panes
-  const top = wide ? 5 : 7, bottom = rows - 8, list = visible(F);
+  const top = wide ? 5 : 7, bottom0 = rows - 8, bottom = Math.max(top + 6, bottom0 - blockRows), list = visible(F);
   if (!list.length) t.put(Math.max(2, Math.floor((cols - word('waiting').length) / 2)), Math.floor((top + bottom) / 2), word('waiting'), T.dim);
   else {
     // the large pane: the first melodic instrument with a note widget, else any note widget, else the first panel
@@ -343,13 +369,15 @@ export function drawClaude(g, W, H, F, T, info = {}) {
     const pane = (b, p, right) => termPanel(t, b, p, F, { word, title: `${F.label(p.inst).toLowerCase()} · ${p.widget}`, right, noLevel: true, border: T.faint });
     const barNow = Number.isFinite(info.bar) ? `bar ${info.bar.toFixed(1)}` : '';
     if (wide) {
-      const lw = Math.round(cols * 0.55), mainH = bottom - top, second = rest.length && mainH >= 9 ? rest[0] : null, others = rest.slice(second ? 1 : 0, 1 + Math.floor(mainH / 3));
-      const bh = second ? Math.max(5, Math.round(mainH * 0.64)) : mainH;
-      pane({ c: 1, r: top, w: lw, h: bh }, big, barNow);
+      // (the large pane keeps its size: its height from the room before the reply block, the second pane gives way)
+      const lw = Math.round(cols * 0.55), mainH0 = bottom0 - top, mainH = bottom - top, bh0 = rest.length && mainH0 >= 9 ? Math.max(5, Math.round(mainH0 * 0.64)) : mainH0;
+      const bh = Math.min(bh0, mainH), second = rest.length && mainH - bh >= 3 ? rest[0] : null, others = rest.slice(second ? 1 : 0, 1 + Math.floor(mainH / 3));
+      pane({ c: 1, r: top, w: lw, h: second ? bh : mainH }, big, barNow);
       if (second) pane({ c: 1, r: top + bh, w: lw, h: mainH - bh }, second, '');
-      if (others.length) {
+      const ow = cols - lw - 3 - (paneW ? paneW + 1 : 0);
+      if (others.length && ow >= 12) {
         const n = others.length, sh = Math.floor(mainH / n);
-        others.forEach((p, i) => pane({ c: lw + 2, r: top + i * sh, w: cols - lw - 3, h: i === n - 1 ? mainH - i * sh : sh }, p, ''));
+        others.forEach((p, i) => pane({ c: lw + 2, r: top + i * sh, w: ow, h: i === n - 1 ? mainH - i * sh : sh }, p, ''));
       }
     } else {
       const mainH = bottom - top, others = rest.slice(0, 2 * Math.floor((mainH - 5) / 4)), n = others.length, bh = n ? Math.max(5, Math.round(mainH * 0.45)) : mainH;
@@ -358,8 +386,43 @@ export function drawClaude(g, W, H, F, T, info = {}) {
       others.forEach((p, i) => { const rr = Math.floor(i / 2), last = i === n - 1 && n % 2 === 1; pane({ c: 1 + (i % 2) * (half + 1), r: top + bh + rr * rh, w: last ? cols - 2 : half, h: rh }, p, ''); });
     }
   }
-  // the prompt box with the typed line and a cursor
-  const pr = rows - 7, { text, shown } = promptLine(F, info, word), chars = [...text].slice(0, Math.max(0, cols - 9));
+  // the transcript pane (C2): the exchanges older than the block, newest at the bottom, each with its bar and speaker
+  const pr = rows - 7, marks = info.captions ? info.captions.marks : null, colOf = (k, on) => (!on ? T.fg : k === 'voice' ? T.magenta : k === 'narrator' ? T.cyan : T.orange);
+  if (paneW) {
+    const pc = cols - paneW - 1, ph = pr - top;
+    t.box(pc, top, paneW, ph, T.faint, word0('transcript'));
+    const lines = [];
+    for (const e of older) {
+      const m = markText(e, marks, word0);
+      if (e.prompt) lines.push([`> ${e.prompt}`, T.dim]);
+      lines.push([`${e.row.kind === 'voice' ? '⎿ ' : '● '}${m.head}${m.text}`, colOf(e.row.kind, m.coloured), e.row.kind === 'voice' ? null : T.orange]);
+      lines.push([`  ${word0('barNo', { n: Math.floor(e.row.at) + 1 })}`, T.dim]);
+    }
+    const shownL = lines.slice(-(ph - 2));
+    shownL.forEach(([s, col, dot], i) => { const cut = [...s].slice(0, paneW - 4).join(''); t.put(pc + 2, top + 1 + i, cut, col); if (dot) t.put(pc + 2, top + 1 + i, '●', dot); });
+  }
+  // the reply block (C1): the user's line on a highlighted ground, ● and the reply typed over its sample's length, the
+  // speaker and the bar; a voice-track line as a tool-output line
+  let latest = null;
+  if (block.length) {
+    let r = pr - blockRows + 1;
+    const w = cols - 4 - (paneW ? paneW + 1 : 0);
+    t.bg(1, r - 1, w + 2, blockRows, T.bg);
+    for (const e of block) {
+      const m = markText(e, marks, word0), col = colOf(e.row.kind, m.coloured);
+      const since = Number.isFinite(info.bar) ? info.bar - e.row.at : 99, len = e.row.len > 0 ? e.row.len : 0.6;
+      const full = `${m.head}${m.text}`, n = Math.floor(Math.max(0, Math.min(1, since / len)) * [...full].length), shownR = [...full].slice(0, n).join('').slice(0, Math.max(0, w - 4));
+      if (e.row.kind === 'voice') { t.put(3, r, '⎿', T.dim); t.put(5, r, shownR, col); r++; continue; }
+      if (e.prompt) { const pl = `> ${e.prompt}`.slice(0, w); t.bg(2, r, [...pl].length + 2, 1, T.faint); t.put(3, r, pl, T.fg); r++; }
+      t.put(3, r, '●', T.orange, { bold: true }); t.put(5, r, shownR, col); r++;
+      t.put(5, r, `⎿ ${word0(`kind:${e.row.kind}`)} · ${word0('barNo', { n: Math.floor(e.row.at) + 1 })}`.slice(0, w), T.dim); r++;
+    }
+    latest = block[block.length - 1].row;
+  }
+  // the prompt box with the typed line and a cursor; cleared once the reply to it is spoken
+  const { text, shown } = promptLine(F, info, word), since0 = Number.isFinite(info.sayBar) && info.sayBar >= 0 ? info.sayBar : Number.isFinite(info.secBar) ? info.secBar : Infinity;
+  const answered = !!latest && info.bar - latest.at <= since0 + 1e-9;
+  const chars = answered ? [] : [...text].slice(0, Math.max(0, cols - 9));
   t.box(1, pr, cols - 2, 3, T.dim, '', { square: false });
   t.put(3, pr + 1, '>', T.fg, { bold: true });
   const typed = chars.slice(0, shown).join('');

@@ -320,10 +320,11 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   // the song's information for the text interfaces (Terminal render, "Claude" look), read once per frame when needed
   function termInfo(cyc, playing, look, render) {
     const I = getInfo(cyc) || {}, S = stage && stage.sectionInfo ? stage.sectionInfo(cyc) : null, sec = sectionAt(cyc);
-    const sayBar = I.say && Number.isFinite(I.bar) ? I.bar - (I.sayAt || 0) : NaN;
+    // (the prompt: the step line, spoken-text-on-stage D4; the replies: the captions with their history)
+    const sayBar = I.prompt && Number.isFinite(I.bar) ? I.bar - (I.promptAt || 0) : NaN;
     return {
       title: I.title || '', bar: Number.isFinite(I.bar) ? I.bar : cyc, bars: I.bars ? Math.round(I.bars) : 0, bpm: I.bpm || 0, playing,
-      say: sayBar >= 0 && sayBar < 8 ? I.say : '', sayBar, secBar: cyc - sec.start,
+      say: sayBar >= 0 && sayBar < 8 ? I.prompt : '', sayBar, secBar: cyc - sec.start, captions: I.captions || null, tall: H > W,
       section: S ? S.label : '', sectionNo: S ? S.i + 1 : 0, sections: S ? S.n : 0, next: S ? S.next : null, nextIn: S ? S.end - cyc : 0,
       lookName: stage && stage.lookName ? stage.lookName(look) : look, renderName: stage && stage.renderName ? stage.renderName(render) : render,
       word: stage && stage.word ? stage.word : null, wave,
@@ -726,9 +727,15 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       cx.fillStyle = pal.dim;
       if (info.bars) cx.fillText(`BAR ${Math.min(info.bars, Math.floor(info.bar || 0) + 1)} / ${info.bars}${info.bpm ? ` · ${info.bpm} BPM` : ''}`, sx + fs * .6, sy + fs * 4.1);
       if (info.say) {
-        const typed = Math.max(0, Math.min(info.say.length, Math.floor(((info.bar || 0) - (info.sayAt || 0)) * 24)));
-        cx.fillStyle = '#e8fbff'; cx.font = `italic ${mono(fs * .85).replace('600 ', '600 ')}`;
-        cx.fillText(`“${info.say.slice(0, typed)}${typed < info.say.length && Math.floor(clock() / 300) % 2 ? '▌' : ''}${typed >= info.say.length ? '”' : ''}`.slice(0, 48), sx + fs * .6, sy + fs * 5.3);
+        // the line heard now, typed over its sample's length (spoken-text-on-stage D5), with its speaker: the narrator in
+        // italics, the voice track in quotes (24 characters a bar without a measured length)
+        const perBar = info.sayLen > 0 ? info.say.length / info.sayLen : 24, voice = info.sayKind === 'voice';
+        const typed = Math.max(0, Math.min(info.say.length, Math.floor(((info.bar || 0) - (info.sayAt || 0)) * perBar)));
+        let lx = sx + fs * .6;
+        if (info.sayWho) { cx.font = mono(fs * .6); cx.fillStyle = pal.dim; cx.fillText(`${info.sayWho.toUpperCase()} ›`, lx, sy + fs * 5.3); lx += cx.measureText(`${info.sayWho.toUpperCase()} › `).width; }
+        cx.fillStyle = voice ? '#ffc6ef' : '#e8fbff'; cx.font = voice ? mono(fs * .85) : `italic ${mono(fs * .85)}`;
+        const q = voice ? ['“', '”'] : ['', ''];
+        cx.fillText(`${q[0]}${info.say.slice(0, typed)}${typed < info.say.length && Math.floor(clock() / 300) % 2 ? '▌' : ''}${typed >= info.say.length ? q[1] : ''}`.slice(0, 44), lx, sy + fs * 5.3);
       }
       waveLine(pal.wave, pal.wave, sy + sh - fs * 1.1, fs * .9, sx + 6, sx + sw - 6);
       cx.restore();

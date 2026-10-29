@@ -5,7 +5,8 @@ import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, RENDERS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks } from './song/build.js';
+import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule } from './song/build.js';
+import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
 import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORDS } from './song/spoken.js';
@@ -427,6 +428,32 @@ function codeCols() {
 const unsaid = ({ say, ...s }) => s;
 const quietSong = sg => !!(sg && !sg.segmentAt && sg.ctl && sg.ctl.narrator === false);
 const saidSteps = sg => (sg && sg.build && !quietSong(sg) ? buildSteps(sg.build).filter(x => x.say) : []);
+// ---------- stage captions (spoken-text-on-stage) ----------
+// the "Testi sul palco" settings (D7), read once and again on each change
+let capS = captionSettings(store.get(CAPTIONS_KEY, null));
+const setCaptions = f => { const S = captionSettings(store.get(CAPTIONS_KEY, null)); f(S); capS = captionSettings(S); store.set(CAPTIONS_KEY, capS); };
+// the captions of a playable song (D1): its caption schedule, kept per build, language, samples manifest and lengths.
+// A song of several (a mix, a radio range) is captioned as joined, with the narrator of each song as its steps say
+const capMemo = new WeakMap();
+function capsOf(sg) {
+  const b = sg && sg.build; if (!b) return [];
+  const lang = getLang(), files = customFiles, lengths = spokenContext.lengths, m = capMemo.get(b);
+  if (m && m.lang === lang && m.files === files && m.lengths === lengths) return m.list;
+  let list = [];
+  try { list = captionSchedule(b, sg.segmentAt ? { narrator: true } : sg.ctl || {}, lang, files, lengths); } catch (e) { list = []; }
+  capMemo.set(b, { lang, files, lengths, list });
+  return list;
+}
+const NO_CAPTIONS = Object.freeze({ rows: [], tag: '', history: [] });
+let lastCapHtml = '';
+// a bar of a song in seconds (the fade of a caption, D5)
+const barSecOf = (meta, cyc) => { const b = meta && meta.bpm ? +meta.bpm[Math.max(0, Math.min(meta.bpm.length - 1, Math.floor(cyc)))] : 0; return b > 0 ? 240 / b : 2; };
+// the voice's name for a caption's tooltip (D12): the speaker, else the system's default voice
+const capName = r => (r.kind === 'step' ? '' : r.speaker ? r.speaker[0].toUpperCase() + r.speaker.slice(1) : getLang() === 'it' ? 'Alice' : 'Samantha');
+const capLabel = k => t(`capKind:${k}`);
+// the "Claude" look's transcript pane (D4, C2): an option of the look, off by default, kept in this browser (and the backup)
+const TRANSCRIPT_KEY = 'coding-misk-claude-transcript';
+const claudeTranscript = () => !!store.get(TRANSCRIPT_KEY, false);
 // oggetto riproducibile: codice + mappa di sezioni e tempo
 // fixed: controls that do not come from Compose (RADIO_LIVE for the radio's window and its exports)
 function playable(tr, fixed = null) {
@@ -1469,6 +1496,8 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = saidSteps(sg).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) }));
+  // the captions of the file (D6): the song's caption schedule, as on the stage; none with texts off for this export
+  const fvCaptions = sg.captionsOff ? [] : capsOf(sg);
   let job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   // code widgets in the fast video (code-widgets D11): the notes of the lines with a note widget come back from the
@@ -1533,9 +1562,10 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
         code: codeAt(cyc), say: said ? said.text : '',
         info: { onAir: true, n: p.n, title: item ? item.title : sg.title, artist: item ? item.artist : '', bar: cyc - p.start, bars: p.end - p.start, bpm: Math.round(sg.meta.bpm[Math.min(sg.meta.bars - 1, Math.floor(cyc))]) || undefined, say: said ? said.text : '', sayAt: said ? said.bar - p.start : 0 },
         soulSrc: doc && doc.sections && doc.tracks ? { key: `fv:${p.n}`, song: doc, ctx: {}, bar: cyc - p.start } : null,
-        meta: sg.meta, seed: sg.id || '',
+        meta: sg.meta, seed: sg.id || '', captions: fvCaptions,
       };
       const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
+      fv.look = fLook;
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
       visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off' });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
@@ -2477,6 +2507,14 @@ async function seekTo(bar) {
   song = compiled; paused = { id: compiled.id, cyc: bar };
   const i = arrSec(compiled.meta.sectionAt(bar)); if (i >= 0 && i !== sel) selectScene(i);
 }
+// (for the checks, spoken-text-on-stage: the caption schedule of the song in Compose, the frame at a bar, the settings,
+// a seek, the lane's rows)
+globalThis.codingMiskCaptions = {
+  lines: () => capsOf(song && song.build ? song : compiled),
+  at: (cyc, o = {}) => stageCaptions(cyc, o), settings: () => capS, set: f => { setCaptions(f); if (settingsPage) settingsPage.render(); },
+  seek: bar => seekTo(bar), now: () => (isPlaying() && sched() ? sched().now() : null),
+  info: cyc => stageInfo(cyc), lane: () => { const el = $('#say'); return { on: el.classList.contains('on'), rows: [...el.querySelectorAll('.cap-row')].map(r => ({ kind: r.dataset.kind, mark: r.dataset.mark, text: r.querySelector('.cap-txt').textContent, icon: !!r.querySelector('.cap-ico'), label: (r.querySelector('.cap-lbl') || {}).textContent || '', italic: r.querySelector('.cap-txt').classList.contains('it'), title: r.title })), tag: (el.querySelector('.cap-tag') || {}).textContent || '' }; },
+};
 let rulerDrag = null;
 $('#ruler-track').addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
@@ -3841,7 +3879,11 @@ function syncSectionFields() {
   if (sc.bpmEnd != null && document.activeElement !== $('#bpm-end')) $('#bpm-end').value = sc.bpmEnd;
   $('#sc-swing-o').textContent = `${Math.round((sc.swing || 0) * 100)}%`;
 }
+// the "Claude" look's transcript option beside the render menu (spoken-text-on-stage D4, C2): shown on that look only
+function syncTranscript() { const b = $('#transcript'); if (!b) return; b.hidden = look !== 'claude'; b.setAttribute('aria-pressed', String(claudeTranscript())); }
+$('#transcript').addEventListener('click', () => { store.set(TRANSCRIPT_KEY, !claudeTranscript()); syncTranscript(); });
 function syncAll() {
+  syncTranscript();
   document.documentElement.dataset.look = look;
   $('#stagewrap').dataset.soul = soulOverride;
   $('#soul-ctl').hidden = !soulOverride;
@@ -4398,10 +4440,15 @@ try {
     $('#sc-pause').textContent = pauseLabel();
     $('#sc-pause').disabled = state === 'stopped';
   }
-  // live build: the comment of the latest step over the stage
-  const say = playing && !hand && resumeTo === null && song && song.build && !quietSong(song) && s ? sayAt(song.build, s.now(), getLang()) : '', sayEl = $('#say');
-  if (say && sayEl.textContent !== say) sayEl.textContent = say;
-  sayEl.classList.toggle('on', !!say);
+  // the captions of what is heard over the stage (spoken-text-on-stage D3): the lane, hidden on the "Claude" look that
+  // draws its own replies (D4); while the user types by hand only the voice track shows (tp7)
+  { const sayEl = $('#say'), f = playing && resumeTo === null && song && s ? stageCaptions(s.now(), { hand }) : NO_CAPTIONS;
+    const html = look === 'claude' && capS.claude ? '' : captionHtml(f, capS, { label: capLabel, name: capName });
+    if (html && html !== lastCapHtml) { sayEl.innerHTML = html; sayEl.dataset.rows = f.rows.length; }
+    if (html) lastCapHtml = html;
+    const where = capS.where === 'top' ? 'top' : 'bottom';
+    if (sayEl.dataset.where !== where) sayEl.dataset.where = where;
+    sayEl.classList.toggle('on', !!html); }
   // avanzamento nell'arrangiatore
   updateRuler(playing);
   const head = $('#arr-strip .head');
@@ -4818,6 +4865,8 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.da
 // settings page (#31): the gear opens it, a second press goes back to the tab before
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
+    // texts on stage (spoken-text-on-stage D7)
+    setCaptions: f => setCaptions(f),
     ui: () => ui, setUi: v => setUi(v), uiFollow: () => uiFollow, setUiFollow: on => setUiFollow(on), lang: () => getLang(), setLang: l => changeLang(l),
     // code themes (code-themes D6): the settings, a change, and the theme Automatic uses now
     codeTheme: { settings: () => codeThemes.settings(), set: patch => codeThemes.set(patch), autoName: l => codeThemes.autoName(l) },
@@ -4879,12 +4928,34 @@ $('#soul-ctl').addEventListener('click', e => {
 syncSoul();
 // what plays, for the studio scene (#28) and the video's title card (#27): the radio's song on air, or the song playing elsewhere
 function stageInfo(cyc) {
-  if (fv) return fv.info;
-  if (mode === 'radio' && radio && radio.on) return radio.info(cyc);
+  // (the step line of the moment becomes the prompt of the "Claude" look; say becomes the line heard)
+  const stepOf = i => (i && i.say ? { text: i.say, at: i.sayAt } : null);
+  if (fv) return { ...fv.info, ...capInfo(stageCaptions(cyc, { history: true }), fv.info.bar - cyc, stepOf(fv.info)) };
+  if (mode === 'radio' && radio && radio.on) { const i = radio.info(cyc); return i ? { ...i, ...capInfo(stageCaptions(cyc, { history: true }), i.bar - cyc, stepOf(i)) } : i; }
   if (!song || !song.meta) return { title: T.title };
   const it = mixActive() ? mixS.items[0] : null, rel = it ? cyc - it.start : cyc;
-  const said = saidSteps(song).filter(x => x.at <= cyc).pop();
-  return { title: it ? it.song.title : mode === 'track' ? T.title : song.title, bar: rel, bars: it ? it.bars : song.meta.bars, bpm: Math.round((song.meta.bpm || [])[Math.max(0, Math.floor(cyc))] || 0) || undefined, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at - (it ? it.start : 0) : 0 };
+  const said = saidSteps(song).filter(x => x.at <= cyc).pop(), step = said ? { text: sayText(said.say, getLang()), at: said.at - (it ? it.start : 0) } : null;
+  return { title: it ? it.song.title : mode === 'track' ? T.title : song.title, bar: rel, bars: it ? it.bars : song.meta.bars, bpm: Math.round((song.meta.bpm || [])[Math.max(0, Math.floor(cyc))] || 0) || undefined, ...capInfo(stageCaptions(cyc, { history: true, hand }), rel - cyc, step) };
+}
+// The captions now (spoken-text-on-stage): { rows, tag, history } of the fast video's song, the radio's song on air or
+// the song playing. o: hand (typing by hand), history (the "Claude" look's exchanges)
+function stageCaptions(cyc, o = {}) {
+  if (fv) return fv.captions ? captionFrame(fv.captions, cyc, capS, { ...o, video: true, barSec: barSecOf(fv.meta, cyc) }) : NO_CAPTIONS;
+  if (mode === 'radio' && radio && radio.on) { const r = radio.captions(); return r ? captionFrame(r.lines, cyc, capS, { ...o, offset: r.offset, barSec: barSecOf(song && song.meta, cyc) }) : NO_CAPTIONS; }
+  if (!song || !song.build) return NO_CAPTIONS;
+  return captionFrame(capsOf(song), cyc, capS, { ...o, barSec: barSecOf(song.meta, cyc) });
+}
+// what the looks read from the captions (D4): say and sayAt, the line heard now (the Studio monitor types it), with its
+// kind; prompt and promptAt, the step line (the "Claude" look's prompt); captions, the frame with its history, every bar
+// moved by `shift` (from the song's bars to the info's own: a song of the radio counts from its start). The "Claude"
+// look draws its replies only with the card's "Replies in the Claude look" on
+function capInfo(f, shift, step) {
+  const top = f.rows[0] || null, mv = r => ({ ...r, at: r.at + shift, until: r.until + shift });
+  return {
+    say: top ? top.text : '', sayAt: top ? top.at + shift : 0, sayKind: top ? top.kind : null, sayLen: top && top.len ? top.len : 0, sayWho: top && top.kind !== 'step' ? capLabel(top.kind) : '',
+    prompt: step ? step.text : '', promptAt: step ? step.at : 0,
+    captions: capS.on && capS.claude ? { rows: f.rows.map(mv), tag: f.tag, history: f.history.map(mv), marks: capS.marks, transcript: claudeTranscript() } : null,
+  };
 }
 // the section around a cycle for the widget looks (widgets-on-stage D5): the fast video's song, the radio's song on air,
 // the song playing; null: the stage counts sections of 8 bars
@@ -5000,7 +5071,15 @@ const video = createVideo({
   getInfo: stageInfo,
   getTimeline: cyc => timelineNow(cyc),
   getHighlights: () => !!(fv ? exportCtl && exportCtl.highlights : song && song.ctl && song.ctl.highlights),
-  getSay: () => { if (fv) return fv.say; const el = $('#say'); return el.classList.contains('on') ? el.textContent : ''; },
+  // the captions of a video frame (D6): the stage's, with "In videos too"; none over the "Claude" look, which draws its
+  // replies itself (D4). look: the look the frame draws
+  getCaptions: (cyc, lookNow) => {
+    if (!fv && !(isPlaying() && resumeTo === null)) return null;
+    const l = lookNow || (fv ? fv.look : look);
+    if (l === 'claude' && capS.claude) return null;
+    const f = stageCaptions(cyc, { video: true, hand: !fv && hand });
+    return f.rows.length || f.tag ? { frame: f, S: capS, label: capLabel, hw: ui === 'hw' } : null;
+  },
   // the soul panel: as the direction says ('auto': only while the Soul display is on and the stage does not show the soul)
   getSoul: () => {
     const d = video.opts().soul, panel = { canvas: (cyc, playing, scale) => soul.frame(cyc, playing, scale) };

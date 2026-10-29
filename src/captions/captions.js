@@ -59,7 +59,7 @@ export function shownLine(x, S, hand = false) {
 export function captionFrame(lines, bar, S, opts = {}) {
   if (!S || !S.on || !Array.isArray(lines) || !lines.length || (opts.video && !S.videos)) return EMPTY;
   const off = opts.offset || 0, b = bar - off, hand = !!opts.hand, barSec = opts.barSec || 2;
-  const row = x => ({ kind: x.kind, text: x.text, at: x.at + off, until: x.until + off, since: b - x.at, fade: Math.max(0, Math.min(1, ((b - x.at) * barSec) / 0.2)), speaker: x.speaker || '', typed: !!x.typed, seconds: x.seconds || null, step: x.step || '' });
+  const row = x => ({ kind: x.kind, text: x.text, at: x.at + off, until: x.until + off, since: b - x.at, fade: Math.max(0, Math.min(1, ((b - x.at) * barSec) / 0.2)), speaker: x.speaker || '', typed: !!x.typed, seconds: x.seconds || null, len: x.seconds ? x.seconds / barSec : null, step: x.step || '' });
   const live = x => x.at <= b && b < x.until;
   const instead = S.steps && S.stepForm === 'instead';
   const active = lines.filter(x => live(x) && shownLine(x, S, hand) && !(instead && x.kind === 'narrator'));

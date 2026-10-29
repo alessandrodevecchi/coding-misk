@@ -3,24 +3,24 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 ## 1. Caption schedule (2 h)
 
 - [x] 1.1 `captionSchedule(song, C, lang, files, lengths)` in `src/song/build.js` from `spokenSchedule` (D1): speaker, start, `until` from `say_lengths.json`, chop once per clip, refrains at each repeat
-- [ ] 1.2 Kept per compiled build, language and manifest in `src/main.js`; the radio's `info` and the fast video's list read it
+- [x] 1.2 Kept per compiled build, language and manifest in `src/main.js`; the radio's `info` and the fast video's list read it
 - [x] 1.3 Lines typed in the radio console: check they reach the schedule of the song on air (Say now, At the right moment); add them if not
 - [x] 1.4 Cases in `npm run check:spoken`: explain, poetic, poetic with Narrated growth, a voice track, narrator off, no sample, a typed line
 
 ## 2. Stage lane (2 h)
 
-- [ ] 2.1 `#say` becomes the caption lane: speaker mark, stack of two, fade, step tag below the spoken line (D2)
-- [ ] 2.2 Hardware theme (amber display, lights), phone width
-- [ ] 2.3 Strings in Italian and English (`src/i18n.js`)
-- [ ] 2.4 The five marks per speaker kind (nothing, style only, label, icon, icon and style), name on hover, from the registry default and the setting (D12)
+- [x] 2.1 `#say` becomes the caption lane: speaker mark, stack of two, fade, step tag below the spoken line (D2)
+- [x] 2.2 Hardware theme (amber display, lights), phone width
+- [x] 2.3 Strings in Italian and English (`src/i18n.js`)
+- [x] 2.4 The five marks per speaker kind (nothing, style only, label, icon, icon and style), name on hover, from the registry default and the setting (D12)
 
 ## 3. Looks (3.5 h)
 
-- [ ] 3.1 "Claude" C1: reply block, prompt cleared, voice line, last two exchanges, no page caption (D4)
-- [ ] 3.2 Studio monitor types the heard line with its speaker
-- [ ] 3.3 `termInfo` and `stageInfo` carry the captions instead of the step line
-- [ ] 3.4 "Claude" C2: transcript pane on the right with the older exchanges, nothing twice; `Trascrizione` option in the look's settings (off by default, stored, in the backup); hidden in 9:16 frames (D4)
-- [ ] 3.5 "Claude": prompt lines invented from the section change (`bring in…`, `drop…`, `keep the groove`) never spoken or captioned; the replies follow the "Claude" choice of the card (D4, D7)
+- [x] 3.1 "Claude" C1: reply block, prompt cleared, voice line, last two exchanges, no page caption (D4)
+- [x] 3.2 Studio monitor types the heard line with its speaker
+- [x] 3.3 `termInfo` and `stageInfo` carry the captions instead of the step line
+- [x] 3.4 "Claude" C2: transcript pane on the right with the older exchanges, nothing twice; `Trascrizione` option in the look's settings (off by default, stored, in the backup); hidden in 9:16 frames (D4)
+- [x] 3.5 "Claude": prompt lines invented from the section change (`bring in…`, `drop…`, `keep the groove`) never spoken or captioned; the replies follow the "Claude" choice of the card (D4, D7)
 
 ## 4. Videos and live output (2.5 h)
 
@@ -31,9 +31,9 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 
 ## 5. Settings (2.5 h)
 
-- [ ] 5.1 "Testi sul palco" card (D7): one switch, the choices under it folded while off and kept, store, backup, reset
-- [ ] 5.2 Guide card in `src/guide.js`, both languages; `npm run check:guide`
-- [ ] 5.3 "How each voice is marked": one row per speaker kind with the five choices, the 1-bit, LED and HW note under Niente (D12)
+- [x] 5.1 "Testi sul palco" card (D7): one switch, the choices under it folded while off and kept, store, backup, reset
+- [x] 5.2 Guide card in `src/guide.js`, both languages; `npm run check:guide`
+- [x] 5.3 "How each voice is marked": one row per speaker kind with the five choices, the 1-bit, LED and HW note under Niente (D12)
 
 ## 6. Checks (2.5 h)
 
