@@ -624,6 +624,10 @@ el.innerHTML = `<!--\n${compiled.code}\n-->`;
 // the growing marks (growth-in-background D3): drawn once, shown by renderGrowing
 for (const id of ['live-growing', 'play-growing']) { const m = document.getElementById(id); if (m) m.innerHTML = GROWING; }
 $('#edhost').appendChild(el);
+// a song loaded or "back to this code" is written by the app too: out of the undo history (takeover-pending-edit tk2).
+// Set as soon as the editor exists, so the element's own first code is not recorded either (only its "// LOADING"
+// placeholder, cleared while it connects, stays in the history)
+if (el.editor) el.editor.setCode = code => { const v = el.editor.editor; v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: code || '' }, annotations: noHistory(v) }); };
 const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor) { clearInterval(iv); ed = el.editor; res(ed); } }, 100); });
 // code-writing: the code evaluated is the code shown and the hidden tail of the song on air (mixer, hidden voice), by
 // hand too (Ctrl+Enter); our helpers (.chan, .crunch), the library and the song's functions are registered once Strudel
@@ -632,6 +636,8 @@ ready.then(() => {
   codeThemes.attach(ed);
   const plain = ed.evaluate.bind(ed);
   ed.evaluate = async (autostart = true) => {
+    // the code shown when evaluated: what a takeover restores when it cannot complete an edit (takeover-pending-edit tk1)
+    playedCode = ed.code || ''; framed = false;
     globalThis.miskBuses = (song && song.buses) || {}; useFns((song && song.fns) || {});
     globalThis.miskWidgets = widgetGroups();
     renderPrelude();
@@ -708,16 +714,25 @@ const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.cod
 // code-widgets D6: the code of a playing song changed only between its equal start and end, in one transaction, so the
 // widgets and the lit notes of the lines left as they were stay (a full replacement removes every widget until the
 // next evaluation); a new song and hand code keep the full replacement (ed.setCode)
-function setCodeRange(txt) {
+// takeover-pending-edit tk2: the code the app writes (typing frames, steps, a completion, a song loaded) stays out of
+// the undo history, so Ctrl+Z by hand undoes only the user's edits and never brings back half-typed code. The
+// annotation comes from the editor's own CodeMirror (the transaction's class), not from a second copy.
+const noHistory = view => view.state.update({}).constructor.addToHistory.of(false);
+// cursorEnd (takeover-pending-edit D5, tk4): a cursor inside the replaced range goes to the end of the new text.
+// Returns the range of the new text, or null when nothing changed
+function setCodeRange(txt, cursorEnd = false) {
   const view = ed && ed.editor;
-  if (!view) { if (ed) ed.setCode(txt); return; }
+  if (!view) { if (ed) ed.setCode(txt); return null; }
   const cur = view.state.doc.toString();
-  if (cur === txt) return;
+  if (cur === txt) return null;
   const n = Math.min(cur.length, txt.length);
   let a = 0; while (a < n && cur.charCodeAt(a) === txt.charCodeAt(a)) a++;
   let b = 0; while (b < n - a && cur.charCodeAt(cur.length - 1 - b) === txt.charCodeAt(txt.length - 1 - b)) b++;
-  view.dispatch({ changes: { from: a, to: cur.length - b, insert: txt.slice(a, txt.length - b) } });
+  const insert = txt.slice(a, txt.length - b), sel = view.state.selection.main;
+  const inside = cursorEnd && sel.empty && sel.head >= a && sel.head <= cur.length - b;
+  view.dispatch({ changes: { from: a, to: cur.length - b, insert }, annotations: noHistory(view), ...(inside ? { selection: { anchor: a + insert.length } } : {}) });
   markMuted();
+  return { from: a, to: a + insert.length };
 }
 // code-widgets D14: the widget of a muted line (`_$:`) dimmed by a class on its element, set after each evaluation and
 // each change of the code; off with the setting
@@ -783,6 +798,9 @@ let built = 0, typing = null;
 // hand live coding (#20): the user typed in the code during a live build. Steps, comments and the stop at the end
 // wait until "resume live build"; the user's code plays meanwhile. resumeTo: the bar where the build takes over again.
 let hand = false, lastHand = null, resumeTo = null, handFrom = 0;
+// takeover-pending-edit: the code shown at the last evaluation (the code playing), and whether the editor shows a
+// typing frame written since then
+let playedCode = null, framed = false;
 // resume from the bar where the user took over (default) or from where the song has got to meanwhile
 let handFromHere = store.get('coding-misk-hand-from', true) !== false;
 // typing speed of the code that types itself (live-typing): slow, normal, fast
@@ -796,8 +814,12 @@ function makeTyping(text, to, from0, end, cps, human = false, stretch = null, fo
   const avail = Math.max(.2, (end - from0) / cps), listenMin = human ? Math.min(avail * .5, 2) : 0;
   const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch, force, earlier });
   const listen = human ? Math.max(listenMin, Math.min(avail * .2, avail - plan.total)) : 0;
-  return { plan, start: Math.max(from0 + listen * cps, end - plan.total * cps), cps, shown: '' };
+  // sg: the song the typing belongs to (a takeover completes it only on that song, takeover-pending-edit)
+  return { plan, start: Math.max(from0 + listen * cps, end - plan.total * cps), cps, shown: '', sg: song };
 }
+// for browser checks (takeover-pending-edit): the edit being typed (the resume's first), whether its typing has shown a
+// frame yet, and the text it types towards
+globalThis.codingMiskEdit = () => { const T = resumeTo || typing; return T ? { started: T.shown !== '', to: T.plan.frame(Infinity) } : null; };
 const typingHuman = () => !!(song && song.ctl && song.ctl.typist === 'human');
 // typing mistakes on (typing-mistakes); a stretch of typing is 16 bars, so app and video draw the same mistake rate
 const typingMistakes = () => !(song && song.ctl && song.ctl.mistakes === 'off');
@@ -807,7 +829,7 @@ function typeFrame(T, cyc) {
   const at = (cyc - T.start) / T.cps, txt = T.plan.frame(at);
   // for browser checks (typing-mistakes): whether a mistake is on screen now
   globalThis.codingMiskTyping = { mistake: !!(T.plan.stats && T.plan.stats.wrong.some(([a, b]) => at >= a && at < b)), stats: T.plan.stats ? { mode: T.plan.stats.mode, typos: T.plan.stats.typos, minds: T.plan.stats.minds, words: T.plan.stats.words } : null };
-  if (txt !== T.shown) { const prev = T.shown || ed.code || ''; T.shown = txt; setCodeRange(txt); followEdit(prev, txt); }
+  if (txt !== T.shown) { const prev = T.shown || ed.code || ''; T.shown = txt; setCodeRange(txt); framed = true; followEdit(prev, txt); }
 }
 function liveBuild(sg, s, cyc) {
   const steps = buildSteps(sg.build), next = steps[built];
@@ -834,9 +856,41 @@ function setHand(on) {
 // a character typed or deleted, a paste, a cut or a drop in the code during a live build: the user takes over
 function takeOver() {
   if (hand || !song || !song.build || !(isPlaying() || (radio && radio.paused))) return;
+  completeTyping();
   typing = null; resumeTo = null;
   const s = sched(); handFrom = Math.floor(s ? s.now() : 0);
   setHand(true);
+}
+// takeover-pending-edit D1, D2, tk1: before the user's key, paste, cut or drop applies, the edit being typed (the
+// resume's first) is completed with the text it types towards; a typing that has not shown a frame leaves the code
+// playing as it is; a typing frame on screen without a usable typing (another song, the editor changed under it) goes
+// back to the code playing. Not evaluated (D3); the lines written flash briefly (tk3)
+function completeTyping() {
+  const T = resumeTo || typing, code = (ed && ed.code) || '';
+  let txt = null;
+  if (T && T.sg === song && T.shown && code === T.shown) txt = T.plan.frame(Infinity);
+  else if (framed && playedCode !== null) txt = playedCode;
+  framed = false;
+  if (txt === null || txt === code) return;
+  const r = setCodeRange(txt, true);
+  if (r) flashLines(r.from, r.to);
+}
+// tk3: the lines a completion wrote, lit for about a second in the code theme's flash colour (none with reduced motion);
+// a layer over the code, so the user's key and CodeMirror's redraws do not cut it short
+function flashLines(from, to) {
+  const view = ed && ed.editor;
+  if (!view || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  try {
+    const sc = view.scrollDOM, a = view.lineBlockAt(from), b = view.lineBlockAt(Math.min(to, view.state.doc.length));
+    const box = sc.getBoundingClientRect(), top = view.documentTop - box.top + sc.scrollTop;
+    const el = document.createElement('div');
+    el.className = 'takeover-flash';
+    el.style.top = `${top + a.top}px`; el.style.height = `${Math.max(b.bottom - a.top, 4)}px`;
+    // as wide as the code: #edhost scrolls sideways past the scroller's own box when lines are long
+    el.style.width = `${Math.max(sc.clientWidth, sc.scrollWidth, view.contentDOM.getBoundingClientRect().right - box.left)}px`;
+    sc.appendChild(el);
+    setTimeout(() => el.remove(), 1100);
+  } catch (e) {}
 }
 const editKey = e => !e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || ['Backspace', 'Delete', 'Enter', 'Tab'].includes(e.key));
 $('#edhost').addEventListener('keydown', e => { if (editKey(e)) takeOver(); }, true);
