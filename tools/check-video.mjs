@@ -3,11 +3,24 @@
 //   npm run check:video      exit 1 when any check fails
 import { LAYOUTS, QUALITIES, CARDS, CARD_SECONDS, layoutAreas, pickMime, extOf, cardAlpha, fileName, lookFor } from '../src/video/layout.js';
 import { levelsFrom, codeFrom, sayFrom } from '../src/video/feed.js';
+import { widgetLines, linesByKey, instrumentOfLine, widgetPlan, lineKey } from '../src/video/widget-frames.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const inside = (a, w, h) => a.x >= 0 && a.y >= 0 && a.x + a.w <= w && a.y + a.h <= h && a.w > 0 && a.h > 0;
 const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const CHECKS = {
+  'code widgets in the fast video: lines, keys, instruments from the line or the hidden mixer (code-widgets D11)'() {
+    const code = 'setcpm(30)\n$: note("a1").s("saw")\n  .gain(0.6)._scope()\n$: s("hh*8").analyze("hats")._pianoroll()\n_$: n("0 2")\n  ._spectrum()\n$: s("bd*4")';
+    const run = `${code}\n\nall(x => miskMix(x, [[11,45,{analyze:'bass',orbit:2}],[99,121,{analyze:'pad'}]]))`;
+    const W = widgetLines(code);
+    assert(W.map(w => w.type).join() === 'scope,pianoroll,spectrum', W.map(w => w.type).join());
+    assert(W[0].key === lineKey('$: note("a1").s("saw").gain(0.6)') && code.slice(W[0].a, W[0].b).startsWith('$: note'), W[0].key);
+    assert(instrumentOfLine(code.slice(W[0].a, W[0].b), W[0].a, run) === 'bass' && instrumentOfLine(code.slice(W[1].a, W[1].b), W[1].a, run) === 'hats', 'instruments');
+    const plan = widgetPlan([{ code, run }]);
+    assert([...plan.noteKeys].length === 1 && plan.instruments.includes('bass'), JSON.stringify(plan.instruments));
+    const bare = code.replace(/\._\w+\(\)/g, '').replace(/\n\s*\n/g, '\n');
+    assert(linesByKey(bare, plan.noteKeys).length === 1, 'the note line found in a block made without the calls');
+  },
   'every quality is 16:9'() {
     for (const [k, q] of Object.entries(QUALITIES)) assert(Math.abs(q.w / q.h - 16 / 9) < 1e-3 && q.fps >= 30, k);
   },

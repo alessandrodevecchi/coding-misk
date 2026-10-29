@@ -3,7 +3,7 @@
 import { makeBackup, mergeBackup } from './backup.js';
 import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
-import { LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, V_DEFAULTS } from '../video/layout.js';
+import { REAL_SCOPES, LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, V_DEFAULTS } from '../video/layout.js';
 import { FORMATS, MP3_RATES, formatOf } from '../export/encode.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data.js';
 import { nextTagline } from '../video/fragments.js';
@@ -46,6 +46,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setVidLayout'), `<select data-vid-opt="layout" data-no-knob>${LAYOUTS.map(k => opt(k, vid.layout, t(`vidLayout:${k}`))).join('')}</select>`, t(`vidLayoutHint:${vid.layout}`))}
           ${row(t('setVidQuality'), `<select data-vid-opt="quality" data-no-knob>${Object.keys(QUALITIES).map(k => opt(k, vid.quality, t(`vidQuality:${k}`))).join('')}</select>`, t('setVidQualityHint'))}
           ${row(t('setVidCard'), `<select data-vid-opt="card" data-no-knob>${CARDS.map(k => opt(k, vid.card, t(`vidCard:${k}`))).join('')}</select>`)}
+          ${row(t('setVidRealScope'), `<select data-vid-opt="realScope" data-no-knob>${REAL_SCOPES.map(k => opt(k, vid.realScope, t(`vidRealScope:${k}`))).join('')}</select>`, t('setVidRealScopeHint'))}
           ${row(t('setVidVisual'), `<select data-vid-opt="visual" data-no-knob>${opt('song', vid.visual, t('vidVisual:song'))}${looks.map(([k, l]) => opt(`fixed:${k}`, vid.visual, t('vidVisual:fixed', { look: tx(l) }))).join('')}${opt('song-cycle', vid.visual, t('vidVisual:song-cycle'))}${opt('section-cycle', vid.visual, t('vidVisual:section-cycle'))}</select>`, t('setVidVisualHint'))}
           ${row(t('setVidSoulMode'), `<select data-vid-opt="soul" data-no-knob>${SOULS.map(k => opt(k, vid.soul, t(`vidSoul:${k}`))).join('')}</select>`, t(`vidSoulHint:${vid.soul}`))}
           ${vid.layout === 'code' && vid.soul !== 'off' && vid.soul !== 'full' ? row(t('setVidSoul'), seg('data-vid-soul', [['1', t('vidSoulShown')], ['0', t('vidSoulFolded')]], vid.soulPanel ? '1' : '0'), t('setVidSoulHint')) : ''}

@@ -1,6 +1,7 @@
 // Video recorder (#27): a frame drawn by the app at a fixed size (the stage, the code typing itself, the soul panel,
 // a title card) recorded together with the master audio; or the whole browser tab, captured as it is.
 // The frame is drawn after each stage frame, so it follows the music exactly as the stage does.
+import { lineKey as widgetLineKey } from './widget-frames.js';
 import { withWidgets, QUALITIES, VIDEO_DEFAULTS, LAYOUTS, TIMELINE_LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
 import { liveAreas, lerpAreas, ease, presetOf, TRANSITION, timelineWindow } from '../live/presets.js';
 import { drawTimeline, drawColumn, futureShown } from '../live/timeline.js';
@@ -16,7 +17,8 @@ const LIVE_KEY = 'coding-misk-live-preset';
 // soulFrame(cyc, playing, scale): the soul screen always (the live picture's soul views, #52)
 // getTimeline(cyc): { shape, bar, live } of the song on air, for the timeline views (#65), or null
 // getHighlights(): true when the playing notes light up in the code (performance-profiles)
-// getWidgets(): { canvas(type, index), dim } of the code widgets drawn in the page now, or null (code-widgets D11)
+// getWidgets(): { canvas(type, index, key), dim } of the code widgets drawn now (the page's, or the fast video's drawn
+// from its notes and waves), or null (code-widgets D11)
 export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo, getSay, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });
@@ -191,12 +193,13 @@ export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo
     const G = getWidgets(), lh = Math.round(fs * 1.4), count = {}, extra = new Map(), items = [];
     if (G) lines.forEach((ln, li) => {
       for (const m of ln.matchAll(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/g)) {
-        const type = m[1], index = count[type] = (count[type] ?? -1) + 1, canvas = G.canvas(type, index);
+        let start = li; while (start > 0 && /^\s+\./.test(lines[start])) start--;
+        let end = li; while (end + 1 < lines.length && /^\s+\./.test(lines[end + 1])) end++;
+        const type = m[1], index = count[type] = (count[type] ?? -1) + 1, canvas = G.canvas(type, index, widgetLineKey(lines.slice(start, end + 1).join('\n')));
         if (!canvas || !canvas.width) continue;
         // sizes as in the panel, at the video's font (the panel's is about 14 px)
         const cssW = parseFloat(canvas.style.width) || canvas.width, cssH = parseFloat(canvas.style.height) || canvas.height;
         const w = Math.min(width, cssW * fs / 14), h = w * cssH / cssW;
-        let start = li; while (start > 0 && /^\s+\./.test(lines[start])) start--;
         const row = rows.reduce((a, r, k) => (r.li === li ? k : a), -1);
         if (row < 0) continue;
         const dy = extra.get(row) || 0;
@@ -485,7 +488,7 @@ export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo
         drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, A.soul.mode ? Math.max(A.soul.w / 1200, A.soul.h / 760) : Math.min((A.soul.w - 8) / 1200, (A.soul.h - 4) / 760))));
         bleedAround(A.soul);
       }
-      if (A.code) drawCode(A.code, P, now, Math.min(C.w, C.h) * 1.6, { mode: o.codeMode || 'focus', progress: t / (J.length || 1), section, cyc });
+      if (A.code) drawCode(A.code, P, now, Math.min(C.w, C.h) * 1.6, { mode: o.codeMode || 'focus', progress: t / (J.length || 1), section, cyc }, withWidgets(o.show));
       if (A.top) drawLogo(A.top, levels);
       const tag = J.tagline !== undefined ? taglineAt(J.tagline, t, J.code) : null, oT = tag ? { ...o, taglineFull: J.tagline } : o;
       if (A.bottom) drawBottomBand(A.bottom, P, oT, getInfo(cyc) || {}, tag);

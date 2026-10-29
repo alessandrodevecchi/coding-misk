@@ -272,8 +272,10 @@ function scopePainter(ctx, id, { color = '#ffffff', thickness = 3, scale = 1, po
     try { d = an && globalThis.getAnalyzerData ? globalThis.getAnalyzerData('time', id) : null; } catch (e) { d = null; }
     if (!d || !d.length) { ctx.moveTo(0, pos * c.height); ctx.lineTo(c.width, pos * c.height); ctx.stroke(); return; }
     let t0 = align ? Array.from(d).findIndex((v, i, a) => i && a[i - 1] > -trigger && v <= -trigger) : 0;
-    t0 = Math.max(t0, 0);
-    const step = c.width / d.length;
+    // (Strudel draws from the trigger on at a fixed step, so a late trigger left a short line, a dot in the video: the
+    // trigger is looked for in the first half, and the rest fills the width)
+    t0 = Math.max(0, Math.min(t0, Math.floor(d.length / 2)));
+    const step = c.width / (d.length - t0);
     for (let i = t0, x = 0; i < d.length; i++, x += step) { const y = (pos - scale * d[i]) * c.height; if (i === t0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
     ctx.stroke();
   };

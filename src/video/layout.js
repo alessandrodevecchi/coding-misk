@@ -20,7 +20,10 @@ export const CARD_SECONDS = 8;
 // 'section-cycle' (every section); soul 'auto' (the panel while the Soul display is on), 'off', 'panel', 'full'
 export const VISUALS = ['song', 'fixed', 'song-cycle', 'section-cycle'];
 export const SOULS = ['auto', 'off', 'panel', 'full'];
-export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true, visual: 'song', soul: 'auto' };
+// realScope (code-widgets D11, cw-5): scope and spectrum widgets in the fast video from their own instrument's render,
+// 'auto' (back to the whole song's wave when the export would take more than twice as long) or 'always'
+export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true, visual: 'song', soul: 'auto', realScope: 'auto' };
+export const REAL_SCOPES = ['auto', 'always'];
 
 // the look of the frame at a point of the song: dir { visual, soul }, looks: the list to pick from,
 // at { n: song number, section: index, own: the song's own look }
@@ -62,7 +65,8 @@ export function layoutAreas(layout, w, h, soul = null) {
 // (logo above, tagline below; a strip at the bottom in landscape), a picture turned by 90° for a phone held sideways,
 // and how the code moves (follow the edits, scroll through all of it, or focus on the part playing)
 export const F_FORMATS = { '9:16': { w: 1080, h: 1920 }, '4:5': { w: 1080, h: 1350 }, '1:1': { w: 1080, h: 1080 }, '16:9': { w: 1920, h: 1080 } };
-export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code'];
+// (code-widgets D11: visual + code and code with the code widgets below their lines)
+export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code', 'visual-code-widgets', 'code-widgets'];
 // whole: the stage's own proportions (o.stageRatio, the app's stage), so the whole visual shows
 export const F_ASPECTS = ['whole', 'fill', '16:9', '4:3', '1:1', '4:5', '9:16'];
 export const F_CODE = ['focus', 'scroll', 'follow'];
@@ -94,7 +98,7 @@ const SOUL = 1200 / 760;
 const fit = (x, y, w, h, r) => { const bw = Math.min(w, h * r), bh = bw / r; return { x: Math.round(x + (w - bw) / 2), y: Math.round(y + (h - bh) / 2), w: Math.round(bw), h: Math.round(bh) }; };
 // the areas of a w×h picture: stage, soul (with head 0), code, and bands top and bottom (portrait) or a strip (landscape)
 export function fragmentAreas(o, w, h) {
-  const show = o.show || 'visual', main = show === 'soul' ? 'soul' : show === 'code' ? 'code' : 'stage';
+  const show = (o.show || 'visual').replace(/-widgets$/, ''), main = show === 'soul' ? 'soul' : show === 'code' ? 'code' : 'stage';
   const second = show === 'visual-code' ? 'code' : show === 'visual-soul' ? 'soul' : null;
   // the soul as the main picture is cut to cover its box (centred on its view's focus); 'whole' keeps all of it.
   // bleed: the free space round a box with its own proportions is filled with a blurred copy of the picture
