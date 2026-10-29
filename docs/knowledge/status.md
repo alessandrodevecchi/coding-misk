@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 88. With open tasks: 26. All tasks ticked, waiting to be archived: 62.
+OpenSpec changes not archived: 89. With open tasks: 27. All tasks ticked, waiting to be archived: 62.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -41,9 +41,10 @@ OpenSpec changes not archived: 88. With open tasks: 26. All tasks ticked, waitin
 | [radio-profiles](../../openspec/changes/radio-profiles/tasks.md) | 1 | 36 |
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
+| [spoken-text-on-stage](../../openspec/changes/spoken-text-on-stage/tasks.md) | 18 | 18 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
-| [widget-render-styles](../../openspec/changes/widget-render-styles/tasks.md) | 3 | 21 |
+| [widget-render-styles](../../openspec/changes/widget-render-styles/tasks.md) | 2 | 21 |
 
 Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-themes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fm-like-effects`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `narrator-ghost-row`, `pattern-followups`, `playlists`, `poetic-steps`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `saved-patterns-list`, `session-choice-prepared`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `test-fixes`, `timeline-growth`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `widgets-on-stage`, `written-like-coder`.
 <!-- /generated -->
