@@ -5,7 +5,7 @@
 // shown in the editor always agree. Tracks named by an "add" step are silent before it; the others play from the start.
 import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
-import { spokenBars, narratorStyle, poeticLine, enteringTrack, placeSpoken, lineTexts, lineSounds, withNarratorStyle } from './spoken.js';
+import { spokenBars, narratorStyle, poeticLine, movementLine, enteringTrack, placeSpoken, lineTexts, lineSounds, withNarratorStyle } from './spoken.js';
 
 // hide and reveal (natural-growth): functions of a track left out of its code until a step brings them in
 // clone, comment, notes (live-coder-growth): a track comes in as a copy of another one; functions commented out in the
@@ -160,9 +160,10 @@ const sampleIndex = (list, text) => list.findIndex(f => decodeURI(f).endsWith(`/
 export function voiceSamples(song, lang, files) {
   const out = new Map();
   const poetic = narratorStyle(song) === 'poetic';
-  buildSteps(song).forEach((st, i) => {
-    // (a poetic narrator says images, and with Narrated growth the step lines too)
-    const texts = poetic ? [enteringTrack(song, st) ? sayText(poeticLine(song, st, i), lang) : '', narratedGrowth(song) && st.say ? sayText(st.say, lang) : ''] : [st.say ? sayText(st.say, lang) : ''];
+  const steps = buildSteps(song);
+  steps.forEach((st, i) => {
+    // (a poetic narrator says images, and with Narrated growth the step lines or their movement images too)
+    const texts = poetic ? [enteringTrack(song, st) ? sayText(poeticLine(song, st, i), lang) : '', narratedGrowth(song) && st.say ? stepSaid(song, steps, st, lang) : ''] : [st.say ? sayText(st.say, lang) : ''];
     for (const text of texts.filter(Boolean)) {
       const { bank, list } = bankFor(voiceOf(song, st), lang, files), n = sampleIndex(list, text);
       if (n >= 0) out.set(`${bank}:${n}`, { s: bank, n });
@@ -194,6 +195,13 @@ const entering = (song, step) => { const t = step && enteringTrack(song, step); 
 const bringsSpoken = (song, step) => { const t = step && enteringTrack(song, step); return !!t && t.type === 'spoken'; };
 // a growth that narrates its steps (Narrated growth, Crescendo and Live coder)
 const narratedGrowth = song => !!(song && song.crescendo && song.crescendo.narrated);
+// the words of a step with "say": its step line; with the poetic style and Narrated growth, a short image of movement
+// when no step on its bar brings a track in (poetic-steps D1; an entry's bar keeps the step line, its image is said the
+// bar before)
+function stepSaid(song, steps, step, lang) {
+  if (narratorStyle(song) === 'poetic' && narratedGrowth(song) && !steps.some(x => x.at === step.at && entering(song, x))) return sayText(movementLine(song, steps.indexOf(step)), lang);
+  return sayText(step.say, lang);
+}
 function narration(song, upTo, lang) {
   const steps = buildSteps(song), step = steps[upTo - 1];
   if (narratorStyle(song) !== 'poetic') { const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && sayText(said.say, lang); return text ? [{ step: said, text, at: said.at }] : []; }
@@ -214,9 +222,10 @@ function narration(song, upTo, lang) {
     out.push({ step: x, text: sayText(poeticLine(song, x, i), lang), at });
   });
   // Narrated growth with the poetic style (voice-full-controls D11): the step lines stay, the images come in addition;
-  // on a shared bar the image is said and the step keeps its line on stage
+  // on a shared bar the image is said and the step keeps its line on stage. A step whose bar has no entry says an image
+  // of movement instead of its step line (poetic-steps)
   if (narratedGrowth(song)) {
-    const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && sayText(said.say, lang);
+    const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && stepSaid(song, steps, said, lang);
     if (text && !out.some(x => x.at === said.at && x.text)) out.push({ step: said, text, at: said.at });
   }
   return out.filter(x => x.text);

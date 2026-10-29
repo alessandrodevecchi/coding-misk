@@ -44,6 +44,16 @@ export const POETIC = {
   code: [{ en: 'a strange machine', it: 'una macchina strana' }],
   spoken: [{ en: 'someone is talking', it: 'qualcuno sta parlando' }],
   any: [{ en: 'something new is here', it: "c'è qualcosa di nuovo" }, { en: 'another light', it: "un'altra luce" }],
+  // poetic-steps: a short image of movement for a step that brings no track in (poetic style with Narrated growth),
+  // neither rising nor falling, since a step may open a filter or take something away
+  move: [
+    { en: 'the light shifts', it: 'la luce si sposta' }, { en: 'the river bends', it: 'il fiume fa una curva' },
+    { en: 'shadows change places', it: 'le ombre cambiano posto' }, { en: 'the wind turns', it: 'il vento gira' },
+    { en: 'the city breathes', it: 'la città respira' }, { en: 'the colours change', it: 'cambiano i colori' },
+    { en: 'a door half open', it: 'una porta socchiusa' }, { en: 'the road turns a corner', it: "la strada gira l'angolo" },
+    { en: 'something moves inside', it: 'qualcosa si muove dentro' }, { en: 'the night turns over', it: 'la notte si gira' },
+    { en: 'ripples on the glass', it: 'cerchi sul vetro' }, { en: 'the room tilts', it: 'la stanza si inclina' },
+  ],
 };
 
 // every text of the vocabulary and of the poetic group, for tools/voice.mjs
