@@ -4,13 +4,16 @@
 // seed and the segment index, so the same seed and setup give the same compilation. Pure: checked in Node.
 import { stream } from './random.js';
 import { makeArtist, randomStyles, SENSIBLE, KNOBS } from './artist-maker.js';
+import { inventStyle } from './style-maker.js';
 
 export const EVERY = ['song', 'some'];
 // neighbouring genres for the journey (a ring: the last is next to the first)
 export const GENRE_RING = ['ambient', 'jazz', 'hip-hop', 'pop', 'house', 'trance', 'techno', 'drum-and-bass', 'industrial', 'metal', 'rock', 'country', 'synthwave', 'experimental'];
 const ranges = () => Object.fromEntries(KNOBS.map(k => [k, SENSIBLE[k].slice()]));
 // a setup: movement, genres / styles / artists allowed (null = all), random artists, a range per knob; profiles
-// (radio-profiles D4): null (as the artists and styles say) or weights over the profiles of generated songs
+// (radio-profiles D4): null (as the artists and styles say) or weights over the profiles of generated songs;
+// invented (invented-styles D11, phase 2): true lets a segment play a style invented for it (missing: off, so the
+// setups saved before draw the same segments)
 export const SETUP_DEFAULT = { movement: 'journey', genres: null, styles: null, artists: null, randomArtists: true, ranges: ranges(), profiles: null };
 const full = () => Object.fromEntries(KNOBS.map(k => [k, [0, 1]]));
 // everything: any genre, jumps, the knobs over their whole scale; journey: neighbouring genres, sensible knobs;
@@ -39,7 +42,23 @@ function neighbours(g, allowed) {
   return allowed;
 }
 
-// one segment: its genre and what plays (an artist object, or styles and knobs)
+// an invented style of a segment (D11): from the session seed and the segment index, in the segment's genre, over the
+// styles the compilation draws from (invented ones left out, so inventions never breed); kept in a small cache, since
+// the segments are drawn again for every song
+const inventCache = new Map();
+export function segmentStyle(seed, index, genre, recipes) {
+  const pool = recipes.filter(x => !x.invented), key = `${seed}|${index}|${genre}|${pool.map(x => x.id).join(',')}`;
+  if (!inventCache.has(key)) {
+    if (inventCache.size > 200) inventCache.clear();
+    let r = null;
+    try { r = inventStyle(`${seed}/compilation/${index}`, pool, { genre, avoid: recipes.flatMap(x => (x.name ? [x.name.en, x.name.it] : [])), kept: recipes.filter(x => x.invented) }).recipe; } catch (e) { r = null; }
+    inventCache.set(key, r);
+  }
+  const r = inventCache.get(key);
+  return r ? JSON.parse(JSON.stringify(r)) : null;
+}
+
+// one segment: its genre and what plays (an artist object, a style invented for it, or styles and knobs)
 function drawSegment(seed, index, setup, recipes, pool, prevGenre) {
   const r = stream(seed, `compilation/${index}`), S = { ...SETUP_DEFAULT, ...setup }, rg = { ...ranges(), ...(S.ranges || {}) };
   const styleOk = id => !S.styles || S.styles.includes(id);
@@ -51,13 +70,15 @@ function drawSegment(seed, index, setup, recipes, pool, prevGenre) {
   if (S.movement === 'journey' && prevGenre && !r.chance(0.1 + 0.3 * chaos)) genre = r.pick(neighbours(prevGenre, genres));
   else { const other = genres.filter(g => g !== prevGenre); genre = r.pick(other.length ? other : genres); }
   const artists = pool.filter(a => (!S.artists || S.artists.includes(a.id)) && artistGenre(a, recipes) === genre);
-  const kinds = ['styles', ...(artists.length ? ['artist'] : []), ...(S.randomArtists ? ['random'] : [])];
+  const kinds = ['styles', ...(artists.length ? ['artist'] : []), ...(S.randomArtists ? ['random'] : []), ...(S.invented === true ? ['invented'] : [])];
   const kind = r.pick(kinds);
   if (kind === 'artist') return { genre, kind, artist: r.pick(artists) };
   if (kind === 'random') return { genre, kind, artist: makeArtist(`${seed}/compilation/${index}`, usable, { allowedGenres: [genre] }) };
+  const knobsOf = () => Object.fromEntries(KNOBS.map(k => [k, round5(r.range(rg[k][0], rg[k][1]))]));
+  if (kind === 'invented') { const style = segmentStyle(seed, index, genre, usable); if (style) return { genre, kind, style, styles: [style.id], knobs: knobsOf() }; }
   const styles = randomStyles(`${seed}/compilation/${index}`, usable, { genre });
-  const knobs = Object.fromEntries(KNOBS.map(k => [k, round5(r.range(rg[k][0], rg[k][1]))]));
-  return { genre, kind, styles, knobs };
+  const knobs = knobsOf();
+  return { genre, kind: kind === 'invented' ? 'styles' : kind, styles, knobs };
 }
 
 // the segments of a session up to song n (n included): [{ start, length, genre, kind, artist | styles+knobs }]
@@ -98,5 +119,6 @@ export function compilationOptions(seed, n, comp, recipes, how = {}) {
   const held = Object.fromEntries(KNOBS.filter(k => typeof locks[k] === 'number').map(k => [k, locks[k]]));
   if (!seg || seg.kind === 'none') return { styles: [recipes[0].id], ...held, ...how };
   if (seg.artist) return { artist: boundArtist(seg.artist, { ...ranges(), ...((comp.setup || {}).ranges || {}) }, locks), ...how };
-  return { styles: seg.styles, ...seg.knobs, ...held, ...how };
+  // (a style invented for the segment travels with the options: the director adds it as an extra style)
+  return { styles: seg.styles, ...seg.knobs, ...held, ...how, ...(seg.style ? { inventedStyle: seg.style } : {}) };
 }

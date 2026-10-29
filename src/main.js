@@ -31,6 +31,7 @@ import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, VOICE_STYLES, styleOf, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice, choiceLabel } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
+import { inventStyle } from './endless/style-maker.js';
 import { createSongOptions, RADIO_KEY, NEW_SONG_KEY } from './endless/song-options.js';
 import { createNewSongPanel } from './live/new-song-panel.js';
 import { generateSong, surpriseValues } from './endless/new-song.js';
@@ -4493,7 +4494,20 @@ $('#pb-repeat').addEventListener('click', () => {
 const BUILTIN_STYLES = usableRecipes(Object.values(import.meta.glob('../styles/*.json', { eager: true, import: 'default' })));
 // the styles the radio uses: built-ins plus the user's valid styles (Styles tab), kept in this one array
 const RECIPES = BUILTIN_STYLES.slice();
-stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins: BUILTIN_STYLES, toast,
+// invented styles (invented-styles, #51): made from the built-in styles only, so a seed gives the same style in every
+// browser; never named like a style, an artist or a genre; never a copy of a style the user kept
+const inventFor = (seed, { genre = null, base = null } = {}) => {
+  try {
+    const avoid = [...BUILTIN_ARTISTS, ...(artistsTab ? artistsTab.usable() : [])].map(a => a.name);
+    const nameOf = id => { const r = BUILTIN_STYLES.find(x => x.id === id); return r ? tx(r.name) : id; };
+    return inventStyle(seed, BUILTIN_STYLES, { genre, base, avoid, kept: stylesTab ? stylesTab.mine : [], lang: getLang() === 'it' ? 'it' : 'en', nameOf }).recipe;
+  } catch (e) { console.warn('[invent]', e); return null; }
+};
+const keepStyle = r => (stylesTab ? stylesTab.keepInvented(r) : null);
+stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins: BUILTIN_STYLES, toast, getLang,
+  invent: seed => inventFor(seed),
+  // the trial card's Ascolta in radio: the style goes on trial in the radio
+  onTrial: r => { showTab('radio'); if (radio) radio.tryStyle(r); },
   onChange: () => { RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable())); if (radio) radio.render(); },
   // the user's songs tagged with a renamed style keep the link (#34)
   onRadio: ids => { showTab('radio'); if (radio && !radio.playStyles(ids)) toast(t('genreNoStyle')); },
@@ -4530,7 +4544,9 @@ genresTab = createGenresTab({ root: $('#tab-generi'), t, tx, esc, face: a => art
   songs: () => { const by = Object.fromEntries(allStyles().map(r => [r.id, r])); return libraryCards().map(c => ({ genres: genresOf(c.tr.tags, id => by[id] && (by[id].genre || 'experimental')) })); },
   onStyle: id => { showTab('stili'); stylesTab.openStyle(id); },
   onSongs: g => { songsView.onlyGenre(g); showTab('brani'); },
-  onRadio: ids => { showTab('radio'); if (radio && !radio.playStyles(ids)) toast(t('genreNoStyle')); } });
+  onRadio: ids => { showTab('radio'); if (radio && !radio.playStyles(ids)) toast(t('genreNoStyle')); },
+  // invent a style of this genre and try it in the radio (invented-styles D8)
+  onInvent: g => { showTab('radio'); if (radio && !radio.inventIn(g)) toast(t('inventFailed')); } });
 // preloads the spoken comments of a song, silently, as playSong does
 // the radio's next song (#54): every zone of its soundfonts loads, without sound, while the song on air plays, so a broken
 // zone is in the register before its first note
@@ -4564,10 +4580,10 @@ globalThis.codingMiskRadioPreview = radioPreview;
 // the options of how a song is made (new-song-panel D1): the radio's values and the New song panel's, apart
 radioOptions = createSongOptions({ store, key: RADIO_KEY, recipes: RECIPES, artists: () => artistsTab.usable(), userPatterns: () => forRadio(patternsStore.list()) });
 newSongOptions = createSongOptions({ store, key: NEW_SONG_KEY, recipes: RECIPES, artists: () => artistsTab.usable(), userPatterns: () => forRadio(patternsStore.list()), from: radioOptions });
-newSong = createNewSongPanel({ root: $('#new-song'), button: $('#tr-new'), t, tx, esc, store, options: newSongOptions, radioOptions, recipes: RECIPES, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a), toast, getLang, userPatterns: () => patternsStore.list(),
+newSong = createNewSongPanel({ root: $('#new-song'), button: $('#tr-new'), t, tx, esc, store, options: newSongOptions, radioOptions, recipes: RECIPES, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a), invent: inventFor, keepStyle, toast, getLang, userPatterns: () => patternsStore.list(),
   onScratch: () => newEmptySong(), onGenerate: seed => generateNew(seed), onSurprise: () => surpriseNew() });
 radio = createRadio({
-  root: $('#tab-radio'), t, tx, esc, store, options: radioOptions, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a),
+  root: $('#tab-radio'), t, tx, esc, store, options: radioOptions, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a), invent: inventFor, keepStyle,
   // the user's saved patterns join the songs where they fit (pattern-library; material-generator D10)
   userPatterns: () => forRadio(patternsStore.list()),
   // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them

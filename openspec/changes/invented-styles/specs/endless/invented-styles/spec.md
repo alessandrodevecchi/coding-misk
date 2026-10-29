@@ -72,11 +72,15 @@ The same seed SHALL give the same invented style in every browser, from the buil
 - **THEN** both recipes are identical
 
 ### Requirement: Invent buttons
-The radio SHALL offer an invent die in its Styles row, next to the dice of the random tools (#50). The Styles tab SHALL offer "Inventa uno stile" with a trial card, and each Genres card with styles SHALL offer "Inventa uno stile di questo genere".
+The radio SHALL offer an invent die in its Styles row, next to the dice of the random tools (#50). The New song panel of Compose SHALL offer the same die in its Styles row, with the same trial chip, kept in the panel's own options. The Styles tab SHALL offer "Inventa uno stile" with a trial card, and each Genres card with styles SHALL offer "Inventa uno stile di questo genere".
 
 #### Scenario: Invent die
 - **WHEN** the listener presses the invent die in the radio Styles row
 - **THEN** a trial style chip appears with its seed in the tooltip
+
+#### Scenario: Invent in the New song panel
+- **WHEN** the listener presses the invent die in the New song panel and then Genera
+- **THEN** the new song is made from the trial style, and the radio's styles do not change
 
 ### Requirement: Invented styles in compilations (phase 2)
 A compilation setup SHALL offer a switch "Stili inventati", off by default. When on, a segment MAY play a style invented from the session seed in the segment's genre, with keep on the now playing tag; the same session seed SHALL give the same segments.

@@ -1,0 +1,575 @@
+{
+ "maker": 1,
+ "styles": [
+  {
+   "seed": "fixture-0",
+   "id": "chalk-mirage-ure0",
+   "name": {
+    "en": "Chalk Mirage",
+    "it": "Miraggio di gesso"
+   },
+   "genre": "trance",
+   "from": {
+    "tempo": "synthwave",
+    "drums": "house",
+    "bass": "synthwave",
+    "harmony": "house",
+    "lead": "synthwave",
+    "pads": "synthwave",
+    "voice": "darksynth"
+   },
+   "hash": "7cd09e06"
+  },
+  {
+   "seed": "fixture-1",
+   "id": "sandwave-ure1",
+   "name": {
+    "en": "Sandwave",
+    "it": "Sandwave"
+   },
+   "genre": "trance",
+   "from": {
+    "tempo": "gated-trance",
+    "drums": "gated-trance",
+    "bass": "gated-trance",
+    "harmony": "progressive-house",
+    "lead": "progressive-house",
+    "pads": "progressive-house",
+    "voice": "gated-trance"
+   },
+   "hash": "8b1641"
+  },
+  {
+   "seed": "fixture-2",
+   "id": "smoke-loom-ure2",
+   "name": {
+    "en": "Smoke Loom",
+    "it": "Telaio di fumo"
+   },
+   "genre": "country",
+   "from": {
+    "tempo": "country",
+    "drums": "house",
+    "bass": "house",
+    "harmony": "house",
+    "lead": "house",
+    "pads": "country",
+    "voice": "country"
+   },
+   "hash": "9a09e11f"
+  },
+  {
+   "seed": "fixture-3",
+   "id": "flint-current-ure3",
+   "name": {
+    "en": "Flint Current",
+    "it": "Corrente di selce"
+   },
+   "genre": "metal",
+   "from": {
+    "tempo": "melodic-metal",
+    "drums": "melodic-metal",
+    "bass": "classic-rock",
+    "harmony": "classic-rock",
+    "lead": "melodic-metal",
+    "pads": "melodic-metal",
+    "voice": "melodic-metal"
+   },
+   "hash": "8c2c0390"
+  },
+  {
+   "seed": "fixture-4",
+   "id": "moss-engine-ure4",
+   "name": {
+    "en": "Moss Engine",
+    "it": "Motore di muschio"
+   },
+   "genre": "country",
+   "from": {
+    "tempo": "country",
+    "drums": "country",
+    "bass": "acid",
+    "harmony": "country",
+    "lead": "acid",
+    "pads": "acid",
+    "voice": "acid"
+   },
+   "hash": "9bd9d56d"
+  },
+  {
+   "seed": "fixture-5",
+   "id": "coral-engine-ure5",
+   "name": {
+    "en": "Coral Engine",
+    "it": "Motore di corallo"
+   },
+   "genre": "rock",
+   "from": {
+    "tempo": "classic-rock",
+    "drums": "classic-rock",
+    "bass": "synthwave",
+    "harmony": "synthwave",
+    "lead": "classic-rock",
+    "pads": "synthwave",
+    "voice": "classic-rock"
+   },
+   "hash": "fd88bdd"
+  },
+  {
+   "seed": "fixture-6",
+   "id": "saltwave-ure6",
+   "name": {
+    "en": "Saltwave",
+    "it": "Saltwave"
+   },
+   "genre": "rock",
+   "from": {
+    "tempo": "dark-cyberpunk",
+    "drums": "dark-cyberpunk",
+    "bass": "dark-cyberpunk",
+    "harmony": "classic-rock",
+    "lead": "classic-rock",
+    "pads": "classic-rock",
+    "voice": "classic-rock"
+   },
+   "hash": "ffa39b2e"
+  },
+  {
+   "seed": "fixture-7",
+   "id": "velvet-ladder-ure7",
+   "name": {
+    "en": "Velvet Ladder",
+    "it": "Scala di velluto"
+   },
+   "genre": "techno",
+   "from": {
+    "tempo": "acid",
+    "drums": "acid",
+    "bass": "pure-trance",
+    "harmony": "pure-trance",
+    "lead": "acid",
+    "pads": "drum-and-bass",
+    "voice": "acid"
+   },
+   "hash": "7a82e510"
+  },
+  {
+   "seed": "fixture-8",
+   "id": "glasspulse-ure8",
+   "name": {
+    "en": "Glasspulse",
+    "it": "Glasspulse"
+   },
+   "genre": "trance",
+   "from": {
+    "tempo": "pure-trance",
+    "drums": "pure-trance",
+    "bass": "pure-trance",
+    "harmony": "pure-trance",
+    "lead": "phonk",
+    "pads": "phonk",
+    "voice": "pure-trance"
+   },
+   "hash": "f1e42995"
+  },
+  {
+   "seed": "fixture-9",
+   "id": "tar-current-ure9",
+   "name": {
+    "en": "Tar Current",
+    "it": "Corrente di catrame"
+   },
+   "genre": "techno",
+   "from": {
+    "tempo": "berlin-techno",
+    "drums": "progressive-house",
+    "bass": "progressive-house",
+    "harmony": "berlin-techno",
+    "lead": "acid",
+    "pads": "acid",
+    "voice": "berlin-techno"
+   },
+   "hash": "d576f722"
+  },
+  {
+   "seed": "fixture-10",
+   "id": "copper-ripple-re10",
+   "name": {
+    "en": "Copper Ripple",
+    "it": "Increspatura di rame"
+   },
+   "genre": "country",
+   "from": {
+    "tempo": "country",
+    "drums": "country",
+    "bass": "jazz",
+    "harmony": "classic-rock",
+    "lead": "country",
+    "pads": "country",
+    "voice": "country"
+   },
+   "hash": "6a69141"
+  },
+  {
+   "seed": "fixture-11",
+   "id": "brass-swarm-re11",
+   "name": {
+    "en": "Brass Swarm",
+    "it": "Sciame di ottone"
+   },
+   "genre": "country",
+   "from": {
+    "tempo": "progressive-house",
+    "drums": "country",
+    "bass": "country",
+    "harmony": "country",
+    "lead": "phonk",
+    "pads": "progressive-house",
+    "voice": "progressive-house"
+   },
+   "hash": "a09ab7f5"
+  },
+  {
+   "seed": "fixture-12",
+   "id": "pollen-lantern-re12",
+   "name": {
+    "en": "Pollen Lantern",
+    "it": "Lanterna di polline"
+   },
+   "genre": "techno",
+   "from": {
+    "tempo": "berlin-techno",
+    "drums": "berlin-techno",
+    "bass": "berlin-techno",
+    "harmony": "gated-trance",
+    "lead": "gated-trance",
+    "pads": "berlin-techno",
+    "voice": "berlin-techno"
+   },
+   "hash": "7375b2c1"
+  },
+  {
+   "seed": "fixture-13",
+   "id": "paper-haze-re13",
+   "name": {
+    "en": "Paper Haze",
+    "it": "Foschia di carta"
+   },
+   "genre": "jazz",
+   "from": {
+    "tempo": "industrial",
+    "drums": "jazz",
+    "bass": "industrial",
+    "harmony": "jazz",
+    "lead": "jazz",
+    "pads": "jazz",
+    "voice": "industrial"
+   },
+   "hash": "bf474952"
+  },
+  {
+   "seed": "fixture-14",
+   "id": "velvetstep-re14",
+   "name": {
+    "en": "Velvetstep",
+    "it": "Velvetstep"
+   },
+   "genre": "industrial",
+   "from": {
+    "tempo": "melodic-metal",
+    "drums": "industrial",
+    "bass": "melodic-metal",
+    "harmony": "industrial",
+    "lead": "industrial",
+    "pads": "melodic-metal",
+    "voice": "industrial"
+   },
+   "hash": "8cf11629"
+  },
+  {
+   "seed": "fixture-15",
+   "id": "ivory-ladder-re15",
+   "name": {
+    "en": "Ivory Ladder",
+    "it": "Scala di avorio"
+   },
+   "genre": "industrial",
+   "from": {
+    "tempo": "industrial",
+    "drums": "industrial",
+    "bass": "industrial",
+    "harmony": "industrial",
+    "lead": "melodic-metal",
+    "pads": "melodic-metal",
+    "voice": "melodic-metal"
+   },
+   "hash": "fbb2043"
+  },
+  {
+   "seed": "fixture-16",
+   "id": "iron-garden-re16",
+   "name": {
+    "en": "Iron Garden",
+    "it": "Giardino di ferro"
+   },
+   "genre": "rock",
+   "from": {
+    "tempo": "classic-rock",
+    "drums": "dark-cyberpunk",
+    "bass": "dark-cyberpunk",
+    "harmony": "classic-rock",
+    "lead": "classic-rock",
+    "pads": "classic-rock",
+    "voice": "classic-rock"
+   },
+   "hash": "5ac3a86e"
+  },
+  {
+   "seed": "fixture-17",
+   "id": "flintwave-re17",
+   "name": {
+    "en": "Flintwave",
+    "it": "Flintwave"
+   },
+   "genre": "house",
+   "from": {
+    "tempo": "house",
+    "drums": "dark-cyberpunk",
+    "bass": "house",
+    "harmony": "house",
+    "lead": "dark-cyberpunk",
+    "pads": "house",
+    "voice": "house"
+   },
+   "hash": "cc3fc678"
+  },
+  {
+   "seed": "fixture-18",
+   "id": "ember-drift-re18",
+   "name": {
+    "en": "Ember Drift",
+    "it": "Deriva di brace"
+   },
+   "genre": "rock",
+   "from": {
+    "tempo": "classic-rock",
+    "drums": "melodic-metal",
+    "bass": "jazz",
+    "harmony": "classic-rock",
+    "lead": "jazz",
+    "pads": "classic-rock",
+    "voice": "classic-rock"
+   },
+   "hash": "cf9eeae5"
+  },
+  {
+   "seed": "fixture-19",
+   "id": "smokepulse-re19",
+   "name": {
+    "en": "Smokepulse",
+    "it": "Smokepulse"
+   },
+   "genre": "drum-and-bass",
+   "from": {
+    "tempo": "melodic-metal",
+    "drums": "drum-and-bass",
+    "bass": "melodic-metal",
+    "harmony": "melodic-metal",
+    "lead": "drum-and-bass",
+    "pads": "melodic-metal",
+    "voice": "melodic-metal"
+   },
+   "hash": "249e8fbf"
+  },
+  {
+   "seed": "fixture-20",
+   "id": "glassstep-re20",
+   "name": {
+    "en": "Glassstep",
+    "it": "Glassstep"
+   },
+   "genre": "ambient",
+   "from": {
+    "tempo": "ambient",
+    "drums": "lo-fi",
+    "bass": "dreamy-cyberpunk",
+    "harmony": "ambient",
+    "lead": "lo-fi",
+    "pads": "ambient",
+    "voice": "ambient"
+   },
+   "hash": "66b547b5"
+  },
+  {
+   "seed": "fixture-21",
+   "id": "tar-ritual-re21",
+   "name": {
+    "en": "Tar Ritual",
+    "it": "Rito di catrame"
+   },
+   "genre": "ambient",
+   "from": {
+    "tempo": "ambient",
+    "drums": "lo-fi",
+    "bass": "ambient",
+    "harmony": "ambient",
+    "lead": "lo-fi",
+    "pads": "ambient",
+    "voice": "ambient"
+   },
+   "hash": "c5fc9125"
+  },
+  {
+   "seed": "fixture-22",
+   "id": "coralcore-re22",
+   "name": {
+    "en": "Coralcore",
+    "it": "Coralcore"
+   },
+   "genre": "house",
+   "from": {
+    "tempo": "progressive-house",
+    "drums": "progressive-house",
+    "bass": "progressive-house",
+    "harmony": "pure-trance",
+    "lead": "dreamy-cyberpunk",
+    "pads": "progressive-house",
+    "voice": "progressive-house"
+   },
+   "hash": "855efbcf"
+  },
+  {
+   "seed": "fixture-23",
+   "id": "fog-mirage-re23",
+   "name": {
+    "en": "Fog Mirage",
+    "it": "Miraggio di nebbia"
+   },
+   "genre": "jazz",
+   "from": {
+    "tempo": "jazz",
+    "drums": "country",
+    "bass": "jazz",
+    "harmony": "jazz",
+    "lead": "jazz",
+    "pads": "country",
+    "voice": "jazz"
+   },
+   "hash": "63084721"
+  },
+  {
+   "seed": "fixture-24",
+   "id": "pollen-orbit-re24",
+   "name": {
+    "en": "Pollen Orbit",
+    "it": "Orbita di polline"
+   },
+   "genre": "synthwave",
+   "from": {
+    "tempo": "dreamy-cyberpunk",
+    "drums": "lo-fi",
+    "bass": "dreamy-cyberpunk",
+    "harmony": "industrial",
+    "lead": "lo-fi",
+    "pads": "lo-fi",
+    "voice": "dreamy-cyberpunk"
+   },
+   "hash": "c4239ec6"
+  },
+  {
+   "seed": "fixture-25",
+   "id": "chalkstep-re25",
+   "name": {
+    "en": "Chalkstep",
+    "it": "Chalkstep"
+   },
+   "genre": "industrial",
+   "from": {
+    "tempo": "industrial",
+    "drums": "industrial",
+    "bass": "industrial",
+    "harmony": "acid",
+    "lead": "trance",
+    "pads": "industrial",
+    "voice": "trance"
+   },
+   "hash": "c7e8f9a7"
+  },
+  {
+   "seed": "fixture-26",
+   "id": "chalk-ladder-re26",
+   "name": {
+    "en": "Chalk Ladder",
+    "it": "Scala di gesso"
+   },
+   "genre": "synthwave",
+   "from": {
+    "tempo": "darksynth",
+    "drums": "darksynth",
+    "bass": "industrial",
+    "harmony": "darksynth",
+    "lead": "darksynth",
+    "pads": "darksynth",
+    "voice": "phonk"
+   },
+   "hash": "a2c48afc"
+  },
+  {
+   "seed": "fixture-27",
+   "id": "copper-ripple-re27",
+   "name": {
+    "en": "Copper Ripple",
+    "it": "Increspatura di rame"
+   },
+   "genre": "jazz",
+   "from": {
+    "tempo": "jazz",
+    "drums": "ambient",
+    "bass": "jazz",
+    "harmony": "jazz",
+    "lead": "jazz",
+    "pads": "jazz",
+    "voice": "ambient"
+   },
+   "hash": "dbafe204"
+  },
+  {
+   "seed": "fixture-28",
+   "id": "frost-lantern-re28",
+   "name": {
+    "en": "Frost Lantern",
+    "it": "Lanterna di brina"
+   },
+   "genre": "country",
+   "from": {
+    "tempo": "dark-cyberpunk",
+    "drums": "country",
+    "bass": "dark-cyberpunk",
+    "harmony": "dark-cyberpunk",
+    "lead": "dark-cyberpunk",
+    "pads": "dark-cyberpunk",
+    "voice": "country"
+   },
+   "hash": "a24dd59b"
+  },
+  {
+   "seed": "fixture-29",
+   "id": "fog-garden-re29",
+   "name": {
+    "en": "Fog Garden",
+    "it": "Giardino di nebbia"
+   },
+   "genre": "techno",
+   "from": {
+    "tempo": "berlin-techno",
+    "drums": "berlin-techno",
+    "bass": "dark-cyberpunk",
+    "harmony": "dark-cyberpunk",
+    "lead": "berlin-techno",
+    "pads": "dark-cyberpunk",
+    "voice": "dark-cyberpunk"
+   },
+   "hash": "ca48d1ae"
+  }
+ ]
+}

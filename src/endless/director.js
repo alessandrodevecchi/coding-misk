@@ -776,19 +776,28 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
 // sequence of options always give the same songs. Without a seed, a new one is drawn and kept in .seed.
 // lead (#29): an entry the session starts after (leadEntry, a song from Compose): the first song is planned
 // after it (harmony, transition), the generated songs keep the same indexes and random streams.
-export function createSession(recipes, seed, { lead = null } = {}) {
+// extra (invented-styles D9): styles a song may use (a trial style, the styles a saved session embeds) that the artist
+// exploration never draws from, so every other draw stays as without them; addStyle(recipe) adds one to a session on air
+export function createSession(recipes, seed, { lead = null, extra = [] } = {}) {
   if (seed === undefined || seed === null || seed === '') seed = freshSeed();
   const byId = Object.fromEntries(recipes.map(r => [r.id, withDefaults(r)]));
+  const known = Object.keys(byId);
+  const addStyle = r => { if (r && r.id && !known.includes(r.id)) byId[r.id] = withDefaults(r); };
+  for (const r of extra || []) addStyle(r);
   const rng = makeRng(seed), entries = [];
   return {
     seed: String(seed),
     entries,
     lead,
+    addStyle,
     get count() { return entries.length; },
     next(options) {
+      // a style invented for a compilation segment (invented-styles D11) comes with the options
+      if (options && options.inventedStyle) addStyle(options.inventedStyle);
       // with an artist, this song's styles and values come from the artist's taste
-      const drawn = options && options.artist ? artistSongOptions(options.artist, Object.keys(byId), rng.artist) : null;
-      const opts = { ...OPTION_DEFAULTS, ...options, ...(drawn || {}), seed };
+      const drawn = options && options.artist ? artistSongOptions(options.artist, known, rng.artist) : null;
+      const { inventedStyle: _inv, ...given } = options || {};
+      const opts = { ...OPTION_DEFAULTS, ...given, ...(drawn || {}), seed };
       // renamed styles (clear-names): saved sessions and settings may hold old ids
       if (opts.styles) opts.styles = opts.styles.map(styleId);
       const unknown = (opts.styles || []).filter(id => !byId[id]);

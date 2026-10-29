@@ -9,7 +9,8 @@ import { MACHINES } from '../sounds/machines.js';
 import { SPEAKERS } from '../song/build.js';
 import { GENRES } from '../song/format.js';
 import { downloadJson, pickJsonFiles, userStore, freeId, errorsByPath } from './library.js';
-import { DICE } from '../icons.js';
+import { DICE, INVENT } from '../icons.js';
+import { inventedDescription } from '../endless/style-maker.js';
 import { kindOfPreset } from './patterns.js';
 import { randomStyles } from '../endless/artist-maker.js';
 import { freshSeed } from '../endless/random.js';
@@ -25,9 +26,12 @@ const INSTR = Object.keys(INSTRUMENTS);
 // onRename(oldId, newId): a user style got a new id (song tags follow it, #34)
 // onRadio(styleIds): play styles in the radio (#50: a random one)
 // onPattern(kind, id): a preset named in a sheet opens in the Patterns tab (pattern-library)
-export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onChange, onRename = () => {}, onRadio = () => {}, onPattern = null }) {
+// invent(seed): a new invented style (invented-styles D8); onTrial(recipe): try it in the radio
+export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onChange, onRename = () => {}, onRadio = () => {}, onPattern = null, invent = null, onTrial = () => {}, getLang = () => 'en' }) {
   const mine = userStore(store, 'coding-misk-styles');
   let open = null, editing = null, jsonView = false;
+  // the trial card (invented-styles D8): the style just invented here, not kept yet
+  let trial = null;
   const builtinIds = () => builtins.map(r => r.id);
   const all = () => [...builtins.map(r => ({ r, own: false })), ...mine.all.map(r => ({ r, own: true }))];
   const check = r => validateRecipe(r);
@@ -40,6 +44,34 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
   // the presets of an instrument link to the Patterns tab
   const PATTERN_LISTS = { drums: 'grooves', bass: 'presets', arp: 'presets', hook: 'presets', pad: 'presets', guitar: 'patterns' };
   const presetList = (type, list) => (list && list.length ? list.map(x => { const kind = kindOfPreset(type, x); return kind ? `<button class="tag-chip pat-link" data-pattern-link="${esc(kind)}|${esc(x)}" title="${esc(t('plOpen'))}">${esc(x)}</button>` : `<span class="tag-chip">${esc(x)}</span>`; }).join(' ') : `<span class="muted">${esc(t('libNone'))}</span>`);
+
+  // ---------- invented styles (invented-styles D7, D8) ----------
+  const nameOf = id => { const r = all().map(x => x.r).find(x => x.id === id); return r ? tx(r.name) : id; };
+  const PART_ORDER = ['tempo', 'drums', 'bass', 'harmony', 'lead', 'pads', 'voice'];
+  const genreName = r => t(`g:${GENRES.includes(r.genre) ? r.genre : 'experimental'}`);
+  const inventedBadge = r => (r.invented ? `<span class="badge invented">${esc(t(r.invented.edited ? 'inventBadgeEdited' : 'inventBadge'))}</span>` : '');
+  // where each part came from, the genre (a broad family) and the closest existing style
+  function originBlock(r) {
+    const f = r.invented.from || {};
+    return `<div class="sheet-grid invent-origin"><div class="sheet-block"><h4>${esc(t('inventFrom'))}</h4>${PART_ORDER.map(p => `<div><span class="lbl">${esc(t(`part_${p}`))}</span> <button class="tag-chip" data-open="${esc(f[p])}" title="${esc(t('inventOpenSource'))}">${esc(nameOf(f[p]))}</button>${p === 'tempo' ? ` <span class="muted small">${esc(t('inventBase'))}</span>` : ''}</div>`).join('')}</div>
+      <div class="sheet-block"><h4>${esc(t('genreLbl'))}</h4><div class="big">${esc(genreName(r))}</div><p class="muted small">${esc(t('inventGenreHint'))}</p>${r.invented.closest ? `<div><span class="lbl">${esc(t('inventClosest'))}</span> ${esc(nameOf(r.invented.closest))}</div>` : ''}</div></div>`;
+  }
+  const inventedLine = r => t('inventLine', { seed: r.invented.seed, g: genreName(r), closest: nameOf(r.invented.closest || r.invented.from.tempo) });
+  const descOf = r => (r.invented ? inventedDescription(r, nameOf, getLang() === 'it' ? 'it' : 'en') : r.description || '');
+  function trialCard() {
+    if (!trial) return '';
+    return `<div class="card lib-sheet invent-card" id="st-trial"><div class="sheet-head"><div><h3>${esc(tx(trial.name))} <span class="badge invented">${esc(t('inventBadgeTrial'))}</span></h3><p class="muted small">${esc(inventedLine(trial))}</p><p class="muted">${esc(descOf(trial))}</p></div>
+      <div class="actions"><button class="btn primary" id="st-trial-radio">${esc(t('inventListen'))}</button><button class="btn dice-btn" id="st-trial-again">${INVENT} ${esc(t('inventAgain'))}</button><button class="btn" id="st-trial-keep" title="${esc(t('inventKeepHint'))}">${esc(t('diceKeep'))}</button><button class="btn" id="st-trial-drop">${esc(t('diceDrop'))}</button></div></div>
+      ${originBlock(trial)}${sheet(trial)}</div>`;
+  }
+  // a kept invented style: among the user's styles, with a free id (Tieni from the radio, the panel or the card)
+  function keepInvented(r) {
+    const copy = JSON.parse(JSON.stringify(r));
+    if (all().some(x => x.r.id === copy.id)) { const same = mine.all.find(x => x.id === copy.id); if (same && JSON.stringify(same) === JSON.stringify(copy)) return copy.id; copy.id = freeId(copy.id, all().map(x => x.r.id)); }
+    copy.invented = { ...copy.invented, edited: false };
+    mine.put(copy); onChange(); render();
+    return copy.id;
+  }
 
   function sheet(r) {
     const prog = id => `${id} <span class="muted">${(PROGS[id] ? PROGS[id][1] : []).map(c => chordName(c, 0)).join(' ')}</span>`;
@@ -108,18 +140,19 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
     const cur = open && items.find(x => x.r.id === open);
     if (!cur) open = null;
     const res = cur ? check(editing || cur.r) : null;
-    root.innerHTML = `<p class="intro">${esc(t('introStyles'))}</p>
-    <div class="lib-top"><button class="btn" id="st-new">+ ${esc(t('libNewStyle'))}</button><button class="btn dice-btn" id="st-random">${DICE} ${esc(t('styleRandom'))}</button><button class="btn" id="st-import">${esc(t('libImport'))}</button><span class="muted small">${esc(t('libWhere'))}</span></div>
+    root.innerHTML = `<p class="intro">${esc(t('introStyles'))}</p><p class="intro words-line">${t('wordsLine')}</p>
+    <div class="lib-top">${invent ? `<button class="btn dice-btn invent-btn" id="st-invent" title="${esc(t('diceInvent'))}">${INVENT} ${esc(t('inventStyle'))}</button>` : ''}<button class="btn" id="st-new">+ ${esc(t('libNewStyle'))}</button><button class="btn dice-btn" id="st-random">${DICE} ${esc(t('styleRandom'))}</button><button class="btn" id="st-import">${esc(t('libImport'))}</button><span class="muted small">${esc(t('libWhere'))}</span></div>
+    ${trialCard()}
     <div class="lib-list">${items.map(({ r, own }) => { const bad = check(r).errors.length; return `<button class="card lib-card${r.id === open ? ' on' : ''}" data-open="${esc(r.id)}">
       <strong>${esc(tx(r.name || { en: r.id }))}</strong><span class="muted">${esc(range(r.tempo))} BPM</span>
-      <span class="badges">${own ? `<span class="badge">${esc(t('mine'))}</span>` : `<span class="badge">${esc(t('libBuiltin'))}</span>`}${bad ? `<span class="badge bad">${esc(t('libInvalid'))}</span>` : ''}</span></button>`; }).join('')}</div>
+      <span class="badges">${own ? `<span class="badge">${esc(t('mine'))}</span>` : `<span class="badge">${esc(t('libBuiltin'))}</span>`}${inventedBadge(r)}${bad ? `<span class="badge bad">${esc(t('libInvalid'))}</span>` : ''}</span></button>`; }).join('')}</div>
     ${cur ? `<div class="card lib-sheet">
-      <div class="sheet-head"><div><h3>${esc(tx((editing || cur.r).name || { en: cur.r.id }))}</h3><p class="muted">${esc((editing || cur.r).description || '')}</p></div>
+      <div class="sheet-head"><div><h3>${esc(tx((editing || cur.r).name || { en: cur.r.id }))}</h3>${(editing || cur.r).invented ? `<p class="muted small">${inventedBadge(editing || cur.r)} ${esc(inventedLine(editing || cur.r))}</p>` : ''}<p class="muted">${esc(descOf(editing || cur.r))}</p></div>
         <div class="actions">${cur.own ? (editing ? `<button class="btn" id="st-json" aria-pressed="${jsonView}">${esc(t('libJson'))}</button><button class="btn primary" id="st-save" ${res.errors.length ? 'disabled' : ''}>${esc(t('save'))}</button><button class="btn" id="st-cancel">${esc(t('libCancel'))}</button>`
           : `<button class="btn primary" id="st-edit">${esc(t('libEdit'))}</button><button class="btn danger" id="st-del">${esc(t('libDelete'))}</button>`) : ''}
           <button class="btn" id="st-dup">${esc(t('libDuplicate'))}</button><button class="btn" id="st-export">${esc(t('libExport'))}</button></div></div>
       ${res.errors.length ? `<div class="field-err">${esc(t('libErrors', { n: res.errors.length }))}${editing ? '' : `: ${res.errors.slice(0, 3).map(e => `${esc(e.path)} ${esc(e.msg)}`).join('; ')}`}</div>` : ''}
-      ${editing ? (jsonView ? `<textarea class="lib-json" id="st-json-text" spellcheck="false">${esc(JSON.stringify(editing, null, 2))}</textarea>${res.errors.map(e => `<div class="field-err">${esc(e.path || '(style)')}: ${esc(e.msg)}</div>`).join('')}` : form(editing, errorsByPath(res.errors))) : sheet(cur.r)}
+      ${editing ? (jsonView ? `<textarea class="lib-json" id="st-json-text" spellcheck="false">${esc(JSON.stringify(editing, null, 2))}</textarea>${res.errors.map(e => `<div class="field-err">${esc(e.path || '(style)')}: ${esc(e.msg)}</div>`).join('')}` : form(editing, errorsByPath(res.errors))) : `${cur.r.invented ? originBlock(cur.r) : ''}${sheet(cur.r)}`}
     </div>` : `<p class="muted">${esc(t('libPick'))}</p>`}`;
   }
 
@@ -127,6 +160,11 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.patternLink && onPattern) { const [kind, id] = b.dataset.patternLink.split('|'); onPattern(kind, id); return; }
     if (b.dataset.open) { open = b.dataset.open; editing = null; jsonView = false; render(); return; }
+    // invent a style: the trial card (invented-styles D8); Ascolta in radio, Ancora, Tieni, Scarta
+    if ((b.id === 'st-invent' || b.id === 'st-trial-again') && invent) { const r = invent(freshSeed()); if (r) { trial = r; render(); const c = root.querySelector('#st-trial'); if (c && c.scrollIntoView) c.scrollIntoView({ block: 'nearest' }); } return; }
+    if (b.id === 'st-trial-radio' && trial) { onTrial(trial); return; }
+    if (b.id === 'st-trial-keep' && trial) { const id = keepInvented(trial); trial = null; open = id; render(); toast(t('inventKeptHere')); return; }
+    if (b.id === 'st-trial-drop') { trial = null; render(); return; }
     // a random style in the radio (#50)
     if (b.id === 'st-random') { const list = usable(); if (list.length) { const one = randomStyles(freshSeed(), list.map(r => ({ id: r.id, genre: 'any' })))[0]; onRadio([one]); } return; }
     const cur = open && all().find(x => x.r.id === open);
@@ -150,6 +188,8 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
     if (b.id === 'st-cancel') { editing = null; jsonView = false; render(); return; }
     if (b.id === 'st-json') { jsonView = !jsonView; render(); return; }
     if (b.id === 'st-save' && editing) {
+      // an invented style edited after keeping (D7): the badge reads "Inventato, modificato"
+      if (editing.invented && JSON.stringify(editing) !== JSON.stringify(cur.r)) editing.invented = { ...editing.invented, edited: true };
       if (editing.id !== cur.r.id) { if (all().some(x => x.r.id === editing.id)) { toast(t('libIdTaken')); return; } mine.remove(cur.r.id); onRename(cur.r.id, editing.id); }
       mine.put(editing); open = editing.id; editing = null; jsonView = false; onChange(); render(); toast(t('libSaved')); return;
     }
@@ -175,5 +215,5 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
     if (el.id === 'st-json-text') { try { editing = JSON.parse(el.value); } catch (err) { toast(t('libJsonBad', { msg: err.message })); } render(); }
   });
 
-  return { render, usable, get mine() { return mine.all; }, openStyle(id) { open = id; editing = null; jsonView = false; render(); } };
+  return { render, usable, keepInvented, get mine() { return mine.all; }, get trial() { return trial; }, openStyle(id) { open = id; editing = null; jsonView = false; render(); } };
 }

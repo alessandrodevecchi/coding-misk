@@ -2,7 +2,7 @@
 // HTML moved out of the radio's render() and one event function. Each view passes its own store (song-options.js) and
 // a prefix ('radio' keeps the ids the radio had, 'ns' for the panel); the data-* attributes are the contract both
 // views listen to.
-import { DICE, CHEVRON, SLIDERS, POWER } from '../icons.js';
+import { DICE, INVENT, CHEVRON, SLIDERS, POWER } from '../icons.js';
 import { PROFILE_CHOICES, RADIO_CHOICES, RADIO_PROFILES, customControls } from '../endless/profile.js';
 import { CONTROLS } from '../live/profiles.js';
 import { COMMENT_PRESETS } from '../song/comments.js';
@@ -11,7 +11,7 @@ import { OPENINGS, PACES, DEVELOPMENTS } from '../song/shapes.js';
 import { SESSION_SOURCES } from '../material/index.js';
 import { styleKeys } from '../endless/recipe.js';
 import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS, genresOf } from '../endless/artist-maker.js';
-import { freshSeed } from '../endless/random.js';
+import { freshSeed, stream } from '../endless/random.js';
 import { voicePanel, voiceEvent } from '../endless/voice-panel.js';
 import { voiceSoundHtml, syncVoiceSound, soundEvent, nextSound, cleanSound, soundShown } from '../endless/voice-sound.js';
 import { cleanVoice } from '../endless/voice-options.js';
@@ -24,7 +24,8 @@ export const COMMENT_KEYS = ['tracks', 'notes', 'steps', 'voice'];
 const mid = r => Math.round((r[0] + r[1]) / 2 * 20) / 20;
 
 // a die: kind, tooltip key, optional visible label; the tooltip adds the seed of the last throw
-export const dieHtml = ({ t, esc, lastDice = {} }, kind, key, label = '', k = '') => `<button class="dice" data-dice="${kind}"${k ? ` data-k="${k}"` : ''} title="${esc(t(key))}${lastDice[kind + k] ? ` · ${esc(t('diceSeed', { seed: lastDice[kind + k] }))}` : ''}" aria-label="${esc(t(key))}">${DICE}${label ? `<span>${esc(label)}</span>` : ''}</button>`;
+// (the invent die, invented-styles D8: a die with a spark, drawn, not an emoji)
+export const dieHtml = ({ t, esc, lastDice = {} }, kind, key, label = '', k = '') => `<button class="dice${kind === 'invent' ? ' dice-invent' : ''}" data-dice="${kind}"${k ? ` data-k="${k}"` : ''} title="${esc(t(key))}${lastDice[kind + k] ? ` · ${esc(t('diceSeed', { seed: lastDice[kind + k] }))}` : ''}" aria-label="${esc(t(key))}">${kind === 'invent' ? INVENT : DICE}${label ? `<span>${esc(label)}</span>` : ''}</button>`;
 
 // the artist chips (the radio): Custom, the random artist with Keep and ×, the usable artists
 export function artistChips({ state, t, tx, esc, artists, face }) {
@@ -35,8 +36,25 @@ export function artistSelect({ state, t, esc, artists, prefix }) {
   const opt = (id, label) => `<option value="${esc(id)}"${(state.artist || '') === id ? ' selected' : ''}>${esc(label)}</option>`;
   return `<select id="${idOf(prefix, 'artist')}" data-artist-pick data-no-knob aria-label="${esc(t('nsArtist'))}">${opt('', t('radioCustom'))}${state.temp ? opt(state.temp.id, `${state.temp.name} · ${t('nsRandomArtist')}`) : ''}${artists.map(a => opt(a.id, a.name)).join('')}</select>`;
 }
-// the style chips
-export const styleChips = ({ state, recipes, t, tx, esc }) => `<div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${state.styles.includes(r.id)}" title="${esc(r.description || t('tipStyles'))}">${esc(tx(r.name))}</button>`).join('')}</div>`;
+// the style chips, after the trial style's chip when one is being tried (invented-styles D9)
+export const styleChips = ({ state, recipes, t, tx, esc }) => `${trialChip({ state, t, tx, esc })}<div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${state.styles.includes(r.id)}" title="${esc(r.description || t('tipStyles'))}">${esc(tx(r.name))}</button>`).join('')}</div>${trialHint({ state, recipes, t, tx, esc })}`;
+// under the chips during a trial: where the parts come from, and what × gives back
+export function trialHint({ state, recipes, t, tx, esc }) {
+  const r = state.tempStyle;
+  if (!r) return '';
+  const back = ((state.trialBefore || {}).styles || []).map(id => recipes.find(x => x.id === id)).filter(Boolean).map(x => tx(x.name));
+  return `<p class="hint muted small trial-hint"><strong>${esc(t('inventTrialHint'))}</strong> ${esc(r.description || '')}${back.length ? ` ${esc(t('inventDropBack', { styles: back.join(' + ') }))}` : ''}</p>`;
+}
+// the trial style (invented-styles D9): its name, "in prova", its genre, and Tieni, Ancora, ×; the name toggles it like
+// any style chip. The tooltip says where each part came from and the seed
+export function trialChip({ state, t, tx, esc }) {
+  const r = state.tempStyle;
+  if (!r) return '';
+  const on = state.styles.includes(r.id), tip = `${r.description || ''} · ${t('diceSeed', { seed: (r.invented || {}).seed || '' })}`;
+  return `<div class="chips trial-row"><span class="chip trial-style" aria-pressed="${on}"><button class="plain" data-style="${esc(r.id)}" aria-pressed="${on}" title="${esc(tip)}"><strong>${esc(tx(r.name))}</strong> · <em>${esc(t('inventTrial'))}</em> <span class="muted">(${esc(t('inventGenreOf', { g: t(`g:${r.genre || 'experimental'}`) }))})</span></button><button class="plain keep" data-trial-keep title="${esc(t('inventKeepHint'))}">${esc(t('diceKeep'))}</button><button class="plain" data-trial-again title="${esc(t('inventAgainHint'))}">${esc(t('inventAgain'))}</button><button class="plain" data-trial-drop aria-label="${esc(t('inventDropHint'))}" title="${esc(t('inventDropHint'))}">×</button></span></div>`;
+}
+// the name of a style id: a known style, the trial style, or the id itself
+export const styleNameOf = (recipes, state, tx) => id => { const r = recipes.find(x => x.id === id) || (state && state.tempStyle && state.tempStyle.id === id ? state.tempStyle : null); return r ? tx(r.name) : id; };
 // the genre chips (new-song-panel D5): a genre with at least one style; on when every style of it is picked
 export function genreChips({ state, recipes, t, esc }) {
   return `<div class="chips genre-chips" role="group">${genresOf(recipes).map(g => { const ids = recipes.filter(r => r.genre === g).map(r => r.id), on = ids.length && ids.every(id => state.styles.includes(id)); return `<button class="chip small" data-genre-pick="${esc(g)}" aria-pressed="${!!on}" title="${esc(t('nsGenreTip'))}">${esc(t(`g:${g}`))}</button>`; }).join('')}</div>`;
@@ -178,11 +196,65 @@ export function pickArtist(ctx, id) {
   options.save(['artist', 'styles', ...KNOBS]);
   return { keys: ['artist'], render: true };
 }
+// ---------- invented styles (invented-styles D8 to D10) ----------
+// A trial style from a seed: ctx.invent(seed, { genre, base }) makes it (the page's maker, over the built-in styles).
+// The state before the first trial is kept in trialBefore, so × gives it back; the trial plays alone, with the artist
+// set to Custom and the compilation off, from the next song. ctx.onTrial(recipe): the radio adds it to the session on air
+export function startTrial(ctx, seed, { genre = null, base } = {}) {
+  const opts = ctx.options.state;
+  if (!ctx.invent) return null;
+  // the base: the first selected style half the time (the invention starts near what plays), else any
+  const sel = opts.tempStyle ? (opts.trialBefore || {}).styles || [] : opts.styles;
+  const b = base !== undefined ? base : !genre && sel.length && stream(seed, 'invent-base').chance(0.5) ? sel[0] : null;
+  return applyTrial(ctx, ctx.invent(seed, { genre, base: b }));
+}
+// a ready invented style (the Styles tab's trial card, a Genres card) goes on trial
+// (quiet: no toast, the caller says what happens)
+export function applyTrial(ctx, recipe, { quiet = false } = {}) {
+  const { options, t, toast } = ctx, opts = options.state;
+  if (!recipe) return null;
+  if (!opts.tempStyle) opts.trialBefore = { styles: opts.styles.slice(), artist: opts.artist || null, ...(ctx.comp ? { compilation: opts.compilation } : {}) };
+  opts.tempStyle = recipe;
+  opts.styles = [recipe.id];
+  opts.artist = null;
+  if (ctx.comp) ctx.comp.off();
+  options.save(['tempStyle', 'trialBefore', 'styles', 'artist']);
+  if (ctx.onTrial) ctx.onTrial(recipe);
+  if (!quiet) toast(t(ctx.panel ? 'inventNextPanel' : 'inventNext'));
+  return { keys: ['styles'], render: true };
+}
+// Tieni: the trial joins the user's styles (ctx.keepStyle(recipe) → its id, or null); the selection stays
+export function keepTrial(ctx) {
+  const { options, t, toast } = ctx, opts = options.state, r = opts.tempStyle;
+  if (!r || !ctx.keepStyle) return { keys: [], render: false };
+  const id = ctx.keepStyle(r);
+  if (!id) return { keys: [], render: false };
+  opts.tempStyle = null; opts.trialBefore = null;
+  opts.styles = opts.styles.map(x => (x === r.id ? id : x));
+  options.save(['tempStyle', 'trialBefore', 'styles']);
+  toast(t('inventKept'));
+  return { keys: ['styles'], render: true };
+}
+// ×: the trial goes, the styles, artist and compilation from before it come back
+export function dropTrial(ctx) {
+  const { options, recipes } = ctx, opts = options.state, r = opts.tempStyle, before = opts.trialBefore || {};
+  if (!r) return { keys: [], render: false };
+  const known = id => recipes.some(x => x.id === id);
+  const back = (before.styles || []).filter(known), rest = opts.styles.filter(x => x !== r.id && known(x));
+  opts.styles = back.length ? back : rest.length ? rest : [recipes[0].id];
+  opts.artist = before.artist && options.artistOf(before.artist) ? before.artist : null;
+  if (ctx.comp && before.compilation && before.compilation !== 'off') opts.compilation = before.compilation;
+  opts.tempStyle = null; opts.trialBefore = null;
+  options.save(['tempStyle', 'trialBefore', 'styles', 'artist']);
+  return { keys: ['styles'], render: true };
+}
+
 // the random tools (#50): every throw has its own fresh seed; changes apply from the next song, like the controls
 export function throwDice(ctx, kind, k) {
   const { options, recipes, t, toast } = ctx, opts = options.state, ids = recipes.map(r => r.id);
   const seed = freshSeed();
   ctx.lastDice[kind + (k || '')] = seed;
+  if (kind === 'invent') return startTrial(ctx, seed) || { keys: [], render: false };
   if (kind === 'artist') { opts.temp = makeArtist(seed, recipes); return pickArtist(ctx, opts.temp.id); }
   if (kind === 'sounds') { opts.sounds = seed; options.save(['sounds']); toast(t('diceSoundsNext')); return { keys: ['sounds'], render: true }; }
   opts.artist = null;
@@ -220,6 +292,9 @@ export function songControlEvent(ctx, el, type) {
     if (d.diceMode !== undefined) { opts.diceRange = !opts.diceRange; options.save(['diceRange']); return { keys: ['diceRange'], render: true }; }
     if (d.soundsClear !== undefined) { opts.sounds = null; options.save(['sounds']); return { keys: ['sounds'], render: true }; }
     if (d.keep !== undefined && opts.temp) { const id = ctx.keepArtist(opts.temp); if (id) { opts.temp = null; opts.artist = id; options.save(['artist', 'temp']); toast(t('diceKept')); return { keys: ['artist'], render: true }; } return { keys: [], render: false }; }
+    if (d.trialKeep !== undefined) return keepTrial(ctx);
+    if (d.trialDrop !== undefined) return dropTrial(ctx);
+    if (d.trialAgain !== undefined) { const seed = freshSeed(); ctx.lastDice.invent = seed; return startTrial(ctx, seed) || { keys: [], render: false }; }
     if (d.tempDrop !== undefined) { if (opts.artist === (opts.temp && opts.temp.id)) opts.artist = null; opts.temp = null; options.save(['artist', 'temp']); return { keys: ['artist'], render: true }; }
     if (d.material) { const was = opts.material; opts.material = d.material; options.save(['material']); return { keys: was !== opts.material ? ['material'] : [], render: true }; }
     if (d.customBase) { opts.custom = { base: d.customBase, controls: {} }; if (ctx.panel) opts.profile = 'custom'; if (ctx.onCustom) ctx.onCustom(customControls(opts.custom)); options.save(['custom']); return { keys: ['custom'], render: true }; }
@@ -251,6 +326,8 @@ export function songControlEvent(ctx, el, type) {
       opts.styles = has ? opts.styles.filter(x => x !== id) : [...opts.styles, id];
       options.save(['styles', 'artist']);
       el.setAttribute('aria-pressed', !has);
+      // (the trial chip's frame follows its name, invented-styles D9)
+      { const f = el.closest('.trial-style'); if (f) f.setAttribute('aria-pressed', !has); }
       if (ctx.root) ctx.root.querySelectorAll('[data-artist]').forEach(c => c.setAttribute('aria-pressed', c.dataset.artist === ''));
       return { keys: ['styles'], render: false };
     }

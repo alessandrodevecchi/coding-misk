@@ -9,7 +9,7 @@ import { overlapOf, extraOf } from '../endless/transitions.js';
 import { steerSong, applyBar, whyNot, COMMANDS, VARY_TYPES, varyTracks, songCurves, densityMax, extendIndex, extendSeconds, INSTRUMENTS, RECOMMENDED, TRACK_CAP, RISER_BARS, RISER_SOUNDS, instrumentOf, lockedIds, moreWarning, partHas, fitsAir, unfitReason, patternPart, TREATMENTS, KEY_MOVES, keyTo, SESSION_KINDS, biasSong } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
-import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, airChooserOf, holdsGrown } from '../endless/items.js';
+import { sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, airChooserOf, holdsGrown, extraStylesOf } from '../endless/items.js';
 import { steerOnAir, airBoundaries, airOffset, directorView, AIR_CHOOSER, chooserOf } from '../endless/waypoints.js';
 import { PROFILE_CHOICES, RADIO_CHOICES, RADIO_PROFILES, CUSTOM_DEFAULT, customControls, profileOptions, savedSongProfile } from '../endless/profile.js';
 import { growOnAir, airControls, leadOnAir, shapeSearchSetting, searchOf, playedOf } from '../endless/growth.js';
@@ -28,7 +28,7 @@ import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } f
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE, GEAR, LOCK, LOCK_OPEN, LOCK_HALF, VARY, SWAP, CHEVRON, SLIDERS, LISTEN, STOP, POWER } from '../icons.js';
+import { DICE, INVENT, GEAR, LOCK, LOCK_OPEN, LOCK_HALF, VARY, SWAP, CHEVRON, SLIDERS, LISTEN, STOP, POWER } from '../icons.js';
 import { previewOf } from '../library/patterns.js';
 import { PROGS } from '../music.js';
 import { paintPreview } from '../library/patterns-tab.js';
@@ -39,7 +39,7 @@ import { speakerOf, narratorSpeaker } from '../song/spoken.js';
 import { SPEAKERS } from '../song/build.js';
 import { voicePanel, voiceEvent } from '../endless/voice-panel.js';
 import { voiceSoundHtml, syncVoiceSound, soundEvent, nextSound, cleanSound, isAutoSound, soundShown } from '../endless/voice-sound.js';
-import { dieHtml, knobSlider, artistChips, styleChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, lengthChips } from './song-controls.js';
+import { dieHtml, knobSlider, artistChips, styleChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, lengthChips, applyTrial } from './song-controls.js';
 import { hasLength } from '../endless/song-options.js';
 
 const HISTORY = 50;
@@ -57,8 +57,9 @@ export function usableRecipes(list) {
 }
 
 // keepArtist(artist): saves a random artist among the listener's, returns its id (#50)
+// invent(seed, { genre, base }): a new invented style (invented-styles); keepStyle(recipe): saves it among the user's, → id
 // userPatterns(): the user's saved patterns as the director reads them (pattern-library): they join a song where they fit
-export function createRadio({ root, t, tx, esc, store, options, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, userPatterns = () => [], reloadSamples = async () => {}, voiceFiles = () => ({}) }) {
+export function createRadio({ root, t, tx, esc, store, options, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, invent = null, keepStyle = null, userPatterns = () => [], reloadSamples = async () => {}, voiceFiles = () => ({}) }) {
   const ids = recipes.map(r => r.id);
   // the options of how the next songs are made (new-song-panel D1): read, migrated and saved by the shared store under
   // coding-misk-radio, as before; the New song panel of Compose keeps its own values in a second instance
@@ -84,7 +85,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the shared song controls (new-song-panel D2): the radio's store, its compilation rules (picking an artist or a
   // style ends the compilation, a knob moved or thrown during one is held) and its display controls on air
   const comp = { off: () => { opts.compilation = 'off'; }, lock: keys => { if (opts.compilation !== 'off') for (const x of keys) opts.compLocks[x] = opts[x]; } };
-  const ctl = { options, recipes, artists, keepArtist: a => keepArtist(a), toast: (...a) => toast(...a), t, lastDice, root, comp, onCustom: changes => showDisplay(changes) };
+  // a trial style (invented-styles D9) joins the session on air as an extra style, recorded in its recipe for a replay
+  const addExtra = r => { if (!S || S.replay || S.frozen || !r) return; S.session.addStyle(r); const ex = (S.recipe.extraStyles || []).filter(x => x.id !== r.id); S.recipe.extraStyles = [...ex, clone(r)]; };
+  const trialRecord = () => (opts.tempStyle ? { extraStyles: [clone(opts.tempStyle)] } : {});
+  const ctl = { options, recipes, artists, keepArtist: a => keepArtist(a), invent, keepStyle, onTrial: r => addExtra(r), toast: (...a) => toast(...a), t, lastDice, root, comp, onCustom: changes => showDisplay(changes) };
   const sc = { state: opts, t, tx, esc, prefix: 'radio', lastDice };
   // the Custom controls shown: with a Durata a growing build grows inside it (phase 8, D12: "in the chosen length")
   const radioCustomC = () => { const C = customControls(opts.custom); return hasLength(opts.length) && C.build === 'crescendo' ? { C: { ...C, duration: 'planned' }, planned: true } : { C }; };
@@ -144,7 +148,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   }
   // the style recipes by id, for the growth shapes
   let shapeCache = null;
-  const shapeStyles = () => shapeCache || (shapeCache = Object.fromEntries(recipes.map(r => [r.id, r])));
+  // (with the styles a session embeds, invented-styles D10)
+  const shapeStyles = () => { const base = shapeCache || (shapeCache = Object.fromEntries(recipes.map(r => [r.id, r]))), ex = S ? extraStylesOf(S.recipe) : []; return ex.length ? { ...base, ...Object.fromEntries(ex.map(r => [r.id, r])) } : base; };
   // an item's song grown from `song` (its director song, or the song as steered); a newer growth of the same item wins
   // (the growth of the director's song is kept as `g0`: commands on it are its waypoints, radio-profiles D9)
   // reused-lines D6: with shape settings that differ from the defaults, a song grows first with the default search (it is
@@ -259,10 +264,12 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     stopQuiet();
     const s = recipe ? recipe.seed : (seed || seedField || undefined);
     const L = recipe ? recipe.lead : lead, le = L ? leadEntry(L.song) : null;
-    const session = createSession(recipes, s, le ? { lead: le } : {});
+    // (the styles a replayed session embeds, or the trial style of a new one, invented-styles D10)
+    const extra = recipe ? extraStylesOf(recipe) : opts.tempStyle ? [opts.tempStyle] : [];
+    const session = createSession(recipes, s, { ...(le ? { lead: le } : {}), extra });
     // a new session records the growth marker (radio-profiles stage 4): its Crescendo and Live coder songs grow on air,
     // and its replays grow them the same; a recipe saved before has none and replays in blocks
-    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...(L ? { lead: leadRecord(L) } : {}) }, lastOptions: null, lastCard: 0 };
+    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...(L ? { lead: leadRecord(L) } : {}), ...trialRecord() }, lastOptions: null, lastCard: 0 };
     S.recipe.seed = session.seed;
     // a replay shows the code with the display controls set when it starts (the console's Custom profile), not with each
     // change made while the session was heard (radio-profiles 9.1)
@@ -315,14 +322,14 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   function exportItems(range) {
     // with the radio off: a new session, with the growth marker when one of its songs grows (radio-profiles D12; a session
     // of Classic songs keeps the recipe it had)
-    const recipe = S ? clone(S.recipe) : { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord() };
+    const recipe = S ? clone(S.recipe) : { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...trialRecord() };
     const marked = (r, items) => { if (!S && !items.some(x => x.grown)) delete r.growth; return items; };
     const from = S ? S.stream[S.onAir].n : 0;
     let items;
     // a clip (#5): one song composed to the clip's length, at full energy, from a new seed each time
     if (range.kind === 'clip') {
       const sec = Math.max(5, Math.min(600, +range.seconds || 30));
-      const clip = { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), ...searchRecord(), fit: Math.max(4, sec - 1) }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord() };
+      const clip = { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), ...searchRecord(), fit: Math.max(4, sec - 1) }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...trialRecord() };
       const items = rebuild(clip, 1);
       if (!items.some(x => x.grown)) delete clip.growth;
       return { recipe: clip, items, from: 0 };
@@ -705,7 +712,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     return `<svg class="radio-curve" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(t('radioShape'))}"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2"/><line x1="${x}" x2="${x}" y1="0" y2="${h}" class="pos"/></svg>`;
   };
   const partsText = entry => Object.entries(entry.parts).filter(([k]) => k !== 'dominant').map(([k, v]) => `${t('part_' + k)} ${styleName(v)}`).join(' · ');
-  const styleName = id => { const r = recipes.find(x => x.id === id); return r ? tx(r.name) : id; };
+  // (a trial style, or one a session embeds, invented-styles D9)
+  const styleOf = id => recipes.find(x => x.id === id) || (opts.tempStyle && opts.tempStyle.id === id ? opts.tempStyle : null) || (S ? extraStylesOf(S.recipe).find(x => x.id === id) || ((S.stream.find(x => x.comp && x.comp.style && x.comp.style.id === id) || {}).comp || {}).style : null);
+  const styleName = id => { const r = styleOf(id); return r ? tx(r.name) : id; };
+  // a song made with a style that is not among the known ones: a trial style
+  const onTrial = e => !!(e && e.styles && e.styles.some(id => !recipes.some(r => r.id === id) && styleOf(id)));
 
   // ---------- console, queue and mixer (#24) ----------
   // keyboard shortcuts: a key per command (type toggles add or remove)
@@ -957,8 +968,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const next = nextRows(song, scheduleOf(item), rel, 3);
     const nextSong = S.stream[S.onAir + 1];
     box.innerHTML = `<div class="lbl">${esc(t('radioNow'))} · ${esc(e.lead ? t('radioLeadShort') : t('radioSongN', { n: item.n + 1 }))}</div>
-      ${item.comp ? `<div class="comp-tag"><span class="chip small">${esc(item.comp.start + item.comp.length - item.n <= 1 ? t('compNextOne') : t('compNext', { n: item.comp.start + item.comp.length - item.n }))}</span>${item.comp.kind === 'random' && !artists().some(a => a.name === item.comp.artist.name) ? `<button class="chip small" data-comp-keep title="${esc(t('diceKeepHint'))}">${esc(t('diceKeep'))} ${esc(item.comp.artist.name)}</button>` : ''}</div>` : ''}
+      ${item.comp ? `<div class="comp-tag"><span class="chip small">${esc(item.comp.start + item.comp.length - item.n <= 1 ? t('compNextOne') : t('compNext', { n: item.comp.start + item.comp.length - item.n }))}</span>${item.comp.kind === 'random' && !artists().some(a => a.name === item.comp.artist.name) ? `<button class="chip small" data-comp-keep title="${esc(t('diceKeepHint'))}">${esc(t('diceKeep'))} ${esc(item.comp.artist.name)}</button>` : ''}${item.comp.kind === 'invented' && item.comp.style && !recipes.some(r => r.id === item.comp.style.id) ? `<button class="chip small" data-comp-keep-style title="${esc(t('inventKeepHint'))}">${esc(t('diceKeep'))} ${esc(tx(item.comp.style.name))} · ${esc(t('inventBadgeShort'))}</button>` : ''}</div>` : ''}
       ${e.artist ? `<div class="radio-artist">${(() => { const a = artistOf(e.artist.id); return a ? `<img class="portrait tiny" src="${face(a)}" alt="">` : ''; })()}<span>${esc(e.artist.name)}</span>${e.artist.quirks && e.artist.quirks.length ? `<span class="muted small">· ${esc(e.artist.quirks.map(q => tx(QUIRKS[q] || { en: q })).join(', '))}</span>` : ''}</div>` : ''}
+      ${onTrial(e) ? `<div class="trial-tag"><span class="chip small" title="${esc(t('inventTrialSongTip'))}">${esc(t('inventTrialSong'))}</span></div>` : ''}
       <h3 class="radio-title">${esc(song.title)}</h3>
       <div class="radio-meta">${esc(e.key)} · ${e.bpm} BPM · ${esc(e.meter)}${e.shape ? ` · ${esc(t('shape_' + e.shape))}` : ''}</div>
       <div class="radio-profile-now" data-profile-now="${esc(profileOf(item))}" title="${esc(t('radioProfileNowTip'))}">${profileLine(item)}</div>
@@ -966,7 +978,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       ${item.plan ? curvePanel(item, rel, `${sec.name} · ${t('radioBar', { n: Math.floor(rel) + 1, total: item.bars })}${item.plan.extended ? ` · ${t('radioExtended', { t: secs(item.plan.extended * extendSeconds(item.plan)) })}` : ''}`) : `<div class="radio-pos">${e.lead ? '' : curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>`}
       <div class="lbl">${esc(t('radioComing'))}</div>
       <ul class="radio-next">${next.map(nextRow).join('') || `<li class="muted">${esc(t('radioNoChanges'))}</li>`}</ul>
-      <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) : esc(t('radioPreparing'))}${nextSong && e.transition && !item.cut ? ` · ${esc(e.transition.kind === 'cut' ? t('radioNextTxCut') : t('radioNextTx', { kind: t(`tx:${e.transition.kind}`), bars: e.transition.bars }))}` : ''}</div>`;
+      <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) + (onTrial(nextSong.entry) ? ` · ${esc(t('inventTrialSong'))}` : '') : esc(t('radioPreparing'))}${nextSong && e.transition && !item.cut ? ` · ${esc(e.transition.kind === 'cut' ? t('radioNextTxCut') : t('radioNextTx', { kind: t(`tx:${e.transition.kind}`), bars: e.transition.bars }))}` : ''}</div>`;
   }
 
   // ---------- compilation setup (#49) ----------
@@ -985,7 +997,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       <div class="comp-line"><span class="lbl">${esc(t('compMovement'))}</span><button class="chip small" data-comp-move="journey" aria-pressed="${S0.movement === 'journey'}" ${tip('compJourneyTip')}>${esc(t('compJourney'))}</button><button class="chip small" data-comp-move="free" aria-pressed="${S0.movement === 'free'}" ${tip('compFreeTip')}>${esc(t('compFree'))}</button></div>
       <div class="comp-line"><span class="lbl">${esc(t('compGenres'))}</span><button class="chip small" data-comp-all="genres" aria-pressed="${!S0.genres}">${esc(t('compAll'))}</button>${chips(GENRE_LIST(), S0.genres, 'data-comp-genre', g => t(`g:${g}`))}</div>
       <div class="comp-line"><span class="lbl">${esc(t('compArtists'))}</span><button class="chip small" data-comp-all="artists" aria-pressed="${!S0.artists}">${esc(t('compAll'))}</button>${chips(artists().map(a => a.id), S0.artists, 'data-comp-artist', id => (artists().find(a => a.id === id) || {}).name || id)}
-        <button class="chip small" data-comp-random aria-pressed="${!!S0.randomArtists}" ${tip('compRandomTip')}>${DICE} ${esc(t('compRandomArtists'))}</button></div>
+        <button class="chip small" data-comp-random aria-pressed="${!!S0.randomArtists}" ${tip('compRandomTip')}>${DICE} ${esc(t('compRandomArtists'))}</button><button class="chip small" data-comp-invented aria-pressed="${S0.invented === true}" ${tip('compInventedTip')}>${INVENT} ${esc(t('compInvented'))}</button></div>
       <div class="comp-line" ${tip('matSourceTip')}><span class="lbl">${esc(t('matSource'))}</span>${SESSION_SOURCES.map(m => `<button class="chip small" data-material="${m}" aria-pressed="${opts.material === m}">${esc(t(`mat:${m}`))}</button>`).join('')}</div>
       ${opts.material === 'varied' ? `<p class="hint muted small">${esc(t('matVariedTip'))}</p>` : ''}
       <div class="comp-ranges">${['chaos', 'energy', 'complexity', 'talk'].map(knob).join('')}</div>
@@ -1036,7 +1048,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         <div class="ctrl" ${tip('tipArtist')}><span class="lbl">${esc(t('radioArtist'))} ${die('artist', 'diceArtist')}</span>
           ${artistChips({ state: opts, t, tx, esc, artists: artists(), face })}
         </div>
-        <div class="ctrl" ${tip('tipStyles')}><span class="lbl">${esc(t('radioStyles'))} ${die('styles', 'diceStyles', t('diceStylesLbl'))} ${die('genre', 'diceGenre', t('diceGenreLbl'))}</span>
+        <div class="ctrl" ${tip('tipStyles')}><span class="lbl">${esc(t('radioStyles'))} ${die('styles', 'diceStyles', t('diceStylesLbl'))} ${die('genre', 'diceGenre', t('diceGenreLbl'))} ${die('invent', 'diceInvent', t('diceInventLbl'))}</span>
           ${styleChips({ state: opts, recipes, t, tx, esc })}
         </div>
         </div>
@@ -1135,6 +1147,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (b.dataset.compGenre) return editSetup(S0 => { S0.genres = toggleIn(S0.genres, GENRE_LIST(), b.dataset.compGenre); });
     if (b.dataset.compArtist) return editSetup(S0 => { S0.artists = toggleIn(S0.artists, artists().map(a => a.id), b.dataset.compArtist); });
     if (b.dataset.compRandom !== undefined) return editSetup(S0 => { S0.randomArtists = !S0.randomArtists; });
+    // invented styles in the compilation (invented-styles D11, phase 2): off by default
+    if (b.dataset.compInvented !== undefined) return editSetup(S0 => { S0.invented = S0.invented !== true; });
+    if (b.dataset.compKeepStyle !== undefined && S) { const it = S.stream[S.onAir]; if (it.comp && it.comp.style && keepStyle) { keepStyle(it.comp.style); toast(t('inventKept')); renderNow(); } return; }
     if (b.id === 'comp-save') { const name = (root.querySelector('#comp-name').value || '').trim(); if (!name || PRESETS[name]) { toast(t('compNameBad')); return; } const all = userPresets(); all[name] = JSON.parse(JSON.stringify(opts.compSetup)); store.set('coding-misk-comp-presets', all); opts.compPreset = name; saveOpts(); render(); return toast(t('compSaved', { name })); }
     if (b.id === 'comp-del') { const all = userPresets(); delete all[opts.compPreset]; store.set('coding-misk-comp-presets', all); opts.compPreset = 'custom'; saveOpts(); return render(); }
     if (b.dataset.compKeep !== undefined && S) { const it = S.stream[S.onAir]; if (it.comp && it.comp.artist) { keepArtist(it.comp.artist); toast(t('diceKept')); renderNow(); } return; }
@@ -1293,6 +1308,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     get recording() { return recS ? { seconds: recElapsed(), list: recS.list.map(x => ({ ...x })) } : null; },
     startRec, stopRec, recordFromStart,
     // the Genres tab (#43): the radio plays these styles, with the sliders as they are
+    // an invented style on trial (invented-styles D8): a ready recipe (the Styles tab), or one invented in a genre (a
+    // Genres card); the radio starts when it is off, else the trial plays from the next song
+    tryStyle(recipe) { const was = !!S; if (!applyTrial(ctl, recipe, { quiet: !was })) return false; if (!was) start(); else render(); return true; },
+    inventIn(genre) { const seed = freshSeed(); lastDice.invent = seed; const r = ctl.invent && ctl.invent(seed, { genre, base: null }); return r ? this.tryStyle(r) : false; },
     playStyles(ids) { const ok = ids.filter(id => recipes.some(r => r.id === id)); if (!ok.length) return false; opts.artist = null; opts.compilation = 'off'; opts.styles = ok; saveOpts(); start(); return true; },
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },

@@ -1196,7 +1196,7 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
 @media (prefers-reduced-motion: reduce) { .soul-tab .st-open i { animation: none; } }
 
 /* random tools (#50): dice */
-.ico-dice { width: 15px; height: 15px; vertical-align: -3px; flex: none; }
+.ico-dice, .ico-invent { width: 15px; height: 15px; vertical-align: -3px; flex: none; }
 .dice { display: inline-flex; align-items: center; gap: 5px; padding: 2px 5px; text-transform: none; letter-spacing: 0; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--muted); cursor: pointer; font: inherit; font-size: 12px; }
 .dice:hover, .dice:focus-visible { color: var(--a1); border-color: color-mix(in srgb, var(--a1) 40%, transparent); }
 .dice:active .ico { transform: rotate(-20deg) scale(.9); }
@@ -1224,6 +1224,23 @@ body.soul-dragging, body.soul-dragging * { cursor: grabbing !important; user-sel
 .temp-artist { display: inline-flex; align-items: center; gap: 6px; border-style: dashed; }
 .temp-artist .plain { background: none; border: 0; color: inherit; font: inherit; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .temp-artist .keep { color: var(--a1); font-weight: 600; }
+/* invented styles (invented-styles D8, D9): the die with a spark, the trial chip, the badge, the trial card */
+.dice-btn .ico-invent, .dice-invent .ico-invent { margin-right: 2px; }
+.trial-row { margin-bottom: 6px; }
+.trial-style { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; border-style: dashed; border-color: var(--a1); max-width: 100%; }
+.trial-style[aria-pressed="false"] { opacity: .75; }
+.trial-style .plain { background: none; border: 0; color: inherit; font: inherit; padding: 0; cursor: pointer; text-align: left; }
+.trial-style em { color: var(--a1); }
+.trial-style .keep { color: var(--a1); font-weight: 600; }
+.trial-tag { margin: 2px 0 4px; }
+.trial-tag .chip { border-style: dashed; border-color: var(--a1); color: var(--a1); }
+.badge.invented { border-style: dashed; }
+.words-line { font-size: 14px; }
+.invent-card { border-color: color-mix(in srgb, var(--a1) 45%, var(--line)); margin-bottom: 14px; }
+.invent-origin { margin-bottom: 10px; }
+.invent-origin .tag-chip { cursor: pointer; }
+.invent-btn { border-color: color-mix(in srgb, var(--a1) 55%, var(--line)); }
+:root[data-ui="hw"] .trial-style, :root[data-ui="hw"] .trial-tag .chip { border-color: var(--a1); }
 .plain { background: none; border: 0; color: inherit; font: inherit; padding: 0 2px; cursor: pointer; }
 :root[data-ui="hw"] .dice { color: #a29f97; }
 :root[data-ui="hw"] .dice:hover { color: #ffb347; border-color: #0d0d10; background: linear-gradient(#3b3b41, #28282d); }
