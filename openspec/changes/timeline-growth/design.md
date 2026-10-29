@@ -32,3 +32,7 @@
 
 - Section indexes: every query by index uses `.arr-scene-btn` (written sections only) or `arrSec`, never a strip child index.
 - A growth that arrives later re-renders the arranger: the compact column has a fixed width, so the written part does not move.
+
+## Follow-up: following the knob (#88)
+
+**D7. Page follow.** While the song plays in Compose with "Follow playback" on and the arranger wider than its scroller, a knob outside the visible part, or within 8% of its right edge, scrolls the arranger so the knob stands at 12% of the visible width (clamped to the scroll range). `scrollTo` is smooth, `auto` under `prefers-reduced-motion: reduce`. A scroll the app starts is marked for 700 ms (smooth) or 150 ms (jump); during it the follow does not start again. A scroll outside that mark, a wheel or touch on the arranger, or a pointer on its scrollbar holds the follow for 3 s from the last such input; dragging the ruler knob holds it too. `playSong` and `seekTo` clear the hold. The same rule serves the sections view and the timeline view; compact and hidden growths that fit the screen have nothing to scroll.
