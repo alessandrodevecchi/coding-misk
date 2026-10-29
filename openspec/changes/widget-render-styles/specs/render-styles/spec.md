@@ -2,7 +2,7 @@
 
 ### Requirement: Render choice next to the look
 
-The app SHALL offer a render choice, "Render" (it: "Resa"), independent of the look, with the values Normal (default), 1-bit, CRT, LED, ASCII and Terminal. Every look, including the soul, Monitor, Rullo and the layer of stage widgets, SHALL be drawable in every render. Normal SHALL draw every look exactly as before this change.
+The app SHALL offer a render choice, named "Render" in English and in Italian, independent of the look, with the values Normal (default), 1-bit, CRT, LED, ASCII and Terminal. Every look, including the soul, Monitor, Rullo and the layer of stage widgets, SHALL be drawable in every render. Normal SHALL draw every look exactly as before this change.
 
 #### Scenario: Normal changes nothing
 
@@ -99,3 +99,17 @@ Measured by the browser check: a pass at a 1080p video target SHALL take at most
 
 - **WHEN** the browser check plays a song for 30 seconds on Tramonto with each render
 - **THEN** the median pass time of each render is within the budget
+
+### Requirement: The "Claude" look
+
+The app SHALL offer a look named "Claude" in every language: a full-screen text interface in the layout of an agent command line tool, drawn with the Terminal palette of the theme. It SHALL show a header card with the song, the section and the tempo, what enters in the section and what comes next, one large pane and smaller panes for the instruments of the section drawn with the Terminal painters, a prompt box with a typed line and a cursor, a status line and a mode line. A frame SHALL depend only on the time, the feed and the song's information, like the other widget looks.
+
+#### Scenario: What enters and what comes next
+
+- **WHEN** a section starts in which hats and bass play and did not play in the section before, and the next section is four bars away
+- **THEN** the header lists hats and bass as entering and names the next section with the bars left
+
+#### Scenario: The typed line
+
+- **WHEN** a narrator line is spoken in the section
+- **THEN** the prompt box shows the line typed out over its first bar, with a cursor after the last character

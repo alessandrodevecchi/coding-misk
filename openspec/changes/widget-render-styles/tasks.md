@@ -2,9 +2,9 @@ Estimate: about 22 agent hours (design, Estimate), after `widgets-on-stage` phas
 
 ## 0. Owner
 
-- [ ] 0.1 Owner answers the open questions in the design (filters or scenes, first renders, name, song field, videos, dither, hardware colours, WebGL, Terminal take and signature scene). Verify: answers in the design; proposal, spec and tasks updated
-- [ ] 0.2 `widgets-on-stage` phases 1 to 3 built (painters, feed, Monitor, Rullo). Verify: its checks pass
-- [ ] 0.3 Owner says go. Verify: answers and go in the DEVLOG
+- [x] 0.1 Owner answers the open questions in the design (filters or scenes, first renders, name, song field, videos, dither, hardware colours, WebGL, Terminal take and signature scene). Verify: answers in the design; proposal, spec and tasks updated
+- [x] 0.2 `widgets-on-stage` phases 1 to 3 built (painters, feed, Monitor, Rullo). Verify: its checks pass
+- [x] 0.3 Owner says go. Verify: answers and go in the DEVLOG
 
 ## 1. Pass pipeline (3 h)
 
@@ -32,6 +32,11 @@ Estimate: about 22 agent hours (design, Estimate), after `widgets-on-stage` phas
 
 - [ ] 5.1 Render menu next to the look menu, video and fragments setting, slow devices, saved, backup, reset. Verify: `check-settings.cjs`, `check-backup.mjs`
 - [ ] 5.2 Texts in English and Italian, Guide line in the `visuals` card. Verify: `npm run check:guide`
+
+## 7. The "Claude" look (5 h)
+
+- [ ] 7.1 `claude` in `LOOKS` (the same name in every language), drawn from the stage feed with the Terminal grid: header card, what enters and what comes next, large pane and small panes, prompt box with the typed line and cursor, status and mode lines, both themes. Verify: `check:render-styles` (same frame for the same time), screenshots in neon and hardware
+- [ ] 7.2 The renders over it (Terminal as it is, ASCII glyphs, passes for the others), fast video and fragments. Verify: screenshots, fast video twice gives the same frames
 
 ## 6. Checks and docs (3.5 h)
 
