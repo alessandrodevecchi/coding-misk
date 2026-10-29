@@ -121,7 +121,7 @@
   .work.code-collapsed .codehead { justify-content: center; }
   .work.code-collapsed #code-collapse { transform: scaleX(-1); }
   .codecol.full { position: fixed; inset: 12px; z-index: 50; top: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; grid-template-rows: auto 1fr auto auto; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
-  .codecol.full .edhost { max-height: none; height: 100%; font-size: 15px; }
+  .codecol.full .edhost { max-height: none; height: 100%; }
   .codecol.full .code-resize { display: none; }
   .tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
   .tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 14px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
@@ -384,7 +384,7 @@
   .codecol { display: grid; gap: 10px; min-width: 0; }
   .codehead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
   .src { font-family: var(--mono); font-size: 12px; color: var(--a2); }
-  .edhost { border: 1px solid var(--line); border-radius: 10px; overflow: auto; max-height: 62vh; min-height: 200px; background: #0a0a0f; font-size: 13px; }
+  .edhost { border: 1px solid var(--line); border-radius: 10px; overflow: auto; max-height: 62vh; min-height: 200px; background: var(--code-bg, #0a0a0f); }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel2); border-radius: 6px; padding: 7px 12px; font-size: 13px; text-decoration: none; color: var(--ink); }
   .btn:disabled, select:disabled { opacity: .4; cursor: default; }
@@ -1713,6 +1713,12 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .cw-inst .cw-prim { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .cw-inst .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; }
 .cw-inst .chip { font: 11px var(--mono); padding: 2px 8px; }
-#edhost .cw-muted { filter: grayscale(1); opacity: .4; outline: 1px dashed var(--muted); outline-offset: -1px; }
+#edhost .cw-muted { filter: grayscale(1); opacity: .4; outline: 1px dashed var(--code-muted, var(--muted)); outline-offset: -1px; }
+/* code themes (code-themes): the panel stays hidden until the theme is installed (at most 3 s), the text of muted
+   lines dimmed (option, on by default), the evaluation flash in the theme's colour (Strudel's is white) */
+#edhost.ct-wait .cm-editor { visibility: hidden; animation: ct-show 0s 3s forwards; }
+@keyframes ct-show { to { visibility: visible; } }
+#edhost.ct-dim .ct-muted { opacity: .55; }
+#edhost [style*="rgba(255,255,255, .4)"] { background-color: var(--code-flash, rgba(255,255,255,.4)) !important; }
 .cw-unit { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .cw-unit input { width: 90px; }

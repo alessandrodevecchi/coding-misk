@@ -102,6 +102,7 @@ import { CW_KEY, widgetSettings, placeWidgets, widgetOptions, linkAnalysers } fr
 import { SW_KEY, stageSettings, stageMapping, stageScopeInstruments, layerOn } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
 const WIDGET_LOOKS = ['monitor', 'rullo'];
+import { createCodeThemes } from './code-themes/install.js';
 import { widgetPlan, linesByKey, fastWidgets } from './video/widget-frames.js';
 import { noteStore } from './visuals/stage-feed.js';
 import { withWidgets } from './video/layout.js';
@@ -607,6 +608,10 @@ let ed = null, mode = 'track', evalTimer = 0, song = null, loopIdx = -1, follow 
 let paused = null; // { id, cyc } quando la musica è in pausa
 let ended = null; // id del brano arrivato alla fine da solo
 let source = { kind: 'track' };
+// code themes (code-themes): the panel's ground and font at once, the theme on the editor as soon as it is there (the
+// panel stays hidden until then); they follow the app theme, the look and the full view
+const codeThemes = createCodeThemes({ store, full: () => $('#codecol').classList.contains('full') });
+globalThis.codingMiskCodeThemes = codeThemes;
 const el = document.createElement('strudel-editor');
 el.innerHTML = `<!--\n${compiled.code}\n-->`;
 // the growing marks (growth-in-background D3): drawn once, shown by renderGrowing
@@ -617,6 +622,7 @@ const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor)
 // hand too (Ctrl+Enter); our helpers (.chan, .crunch), the library and the song's functions are registered once Strudel
 // is there (song-functions)
 ready.then(() => {
+  codeThemes.attach(ed);
   const plain = ed.evaluate.bind(ed);
   ed.evaluate = async (autostart = true) => {
     globalThis.miskBuses = (song && song.buses) || {}; useFns((song && song.fns) || {});
@@ -724,11 +730,12 @@ function markMuted() {
     el.classList.toggle('cw-muted', muted);
   }
 }
-// code-widgets D4, D5: the hidden parameter groups of the widgets, from the settings, the theme's colours and the panel
+// code-widgets D4, D5: the hidden parameter groups of the widgets, from the settings, the code theme's widget colours
+// (code-themes D7) and the panel
 function widgetGroups() {
-  const S = cwSettings(), cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim();
+  const S = cwSettings(), W = codeThemes.current.roles.widget;
   const host = $('#edhost');
-  return widgetOptions(S, { fg: v('--ink'), accent: v('--a1'), accent2: v('--a2'), muted: v('--muted') }, host ? host.clientWidth - 72 : 500);
+  return widgetOptions(S, { fg: W.ink, accent: W.a1, accent2: W.a2, muted: W.muted }, host ? host.clientWidth - 72 : 500);
 }
 // code-widgets D9, D10: at a section boundary without a step the widgets move (a song as written, Classic's past
 // sections): the code of the boundary and one evaluation, as a step does. A typing in progress keeps its code: the
@@ -1389,6 +1396,8 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   const o = video.opts(), fsz = frag ? fragmentSize(frag.o) : null, q = frag ? fsz.file : QUALITIES[o.quality], layout = o.layout === 'tab' ? 'visual' : o.layout;
   const A = frag ? fragmentAreas(frag.o, fsz.comp.w, fsz.comp.h) : TIMELINE_LAYOUTS.includes(layout) ? liveAreas(layout, q.w, q.h) : layoutAreas(layout, q.w, q.h, null), stageA = A.stage || { w: 720, h: 720 };
   exportCols = codeColsOf(A.code, frag ? fsz.comp.h : q.h);
+  // the code theme read once: the whole video keeps it, whatever changes meanwhile (code-themes D8)
+  const ct = videoCodeTheme();
   const segments = segmentsOf(sg, codeFor), looks = PICK_LOOKS.map(l => l[0]);
   // the parts of the file: one per song of a session ("3 Intro" belongs to song 3), or the song itself
   const parts = [];
@@ -1410,7 +1419,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     const plan = widgetPlan(segments), mark = list => list && list.map(s => ({ ...s, wlines: linesByKey(s.code, plan.noteKeys) }));
     const at = job.segmentsAt;
     job = { ...job, segments: mark(job.segments), segmentsAt: at ? (a, b) => mark(at(a, b)) : null };
-    const P = (() => { const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim(); return { ink: v('--ink') || '#fff', muted: v('--muted') || '#888', a1: v('--a1') || '#f4a', a2: v('--a2') || '#fb4' }; })();
+    const P = (() => { if (ct.roles) return { ...ct.roles.widget }; const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim(); return { ink: v('--ink') || '#fff', muted: v('--muted') || '#888', a1: v('--a1') || '#f4a', a2: v('--a2') || '#fb4' }; })();
     const waves = {}, notes = {}, seen = new Set();
     cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P }), addNotes(block) { for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
     if (plan.instruments.length) {
@@ -1439,7 +1448,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   const instWave = Object.keys(waves).length ? (inst, at, n = 256) => { const wv = waves[inst]; if (!wv) return null; const end = Math.round(at * wv.sr), out = new Float32Array(n); for (let i = 0; i < n; i++) out[i] = wv.data[end - n + i] || 0; return out; } : null;
   let stageLogged = false;
   visuals.setTarget({ w: stageA.w, h: stageA.h });
-  const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
+  const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start, ct } : null;
   // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen
   const pickOf = (choice, list) => (choice === 'random' ? list[hashString(`${frag.code}/${list.length}`) % list.length] : list.includes(choice) ? choice : null);
   const fragLook = frag ? pickOf(frag.o.look, looks) : null;
@@ -1467,7 +1476,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
       visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0 });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
-      else video.composeAt({ layout, q }, cyc, t);
+      else video.composeAt({ layout, q, ct }, cyc, t);
     },
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
     onNotes: cw ? block => cw.addNotes(block) : null,
@@ -4733,6 +4742,8 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.da
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
     ui: () => ui, setUi: v => setUi(v), lang: () => getLang(), setLang: l => changeLang(l),
+    // code themes (code-themes D6): the settings, a change, and the theme Automatic uses now
+    codeTheme: { settings: () => codeThemes.settings(), set: patch => codeThemes.set(patch), autoName: l => codeThemes.autoName(l) },
     volume: () => volume, setVolume: v => setVolume(v),
     // code widgets (code-widgets D1): a stopped song shows its code with the new settings; a playing one takes them at
     // its next step, section or evaluation
@@ -4862,8 +4873,17 @@ function timelineNow(cyc) {
   if (!doc || !doc.sections || !doc.tracks) return null;
   try { return { shape: timelineShape(doc), bar, live: Array.isArray(doc.build) && doc.build.length > 0, sayOf: s => sayText(s, getLang()) }; } catch (e) { return null; }
 }
+// the code's colours and font in videos (code-themes D8): the code theme's, or the app theme's colours with
+// Settings → Video → Code colours; dim: the text of muted lines
+function videoCodeTheme() {
+  const c = codeThemes.current, app = (store.get('coding-misk-video', {}) || {}).codeColors === 'app';
+  return { id: c.id, roles: app ? null : c.roles, family: c.family, dim: c.dim };
+}
+// (for checks: what a video would draw with now)
+codeThemes.forVideo = videoCodeTheme;
 const video = createVideo({
   visuals, store, t, esc,
+  getCodeTheme: videoCodeTheme,
   // code-widgets D11: the widgets drawn in the page (never in a fast video, whose code is not the page's)
   getWidgets: () => { const S = cwSettings(), M = globalThis.miskWidgetCanvases; if (fv) return fv.widgets ? { dim: S.dim, canvas: (type, i, key) => fv.widgets.canvas(type, i, key, fv.cyc, fv.t, fv.master) } : null; if (!S.on || !M) return null; return { dim: S.dim, canvas: (type, i) => { const k = `_widget__${type}_${i}`; for (const [id, c] of M) if (id.endsWith(k)) return c; return null; } }; },
   soulFrame: (cyc, playing, scale) => soul.frame(cyc, playing, scale),

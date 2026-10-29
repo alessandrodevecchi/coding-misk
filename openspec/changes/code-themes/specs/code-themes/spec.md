@@ -44,7 +44,7 @@ The Neon code theme SHALL take its colours from the current look's tokens (groun
 
 ### Requirement: Readable contrast
 
-Every text role of the app's own code themes (text, comment, string, number, label, variable, method, punctuation) SHALL reach a contrast of at least 4.5:1 against the theme's ground, and at least 7:1 in High contrast dark and Light high contrast. For Neon this SHALL hold on every look. A Strudel theme SHALL be offered only if its text and comment reach 4.5:1.
+Every text role of the app's own code themes (text, comment, string, number, label, variable, method, punctuation) SHALL reach a contrast of at least 4.5:1 against the theme's ground, and at least 7:1 in High contrast dark and Light high contrast. For Neon this SHALL hold on every look. A Strudel theme SHALL be offered only if its text and comment reach 4.5:1, except Strudel's default theme (`strudelTheme`), kept as the panel's look of before.
 
 #### Scenario: Theme data check
 
@@ -73,6 +73,29 @@ The code widgets, the dimmed widget of a muted `_$:` line, the outline of the pl
 
 - **WHEN** the user evaluates the code with Light high contrast
 - **THEN** the evaluation flash is visible on the white ground
+
+### Requirement: Muted lines dimmed
+
+The app SHALL offer "Dim muted lines" (it: "Attenua le righe mute") in the Settings "Appearance" card, on by default. When it is on, the text of a muted `_$:` line and of its continuation lines SHALL be drawn at about 55 % opacity in the code panel and in the code drawn in videos. When it is off, the text SHALL keep the theme's colours. The option SHALL be saved, in the backup and cleared by the settings reset.
+
+#### Scenario: Default
+
+- **WHEN** a user who never changed the option sees a song with a `_$:` line
+- **THEN** the text of that line is dimmed in the code panel
+
+#### Scenario: Off
+
+- **WHEN** the user turns "Dim muted lines" off
+- **THEN** the text of the `_$:` line has the theme's colours, in the panel and in a video
+
+### Requirement: Automatic leaves room for a light app theme
+
+The Automatic mapping SHALL be keyed by the app theme's `data-ui` value and SHALL already map a light app theme (`light`) to Light high contrast, so that a light app theme needs no change to the code themes.
+
+#### Scenario: Light app theme
+
+- **WHEN** the code theme is Automatic and the app theme's `data-ui` becomes `light`
+- **THEN** the code panel shows Light high contrast
 
 ### Requirement: Installing a theme never breaks the editor
 
