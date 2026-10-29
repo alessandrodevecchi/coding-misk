@@ -837,7 +837,8 @@ function sayAir(song, list) {
     }
     const t = JSON.parse(JSON.stringify(tracks[ti])), keys = new Set(Object.keys(t.patterns || {}));
     let key = 'L1'; for (let k = 2; keys.has(key); k++) key = `L${k}`;
-    t.patterns = { ...(t.patterns || {}), [key]: { way: 'passage', text: { [e.lang]: e.text } } };
+    // (typed: a line from the console, for the captions' "Lines typed in the console" choice, spoken-text-on-stage D7)
+    t.patterns = { ...(t.patterns || {}), [key]: { way: 'passage', text: { [e.lang]: e.text }, typed: true } };
     t.clips = [...(t.clips || []), { start: at, bars: Math.min(2, total - at), pattern: key }];
     tracks[ti] = t;
     build = build.map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x);

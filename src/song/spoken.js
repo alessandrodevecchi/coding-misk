@@ -89,8 +89,21 @@ function sampleOf(text, bank, virtual) {
 // a placed line (placeSpoken) with a sample for at least one of its texts: the compiler writes code for it (without
 // one it writes only the comment, "no sample"); with files null every sample exists
 export const lineSounds = p => spokenContext.files === null || p.texts.some(x => !!sampleOf(x, p.bank, new Map()));
+// the bank a text plays from on this machine (the speaker's, else the default voice's), or null without a sample
+export const lineBank = (text, bank) => { if (spokenContext.files === null) return bank; const s = sampleOf(text, bank, new Map()); return s ? s.bank : null; };
 // a text's length in seconds: measured by tools/voice.mjs, else estimated from its words
 const secondsOf = (text, bank) => { const m = (spokenContext.lengths || {})[`${bank}/${saySlug(text)}.wav`]; return Number.isFinite(m) && m > 0 ? m : words(text) * SECONDS_PER_WORD + 0.3; };
+
+// a sample's measured length in seconds, or null (spoken-text-on-stage D1: how long a caption holds)
+export const sampleSeconds = (text, bank, lengths = spokenContext.lengths) => { const m = (lengths || {})[`${bank}/${saySlug(text)}.wav`]; return Number.isFinite(m) && m > 0 ? m : null; };
+// the length of a bar in seconds at a bar of a song (its section's tempo and meter); kept per song
+const barMemo = new WeakMap();
+export function barSeconds(input, bar) {
+  let n = barMemo.get(input);
+  if (!n) { n = normalizeSong(input); barMemo.set(input, n); }
+  const sec = secAt(n, Math.max(0, Math.floor(bar)));
+  return sec ? beatsOf(sec) * secPerBeat(sec) : 2;
+}
 
 // ---------- placement ----------
 // tracks that count as playing in a section: neither voice nor spoken, with a clip there (from the clips, so every

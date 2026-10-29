@@ -2,10 +2,10 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 
 ## 1. Caption schedule (2 h)
 
-- [ ] 1.1 `captionSchedule(song, C, lang, files, lengths)` in `src/song/build.js` from `spokenSchedule` (D1): speaker, start, `until` from `say_lengths.json`, chop once per clip, refrains at each repeat
+- [x] 1.1 `captionSchedule(song, C, lang, files, lengths)` in `src/song/build.js` from `spokenSchedule` (D1): speaker, start, `until` from `say_lengths.json`, chop once per clip, refrains at each repeat
 - [ ] 1.2 Kept per compiled build, language and manifest in `src/main.js`; the radio's `info` and the fast video's list read it
-- [ ] 1.3 Lines typed in the radio console: check they reach the schedule of the song on air (Say now, At the right moment); add them if not
-- [ ] 1.4 Cases in `npm run check:spoken`: explain, poetic, poetic with Narrated growth, a voice track, narrator off, no sample, a typed line
+- [x] 1.3 Lines typed in the radio console: check they reach the schedule of the song on air (Say now, At the right moment); add them if not
+- [x] 1.4 Cases in `npm run check:spoken`: explain, poetic, poetic with Narrated growth, a voice track, narrator off, no sample, a typed line
 
 ## 2. Stage lane (2 h)
 
@@ -43,20 +43,20 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 
 ## 7. Speaker registry (1.5 h, D11)
 
-- [ ] 7.1 `SPEAKER_KINDS` in `src/song/speakers.js`: rank, icon, style, colour, `exclusive`, `multiCaption`; `N` and `T` mapped to kinds, `singing` marked future
-- [ ] 7.2 Precedence read from the registry, behaviour unchanged: voice track over narrator, one narrator line per bar, the step's line after both (`check:spoken`, `check:code` unchanged)
-- [ ] 7.3 Captions take icon, style, default mark and rows from the registry; a fake third kind in `check:spoken` gets its caption with no other change, and turns the others quiet with `exclusive` and adds a row with `multiCaption` (groundwork only, no singing voice)
+- [x] 7.1 `SPEAKER_KINDS` in `src/song/speakers.js`: rank, icon, style, colour, `exclusive`, `multiCaption`; `N` and `T` mapped to kinds, `singing` marked future
+- [x] 7.2 Precedence read from the registry, behaviour unchanged: voice track over narrator, one narrator line per bar, the step's line after both (`check:spoken`, `check:code` unchanged)
+- [x] 7.3 Captions take icon, style, default mark and rows from the registry; a fake third kind in `check:spoken` gets its caption with no other change, and turns the others quiet with `exclusive` and adds a row with `multiCaption` (groundwork only, no singing voice)
 
 ## 8. Samples prepared ahead (2.5 h, D9)
 
-- [ ] 8.1 `spokenSchedule` with a `needSamples` switch (`spokenNeeds`): every line without the sample filter, with bank and text
+- [x] 8.1 `spokenSchedule` with a `needSamples` switch (`spokenNeeds`): every line without the sample filter, with bank and text
 - [ ] 8.2 Compose: on open, Generate and regrowth, queue the missing lines to `/voice/say`, read the manifest again, recompile; progress note in the Voices group
 - [ ] 8.3 Radio: the same when the next song is prepared, its first lines first; progress in Coming next
 - [ ] 8.4 Without the helper: the list of lines without a sample in the Voices group, with the `npm run voices` hint
 
 ## 9. Fallback chain (2 h, D10)
 
-- [ ] 9.1 Per-line fallback to the default voice for narrator lines (as voice-track lines already do), speaker settings kept
+- [x] 9.1 Per-line fallback to the default voice for narrator lines (as voice-track lines already do), speaker settings kept
 - [ ] 9.2 On-the-fly sample from the dev voice helper (about 1 s), then the line is spoken as soon as it is ready (next beat of its bar, else the next bar, never over a higher rank) and captioned when it plays
 - [ ] 9.3 Last resort: silent, text as the step tag; a dev-console note on every fallback (visible side of `#63`)
 
