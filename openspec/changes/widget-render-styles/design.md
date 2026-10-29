@@ -147,7 +147,7 @@ Take B as a look of its own in `LOOKS`, named "Claude" in every language (the ow
 - a prompt box with a typed line and a block cursor: the narrator's or the radio's spoken line when there is one, else a line made from the section change ("bring in hats, bass"); typed out over the first bar of the line, from the bar alone (no state);
 - a status line (tracks, section n of m, time, the render) and a mode line.
 
-It is a widget look for the renders: Terminal draws it as it is, ASCII as its glyphs, and 1-bit, CRT and LED as passes over it. Same frame from the same time and feed, in every output.
+For the renders: Terminal draws it as it is; ASCII, 1-bit, CRT and LED are passes over it (it is text already). It leaves room at the top for the stage's readout and look buttons, as Monitor does. Same frame from the same time and feed, in every output.
 
 ## Risks / Trade-offs
 
