@@ -84,6 +84,14 @@ const CHECKS = {
     const merged = mergeBackup(b, k => (k === 'coding-misk-patterns' ? [{ id: 'p-2', name: 'old' }, { id: 'p-9', name: 'here' }] : null)).values['coding-misk-patterns'];
     assert(merged.map(p => p.id).join() === 'p-2,p-9,p-1,p-3' && merged[0].name === 'Hook · B', merged.map(p => `${p.id}:${p.name}`).join());
   },
+  'use counts of saved patterns merge: the larger count and the newer last use (saved-patterns-list D5)'() {
+    const P = (id, extra = {}) => ({ id, name: id, kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, ...extra });
+    const b = makeBackup([['coding-misk-patterns', [P('p-1', { uses: 1, lastUsed: '2026-10-28T10:00:00.000Z' }), P('p-2', { uses: 6 }), P('p-3')]]]);
+    const cur = [P('p-1', { uses: 4, lastUsed: '2026-10-20T10:00:00.000Z' }), P('p-2', { uses: 2, lastUsed: '2026-10-01T10:00:00.000Z' }), P('p-4', { uses: 1 })];
+    const got = mergeBackup(b, k => (k === 'coding-misk-patterns' ? cur : null)).values['coding-misk-patterns'];
+    const by = Object.fromEntries(got.map(p => [p.id, `${p.uses || 0}|${(p.lastUsed || '').slice(0, 10)}`]));
+    assert(by['p-1'] === '4|2026-10-28' && by['p-2'] === '6|2026-10-01' && by['p-3'] === '0|' && by['p-4'] === '1|', JSON.stringify(by));
+  },
   'new parts of the Patterns tab merge by id, newest kept, at most 30 (pattern-followups)'() {
     const d = (id, at, name = id) => ({ id, kind: 'riffs', type: 'guitar', name, pattern: { idea: { rhythm: 'x x' } }, at });
     const b = makeBackup([['coding-misk-pattern-drafts', [d('d-2', '2026-10-25T10:02:00Z', 'new copy'), d('d-3', '2026-10-25T10:03:00Z')]]]);

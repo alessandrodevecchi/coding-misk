@@ -4,6 +4,7 @@ import { mergeTrash, mergeHidden } from '../library/trash.js';
 import { upgradeLibrary } from '../library/code-upgrade.js';
 import { CODE_VERSION } from '../song/writer.js';
 import { DRAFTS_KEY, mergeDrafts } from '../library/pattern-drafts.js';
+import { mergeUses } from '../library/patterns.js';
 
 export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
@@ -49,8 +50,10 @@ export function mergeBackup(backup, get) {
       values[k] = byId(get(k), v);
       counts[k === 'coding-misk-styles' ? 'styles' : 'artists'] += (Array.isArray(v) ? v.length : 0);
     } else if (k === 'coding-misk-patterns') {
-      // the user's patterns (pattern-library) by id, like styles and artists
-      values[k] = byId(get(k), v);
+      // the user's patterns (pattern-library) by id, like styles and artists; the use counts keep the larger count and
+      // the newer last use of the two copies (saved-patterns-list D5)
+      const cur = Array.isArray(get(k)) ? get(k) : [];
+      values[k] = byId(cur, v).map(p => { const c = p && p.id && cur.find(x => x && x.id === p.id); return c && c !== p ? { ...p, ...mergeUses(c, p) } : p; });
       counts.patterns += (Array.isArray(v) ? v.length : 0);
     } else if (k === DRAFTS_KEY) {
       // new parts of the Patterns tab, not saved yet (pattern-followups D2): by id, newest kept up to the cap
