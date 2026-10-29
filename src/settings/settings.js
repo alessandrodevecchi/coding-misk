@@ -13,6 +13,7 @@ import { confirmInline } from '../library/songs-view.js';
 import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shapeKeepOf, LONG_SONG, LONG_SONG_MIN, LONG_SONG_MAX, longSongOf } from '../song/crescendo.js';
 import { shapeCounts } from '../song/shapes.js';
 import { AIR_CHOOSERS, AIR_CHOOSER, chooserOf, chooserName } from '../endless/waypoints.js';
+import { RENDERS } from '../music.js';
 import { CW_KEY, CW_DEFAULTS, CW_INSTRUMENTS, CW_WINDOWS, CW_PARAMS, CW_SIZE_LIMITS, WIDGETS, widgetSettings } from '../live/widgets.js';
 import { SW_KEY, SW_OPEN, SW_LAYERS, SW_MAPPINGS, SW_COLOURS, SW_SILENT, SW_LIMITS, stageSettings } from '../visuals/stage-settings.js';
 
@@ -35,6 +36,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setTheme'), seg('data-set-ui', [['neon', 'NEON'], ['hw', 'HW']], app.ui()))}
           ${row(t('setLang'), seg('data-set-lang', [['it', 'IT'], ['en', 'EN']], app.lang()))}
           ${row(t('setRadioLook'), `<select id="set-radio-look" data-no-knob>${looks.map(([k, l]) => opt(k, store.get('coding-misk-radio-look', 'palco'), tx(l))).join('')}</select>`, t('setRadioLookHint'))}
+          ${row(t('setRender'), `<select id="set-render" data-no-knob>${RENDERS.map(([k, l]) => opt(k, store.get('coding-misk-render', 'normal'), tx(l))).join('')}</select>`, t('setRenderHint'))}
+          ${row(t('setRenderLight'), `<select id="set-render-light" data-no-knob>${['auto', 'on', 'off'].map(k => opt(k, store.get('coding-misk-render-light', 'auto'), t(`setRenderLight:${k}`))).join('')}</select>`, t('setRenderLightHint'))}
           ${codeRows()}
         </div>
         <div class="card set-card"><h3>${esc(t('setAudio'))}</h3>
@@ -52,6 +55,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setVidCodeColors'), `<select data-vid-opt="codeColors" data-no-knob>${CODE_COLORS.map(k => opt(k, vid.codeColors, t(`vidCodeColors:${k}`))).join('')}</select>`, t('setVidCodeColorsHint'))}
           ${row(t('setVidRealScope'), `<select data-vid-opt="realScope" data-no-knob>${REAL_SCOPES.map(k => opt(k, vid.realScope, t(`vidRealScope:${k}`))).join('')}</select>`, t('setVidRealScopeHint'))}
           ${row(t('setVidVisual'), `<select data-vid-opt="visual" data-no-knob>${opt('song', vid.visual, t('vidVisual:song'))}${looks.map(([k, l]) => opt(`fixed:${k}`, vid.visual, t('vidVisual:fixed', { look: tx(l) }))).join('')}${opt('song-cycle', vid.visual, t('vidVisual:song-cycle'))}${opt('section-cycle', vid.visual, t('vidVisual:section-cycle'))}</select>`, t('setVidVisualHint'))}
+          ${row(t('setRender'), `<select data-vid-opt="render" data-no-knob>${opt('stage', vid.render, t('renderStage'))}${RENDERS.map(([k, l]) => opt(k, vid.render, tx(l))).join('')}</select>`)}
           ${row(t('setVidSoulMode'), `<select data-vid-opt="soul" data-no-knob>${SOULS.map(k => opt(k, vid.soul, t(`vidSoul:${k}`))).join('')}</select>`, t(`vidSoulHint:${vid.soul}`))}
           ${vid.layout === 'code' && vid.soul !== 'off' && vid.soul !== 'full' ? row(t('setVidSoul'), seg('data-vid-soul', [['1', t('vidSoulShown')], ['0', t('vidSoulFolded')]], vid.soulPanel ? '1' : '0'), t('setVidSoulHint')) : ''}
           ${row(t('setVidPreset'), `<span class="vid-presets"><select id="set-vid-preset" data-no-knob><option value="">${esc(t('vidPresetPick'))}</option>${Object.keys(presets).sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select><input id="set-vid-preset-name" type="text" maxlength="40" placeholder="${esc(t('vidPresetName'))}" aria-label="${esc(t('vidPresetName'))}"><button class="btn small" id="set-vid-preset-save">${esc(t('vidPresetSave'))}</button>${Object.keys(presets).length ? `<button class="btn small danger" id="set-vid-preset-del">${esc(t('vidPresetDel'))}</button>` : ''}</span>`, t('setVidPresetHint'))}
@@ -63,6 +67,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('fragShow'), `<select data-frag-opt="show" data-no-knob>${F_SHOWS.map(k => opt(k, fr.show, t(`fragShow:${k}`))).join('')}</select>`)}
           ${row(t('fragAspect'), `<select data-frag-opt="aspect" data-no-knob>${F_ASPECTS.map(k => opt(k, fr.aspect, t(`fragAspect:${k}`))).join('')}</select>`, t('fragAspectHint'))}
           ${row(t('fragLook'), `<select data-frag-opt="look" data-no-knob>${opt('song', fr.look, t('fragPick:song'))}${opt('random', fr.look, t('fragPick:random'))}${looks.map(([k, l]) => opt(k, fr.look, tx(l))).join('')}</select>`)}
+          ${row(t('setRender'), `<select data-frag-opt="render" data-no-knob>${opt('stage', fr.render, t('renderStage'))}${RENDERS.map(([k, l]) => opt(k, fr.render, tx(l))).join('')}</select>`)}
           ${row(t('fragSoulView'), `<select data-frag-opt="soulView" data-no-knob>${opt('song', fr.soulView, t('fragPick:song'))}${opt('random', fr.soulView, t('fragPick:random'))}${SOUL_VIEWS.map(k => opt(k, fr.soulView, `${k.toUpperCase()} · ${SOUL_VIEW_NAMES[k]}`)).join('')}</select>`)}
           ${row(t('fragFiles'), `<span class="chips" role="group">${F_FILES.map(k => `<button class="chip" data-frag-file="${k}" aria-pressed="${fr.files.includes(k)}">${esc(t(`fragFile:${k}`))}</button>`).join('')}</span>`, t('fragFilesHint'))}
           ${row(t('fragBandTop'), seg('data-fb-bandtop', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bandTop ? '1' : '0'))}
@@ -266,6 +271,9 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       if (d.cwPrim) { setCw(S => { const I = S.instruments[d.cwPrim], old = I.primary; I.primary = x.value; I.secondary = [...I.secondary.filter(w => w !== x.value), ...(old !== x.value && !I.secondary.includes(old) ? [old] : [])]; }); return render(); }
     }
     if (e.target.id === 'set-radio-look') store.set('coding-misk-radio-look', e.target.value);
+    // the stage's render and its light form on slow devices (widget-render-styles D8)
+    if (e.target.id === 'set-render') { if (app.setRender) app.setRender(e.target.value); else store.set('coding-misk-render', e.target.value); }
+    if (e.target.id === 'set-render-light') { if (e.target.value === 'auto') store.remove('coding-misk-render-light'); else store.set('coding-misk-render-light', e.target.value); }
     if (e.target.id === 'set-code-theme') { app.codeTheme.set({ theme: e.target.value }); render(); }
     if (e.target.id === 'set-code-font') { app.codeTheme.set({ font: e.target.value }); render(); }
     if (e.target.id === 'set-format') { store.set('coding-misk-export-format', e.target.value); render(); }

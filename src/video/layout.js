@@ -23,7 +23,8 @@ export const SOULS = ['auto', 'off', 'panel', 'full'];
 // realScope (code-widgets D11, cw-5): scope and spectrum widgets in the fast video from their own instrument's render,
 // 'auto' (back to the whole song's wave when the export would take more than twice as long) or 'always'
 // codeColors (code-themes D8): the code in videos in the code theme's colours ('panel') or in the app theme's ('app')
-export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true, visual: 'song', soul: 'auto', realScope: 'auto', codeColors: 'panel' };
+// render (widget-render-styles D7): the stage's render ('stage') or one of RENDERS
+export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true, visual: 'song', soul: 'auto', realScope: 'auto', codeColors: 'panel', render: 'stage' };
 export const CODE_COLORS = ['panel', 'app'];
 export const REAL_SCOPES = ['auto', 'always'];
 
@@ -73,7 +74,7 @@ export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code', 
 export const F_ASPECTS = ['whole', 'fill', '16:9', '4:3', '1:1', '4:5', '9:16'];
 export const F_CODE = ['focus', 'scroll', 'follow'];
 export const F_FILES = ['video', 'audio', 'texts', 'list'];
-export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', look: 'song', soulView: 'song', tagline: 'music written as code', taglineMode: 'fixed', bleed: true, files: ['video', 'audio', 'texts', 'list'], fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
+export const V_DEFAULTS = { format: '9:16', show: 'visual', aspect: '1:1', bands: true, rotate: false, codeMode: 'focus', look: 'song', soulView: 'song', render: 'stage', tagline: 'music written as code', taglineMode: 'fixed', bleed: true, files: ['video', 'audio', 'texts', 'list'], fullLine: '', vTitle: false, label: true, glitch: true, vLength: 30 };
 // the layouts of the first version, kept for saved settings and agents
 const OLD = { 'v-code': { show: 'visual-code', aspect: 'fill', bands: false }, 'v-soul': { show: 'visual-soul', aspect: 'fill', bands: false }, 'v-bands': { show: 'visual', aspect: '1:1', bands: true }, 'v-soul-bands': { show: 'soul', aspect: 'fill', bands: true } };
 export function fragmentOpts(o = {}) {

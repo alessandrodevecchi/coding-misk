@@ -2,7 +2,7 @@ import '@strudel/repl';
 import './style.css';
 import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
-import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
+import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, RENDERS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks } from './song/build.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
@@ -101,7 +101,7 @@ import { startHardware } from './hardware.js';
 import { CW_KEY, widgetSettings, placeWidgets, widgetOptions, linkAnalysers } from './live/widgets.js';
 import { SW_KEY, stageSettings, stageMapping, stageScopeInstruments, layerOn } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
-const WIDGET_LOOKS = ['monitor', 'rullo'];
+const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
 import { createCodeThemes } from './code-themes/install.js';
 import { widgetPlan, linesByKey, fastWidgets } from './video/widget-frames.js';
 import { noteStore } from './visuals/stage-feed.js';
@@ -472,6 +472,12 @@ const GROW_EYES = { hidden: EYE_CLOSED, compact: EYE_HALF, open: EYE_OPEN };
 let growView = GROW_VIEWS.includes(store.get('coding-misk-growth-view', 'compact')) ? store.get('coding-misk-growth-view', 'compact') : 'compact';
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!PICK_LOOKS.some(([k]) => k === look)) look = 'palco';
+// the render style of the stage (widget-render-styles D1, D8): next to the look, the user's own (a song carries none)
+const renderOf = v => (RENDERS.some(([k]) => k === v) ? v : 'normal');
+let render = renderOf(store.get('coding-misk-render', 'normal'));
+// the render of a video or a fragment: 'stage' (the stage's, by default) or a render of its own
+const outRender = v => (v && v !== 'stage' ? renderOf(v) : render);
+const renderLight = () => (['on', 'off'].includes(store.get('coding-misk-render-light', 'auto')) ? store.get('coding-misk-render-light', 'auto') : 'auto');
 // the soul scene (#46) keeps the colours of the last other visual: the app's accents and the colour views' hue
 // the fast video's frame being drawn (#53): { info, code, say, soulSrc }, read instead of the live player
 let fv = null, exportCtl = null;
@@ -1452,6 +1458,8 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen
   const pickOf = (choice, list) => (choice === 'random' ? list[hashString(`${frag.code}/${list.length}`) % list.length] : list.includes(choice) ? choice : null);
   const fragLook = frag ? pickOf(frag.o.look, looks) : null;
+  // the render of the file (widget-render-styles D7): the fragment's or the video's own, else the stage's
+  const fRender = outRender(frag ? frag.o.render : o.render);
   if (frag) soul.force(pickOf(frag.o.soulView, SOUL_VIEWS));
   const EQ = ['kick', 'snare', 'hats', 'bass', 'arp', 'pad', 'hook'];
   visuals.hold(true);
@@ -1474,7 +1482,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       };
       const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
-      visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0 });
+      visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off' });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
       else video.composeAt({ layout, q, ct }, cyc, t);
     },
@@ -1600,7 +1608,7 @@ async function makeFragments(opts = {}) {
   if (fastJob || rec || capture) return { error: 'busy' };
   const src = fragmentSource(opts.source); if (src.error) return src;
   // settings, then what the call says: format, show, aspect, bands (true/false or { tagline, taglineMode, fullLine, vTitle }), rotate, codeMode, label, glitch, or an old layout name
-  const pick = ['format', 'show', 'aspect', 'rotate', 'bleed', 'files', 'codeMode', 'label', 'glitch', 'layout', 'look', 'soulView', 'tagline', 'taglineMode'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
+  const pick = ['format', 'show', 'aspect', 'rotate', 'bleed', 'files', 'codeMode', 'label', 'glitch', 'layout', 'look', 'render', 'soulView', 'tagline', 'taglineMode'].reduce((a, k) => (opts[k] !== undefined ? { ...a, [k]: opts[k] } : a), {});
   // bands: true/false for both, or { bands, bandTop, bandBottom, tagline, … }; a call's choice wins over the settings
   const bandObj = typeof opts.bands === 'object' && opts.bands ? opts.bands : opts.bands !== undefined ? { bands: !!opts.bands } : {};
   const bands = 'bands' in bandObj ? { bandTop: bandObj.bands, bandBottom: bandObj.bands, ...bandObj } : bandObj;
@@ -3731,6 +3739,8 @@ $('#looks').addEventListener('change', e => {
   if (v === 'soul') return;
   if (soulOverride) soulDisplay.act('override');
   setLook(v); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', v); });
+// the render menu beside the looks (widget-render-styles D8)
+$('#renders').addEventListener('change', e => { render = renderOf(e.target.value); store.set('coding-misk-render', render); e.target.value = render; });
 // the arrows beside the menu: the previous or next visual, round the list
 $$('[data-look-step]').forEach(b => b.addEventListener('click', () => {
   const i = PICK_LOOKS.findIndex(([k]) => k === look), n = PICK_LOOKS.length;
@@ -4725,6 +4735,8 @@ function renderStatic() {
   $('#tr-new').innerHTML = `${PLUS}<span>${esc(t('newTrack'))}</span>${CHEVRON}`;
   $('#looks').innerHTML = PICK_LOOKS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('') + `<option value="soul" disabled>${esc(t('soulLook'))} ${LOCK}</option>`;
   $('#looks').value = soulOverride ? 'soul' : look;
+  $('#renders').innerHTML = RENDERS.map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('');
+  $('#renders').value = render;
   $('#play').dataset.state = '';
 }
 function renderAll() {
@@ -4756,6 +4768,7 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     liveOpenWindow: () => liveLink.openWindow(), liveOpenRoom: () => liveLink.openRoom(), liveOn: () => { try { return liveLink.on; } catch (e) { return false; } },
     // hidden built-in songs (#68, D3b): how many, and all of them shown again
     hiddenSongs: () => (user.hidden || []).length, showHiddenSongs: () => showHiddenSongs(),
+    setRender: v => { render = renderOf(v); store.set('coding-misk-render', render); $('#renders').value = render; },
     radioSettings: () => (radio ? radio.settings : { transition: 'artist', harmony: 'artist', profile: 'artist', scope: 'song', material: 'mix' }), setRadio: (k, v) => radio && radio.setOption(k, v),
   } });
 $('#open-settings').addEventListener('click', () => showTab($('#tab-impostazioni').hidden ? 'impostazioni' : prevTab));
@@ -4822,10 +4835,39 @@ function stageSection(cyc) {
   }
   return song && song.meta ? of(song.meta) : null;
 }
+// the section around a cycle with its name, its number and the next one, for the text interfaces of the Terminal render
+// and the "Claude" look (widget-render-styles D10): { label, i, n, end, next } or null
+function stageSectionInfo(cyc) {
+  const of = m => {
+    if (!m || !m.sections || !m.sections.length) return null;
+    const i = Math.max(0, m.sectionAt(Math.min(cyc, m.bars - 0.001))), s = m.sections[i], nx = m.sections[i + 1];
+    return s ? { label: s.label, i, n: m.sections.length, end: s.start + s.len, next: nx ? nx.label : null } : null;
+  };
+  if (fv) return of(fv.meta);
+  if (mode === 'radio' && radio && radio.on) {
+    const rs = radio.state, it = rs && rs.stream[rs.onAir], doc = it && it.song;
+    if (!doc || !Array.isArray(doc.sections)) return null;
+    let at = it.start;
+    for (let i = 0; i < doc.sections.length; i++) {
+      const x = doc.sections[i], nx = doc.sections[i + 1];
+      if (cyc < at + x.bars) return { label: x.name || x.label || '', i, n: doc.sections.length, end: at + x.bars, next: nx ? nx.name || nx.label || '' : null };
+      at += x.bars;
+    }
+    return null;
+  }
+  return song && song.meta ? of(song.meta) : null;
+}
+// the render while a video records from the stage (not the whole tab): the video's own; else the stage's
+const recRender = () => { try { return video.on && video.layout !== 'tab' ? outRender(video.opts().render) : render; } catch (e) { return render; } };
 const visuals = startVisuals({
-  getS: () => ({ look: soulOverride ? 'soul' : look }), soul,
+  // a video being recorded from the stage (not the whole tab) draws the video's render
+  getS: () => ({ look: soulOverride ? 'soul' : look, render: recRender(), light: renderLight() }), soul,
   stage: {
     settings: () => stageWidgets().S, options: () => stageWidgets().sw, section: stageSection, theme: () => ui,
+    sectionInfo: stageSectionInfo,
+    word: (k, vars) => { const key = `term:${k}`, v = t(key, vars); return v === key ? null : v; },
+    lookName: l => { const x = LOOKS.find(([k]) => k === l); return x ? tx(x[1]) : l; },
+    renderName: r => { const x = RENDERS.find(([k]) => k === r); return x ? tx(x[1]) : r; },
     seed: () => (fv ? fv.seed : (song && song.id) || ''),
     label: inst => { const k = `stInst:${inst}`, v = t(k); return v === k ? inst : v; },
   },

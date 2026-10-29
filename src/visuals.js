@@ -1,10 +1,13 @@
-import { INSTRUMENTS } from './music.js';
+import { INSTRUMENTS, NATIVE_RENDERS } from './music.js';
 import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache, cwInstrument, DRUMS } from './visuals/stage-feed.js';
 import { pitchesOf } from './visuals/widget-painters.js';
 import { drawMonitor, drawRullo } from './visuals/widget-looks.js';
 import { themePalette, scenePalette } from './visuals/widget-palettes.js';
 import { drawLayer, seeThrough } from './visuals/widget-layer.js';
 import { layerOn, limitOf } from './visuals/stage-settings.js';
+import { createRenderer } from './visuals/render-styles.js';
+import { termPalette } from './visuals/term-grid.js';
+import { drawMonitorTerm, drawRulloTerm, drawMonitorAscii, drawRulloAscii, drawClaude, drawLayerGlyph } from './visuals/glyph-looks.js';
 
 // Visual su canvas sincronizzati con l'audio.
 // Ogni strumento suona su un analizzatore separato (.analyze("kick"), .analyze("bass"), …):
@@ -14,7 +17,10 @@ import { layerOn, limitOf } from './visuals/stage-settings.js';
 // afterFrame(cyc, playing): called after each frame (the video recorder draws its frame there, #27)
 // stage: the widget looks' inputs (widgets-on-stage): { settings() (the panels' mapping: the code widgets' settings, or
 // the stage's own instruments; a new object only when a setting changes), options() (the stage widgets' settings:
-// layer, limits, colours, silent), section(cyc) → { start, end } in cycles, seed(), label(instrument), theme() → 'neon' | 'hw' }
+// layer, limits, colours, silent), section(cyc) → { start, end } in cycles, seed(), label(instrument), theme() → 'neon' | 'hw' };
+// for the render styles and the "Claude" look (widget-render-styles): sectionInfo(cyc) → { label, i, n, end, next },
+// word(key, vars) → a word of the text interface or null, lookName(look), renderName(render)
+// getS() → { look, render ('normal' by default), light ('auto' | 'on' | 'off', the light form on slow devices) }
 export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}), soul = null, afterFrame = null, stage = null }) {
   const $ = (s, r = document) => r.querySelector(s);
   const cv = $('#stage'), vcx = cv.getContext('2d');
@@ -211,7 +217,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   // per source of notes: the panels of each section, the pitches, the spectrum columns
   const wcache = new WeakMap();
   const cacheOf = src => { let c = wcache.get(src); if (!c) { c = { rosters: new Map(), pitches: new Map(), ranges: new Map(), cols: columnCache(), S: null }; wcache.set(src, c); } return c; };
-  const WIDGET_LOOKS = ['monitor', 'rullo'];
+  const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
   // (for the checks: the time of the last widget look frames, in ms)
   const stageTimes = globalThis.codingMiskStageTimes = [];
   function sectionAt(cyc) {
@@ -301,7 +307,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       return seen.length ? { lo: Math.min(r.lo, ...seen), hi: Math.max(r.hi, ...seen) } : r;
     };
     return {
-      cyc, pal, roster, dim: silent, full, lanes, melodic,
+      cyc, pal, roster, prev, dim: silent, full, lanes, melodic,
       fade: same ? 1 : Math.max(0, Math.min(1, (cyc - sec.start) / 0.25)),
       notes: (inst, c0, c1) => (c0 >= cyc - 2.5 && c1 <= cyc + 2.5 ? around(inst).filter(n => n[1] > c0 && n[0] < c1) : src.around(inst, c0, c1)),
       level, flash: inst => (playing || feed ? flashAt(now(inst), cyc) : 0), silent: inst => !(playing || feed) || silentAt(now(inst), cyc),
@@ -311,24 +317,47 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   }
   // the panels' font, loaded before the first widget look frame (a frame drawn before it would use another font)
   try { if (document.fonts) document.fonts.load('600 14px "JetBrains Mono"').catch(() => {}); } catch (e) {}
-  function widgetLook(look, cyc, playing) {
-    const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000, look);
-    if (!F) { cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H); return; }
-    (look === 'rullo' ? drawRullo : drawMonitor)(cx, W, H, F);
+  // the song's information for the text interfaces (Terminal render, "Claude" look), read once per frame when needed
+  function termInfo(cyc, playing, look, render) {
+    const I = getInfo(cyc) || {}, S = stage && stage.sectionInfo ? stage.sectionInfo(cyc) : null, sec = sectionAt(cyc);
+    const sayBar = I.say && Number.isFinite(I.bar) ? I.bar - (I.sayAt || 0) : NaN;
+    return {
+      title: I.title || '', bar: Number.isFinite(I.bar) ? I.bar : cyc, bars: I.bars ? Math.round(I.bars) : 0, bpm: I.bpm || 0, playing,
+      say: sayBar >= 0 && sayBar < 8 ? I.say : '', sayBar, secBar: cyc - sec.start,
+      section: S ? S.label : '', sectionNo: S ? S.i + 1 : 0, sections: S ? S.n : 0, next: S ? S.next : null, nextIn: S ? S.end - cyc : 0,
+      lookName: stage && stage.lookName ? stage.lookName(look) : look, renderName: stage && stage.renderName ? stage.renderName(render) : render,
+      word: stage && stage.word ? stage.word : null, wave,
+      stageWord: stage && stage.word ? stage.word('stage') : null, codeWord: stage && stage.word ? stage.word('code') : null,
+      scopeWord: stage && stage.word ? stage.word('scope') : null, spectrumWord: stage && stage.word ? stage.word('spectrum') : null,
+    };
+  }
+  // a widget look in a render: the glyph forms of ASCII and Terminal (D4), the "Claude" look (D10); → true when the
+  // render was drawn natively (no pass after it)
+  function widgetLook(look, cyc, playing, render = 'normal') {
+    const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000, look === 'claude' ? 'monitor' : look, look);
+    if (!F) { cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H); return false; }
+    const theme = stage.theme ? stage.theme() : 'neon', native = NATIVE_RENDERS.includes(render);
+    let drawn = false;
+    if (look === 'claude') { drawClaude(cx, W, H, F, termPalette(theme), termInfo(cyc, playing, look, render)); drawn = render === 'terminal'; }
+    else if (native) { const info = termInfo(cyc, playing, look, render); if (render === 'terminal') (look === 'rullo' ? drawRulloTerm : drawMonitorTerm)(cx, W, H, F, termPalette(theme), info); else (look === 'rullo' ? drawRulloAscii : drawMonitorAscii)(cx, W, H, F, info); drawn = true; }
+    else (look === 'rullo' ? drawRullo : drawMonitor)(cx, W, H, F);
     // (for the checks: the panels of Monitor, the notes Rullo shows)
     if (look === 'monitor') globalThis.codingMiskStagePanels = F.roster.filter(p => F.dim !== 'hidden' || !p.quiet).map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`);
     else globalThis.codingMiskStageNotes = [...F.melodic, ...F.lanes].reduce((a, i) => a + F.notes(i, cyc - 2, cyc + 2).length, 0);
     stageTimes.push(performance.now() - t0); if (stageTimes.length > 600) stageTimes.shift();
+    return drawn;
   }
   // the layer over the other looks (D4): off by default, then nothing is asked or drawn
   const layerTimes = globalThis.codingMiskLayerTimes = [];
-  function widgetLayer(look, cyc, playing) {
+  // render: ASCII or Terminal draw the layer natively, after the pass (widget-render-styles D2, D4)
+  function widgetLayer(look, cyc, playing, render = 'normal') {
     const kind = stage && layerOn(optionsOf(), look);
     if (!kind) { globalThis.codingMiskLayerPanels = null; return; }
     const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000, kind, look);
     if (!F) return;
     cx.save();
-    const drawn = drawLayer(cx, W, H, F, kind);
+    const native = NATIVE_RENDERS.includes(render);
+    const drawn = native ? drawLayerGlyph(cx, W, H, F, kind, render, termPalette(stage.theme ? stage.theme() : 'neon'), termInfo(cyc, playing, look, render)) : drawLayer(cx, W, H, F, kind);
     cx.restore();
     // (for the checks: the layer's panels and where they are)
     globalThis.codingMiskLayerPanels = { kind, panels: drawn.map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`) };
@@ -975,17 +1004,31 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const EQ = ['kick', 'snare', 'hats', 'bass', 'guitar', 'arp', 'pad', 'hook'];
   const logo = document.querySelector('.logo');
 
-  // one picture of the scene: decays, then the look's drawing
-  function paint(look, cyc, dt, playing) {
+  // the render styles (widget-render-styles): the pass after the look and the flash, on the canvas drawn
+  const renderer = createRenderer();
+  // (for the checks: the time of the last passes, in ms, and the render drawn)
+  const passTimes = globalThis.codingMiskPassTimes = [];
+  // one picture of the scene: decays, then the look's drawing, then the render's pass
+  // r: { render, light, fixed (no automatic light form: the fast video) }
+  function paint(look, cyc, dt, playing, r = {}) {
+    const render = r.render || 'normal';
     if (!playing) echoes.length = 0;
     kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
     const pal = PAL[look] || PAL.palco;
     cx.clearRect(0, 0, W, H);
+    let native = false;
     if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
-    else if (WIDGET_LOOKS.includes(look)) { if (soul) soul.hide(); widgetLook(look, cyc, playing); }
-    else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); widgetLayer(look, cyc, playing); }
+    else if (WIDGET_LOOKS.includes(look)) { if (soul) soul.hide(); native = widgetLook(look, cyc, playing, render); }
+    // the layer over the scene: before the pass, or drawn natively after it in ASCII and Terminal (D2)
+    else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); if (!NATIVE_RENDERS.includes(render)) widgetLayer(look, cyc, playing); }
     // (the widget looks have no flash: their panels flash on their own onsets)
     if (flash > .02 && !reduce && look !== 'soul' && !WIDGET_LOOKS.includes(look)) { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
+    // D2: the pass over the finished frame, unless the look drew the render natively
+    if (render !== 'normal' && !native) {
+      const ms = renderer.apply(cx, cc, render, { look, theme: stage && stage.theme ? stage.theme() : 'neon', W, H, dpr, light: r.light || 'auto', fixed: !!r.fixed, info: () => termInfo(cyc, playing, look, render) });
+      passTimes.push(ms); if (passTimes.length > 600) passTimes.shift();
+    }
+    if (NATIVE_RENDERS.includes(render) && look !== 'soul' && !WIDGET_LOOKS.includes(look)) widgetLayer(look, cyc, playing, render);
   }
   // the stage shows the video picture, fitted (while a video records, or is rendered)
   function showTarget() {
@@ -995,9 +1038,10 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   }
   // a frame of the fast video: at time now (ms), cycle cyc, with the look and the feed given
   // feed: { raw: { instrument: level }, wave: Float32Array(256), hook: Float32Array(128) }
-  function drawAt({ now, cyc, look, feed: f, dt = 1 / 30, show = false }) {
+  // render, light: the render of the video and its light form ('on' or 'off'; never automatic, so the frames repeat)
+  function drawAt({ now, cyc, look, feed: f, dt = 1 / 30, show = false, render = 'normal', light = 'off' }) {
     feed = f; clock = () => now;
-    try { readAudio(dt, now); paint(look, cyc, dt, true); if (show && target) showTarget(); }
+    try { readAudio(dt, now); paint(look, cyc, dt, true, { render, light: light === 'on' ? 'on' : 'off', fixed: true }); if (show && target) showTarget(); }
     finally { feed = null; clock = () => performance.now(); }
   }
 
@@ -1020,7 +1064,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const nSteps = getSteps ? getSteps() : 16;
     const step = playing ? Math.floor(cyc * nSteps) % nSteps : -1;
     if (step !== lastStep) { lastStep = step; onStep(step); }
-    paint(getS().look, cyc, dt, playing);
+    { const S = getS(); paint(S.look, cyc, dt, playing, { render: S.render, light: S.light }); }
 
     if (logo) logo.style.setProperty('--pulse', kick.toFixed(3));
     eq.forEach((el, i) => el.style.setProperty('--l', (playing ? lv[EQ[i]] : .15 + .1 * Math.sin(now / 400 + i)).toFixed(3)));
@@ -1033,5 +1077,5 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   let idle = 0, spin = 0;
   requestAnimationFrame(frame);
   // levels: the current level of each instrument (analysers live, the feed in a fast video)
-  return { setTarget, drawAt, pump, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; }, get levels() { return lastLevels; } };
+  return { setTarget, drawAt, pump, get lightForm() { return renderer.light; }, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; }, get levels() { return lastLevels; } };
 }

@@ -48,7 +48,7 @@ export function stageMapping(sw, cw) {
 }
 
 // the layer over a look: 'strip', 'screen' (Palco's big screen) or null (off, a widget look, the soul)
-export const FULL_LOOKS = ['monitor', 'rullo', 'soul'];
+export const FULL_LOOKS = ['monitor', 'rullo', 'claude', 'soul'];
 export function layerOn(sw, look) {
   if (!sw || sw.layer === 'off' || FULL_LOOKS.includes(look)) return null;
   return sw.layer === 'palco' && look === 'palco' ? 'screen' : 'strip';

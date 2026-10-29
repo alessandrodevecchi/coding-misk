@@ -75,12 +75,12 @@ What it is: new looks such as "Terminal Monitor", "1-bit Rullo", each drawn by h
 Owner feedback on the first prototypes: the Terminal render looked like monochrome ASCII on a phosphor screen. The owner imagines a modern text interface instead, like today's agent command line tools and GPU terminals: a dark ground, many truecolour colours, a monospace font, rounded box-drawing panels with titles, a status bar, maybe a prompt line and a cursor, block characters for meters and spectra, braille or half blocks for lines, dim labels. Three takes were prototyped (screenshots `terminale-*`, neon and hardware):
 
 - **A, system monitor** (`terminale-a-monitor-*`): Monitor as one rounded panel per instrument, title in the instrument's colour and widget kind dimmed, a level line with a percentage, braille scopes, half-block piano rolls, `●` punchcards, a dimmed silent panel; a header line (song, tempo, bar, section) and a footer of key hints. Clear at a glance, same grid as Monitor, works for Rullo and the layer the same way. 2.4 to 4.8 ms at 720p, about 3 ms at 1080p (prototype, unoptimised).
-- **B, agent command line layout** (`terminale-b-monitor-*`): a header card with the song and a side list of what enters and what comes next, one large pane (lead) and smaller ones, a prompt box with a typed command and a cursor, a status line (tracks, section, time, render) and a mode line. The most characterful, but its layout is fixed and it shows information (what enters, the next change, a typed command) that no other look has: it is a scene, not a way of drawing one. 1.9 to 6.1 ms.
+- **B, agent command line layout** (`terminale-b-monitor-*`): a header card with the song and a side list of what enters and what comes next, one large pane (lead) and smaller ones, a prompt box with a typed command and a cursor, a status line (tracks, section, time, render) and a mode line. The most characterful, but its layout is fixed and it shows information (what enters, the next change, a typed command) that no other look has: it is a scene, not a way of drawing one. 1.9 to 6.1 ms. Built now as its own look, "Claude" (D10).
 - **C, clean truecolour over a scene** (`terminale-c-tramonto-*`): Tramonto as half-block truecolour cells (160 × 86 pixels), a tab bar, a braille scope pane and an eighth-block spectrum pane, a status bar with a mode badge and the section. Keeps the scene's colours and shapes, so it works on every look. 12 to 15 ms as prototyped (two rectangles per cell); drawn as one downscale and one upscale without smoothing it should cost about 1 ms plus the chrome.
 
-**Recommendation:** the Terminal render is A on the widget looks and the layer (native painters) and C on every other look (the half-block pass with the same chrome). Both share the palette, the panels and the status bar, so a video that cycles looks stays one family. B is not a render.
+**Recommendation:** the Terminal render is A on the widget looks and the layer (native painters) and C on every other look (the half-block pass with the same chrome). Both share the palette, the panels and the status bar, so a video that cycles looks stays one family. B is not a render: it is the "Claude" look (D10).
 
-**A signature scene instead?** Not for the render. A and C are what the render should be: any look, one choice. B is the best candidate for a later hand-made signature look, a full-screen text interface (working name "Console"), because it needs the song's information (what enters, the next change, the narrator's or the console's commands as the typed prompt) and a fixed composition. It would reuse the Terminal palette and glyph painters, cost about 5 agent hours, and belong in its own change after this one.
+**A signature scene instead?** Not for the render. A and C are what the render should be: any look, one choice. B needs the song's information (what enters, the next change, the narrator's lines as the typed prompt) and a fixed composition, so it is a look of its own. The owner asked for it now, named "Claude" (D10).
 
 ## Decisions
 
@@ -138,6 +138,17 @@ Measured by the browser check on the owner's machine class:
 - Fast video: a render adds at most 15% to the export time of the same song with Normal.
 - If Canvas 2D misses the 1080p budget after the atlas and cached canvases, a WebGL pass for 1-bit, CRT and LED is the fallback (a new decision then, with its own check).
 
+### D10. The "Claude" look
+
+Take B as a look of its own in `LOOKS`, named "Claude" in every language (the owner's explicit exception to the rule on brand names). Drawn with the Terminal grid and palette of the theme, from the frame of the widget looks (the stage feed) plus the song's information:
+
+- a header card: the look's mark, the song title, the section, the tempo; beside it what enters in this section (the instruments playing now that did not play in the section before) and what comes next (the next section's name and the bars left);
+- one large pane (the first melodic instrument of the section, as a half-block piano roll) and smaller ones for the rest of the roster (braille scopes, eighth-block spectra, dot punchcards), dimmed when silent;
+- a prompt box with a typed line and a block cursor: the narrator's or the radio's spoken line when there is one, else a line made from the section change ("bring in hats, bass"); typed out over the first bar of the line, from the bar alone (no state);
+- a status line (tracks, section n of m, time, the render) and a mode line.
+
+For the renders: Terminal draws it as it is; ASCII, 1-bit, CRT and LED are passes over it (it is text already). It leaves room at the top for the stage's readout and look buttons, as Monitor does. Same frame from the same time and feed, in every output.
+
 ## Risks / Trade-offs
 
 - **Glyph shimmer** when a cell's light sits on a step: no hysteresis (it would break the frame drawn alone). Mitigation: black point and a ramp with fewer steps; native painters where it matters most.
@@ -145,7 +156,7 @@ Measured by the browser check on the owner's machine class:
 - **Phone frame budget.** Mitigation: the light setting, automatic.
 - **Non-repeatable looks stay non-repeatable** (`Math.random()` sparks and Edgerunners glitch). The pass neither fixes nor worsens it. Out of scope here; worth a separate fix if the fast video must match the live picture exactly.
 - **Video size.** 1-bit and LED have many hard edges and dots; files may grow. Mitigation: measure in `check-export.cjs`, keep the quality presets.
-- **The word "style".** The interface says Render (Resa) to keep "style" for music recipes.
+- **The word "style".** The interface says Render (in Italian too, owner rs3) to keep "style" for music recipes.
 
 ## Later ideas
 
@@ -158,7 +169,7 @@ Each marked by how it would be drawn:
 
 ## Estimate
 
-About 22 agent hours, after `widgets-on-stage` phases 1 to 3:
+About 27 agent hours (22, and 5 for the "Claude" look), after `widgets-on-stage` phases 1 to 3:
 
 | Phase | Content | Hours |
 | --- | --- | --- |
@@ -167,24 +178,25 @@ About 22 agent hours, after `widgets-on-stage` phases 1 to 3:
 | 3. ASCII and Terminal as passes | Glyph atlas, ramp; Terminal half-block truecolour pass, tab bar, panes, status bar | 4 |
 | 4. Native glyph painters | Cell target; ASCII and Terminal forms of six painters (braille, eighth blocks, half blocks), rounded panels, header and footer, layer after the pass | 5 |
 | 5. Settings | Render menu, video and fragments, slow devices, backup, i18n, Guide | 2.5 |
+| 7. The "Claude" look | Layout of take B from the stage feed and the song information, both themes, the menu, checks and screenshots | 5 |
 | 6. Checks and docs | `check:render-styles`, browser check with times and screenshots of every look and render, video, clips, live, export, knowledge base, design system | 3.5 |
 
 Phases 1 and 2 alone (1-bit, CRT, LED on every look) are about 7 hours and can ship first; ASCII and Terminal follow.
 
 ## Open Questions
 
-Each with a recommended answer.
+Answered by the owner on 2026-10-29: every recommendation approved, with the changes to 3 (the name) and 10 (take B now, as the "Claude" look). The answers below are the decisions.
 
 1. **Separate visuals or filters?** Recommended: filters for the user (one Render choice next to the look, any look takes any render), drawn as a frame pass on every look and natively by the widget painters for ASCII and Terminal.
 2. **Which renders first?** Recommended: 1-bit, CRT and LED first (good as passes on every look, about 7 hours), then ASCII and Terminal with the native painters.
-3. **Name in the interface?** Recommended: "Render" (it: "Resa"), since "style" already names the music recipes. Renders: Normal (Normale), 1-bit, CRT, LED, ASCII, Terminal (Terminale).
+3. **Name in the interface?** Answered: "Render" in English and in Italian (not "Resa"), since "style" already names the music recipes. Renders: Normal (Normale), 1-bit, CRT, LED, ASCII, Terminal (Terminale).
 4. **Does a song carry a render, like its look?** Recommended: no for now; the render is the user's choice on the stage and in the video settings. A song field can come later.
 5. **Videos and fragments: same render as the stage?** Recommended: yes by default, with its own setting.
 6. **The code panel?** Decided by the owner: no render on the code panel, in the page or in videos. Recommended: no Settings option for it now either; the code themes change owns code styling.
 7. **Dither kind?** Recommended: Bayer only. Atkinson looks finer in a still but shimmers in video.
 8. **Hardware theme colours?** Recommended: amber for 1-bit, as the soul's retro filter; Terminal a warm truecolour palette with the scene on an amber ramp (screenshots `terminale-*-hw`).
 9. **WebGL?** Recommended: not now. Canvas 2D with a glyph atlas and cached canvases first; WebGL only if the 1080p budget is missed.
-10. **Terminal as a hand-made signature scene instead of a render?** Recommended: no for the render (take A on the widget looks, take C on the others). Take B, the agent command line layout, becomes a later signature look ("Console", about 5 hours, own change).
+10. **Terminal as a hand-made signature scene instead of a render?** Answered: no for the render (take A on the widget looks, take C on the others). Take B, the agent command line layout, is built now in this change as its own look named "Claude" (D10); the owner confirmed the brand name as an exception, in the code and in the public app.
 11. **Which Terminal take?** Recommended: A plus C, as above; B later as a scene.
 
 ## Prototypes

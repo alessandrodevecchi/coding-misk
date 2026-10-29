@@ -24,10 +24,10 @@ Every value is saved in the browser and goes into the backup.
 
 The page has nine cards:
 
-- **Appearance:** theme (NEON or HW, the hardware look), language (IT or EN), the radio visual, and the code theme: Code theme, Code font, Code size, Dim muted lines (see Code themes below).
+- **Appearance:** theme (NEON or HW, the hardware look), language (IT or EN), the radio visual, the stage's Render (`coding-misk-render`, also in the menu beside the looks) and Render on slow devices (`coding-misk-render-light`: automatic, the default and not stored; always light; never light) ([visuals.md](visuals.md)), and the code theme: Code theme, Code font, Code size, Dim muted lines (see Code themes below).
 - **Audio:** volume, export format and MP3 rate, code typing speed, export speed.
-- **Video:** layout, quality, title card, Code colours (the code theme's, or the app theme's colours), visual, soul panel, video presets.
-- **Vertical fragments:** format, what to show, aspect, look, soul view, files, bands, bleed, rotation, code mode, tagline, label, glitch, length.
+- **Video:** layout, quality, title card, Code colours (the code theme's, or the app theme's colours), visual, render (as the stage by default), soul panel, video presets.
+- **Vertical fragments:** format, what to show, aspect, look, render (as the stage by default), soul view, files, bands, bleed, rotation, code mode, tagline, label, glitch, length.
 - **Live output:** a window with only the picture of the session, for a capture program, and a control room in another tab.
 - **Radio:** transition, harmony, profile (as the artist and style say, or one profile for every generated song, radio-profiles; Custom is set in the console only), the default material source, the scope of console changes.
 - **Library:** built-in songs deleted in this browser, with restore.

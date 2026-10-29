@@ -38,6 +38,7 @@
     "check:profiles": "node --no-warnings tools/check-profiles.mjs",
     "check:clips": "node --no-warnings tools/check-clips.mjs",
     "check:stage-widgets": "node --no-warnings tools/check-stage-widgets.mjs",
+    "check:render-styles": "node --no-warnings tools/check-render-styles.mjs",
     "check:sound-guard": "node --no-warnings tools/check-sound-guard.mjs",
     "catalog:strudel": "node --no-warnings tools/strudel-catalog.mjs",
     "check:strudel": "node --no-warnings tools/check-strudel.mjs",
