@@ -5,7 +5,7 @@ import { soulData, defaultView, VIEWS, VIEW_NAMES, PHRASES, RECAL } from './data
 import { createSoulRenderer } from './views.js';
 
 // accent hue of each visual look, for the colour views (degrees, shift from the views' own hues)
-const LOOK_HUE = { palco: 130, pixel: 120, tramonto: 140, montagne: 0, spazio: 70, sonar: -40, edgerunners: -120, studio: -150 };
+const LOOK_HUE = { palco: 130, pixel: 120, tramonto: 140, montagne: 0, spazio: 70, sonar: -40, edgerunners: -120, studio: -150, monitor: 100, rullo: 160 };
 const ANALYZE = 1.6, GLITCH = 0.7, FPS = 30;
 
 // getSource(cyc): { key, song, ctx, bar } of the song playing, or null. store: the app's browser storage.

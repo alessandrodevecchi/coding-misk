@@ -100,6 +100,7 @@ import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
 import { CW_KEY, widgetSettings, placeWidgets, widgetOptions, linkAnalysers } from './live/widgets.js';
 import { widgetPlan, linesByKey, fastWidgets } from './video/widget-frames.js';
+import { noteStore } from './visuals/stage-feed.js';
 import { withWidgets } from './video/layout.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -1404,6 +1405,12 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       catch (e) { fastJob = null; if (e && e.cancelled) { if (frag) return 'cancelled'; toast(t('vidCancelled')); return true; } console.warn('[fast video] scope renders', e); for (const k of Object.keys(waves)) delete waves[k]; }
     }
   }
+  // the widget looks (widgets-on-stage D2, D8): the notes of every instrument come back from the render page with each
+  // block (kept on globalThis for the checks); scope and spectrum read the code widgets' renders of an instrument when there are some, else the song's wave
+  const stageNotes = globalThis.codingMiskFastStageNotes = noteStore();
+  job = { ...job, stageNotes: true };
+  const instWave = cw && Object.keys(cw.waves).length ? (inst, at, n = 256) => { const wv = cw.waves[inst]; if (!wv) return null; const end = Math.round(at * wv.sr), out = new Float32Array(n); for (let i = 0; i < n; i++) out[i] = wv.data[end - n + i] || 0; return out; } : null;
+  let stageLogged = false;
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
   // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen
@@ -1427,13 +1434,17 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
         code: codeAt(cyc), say: said ? said.text : '',
         info: { onAir: true, n: p.n, title: item ? item.title : sg.title, artist: item ? item.artist : '', bar: cyc - p.start, bars: p.end - p.start, bpm: Math.round(sg.meta.bpm[Math.min(sg.meta.bars - 1, Math.floor(cyc))]) || undefined, say: said ? said.text : '', sayAt: said ? said.bar - p.start : 0 },
         soulSrc: doc && doc.sections && doc.tracks ? { key: `fv:${p.n}`, song: doc, ctx: {}, bar: cyc - p.start } : null,
+        meta: sg.meta, seed: sg.id || '',
       };
-      visuals.drawAt({ now: t * 1000, cyc, look: fragLook || lookFor(o, looks, { n: p.n, section, own }), feed, dt: 1 / q.fps, show: fi % 6 === 0 });
+      const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
+      if (!stageLogged && (fLook === 'monitor' || fLook === 'rullo')) { stageLogged = true; console.info(`[fast video] ${fLook}: notes from the render page; stage scopes use ${instWave ? 'the code widgets\' renders where there are some, else ' : ''}the song's wave scaled by each instrument's level`); }
+      visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0 });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
       else video.composeAt({ layout, q }, cyc, t);
     },
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
     onNotes: cw ? block => cw.addNotes(block) : null,
+    onStageNotes: block => { for (const [k, list] of Object.entries(block)) for (const n of list) stageNotes.add(k, n); },
   });
   if (preview) preview.stop();
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: run.cancel };
@@ -4754,8 +4765,27 @@ function stageInfo(cyc) {
   const said = saidSteps(song).filter(x => x.at <= cyc).pop();
   return { title: it ? it.song.title : mode === 'track' ? T.title : song.title, bar: rel, bars: it ? it.bars : song.meta.bars, bpm: Math.round((song.meta.bpm || [])[Math.max(0, Math.floor(cyc))] || 0) || undefined, say: said ? sayText(said.say, getLang()) : '', sayAt: said ? said.at - (it ? it.start : 0) : 0 };
 }
+// the section around a cycle for the widget looks (widgets-on-stage D5): the fast video's song, the radio's song on air,
+// the song playing; null: the stage counts sections of 8 bars
+function stageSection(cyc) {
+  const of = m => { if (!m || !m.sections || !m.sections.length) return null; const s = m.sections[Math.max(0, m.sectionAt(Math.min(cyc, m.bars - 0.001)))]; return s ? { start: s.start, end: s.start + s.len } : null; };
+  if (fv) return of(fv.meta);
+  if (mode === 'radio' && radio && radio.on) {
+    const rs = radio.state, it = rs && rs.stream[rs.onAir], doc = it && it.song;
+    if (!doc || !Array.isArray(doc.sections)) return null;
+    let at = it.start;
+    for (const x of doc.sections) { if (cyc < at + x.bars) return { start: at, end: at + x.bars }; at += x.bars; }
+    return null;
+  }
+  return song && song.meta ? of(song.meta) : null;
+}
 const visuals = startVisuals({
   getS: () => ({ look: soulOverride ? 'soul' : look }), soul,
+  stage: {
+    settings: cwSettings, section: stageSection, theme: () => ui,
+    seed: () => (fv ? fv.seed : (song && song.id) || ''),
+    label: inst => { const k = `stInst:${inst}`, v = t(k); return v === k ? inst : v; },
+  },
   afterFrame: (cyc, playing) => { video.frame(cyc, playing); liveLink.tick(); },
   getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
@@ -4820,6 +4850,8 @@ const video = createVideo({
   },
 });
 globalThis.codingMiskVideo = video;
+// (for the checks: the stage, to draw frames of a look at given times, widgets-on-stage)
+globalThis.codingMiskVisuals = visuals;
 // live output (#52): the broadcast window draws through this link, the control room talks to it
 const liveLink = createLiveLink({
   video, visuals,

@@ -1,4 +1,8 @@
 import { INSTRUMENTS } from './music.js';
+import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache, cwInstrument, DRUMS } from './visuals/stage-feed.js';
+import { pitchesOf } from './visuals/widget-painters.js';
+import { drawMonitor, drawRullo } from './visuals/widget-looks.js';
+import { themePalette } from './visuals/widget-palettes.js';
 
 // Visual su canvas sincronizzati con l'audio.
 // Ogni strumento suona su un analizzatore separato (.analyze("kick"), .analyze("bass"), …):
@@ -6,7 +10,9 @@ import { INSTRUMENTS } from './music.js';
 // getInfo(cyc): what plays, for the studio scene: { onAir, title, artist, line, bar, bars, bpm, say, sayAt, n }
 // soul: the soul scene (#46), drawn when the look is 'soul'
 // afterFrame(cyc, playing): called after each frame (the video recorder draws its frame there, #27)
-export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}), soul = null, afterFrame = null }) {
+// stage: the widget looks' inputs (widgets-on-stage): { settings() (the code widgets' settings), section(cyc) →
+// { start, end } in cycles, seed(), label(instrument), theme() → 'neon' | 'hw' }
+export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}), soul = null, afterFrame = null, stage = null }) {
   const $ = (s, r = document) => r.querySelector(s);
   const cv = $('#stage'), vcx = cv.getContext('2d');
   // the canvas the scenes draw into: the stage, or an offscreen canvas at the video size while a video records (#27)
@@ -56,6 +62,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const N = 256;
   const wave = new Float32Array(N);
   const hookWave = new Float32Array(128);
+  // the wave of each instrument's analyser, kept for the widget looks (widgets-on-stage D2: no extra analyser)
+  const instWave = {};
   const lv = {}, prev = {}, norm = {}, lastOn = {};
   for (const k of INSTRUMENTS) { lv[k] = 0; prev[k] = 0; norm[k] = .05; lastOn[k] = 0; }
   let glitch = 0, shake = 0;
@@ -91,7 +99,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
         let d; try { d = fn('time', id); } catch (e) { continue; }
         if (!d || !d.length) continue;
         const step = Math.floor(d.length / N); let sum = 0;
-        for (let i = 0; i < N; i++) { const v = d[i * step] || 0; wave[i] += v; sum += v * v; }
+        const own = instWave[id] || (instWave[id] = new Float32Array(N));
+        for (let i = 0; i < N; i++) { const v = d[i * step] || 0; wave[i] += v; own[i] = v; sum += v * v; }
         raw[id] = Math.sqrt(sum / N);
         if (id === 'hook') { const s2 = Math.floor(d.length / 128); for (let i = 0; i < 128; i++) hookWave[i] = d[i * s2] || 0; }
       }
@@ -191,6 +200,106 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       tri(p, a, b, [x0, hz], cols[0]);
       tri(p, b, [x1, hz], [x0, hz], cols[1]);
     }
+  }
+
+  // ---------- widget looks (widgets-on-stage): Monitor and Rullo ----------
+  // the notes live (queried from the playing pattern, one cycle at a time) or from the fast video's feed (feed.store)
+  const liveStore = noteStore(), live = liveNotes(liveStore);
+  // per source of notes: the panels of each section, the pitches, the spectrum columns
+  const wcache = new WeakMap();
+  const cacheOf = src => { let c = wcache.get(src); if (!c) { c = { rosters: new Map(), pitches: new Map(), ranges: new Map(), cols: columnCache() }; wcache.set(src, c); } return c; };
+  const WIDGET_LOOKS = ['monitor', 'rullo'];
+  // (for the checks: the time of the last widget look frames, in ms)
+  const stageTimes = globalThis.codingMiskStageTimes = [];
+  function sectionAt(cyc) {
+    const s = stage && stage.section ? stage.section(cyc) : null;
+    if (s && s.end > s.start) return s;
+    const a = Math.floor(Math.max(0, cyc) / 8) * 8;
+    return { start: a, end: a + 8 };
+  }
+  function widgetFrame(cyc, playing, t) {
+    const S = stage && stage.settings ? stage.settings() : null;
+    if (!S) return null;
+    const src = feed && feed.store ? feed.store : liveStore, C = cacheOf(src), sec = sectionAt(cyc);
+    let known = Infinity;
+    if (!(feed && feed.store)) {
+      const P = playing && sched && sched() ? sched().pattern : null, c = Math.floor(cyc);
+      // the playhead's window first (three cycles a frame), then the rest of the section ahead (one a frame)
+      known = live.pump(P, cyc, c + 3, 3);
+      if (known >= c + 3) known = live.pump(P, cyc, Math.min(sec.end, c + 24), 1);
+      if (!P) known = -Infinity;
+    }
+    const seed = stage.seed ? stage.seed() : '', silent = S.dim === false ? 'hidden' : 'dimmed', full = S.notes === 'full';
+    // the panels of a section, decided while its notes are still coming in (live: the first bar), then kept
+    const rosterAt = s => {
+      let r = C.rosters.get(s.start);
+      const k = Math.min(known, s.end);
+      if (!r || (r.known < k && cyc < s.start + 1 && cyc >= s.start)) {
+        r = { known: k, list: rosterOf(src, s, { S, max: 6, silent, seed, known: k }) };
+        C.rosters.set(s.start, r);
+        if (C.rosters.size > 64) C.rosters.delete(C.rosters.keys().next().value);
+      }
+      return r.list;
+    };
+    const roster = rosterAt(sec), prev = sec.start > 0 ? rosterAt(sectionAt(sec.start - 0.001)) : [];
+    const same = prev.length === roster.length && prev.every((p, i) => p.inst === roster[i].inst && p.widget === roster[i].widget);
+    const memo = new Map(), around = inst => { let l = memo.get(inst); if (!l) { l = src.around(inst, cyc - 2.5, cyc + 2.5); memo.set(inst, l); } return l; };
+    const now = inst => around(inst).filter(n => n[0] <= cyc + 0.01);
+    const level = inst => (playing || feed ? levelAt(now(inst), cyc, inst, full) : 0);
+    const pal = themePalette(stage.theme ? stage.theme() : 'neon');
+    // scope: the instrument's own wave (its analyser live, its render in the fast video), else the song's wave scaled by
+    // the instrument's level (D8 fallback)
+    const ownWave = inst => (feed ? (feed.instWave ? feed.instWave(inst, t) : null) : playing && instWave[inst] ? instWave[inst] : null);
+    const wave1 = inst => { const d = ownWave(inst); if (d) return d; const l = level(inst), out = new Float32Array(N); for (let i = 0; i < N; i++) out[i] = wave[i] * l; return out; };
+    const waveAt = (inst, at) => {
+      if (feed) { if (feed.instWave) { const d = feed.instWave(inst, at, 128); if (d) return d; } return feed.waveAt ? feed.waveAt(at, 128) : null; }
+      // live: only the slot of now can be read (the analysers have no past)
+      if (!playing || Math.abs(at - t) > 0.1) return null;
+      const d = wave1(inst); return d.subarray(N - 128);
+    };
+    const secKey = `${sec.start}|${Math.min(known, sec.end)}`;
+    const pitches = inst => {
+      const key = `${inst}|${secKey}`;
+      if (!C.pitches.has(key)) { C.pitches.set(key, pitchesOf(src.around(inst, sec.start, sec.end))); if (C.pitches.size > 256) C.pitches.delete(C.pitches.keys().next().value); }
+      const p = C.pitches.get(key);
+      // a note of the window outside the section's pitches (a section still being read): the window's pitches join
+      return around(inst).every(n => p.includes(n[2])) ? p : pitchesOf([...src.around(inst, sec.start, sec.end), ...around(inst)]);
+    };
+    const playingIn = [...src.startingIn(sec.start, Math.max(sec.start + 0.001, Math.min(sec.end, known)))].filter(i => S.instruments[cwInstrument(i)] && S.instruments[cwInstrument(i)].on);
+    const rank = i => S.order.indexOf(cwInstrument(i)) * 100 + INSTRUMENTS.indexOf(i);
+    const lanes = DRUMS.filter(d => playingIn.includes(d)), melodic = playingIn.filter(i => !DRUMS.includes(i)).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+    const range = () => {
+      const key = `${melodic.join(',')}|${secKey}`;
+      if (!C.ranges.has(key)) {
+        let lo = Infinity, hi = -Infinity;
+        for (const i of melodic) for (const n of src.around(i, sec.start, sec.end)) if (typeof n[2] === 'number') { lo = Math.min(lo, Math.round(n[2])); hi = Math.max(hi, Math.round(n[2])); }
+        if (lo > hi) { lo = 48; hi = 72; }
+        if (hi - lo < 12) { const m = Math.round((lo + hi) / 2); lo = m - 6; hi = m + 6; }
+        C.ranges.set(key, { lo: lo - 1, hi: hi + 1 });
+        if (C.ranges.size > 64) C.ranges.delete(C.ranges.keys().next().value);
+      }
+      const r = C.ranges.get(key), seen = melodic.flatMap(i => around(i)).filter(n => typeof n[2] === 'number').map(n => Math.round(n[2]));
+      return seen.length ? { lo: Math.min(r.lo, ...seen), hi: Math.max(r.hi, ...seen) } : r;
+    };
+    return {
+      cyc, pal, roster, dim: silent, full, lanes, melodic,
+      fade: same ? 1 : Math.max(0, Math.min(1, (cyc - sec.start) / 0.25)),
+      notes: (inst, c0, c1) => (c0 >= cyc - 2.5 && c1 <= cyc + 2.5 ? around(inst).filter(n => n[1] > c0 && n[0] < c1) : src.around(inst, c0, c1)),
+      level, flash: inst => (playing || feed ? flashAt(now(inst), cyc) : 0), silent: inst => !(playing || feed) || silentAt(now(inst), cyc),
+      wave: wave1, columns: inst => C.cols.columns(inst, t, waveAt), pitches, range,
+      label: inst => (stage.label ? stage.label(inst) : inst),
+    };
+  }
+  // the panels' font, loaded before the first widget look frame (a frame drawn before it would use another font)
+  try { if (document.fonts) document.fonts.load('600 14px "JetBrains Mono"').catch(() => {}); } catch (e) {}
+  function widgetLook(look, cyc, playing) {
+    const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000);
+    if (!F) { cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H); return; }
+    (look === 'rullo' ? drawRullo : drawMonitor)(cx, W, H, F);
+    // (for the checks: the panels of Monitor, the notes Rullo shows)
+    if (look === 'monitor') globalThis.codingMiskStagePanels = F.roster.filter(p => F.dim !== 'hidden' || !p.quiet).map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`);
+    else globalThis.codingMiskStageNotes = [...F.melodic, ...F.lanes].reduce((a, i) => a + F.notes(i, cyc - 2, cyc + 2).length, 0);
+    stageTimes.push(performance.now() - t0); if (stageTimes.length > 600) stageTimes.shift();
   }
 
   const SCENE_DRAW = {
@@ -840,8 +949,10 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const pal = PAL[look] || PAL.palco;
     cx.clearRect(0, 0, W, H);
     if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
+    else if (WIDGET_LOOKS.includes(look)) { if (soul) soul.hide(); widgetLook(look, cyc, playing); }
     else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); }
-    if (flash > .02 && !reduce && look !== 'soul') { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
+    // (the widget looks have no flash: their panels flash on their own onsets)
+    if (flash > .02 && !reduce && look !== 'soul' && !WIDGET_LOOKS.includes(look)) { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
   }
   // the stage shows the video picture, fitted (while a video records, or is rendered)
   function showTarget() {
