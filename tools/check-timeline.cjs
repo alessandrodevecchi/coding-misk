@@ -152,15 +152,15 @@ async function shot(page, name) {
     check(t149 && /«sta arrivando»/.test(t149) && /Sola lettura/.test(t149), 'ghost section tooltip: the section, "battuta 149" with its line, read-only', t149 && t149.replace(/\n/g, ' / '));
     check(/19 frasi/.test(g.nameTip) && /traccia Narrator/.test(g.nameTip), 'ghost name tooltip: how many lines, the track it becomes', g.nameTip.replace(/\n/g, ' / '));
     check(aligned(await boxes(page)), 'ghost row: its growth cell and first section aligned with the rows above (sections view)');
-    // clicks: the nearest line, no track selected
+    // clicks: the nearest line, no track selected (each cell scrolled into view first: the row sits low on the page)
     const tk0 = (await bars(page)).map.tk;
-    const gc = await page.$eval('#arr-grid [data-ghost] .ncell.x-grow', e => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * 0.5, y: r.top + r.height / 2, w: r.width }; });
+    const gc = await page.$eval('#arr-grid [data-ghost] .ncell.x-grow', e => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width * 0.5, y: r.top + r.height / 2, w: r.width }; });
     await page.mouse.click(gc.x, gc.y); await sleep(500);
     let cue = (await bars(page)).cue;
     const want = inG.reduce((p, q) => (Math.abs(q - G * 0.5) < Math.abs(p - G * 0.5) ? q : p));
     check(near(cue, want, 6) && inG.includes(cue) && (await bars(page)).map.tk === tk0, 'ghost growth cell: goes to the nearest narrator line, the selected track stays', `bar ${cue}, nearest ${want}, track ${(await bars(page)).map.tk}`);
     const si = g.secTicks.findIndex(x => x === '148');
-    { const p = await page.$$eval('#arr-grid [data-ghost] [data-ncell="sec"]', (els, i) => { const r = els[i].getBoundingClientRect(); return { x: r.left + r.width * 0.8, y: r.top + r.height / 2 }; }, si); await page.mouse.click(p.x, p.y); }
+    { const p = await page.$$eval('#arr-grid [data-ghost] [data-ncell="sec"]', (els, i) => { els[i].scrollIntoView({ block: 'center' }); const r = els[i].getBoundingClientRect(); return { x: r.left + r.width * 0.8, y: r.top + r.height / 2 }; }, si); await page.mouse.click(p.x, p.y); }
     await sleep(500);
     cue = (await bars(page)).cue;
     check(cue === 148 && (await bars(page)).map.tk === tk0, 'ghost section cell: goes to its line at bar 149', `bar ${cue + 1}`);

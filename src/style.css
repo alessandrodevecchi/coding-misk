@@ -18,6 +18,8 @@
   :root[data-look="sonar"]    { --bg: #03110d; --panel: #071c16; --panel2: #0b261e; --line: #174536; --muted: #7fb7a3; --a1: #3dffb0; --a2: #d4ff5a; }
 
   * { box-sizing: border-box; }
+  /* focus and scrollIntoView keep the element above the fixed player bar (.pbar) */
+  html { scroll-padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
   [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--ui); padding-inline: 16px; padding-block: 0 calc(72px + env(safe-area-inset-bottom, 0px)); transition: background .4s; }
   button, select, input { font: inherit; color: inherit; }
