@@ -18,6 +18,19 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
       last: document.getElementById('hand-last').hidden ? null : document.getElementById('hand-last-code').textContent };
   });
   const untilBar = async b => { for (let k = 0; k < 120 && (await st()).cyc < b; k++) await sleep(250); };
+  // the next step of the live build: evaluated, and its bar begun. The code shown is then the code playing, and the
+  // edit towards the step after is typed from half a bar later at the earliest. The takeovers below type there: a
+  // takeover while an edit is being typed keeps the half-typed text (a lone "/" of a comment, a call cut in two), and
+  // that code does not evaluate. Returns the step's bar, or null after 30 s without a step.
+  const nextStep = () => page.evaluate(() => new Promise(res => {
+    const e = document.querySelector('strudel-editor').editor, was = e.repl.state.activeCode, t0 = Date.now();
+    let bar = null;
+    const iv = setInterval(() => {
+      const a = e.repl.state.activeCode || '', now = e.repl.scheduler.now();
+      if (bar === null && a !== was && a.startsWith(e.code)) bar = Math.round(now);
+      if ((bar !== null && now >= bar + .02) || Date.now() - t0 > 30000) { clearInterval(iv); res(bar); }
+    }, 20);
+  }));
 
   await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
   await page.locator('#track-pick').selectOption('primo-segnale'); await sleep(800);
@@ -29,11 +42,11 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   await page.keyboard.press('ArrowDown'); await sleep(300);
   const before = await st();
   check(!before.hand, 'click, select and copy do not take over');
-  await untilBar(8.5);
+  const step1 = await nextStep();
   const afterStep = await st();
-  check(afterStep.code !== before.code && !afterStep.hand, 'the next step still writes the code');
+  check(step1 !== null && afterStep.code !== before.code && !afterStep.hand, 'the next step still writes the code', `step at bar ${step1}`);
 
-  // typing takes over
+  // typing takes over (right after the step: nothing half typed)
   await page.click('#edhost .cm-line >> nth=0'); await page.keyboard.press('End'); await page.keyboard.type(' hand');
   await sleep(300);
   let s = await st();
@@ -65,7 +78,9 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   s = await st();
   check(s.code !== resumed && !s.hand && !s.err, 'after resume, the next step plays on its bar');
 
-  // the option on (default): resume goes back to the bar where the user took over
+  // the option on (default): resume goes back to the bar where the user took over (right after a step: nothing half
+  // typed, so "back to this code" below evaluates)
+  await nextStep();
   const tookOver = Math.floor((await st()).cyc);
   await page.click('#edhost .cm-line >> nth=0'); await page.keyboard.press('End'); await page.keyboard.type(' z');
   if (!((await page.getAttribute('#hand-from', 'aria-pressed')) === 'true')) await page.click('#hand-from');
