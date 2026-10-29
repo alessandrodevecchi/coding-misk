@@ -22,6 +22,7 @@
     "check:guide": "node --no-warnings tools/check-guide.mjs",
     "check:soul": "node --no-warnings tools/check-soul.mjs",
     "check:random": "node --no-warnings tools/check-random.mjs",
+    "check:invent": "node --no-warnings tools/check-invent.mjs",
     "check:compilation": "node --no-warnings tools/check-compilation.mjs",
     "check:radio-profiles": "node --no-warnings tools/check-radio-profiles.mjs",
     "check:video": "node --no-warnings tools/check-video.mjs",

@@ -45,11 +45,15 @@ export const directorOptions = (recipes, recipe, n, o = recipeOptionsAt(recipe, 
 // (steering a grown song, D9: its commands are waypoints of the growth, past steps kept, waypoints.js; a recipe of
 // growth version 1 grows the steered song again, as the radio played it then)
 // → [{ song, entry, plan, opts }] (song 0 of a lead has only song and entry)
+// the styles a session recipe embeds (invented-styles D10): trial styles the songs used, so a replay needs no store
+export const extraStylesOf = recipe => (recipe && Array.isArray(recipe.extraStyles) ? recipe.extraStyles.filter(r => r && r.id) : []);
 export function sessionItems(recipes, recipe, count, until = null, { grow = growsOnAir(recipe), styles = null } = {}) {
-  const shapes = grow ? styles || Object.fromEntries(recipes.map(r => [r.id, r])) : null;
-  const L = recipe.lead, le = L ? leadEntry(L.song) : null, ses = createSession(recipes, recipe.seed, le ? { lead: le } : {});
+  // (invented-styles D10: the styles a session embeds, a trial style, join it as extra styles)
+  const extra = extraStylesOf(recipe), all = extra.length ? [...recipes, ...extra.filter(x => !recipes.some(r => r.id === x.id))] : recipes;
+  const shapes = grow ? (styles && !extra.length ? styles : { ...(styles || {}), ...Object.fromEntries(all.map(r => [r.id, r])) }) : null;
+  const L = recipe.lead, le = L ? leadEntry(L.song) : null, ses = createSession(recipes, recipe.seed, { ...(le ? { lead: le } : {}), extra });
   // (song 0 keeps the profile it had in Compose, or takes the forced one, radio-profiles D2: leadOnAir)
-  const out = L ? [{ song: leadOnAir(L, shapes || Object.fromEntries(recipes.map(r => [r.id, r]))), entry: le }] : [];
+  const out = L ? [{ song: leadOnAir(L, shapes || Object.fromEntries(all.map(r => [r.id, r]))), entry: le }] : [];
   for (let n = out.length; out.length < count && !(until && until(out)); n++) {
     // (the session's choices on the director's song, radio-arrangement D10: the base the listener's commands steer)
     const g = biasSong(recipe, n, ses.next(directorOptions(recipes, recipe, n))), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);

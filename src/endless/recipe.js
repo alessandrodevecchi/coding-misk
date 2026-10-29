@@ -66,7 +66,7 @@ export const recipeOrder = id => OLD_ID[id] || id;
 // an object keyed by style ids (an artist's taste) with old ids renamed
 export const styleKeys = o => (o && typeof o === 'object' && !Array.isArray(o) ? Object.fromEntries(Object.entries(o).map(([k, v]) => [styleId(k), v])) : o);
 export const RECIPE_FORMAT = 1;
-export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'profile', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'spoken', 'narrator', 'words', 'growthShapes', 'headroom', ...Object.keys(INSTRUMENTS)];
+export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'profile', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'spoken', 'narrator', 'words', 'growthShapes', 'headroom', 'invented', ...Object.keys(INSTRUMENTS)];
 // level-headroom: the peak a track line of the style's songs may reach before the level checks warn. The output peak
 // stays the hard limit (1.0); a loud genre may let single lines go higher, since every line passes the master level first
 export const HEADROOM = { default: 1, min: 1, max: 1.5 };
@@ -114,6 +114,13 @@ export function validateRecipe(r) {
   if (r.profile !== undefined && !['classic', 'crescendo', 'switch'].includes(r.profile)) err('profile', 'one of classic, crescendo, switch');
   // weights of the growth shapes its songs draw in a Live coder build (growth-shapes)
   checkGrowthShapes(r.growthShapes, err);
+  // an invented style (invented-styles D7): its seed, the maker's version, the style each part came from, the closest
+  // style and whether it was edited after keeping; the director ignores it
+  if (r.invented !== undefined) {
+    const v = r.invented;
+    if (!v || typeof v !== 'object' || Array.isArray(v) || typeof v.seed !== 'string' || !isInt(v.maker) || !v.from || typeof v.from !== 'object' || PART_NAMES.some(p => typeof v.from[p] !== 'string')) err('invented', `{ "seed": "…", "maker": 1, "from": { ${PART_NAMES.map(p => `"${p}": style id`).join(', ')} }, "closest": style id, "edited": false }`);
+    else if (v.edited !== undefined && typeof v.edited !== 'boolean') err('invented.edited', 'true or false');
+  }
   // one genre of the song library (#34); a style without one is treated as experimental
   if (r.genre === undefined) warn('genre', `no genre: treated as "experimental"; genres: ${GENRES.join(', ')}`);
   else if (!GENRES.includes(r.genre)) err('genre', `a genre: ${GENRES.join(', ')}`);

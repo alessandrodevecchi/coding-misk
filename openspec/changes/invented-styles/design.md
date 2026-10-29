@@ -38,7 +38,7 @@ The rules read the built-in styles as a table of pairs that already work: **two 
 | --- | --- |
 | Groove and tempo | A groove's home tempo is the union of the tempo ranges of the styles that list it, widened by 8 BPM. The new tempo range is the base's range cut to the home tempo of the chosen grooves; it keeps at least 4 BPM. No home tempo overlap: drop the groove; no groove left: take the drums part from the base. |
 | Kit and groove | At least one chosen drum machine appears in a style together with one chosen groove. |
-| Swing | Swing only when a chosen groove comes from a style with swing (jazz, lo-fi, country), with that style's range; otherwise `[0, 0]`. |
+| Swing | Swing only when a chosen groove comes from a style with swing (jazz, lo-fi, country) and the harmony or the drums come from a style that swings, with that style's range; otherwise `[0, 0]`. |
 | Chords and melody | Hook modes are kept only when a style uses that mode with one of the chosen progressions; none left: the harmony source's own hook modes. |
 | Guitar and tempo | Guitar types and patterns only at tempos a style with guitar plays (rock, metal, country, darksynth, industrial ranges). |
 | Energy shape | Shapes are the base's shapes shared with a donor; none shared: the base's. |
