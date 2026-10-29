@@ -1,9 +1,9 @@
-Estimates in agent hours, for the recommended answers, after `spoken-text-on-stage` (its preparation of samples, fallback chain, `spokenNeeds`, `check:samples` and speaker registry). Total: about 22 (17 to 28). Before `spoken-text-on-stage`: about 1.5 more for a minimal fallback.
+Estimates in agent hours, for the recommended answers, after `spoken-text-on-stage` (its preparation of samples, fallback chain, `spokenNeeds`, `check:samples` and speaker registry). Total: about 22 (17 to 28), unchanged by round 5: Sempre is one more value of the same setting and draw, covered by tasks 3.1, 3.5 and 6.1. Splitting the moments into several lists, if the owner asks (D2, open), adds about 0.5. Before `spoken-text-on-stage`: about 1.5 more for a minimal fallback.
 
 ## 1. Store and backup (2 h)
 
 - [ ] 1.1 `src/voices/phrases.js` (pure): the store `coding-misk-phrases`, key `kind + lang + slug`, add with use count, edit, delete, cap, translation
-- [ ] 1.2 Moments: the map of the 14 `PHRASES` kinds and the 18 `POOL` kinds onto 21 moments; every pool key mapped (D2)
+- [ ] 1.2 Moments: the map of the 14 `PHRASES` kinds and the 18 `POOL` kinds onto 21 moments, in three groups, the same for Compose and the radio; every pool key mapped (D2; one list or several to confirm with the owner first)
 - [ ] 1.3 Backup merge by id with larger use count and newer last use (`src/settings/backup.js`); case in `tools/check-backup.mjs`
 
 ## 2. Capture and save policy (2.5 h)
@@ -19,7 +19,7 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 - [ ] 3.2 Radio: voice track vocabulary lines and `POOL` lines in `src/endless/director.js`, written out in the song; `mine` in the session recipe only when not Mai
 - [ ] 3.3 Compose: `PHRASES` and `POETIC` lines in the narration layer (`src/song/spoken.js`), growth untouched; "Fill with" and "New phrases" get Le mie frasi (`src/endless/voice-track.js`)
 - [ ] 3.4 Use counts on play (radio on air, Compose Play)
-- [ ] 3.5 `npm run check:phrases` (`tools/check-phrases.mjs`, no browser): store, merge, moments map, Mai and empty collection leave `check:endless`, `check:spoken` and the growth fixtures unchanged, share rates over 200 seeds, a song's own lines never replaced, Replay identical after a delete
+- [ ] 3.5 `npm run check:phrases` (`tools/check-phrases.mjs`, no browser): store, merge, moments map, Mai and empty collection leave `check:endless`, `check:spoken` and the growth fixtures unchanged, share rates over 200 seeds, Sempre replaces every pool line that has a candidate and none of a song's or a style's own lines, a song's own lines never replaced, Replay identical after a delete
 
 ## 4. Voice helper: samples (2.5 h)
 
@@ -38,7 +38,7 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 
 ## 6. Settings and links (1 h)
 
-- [ ] 6.1 "Voci e frasi" card: save policy, temporary lifetime, how often, space with the link (`src/settings/settings.js`), reset
+- [ ] 6.1 "Voci e frasi" card: save policy, temporary lifetime, how often (five levels with Sempre), space with the link (`src/settings/settings.js`), reset
 - [ ] 6.2 Links: "Fill with" and the radio vocabulary choice to Vocabolari inclusi, missing-sample rows to Campioni, the Voices groups to Voci e suoni
 
 ## 7. Look (1 h)

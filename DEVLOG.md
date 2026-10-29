@@ -1909,3 +1909,16 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Check previsto:** `check-hand.cjs` prende il controllo a metà di una modifica (tasto, incolla, Backspace, durante «Riprendi») e Ctrl+Invio deve valutare senza errore; prima deve fallire su develop.
 - **Stima:** circa 4 ore agente (da 3 a 6).
 - **Esiti:** `openspec validate takeover-pending-edit --strict` passa; `npm run knowledge` e `npm run check:knowledge` ok.
+
+## 2026-10-30: risposte del quinto giro su testi sul palco e mie frasi (spoken-text-on-stage, my-phrases)
+
+- **Cosa:** solo spec, nessun codice dell'app. Il proprietario ha approvato tutte le risposte consigliate dei blocchi 9 e 10; le sue note sono entrate nelle due change.
+- **Testi sul palco, tp2:** un campione voce mancante lo fa al volo l'helper voce del server di sviluppo (circa 1 s) e poi la frase si dice, invece di restare muta (D10); una frase ancora non detta compare solo come etichetta piccola sotto la frase detta (D2). Precedenza scritta nel registro: la voce traccia batte il narratore, il narratore dice al massimo una frase per battuta, la frase del passo viene dopo (D11). Base per un canto futuro con le due opzioni «col canto le altre voci tacciono» (`exclusive`) e «più testi insieme» (`multiCaption`), nessun canto ora. Le righe di prompt che la scena Claude inventa al cambio di sezione («bring in…», «drop…», «keep the groove») non si dicono mai (D4). Il vocabolario personale resta in `my-phrases`, con un rimando.
+- **tp4:** scena Claude con C1 e C2: C1 sempre (blocco di risposta sotto il prompt, ultimi due scambi, niente didascalia rosa sopra la scena); C2 (riquadro di trascrizione a destra con gli scambi più vecchi, nulla due volte) come opzione della scena, spenta di base e nascosta in 9:16 (D4).
+- **tp6:** come si riconosce chi parla diventa un'impostazione per voce: niente, solo formattazione, etichetta, icona, icona e formattazione (di base); nome della voce al passaggio del mouse con ogni scelta (D12 nuova).
+- **tp8:** un interruttore «Testi sul palco» per palco e video, con sotto le scelte: narratore, voce traccia, frasi della console, frasi del passo, risposte della scena Claude, segno per voce, posizione, anche nei video (D7).
+- **Stima testi sul palco:** circa 22,5 ore agente (18-28), prima 18: +1,5 per C2, +1 per il segno per voce, +1 per le scelte sotto l'interruttore anche negli export, +0,5 per dire la frase fatta al volo, +0,5 di check.
+- **Mie frasi, mf4:** quinto livello «Sempre», che sostituisce ogni frase sostituibile (solo frasi delle raccolte di serie, mai quelle scritte di un brano o di uno stile).
+- **mf7:** resta un solo elenco di 21 momenti uguale per Componi e radio, mostrato in tre gruppi; nota che potrà diventare più elenchi, sempre identici tra Componi e radio. Punto aperto da confermare prima del compito 1.2, consiglio: un elenco ora, dividere solo se l'ascolto lo chiede.
+- **Stima mie frasi:** invariata, circa 22 ore (17-28); +0,5 se si dividono i momenti.
+- **Esiti:** `openspec validate spoken-text-on-stage --strict` e `openspec validate my-phrases --strict` passano; `npm run knowledge` (aggiorna il conteggio dei compiti in `status.md`) e `npm run check:knowledge` ok.
