@@ -108,6 +108,81 @@ const calls = code => (code.match(CALL) || []).length;
     await page.close();
   }
 
+  // 3b. drawing: the scope in the theme's colour between hits, a new spectrum blank, "always full" notes
+  {
+    const { page, errors } = await open(browser, { widgets: { on: true } });
+    const ev = c => page.evaluate(c => { const e = document.querySelector('strudel-editor').editor; e.setCode(c); return e.evaluate(); }, c);
+    await ev('setcpm(30)\n$: s("hh ~ ~ ~").analyze("hats")._scope()\n$: s("white").gain(0.3).analyze("fx")._spectrum()'); await sleep(2500);
+    const col = await page.evaluate(() => { const c = [...document.querySelectorAll('#edhost canvas[id*="_widget__scope"]')][0], d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let white = 0, ink = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 100) { ink++; if (d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235) white++; } return { ink, white }; });
+    check(col.ink > 50 && col.white === 0, 'scope: drawn in the theme colour, never white between hits', JSON.stringify(col));
+    await ev('setcpm(30)\n$: s("hh ~ ~ ~").analyze("hats")._scope()\n$: s("white").gain(0.3).analyze("fx").lpf(800)._spectrum()'); await sleep(120);
+    const blank = await page.evaluate(() => { const c = document.querySelector('#edhost canvas[id*="_widget__spectrum"]'), d = c.getContext('2d').getImageData(0, 0, Math.floor(c.width / 2), c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 10) n++; return n; });
+    check(blank === 0, 'a new spectrum starts blank', `${blank} pixels of the old one`);
+    const alpha = async notes => {
+      await page.evaluate(n => localStorage.setItem('coding-misk-code-widgets', JSON.stringify({ on: true, notes: n })), notes);
+      await ev('setcpm(60)\n$: note("c3 e3 g3 b3").gain(0.1).analyze("pad")._pianoroll()\n$: note("c3 e3 g3 b3").gain(0.1).analyze("arp")._punchcard()'); await sleep(1500);
+      return page.evaluate(() => [...document.querySelectorAll('#edhost canvas[id*="_widget_"]')].map(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let a = 0; for (let i = 3; i < d.length; i += 4) a += d[i]; return { id: c.id.replace(/.*_widget__/, ''), a }; }));
+    };
+    const vol = await alpha('volume'), full = await alpha('full');
+    const ratio = k => (full.find(x => x.id.startsWith(k)) || { a: 0 }).a / Math.max(1, (vol.find(x => x.id.startsWith(k)) || { a: 0 }).a);
+    check(ratio('pianoroll') > 2 && ratio('punchcard') > 2, '"always full": quiet notes drawn stronger in pianoroll and punchcard', `pianoroll ×${ratio('pianoroll').toFixed(1)}, punchcard ×${ratio('punchcard').toFixed(1)}`);
+    await page.evaluate(() => document.querySelector('strudel-editor').editor.stop());
+    check(!errors.length, 'no page errors (drawing)', errors.join('; '));
+    await page.close();
+  }
+
+  // 3c. Widget notes (7.4): a quiet pad and arp as pianoroll, with each value (screenshots for the owner)
+  if (SHOTS) for (const notes of ['volume', 'full']) {
+    const { page } = await open(browser, { widgets: { on: true, max: 3, share: 0, notes, order: ['pad', 'arp', 'lead', 'hats', 'bass', 'drums', 'fx', 'voice'], instruments: { pad: { primary: 'pianoroll', secondary: ['scope'] } } } });
+    await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(800);
+    await page.click('#play'); await untilBar(page, 20.5);
+    await page.evaluate(() => { const c = document.querySelector('#edhost [id*="_widget__pianoroll"]'); if (c) c.scrollIntoView({ block: 'center' }); }); await sleep(600);
+    await page.locator('#edhost').screenshot({ path: `${SHOTS}/note-dei-widget-${notes === 'full' ? 'sempre-piene' : 'come-il-volume'}.png` });
+    await page.close();
+  }
+
+  // 3d. section boundaries with the widgets on and off: no underrun, the same levels (luci-rosse, bars 6 to 19)
+  {
+    const run = async on => {
+      const { page } = await open(browser, { widgets: on ? { on: true } : null });
+      await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(800);
+      await page.evaluate(() => { const s = globalThis.getAudioContext().playbackStats; globalThis.cwUnder = s ? s.underrunEvents : null; });
+      await page.click('#play');
+      const peaks = {};
+      for (let k = 0; k < 400; k++) {
+        const r = await page.evaluate(() => { const e = document.querySelector('strudel-editor').editor, out = {}; for (const a of Object.keys(window.analysers || {})) { const d = getAnalyzerData('time', a); let m = 0; for (const v of d) m = Math.max(m, Math.abs(v)); out[a] = m; } return { cyc: e.repl.scheduler.now(), out }; });
+        if (r.cyc >= 19) break;
+        if (r.cyc >= 6) { const bar = Math.floor(r.cyc); for (const [a, m] of Object.entries(r.out)) { const key = `${bar}:${a}`; peaks[key] = Math.max(peaks[key] || 0, m); } }
+        await sleep(60);
+      }
+      const under = await page.evaluate(() => { const s = globalThis.getAudioContext().playbackStats; return s && globalThis.cwUnder !== null ? s.underrunEvents - globalThis.cwUnder : null; });
+      await page.close();
+      return { peaks, under };
+    };
+    const off = await run(false), on = await run(true);
+    const near = [7, 8, 9, 15, 16, 17, 18], diffs = [];
+    for (const k of Object.keys(off.peaks)) { const bar = +k.split(':')[0]; if (!near.includes(bar) || off.peaks[k] < 0.05) continue; const r = (on.peaks[k] || 0) / off.peaks[k]; if (r < 0.6 || r > 1.6) diffs.push(`${k} ${r.toFixed(2)}`); }
+    check((on.under === null || on.under === 0) && diffs.length === 0, 'section boundaries with widgets: no underrun, levels as with the option off', `underruns ${on.under}, off ${off.under}; ${diffs.join(', ') || 'levels match'}`);
+  }
+
+  // 3e. the session video and the live output draw the widgets in the new scenes only
+  {
+    const { page, errors } = await open(browser, { widgets: { on: true } });
+    await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(800);
+    await page.click('#play'); await sleep(4000);
+    const frame = layout => page.evaluate(L => {
+      const V = globalThis.codingMiskVideo; V.setOpt('layout', L);
+      const c = document.createElement('canvas'); c.width = 960; c.height = 540; document.body.appendChild(c); c.style.position = 'absolute'; c.style.top = '0'; c.style.left = '0';
+      V.preview(c); return new Promise(res => setTimeout(() => { const d = c.getContext('2d').getImageData(640, 0, 320, 540).data; let sum = 0; for (let i = 0; i < d.length; i += 16) sum += d[i] + d[i + 1] + d[i + 2]; const url = c.toDataURL(); c.remove(); res({ sum, url }); }, 900));
+    }, layout);
+    const a = await frame('code'), b = await frame('code-widgets');
+    check(a.sum !== b.sum, 'session video: "Visual + code + widgets" draws more than "Visual + code"', `${a.sum} → ${b.sum}`);
+    if (SHOTS) for (const [n, f] of [['video-codice', a], ['video-codice-widget', b]]) fs.writeFileSync(`${SHOTS}/${n}.png`, Buffer.from(f.url.split(',')[1], 'base64'));
+    await page.evaluate(() => globalThis.codingMiskVideo.setOpt('layout', 'code'));
+    check(!errors.length, 'no page errors (video)', errors.join('; '));
+    await page.close();
+  }
+
   // 4. Live coder: the widgets stay while a line is typed
   {
     const { page, errors } = await open(browser, { widgets: { on: true, max: 8 } });

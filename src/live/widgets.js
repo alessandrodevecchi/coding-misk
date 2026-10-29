@@ -129,19 +129,39 @@ export function targets(n, S, seed = '') {
 // Lines already carrying a widget (code typed by hand) keep it and take a slot.
 export function placeWidgets(code, { S, bar = 0, section = 0, sections = 1, seed = '', insts = null, returns = null } = {}) {
   if (!S || !S.on || typeof code !== 'string') return code;
-  const lines = chainLines(code), lanes = lanesOf(code), cands = [];
-  let k = -1, taken = 0;
+  const lines = chainLines(code), lanes = lanesOf(code), cands = [], info = [];
+  let k = -1, taken = 0, track = null;
   lines.forEach((l, i) => {
+    const h = l.match(/^\/\/ =+ (.+?) =+$/);
+    if (h) { track = h[1]; return; }
     if (!PATTERN.test(l)) return;
     k++;
     if (hasWidget(l)) { taken++; return; }
     const inst = (insts && insts[k]) || instrumentOf(l);
     if (!inst) return;
-    const playing = playsAt(l, lanes, bar);
-    if (!playing && !(MUTED.test(l) && returns && returns(l))) return;
-    const w = widgetFor(inst, S, seedKey(l), seed);
-    if (w) cands.push({ i, rank: S.order.indexOf(inst), w, playing });
+    info.push({ i, l, inst, track: track || `${inst}:${(l.match(/\.(?:analyze|chan)\(\s*["']([\w-]+)/) || [])[1] || ''}`, playing: playsAt(l, lanes, bar), masked: /\.mask\((\w+)\)/.test(l) && [...l.matchAll(/\.mask\((\w+)\)/g)].some(m => lanes.has(m[1])) });
   });
+  // D9 (Classic, the lines of each section kept in the code): a track silent now keeps its widget on the line it played
+  // last, when one of its lines plays again within the window of muted lines
+  const win = S.window === 'always' ? Infinity : S.window, span = Math.max(0, ...[...lanes.values()].map(v => v.length));
+  const silentKeeps = new Set();
+  if (span) {
+    const byTrack = new Map();
+    for (const x of info) if (x.masked && !MUTED.test(x.l)) (byTrack.get(x.track) || byTrack.set(x.track, []).get(x.track)).push(x);
+    for (const list of byTrack.values()) {
+      if (list.some(x => x.playing)) continue;
+      const until = Math.min(span - 1, bar + win);
+      if (!list.some(x => { for (let b = Math.floor(bar) + 1; b <= until; b++) if (playsAt(x.l, lanes, b)) return true; return false; })) continue;
+      let last = null, lastBar = -1;
+      for (const x of list) for (let b = Math.floor(bar) - 1; b >= 0 && b > lastBar; b--) if (playsAt(x.l, lanes, b)) { if (b > lastBar) { lastBar = b; last = x; } break; }
+      if (last) silentKeeps.add(last.i);
+    }
+  }
+  for (const x of info) {
+    if (!x.playing && !silentKeeps.has(x.i) && !(MUTED.test(x.l) && returns && returns(x.l))) continue;
+    const w = widgetFor(x.inst, S, seedKey(x.l), seed);
+    if (w) cands.push({ i: x.i, rank: S.order.indexOf(x.inst), w, playing: x.playing });
+  }
   const want = Math.max(0, targets(Math.max(1, sections), S, seed)[Math.max(0, Math.min(section, sections - 1))] - taken);
   // the slot order, then the place in the code; lines that play before muted ones of the same instrument
   // (one line per instrument first, for variety: kick and snare lines are both drums; then the rest in the same order)
@@ -181,13 +201,20 @@ export function widgetOptions(S, theme = {}, width = 500) {
 }
 
 // D4, D12: the six `_` methods wrapped once per copy of Strudel. Each call merges the hidden groups and the line's own
-// options and passes every key on; `_scope` and `_spectrum` keep the line's `analyze` (the widget's analyser is linked
-// to the line's instrument, linkAnalysers); `_pianoroll` draws from notes at full opacity with "always full" (D15).
+// options and passes every key on; the canvas of each widget is kept by id (globalThis.miskWidgetCanvases, for the
+// videos, D11). `_scope` and `_spectrum` keep the line's `analyze` (the widget's analyser is linked to the line's
+// instrument, linkAnalysers) and are drawn here: in the theme's colour also between two hits (Strudel's scope takes the
+// colour from the haps, white without one), and a new spectrum starts blank (Strudel keeps the last frame per id).
+// "Always full" (D15) draws the notes of every note widget at full opacity, on a copy of the haps: the pianoroll from a
+// copy of the pattern, the painters (punchcard, spiral, pitchwheel) from a copy of the haps they are given.
 // Missing methods (Node, the render page) are stubs that return the pattern unchanged.
+const DRAWN = { scope: ['scope', 'tscope'], spectrum: ['spectrum'], pianoroll: ['pianoroll'], punchcard: ['punchcard', 'pianoroll'], spiral: ['spiral'], pitchwheel: ['pitchwheel'] };
+const fullHap = h => (h && h.value && typeof h.value === 'object' && typeof h.withValue === 'function' ? h.withValue(v => ({ ...v, gain: 1, velocity: 1 })) : h);
 export function installWidgets(Pattern, getOpts = () => globalThis.miskWidgets) {
   if (!Pattern || !Pattern.prototype) return;
+  const P = Pattern.prototype;
   for (const name of WIDGETS) {
-    const key = `_${name}`, orig = Pattern.prototype[key];
+    const key = `_${name}`, orig = P[key];
     if (orig && orig.miskWidget) continue;
     let f;
     if (typeof orig !== 'function') f = function () { return this; };
@@ -195,16 +222,82 @@ export function installWidgets(Pattern, getOpts = () => globalThis.miskWidgets) 
       f = function (id, options) {
         if (typeof id !== 'string') return orig.call(this, id, options);
         const W = getOpts() || {}, o = { ...(W[name] || {}), ...(options && typeof options === 'object' ? options : {}) };
-        try { const c = typeof document !== 'undefined' && document.getElementById(id); if (c && c.getContext) { const x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height); } } catch (e) {}
-        // (Strudel's scope takes its colour from the haps, not from its options: the colour goes on the drawn copy only)
-        if (name === 'scope' || name === 'spectrum') { orig.call(o.color && typeof this.color === 'function' ? this.color(o.color) : this, id, o); return this.tag(id); }
-        if (name === 'pianoroll' && W.notes === 'full') { orig.call(this.withValue(v => (v && typeof v === 'object' ? { ...v, gain: 1, velocity: 1 } : v)), id, o); return this.tag(id); }
-        return orig.call(this, id, o);
+        const full = W.notes === 'full' && name !== 'scope' && name !== 'spectrum';
+        // the drawing methods Strudel's widget calls, wrapped for this call only: the canvas is kept, scope and
+        // spectrum are not started (drawn below), the painters get full notes
+        let ctx = null;
+        const keep = {}, own = name === 'scope' || name === 'spectrum';
+        for (const m of DRAWN[name]) {
+          keep[m] = P[m];
+          if (typeof keep[m] !== 'function') continue;
+          P[m] = function (cfg) {
+            if (cfg && cfg.ctx) ctx = cfg.ctx;
+            if (own) return this;
+            return keep[m].call(this, cfg);
+          };
+        }
+        const paint = P.onPaint;
+        if (full && typeof paint === 'function' && name !== 'pianoroll') P.onPaint = function (painter) { return paint.call(this, (c, time, haps, ...rest) => painter(c, time, (haps || []).map(fullHap), ...rest)); };
+        let out;
+        try {
+          const src = name === 'pianoroll' && full ? this.withValue(v => (v && typeof v === 'object' ? { ...v, gain: 1, velocity: 1 } : v)) : this;
+          out = orig.call(src, id, o);
+        } finally {
+          for (const m of Object.keys(keep)) P[m] = keep[m];
+          P.onPaint = paint;
+        }
+        if (ctx && ctx.canvas) {
+          try { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); } catch (e) {}
+          (globalThis.miskWidgetCanvases ||= new Map()).set(id, ctx.canvas);
+        }
+        if (own) {
+          if (ctx && typeof this.draw === 'function') this.draw(name === 'scope' ? scopePainter(ctx, id, o) : spectrumPainter(ctx, id, o), { id });
+          return this.tag(id);
+        }
+        return name === 'pianoroll' && full ? this.tag(id) : out;
       };
     }
     f.miskWidget = true;
-    Pattern.prototype[key] = f;
+    P[key] = f;
   }
+}
+// a scope as Strudel draws it (drawTimeScope), always in the widget's colour
+function scopePainter(ctx, id, { color = '#ffffff', thickness = 3, scale = 1, pos = 0.5, trigger = 0, align = true, smear = 0 } = {}) {
+  return () => {
+    const c = ctx.canvas, A = globalThis.analysers, an = A && A[id];
+    if (smear) { ctx.fillStyle = `rgba(0,0,0,${1 - smear})`; ctx.fillRect(0, 0, c.width, c.height); } else ctx.clearRect(0, 0, c.width, c.height);
+    ctx.lineWidth = thickness; ctx.strokeStyle = color;
+    ctx.beginPath();
+    let d = null;
+    try { d = an && globalThis.getAnalyzerData ? globalThis.getAnalyzerData('time', id) : null; } catch (e) { d = null; }
+    if (!d || !d.length) { ctx.moveTo(0, pos * c.height); ctx.lineTo(c.width, pos * c.height); ctx.stroke(); return; }
+    let t0 = align ? Array.from(d).findIndex((v, i, a) => i && a[i - 1] > -trigger && v <= -trigger) : 0;
+    t0 = Math.max(t0, 0);
+    const step = c.width / d.length;
+    for (let i = t0, x = 0; i < d.length; i++, x += step) { const y = (pos - scale * d[i]) * c.height; if (i === t0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    ctx.stroke();
+  };
+}
+// a spectrum as Strudel draws it (drawSpectrum), its last frame kept by this widget only, in the widget's colour
+function spectrumPainter(ctx, id, { color = '#ffffff', speed = 1, min = -80, max = 0 } = {}) {
+  let last = null;
+  return () => {
+    const c = ctx.canvas, A = globalThis.analysers, an = A && A[id];
+    let d = null;
+    try { d = an && globalThis.getAnalyzerData ? globalThis.getAnalyzerData('frequency', id) : null; } catch (e) { d = null; }
+    if (!d || !d.length) return;
+    if (last && (last.width !== c.width || last.height !== c.height)) last = null;
+    ctx.clearRect(0, 0, c.width, c.height);
+    if (last) ctx.putImageData(last, -speed, 0);
+    ctx.fillStyle = color;
+    const q = c.width - speed, n = d.length;
+    for (let i = 0; i < n; i++) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, (d[i] - min) / (max - min)));
+      ctx.fillRect(q, c.height - (Math.log(i + 1) / Math.log(n)) * c.height, speed, 2);
+    }
+    ctx.globalAlpha = 1;
+    last = ctx.getImageData(0, 0, c.width, c.height);
+  };
 }
 
 // D4: the analyser of a scope or spectrum widget reads the analyser of its line's instrument. The widget's id is defined

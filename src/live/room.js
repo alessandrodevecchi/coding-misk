@@ -19,7 +19,7 @@ let armed = null, armedTimer = 0;
 const urls = { program: '', preview: '' };
 
 // ---------- the page ----------
-const VIEW_NAMES = { visual: 'lrViewVisual', code: 'lrViewCode', 'code-soul': 'lrViewCodeSoul', soul: 'lrViewSoul', 'code-only': 'lrViewCodeOnly',
+const VIEW_NAMES = { 'code-widgets': 'lrViewCodeWidgets', 'code-only-widgets': 'lrViewCodeOnlyWidgets', visual: 'lrViewVisual', code: 'lrViewCode', 'code-soul': 'lrViewCodeSoul', soul: 'lrViewSoul', 'code-only': 'lrViewCodeOnly',
   'visual-tl': 'lrViewVisualTl', 'visual-code-tl': 'lrViewVisualCodeTl', 'code-tl': 'lrViewCodeTl', 'soul-tl': 'lrViewSoulTl', 'visual-float': 'lrViewVisualFloat', 'visual-column': 'lrViewVisualColumn' };
 // a small drawing of a view, from the same areas the picture uses
 function thumb(view) {

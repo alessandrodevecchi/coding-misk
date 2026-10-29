@@ -21,6 +21,8 @@ function lineDiff(a, b, blanks = true) {
   return ops;
 }
 
+import { stripWidgets } from '../live/widgets.js';
+
 export function typingFrames(from, to) {
   const ops = lineDiff(from.split('\n'), to.split('\n')), parts = [];
   // a run of deleted lines followed by added lines: pair them up as edits in place
@@ -350,12 +352,13 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
   // a long new line like a line above it (as it is once that one is done): pasted as a copy, then edited; a short
   // line is typed by hand
   parts.forEach((p, i) => {
-    if (p.kind !== 'new' || p.text.length < COPY_MIN) return;
+    // (code-widgets D7: the lengths and likeness are measured without widget calls)
+    if (p.kind !== 'new' || stripWidgets(p.text).length < COPY_MIN) return;
     let best = null, score = LIKE;
     for (let k = 0; k < i; k++) {
       const q = parts[k], txt = q.kind === 'keep' || q.kind === 'new' ? q.text : q.kind === 'edit' ? q.segs.map(s => (s.eq !== undefined ? s.eq : s.new)).join('') : null;
       if (txt === null || !txt.trim()) continue;
-      const v = lineLike(txt, p.text);
+      const v = lineLike(stripWidgets(txt), stripWidgets(p.text));
       if (v >= score) { best = txt; score = v; }
     }
     if (best !== null) { p.paste = true; p.how = 'above'; p.segs = tokenDiff(best, p.text); }
@@ -364,9 +367,9 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
   // from the earlier code, then edited; never a comment or the voice's code
   if (earlier && earlier.length) {
     parts.forEach(p => {
-      if (p.kind !== 'new' || p.paste || p.text.length < COPY_MIN || /^\s*\/\//.test(p.text) || /say_|\.voice\(/.test(p.text)) return;
+      if (p.kind !== 'new' || p.paste || stripWidgets(p.text).length < COPY_MIN || /^\s*\/\//.test(p.text) || /say_|\.voice\(/.test(p.text)) return;
       let best = null, score = LIKE;
-      for (let k = earlier.length - 1; k >= 0; k--) { const e = earlier[k]; if (!e || /^\s*\/\//.test(e) || /say_|\.voice\(/.test(e)) continue; const v = e === p.text ? 1 : lineLike(e, p.text); if (v > score || (v === score && best === null)) { best = e; score = v; } }
+      for (let k = earlier.length - 1; k >= 0; k--) { const e = earlier[k]; if (!e || /^\s*\/\//.test(e) || /say_|\.voice\(/.test(e)) continue; const v = stripWidgets(e) === stripWidgets(p.text) ? 1 : lineLike(stripWidgets(e), stripWidgets(p.text)); if (v > score || (v === score && best === null)) { best = e; score = v; } }
       if (best !== null) { p.paste = true; p.look = true; p.how = 'earlier'; p.segs = tokenDiff(best, p.text); }
     });
   }

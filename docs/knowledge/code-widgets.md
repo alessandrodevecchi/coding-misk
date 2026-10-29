@@ -24,7 +24,10 @@ Strudel's inline widgets (`._scope()`, `._pianoroll()`, `._punchcard()`, `._spec
 - **Range update.** Every code change of a playing song (typed frames, steps, resume, boundaries) goes through `setCodeRange`: only the text between the equal start and end changes, in one transaction. A full `setCode` would remove every widget until the next evaluation. A new song and hand code still use the full replacement.
 - **Wrapper.** `installWidgets` (called by `installHelpers`, in the page and on the render page) wraps the six `_` methods once: it merges the hidden groups of `globalThis.miskWidgets` (sizes, theme colours from `--ink`, `--a1`, `--a2`, `--muted`, set before each evaluation) with the line's own options, passes every key on, and clears a reused canvas. `_scope` and `_spectrum` return `this.tag(id)`, so the line keeps its `analyze`; `linkAnalysers` defines the widget's id on `window.analysers` as a hidden getter that returns the analyser of the line's instrument (read from the haps with the tag every half second). The stage and the level checks never list it. Where the `_` methods do not exist (Node, the render page) they are stubs that return the pattern.
 - **Muted lines.** After each evaluation and code change, `markMuted` puts the class `cw-muted` on the widget of a `_$:` line: grey, see-through, dashed frame. Off with the setting.
-- **Widget notes.** "Always full" draws the pianoroll from a copy of the haps with gain and velocity 1; the sound is unchanged. Only `_pianoroll`: the painter widgets (punchcard, spiral, pitchwheel) draw from the scheduler's haps.
+- **Widget notes.** "Always full" draws the notes of every note widget at full opacity, on a copy: the pianoroll from a copy of the pattern, the painters (punchcard, spiral, pitchwheel) from copies of the haps they are given (`onPaint` wrapped during the call). The sound is unchanged. `tools/widget-notes.mjs` measures how faint the notes are per instrument: the pianoroll draws the line's own haps, before the hidden mixer.
+- **Writing (D8).** In a growth typed by a person (Live coder), a widget call new at a step comes with its line when the step's typing still fits its time; otherwise it waits for a later step with time to spare, and at the latest comes with the next section's first step (`idlePlan` in `liveCode`). A widget never makes a step rushed.
+- **Classic silences (D9).** A track silent now keeps its widget on the line it played last while one of its lines plays again within the window (tracks found by their header, else by instrument and visual).
+- **Videos (D11).** The scenes "Visual + code + widgets" (session video, `code-widgets`) and the live output's views 12 and 13 copy the page's widget canvases (`globalThis.miskWidgetCanvases`, kept by id by the wrapper) below their lines, dimmed on muted lines; the other scenes are unchanged.
 
 ## Options
 
@@ -40,9 +43,8 @@ PORT=5196 node tools/check-code-widgets.cjs /tmp/cw   # in the browser, with scr
 ## Gotchas
 
 - Strudel's `_scope` takes its colour from the haps, not its options: the wrapper colours only the drawn copy (`.color()` on the pattern given to the original).
-- Between two hits (no hap in its window) Strudel's scope draws in the theme's foreground, white: a sparse hats line shows a white flat line until its next hit.
-- `_spectrum` ignores `color` and keeps its last frame per id: a new spectrum can show the previous drawing for a few seconds.
-- Not done yet: the videos (session video, fragments, live output, fast video) do not draw the widgets; the code text carries the calls. The Widget notes default waits for the owner's choice (measures and screenshots, task 7.4).
+- Strudel's own scope takes its colour from the haps (white between two hits) and its spectrum ignores `color` and keeps its last frame per id. The app draws both itself (`scopePainter`, `spectrumPainter`, started with `.draw` on the widget's id, which stops Strudel's loop): always in the widget's colour, and a new spectrum starts blank.
+- Not done yet: the fast video and the fragments (rendered offline, no widget canvases: D11 note widgets from the haps, scope and spectrum from extra renders, and its setting), and the choice of the Widget notes default (measures below).
 
 ## Where to read more
 

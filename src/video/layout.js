@@ -5,7 +5,9 @@
 // tab: the whole browser tab, captured as it is (the browser asks which tab to share)
 // the views with a timeline of the live picture (#65) are video layouts too, drawn with the live picture's areas
 export const TIMELINE_LAYOUTS = ['visual-tl', 'visual-code-tl', 'code-tl', 'soul-tl', 'visual-float', 'visual-column'];
-export const LAYOUTS = ['visual', 'code', 'tab', ...TIMELINE_LAYOUTS];
+// code-widgets (code-widgets D11): the code layout with the code widgets drawn below their lines
+export const LAYOUTS = ['visual', 'code', 'code-widgets', 'tab', ...TIMELINE_LAYOUTS];
+export const withWidgets = layout => typeof layout === 'string' && layout.endsWith('-widgets');
 export const QUALITIES = {
   '1080p30': { w: 1920, h: 1080, fps: 30, bps: 8e6 },
   '1080p60': { w: 1920, h: 1080, fps: 60, bps: 12e6 },
@@ -41,7 +43,7 @@ export function codeColsOf(area, frameH) {
   return Math.max(20, Math.floor((area.w - padX * 2) / (fs * 0.6)) - 1);
 }
 export function layoutAreas(layout, w, h, soul = null) {
-  if (layout !== 'code') return { stage: { x: 0, y: 0, w, h } };
+  if (layout !== 'code' && layout !== 'code-widgets') return { stage: { x: 0, y: 0, w, h } };
   const side = Math.round(w / 3), sx = w - side, pad = Math.round(h / 54);
   const out = { stage: { x: 0, y: 0, w: sx, h } };
   let y = pad;

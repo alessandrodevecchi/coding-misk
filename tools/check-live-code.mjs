@@ -225,13 +225,43 @@ const CHECKS_WIDGETS = {
     assert(sec0 === 0, `share 0 gave ${sec0} secondary widgets`);
   },
   'code widgets: Classic puts a widget only on the line of its track that plays now'() {
-    const T = widgetCodes('luci-rosse', 'classic', { max: 8 });
+    const T = widgetCodes('luci-rosse', 'classic', { max: 8, window: 8 });
     for (const [b, k] of sectionStarts(T.build).map((b, k) => [b, k + 1])) {
       for (const l of chainLinesW(T.at(b)).filter(l => WCALL.test(l) && !(WCALL.lastIndex = 0))) {
         const m = l.match(/\.mask\((section\d+)\)/);
         assert(!m || m[1] === `section${k}`, `bar ${b}: a widget on a line of ${m && m[1]}`);
       }
     }
+  },
+  'code widgets: a person typing a growth adds a widget only where it fits, else at a later step (D8)'() {
+    const C = resolveProfile('switch'), g = crescendoSong(song('kellerlicht'), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
+    const W = liveCode(g, C, { cols: () => 80, widgets: () => ({ on: true }) }), P = liveCode(g, C, { cols: () => 80 }), X = liveCode(g, { ...C, typist: 'exact' }, { cols: () => 80, widgets: () => ({ on: true }) });
+    assert(C.typist === 'human', 'Live coder types as a person');
+    const bars = [0, ...new Set(buildSteps(W.build).map(x => x.at))].sort((x, y) => x - y), starts = new Set(sectionStarts(W.build)), sb = barSeconds(W.build);
+    let waiting = 0, made = 0;
+    for (let i = 1; i < bars.length; i++) {
+      const b = bars[i], a = bars[i - 1];
+      assert(stripWidgets(W.codeAt(b)) === P.codeAt(b), `bar ${b}: the code without widgets changed`);
+      if (calls(W.codeAt(b)).length !== calls(X.codeAt(b)).length) waiting++;
+      if (starts.has(b)) continue;
+      const usable = (() => { const av = Math.max(0.2, (b - a - 0.5) * sb - 0.2); return Math.max(0.2, av - Math.min(av * 0.5, 2)); })();
+      const need = L => { const to = L.codeAt(b), from = settleOthers(L.codeAt(a), to, b); return from === to ? 0 : typingPlan(from, to, { style: 'human', lean: true, seed: 'kellerlicht', notes: false }).natural; };
+      // (rushed as the growth counts it: more than 1.1 times the time there is)
+      if (need(P) <= usable * 1.1 && need(W) > usable * 1.1) made++;
+    }
+    assert(waiting > 0 && made === 0, `${waiting} steps with a widget waiting, ${made} steps made rushed by a widget`);
+  },
+  'code widgets: in Classic a silent track keeps its widget on its last line while it returns within the window (D9)'() {
+    // bass plays bars 0-7 (section1), is silent 8-19, plays again from 20 (section3)
+    const code = ['const section1 = "<1!8 0!32>"', 'const section2 = "<0!8 1!12 0!20>"', 'const section3 = "<0!20 1!20>"', '// ========== bass ==========',
+      '$: note("a1").mask(section1).velocity(section1).analyze("bass")', '$: note("a1 c2").mask(section3).velocity(section3).analyze("bass")',
+      '// ========== drums ==========', '$: s("bd*4").mask(section2).velocity(section2).analyze("kick")'].join('\n');
+    const at = (bar, window) => placeWidgets(code, { S: widgetSettings({ on: true, max: 8, share: 0, window }), bar, section: 0, sections: 1, seed: 's' }).split('\n').filter(l => /_\w+\(\)/.test(l)).map(l => l.match(/note\("([^"]+)"|s\("([^"]+)"/).slice(1).find(Boolean));
+    assert(at(10, 16).join() === 'a1,bd*4', `bar 10, window 16 (returns in 10): ${at(10, 16)}`);
+    assert(at(10, 8).join() === 'bd*4', `bar 10, window 8 (returns in 10): ${at(10, 8)}`);
+    assert(at(14, 8).join() === 'a1,bd*4', `bar 14, window 8 (returns in 6): ${at(14, 8)}`);
+    assert(at(22, 8).join() === 'a1 c2', `bar 22: the widget is on the playing line: ${at(22, 8)}`);
+    assert(at(10, 'always').join() === 'a1,bd*4', `always: ${at(10, 'always')}`);
   },
   'code widgets: a muted line keeps its widget only when it returns within the window, and takes a slot'() {
     // kellerlicht in Live coder: the acid line is muted from bar 280 and returns at 320 (reused-lines D1)

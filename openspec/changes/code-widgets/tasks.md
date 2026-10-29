@@ -6,11 +6,11 @@
 ## 1. Base
 
 - [x] 1.1 Range update of the editor (equal prefix and suffix, one transaction) for every `setCode` of a playing song in `src/main.js`; full replacement kept for a new song and hand code. Verify: browser check, text at every typed frame equal to the full replacement; `check-hand.cjs`
-- [ ] 1.2 Wrapper for the six `_` methods in `installHelpers` (page and render page): merge hidden groups and line options, pass every parameter on, clear a reused canvas. Verify: a line with `labels` and `overscan` evaluates; a new `_spectrum` starts blank
+- [x] 1.2 Wrapper for the six `_` methods in `installHelpers` (page and render page): merge hidden groups and line options, pass every parameter on, clear a reused canvas. Verify: a line with `labels` and `overscan` evaluates; a new `_spectrum` starts blank
 - [x] 1.3 `_scope` and `_spectrum` keep `analyze` and read the instrument's analyser each frame. Verify: browser check, haps keep `analyze`, scope moves with the bass
 - [x] 1.4 Hidden object `miskWidgets` from the settings and the theme colours (neon, hardware)
 - [x] 1.6 Dimmed class on the widget element of a `_$:` line, set after each evaluation and range update, removed when the line returns; theme tokens of the muted code lines. Verify: browser check, all six widgets on a muted line are grey, semi-transparent and dashed; normal after the unmuting evaluation; dimmed look off leaves them as Strudel draws them
-- [ ] 1.7 "Widget notes": "always full" draws from a copy of the haps with gain 1 for the widget only. Verify: pad line at gain 0.1 drawn at full opacity; `check:mixer` case, haps identical with both values
+- [x] 1.7 "Widget notes": "always full" draws from a copy of the haps with gain 1 for the widget only. Verify: pad line at gain 0.1 drawn at full opacity; `check:mixer` case, haps identical with both values
 - [x] 1.5 Node stubs for the `_` methods; `check:strudel` accepts them; `npm run catalog:strudel`. Verify: `npm run check:strudel`
 
 ## 2. Settings
@@ -24,16 +24,16 @@
 ## 3. Writing in growing profiles
 
 - [x] 3.1 Module `src/live/widgets.js`: instrument of a track, widget of a line (primary, or secondary by the share and the seed), target count per section from 1 to the maximum by the seed, slots by the slot order and seed, muted lines in the count, `stripWidgets(line)`. Verify: new cases in `check:live-code`: same song same widgets; the count varies across sections and never passes the maximum; about 25% secondary over the built-in songs; a muted widget takes a slot
-- [ ] 3.2 `stripWidgets` in `lineKey`, `plainKey`, `norm`, `shownLine`, reused lines, copy limits. Verify: `check:typing`, `npm run growth:probe -- all` same counters with the option off
+- [x] 3.2 `stripWidgets` in `lineKey`, `plainKey`, `norm`, `shownLine`, reused lines, copy limits. Verify: `check:typing`, `npm run growth:probe -- all` same counters with the option off
 - [x] 3.3 Calls added in `liveCode.codeWith` after folding and before `breakLines` and the hidden tail. Verify: `npm run check:mixer -- --full` with a new case with widgets on (same gain, orbit, analyze, postgain, velocity)
-- [ ] 3.4 Post-pass after the growth: moment 1, moment 2, muted lines (carried or added in a pause, only when they return within N bars), fallback at once. Verify: `check:typing` cases; Live coder fixtures unchanged (`node tools/check-crescendo.mjs`); if an intended change moves them, raise `SHAPES_VERSION` and run `npm run durations` in the same commit
+- [x] 3.4 Post-pass after the growth: moment 1, moment 2, muted lines (carried or added in a pause, only when they return within N bars), fallback at once. Verify: `check:typing` cases; Live coder fixtures unchanged (`node tools/check-crescendo.mjs`); if an intended change moves them, raise `SHAPES_VERSION` and run `npm run durations` in the same commit
 - [ ] 3.5 Crescendo and Classic with growth use the same post-pass. Verify: `npm run check:crescendo -- --full`, Crescendo fixtures unchanged
 
 ## 4. Classic and songs that do not grow
 
-- [ ] 4.1 Classic rules: widget on the playing line, move at a section change, remove when silent, keep on a muted line returning within N bars (setting, default 16). Verify: `check:live-code` cases for 8, 16, 32 and always
+- [x] 4.1 Classic rules: widget on the playing line, move at a section change, remove when silent, keep on a muted line returning within N bars (setting, default 16). Verify: `check:live-code` cases for 8, 16, 32 and always
 - [x] 4.2 Songs that do not grow: calls replaced at each boundary, one evaluation at the boundary; "one line per track" never moves
-- [ ] 4.3 Browser check `tools/check-code-widgets.cjs` (dev server on its own port): widgets at every typed frame and after a text change without evaluation, scope instrument, Classic moves on luci-rosse, dimmed muted widgets, every boundary without underrun or level jump against the option off, frame time. Verify: the check passes; screenshots for the owner
+- [x] 4.3 Browser check `tools/check-code-widgets.cjs` (dev server on its own port): widgets at every typed frame and after a text change without evaluation, scope instrument, Classic moves on luci-rosse, dimmed muted widgets, every boundary without underrun or level jump against the option off, frame time. Verify: the check passes; screenshots for the owner
 
 ## 5. Videos and live output
 
