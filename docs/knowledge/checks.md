@@ -28,6 +28,7 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 | Export, video, fragments | `check:export`, `check:video`, `check:clips` | `check-export.cjs`, `check-video.cjs`, `check-clips.cjs` |
 | Library, playlists, trash, settings, startup, card lengths (`src/live/card-duration.js`) and song configuration (`src/live/song-config.js`) | `check:durations`, `check:profiles`, `check:song-filter`, `check:playlists`, `check:trash`, `check-backup.mjs` | `check-songs-tab.cjs`, `check-playlists.cjs`, `check-settings.cjs`, `check-startup.cjs`, `check-song-config.cjs` |
 | Interface text or the Guide | `check:guide` | `check-modes.cjs` |
+| The Compose arranger, ruler and seeking (`playMap`, the growth and ending columns) | `check:guide` | `check-timeline.cjs`, `check-preview.cjs`, `check-player.cjs`, `check-hand.cjs` |
 | Anything a note or a recipe describes | `check:knowledge` | |
 | Strudel version, sounds | `catalog:strudel`, `check:strudel`, `check:sound-guard` | `check-sounds.cjs`, `check-style-sounds.cjs` |
 | The generator, app functions, the writer (Strudel the app writes) | `catalog:strudel`, then `knowledge` | |
@@ -135,6 +136,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-strudel.mjs` | `npm run check:strudel` | Node | Checks the code the app generates against the catalog of the installed Strudel (strudel-catalog, #69, design D5). No browser. |
 | `tools/check-style-sounds.cjs` |  | dev server, Chrome | Checks that every sound and drum machine named by the style recipes is in the app's loaded sound map. |
 | `tools/check-test-fixes.cjs` |  | dev server, Chrome | Browser checks for the fixes after the owner's tests of v0.6.0-beta.2 (#76): the New row of the Patterns tab and the tempo that follows the slider, the shape of a composed melody, "Song harmony" with its hint and "This… |
+| `tools/check-timeline.cjs` |  | dev server, Chrome | Browser check of the Compose timeline of grown songs (timeline-growth, #88): the growth column aligned in the ruler, the section strip and the track grid (sections view and timeline view), its three views (compact by… |
 | `tools/check-transitions.cjs` |  | dev server, Chrome | Browser checks for transitions in the radio (#23): for each kind, the radio plays through the end of a song into the next one without evaluation or page errors, with the master output below clipping (level-headroom: a… |
 | `tools/check-trash.mjs` | `npm run check:trash` | Node | Checks for the song trash (#68): move to the trash, restore, delete for good, empty, purge after 30 days, days left, merge of two trashes, hidden built-in songs (D3b). No browser, fixed dates. |
 | `tools/check-typing.mjs` | `npm run check:typing` | Node | Checks for the typing of the code that types itself (live-typing): only the words that change are touched, a person's speed for small edits and faster for long ones, the last frame is the new code, a deadline is kept;… |

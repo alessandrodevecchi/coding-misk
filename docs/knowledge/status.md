@@ -14,12 +14,12 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 77. With open tasks: 23. All tasks ticked, waiting to be archived: 54.
+OpenSpec changes not archived: 78. With open tasks: 24. All tasks ticked, waiting to be archived: 54.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
-| [code-widgets](../../openspec/changes/code-widgets/tasks.md) | 15 | 31 |
+| [code-widgets](../../openspec/changes/code-widgets/tasks.md) | 9 | 31 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
 | [fm-groove-lab](../../openspec/changes/fm-groove-lab/tasks.md) | 1 | 16 |
@@ -40,6 +40,7 @@ OpenSpec changes not archived: 77. With open tasks: 23. All tasks ticked, waitin
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
+| [timeline-growth](../../openspec/changes/timeline-growth/tasks.md) | 8 | 8 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 
 Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `pattern-followups`, `playlists`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `strudel-catalog`, `test-fixes`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `written-like-coder`.
