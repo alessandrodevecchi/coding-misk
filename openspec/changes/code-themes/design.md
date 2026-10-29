@@ -37,6 +37,14 @@ Strudel's built-in themes go through the editor's `setTheme(name)` (public). Our
 
 Alternatives: (a) build the editor from `@strudel/codemirror` ourselves instead of `<strudel-editor>`: public API, but it moves the whole player setup off the component the app is built on (large, risky); (b) CSS only: CodeMirror's token class names are generated, so there is nothing stable to target. The adapter reads CodeMirror internals of a pinned Strudel version, so a browser check fails loudly when it cannot install a theme, and the panel then keeps Strudel's default with a console warning.
 
+### D1b. Built: what the installer reads
+
+- The highlight tags are read from `strudelTheme`'s style, by name and in its order; when the editor starts in another Strudel theme, the installer swaps `strudelTheme` in first. Our styles are made with the class of that style (`HighlightStyle.define`), the editor theme with `view.constructor.theme`.
+- Our `:root` variables live in a style element of our own placed after Strudel's (`#misk-code-theme-vars`), emptied of Strudel's names when a Strudel theme is chosen, because Strudel's `activateTheme` skips a theme it believes is already active.
+- The text of muted lines (D7) is a line decoration (`ct-muted`). The `Decoration` class is not exported by the bundle: it is found on a decoration in place (the flash gives one; one flash is asked for at the start while the panel is still hidden), and the extension is added once with `StateEffect.appendConfig`, reached from a compartment's reconfigure effect. CSS decides (`#edhost.ct-dim .ct-muted { opacity: .55 }`), so the option needs no editor change.
+- The panel is hidden (`#edhost.ct-wait`) until the first theme is installed, at most 3 s (a CSS animation shows it anyway), so the default theme never flashes; `codemirror-settings` gets the theme, font and size so the next start opens close to them.
+- The flash is Strudel's mark with an inline white background; a CSS rule on that inline style gives it the theme's flash colour.
+
 ### D2. Themes as roles
 
 A code theme is a set of roles: ground, text, comment, string, number, label and keyword (`$:`, `const`), variable (`note`, `s`), method (`.gain`), punctuation, caret, selection, line numbers, playing-note outline, flash, muted line, and widget colours (ink, accent, second accent, muted). Our themes fill every role; for Strudel's themes the missing roles come from their settings (foreground for ink and outline, caret for accent). The same roles feed the editor, the widgets and `drawCode`.
@@ -46,16 +54,20 @@ A code theme is a set of roles: ground, text, comment, string, number, label and
 | Theme | Ground | Text | Accents | Contrast (lowest text role) |
 | --- | --- | --- | --- | --- |
 | Neon | the look's ground, darker | `--ink` | label and variable `--a1`, string `--a2`, number `--s3`, comment `--muted` | 5.7:1 (label, Palco) |
-| Amber | `#140e04` | `#ffb347` | keyword `#ff8a3d`, string `#ffd9a0`, number `#fff1d6`, soft glow | 4.5:1 (comment; `#a88048` gives 5.3:1) |
+| Amber | `#140e04` | `#ffb347` | keyword `#ff8a3d`, string `#ffd9a0`, number `#fff1d6`, soft glow | 5.3:1 (comment `#a88048`) |
 | Terminal | `#0b0d10` | `#d0d6e0` | magenta keyword, green string, yellow number, blue method, cyan variable | 5.0:1 (comment) |
 | High contrast dark | `#000000` | `#ffffff` | yellow label, cyan string, pink number | 11.2:1 |
 | Light high contrast | `#ffffff` | `#000000` | purple label, dark blue string, dark red number, grey italic comment | 8.1:1 |
 
-Neon reads the look's tokens, so one theme serves every look (screenshots 05 and 06); its widget colours and the canvas need resolved colours, read from the computed tokens on a look change. Terminal uses the modern palette of the Terminal render, not a green phosphor (Strudel's `greenText` covers that).
+Neon reads the look's tokens, so one theme serves every look (screenshots 05 and 06); its widget colours and the canvas need resolved colours, read from the computed tokens on a look change. Terminal uses the modern palette of the Terminal render, not a green phosphor.
+
+Measured by `npm run check:code-themes` (built): Neon's lowest text role is 5.2:1 (Studio's red string on HW) to 6.4:1 over the seven looks in both app themes; Terminal 5.0:1, Amber 5.3:1, High contrast dark 11.2:1, Light high contrast 8.1:1. The text of a muted line at 55 % stays at 4.0:1 or more.
 
 ### D4. Automatic by default
 
 The default "Automatic" maps neon to Neon and hardware to Amber, and a future light app theme to Light high contrast. A chosen theme stays until the user goes back to Automatic.
+
+Hook for `light-theme` (built after this change): the mapping is one table keyed by the value of `data-ui` (`neon`, `hw`, and already `light` → Light high contrast), read every time `data-ui` changes. `light-theme` only has to set `data-ui="light"`: the code panel follows without a change here. The Settings line naming Automatic's theme reads the same table. Light high contrast never reads the app tokens, so it stays readable whatever the light token set becomes.
 
 ### D5. Font and size
 
@@ -63,12 +75,12 @@ JetBrains Mono by default: already loaded, already the font of the code in video
 
 ### D6. Where the setting lives
 
-The Settings "Appearance" card (next to Theme, Language, Radio visual): "Code theme" (a menu with Automatic, our themes, then Strudel's themes in a group), "Code font", "Code size". A line under the menu says which theme Automatic is using. No control in the code panel header. Our own key (`coding-misk-code-theme`), in the backup and the reset; Strudel's `codemirror-settings` is written with a Strudel theme name when one is chosen, so the editor starts in it without a flash of the default.
+The Settings "Appearance" card (next to Theme, Language, Radio visual): "Code theme" (a menu with Automatic, our themes, then Strudel's themes in a group), "Code font", "Code size", "Dim muted lines" (D7). A line under the menu says which theme Automatic is using. No control in the code panel header. Our own key (`coding-misk-code-theme`), in the backup and the reset; Strudel's `codemirror-settings` is written with a Strudel theme name when one is chosen, so the editor starts in it without a flash of the default.
 
 ### D7. What follows the theme
 
 - **Widgets:** `widgetGroups` reads the theme's widget roles instead of the app tokens. Strudel's pitchwheel default colour comes from the draw package's theme, so the app passes it explicitly.
-- **Muted lines:** the dimmed widget's outline uses the theme's muted role. Dimming the text of `_$:` lines too is an open question (Q7).
+- **Muted lines:** the dimmed widget's outline uses the theme's muted role. The text of a muted `_$:` line and of its continuation lines is dimmed to about 55 % opacity, in the panel and in videos, behind an option in the same Appearance card: "Dim muted lines" (it: "Attenua le righe mute"), **on by default**. On by default because in Live coder growths the muted lines are the lines typed ahead, and a dimmed line says at a glance that it does not play yet; the text stays readable (the theme data check also measures the dimmed text). Off keeps the text as it is and dims only the widget (the code widgets' own "Dim" switch). In the panel the dimming is a line decoration added by the installer (D1) with the editor's own classes, so CodeMirror keeps it across redraws.
 - **Playing notes and flash:** the outline already uses `--foreground` (set by the theme). The white flash is invisible on a light ground; a CSS rule gives it the theme's flash role.
 - **Panel:** `.edhost` takes the theme's ground instead of the fixed `#0a0a0f`; the HW bezel stays.
 
@@ -85,7 +97,7 @@ The Settings "Appearance" card (next to Theme, Language, Radio visual): "Code th
 
 ## Later ideas
 
-- A song or a style naming its code theme, like its look.
+- **A song carrying its own code theme (owner, Q9: not now, later, as a preference and never an obligation).** A song or a style could suggest a code theme, like its look; the user's choice decides (for example "Use the song's code theme" off by default, or a suggestion shown next to the setting), and a song never forces its theme on the panel or on a video.
 - Self-hosted fonts (allowed by the OFL) for offline use and repeatable video exports.
 - More of our own themes matched to single looks.
 
@@ -98,14 +110,16 @@ About 17 agent hours (tasks): adapter and theme data 5.5, fonts 1.5, widgets and
 Each with a recommended answer.
 
 1. **Default: Automatic (follow the app theme) or keep today's Strudel theme?** Recommended: Automatic, neon to Neon and hardware to Amber. Today's `strudelTheme` stays in the list.
-2. **Which Strudel themes to offer?** Recommended: a curated list without product names and with text at 4.5:1 or more: `strudelTheme`, `teletext`, `blackscreen`, `whitescreen`, `bluescreen`, `greenText`. Not all 39; `algoboy` (2.4:1), `redText` and `bluescreenlight` (3.6:1) left out for contrast although they fit the style.
+2. **Which Strudel themes to offer?** Recommended: a curated list without product names and with text at 4.5:1 or more: `strudelTheme`, `teletext`, `blackscreen`, `whitescreen`, `bluescreen`, `greenText`. Not all 39; `algoboy` (2.4:1), `redText` and `bluescreenlight` (3.6:1) left out for contrast although they fit the style. **Built:** the data check measured `greenText`'s comments at 3.4:1 (`#54636D` on black), under the spec's 4.5:1 for text and comment, so it is left out too; `strudelTheme` (comments 4.4:1) stays as the one exception, because it is the panel's look of before.
 3. **Our themes: Neon, Amber, Terminal, High contrast dark, Light high contrast?** Recommended: yes, these five. Terminal follows the modern palette of the Terminal render.
 4. **Neon follows the look's colours, or fixed colours?** Recommended: follows the look (screenshots 05 and 06).
 5. **Code font?** Recommended: JetBrains Mono by default, Medium (14 px); offer Share Tech Mono, VT323 and the system monospace.
 6. **Videos follow the code theme?** Recommended: yes by default, with "app theme" as the other choice; the fast video fixes the theme at its start.
-7. **Dim the text of muted `_$:` lines too (today only their widget dims)?** Recommended: yes, through the theme's muted role at about 55 % opacity, in the panel and in videos.
+7. **Dim the text of muted `_$:` lines too (today only their widget dims)?** Recommended: yes, through the theme's muted role at about 55 % opacity, in the panel and in videos. **Owner: yes, but as an option in the same Settings card** (D7: "Dim muted lines", on by default).
 8. **Where is the setting?** Recommended: the Settings "Appearance" card only, no control in the code panel header.
-9. **A song carries a code theme?** Recommended: not now (later idea).
+9. **A song carries a code theme?** Recommended: not now (later idea). **Owner: not now; later as a preference, not an obligation** (Later ideas).
+
+Owner's answers (2026-10-29): every recommendation approved, with the two changes above (7 and 9).
 
 ## Prototypes
 

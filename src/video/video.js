@@ -8,6 +8,7 @@ import { drawTimeline, drawColumn, futureShown } from '../live/timeline.js';
 import { fragmentAreas, soulFocus, coverOffset } from './layout.js';
 import { glitchAt, GLITCH_SECONDS, taglineAt, taglineFor } from './fragments.js';
 import { hashString } from '../endless/random.js';
+import { appRoles, MUTED_TEXT } from '../code-themes/themes.js';
 
 const KEY = 'coding-misk-video';
 const LIVE_KEY = 'coding-misk-live-preset';
@@ -17,9 +18,11 @@ const LIVE_KEY = 'coding-misk-live-preset';
 // soulFrame(cyc, playing, scale): the soul screen always (the live picture's soul views, #52)
 // getTimeline(cyc): { shape, bar, live } of the song on air, for the timeline views (#65), or null
 // getHighlights(): true when the playing notes light up in the code (performance-profiles)
+// getCodeTheme(): the code's colours and font (code-themes D8): { roles (null: the app theme's colours), family, dim },
+// read every frame; a fast video or a fragment passes the one read at its start (J.ct)
 // getWidgets(): { canvas(type, index, key), dim } of the code widgets drawn now (the page's, or the fast video's drawn
 // from its notes and waves), or null (code-widgets D11)
-export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo, getSay, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
+export function createVideo({ getCodeTheme = () => null, getWidgets = () => null, visuals, getCode, getInfo, getSay, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });
   const cv = document.createElement('canvas');
@@ -61,22 +64,31 @@ export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo
   // the scroll is kept per canvas: the live picture and the control room's small pictures scroll on their own
   let code = '', lastEdit = 0, editAt = -10;
   const scrolls = new WeakMap();
-  function tokens(line, P) {
+  // R: the code theme's roles (code-themes D8), or the app theme's (appRoles: today's colours)
+  function tokens(line, R) {
     const out = []; let i = 0;
     while (i < line.length) {
       const rest = line.slice(i);
       let m;
-      if (rest.startsWith('//')) { out.push([rest, P.muted]); break; }
-      if ((m = /^(["'`])(?:\\.|(?!\1).)*\1?/.exec(rest))) { out.push([m[0], P.a2]); i += m[0].length; continue; }
-      if ((m = /^\d+(\.\d+)?/.exec(rest))) { out.push([m[0], P.a1]); i += m[0].length; continue; }
-      if ((m = /^[A-Za-z_$][\w$]*/.exec(rest))) { const fn = line[i + m[0].length] === '('; out.push([m[0], fn ? P.a1 : /^(const|let|var|return|function|await|true|false|null|new|if|else|for)$/.test(m[0]) ? P.a2 : P.ink]); i += m[0].length; continue; }
-      out.push([line[i], P.muted]); i++;
+      if (rest.startsWith('//')) { out.push([rest, R.comment]); break; }
+      if ((m = /^(["'`])(?:\\.|(?!\1).)*\1?/.exec(rest))) { out.push([m[0], R.string]); i += m[0].length; continue; }
+      if ((m = /^\d+(\.\d+)?/.exec(rest))) { out.push([m[0], R.number]); i += m[0].length; continue; }
+      if ((m = /^[A-Za-z_$][\w$]*/.exec(rest))) {
+        const w = m[0], fn = line[i + w.length] === '(', dot = line[i - 1] === '.';
+        // a keyword, a label (`$:`, `_$:`) at the start of the line, a method (`.gain(`), a call (`note(`), a name
+        const label = line[i + w.length] === ':' && !line.slice(0, i).trim();
+        out.push([w, /^(const|let|var|return|function|await|true|false|null|new|if|else|for)$/.test(w) ? R.keyword : label ? R.label : fn ? (dot ? R.method : R.call || R.variable) : dot ? R.prop || R.method : R.name || R.variable]);
+        i += w.length; continue;
+      }
+      out.push([line[i], R.punct]); i++;
     }
     return out;
   }
   // co: { mode: 'follow' | 'scroll' | 'focus', progress 0..1 (scroll), section: the section playing (focus), cyc }
   // widgets (code-widgets D11): the code widgets of the page copied below their lines, dimmed on muted lines
-  function drawCode(A, P, now, frameH, co = null, widgets = false) {
+  // ct: the code theme read at the start of a fast video or a fragment (else the one in use now)
+  function drawCode(A, P, now, frameH, co = null, widgets = false, ct = null) {
+    const C = ct || getCodeTheme() || {}, R = C.roles || appRoles(P), W1 = R.widget || { a1: P.a1, a2: P.a2, muted: P.muted }, fam = C.family || '"JetBrains Mono", monospace';
     const src = getCode() || '';
     if (src !== code) {
       let i = 0; while (i < src.length && i < code.length && src[i] === code[i]) i++;
@@ -84,12 +96,15 @@ export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo
     }
     const fs = Math.round(frameH / 50), lh = Math.round(fs * 1.4), padX = Math.round(fs * 1.1), head = Math.round(fs * 2.4);
     g.save(); g.globalAlpha = A.a ?? 1;
-    g.fillStyle = P.panel; g.strokeStyle = P.line; g.lineWidth = 2;
+    g.fillStyle = R.bg; g.strokeStyle = R.line; g.lineWidth = 2;
     g.beginPath(); g.roundRect(A.x, A.y, A.w, A.h, 10); g.fill(); g.stroke();
-    g.fillStyle = P.muted; g.font = `600 ${Math.round(fs * .8)}px "JetBrains Mono", monospace`; g.textBaseline = 'middle';
+    g.fillStyle = R.head || R.comment; g.font = `600 ${Math.round(fs * .8)}px "JetBrains Mono", monospace`; g.textBaseline = 'middle';
     g.fillText('CODE · STRUDEL', A.x + padX, A.y + head / 2);
     g.beginPath(); g.rect(A.x + 2, A.y + head, A.w - 4, A.h - head - 2); g.clip();
     g.font = `500 ${fs}px "JetBrains Mono", monospace`; g.textBaseline = 'alphabetic';
+    // another code font: sized so that its characters are as wide as JetBrains Mono's, so the lines break where the
+    // code's line breaks expect (codeColsOf)
+    if (C.family && !/^"JetBrains Mono"/.test(fam)) { const want = g.measureText('M').width; g.font = `500 ${fs}px ${fam}`; const k = Math.max(.7, Math.min(1.8, want / (g.measureText('M').width || want))); g.font = `500 ${Math.round(fs * k * 10) / 10}px ${fam}`; }
     // long lines wrap: rows of at most cols characters, continuation rows indented
     const cw = g.measureText('M').width, cols = Math.max(20, Math.floor((A.w - padX * 2) / cw)), ind = 2;
     const rows = [];
@@ -136,7 +151,7 @@ export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo
     // the active lines glow, a little brighter on every beat
     if (active) {
       const beat = 1 - ((co.cyc || 0) * 4 % 1);
-      rows.forEach((r, k) => { if (!active.has(r.li)) return; const y = y0 + at(k) * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return; g.fillStyle = P.a1; g.globalAlpha = (A.a ?? 1) * (.12 + .14 * beat); g.fillRect(A.x + 4, y - fs * 1.02, A.w - 8, lh); g.globalAlpha = A.a ?? 1; g.fillStyle = P.a1; g.fillRect(A.x + 4, y - fs * 1.02, Math.max(3, fs * .18), lh); });
+      rows.forEach((r, k) => { if (!active.has(r.li)) return; const y = y0 + at(k) * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return; g.fillStyle = W1.a1; g.globalAlpha = (A.a ?? 1) * (.12 + .14 * beat); g.fillRect(A.x + 4, y - fs * 1.02, A.w - 8, lh); g.globalAlpha = A.a ?? 1; g.fillStyle = W1.a1; g.fillRect(A.x + 4, y - fs * 1.02, Math.max(3, fs * .18), lh); });
     }
     // highlights: the layers of the instruments that sound glow with their level, and the step that plays in their
     // first pattern string gets a box, in time with the bar (as Strudel's editor marks the playing notes)
@@ -151,29 +166,34 @@ export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo
         const L = layerOf[r.li]; if (!L || L.muted) return;
         const level = Math.min(1, (lv[idOf.get(L.start)] || 0) * 2.5); if (level < .05) return;
         const y = y0 + at(k) * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
-        g.fillStyle = P.a2 || P.a1; g.globalAlpha = (A.a ?? 1) * .3 * level; g.fillRect(A.x + 4, y - fs * .95, A.w - 8, lh);
+        g.fillStyle = W1.a2 || W1.a1; g.globalAlpha = (A.a ?? 1) * .3 * level; g.fillRect(A.x + 4, y - fs * .95, A.w - 8, lh);
         // the step box, in the first string of the layer's first row
         if (r.li !== L.start || r.from > 0) return;
         const m = r.line.match(/"([^"<>]*)"/); if (!m || m.index >= r.text.length) return;
         const toks = [...m[1].matchAll(/[^\s[\]]+/g)]; if (!toks.length) return;
         const tk = toks[Math.floor(((cyc % 1) + 1) % 1 * toks.length)], x = A.x + padX + (m.index + 1 + tk.index) * cw;
-        g.globalAlpha = (A.a ?? 1) * (.5 + .5 * level); g.strokeStyle = P.a2 || P.a1; g.lineWidth = 1.5; g.strokeRect(x - 2, y - fs * .9, tk[0].length * cw + 4, fs * 1.15);
+        g.globalAlpha = (A.a ?? 1) * (.5 + .5 * level); g.strokeStyle = W1.a2 || W1.a1; g.lineWidth = 1.5; g.strokeRect(x - 2, y - fs * .9, tk[0].length * cw + 4, fs * 1.15);
       });
       g.globalAlpha = A.a ?? 1;
     }
+    // the text of muted lines (`_$:` and the indented lines below) dimmed, as in the panel (code-themes Q7)
+    const dimmed = new Set();
+    if (C.dim) { let on = false; lines.forEach((ln, i) => { const m = /^\s*(_?)\$:/.exec(ln); if (m) on = m[1] === '_'; else if (!/^\s+\S/.test(ln)) on = false; if (on) dimmed.add(i); }); }
     rows.forEach((r, k) => {
       const y = y0 + at(k) * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
+      if (dimmed.has(r.li)) g.globalAlpha = (A.a ?? 1) * MUTED_TEXT;
       // colours come from the whole line, so a string or comment cut by the wrap keeps its colour
       let x = A.x + padX + r.indent * cw, c = 0;
-      for (const [txt, col] of tokens(r.line, P)) {
+      for (const [txt, col] of tokens(r.line, R)) {
         const a = Math.max(c, r.from), b = Math.min(c + txt.length, r.from + r.text.length);
         if (b > a) { g.fillStyle = col; g.fillText(txt.slice(a - c, b - c), x, y); x += cw * (b - a); }
         c += txt.length;
       }
+      if (dimmed.has(r.li)) g.globalAlpha = A.a ?? 1;
     });
     // caret after the last edit, blinking once typing stops
     if (now - editAt < 1.2 || Math.floor(now * 2) % 2) {
-      g.fillStyle = P.a1; g.fillRect(A.x + padX + caret.col * cw, y0 + at(caret.row) * lh - fs * .85, Math.max(2, fs * .12), fs * 1.05);
+      g.fillStyle = R.caret; g.fillRect(A.x + padX + caret.col * cw, y0 + at(caret.row) * lh - fs * .85, Math.max(2, fs * .12), fs * 1.05);
     }
     if (W) for (const w of W.items) {
       const y = y0 + (at(w.row) + 1) * lh - fs * .7 + w.dy;
@@ -181,7 +201,7 @@ export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo
       g.save();
       if (w.muted) { g.globalAlpha = (A.a ?? 1) * .4; g.filter = 'grayscale(1)'; }
       try { g.drawImage(w.canvas, A.x + padX, y, w.w, w.h); } catch (e) {}
-      if (w.muted) { g.filter = 'none'; g.globalAlpha = A.a ?? 1; g.setLineDash([4, 4]); g.strokeStyle = P.muted; g.lineWidth = 1; g.strokeRect(A.x + padX, y, w.w, w.h); }
+      if (w.muted) { g.filter = 'none'; g.globalAlpha = A.a ?? 1; g.setLineDash([4, 4]); g.strokeStyle = W1.muted || P.muted; g.lineWidth = 1; g.strokeRect(A.x + padX, y, w.w, w.h); }
       g.restore();
     }
     g.restore();
@@ -294,7 +314,7 @@ export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo
     drawSay(A.stage);
     drawCard(A.stage, P, getInfo(cyc) || {}, now);
     if (A.soul) drawSoul(A.soul, P, soulMode === 'open', soulMode === 'open' ? soul.canvas(cyc, playing, (A.soul.w - 8) / 1200) : null);
-    if (A.code) drawCode(A.code, P, now, Q.h, null, withWidgets(J.layout));
+    if (A.code) drawCode(A.code, P, now, Q.h, null, withWidgets(J.layout), J.ct);
     return !!soul;
   }
   function frame(cyc, playing) {
@@ -488,7 +508,7 @@ export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo
         drawSoul(A.soul, P, true, soulFrame(cyc, true, Math.max(.05, A.soul.mode ? Math.max(A.soul.w / 1200, A.soul.h / 760) : Math.min((A.soul.w - 8) / 1200, (A.soul.h - 4) / 760))));
         bleedAround(A.soul);
       }
-      if (A.code) drawCode(A.code, P, now, Math.min(C.w, C.h) * 1.6, { mode: o.codeMode || 'focus', progress: t / (J.length || 1), section, cyc }, withWidgets(o.show));
+      if (A.code) drawCode(A.code, P, now, Math.min(C.w, C.h) * 1.6, { mode: o.codeMode || 'focus', progress: t / (J.length || 1), section, cyc }, withWidgets(o.show), J.ct);
       if (A.top) drawLogo(A.top, levels);
       const tag = J.tagline !== undefined ? taglineAt(J.tagline, t, J.code) : null, oT = tag ? { ...o, taglineFull: J.tagline } : o;
       if (A.bottom) drawBottomBand(A.bottom, P, oT, getInfo(cyc) || {}, tag);

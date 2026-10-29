@@ -3,7 +3,8 @@
 import { makeBackup, mergeBackup } from './backup.js';
 import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
-import { REAL_SCOPES, LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, V_DEFAULTS } from '../video/layout.js';
+import { OWN_IDS, STRUDEL_IDS, FONTS, SIZES, themeName, fontName } from '../code-themes/themes.js';
+import { CODE_COLORS, REAL_SCOPES, LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, V_DEFAULTS } from '../video/layout.js';
 import { FORMATS, MP3_RATES, formatOf } from '../export/encode.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data.js';
 import { nextTagline } from '../video/fragments.js';
@@ -13,6 +14,7 @@ import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shape
 import { shapeCounts } from '../song/shapes.js';
 import { AIR_CHOOSERS, AIR_CHOOSER, chooserOf, chooserName } from '../endless/waypoints.js';
 import { CW_KEY, CW_DEFAULTS, CW_INSTRUMENTS, CW_WINDOWS, CW_PARAMS, CW_SIZE_LIMITS, WIDGETS, widgetSettings } from '../live/widgets.js';
+import { SW_KEY, SW_OPEN, SW_LAYERS, SW_MAPPINGS, SW_COLOURS, SW_SILENT, SW_LIMITS, stageSettings } from '../visuals/stage-settings.js';
 
 // the code widgets card (code-widgets D2): the sections left open, remembered in this browser
 const CW_OPEN = 'coding-misk-cw-open';
@@ -33,6 +35,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setTheme'), seg('data-set-ui', [['neon', 'NEON'], ['hw', 'HW']], app.ui()))}
           ${row(t('setLang'), seg('data-set-lang', [['it', 'IT'], ['en', 'EN']], app.lang()))}
           ${row(t('setRadioLook'), `<select id="set-radio-look" data-no-knob>${looks.map(([k, l]) => opt(k, store.get('coding-misk-radio-look', 'palco'), tx(l))).join('')}</select>`, t('setRadioLookHint'))}
+          ${codeRows()}
         </div>
         <div class="card set-card"><h3>${esc(t('setAudio'))}</h3>
           ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`)}
@@ -46,6 +49,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setVidLayout'), `<select data-vid-opt="layout" data-no-knob>${LAYOUTS.map(k => opt(k, vid.layout, t(`vidLayout:${k}`))).join('')}</select>`, t(`vidLayoutHint:${vid.layout}`))}
           ${row(t('setVidQuality'), `<select data-vid-opt="quality" data-no-knob>${Object.keys(QUALITIES).map(k => opt(k, vid.quality, t(`vidQuality:${k}`))).join('')}</select>`, t('setVidQualityHint'))}
           ${row(t('setVidCard'), `<select data-vid-opt="card" data-no-knob>${CARDS.map(k => opt(k, vid.card, t(`vidCard:${k}`))).join('')}</select>`)}
+          ${row(t('setVidCodeColors'), `<select data-vid-opt="codeColors" data-no-knob>${CODE_COLORS.map(k => opt(k, vid.codeColors, t(`vidCodeColors:${k}`))).join('')}</select>`, t('setVidCodeColorsHint'))}
           ${row(t('setVidRealScope'), `<select data-vid-opt="realScope" data-no-knob>${REAL_SCOPES.map(k => opt(k, vid.realScope, t(`vidRealScope:${k}`))).join('')}</select>`, t('setVidRealScopeHint'))}
           ${row(t('setVidVisual'), `<select data-vid-opt="visual" data-no-knob>${opt('song', vid.visual, t('vidVisual:song'))}${looks.map(([k, l]) => opt(`fixed:${k}`, vid.visual, t('vidVisual:fixed', { look: tx(l) }))).join('')}${opt('song-cycle', vid.visual, t('vidVisual:song-cycle'))}${opt('section-cycle', vid.visual, t('vidVisual:section-cycle'))}</select>`, t('setVidVisualHint'))}
           ${row(t('setVidSoulMode'), `<select data-vid-opt="soul" data-no-knob>${SOULS.map(k => opt(k, vid.soul, t(`vidSoul:${k}`))).join('')}</select>`, t(`vidSoulHint:${vid.soul}`))}
@@ -92,6 +96,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           <div class="actions">${app.hiddenSongs && app.hiddenSongs() ? `<button class="btn" id="set-show-hidden">${esc(t('setShowHidden', { n: app.hiddenSongs() }))}</button>` : `<span class="muted">${esc(t('setHiddenNone'))}</span>`}</div>
         </div>
         ${widgetsCard()}
+        ${stageCard()}
         <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
           <p class="muted">${esc(t('setAdvancedIntro'))}</p>
           <p class="muted" id="set-shape-count" data-shapes="${counts.shapes}">${esc(t('setShapeCount', counts))}</p>
@@ -109,6 +114,17 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       </div>`;
     if (app.videoPreview) app.videoPreview(root.querySelector('#set-vid-preview'));
     if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => { const x = { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), stageRatio: app.stageRatio ? app.stageRatio() : 2.4 }; return { ...x, size: fragmentSize(x), next: store.get('coding-misk-fragment-n', 1) }; });
+  }
+
+  // code themes (code-themes D6): theme, font, size and the dimmed muted lines, in the Appearance card
+  function codeRows() {
+    if (!app.codeTheme) return '';
+    const C = app.codeTheme.settings(), L = app.lang();
+    const themes = `${opt('auto', C.theme, t('codeTheme:auto'))}<optgroup label="${esc(t('setCodeThemeOwn'))}">${OWN_IDS.map(id => opt(id, C.theme, themeName(id, L))).join('')}</optgroup><optgroup label="${esc(t('setCodeThemeStrudel'))}">${STRUDEL_IDS.map(id => opt(id, C.theme, themeName(id, L))).join('')}</optgroup>`;
+    return `${row(t('setCodeTheme'), `<select id="set-code-theme" data-no-knob>${themes}</select>`, C.theme === 'auto' ? t('setCodeThemeAuto', { name: app.codeTheme.autoName(L) }) : t('setCodeThemeChosen'))}
+          ${row(t('setCodeFont'), `<select id="set-code-font" data-no-knob>${Object.keys(FONTS).map(k => opt(k, C.font, fontName(k, L))).join('')}</select>`)}
+          ${row(t('setCodeSize'), seg('data-set-code-size', Object.keys(SIZES).map(k => [k, t(`codeSize:${k}`)]), C.size), t('setCodeSizeHint'))}
+          ${row(t('setCodeDim'), seg('data-set-code-dim', [['1', t('cwYes')], ['0', t('cwNo')]], C.dim ? '1' : '0'), t('setCodeDimHint'))}`;
   }
 
   // code widgets (code-widgets D2): one card, sections that open and close
@@ -139,6 +155,33 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       <div class="actions"><button class="btn" id="set-cw-defaults">${esc(t('cwDefaults'))}</button></div>
     </div>`;
   }
+  // stage widgets (widgets-on-stage D9): the layer over the scene, then sections that open and close, like the code
+  // widgets card
+  function stageCard() {
+    const W = stageSettings(store.get(SW_KEY, null)), open = new Set(store.get(SW_OPEN, ['general']) || []), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) };
+    const sec = (id, body) => `<details class="cw-sec" data-sw-sec="${id}"${open.has(id) ? ' open' : ''}><summary>${esc(t(`swSec:${id}`))}</summary>${body}</details>`;
+    const check = (attr, on, label) => `<label class="rx-opt"><input type="checkbox" ${attr}${on ? ' checked' : ''} data-no-knob> <span>${esc(label)}</span></label>`;
+    const inst = W.mapping === 'own' ? CW_INSTRUMENTS.map(k => { const I = W.instruments[k]; return `<div class="cw-inst" data-sw-inst="${k}">
+      ${check(`data-sw-inst-on="${k}"`, I.on, t(`cwInst:${k}`))}
+      <label class="cw-prim"><span class="muted">${esc(t('cwPrimary'))}</span> <select data-sw-prim="${k}" data-no-knob>${WIDGETS.map(w => opt(w, I.primary, w)).join('')}</select></label>
+      <span class="chips" role="group" aria-label="${esc(t('cwSecondary'))}"><span class="muted">${esc(t('cwSecondary'))}</span> ${WIDGETS.filter(w => w !== I.primary).map(w => `<button class="chip" data-sw-sec2="${k}" data-w="${w}" aria-pressed="${I.secondary.includes(w)}">${w}</button>`).join('')}</span>
+    </div>`; }).join('') : '';
+    return `<div class="card set-card" id="set-stage-widgets"><h3>${esc(t('setSw'))}</h3>
+      <p class="muted">${esc(t('setSwIntro'))}</p>
+      ${row(t('swLayer'), seg('data-sw-layer', SW_LAYERS.map(k => [k, t(`swLayer:${k}`)]), W.layer), t('swLayerHint'))}
+      ${sec('general', `${row(t('swMonitor'), `<input type="number" data-sw-num="monitor" min="${SW_LIMITS.monitor[0]}" max="${SW_LIMITS.monitor[1]}" step="1" value="${W.monitor}" data-no-knob>`, t('swMonitorHint'))}
+        ${row(t('swStrip'), `<input type="number" data-sw-num="strip" min="${SW_LIMITS.strip[0]}" max="${SW_LIMITS.strip[1]}" step="1" value="${W.strip}" data-no-knob>`, t('swStripHint'))}
+        ${row(t('swMapping'), seg('data-sw-mapping', SW_MAPPINGS.map(k => [k, t(`swMapping:${k}`)]), W.mapping), t('swMappingHint'))}
+        ${row(t('swColours'), `<select data-sw-colours data-no-knob>${SW_COLOURS.map(k => opt(k, W.colours, t(`swColours:${k}`))).join('')}</select>`, t('swColoursHint'))}
+        ${row(t('swSilent'), seg('data-sw-silent', SW_SILENT.map(k => [k, t(`swSilent:${k}`)]), W.silent), t('swSilentHint'))}`)}
+      ${sec('widgets', `<p class="hint muted">${esc(t('swWidgetsHint'))}</p><div class="cw-checks">${WIDGETS.map(w => check(`data-sw-widget="${w}"`, W.widgets[w], w)).join('')}</div>`)}
+      ${sec('instruments', W.mapping === 'own' ? `<p class="hint muted">${esc(t('swInstHint'))}</p>${inst}` : `<p class="hint muted" data-sw-same>${esc(t('swInstSame'))}</p>`)}
+      ${sec('video', `<p class="hint muted">${esc(t('swVideoHint', { value: t(`vidRealScope:${vid.realScope}`) }))}</p>`)}
+      <div class="actions"><button class="btn" id="set-sw-defaults">${esc(t('cwDefaults'))}</button></div>
+    </div>`;
+  }
+  // a change of the stage widgets' settings, stored whole (the defaults filled in)
+  const setSw = f => { const W = stageSettings(store.get(SW_KEY, null)); f(W); store.set(SW_KEY, stageSettings(W)); };
   // a change of the code widgets' settings, stored whole (the defaults filled in)
   const setCw = f => { const S = widgetSettings(store.get(CW_KEY, null)); f(S); store.set(CW_KEY, widgetSettings(S)); if (app.widgetsChanged) app.widgetsChanged(); };
   const setFrag = (k, v) => store.set('coding-misk-fragments', { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), [k]: v });
@@ -148,6 +191,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
+    if (b.dataset.setCodeSize) { app.codeTheme.set({ size: b.dataset.setCodeSize }); return render(); }
+    if (b.dataset.setCodeDim) { app.codeTheme.set({ dim: b.dataset.setCodeDim === '1' }); return render(); }
     // code widgets (code-widgets D2)
     if (b.dataset.cwOn) { setCw(S => { S.on = b.dataset.cwOn === '1'; }); return render(); }
     if (b.dataset.cwRoll) { setCw(S => { S.roll = b.dataset.cwRoll; }); return render(); }
@@ -156,6 +201,13 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.dataset.cwMove) { const k = b.dataset.cwMove, d = +b.dataset.dir; setCw(S => { const i = S.order.indexOf(k), j = i + d; if (i >= 0 && j >= 0 && j < S.order.length) [S.order[i], S.order[j]] = [S.order[j], S.order[i]]; }); render(); const f = root.querySelector(`[data-cw-move="${k}"][data-dir="${d}"]:not([disabled])`) || root.querySelector(`[data-cw-move="${k}"]:not([disabled])`); if (f) f.focus(); return; }
     if (b.dataset.cwSec2) { const k = b.dataset.cwSec2, w = b.dataset.w; setCw(S => { const I = S.instruments[k], has = I.secondary.includes(w); I.secondary = has ? I.secondary.filter(x => x !== w) : [...I.secondary, w]; }); return render(); }
     if (b.id === 'set-cw-defaults') { const on = widgetSettings(store.get(CW_KEY, null)).on; store.set(CW_KEY, { ...widgetSettings(null), on }); if (app.widgetsChanged) app.widgetsChanged(); toast(t('cwDefaultsDone')); return render(); }
+    // stage widgets (widgets-on-stage D9)
+    if (b.dataset.swLayer) { setSw(W => { W.layer = b.dataset.swLayer; }); return render(); }
+    if (b.dataset.swSilent) { setSw(W => { W.silent = b.dataset.swSilent; }); return render(); }
+    // the stage's own instruments start as a copy of the code widgets' ones (unless the stage's copy was already edited)
+    if (b.dataset.swMapping) { setSw(W => { W.mapping = b.dataset.swMapping; if (W.mapping === 'own' && JSON.stringify(W.instruments) === JSON.stringify(stageSettings(null).instruments)) W.instruments = widgetSettings(store.get(CW_KEY, null)).instruments; }); return render(); }
+    if (b.dataset.swSec2) { const k = b.dataset.swSec2, w = b.dataset.w; setSw(W => { const I = W.instruments[k], has = I.secondary.includes(w); I.secondary = has ? I.secondary.filter(x => x !== w) : [...I.secondary, w]; }); return render(); }
+    if (b.id === 'set-sw-defaults') { store.set(SW_KEY, stageSettings(null)); toast(t('swDefaultsDone')); return render(); }
     if (b.dataset.setMp3) { store.set('coding-misk-export-mp3', +b.dataset.setMp3); return render(); }
     // direction presets (#53): the whole video setting under a name
     if (b.id === 'set-vid-preset-save') {
@@ -197,7 +249,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   });
   root.addEventListener('input', e => { if (e.target.id === 'set-volume') { app.setVolume(+e.target.value); e.target.nextElementSibling.textContent = `${e.target.value}%`; } });
   // the sections of the code widgets card left open
-  root.addEventListener('toggle', e => { const d = e.target; if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
+  root.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.swSec) { const open = new Set(store.get(SW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.swSec); else open.delete(d.dataset.swSec); store.set(SW_OPEN, [...open]); return; } if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
   root.addEventListener('change', e => {
     { const x = e.target, d = x.dataset || {};
       if (d.cwNum) { setCw(S => { S[d.cwNum] = +x.value; }); x.value = widgetSettings(store.get(CW_KEY, null))[d.cwNum]; return; }
@@ -206,9 +258,16 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       if (d.cwParam) { setCw(S => { S.params[d.cwParam] = x.checked; }); return; }
       if (d.cwSize) { setCw(S => { S.sizes[d.cwSize] = +x.value; }); x.value = widgetSettings(store.get(CW_KEY, null)).sizes[d.cwSize]; return; }
       if (d.cwInstOn) { setCw(S => { S.instruments[d.cwInstOn].on = x.checked; }); return; }
+      if (d.swNum) { setSw(W => { W[d.swNum] = +x.value; }); x.value = stageSettings(store.get(SW_KEY, null))[d.swNum]; return; }
+      if (d.swColours !== undefined) { setSw(W => { W.colours = x.value; }); return; }
+      if (d.swWidget) { setSw(W => { W.widgets[d.swWidget] = x.checked; }); return; }
+      if (d.swInstOn) { setSw(W => { W.instruments[d.swInstOn].on = x.checked; }); return; }
+      if (d.swPrim) { setSw(W => { const I = W.instruments[d.swPrim], old = I.primary; I.primary = x.value; I.secondary = [...I.secondary.filter(w => w !== x.value), ...(old !== x.value && !I.secondary.includes(old) ? [old] : [])]; }); return render(); }
       if (d.cwPrim) { setCw(S => { const I = S.instruments[d.cwPrim], old = I.primary; I.primary = x.value; I.secondary = [...I.secondary.filter(w => w !== x.value), ...(old !== x.value && !I.secondary.includes(old) ? [old] : [])]; }); return render(); }
     }
     if (e.target.id === 'set-radio-look') store.set('coding-misk-radio-look', e.target.value);
+    if (e.target.id === 'set-code-theme') { app.codeTheme.set({ theme: e.target.value }); render(); }
+    if (e.target.id === 'set-code-font') { app.codeTheme.set({ font: e.target.value }); render(); }
     if (e.target.id === 'set-format') { store.set('coding-misk-export-format', e.target.value); render(); }
     if (e.target.id === 'set-speed') store.set('coding-misk-export-speed', e.target.value);
     if (e.target.id === 'set-typing') store.set('coding-misk-typing', e.target.value);

@@ -24,7 +24,7 @@ The UI is dark only, by design.
 ## Typography
 
 - Logo: "coding" in `Mr Dafoe` (neon script, white with `--a2` glow) over "MISK" in `Russo One` (chrome gradient, skewed), on a perspective grid, with an 8-bar equalizer driven by the instruments.
-- UI: `Chakra Petch`. Code, numbers, readouts: `JetBrains Mono`. Hardware LCD: `VT323`.
+- UI: `Chakra Petch`. Code, numbers, readouts: `JetBrains Mono` (the code font is a setting, see Code themes). Hardware LCD: `VT323`.
 - Labels (`.lbl`): 11px, uppercase, letter-spacing .14em.
 
 ## Components
@@ -39,6 +39,12 @@ The UI is dark only, by design.
 ## Navigation
 
 Two modes at the top of the work area (`#42`): **Listen** (Compose, Songs, Playlists, Radio) to make and hear music, and **Groove Lab** (Artists, Styles, Genres, Sounds, Patterns, Guide, References) for the material music is made of and for learning. The mode buttons are large toggles with the tab names as a subtitle (hidden on phones); in the hardware theme they are latching keys with a lamp. Under them, the tabs of the mode. Each mode remembers its last tab; a link to a tab of the other mode switches mode. The live code stays on the right in both modes and can be collapsed; the settings open from the gear next to the code, with no mode lit.
+
+## Code themes (`code-themes`)
+
+The code panel and the code in videos have their own theme, chosen in Settings → Appearance (`src/code-themes/`). Automatic follows the app theme: NEON gives **Neon**, built from the look's tokens (ground `--bg` darkened by a quarter, text `--ink`, label and variable `--a1`, string `--a2`, number `--s3`, comment `--muted`), HW gives **Amber** (ground `#140e04`, text `#ffb347`, like the LCD fields, a soft glow). Also **Terminal** (`#0b0d10`, the modern palette of the Terminal render), **High contrast dark** (black, white, yellow labels) and **Light high contrast** (white, black, purple labels, dark blue strings), the latter kept for a light app theme (`data-ui="light"` already maps to it). Every text role reaches 4.5:1 on its ground, 7:1 in the two high contrast themes, Neon on every look (`npm run check:code-themes`). A few of Strudel's own themes are offered under their Strudel names.
+
+Code font: JetBrains Mono by default (Share Tech Mono, VT323, the system monospace), 13, 14 or 16 px, one step larger in the full view. The panel's ground (`--code-bg`), the flash (`--code-flash`), the dimmed widget's outline (`--code-muted`), the widgets, the playing-note outline and the text of muted lines (55 %) follow the theme.
 
 ## Hardware theme (`data-ui="hw"`)
 
@@ -57,6 +63,7 @@ Each theme reacts to per-instrument levels and onsets (kick echoes and flashes, 
 - **Studio** (`#28`, the radio's look by default): acoustic foam wall, an ON AIR light lit while the radio is on air, a microphone whose ring lights up and sends waves while the voice speaks, a screen with the song, artist, styles, bar and the last spoken comment typed out, a radio dial whose needle finds the station, two VU meters, a desk with one fader per instrument and a turntable that spins at the song's tempo. A look picked while the radio plays becomes the radio's look.
 - **Edgerunners:** halftone moon, layered city with cyan rim light and holo signs, elevated train, anime speed lines, glitch slices with RGB split, cyberware HUD.
 - **Monitor** (`widgets-on-stage`, `#79`): a wall of up to 6 panels, one per playing instrument, on a dark gradient. Each panel: the instrument's name in its colour and the widget kind in the label colour (JetBrains Mono 600), a level bar top right, the code widget (scope, pianoroll, punchcard, spectrum as a scrolling grid of 24 bands, spiral, pitchwheel), a border that glows with the level and a short flash on each onset; a silent instrument is grey, see-through, with a dashed border. Grid by the stage's proportions: 1 panel large and centred, 2 side by side (stacked on a tall stage), 3 as two over one centred (a column on a tall stage), 4 as 2×2, 5 as three over two, 6 as 3×2 (2×3 on a tall stage); the top leaves room for the readout and the look buttons.
+- **Stage widgets layer** (widgets-on-stage D4): Monitor's panels over another look, the panel background at 60% opacity so the scene shows through, the playing look's colours by default. Strip: two per side around the middle on a wide stage (about a fifth of the width and height each), a centred row at the bottom on a tall one (2×2 for 4). Palco: inside the Palco look's LED wall, up to 4, fewer bigger. A panel's level bar shortens rather than run over its header on a narrow panel.
 - **Rullo** (en: Roll): the melodic instruments on one pitch axis (the section's range, at least an octave) around a playhead in the middle, 4 bars across, each in its colour with a legend top right; past notes half lit, the note sounding lit with a glow; kick, snare and hats as lanes of dots at the bottom, the one just hit bigger, the lane name on a dark plate.
 - **Widget colours** (`src/visuals/widget-palettes.js`): neon: kick `#ff2e88`, snare and bass `#00e5ff`, hats and guitar `#ffe14d`, arp `#3dffb0`, pad `#a98bff`, lead `#ff7ad9`, fx `#ff9f43`; hardware: kick `#ff5a3d`, bass `#ffb347`, snare `#ffd27a`, hats `#ffe2a8`, guitar `#ffcf4d`, arp `#39ff6a`, pad `#d9b77a`, lead `#ff9a5c`, fx `#ff8c42`, on the amber LCD tones with a softer glow.
 

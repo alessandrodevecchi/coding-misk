@@ -22,7 +22,9 @@ export const VISUALS = ['song', 'fixed', 'song-cycle', 'section-cycle'];
 export const SOULS = ['auto', 'off', 'panel', 'full'];
 // realScope (code-widgets D11, cw-5): scope and spectrum widgets in the fast video from their own instrument's render,
 // 'auto' (back to the whole song's wave when the export would take more than twice as long) or 'always'
-export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true, visual: 'song', soul: 'auto', realScope: 'auto' };
+// codeColors (code-themes D8): the code in videos in the code theme's colours ('panel') or in the app theme's ('app')
+export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true, visual: 'song', soul: 'auto', realScope: 'auto', codeColors: 'panel' };
+export const CODE_COLORS = ['panel', 'app'];
 export const REAL_SCOPES = ['auto', 'always'];
 
 // the look of the frame at a point of the song: dir { visual, soul }, looks: the list to pick from,

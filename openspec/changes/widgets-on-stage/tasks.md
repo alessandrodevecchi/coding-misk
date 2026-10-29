@@ -24,22 +24,22 @@ Estimate: about 24 agent hours (design, Estimate). Phases 1 to 3 alone, Monitor 
 
 ## 4. Layer (2.5 h)
 
-- [ ] 4.1 Strip and Palco screen drawn after the look in `paint`; not on widget looks and soul. Verify: screenshots of each look with the strip; Palco with the screen
-- [ ] 4.2 Off by default leaves every look identical. Verify: `node tools/screenshot-visual.cjs` before and after on every look
+- [x] 4.1 Strip and Palco screen drawn after the look in `paint`; not on widget looks and soul. Verify: screenshots of each look with the strip; Palco with the screen (done: `tools/check-stage-widgets.cjs --only=layer`, screenshots `fatto-strato-*.png` in the owner's notes)
+- [x] 4.2 Off by default leaves every look identical. Verify: `node tools/screenshot-visual.cjs` before and after on every look (done with `tools/check-stage-widgets.cjs --hashes=` on develop and on the branch: the 7 deterministic looks equal; Spazio, Edgerunners and Studio differ between two runs of the same code)
 
 ## 5. Fast video (3 h)
 
 - [x] 5.1 Render page sends notes per instrument per block. Verify: `npm run check:export` (done with the first delivery: `stageNotes`, no extra query; checked note by note against the live notes in `tools/check-stage-widgets.cjs`)
-- [ ] 5.2 Per-instrument renders reused for stage scope and spectrum; fallback scaled by level, said in the log. Verify: `node tools/check-export.cjs` with Monitor, both `realScope` values; time against the Palco look within 10%
+- [x] 5.2 Per-instrument renders reused for stage scope and spectrum; fallback scaled by level, said in the log. Verify: `node tools/check-export.cjs` with Monitor, both `realScope` values; time against the Palco look within 10% (done in `tools/check-stage-widgets.cjs`: Monitor with Automatic and Always, the log lines; Automatic within 10% of Palco)
 
 ## 6. Settings (2.5 h)
 
-- [ ] 6.1 Card "Stage widgets" with sections, defaults, backup, reset. Verify: `check-settings.cjs`, `check-backup.mjs`
-- [ ] 6.2 Texts in English and Italian; Guide card. Verify: `npm run check:guide`
+- [x] 6.1 Card "Stage widgets" with sections, defaults, backup, reset. Verify: `check-settings.cjs`, `check-backup.mjs` (and the card in `tools/check-stage-widgets.cjs --only=card`)
+- [x] 6.2 Texts in English and Italian; Guide card. Verify: `npm run check:guide`
 
 ## 7. Checks and docs (4 h)
 
 - [x] 7.1 `npm run check:stage-widgets` (no browser) and a browser check with frame times (budget of D10) and screenshots. Verify: both pass; times in the DEVLOG
-- [ ] 7.2 `check:video`, `check:clips`, `check:live`, `node tools/check-video.cjs`, `node tools/check-clips.cjs`, `node tools/check-live.cjs` with a widget look. Verify: all pass (first delivery: video and live pass; `check-clips.cjs` speed fails under load as on develop; widget looks covered by `tools/check-stage-widgets.cjs`)
+- [x] 7.2 `check:video`, `check:clips`, `check:live`, `node tools/check-video.cjs`, `node tools/check-clips.cjs`, `node tools/check-live.cjs` with a widget look. Verify: all pass (first delivery: video and live pass; `check-clips.cjs` speed fails under load as on develop; widget looks covered by `tools/check-stage-widgets.cjs`. Second delivery: video and live pass, `check-clips.cjs` only the speed under a load of 8 to 9)
 - [x] 7.3 With the layer off and no widget look: `npm run check:code`, `npm run check:mixer`, level snapshots, fixtures unchanged
-- [ ] 7.4 Knowledge base (`visuals.md`, `code-widgets.md`, `decisions.md`, `settings.md`), `docs/DESIGN-SYSTEM.md`, DEVLOG with screenshots shown to the owner. Verify: `npm run check:knowledge`
+- [x] 7.4 Knowledge base (`visuals.md`, `code-widgets.md`, `decisions.md`, `settings.md`), `docs/DESIGN-SYSTEM.md`, DEVLOG with screenshots shown to the owner. Verify: `npm run check:knowledge`
