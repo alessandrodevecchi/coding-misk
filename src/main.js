@@ -1,5 +1,6 @@
 import '@strudel/repl';
 import './style.css';
+import './theme-light.css';
 import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
@@ -1419,7 +1420,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     const plan = widgetPlan(segments), mark = list => list && list.map(s => ({ ...s, wlines: linesByKey(s.code, plan.noteKeys) }));
     const at = job.segmentsAt;
     job = { ...job, segments: mark(job.segments), segmentsAt: at ? (a, b) => mark(at(a, b)) : null };
-    const P = (() => { if (ct.roles) return { ...ct.roles.widget }; const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim(); return { ink: v('--ink') || '#fff', muted: v('--muted') || '#888', a1: v('--a1') || '#f4a', a2: v('--a2') || '#fb4' }; })();
+    const P = (() => { if (ct.roles) return { ...ct.roles.widget }; const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k.replace('--', '--dk-')).trim() || cs.getPropertyValue(k).trim(); return { ink: v('--ink') || '#fff', muted: v('--muted') || '#888', a1: v('--a1') || '#f4a', a2: v('--a2') || '#fb4' }; })();
     const waves = {}, notes = {}, seen = new Set();
     cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P }), addNotes(block) { for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
     if (plan.instruments.length) {
@@ -3716,9 +3717,19 @@ $('#track-panel').addEventListener('click', e => {
   if (r === 'tk-del') { if (!confirmTwice('track', t('confirmRemoveTrack', { name: trackLabel(tr) }))) return; T.tracks.splice(tk, 1); tk = Math.max(0, Math.min(tk, T.tracks.length - 1)); editPat = null; changed(); renderTrackPanel(); }
 });
 
-// tema dell'interfaccia: neon (predefinito) o hardware con manopole, display e LED
-let ui = store.get('coding-misk-ui', 'neon');
-const setUi = v => { ui = v === 'hw' ? 'hw' : 'neon'; store.set('coding-misk-ui', ui); syncAll(); if (globalThis.codingMiskSoulDisplay) globalThis.codingMiskSoulDisplay.themeChanged(); };
+// tema dell'interfaccia: neon (predefinito), chiaro (light-theme: una variante chiara del neon, il palco resta scuro)
+// o hardware con manopole, display e LED. "Segui il sistema" (spento di base) sceglie chiaro o neon dalla preferenza
+// del sistema; premere un tema lo spegne.
+const UIS = ['neon', 'light', 'hw'];
+let uiPick = store.get('coding-misk-ui', 'neon'); if (!UIS.includes(uiPick)) uiPick = 'neon';
+let uiFollow = store.get('coding-misk-ui-follow', false) === true;
+const sysLight = globalThis.matchMedia ? matchMedia('(prefers-color-scheme: light)') : { matches: false };
+const resolveUi = () => (uiFollow ? (sysLight.matches ? 'light' : 'neon') : uiPick);
+let ui = resolveUi();
+const applyUi = () => { ui = resolveUi(); syncAll(); if (globalThis.codingMiskSoulDisplay) globalThis.codingMiskSoulDisplay.themeChanged(); };
+const setUi = v => { uiPick = UIS.includes(v) ? v : 'neon'; store.set('coding-misk-ui', uiPick); if (uiFollow) { uiFollow = false; store.set('coding-misk-ui-follow', false); } applyUi(); };
+const setUiFollow = on => { uiFollow = !!on; store.set('coding-misk-ui-follow', uiFollow); applyUi(); };
+if (sysLight.addEventListener) sysLight.addEventListener('change', () => { if (uiFollow) applyUi(); });
 $$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.dataset.uitheme)));
 const setLook = l => { if (HIDDEN_LOOKS.includes(l)) l = 'palco'; if (!LOOKS.some(([k]) => k === l)) return; look = l; soulBase = l; store.set('coding-misk-look', l); syncAll(); };
 // a song's own visual, unless the listener is watching the soul
@@ -4741,7 +4752,7 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.da
 // settings page (#31): the gear opens it, a second press goes back to the tab before
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
-    ui: () => ui, setUi: v => setUi(v), lang: () => getLang(), setLang: l => changeLang(l),
+    ui: () => ui, setUi: v => setUi(v), uiFollow: () => uiFollow, setUiFollow: on => setUiFollow(on), lang: () => getLang(), setLang: l => changeLang(l),
     // code themes (code-themes D6): the settings, a change, and the theme Automatic uses now
     codeTheme: { settings: () => codeThemes.settings(), set: patch => codeThemes.set(patch), autoName: l => codeThemes.autoName(l) },
     volume: () => volume, setVolume: v => setVolume(v),
@@ -4824,8 +4835,9 @@ function stageSection(cyc) {
 }
 const visuals = startVisuals({
   getS: () => ({ look: soulOverride ? 'soul' : look }), soul,
+  // light-theme: the stage stays dark, its widgets take the neon palette in the light app theme
   stage: {
-    settings: () => stageWidgets().S, options: () => stageWidgets().sw, section: stageSection, theme: () => ui,
+    settings: () => stageWidgets().S, options: () => stageWidgets().sw, section: stageSection, theme: () => (ui === 'hw' ? 'hw' : 'neon'),
     seed: () => (fv ? fv.seed : (song && song.id) || ''),
     label: inst => { const k = `stInst:${inst}`, v = t(k); return v === k ? inst : v; },
   },

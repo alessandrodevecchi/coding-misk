@@ -36,6 +36,24 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // theme and language
   await page.click('#tab-impostazioni [data-set-ui="hw"]'); await sleep(200);
   check((await page.evaluate(() => document.documentElement.dataset.ui)) === 'hw', 'theme from the settings');
+  // the light theme (light-theme): third button, saved, Follow the system (light or dark preference), a theme button turns it off
+  const ui = () => page.evaluate(() => ({ ui: document.documentElement.dataset.ui, scheme: getComputedStyle(document.documentElement).colorScheme, saved: JSON.parse(localStorage.getItem('coding-misk-ui')), follow: JSON.parse(localStorage.getItem('coding-misk-ui-follow')) }));
+  await page.click('#tab-impostazioni [data-set-ui="light"]'); await sleep(200);
+  let u = await ui();
+  check(u.ui === 'light' && u.scheme === 'light' && u.saved === 'light' && (await page.getAttribute('[data-uitheme="light"]', 'aria-pressed')) === 'true', 'light theme from the settings, light colour scheme, top bar button lit', JSON.stringify(u));
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.click('#tab-impostazioni [data-set-ui-follow="1"]'); await sleep(200);
+  u = await ui();
+  check(u.ui === 'neon' && u.follow === true, 'Follow the system with a dark system: neon', JSON.stringify(u));
+  await page.emulateMedia({ colorScheme: 'light' }); await sleep(200);
+  check((await ui()).ui === 'light', 'Follow the system: the system turns light, the app follows');
+  await page.reload(); await sleep(2500);
+  check((await ui()).ui === 'light', 'Follow the system kept after a reload');
+  await page.click('[data-uitheme="hw"]'); await sleep(200);
+  u = await ui();
+  check(u.ui === 'hw' && u.follow === false, 'a theme button turns Follow the system off', JSON.stringify(u));
+  await page.emulateMedia({ colorScheme: null });
+  if (!(await page.isVisible('#tab-impostazioni'))) { await page.click('#open-settings'); await sleep(300); }
   await page.click('#tab-impostazioni [data-set-ui="neon"]'); await sleep(200);
   const lang0 = await page.evaluate(() => document.documentElement.lang || '');
   await page.click('#tab-impostazioni [data-set-lang="it"]'); await sleep(300);
