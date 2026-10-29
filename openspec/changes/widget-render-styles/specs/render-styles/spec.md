@@ -32,14 +32,32 @@ On Monitor, Rullo and the layer of stage widgets, the ASCII and Terminal renders
 - **WHEN** Monitor shows a bass scope in the ASCII render
 - **THEN** the scope is drawn as one glyph per column following the wave, and the panel name is readable
 
-### Requirement: Code panel in videos
+### Requirement: Code panel untouched
 
-In video and fragment layouts with code, the code panel SHALL take the render's text look instead of a pass: Terminal draws the code in a phosphor mono font on a near black ground, 1-bit in two colours without shading, the other renders as Normal. The code editor in the page SHALL NOT change.
+No render SHALL change the code panel, in the page, in videos or in fragments. The pass SHALL run on the stage canvas only.
 
-#### Scenario: Terminal code in a video
+#### Scenario: Terminal render in a video with code
 
 - **WHEN** a video with the code layout is exported with the Terminal render
-- **THEN** the code is drawn in the phosphor colour and stays readable, and the stage area is drawn in Terminal
+- **THEN** the stage area is drawn in Terminal and the code panel is identical to the one exported with Normal
+
+### Requirement: Terminal as a modern text interface
+
+The Terminal render SHALL draw a text interface on a dark ground with a truecolour palette of named colours per theme, a monospace font, rounded box-drawing panels with titles, a header line and a status bar. On the widget looks and the layer it SHALL be drawn natively: one panel per instrument titled in its colour, a level line, scopes as braille dots, spectra as eighth blocks, piano rolls as half blocks, punchcards as dots.
+
+#### Scenario: Monitor in Terminal
+
+- **WHEN** Monitor shows bass, lead and hats in the Terminal render
+- **THEN** each instrument has a rounded panel titled with its name in its colour, the bass scope is drawn in braille dots and the hats as dots in their lanes
+
+### Requirement: Terminal over the other looks
+
+On looks without native widgets, the Terminal render SHALL draw the frame as half-block cells of two pixels each with stepped colours, under a tab bar and above a status bar with the song, the section, the bar and the tempo.
+
+#### Scenario: A scene in Terminal
+
+- **WHEN** Tramonto plays in the Terminal render
+- **THEN** the scene keeps its colours and shapes as half-block cells, with a tab bar on top and a status bar at the bottom
 
 ### Requirement: Same frame in every output
 
@@ -52,7 +70,7 @@ The stage, the session video, the fast video, the fragments and the live output 
 
 ### Requirement: Theme colours
 
-1-bit and Terminal SHALL take their colours from the app theme: neon white paper and green phosphor, hardware amber on the LCD ground. The colours SHALL change from the next frame when the theme changes.
+1-bit and Terminal SHALL take their colours from the app theme: 1-bit neon white paper, hardware amber on the LCD ground; Terminal a cool truecolour palette in neon and a warm one in hardware, with the scene of a non-widget look mapped to an amber ramp. The colours SHALL change from the next frame when the theme changes.
 
 #### Scenario: Hardware theme
 
