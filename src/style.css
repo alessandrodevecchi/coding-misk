@@ -1631,9 +1631,11 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .ns-surprise .ico { width: 15px; height: 15px; }
 .ns-saveas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ns-saveas input { flex: 0 1 220px; min-width: 0; }
-.ns-secs { display: grid; gap: 8px; }
-.ns-sec { display: grid; gap: 6px; min-width: 0; }
-.ns-sec > .custom-toggle { width: 100%; text-align: left; }
+/* minmax(0, 1fr) and min-width: 0 keep a closed section's one-line summary from widening the panel on a phone (#78):
+   the summary is cut with an ellipsis instead */
+.ns-secs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.ns-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; }
+.ns-sec > .custom-toggle { box-sizing: border-box; width: 100%; min-width: 0; text-align: left; }
 .ns-sec .custom-summary { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ns-row { display: flex; flex-wrap: wrap; gap: 8px 14px; }
 .ns-row .ctrl { display: grid; gap: 4px; min-width: 160px; }
