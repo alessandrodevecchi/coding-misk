@@ -792,9 +792,12 @@ export function createSession(recipes, seed, { lead = null, extra = [] } = {}) {
     addStyle,
     get count() { return entries.length; },
     next(options) {
+      // a style invented for a compilation segment (invented-styles D11) comes with the options
+      if (options && options.inventedStyle) addStyle(options.inventedStyle);
       // with an artist, this song's styles and values come from the artist's taste
       const drawn = options && options.artist ? artistSongOptions(options.artist, known, rng.artist) : null;
-      const opts = { ...OPTION_DEFAULTS, ...options, ...(drawn || {}), seed };
+      const { inventedStyle: _inv, ...given } = options || {};
+      const opts = { ...OPTION_DEFAULTS, ...given, ...(drawn || {}), seed };
       // renamed styles (clear-names): saved sessions and settings may hold old ids
       if (opts.styles) opts.styles = opts.styles.map(styleId);
       const unknown = (opts.styles || []).filter(id => !byId[id]);

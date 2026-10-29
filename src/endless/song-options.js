@@ -17,7 +17,8 @@ export const NEW_SONG_KEY = 'coding-misk-new-song';
 // the values of how a song is made: what the panel copies from the radio ("Prendi dalla radio", the first open) and
 // what a preset may hold (with `length`). Everything else in the radio's store is about the session on air
 // (transition, harmony, incoming, compilation, scope, the dice range, the material default)
-export const SONG_KEYS = ['styles', 'chaos', 'energy', 'complexity', 'talk', 'artist', 'temp', 'sounds', 'profile', 'custom', 'material', 'voice', 'voices', 'narratorSound', 'length'];
+// (tempStyle and trialBefore: an invented style being tried and the choice before it, invented-styles D9)
+export const SONG_KEYS = ['styles', 'chaos', 'energy', 'complexity', 'talk', 'artist', 'temp', 'sounds', 'profile', 'custom', 'material', 'voice', 'voices', 'narratorSound', 'length', 'tempStyle', 'trialBefore'];
 // the song length of the director (D8): as the style, or a range, or exact minutes (1 to 12, step 0.5)
 export const LENGTHS = ['style', 'short', 'medium', 'long'];
 export const LENGTH_MINUTES = [1, 12];
@@ -34,8 +35,13 @@ const clone = o => JSON.parse(JSON.stringify(o));
 // migrated } where migrated says the stored form changed and should be written back
 export function readOptions(saved, ids) {
   saved = saved || {};
+  // an invented style in trial (invented-styles D9): kept until Tieni or ×, so its id stays a usable style
+  const tempStyle = saved.tempStyle && typeof saved.tempStyle === 'object' && saved.tempStyle.id && saved.tempStyle.invented && !ids.includes(saved.tempStyle.id) ? saved.tempStyle : null;
+  const usable = tempStyle ? [...ids, tempStyle.id] : ids;
   const opts = {
-    styles: (saved.styles || []).map(styleId).filter(id => ids.includes(id)),
+    styles: (saved.styles || []).map(styleId).filter(id => usable.includes(id)),
+    tempStyle,
+    trialBefore: tempStyle && saved.trialBefore && typeof saved.trialBefore === 'object' ? saved.trialBefore : null,
     chaos: saved.chaos ?? OPTION_DEFAULTS.chaos, energy: saved.energy ?? OPTION_DEFAULTS.energy, complexity: saved.complexity ?? OPTION_DEFAULTS.complexity,
     talk: saved.talk ?? OPTION_DEFAULTS.talk,
     // the artist picked (its id), or null when the controls are set by hand ("custom")

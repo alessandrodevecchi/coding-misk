@@ -7,6 +7,8 @@ import { validateArtist } from '../src/endless/artist.js';
 import { createSession } from '../src/endless/director.js';
 import { withDefaults } from '../src/endless/recipe.js';
 import { loadStyles } from './styles-dir.mjs';
+import { sessionItems } from '../src/endless/items.js';
+import { validateRecipe } from '../src/endless/recipe.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const recipes = loadStyles().map(withDefaults), ids = recipes.map(r => r.id);
@@ -72,6 +74,22 @@ const CHECKS = {
     }
     const ses = createSession(recipes, 'lk');
     for (let n = 0; n < 4; n++) { const g = ses.next(compilationOptions('lk', n, comp, recipes)); assert(Math.abs(g.opts.energy - 0.9) < 1e-9 && g.opts.talk <= 0.3 + 1e-9, `song ${n} plays energy ${g.opts.energy}, talk ${g.opts.talk}`); }
+  },
+  'invented styles (invented-styles D11): off by default, the same segments as before; on, some segments invent a style in their genre'() {
+    const c = { every: 'song', setup: PRESETS.everything, pool };
+    const before = segmentsUpTo('inv', 40, c, recipes, pool), off = segmentsUpTo('inv', 40, { ...c, setup: { ...PRESETS.everything, invented: false } }, recipes, pool);
+    assert(JSON.stringify(before) === JSON.stringify(off) && before.every(s => s.kind !== 'invented') && PRESETS.journey.invented === undefined, 'off: unchanged');
+    const on = { every: 'song', setup: { ...PRESETS.everything, invented: true }, pool };
+    const segs = segmentsUpTo('inv', 40, on, recipes, pool), inv = segs.filter(s => s.kind === 'invented');
+    assert(inv.length >= 4, `${inv.length} invented segments of ${segs.length}`);
+    for (const s of inv) { assert(s.style.genre === s.genre && s.styles[0] === s.style.id && !validateRecipe(s.style).errors.length, `segment ${s.index}: ${s.style.id} ${s.style.genre} in ${s.genre}`); assert(!recipes.some(r => r.id === s.style.id), 'a new id'); }
+    assert(JSON.stringify(segs) === JSON.stringify(segmentsUpTo('inv', 40, on, recipes, pool)), 'same seed, same invented segments');
+    // the songs play, and a replay of the recipe gives the same ones
+    const recipe = { seed: 'inv', options: { compilation: on, energy: 0.6 }, changes: [] };
+    const a = sessionItems(recipes, recipe, 8), b = sessionItems(recipes, JSON.parse(JSON.stringify(recipe)), 8);
+    assert(JSON.stringify(a.map(x => x.song)) === JSON.stringify(b.map(x => x.song)), 'replay');
+    const used = a.filter((x, n) => inv.some(s => s.start === n));
+    assert(used.length && used.every(x => inv.some(s => x.entry.styles.includes(s.style.id))), 'invented segments play their style');
   },
 };
 let failed = 0;

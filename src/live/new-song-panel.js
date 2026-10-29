@@ -4,7 +4,7 @@
 // song-controls.js) on the panel's own store (src/endless/song-options.js); the page makes the songs (onScratch,
 // onGenerate, onSurprise).
 import { CHEVRON, SLIDERS, DICE, CROSS, SAVE, BIN } from '../icons.js';
-import { dieHtml, knobSlider, artistSelect, styleChips, genreChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, pickArtist, idOf, lengthChips } from '../radio/song-controls.js';
+import { dieHtml, knobSlider, artistSelect, styleChips, genreChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, pickArtist, idOf, lengthChips, styleNameOf } from '../radio/song-controls.js';
 import { panelControls, baseDuration } from '../endless/new-song.js';
 import { hasLength, cleanLength, LENGTHS, LENGTH_MINUTES } from '../endless/song-options.js';
 import { LENGTH_RANGES } from '../endless/director.js';
@@ -19,13 +19,15 @@ const clock = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(
 
 // root: the #new-song card; options: the panel's store; radioOptions: the radio's (Prendi dalla radio)
 // onScratch(), onGenerate(seed), onSurprise(): the page's; dirty(): the song in Compose has unsaved changes
-export function createNewSongPanel({ root, button, t, tx, esc, store, options, radioOptions, recipes, artists, face = () => '', keepArtist = () => null, toast, getLang, userPatterns = () => [], onScratch, onGenerate, onSurprise }) {
+export function createNewSongPanel({ root, button, t, tx, esc, store, options, radioOptions, recipes, artists, face = () => '', keepArtist = () => null, invent = null, keepStyle = null, toast, getLang, userPatterns = () => [], onScratch, onGenerate, onSurprise }) {
   const opts = options.state, lastDice = {};
   let open = store.get(NS_OPEN, false) === true, folds = store.get(NS_FOLDS, {}) || {};
   let seedShown = '', busy = false, saving = false;
   const vfold = id => { try { return !!(JSON.parse(localStorage.getItem('coding-misk-voice-folds') || '{}') || {})[id]; } catch (e) { return false; } };
   const ctl = {
     options, recipes, artists, keepArtist, toast, t, lastDice, root, comp: null, panel: true,
+    // an invented style tried in the panel (invented-styles D8): made by the page's maker, kept among the user's styles
+    invent, keepStyle,
     controls: () => panelControls(opts),
     baseControls: base => baseDuration(base),
     // (the growth duration with a Durata, D12: lengthHook in song-controls.js; freed: its line shows)
@@ -47,7 +49,7 @@ export function createNewSongPanel({ root, button, t, tx, esc, store, options, r
   }
   const lengthName = () => { const L = cleanLength(opts.length); return typeof L === 'number' ? t('nsMinutes', { n: L }) : t(`nsLen:${L}`); };
   function summary(k) {
-    if (k === 'style') return [opts.artist ? (artists().find(a => a.id === opts.artist) || opts.temp || {}).name || '' : opts.styles.map(id => tx((recipes.find(r => r.id === id) || {}).name || id)).join(' + '), `${t('radioChaos')} ${opts.chaos}`, `${t('radioEnergy')} ${opts.energy}`, `${t('radioComplexity')} ${opts.complexity}`].filter(Boolean).join(' · ');
+    if (k === 'style') return [opts.artist ? (artists().find(a => a.id === opts.artist) || opts.temp || {}).name || '' : opts.styles.map(styleNameOf(recipes, opts, tx)).join(' + '), `${t('radioChaos')} ${opts.chaos}`, `${t('radioEnergy')} ${opts.energy}`, `${t('radioComplexity')} ${opts.complexity}`].filter(Boolean).join(' · ');
     if (k === 'profile') { const C = panelControls(opts); return [profName(), ...(C.build === 'crescendo' && C.growth === 'natural' ? ['opening', 'pace', 'development'].map(x => (C[x] === 'auto' ? t('shapeAuto') : t(`${x}:${C[x]}`))) : []), C.duration === 'planned' ? t('nsGrowInLength') : ''].filter(Boolean).join(' · '); }
     if (k === 'voices') return [`${t('narratorLbl')}: ${t(opts.voices.narrator ? 'switchOn' : 'switchOff')}`, `${t('vinstLbl')}: ${opts.voices.track ? t(`vinstPreset:${opts.voice.preset}`) : t('switchOff')}`].join(' · ');
     if (k === 'material') { const C = panelControls(opts); return [t(`matShort:${opts.material}`), C.build === 'crescendo' ? t(C.gen === 'standard' ? 'liveGenStandard' : 'liveGenIdiomatic') : ''].filter(Boolean).join(' · '); }
@@ -60,7 +62,7 @@ export function createNewSongPanel({ root, button, t, tx, esc, store, options, r
   function body(k) {
     const die = (...a) => dieHtml({ t, esc, lastDice }, ...a);
     if (k === 'style') return `<div class="ctrl"><span class="lbl">${esc(t('nsGenres'))}</span>${genreChips(sc)}</div>
-      <div class="ctrl" ${tip('tipStyles')}><span class="lbl">${esc(t('radioStyles'))} ${die('styles', 'diceStyles', t('diceStylesLbl'))} ${die('genre', 'diceGenre', t('diceGenreLbl'))}</span>${styleChips({ state: opts, recipes, t, tx, esc })}</div>
+      <div class="ctrl" ${tip('tipStyles')}><span class="lbl">${esc(t('radioStyles'))} ${die('styles', 'diceStyles', t('diceStylesLbl'))} ${die('genre', 'diceGenre', t('diceGenreLbl'))} ${die('invent', 'diceInvent', t('diceInventLbl'))}</span>${styleChips({ state: opts, recipes, t, tx, esc })}</div>
       ${diceRow(sc)}
       <div class="ctrls three ns-knobs">${knob('chaos', 'radioChaos', 'tipChaos')}${knob('energy', 'radioEnergy', 'tipEnergy')}${knob('complexity', 'radioComplexity', 'tipComplexity')}</div>`;
     if (k === 'profile') { const C = panelControls(opts); return `<div class="ns-row">${profileSelect(sc)}</div>${opts.profile !== 'custom' ? `<p class="hint muted small">${esc(t('nsShapeHint'))}</p>` : ''}${customPanel(sc, { C, all: true, planned: C.duration === 'planned' })}`; }

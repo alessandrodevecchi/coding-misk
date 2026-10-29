@@ -45,7 +45,9 @@ export function songConfig(state, { profile = 'classic', phrase = 8 } = {}) {
 // Genera: one director call with the panel's options. options: the panel's store (song-options.js); seed: the Seme
 // field ('' or null: a new one). → { song, entry, plan, seed, config, artist } (the song not yet given an id)
 export function generateSong({ recipes, options, seed = null }) {
-  const session = createSession(recipes, seed || undefined);
+  // (an invented style in trial in the panel, invented-styles D8: an extra style of this one call)
+  const trial = options.state && options.state.tempStyle;
+  const session = createSession(recipes, seed || undefined, trial ? { extra: [trial] } : {});
   const dopts = options.directorOptions({ use: 'new-song' });
   const { song, entry, plan } = session.next(dopts);
   const config = songConfig(options.state, { profile: entry.profile || 'classic', phrase: plan.phrase });

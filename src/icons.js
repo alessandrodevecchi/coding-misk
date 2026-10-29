@@ -2,6 +2,8 @@
 const svg = (vb, body, cls) => `<svg class="ico ${cls}" viewBox="${vb}" aria-hidden="true">${body}</svg>`;
 // a die showing five
 export const DICE = svg('0 0 16 16', '<rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5.2" cy="5.2" r="1.2" fill="currentColor"/><circle cx="10.8" cy="5.2" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="5.2" cy="10.8" r="1.2" fill="currentColor"/><circle cx="10.8" cy="10.8" r="1.2" fill="currentColor"/>', 'ico-dice');
+// a die with a spark at its corner (invented-styles: invent a style)
+export const INVENT = svg('0 0 16 16', '<rect x="1.5" y="4" width="10.5" height="10.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="4.6" cy="7.1" r="1.05" fill="currentColor"/><circle cx="8.9" cy="11.4" r="1.05" fill="currentColor"/><circle cx="6.75" cy="9.25" r="1.05" fill="currentColor"/><path d="M13 0.6 L13.75 2.25 L15.4 3 L13.75 3.75 L13 5.4 L12.25 3.75 L10.6 3 L12.25 2.25 Z" fill="currentColor"/>', 'ico-invent');
 export const LOCK = svg('0 0 12 14', '<path d="M3.2 6V4.2a2.8 2.8 0 0 1 5.6 0V6" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="6" width="9" height="7" rx="1.4" fill="currentColor"/>', 'lock-ico');
 // an open lock: the shackle lifted (radio-arrangement D12: the director may change the instrument)
 export const LOCK_OPEN = svg('0 0 12 14', '<path d="M3.2 6V4.2a2.8 2.8 0 0 1 5.5-.7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><rect x="1.5" y="6" width="9" height="7" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/>', 'lock-ico lock-open');
