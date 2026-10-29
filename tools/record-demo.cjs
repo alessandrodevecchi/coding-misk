@@ -46,7 +46,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const wheel = async (dy, n, wait) => { for (let i = 0; i < n; i++) { await page.mouse.wheel(0, dy); await sleep(wait); } };
 
   // ---------- riscaldamento (tagliato dal video): carica campioni, soundfont e worklet ----------
-  await page.goto('http://localhost:5173/');
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`);
   await sleep(6000);
   await page.locator('#track-pick').selectOption('dci-carica');
   await page.click('#sc-play'); await sleep(8000);

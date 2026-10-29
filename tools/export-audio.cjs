@@ -8,7 +8,7 @@ const [out, ...ids] = process.argv.slice(2);
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true })).newPage();
   page.on('pageerror', e => console.error('pageerror', e.message));
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
   for (const id of ids) {
     await page.locator('#track-pick').selectOption(id); await sleep(800);
     const t0 = Date.now();

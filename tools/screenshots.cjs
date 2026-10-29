@@ -5,7 +5,7 @@ const OUT = process.argv[2];
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 })).newPage();
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
   await page.locator('#track-pick').selectOption('luci-rosse'); await page.click('#play'); await sleep(2500);
   await page.click('[data-scene-i="3"]'); await sleep(5000);
   const stage = page.locator('#stagewrap');

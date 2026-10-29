@@ -13,6 +13,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
+// wait for a condition, not a fixed pause: polls fn until it returns something truthy or ms pass (the page can be
+// slow under load); returns the last value
+const until = async (fn, ms = 8000, step = 50) => { const t = Date.now(); for (;;) { let v = null; try { v = await fn(); } catch (e) {} if (v || Date.now() - t > ms) return v; await sleep(step); } };
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
 const shots = process.argv.slice(2).find(a => !a.startsWith('--'));
 const typedOnly = process.argv.includes('--typed'), manyOnly = process.argv.includes('--many');
@@ -282,8 +285,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // an arrangement command applies at its bar, marked as the listener's, shown in the code
   const typeBtn = await page.$('#radio-steer [data-cmd="less"]:not([disabled])') || await page.$('#radio-steer [data-cmd="more"]:not([disabled])');
   const kind = await typeBtn.getAttribute('data-cmd'), type = await typeBtn.getAttribute('data-inst');
-  await typeBtn.click(); await sleep(300);
-  st = await ST();
+  await page.click(`#radio-steer [data-cmd="${kind}"]${type ? `[data-inst="${type}"]` : ''}:not([disabled])`);
+  st = await until(async () => { const x = await ST(); return x.commands.length ? x : null; }) || await ST();
   const cmd = st.commands[0];
   check(cmd && cmd.kind === kind && st.build.some(x => x.at === cmd.at && (x.add || x.remove)), `${kind} ${type} written as the listener's step`, JSON.stringify(st.build));
   await page.evaluate(b => globalThis.codingMiskRadio.seek(b), cmd.at - 1); await sleep(300);
@@ -298,16 +301,19 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // (the curve itself in view: the card is as tall as the controls column, taller than the window with the Voices group)
   await page.$eval('#radio-now svg.steer', el => el.scrollIntoView({ block: 'center' })); await sleep(300);
   // the card redraws four times a second: take the handle and its box in one go, retrying until both are there
-  let handle = null, d = -1, box = null, svg = null;
-  for (let k = 0; k < 10 && !box; k++) {
-    handle = (await page.$$('#radio-now svg.steer rect.handle')).pop();
-    if (handle) { d = +(await handle.getAttribute('data-d').catch(() => -1)); box = await handle.boundingBox().catch(() => null); const sv = await page.$('#radio-now svg.steer'); svg = sv && await sv.boundingBox(); }
-    if (!box) await sleep(100);
-  }
+  const lastHandle = sel => until(() => page.evaluate(sel => {
+    const hs = [...document.querySelectorAll(`${sel} rect.handle`)], h = hs[hs.length - 1], sv = document.querySelector(`${sel}`);
+    if (!h || !sv) return null;
+    const r = h.getBoundingClientRect(), q = (sv.tagName.toLowerCase() === 'svg' ? sv : sv.querySelector('svg')).getBoundingClientRect();
+    if (!r.width || !q.width) return null;
+    return { d: +h.dataset.d, box: { x: r.x, y: r.y, width: r.width, height: r.height }, svg: { x: q.x, y: q.y, width: q.width, height: q.height } };
+  }, sel), 10000);
+  const lh0 = await lastHandle('#radio-now svg.steer');
+  const d = lh0 ? lh0.d : -1, box = lh0 && lh0.box, svg = lh0 && lh0.svg;
   if (box && svg) {
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2, svg.y + svg.height - 6, { steps: 5 }); await page.mouse.up(); await sleep(300);
-    st = await ST();
+    await page.mouse.move(box.x + box.width / 2, svg.y + svg.height - 6, { steps: 5 }); await page.mouse.up();
+    st = await until(async () => { const x = await ST(); return x.commands.some(c => c.kind === 'curve') ? x : null; }) || await ST();
     const c = st.commands.find(x => x.kind === 'curve');
     check(c && c.d === d && c.value <= 0.15 && st.plan.targets[d] === c.value, 'dragging a curve handle queues a curve command', `${JSON.stringify(c)} d=${d} targets=${JSON.stringify(st.plan.targets)} cmds=${JSON.stringify(st.commands.map(x => x.kind))}`);
     if (shots) await (await page.$('#radio-now')).screenshot({ path: path.join(shots, 'curve.png') });
@@ -327,16 +333,12 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check((await page.$$eval('#radio-now .radio-lanes .radio-lane', xs => xs.map(x => x.dataset.lane).join())) === 'density,brightness,tension,voice', 'four curve lanes under the energy curve');
   check(await page.$$eval('#radio-now .radio-lanes .radio-lane', xs => xs.every(x => x.title.length > 40)) && /main|principale/i.test(await page.$eval('#radio-now svg.steer > title', x => x.textContent)), 'tooltips explain the curves, energy first');
   await page.$eval('#radio-now [data-lane="density"]', el => el.scrollIntoView({ block: 'center' })).catch(() => {}); await sleep(200);
-  let lh = null, lbox = null, lsvg = null, ld = -1;
-  for (let k = 0; k < 10 && !lbox; k++) {
-    lh = (await page.$$('#radio-now [data-lane="density"] rect.handle')).pop();
-    if (lh) { ld = +(await lh.getAttribute('data-d').catch(() => -1)); lbox = await lh.boundingBox().catch(() => null); const sv = await page.$('#radio-now [data-lane="density"] svg'); lsvg = sv && await sv.boundingBox(); }
-    if (!lbox) await sleep(100);
-  }
+  const lh1 = await lastHandle('#radio-now [data-lane="density"]');
+  const ld = lh1 ? lh1.d : -1, lbox = lh1 && lh1.box, lsvg = lh1 && lh1.svg;
   if (lbox && lsvg) {
     await page.mouse.move(lbox.x + lbox.width / 2, lbox.y + lbox.height / 2); await page.mouse.down();
-    await page.mouse.move(lbox.x + lbox.width / 2, lsvg.y + lsvg.height - 2, { steps: 5 }); await page.mouse.up(); await sleep(300);
-    st = await ST();
+    await page.mouse.move(lbox.x + lbox.width / 2, lsvg.y + lsvg.height - 2, { steps: 5 }); await page.mouse.up();
+    st = await until(async () => { const x = await ST(); return x.commands.some(c => c.kind === 'curve' && c.curve === 'density') ? x : null; }) || await ST();
     const c = st.commands.find(x => x.kind === 'curve' && x.curve === 'density');
     check(c && c.d === ld && c.value === 1 && st.plan.curves[ld].density === 1, 'dragging a density handle sets a track count', JSON.stringify(c));
     check(await page.isVisible(`#radio-now [data-lane="density"] rect.handle.set[data-d="${ld}"]`), 'a set part is drawn solid');
@@ -422,20 +424,24 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     if (on) {
       await page.click(`#radio-steer [data-vary-part="${on.p}"]`); await sleep(150);
       const n0 = (await ST()).commands.length;
-      await page.click('#radio-steer [data-cmd="vary"]'); await sleep(300);
-      await page.click('#radio-steer [data-cmd="vary"]'); await sleep(300);
+      await page.click('#radio-steer [data-cmd="vary"]');
+      await until(async () => (await ST()).commands.some(c => c.kind === 'vary'));
+      await page.click('#radio-steer [data-cmd="vary"]');
+      // the queue read as soon as it names the part (the command leaves it at its boundary)
+      const qv = await until(async () => { const t = await page.innerText('#radio-steer .steer-queue'); return /(Vary|Varia) \S+/.test(t) ? t : null; });
+      await sleep(300);
       let x = await ST();
       const vs = x.commands.filter(c => c.kind === 'vary');
       check(vs.length === 1 && vs[0].type === on.p && x.commands.length === n0 + 1, 'two Vary of the same part for the same boundary count as one', JSON.stringify(vs));
       const v = vs[0];
       check(x.build.some(s => s.at === v.at && s.pattern && /^V\d+$/.test(s.pattern.to)), 'Vary writes a listener\'s pattern step', JSON.stringify(x.build.filter(s => s.pattern)));
-      const q = await page.innerText('#radio-steer .steer-queue');
+      const q = qv || await page.innerText('#radio-steer .steer-queue');
       check(new RegExp(`(Vary|Varia) \\S+`).test(q), 'the queue says "Vary <part>"', q.replace(/\n/g, ' | '));
-      await page.click(`#radio-steer [data-cancel="${v.id}"]`); await sleep(300);
-      x = await ST();
+      await page.click(`#radio-steer [data-cancel="${v.id}"]`);
+      x = await until(async () => { const y = await ST(); return y.commands.some(c => c.kind === 'vary') ? null : y; }) || await ST();
       check(!x.commands.some(c => c.kind === 'vary') && !Object.values(x.patterns).some(ps => Object.keys(ps).some(k => /^V\d+$/.test(k))), 'cancel leaves the part as it was');
-      await page.mouse.click(5, 5); await page.keyboard.press('n'); await sleep(300);
-      x = await ST();
+      await page.mouse.click(5, 5); await page.keyboard.press('n');
+      x = await until(async () => { const y = await ST(); return y.commands.some(c => c.kind === 'vary') ? y : null; }) || await ST();
       check(x.commands.some(c => c.kind === 'vary' && c.type === on.p), 'shortcut N varies the picked part');
       const sw = await page.$eval('#radio-steer [data-cmd="swap"]', b => ({ dis: b.disabled, title: b.title }));
       check(/\(W\)/.test(sw.title), 'Swap shows its shortcut W', sw.title);
@@ -699,10 +705,17 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     a = await A();
     check(a.commands[a.commands.length - 1].kind === 'less' && a.commands[a.commands.length - 1].part === order[2], 'Shift+3 removes one', JSON.stringify(a.commands.slice(-1)));
     // the cap: 12 tracks, then every + is off with its reason
-    for (let k = 0; k < 16; k++) { const s2 = await A(); if (s2.on.filter(id => !/riser/.test(id)).length >= 12) break; await page.evaluate(p => globalThis.codingMiskRadio.command({ kind: 'more', part: p }), order[k % order.length]); await sleep(150); }
-    await sleep(400);
-    const plus = await page.$$eval('#radio-steer [data-cmd="more"]', xs => xs.map(x => [x.disabled, x.dataset.why]));
-    const n12 = (await A()).on.filter(id => !/riser/.test(id)).length;
+    // (the bar a + applies to moves on while the song plays: count and buttons are read together, waited for)
+    let k12 = 0;
+    const capped = await until(async () => {
+      const s2 = await A(), n = s2.on.filter(id => !/riser/.test(id)).length;
+      if (n < 12 && k12 < 24) { await page.evaluate(p => globalThis.codingMiskRadio.command({ kind: 'more', part: p }), order[k12++ % order.length]); return null; }
+      const plus = await page.$$eval('#radio-steer [data-cmd="more"]', xs => xs.map(x => [x.disabled, x.dataset.why]));
+      const n2 = (await A()).on.filter(id => !/riser/.test(id)).length;
+      return n2 === 12 && plus.every(([d, w]) => d && w === 'cap') ? { plus, n12: n2 } : null;
+    }, 15000, 150);
+    const plus = capped ? capped.plus : await page.$$eval('#radio-steer [data-cmd="more"]', xs => xs.map(x => [x.disabled, x.dataset.why]));
+    const n12 = capped ? capped.n12 : (await A()).on.filter(id => !/riser/.test(id)).length;
     check(n12 === 12 && plus.every(([d, w]) => d && w === 'cap'), 'at 12 tracks every + is off: cap', `${n12} ${JSON.stringify(plus)}`);
     check(/12/.test(await page.innerText('#radio-steer .arr-info')), 'the count line shows the cap');
     check(!(await err()), 'no evaluation error with 12 tracks', (await err()).slice(0, 120));
@@ -759,7 +772,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     // replace: the saved melody in place of a playing track of its type, when one plays
     const rep = await page.$('#radio-steer [data-sp-replace="p-hook"]:not([disabled])');
     if (rep) {
-      await rep.click(); await sleep(400);
+      await page.click('#radio-steer [data-sp-replace="p-hook"]:not([disabled])'); await sleep(400);
       x = await ST();
       const rc = x.commands.find(c => c.kind === 'pattern' && c.mode === 'replace');
       check(rc && x.build.some(s => s.at === rc.at && s.pattern && s.pattern.track === rc.target && /^P\d+$/.test(s.pattern.to)), 'Replace: the saved melody as a P pattern on the chosen track', JSON.stringify(rc && { target: rc.target }));
@@ -801,11 +814,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const n0 = (await ST()).commands.length;
     await page.selectOption('#radio-steer [data-harm-chords]', progs[progs.length - 1]); await sleep(250);
     const chBtn = await page.$('#radio-steer [data-cmd="progression"]:not([disabled])');
-    if (chBtn) { await chBtn.click(); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'progression' && c.chords === progs[progs.length - 1] && /(Change chords|Cambia accordi): /.test(await page.innerText('#radio-steer .steer-queue')), 'a chosen progression is recorded and named in the queue', JSON.stringify(c)); }
+    if (chBtn) { await page.click('#radio-steer [data-cmd="progression"]:not([disabled])'); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'progression' && c.chords === progs[progs.length - 1] && /(Change chords|Cambia accordi): /.test(await page.innerText('#radio-steer .steer-queue')), 'a chosen progression is recorded and named in the queue', JSON.stringify(c)); }
     else check(/ · /.test(await page.getAttribute('#radio-steer [data-cmd="progression"]', 'title')), 'Change chords off with its reason (already playing those chords)');
     await page.selectOption('#radio-steer [data-harm-key]', 'up'); await sleep(250);
     const kb = await page.$('#radio-steer [data-cmd="key"]:not([disabled])');
-    if (kb) { await kb.click(); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'key' && c.to === 'up' && /(a fifth up|una quinta sopra)/.test(await page.innerText('#radio-steer .steer-queue')), 'a key a fifth up from the menu', JSON.stringify(c)); }
+    if (kb) { await page.click('#radio-steer [data-cmd="key"]:not([disabled])'); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'key' && c.to === 'up' && /(a fifth up|una quinta sopra)/.test(await page.innerText('#radio-steer .steer-queue')), 'a key a fifth up from the menu', JSON.stringify(c)); }
     check((await ST()).commands.length > n0 && !(await err()), 'no evaluation error with the harmony menu', (await err()).slice(0, 120));
     if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'harmony-en.png') });
   }
@@ -815,7 +828,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   {
     if ((await page.getAttribute('#steer-scope', 'aria-pressed')) !== 'true') { await page.click('#steer-scope'); await sleep(200); }
     const plus = await page.$('#radio-steer [data-cmd="more"]:not([disabled])'), part = plus && await plus.getAttribute('data-inst');
-    await plus.click(); await sleep(400);
+    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]:not([disabled])`); await sleep(400);
     let x = await ST();
     const c = x.commands.slice(-1)[0];
     check(c && c.kind === 'more' && c.scope === 'session' && (x.recipe.arrange || []).length === 1 && x.recipe.arrange[0].part === part, `"+ ${part}" for the session goes to the recipe`, JSON.stringify(x.recipe.arrange));
@@ -898,10 +911,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(vo.preset === 'obsessive' && vo.sound && vo.sound.style === 'deep' && shown.preset === 'obsessive' && shown.style === 'deep', 'Apply (whole session): the Voices group shows the preset and the style for the next songs', JSON.stringify(shown));
     await page.click('#steer-scope'); await sleep(200);
     // a typed line, Say now: queued on the next bar, written on the voice track, recorded
-    await page.fill('#radio-steer [data-sv-line]', 'stay with me'); await page.click('#radio-steer [data-sv-say="now"]'); await sleep(250);
-    // (a line on the next bar leaves the queue as soon as it sounds: the queue is read at once)
-    const q = await page.innerText('#radio-steer .steer-queue');
-    await sleep(900);
+    await page.fill('#radio-steer [data-sv-line]', 'stay with me'); await page.click('#radio-steer [data-sv-say="now"]');
+    // (a line on the next bar leaves the queue as soon as it sounds: the queue is read from the click on, often)
+    const q = await until(async () => { const t = await page.innerText('#radio-steer .steer-queue'); return /stay with me/.test(t) ? t : null; }, 3000, 20) || await page.innerText('#radio-steer .steer-queue');
+    await until(async () => (await ST()).commands.some(x => x.kind === 'say-live' && x.mode === 'now'));
+    await sleep(300);
     st = await ST();
     const say = st.commands.find(x => x.kind === 'say-live' && x.mode === 'now'), n1 = await now();
     const sp = st.song.tracks.find(t => t.type === 'spoken'), pat = sp && Object.entries(sp.patterns).find(([, p]) => p.text && p.text.en === 'stay with me');

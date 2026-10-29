@@ -87,15 +87,15 @@ Peak levels per instrument in `tests/snapshots/levels.json` (46 built-in songs, 
 | Instrument | Sections | Median peak | Highest peak |
 | --- | --- | --- | --- |
 | `arp` | 97 | 0.16 | 0.69 |
-| `bass` | 189 | 0.36 | 0.94 |
-| `fx` | 95 | 0.06 | 0.62 |
-| `guitar` | 39 | 0.48 | 0.89 |
-| `hats` | 194 | 0.33 | 1.24 |
-| `hook` | 102 | 0.12 | 0.69 |
-| `kick` | 199 | 0.48 | 0.9 |
-| `pad` | 150 | 0.17 | 0.43 |
-| `riser` | 23 | 0.07 | 0.16 |
-| `snare` | 155 | 0.41 | 0.76 |
+| `bass` | 187 | 0.36 | 0.94 |
+| `fx` | 113 | 0.13 | 0.62 |
+| `guitar` | 39 | 0.46 | 0.85 |
+| `hats` | 196 | 0.3 | 1.24 |
+| `hook` | 103 | 0.12 | 0.68 |
+| `kick` | 198 | 0.48 | 0.9 |
+| `pad` | 138 | 0.18 | 0.44 |
+| `riser` | 23 | 0.06 | 0.13 |
+| `snare` | 157 | 0.42 | 0.76 |
 
 Snapshot tolerance (`tools/snapshot-levels.cjs`): 0.12 absolute, floor 0.03, per instrument { guitar: 0.25 }; `fx` is recorded, not compared. Master level: `MASTER = .6` in `src/main.js`.
 <!-- /generated -->

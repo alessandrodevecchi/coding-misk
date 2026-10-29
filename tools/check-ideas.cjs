@@ -25,7 +25,7 @@ const songs = files(path.join(ROOT, 'songs')).map(f => JSON.parse(fs.readFileSyn
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await (await browser.newContext()).newPage();
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
   let failed = 0, compared = 0, events = 0, states = 0, added = 0;
   for (const song of songs) {
     const snap = path.join(BASE, `${song.id}.strudel`);

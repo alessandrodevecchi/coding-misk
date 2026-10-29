@@ -3,12 +3,12 @@
 // guard has a stand-in for it: another font of the instrument whose zone holds the same notes, or another sample of the
 // bank that decodes. Long (thousands of files) but unattended.
 // Usage: PLAYWRIGHT_CORE=... node tools/check-sounds.cjs [--fonts] [--samples] [--only <prefix>] [--limit <n>] [--out <file.json>] [--url <app url>] [--banks a,b] [--width <parallel fetches>]
-//   (dev server on :5173; without --fonts or --samples both). Exit 1 when a broken part has no stand-in.
+//   (dev server on PORT, default 5173; without --fonts or --samples both). Exit 1 when a broken part has no stand-in.
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs');
 const args = process.argv.slice(2), opt = k => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : null; };
 const wantFonts = args.includes('--fonts') || !args.includes('--samples'), wantSamples = args.includes('--samples') || !args.includes('--fonts');
-const only = opt('only') || '', limit = Number(opt('limit')) || Infinity, out = opt('out'), url = opt('url') || 'http://localhost:5173/', banks = (opt('banks') || '').split(',').filter(Boolean), width = Number(opt('width')) || 8;
+const only = opt('only') || '', limit = Number(opt('limit')) || Infinity, out = opt('out'), url = opt('url') || `http://localhost:${process.env.PORT || 5173}/`, banks = (opt('banks') || '').split(',').filter(Boolean), width = Number(opt('width')) || 8;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {

@@ -20,7 +20,7 @@ const SONGS = ['ferro', 'cavo-scoperto'];
   const tracks = code => code.split(/^\/\/ ========== /m).slice(1).filter(b => !/^[^\n]*voice ==========/.test(b) && /^\$:/m.test(b)).length;
   const seek = async k => { await page.evaluate(v => { const x = document.getElementById('pb-seek'); x.value = v; x.dispatchEvent(new Event('change')); }, k); await sleep(1500); };
 
-  await page.goto('http://localhost:5173/'); await sleep(5000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
   await page.evaluate(() => { localStorage.removeItem('coding-misk-live-style'); });
   for (const id of SONGS) {
     await page.locator('#track-pick').selectOption(id); await sleep(800);

@@ -8,7 +8,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 1600 } })).newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:5173/'); await sleep(2000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2000);
   await page.evaluate(() => { localStorage.removeItem('coding-misk-songs-view'); localStorage.setItem('coding-misk-played', JSON.stringify({ 'crescendo-primo-passo': Date.now() })); });
   await page.reload(); await sleep(4000);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(800);

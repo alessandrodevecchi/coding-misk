@@ -41,6 +41,16 @@ const secs = s => { const m = /(\d+):(\d\d)\s*$/.exec(s || ''); return m ? +m[1]
   const T = () => page.evaluate(() => globalThis.codingMiskPatterns.compose());
   const fold = async k => { if ((await page.getAttribute(`[data-ns-fold="${k}"]`, 'aria-expanded')) !== 'true') { await page.click(`[data-ns-fold="${k}"]`); await sleep(150); } };
   const unfold = async k => { if ((await page.getAttribute(`[data-ns-fold="${k}"]`, 'aria-expanded')) === 'true') { await page.click(`[data-ns-fold="${k}"]`); await sleep(150); } };
+  // closed sections on a phone (#78): a long one-line summary is cut, the headers and the page stay inside 360 and 400 px
+  const phoneClosed = async theme => {
+    if (await page.isHidden('#new-song')) { await page.click('#tr-new'); await sleep(300); }
+    for (const k of ['style', 'profile', 'voices', 'material', 'length']) await unfold(k);
+    for (const w of [400, 360]) {
+      await page.setViewportSize({ width: w, height: 900 }); await sleep(400);
+      const m = await page.evaluate(() => ({ doc: document.documentElement.scrollWidth, w: innerWidth, right: Math.round(Math.max(...[...document.querySelectorAll('[data-ns-fold], [data-ns-fold] .custom-summary')].map(e => e.getBoundingClientRect().right))), cut: [...document.querySelectorAll('[data-ns-fold] .custom-summary')].some(e => e.scrollWidth > e.clientWidth) }));
+      check(m.doc <= m.w + 1 && m.right <= m.w, `${theme}, ${w} px with every section closed: headers inside the page, nothing scrolls sideways`, JSON.stringify(m));
+    }
+  };
   // the heard length in Compose once the growth is ready: the total of the ruler
   const heard = async () => { for (let i = 0; i < 120; i++) { const p = await page.evaluate(() => globalThis.codingMiskBars().compose.pending); if (!p) break; await sleep(500); } await sleep(300); return secs((await page.textContent('#ruler-time')).split('/')[1]); };
   const generate = async (seed = '') => { await page.fill('#ns-seed', seed); await page.click('#ns-generate'); await sleep(1500); if (/di nuovo|again/i.test(await toastText())) { await page.click('#ns-generate'); await sleep(1500); } };
@@ -221,11 +231,13 @@ const secs = s => { const m = /(\d+):(\d\d)\s*$/.exec(s || ''); return m ? +m[1]
   for (const k of ['style', 'profile', 'voices', 'material', 'length']) await fold(k);
   const wide = await page.evaluate(() => ({ doc: document.documentElement.scrollWidth, panel: document.getElementById('new-song').scrollWidth, w: window.innerWidth }));
   check(wide.doc <= wide.w + 1 && wide.panel <= wide.w, '400 px with every section open: nothing scrolls sideways', JSON.stringify(wide));
+  await phoneClosed('hardware');
   await page.locator('#ns-generate').scrollIntoViewIfNeeded();
   check(await page.isVisible('#ns-generate'), 'Genera is reachable on a phone');
   if (shots) await shot(page, path.join(shots, 'panel-phone-hw.png'));
   await page.evaluate(() => { localStorage.setItem('coding-misk-ui', JSON.stringify('neon')); });
   await page.reload(); await sleep(3500); await page.click('[data-mode="ascolta"]'); await compose();
+  await phoneClosed('neon');
   if (shots) { for (const k of ['style', 'profile', 'voices', 'material', 'length']) await fold(k); await shot(page, path.join(shots, 'panel-phone.png')); await page.setViewportSize({ width: 1440, height: 1100 }); await sleep(500); await shot(page, path.join(shots, 'panel-open.png')); }
 
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));

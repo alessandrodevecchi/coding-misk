@@ -14,7 +14,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const errors = [], downloads = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('download', d => downloads.push(d));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-export-format', JSON.stringify('opus')); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['synthwave'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); });
   await page.reload(); await sleep(3500);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
