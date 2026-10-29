@@ -40,7 +40,9 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // 12 (after-tests-oct28 D7): a locked drum sits out breaks and the charge before a drop and comes back at the drop,
 // like an unlocked one; other locked instruments still play through; a steered song never plays more than 12 tracks at
 // a bar (D8: the director's adds, the returns after a break and the drop stop at the cap, its own tracks leave past it)
-export const DIRECTOR_VERSION = 12;
+// 13 (fm-like-effects D6, #90): a radio voice may get the Fold effect (from a stream of its own), so the voices of
+// some songs sound different; the music does not move
+export const DIRECTOR_VERSION = 13;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };
@@ -233,7 +235,7 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
   const material = applyMaterial(tracks, R, opts.complexity, opts, { seed: opts.seed, index, key, chords: mainChords, meter, targets: plan.map(d => d.target), parts, entry: ENTRY });
   const usual = R.tracks.usual, hardMax = opts.complexity > 0.8 ? Math.max(R.tracks.max, 8) + 2 : Math.min(R.tracks.max, 8);
   const usualHigh = clamp(usual[1] + Math.round((opts.complexity - 0.5) * 2), usual[0], hardMax);
-  const voice = voiceFor(R, opts, rng.voice);
+  const voice = voiceFor(R, opts, rng.voice, index);
   // the narrator's sound for the next songs (voice-full-controls D4): the draw stays (later draws do not move), the
   // chosen style or values go over it, and the speaker when one is set; the rack the draw picked is kept
   const narSound = soundPatch(opts.narratorSound);
@@ -281,10 +283,13 @@ const VOICE_DEVICES = {
   crush: { bits: [4, 9] }, coarse: { amount: [3, 14] }, phaser: { rate: [0.3, 4], depth: [0.4, 0.9] },
   tremolo: { rate: [4, 16], depth: [0.4, 0.85] }, vowel: { vowel: ['a', 'e', 'i', 'o', 'u'] }, echo: { count: [2, 4], feedback: [0.3, 0.6] },
 };
+// Fold on a radio voice (fm-like-effects D6): mild, so the words stay clear; drawn from a stream of its own, so the
+// draws above and the music do not move. Ring is not drawn while it is on trial.
+const VOICE_FOLD = { amount: [0.3, 1.2], curve: ['sharp', 'soft'] };
 // The voice of one song: the style's base (its ranges widened, wider with more chaos; a speaker among the style's),
 // sometimes a wild value for a knob the style leaves alone, sometimes another speaker, a character on top and one or
 // two effects in its rack (#66). More chaos, more variety.
-export function voiceFor(R, opts, rng) {
+export function voiceFor(R, opts, rng, index = 0) {
   const base = { ...VOICE_DEFAULT }, v = R.voice || {}, chaos = opts.chaos ?? 0.3;
   const clampTo = (k, x) => (VOICE_LIMITS[k] ? Math.max(VOICE_LIMITS[k][0], Math.min(VOICE_LIMITS[k][1], x)) : x);
   for (const [k, x] of Object.entries(v)) {
@@ -306,6 +311,8 @@ export function voiceFor(R, opts, rng) {
     for (const [k, r] of Object.entries(VOICE_DEVICES[name])) dev[k] = typeof r[0] === 'string' ? rng.pick(r) : Number.isInteger(r[0]) && Number.isInteger(r[1]) ? rng.int(r[0], r[1]) : round(rng.range(r[0], r[1]));
     rack.push(dev);
   }
+  const F = rng.fork(`fold/${index}`);
+  if (rack.length < 2 && F.chance(0.15 + 0.25 * chaos)) rack.push({ device: 'fold', amount: round(F.range(...VOICE_FOLD.amount)), curve: F.pick(VOICE_FOLD.curve) });
   return { settings: base, character, rack };
 }
 

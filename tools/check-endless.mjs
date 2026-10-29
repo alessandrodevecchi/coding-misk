@@ -71,6 +71,8 @@ function voiceless(x, { narrator = false } = {}) {
     const gone = new Set(song.tracks.filter(t => t.type === 'spoken' || (narrator && t.type === 'voice')).map(t => t.id));
     song.tracks = song.tracks.filter(t => !gone.has(t.id));
     for (const t of song.tracks) if (t.type === 'voice' && t.name === 'Narrator') t.name = 'Voice';
+    // (the Fold a radio voice may get since director version 13, fm-like-effects D6: a voice fact, not music)
+    for (const t of song.tracks) if (t.type === 'voice' && Array.isArray(t.rack)) { t.rack = t.rack.filter(d => d.device !== 'fold'); if (!t.rack.length) delete t.rack; }
     if (Array.isArray(song.build)) song.build = song.build.map(st => {
       const o = { ...st };
       for (const k of ['add', 'remove']) if (o[k] !== undefined) { const l = [].concat(o[k]).filter(id => !gone.has(id)); if (!l.length) delete o[k]; else o[k] = Array.isArray(st[k]) && l.length > 1 ? l : l.length === 1 && !Array.isArray(st[k]) ? l[0] : l; }
@@ -978,6 +980,8 @@ const CHECKS = {
         out.push(steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed, n: i }).song);
       }
     }
+    // (a radio voice's Fold, director version 13, is a voice fact: left out)
+    for (const sg of out) for (const t of sg.tracks) if (t.type === 'voice' && Array.isArray(t.rack)) { t.rack = t.rack.filter(d => d.device !== 'fold'); if (!t.rack.length) delete t.rack; }
     const h = hashString(JSON.stringify(out)).toString(16).padStart(8, '0');
     assert(h === 'a6e28951', `old commands give other songs: ${h}`);
   },

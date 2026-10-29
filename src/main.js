@@ -29,7 +29,7 @@ const stamp = (o, fresh = false) => { if (fresh || !o.created) o.created = today
 import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, VOICE_STYLES, styleOf, fromScenes, clipState } from './song/format.js';
-import { DEVICES, deviceArgs, newDevice } from './song/rack.js';
+import { DEVICES, deviceArgs, newDevice, choiceLabel } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { createSongOptions, RADIO_KEY, NEW_SONG_KEY } from './endless/song-options.js';
 import { createNewSongPanel } from './live/new-song-panel.js';
@@ -2934,8 +2934,8 @@ function deviceHtml(d, i, tr) {
     <div class="dev-head"><button class="led" data-dev-on="${i}" aria-pressed="${d.on !== false}" aria-label="${esc(t('onoff', { name: tx(spec.label) }))}"></button>
       <b>${esc(tx(spec.label))}</b><code data-dev-code="${i}"></code>
       <span class="dev-tools"><button class="mini" data-dev-move="${i}:-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(t('moveUp'))}">▲</button><button class="mini" data-dev-move="${i}:1" ${i === n - 1 ? 'disabled' : ''} aria-label="${esc(t('moveDown'))}">▼</button><button class="mini" data-dev-del="${i}" aria-label="${esc(t('remove'))}">✕</button></span></div>
-    ${spec.args.length ? `<div class="dev-args">${spec.args.map(([name, kind, , lo, hi, step]) => kind === 'choice'
-      ? `<div class="ctrl"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><select id="dev-${i}-${name}" data-dev-arg="${i}:${name}">${lo.map(v => `<option value="${v}"${v === a[name] ? ' selected' : ''}>${esc(devValue(name, v))}</option>`).join('')}</select></div>`
+    ${spec.args.length ? `<div class="dev-args">${spec.args.map(([name, kind, , lo, hi, step], k) => kind === 'choice'
+      ? `<div class="ctrl"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><select id="dev-${i}-${name}" data-dev-arg="${i}:${name}">${lo.map(v => `<option value="${v}"${v === a[name] ? ' selected' : ''}>${esc(spec.args[k][4] ? choiceLabel(spec.args[k], v, getLang()) : devValue(name, v))}</option>`).join('')}</select></div>`
       : `<div class="ctrl"><div class="row"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><output data-dev-out="${i}:${name}"></output></div><input type="range" id="dev-${i}-${name}" data-dev-arg="${i}:${name}" min="${lo}" max="${hi}" step="${step}" value="${a[name]}"></div>`).join('')}</div>` : ''}
   </div>`;
 }

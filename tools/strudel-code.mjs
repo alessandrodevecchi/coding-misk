@@ -69,8 +69,20 @@ export function localNames(b) {
   return out;
 }
 // every name called in a code: an identifier followed by `(`, with or without a leading `.`
+// the argument of K(…) is a Kabelsalat expression (audioin, sine, mul…), not Strudel code: blanked, K itself stays
+// (the Ring rack device, fm-like-effects D3)
+export function blankKabel(b) {
+  let out = b;
+  for (const m of b.matchAll(/(?<![\w$])K\s*\(/g)) {
+    let depth = 0, i = m.index + m[0].length - 1;
+    for (; i < b.length; i++) { if (b[i] === '(') depth++; else if (b[i] === ')' && --depth === 0) break; }
+    const from = m.index + m[0].length;
+    out = out.slice(0, from) + ' '.repeat(Math.max(0, i - from)) + out.slice(i);
+  }
+  return out;
+}
 export function scanCalls(code) {
-  const b = blank(code), locals = localNames(b), out = new Set();
+  const b = blankKabel(blank(code)), locals = localNames(b), out = new Set();
   for (const m of b.matchAll(/(\.\s*)?([A-Za-z_$][\w$]*)\s*\(/g)) {
     const name = m[2], before = b.slice(Math.max(0, m.index - 60), m.index);
     if (m[1]) {

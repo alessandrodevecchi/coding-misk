@@ -33,9 +33,30 @@ export const DEVICES = {
   fm: { kind: 'sound', label: { en: 'FM', it: 'FM' }, args: [['index', 'num', 1, 0, 4, 0.05], ['harmonicity', 'choice', 1, [0.5, 0.505, 1, 1.005, 1.01, 1.015, 1.02, 1.41, 2, 2.01, 2.76, 3, 3.5, 4]], ['wave', 'choice', 'sine', ['sine', 'triangle', 'square', 'sawtooth', 'pink', 'brown']],
     ['decay', 'num', 0.3, 0.05, 1, 0.05], ['sustain', 'num', 0.5, 0, 1, 0.05], ['index2', 'num', 0, 0, 3, 0.05], ['harmonicity2', 'num', 1, 1, 10, 0.5]],
     code: a => `.fm(${f(a.index)}).fmh(${f(a.harmonicity)})${a.wave !== 'sine' ? `.fmwave("${a.wave}")` : ''}.fmdecay(${f(a.decay)}).fmsustain(${f(a.sustain)})${a.index2 > 0 ? `.fm2(${f(a.index2)}).fmh2(${f(a.harmonicity2)})` : ''}` },
+  // FM-like colour for any sound, samples and voices included (fm-like-effects, #90)
+  // Fold (D1, D2): superdough's distortion with a fold curve, and the level after it (foldLevel): a line never goes
+  // above its own peak or the usual peak of its track type. It shares the distort stage with Distortion: the later
+  // device wins.
+  fold: { kind: 'sound', label: { en: 'Fold', it: 'Piega' }, args: [['amount', 'num', 1.5, 0.1, 3, 0.05], ['curve', 'choice', 'sharp', ['sharp', 'soft'], { sharp: { en: 'Sharp', it: 'Spigolosa' }, soft: { en: 'Soft', it: 'Morbida' } }]],
+    code: (a, type) => `.distort(${f(a.amount)}).distorttype("${a.curve === 'soft' ? 'sinefold' : 'fold'}").distortvol(${f(foldLevel(a.amount, a.curve, type))})` },
+  // Ring, on trial (D3): the sound times 1 - amount + amount·sin(2π·freq·t), a Kabelsalat effect through K (one worklet
+  // per note); never above the input
+  ring: { kind: 'sound', label: { en: 'Ring (trial)', it: 'Ring (prova)' }, args: [['freq', 'num', 220, 30, 2000, 10], ['amount', 'num', 0.8, 0, 1, 0.05]],
+    code: a => `.K(audioin().mul(sine(${f(a.freq)}).mul(${f(a.amount)}).add(${f(1 - a.amount)})).out())` },
   pan: { kind: 'sound', label: { en: 'Pan', it: 'Panorama' }, args: [['position', 'num', 0.5, 0, 1, 0.05], ['motion', 'choice', 'fixed', ['fixed', 'slow', 'fast']]],
     code: a => a.motion === 'fixed' ? `.pan(${f(a.position)})` : `.pan(sine.slow(${a.motion === 'slow' ? 8 : 1}))` },
 };
+
+// the level after a fold (fm-like-effects D2). The fold's slope at zero is g = 1 + k/2 with k = expm1(amount)
+// (superdough's distort), times π/2 for the soft curve (sinefold), and the fold never leaves -1…1. With the level
+// max(1/g, P), P the usual peak of the track type, a sample x comes out at most max(|x|, P): a line below the fold
+// keeps its level (1/g), a folded one comes out near the usual peak of its type instead of far below it.
+// P: the level targets (docs/knowledge/sound-and-levels.md: kick and leads around 0.5, pads and arps 0.1 to 0.3)
+export const FOLD_PEAK = { drums: 0.45, bass: 0.35, guitar: 0.4, voice: 0.35, spoken: 0.35, hook: 0.2, pad: 0.2, arp: 0.18, code: 0.3, texture: 0.15, riser: 0.1 };
+export const foldGain = (amount, curve = 'sharp') => (1 + Math.expm1(amount) / 2) * (curve === 'soft' ? Math.PI / 2 : 1);
+export const foldLevel = (amount, curve = 'sharp', type) => Math.floor(1000 * Math.max(1 / foldGain(amount, curve), FOLD_PEAK[type] ?? 0.2)) / 1000;
+// the label of a choice value in a language (the value itself when the device names none)
+export const choiceLabel = (arg, v, lang) => (arg[4] && arg[4][v] ? arg[4][v][lang] || arg[4][v].en : String(v));
 
 // values of a device, defaults filled in
 export const deviceArgs = dev => {
@@ -60,4 +81,7 @@ export function checkRack(rack, p, err, warn) {
       if (a[1] === 'num' && (typeof v !== 'number' || v < a[3] || v > a[4])) err(`${dp}.${k}`, `a number from ${a[3]} to ${a[4]}`);
     }
   });
+  // Fold and Distortion write the same Strudel stage (distort): only the later one is heard (fm-like-effects D2)
+  const on = rack.map((d, i) => [d, i]).filter(([d]) => d && d.on !== false && (d.device === 'fold' || d.device === 'distort'));
+  if (on.some(([d]) => d.device === 'fold') && on.some(([d]) => d.device === 'distort')) warn(p, `fold and distort share one distortion stage: only the later one (${on[on.length - 1][0].device}) is heard`);
 }
