@@ -9,6 +9,9 @@ import { monitorLayout, drawMonitor, drawRullo } from '../src/visuals/widget-loo
 import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache, pitchOf, cwInstrument } from '../src/visuals/stage-feed.js';
 import { THEME_PALETTES, themePalette, instColour, scenePalette } from '../src/visuals/widget-palettes.js';
 import { widgetSettings } from '../src/live/widgets.js';
+import { stripLayout, screenLayout, palcoScreen, drawLayer, seeThrough } from '../src/visuals/widget-layer.js';
+import { SW_DEFAULTS, stageSettings, stageMapping, layerOn, limitOf, stageScopeInstruments } from '../src/visuals/stage-settings.js';
+import { makeBackup } from '../src/settings/backup.js';
 import { INSTRUMENTS, LOOKS, PICK_LOOKS } from '../src/music.js';
 
 let failed = 0;
@@ -146,6 +149,71 @@ for (const look of ['monitor', 'rullo']) {
   for (let f = 0; f < 90; f++) { const cyc = 6 + f / 30; const g = recorder(); draw(g, 1280, 720, frameOf(st, cyc, seqCache, look)); if (f === 45) seq.mid = JSON.stringify(g.log); }
   const a = alone(6 + 45 / 30), b = alone(6 + 45 / 30);
   check(a === b && a === seq.mid && a.length > 1000, `${look}: the same frame twice, alone and in a sequence, gives the same drawing`, `${a.length} characters of calls`);
+}
+
+// ---------- the layer over the other looks (D4) ----------
+{
+  const inBox = (b, B) => b.x >= B.x - 1e-6 && b.y >= B.y - 1e-6 && b.x + b.w <= B.x + B.w + 1e-6 && b.y + b.h <= B.y + B.h + 1e-6;
+  const apart = L => L.every((a, i) => L.every((b, j) => i === j || !overlap(a, b)));
+  const fmt = L => L.map(b => `${Math.round(b.x)},${Math.round(b.y)} ${Math.round(b.w)}×${Math.round(b.h)}`).join(' ');
+  for (const [name, [W, H]] of Object.entries({ '16:9': [1280, 720], '1:1': [720, 720], 'app 2.4:1': [1440, 600] })) {
+    const stage = { x: 0, y: 0, w: W, h: H }, centre = { x: W * 0.3, y: H * 0.3, w: W * 0.4, h: H * 0.4 };
+    for (let n = 1; n <= 4; n++) {
+      const L = stripLayout(n, W, H), left = L.filter(b => b.x + b.w / 2 < W / 2), right = L.filter(b => b.x + b.w / 2 > W / 2);
+      const sizes = L.every(b => b.w <= W * 0.2 + 1e-6 && b.h <= H * 0.2 + 1e-6 && b.w / b.h >= 1.1 && b.w / b.h <= 3.01);
+      check(L.length === n && L.every(b => inBox(b, stage)) && apart(L) && L.every(b => !overlap(b, centre)) && sizes, `strip ${name}, ${n} panel${n > 1 ? 's' : ''}: inside, apart, the centre free, at most a fifth of the stage`, fmt(L));
+      const want = { 1: [1, 0], 2: [1, 1], 3: [2, 1], 4: [2, 2] }[n];
+      check(left.length === want[0] && right.length === want[1], `strip ${name}, ${n}: ${want[0]} on the left, ${want[1]} on the right`);
+      if (n === 3) check(Math.abs(L[0].y - L[1].y) < 1e-6, `strip ${name}, 3: the right panel at the same top as the left one`);
+      if (n === 4) { const mid = (Math.min(...L.map(b => b.y)) + Math.max(...L.map(b => b.y + b.h))) / 2; check(Math.abs(mid - H / 2) < 1, `strip ${name}, 4: two per side stacked around the middle`); }
+    }
+  }
+  // a tall stage: a centred row at the bottom, up to 3, 4 as 2×2
+  for (let n = 1; n <= 4; n++) {
+    const W = 405, H = 720, L = stripLayout(n, W, H), minX = Math.min(...L.map(b => b.x)), maxX = Math.max(...L.map(b => b.x + b.w)), rows = new Set(L.map(b => Math.round(b.y))).size;
+    check(L.every(b => b.y > H * 0.6 && b.y + b.h <= H) && Math.abs(minX - (W - maxX)) < 1 && apart(L) && rows === (n === 4 ? 2 : 1), `strip 9:16, ${n}: a centred row at the bottom${n === 4 ? ' (2×2)' : ''}`, fmt(L));
+  }
+  // the Palco screen: up to 4 panels inside the LED wall, fewer are bigger
+  for (const [name, [W, H]] of Object.entries({ '16:9': [1280, 720], '9:16': [405, 720] })) {
+    const S = palcoScreen(W, H), area = {};
+    for (let n = 1; n <= 4; n++) { const L = screenLayout(n, W, H); area[n] = L[0].w * L[0].h; check(L.length === n && L.every(b => inBox(b, S)) && apart(L), `Palco screen ${name}, ${n}: inside the big screen, apart`, fmt(L)); }
+    check(area[1] >= area[2] && area[2] >= area[4], `Palco screen ${name}: fewer panels are bigger`);
+  }
+  check(stripLayout(6, 1280, 720).length === 4 && screenLayout(9, 1280, 720).length === 4, 'the layer never shows more than 4 panels');
+  // where the layer goes
+  const on = stageSettings({ layer: 'strip' }), pal = stageSettings({ layer: 'palco' });
+  check(layerOn(stageSettings(null), 'tramonto') === null, 'off by default: no layer on any look');
+  check(layerOn(on, 'tramonto') === 'strip' && layerOn(on, 'palco') === 'strip' && layerOn(pal, 'palco') === 'screen' && layerOn(pal, 'sonar') === 'strip', 'strip over the looks; Palco: the big screen on Palco, the strip elsewhere');
+  check(['monitor', 'rullo', 'soul'].every(l => layerOn(on, l) === null && layerOn(pal, l) === null), 'never on Monitor, Rullo and the soul');
+  check(limitOf(on, 'strip') === 4 && limitOf(on, 'screen') === 4 && limitOf(stageSettings({ strip: 2 }), 'strip') === 2 && limitOf(on, 'monitor') === 6, 'limits: strip 4 by default, the screen 4, Monitor 6');
+  // the same layer frame twice, alone and in a sequence
+  const st = song(), draw = (cyc, cache) => { const g = recorder(), F = frameOf(st, cyc, cache); F.pal = seeThrough(F.pal); F.roster = F.roster.slice(0, 4); drawLayer(g, 1280, 720, F, 'strip'); return JSON.stringify(g.log); };
+  const seqCache = columnCache(); let mid = null;
+  for (let f = 0; f < 60; f++) { const x = draw(6 + f / 30, seqCache); if (f === 30) mid = x; }
+  const a = draw(7, columnCache());
+  check(a === mid && a === draw(7, columnCache()) && a.length > 500, 'layer: the same frame twice, alone and in a sequence, gives the same drawing', `${a.length} characters of calls`);
+  check(/rgba\([^)]*,\.6\)/.test(seeThrough(THEME_PALETTES.hw).panel) && THEME_PALETTES.hw.panel !== seeThrough(THEME_PALETTES.hw).panel, 'the layer\'s panels are see-through (theme colours too)');
+}
+
+// ---------- the settings of the stage widgets (D9) ----------
+{
+  const D = stageSettings(null);
+  check(D.layer === 'off' && D.monitor === 6 && D.strip === 4 && D.mapping === 'same' && D.colours === 'auto' && D.silent === 'dimmed' && !D.widgets.spiral && !D.widgets.pitchwheel && D.widgets.scope, 'defaults: off, Monitor 6, strip 4, same as code widgets, automatic colours, dimmed, spiral and pitchwheel off');
+  const X = stageSettings({ layer: 'nope', monitor: 9, strip: 0, colours: 'x', silent: 'hidden', widgets: { spiral: true } });
+  check(X.layer === 'off' && X.monitor === 6 && X.strip === 1 && X.colours === 'auto' && X.silent === 'hidden' && X.widgets.spiral, 'stored values kept within their limits');
+  check(stageSettings({ monitor: 1 }).monitor === 2, 'Monitor at least 2 panels');
+  const cw = widgetSettings({ share: 0, instruments: { bass: { primary: 'spectrum' } }, widgets: { scope: false } });
+  const same = stageMapping(stageSettings(null), cw), own = stageMapping(stageSettings({ mapping: 'own', instruments: { bass: { primary: 'pianoroll' } } }), cw);
+  check(same.instruments.bass.primary === 'spectrum' && same.widgets.scope === true && same.order === cw.order && same.share === cw.share, 'same as code widgets: the code widgets\' instruments, the stage\'s widget kinds');
+  check(own.instruments.bass.primary === 'pianoroll' && own.order === cw.order, 'own: the stage\'s instruments, the slot order of the code widgets');
+  const st = song();
+  check(rosterOf(st, { start: 0, end: 16 }, { S: same, max: 6 }).find(p => p.inst === 'bass').widget === 'spectrum', 'spec scenario: the code widgets card maps the bass, the stage follows it');
+  const segs = [{ code: '$: s("bd*4").analyze("kick")\n$: note("c2").s("saw").analyze("bass")\n$: n("0 2").s("piano").analyze("arp")' }, { code: '$: x', run: "[0,9,{gain:1,analyze:'pad'}]" }];
+  const sc = stageScopeInstruments(segs, stageMapping(stageSettings(null), widgetSettings({ share: 0 })));
+  check(sc.join() === 'bass,kick,pad', 'Always real: the stage instruments with a scope or spectrum (code and hidden mixer)', sc.join());
+  const b = makeBackup([['coding-misk-stage-widgets', { strip: 2 }], ['coding-misk-sw-open', ['general']]]);
+  check(b.data['coding-misk-stage-widgets'].strip === 2 && !('coding-misk-sw-open' in b.data), 'the stage widgets travel in the backup, the open sections of their card do not');
+  check(JSON.stringify(SW_DEFAULTS.widgets) === JSON.stringify(D.widgets), 'the defaults read back as the defaults');
 }
 
 // ---------- the looks in the menus ----------

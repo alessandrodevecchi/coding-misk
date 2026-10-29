@@ -2,7 +2,9 @@ import { INSTRUMENTS } from './music.js';
 import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache, cwInstrument, DRUMS } from './visuals/stage-feed.js';
 import { pitchesOf } from './visuals/widget-painters.js';
 import { drawMonitor, drawRullo } from './visuals/widget-looks.js';
-import { themePalette } from './visuals/widget-palettes.js';
+import { themePalette, scenePalette } from './visuals/widget-palettes.js';
+import { drawLayer, seeThrough } from './visuals/widget-layer.js';
+import { layerOn, limitOf } from './visuals/stage-settings.js';
 
 // Visual su canvas sincronizzati con l'audio.
 // Ogni strumento suona su un analizzatore separato (.analyze("kick"), .analyze("bass"), …):
@@ -10,8 +12,9 @@ import { themePalette } from './visuals/widget-palettes.js';
 // getInfo(cyc): what plays, for the studio scene: { onAir, title, artist, line, bar, bars, bpm, say, sayAt, n }
 // soul: the soul scene (#46), drawn when the look is 'soul'
 // afterFrame(cyc, playing): called after each frame (the video recorder draws its frame there, #27)
-// stage: the widget looks' inputs (widgets-on-stage): { settings() (the code widgets' settings), section(cyc) →
-// { start, end } in cycles, seed(), label(instrument), theme() → 'neon' | 'hw' }
+// stage: the widget looks' inputs (widgets-on-stage): { settings() (the panels' mapping: the code widgets' settings, or
+// the stage's own instruments; a new object only when a setting changes), options() (the stage widgets' settings:
+// layer, limits, colours, silent), section(cyc) → { start, end } in cycles, seed(), label(instrument), theme() → 'neon' | 'hw' }
 export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}), soul = null, afterFrame = null, stage = null }) {
   const $ = (s, r = document) => r.querySelector(s);
   const cv = $('#stage'), vcx = cv.getContext('2d');
@@ -207,7 +210,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const liveStore = noteStore(), live = liveNotes(liveStore);
   // per source of notes: the panels of each section, the pitches, the spectrum columns
   const wcache = new WeakMap();
-  const cacheOf = src => { let c = wcache.get(src); if (!c) { c = { rosters: new Map(), pitches: new Map(), ranges: new Map(), cols: columnCache() }; wcache.set(src, c); } return c; };
+  const cacheOf = src => { let c = wcache.get(src); if (!c) { c = { rosters: new Map(), pitches: new Map(), ranges: new Map(), cols: columnCache(), S: null }; wcache.set(src, c); } return c; };
   const WIDGET_LOOKS = ['monitor', 'rullo'];
   // (for the checks: the time of the last widget look frames, in ms)
   const stageTimes = globalThis.codingMiskStageTimes = [];
@@ -217,10 +220,25 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const a = Math.floor(Math.max(0, cyc) / 8) * 8;
     return { start: a, end: a + 8 };
   }
-  function widgetFrame(cyc, playing, t) {
+  // the stage widgets' settings (defaults without them: Monitor 6 panels, layer off)
+  const optionsOf = () => (stage && stage.options ? stage.options() : { layer: 'off', monitor: 6, strip: 4, colours: 'auto', silent: 'dimmed' });
+  // the palettes (D7): the app theme on the widget looks, the playing look's scene colours on the layer (automatic);
+  // "app theme" and "scene colours" choose one for both (the widget looks take Palco's scene colours)
+  const scenePals = new Map();
+  const sceneOf = (look, theme) => { const k = `${look}|${theme}`; if (!scenePals.has(k)) scenePals.set(k, scenePalette(PAL[look] || PAL.palco, themePalette(theme))); return scenePals.get(k); };
+  function paletteOf(kind, look, colours) {
+    const theme = stage && stage.theme ? stage.theme() : 'neon', layer = kind === 'strip' || kind === 'screen';
+    if (colours === 'theme' || (colours !== 'scene' && !layer)) return layer ? seeThrough(themePalette(theme)) : themePalette(theme);
+    return sceneOf(layer ? look : 'palco', theme);
+  }
+  // kind: 'monitor', 'rullo', 'strip' or 'screen' (the layer over look)
+  function widgetFrame(cyc, playing, t, kind = 'monitor', look = kind) {
     const S = stage && stage.settings ? stage.settings() : null;
     if (!S) return null;
+    const O = optionsOf(), max = limitOf(O, kind);
     const src = feed && feed.store ? feed.store : liveStore, C = cacheOf(src), sec = sectionAt(cyc);
+    // a change of the settings: the panels of every section are chosen again
+    if (C.S !== S) { C.S = S; C.rosters.clear(); }
     let known = Infinity;
     if (!(feed && feed.store)) {
       const P = playing && sched && sched() ? sched().pattern : null, c = Math.floor(cyc);
@@ -229,14 +247,15 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       if (known >= c + 3) known = live.pump(P, cyc, Math.min(sec.end, c + 24), 1);
       if (!P) known = -Infinity;
     }
-    const seed = stage.seed ? stage.seed() : '', silent = S.dim === false ? 'hidden' : 'dimmed', full = S.notes === 'full';
+    const seed = stage.seed ? stage.seed() : '', silent = O.silent === 'hidden' ? 'hidden' : 'dimmed', full = S.notes === 'full';
     // the panels of a section, decided while its notes are still coming in (live: the first bar), then kept
     const rosterAt = s => {
-      let r = C.rosters.get(s.start);
+      const key = `${s.start}|${max}|${silent}`;
+      let r = C.rosters.get(key);
       const k = Math.min(known, s.end);
       if (!r || (r.known < k && cyc < s.start + 1 && cyc >= s.start)) {
-        r = { known: k, list: rosterOf(src, s, { S, max: 6, silent, seed, known: k }) };
-        C.rosters.set(s.start, r);
+        r = { known: k, list: rosterOf(src, s, { S, max, silent, seed, known: k }) };
+        C.rosters.set(key, r);
         if (C.rosters.size > 64) C.rosters.delete(C.rosters.keys().next().value);
       }
       return r.list;
@@ -246,7 +265,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const memo = new Map(), around = inst => { let l = memo.get(inst); if (!l) { l = src.around(inst, cyc - 2.5, cyc + 2.5); memo.set(inst, l); } return l; };
     const now = inst => around(inst).filter(n => n[0] <= cyc + 0.01);
     const level = inst => (playing || feed ? levelAt(now(inst), cyc, inst, full) : 0);
-    const pal = themePalette(stage.theme ? stage.theme() : 'neon');
+    const pal = paletteOf(kind, look, O.colours);
     // scope: the instrument's own wave (its analyser live, its render in the fast video), else the song's wave scaled by
     // the instrument's level (D8 fallback)
     const ownWave = inst => (feed ? (feed.instWave ? feed.instWave(inst, t) : null) : playing && instWave[inst] ? instWave[inst] : null);
@@ -293,13 +312,27 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   // the panels' font, loaded before the first widget look frame (a frame drawn before it would use another font)
   try { if (document.fonts) document.fonts.load('600 14px "JetBrains Mono"').catch(() => {}); } catch (e) {}
   function widgetLook(look, cyc, playing) {
-    const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000);
+    const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000, look);
     if (!F) { cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H); return; }
     (look === 'rullo' ? drawRullo : drawMonitor)(cx, W, H, F);
     // (for the checks: the panels of Monitor, the notes Rullo shows)
     if (look === 'monitor') globalThis.codingMiskStagePanels = F.roster.filter(p => F.dim !== 'hidden' || !p.quiet).map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`);
     else globalThis.codingMiskStageNotes = [...F.melodic, ...F.lanes].reduce((a, i) => a + F.notes(i, cyc - 2, cyc + 2).length, 0);
     stageTimes.push(performance.now() - t0); if (stageTimes.length > 600) stageTimes.shift();
+  }
+  // the layer over the other looks (D4): off by default, then nothing is asked or drawn
+  const layerTimes = globalThis.codingMiskLayerTimes = [];
+  function widgetLayer(look, cyc, playing) {
+    const kind = stage && layerOn(optionsOf(), look);
+    if (!kind) { globalThis.codingMiskLayerPanels = null; return; }
+    const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000, kind, look);
+    if (!F) return;
+    cx.save();
+    const drawn = drawLayer(cx, W, H, F, kind);
+    cx.restore();
+    // (for the checks: the layer's panels and where they are)
+    globalThis.codingMiskLayerPanels = { kind, panels: drawn.map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`) };
+    layerTimes.push(performance.now() - t0); if (layerTimes.length > 600) layerTimes.shift();
   }
 
   const SCENE_DRAW = {
@@ -950,7 +983,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     cx.clearRect(0, 0, W, H);
     if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
     else if (WIDGET_LOOKS.includes(look)) { if (soul) soul.hide(); widgetLook(look, cyc, playing); }
-    else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); }
+    else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); widgetLayer(look, cyc, playing); }
     // (the widget looks have no flash: their panels flash on their own onsets)
     if (flash > .02 && !reduce && look !== 'soul' && !WIDGET_LOOKS.includes(look)) { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
   }

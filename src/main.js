@@ -99,6 +99,9 @@ import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
 import { CW_KEY, widgetSettings, placeWidgets, widgetOptions, linkAnalysers } from './live/widgets.js';
+import { SW_KEY, stageSettings, stageMapping, stageScopeInstruments, layerOn } from './visuals/stage-settings.js';
+// the full-screen widget looks (widgets-on-stage D3)
+const WIDGET_LOOKS = ['monitor', 'rullo'];
 import { widgetPlan, linesByKey, fastWidgets } from './video/widget-frames.js';
 import { noteStore } from './visuals/stage-feed.js';
 import { withWidgets } from './video/layout.js';
@@ -115,6 +118,17 @@ const store = {
 setLang(getLang());
 // code widgets (code-widgets): the settings of the Settings card, read each time a code is shown
 const cwSettings = () => widgetSettings(store.get(CW_KEY, null));
+// the stage widgets (widgets-on-stage D9): their settings and the panels' mapping, read again only when one of the two
+// stored values changes (the stage asks every frame)
+const stageWidgets = (() => {
+  let raw = null, cur = null;
+  return () => {
+    let a = null, b = null;
+    try { a = localStorage.getItem(SW_KEY); b = localStorage.getItem(CW_KEY); } catch (e) {}
+    if (!cur || raw !== `${a}\u0000${b}`) { raw = `${a}\u0000${b}`; const sw = stageSettings(store.get(SW_KEY, null)); cur = { sw, S: stageMapping(sw, cwSettings()) }; }
+    return cur;
+  };
+})();
 
 // ---------- libreria dei brani ----------
 // "composed": brani v2 (sezioni e tracce, file JSON in songs/), si aprono nell'arrangiatore.
@@ -1409,7 +1423,20 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   // block (kept on globalThis for the checks); scope and spectrum read the code widgets' renders of an instrument when there are some, else the song's wave
   const stageNotes = globalThis.codingMiskFastStageNotes = noteStore();
   job = { ...job, stageNotes: true };
-  const instWave = cw && Object.keys(cw.waves).length ? (inst, at, n = 256) => { const wv = cw.waves[inst]; if (!wv) return null; const end = Math.round(at * wv.sr), out = new Float32Array(n); for (let i = 0; i < n; i++) out[i] = wv.data[end - n + i] || 0; return out; } : null;
+  // with "Real scope and spectrum: Always" (D8), the stage's scope and spectrum instruments are rendered alone too when a
+  // widget look or the layer can show in this video (the ones the code widgets rendered are not rendered again);
+  // Automatic adds no render
+  const SWS = stageWidgets(), waves = cw ? cw.waves : {};
+  const mayShow = (frag && (frag.o.look === 'random' || WIDGET_LOOKS.includes(frag.o.look))) || o.soul !== 'full' && (o.visual === 'song-cycle' || o.visual === 'section-cycle' || WIDGET_LOOKS.includes(String(o.visual).replace('fixed:', '')) || WIDGET_LOOKS.includes(own));
+  if (o.realScope === 'always' && (mayShow || SWS.sw.layer !== 'off')) {
+    const more = stageScopeInstruments(segments, SWS.S, sg.id || '').filter(i => !waves[i]);
+    if (more.length) {
+      fastJob = { id: sg.id, progress: 0, phase: 'scope', cancel: () => {} };
+      try { await cwRealScopes(job, more, waves, true); }
+      catch (e) { fastJob = null; if (e && e.cancelled) { if (frag) return 'cancelled'; toast(t('vidCancelled')); return true; } console.warn('[fast video] stage scope renders', e); for (const k of more) delete waves[k]; }
+    }
+  }
+  const instWave = Object.keys(waves).length ? (inst, at, n = 256) => { const wv = waves[inst]; if (!wv) return null; const end = Math.round(at * wv.sr), out = new Float32Array(n); for (let i = 0; i < n; i++) out[i] = wv.data[end - n + i] || 0; return out; } : null;
   let stageLogged = false;
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
@@ -1437,7 +1464,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
         meta: sg.meta, seed: sg.id || '',
       };
       const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
-      if (!stageLogged && (fLook === 'monitor' || fLook === 'rullo')) { stageLogged = true; console.info(`[fast video] ${fLook}: notes from the render page; stage scopes use ${instWave ? 'the code widgets\' renders where there are some, else ' : ''}the song's wave scaled by each instrument's level`); }
+      if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
       visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0 });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
       else video.composeAt({ layout, q }, cyc, t);
@@ -4787,7 +4814,7 @@ function stageSection(cyc) {
 const visuals = startVisuals({
   getS: () => ({ look: soulOverride ? 'soul' : look }), soul,
   stage: {
-    settings: cwSettings, section: stageSection, theme: () => ui,
+    settings: () => stageWidgets().S, options: () => stageWidgets().sw, section: stageSection, theme: () => ui,
     seed: () => (fv ? fv.seed : (song && song.id) || ''),
     label: inst => { const k = `stInst:${inst}`, v = t(k); return v === k ? inst : v; },
   },
