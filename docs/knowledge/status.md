@@ -28,7 +28,7 @@ OpenSpec changes not archived: 89. With open tasks: 27. All tasks ticked, waitin
 | [idea-model](../../openspec/changes/idea-model/tasks.md) | 3 | 20 |
 | [idiomatic-code](../../openspec/changes/idiomatic-code/tasks.md) | 2 | 8 |
 | [invented-styles](../../openspec/changes/invented-styles/tasks.md) | 1 | 22 |
-| [light-theme](../../openspec/changes/light-theme/tasks.md) | 13 | 13 |
+| [light-theme](../../openspec/changes/light-theme/tasks.md) | 1 | 13 |
 | [live-output](../../openspec/changes/live-output/tasks.md) | 5 | 9 |
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |
