@@ -85,8 +85,10 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(await page.isVisible('#lessons .lesson'), 'the Strudel lessons have their own tab');
   if (shots) await page.screenshot({ path: path.join(shots, 'lessons.png') });
   await page.click('[data-tab="guida"]'); await sleep(300);
-  await page.click('[data-g-chip="playlists"]'); await sleep(800);
-  const top = await page.$eval('#g-playlists', el => el.getBoundingClientRect().top);
+  await page.click('[data-g-chip="playlists"]');
+  // a smooth scroll over a long Guide: wait until it settles (up to 3 s)
+  let top = 1e9;
+  for (let i = 0; i < 15 && !(top >= -2 && top < 200); i++) { await sleep(200); top = await page.$eval('#g-playlists', el => el.getBoundingClientRect().top); }
   check(top >= -2 && top < 200, 'a chip scrolls to its card', `${Math.round(top)}`);
   if (shots) await page.screenshot({ path: path.join(shots, 'guide.png') });
   await page.click('#g-radio [data-g-show]'); await sleep(500);

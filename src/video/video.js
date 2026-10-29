@@ -56,7 +56,8 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
   let colours = null, coloursAt = 0;
   function palette() {
     if (colours && performance.now() - coloursAt < 1000) return colours;
-    const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim();
+    // light-theme: videos do not follow the app theme; in LIGHT the neon tokens of the look are the --dk-* ones
+    const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k.replace('--', '--dk-')).trim() || cs.getPropertyValue(k).trim();
     coloursAt = performance.now();
     return (colours = { bg: v('--bg') || '#0d0818', panel: v('--panel') || '#160f26', line: v('--line') || '#3a2a5c', ink: v('--ink') || '#f3ecff', muted: v('--muted') || '#a597c7', a1: v('--a1') || '#ff4fa3', a2: v('--a2') || '#ffb347' });
   }

@@ -31,6 +31,7 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 | Library, playlists, trash, settings, startup, card lengths (`src/live/card-duration.js`) and song configuration (`src/live/song-config.js`) | `check:durations`, `check:profiles`, `check:song-filter`, `check:playlists`, `check:trash`, `check-backup.mjs` | `check-songs-tab.cjs`, `check-playlists.cjs`, `check-settings.cjs`, `check-startup.cjs`, `check-song-config.cjs` |
 | Interface text or the Guide | `check:guide` | `check-modes.cjs` |
 | Code themes, the code panel's look, `drawCode` (`src/code-themes/`) | `check:code-themes`, `check:video`, `check:guide` | `check-code-themes.cjs`, `check-settings.cjs`, `check-video.cjs` |
+| Light app theme (`src/theme-light.css`, the theme switch) | `check:light-theme`, `check:guide` | `check-light-theme.cjs`, `check-settings.cjs` |
 | The Compose arranger, ruler and seeking (`playMap`, the growth and ending columns, the ghost narrator row) | `check:guide` | `check-timeline.cjs`, `check-preview.cjs`, `check-player.cjs`, `check-hand.cjs` |
 | Anything a note or a recipe describes | `check:knowledge` | |
 | Strudel version, sounds | `catalog:strudel`, `check:strudel`, `check:sound-guard` | `check-sounds.cjs`, `check-style-sounds.cjs` |
@@ -103,6 +104,8 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-knowledge.mjs` | `npm run check:knowledge` | Node | Checks the knowledge base in docs/knowledge/ (knowledge-base, #74, design D5). No browser. |
 | `tools/check-levels.cjs` |  | dev server, Chrome | Plays every scene of the given tracks and prints errors, per-instrument peak levels and the peak of the master output. The output peak (out=) is the hard limit: above 1.0 it clips and the run fails. in= is the level… |
 | `tools/check-library.cjs` |  | dev server, Chrome | Browser checks for the Styles and Artists tabs (#35). |
+| `tools/check-light-theme.cjs` |  | dev server, Chrome | Browser check of the light app theme (light-theme): every tab and the main panels in LIGHT, at desktop and phone width, with a contrast probe of every visible text against its computed background, a search for dark… |
+| `tools/check-light-theme.mjs` | `npm run check:light-theme` | Node | Contrast check of the light app theme's tokens (light-theme), no browser: reads src/theme-light.css and, for the base set and every look, checks body text (7:1), muted, accent and warning text (4.5:1), text on an accent… |
 | `tools/check-live-code.mjs` | `npm run check:live-code` | Node | Checks for the code a live build shows (code-writing): Classic and Crescendo keep their code (a fingerprint of the code at every step of some songs, per profile), comment options and presets. No browser. |
 | `tools/check-live.cjs` |  | dev server, Chrome | Browser checks for the live output (#52): the broadcast window draws the picture of the radio playing in the app, the control room sees the app and the window (state, beat, pictures), presets with TAKE move the picture… |
 | `tools/check-live.mjs` | `npm run check:live` | Node | Checks for the live output (#52): preset areas inside the picture without overlap, transitions between views, the beat's staleness, and the OBS client (challenge answer, identify, requests, errors) against a fake OBS.… |

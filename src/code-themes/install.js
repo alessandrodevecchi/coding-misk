@@ -20,7 +20,8 @@ export function createCodeThemes({ store, root = document.documentElement, host 
   const listeners = new Set();
   const settings = () => codeThemeSettings(store.get(CT_KEY, null));
   // the look's tokens, resolved (Neon reads them)
-  const tokens = () => { const cs = getComputedStyle(root), v = k => cs.getPropertyValue(`--${k}`).trim(); const o = {}; for (const k of Object.keys(NEON_TOKENS)) o[k] = v(k) || NEON_TOKENS[k]; return o; };
+  // light-theme: the Neon code theme keeps neon's colours in LIGHT, where they are the --dk-* tokens
+  const tokens = () => { const cs = getComputedStyle(root), v = k => cs.getPropertyValue(`--dk-${k}`).trim() || cs.getPropertyValue(`--${k}`).trim(); const o = {}; for (const k of Object.keys(NEON_TOKENS)) o[k] = v(k) || NEON_TOKENS[k]; return o; };
   // our :root variables: the panel's ground, the flash, the muted outline; for our themes also the variables Strudel's
   // activateTheme writes for its own (container ground, playing-note outline), after Strudel's style so they win
   const varsEl = (() => { let el = document.getElementById('misk-code-theme-vars'); if (!el) { el = document.createElement('style'); el.id = 'misk-code-theme-vars'; document.head.append(el); } return el; })();

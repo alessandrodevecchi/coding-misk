@@ -12,7 +12,7 @@ The whole app is dark: the neon theme and the hardware theme both sit on near bl
 - **The code panel** uses Light high contrast when the code theme is Automatic (`code-themes`).
 - **Hardware stays dark:** HW has no light variant.
 - **Videos are not affected:** their look and code colours do not depend on the app theme (the code follows the code theme).
-- **Saved, in the backup, reset with the other settings.** An option "follow the system" is an open question.
+- **Saved, in the backup, reset with the other settings.** An option "Follow the system" (off by default) picks LIGHT or NEON from the system preference.
 - **Out of scope:** light versions of the looks, a light hardware theme, a high contrast dark app theme.
 
 ## Capabilities

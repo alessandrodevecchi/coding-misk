@@ -33,7 +33,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     root.innerHTML = `<p class="intro">${esc(t('setIntro'))}</p>
       <div class="set-grid">
         <div class="card set-card"><h3>${esc(t('setLook'))}</h3>
-          ${row(t('setTheme'), seg('data-set-ui', [['neon', 'NEON'], ['hw', 'HW']], app.ui()))}
+          ${row(t('setTheme'), seg('data-set-ui', [['neon', 'NEON'], ['hw', 'HW'], ['light', t('uiLight')]], app.ui()), t('setThemeHint'))}
+          ${row(t('setUiFollow'), seg('data-set-ui-follow', [['1', t('cwYes')], ['0', t('cwNo')]], app.uiFollow() ? '1' : '0'), t('setUiFollowHint'))}
           ${row(t('setLang'), seg('data-set-lang', [['it', 'IT'], ['en', 'EN']], app.lang()))}
           ${row(t('setRadioLook'), `<select id="set-radio-look" data-no-knob>${looks.map(([k, l]) => opt(k, store.get('coding-misk-radio-look', 'palco'), tx(l))).join('')}</select>`, t('setRadioLookHint'))}
           ${row(t('setRender'), `<select id="set-render" data-no-knob>${RENDERS.map(([k, l]) => opt(k, store.get('coding-misk-render', 'normal'), tx(l))).join('')}</select>`, t('setRenderHint'))}
@@ -195,6 +196,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
+    if (b.dataset.setUiFollow) { app.setUiFollow(b.dataset.setUiFollow === '1'); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
     if (b.dataset.setCodeSize) { app.codeTheme.set({ size: b.dataset.setCodeSize }); return render(); }
     if (b.dataset.setCodeDim) { app.codeTheme.set({ dim: b.dataset.setCodeDim === '1' }); return render(); }

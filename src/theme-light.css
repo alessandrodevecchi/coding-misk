@@ -1,0 +1,65 @@
+/* Light app theme (light-theme): a light variant of neon, chosen with LIGHT (it: CHIARO) next to NEON and HW.
+   Same layout and fonts; light ground, dark text and, for each look, an accent pair picked by hand to read on white
+   (npm run check:light-theme checks every pair). The stage stays dark: inside it the tokens go back to neon's (--dk-*),
+   and the video, the live output and the Neon code theme read the --dk-* tokens too, so they do not change.
+   Parts that imitate a device (LCDs, the Soul display, pads, knobs) keep their dark inner screen.
+   Neon and HW never match these rules. */
+
+:root[data-ui="light"] {
+  color-scheme: light;
+  --bg: #f5f3f8; --panel: #ffffff; --panel2: #efecf4; --line: #d4cde0;
+  --ink: #15111d; --muted: #574e66; --a1: #b80f62; --a2: #9a4f00;
+  --s1: #c8102e; --s2: #a34300; --s3: #7a5c00; --s4: #4b4266;
+  /* shared parts that assumed a dark ground (style.css gives them neon's values) */
+  --chip-bg: #ffffff; --danger: #b3123a; --rec: #c4102c; --info: #00648c; --charge: #c4321f; --on-accent: #ffffff;
+  /* the borders of controls (inputs, buttons, chips) reach 3:1 on the panels; dividers stay faint (--line) */
+  --ctl-line: #8b8299; --chip-line: #8b8299;
+  /* neon's tokens, for the dark stage, the video and the Neon code theme */
+  --dk-bg: #0d0818; --dk-panel: #160f26; --dk-panel2: #1f1534; --dk-line: #3a2a5c;
+  --dk-ink: #f3ecff; --dk-muted: #a597c7; --dk-a1: #ff4fa3; --dk-a2: #ffb347; --dk-s3: #ffd23d;
+}
+/* the looks: a light accent pair, and neon's values of that look for the dark parts */
+:root[data-ui="light"][data-look="palco"]       { --a1: #b0105a; --a2: #00687a; --dk-bg: #0a0614; --dk-panel: #140d22; --dk-panel2: #1d1430; --dk-line: #3b2758; --dk-muted: #a491c4; --dk-a1: #ff2e88; --dk-a2: #00e5ff; }
+:root[data-ui="light"][data-look="studio"]      { --a1: #9a4f00; --a2: #b8101f; --dk-bg: #0b0710; --dk-panel: #161019; --dk-panel2: #1f1724; --dk-line: #3e2f3f; --dk-muted: #b8a08e; --dk-a1: #ffb347; --dk-a2: #ff2a3d; }
+:root[data-ui="light"][data-look="edgerunners"] { --a1: #6b5f00; --a2: #00687a; --dk-bg: #0b0410; --dk-panel: #170a1f; --dk-panel2: #221030; --dk-line: #4a1f5c; --dk-muted: #b48fc4; --dk-a1: #fcee0a; --dk-a2: #00f0ff; }
+:root[data-ui="light"][data-look="pixel"]       { --a1: #855c00; --a2: #b0183c; --dk-bg: #0f0f1b; --dk-panel: #191a2e; --dk-panel2: #22233d; --dk-line: #3a3b63; --dk-muted: #9d9ec9; --dk-a1: #ffcc33; --dk-a2: #ff5577; }
+:root[data-ui="light"][data-look="montagne"]    { --a1: #00657f; --a2: #5a3fd0; --dk-bg: #070d1d; --dk-panel: #0e1730; --dk-panel2: #142142; --dk-line: #26386a; --dk-muted: #8fa3cf; --dk-a1: #4fe3ff; --dk-a2: #a98bff; }
+:root[data-ui="light"][data-look="spazio"]      { --a1: #5a42d6; --a2: #a3157c; --dk-bg: #06050d; --dk-panel: #100e1e; --dk-panel2: #18152c; --dk-line: #2d2850; --dk-muted: #9a94c4; --dk-a1: #a495ff; --dk-a2: #ff7ad9; }
+:root[data-ui="light"][data-look="sonar"]       { --a1: #006b47; --a2: #4a6800; --dk-bg: #03110d; --dk-panel: #071c16; --dk-panel2: #0b261e; --dk-line: #174536; --dk-muted: #7fb7a3; --dk-a1: #3dffb0; --dk-a2: #d4ff5a; }
+
+/* the stage stays dark: its overlay (tempo line, look menu, full screen, the soul's keys, the typed comment) takes
+   neon's tokens of the look */
+:root[data-ui="light"] .stagewrap {
+  color-scheme: dark; color: var(--dk-ink);
+  --bg: var(--dk-bg); --panel: var(--dk-panel); --panel2: var(--dk-panel2); --line: var(--dk-line);
+  --ink: var(--dk-ink); --muted: var(--dk-muted); --a1: var(--dk-a1); --a2: var(--dk-a2); --chip-bg: rgba(0,0,0,.45);
+  --ctl-line: var(--dk-line); --chip-line: color-mix(in srgb, var(--dk-ink) 30%, transparent);
+}
+/* the stage framed in a light page */
+:root[data-ui="light"] .stagewrap:not(:fullscreen) { border-color: #b9b0c8; box-shadow: 0 6px 20px rgba(40, 20, 70, .18); }
+
+/* device screens keep neon's colours on their dark glass: the LCD readouts, the Soul display's shell and tab */
+:root[data-ui="light"] :is(.comp-lcd, .sb-rim, .soul-tab, .soul-sock) {
+  --bg: var(--dk-bg); --panel: var(--dk-panel); --panel2: var(--dk-panel2); --line: var(--dk-line);
+  --ink: var(--dk-ink); --muted: var(--dk-muted); --a1: var(--dk-a1); --a2: var(--dk-a2); --ctl-line: var(--dk-line);
+}
+
+/* the logo: the script in the accent, a soft glow */
+:root[data-ui="light"] .logo-script { color: var(--a1); text-shadow: 0 0 6px color-mix(in srgb, var(--a2) 35%, transparent); }
+:root[data-ui="light"] .logo-chrome { -webkit-text-stroke: 1px rgba(40, 20, 70, .35); }
+
+/* text on an accent fill */
+:root[data-ui="light"] .mode-btn[aria-pressed="true"] { color: var(--on-accent); }
+
+/* code outside the editor (lessons, the Guide, the prelude, a pattern's code) follows the code theme's ground */
+:root[data-ui="light"] :is(pre, #pt-code) { background: var(--code-bg, #ffffff); color: var(--code-ink, var(--ink)); }
+
+/* the radio's curves: darker lane colours */
+:root[data-ui="light"] :is(.curves, .curve-tip) [data-lane="density"] { --lane: #00648c; }
+:root[data-ui="light"] :is(.curves, .curve-tip) [data-lane="brightness"] { --lane: #7a5c00; }
+:root[data-ui="light"] :is(.curves, .curve-tip) [data-lane="tension"] { --lane: #c4321f; }
+:root[data-ui="light"] :is(.curves, .curve-tip) [data-lane="voice"] { --lane: #2f6b1f; }
+:root[data-ui="light"] .radio-curve .past-shade { fill: #3a2a5c; opacity: .12; }
+
+/* the FM lab's drawings read the tokens (src/sounds/fm-draw.js): a light ground under them */
+:root[data-ui="light"] :is(.fm-thumb, .fm-wave, .fm-scope canvas) { background: var(--panel2); }
