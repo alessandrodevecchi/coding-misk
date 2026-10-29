@@ -6,8 +6,8 @@ import { withNarratorStyle } from '../song/spoken.js';
 import { compileCompact, compileNow, liftLanes, clipBounds } from '../song/compile-compact.js';
 import { applyComments } from '../song/comments.js';
 import { idiomatic } from '../song/idiom.js';
-import { breakLines, lineLike, chainLines } from '../song/typing.js';
-import { pasteRule } from './typing-load.js';
+import { breakLines, lineLike, chainLines, typingPlan, settleOthers } from '../song/typing.js';
+import { pasteRule, barSeconds } from './typing-load.js';
 import { planWritten } from './written-plan.js';
 import { resolveProfile } from './profiles.js';
 import { rampLists } from '../song/ramps.js';
@@ -197,7 +197,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // (lines-ahead-balanced D2) the plan from the first step after bar 0: lines ahead are typed at growth steps too
   const planAt = bar => (planOn && bar >= (growthAhead ? 1 : returning) ? planOf() : null);
   const codeRaw = (bar, keep) => codeWith(bar, keep, { plan: planAt(bar) });
-  const codeAt = (bar, keep) => codeWith(bar, keep, { plan: planAt(bar), widgets: true });
+  const codeAt = (bar, keep) => { const c = codeWith(bar, keep, { plan: planAt(bar), widgets: true }); return keep || !typedWidgets() ? c : idleWidgets(bar, c); };
   // code widgets: the settings now, the section of a bar, the instrument of each pattern line (from the code before the
   // writer takes the visuals out), and whether a muted line returns within the window (the code at the next steps)
   const widgetsNow = () => { const S = typeof widgets === 'function' ? widgets() : widgets; return S && S.on ? widgetSettings(S) : null; };
@@ -206,6 +206,45 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const instsOf = (before, after) => { const a = chainLines(before).filter(isLine), n = chainLines(after).filter(isLine).length; return a.length === n ? a.map(instrumentOf) : null; };
   const rawMemo = new Map(), unmuted = l => stripWidgets(l).replace(/^(\s*)_\$:/, '$1$:').replace(/\s+/g, '');
   const rawLines = b => { const k = `${b}\u0000${lang()}`; if (!rawMemo.has(k)) { if (rawMemo.size > 400) rawMemo.clear(); rawMemo.set(k, new Set(chainLines(codeWith(b, null, { plan: planAt(b), wrap: false })).filter(l => isLine(l) && !/^\s*_\$:/.test(l)).map(unmuted))); } return rawMemo.get(k); };
+  // D8 (moments 1 and 2): in a growth typed by a person, a widget call new at a step is typed with its line when the
+  // step's typing still fits its time with it; otherwise it waits for a later step with time to spare (a small edit of
+  // the line), and at the latest comes with the next section's first step. The growth and its steps never change.
+  const typedWidgets = () => !!(build.crescendo && C.typist === 'human' && widgetsNow());
+  const sbW = barSeconds(build), secStarts = new Set(); { let a = 0; for (const x of build.sections) { secStarts.add(a); a += x.bars; } }
+  const callsOf = c => { const out = new Set(); for (const l of chainLines(c)) { if (!isLine(l)) continue; const m = l.match(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/); if (m) out.add(`${stripWidgets(l).replace(/\s+/g, '')}|${m[1]}`); } return out; };
+  const keepCalls = (c, allowed) => chainLines(c).map(l => { if (!isLine(l) || !hasCall(l)) return l; const m = l.match(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/); return allowed.has(`${stripWidgets(l).replace(/\s+/g, '')}|${m[1]}`) ? l : stripWidgets(l); }).join('\n');
+  const hasCall = l => /\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/.test(l);
+  let idleMemo = null;
+  const idlePlan = () => {
+    const key = `${JSON.stringify(widgetsNow())}\u0000${lang()}\u0000${cols()}`;
+    if (idleMemo && idleMemo.key === key) return idleMemo;
+    const bars = stepBars(), allowedAt = new Map();
+    let allowed = new Set(), prevCode = '', prevBar = 0;
+    for (const b of bars) {
+      const want = codeWith(b, null, { plan: planAt(b), widgets: true }), desired = callsOf(want);
+      // calls already shown stay while their line wants them; new ones are tried
+      const kept = new Set([...allowed].filter(x => desired.has(x))), fresh = [...desired].filter(x => !kept.has(x));
+      let next = kept;
+      if (fresh.length) {
+        const all = new Set([...kept, ...fresh]);
+        if (b === 0 || secStarts.has(b)) next = all;
+        else {
+          const avail = Math.max(0.2, (b - prevBar - 0.5) * sbW - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
+          const need = to => { const from = settleOthers(prevCode, to, b); return from === to ? 0 : typingPlan(from, to, { style: 'human', lean: true, seed: build.id || '', notes: false }).natural; };
+          // (a widget never makes a step rushed)
+          next = need(keepCalls(want, all)) <= usable ? all : kept;
+        }
+      }
+      allowed = next; allowedAt.set(b, allowed); prevCode = keepCalls(want, allowed); prevBar = b;
+    }
+    idleMemo = { key, bars, allowedAt };
+    return idleMemo;
+  };
+  const idleWidgets = (bar, c) => {
+    const P = idlePlan(); let s = null;
+    for (const b of P.bars) { if (b > bar) break; s = b; }
+    return s === null ? c : keepCalls(c, P.allowedAt.get(s));
+  };
   // (a line edited while muted, reused-lines D4, returns in another form: a line of the next steps like it, by words,
   // that does not play now, counts as its return)
   const returnsWithin = (line, bar, win) => {

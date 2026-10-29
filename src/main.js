@@ -4483,6 +4483,8 @@ function timelineNow(cyc) {
 }
 const video = createVideo({
   visuals, store, t, esc,
+  // code-widgets D11: the widgets drawn in the page (never in a fast video, whose code is not the page's)
+  getWidgets: () => { const S = cwSettings(), M = globalThis.miskWidgetCanvases; if (fv || !S.on || !M) return null; return { dim: S.dim, canvas: (type, i) => { const k = `_widget__${type}_${i}`; for (const [id, c] of M) if (id.endsWith(k)) return c; return null; } }; },
   soulFrame: (cyc, playing, scale) => soul.frame(cyc, playing, scale),
   soulView: () => soul.shown,
   getCode: () => (fv ? fv.code : (ed && ed.code) || ''),

@@ -36,7 +36,7 @@ const CHECKS = {
     assert(extOf('video/mp4;codecs=avc1') === 'mp4' && extOf('video/webm;codecs=vp9') === 'webm', 'ext');
   },
   'title card: always, at the start, never'() {
-    assert(CARDS.length === 3 && LAYOUTS.length === 9 && LAYOUTS.slice(0, 3).join() === 'visual,code,tab', 'lists');
+    assert(CARDS.length === 3 && LAYOUTS.length === 10 && LAYOUTS.slice(0, 4).join() === 'visual,code,code-widgets,tab', 'lists');
     assert(cardAlpha('always', 100, 0) === 1 && cardAlpha('off', 1, 0) === 0, 'always and off');
     assert(cardAlpha('start', 3, 0) === 1 && cardAlpha('start', CARD_SECONDS + 1, 0) === 0 && cardAlpha('start', 0.1, 0) < 1, 'start fades in and out');
   },

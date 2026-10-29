@@ -1,7 +1,7 @@
 // Video recorder (#27): a frame drawn by the app at a fixed size (the stage, the code typing itself, the soul panel,
 // a title card) recorded together with the master audio; or the whole browser tab, captured as it is.
 // The frame is drawn after each stage frame, so it follows the music exactly as the stage does.
-import { QUALITIES, VIDEO_DEFAULTS, LAYOUTS, TIMELINE_LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
+import { withWidgets, QUALITIES, VIDEO_DEFAULTS, LAYOUTS, TIMELINE_LAYOUTS, CARDS, layoutAreas, pickMime, extOf, cardAlpha } from './layout.js';
 import { liveAreas, lerpAreas, ease, presetOf, TRANSITION, timelineWindow } from '../live/presets.js';
 import { drawTimeline, drawColumn, futureShown } from '../live/timeline.js';
 import { fragmentAreas, soulFocus, coverOffset } from './layout.js';
@@ -16,7 +16,8 @@ const LIVE_KEY = 'coding-misk-live-preset';
 // soulFrame(cyc, playing, scale): the soul screen always (the live picture's soul views, #52)
 // getTimeline(cyc): { shape, bar, live } of the song on air, for the timeline views (#65), or null
 // getHighlights(): true when the playing notes light up in the code (performance-profiles)
-export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
+// getWidgets(): { canvas(type, index), dim } of the code widgets drawn in the page now, or null (code-widgets D11)
+export function createVideo({ getWidgets = () => null, visuals, getCode, getInfo, getSay, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });
   const cv = document.createElement('canvas');
@@ -32,7 +33,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
   function renderBar() {
     if (!job) { bar.hidden = true; return; }
     bar.hidden = job.layout === 'tab';
-    const o = opts(), soulBtn = job.layout === 'code' && getSoul() ? `<button class="chip" data-vid="soul" aria-pressed="${o.soulPanel}">${esc(t(o.soulPanel ? 'vidSoulFold' : 'vidSoulOpen'))}</button>` : '';
+    const o = opts(), soulBtn = (job.layout === 'code' || job.layout === 'code-widgets') && getSoul() ? `<button class="chip" data-vid="soul" aria-pressed="${o.soulPanel}">${esc(t(o.soulPanel ? 'vidSoulFold' : 'vidSoulOpen'))}</button>` : '';
     bar.innerHTML = `<span class="vid-dot" aria-hidden="true"></span><span class="vid-time" data-vid-time></span>${soulBtn}<button class="chip" data-vid="stop">${esc(t('vidStop'))}</button><button class="chip" data-vid="cancel">${esc(t('vidCancel'))}</button>`;
     bar.prepend(preview);
     job.soulShown = !!soulBtn;
@@ -72,7 +73,8 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
     return out;
   }
   // co: { mode: 'follow' | 'scroll' | 'focus', progress 0..1 (scroll), section: the section playing (focus), cyc }
-  function drawCode(A, P, now, frameH, co = null) {
+  // widgets (code-widgets D11): the code widgets of the page copied below their lines, dimmed on muted lines
+  function drawCode(A, P, now, frameH, co = null, widgets = false) {
     const src = getCode() || '';
     if (src !== code) {
       let i = 0; while (i < src.length && i < code.length && src[i] === code[i]) i++;
@@ -107,9 +109,11 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
       pos += ln.length + 1;
     }
     if (!caret) caret = { row: rows.length - 1, col: 0 };
-    const fit = Math.floor((A.h - head) / lh), maxScroll = Math.max(0, rows.length - fit);
+    // the code widgets below their lines: each row's place in rows, with the widgets' heights in between
+    const W = widgets ? codeWidgets(lines, rows, A.w - padX * 2, fs) : null, at = k => (W ? W.pos[k] : k);
+    const fit = Math.floor((A.h - head) / lh), maxScroll = Math.max(0, (W ? W.total : rows.length) - fit);
     // the row being edited sits in the upper third, when the code is longer than the panel
-    let want = Math.max(0, Math.min(maxScroll, caret.row - Math.floor(fit / 3)));
+    let want = Math.max(0, Math.min(maxScroll, at(caret.row) - Math.floor(fit / 3)));
     // fragments (#57): scroll through all the code, or focus on the lines of the section playing
     let active = null;
     if (co && co.mode === 'scroll') want = maxScroll * Math.max(0, Math.min(1, co.progress || 0));
@@ -121,7 +125,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
         // the blocks of the section, one after another every two bars
         const blocks = [...on].filter(i => !on.has(i - 1)), li = blocks[Math.floor((co.cyc || 0) / 2) % blocks.length];
         const row = rows.findIndex(r => r.li === li);
-        if (row >= 0) want = Math.max(0, Math.min(maxScroll, row - Math.floor(fit / 3)));
+        if (row >= 0) want = Math.max(0, Math.min(maxScroll, at(row) - Math.floor(fit / 3)));
       }
     }
     let scroll = scrolls.get(g.canvas) ?? want;
@@ -130,7 +134,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
     // the active lines glow, a little brighter on every beat
     if (active) {
       const beat = 1 - ((co.cyc || 0) * 4 % 1);
-      rows.forEach((r, k) => { if (!active.has(r.li)) return; const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return; g.fillStyle = P.a1; g.globalAlpha = (A.a ?? 1) * (.12 + .14 * beat); g.fillRect(A.x + 4, y - fs * 1.02, A.w - 8, lh); g.globalAlpha = A.a ?? 1; g.fillStyle = P.a1; g.fillRect(A.x + 4, y - fs * 1.02, Math.max(3, fs * .18), lh); });
+      rows.forEach((r, k) => { if (!active.has(r.li)) return; const y = y0 + at(k) * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return; g.fillStyle = P.a1; g.globalAlpha = (A.a ?? 1) * (.12 + .14 * beat); g.fillRect(A.x + 4, y - fs * 1.02, A.w - 8, lh); g.globalAlpha = A.a ?? 1; g.fillStyle = P.a1; g.fillRect(A.x + 4, y - fs * 1.02, Math.max(3, fs * .18), lh); });
     }
     // highlights: the layers of the instruments that sound glow with their level, and the step that plays in their
     // first pattern string gets a box, in time with the bar (as Strudel's editor marks the playing notes)
@@ -144,7 +148,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
       rows.forEach((r, k) => {
         const L = layerOf[r.li]; if (!L || L.muted) return;
         const level = Math.min(1, (lv[idOf.get(L.start)] || 0) * 2.5); if (level < .05) return;
-        const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
+        const y = y0 + at(k) * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
         g.fillStyle = P.a2 || P.a1; g.globalAlpha = (A.a ?? 1) * .3 * level; g.fillRect(A.x + 4, y - fs * .95, A.w - 8, lh);
         // the step box, in the first string of the layer's first row
         if (r.li !== L.start || r.from > 0) return;
@@ -156,7 +160,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
       g.globalAlpha = A.a ?? 1;
     }
     rows.forEach((r, k) => {
-      const y = y0 + k * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
+      const y = y0 + at(k) * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
       // colours come from the whole line, so a string or comment cut by the wrap keeps its colour
       let x = A.x + padX + r.indent * cw, c = 0;
       for (const [txt, col] of tokens(r.line, P)) {
@@ -167,9 +171,43 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
     });
     // caret after the last edit, blinking once typing stops
     if (now - editAt < 1.2 || Math.floor(now * 2) % 2) {
-      g.fillStyle = P.a1; g.fillRect(A.x + padX + caret.col * cw, y0 + caret.row * lh - fs * .85, Math.max(2, fs * .12), fs * 1.05);
+      g.fillStyle = P.a1; g.fillRect(A.x + padX + caret.col * cw, y0 + at(caret.row) * lh - fs * .85, Math.max(2, fs * .12), fs * 1.05);
+    }
+    if (W) for (const w of W.items) {
+      const y = y0 + (at(w.row) + 1) * lh - fs * .7 + w.dy;
+      if (y > A.y + A.h || y + w.h < A.y + head) continue;
+      g.save();
+      if (w.muted) { g.globalAlpha = (A.a ?? 1) * .4; g.filter = 'grayscale(1)'; }
+      try { g.drawImage(w.canvas, A.x + padX, y, w.w, w.h); } catch (e) {}
+      if (w.muted) { g.filter = 'none'; g.globalAlpha = A.a ?? 1; g.setLineDash([4, 4]); g.strokeStyle = P.muted; g.lineWidth = 1; g.strokeRect(A.x + padX, y, w.w, w.h); }
+      g.restore();
     }
     g.restore();
+  }
+  // the code widgets of the code shown: each call (type, its index among the calls of that type) found among the page's
+  // widgets, drawn at the width of the panel; → { items: [{ row, dy, w, h, canvas, muted }], pos (row → place in rows),
+  // total }
+  function codeWidgets(lines, rows, width, fs) {
+    const G = getWidgets(), lh = Math.round(fs * 1.4), count = {}, extra = new Map(), items = [];
+    if (G) lines.forEach((ln, li) => {
+      for (const m of ln.matchAll(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/g)) {
+        const type = m[1], index = count[type] = (count[type] ?? -1) + 1, canvas = G.canvas(type, index);
+        if (!canvas || !canvas.width) continue;
+        // sizes as in the panel, at the video's font (the panel's is about 14 px)
+        const cssW = parseFloat(canvas.style.width) || canvas.width, cssH = parseFloat(canvas.style.height) || canvas.height;
+        const w = Math.min(width, cssW * fs / 14), h = w * cssH / cssW;
+        let start = li; while (start > 0 && /^\s+\./.test(lines[start])) start--;
+        const row = rows.reduce((a, r, k) => (r.li === li ? k : a), -1);
+        if (row < 0) continue;
+        const dy = extra.get(row) || 0;
+        items.push({ row, dy, w, h, canvas, muted: !!G.dim && /^\s*_\$:/.test(lines[start]) });
+        extra.set(row, dy + h + fs * .4);
+      }
+    });
+    const pos = [];
+    let acc = 0;
+    rows.forEach((r, k) => { pos.push(k + acc); acc += (extra.get(k) || 0) / lh; });
+    return { items, pos, total: rows.length + acc };
   }
   function drawSoul(A, P, open, soulCanvas) {
     // a fragment's main picture (#57): the soul screen cut to cover the box, kept on its view's focus (A.focus)
@@ -245,7 +283,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
   function compose(J, cyc, playing, now) {
     if (TIMELINE_LAYOUTS.includes(J.layout)) { paintLive(liveAreas(J.layout, J.q.w, J.q.h), J.q, cyc, playing, now, 1, { view: J.layout, card: true }); return false; }
     const P = palette(), Q = J.q;
-    const soul = J.layout === 'code' ? getSoul() : null, soulMode = soul ? (opts().soulPanel ? 'open' : 'folded') : null;
+    const soul = J.layout === 'code' || J.layout === 'code-widgets' ? getSoul() : null, soulMode = soul ? (opts().soulPanel ? 'open' : 'folded') : null;
     const A = layoutAreas(J.layout, Q.w, Q.h, soulMode);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
@@ -253,7 +291,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
     drawSay(A.stage);
     drawCard(A.stage, P, getInfo(cyc) || {}, now);
     if (A.soul) drawSoul(A.soul, P, soulMode === 'open', soulMode === 'open' ? soul.canvas(cyc, playing, (A.soul.w - 8) / 1200) : null);
-    if (A.code) drawCode(A.code, P, now, Q.h);
+    if (A.code) drawCode(A.code, P, now, Q.h, null, withWidgets(J.layout));
     return !!soul;
   }
   function frame(cyc, playing) {
@@ -483,7 +521,7 @@ export function createVideo({ visuals, getCode, getInfo, getSay, getSoul, getTim
       const bw = A.soul.w - 8, bh = A.soul.h - A.soul.head - 4;
       drawSoul(A.soul, P, true, soulFrame(cyc, playing, Math.max(.05, Math.min(bw / 1200, bh / 760))));
     }
-    if (A.code.a > .01 && A.code.x < Q.w) drawCode(A.code, P, now, Q.h);
+    if (A.code.a > .01 && A.code.x < Q.w) drawCode(A.code, P, now, Q.h, null, !!(preset && withWidgets(preset.view)));
     // timeline and track column (#65): the song on air, what is coming hidden for live builds unless the preset shows it
     const tlOn = A.timeline && A.timeline.a > .01 && A.timeline.y < Q.h, colOn = A.column && A.column.a > .01 && A.column.x < Q.w;
     if (tlOn || colOn) {

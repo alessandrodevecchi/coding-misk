@@ -37,7 +37,7 @@ Soul display shells (`SHELLS` in `src/soul/shells.js`): `A` MISK/OS 6000, `B` Un
 <!-- /generated -->
 
 <!-- generated:video-options -->
-Video layouts (`LAYOUTS`): `visual`, `code`, `tab`, `visual-tl`, `visual-code-tl`, `code-tl`, `soul-tl`, `visual-float`, `visual-column`. Qualities: `1080p30`, `1080p60`, `720p30`. Title card: `always`, `start`, `off`.
+Video layouts (`LAYOUTS`): `visual`, `code`, `code-widgets`, `tab`, `visual-tl`, `visual-code-tl`, `code-tl`, `soul-tl`, `visual-float`, `visual-column`. Qualities: `1080p30`, `1080p60`, `720p30`. Title card: `always`, `start`, `off`.
 
 Fragments: formats `9:16`, `4:5`, `1:1`, `16:9`; show `visual`, `visual-code`, `visual-soul`, `soul`, `code`; aspect `whole`, `fill`, `16:9`, `4:3`, `1:1`, `4:5`, `9:16`; code mode `focus`, `scroll`, `follow`; files `video`, `audio`, `texts`, `list`.
 
