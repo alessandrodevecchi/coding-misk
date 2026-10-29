@@ -1,7 +1,7 @@
 // Browser checks for fragments (#57): random and timed fragments from a song and from a radio recipe, 1080×1920 files
 // with sound, a timed fragment that sounds as the same stretch of the full song, label numbers that grow, texts and
 // the list saved, the menu and the texts panel, every visual in each vertical layout (screenshots). Needs ffmpeg.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-clips.cjs [shots-dir]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-clips.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), { execFileSync } = require('node:child_process');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -23,7 +23,7 @@ const db = (a, b) => 20 * Math.log10((a.reduce((x, y) => x + y, 0) / a.length) /
   const errors = [], downloads = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('download', d => downloads.push(d));
-  await page.goto('http://localhost:5173/'); await sleep(2000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2000);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['synthwave'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); localStorage.setItem('coding-misk-export-format', JSON.stringify('wav')); localStorage.setItem('coding-misk-export-speed', JSON.stringify('fast')); });
   await page.reload(); await sleep(4000);
   const save = async (re, name) => { const d = downloads.find(x => re.test(x.suggestedFilename())); if (!d) return null; const f = path.join(TMP, name || d.suggestedFilename()); await d.saveAs(f); return f; };

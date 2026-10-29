@@ -2,7 +2,7 @@
 // the control room sees the app and the window (state, beat, pictures), presets with TAKE move the picture with a
 // transition, the window comes back after the app reloads, and closing it gives the stage back. OBS is not needed:
 // without it the control room says so and shows the app's picture.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-live.cjs [shots-dir]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... node tools/check-live.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -18,7 +18,7 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
   const errors = [];
   const watch = (p, tag) => p.on('pageerror', e => errors.push(`${tag}: ${e.message}`));
   watch(page, 'app');
-  await page.goto('http://localhost:5173/'); await sleep(2000);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2000);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['synthwave'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song' })); });
   await page.reload(); await sleep(3500);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
@@ -44,7 +44,7 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
   const room = await ctx.newPage(); watch(room, 'room');
   // a port where no OBS answers, even when OBS runs on this computer
   await page.evaluate(() => localStorage.setItem('coding-misk-obs', JSON.stringify({ host: '127.0.0.1', port: 4499, password: '' })));
-  await room.goto('http://localhost:5173/live.html'); await sleep(3500);
+  await room.goto(`http://localhost:${process.env.PORT || 5173}/live.html`); await sleep(3500);
   const txt = id => room.textContent(`#${id}`);
   check(/alive|vivo/i.test(await txt('lr-pic')), 'the control room sees the picture alive', await txt('lr-pic'));
   check((await txt('lr-title')).length > 0 && /radio/i.test(await txt('lr-src')), 'it shows the song on air from the radio', `${await txt('lr-src')} · ${await txt('lr-title')}`);
