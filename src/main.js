@@ -4,7 +4,7 @@ import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank } from './song/build.js';
+import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks } from './song/build.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
 import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORDS } from './song/spoken.js';
@@ -1846,6 +1846,10 @@ function renderArranger() {
   if (!$('#live-narrator .ico')) $('#live-narrator .vs-lamp').insertAdjacentHTML('afterend', POWER);
   $('#live-narrator').disabled = !on; $('#live-narrator').title = why ? t(why) : t('voiceSwitchTip', { voice: t('narratorLbl') });
   $('#live-narrator-row').classList.toggle('off', !on || narOff);
+  // the Live build off (narrator-ghost-row, Voices note): the block says the song has no narrator, its Sound and
+  // Narrator lines fold (their remembered state comes back with the Live build on)
+  $('#live-narrator-row').classList.toggle('no-live', !on);
+  $('#live-narrator-note').hidden = on;
   const nt = voiceOf(T);
   $('#live-narrator-sub').textContent = nt ? `${t('narratorLbl')} · ${trackLabel(nt)}` : t('narratorLbl');
   $('#live-narrator-style').value = C.narratorStyle || 'auto'; $('#live-narrator-style').disabled = !on || narOff;
@@ -1853,7 +1857,7 @@ function renderArranger() {
   $('#live-narrated').hidden = false; $('#live-narrated').setAttribute('aria-pressed', C.narrated);
   $('#live-narrated').disabled = !crescendo || narOff; $('#live-narrated').title = t(why || (!crescendo ? 'narratedNeedsCrescendo' : narOff ? 'liveNarratedOff' : 'liveNarratedHint'));
   renderSongVoice();
-  renderNarratorParts(why ? t(why) : narOff ? t('voiceOffTip', { voice: t('narratorLbl') }) : '');
+  renderNarratorParts(why ? t(why) : narOff ? t('voiceOffTip', { voice: t('narratorLbl') }) : '', !on);
   // the live build options: a panel under the "Live build" button; with the Live build off it keeps the code options
   // (comments, technical functions, title, lit notes, line breaks: profile-options) under the title "Code"
   lt.setAttribute('aria-expanded', on);
@@ -1922,6 +1926,8 @@ function stripHtml(P) {
 // where a track plays between two bars of the played song (its clips less its silent spans) and its steps there:
 // the build's marks and the bars where it comes in; without a build, where its clips start
 function xSpans(tr, a, b) {
+  // a narrator track: no clips, a tick per line it says there (narrator-ghost-row D2, the marks of the ghost row)
+  if (tr.type === 'voice') return { on: [], ticks: nMarks().filter(x => x.track === tr.id && x.at >= a && x.at < b).map(x => ({ at: x.at, say: x.text, action: 'say' })) };
   let sh = null; try { sh = compiled.doc && compiled.doc.sections && compiled.doc.tracks ? timelineShape(compiled.doc) : null; } catch (e) { sh = null; }
   const st = sh && sh.tracks.find(x => x.id === tr.id); if (!st) return { on: [], ticks: [] };
   let on = (st.clips || []).map(c => [Math.max(a, c.start), Math.min(b, c.start + c.bars)]).filter(([x, y]) => y > x).sort((p, q) => p[0] - q[0]);
@@ -1940,6 +1946,71 @@ function xCell(tr, i, a, b, kind) {
   return `<button class="trk-cell xcell x-${kind}" data-xcell="${i}" data-a="${a}" data-b="${b}" data-ticks="${ticks.map(k => k.at).join(',')}" title="${esc([`${trackLabel(tr)} · ${kind === 'grow' ? growName() : t('endCol')}`, ...tip].join('\n'))}">${on.map(([x, y]) => `<i class="x-on" style="left:${(x - a) / w * 100}%;width:${(y - x) / w * 100}%"></i>`).join('')}${ticks.map(k => `<i class="x-step" style="left:${(k.at - a) / w * 100}%"></i>`).join('')}</button>`;
 }
 const xCells = (P, tr, i, which) => (which === 'grow' ? (P.G ? xCell(tr, i, 0, P.G, 'grow') : '') : P.ending ? xCell(tr, i, P.ending.start, P.ending.start + P.ending.bars, 'ending') : '');
+// ---------- the narrator in the timeline (narrator-ghost-row) ----------
+// the name of the narrator track a first sound edit adds (voice-full-controls D2), and of the ghost row in both
+// languages (Q2), so nothing is renamed when the ghost becomes the track
+const NARRATOR_NAME = 'Narrator';
+// where the narrator speaks in the build that plays (D2): what is heard, from the schedule the code is written from;
+// kept per compiled build, language and samples manifest (the arranger is drawn often)
+const nmarkMemo = new WeakMap();
+function nMarks(c = compiled) {
+  const b = c && !c.pending && c.build; if (!b) return [];
+  const lang = getLang(), m = nmarkMemo.get(b);
+  if (m && m.lang === lang && m.files === customFiles) return m.list;
+  let list = [];
+  try { list = narratorMarks(b, c.ctl || {}, lang, customFiles); } catch (e) { list = []; }
+  nmarkMemo.set(b, { lang, files: customFiles, list });
+  return list;
+}
+const nLine = x => t('nLine', { n: x.at + 1, text: x.text });
+// the ghost narrator row (D3): the song has no narrator track and its narrator can speak (the Live build on, or its own
+// steps); shown empty while the song grows, hidden once built with no line. off: the narrator switched off (dimmed)
+function ghostInfo() {
+  if (T.tracks.some(x => x.type === 'voice')) return null;
+  const lv = liveOf(T);
+  if (!hasBuild(T) && !lv.on) return null;
+  const pending = !!compiled.pending, marks = nMarks();
+  if (!pending && !marks.length) return null;
+  return { marks, pending, off: lv.ctl.narrator === false };
+}
+const ghostTip = g => [t(g.pending ? 'ghostTipPending' : 'ghostTip', { n: g.marks.length }), ...(g.off ? [t('ghostOff')] : [])].join('\n');
+// a ghost cell between two bars of the played song (D4, D5): a written section shows how many lines the narrator says
+// there, the growth and the ending a tick per line; the tooltip lists them; a click goes to the nearest line (a
+// section: its first line), or to the cell's start without one
+function nCell(marks, a, b, kind, name) {
+  const at = marks.filter(x => x.at >= a && x.at < b), w = Math.max(1, b - a), sec = kind === 'sec';
+  const tip = [`${NARRATOR_NAME} · ${name}`, ...at.map(nLine), at.length ? t(sec ? 'ghostReadSec' : 'ghostReadNear') : t('ghostNone')].join('\n');
+  const body = sec ? (at.length ? `❝ ${at.length}` : '') : at.map(x => `<i class="x-step n-step" style="left:${(x.at - a) / w * 100}%"></i>`).join('');
+  return `<button class="trk-cell ncell${sec ? '' : ` xcell x-${kind}`}${at.length ? ' on' : ''}" data-ncell="${kind}" data-a="${a}" data-b="${b}" data-ticks="${at.map(x => x.at).join(',')}" title="${esc(tip)}">${body}</button>`;
+}
+// the round marks of the narrator's lines on a timeline lane of the written bars (from bar g of the played song)
+const nDots = (marks, g, total) => marks.filter(x => x.at >= g && x.at < g + total).map(x => `<button class="n-mark" data-nmark="${x.at}" style="left:${(x.at - g) / total * 100}%" title="${esc(nLine(x))}" aria-label="${esc(`${NARRATOR_NAME} · ${nLine(x)}`)}"></button>`).join('');
+// the ghost row: always the last row, a dashed head with no Mute or Solo, the growth and ending cells aligned (D4)
+function ghostRow(P, cols, view, total, lines = '') {
+  const g = ghostInfo(); if (!g) return '';
+  const head = `<div class="trk-head ghost-head"><button class="trk-name ghost-name" data-nghost title="${esc(ghostTip(g))}"><span class="trk-type">${TYPE_ICON.voice}</span><i>${esc(NARRATOR_NAME)}</i></button></div>`;
+  const grow = P.G ? nCell(g.marks, 0, P.G, 'grow', growName()) : '', end = P.ending ? nCell(g.marks, P.ending.start, P.ending.start + P.ending.bars, 'ending', P.ending.label || t('endCol')) : '';
+  const inW = g.marks.filter(x => x.at >= P.G && x.at < P.G + total);
+  const mid = view === 'timeline'
+    ? `<div class="trk-lane n-lane" data-ncell="lane" data-a="${P.G}" data-b="${P.G + total}" data-ticks="${inW.map(x => x.at).join(',')}" style="--bars:${total}" title="${esc([NARRATOR_NAME, ...inW.map(nLine), t('ghostReadNear')].join('\n'))}">${lines}${nDots(g.marks, P.G, total)}</div>`
+    : T.sections.map((s, j) => nCell(g.marks, secStart(j), secStart(j) + s.bars, 'sec', s.name)).join('');
+  return `<div class="trk-row ghost${g.off ? ' silent' : ''}" data-ghost style="grid-template-columns:${cols}">${head}${grow}${mid}${end}</div>`;
+}
+// the ghost row's name (D5): Voice: narrator in view in the Voices group, its Sound unfolded and focused
+function openNarratorSound() {
+  const row = $('#live-narrator-row'); if (!row) return;
+  const d = row.querySelector('details.vs-part');
+  if (d) d.open = true;
+  row.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  const s = d && d.querySelector('summary'); if (s) s.focus({ preventScroll: true });
+}
+// the Narrator track that takes the ghost row's place flashes once (D6)
+let flashId = null, flashTimer = 0;
+function flashTrack(id) {
+  flashId = id; clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { flashId = null; $$('#arr-grid .trk-row.flash').forEach(r => r.classList.remove('flash')); }, 1200);
+}
+const rowClass = (tr, solo) => `trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}${tr.id === flashId ? ' flash' : ''}`;
 const trkHead = (tr, i) => `<div class="trk-head" data-act-ids="${ACT_IDS[tr.type] || esc((tr.settings && tr.settings.visual) || 'fx')}">
         <button class="trk-name" data-trk="${i}" title="${esc(tr.type)}"><span class="trk-type">${esc(TYPE_ICON[tr.type] || '·')}</span>${esc(trackLabel(tr))}</button>
         <button class="mini" data-mute="${i}" aria-pressed="${!!tr.mute}" title="${esc(t('mute'))}">M</button><button class="mini" data-solo="${i}" aria-pressed="${!!tr.solo}" title="${esc(t('solo'))}">S</button>
@@ -1959,18 +2030,18 @@ function renderCells(total) {
   $('#arr-strip').style.gridTemplateColumns = cols;
   $('#arr-strip').innerHTML = stripHtml(P);
   const solo = T.tracks.some(tr => tr.solo);
-  $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}" style="grid-template-columns:${cols}" aria-current="${i === tk}">
+  $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="${rowClass(tr, solo)}" style="grid-template-columns:${cols}" aria-current="${i === tk}">
       ${trkHead(tr, i)}${xCells(P, tr, i, 'grow')}${T.sections.map((s, j) => {
-        // a voice track: how many comments it speaks in the section
+        // a voice track: how many lines the narrator says in the section, as heard (narrator-ghost-row D2)
         if (tr.type === 'voice') {
-          const a = secStart(j), lines = compiled.build ? buildSteps(compiled.build).filter(x => x.say && x.at >= a && x.at < a + s.bars && voiceOf(T, x) === tr) : [];
-          return `<button class="trk-cell voice${lines.length ? ' on' : ''}" data-cell="${i}:${j}" aria-current="${i === tk && j === sel}" title="${esc(lines.map(x => `${t('liveMark', { n: x.at + 1 })} · ${sayText(x.say, getLang())}`).join('\n') || `${trackLabel(tr)} · ${s.name}`)}">${lines.length ? `❝ ${lines.length}` : ''}</button>`;
+          const a = secStart(j), lines = nMarks().filter(x => x.track === tr.id && x.at >= a && x.at < a + s.bars);
+          return `<button class="trk-cell voice${lines.length ? ' on' : ''}" data-cell="${i}:${j}" aria-current="${i === tk && j === sel}" title="${esc([`${trackLabel(tr)} · ${s.name}`, ...lines.map(nLine)].join('\n'))}">${lines.length ? `❝ ${lines.length}` : ''}</button>`;
         }
         const c = cellOf(tr, j);
         const cls = !c ? '' : c.clip ? ' on' : ' custom';
         const label = !c ? '' : c.clip ? esc(c.clip.pattern) + (c.clip.set ? '*' : '') : '≈';
         return `<button class="trk-cell${cls}" data-cell="${i}:${j}" aria-current="${i === tk && j === sel}" title="${esc(`${trackLabel(tr)} · ${s.name}`)}">${label}</button>`;
-      }).join('')}${xCells(P, tr, i, 'ending')}</div>`).join('') + '<span class="head"></span>';
+      }).join('')}${xCells(P, tr, i, 'ending')}</div>`).join('') + ghostRow(P, cols, 'sections', total) + '<span class="head"></span>';
 }
 // vista timeline: clip liberi su una corsia continua, larghezza proporzionale alle battute
 const clipLabel = c => esc(c.pattern) + (c.set ? '*' : '');
@@ -1989,12 +2060,12 @@ function renderTimeline(total) {
   const solo = T.tracks.some(tr => tr.solo), bmap = compiled.build ? shownBuildMap(total) : null;
   const lines = st.slice(1).map(b => `<i class="sec-line" style="left:${b / total * 100}%"></i>`).join('');
   const cols = `var(--trk-col)${growColW(P)} minmax(0, ${total}fr)${endColW(P, '0px')}`;
-  $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}" style="grid-template-columns:${cols}" aria-current="${i === tk}">
+  $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="${rowClass(tr, solo)}" style="grid-template-columns:${cols}" aria-current="${i === tk}">
       ${trkHead(tr, i)}${xCells(P, tr, i, 'grow')}
-      <div class="trk-lane" data-lane="${i}" style="--bars:${total}" title="${esc(t('laneAdd'))}">${lines}${liveLayer(bmap, tr, total)}${spans(tr).map(({ c, s: a, e: b }) => {
+      <div class="trk-lane" data-lane="${i}" style="--bars:${total}" title="${esc(t('laneAdd'))}">${lines}${tr.type === 'voice' ? nDots(nMarks().filter(x => x.track === tr.id), P.G, total) : liveLayer(bmap, tr, total)}${spans(tr).map(({ c, s: a, e: b }) => {
         const k = tr.clips.indexOf(c);
         return `<button class="clip${isWhole(c) ? '' : ' free'}" data-clip="${i}:${k}" aria-current="${i === tk && k === selClip}" style="left:${a / total * 100}%;width:${(b - a) / total * 100}%" aria-label="${esc(`${trackLabel(tr)} · ${t('cBars', { from: a + 1, to: b })} · ${t('cPattern', { p: c.pattern })}`)}">${clipLabel(c)}<span class="clip-grip" data-grip aria-hidden="true"></span></button>`;
-      }).join('')}</div>${xCells(P, tr, i, 'ending')}</div>`).join('') + '<span class="head"></span>';
+      }).join('')}</div>${xCells(P, tr, i, 'ending')}</div>`).join('') + ghostRow(P, cols, 'timeline', total, lines) + '<span class="head"></span>';
 }
 function renderSectionPanel(total) {
   const sc = SEC();
@@ -2025,6 +2096,19 @@ const TYPE_ICON = { drums: '◉', bass: '▁', guitar: '⚡', arp: '⋰', hook: 
 
 // clic sulla griglia: nome traccia, mute, solo, cella (seleziona sezione e traccia; se suona salta lì)
 $('#arr-grid').addEventListener('click', e => {
+  // the narrator's marks and the ghost row (narrator-ghost-row D5): a mark goes to its line, a ghost cell to the line
+  // nearest to the click (a section: its first line; none: the cell's start), the name to Voice: narrator. No track
+  // is selected: the ghost has no track panel
+  if (e.target.closest('[data-nghost]')) return openNarratorSound();
+  const nm = e.target.closest('[data-nmark]');
+  if (nm) return seekTo(+nm.dataset.nmark);
+  const nc = e.target.closest('[data-ncell]');
+  if (nc) {
+    const a = +nc.dataset.a, b = +nc.dataset.b, r = nc.getBoundingClientRect(), ticks = nc.dataset.ticks ? nc.dataset.ticks.split(',').map(Number) : [];
+    const at = a + Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width))) * (b - a);
+    const bar = !ticks.length ? a : nc.dataset.ncell === 'sec' ? ticks[0] : ticks.reduce((p, q) => (Math.abs(q - at) < Math.abs(p - at) ? q : p));
+    return seekTo(Math.max(0, Math.min(playMap().bars - 1, bar)));
+  }
   const m = e.target.closest('[data-mute]'), s = e.target.closest('[data-solo]');
   if (m) { const tr = T.tracks[+m.dataset.mute]; tr.mute = !tr.mute || undefined; changed(); return; }
   if (s) { const tr = T.tracks[+s.dataset.solo]; tr.solo = !tr.solo || undefined; changed(); return; }
@@ -2081,10 +2165,10 @@ function setClipSpan(tr, c, start, bars) {
 let drag = null;
 $('#arr-grid').addEventListener('pointerdown', e => {
   if (arrMode !== 'timeline' || e.button !== 0) return;
-  const lane = e.target.closest('.trk-lane'); if (!lane) return;
+  const lane = e.target.closest('.trk-lane'); if (!lane || lane.dataset.lane === undefined) return;
   const i = +lane.dataset.lane, tr = T.tracks[i], rect = lane.getBoundingClientRect(), total = songBars();
-  // a voice track has no clips: it speaks on the steps of the live build
-  if (tr.type === 'voice') return;
+  // a voice track has no clips: it speaks on the steps of the live build (the ghost narrator row has no lane index)
+  if (!tr || tr.type === 'voice') return;
   const barAt = x => (x - rect.left) / rect.width * total;
   const clipEl = e.target.closest('[data-clip]');
   if (!clipEl) {
@@ -2491,6 +2575,8 @@ const VOICE_FOLDS = 'coding-misk-voice-folds';
 const foldOpen = id => !!(store.get(VOICE_FOLDS, {}) || {})[id];
 document.addEventListener('toggle', e => {
   const d = e.target; if (!d || !d.dataset || !d.dataset.vfold) return;
+  // (parts folded because the Live build is off keep the state the user left them in)
+  if (d.closest('.no-live')) return;
   const f = store.get(VOICE_FOLDS, {}) || {};
   if (d.open) f[d.dataset.vfold] = true; else delete f[d.dataset.vfold];
   store.set(VOICE_FOLDS, f);
@@ -2503,13 +2589,14 @@ function drawPart(box, sig, html, sync = null) {
 const narratorSettings = () => ({ ...VOICE_DEFAULT, ...((voiceOf(T) || {}).settings || {}) });
 // the narrator block's folded parts: its Sound (the narrator track's settings, the default sound without one) and the
 // list of its lines in the build that plays
-function renderNarratorParts(off) {
+// noLive: the Live build is off, the narrator cannot speak: both parts folded (narrator-ghost-row, Voices note)
+function renderNarratorParts(off, noLive = false) {
   const box = $('#live-narrator-parts'); if (!box) return;
   const tr = voiceOf(T), v = narratorSettings();
   drawPart(box, `parts:${getLang()}`, () => '<div class="vb-sound"></div><div class="vb-nlines"></div>');
-  drawPart(box.querySelector('.vb-sound'), JSON.stringify([getLang(), off, tr ? tr.id : '']), () => voiceSoundHtml({ voice: 'narrator', settings: v, t, esc, off, open: foldOpen('compose-narrator-sound') }),
+  drawPart(box.querySelector('.vb-sound'), JSON.stringify([getLang(), off, tr ? tr.id : '', noLive]), () => voiceSoundHtml({ voice: 'narrator', settings: v, t, esc, off, open: !noLive && foldOpen('compose-narrator-sound') }),
     b => syncVoiceSound(b, { voice: 'narrator', settings: v, t, off }));
-  const el = box.querySelector('.vb-nlines'), html = narratorLinesHtml(off);
+  const el = box.querySelector('.vb-nlines'), html = narratorLinesHtml(off, noLive);
   if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; }
 }
 // The narrator's lines (voice-full-controls, spec "Phrase list of the narrator"): the step lines of the build that
@@ -2518,15 +2605,17 @@ function renderNarratorParts(off) {
 function narratorLines() {
   const b = compiled && compiled.build, lv = liveOf(T), grows = lv.on && lv.style === 'crescendo';
   const own = hasBuild(T) && !grows;
-  const steps = b && !compiled.pending ? buildSteps(b).filter(x => x.say) : [];
+  // (lines a build makes: the ones heard, as the timeline marks them, narrator-ghost-row Q1; written steps: each
+  // step's line, edited in place)
+  const steps = !b || compiled.pending ? [] : own ? buildSteps(b).filter(x => x.say) : nMarks().map(x => ({ at: x.at, say: x.text, i: -1 }));
   return { steps, own, grows, on: !!b };
 }
-function narratorLinesHtml(off) {
+function narratorLinesHtml(off, noLive = false) {
   const { steps, own, grows, on } = narratorLines(), lang = getLang(), dis = off ? ' disabled' : '';
   const why = !on ? t('narratorNeedsLive') : own ? t('nlOwn') : t(grows ? 'nlGrown' : 'nlDerived');
   const rows = steps.map(x => `<div class="pl-row nl-row" data-nl-step="${x.i}"><div class="pl-bar"><span class="pl-said">${esc(t('liveMark', { n: x.at + 1 }))}</span></div>
       <div class="pl-text">${own ? `<input type="text" data-nl-text maxlength="80" autocomplete="off" spellcheck="false" value="${esc(sayText(x.say, lang))}" aria-label="${esc(t('plText'))}"${dis}>` : `<span>${esc(sayText(x.say, lang))}</span>`}</div></div>`).join('');
-  const open = foldOpen('compose-narrator-lines');
+  const open = !noLive && foldOpen('compose-narrator-lines');
   return `<details class="voice-part" data-vfold="compose-narrator-lines"${open ? ' open' : ''}><summary><span class="lbl">${esc(t('nlTitle'))}</span> <span class="vs-sum">${esc(`${steps.length} · ${own ? t('nlOwnShort') : t('nlReadOnly')}`)}</span></summary>
     <p class="hint muted small">${esc(why)}</p><div class="pl nl">${rows}</div></details>`;
 }
@@ -2728,7 +2817,7 @@ for (const host of ['#live-voices', '#track-panel']) for (const type of ['click'
 const phrasesSummary = sp => [String((sp.clips || []).length), ...trackVoice(sp).where.map(w => t(`vinstWhere:${w}`))].join(' · ');
 // One value per control (voice-full-controls D1): every place that shows a voice's sound writes its track's settings
 // here. A song without a narrator track gets one, named Narrator, on the first edit (D2), with Undo.
-const NARRATOR_NAME = 'Narrator';
+// (NARRATOR_NAME: the track's name, the ghost row's too, defined with the narrator in the timeline)
 function newNarratorTrack() {
   const ids = new Set(T.tracks.map(x => x.id));
   let id = 'narrator', k = 2;
@@ -2739,7 +2828,8 @@ function setVoiceSetting(voice, patch, { undo = false } = {}) {
   let tr = voice === 'narrator' ? voiceOf(T) : songSpoken();
   if (!tr && voice !== 'narrator') return;
   const before = JSON.parse(JSON.stringify(T.tracks)), added = !tr;
-  if (!tr) { tr = newNarratorTrack(); T.tracks.push(tr); }
+  // (the new track takes the ghost row's place, last in the timeline, and flashes once: narrator-ghost-row D6)
+  if (!tr) { tr = newNarratorTrack(); T.tracks.push(tr); flashTrack(tr.id); }
   tr.settings = { ...VOICE_DEFAULT, ...(tr.settings || {}) };
   for (const [k, v] of Object.entries(patch)) setSetting(k, v, tr);
   changed();
@@ -3191,7 +3281,7 @@ function previewBtn(tr) { const on = !!(preview && preview.state && preview.stat
 // for the browser checks (tools/check-preview.cjs)
 globalThis.codingMiskPreview = preview;
 // (and what the bar counter counts: the song in Compose, written or grown, and the song playing)
-globalThis.codingMiskBars = () => ({ compose: { bars: compiled.meta.bars, pending: !!compiled.pending, growth: growBars(), cue: cueBar(), map: (({ pre, G, W, end, bars, ending, steps }) => ({ pre, G, W, end, bars, ending, steps, view: growView, sel, tk }))(playMap()), follow: { on: follow, held: followHeld(), scrolls: knobFollow.scrolls } }, song: song && song.meta ? { id: song.id, bars: song.meta.bars, loop: !!song.loop } : null });
+globalThis.codingMiskBars = () => ({ compose: { bars: compiled.meta.bars, pending: !!compiled.pending, growth: growBars(), cue: cueBar(), map: (({ pre, G, W, end, bars, ending, steps }) => ({ pre, G, W, end, bars, ending, steps, view: growView, sel, tk }))(playMap()), follow: { on: follow, held: followHeld(), scrolls: knobFollow.scrolls }, narrator: (g => ({ ghost: !!g, off: g ? g.off : null, pending: g ? g.pending : null, marks: nMarks().map(({ at, text, track }) => ({ at, text, track })) }))(ghostInfo()) }, song: song && song.meta ? { id: song.id, bars: song.meta.bars, loop: !!song.loop } : null });
 // the styles a pattern saved from a song with no style tags links (pattern-followups D1): its artist's, or the styles
 // its style line names
 const songStyleFallback = () => fallbackStyles(T, { recipes: RECIPES, artists: [...BUILTIN_ARTISTS, ...(store.get('coding-misk-artists', []) || [])] });

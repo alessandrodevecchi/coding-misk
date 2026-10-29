@@ -25,11 +25,11 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 | Growth shapes, Crescendo, profiles, typing, growth in Compose (`composeCompiled`, the Compose worker, `src/live/growth-store.js`, the growth hash in `vite.config.js`) | `check:crescendo -- --full`, `check:profiles`, `check:live-code`, `check:typing`, `check:functions`, `check:durations`; `growth:probe` to measure | `check-crescendo-play.cjs`, `check-hand.cjs`, `check-growth-background.cjs`, `check-startup.cjs` |
 | App functions, the writer | `check:functions`, `check:strudel`, `check:live-code` | `check-compact-code.cjs` |
 | The hidden mixer and the code views (`src/song/writer.js`, `src/live/live-code.js`, `src/live/air-code.js`, `src/song/compile-compact.js`, `compileNow`) | `check:mixer` (quick; `--full` before a merge to main), `check:live-code`, `check:functions` | `check-compact-code.cjs` |
-| The voice | `check:spoken`, `check:endless` | `check-spoken-play.cjs` |
+| The voice (and `narratorMarks`, the timeline's narrator marks) | `check:spoken`, `check:endless` | `check-spoken-play.cjs`, `check-voices.cjs`, `check-timeline.cjs` |
 | Export, video, fragments | `check:export`, `check:video`, `check:clips` | `check-export.cjs`, `check-video.cjs`, `check-clips.cjs` |
 | Library, playlists, trash, settings, startup, card lengths (`src/live/card-duration.js`) and song configuration (`src/live/song-config.js`) | `check:durations`, `check:profiles`, `check:song-filter`, `check:playlists`, `check:trash`, `check-backup.mjs` | `check-songs-tab.cjs`, `check-playlists.cjs`, `check-settings.cjs`, `check-startup.cjs`, `check-song-config.cjs` |
 | Interface text or the Guide | `check:guide` | `check-modes.cjs` |
-| The Compose arranger, ruler and seeking (`playMap`, the growth and ending columns) | `check:guide` | `check-timeline.cjs`, `check-preview.cjs`, `check-player.cjs`, `check-hand.cjs` |
+| The Compose arranger, ruler and seeking (`playMap`, the growth and ending columns, the ghost narrator row) | `check:guide` | `check-timeline.cjs`, `check-preview.cjs`, `check-player.cjs`, `check-hand.cjs` |
 | Anything a note or a recipe describes | `check:knowledge` | |
 | Strudel version, sounds | `catalog:strudel`, `check:strudel`, `check:sound-guard` | `check-sounds.cjs`, `check-style-sounds.cjs` |
 | The generator, app functions, the writer (Strudel the app writes) | `catalog:strudel`, then `knowledge` | |

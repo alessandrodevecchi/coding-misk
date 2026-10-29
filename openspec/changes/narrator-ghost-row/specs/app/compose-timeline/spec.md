@@ -11,12 +11,12 @@ When the open song has no track of type voice and its narrator can speak (the Li
 
 ### Requirement: Where the narrator speaks
 
-The ghost row SHALL show where the narrator's lines are heard: a count per written section in the sections view, a mark per line in the timeline view, and a tick per line in the growth and ending cells. Each cell's tooltip SHALL list the bars and texts of its lines.
+The ghost row SHALL show where the narrator's lines are heard, from the same schedule the code speaks them from (the poetic images, no line where the voice instrument speaks, none without a sample): a count per written section in the sections view, a mark per line in the timeline view, and a tick per line in the growth and ending cells. Each cell's tooltip SHALL list the bars and texts of its lines.
 
 #### Scenario: Grown song without a narrator track
 
 - **WHEN** luci-rosse is open in Compose in Live coder and has no narrator track
-- **THEN** a ghost Narrator row follows the Riser row, its growth cell has a tick for each of the 19 narrator lines of the growth, and the written sections where the narrator speaks show their count
+- **THEN** a ghost Narrator row follows the Riser row, its growth cell has a tick for each of the 17 narrator lines heard in the growth (19 in the song), and the written sections where the narrator speaks show their count
 
 #### Scenario: Tooltip of a section
 
@@ -41,6 +41,15 @@ The ghost row SHALL NOT be part of the song: the song's tracks, its code, its so
 
 - **WHEN** the user switches Voice: narrator off
 - **THEN** the ghost row stays, dimmed, and its tooltip says the narrator is off
+
+### Requirement: The narrator track shows the same marks
+
+A narrator track row SHALL show its lines from the same source as the ghost row: a count per written section, a tick per line in the growth and ending cells, and a round mark per line on the timeline lane.
+
+#### Scenario: Poetic style
+
+- **WHEN** a song with a narrator track builds live with the poetic narrator style
+- **THEN** its row marks the bars where the poetic images are said, not the bars of the step lines
 
 ### Requirement: Ghost row clicks
 

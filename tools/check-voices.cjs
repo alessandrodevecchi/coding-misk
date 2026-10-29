@@ -4,7 +4,9 @@
 // edits, a Narrator track added on the first edit with Undo, looking adds nothing), disabled with the reason; the phrase
 // list of the voice track (sorted rows, text and bars edited in place with Undo, Fill with, + Add line, the bin, the
 // last row) with heard bars in Crescendo (a typed bar stored as written, a bar in the growth refused); the narrator's
-// lines (read-only in Crescendo, editable for written steps); Where; no "In the next song" row (new-song-panel D9: the New song panel has its own Voci). Radio: the Voices group for the
+// lines (read-only in Crescendo, editable for written steps); Where; the narrator block with the Live build off (a note,
+// Sound and Narrator lines folded, the user's state back with it on: narrator-ghost-row); the ghost narrator row replaced
+// by the Narrator track on the first edit and back on Undo; no "In the next song" row (new-song-panel D9: the New song panel has its own Voci). Radio: the Voices group for the
 // next songs (two blocks, switches, How often without Mai and with Sempre, a saved Mai and an old Custom profile with
 // the narrator off, presets that keep Sempre, the Sound parts, Fill with, no on-air button). Italian labels.
 // Screenshots of each part when a folder is given.
@@ -56,6 +58,35 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(v.shown && v.label === 'Voices' && v.sub === 'Voice: narrator' && v.switchTxt === 'On' && v.vinst && !v.next, 'Live build off: the Voices group shows the Voice: narrator block with its On switch and the voice track, without the next song row', JSON.stringify(v));
   check(v.narratorOff && v.styleOff && v.narratedOff && v.soundOff && /Live build/.test(v.narratorTip) && /Live build/.test(v.soundTip), 'Live build off: the switch, the style, Narrated growth and the Sound controls are disabled, the tooltip says the song does not build live', `${v.narratorTip} | ${v.soundTip}`);
   await shot('#live-voices', 'compose-voci-live-spento.png');
+  // the Live build off (narrator-ghost-row): a note in the block, Sound and Narrator lines folded; on again, the user's
+  // open or closed state comes back; a song opened with it off opens folded
+  const folds = () => page.evaluate(() => ({ note: (n => (n && !n.hidden ? n.textContent : ''))(document.querySelector('#live-narrator-note')), open: [...document.querySelectorAll('#live-narrator-parts details')].map(d => d.open), stored: JSON.parse(localStorage.getItem('coding-misk-voice-folds') || '{}') }));
+  let f = await folds();
+  check(f.note === 'This song has no narrator: turn on the Live build to hear it.' && f.open.length === 2 && f.open.every(x => !x), 'Live build off: the narrator block says the song has no narrator, Sound and Narrator lines folded', JSON.stringify(f));
+  await live('classic');
+  check(!(await folds()).note, 'Live build on: no note');
+  await page.evaluate(() => { for (const s of document.querySelectorAll('#live-narrator-parts details > summary')) s.click(); }); await sleep(400);
+  f = await folds();
+  check(f.open.every(Boolean) && f.stored['compose-narrator-sound'] && f.stored['compose-narrator-lines'], 'Live build on: Sound and Narrator lines opened by the user, remembered', JSON.stringify(f.stored));
+  await page.click('#live-toggle'); await sleep(800);
+  f = await folds();
+  check(f.note && f.open.every(x => !x) && f.stored['compose-narrator-sound'] && f.stored['compose-narrator-lines'], 'Live build turned off: both parts fold, the note shows, the user\'s state is kept', JSON.stringify(f));
+  await page.evaluate(() => { document.querySelector('#live-narrator-parts details.vs-part').open = true; }); await sleep(300);
+  check((await folds()).stored['compose-narrator-sound'] === true, 'a part opened while the Live build is off does not change the remembered state');
+  await page.evaluate(() => { document.querySelector('#live-narrator-parts details.vs-part').open = false; }); await sleep(300);
+  check((await folds()).stored['compose-narrator-sound'] === true, 'a part closed while the Live build is off does not change the remembered state either');
+  await page.click('#live-toggle'); await sleep(800);
+  f = await folds();
+  check(!f.note && f.open.every(Boolean), 'Live build on again: Sound and Narrator lines open as the user left them', JSON.stringify(f.open));
+  await page.click('#live-toggle'); await sleep(800);
+  await open('primo-segnale'); await open('luci-rosse');
+  f = await folds();
+  check(f.note && f.open.every(x => !x), 'a song opened with the Live build off: folded, with the note', JSON.stringify(f.open));
+  // (back to the default: folded)
+  await page.evaluate(() => localStorage.removeItem('coding-misk-voice-folds'));
+  await live('classic');
+  await page.evaluate(() => { for (const d of document.querySelectorAll('#live-narrator-parts details')) d.open = false; }); await sleep(300);
+  await page.click('#live-toggle'); await sleep(800);
   await live('classic');
   v = await voices();
   check(!v.narratorOff && !v.styleOff && !v.soundOff && v.narratedOff && /crescendo/i.test(v.narratedTip), 'In blocks: the narrator and its Sound work, Narrated growth disabled (needs Crescendo)', v.narratedTip);
@@ -72,6 +103,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // one value per control: the narrator's Sound and its track (luci-rosse has no narrator track)
   await live('classic');
   const n0 = (await T()).T.tracks.length;
+  check(await page.evaluate(() => !!document.querySelector('#arr-grid [data-ghost]')), 'a song without a narrator track that builds live: the ghost narrator row in the timeline');
   await page.evaluate(() => { const d = document.querySelector('#live-narrator-parts details.vs-part'); d.open = true; }); await sleep(300);
   await page.evaluate(() => { const d = document.querySelector('#live-narrator-parts details.vs-part'); d.open = false; }); await sleep(300);
   let c = await T();
@@ -83,9 +115,14 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   let nar = c.T.tracks.find(t => t.type === 'voice');
   check(nar && nar.name === 'Narrator' && nar.settings.pitch === 0.55 && nar.settings.tempo === 0.75 && nar.settings.cutoff === 6000 && /Narrator/.test(await toastText()), 'first edit: the voice style Deep adds a Narrator track with the Deep settings, the toast offers Undo', JSON.stringify(nar && nar.settings));
   await shot('#live-voices', 'compose-voci-suono.png');
+  const lastRow = () => page.evaluate(() => { const rows = [...document.querySelectorAll('#arr-grid .trk-row')], l = rows[rows.length - 1]; return { ghost: !!document.querySelector('#arr-grid [data-ghost]'), last: l ? l.querySelector('.trk-name').textContent.trim() : '' }; });
+  let lr = await lastRow();
+  check(!lr.ghost && /Narrator/.test(lr.last), 'first edit: the Narrator track row replaces the ghost narrator row in the timeline', JSON.stringify(lr));
   await undo();
   c = await T();
   check(!c.T.tracks.some(t => t.type === 'voice'), 'Undo takes the Narrator track away again');
+  lr = await lastRow();
+  check(lr.ghost, 'Undo: the ghost narrator row is back', JSON.stringify(lr));
   await page.selectOption('[data-vsound-style="narrator"]', 'radio'); await sleep(1000);
   c = await T(); nar = c.T.tracks.find(t => t.type === 'voice');
   const ti = c.T.tracks.indexOf(c.T.tracks.find(t => t.type === 'voice'));
@@ -263,6 +300,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.evaluate(() => localStorage.setItem('coding-misk-lang', 'it'));
   await page.reload(); await sleep(3000);
   await page.click('[data-mode="ascolta"]');
+  await open('luci-rosse');
+  if ((await page.getAttribute('#live-toggle', 'aria-pressed')) === 'true') { await page.click('#live-toggle'); await sleep(800); }
+  { const n = await page.evaluate(() => { const e = document.querySelector('#live-narrator-note'); return e && !e.hidden ? e.textContent : ''; });
+    check(n === 'Questo brano non ha il narratore: accendi In divenire per sentirlo.', 'Italian: the note of the narrator block with In divenire off', n); }
+  if (shots) await shot('#live-narrator-row', 'compose-voci-nota-it.png');
   await open('kellerlicht');
   await live('crescendo');
   v = await voices();

@@ -64,11 +64,21 @@ At 400 px the head is 96 px wide: without Mute and Solo the name fits. Touch has
 - `spokenSchedule` walks every build state: on long grown songs it must be cached with the compiled build (computed once per compile, as `timelineShape`).
 - A sample missing for a line: the line is silent and not marked. Accepted: the row shows what is heard.
 
-## Open Questions
+## Owner decisions (2026-10-29)
 
-- **Q1. Which lines the row shows.** Recommended: what is heard (`spokenSchedule`), and the real narrator row switched to the same helper. Alternative: step `say` values, as the real row and the phrase list today (wrong for the poetic style).
-- **Q2. The row's label.** Recommended: "Narrator" in both languages, the name of the track it becomes, so nothing renames at the switch. Alternative: "Narratore" in Italian (the mockups), which then asks for a localized name for the real track too.
-- **Q3. Hover content.** Recommended: native tooltips, as every other cell. Alternative: a styled popover like the mockups, a new component with its own phone behaviour (+1 agent hour).
-- **Q4. Narrator switched off.** Recommended: the row stays, dimmed. Alternative: hidden.
-- **Q5. A button "Crea traccia" on the ghost.** Recommended: no; one way to the real track (the first sound edit). Alternative: a button on the name's tooltip or in Voice: narratore.
-- **Q6. Live build off.** Recommended: no ghost row. Alternative: a faint row that says "Accendi In divenire".
+The owner approved every recommendation:
+
+- **Q1.** The marks are what is heard (`spokenSchedule`), and the real narrator row uses the same helper. The read-only Narrator lines list (lines made by a build) lists the same heard lines, so the list, the row's tooltip and the timeline count the same; a song's own written steps keep their editable list.
+- **Q2.** The label is "Narrator" in both languages, the name of the track it becomes.
+- **Q3.** Native tooltips.
+- **Q4.** Narrator switched off: the row stays, dimmed.
+- **Q5.** No "Crea traccia" button: the first sound edit is the one way to the real track.
+- **Q6.** Live build off: no ghost row.
+
+### D8. Voice: narrator with the Live build off (owner request)
+
+With the Live build off (and no own steps) the narrator cannot speak. The block keeps its On switch and Narrator style row as they are (disabled, with the tooltip) and adds a short note with the same meaning, in the app's wording for the Live build: "Questo brano non ha il narratore: accendi In divenire per sentirlo." / "This song has no narrator: turn on the Live build to hear it." Its Sound and Narrator lines parts render folded while the Live build is off; their remembered state (`coding-misk-voice-folds`) is not written while the block is in that state, so turning the Live build on restores what the user left, and a song opened with the Live build off opens folded.
+
+### Measured
+
+luci-rosse in Live coder: 21 step lines, 19 heard (bars 1 and 81 each have two step lines: one of them is said), 17 of them in the 132 bars of the growth, 2 in the written part (bars 149 and 171). `narratorMarks` takes about 9 ms on it in Node and is computed once per compiled build.

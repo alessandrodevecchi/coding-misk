@@ -9,6 +9,8 @@ In Compose a song that builds live has a narrator that speaks its steps, but mos
 - **Clicks.** A cell goes to the narrator line nearest to the click. The row's name opens Voice: narrator in the Voices group with its Sound part unfolded.
 - **It becomes the real track** on the first edit of the narrator's sound, as today: the ghost row is replaced by the Narrator track in the same place, and Undo brings the ghost back.
 - With the narrator switched off, the row stays, dimmed, like a muted track.
+- **The narrator track shows the same marks** as the ghost (what is heard, from the code's schedule), and the read-only Narrator lines list of Voice: narrator lists the same heard lines (Q1).
+- **Voice: narrator with the Live build off** (owner request): the block says the song has no narrator ("Questo brano non ha il narratore: accendi In divenire per sentirlo."), and its Sound and Narrator lines fold; turning the Live build on brings back the user's open or closed state.
 - The ghost row is not a track: songs, the code, levels, the growth, the radio track count, the console and the hidden mixer do not change.
 
 ## Rejected alternative
@@ -23,8 +25,10 @@ A real narrator track in every song. It changes the song format (every song gain
 
 ### Modified Capabilities
 
-- `app/compose-timeline` (from `timeline-growth`): a ghost narrator row.
+- `app/compose-timeline` (from `timeline-growth`): a ghost narrator row; the narrator track's marks.
+- `live-build/voice-sound` (from `voice-full-controls`): the narrator block with the Live build off.
+- `live-build/voice-phrases` (from `voice-full-controls`): the narrator's read-only lines as heard.
 
 ## Impact
 
-- `src/main.js` (arranger rows, cell clicks, the switch to the real track), a pure helper for the narrator's marks (`src/song/build.js`, next to `spokenSchedule`), `src/style.css` (neon, hardware theme, phone), `src/i18n.js`, `src/guide.js` (Compose timeline card), `docs/knowledge/`, `tools/check-timeline.cjs`, `tools/check-voices.cjs`, `npm run check:spoken`.
+- `src/main.js` (arranger rows, cell clicks, the switch to the real track), a pure helper for the narrator's marks (`src/song/build.js`, next to `spokenSchedule`), `src/style.css` (neon, hardware theme, phone), `src/i18n.js`, `index.html` (the note), `src/guide.js` (Compose timeline and Two voices cards), `docs/knowledge/`, `tools/check-timeline.cjs`, `tools/check-voices.cjs`, `npm run check:spoken`.
