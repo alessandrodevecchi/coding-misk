@@ -183,6 +183,75 @@ const calls = code => (code.match(CALL) || []).length;
     await page.close();
   }
 
+  // 3f. the fast video (5.3, 5.4, 2.5): note widgets from the render page's notes, scope and spectrum from their own
+  // instrument's render, the fallback to the whole song's wave in Automatic, Always real
+  {
+    const { execFileSync } = require('child_process'), os = require('os'), path = require('path');
+    const fast = async (layout, realScope, limit) => {
+      const { page, errors } = await open(browser, { widgets: { on: true } });
+      const logs = [], downloads = [];
+      page.on('console', m => { if (/\[fast video\]/.test(m.text())) logs.push(m.text()); });
+      page.on('download', d => downloads.push(d));
+      await page.evaluate(([layout, realScope, limit]) => {
+        localStorage.setItem('coding-misk-export-speed', JSON.stringify('fast')); localStorage.setItem('coding-misk-out-kind', JSON.stringify('video'));
+        localStorage.setItem('coding-misk-video', JSON.stringify({ layout, quality: '720p30', card: 'always', soulPanel: true, visual: 'fixed:pixel', soul: 'off', realScope }));
+        if (limit !== null) globalThis.codingMiskScopeLimit = limit;
+      }, [layout, realScope, limit]);
+      await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(600);
+      const t0 = Date.now();
+      // (a Live coder song: its code is short, the widgets are in view)
+      await page.click('#songs [data-song-id="switch-prima-luce"] [data-act="export"]'); await sleep(1500);
+      while (Date.now() - t0 < 600000 && await page.evaluate(() => globalThis.codingMiskExport.job)) await sleep(400);
+      await sleep(1500);
+      const d = downloads.find(x => /\.(mp4|webm)$/.test(x.suggestedFilename()));
+      let file = null;
+      if (d) { file = path.join(os.tmpdir(), `cw-${Date.now()}.mp4`); await d.saveAs(file); }
+      const notes = await page.evaluate(() => globalThis.codingMiskFastNotes || 0);
+      await page.close();
+      return { file, logs, errors, notes, seconds: (Date.now() - t0) / 1000 };
+    };
+    const frame = (file, at, out) => { execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(at), '-i', file, '-frames:v', '1', out]); return fs.readFileSync(out); };
+    const own = await fast('code-widgets', 'auto', null), fall = await fast('code-widgets', 'auto', 0.0001), always = await fast('code-widgets', 'always', 0.0001), plain = await fast('code', 'auto', null);
+    check(own.notes > 0, 'fast video: note widgets drawn from the notes the render page sends back', `at most ${own.notes} notes in a widget`);
+    check(own.file && own.logs.some(l => /own instruments/.test(l)) && !own.errors.length, 'fast video: scope and spectrum from their own instruments (Automatic, in time)', `${own.seconds.toFixed(0)} s; ${own.logs.join(' | ')}`);
+    check(fall.file && fall.logs.some(l => /whole song/.test(l)), 'fast video: Automatic falls back to the whole song\'s wave over the limit, and says so', fall.logs.join(' | '));
+    check(always.file && always.logs.some(l => /own instruments/.test(l)) && !always.logs.some(l => /whole song/.test(l)), 'fast video: Always real never falls back', always.logs.join(' | '));
+    if (own.file && plain.file) {
+      // the code panel (the right third) of both files at a few moments: the widgets make it differ
+      const tmp = os.tmpdir(), crop = (file, at, out) => { execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(at), '-i', file, '-frames:v', '1', '-vf', 'crop=iw/3:ih:iw*2/3:0', '-f', 'rawvideo', '-pix_fmt', 'gray', out]); return fs.readFileSync(out); };
+      let best = null;
+      for (const at of [8, 16, 24, 32, 40, 60]) { const a = crop(own.file, at, path.join(tmp, 'cw-a.raw')), b = crop(plain.file, at, path.join(tmp, 'cw-b.raw')); let d = 0; for (let i = 0; i < a.length; i++) d += Math.abs(a[i] - b[i]); if (!best || d > best.d) best = { at, d: d / a.length }; }
+      check(best.d > 1, 'fast video: "Visual + code + widgets" draws widgets in the code panel', `largest mean difference ${best.d.toFixed(2)} at ${best.at} s`);
+      // (Prima luce's bass, with a scope, comes in at 60 s)
+      if (SHOTS) { frame(own.file, 64.5, `${SHOTS}/video-veloce-widget.png`); frame(fall.file, 64.5, `${SHOTS}/video-veloce-widget-onda-intera.png`); }
+    } else check(false, 'fast videos saved', `${!!own.file} ${!!plain.file}`);
+  }
+
+  // 3g. a vertical fragment with "Code + widgets" (rendered like the fast video)
+  {
+    const { execFileSync } = require('child_process'), os = require('os'), path = require('path');
+    const frag = async show => {
+      const { page } = await open(browser, { widgets: { on: true } });
+      const downloads = []; page.on('download', d => downloads.push(d));
+      const r = await page.evaluate(show => globalThis.codingMiskClips.fragments({ source: 'switch-prima-luce', from: 62, to: 70, show, quiet: true, codeMode: 'follow' }), show);
+      const t0 = Date.now(); await sleep(1500);
+      while (Date.now() - t0 < 300000 && await page.evaluate(() => globalThis.codingMiskClips.job)) await sleep(500);
+      await sleep(1500);
+      const d = downloads.find(x => /\.(mp4|webm)$/.test(x.suggestedFilename()));
+      let file = null; if (d) { file = path.join(os.tmpdir(), `cwf-${show}-${Date.now()}.mp4`); await d.saveAs(file); }
+      await page.close();
+      return { file, r };
+    };
+    const w = await frag('code-widgets'), c = await frag('code');
+    if (w.file && c.file) {
+      const tmp = os.tmpdir(), raw = (f, o) => { execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '4', '-i', f, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'gray', o]); return fs.readFileSync(o); };
+      const a = raw(w.file, path.join(tmp, 'cwf-a.raw')), b = raw(c.file, path.join(tmp, 'cwf-b.raw'));
+      let d = 0; for (let i = 0; i < a.length; i++) d += Math.abs(a[i] - b[i]);
+      check(d / a.length > 0.5, 'fragment: "Code + widgets" draws the widgets', `mean difference ${(d / a.length).toFixed(2)}`);
+      if (SHOTS) execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '4', '-i', w.file, '-frames:v', '1', '-vf', 'scale=540:-1', `${SHOTS}/frammento-codice-widget.png`]);
+    } else check(false, 'fragments saved', JSON.stringify([w.r, c.r]).slice(0, 300));
+  }
+
   // 4. Live coder: the widgets stay while a line is typed
   {
     const { page, errors } = await open(browser, { widgets: { on: true, max: 8 } });

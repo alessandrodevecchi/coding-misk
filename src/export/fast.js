@@ -50,7 +50,7 @@ export function renderOffline(job, onProgress = () => {}) {
       if (m.ready) { clearTimeout(timer); alive(); try { frame.contentWindow.postMessage({ render: job }, location.origin); } catch (err) { finish(err); } }
       else if (m.progress !== undefined) { alive(); onProgress(m.progress, m.phase); }
       else if (m.error) finish(new Error(m.error));
-      else if (m.done) finish(null, { channels: m.channels, sampleRate: m.sampleRate, onsets: m.onsets, skipped: m.skipped || [], replaced: m.replaced || [] });
+      else if (m.done) finish(null, { channels: m.channels, sampleRate: m.sampleRate, onsets: m.onsets, notes: m.notes || {}, skipped: m.skipped || [], replaced: m.replaced || [] });
     }
     addEventListener('message', on);
   });
@@ -104,7 +104,7 @@ export function renderInBlocks(job, sink, onProgress = () => {}) {
       if (fadeIn > 0 && a - start < fadeIn) for (let i = 0, n = Math.min(ch[0].length, Math.round((fadeIn - (a - start)) * sr)); i < n; i++) { const g = (a - start + i / sr) / fadeIn; for (const c of ch) c[i] *= g; }
       // onsets in output time
       const own = start ? Object.fromEntries(Object.entries(r.onsets).map(([k, list]) => [k, list.map(([t, d, v]) => [+(t - start).toFixed(4), d, v])])) : r.onsets;
-      await sink.add(ch, frames / sr, own);
+      await sink.add(ch, frames / sr, own, r.notes || {});
       frames += ch[0].length;
       for (const [k, list] of Object.entries(own)) (onsets[k] = onsets[k] || []).push(...list);
     }

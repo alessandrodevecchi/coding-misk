@@ -5,7 +5,7 @@
 // job: { segments: [{ from, to, code, run?, buses?, fns? }] in bars, bpm: per bar, from / to: the window in seconds (a block of a long
 // export), tail: seconds after it, keepFrom: onsets before it belong to the block before, sampleRate, gain: the master level,
 // push: the style's push into the master limiter (level-headroom, 1 for none) }
-import { repl, register as strudelRegister, Pattern } from '@strudel/core';
+import { repl, register as strudelRegister, Pattern, noteToMidi } from '@strudel/core';
 import { transpiler } from '@strudel/transpiler';
 import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio, registerSound, soundMap } from '@strudel/webaudio';
 import { guardDecode, guardSounds, createRegister } from '../sounds/sound-guard.js';
@@ -45,7 +45,11 @@ const WORKLET_SEED = `{ let a = ${SEED} >>> 0; Math.random = () => { a = (a + 0x
 const SOUND_WAIT = 8000;
 // seconds from the start of a render before a sound with stretch can start (measured: 0.02 is silent, 0.1 is heard)
 const STRETCH_LEAD = 0.1;
-async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, push = 1, buses = {}, fns = {} }) {
+// only (code-widgets D11): render only the haps of that instrument (`analyze`), for a scope or spectrum in a fast video.
+// A segment's wlines ([{ a, b, key }], places in its code) are the lines with a note widget: their notes come back by key,
+// [begin, end, pitch, gain × velocity] in cycles, for the fast video to draw the widget
+const pitchOf = v => { try { if (typeof v.note === 'number') return v.note; if (typeof v.note === 'string') return noteToMidi(v.note); if (typeof v.n === 'number' && !v.s) return v.n; if (v.freq) return 12 * Math.log2(v.freq / 440) + 69; } catch (e) {} return String(v.s ?? v.n ?? '?'); };
+async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, push = 1, buses = {}, fns = {}, only = null }) {
   globalThis.miskBuses = buses; useFns(fns);
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
   // the master limiter delays the sound by its look-ahead: the render runs that much longer and the file starts after it
@@ -64,7 +68,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   setMasterLevel(getSuperdoughAudioController().output, gain, push);
   post({ progress: 0, phase: 'schedule' });
   const R = repl({ transpiler, defaultOutput: () => {}, getTime: () => 0 });
-  const onsets = {}, skipped = new Set();
+  const onsets = {}, skipped = new Set(), notes = {};
   // the haps that start in this block's window [from, end), from the segments it covers, in onset order (cut groups depend on it)
   const c0 = T.cycleAt(from), c1 = T.cycleAt(end), all = [];
   for (const seg of segments) {
@@ -74,11 +78,21 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
     if (seg.buses || seg.fns) { globalThis.miskBuses = seg.buses || buses; useFns(seg.fns || fns); }
     const pattern = await R.evaluate(seg.run || seg.code, false);
     if (!pattern) throw new Error('evaluation failed');
+    // the notes of the lines with a note widget, two cycles past the block too (the widget looks ahead); the app drops
+    // the notes it already has
+    if (seg.wlines && seg.wlines.length) for (const hap of pattern.queryArc(Math.max(a, T.cycleAt(keepFrom)), Math.min(seg.to, b + 2))) {
+      if (!hap.hasOnset()) continue;
+      const at = ((hap.context && hap.context.locations) || [])[0], w = at && seg.wlines.find(x => at.start >= x.a && at.start < x.b);
+      if (!w) continue;
+      hap.ensureObjectValue();
+      (notes[w.key] ||= []).push([+hap.whole.begin.valueOf().toFixed(4), +hap.whole.end.valueOf().toFixed(4), pitchOf(hap.value), +((hap.value.gain ?? 1) * (hap.value.velocity ?? 1)).toFixed(3)]);
+    }
     for (const hap of pattern.queryArc(a, b, { _cps: T.cps(a) })) {
       if (!hap.hasOnset()) continue;
       const hb = hap.whole.begin.valueOf();
       if (hb < a || hb >= b) continue;
       hap.ensureObjectValue();
+      if (only !== null && hap.value.analyze !== only) continue;
       all.push({ b: hb, hap, t: T.seconds(hb) });
     }
   }
@@ -128,7 +142,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   }
   const buf = await ctx.startRendering();
   const channels = [buf.getChannelData(0).slice(lag), buf.getChannelData(1).slice(lag)];
-  post({ done: true, channels, sampleRate, onsets, skipped: [...skipped], replaced: [...replaced] }, channels.map(c => c.buffer));
+  post({ done: true, channels, sampleRate, onsets, notes, skipped: [...skipped], replaced: [...replaced] }, channels.map(c => c.buffer));
 }
 
 addEventListener('message', e => {

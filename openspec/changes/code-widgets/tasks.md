@@ -17,7 +17,7 @@
 
 - [x] 2.1 "Code widgets" card with collapsible sections: general, muted lines, widgets, instruments, parameters, sizes; defaults (off, maximum 3, slot order bass, lead, drums, arp, hats, pad, fx, voice, secondary share 25%, return window 16 bars, dimmed look on, "Widget notes" as chosen in 7.4, `_spiral` and `_pitchwheel` off, `labels` and `smear` off, fx and voice off, the default mapping, pianoroll or punchcard). Verify: `check-settings.cjs` with screenshots
 - [ ] 2.4 Each new setting changes what it says. Verify: `check-settings.cjs` cases: maximum 1 gives one widget; drums first in the order takes the slot over bass; share 0% gives only primary widgets; window 8, 16, 32, always each keep or remove a muted widget at 12 and 24 bars; dimmed off shows a muted widget undimmed; "Widget notes" switches the pianoroll opacity
-- [ ] 2.5 Video setting "Real scope and spectrum in the fast video" ("Automatic" default, "Always real") with the video settings, saved and in the backup. Verify: `check-settings.cjs`, `check-backup.mjs`
+- [x] 2.5 Video setting "Real scope and spectrum in the fast video" ("Automatic" default, "Always real") with the video settings, saved and in the backup. Verify: `check-settings.cjs`, `check-backup.mjs`
 - [x] 2.2 Saved, in the backup, reset to defaults. Verify: `check-backup.mjs`
 - [x] 2.3 Texts in English and Italian in `src/i18n.js`. Verify: `npm run check:guide`
 
@@ -27,7 +27,7 @@
 - [x] 3.2 `stripWidgets` in `lineKey`, `plainKey`, `norm`, `shownLine`, reused lines, copy limits. Verify: `check:typing`, `npm run growth:probe -- all` same counters with the option off
 - [x] 3.3 Calls added in `liveCode.codeWith` after folding and before `breakLines` and the hidden tail. Verify: `npm run check:mixer -- --full` with a new case with widgets on (same gain, orbit, analyze, postgain, velocity)
 - [x] 3.4 Post-pass after the growth: moment 1, moment 2, muted lines (carried or added in a pause, only when they return within N bars), fallback at once. Verify: `check:typing` cases; Live coder fixtures unchanged (`node tools/check-crescendo.mjs`); if an intended change moves them, raise `SHAPES_VERSION` and run `npm run durations` in the same commit
-- [ ] 3.5 Crescendo and Classic with growth use the same post-pass. Verify: `npm run check:crescendo -- --full`, Crescendo fixtures unchanged
+- [x] 3.5 Crescendo and Classic with growth use the same post-pass. Verify: `npm run check:crescendo -- --full`, Crescendo fixtures unchanged
 
 ## 4. Classic and songs that do not grow
 
@@ -37,10 +37,10 @@
 
 ## 5. Videos and live output
 
-- [ ] 5.1 "Code + widgets" scenes; old scenes unchanged. Verify: `npm run check:video`, `npm run check:clips`
-- [ ] 5.2 `drawCode` copies widget canvases below their lines in the session video, fragments and live output, with the dimmed look on muted lines when it is on. Verify: `node tools/check-video.cjs`, `node tools/check-clips.cjs`, `npm run check:live`, `node tools/check-live.cjs`
-- [ ] 5.3 Fast video: haps by line from the render page, redraw with Strudel's drawing functions. Verify: `npm run check:export`
-- [ ] 5.4 Fast video scope and spectrum: one extra render per track with a widget; "Automatic" falls back to the master waveform over twice the time and says so in the export log, "Always real" never falls back. Verify: `node tools/check-export.cjs` with two scope tracks and a forced slow limit, once per value; time measured in the DEVLOG
+- [x] 5.1 "Code + widgets" scenes; old scenes unchanged. Verify: `npm run check:video`, `npm run check:clips`
+- [x] 5.2 `drawCode` copies widget canvases below their lines in the session video, fragments and live output, with the dimmed look on muted lines when it is on. Verify: `node tools/check-video.cjs`, `node tools/check-clips.cjs`, `npm run check:live`, `node tools/check-live.cjs`
+- [x] 5.3 Fast video: haps by line from the render page, redraw with Strudel's drawing functions. Verify: `npm run check:export`
+- [x] 5.4 Fast video scope and spectrum: one extra render per track with a widget; "Automatic" falls back to the master waveform over twice the time and says so in the export log, "Always real" never falls back. Verify: `node tools/check-export.cjs` with two scope tracks and a forced slow limit, once per value; time measured in the DEVLOG
 
 ## 6. Regression
 

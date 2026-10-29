@@ -18,7 +18,8 @@ async function pickFormat(mb, q) {
 // drawFrame(t, cyc, feed, codeAt, index): draws the frame for time t into the canvas; onProgress(0..1, phase).
 // writable: a file to write into while rendering (#61), else the file is kept in memory.
 // Returns { promise, cancel }: the promise gives { blob (null when written to disk), ext, seconds, onsets }.
-export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, writable = null }) {
+// onNotes(notes): the notes of the lines with a note widget of each block, before its frames (code-widgets D11)
+export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, writable = null, onNotes = null }) {
   let audio = null, cancelled = false;
   const promise = (async () => {
     const mb = await import('mediabunny');
@@ -36,7 +37,8 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
     let hist = new Float32Array(0), histAt = 0, drawn = 0, ap = 0;
     const report = phase => onProgress(Math.min(1, ap * 0.3 + drawn / frames * 0.7), phase);
     const sink = {
-      async add(ch, start, blockOnsets) {
+      async add(ch, start, blockOnsets, notes) {
+        if (onNotes && notes) onNotes(notes);
         for (const [k, list] of Object.entries(blockOnsets || {})) (onsets[k] = onsets[k] || []).push(...list);
         const sr = job.sampleRate || 48000, n = ch[0].length;
         // the AAC encoder puts 2112 samples of silence first: the audio starts that much earlier, the file's edit list

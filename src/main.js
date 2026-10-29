@@ -98,6 +98,8 @@ import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
 import { CW_KEY, widgetSettings, placeWidgets, widgetOptions, linkAnalysers } from './live/widgets.js';
+import { widgetPlan, linesByKey, fastWidgets } from './video/widget-frames.js';
+import { withWidgets } from './video/layout.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1351,8 +1353,26 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   });
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = saidSteps(sg).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) }));
-  const job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
+  let job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
+  // code widgets in the fast video (code-widgets D11): the notes of the lines with a note widget come back from the
+  // render page; scope and spectrum read their instrument rendered alone (one render each, before the video), or the
+  // whole song's wave when "Automatic" finds that it would take more than twice as long
+  const cwS = cwSettings(), cwOn = cwS.on && withWidgets(frag ? frag.o.show : layout);
+  let cw = null;
+  if (cwOn) {
+    const plan = widgetPlan(segments), mark = list => list && list.map(s => ({ ...s, wlines: linesByKey(s.code, plan.noteKeys) }));
+    const at = job.segmentsAt;
+    job = { ...job, segments: mark(job.segments), segmentsAt: at ? (a, b) => mark(at(a, b)) : null };
+    const P = (() => { const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k).trim(); return { ink: v('--ink') || '#fff', muted: v('--muted') || '#888', a1: v('--a1') || '#f4a', a2: v('--a2') || '#fb4' }; })();
+    const waves = {}, notes = {}, seen = new Set();
+    cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P }), addNotes(block) { for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
+    if (plan.instruments.length) {
+      fastJob = { id: sg.id, progress: 0, phase: 'scope', cancel: () => {} };
+      try { if (!(await cwRealScopes(job, plan.instruments, waves, o.realScope === 'always'))) for (const k of Object.keys(waves)) delete waves[k]; }
+      catch (e) { fastJob = null; if (e && e.cancelled) { if (frag) return 'cancelled'; toast(t('vidCancelled')); return true; } console.warn('[fast video] scope renders', e); for (const k of Object.keys(waves)) delete waves[k]; }
+    }
+  }
   visuals.setTarget({ w: stageA.w, h: stageA.h });
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start } : null;
   // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen
@@ -1372,6 +1392,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       const said = sayList.filter(x => x.bar <= cyc && cyc < x.bar + 4).pop();
       const doc = item ? item.song : sg.doc;
       fv = {
+        cyc, t, master: feed.wave, widgets: cw ? cw.provider : null,
         code: codeAt(cyc), say: said ? said.text : '',
         info: { onAir: true, n: p.n, title: item ? item.title : sg.title, artist: item ? item.artist : '', bar: cyc - p.start, bars: p.end - p.start, bpm: Math.round(sg.meta.bpm[Math.min(sg.meta.bars - 1, Math.floor(cyc))]) || undefined, say: said ? said.text : '', sayAt: said ? said.bar - p.start : 0 },
         soulSrc: doc && doc.sections && doc.tracks ? { key: `fv:${p.n}`, song: doc, ctx: {}, bar: cyc - p.start } : null,
@@ -1381,6 +1402,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       else video.composeAt({ layout, q }, cyc, t);
     },
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
+    onNotes: cw ? block => cw.addNotes(block) : null,
   });
   if (preview) preview.stop();
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: run.cancel };
@@ -1403,6 +1425,32 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     fastJob = null; fv = null;
     soul.setClock(null); soul.force(null); visuals.hold(false); visuals.setTarget(null);
   }
+}
+// code-widgets D11 (cw-5): the instruments of the scope and spectrum widgets rendered alone, mono at a quarter of the
+// sample rate, into waves[instrument]. always: never falls back. Else, after the first render, the renders left are
+// weighed against the export without them (one render and the frames): over twice as long, it falls back to the whole
+// song's wave and says so (export log, a toast). → true when the waves are kept
+async function cwRealScopes(job, instruments, waves, always) {
+  const T = tempoClock(job.bpm), start = job.start || 0, total = (job.cut || T.seconds(job.bpm.length) + (job.tail || 0)) - start, DEC = 4;
+  for (let i = 0; i < instruments.length; i++) {
+    const inst = instruments[i], t0 = performance.now(), sr0 = job.sampleRate || 48000, data = new Float32Array(Math.ceil(total * sr0 / DEC) + 1);
+    const r = renderInBlocks({ ...job, only: inst }, { async add(ch, at) { const o = Math.round(at * sr0 / DEC); for (let k = 0; k * DEC < ch[0].length; k++) data[o + k] = (ch[0][k * DEC] + (ch[1] || ch[0])[k * DEC]) / 2; } }, (p, phase) => { if (fastJob) { fastJob.progress = (i + p) / instruments.length * 0.3; fastJob.phase = 'scope'; } });
+    if (fastJob) fastJob.cancel = r.cancel;
+    await r.promise;
+    waves[inst] = { sr: sr0 / DEC, data };
+    if (i === 0 && !always) {
+      // the export without the renders: one render as long as this one, and the frames (about 5 ms each at 30 frames a
+      // second); a test page may lower the limit (globalThis.codingMiskScopeLimit)
+      const one = performance.now() - t0, frames = total * 30 * 5, base = one + frames, extra = one * instruments.length, limit = globalThis.codingMiskScopeLimit ?? 1;
+      if (extra > base * limit) {
+        console.info(`[fast video] scope and spectrum from the whole song: ${instruments.length} renders of ${(one / 1000).toFixed(1)} s would make the export more than twice as long`);
+        toast(t('cwScopeFallback'));
+        return false;
+      }
+    }
+  }
+  console.info(`[fast video] scope and spectrum from their own instruments: ${instruments.join(', ')}`);
+  return true;
 }
 // ---------- fragments and texts for sharing (#57) ----------
 const FRAG_KEY = 'coding-misk-fragments', FRAG_N = 'coding-misk-fragment-n';
@@ -4484,7 +4532,7 @@ function timelineNow(cyc) {
 const video = createVideo({
   visuals, store, t, esc,
   // code-widgets D11: the widgets drawn in the page (never in a fast video, whose code is not the page's)
-  getWidgets: () => { const S = cwSettings(), M = globalThis.miskWidgetCanvases; if (fv || !S.on || !M) return null; return { dim: S.dim, canvas: (type, i) => { const k = `_widget__${type}_${i}`; for (const [id, c] of M) if (id.endsWith(k)) return c; return null; } }; },
+  getWidgets: () => { const S = cwSettings(), M = globalThis.miskWidgetCanvases; if (fv) return fv.widgets ? { dim: S.dim, canvas: (type, i, key) => fv.widgets.canvas(type, i, key, fv.cyc, fv.t, fv.master) } : null; if (!S.on || !M) return null; return { dim: S.dim, canvas: (type, i) => { const k = `_widget__${type}_${i}`; for (const [id, c] of M) if (id.endsWith(k)) return c; return null; } }; },
   soulFrame: (cyc, playing, scale) => soul.frame(cyc, playing, scale),
   soulView: () => soul.shown,
   getCode: () => (fv ? fv.code : (ed && ed.code) || ''),
