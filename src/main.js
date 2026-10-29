@@ -85,7 +85,7 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING, FLASK, STOP, POWER, PLUS, CHEVRON } from './icons.js';
+import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING, FLASK, STOP, POWER, PLUS, CHEVRON, EYE_CLOSED, EYE_HALF, EYE_OPEN } from './icons.js';
 import { createPreview, previewOrbit } from './player/preview.js';
 import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS, KIND_TYPE, loopSong } from './library/patterns.js';
@@ -447,6 +447,10 @@ let dirty = !!(draft && draft.dirty);
 let scope = 'track', editPat = null, panelView = store.get('coding-misk-panel', 'full');
 // vista dell'arrangiatore: 'sections' (celle per sezione) o 'timeline' (clip liberi); selClip = indice del clip scelto nella timeline
 let arrMode = store.get('coding-misk-arr-mode', 'timeline'), selClip = null;
+// the growth column of a grown song (timeline-growth D3): hidden (a narrow tab), compact (default) or open
+const GROW_VIEWS = ['hidden', 'compact', 'open'];
+const GROW_EYES = { hidden: EYE_CLOSED, compact: EYE_HALF, open: EYE_OPEN };
+let growView = GROW_VIEWS.includes(store.get('coding-misk-growth-view', 'compact')) ? store.get('coding-misk-growth-view', 'compact') : 'compact';
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!PICK_LOOKS.some(([k]) => k === look)) look = 'palco';
 // the soul scene (#46) keeps the colours of the last other visual: the app's accents and the colour views' hue
@@ -544,14 +548,40 @@ function afterGrowth() {
   renderGrowing();
 }
 const saveDraft = () => store.set('coding-misk-draft', { T, sel, tk, dirty });
-// a Crescendo build plays a growth span before the written sections (#64): the arranger shows the written song,
-// so its bars and sections are offset by the growth (bars of the played song = bars of the arranger + growBars())
+// a Crescendo build plays a growth span before the written sections (#64)
 const growth = () => (compiled && compiled.build && compiled.build.crescendo) || null;
-const growBars = () => (growth() ? growth().growth : 0);
-// section of the played song → section of the arranger (-1: in the growth span or the added ending)
-const arrSec = i => { const g = growth(); if (!g || i < 0) return i; const k = i - g.sections; return k >= 0 && k < T.sections.length ? k : -1; };
-// (the first section starts the song from the top, growth included)
-const sceneStart = i => (i > 0 ? growBars() : 0) + T.sections.slice(0, i).reduce((a, s) => a + s.bars, 0);
+// the song cards draw the library song: their offset stays the Crescendo growth (timeline-growth D1)
+const cardGrowBars = () => (growth() ? growth().growth : 0);
+// the played song in the arranger's columns (timeline-growth D1): the sections played before the written ones (a
+// growth, or the waypoints a song starts with in Classic with the live build off), the written sections, an added
+// ending. Every mapping between bars of the played song and the arranger reads it.
+const pmaps = new WeakMap();
+function playMap(c = compiled) {
+  const n = T.sections.length;
+  const hit = c && pmaps.get(c); if (hit && hit.n === n) return hit;
+  const M = c && c.meta;
+  if (!M || !M.sections.length) return { n, pre: 0, G: 0, W: 0, end: 0, bars: 0, ending: null, steps: [], arrSec: i => i, start: k => T.sections.slice(0, k).reduce((a, s) => a + s.bars, 0) };
+  const g = c.build && c.build.crescendo;
+  let pre = g ? g.sections : Math.max(0, M.sections.length - n);
+  if (pre + n > M.sections.length) pre = 0;
+  const G = pre ? M.sections[pre].start : 0, last = M.sections[Math.min(M.sections.length, pre + n) - 1], end = last.start + last.len;
+  const tail = M.sections.slice(pre + n), ending = tail.length && M.bars > end ? { start: end, bars: M.bars - end, label: tail.map(s => s.label).join(' · ') } : null;
+  // the bars where the growth changes (its steps; the waypoint sections of a song without a build)
+  let steps = [];
+  if (G) steps = c.build && Array.isArray(c.build.build) ? [...new Set(buildSteps(c.build).map(x => x.at).filter(a => a > 0 && a < G))].sort((a, b) => a - b) : M.sections.slice(1, pre).map(s => s.start);
+  const m = { n, pre, G, W: end - G, end, bars: M.bars, ending, steps,
+    // section of the played song → section of the arranger (-1: in the growth or the added ending)
+    arrSec: i => (i < 0 ? i : i >= pre && i < pre + n ? i - pre : -1),
+    // the played bar where a written section starts
+    start: k => G + T.sections.slice(0, k).reduce((a, s) => a + s.bars, 0) };
+  pmaps.set(c, m);
+  return m;
+}
+const growBars = () => playMap().G;
+const arrSec = i => playMap().arrSec(i);
+const secStart = k => playMap().start(k);
+// (the first section starts the song from the top, growth included: Play, Play from this section)
+const sceneStart = i => (i > 0 ? secStart(i) : 0);
 const SEC = () => T.sections[sel];
 
 // ---------- editor Strudel e trasporto ----------
@@ -1813,30 +1843,86 @@ function renderShape(C, building) {
   $('#live-shape-now').textContent = t('shapeNow', { v: ['opening', 'pace', 'development'].map(p => t(`${p}:${shape[p]}`)).join(' · ') });
   $('#live-shape-now').title = ['opening', 'pace', 'development'].map(p => `${t(`${p}Lbl`)}: ${t(`${p}:${shape[p]}`)} (${from(p)})`).join('\n');
 }
-// vista a sezioni: una cella per traccia e sezione
-function renderCells(total) {
-  $('#arr-strip').style.minWidth = $('#arr-grid').style.minWidth = '';
-  // sezioni e tracce condividono le stesse colonne: larghezza proporzionale alle battute
-  const cols = `var(--trk-col) ${T.sections.map(s => `minmax(54px, ${s.bars}fr)`).join(' ')}`;
-  $('#arr-strip').style.gridTemplateColumns = cols;
-  $('#arr-strip').innerHTML = `<span class="arr-corner">${t('sections')}</span>` + T.sections.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" aria-current="${i === sel}">
-      <b>${esc(s.name)}</b><span>${s.bars} · ${s.bpmEnd ? `${s.bpm}→${s.bpmEnd}` : s.bpm ?? 138}</span></button>`).join('') + '<span class="head"></span>';
-  const solo = T.tracks.some(tr => tr.solo);
-  $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}" style="grid-template-columns:${cols}" aria-current="${i === tk}">
-      <div class="trk-head" data-act-ids="${ACT_IDS[tr.type] || esc((tr.settings && tr.settings.visual) || 'fx')}">
+// ---------- growth and ending columns (timeline-growth D2-D4) ----------
+// the growth column: hidden (a narrow tab), compact (fixed width, default) or open (the written song's scale)
+// the grid columns of the growth and the ending (`fr` in the timeline view: no minimum)
+const growColW = P => (!P.G ? '' : growView === 'open' ? ` minmax(0, ${P.G}fr)` : ' var(--grow-col)');
+const endColW = (P, min) => (P.ending ? ` minmax(${min}, ${P.ending.bars}fr)` : '');
+// the open growth keeps the written song's pixels per bar: the arranger grows wider and scrolls (D3)
+function openWidth(P, perBar, gaps) {
+  const sc = $('.arr-scroll'), trk = parseFloat(getComputedStyle(sc).getPropertyValue('--trk-col')) || 150;
+  const fit = Math.max(1, sc.clientWidth - trk - gaps) / Math.max(1, P.W + (P.ending ? P.ending.bars : 0));
+  return `${Math.ceil(trk + gaps + (P.bars) * Math.max(perBar, fit))}px`;
+}
+function arrWidth(P, view, total) {
+  if (P.G && growView === 'open') return openWidth(P, view === 'timeline' ? 10 : 0, view === 'timeline' ? 0 : 3 * (T.sections.length + 2));
+  if (view !== 'timeline') return '';
+  const more = P.ending ? P.ending.bars : 0;
+  return P.G ? `calc(var(--trk-col) + var(--grow-col) + ${(total + more) * 10}px)` : `calc(var(--trk-col) + ${(total + more) * 10}px)`;
+}
+const growToggle = () => `<button class="grow-eye" data-grow-view="${growView}" title="${esc(t(`growView:${growView}`))}" aria-label="${esc(t(`growView:${growView}`))}">${GROW_EYES[growView]}</button>`;
+// the growth's name: a growth, or the waypoints a song starts with when it plays without a live build
+const growName = () => t(growth() ? 'growCol' : 'wayCol');
+// the strip: corner, growth, written sections, ending; every column says where it starts in the played song
+function stripHtml(P) {
+  const M = compiled.meta, gt = P.G ? clock(M.secondsAt(P.G)) : '';
+  const grow = P.G ? `<button class="arr-xcol x-grow" data-xcol="growth" data-col-start="0" data-col-bars="${P.G}" title="${esc(t('growColTip', { name: growName(), bars: P.G, time: gt }))}"><b>${esc(growName())}</b><span>${P.G} · ${gt}</span></button>` : '';
+  const end = P.ending ? `<button class="arr-xcol x-end" data-xcol="ending" data-col-start="${P.ending.start}" data-col-bars="${P.ending.bars}" title="${esc(t('endColTip', { name: P.ending.label, bars: P.ending.bars }))}"><b>${esc(P.ending.label)}</b><span>${P.ending.bars}</span></button>` : '';
+  return `<span class="arr-corner">${t('sections')}${P.G ? growToggle() : ''}</span>` + grow + T.sections.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" data-col-start="${P.start(i)}" data-col-bars="${s.bars}" aria-current="${i === sel}">
+      <b>${esc(s.name)}</b><span>${s.bars} · ${s.bpmEnd ? `${s.bpm}→${s.bpmEnd}` : s.bpm ?? 138}</span></button>`).join('') + end + '<span class="head"></span>';
+}
+// where a track plays between two bars of the played song (its clips less its silent spans) and its steps there:
+// the build's marks and the bars where it comes in; without a build, where its clips start
+function xSpans(tr, a, b) {
+  let sh = null; try { sh = compiled.doc && compiled.doc.sections && compiled.doc.tracks ? timelineShape(compiled.doc) : null; } catch (e) { sh = null; }
+  const st = sh && sh.tracks.find(x => x.id === tr.id); if (!st) return { on: [], ticks: [] };
+  let on = (st.clips || []).map(c => [Math.max(a, c.start), Math.min(b, c.start + c.bars)]).filter(([x, y]) => y > x).sort((p, q) => p[0] - q[0]);
+  for (const [x0, x1] of st.off || []) on = on.flatMap(([x, y]) => (x1 <= x || x0 >= y ? [[x, y]] : [...(x0 > x ? [[x, x0]] : []), ...(x1 < y ? [[x1, y]] : [])]));
+  const merged = [];
+  for (const s of on) { const l = merged[merged.length - 1]; if (l && s[0] <= l[1]) l[1] = Math.max(l[1], s[1]); else merged.push([...s]); }
+  const build = Array.isArray(compiled.doc.build) && compiled.doc.build.length;
+  const ticks = build ? [...(st.marks || []).filter(k => k.at >= a && k.at < b).map(k => ({ at: k.at, say: k.say, action: k.action })), ...(st.off || []).filter(([, x1]) => x1 > a && x1 < b).map(([, x1]) => ({ at: x1, action: 'add' }))]
+    : (st.clips || []).filter(c => c.start >= a && c.start < b).map(c => ({ at: c.start, action: 'clip' }));
+  const seen = new Set();
+  return { on: merged, ticks: ticks.sort((p, q) => p.at - q.at).filter(k => (seen.has(k.at) ? false : seen.add(k.at))) };
+}
+// a read-only cell of the growth or the ending: hatched, the spans where the track plays, a tick per step
+function xCell(tr, i, a, b, kind) {
+  const { on, ticks } = xSpans(tr, a, b), w = b - a, tip = ticks.map(k => `${t('liveMark', { n: k.at + 1 })}${k.say ? ` · ${sayText(k.say, getLang())}` : ''}`);
+  return `<button class="trk-cell xcell x-${kind}" data-xcell="${i}" data-a="${a}" data-b="${b}" data-ticks="${ticks.map(k => k.at).join(',')}" title="${esc([`${trackLabel(tr)} · ${kind === 'grow' ? growName() : t('endCol')}`, ...tip].join('\n'))}">${on.map(([x, y]) => `<i class="x-on" style="left:${(x - a) / w * 100}%;width:${(y - x) / w * 100}%"></i>`).join('')}${ticks.map(k => `<i class="x-step" style="left:${(k.at - a) / w * 100}%"></i>`).join('')}</button>`;
+}
+const xCells = (P, tr, i, which) => (which === 'grow' ? (P.G ? xCell(tr, i, 0, P.G, 'grow') : '') : P.ending ? xCell(tr, i, P.ending.start, P.ending.start + P.ending.bars, 'ending') : '');
+const trkHead = (tr, i) => `<div class="trk-head" data-act-ids="${ACT_IDS[tr.type] || esc((tr.settings && tr.settings.visual) || 'fx')}">
         <button class="trk-name" data-trk="${i}" title="${esc(tr.type)}"><span class="trk-type">${esc(TYPE_ICON[tr.type] || '·')}</span>${esc(trackLabel(tr))}</button>
         <button class="mini" data-mute="${i}" aria-pressed="${!!tr.mute}" title="${esc(t('mute'))}">M</button><button class="mini" data-solo="${i}" aria-pressed="${!!tr.solo}" title="${esc(t('solo'))}">S</button>
-      </div>${T.sections.map((s, j) => {
+      </div>`;
+function arrClasses(P) {
+  const a = $('#arranger');
+  a.classList.toggle('has-growth', !!P.G);
+  for (const v of GROW_VIEWS) a.classList.toggle(`grow-${v}`, !!P.G && growView === v);
+}
+// vista a sezioni: una cella per traccia e sezione
+function renderCells(total) {
+  const P = playMap();
+  arrClasses(P);
+  $('#arr-strip').style.minWidth = $('#arr-grid').style.minWidth = $('.arr-ruler').style.minWidth = arrWidth(P, 'sections', total);
+  // sezioni e tracce condividono le stesse colonne: larghezza proporzionale alle battute
+  const cols = `var(--trk-col)${growColW(P)} ${T.sections.map(s => `minmax(54px, ${s.bars}fr)`).join(' ')}${endColW(P, '54px')}`;
+  $('#arr-strip').style.gridTemplateColumns = cols;
+  $('#arr-strip').innerHTML = stripHtml(P);
+  const solo = T.tracks.some(tr => tr.solo);
+  $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}" style="grid-template-columns:${cols}" aria-current="${i === tk}">
+      ${trkHead(tr, i)}${xCells(P, tr, i, 'grow')}${T.sections.map((s, j) => {
         // a voice track: how many comments it speaks in the section
         if (tr.type === 'voice') {
-          const a = sceneStart(j), lines = compiled.build ? buildSteps(compiled.build).filter(x => x.say && x.at >= a && x.at < a + s.bars && voiceOf(T, x) === tr) : [];
+          const a = secStart(j), lines = compiled.build ? buildSteps(compiled.build).filter(x => x.say && x.at >= a && x.at < a + s.bars && voiceOf(T, x) === tr) : [];
           return `<button class="trk-cell voice${lines.length ? ' on' : ''}" data-cell="${i}:${j}" aria-current="${i === tk && j === sel}" title="${esc(lines.map(x => `${t('liveMark', { n: x.at + 1 })} · ${sayText(x.say, getLang())}`).join('\n') || `${trackLabel(tr)} · ${s.name}`)}">${lines.length ? `❝ ${lines.length}` : ''}</button>`;
         }
         const c = cellOf(tr, j);
         const cls = !c ? '' : c.clip ? ' on' : ' custom';
         const label = !c ? '' : c.clip ? esc(c.clip.pattern) + (c.clip.set ? '*' : '') : '≈';
         return `<button class="trk-cell${cls}" data-cell="${i}:${j}" aria-current="${i === tk && j === sel}" title="${esc(`${trackLabel(tr)} · ${s.name}`)}">${label}</button>`;
-      }).join('')}</div>`).join('') + '<span class="head"></span>';
+      }).join('')}${xCells(P, tr, i, 'ending')}</div>`).join('') + '<span class="head"></span>';
 }
 // vista timeline: clip liberi su una corsia continua, larghezza proporzionale alle battute
 const clipLabel = c => esc(c.pattern) + (c.set ? '*' : '');
@@ -1847,22 +1933,20 @@ function liveLayer(bmap, tr, total) {
     + m.marks.map(k => `<i class="build-mark" style="left:${k.at / total * 100}%" title="${esc(`${t('liveMark', { n: k.at + 1 })} · ${k.action}${k.say ? ` · ${sayText(k.say, getLang())}` : ''}`)}"></i>`).join('');
 }
 function renderTimeline(total) {
-  const st = starts(), minW = `calc(var(--trk-col) + ${total * 10}px)`;
-  $('#arr-strip').style.gridTemplateColumns = `var(--trk-col) ${T.sections.map(s => `minmax(0, ${s.bars}fr)`).join(' ')}`;
-  $('#arr-strip').style.minWidth = $('#arr-grid').style.minWidth = minW;
-  $('#arr-strip').innerHTML = `<span class="arr-corner">${t('sections')}</span>` + T.sections.map((s, i) => `<button class="arr-scene-btn${i > 0 && s.fade ? ' fade' : ''}" data-scene-i="${i}" aria-current="${i === sel}">
-      <b>${esc(s.name)}</b><span>${s.bars} · ${s.bpmEnd ? `${s.bpm}→${s.bpmEnd}` : s.bpm ?? 138}</span></button>`).join('') + '<span class="head"></span>';
+  const P = playMap(), st = starts(), minW = arrWidth(P, 'timeline', total);
+  arrClasses(P);
+  $('#arr-strip').style.gridTemplateColumns = `var(--trk-col)${growColW(P)} ${T.sections.map(s => `minmax(0, ${s.bars}fr)`).join(' ')}${endColW(P, '0px')}`;
+  $('#arr-strip').style.minWidth = $('#arr-grid').style.minWidth = $('.arr-ruler').style.minWidth = minW;
+  $('#arr-strip').innerHTML = stripHtml(P);
   const solo = T.tracks.some(tr => tr.solo), bmap = compiled.build ? shownBuildMap(total) : null;
   const lines = st.slice(1).map(b => `<i class="sec-line" style="left:${b / total * 100}%"></i>`).join('');
-  $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}" style="grid-template-columns:var(--trk-col) minmax(0, 1fr)" aria-current="${i === tk}">
-      <div class="trk-head" data-act-ids="${ACT_IDS[tr.type] || esc((tr.settings && tr.settings.visual) || 'fx')}">
-        <button class="trk-name" data-trk="${i}" title="${esc(tr.type)}"><span class="trk-type">${esc(TYPE_ICON[tr.type] || '·')}</span>${esc(trackLabel(tr))}</button>
-        <button class="mini" data-mute="${i}" aria-pressed="${!!tr.mute}" title="${esc(t('mute'))}">M</button><button class="mini" data-solo="${i}" aria-pressed="${!!tr.solo}" title="${esc(t('solo'))}">S</button>
-      </div>
+  const cols = `var(--trk-col)${growColW(P)} minmax(0, ${total}fr)${endColW(P, '0px')}`;
+  $('#arr-grid').innerHTML = T.tracks.map((tr, i) => `<div class="trk-row${tr.mute || (solo && !tr.solo) ? ' silent' : ''}" style="grid-template-columns:${cols}" aria-current="${i === tk}">
+      ${trkHead(tr, i)}${xCells(P, tr, i, 'grow')}
       <div class="trk-lane" data-lane="${i}" style="--bars:${total}" title="${esc(t('laneAdd'))}">${lines}${liveLayer(bmap, tr, total)}${spans(tr).map(({ c, s: a, e: b }) => {
         const k = tr.clips.indexOf(c);
         return `<button class="clip${isWhole(c) ? '' : ' free'}" data-clip="${i}:${k}" aria-current="${i === tk && k === selClip}" style="left:${a / total * 100}%;width:${(b - a) / total * 100}%" aria-label="${esc(`${trackLabel(tr)} · ${t('cBars', { from: a + 1, to: b })} · ${t('cPattern', { p: c.pattern })}`)}">${clipLabel(c)}<span class="clip-grip" data-grip aria-hidden="true"></span></button>`;
-      }).join('')}</div></div>`).join('') + '<span class="head"></span>';
+      }).join('')}</div>${xCells(P, tr, i, 'ending')}</div>`).join('') + '<span class="head"></span>';
 }
 function renderSectionPanel(total) {
   const sc = SEC();
@@ -1898,10 +1982,20 @@ $('#arr-grid').addEventListener('click', e => {
   if (s) { const tr = T.tracks[+s.dataset.solo]; tr.solo = !tr.solo || undefined; changed(); return; }
   const n = e.target.closest('[data-trk]');
   if (n) return selectTrack(+n.dataset.trk);
+  // a growth cell: the track's step nearest to the click (the bar under it when the track has none), the track
+  // selected; an ending cell: the ending's start (timeline-growth D4)
+  const x = e.target.closest('[data-xcell]');
+  if (x) {
+    const a = +x.dataset.a, b = +x.dataset.b, r = x.getBoundingClientRect(), at = a + Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width))) * (b - a);
+    const ticks = x.dataset.ticks ? x.dataset.ticks.split(',').map(Number) : [];
+    const bar = x.classList.contains('x-ending') ? a : ticks.length ? ticks.reduce((p, q) => (Math.abs(q - at) < Math.abs(p - at) ? q : p)) : Math.floor(at);
+    seekTo(Math.max(0, Math.min(playMap().bars - 1, bar)));
+    return selectTrack(+x.dataset.xcell);
+  }
   const c = e.target.closest('[data-cell]'); if (!c) return;
   const [i, j] = c.dataset.cell.split(':').map(Number);
   if (i !== tk) { tk = i; editPat = null; }
-  if (isPlaying() && mode === 'track' && j !== sel) { playSong(compiled, sceneStart(j), 'track'); }
+  if (isPlaying() && mode === 'track' && j !== arrSec(compiled.meta.sectionAt(sched().now()))) { playSong(compiled, secStart(j), 'track'); }
   sel = j; editPat = null; saveDraft(); renderArranger(); renderTrackPanel(); highlightTrack();
 });
 // ---------- timeline: crea, sposta e allunga i clip (si fermano sui clip vicini) ----------
@@ -2088,9 +2182,11 @@ $$('[data-arr-mode]').forEach(b => b.addEventListener('click', () => {
 
 // ---------- barra di riproduzione: tempo continuo, clic o trascinamento per spostarsi ----------
 // la posizione si calcola sui blocchi delle sezioni, così funziona in entrambe le viste
+// one scale for the played song (timeline-growth D5): every column of the strip (growth, written sections, ending)
+// says where it starts and how many bars it holds; inside a column the scale is linear
 function rulerGeo() {
-  const track = $('#ruler-track'), btns = $$('.arr-scene-btn'), tr = track.getBoundingClientRect(), st = starts();
-  return { tr, secs: btns.map((b, i) => { const r = b.getBoundingClientRect(); return { left: r.left - tr.left, width: r.width, start: st[i], bars: T.sections[i].bars }; }) };
+  const track = $('#ruler-track'), tr = track.getBoundingClientRect();
+  return { tr, bars: playMap().bars, secs: $$('#arr-strip [data-col-start]').map(b => { const r = b.getBoundingClientRect(); return { left: r.left - tr.left, width: r.width, start: +b.dataset.colStart, bars: +b.dataset.colBars, grow: b.dataset.xcol === 'growth' }; }) };
 }
 function barToX(g, bar) {
   const s = g.secs.find(x => bar < x.start + x.bars) || g.secs[g.secs.length - 1];
@@ -2100,14 +2196,32 @@ function xToBar(g, x) {
   let s = g.secs[0];
   for (const c of g.secs) if (x >= c.left - 2) s = c;
   if (!s) return 0;
-  const bar = s.start + Math.min(1, Math.max(0, (x - s.left) / s.width)) * s.bars;
-  return Math.max(0, Math.min(songBars() - .25, Math.round(bar * 4) / 4));
+  const raw = s.start + Math.min(1, Math.max(0, (x - s.left) / s.width)) * s.bars;
+  // in the growth a click within 4 px of a step lands on the step
+  if (s.grow) { const near = playMap().steps.find(b => Math.abs(barToX(g, b) - x) <= 4); if (near !== undefined) return near; }
+  return Math.max(0, Math.min(g.bars - .25, Math.round(raw * 4) / 4));
 }
 function renderRuler() {
   requestAnimationFrame(() => {
-    const g = rulerGeo(), total = songBars(), every = total > 96 ? 8 : 4;
-    $('#ruler-ticks').innerHTML = Array.from({ length: total }, (_, b) => `<i class="${b % every === 0 ? 'major' : ''}" style="left:${barToX(g, b)}px">${b % every === 0 ? b + 1 : ''}</i>`).join('');
-    $('#ruler-track').setAttribute('aria-valuemax', total);
+    const g = rulerGeo(), P = playMap(), M = compiled.meta, every = P.bars > 96 ? 8 : 4;
+    // the growth: minutes and its steps when compact, nothing in the hidden tab, bars like the song when open
+    const inGrow = b => b < P.G, open = growView === 'open';
+    let html = '';
+    for (let b = 0; b < P.bars; b++) {
+      if (inGrow(b) && !open) continue;
+      html += `<i class="${b % every === 0 ? 'major' : ''}" style="left:${barToX(g, b)}px">${b % every === 0 ? b + 1 : ''}</i>`;
+    }
+    if (P.G && growView === 'compact') {
+      for (let k = 1, b = 0; b < P.G; k++) {
+        while (b < P.G && M.secondsAt(b) < k * 60) b++;
+        if (b >= P.G) break;
+        html += `<i class="r-min" style="left:${barToX(g, b)}px">${k}'</i>`;
+        b++;
+      }
+    }
+    if (P.G && growView !== 'hidden') html += P.steps.map(b => `<i class="r-step" style="left:${barToX(g, b)}px"></i>`).join('');
+    $('#ruler-ticks').innerHTML = html;
+    $('#ruler-track').setAttribute('aria-valuemax', P.bars);
   });
 }
 // dove ripartirebbe la musica: la posizione in pausa, oppure l'inizio della sezione selezionata
@@ -2127,33 +2241,48 @@ $('#ruler-track').addEventListener('pointerdown', e => {
   $('#ruler-track').setPointerCapture(e.pointerId); e.preventDefault();
 });
 $('#ruler-track').addEventListener('pointermove', e => { if (rulerDrag) rulerDrag.bar = xToBar(rulerDrag.g, e.clientX - rulerDrag.g.tr.left); });
-$('#ruler-track').addEventListener('pointerup', () => { if (!rulerDrag) return; const b = rulerDrag.bar; rulerDrag = null; seekTo(b + growBars()); });
+$('#ruler-track').addEventListener('pointerup', () => { if (!rulerDrag) return; const b = rulerDrag.bar; rulerDrag = null; seekTo(b); });
+// keys on the played song: arrows one bar, Page Up and Page Down the previous or next growth step or section,
+// Home bar 0, End the last bar (an added ending included)
 $('#ruler-track').addEventListener('keydown', e => {
-  const g = growBars(), now = (isPlaying() && mode === 'track' && sched() ? sched().now() : cueBar()) - g, total = songBars();
-  const to = { ArrowLeft: Math.floor(now) - 1, ArrowRight: Math.floor(now) + 1, Home: -g, End: total - 1 }[e.key];
-  if (to === undefined) return;
-  e.preventDefault(); seekTo(g + Math.max(-g, Math.min(total - 1, to)));
+  const P = playMap(), now = isPlaying() && mode === 'track' && sched() ? sched().now() : cueBar(), last = Math.max(0, P.bars - 1);
+  const marks = [...new Set([0, ...P.steps, ...compiled.meta.sections.map(s => s.start)])].filter(b => b <= last).sort((a, b) => a - b);
+  const prev = () => { const l = marks.filter(b => b < now - .5); return l.length ? l[l.length - 1] : 0; };
+  const next = () => marks.find(b => b > now + .01) ?? last;
+  const go = { ArrowLeft: () => Math.floor(now) - 1, ArrowRight: () => Math.floor(now) + 1, Home: () => 0, End: () => last, PageUp: prev, PageDown: next }[e.key];
+  if (!go) return;
+  e.preventDefault(); seekTo(Math.max(0, Math.min(last, go())));
 });
 // a ogni frame: cursore e tempo (durante il trascinamento segue il puntatore)
 function updateRuler(playing) {
   const knob = $('#ruler-knob'); if (!knob || !compiled) return;
-  const g = rulerGeo(), s = sched();
-  const gb = growBars(), played = rulerDrag ? rulerDrag.bar + gb : playing && mode === 'track' && s ? Math.min(s.now(), compiled.meta.bars) : cueBar();
-  const pos = Math.max(0, Math.min(songBars(), played - gb));
+  const g = rulerGeo(), s = sched(), P = playMap();
+  const played = rulerDrag ? rulerDrag.bar : playing && mode === 'track' && s ? Math.min(s.now(), compiled.meta.bars) : cueBar();
+  const pos = Math.max(0, Math.min(P.bars, played));
   const x = barToX(g, pos), w = g.tr.width;
   // il cursore resta dentro la barra anche a fine brano (prima sporgeva e faceva comparire le barre di scorrimento)
   knob.style.left = `${Math.max(7, Math.min(w - 7, x))}px`; $('#ruler-fill').style.width = `${Math.max(0, Math.min(w, x))}px`;
   const tt = `${clock(compiled.meta.secondsAt(played))} / ${clock(compiled.meta.seconds)}`;
   if ($('#ruler-time').textContent !== tt) $('#ruler-time').textContent = tt;
-  $('#ruler-track').setAttribute('aria-valuenow', Math.min(songBars(), Math.floor(pos) + 1));
+  $('#ruler-track').setAttribute('aria-valuenow', Math.min(P.bars, Math.floor(pos) + 1));
 }
 
 $('#arr-strip').addEventListener('click', e => {
+  // the growth view toggle: hidden, compact, open (timeline-growth D3), remembered
+  const v = e.target.closest('[data-grow-view]');
+  if (v) { growView = GROW_VIEWS[(GROW_VIEWS.indexOf(growView) + 1) % GROW_VIEWS.length]; store.set('coding-misk-growth-view', growView); renderArranger(); return; }
+  // the growth goes to bar 0, the ending to its start (D6)
+  const x = e.target.closest('[data-xcol]');
+  if (x) return seekTo(x.dataset.xcol === 'growth' ? 0 : +x.dataset.colStart);
   const b = e.target.closest('[data-scene-i]'); if (!b) return;
   const i = +b.dataset.sceneI;
+  // a grown song: the written section itself, the first one too (the growth has its own column)
+  if (growBars()) return seekTo(secStart(i));
   if (isPlaying() && mode === 'track') return playSong(compiled, sceneStart(i), 'track');
   paused = null; selectScene(i);
 });
+// the open growth keeps the written song's scale: a new width redraws it
+{ let rt = 0; addEventListener('resize', () => { if (growView !== 'open' || !growBars()) return; clearTimeout(rt); rt = setTimeout(renderArranger, 150); }); }
 $('#track-title').addEventListener('input', e => { T.title = e.target.value; changed(); renderSource(); });
 $('#track-pick').addEventListener('change', e => {
   const tr = composedTracks().find(x => x.id === e.target.value);
@@ -2979,7 +3108,7 @@ function previewBtn(tr) { const on = !!(preview && preview.state && preview.stat
 // for the browser checks (tools/check-preview.cjs)
 globalThis.codingMiskPreview = preview;
 // (and what the bar counter counts: the song in Compose, written or grown, and the song playing)
-globalThis.codingMiskBars = () => ({ compose: { bars: compiled.meta.bars, pending: !!compiled.pending, growth: growBars(), cue: cueBar() }, song: song && song.meta ? { id: song.id, bars: song.meta.bars, loop: !!song.loop } : null });
+globalThis.codingMiskBars = () => ({ compose: { bars: compiled.meta.bars, pending: !!compiled.pending, growth: growBars(), cue: cueBar(), map: (({ pre, G, W, end, bars, ending, steps }) => ({ pre, G, W, end, bars, ending, steps, view: growView, sel, tk }))(playMap()) }, song: song && song.meta ? { id: song.id, bars: song.meta.bars, loop: !!song.loop } : null });
 // the styles a pattern saved from a song with no style tags links (pattern-followups D1): its artist's, or the styles
 // its style line names
 const songStyleFallback = () => fallbackStyles(T, { recipes: RECIPES, artists: [...BUILTIN_ARTISTS, ...(store.get('coding-misk-artists', []) || [])] });
@@ -3770,7 +3899,7 @@ function startCard(i, bar) {
     if (!loadTrack(tr)) return;
     songLook(tr.look);
     // the card's timeline is the written song: a bar on it is a bar of the written part, after a growth span
-    return playSong(compiled, bar > 0 ? bar + growBars() : 0, 'track');
+    return playSong(compiled, bar > 0 ? bar + cardGrowBars() : 0, 'track');
   }
   if (!(song && song.id === tr.id)) songLook(tr.look);
   playSong(p, bar, 'free');
@@ -3981,14 +4110,14 @@ try {
   updateRuler(playing);
   const head = $('#arr-strip .head');
   if (head) {
+    // (the column that plays: a written section, the growth or the ending, timeline-growth D5)
     const trackCyc = playing && mode === 'track' && s ? s.now() : -1;
-    const idx = trackCyc >= 0 ? compiled.meta.sectionAt(trackCyc) : -1;
-    const btns = $$('.arr-scene-btn'), b = btns[arrSec(idx)];
+    const cols = $$('#arr-strip [data-col-start]'), b = trackCyc < 0 ? null : cols.find(x => trackCyc >= +x.dataset.colStart && trackCyc < +x.dataset.colStart + +x.dataset.colBars) || null;
     head.hidden = !b;
-    if (b) head.style.left = `${b.offsetLeft + Math.min(1, (trackCyc - compiled.meta.sections[idx].start) / compiled.meta.sections[idx].len) * (b.offsetWidth - 2)}px`;
+    if (b) head.style.left = `${b.offsetLeft + Math.min(1, (trackCyc - +b.dataset.colStart) / +b.dataset.colBars) * (b.offsetWidth - 2)}px`;
     const lh = $('#arr-grid .head');
     if (lh) { lh.hidden = !b; if (b) lh.style.left = head.style.left; }
-    btns.forEach((x, j) => x.classList.toggle('playing', j === idx));
+    cols.forEach(x => x.classList.toggle('playing', x === b));
   }
   // avanzamento e pulsanti nelle card
   $$('[data-song-card]').forEach(card => {
@@ -3997,7 +4126,7 @@ try {
     const active = playing && mine, isPaused = !playing && paused && mine;
     const m = mine ? song.meta : c.p.meta, L = mine ? m : cardLen(c), cyc = active ? s.now() : isPaused ? paused.cyc : 0;
     // (the card's timeline is the written song: a grown song in Compose plays its growth span before it)
-    const off = mine && mode === 'track' ? growBars() : 0, w = c.p.meta;
+    const off = mine && mode === 'track' ? cardGrowBars() : 0, w = c.p.meta;
     card.querySelector('.head').style.left = `${Math.min(100, Math.max(0, cyc - off) / w.bars * 100)}%`;
     const cur = active || isPaused ? w.sectionAt(cyc - off) : -1;
     card.querySelectorAll('.sec').forEach((x, j) => x.classList.toggle('on', j === cur));
@@ -4442,7 +4571,7 @@ const visuals = startVisuals({
   getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando
-  getMode: () => (mode === 'track' && song && isPlaying() && song.meta.sectionAt(sched().now()) === sel ? 'comp' : 'free'),
+  getMode: () => (mode === 'track' && song && isPlaying() && arrSec(song.meta.sectionAt(sched().now())) === sel ? 'comp' : 'free'),
   isPlaying, sched,
   readout(cyc, step, playing) {
     if (!playing) return `${secFull().bpm} BPM  ·  ${paused ? t('resume').replace('▶ ', '') : t('rdPaused')}\n${t('rdHint')}`;
@@ -4453,8 +4582,9 @@ const visuals = startVisuals({
     if (song) {
       const i = song.meta.sectionAt(cyc), sec = song.meta.sections[i];
       line2 = `${song.title}  ·  ${sec ? sec.label : ''}`;
-      if (mode === 'track' && sec && T.sections[i]) {
-        const st = { ...SECTION_DEFAULTS, ...T.sections[i] }, tr = (KEYS.find(k => k[0] === st.key) || [0, 0])[1];
+      const k = mode === 'track' ? arrSec(i) : -1;
+      if (mode === 'track' && sec && T.sections[k]) {
+        const st = { ...SECTION_DEFAULTS, ...T.sections[k] }, tr = (KEYS.find(k => k[0] === st.key) || [0, 0])[1];
         const prog = PROGS[st.chords][1], pos = (bar - sec.start) % prog.length;
         line2 += '\n' + prog.map(c => chordName(c, tr)).map((n, j) => j === pos ? `[${n}]` : ` ${n} `).join('');
       }

@@ -310,6 +310,28 @@
   .arr-scene-btn.playing { background: color-mix(in srgb, var(--a1) 20%, var(--panel2)); }
   .arr-scene-btn.fade::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 10px; background: linear-gradient(90deg, var(--a2), transparent); opacity: .6; }
   .arr-strip .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); box-shadow: 0 0 8px var(--a1); left: 0; pointer-events: none; }
+  /* the growth and the ending of a grown song (timeline-growth): read-only, hatched columns before and after the
+     written sections, in the ruler, the strip and the grid; the growth compact, hidden (a tab) or open */
+  .arr-scroll { --grow-col: 160px; }
+  @media (max-width: 560px) { .arr-scroll { --grow-col: 96px; } }
+  .grow-hidden .arr-scroll { --grow-col: 22px; }
+  .arranger.has-growth .arr-corner { display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; padding-right: 6px; }
+  .grow-eye { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 24px; padding: 0; border-radius: 5px; border: 1px solid var(--line); background: var(--panel2); color: var(--a2); cursor: pointer; }
+  .grow-eye:hover, .grow-eye:focus-visible { border-color: var(--a2); }
+  .grow-eye .ico { width: 18px; height: 18px; }
+  .arr-xcol { position: relative; min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; padding: 6px 8px; border-radius: 6px; border: 1px dashed color-mix(in srgb, var(--a2) 55%, var(--line)); color: var(--ink); text-align: left; overflow: hidden; cursor: pointer; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--a2) 16%, transparent) 0 5px, transparent 5px 10px), var(--panel2); }
+  .arr-xcol b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .arr-xcol span { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .arr-xcol.playing { border-style: solid; border-color: var(--a2); }
+  .grow-hidden .arr-xcol.x-grow { padding: 0; }
+  .grow-hidden .arr-xcol.x-grow b, .grow-hidden .arr-xcol.x-grow span { display: none; }
+  .trk-cell.xcell { position: relative; overflow: hidden; border: 1px dashed color-mix(in srgb, var(--a2) 40%, transparent); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--line) 40%, transparent) 0 4px, transparent 4px 8px); }
+  .tl-mode .trk-cell.xcell { height: 28px; border-radius: 4px; }
+  .x-on { position: absolute; top: 5px; bottom: 5px; border-radius: 2px; background: color-mix(in srgb, var(--a1) 55%, var(--panel2)); pointer-events: none; }
+  .x-step { position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); opacity: .85; pointer-events: none; }
+  .grow-hidden .xcell.x-grow i { display: none; }
+  .ruler-ticks i.r-min { top: 1px; bottom: auto; height: 12px; padding-left: 2px; border-left-color: var(--a2); color: var(--a2); }
+  .ruler-ticks i.r-step { top: auto; height: 7px; border-left: 2px solid var(--a2); }
   .arr-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .arr-tools .song-meta { margin-left: auto; }
   .arr-scene { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
@@ -516,6 +538,9 @@
 :root[data-ui="hw"] .arr-scene-btn { background: linear-gradient(#34343a, #25252a); border: 1px solid #0c0c0e; box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 2px 0 #000; }
 :root[data-ui="hw"] .arr-scene-btn[aria-current="true"] { box-shadow: inset 0 0 0 1px var(--a1), 0 0 10px color-mix(in srgb, var(--a1) 50%, transparent); }
 :root[data-ui="hw"] .arr-scene-btn.playing::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--led); box-shadow: 0 0 8px var(--led); }
+:root[data-ui="hw"] .arr-xcol { background: repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 5px, transparent 5px 10px), linear-gradient(#2c2c31, #202024); border: 1px dashed #4a4a52; box-shadow: 0 2px 0 #000; }
+:root[data-ui="hw"] .arr-xcol.playing::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--led); box-shadow: 0 0 8px var(--led); }
+:root[data-ui="hw"] .trk-cell.xcell { border: 1px dashed #3a3a40; }
 :root[data-ui="hw"] .edhost, :root[data-ui="hw"] .stagewrap { border: 6px solid #0f0f11; box-shadow: 0 0 0 1px #3d3d43, 0 6px 16px rgba(0,0,0,.6); }
 
 /* radio (#22) */
