@@ -4,7 +4,8 @@
 // `npm run check:patterns` (Node) use the same functions.
 //
 // A saved pattern: { id, name, kind, type, pattern (as the song format stores it), sound, settings, context { key,
-// chords, meter, bpm, mode }, styles, source ('compose' | 'generated'), seed, why, created }. Favourites and votes come
+// chords, meter, bpm, mode }, styles, source ('compose' | 'generated'), seed, why, created, uses, lastUsed }. `uses` and
+// `lastUsed` (saved-patterns-list D5) count how often it was brought into a song; older patterns have neither. Favourites and votes come
 // later (design D8): a star per pattern and a vote (no, maybe, yes) kept next to `why` and `seed`.
 import { BASS, ARPS, HOOKS, PADS, GROOVES, GUITAR_PATTERNS, CHORDS, ROWS, DEFAULT, meterSteps } from '../music.js';
 import { miniEvents, ideaRows, slotTokens, altItems, beatForm, midi } from '../song/ideas.js';
@@ -111,6 +112,14 @@ export function cleanStyles(styles) {
 }
 export const everyStyle = styles => !cleanStyles(styles).filter(x => x !== 'any').length;
 export const setPatternStyles = (list, id, styles) => listPatterns(list).map(p => (p.id === id ? { ...p, styles: cleanStyles(styles) } : p));
+// a saved pattern brought into a song (saved-patterns-list D5): one more use and the time of it (ISO); a preview
+// listen or a session replay does not count
+export const markPatternUsed = (list, id, now = new Date()) => listPatterns(list).map(p => (p.id === id ? { ...p, uses: (Number(p.uses) || 0) + 1, lastUsed: now.toISOString() } : p));
+// two copies of the same pattern (a backup and this browser): the larger use count and the newer last use win
+export function mergeUses(a, b) {
+  const uses = Math.max(Number(a && a.uses) || 0, Number(b && b.uses) || 0), last = [a && a.lastUsed, b && b.lastUsed].filter(x => typeof x === 'string').sort().pop();
+  return { ...(uses ? { uses } : {}), ...(last ? { lastUsed: last } : {}) };
+}
 // the store over the app's browser storage ({ get, set }); built-in patterns are not in it, so they cannot be renamed
 // or deleted
 export function patternStore(store) {
@@ -122,14 +131,17 @@ export function patternStore(store) {
     rename(id, name) { store.set(STORE_KEY, renamePattern(read(), id, name)); },
     remove(id) { store.set(STORE_KEY, removePattern(read(), id)); },
     setStyles(id, styles) { store.set(STORE_KEY, setPatternStyles(read(), id, styles)); },
+    markUsed(id, now = new Date()) { store.set(STORE_KEY, markPatternUsed(read(), id, now)); },
   };
 }
 // the user's patterns as the director reads them (material-generator D10, src/endless/material.js): type, pattern, the
 // style tags it fits ("any" when it has none), the key context and the idea (a chromatic melody keeps its own mode)
 // (radio-arrangement D9: with its name, kind, sound and settings, for the console's Add a saved pattern; the context
-// holds its meter, key and tempo)
-export const forRadio = list => listPatterns(list).filter(p => p.kind !== 'grooves' || p.pattern.idea || p.pattern.rows)
-  .map(p => ({ id: p.id, name: p.name || p.id, kind: p.kind, type: p.type, pattern: clone(p.pattern), sound: p.sound ?? null, settings: clone(p.settings || {}), styles: Array.isArray(p.styles) && p.styles.length ? p.styles.slice() : ['any'], context: { ...(p.context || {}) }, ...(p.pattern.idea ? { idea: clone(p.pattern.idea) } : {}) }));
+// holds its meter, key and tempo). meta: also `created`, `uses` and `lastUsed` for the console's sorts (saved-patterns-list
+// D5); the director's pool is read without them, so session recipes and the endless fixtures stay as before
+export const forRadio = (list, { meta = false } = {}) => listPatterns(list).filter(p => p.kind !== 'grooves' || p.pattern.idea || p.pattern.rows)
+  .map(p => ({ id: p.id, name: p.name || p.id, kind: p.kind, type: p.type, pattern: clone(p.pattern), sound: p.sound ?? null, settings: clone(p.settings || {}), styles: Array.isArray(p.styles) && p.styles.length ? p.styles.slice() : ['any'], context: { ...(p.context || {}) }, ...(p.pattern.idea ? { idea: clone(p.pattern.idea) } : {}),
+    ...(meta ? { created: p.created || null, uses: Number(p.uses) || 0, lastUsed: p.lastUsed || null } : {}) }));
 
 // ---------- Save as pattern (design D7) ----------
 // the section a pattern of a track plays in first (the first section when none of its clips plays it)

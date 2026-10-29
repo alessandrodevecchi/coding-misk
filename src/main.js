@@ -4526,6 +4526,8 @@ patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast
   onStyle: id => { showTab('stili'); stylesTab.openStyle(id); },
   addToSong: (it, cfg) => {
     const res = addPatternToSong(T, it, { sound: cfg && cfg.sound, base: baseSettings(it.type), name: t(it.type), section: SEC().name });
+    // a saved pattern added to the song in Compose counts as one use (saved-patterns-list D5)
+    if (it.src === 'mine' && it.id) patternsStore.markUsed(it.id);
     tk = res.track; editPat = res.key; selClip = null;
     // the song changes without moving the player: the loop goes on
     if (mode === 'track') changed(); else { dirty = true; saveDraft(); compiled = playable({ ...T, kind: 'composed' }); renderArranger(); }
@@ -4584,8 +4586,11 @@ newSong = createNewSongPanel({ root: $('#new-song'), button: $('#tr-new'), t, tx
   onScratch: () => newEmptySong(), onGenerate: seed => generateNew(seed), onSurprise: () => surpriseNew() });
 radio = createRadio({
   root: $('#tab-radio'), t, tx, esc, store, options: radioOptions, recipes: RECIPES, toast, getLang, artists: () => artistsTab.usable(), face: a => artistsTab.face(a), keepArtist: a => artistsTab.keep(a), invent: inventFor, keepStyle,
-  // the user's saved patterns join the songs where they fit (pattern-library; material-generator D10)
-  userPatterns: () => forRadio(patternsStore.list()),
+  // the user's saved patterns join the songs where they fit (pattern-library; material-generator D10); the console
+  // also reads their save date and use counts for its sorts (saved-patterns-list D5)
+  userPatterns: () => forRadio(patternsStore.list(), { meta: true }),
+  // a saved pattern queued from the console (Add as a new track, Replace) counts as one use
+  onPatternUsed: id => patternsStore.markUsed(id),
   // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them
   reloadSamples: () => reloadSamples(),
   // the samples manifest, for the voices of Next changes (after-tests-oct28 D2)

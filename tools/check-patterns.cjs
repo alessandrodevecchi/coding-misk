@@ -254,6 +254,12 @@ const shot = (page, name) => (shots ? page.screenshot({ path: path.join(shots, n
     check(keys1.length === keys0.length + 1 && hook1.patterns[added].preset === 'neon' && keys0.every(k => JSON.stringify(hook0.patterns[k]) === JSON.stringify(hook1.patterns[k])), 'Add to song: a new letter on the hook track, the other patterns unchanged', `${keys0} → ${keys1}`);
   } else check(!!hook1 && hook1.patterns.A.preset === 'neon', 'Add to song: a new hook track with the pattern');
   check(d1.dirty === true, 'the song is marked changed, not saved');
+  // a saved pattern added to the song counts one use, a built-in one has none to count (saved-patterns-list D5)
+  { const mine = (await saved())[0];
+    if (mine) { const u0 = mine.uses || 0; await kind(mine.kind); await sel(`u:${mine.id}`); await page.click('#patterns [data-pn-add]'); await sleep(400);
+      const u1 = ((await saved()).find(p => p.id === mine.id) || {}).uses || 0;
+      check(u1 === u0 + 1 && !!((await saved()).find(p => p.id === mine.id) || {}).lastUsed, 'Add to song of a saved pattern counts one use', `${u0} -> ${u1}`); }
+    else check(false, 'a saved pattern to add'); }
 
   // ---------- pattern-followups (#72) ----------
   const drafts = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-pattern-drafts') || '[]'));
