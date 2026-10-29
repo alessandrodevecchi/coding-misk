@@ -8,6 +8,7 @@
 // info: { title, section, sectionNo, sections, next, nextIn (bars), bar, bars, bpm, playing, renderName, say, sayBar
 //   (bars since the line began), secBar (bars since the section began), word(key, vars) → a word of the interface }
 import { monitorLayout } from './widget-looks.js';
+import { layerLayout } from './widget-layer.js';
 import { instColour } from './widget-palettes.js';
 import { gridOf, termGrid, termColour, brailleDots, brailleWave } from './term-grid.js';
 
@@ -378,3 +379,23 @@ export function drawClaude(g, W, H, F, T, info = {}) {
   t.put(1, rows - 2, '⏵⏵', T.orange); t.put(4, rows - 2, info.playing ? word('mode') : word('paused'), T.orange);
   if (cols > 50) t.put(5 + (info.playing ? word('mode') : word('paused')).length, rows - 2, word('modeHint'), T.dim);
 }
+
+// ---------- the layer over a scene in ASCII and Terminal (D2, D4) ----------
+// The panels of the strip or the Palco screen (layerLayout of widget-layer.js) in glyph forms, on the grid of the frame,
+// drawn after the pass so their text and lines stay sharp. → the panels drawn (for the checks)
+export function drawLayerGlyph(g, W, H, F, kind, render, T, info = {}) {
+  const list = F.dim === 'hidden' ? F.roster.filter(p => !p.quiet) : F.roster;
+  if (!list.length) return [];
+  const boxes = layerLayout(kind, list.length, W, H), word = wordOf(info);
+  const G = render === 'terminal' ? gridOf(W, H, passRows(H)) : gridOf(W, H, rowsFor(H));
+  const t = termGrid(g, G, render === 'terminal' ? T : F.pal);
+  const shown = list.slice(0, boxes.length);
+  shown.forEach((p, i) => {
+    const b = cellsOf(boxes[i], G, 0, G.rows - 1);
+    if (render === 'terminal') termPanel(t, b, p, F, { word });
+    else { t.bg(b.c, b.r, b.w, b.h, F.pal.bg); asciiPanel(t, b, p, F); }
+  });
+  return shown;
+}
+// the rows of the Terminal pass over a scene (45 at any height, render-styles.js), so the panels sit on its cells
+const passRows = () => 45;

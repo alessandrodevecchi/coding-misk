@@ -104,6 +104,30 @@ const savePng = (file, url) => { if (SHOTS && url) fs.writeFileSync(`${SHOTS}/${
     await page.close();
   }
 
+  // 1b. the layer over a scene (task 4.3): drawn before the pass in 1-bit, CRT and LED, natively after it in ASCII and
+  // Terminal; the same frame twice; the layer's panels there; a picture of each
+  {
+    const { page, errors } = await open(browser, {});
+    const setLayer = v => page.evaluate(x => { if (x === null) localStorage.removeItem('coding-misk-stage-widgets'); else localStorage.setItem('coding-misk-stage-widgets', JSON.stringify(x)); }, v);
+    // (a pass is checked for repeating frames where the same look and layer repeat with Normal: Tramonto's level
+    // smoothing carries a little from frame to frame, which the see-through panels show)
+    let normalSame = true;
+    for (const [look, layer] of [['tramonto', 'strip'], ['palco', 'palco']]) for (const render of RENDERS) {
+      await setLayer({ layer });
+      const r = await synth(page, { look, render, w: 1280, h: 720, times: [5], png: SHOTS && !NO_SHOTS ? 7.3 : null });
+      const panels = await page.evaluate(() => globalThis.codingMiskLayerPanels);
+      await setLayer(null);
+      const off = await synth(page, { look, render, w: 1280, h: 720, times: [5] });
+      savePng(`fatto-strato-${look}-${render}.png`, r.png);
+      const rep = r.hashes['alone:5'] === r.hashes['again:5'];
+      if (render === 'normal') normalSame = rep && !UNREPEATABLE.includes(look);
+      const same = !normalSame || rep;
+      check(same && panels && panels.panels.length > 0 && r.hashes['alone:5'] !== off.hashes['alone:5'], `layer (${layer}) over ${look} in ${render}: drawn${['ascii', 'terminal'].includes(render) ? ' natively after the pass' : ' under the pass'}${normalSame ? ', the same frame twice' : ''}`, panels ? `${panels.kind}: ${panels.panels.join(' ')}` : 'no panels');
+    }
+    check(!errors.length, 'no page errors (layer)', errors.join('; '));
+    await page.close();
+  }
+
   // 2. the code panel of a video is the same with any render (D5)
   {
     const { page, errors } = await open(browser, {});

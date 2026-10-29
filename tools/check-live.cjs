@@ -34,7 +34,7 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
   let l = await L();
   check(l.on && l.frames > 30, 'the window draws the live picture', JSON.stringify(l));
   check(await win.title() === 'coding-misk broadcast', 'the window has the title OBS captures by');
-  const pic = (x, y, w, h) => win.evaluate(([x, y, w, h]) => { const d = document.getElementById('picture').getContext('2d').getImageData(x, y, w, h).data; let n = 0, s = 0; for (let i = 0; i < d.length; i += 4) { const v = d[i] + d[i + 1] + d[i + 2]; s += v; if (v > 380) n++; } return { lit: n, mean: s / (d.length / 4) }; }, [x, y, w, h]);
+  const pic = (x, y, w, h) => win.evaluate(([x, y, w, h]) => { const d = document.getElementById('picture').getContext('2d').getImageData(x, y, w, h).data; let n = 0, s = 0; const cells = new Array(64).fill(0); for (let i = 0; i < d.length; i += 4) { const v = d[i] + d[i + 1] + d[i + 2]; s += v; if (v > 380) n++; const p = i / 4, cx = Math.floor((p % w) * 8 / w), cy = Math.floor(Math.floor(p / w) * 8 / h); cells[cy * 8 + cx] += v / (w * h / 64); } return { lit: n, mean: s / (d.length / 4), cells }; }, [x, y, w, h]);
   const full = await pic(0, 0, 1920, 1080);
   check(full.mean > 20, 'the picture is not black', JSON.stringify(full));
   check(await win.evaluate(() => { const c = document.getElementById('picture'); return c.width === 1920 && c.height === 1080; }), 'the picture is 1920×1080');
@@ -65,7 +65,9 @@ const shot = async (p, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
   await sleep(1000);
   const after = await pic(1300, 400, 600, 600);
   check(mid === 'code-soul', 'TAKE puts the preset on air', mid);
-  check(Math.abs(after.mean - before.mean) > 5, 'the right side of the picture changes to the code', `${before.mean.toFixed(1)} → ${after.mean.toFixed(1)}`);
+  // (compared area by area: the code panel's ground follows the code theme, so the mean alone can stay close)
+  const moved = before.cells.reduce((a, v, i) => a + Math.abs(v - after.cells[i]), 0) / 64;
+  check(moved > 5, 'the right side of the picture changes to the code', `mean ${before.mean.toFixed(1)} → ${after.mean.toFixed(1)}, change by area ${moved.toFixed(1)}`);
   await shot(win, 'live-window-code-soul.png');
   const card = await page.evaluate(() => globalThis.codingMiskVideo.live.preset.card);
   await room.click('[data-preset="5"]'); await room.keyboard.press('c'); await room.click('#lr-take'); await sleep(1200);

@@ -7,12 +7,13 @@ The code panel always looks the same: Strudel's default editor theme on a grey g
 - **A code theme setting** in the Settings "Appearance" card ("Code theme", it: "Tema del codice"): Automatic (default), our own themes, and a short list of Strudel's built-in themes.
 - **Automatic follows the app theme:** neon gives our Neon code theme, which takes its colours from the look (accent, second accent, ink, muted), so the code changes with the look; hardware gives our Amber code theme, matched to the LCD fields.
 - **Our themes:** Neon, Amber, Terminal (a modern terminal palette, the same family as the Terminal render), High contrast dark, and Light high contrast (white ground, black text). Every text colour at least 4.5:1 against the ground, the two high contrast themes at least 7:1.
-- **Strudel's themes, curated:** a short list of Strudel's themes whose names are not product names, shown under their Strudel names and whose text reaches 4.5:1 (recommended: `strudelTheme`, `teletext`, `blackscreen`, `whitescreen`, `bluescreen`, `greenText`). The full list stays out.
+- **Strudel's themes, curated:** a short list of Strudel's themes whose names are not product names, shown under their Strudel names and whose text reaches 4.5:1 (built: `strudelTheme`, `teletext`, `blackscreen`, `whitescreen`, `bluescreen`; `greenText` left out, its comments are 3.4:1). The full list stays out.
 - **A code font and size:** JetBrains Mono by default (already loaded, already used by the code in videos), with a short font list and three sizes. The app's own code sizes start to apply (today Strudel's inline 18 px overrides them).
 - **Everything drawn in the code panel follows the code theme:** the code widgets (`#79`), the dimmed widget of a muted `_$:` line, the outline of the playing notes, the evaluation flash, the caret and the selection.
+- **Muted lines dimmed:** the text of a muted `_$:` line is dimmed to about 55 %, in the panel and in videos, with an option in the same Settings card ("Dim muted lines", on by default).
 - **Videos follow the code theme:** the code panel drawn in session videos, the fast video, fragments and the live output uses the code theme's colours and font ("same as the panel" by default, or the app theme's colours as today). The fast video reads the theme once when it starts.
 - **Saved and in the backup,** reset with the other settings.
-- **Out of scope:** a song naming its own code theme, a theme editor, editor settings of Strudel's own REPL (keybindings, line wrapping), the light app theme (separate change `light-theme`).
+- **Out of scope:** a song naming its own code theme (a later idea, as a preference and never an obligation), a theme editor, editor settings of Strudel's own REPL (keybindings, line wrapping), the light app theme (separate change `light-theme`).
 
 ## Capabilities
 

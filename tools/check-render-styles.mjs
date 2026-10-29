@@ -7,7 +7,7 @@
 import { RENDERS, NATIVE_RENDERS, RENDER_GAIN, LOOKS, PICK_LOOKS } from '../src/music.js';
 import { BAYER8, BIT_COLOURS, bitPixels, ledPixels, asciiCells, ASCII_RAMP, termPixels, passSizes, liftTable, gainOf, drawTermChrome } from '../src/visuals/render-styles.js';
 import { TERM_PALETTES, termPalette, termColour, gridOf, brailleWave, brailleDots } from '../src/visuals/term-grid.js';
-import { drawMonitorTerm, drawRulloTerm, drawMonitorAscii, drawRulloAscii, drawClaude, sectionChange, promptLine, rowsFor } from '../src/visuals/glyph-looks.js';
+import { drawMonitorTerm, drawRulloTerm, drawMonitorAscii, drawRulloAscii, drawClaude, drawLayerGlyph, sectionChange, promptLine, rowsFor } from '../src/visuals/glyph-looks.js';
 import { noteStore, rosterOf, levelAt, flashAt, silentAt, columnCache } from '../src/visuals/stage-feed.js';
 import { THEME_PALETTES } from '../src/visuals/widget-palettes.js';
 import { widgetSettings } from '../src/live/widgets.js';
@@ -145,7 +145,9 @@ const infoOf = cyc => ({ title: 'Luci Rosse', section: cyc < 16 ? 'Intro' : 'Dro
 const FORMS = {
   'Monitor Terminal': (g, W, H, F, i) => drawMonitorTerm(g, W, H, F, TERM_PALETTES.neon, i), 'Monitor Terminal hardware': (g, W, H, F, i) => drawMonitorTerm(g, W, H, F, TERM_PALETTES.hw, i),
   'Rullo Terminal': (g, W, H, F, i) => drawRulloTerm(g, W, H, F, TERM_PALETTES.neon, i), 'Monitor ASCII': drawMonitorAscii, 'Rullo ASCII': drawRulloAscii,
-  Claude: (g, W, H, F, i) => drawClaude(g, W, H, F, TERM_PALETTES.neon, i), 'Claude hardware': (g, W, H, F, i) => drawClaude(g, W, H, F, TERM_PALETTES.hw, i),
+  Claude: (g, W, H, F, i) => drawClaude(g, W, H, F, TERM_PALETTES.neon, i),
+  'layer strip Terminal': (g, W, H, F, i) => drawLayerGlyph(g, W, H, F, 'strip', 'terminal', TERM_PALETTES.neon, i), 'layer strip ASCII': (g, W, H, F, i) => drawLayerGlyph(g, W, H, F, 'strip', 'ascii', TERM_PALETTES.neon, i),
+  'layer screen Terminal': (g, W, H, F, i) => drawLayerGlyph(g, W, H, F, 'screen', 'terminal', TERM_PALETTES.hw, i), 'Claude hardware': (g, W, H, F, i) => drawClaude(g, W, H, F, TERM_PALETTES.hw, i),
 };
 const st = song();
 for (const [name, draw] of Object.entries(FORMS)) for (const [W, H] of [[1280, 720], [405, 720]]) {
@@ -166,6 +168,14 @@ for (const [name, draw] of Object.entries(FORMS)) for (const [W, H] of [[1280, 7
   const ga = recorder(); drawMonitorAscii(ga, 1280, 720, frameOf(st, 17.5, columnCache()), infoOf(17.5));
   const ta = ga.log.filter(x => x[0] === 'fillText').map(x => x[1]);
   check(ta.some(s => /^\+-+\+$/.test(s)) && ta.some(s => /^\[#*\.*\]$/.test(s)) && ta.some(s => s === '/' || s === '\\' || s === '-'), 'Monitor ASCII: +-| frames, a [####....] level, slope glyphs for the scope');
+}
+{
+  // the layer over a scene in glyph forms (task 4.3): the strip's panels, one per instrument, no more than the strip holds
+  const F = frameOf(st, 17.5, columnCache()), g = recorder(), drawn = drawLayerGlyph(g, 1280, 720, F, 'strip', 'terminal', TERM_PALETTES.neon, infoOf(17.5));
+  const texts = g.log.filter(x => x[0] === 'fillText').map(x => x[1]);
+  check(drawn.length > 0 && drawn.length <= 4 && texts.filter(s => s.startsWith('╭')).length === drawn.length, 'layer in Terminal: rounded panels in the strip, up to 4', `${drawn.length} panels`);
+  const ga = recorder(), da = drawLayerGlyph(ga, 1280, 720, F, 'screen', 'ascii', TERM_PALETTES.neon, infoOf(17.5));
+  check(da.length > 0 && ga.log.some(x => x[0] === 'fillText' && /^\+-+\+$/.test(x[1])), 'layer in ASCII: +-| panels in the Palco screen', `${da.length} panels`);
 }
 {
   // "Claude": what enters, what comes next, the typed line

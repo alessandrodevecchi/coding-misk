@@ -10,6 +10,13 @@ const CHECKS = {
     const { values } = mergeBackup(b, () => null);
     assert(JSON.stringify(values['coding-misk-code-widgets']) === JSON.stringify(w), 'imported');
   },
+  'stage widgets settings travel in the backup, the open sections of their card do not (widgets-on-stage 6.1)'() {
+    const w = { layer: 'strip', strip: 2, mapping: 'own' };
+    const b = makeBackup([['coding-misk-stage-widgets', w], ['coding-misk-sw-open', ['general']]]);
+    assert(JSON.stringify(b.data['coding-misk-stage-widgets']) === JSON.stringify(w) && !('coding-misk-sw-open' in b.data), Object.keys(b.data).join());
+    const { values } = mergeBackup(b, () => ({ layer: 'off', strip: 4 }));
+    assert(values['coding-misk-stage-widgets'].strip === 2, 'imported: the strip limit is 2 (spec scenario)');
+  },
   'backup keeps the app keys and leaves working state out'() {
     const b = makeBackup([['coding-misk-library', { tracks: [] }], ['coding-misk-draft', { x: 1 }], ['other', 1], ['coding-misk-ui', 'hw']]);
     assert(b.format === BACKUP_FORMAT && Object.keys(b.data).join() === 'coding-misk-library,coding-misk-ui', Object.keys(b.data).join());

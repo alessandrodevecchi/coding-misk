@@ -10,6 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:code": "node --no-warnings tools/snapshot-code.mjs check",
+    "check:code-themes": "node --no-warnings tools/check-code-themes.mjs",
     "snapshot:code": "node --no-warnings tools/snapshot-code.mjs write",
     "check:songs": "node --no-warnings tools/song.mjs validate songs && node --no-warnings tools/check-idea-errors.mjs",
     "voices": "node --no-warnings tools/voice.mjs",

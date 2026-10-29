@@ -26,7 +26,7 @@ Estimate: about 22 agent hours (design, Estimate), after `widgets-on-stage` phas
 
 - [x] 4.1 Cell target in the painters module and ASCII forms of scope, spectrum, pianoroll, punchcard, spiral, pitchwheel, frame, name, level, dimmed panels. Verify: `check:render-styles` (same grid for the same time), screenshots of Monitor and Rullo
 - [x] 4.2 Terminal forms: rounded titled panels, level line, braille scope drawn as dots, eighth-block spectrum, half-block piano roll, dot punchcard, header and footer, both palettes. Verify: screenshots of Monitor and Rullo in neon and hardware against `terminale-a-*`
-- [ ] 4.3 Layer drawn natively after the pass. Verify: screenshot of the strip over Tramonto in ASCII (waits for the layer of `widgets-on-stage` phase 4, built in parallel)
+- [x] 4.3 Layer drawn natively after the pass. Verify: screenshot of the strip over Tramonto in ASCII
 
 ## 5. Settings (2.5 h)
 
