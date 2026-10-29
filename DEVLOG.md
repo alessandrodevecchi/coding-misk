@@ -1606,3 +1606,10 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Perché così poche.** Su 296 passi della parte scritta, 74 hanno più di 2 s liberi ma solo 13 hanno una riga nuova più avanti: le righe dei passi dopo modificano quasi sempre una riga già a schermo (1091 casi), e una riga nuova costa 6-33 s di scrittura (mediana 14 s). I limiti contano poco: la leva è il meccanismo.
 - **Check.** Con `muted: 8` di serie `check:live-code` fallisce nel caso D8 (il limite 4 è scritto nel check). Nessun codice dell'app cambiato; analisi per il proprietario in `notes/prove-2026-10-26/righe-anticipo-limiti/`.
 
+
+## 2026-10-29: pulsante Esporta delle sessioni coperto dal pannello del codice
+
+- **Bug vero della UI, non del check.** In `check-export.cjs` il clic sul pulsante ⬇ di una sessione radio nella scheda Playlist andava in timeout: a 1300 px il pulsante stava sotto `aside#codecol`, e il proprietario non poteva cliccarlo nemmeno a mano (riga larga 736 px in 427 px di spazio).
+- **Causa.** L'elenco delle frasi della voce in Compose (56acec9) usa le stesse classi `.pl-row` e `.pl-head` della scheda Playlist con regole globali: la griglia a sei colonne con larghezze minime (circa 530 px) sostituiva quella delle righe della playlist. Il difetto c'era già a 789876c, prima dei widget nel codice.
+- **Correzione.** Regole dell'elenco delle frasi limitate a `.pl` (il suo contenitore), aspetto in Compose invariato. Con una playlist aperta stretta (pannello del codice accanto) i pulsanti della riga vanno su una seconda riga (container query sotto 640 px, solo sopra i 700 px di schermo): prima il titolo spariva a 0 px.
+- **Check.** `check-export.cjs` accetta `PORT` (prima andava sempre su 5173) e passa tutto, 33/33, sessioni salvate comprese. `check-library` tutto ok, `check-radio` 69/69, `check-voices` 53/53 (elenco delle frasi), `check:code` 46/46. In un worktree `check-radio` vuole i campioni parlati git-ignorati `public/samples/say_*`: senza, 3 controlli della voce falliscono. Screenshot in `notes/prove-2026-10-29/export-button/`.

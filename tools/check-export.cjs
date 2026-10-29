@@ -5,7 +5,7 @@
 // file stays below full scale (level-headroom): the render's float peak and the WAV's samples, with the time of the first
 // clipped sample.
 // Needs ffmpeg and ffprobe. Real time exports take as long as the songs.
-// Usage: PLAYWRIGHT_CORE=... node tools/check-export.cjs [song-id,song-id…] [--quick]   (dev server on :5173)
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-export.cjs [song-id,song-id…] [--quick]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const { CLIP, tapRender, renderPeak, filePeak } = require('./output-peak.cjs');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), { execFileSync } = require('node:child_process');
@@ -38,7 +38,7 @@ const align = (F, R) => { const ef = env(F, 480), er = env(R, 480); let best = 0
   const errors = [], downloads = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('download', d => downloads.push(d));
-  await page.goto('http://localhost:5173/'); await sleep(2500);
+  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   const settings = o => page.evaluate(o => { for (const [k, v] of Object.entries(o)) localStorage.setItem(k, JSON.stringify(v)); }, o);
   await page.evaluate(() => localStorage.clear());
   await settings({ 'coding-misk-export-format': 'wav', 'coding-misk-export-speed': 'fast' });
