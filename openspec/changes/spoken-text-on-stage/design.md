@@ -131,11 +131,18 @@ HW: the lane is an amber display with one light per speaker that glows while it 
 ## Open questions for the owner (each with a recommendation)
 
 1. **The step line:** hidden, small tag only when it differs, or kept as the caption? Recommended: small tag only when it differs.
+   - **1b. Where the tag goes (owner, round 2):** beside the spoken line (after a thin divider) or below it, in the same box (`giro2-tp1-accanto-16x9`, `giro2-tp1-sotto-16x9`, `giro2-tp1-accanto-9x16`, `giro2-tp1-sotto-9x16`). Recommended: below. It keeps the spoken line centred and alone on its row, it does not make the box wider, and it is the only layout that holds in 9:16, where "beside" wraps below anyway. This replaces the top-right tag of D2.
 2. **A line with no sample** (silent): show it? Recommended: only as the tag, never as a spoken caption.
 3. **Design for the other looks:** A (one lane) or B (two lanes)? Recommended: A.
 4. **The "Claude" look:** C1 reply block, C2 transcript pane, or C3 same line? Recommended: C1, keeping the last two exchanges.
 5. **Karaoke for the voice track** (words lit as they are said)? Recommended: not now; the typed reveal over the sample length gives most of it without word timing.
-6. **Speaker names:** roles (Narratore, Voce) or the speaker's voice name (Reed, Flo)? Recommended: roles.
+6. **How the speaker is marked (owner, round 2: text labels on the stage do not convince).** Four ways on the same scene and the same two lines (`giro2-voci-a-icone`, `giro2-voci-b-stile`, `giro2-voci-c-colore`, `giro2-voci-d-etichette`):
+   - a) a drawn line icon per voice: a microphone for the narrator, a wave for the voice track, a wave in a circle or a square for a second or third voice, with each voice in its own colour;
+   - b) style only: the narrator in italics, the voice track upright and in quotes;
+   - c) colour only: the narrator in cyan, the voice track in magenta;
+   - d) the text labels of round 1, for comparison.
+
+   Recommended: a with b (`giro2-voci-consigliata`). The icon tells the speaker apart without words and works for N voices. Italics and quotes still work where colour is lost: the 1-bit and LED renders, the amber hardware theme and colour-blind viewers. Colour alone is not enough, and labels cost width, take a language, and read as an interface rather than a voice. The speaker's voice name (Reed, Flo) shows only in the tooltip and the Guide. The same icons go in the "Claude" look, where ● remains the narrator's reply and the wave icon replaces ♪ for the voice track. This replaces the chips of D3 A.
 7. **While the user types by hand:** show the voice-track lines that still play? Recommended: yes; the narrator is silent then, so nothing of it shows.
 8. **Videos:** one setting with the stage, or a separate switch per video kind? Recommended: one setting; a fragment that needs no text can turn it off in the card for that export.
 9. **Default:** on for everyone, or off until chosen? Recommended: on.

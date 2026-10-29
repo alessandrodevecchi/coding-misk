@@ -40,12 +40,12 @@ A caption SHALL appear on the bar its line is spoken and SHALL stay for the leng
 
 ### Requirement: Speaker of a caption
 
-Each caption SHALL name its speaker, Narrator or Voice, with a style per speaker that differs in colour and face, in Italian and English.
+Each caption SHALL mark its speaker without words on the stage: a drawn line icon and a colour per voice (narrator, voice track, further voices), the narrator's text in italics and the voice track's text upright in quotes. The speaker's name SHALL be available in the tooltip, in Italian and English.
 
 #### Scenario: Two speakers
 
 - **WHEN** the narrator speaks and later the voice track speaks
-- **THEN** the first caption carries the Narrator label and the second the Voice label, with different styles
+- **THEN** the first caption carries the narrator's icon with italic text, the second the voice track's icon with its text in quotes
 
 ### Requirement: Step line tag
 
