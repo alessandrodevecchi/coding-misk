@@ -3,7 +3,8 @@
 import { makeBackup, mergeBackup } from './backup.js';
 import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
-import { REAL_SCOPES, LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, V_DEFAULTS } from '../video/layout.js';
+import { OWN_IDS, STRUDEL_IDS, FONTS, SIZES, themeName, fontName } from '../code-themes/themes.js';
+import { CODE_COLORS, REAL_SCOPES, LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, V_DEFAULTS } from '../video/layout.js';
 import { FORMATS, MP3_RATES, formatOf } from '../export/encode.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data.js';
 import { nextTagline } from '../video/fragments.js';
@@ -33,6 +34,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setTheme'), seg('data-set-ui', [['neon', 'NEON'], ['hw', 'HW']], app.ui()))}
           ${row(t('setLang'), seg('data-set-lang', [['it', 'IT'], ['en', 'EN']], app.lang()))}
           ${row(t('setRadioLook'), `<select id="set-radio-look" data-no-knob>${looks.map(([k, l]) => opt(k, store.get('coding-misk-radio-look', 'palco'), tx(l))).join('')}</select>`, t('setRadioLookHint'))}
+          ${codeRows()}
         </div>
         <div class="card set-card"><h3>${esc(t('setAudio'))}</h3>
           ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`)}
@@ -46,6 +48,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setVidLayout'), `<select data-vid-opt="layout" data-no-knob>${LAYOUTS.map(k => opt(k, vid.layout, t(`vidLayout:${k}`))).join('')}</select>`, t(`vidLayoutHint:${vid.layout}`))}
           ${row(t('setVidQuality'), `<select data-vid-opt="quality" data-no-knob>${Object.keys(QUALITIES).map(k => opt(k, vid.quality, t(`vidQuality:${k}`))).join('')}</select>`, t('setVidQualityHint'))}
           ${row(t('setVidCard'), `<select data-vid-opt="card" data-no-knob>${CARDS.map(k => opt(k, vid.card, t(`vidCard:${k}`))).join('')}</select>`)}
+          ${row(t('setVidCodeColors'), `<select data-vid-opt="codeColors" data-no-knob>${CODE_COLORS.map(k => opt(k, vid.codeColors, t(`vidCodeColors:${k}`))).join('')}</select>`, t('setVidCodeColorsHint'))}
           ${row(t('setVidRealScope'), `<select data-vid-opt="realScope" data-no-knob>${REAL_SCOPES.map(k => opt(k, vid.realScope, t(`vidRealScope:${k}`))).join('')}</select>`, t('setVidRealScopeHint'))}
           ${row(t('setVidVisual'), `<select data-vid-opt="visual" data-no-knob>${opt('song', vid.visual, t('vidVisual:song'))}${looks.map(([k, l]) => opt(`fixed:${k}`, vid.visual, t('vidVisual:fixed', { look: tx(l) }))).join('')}${opt('song-cycle', vid.visual, t('vidVisual:song-cycle'))}${opt('section-cycle', vid.visual, t('vidVisual:section-cycle'))}</select>`, t('setVidVisualHint'))}
           ${row(t('setVidSoulMode'), `<select data-vid-opt="soul" data-no-knob>${SOULS.map(k => opt(k, vid.soul, t(`vidSoul:${k}`))).join('')}</select>`, t(`vidSoulHint:${vid.soul}`))}
@@ -111,6 +114,17 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => { const x = { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), stageRatio: app.stageRatio ? app.stageRatio() : 2.4 }; return { ...x, size: fragmentSize(x), next: store.get('coding-misk-fragment-n', 1) }; });
   }
 
+  // code themes (code-themes D6): theme, font, size and the dimmed muted lines, in the Appearance card
+  function codeRows() {
+    if (!app.codeTheme) return '';
+    const C = app.codeTheme.settings(), L = app.lang();
+    const themes = `${opt('auto', C.theme, t('codeTheme:auto'))}<optgroup label="${esc(t('setCodeThemeOwn'))}">${OWN_IDS.map(id => opt(id, C.theme, themeName(id, L))).join('')}</optgroup><optgroup label="${esc(t('setCodeThemeStrudel'))}">${STRUDEL_IDS.map(id => opt(id, C.theme, themeName(id, L))).join('')}</optgroup>`;
+    return `${row(t('setCodeTheme'), `<select id="set-code-theme" data-no-knob>${themes}</select>`, C.theme === 'auto' ? t('setCodeThemeAuto', { name: app.codeTheme.autoName(L) }) : t('setCodeThemeChosen'))}
+          ${row(t('setCodeFont'), `<select id="set-code-font" data-no-knob>${Object.keys(FONTS).map(k => opt(k, C.font, fontName(k, L))).join('')}</select>`)}
+          ${row(t('setCodeSize'), seg('data-set-code-size', Object.keys(SIZES).map(k => [k, t(`codeSize:${k}`)]), C.size), t('setCodeSizeHint'))}
+          ${row(t('setCodeDim'), seg('data-set-code-dim', [['1', t('cwYes')], ['0', t('cwNo')]], C.dim ? '1' : '0'), t('setCodeDimHint'))}`;
+  }
+
   // code widgets (code-widgets D2): one card, sections that open and close
   function widgetsCard() {
     const S = widgetSettings(store.get(CW_KEY, null)), open = new Set(store.get(CW_OPEN, ['general']) || []);
@@ -148,6 +162,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
+    if (b.dataset.setCodeSize) { app.codeTheme.set({ size: b.dataset.setCodeSize }); return render(); }
+    if (b.dataset.setCodeDim) { app.codeTheme.set({ dim: b.dataset.setCodeDim === '1' }); return render(); }
     // code widgets (code-widgets D2)
     if (b.dataset.cwOn) { setCw(S => { S.on = b.dataset.cwOn === '1'; }); return render(); }
     if (b.dataset.cwRoll) { setCw(S => { S.roll = b.dataset.cwRoll; }); return render(); }
@@ -209,6 +225,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       if (d.cwPrim) { setCw(S => { const I = S.instruments[d.cwPrim], old = I.primary; I.primary = x.value; I.secondary = [...I.secondary.filter(w => w !== x.value), ...(old !== x.value && !I.secondary.includes(old) ? [old] : [])]; }); return render(); }
     }
     if (e.target.id === 'set-radio-look') store.set('coding-misk-radio-look', e.target.value);
+    if (e.target.id === 'set-code-theme') { app.codeTheme.set({ theme: e.target.value }); render(); }
+    if (e.target.id === 'set-code-font') { app.codeTheme.set({ font: e.target.value }); render(); }
     if (e.target.id === 'set-format') { store.set('coding-misk-export-format', e.target.value); render(); }
     if (e.target.id === 'set-speed') store.set('coding-misk-export-speed', e.target.value);
     if (e.target.id === 'set-typing') store.set('coding-misk-typing', e.target.value);

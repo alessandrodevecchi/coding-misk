@@ -1,8 +1,8 @@
 ---
 id: settings
 related: [export, radio, library, profiles]
-code: [src/settings/settings.js, src/settings/backup.js, src/i18n.js, src/endless/song-presets.js]
-checks: [node --no-warnings tools/check-backup.mjs, node --no-warnings tools/check-settings.cjs]
+code: [src/settings/settings.js, src/settings/backup.js, src/i18n.js, src/endless/song-presets.js, src/code-themes/themes.js, src/code-themes/install.js]
+checks: [node --no-warnings tools/check-backup.mjs, node --no-warnings tools/check-settings.cjs, npm run check:code-themes, node tools/check-code-themes.cjs]
 ---
 
 # Settings
@@ -24,9 +24,9 @@ Every value is saved in the browser and goes into the backup.
 
 The page has nine cards:
 
-- **Appearance:** theme (NEON or HW, the hardware look), language (IT or EN), the radio visual.
+- **Appearance:** theme (NEON or HW, the hardware look), language (IT or EN), the radio visual, and the code theme: Code theme, Code font, Code size, Dim muted lines (see Code themes below).
 - **Audio:** volume, export format and MP3 rate, code typing speed, export speed.
-- **Video:** layout, quality, title card, visual, soul panel, video presets.
+- **Video:** layout, quality, title card, Code colours (the code theme's, or the app theme's colours), visual, soul panel, video presets.
 - **Vertical fragments:** format, what to show, aspect, look, soul view, files, bands, bleed, rotation, code mode, tagline, label, glitch, length.
 - **Live output:** a window with only the picture of the session, for a capture program, and a control room in another tab.
 - **Radio:** transition, harmony, profile (as the artist and style say, or one profile for every generated song, radio-profiles; Custom is set in the console only), the default material source, the scope of console changes.
@@ -37,6 +37,17 @@ The page has nine cards:
 Each option has its help text in `src/i18n.js`, under keys that start with `set`, `vid`, `frag` or `lr`.
 
 **New song presets (new-song-panel D6).** The owner's presets of the New song panel (`coding-misk-song-presets`, `{ name: values }`, `src/endless/song-presets.js`) and the panel's values (`coding-misk-new-song`) go into the backup; an import merges presets by name, the backup's winning. The five built-in presets live in the code. The old voice of the next song by an artist (`coding-misk-artist-voice`) is no longer read and stays out of the backup (D9).
+
+## Code themes
+
+The colours and the font of the code panel and of the code drawn in videos (`code-themes`). One key, `coding-misk-code-theme`: `{ theme, font, size, dim }` (`src/code-themes/themes.js`, `codeThemeSettings` fills the defaults).
+
+- **Theme.** `auto` (default) follows the app theme through one table keyed by `data-ui` (`AUTO`: `neon` → Neon, `hw` → Amber, and already `light` → Light high contrast for the light app theme to come). The app's own themes: Neon (its colours from the look's tokens, so it changes with the look), Amber, Terminal, High contrast dark, Light high contrast. Strudel's themes, curated: `strudelTheme` (the panel's look of before), `teletext`, `blackscreen`, `whitescreen`, `bluescreen`.
+- **Roles.** A theme is a set of resolved colours: ground, text, comment, string, number, label, keyword, variable, method, punctuation, caret, selection, line numbers, playing-note outline, flash, video border, and widget colours (ink, accent, second accent, muted). The same roles feed the editor, the widgets (`widgetGroups`) and `drawCode` in videos.
+- **Font and size.** JetBrains Mono (default), Share Tech Mono, VT323 (drawn 1.3 times larger), the system monospace; Small 13, Medium 14 (default), Large 16 px, one step larger in the full view. A change moves where the long lines of a live build break (`codeCols` reads the editor's character width), never the sound.
+- **Dim muted lines** (on by default): the text of a `_$:` line and its indented lines at 55 %, in the panel (a line decoration, class `ct-muted`) and in videos.
+- **Videos.** Settings → Video → Code colours (`codeColors` in `coding-misk-video`): `panel` (default) or `app` (today's colours from the app tokens, `appRoles`). The fast video and fragments read the theme once at their start (`J.ct`); the session video and the live output read it every frame.
+- **Installer** (`src/code-themes/install.js`): Strudel's themes through the editor's `setTheme`; ours built with the editor's own classes (see [decisions.md](decisions.md)). It writes our `:root` variables (`--code-bg`, `--code-flash`, `--code-muted`, and for our themes Strudel's `--background`, `--foreground`), keeps the panel hidden until the first theme is in place (`#edhost.ct-wait`, 3 s at most) and writes Strudel's `codemirror-settings` so the next start opens close to the choice. A theme that cannot be installed leaves Strudel's default and one console warning.
 
 ## Example
 
