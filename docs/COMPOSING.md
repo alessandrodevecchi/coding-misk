@@ -93,6 +93,12 @@ Each track can chain devices after the instrument: delays, reverbs, distortion, 
 "rack": [{ "device": "delay", "amount": 0.35, "time": 0.1875, "feedback": 0.5 }, { "device": "pan", "motion": "slow" }]
 ```
 
+FM works only on synth oscillators. For an FM-like colour on drums, samples and voices, use **Fold** (the wave folded back on itself: bright, hollow, metallic; Amount and Curve) or **Ring (trial)** (the sound times a sine wave: bells, metal, robot voices; Frequency and Amount). Fold folds only what is loud enough: drums, basses and voices fold from Amount 1.5, quiet pads need 2.5 or more. A folded line never goes above its own peak or the usual peak of its track type. Fold uses the same Strudel stage as Distortion and the track's own drive (Saturation on drums, the guitar's distortion): it takes their place.
+
+```json
+"rack": [{ "device": "fold", "amount": 2, "curve": "soft" }, { "device": "ring", "freq": 440, "amount": 0.6 }]
+```
+
 In the app, the arranger has two views of the same song: **Free timeline** (the default) and **Sections** (a cell per track and section, quick to fill). The free timeline places clips at any bar: click an empty lane to add one, drag to move, drag the right edge to resize, arrows and Shift + arrows on the selected clip. Above the sections, a player ruler shows the time and a cursor: click or drag it to start from any point, arrow keys move one bar. Switching views loses nothing: a section covered by free clips shows a striped cell in the sections view. The track panel has three views: "All in <section>" (the default) with the complete editor of every track that plays in the selected section, one under the other; "Selected track" with the editor of one track; "Section summary" with a compact card per playing track (patterns, volume, filter, drive, rhythm, rack).
 
 ## Live build

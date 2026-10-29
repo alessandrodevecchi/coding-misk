@@ -14,7 +14,7 @@ What the code does today (`develop` f80b167):
 **Goals:**
 
 - An FM-like colour on any track, drums, samples, soundfonts and voices included, from the rack, with two settings per device.
-- No line louder than before the device.
+- Safe levels: Ring never makes a line louder; Fold never takes a note above its own peak or its track type's usual peak.
 - The Ring trial answers three questions with numbers: does it play in the page, does it play the same in the fast export, what does it cost on a 12-track radio.
 
 **Non-Goals:**
@@ -28,7 +28,7 @@ What the code does today (`develop` f80b167):
 
 ### D1. Fold is superdough's distortion with its fold curves
 
-`fold: { amount 0.1–3 (1), curve sharp | soft (sharp) }` writes `.distort(a).distorttype("fold" | "sinefold").distortvol(v)`.
+`fold: { amount 0.1–3 (1.5), curve sharp | soft (sharp) }` writes `.distort(a).distorttype("fold" | "sinefold").distortvol(v)`.
 
 | Option | Notes |
 | --- | --- |
@@ -37,11 +37,17 @@ What the code does today (`develop` f80b167):
 
 Amount 0.1 to 3 maps to superdough's `k = expm1(amount)`, a fold gain from 1.05 to 11: above 3 the sound is noise. Curve "Sharp" is `fold`, "Soft" is `sinefold` (rounder, fewer high harmonics).
 
-### D2. Fold keeps the level by construction
+### D2. Fold's level: never above the line's own peak or its type's usual peak
 
-The fold's slope near zero is its gain `g = 1 + k/2` (`π/2 · g` for `sinefold`), so a quiet line would get up to `g` times louder. The device writes `distortvol(1/g)` (`2/(π·g)` for Soft), rounded to 3 decimals. Since `|fold(y)| ≤ min(|y|, 1)` and `|sin(π/2·fold(y))| ≤ min(π/2·|y|, 1)`, the output is never above the input: `|out| ≤ |x|`. The check asserts it on sample curves and in the browser (peak with Fold at most the peak without, plus 0.02 of measurement noise).
+The fold's slope near zero is its gain `g = 1 + k/2` (`π/2 · g` for `sinefold`), and the fold never leaves −1…1. A fold acts only on what is loud enough: a sample `x` folds when `g·|x| > 1`.
 
-Fold and Distortion share one Strudel stage (`distort`): with both on a track, the later one in the rack wins. The validator warns, and the Guide line of the device says so.
+First version (rejected after measuring): `distortvol(1/g)`, so `|out| ≤ |x|` always. In the page a line below the fold kept its level, but a folded line fell far below it: drums peaking at 1.10 came out at 0.12 to 0.19 with Amount 3 (RMS −15 dB). The effect sounded like a volume cut.
+
+Chosen: `distortvol(max(1/g, P))`, `P` the usual peak of the track type (`FOLD_PEAK`: drums 0.45, guitar 0.4, bass, voice and spoken 0.35, code 0.3, hook and pad 0.2, arp 0.18, texture 0.15, riser 0.1, from the level targets of `docs/knowledge/sound-and-levels.md`), floored to 3 decimals. Then each note comes out at most `max(|x|, P)`: a line below the fold keeps its level, a folded one comes out near its type's usual peak. Measured in the page (`tools/check-fm-effects.cjs`): drums 1.10 → 0.83 to 0.90, a voice 0.37 → 0.35 to 0.36, a single pad note 0.08 → 0.18 to 0.20 at Amount 3 (a quiet pad folded gets louder, up to the pad target). The bound holds per note: chords and overlapping tails add up as without the device. The check asserts it on superdough's own curves for every type, amount and curve, and in the browser (peak at most the higher of the plain peak and `P`, plus 0.02).
+
+Default Amount 1.5 (`g` = 2.7): drums, basses and voices at their usual level fold a little; quiet pads need 2.5 or more.
+
+Fold and Distortion share one Strudel stage (`distort`): with both on a track, the later one in the rack wins. The track's own drive (Saturation on drums, `drive`; the guitar's distortion) writes the same stage before the rack, so Fold takes its place. The validator warns, and the Guide line of the device says so.
 
 ### D3. Ring is a Kabelsalat effect through `.K`
 
@@ -75,7 +81,7 @@ A choice argument may carry a fifth element, labels per value: `['curve', 'choic
 
 ### D6. The radio: Fold on voices
 
-`VOICE_DEVICES` gains `fold: { amount: [0.3, 1.2], curve: ['sharp', 'soft'] }`: mild amounts, so a voice stays understandable. The shuffle draws from one more device, so the endless fixtures move: `DIRECTOR_VERSION` + 1 in the same commit, fixtures rewritten. Ring stays out of the director during the trial.
+A radio voice with fewer than two devices gets Fold (`amount 0.3–1.2`, either curve) with chance `0.15 + 0.25 · chaos`, drawn from a stream of its own (`rng.voice.fork('fold/<song index>')`), so the other voice draws and the music do not move. The voices of the seed fixtures move: `DIRECTOR_VERSION` + 1 in the same commit, fixtures rewritten. Ring stays out of the director during the trial.
 
 ### D7. Checks
 

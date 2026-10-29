@@ -7,22 +7,26 @@ Rack devices that give an FM-like colour to any track, samples, drums and voices
 ## ADDED Requirements
 
 ### Requirement: Fold device
-The rack SHALL offer a sound device "Fold" (Italian "Piega") on every track type, voice tracks included, with two settings: Amount from 0.1 to 3 (default 1) and Curve, Sharp or Soft (default Sharp). Its code SHALL be Strudel's distortion with the fold curve (`fold` for Sharp, `sinefold` for Soft) and a level after the fold.
+The rack SHALL offer a sound device "Fold" (Italian "Piega") on every track type, voice tracks included, with two settings: Amount from 0.1 to 3 (default 1.5) and Curve, Sharp or Soft (default Sharp). Its code SHALL be Strudel's distortion with the fold curve (`fold` for Sharp, `sinefold` for Soft) and a level after the fold.
 
 #### Scenario: Fold on a drum track
 - **WHEN** the user adds Fold to a drums track in Compose and plays
-- **THEN** the track's line carries `.distort(1).distorttype("fold").distortvol(…)` and the drums sound folded, with no evaluation error
+- **THEN** the track's line carries `.distort(1.5).distorttype("fold").distortvol(…)` and the drums sound folded, with no evaluation error
 
 #### Scenario: Fold on a voice
 - **WHEN** the user adds Fold to a voice track
 - **THEN** the voice line carries the Fold code and the voice plays folded
 
-### Requirement: Fold never raises the level
-The level after the fold SHALL be set so that the output of the device is never above its input, for every amount and both curves.
+### Requirement: Fold keeps the line within its level
+The level after the fold SHALL be set so that each note of the device's output is never above the higher of its input and the usual peak of its track type, for every amount and both curves; a line too quiet to fold SHALL keep its level.
+
+#### Scenario: Loud drums
+- **WHEN** drums peaking at 1.1 get Fold at amount 3
+- **THEN** each note peaks at most 1.1, and the line stays near the drums' usual peak (0.45 per note) instead of dropping far below it
 
 #### Scenario: A quiet pad
-- **WHEN** a pad peaking at 0.15 gets Fold at amount 3
-- **THEN** its line peaks at most 0.15 plus measurement noise (0.02)
+- **WHEN** a pad note peaking at 0.08 gets Fold at amount 3
+- **THEN** it peaks at most 0.2 (the pad's usual peak) plus measurement noise (0.02)
 
 ### Requirement: Fold and Distortion on one track
 A track with both Fold and Distortion on SHALL validate with a warning that the later of the two is the one heard.

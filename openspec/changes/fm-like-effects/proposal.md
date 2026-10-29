@@ -16,7 +16,7 @@ This change covers steps 1 and 2. Step 3 waits for the owner's verdict on the tr
 
 - **A new sound device "Fold" (it: "Piega")** in the rack menu of every track, drums, samples and voices included. It folds the wave back on itself when it passes a threshold: the sound gets bright, hollow and metallic, close to an FM sound with a rising index.
 - **Two settings**: Amount (how hard the wave is folded) and Curve (Sharp or Soft).
-- **Safe level by construction**: the device sets the level after the fold so that a line is never louder than without it.
+- **A safe level**: the device sets the level after the fold so that a line never goes above its own peak or the usual peak of its track type.
 - **In the radio**: the director can give a radio voice the Fold device, like the other voice effects it already picks (crush, phaser, tremolo…). This moves the endless fixtures, so `DIRECTOR_VERSION` goes up.
 
 ### Ring trial
