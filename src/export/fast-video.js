@@ -23,7 +23,8 @@ async function pickFormat(mb, q) {
 // The feed of a frame also has waveAt(t, n): n samples of the song's wave ending at t seconds (at a quarter of the sample
 // rate), for the widget looks' spectrum columns, up to HISTORY seconds back
 const HISTORY = 2;
-export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, writable = null, onNotes = null, onStageNotes = null }) {
+// onLit(list): the places in the code of the haps of each block, before its frames (code-over-visual D6)
+export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, writable = null, onNotes = null, onStageNotes = null, onLit = null }) {
   let audio = null, cancelled = false;
   const promise = (async () => {
     const mb = await import('mediabunny');
@@ -41,8 +42,9 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
     let hist = new Float32Array(0), histAt = 0, drawn = 0, ap = 0;
     const report = phase => onProgress(Math.min(1, ap * 0.3 + drawn / frames * 0.7), phase);
     const sink = {
-      async add(ch, start, blockOnsets, notes, stageNotes) {
+      async add(ch, start, blockOnsets, notes, stageNotes, lit = null) {
         if (onNotes && notes) onNotes(notes);
+        if (onLit && lit) onLit(lit);
         if (onStageNotes && stageNotes) onStageNotes(stageNotes);
         for (const [k, list] of Object.entries(blockOnsets || {})) (onsets[k] = onsets[k] || []).push(...list);
         const sr = job.sampleRate || 48000, n = ch[0].length;

@@ -3,6 +3,7 @@
 // (typing-lines): only alike lines are edited in place, copy and change, line breaks, insertions in a chain. No browser.
 //   npm run check:typing      exit 1 when any check fails
 import fs from 'node:fs';
+import { codeFrom } from '../src/video/feed.js';
 import { typingPlan, TYPING_SPEEDS, settleOthers, breakLines, lineLike, stretchRate } from '../src/song/typing.js';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { resolveProfile } from '../src/live/profiles.js';
@@ -13,6 +14,29 @@ const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 // every frame keeps the untouched parts of the line
 const frames = (p, n = 60) => Array.from({ length: n + 1 }, (_, i) => p.frame((p.total * i) / n));
 const CHECKS = {
+  'cursor (code-over-visual D5): on the typed part, editing ends 0.35 s after the last key'() {
+    const from = '$: s("bd")\n$: note("c")', to = '$: s("bd")\n$: note("c e g").s("saw")';
+    for (const style of ['exact', 'human']) {
+      const p = typingPlan(from, to, { style, seed: 'k', mistakes: false });
+      for (let i = 1; i < 30; i++) {
+        const t = (p.total * i) / 30, k = p.cursor(t), txt = p.frame(t);
+        if (k.line < 0) continue;
+        assert(k.line === 1, `${style}: the typed line is line 2 (got ${k.line} at ${t.toFixed(2)})`);
+        assert(k.col <= txt.split('\n')[1].length, `${style}: the column inside the line`);
+      }
+      const end = p.cursor(p.total + 0.2), after = p.cursor(p.total + 0.5);
+      assert(end.editing && !after.editing && end.line === 1, `${style}: editing until 0.35 s after the last key (${JSON.stringify(end)} ${JSON.stringify(after)})`);
+      assert(p.cursor(-1).line === -1 && !p.cursor(-1).editing, `${style}: nothing typed yet`);
+    }
+  },
+  'cursor in the fast video: the same as the plan at the same cycle, off at the evaluation'() {
+    const segs = [{ from: 0, code: '$: s("bd")' }, { from: 4, code: '$: s("bd")\n$: s("hh*8")' }], seconds = c => c * 2;
+    const at = codeFrom(segs, { seconds }), k = at.cursor(3.9);
+    assert(k && k.line === 1 && k.editing, `typing the new line near the step (${JSON.stringify(k)})`);
+    assert(at.cursor(4.05) === null, 'after the step: no typing');
+    assert(at.cursor(1) === null, 'before the typing: none');
+    assert(codeFrom(segs).cursor(3.9) === null, 'without seconds: no cursor');
+  },
   'one note changes: the rest of the line never moves'() {
     const a = '$: s("[bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~] [bd ~ ~ ~]").bank("RolandTR909").gain(0.8).lpf(2000)';
     const b = a.replace('[bd ~ ~ ~] [bd ~ ~ ~] [bd', '[bd ~ ~ ~] [bd ~ hh ~] [bd');

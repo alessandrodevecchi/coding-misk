@@ -286,8 +286,18 @@ function humanPlan(parts, acts, to, { speed, max, seed, mistakes = true, rate = 
     stats: plan.stats,
     // the time the plan needs before any speeding up (growth-shapes: typing load)
     natural,
-    frame(time) {
-      if (time >= total) return to;
+    frame(time) { return humanFrame(time, null).text; },
+    // code-over-visual D5: the line being typed at `time`, the column after its last key, and whether the edit is on
+    cursor(time) {
+      const keyed = list.filter(a => !a.paste && a.keys.length);
+      let a = null; for (const x of keyed) if (x.keys[0].t <= time) a = x;
+      if (!a) return { line: -1, col: 0, editing: false };
+      const last = a.keys[a.keys.length - 1].t, r = humanFrame(Math.min(time, total - 1e-9), a);
+      return { ...lineCol(r.text, r.off), editing: time <= last + EDIT_HOLD };
+    },
+  };
+  function humanFrame(time, mark) {
+      if (time >= total && !mark) return { text: to, off: -1 };
       // each changed place: the old text, its backspaces, then the keys typed (typos and their fixes included)
       const buf = new Map();
       for (const a of list) {
@@ -299,23 +309,33 @@ function humanPlan(parts, acts, to, { speed, max, seed, mistakes = true, rate = 
         buf.set(k, b);
       }
       const out = [];
+      let off = -1, len = 0;
       parts.forEach((p, pi) => {
-        if (p.kind === 'keep') { out.push(p.text); return; }
+        if (p.kind === 'keep') { out.push(p.text); len += p.text.length + 1; return; }
         if (p.kind === 'gone') return;
         if (p.paste && time < pasteAt.get(pi)) return;
-        let line = '', any = false;
+        let line = '', any = false, at = -1;
         p.segs.forEach((s, si) => {
           if (s.eq !== undefined) { line += s.eq; return; }
           const b = buf.get(`${pi}:${si}`) || { text: s.old, started: false };
           if (b.started) any = true;
           line += b.text;
+          if (mark && mark.pi === pi && mark.si === si) at = line.length;
         });
         if (p.kind === 'new' && !p.paste && !any && (p.text || !(time >= pasteAt.get(pi)))) return;
-        out.push(line);
+        if (at >= 0) off = len + at;
+        out.push(line); len += line.length + 1;
       });
-      return out.join('\n');
-    },
-  };
+      return { text: out.join('\n'), off };
+  }
+}
+// code-over-visual D5: an edit stays on for this long after its last key
+const EDIT_HOLD = 0.35;
+// the line and column of an offset in a text (line -1 when there is none)
+function lineCol(text, off) {
+  if (off < 0) return { line: -1, col: 0 };
+  const before = text.slice(0, off), line = (before.match(/\n/g) || []).length;
+  return { line, col: off - (before.lastIndexOf('\n') + 1) };
 }
 
 // the first k characters of a text, with a line break and its indent as one key (Enter indents by itself)
@@ -420,29 +440,40 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
   return {
     total,
     lines: newLines(parts),
-    frame(time) {
-      if (time >= total) return to;
+    frame(time) { return exactFrame(time, null).text; },
+    // code-over-visual D5: the line being typed at `time`, the column after its last key, and whether the edit is on
+    cursor(time) {
+      let a = null; for (const x of acts) if (!x.paste && x.n > 0 && x.t0 <= time) a = x;
+      if (!a) return { line: -1, col: 0, editing: false };
+      const r = exactFrame(Math.min(time, total - 1e-9), a);
+      return { ...lineCol(r.text, r.off), editing: time <= a.t1 + EDIT_HOLD };
+    },
+  };
+  function exactFrame(time, mark) {
+      if (time >= total && !mark) return { text: to, off: -1 };
       const state = new Map();
       for (const a of acts) { if (a.paste) continue; const k = `${a.pi}:${a.si}`, s = state.get(k) || { del: 0, typed: 0 }; const f = time <= a.t0 ? 0 : time >= a.t1 ? 1 : (time - a.t0) / (a.t1 - a.t0); if (a.del) s.del = Math.floor(a.n * f + 1e-9); else s.typed = Math.floor(a.n * f + 1e-9); state.set(k, s); }
       const out = [];
+      let off = -1, len = 0;
       parts.forEach((p, pi) => {
-        if (p.kind === 'keep') { out.push(p.text); return; }
+        if (p.kind === 'keep') { out.push(p.text); len += p.text.length + 1; return; }
         if (p.kind === 'gone') return;
         // a pasted line appears whole when it is pasted
         if (p.paste && time < pasteAt.get(pi)) return;
-        let line = '';
+        let line = '', at = -1;
         p.segs.forEach((s, si) => {
           if (s.eq !== undefined) { line += s.eq; return; }
           const st = state.get(`${pi}:${si}`) || { del: 0, typed: 0 };
           line += st.typed > 0 || st.del >= s.old.length ? whole(s.new, st.typed) : whole(s.old, s.old.length - st.del);
+          if (mark && mark.pi === pi && mark.si === si) at = line.length;
         });
         // a new line appears once its first character is typed (an empty one at its Enter)
         if (p.kind === 'new' && !p.paste && !line && (p.text || !(time >= pasteAt.get(pi)))) return;
-        out.push(line);
+        if (at >= 0) off = len + at;
+        out.push(line); len += line.length + 1;
       });
-      return out.join('\n');
-    },
-  };
+      return { text: out.join('\n'), off };
+  }
 }
 
 // Long lines broken before a function (typing-lines): a code line longer than cols breaks before a ".name(" outside

@@ -1,12 +1,14 @@
 // Video from a song or a session (#27): the layouts, qualities and title card modes, and the areas of a frame.
 // Pure: checked in Node (tools/check-video.mjs).
+import { codeOverAreas, CO_DEFAULTS } from './code-over.js';
 
 // visual: the stage fills the frame; code: the stage beside the code (and the soul panel when the soul is on);
 // tab: the whole browser tab, captured as it is (the browser asks which tab to share)
 // the views with a timeline of the live picture (#65) are video layouts too, drawn with the live picture's areas
 export const TIMELINE_LAYOUTS = ['visual-tl', 'visual-code-tl', 'code-tl', 'soul-tl', 'visual-float', 'visual-column'];
 // code-widgets (code-widgets D11): the code layout with the code widgets drawn below their lines
-export const LAYOUTS = ['visual', 'code', 'code-widgets', 'tab', ...TIMELINE_LAYOUTS];
+// code-over (code-over-visual D1): the stage over the whole frame, the code drawn over it
+export const LAYOUTS = ['visual', 'code', 'code-widgets', 'tab', ...TIMELINE_LAYOUTS, 'code-over'];
 export const withWidgets = layout => typeof layout === 'string' && layout.endsWith('-widgets');
 export const QUALITIES = {
   '1080p30': { w: 1920, h: 1080, fps: 30, bps: 8e6 },
@@ -48,7 +50,9 @@ export function codeColsOf(area, frameH) {
   const fs = Math.round(frameH / 50), padX = Math.round(fs * 1.1);
   return Math.max(20, Math.floor((area.w - padX * 2) / (fs * 0.6)) - 1);
 }
-export function layoutAreas(layout, w, h, soul = null) {
+// co: the "Code over" settings (side, width) for the code-over layout: { stage, over (the code area), free (captions) }
+export function layoutAreas(layout, w, h, soul = null, co = CO_DEFAULTS) {
+  if (layout === 'code-over') { const C = codeOverAreas(w, h, co); return { stage: { x: 0, y: 0, w, h }, over: C.code, free: C.free }; }
   if (layout !== 'code' && layout !== 'code-widgets') return { stage: { x: 0, y: 0, w, h } };
   const side = Math.round(w / 3), sx = w - side, pad = Math.round(h / 54);
   const out = { stage: { x: 0, y: 0, w: sx, h } };
@@ -69,7 +73,8 @@ export function layoutAreas(layout, w, h, soul = null) {
 // and how the code moves (follow the edits, scroll through all of it, or focus on the part playing)
 export const F_FORMATS = { '9:16': { w: 1080, h: 1920 }, '4:5': { w: 1080, h: 1350 }, '1:1': { w: 1080, h: 1080 }, '16:9': { w: 1920, h: 1080 } };
 // (code-widgets D11: visual + code and code with the code widgets below their lines)
-export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code', 'visual-code-widgets', 'code-widgets'];
+// (code-over-visual D1: code-over, the visual filling the picture with the code drawn over it)
+export const F_SHOWS = ['visual', 'visual-code', 'visual-soul', 'soul', 'code', 'visual-code-widgets', 'code-widgets', 'code-over'];
 // whole: the stage's own proportions (o.stageRatio, the app's stage), so the whole visual shows
 export const F_ASPECTS = ['whole', 'fill', '16:9', '4:3', '1:1', '4:5', '9:16'];
 export const F_CODE = ['focus', 'scroll', 'follow'];
@@ -101,6 +106,15 @@ const SOUL = 1200 / 760;
 const fit = (x, y, w, h, r) => { const bw = Math.min(w, h * r), bh = bw / r; return { x: Math.round(x + (w - bw) / 2), y: Math.round(y + (h - bh) / 2), w: Math.round(bw), h: Math.round(bh) }; };
 // the areas of a w×h picture: stage, soul (with head 0), code, and bands top and bottom (portrait) or a strip (landscape)
 export function fragmentAreas(o, w, h) {
+  // code-over: the stage fills the space between the bands, the code over it (whole width, D7), captions below the code
+  if (o.show === 'code-over') {
+    const tall = h >= w, band = Math.round(h * (tall ? 0.13 : 0.14)), tb = tall && o.bandTop !== false && o.bands ? band : 0, bb = o.bands && (!tall || o.bandBottom !== false) ? band : 0;
+    const S = { x: 0, y: tb, w, h: h - tb - bb }, C = codeOverAreas(S.w, S.h, { ...CO_DEFAULTS, ...(o.co || {}) }, tall || undefined), sh = r => ({ ...r, y: r.y + tb });
+    const out = { stage: S, over: { ...sh(C.code), fs: C.code.fs }, free: sh(C.free) };
+    if (tall) { if (tb) out.top = { x: 0, y: 0, w, h: tb }; if (bb) out.bottom = { x: 0, y: h - bb, w, h: bb }; }
+    else if (bb) out.strip = { x: 0, y: h - bb, w, h: bb };
+    return out;
+  }
   const show = (o.show || 'visual').replace(/-widgets$/, ''), main = show === 'soul' ? 'soul' : show === 'code' ? 'code' : 'stage';
   const second = show === 'visual-code' ? 'code' : show === 'visual-soul' ? 'soul' : null;
   // the soul as the main picture is cut to cover its box (centred on its view's focus); 'whole' keeps all of it.

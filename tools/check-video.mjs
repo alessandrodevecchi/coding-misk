@@ -42,6 +42,15 @@ const CHECKS = {
     assert(f.h === f.head, 'folded header');
     assert(layoutAreas('code', 1920, 1080, 'folded').code.h > layoutAreas('code', 1920, 1080, 'open').code.h, 'folding gives the code more room');
   },
+  'code over (code-over-visual): the stage over the whole frame, the code over it, captions apart'() {
+    const A = layoutAreas('code-over', 1920, 1080);
+    assert(A.stage.w === 1920 && A.stage.h === 1080 && !A.code, 'the stage fills the frame, no code panel');
+    assert(Math.abs(A.over.x - 67) <= 1 && Math.abs(A.over.x + A.over.w - 1190) <= 1, `the code from 3.5% to 62% (${A.over.x}, ${A.over.w})`);
+    assert(A.free.x >= A.over.x + A.over.w, 'captions on the scene\'s side');
+    const R = layoutAreas('code-over', 1920, 1080, null, { side: 'right', width: 62 });
+    assert(R.over.x > 700 && R.free.x === 0, 'code on the right');
+    assert(JSON.stringify(layoutAreas('visual', 1920, 1080)) === JSON.stringify({ stage: { x: 0, y: 0, w: 1920, h: 1080 } }), 'the old layouts unchanged');
+  },
   'format: MP4 first, then WebM, extension from the type'() {
     assert(/mp4/.test(pickMime(() => true)), 'mp4 first');
     assert(pickMime(m => /webm/.test(m)) === 'video/webm;codecs=vp9,opus', 'webm fallback');
@@ -49,7 +58,7 @@ const CHECKS = {
     assert(extOf('video/mp4;codecs=avc1') === 'mp4' && extOf('video/webm;codecs=vp9') === 'webm', 'ext');
   },
   'title card: always, at the start, never'() {
-    assert(CARDS.length === 3 && LAYOUTS.length === 10 && LAYOUTS.slice(0, 4).join() === 'visual,code,code-widgets,tab', 'lists');
+    assert(CARDS.length === 3 && LAYOUTS.length === 11 && LAYOUTS.slice(0, 4).join() === 'visual,code,code-widgets,tab' && LAYOUTS.includes('code-over'), 'lists');
     assert(cardAlpha('always', 100, 0) === 1 && cardAlpha('off', 1, 0) === 0, 'always and off');
     assert(cardAlpha('start', 3, 0) === 1 && cardAlpha('start', CARD_SECONDS + 1, 0) === 0 && cardAlpha('start', 0.1, 0) < 1, 'start fades in and out');
   },

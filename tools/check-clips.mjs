@@ -29,7 +29,10 @@ const CHECKS = {
       const o = fragmentOpts({ format: fk, show, aspect, bands, rotate }), { comp } = fragmentSize(o), A = fragmentAreas(o, comp.w, comp.h), parts = Object.entries(A);
       const tag = `${fk} ${show} ${aspect} ${bands} ${rotate}`;
       parts.forEach(([n, a]) => assert(inside(a, comp.w, comp.h), `${tag} ${n} inside`));
-      for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) assert(!overlap(parts[i][1], parts[j][1]), `${tag} ${parts[i][0]}/${parts[j][0]}`);
+      // code-over: the code (over) lies on the stage on purpose; its caption area (free) too
+      const apart = parts.filter(([n]) => !(show === 'code-over' && (n === 'over' || n === 'free')));
+      for (let i = 0; i < apart.length; i++) for (let j = i + 1; j < apart.length; j++) assert(!overlap(apart[i][1], apart[j][1]), `${tag} ${apart[i][0]}/${apart[j][0]}`);
+      if (show === 'code-over') { assert(A.stage && A.over && !A.code && !A.soul && inside(A.over, comp.w, comp.h) && !overlap(A.over, A.free) && (!A.bottom || !overlap(A.over, A.bottom)) && (!A.top || !overlap(A.over, A.top)), `${tag} code over`); continue; }
       assert(!!A.stage === show.startsWith('visual') && !!A.code === show.includes('code') && !!A.soul === show.includes('soul'), `${tag} shows ${Object.keys(A)}`);
     }
   },
@@ -42,6 +45,10 @@ const CHECKS = {
     assert(z.file.w === 1080 && z.file.h === 1920 && z.comp.w === 1920 && z.comp.h === 1080, JSON.stringify(z));
     const A = fragmentAreas(fragmentOpts({ show: 'visual-code', aspect: 'fill', bands: true }), 1920, 1080);
     assert(A.strip && A.stage.w === 1280 && A.code.x >= 1280, 'landscape: stage and code side by side, a strip below');
+  },
+  'code over in 9:16: whole width, the caption lane below the code'() {
+    const A = fragmentAreas(fragmentOpts({ format: '9:16', show: 'code-over', bands: true }), 1080, 1920);
+    assert(A.over.w === Math.round(1080 * 0.92) && A.free.y >= A.over.y + A.over.h && A.stage.y === A.top.h, JSON.stringify(A));
   },
   'old layout names still work'() {
     const o = fragmentOpts({ vLayout: 'v-soul-bands' });

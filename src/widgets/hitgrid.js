@@ -74,9 +74,9 @@ const T = { it: { bar: 'battuta', step: 'passo' }, en: { bar: 'bar', step: 'step
 // the form of the cells: 'blocks' (Normal, CRT), 'round' (LED), 'two' (1-bit), 'text' (ASCII, Terminal)
 export function cellForm(style, render) {
   if (style === 'text') return 'text';
-  if (style === 'blocks') return render === 'led' ? 'round' : render === '1bit' ? 'two' : 'blocks';
+  if (style === 'blocks') return render === 'led' ? 'round' : (render === 'bit' || render === '1bit') ? 'two' : 'blocks';
   if (render === 'ascii' || render === 'terminal') return 'text';
-  return render === 'led' ? 'round' : render === '1bit' ? 'two' : 'blocks';
+  return render === 'led' ? 'round' : (render === 'bit' || render === '1bit') ? 'two' : 'blocks';
 }
 // sizes at a font size fs (the code's): cell width, row height, label width
 function metrics(D, o, fs) {

@@ -7,7 +7,7 @@
 
 - [x] 1.1 Theme roles `band`, `edit`, `editInk` for every own and Strudel theme, band opacity setting (Low, Medium, High) with the theme's floor. Verify: `npm run check:code-themes` new cases (text roles 4.5:1 on `band` over black and over white at every opacity, `editInk` on `edit`)
 - [x] 1.2 `drawCodeOver` painter: rows in cells, bands as wide as the text, empty lines bare, comments and muted blocks dimmed, cut with `…`, eased scroll. Verify: new `npm run check:code-over` (Node, canvas stub): band widths, no band on empty lines, cut column, scroll keeps the focus line in the upper third
-- [ ] 1.3 Layout `code-over` in `LAYOUTS` and `F_SHOWS` (every fragment format) with the code area (left, right, whole width; width setting, default 62%); compose, composeVertical and the live output view "Code over". Verify: `npm run check:video`, `npm run check:clips`, `npm run check:live` new cases; old layouts' areas unchanged
+- [x] 1.3 Layout `code-over` in `LAYOUTS` and `F_SHOWS` (every fragment format) with the code area (left, right, whole width; width setting, default 62%); compose, composeVertical and the live output view "Code over". Verify: `npm run check:video`, `npm run check:clips`, `npm run check:live` new cases; old layouts' areas unchanged
 - [ ] 1.4 Captions and the strip layer use the free area in this layout. Verify: `check:code-over` geometry (no caption or panel box overlaps the code area in 16:9 left, right, whole, and 9:16); `PORT=… node tools/check-captions.cjs` passes
 
 ## 2. Page mode
@@ -18,7 +18,7 @@
 
 ## 3. Edited line and lit notes
 
-- [ ] 3.1 `typingPlan(...).cursor(t)` → `{ line, col, editing }`, passed by `typeFrame` and `codeFrom`. Verify: `npm run check:typing` new cases (cursor on the typed part, editing ends 0.35 s after the last key or at the evaluation; same cursor in `codeFrom` at the same cycle)
+- [x] 3.1 `typingPlan(...).cursor(t)` → `{ line, col, editing }`, passed by `typeFrame` and `codeFrom`. Verify: `npm run check:typing` new cases (cursor on the typed part, editing ends 0.35 s after the last key or at the evaluation; same cursor in `codeFrom` at the same cycle)
 - [ ] 3.2 Edit band in the theme's accent and block cursor in the painter; CodeMirror selection for hand code. Verify: `check-code-over.cjs` screenshot at a typed frame; fast video frame at the same cycle has the same edited row
 - [ ] 3.3 Real lit locations: scheduler haps in real time, per-hap locations from the render page in the fast video; lit tokens setting (first string, every string). Verify: `check:code-over` (first string only); `check-code-over.cjs` lit boxes land on the playing tokens (luci-rosse, kellerlicht); `node tools/check-export.cjs` passes and render time grows under 10%
 - [ ] 3.4 "Lit notes" Outline / Filled in the code theme settings, in the editor (a style rule over Strudel's marks) and in the painter. Verify: `tools/check-code-themes.cjs` new case; screenshots both values

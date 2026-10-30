@@ -2054,3 +2054,12 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Widget dell'app** `src/widgets/` (`app-widgets.js` registro, `hitgrid.js`, `tonecloud.js`): dati dai hap e pittore per forma (blocchi, LED tondi, 1-bit, caratteri). Griglia: righe per suono e variante (`hh`, `hh:3`), riga del basso, metro. Nuvola: vicini e armonici (quinta, terza maggiore), grana deterministica, scia 0,6, 48 colonne su 3 battute, celle più alte. Le chiamate escono commentate: `/* ._hitgrid() */`.
 - **Note del palco** (`stage-feed.js` `noteOf`): quinto elemento con la variante del campione (`n`), per le righe della griglia nel video veloce.
 - **Check:** `npm run check:code-over` nuovo (63 controlli, Strudel in Node: `s("bd*4")` accende i passi 1, 5, 9, 13; `[a2,c3,e3]` dà `Am`; il codice commentato dà gli stessi hap); `check:code-themes` controlla 69 fasce (minimo 4,5:1 sopra nero o bianco).
+
+## 2026-10-30: codice sopra il visual, parte 2: layout, uscita live, cursore (code-over-visual)
+
+- **Layout `code-over`** in `LAYOUTS` (video di sessione, tempo reale e veloce), show `code-over` nei frammenti (ogni formato: il visual tra le bande, il codice sopra a tutta larghezza, didascalie sotto il codice) e vista 14 "Codice sopra" nell'uscita live (cv14; ogni vista ha un'area `over` nascosta, così il passaggio sfuma). Didascalie e cartellino del brano vanno nella parte libera (a destra del codice in 16:9).
+- **Cursore della scrittura** (`typingPlan(...).cursor(t)` → `{ line, col, editing }`, D5): riga e colonna dopo l'ultimo tasto, modifica accesa fino a 0,35 s dopo l'ultimo tasto. `codeFrom(...).cursor(c)` lo dà al video veloce e si spegne alla valutazione del passo.
+- **Pagina**: `getCodeOver` in `main.js` passa al pittore impostazioni, cursore (scrittura dell'app, oppure il cursore di CodeMirror mentre si scrive a mano), codice valutato, posizioni dei hap che suonano ora e note per i widget (una query per ciclo, tenuta finché il pattern resta).
+- **Video veloce**: la pagina di rendering manda anche le posizioni dei hap (`lit`, solo con il codice sopra); il video veloce le usa con il codice del segmento valutato.
+- **Prova:** un fotogramma 1920×1080 di luci-rosse composto dall'app vera: fasce, tagli con `…`, cartellino a destra, nessun errore in console.
+- **Check:** `check:video` (11), `check:clips` (22), `check:live` (14), `check:typing` (18, due casi nuovi) passano.

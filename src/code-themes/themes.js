@@ -9,7 +9,8 @@
 export const CT_KEY = 'coding-misk-code-theme';
 // theme: 'auto' or a theme id; font: a FONTS key; size: a SIZES key; dim: the text of muted `_$:` lines at about 55 %
 // (owner's answer to Q7: an option, on by default)
-export const CT_DEFAULTS = { theme: 'auto', font: 'jetbrains', size: 'medium', dim: true };
+// lit: the playing notes outlined (Strudel's way) or filled (code-over-visual D6, "Lit notes")
+export const CT_DEFAULTS = { theme: 'auto', font: 'jetbrains', size: 'medium', dim: true, lit: 'outline' };
 // the opacity of the text of a muted line, in the panel and in videos
 export const MUTED_TEXT = 0.55;
 
@@ -42,6 +43,7 @@ export function codeThemeSettings(v) {
     font: FONTS[o.font] ? o.font : CT_DEFAULTS.font,
     size: SIZES[o.size] ? o.size : CT_DEFAULTS.size,
     dim: typeof o.dim === 'boolean' ? o.dim : CT_DEFAULTS.dim,
+    lit: o.lit === 'fill' ? 'fill' : 'outline',
   };
 }
 

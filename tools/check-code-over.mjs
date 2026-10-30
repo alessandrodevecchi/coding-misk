@@ -117,7 +117,7 @@ const T = { R, O, lit: 'outline' };
   check(APP_WIDGET_NAMES.every(k => S[k].on) && S.hitgrid.steps === 16 && S.tonecloud.cols === 48, 'settings: on with the defaults');
   check(appWidgetSettings({ hitgrid: { steps: 99, on: false } }).hitgrid.steps === 32 && appWidgetSettings({ hitgrid: { on: false } }).hitgrid.on === false, 'settings: limits and off');
   check(hitgridOptions({ steps: 8, nope: 1 }).steps === 8 && hitgridOptions({ nope: 1 }).nope === undefined, 'unknown parameters ignored');
-  check(cellForm('auto', 'terminal') === 'text' && cellForm('auto', 'led') === 'round' && cellForm('auto', '1bit') === 'two' && cellForm('auto', 'normal') === 'blocks', 'the cell form by render');
+  check(cellForm('auto', 'terminal') === 'text' && cellForm('auto', 'led') === 'round' && cellForm('auto', 'bit') === 'two' && cellForm('auto', 'normal') === 'blocks', 'the cell form by render');
 }
 
 // ---------- widgets from haps (Strudel in Node) ----------
