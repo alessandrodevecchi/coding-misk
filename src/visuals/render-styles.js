@@ -7,6 +7,7 @@
 import { RENDER_GAIN } from '../music.js';
 import { termPalette, gridOf, termGrid, brailleWave } from './term-grid.js';
 import { spectrumOf } from './widget-painters.js';
+import { layerFree } from './widget-layer.js';
 
 // D3: 8×8 Bayer thresholds in (0, 1), row by row
 export const BAYER8 = (() => {
@@ -98,10 +99,14 @@ export function drawTermChrome(g, G, T, info) {
     const ph = Math.max(5, Math.round(rows * 0.2)), pw = Math.max(18, Math.round(cols * 0.3)), py = last - 1 - ph;
     const wave = info.wave;
     let peak = 0; if (wave) for (let i = 0; i < wave.length; i++) peak = Math.max(peak, Math.abs(wave[i]));
-    t.bg(2, py, pw, ph, T.bg); t.box(2, py, pw, ph, T.faint, `${info.scopeWord || 'scope'} ⠿`, { titleCol: T.blue });
-    t.braille(4, py + 1, pw - 4, ph - 2, brailleWave(pw - 4, ph - 2, peak > 1e-4 ? wave : null, Math.min(8, 0.42 / Math.max(peak, 0.02))), T.blue);
+    // (code-over-visual D7: with the code drawn over the stage, only the pane on the side away from it)
+    const free = layerFree(), left = !free || free === 'left', right = !free || free === 'right';
+    if (left) {
+      t.bg(2, py, pw, ph, T.bg); t.box(2, py, pw, ph, T.faint, `${info.scopeWord || 'scope'} ⠿`, { titleCol: T.blue });
+      t.braille(4, py + 1, pw - 4, ph - 2, brailleWave(pw - 4, ph - 2, peak > 1e-4 ? wave : null, Math.min(8, 0.42 / Math.max(peak, 0.02))), T.blue);
+    }
     const sw = Math.max(16, Math.round(cols * 0.26)), sx = cols - 2 - sw;
-    if (sx > 2 + pw + 2) {
+    if (right && sx > 2 + pw + 2) {
       t.bg(sx, py, sw, ph, T.bg); t.box(sx, py, sw, ph, T.faint, `${info.spectrumWord || 'spectrum'} ▇`, { titleCol: T.green });
       const bw = sw - 4, vals = new Array(bw).fill(0);
       if (wave && peak > 1e-4) {

@@ -15,6 +15,7 @@ const tallOf = (W, H) => H > W * 1.05;
 // whole width) or null (as before). Set by the stage before it draws the layer (setLayerFree)
 let FREE = null;
 export const setLayerFree = side => { FREE = side === 'left' || side === 'right' || side === 'none' ? side : null; };
+export const layerFree = () => FREE;
 export function stripLayout(n, W, H, free = FREE) {
   n = Math.max(0, Math.min(4, n));
   if (!n || free === 'none') return [];

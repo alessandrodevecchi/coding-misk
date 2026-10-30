@@ -5,7 +5,8 @@
 // A note: { inst (the `analyze` name), b, e (cycles), p (pitch: a MIDI number, or the sound's name for a sample), lv
 // (gain × velocity), n (the sample's variant, or undefined) }. One cycle is one bar.
 
-export const HG_DEFAULTS = Object.freeze({ steps: 16, bars: 1, rows: 'auto', names: 'short', variants: true, extra: ['bass'], style: 'auto', trail: 2, size: 1 });
+// extra (cv9: more rows): the onsets of these melodic instruments as rows of their own, when they play
+export const HG_DEFAULTS = Object.freeze({ steps: 16, bars: 1, rows: 'auto', names: 'short', variants: true, extra: ['bass', 'hook', 'lead', 'arp', 'guitar'], style: 'auto', trail: 2, size: 1 });
 // limits of the numbers a call or the settings can give
 export const HG_LIMITS = { steps: [4, 32], bars: [1, 4], trail: [0, 8], size: [0.6, 2.5] };
 // the drum instruments (`analyze` names) whose notes are hits

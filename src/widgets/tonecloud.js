@@ -15,7 +15,7 @@ const FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 const CHORDS = [['maj7', [0, 4, 7, 11]], ['m7', [0, 3, 7, 10]], ['7', [0, 4, 7, 10]], ['m7b5', [0, 3, 6, 10]], ['', [0, 4, 7]], ['m', [0, 3, 7]], ['dim', [0, 3, 6]], ['sus4', [0, 5, 7]], ['sus2', [0, 2, 7]], ['5', [0, 7]]];
 // how much of a note's energy reaches other pitch classes (cv9: a cloud, not lines): the neighbours, and the overtones of
 // a real tone (the fifth, the 3rd harmonic; the major third, the 5th harmonic), times the spread setting
-const SPREAD = [[7, 0.55], [4, 0.4], [1, 0.32], [11, 0.32], [5, 0.18], [2, 0.12], [10, 0.12]];
+const SPREAD = [[7, 0.6], [4, 0.45], [1, 0.4], [11, 0.4], [5, 0.25], [2, 0.2], [10, 0.2], [3, 0.12], [9, 0.12]];
 
 const num = (v, [lo, hi], d) => { const x = Number(v); return Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : d; };
 export function tonecloudOptions(call = {}, base = TC_DEFAULTS) {
@@ -36,7 +36,7 @@ export const tonecloudWindow = (cyc, o) => [cyc - o.bars - o.decay * 4 - 1, cyc 
 
 const pcOf = p => (typeof p === 'number' && Number.isFinite(p) ? ((Math.round(p) % 12) + 12) % 12 : null);
 // a small deterministic grain (the same for the same slice of the song, real time and fast video alike)
-const grain = (pc, slice) => { let h = Math.imul((slice * 12 + pc) | 0, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822507) >>> 0; h ^= h >>> 13; return 0.78 + 0.22 * ((h >>> 0) / 4294967296); };
+const grain = (pc, slice) => { let h = Math.imul((slice * 12 + pc) | 0, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822507) >>> 0; h ^= h >>> 13; return 0.55 + 0.45 * ((h >>> 0) / 4294967296); };
 // names by the song's key: flats for flat keys (F, Bb, Eb, … and their minors), sharps otherwise
 export function useFlats(names, key = '') {
   if (names === 'flat') return true;
@@ -78,8 +78,8 @@ export function tonecloudData(notes, cyc, o, { key = '' } = {}) {
     for (let p = 0; p < 12; p++) { lo = Math.min(lo, E[p][c]); hi = Math.max(hi, E[p][c]); }
     for (let p = 0; p < 12; p++) {
       const v = E[p][c];
-      if (o.norm === 'column') E[p][c] = hi < 0.02 ? 0 : Math.pow(Math.max(0, (v - lo) / Math.max(1e-6, hi - lo)), 1.25) * Math.min(1, hi / Math.max(1e-6, max) * 1.6);
-      else E[p][c] = max < 0.02 ? 0 : Math.pow(v / max, 0.8);
+      if (o.norm === 'column') E[p][c] = hi < 0.02 ? 0 : Math.pow(Math.max(0, (v - lo) / Math.max(1e-6, hi - lo)), 0.7) * Math.min(1, hi / Math.max(1e-6, max) * 1.6);
+      else E[p][c] = max < 0.02 ? 0 : Math.pow(v / max, 0.7);
     }
   }
   const flats = useFlats(o.names, key), names = flats ? FLAT : SHARP;
@@ -103,9 +103,10 @@ export const rowText = (D, pc, ramp) => Array.from(D.E[pc], e => rampChar(ramp, 
 
 // ---------- painter ----------
 const T = { it: { chord: 'accordo' }, en: { chord: 'chord' } };
+// (the characters at 0.7 of the code's size, so a cell is as wide as its glyph; rows a little taller than the code's)
 function metrics(D, o, fs) {
-  const cw = fs * 0.6 * o.size, rh = fs * 0.92 * o.size, lab = o.labels ? cw * 3.4 : 0;
-  return { cw, rh, lab, w: lab + D.cols * cw, h: rh * (12.4 + (o.chord ? 1.3 : 0)) };
+  const px = fs * 0.7 * o.size, cw = px * 0.6, rh = px * 1.12, lab = o.labels ? cw * 3.6 : 0;
+  return { px, cw, rh, lab, w: lab + D.cols * cw, h: rh * (12.4 + (o.chord ? 1.3 : 0)) };
 }
 export function tonecloudSize(D, o, fs) { const m = metrics(D, o, fs); return { w: m.w + fs * 0.6, h: m.h }; }
 // P: { band, ink, comment, hit, now, cell, inv, invInk }; o: options with form ('blocks' | 'round' | 'two' | 'text'),
@@ -115,7 +116,9 @@ export function paintTonecloud(g, x, y, D, P, o, fs) {
   const order = o.order === 'high' ? [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   g.save();
   g.fillStyle = P.band; g.fillRect(x - fs * 0.3, y, m.w + fs * 0.6, m.h);
-  g.font = `${Math.round(fs * 0.6 * o.size)}px ${font}`; g.textBaseline = 'middle';
+  g.font = `${Math.round(m.px * 10) / 10}px ${font}`; g.textBaseline = 'middle';
+  // the cells of a row on the grid of the glyphs (another font's width scaled to it)
+  const gw = g.measureText('M').width || m.cw, sx = m.cw / gw;
   order.forEach((pc, i) => {
     const yy = y + m.rh * 0.2 + i * m.rh, inChord = o.chord && D.chord && D.chord.set.includes(pc);
     if (o.labels) {
@@ -135,11 +138,12 @@ export function paintTonecloud(g, x, y, D, P, o, fs) {
       return;
     }
     g.fillStyle = inChord ? P.now : P.ink;
-    g.fillText(rowText(D, pc, ramp), x0, yy + m.rh / 2);
+    if (Math.abs(sx - 1) < 0.02) g.fillText(rowText(D, pc, ramp), x0, yy + m.rh / 2);
+    else { g.save(); g.translate(x0, yy + m.rh / 2); g.scale(sx, 1); g.fillText(rowText(D, pc, ramp), 0, 0); g.restore(); }
   });
   if (o.chord) {
-    g.fillStyle = P.comment; g.font = `${Math.round(fs * 0.55 * o.size)}px ${font}`;
-    g.fillText(`${(T[o.lang] || T.it).chord} ${D.chord ? D.chord.name : '—'}`, x, y + m.rh * 12.9);
+    g.fillStyle = P.comment; g.font = `${Math.round(m.px * 0.85)}px ${font}`;
+    g.fillText(`${(T[o.lang] || T.it).chord} ${D.chord ? D.chord.name : '—'}`, x, y + m.rh * 12.95);
   }
   g.restore();
   return { w: m.w + fs * 0.6, h: m.h };

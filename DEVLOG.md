@@ -2087,3 +2087,13 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Corretto:** nel video veloce i segmenti dei blocchi non hanno lo stesso `from` dei segmenti del brano, quindi le note accese non trovavano il loro codice: la pagina di rendering ora manda per ogni blocco i codici valutati e per ogni hap l'indice del suo codice.
 - **Corretto:** nel 9:16 il codice partiva sotto l'etichetta del frammento: ora parte un decimo più in basso quando c'è la banda in alto.
 - **Backup:** `check-backup.mjs` (16) controlla `coding-misk-code-over`, `coding-misk-app-widgets` e `lit` del tema del codice.
+
+## 2026-10-30: codice sopra il visual, parte 6: widget più densi, figure e clip v2 (code-over-visual)
+
+- **Nuvola di note (cv9):** più vicini e armonici (quinta 0,6, terza 0,45, semitoni 0,4, poi 0,25-0,12), grana deterministica più ampia (0,55-1), gamma 0,7 su ogni colonna: ora i caratteri intermedi della scala (`: - = + *`) riempiono lo spazio tra le note e si legge come una nuvola. Celle allineate ai glifi (prima la fascia era più larga dei caratteri), caratteri a 0,7 della dimensione del codice.
+- **Griglia colpi (cv9):** righe in più di default: i ritmi di basso, hook, lead, arp e chitarra quando suonano.
+- **Scorrimento senza scrittura:** la finestra che mostra più righe suonate negli ultimi due secondi (prima: l'ultima riga, cioè la coda del codice).
+- **Riga in modifica:** resta accesa dal primo all'ultimo tasto della riga, pause di pensiero comprese (prima si spegneva in una pausa a metà riga).
+- **Terminale:** i due riquadri del passaggio Terminale (scope e spectrum) tengono il lato libero come la striscia: niente scope sotto il codice.
+- **Per il proprietario** in `notes/prove-2026-10-30/code-over-visual/`: `clip-16x9-v2.mp4` e `clip-9x16-v2.mp4` (30 s, kellerlicht in Live coder dal secondo 190, con l'audio dell'app; per la demo la nuvola è il primario anche di arp e lead), `widgets-before-after-v2.png` e `tonecloud-before-after-v2.png` (stesse note reali di luci-rosse a battuta 47 con i parametri di prima e i nuovi, disegnate dal nuovo pittore; il "prima" vero del prototipo è nei mockup `widget-*.png`), `widgets-themes-v2.png`, `widgets-renders-v2.png`, `tonecloud-renders-v2.png`, `layout-16x9-neon-v2.png`, `layout-9x16-hw-v2.png`, `layout-16x9-light-v2.png`, `render-terminal-v2.png`, `render-led-v2.png`, `page-typing-v2.png`, `page-widgets-v2.png`, `settings-code-over-v2.png`, `settings-app-widgets-v2.png`.
+- **Check:** `check:code-over` (63), `check:render-styles`, `check:typing` passano.

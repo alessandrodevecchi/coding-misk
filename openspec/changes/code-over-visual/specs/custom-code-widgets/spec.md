@@ -48,7 +48,7 @@ The hit grid (it: "Griglia colpi") SHALL show the beats numbered on top, the ste
 
 ### Requirement: Hit grid rows
 
-The hit grid SHALL show one row per drum sound and variant of the song (`hh` and `hh:3` apart) and the bass's rhythm in a row of its own by default. Rows SHALL keep a stable order (kick, snare, clap, rim, hats, open hats, toms, cymbals, other, then the extra rows) and SHALL not vanish while a sound pauses.
+The hit grid SHALL show one row per drum sound and variant of the song (`hh` and `hh:3` apart) and, by default, the rhythm of the bass, hook, lead, arp and guitar in rows of their own when they play. Rows SHALL keep a stable order (kick, snare, clap, rim, hats, open hats, toms, cymbals, other, then the extra rows) and SHALL not vanish while a sound pauses.
 
 #### Scenario: Variants apart
 
@@ -94,7 +94,7 @@ Each app widget SHALL accept parameters in its call, merged over defaults from S
 
 ### Requirement: Hit grid parameters
 
-The hit grid SHALL accept `steps` (per bar, default 16; 12 in ternary meters), `bars` (default 1), `rows` (list and order, default automatic), `names` (`short` or `long`, default short), `variants` (default on: sound variants in rows of their own), `extra` (melodic rows, default the bass), `style` (`blocks` or `text`, default automatic), `trail` (default 2) and `size` (default 1).
+The hit grid SHALL accept `steps` (per bar, default 16; 12 in ternary meters), `bars` (default 1), `rows` (list and order, default automatic), `names` (`short` or `long`, default short), `variants` (default on: sound variants in rows of their own), `extra` (melodic rows, default bass, hook, lead, arp and guitar), `style` (`blocks` or `text`, default automatic), `trail` (default 2) and `size` (default 1).
 
 #### Scenario: Extra row
 

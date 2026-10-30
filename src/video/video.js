@@ -255,6 +255,7 @@ export function createVideo({ getCodeOver = () => null, getCodeTheme = () => nul
     try {
       const out = drawCodeOver(g, A, { code, cursor: X.cursor || null, lit, widgets, dim: C.dim !== false, blink: !X.fast, now }, { R, O: overRoles(R, S.opacity), lit: X.litForm || 'outline', font: C.family, long: S.long, edit: S.edit }, st);
       // (for the checks: the last code over drawn)
+      if (Array.isArray(globalThis.codingMiskCodeOverProbe) && globalThis.codingMiskCodeOverProbe.length < 50) globalThis.codingMiskCodeOverProbe.push({ cyc, cursor: X.cursor, code, lit: (X.lit || []).map(L => ({ evaluated: L.evaluated, spans: L.spans })), mapped: lit });
       globalThis.codingMiskCodeOver = { rows: out.rows.length, edit: (out.rows.find(r => r.edit) || {}).line ?? null, lit: lit.length, widgets: out.widgets.map(w => w.kind), cols: out.cols, cyc };
       return out;
     } finally { g.restore(); }

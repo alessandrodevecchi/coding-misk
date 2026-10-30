@@ -356,8 +356,6 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (!kind) { globalThis.codingMiskLayerPanels = null; return; }
     const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000, kind, look);
     if (!F) return;
-    // code-over-visual D7: the side away from the code drawn over the stage, when it is
-    setLayerFree(stage.free ? stage.free() : null);
     cx.save();
     const native = NATIVE_RENDERS.includes(render);
     const drawn = native ? drawLayerGlyph(cx, W, H, F, kind, render, termPalette(stage.theme ? stage.theme() : 'neon'), termInfo(cyc, playing, look, render)) : drawLayer(cx, W, H, F, kind);
@@ -1025,6 +1023,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
     const pal = PAL[look] || PAL.palco;
     cx.clearRect(0, 0, W, H);
+    // code-over-visual D7: the side away from the code drawn over the stage (the strip and the Terminal panes keep to it)
+    setLayerFree(stage && stage.free ? stage.free() : null);
     let native = false;
     if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
     else if (WIDGET_LOOKS.includes(look)) { if (soul) soul.hide(); native = widgetLook(look, cyc, playing, render); }

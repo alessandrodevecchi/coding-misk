@@ -292,7 +292,8 @@ function humanPlan(parts, acts, to, { speed, max, seed, mistakes = true, rate = 
       const keyed = list.filter(a => !a.paste && a.keys.length);
       let a = null; for (const x of keyed) if (x.keys[0].t <= time) a = x;
       if (!a) return { line: -1, col: 0, editing: false };
-      const last = a.keys[a.keys.length - 1].t, r = humanFrame(Math.min(time, total - 1e-9), a);
+      // (the edit of a line lasts from its first key to its last, pauses to think included)
+      const last = Math.max(...keyed.filter(x => x.pi === a.pi).map(x => x.keys[x.keys.length - 1].t)), r = humanFrame(Math.min(time, total - 1e-9), a);
       return { ...lineCol(r.text, r.off), editing: time <= last + EDIT_HOLD };
     },
   };
@@ -446,7 +447,8 @@ export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact
       let a = null; for (const x of acts) if (!x.paste && x.n > 0 && x.t0 <= time) a = x;
       if (!a) return { line: -1, col: 0, editing: false };
       const r = exactFrame(Math.min(time, total - 1e-9), a);
-      return { ...lineCol(r.text, r.off), editing: time <= a.t1 + EDIT_HOLD };
+      const last = Math.max(...acts.filter(x => !x.paste && x.pi === a.pi).map(x => x.t1));
+      return { ...lineCol(r.text, r.off), editing: time <= last + EDIT_HOLD };
     },
   };
   function exactFrame(time, mark) {

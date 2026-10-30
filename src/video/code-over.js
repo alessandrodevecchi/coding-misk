@@ -139,11 +139,25 @@ export function drawCodeOver(g, A, F, T, st = {}) {
     else rows.push({ i, text: l, from: 0, h: lh });
     for (const w of below.get(i) || []) { const s = widgetSize(w.frame, fs); rows.push({ w, i, h: s.h + lh * 0.3, size: s }); }
   });
-  // the scroll keeps the edited line (else the last line typed, else the end) in the upper third, eased
-  const focus = cur ? cur.line : lines.length - 1;
+  // the scroll keeps the edited line (else the last line typed) in the upper third, eased; with no typing, the lines
+  // playing (the middle of the lit tokens), else the end
+  // (the lines lit within the last two seconds, so the scroll does not follow every single hit)
+  const seen = (st.seen ||= new Map()), now = F.now || 0;
+  for (const x of F.lit || []) seen.set(x[0], now);
+  for (const [k, t] of seen) if (now - t > 2 || t > now + 1 || k >= lines.length) seen.delete(k);
+  const litLines = [...seen.keys()].sort((a, b) => a - b);
+  const focus = cur ? cur.line : litLines.length ? -2 : lines.length - 1;
   let acc = 0, focusY = 0;
-  for (const r of rows) { if (!r.w && r.i === focus && !focusY) focusY = acc; r.y = acc; acc += r.h; }
-  const total = acc, room = A.h, want = total <= room ? 0 : Math.max(0, Math.min(total - room, focusY - room / 3));
+  const yOf = new Map();
+  for (const r of rows) { if (!r.w && !yOf.has(r.i)) yOf.set(r.i, acc); if (!r.w && r.i === focus && !focusY) focusY = acc; r.y = acc; acc += r.h; }
+  const total = acc, room = A.h;
+  // no typing: the window that shows the most lines playing (the first such window), its first line in the upper third
+  if (focus === -2) {
+    const ys = litLines.map(i => yOf.get(i) ?? 0);
+    let best = -1;
+    for (const y of ys) { const top = y - room / 3, n = ys.filter(v => v >= top && v < top + room - lh).length; if (n > best) { best = n; focusY = y; } }
+  }
+  const want = total <= room ? 0 : Math.max(0, Math.min(total - room, focusY - room / 3));
   st.scroll = st.scroll === undefined ? want : st.scroll + (want - st.scroll) * (F.ease ?? 0.12);
   const lit = new Map(); for (const [li, a, b] of F.lit || []) { if (!lit.has(li)) lit.set(li, []); lit.get(li).push([a, b]); }
   const out = { cols, cw, lh, rows: [], widgets: [] };
