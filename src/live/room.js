@@ -20,14 +20,14 @@ const urls = { program: '', preview: '' };
 
 // ---------- the page ----------
 const VIEW_NAMES = { 'code-widgets': 'lrViewCodeWidgets', 'code-only-widgets': 'lrViewCodeOnlyWidgets', visual: 'lrViewVisual', code: 'lrViewCode', 'code-soul': 'lrViewCodeSoul', soul: 'lrViewSoul', 'code-only': 'lrViewCodeOnly',
-  'visual-tl': 'lrViewVisualTl', 'visual-code-tl': 'lrViewVisualCodeTl', 'code-tl': 'lrViewCodeTl', 'soul-tl': 'lrViewSoulTl', 'visual-float': 'lrViewVisualFloat', 'visual-column': 'lrViewVisualColumn' };
+  'visual-tl': 'lrViewVisualTl', 'visual-code-tl': 'lrViewVisualCodeTl', 'code-tl': 'lrViewCodeTl', 'soul-tl': 'lrViewSoulTl', 'visual-float': 'lrViewVisualFloat', 'visual-column': 'lrViewVisualColumn', 'code-over': 'lrViewCodeOver' };
 // a small drawing of a view, from the same areas the picture uses
 function thumb(view) {
   const W = 160, H = 90, A = liveAreas(view, W, H), r = (a, fill, extra = '') => (a.a > .5 && a.x < W ? `<rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}" rx="2" fill="${fill}" ${extra}/>` : '');
   const lines = a => (a.a > .5 && a.x < W ? Array.from({ length: Math.floor((a.h - 6) / 5) }, (_, i) => `<rect x="${a.x + 4}" y="${a.y + 5 + i * 5}" width="${(a.w - 8) * (.45 + ((i * 37) % 50) / 100)}" height="2" fill="#00e5ff" opacity=".7"/>`).join('') : '');
   const soul = A.soul.a > .5 && A.soul.x < W ? `<circle cx="${A.soul.x + A.soul.w / 2}" cy="${A.soul.y + A.soul.h / 2 + 2}" r="${Math.min(A.soul.w, A.soul.h) * .3}" fill="url(#sg)"/>` : '';
   return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs><linearGradient id="vg" x2="1" y2="1"><stop offset="0" stop-color="#ff2e88"/><stop offset="1" stop-color="#7b2cff"/></linearGradient><radialGradient id="sg"><stop offset="0" stop-color="#3dffb0"/><stop offset="1" stop-color="#3dffb0" stop-opacity="0"/></radialGradient></defs>
-    <rect width="${W}" height="${H}" fill="#0a0614"/>${r(A.stage, 'url(#vg)')}${r(A.soul, '#06120e', 'stroke="#3b2758"')}${soul}${r(A.code, '#06101a', 'stroke="#3b2758"')}${lines(A.code)}</svg>`;
+    <rect width="${W}" height="${H}" fill="#0a0614"/>${r(A.stage, 'url(#vg)')}${r(A.soul, '#06120e', 'stroke="#3b2758"')}${soul}${r(A.code, '#06101a', 'stroke="#3b2758"')}${lines(A.code)}${lines(A.over)}</svg>`;
 }
 function build() {
   const c = load();

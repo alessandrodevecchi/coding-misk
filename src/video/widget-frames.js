@@ -7,11 +7,12 @@
 // the instrument of each line with a scope or spectrum, from the code shown and the code evaluated: the line's own visual,
 // else the hidden mixer's entry for the line (`miskMix(x, [[from, to, { analyze: '…' }], …])`)
 import * as paint from '../visuals/widget-painters.js';
+import { widgetFrame, widgetSize, paintWidget } from '../widgets/app-widgets.js';
 
-const CALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/;
+const CALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/;
 const NOTE = ['pianoroll', 'punchcard', 'spiral', 'pitchwheel'];
 // a widget call at the end of a line (one level of nested brackets), with its line break before it
-const STRIP = /(?:[ \t]*\n[ \t]*)?\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\((?:[^()]|\([^()]*\))*\)/g;
+const STRIP = /(?:[ \t]*\n[ \t]*)?\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\((?:[^()]|\([^()]*\))*\)/g;
 export const lineKey = text => text.replace(STRIP, '').replace(/\s+/g, '');
 function chains(code) {
   const out = []; let pos = 0;
@@ -43,6 +44,8 @@ export function instrumentOfLine(text, a, run) {
 export function widgetPlan(segments) {
   const noteKeys = new Set(), instOf = new Map();
   for (const s of segments) for (const w of widgetLines(s.code)) {
+    // (the app widgets draw from the stage notes, code-over-visual D8)
+    if (w.type === 'hitgrid' || w.type === 'tonecloud') continue;
     if (NOTE.includes(w.type)) noteKeys.add(w.key);
     else { const i = instrumentOfLine(s.code.slice(w.a, w.b), w.a, s.run || null); if (i) instOf.set(w.key, i); }
   }
@@ -53,7 +56,9 @@ export function widgetPlan(segments) {
 // instOf: key → instrument; S: the code widgets' settings; P: colours { ink, muted, a1, a2 }
 // → { canvas(type, index, key, cyc, t, master) }: a canvas with the widget at that moment (master: the song's wave, for
 // the fallback). The pictures come from the shared painters (src/visuals/widget-painters.js, widgets-on-stage D1).
-export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P }) {
+// app (code-over-visual D8): the app widgets' { S (their settings), notes(c0, c1) (the stage notes), P (their palette),
+// ctx, options(index, type) (a call's own options) }, or null
+export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P, app = null }) {
   const cache = new Map(), Z = S.sizes, full = S.notes === 'full', DPR = 2;
   const canvasFor = (id, w, h) => {
     let c = cache.get(id);
@@ -115,6 +120,15 @@ export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P }
       if (type === 'pianoroll' || type === 'punchcard') { const c = canvasFor(id, 500, Z.row); roll(c, list, cyc, type === 'punchcard'); return c; }
       if (type === 'spiral') { const c = canvasFor(id, Z.spiral, Z.spiral); spiral(c, list, cyc); return c; }
       if (type === 'pitchwheel') { const c = canvasFor(id, Z.round, Z.round); wheel(c, list, cyc); return c; }
+      if ((type === 'hitgrid' || type === 'tonecloud') && app) {
+        const fs = 14, memo = (app.memos ||= new Map()), mk = `${type}:${index}`;
+        if (!memo.has(mk)) memo.set(mk, new Map());
+        const F = widgetFrame(type, app.options ? app.options(type, index) : {}, app.S, app.notes, cyc, { ...(app.ctx || {}), memo: memo.get(mk) }), sz = widgetSize(F, fs);
+        const c = canvasFor(id, Math.ceil(sz.w + fs * 0.4), Math.ceil(sz.h)), g = c.getContext('2d');
+        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+        paintWidget(g, fs * 0.3, 0, F, app.P, fs); g.setTransform(1, 0, 0, 1, 0, 0);
+        return c;
+      }
       return null;
     },
   };

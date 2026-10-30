@@ -38,27 +38,44 @@ export function levelsFrom(onsets) {
 // style 'human' (human-typing): a listening pause after the step, then the typing at a person's pace, as in the app
 export function codeFrom(segments, { seconds = null, speed = 1, style = 'exact', seed = '', mistakes = true } = {}) {
   const cache = new Map();
-  return function codeAt(c) {
-    let i = 0; while (i + 1 < segments.length && segments[i + 1].from <= c) i++;
+  // the typing of segment i towards the next: { plan, start } (seconds), made once
+  const typingOf = i => {
     const seg = segments[i], next = segments[i + 1];
-    // a joined radio session (radio-profiles D12): the next song on air appears whole, and each song types as it does
-    if (next && next.whole) return seg.code;
-    if (seconds && next) {
-      if (!cache.has(i)) {
+    if (!cache.has(i)) {
         const end = seconds(next.from) - 0.2, from0 = seconds(seg.from + 0.5), to = next.code, human = (next.typist || style) === 'human';
         const avail = Math.max(0.2, end - from0), listenMin = human ? Math.min(avail * 0.5, 2) : 0;
         const plan = typingPlan(settleOthers(seg.code, to, next.from), to, { speed, max: Math.max(0.2, avail - listenMin), style: next.typist || style, seed: next.seed ?? seed, mistakes: next.mistakes ?? mistakes, stretch: Math.floor(next.from / 16), force: next.paste ?? Infinity, earlier: next.earlier || null });
         const listen = human ? Math.max(listenMin, Math.min(avail * 0.2, avail - plan.total)) : 0;
         cache.set(i, { plan, start: Math.max(from0 + listen, end - plan.total) });
-      }
-      const T = cache.get(i), t = seconds(c) - T.start;
+    }
+    return cache.get(i);
+  };
+  const segAt = c => { let i = 0; while (i + 1 < segments.length && segments[i + 1].from <= c) i++; return i; };
+  function codeAt(c) {
+    const i = segAt(c), seg = segments[i], next = segments[i + 1];
+    // a joined radio session (radio-profiles D12): the next song on air appears whole, and each song types as it does
+    if (next && next.whole) return seg.code;
+    if (seconds && next) {
+      const T = typingOf(i), t = seconds(c) - T.start;
       return t < 0 ? seg.code : T.plan.frame(t);
     }
     if (!next || c < next.from - 1) return seg.code;
     // as live: only the line of the section that plays at the step is typed
     if (!cache.has(i)) cache.set(i, typingFrames(settleOthers(seg.code, next.code, next.from), next.code));
     return cache.get(i)(Math.max(0, Math.min(1, (c - (next.from - 1)) / 0.9)));
+  }
+  // code-over-visual D5: the line being typed at cycle c, as the app's typing plan says ({ line, col, editing }), or null
+  // (no typing towards the next step at c; the typing as a whole step without seconds has no cursor). An edit ends at
+  // the step's evaluation at the latest
+  codeAt.cursor = c => {
+    const i = segAt(c), next = segments[i + 1];
+    if (!seconds || !next || next.whole) return null;
+    const T = typingOf(i), t = seconds(c) - T.start;
+    if (t < 0) return null;
+    const k = T.plan.cursor(t);
+    return k.line < 0 ? null : { ...k, editing: k.editing && c < next.from };
   };
+  return codeAt;
 }
 
 // the voice line at cycle c (held 4 bars), from the timeline's say list [{ bar, text }]

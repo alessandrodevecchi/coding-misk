@@ -3,7 +3,7 @@ import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache
 import { pitchesOf } from './visuals/widget-painters.js';
 import { drawMonitor, drawRullo } from './visuals/widget-looks.js';
 import { themePalette, scenePalette } from './visuals/widget-palettes.js';
-import { drawLayer, seeThrough } from './visuals/widget-layer.js';
+import { drawLayer, seeThrough, setLayerFree } from './visuals/widget-layer.js';
 import { layerOn, limitOf } from './visuals/stage-settings.js';
 import { createRenderer } from './visuals/render-styles.js';
 import { termPalette } from './visuals/term-grid.js';
@@ -1023,6 +1023,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
     const pal = PAL[look] || PAL.palco;
     cx.clearRect(0, 0, W, H);
+    // code-over-visual D7: the side away from the code drawn over the stage (the strip and the Terminal panes keep to it)
+    setLayerFree(stage && stage.free ? stage.free() : null);
     let native = false;
     if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
     else if (WIDGET_LOOKS.includes(look)) { if (soul) soul.hide(); native = widgetLook(look, cyc, playing, render); }

@@ -8,7 +8,8 @@ import { drawTimeline, drawColumn, futureShown } from '../live/timeline.js';
 import { fragmentAreas, soulFocus, coverOffset } from './layout.js';
 import { glitchAt, GLITCH_SECONDS, taglineAt, taglineFor } from './fragments.js';
 import { hashString } from '../endless/random.js';
-import { appRoles, MUTED_TEXT } from '../code-themes/themes.js';
+import { appRoles, MUTED_TEXT, overRoles } from '../code-themes/themes.js';
+import { drawCodeOver, codeOverWidgets, litSpans, codeOverSettings, codeOverAreas } from './code-over.js';
 import { drawCaptions } from '../captions/captions.js';
 
 const KEY = 'coding-misk-video';
@@ -23,7 +24,11 @@ const LIVE_KEY = 'coding-misk-live-preset';
 // read every frame; a fast video or a fragment passes the one read at its start (J.ct)
 // getWidgets(): { canvas(type, index, key), dim } of the code widgets drawn now (the page's, or the fast video's drawn
 // from its notes and waves), or null (code-widgets D11)
-export function createVideo({ getCodeTheme = () => null, getWidgets = () => null, visuals, getCode, getInfo, getCaptions = () => null, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
+// getCodeOver(cyc): what the "Code over" layout needs besides the code (code-over-visual): { S (its settings), aw (the app
+// widgets' settings), cursor ({ line, col, editing } of the line being typed, or null), lit ([{ evaluated (a code
+// evaluated), spans ([from, to] offsets into it of the haps sounding) }]), notes(c0, c1) (for the app widgets), meter, key, lang, render,
+// litForm ('outline' | 'fill'), song (a key: the widgets' rows start again with another song), fast (the fast video) }
+export function createVideo({ getCodeOver = () => null, getCodeTheme = () => null, getWidgets = () => null, visuals, getCode, getInfo, getCaptions = () => null, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });
   const cv = document.createElement('canvas');
@@ -214,7 +219,7 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
   function codeWidgets(lines, rows, width, fs) {
     const G = getWidgets(), lh = Math.round(fs * 1.4), count = {}, extra = new Map(), items = [];
     if (G) lines.forEach((ln, li) => {
-      for (const m of ln.matchAll(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/g)) {
+      for (const m of ln.matchAll(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/g)) {
         let start = li; while (start > 0 && /^\s+\./.test(lines[start])) start--;
         let end = li; while (end + 1 < lines.length && /^\s+\./.test(lines[end + 1])) end++;
         const type = m[1], index = count[type] = (count[type] ?? -1) + 1, canvas = G.canvas(type, index, widgetLineKey(lines.slice(start, end + 1).join('\n')));
@@ -233,6 +238,27 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     let acc = 0;
     rows.forEach((r, k) => { pos.push(k + acc); acc += (extra.get(k) || 0) / lh; });
     return { items, pos, total: rows.length + acc };
+  }
+  // "Code over" (code-over-visual D1): the code drawn over the stage in area A, with its own scroll per canvas; the app
+  // widgets' rows are kept per song (D9)
+  const overScroll = new WeakMap();
+  let memos = new Map(), memoSong = null;
+  function drawOver(A, P, now, cyc, ct = null) {
+    if (!A || (A.a ?? 1) <= 0.01) return null;
+    const C = ct || getCodeTheme() || {}, R = C.roles || appRoles(P), X = getCodeOver(cyc) || {}, S = codeOverSettings(X.S);
+    const code = getCode() || '';
+    if (X.song !== memoSong) { memoSong = X.song; memos = new Map(); }
+    const lit = (X.lit || []).flatMap(L => litSpans(code, L.evaluated ?? code, L.spans, S.lit));
+    const widgets = X.notes ? codeOverWidgets(code, X.aw, X.notes, cyc, { meter: X.meter, key: X.key, lang: X.lang, render: X.render, font: C.family, memos }) : [];
+    let st = overScroll.get(g.canvas); if (!st) { st = {}; overScroll.set(g.canvas, st); }
+    g.save(); g.globalAlpha = A.a ?? 1;
+    try {
+      const out = drawCodeOver(g, A, { code, cursor: X.cursor || null, lit, widgets, dim: C.dim !== false, blink: !X.fast, now }, { R, O: overRoles(R, S.opacity), lit: X.litForm || 'outline', font: C.family, long: S.long, edit: S.edit }, st);
+      // (for the checks: the last code over drawn)
+      if (Array.isArray(globalThis.codingMiskCodeOverProbe) && globalThis.codingMiskCodeOverProbe.length < 50) globalThis.codingMiskCodeOverProbe.push({ cyc, cursor: X.cursor, code, lit: (X.lit || []).map(L => ({ evaluated: L.evaluated, spans: L.spans })), mapped: lit });
+      globalThis.codingMiskCodeOver = { rows: out.rows.length, edit: (out.rows.find(r => r.edit) || {}).line ?? null, lit: lit.length, widgets: out.widgets.map(w => w.kind), cols: out.cols, cyc };
+      return out;
+    } finally { g.restore(); }
   }
   function drawSoul(A, P, open, soulCanvas) {
     // a fragment's main picture (#57): the soul screen cut to cover the box, kept on its view's focus (A.focus)
@@ -309,16 +335,28 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     compose({ layout: o.layout, q: { w: 960, h: 540 } }, cyc, playing, now);
     pg.drawImage(cv, 0, 0, W, H);
   }
+  // the "Code over" card's preview (code-over-visual D13): the layout at 960×540, small
+  let coPrev = null, coPrevAt = 0;
+  function drawCoPreview(cyc, playing) {
+    if (!coPrev || !coPrev.isConnected || !coPrev.offsetParent) return;
+    const now = performance.now() / 1000; if (now - coPrevAt < 1 / 15) return; coPrevAt = now;
+    if (cv.width !== 960 || cv.height !== 540) { cv.width = 960; cv.height = 540; }
+    compose({ layout: 'code-over', q: { w: 960, h: 540 } }, cyc, playing, now);
+    coPrev.getContext('2d').drawImage(cv, 0, 0, coPrev.width, coPrev.height);
+  }
   function compose(J, cyc, playing, now) {
     if (TIMELINE_LAYOUTS.includes(J.layout)) { paintLive(liveAreas(J.layout, J.q.w, J.q.h), J.q, cyc, playing, now, 1, { view: J.layout, card: true }); return false; }
     const P = palette(), Q = J.q;
     const soul = J.layout === 'code' || J.layout === 'code-widgets' ? getSoul() : null, soulMode = soul ? (opts().soulPanel ? 'open' : 'folded') : null;
-    const A = layoutAreas(J.layout, Q.w, Q.h, soulMode);
+    const X = J.layout === 'code-over' ? getCodeOver(cyc) || {} : null;
+    const A = layoutAreas(J.layout, Q.w, Q.h, soulMode, X ? codeOverSettings(X.S) : undefined);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
     drawStage(A.stage);
-    drawSay(A.stage, 1, cyc);
-    drawCard(A.stage, P, getInfo(cyc) || {}, now);
+    // code-over (D7): the captions and the card on the scene's side, the code drawn over the stage
+    drawSay(A.free || A.stage, 1, cyc);
+    drawCard(A.free || A.stage, P, getInfo(cyc) || {}, now);
+    if (A.over) drawOver(A.over, P, now, cyc, J.ct);
     if (A.soul) drawSoul(A.soul, P, soulMode === 'open', soulMode === 'open' ? soul.canvas(cyc, playing, (A.soul.w - 8) / 1200) : null);
     if (A.code) drawCode(A.code, P, now, Q.h, null, withWidgets(J.layout), J.ct);
     return !!soul;
@@ -326,7 +364,7 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
   function frame(cyc, playing) {
     lastCyc = cyc; lastPlaying = playing;
     liveIdle();
-    if (!job) { drawPreview(cyc, playing); drawVPreview(cyc); return; }
+    if (!job) { drawPreview(cyc, playing); drawVPreview(cyc); drawCoPreview(cyc, playing); return; }
     if (job.layout === 'tab') return;
     const now = performance.now() / 1000;
     if (compose(job, cyc, playing, now) !== job.soulShown) renderBar();
@@ -505,7 +543,8 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
       const A = fragmentAreas(o, C.w, C.h);
       g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
       g.fillStyle = P.bg; g.fillRect(0, 0, C.w, C.h);
-      if (A.stage) { drawStage(A.stage); drawSay(A.stage, 1, cyc, true); bleedAround(A.stage); }
+      if (A.stage) { drawStage(A.stage); drawSay(A.free || A.stage, 1, cyc, C.h >= C.w || !A.free); bleedAround(A.stage); }
+      if (A.over) drawOver(A.over, P, now, cyc, J.ct);
       if (A.soul && soulFrame) {
         // the soul cut to fill: centred on its view's focus; a view along the song keeps the fragment's stretch in sight,
         // its middle worked out once at the fragment's first frame
@@ -538,8 +577,10 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
   const LIVE_Q = { w: 1920, h: 1080, fps: 30 };
   const nowS = () => performance.now() / 1000;
   // the areas and the card's opacity now: between the preset before and the preset on air during a transition
+  const coOf = () => codeOverSettings((getCodeOver(lastCyc) || {}).S);
+  const codeOverFree = (Q, S) => layoutAreas('code-over', Q.w, Q.h, null, S).free;
   function liveState(L, now, Q) {
-    const k = ease((now - L.t0) / TRANSITION), to = liveAreas(L.preset.view, Q.w, Q.h);
+    const k = ease((now - L.t0) / TRANSITION), to = liveAreas(L.preset.view, Q.w, Q.h, coOf());
     const from = L.from || to;
     return { A: k >= 1 ? to : lerpAreas(from, to, k), card: L.cardFrom + ((L.preset.card ? 1 : 0) - L.cardFrom) * k };
   }
@@ -548,12 +589,15 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
     g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
     if (A.stage.a > .01) { g.globalAlpha = A.stage.a; drawStage(A.stage); g.globalAlpha = 1; }
-    drawSay(A.stage, A.stage.a, cyc);
+    // code-over (cv14): the captions on the scene's side while the code is over the stage
+    const coS = A.over && A.over.a > .01 ? codeOverSettings((getCodeOver(cyc) || {}).S) : null, coFree = coS ? codeOverFree(Q, coS) : null;
+    drawSay(coFree && A.over.a > .5 ? coFree : A.stage, A.stage.a, cyc);
     if (A.soul.a > .01 && A.soul.x < Q.w && soulFrame) {
       const bw = A.soul.w - 8, bh = A.soul.h - A.soul.head - 4;
       drawSoul(A.soul, P, true, soulFrame(cyc, playing, Math.max(.05, Math.min(bw / 1200, bh / 760))));
     }
     if (A.code.a > .01 && A.code.x < Q.w) drawCode(A.code, P, now, Q.h, null, !!(preset && withWidgets(preset.view)));
+    if (coS) drawOver(A.over, P, now, cyc);
     // timeline and track column (#65): the song on air, what is coming hidden for live builds unless the preset shows it
     const tlOn = A.timeline && A.timeline.a > .01 && A.timeline.y < Q.h, colOn = A.column && A.column.a > .01 && A.column.x < Q.w;
     if (tlOn || colOn) {
@@ -567,7 +611,7 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     // the card: bottom left of the stage, or of the whole picture when the stage is hidden
     // (above the timeline when it runs along the bottom)
     const below = A.timeline && A.timeline.a > .5 && !A.timeline.float && A.timeline.y < Q.h ? A.timeline.y : Q.h;
-    drawCard(A.stage.a > .5 ? A.stage : { x: 0, y: 0, w: Q.w, h: below }, P, getInfo(cyc) || {}, now, 'always', card);
+    drawCard(coFree && A.over.a > .5 ? coFree : A.stage.a > .5 ? A.stage : { x: 0, y: 0, w: Q.w, h: below }, P, getInfo(cyc) || {}, now, 'always', card);
   }
   function drawLive(target) {
     if (!live) {
@@ -586,7 +630,7 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
   function drawLivePreview(target, preset) {
     const Q = { w: target.width, h: target.height }, now = nowS(), keep = g;
     let A, card, shown = preset || (live && live.preset);
-    if (preset) { const p = presetOf(preset); A = liveAreas(p.view, Q.w, Q.h); card = p.card ? 1 : 0; }
+    if (preset) { const p = presetOf(preset); A = liveAreas(p.view, Q.w, Q.h, coOf()); card = p.card ? 1 : 0; }
     else if (live) ({ A, card } = liveState(live, now, Q));
     else { A = liveAreas('visual', Q.w, Q.h); card = 1; }
     g = target.getContext('2d');
@@ -605,8 +649,27 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
   function liveIdle() {
     if (live && nowS() - live.drawnAt > 2) { live = null; if (!job) visuals.setTarget(null); }
   }
+  // the page's stage mode (code-over-visual D2): the code over the stage, drawn into the overlay canvas (device pixels,
+  // dpr: the font is never smaller than 13 CSS pixels on the page's short stage)
+  function stageOver(target, cyc, dpr = 1) {
+    const W = target.width, H = target.height, keep = g, X = getCodeOver(cyc) || {}, S = codeOverSettings(X.S), C = codeOverAreas(W, H, S);
+    C.code.fs = Math.max(C.code.fs, Math.round(13 * dpr));
+    // below the stage's readout (three short lines at the top left)
+    const top = Math.round(60 * dpr); if (C.code.y < top) { C.code.h -= top - C.code.y; C.code.y = top; }
+    g = target.getContext('2d');
+    try { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); return drawOver(C.code, palette(), performance.now() / 1000, cyc); }
+    finally { g = keep; }
+  }
+  // the side of the stage away from the code while a video or the live picture draws the code over it (D7):
+  // 'left' | 'right' (the free side), 'none' (code across the whole width), or null
+  function overSide() {
+    const S = () => codeOverSettings((getCodeOver(lastCyc) || {}).S), free = s => (s.side === 'whole' ? 'none' : s.side === 'right' ? 'left' : 'right');
+    if (job && job.layout === 'code-over') return free(S());
+    if (live && live.preset && live.preset.view === 'code-over') return free(S());
+    return null;
+  }
   return {
-    start, end, askTab, frame, opts, setOpt,
+    start, end, askTab, frame, opts, setOpt, stageOver, overSide,
     // a frame of a fragment (#57), and the settings' preview of one
     composeVertical,
     previewVertical(el, opts, section = null) { vPrev = el ? { el, opts, section } : null; },
@@ -618,6 +681,7 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     },
     // the settings' live preview: a canvas element, or null
     preview(el) { previewEl = el; },
+    previewOver(el) { coPrev = el; },
     // a frame of the fast video (#53): the layout's frame at cycle cyc and time now (seconds), into the canvas
     composeAt(J, cyc, now) { if (cv.width !== J.q.w || cv.height !== J.q.h) { cv.width = J.q.w; cv.height = J.q.h; } cardKey = cardKey || ''; lastCyc = cyc; return compose(J, cyc, true, now); },
     pause() { if (job && !job.pauseAt) job.pauseAt = performance.now(); },

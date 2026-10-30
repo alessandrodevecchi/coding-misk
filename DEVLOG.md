@@ -2035,3 +2035,79 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Mockup** (`openspec/changes/code-over-visual/mockups/`, 37 immagini, copiati in `notes/prove-2026-10-30/code-over-visual/`) e **video di prova** con audio solo in `notes/`: `prova-widget-16x9.mp4` (10 schermate: kellerlicht, settimo-cielo, pioggia-sul-vetro, insert-coin, ferro; croma su tutti i melodici, basso, chitarra, pad, tema, arpeggi; Normale, Terminale, LED, 1-bit) e `prova-widget-9x16.mp4` (4 schermate). Sincronia audio-video con lampo e bip agli estremi, scarto lineare (0,36 s di deriva in 4 minuti).
 - **Da ricordare.** Il primo "lampo" della registrazione è la pagina bianca che si carica: va ignorato. Per i video di Playwright serve il suo ffmpeg (`cli.js install ffmpeg`).
 - **Check:** `openspec validate code-over-visual --strict` passa. Non posso sentire: l'audio dei video è stato controllato solo come sincronia.
+
+## 2026-10-30: codice sopra il visual, risposte del proprietario e via (code-over-visual)
+
+- **Risposte cv1-cv14** nella sezione "Owner Answers" del design; proposta, spec e task aggiornati; il proprietario ha dato il via.
+- **cv1:** il layout serve soprattutto ai video (tempo reale, video veloce, frammenti, uscita live). Nella pagina l'editor resta aperto com'è; la modalità del palco è facoltativa (spenta di default) e non sostituisce mai l'editor.
+- **cv2:** lato e larghezza del codice sono impostazioni; misurato sui mockup: il testo va dal 3,5% al 61,5% circa del quadro, quindi larghezza di default 62%.
+- **cv6:** il sorgente del progetto di riferimento usa `rhythm` e `chroma` come nomi di campi suoi: le chiamate diventano `._hitgrid()` ("Griglia colpi") e `._tonecloud()` ("Nuvola di note").
+- **cv7:** il codice che esce dall'app tiene le chiamate commentate sul posto, `/* ._hitgrid() */`, valido anche a metà catena.
+- **cv8, cv9:** nuvola anche sulle tracce voce; widget più densi (righe per suono e variante, riga del basso; nuvola con vicini e armonici, scia più lunga, celle più alte).
+- **cv10-cv12:** le righe con nome escono da questo change (spec `labeled-lines` tolta): saranno un change a parte, legato alle opzioni dei commenti. **cv13:** widget sul palco in un change successivo. **cv14:** vista "Codice sopra" nell'uscita live.
+- **Check:** `openspec validate code-over-visual --strict` passa.
+
+## 2026-10-30: codice sopra il visual, parte 1: ruoli, pittore e widget (code-over-visual)
+
+- **Ruoli del tema** (`themes.js` `overRoles`): fascia = fondo del tema con opacità Bassa 0,7 / Media 0,82 / Alta 0,92, mai sotto il minimo del tema; i colori di testo troppo deboli sulla fascia (commenti, punteggiatura) vengono avvicinati al colore del testo finché leggono a 4,5:1 sopra nero e sopra bianco. Riga in modifica nell'accento del tema con inchiostro nero o bianco, quello che legge meglio (Neon: magenta con inchiostro nero, il bianco era sotto 4,5:1).
+- **Pittore** `src/video/code-over.js`: aree per formato (16:9 dal 3,5% al 62%, lato sinistro, destro o tutta la larghezza; 9:16 a tutta larghezza fino all'84%), fasce larghe quanto il testo, niente fascia sulle righe vuote, riga lunga tagliata con `…`, righe mute e commenti attenuati, scorrimento con la riga a fuoco nel terzo alto, riga in modifica con cursore a blocco, note accese contornate o piene; mappa le posizioni dei hap del codice valutato sul codice mostrato per testo della riga; modo "prima stringa" (cv4).
+- **Widget dell'app** `src/widgets/` (`app-widgets.js` registro, `hitgrid.js`, `tonecloud.js`): dati dai hap e pittore per forma (blocchi, LED tondi, 1-bit, caratteri). Griglia: righe per suono e variante (`hh`, `hh:3`), riga del basso, metro. Nuvola: vicini e armonici (quinta, terza maggiore), grana deterministica, scia 0,6, 48 colonne su 3 battute, celle più alte. Le chiamate escono commentate: `/* ._hitgrid() */`.
+- **Note del palco** (`stage-feed.js` `noteOf`): quinto elemento con la variante del campione (`n`), per le righe della griglia nel video veloce.
+- **Check:** `npm run check:code-over` nuovo (63 controlli, Strudel in Node: `s("bd*4")` accende i passi 1, 5, 9, 13; `[a2,c3,e3]` dà `Am`; il codice commentato dà gli stessi hap); `check:code-themes` controlla 69 fasce (minimo 4,5:1 sopra nero o bianco).
+
+## 2026-10-30: codice sopra il visual, parte 2: layout, uscita live, cursore (code-over-visual)
+
+- **Layout `code-over`** in `LAYOUTS` (video di sessione, tempo reale e veloce), show `code-over` nei frammenti (ogni formato: il visual tra le bande, il codice sopra a tutta larghezza, didascalie sotto il codice) e vista 14 "Codice sopra" nell'uscita live (cv14; ogni vista ha un'area `over` nascosta, così il passaggio sfuma). Didascalie e cartellino del brano vanno nella parte libera (a destra del codice in 16:9).
+- **Cursore della scrittura** (`typingPlan(...).cursor(t)` → `{ line, col, editing }`, D5): riga e colonna dopo l'ultimo tasto, modifica accesa fino a 0,35 s dopo l'ultimo tasto. `codeFrom(...).cursor(c)` lo dà al video veloce e si spegne alla valutazione del passo.
+- **Pagina**: `getCodeOver` in `main.js` passa al pittore impostazioni, cursore (scrittura dell'app, oppure il cursore di CodeMirror mentre si scrive a mano), codice valutato, posizioni dei hap che suonano ora e note per i widget (una query per ciclo, tenuta finché il pattern resta).
+- **Video veloce**: la pagina di rendering manda anche le posizioni dei hap (`lit`, solo con il codice sopra); il video veloce le usa con il codice del segmento valutato.
+- **Prova:** un fotogramma 1920×1080 di luci-rosse composto dall'app vera: fasce, tagli con `…`, cartellino a destra, nessun errore in console.
+- **Check:** `check:video` (11), `check:clips` (22), `check:live` (14), `check:typing` (18, due casi nuovi) passano.
+
+## 2026-10-30: codice sopra il visual, parte 3: palco della pagina e impostazioni (code-over-visual)
+
+- **Palco della pagina** (cv1): pulsante "Codice sopra" nella barra del palco (anche a schermo intero), spento di default e ricordato; disegna il codice su una tela sopra il palco, dopo il passaggio di render; l'editor resta aperto com'è. Font mai sotto 13 px CSS, codice sotto la lettura in alto a sinistra; le didascalie della pagina vanno al centro della parte libera.
+- **Striscia dei widget del palco** (D7): con il codice sopra (video, uscita live, video veloce, pagina) tiene al massimo due pannelli sul lato libero; niente striscia nei formati alti o con il codice a tutta larghezza (`setLayerFree` in `widget-layer.js`).
+- **Impostazioni:** scheda "Codice sopra" con anteprima (modalità del palco, lato, larghezza 40-90%, opacità, riga in modifica, note accese prima stringa / ogni stringa, righe lunghe, valori di default); riga "Note accese" Contorno / Piene nei temi del codice (nell'editor una regola CSS sopra i segni di Strudel: niente cornice, il token pieno); sezione "Widget dell'app" nella scheda dei widget nel codice con acceso/spento, parametri e anteprima viva per widget su note dimostrative.
+- **Testi** IT/EN per pulsante, scheda, sezione e parametri.
+- **Prova:** pagina con kellerlicht: codice sopra il palco, editor aperto (575 px), nessun errore; impostazioni salvate (`coding-misk-code-over`, `coding-misk-app-widgets`, `lit: fill` nel tema).
+
+## 2026-10-30: codice sopra il visual, parte 4: widget dell'app nell'editor e nei posti di #79 (code-over-visual)
+
+- **Editor:** `._hitgrid()` e `._tonecloud()` registrati con il `registerWidget` di Strudel (globale nella pagina): ogni chiamata ha la sua tela sotto la riga, ridisegnata a ogni fotogramma dalle note del pattern che suona; altrove (Node, pagina di rendering) i metodi sono stub che non cambiano i hap.
+- **Widget nel codice (#79):** due tipi nuovi in `WIDGETS` (`STRUDEL_WIDGETS` restano i sei di Strudel). Default cv8: batteria → griglia colpi; pad e voce → nuvola di note (la voce ora è accesa); nuvola secondaria per basso, lead, arp. Il palco non cambia (cv13): un primario dell'app ricade sul primo widget di Strudel, la voce resta spenta sul palco.
+- **Posto della griglia:** sulla **prima** riga di batteria che suona, non sull'ultima come diceva il design: sull'ultima la chiamata si spostava a ogni riga di batteria aggiunta e chi scrive la crescita doveva cancellarla e riscriverla (2 passi resi frettolosi in `check:live-code`). Design e spec aggiornati.
+- **Codice che esce dall'app** (cv7): Copia, link a strudel.cc e copia del codice scritto a mano tengono le chiamate commentate (`/* ._hitgrid() */`). Salva come pattern non le porta (salva i pattern del brano, non il testo).
+- **Video veloce:** nei layout con il pannello del codice e i widget i due widget si disegnano dalle note del palco della pagina di rendering.
+- **Check:** `check:live-code` (18, due attese aggiornate al nuovo default e alla griglia sulla prima riga), `check:strudel` (10: `_hitgrid` e `_tonecloud` sono chiamate dell'app), `check:code` (46 brani uguali), `check:stage-widgets`, `check:video`, `check:patterns`, `check:code-over` passano. Prova nel browser: luci-rosse con i widget accesi, griglia `bd`, `hh`, `bass` sotto la riga del kick, nessun errore.
+
+## 2026-10-30: codice sopra il visual, parte 5: check nel browser (code-over-visual)
+
+- **`tools/check-code-over.cjs`** (nuovo, server di sviluppo su PORT): spento di default con l'editor aperto; il pulsante disegna il codice sopra il palco e l'editor resta (575 px); la tela sta nell'elemento del palco (lo schermo intero la tiene, verificato anche con `requestFullscreen`); al massimo 4,4 ms per fotogramma su kellerlicht; resta dopo un ricaricamento; scrittura a mano: la riga del cursore di CodeMirror è la riga in modifica e si spegne poco dopo l'ultimo tasto; Live coder: riga scritta nell'accento, griglia colpi nell'editor e sopra il palco; Copia con le chiamate commentate; frammento 9:16 "Codice sopra" veloce con le note accese dalla pagina di rendering (299 fotogrammi su 300); scheda delle impostazioni con anteprima e modalità del palco che segue.
+- **Corretto:** nel video veloce i segmenti dei blocchi non hanno lo stesso `from` dei segmenti del brano, quindi le note accese non trovavano il loro codice: la pagina di rendering ora manda per ogni blocco i codici valutati e per ogni hap l'indice del suo codice.
+- **Corretto:** nel 9:16 il codice partiva sotto l'etichetta del frammento: ora parte un decimo più in basso quando c'è la banda in alto.
+- **Backup:** `check-backup.mjs` (16) controlla `coding-misk-code-over`, `coding-misk-app-widgets` e `lit` del tema del codice.
+
+## 2026-10-30: codice sopra il visual, parte 6: widget più densi, figure e clip v2 (code-over-visual)
+
+- **Nuvola di note (cv9):** più vicini e armonici (quinta 0,6, terza 0,45, semitoni 0,4, poi 0,25-0,12), grana deterministica più ampia (0,55-1), gamma 0,7 su ogni colonna: ora i caratteri intermedi della scala (`: - = + *`) riempiono lo spazio tra le note e si legge come una nuvola. Celle allineate ai glifi (prima la fascia era più larga dei caratteri), caratteri a 0,7 della dimensione del codice.
+- **Griglia colpi (cv9):** righe in più di default: i ritmi di basso, hook, lead, arp e chitarra quando suonano.
+- **Scorrimento senza scrittura:** la finestra che mostra più righe suonate negli ultimi due secondi (prima: l'ultima riga, cioè la coda del codice).
+- **Riga in modifica:** resta accesa dal primo all'ultimo tasto della riga, pause di pensiero comprese (prima si spegneva in una pausa a metà riga).
+- **Terminale:** i due riquadri del passaggio Terminale (scope e spectrum) tengono il lato libero come la striscia: niente scope sotto il codice.
+- **Per il proprietario** in `notes/prove-2026-10-30/code-over-visual/`: `clip-16x9-v2.mp4` e `clip-9x16-v2.mp4` (30 s, kellerlicht in Live coder dal secondo 190, con l'audio dell'app; per la demo la nuvola è il primario anche di arp e lead), `widgets-before-after-v2.png` e `tonecloud-before-after-v2.png` (stesse note reali di luci-rosse a battuta 47 con i parametri di prima e i nuovi, disegnate dal nuovo pittore; il "prima" vero del prototipo è nei mockup `widget-*.png`), `widgets-themes-v2.png`, `widgets-renders-v2.png`, `tonecloud-renders-v2.png`, `layout-16x9-neon-v2.png`, `layout-9x16-hw-v2.png`, `layout-16x9-light-v2.png`, `render-terminal-v2.png`, `render-led-v2.png`, `page-typing-v2.png`, `page-widgets-v2.png`, `settings-code-over-v2.png`, `settings-app-widgets-v2.png`.
+- **Check:** `check:code-over` (63), `check:render-styles`, `check:typing` passano.
+
+## 2026-10-30: codice sopra il visual, parte 7: guida, documenti, catalogo (code-over-visual)
+
+- **Guida:** schede nuove «Codice sopra» e «Widget dell'app: griglia colpi e nuvola di note», in inglese e italiano (`check:guide`: 33 schede).
+- **Base di conoscenza:** sezione Code over in `visuals.md`, sezione App widgets in `code-widgets.md` (mappa di default aggiornata), Lit notes e scheda Code over in `settings.md`, cinque decisioni in `decisions.md`; `checks.md` rigenerato con i due check nuovi. `docs/ARCHITECTURE.md` (sezione Code over, chiavi `coding-misk-code-over` e `coding-misk-app-widgets`), `docs/DESIGN-SYSTEM.md` (fasce, accento, colori dei widget), `AGENTS.md` (i due check, `src/widgets/`).
+- **Catalogo Strudel:** `npm run catalog:strudel` rifatto; `check:knowledge` senza l'avviso del catalogo vecchio.
+
+## 2026-10-30: codice sopra il visual, parte 8: regressioni (code-over-visual)
+
+- **Passano (Node):** `check:code` (46 brani uguali), `check:video` (11), `check:clips` (22), `check:live` (14), `check:export` (5), `check:code-themes`, `check:light-theme`, `check:render-styles`, `check:typing` (18), `check:live-code` (18), `check:code-over` (65), `check:guide`, `check:patterns` (22), `check:stage-widgets`, `check:strudel` (10), `check:knowledge`, `check-backup.mjs` (16); `vite build`.
+- **Passano (browser, server 5241):** `check-video`, `check-clips`, `check-live`, `check-captions`, `check-settings`, `check-code-widgets`, `check-timeline`, `check-hand`, `check-light-theme`, `check-export`, `check-render-styles`, `check-stage-widgets`, `check-code-themes`, `check-code-over`.
+- **Da ricordare:** `check-captions` falliva solo perché il worktree aveva una parte dei campioni delle voci: con le cartelle `say_*` e `say_lengths.json` copiate dal checkout principale (ignorate da git) passa tutto.
+- **Costo del video veloce:** frammento di 30 s di kellerlicht, 18-19 s di rendering con "Visual + codice" e con "Codice sopra" (le posizioni dei hap non si notano).
+- **Riga in modifica nel video veloce:** viene dallo stesso piano di scrittura del feed (`codeFrom`), con le stesse regole del tempo reale; i tempi esatti di inizio della scrittura di app e video veloce erano già un po' diversi prima di questo change (finestre calcolate in due posti), quindi la riga è la stessa ma l'istante di inizio può differire di qualche decimo.

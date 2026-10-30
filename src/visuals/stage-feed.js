@@ -20,8 +20,9 @@ export function pitchOf(v) {
   if (v.freq) return 12 * Math.log2(v.freq / 440) + 69;
   return String(v.s ?? v.n ?? '?');
 }
-// a hap's value → a note [begin, end, pitch, level] (level: gain × velocity)
-export const noteOf = (b, e, v) => [+b.toFixed(4), +e.toFixed(4), pitchOf(v), +((v.gain ?? 1) * (v.velocity ?? 1)).toFixed(3)];
+// a hap's value → a note [begin, end, pitch, level(, variant)] (level: gain × velocity)
+// (code-over-visual: a sample's variant `n` as a fifth element, for the hit grid's rows)
+export const noteOf = (b, e, v) => { const p = pitchOf(v), out = [+b.toFixed(4), +e.toFixed(4), p, +((v.gain ?? 1) * (v.velocity ?? 1)).toFixed(3)]; if (typeof p === 'string' && typeof v.n === 'number') out.push(v.n); return out; };
 
 // the code widgets' instrument of a stage instrument (the `analyze` name): kick and snare are drums, hook a lead
 export const cwInstrument = name => BY_VISUAL[name] || 'lead';

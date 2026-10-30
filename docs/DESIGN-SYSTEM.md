@@ -46,6 +46,8 @@ The code panel and the code in videos have their own theme, chosen in Settings â
 
 Code font: JetBrains Mono by default (Share Tech Mono, VT323, the system monospace), 13, 14 or 16 px, one step larger in the full view. The panel's ground (`--code-bg`), the flash (`--code-flash`), the dimmed widget's outline (`--code-muted`), the widgets, the playing-note outline and the text of muted lines (55 %) follow the theme.
 
+**Code over** (`code-over-visual`): the bands take the code theme's ground at Low 0.7, Medium 0.82 or High 0.92 opacity (never under the theme's floor), with faint text colours lifted toward the text colour so every role reads at 4.5:1 over a black or a white scene (`overRoles`); the line being typed takes the theme's accent (`widget.a1`) with black or white ink, whichever reads better (Neon: magenta with black ink). The app widgets take the theme's widget colours (`widgetPalette`), never their own.
+
 ## Light theme (`data-ui="light"`, `light-theme`)
 
 The third button, LIGHT (it: CHIARO), next to NEON and HW in the top bar and in Settings â†’ Appearance. A light variant of neon in `src/theme-light.css`: same layout and fonts, ground `#f5f3f8`, panels white, `--panel2 #efecf4`, dividers `--line #d4cde0`, ink `#15111d` (at least 7:1), muted `#574e66`, and one accent pair per look picked by hand to reach 4.5:1 on every ground (palco `#b0105a`/`#00687a`, studio `#9a4f00`/`#b8101f`, edgerunners `#6b5f00`/`#00687a`, pixel `#855c00`/`#b0183c`, montagne `#00657f`/`#5a3fd0`, spazio `#5a42d6`/`#a3157c`, sonar `#006b47`/`#4a6800`). `color-scheme: light`, so selects and scrollbars turn light. Borders of controls (inputs, buttons, chips: `--ctl-line`, `--chip-line`) reach 3:1; dividers stay faint.

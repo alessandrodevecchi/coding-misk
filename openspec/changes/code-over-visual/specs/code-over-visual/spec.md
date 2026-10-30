@@ -2,7 +2,7 @@
 
 ### Requirement: Code over layout
 
-The app SHALL offer a layout "Code over" (it: "Codice sopra") that draws the code transparent over the scene, without a separate code panel. It SHALL exist for the session video, the live output, fragments in every format and the page's stage. Every existing layout SHALL stay unchanged.
+The app SHALL offer a layout "Code over" (it: "Codice sopra") that draws the code transparent over the scene, without a separate code panel. It SHALL exist for the session video (real time and fast), the live output (a "Code over" view), fragments in every format and an optional stage mode of the page. Every existing layout SHALL stay unchanged.
 
 #### Scenario: Session video
 
@@ -19,9 +19,19 @@ The app SHALL offer a layout "Code over" (it: "Codice sopra") that draws the cod
 - **WHEN** a user records with any layout that existed before this change
 - **THEN** the frames are drawn as before
 
+#### Scenario: Live output
+
+- **WHEN** the live output takes the "Code over" view
+- **THEN** the picture on air shows the scene over the whole frame with the code drawn over it
+
 ### Requirement: Code area by format
 
-In 16:9 the code SHALL take the left part of the frame by default, and a setting SHALL put it on the right or across the whole width. In tall formats it SHALL take the whole width above the bottom band.
+In 16:9 the code SHALL take the left part of the frame by default, from 3.5% of the width to the "Code width" setting (default 62% of the frame), and a setting SHALL put it on the right or across the whole width. In tall formats it SHALL take the whole width above the bottom band.
+
+#### Scenario: Default width
+
+- **WHEN** a 16:9 video is recorded with the default settings
+- **THEN** the code area starts at 3.5% of the frame width and ends at 62% of it
 
 #### Scenario: Code on the right
 
@@ -44,7 +54,7 @@ In "Code over", each line SHALL have a background band as wide as its text, from
 
 ### Requirement: Band colours from the code theme
 
-Band colour and opacity SHALL come from the code theme: dark bands with light text in Neon, amber on dark brown in Hardware, light bands with dark text in Light, and a band role for every other theme. Every text role SHALL meet 4.5:1 against its band whatever the look and render style behind.
+Band colour and opacity SHALL come from the code theme: dark bands with light text in Neon, amber on dark brown in Hardware, light bands with dark text in Light, and a band role for every other theme. A setting SHALL choose the band opacity (Low, Medium, High), never below the theme's floor. Every text role SHALL meet 4.5:1 against its band whatever the look and render style behind, at every opacity setting.
 
 #### Scenario: Readable over every look
 
@@ -62,21 +72,26 @@ A line longer than the code area SHALL end with `…` at the area's edge in "Cod
 
 ### Requirement: Stage mode in the page
 
-The stage SHALL have a "Code over" mode, switched by a button in the stage bar and kept in full screen. With the mode on, the stage SHALL grow to the window height, the code column SHALL fold, and the code SHALL be drawn over the stage. Taking over by hand or opening the code column SHALL show the editor again. The mode SHALL be remembered.
+The stage SHALL have an optional "Code over" mode, off by default, switched by a button in the stage bar and kept in full screen. With the mode on, the code SHALL be drawn over the stage. The code editor SHALL stay open as without the mode and SHALL never be replaced by it. The mode SHALL be remembered.
 
 #### Scenario: Switch on
 
 - **WHEN** a user presses "Code over" while a song plays
-- **THEN** the stage fills the window height, the code column folds, and the playing code is drawn over the scene with its bands
+- **THEN** the playing code is drawn over the scene with its bands, and the code editor stays where it was
+
+#### Scenario: Off by default
+
+- **WHEN** a user opens the app for the first time
+- **THEN** the stage shows the scene without code over it
 
 #### Scenario: Hand take-over
 
 - **WHEN** the mode is on and the user takes over the code by hand
-- **THEN** the editor opens with the code, and the stage keeps drawing the code over the scene
+- **THEN** the user types in the editor, and the stage keeps drawing the code over the scene
 
 ### Requirement: Line being edited
 
-While the coder types a line (automatic typing in any profile, or the radio), the line SHALL be drawn with the theme's edit band colour and a block cursor at the typing position. When the edit of that line ends, the band SHALL go back to the normal colour. The same edited line SHALL appear in real-time videos, the live output and the fast video, taken from the typing plan, not guessed from text changes.
+While the coder types a line (automatic typing in any profile, or the radio), the line SHALL be drawn with the theme's accent colour as its band and a block cursor at the typing position. When the edit of that line ends, the band SHALL go back to the normal colour. The same edited line SHALL appear in real-time videos, the live output and the fast video, taken from the typing plan, not guessed from text changes.
 
 #### Scenario: Typing a line
 
@@ -106,6 +121,15 @@ The code theme settings SHALL have an option "Lit notes" (it: "Note accese") wit
 
 - **WHEN** a user sets "Lit notes" to Filled
 - **THEN** the playing tokens are filled in the editor and in "Code over", and the text inside stays readable
+
+### Requirement: Lit tokens in Code over
+
+In "Code over" a setting SHALL choose which tokens light: only the first mini-notation string of each line (default) or every playing string.
+
+#### Scenario: First string only
+
+- **WHEN** the line `$: s("bd*4").bank("RolandTR909")` plays in "Code over" with the default settings
+- **THEN** only tokens of `"bd*4"` are lit, never `"RolandTR909"`
 
 ### Requirement: Captions and stage widgets in this layout
 

@@ -63,6 +63,11 @@ const CHECKS = {
     assert(s('visual-tl') === 'stage,timeline', 'visual-tl'); assert(s('visual-code-tl') === 'code,stage,timeline', 'visual-code-tl');
     assert(s('code-tl') === 'code,timeline', 'code-tl'); assert(s('soul-tl') === 'soul,timeline', 'soul-tl');
     assert(s('visual-float') === 'stage,timeline', 'visual-float'); assert(s('visual-column') === 'column,stage', 'visual-column');
+    assert(s('code-over') === 'over,stage', 'code-over: the code over the stage');
+    const o = liveAreas('code-over', 1920, 1080).over;
+    assert(Math.abs(o.x - 1920 * 0.035) <= 1 && Math.abs(o.x + o.w - 1920 * 0.62) <= 1 && o.fs === 27, 'code-over: the code area of the mockups');
+    assert(liveAreas('code-over', 1920, 1080, { side: 'right', width: 62 }).over.x > 700, 'code-over: the side setting');
+    assert(liveAreas('visual', 1920, 1080).over.a === 0, 'the code over is hidden in the other views');
   },
   'code-only leaves room at the bottom for the song card'() {
     const c = liveAreas('code-only', 1920, 1080).code; assert(1080 - (c.y + c.h) > 140, 'room');

@@ -5,7 +5,7 @@
 //   npm run check:code-themes            exit 1 on a failure
 //   npm run check:code-themes -- --table print the contrast table
 import fs from 'node:fs';
-import { THEMES, OWN_IDS, STRUDEL_IDS, HIGH_CONTRAST, TEXT_ROLES, AUTO, autoTheme, resolveTheme, neonRoles, contrast, over, codeThemeSettings, CT_DEFAULTS, fontPx, FONTS, SIZES, MUTED_TEXT, parseColor, appRoles } from '../src/code-themes/themes.js';
+import { THEMES, OWN_IDS, STRUDEL_IDS, HIGH_CONTRAST, TEXT_ROLES, AUTO, autoTheme, resolveTheme, neonRoles, contrast, over, codeThemeSettings, CT_DEFAULTS, fontPx, FONTS, SIZES, MUTED_TEXT, parseColor, appRoles, overRoles, bandContrast, BAND_LEVELS, BAND_OPACITY } from '../src/code-themes/themes.js';
 
 const problems = [], table = process.argv.includes('--table');
 const fail = m => problems.push(m);
@@ -56,6 +56,23 @@ for (const id of STRUDEL_IDS) {
   if (table) console.log(`${(id + (R.legacy ? ' (legacy)' : '')).padEnd(34)} text ${fmt(t).padStart(5)}   comment ${fmt(cm).padStart(5)}`);
 }
 
+// ---------- "Code over" bands (code-over-visual D4): every text role on the band over black and over white ----------
+let bands = 0, bandLow = Infinity;
+const bandCheck = (label, R) => {
+  for (const level of BAND_LEVELS) {
+    const O = overRoles(R, level);
+    if (O.opacity < BAND_OPACITY[level] - 1e-9) fail(`${label} ${level}: band opacity ${O.opacity} under the setting`);
+    for (const k of TEXT_ROLES) { const c = bandContrast(O.roles[k], O.band); bandLow = Math.min(bandLow, c); if (c < 4.5) fail(`${label} ${level}: ${k} on the band is ${fmt(c)}:1 over black or white, under 4.5:1`); }
+    const e = bandContrast(O.editInk, O.edit);
+    if (e < 4.5) fail(`${label} ${level}: the edited line's ink ${O.editInk} on ${O.edit} is ${fmt(e)}:1`);
+    bands++;
+  }
+  if (overRoles(R, 'low').opacity > overRoles(R, 'high').opacity) fail(`${label}: Low is more opaque than High`);
+};
+for (const ui of ['neon', 'hw']) for (const look of Object.keys(looks)) bandCheck(`neon (${ui}, ${look}) band`, neonRoles(tokensOf(look, ui)));
+for (const id of [...OWN_IDS.filter(i => i !== 'neon'), ...STRUDEL_IDS]) bandCheck(`${id} band`, THEMES[id].roles);
+if (overRoles(THEMES.amber.roles).editInk !== '#000000') fail('Amber: the edited line has dark ink on amber');
+
 // ---------- the curated Strudel themes against the installed files ----------
 const dir = new URL('../node_modules/@strudel/codemirror/', import.meta.url);
 if (fs.existsSync(dir)) {
@@ -93,4 +110,4 @@ if (A.bg !== P.panel || A.comment !== P.muted || A.string !== P.a2 || A.number !
 
 const n = OWN_IDS.length + STRUDEL_IDS.length;
 if (problems.length) { console.log(problems.map(p => `✗ ${p}`).join('\n')); console.log(`code themes: ${problems.length} problem(s)`); process.exit(1); }
-console.log(`code themes: ok (${n} themes, Neon on ${Object.keys(looks).length} looks × 2 app themes; lowest text role ${fmt(Math.min(...Object.values(lowest)))}:1)`);
+console.log(`code themes: ok (${n} themes, Neon on ${Object.keys(looks).length} looks × 2 app themes; lowest text role ${fmt(Math.min(...Object.values(lowest)))}:1; ${bands} code-over bands, lowest ${fmt(bandLow)}:1 over black or white)`);

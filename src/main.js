@@ -114,6 +114,8 @@ import { createCodeThemes } from './code-themes/install.js';
 import { widgetPlan, linesByKey, fastWidgets } from './video/widget-frames.js';
 import { noteStore } from './visuals/stage-feed.js';
 import { withWidgets } from './video/layout.js';
+import { CO_KEY, codeOverSettings } from './video/code-over.js';
+import { AW_KEY, appWidgetSettings, noteOfHap, notesOfStore, commentAppWidgets, drawAppWidgets, widgetPalette } from './widgets/app-widgets.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -687,13 +689,14 @@ ready.then(() => {
     try { return await evalInner(autostart); } finally { markMuted(); requestAnimationFrame(markMuted); }
   };
   const evalInner = async autostart => {
-    if (!(song && song.run)) return plain(autostart);
+    if (!(song && song.run)) { evaluatedCode = ed.code || ''; return plain(autostart); }
     ed.flash();
     // the bar the code is for (the radio's hidden songs change with their own steps): the bar just shown by the
     // player, else the bar playing (code evaluated by hand)
     const s = sched(), bar = codeFresh ? codeBar : Math.floor(s ? s.now() : 0);
     codeFresh = false;
-    await ed.repl.evaluate(song.run(ed.code || '', bar), autostart);
+    evaluatedCode = song.run(ed.code || '', bar);
+    await ed.repl.evaluate(evaluatedCode, autostart);
   };
   const iv = setInterval(() => { if (typeof globalThis.register === 'function') { clearInterval(iv); installHelpers({ register: globalThis.register }); } }, 100);
   // code widgets D4: a scope or spectrum widget reads its line's instrument
@@ -844,6 +847,9 @@ let hand = false, lastHand = null, resumeTo = null, handFrom = 0;
 // takeover-pending-edit: the code shown at the last evaluation (the code playing), and whether the editor shows a
 // typing frame written since then
 let playedCode = null, framed = false;
+// code-over-visual: the code last evaluated (the lit tokens map its haps' places to the code shown), the line being typed
+// by the app ({ line, col, editing } from the typing plan, D5) and the last key typed by hand
+let evaluatedCode = '', typingCursor = null, handKeyAt = -1e9;
 // resume from the bar where the user took over (default) or from where the song has got to meanwhile
 let handFromHere = store.get('coding-misk-hand-from', true) !== false;
 // typing speed of the code that types itself (live-typing): slow, normal, fast
@@ -870,6 +876,7 @@ const stretchOf = bar => Math.floor(bar / 16);
 function typeFrame(T, cyc) {
   if (cyc < T.start) return;
   const at = (cyc - T.start) / T.cps, txt = T.plan.frame(at);
+  typingCursor = T.plan.cursor ? T.plan.cursor(at) : null;
   // for browser checks (typing-mistakes): whether a mistake is on screen now
   globalThis.codingMiskTyping = { mistake: !!(T.plan.stats && T.plan.stats.wrong.some(([a, b]) => at >= a && at < b)), stats: T.plan.stats ? { mode: T.plan.stats.mode, typos: T.plan.stats.typos, minds: T.plan.stats.minds, words: T.plan.stats.words } : null };
   if (txt !== T.shown) { const prev = T.shown || ed.code || ''; T.shown = txt; setCodeRange(txt); framed = true; followEdit(prev, txt); }
@@ -936,7 +943,7 @@ function flashLines(from, to) {
   } catch (e) {}
 }
 const editKey = e => !e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || ['Backspace', 'Delete', 'Enter', 'Tab'].includes(e.key));
-$('#edhost').addEventListener('keydown', e => { if (editKey(e)) takeOver(); }, true);
+$('#edhost').addEventListener('keydown', e => { if (editKey(e)) { takeOver(); handKeyAt = performance.now(); } }, true);
 for (const ev of ['paste', 'cut', 'drop']) $('#edhost').addEventListener(ev, takeOver, true);
 // resume: keep the user's code, type back to the song's code at the next bar, then the steps go on
 function resumeHand() {
@@ -982,7 +989,7 @@ $('#hand-resume').addEventListener('click', resumeHand);
 const toggleHandFrom = () => { handFromHere = !handFromHere; store.set('coding-misk-hand-from', handFromHere); $('#hand-from').setAttribute('aria-pressed', handFromHere); };
 $('#hand-from').addEventListener('click', toggleHandFrom);
 $('#hand-from-lbl').addEventListener('click', toggleHandFrom);
-$('#hand-copy').addEventListener('click', () => { try { navigator.clipboard.writeText(lastHand || '').then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (e) { toast(t('copyNo')); } });
+$('#hand-copy').addEventListener('click', () => { try { navigator.clipboard.writeText(commentAppWidgets(lastHand || '')).then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (e) { toast(t('copyNo')); } });
 $('#hand-back').addEventListener('click', async () => {
   if (!lastHand || !song || !isPlaying()) return;
   typing = null; resumeTo = null; handFrom = Math.floor(sched().now()); setHand(true);
@@ -1176,7 +1183,10 @@ const shareLink = code => {
   let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
   return 'https://strudel.cc/#' + encodeURIComponent(btoa(bin));
 };
-function updateShare() { $('#share').href = shareLink(currentCode()); }
+// code leaving the app (copy, the strudel.cc link): the app widgets' calls stay, commented out, so it runs in another
+// Strudel (code-over-visual cv7)
+const leavingCode = () => commentAppWidgets(currentCode());
+function updateShare() { $('#share').href = shareLink(leavingCode()); }
 $('#share').addEventListener('pointerdown', updateShare);
 $('#share').addEventListener('focus', updateShare);
 
@@ -1204,7 +1214,7 @@ function confirmTwice(key, msg) {
 }
 
 $('#copy').addEventListener('click', () => {
-  try { navigator.clipboard.writeText(currentCode()).then(() => toast(t('copied')), () => toast(t('copyNo'))); }
+  try { navigator.clipboard.writeText(leavingCode()).then(() => toast(t('copied')), () => toast(t('copyNo'))); }
   catch (e) { toast(t('copyNo')); }
 });
 $('#back').addEventListener('click', backToTrack);
@@ -1532,7 +1542,9 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     job = { ...job, segments: mark(job.segments), segmentsAt: at ? (a, b) => mark(at(a, b)) : null };
     const P = (() => { if (ct.roles) return { ...ct.roles.widget }; const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k.replace('--', '--dk-')).trim() || cs.getPropertyValue(k).trim(); return { ink: v('--ink') || '#fff', muted: v('--muted') || '#888', a1: v('--a1') || '#f4a', a2: v('--a2') || '#fb4' }; })();
     const waves = {}, notes = {}, seen = new Set();
-    cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P }), addNotes(block) { for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
+    // the app widgets (code-over-visual D8) from the stage notes the render page sends with each block
+    const fsn = () => globalThis.codingMiskFastStageNotes, appW = { S: awSettings(), P: ct.roles ? widgetPalette(ct.roles) : { band: P.ink === '#fff' ? '#000' : '#0d0818', ink: P.ink, comment: P.muted, hit: P.a1, now: P.a2, cur: P.muted, cell: P.muted, inv: P.a2, invInk: '#000' }, notes: (c0, c1) => (fsn() ? notesOfStore(fsn(), () => fsn().instruments)(c0, c1) : []), ctx: { lang: getLang(), font: ct.family } };
+    cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P, app: appW }), addNotes(block) { for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
     if (plan.instruments.length) {
       fastJob = { id: sg.id, progress: 0, phase: 'scope', cancel: () => {} };
       try { if (!(await cwRealScopes(job, plan.instruments, waves, o.realScope === 'always'))) for (const k of Object.keys(waves)) delete waves[k]; }
@@ -1543,6 +1555,12 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   // block (kept on globalThis for the checks); scope and spectrum read the code widgets' renders of an instrument when there are some, else the song's wave
   const stageNotes = globalThis.codingMiskFastStageNotes = noteStore();
   job = { ...job, stageNotes: true };
+  // code-over-visual D6: with the code over the stage, the render page sends the places of the haps in the code too
+  // (lits: [begin, end, code index, places], codes: the codes the render page evaluated)
+  const overOn = (frag ? frag.o.show : layout) === 'code-over', lits = [], litCodes = [];
+  if (overOn) job = { ...job, lit: true };
+  // the haps sounding at cycle c, grouped by the code they were evaluated from: [{ evaluated, spans }]
+  const litAt = c => { const by = new Map(); let lo = 0, hi = lits.length; while (lo < hi) { const m = (lo + hi) >> 1; if (lits[m][0] < c - 16) lo = m + 1; else hi = m; } for (let i = lo; i < lits.length && lits[i][0] <= c; i++) { const x = lits[i]; if (x[1] <= c) continue; if (!by.has(x[2])) by.set(x[2], []); const out = by.get(x[2]); for (let k = 0; k < x[3].length; k += 2) out.push([x[3][k], x[3][k + 1]]); } return [...by].map(([k, spans]) => ({ evaluated: litCodes[k], spans })); };
   // with "Real scope and spectrum: Always" (D8), the stage's scope and spectrum instruments are rendered alone too when a
   // widget look or the layer can show in this video (the ones the code widgets rendered are not rendered again);
   // Automatic adds no render
@@ -1585,6 +1603,8 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
         soulSrc: doc && doc.sections && doc.tracks ? { key: `fv:${p.n}`, song: doc, ctx: {}, bar: cyc - p.start } : null,
         meta: sg.meta, seed: sg.id || '', captions: fvCaptions,
       };
+      // code-over-visual: the line typed (D5), the code evaluated and the places of the haps sounding (D6)
+      if (overOn) { Object.assign(fv, { cursor: codeAt.cursor ? codeAt.cursor(cyc) : null, lit: litAt(cyc), doc: sg.doc, render: fRender, overFree: frag && fsz.comp.h >= fsz.comp.w ? 'none' : (frag ? 'right' : (S => (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right'))(coSettings())) }); }
       const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
       fv.look = fLook;
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
@@ -1595,6 +1615,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
     onNotes: cw ? block => cw.addNotes(block) : null,
     onStageNotes: block => { for (const [k, list] of Object.entries(block)) for (const n of list) stageNotes.add(k, n); },
+    onLit: overOn ? L => { for (const x of L.haps) { const src = L.codes[x[2]]; let k = litCodes.lastIndexOf(src); if (k < 0) k = litCodes.push(src) - 1; lits.push([x[0], x[1], k, x[3]]); } lits.sort((a, b) => a[0] - b[0]); } : null,
   });
   if (preview) preview.stop();
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: run.cancel };
@@ -4051,6 +4072,40 @@ $$('[data-look-step]').forEach(b => b.addEventListener('click', () => {
   if (soulOverride) soulDisplay.act('override');
   setLook(v); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', v);
 }));
+// the page's stage mode "Code over" (code-over-visual D2): optional, off by default; the code drawn over the stage on
+// an overlay canvas, the editor left as it is; kept in full screen, remembered
+function syncCodeOver() {
+  const S = codeOverSettings(store.get(CO_KEY, null)), on = S.stage, w = $('#stagewrap'), c = $('#stage-over'), say = $('#say');
+  w.classList.toggle('co-on', on); c.hidden = !on;
+  $('#code-over-btn').setAttribute('aria-pressed', String(on));
+  // the caption lane: the middle of the free side (D7)
+  const mid = S.side === 'right' ? (100 - S.width) / 2 : S.side === 'left' ? (S.width + 100) / 2 : 50;
+  w.style.setProperty('--co-say-x', `${mid}%`); w.style.setProperty('--co-say-w', S.side === 'whole' ? 'calc(100% - 32px)' : `${100 - S.width - 3}%`);
+  if (say) say.dataset.coSide = S.side;
+  if (!on) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); }
+}
+$('#code-over-btn').addEventListener('click', () => { store.set(CO_KEY, { ...codeOverSettings(store.get(CO_KEY, null)), stage: !codeOverSettings(store.get(CO_KEY, null)).stage }); syncCodeOver(); });
+syncCodeOver();
+// the app widgets in the editor (code-over-visual D8): redrawn after each stage frame from the playing pattern's notes
+function drawEditorWidgets(cyc) {
+  if (!globalThis.miskAppWidgets || !globalThis.miskAppWidgets.size || !isPlaying()) return;
+  try {
+    const cur = codeThemes.current, X = songAt(song, cyc);
+    drawAppWidgets(awSettings(), liveNotes, cyc, widgetPalette(cur.roles), { meter: X.meter, key: X.key, lang: getLang(), render: 'normal', font: cur.family }, cur.px || 14);
+  } catch (e) { console.warn('[app widgets]', e); }
+}
+// a frame of the overlay, after each stage frame (the render pass never touches it)
+const overTimes = globalThis.codingMiskOverTimes = [];
+function drawStageOver(cyc) {
+  const c = $('#stage-over');
+  if (c.hidden) return;
+  const r = c.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2), W = Math.round(r.width * d), H = Math.round(r.height * d);
+  if (!W || !H) return;
+  if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+  const t0 = performance.now();
+  try { video.stageOver(c, cyc, d); } catch (e) { console.warn('[code over]', e); }
+  overTimes.push(performance.now() - t0); if (overTimes.length > 600) overTimes.shift();
+}
 $('#fs').addEventListener('click', () => {
   const w = $('#stagewrap');
   try {
@@ -5092,13 +5147,16 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     setCaptions: f => setCaptions(f), capsSkipNext: v => (v === undefined ? capsSkipNext : (capsSkipNext = !!v)),
     ui: () => ui, setUi: v => setUi(v), uiFollow: () => uiFollow, setUiFollow: on => setUiFollow(on), lang: () => getLang(), setLang: l => changeLang(l),
     // code themes (code-themes D6): the settings, a change, and the theme Automatic uses now
-    codeTheme: { settings: () => codeThemes.settings(), set: patch => codeThemes.set(patch), autoName: l => codeThemes.autoName(l) },
+    codeTheme: { settings: () => codeThemes.settings(), set: patch => codeThemes.set(patch), autoName: l => codeThemes.autoName(l), get current() { return codeThemes.current; } },
     volume: () => volume, setVolume: v => setVolume(v),
     // code widgets (code-widgets D1): a stopped song shows its code with the new settings; a playing one takes them at
     // its next step, section or evaluation
     widgetsChanged: () => { if (ed && !isPlaying() && mode === 'track' && compiled) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code); markMuted(); },
     // the video recorder is made after the settings: a page opened on the settings gets its preview below
     videoPreview: el => { try { video.preview(el); } catch (e) {} },
+    // code-over-visual D13: the Code over card's preview; a change of its settings reaches the stage at once
+    coPreview: el => { try { video.previewOver(el); } catch (e) {} },
+    codeOverChanged: () => { try { syncCodeOver(); } catch (e) {} },
     fragmentsFromRecipe: (recipe, anchor) => openFragMenu(recipe, anchor),
     stageRatio: () => stageRatio(),
     fragPreview: (el, opts) => { try { video.previewVertical(el, opts, c => (song && song.meta ? song.meta.sectionAt(c) : -1)); } catch (e) {} },
@@ -5231,8 +5289,14 @@ const visuals = startVisuals({
     renderName: r => { const x = RENDERS.find(([k]) => k === r); return x ? tx(x[1]) : r; },
     seed: () => (fv ? fv.seed : (song && song.id) || ''),
     label: inst => { const k = `stInst:${inst}`, v = t(k); return v === k ? inst : v; },
+    // code-over-visual D7: the side of the stage away from the code drawn over it (video, live picture, fast video, page)
+    free: () => {
+      if (fv) return fv.overFree || null;
+      const v = video.overSide(); if (v) return v;
+      const S = coSettings(); return S.stage ? (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right') : null;
+    },
   },
-  afterFrame: (cyc, playing) => { video.frame(cyc, playing); liveLink.tick(); },
+  afterFrame: (cyc, playing) => { video.frame(cyc, playing); drawStageOver(cyc); drawEditorWidgets(cyc); liveLink.tick(); },
   getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando
@@ -5284,9 +5348,66 @@ function videoCodeTheme() {
 }
 // (for checks: what a video would draw with now)
 codeThemes.forVideo = videoCodeTheme;
+// ---------- "Code over" (code-over-visual) ----------
+const coSettings = () => codeOverSettings(store.get(CO_KEY, null));
+const awSettings = () => appWidgetSettings(store.get(AW_KEY, null));
+// the notes of the playing pattern for the app widgets, queried a cycle at a time and kept while the pattern stays
+const liveCache = { pat: null, by: new Map() };
+function liveNotes(c0, c1) {
+  const s = sched(), p = s && s.pattern;
+  if (!p || typeof p.queryArc !== 'function') return [];
+  if (p !== liveCache.pat) { liveCache.pat = p; liveCache.by.clear(); }
+  const out = [];
+  // (nothing before the song's start: the fast video has no notes there either)
+  for (let c = Math.max(0, Math.floor(c0)); c < Math.ceil(c1); c++) {
+    let list = liveCache.by.get(c);
+    if (!list) {
+      try { list = p.queryArc(c, c + 1).filter(h => h.hasOnset() && h.whole).map(noteOfHap); } catch (e) { list = []; }
+      liveCache.by.set(c, list);
+      if (liveCache.by.size > 48) liveCache.by.delete(liveCache.by.keys().next().value);
+    }
+    for (const x of list) if (x.e > c0 && x.b < c1) out.push(x);
+  }
+  return out;
+}
+// the places of the haps sounding now ([from, to] offsets into the code evaluated)
+function liveSpans() {
+  const s = sched();
+  if (!s || !s.pattern || !isPlaying()) return null;
+  const now = s.now(), out = [];
+  try {
+    for (const h of s.pattern.queryArc(now, now + 1e-4)) {
+      if (!h.whole || h.whole.begin.valueOf() > now || h.whole.end.valueOf() <= now) continue;
+      for (const l of (h.context && h.context.locations) || []) out.push([l.start, l.end]);
+    }
+  } catch (e) { return null; }
+  return out;
+}
+// the line being typed now: the app's typing (D5), else the user's own while typing by hand (CodeMirror's caret)
+function liveCursor() {
+  if (typing || resumeTo) return typingCursor;
+  if (performance.now() - handKeyAt < 1200 && ed && ed.editor) {
+    try { const st = ed.editor.state, head = st.selection.main.head, ln = st.doc.lineAt(head); return { line: ln.number - 1, col: head - ln.from, editing: true }; } catch (e) {}
+  }
+  return typingCursor ? { ...typingCursor, editing: false } : null;
+}
+// the song's meter and key at a bar (the doc's section), for the hit grid's steps and the tone cloud's names
+function songAt(sg, bar) {
+  const d = sg && sg.doc, i = sg && sg.meta ? sg.meta.sectionAt(Math.max(0, Math.min(sg.meta.bars - 0.001, bar))) : -1, sec = d && d.sections && d.sections[i];
+  return { meter: (sec && sec.meter) || '4/4', key: (sec && sec.key) || '' };
+}
+function codeOverNow(cyc) {
+  const S = coSettings(), aw = awSettings(), lit = codeThemes.current.S.lit || 'outline';
+  if (fv) {
+    const st = globalThis.codingMiskFastStageNotes;
+    return { S, aw, litForm: lit, fast: true, song: `fv:${fv.seed}`, cursor: fv.cursor || null, lit: fv.lit || null, notes: st ? notesOfStore(st, () => st.instruments) : null, ...songAt({ doc: fv.doc, meta: fv.meta }, cyc), lang: getLang(), render: fv.render || 'normal' };
+  }
+  return { S, aw, litForm: lit, fast: false, song: song ? song.id || song.title || '' : '', cursor: S.edit ? liveCursor() : null, lit: (sp => (sp ? [{ evaluated: evaluatedCode, spans: sp }] : null))(liveSpans()), notes: isPlaying() ? liveNotes : null, ...songAt(song, cyc), lang: getLang(), render: recRender() };
+}
 const video = createVideo({
   visuals, store, t, esc,
   getCodeTheme: videoCodeTheme,
+  getCodeOver: codeOverNow,
   // code-widgets D11: the widgets drawn in the page (never in a fast video, whose code is not the page's)
   getWidgets: () => { const S = cwSettings(), M = globalThis.miskWidgetCanvases; if (fv) return fv.widgets ? { dim: S.dim, canvas: (type, i, key) => fv.widgets.canvas(type, i, key, fv.cyc, fv.t, fv.master) } : null; if (!S.on || !M) return null; return { dim: S.dim, canvas: (type, i) => { const k = `_widget__${type}_${i}`; for (const [id, c] of M) if (id.endsWith(k)) return c; return null; } }; },
   soulFrame: (cyc, playing, scale) => soul.frame(cyc, playing, scale),

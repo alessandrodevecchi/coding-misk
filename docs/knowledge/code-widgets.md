@@ -1,8 +1,8 @@
 ---
 id: code-widgets
 related: [live-build, profiles, settings, visuals, strudel]
-code: [src/live/widgets.js, src/video/widget-frames.js, src/visuals/widget-painters.js, src/live/live-code.js, src/live/air-code.js, src/song/writer.js, src/main.js, src/settings/settings.js, src/style.css]
-checks: [npm run check:live-code, npm run check:mixer, npm run check:strudel, npm run check:video, node tools/check-code-widgets.cjs]
+code: [src/widgets/app-widgets.js, src/widgets/hitgrid.js, src/widgets/tonecloud.js, src/live/widgets.js, src/video/widget-frames.js, src/visuals/widget-painters.js, src/live/live-code.js, src/live/air-code.js, src/song/writer.js, src/main.js, src/settings/settings.js, src/style.css]
+checks: [npm run check:code-over, node tools/check-code-over.cjs, npm run check:live-code, npm run check:mixer, npm run check:strudel, npm run check:video, node tools/check-code-widgets.cjs]
 ---
 
 # Code widgets
@@ -13,7 +13,7 @@ Strudel's inline widgets (`._scope()`, `._pianoroll()`, `._punchcard()`, `._spec
 
 - **How many.** A maximum (default 3), not a fixed count: each section draws its own count from 1 to the maximum from the song's seed, never the same count three sections in a row (`targets`).
 - **Which lines.** Lines that play at the bar (not `_$:`, and their section lane on), plus muted lines that return within the window (8, 16, 32 bars or always; default 16). Slots go by the slot order of instruments (default bass, lead, drums, arp, hats, pad, fx, voice), one line per instrument first, then the place in the code. A muted line with a widget takes a slot.
-- **Which widget.** Each instrument has a primary and secondary widgets (default mapping: drums scope; hats pianoroll; bass scope; lead pianoroll; arp pianoroll; pad scope; fx and voice off). A line takes a secondary widget with the share (default 25%), chosen from the song's seed and the line's text without its section lane, so a track keeps its widget across sections. Pianoroll can be replaced by punchcard. Spiral, pitchwheel, `labels` and `smear` are off by default.
+- **Which widget.** Each instrument has a primary and secondary widgets (default mapping: drums the hit grid; hats pianoroll; bass scope; lead pianoroll; arp pianoroll; pad and voice the tone cloud; fx off; see App widgets below). A line takes a secondary widget with the share (default 25%), chosen from the song's seed and the line's text without its section lane, so a track keeps its widget across sections. Pianoroll can be replaced by punchcard. Spiral, pitchwheel, `labels` and `smear` are off by default.
 - **Instrument of a line.** From its `.analyze("…")` or `.chan("…")` (kick and snare are drums, hook and guitar lead, riser fx, texture pad); a spoken line (`say_`) is the voice.
 
 ## How it connects
@@ -32,9 +32,21 @@ Strudel's inline widgets (`._scope()`, `._pianoroll()`, `._punchcard()`, `._spec
 
 - **On the stage (widgets-on-stage).** The looks Monitor and Rullo draw the same pictures on the stage with the app's painters (`src/visuals/widget-painters.js`, shared with `fastWidgets`, identical pixels), one panel per playing instrument up to 6. They follow this card's slot order, instruments on, primary and secondary widget, share and Widget notes, whether or not the code widgets are on; the Stage widgets card decides the widget kinds for the stage, whether a silent instrument keeps a dimmed panel (Silent instruments) and can give the stage its own instruments section (Own). In the fast video, Real scope and spectrum Always also renders alone each stage instrument whose panel is a scope or spectrum (`stageScopeInstruments`) when a widget look or the layer can show; Automatic adds no render. See [visuals.md](visuals.md).
 
+## App widgets
+
+Two widgets of the app (OpenSpec change `code-over-visual`), written like Strudel's and placed by the same slots: `._hitgrid()` (Hit grid, it: Griglia colpi) and `._tonecloud()` (Tone cloud, it: Nuvola di note). The names are the app's own, unlike the reference project's (its source uses `rhythm` and `chroma`).
+
+- **Drawn from notes.** `src/widgets/app-widgets.js` keeps one entry per widget (defaults, options of a call, the window of notes it needs, data, painter). Notes are `{ inst, b, e, p, lv, n }`: from the playing pattern in the page (`noteOfHap`, a cycle at a time, never before cycle 0) and from the render page's stage notes in the fast video (`notesOfStore`; `noteOf` carries the sample's variant as a fifth element), rounded alike so both draw the same cells (`check:code-over`).
+- **Hit grid.** One row per drum sound and variant (`hh`, `hh:3`) in a stable order, rows kept once seen, the rhythm of bass, hook, lead, arp and guitar as extra rows while they play, the meter's steps (12 in 3/4), the current step, played and coming hits, `battuta N · passo S/T`.
+- **Tone cloud.** 12 rows over 3 bars in 48 slices, energy from level and overlap with a 0.6-cycle tail, spread to neighbouring classes and overtones (fifth, major third) with a deterministic grain, column normalisation with a gamma of 0.7, the ramp ` .:-=+*#%@`; the chord of the last quarter cycle (largest shape, lowest root) inverted in the labels and named below, flats in flat keys.
+- **Forms.** By the render (`cellForm`): blocks (Normal, CRT), round cells (LED), two tones (1-bit), characters (ASCII, Terminal); the cloud stays characters in Normal and CRT.
+- **Editor.** `installAppWidgets` registers both calls with Strudel's global `registerWidget` in the page (the canvas kept in `globalThis.miskAppWidgets` and `miskWidgetCanvases`) and stubs them in Node and on the render page; `drawAppWidgets` redraws them after each stage frame.
+- **Slots (cv8).** Drums: the hit grid, once, on the first drum line playing (on the last drum line it moved each time a line was added and a person typing had to retype it). Pad and voice: the tone cloud (the voice's spoken lines have no pitch: the cloud shows the harmony under it); bass, lead and arp: a secondary. The stage keeps its panels as before (`stageMapping`): app widgets are not stage panels yet.
+- **Leaving the app (cv7).** Copy, the strudel.cc link and the hand code's copy keep the calls commented out in place, `/* ._hitgrid() */` (`commentAppWidgets`), valid mid-chain and on a line of its own; the code evaluates with the same haps in a plain Strudel.
+
 ## Options
 
-The card's sections: General (on, maximum, pianoroll or punchcard, slot order, secondary share, Widget notes), Muted lines (window, dimmed look), Widgets (a switch each), Instruments (on, primary, secondary), Parameters (`labels`, `smear`, `fold`, `steady`, `fade`), Sizes (row height 36 px, pitchwheel 120, spiral 200, spectrum 120). `widgetSettings` fills in the defaults of any stored value.
+The card's sections: General (on, maximum, pianoroll or punchcard, slot order, secondary share, Widget notes), Muted lines (window, dimmed look), Widgets (a switch each), Instruments (on, primary, secondary), Parameters (`labels`, `smear`, `fold`, `steady`, `fade`), Sizes (row height 36 px, pitchwheel 120, spiral 200, spectrum 120), App widgets (each on or off, its parameters, a live preview from demo notes; `coding-misk-app-widgets`). `widgetSettings` fills in the defaults of any stored value.
 
 ## Example
 

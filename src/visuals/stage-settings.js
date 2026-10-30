@@ -1,7 +1,7 @@
 // The settings of the stage widgets (widgets-on-stage D4, D5, D7, D9): the layer over the other looks, the panel limits,
 // the instruments and widgets (the code widgets card's, or the stage's own copy), colours and silent instruments.
 // Stored whole in `coding-misk-stage-widgets` (in the backup); pure, checked in Node (tools/check-stage-widgets.mjs).
-import { CW_DEFAULTS, CW_INSTRUMENTS, WIDGETS, BY_VISUAL, widgetFor, widgetSettings } from '../live/widgets.js';
+import { CW_DEFAULTS, CW_INSTRUMENTS, WIDGETS, APP_KINDS, BY_VISUAL, widgetFor, widgetSettings } from '../live/widgets.js';
 
 export const SW_KEY = 'coding-misk-stage-widgets';
 // the sections of the card left open (working state, not in the backup)
@@ -17,7 +17,7 @@ export const PALCO_MAX = 4;
 
 export const SW_DEFAULTS = Object.freeze({
   layer: 'off', monitor: 6, strip: 4, mapping: 'same', colours: 'auto', silent: 'dimmed',
-  widgets: Object.freeze({ ...CW_DEFAULTS.widgets }),
+  widgets: Object.freeze({ ...CW_DEFAULTS.widgets, ...Object.fromEntries(APP_KINDS.map(k => [k, false])) }),
   instruments: CW_DEFAULTS.instruments,
 });
 
@@ -43,8 +43,16 @@ export function stageSettings(raw) {
 // D5: the mapping the panels use. Same as code widgets: the code widgets card's slot order, instruments, primary and
 // secondary widgets, share, "Widget notes" and window, whether or not the code widgets are on; own: the stage's own
 // instruments section. Either way the widget kinds on or off are the stage's own.
+// code-over-visual cv13: the app widgets (hit grid, tone cloud) are not stage panels yet: an instrument whose primary is
+// one falls back to its first Strudel widget, and the voice (off on the stage before its tone cloud) stays off
 export function stageMapping(sw, cw) {
-  return { ...cw, widgets: { ...sw.widgets }, instruments: sw.mapping === 'own' ? sw.instruments : cw.instruments };
+  const own = sw.mapping === 'own' ? sw.instruments : cw.instruments, instruments = {};
+  for (const [k, I] of Object.entries(own)) {
+    if (!APP_KINDS.includes(I.primary)) { instruments[k] = { ...I, secondary: I.secondary.filter(w => !APP_KINDS.includes(w)) }; continue; }
+    const sec = I.secondary.filter(w => !APP_KINDS.includes(w));
+    instruments[k] = { on: I.on && k !== 'voice' && sec.length > 0, primary: sec[0] || 'scope', secondary: sec.slice(1) };
+  }
+  return { ...cw, widgets: { ...sw.widgets, ...Object.fromEntries(APP_KINDS.map(k => [k, false])) }, instruments };
 }
 
 // the layer over a look: 'strip', 'screen' (Palco's big screen) or null (off, a widget look, the soul)

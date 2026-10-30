@@ -1,12 +1,14 @@
 // Live output (#52): the presets of the broadcast picture, their areas and the transition between them,
 // and the messages between the app tab, the broadcast window and the control room.
 // Pure: checked in Node (tools/check-live.mjs).
+import { codeOverAreas, CO_DEFAULTS } from '../video/code-over.js';
 
 // the views a preset shows; each preset is a view with or without the song card
 // the views with a timeline (#65): visual + timeline, visual + code + timeline, code + timeline, soul + timeline,
 // visual with a floating scrolling timeline, visual + track column
 // code-widgets D11: visual + code and code only with the code widgets drawn below their lines
-export const VIEWS = ['visual', 'code', 'code-soul', 'soul', 'code-only', 'visual-tl', 'visual-code-tl', 'code-tl', 'soul-tl', 'visual-float', 'visual-column', 'code-widgets', 'code-only-widgets'];
+// code-over (code-over-visual, cv14): the visual over the whole picture with the code drawn over it
+export const VIEWS = ['visual', 'code', 'code-soul', 'soul', 'code-only', 'visual-tl', 'visual-code-tl', 'code-tl', 'soul-tl', 'visual-float', 'visual-column', 'code-widgets', 'code-only-widgets', 'code-over'];
 export const PRESETS = [
   { id: 1, view: 'visual', card: true },
   { id: 2, view: 'code', card: true },
@@ -21,6 +23,7 @@ export const PRESETS = [
   { id: 11, view: 'visual-column', card: true },
   { id: 12, view: 'code-widgets', card: true },
   { id: 13, view: 'code-only-widgets', card: false },
+  { id: 14, view: 'code-over', card: true },
 ];
 // future: what is still to come on the timeline ('auto' hides it for songs with a live build, src/live/timeline.js)
 export const LIVE_DEFAULTS = { view: 'visual', card: true, future: 'auto' };
@@ -35,9 +38,15 @@ export const TRANSITION = 0.8;
 
 // the areas of a w×h picture for a view: stage, code and soul, each { x, y, w, h, a } (a: opacity, 0 hidden).
 // A hidden area keeps a place (off the right edge, or under the others) so a change of view can move it in.
-export function liveAreas(view, w, h) {
+// co: the "Code over" settings (side, width). Every view has an `over` area (the code drawn over the stage), hidden
+// (a 0) except in code-over, so a change of view fades it in and out
+export function liveAreas(view, w, h, co = CO_DEFAULTS) {
+  const C = codeOverAreas(w, h, co, false), over = { ...C.code, a: view === 'code-over' ? 1 : 0, float: true };
+  return { ...liveAreasOf(view === 'code-over' ? 'visual' : view, w, h), over };
+}
+function liveAreasOf(view, w, h) {
   // (a view with widgets has the areas of the same view without them)
-  if (typeof view === 'string' && view.endsWith('-widgets')) return liveAreas(view.slice(0, -'-widgets'.length), w, h);
+  if (typeof view === 'string' && view.endsWith('-widgets')) return liveAreasOf(view.slice(0, -'-widgets'.length), w, h);
   const pad = Math.round(h / 54), tlH = Math.round(h * 0.24), colW = Math.round(w * 0.2);
   // hidden places of the timeline (under the picture) and of the track column (off the right edge)
   const tlOff = { x: pad, y: h + pad, w: w - 2 * pad, h: tlH, a: 0 }, colOff = { x: w + pad, y: pad, w: colW, h: h - 2 * pad, a: 0 };

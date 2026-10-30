@@ -17,6 +17,13 @@ const CHECKS = {
     const { values } = mergeBackup(b, () => ({ layer: 'off', strip: 4 }));
     assert(values['coding-misk-stage-widgets'].strip === 2, 'imported: the strip limit is 2 (spec scenario)');
   },
+  'Code over and the app widgets travel in the backup (code-over-visual 2.3, 7.1)'() {
+    const co = { stage: true, side: 'right', width: 70 }, aw = { hitgrid: { steps: 8 }, tonecloud: { on: false } };
+    const b = makeBackup([['coding-misk-code-over', co], ['coding-misk-app-widgets', aw], ['coding-misk-code-theme', { lit: 'fill' }]]);
+    assert(JSON.stringify(b.data['coding-misk-code-over']) === JSON.stringify(co) && JSON.stringify(b.data['coding-misk-app-widgets']) === JSON.stringify(aw) && b.data['coding-misk-code-theme'].lit === 'fill', Object.keys(b.data).join());
+    const { values } = mergeBackup(b, () => null);
+    assert(values['coding-misk-code-over'].width === 70 && values['coding-misk-app-widgets'].hitgrid.steps === 8, 'imported');
+  },
   'backup keeps the app keys and leaves working state out'() {
     const b = makeBackup([['coding-misk-library', { tracks: [] }], ['coding-misk-draft', { x: 1 }], ['other', 1], ['coding-misk-ui', 'hw']]);
     assert(b.format === BACKUP_FORMAT && Object.keys(b.data).join() === 'coding-misk-library,coding-misk-ui', Object.keys(b.data).join());

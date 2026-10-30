@@ -211,9 +211,9 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // the line), and at the latest comes with the next section's first step. The growth and its steps never change.
   const typedWidgets = () => !!(build.crescendo && C.typist === 'human' && widgetsNow());
   const sbW = barSeconds(build), secStarts = new Set(); { let a = 0; for (const x of build.sections) { secStarts.add(a); a += x.bars; } }
-  const callsOf = c => { const out = new Set(); for (const l of chainLines(c)) { if (!isLine(l)) continue; const m = l.match(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/); if (m) out.add(`${stripWidgets(l).replace(/\s+/g, '')}|${m[1]}`); } return out; };
-  const keepCalls = (c, allowed) => chainLines(c).map(l => { if (!isLine(l) || !hasCall(l)) return l; const m = l.match(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/); return allowed.has(`${stripWidgets(l).replace(/\s+/g, '')}|${m[1]}`) ? l : stripWidgets(l); }).join('\n');
-  const hasCall = l => /\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/.test(l);
+  const callsOf = c => { const out = new Set(); for (const l of chainLines(c)) { if (!isLine(l)) continue; const m = l.match(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/); if (m) out.add(`${stripWidgets(l).replace(/\s+/g, '')}|${m[1]}`); } return out; };
+  const keepCalls = (c, allowed) => chainLines(c).map(l => { if (!isLine(l) || !hasCall(l)) return l; const m = l.match(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/); return allowed.has(`${stripWidgets(l).replace(/\s+/g, '')}|${m[1]}`) ? l : stripWidgets(l); }).join('\n');
+  const hasCall = l => /\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/.test(l);
   let idleMemo = null;
   const idlePlan = () => {
     const key = `${JSON.stringify(widgetsNow())}\u0000${lang()}\u0000${cols()}`;

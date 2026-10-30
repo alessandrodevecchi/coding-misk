@@ -9,7 +9,8 @@
 export const CT_KEY = 'coding-misk-code-theme';
 // theme: 'auto' or a theme id; font: a FONTS key; size: a SIZES key; dim: the text of muted `_$:` lines at about 55 %
 // (owner's answer to Q7: an option, on by default)
-export const CT_DEFAULTS = { theme: 'auto', font: 'jetbrains', size: 'medium', dim: true };
+// lit: the playing notes outlined (Strudel's way) or filled (code-over-visual D6, "Lit notes")
+export const CT_DEFAULTS = { theme: 'auto', font: 'jetbrains', size: 'medium', dim: true, lit: 'outline' };
 // the opacity of the text of a muted line, in the panel and in videos
 export const MUTED_TEXT = 0.55;
 
@@ -42,6 +43,7 @@ export function codeThemeSettings(v) {
     font: FONTS[o.font] ? o.font : CT_DEFAULTS.font,
     size: SIZES[o.size] ? o.size : CT_DEFAULTS.size,
     dim: typeof o.dim === 'boolean' ? o.dim : CT_DEFAULTS.dim,
+    lit: o.lit === 'fill' ? 'fill' : 'outline',
   };
 }
 
@@ -194,3 +196,39 @@ export function appRoles(P) {
     method: P.a1, punct: P.muted, caret: P.a1, line: P.line, head: P.muted, widget: { ink: P.ink, a1: P.a1, a2: P.a2, muted: P.muted },
   };
 }
+
+// ---------- "Code over" (code-over-visual D4) ----------
+// the band behind each line drawn over the scene: the theme's ground at an opacity (Low, Medium, High, cv5), never
+// below the theme's floor; the edited line's band in the theme's accent (cv3) with black or white ink. A text role too
+// faint on the band (a dim comment over a bright scene) is lifted toward the text colour until it reads at 4.5:1.
+export const BAND_OPACITY = { low: 0.7, medium: 0.82, high: 0.92 };
+export const BAND_LEVELS = Object.keys(BAND_OPACITY);
+// the scenes behind a band can be anything: the worst cases are black and white
+export const BAND_GROUNDS = ['#000000', '#ffffff'];
+const worstOn = (fg, band) => Math.min(...BAND_GROUNDS.map(G => contrast(fg, over(band, G))));
+// the lowest opacity of the ground at which the text role reads at 4.5:1 on the band over black and over white
+export function bandFloor(R) {
+  for (let a = 0.5; a < 1; a += 0.01) if (worstOn(R.text, alpha(R.bg, a)) >= 4.5) return Math.round(a * 100) / 100;
+  return 1;
+}
+const cache = new WeakMap();
+// R: a theme's roles; level: 'low' | 'medium' | 'high' → { band, opacity, edit, editInk, roles (the text roles as drawn
+// on the band) }
+export function overRoles(R, level = 'medium') {
+  let c = cache.get(R);
+  if (!c) { c = { floor: bandFloor(R) }; cache.set(R, c); }
+  if (c[level]) return c[level];
+  const opacity = Math.max(c.floor, BAND_OPACITY[level] || BAND_OPACITY.medium), band = alpha(R.bg, opacity);
+  const roles = {};
+  for (const k of TEXT_ROLES) {
+    let col = R[k];
+    for (let t = 0.1; worstOn(col, band) < 4.5 && t <= 1.001; t += 0.1) col = mix(R.text, R[k], Math.min(1, t));
+    roles[k] = col;
+  }
+  const accent = (R.widget && R.widget.a1) || R.caret || R.text, edit = alpha(over(accent, R.bg), 0.94);
+  // the ink of the edited line: black or white, whichever reads better on the edit band over either ground
+  const editInk = worstOn('#000000', edit) >= worstOn('#ffffff', edit) ? '#000000' : '#ffffff';
+  return (c[level] = { band, opacity, edit, editInk, roles });
+}
+// (for the check) the worst contrast of a colour on a band over black and over white
+export const bandContrast = worstOn;

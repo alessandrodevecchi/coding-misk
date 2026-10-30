@@ -1,8 +1,8 @@
 ---
 id: visuals
 related: [export, radio, settings, songs, live-build]
-code: [src/visuals.js, src/visuals/widget-looks.js, src/visuals/stage-feed.js, src/visuals/widget-painters.js, src/visuals/widget-palettes.js, src/visuals/render-styles.js, src/visuals/term-grid.js, src/visuals/glyph-looks.js, src/hardware.js, src/soul/data.js, src/soul/views.js, src/soul/shells.js, src/video/layout.js, src/live/timeline.js, src/style.css]
-checks: [npm run check:soul, npm run check:video, npm run check:clips, npm run check:stage-widgets, npm run check:render-styles, node tools/check-soul.cjs, node tools/check-stage-widgets.cjs, node tools/check-render-styles.cjs, node tools/screenshot-visual.cjs]
+code: [src/video/code-over.js, src/visuals.js, src/visuals/widget-looks.js, src/visuals/stage-feed.js, src/visuals/widget-painters.js, src/visuals/widget-palettes.js, src/visuals/render-styles.js, src/visuals/term-grid.js, src/visuals/glyph-looks.js, src/hardware.js, src/soul/data.js, src/soul/views.js, src/soul/shells.js, src/video/layout.js, src/live/timeline.js, src/style.css]
+checks: [npm run check:code-over, node tools/check-code-over.cjs, npm run check:soul, npm run check:video, npm run check:clips, npm run check:stage-widgets, npm run check:render-styles, node tools/check-soul.cjs, node tools/check-stage-widgets.cjs, node tools/check-render-styles.cjs, node tools/screenshot-visual.cjs]
 ---
 
 # Visuals
@@ -21,6 +21,7 @@ What the app draws while music plays, and how video files are laid out.
 - **Song soul.** A science fiction screen of the song playing: ten views, drawn from the song's own data, inside a choice of device shells. It opens from a hidden screw on the stage (an easter egg).
 - **Procedural visuals.** Endless scrolling scenes were built and then moved out of the app at the owner's request. They live in the owner's local notes; the repo keeps the tags `visuals-v1` to `visuals-v3`.
 - **Video layouts.** Where the visual, the code, the soul and the timeline sit in an exported video, and the vertical fragments.
+- **Code over** (it: Codice sopra, OpenSpec change `code-over-visual`, `src/video/code-over.js`). The code drawn over the scene instead of in a panel: one band per line as wide as its text, nothing on empty lines, comments and muted lines dimmed, long lines cut with `…` (this layout only), the line being typed in the theme's accent with a block cursor (from the typing plan's `cursor(t)`, or CodeMirror's caret while typing by hand), the playing tokens framed or filled. One painter (`drawCodeOver`) for the session video (layout `code-over`), the fast video, the fragments (show `code-over`), the live output (view 14) and an optional stage mode of the page (the stage's Code over button, off by default, an overlay canvas `#stage-over`; the editor stays open). Areas (`codeOverAreas`): 16:9 from 3.5% of the width to the Code width setting (62% by default) on the left or the right, or the whole width above a bottom band; tall pictures the whole width above 84%. Captions, the song card, the stage strip and the Terminal pass's panes keep to the free side (`setLayerFree`). Without typing the scroll shows the window with the most lines lit in the last two seconds. The lit tokens are the haps' `context.locations` mapped from the code evaluated to the shown lines by their text (the fast video gets them from the render page, `lit` on the job; a line being edited lights nothing until it is evaluated).
 
 ## How it connects
 
@@ -44,9 +45,9 @@ Soul display shells (`SHELLS` in `src/soul/shells.js`): `A` MISK/OS 6000, `B` Un
 <!-- /generated -->
 
 <!-- generated:video-options -->
-Video layouts (`LAYOUTS`): `visual`, `code`, `code-widgets`, `tab`, `visual-tl`, `visual-code-tl`, `code-tl`, `soul-tl`, `visual-float`, `visual-column`. Qualities: `1080p30`, `1080p60`, `720p30`. Title card: `always`, `start`, `off`.
+Video layouts (`LAYOUTS`): `visual`, `code`, `code-widgets`, `tab`, `visual-tl`, `visual-code-tl`, `code-tl`, `soul-tl`, `visual-float`, `visual-column`, `code-over`. Qualities: `1080p30`, `1080p60`, `720p30`. Title card: `always`, `start`, `off`.
 
-Fragments: formats `9:16`, `4:5`, `1:1`, `16:9`; show `visual`, `visual-code`, `visual-soul`, `soul`, `code`, `visual-code-widgets`, `code-widgets`; aspect `whole`, `fill`, `16:9`, `4:3`, `1:1`, `4:5`, `9:16`; code mode `focus`, `scroll`, `follow`; files `video`, `audio`, `texts`, `list`.
+Fragments: formats `9:16`, `4:5`, `1:1`, `16:9`; show `visual`, `visual-code`, `visual-soul`, `soul`, `code`, `visual-code-widgets`, `code-widgets`, `code-over`; aspect `whole`, `fill`, `16:9`, `4:3`, `1:1`, `4:5`, `9:16`; code mode `focus`, `scroll`, `follow`; files `video`, `audio`, `texts`, `list`.
 
 Audio formats (`src/export/encode.js`): `wav`, `flac`, `mp3`, `opus`; MP3 at 320 or 192 kbps.
 <!-- /generated -->
