@@ -2103,3 +2103,11 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Guida:** schede nuove «Codice sopra» e «Widget dell'app: griglia colpi e nuvola di note», in inglese e italiano (`check:guide`: 33 schede).
 - **Base di conoscenza:** sezione Code over in `visuals.md`, sezione App widgets in `code-widgets.md` (mappa di default aggiornata), Lit notes e scheda Code over in `settings.md`, cinque decisioni in `decisions.md`; `checks.md` rigenerato con i due check nuovi. `docs/ARCHITECTURE.md` (sezione Code over, chiavi `coding-misk-code-over` e `coding-misk-app-widgets`), `docs/DESIGN-SYSTEM.md` (fasce, accento, colori dei widget), `AGENTS.md` (i due check, `src/widgets/`).
 - **Catalogo Strudel:** `npm run catalog:strudel` rifatto; `check:knowledge` senza l'avviso del catalogo vecchio.
+
+## 2026-10-30: codice sopra il visual, parte 8: regressioni (code-over-visual)
+
+- **Passano (Node):** `check:code` (46 brani uguali), `check:video` (11), `check:clips` (22), `check:live` (14), `check:export` (5), `check:code-themes`, `check:light-theme`, `check:render-styles`, `check:typing` (18), `check:live-code` (18), `check:code-over` (65), `check:guide`, `check:patterns` (22), `check:stage-widgets`, `check:strudel` (10), `check:knowledge`, `check-backup.mjs` (16); `vite build`.
+- **Passano (browser, server 5241):** `check-video`, `check-clips`, `check-live`, `check-captions`, `check-settings`, `check-code-widgets`, `check-timeline`, `check-hand`, `check-light-theme`, `check-export`, `check-render-styles`, `check-stage-widgets`, `check-code-themes`, `check-code-over`.
+- **Da ricordare:** `check-captions` falliva solo perché il worktree aveva una parte dei campioni delle voci: con le cartelle `say_*` e `say_lengths.json` copiate dal checkout principale (ignorate da git) passa tutto.
+- **Costo del video veloce:** frammento di 30 s di kellerlicht, 18-19 s di rendering con "Visual + codice" e con "Codice sopra" (le posizioni dei hap non si notano).
+- **Riga in modifica nel video veloce:** viene dallo stesso piano di scrittura del feed (`codeFrom`), con le stesse regole del tempo reale; i tempi esatti di inizio della scrittura di app e video veloce erano già un po' diversi prima di questo change (finestre calcolate in due posti), quindi la riga è la stessa ma l'istante di inizio può differire di qualche decimo.
