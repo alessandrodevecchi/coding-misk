@@ -8,7 +8,7 @@
 // Bars: a grown song keeps the bars of its written form after its growth, moved by the growth (airOffset): grown bar
 // b plays the written bar b - off. A command records its boundary in the grown song's bars (what the queue shows); the
 // director's rewrite gets the same boundary in its own bars.
-import { steerSong, COMMANDS } from './steering.js';
+import { steerSong, sayAir, COMMANDS } from './steering.js';
 import { writtenForm, growOnAir, airControls } from './growth.js';
 import { energyOf } from './energy.js';
 import { stream } from './random.js';
@@ -426,15 +426,20 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
   // comments are display only and never move the boundaries of the commands)
   const off = airOffset(g0), C = controls || ctx.controls || withDisplay(airControls(g0.onAir.profile, g0.onAir.free), { tracks: true });
   const toDirector = c => { const { q, pend, at0, ...rest } = c; return { ...rest, at: c.at - off }; };
+  // (a typed line, say-live, changes no code to type and nothing of the written form: it goes on the grown song on its
+  // own bar, after the other commands. Through the director it landed on the written form's bar B - off, before the
+  // arrival or inside the growth, where the transit keeps no clip of the written form, and was never heard; fx3)
+  const typed = c => c.kind === 'say-live', director = list => list.filter(c => !typed(c)).map(toDirector);
   let N = g0, Wprev = writtenForm(song), P = plan, R = { song, plan, opts };
   const done = [];
   commands.forEach((cmd, i) => {
     const cands = cmd.pend ? airBoundaries(cmd.kind, Number.isFinite(cmd.q) ? cmd.q : cmd.at - 1, P, g0) : [cmd.at];
+    if (typed(cmd)) { if (cands.length) { const { pend, ...kept } = cmd; done.push({ ...kept, at: cands[0] }); } return; }
     const rng = stream(seed, `waypoint:${n}:${i}`);
     let pick = null;
     for (let j = 0; j < cands.length; j++) {
       const B = cands[j];
-      const r = steerSong({ song, plan, opts, commands: [...done, { ...cmd, at: B }].map(toDirector), seed, n });
+      const r = steerSong({ song, plan, opts, commands: director([...done, { ...cmd, at: B }]), seed, n });
       const W = writtenForm(r.song), o = { kind: cmd.kind, track: cmd.track, rng, chooser, phrase: plan.phrase, plan: r.plan };
       let t = transitSong(N, W, Wprev, B, off, o);
       const last = j === cands.length - 1;
@@ -463,11 +468,14 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
     const { pend, ...kept } = cmd;
     done.push({ ...kept, at: pick.B });
   });
+  const said = done.filter(typed);
+  if (said.length) N = sayAir(N, said.map(c => ({ at: c.at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' })));
   return { song: N, grown: g0, commands: done, plan: R.plan, opts: R.opts, plain: R.song };
 }
 // the director's view of a steered grown song (its plan, options and song as steered), from commands with their
 // boundaries in the grown song's bars: what the console reads
 export function directorView({ song, plan, opts, commands, seed, n, grown }) {
   const off = airOffset(grown);
-  return steerSong({ song, plan, opts, commands: commands.map(c => { const { q, pend, at0, ...rest } = c; return { ...rest, at: c.at - off }; }), seed, n });
+  // (typed lines live on the grown song only, as in steerOnAir)
+  return steerSong({ song, plan, opts, commands: commands.filter(c => c.kind !== 'say-live').map(c => { const { q, pend, at0, ...rest } = c; return { ...rest, at: c.at - off }; }), seed, n });
 }
