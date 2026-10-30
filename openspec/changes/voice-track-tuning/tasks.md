@@ -4,8 +4,8 @@ Estimate: about 19 agent hours (16 to 22), in the order below. Each group ends w
 
 ## 1. Measure before (about 1.5 h)
 
-- [ ] 1.1 Write `tools/voice-repeats.mjs` (Node, no browser): for a fixed list of seeds (`f7zvee` plus 10 seeds of 12 songs, styles with own lines among them: dark cyberpunk, synthwave, berlin techno), voice options default, "many" mixed, one-phrase chop and one-phrase refrain, print per song the voice bars, starts per line, the most starts of one line, the share of the song with voice, and per session the lines said again within 5 songs and the share of songs per style line. JSON output with `--json`.
-- [ ] 1.2 Run it on `develop` (before any change below) and keep the output in `notes/prove-2026-10-30/voci-misure-prima.json`; record the seed list in the script.
+- [x] 1.1 Write `tools/voice-repeats.mjs` (Node, no browser): for a fixed list of seeds (`f7zvee` plus 10 seeds of 12 songs, styles with own lines among them: dark cyberpunk, synthwave, berlin techno), voice options default, "many" mixed, one-phrase chop and one-phrase refrain, print per song the voice bars, starts per line, the most starts of one line, the share of the song with voice, and per session the lines said again within 5 songs and the share of songs per style line. JSON output with `--json`.
+- [x] 1.2 Run it on `develop` (before any change below) and keep the output in `notes/prove-2026-10-30/voci-misure-prima.json`; record the seed list in the script.
 
 ## 2. Song format and compiler (about 3 h)
 
