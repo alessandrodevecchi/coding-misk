@@ -2015,3 +2015,8 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Temi:** `tools/check-light-theme.cjs` copre il tab Voci (modulo aperto, vocabolari, voci, campioni) e le Impostazioni: nessun testo con poco contrasto.
 - **Ritocchi:** la card delle Impostazioni usa chip che vanno a capo (cinque livelli non stavano in una riga); «Frasi salvate: {n}» al posto di «({n} ora)», che si leggeva come un'ora; `sizeText(0)` dice 0 KB.
 - **Da ricordare:** nel check i clic passano da `el.click()`: la barra in alto, fissa, prende i clic di Playwright sui pulsanti sotto di lei.
+
+## 2026-10-30: le mie frasi, parte 7: documenti (my-phrases)
+
+- **Base di conoscenza:** nota nuova `docs/knowledge/phrases.md` (raccolta, politica, momenti, regista, campioni, tab Voci), righe in `voice.md`, `narrator.md`, `settings.md`, una decisione in `decisions.md`, la ricetta «Add a pool kind or a moment» in `recipes-build.md` con la riga nella tabella dei compiti; `npm run knowledge` ha rigenerato `checks.md` e `status.md`; `check:knowledge` passa.
+- **AGENTS.md:** `npm run check:phrases`, `tools/check-voices-tab.cjs` e la cartella `src/voices/`.

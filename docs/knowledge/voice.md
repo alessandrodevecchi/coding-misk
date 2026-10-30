@@ -1,6 +1,6 @@
 ---
 id: voice
-related: [narrator, songs, growth-shapes, styles, live-build]
+related: [phrases, narrator, songs, growth-shapes, styles, live-build]
 code: [src/song/spoken.js, src/song/vocabulary.js, src/endless/director.js, src/endless/voice-options.js, src/endless/voice-panel.js, src/endless/voice-track.js, src/endless/voice-sound.js, src/endless/phrase-list.js, tools/voice.mjs, tools/voice-sample.mjs]
 checks: [npm run check:spoken, node tools/check-voices.cjs, node tools/check-steering.cjs]
 ---
@@ -15,6 +15,7 @@ Lines are samples made on macOS by `npm run voices`. Without them the track stay
 
 ## How it connects
 
+- **My phrases (my-phrases, #82).** A line typed in the phrase list or the radio console is offered to the user's phrases (save policy in Settings → Voices and phrases). A vocabulary line of a generated song, of Fill with or New phrases may become a phrase of mine (kind `voice`, the same group or none), drawn on its own stream after the vocabulary; a song's or a style's own lines never change ([phrases.md](phrases.md)).
 - **Songs.** A spoken track's patterns are lines, and its clips place them ([songs.md](songs.md)).
 - **Narrator.** The narrator yields: it stays quiet on bars where a line sounds and never announces a spoken track ([narrator.md](narrator.md)).
 - **On the stage (spoken-text-on-stage, #82).** Every start of a voice-track line shows as a caption in quotes, magenta, while it is heard (a chop once per clip, a refrain at each repeat), also while the user codes by hand; the lines typed in the radio console are voice-track lines marked `typed` (their own choice in Settings → Texts on stage) ([visuals.md](visuals.md)).

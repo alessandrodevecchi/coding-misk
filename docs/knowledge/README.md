@@ -21,7 +21,7 @@ The detailed references stay in `docs/*.md`. Each note links them.
 11. [patterns.md](patterns.md): the Patterns tab and the user's saved patterns.
 12. [radio.md](radio.md) and [radio-commands.md](radio-commands.md): endless sessions and the console.
 13. [artists.md](artists.md): artists, a taste over styles and knobs.
-14. [voice.md](voice.md) and [narrator.md](narrator.md): the voices.
+14. [voice.md](voice.md), [narrator.md](narrator.md) and [phrases.md](phrases.md): the voices and the user's phrases.
 15. [sounds.md](sounds.md) and [sound-and-levels.md](sound-and-levels.md): every sound, the missing ones, levels.
 16. [visuals.md](visuals.md), [code-widgets.md](code-widgets.md), [export.md](export.md), [library.md](library.md), [settings.md](settings.md).
 17. Before a task: [checks.md](checks.md), [pitfalls.md](pitfalls.md), [decisions.md](decisions.md), [status.md](status.md), [glossary.md](glossary.md).
@@ -47,6 +47,7 @@ The detailed references stay in `docs/*.md`. Each note links them.
 | [artists.md](artists.md) | Artist files, how each field steers the director, random artists |
 | [voice.md](voice.md) | Spoken tracks: opening, passage, refrain, chop |
 | [narrator.md](narrator.md) | Spoken step comments, speakers, explain or poetic |
+| [phrases.md](phrases.md) | My phrases: capture, save policy, how the director reuses them, samples, the Voices tab |
 | [sounds.md](sounds.md) | Synths, soundfonts, drum machines, samples, FM; sounds asked for and missing |
 | [sound-and-levels.md](sound-and-levels.md) | Rack devices, the sound guard, level targets and snapshots, clipping |
 | [visuals.md](visuals.md) | Themes, looks, the song soul, video and fragment layouts |
@@ -88,6 +89,7 @@ Each task has a recipe with the files to change, the steps, the checks and the m
 | Add a radio command | [recipes-build](recipes-build.md#add-a-radio-command) |
 | Add a transition, an energy shape or a quirk | [recipes-build](recipes-build.md#add-a-transition-an-energy-shape-or-a-quirk) |
 | Add voice lines, a speaker or a language | [recipes-build](recipes-build.md#add-voice-lines-a-speaker-or-a-language) |
+| Add a pool kind or a moment | [recipes-build](recipes-build.md#add-a-pool-kind-or-a-moment) |
 | Change the director safely | [recipes-build](recipes-build.md#change-the-director-safely) |
 | Add a check | [recipes-app](recipes-app.md#add-a-check) |
 | Update Strudel | [recipes-app](recipes-app.md#update-strudel) |

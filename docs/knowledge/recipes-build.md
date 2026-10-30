@@ -96,6 +96,18 @@ A new console command that rewrites the song on air ([radio-commands.md](radio-c
 
 **Mistakes:** the narrator's speaker reused for the voice instrument; lines that name real people; committing the generated samples.
 
+### Add a pool kind or a moment
+
+**Files:** the pool (`PHRASES` in `src/song/build.js`, `POOL` in `src/endless/phrases.js`, `CRESCENDO_POOL` in `src/song/crescendo.js`), `src/voices/moments.js` (my-phrases D2), `src/i18n.js` (`phMoment:<id>` in both languages).
+
+**Steps:**
+1. Map the new key in `PHRASES_MOMENT`, `POOL_MOMENT` or `crescendoMoment`, so a phrase of mine of that moment can replace its lines.
+2. A new moment goes in one of `MOMENT_GROUPS` (tracks, colour, structure), with its label in both languages.
+
+**Checks:** `npm run check:phrases` (every pool key mapped), `npm run check:guide`, `npm run check:samples`.
+
+**Mistakes:** a moment in no group never shows in the Voices tab's form; changing a pool's lines moves the director's fixtures (bump `DIRECTOR_VERSION`), the moments map does not ([phrases.md](phrases.md)).
+
 ### Change the director safely
 
 Any change to how radio songs are written.

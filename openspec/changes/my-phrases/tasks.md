@@ -54,4 +54,4 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 ## 9. Docs (1 h)
 
 - [x] 9.1 Guide cards `voices-tab` and `my-phrases`, updates to the radio console and Compose cards; `npm run check:guide`
-- [ ] 9.2 `docs/knowledge/voice.md`, `narrator.md`, a new `phrases.md`; `npm run knowledge`, `npm run check:knowledge`; the two new checks in `AGENTS.md` and `docs/knowledge/checks.md`; DEVLOG
+- [x] 9.2 `docs/knowledge/voice.md`, `narrator.md`, a new `phrases.md`; `npm run knowledge`, `npm run check:knowledge`; the two new checks in `AGENTS.md` and `docs/knowledge/checks.md`; DEVLOG
