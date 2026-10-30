@@ -112,6 +112,10 @@ const SCENES = [
   { id: 'stili', tab: 'stili' },
   { id: 'generi', tab: 'generi' },
   { id: 'suoni', tab: 'suoni' },
+  { id: 'voci', tab: 'voci', go: async p => { await p.$eval('[data-vt-sub="mine"]', el => el.click()); await sleep(300); await p.$eval('[data-ph-new]', el => el.click()); await sleep(300); } },
+  { id: 'voci-vocabolari', tab: 'voci', go: async p => { await p.$eval('[data-vt-sub="vocab"]', el => el.click()); await sleep(400); } },
+  { id: 'voci-voci', tab: 'voci', go: async p => { await p.$eval('[data-vt-sub="voices"]', el => el.click()); await sleep(2500); } },
+  { id: 'voci-campioni', tab: 'voci', go: async p => { await p.$eval('[data-vt-sub="samples"]', el => el.click()); await sleep(2500); } },
   { id: 'pattern', tab: 'pattern' },
   { id: 'guida', tab: 'guida' },
   { id: 'lezioni', tab: 'lezioni' },
@@ -120,7 +124,7 @@ const SCENES = [
   { id: 'componi-suona', tab: 'componi', play: true, go: async p => { await p.click('#play'); await sleep(6000); } },
   { id: 'radio-in-onda', tab: 'radio', play: true, go: async p => { await p.fill('#radio-seed', 'light-check'); await p.click('#radio-start'); await sleep(6000); } },
 ];
-const LAB = new Set(['artisti', 'stili', 'generi', 'suoni', 'pattern', 'guida', 'lezioni', 'riferimenti']);
+const LAB = new Set(['artisti', 'stili', 'generi', 'suoni', 'voci', 'pattern', 'guida', 'lezioni', 'riferimenti']);
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });

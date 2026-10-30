@@ -33,7 +33,7 @@ OpenSpec changes not archived: 91. With open tasks: 27. All tasks ticked, waitin
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |
 | [material-generator](../../openspec/changes/material-generator/tasks.md) | 1 | 22 |
-| [my-phrases](../../openspec/changes/my-phrases/tasks.md) | 29 | 29 |
+| [my-phrases](../../openspec/changes/my-phrases/tasks.md) | 3 | 29 |
 | [natural-growth](../../openspec/changes/natural-growth/tasks.md) | 2 | 10 |
 | [new-song-panel](../../openspec/changes/new-song-panel/tasks.md) | 1 | 21 |
 | [pattern-library](../../openspec/changes/pattern-library/tasks.md) | 1 | 16 |

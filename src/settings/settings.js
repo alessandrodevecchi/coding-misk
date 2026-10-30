@@ -17,6 +17,7 @@ import { RENDERS } from '../music.js';
 import { CW_KEY, CW_DEFAULTS, CW_INSTRUMENTS, CW_WINDOWS, CW_PARAMS, CW_SIZE_LIMITS, WIDGETS, widgetSettings } from '../live/widgets.js';
 import { CAPTIONS_KEY, captionSettings, WHERES, STEP_FORMS } from '../captions/captions.js';
 import { SPEAKER_KINDS, MARKS } from '../song/speakers.js';
+import { SAVE, TEMP, SHARE_LEVELS, SETTINGS_DEFAULT } from '../voices/phrases.js';
 import { SW_KEY, SW_OPEN, SW_LAYERS, SW_MAPPINGS, SW_COLOURS, SW_SILENT, SW_LIMITS, stageSettings } from '../visuals/stage-settings.js';
 
 // the code widgets card (code-widgets D2): the sections left open, remembered in this browser
@@ -44,6 +45,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${codeRows()}
         </div>
         ${captionsCard()}
+        ${phrasesCard()}
         <div class="card set-card"><h3>${esc(t('setAudio'))}</h3>
           ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`)}
           ${row(t('setFormat'), `<select id="set-format" data-no-knob>${FORMATS.map(f => opt(f, fmt, t(`set${f[0].toUpperCase()}${f.slice(1)}`))).join('')}</select>`, t('setFormatHint'))}
@@ -168,6 +170,25 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   // stage widgets (widgets-on-stage D9): the layer over the scene, then sections that open and close, like the code
   // widgets card
   // texts on stage (spoken-text-on-stage D7): one switch, the choices under it folded while it is off and kept
+  // voices and phrases (my-phrases D3, D4, D6): the save policy, the lifetime of unsaved samples, how often the director
+  // uses my phrases, the space of the samples with a link to the Voci tab
+  let phSpace = null;
+  // (five levels do not fit a narrow card as one segmented row: chips that wrap)
+  const chipSeg = (attr, items, cur) => `<div class="chips" role="group">${items.map(([v, l]) => `<button class="chip small" ${attr}="${esc(v)}" aria-pressed="${v === cur}">${esc(l)}</button>`).join('')}</div>`;
+  function phrasesCard() {
+    const P = app.phrases;
+    if (!P) return '';
+    const S = P.settings();
+    if (phSpace === null) { phSpace = ''; P.space().then(x => { phSpace = x; const el = root.querySelector('#set-ph-space'); if (el) el.textContent = x; }); }
+    return `<div class="card set-card" id="set-phrases"><h3>${esc(t('setPh'))}</h3>
+      <p class="muted">${esc(t('setPhIntro', { n: P.count() }))}</p>
+      ${row(t('setPhSave'), chipSeg('data-ph-set-save', SAVE.map(k => [k, t(`phSave:${k}`)]), S.save), t(`phSaveHint:${S.save}`))}
+      ${row(t('setPhTemp'), `<select data-ph-set-temp data-no-knob>${TEMP.map(k => opt(k, S.temp, t(`phTemp:${k}`))).join('')}</select>`, t('setPhTempHint'))}
+      ${row(t('phShareLbl'), chipSeg('data-ph-set-share', SHARE_LEVELS.map(k => [k, t(`phShare:${k}`)]), S.share), t(`phShareHint:${S.share}`))}
+      ${row(t('phSpace'), `<span id="set-ph-space" class="vt-lcd">${esc(phSpace || '…')}</span> <button class="btn small" data-ph-set-open>${esc(t('setPhOpen'))}</button>`)}
+      <div class="actions"><button class="btn small" data-ph-set-reset>${esc(t('setPhReset'))}</button></div>
+    </div>`;
+  }
   function captionsCard() {
     const S = captionSettings(store.get(CAPTIONS_KEY, null));
     const check = (k, label, hint = '') => `<label class="rx-opt"${hint ? ` title="${esc(hint)}"` : ''}><input type="checkbox" data-cap-show="${k}"${S[k] ? ' checked' : ''} data-no-knob> <span>${esc(label)}</span></label>`;
@@ -220,6 +241,10 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
     if (b.dataset.setUiFollow) { app.setUiFollow(b.dataset.setUiFollow === '1'); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
+    if (b.dataset.phSetSave) { app.phrases.set({ save: b.dataset.phSetSave }); return render(); }
+    if (b.dataset.phSetShare) { app.phrases.set({ share: b.dataset.phSetShare }); return render(); }
+    if (b.dataset.phSetOpen !== undefined) return app.phrases.open('samples');
+    if (b.dataset.phSetReset !== undefined) { app.phrases.set({ ...SETTINGS_DEFAULT }); toast(t('setPhResetDone')); return render(); }
     if (b.dataset.capOn) { setCap(S => { S.on = b.dataset.capOn === '1'; }); return render(); }
     if (b.dataset.capVideos) { setCap(S => { S.videos = b.dataset.capVideos === '1'; }); return render(); }
     if (b.dataset.setCodeSize) { app.codeTheme.set({ size: b.dataset.setCodeSize }); return render(); }
@@ -282,6 +307,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   // the sections of the code widgets card left open
   root.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.swSec) { const open = new Set(store.get(SW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.swSec); else open.delete(d.dataset.swSec); store.set(SW_OPEN, [...open]); return; } if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
   root.addEventListener('change', e => {
+    if (e.target.matches && e.target.matches('[data-ph-set-temp]')) { app.phrases.set({ temp: e.target.value }); return render(); }
     { const x = e.target, d = x.dataset || {};
       if (d.capSkip !== undefined && app.capsSkipNext) { app.capsSkipNext(x.checked); return; }
       if (d.capShow) { setCap(S => { S[d.capShow] = x.checked; }); return render(); }
@@ -325,5 +351,5 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (e.target.id === 'set-frag-n') store.set('coding-misk-fragment-n', Math.max(1, Math.round(+e.target.value || 1)));
     if (e.target.id === 'set-vid-preset' && e.target.value) { const p = (store.get('coding-misk-video-presets', {}) || {})[e.target.value]; if (p) { store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...p }); toast(t('vidPresetLoaded', { name: e.target.value })); render(); } }
   });
-  return { render };
+  return { render, refresh: () => { phSpace = null; render(); } };
 }

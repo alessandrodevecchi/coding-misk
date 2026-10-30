@@ -9,7 +9,7 @@ import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, 
 import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
-import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORDS } from './song/spoken.js';
+import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORDS, narratorStyle } from './song/spoken.js';
 import { airCode } from './live/air-code.js';
 import { growOnAir, airControls, composeGrowth } from './endless/growth.js';
 import { controlsProfile, customControls } from './endless/profile.js';
@@ -59,7 +59,7 @@ import { freshSeed } from './endless/random.js';
 import { cleanVoice, voiceOption, presetOf as voicePresetOf } from './endless/voice-options.js';
 import { voicePanel, voiceEvent } from './endless/voice-panel.js';
 import { voiceSoundHtml, syncVoiceSound, soundEvent } from './endless/voice-sound.js';
-import { phraseRows, listVocab, editText, editBars, editWay, removeRow, addRow, fillRows, freeParts, FILL_GROUPS } from './endless/phrase-list.js';
+import { phraseRows, listVocab, editText, editBars, editWay, removeRow, addRow, fillRows, fillMine, freeParts, FILL_GROUPS } from './endless/phrase-list.js';
 import { rewriteSpoken, trackVoice } from './endless/voice-track.js';
 import { styleId, stylePush } from './endless/recipe.js';
 import { loadLimiter, setMasterLevel } from './sounds/limiter.js';
@@ -94,6 +94,12 @@ import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS, KIND_TYPE, loopSong } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
+import { createPhrases } from './voices/service.js';
+import { createVoicesTab } from './voices/voices-tab.js';
+import { narratorPick } from './voices/mine.js';
+import { setNarratorMine } from './song/build.js';
+import { PHRASES_MOMENT } from './voices/moments.js';
+import { builtinKeys, mineKeys, songKeys, sizeText } from './voices/samples.js';
 import { parseSong, clock } from './songs.js';
 import { durationKey, growingProfile, hashText } from './live/card-duration.js';
 import { createGrowthStore } from './live/growth-store.js';
@@ -119,6 +125,12 @@ const store = {
   remove(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
 setLang(getLang());
+// my phrases (my-phrases D4): the narrator of the song in Compose may say phrases of the collection in place of lines
+// from the built-in pools, never the song's own written lines; a radio song draws from the snapshot it carries
+let phr = null;
+const ownMemo = new WeakMap();
+const ownTexts = sg => { const b = sg && Array.isArray(sg.build) ? sg.build : null; if (!b) return new Set(); if (!ownMemo.has(b)) ownMemo.set(b, new Set(b.map(x => x && x.say ? sayText(x.say, 'en') : '').filter(Boolean))); return ownMemo.get(b); };
+setNarratorMine(narratorPick(sg => { try { return phr && sg && T && sg.id === T.id ? phr.composeSource(ownTexts(T)) : null; } catch (e) { return null; } }));
 // code widgets (code-widgets): the settings of the Settings card, read each time a code is shown
 const cwSettings = () => widgetSettings(store.get(CW_KEY, null));
 // the stage widgets (widgets-on-stage D9): their settings and the panels' mapping, read again only when one of the two
@@ -409,7 +421,7 @@ function nextCardLength() {
   }, () => durWait.clear()).finally(() => { durWait.delete(key); durBusy = false; nextCardLength(); });
 }
 // the radio tab (created further down, once the player exists)
-let radio = null, radioOptions = null, newSongOptions = null, newSong = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, genresTab = null, patternsTab = null, prevTab = 'componi', curTab = null;
+let radio = null, radioOptions = null, newSongOptions = null, newSong = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, genresTab = null, patternsTab = null, voicesTab = null, prevTab = 'componi', curTab = null;
 // the user's saved patterns (pattern-library): the Patterns tab, Save as pattern in Compose and the radio read them
 const patternsStore = patternStore(store);
 // custom samples manifest (bank → files), for spoken comments
@@ -1170,17 +1182,19 @@ $('#share').addEventListener('focus', updateShare);
 
 let toastT = 0;
 // action: { label, run } adds a button (Restore after a delete, #68) and keeps the toast a little longer
-function toast(msg, action = null) {
+// (my-phrases D3: several actions, [{ label, run }], and a time of its own: the Chiedi toast waits 10 s, never blocking)
+function toast(msg, action = null, { ms = 0 } = {}) {
   let box = $('.toast');
   if (!box) { box = document.createElement('div'); box.className = 'toast'; box.setAttribute('role', 'status'); document.body.appendChild(box); }
   box.textContent = msg; box.hidden = false;
-  if (action) {
+  const acts = Array.isArray(action) ? action : action ? [action] : [];
+  for (const a of acts) {
     const b = document.createElement('button');
-    b.className = 'btn toast-act'; b.textContent = action.label;
-    b.addEventListener('click', () => { box.hidden = true; action.run(); });
+    b.className = 'btn toast-act'; b.textContent = a.label;
+    b.addEventListener('click', () => { box.hidden = true; clearTimeout(toastT); a.run(); });
     box.append(' ', b);
   }
-  clearTimeout(toastT); toastT = setTimeout(() => box.hidden = true, action ? 5000 : 2600);
+  clearTimeout(toastT); toastT = setTimeout(() => box.hidden = true, ms || (acts.length ? 5000 : 2600));
 }
 // conferma in due tocchi
 const armed = {};
@@ -2784,7 +2798,8 @@ $('#live-voices').addEventListener('change', e => {
   st.say = typeof st.say === 'object' && st.say ? { ...st.say, [lang]: v } : lang === 'en' || !st.say ? (lang === 'en' ? v : { [lang]: v }) : { en: st.say, [lang]: v };
   narratorEdited.add(v);
   changed(); askSamples();
-  toast(t('plTextChanged'), { label: t('vinstUndo'), run: () => { T.build = before; changed(); } });
+  // (my-phrases D2, D3: the line is offered to my phrases; the edit's Undo also removes a phrase it created)
+  phr.offer(narratorOffer(st, v), { msg: t('plTextChanged'), undo: () => { T.build = before; changed(); } });
 });
 function vinstSongHtml(sp, off) {
   const ti = T.tracks.indexOf(sp);
@@ -2841,7 +2856,91 @@ const sampleAsked = new Set();
 // the line is written and shown at once, silent until its sample exists, then it speaks from its next bar (the samples
 // are loaded again, no page reload). Without the helper (a built app, another system) the row says how to make it.
 let voiceHelper = null;
-const helperReady = fetch('/voice/status').then(r => (r.ok ? r.json() : { ok: false })).then(j => { voiceHelper = !!(j && j.ok); }, () => { voiceHelper = false; });
+const helperReady = fetch('/voice/status').then(r => (r.ok ? r.json() : { ok: false })).then(j => { voiceHelper = !!(j && j.ok); lastSweep = j && Number.isInteger(j.sweep) ? j.sweep : 0; }, () => { voiceHelper = false; });
+// ---------- my phrases (my-phrases) ----------
+let lastSweep = 0;
+phr = createPhrases({ store, t, toast, getLang, helper: () => !!voiceHelper, onChange: what => { if (what === 'items' || what === 'settings') phrasesChanged(what); } });
+// the collection or how often it is used changed: the narrator of the song in Compose says other lines (its code and
+// captions are written again; the growth stays), the tab and the radio console are drawn again
+function phrasesChanged(what) {
+  // (in the radio or by hand only the song in Compose is written again: changed() would leave the radio)
+  try { if (mode === 'track' && !hand) { const was = dirty; changed(); dirty = was; saveDraft(); } else compiled = playable({ ...T, kind: 'composed' }); } catch (e) { /* not ready yet */ }
+  if (voicesTab) voicesTab.render();
+  if (radio && radio.on && radio.render) radio.render();
+  if (settingsPage && settingsPage.refresh && what === 'settings') settingsPage.refresh();
+}
+// the user's library, for the samples a delete keeps (D5): saved songs, trashed songs, songs of playlist sessions
+function librarySongs() {
+  const out = [...(user.tracks || []), ...(user.trash || []).map(e => e && e.song).filter(Boolean)];
+  const walk = (v, d = 0) => { if (!v || typeof v !== 'object' || d > 6) return; if (Array.isArray(v.tracks) && Array.isArray(v.sections)) { out.push(v); return; } for (const x of Object.values(v)) walk(x, d + 1); };
+  walk(store.get('coding-misk-playlists', null));
+  return out;
+}
+let builtinMemo = null;
+const sampleKeys = (except = null) => ({
+  builtin: builtinMemo || (builtinMemo = builtinKeys({ songs: BUILTIN, styles: RECIPES })),
+  mine: mineKeys(phr.items.filter(p => p.id !== except)),
+  songs: songKeys([...librarySongs(), T]),
+});
+// a line the user wrote whose sample the helper just made (made: true) and that is not saved: temporary (D6)
+function listTemp(text, lang, bank, songKey) {
+  if (!voiceHelper || !text || phr.isSaved(text, lang, 'voice') || phr.isSaved(text, lang, 'explain') || phr.isSaved(text, lang, 'poetic')) return;
+  fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ add: [{ file: `${bank}/${saySlug(text)}.wav`, ms: phr.tempMs(), song: songKey, text }] }) }).catch(() => {});
+}
+// on load: every phrase of mine and every saved song leaves the temporary list (a file that became used is never swept)
+helperReady.then(() => {
+  if (!voiceHelper) return;
+  const k = sampleKeys();
+  fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ protect: [...k.mine, ...k.songs] }) }).catch(() => {});
+});
+// the song playing now (its temporary samples are not swept) and the sweeps of the helper (the manifest read again)
+const playingKey = () => { if (!isPlaying()) return null; if (mode === 'radio' && radio && radio.on) { const s = radio.state, it = s && s.stream[s.onAir]; return it ? `radio:${it.id}` : null; } return song ? `compose:${song.id}` : null; };
+setInterval(async () => {
+  if (!voiceHelper || document.hidden) return;
+  const k = playingKey();
+  if (k) fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playing: [k] }) }).catch(() => {});
+  try {
+    const j = await (await fetch('/voice/status')).json();
+    if (Number.isInteger(j.sweep) && j.sweep !== lastSweep) { lastSweep = j.sweep; await refreshSamples(); if (radio && radio.samplesArrived) radio.samplesArrived(); }
+  } catch (e) { /* the helper went away */ }
+}, 60000);
+// opens the Voci tab on a section (links from Compose, the radio and Settings, D9)
+function openVoices(section) { showTab('voci'); if (voicesTab) voicesTab.show(section); }
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-open-voices]'); if (b) { e.preventDefault(); openVoices(b.dataset.openVoices); } });
+// hears a line with a speaker and a voice style (the Voci tab): its sample, made first by the helper when missing (a
+// line nobody saved: temporary), played once through the voice's settings
+async function hearLine({ text, lang, speaker = '', settings = null, temp = false }) {
+  initAudioOnce();
+  const bank = sayBank(lang, speaker), slug = saySlug(text);
+  const find = () => [bank, ...(speaker ? [sayBank(lang, '')] : [])].map(b => ({ b, n: (customFiles[b] || []).findIndex(f => decodeURI(f).endsWith(`/${slug}.wav`)) })).find(x => x.n >= 0);
+  let s = find();
+  if ((!s || s.b !== bank) && voiceHelper) {
+    try {
+      const r = await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang, speaker }) });
+      if (r.ok) { const j = await r.json(); if (j.made && temp) listTemp(text, lang, j.bank, 'voci'); await reloadSamples(); s = find(); }
+    } catch (e) { /* the default voice, or nothing */ }
+  }
+  if (!s || !globalThis.superdough) { toast(t(voiceHelper ? 'phNoSample' : 'phNoHelper')); return; }
+  const v = { ...VOICE_DEFAULT, ...(settings || {}) };
+  try {
+    const ctx = globalThis.getAudioContext();
+    globalThis.superdough({ s: s.b, n: s.n, gain: v.gain, speed: v.tempo, ...(v.cutoff < 18000 ? { cutoff: v.cutoff } : {}), ...(v.hpf > 0 ? { hcutoff: v.hpf } : {}), ...(v.drive > 0 ? { distort: v.drive } : {}), ...(v.room > 0 ? { room: v.room } : {}), ...(v.delay > 0 ? { delay: v.delay, delaytime: 0.25, delayfeedback: 0.4 } : {}), orbit: 12 }, ctx.currentTime + 0.05, 4);
+  } catch (e) { toast(t('phNoSample')); }
+}
+// the kind and tag of a narrator line the user wrote (D2): explaining, the step's moment; poetic, the entering track
+function narratorOffer(st, text) {
+  const poetic = narratorStyle(T) === 'poetic', tr = st.add !== undefined ? T.tracks.find(x => x.id === [].concat(st.add)[0]) : null;
+  const tag = poetic ? (tr ? tr.type : 'move') : tr ? PHRASES_MOMENT[tr.type] || 'code' : st.at === 0 ? 'start' : st.remove !== undefined ? ([].concat(st.remove).length > 1 ? 'breakdown' : 'less') : null;
+  return { text, lang: getLang(), kind: poetic ? 'poetic' : 'explain', tag: tag === 'spoken' ? null : tag, styles: [], source: 'narrator', from: { song: T.title || T.id } };
+}
+// a line typed in the radio console as a phrase (D2): kind voice, the vocabulary group of the song's style, the style
+function typedInput(text, lang, sg) {
+  const styles = ((sg && sg.tags && sg.tags.styles) || []).slice(0, 3);
+  const tag = styles.map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null;
+  return { text, lang, kind: 'voice', tag, styles: styles.slice(0, 1), source: 'radio', from: { song: (sg && sg.title) || '', ...(styles[0] ? { style: styles[0] } : {}) } };
+}
+// the vocabulary group of the song's voice track (its "vocab:" line, else its style's)
+const songVocab = () => { const sp = songSpoken(), own = sp && Object.values(sp.patterns || {}).map(p => (typeof p.text === 'string' && p.text.startsWith('vocab:') ? p.text.slice(6) : null)).find(Boolean); return own || ((T.tags && T.tags.styles) || []).map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null; };
 const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
   const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
@@ -2888,7 +2987,8 @@ function prepNote() {
   if (!txt) { if (el) el.remove(); }
   else {
     if (!el) { el = document.createElement('p'); el.id = 'voice-prep'; el.className = 'hint muted small voice-prep'; box.appendChild(el); }
-    if (el.textContent !== txt) el.textContent = txt;
+    // (my-phrases D9: a missing-sample note links to the Campioni section of the Voci tab)
+    if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.textContent = txt + ' '; const a = document.createElement('button'); a.className = 'plain link vt-link'; a.dataset.openVoices = 'samples'; a.textContent = t('phSamplesLink'); el.appendChild(a); }
     el.title = missing.length ? missing.map(x => `${x.bank}: ${x.text}`).slice(0, 20).join('\n') : '';
   }
   if (radio && radio.setPrep) radio.setPrep(prep.total && mode === 'radio' ? t('voicePrep', { i: prep.done, n: prep.total }) : '');
@@ -2930,7 +3030,7 @@ async function askSamples() {
       renderSongVoice(); renderTrackPanel();
       try {
         const r = await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: next.text, lang: next.lang, speaker: next.speaker }) });
-        if (r.ok) { made++; await refreshSamples(); }
+        if (r.ok) { made++; const j = await r.json().catch(() => ({})); if (j.made) listTemp(next.text, next.lang, j.bank || next.bank, `compose:${T.id}`); await refreshSamples(); }
       } catch (e) { /* the row keeps saying the sample is missing */ }
     }
     // (no message of its own: the rows say sample ok, and a toast would take the place of an edit's Undo)
@@ -2987,7 +3087,8 @@ function phraseListHtml(sp, off) {
   const fill = listVocab(rows), barsTxt = list => { const runs = []; for (const b of list.map(x => x + 1)) { const r = runs[runs.length - 1]; if (r && r[1] === b - 1) r[1] = b; else runs.push([b, b]); } return runs.map(([a, z]) => (z > a + 1 ? `${a}–${z}` : z > a ? `${a}, ${z}` : `${a}`)).join(', '); };
   const way = (r) => `<select data-pl-way data-no-knob aria-label="${esc(t('spokenWay'))}"${dis}>${WAYS.map(w => `<option value="${w}"${w === r.way ? ' selected' : ''}>${esc(t(`way:${w}`))}</option>`).join('')}</select>`;
   const src = r => [r.source === 'vocab' ? t('plFromVocab', { g: t(`vocab:${r.group}`) }) : r.source === 'own' ? t('plOwn') : t('plFromStyle'), r.shared > 1 ? t('plShared', { n: r.shared }) : '', r.toTranslate ? t('plToTranslate') : ''].filter(Boolean).join(' · ');
-  const sample = r => { const st = sampleState(sp, r.texts); return `<span class="pl-sample ${st}" title="${esc(t(`plSampleTip:${st}`))}">${esc(t(`plSample:${st}`))}</span>`; };
+  // (my-phrases D9: a row without its sample links to the Campioni section of the Voci tab)
+  const sample = r => { const st = sampleState(sp, r.texts); if (st === 'none') return `<button class="plain link pl-sample none" data-open-voices="samples" title="${esc(t(`plSampleTip:${st}`))} · ${esc(t('phSamplesLink'))}">${esc(t(`plSample:${st}`))}</button>`; return `<span class="pl-sample ${st}" title="${esc(t(`plSampleTip:${st}`))}">${esc(t(`plSample:${st}`))}</span>`; };
   const heardTxt = r => (r.heard ? t('plHeard', { bars: barsTxt(r.heard.said.length ? r.heard.said : [r.heard.start]), w: r.start + 1 }) : r.said.length ? barsTxt(r.said) : t('plSilent'));
   const body = rows.map(r => `<div class="pl-row" data-pl-row="${r.raw}">
       <div class="pl-bar"><input type="number" min="1" step="1" data-pl-start value="${(r.heard ? r.heard.start : r.start) + 1}" aria-label="${esc(t('plBar'))}"${dis}><span class="pl-said">${esc(heardTxt(r))}${h.growing ? ` <span class="pl-growing" title="${esc(t('plGrowingTip'))}">${GROWING}</span>` : ''}</span></div>
@@ -2997,21 +3098,23 @@ function phraseListHtml(sp, off) {
       <div class="pl-voice">${sample(r)}</div>
       <div class="pl-end">${off ? '' : trashBtn(t('vplRemove'))}</div></div>`).join('');
   const free = freeParts(T, sp.id).length > 0;
-  const head = `<div class="pl-head"><label class="ctrl pl-fill" title="${esc(t('plFillHint'))}"><span class="lbl">${esc(t('vinstFillLbl'))}</span><select data-pl-fill data-no-knob${dis}><option value=""${fill === '' ? ' selected' : ''}>—</option>${fill === 'mixed' ? `<option value="mixed" selected disabled>${esc(t('plMixed'))}</option>` : ''}${FILL_GROUPS.map(g => `<option value="${g}"${fill === g ? ' selected' : ''}>${esc(t(`vocab:${g}`))}</option>`).join('')}</select></label><p class="hint muted small">${esc(t(h.G ? 'plHintGrown' : 'plHint', { g: h.G + 1 }))}</p></div>`;
+  const head = `<div class="pl-head"><label class="ctrl pl-fill" title="${esc(t('plFillHint'))}"><span class="lbl">${esc(t('vinstFillLbl'))}</span><select data-pl-fill data-no-knob${dis}><option value=""${fill === '' ? ' selected' : ''}>—</option>${fill === 'mixed' ? `<option value="mixed" selected disabled>${esc(t('plMixed'))}</option>` : ''}${FILL_GROUPS.map(g => `<option value="${g}"${fill === g ? ' selected' : ''}>${esc(t(`vocab:${g}`))}</option>`).join('')}<option value="mine">${esc(t('phMine'))}</option><option value="browse">${esc(t('phBrowse'))}</option></select></label><p class="hint muted small">${esc(t(h.G ? 'plHintGrown' : 'plHint', { g: h.G + 1 }))}</p></div>`;
   const cols = `<div class="pl-row pl-cols" aria-hidden="true"><span>${esc(t(h.G ? 'plBarHeard' : 'plBar'))}</span><span>${esc(t('plBars'))}</span><span>${esc(t('spokenWay'))}</span><span>${esc(t('plText'))}</span><span>${esc(t('plVoice'))}</span><span></span></div>`;
   const empty = rows.length ? '' : `<p class="hint muted small pl-empty">${esc(t('vplEmpty'))}</p>`;
   const add = `<div class="pl-add"><button class="btn small" data-pl-add title="${esc(free ? t('plAddHint') : t('plNoPart'))}"${off || !free ? ' disabled' : ''}>${esc(t('vplAdd'))}</button><span class="hint muted small">${esc(free ? t('plAddWhere') : t('plNoPart'))}</span></div>`;
   return `<div class="pl" data-pl-track="${esc(sp.id)}">${head}${rows.length ? cols : ''}${body}${empty}${add}</div>`;
 }
 // one edit of the phrase list: the new song's tracks in place of the old ones, with Undo in the toast
-function phraseEdit(next, msg) {
+function phraseEdit(next, msg, offer = null) {
   if (!next) return;
   const before = JSON.parse(JSON.stringify(T.tracks));
   T.tracks = next.tracks;
   editPat = null; selClip = null;
   changed(); renderTrackPanel();
   askSamples();
-  toast(msg, { label: t('vinstUndo'), run: () => { T.tracks = before; tk = Math.min(tk, T.tracks.length - 1); editPat = null; selClip = null; changed(); renderTrackPanel(); } });
+  const undo = () => { T.tracks = before; tk = Math.min(tk, T.tracks.length - 1); editPat = null; selClip = null; changed(); renderTrackPanel(); };
+  // (a line typed in the phrase list is offered to my phrases, riding the edit's Undo: my-phrases D3)
+  if (offer) phr.offer(offer, { msg, undo }); else toast(msg, { label: t('vinstUndo'), run: undo });
 }
 const styleWaysOf = () => { const r = RECIPES.filter(x => ((T.tags && T.tags.styles) || []).includes(x.id) && x.spoken && x.spoken.ways); const w = {}; for (const x of r) for (const [k, v] of Object.entries(x.spoken.ways)) if (v > 0) w[k] = (w[k] || 0) + v; return Object.keys(w).sort((a, b) => w[b] - w[a]); };
 function phraseListEvent(e) {
@@ -3031,6 +3134,13 @@ function phraseListEvent(e) {
   }
   if (e.type !== 'change') return false;
   if (el.matches('[data-pl-fill]')) {
+    // (my-phrases D4, D9: Le mie frasi fills the rows with phrases of mine; Sfoglia… opens the built-in vocabularies)
+    if (el.value === 'browse') { renderSongVoice(); openVoices('vocab'); return true; }
+    if (el.value === 'mine') {
+      const r = fillMine(T, id, phr.items, { lang: getLang(), styles: (T.tags && T.tags.styles) || [], styleWays: styleWaysOf() });
+      if (r.error || !r.filled) { toast(t(r.error === 'empty' ? 'plMineEmpty' : 'plNoPart')); renderSongVoice(); return true; }
+      phraseEdit(r.song, t('plFilled', { n: r.filled, g: t('phMine') })); return true;
+    }
     const r = fillRows(T, id, el.value, { styleWays: styleWaysOf() });
     if (r.error || !r.filled) { toast(t('plNoPart')); renderSongVoice(); return true; }
     phraseEdit(r.song, t('plFilled', { n: r.filled, g: t(`vocab:${el.value}`) })); return true;
@@ -3040,7 +3150,7 @@ function phraseListEvent(e) {
     const r = editText(T, id, raw, getLang(), el.value);
     if (r.error) { toast(r.error === 'words' ? t('plTooMany', { n: r.n, max: MAX_WORDS }) : t('plEmptyText')); forceVoices(); return true; }
     const tr = T.tracks.find(x => x.id === id), c = tr && tr.clips[raw], n = c ? tr.clips.filter(x => x.pattern === c.pattern).length : 1;
-    phraseEdit(r.song, n > 1 ? t('plTextShared', { n }) : t('plTextChanged')); return true;
+    phraseEdit(r.song, n > 1 ? t('plTextShared', { n }) : t('plTextChanged'), { text: el.value, lang: getLang(), kind: 'voice', tag: songVocab(), styles: (T.tags && T.tags.styles) || [], source: 'compose', from: { song: T.title || T.id } }); return true;
   }
   if (el.matches('[data-pl-start]') || el.matches('[data-pl-bars]')) {
     const v = Math.round(+el.value);
@@ -3093,7 +3203,7 @@ for (const [type, fn] of [['input', e => e.target.type === 'range'], ['change', 
 }
 function applySongVoice(id, raw) {
   const before = { tracks: JSON.parse(JSON.stringify(T.tracks)), build: T.build === undefined ? undefined : JSON.parse(JSON.stringify(T.build)) };
-  const r = rewriteSpoken(T, id, raw, { recipes: RECIPES });
+  const r = rewriteSpoken(T, id, raw, { recipes: RECIPES, mine: phr.snapshot(getLang()) });
   if (!r) return;
   T.tracks = r.song.tracks; if (r.song.build !== undefined) T.build = r.song.build;
   if (!id) tk = T.tracks.indexOf(r.track);
@@ -4015,10 +4125,10 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'lezioni', 'suoni', 'pattern', 'riferimenti'];
+const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'lezioni', 'suoni', 'voci', 'pattern', 'riferimenti'];
 let cards = [];
 // two modes (#42): Listen to make and hear music, Groove Lab for its material and for learning
-const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'pattern', 'guida', 'lezioni', 'riferimenti'] };
+const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'voci', 'pattern', 'guida', 'lezioni', 'riferimenti'] };
 const modeOf = tab => Object.keys(APP_MODES).find(m => APP_MODES[m].includes(tab)) || null;
 let modeTabs = store.get('coding-misk-mode-tabs', {});
 if (!modeTabs || typeof modeTabs !== 'object') modeTabs = {};
@@ -4047,6 +4157,7 @@ function showTab(name) {
   if (name === 'playlist' && playlistsTab) playlistsTab.render();
   if (name === 'impostazioni' && settingsPage) settingsPage.render();
   if (name === 'generi' && genresTab) genresTab.render();
+  if (name === 'voci' && voicesTab) voicesTab.render();
   $('#open-settings').setAttribute('aria-pressed', name === 'impostazioni');
   if (name !== 'impostazioni') prevTab = name;
   if (name === 'stili' && stylesTab) stylesTab.render();
@@ -4779,6 +4890,10 @@ stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins
 RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
 // the Patterns tab (pattern-library, #72): the loop plays through the player above; Add to song changes the song open
 // in Compose (marked changed, not saved)
+// the Voci tab (my-phrases D9)
+voicesTab = createVoicesTab({ root: $('#tab-voci'), phr, store, t, tx, esc, getLang, toast, helper: () => !!voiceHelper, files: () => customFiles,
+  recipes: RECIPES, songs: BUILTIN, library: () => librarySongs(), keys: except => sampleKeys(except), hear: x => hearLine(x),
+  samplesChanged: async () => { await refreshSamples(); if (radio && radio.samplesArrived) radio.samplesArrived(); } });
 patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast, recipes: () => RECIPES,
   loop: { play: (sg, uid, title) => playLoop(sg, uid, title), stop: () => { loopNext = null; return stop(); }, state: loopState },
   codeOf: sg => loopPlayable(sg).code,
@@ -4795,6 +4910,8 @@ patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast
   } });
 // for the browser checks (tools/check-patterns.cjs): the song open in Compose
 globalThis.codingMiskPatterns = { tab: patternsTab, compose: () => ({ T: JSON.parse(JSON.stringify(T)), sel, dirty }) };
+// for the browser check of my phrases (tools/check-voices-tab.cjs)
+globalThis.codingMiskPhrases = { phr, tab: voicesTab, code: () => (ed && ed.code) || '', manifest: () => customFiles, reload: () => refreshSamples(), keys: () => { const k = sampleKeys(); return { builtin: k.builtin.size, mine: [...k.mine], songs: k.songs.size }; } };
 // artists from artists/ plus the user's (Artists tab)
 const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));
 artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onCompose: a => newSongFromArtist(a), onChange: () => { if (radio) radio.render(); renderArtistPick(); } });
@@ -4854,6 +4971,14 @@ radio = createRadio({
   reloadSamples: () => reloadSamples(),
   // the samples manifest, for the voices of Next changes (after-tests-oct28 D2)
   voiceFiles: () => customFiles,
+  // my phrases (my-phrases): the snapshot a new session records, the lines typed in the console offered to the
+  // collection (kind voice, the style's vocabulary group and the style), their samples temporary while unsaved, the
+  // late save of the console's typed rows
+  mine: () => phr.snapshot(getLang()),
+  onTyped: ({ text, lang, song: sg }) => phr.offer(typedInput(text, lang, sg), { use: true }),
+  onSampleMade: ({ text, lang, bank, song: sg }) => listTemp(text, lang, bank, `radio:${sg.id}`),
+  typedSaved: (text, lang) => phr.isSaved(text, lang, 'voice'),
+  saveTyped: x => { const r = phr.add(typedInput(x.text, x.lang, x.song), { use: true }); if (!r.error) toast(t('phSaved')); },
   player: {
     // a saved pattern heard before it goes in (radio-arrangement D9): toggle(item, { key, chords, bpm, meter, n })
     preview: {
@@ -4955,6 +5080,14 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.da
 // settings page (#31): the gear opens it, a second press goes back to the tab before
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
+    // voices and phrases (my-phrases D3, D4, D6): the card's settings, the space of the samples, the link to the Voci tab
+    phrases: {
+      settings: () => phr.settings, set: patch => phr.setSettings(patch), count: () => phr.items.length, open: s => openVoices(s),
+      space: async () => {
+        if (!voiceHelper) { const n = Object.entries(customFiles).filter(([b]) => /^say_/.test(b)).reduce((a, [, l]) => a + l.length, 0); return t('setPhSpaceNoHelper', { n }); }
+        try { const u = await (await fetch('/voice/usage')).json(); const all = Object.values(u.banks || {}).flat(); return `${sizeText(all.reduce((a, x) => a + x.b, 0))} · ${all.length}`; } catch (e) { return '—'; }
+      },
+    },
     // texts on stage (spoken-text-on-stage D7)
     setCaptions: f => setCaptions(f), capsSkipNext: v => (v === undefined ? capsSkipNext : (capsSkipNext = !!v)),
     ui: () => ui, setUi: v => setUi(v), uiFollow: () => uiFollow, setUiFollow: on => setUiFollow(on), lang: () => getLang(), setLang: l => changeLang(l),
@@ -5203,6 +5336,11 @@ if (settingsPage && !$('#tab-impostazioni').hidden) settingsPage.render();
     if (id !== cur) { cur = id; since = Date.now(); counted = false; return; }
     if (id && !counted && Date.now() - since >= 10000) {
       counted = true;
+      // my phrases a song says count a use when it plays (my-phrases D4: radio on air, Compose Play)
+      try {
+        const caps = mode === 'radio' && radio && radio.on ? ((radio.captions() || {}).lines || []) : capsOf(song);
+        phr.countPlayed(caps.filter(x => x.kind !== 'step').flatMap(x => String(x.text || '').split(' · ')));
+      } catch (e) { /* no captions yet */ }
       const played = store.get('coding-misk-played', {}) || {};
       played[id] = Date.now(); store.set('coding-misk-played', played);
     }

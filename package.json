@@ -16,6 +16,7 @@
     "check:songs": "node --no-warnings tools/song.mjs validate songs && node --no-warnings tools/check-idea-errors.mjs",
     "voices": "node --no-warnings tools/voice.mjs",
     "check:endless": "node --no-warnings tools/check-endless.mjs",
+    "check:phrases": "node --no-warnings tools/check-phrases.mjs",
     "endless": "node --no-warnings tools/endless.mjs",
     "check:styles": "node --no-warnings tools/style.mjs validate",
     "check:song-filter": "node --no-warnings tools/check-song-filter.mjs",

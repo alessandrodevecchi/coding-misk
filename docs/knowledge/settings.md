@@ -15,6 +15,7 @@ Every value is saved in the browser and goes into the backup.
 
 ## How it connects
 
+- **Voices and phrases (my-phrases).** The card holds the save policy of the lines you write, the lifetime of unsaved samples, how often the director uses your phrases (Mai to Sempre) and the space of the samples with a link to the Voci tab ([phrases.md](phrases.md)).
 - **Export.** Audio format, speed, video and fragment options are read by every export ([export.md](export.md)).
 - **Radio.** Defaults for new sessions: the radio visual, transitions, harmony, material ([radio.md](radio.md)).
 - **Library.** Hidden built-in songs, backup, import and reset ([library.md](library.md)).

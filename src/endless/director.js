@@ -12,6 +12,7 @@ import { shapePlan, LANDMARKS } from './shapes.js';
 import { energyOf, playing, curveParts } from './energy.js';
 import { mutateRows, mutateBass, mutateArp, mutateHook } from './mutate.js';
 import { phrase as pickPhrase } from './phrases.js';
+import { mineSpokenTrack } from '../voices/mine.js';
 import { artistSongOptions, pickWeighted } from './artist.js';
 import { has, applyPlanQuirks } from './quirks.js';
 import { planTransition, MAX_RAMP } from './transitions.js';
@@ -743,11 +744,16 @@ function titleOf(styles, byId, rng) {
 // One song of the session: plan, steps, the v2 song and its session entry.
 function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   const plan = planSong({ parts, byId, prev, opts, rng, index });
+  const styles = stylesOf(parts), id = `endless-${slug(seed)}-${index + 1}`;
+  // my phrases (my-phrases D4): with a snapshot of the collection (opts.mine, never with Mai), the vocabulary lines of
+  // the voice track become phrases of mine, written out in the plan's track (steering rewrites from it), drawn on
+  // streams of their own after every other draw of the plan
+  const mineUsed = opts.mine && plan.spoken ? mineSpokenTrack(plan.spoken.track, opts.mine, id, styles) : [];
   const { tracks, steps, phrases, ctx } = directSong(plan, opts, rng, rng.comments);
-  const styles = stylesOf(parts), title = titleOf(styles, byId, rng.titles);
+  const title = titleOf(styles, byId, rng.titles);
   const names = lang => styles.map(id => byId[id].name[lang]).join(' + ');
   const song = {
-    format: FORMAT, version: VERSION, id: `endless-${slug(seed)}-${index + 1}`, title,
+    format: FORMAT, version: VERSION, id, title,
     style: { en: `Endless · ${names('en')} · ${plan.key} · ${plan.bpm} BPM · ${plan.shape}`, it: `Endless · ${names('it')} · ${plan.key} · ${plan.bpm} BPM · ${plan.shape}` },
     tags: { styles }, origin: 'endless',
     sections: plan.sections.map(({ role, ...s }) => s), tracks, build: steps,
@@ -759,6 +765,13 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   if (pf) song.profile = pf;
   // the narrator style of the voice part's style (voice-instrument): poetic images instead of explanations
   if (plan.R.narrator !== undefined && opts.complexity > 0) song.narrator = JSON.parse(JSON.stringify(plan.R.narrator));
+  // the narrator's phrases of mine (explaining and poetic) go with the song, so the song on air, Replay and a saved
+  // session say the same lines after the collection changes (the narration draws them, build.js narratorMine)
+  if (opts.mine) {
+    const list = opts.mine.list.filter(p => (p.kind === 'explain' || p.kind === 'poetic') && (!(p.styles || []).length || p.styles.some(x => styles.includes(x))));
+    if (list.length) song.mine = { share: opts.mine.share, lang: opts.mine.lang, list };
+    if (mineUsed.length) song.mineUsed = mineUsed;
+  }
   // measured energy of the final song at each phrase
   for (const p of phrases) p.energy = round(measure(song, p.bar, ctx));
   const entry = { id: song.id, title, parts, styles, bars: plan.bars, seconds: Math.round(plan.seconds), bpm: plan.bpm, key: plan.key, meter: plan.meter, shape: plan.shape, phrase: plan.phrase, tracks: tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken').length, voice: { speaker: plan.voice.settings.speaker, character: plan.voice.character }, usualHigh: plan.usualHigh, hardMax: plan.hardMax, phrases };

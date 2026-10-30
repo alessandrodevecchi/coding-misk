@@ -320,7 +320,7 @@ export function crescendoPath(plans, rng) {
 
 // ---------- narration ----------
 // short comments per kind of step, our own wording: [en, it]
-const P = {
+export const CRESCENDO_POOL = {
   enter: {
     drums: [['start with the kick', 'partiamo dalla cassa'], ['drums in', 'entra la batteria']],
     bass: [['need bass', 'serve il basso'], ['here comes the bass', 'arriva il basso'], ['bass in', 'dentro il basso']],
@@ -370,6 +370,8 @@ const P = {
   rewrite: { any: [['new notes', 'note nuove'], ['rewrite the line', 'riscrivo la linea']] },
   settle: { any: [['there it is', 'eccolo']] },
 };
+// (my-phrases: the moments map reads this pool by kind, src/voices/moments.js)
+const P = CRESCENDO_POOL;
 export const CRESCENDO_PHRASES = Object.values(P).flatMap(g => Object.values(g).flat()).map(([en, it]) => ({ en, it }));
 function phrase(kind, type, device, recent, rng) {
   const g = P[kind] || P.device, list = (kind === 'device' || kind === 'reveal' ? g[device] : g[type]) || g.any || P.enter.any;

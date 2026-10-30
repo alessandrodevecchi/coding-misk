@@ -7,6 +7,20 @@ import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
 import { spokenBars, narratorStyle, poeticLine, movementLine, enteringTrack, placeSpoken, lineTexts, lineSounds, lineBank, withNarratorStyle, sampleSeconds, barSeconds, spokenContext } from './spoken.js';
 import { kindOf, outranks, perBar, applyExclusive } from './speakers.js';
+import { POETIC } from './vocabulary.js';
+
+// My phrases in the narration (my-phrases D4): a pick the app sets (src/voices/mine.js, narratorPick) that may give a
+// phrase of mine in place of a line from a built-in pool: an explaining line of PHRASES, POOL or a growth's comments, a
+// poetic image of POETIC. Unset (Node checks, snapshots, Mai, no phrase) every line is as before. Only what the narrator
+// says changes: the steps, the growth and its code stay the same.
+export const narratorMine = { pick: null };
+export const setNarratorMine = fn => { narratorMine.pick = typeof fn === 'function' ? fn : null; };
+const POETIC_ITEMS = new Set(Object.values(POETIC).flat());
+const mineOr = (song, o, text) => { if (!narratorMine.pick || !song) return text; const x = narratorMine.pick(song, o); return x || text; };
+// the explaining line of a step, a phrase of mine in place of a pool line
+export const stepText = (song, step, lang) => (!step || !step.say ? '' : mineOr(song, { kind: 'explain', say: step.say, key: `${step.at}:${sayText(step.say, 'en')}`, lang }, sayText(step.say, lang)));
+// a poetic image (poeticLine or movementLine); tag: the entering track's type, or "move"
+const poeticText = (song, line, tag, key, lang) => (line && narratorMine.pick && POETIC_ITEMS.has(line) ? mineOr(song, { kind: 'poetic', say: line, key, tag, lang }, sayText(line, lang)) : sayText(line, lang));
 
 // hide and reveal (natural-growth): functions of a track left out of its code until a step brings them in
 // clone, comment, notes (live-coder-growth): a track comes in as a copy of another one; functions commented out in the
@@ -145,7 +159,7 @@ export function annotate(code, song, upTo, lang) {
   // the listener's changes from the radio console (#24) are marked "you:"
   // every listener's change on this bar, not only the last step applied
   const mine = steps.slice(0, upTo).filter(x => x.at === step.at && x.by === 'listener');
-  const add = [...mine.map(x => `// you: ${stepWords(x)}`), said ? `// > ${sayText(said.say, lang)}` : null].filter(Boolean);
+  const add = [...mine.map(x => `// you: ${stepWords(x)}`), said ? `// > ${stepText(song, said, lang)}` : null].filter(Boolean);
   lines.splice(at, 0, ...add);
   return lines.join('\n');
 }
@@ -164,7 +178,7 @@ export function voiceSamples(song, lang, files) {
   const steps = buildSteps(song);
   steps.forEach((st, i) => {
     // (a poetic narrator says images, and with Narrated growth the step lines or their movement images too)
-    const texts = poetic ? [enteringTrack(song, st) ? sayText(poeticLine(song, st, i), lang) : '', narratedGrowth(song) && st.say ? stepSaid(song, steps, st, lang) : ''] : [st.say ? sayText(st.say, lang) : ''];
+    const texts = poetic ? [enteringTrack(song, st) ? poeticText(song, poeticLine(song, st, i), enteringTrack(song, st).type, `p:${i}`, lang) : '', narratedGrowth(song) && st.say ? stepSaid(song, steps, st, lang) : ''] : [st.say ? stepText(song, st, lang) : ''];
     for (const text of texts.filter(Boolean)) {
       const { bank, n } = lineSample(voiceOf(song, st), lang, files, text);
       if (n >= 0) out.set(`${bank}:${n}`, { s: bank, n });
@@ -208,12 +222,12 @@ const narratedGrowth = song => !!(song && song.crescendo && song.crescendo.narra
 // when no step on its bar brings a track in (poetic-steps D1; an entry's bar keeps the step line, its image is said the
 // bar before)
 function stepSaid(song, steps, step, lang) {
-  if (narratorStyle(song) === 'poetic' && narratedGrowth(song) && !steps.some(x => x.at === step.at && entering(song, x))) return sayText(movementLine(song, steps.indexOf(step)), lang);
-  return sayText(step.say, lang);
+  if (narratorStyle(song) === 'poetic' && narratedGrowth(song) && !steps.some(x => x.at === step.at && entering(song, x))) { const k = steps.indexOf(step); return poeticText(song, movementLine(song, k), 'move', `m:${k}`, lang); }
+  return stepText(song, step, lang);
 }
 function narration(song, upTo, lang) {
   const steps = buildSteps(song), step = steps[upTo - 1];
-  if (narratorStyle(song) !== 'poetic') { const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && sayText(said.say, lang); return text ? [{ step: said, text, at: said.at }] : []; }
+  if (narratorStyle(song) !== 'poetic') { const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && stepText(song, said, lang); return text ? [{ step: said, text, at: said.at }] : []; }
   // after-tests-oct28 D5: an image for every entry. This state's code plays from its bar `a` to the next step's bar
   // `b`; it says the image of each entry whose image bar falls there: the bar before the entry, or the entry's own bar
   // when the bar before is not the song's (its first bar: bar 0, or its start in the radio window, `song.start`). An
@@ -228,7 +242,7 @@ function narration(song, upTo, lang) {
     // (an entry on this state's own bar is said here only on the song's first bar; later ones were said the bar before)
     if (at < a || at >= b || (x.at === a && at !== a)) return;
     seen.add(x.at);
-    out.push({ step: x, text: sayText(poeticLine(song, x, i), lang), at });
+    out.push({ step: x, text: poeticText(song, poeticLine(song, x, i), entering(song, x).type, `p:${i}`, lang), at });
   });
   // Narrated growth with the poetic style (voice-full-controls D11): the step lines stay, the images come in addition;
   // on a shared bar the image is said and the step keeps its line on stage. A step whose bar has no entry says an image
@@ -339,7 +353,7 @@ export function captionSchedule(song, C = {}, lang = 'en', files = {}, lengths =
   const s = withNarratorStyle(song, C && C.narratorStyle);
   const sched = (opts && opts.schedule) || spokenSchedule(song, C, lang, files);
   const steps = buildSteps(s).filter(x => x.say);
-  const stepAt = bar => { const st = steps.filter(x => x.at <= bar && bar < x.at + 4).pop(); return st ? sayText(st.say, lang) : ''; };
+  const stepAt = bar => { const st = steps.filter(x => x.at <= bar && bar < x.at + 4).pop(); return st ? stepText(s, st, lang) : ''; };
   const out = [], chops = new Map();
   for (const x of sched) {
     const kind = kindOf(x.voice);
@@ -364,7 +378,7 @@ export function captionSchedule(song, C = {}, lang = 'en', files = {}, lengths =
   const lines = applyExclusive(out);
   // the step lines (D2)
   if (!C || C.narrator !== false) for (const st of steps) {
-    const text = sayText(st.say, lang);
+    const text = stepText(s, st, lang);
     if (!text) continue;
     const heard = lines.some(x => x.kind === 'narrator' && x.text === text && x.at >= st.at - 1 && x.at < st.at + 4);
     lines.push({ at: st.at, until: st.at + 4, kind: 'step', code: null, text, step: text, heard, typed: false, track: null, way: null, seconds: null });

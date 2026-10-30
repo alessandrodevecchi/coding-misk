@@ -1,6 +1,6 @@
 ---
 id: narrator
-related: [voice, live-build, radio, artists, songs, profiles]
+related: [phrases, voice, live-build, radio, artists, songs, profiles]
 code: [src/song/build.js, src/song/spoken.js, src/endless/phrases.js, src/song/format.js, tools/voice.mjs]
 checks: [npm run check:spoken, npm run check:endless, npm run check:profiles]
 ---
@@ -15,6 +15,7 @@ The narrator, labelled "Voice: narrator" (it: "Voce: narratore"), is the voice t
 
 ## How it connects
 
+- **My phrases (my-phrases, #82).** An explaining line from `PHRASES`, `POOL` or a growth's comments, and a poetic image from `POETIC`, may be said as a phrase of mine of the same moment or entering track (`setNarratorMine`, `stepText` in `src/song/build.js`); the song's own written steps never. The narrator lines the user edits in a song of theirs are offered to the collection as kind `explain` (the step's moment) or `poetic` ([phrases.md](phrases.md)).
 - **Live build.** Phrases come from the steps ([live-build.md](live-build.md)). Several steps can share a bar (the director puts a boundary's phrase on its first move); the narrator says the latest phrase of the bar, not only the phrase of the bar's last step (`sayStep`, #81). One phrase per bar is spoken. The profile control `narrated` ("Narrated growth", formerly Fully narrated) makes the Crescendo steps denser, each one spoken ([profiles.md](profiles.md)).
 - **Narrator switch.** The profile control `narrator` (the On switch in the title row of the Voice: narrator block, once "Narrator voice"; on by default in every profile; profile-options) silences the narrator in Compose and in the radio: `liveCode` leaves out the narrator's voice lines, shown and hidden (`voiceCode` is not called). The music, the steps and the length stay the same; the phrases written as `// > …` follow the comment option `steps`; the voice instrument is a track of the song and still speaks. "Narrated growth" and "Narrator style" are disabled with a hint while the narrator is off (its value is kept, so the growth does not change). A configuration or a trial saved without the control plays with the narrator on. In the radio the narrator switch of the Voices group (`opts.voices.narrator`, voice-full-controls D15) works with every profile and applies from the next song (`item.hush`); a Custom profile saved with the narrator off reads as the switch off. A song not on air (hidden or shown in Classic) keeps its own switch.
 - **Voices group (voice-controls, voice-placement).** Compose has one Voices group in the live build panel, shown with the Live build on or off: Narrator voice, Narrator style and Narrated growth, then the voice instrument of the open song and "In the next song" ([voice.md](voice.md)). A narrator control that cannot apply is disabled and its tooltip says why: the Live build is off, Narrated growth outside Crescendo, the narrator is off. The radio has one Voices group too: the Narrator knob, the narrator controls (the Custom profile's, disabled with the reason under another profile) and the voice instrument block. The narrator of the song on air never changes: its comments are steps the director already wrote.

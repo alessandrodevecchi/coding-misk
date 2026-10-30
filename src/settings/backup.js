@@ -5,12 +5,14 @@ import { upgradeLibrary } from '../library/code-upgrade.js';
 import { CODE_VERSION } from '../song/writer.js';
 import { DRAFTS_KEY, mergeDrafts } from '../library/pattern-drafts.js';
 import { mergeUses } from '../library/patterns.js';
+import { PHRASES_KEY, mergePhrases } from '../voices/phrases.js';
 
 export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
 // working state that does not belong in a backup
 // (coding-misk-artist-voice: the old voice of the next song by an artist, no longer read since new-song-panel D9)
-const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel', 'coding-misk-code-w', 'coding-misk-code-collapsed', 'coding-misk-artist-voice', 'coding-misk-cw-open', 'coding-misk-sw-open']);
+const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel', 'coding-misk-code-w', 'coding-misk-code-collapsed', 'coding-misk-artist-voice', 'coding-misk-cw-open', 'coding-misk-sw-open', 'coding-misk-voices-sub']);
+// (coding-misk-voices-sub: the section of the Voci tab open last, my-phrases D9)
 
 // entries: [[key, value]] of the browser storage (values parsed). Returns the backup object.
 export function makeBackup(entries, now = new Date()) {
@@ -26,7 +28,7 @@ const byId = (a, b) => { const out = (Array.isArray(a) ? a : []).slice(); for (c
 // Returns { values: { key: value }, counts } or { error }.
 export function mergeBackup(backup, get) {
   if (!backup || backup.format !== BACKUP_FORMAT || !backup.data || typeof backup.data !== 'object') return { error: 'format' };
-  const values = {}, counts = { songs: 0, versions: 0, playlists: 0, styles: 0, artists: 0, patterns: 0, settings: 0 };
+  const values = {}, counts = { songs: 0, versions: 0, playlists: 0, styles: 0, artists: 0, patterns: 0, phrases: 0, settings: 0 };
   for (let [k, v] of Object.entries(backup.data)) {
     if (!k.startsWith(PREFIX)) continue;
     if (k === 'coding-misk-library') {
@@ -55,6 +57,10 @@ export function mergeBackup(backup, get) {
       const cur = Array.isArray(get(k)) ? get(k) : [];
       values[k] = byId(cur, v).map(p => { const c = p && p.id && cur.find(x => x && x.id === p.id); return c && c !== p ? { ...p, ...mergeUses(c, p) } : p; });
       counts.patterns += (Array.isArray(v) ? v.length : 0);
+    } else if (k === PHRASES_KEY) {
+      // my phrases (my-phrases D1) by id; the use count keeps the larger value and last the newer one
+      values[k] = mergePhrases(get(k), v);
+      counts.phrases += (v && Array.isArray(v.items) ? v.items.length : 0);
     } else if (k === DRAFTS_KEY) {
       // new parts of the Patterns tab, not saved yet (pattern-followups D2): by id, newest kept up to the cap
       values[k] = mergeDrafts(get(k), v);
