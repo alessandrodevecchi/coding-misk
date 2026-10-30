@@ -87,3 +87,74 @@ export function writeLengths(root = path.join('public', 'samples'), only = null)
   fs.writeFileSync(file, JSON.stringify(lengths) + '\n');
   return lengths;
 }
+
+// ---------- my-phrases: sample housekeeping (D5, D6, D8), shared with the dev server's voice helper ----------
+// A sample's path relative to public/samples: say_<lang>[_<speaker>]/<slug>.wav, nothing else
+export const SAMPLE_PATH = /^say_([a-z]{2})(_[a-z]+)?\/([a-z0-9_]{1,48})\.wav$/;
+// "say_it_reed/x.wav" → "it|x": the key a page protects (by language and slug, every bank of that language)
+export const protectKey = rel => { const m = SAMPLE_PATH.exec(rel); return m ? `${m[1]}|${m[3]}` : null; };
+// Every say_* bank with its files and sizes (GET /voice/usage): { say_it: [{ f: 'x.wav', b: 81234 }] }
+export function sampleUsage(root = path.join('public', 'samples')) {
+  const out = {};
+  if (!fs.existsSync(root)) return out;
+  for (const bank of fs.readdirSync(root).filter(d => /^say_[a-z]{2}(_[a-z]+)?$/.test(d)).sort()) {
+    const dir = path.join(root, bank);
+    if (!fs.statSync(dir).isDirectory()) continue;
+    out[bank] = fs.readdirSync(dir).filter(f => f.endsWith('.wav')).sort().map(f => ({ f, b: fs.statSync(path.join(dir, f)).size }));
+  }
+  return out;
+}
+// the ledger of temporary samples: public/samples/say_temp.json { "say_it/x.wav": { expires, song } }
+export const TEMP_FILE = 'say_temp.json';
+export function readTemp(root = path.join('public', 'samples')) {
+  try { const v = JSON.parse(fs.readFileSync(path.join(root, TEMP_FILE), 'utf8')); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (e) { return {}; }
+}
+export function writeTemp(root, ledger) { fs.writeFileSync(path.join(root, TEMP_FILE), JSON.stringify(ledger, null, 1) + '\n'); }
+const dropLengths = (root, rels) => {
+  const lf = path.join(root, 'say_lengths.json');
+  try { const l = JSON.parse(fs.readFileSync(lf, 'utf8')); for (const rel of rels) delete l[rel]; fs.writeFileSync(lf, JSON.stringify(l) + '\n'); } catch (e) { /* no lengths file */ }
+};
+// Deletes the named samples (POST /voice/delete): only paths of SAMPLE_PATH under root, never one whose language and
+// slug the page protects; their lengths and ledger entries go too. → { deleted: [rel], skipped: [rel] }
+export function deleteSamples(root, files, protect = []) {
+  const keep = new Set(protect), deleted = [], skipped = [];
+  for (const rel of [...new Set(files || [])]) {
+    const k = typeof rel === 'string' ? protectKey(rel) : null;
+    if (!k || keep.has(k)) { skipped.push(rel); continue; }
+    const file = path.join(root, ...rel.split('/'));
+    if (!fs.existsSync(file)) { skipped.push(rel); continue; }
+    fs.rmSync(file, { force: true });
+    deleted.push(rel);
+  }
+  if (deleted.length) {
+    dropLengths(root, deleted);
+    const t = readTemp(root);
+    if (deleted.some(rel => t[rel])) { for (const rel of deleted) delete t[rel]; writeTemp(root, t); }
+  }
+  return { deleted, skipped };
+}
+// The ledger updated (POST /voice/keep): add [{ file, ms, song }] lists new temporary samples (expiry now + ms, at
+// least an hour); files (saved later) and protected keys leave it. → the ledger
+export function keepTemp(root, { add = [], files = [], protect = [] } = {}, now = Date.now()) {
+  const t = readTemp(root), keep = new Set(protect);
+  let changed = false;
+  for (const x of add || []) {
+    if (!x || !SAMPLE_PATH.test(x.file) || keep.has(protectKey(x.file)) || !fs.existsSync(path.join(root, ...x.file.split('/')))) continue;
+    t[x.file] = { expires: new Date(now + Math.max(60 * 60 * 1000, +x.ms || 0)).toISOString(), ...(x.song ? { song: String(x.song).slice(0, 80) } : {}) };
+    changed = true;
+  }
+  for (const rel of [...(files || []), ...Object.keys(t).filter(rel => keep.has(protectKey(rel)))]) if (t[rel]) { delete t[rel]; changed = true; }
+  if (changed) writeTemp(root, t);
+  return t;
+}
+// The sweep (D6): deletes the expired temporary samples, except those of a song playing now. → [rel deleted]
+export function sweepTemp(root, playing = [], now = Date.now()) {
+  const t = readTemp(root), on = new Set(playing), gone = [];
+  for (const [rel, e] of Object.entries(t)) {
+    if (!(Date.parse(e && e.expires) <= now) || (e && e.song && on.has(e.song))) continue;
+    if (SAMPLE_PATH.test(rel)) fs.rmSync(path.join(root, ...rel.split('/')), { force: true });
+    delete t[rel]; gone.push(rel);
+  }
+  if (gone.length) { writeTemp(root, t); dropLengths(root, gone); }
+  return gone;
+}

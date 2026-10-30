@@ -7,6 +7,12 @@ import { MOMENTS, MOMENT_GROUPS, poolKeys, momentOfLine, PHRASES_MOMENT, POOL_MO
 import { PHRASES } from '../src/song/build.js';
 import { POOL } from '../src/endless/phrases.js';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { songFiles } from './songs-dir.mjs';
+import { builtinKeys, mineKeys, songKeys, classify, totals, phraseFiles, keyOfFile } from '../src/voices/samples.js';
+import { sampleUsage, deleteSamples, keepTemp, sweepTemp, readTemp } from './voice-sample.mjs';
 import { loadStyles } from './styles-dir.mjs';
 import { createSession } from '../src/endless/director.js';
 import { mineSnapshot, candidates, drawMine, narratorPick, vocabGroupOf } from '../src/voices/mine.js';
@@ -118,6 +124,54 @@ const DIRECTOR = {
     const changed = got.filter((x, i) => x.text !== plain[i].text);
     assert(changed.length && changed.every(x => items.some(p => p.text === x.text)), `${changed.length} changed`);
     console.log(`      ${changed.length} of ${got.length} poetic lines are mine with Sempre`);
+  },
+  'samples: the built-in text set is the one of check:samples (every line tools/voice.mjs lists is built-in)'() {
+    const songs = songFiles('songs').map(read), keys = builtinKeys({ songs, styles: RECIPES });
+    const listed = execFileSync(process.execPath, ['--no-warnings', 'tools/voice.mjs', '--list'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).split('\n').map(x => x.trim()).filter(x => x.endsWith('.wav'));
+    const out = [...new Set(listed.map(f => keyOfFile(f.split('/')[0], f.split('/')[1])))].filter(k => !keys.has(k));
+    assert(listed.length > 500 && !out.length, `${out.length} listed lines not built-in: ${out.slice(0, 5)}`);
+    console.log(`      ${new Set(listed.map(f => keyOfFile(f.split('/')[0], f.split('/')[1]))).size} listed keys, ${keys.size} built-in keys`);
+  },
+  'samples: classes, a shared file stays built-in, the files of a phrase minus the protected ones (spec: shared file)'() {
+    const usage = { say_it: [{ f: 'l_ultimo_treno.wav', b: 10 }, { f: 'le_torri.wav', b: 20 }, { f: 'nella_mia_canzone.wav', b: 30 }, { f: 'provvisoria.wav', b: 40 }, { f: 'vecchia.wav', b: 50 }], say_it_reed: [{ f: 'le_torri.wav', b: 25 }], say_en: [{ f: 'the_towers.wav', b: 5 }] };
+    const builtin = builtinKeys({ songs: [], styles: [] });
+    const items = [P('a', 'le torri', 'voice', 'night', { alt: { en: 'the towers' } }), P('b', "l'ultimo treno", 'voice', 'night')];
+    const mine = mineKeys(items), songs = songKeys([{ id: 'u-1', tracks: [{ id: 'w', type: 'spoken', patterns: { A: { way: 'passage', text: { it: 'nella mia canzone' } } }, clips: [] }] }]);
+    const rows = classify(usage, { builtin, mine, songs, temp: { 'say_it/provvisoria.wav': { expires: 'x' } } });
+    const cls = Object.fromEntries(rows.map(r => [r.rel, r.cls]));
+    assert(cls['say_it/l_ultimo_treno.wav'] === 'builtin' && cls['say_it/le_torri.wav'] === 'mine' && cls['say_en/the_towers.wav'] === 'mine' && cls['say_it/nella_mia_canzone.wav'] === 'song' && cls['say_it/provvisoria.wav'] === 'temp' && cls['say_it/vecchia.wav'] === 'orphan', JSON.stringify(cls));
+    const T = totals(rows);
+    assert(T.total.n === 7 && T.classes.mine.n === 3 && T.classes.mine.b === 50 && T.banks.say_it.orphan === 1, JSON.stringify(T.classes));
+    // deleting "l'ultimo treno" (a copy of a vocabulary entry): its file is built-in and stays
+    const others = mineKeys(items.filter(p => p.id !== 'b'));
+    const f1 = phraseFiles(items[1], usage, { builtin, mine: others, songs });
+    assert(!f1.files.length && f1.kept.length === 1 && f1.kept[0].why === 'builtin', JSON.stringify(f1));
+    const f2 = phraseFiles(items[0], usage, { builtin, mine: mineKeys(items.filter(p => p.id !== 'a')), songs });
+    assert(f2.files.map(x => x.rel).sort().join() === 'say_en/the_towers.wav,say_it/le_torri.wav,say_it_reed/le_torri.wav' && !f2.kept.length, JSON.stringify(f2));
+  },
+  'voice helper files: delete only named say_* files never protected, the ledger, the sweep never a playing song'() {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cm-samples-'));
+    try {
+      for (const [b, f] of [['say_it', 'uno.wav'], ['say_it', 'due.wav'], ['say_it_reed', 'uno.wav'], ['say_en', 'tre.wav'], ['say_it', 'quattro.wav']]) { fs.mkdirSync(path.join(root, b), { recursive: true }); fs.writeFileSync(path.join(root, b, f), 'RIFF'); }
+      fs.writeFileSync(path.join(root, 'other.wav'), 'x');
+      fs.writeFileSync(path.join(root, 'say_lengths.json'), JSON.stringify({ 'say_it/uno.wav': 1, 'say_it/due.wav': 2 }));
+      const u = sampleUsage(root);
+      assert(Object.keys(u).join() === 'say_en,say_it,say_it_reed' && u.say_it.length === 3 && u.say_it[0].b === 4, JSON.stringify(u));
+      const r = deleteSamples(root, ['say_it/uno.wav', 'say_it_reed/uno.wav', 'say_it/due.wav', '../other.wav', 'say_it/../../x.wav', 'say_it/missing.wav'], ['it|uno']);
+      assert(r.deleted.join() === 'say_it/due.wav' && r.skipped.length === 5 && fs.existsSync(path.join(root, 'other.wav')) && fs.existsSync(path.join(root, 'say_it', 'uno.wav')), JSON.stringify(r));
+      assert(!('say_it/due.wav' in JSON.parse(fs.readFileSync(path.join(root, 'say_lengths.json'), 'utf8'))), 'length dropped');
+      const now = Date.parse('2026-10-30T10:00:00Z');
+      keepTemp(root, { add: [{ file: 'say_en/tre.wav', ms: 1000, song: 'radio:a' }, { file: 'say_it/quattro.wav', ms: 1000, song: 'compose:b' }, { file: 'say_it/uno.wav', ms: 1000 }] }, now);
+      let t = readTemp(root);
+      assert(Object.keys(t).length === 3 && Date.parse(t['say_en/tre.wav'].expires) === now + 3600000, 'listed, at least an hour');
+      keepTemp(root, { protect: ['it|uno'] }, now);
+      assert(!readTemp(root)['say_it/uno.wav'], 'a protected slug leaves the ledger');
+      const gone = sweepTemp(root, ['radio:a'], now + 2 * 3600000);
+      t = readTemp(root);
+      assert(gone.join() === 'say_it/quattro.wav' && t['say_en/tre.wav'] && fs.existsSync(path.join(root, 'say_en', 'tre.wav')) && !fs.existsSync(path.join(root, 'say_it', 'quattro.wav')), `swept ${gone}`);
+      keepTemp(root, { files: ['say_en/tre.wav'] }, now);
+      assert(!Object.keys(readTemp(root)).length && !sweepTemp(root, [], now + 1e9).length, 'saved later: never swept');
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
   },
   'candidates: kind, tag or none, language or translation, styles, switch; least used first'() {
     const list = [P('a', 'uno', 'voice', 'night', { uses: 3 }), P('b', 'due', 'voice', null, { uses: 1 }), P('c', 'tre', 'voice', 'dark'), P('d', 'quattro', 'voice', 'night', { on: false }), P('e', 'cinque', 'voice', 'night', { styles: ['jazz'], uses: 1 }), P('f', 'sei', 'voice', 'night', { alt: { en: 'six' }, uses: 1 })];

@@ -23,7 +23,7 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 
 ## 4. Voice helper: samples (2.5 h)
 
-- [ ] 4.1 `GET /voice/usage` (banks, files, sizes), `POST /voice/delete` (named files under `say_*`, protected slugs skipped), `POST /voice/keep` (playing songs, saved slugs) in `vite.config.js`, local only like `/voice/say`
+- [x] 4.1 `GET /voice/usage` (banks, files, sizes), `POST /voice/delete` (named files under `say_*`, protected slugs skipped), `POST /voice/keep` (playing songs, saved slugs) in `vite.config.js`, local only like `/voice/say`
 - [ ] 4.2 `say_temp.json` ledger: list on `made: true` for unsaved lines, expiry from the setting, sweep at start and hourly, never a playing song's (D6)
 - [ ] 4.3 Page side: classes of D5 (built-in set shared with `check:samples`), protected slugs on every delete, `reloadSamples` and recompile after any deletion
 - [ ] 4.4 Delete and edit of a phrase: files per bank minus protected, size in the confirmation, Undo (D7)
