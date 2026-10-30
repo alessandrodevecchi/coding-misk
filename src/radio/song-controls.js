@@ -20,7 +20,9 @@ import { LENGTHS, LENGTH_MINUTES, cleanLength, hasLength } from '../endless/song
 export const fmt = n => (Math.round(n * 100) / 100).toString();
 // an id of a view: the radio keeps the ids it had (radio-chaos, custom-toggle…), the panel gets its own (ns-chaos…)
 export const idOf = (prefix, name, radioName = null) => (prefix === 'radio' ? radioName || `radio-${name}` : `${prefix}-${name}`);
-export const COMMENT_KEYS = ['tracks', 'notes', 'steps', 'voice'];
+export const COMMENT_KEYS = ['tracks', 'notes', 'steps'];
+// the voices' code in Options (voice-track-tuning D11): "V:N code" (the narrator, key voice) and "V:T code" (the voice track)
+export const VOICE_CODE_KEYS = ['voice', 'spoken'];
 const mid = r => Math.round((r[0] + r[1]) / 2 * 20) / 20;
 
 // a die: kind, tooltip key, optional visible label; the tooltip adds the seed of the last throw
@@ -110,7 +112,7 @@ export function customPanel({ state, t, esc, prefix }, { C = customControls(stat
         </div>
         <div class="custom-row">${sel('comments', [...Object.keys(COMMENT_PRESETS), ...(C.comments === 'custom' ? ['custom'] : [])], 'commentsLbl', 'commentsHint', v => t(`comments:${v}`))}<div class="chips">${COMMENT_KEYS.map(k => chip(k, C[k] !== false, `cOpt:${k}`, `cOptHint:${k}`)).join('')}</div></div>
         <div class="custom-row">${sel('functions', [...Object.keys(FUNCTION_PRESETS), ...(C.functions === 'custom' ? ['custom'] : [])], 'fnsLbl', 'fnsHint', v => t(`fns:${v}`))}<div class="chips">${FUNCTION_OPTIONS.map(k => chip(k, C[k], `fOpt:${k}`, `fOptHint:${k}`)).join('')}</div></div>
-        <div class="custom-row"><span class="lbl">${esc(t('liveOptions'))}</span><div class="chips">${chip('title', C.title, 'liveTitle', 'liveTitleHint')}${chip('highlights', C.highlights, 'liveHl', 'liveHlHint')}${chip('wrap', C.wrap, 'liveWrap', 'liveWrapHint')}${chip('typist', C.typist === 'human', 'liveHuman', 'liveHumanHint')}${chip('mistakes', C.mistakes !== 'off', 'liveMistakes', 'liveMistakesHint', C.typist !== 'human')}</div></div>`;
+        <div class="custom-row"><span class="lbl">${esc(t('liveOptions'))}</span><div class="chips">${chip('title', C.title, 'liveTitle', 'liveTitleHint')}${chip('highlights', C.highlights, 'liveHl', 'liveHlHint')}${chip('wrap', C.wrap, 'liveWrap', 'liveWrapHint')}${chip('typist', C.typist === 'human', 'liveHuman', 'liveHumanHint')}${chip('mistakes', C.mistakes !== 'off', 'liveMistakes', 'liveMistakesHint', C.typist !== 'human')}${VOICE_CODE_KEYS.map(k => chip(k, C[k] !== false, `cOpt:${k}`, `cOptHint:${k}`)).join('')}</div></div>`;
   if (open === null) return `<div class="radio-custom ns-custom" id="${idOf(prefix, 'custom')}">${body}</div>`;
   return `<div class="radio-custom" id="${idOf(prefix, 'custom')}">
       <button class="curves-toggle custom-toggle" id="${idOf(prefix, 'custom-toggle', 'custom-toggle')}" aria-expanded="${open}" aria-controls="${idOf(prefix, 'custom-body', 'custom-body')}" title="${esc(t('radioCustomTip'))}"><span class="tw">${CHEVRON}${SLIDERS}<span>${esc(t('radioCustomTitle'))}</span></span><span class="custom-summary">${esc(customSummary(C, t))}</span></button>
@@ -304,7 +306,7 @@ export function songControlEvent(ctx, el, type) {
       const k = d.customChip, C = ctx.controls ? ctx.controls() : customControls(opts.custom);
       if (k === 'typist') return setCustom(ctx, { typist: C.typist === 'human' ? 'exact' : 'human' });
       if (k === 'mistakes') return setCustom(ctx, { mistakes: C.mistakes === 'off' ? 'on' : 'off' });
-      return setCustom(ctx, { [k]: COMMENT_KEYS.includes(k) ? C[k] === false : !C[k] });
+      return setCustom(ctx, { [k]: COMMENT_KEYS.includes(k) || VOICE_CODE_KEYS.includes(k) ? C[k] === false : !C[k] });
     }
     if (d.songLength) { if (d.songLength === 'exact') { const i = ctx.root && ctx.root.querySelector('[data-song-minutes]'); return setLength(ctx, i ? +i.value || 3 : 3); } return setLength(ctx, d.songLength); }
     if (d.genrePick) {

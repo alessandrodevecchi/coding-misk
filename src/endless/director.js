@@ -43,7 +43,11 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // a bar (D8: the director's adds, the returns after a break and the drop stop at the cap, its own tracks leave past it)
 // 13 (fm-like-effects D6, #90): a radio voice may get the Fold effect (from a stream of its own), so the voices of
 // some songs sound different; the music does not move
-export const DIRECTOR_VERSION = 13;
+// 14 (voice-track-tuning): the voice track varies: short sparse chops every other bar, refrains every 4 or 8 bars (one
+// refrain at most 3 times a song), line A at most 3 times among mixed phrases, vocabulary lines written out without
+// repeats, a style's own line one time in two, no line of the 5 songs before in the session, my phrases counted within
+// the session; the music does not move
+export const DIRECTOR_VERSION = 14;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };
@@ -179,7 +183,8 @@ export function lengthOf(v) {
 
 // Plan of one song: parts, tempo, key, length, sections with chords, shape, candidate tracks.
 // opts.fit: seconds, a clip of that exact length that starts at full energy (#5)
-export function planSong({ parts, byId, prev, opts, rng, index }) {
+// recent (voice-track-tuning D5): what the voice tracks of the songs before said, { key: song index } (sessionMemory)
+export function planSong({ parts, byId, prev, opts, rng, index, recent = null }) {
   const R = withDefaults(partRecipe(parts, byId));
   // compatible harmony (#23): a tempo a transition can ramp to, and a key a fifth away, when the style allows
   const compatible = prev && harmonyOf(opts) === 'compatible';
@@ -245,11 +250,11 @@ export function planSong({ parts, byId, prev, opts, rng, index }) {
   // (a single song with the voice instrument on, from a style without one, speaks with the speakers of the styles that
   // have one: their vocabulary samples exist)
   const spokenSpeakers = [...new Set(Object.values(byId).flatMap(r => (r.spoken && r.spoken.speakers) || []))];
-  const drawnSpoken = spokenFor(R, opts, voice, rng.spoken || stream(String(opts.seed), 'spoken'), stream(String(opts.seed), `spoken-more/${index}`), spokenSpeakers);
+  const drawnSpoken = spokenFor(R, opts, voice, rng.spoken || stream(String(opts.seed), 'spoken'), stream(String(opts.seed), `spoken-more/${index}`), spokenSpeakers, recent);
   // (the Voce: traccia switch off, voice-full-controls D15: the draw still runs on its stream, the song gets no voice
   // track, so switching it on again gives the songs a session would have had)
   const spoken = opts.voices && opts.voices.track === false ? null : drawnSpoken;
-  return { index, parts, R, voice, spoken, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords, material };
+  return { index, parts, R, voice, spoken, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords, material, ...(recent ? { recent } : {}) };
 }
 
 // A part takes the strong progression on a big moment, or when the listener set a high tension (#40).
@@ -319,15 +324,55 @@ export function voiceFor(R, opts, rng, index = 0) {
 
 // ---------- voice instrument (voice-instrument, D7) ----------
 
-// rhythms of a chopped word: slices of a phrase on the steps of a bar (eighths)
-export const CHOP_RHYTHMS = ['0 1 0 1 2 2 3 ~', '0 ~ 1 ~ 2 3 ~ 3', '0 0 ~ 1 ~ 2 ~ 3', '~ 0 ~ 1 ~ 2 3 3'];
+// rhythms of a chopped word: slices of a phrase on the steps of a bar (eighths); three slices each, never on two
+// neighbouring steps (voice-track-tuning D1: the denser rhythms of before chopped a whole section)
+export const CHOP_RHYTHMS = ['0 ~ ~ 1 ~ ~ 2 ~', '0 ~ 1 ~ ~ ~ 2 ~', '~ ~ 0 ~ 1 ~ ~ 2', '0 ~ ~ ~ 1 ~ 2 ~'];
+// voice-track-tuning: a generated chop lasts at most CHOP_BARS bars and plays every other bar; a refrain returns every 4
+// or 8 bars; a song whose voice track is one refrain hears it at most REFRAIN_TIMES times
+export const CHOP_BARS = 4, CHOP_EVERY = 2, REFRAIN_EVERY = [4, 8], REFRAIN_TIMES = 3;
+// D5: a radio song does not use a line said by the voice tracks of the RECENT_SONGS songs before it; a style's own line
+// is drawn with this chance when one is free (else the vocabulary)
+export const RECENT_SONGS = 5, STYLE_LINE_SHARE = 0.5;
+// the values a generated pattern of a way carries
+export const extrasFor = (way, r) => ({ ...(way === 'refrain' ? { every: r.pick(REFRAIN_EVERY) } : {}), ...(way === 'chop' ? { slices: 8, rhythm: r.pick(CHOP_RHYTHMS), every: CHOP_EVERY } : {}) });
+// the memory key of a line or a vocabulary entry: its English text
+export const lineKeyOf = x => `en:${(typeof x === 'string' ? x : x && x.en) || ''}`;
+// the keys a pattern's text says: every entry of a list, the text itself, nothing for "vocab:"
+export const saidKeys = text => (Array.isArray(text) ? text.map(lineKeyOf) : text && !(typeof text === 'string' && text.startsWith('vocab:')) ? [lineKeyOf(text)] : []);
+// the candidate said longest ago (recent: key → index of the last song that said it; never said counts as the oldest),
+// ties drawn on the stream
+export function pickFresh(r, cands, recent = null) {
+  if (!cands.length) return null;
+  const age = x => (recent && Object.hasOwn(recent, lineKeyOf(x)) ? recent[lineKeyOf(x)] : -1), best = Math.min(...cands.map(age));
+  return r.pick(cands.filter(x => age(x) === best));
+}
+// A line's text for a way (voice-track-tuning D4, D5): one of the style's own lines with a chance of one half when one is
+// free (not in the song, not said in the songs before), else vocabulary entries written out (a chop one, a refrain or an
+// opening 2 or 3, a passage 3 or 4) not in the song, the least recently said first; when the group has no unused entry
+// left, a style line not in the song. used: the keys the song says already (updated); → the text, or null when the
+// lines run out
+export function drawLine(r, way, { lines = [], group, used, recent = null }) {
+  const own = lines.filter(x => !used.has(lineKeyOf(x))), fresh = own.filter(x => !(recent && Object.hasOwn(recent, lineKeyOf(x))));
+  let text = null;
+  if (fresh.length && r.chance(STYLE_LINE_SHARE)) text = pickFresh(r, fresh, recent);
+  else {
+    const free = (VOCABULARY[group] || []).filter(e => !used.has(lineKeyOf(e)));
+    const n = way === 'chop' ? 1 : way === 'passage' ? r.int(3, 4) : r.int(2, 3), out = [];
+    while (out.length < n && free.length) { const e = pickFresh(r, free, recent); out.push({ ...e }); free.splice(free.indexOf(e), 1); }
+    text = out.length > 1 ? out : out.length ? out[0] : own.length ? pickFresh(r, own, recent) : null;
+  }
+  if (text !== null) for (const k of saidKeys(text)) used.add(k);
+  return text === null ? null : typeof text === 'string' ? text : Array.isArray(text) ? text : { ...text };
+}
 // The voice instrument of one song, or null: drawn with the style's weight as its chance, on its own stream. One line:
-// its way by the style's weights, its text from the style's lines for that way, else the vocabulary (a group the style
-// names, else one drawn); a speaker among the style's that is not the narrator's.
+// its way by the style's weights, its text a style's line for that way or vocabulary entries (drawLine: a group the
+// style names, else one drawn); a speaker among the style's that is not the narrator's. A song with one phrase that is
+// a refrain hears it at most 3 times (times).
 // voice-controls (#77): the options (opts.voice, voice-options.js) change how often a song gets one (never, the style's
-// weight, often: twice the weight up to 0.9, always), the ways it may use and how many phrases it speaks. The default
-// draws exactly as before; the other phrases and their lines come from `more`, a stream of their own.
-export function spokenFor(R, opts, voice, rng, more = null, speakers = []) {
+// weight, often: twice the weight up to 0.9, always), the ways it may use and how many phrases it speaks; the other
+// phrases and their lines come from `more`, a stream of their own. recent (voice-track-tuning D5): the lines the songs
+// before said, key → song index.
+export function spokenFor(R, opts, voice, rng, more = null, speakers = [], recent = null) {
   const V = voiceOption(opts.voice);
   let sp = R.spoken;
   if (V) {
@@ -346,54 +391,49 @@ export function spokenFor(R, opts, voice, rng, more = null, speakers = []) {
   const way = rng.weighted(ways, ways.map(k => w[k]));
   // (a vocabulary chosen for the next songs, D16: its lines instead of the style's)
   if (V && VOCAB_GROUPS.includes(V.vocab)) sp = { ...sp, vocab: V.vocab, lines: {} };
-  const lines = (sp.lines && sp.lines[way]) || [];
-  const text = lines.length ? rng.pick(lines) : `vocab:${VOCAB_GROUPS.includes(sp.vocab) ? sp.vocab : rng.pick(VOCAB_GROUPS)}`;
+  const group = VOCAB_GROUPS.includes(sp.vocab) ? sp.vocab : rng.pick(VOCAB_GROUPS);
+  sp = { ...sp, vocab: group };
+  const used = new Set(), text = drawLine(rng, way, { lines: (sp.lines && sp.lines[way]) || [], group, used, recent });
   const nar = (voice && voice.settings && voice.settings.speaker) || '';
   const own = (sp.speakers || []).filter(x => x && x !== nar), speaker = rng.pick(own.length ? own : SPEAKERS.filter(x => x !== nar));
   const settings = { ...VOICE_DEFAULT, gain: 0.5, room: 0.3, speaker };
   // a character now and then (more often on a chop, which may go further)
   if (rng.chance(way === 'chop' ? 0.6 : 0.25 + 0.3 * (opts.chaos ?? 0.3))) Object.assign(settings, VOICE_CHARACTERS[rng.pick(way === 'chop' ? ['robot', 'radio', 'dirty', 'echo'] : ['radio', 'deep', 'cathedral', 'echo', 'slow'])]);
-  const pat = { way, text, ...(way === 'refrain' ? { every: rng.pick([2, 4]) } : {}), ...(way === 'chop' ? { slices: 8, rhythm: rng.pick(CHOP_RHYTHMS) } : {}) };
+  const pat = { way, text, ...extrasFor(way, rng) };
   // the voice track's sound for the next songs (D4): over the draw, the speaker when one is set
   if (V && V.sound) Object.assign(settings, soundPatch(V.sound));
   const out = { track: { id: 'words', name: 'Words', type: 'spoken', settings, patterns: { A: pat } }, way };
-  if (!V || !more) return out;
+  const one = () => { if (way === 'refrain') pat.times = REFRAIN_TIMES; return out; };
+  if (!V || !more) return one();
   // where it may speak (D7): quiet only places as before; other kinds go through the parts, also for one phrase
   const where = whereOf(V.where);
   if (!isQuietOnly(where)) { out.where = where; out.track.voiceOptions = { where }; }
   const [lo, hi] = PHRASE_RANGES[V.phrases] || [1, 1], n = more.int(lo, hi);
-  if (n <= 1) { if (out.where) out.phrases = [{ key: 'A', way }]; return out; }
-  const phrases = morePhrases(sp, V, out.track.patterns, ways, w, n, more);
+  if (n <= 1) { if (out.where) out.phrases = [{ key: 'A', way }]; return one(); }
+  const phrases = morePhrases(sp, V, out.track.patterns, ways, w, n, more, { used, recent });
   if (phrases.length > 1 || out.where) out.phrases = phrases;
-  return out;
+  return phrases.length > 1 ? out : one();
 }
 // a style with no voice instrument of its own, for a single song with the voice instrument on (voice-controls)
 const SPOKEN_FALLBACK = { weight: 1, ways: Object.fromEntries(VOICE_WAYS.map(k => [k, 1])) };
+// the phrases of line A among n mixed phrases (voice-track-tuning D3): at most 3, the first included, spread, never two
+// in a row
+export const mixedSlots = n => { const k = n <= 2 ? 1 : n <= 5 ? 2 : 3; return new Set(Array.from({ length: k }, (_, i) => Math.round(i * n / k))); };
 // Several phrases (voice-controls D4): n phrases in order, [{ key, way }], each a pattern of the spoken track (A is the
-// line drawn above). different: a new line each time; repeated: A every time; mixed: A, a new line, A, another one…
-// A new line: one of the style's lines for its way not used yet, else a vocabulary entry not used yet (written out, so
-// two lines are never the same; a chop of A from the vocabulary is written out too, for the same reason). The lines run
-// out: fewer phrases (the count is a ceiling).
-export function morePhrases(sp, V, patterns, ways, w, n, more) {
-  const A = patterns.A, keyOf = x => (typeof x === 'string' ? x : x && x.en) || '';
-  const group = VOCAB_GROUPS.includes(sp.vocab) ? sp.vocab : typeof A.text === 'string' && A.text.startsWith('vocab:') ? A.text.slice(6) : more.pick(VOCAB_GROUPS);
-  const used = new Set([keyOf(A.text)]), pool = more.shuffle(VOCABULARY[group]);
-  const newLine = way => {
-    const own = ((sp.lines && sp.lines[way]) || []).filter(x => !used.has(keyOf(x)));
-    const x = own.length ? more.pick(own) : pool.find(e => !used.has(keyOf(e)));
-    if (!x) return null;
-    used.add(keyOf(x));
-    return typeof x === 'string' ? x : { ...x };
-  };
-  if (V.kind !== 'repeated' && A.way === 'chop' && typeof A.text === 'string' && A.text.startsWith('vocab:')) { const x = newLine('chop'); if (x) A.text = x; }
+// line drawn above). different: a new line each time; repeated: A every time; mixed: A at most 3 times, spread
+// (mixedSlots), a new line in the other phrases. A new line: drawLine, never a line or an entry the song says already
+// (used), the lines said in the songs before last (recent). The lines run out: fewer phrases (the count is a ceiling).
+export function morePhrases(sp, V, patterns, ways, w, n, more, { used = null, recent = null } = {}) {
+  const A = patterns.A, group = VOCAB_GROUPS.includes(sp.vocab) ? sp.vocab : more.pick(VOCAB_GROUPS);
+  const said = used || new Set(saidKeys(A.text)), slots = V.kind === 'mixed' ? mixedSlots(n) : null;
   const out = [], keys = 'BCDEFGHIJKLMNOPQRSTUVWXYZ';
   let k = 0;
   for (let j = 0; j < n; j++) {
-    if (j === 0 || V.kind === 'repeated' || (V.kind === 'mixed' && j % 2 === 0)) { out.push({ key: 'A', way: A.way }); continue; }
-    const way = more.weighted(ways, ways.map(x => w[x])), text = newLine(way);
-    if (!text) break;
+    if (j === 0 || V.kind === 'repeated' || (slots && slots.has(j))) { out.push({ key: 'A', way: A.way }); continue; }
+    const way = more.weighted(ways, ways.map(x => w[x])), text = drawLine(more, way, { lines: (sp.lines && sp.lines[way]) || [], group, used: said, recent });
+    if (text === null) break;
     const key = keys[k++];
-    patterns[key] = { way, text, ...(way === 'refrain' ? { every: more.pick([2, 4]) } : {}), ...(way === 'chop' ? { slices: 8, rhythm: more.pick(CHOP_RHYTHMS) } : {}) };
+    patterns[key] = { way, text, ...extrasFor(way, more) };
     out.push({ key, way });
   }
   return out;
@@ -412,7 +452,7 @@ function spokenPlace(plan, steps, base) {
     // spare): the clip ends where that track enters, so the line ends before it
     const next = steps.filter(s => s.at > 0 && s.add !== undefined).sort((a, b) => a.at - b.at)[0];
     if (!next) return { start: 0, bars: secs[0].bars };
-    const t = plan.spoken.track.patterns.A.text, wordsOf = typeof t === 'string' ? (t.startsWith('vocab:') ? 3 : t.split(/\s+/).length) : String(t.en || '').split(/\s+/).length;
+    const t = plan.spoken.track.patterns.A.text, wordsOf = typeof t === 'string' ? (t.startsWith('vocab:') ? 3 : t.split(/\s+/).length) : Array.isArray(t) ? t.length : String(t.en || '').split(/\s+/).length;
     const bpb = meterSteps(plan.meter) / 4, beats = (wordsOf * 0.38 + 0.3) * plan.bpm / 60 / ((plan.spoken.track.settings || {}).tempo || 1);
     const k = Math.min(next.at, Math.ceil((beats + 1) / bpb));
     return { start: next.at - k, bars: k };
@@ -420,7 +460,7 @@ function spokenPlace(plan, steps, base) {
   if (way === 'passage') { const s = find(['break', 'intro', 'outro']) || secs[0]; return { start: s.start, bars: s.bars }; }
   const count = bar => playing(stateAt(working(base, steps), bar).song).length;
   const s = secs.find(x => ['groove', 'drop', 'build', 'peak'].includes(x.role) && count(x.start) < plan.usualHigh) || secs.find(x => x.role !== 'intro' && x.role !== 'outro') || secs[0];
-  return { start: s.start, bars: s.bars };
+  return { start: s.start, bars: Math.min(CHOP_BARS, s.bars) };
 }
 
 // Where several phrases play (voice-controls D4): one clip per phrase, each in a quiet part (a phrase of the plan, 8
@@ -461,7 +501,7 @@ function spokenParts(plan, steps, base) {
     }
     taken.add(i);
     const p = parts[i];
-    clips.push({ start: p.start, bars: Math.min(len, plan.bars - p.start), pattern: ph.key });
+    clips.push({ start: p.start, bars: Math.min(ph.way === 'chop' ? CHOP_BARS : len, plan.bars - p.start), pattern: ph.key });
   });
   return clips.sort((a, b) => a.start - b.start);
 }
@@ -742,13 +782,17 @@ function titleOf(styles, byId, rng) {
 }
 
 // One song of the session: plan, steps, the v2 song and its session entry.
-function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
-  const plan = planSong({ parts, byId, prev, opts, rng, index });
+// memory: { recent, uses } of the session (sessionMemory, voice-track-tuning D5, D6)
+function makeSong({ parts, byId, prev, opts, rng, index, seed, memory = null }) {
+  const recent = memory ? memory.recent : null;
+  const plan = planSong({ parts, byId, prev, opts, rng, index, recent });
   const styles = stylesOf(parts), id = `endless-${slug(seed)}-${index + 1}`;
   // my phrases (my-phrases D4): with a snapshot of the collection (opts.mine, never with Mai), the vocabulary lines of
   // the voice track become phrases of mine, written out in the plan's track (steering rewrites from it), drawn on
-  // streams of their own after every other draw of the plan
-  const mineUsed = opts.mine && plan.spoken ? mineSpokenTrack(plan.spoken.track, opts.mine, id, styles) : [];
+  // streams of their own after every other draw of the plan. In a session (D6) the use counts add the times each
+  // phrase was written into the songs before, and the phrases of the 5 songs before are left out while others are free
+  const mine = opts.mine && memory ? withSessionUses(opts.mine, memory.uses) : opts.mine;
+  const mineUsed = mine && plan.spoken ? mineSpokenTrack(plan.spoken.track, mine, id, styles, { recent }) : [];
   const { tracks, steps, phrases, ctx } = directSong(plan, opts, rng, rng.comments);
   const title = titleOf(styles, byId, rng.titles);
   const names = lang => styles.map(id => byId[id].name[lang]).join(' + ');
@@ -768,8 +812,8 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   // the narrator's phrases of mine (explaining and poetic) go with the song, so the song on air, Replay and a saved
   // session say the same lines after the collection changes (the narration draws them, build.js narratorMine)
   if (opts.mine) {
-    const list = opts.mine.list.filter(p => (p.kind === 'explain' || p.kind === 'poetic') && (!(p.styles || []).length || p.styles.some(x => styles.includes(x))));
-    if (list.length) song.mine = { share: opts.mine.share, lang: opts.mine.lang, list };
+    const list = mine.list.filter(p => (p.kind === 'explain' || p.kind === 'poetic') && (!(p.styles || []).length || p.styles.some(x => styles.includes(x))));
+    if (list.length) song.mine = { share: mine.share, lang: mine.lang, list };
     if (mineUsed.length) song.mineUsed = mineUsed;
   }
   // measured energy of the final song at each phrase
@@ -780,8 +824,33 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed }) {
   if (plan.spoken && plan.spoken.phrases && tracks.some(t => t.type === 'spoken')) entry.phrasesSpoken = tracks.find(t => t.type === 'spoken').clips.length;
   // which tracks play composed, varied or saved material (material-generator)
   if (Object.keys(plan.material || {}).length) entry.material = { ...plan.material };
+  // what its voice track says (voice-track-tuning D5, D6): the keys of its lines and entries, the phrases of mine
+  const said = songSaid(song);
+  if (said.length) entry.said = said;
+  if (mineUsed.length) entry.mineUsed = [...mineUsed];
   return { song, entry, plan };
 }
+
+// ---------- the session's memory of voice lines (voice-track-tuning D5, D6) ----------
+// the keys a song's voice tracks say: en:<text> for every line and entry, mine:<id> for the phrases of mine written in
+export function songSaid(song) {
+  const out = new Set();
+  for (const t of (song && song.tracks) || []) if (t.type === 'spoken') for (const p of Object.values(t.patterns || {})) for (const k of saidKeys(p && p.text)) out.add(k);
+  for (const id of (song && song.mineUsed) || []) out.add(`mine:${id}`);
+  return [...out];
+}
+// the memory of song i: recent, { key: index of the last of the RECENT_SONGS songs before that said it }; uses, { id:
+// times a phrase of mine was written into the songs before } (every song before, not only the recent ones)
+export function sessionMemory(entries, i) {
+  const recent = {}, uses = {};
+  entries.slice(0, i).forEach((e, k) => {
+    if (k >= i - RECENT_SONGS) for (const key of e.said || []) recent[key] = k;
+    for (const id of e.mineUsed || []) uses[id] = (uses[id] || 0) + 1;
+  });
+  return { recent, uses };
+}
+// a snapshot of my phrases with the session's counts added
+export const withSessionUses = (mine, uses) => (!mine || !uses || !Object.keys(uses).length ? mine : { ...mine, list: mine.list.map(p => (uses[p.id] ? { ...p, uses: (p.uses || 0) + uses[p.id] } : p)) });
 
 // A session that makes one song at a time (the radio, docs/ENDLESS.md "Incremental sessions").
 // next(options) generates the next song with the options given (styles, chaos, energy, complexity);
@@ -823,7 +892,7 @@ export function createSession(recipes, seed, { lead = null, extra = [] } = {}) {
       let parts = mixParts(selected, opts.chaos, at, rng.plan);
       for (let t = 0; t < 12 && recent.includes(partsKey(parts)) && selected.length > 1 && opts.chaos > 0; t++) parts = mixParts(selected, opts.chaos, at, rng.plan);
       const before = i > 0 ? entries[i - 1] : lead;
-      const { song, entry, plan } = makeSong({ parts, byId, prev: before, opts, rng, index: i, seed });
+      const { song, entry, plan } = makeSong({ parts, byId, prev: before, opts, rng, index: i, seed, memory: sessionMemory(entries, i) });
       // the transition from the song before to this one (it needs both tempos)
       if (before) before.transition = planTransition(before, entry, opts, rng.transition);
       if (drawn) entry.artist = { id: options.artist.id, name: options.artist.name, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, pace: opts.pace, quirks: opts.quirks };

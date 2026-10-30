@@ -65,4 +65,4 @@ $: note("<[a3,c4,e4,a4] [f3,a3,c4,f4] [g3,b3,d4,g4] [g#3,b3,e4,g#4]>").arp("[0 3
 // "the towers never sleep" · opening · bar 7
 $: s("say_en_reed").n(3).late(0.875).mask("<0!6 1 0!49>").stretch(0.8).lpf(6000).room(0.35).postgain(0.55).orbit(13).analyze("fx")
 // "empty streets · awake · city lights" · refrain · bar 25, 29
-$: s("say_en_reed").n("2 0 1 ~").mask("<0!24 1 0!3 1 0!27>").stretch(0.8).lpf(6000).room(0.35).postgain(0.55).orbit(13).analyze("fx")
+$: n("2 0 1 ~").s("say_en_reed").mask("<0!24 1 0!3 1 0!27>").stretch(0.8).lpf(6000).room(0.35).postgain(0.55).orbit(13).analyze("fx")

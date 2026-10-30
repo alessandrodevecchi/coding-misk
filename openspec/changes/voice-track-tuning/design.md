@@ -72,7 +72,7 @@ Alternative: a compile rule "every chop plays every other bar". Rejected: it wou
 
 The draws `[2, 4]` become `[4, 8]` (director `:356`, `:396`, `extrasOf`). A new optional field `times` (1 to 64, refrains only) caps the starts of one clip: `placeSpoken` collects the candidate starts as today, then keeps `times` of them at indices `round(j * (m - 1) / (times - 1))`, so the first and the last stay. A one-phrase refrain (whole-song clip) gets `times: 3`.
 
-"At most 3 returns" is read as "heard at most 3 times in the song" (the owner's figure counted every time the line is heard: "8 to 24 times a song"). Owner to confirm; 1 + 3 is the other reading (`times: 4`).
+"At most 3 returns" is read as "heard at most 3 times in the song" (the owner's figure counted every time the line is heard: "8 to 24 times a song"). Confirmed by the owner (answer 1).
 
 ### D3. Mixed: A at most 3 times, spread
 
@@ -136,8 +136,8 @@ The director's draws change (sparser chops, refrain spacing, written-out lines, 
 
 The two hide-the-code toggles sit together in the Options group (Compose: the chips row with `#live-title`, `#live-hl`, `#live-wrap`, `#live-human`, `#live-mistakes`, `index.html:110-125`; radio Custom section: the `liveOptions` row, `src/radio/song-controls.js:113`).
 
-- "V:N code": the existing control key `voice` (label "Narrator voice code" today), moved from the Comments chips (`#live-c-voice`, `COMMENT_KEYS` at `song-controls.js:23`) to Options. The key and its stored values do not change, so there is nothing to convert in songs, profiles or saved settings; only the place and the label change. `voice` was never part of the comment presets (`COMMENT_OPTIONS`, `src/song/comments.js:6`), so the presets do not change. Its profile defaults stay as today: on in Classic and Crescendo, off in Live coder (`src/live/profiles.js:53-57`).
-- "V:T code": a new control key `spoken`, on in every profile, in `DISPLAY_CONTROLS` (`profiles.js:64`). Off: `splitSpoken` (like `splitVoice`, matching the `· spoken` headers) moves every voice-track line to the hidden tail, in every profile. Off wins over D8.
+- "V:N code": the existing control key `voice` (label "Narrator voice code" today), moved from the Comments chips (`#live-c-voice`, `COMMENT_KEYS` at `song-controls.js:23`) to Options. The key and its stored values do not change, so there is nothing to convert in songs, profiles or saved settings; only the place and the label change. `voice` was never part of the comment presets (`COMMENT_OPTIONS`, `src/song/comments.js:6`), so the presets do not change. Its defaults change (owner answer 2): off in every profile that grows the song (Crescendo, Live coder, a custom profile with the crescendo build), on when the code is static (Classic, and any profile with the Live build off). Only defaults move: a value the user set and stored stays; a value equal to the old default was never stored and cannot be told apart, so it follows the new default.
+- "V:T code": a new control key `spoken`, with the same defaults as "V:N code" (off in growing profiles, on in Classic and with the Live build off), in `DISPLAY_CONTROLS` (`profiles.js:64`). The defaults follow the `build` control (`resolveProfile`: a custom profile with the crescendo build hides both) and, in Compose, the Live build switch (`controlsOf`: with the switch off both are on unless set). Off: `splitSpoken` (like `splitVoice`, matching the `· spoken` headers) moves every voice-track line to the hidden tail, in every profile. Off wins over D8.
 - Both are independent of Technical functions → "Voice effects" (`fnVoice`). The split happens on the code as written, before `writeCode` folds the shown part, so the hidden lines would keep their effects written out; to keep them folded, the hidden voice code goes through `voiceCall` with the same song functions context (`ctx.voices`), so a hidden line calls the same function name as when shown. The function's definition is in the hidden prelude in both cases.
 - Strings: "V:N code" / "Codice V:N" and "V:T code" / "Codice V:T", matching the V:N and V:T tags of Coming next, with tooltips that name them in full ("Voice: narrator: show its code in the panel; off: it still speaks, the code goes to the hidden code", and the same for "Voice: track"; Italian alike), in `src/i18n.js`; the Guide card of the code options in `src/guide.js`.
 
@@ -165,10 +165,16 @@ A `say_` line without `.mask` is the only form that stays unfolded and no genera
 - [A display step in a dense growth] → it changes only the shown code and never types (D9).
 - [The analysis's 120-song run did not record its seeds] → the measurement fixes a seed list (with `f7zvee`) and runs it on `develop` before any code change, so before and after use the same seeds.
 
-## Open Questions for the owner
+## Owner answers (30 October)
 
-1. Refrain with one phrase: heard at most 3 times in total (chosen), or the first time plus 3 returns?
-2. Style line share one half (chosen), or lower so the vocabulary and your phrases come up more?
-3. A just-in-time line shows from a step up to 4 bars before it speaks (chosen); shorter (2 bars) means more display steps.
-4. "V:N code" keeps today's profile defaults (off in Live coder, D11). Should Live coder show the narrator's code too, now that it sits in Options?
-5. The toggles' texts never say a bare "Narrator". Other app texts still do (the narrator track is named "Narrator" since director version 9): rename them in a separate change?
+1. Every decision of this design is approved: the chop rules, a one-phrase refrain heard at most 3 times in total (`times: 3`), the mixed counts, vocabulary lines written out as lists, the 5-song memory with style lines at a chance of one half, the session counts of my phrases, every entry played with `n(...).s(bank)` and `voiceCall` accepting that form, just-in-time lines pasted by default and typed only in free gaps, `DIRECTOR_VERSION` 14 and the snapshot updates. A just-in-time line shows from a step up to 4 bars before it speaks.
+2. "V:N code" and "V:T code" are both hidden by default in every profile that grows the song (Crescendo, Live coder, a custom profile with the crescendo build) and both shown when the code is static (Classic, the Live build off). The toggles always let the user change it. The narrator's stored key stays `voice`; only defaults migrate, never a value the user set.
+3. Controls and labels say "Voice: narrator" and "Voice: track" (V:N and V:T on chips); running prose may say "the narrator voice". The track name in code comments and the timeline stays "Narrator". Only control labels that say a bare "Narrator" change; no broader rename.
+
+## Implementation notes (31 October)
+
+- D9: the typing load, the written-part plan and the paste rule read the code with every voice-track line as written (`codeLoad` in `src/live/live-code.js`), the same code as before this change, so no growth, shape or fixture moves. The display typing (`typingPlan` with `voiceAside`, the app and the videos) treats every new `say_` line that way, the narrator's too.
+- D8: a display step is a real code step: the typing toward the next step starts after it, so with "V:T code" on that typing may have less time. It only exists with "V:T code" on in a grown song (off by default).
+- D11: the defaults follow the `build` control (`codeDefaults` in `src/live/profiles.js`) and, in Compose, the Live build switch: Classic (also with the Live build on) and the Live build off show both voices' code.
+- D4: "Fill with" in the phrase list still writes one entry per row (each row a different entry); only the director and `rewriteSpoken` write lists.
+- D7: a line keeps the speaker's bank when one entry at least has a sample there; an entry that only the default voice has is a silent quarter.

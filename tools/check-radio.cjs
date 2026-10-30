@@ -115,12 +115,15 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   // (the spoken line is in the code shown only around its bar: live typing removes it on the way to the next step, about
   // a bar after a comment on bar 0, while the sound is unchanged; so the code is read every 0.2 s from the start)
   {
-    const voiceBank = () => page.evaluate(() => (document.querySelector('strudel-editor').editor.code.match(/s\("(say_[a-z_]+)"\)/) || [])[1] || '');
+    // (the narrator's lines only: orbit 15 and up, the voice track speaks on 13 and 14; read in the code evaluated, as the
+    // narrator's code is hidden by default in the profiles that grow the song, voice-track-tuning)
+    const voiceBank = () => page.evaluate(() => (((globalThis.codingMiskEvaluated && globalThis.codingMiskEvaluated()) || document.querySelector('strudel-editor').editor.code).match(/s\("(say_[a-z_]+)"\)[^\n]*\.orbit\((?:1[5-9]|2\d)\)/) || [])[1] || '');
     const banks = {};
     for (const style of ['industrial', 'country']) {
       await page.click('#radio-start'); await sleep(500);
       await pick([style]); await page.fill('#radio-seed', `voice-${style}`); await page.click('#radio-start');
-      for (let k = 0; k < 100 && !banks[style]; k++) { banks[style] = await voiceBank(); if (!banks[style]) await sleep(200); }
+      // (up to a minute: a voice-track line on bar 0 makes the narrator yield there, voice-track-tuning)
+      for (let k = 0; k < 300 && !banks[style]; k++) { banks[style] = await voiceBank(); if (!banks[style]) await sleep(200); }
     }
     check(banks.industrial && banks.country && banks.industrial !== banks.country, 'two styles speak with different speakers', JSON.stringify(banks));
     await page.click('#radio-start'); await sleep(500);

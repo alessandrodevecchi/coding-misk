@@ -67,4 +67,4 @@ $: s("say_en_eddy").n(0).slice(8, "0 1 0 1 2 2 3 ~").clip(1).mask("<0!32 1!16 0!
 
 // ========== Story · spoken ==========
 // "reset · feedback · circuit · pulse" · spoken passage · bar 25
-$: s("say_en_flo").n("3 1 0 2").mask("<0!24 1 0!31>").room(0.3).postgain(0.55).orbit(14).analyze("fx")
+$: n("3 1 0 2").s("say_en_flo").mask("<0!24 1 0!31>").room(0.3).postgain(0.55).orbit(14).analyze("fx")

@@ -24,24 +24,24 @@ export function baseConfig(song) {
   const declared = songProfile(song), c = song && song.config && typeof song.config === 'object' && !Array.isArray(song.config) ? song.config : null;
   const profile = c && PROFILES[c.profile] ? c.profile : declared || 'classic';
   const live = c && typeof c.live === 'boolean' ? c.live : !!declared;
-  return withTarget({ profile, live, options: cleanOverrides(c && c.options, PROFILES[profile]) }, c && c.durationTarget);
+  return withTarget({ profile, live, options: cleanOverrides(c && c.options, PROFILES[profile], { live }) }, c && c.durationTarget);
 }
 // a configuration made whole and clean (a trial read back from the browser, or one set in Compose); null when unusable
 export function normalConfig(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !PROFILES[raw.profile]) return null;
-  return withTarget({ profile: raw.profile, live: !!raw.live, options: cleanOverrides(raw.options, PROFILES[raw.profile]) }, raw.durationTarget);
+  return withTarget({ profile: raw.profile, live: !!raw.live, options: cleanOverrides(raw.options, PROFILES[raw.profile], { live: !!raw.live }) }, raw.durationTarget);
 }
 // the configuration in force: the trial when there is one, else the song's own
 export const configOf = (song, trial = null) => normalConfig(trial) || baseConfig(song);
 // the controls in force of a configuration (resolveProfile's result); with a length target a growing build grows inside
 // it (D12: 'planned', whatever the profile's own growth duration)
-export const controlsOf = cfg => { const C = resolveProfile(cfg.profile, cfg.options); return cfg.durationTarget && C.build === 'crescendo' ? { ...C, duration: 'planned' } : C; };
+export const controlsOf = cfg => { const C = resolveProfile(cfg.profile, cfg.options, { live: cfg.live !== false }); return cfg.durationTarget && C.build === 'crescendo' ? { ...C, duration: 'planned' } : C; };
 // the planned growth's options for composeGrowth (src/endless/growth.js), or null when the song does not grow in its target
 export const plannedOf = (cfg, C, styles = {}) => (C && C.duration === 'planned' && cfg && cfg.durationTarget ? { controls: C, phrase: cfg.durationTarget.phrase, styles } : null);
 // two configurations play the same
 export function sameConfig(a, b) {
   if (!a || !b || a.profile !== b.profile || !!a.live !== !!b.live || JSON.stringify(cleanTarget(a.durationTarget)) !== JSON.stringify(cleanTarget(b.durationTarget))) return false;
-  const x = cleanOverrides(a.options, PROFILES[a.profile]), y = cleanOverrides(b.options, PROFILES[b.profile]);
+  const x = cleanOverrides(a.options, PROFILES[a.profile], { live: !!a.live }), y = cleanOverrides(b.options, PROFILES[b.profile], { live: !!b.live });
   const kx = Object.keys(x), ky = Object.keys(y);
   return kx.length === ky.length && kx.every(k => x[k] === y[k]);
 }

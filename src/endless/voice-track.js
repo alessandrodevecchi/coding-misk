@@ -10,10 +10,10 @@ import { normalizeSong, VOICE_DEFAULT } from '../song/format.js';
 import { sectionFacts, entryAfter, whereOfTrack, placeSpoken } from '../song/spoken.js';
 import { stateAt, buildSteps } from '../song/build.js';
 import { meterSteps } from '../music.js';
-import { VOCABULARY, VOCAB_GROUPS } from '../song/vocabulary.js';
+import { VOCAB_GROUPS } from '../song/vocabulary.js';
 import { stream } from './random.js';
 import { mineSpokenTrack } from '../voices/mine.js';
-import { morePhrases, CHOP_RHYTHMS } from './director.js';
+import { morePhrases, extrasFor, drawLine, saidKeys, CHOP_BARS, REFRAIN_TIMES } from './director.js';
 import { cleanVoice, presetOf, PHRASE_RANGES, VOICE_WAYS, VOICE_WHERE, whereOf, isQuietOnly } from './voice-options.js';
 
 // the phrases-per-song choice a number of clips falls in
@@ -46,7 +46,8 @@ function styleSpoken(song, recipes, spoken) {
   const vocab = own.map(r => r.spoken.vocab).find(g => VOCAB_GROUPS.includes(g));
   return { ways: Object.keys(ways).length ? ways : Object.fromEntries(VOICE_WAYS.map(k => [k, 1])), lines, ...(vocab ? { vocab } : {}) };
 }
-const extrasOf = (way, r) => ({ ...(way === 'refrain' ? { every: r.pick([2, 4]) } : {}), ...(way === 'chop' ? { slices: 8, rhythm: r.pick(CHOP_RHYTHMS) } : {}) });
+// (voice-track-tuning D1, D2: a refrain every 4 or 8 bars, a chop sparse and every other bar, as the director's)
+const extrasOf = extrasFor;
 const KEYS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 // a part: a phrase of 8 bars (the director's) inside a section, the section's end cutting the last one
@@ -99,7 +100,9 @@ export function newSpokenTrack(song) {
 // With trackId null a new track is made (and added before the narrator), with an add step when the song builds live.
 // mine (my-phrases D4): a snapshot of my phrases; its vocabulary lines may become phrases of mine (Compose, "New
 // phrases", with the same share as the director), drawn after the lines on streams of their own.
-export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null, from = 0, seed = null, mine = null } = {}) {
+// recent (voice-track-tuning D5): the lines the songs before said (key → song index), from the radio session; the
+// lines of the kept clips are not drawn again either.
+export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null, from = 0, seed = null, mine = null, recent = null } = {}) {
   const tracks = (song.tracks || []).map(x => x);
   let ti = trackId ? tracks.findIndex(x => x.id === trackId && x.type === 'spoken') : -1;
   if (trackId && ti < 0) return null;
@@ -118,22 +121,25 @@ export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null,
     const r = stream(seed || `${song.id || 'song'}:${id}`, `voice-track/${v.phrases}/${v.kind}/${(v.ways || []).join('+')}/${draw}`);
     const sp = styleSpoken(song, recipes, spoken);
     const w = v.ways ? Object.fromEntries(v.ways.map(k => [k, 1])) : sp.ways, ways = Object.keys(w);
-    // the first line: one of the style's lines for its way, else a vocabulary entry, written out
+    // the first line: one of the style's lines for its way (one half of the time) or vocabulary entries, written out
+    // (drawLine, voice-track-tuning D4, D5); never a line the kept clips say
     const way = r.weighted(ways, ways.map(k => w[k]));
-    const own = sp.lines[way] || [], group = sp.vocab || r.pick(VOCAB_GROUPS);
-    const first = own.length ? r.pick(own) : r.pick(VOCABULARY[group]);
-    patterns = { A: { way, text: typeof first === 'string' ? first : { ...first }, ...extrasOf(way, r) } };
+    const group = sp.vocab || r.pick(VOCAB_GROUPS), used = new Set();
+    for (const key of keptKeys) for (const k of saidKeys((old.patterns || {})[key] && old.patterns[key].text)) used.add(k);
+    const first = drawLine(r, way, { lines: sp.lines[way] || [], group, used, recent });
+    patterns = { A: { way, text: first === null ? `vocab:${group}` : first, ...extrasOf(way, r) } };
     const [lo, hi] = PHRASE_RANGES[v.phrases] || [1, 1], n = r.int(lo, hi);
-    const list = n > 1 ? morePhrases({ ...sp, vocab: group }, v, patterns, ways, w, n, r) : [{ key: 'A', way }];
+    const list = n > 1 ? morePhrases({ ...sp, vocab: group }, v, patterns, ways, w, n, r, { used, recent }) : [{ key: 'A', way }];
     asked = list.length;
     // places: the parts of the kinds allowed, quiet first (in Compose, else the phrases of the section with the fewest
     // tracks), each kind spread, one phrase each
     let parts = wherePartsOf(song, start, where);
     if (!parts.length && !(from > 0) && N.sections.length) { const facts = sectionFacts(N), least = Math.min(...facts.counts), i = facts.counts.indexOf(least); parts = partsOf(N.sections[i], i); }
-    if (list.length === 1 && way === 'refrain') clips = [{ start, bars: N.total - start, pattern: 'A' }];
+    // (one refrain: over the rest of the song, heard at most 3 times; a chop: at most 4 bars of its part)
+    if (list.length === 1 && way === 'refrain') { clips = [{ start, bars: N.total - start, pattern: 'A' }]; patterns.A.times = REFRAIN_TIMES; }
     else {
       const chosen = pickParts(parts, Math.min(list.length, parts.length));
-      clips = chosen.map((p, j) => ({ start: p.start, bars: p.bars, pattern: list[j].key }));
+      clips = chosen.map((p, j) => ({ start: p.start, bars: patterns[list[j].key].way === 'chop' ? Math.min(CHOP_BARS, p.bars) : p.bars, pattern: list[j].key }));
     }
     // an opening line ends before the first track that comes in within its clip
     for (const c of clips) {
@@ -142,8 +148,8 @@ export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null,
       const next = N.tracks.filter(x => x.type !== 'voice' && x.type !== 'spoken').map(x => ({ id: x.id, at: entryAfter(N, x.id, c.start) })).filter(x => x.at !== null && x.at <= c.start + c.bars).sort((a, b) => a.at - b.at)[0];
       if (next) patterns[c.pattern] = { ...pat, before: next.id };
     }
-    const used = new Set(clips.map(c => c.pattern));
-    patterns = Object.fromEntries(Object.entries(patterns).filter(([key]) => used.has(key)));
+    const kept2 = new Set(clips.map(c => c.pattern));
+    patterns = Object.fromEntries(Object.entries(patterns).filter(([key]) => kept2.has(key)));
     if (mine) mineSpokenTrack({ id: `${id}:${draw}`, patterns }, mine, song.id || 'song', (song.tags && song.tags.styles) || []);
     // (from a bar: the new lines take letters the kept clips do not use)
     if (keptKeys.size) {
@@ -262,7 +268,7 @@ export function placeGrownSpoken(grown, written, growth) {
       chosen.push(...others.slice(0, rest.length - chosen.length));
       chosen.sort((a, b) => a.start - b.start);
     }
-    chosen.forEach((p, j) => clips.push({ start: p.start, bars: p.bars, pattern: rest[j].pattern }));
+    chosen.forEach((p, j) => clips.push({ start: p.start, bars: (patterns[rest[j].pattern] || {}).way === 'chop' ? Math.min(CHOP_BARS, p.bars) : p.bars, pattern: rest[j].pattern }));
     clips.sort((a, b) => a.start - b.start);
     const used = new Set(clips.map(c => c.pattern));
     const track = { ...JSON.parse(JSON.stringify(w)), patterns: Object.fromEntries(Object.entries(patterns).filter(([k]) => used.has(k))), clips };

@@ -51,7 +51,8 @@ Comments (it: Commenti): Comments in the code. Essential: the title and the trac
 | `tracks` | Tracks (it: Tracce) | The track names (// ===== bass =====) |
 | `notes` | Notes (it: Note) | The section and pattern notes (// Intro · bars 1-8) |
 | `steps` | Step phrases (it: Frasi dei passi) | The step phrases (// > …) and the phrase the narrator says |
-| `voice` | Narrator voice code (it: Codice voce narratore) | The lines that make the narrator speak. Off: the narrator still speaks, its code is not shown |
+| `voice` | V:N code (it: Codice V:N) | Voice: narrator: show its code in the panel; off: it still speaks, the code goes to the hidden code |
+| `spoken` | V:T code (it: Codice V:T) | Voice: track: show its code in the panel; off: it still speaks, the code goes to the hidden code |
 <!-- /generated -->
 
 <!-- generated:function-presets -->

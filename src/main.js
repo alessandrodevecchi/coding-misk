@@ -96,7 +96,7 @@ import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
 import { createVoicesTab } from './voices/voices-tab.js';
-import { narratorPick } from './voices/mine.js';
+import { narratorPick, vocabGroupOf } from './voices/mine.js';
 import { setNarratorMine } from './song/build.js';
 import { PHRASES_MOMENT } from './voices/moments.js';
 import { builtinKeys, mineKeys, songKeys, sizeText } from './voices/samples.js';
@@ -343,7 +343,7 @@ function composeAway(key, msg) {
 const keepTarget = c => (c && c.durationTarget ? { durationTarget: c.durationTarget } : {});
 let targetFreed = null;
 // one control changed by hand: a trial on the song in Compose, kept until a profile is picked again
-function setControl(k, v) { const c = cfgOf(T); tryConfig({ ...c, options: cleanOverrides({ ...c.options, [k]: v }, PROFILES[c.profile]) }); }
+function setControl(k, v) { const c = cfgOf(T); tryConfig({ ...c, options: cleanOverrides({ ...c.options, [k]: v }, PROFILES[c.profile], { live: !!c.live }) }); }
 // Crescendo builds are computed once per song version and option, kept for the songs used last (LRU)
 const crescendoCache = new Map(), CRESCENDO_CACHE = 48;
 // the built-in style recipes, for the weights of the growth shapes and the metamorphosis (growth-shapes)
@@ -850,6 +850,8 @@ let playedCode = null, framed = false;
 // code-over-visual: the code last evaluated (the lit tokens map its haps' places to the code shown), the line being typed
 // by the app ({ line, col, editing } from the typing plan, D5) and the last key typed by hand
 let evaluatedCode = '', typingCursor = null, handKeyAt = -1e9;
+// for browser checks (voice-track-tuning): the code last evaluated, its hidden tail included (the voices' code may be hidden)
+globalThis.codingMiskEvaluated = () => evaluatedCode;
 // resume from the bar where the user took over (default) or from where the song has got to meanwhile
 let handFromHere = store.get('coding-misk-hand-from', true) !== false;
 // typing speed of the code that types itself (live-typing): slow, normal, fast
@@ -861,7 +863,8 @@ const typingSpeed = () => TYPING_SPEEDS[store.get('coding-misk-typing', null) ||
 // force: how many new lines may be pasted whole when the typing does not fit (the live build's paste rule)
 function makeTyping(text, to, from0, end, cps, human = false, stretch = null, force = Infinity, earlier = null) {
   const avail = Math.max(.2, (end - from0) / cps), listenMin = human ? Math.min(avail * .5, 2) : 0;
-  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch, force, earlier });
+  // (voiceAside, voice-track-tuning D9: voice lines new at the step never take typing time from the other edits)
+  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch, force, earlier, voiceAside: true });
   const listen = human ? Math.max(listenMin, Math.min(avail * .2, avail - plan.total)) : 0;
   // sg: the song the typing belongs to (a takeover completes it only on that song, takeover-pending-edit)
   return { plan, start: Math.max(from0 + listen * cps, end - plan.total * cps), cps, shown: '', sg: song };
@@ -2051,7 +2054,8 @@ function renderArranger() {
   // the growth shape belongs to the natural growth (Live coder)
   $('#live-shape').hidden = !crescendo || C.growth !== 'natural';
   $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-fns').value = C.functions;
-  for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
+  // (voice and spoken: "V:N code" and "V:T code" in Options, voice-track-tuning D11)
+  for (const k of ['tracks', 'notes', 'steps', 'voice', 'spoken']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
   for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).setAttribute('aria-pressed', !!C[k]);
   $('#live-title').setAttribute('aria-pressed', C.title); $('#live-hl').setAttribute('aria-pressed', C.highlights); $('#live-wrap').setAttribute('aria-pressed', C.wrap); $('#live-human').setAttribute('aria-pressed', C.typist === 'human'); $('#live-mistakes').setAttribute('aria-pressed', C.mistakes !== 'off'); $('#live-mistakes').disabled = C.typist !== 'human';
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
@@ -2468,7 +2472,7 @@ for (const k of ['opening', 'pace', 'development']) $(`#live-${k}`).addEventList
 $('#live-code').addEventListener('change', e => { setControl('view', e.target.value); liveChanged(); });
 // a comments preset sets its options (code-writing)
 $('#live-comments').addEventListener('change', e => { if (COMMENT_PRESETS[e.target.value]) for (const [k, v] of Object.entries(COMMENT_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
-for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).addEventListener('click', () => { setControl(k, ctlOf(T)[k] === false); liveChanged(); });
+for (const k of ['tracks', 'notes', 'steps', 'voice', 'spoken']) $(`#live-c-${k}`).addEventListener('click', () => { setControl(k, ctlOf(T)[k] === false); liveChanged(); });
 $('#live-fns').addEventListener('change', e => { if (FUNCTION_PRESETS[e.target.value]) for (const [k, v] of Object.entries(FUNCTION_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
 for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).addEventListener('click', () => { setControl(k, !ctlOf(T)[k]); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { setControl('narrated', !ctlOf(T).narrated); liveChanged(); });
@@ -2961,7 +2965,7 @@ function typedInput(text, lang, sg) {
   return { text, lang, kind: 'voice', tag, styles: styles.slice(0, 1), source: 'radio', from: { song: (sg && sg.title) || '', ...(styles[0] ? { style: styles[0] } : {}) } };
 }
 // the vocabulary group of the song's voice track (its "vocab:" line, else its style's)
-const songVocab = () => { const sp = songSpoken(), own = sp && Object.values(sp.patterns || {}).map(p => (typeof p.text === 'string' && p.text.startsWith('vocab:') ? p.text.slice(6) : null)).find(Boolean); return own || ((T.tags && T.tags.styles) || []).map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null; };
+const songVocab = () => { const sp = songSpoken(), own = sp && Object.values(sp.patterns || {}).map(p => (typeof p.text === 'string' && p.text.startsWith('vocab:') ? p.text.slice(6) : Array.isArray(p.text) ? vocabGroupOf(p.text) : null)).find(Boolean); return own || ((T.tags && T.tags.styles) || []).map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null; };
 const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
   const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
@@ -3791,7 +3795,7 @@ function panelHtml(ti) {
 // vocabulary), the values of its way, and where it speaks in the song with the words it says now
 function spokenEditor(tr, key, pat) {
   const lang = getLang(), src = typeof pat.text === 'string' && pat.text.startsWith('vocab:') ? pat.text : pat.text ? 'own' : 'auto';
-  const txt = l => (!pat.text || src !== 'own' ? '' : typeof pat.text === 'string' ? (l === 'en' ? pat.text : '') : pat.text[l] || '');
+  const txt = l => (!pat.text || src !== 'own' ? '' : typeof pat.text === 'string' ? (l === 'en' ? pat.text : '') : Array.isArray(pat.text) ? pat.text.map(x => x[l] || x.en).join(' · ') : pat.text[l] || '');
   let placed = [];
   try { placed = placeSpoken(T, lang).filter(p => p.track === tr.id && p.key === key); } catch (e) { placed = []; }
   const bars = [...new Set(placed.flatMap(p => p.starts.map(s => s.bar + 1)))].sort((a, b) => a - b), said = placed[0] ? placed[0].texts.join(' · ') : '';
@@ -3931,9 +3935,9 @@ $('#track-panel').addEventListener('change', e => {
   if (r.startsWith('sp-')) {
     const v = e.target.value, num = Math.round(+v);
     editPattern(p => {
-      if (r === 'sp-way') { p.way = v; if (v !== 'refrain') delete p.every; if (v !== 'chop') { delete p.slices; delete p.rhythm; } if (v !== 'passage' && v !== 'opening') delete p.before; }
+      if (r === 'sp-way') { p.way = v; if (v !== 'refrain' && v !== 'chop') delete p.every; if (v !== 'refrain') delete p.times; if (v !== 'chop') { delete p.slices; delete p.rhythm; } if (v !== 'passage' && v !== 'opening') delete p.before; }
       if (r === 'sp-src') { if (v === 'own') p.text = { en: getLang() === 'it' ? '' : '…', it: getLang() === 'it' ? '…' : '' }; else if (v === 'auto') delete p.text; else p.text = v; if (p.text && typeof p.text === 'object') p.text = Object.fromEntries(Object.entries(p.text).filter(([, x]) => x)); }
-      if (r === 'sp-en' || r === 'sp-it') { const k = r.slice(3), cur = p.text && typeof p.text === 'object' ? { ...p.text } : typeof p.text === 'string' && !p.text.startsWith('vocab:') ? { en: p.text } : {}; if (v.trim()) cur[k] = v.trim(); else delete cur[k]; if (Object.keys(cur).length) p.text = cur; else delete p.text; }
+      if (r === 'sp-en' || r === 'sp-it') { const k = r.slice(3), cur = Array.isArray(p.text) ? { en: p.text.map(x => x.en).join(' · '), it: p.text.map(x => x.it || x.en).join(' · ') } : p.text && typeof p.text === 'object' ? { ...p.text } : typeof p.text === 'string' && !p.text.startsWith('vocab:') ? { en: p.text } : {}; if (v.trim()) cur[k] = v.trim(); else delete cur[k]; if (Object.keys(cur).length) p.text = cur; else delete p.text; }
       if (r === 'sp-every' && num >= 1) p.every = Math.min(64, num);
       if (r === 'sp-slices' && num >= 2) p.slices = Math.min(32, num);
       if (r === 'sp-rhythm') { const ok = v.trim().split(/\s+/).every(x => x === '~' || (/^\d+$/.test(x) && +x < (p.slices || 8))); if (ok) p.rhythm = v.trim().replace(/\s+/g, ' '); else toast(t('spokenRhythmBad')); }

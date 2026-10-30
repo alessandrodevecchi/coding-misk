@@ -77,6 +77,26 @@ const DIRECTOR = {
     console.log(`      ${vocab} night lines replaced, ${own} style lines kept`);
     assert(vocab > 20 && own > 5, `vocab ${vocab}, own ${own}`);
   },
+  'session counts (voice-track-tuning D6): songs in a row say other phrases of mine, the counts add the songs before, the narrator list carries them, Replay the same (spec: two songs in a row)'() {
+    const items = ['le torri non dormono mai', 'chi guida stanotte', 'la città trattiene il fiato', 'il neon respira', 'una porta socchiusa', 'il treno non arriva'].map((x, i) => P(`ph_${i}`, x, 'voice', 'night'));
+    const narr = [P('nx_1', 'una frase del narratore', 'poetic', null)];
+    const mine = mineSnapshot([...items, ...narr], 1, 'it'), voice = { presence: 'always', vocab: 'night', phrases: '1', ways: ['refrain'] };
+    const run = () => { const s = createSession(RECIPES, 'counts'); return Array.from({ length: 8 }, () => s.next({ styles: ['dark-cyberpunk'], voice, mine })); };
+    const songs = run(), said = songs.map(x => x.song.mineUsed || []);
+    assert(said.every(l => l.length === 1), `a song without a phrase of mine: ${JSON.stringify(said)}`);
+    // 6 phrases, 5 songs remembered: the first 6 songs say 6 different phrases, the 7th the one said longest ago
+    const ids = said.map(l => l[0]);
+    assert(new Set(ids.slice(0, 6)).size === 6 && ids[6] === ids[0], `phrases by song: ${ids.join(', ')}`);
+    // the narrator's list of song 3 counts the two songs before
+    const list = songs[2].song.mine && songs[2].song.mine.list, used = new Set(ids.slice(0, 2));
+    assert(list && list.filter(p => p.kind === 'voice').every(p => p.uses === (used.has(p.id) ? 1 : 0)), `counts of song 3: ${JSON.stringify(list && list.map(p => [p.id, p.uses]))}`);
+    // Replay with the recorded snapshot: the same phrases, even if the collection's counts changed since
+    assert(JSON.stringify(run().map(x => x.song.mineUsed)) === JSON.stringify(said), 'Replay says other phrases');
+    // Mai: nothing of mine, the same voice lines as without a collection
+    const plain = createSession(RECIPES, 'counts').next({ styles: ['dark-cyberpunk'], voice }).song, off = createSession(RECIPES, 'counts').next({ styles: ['dark-cyberpunk'], voice, mine: null }).song;
+    assert(JSON.stringify(spokenTexts(plain)) === JSON.stringify(spokenTexts(off)) && !off.mineUsed, 'Mai changes the voice lines');
+    console.log(`      phrases of mine by song: ${ids.join(', ')}`);
+  },
   'Replay after a delete: the session recipe keeps the snapshot, the same songs come back (spec: replay)'() {
     const items = [P('ph_1', 'le torri non dormono mai', 'voice', 'night'), P('ph_2', 'fermi tutti', 'explain', 'breakdown')];
     const snap = mineSnapshot(items, 0.8, 'it'), recorded = JSON.parse(JSON.stringify(snap));

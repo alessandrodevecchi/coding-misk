@@ -10,7 +10,8 @@ import { validateRecipe, withDefaults, PART_NAMES, TOP_FIELDS, INSTRUMENTS, SHAP
 import { mixParts, stylesOf } from '../src/endless/mix.js';
 import { loadStyles } from './styles-dir.mjs';
 import { songEntry, cleanView } from '../src/library/song-filter.js';
-import { generateSession, createSession, leadEntry, stylesNear } from '../src/endless/director.js';
+import { generateSession, createSession, leadEntry, stylesNear, sessionMemory } from '../src/endless/director.js';
+import { VOCABULARY } from '../src/song/vocabulary.js';
 import { validateArtist, ARTIST_FIELDS, PALETTES, MOVE_KINDS, VOICE_CHARACTER_NAMES } from '../src/endless/artist.js';
 import { QUIRKS } from '../src/endless/quirks.js';
 import { portraitPixels } from '../src/endless/portrait.js';
@@ -80,8 +81,9 @@ function voiceless(x, { narrator = false } = {}) {
       return o;
     }).filter(st => Object.keys(st).some(k => k !== 'at' && k !== 'by'));
   };
-  // (a session's entries say which way the voice track speaks and how many phrases: voice facts, not music)
-  const walk = v => { if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') { if (Array.isArray(v.tracks) && Array.isArray(v.sections)) strip(v); else { if (narrator) { delete v.spoken; delete v.phrasesSpoken; } Object.values(v).forEach(walk); } } };
+  // (a session's entries say which way the voice track speaks, how many phrases and, since director version 14, what
+  // it said: voice facts, not music)
+  const walk = v => { if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') { if (Array.isArray(v.tracks) && Array.isArray(v.sections)) strip(v); else { if (narrator) { delete v.spoken; delete v.phrasesSpoken; delete v.said; delete v.mineUsed; } Object.values(v).forEach(walk); } } };
   walk(r);
   return r;
 }
@@ -967,6 +969,39 @@ const CHECKS = {
     assert(bassMore > bassLess, `different bass notes: less complex ${bassLess}, more complex ${bassMore}`);
     console.log(`      lead notes per bar ${lo.toFixed(2)} / ${hi.toFixed(2)} (density 0.2 / 0.8); mean degree ${low.toFixed(2)} / ${high.toFixed(2)} (energy 0.2 / 0.9); different degrees ${hookLess.toFixed(2)} / ${hookMore.toFixed(2)}, bass notes ${bassLess.toFixed(2)} / ${bassMore.toFixed(2)} (less / more complex)`);
   },
+  'voice memory (voice-track-tuning D5): no line said again within 6 songs while candidates remain, the oldest when the pool runs out, style lines one song in five at most, Replay and a steering rewrite equal'() {
+    // one chop a song (one entry each): 20 songs never repeat a line or an entry within 6 songs
+    const run = (voice, styles, n, seed) => { const s = createSession(STYLES, seed); return Array.from({ length: n }, () => s.next({ styles, voice })); };
+    const repeats = list => { let k = 0; list.forEach((x, i) => { const before = new Set(list.slice(Math.max(0, i - 5), i).flatMap(y => y.entry.said || [])); k += (x.entry.said || []).filter(y => before.has(y)).length; }); return k; };
+    const chops = run({ phrases: '1', ways: ['chop'], presence: 'always' }, ['dark-cyberpunk'], 20, 'mem-chop');
+    assert(chops.every(x => (x.entry.said || []).length) && repeats(chops) === 0, `chops: ${repeats(chops)} lines said again within 6 songs`);
+    // refrains of 2 or 3 entries: the pool runs out; each entry said again is the one said longest ago among those left
+    const refr = run({ phrases: '1', ways: ['refrain'], presence: 'always', vocab: 'night' }, ['synthwave'], 20, 'mem-ref');
+    let oldest = 0;
+    refr.forEach((x, i) => {
+      const mem = sessionMemory(refr.map(y => y.entry), i);
+      for (const k of x.entry.said || []) if (Object.hasOwn(mem.recent, k)) {
+        // a recent entry was drawn: no entry of the group was free (never said in the 5 songs before) and not in the song
+        const free = VOCABULARY.night.map(e => `en:${e.en}`).filter(y => !Object.hasOwn(mem.recent, y) && !(x.entry.said || []).includes(y));
+        assert(!free.length, `song ${i + 1}: said ${k} again with ${free.join(', ')} free`);
+        oldest++;
+      }
+    });
+    // 120 songs of a style with lines of its own: a style line in one song out of five at most
+    const long = run({ phrases: '1', ways: ['refrain'], presence: 'always' }, ['dark-cyberpunk'], 120, 'mem-long');
+    const own = new Set(Object.values(STYLES.find(r => r.id === 'dark-cyberpunk').spoken.lines || {}).flat().map(x => `en:${typeof x === 'string' ? x : x.en}`));
+    const counts = {}; for (const x of long) for (const k of x.entry.said || []) if (own.has(k)) counts[k] = (counts[k] || 0) + 1;
+    const most = Math.max(0, ...Object.values(counts));
+    assert(Object.keys(counts).length && most <= 120 / 5, `style lines: ${JSON.stringify(counts)}`);
+    // Replay: the same seed and options say the same lines
+    const again = run({ phrases: '1', ways: ['refrain'], presence: 'always', vocab: 'night' }, ['synthwave'], 20, 'mem-ref');
+    assert(JSON.stringify(again.map(x => x.entry.said)) === JSON.stringify(refr.map(x => x.entry.said)), 'Replay says other lines');
+    // a steering rewrite of song 8 uses the memory of songs 3 to 7, the same twice, and none of their lines while others are free
+    const g = refr[7], cmd = [{ kind: 'voice', voice: { phrases: '2-3', kind: 'different', presence: 'always' }, at: 0 }];
+    const a = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmd, seed: 'mem-ref', n: 7 }).song, b = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmd, seed: 'mem-ref', n: 7 }).song;
+    assert(JSON.stringify(a) === JSON.stringify(b) && g.plan.recent, 'a steering rewrite differs between two runs, or the plan has no memory');
+    console.log(`      20 chops without repeats; ${oldest} refrain entries said again as the oldest left; style lines over 120 songs: at most ${most}`);
+  },
   'arrangement: old add and remove replay as before radio-arrangement'() {
     // a recorded session with add lead, remove drums, add pad and a lock gives the songs heard before (hash recorded
     // with the code before radio-arrangement, on develop 5c0dd4f: #82 renamed the narrator track and gave more styles a
@@ -982,8 +1017,9 @@ const CHECKS = {
     }
     // (a radio voice's Fold, director version 13, is a voice fact: left out)
     for (const sg of out) for (const t of sg.tracks) if (t.type === 'voice' && Array.isArray(t.rack)) { t.rack = t.rack.filter(d => d.device !== 'fold'); if (!t.rack.length) delete t.rack; }
-    const h = hashString(JSON.stringify(out)).toString(16).padStart(8, '0');
-    assert(h === 'a6e28951', `old commands give other songs: ${h}`);
+    const h = hashString(JSON.stringify(voiceless(out))).toString(16).padStart(8, '0');
+    // (since director version 14 the voice tracks are left out, voiceless: 9475a713 is a6e28951 without them, on develop 0307b02)
+    assert(h === '9475a713', `old commands give other songs: ${h}`);
   },
   'arrangement: + and − per instrument, several tracks of one instrument'() {
     let checked = 0;

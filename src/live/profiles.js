@@ -27,7 +27,10 @@ export const CONTROLS = {
   tracks: [true, false],
   notes: [true, false],
   steps: [true, false],
+  // the voices' code (voice-track-tuning D11, Options): "V:N code" (voice, the narrator's lines) and "V:T code"
+  // (spoken, the voice track's lines); off, they play from the hidden code. Their defaults follow the build (codeDefaults)
   voice: [true, false],
+  spoken: [true, false],
   highlights: [false, true],
   wrap: [false, true],
   // technical functions (code-writing, song-functions): separate options; the preset (full, short, mixer, compact or
@@ -50,18 +53,18 @@ export const CONTROLS = {
   development: ['auto', ...DEVELOPMENTS],
 };
 export const PROFILES = {
-  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
-  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, spoken: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: false, spoken: false, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
   // Live coder (shown so since clear-names; the id stays switch in songs, recipes and storage); its comments are the
   // title only (radio-profiles 9.2): no track names, notes or phrases
-  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: false, notes: false, steps: false, voice: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, fnLanes: true, typist: 'human', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: false, notes: false, steps: false, voice: false, spoken: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, fnLanes: true, typist: 'human', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
 };
 export const PROFILE_IDS = Object.keys(PROFILES);
 // the controls that change only how the code looks, never the sound or the growth (radio-profiles 9.1): comments, technical
 // functions, the title, lit notes, line breaks, human typing and its mistakes. In the radio they apply to the song on air
 // from its next code edit; the others (build, growth, duration, shape, view, generator, narrator, narrated, narrator style, typing speed) from the
 // next song
-export const DISPLAY_CONTROLS = ['title', 'tracks', 'notes', 'steps', 'voice', 'highlights', 'wrap', 'fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'fnLanes', 'typist', 'mistakes'];
+export const DISPLAY_CONTROLS = ['title', 'tracks', 'notes', 'steps', 'voice', 'spoken', 'highlights', 'wrap', 'fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'fnLanes', 'typist', 'mistakes'];
 // the code options that also apply with the Live build off (profile-options): the song as written goes through the
 // live code when one of them is away from Classic's
 export const CODE_CONTROLS = DISPLAY_CONTROLS.filter(k => k !== 'typist' && k !== 'mistakes');
@@ -87,7 +90,14 @@ export function songProfile(song) {
 // overrides cleaned: only known controls with allowed values, and only those that differ from the profile
 // a comments preset (saved before code-writing, or picked in Compose) stands for its options; so does a technical
 // functions preset (full, short and mixer saved before song-functions keep their meaning)
-export function cleanOverrides(raw, base) {
+// The voices' code defaults (voice-track-tuning D11, owner answer 2): hidden when the song grows (the crescendo build of
+// Crescendo, Live coder or a custom profile), shown when the code is static (Classic, or the Live build off: live false)
+export const codeDefaults = (build, live = true) => (live && build === 'crescendo' ? { voice: false, spoken: false } : { voice: true, spoken: true });
+// a profile's base with the voices' code defaults of the build the overrides ask for (a value set by the user is kept: it
+// differs from this base)
+const baseFor = (base, raw, live) => { const b = raw && CONTROLS.build.includes(raw.build) ? raw.build : base && base.build; return base ? { ...base, ...codeDefaults(b, live) } : base; };
+export function cleanOverrides(raw, base, { live = true } = {}) {
+  base = baseFor(base, raw, live);
   const out = {}, src = raw && typeof raw === 'object' ? { ...raw } : {};
   if (COMMENT_PRESETS[src.comments]) { for (const [k, v] of Object.entries(COMMENT_PRESETS[src.comments])) if (!(k in src)) src[k] = v; }
   if (FUNCTION_PRESETS[src.functions]) { for (const [k, v] of Object.entries(FUNCTION_PRESETS[src.functions])) if (!(k in src)) src[k] = v; }
@@ -96,8 +106,9 @@ export function cleanOverrides(raw, base) {
   return out;
 }
 // the controls in force: { id, custom, ...controls }
-export function resolveProfile(id, overrides = {}) {
-  const pid = PROFILES[id] ? id : 'classic', base = PROFILES[pid], over = cleanOverrides(overrides, base);
+// live: false (Compose with the Live build off) shows both voices' code unless the user hid it
+export function resolveProfile(id, overrides = {}, { live = true } = {}) {
+  const pid = PROFILES[id] ? id : 'classic', base = baseFor(PROFILES[pid], overrides, live), over = cleanOverrides(overrides, PROFILES[pid], { live });
   const c = { ...base, ...over };
   return { id: pid, custom: Object.keys(over).length > 0, ...c, comments: commentPreset(c), functions: functionPreset(c) };
 }

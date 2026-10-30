@@ -180,7 +180,8 @@ function foldSong(cs, table, used) {
 // a voice line (voice-function, song-functions): the effects between its mask and its bus become a song function with
 // no parameters, named from the voice words of the song; voices: chain → name, so the same chain keeps its name
 function voiceCall(cs, ctx, used) {
-  const head = cs[0].text.match(/s\("say_[a-z]+(?:_(\w+))?"\)/);
+  // (a line of several entries starts with n(…) and names its bank in the next call, voice-track-tuning D7)
+  const head = cs[0].text.match(/s\("say_[a-z]+(?:_(\w+))?"\)/) || (/\bn\(/.test(cs[0].text) && cs[1] && cs[1].text.match(/^\s*\.s\("say_[a-z]+(?:_(\w+))?"\)/));
   if (!head) return;
   const at = cs.findIndex(c => c.name === 'mask'), end = cs.findIndex(c => c.name === 'orbit');
   if (at < 0 || end < 0 || end - at < 2) return;
@@ -342,6 +343,49 @@ export function splitVoice(code) {
   return { shown: shown.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\n+$/, ''), voice: voice.join('\n') };
 }
 
+// the voice instrument's code (voice-track-tuning D8, D11): its blocks ("// ===== … · spoken =====", then for each line
+// its quoting comment and its `$:` lines) split into the lines shown and the lines that play from the hidden tail.
+// keep(line): whether a `$:` line shows; null hides every line ("V:T code" off). A block's header shows when one of its
+// lines does; a comment goes with its lines (a line with no sample has no `$:` line and is hidden in the hidden tail).
+const SPOKEN_HEAD = /^\/\/ =+ (?:.* · )?spoken =+$/;
+export function splitSpoken(code, keep = null) {
+  const lines = code.split('\n'), shown = [], hidden = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!SPOKEN_HEAD.test(lines[i].trim())) { shown.push(lines[i]); continue; }
+    let j = i + 1;
+    while (j < lines.length && !/^\/\/ =+ /.test(lines[j].trim()) && lines[j].trim()) j++;
+    const body = lines.slice(i + 1, j), show = [], hide = [], other = [];
+    for (let k = 0; k < body.length;) {
+      // (a step's comment the build puts under the header, "// > …" or "// you: …", stays in the code shown)
+      if (/^\s*\/\//.test(body[k]) && !/^\s*\/\/ "/.test(body[k])) { other.push(body[k]); k++; continue; }
+      // a unit: a line's quoting comment and the pattern lines after it (or a pattern line alone)
+      let e = k + 1;
+      if (/^\s*\/\//.test(body[k])) while (e < body.length && !/^\s*\/\//.test(body[e])) e++;
+      const unit = body.slice(k, e), pats = unit.filter(l => /^\s*[_S]?\$:/.test(l)), on = keep ? pats.filter(keep) : [];
+      if (on.length) { show.push(...unit.filter(l => !/^\s*[_S]?\$:/.test(l) || on.includes(l))); hide.push(...pats.filter(l => !on.includes(l))); }
+      else hide.push(...unit);
+      k = e;
+    }
+    if (show.length) shown.push(lines[i], ...other, ...show);
+    else shown.push(...other);
+    if (hide.length) hidden.push(lines[i], ...hide);
+    i = j - 1;
+  }
+  return { shown: shown.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\n+$/, ''), hidden: hidden.join('\n') };
+}
+// the bars a voice line starts on, read from its mask lane ("<0!8 1 0!3 1>"), or null without one
+export function maskBars(line) {
+  const m = String(line).match(/\.mask\("<([^">]*)>"\)/);
+  if (!m) return null;
+  const out = [];
+  let at = 0;
+  for (const tok of m[1].trim().split(/\s+/)) {
+    const [v, n] = tok.split('!'), k = n === undefined ? 1 : +n;
+    if (Number(v) > 0) for (let j = 0; j < k; j++) out.push(at + j);
+    at += k;
+  }
+  return out;
+}
 // the song's functions and names for writeCode, made once per song: ref, the song written in full; song: { id, tags,
 // profile }; o: the options
 export function functionContext(ref, song = {}, o = {}) {

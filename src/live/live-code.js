@@ -2,7 +2,7 @@
 // controls in force (performance-profiles). Pure: the app and the Node checks build the same code.
 import { compileSong } from '../song/compile.js';
 import { buildSteps, stateAt, annotate, voiceCode } from '../song/build.js';
-import { withNarratorStyle } from '../song/spoken.js';
+import { withNarratorStyle, placeSpoken } from '../song/spoken.js';
 import { compileCompact, compileNow, liftLanes, clipBounds } from '../song/compile-compact.js';
 import { applyComments } from '../song/comments.js';
 import { idiomatic } from '../song/idiom.js';
@@ -12,7 +12,7 @@ import { planWritten } from './written-plan.js';
 import { resolveProfile } from './profiles.js';
 import { rampLists } from '../song/ramps.js';
 import { placeWidgets, stripWidgets, instrumentOf, widgetSettings } from './widgets.js';
-import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOptions, functionContext, FUNCTION_OPTIONS, lineKey, addEntry } from '../song/writer.js';
+import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, splitSpoken, maskBars, functionOptions, functionContext, FUNCTION_OPTIONS, lineKey, addEntry } from '../song/writer.js';
 
 // build: the live build (a song with steps); C: the controls; lang(): the language of the comments; files(): the
 // custom samples manifest, for the spoken comments; cols(): the width of the code panel in characters, for the line
@@ -24,8 +24,10 @@ import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, functionOp
 // canon (reused-lines): this is the reference instance the choices of the code edited in place are made on
 // the live build as the code is written from it (after-tests-oct28 D2: the radio lists its voices from the same
 // build): the narrator style of the controls (voice-controls) over the song's own, and in the code of the moment one
-// step at each section boundary (and clip change with Sections), with the bars that prepare it
-// → { build, lanes, now, inPlace, bounds }
+// step at each section boundary (and clip change with Sections), with the bars that prepare it; with the voice track's
+// lines just in time (voice-track-tuning D8: a grown song's code of the moment with "V:T code" on) a display step on the
+// bar before a line's first start when no step falls in the 4 bars before it (it changes only the code shown)
+// → { build, lanes, now, inPlace, bounds, jit }
 function momentOf(build, C) {
   build = withNarratorStyle(build, C.narratorStyle);
   const o = functionOptions(C);
@@ -46,7 +48,28 @@ function momentOf(build, C) {
     if (bounds) for (const b of bounds) extra.push({ at: b });
     build = { ...build, build: [...extra.filter(x => x.at > 0), ...(build.build || [])] };
   }
-  return { build, lanes, now, inPlace, bounds };
+  const jit = !!(build.crescendo && C.view === 'now' && C.spoken !== false && (build.tracks || []).some(t => t.type === 'spoken'));
+  if (jit) {
+    const at = new Set(buildSteps(build).map(x => x.at)), shows = [];
+    for (const first of spokenFirsts(build)) {
+      if (first < 2) continue;
+      let ok = false;
+      for (let b = first - JIT_BARS; b <= first - 1; b++) if (b === 0 || at.has(b)) ok = true;
+      if (!ok && !shows.includes(first - 1)) shows.push(first - 1);
+    }
+    if (shows.length) build = { ...build, build: [...shows.map(b => ({ at: b, display: true })), ...(build.build || [])] };
+  }
+  return { build, lanes, now, inPlace, bounds, jit };
+}
+// D8: a voice-track line shows from the last code step in the JIT_BARS bars before its first start
+export const JIT_BARS = 4;
+// the first bars the voice track's lines start on (each line of each clip, by its offset), from placeSpoken
+function spokenFirsts(build) {
+  const out = new Set();
+  try {
+    for (const p of placeSpoken(build)) { const byLate = new Map(); for (const s of p.starts) byLate.set(s.late, Math.min(byLate.get(s.late) ?? Infinity, s.bar)); for (const b of byLate.values()) out.add(b); }
+  } catch (e) { /* a song the compiler cannot place: no display steps */ }
+  return [...out].sort((a, b) => a - b);
 }
 export const liveBuildOf = (build, C) => momentOf(build, C).build;
 // growthAhead: false plans lines typed ahead in the written part only (the shape search measures the growth without
@@ -148,7 +171,24 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     for (const l of M) { if (i < B.length && l === B[i]) { i++; continue; } if (!(/^\s*_\$:/.test(l) || /^\s*\/\//.test(l) || /^const \w+ = /.test(l) || !l.trim())) return false; }
     return i === B.length;
   };
-  const codeWith = (bar, keep, { plan = null, info = null, wrap = true, widgets: wOn = false } = {}) => {
+  // voice-track-tuning D8: the bars of the code steps (display steps included), and whether a voice-track line shows at a
+  // bar: from the last step in the JIT_BARS bars before its first start (bar 0 for a start on bar 0 or 1) to the first
+  // step after its last start
+  let stepList = null;
+  const codeSteps = () => (stepList = stepList || [...new Set([0, ...buildSteps(build).map(x => x.at)])].sort((a, b) => a - b));
+  const dueAt = bar => line => {
+    const starts = maskBars(line);
+    if (!starts || !starts.length) return true;
+    const first = starts[0], last = starts[starts.length - 1], S = codeSteps();
+    const before = S.filter(b => b <= first - 1), near = before.filter(b => b >= first - JIT_BARS);
+    const from = first <= 1 ? 0 : near.length ? near[near.length - 1] : before.length ? before[before.length - 1] : 0;
+    const after = S.find(b => b > last), to = after === undefined ? Infinity : after;
+    return bar >= from && bar < to;
+  };
+  // split: the code shown on screen (codeAt), with the voice-track lines that are not due, or every one with "V:T code"
+  // off, in the hidden tail; the plan, the paste rule and the typing load read the code without it (codeLoad), so the
+  // growth and its typing stay as they were
+  const codeWith = (bar, keep, { plan = null, info = null, wrap = true, widgets: wOn = false, split = false } = {}) => {
     const src = refBuild && bar < refUntil ? refBuild : build, st = stateAt(src, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
     let hide = inPlace ? [] : null;
     const voice = () => (C.narrator === false ? '' : voiceCode(build, st.song, st.upTo, total, lang(), files()));
@@ -164,11 +204,17 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     } else c = annotate(ramp(compileAt(only(st.song, keep), bar, hide, plan, info)), build, st.upTo, lang()) + voice();
     // (the narrator off, profile-options: no spoken step lines at all, neither shown nor hidden; the phrases written as
     // comments follow the comment options, the voice instrument's lines are part of the song's code)
+    // the voice track's lines (voice-track-tuning D8, D11): just in time, or hidden with "V:T code" off
+    let spokenHidden = '';
+    if (split && (C.spoken === false || M.jit)) { const sp = splitSpoken(c, C.spoken === false ? null : dueAt(bar)); c = sp.shown; spokenHidden = sp.hidden; }
     // the voice is taken out before the comments go: it is found by its header
     const v = C.voice === false ? splitVoice(c) : { shown: c, voice: '' };
     const lifted = inPlace ? liftLanes(applyComments(v.shown, C), { gated: lanes }) : { code: applyComments(v.shown, C), lanes: null };
     const w = writeCode(lifted.code, { mode: o, written, buses, fns: fctx });
-    w.voice = [hide && hide.length ? hide.join('\n') : '', v.voice].filter(Boolean).join('\n\n');
+    // (hidden voice code keeps its effects folded with Voice effects on, voice-track-tuning D11: the same song function
+    // as when it shows; written after the code shown, so the shown lines name their functions first)
+    const folded = txt => { if (!txt || !o.fnVoice) return txt; const h = writeCode(txt, { mode: { fnVoice: true }, fns: fctx }); Object.assign(fns, h.fns); return h.code; };
+    w.voice = [hide && hide.length ? hide.join('\n') : '', folded(v.voice), folded(spokenHidden)].filter(Boolean).join('\n\n');
     w.table.forEach((e, k) => addEntry(table, k, e));
     Object.assign(fns, w.fns);
     // code widgets (D4): the calls after the folding, before the line breaks and the hidden tail
@@ -197,7 +243,10 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // (lines-ahead-balanced D2) the plan from the first step after bar 0: lines ahead are typed at growth steps too
   const planAt = bar => (planOn && bar >= (growthAhead ? 1 : returning) ? planOf() : null);
   const codeRaw = (bar, keep) => codeWith(bar, keep, { plan: planAt(bar) });
-  const codeAt = (bar, keep) => { const c = codeWith(bar, keep, { plan: planAt(bar), widgets: true }); return keep || !typedWidgets() ? c : idleWidgets(bar, c); };
+  const codeAt = (bar, keep) => { const c = codeWith(bar, keep, { plan: planAt(bar), widgets: true, split: true }); return keep || !typedWidgets() ? c : idleWidgets(bar, c); };
+  // the code as codeAt shows it, with every voice-track line as written (voice-track-tuning D9: the typing load and the
+  // growth's shape search measure this code, so voice lines shown just in time or hidden never move a growth)
+  const codeLoad = (bar, keep) => { const c = codeWith(bar, keep, { plan: planAt(bar), widgets: true }); return keep || !typedWidgets() ? c : idleWidgets(bar, c); };
   // code widgets: the settings now, the section of a bar, the instrument of each pattern line (from the code before the
   // writer takes the visuals out), and whether a muted line returns within the window (the code at the next steps)
   const widgetsNow = () => { const S = typeof widgets === 'function' ? widgets() : widgets; return S && S.on ? widgetSettings(S) : null; };
@@ -265,10 +314,10 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     return chainLines(shown).filter(l => /^\s*[_S]?\$:/.test(l)).map(l => laneLines.get(lineKey(l)) || null);
   };
   // nothing hidden: the code shown is the code evaluated
-  const run = !any && C.voice !== false && !inPlace ? null : shown => shown + tail(shown, { table, entries: entrySets.get(plainKey(shown)) || null, voice: hidden.get(plainKey(shown)) || '', like: lineLike, lanes: lanesOf(shown) });
+  const run = !any && C.voice !== false && C.spoken !== false && !M.jit && !inPlace ? null : shown => shown + tail(shown, { table, entries: entrySets.get(plainKey(shown)) || null, voice: hidden.get(plainKey(shown)) || '', like: lineLike, lanes: lanesOf(shown) });
   // the code that plays anywhere (copied, opened in Strudel): the helpers written out, the code shown, its tail
   const standalone = run && (shown => { const pre = any || inPlace ? preludeText(buses, fns) : ''; return pre + shown + tail(shown, { table: any ? table : new Map(), entries: any ? entrySets.get(plainKey(shown)) || null : null, voice: hidden.get(plainKey(shown)) || '', like: lineLike, offset: pre.length, lanes: lanesOf(shown) }); });
-  const out = { build, now, inPlace, codeAt, run, standalone, buses, fns, shownLine, plan: () => (planOn ? planOf() : { edits: new Map(), ahead: [] }) };
+  const out = { build, now, inPlace, codeAt, codeLoad, run, standalone, buses, fns, shownLine, plan: () => (planOn ? planOf() : { edits: new Map(), ahead: [] }) };
   self = out;
   // the lines typed ahead, muted (reused-lines D8): [{ header, text, from, to }]
   out.ahead = () => (planOn ? planOf().ahead : []);
@@ -288,7 +337,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     }
     return [...lines.keys()];
   };
-  out.paste = pasteRule({ ...out, codeAt: codeRaw }, C, { seed: build.id || '' });
+  out.paste = pasteRule({ ...out, codeAt: codeRaw, codeLoad: codeRaw }, C, { seed: build.id || '' });
   return out;
 }
 // (inside liveCode the name `liveCode` is the view of the controls)

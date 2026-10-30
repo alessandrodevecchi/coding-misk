@@ -3,10 +3,10 @@
 ## ADDED Requirements
 
 ### Requirement: Voice-track lines just in time
-In the code of the moment of a grown song (Live coder and Crescendo) a voice-track line SHALL show from the last code step in the 4 bars before its first start until the first code step after its last start. When no code step falls in those 4 bars, a display step on the bar before its first start SHALL bring it in; a display step changes only the code shown. Outside that span the line SHALL play from the hidden tail, so the sound is unchanged.
+In the code of the moment of a grown song (Live coder and Crescendo), with "V:T code" on (off by default in these profiles, see code-writing), a voice-track line SHALL show from the last code step in the 4 bars before its first start until the first code step after its last start. When no code step falls in those 4 bars, a display step on the bar before its first start SHALL bring it in; a display step changes only the code shown. Outside that span the line SHALL play from the hidden tail, so the sound is unchanged.
 
 #### Scenario: Grown radio song
-- **WHEN** the radio plays seed `f7zvee` with the Live coder profile and the song "Static" is on air at bar 0
+- **WHEN** the radio plays seed `f7zvee` with the Live coder profile and "V:T code" on, and the song "Static" is on air at bar 0
 - **THEN** the code of the moment shows no voice-track line, and each of the 12 voice lines shows only from shortly before it first speaks until the code step after it last speaks
 
 #### Scenario: Same sound

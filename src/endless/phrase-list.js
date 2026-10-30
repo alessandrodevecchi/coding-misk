@@ -21,7 +21,9 @@ export function vocabOf(pat) {
   const x = pat && pat.text;
   if (typeof x === 'string') return x.startsWith('vocab:') && VOCAB_GROUPS.includes(x.slice(6)) ? x.slice(6) : null;
   if (!x || typeof x !== 'object') return null;
-  return FILL_GROUPS.find(g => VOCABULARY[g].some(e => e.en === x.en && (x.it === undefined || e.it === x.it))) || null;
+  // (entries written out, voice-track-tuning D4: the group of all of them)
+  const list = Array.isArray(x) ? x : [x];
+  return (list.length && FILL_GROUPS.find(g => list.every(y => y && VOCABULARY[g].some(e => e.en === y.en && (y.it === undefined || e.it === y.it))))) || null;
 }
 // where a row's text comes from: own (written here), vocab (a vocabulary entry or group), style (the style's lines or a draw)
 export const sourceOf = pat => (vocabOf(pat) ? 'vocab' : pat && pat.text ? 'own' : 'style');

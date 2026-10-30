@@ -28,7 +28,7 @@ function addSay(set, say) {
 function addSong(set, song) {
   if (!song || typeof song !== 'object') return;
   try { for (const st of buildSteps(song)) addSay(set, st.say); } catch (e) { /* not a song */ }
-  for (const t of song.tracks || []) for (const p of Object.values(t.patterns || {})) if (p && p.text && !(typeof p.text === 'string' && p.text.startsWith('vocab:'))) addSay(set, p.text);
+  for (const t of song.tracks || []) for (const p of Object.values(t.patterns || {})) if (p && p.text && !(typeof p.text === 'string' && p.text.startsWith('vocab:'))) for (const x of Array.isArray(p.text) ? p.text : [p.text]) addSay(set, x);
   const n = song.narrator && typeof song.narrator === 'object' && song.narrator.lines ? song.narrator.lines : null;
   if (n) for (const l of Object.values(n)) for (const x of l || []) addSay(set, x);
 }
