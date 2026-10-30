@@ -20,18 +20,18 @@ Estimate: about 19 agent hours (16 to 22), in the order below. Each group ends w
 
 ## 3. Generation rules (about 3 h)
 
-- [ ] 3.1 `src/endless/director.js`: new `CHOP_RHYTHMS`; chop clips at most 4 bars with `every: 2` (`spokenPlace`, `spokenParts`); refrain `every` from `[4, 8]`; one-phrase refrain `times: 3`; mixed A slots (D3); vocabulary lines written out without repeats in the song (D4).
-- [ ] 3.2 `src/endless/voice-track.js`: the same in `extrasOf`, the first line, the one-phrase refrain clip, chop clip length in `rewriteSpoken` and `placeGrownSpoken`.
-- [ ] 3.3 Style line share one half in both paths (`STYLE_LINE_SHARE`).
-- [ ] 3.4 `npm run check:spoken`, `npm run check:phrases`.
+- [x] 3.1 `src/endless/director.js`: new `CHOP_RHYTHMS`; chop clips at most 4 bars with `every: 2` (`spokenPlace`, `spokenParts`); refrain `every` from `[4, 8]`; one-phrase refrain `times: 3`; mixed A slots (D3); vocabulary lines written out without repeats in the song (D4).
+- [x] 3.2 `src/endless/voice-track.js`: the same in `extrasOf`, the first line, the one-phrase refrain clip, chop clip length in `rewriteSpoken` and `placeGrownSpoken`.
+- [x] 3.3 Style line share one half in both paths (`STYLE_LINE_SHARE`).
+- [x] 3.4 `npm run check:spoken`, `npm run check:phrases`.
 
 ## 4. Memory in the radio session (about 3 h)
 
-- [ ] 4.1 `createSession`/`makeSong`: `entry.said`, `recent` over the 5 songs before (`RECENT_SONGS`), least recently used fallback.
-- [ ] 4.2 Every line draw takes `recent` (A, new lines, vocabulary entries, my phrases); the radio voice steering commands pass the session's `recent` for the song they rewrite (`src/endless/steering.js`).
-- [ ] 4.3 My phrases: session-overlaid use counts for `mineSpokenTrack` and `song.mine` (D6).
-- [ ] 4.4 `DIRECTOR_VERSION` 14 with its comment; `npm run check:endless -- --write-fixtures`, then `npm run check:endless`; new cases: no line said twice within 6 songs while candidates remain, Replay equality, steering rewrite equality.
-- [ ] 4.5 `npm run check:phrases` (session counts, exclusion, Mai unchanged), `npm run check:radio-profiles`.
+- [x] 4.1 `createSession`/`makeSong`: `entry.said`, `recent` over the 5 songs before (`RECENT_SONGS`), least recently used fallback.
+- [x] 4.2 Every line draw takes `recent` (A, new lines, vocabulary entries, my phrases); the radio voice steering commands pass the session's `recent` for the song they rewrite (`src/endless/steering.js`).
+- [x] 4.3 My phrases: session-overlaid use counts for `mineSpokenTrack` and `song.mine` (D6).
+- [x] 4.4 `DIRECTOR_VERSION` 14 with its comment; `npm run check:endless -- --write-fixtures`, then `npm run check:endless`; new cases: no line said twice within 6 songs while candidates remain, Replay equality, steering rewrite equality.
+- [x] 4.5 `npm run check:phrases` (session counts, exclusion, Mai unchanged), `npm run check:radio-profiles`.
 
 ## 5. Just-in-time lines and the Options toggles (about 5.5 h)
 

@@ -18,7 +18,7 @@ import { crescendoSong } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
 import { shapeFacts, canPlay, resolveShape } from '../src/song/shapes.js';
-import { generateSession, createSession } from '../src/endless/director.js';
+import { generateSession, createSession, CHOP_RHYTHMS, mixedSlots } from '../src/endless/director.js';
 import { VOICE_PRESETS, VOICE_PHRASES, PHRASE_RANGES, applyPreset, presetOf, cleanVoice, isDefaultVoice } from '../src/endless/voice-options.js';
 import { voiceEvent } from '../src/endless/voice-panel.js';
 import { withNarratorStyle, lineTexts, narratorStyle } from '../src/song/spoken.js';
@@ -1080,6 +1080,50 @@ const CHECKS = {
     const code = compileSong(listSong);
     assert(/\$: n\("\d+ \d+ \d+ ~"\)\.s\("say_[a-z_]+"\)/.test(code) && !/s\("say_[a-z_]+"\)\.n\("/.test(code), `code: ${code.split('\n').filter(l => /say_/.test(l)).join(' | ')}`);
     console.log(`      chop every 2: bars ${bars(chopSong(2))}; refrain times 3: ${three} of ${all.length} starts`);
+  },
+  'generation (voice-track-tuning D1 to D4): one chop at most 4 bars heard on at most 2; one refrain heard at most 3 times, 4 bars apart; refrains every 4 or 8; mixed A at most 3 times, spread; vocabulary lines written out, no entry in two lines'() {
+    const ALL = ['quiet', 'medium', 'busy'], seen = { chop: 0, refrain: 0, mixed: 0, lists: 0 };
+    const songsOf = (voice, seed, n = 8, st = VOICE_STYLES) => { const s = createSession(recipes, seed); return Array.from({ length: n }, () => s.next({ styles: st, voice }).song).filter(x => x.tracks.some(t => t.type === 'spoken')); };
+    const keysOf = text => (Array.isArray(text) ? text.map(x => x.en) : text && typeof text === 'object' ? [text.en] : typeof text === 'string' && !text.startsWith('vocab:') ? [text] : []);
+    for (const seed of ['gen-a', 'gen-b', 'gen-c']) {
+      for (const song of songsOf({ phrases: '1', ways: ['chop'], presence: 'always' }, seed)) {
+        const p = placeSpoken(song, 'en'), sp = spokenOf(song);
+        assert(sp.clips.length === 1 && sp.clips[0].bars <= 4 && sp.patterns.A.every === 2, `${song.id}: chop clip ${JSON.stringify(sp.clips)} every ${sp.patterns.A.every}`);
+        assert(p.every(x => x.starts.length <= 2), `${song.id}: chop heard on ${p.map(x => x.starts.length)} bars`);
+        assert(CHOP_RHYTHMS.includes(sp.patterns.A.rhythm) && sp.patterns.A.rhythm.split(' ').filter(x => x !== '~').length === 3, `${song.id}: chop rhythm ${sp.patterns.A.rhythm}`);
+        seen.chop++;
+      }
+      for (const song of songsOf({ phrases: '1', ways: ['refrain'], presence: 'always' }, seed)) {
+        const p = placeSpoken(song, 'en'), sp = spokenOf(song), bars = p.flatMap(x => x.starts.map(s => s.bar)).sort((a, b) => a - b);
+        assert(sp.patterns.A.times === 3 && [4, 8].includes(sp.patterns.A.every), `${song.id}: refrain ${JSON.stringify(sp.patterns.A)}`);
+        assert(bars.length <= 3 && bars.every((b, i) => !i || b - bars[i - 1] >= 4), `${song.id}: refrain heard on bars ${bars}`);
+        seen.refrain++;
+      }
+      for (const song of songsOf({ phrases: 'many', kind: 'mixed', presence: 'always', where: ALL }, seed)) {
+        const sp = spokenOf(song), clips = [...sp.clips].sort((a, b) => a.start - b.start), keys = clips.map(c => c.pattern);
+        const n = keys.length, a = keys.map((k, i) => (k === 'A' ? i : -1)).filter(i => i >= 0);
+        assert(a[0] === 0 && a.length <= 3 && a.every((i, j) => !j || i - a[j - 1] >= 2), `${song.id}: A in phrases ${a.map(i => i + 1)} of ${n}`);
+        assert(new Set(keys.filter(k => k !== 'A')).size === keys.filter(k => k !== 'A').length, `${song.id}: a new line repeats: ${keys}`);
+        // no entry or line in two patterns
+        const all = Object.values(sp.patterns).flatMap(p => keysOf(p.text));
+        assert(new Set(all).size === all.length, `${song.id}: an entry in two lines: ${all}`);
+        for (const p of Object.values(sp.patterns)) {
+          if (p.way === 'refrain') assert([4, 8].includes(p.every), `${song.id}: refrain every ${p.every}`);
+          if (Array.isArray(p.text)) { seen.lists++; assert(p.way !== 'chop' && p.text.length >= 2 && p.text.length <= 4, `${song.id}: list ${JSON.stringify(p)}`); }
+          assert(!(typeof p.text === 'string' && p.text.startsWith('vocab:')), `${song.id}: a vocab: line left for the compiler`);
+        }
+        seen.mixed++;
+      }
+    }
+    // the mixed slots: 12 phrases give A on 1, 5, 9; 3 phrases A, B, A
+    assert(JSON.stringify([...mixedSlots(12)]) === '[0,4,8]' && JSON.stringify([...mixedSlots(3)]) === '[0,2]' && JSON.stringify([...mixedSlots(2)]) === '[0]' && JSON.stringify([...mixedSlots(6)]) === '[0,2,4]', 'mixed slots');
+    // written out: the same entries in Italian
+    const song = songsOf({ phrases: '1', ways: ['refrain'], presence: 'always', vocab: 'night' }, 'gen-it', 4)[0], sp = spokenOf(song);
+    assert(Array.isArray(sp.patterns.A.text), `refrain with the night vocabulary: ${JSON.stringify(sp.patterns.A.text)}`);
+    const it = placeSpoken(song, 'it').find(p => p.track === sp.id), en = placeSpoken(song, 'en').find(p => p.track === sp.id);
+    assert(JSON.stringify(it.texts) === JSON.stringify(sp.patterns.A.text.map(x => x.it)) && JSON.stringify(en.texts) === JSON.stringify(sp.patterns.A.text.map(x => x.en)), `languages: ${it.texts} / ${en.texts}`);
+    assert(seen.chop >= 10 && seen.refrain >= 10 && seen.mixed >= 10 && seen.lists > 0, `too few songs: ${JSON.stringify(seen)}`);
+    console.log(`      ${seen.chop} chops, ${seen.refrain} refrains, ${seen.mixed} mixed songs (${seen.lists} lists of entries)`);
   },
   'spoken needs (spoken-text-on-stage D9): every line the code would say with every sample, with its bank; the schedule with every sample is the needs; a missing sample is listed with has false'() {
     const C = { ...resolveProfile('switch'), narratorStyle: 'poetic', narrated: true }, B = liveBuildOf(crescendoSong({ ...read('songs/prova-voce-notte.json'), kind: 'composed' }, { narrated: true, rules: growthRules(C, { styles: recipes }) }), C);

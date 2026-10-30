@@ -785,7 +785,7 @@ function voiceAir(song, P, list) {
   for (const e of list) {
     const sp = cur.tracks.find(t => t.type === 'spoken');
     if (e.voice) {
-      const r = rewriteSpoken(cur, sp ? sp.id : null, e.voice, { spoken: (P.R && P.R.spoken) || null, from: e.at, seed: e.seed });
+      const r = rewriteSpoken(cur, sp ? sp.id : null, e.voice, { spoken: (P.R && P.R.spoken) || null, from: e.at, seed: e.seed, recent: P.recent || null });
       if (r) cur = r.song;
     }
     // the sound: a set step on the voice track from the command's bar (the voice style's values, speaker and volume kept)

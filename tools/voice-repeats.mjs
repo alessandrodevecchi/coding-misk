@@ -55,7 +55,7 @@ function measureSong(song) {
   const byLine = new Map();
   for (const p of placed) { const k = keysOf(p).join(' · '); byLine.set(k, (byLine.get(k) || 0) + p.starts.length); }
   const starts = [...byLine.values()];
-  return { id: song.id, title: song.title, bars: total, voiceBars: bars.size, share: Math.round((bars.size / total) * 1000) / 1000, lines: Object.fromEntries(byLine), mostStarts: Math.max(...starts), starts: starts.reduce((a, b) => a + b, 0), said: [...new Set(placed.flatMap(keysOf))] };
+  return { id: song.id, title: song.title, bars: total, voiceBars: bars.size, share: Math.round((bars.size / total) * 1000) / 1000, lines: Object.fromEntries(byLine), mostStarts: Math.max(...starts), starts: starts.reduce((a, b) => a + b, 0), said: [...new Set(placed.flatMap(keysOf))], lineKeys: [...byLine.keys()], phrases: placed.length };
 }
 
 function runSession({ seed, styles, where }, voice, count) {
@@ -67,7 +67,7 @@ function runSession({ seed, styles, where }, voice, count) {
   }
   // lines said again within RECENT songs: per song, the keys it says that one of the RECENT songs before said
   let again = 0;
-  out.forEach((s, i) => { const before = new Set(out.slice(Math.max(0, i - RECENT), i).flatMap(x => x.said)); s.again = s.said.filter(k => before.has(k)).length; again += s.again; });
+  out.forEach((s, i) => { const before = new Set(out.slice(Math.max(0, i - RECENT), i).flatMap(x => x.said)); s.again = s.said.filter(k => before.has(k)).length; again += s.again; const prevLines = new Set(out.slice(Math.max(0, i - RECENT), i).flatMap(x => x.lineKeys || [])); s.linesAgain = (s.lineKeys || []).filter(k => prevLines.has(k)).length; });
   return { songs: out, again };
 }
 
@@ -93,7 +93,7 @@ for (const [name, voice] of Object.entries(CONFIGS)) {
       voiceBars: mean(voiced.map(s => s.voiceBars)), maxVoiceBars: Math.max(0, ...voiced.map(s => s.voiceBars)),
       mostStarts: mean(voiced.map(s => s.mostStarts)), maxMostStarts: Math.max(0, ...voiced.map(s => s.mostStarts)),
       share: mean(voiced.map(s => s.share)), againWithin5: sessions.reduce((a, s) => a + s.again, 0),
-      songsWithRepeat: voiced.filter(s => s.again > 0).length,
+      songsWithRepeat: voiced.filter(s => s.again > 0).length, linesAgain: sessions.reduce((a, s) => a + s.songs.reduce((b, x) => b + (x.linesAgain || 0), 0), 0), phrases: mean(voiced.map(s => s.phrases || 0)),
     },
   };
 }
@@ -106,10 +106,10 @@ for (const style of LONG.styles) {
 if (process.argv.includes('--json')) { console.log(JSON.stringify(result, null, 1)); process.exit(0); }
 const pad = (x, n) => String(x).padEnd(n);
 console.log(`Voice-track repeats: ${SESSIONS.length} sessions of ${SONGS} songs per option (seeds ${SESSIONS.map(s => s.seed).join(', ')})\n`);
-console.log(`${pad('option', 12)}${pad('voiced', 8)}${pad('voice bars', 18)}${pad('most starts', 18)}${pad('share', 8)}${pad('again ≤5', 10)}songs with a repeat`);
+console.log(`${pad('option', 12)}${pad('voiced', 8)}${pad('voice bars', 18)}${pad('most starts', 18)}${pad('share', 8)}${pad('phrases', 9)}${pad('entries again ≤5', 18)}${pad('lines again ≤5', 16)}songs with a repeat`);
 for (const [name, c] of Object.entries(result.configs)) {
   const s = c.summary;
-  console.log(`${pad(name, 12)}${pad(`${s.voiced}/${s.songs}`, 8)}${pad(`${s.voiceBars} (max ${s.maxVoiceBars})`, 18)}${pad(`${s.mostStarts} (max ${s.maxMostStarts})`, 18)}${pad(s.share, 8)}${pad(s.againWithin5, 10)}${s.songsWithRepeat}`);
+  console.log(`${pad(name, 12)}${pad(`${s.voiced}/${s.songs}`, 8)}${pad(`${s.voiceBars} (max ${s.maxVoiceBars})`, 18)}${pad(`${s.mostStarts} (max ${s.maxMostStarts})`, 18)}${pad(s.share, 8)}${pad(s.phrases, 9)}${pad(s.againWithin5, 18)}${pad(s.linesAgain, 16)}${s.songsWithRepeat}`);
 }
 console.log(`\nStyle lines over ${LONG.songs} songs of one style (share of voiced songs saying the most frequent style line; repeats within 5 songs)`);
 for (const [style, x] of Object.entries(result.long)) console.log(`${pad(style, 18)}refrain-1: ${x['refrain-1'].max} of ${x['refrain-1'].voiced}, again ${x['refrain-1'].againWithin5}   default: ${x.default.max} of ${x.default.voiced}, again ${x.default.againWithin5}`);

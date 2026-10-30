@@ -47,16 +47,20 @@ export function vocabGroupOf(text) {
 }
 // A spoken track's patterns with my phrases in place of their vocabulary lines (written out). mine: a snapshot; seed:
 // the song's id. Changes the track in place; → the ids of the phrases written
-export function mineSpokenTrack(track, mine, seed, styles = []) {
+// recent (voice-track-tuning D6): the radio session's lines of the 5 songs before ({ "mine:<id>": index }): those
+// phrases are left out while others are free
+export function mineSpokenTrack(track, mine, seed, styles = [], { recent = null } = {}) {
   const used = [];
   if (!mine || !track || !track.patterns) return used;
-  const taken = new Set();
+  const taken = new Set(), old = p => !!recent && Object.hasOwn(recent, `mine:${p.id}`);
   for (const key of Object.keys(track.patterns).sort()) {
     const pat = track.patterns[key], group = pat && vocabGroupOf(pat.text);
     if (!group) continue;
-    // (a phrase already written in another line of the track is not used again while others are left)
+    // (a phrase already written in another line of the track is not used again while others are left; nor one of the
+    // songs before in the session)
     const all = candidates(mine.list, { kind: 'voice', tag: group, lang: mine.lang, styles });
-    const fresh = all.filter(p => !taken.has(p.id));
+    const unused = all.filter(p => !taken.has(p.id)), freshest = unused.filter(p => !old(p));
+    const fresh = freshest.length ? freshest : unused;
     const p = drawMine(fresh.length ? fresh : all, mine.share, seed, 'voice', `${track.id}:${key}`);
     if (!p) continue;
     track.patterns[key] = { ...pat, text: lineOfPhrase(p) };
