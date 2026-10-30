@@ -44,11 +44,11 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 ## 7. Look (1 h)
 
 - [x] 7.1 Icons in `src/icons.js` (wave, microphone, quill, copy, disk, broom, spark, clock), shared with the speaker registry
-- [ ] 7.2 Hardware lights and LCD, light theme tokens, 400 px layout; strings in `src/i18n.js` in both languages
+- [x] 7.2 Hardware lights and LCD, light theme tokens, 400 px layout; strings in `src/i18n.js` in both languages
 
 ## 8. Checks (2 h)
 
-- [ ] 8.1 `tools/check-voices-tab.cjs` (dev server): capture from the radio console and Compose with the three policies (fake helper), toast Annulla and the 10 s No, edit, delete with protected files, copy from a vocabulary, test bench, a delete during playback against the new manifest, hardware, light, 400 px, English
+- [x] 8.1 `tools/check-voices-tab.cjs` (dev server): capture from the radio console and Compose with the three policies (fake helper), toast Annulla and the 10 s No, edit, delete with protected files, copy from a vocabulary, test bench, a delete during playback against the new manifest, hardware, light, 400 px, English
 - [ ] 8.2 Regression: `check:endless`, `check:spoken`, `check-voices.cjs`, `check-steering.cjs`, `check-settings.cjs`, `check-backup.mjs`, `check:light-theme`, `check-light-theme.cjs`, `check:guide`
 
 ## 9. Docs (1 h)

@@ -4910,6 +4910,8 @@ patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast
   } });
 // for the browser checks (tools/check-patterns.cjs): the song open in Compose
 globalThis.codingMiskPatterns = { tab: patternsTab, compose: () => ({ T: JSON.parse(JSON.stringify(T)), sel, dirty }) };
+// for the browser check of my phrases (tools/check-voices-tab.cjs)
+globalThis.codingMiskPhrases = { phr, tab: voicesTab, code: () => (ed && ed.code) || '', manifest: () => customFiles, reload: () => refreshSamples(), keys: () => { const k = sampleKeys(); return { builtin: k.builtin.size, mine: [...k.mine], songs: k.songs.size }; } };
 // artists from artists/ plus the user's (Artists tab)
 const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));
 artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onCompose: a => newSongFromArtist(a), onChange: () => { if (radio) radio.render(); renderArtistPick(); } });

@@ -95,4 +95,4 @@ export function phraseFiles(p, usage, { builtin, mine, songs }) {
   return { files, kept };
 }
 // a size for people: 812 KB, 4.3 MB
-export const sizeText = b => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
+export const sizeText = b => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${b > 0 ? Math.max(1, Math.round(b / 1e3)) : 0} KB`);

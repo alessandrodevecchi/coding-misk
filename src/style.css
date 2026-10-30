@@ -1839,3 +1839,4 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 :root[data-ui="hw"] .ph-share .chip[aria-checked="true"] { color: var(--lcd-fg); border-color: var(--lcd-fg); box-shadow: none; }
 .ph-main .ph-alt { color: var(--muted); font-size: 12px; }
 .ph-meta { color: var(--muted); font-size: 12px; }
+.vt-missing { margin: 8px 0 12px; }

@@ -173,6 +173,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   // voices and phrases (my-phrases D3, D4, D6): the save policy, the lifetime of unsaved samples, how often the director
   // uses my phrases, the space of the samples with a link to the Voci tab
   let phSpace = null;
+  // (five levels do not fit a narrow card as one segmented row: chips that wrap)
+  const chipSeg = (attr, items, cur) => `<div class="chips" role="group">${items.map(([v, l]) => `<button class="chip small" ${attr}="${esc(v)}" aria-pressed="${v === cur}">${esc(l)}</button>`).join('')}</div>`;
   function phrasesCard() {
     const P = app.phrases;
     if (!P) return '';
@@ -180,9 +182,9 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (phSpace === null) { phSpace = ''; P.space().then(x => { phSpace = x; const el = root.querySelector('#set-ph-space'); if (el) el.textContent = x; }); }
     return `<div class="card set-card" id="set-phrases"><h3>${esc(t('setPh'))}</h3>
       <p class="muted">${esc(t('setPhIntro', { n: P.count() }))}</p>
-      ${row(t('setPhSave'), seg('data-ph-set-save', SAVE.map(k => [k, t(`phSave:${k}`)]), S.save), t(`phSaveHint:${S.save}`))}
+      ${row(t('setPhSave'), chipSeg('data-ph-set-save', SAVE.map(k => [k, t(`phSave:${k}`)]), S.save), t(`phSaveHint:${S.save}`))}
       ${row(t('setPhTemp'), `<select data-ph-set-temp data-no-knob>${TEMP.map(k => opt(k, S.temp, t(`phTemp:${k}`))).join('')}</select>`, t('setPhTempHint'))}
-      ${row(t('phShareLbl'), seg('data-ph-set-share', SHARE_LEVELS.map(k => [k, t(`phShare:${k}`)]), S.share), t(`phShareHint:${S.share}`))}
+      ${row(t('phShareLbl'), chipSeg('data-ph-set-share', SHARE_LEVELS.map(k => [k, t(`phShare:${k}`)]), S.share), t(`phShareHint:${S.share}`))}
       ${row(t('phSpace'), `<span id="set-ph-space" class="vt-lcd">${esc(phSpace || '…')}</span> <button class="btn small" data-ph-set-open>${esc(t('setPhOpen'))}</button>`)}
       <div class="actions"><button class="btn small" data-ph-set-reset>${esc(t('setPhReset'))}</button></div>
     </div>`;

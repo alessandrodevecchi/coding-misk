@@ -2008,3 +2008,10 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Guida:** schede nuove «Le mie frasi» e «Voci», e una frase nella scheda «Due voci» (`check:guide`: 31 schede, 14 tab).
 - **Icone:** onda e microfono presi dal registro delle voci di `captions.js`, più penna, copia, disco, scopa, scintilla, orologio in `src/icons.js`.
 - **Check:** `check-settings.cjs`, `check:light-theme` e `vite build` passano.
+
+## 2026-10-30: le mie frasi, parte 6: check nel browser e temi (my-phrases)
+
+- **Check:** `tools/check-voices-tab.cjs` (nuovo, server di sviluppo con l'aiutante): Console della radio con le tre politiche (aiutante finto per la radio), avviso Salvata con Annulla, stessa riga due volte (un solo elemento, due usi), Chiedi con Salva, No, Sempre e nessuna risposta per 10 s (non salvata, la riga suona lo stesso), Salva tardivo dalla Console, Sempre che passa a Salva sempre, Non salvare mai; lista frasi di Componi con l'Annulla della modifica che toglie anche la frase; tab Voci: nuova frase spiega con momento pausa e il suo campione fatto davvero, modifica, copia di «l'ultimo treno» (voce, notte, copia) la cui cancellazione non tocca i file inclusi, cancellazione di «fermi tutti» con il suo file e Annulla, nove voci, banco di prova con campione temporaneo nel registro, un orfano «aaa_orphan_check» che sposta gli indici di `say_it` pulito mentre luci-rosse suona (il codice usa i numeri del manifest nuovo), card nelle Impostazioni con Sempre, neon, hardware e chiaro a 1300 e 400 px (niente scorrimento laterale, azioni sulla prima riga, LCD nel tema hardware), inglese. Passa tutto.
+- **Temi:** `tools/check-light-theme.cjs` copre il tab Voci (modulo aperto, vocabolari, voci, campioni) e le Impostazioni: nessun testo con poco contrasto.
+- **Ritocchi:** la card delle Impostazioni usa chip che vanno a capo (cinque livelli non stavano in una riga); «Frasi salvate: {n}» al posto di «({n} ora)», che si leggeva come un'ora; `sizeText(0)` dice 0 KB.
+- **Da ricordare:** nel check i clic passano da `el.click()`: la barra in alto, fissa, prende i clic di Playwright sui pulsanti sotto di lei.
