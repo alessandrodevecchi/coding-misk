@@ -5,8 +5,8 @@
 
 ## 1. Painter and layout
 
-- [ ] 1.1 Theme roles `band`, `edit`, `editInk` for every own and Strudel theme, band opacity setting (Low, Medium, High) with the theme's floor. Verify: `npm run check:code-themes` new cases (text roles 4.5:1 on `band` over black and over white at every opacity, `editInk` on `edit`)
-- [ ] 1.2 `drawCodeOver` painter: rows in cells, bands as wide as the text, empty lines bare, comments and muted blocks dimmed, cut with `…`, eased scroll. Verify: new `npm run check:code-over` (Node, canvas stub): band widths, no band on empty lines, cut column, scroll keeps the focus line in the upper third
+- [x] 1.1 Theme roles `band`, `edit`, `editInk` for every own and Strudel theme, band opacity setting (Low, Medium, High) with the theme's floor. Verify: `npm run check:code-themes` new cases (text roles 4.5:1 on `band` over black and over white at every opacity, `editInk` on `edit`)
+- [x] 1.2 `drawCodeOver` painter: rows in cells, bands as wide as the text, empty lines bare, comments and muted blocks dimmed, cut with `…`, eased scroll. Verify: new `npm run check:code-over` (Node, canvas stub): band widths, no band on empty lines, cut column, scroll keeps the focus line in the upper third
 - [ ] 1.3 Layout `code-over` in `LAYOUTS` and `F_SHOWS` (every fragment format) with the code area (left, right, whole width; width setting, default 62%); compose, composeVertical and the live output view "Code over". Verify: `npm run check:video`, `npm run check:clips`, `npm run check:live` new cases; old layouts' areas unchanged
 - [ ] 1.4 Captions and the strip layer use the free area in this layout. Verify: `check:code-over` geometry (no caption or panel box overlaps the code area in 16:9 left, right, whole, and 9:16); `PORT=… node tools/check-captions.cjs` passes
 
