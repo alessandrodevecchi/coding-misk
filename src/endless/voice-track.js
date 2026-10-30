@@ -12,6 +12,7 @@ import { stateAt, buildSteps } from '../song/build.js';
 import { meterSteps } from '../music.js';
 import { VOCABULARY, VOCAB_GROUPS } from '../song/vocabulary.js';
 import { stream } from './random.js';
+import { mineSpokenTrack } from '../voices/mine.js';
 import { morePhrases, CHOP_RHYTHMS } from './director.js';
 import { cleanVoice, presetOf, PHRASE_RANGES, VOICE_WAYS, VOICE_WHERE, whereOf, isQuietOnly } from './voice-options.js';
 
@@ -96,7 +97,9 @@ export function newSpokenTrack(song) {
 //   from: a bar (radio steering): the clips before the first quiet section at or after it stay, the new phrases go
 //   there and after; presence "never" leaves only those; seed: the random stream's name (default: song, track, options).
 // With trackId null a new track is made (and added before the narrator), with an add step when the song builds live.
-export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null, from = 0, seed = null } = {}) {
+// mine (my-phrases D4): a snapshot of my phrases; its vocabulary lines may become phrases of mine (Compose, "New
+// phrases", with the same share as the director), drawn after the lines on streams of their own.
+export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null, from = 0, seed = null, mine = null } = {}) {
   const tracks = (song.tracks || []).map(x => x);
   let ti = trackId ? tracks.findIndex(x => x.id === trackId && x.type === 'spoken') : -1;
   if (trackId && ti < 0) return null;
@@ -141,6 +144,7 @@ export function rewriteSpoken(song, trackId, raw, { recipes = [], spoken = null,
     }
     const used = new Set(clips.map(c => c.pattern));
     patterns = Object.fromEntries(Object.entries(patterns).filter(([key]) => used.has(key)));
+    if (mine) mineSpokenTrack({ id: `${id}:${draw}`, patterns }, mine, song.id || 'song', (song.tags && song.tags.styles) || []);
     // (from a bar: the new lines take letters the kept clips do not use)
     if (keptKeys.size) {
       const free = [...KEYS].filter(x => !keptKeys.has(x) && !Object.keys(old.patterns || {}).includes(x)), map = {};

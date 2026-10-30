@@ -1,4 +1,5 @@
 // Small drawn icons (no emoji): they take the text colour.
+import { ICONS as SPEAKER_PATHS } from './captions/captions.js';
 const svg = (vb, body, cls) => `<svg class="ico ${cls}" viewBox="${vb}" aria-hidden="true">${body}</svg>`;
 // a die showing five
 export const DICE = svg('0 0 16 16', '<rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5.2" cy="5.2" r="1.2" fill="currentColor"/><circle cx="10.8" cy="5.2" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="5.2" cy="10.8" r="1.2" fill="currentColor"/><circle cx="10.8" cy="10.8" r="1.2" fill="currentColor"/>', 'ico-dice');
@@ -61,3 +62,14 @@ export const SAVE = svg('0 0 16 16', '<path d="M2.5 2.5h8.6l2.4 2.4v8.6h-11z" fi
 export const EYE_CLOSED = svg('0 0 16 16', '<path d="M1.8 7.2c1.6 2.2 3.7 3.3 6.2 3.3s4.6-1.1 6.2-3.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 9.6l-1.2 1.6M8 10.5v2M12 9.6l1.2 1.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>', 'ico-eye');
 export const EYE_HALF = svg('0 0 16 16', '<path d="M1.6 8.6C3.2 6.6 5.4 5.6 8 5.6s4.8 1 6.4 3c-1.6 2-3.8 3-6.4 3s-4.8-1-6.4-3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.6 7.2a2.6 2.6 0 0 0 4.8 0" fill="currentColor"/><path d="M1.6 8.6h12.8" fill="none" stroke="currentColor" stroke-width="1.2"/>', 'ico-eye');
 export const EYE_OPEN = svg('0 0 16 16', '<path d="M1.4 8C3 5.3 5.3 4 8 4s5 1.3 6.6 4C13 10.7 10.7 12 8 12S3 10.7 1.4 8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.3" fill="currentColor"/>', 'ico-eye');
+// my-phrases (D10): the speakers' icons come from the speaker registry's caption icons (spoken-text-on-stage D11)
+const line24 = (d, cls) => svg('0 0 24 24', `<path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`, cls);
+export const WAVE = line24(SPEAKER_PATHS.wave, 'ico-wave');
+export const MIC = line24(SPEAKER_PATHS.mic, 'ico-mic');
+// a quill: the poetic narrator
+export const QUILL = line24('M20 4c-6 1-10.5 5-12.5 11.5L6 20M8.6 13.6c3 .2 6-1.2 8-4M11 10.5c2 .1 4-.6 5.6-2', 'ico-quill');
+export const COPY = svg('0 0 16 16', '<rect x="5" y="5" width="8.5" height="8.5" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3 10.5V3.8A1.3 1.3 0 0 1 4.3 2.5H10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>', 'ico-copy');
+export const DISK = svg('0 0 16 16', '<ellipse cx="8" cy="4" rx="5.5" ry="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2.5 4v8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V4M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2" fill="none" stroke="currentColor" stroke-width="1.4"/>', 'ico-disk');
+export const BROOM = svg('0 0 16 16', '<path d="M13.5 2.5L8.6 7.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8.6 7.4l-2-1.3-3.8 3.8c-.6.6-.7 2.5-.3 3.6 1.1.4 3 .3 3.6-.3l3.8-3.8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M4.4 11.6l2-2" stroke="currentColor" stroke-width="1.2"/>', 'ico-broom');
+export const SPARK = svg('0 0 16 16', '<path d="M8 1.5l1.5 4.5 4.5 1.5-4.5 1.5L8 13.5 6.5 9 2 7.5 6.5 6z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>', 'ico-spark');
+export const CLOCK = svg('0 0 16 16', '<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5V8l2.4 1.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>', 'ico-clock');

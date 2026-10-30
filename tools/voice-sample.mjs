@@ -140,7 +140,7 @@ export function keepTemp(root, { add = [], files = [], protect = [] } = {}, now 
   let changed = false;
   for (const x of add || []) {
     if (!x || !SAMPLE_PATH.test(x.file) || keep.has(protectKey(x.file)) || !fs.existsSync(path.join(root, ...x.file.split('/')))) continue;
-    t[x.file] = { expires: new Date(now + Math.max(60 * 60 * 1000, +x.ms || 0)).toISOString(), ...(x.song ? { song: String(x.song).slice(0, 80) } : {}) };
+    t[x.file] = { expires: new Date(now + Math.max(60 * 60 * 1000, +x.ms || 0)).toISOString(), ...(x.song ? { song: String(x.song).slice(0, 80) } : {}), ...(typeof x.text === 'string' && x.text ? { text: x.text.slice(0, 160), lang: x.file.slice(4, 6) } : {}) };
     changed = true;
   }
   for (const rel of [...(files || []), ...Object.keys(t).filter(rel => keep.has(protectKey(rel)))]) if (t[rel]) { delete t[rel]; changed = true; }

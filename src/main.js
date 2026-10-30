@@ -59,7 +59,7 @@ import { freshSeed } from './endless/random.js';
 import { cleanVoice, voiceOption, presetOf as voicePresetOf } from './endless/voice-options.js';
 import { voicePanel, voiceEvent } from './endless/voice-panel.js';
 import { voiceSoundHtml, syncVoiceSound, soundEvent } from './endless/voice-sound.js';
-import { phraseRows, listVocab, editText, editBars, editWay, removeRow, addRow, fillRows, freeParts, FILL_GROUPS } from './endless/phrase-list.js';
+import { phraseRows, listVocab, editText, editBars, editWay, removeRow, addRow, fillRows, fillMine, freeParts, FILL_GROUPS } from './endless/phrase-list.js';
 import { rewriteSpoken, trackVoice } from './endless/voice-track.js';
 import { styleId, stylePush } from './endless/recipe.js';
 import { loadLimiter, setMasterLevel } from './sounds/limiter.js';
@@ -95,10 +95,11 @@ import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternTo
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
+import { createVoicesTab } from './voices/voices-tab.js';
 import { narratorPick } from './voices/mine.js';
 import { setNarratorMine } from './song/build.js';
 import { PHRASES_MOMENT } from './voices/moments.js';
-import { builtinKeys, mineKeys, songKeys } from './voices/samples.js';
+import { builtinKeys, mineKeys, songKeys, sizeText } from './voices/samples.js';
 import { parseSong, clock } from './songs.js';
 import { durationKey, growingProfile, hashText } from './live/card-duration.js';
 import { createGrowthStore } from './live/growth-store.js';
@@ -2884,7 +2885,7 @@ const sampleKeys = (except = null) => ({
 // a line the user wrote whose sample the helper just made (made: true) and that is not saved: temporary (D6)
 function listTemp(text, lang, bank, songKey) {
   if (!voiceHelper || !text || phr.isSaved(text, lang, 'voice') || phr.isSaved(text, lang, 'explain') || phr.isSaved(text, lang, 'poetic')) return;
-  fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ add: [{ file: `${bank}/${saySlug(text)}.wav`, ms: phr.tempMs(), song: songKey }] }) }).catch(() => {});
+  fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ add: [{ file: `${bank}/${saySlug(text)}.wav`, ms: phr.tempMs(), song: songKey, text }] }) }).catch(() => {});
 }
 // on load: every phrase of mine and every saved song leaves the temporary list (a file that became used is never swept)
 helperReady.then(() => {
@@ -2903,6 +2904,29 @@ setInterval(async () => {
     if (Number.isInteger(j.sweep) && j.sweep !== lastSweep) { lastSweep = j.sweep; await refreshSamples(); if (radio && radio.samplesArrived) radio.samplesArrived(); }
   } catch (e) { /* the helper went away */ }
 }, 60000);
+// opens the Voci tab on a section (links from Compose, the radio and Settings, D9)
+function openVoices(section) { showTab('voci'); if (voicesTab) voicesTab.show(section); }
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-open-voices]'); if (b) { e.preventDefault(); openVoices(b.dataset.openVoices); } });
+// hears a line with a speaker and a voice style (the Voci tab): its sample, made first by the helper when missing (a
+// line nobody saved: temporary), played once through the voice's settings
+async function hearLine({ text, lang, speaker = '', settings = null, temp = false }) {
+  initAudioOnce();
+  const bank = sayBank(lang, speaker), slug = saySlug(text);
+  const find = () => [bank, ...(speaker ? [sayBank(lang, '')] : [])].map(b => ({ b, n: (customFiles[b] || []).findIndex(f => decodeURI(f).endsWith(`/${slug}.wav`)) })).find(x => x.n >= 0);
+  let s = find();
+  if ((!s || s.b !== bank) && voiceHelper) {
+    try {
+      const r = await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang, speaker }) });
+      if (r.ok) { const j = await r.json(); if (j.made && temp) listTemp(text, lang, j.bank, 'voci'); await reloadSamples(); s = find(); }
+    } catch (e) { /* the default voice, or nothing */ }
+  }
+  if (!s || !globalThis.superdough) { toast(t(voiceHelper ? 'phNoSample' : 'phNoHelper')); return; }
+  const v = { ...VOICE_DEFAULT, ...(settings || {}) };
+  try {
+    const ctx = globalThis.getAudioContext();
+    globalThis.superdough({ s: s.b, n: s.n, gain: v.gain, speed: v.tempo, ...(v.cutoff < 18000 ? { cutoff: v.cutoff } : {}), ...(v.hpf > 0 ? { hcutoff: v.hpf } : {}), ...(v.drive > 0 ? { distort: v.drive } : {}), ...(v.room > 0 ? { room: v.room } : {}), ...(v.delay > 0 ? { delay: v.delay, delaytime: 0.25, delayfeedback: 0.4 } : {}), orbit: 12 }, ctx.currentTime + 0.05, 4);
+  } catch (e) { toast(t('phNoSample')); }
+}
 // the kind and tag of a narrator line the user wrote (D2): explaining, the step's moment; poetic, the entering track
 function narratorOffer(st, text) {
   const poetic = narratorStyle(T) === 'poetic', tr = st.add !== undefined ? T.tracks.find(x => x.id === [].concat(st.add)[0]) : null;
@@ -2963,7 +2987,8 @@ function prepNote() {
   if (!txt) { if (el) el.remove(); }
   else {
     if (!el) { el = document.createElement('p'); el.id = 'voice-prep'; el.className = 'hint muted small voice-prep'; box.appendChild(el); }
-    if (el.textContent !== txt) el.textContent = txt;
+    // (my-phrases D9: a missing-sample note links to the Campioni section of the Voci tab)
+    if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.textContent = txt + ' '; const a = document.createElement('button'); a.className = 'plain link vt-link'; a.dataset.openVoices = 'samples'; a.textContent = t('phSamplesLink'); el.appendChild(a); }
     el.title = missing.length ? missing.map(x => `${x.bank}: ${x.text}`).slice(0, 20).join('\n') : '';
   }
   if (radio && radio.setPrep) radio.setPrep(prep.total && mode === 'radio' ? t('voicePrep', { i: prep.done, n: prep.total }) : '');
@@ -3062,7 +3087,8 @@ function phraseListHtml(sp, off) {
   const fill = listVocab(rows), barsTxt = list => { const runs = []; for (const b of list.map(x => x + 1)) { const r = runs[runs.length - 1]; if (r && r[1] === b - 1) r[1] = b; else runs.push([b, b]); } return runs.map(([a, z]) => (z > a + 1 ? `${a}–${z}` : z > a ? `${a}, ${z}` : `${a}`)).join(', '); };
   const way = (r) => `<select data-pl-way data-no-knob aria-label="${esc(t('spokenWay'))}"${dis}>${WAYS.map(w => `<option value="${w}"${w === r.way ? ' selected' : ''}>${esc(t(`way:${w}`))}</option>`).join('')}</select>`;
   const src = r => [r.source === 'vocab' ? t('plFromVocab', { g: t(`vocab:${r.group}`) }) : r.source === 'own' ? t('plOwn') : t('plFromStyle'), r.shared > 1 ? t('plShared', { n: r.shared }) : '', r.toTranslate ? t('plToTranslate') : ''].filter(Boolean).join(' · ');
-  const sample = r => { const st = sampleState(sp, r.texts); return `<span class="pl-sample ${st}" title="${esc(t(`plSampleTip:${st}`))}">${esc(t(`plSample:${st}`))}</span>`; };
+  // (my-phrases D9: a row without its sample links to the Campioni section of the Voci tab)
+  const sample = r => { const st = sampleState(sp, r.texts); if (st === 'none') return `<button class="plain link pl-sample none" data-open-voices="samples" title="${esc(t(`plSampleTip:${st}`))} · ${esc(t('phSamplesLink'))}">${esc(t(`plSample:${st}`))}</button>`; return `<span class="pl-sample ${st}" title="${esc(t(`plSampleTip:${st}`))}">${esc(t(`plSample:${st}`))}</span>`; };
   const heardTxt = r => (r.heard ? t('plHeard', { bars: barsTxt(r.heard.said.length ? r.heard.said : [r.heard.start]), w: r.start + 1 }) : r.said.length ? barsTxt(r.said) : t('plSilent'));
   const body = rows.map(r => `<div class="pl-row" data-pl-row="${r.raw}">
       <div class="pl-bar"><input type="number" min="1" step="1" data-pl-start value="${(r.heard ? r.heard.start : r.start) + 1}" aria-label="${esc(t('plBar'))}"${dis}><span class="pl-said">${esc(heardTxt(r))}${h.growing ? ` <span class="pl-growing" title="${esc(t('plGrowingTip'))}">${GROWING}</span>` : ''}</span></div>
@@ -3072,7 +3098,7 @@ function phraseListHtml(sp, off) {
       <div class="pl-voice">${sample(r)}</div>
       <div class="pl-end">${off ? '' : trashBtn(t('vplRemove'))}</div></div>`).join('');
   const free = freeParts(T, sp.id).length > 0;
-  const head = `<div class="pl-head"><label class="ctrl pl-fill" title="${esc(t('plFillHint'))}"><span class="lbl">${esc(t('vinstFillLbl'))}</span><select data-pl-fill data-no-knob${dis}><option value=""${fill === '' ? ' selected' : ''}>—</option>${fill === 'mixed' ? `<option value="mixed" selected disabled>${esc(t('plMixed'))}</option>` : ''}${FILL_GROUPS.map(g => `<option value="${g}"${fill === g ? ' selected' : ''}>${esc(t(`vocab:${g}`))}</option>`).join('')}</select></label><p class="hint muted small">${esc(t(h.G ? 'plHintGrown' : 'plHint', { g: h.G + 1 }))}</p></div>`;
+  const head = `<div class="pl-head"><label class="ctrl pl-fill" title="${esc(t('plFillHint'))}"><span class="lbl">${esc(t('vinstFillLbl'))}</span><select data-pl-fill data-no-knob${dis}><option value=""${fill === '' ? ' selected' : ''}>—</option>${fill === 'mixed' ? `<option value="mixed" selected disabled>${esc(t('plMixed'))}</option>` : ''}${FILL_GROUPS.map(g => `<option value="${g}"${fill === g ? ' selected' : ''}>${esc(t(`vocab:${g}`))}</option>`).join('')}<option value="mine">${esc(t('phMine'))}</option><option value="browse">${esc(t('phBrowse'))}</option></select></label><p class="hint muted small">${esc(t(h.G ? 'plHintGrown' : 'plHint', { g: h.G + 1 }))}</p></div>`;
   const cols = `<div class="pl-row pl-cols" aria-hidden="true"><span>${esc(t(h.G ? 'plBarHeard' : 'plBar'))}</span><span>${esc(t('plBars'))}</span><span>${esc(t('spokenWay'))}</span><span>${esc(t('plText'))}</span><span>${esc(t('plVoice'))}</span><span></span></div>`;
   const empty = rows.length ? '' : `<p class="hint muted small pl-empty">${esc(t('vplEmpty'))}</p>`;
   const add = `<div class="pl-add"><button class="btn small" data-pl-add title="${esc(free ? t('plAddHint') : t('plNoPart'))}"${off || !free ? ' disabled' : ''}>${esc(t('vplAdd'))}</button><span class="hint muted small">${esc(free ? t('plAddWhere') : t('plNoPart'))}</span></div>`;
@@ -3108,6 +3134,13 @@ function phraseListEvent(e) {
   }
   if (e.type !== 'change') return false;
   if (el.matches('[data-pl-fill]')) {
+    // (my-phrases D4, D9: Le mie frasi fills the rows with phrases of mine; Sfoglia… opens the built-in vocabularies)
+    if (el.value === 'browse') { renderSongVoice(); openVoices('vocab'); return true; }
+    if (el.value === 'mine') {
+      const r = fillMine(T, id, phr.items, { lang: getLang(), styles: (T.tags && T.tags.styles) || [], styleWays: styleWaysOf() });
+      if (r.error || !r.filled) { toast(t(r.error === 'empty' ? 'plMineEmpty' : 'plNoPart')); renderSongVoice(); return true; }
+      phraseEdit(r.song, t('plFilled', { n: r.filled, g: t('phMine') })); return true;
+    }
     const r = fillRows(T, id, el.value, { styleWays: styleWaysOf() });
     if (r.error || !r.filled) { toast(t('plNoPart')); renderSongVoice(); return true; }
     phraseEdit(r.song, t('plFilled', { n: r.filled, g: t(`vocab:${el.value}`) })); return true;
@@ -3170,7 +3203,7 @@ for (const [type, fn] of [['input', e => e.target.type === 'range'], ['change', 
 }
 function applySongVoice(id, raw) {
   const before = { tracks: JSON.parse(JSON.stringify(T.tracks)), build: T.build === undefined ? undefined : JSON.parse(JSON.stringify(T.build)) };
-  const r = rewriteSpoken(T, id, raw, { recipes: RECIPES });
+  const r = rewriteSpoken(T, id, raw, { recipes: RECIPES, mine: phr.snapshot(getLang()) });
   if (!r) return;
   T.tracks = r.song.tracks; if (r.song.build !== undefined) T.build = r.song.build;
   if (!id) tk = T.tracks.indexOf(r.track);
@@ -4092,10 +4125,10 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'lezioni', 'suoni', 'pattern', 'riferimenti'];
+const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'lezioni', 'suoni', 'voci', 'pattern', 'riferimenti'];
 let cards = [];
 // two modes (#42): Listen to make and hear music, Groove Lab for its material and for learning
-const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'pattern', 'guida', 'lezioni', 'riferimenti'] };
+const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'voci', 'pattern', 'guida', 'lezioni', 'riferimenti'] };
 const modeOf = tab => Object.keys(APP_MODES).find(m => APP_MODES[m].includes(tab)) || null;
 let modeTabs = store.get('coding-misk-mode-tabs', {});
 if (!modeTabs || typeof modeTabs !== 'object') modeTabs = {};
@@ -4124,6 +4157,7 @@ function showTab(name) {
   if (name === 'playlist' && playlistsTab) playlistsTab.render();
   if (name === 'impostazioni' && settingsPage) settingsPage.render();
   if (name === 'generi' && genresTab) genresTab.render();
+  if (name === 'voci' && voicesTab) voicesTab.render();
   $('#open-settings').setAttribute('aria-pressed', name === 'impostazioni');
   if (name !== 'impostazioni') prevTab = name;
   if (name === 'stili' && stylesTab) stylesTab.render();
@@ -4856,6 +4890,10 @@ stylesTab = createStylesTab({ root: $('#tab-stili'), t, tx, esc, store, builtins
 RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
 // the Patterns tab (pattern-library, #72): the loop plays through the player above; Add to song changes the song open
 // in Compose (marked changed, not saved)
+// the Voci tab (my-phrases D9)
+voicesTab = createVoicesTab({ root: $('#tab-voci'), phr, store, t, tx, esc, getLang, toast, helper: () => !!voiceHelper, files: () => customFiles,
+  recipes: RECIPES, songs: BUILTIN, library: () => librarySongs(), keys: except => sampleKeys(except), hear: x => hearLine(x),
+  samplesChanged: async () => { await refreshSamples(); if (radio && radio.samplesArrived) radio.samplesArrived(); } });
 patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast, recipes: () => RECIPES,
   loop: { play: (sg, uid, title) => playLoop(sg, uid, title), stop: () => { loopNext = null; return stop(); }, state: loopState },
   codeOf: sg => loopPlayable(sg).code,
@@ -5040,6 +5078,14 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.da
 // settings page (#31): the gear opens it, a second press goes back to the tab before
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
+    // voices and phrases (my-phrases D3, D4, D6): the card's settings, the space of the samples, the link to the Voci tab
+    phrases: {
+      settings: () => phr.settings, set: patch => phr.setSettings(patch), count: () => phr.items.length, open: s => openVoices(s),
+      space: async () => {
+        if (!voiceHelper) { const n = Object.entries(customFiles).filter(([b]) => /^say_/.test(b)).reduce((a, [, l]) => a + l.length, 0); return t('setPhSpaceNoHelper', { n }); }
+        try { const u = await (await fetch('/voice/usage')).json(); const all = Object.values(u.banks || {}).flat(); return `${sizeText(all.reduce((a, x) => a + x.b, 0))} · ${all.length}`; } catch (e) { return '—'; }
+      },
+    },
     // texts on stage (spoken-text-on-stage D7)
     setCaptions: f => setCaptions(f), capsSkipNext: v => (v === undefined ? capsSkipNext : (capsSkipNext = !!v)),
     ui: () => ui, setUi: v => setUi(v), uiFollow: () => uiFollow, setUiFollow: on => setUiFollow(on), lang: () => getLang(), setLang: l => changeLang(l),

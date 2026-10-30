@@ -205,4 +205,36 @@ export function fillRows(song, trackId, group, { styleWays = null } = {}) {
   for (const t of out.tracks) if (t.patterns) for (const p of Object.values(t.patterns)) if (p && p.text === undefined) delete p.text;
   return { song: out, filled };
 }
+// "Fill with: Le mie frasi" (my-phrases D4): each row gets a voice phrase of mine not used yet (least used first), in
+// the app's language with its translation, keeping its bars and way; an empty list gets as many rows as Phrases per
+// song asks. phrases: the collection's items; styles: the song's. → { song, filled } or { error: 'none' | 'empty' }
+export function fillMine(song, trackId, phrases, { lang = 'en', styles = [], styleWays = null } = {}) {
+  const pool = (phrases || []).filter(p => p && p.on !== false && p.kind === 'voice' && (p.lang === lang || (p.alt && p.alt[lang])) && (!(p.styles || []).length || p.styles.some(x => styles.includes(x))))
+    .slice().sort((a, b) => (a.uses || 0) - (b.uses || 0) || String(a.created || '').localeCompare(String(b.created || '')))
+    .map(p => ({ ...(p.alt || {}), [p.lang]: p.text }));
+  if (!pool.length) return { error: 'empty' };
+  const ti = song.tracks.findIndex(t => t.id === trackId && t.type === 'spoken');
+  if (ti < 0) return { error: 'none' };
+  const tr0 = song.tracks[ti], list = sortedIndex(song, ti);
+  let filled = 0;
+  const out = withTrack(song, trackId, tr => {
+    if (!list.length) {
+      const v = trackVoice(tr0), [lo, hi] = PHRASE_RANGES[v.phrases] || [1, 1], n = Math.max(lo, Math.min(hi, pool.length));
+      const parts = pickParts(wherePartsOf(song, 0, v.where), n), way = firstWay(tr0, styleWays);
+      tr.patterns = {}; tr.clips = [];
+      parts.forEach((p, j) => { if (!pool[j]) return; const key = KEYS[j]; tr.patterns[key] = { way, ...extrasOf(way, j), text: { ...pool[j] } }; tr.clips.push({ start: p.start, bars: p.bars, pattern: key }); filled++; });
+      return;
+    }
+    const old = clone(tr0.patterns || {}), pats = {};
+    list.forEach((c, j) => {
+      const key = KEYS[j] || `P${j + 1}`, e = pool[j];
+      if (!e) { pats[key] = clone(old[c.pattern] || { way: 'passage' }); tr.clips[c.raw].pattern = key; return; }
+      const base = { ...(old[c.pattern] || { way: 'passage' }) };
+      delete base.text;
+      pats[key] = { ...base, text: { ...e } }; tr.clips[c.raw].pattern = key; filled++;
+    });
+    tr.patterns = pats;
+  });
+  return out ? { song: out, filled } : { error: 'none' };
+}
 export { VOICE_WAYS };

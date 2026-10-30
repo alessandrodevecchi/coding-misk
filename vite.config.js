@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import { readdirSync, statSync, existsSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { canSpeak, makeSampleAsync, writeLengths, wavSeconds, MAX_WORDS, sampleUsage, deleteSamples, keepTemp, sweepTemp, readTemp } from './tools/voice-sample.mjs';
+import { canSpeak, makeSampleAsync, writeLengths, wavSeconds, MAX_WORDS, sampleUsage, deleteSamples, keepTemp, sweepTemp, readTemp, systemVoice } from './tools/voice-sample.mjs';
 
 // Campioni personalizzati: ogni cartella in public/samples/ diventa un suono (voce/01.wav → s("voce").n(0)),
 // ogni file sciolto diventa un suono col suo nome. L'elenco per Strudel si genera da solo.
@@ -70,7 +70,7 @@ const voiceHelper = () => ({
     const list = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string') : []);
     server.middlewares.use('/voice/usage', (req, res) => {
       if (!local(req)) return send(res, 403, { error: 'local only' });
-      try { send(res, 200, { banks: sampleUsage(SAMPLES_DIR), temp: readTemp(SAMPLES_DIR), playing: playingNow() }); } catch (e) { send(res, 500, { error: String(e && e.message || e).slice(0, 200) }); }
+      try { if (ok === null) ok = canSpeak(); const voices = ok ? Object.fromEntries(['it', 'en'].map(l => [l, Object.fromEntries(SPEAKER_IDS.map(sp => [sp, systemVoice(l, sp)]))])) : null; send(res, 200, { banks: sampleUsage(SAMPLES_DIR), temp: readTemp(SAMPLES_DIR), playing: playingNow(), voices }); } catch (e) { send(res, 500, { error: String(e && e.message || e).slice(0, 200) }); }
     });
     server.middlewares.use('/voice/delete', (req, res) => body(req, res, b => {
       queue = queue.then(() => { try { send(res, 200, deleteSamples(SAMPLES_DIR, list(b.files), list(b.protect))); } catch (e) { send(res, 500, { error: String(e && e.message || e).slice(0, 200) }); } });
