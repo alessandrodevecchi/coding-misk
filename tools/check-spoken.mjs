@@ -41,6 +41,10 @@ import { sessionItems, GROWTH_ON_AIR } from '../src/endless/items.js';
 import { airControls } from '../src/endless/growth.js';
 import { validateRecipe, recipeOrder } from '../src/endless/recipe.js';
 import { setLang } from '../src/i18n.js';
+import { captionSchedule, spokenNeeds, narratorLines } from '../src/song/build.js';
+import { captionFrame, captionSettings } from '../src/captions/captions.js';
+import { SPEAKER_KINDS, kindOf, outranks, applyExclusive, captionRows } from '../src/song/speakers.js';
+import { barSeconds } from '../src/song/spoken.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -911,10 +915,108 @@ const CHECKS = {
       assert(new RegExp(`"here we are", spoken on bar ${bar + 1}`).test(said(without)) && !spokenBars(song, 'en').has(bar), `without the line's sample the narrator is silent on bar ${bar + 1}`);
     } finally { setSpokenContext({ files: saved }); }
   },
+  'stage captions (spoken-text-on-stage D1, D2): the captions are what is heard (explain, poetic, poetic with Narrated growth, a voice track, the narrator off, a line with no sample, a typed line), their timing, the step tag'() {
+    const S = captionSettings({}), grownOf = (id, C) => crescendoSong({ ...read(`songs/${id}.json`), kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles: recipes }) });
+    // every spoken bar: the caption is the heard line; a bar of a step line not heard shows it only as the tag
+    const same = (B, C, lang, files, lengths = {}) => {
+      const sch = spokenSchedule(B, C, lang, files), cs = captionSchedule(B, C, lang, files, lengths), spoken = cs.filter(x => x.kind !== 'step');
+      assert(JSON.stringify(spoken.map(x => [Math.floor(x.at), x.code, x.text])) === JSON.stringify(sch.filter(x => x.way !== 'chop').map(x => [x.at, x.voice, x.text])), 'the captions are not the schedule');
+      for (const x of sch.filter(y => y.way !== 'chop')) {
+        const f = captionFrame(cs, x.at + (x.late || 0) + 0.01, S);
+        assert(f.rows.some(r => r.text === x.text && r.kind === kindOf(x.voice)), `bar ${x.at + 1}: "${x.text}" heard, the stage shows ${JSON.stringify(f.rows.map(r => r.text))}`);
+      }
+      return { sch, cs };
+    };
+    const explain = resolveProfile('switch'), A = liveBuildOf(grownOf('luci-rosse', explain), explain), a = same(A, explain, 'it', ANY);
+    // explain: every step line heard is the caption and never a tag
+    assert(a.cs.filter(x => x.kind === 'narrator').length === 19, `luci-rosse explain: ${a.cs.filter(x => x.kind === 'narrator').length} captions`);
+    for (const x of a.cs.filter(y => y.kind === 'narrator')) assert(!captionFrame(a.cs, x.at + 0.01, S).tag, `explain, bar ${x.at + 1}: a tag under "${x.text}"`);
+    // poetic: the images, the step lines as tags only
+    const poetic = { ...explain, narratorStyle: 'poetic' }, P = liveBuildOf(grownOf('luci-rosse', poetic), poetic), p = same(P, poetic, 'it', ANY);
+    assert(p.cs.filter(x => x.kind === 'step').every(x => !x.heard), 'poetic: a step line counted as heard');
+    assert(p.cs.filter(x => x.kind === 'narrator').every(x => !p.cs.some(y => y.kind === 'step' && y.text === x.text)), 'poetic: a step line as a spoken caption');
+    // poetic with Narrated growth: bar 8 says "la città respira" with the tag "ritmo più fitto"
+    const pn = { ...poetic, narrated: true }, PN = liveBuildOf(grownOf('luci-rosse', pn), pn), q = same(PN, pn, 'it', ANY), f8 = captionFrame(q.cs, 7.1, S);
+    assert(q.cs.filter(x => x.kind === 'narrator').length === 38, `poetic with Narrated growth: ${q.cs.filter(x => x.kind === 'narrator').length} captions, 38 heard`);
+    assert(f8.rows[0] && f8.rows[0].text === 'la città respira' && f8.tag === 'ritmo più fitto', `bar 8: ${JSON.stringify(f8)}`);
+    assert(captionFrame(q.cs, 16.1, S).rows.some(r => r.text === 'qualcosa di profondo si sveglia'), 'bar 17: the entry image');
+    // a voice track: its lines captioned as the voice; the narrator off leaves them and no narrator caption or tag
+    const notte = read('songs/prova-voce-notte.json'), CT = resolveProfile('switch'), NB = liveBuildOf(grownOf('prova-voce-notte', CT), CT), n = same(NB, CT, 'it', ANY);
+    const voiced = n.cs.filter(x => x.kind === 'voice');
+    assert(voiced.length >= 4 && voiced.every(x => captionFrame(n.cs, x.at + 0.01, S).rows.some(r => r.kind === 'voice' && r.text === x.text)), `prova-voce-notte: ${voiced.length} voice-track captions`);
+    void notte;
+    const off = { ...CT, narrator: false }, no = captionSchedule(NB, off, 'it', ANY, {});
+    assert(!no.some(x => x.kind === 'narrator' || x.kind === 'step') && no.filter(x => x.kind === 'voice').length === voiced.length, 'the narrator off: narrator captions or tags left, or voice-track lines lost');
+    // no sample: a line without its sample is not a caption; its step line stays as the tag
+    const said = a.cs.find(x => x.kind === 'narrator' && x.at > 0), only = new Proxy({}, { get: () => ({ findIndex: f => (['/' + saySlug(said.text) + '.wav'].some(s => f(`x${s}`)) ? -1 : 0) }) });
+    const ns = captionSchedule(A, explain, 'it', only, {});
+    assert(!ns.some(x => x.kind === 'narrator' && x.text === said.text) && captionFrame(ns, said.at + 0.01, S).tag === said.text, `no sample: "${said.text}" captioned, or no tag`);
+    // timing: the sample's length plus 1.5 s, at least 2 s, at most 4 bars, 2 bars without a length
+    const bs = barSeconds(A, said.at), lens = { [`say_it/${saySlug(said.text)}.wav`]: 1.3 }, timed = captionSchedule(A, explain, 'it', ANY, lens).find(x => x.kind === 'narrator' && x.text === said.text);
+    const nextN = a.cs.find(x => x.kind === 'narrator' && x.at > said.at), want = Math.min(4, 2.8 / bs, nextN ? nextN.at - said.at : 4);
+    assert(Math.abs(timed.until - timed.at - want) < 1e-9, `a 1.3 s line holds ${((timed.until - timed.at) * bs).toFixed(2)} s`);
+    assert(a.cs.filter(x => x.kind === 'narrator').every((x, i, l) => x.until - x.at <= 4 && (x.until - x.at === 2 || (l[i + 1] && x.until === l[i + 1].at))), 'without lengths a caption holds 2 bars (or up to the next one)');
+    // a typed line: a voice-track caption marked typed, hidden with "Lines typed in the console" off
+    let typedOk = 0;
+    for (let i = 0; i < 30 && !typedOk; i++) {
+      const g = createSession(loadStyles(), `cap-typed-${i}`).next({ styles: [['pure-trance', 'dark-cyberpunk', 'ambient'][i % 3]], voice: { presence: 'always' } });
+      const sp = g.song.tracks.find(t => t.type === 'spoken');
+      if (!sp) continue;
+      const bar = Array.from({ length: g.plan.bars - 4 }, (_, b) => b + 2).find(b => { const t = stateAt(g.song, b).song.tracks.find(x => x.id === sp.id); return t && !t.mute && !buildSteps(g.song).some(x => x.at === b); });
+      if (bar === undefined) continue;
+      const r = steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: [{ kind: 'say-live', text: 'stay with me', lang: 'en', speaker: '', mode: 'now', at: bar }], seed: `cap-typed-${i}`, n: 0 }).song;
+      const C = resolveProfile('classic'), cs = captionSchedule(liveBuildOf(r, C), C, 'en', ANY, {}), x = cs.find(y => y.text === 'stay with me');
+      if (!x) continue;
+      assert(x.kind === 'voice' && x.typed && x.at === bar, `typed line: ${JSON.stringify(x)}`);
+      assert(captionFrame(cs, bar + 0.01, S).rows.some(y => y.text === 'stay with me') && !captionFrame(cs, bar + 0.01, { ...S, typed: false }).rows.some(y => y.text === 'stay with me'), 'typed line: not shown, or shown with console lines off');
+      typedOk++;
+    }
+    assert(typedOk, 'no typed line reached the captions');
+    // the settings: off, narrator only, the old behaviour, typing by hand
+    assert(!captionFrame(q.cs, 7.1, { ...S, on: false }).rows.length && !captionFrame(q.cs, 7.1, { ...S, videos: false }, { video: true }).rows.length, 'switch off, or a video with In videos too off, shows a caption');
+    const old = captionFrame(q.cs, 7.1, { ...S, stepForm: 'instead' });
+    assert(old.rows.length === 1 && old.rows[0].kind === 'step' && old.rows[0].text === 'ritmo più fitto' && !old.tag, `old behaviour: ${JSON.stringify(old.rows)}`);
+    assert(!captionFrame(q.cs, 7.1, S, { hand: true }).rows.length && voiced.every(x => captionFrame(n.cs, x.at + 0.01, S, { hand: true }).rows.some(r => r.kind === 'voice')), 'typing by hand: the narrator shows, or the voice track does not');
+    console.log(`      luci-rosse: explain ${a.cs.filter(x => x.kind === 'narrator').length}, poetic ${p.cs.filter(x => x.kind === 'narrator').length}, poetic Narrated growth ${q.cs.filter(x => x.kind === 'narrator').length} captions; prova-voce-notte ${voiced.length} voice-track captions; a typed line captioned`);
+  },
+  'spoken needs (spoken-text-on-stage D9): every line the code would say with every sample, with its bank; the schedule with every sample is the needs; a missing sample is listed with has false'() {
+    const C = { ...resolveProfile('switch'), narratorStyle: 'poetic', narrated: true }, B = liveBuildOf(crescendoSong({ ...read('songs/prova-voce-notte.json'), kind: 'composed' }, { narrated: true, rules: growthRules(C, { styles: recipes }) }), C);
+    const needs = spokenNeeds(B, C, 'it', {}), sch = spokenSchedule(B, C, 'it', ANY);
+    const texts = new Set(sch.flatMap(x => x.text.split(' · ')));
+    assert(needs.length && needs.every(x => !x.has && texts.has(x.text) && x.bank.startsWith('say_it')), 'needs without a manifest: not every line, or a line the schedule does not say');
+    assert([...texts].every(x => needs.some(y => y.text === x)), 'a line of the schedule is not in the needs');
+    assert(needs.some(x => x.voice === 'N') && needs.some(x => x.voice === 'T'), 'needs: narrator and voice-track lines');
+    assert(spokenNeeds(B, C, 'it', ANY).every(x => x.has), 'needs with every sample: a line missing');
+    console.log(`      prova-voce-notte poetic: ${needs.length} lines to make with no samples`);
+  },
+  'speaker registry (spoken-text-on-stage D11): N and T mapped to kinds, the voice track outranks the narrator, one narrator line per bar; a fake third kind is captioned with no other change, exclusive quiets the lower ranks, multiCaption adds a row'() {
+    assert(kindOf('N') === 'narrator' && kindOf('T') === 'voice' && SPEAKER_KINDS.singing.future && outranks('voice', 'narrator') && !outranks('narrator', 'voice'), 'registry');
+    assert(!SPEAKER_KINDS.singing.exclusive && Object.values(SPEAKER_KINDS).every(k => k.rank && k.icon && k.style && k.colour && k.mark), 'registry fields');
+    const C = resolveProfile('switch'), B = liveBuildOf(crescendoSong({ ...read('songs/luci-rosse.json'), kind: 'composed' }, { narrated: true, rules: growthRules(C, { styles: recipes }) }), { ...C, narrated: true });
+    const N = spokenSchedule(B, C, 'en', ANY).filter(x => x.voice === 'N'), bars = N.map(x => x.at);
+    assert(new Set(bars).size === bars.length, 'two narrator lines on one bar');
+    void narratorLines;
+    // a fake kind: X, above the voice track
+    SPEAKER_KINDS.test = { code: 'X', rank: 5, icon: 'note', style: 'sung', colour: 'amber', mark: 'icon+style', exclusive: false, multiCaption: true };
+    try {
+      const base = [{ at: 4, voice: 'T', text: 'the towers', bank: 'say_en_reed' }, { at: 4, voice: 'N', text: 'more bass', bank: 'say_en' }];
+      const sch = [...base, { at: 4, voice: 'X', text: 'la la', bank: 'say_en_flo' }];
+      const cs = captionSchedule({ ...B, build: [] }, C, 'en', ANY, {}, { schedule: sch }), S = captionSettings({});
+      const rows = captionFrame(cs, 4.1, S).rows;
+      assert(cs.some(x => x.kind === 'test' && x.text === 'la la') && rows.map(r => r.kind).join() === 'test,voice,narrator', `fake kind, multiCaption: rows ${rows.map(r => r.kind)}`);
+      SPEAKER_KINDS.test.multiCaption = false;
+      assert(captionFrame(cs, 4.1, S).rows.map(r => r.kind).join() === 'test', 'multiCaption off: more than the highest rank');
+      SPEAKER_KINDS.test.exclusive = true; SPEAKER_KINDS.test.multiCaption = true;
+      const ex = captionSchedule({ ...B, build: [] }, C, 'en', ANY, {}, { schedule: sch });
+      assert(ex.filter(x => x.kind !== 'step').map(x => x.kind).join() === 'test' && captionFrame(ex, 4.1, S).rows.map(r => r.kind).join() === 'test', `exclusive: ${ex.map(x => x.kind)}`);
+      assert(applyExclusive([{ at: 0, until: 1, kind: 'test' }, { at: 2, until: 3, kind: 'voice' }]).length === 2, 'exclusive quiets a line that does not overlap');
+      assert(captionRows([{ at: 1, kind: 'narrator' }, { at: 1, kind: 'voice' }]).map(r => r.kind).join() === 'voice,narrator', 'rows by rank');
+    } finally { delete SPEAKER_KINDS.test; }
+  },
 };
 
 let failed = 0;
-for (const [name, fn] of Object.entries(CHECKS)) {
+for (const [name, fn] of Object.entries(CHECKS).filter(([n]) => !process.env.ONLY || n.includes(process.env.ONLY))) {
   try { await fn(); console.log(`ok    ${name}`); }
   catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); }
 }

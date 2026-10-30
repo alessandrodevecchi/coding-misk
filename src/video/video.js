@@ -9,12 +9,13 @@ import { fragmentAreas, soulFocus, coverOffset } from './layout.js';
 import { glitchAt, GLITCH_SECONDS, taglineAt, taglineFor } from './fragments.js';
 import { hashString } from '../endless/random.js';
 import { appRoles, MUTED_TEXT } from '../code-themes/themes.js';
+import { drawCaptions } from '../captions/captions.js';
 
 const KEY = 'coding-misk-video';
 const LIVE_KEY = 'coding-misk-live-preset';
 
 // visuals: { setTarget, canvas } from startVisuals; getCode(): the code in the editor; getInfo(cyc): what plays;
-// getSay(): the voice line on the stage; getSoul(): { canvas } of the soul screen when the soul is on, else null;
+// getCaptions(cyc): { frame, S, label, hw } of the stage's captions now (spoken-text-on-stage D6), or null; getSoul(): { canvas } of the soul screen when the soul is on, else null;
 // soulFrame(cyc, playing, scale): the soul screen always (the live picture's soul views, #52)
 // getTimeline(cyc): { shape, bar, live } of the song on air, for the timeline views (#65), or null
 // getHighlights(): true when the playing notes light up in the code (performance-profiles)
@@ -22,7 +23,7 @@ const LIVE_KEY = 'coding-misk-live-preset';
 // read every frame; a fast video or a fragment passes the one read at its start (J.ct)
 // getWidgets(): { canvas(type, index, key), dim } of the code widgets drawn now (the page's, or the fast video's drawn
 // from its notes and waves), or null (code-widgets D11)
-export function createVideo({ getCodeTheme = () => null, getWidgets = () => null, visuals, getCode, getInfo, getSay, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
+export function createVideo({ getCodeTheme = () => null, getWidgets = () => null, visuals, getCode, getInfo, getCaptions = () => null, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });
   const cv = document.createElement('canvas');
@@ -272,13 +273,17 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     if (sub) { g.fillStyle = P.muted; g.font = `500 ${sf}px "JetBrains Mono", monospace`; g.fillText(sub, x + pad, y + pad + tf + sf * .4, S.w - 72 * u - pad * 2); }
     g.restore();
   }
-  function drawSay(S, fade = 1) {
-    const say = getSay(); if (!say || fade <= 0.01) return;
-    const u = S.h / 1080, f = Math.round(44 * u);
-    g.save(); g.globalAlpha = fade; g.font = `700 ${f}px "JetBrains Mono", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const w = Math.min(S.w - 64 * u, g.measureText(say).width + 40 * u), cx = S.x + S.w / 2, cy = S.y + S.h * .86;
-    g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.roundRect(cx - w / 2, cy - f * .8, w, f * 1.6, 8 * u); g.fill();
-    g.fillStyle = palette().a1; g.fillText(say, cx, cy, w - 24 * u); g.restore();
+  // the captions over the stage's area (D6): one renderer for every video, the fragments (tall: 9:16, the lower third,
+  // two lines at most) and the live picture
+  function drawSay(S, fade = 1, cyc = lastCyc, tall = false) {
+    if (fade <= 0.01) return;
+    const c = getCaptions(cyc); if (!c) return;
+    g.save(); g.globalAlpha = fade;
+    try {
+      const drawn = drawCaptions(g, S, c.frame, c.S, { scale: (tall ? S.w : S.h) / 1080, tall, where: c.S.where, hw: c.hw, label: c.label });
+      // (for the checks: the rows drawn in videos, when a check asks for them)
+      if (Array.isArray(globalThis.codingMiskVideoCaptions)) for (const r of c.frame.rows) globalThis.codingMiskVideoCaptions.push({ cyc, kind: r.kind, text: r.text, tag: c.frame.tag, tall, rows: drawn.length });
+    } finally { g.restore(); }
   }
 
   // the stage into an area: exact while recording (the stage draws at the area's size), cropped to fill for the preview
@@ -312,7 +317,7 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
     drawStage(A.stage);
-    drawSay(A.stage);
+    drawSay(A.stage, 1, cyc);
     drawCard(A.stage, P, getInfo(cyc) || {}, now);
     if (A.soul) drawSoul(A.soul, P, soulMode === 'open', soulMode === 'open' ? soul.canvas(cyc, playing, (A.soul.w - 8) / 1200) : null);
     if (A.code) drawCode(A.code, P, now, Q.h, null, withWidgets(J.layout), J.ct);
@@ -500,7 +505,7 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
       const A = fragmentAreas(o, C.w, C.h);
       g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
       g.fillStyle = P.bg; g.fillRect(0, 0, C.w, C.h);
-      if (A.stage) { drawStage(A.stage); drawSay(A.stage); bleedAround(A.stage); }
+      if (A.stage) { drawStage(A.stage); drawSay(A.stage, 1, cyc, true); bleedAround(A.stage); }
       if (A.soul && soulFrame) {
         // the soul cut to fill: centred on its view's focus; a view along the song keeps the fragment's stretch in sight,
         // its middle worked out once at the fragment's first frame
@@ -525,6 +530,9 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     if (turned) { g.setTransform(0, 1, -1, 0, Q.w, 0); g.drawImage(turnCv, 0, 0); g.setTransform(1, 0, 0, 1, 0, 0); }
   }
 
+  // the timeline layout's line beside the playhead (D6): the line heard now with its speaker, '' when none (the step
+  // line no longer shows there)
+  const heardLine = cyc => { const c = getCaptions(cyc); const r = c && c.frame.rows[0]; return r ? { text: r.text, kind: r.kind } : null; };
   // ---------- the live picture (#52): drawn into the broadcast window's canvas, with presets and transitions ----------
   let lastCyc = 0, lastPlaying = false, live = null;
   const LIVE_Q = { w: 1920, h: 1080, fps: 30 };
@@ -540,7 +548,7 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
     g.fillStyle = P.bg; g.fillRect(0, 0, Q.w, Q.h);
     if (A.stage.a > .01) { g.globalAlpha = A.stage.a; drawStage(A.stage); g.globalAlpha = 1; }
-    drawSay(A.stage, A.stage.a);
+    drawSay(A.stage, A.stage.a, cyc);
     if (A.soul.a > .01 && A.soul.x < Q.w && soulFrame) {
       const bw = A.soul.w - 8, bh = A.soul.h - A.soul.head - 4;
       drawSoul(A.soul, P, true, soulFrame(cyc, playing, Math.max(.05, Math.min(bw / 1200, bh / 760))));
@@ -552,7 +560,7 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
       const T = getTimeline(cyc), p = presetOf(preset);
       if (T) {
         const future = futureShown(p.future, T.live);
-        if (tlOn) drawTimeline(g, A.timeline, T.shape, T.bar, P, { window: timelineWindow(p.view), future, sayOf: T.sayOf });
+        if (tlOn) drawTimeline(g, A.timeline, T.shape, T.bar, P, { window: timelineWindow(p.view), future, sayOf: T.sayOf, heard: heardLine(cyc) });
         if (colOn) drawColumn(g, A.column, T.shape, T.bar, P, { future });
       }
     }

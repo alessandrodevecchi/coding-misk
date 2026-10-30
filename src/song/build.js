@@ -5,7 +5,8 @@
 // shown in the editor always agree. Tracks named by an "add" step are silent before it; the others play from the start.
 import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
-import { spokenBars, narratorStyle, poeticLine, movementLine, enteringTrack, placeSpoken, lineTexts, lineSounds, withNarratorStyle } from './spoken.js';
+import { spokenBars, narratorStyle, poeticLine, movementLine, enteringTrack, placeSpoken, lineTexts, lineSounds, lineBank, withNarratorStyle, sampleSeconds, barSeconds, spokenContext } from './spoken.js';
+import { kindOf, outranks, perBar, applyExclusive } from './speakers.js';
 
 // hide and reveal (natural-growth): functions of a track left out of its code until a step brings them in
 // clone, comment, notes (live-coder-growth): a track comes in as a copy of another one; functions commented out in the
@@ -165,7 +166,7 @@ export function voiceSamples(song, lang, files) {
     // (a poetic narrator says images, and with Narrated growth the step lines or their movement images too)
     const texts = poetic ? [enteringTrack(song, st) ? sayText(poeticLine(song, st, i), lang) : '', narratedGrowth(song) && st.say ? stepSaid(song, steps, st, lang) : ''] : [st.say ? sayText(st.say, lang) : ''];
     for (const text of texts.filter(Boolean)) {
-      const { bank, list } = bankFor(voiceOf(song, st), lang, files), n = sampleIndex(list, text);
+      const { bank, n } = lineSample(voiceOf(song, st), lang, files, text);
       if (n >= 0) out.set(`${bank}:${n}`, { s: bank, n });
     }
   });
@@ -177,11 +178,19 @@ export function voiceSamples(song, lang, files) {
   }
   return [...out.values()];
 }
-// the speaker's bank when it has samples, else the default voice
-function bankFor(track, lang, files) {
-  const speaker = track && track.settings && track.settings.speaker, own = speaker && (files || {})[sayBank(lang, speaker)];
-  const bank = own ? sayBank(lang, speaker) : sayBank(lang);
-  return { bank, list: (files || {})[bank] || [] };
+// The sample of one narrator line (spoken-text-on-stage D10, per line): the speaker's own, else the default voice's
+// sample of the same line (the speaker's sound settings still apply). → { bank, n, own } or { bank: the speaker's bank,
+// n: -1 } without a sample. A fallback is noted once in the dev console (the visible side of #63).
+const fellBack = new Set();
+export function lineSample(track, lang, files, text) {
+  const speaker = (track && track.settings && track.settings.speaker) || '', own = sayBank(lang, speaker);
+  for (const bank of speaker ? [own, sayBank(lang)] : [own]) {
+    const n = sampleIndex((files || {})[bank] || [], text);
+    if (n < 0) continue;
+    if (bank !== own && !fellBack.has(`${own}/${text}`)) { fellBack.add(`${own}/${text}`); try { console.info(`[voice] "${text}": no sample in ${own}, the default voice speaks it`); } catch (e) {} }
+    return { bank, n, own: bank === own };
+  }
+  return { bank: own, n: -1, own: false };
 }
 // spoken comment of the latest step: a sample of public/samples/say_<lang>/ (tools/voice.mjs), played once on the
 // step's bar with the settings and rack of its voice track (in "state": the song at that bar, so steps can change them).
@@ -226,21 +235,24 @@ function narration(song, upTo, lang) {
   // of movement instead of its step line (poetic-steps)
   if (narratedGrowth(song)) {
     const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && stepSaid(song, steps, said, lang);
-    if (text && !out.some(x => x.at === said.at && x.text)) out.push({ step: said, text, at: said.at });
+    // (the narrator says at most perBar lines on a bar: the registry's rule, D11)
+    if (text && out.filter(x => x.at === said.at && x.text).length < perBar('narrator')) out.push({ step: said, text, at: said.at });
   }
   return out.filter(x => x.text);
 }
 // the narrator's lines in the code of a state (the first `upTo` steps applied): [{ at, voice: 'N', text, step, track,
 // bank, n }], after the filters of the code: its voice track muted, a bar where the voice instrument sounds (the
 // narrator yields), no sample. voiceCode writes these lines and spokenSchedule lists them, so they cannot disagree
-export function narratorLines(song, state, upTo, lang, files) {
-  const spokenAt = (state.tracks || []).some(t => t.type === 'spoken') ? spokenBars(state, lang) : null;
+// all: every line, also the ones without a sample (n: -1, the speaker's bank), for spokenNeeds (D9)
+export function narratorLines(song, state, upTo, lang, files, all = false) {
+  // (the registry's precedence, D11: the narrator yields on the bars where the voice track sounds)
+  const spokenAt = outranks('voice', 'narrator') && (state.tracks || []).some(t => t.type === 'spoken') ? spokenBars(state, lang) : null;
   return narration(song, upTo, lang).flatMap(said => {
     const step = said.step, text = said.text, track = voiceOf(state, step);
     if (track && track.mute) return [];
     if (spokenAt && spokenAt.has(said.at)) return [];
-    const { bank, list } = bankFor(track, lang, files), n = sampleIndex(list, text);
-    if (n < 0) return [];
+    const { bank, n } = lineSample(track, lang, files, text);
+    if (n < 0 && !all) return [];
     return [{ at: said.at, voice: 'N', text, step, track, bank, n }];
   });
 }
@@ -264,32 +276,100 @@ export function voiceCode(song, state, upTo, total, lang, files) {
 // style of the controls and the code-of-the-moment steps); C: the controls (narrator off: no N). N: the narrator's lines
 // of every state the code is written in (narratorLines). T: every start of every voice-track line with its texts joined
 // by " · ", when the line has a sample (the samples of spokenContext, as the compiler) and its track sounds on that bar.
-export function spokenSchedule(song, C = {}, lang = 'en', files = {}) {
+// opts.needSamples (spoken-text-on-stage D9): every line the code would say if every sample existed, without the
+// sample filter (spokenNeeds). Each line also carries its bank; a voice-track line its way, clip (ci), offset (late, a
+// fraction of a bar), length in beats and whether the listener typed it in the radio console (typed).
+export function spokenSchedule(song, C = {}, lang = 'en', files = {}, opts = {}) {
+  const all = !!(opts && opts.needSamples);
   const s = withNarratorStyle(song, C && C.narratorStyle), out = [], seen = new Set();
   const steps = buildSteps(s), states = new Map();
   const state = bar => { if (!states.has(bar)) states.set(bar, stateAt(s, bar)); return states.get(bar); };
   if (!C || C.narrator !== false) {
     for (const bar of [...new Set([0, ...steps.map(x => x.at)])].sort((a, b) => a - b)) {
       const st = state(bar);
-      for (const x of narratorLines(s, st.song, st.upTo, lang, files)) {
+      for (const x of narratorLines(s, st.song, st.upTo, lang, files, all)) {
         const k = `${x.at}|${x.text}`;
         if (seen.has(k)) continue;
         seen.add(k);
-        out.push({ at: x.at, voice: 'N', text: x.text, step: x.step, track: x.track ? x.track.id : null });
+        out.push({ at: x.at, voice: 'N', text: x.text, step: x.step, track: x.track ? x.track.id : null, bank: x.bank, ...(all ? { texts: [x.text] } : {}) });
       }
     }
   }
   if ((s.tracks || []).some(t => t.type === 'spoken')) {
     for (const p of placeSpoken(s, lang)) {
-      if (!lineSounds(p)) continue;
+      if (!all && !lineSounds(p)) continue;
       for (const st of p.starts) {
         const tracks = state(st.bar).song.tracks, tr = tracks.find(x => x.id === p.track), solo = tracks.some(x => x.alone && !x.mute);
         if (!tr || tr.mute || tr.hush || (solo && !tr.alone)) continue;
-        out.push({ at: st.bar, voice: 'T', text: p.texts.join(' · '), track: p.track });
+        out.push({ at: st.bar, voice: 'T', text: p.texts.join(' · '), track: p.track, bank: (!all && lineBank(p.texts[0], p.bank)) || p.bank, way: p.way, ci: p.ci, late: st.late || 0, beats: p.beats, typed: !!(p.pat && p.pat.typed), ...(all ? { texts: p.texts } : {}) });
       }
     }
   }
   return out.sort((a, b) => a.at - b.at || (a.voice === b.voice ? 0 : a.voice === 'N' ? -1 : 1));
+}
+// Every line a song would speak if every sample existed (D9): [{ at, voice, text, bank, lang, speaker, has }], one per
+// sample (a voice-track line of several entries gives one per entry), first lines first. has: the speaker's own sample
+// exists on this machine (a line the default voice speaks in its place still counts as missing for the speaker). The
+// same function as spokenSchedule with its needSamples switch, so the two lists cannot drift.
+export function spokenNeeds(song, C = {}, lang = 'en', files = {}) {
+  const out = [], seen = new Set();
+  for (const x of spokenSchedule(song, C, lang, files, { needSamples: true })) {
+    for (const text of x.texts || [x.text]) {
+      const k = `${x.bank}/${saySlug(text)}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const has = sampleIndex((files || {})[x.bank] || [], text) >= 0;
+      out.push({ at: x.at, voice: x.voice, text, bank: x.bank, lang, speaker: x.bank.slice(`say_${lang}`.length + 1), has });
+    }
+  }
+  return out;
+}
+
+// The captions of a song (spoken-text-on-stage D1): what is heard, from spokenSchedule, with its speaker and how long it
+// shows: [{ at, until, kind, code, text, step, typed, track, way, seconds }] in bars (at carries a voice-track line's
+// offset), sorted by start. until: the sample's length (lengths: { "bank/slug.wav": seconds }, say_lengths.json) plus
+// 1.5 s, at least 2 s, at most 4 bars, cut by the next caption of the same speaker; without a measured length, 2 bars.
+// A chopped line shows once per clip, held for the clip; a refrain shows at each repeat. step: the step line of the
+// caption's bar (the tag of D2), '' when there is none. The step lines follow as entries of kind "step" (4 bars each;
+// heard: a narrator caption says the same words), for the tag and the old behaviour; none with the narrator off.
+// opts.schedule: a spokenSchedule already made (the radio's Coming next keeps one).
+// the speaker of a sample bank ('' the default voice): "say_it_reed" → "reed"
+const speakerOfBank = bank => String(bank || '').replace(/^say_[a-z]+_?/, '');
+export function captionSchedule(song, C = {}, lang = 'en', files = {}, lengths = spokenContext.lengths, opts = {}) {
+  const s = withNarratorStyle(song, C && C.narratorStyle);
+  const sched = (opts && opts.schedule) || spokenSchedule(song, C, lang, files);
+  const steps = buildSteps(s).filter(x => x.say);
+  const stepAt = bar => { const st = steps.filter(x => x.at <= bar && bar < x.at + 4).pop(); return st ? sayText(st.say, lang) : ''; };
+  const out = [], chops = new Map();
+  for (const x of sched) {
+    const kind = kindOf(x.voice);
+    if (!kind) continue;
+    if (x.way === 'chop') {
+      // (a chop: one caption per clip, from its first bar to the clip's last)
+      const k = `${x.track}|${x.ci}`, c = chops.get(k);
+      if (c) { c.until = Math.max(c.until, x.at + 1); continue; }
+      const e = { at: x.at, until: x.at + 1, kind, code: x.voice, text: x.text, step: stepAt(x.at), typed: !!x.typed, track: x.track || null, way: 'chop', seconds: null, hold: true, speaker: speakerOfBank(x.bank) };
+      chops.set(k, e); out.push(e);
+      continue;
+    }
+    const at = x.at + (x.late || 0), bs = barSeconds(s, x.at), texts = x.text.split(' · ');
+    // the sample's length: measured; a line of several entries one beat apart: its length in beats
+    const len = texts.length > 1 && Number.isFinite(x.beats) ? x.beats * bs / 4 : sampleSeconds(texts[0], x.bank, lengths);
+    const hold = len === null ? 2 : Math.min(4, Math.max(2, len + 1.5) / bs);
+    out.push({ at, until: at + hold, kind, code: x.voice, text: x.text, step: stepAt(x.at), typed: !!x.typed, track: x.track || null, way: x.way || null, seconds: len, speaker: speakerOfBank(x.bank) });
+  }
+  out.sort((a, b) => a.at - b.at);
+  // (cut by the next caption of the same speaker; a chop holds for its clip)
+  out.forEach((x, i) => { const nx = out.slice(i + 1).find(y => y.kind === x.kind && y.at > x.at); if (nx && !x.hold && nx.at < x.until) x.until = nx.at; });
+  const lines = applyExclusive(out);
+  // the step lines (D2)
+  if (!C || C.narrator !== false) for (const st of steps) {
+    const text = sayText(st.say, lang);
+    if (!text) continue;
+    const heard = lines.some(x => x.kind === 'narrator' && x.text === text && x.at >= st.at - 1 && x.at < st.at + 4);
+    lines.push({ at: st.at, until: st.at + 4, kind: 'step', code: null, text, step: text, heard, typed: false, track: null, way: null, seconds: null });
+  }
+  return lines.sort((a, b) => a.at - b.at || (a.kind === 'step' ? 1 : 0) - (b.kind === 'step' ? 1 : 0));
 }
 // Where the narrator speaks, for the Compose timeline (narrator-ghost-row D2): [{ at, text, track }] from spokenSchedule,
 // so the marks are what is heard (the poetic images, no line where the voice instrument speaks, none from a muted

@@ -15,6 +15,8 @@ import { shapeCounts } from '../song/shapes.js';
 import { AIR_CHOOSERS, AIR_CHOOSER, chooserOf, chooserName } from '../endless/waypoints.js';
 import { RENDERS } from '../music.js';
 import { CW_KEY, CW_DEFAULTS, CW_INSTRUMENTS, CW_WINDOWS, CW_PARAMS, CW_SIZE_LIMITS, WIDGETS, widgetSettings } from '../live/widgets.js';
+import { CAPTIONS_KEY, captionSettings, WHERES, STEP_FORMS } from '../captions/captions.js';
+import { SPEAKER_KINDS, MARKS } from '../song/speakers.js';
 import { SW_KEY, SW_OPEN, SW_LAYERS, SW_MAPPINGS, SW_COLOURS, SW_SILENT, SW_LIMITS, stageSettings } from '../visuals/stage-settings.js';
 
 // the code widgets card (code-widgets D2): the sections left open, remembered in this browser
@@ -41,6 +43,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setRenderLight'), `<select id="set-render-light" data-no-knob>${['auto', 'on', 'off'].map(k => opt(k, store.get('coding-misk-render-light', 'auto'), t(`setRenderLight:${k}`))).join('')}</select>`, t('setRenderLightHint'))}
           ${codeRows()}
         </div>
+        ${captionsCard()}
         <div class="card set-card"><h3>${esc(t('setAudio'))}</h3>
           ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`)}
           ${row(t('setFormat'), `<select id="set-format" data-no-knob>${FORMATS.map(f => opt(f, fmt, t(`set${f[0].toUpperCase()}${f.slice(1)}`))).join('')}</select>`, t('setFormatHint'))}
@@ -59,6 +62,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setRender'), `<select data-vid-opt="render" data-no-knob>${opt('stage', vid.render, t('renderStage'))}${RENDERS.map(([k, l]) => opt(k, vid.render, tx(l))).join('')}</select>`)}
           ${row(t('setVidSoulMode'), `<select data-vid-opt="soul" data-no-knob>${SOULS.map(k => opt(k, vid.soul, t(`vidSoul:${k}`))).join('')}</select>`, t(`vidSoulHint:${vid.soul}`))}
           ${vid.layout === 'code' && vid.soul !== 'off' && vid.soul !== 'full' ? row(t('setVidSoul'), seg('data-vid-soul', [['1', t('vidSoulShown')], ['0', t('vidSoulFolded')]], vid.soulPanel ? '1' : '0'), t('setVidSoulHint')) : ''}
+          ${row(t('setCap'), `<span class="muted">${esc(t(captionSettings(store.get(CAPTIONS_KEY, null)).on && captionSettings(store.get(CAPTIONS_KEY, null)).videos ? 'capExportOn' : 'capExportOff'))} · <a href="#set-captions" data-cap-link>${esc(t('capExportLink'))}</a></span>${app.capsSkipNext ? ` <label class="rx-opt"><input type="checkbox" data-cap-skip${app.capsSkipNext() ? ' checked' : ''} data-no-knob> <span>${esc(t('capExportNone'))}</span></label>` : ''}`)}
           ${row(t('setVidPreset'), `<span class="vid-presets"><select id="set-vid-preset" data-no-knob><option value="">${esc(t('vidPresetPick'))}</option>${Object.keys(presets).sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select><input id="set-vid-preset-name" type="text" maxlength="40" placeholder="${esc(t('vidPresetName'))}" aria-label="${esc(t('vidPresetName'))}"><button class="btn small" id="set-vid-preset-save">${esc(t('vidPresetSave'))}</button>${Object.keys(presets).length ? `<button class="btn small danger" id="set-vid-preset-del">${esc(t('vidPresetDel'))}</button>` : ''}</span>`, t('setVidPresetHint'))}
         </div>
         <div class="card set-card" id="set-fragments"><h3>${esc(t('setVertical'))}</h3>
@@ -163,6 +167,24 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   }
   // stage widgets (widgets-on-stage D9): the layer over the scene, then sections that open and close, like the code
   // widgets card
+  // texts on stage (spoken-text-on-stage D7): one switch, the choices under it folded while it is off and kept
+  function captionsCard() {
+    const S = captionSettings(store.get(CAPTIONS_KEY, null));
+    const check = (k, label, hint = '') => `<label class="rx-opt"${hint ? ` title="${esc(hint)}"` : ''}><input type="checkbox" data-cap-show="${k}"${S[k] ? ' checked' : ''} data-no-knob> <span>${esc(label)}</span></label>`;
+    const kinds = Object.keys(SPEAKER_KINDS).filter(k => !SPEAKER_KINDS[k].future);
+    return `<div class="card set-card" id="set-captions"><h3>${esc(t('setCap'))}</h3>
+      <p class="muted">${esc(t('setCapIntro'))}</p>
+      ${row(t('capOn'), seg('data-cap-on', [['1', t('cwYes')], ['0', t('cwNo')]], S.on ? '1' : '0'), t('capOnHint'))}
+      <div class="cap-choices"${S.on ? '' : ' hidden'}>
+        ${row(t('capShow'), `<div class="cw-checks">${check('narrator', t('capNarrator'))}${check('voice', t('capVoice'))}${check('typed', t('capTyped'))}${check('steps', t('capSteps'))}${check('claude', t('capClaude'), t('capClaudeHint'))}</div>`)}
+        ${row(t('capStepForm'), `<select data-cap-opt="stepForm" data-no-knob${S.steps ? '' : ' disabled'}>${STEP_FORMS.map(k => opt(k, S.stepForm, t(`capStepForm:${k}`))).join('')}</select>`)}
+        ${row(t('capMarks'), kinds.map(k => `<label class="cap-mark"><span class="muted">${esc(t(`capKind:${k}`))}</span> <select data-cap-mark="${k}" data-no-knob>${MARKS.map(m => opt(m, S.marks[k], t(`capMark:${m}`))).join('')}</select></label>`).join(''), t('capMarksHint'))}
+        ${row(t('capWhere'), `<select data-cap-opt="where" data-no-knob>${WHERES.map(k => opt(k, S.where, t(`capWhere:${k}`))).join('')}</select>`)}
+        ${row(t('capVideos'), seg('data-cap-videos', [['1', t('cwYes')], ['0', t('cwNo')]], S.videos ? '1' : '0'), t('capVideosHint'))}
+      </div>
+    </div>`;
+  }
+  const setCap = f => { if (app.setCaptions) app.setCaptions(f); else { const S = captionSettings(store.get(CAPTIONS_KEY, null)); f(S); store.set(CAPTIONS_KEY, captionSettings(S)); } };
   function stageCard() {
     const W = stageSettings(store.get(SW_KEY, null)), open = new Set(store.get(SW_OPEN, ['general']) || []), vid = { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}) };
     const sec = (id, body) => `<details class="cw-sec" data-sw-sec="${id}"${open.has(id) ? ' open' : ''}><summary>${esc(t(`swSec:${id}`))}</summary>${body}</details>`;
@@ -198,6 +220,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
     if (b.dataset.setUiFollow) { app.setUiFollow(b.dataset.setUiFollow === '1'); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
+    if (b.dataset.capOn) { setCap(S => { S.on = b.dataset.capOn === '1'; }); return render(); }
+    if (b.dataset.capVideos) { setCap(S => { S.videos = b.dataset.capVideos === '1'; }); return render(); }
     if (b.dataset.setCodeSize) { app.codeTheme.set({ size: b.dataset.setCodeSize }); return render(); }
     if (b.dataset.setCodeDim) { app.codeTheme.set({ dim: b.dataset.setCodeDim === '1' }); return render(); }
     // code widgets (code-widgets D2)
@@ -259,6 +283,10 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   root.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.swSec) { const open = new Set(store.get(SW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.swSec); else open.delete(d.dataset.swSec); store.set(SW_OPEN, [...open]); return; } if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
   root.addEventListener('change', e => {
     { const x = e.target, d = x.dataset || {};
+      if (d.capSkip !== undefined && app.capsSkipNext) { app.capsSkipNext(x.checked); return; }
+      if (d.capShow) { setCap(S => { S[d.capShow] = x.checked; }); return render(); }
+      if (d.capOpt) { setCap(S => { S[d.capOpt] = x.value; }); return; }
+      if (d.capMark) { setCap(S => { S.marks[d.capMark] = x.value; }); return; }
       if (d.cwNum) { setCw(S => { S[d.cwNum] = +x.value; }); x.value = widgetSettings(store.get(CW_KEY, null))[d.cwNum]; return; }
       if (d.cwWindow !== undefined) { setCw(S => { S.window = x.value === 'always' ? 'always' : +x.value; }); return; }
       if (d.cwWidget) { setCw(S => { S.widgets[d.cwWidget] = x.checked; }); return; }

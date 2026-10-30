@@ -25,7 +25,7 @@ function round(ctx, x, y, w, h, r) {
 }
 
 // P: palette { bg, panel, line, ink, muted, a1, a2, a3 }; opts: { window, future, say (lang → text of a mark) }
-export function drawTimeline(ctx, area, shape, bar, P, { window = 0, future = true, sayOf = s => (typeof s === 'string' ? s : (s && (s.en || Object.values(s)[0])) || '') } = {}) {
+export function drawTimeline(ctx, area, shape, bar, P, { window = 0, future = true, heard = undefined, sayOf = s => (typeof s === 'string' ? s : (s && (s.en || Object.values(s)[0])) || '') } = {}) {
   if (!shape || !shape.bars || area.a <= 0.01) return;
   const { x, y, w, h } = area, tracks = (shape.tracks || []).filter(t => t.type !== 'voice');
   const [b0, b1] = shownRange(shape.bars, bar, window), span = b1 - b0;
@@ -74,11 +74,16 @@ export function drawTimeline(ctx, area, shape, bar, P, { window = 0, future = tr
   // what is coming hidden (a live build keeps its surprise)
   if (!future) { ctx.fillStyle = P.panel; ctx.fillRect(px, y + head - 2, gx + gw - px + 6, h - head + 2); }
   ctx.fillStyle = P.a1; ctx.fillRect(px - 1, y + 2, 3, h - 4);
-  // the comment of the latest step, next to the playhead
-  const last = tracks.flatMap(t => (t.marks || []).filter(m => m.say && m.at <= bar && bar < m.at + 4)).sort((a, b) => b.at - a.at)[0];
-  if (last) {
-    const txt = `> ${sayOf(last.say)}`, tw = ctx.measureText(txt).width + 12, tx = Math.min(px + 6, x + w - tw - 4);
-    round(ctx, tx, y + 3, tw, head - 4, 4); ctx.fillStyle = P.bg; ctx.fill(); ctx.fillStyle = P.a2 || P.ink; ctx.fillText(txt, tx + 6, y + head / 2 + 1);
+  // the line heard now, next to the playhead (spoken-text-on-stage D6: heard { text, kind } from the captions, null when
+  // nothing is said; without it, as before, the comment of the latest step)
+  const last = heard !== undefined ? null : tracks.flatMap(t => (t.marks || []).filter(m => m.say && m.at <= bar && bar < m.at + 4)).sort((a, b) => b.at - a.at)[0];
+  const said = heard ? { txt: heard.kind === 'voice' ? `“${heard.text}”` : heard.text, col: heard.kind === 'voice' ? '#ff5fd2' : heard.kind === 'narrator' ? '#4fe3ff' : P.a2 || P.ink, italic: heard.kind === 'narrator' } : last ? { txt: `> ${sayOf(last.say)}`, col: P.a2 || P.ink } : null;
+  if (said) {
+    const was = ctx.font;
+    if (said.italic) ctx.font = `italic ${was}`;
+    const tw = ctx.measureText(said.txt).width + 12, tx = Math.min(px + 6, x + w - tw - 4);
+    round(ctx, tx, y + 3, tw, head - 4, 4); ctx.fillStyle = P.bg; ctx.fill(); ctx.fillStyle = said.col; ctx.fillText(said.txt, tx + 6, y + head / 2 + 1);
+    ctx.font = was;
   }
   ctx.restore();
 }
