@@ -110,6 +110,17 @@ const CHECKS = {
     const capped = mergeBackup(makeBackup([['coding-misk-pattern-drafts', many]]), () => null).values['coding-misk-pattern-drafts'];
     assert(capped.length === 30 && capped[0].id === 'd-m39' && !capped.some(x => x.id === 'd-m9'), `capped ${capped.length}`);
   },
+  'my phrases merge by id with the larger use count and the newer last use, the open Voci section stays out (my-phrases 1.3)'() {
+    const P = (id, text, extra = {}) => ({ id, text, lang: 'it', kind: 'voice', tag: 'night', source: 'radio', created: '2026-10-29T21:00:00Z', ...extra });
+    const b = makeBackup([['coding-misk-phrases', { format: 1, items: [P('ph_a', 'le torri non dormono mai', { uses: 2, last: '2026-10-29T22:00:00Z' }), P('ph_b', 'chi guida stanotte', { uses: 1, last: '2026-10-28T10:00:00Z' })] }], ['coding-misk-voices-sub', 'samples'], ['coding-misk-phrase-settings', { save: 'ask' }]]);
+    assert(b.data['coding-misk-phrases'] && !('coding-misk-voices-sub' in b.data) && b.data['coding-misk-phrase-settings'].save === 'ask', Object.keys(b.data).join());
+    const cur = { format: 1, items: [P('ph_a', 'le torri non dormono mai', { uses: 5, last: '2026-10-20T10:00:00Z' }), P('ph_c', 'fermi tutti', { kind: 'explain', tag: 'breakdown' }), P('ph_x', 'chi guida stanotte', { uses: 4, last: '2026-10-01T00:00:00Z' })] };
+    const { values, counts } = mergeBackup(b, k => (k === 'coding-misk-phrases' ? cur : null));
+    const by = Object.fromEntries(values['coding-misk-phrases'].items.map(p => [p.id, `${p.uses}|${(p.last || '').slice(0, 10)}`]));
+    // ph_a: larger count here, newer last there; ph_b has the key of ph_x: one phrase, the larger count, the newer last
+    assert(by.ph_a === '5|2026-10-29' && by.ph_c === '0|' && by.ph_x === '4|2026-10-28' && !by.ph_b && counts.phrases === 2, JSON.stringify(by));
+    assert(values['coding-misk-phrase-settings'].save === 'ask', 'the settings travel');
+  },
   'a file that is not a backup is refused'() { assert(mergeBackup({ format: 'x' }, () => null).error, 'accepted'); },
 };
 let failed = 0;

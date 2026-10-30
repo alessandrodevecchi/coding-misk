@@ -2,9 +2,9 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 
 ## 1. Store and backup (2 h)
 
-- [ ] 1.1 `src/voices/phrases.js` (pure): the store `coding-misk-phrases`, key `kind + lang + slug`, add with use count, edit, delete, cap, translation
-- [ ] 1.2 Moments: the map of the 14 `PHRASES` kinds and the 18 `POOL` kinds onto 21 moments, in three groups, the same for Compose and the radio; every pool key mapped (D2; one list or several to confirm with the owner first)
-- [ ] 1.3 Backup merge by id with larger use count and newer last use (`src/settings/backup.js`); case in `tools/check-backup.mjs`
+- [x] 1.1 `src/voices/phrases.js` (pure): the store `coding-misk-phrases`, key `kind + lang + slug`, add with use count, edit, delete, cap, translation
+- [x] 1.2 Moments: the map of the 14 `PHRASES` kinds and the 18 `POOL` kinds onto 21 moments, in three groups, the same for Compose and the radio; every pool key mapped (D2; one list or several to confirm with the owner first). Built as the recommended single list of 21 moments shown in three groups (`src/voices/moments.js`), the growths' comments mapped too; awaiting the owner's confirmation (mf7)
+- [x] 1.3 Backup merge by id with larger use count and newer last use (`src/settings/backup.js`); case in `tools/check-backup.mjs`
 
 ## 2. Capture and save policy (2.5 h)
 
