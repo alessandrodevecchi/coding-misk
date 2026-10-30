@@ -7,7 +7,7 @@ The app SHALL offer its own code widgets next to Strudel's inline widgets, writt
 #### Scenario: Written like the other widgets
 
 - **WHEN** the "Code widgets" option is on and a song with drums and a pad plays
-- **THEN** the last drum line ends with `._hitgrid()` and the pad line ends with `._tonecloud()`, and the editor draws each widget below its line
+- **THEN** the first drum line playing ends with `._hitgrid()` and the pad line ends with `._tonecloud()`, and the editor draws each widget below its line
 
 ### Requirement: Widgets drawn from haps everywhere
 
@@ -126,7 +126,7 @@ The hit grid SHALL be the drums' primary widget, the tone cloud the pad's and th
 #### Scenario: Pad and drums
 
 - **WHEN** "Code widgets" is on with the default settings and a section has drums and a pad
-- **THEN** the hit grid is on the last drum line and the tone cloud on the pad line
+- **THEN** the hit grid is on the first drum line playing and the tone cloud on the pad line
 
 ### Requirement: Widgets in every render style
 

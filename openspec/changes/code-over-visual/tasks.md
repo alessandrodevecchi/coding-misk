@@ -25,8 +25,8 @@
 
 ## 4. App widget registry
 
-- [ ] 4.1 Registry (`name`, defaults, limits, `data`, `paint`) and `registerWidget('_hitgrid' | '_tonecloud')` in both Strudel copies with merged hidden defaults. Verify: a line with `._hitgrid({ steps: 8 })` evaluates in the page and the render page; `npm run check:strudel` accepts the calls; Node stubs for the checks without a browser
-- [ ] 4.2 Calls commented out in place (`/* ._hitgrid() */`) on copy, Save as pattern and export. Verify: `check:code-over` cases; the commented code evaluates in a plain Strudel in Node with the same haps; `npm run check:patterns`
+- [x] 4.1 Registry (`name`, defaults, limits, `data`, `paint`) and `registerWidget('_hitgrid' | '_tonecloud')` in both Strudel copies with merged hidden defaults. Verify: a line with `._hitgrid({ steps: 8 })` evaluates in the page and the render page; `npm run check:strudel` accepts the calls; Node stubs for the checks without a browser
+- [x] 4.2 Calls commented out in place (`/* ._hitgrid() */`) on copy, Save as pattern and export. Verify: `check:code-over` cases; the commented code evaluates in a plain Strudel in Node with the same haps; `npm run check:patterns`
 
 ## 5. Hit grid
 
@@ -41,7 +41,7 @@
 ## 7. Settings and slots
 
 - [ ] 7.1 "App widgets" section in the Code widgets card: on or off, parameters, ramp field, live preview, Default values; backup. Verify: `check-settings.cjs`, `check-backup.mjs`
-- [ ] 7.2 The two kinds in `WIDGETS` with primaries (drums: hit grid; pad and voice: tone cloud) and secondaries (bass, lead, arp, guitar: tone cloud); slots, maximum and muted-line rules of `#79`. Verify: `npm run check:live-code` new cases; with "Code widgets" off, `npm run check:code` unchanged
+- [x] 7.2 The two kinds in `WIDGETS` with primaries (drums: hit grid; pad and voice: tone cloud) and secondaries (bass, lead, arp, guitar: tone cloud); slots, maximum and muted-line rules of `#79`. Verify: `npm run check:live-code` new cases; with "Code widgets" off, `npm run check:code` unchanged
 - [ ] 7.3 Strudel catalog: the two widget calls. Verify: `npm run catalog:strudel`, `npm run check:knowledge` without the stale warning
 
 ## 8. Closing

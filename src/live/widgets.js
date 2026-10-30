@@ -7,24 +7,28 @@ import { hashString } from '../endless/random.js';
 
 export const CW_KEY = 'coding-misk-code-widgets';
 // the six inline widgets of @strudel/codemirror, in the order the Settings card shows them
-export const WIDGETS = ['scope', 'pianoroll', 'punchcard', 'spectrum', 'spiral', 'pitchwheel'];
+export const STRUDEL_WIDGETS = ['scope', 'pianoroll', 'punchcard', 'spectrum', 'spiral', 'pitchwheel'];
+// and the app's own (code-over-visual D8, D11): the hit grid and the tone cloud
+export const APP_KINDS = ['hitgrid', 'tonecloud'];
+export const WIDGETS = [...STRUDEL_WIDGETS, ...APP_KINDS];
 // the instruments a widget is chosen for (D3), and the default slot order
 export const CW_INSTRUMENTS = ['bass', 'lead', 'drums', 'arp', 'hats', 'pad', 'fx', 'voice'];
 // the window of a muted line (bars), D8, D9
 export const CW_WINDOWS = [8, 16, 32, 'always'];
 export const CW_PARAMS = ['labels', 'smear', 'fold', 'steady', 'fade'];
-// default mapping (owner, 2026-10-28): primary, then secondary widgets; fx and voice off
+// default mapping (owner, 2026-10-28): primary, then secondary widgets; fx off. code-over-visual cv8: the hit grid is
+// the drums' primary, the tone cloud the pad's and the voice's primary and a secondary of bass, lead (guitar) and arp
 const MAP = {
-  drums: ['scope', 'pianoroll', 'spectrum'], hats: ['pianoroll', 'scope', 'spectrum'], bass: ['scope', 'pianoroll', 'spectrum'],
-  lead: ['pianoroll', 'scope', 'spectrum'], arp: ['pianoroll', 'scope', 'spectrum'], pad: ['scope', 'pianoroll'],
-  fx: ['scope', 'spectrum'], voice: ['scope', 'spectrum'],
+  drums: ['hitgrid', 'scope', 'pianoroll', 'spectrum'], hats: ['pianoroll', 'scope', 'spectrum'], bass: ['scope', 'pianoroll', 'spectrum', 'tonecloud'],
+  lead: ['pianoroll', 'scope', 'spectrum', 'tonecloud'], arp: ['pianoroll', 'scope', 'spectrum', 'tonecloud'], pad: ['tonecloud', 'scope', 'pianoroll'],
+  fx: ['scope', 'spectrum'], voice: ['tonecloud', 'scope', 'spectrum'],
 };
 export const CW_DEFAULTS = Object.freeze({
   on: false, max: 3, roll: 'pianoroll', order: CW_INSTRUMENTS.slice(), share: 25, window: 16, dim: true,
   // "Widget notes" (D15): provisional default, Strudel's behaviour, until the owner chooses after the measures (task 7.4)
   notes: 'volume',
-  widgets: { scope: true, pianoroll: true, punchcard: true, spectrum: true, spiral: false, pitchwheel: false },
-  instruments: Object.fromEntries(CW_INSTRUMENTS.map(k => [k, { on: k !== 'fx' && k !== 'voice', primary: MAP[k][0], secondary: MAP[k].slice(1) }])),
+  widgets: { scope: true, pianoroll: true, punchcard: true, spectrum: true, spiral: false, pitchwheel: false, hitgrid: true, tonecloud: true },
+  instruments: Object.fromEntries(CW_INSTRUMENTS.map(k => [k, { on: k !== 'fx', primary: MAP[k][0], secondary: MAP[k].slice(1) }])),
   params: { labels: false, smear: false, fold: true, steady: true, fade: true },
   // px: the height of the row widgets (Strudel 60), the round ones (Strudel 200 and 275), spiral, spectrum
   sizes: { row: 36, round: 120, spiral: 200, spectrum: 120 },
@@ -60,8 +64,8 @@ export function widgetSettings(raw) {
 }
 
 // a widget call at the end of a line, a continuation line of its own included (one level of nested brackets for options)
-const CALL = /(?:[ \t]*\n[ \t]*)?\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\((?:[^()]|\([^()]*\))*\)/g;
-const HAS_CALL = /\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/;
+const CALL = /(?:[ \t]*\n[ \t]*)?\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\((?:[^()]|\([^()]*\))*\)/g;
+const HAS_CALL = /\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/;
 // D7: a line with and without a widget is the same line
 export const stripWidgets = text => (typeof text === 'string' && HAS_CALL.test(text) ? text.replace(CALL, '') : text);
 export const hasWidget = text => HAS_CALL.test(text);
@@ -168,7 +172,16 @@ export function placeWidgets(code, { S, bar = 0, section = 0, sections = 1, seed
   const sorted = cands.sort((a, b) => a.rank - b.rank || (b.playing - a.playing) || a.i - b.i), seen = new Set();
   const first = sorted.filter(c => !seen.has(c.rank) && seen.add(c.rank)), chosen = [...first, ...sorted.filter(c => !first.includes(c))].slice(0, want);
   if (!chosen.length) return code;
-  for (const c of chosen) lines[c.i] = withCall(lines[c.i], c.w);
+  // code-over-visual D11: the hit grid covers every drum sound, so it sits once, on the first drum line playing (the
+  // kick's, as a rule): a line that stays while drum lines come and go, so a person typing never moves it
+  const grids = chosen.filter(c => c.w === 'hitgrid');
+  if (grids.length) {
+    const drums = info.filter(x => (x.inst === 'drums' || x.inst === 'hats') && x.playing && !hasWidget(x.l) && !chosen.some(c => c.i === x.i && c.w !== 'hitgrid'));
+    const at = drums.length ? drums[0].i : grids[0].i;
+    for (const g of grids) g.skip = true;
+    chosen.push({ i: at, w: 'hitgrid' });
+  }
+  for (const c of chosen) if (!c.skip) lines[c.i] = withCall(lines[c.i], c.w);
   return lines.join('\n');
 }
 // the call at the end of a line, before a comment at its end
@@ -213,7 +226,7 @@ const fullHap = h => (h && h.value && typeof h.value === 'object' && typeof h.wi
 export function installWidgets(Pattern, getOpts = () => globalThis.miskWidgets) {
   if (!Pattern || !Pattern.prototype) return;
   const P = Pattern.prototype;
-  for (const name of WIDGETS) {
+  for (const name of STRUDEL_WIDGETS) {
     const key = `_${name}`, orig = P[key];
     if (orig && orig.miskWidget) continue;
     let f;

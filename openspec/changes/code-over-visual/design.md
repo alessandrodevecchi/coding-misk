@@ -86,7 +86,7 @@ Window: `bars` cycles ending now, `cols` slices. For each melodic note of the so
 
 ### D11. Where they go and the "Code widgets" option
 
-The two widgets are two new kinds in `WIDGETS` of `#79` with their own defaults (cv8): the hit grid is the drums' primary widget (it sits on the last drum line of the shown code and covers every drum sound, so one slot serves the whole kit), the tone cloud is the pad's primary (on chord instruments), the voice's primary (the voice tracks), and a secondary for bass, lead, arp and guitar. They count toward the maximum (default 3) and follow the slot order and the muted-line rules of `#79`. With "Code widgets" off they are not written.
+The two widgets are two new kinds in `WIDGETS` of `#79` with their own defaults (cv8): the hit grid is the drums' primary widget (it covers every drum sound, so one slot serves the whole kit; it sits on the first drum line playing, the kick's as a rule, a line that stays while drum lines come and go: on the last drum line it moved each time a drum line was added, and the person typing a growth had to delete and retype the call, which made steps rushed in `check:live-code`), the tone cloud is the pad's primary (on chord instruments), the voice's primary (the voice tracks), and a secondary for bass, lead, arp and guitar. They count toward the maximum (default 3) and follow the slot order and the muted-line rules of `#79`. With "Code widgets" off they are not written.
 
 ### D12. Render styles
 

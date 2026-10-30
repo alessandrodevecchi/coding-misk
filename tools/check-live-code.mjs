@@ -156,7 +156,7 @@ const CHECKS_REUSED = {
   },
 };
 // code widgets (code-widgets): which lines get a widget, how many, which widget; the code without widgets unchanged
-const WCALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(\)/g;
+const WCALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(\)/g;
 const calls = code => [...code.matchAll(WCALL)].map(m => m[1]);
 function widgetCodes(id, profile, over = {}, opts = {}) {
   const s = song(id), C = resolveProfile(profile), S = { on: true, ...over };
@@ -188,12 +188,14 @@ const CHECKS_WIDGETS = {
       }
     }
   },
-  'code widgets: default mapping and slot order; fx and voice off; spiral and pitchwheel off'() {
+  'code widgets: default mapping and slot order; fx off; spiral and pitchwheel off; hit grid and tone cloud (code-over-visual cv8)'() {
     const one = (line, S = {}) => calls(placeWidgets(line, { S: widgetSettings({ on: true, share: 0, ...S }) }));
     assert(one('$: note("a1").s("sawtooth").analyze("bass")')[0] === 'scope', 'bass scope');
     assert(one('$: note("a4").s("square").analyze("hook")')[0] === 'pianoroll', 'lead pianoroll');
-    assert(one('$: s("hh*8").analyze("hats")')[0] === 'pianoroll' && one('$: s("bd*4").analyze("kick")')[0] === 'scope', 'hats and drums');
-    assert(!one('$: s("cr").analyze("fx")').length && !one('$: s("say_it").n(3).analyze("fx")').length, 'fx and voice off');
+    assert(one('$: s("hh*8").analyze("hats")')[0] === 'pianoroll' && one('$: s("bd*4").analyze("kick")')[0] === 'hitgrid', 'hats pianoroll, drums the hit grid');
+    assert(!one('$: s("cr").analyze("fx")').length, 'fx off');
+    assert(one('$: note("c3").analyze("pad")')[0] === 'tonecloud' && one('$: s("say_it").n(3).mask("<1 0>")')[0] === 'tonecloud', 'the pad and the voice: the tone cloud');
+    assert(one('$: s("bd*4").analyze("kick")', { widgets: { hitgrid: false } })[0] === 'scope', 'drums with the hit grid off take scope');
     assert(one('$: note("a4").s("square").analyze("hook")', { widgets: { pianoroll: false } })[0] === 'scope', 'lead with pianoroll off takes scope');
     assert(one('$: note("a4").s("square").analyze("hook")', { roll: 'punchcard' })[0] === 'punchcard', 'punchcard');
     const S = widgetSettings({ on: true, share: 0 }), all = ['drums', 'hats', 'bass', 'lead', 'arp', 'pad'].flatMap(k => [S.instruments[k].primary, ...S.instruments[k].secondary]);
@@ -216,8 +218,9 @@ const CHECKS_WIDGETS = {
       const meta = { sections: s.sections.length };
       for (let k = 0, a = 0; k < s.sections.length; a += s.sections[k].bars, k++) {
         const one = (SS) => chainLinesW(placeWidgets(code, { S: SS, bar: a, section: k, sections: meta.sections, seed: id })).filter(l => WCALL.test(l) && !(WCALL.lastIndex = 0));
-        for (const l of one(S)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w === S.instruments[inst].primary) prim++; else sec++; }
-        for (const l of one(S0)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w !== S0.instruments[inst].primary) sec0++; }
+        // (the hit grid is the drums' primary, on the first drum line playing, which may be a hats line: code-over-visual D11)
+        for (const l of one(S)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w === S.instruments[inst].primary || w === 'hitgrid') prim++; else sec++; }
+        for (const l of one(S0)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w !== S0.instruments[inst].primary && w !== 'hitgrid') sec0++; }
       }
     }
     const share = sec / (prim + sec);

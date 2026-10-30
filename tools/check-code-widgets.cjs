@@ -9,7 +9,7 @@ const SHOTS = process.argv[2] || null;
 const URL = `http://localhost:${process.env.PORT || 5173}/`;
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
-const CALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/g;
+const CALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/g;
 
 async function open(browser, { widgets = null, lang = 'it', ui = 'neon', width = 1440, height = 1000 } = {}) {
   const page = await (await browser.newContext({ viewport: { width, height } })).newPage();

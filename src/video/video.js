@@ -219,7 +219,7 @@ export function createVideo({ getCodeOver = () => null, getCodeTheme = () => nul
   function codeWidgets(lines, rows, width, fs) {
     const G = getWidgets(), lh = Math.round(fs * 1.4), count = {}, extra = new Map(), items = [];
     if (G) lines.forEach((ln, li) => {
-      for (const m of ln.matchAll(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel)\(/g)) {
+      for (const m of ln.matchAll(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/g)) {
         let start = li; while (start > 0 && /^\s+\./.test(lines[start])) start--;
         let end = li; while (end + 1 < lines.length && /^\s+\./.test(lines[end + 1])) end++;
         const type = m[1], index = count[type] = (count[type] ?? -1) + 1, canvas = G.canvas(type, index, widgetLineKey(lines.slice(start, end + 1).join('\n')));

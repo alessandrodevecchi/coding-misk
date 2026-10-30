@@ -93,3 +93,50 @@ export function noteOfHap(h) {
 }
 // notes from the render page's stage notes ([begin, end, pitch, level, variant] per instrument): the fast video
 export const notesOfStore = (store, insts) => (c0, c1) => insts().flatMap(inst => store.around(inst, c0, c1).map(n => ({ inst, b: n[0], e: n[1], p: n[2], lv: n[3], n: n[4] ?? undefined })));
+
+// ---------- the editor (D8): the calls registered with Strudel's registerWidget in the page ----------
+// Each call's canvas is kept by its id with its kind and options (globalThis.miskAppWidgets), and also among the code
+// widgets' canvases (globalThis.miskWidgetCanvases), so the video code layouts find it as they find Strudel's. The page
+// redraws them every frame (drawAppWidgets). Where Strudel's editor is not loaded (Node, the render page) the methods
+// are stubs that return the pattern unchanged, so the haps stay the same.
+export function installAppWidgets(Pattern, { registerWidget = globalThis.registerWidget, setWidget = globalThis.setWidget } = {}) {
+  if (!Pattern || !Pattern.prototype) return;
+  const P = Pattern.prototype, page = typeof document !== 'undefined' && typeof registerWidget === 'function' && typeof setWidget === 'function';
+  for (const kind of APP_WIDGET_NAMES) {
+    const key = `_${kind}`;
+    if (P[key] && P[key].miskApp) continue;
+    if (!page) { const f = function () { return this; }; f.miskApp = true; P[key] = f; continue; }
+    registerWidget(key, (id, options, pat) => {
+      const reg = (globalThis.miskAppWidgets ||= new Map());
+      let canvas = (reg.get(id) || {}).canvas || document.getElementById(id);
+      if (!canvas || canvas.tagName !== 'CANVAS') { canvas = document.createElement('canvas'); canvas.className = 'app-widget'; }
+      setWidget(id, canvas);
+      reg.set(id, { kind, options: options && typeof options === 'object' && !Array.isArray(options) ? options : {}, canvas });
+      (globalThis.miskWidgetCanvases ||= new Map()).set(id, canvas);
+      return typeof pat.tag === 'function' ? pat.tag(id) : pat;
+    });
+    if (P[key]) P[key].miskApp = true;
+  }
+}
+// every app widget in the editor at cycle cyc: S (appWidgetSettings), notes(c0, c1), P (widgetPalette), ctx (meter, key,
+// lang, render, font); fs: the editor's font size (CSS px). Gone canvases are forgotten
+export function drawAppWidgets(S, notes, cyc, P, ctx = {}, fs = 14) {
+  const reg = globalThis.miskAppWidgets;
+  if (!reg || !reg.size) return 0;
+  const dpr = Math.min((typeof devicePixelRatio === 'number' && devicePixelRatio) || 1, 2);
+  let n = 0;
+  for (const [id, W] of reg) {
+    if (!W.canvas.isConnected) { if (reg.size > 24) reg.delete(id); continue; }
+    if (S && S[W.kind] && S[W.kind].on === false) { W.canvas.style.display = 'none'; continue; }
+    W.canvas.style.display = '';
+    const memo = (W.memo ||= new Map()), F = widgetFrame(W.kind, W.options, S, notes, cyc, { ...ctx, memo }), sz = widgetSize(F, fs);
+    const w = Math.ceil(sz.w + fs * 0.4), h = Math.ceil(sz.h);
+    if (W.canvas.width !== Math.round(w * dpr) || W.canvas.height !== Math.round(h * dpr)) { W.canvas.width = Math.round(w * dpr); W.canvas.height = Math.round(h * dpr); W.canvas.style.width = `${w}px`; W.canvas.style.height = `${h}px`; }
+    const g = W.canvas.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W.canvas.width, W.canvas.height);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    paintWidget(g, fs * 0.3, 0, F, P, fs);
+    n++;
+  }
+  return n;
+}

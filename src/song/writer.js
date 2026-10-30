@@ -9,6 +9,7 @@
 // are). Pure text in, text out, apart from installHelpers and useFns.
 import { chainLines, breakPoints } from './typing.js';
 import { stripWidgets, installWidgets } from '../live/widgets.js';
+import { installAppWidgets } from '../widgets/app-widgets.js';
 import { EFFECTS, LIBRARY, LIBRARY_NAMES, nameOrder, NAMES } from './functions.js';
 import { hashString } from '../endless/random.js';
 
@@ -474,6 +475,8 @@ function defineFn(name, f) {
 export function installHelpers({ register, Pattern = globalThis.Pattern }) {
   reg = register;
   installWidgets(Pattern);
+  // the app's own widgets (code-over-visual D8): registered in the page's editor, stubs elsewhere
+  installAppWidgets(Pattern);
   register('chan', (name, pat) => { const n = (globalThis.miskBuses || {})[name]; return (n === undefined ? pat : pat.orbit(n)).analyze(name); });
   register('crunch', (x, pat) => pat.distort(x).distortvol(0.5));
   for (const f of LIBRARY) defineFn(f.name, f);

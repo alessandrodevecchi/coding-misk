@@ -115,7 +115,7 @@ import { widgetPlan, linesByKey, fastWidgets } from './video/widget-frames.js';
 import { noteStore } from './visuals/stage-feed.js';
 import { withWidgets } from './video/layout.js';
 import { CO_KEY, codeOverSettings } from './video/code-over.js';
-import { AW_KEY, appWidgetSettings, noteOfHap, notesOfStore } from './widgets/app-widgets.js';
+import { AW_KEY, appWidgetSettings, noteOfHap, notesOfStore, commentAppWidgets, drawAppWidgets, widgetPalette } from './widgets/app-widgets.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -989,7 +989,7 @@ $('#hand-resume').addEventListener('click', resumeHand);
 const toggleHandFrom = () => { handFromHere = !handFromHere; store.set('coding-misk-hand-from', handFromHere); $('#hand-from').setAttribute('aria-pressed', handFromHere); };
 $('#hand-from').addEventListener('click', toggleHandFrom);
 $('#hand-from-lbl').addEventListener('click', toggleHandFrom);
-$('#hand-copy').addEventListener('click', () => { try { navigator.clipboard.writeText(lastHand || '').then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (e) { toast(t('copyNo')); } });
+$('#hand-copy').addEventListener('click', () => { try { navigator.clipboard.writeText(commentAppWidgets(lastHand || '')).then(() => toast(t('copied')), () => toast(t('copyNo'))); } catch (e) { toast(t('copyNo')); } });
 $('#hand-back').addEventListener('click', async () => {
   if (!lastHand || !song || !isPlaying()) return;
   typing = null; resumeTo = null; handFrom = Math.floor(sched().now()); setHand(true);
@@ -1183,7 +1183,10 @@ const shareLink = code => {
   let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
   return 'https://strudel.cc/#' + encodeURIComponent(btoa(bin));
 };
-function updateShare() { $('#share').href = shareLink(currentCode()); }
+// code leaving the app (copy, the strudel.cc link): the app widgets' calls stay, commented out, so it runs in another
+// Strudel (code-over-visual cv7)
+const leavingCode = () => commentAppWidgets(currentCode());
+function updateShare() { $('#share').href = shareLink(leavingCode()); }
 $('#share').addEventListener('pointerdown', updateShare);
 $('#share').addEventListener('focus', updateShare);
 
@@ -1211,7 +1214,7 @@ function confirmTwice(key, msg) {
 }
 
 $('#copy').addEventListener('click', () => {
-  try { navigator.clipboard.writeText(currentCode()).then(() => toast(t('copied')), () => toast(t('copyNo'))); }
+  try { navigator.clipboard.writeText(leavingCode()).then(() => toast(t('copied')), () => toast(t('copyNo'))); }
   catch (e) { toast(t('copyNo')); }
 });
 $('#back').addEventListener('click', backToTrack);
@@ -1539,7 +1542,9 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     job = { ...job, segments: mark(job.segments), segmentsAt: at ? (a, b) => mark(at(a, b)) : null };
     const P = (() => { if (ct.roles) return { ...ct.roles.widget }; const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k.replace('--', '--dk-')).trim() || cs.getPropertyValue(k).trim(); return { ink: v('--ink') || '#fff', muted: v('--muted') || '#888', a1: v('--a1') || '#f4a', a2: v('--a2') || '#fb4' }; })();
     const waves = {}, notes = {}, seen = new Set();
-    cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P }), addNotes(block) { for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
+    // the app widgets (code-over-visual D8) from the stage notes the render page sends with each block
+    const fsn = () => globalThis.codingMiskFastStageNotes, appW = { S: awSettings(), P: ct.roles ? widgetPalette(ct.roles) : { band: P.ink === '#fff' ? '#000' : '#0d0818', ink: P.ink, comment: P.muted, hit: P.a1, now: P.a2, cur: P.muted, cell: P.muted, inv: P.a2, invInk: '#000' }, notes: (c0, c1) => (fsn() ? notesOfStore(fsn(), () => fsn().instruments)(c0, c1) : []), ctx: { lang: getLang(), font: ct.family } };
+    cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P, app: appW }), addNotes(block) { for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
     if (plan.instruments.length) {
       fastJob = { id: sg.id, progress: 0, phase: 'scope', cancel: () => {} };
       try { if (!(await cwRealScopes(job, plan.instruments, waves, o.realScope === 'always'))) for (const k of Object.keys(waves)) delete waves[k]; }
@@ -4080,6 +4085,14 @@ function syncCodeOver() {
 }
 $('#code-over-btn').addEventListener('click', () => { store.set(CO_KEY, { ...codeOverSettings(store.get(CO_KEY, null)), stage: !codeOverSettings(store.get(CO_KEY, null)).stage }); syncCodeOver(); });
 syncCodeOver();
+// the app widgets in the editor (code-over-visual D8): redrawn after each stage frame from the playing pattern's notes
+function drawEditorWidgets(cyc) {
+  if (!globalThis.miskAppWidgets || !globalThis.miskAppWidgets.size || !isPlaying()) return;
+  try {
+    const cur = codeThemes.current, X = songAt(song, cyc);
+    drawAppWidgets(awSettings(), liveNotes, cyc, widgetPalette(cur.roles), { meter: X.meter, key: X.key, lang: getLang(), render: 'normal', font: cur.family }, cur.px || 14);
+  } catch (e) { console.warn('[app widgets]', e); }
+}
 // a frame of the overlay, after each stage frame (the render pass never touches it)
 const overTimes = globalThis.codingMiskOverTimes = [];
 function drawStageOver(cyc) {
@@ -5282,7 +5295,7 @@ const visuals = startVisuals({
       const S = coSettings(); return S.stage ? (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right') : null;
     },
   },
-  afterFrame: (cyc, playing) => { video.frame(cyc, playing); drawStageOver(cyc); liveLink.tick(); },
+  afterFrame: (cyc, playing) => { video.frame(cyc, playing); drawStageOver(cyc); drawEditorWidgets(cyc); liveLink.tick(); },
   getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando
