@@ -19,7 +19,7 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 - [x] 3.2 Radio: voice track vocabulary lines and `POOL` lines in `src/endless/director.js`, written out in the song; `mine` in the session recipe only when not Mai
 - [x] 3.3 Compose: `PHRASES` and `POETIC` lines in the narration layer (`src/song/spoken.js`), growth untouched; "Fill with" and "New phrases" get Le mie frasi (`src/endless/voice-track.js`)
 - [x] 3.4 Use counts on play (radio on air, Compose Play)
-- [ ] 3.5 `npm run check:phrases` (`tools/check-phrases.mjs`, no browser): store, merge, moments map, Mai and empty collection leave `check:endless`, `check:spoken` and the growth fixtures unchanged, share rates over 200 seeds, Sempre replaces every pool line that has a candidate and none of a song's or a style's own lines, a song's own lines never replaced, Replay identical after a delete
+- [x] 3.5 `npm run check:phrases` (`tools/check-phrases.mjs`, no browser): store, merge, moments map, Mai and empty collection leave `check:endless`, `check:spoken` and the growth fixtures unchanged, share rates over 200 seeds, Sempre replaces every pool line that has a candidate and none of a song's or a style's own lines, a song's own lines never replaced, Replay identical after a delete
 
 ## 4. Voice helper: samples (2.5 h)
 
@@ -49,7 +49,7 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 ## 8. Checks (2 h)
 
 - [x] 8.1 `tools/check-voices-tab.cjs` (dev server): capture from the radio console and Compose with the three policies (fake helper), toast Annulla and the 10 s No, edit, delete with protected files, copy from a vocabulary, test bench, a delete during playback against the new manifest, hardware, light, 400 px, English
-- [ ] 8.2 Regression: `check:endless`, `check:spoken`, `check-voices.cjs`, `check-steering.cjs`, `check-settings.cjs`, `check-backup.mjs`, `check:light-theme`, `check-light-theme.cjs`, `check:guide`
+- [x] 8.2 Regression: `check:endless`, `check:spoken`, `check-voices.cjs`, `check-steering.cjs`, `check-settings.cjs`, `check-backup.mjs`, `check:light-theme`, `check-light-theme.cjs`, `check:guide`
 
 ## 9. Docs (1 h)
 

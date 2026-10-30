@@ -2020,3 +2020,8 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 
 - **Base di conoscenza:** nota nuova `docs/knowledge/phrases.md` (raccolta, politica, momenti, regista, campioni, tab Voci), righe in `voice.md`, `narrator.md`, `settings.md`, una decisione in `decisions.md`, la ricetta «Add a pool kind or a moment» in `recipes-build.md` con la riga nella tabella dei compiti; `npm run knowledge` ha rigenerato `checks.md` e `status.md`; `check:knowledge` passa.
 - **AGENTS.md:** `npm run check:phrases`, `tools/check-voices-tab.cjs` e la cartella `src/voices/`.
+
+## 2026-10-30: le mie frasi, parte 8: regressioni (my-phrases)
+
+- **Passano:** `check:phrases` (16), `check:endless` (88, fixture invariate, nessun aumento di `DIRECTOR_VERSION`), `check:spoken` (44), `check:crescendo` livello rapido (39, fixture di crescita invariate), `check:samples` (2664 righe, nessuna mancante), `check:code` (46), `check-backup.mjs` (15), `check:guide`, `check:knowledge`, `check:light-theme`, `vite build`; nel browser (server 5237) `check-voices.cjs`, `check-settings.cjs`, `check-captions.cjs --no-video`, `check-steering.cjs`, `check-light-theme.cjs` completo e `check-voices-tab.cjs`.
+- **Aperto:** mf7 (una lista di momenti o più): costruita la raccomandazione, una lista di 21 in tre gruppi uguale in Componi e in radio; da confermare con il proprietario. Da ascoltare: le frasi mie dette dal narratore e dalla voce traccia (non posso sentire; i check misurano righe e codice, non il suono).
