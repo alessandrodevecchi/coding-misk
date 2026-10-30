@@ -91,6 +91,14 @@ function sampleOf(text, bank, virtual) {
 export const lineSounds = p => spokenContext.files === null || p.texts.some(x => !!sampleOf(x, p.bank, new Map()));
 // the bank a text plays from on this machine (the speaker's, else the default voice's), or null without a sample
 export const lineBank = (text, bank) => { if (spokenContext.files === null) return bank; const s = sampleOf(text, bank, new Map()); return s ? s.bank : null; };
+// What the code plays of a placed line (voice-track-captions): [{ text, late, bank }]. A whole line is its one text. A
+// line of several entries is written `s(bank).n("a b c ~")`, and Strudel takes the structure from s: one sample per
+// bar, the FIRST entry's, the others never sound (an entry with no sample there: nothing sounds). The stage captions
+// and Coming next show these, so they read as the line sounds, never the entries joined.
+export function lineEntries(p, late = 0) {
+  const bank = lineBank(p.texts[0], p.bank);
+  return bank ? [{ text: p.texts[0], late, bank }] : [];
+}
 // a text's length in seconds: measured by tools/voice.mjs, else estimated from its words
 const secondsOf = (text, bank) => { const m = (spokenContext.lengths || {})[`${bank}/${saySlug(text)}.wav`]; return Number.isFinite(m) && m > 0 ? m : words(text) * SECONDS_PER_WORD + 0.3; };
 

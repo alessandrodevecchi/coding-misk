@@ -5,7 +5,7 @@
 // shown in the editor always agree. Tracks named by an "add" step are silent before it; the others play from the start.
 import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
-import { spokenBars, narratorStyle, poeticLine, movementLine, enteringTrack, placeSpoken, lineTexts, lineSounds, lineBank, withNarratorStyle, sampleSeconds, barSeconds, spokenContext } from './spoken.js';
+import { spokenBars, narratorStyle, poeticLine, movementLine, enteringTrack, placeSpoken, lineTexts, lineSounds, lineBank, lineEntries, withNarratorStyle, sampleSeconds, barSeconds, spokenContext } from './spoken.js';
 import { kindOf, outranks, perBar, applyExclusive } from './speakers.js';
 import { POETIC } from './vocabulary.js';
 
@@ -289,7 +289,9 @@ export function voiceCode(song, state, upTo, total, lang, files) {
 // track? }], sorted by bar, the narrator first. song: the live build as liveCode builds it (liveBuildOf: the narrator
 // style of the controls and the code-of-the-moment steps); C: the controls (narrator off: no N). N: the narrator's lines
 // of every state the code is written in (narratorLines). T: every start of every voice-track line with its texts joined
-// by " · ", when the line has a sample (the samples of spokenContext, as the compiler) and its track sounds on that bar.
+// by " · " (as the code's comment quotes it), when the line has a sample (the samples of spokenContext, as the compiler)
+// and its track sounds on that bar; entries: what is heard of it (lineEntries: the first entry of a line of several,
+// when it has a sample; with its offset in the bar and its bank), the words the captions and Coming next show.
 // opts.needSamples (spoken-text-on-stage D9): every line the code would say if every sample existed, without the
 // sample filter (spokenNeeds). Each line also carries its bank; a voice-track line its way, clip (ci), offset (late, a
 // fraction of a bar), length in beats and whether the listener typed it in the radio console (typed).
@@ -315,7 +317,7 @@ export function spokenSchedule(song, C = {}, lang = 'en', files = {}, opts = {})
       for (const st of p.starts) {
         const tracks = state(st.bar).song.tracks, tr = tracks.find(x => x.id === p.track), solo = tracks.some(x => x.alone && !x.mute);
         if (!tr || tr.mute || tr.hush || (solo && !tr.alone)) continue;
-        out.push({ at: st.bar, voice: 'T', text: p.texts.join(' · '), track: p.track, bank: (!all && lineBank(p.texts[0], p.bank)) || p.bank, way: p.way, ci: p.ci, late: st.late || 0, beats: p.beats, typed: !!(p.pat && p.pat.typed), ...(all ? { texts: p.texts } : {}) });
+        out.push({ at: st.bar, voice: 'T', text: p.texts.join(' · '), track: p.track, bank: (!all && lineBank(p.texts[0], p.bank)) || p.bank, way: p.way, ci: p.ci, late: st.late || 0, beats: p.beats, typed: !!(p.pat && p.pat.typed), ...(all ? { texts: p.texts } : { entries: lineEntries(p, st.late || 0) }) });
       }
     }
   }
@@ -343,7 +345,8 @@ export function spokenNeeds(song, C = {}, lang = 'en', files = {}) {
 // shows: [{ at, until, kind, code, text, step, typed, track, way, seconds }] in bars (at carries a voice-track line's
 // offset), sorted by start. until: the sample's length (lengths: { "bank/slug.wav": seconds }, say_lengths.json) plus
 // 1.5 s, at least 2 s, at most 4 bars, cut by the next caption of the same speaker; without a measured length, 2 bars.
-// A chopped line shows once per clip, held for the clip; a refrain shows at each repeat. step: the step line of the
+// A chopped line shows once per clip, held for the clip; a refrain shows at each repeat; a line of several entries
+// shows the entry heard (lineEntries). step: the step line of the
 // caption's bar (the tag of D2), '' when there is none. The step lines follow as entries of kind "step" (4 bars each;
 // heard: a narrator caption says the same words), for the tag and the old behaviour; none with the narrator off.
 // opts.schedule: a spokenSchedule already made (the radio's Coming next keeps one).
@@ -366,11 +369,13 @@ export function captionSchedule(song, C = {}, lang = 'en', files = {}, lengths =
       chops.set(k, e); out.push(e);
       continue;
     }
-    const at = x.at + (x.late || 0), bs = barSeconds(s, x.at), texts = x.text.split(' · ');
-    // the sample's length: measured; a line of several entries one beat apart: its length in beats
-    const len = texts.length > 1 && Number.isFinite(x.beats) ? x.beats * bs / 4 : sampleSeconds(texts[0], x.bank, lengths);
-    const hold = len === null ? 2 : Math.min(4, Math.max(2, len + 1.5) / bs);
-    out.push({ at, until: at + hold, kind, code: x.voice, text: x.text, step: stepAt(x.at), typed: !!x.typed, track: x.track || null, way: x.way || null, seconds: len, speaker: speakerOfBank(x.bank) });
+    // (a line of several entries: only its first entry sounds, the caption is that entry; voice-track-captions)
+    const bs = barSeconds(s, x.at);
+    for (const e of x.entries || [{ text: x.text, late: x.late || 0, bank: x.bank }]) {
+      const at = x.at + e.late, len = sampleSeconds(e.text, e.bank, lengths);
+      const hold = len === null ? 2 : Math.min(4, Math.max(2, len + 1.5) / bs);
+      out.push({ at, until: at + hold, kind, code: x.voice, text: e.text, step: stepAt(x.at), typed: !!x.typed, track: x.track || null, way: x.way || null, seconds: len, speaker: speakerOfBank(e.bank) });
+    }
   }
   out.sort((a, b) => a.at - b.at);
   // (cut by the next caption of the same speaker; a chop holds for its clip)

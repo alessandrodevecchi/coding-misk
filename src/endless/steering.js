@@ -806,8 +806,9 @@ export function sayBar(song, from) {
 }
 // Lines typed in the console (voice-full-controls D10), in order: each one a clip of its own (an own text, spoken as a
 // passage) on the voice track of the song, from its bar; a song without one gets a Words track, silent until the line,
-// with a speaker that is not the narrator's and the Clear sound
-function sayAir(song, list) {
+// with a speaker that is not the narrator's and the Clear sound. Exported for the grown songs, which take their typed
+// lines on their own bars (steerOnAir in waypoints.js)
+export function sayAir(song, list) {
   let cur = song;
   for (const e of list) {
     if (!e.text || !e.lang) continue;

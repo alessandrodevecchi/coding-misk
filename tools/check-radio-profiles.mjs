@@ -20,15 +20,16 @@ import { createSession, OPTION_DEFAULTS } from '../src/endless/director.js';
 import { writtenForm, soundAt, growOnAir, airControls, leadOnAir, shapeSearchSetting, searchOf, playedOf } from '../src/endless/growth.js';
 import { windowSong } from '../src/endless/join.js';
 import { overlapOf, extraOf } from '../src/endless/transitions.js';
-import { stateAt, buildSteps, checkBuild } from '../src/song/build.js';
+import { stateAt, buildSteps, checkBuild, spokenSchedule } from '../src/song/build.js';
 import { compileSong } from '../src/song/compile.js';
-import { liveCode } from '../src/live/live-code.js';
+import { liveCode, liveBuildOf } from '../src/live/live-code.js';
 import { typingLoad, rushedOf } from '../src/live/typing-load.js';
 import { resolveShape, shapeFacts, canPlay, OPENINGS } from '../src/song/shapes.js';
 import { steerOnAir, airBoundaries, airOffset, ideaSteps, directorView, AIR_CHOOSERS, AIR_CHOOSER, AIR_CHOOSER_NAMES, chooserOf, chooserName } from '../src/endless/waypoints.js';
 import { steerSong } from '../src/endless/steering.js';
 import { waypointsOnAir, airChooserOf } from '../src/endless/items.js';
 import { typingPlan, settleOthers } from '../src/song/typing.js';
+import { hapsAt } from './mixer-checks.mjs';
 import { meterSteps } from '../src/music.js';
 import { energyOf } from '../src/endless/energy.js';
 
@@ -445,6 +446,36 @@ const CHECKS = {
       const view = directorView({ song: x.song, plan: x.plan, opts: x.opts, commands: two.commands, seed: x.seed, n: 0, grown: x.g0 });
       assert(same(view.song, two.plain) && same(view.plan, two.plan), `${x.id}: the director's view differs from the steered song`);
     }
+  },
+  async 'typed lines on a grown song (fx3): Say now in the growth and after it, and At the right moment, play on their bar in the code (Live coder), with another command in between; the steps before stay; replay and the director view agree'() {
+    let n = 0;
+    for (const x of airCases().slice(0, 4)) {
+      const G = x.g0.crescendo.growth, C = { ...airControls('switch', false), narrator: false };
+      for (const [k, q, mode] of [[1, 2.4, 'now'], [2, G + 6.4, 'now'], [3, 2.4, 'moment']]) {
+        const text = `typed line ${k}`, at = airBoundaries('say-live', q, x.plan, x.g0)[0];
+        const cmds = [{ kind: 'say-live', text, lang: 'en', speaker: '', mode, q, at, pend: true, id: 1 }];
+        // (another command after the line: the line stays on its bar)
+        const ec = commandsFor(x).find(c => c.kind === 'energy-up');
+        if (ec && k === 2) cmds.push({ ...ec, id: 2 });
+        const r = steer(x, cmds), c = r.commands.find(y => y.kind === 'say-live');
+        assert(c && c.at === at, `${x.id} ${k}: the line has no boundary (${c && c.at} against ${at})`);
+        const sp = r.song.tracks.find(t => t.type === 'spoken'), key = sp && Object.keys(sp.patterns).find(p => JSON.stringify(sp.patterns[p].text || '').includes(text));
+        const clip = key && sp.clips.find(y => y.pattern === key);
+        assert(clip && (mode === 'moment' ? clip.start >= at : clip.start === at), `${x.id} ${k} (${mode}): the typed line has no clip on the grown song (bar ${at + 1})`);
+        const B = liveBuildOf(r.song, C), heard = spokenSchedule(B, C, 'en', {}).filter(y => y.voice === 'T' && y.text === text);
+        assert(heard.length === 1 && heard[0].at === clip.start, `${x.id} ${k}: the schedule says it on ${JSON.stringify(heard.map(y => y.at))}, its clip is on bar ${clip.start}`);
+        // (by ear: the code on air at that bar plays one more voice sample on its first beat than the song without the line)
+        const voiceHaps = async song => { const L = liveCode(song, C, { files: () => ({}), lang: () => 'en' }); return (await hapsAt(L, L.codeAt(clip.start), clip.start)).filter(h => /^say_/.test(h.s) && Math.abs(h.at - clip.start) < 1e-9).length; };
+        const withLine = await voiceHaps(r.song), without = await voiceHaps(steer(x, cmds.filter(y => y.kind !== 'say-live')).song);
+        assert(withLine === without + 1, `${x.id} ${k}: bar ${clip.start + 1} plays ${withLine} voice samples, ${without} without the typed line`);
+        assert(same(pastSteps(r.song, at), pastSteps(x.g0, at)), `${x.id} ${k}: the typed line changed the steps before it`);
+        assert(same(steer(x, r.commands).song, r.song), `${x.id} ${k}: a replay differs`);
+        const view = directorView({ song: x.song, plan: x.plan, opts: x.opts, commands: r.commands, seed: x.seed, n: 0, grown: x.g0 });
+        assert(same(view.song, r.plain), `${x.id} ${k}: the director's view differs from the steered song`);
+        n++;
+      }
+    }
+    console.log(`      ${n} typed lines on grown songs, each on its bar`);
   },
   'stage 5 (5.2): the boundary waits for the typing; late when no boundary is left'() {
     let waited = 0, rushed = 0, moves = 0, pasted = 0;

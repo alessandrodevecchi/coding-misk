@@ -17,6 +17,7 @@ Mistakes that cost time before. Each line says what goes wrong and what to do. T
 - **`*n` around an alternation.** `"<a b>*2"` counts the alternation faster and the notes change. The idea writer never does it.
 - **`add` outside the string on `n`.** `n("0 2").add("4")` does nothing useful on degrees. Sum the degrees first, then turn them into notes.
 - **Chord names.** `voicing()` knows `F^7`, not `Fmaj7`. `Fmaj7` is only a key of the `CHORDS` table; an idea with `voicing()` must write `F^7`.
+- **Structure comes from the left.** `s("x").n("0 6 1 ~")` plays one sample per cycle, `n` 0: the other values are never heard. `n("0 6 1 ~").s("x")` plays three. The voice track's vocabulary lines are written the first way, so they say only their first entry; captions follow that (`lineEntries`).
 - **App names over Strudel names.** An app function named like a Strudel function or synonym hides it (`o` is `orbit`, `drive` is a filter overdrive, `env` exists). `npm run check:strudel` fails on it. `docs/MUSIC-ENGINE.md` still mentions `o`, `drive` and `voice` as helpers: that is out of date, they became `chan`, `crunch` and song functions.
 - **A function the app has never written.** Look it up in [strudel-functions.md](strudel-functions.md) first: synonyms, parameters, whether it is documented.
 
