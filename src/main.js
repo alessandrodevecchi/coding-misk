@@ -850,6 +850,8 @@ let playedCode = null, framed = false;
 // code-over-visual: the code last evaluated (the lit tokens map its haps' places to the code shown), the line being typed
 // by the app ({ line, col, editing } from the typing plan, D5) and the last key typed by hand
 let evaluatedCode = '', typingCursor = null, handKeyAt = -1e9;
+// for browser checks (voice-track-tuning): the code last evaluated, its hidden tail included (the voices' code may be hidden)
+globalThis.codingMiskEvaluated = () => evaluatedCode;
 // resume from the bar where the user took over (default) or from where the song has got to meanwhile
 let handFromHere = store.get('coding-misk-hand-from', true) !== false;
 // typing speed of the code that types itself (live-typing): slow, normal, fast
