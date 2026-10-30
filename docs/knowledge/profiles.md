@@ -55,7 +55,8 @@ Every control, its values and its default per profile. Texts come from the app's
 | `tracks` | `true`, `false` | `true` | `true` | `false` | Tracks (it: Tracce): The track names (// ===== bass =====) |
 | `notes` | `true`, `false` | `true` | `true` | `false` | Notes (it: Note): The section and pattern notes (// Intro · bars 1-8) |
 | `steps` | `true`, `false` | `true` | `true` | `false` | Step phrases (it: Frasi dei passi): The step phrases (// > …) and the phrase the narrator says |
-| `voice` | `true`, `false` | `true` | `true` | `false` | Narrator voice code (it: Codice voce narratore): The lines that make the narrator speak. Off: the narrator still speaks, its code is not shown |
+| `voice` | `true`, `false` | `true` | `false` | `false` | V:N code (it: Codice V:N): Voice: narrator: show its code in the panel; off: it still speaks, the code goes to the hidden code |
+| `spoken` | `true`, `false` | `true` | `false` | `false` | V:T code (it: Codice V:T): Voice: track: show its code in the panel; off: it still speaks, the code goes to the hidden code |
 | `highlights` | `false`, `true` | `false` | `false` | `true` | Lit notes (it: Note accese): In the code of videos and of the live picture the playing notes light up in time |
 | `wrap` | `false`, `true` | `false` | `false` | `true` | Line breaks (it: A capo): A line wider than the panel breaks before a function, as a person would |
 | `fnBus` | `false`, `true` | `false` | `false` | `true` | Bus: Bus and visual in short: .chan("bass") |

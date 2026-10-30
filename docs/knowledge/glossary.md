@@ -68,7 +68,8 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Live build options | Tracks | Tracce | `cOpt:tracks` |
 | Live build options | Notes | Note | `cOpt:notes` |
 | Live build options | Step phrases | Frasi dei passi | `cOpt:steps` |
-| Live build options | Narrator voice code | Codice voce narratore | `cOpt:voice` |
+| Live build options | V:N code | Codice V:N | `cOpt:voice` |
+| Live build options | V:T code | Codice V:T | `cOpt:spoken` |
 | Live build options | Bus | Bus | `fOpt:fnBus` |
 | Live build options | Mixer | Mixer | `fOpt:fnLevel` |
 | Live build options | Distortion | Distorsione | `fOpt:fnCrunch` |
