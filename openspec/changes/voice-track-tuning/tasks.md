@@ -46,5 +46,5 @@ Estimate: about 19 agent hours (16 to 22), in the order below. Each group ends w
 
 - [x] 6.1 Run `tools/voice-repeats.mjs` with the same seeds; write a before/after table (voice bars per song, most starts of one line, repeats within 5 songs, share of songs per style line) into the DEVLOG entry and `notes/prove-2026-10-30/`.
 - [x] 6.2 Docs: `docs/SONG-FORMAT.md` (array texts, chop `every`, refrain `times`), `docs/ENDLESS.md` (memory, director version 14), `docs/knowledge/voice.md` and `docs/knowledge/decisions.md` (D4, D7, D8 and the rejected compile rule of D1); `npm run knowledge`, `npm run check:knowledge`, `npm run check:guide`, `npm run check:samples`.
-- [ ] 6.3 `npm run check:code`, `npm run check:songs`, `node tools/snapshot-levels.cjs check` (dev server on 5245, no edits under `src/` while it runs), `npm run durations` if a built-in song's grown length moved.
+- [x] 6.3 `npm run check:code`, `npm run check:songs`, `node tools/snapshot-levels.cjs check` (dev server on 5245, no edits under `src/` while it runs), `npm run durations` if a built-in song's grown length moved.
 - [x] 6.4 DEVLOG entry (Italian) with the measurements and what the owner should listen for.
