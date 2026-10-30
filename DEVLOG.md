@@ -2035,3 +2035,14 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Mockup** (`openspec/changes/code-over-visual/mockups/`, 37 immagini, copiati in `notes/prove-2026-10-30/code-over-visual/`) e **video di prova** con audio solo in `notes/`: `prova-widget-16x9.mp4` (10 schermate: kellerlicht, settimo-cielo, pioggia-sul-vetro, insert-coin, ferro; croma su tutti i melodici, basso, chitarra, pad, tema, arpeggi; Normale, Terminale, LED, 1-bit) e `prova-widget-9x16.mp4` (4 schermate). Sincronia audio-video con lampo e bip agli estremi, scarto lineare (0,36 s di deriva in 4 minuti).
 - **Da ricordare.** Il primo "lampo" della registrazione è la pagina bianca che si carica: va ignorato. Per i video di Playwright serve il suo ffmpeg (`cli.js install ffmpeg`).
 - **Check:** `openspec validate code-over-visual --strict` passa. Non posso sentire: l'audio dei video è stato controllato solo come sincronia.
+
+## 2026-10-30: codice sopra il visual, risposte del proprietario e via (code-over-visual)
+
+- **Risposte cv1-cv14** nella sezione "Owner Answers" del design; proposta, spec e task aggiornati; il proprietario ha dato il via.
+- **cv1:** il layout serve soprattutto ai video (tempo reale, video veloce, frammenti, uscita live). Nella pagina l'editor resta aperto com'è; la modalità del palco è facoltativa (spenta di default) e non sostituisce mai l'editor.
+- **cv2:** lato e larghezza del codice sono impostazioni; misurato sui mockup: il testo va dal 3,5% al 61,5% circa del quadro, quindi larghezza di default 62%.
+- **cv6:** il sorgente del progetto di riferimento usa `rhythm` e `chroma` come nomi di campi suoi: le chiamate diventano `._hitgrid()` ("Griglia colpi") e `._tonecloud()` ("Nuvola di note").
+- **cv7:** il codice che esce dall'app tiene le chiamate commentate sul posto, `/* ._hitgrid() */`, valido anche a metà catena.
+- **cv8, cv9:** nuvola anche sulle tracce voce; widget più densi (righe per suono e variante, riga del basso; nuvola con vicini e armonici, scia più lunga, celle più alte).
+- **cv10-cv12:** le righe con nome escono da questo change (spec `labeled-lines` tolta): saranno un change a parte, legato alle opzioni dei commenti. **cv13:** widget sul palco in un change successivo. **cv14:** vista "Codice sopra" nell'uscita live.
+- **Check:** `openspec validate code-over-visual --strict` passa.
