@@ -9,7 +9,7 @@ import { fragmentAreas, soulFocus, coverOffset } from './layout.js';
 import { glitchAt, GLITCH_SECONDS, taglineAt, taglineFor } from './fragments.js';
 import { hashString } from '../endless/random.js';
 import { appRoles, MUTED_TEXT, overRoles } from '../code-themes/themes.js';
-import { drawCodeOver, codeOverWidgets, litSpans, codeOverSettings } from './code-over.js';
+import { drawCodeOver, codeOverWidgets, litSpans, codeOverSettings, codeOverAreas } from './code-over.js';
 import { drawCaptions } from '../captions/captions.js';
 
 const KEY = 'coding-misk-video';
@@ -334,6 +334,15 @@ export function createVideo({ getCodeOver = () => null, getCodeTheme = () => nul
     compose({ layout: o.layout, q: { w: 960, h: 540 } }, cyc, playing, now);
     pg.drawImage(cv, 0, 0, W, H);
   }
+  // the "Code over" card's preview (code-over-visual D13): the layout at 960×540, small
+  let coPrev = null, coPrevAt = 0;
+  function drawCoPreview(cyc, playing) {
+    if (!coPrev || !coPrev.isConnected || !coPrev.offsetParent) return;
+    const now = performance.now() / 1000; if (now - coPrevAt < 1 / 15) return; coPrevAt = now;
+    if (cv.width !== 960 || cv.height !== 540) { cv.width = 960; cv.height = 540; }
+    compose({ layout: 'code-over', q: { w: 960, h: 540 } }, cyc, playing, now);
+    coPrev.getContext('2d').drawImage(cv, 0, 0, coPrev.width, coPrev.height);
+  }
   function compose(J, cyc, playing, now) {
     if (TIMELINE_LAYOUTS.includes(J.layout)) { paintLive(liveAreas(J.layout, J.q.w, J.q.h), J.q, cyc, playing, now, 1, { view: J.layout, card: true }); return false; }
     const P = palette(), Q = J.q;
@@ -354,7 +363,7 @@ export function createVideo({ getCodeOver = () => null, getCodeTheme = () => nul
   function frame(cyc, playing) {
     lastCyc = cyc; lastPlaying = playing;
     liveIdle();
-    if (!job) { drawPreview(cyc, playing); drawVPreview(cyc); return; }
+    if (!job) { drawPreview(cyc, playing); drawVPreview(cyc); drawCoPreview(cyc, playing); return; }
     if (job.layout === 'tab') return;
     const now = performance.now() / 1000;
     if (compose(job, cyc, playing, now) !== job.soulShown) renderBar();
@@ -639,8 +648,27 @@ export function createVideo({ getCodeOver = () => null, getCodeTheme = () => nul
   function liveIdle() {
     if (live && nowS() - live.drawnAt > 2) { live = null; if (!job) visuals.setTarget(null); }
   }
+  // the page's stage mode (code-over-visual D2): the code over the stage, drawn into the overlay canvas (device pixels,
+  // dpr: the font is never smaller than 13 CSS pixels on the page's short stage)
+  function stageOver(target, cyc, dpr = 1) {
+    const W = target.width, H = target.height, keep = g, X = getCodeOver(cyc) || {}, S = codeOverSettings(X.S), C = codeOverAreas(W, H, S);
+    C.code.fs = Math.max(C.code.fs, Math.round(13 * dpr));
+    // below the stage's readout (three short lines at the top left)
+    const top = Math.round(60 * dpr); if (C.code.y < top) { C.code.h -= top - C.code.y; C.code.y = top; }
+    g = target.getContext('2d');
+    try { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); return drawOver(C.code, palette(), performance.now() / 1000, cyc); }
+    finally { g = keep; }
+  }
+  // the side of the stage away from the code while a video or the live picture draws the code over it (D7):
+  // 'left' | 'right' (the free side), 'none' (code across the whole width), or null
+  function overSide() {
+    const S = () => codeOverSettings((getCodeOver(lastCyc) || {}).S), free = s => (s.side === 'whole' ? 'none' : s.side === 'right' ? 'left' : 'right');
+    if (job && job.layout === 'code-over') return free(S());
+    if (live && live.preset && live.preset.view === 'code-over') return free(S());
+    return null;
+  }
   return {
-    start, end, askTab, frame, opts, setOpt,
+    start, end, askTab, frame, opts, setOpt, stageOver, overSide,
     // a frame of a fragment (#57), and the settings' preview of one
     composeVertical,
     previewVertical(el, opts, section = null) { vPrev = el ? { el, opts, section } : null; },
@@ -652,6 +680,7 @@ export function createVideo({ getCodeOver = () => null, getCodeTheme = () => nul
     },
     // the settings' live preview: a canvas element, or null
     preview(el) { previewEl = el; },
+    previewOver(el) { coPrev = el; },
     // a frame of the fast video (#53): the layout's frame at cycle cyc and time now (seconds), into the canvas
     composeAt(J, cyc, now) { if (cv.width !== J.q.w || cv.height !== J.q.h) { cv.width = J.q.w; cv.height = J.q.h; } cardKey = cardKey || ''; lastCyc = cyc; return compose(J, cyc, true, now); },
     pause() { if (job && !job.pauseAt) job.pauseAt = performance.now(); },

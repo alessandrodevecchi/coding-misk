@@ -10,9 +10,22 @@ const tallOf = (W, H) => H > W * 1.05;
 // LED wall, the typed comment) stays free. Order: left top, right top, left bottom, right bottom: 3 panels are two on
 // the left and one on the right at the same top, 1 panel is on the left. One row (1 or 2 panels) is centred in height.
 // Tall stage (9:16 fragments): a centred row at the bottom, up to 3 in a row, 4 as 2×2.
-export function stripLayout(n, W, H) {
+// code-over-visual D7: while the code is drawn over the stage the strip keeps to the side away from the code: free is
+// 'left' or 'right' (the free side: two panels at most, stacked there), 'none' (no strip: tall pictures, code across the
+// whole width) or null (as before). Set by the stage before it draws the layer (setLayerFree)
+let FREE = null;
+export const setLayerFree = side => { FREE = side === 'left' || side === 'right' || side === 'none' ? side : null; };
+export function stripLayout(n, W, H, free = FREE) {
   n = Math.max(0, Math.min(4, n));
-  if (!n) return [];
+  if (!n || free === 'none') return [];
+  if (free && !tallOf(W, H)) {
+    const mx = Math.max(8, W * 0.02), gap = Math.max(6, H * 0.025), k = Math.min(2, n);
+    let h = H * 0.2, w = W * 0.2;
+    if (w / h > 3) w = h * 3;
+    if (w / h < 1.15) h = w / 1.15;
+    const top = H / 2 - (k * h + (k - 1) * gap) / 2;
+    return Array.from({ length: k }, (_, i) => ({ x: free === 'right' ? W - mx - w : mx, y: top + i * (h + gap), w, h }));
+  }
   if (tallOf(W, H)) {
     const mx = Math.max(8, W * 0.04), gap = Math.max(6, W * 0.025), bottom = H * 0.035;
     const cols = n === 4 ? 2 : n, rows = n === 4 ? 2 : 1;

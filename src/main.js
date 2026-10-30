@@ -1598,7 +1598,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
         meta: sg.meta, seed: sg.id || '', captions: fvCaptions,
       };
       // code-over-visual: the line typed (D5), the code evaluated and the places of the haps sounding (D6)
-      if (overOn) { const seg = segAt(cyc); Object.assign(fv, { cursor: codeAt.cursor ? codeAt.cursor(cyc) : null, evaluated: seg.run || seg.code, spans: litAt(cyc, seg), doc: sg.doc, render: fRender }); }
+      if (overOn) { const seg = segAt(cyc); Object.assign(fv, { cursor: codeAt.cursor ? codeAt.cursor(cyc) : null, evaluated: seg.run || seg.code, spans: litAt(cyc, seg), doc: sg.doc, render: fRender, overFree: frag && fsz.comp.h >= fsz.comp.w ? 'none' : (frag ? 'right' : (S => (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right'))(coSettings())) }); }
       const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
       fv.look = fLook;
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
@@ -4066,6 +4066,32 @@ $$('[data-look-step]').forEach(b => b.addEventListener('click', () => {
   if (soulOverride) soulDisplay.act('override');
   setLook(v); if (mode === 'radio' && radio && radio.on) store.set('coding-misk-radio-look', v);
 }));
+// the page's stage mode "Code over" (code-over-visual D2): optional, off by default; the code drawn over the stage on
+// an overlay canvas, the editor left as it is; kept in full screen, remembered
+function syncCodeOver() {
+  const S = codeOverSettings(store.get(CO_KEY, null)), on = S.stage, w = $('#stagewrap'), c = $('#stage-over'), say = $('#say');
+  w.classList.toggle('co-on', on); c.hidden = !on;
+  $('#code-over-btn').setAttribute('aria-pressed', String(on));
+  // the caption lane: the middle of the free side (D7)
+  const mid = S.side === 'right' ? (100 - S.width) / 2 : S.side === 'left' ? (S.width + 100) / 2 : 50;
+  w.style.setProperty('--co-say-x', `${mid}%`); w.style.setProperty('--co-say-w', S.side === 'whole' ? 'calc(100% - 32px)' : `${100 - S.width - 3}%`);
+  if (say) say.dataset.coSide = S.side;
+  if (!on) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); }
+}
+$('#code-over-btn').addEventListener('click', () => { store.set(CO_KEY, { ...codeOverSettings(store.get(CO_KEY, null)), stage: !codeOverSettings(store.get(CO_KEY, null)).stage }); syncCodeOver(); });
+syncCodeOver();
+// a frame of the overlay, after each stage frame (the render pass never touches it)
+const overTimes = globalThis.codingMiskOverTimes = [];
+function drawStageOver(cyc) {
+  const c = $('#stage-over');
+  if (c.hidden) return;
+  const r = c.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2), W = Math.round(r.width * d), H = Math.round(r.height * d);
+  if (!W || !H) return;
+  if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+  const t0 = performance.now();
+  try { video.stageOver(c, cyc, d); } catch (e) { console.warn('[code over]', e); }
+  overTimes.push(performance.now() - t0); if (overTimes.length > 600) overTimes.shift();
+}
 $('#fs').addEventListener('click', () => {
   const w = $('#stagewrap');
   try {
@@ -5107,13 +5133,16 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     setCaptions: f => setCaptions(f), capsSkipNext: v => (v === undefined ? capsSkipNext : (capsSkipNext = !!v)),
     ui: () => ui, setUi: v => setUi(v), uiFollow: () => uiFollow, setUiFollow: on => setUiFollow(on), lang: () => getLang(), setLang: l => changeLang(l),
     // code themes (code-themes D6): the settings, a change, and the theme Automatic uses now
-    codeTheme: { settings: () => codeThemes.settings(), set: patch => codeThemes.set(patch), autoName: l => codeThemes.autoName(l) },
+    codeTheme: { settings: () => codeThemes.settings(), set: patch => codeThemes.set(patch), autoName: l => codeThemes.autoName(l), get current() { return codeThemes.current; } },
     volume: () => volume, setVolume: v => setVolume(v),
     // code widgets (code-widgets D1): a stopped song shows its code with the new settings; a playing one takes them at
     // its next step, section or evaluation
     widgetsChanged: () => { if (ed && !isPlaying() && mode === 'track' && compiled) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code); markMuted(); },
     // the video recorder is made after the settings: a page opened on the settings gets its preview below
     videoPreview: el => { try { video.preview(el); } catch (e) {} },
+    // code-over-visual D13: the Code over card's preview; a change of its settings reaches the stage at once
+    coPreview: el => { try { video.previewOver(el); } catch (e) {} },
+    codeOverChanged: () => { try { syncCodeOver(); } catch (e) {} },
     fragmentsFromRecipe: (recipe, anchor) => openFragMenu(recipe, anchor),
     stageRatio: () => stageRatio(),
     fragPreview: (el, opts) => { try { video.previewVertical(el, opts, c => (song && song.meta ? song.meta.sectionAt(c) : -1)); } catch (e) {} },
@@ -5246,8 +5275,14 @@ const visuals = startVisuals({
     renderName: r => { const x = RENDERS.find(([k]) => k === r); return x ? tx(x[1]) : r; },
     seed: () => (fv ? fv.seed : (song && song.id) || ''),
     label: inst => { const k = `stInst:${inst}`, v = t(k); return v === k ? inst : v; },
+    // code-over-visual D7: the side of the stage away from the code drawn over it (video, live picture, fast video, page)
+    free: () => {
+      if (fv) return fv.overFree || null;
+      const v = video.overSide(); if (v) return v;
+      const S = coSettings(); return S.stage ? (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right') : null;
+    },
   },
-  afterFrame: (cyc, playing) => { video.frame(cyc, playing); liveLink.tick(); },
+  afterFrame: (cyc, playing) => { video.frame(cyc, playing); drawStageOver(cyc); liveLink.tick(); },
   getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando

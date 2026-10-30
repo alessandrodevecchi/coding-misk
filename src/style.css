@@ -77,6 +77,11 @@
      in quotes. The stage stays dark in every app theme, so the colours are fixed */
   .say { position: absolute; z-index: 2; left: 50%; bottom: 14%; transform: translate(-50%, 8px); display: flex; flex-direction: column; align-items: center; gap: 2px; max-width: calc(100% - 32px); padding: 6px 14px; border-radius: 6px; background: color-mix(in srgb, #000 58%, transparent); color: #f3ecff; font: 700 clamp(18px, 3.2vw, 34px) var(--mono); letter-spacing: .02em; text-align: center; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
   .say[data-where="top"] { bottom: auto; top: 16%; }
+  /* code-over-visual D2, D7: the code drawn over the stage (an overlay canvas under the captions and the controls); the
+     caption lane on the side away from the code, or at the bottom when the code takes the whole width */
+  #stage-over { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+  .stagewrap.co-on .say { left: var(--co-say-x, 50%); max-width: var(--co-say-w, calc(100% - 32px)); }
+  .stagewrap.co-on .say[data-co-side="whole"] { bottom: 3%; top: auto; }
   .say .cap-row { display: flex; align-items: center; gap: .35em; max-width: 100%; white-space: nowrap; pointer-events: auto; }
   .say .cap-txt { overflow: hidden; text-overflow: ellipsis; }
   .say .cap-txt.it { font-style: italic; }
@@ -1742,6 +1747,12 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .cw-order .icon-btn:disabled { opacity: .3; cursor: default; }
 .cw-order .icon-btn:not(:disabled):hover, .cw-order .icon-btn:focus-visible { border-color: var(--a1); color: var(--a1); }
 .cw-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 12px var(--mono); }
+/* the app widgets (code-over-visual D13): each with its preview in the code theme */
+.aw-widget { display: grid; gap: 8px; padding: 6px 0 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent); }
+.aw-widget h4 { margin: 0; font-size: 13px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.aw-widget h4 code { color: var(--muted); font-size: 12px; }
+.aw-widget .aw-num { width: 6.5em; }
+.aw-preview { width: 100%; max-width: 520px; height: auto; border-radius: 6px; border: 1px solid var(--line); }
 .cw-inst { display: grid; gap: 6px; padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent); }
 .cw-inst:last-child { border-bottom: 0; }
 .cw-inst .cw-prim { display: flex; align-items: center; gap: 6px; font-size: 12px; }

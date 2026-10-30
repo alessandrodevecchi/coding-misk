@@ -3,7 +3,7 @@ import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache
 import { pitchesOf } from './visuals/widget-painters.js';
 import { drawMonitor, drawRullo } from './visuals/widget-looks.js';
 import { themePalette, scenePalette } from './visuals/widget-palettes.js';
-import { drawLayer, seeThrough } from './visuals/widget-layer.js';
+import { drawLayer, seeThrough, setLayerFree } from './visuals/widget-layer.js';
 import { layerOn, limitOf } from './visuals/stage-settings.js';
 import { createRenderer } from './visuals/render-styles.js';
 import { termPalette } from './visuals/term-grid.js';
@@ -356,6 +356,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (!kind) { globalThis.codingMiskLayerPanels = null; return; }
     const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000, kind, look);
     if (!F) return;
+    // code-over-visual D7: the side away from the code drawn over the stage, when it is
+    setLayerFree(stage.free ? stage.free() : null);
     cx.save();
     const native = NATIVE_RENDERS.includes(render);
     const drawn = native ? drawLayerGlyph(cx, W, H, F, kind, render, termPalette(stage.theme ? stage.theme() : 'neon'), termInfo(cyc, playing, look, render)) : drawLayer(cx, W, H, F, kind);

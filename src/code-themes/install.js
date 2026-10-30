@@ -29,10 +29,13 @@ export function createCodeThemes({ store, root = document.documentElement, host 
     const R = cur.roles, own = cur.theme.kind === 'own';
     const text = `:root { --code-bg: ${R.bg}; --code-flash: ${R.flash}; --code-muted: ${R.widget.muted}; --code-ink: ${R.text}; --code-font: ${cur.family}; }`
       + (own ? `\n:root { --background: ${R.bg} !important; --foreground: ${R.outline} !important; --caret: ${R.caret} !important; --selection: ${R.selection} !important; --lineBackground: transparent !important; --lineHighlight: transparent !important; --gutterBackground: transparent !important; --gutterForeground: ${R.gutter} !important; }` : '');
+    // "Lit notes: Filled" (code-over-visual D6): Strudel's highlight marks carry an inline `outline: solid 2px …`; the
+    // filled form drops the frame and fills the token with the outline colour under the text
+    const fill = cur.S && cur.S.lit === 'fill' ? `\n#edhost .cm-content [style^="outline: solid 2px"] { outline: none !important; background-color: color-mix(in srgb, ${R.outline} 45%, transparent) !important; border-radius: 2px; }` : '';
     // after Strudel's own variables (its style comes when the editor starts), rewritten only when it changes
     const sv = document.getElementById('strudel-theme-vars');
     if (sv && (sv.compareDocumentPosition(varsEl) & Node.DOCUMENT_POSITION_PRECEDING)) document.head.append(varsEl);
-    if (varsEl.textContent !== text) varsEl.textContent = text;
+    if (varsEl.textContent !== text + fill) varsEl.textContent = text + fill;
   }
 
   // ---------- the editor's own classes (D1) ----------

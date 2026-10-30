@@ -2063,3 +2063,11 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Video veloce**: la pagina di rendering manda anche le posizioni dei hap (`lit`, solo con il codice sopra); il video veloce le usa con il codice del segmento valutato.
 - **Prova:** un fotogramma 1920×1080 di luci-rosse composto dall'app vera: fasce, tagli con `…`, cartellino a destra, nessun errore in console.
 - **Check:** `check:video` (11), `check:clips` (22), `check:live` (14), `check:typing` (18, due casi nuovi) passano.
+
+## 2026-10-30: codice sopra il visual, parte 3: palco della pagina e impostazioni (code-over-visual)
+
+- **Palco della pagina** (cv1): pulsante "Codice sopra" nella barra del palco (anche a schermo intero), spento di default e ricordato; disegna il codice su una tela sopra il palco, dopo il passaggio di render; l'editor resta aperto com'è. Font mai sotto 13 px CSS, codice sotto la lettura in alto a sinistra; le didascalie della pagina vanno al centro della parte libera.
+- **Striscia dei widget del palco** (D7): con il codice sopra (video, uscita live, video veloce, pagina) tiene al massimo due pannelli sul lato libero; niente striscia nei formati alti o con il codice a tutta larghezza (`setLayerFree` in `widget-layer.js`).
+- **Impostazioni:** scheda "Codice sopra" con anteprima (modalità del palco, lato, larghezza 40-90%, opacità, riga in modifica, note accese prima stringa / ogni stringa, righe lunghe, valori di default); riga "Note accese" Contorno / Piene nei temi del codice (nell'editor una regola CSS sopra i segni di Strudel: niente cornice, il token pieno); sezione "Widget dell'app" nella scheda dei widget nel codice con acceso/spento, parametri e anteprima viva per widget su note dimostrative.
+- **Testi** IT/EN per pulsante, scheda, sezione e parametri.
+- **Prova:** pagina con kellerlicht: codice sopra il palco, editor aperto (575 px), nessun errore; impostazioni salvate (`coding-misk-code-over`, `coding-misk-app-widgets`, `lit: fill` nel tema).

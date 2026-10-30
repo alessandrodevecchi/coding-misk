@@ -35,6 +35,7 @@
 <div class="stagerow" id="stagerow">
 <section class="stagewrap" id="stagewrap" data-i18n-aria="stage">
   <canvas id="stage"></canvas>
+  <canvas id="stage-over" hidden aria-hidden="true"></canvas>
   <div class="say" id="say" aria-live="polite"></div>
   <div class="hud">
     <div class="readout" id="readout"></div>
@@ -45,6 +46,7 @@
         <button class="chip look-step" data-look-step="1" data-i18n-aria="lookNext" data-i18n-title="lookNext">▶</button>
         <select class="look-pick render-pick" id="renders" data-no-knob data-i18n-aria="renders" data-i18n-title="renders"></select>
         <button class="chip transcript-chip" id="transcript" aria-pressed="false" hidden data-i18n="transcript" data-i18n-title="transcriptTip"></button>
+        <button class="chip co-chip" id="code-over-btn" aria-pressed="false" data-i18n="codeOverBtn" data-i18n-title="codeOverTip"></button>
         <button class="chip fs" id="fs" data-i18n="fullscreen"></button>
       </div>
       <div class="soul-ctl" id="soul-ctl" role="group" data-i18n-aria="soulViews" hidden>

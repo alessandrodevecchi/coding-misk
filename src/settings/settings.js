@@ -19,6 +19,20 @@ import { CAPTIONS_KEY, captionSettings, WHERES, STEP_FORMS } from '../captions/c
 import { SPEAKER_KINDS, MARKS } from '../song/speakers.js';
 import { SAVE, TEMP, SHARE_LEVELS, SETTINGS_DEFAULT } from '../voices/phrases.js';
 import { SW_KEY, SW_OPEN, SW_LAYERS, SW_MAPPINGS, SW_COLOURS, SW_SILENT, SW_LIMITS, stageSettings } from '../visuals/stage-settings.js';
+import { CO_KEY, CO_DEFAULTS, CO_SIDES, CO_WIDTHS, CO_LITS, CO_LONG, codeOverSettings } from '../video/code-over.js';
+import { AW_KEY, APP_WIDGETS, APP_WIDGET_NAMES, appWidgetSettings, widgetFrame, widgetSize, paintWidget, widgetPalette } from '../widgets/app-widgets.js';
+import { HG_LIMITS } from '../widgets/hitgrid.js';
+import { TC_LIMITS } from '../widgets/tonecloud.js';
+import { overRoles } from '../code-themes/themes.js';
+
+// the app widgets' previews (code-over-visual D13): a few bars of drums, bass and pad chords, the same every time
+const DEMO = (() => {
+  const out = [], drum = (inst, p, steps, n) => { for (let b = 0; b < 8; b++) for (const k of steps) out.push({ inst, b: b + k / 16, e: b + k / 16 + 0.06, p, lv: 0.9, n }); };
+  drum('kick', 'bd', [0, 4, 8, 12]); drum('snare', 'sd', [4, 12]); drum('hats', 'hh', [2, 6, 10, 14]); drum('hats', 'hh', [3, 11], 3);
+  const chords = [[57, 60, 64], [58, 62, 65], [55, 59, 62], [57, 60, 64]];
+  for (let b = 0; b < 8; b++) { for (const p of chords[b % 4]) out.push({ inst: 'pad', b, e: b + 0.9, p, lv: 0.7 }); for (const k of [0, 6, 10]) out.push({ inst: 'bass', b: b + k / 16, e: b + k / 16 + 0.2, p: chords[b % 4][0] - 24, lv: 0.8 }); }
+  return out;
+})();
 
 // the code widgets card (code-widgets D2): the sections left open, remembered in this browser
 const CW_OPEN = 'coding-misk-cw-open';
@@ -108,6 +122,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           <div class="actions">${app.hiddenSongs && app.hiddenSongs() ? `<button class="btn" id="set-show-hidden">${esc(t('setShowHidden', { n: app.hiddenSongs() }))}</button>` : `<span class="muted">${esc(t('setHiddenNone'))}</span>`}</div>
         </div>
         ${widgetsCard()}
+        ${codeOverCard()}
         ${stageCard()}
         <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
           <p class="muted">${esc(t('setAdvancedIntro'))}</p>
@@ -125,6 +140,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         </div>
       </div>`;
     if (app.videoPreview) app.videoPreview(root.querySelector('#set-vid-preview'));
+    if (app.coPreview) app.coPreview(root.querySelector('#set-co-preview'));
+    drawAwPreviews(); if (!awTimer) awTimer = setInterval(drawAwPreviews, 100);
     if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => { const x = { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), stageRatio: app.stageRatio ? app.stageRatio() : 2.4 }; return { ...x, size: fragmentSize(x), next: store.get('coding-misk-fragment-n', 1) }; });
   }
 
@@ -136,7 +153,63 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     return `${row(t('setCodeTheme'), `<select id="set-code-theme" data-no-knob>${themes}</select>`, C.theme === 'auto' ? t('setCodeThemeAuto', { name: app.codeTheme.autoName(L) }) : t('setCodeThemeChosen'))}
           ${row(t('setCodeFont'), `<select id="set-code-font" data-no-knob>${Object.keys(FONTS).map(k => opt(k, C.font, fontName(k, L))).join('')}</select>`)}
           ${row(t('setCodeSize'), seg('data-set-code-size', Object.keys(SIZES).map(k => [k, t(`codeSize:${k}`)]), C.size), t('setCodeSizeHint'))}
-          ${row(t('setCodeDim'), seg('data-set-code-dim', [['1', t('cwYes')], ['0', t('cwNo')]], C.dim ? '1' : '0'), t('setCodeDimHint'))}`;
+          ${row(t('setCodeDim'), seg('data-set-code-dim', [['1', t('cwYes')], ['0', t('cwNo')]], C.dim ? '1' : '0'), t('setCodeDimHint'))}
+          ${row(t('setCodeLit'), seg('data-set-code-lit', [['outline', t('codeLit:outline')], ['fill', t('codeLit:fill')]], C.lit || 'outline'), t('setCodeLitHint'))}`;
+  }
+
+  // "Code over" (code-over-visual D13): the stage mode, side, width, opacity, the edited line, lit tokens, long lines
+  function codeOverCard() {
+    const S = codeOverSettings(store.get(CO_KEY, null)), yn = (attr, v) => seg(attr, [['1', t('cwYes')], ['0', t('cwNo')]], v ? '1' : '0');
+    return `<div class="card set-card" id="set-code-over"><h3>${esc(t('setCo'))}</h3>
+      <p class="muted">${esc(t('setCoIntro'))}</p>
+      <figure class="vid-preview"><canvas id="set-co-preview" width="480" height="270" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted">${esc(t('coPreviewHint'))}</figcaption></figure>
+      ${row(t('coStage'), yn('data-co-stage', S.stage), t('coStageHint'))}
+      ${row(t('coSide'), seg('data-co-side', CO_SIDES.map(k => [k, t(`coSide:${k}`)]), S.side))}
+      ${row(t('coWidth'), `<span class="cw-unit"><input type="number" id="set-co-width" min="${CO_WIDTHS[0]}" max="${CO_WIDTHS[1]}" step="2" value="${S.width}" data-no-knob> %</span>`, t('coWidthHint'))}
+      ${row(t('coOpacity'), seg('data-co-opacity', ['low', 'medium', 'high'].map(k => [k, t(`coOpacity:${k}`)]), S.opacity), t('coOpacityHint'))}
+      ${row(t('coEdit'), yn('data-co-edit', S.edit), t('coEditHint'))}
+      ${row(t('coLit'), seg('data-co-lit', CO_LITS.map(k => [k, t(`coLit:${k}`)]), S.lit), t('coLitHint'))}
+      ${row(t('coLong'), seg('data-co-long', CO_LONG.map(k => [k, t(`coLong:${k}`)]), S.long))}
+      <div class="actions"><button class="btn" id="set-co-defaults">${esc(t('cwDefaults'))}</button></div>
+    </div>`;
+  }
+  // the app widgets (code-over-visual D13): each on or off, its parameters, a live preview in the code theme
+  const AW_PARAMS = {
+    hitgrid: [['steps', 'num', HG_LIMITS.steps, 1], ['bars', 'num', HG_LIMITS.bars, 1], ['names', 'seg', ['short', 'long']], ['variants', 'bool'], ['extra', 'list'], ['style', 'seg', ['auto', 'blocks', 'text']], ['trail', 'num', HG_LIMITS.trail, 1], ['size', 'num', HG_LIMITS.size, 0.05]],
+    tonecloud: [['cols', 'num', TC_LIMITS.cols, 2], ['bars', 'num', TC_LIMITS.bars, 1], ['ramp', 'text'], ['order', 'seg', ['high', 'low']], ['norm', 'seg', ['column', 'window']], ['decay', 'num', TC_LIMITS.decay, 0.05], ['spread', 'num', TC_LIMITS.spread, 0.05], ['labels', 'bool'], ['chord', 'bool'], ['from', 'list'], ['size', 'num', TC_LIMITS.size, 0.05]],
+  };
+  function appWidgetsSection() {
+    const A = appWidgetSettings(store.get(AW_KEY, null));
+    const ctl = (w, [k, kind, lim, step]) => {
+      const v = A[w][k], hint = t(`awp:${k}Hint`) !== `awp:${k}Hint` ? t(`awp:${k}Hint`) : '';
+      if (kind === 'num') return row(t(`awp:${k}`), `<input type="number" class="aw-num" data-aw-num="${w}:${k}" min="${lim[0]}" max="${lim[1]}" step="${step}" value="${v}" data-no-knob>`);
+      if (kind === 'bool') return row(t(`awp:${k}`), seg(`data-aw-bool="${w}:${k}" data-v`, [['1', t('cwYes')], ['0', t('cwNo')]], v ? '1' : '0'));
+      if (kind === 'seg') return row(t(`awp:${k}`), seg(`data-aw-seg="${w}:${k}" data-v`, lim.map(x => [x, t(`awp:${k}:${x}`)]), v));
+      if (kind === 'list') return row(t(`awp:${k}`), `<input type="text" data-aw-list="${w}:${k}" value="${esc(Array.isArray(v) ? v.join(', ') : '')}" data-no-knob>`, hint);
+      return row(t(`awp:${k}`), `<input type="text" class="mono" data-aw-text="${w}:${k}" value="${esc(v)}" data-no-knob>`, hint);
+    };
+    return `<p class="hint muted">${esc(t('awHint'))}</p>${APP_WIDGET_NAMES.map(w => `<div class="aw-widget" data-aw="${w}"><h4>${esc(t(`aw:${w}`))} <code>._${w}()</code></h4>
+      ${row(t('awOn'), seg(`data-aw-on="${w}" data-v`, [['1', t('cwYes')], ['0', t('cwNo')]], A[w].on ? '1' : '0'))}
+      <canvas class="aw-preview" data-aw-preview="${w}" width="520" height="${w === 'hitgrid' ? 220 : 380}" aria-label="${esc(`${t('awPreview')}: ${t(`aw:${w}`)}`)}"></canvas>
+      ${AW_PARAMS[w].map(p => ctl(w, p)).join('')}</div>`).join('')}
+      <div class="actions"><button class="btn" id="set-aw-defaults">${esc(t('cwDefaults'))}</button></div>`;
+  }
+  // the previews: the demo notes at a moving cycle, in the code theme's colours (redrawn while the card shows)
+  let awTimer = null;
+  function drawAwPreviews() {
+    const cs = root.querySelectorAll('[data-aw-preview]');
+    if (!cs.length || !cs[0].isConnected) { clearInterval(awTimer); awTimer = null; return; }
+    if (!cs[0].offsetParent) return;
+    const A = appWidgetSettings(store.get(AW_KEY, null)), cur = app.codeTheme && app.codeTheme.current, R = cur && cur.roles;
+    if (!R) return;
+    const O = overRoles(R), P = widgetPalette(R, O), cyc = 2 + ((performance.now() / 2000) % 4);
+    const notes = (c0, c1) => DEMO.filter(x => x.e > c0 && x.b < c1);
+    for (const c of cs) {
+      const w = c.dataset.awPreview, g = c.getContext('2d'), F = widgetFrame(w, {}, A, notes, cyc, { lang: app.lang() });
+      const fs = 16, sz = widgetSize(F, fs), k = Math.min((c.width - 16) / sz.w, (c.height - 8) / sz.h);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height); g.fillStyle = R.bg; g.fillRect(0, 0, c.width, c.height);
+      g.setTransform(k, 0, 0, k, 8, 4); paintWidget(g, fs * 0.3, 0, F, P, fs); g.setTransform(1, 0, 0, 1, 0, 0);
+    }
   }
 
   // code widgets (code-widgets D2): one card, sections that open and close
@@ -163,6 +236,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       ${sec('widgets', `<p class="hint muted">${esc(t('cwWidgetsHint'))}</p><div class="cw-checks">${WIDGETS.map(w => check(`data-cw-widget="${w}"`, S.widgets[w], w)).join('')}</div>`)}
       ${sec('instruments', `<p class="hint muted">${esc(t('cwInstHint'))}</p>${inst}`)}
       ${sec('params', `<p class="hint muted">${esc(t('cwParamsHint'))}</p><div class="cw-checks">${CW_PARAMS.map(k => check(`data-cw-param="${k}"`, S.params[k], k)).join('')}</div>`)}
+      ${sec('app', appWidgetsSection())}
       ${sec('sizes', `<p class="hint muted">${esc(t('cwSizesHint'))}</p>${Object.keys(CW_DEFAULTS.sizes).map(k => row(t(`cwSize:${k}`), `<span class="cw-unit"><input type="number" data-cw-size="${k}" min="${CW_SIZE_LIMITS[k][0]}" max="${CW_SIZE_LIMITS[k][1]}" step="2" value="${S.sizes[k]}" data-no-knob> px</span>`)).join('')}`)}
       <div class="actions"><button class="btn" id="set-cw-defaults">${esc(t('cwDefaults'))}</button></div>
     </div>`;
@@ -232,6 +306,9 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   // a change of the stage widgets' settings, stored whole (the defaults filled in)
   const setSw = f => { const W = stageSettings(store.get(SW_KEY, null)); f(W); store.set(SW_KEY, stageSettings(W)); };
   // a change of the code widgets' settings, stored whole (the defaults filled in)
+  // Code over and the app widgets, stored whole (the defaults filled in)
+  const setCo = f => { const S = codeOverSettings(store.get(CO_KEY, null)); f(S); store.set(CO_KEY, codeOverSettings(S)); if (app.codeOverChanged) app.codeOverChanged(); };
+  const setAw = f => { const A = appWidgetSettings(store.get(AW_KEY, null)); f(A); store.set(AW_KEY, appWidgetSettings(A)); if (app.widgetsChanged) app.widgetsChanged(); };
   const setCw = f => { const S = widgetSettings(store.get(CW_KEY, null)); f(S); store.set(CW_KEY, widgetSettings(S)); if (app.widgetsChanged) app.widgetsChanged(); };
   const setFrag = (k, v) => store.set('coding-misk-fragments', { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), [k]: v });
   const setVid = (k, v) => store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}), [k]: v });
@@ -249,6 +326,19 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.dataset.capVideos) { setCap(S => { S.videos = b.dataset.capVideos === '1'; }); return render(); }
     if (b.dataset.setCodeSize) { app.codeTheme.set({ size: b.dataset.setCodeSize }); return render(); }
     if (b.dataset.setCodeDim) { app.codeTheme.set({ dim: b.dataset.setCodeDim === '1' }); return render(); }
+    if (b.dataset.setCodeLit) { app.codeTheme.set({ lit: b.dataset.setCodeLit }); return render(); }
+    // Code over and the app widgets (code-over-visual D13)
+    if (b.dataset.coStage) { setCo(S => { S.stage = b.dataset.coStage === '1'; }); return render(); }
+    if (b.dataset.coSide) { setCo(S => { S.side = b.dataset.coSide; }); return render(); }
+    if (b.dataset.coOpacity) { setCo(S => { S.opacity = b.dataset.coOpacity; }); return render(); }
+    if (b.dataset.coEdit) { setCo(S => { S.edit = b.dataset.coEdit === '1'; }); return render(); }
+    if (b.dataset.coLit) { setCo(S => { S.lit = b.dataset.coLit; }); return render(); }
+    if (b.dataset.coLong) { setCo(S => { S.long = b.dataset.coLong; }); return render(); }
+    if (b.id === 'set-co-defaults') { store.set(CO_KEY, { ...CO_DEFAULTS, stage: codeOverSettings(store.get(CO_KEY, null)).stage }); if (app.codeOverChanged) app.codeOverChanged(); return render(); }
+    if (b.dataset.awOn) { setAw(A => { A[b.dataset.awOn].on = b.dataset.v === '1'; }); return render(); }
+    if (b.dataset.awBool) { const [w, k] = b.dataset.awBool.split(':'); setAw(A => { A[w][k] = b.dataset.v === '1'; }); return render(); }
+    if (b.dataset.awSeg) { const [w, k] = b.dataset.awSeg.split(':'); setAw(A => { A[w][k] = b.dataset.v; }); return render(); }
+    if (b.id === 'set-aw-defaults') { store.remove(AW_KEY); if (app.widgetsChanged) app.widgetsChanged(); return render(); }
     // code widgets (code-widgets D2)
     if (b.dataset.cwOn) { setCw(S => { S.on = b.dataset.cwOn === '1'; }); return render(); }
     if (b.dataset.cwRoll) { setCw(S => { S.roll = b.dataset.cwRoll; }); return render(); }
@@ -313,6 +403,10 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       if (d.capShow) { setCap(S => { S[d.capShow] = x.checked; }); return render(); }
       if (d.capOpt) { setCap(S => { S[d.capOpt] = x.value; }); return; }
       if (d.capMark) { setCap(S => { S.marks[d.capMark] = x.value; }); return; }
+      if (e.target.id === 'set-co-width') { setCo(S => { S.width = +x.value; }); x.value = codeOverSettings(store.get(CO_KEY, null)).width; return; }
+      if (d.awNum) { const [w, k] = d.awNum.split(':'); setAw(A => { A[w][k] = +x.value; }); x.value = appWidgetSettings(store.get(AW_KEY, null))[w][k]; return; }
+      if (d.awList) { const [w, k] = d.awList.split(':'), v = x.value.split(/[\s,]+/).filter(Boolean); setAw(A => { A[w][k] = k === 'from' && !v.length ? 'melodic' : v; }); return; }
+      if (d.awText) { const [w, k] = d.awText.split(':'); setAw(A => { A[w][k] = x.value; }); x.value = appWidgetSettings(store.get(AW_KEY, null))[w][k]; return; }
       if (d.cwNum) { setCw(S => { S[d.cwNum] = +x.value; }); x.value = widgetSettings(store.get(CW_KEY, null))[d.cwNum]; return; }
       if (d.cwWindow !== undefined) { setCw(S => { S.window = x.value === 'always' ? 'always' : +x.value; }); return; }
       if (d.cwWidget) { setCw(S => { S.widgets[d.cwWidget] = x.checked; }); return; }
