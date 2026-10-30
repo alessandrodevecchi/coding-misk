@@ -119,7 +119,7 @@ export function airCode(W, songs, { lang = () => 'en', files = () => ({}), cols 
   let paste = () => 0;
   if (LA.build.crescendo && A.song && A.song.crescendo) {
     const local = { ...A.song, build: buildSteps(LA.build).filter(s => s.at >= A.start).map(({ i, ...s }) => ({ ...s, at: s.at - A.start })) };
-    const P = pasteRule({ build: local, codeAt: b => LA.codeAt(b + A.start) }, A.ctl, { seed: A.song.id || '' });
+    const P = pasteRule({ build: local, codeAt: b => (LA.codeLoad || LA.codeAt)(b + A.start) }, A.ctl, { seed: A.song.id || '' });
     paste = bar => P(bar - A.start);
   }
   return { build, codeAt, run, standalone, buses: LA.buses, fns: LA.fns, paste, ctl: A.ctl, now: LA.now, inPlace: LA.inPlace, onAir: A, hidden: () => others.filter(p => p.show === 'hidden').map(p => p.n) };

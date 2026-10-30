@@ -343,7 +343,7 @@ function composeAway(key, msg) {
 const keepTarget = c => (c && c.durationTarget ? { durationTarget: c.durationTarget } : {});
 let targetFreed = null;
 // one control changed by hand: a trial on the song in Compose, kept until a profile is picked again
-function setControl(k, v) { const c = cfgOf(T); tryConfig({ ...c, options: cleanOverrides({ ...c.options, [k]: v }, PROFILES[c.profile]) }); }
+function setControl(k, v) { const c = cfgOf(T); tryConfig({ ...c, options: cleanOverrides({ ...c.options, [k]: v }, PROFILES[c.profile], { live: !!c.live }) }); }
 // Crescendo builds are computed once per song version and option, kept for the songs used last (LRU)
 const crescendoCache = new Map(), CRESCENDO_CACHE = 48;
 // the built-in style recipes, for the weights of the growth shapes and the metamorphosis (growth-shapes)
@@ -861,7 +861,8 @@ const typingSpeed = () => TYPING_SPEEDS[store.get('coding-misk-typing', null) ||
 // force: how many new lines may be pasted whole when the typing does not fit (the live build's paste rule)
 function makeTyping(text, to, from0, end, cps, human = false, stretch = null, force = Infinity, earlier = null) {
   const avail = Math.max(.2, (end - from0) / cps), listenMin = human ? Math.min(avail * .5, 2) : 0;
-  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch, force, earlier });
+  // (voiceAside, voice-track-tuning D9: voice lines new at the step never take typing time from the other edits)
+  const plan = typingPlan(text, to, { speed: typingSpeed(), max: Math.max(.2, avail - listenMin), style: human ? 'human' : 'exact', seed: (song && song.id) || '', mistakes: typingMistakes(), stretch, force, earlier, voiceAside: true });
   const listen = human ? Math.max(listenMin, Math.min(avail * .2, avail - plan.total)) : 0;
   // sg: the song the typing belongs to (a takeover completes it only on that song, takeover-pending-edit)
   return { plan, start: Math.max(from0 + listen * cps, end - plan.total * cps), cps, shown: '', sg: song };
@@ -2051,7 +2052,8 @@ function renderArranger() {
   // the growth shape belongs to the natural growth (Live coder)
   $('#live-shape').hidden = !crescendo || C.growth !== 'natural';
   $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-fns').value = C.functions;
-  for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
+  // (voice and spoken: "V:N code" and "V:T code" in Options, voice-track-tuning D11)
+  for (const k of ['tracks', 'notes', 'steps', 'voice', 'spoken']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
   for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).setAttribute('aria-pressed', !!C[k]);
   $('#live-title').setAttribute('aria-pressed', C.title); $('#live-hl').setAttribute('aria-pressed', C.highlights); $('#live-wrap').setAttribute('aria-pressed', C.wrap); $('#live-human').setAttribute('aria-pressed', C.typist === 'human'); $('#live-mistakes').setAttribute('aria-pressed', C.mistakes !== 'off'); $('#live-mistakes').disabled = C.typist !== 'human';
   if (arrMode === 'timeline') renderTimeline(total); else renderCells(total);
@@ -2468,7 +2470,7 @@ for (const k of ['opening', 'pace', 'development']) $(`#live-${k}`).addEventList
 $('#live-code').addEventListener('change', e => { setControl('view', e.target.value); liveChanged(); });
 // a comments preset sets its options (code-writing)
 $('#live-comments').addEventListener('change', e => { if (COMMENT_PRESETS[e.target.value]) for (const [k, v] of Object.entries(COMMENT_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
-for (const k of ['tracks', 'notes', 'steps', 'voice']) $(`#live-c-${k}`).addEventListener('click', () => { setControl(k, ctlOf(T)[k] === false); liveChanged(); });
+for (const k of ['tracks', 'notes', 'steps', 'voice', 'spoken']) $(`#live-c-${k}`).addEventListener('click', () => { setControl(k, ctlOf(T)[k] === false); liveChanged(); });
 $('#live-fns').addEventListener('change', e => { if (FUNCTION_PRESETS[e.target.value]) for (const [k, v] of Object.entries(FUNCTION_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
 for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).addEventListener('click', () => { setControl(k, !ctlOf(T)[k]); liveChanged(); });
 $('#live-narrated').addEventListener('click', () => { setControl('narrated', !ctlOf(T).narrated); liveChanged(); });

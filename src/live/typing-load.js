@@ -22,14 +22,15 @@ export function secondsAt(song, bar) {
 // video and the checks. Decided step by step in order (a step needs the decisions before it), and kept.
 export function pasteRule(L, C, { seed = '' } = {}) {
   if (C.typist !== 'human' || C.duration === 'free' || !L.build.crescendo) return () => 0;
-  const bars = [...new Set(buildSteps(L.build).map(x => x.at))].filter(b => b >= 1).sort((a, b) => a - b), done = new Map();
+  // (display steps, voice-track-tuning D8, change only the code shown: never a step of the typing)
+  const bars = [...new Set(buildSteps(L.build).filter(x => !x.display).map(x => x.at))].filter(b => b >= 1).sort((a, b) => a - b), done = new Map();
   let k = 0, prev = 0, last = -Infinity;
   return bar => {
     while (k < bars.length && bars[k] <= bar) {
       const at = bars[k++], t = secondsAt(L.build, at);
       let ok = 0;
       if (t >= 120 && t - last >= 60) {
-        const code = L.codeAt(at), was = settleOthers(L.codeAt(prev), code, at);
+        const codeOf = L.codeLoad || L.codeAt, code = codeOf(at), was = settleOthers(codeOf(prev), code, at);
         const avail = Math.max(0.2, secondsAt(L.build, at) - secondsAt(L.build, prev + 0.5) - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
         if (was !== code && typingPlan(was, code, { style: 'human', lean: true, seed, force: 0, earlier: L.earlier ? L.earlier(at) : null }).natural > usable) { ok = 1; last = t; }
       }
@@ -44,14 +45,15 @@ export function pasteRule(L, C, { seed = '' } = {}) {
 // fifth of a second before the step, a listening pause of up to 2 s first; need: the leanest human typing (no pauses,
 // no mistakes). → [{ at, seconds, usable, need, ratio }] (ratio > 1: the typing has to speed up)
 export function typingLoad(L, { seed = '', from = 1, to = Infinity } = {}) {
-  const sb = barSeconds(L.build), bars = [...new Set(buildSteps(L.build).map(x => x.at))].filter(b => b >= from && b <= to);
+  const steps = buildSteps(L.build).filter(x => !x.display), sb = barSeconds(L.build), bars = [...new Set(steps.map(x => x.at))].filter(b => b >= from && b <= to);
   const out = [];
   // the code of each bar is computed once per call (growth-in-background D4): a bar is the step and then the bar before
   // the next step; the calls keep their order, so the code is the same as when each one was computed again
-  const memo = new Map(), codeAt = b => { if (!memo.has(b)) memo.set(b, L.codeAt(b)); return memo.get(b); };
+  // (codeLoad: the code with every voice-track line as written, voice-track-tuning D9)
+  const memo = new Map(), codeAt = b => { if (!memo.has(b)) memo.set(b, (L.codeLoad || L.codeAt)(b)); return memo.get(b); };
   // reused-lines D3: the pattern lines shown at the steps before, for the typing to copy from (as L.earlier)
   const seen = new Map(), show = c => { for (const l of chainLines(c)) if (/^\s*[_S]?\$:/.test(l)) { seen.delete(l); seen.set(l, true); } };
-  if (from > 1) for (const b of [...new Set(buildSteps(L.build).map(x => x.at))].filter(b => b >= 1 && b < from).sort((a, b) => a - b)) show(codeAt(b));
+  if (from > 1) for (const b of [...new Set(steps.map(x => x.at))].filter(b => b >= 1 && b < from).sort((a, b) => a - b)) show(codeAt(b));
   let prev = 0;
   show(codeAt(0));
   for (const at of bars) {

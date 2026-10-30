@@ -267,7 +267,7 @@ const CHECKS = {
     const song = JSON.parse(JSON.stringify(EXAMPLE));
     song.tracks.find(t => t.id === 'story').clips = [{ start: 0, bars: 16, pattern: 'passage' }];
     for (const [id, o] of [['crescendo', { narrated: true }], ['switch', {}]]) {
-      const C = resolveProfile(id, o), c = crescendoSong({ ...song, kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles }) });
+      const C = resolveProfile(id, { ...o, spoken: true }), c = crescendoSong({ ...song, kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles }) });
       const start = c.tracks.find(t => t.id === 'story').clips[0].start, L = liveCode(c, C, {});
       assert(start === c.crescendo.growth, `${id}: the passage clip starts at the written part (${start}, growth ${c.crescendo.growth})`);
       for (const bar of [0, Math.floor(start / 2), start - 1]) assert(!/say_\w+_\w+"\)\.n\([^)]*\)\.mask\("<0!/.test(L.codeAt(bar)) || !L.codeAt(bar).includes(`<0!${start} 1`), `${id}: no passage line at bar ${bar}`);
@@ -413,11 +413,11 @@ const CHECKS = {
       return out;
     };
     const poetic = Object.values(POETIC).flat().map(x => x.en), luci = read('songs/luci-rosse.json'), notte = read('songs/prova-voce-notte.json');
-    const auto = texts(luci, resolveProfile('crescendo')), ex = texts(luci, resolveProfile('crescendo', { narratorStyle: 'explain' })), po = texts(luci, resolveProfile('crescendo', { narratorStyle: 'poetic' }));
+    const auto = texts(luci, resolveProfile('crescendo', { voice: true })), ex = texts(luci, resolveProfile('crescendo', { narratorStyle: 'explain', voice: true })), po = texts(luci, resolveProfile('crescendo', { narratorStyle: 'poetic', voice: true }));
     assert(auto.length && JSON.stringify(auto) === JSON.stringify(ex) && !auto.some(x => poetic.includes(x)), `luci-rosse automatic: ${auto.slice(0, 3)}`);
     assert(po.length >= 2 && po.every(x => poetic.includes(x)), `luci-rosse poetic: ${po.slice(0, 3)}`);
     const own = notte.narrator && typeof notte.narrator === 'object' && notte.narrator.lines ? Object.values(notte.narrator.lines).flat().map(x => x.en) : [];
-    const nAuto = texts(notte, resolveProfile('crescendo')), nEx = texts(notte, resolveProfile('crescendo', { narratorStyle: 'explain' }));
+    const nAuto = texts(notte, resolveProfile('crescendo', { voice: true })), nEx = texts(notte, resolveProfile('crescendo', { narratorStyle: 'explain', voice: true }));
     assert(nAuto.length && nAuto.every(x => poetic.includes(x) || own.includes(x)), `prova-voce-notte automatic: ${nAuto.slice(0, 3)}`);
     assert(nEx.length && !nEx.some(x => poetic.includes(x) || own.includes(x)), `prova-voce-notte explaining: ${nEx.slice(0, 3)}`);
     assert(withNarratorStyle(luci, 'auto') === luci && withNarratorStyle(notte, 'poetic') === notte, 'auto and the same style keep the song');
@@ -553,17 +553,17 @@ const CHECKS = {
       }
       return { out, c };
     };
-    const both = run(resolveProfile('crescendo', { narratorStyle: 'poetic', narrated: true }), true);
+    const both = run(resolveProfile('crescendo', { narratorStyle: 'poetic', narrated: true, voice: true }), true);
     const images = both.out.filter(x => poetic.includes(x.text) && !move.includes(x.text)), moves = both.out.filter(x => move.includes(x.text)), lines = both.out.filter(x => !poetic.includes(x.text));
     assert(images.length >= 2 && moves.length >= 4 && lines.length >= 1, `poetic and narrated: ${images.length} images, ${moves.length} movement images, ${lines.length} step lines`);
-    const plain = run(resolveProfile('crescendo', { narrated: true }), true).out;
+    const plain = run(resolveProfile('crescendo', { narrated: true, voice: true }), true).out;
     assert(plain.length && !plain.some(x => poetic.includes(x.text)), 'explaining with Narrated growth: no images');
     // every bar the explaining narration speaks on is spoken with the poetic style too: its step line, a movement
     // image in its place, or an image that takes its bar
     const imageBars = new Set(images.map(x => x.bar));
     const missing = plain.filter(x => !imageBars.has(x.bar) && !lines.some(y => y.bar === x.bar && y.text === x.text) && !moves.some(y => y.bar === x.bar));
     assert(!missing.length, `step lines lost: ${missing.slice(0, 3).map(x => `${x.bar + 1} ${x.text}`)}`);
-    const only = run(resolveProfile('crescendo', { narratorStyle: 'poetic' }), false).out;
+    const only = run(resolveProfile('crescendo', { narratorStyle: 'poetic', voice: true }), false).out;
     assert(only.length && only.every(x => poetic.includes(x.text) && !move.includes(x.text)), 'poetic without Narrated growth: images only, as before');
     console.log(`      ${images.length} images, ${moves.length} movement images and ${lines.length} step lines; ${plain.length - lines.length - moves.length} step lines give their bar to an image`);
   },

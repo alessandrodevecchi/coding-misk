@@ -360,7 +360,27 @@ const newLines = parts => parts.filter(p => p.kind === 'new').map(p => ({ text: 
 // earlier (reused-lines D3): lines the code showed earlier in the song (pattern lines of the code at the steps before);
 // a long new line with no like line above it is pasted as a copy of the most alike of them and edited, after a pause
 // to look it up (LOOK_UP). → also lines: for each new line, { text, how: 'typed' | 'above' | 'earlier' | 'notes' | 'forced' }
-export function typingPlan(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false, force = Infinity, notes = true, earlier = null } = {}) {
+// voiceAside (voice-track-tuning D9, the typing shown in the app and the videos): a voice line new at a step (a `say_`
+// line, its quoting comment, its track's header) never takes typing time from the other edits: they are typed as without
+// it and the voice lines appear whole at the end, pasted. At a step where only voice lines change (a free gap) they are
+// typed at a person's pace when that fits the time, else pasted. The typing load and the growth never use it.
+const VOICE_LINE = l => /say_/.test(l) || /^\s*\/\/ "/.test(l) || /^\s*\/\/ =+ .*· (?:spoken|voice) =+\s*$/.test(l);
+export function typingPlan(from, to, opts = {}) {
+  if (!opts || !opts.voiceAside) return planOf(from, to, opts || {});
+  const { voiceAside: _, ...rest } = opts, had = new Set(chainLines(from)), T = chainLines(to);
+  const fresh = new Set(T.map((l, i) => (!had.has(l) && VOICE_LINE(l) ? i : -1)).filter(i => i >= 0));
+  if (!fresh.size) return planOf(from, to, rest);
+  const voiceLines = [...fresh].map(i => ({ text: T[i], how: 'voice' })), others = T.filter((_, i) => !fresh.has(i)).join('\n');
+  if (others === from) {
+    // (a free gap: typed when it fits at a person's pace, else pasted at the step)
+    const typed = planOf(from, to, { ...rest, max: Infinity, force: 0 }), need = Number.isFinite(typed.natural) ? typed.natural : typed.total;
+    if (!(need > (rest.max ?? Infinity))) return planOf(from, to, rest);
+    return { ...typed, total: 0, natural: 0, stats: null, forced: 0, lines: voiceLines, frame: () => to, cursor: () => ({ line: -1, col: 0, editing: false }) };
+  }
+  const p = planOf(from, others, rest);
+  return { ...p, lines: [...(p.lines || []), ...voiceLines], frame: time => (time >= p.total ? to : p.frame(time)) };
+}
+function planOf(from, to, { speed = 1, max = Infinity, style = 'exact', seed = '', mistakes = true, stretch = null, lean = false, force = Infinity, notes = true, earlier = null } = {}) {
   const ops = lineDiff(chainLines(from), chainLines(to), false), parts = [];
   for (let k = 0; k < ops.length;) {
     if (ops[k].op === 'keep') { parts.push({ kind: 'keep', text: ops[k].text }); k++; continue; }

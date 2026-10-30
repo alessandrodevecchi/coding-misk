@@ -28,7 +28,7 @@ import { resolveShape, shapeFacts, canPlay, OPENINGS } from '../src/song/shapes.
 import { steerOnAir, airBoundaries, airOffset, ideaSteps, directorView, AIR_CHOOSERS, AIR_CHOOSER, AIR_CHOOSER_NAMES, chooserOf, chooserName } from '../src/endless/waypoints.js';
 import { steerSong } from '../src/endless/steering.js';
 import { waypointsOnAir, airChooserOf } from '../src/endless/items.js';
-import { typingPlan, settleOthers } from '../src/song/typing.js';
+import { typingPlan, settleOthers, chainLines } from '../src/song/typing.js';
 import { hapsAt } from './mixer-checks.mjs';
 import { meterSteps } from '../src/music.js';
 import { energyOf } from '../src/endless/energy.js';
@@ -621,6 +621,49 @@ const CHECKS = {
     const cl = { ...CLASSIC[0].recipe, growth: GROWTH_ON_AIR, steering: [{ song: 1, kind: 'energy-up', at: 16 }, { song: 1, kind: 'mute', track: 'bass', at: 20 }] };
     const items = sessionItems(RECIPES, cl, 2), ses = createSession(RECIPES, cl.seed); ses.next(cl.options); const g = ses.next(cl.options);
     assert(same(items[1].song, steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cl.steering.map(({ song: _, ...k }) => k), seed: cl.seed, n: 1 }).song), 'a Classic song steers as before');
+  },
+  async 'voice-track lines just in time (voice-track-tuning D8, D9, D11): f7zvee in Live coder hides them by default; with V:T code on no line at bar 0, each line only around where it speaks; the same voice haps; Classic keeps every line; a busy step pastes, a free step may type'() {
+    const rec = { seed: 'f7zvee', options: { styles: ['berlin-techno', 'dark-cyberpunk'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, ...how, profile: 'switch', voice: { phrases: 'many', kind: 'mixed', presence: 'always', where: ['quiet', 'medium', 'busy'] } }, changes: [], growth: GROWTH_ON_AIR };
+    const [x] = sessionItems(RECIPES, rec, 1, null, { grow: true }), song = x.song, total = barsOf(song);
+    assert(song.title === 'Static' && song.crescendo && song.crescendo.coder, `f7zvee: ${song.title}`);
+    const base = airControls('switch'), C = withDisplay(base, { spoken: true });
+    assert(base.spoken === false && base.voice === false, 'Live coder shows the voices\' code by default');
+    const L = liveCode(song, C, { lang: () => 'en' }), L0 = liveCode(song, base, { lang: () => 'en' });
+    const voiceLines = c => chainLines(c).filter(l => /say_/.test(l));
+    assert(!voiceLines(L0.codeAt(0)).length && !voiceLines(L0.codeAt(Math.floor(total / 2))).length, 'V:T code off: a voice line in the code');
+    const steps = [...new Set([0, ...buildSteps(L.build).map(s => s.at)])].sort((a, b) => a - b);
+    // every line shows only from the last step in the 4 bars before its first start to the first step after its last
+    let shown = 0;
+    for (const b of steps.filter(b => b < total)) for (const l of voiceLines(L.codeAt(b))) {
+      const m = l.match(/\.mask\("<([^">]*)>"\)/), bars = []; let at = 0;
+      for (const tok of m[1].trim().split(/\s+/)) { const [v, n] = tok.split('!'), k = n === undefined ? 1 : +n; if (+v > 0) for (let j = 0; j < k; j++) bars.push(at + j); at += k; }
+      const first = bars[0], last = bars[bars.length - 1];
+      assert(b >= Math.max(0, first - 4) && b <= Math.max(last, steps.filter(s => s <= last).pop()), `bar ${b}: a line starting on ${first} and ending on ${last} shows`);
+      shown++;
+    }
+    const firstStart = Math.min(...song.tracks.filter(t => t.type === 'spoken').flatMap(t => t.clips.map(c => c.start)));
+    if (firstStart > 1) assert(!voiceLines(L.codeAt(0)).length, `a voice line at bar 0 (first clip on ${firstStart})`);
+    // the same voice haps with the lines just in time, hidden, and as written
+    let bars = 0;
+    for (let b = 0; b < total; b++) {
+      const v = h => h.filter(y => /^say_/.test(y.s)).map(y => `${y.at.toFixed(4)} ${y.s} ${y.note} ${y.postgain}`).join('|');
+      const a = v(await hapsAt(L, L.codeAt(b), b)), w = v(await hapsAt(L, L.codeLoad(b), b)), o = v(await hapsAt(L0, L0.codeAt(b), b));
+      assert(a === w && o === w, `bar ${b}: the voice sounds differently\n${a}\n${w}\n${o}`);
+      if (a) bars++;
+    }
+    // Classic: every line from the bar the voice track comes in (bar 0 of the written song) to the end
+    const K = liveCode(song, resolveProfile('classic'), { lang: () => 'en' });
+    const all = (song.tracks.find(t => t.type === 'spoken').clips || []).length;
+    const addAt = buildSteps(song).find(s => [].concat(s.add ?? []).some(id => song.tracks.some(t => t.id === id && t.type === 'spoken'))).at;
+    assert([addAt, total - 1].every(b => voiceLines(K.codeAt(b)).length >= all), `Classic shows ${voiceLines(K.codeAt(addAt)).length} voice lines when the voice track comes in, the song has ${all} clips`);
+    // typing (D9): a voice line new at a busy step comes whole at the end, the other edits as without it; at a free step
+    // it may be typed when it fits
+    const from = '$: s("bd*4")', other = '$: s("bd*4").gain(0.8)\n$: s("hh*8")', voice = '$: n("1 2 ~ ~").s("say_en_reed").mask("<0!4 1>")';
+    const plain = typingPlan(from, other, { style: 'human', seed: 'v', max: 4 }), busy = typingPlan(from, `${other}\n${voice}`, { style: 'human', seed: 'v', max: 4, voiceAside: true });
+    assert(Math.abs(busy.total - plain.total) < 1e-9 && busy.frame(busy.total - 0.01) === plain.frame(plain.total - 0.01) && busy.frame(busy.total) === `${other}\n${voice}`, 'a busy step: the voice line takes typing time or does not come at the end');
+    const free = typingPlan(from, `${from}\n${voice}`, { style: 'human', seed: 'v', max: 20, voiceAside: true }), tight = typingPlan(from, `${from}\n${voice}`, { style: 'human', seed: 'v', max: 0.3, voiceAside: true });
+    assert(free.total > 1 && !free.frame(0.01).includes('say_') && tight.total === 0 && tight.frame(0) === `${from}\n${voice}`, 'a free step: typed when it fits, pasted when it does not');
+    console.log(`      ${song.title}: ${shown} voice lines shown at ${steps.length} steps (${buildSteps(L.build).filter(s => s.display).length} display steps), voice heard on ${bars} bars the same three ways`);
   },
   'radio fixtures: Classic sessions rebuild the same items'() {
     for (const { name, recipe } of CLASSIC) {

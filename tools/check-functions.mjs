@@ -100,6 +100,43 @@ const CHECKS = {
     assert(!bad.length, bad.slice(0, 4).join('\n'));
     assert(calls > 0, 'no voice line called its function');
   },
+  async 'voice effects fold on every generated voice line (voice-track-tuning D12), shown or hidden with V:N code and V:T code off, and sound the same'() {
+    const { sessionItems, GROWTH_ON_AIR } = await import('../src/endless/items.js');
+    const { loadStyles } = await import('./styles-dir.mjs');
+    const { validateRecipe, recipeOrder } = await import('../src/endless/recipe.js');
+    const { hapsAt } = await import('./mixer-checks.mjs');
+    const { setSpokenContext } = await import('../src/song/spoken.js');
+    const R = loadStyles().filter(r => !validateRecipe(r).errors.length).sort((a, b) => recipeOrder(a.id).localeCompare(recipeOrder(b.id)));
+    setSpokenContext({ styles: Object.fromEntries(R.map(r => [r.id, r])) });
+    const ids = ['dark-cyberpunk', 'synthwave', 'berlin-techno', 'ambient', 'lo-fi'], voice = { presence: 'always', phrases: '4-5', kind: 'mixed', where: ['quiet', 'medium', 'busy'] };
+    const unfolded = l => /say_/.test(l) && /\.mask\("[^"]*"\)\s*\.(speed|stretch|lpf|hpf|distort|delay|room|postgain)\(/.test(l.replace(/\s*\n\s*/g, ''));
+    let songs = 0, lines = 0, hiddenLines = 0;
+    for (let i = 0; i < 20; i++) {
+      const profile = i < 8 ? 'classic' : i < 14 ? 'crescendo' : 'switch';
+      const rec = { seed: `fold-${i}`, options: { styles: [ids[i % ids.length]], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile, voice }, changes: [], growth: GROWTH_ON_AIR };
+      const song = sessionItems(R, rec, 1, null, { grow: true })[0].song, bars = song.sections.reduce((a, s) => a + s.bars, 0);
+      const pid = song.onAir ? song.onAir.profile : 'classic';
+      const show = liveCode(song, resolveProfile(pid, { fnVoice: true, voice: true, spoken: true }), { files: () => files, lang: () => 'en' });
+      const hide = liveCode(song, resolveProfile(pid, { fnVoice: true, voice: false, spoken: false }), { files: () => files, lang: () => 'en' });
+      const at = [...new Set([0, ...buildSteps(show.build).map(s => s.at)])].filter(b => b < bars);
+      for (const b of at) {
+        const a = show.codeAt(b), h = hide.codeAt(b), tail = hide.run(h).slice(h.length);
+        const bad = [...chainLines(show.run ? show.run(a) : a), ...chainLines(tail)].filter(unfolded);
+        assert(!bad.length, `${song.id} ${pid} bar ${b}: a voice line with its effects written out: ${bad[0]}`);
+        assert(!chainLines(h).some(l => /say_/.test(l)), `${song.id} ${pid} bar ${b}: a voice line shown with both toggles off`);
+        lines += chainLines(a).filter(l => /say_/.test(l)).length; hiddenLines += chainLines(tail).filter(l => /say_/.test(l)).length;
+      }
+      // the same voice haps on the bars where the voice track starts
+      const sp = song.tracks.find(t => t.type === 'spoken');
+      for (const b of [...new Set(((sp && sp.clips) || []).map(c => c.start))].slice(0, 3)) {
+        const v = x => x.filter(y => /^say_/.test(y.s)).map(y => `${y.at.toFixed(4)} ${y.s} ${y.note} ${y.postgain} ${y.room}`).join('|');
+        assert(v(await hapsAt(show, show.codeAt(b), b)) === v(await hapsAt(hide, hide.codeAt(b), b)), `${song.id} ${pid} bar ${b}: the voice sounds differently with its code hidden`);
+      }
+      songs++;
+    }
+    assert(lines > 20 && hiddenLines > 20, `${lines} voice lines shown, ${hiddenLines} hidden`);
+    console.log(`      ${songs} radio songs: ${lines} voice lines shown and ${hiddenLines} hidden, all folded`);
+  },
   'song functions: names from the lists, unique, the same every time; at most three parameters'() {
     for (const { song } of songs.slice(0, 12)) {
       const fa = songFns(builds(song)), fb = songFns(builds(song));
@@ -222,7 +259,7 @@ songRows = results.filter((r, i) => tasks[i].kind === 'song');
 const unitError = name => results[tasks.findIndex(t => t.name === name)].error;
 let failed = 0;
 for (const [name, fn] of Object.entries(CHECKS)) {
-  try { if (name !== FIRST && HEAVY.includes(name)) { const e = unitError(name); if (e !== null) throw new Error(e); } else fn(); console.log(`ok    ${name}`); }
+  try { if (name !== FIRST && HEAVY.includes(name)) { const e = unitError(name); if (e !== null) throw new Error(e); } else await fn(); console.log(`ok    ${name}`); }
   catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); }
 }
 const pc = (a, b) => `${(100 * (1 - a / b)).toFixed(1)}%`;

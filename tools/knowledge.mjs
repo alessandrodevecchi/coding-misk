@@ -96,7 +96,7 @@ const CONTROL_TEXT = {
   wrap: { label: 'liveWrap', hint: 'liveWrapHint' },
   typist: { label: 'liveHuman', hint: 'liveHumanHint' },
   mistakes: { label: 'liveMistakes', hint: 'liveMistakesHint' },
-  ...Object.fromEntries(COMMENT_OPTIONS.concat('voice').map(k => [k, { label: `cOpt:${k}`, hint: `cOptHint:${k}` }])),
+  ...Object.fromEntries(COMMENT_OPTIONS.concat('voice', 'spoken').map(k => [k, { label: `cOpt:${k}`, hint: `cOptHint:${k}` }])),
   ...Object.fromEntries(FUNCTION_OPTIONS.map(k => [k, { label: `fOpt:${k}`, hint: `fOptHint:${k}` }])),
   ...Object.fromEntries(Object.keys(SHAPE_PARTS).map(k => [k, { label: `${k}Lbl`, hint: `${k}Hint`, value: v => (v === 'auto' ? 'shapeAuto' : `${k}:${v}`) }])),
 };
@@ -325,7 +325,7 @@ const BLOCKS = {
   'comments-and-functions': {
     'comment-presets'() {
       const rows = [...COMMENT_LEVELS.map(p => [code(p), both(`comments:${p}`), ...COMMENT_OPTIONS.map(o => (COMMENT_PRESETS[p][o] ? 'on' : 'off'))])];
-      return [`${both('commentsLbl')}: ${text('commentsHint')}.`, '', table(['Preset', 'Name', ...COMMENT_OPTIONS.map(code)], rows), '', table(['Option', 'Name', 'What it shows'], COMMENT_OPTIONS.concat('voice').map(o => [code(o), both(`cOpt:${o}`), text(`cOptHint:${o}`) || NONE]))].join('\n');
+      return [`${both('commentsLbl')}: ${text('commentsHint')}.`, '', table(['Preset', 'Name', ...COMMENT_OPTIONS.map(code)], rows), '', table(['Option', 'Name', 'What it shows'], COMMENT_OPTIONS.concat('voice', 'spoken').map(o => [code(o), both(`cOpt:${o}`), text(`cOptHint:${o}`) || NONE]))].join('\n');
     },
     'function-presets'() {
       const def = id => FUNCTION_LEVELS.find(p => FUNCTION_OPTIONS.every(o => FUNCTION_PRESETS[p][o] === PROFILES[id][o])) || 'custom';
@@ -569,7 +569,7 @@ export function lists() {
     { list: 'console command', note: 'radio-commands', items: Object.keys(COMMANDS).map(k => ({ id: k, described: has(`steerTip:${k}`) })) },
     { list: 'profile', note: 'profiles', items: PROFILE_IDS.map(id => ({ id, described: has(`profileHint:${id}`) })) },
     { list: 'profile control', note: 'profiles', items: Object.keys(CONTROLS).map(k => ({ id: k, described: !!controlHint(k) })) },
-    { list: 'comment option', note: 'comments-and-functions', items: COMMENT_OPTIONS.concat('voice').map(o => ({ id: o, described: has(`cOptHint:${o}`) })) },
+    { list: 'comment option', note: 'comments-and-functions', items: COMMENT_OPTIONS.concat('voice', 'spoken').map(o => ({ id: o, described: has(`cOptHint:${o}`) })) },
     { list: 'technical function option', note: 'comments-and-functions', items: FUNCTION_OPTIONS.map(o => ({ id: o, described: has(`fOptHint:${o}`) })) },
     { list: 'technical functions preset', note: 'comments-and-functions', items: FUNCTION_LEVELS.map(p => ({ id: p, described: has(`fns:${p}`) })) },
     { list: 'helper', note: 'comments-and-functions', items: HELPERS.map(h => ({ id: h, described: LIBRARY.some(f => f.name === h) })) },
