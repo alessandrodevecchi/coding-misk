@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saved patterns panel</title>
+<!-- Static mockup for the saved-patterns-hide change: the "Add a saved pattern" panel of the radio console, hidden,
+     rows and cards, in the neon and hardware themes. Not part of the app. -->
+<style>
+  :root { --ui: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .neon { --bg: #0d0818; --panel: #160f26; --panel2: #1f1534; --line: #3a2a5c; --ink: #f3ecff; --muted: #a597c7; --a1: #ff4fa3; --a2: #ffb347; --s2: #ff8a3d; --chip-bg: rgba(0,0,0,.45); }
+  .hw { --bg: #141416; --panel: #26262a; --panel2: #1a1a1d; --line: #3d3d43; --ink: #e9e6de; --muted: #a29f97; --a1: #ffb347; --a2: #ffb347; --s2: #ffb347; --chip-bg: #121214; --lcd-bg: #1b1306; --lcd-fg: #ffb347; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #08060f; color: #ddd; font: 14px var(--ui); }
+  h1 { font-size: 16px; margin: 16px; color: #ccc; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; padding: 0 16px 24px; }
+  .frame { background: var(--bg); color: var(--ink); border-radius: 10px; padding: 12px; display: grid; gap: 10px; align-content: start; }
+  .hw.frame { background: repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px), var(--bg); }
+  .tag { font-size: 11px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 8px; }
+  .hw .card { background: linear-gradient(180deg, #2d2d32, #222226); border: 1px solid #0c0c0e; border-radius: 4px; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 3px 8px rgba(0,0,0,.55); }
+  .ico { width: 14px; height: 14px; flex: none; }
+  .sp-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .sp-toggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink); font: 600 13px var(--ui); min-width: 0; flex: 1; text-align: left; }
+  .sp-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sp-toggle .ico { width: 12px; height: 12px; transition: transform .15s; }
+  .sp-toggle[aria-expanded="true"] .ico { transform: rotate(90deg); }
+  .btn { display: inline-flex; align-items: center; gap: 5px; font: 12px var(--ui); color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+  .btn.icon { padding: 4px; width: 28px; height: 26px; justify-content: center; }
+  .hw .btn { background: linear-gradient(#3a3a40, #26262b); border: 1px solid #000; border-radius: 3px; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 2px 0 #000; color: var(--ink); }
+  .btn.add { border-color: var(--a1); color: var(--a1); }
+  .sp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .sp-search { flex: 1 1 200px; min-width: 0; padding: 6px 10px; font: 13px var(--ui); color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; }
+  .hw .sp-search { background: var(--lcd-bg); color: var(--lcd-fg); border: 1px solid #000; border-radius: 3px; box-shadow: inset 0 2px 4px rgba(0,0,0,.8); font-family: ui-monospace, Menlo, monospace; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font: 12px var(--ui); color: var(--ink); background: var(--chip-bg); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+  .chip small { color: var(--muted); }
+  .chip[aria-pressed="true"] { border-color: var(--a1); color: var(--a1); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .sel { font-size: 12px; color: var(--muted); }
+  .sel b { color: var(--ink); font-weight: 400; border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; background: var(--panel2); }
+  .sp-scroll { max-height: 210px; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
+  .hw .sp-scroll { background: #121214; border: 1px solid #000; border-radius: 4px; padding: 8px; box-shadow: inset 0 2px 6px rgba(0,0,0,.75); }
+  .grp { font-size: 13px; display: flex; align-items: center; gap: 6px; margin: 2px 0 4px; }
+  .grp small { color: var(--muted); }
+  .grp .ico { width: 10px; height: 10px; transform: rotate(90deg); }
+  .sp-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 4px; }
+  .sp-row { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+  .sp-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pv { width: 64px; height: 20px; flex: none; border-radius: 3px; background: var(--panel2); }
+  .pv.big { width: 100%; height: 40px; }
+  .listen { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; display: inline-grid; }
+  .sp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-bottom: 6px; }
+  .sp-card { display: grid; gap: 5px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 60%, transparent); min-width: 0; }
+  .hw .sp-card { border-radius: 3px; background: #1d1d20; border-color: #000; }
+  .sp-card .top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .sp-card b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sp-card small { color: var(--muted); font-size: 11px; }
+  .acts { display: flex; flex-wrap: wrap; gap: 5px; }
+  .note { margin: 0; font-size: 12px; color: var(--muted); }
+  .next { opacity: .55; }
+  .next .lbl { font-size: 13px; font-weight: 600; }
+  .phone .grid { grid-template-columns: 1fr; padding: 0 16px 24px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-rows" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 4h8M5.5 8h8M5.5 12h8"/></g><g fill="currentColor"><circle cx="2.6" cy="4" r="1"/><circle cx="2.6" cy="8" r="1"/><circle cx="2.6" cy="12" r="1"/></g></symbol>
+  <symbol id="i-cards" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></g></symbol>
+  <symbol id="i-phones" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 10V8a5.5 5.5 0 0 1 11 0v2"/><rect x="2" y="9.5" width="3" height="4.5" rx="1"/><rect x="11" y="9.5" width="3" height="4.5" rx="1"/></g></symbol>
+</svg>
+<h1 id="title">Add a saved pattern: hidden, rows, cards (neon and hardware)</h1>
+<div class="grid" id="grid"></div>
+<script>
+// pattern names and their step drawings (seeded, so the screenshots are stable)
+const PATS = [
+  ['Basso rotto 5', 'bass', 'A min · 128 BPM', 'techno'], ['Basso teso 23', 'bass', 'D min · 132 BPM', 'synthwave'],
+  ['Acido 3', 'bass', 'E min · 138 BPM', 'acid'], ['Arpa fredda', 'arp', 'C min · 120 BPM', 'darksynth'],
+  ['Neon 12', 'arp', 'F min · 124 BPM', 'synthwave'], ['Cassa piena', 'drums', '4/4 · 130 BPM', 'techno'],
+];
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const steps = () => Array.from({ length: 16 }, () => rnd() < 0.45 ? Math.floor(rnd() * 5) : -1);
+const pv = (big) => { const s = steps(), w = big ? 160 : 64, h = big ? 40 : 20; return `<svg class="pv${big ? ' big' : ''}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${s.map((v, i) => v < 0 ? '' : `<rect x="${(i * w / 16 + 1).toFixed(1)}" y="${(h - 4 - v * (h - 6) / 5).toFixed(1)}" width="${(w / 16 - 2).toFixed(1)}" height="3" rx="1" fill="var(--a1)"/>`).join('')}</svg>`; };
+const icon = (id, cls = 'ico') => `<svg class="${cls}"><use href="#${id}"/></svg>`;
+const listen = () => `<button class="listen" aria-label="Listen">${icon('i-phones')}</button>`;
+const row = p => `<li class="sp-row">${listen()}${pv(false)}<span class="nm">${p[0]}</span><span class="chip">${p[1]}</span></li>`;
+const card = p => `<div class="sp-card"><div class="top">${listen()}<b>${p[0]}</b></div><small>${p[1]} · ${p[2]} · ${p[3]}</small><small>used 2 times · 3 days ago</small>${pv(true)}<div class="acts"><button class="btn add">Add as new track</button><button class="btn">Replace</button></div></div>`;
+const groups = view => ['bass', 'arp', 'drums'].map(k => { const l = PATS.filter(p => p[1] === k); return `<div class="grp">${icon('i-chev')}<b>${k}</b> <small>${l.length * 11}</small></div>${view === 'rows' ? `<ul class="sp-list">${l.map(row).join('')}</ul>` : `<div class="sp-cards">${l.slice(0, 2).map(card).join('')}</div>`}`; }).join('');
+function panel(theme, state, view) {
+  const shown = state !== 'hidden', nextView = view === 'rows' ? 'cards' : 'rows';
+  const head = `<div class="sp-head"><button class="sp-toggle" aria-expanded="${shown}" title="Shows or hides your saved patterns that fit this song">${icon('i-chev')}<span>Add a saved pattern (97)</span></button><button class="btn icon" title="Show as ${nextView}" aria-label="Show as ${nextView}">${icon(nextView === 'cards' ? 'i-cards' : 'i-rows')}</button></div>`;
+  const body = !shown ? '' : `<div class="sp-tools"><input class="sp-search" placeholder="Search 97 saved patterns" aria-label="Search"><span class="chip">Fit this song</span><span class="sel">Style <b>all</b></span><span class="sel">Sort <b>As in Patterns</b></span></div>
+    <div class="chips"><span class="chip" aria-pressed="true">All <small>97</small></span><span class="chip">Bass <small>33</small></span><span class="chip">Arp <small>22</small></span><span class="chip">Drums <small>11</small></span><span class="chip">Lead <small>31</small></span></div>
+    <div class="sp-scroll">${groups(view)}</div><p class="note">2 in another meter.</p>`;
+  const label = `${theme === 'neon' ? 'Neon' : 'Hardware'} · ${shown ? `shown as ${view}` : `hidden (opens as ${view})`}`;
+  return `<section class="${theme} frame"><div class="tag">${label}</div><div class="card">${head}${body}</div><div class="card next"><span class="lbl">Sound</span><span class="note">the next console group</span></div></section>`;
+}
+// ?only=neon-hidden etc. shows one state, for a screenshot; ?phone=1 lays the frames in one column
+const q = new URLSearchParams(location.search), only = q.get('only');
+if (q.get('phone')) document.body.classList.add('phone');
+const all = [['neon', 'hidden', 'rows'], ['neon', 'shown', 'rows'], ['neon', 'shown', 'cards'], ['hw', 'hidden', 'rows'], ['hw', 'shown', 'rows'], ['hw', 'shown', 'cards']];
+document.getElementById('grid').innerHTML = all.filter(([t, s, v]) => !only || only === `${t}-${s === 'hidden' ? 'hidden' : v}`).map(a => panel(...a)).join('');
+if (only) document.getElementById('title').remove();
+</script>
+</body>
+</html>
