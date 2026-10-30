@@ -5358,7 +5358,8 @@ function liveNotes(c0, c1) {
   if (!p || typeof p.queryArc !== 'function') return [];
   if (p !== liveCache.pat) { liveCache.pat = p; liveCache.by.clear(); }
   const out = [];
-  for (let c = Math.floor(c0); c < Math.ceil(c1); c++) {
+  // (nothing before the song's start: the fast video has no notes there either)
+  for (let c = Math.max(0, Math.floor(c0)); c < Math.ceil(c1); c++) {
     let list = liveCache.by.get(c);
     if (!list) {
       try { list = p.queryArc(c, c + 1).filter(h => h.hasOnset() && h.whole).map(noteOfHap); } catch (e) { list = []; }

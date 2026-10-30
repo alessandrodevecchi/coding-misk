@@ -11,6 +11,8 @@ import { tonecloudOptions, tonecloudData, rampChar, rowText, useFlats } from '..
 import { neonRoles, NEON_TOKENS, overRoles } from '../src/code-themes/themes.js';
 import { stripLayout } from '../src/visuals/widget-layer.js';
 import { strudelInNode } from './mixer-checks.mjs';
+import { noteStore, noteOf } from '../src/visuals/stage-feed.js';
+import { notesOfStore } from '../src/widgets/app-widgets.js';
 
 const problems = []; let n = 0;
 const check = (ok, msg) => { n++; if (!ok) problems.push(msg); };
@@ -165,6 +167,18 @@ const notesOf = async (code, c0, c1) => (await S.evaluate(code)).queryArc(c0, c1
   check(out.widgets.length === 2 && out.widgets[0].y > out.rows.find(r => r.line === 0).y && out.widgets[1].y > out.rows.find(r => r.line === 3).y, 'widgets drawn below their lines');
   check(widgetFrame('hitgrid', {}, null, notes, 2.5, { render: 'terminal' }).o.form === 'text', 'Terminal: the grid in characters');
 }
+// ---------- real time and fast video draw the same widgets (D8): notes from haps and from the render page's store ----------
+{
+  const pat = await S.evaluate('$: s("bd*4").analyze("kick")\n$: s("hh*8").n("<0 3>").analyze("hats")\n$: note("<[a2,c3,e3] [f2,a2,c3]>").s("sawtooth").analyze("pad")\n$: note("a1*4").s("sawtooth").analyze("bass")');
+  const live = (c0, c1) => pat.queryArc(Math.max(0, Math.floor(c0)), Math.ceil(c1)).filter(h => h.hasOnset()).map(noteOfHap).filter(x => x.e > c0 && x.b < c1);
+  const st = noteStore();
+  for (const h of pat.queryArc(0, 12)) if (h.hasOnset()) { h.ensureObjectValue && h.ensureObjectValue(); st.add(String(h.value.analyze), noteOf(h.whole.begin.valueOf(), h.whole.end.valueOf(), h.value)); }
+  const fast = notesOfStore(st, () => st.instruments), S0 = appWidgetSettings(null);
+  const same = (kind, cyc) => { const a = widgetFrame(kind, {}, S0, live, cyc, { memo: new Map() }), b = widgetFrame(kind, {}, S0, fast, cyc, { memo: new Map() }); return JSON.stringify(a.D, (k, v) => (v instanceof Map ? [...v] : v instanceof Float64Array ? Array.from(v, x => +x.toFixed(6)) : v)) === JSON.stringify(b.D, (k, v) => (v instanceof Map ? [...v] : v instanceof Float64Array ? Array.from(v, x => +x.toFixed(6)) : v)); };
+  check([3.3, 5.81, 8.02].every(c => same('hitgrid', c)), 'the hit grid: the same data from the haps and from the fast video\'s note store');
+  check([3.3, 5.81, 8.02].every(c => same('tonecloud', c)), 'the tone cloud: the same data from the haps and from the fast video\'s note store');
+}
+
 // ---------- code leaving the app evaluates in a plain Strudel with the same haps (cv7) ----------
 {
   const code = '$: s("bd*4 sd")._hitgrid({ steps: 8 })\n$: note("c3 e3")\n  .s("sawtooth")\n  ._tonecloud({ ramp: " */" })\n  .gain(.5)';

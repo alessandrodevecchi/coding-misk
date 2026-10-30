@@ -89,7 +89,8 @@ export function pitchOfValue(v) {
 export const variantOf = v => (typeof v.n === 'number' && typeof pitchOfValue(v) === 'string' ? v.n : undefined);
 export function noteOfHap(h) {
   const v = h.value && typeof h.value === 'object' ? h.value : { value: h.value };
-  return { inst: v.analyze ?? null, b: h.whole.begin.valueOf(), e: h.whole.end.valueOf(), p: pitchOfValue(v), lv: (v.gain ?? 1) * (v.velocity ?? 1), n: variantOf(v) };
+  // (rounded as the render page rounds them, so both draw the very same cells)
+  return { inst: v.analyze ?? null, b: +h.whole.begin.valueOf().toFixed(4), e: +h.whole.end.valueOf().toFixed(4), p: pitchOfValue(v), lv: +((v.gain ?? 1) * (v.velocity ?? 1)).toFixed(3), n: variantOf(v) };
 }
 // notes from the render page's stage notes ([begin, end, pitch, level, variant] per instrument): the fast video
 export const notesOfStore = (store, insts) => (c0, c1) => insts().flatMap(inst => store.around(inst, c0, c1).map(n => ({ inst, b: n[0], e: n[1], p: n[2], lv: n[3], n: n[4] ?? undefined })));

@@ -236,6 +236,20 @@ const rgb = h => { const m = /^#?([0-9a-f]{6})$/i.exec(h); if (!m) return h; con
     await page.screenshot({ path: path.join(shots, 'fatto-15-telefono-chiaro-alto-contrasto.png') });
     await page.setViewportSize({ width: 1440, height: 1100 }); await sleep(300);
   }
+  // "Lit notes" (code-over-visual D6): Filled drops Strudel's frame of the playing notes and fills them; Outline back
+  {
+    if (await page.evaluate(() => document.querySelector('#tab-impostazioni').hidden)) { await page.click('#open-settings'); await sleep(500); }
+    const lit = page.locator('#tab-impostazioni [data-set-code-lit="fill"]');
+    if (await lit.count()) {
+      await lit.click(); await sleep(400);
+      const fill = await CT(() => ({ rule: (document.getElementById('misk-code-theme-vars') || {}).textContent || '', S: globalThis.codingMiskCodeThemes.settings().lit }));
+      check(fill.S === 'fill' && /\[style\^="outline: solid 2px"\][^}]*outline: none[^}]*background-color/.test(fill.rule), 'Lit notes: Filled replaces the frame with a fill in the editor', fill.S);
+      if (shots) { const c = page.locator('#tab-impostazioni .set-card').first(); await c.screenshot({ path: path.join(shots, `lit-notes-fill-${LANG}.png`) }); }
+      await page.click('#tab-impostazioni [data-set-code-lit="outline"]'); await sleep(300);
+      const back = await CT(() => ((document.getElementById('misk-code-theme-vars') || {}).textContent || '').includes('outline: none'));
+      check(!back, 'Lit notes: Outline is Strudel\'s frame again');
+    } else check(false, 'Lit notes: the row is in Settings → Appearance');
+  }
   // the reset removes the code theme with the other settings (every coding-misk- key)
   check(await CT(() => Object.keys(localStorage).includes('coding-misk-code-theme')), 'the code theme is kept under coding-misk-code-theme (backup and reset take every coding-misk- key)');
 
