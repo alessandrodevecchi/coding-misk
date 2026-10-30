@@ -15,7 +15,7 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 
 ## 3. The director uses them (3 h)
 
-- [ ] 3.1 `src/voices/mine.js`: candidates by kind, tag, language, styles, on; the second draw on `mine/<kind>/<n>`; least used first (D4)
+- [x] 3.1 `src/voices/mine.js`: candidates by kind, tag, language, styles, on; the second draw on `mine/<kind>/<n>`; least used first (D4)
 - [ ] 3.2 Radio: voice track vocabulary lines and `POOL` lines in `src/endless/director.js`, written out in the song; `mine` in the session recipe only when not Mai
 - [ ] 3.3 Compose: `PHRASES` and `POETIC` lines in the narration layer (`src/song/spoken.js`), growth untouched; "Fill with" and "New phrases" get Le mie frasi (`src/endless/voice-track.js`)
 - [ ] 3.4 Use counts on play (radio on air, Compose Play)
