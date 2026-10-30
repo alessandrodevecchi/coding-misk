@@ -67,7 +67,7 @@ $: s("say_en_reed").n(2).late(0.625).mask("<0!6 1 0!49>").stretch(0.9).room(0.25
 // "signal" · chop · bar 17–24
 $: s("say_en_reed").n(0).slice(8, "0 ~ 1 ~ 2 3 ~ 3").clip(1).mask("<0!16 1!8 0!32>").stretch(0.9).room(0.25).postgain(0.55).orbit(13).analyze("fx")
 // "the last train · stay" · refrain · bar 49, 51, 53, 55
-$: s("say_en_reed").n("3 1 ~ ~").mask("<0!48 1 0 1 0 1 0 1 0>").stretch(0.9).room(0.25).postgain(0.55).orbit(13).analyze("fx")
+$: n("3 1 ~ ~").s("say_en_reed").mask("<0!48 1 0 1 0 1 0 1 0>").stretch(0.9).room(0.25).postgain(0.55).orbit(13).analyze("fx")
 
 // ========== Story · spoken ==========
 // "The rain stopped. Every window is a small light in the dark." · spoken passage · bar 25

@@ -96,7 +96,7 @@ import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
 import { createVoicesTab } from './voices/voices-tab.js';
-import { narratorPick } from './voices/mine.js';
+import { narratorPick, vocabGroupOf } from './voices/mine.js';
 import { setNarratorMine } from './song/build.js';
 import { PHRASES_MOMENT } from './voices/moments.js';
 import { builtinKeys, mineKeys, songKeys, sizeText } from './voices/samples.js';
@@ -2961,7 +2961,7 @@ function typedInput(text, lang, sg) {
   return { text, lang, kind: 'voice', tag, styles: styles.slice(0, 1), source: 'radio', from: { song: (sg && sg.title) || '', ...(styles[0] ? { style: styles[0] } : {}) } };
 }
 // the vocabulary group of the song's voice track (its "vocab:" line, else its style's)
-const songVocab = () => { const sp = songSpoken(), own = sp && Object.values(sp.patterns || {}).map(p => (typeof p.text === 'string' && p.text.startsWith('vocab:') ? p.text.slice(6) : null)).find(Boolean); return own || ((T.tags && T.tags.styles) || []).map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null; };
+const songVocab = () => { const sp = songSpoken(), own = sp && Object.values(sp.patterns || {}).map(p => (typeof p.text === 'string' && p.text.startsWith('vocab:') ? p.text.slice(6) : Array.isArray(p.text) ? vocabGroupOf(p.text) : null)).find(Boolean); return own || ((T.tags && T.tags.styles) || []).map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null; };
 const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
   const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
@@ -3791,7 +3791,7 @@ function panelHtml(ti) {
 // vocabulary), the values of its way, and where it speaks in the song with the words it says now
 function spokenEditor(tr, key, pat) {
   const lang = getLang(), src = typeof pat.text === 'string' && pat.text.startsWith('vocab:') ? pat.text : pat.text ? 'own' : 'auto';
-  const txt = l => (!pat.text || src !== 'own' ? '' : typeof pat.text === 'string' ? (l === 'en' ? pat.text : '') : pat.text[l] || '');
+  const txt = l => (!pat.text || src !== 'own' ? '' : typeof pat.text === 'string' ? (l === 'en' ? pat.text : '') : Array.isArray(pat.text) ? pat.text.map(x => x[l] || x.en).join(' · ') : pat.text[l] || '');
   let placed = [];
   try { placed = placeSpoken(T, lang).filter(p => p.track === tr.id && p.key === key); } catch (e) { placed = []; }
   const bars = [...new Set(placed.flatMap(p => p.starts.map(s => s.bar + 1)))].sort((a, b) => a - b), said = placed[0] ? placed[0].texts.join(' · ') : '';
@@ -3931,9 +3931,9 @@ $('#track-panel').addEventListener('change', e => {
   if (r.startsWith('sp-')) {
     const v = e.target.value, num = Math.round(+v);
     editPattern(p => {
-      if (r === 'sp-way') { p.way = v; if (v !== 'refrain') delete p.every; if (v !== 'chop') { delete p.slices; delete p.rhythm; } if (v !== 'passage' && v !== 'opening') delete p.before; }
+      if (r === 'sp-way') { p.way = v; if (v !== 'refrain' && v !== 'chop') delete p.every; if (v !== 'refrain') delete p.times; if (v !== 'chop') { delete p.slices; delete p.rhythm; } if (v !== 'passage' && v !== 'opening') delete p.before; }
       if (r === 'sp-src') { if (v === 'own') p.text = { en: getLang() === 'it' ? '' : '…', it: getLang() === 'it' ? '…' : '' }; else if (v === 'auto') delete p.text; else p.text = v; if (p.text && typeof p.text === 'object') p.text = Object.fromEntries(Object.entries(p.text).filter(([, x]) => x)); }
-      if (r === 'sp-en' || r === 'sp-it') { const k = r.slice(3), cur = p.text && typeof p.text === 'object' ? { ...p.text } : typeof p.text === 'string' && !p.text.startsWith('vocab:') ? { en: p.text } : {}; if (v.trim()) cur[k] = v.trim(); else delete cur[k]; if (Object.keys(cur).length) p.text = cur; else delete p.text; }
+      if (r === 'sp-en' || r === 'sp-it') { const k = r.slice(3), cur = Array.isArray(p.text) ? { en: p.text.map(x => x.en).join(' · '), it: p.text.map(x => x.it || x.en).join(' · ') } : p.text && typeof p.text === 'object' ? { ...p.text } : typeof p.text === 'string' && !p.text.startsWith('vocab:') ? { en: p.text } : {}; if (v.trim()) cur[k] = v.trim(); else delete cur[k]; if (Object.keys(cur).length) p.text = cur; else delete p.text; }
       if (r === 'sp-every' && num >= 1) p.every = Math.min(64, num);
       if (r === 'sp-slices' && num >= 2) p.slices = Math.min(32, num);
       if (r === 'sp-rhythm') { const ok = v.trim().split(/\s+/).every(x => x === '~' || (/^\d+$/.test(x) && +x < (p.slices || 8))); if (ok) p.rhythm = v.trim().replace(/\s+/g, ' '); else toast(t('spokenRhythmBad')); }

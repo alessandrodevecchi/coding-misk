@@ -1,7 +1,9 @@
 // Voice instrument (voice-instrument, #39): a track of type "spoken" whose lines are part of the music, apart from the
 // narrator (voice tracks, which speak the comments of a live build). A pattern is a line:
-//   { "text": { "en": "…", "it": "…" } | "…" | "vocab:<group>", "way": "passage" | "refrain" | "chop" | "opening",
-//     "every": 4, "slices": 8, "rhythm": "0 1 0 1 2 2 3 ~", "before": "<track id>" }
+//   { "text": { "en": "…", "it": "…" } | "…" | "vocab:<group>" | [{ "en": "…", "it": "…" }, …],
+//     "way": "passage" | "refrain" | "chop" | "opening", "every": 4, "times": 3, "slices": 8, "rhythm": "0 1 0 1 2 2 3 ~",
+//     "before": "<track id>" }
+// (voice-track-tuning: a text may be 2 to 4 vocabulary entries written out; a chop may carry `every`, a refrain `times`)
 // Clips place lines like any pattern; the compiler resolves each clip to bars (placeSpoken) and writes one sample line
 // per way with a mask lane, on orbits 13 and 14 (the narrator speaks on 15 and up). Samples are made offline by
 // `npm run voices` (tools/voice.mjs); a line without its sample stays silent. Pure: the app and the Node checks resolve
@@ -41,10 +43,26 @@ const rngOf = (song, sub) => stream(String((song && song.id) || 'song'), 'spoken
 
 // ---------- texts ----------
 // the line of a pattern: { text: { en, it } } (a whole sample) or { parts: [{ en, it }] } (vocabulary entries, one per
-// beat). Own text, else the style's lines for the way, else the vocabulary drawn with the song's seed.
+// beat). Own text (an array of entries written out: its parts), else the style's lines for the way, else the vocabulary
+// drawn with the song's seed, without the entries the track's other patterns write out (voice-track-tuning D4; the whole
+// group when too few are left).
+export const MAX_ENTRIES = 4;
+const enKey = x => (typeof x === 'string' ? x : x && x.en) || '';
+// the entries (or whole texts) the other patterns of a track write out: their English texts
+export function writtenOut(track, key) {
+  const out = new Set();
+  for (const [k, p] of Object.entries((track && track.patterns) || {})) {
+    if (k === key || !p || !p.text) continue;
+    if (Array.isArray(p.text)) p.text.forEach(x => out.add(enKey(x)));
+    else if (!(typeof p.text === 'string' && p.text.startsWith('vocab:'))) out.add(enKey(p.text));
+  }
+  out.delete('');
+  return out;
+}
 export function lineOf(song, track, key, pat) {
   const way = WAYS.includes(pat.way) ? pat.way : 'passage';
-  if (pat.text && !(typeof pat.text === 'string' && pat.text.startsWith('vocab:'))) return { text: typeof pat.text === 'string' ? { en: pat.text } : pat.text };
+  if (Array.isArray(pat.text)) { const list = pat.text.filter(x => x && typeof x === 'object' && x.en); return list.length > 1 ? { parts: list } : list.length ? { text: list[0] } : { parts: [] }; }
+  if (pat.text &&!(typeof pat.text === 'string' && pat.text.startsWith('vocab:'))) return { text: typeof pat.text === 'string' ? { en: pat.text } : pat.text };
   const r = rngOf(song, `${track.id}:${key}`);
   const fromStyle = styleRecipes(song).flatMap(x => (x.spoken && x.spoken.lines && x.spoken.lines[way]) || []);
   if (!pat.text && fromStyle.length) return { text: r.pick(fromStyle) };
@@ -54,7 +72,8 @@ export function lineOf(song, track, key, pat) {
   const list = VOCABULARY[group];
   // a chop is one entry; a refrain or an opening two or three; a passage three or four
   const n = way === 'chop' ? 1 : way === 'passage' ? r.int(3, 4) : r.int(2, 3);
-  const parts = r.shuffle(list).slice(0, n);
+  const taken = writtenOut(track, key), free = list.filter(e => !taken.has(e.en));
+  const parts = r.shuffle(free.length >= n ? free : list).slice(0, n);
   return n === 1 ? { text: parts[0], generated: true } : { parts };
 }
 // the texts of a line in a language (one per sample)
@@ -91,13 +110,17 @@ function sampleOf(text, bank, virtual) {
 export const lineSounds = p => spokenContext.files === null || p.texts.some(x => !!sampleOf(x, p.bank, new Map()));
 // the bank a text plays from on this machine (the speaker's, else the default voice's), or null without a sample
 export const lineBank = (text, bank) => { if (spokenContext.files === null) return bank; const s = sampleOf(text, bank, new Map()); return s ? s.bank : null; };
-// What the code plays of a placed line (voice-track-captions): [{ text, late, bank }]. A whole line is its one text. A
-// line of several entries is written `s(bank).n("a b c ~")`, and Strudel takes the structure from s: one sample per
-// bar, the FIRST entry's, the others never sound (an entry with no sample there: nothing sounds). The stage captions
-// and Coming next show these, so they read as the line sounds, never the entries joined.
+// What the code plays of a placed line (voice-track-captions, voice-track-tuning D7): [{ text, late, bank }]. A whole
+// line is its one text. A line of several entries is written `n("a b c ~").s(bank)`, so each entry plays on its slot of
+// the bar (a quarter with four entries or fewer), in order; an entry with no sample in the line's bank is a rest and is
+// left out. The stage captions and Coming next show these, so they read as the line sounds, never the entries joined.
 export function lineEntries(p, late = 0) {
-  const bank = lineBank(p.texts[0], p.bank);
-  return bank ? [{ text: p.texts[0], late, bank }] : [];
+  if (!p.line.parts) { const bank = lineBank(p.texts[0], p.bank); return bank ? [{ text: p.texts[0], late, bank }] : []; }
+  // (the speaker's bank when one entry at least has a sample there, else the bank of the first entry that has one)
+  const banks = p.texts.map(x => lineBank(x, p.bank)), bank = banks.includes(p.bank) ? p.bank : banks.find(Boolean);
+  if (!bank) return [];
+  const slots = Math.max(4, p.texts.length);
+  return p.texts.map((text, k) => ({ text, late: Math.round((late + k / slots) * 10000) / 10000, bank })).filter(e => lineBank(e.text, p.bank) === bank);
 }
 // a text's length in seconds: measured by tools/voice.mjs, else estimated from its words
 const secondsOf = (text, bank) => { const m = (spokenContext.lengths || {})[`${bank}/${saySlug(text)}.wav`]; return Number.isFinite(m) && m > 0 ? m : words(text) * SECONDS_PER_WORD + 0.3; };
@@ -182,7 +205,7 @@ export function placeSpoken(input, lang = langOf()) {
           starts.push({ bar: Math.max(clip.start, best.s.start), late: 0 });
         }
       } else if (pat.way === 'refrain') {
-        const every = Number.isInteger(pat.every) && pat.every > 0 ? pat.every : 4, kinds = whereOfTrack(tr);
+        const every = Number.isInteger(pat.every) && pat.every > 0 ? pat.every : 4, kinds = whereOfTrack(tr), from = starts.length;
         n.sections.forEach((s, i) => {
           // (a refrain repeats in the sections of the kinds its track may speak in, quiet only by default, D7)
           // (in a song grown on air the growth's sections look busy by their clips, which run under its steps: a refrain
@@ -192,7 +215,17 @@ export function placeSpoken(input, lang = langOf()) {
           // the line ends before the section does: it stops when the song gets full again
           for (let b = a; b < z; b += every) if (b + Math.ceil(lenBars(b) - 1e-9) <= s.start + s.bars) starts.push({ bar: b, late: 0 });
         });
-      } else if (pat.way === 'chop') for (let b = clip.start; b < end; b++) starts.push({ bar: b, late: 0 });
+        // times (voice-track-tuning D2): the most starts in one clip, spread over it, the first and the last kept
+        const m = starts.length - from, times = Number.isInteger(pat.times) && pat.times > 0 ? pat.times : 0;
+        if (times && m > times) {
+          const all = starts.splice(from, m);
+          starts.push(...(times === 1 ? [all[0]] : Array.from({ length: times }, (_, j) => all[Math.round(j * (m - 1) / (times - 1))])));
+        }
+      } else if (pat.way === 'chop') {
+        // (every, voice-track-tuning D1: the bars between two chops, 1 by default, so songs written before sound the same)
+        const every = Number.isInteger(pat.every) && pat.every > 0 ? pat.every : 1;
+        for (let b = clip.start; b < end; b += every) starts.push({ bar: b, late: 0 });
+      }
       // (ci: the clip's index among the track's clips sorted by bar, for the phrase list)
       if (starts.length) out.push({ track: tr.id, name: tr.name || tr.id, ti, ci, orbit, key: clip.pattern, way: pat.way, pat, line, speaker, bank, texts, beats, starts, settings: v, rack: tr.rack, mute: !!tr.mute });
     });
@@ -246,9 +279,11 @@ export function spokenCode(lines, total, lang = langOf()) {
     const missing = samples.every(x => !x);
     out.push(`// "${quote.replace(/"/g, "'")}" · ${t(`way:${p.way}`)} · ${t('cSpokenBars', { bars })}${missing ? ` · ${t('cNoSample')}` : ''}`);
     if (missing) continue;
-    // a generated line: one entry per beat of the bar; a whole line: one sample
-    const bank = (samples.find(Boolean) || {}).bank || p.bank;
-    const head = p.line.parts ? `s("${bank}").n("${samples.map(x => (x ? x.n : '~')).concat(Array(Math.max(0, 4 - samples.length)).fill('~')).join(' ')}")` : `s("${bank}").n(${samples[0].n})`;
+    // a line of entries: n first, so each entry plays on its slot of the bar (voice-track-tuning D7; an entry with no
+    // sample in the line's bank is a rest); a whole line: one sample
+    // (the speaker's bank when one entry at least has a sample there, as lineEntries)
+    const bank = samples.some(x => x && x.bank === p.bank) ? p.bank : (samples.find(Boolean) || {}).bank || p.bank;
+    const head = p.line.parts ? `n("${samples.map(x => (x && x.bank === bank ? x.n : '~')).concat(Array(Math.max(0, 4 - samples.length)).fill('~')).join(' ')}").s("${bank}")` : `s("${bank}").n(${samples[0].n})`;
     const chop = p.way === 'chop' ? `.slice(${p.pat.slices || 8}, "${p.pat.rhythm || '0 1 2 3 4 5 6 7'}").clip(1)` : '';
     const fx = spokenFx(p.settings, p.way, p.rack) + `.postgain(${p.settings.gain}).orbit(${p.orbit}).analyze("fx")`;
     // starts with the same offset share one line
@@ -335,8 +370,15 @@ export function songPoeticTexts(song) {
 // checks for a spoken track's patterns and for a song's or a recipe's narrator; err/warn take (path, message)
 export function checkSpokenPattern(pat, p, ids, err, warn) {
   if (!WAYS.includes(pat.way)) err(`${p}.way`, `one of ${WAYS.join(', ')}`);
-  const texts = pat.text === undefined ? [] : typeof pat.text === 'string' ? [pat.text] : pat.text && typeof pat.text === 'object' && !Array.isArray(pat.text) ? Object.entries(pat.text) : null;
-  if (texts === null) err(`${p}.text`, 'a line, one per language { "en": "…", "it": "…" }, or "vocab:<group>"');
+  const isList = Array.isArray(pat.text);
+  const texts = pat.text === undefined || isList ? [] : typeof pat.text === 'string' ? [pat.text] : pat.text && typeof pat.text === 'object' ? Object.entries(pat.text) : null;
+  if (texts === null) err(`${p}.text`, 'a line, one per language { "en": "…", "it": "…" }, "vocab:<group>" or 2 to 4 vocabulary entries [{ "en": "…", "it": "…" }, …]');
+  else if (isList) {
+    // (vocabulary entries written out, voice-track-tuning D4: 2 to 4, from one group)
+    if (pat.text.length < 2 || pat.text.length > MAX_ENTRIES) err(`${p}.text`, `2 to ${MAX_ENTRIES} vocabulary entries`);
+    pat.text.forEach((x, i) => { if (!x || typeof x !== 'object' || Array.isArray(x) || typeof x.en !== 'string' || !x.en.trim() || words(x.en) > MAX_WORDS || (x.it !== undefined && typeof x.it !== 'string')) err(`${p}.text[${i}]`, `an entry { "en": "…", "it": "…" }, at most ${MAX_WORDS} words`); });
+    if (pat.text.every(x => x && typeof x.en === 'string') && !VOCAB_GROUPS.some(g => pat.text.every(x => VOCABULARY[g].some(e => e.en === x.en)))) warn(`${p}.text`, 'entries of one vocabulary group (an entry without a sample stays silent)');
+  }
   else if (typeof pat.text === 'string' && pat.text.startsWith('vocab:')) { if (!VOCAB_GROUPS.includes(pat.text.slice(6))) err(`${p}.text`, `a vocabulary group: ${VOCAB_GROUPS.map(g => `vocab:${g}`).join(', ')}`); }
   else for (const x of texts) {
     const [k, v] = Array.isArray(x) ? x : ['', x];
@@ -345,7 +387,8 @@ export function checkSpokenPattern(pat, p, ids, err, warn) {
     if (typeof v !== 'string' || !v.trim()) err(q, 'a non-empty line');
     else if (words(v) > MAX_WORDS) err(q, `at most ${MAX_WORDS} words (${words(v)})`);
   }
-  if (pat.every !== undefined && (!Number.isInteger(pat.every) || pat.every < 1 || pat.every > 64)) err(`${p}.every`, 'bars between two refrains: a whole number from 1 to 64');
+  if (pat.every !== undefined && (!Number.isInteger(pat.every) || pat.every < 1 || pat.every > 64)) err(`${p}.every`, 'bars between two refrains or two chops: a whole number from 1 to 64');
+  if (pat.times !== undefined && (!Number.isInteger(pat.times) || pat.times < 1 || pat.times > 64)) err(`${p}.times`, 'the most starts of a refrain in one clip: a whole number from 1 to 64');
   if (pat.slices !== undefined && (!Number.isInteger(pat.slices) || pat.slices < 2 || pat.slices > 32)) err(`${p}.slices`, 'slices of a chop: a whole number from 2 to 32');
   if (pat.rhythm !== undefined) {
     const toks = typeof pat.rhythm === 'string' ? pat.rhythm.trim().split(/\s+/) : null, n = pat.slices || 8;
@@ -353,7 +396,8 @@ export function checkSpokenPattern(pat, p, ids, err, warn) {
   }
   if (pat.before !== undefined && !ids.includes(pat.before)) err(`${p}.before`, `unknown track "${pat.before}"; tracks: ${ids.join(', ')}`);
   if (pat.way && pat.way !== 'chop' && (pat.slices !== undefined || pat.rhythm !== undefined)) warn(p, 'slices and rhythm are for chops');
-  if (pat.way && pat.way !== 'refrain' && pat.every !== undefined) warn(`${p}.every`, 'every is for refrains');
+  if (pat.way && pat.way !== 'refrain' && pat.way !== 'chop' && pat.every !== undefined) warn(`${p}.every`, 'every is for refrains and chops');
+  if (pat.way && pat.way !== 'refrain' && pat.times !== undefined) warn(`${p}.times`, 'times is for refrains');
   if (pat.way && !['passage', 'opening'].includes(pat.way) && pat.before !== undefined) warn(`${p}.before`, 'before is for passages and openings');
 }
 export function checkNarrator(v, p, err) {

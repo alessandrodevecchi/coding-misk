@@ -29,7 +29,7 @@ import { writtenForm } from '../src/endless/growth.js';
 import { windowSong } from '../src/endless/join.js';
 import { layout } from '../src/endless/transitions.js';
 import { windowPart } from '../src/live/air-code.js';
-import { sectionFacts, whereOfTrack } from '../src/song/spoken.js';
+import { sectionFacts, whereOfTrack, checkSpokenPattern } from '../src/song/spoken.js';
 import { soundPatch } from '../src/endless/voice-sound.js';
 import * as VS from './voice-sample.mjs';
 import { phraseRows, listVocab, editText, editBars, removeRow, addRow, fillRows, vocabOf } from '../src/endless/phrase-list.js';
@@ -982,7 +982,7 @@ const CHECKS = {
     assert(!captionFrame(q.cs, 7.1, S, { hand: true }).rows.length && voiced.every(x => captionFrame(n.cs, x.at + 0.01, S, { hand: true }).rows.some(r => r.kind === 'voice')), 'typing by hand: the narrator shows, or the voice track does not');
     console.log(`      luci-rosse: explain ${a.cs.filter(x => x.kind === 'narrator').length}, poetic ${p.cs.filter(x => x.kind === 'narrator').length}, poetic Narrated growth ${q.cs.filter(x => x.kind === 'narrator').length} captions; prova-voce-notte ${voiced.length} voice-track captions; a typed line captioned`);
   },
-  async 'voice-track captions: a line of several entries plays its first entry only (Strudel takes the structure from s), and the stage and Coming next show that entry, never the entries joined; a first entry with no sample shows nothing; the sample the code plays at each voice hap is the caption on the stage (Strudel in Node), also with the first entry in the default voice'() {
+  async 'voice-track captions (voice-track-tuning D7): a line of several entries plays every entry on its quarter of the bar, and the stage and Coming next show the entry heard, never the entries joined; an entry with no sample is a silent quarter with no caption; the sample the code plays at each voice hap is the caption on the stage (Strudel in Node), also with the first entry only in the default voice'() {
     // the owner's radio: synthwave, Voice track always, many phrases, mixed, every way, quiet, medium and busy parts
     const voice = { presence: 'always', phrases: 'many', kind: 'mixed', ways: ['opening', 'refrain', 'chop', 'passage'], where: ['quiet', 'medium', 'busy'] };
     const rec = { seed: 'own', options: { styles: ['synthwave'], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile: 'classic', voice }, changes: [], growth: GROWTH_ON_AIR };
@@ -992,26 +992,30 @@ const CHECKS = {
     // a manifest of every text the song speaks, per bank, sorted (the voice helper's files); the voice track reads its
     // samples in spokenContext, as the compiler
     const manifest = drop => { const m = {}; for (const p of placed) for (const x of p.texts) { const f = `${p.bank}/${saySlug(x)}.wav`; if (!drop || !drop(p.bank, x)) (m[p.bank] = m[p.bank] || []).includes(f) || m[p.bank].push(f); } for (const l of Object.values(m)) l.sort(); return m; };
-    const saved = spokenContext.files, first = multi.texts[0];
+    const saved = spokenContext.files, first = multi.texts[0], second = multi.texts[1];
     const def = 'say_en', other = manifest((b, t) => t === first);
     other[def] = [...(other[def] || []), `${def}/${saySlug(first)}.wav`, `${def}/aa_other.wav`].sort();
     const { hapsAt } = await import('./mixer-checks.mjs');
+    const slots = Math.max(4, multi.texts.length);
     let checked = 0;
     try {
-      for (const [name, m] of [['speaker bank', manifest()], ['first entry in the default voice', other]]) {
+      // (with the first entry only in the default voice the line keeps the speaker's bank: its first quarter is silent)
+      for (const [name, m, heard] of [['speaker bank', manifest(), multi.texts], ['first entry in the default voice', other, multi.texts.slice(1)], ['second entry missing', manifest((b, t) => t === second), multi.texts.filter(t => t !== second)]]) {
         setSpokenContext({ files: m });
         const sch = spokenSchedule(B, C, 'en', m), caps = captionSchedule(B, C, 'en', m, {});
         const joined = caps.find(y => y.kind === 'voice' && y.text.includes(' · '));
         assert(!joined, `${name}: a caption joins entries: ${joined && joined.text}`);
         const x = sch.find(y => y.voice === 'T' && y.track === multi.track && y.ci === multi.ci);
-        assert(x.entries.length === 1 && x.entries[0].text === first && x.entries[0].bank === (name === 'speaker bank' ? multi.bank : def), `${name}: entries ${JSON.stringify(x.entries)}`);
-        for (const at of [0.01, 0.3, 0.6]) {
-          const rows = captionFrame(caps, x.at + x.late + at, S).rows.filter(r => r.kind === 'voice');
-          assert(rows.length === 1 && rows[0].text === first, `${name}, bar ${x.at + 1} + ${at}: "${first}" heard, the stage shows ${JSON.stringify(rows.map(r => r.text))}`);
+        assert(JSON.stringify(x.entries.map(e => e.text)) === JSON.stringify(heard) && x.entries.every(e => e.bank === multi.bank) && x.entries.every(e => Math.abs(e.late - x.late - multi.texts.indexOf(e.text) / slots) < 1e-6), `${name}: entries ${JSON.stringify(x.entries)}`);
+        for (const [k, text] of multi.texts.entries()) {
+          const rows = captionFrame(caps, x.at + x.late + k / slots + 0.01, S).rows.filter(r => r.kind === 'voice');
+          if (heard.includes(text)) assert(rows.length === 1 && rows[0].text === text, `${name}, bar ${x.at + 1} quarter ${k + 1}: "${text}" heard, the stage shows ${JSON.stringify(rows.map(r => r.text))}`);
+          else assert(!rows.some(r => r.text === text), `${name}: "${text}" has no sample and shows`);
         }
         const row = nextRows(B, sch, x.at - 1, 1)[0];
-        assert(row.at === x.at && JSON.stringify(row.voices.filter(v => v.voice === 'T').map(v => v.text)) === JSON.stringify([first]), `${name}: Coming next, bar ${x.at + 1}: ${JSON.stringify(row.voices)}`);
-        // by ear: the sample each voice hap plays (bank and number read in the manifest) is the voice caption then
+        assert(row.at === x.at && JSON.stringify(row.voices.filter(v => v.voice === 'T').map(v => v.text)) === JSON.stringify(heard), `${name}: Coming next, bar ${x.at + 1}: ${JSON.stringify(row.voices)}`);
+        // by ear: the sample each voice hap plays (bank and number read in the manifest) is the voice caption then, and
+        // every entry heard sounds on the line's bar
         const L = liveCode(song, C, { files: () => m, lang: () => 'en' });
         const bars = [...new Set(sch.filter(y => y.voice === 'T' && y.way !== 'chop').map(y => y.at))].slice(0, 12);
         assert(bars.includes(x.at), `${name}: bar ${x.at + 1} not checked`);
@@ -1023,15 +1027,59 @@ const CHECKS = {
             assert(file && rows.length === 1 && file.endsWith(`/${saySlug(rows[0].text)}.wav`), `${name}, bar ${bar + 1} at ${h.at.toFixed(2)}: plays ${file}, the stage shows ${JSON.stringify(rows.map(r => r.text))}`);
             checked++;
           }
+          if (bar === x.at) { const files = said.filter(h => h.at < bar + 1).map(h => (m[h.s] || [])[h.note]); assert(heard.every(t => files.some(f => f.endsWith(`/${saySlug(t)}.wav`))), `${name}, bar ${bar + 1}: heard ${JSON.stringify(files)}, want every entry of ${JSON.stringify(heard)}`); }
         }
       }
-      // the first entry with no sample anywhere: nothing sounds on that bar, nothing shows
-      const none = manifest((b, t) => t === first);
+      // no entry with a sample anywhere: nothing sounds on that bar, nothing shows
+      const none = manifest((b, t) => multi.texts.includes(t));
       setSpokenContext({ files: none });
       const sch = spokenSchedule(B, C, 'en', none), caps = captionSchedule(B, C, 'en', none, {}), x = sch.find(y => y.voice === 'T' && y.track === multi.track && y.ci === multi.ci);
-      assert(x && !x.entries.length && !caps.some(y => y.kind === 'voice' && y.at >= x.at && y.at < x.at + 1) && !(nextRows(B, sch, x.at - 1, 1)[0] || { voices: [] }).voices.some(v => v.voice === 'T'), `"${first}" has no sample and something shows on bar ${x && x.at + 1}`);
+      assert(!x || (!x.entries.length && !caps.some(y => y.kind === 'voice' && y.at >= x.at && y.at < x.at + 1)), `"${multi.texts.join(' · ')}" has no sample and something shows on bar ${x && x.at + 1}`);
     } finally { setSpokenContext({ files: saved }); }
-    console.log(`      ${song.id}: the line "${multi.texts.join(' · ')}" sounds and shows as "${first}"; ${checked} voice haps heard as captioned`);
+    console.log(`      ${song.id}: the line "${multi.texts.join(' · ')}" sounds and shows entry by entry; ${checked} voice haps heard as captioned`);
+  },
+  'format (voice-track-tuning D1, D2, D4): entries written out, chop every, refrain times; the validator; lineOf leaves out the entries another line writes out'() {
+    const base = clone(EXAMPLE), sp = base.tracks.find(t => t.type === 'spoken'), ids = base.tracks.map(t => t.id);
+    const errs = pat => { const e = [], w = []; checkSpokenPattern(pat, 'p', ids, (p, m) => e.push(`${p}: ${m}`), (p, m) => w.push(`${p}: ${m}`)); return { e, w }; };
+    const night = VOCABULARY.night;
+    // entries: 2 to 4 objects of one group
+    assert(!errs({ way: 'refrain', text: [night[0], night[1]] }).e.length && !errs({ way: 'refrain', text: [night[0], night[1]] }).w.length, 'two entries of one group are valid');
+    assert(errs({ way: 'refrain', text: [night[0]] }).e.length && errs({ way: 'refrain', text: night.slice(0, 5) }).e.length && errs({ way: 'refrain', text: [night[0], 'x'] }).e.length, 'one entry, five entries or a string in the list are not errors');
+    assert(errs({ way: 'refrain', text: [night[0], VOCABULARY.dark[0]] }).w.length, 'entries of two groups are not warned');
+    // every on a chop, times on a refrain
+    assert(!errs({ way: 'chop', every: 2 }).w.length && !errs({ way: 'chop', every: 2 }).e.length, 'every on a chop warns');
+    assert(errs({ way: 'passage', every: 2 }).w.length && errs({ way: 'chop', times: 2 }).w.length && errs({ way: 'refrain', times: 0 }).e.length && !errs({ way: 'refrain', times: 3 }).e.length, 'times and every checks');
+    // a chop with every 2 on a 4-bar clip from bar 33 plays on 33 and 35 (1-based); without every on each bar
+    const chopSong = every => { const s = clone(base), t = s.tracks.find(x => x.type === 'spoken'); t.patterns = { C: { way: 'chop', text: night[1], ...(every ? { every } : {}) } }; t.clips = [{ start: 32, bars: 4, pattern: 'C' }]; return s; };
+    const bars = s => placeSpoken(s, 'en').filter(p => p.track === sp.id).flatMap(p => p.starts.map(x => x.bar + 1));
+    assert(JSON.stringify(bars(chopSong(2))) === '[33,35]' && JSON.stringify(bars(chopSong(0))) === '[33,34,35,36]', `chop bars ${bars(chopSong(2))} / ${bars(chopSong(0))}`);
+    // a refrain with times 3 over the whole song keeps 3 starts, the first and the last of those it had
+    const refSong = times => { const s = clone(base), t = s.tracks.find(x => x.type === 'spoken'); t.patterns = { R: { way: 'refrain', text: night[2], every: 4, ...(times ? { times } : {}) } }; t.clips = [{ start: 0, bars: s.sections.reduce((a, x) => a + x.bars, 0), pattern: 'R' }]; return s; };
+    const all = bars(refSong(0)), three = bars(refSong(3));
+    assert(all.length > 3 && three.length === 3 && three[0] === all[0] && three[2] === all[all.length - 1] && three.every(b => all.includes(b)), `refrain times 3: ${three} of ${all}`);
+    assert(JSON.stringify(bars(refSong(1))) === JSON.stringify([all[0]]), 'refrain times 1: the first start');
+    // a list of entries is its parts, in order, the same in every language
+    const listSong = clone(base), lt = listSong.tracks.find(x => x.type === 'spoken');
+    lt.patterns = { A: { way: 'passage', text: [night[5], night[10], night[4]] } }; lt.clips = [{ start: 0, bars: 8, pattern: 'A' }];
+    const line = lineOf(listSong, lt, 'A', lt.patterns.A);
+    assert(JSON.stringify(lineTexts(line, 'en')) === '["after hours","wide awake","awake"]' && JSON.stringify(lineTexts(line, 'it')) === JSON.stringify([night[5].it, night[10].it, night[4].it]), `entries: ${JSON.stringify(lineTexts(line, 'it'))}`);
+    // lineOf of a vocab: line leaves out what another line writes out (all but three entries taken: those three)
+    const dd = clone(base), dt = dd.tracks.find(x => x.type === 'spoken');
+    const keep = night.slice(9).map(e => e.en);
+    dt.patterns = { A: { way: 'refrain', text: 'vocab:night' }, B: { way: 'passage', text: night.slice(0, 4) }, C: { way: 'chop', text: night[4] }, D: { way: 'refrain', text: night.slice(5, 9) } };
+    for (let k = 0; k < 20; k++) {
+      const s = { ...dd, id: `dedup-${k}` }, l = lineOf(s, dt, 'A', dt.patterns.A), t = lineTexts(l, 'en');
+      assert(t.every(x => keep.includes(x)), `vocab:night drew ${t} with ${keep} free`);
+    }
+    // too few free: the whole group
+    dt.patterns.D = { way: 'refrain', text: night.slice(5, 11) };
+    const s = { ...dd, id: 'dedup-x' }, t = lineTexts(lineOf(s, dt, 'A', dt.patterns.A), 'en');
+    assert(t.length >= 2 && t.every(x => night.some(e => e.en === x)), `fallback: ${t}`);
+    // code: a line of entries is written n(…).s(bank), every entry on its quarter
+    setSpokenContext({ files: null });
+    const code = compileSong(listSong);
+    assert(/\$: n\("\d+ \d+ \d+ ~"\)\.s\("say_[a-z_]+"\)/.test(code) && !/s\("say_[a-z_]+"\)\.n\("/.test(code), `code: ${code.split('\n').filter(l => /say_/.test(l)).join(' | ')}`);
+    console.log(`      chop every 2: bars ${bars(chopSong(2))}; refrain times 3: ${three} of ${all.length} starts`);
   },
   'spoken needs (spoken-text-on-stage D9): every line the code would say with every sample, with its bank; the schedule with every sample is the needs; a missing sample is listed with has false'() {
     const C = { ...resolveProfile('switch'), narratorStyle: 'poetic', narrated: true }, B = liveBuildOf(crescendoSong({ ...read('songs/prova-voce-notte.json'), kind: 'composed' }, { narrated: true, rules: growthRules(C, { styles: recipes }) }), C);

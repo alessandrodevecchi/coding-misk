@@ -41,7 +41,9 @@ export function mineSnapshot(items, share, lang) {
 export function vocabGroupOf(text) {
   if (typeof text === 'string') return text.startsWith('vocab:') && VOCAB_GROUPS.includes(text.slice(6)) ? text.slice(6) : null;
   if (!text || typeof text !== 'object') return null;
-  return VOCAB_GROUPS.find(g => VOCABULARY[g].some(e => e.en === text.en && (text.it === undefined || e.it === text.it))) || null;
+  // (entries written out, voice-track-tuning D4: the group of all of them)
+  const list = Array.isArray(text) ? text : [text];
+  return (list.length && VOCAB_GROUPS.find(g => list.every(x => x && VOCABULARY[g].some(e => e.en === x.en && (x.it === undefined || e.it === x.it))))) || null;
 }
 // A spoken track's patterns with my phrases in place of their vocabulary lines (written out). mine: a snapshot; seed:
 // the song's id. Changes the track in place; → the ids of the phrases written

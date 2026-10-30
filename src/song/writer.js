@@ -180,7 +180,8 @@ function foldSong(cs, table, used) {
 // a voice line (voice-function, song-functions): the effects between its mask and its bus become a song function with
 // no parameters, named from the voice words of the song; voices: chain → name, so the same chain keeps its name
 function voiceCall(cs, ctx, used) {
-  const head = cs[0].text.match(/s\("say_[a-z]+(?:_(\w+))?"\)/);
+  // (a line of several entries starts with n(…) and names its bank in the next call, voice-track-tuning D7)
+  const head = cs[0].text.match(/s\("say_[a-z]+(?:_(\w+))?"\)/) || (/\bn\(/.test(cs[0].text) && cs[1] && cs[1].text.match(/^\s*\.s\("say_[a-z]+(?:_(\w+))?"\)/));
   if (!head) return;
   const at = cs.findIndex(c => c.name === 'mask'), end = cs.findIndex(c => c.name === 'orbit');
   if (at < 0 || end < 0 || end - at < 2) return;

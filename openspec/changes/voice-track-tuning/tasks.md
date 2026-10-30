@@ -9,14 +9,14 @@ Estimate: about 19 agent hours (16 to 22), in the order below. Each group ends w
 
 ## 2. Song format and compiler (about 3 h)
 
-- [ ] 2.1 `src/song/spoken.js`: array texts (2 to 4 vocabulary entries) in `lineOf` and the validator; chop `every` (default 1) in `placeSpoken`; refrain `times` (spread starts, first and last kept); stop the "every is for refrains" warning for chops.
-- [ ] 2.2 `lineOf`: leave out the entries the track's other patterns write out (fallback to the whole group).
-- [ ] 2.3 `spokenCode`: `n("…").s("bank")` for lines of several entries; `lineEntries` returns every entry with its offset.
-- [ ] 2.4 `src/song/writer.js` `voiceCall`: accept `n(…).s("say_…")`.
-- [ ] 2.5 `src/voices/mine.js` `vocabGroupOf`: arrays.
-- [ ] 2.6 Captions and Coming next per entry (`src/song/build.js`, `src/radio/next-changes.js`), Compose phrase list shows array texts joined.
-- [ ] 2.7 `npm run check:spoken` (new cases: array texts, de-duplication, every entry heard in Strudel in Node with captions matching, `every`, `times`); update the d2a7911 synthwave case to all entries.
-- [ ] 2.8 `npm run snapshot:code` for `example-voices`, `prova-voce-notte`, `prova-voce-taglio` only (check `git diff --stat tests/snapshots/code`); `node tools/snapshot-levels.cjs write` for those three songs (dev server on 5245); say why in the commit.
+- [x] 2.1 `src/song/spoken.js`: array texts (2 to 4 vocabulary entries) in `lineOf` and the validator; chop `every` (default 1) in `placeSpoken`; refrain `times` (spread starts, first and last kept); stop the "every is for refrains" warning for chops.
+- [x] 2.2 `lineOf`: leave out the entries the track's other patterns write out (fallback to the whole group).
+- [x] 2.3 `spokenCode`: `n("…").s("bank")` for lines of several entries; `lineEntries` returns every entry with its offset.
+- [x] 2.4 `src/song/writer.js` `voiceCall`: accept `n(…).s("say_…")`.
+- [x] 2.5 `src/voices/mine.js` `vocabGroupOf`: arrays.
+- [x] 2.6 Captions and Coming next per entry (`src/song/build.js`, `src/radio/next-changes.js`), Compose phrase list shows array texts joined.
+- [x] 2.7 `npm run check:spoken` (new cases: array texts, de-duplication, every entry heard in Strudel in Node with captions matching, `every`, `times`); update the d2a7911 synthwave case to all entries.
+- [x] 2.8 `npm run snapshot:code` for `example-voices`, `prova-voce-notte`, `prova-voce-taglio` only (check `git diff --stat tests/snapshots/code`); `node tools/snapshot-levels.cjs write` for those three songs (dev server on 5245); say why in the commit.
 
 ## 3. Generation rules (about 3 h)
 
