@@ -42,12 +42,12 @@
 
 - [x] 7.1 "App widgets" section in the Code widgets card: on or off, parameters, ramp field, live preview, Default values; backup. Verify: `check-settings.cjs`, `check-backup.mjs`
 - [x] 7.2 The two kinds in `WIDGETS` with primaries (drums: hit grid; pad and voice: tone cloud) and secondaries (bass, lead, arp, guitar: tone cloud); slots, maximum and muted-line rules of `#79`. Verify: `npm run check:live-code` new cases; with "Code widgets" off, `npm run check:code` unchanged
-- [ ] 7.3 Strudel catalog: the two widget calls. Verify: `npm run catalog:strudel`, `npm run check:knowledge` without the stale warning
+- [x] 7.3 Strudel catalog: the two widget calls. Verify: `npm run catalog:strudel`, `npm run check:knowledge` without the stale warning
 
 ## 8. Closing
 
-- [ ] 8.1 Guide cards (Code over, App widgets) in English and Italian. Verify: `npm run check:guide`
-- [ ] 8.2 Knowledge base: visuals, code widgets, settings, decisions, checks; `docs/ARCHITECTURE.md`, `docs/DESIGN-SYSTEM.md`. Verify: `npm run knowledge`, `npm run check:knowledge`
+- [x] 8.1 Guide cards (Code over, App widgets) in English and Italian. Verify: `npm run check:guide`
+- [x] 8.2 Knowledge base: visuals, code widgets, settings, decisions, checks; `docs/ARCHITECTURE.md`, `docs/DESIGN-SYSTEM.md`. Verify: `npm run knowledge`, `npm run check:knowledge`
 - [ ] 8.3 Full regression: `check:video`, `check:clips`, `check:live`, `check:export`, `check:render-styles`, `check:code-themes`, `check:light-theme`, `check:captions` (browser), settings, code widgets, timeline, hand, guide, knowledge, `check:code`, `vite build`. Verify: all pass
 - [ ] 8.4 Pictures for the owner in `notes/prove-2026-10-30/code-over-visual/` named `*-v2.*`: the widgets before and after the denser defaults, the layout (neon, HW, light, 16:9 and 9:16), and a short clip in 16:9 and 9:16 (20-40 s, app audio). Verify: files listed in the DEVLOG
 
