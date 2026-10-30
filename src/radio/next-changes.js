@@ -40,6 +40,8 @@ export function stepLabel(s, song) {
 export function nextRows(song, schedule, rel, max = 3) {
   const rows = new Map(), row = at => { if (!rows.has(at)) rows.set(at, { at, labels: [], voices: [] }); return rows.get(at); };
   for (const s of buildSteps(song)) if (s.at > rel) { const l = stepLabel(s, song); if (l && !row(s.at).labels.includes(l)) row(s.at).labels.push(l); }
-  for (const x of schedule || []) if (x.at > rel && !row(x.at).voices.some(v => v.voice === x.voice && v.text === x.text)) row(x.at).voices.push({ voice: x.voice, text: x.text });
+  // (a voice-track line of several entries: the entry heard on that bar, not the line's texts joined;
+  // voice-track-captions)
+  for (const x of schedule || []) if (x.at > rel) for (const text of x.entries ? x.entries.map(e => e.text) : [x.text]) if (!row(x.at).voices.some(v => v.voice === x.voice && v.text === text)) row(x.at).voices.push({ voice: x.voice, text });
   return [...rows.values()].filter(r => r.labels.length || r.voices.length).sort((a, b) => a.at - b.at).slice(0, max);
 }
