@@ -51,6 +51,7 @@
     "check:fm-lab": "node --no-warnings tools/check-fm-lab.mjs",
     "check:fm-effects": "node --no-warnings tools/check-fm-effects.mjs",
     "check:spoken": "node --no-warnings tools/check-spoken.mjs",
+    "check:samples": "node --no-warnings tools/check-samples.mjs",
     "knowledge": "node --no-warnings tools/knowledge.mjs",
     "check:knowledge": "node --no-warnings tools/check-knowledge.mjs",
     "durations": "node --no-warnings tools/song-durations.mjs write",

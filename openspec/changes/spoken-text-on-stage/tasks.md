@@ -24,10 +24,10 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 
 ## 4. Videos and live output (2.5 h)
 
-- [ ] 4.1 `drawCaptions` in `src/video/video.js` for the session video and the live output
-- [ ] 4.2 Fast video and fragments from `captionSchedule` (replaces `sayList`), 9:16 lower third
-- [ ] 4.3 Timeline layout: the heard line beside the playhead
-- [ ] 4.4 Videos follow the switch and the choices under it (In videos too); the fast video and fragment panels show the state, link to the card and can turn texts off for one export (D7)
+- [x] 4.1 `drawCaptions` in `src/video/video.js` for the session video and the live output
+- [x] 4.2 Fast video and fragments from `captionSchedule` (replaces `sayList`), 9:16 lower third
+- [x] 4.3 Timeline layout: the heard line beside the playhead
+- [x] 4.4 Videos follow the switch and the choices under it (In videos too); the fast video and fragment panels show the state, link to the card and can turn texts off for one export (D7)
 
 ## 5. Settings (2.5 h)
 
@@ -38,7 +38,7 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 ## 6. Checks (2.5 h)
 
 - [ ] 6.1 `tools/check-captions.cjs` (dev server): the five cases of the design measured again (caption equals the heard line on every spoken bar, voice-track lines shown, nothing shown when not heard), "Claude" and Palco pictures, HW, 400 px, a fast video fragment
-- [ ] 6.2 Regression: `check:video`, `check:clips`, `check:live`, `check:render-styles`, `check-render-styles.cjs`, `check-song-config.cjs` (its "narrator off: no phrase" case changes for songs with a voice track)
+- [x] 6.2 Regression: `check:video`, `check:clips`, `check:live`, `check:render-styles`, `check-render-styles.cjs`, `check-song-config.cjs` (its "narrator off: no phrase" case changes for songs with a voice track)
 - [ ] 6.3 Settings in the browser: switch off and on (choices kept), narrator only, each of the five marks, the "Claude" transcript pane at 16:9 and absent at 9:16, an invented prompt line never captioned
 
 ## 7. Speaker registry (1.5 h, D11)
@@ -62,8 +62,8 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 
 ## 10. Missing samples check (1 h, D9)
 
-- [ ] 10.1 `tools/check-samples.mjs`, `npm run check:samples`: built-in and example songs, style lines, vocabularies, both languages, every named speaker bank; `--strict` exits non-zero, `--make` fills the gaps (macOS)
-- [ ] 10.2 Row in `docs/knowledge/checks.md` and in the AGENTS.md tooling list
+- [x] 10.1 `tools/check-samples.mjs`, `npm run check:samples`: built-in and example songs, style lines, vocabularies, both languages, every named speaker bank; `--strict` exits non-zero, `--make` fills the gaps (macOS)
+- [x] 10.2 Row in `docs/knowledge/checks.md` and in the AGENTS.md tooling list
 
 ## 11. Docs (0.5 h)
 

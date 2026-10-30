@@ -446,6 +446,10 @@ function capsOf(sg) {
 }
 const NO_CAPTIONS = Object.freeze({ rows: [], tag: '', history: [] });
 let lastCapHtml = '';
+// texts off for the next fast video only (Settings → Video, D7); the fragments menu has its own box
+let capsSkipNext = false;
+// a link to the "Testi sul palco" card from an export panel
+document.addEventListener('click', e => { const a = e.target.closest('[data-fm-caps], [data-cap-link]'); if (!a) return; e.preventDefault(); showTab('impostazioni'); setTimeout(() => { const c = $('#set-captions'); if (c) c.scrollIntoView({ block: 'start' }); }, 80); });
 // a bar of a song in seconds (the fade of a caption, D5)
 const barSecOf = (meta, cyc) => { const b = meta && meta.bpm ? +meta.bpm[Math.max(0, Math.min(meta.bpm.length - 1, Math.floor(cyc)))] : 0; return b > 0 ? 240 / b : 2; };
 // the voice's name for a caption's tooltip (D12): the speaker, else the system's default voice
@@ -1475,6 +1479,9 @@ async function exportVideoFast(...args) {
   try { return await exportVideoFastIn(...args); } finally { exportCols = null; }
 }
 async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null } = {}) {
+  // texts on stage off for this one export (spoken-text-on-stage D7): the fragment menu's choice, or Settings → Video
+  const noCaptions = frag ? !!frag.noCaptions : capsSkipNext;
+  if (!frag) capsSkipNext = false;
   // the song being rendered decides the lit notes (performance-profiles), not the one in the player
   exportCtl = sg.ctl || null;
   // a long video goes straight to a file on disk (#61): the dialog comes first, while the click still counts
@@ -1497,7 +1504,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   const own = songs ? store.get('coding-misk-radio-look', 'palco') : sg.look || look;
   const sayList = saidSteps(sg).map(x => ({ bar: x.at, text: sayText(x.say, getLang()) }));
   // the captions of the file (D6): the song's caption schedule, as on the stage; none with texts off for this export
-  const fvCaptions = sg.captionsOff ? [] : capsOf(sg);
+  const fvCaptions = noCaptions ? [] : capsOf(sg);
   let job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
     ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
   // code widgets in the fast video (code-widgets D11): the notes of the lines with a note widget come back from the
@@ -1716,7 +1723,7 @@ async function makeFragments(opts = {}) {
     // the files chosen (#57): the video, the audio alone (the export format), then texts and the list below
     const want = k => o.files.includes(k), saved = [];
     let stop = false;
-    if (want('video')) { const name = await exportVideoFast(src.sg, src.title, { songs: src.songs, frag: { start: p.start, end: p.end, label: o.label ? label : '', code, tagline, msgs: glitchMessages(code), o, file } }); if (name === 'cancelled') stop = true; else if (!name) return { error: 'render', files, items }; else saved.push(name); }
+    if (want('video')) { const name = await exportVideoFast(src.sg, src.title, { songs: src.songs, frag: { start: p.start, end: p.end, label: o.label ? label : '', code, tagline, msgs: glitchMessages(code), o, file, noCaptions: !!opts.noCaptions } }); if (name === 'cancelled') stop = true; else if (!name) return { error: 'render', files, items }; else saved.push(name); }
     if (!stop && want('audio')) { const name = await exportFast(src.sg, src.title, null, null, { frag: { start: p.start, end: p.end, file } }); if (name === 'cancelled') stop = true; else if (!name) return { error: 'render', files, items }; else saved.push(name); }
     if (stop) break;
     const name = saved[0] || file;
@@ -1808,6 +1815,7 @@ function openFragMenu(source, anchor) {
     </details>
     <details class="fm-files"><summary>${esc(t('fragFiles'))}: <span data-fm-files-sum>${esc(filesLabel(o.files))}</span></summary>
       <div class="fm-files-list">${F_FILES.map(k => `<label class="rx-opt"><input type="checkbox" data-fm-file="${k}"${o.files.includes(k) ? ' checked' : ''}> <span>${esc(t(`fragFile:${k}`))}</span></label>`).join('')}</div></details>
+    <div class="rx-opt fm-caps"><span class="muted small">${esc(t(capS.on && capS.videos ? 'capExportOn' : 'capExportOff'))} · <a href="#set-captions" data-fm-caps>${esc(t('capExportLink'))}</a></span>${capS.on && capS.videos ? chk('fm-nocap', false, t('capExportNone')) : ''}</div>
     <p class="hint muted small" data-fm-hint>${esc(t('fragHint', { n: String(nextFragment()).padStart(3, '0') }))}</p>
     <div class="tp-actions"><button class="btn primary" data-fm="go">${esc(t('fragGo'))}</button><span class="muted small" data-fm-status></span></div>
     </div><figure class="fm-prev"><canvas id="fm-preview" width="180" height="320" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted small">${esc(t('fragPreviewHint'))}</figcaption></figure>
@@ -1839,7 +1847,7 @@ function openFragMenu(source, anchor) {
     if (fastJob) { fastJob.cancel(); return; }
     remember();
     const kind = el.querySelector('input[name="fm-kind"]:checked').value;
-    const opts = { source, seed: v('#fm-seed').value.trim(), onProgress: (i, n) => status(t('fragProgress', { i: i + 1, n })),
+    const opts = { source, seed: v('#fm-seed').value.trim(), noCaptions: !!(v('#fm-nocap') && v('#fm-nocap').checked), onProgress: (i, n) => status(t('fragProgress', { i: i + 1, n })),
       onTexts: last => { if (fragMenu && fragMenu.el === el) textsBox(v('[data-fm-texts]'), last.tx, () => last.info, t('fragTextsLast', { label: last.info.fragment.label })); } };
     if (kind === 'between') {
       const from = parseTime(v('#fm-from').value), to = parseTime(v('#fm-to').value);
@@ -4866,7 +4874,7 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.da
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
     // texts on stage (spoken-text-on-stage D7)
-    setCaptions: f => setCaptions(f),
+    setCaptions: f => setCaptions(f), capsSkipNext: v => (v === undefined ? capsSkipNext : (capsSkipNext = !!v)),
     ui: () => ui, setUi: v => setUi(v), uiFollow: () => uiFollow, setUiFollow: on => setUiFollow(on), lang: () => getLang(), setLang: l => changeLang(l),
     // code themes (code-themes D6): the settings, a change, and the theme Automatic uses now
     codeTheme: { settings: () => codeThemes.settings(), set: patch => codeThemes.set(patch), autoName: l => codeThemes.autoName(l) },

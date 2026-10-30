@@ -62,6 +62,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setRender'), `<select data-vid-opt="render" data-no-knob>${opt('stage', vid.render, t('renderStage'))}${RENDERS.map(([k, l]) => opt(k, vid.render, tx(l))).join('')}</select>`)}
           ${row(t('setVidSoulMode'), `<select data-vid-opt="soul" data-no-knob>${SOULS.map(k => opt(k, vid.soul, t(`vidSoul:${k}`))).join('')}</select>`, t(`vidSoulHint:${vid.soul}`))}
           ${vid.layout === 'code' && vid.soul !== 'off' && vid.soul !== 'full' ? row(t('setVidSoul'), seg('data-vid-soul', [['1', t('vidSoulShown')], ['0', t('vidSoulFolded')]], vid.soulPanel ? '1' : '0'), t('setVidSoulHint')) : ''}
+          ${row(t('setCap'), `<span class="muted">${esc(t(captionSettings(store.get(CAPTIONS_KEY, null)).on && captionSettings(store.get(CAPTIONS_KEY, null)).videos ? 'capExportOn' : 'capExportOff'))} · <a href="#set-captions" data-cap-link>${esc(t('capExportLink'))}</a></span>${app.capsSkipNext ? ` <label class="rx-opt"><input type="checkbox" data-cap-skip${app.capsSkipNext() ? ' checked' : ''} data-no-knob> <span>${esc(t('capExportNone'))}</span></label>` : ''}`)}
           ${row(t('setVidPreset'), `<span class="vid-presets"><select id="set-vid-preset" data-no-knob><option value="">${esc(t('vidPresetPick'))}</option>${Object.keys(presets).sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select><input id="set-vid-preset-name" type="text" maxlength="40" placeholder="${esc(t('vidPresetName'))}" aria-label="${esc(t('vidPresetName'))}"><button class="btn small" id="set-vid-preset-save">${esc(t('vidPresetSave'))}</button>${Object.keys(presets).length ? `<button class="btn small danger" id="set-vid-preset-del">${esc(t('vidPresetDel'))}</button>` : ''}</span>`, t('setVidPresetHint'))}
         </div>
         <div class="card set-card" id="set-fragments"><h3>${esc(t('setVertical'))}</h3>
@@ -282,6 +283,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   root.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.swSec) { const open = new Set(store.get(SW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.swSec); else open.delete(d.dataset.swSec); store.set(SW_OPEN, [...open]); return; } if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
   root.addEventListener('change', e => {
     { const x = e.target, d = x.dataset || {};
+      if (d.capSkip !== undefined && app.capsSkipNext) { app.capsSkipNext(x.checked); return; }
       if (d.capShow) { setCap(S => { S[d.capShow] = x.checked; }); return render(); }
       if (d.capOpt) { setCap(S => { S[d.capOpt] = x.value; }); return; }
       if (d.capMark) { setCap(S => { S.marks[d.capMark] = x.value; }); return; }

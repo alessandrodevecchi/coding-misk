@@ -17,6 +17,7 @@ Lines are samples made on macOS by `npm run voices`. Without them the track stay
 
 - **Songs.** A spoken track's patterns are lines, and its clips place them ([songs.md](songs.md)).
 - **Narrator.** The narrator yields: it stays quiet on bars where a line sounds and never announces a spoken track ([narrator.md](narrator.md)).
+- **On the stage (spoken-text-on-stage, #82).** Every start of a voice-track line shows as a caption in quotes, magenta, while it is heard (a chop once per clip, a refrain at each repeat), also while the user codes by hand; the lines typed in the radio console are voice-track lines marked `typed` (their own choice in Settings → Texts on stage) ([visuals.md](visuals.md)).
 - **Growth shapes.** The `voice` opening starts a Live coder build with the first opening line ([growth-shapes.md](growth-shapes.md)).
 - **Styles.** A recipe's `spoken` field gives the chance, the ways, lines, speakers and a vocabulary group ([styles.md](styles.md)).
 - **Live build.** A spoken track is never thinned. It enters on the bar of its first line ([live-build.md](live-build.md)).

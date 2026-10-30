@@ -279,7 +279,11 @@ export function createVideo({ getCodeTheme = () => null, getWidgets = () => null
     if (fade <= 0.01) return;
     const c = getCaptions(cyc); if (!c) return;
     g.save(); g.globalAlpha = fade;
-    try { drawCaptions(g, S, c.frame, c.S, { scale: (tall ? S.w : S.h) / 1080, tall, where: c.S.where, hw: c.hw, label: c.label }); } finally { g.restore(); }
+    try {
+      const drawn = drawCaptions(g, S, c.frame, c.S, { scale: (tall ? S.w : S.h) / 1080, tall, where: c.S.where, hw: c.hw, label: c.label });
+      // (for the checks: the rows drawn in videos, when a check asks for them)
+      if (Array.isArray(globalThis.codingMiskVideoCaptions)) for (const r of c.frame.rows) globalThis.codingMiskVideoCaptions.push({ cyc, kind: r.kind, text: r.text, tag: c.frame.tag, tall, rows: drawn.length });
+    } finally { g.restore(); }
   }
 
   // the stage into an area: exact while recording (the stage draws at the area's size), cropped to fill for the preview

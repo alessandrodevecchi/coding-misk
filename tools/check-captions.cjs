@@ -43,11 +43,23 @@ async function laneAt(page, bar) {
   await sleep(350);
   return cap(page, C => C.lane());
 }
+const { execFileSync } = require('node:child_process');
+// a picture of a 9:16 fragment: its video saved, one frame taken with ffmpeg at `at` seconds
+async function fragShot(page, downloads, name, opts, at = 3.8) {
+  downloads.length = 0;
+  await page.evaluate(o => globalThis.codingMiskClips.fragments(o), { source: 'luci-rosse', from: 10, to: 20, quiet: true, files: ['video'], ...opts });
+  await sleep(2500);
+  const d = downloads.find(x => /\.mp4$/.test(x.suggestedFilename()));
+  if (!d || !shots) return false;
+  const f = path.join(shots, `${name}.mp4`); await d.saveAs(f);
+  try { execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-ss', String(at), '-i', f, '-frames:v', '1', '-vf', 'scale=540:-1', path.join(shots, `${name}.png`)]); fs.unlinkSync(f); return true; } catch (e) { return false; }
+}
 const shot = async (page, name, sel = '#stagewrap') => { if (shots) await page.locator(sel).screenshot({ path: path.join(shots, `${name}.png`) }); };
 
 (async () => {
   const browser = await launch();
-  const page = await browser.newPage({ viewport: { width: 1300, height: 900 } });
+  const ctx = await browser.newContext({ viewport: { width: 1300, height: 900 }, acceptDownloads: true }), page = await ctx.newPage(), downloads = [];
+  page.on('download', d => downloads.push(d));
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(URL);
@@ -106,6 +118,8 @@ const shot = async (page, name, sel = '#stagewrap') => { if (shots) await page.l
   // hardware theme
   await page.click('[data-uitheme="hw"]'); await sleep(300);
   await laneAt(page, 7); await shot(page, 'lane-hw-poetic');
+  await page.click('[data-uitheme="light"]'); await sleep(300);
+  await laneAt(page, 7); await shot(page, 'lane-light-poetic');
   await page.click('[data-uitheme="neon"]'); await sleep(300);
 
   // ---- the "Claude" look: no page caption, the reply block, the transcript pane at 16:9
@@ -126,6 +140,37 @@ const shot = async (page, name, sel = '#stagewrap') => { if (shots) await page.l
   await page.click('#transcript'); await sleep(200);
   await page.selectOption('#looks', 'palco'); await sleep(300);
 
+  // ---- a fast video fragment (9:16) of the poetic song: each image heard shows as its caption, no step line as a
+  // spoken caption, the lower third
+  if (!noVideo) {
+    await stop(page);
+    await page.evaluate(() => { globalThis.codingMiskVideoCaptions = []; });
+    const r = await page.evaluate(() => globalThis.codingMiskClips.fragments({ source: 'luci-rosse', from: 10, to: 40, quiet: true }));
+    const drawn = await page.evaluate(() => globalThis.codingMiskVideoCaptions);
+    const heard = new Set(lines.filter(x => x.kind === 'narrator').map(x => x.text)), steps = new Set(lines.filter(x => x.kind === 'step' && !x.heard).map(x => x.text));
+    const texts = [...new Set(drawn.map(x => x.text))];
+    check(!r.error && texts.length > 0 && texts.every(x => heard.has(x)) && drawn.every(x => x.tall && x.kind === 'narrator'), 'fragment 9:16: the images heard as captions, in the tall form', `${texts.length} lines: ${texts.slice(0, 4).join(' | ')}${r.error ? ` error ${r.error}` : ''}`);
+    check(!texts.some(x => steps.has(x)) && drawn.some(x => x.tag), 'fragment: no step line as a spoken caption, the step tag below', `${drawn.filter(x => x.tag).length} frames with a tag`);
+    // In videos too off: none
+    await cap(page, C => C.set(S => { S.videos = false; }));
+    await page.evaluate(() => { globalThis.codingMiskVideoCaptions = []; });
+    await page.evaluate(() => globalThis.codingMiskClips.fragments({ source: 'luci-rosse', from: 10, to: 20, quiet: true }));
+    check(!(await page.evaluate(() => globalThis.codingMiskVideoCaptions.length)), 'In videos too off: no caption in the fragment');
+    await cap(page, C => C.set(S => { S.videos = true; }));
+    await page.evaluate(() => { globalThis.codingMiskVideoCaptions = null; });
+    // pictures for the owner: 9:16 in neon and hardware, the "Claude" look in 9:16 (reply block, no transcript pane)
+    if (shots) {
+      await fragShot(page, downloads, 'fragment-9x16-neon', { look: 'palco', render: 'normal' });
+      await page.click('[data-uitheme="hw"]'); await sleep(300);
+      await fragShot(page, downloads, 'fragment-9x16-hw', { look: 'palco', render: 'normal' });
+      await page.click('[data-uitheme="neon"]'); await sleep(300);
+      await page.evaluate(() => localStorage.setItem('coding-misk-claude-transcript', 'true'));
+      await fragShot(page, downloads, 'fragment-9x16-claude', { look: 'claude', render: 'normal' }, 5.5);
+      await page.evaluate(() => localStorage.removeItem('coding-misk-claude-transcript'));
+    }
+    await play(page);
+  }
+
   // ---- a voice track: prova-voce-notte, the line on bar 8, and with the narrator off
   await stop(page);
   await openSong(page, 'prova-voce-notte', { style: 'explain' });
@@ -142,6 +187,33 @@ const shot = async (page, name, sel = '#stagewrap') => { if (shots) await page.l
   await laneAt(page, Math.floor(voice[0].at)); await shot(page, 'lane-400px');
   await page.setViewportSize({ width: 1300, height: 900 }); await sleep(300);
   await stop(page);
+
+  // ---- samples prepared ahead (D9): a narrator line's sample taken away is made again by the voice helper, the song
+  // written again and the line captioned; without the helper, skipped
+  const helper = await page.evaluate(() => fetch('/voice/status').then(r => r.json()).then(j => !!j.ok).catch(() => false));
+  if (!helper) console.log('skip  samples prepared ahead: no voice helper on this machine');
+  else {
+    await openSong(page, 'luci-rosse', { style: 'explain' });
+    const x = (await cap(page, C => C.lines())).filter(y => y.kind === 'narrator')[4], slug = await cap(page, (C, t) => C.slug(t), x.text);
+    const file = path.join('public', 'samples', 'say_it', `${slug}.wav`), keep = path.join(require('node:os').tmpdir(), `cap-${slug}.wav`);
+    let notes = new Set(), back = false;
+    if (fs.existsSync(file)) {
+      fs.renameSync(file, keep);
+      try {
+        await cap(page, C => C.reload());
+        const t0 = Date.now();
+        while (Date.now() - t0 < 120000) {
+          const n = await page.evaluate(() => { const el = document.querySelector('#voice-prep'); return el ? el.textContent : ''; });
+          if (n) notes.add(n);
+          back = fs.existsSync(file) && (await cap(page, (C, t) => C.lines().some(y => y.kind === 'narrator' && y.text === t), x.text));
+          if (back) break;
+          await sleep(500);
+        }
+        check(back, 'a missing narrator sample is made by the voice helper and the line captioned again', `"${x.text}"`);
+        check(notes.size > 0, 'the Voices group says the voices are being prepared', [...notes].join(' | '));
+      } finally { if (!fs.existsSync(file)) fs.renameSync(keep, file); else if (fs.existsSync(keep)) fs.unlinkSync(keep); }
+    } else console.log(`skip  samples prepared ahead: ${file} not here (copy the voice samples first)`);
+  }
 
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
