@@ -12,7 +12,7 @@
 
 ## 2. Page mode
 
-- [ ] 2.1 Optional stage mode "Code over" (off by default): button in the stage bar and in full screen, overlay canvas drawn after the render pass, the editor column left as it is, mode remembered. Verify: browser check `tools/check-code-over.cjs` (dev server on its own port): off by default, on and off, the editor still open, reload, full screen, no long task over 50 ms per frame on kellerlicht
+- [x] 2.1 Optional stage mode "Code over" (off by default): button in the stage bar and in full screen, overlay canvas drawn after the render pass, the editor column left as it is, mode remembered. Verify: browser check `tools/check-code-over.cjs` (dev server on its own port): off by default, on and off, the editor still open, reload, full screen, no long task over 50 ms per frame on kellerlicht
 - [ ] 2.2 Hand take-over keeps the overlay; the user types in the editor. Verify: `check-hand.cjs` passes; new case in `check-code-over.cjs`
 - [ ] 2.3 Settings card "Code over" with preview (stage mode, side, width, opacity, edited line, lit tokens, long lines), saved, in the backup, texts IT/EN. Verify: `check-settings.cjs`, `check-backup.mjs`, `npm run check:guide`
 

@@ -52,8 +52,8 @@ const STRETCH_LEAD = 0.1;
 const pitchOf = v => { try { if (typeof v.note === 'number') return v.note; if (typeof v.note === 'string') return noteToMidi(v.note); if (typeof v.n === 'number' && !v.s) return v.n; if (v.freq) return 12 * Math.log2(v.freq / 440) + 69; } catch (e) {} return String(v.s ?? v.n ?? '?'); };
 // stageNotes (widgets-on-stage D2): the notes of every instrument (`analyze`) that start in the block, [begin, end, pitch,
 // gain × velocity] in cycles, for the widget looks of the fast video; read from the haps scheduled anyway (no extra query)
-// lit (code-over-visual D6): the places in the code of every hap that starts in the block, [begin, end, segment start,
-// [from, to, …]] in cycles and offsets into the segment's code evaluated, for the lit tokens of "Code over"
+// lit (code-over-visual D6): the places in the code of every hap that starts in the block, for the lit tokens of "Code
+// over": { codes (the codes evaluated), haps: [[begin, end, index in codes, [from, to, …]]] } in cycles and offsets
 async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, push = 1, buses = {}, fns = {}, only = null, stageNotes = false, lit = false }) {
   globalThis.miskBuses = buses; useFns(fns);
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
@@ -73,7 +73,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   setMasterLevel(getSuperdoughAudioController().output, gain, push);
   post({ progress: 0, phase: 'schedule' });
   const R = repl({ transpiler, defaultOutput: () => {}, getTime: () => 0 });
-  const onsets = {}, skipped = new Set(), notes = {}, stage = stageNotes ? {} : null, lits = lit ? [] : null;
+  const onsets = {}, skipped = new Set(), notes = {}, stage = stageNotes ? {} : null, lits = lit ? { codes: [], haps: [] } : null;
   // the haps that start in this block's window [from, end), from the segments it covers, in onset order (cut groups depend on it)
   const c0 = T.cycleAt(from), c1 = T.cycleAt(end), all = [];
   for (const seg of segments) {
@@ -98,7 +98,11 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
       if (hb < a || hb >= b) continue;
       hap.ensureObjectValue();
       if (stage && hap.value.analyze !== undefined && hb >= T.cycleAt(keepFrom)) (stage[hap.value.analyze] ||= []).push(noteOf(hb, hap.whole.end.valueOf(), hap.value));
-      if (lits && hb >= T.cycleAt(keepFrom)) { const L = (hap.context && hap.context.locations) || []; if (L.length) lits.push([+hb.toFixed(4), +hap.whole.end.valueOf().toFixed(4), seg.from, L.flatMap(l => [l.start, l.end])]); }
+      if (lits && hb >= T.cycleAt(keepFrom)) {
+        const L = (hap.context && hap.context.locations) || [], src = seg.run || seg.code;
+        let k = lits.codes.lastIndexOf(src); if (k < 0) k = lits.codes.push(src) - 1;
+        if (L.length) lits.haps.push([+hb.toFixed(4), +hap.whole.end.valueOf().toFixed(4), k, L.flatMap(l => [l.start, l.end])]);
+      }
       if (only !== null && hap.value.analyze !== only) continue;
       all.push({ b: hb, hap, t: T.seconds(hb) });
     }

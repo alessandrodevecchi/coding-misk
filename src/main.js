@@ -1556,10 +1556,11 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   const stageNotes = globalThis.codingMiskFastStageNotes = noteStore();
   job = { ...job, stageNotes: true };
   // code-over-visual D6: with the code over the stage, the render page sends the places of the haps in the code too
-  const overOn = (frag ? frag.o.show : layout) === 'code-over', lits = [];
+  // (lits: [begin, end, code index, places], codes: the codes the render page evaluated)
+  const overOn = (frag ? frag.o.show : layout) === 'code-over', lits = [], litCodes = [];
   if (overOn) job = { ...job, lit: true };
-  const segAt = c => { let i = 0; while (i + 1 < segments.length && segments[i + 1].from <= c) i++; return segments[i]; };
-  const litAt = (c, seg) => { const out = []; let lo = 0, hi = lits.length; while (lo < hi) { const m = (lo + hi) >> 1; if (lits[m][0] < c - 16) lo = m + 1; else hi = m; } for (let i = lo; i < lits.length && lits[i][0] <= c; i++) { const x = lits[i]; if (x[1] > c && x[2] === seg.from) for (let k = 0; k < x[3].length; k += 2) out.push([x[3][k], x[3][k + 1]]); } return out; };
+  // the haps sounding at cycle c, grouped by the code they were evaluated from: [{ evaluated, spans }]
+  const litAt = c => { const by = new Map(); let lo = 0, hi = lits.length; while (lo < hi) { const m = (lo + hi) >> 1; if (lits[m][0] < c - 16) lo = m + 1; else hi = m; } for (let i = lo; i < lits.length && lits[i][0] <= c; i++) { const x = lits[i]; if (x[1] <= c) continue; if (!by.has(x[2])) by.set(x[2], []); const out = by.get(x[2]); for (let k = 0; k < x[3].length; k += 2) out.push([x[3][k], x[3][k + 1]]); } return [...by].map(([k, spans]) => ({ evaluated: litCodes[k], spans })); };
   // with "Real scope and spectrum: Always" (D8), the stage's scope and spectrum instruments are rendered alone too when a
   // widget look or the layer can show in this video (the ones the code widgets rendered are not rendered again);
   // Automatic adds no render
@@ -1603,7 +1604,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
         meta: sg.meta, seed: sg.id || '', captions: fvCaptions,
       };
       // code-over-visual: the line typed (D5), the code evaluated and the places of the haps sounding (D6)
-      if (overOn) { const seg = segAt(cyc); Object.assign(fv, { cursor: codeAt.cursor ? codeAt.cursor(cyc) : null, evaluated: seg.run || seg.code, spans: litAt(cyc, seg), doc: sg.doc, render: fRender, overFree: frag && fsz.comp.h >= fsz.comp.w ? 'none' : (frag ? 'right' : (S => (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right'))(coSettings())) }); }
+      if (overOn) { Object.assign(fv, { cursor: codeAt.cursor ? codeAt.cursor(cyc) : null, lit: litAt(cyc), doc: sg.doc, render: fRender, overFree: frag && fsz.comp.h >= fsz.comp.w ? 'none' : (frag ? 'right' : (S => (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right'))(coSettings())) }); }
       const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
       fv.look = fLook;
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
@@ -1614,7 +1615,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
     onNotes: cw ? block => cw.addNotes(block) : null,
     onStageNotes: block => { for (const [k, list] of Object.entries(block)) for (const n of list) stageNotes.add(k, n); },
-    onLit: overOn ? list => { for (const x of list) lits.push(x); lits.sort((a, b) => a[0] - b[0]); } : null,
+    onLit: overOn ? L => { for (const x of L.haps) { const src = L.codes[x[2]]; let k = litCodes.lastIndexOf(src); if (k < 0) k = litCodes.push(src) - 1; lits.push([x[0], x[1], k, x[3]]); } lits.sort((a, b) => a[0] - b[0]); } : null,
   });
   if (preview) preview.stop();
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: run.cancel };
@@ -5398,9 +5399,9 @@ function codeOverNow(cyc) {
   const S = coSettings(), aw = awSettings(), lit = codeThemes.current.S.lit || 'outline';
   if (fv) {
     const st = globalThis.codingMiskFastStageNotes;
-    return { S, aw, litForm: lit, fast: true, song: `fv:${fv.seed}`, cursor: fv.cursor || null, evaluated: fv.evaluated, spans: fv.spans || null, notes: st ? notesOfStore(st, () => st.instruments) : null, ...songAt({ doc: fv.doc, meta: fv.meta }, cyc), lang: getLang(), render: fv.render || 'normal' };
+    return { S, aw, litForm: lit, fast: true, song: `fv:${fv.seed}`, cursor: fv.cursor || null, lit: fv.lit || null, notes: st ? notesOfStore(st, () => st.instruments) : null, ...songAt({ doc: fv.doc, meta: fv.meta }, cyc), lang: getLang(), render: fv.render || 'normal' };
   }
-  return { S, aw, litForm: lit, fast: false, song: song ? song.id || song.title || '' : '', cursor: S.edit ? liveCursor() : null, evaluated: evaluatedCode, spans: liveSpans(), notes: isPlaying() ? liveNotes : null, ...songAt(song, cyc), lang: getLang(), render: recRender() };
+  return { S, aw, litForm: lit, fast: false, song: song ? song.id || song.title || '' : '', cursor: S.edit ? liveCursor() : null, lit: (sp => (sp ? [{ evaluated: evaluatedCode, spans: sp }] : null))(liveSpans()), notes: isPlaying() ? liveNotes : null, ...songAt(song, cyc), lang: getLang(), render: recRender() };
 }
 const video = createVideo({
   visuals, store, t, esc,

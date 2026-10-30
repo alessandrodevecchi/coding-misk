@@ -111,6 +111,8 @@ export function fragmentAreas(o, w, h) {
     const tall = h >= w, band = Math.round(h * (tall ? 0.13 : 0.14)), tb = tall && o.bandTop !== false && o.bands ? band : 0, bb = o.bands && (!tall || o.bandBottom !== false) ? band : 0;
     const S = { x: 0, y: tb, w, h: h - tb - bb }, C = codeOverAreas(S.w, S.h, { ...CO_DEFAULTS, ...(o.co || {}) }, tall || undefined), sh = r => ({ ...r, y: r.y + tb });
     const out = { stage: S, over: { ...sh(C.code), fs: C.code.fs }, free: sh(C.free) };
+    // (tall: below the fragment's label, drawn just under the top band)
+    if (tall && tb) { const d = Math.round(Math.min(w, h) * 0.1); out.over.y += d; out.over.h -= d; }
     if (tall) { if (tb) out.top = { x: 0, y: 0, w, h: tb }; if (bb) out.bottom = { x: 0, y: h - bb, w, h: bb }; }
     else if (bb) out.strip = { x: 0, y: h - bb, w, h: bb };
     return out;
