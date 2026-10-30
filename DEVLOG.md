@@ -2097,3 +2097,9 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 - **Terminale:** i due riquadri del passaggio Terminale (scope e spectrum) tengono il lato libero come la striscia: niente scope sotto il codice.
 - **Per il proprietario** in `notes/prove-2026-10-30/code-over-visual/`: `clip-16x9-v2.mp4` e `clip-9x16-v2.mp4` (30 s, kellerlicht in Live coder dal secondo 190, con l'audio dell'app; per la demo la nuvola è il primario anche di arp e lead), `widgets-before-after-v2.png` e `tonecloud-before-after-v2.png` (stesse note reali di luci-rosse a battuta 47 con i parametri di prima e i nuovi, disegnate dal nuovo pittore; il "prima" vero del prototipo è nei mockup `widget-*.png`), `widgets-themes-v2.png`, `widgets-renders-v2.png`, `tonecloud-renders-v2.png`, `layout-16x9-neon-v2.png`, `layout-9x16-hw-v2.png`, `layout-16x9-light-v2.png`, `render-terminal-v2.png`, `render-led-v2.png`, `page-typing-v2.png`, `page-widgets-v2.png`, `settings-code-over-v2.png`, `settings-app-widgets-v2.png`.
 - **Check:** `check:code-over` (63), `check:render-styles`, `check:typing` passano.
+
+## 2026-10-30: codice sopra il visual, parte 7: guida, documenti, catalogo (code-over-visual)
+
+- **Guida:** schede nuove «Codice sopra» e «Widget dell'app: griglia colpi e nuvola di note», in inglese e italiano (`check:guide`: 33 schede).
+- **Base di conoscenza:** sezione Code over in `visuals.md`, sezione App widgets in `code-widgets.md` (mappa di default aggiornata), Lit notes e scheda Code over in `settings.md`, cinque decisioni in `decisions.md`; `checks.md` rigenerato con i due check nuovi. `docs/ARCHITECTURE.md` (sezione Code over, chiavi `coding-misk-code-over` e `coding-misk-app-widgets`), `docs/DESIGN-SYSTEM.md` (fasce, accento, colori dei widget), `AGENTS.md` (i due check, `src/widgets/`).
+- **Catalogo Strudel:** `npm run catalog:strudel` rifatto; `check:knowledge` senza l'avviso del catalogo vecchio.
