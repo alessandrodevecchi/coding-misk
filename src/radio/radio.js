@@ -30,7 +30,7 @@ import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } f
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE, INVENT, GEAR, LOCK, LOCK_OPEN, LOCK_HALF, VARY, SWAP, CHEVRON, SLIDERS, LISTEN, STOP, POWER } from '../icons.js';
+import { DICE, INVENT, GEAR, LOCK, LOCK_OPEN, LOCK_HALF, VARY, SWAP, CHEVRON, SLIDERS, ROWS, CARDS, LISTEN, STOP, POWER } from '../icons.js';
 import { previewOf } from '../library/patterns.js';
 import { PROGS } from '../music.js';
 import { paintPreview } from '../library/patterns-tab.js';
@@ -741,10 +741,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   let varyTarget = 'auto';
   // Part harmony's treatment and the Song harmony menu (radio-arrangement D8), Auto by default
   let voicingTreat = 'auto', harmChords = 'auto', harmKey = 'auto';
-  // Add a saved pattern (radio-arrangement D9): the panel open as cards or folded to a list (remembered in this browser),
-  // the track each pattern would replace
-  let savedOpen = false;
-  try { savedOpen = !!store.get('coding-misk-radio-saved-open', false); } catch (e) {}
+  // Add a saved pattern (radio-arrangement D9, saved-patterns-hide): the panel shown or hidden, and its body as rows or
+  // cards (both remembered in this browser; the old key "saved-open" now means cards), the track each pattern would replace
+  let spCards = false, spHidden = false;
+  try { spCards = !!store.get('coding-misk-radio-saved-open', false); spHidden = !!store.get('coding-misk-radio-saved-hidden', false); } catch (e) {}
   const spTarget = {};
   // the panel among many saved patterns (saved-patterns-list D1): its view (instrument chip, Fit this song, style, sort,
   // collapsed groups) remembered in this browser; the search, the scroll position and the last context of the console
@@ -874,7 +874,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const ph = item.plan.phrase;
     const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel || c.scope === 'session');
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), savedOpen, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => `${x.id}:${x.uses || 0}`).join(), sv.preset, sv.style, voiceHelper, sayWait.length, typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
+    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => `${x.id}:${x.uses || 0}`).join(), sv.preset, sv.style, voiceHelper, sayWait.length, typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
     if (!force && key === steerKey) return;
     steerKey = key;
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-sv-line]') ? document.activeElement.selectionStart : null;
@@ -1000,10 +1000,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the panel's HTML from the last console context and the view: the title, the toolbar (more than 8 patterns), the
   // instrument chips, the line of what is shown, the scroll area with groups or one list, the note of unfit patterns
   function spParts() {
-    const c = spCtx, open = savedOpen;
+    const c = spCtx, open = spCards;
     const v = savedView(c.fitting, { ...spView, q: spQ }, c.song, { inst: instName, style: styleName });
     const list = items => (open ? `<div class="sp-cards">${items.map(x => c.spCard(x, v.toolbar)).join('')}</div>` : `<ul class="sp-list">${items.map(c.spRow).join('')}</ul>`);
-    const head = `<button class="sp-toggle lbl" id="sp-toggle" aria-expanded="${open}" title="${esc(t('savedToggleTip'))}">${CHEVRON}<span>${esc(t('savedTitle', { n: c.fitting.length }))}</span></button>`;
+    const next = open ? 'savedViewRows' : 'savedViewCards';
+    const head = `<div class="sp-head"><button class="sp-toggle lbl" id="sp-toggle" aria-expanded="${!spHidden}" title="${esc(t('savedToggleTip'))}">${CHEVRON}<span>${esc(t('savedTitle', { n: c.fitting.length }))}</span></button><button class="btn small icon sp-view" id="sp-view" title="${esc(t(next))}" aria-label="${esc(t(next))}">${open ? ROWS : CARDS}</button></div>`;
     if (!v.toolbar) return { v, head, tools: '', body: c.fitting.length ? list(c.fitting) : '' };
     const opt = (val, cur, label) => `<option value="${esc(val)}"${val === cur ? ' selected' : ''}>${esc(label)}</option>`;
     const styles = v.styles.includes(spView.style) || spView.style === 'all' ? v.styles : [...v.styles, spView.style];
@@ -1022,6 +1023,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   }
   function spPanelHtml() {
     const p = spParts();
+    if (spHidden) return `<div class="steer-group arr sp hidden">${p.head}</div>`;
     return `<div class="steer-group arr sp${p.v.toolbar ? ' many' : ''}">${p.head}${p.tools}<div class="sp-body">${p.body}</div>${spCtx.note ? `<p class="muted small sp-note">${esc(spCtx.note)}</p>` : ''}</div>`;
   }
   // what had the focus inside the panel: a selector by its data attribute, and the caret of the search
@@ -1317,7 +1319,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (b.dataset.cmd) return command({ kind: b.dataset.cmd, ...(b.dataset.type ? { type: b.dataset.type } : {}), ...(b.dataset.part ? { type: b.dataset.part } : {}), ...(b.dataset.inst ? { part: b.dataset.inst } : {}), ...(b.dataset.target ? { target: b.dataset.target } : {}), ...(b.dataset.treatment ? { treatment: b.dataset.treatment } : {}), ...(b.dataset.chords && b.dataset.chords !== 'auto' ? { chords: b.dataset.chords } : {}), ...(b.dataset.to && b.dataset.to !== 'auto' ? { to: b.dataset.to } : {}) });
     // the lock of an instrument (radio-arrangement D12): closed opens, open or half locks every track of it
     // Add a saved pattern (D9): fold or open the panel, listen, add as a new track or in place of a playing one
-    if (b.id === 'sp-toggle') { savedOpen = !savedOpen; spScroll = 0; try { store.set('coding-misk-radio-saved-open', savedOpen); } catch (err) {} return renderSteer(true); }
+    if (b.id === 'sp-toggle') { spHidden = !spHidden; spScroll = 0; try { store.set('coding-misk-radio-saved-hidden', spHidden); } catch (err) {} return renderSteer(true); }
+    if (b.id === 'sp-view') { spCards = !spCards; spScroll = 0; try { store.set('coding-misk-radio-saved-open', spCards); } catch (err) {} return renderSteer(true); }
     // the panel among many (saved-patterns-list): instrument chips and "Show all", Fit this song, groups, clear filters
     if (b.dataset.spInst) { const all = b.classList.contains('sp-all'); spView.inst = b.dataset.spInst; spSaveView(); spRenderBody({ top: true }); if (all) { const f = root.querySelector(`#radio-steer .sp-insts [data-sp-inst="${CSS.escape(spView.inst)}"]`); if (f) f.focus(); } return; }
     if (b.dataset.spFit !== undefined) { spView.fit = !spView.fit; spSaveView(); return spRenderBody({ top: true }); }
@@ -1423,7 +1426,13 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       return;
     }
     // P: the search of the saved patterns (saved-patterns-list), when the panel shows it
-    if (e.key === 'p' || e.key === 'P') { const q = root.querySelector('#radio-steer [data-sp-q]'); if (q) { e.preventDefault(); q.focus(); q.select(); } return; }
+    // on a hidden panel it shows the panel first; without a search (8 patterns or fewer) the focus goes to the chevron
+    if (e.key === 'p' || e.key === 'P') {
+      if (spHidden && root.querySelector('#radio-steer #sp-toggle')) { spHidden = false; spScroll = 0; try { store.set('coding-misk-radio-saved-hidden', false); } catch (err) {} renderSteer(true); }
+      const q = root.querySelector('#radio-steer [data-sp-q]') || root.querySelector('#radio-steer #sp-toggle');
+      if (q) { e.preventDefault(); q.focus(); if (q.select) q.select(); }
+      return;
+    }
     const kind = Object.keys(KEYS_OF).find(k => KEYS_OF[k] === e.key);
     if (kind === 'extend' && e.repeat) return;
     if (!kind) return;
