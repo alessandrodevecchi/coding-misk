@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 91. With open tasks: 27. All tasks ticked, waiting to be archived: 64.
+OpenSpec changes not archived: 91. With open tasks: 26. All tasks ticked, waiting to be archived: 65.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -33,7 +33,6 @@ OpenSpec changes not archived: 91. With open tasks: 27. All tasks ticked, waitin
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |
 | [material-generator](../../openspec/changes/material-generator/tasks.md) | 1 | 22 |
-| [my-phrases](../../openspec/changes/my-phrases/tasks.md) | 3 | 29 |
 | [natural-growth](../../openspec/changes/natural-growth/tasks.md) | 2 | 10 |
 | [new-song-panel](../../openspec/changes/new-song-panel/tasks.md) | 1 | 21 |
 | [pattern-library](../../openspec/changes/pattern-library/tasks.md) | 1 | 16 |
@@ -46,7 +45,7 @@ OpenSpec changes not archived: 91. With open tasks: 27. All tasks ticked, waitin
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 | [widget-render-styles](../../openspec/changes/widget-render-styles/tasks.md) | 2 | 21 |
 
-Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-themes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fm-like-effects`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `narrator-ghost-row`, `pattern-followups`, `playlists`, `poetic-steps`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `saved-patterns-list`, `session-choice-prepared`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `spoken-text-on-stage`, `strudel-catalog`, `takeover-pending-edit`, `test-fixes`, `timeline-growth`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `widgets-on-stage`, `written-like-coder`.
+Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-lanes`, `code-themes`, `code-writing`, `continue-in-radio`, `curve-look`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fm-like-effects`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `my-phrases`, `narrator-ghost-row`, `pattern-followups`, `playlists`, `poetic-steps`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `saved-patterns-list`, `session-choice-prepared`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `spoken-text-on-stage`, `strudel-catalog`, `takeover-pending-edit`, `test-fixes`, `timeline-growth`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `widgets-on-stage`, `written-like-coder`.
 <!-- /generated -->
 
 Many open tasks are the owner's listening tests or short videos for the owner. They are not code to write: leave them open and mention them.
