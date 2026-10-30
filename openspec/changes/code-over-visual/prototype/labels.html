@@ -1,0 +1,98 @@
+<!doctype html>
+<!-- THROWAWAY mockup for code-over-visual: labeled lines, before and after (real code of kellerlicht). -->
+<html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600&display=swap">
+<style>
+  :root { --bg: #0b0918; --panel: #120f26; --ink: #ece9ff; --muted: #8e89b9; --str: #ff7ad9; --num: #7cf2ff; --meth: #c3b4ff; --lab: #ffd36e; --warn: #ffcc4d; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "Space Grotesk", sans-serif; padding: 28px; width: 1860px; }
+  h1 { font-size: 26px; margin: 0 0 6px; } p.sub { color: var(--muted); margin: 0 0 20px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .card { background: var(--panel); border: 1px solid #2a2550; border-radius: 10px; padding: 14px 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .card h2 b { color: var(--ink); }
+  pre { margin: 0; font: 15px/1.55 "JetBrains Mono", monospace; white-space: pre; overflow: hidden; }
+  .c { color: var(--muted); } .s { color: var(--str); } .n { color: var(--num); } .m { color: var(--meth); } .l { color: var(--lab); font-weight: 600; } .mut { opacity: .55; }
+  .warn { margin-top: 10px; border-left: 3px solid var(--warn); background: rgba(255,204,77,.08); padding: 6px 10px; font: 14px/1.45 "JetBrains Mono", monospace; color: var(--warn); }
+  .tag { display: inline-block; font: 600 12px "Space Grotesk"; padding: 1px 7px; border-radius: 9px; background: #2a2550; color: var(--ink); margin-left: 6px; text-transform: none; letter-spacing: 0; }
+</style></head><body>
+<h1>Labeled lines (Righe con nome) · before / after</h1>
+<p class="sub">Same haps, same sound. Lowercase names made by the app, a number for repeated instruments, <code>_name:</code> mutes, <code>Sname:</code> solos.</p>
+<div class="grid" id="g"></div>
+<script>
+const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const TOK = /(\/\/.*$)|("[^"]*")|(^\s*[_S]?[A-Za-z$][\w$]*:(?=\s))|(\.[A-Za-z_]\w*(?=\())|(\b\d+(?:\.\d+)?\b)|([^"\/.\d]+|.)/g;
+const hl = code => code.split('\n').map(line => { let out = '', m; TOK.lastIndex = 0;
+  while ((m = TOK.exec(line))) { const t = esc(m[0]); out += m[1] ? `<span class="c">${t}</span>` : m[2] ? `<span class="s">${t}</span>` : m[3] ? `<span class="l">${t}</span>` : m[4] ? `.<span class="m">${esc(m[0].slice(1))}</span>` : m[5] ? `<span class="n">${t}</span>` : t; if (!m[0]) TOK.lastIndex++; }
+  return out; }).join('\n');
+const panels = [
+  ['Classic · <b>today</b>', `// ========== Kick · drums ==========
+// Tunnel · bars 1-16 · pattern floor
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.9).distort(0.4)
+  .mask(section1).velocity(section1).orbit(1).analyze("kick")
+// Eingang · bars 17-32 · pattern floor
+$: s("bd*4").bank("RolandTR909").gain(0.9).distort(0.4)
+  .mask(section2).velocity(section2).orbit(1).analyze("kick")
+
+// ========== Rolling bass · bass ==========
+// Eingang · bars 17-32 · pattern roll
+// Bass · Rolling
+$: note("a1").transpose(-4).struct("[~ x x x]*4")
+  .s("sawtooth").lpf(sine.range(168, 672).slow(8)).lpq(6)
+  .mask(section2).velocity(section2).orbit(2).analyze("bass")`],
+  ['Classic · <b>labeled lines</b>', `// ========== Kick · drums ==========
+// Tunnel · bars 1-16 · pattern floor
+kick: s("bd*4").bank("RolandTR909").gain(0.9).distort(0.4)
+  .mask(section1).velocity(section1).orbit(1).analyze("kick")
+// Eingang · bars 17-32 · pattern floor
+kick2: s("bd*4").bank("RolandTR909").gain(0.9).distort(0.4)
+  .mask(section2).velocity(section2).orbit(1).analyze("kick")
+
+// ========== Rolling bass · bass ==========
+// Eingang · bars 17-32 · pattern roll
+bass: note("a1").transpose(-4).struct("[~ x x x]*4")
+  .s("sawtooth").lpf(sine.range(168, 672).slow(8)).lpq(6)
+  .mask(section2).velocity(section2).orbit(2).analyze("bass")
+
+`],
+  ['Live coder · <b>today</b>', `// coding-misk · Kellerlicht
+setcpm(132/4)
+
+$: s("bd*4").bank("RolandTR909").crunch(0.4)
+
+$: (s("bd*4").bank("RolandTR909").lpf(160).distort(0.6).room(0.9))
+
+$: note("<a#1 a1!3>").transpose(-4).struct("[~ x]*4")
+  .s("sawtooth").wob(168, 672).crunch(0.15)
+  .gain(0.7).mask("<1 1 1 0>")
+
+_$: s("[~ hh]*4").bank("LinnDrum").gain(0.08).crush(15)
+  .mask("<0 1 1 1>")`],
+  ['Live coder · <b>labeled lines</b>', `// coding-misk · Kellerlicht
+setcpm(132/4)
+
+kick: s("bd*4").bank("RolandTR909").crunch(0.4)
+
+rumble: (s("bd*4").bank("RolandTR909").lpf(160).distort(0.6).room(0.9))
+
+bass: note("<a#1 a1!3>").transpose(-4).struct("[~ x]*4")
+  .s("sawtooth").wob(168, 672).crunch(0.15)
+  .gain(0.7).mask("<1 1 1 0>")
+
+_hats: s("[~ hh]*4").bank("LinnDrum").gain(0.08).crush(15)
+  .mask("<0 1 1 1>")`],
+];
+const g = document.getElementById('g');
+for (const [t, code] of panels) {
+  const d = document.createElement('div'); d.className = 'card';
+  d.innerHTML = `<h2>${t}</h2><pre>${hl(code).split('\n').map(l => /^(\s*<span class="l">_|_\$:|\s*\.mask\("&lt;0 1)/.test(l) ? `<span class="mut">${l}</span>` : l).join('\n')}</pre>`;
+  g.appendChild(d);
+}
+const w = document.createElement('div'); w.className = 'card'; w.style.gridColumn = '1 / 3';
+w.innerHTML = `<h2>Guard on code typed by hand <span class="tag">warning, not an error</span></h2><pre>${hl(`bass: note("<f1 c2>").s("sawtooth")
+bass: note("<a#1 a1!3>").s("square")
+Synth: n("0 2 4").scale("F:minor").s("triangle")`)}</pre>
+<div class="warn">⚠ line 2: two lines named <b>bass</b>: only the last one plays. Rename it, for example <b>bass2:</b></div>
+<div class="warn">⚠ line 3: <b>Synth:</b> starts with a capital S, so Strudel solos it and silences every other line. Write <b>synth:</b></div>`;
+g.appendChild(w);
+</script></body></html>
