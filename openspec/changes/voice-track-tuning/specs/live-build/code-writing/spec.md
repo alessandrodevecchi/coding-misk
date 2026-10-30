@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Hide-the-code toggles in Options
-The Options group, in Compose and in the radio's Custom section, SHALL offer "V:N code" and "V:T code" next to Title, Lit notes, Line breaks, Human typing and Typing mistakes. "V:N code" SHALL be today's "Narrator voice code", moved out of Comments with the same behaviour and stored setting. "V:T code" SHALL be on by default in every profile. Neither SHALL be part of the comment presets.
+The Options group, in Compose and in the radio's Custom section, SHALL offer "V:N code" and "V:T code" next to Title, Lit notes, Line breaks, Human typing and Typing mistakes. "V:N code" SHALL be today's "Narrator voice code", moved out of Comments with the same behaviour and stored setting. Both SHALL be off by default in every profile that grows the song (Crescendo, Live coder, a custom profile with the crescendo build) and on by default when the code is static (Classic, or the Live build off). A value the user set SHALL be kept; only the defaults change. Neither SHALL be part of the comment presets.
 
 #### Scenario: Moved toggle keeps its value
 - **WHEN** a song saved with "Narrator voice code" off opens after this change
@@ -12,6 +12,14 @@ The Options group, in Compose and in the radio's Custom section, SHALL offer "V:
 #### Scenario: Default
 - **WHEN** a song opens with the Classic profile
 - **THEN** "V:N code" and "V:T code" are both on and both kinds of voice lines show
+
+#### Scenario: Default in a growing profile
+- **WHEN** a song plays with the Live coder or the Crescendo profile and the user has not changed the toggles
+- **THEN** "V:N code" and "V:T code" are both off, and both voices speak from the hidden code
+
+#### Scenario: A set value is kept
+- **WHEN** the user turned "V:N code" on in the Live coder profile before this change
+- **THEN** it is still on
 
 ### Requirement: Toggle labels name the voices
 The toggles SHALL be labelled "V:N code" and "V:T code" (Italian "Codice V:N", "Codice V:T"), matching the V:N and V:T tags of Coming next. Their tooltips SHALL name the voices in full: "Voice: narrator: show its code in the panel; off: it still speaks, the code goes to the hidden code", and the same for "Voice: track". Their texts SHALL say "Voice: narrator" and "Voice: track", never a bare "Narrator".
