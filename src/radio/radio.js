@@ -20,8 +20,9 @@ import { OPENINGS, PACES, DEVELOPMENTS, SHAPES_VERSION } from '../song/shapes.js
 import { CRESCENDO_VERSION } from '../song/crescendo.js';
 import { sessionVersions } from '../library/playlists.js';
 import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
-import { buildSteps, sayText, spokenSchedule, captionSchedule } from '../song/build.js';
+import { buildSteps, sayText, spokenSchedule, captionSchedule, spokenNeeds } from '../song/build.js';
 import { spokenContext } from '../song/spoken.js';
+import { saySlug as sayFile } from '../song/build.js';
 import { liveBuildOf } from '../live/live-code.js';
 import { nextRows } from './next-changes.js';
 import { QUIRKS } from '../endless/quirks.js';
@@ -1113,6 +1114,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       <div class="radio-parts">${esc(e.lead ? t('radioLeadParts', { styles: opts.styles.map(styleName).join(', ') }) : partsText(e))}</div>
       ${item.plan ? curvePanel(item, rel, `${sec.name} · ${t('radioBar', { n: Math.floor(rel) + 1, total: item.bars })}${item.plan.extended ? ` · ${t('radioExtended', { t: secs(item.plan.extended * extendSeconds(item.plan)) })}` : ''}`) : `<div class="radio-pos">${e.lead ? '' : curve(e, rel)}<span>${esc(sec.name)} · ${esc(t('radioBar', { n: Math.floor(rel) + 1, total: item.bars }))}</span></div>`}
       <div class="lbl">${esc(t('radioComing'))}</div>
+      <p class="hint muted small radio-prep"${prepText ? '' : ' hidden'}>${esc(prepText)}</p>
       <ul class="radio-next">${next.map(nextRow).join('') || `<li class="muted">${esc(t('radioNoChanges'))}</li>`}</ul>
       <div class="radio-after muted">${nextSong ? esc(t('radioAfter', { title: nextSong.song.title })) + (onTrial(nextSong.entry) ? ` · ${esc(t('inventTrialSong'))}` : '') : esc(t('radioPreparing'))}${nextSong && e.transition && !item.cut ? ` · ${esc(e.transition.kind === 'cut' ? t('radioNextTxCut') : t('radioNextTx', { kind: t(`tx:${e.transition.kind}`), bars: e.transition.bars }))}` : ''}</div>`;
   }
@@ -1463,6 +1465,24 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     return { lines, offset: it.start };
   }
 
+  // the lines the next song (first lines first), then the song on air, would speak with no sample at all (D9): the app
+  // asks the voice helper for them; samplesArrived writes the songs again with the new samples
+  function needs() {
+    if (!S) return [];
+    const files = voiceFiles(), lang = getLang(), out = [], seen = new Set();
+    const any = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${x}.wav`)));
+    for (const it of [S.stream[S.onAir + 1], S.stream[S.onAir]].filter(Boolean)) {
+      const C = liveControlsOf(it);
+      let list = [];
+      try { list = spokenNeeds(liveBuildOf(it.song, C), C, lang, files); } catch (e) { list = []; }
+      for (const x of list) { const slug = x.text.toLowerCase(); const k = `${x.bank}|${slug}`; if (x.has || seen.has(k)) continue; seen.add(k); out.push(x); }
+    }
+    return out.filter(x => !any(x.bank, sayFile(x.text)) && x.text.split(/\s+/).length <= 12);
+  }
+  function samplesArrived() { if (S && S.paused === undefined) player.swap(windowPlayable()); }
+  let prepText = '';
+  function setPrep(txt) { if (txt === prepText) return; prepText = txt; const el = root.querySelector('.radio-prep'); if (el) { el.textContent = txt; el.hidden = !txt; } }
+
   // the song on air for its soul (#46): the song with the director's plan (steering replaces the song object),
   // or the song alone for a lead or frozen song
   function soulSource(cyc) {
@@ -1473,7 +1493,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   }
 
   return {
-    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, captions, soulSource, continueSong, playSession, rebuild, exportItems, airSongs,
+    render, tick, stop, start, skip, pause, resume, afterHand, restart, seek, command, cancel, info, captions, needs, samplesArrived, setPrep, soulSource, continueSong, playSession, rebuild, exportItems, airSongs,
     // the session on air as a playlist item (#38)
     get sessionNow() { return S && !S.limit ? sessionItem(S.recipe, S.onAir + 1, S.stream[0].song.title) : null; },
     get steering() { if (!S) return null; const it = S.stream[S.onAir]; if (!it.plan) return { n: it.n, lead: true, commands: [], plan: null, song: it.song, recipe: clone(S.recipe) }; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [], lockedParts: it.plan.lockedParts || [], added: clone(it.plan.added || []), risers: clone(it.plan.risers || []), usualHigh: it.plan.usualHigh, hardMax: it.plan.hardMax }, song: it.song, recipe: clone(S.recipe) }; },

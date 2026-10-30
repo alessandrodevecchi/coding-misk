@@ -182,6 +182,11 @@ const shot = async (page, name, sel = '#stagewrap') => { if (shots) await page.l
   for (const x of voice.slice(0, 3)) { const l = await laneAt(page, Math.floor(x.at)); if (l.rows.some(r => r.kind === 'voice' && r.text === `“${x.text}”`)) vOk++; }
   check(vOk === Math.min(3, voice.length), 'voice track: its lines shown in quotes', `${vOk}`);
   await shot(page, 'lane-voice-track');
+  // narrator only: voice track, console lines, step lines and replies off
+  await cap(page, C => C.set(S => { Object.assign(S, { voice: false, typed: false, steps: false, claude: false }); }));
+  const only = await laneAt(page, Math.floor(voice[0].at));
+  check(!only.on || (!only.rows.some(r => r.kind !== 'narrator') && !only.tag), 'narrator only: no voice-track line, no step tag', JSON.stringify(only));
+  await cap(page, C => C.set(S => { Object.assign(S, { voice: true, typed: true, steps: true, claude: true }); }));
   // 400 px
   await page.setViewportSize({ width: 400, height: 860 }); await sleep(500);
   await laneAt(page, Math.floor(voice[0].at)); await shot(page, 'lane-400px');
@@ -193,8 +198,11 @@ const shot = async (page, name, sel = '#stagewrap') => { if (shots) await page.l
   const helper = await page.evaluate(() => fetch('/voice/status').then(r => r.json()).then(j => !!j.ok).catch(() => false));
   if (!helper) console.log('skip  samples prepared ahead: no voice helper on this machine');
   else {
-    await openSong(page, 'luci-rosse', { style: 'explain' });
-    const x = (await cap(page, C => C.lines())).filter(y => y.kind === 'narrator')[4], slug = await cap(page, (C, t) => C.slug(t), x.text);
+    // (Classic: the steps come from the clips, so a missing sample does not change the build; a grown song may grow
+    // another way without it)
+    await page.reload(); await page.waitForFunction(() => !!globalThis.codingMiskCaptions, null, { timeout: WAIT }); await sleep(1500);
+    await openSong(page, 'luci-rosse', { profile: 'classic', style: 'auto' });
+    const x = (await cap(page, C => C.lines())).filter(y => y.kind === 'narrator')[2], slug = await cap(page, (C, t) => C.slug(t), x.text);
     const file = path.join('public', 'samples', 'say_it', `${slug}.wav`), keep = path.join(require('node:os').tmpdir(), `cap-${slug}.wav`);
     let notes = new Set(), back = false;
     if (fs.existsSync(file)) {

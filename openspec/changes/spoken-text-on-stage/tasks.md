@@ -37,9 +37,9 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 
 ## 6. Checks (2.5 h)
 
-- [ ] 6.1 `tools/check-captions.cjs` (dev server): the five cases of the design measured again (caption equals the heard line on every spoken bar, voice-track lines shown, nothing shown when not heard), "Claude" and Palco pictures, HW, 400 px, a fast video fragment
+- [x] 6.1 `tools/check-captions.cjs` (dev server): the five cases of the design measured again (caption equals the heard line on every spoken bar, voice-track lines shown, nothing shown when not heard), "Claude" and Palco pictures, HW, 400 px, a fast video fragment
 - [x] 6.2 Regression: `check:video`, `check:clips`, `check:live`, `check:render-styles`, `check-render-styles.cjs`, `check-song-config.cjs` (its "narrator off: no phrase" case changes for songs with a voice track)
-- [ ] 6.3 Settings in the browser: switch off and on (choices kept), narrator only, each of the five marks, the "Claude" transcript pane at 16:9 and absent at 9:16, an invented prompt line never captioned
+- [x] 6.3 Settings in the browser: switch off and on (choices kept), narrator only, each of the five marks, the "Claude" transcript pane at 16:9 and absent at 9:16, an invented prompt line never captioned
 
 ## 7. Speaker registry (1.5 h, D11)
 
@@ -50,15 +50,15 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 ## 8. Samples prepared ahead (2.5 h, D9)
 
 - [x] 8.1 `spokenSchedule` with a `needSamples` switch (`spokenNeeds`): every line without the sample filter, with bank and text
-- [ ] 8.2 Compose: on open, Generate and regrowth, queue the missing lines to `/voice/say`, read the manifest again, recompile; progress note in the Voices group
-- [ ] 8.3 Radio: the same when the next song is prepared, its first lines first; progress in Coming next
-- [ ] 8.4 Without the helper: the list of lines without a sample in the Voices group, with the `npm run voices` hint
+- [x] 8.2 Compose: on open, Generate and regrowth, queue the missing lines to `/voice/say`, read the manifest again, recompile; progress note in the Voices group
+- [x] 8.3 Radio: the same when the next song is prepared, its first lines first; progress in Coming next
+- [x] 8.4 Without the helper: the list of lines without a sample in the Voices group, with the `npm run voices` hint
 
 ## 9. Fallback chain (2 h, D10)
 
 - [x] 9.1 Per-line fallback to the default voice for narrator lines (as voice-track lines already do), speaker settings kept
-- [ ] 9.2 On-the-fly sample from the dev voice helper (about 1 s), then the line is spoken as soon as it is ready (next beat of its bar, else the next bar, never over a higher rank) and captioned when it plays
-- [ ] 9.3 Last resort: silent, text as the step tag; a dev-console note on every fallback (visible side of `#63`)
+- [x] 9.2 On-the-fly sample from the dev voice helper (about 1 s), then the line is spoken as soon as it is ready (next beat of its bar, else the next bar, never over a higher rank) and captioned when it plays
+- [x] 9.3 Last resort: silent, text as the step tag; a dev-console note on every fallback (visible side of `#63`)
 
 ## 10. Missing samples check (1 h, D9)
 
@@ -67,4 +67,4 @@ Estimates in agent hours, for the design the owner approved in round 5 (A for ev
 
 ## 11. Docs (0.5 h)
 
-- [ ] 11.1 `docs/knowledge/narrator.md`, `voice.md`, `visuals.md`; `npm run knowledge`, `npm run check:knowledge`; DEVLOG
+- [x] 11.1 `docs/knowledge/narrator.md`, `voice.md`, `visuals.md`; `npm run knowledge`, `npm run check:knowledge`; DEVLOG

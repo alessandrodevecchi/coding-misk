@@ -5,7 +5,7 @@ import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, RENDERS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule } from './song/build.js';
+import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds } from './song/build.js';
 import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
@@ -2520,7 +2520,7 @@ async function seekTo(bar) {
 globalThis.codingMiskCaptions = {
   lines: () => capsOf(song && song.build ? song : compiled),
   at: (cyc, o = {}) => stageCaptions(cyc, o), settings: () => capS, set: f => { setCaptions(f); if (settingsPage) settingsPage.render(); },
-  seek: bar => seekTo(bar), now: () => (isPlaying() && sched() ? sched().now() : null),
+  seek: bar => seekTo(bar), now: () => (isPlaying() && sched() ? sched().now() : null), slug: x => saySlug(x), reload: () => refreshSamples(), late: () => lateCaps.map(x => ({ at: x.at, text: x.text })), needs: () => prepLines(), helper: () => voiceHelper, pending: () => !!compiled.pending,
   info: cyc => stageInfo(cyc), lane: () => { const el = $('#say'); return { on: el.classList.contains('on'), rows: [...el.querySelectorAll('.cap-row')].map(r => ({ kind: r.dataset.kind, mark: r.dataset.mark, text: r.querySelector('.cap-txt').textContent, icon: !!r.querySelector('.cap-ico'), label: (r.querySelector('.cap-lbl') || {}).textContent || '', italic: r.querySelector('.cap-txt').classList.contains('it'), title: r.title })), tag: (el.querySelector('.cap-tag') || {}).textContent || '' }; },
 };
 let rulerDrag = null;
@@ -2856,6 +2856,64 @@ const lineSamples = () => {
   if (hasBuild(T)) for (const st of buildSteps(T)) { const x = st.say && sayText(st.say, lang); if (x && narratorEdited.has(x) && !has(nb, x)) out.push({ text: x, lang, speaker: nsp, bank: nb }); }
   return out.filter(x => x.text.split(/\s+/).length <= MAX_WORDS);
 };
+// ---------- samples prepared ahead (spoken-text-on-stage D9, D10) ----------
+// every line the song in Compose would speak with no sample at all (neither the speaker's nor the default voice's: those
+// play the default voice's, D10), from spokenNeeds, kept per build, language, controls and manifest; first lines first
+const needMemo = new WeakMap();
+function needsOf(build, C) {
+  if (!build) return [];
+  const lang = getLang(), files = customFiles, key = `${lang}|${JSON.stringify(C || {})}`, m = needMemo.get(build);
+  if (m && m.key === key && m.files === files) return m.list;
+  let list = [];
+  try {
+    const any = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
+    list = spokenNeeds(build, C || {}, lang, files).filter(x => !x.has && !any(x.bank, x.text) && x.text.split(/\s+/).length <= MAX_WORDS);
+  } catch (e) { list = []; }
+  needMemo.set(build, { key, files, list });
+  return list;
+}
+// the lines to make now: the radio's next song (its first lines first) and the song on air, else the song in Compose
+function prepLines() {
+  if (mode === 'radio' && radio && radio.on) return (radio.needs ? radio.needs() : []).map(x => ({ ...x, src: 'radio' }));
+  if (compiled.pending || !compiled.build) return [];
+  return needsOf(compiled.build, compiled.ctl).map(x => ({ ...x, src: 'compose' }));
+}
+// the progress of the preparation ("voci in preparazione 3/7") and, without the helper, the lines left silent (D9)
+const prep = { done: 0, total: 0 };
+function prepNote() {
+  const box = $('#live-voices'); if (!box) return;
+  let el = box.querySelector('#voice-prep');
+  const missing = voiceHelper === false ? prepLines() : [];
+  const txt = prep.total ? t('voicePrep', { i: prep.done, n: prep.total }) : missing.length ? t('voiceMissing', { n: missing.length }) : '';
+  if (!txt) { if (el) el.remove(); }
+  else {
+    if (!el) { el = document.createElement('p'); el.id = 'voice-prep'; el.className = 'hint muted small voice-prep'; box.appendChild(el); }
+    if (el.textContent !== txt) el.textContent = txt;
+    el.title = missing.length ? missing.map(x => `${x.bank}: ${x.text}`).slice(0, 20).join('\n') : '';
+  }
+  if (radio && radio.setPrep) radio.setPrep(prep.total && mode === 'radio' ? t('voicePrep', { i: prep.done, n: prep.total }) : '');
+}
+// lines that missed their bar while their sample was made (D10, step 3): spoken on the next beat of their bar, else on
+// the next bar, never over a line of a higher rank, and captioned when they play
+let lateCaps = [];
+function playLate(lines) {
+  if (!isPlaying() || mode !== 'track' || !song || !song.build || !globalThis.superdough) return;
+  const s = sched(), now = s.now(), cps = s.cps, caps = capsOf(song), files = customFiles;
+  for (const x of lines) {
+    if (x.voice !== 'N' || !(now >= x.at && now < x.at + 2)) continue;
+    const kind = 'narrator', busy = at => caps.some(c => c.kind === 'voice' && c.at <= at && at < c.until);
+    let at = Math.ceil(now * 4 + 0.01) / 4;
+    if (at >= x.at + 1 || busy(at)) at = Math.floor(now) + 1;
+    if (at >= x.at + 2 || busy(at)) continue;
+    const bank = [x.bank, x.bank.replace(/_[a-z]+$/, '')].find(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x.text)}.wav`)));
+    if (!bank) continue;
+    const n = files[bank].findIndex(f => decodeURI(f).endsWith(`/${saySlug(x.text)}.wav`)), tr = voiceOf(song.build), v = { gain: 1, tempo: 1, ...((tr && tr.settings) || {}) };
+    try { globalThis.superdough({ s: bank, n, gain: v.gain, speed: v.tempo, orbit: 15 }, globalThis.getAudioContext().currentTime + (at - now) / cps, 2); } catch (e) { continue; }
+    const sec = spokenContext.lengths[`${bank}/${saySlug(x.text)}.wav`] || 1.2, bs = barSecOf(song.meta, at);
+    lateCaps.push({ build: song.build, at, until: at + Math.min(4, Math.max(2, sec + 1.5) / bs), kind, code: 'N', text: x.text, step: '', typed: false, speaker: x.speaker || '', seconds: sec });
+    console.info(`[voice] "${x.text}": its sample came late, spoken on bar ${Math.floor(at) + 1}`);
+  }
+}
 let samplesBusy = false;
 // the narrator lines edited in this page (their samples are asked; the song's own lines come with npm run voices)
 const narratorEdited = new Set();
@@ -2877,8 +2935,32 @@ async function askSamples() {
     }
     // (no message of its own: the rows say sample ok, and a toast would take the place of an edit's Undo)
     void made;
+    // the lines the prepared song would speak with no sample (D9): made one at a time, in batches of up to 6; the
+    // manifest read again and the song written again after each batch
+    for (;;) {
+      const batch = prepLines().filter(x => !sampleAsked.has(`${x.bank}/${saySlug(x.text)}`)).slice(0, 6);
+      if (!batch.length) break;
+      prep.total = prep.done + batch.length + Math.max(0, prepLines().filter(x => !sampleAsked.has(`${x.bank}/${saySlug(x.text)}`)).length - batch.length);
+      prepNote();
+      const got = [];
+      for (const x of batch) {
+        sampleAsked.add(`${x.bank}/${saySlug(x.text)}`);
+        try {
+          const r = await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: x.text, lang: x.lang, speaker: x.speaker }) });
+          if (r.ok) got.push(x); else console.info(`[voice] "${x.text}": the voice helper could not make it (${x.bank}); it stays silent, shown as the step tag`);
+        } catch (e) { console.info(`[voice] "${x.text}": no voice helper; it stays silent`); }
+        prep.done++; prepNote();
+      }
+      if (got.length) {
+        if (batch[0].src === 'radio') { await reloadSamples(); if (radio && radio.samplesArrived) radio.samplesArrived(); }
+        else { await refreshSamples(); playLate(got); }
+      }
+    }
+    prep.done = 0; prep.total = 0; prepNote();
   } finally { samplesBusy = false; }
 }
+// (the preparation looks for work every few seconds: a song opened, generated or grown again, the radio's next song)
+setInterval(() => { if (voiceHelper && !samplesBusy && !document.hidden) askSamples(); else if (voiceHelper === false) prepNote(); }, 4000);
 // the custom samples and their lengths read again (a new sample of the voice helper): the song is written again with
 // them; while it plays, the new code is evaluated on the next bar
 // (the samples alone, for the radio's typed lines: the radio writes its songs again itself)
@@ -4951,7 +5033,8 @@ function stageCaptions(cyc, o = {}) {
   if (fv) return fv.captions ? captionFrame(fv.captions, cyc, capS, { ...o, video: true, barSec: barSecOf(fv.meta, cyc) }) : NO_CAPTIONS;
   if (mode === 'radio' && radio && radio.on) { const r = radio.captions(); return r ? captionFrame(r.lines, cyc, capS, { ...o, offset: r.offset, barSec: barSecOf(song && song.meta, cyc) }) : NO_CAPTIONS; }
   if (!song || !song.build) return NO_CAPTIONS;
-  return captionFrame(capsOf(song), cyc, capS, { ...o, barSec: barSecOf(song.meta, cyc) });
+  const late = lateCaps.length ? lateCaps.filter(x => x.build === song.build) : null;
+  return captionFrame(late && late.length ? [...capsOf(song), ...late].sort((a, b) => a.at - b.at) : capsOf(song), cyc, capS, { ...o, barSec: barSecOf(song.meta, cyc) });
 }
 // what the looks read from the captions (D4): say and sayAt, the line heard now (the Studio monitor types it), with its
 // kind; prompt and promptAt, the step line (the "Claude" look's prompt); captions, the frame with its history, every bar
