@@ -8,23 +8,23 @@ Estimates in agent hours, for the recommended answers, after `spoken-text-on-sta
 
 ## 2. Capture and save policy (2.5 h)
 
-- [ ] 2.1 Radio console (`sayLine`): offer the line with kind voice, the style's group and the style (D2)
-- [ ] 2.2 Compose phrase list and the narrator lines of the user's own songs (`lineSamples`, narrator edits): offer with kind and tag
-- [ ] 2.3 Policy setting `coding-misk-phrase-settings.save`: Salva sempre with Annulla (riding the edit's Undo in Compose), Chiedi with Salva, No, Sempre and the 10 s timeout, Non salvare mai (D3)
-- [ ] 2.4 A late save button on the radio console's row until the song ends
+- [x] 2.1 Radio console (`sayLine`): offer the line with kind voice, the style's group and the style (D2)
+- [x] 2.2 Compose phrase list and the narrator lines of the user's own songs (`lineSamples`, narrator edits): offer with kind and tag
+- [x] 2.3 Policy setting `coding-misk-phrase-settings.save`: Salva sempre with Annulla (riding the edit's Undo in Compose), Chiedi with Salva, No, Sempre and the 10 s timeout, Non salvare mai (D3)
+- [x] 2.4 A late save button on the radio console's row until the song ends
 
 ## 3. The director uses them (3 h)
 
 - [x] 3.1 `src/voices/mine.js`: candidates by kind, tag, language, styles, on; the second draw on `mine/<kind>/<n>`; least used first (D4)
-- [ ] 3.2 Radio: voice track vocabulary lines and `POOL` lines in `src/endless/director.js`, written out in the song; `mine` in the session recipe only when not Mai
+- [x] 3.2 Radio: voice track vocabulary lines and `POOL` lines in `src/endless/director.js`, written out in the song; `mine` in the session recipe only when not Mai
 - [ ] 3.3 Compose: `PHRASES` and `POETIC` lines in the narration layer (`src/song/spoken.js`), growth untouched; "Fill with" and "New phrases" get Le mie frasi (`src/endless/voice-track.js`)
-- [ ] 3.4 Use counts on play (radio on air, Compose Play)
+- [x] 3.4 Use counts on play (radio on air, Compose Play)
 - [ ] 3.5 `npm run check:phrases` (`tools/check-phrases.mjs`, no browser): store, merge, moments map, Mai and empty collection leave `check:endless`, `check:spoken` and the growth fixtures unchanged, share rates over 200 seeds, Sempre replaces every pool line that has a candidate and none of a song's or a style's own lines, a song's own lines never replaced, Replay identical after a delete
 
 ## 4. Voice helper: samples (2.5 h)
 
 - [x] 4.1 `GET /voice/usage` (banks, files, sizes), `POST /voice/delete` (named files under `say_*`, protected slugs skipped), `POST /voice/keep` (playing songs, saved slugs) in `vite.config.js`, local only like `/voice/say`
-- [ ] 4.2 `say_temp.json` ledger: list on `made: true` for unsaved lines, expiry from the setting, sweep at start and hourly, never a playing song's (D6)
+- [x] 4.2 `say_temp.json` ledger: list on `made: true` for unsaved lines, expiry from the setting, sweep at start and hourly, never a playing song's (D6)
 - [ ] 4.3 Page side: classes of D5 (built-in set shared with `check:samples`), protected slugs on every delete, `reloadSamples` and recompile after any deletion
 - [ ] 4.4 Delete and edit of a phrase: files per bank minus protected, size in the confirmation, Undo (D7)
 

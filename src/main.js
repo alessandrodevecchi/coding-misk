@@ -9,7 +9,7 @@ import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, 
 import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
-import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORDS } from './song/spoken.js';
+import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORDS, narratorStyle } from './song/spoken.js';
 import { airCode } from './live/air-code.js';
 import { growOnAir, airControls, composeGrowth } from './endless/growth.js';
 import { controlsProfile, customControls } from './endless/profile.js';
@@ -94,6 +94,11 @@ import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS, KIND_TYPE, loopSong } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
+import { createPhrases } from './voices/service.js';
+import { narratorPick } from './voices/mine.js';
+import { setNarratorMine } from './song/build.js';
+import { PHRASES_MOMENT } from './voices/moments.js';
+import { builtinKeys, mineKeys, songKeys } from './voices/samples.js';
 import { parseSong, clock } from './songs.js';
 import { durationKey, growingProfile, hashText } from './live/card-duration.js';
 import { createGrowthStore } from './live/growth-store.js';
@@ -119,6 +124,12 @@ const store = {
   remove(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
 setLang(getLang());
+// my phrases (my-phrases D4): the narrator of the song in Compose may say phrases of the collection in place of lines
+// from the built-in pools, never the song's own written lines; a radio song draws from the snapshot it carries
+let phr = null;
+const ownMemo = new WeakMap();
+const ownTexts = sg => { const b = sg && Array.isArray(sg.build) ? sg.build : null; if (!b) return new Set(); if (!ownMemo.has(b)) ownMemo.set(b, new Set(b.map(x => x && x.say ? sayText(x.say, 'en') : '').filter(Boolean))); return ownMemo.get(b); };
+setNarratorMine(narratorPick(sg => { try { return phr && sg && T && sg.id === T.id ? phr.composeSource(ownTexts(T)) : null; } catch (e) { return null; } }));
 // code widgets (code-widgets): the settings of the Settings card, read each time a code is shown
 const cwSettings = () => widgetSettings(store.get(CW_KEY, null));
 // the stage widgets (widgets-on-stage D9): their settings and the panels' mapping, read again only when one of the two
@@ -409,7 +420,7 @@ function nextCardLength() {
   }, () => durWait.clear()).finally(() => { durWait.delete(key); durBusy = false; nextCardLength(); });
 }
 // the radio tab (created further down, once the player exists)
-let radio = null, radioOptions = null, newSongOptions = null, newSong = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, genresTab = null, patternsTab = null, prevTab = 'componi', curTab = null;
+let radio = null, radioOptions = null, newSongOptions = null, newSong = null, stylesTab = null, artistsTab = null, playlistsTab = null, settingsPage = null, genresTab = null, patternsTab = null, voicesTab = null, prevTab = 'componi', curTab = null;
 // the user's saved patterns (pattern-library): the Patterns tab, Save as pattern in Compose and the radio read them
 const patternsStore = patternStore(store);
 // custom samples manifest (bank → files), for spoken comments
@@ -1170,17 +1181,19 @@ $('#share').addEventListener('focus', updateShare);
 
 let toastT = 0;
 // action: { label, run } adds a button (Restore after a delete, #68) and keeps the toast a little longer
-function toast(msg, action = null) {
+// (my-phrases D3: several actions, [{ label, run }], and a time of its own: the Chiedi toast waits 10 s, never blocking)
+function toast(msg, action = null, { ms = 0 } = {}) {
   let box = $('.toast');
   if (!box) { box = document.createElement('div'); box.className = 'toast'; box.setAttribute('role', 'status'); document.body.appendChild(box); }
   box.textContent = msg; box.hidden = false;
-  if (action) {
+  const acts = Array.isArray(action) ? action : action ? [action] : [];
+  for (const a of acts) {
     const b = document.createElement('button');
-    b.className = 'btn toast-act'; b.textContent = action.label;
-    b.addEventListener('click', () => { box.hidden = true; action.run(); });
+    b.className = 'btn toast-act'; b.textContent = a.label;
+    b.addEventListener('click', () => { box.hidden = true; clearTimeout(toastT); a.run(); });
     box.append(' ', b);
   }
-  clearTimeout(toastT); toastT = setTimeout(() => box.hidden = true, action ? 5000 : 2600);
+  clearTimeout(toastT); toastT = setTimeout(() => box.hidden = true, ms || (acts.length ? 5000 : 2600));
 }
 // conferma in due tocchi
 const armed = {};
@@ -2784,7 +2797,8 @@ $('#live-voices').addEventListener('change', e => {
   st.say = typeof st.say === 'object' && st.say ? { ...st.say, [lang]: v } : lang === 'en' || !st.say ? (lang === 'en' ? v : { [lang]: v }) : { en: st.say, [lang]: v };
   narratorEdited.add(v);
   changed(); askSamples();
-  toast(t('plTextChanged'), { label: t('vinstUndo'), run: () => { T.build = before; changed(); } });
+  // (my-phrases D2, D3: the line is offered to my phrases; the edit's Undo also removes a phrase it created)
+  phr.offer(narratorOffer(st, v), { msg: t('plTextChanged'), undo: () => { T.build = before; changed(); } });
 });
 function vinstSongHtml(sp, off) {
   const ti = T.tracks.indexOf(sp);
@@ -2841,7 +2855,68 @@ const sampleAsked = new Set();
 // the line is written and shown at once, silent until its sample exists, then it speaks from its next bar (the samples
 // are loaded again, no page reload). Without the helper (a built app, another system) the row says how to make it.
 let voiceHelper = null;
-const helperReady = fetch('/voice/status').then(r => (r.ok ? r.json() : { ok: false })).then(j => { voiceHelper = !!(j && j.ok); }, () => { voiceHelper = false; });
+const helperReady = fetch('/voice/status').then(r => (r.ok ? r.json() : { ok: false })).then(j => { voiceHelper = !!(j && j.ok); lastSweep = j && Number.isInteger(j.sweep) ? j.sweep : 0; }, () => { voiceHelper = false; });
+// ---------- my phrases (my-phrases) ----------
+let lastSweep = 0;
+phr = createPhrases({ store, t, toast, getLang, helper: () => !!voiceHelper, onChange: what => { if (what === 'items' || what === 'settings') phrasesChanged(what); } });
+// the collection or how often it is used changed: the narrator of the song in Compose says other lines (its code and
+// captions are written again; the growth stays), the tab and the radio console are drawn again
+function phrasesChanged(what) {
+  // (in the radio or by hand only the song in Compose is written again: changed() would leave the radio)
+  try { if (mode === 'track' && !hand) { const was = dirty; changed(); dirty = was; saveDraft(); } else compiled = playable({ ...T, kind: 'composed' }); } catch (e) { /* not ready yet */ }
+  if (voicesTab) voicesTab.render();
+  if (radio && radio.on && radio.render) radio.render();
+  if (settingsPage && settingsPage.refresh && what === 'settings') settingsPage.refresh();
+}
+// the user's library, for the samples a delete keeps (D5): saved songs, trashed songs, songs of playlist sessions
+function librarySongs() {
+  const out = [...(user.tracks || []), ...(user.trash || []).map(e => e && e.song).filter(Boolean)];
+  const walk = (v, d = 0) => { if (!v || typeof v !== 'object' || d > 6) return; if (Array.isArray(v.tracks) && Array.isArray(v.sections)) { out.push(v); return; } for (const x of Object.values(v)) walk(x, d + 1); };
+  walk(store.get('coding-misk-playlists', null));
+  return out;
+}
+let builtinMemo = null;
+const sampleKeys = (except = null) => ({
+  builtin: builtinMemo || (builtinMemo = builtinKeys({ songs: BUILTIN, styles: RECIPES })),
+  mine: mineKeys(phr.items.filter(p => p.id !== except)),
+  songs: songKeys([...librarySongs(), T]),
+});
+// a line the user wrote whose sample the helper just made (made: true) and that is not saved: temporary (D6)
+function listTemp(text, lang, bank, songKey) {
+  if (!voiceHelper || !text || phr.isSaved(text, lang, 'voice') || phr.isSaved(text, lang, 'explain') || phr.isSaved(text, lang, 'poetic')) return;
+  fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ add: [{ file: `${bank}/${saySlug(text)}.wav`, ms: phr.tempMs(), song: songKey }] }) }).catch(() => {});
+}
+// on load: every phrase of mine and every saved song leaves the temporary list (a file that became used is never swept)
+helperReady.then(() => {
+  if (!voiceHelper) return;
+  const k = sampleKeys();
+  fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ protect: [...k.mine, ...k.songs] }) }).catch(() => {});
+});
+// the song playing now (its temporary samples are not swept) and the sweeps of the helper (the manifest read again)
+const playingKey = () => { if (!isPlaying()) return null; if (mode === 'radio' && radio && radio.on) { const s = radio.state, it = s && s.stream[s.onAir]; return it ? `radio:${it.id}` : null; } return song ? `compose:${song.id}` : null; };
+setInterval(async () => {
+  if (!voiceHelper || document.hidden) return;
+  const k = playingKey();
+  if (k) fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playing: [k] }) }).catch(() => {});
+  try {
+    const j = await (await fetch('/voice/status')).json();
+    if (Number.isInteger(j.sweep) && j.sweep !== lastSweep) { lastSweep = j.sweep; await refreshSamples(); if (radio && radio.samplesArrived) radio.samplesArrived(); }
+  } catch (e) { /* the helper went away */ }
+}, 60000);
+// the kind and tag of a narrator line the user wrote (D2): explaining, the step's moment; poetic, the entering track
+function narratorOffer(st, text) {
+  const poetic = narratorStyle(T) === 'poetic', tr = st.add !== undefined ? T.tracks.find(x => x.id === [].concat(st.add)[0]) : null;
+  const tag = poetic ? (tr ? tr.type : 'move') : tr ? PHRASES_MOMENT[tr.type] || 'code' : st.at === 0 ? 'start' : st.remove !== undefined ? ([].concat(st.remove).length > 1 ? 'breakdown' : 'less') : null;
+  return { text, lang: getLang(), kind: poetic ? 'poetic' : 'explain', tag: tag === 'spoken' ? null : tag, styles: [], source: 'narrator', from: { song: T.title || T.id } };
+}
+// a line typed in the radio console as a phrase (D2): kind voice, the vocabulary group of the song's style, the style
+function typedInput(text, lang, sg) {
+  const styles = ((sg && sg.tags && sg.tags.styles) || []).slice(0, 3);
+  const tag = styles.map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null;
+  return { text, lang, kind: 'voice', tag, styles: styles.slice(0, 1), source: 'radio', from: { song: (sg && sg.title) || '', ...(styles[0] ? { style: styles[0] } : {}) } };
+}
+// the vocabulary group of the song's voice track (its "vocab:" line, else its style's)
+const songVocab = () => { const sp = songSpoken(), own = sp && Object.values(sp.patterns || {}).map(p => (typeof p.text === 'string' && p.text.startsWith('vocab:') ? p.text.slice(6) : null)).find(Boolean); return own || ((T.tags && T.tags.styles) || []).map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null; };
 const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
   const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
@@ -2930,7 +3005,7 @@ async function askSamples() {
       renderSongVoice(); renderTrackPanel();
       try {
         const r = await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: next.text, lang: next.lang, speaker: next.speaker }) });
-        if (r.ok) { made++; await refreshSamples(); }
+        if (r.ok) { made++; const j = await r.json().catch(() => ({})); if (j.made) listTemp(next.text, next.lang, j.bank || next.bank, `compose:${T.id}`); await refreshSamples(); }
       } catch (e) { /* the row keeps saying the sample is missing */ }
     }
     // (no message of its own: the rows say sample ok, and a toast would take the place of an edit's Undo)
@@ -3004,14 +3079,16 @@ function phraseListHtml(sp, off) {
   return `<div class="pl" data-pl-track="${esc(sp.id)}">${head}${rows.length ? cols : ''}${body}${empty}${add}</div>`;
 }
 // one edit of the phrase list: the new song's tracks in place of the old ones, with Undo in the toast
-function phraseEdit(next, msg) {
+function phraseEdit(next, msg, offer = null) {
   if (!next) return;
   const before = JSON.parse(JSON.stringify(T.tracks));
   T.tracks = next.tracks;
   editPat = null; selClip = null;
   changed(); renderTrackPanel();
   askSamples();
-  toast(msg, { label: t('vinstUndo'), run: () => { T.tracks = before; tk = Math.min(tk, T.tracks.length - 1); editPat = null; selClip = null; changed(); renderTrackPanel(); } });
+  const undo = () => { T.tracks = before; tk = Math.min(tk, T.tracks.length - 1); editPat = null; selClip = null; changed(); renderTrackPanel(); };
+  // (a line typed in the phrase list is offered to my phrases, riding the edit's Undo: my-phrases D3)
+  if (offer) phr.offer(offer, { msg, undo }); else toast(msg, { label: t('vinstUndo'), run: undo });
 }
 const styleWaysOf = () => { const r = RECIPES.filter(x => ((T.tags && T.tags.styles) || []).includes(x.id) && x.spoken && x.spoken.ways); const w = {}; for (const x of r) for (const [k, v] of Object.entries(x.spoken.ways)) if (v > 0) w[k] = (w[k] || 0) + v; return Object.keys(w).sort((a, b) => w[b] - w[a]); };
 function phraseListEvent(e) {
@@ -3040,7 +3117,7 @@ function phraseListEvent(e) {
     const r = editText(T, id, raw, getLang(), el.value);
     if (r.error) { toast(r.error === 'words' ? t('plTooMany', { n: r.n, max: MAX_WORDS }) : t('plEmptyText')); forceVoices(); return true; }
     const tr = T.tracks.find(x => x.id === id), c = tr && tr.clips[raw], n = c ? tr.clips.filter(x => x.pattern === c.pattern).length : 1;
-    phraseEdit(r.song, n > 1 ? t('plTextShared', { n }) : t('plTextChanged')); return true;
+    phraseEdit(r.song, n > 1 ? t('plTextShared', { n }) : t('plTextChanged'), { text: el.value, lang: getLang(), kind: 'voice', tag: songVocab(), styles: (T.tags && T.tags.styles) || [], source: 'compose', from: { song: T.title || T.id } }); return true;
   }
   if (el.matches('[data-pl-start]') || el.matches('[data-pl-bars]')) {
     const v = Math.round(+el.value);
@@ -4854,6 +4931,14 @@ radio = createRadio({
   reloadSamples: () => reloadSamples(),
   // the samples manifest, for the voices of Next changes (after-tests-oct28 D2)
   voiceFiles: () => customFiles,
+  // my phrases (my-phrases): the snapshot a new session records, the lines typed in the console offered to the
+  // collection (kind voice, the style's vocabulary group and the style), their samples temporary while unsaved, the
+  // late save of the console's typed rows
+  mine: () => phr.snapshot(getLang()),
+  onTyped: ({ text, lang, song: sg }) => phr.offer(typedInput(text, lang, sg), { use: true }),
+  onSampleMade: ({ text, lang, bank, song: sg }) => listTemp(text, lang, bank, `radio:${sg.id}`),
+  typedSaved: (text, lang) => phr.isSaved(text, lang, 'voice'),
+  saveTyped: x => { const r = phr.add(typedInput(x.text, x.lang, x.song), { use: true }); if (!r.error) toast(t('phSaved')); },
   player: {
     // a saved pattern heard before it goes in (radio-arrangement D9): toggle(item, { key, chords, bpm, meter, n })
     preview: {
@@ -5203,6 +5288,11 @@ if (settingsPage && !$('#tab-impostazioni').hidden) settingsPage.render();
     if (id !== cur) { cur = id; since = Date.now(); counted = false; return; }
     if (id && !counted && Date.now() - since >= 10000) {
       counted = true;
+      // my phrases a song says count a use when it plays (my-phrases D4: radio on air, Compose Play)
+      try {
+        const caps = mode === 'radio' && radio && radio.on ? ((radio.captions() || {}).lines || []) : capsOf(song);
+        phr.countPlayed(caps.filter(x => x.kind !== 'step').flatMap(x => String(x.text || '').split(' · ')));
+      } catch (e) { /* no captions yet */ }
       const played = store.get('coding-misk-played', {}) || {};
       played[id] = Date.now(); store.set('coding-misk-played', played);
     }

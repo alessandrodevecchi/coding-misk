@@ -4,6 +4,9 @@
 
 const STR = {
   it: {
+    // my-phrases: capture and save policy
+    phSaved: 'Salvata nelle tue frasi', phUndoSave: 'Annulla', phAsk: 'Salvare «{text}» nelle tue frasi?', phAskSave: 'Salva', phAskNo: 'No', phAskAlways: 'Sempre',
+    svTypedTitle: 'Righe scritte in questo brano', svTypedSaved: 'nelle tue frasi', svTypedSaveTip: 'Salva questa riga nelle tue frasi (fino alla fine del brano)',
     // new-song-panel: the New song panel of Compose
     nsBtnTip: 'Apri o chiudi il pannello Nuovo brano: da zero, generato con le tue scelte o a sorpresa', nsFor: 'le scelte valgono per il prossimo brano nuovo; la radio ha le sue', nsClose: 'Chiudi il pannello (Esc)',
     nsScratch: 'Da zero', nsScratchTip: 'Un brano vuoto con una traccia di batteria, da scrivere a mano', nsArtist: 'Artista', nsRandomArtist: 'casuale', nsPreset: 'Preset', nsBuiltin: 'Guida', nsMine: 'I tuoi',
@@ -340,6 +343,9 @@ const STR = {
     voiceStyleTip: 'Imposta insieme pitch, velocità, filtro, taglia bassi, saturazione, riverbero e delay; non cambia la voce che parla né il volume. Personalizzato: valori cambiati a mano',
   },
   en: {
+    // my-phrases: capture and save policy
+    phSaved: 'Saved in your phrases', phUndoSave: 'Undo', phAsk: 'Save “{text}” in your phrases?', phAskSave: 'Save', phAskNo: 'No', phAskAlways: 'Always',
+    svTypedTitle: 'Lines typed in this song', svTypedSaved: 'in your phrases', svTypedSaveTip: 'Save this line in your phrases (until the song ends)',
     // new-song-panel: the New song panel of Compose
     nsBtnTip: 'Open or close the New song panel: from scratch, generated with your choices or by surprise', nsFor: 'the choices are for the next new song; the radio keeps its own', nsClose: 'Close the panel (Esc)',
     nsScratch: 'From scratch', nsScratchTip: 'An empty song with one drum track, to write by hand', nsArtist: 'Artist', nsRandomArtist: 'random', nsPreset: 'Preset', nsBuiltin: 'Guide', nsMine: 'Yours',
