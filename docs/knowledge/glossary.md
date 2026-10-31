@@ -48,6 +48,7 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Tabs | References | Riferimenti | `tabRiferimenti` |
 | Tabs | Radio | Radio | `tabRadio` |
 | Tabs | Patterns | Pattern | `tabPattern` |
+| Tabs | Decode | Decodifica | `tabDecode` |
 | Profiles | Classic | Classico | `profile:classic` |
 | Profiles | Crescendo | Crescendo | `profile:crescendo` |
 | Profiles | Live coder | Live coder | `profile:switch` |

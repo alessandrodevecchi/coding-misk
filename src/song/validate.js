@@ -39,6 +39,17 @@ export function validateSong(song, opts = {}) {
     if (!ins || typeof ins !== 'object' || Array.isArray(ins) || typeof ins.en !== 'string' || !ins.en.trim()) err('inspiration', 'an object with "en" (and "it"): short notes, for example { "en": "rain on a window" }');
     else for (const k of Object.keys(ins)) if (!['en', 'it'].includes(k) || typeof ins[k] !== 'string' || ins[k].length > 120) err(`inspiration.${k}`, 'a note of at most 120 characters, in "en" or "it"');
   }
+  // a decoded track (track-to-code D14, D15): the original's title and artist, and whether the title line names it as a cover
+  if (song.cover !== undefined) {
+    const c = song.cover;
+    if (!c || typeof c !== 'object' || Array.isArray(c)) err('cover', 'an object { "title", "artist", "attribution" }');
+    else {
+      if (typeof c.title !== 'string' || !c.title.trim() || c.title.length > 120) err('cover.title', 'the original\'s title, at most 120 characters');
+      if (c.artist !== undefined && (typeof c.artist !== 'string' || c.artist.length > 120)) err('cover.artist', 'the original\'s artist, at most 120 characters, or left out');
+      if (c.attribution !== undefined && typeof c.attribution !== 'boolean') err('cover.attribution', 'true (the title line reads "cover of …") or false');
+      for (const k of Object.keys(c)) if (!['title', 'artist', 'attribution'].includes(k)) warn(`cover.${k}`, 'unknown field');
+    }
+  }
   // when the song was made and with which version of the app (#67)
   if (song.created !== undefined && (typeof song.created !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(song.created) || Number.isNaN(Date.parse(song.created)))) err('created', 'a date, for example "2026-10-16"');
   if (song.appVersion !== undefined && (typeof song.appVersion !== 'string' || !/^\d+\.\d+\.\d+/.test(song.appVersion))) err('appVersion', 'a version, for example "0.6.0"');

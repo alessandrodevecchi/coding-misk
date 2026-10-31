@@ -39,6 +39,10 @@ export function cutFns(line, names) {
   return { line: out, cut };
 }
 
+// the title of a cover: `cover of "<title>" by <artist>`, without "by" when the artist is unknown
+const plainText = s => String(s || '').replace(/["`\\\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+export const coverLine = c => `cover of "${plainText(c.title) || '?'}"${plainText(c.artist) ? ` by ${plainText(c.artist)}` : ''}`;
+
 export function compileSong(input) {
   const song = normalizeSong(input);
   const secs = song.sections, total = song.total;
@@ -46,6 +50,8 @@ export function compileSong(input) {
   const v1secs = secs.map(s => ({ bars: s.bars, fade: s.fade, bpm: s.bpm, bpmEnd: s.bpmEnd, meter: s.meter, key: s.key, prog: s.chords }));
   const names = uniqueNames(secs.map(s => s.name));
   const L = songHeader(song.title, v1secs[0], names, v1secs);
+  // a decoded track names its original as a cover (track-to-code D14), unless Attribution is off
+  if (song.cover && song.cover.attribution !== false) L[0] = `// coding-misk · ${coverLine(song.cover)}`;
   // lanes: one per section (1 plays, 0 silent, values in between fade), as in v1
   const lanes = secs.map((_, i) => sectionLane(v1secs, i));
   L.push('', `// ${t('cSections')}`);
