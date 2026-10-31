@@ -154,6 +154,13 @@
   .code-resize:hover::after, .code-resize:focus-visible::after, .code-resize.drag::after { background: var(--a1); }
   @media (min-width: 1040px) { .code-resize { display: block; } }
   .code-tools { display: flex; gap: 6px; margin-left: auto; }
+  /* code-follow: off is dimmed, paused shows the pause mark */
+  #code-follow .ico { width: 16px; height: 16px; }
+  #code-follow .follow-pause { display: none; }
+  #code-follow[aria-pressed="true"] { border-color: var(--a1); color: var(--a1); }
+  #code-follow[aria-pressed="false"] { color: var(--muted); }
+  #code-follow.paused { opacity: .7; }
+  #code-follow.paused .follow-pause { display: inline; }
   .work.code-collapsed .codecol > :not(.codehead), .work.code-collapsed .codehead > div:first-child, .work.code-collapsed #back, .work.code-collapsed #code-full { display: none; }
   .work.code-collapsed .codehead { justify-content: center; }
   .work.code-collapsed #code-collapse { transform: scaleX(-1); }

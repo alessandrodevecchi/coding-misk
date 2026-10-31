@@ -89,7 +89,7 @@ import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
 import { createSoulScene } from './soul/scene.js';
 import { createSoulDisplay } from './soul/display.js';
-import { LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING, FLASK, STOP, POWER, PLUS, CHEVRON, EYE_CLOSED, EYE_HALF, EYE_OPEN } from './icons.js';
+import { FOLLOW, LOCK, DICE, REVERT, BIN, COMPOSE, RHYTHM, NOTES, LISTEN, KEEP, RESET_CONFIG, GROWING, FLASK, STOP, POWER, PLUS, CHEVRON, EYE_CLOSED, EYE_HALF, EYE_OPEN } from './icons.js';
 import { createPreview, previewOrbit } from './player/preview.js';
 import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS, KIND_TYPE, loopSong } from './library/patterns.js';
@@ -821,8 +821,25 @@ function widgetTick(sg, s) {
   setCodeRange(txt); ed.evaluate();
 }
 // keeps the point being edited in view: #edhost scrolls, not CodeMirror's own scroller
-function followEdit(a, b) {
-  let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+// code-follow: the "Follow edits" toggle, and a pause after the person scrolls the panel by hand
+const FOLLOW_PAUSE_MS = 10000;
+let followOn = store.get('coding-misk-code-follow', true) !== false, followUntil = 0, followIdx = 0, followTimer = null;
+const followPaused = () => followOn && Date.now() < followUntil;
+function followSync() {
+  const b = document.getElementById('code-follow'); if (!b) return;
+  const p = followPaused();
+  if (!b.firstChild) b.innerHTML = FOLLOW;
+  b.setAttribute('aria-pressed', followOn); b.classList.toggle('paused', p);
+  b.title = !followOn ? t('followTipOff') : p ? t('followTipPaused') : t('followTipOn');
+}
+function followPause() {
+  if (!followOn) return;
+  if (glide) { cancelAnimationFrame(glide); glide = null; } // a glide in flight must not fight the reader
+  followUntil = Date.now() + FOLLOW_PAUSE_MS;
+  clearTimeout(followTimer); followTimer = setTimeout(followSync, FOLLOW_PAUSE_MS + 20);
+  followSync();
+}
+function followScroll(i) {
   const view = ed && ed.editor, host = $('#edhost');
   try {
     // lineBlockAt works for lines CodeMirror has not drawn yet (below the window), coordsAtPos does not
@@ -833,6 +850,12 @@ function followEdit(a, b) {
     // glide there (live-typing): about 0.3 s, eased; a new target replaces the old one
     if (at.top < top + 8 || at.bottom > bottom - 8) glideTo(host, host.scrollTop + at.top - top - (bottom - top) / 3);
   } catch (e) {}
+}
+function followEdit(a, b) {
+  let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  followIdx = i;
+  if (!followOn || followPaused()) return;
+  followScroll(i);
 }
 let glide = null;
 function glideTo(host, y) {
@@ -4276,6 +4299,19 @@ function syncAll() {
   const setFull = v => { col.classList.toggle('full', v); $('#code-full').setAttribute('aria-pressed', v); };
   $('#code-full').addEventListener('click', () => setFull(!col.classList.contains('full')));
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && col.classList.contains('full')) setFull(false); });
+  // code-follow: the toggle; pressed while paused it follows at once and stays on
+  followSync();
+  $('#code-follow').addEventListener('click', () => {
+    if (followPaused()) { followUntil = 0; followSync(); followScroll(followIdx); return; }
+    if (glide) { cancelAnimationFrame(glide); glide = null; }
+    followOn = !followOn; store.set('coding-misk-code-follow', followOn); followUntil = 0; followSync();
+  });
+  // manual scrolling of the panel starts the pause; the app's own glide sets scrollTop and listens to none of these
+  const eh = $('#edhost'), SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
+  eh.addEventListener('wheel', followPause, { passive: true });
+  eh.addEventListener('touchmove', followPause, { passive: true });
+  eh.addEventListener('keydown', e => { if (SCROLL_KEYS.includes(e.key)) followPause(); });
+  eh.addEventListener('pointerdown', e => { if (e.target === eh && e.offsetX >= eh.clientWidth) followPause(); });
   grip.addEventListener('pointerdown', e => {
     e.preventDefault(); grip.setPointerCapture(e.pointerId); grip.classList.add('drag');
     const move = ev => setW(clampW(window.innerWidth - ev.clientX - 20));
@@ -5267,6 +5303,7 @@ function renderStatic() {
   $$('[data-i18n-html]').forEach(x => { x.innerHTML = t(x.dataset.i18nHtml); });
   $$('[data-i18n-aria]').forEach(x => { x.setAttribute('aria-label', t(x.dataset.i18nAria)); });
   $$('[data-i18n-title]').forEach(x => { x.title = t(x.dataset.i18nTitle); });
+  followSync();
   opts($('#key'), KEYS.map(k => [k[0], k[2]]));
   opts($('#tk-type'), ['drums', 'bass', 'guitar', 'arp', 'hook', 'pad', 'texture', 'riser', 'code', 'voice', 'spoken'].map(k => [k, `${TYPE_ICON[k]}  ${t(k)}`]));
   opts($('#sc-meter'), METERS.map(([k]) => [k, k]));
