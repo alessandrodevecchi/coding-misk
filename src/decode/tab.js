@@ -9,6 +9,7 @@ import { momentSong, writeFull, withVox, withoutVox, keyName, SOUND_PRESETS } fr
 import { defaultMix, mixApply, gainsOf, loudnessTrim, codeBus, setGain, ORIG } from './mix.js';
 import { cycleOfFile, fileOfCycle, decodeMeta, createOriginal } from './sync.js';
 import { currentModel } from './model.js';
+import { exportMix, mixForParts, wholeJob, fragmentJob } from './export.js';
 import { liveCode } from '../live/live-code.js';
 import { resolveProfile, cleanOverrides, PROFILES } from '../live/profiles.js';
 import { followSong } from '../song/crescendo.js';
@@ -59,7 +60,8 @@ const ICON = {
 };
 
 // app: { t, esc, toast, ctx(), output(), play({ cycle, sg, code }) → { time }, stopCode(), mode(), lang(), cols(),
-//   files(), widgets(), source(name, level), stopOthers(), pickerOpen }
+//   files(), widgets(), source(name, level), stopOthers(), pickerOpen, outCombo(buttonHtml), exportJob(), exportDecode(kind),
+//   openFragments(source, anchor) }
 export function createDecodeTab({ root, app }) {
   const { t, esc } = app;
   const store = createDecodeStore();
@@ -397,6 +399,8 @@ export function createDecodeTab({ root, app }) {
       status = { kind: 'note', text: t(m.model.engines && m.model.engines.chords === 'essentia.js' ? 'dcFullReady2' : 'dcFullOwn') };
       save();
       if (job.then === 'compose') { openCompose(); return; }
+      // an export waited for the analysis (D16): the track stays in the level it was in
+      if (job.then === 'export') { render(); const k = pendingExport; pendingExport = null; if (k) requestExport(k.kind, k.anchor); return; }
       if (job.then === 'switch') setLevel('B'); else render();
       app.toast(t('dcFullDone', { s: ((performance.now() - job.t0) / 1000).toFixed(1) }));
     };
@@ -406,6 +410,43 @@ export function createDecodeTab({ root, app }) {
     if (!full || full.id !== id) return;
     w.postMessage({ type: 'load', pcm, rate: ANALYSIS_RATE }, [pcm.buffer]);
     w.postMessage({ type: 'all', id, tempo: track.tempo || null, essentia: !globalThis.codingMiskNoEssentia });
+  }
+  // Export and Fragments (D16): both write the Full song, the whole file; the analysis runs first when it is missing, then the
+  // export starts by itself. kind: 'out' (audio or video as the display says) or 'frag'
+  let pendingExport = null;
+  function requestExport(kind, anchor = null) {
+    if (!cur) { app.toast(t('dcExportNone')); return; }
+    if (app.exportJob()) { if (kind === 'out') app.exportDecode('cancel'); return; }
+    if (!modelB) { pendingExport = { kind, anchor }; if (full) full.then = 'export'; else runFull('export'); status = { kind: 'note', text: t('dcExportFull') }; render(); return; }
+    if (kind === 'frag') app.openFragments('decode', root.querySelector('#dc-frag') || anchor); else app.exportDecode('out');
+  }
+  // the Export button shows the progress of the export running, and a tap on it then cancels
+  function exportLabel() {
+    const eb = root.querySelector('#dc-export');
+    if (!eb) return;
+    const j = app.exportJob(), l = j ? (j.label || t(`fast:${j.phase}`, { p: Math.round(j.progress * 100) })) : t('exportWav');
+    if (eb.textContent !== l) eb.textContent = l;
+    eb.classList.toggle('rec', !!j);
+  }
+  // a real time export plays the Full code: the track switches to Full with the mix of its one code track given to every part
+  function fullForExport() {
+    if (!cur || !modelB || level() === 'B') return;
+    const mix = mixForParts(cur.settings.mix, levelTracks('B'));
+    setLevel('B', { quiet: true });
+    cur.settings.mix = mix;
+    render();
+  }
+  // what an export of this track needs (D16): the Full song as the player plays it, its mix as heard now (the original's
+  // gain, the code bus, the muted parts), and the original's samples for any window, mixed in the render page
+  function exportSource() {
+    if (!cur || !modelB) return null;
+    const sg = playableB(), ids = sg.tracks.map(x => x.id), mix = exportMix(mixForParts(cur.settings.mix, ids), cur.trim, sg.orbits);
+    const parts = { channels: [0, 1].slice(0, cur.buffer.numberOfChannels).map(i => cur.buffer.getChannelData(i)), rate: cur.buffer.sampleRate, downbeat: modelB.downbeat, duration: cur.duration, mix };
+    return {
+      sg, song: songB(), title: cur.title, artist: cur.artist, key: cur.fp ? cur.fp.key : 'decode', mix,
+      cover: { title: cur.title, artist: cur.artist, attribution: cur.attribution, original: mix.hasOriginal },
+      seconds: cur.duration, whole: () => wholeJob(parts), fragment: () => fragmentJob(parts),
+    };
   }
   // cancel (analysis spec: Cancel): the worker ends, nothing is stored for level B, level A stays
   function cancelFull() {
@@ -561,7 +602,10 @@ export function createDecodeTab({ root, app }) {
         <div class="dc-xf"><div class="dc-ends"><span class="${mix.slider < 0.5 ? 'on' : ''}">${esc(t('dcOrig'))}</span><span class="${mix.slider > 0.5 ? 'on' : ''}">${esc(t('dcCode'))}</span></div>
           <input type="range" id="dc-slider" min="0" max="100" step="1" value="${Math.round(mix.slider * 100)}" aria-label="${esc(t('dcSliderLbl'))}" data-no-knob>
           <p class="note" id="dc-xf-note">${esc(sliderNote(mix))}</p></div>
-        <div class="dc-legend"><span class="mini by-slider" aria-pressed="true">M</span> ${esc(t('dcLegendSlider'))} <span class="mini" aria-pressed="true">M</span> ${esc(t('dcLegendUser'))}</div></div>`;
+        <div class="dc-legend"><span class="mini by-slider" aria-pressed="true">M</span> ${esc(t('dcLegendSlider'))} <span class="mini" aria-pressed="true">M</span> ${esc(t('dcLegendUser'))}</div></div>
+      <div class="card dc-panel dc-export" id="dc-export-card"><div class="lbl">${esc(t('dcExport'))}</div>
+        <div class="dc-acts">${app.outCombo(`<button class="btn" id="dc-export" title="${esc(t('dcExportTip'))}">${esc(t('exportWav'))}</button>`)}<button class="btn" id="dc-frag" title="${esc(t('dcFragTip'))}">${esc(t('fragBtn'))}</button></div>
+        <p class="note">${esc(t('dcExportNote'))}</p></div>`;
     renderLight(true);
   }
   // the parts that move while playing, without rebuilding the panel
@@ -569,6 +613,7 @@ export function createDecodeTab({ root, app }) {
     if (!cur) return;
     const tb = root.querySelector('#dc-tempo-box');
     if (tb) { const h = tempoHtml(); if (force || tb.dataset.h !== h) { tb.innerHTML = h; tb.dataset.h = h; } }
+    exportLabel();
     const pb = root.querySelector('#dc-play'); if (pb) { const l = playing ? t('pause') : t('dcPlay'); if (pb.textContent !== l) pb.textContent = l; }
     const tm = root.querySelector('#dc-time');
     const M = shownModel();
@@ -606,6 +651,8 @@ export function createDecodeTab({ root, app }) {
     if (b.dataset.dcLevel) { if (b.dataset.dcLevel === 'B' && !modelB) runFull('switch'); else setLevel(b.dataset.dcLevel); return; }
     if (b.id === 'dc-full-cancel') { cancelFull(); return; }
     if (b.id === 'dc-compose') { openCompose(); return; }
+    if (b.id === 'dc-export') { requestExport('out'); return; }
+    if (b.id === 'dc-frag') { requestExport('frag', b); return; }
     if (b.dataset.dcSec !== undefined && modelB) { const f = Math.min(cur.duration - 0.1, fileOfCycle(modelB, +b.dataset.dcSec)); seek(f); return; }
     if (b.dataset.dcSounds) { cur.settings.sounds = b.dataset.dcSounds; root.querySelectorAll('[data-dc-sounds]').forEach(x => { x.setAttribute('aria-pressed', x === b); x.setAttribute('aria-checked', x === b); }); optionChanged(); return; }
     if (b.dataset.dcMute) { setMix({ type: 'mute', id: b.dataset.dcMute }); return; }
@@ -644,7 +691,7 @@ export function createDecodeTab({ root, app }) {
   store.list().then(list => { recent = list; if (!cur) render(); });
   render();
   const api = {
-    render, frame, next, tap, toggle, play, pause, seek, stop, openFile, runFull, cancelFull, setLevel, openCompose,
+    render, frame, next, tap, toggle, play, pause, seek, stop, openFile, runFull, cancelFull, setLevel, openCompose, exportSource, requestExport, exportLabel, fullForExport,
     get level() { return level(); },
     get modelB() { return modelB; },
     // the code of level B at a bar, as the player shows it (Open in Compose must show the same, D15)

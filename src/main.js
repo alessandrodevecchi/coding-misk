@@ -1390,6 +1390,49 @@ async function encodeRecording(blob) {
   try { return await encode(channels, buf.sampleRate, fmt, { mp3Rate: mp3Rate() }); } catch (e) { console.warn(e); return encode(channels, buf.sampleRate, 'wav'); }
 }
 
+// ---------- the Decode tab's exports (track-to-code D16) ----------
+// Export of a decoded track, as the Decode tab's button asks (src/decode/tab.js builds the source): the same audio and video
+// exports as everywhere, the Full song as the player plays it, with the original's samples mixed into the render page before
+// its limiter, and the mix as heard when the export starts. Fast by default; real time (the Settings choice, or when the fast
+// render fails, or a video of the whole tab) plays the track from its start and records the master stage, where the original
+// passes before the limiter as it does live.
+let decodeRec = null;
+async function exportDecode(kind) {
+  if (kind === 'cancel') { if (fastJob) fastJob.cancel(); else if (decodeRec) decodeRec.finish(true); return; }
+  if (!decodeTab) return;
+  const d = decodeTab.exportSource();
+  if (!d) return;
+  if (fastJob || rec || capture || decodeRec) return toast(t('dcExportBusy'));
+  const job = d.whole(), asVideo = outKind() === 'video';
+  const dec = { job, seconds: d.seconds, timeline: { cover: { title: d.cover.title, artist: d.cover.artist, attribution: d.cover.attribution }, start: job.start }, texts: { cover: d.cover, textsTitle: d.cover.attribution ? d.title : t('dcHeading'), seconds: d.seconds } };
+  if (exportSpeed() === 'fast' && (!asVideo || video.opts().layout !== 'tab')) {
+    if (await (asVideo ? exportVideoFast(d.sg, d.title, { seed: d.key, dec }) : exportFast(d.sg, d.title, null, null, { seed: d.key, dec }))) return;
+    toast(t('exportFastFailed'));
+  }
+  return exportDecodeReal(d, asVideo);
+}
+async function exportDecodeReal(d, asVideo) {
+  decodeTab.stop();
+  decodeTab.fullForExport();
+  const r = { ending: false, t0: performance.now(), asVideo };
+  const finish = async cancel => {
+    if (decodeRec !== r) return;
+    decodeRec = null;
+    decodeTab.stop();
+    const out = await r.cap.stop(cancel);
+    if (cancel || !out) return toast(t(asVideo ? 'vidCancelled' : 'exportCancel'));
+    const name = fileName(d.title, out.ext);
+    saveBlob(name, out.blob);
+    toast(t(asVideo ? 'vidSaved' : 'exportDone', { name }));
+  };
+  r.finish = finish;
+  const cap = asVideo ? await startVideoCapture({ total: d.seconds, onStop: () => finish(false), onCancel: () => finish(true) }) : startCapture();
+  if (!cap) return;
+  r.cap = cap; decodeRec = r;
+  await decodeTab.play(0);
+}
+const decodeExportJob = () => (fastJob ? { phase: fastJob.phase, progress: fastJob.progress } : decodeRec ? { phase: 'real', progress: 0, label: t('exporting', { t: clock(decodeTab.fileNow()), total: clock(decodeTab.duration) }) } : null);
+
 // ---------- fast export (#8) ----------
 // the export settings: format (wav, flac, mp3, opus), MP3 bitrate, speed (fast or real time)
 const exportFormat = () => formatOf(store.get('coding-misk-export-format', 'wav'));
@@ -1419,14 +1462,14 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
   if (typeof OfflineAudioContext === 'undefined') return false;
   let fmt = exportFormat();
   // a long export goes straight to a file on disk (#61): the dialog comes first, while the click still counts
-  const frag = extra.frag || null;
-  const long = (frag ? frag.end - frag.start : (cut && cut.cut) || sg.meta.seconds) > LONG_SECONDS;
+  const frag = extra.frag || null, dec = extra.dec || null;
+  const long = (frag ? frag.end - frag.start : dec ? dec.seconds : (cut && cut.cut) || sg.meta.seconds) > LONG_SECONDS;
   const disk = long ? await askDiskFile(fileName(frag ? frag.file : title, EXT[fmt] || fmt), { wav: 'audio/wav', flac: 'audio/flac', mp3: 'audio/mpeg', opus: 'audio/ogg' }[fmt] || 'audio/wav', EXT[fmt] || fmt) : null;
   if (disk === false) { toast(t('exportCancel')); return true; }
   if (fmt !== 'wav' && !(await canEncode(fmt))) { toast(t('exportFormatMissing', { f: fmt.toUpperCase() })); fmt = 'wav'; }
   const segments = segmentsOf(sg, codeFor);
   const enc = await createEncoder(fmt, 48000, { mp3Rate: mp3Rate(), writable: disk ? disk.writable : null });
-  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
+  const job = renderInBlocks({ segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), ...(dec ? dec.job : {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })) }, enc, (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } });
   if (preview) preview.stop();
   fastJob = { id: sg.id, progress: 0, phase: 'load', cancel: job.cancel };
   try {
@@ -1436,9 +1479,9 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
     const name = disk ? disk.name : fileName(frag ? frag.file : title, ext);
     if (blob) saveBlob(name, blob);
     if (frag) return name;
-    const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang());
+    const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang(), dec ? dec.timeline : null);
     setTimeout(() => saveBlob(fileName(title, 'timeline.json'), new Blob([JSON.stringify(tl)], { type: 'application/json' })), 400);
-    { const src = { sg, title, songs: extra.songs || null, seed: extra.seed || sg.id || title, cut }; showTexts(saveTexts(textsInfo(src, 'audio'), title), () => textsInfo(src, 'audio')); }
+    { const src = { sg, title, songs: extra.songs || null, seed: extra.seed || sg.id || title, cut, ...(dec ? dec.texts : {}) }; showTexts(saveTexts(textsInfo(src, 'audio'), title), () => textsInfo(src, 'audio')); }
     if (after) after(title);
     toast(t('exportDone', { name }));
     return true;
@@ -1557,14 +1600,14 @@ async function exportRadio(range) {
 async function exportVideoFast(...args) {
   try { return await exportVideoFastIn(...args); } finally { exportCols = null; }
 }
-async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null } = {}) {
+async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null, dec = null } = {}) {
   // texts on stage off for this one export (spoken-text-on-stage D7): the fragment menu's choice, or Settings → Video
   const noCaptions = frag ? !!frag.noCaptions : capsSkipNext;
   if (!frag) capsSkipNext = false;
   // the song being rendered decides the lit notes (performance-profiles), not the one in the player
   exportCtl = sg.ctl || null;
   // a long video goes straight to a file on disk (#61): the dialog comes first, while the click still counts
-  const long = !frag && ((cut && cut.cut) || sg.meta.seconds) > LONG_SECONDS;
+  const long = !frag && (dec ? dec.seconds : (cut && cut.cut) || sg.meta.seconds) > LONG_SECONDS;
   const disk = long ? await askDiskFile(fileName(title, 'mp4'), 'video/mp4', 'mp4') : null;
   if (disk === false) { toast(t('vidCancelled')); return true; }
   const o = video.opts(), fsz = frag ? fragmentSize(frag.o) : null, q = frag ? fsz.file : QUALITIES[o.quality], layout = o.layout === 'tab' ? 'visual' : o.layout;
@@ -1585,7 +1628,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   // the captions of the file (D6): the song's caption schedule, as on the stage; none with texts off for this export
   const fvCaptions = noCaptions ? [] : capsOf(sg);
   let job = { typingSpeed: typingSpeed(), typingStyle: sg.ctl && sg.ctl.typist === 'human' ? 'human' : 'exact', typingMistakes: !(sg.ctl && sg.ctl.mistakes === 'off'), songId: sg.id, segments, segmentsAt: blockSegments(sg), buses: sg.buses || {}, fns: sg.fns || {}, bpm: sg.meta.bpm.map(Number), tail: 3, sampleRate: 48000, gain: MASTER, push: songPush(sg), block: store.get('coding-misk-export-block', 0), ...(cut || {}), onSkipped: list => toast(t('soundsSkipped', { list: list.join(', ') })),
-    ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}) };
+    ...(frag ? { start: frag.start, cut: frag.end, fade: 0.5, fadeIn: 0.3 } : {}), ...(dec ? dec.job : {}) };
   // code widgets in the fast video (code-widgets D11): the notes of the lines with a note widget come back from the
   // render page; scope and spectrum read their instrument rendered alone (one render each, before the video), or the
   // whole song's wave when "Automatic" finds that it would take more than twice as long
@@ -1679,9 +1722,9 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     if (frag) { const name = fileName(frag.file, r.ext); saveBlob(name, r.blob); return name; }
     const name = disk ? disk.name : fileName(title, r.ext);
     if (r.blob) saveBlob(name, r.blob);
-    const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang());
+    const tl = timelineOf(sg, segments, r.onsets, r.seconds, getLang(), dec ? dec.timeline : null);
     setTimeout(() => saveBlob(fileName(title, 'timeline.json'), new Blob([JSON.stringify(tl)], { type: 'application/json' })), 400);
-    { const src = { sg, title, songs, seed: seed || sg.id || title, cut }; showTexts(saveTexts(textsInfo(src, 'video'), title), () => textsInfo(src, 'video')); }
+    { const src = { sg, title, songs, seed: seed || sg.id || title, cut, ...(dec ? dec.texts : {}) }; showTexts(saveTexts(textsInfo(src, 'video'), title), () => textsInfo(src, 'video')); }
     if (after) after(title);
     toast(t('vidSaved', { name }));
     return true;
@@ -1760,6 +1803,13 @@ function fragmentSource(src) {
     const sg = joinItems(items, src.seed, src.options, 'recipe');
     return { sg, title: `Radio ${src.seed}`, key: `recipe:${src.seed}:${from}`, seed: String(src.seed), songs: items.map(x => ({ song: x.song, title: x.song.title, artist: x.artist || '' })), cut: ex.cut ? { cut: ex.cut, fade: ex.fade || 0 } : null };
   }
+  // the Decode tab's track (track-to-code D16): its Full song, the sections named by kind give the picker its weights, the original's
+  // span of each fragment goes with its render
+  if (src === 'decode') {
+    const d = decodeTab && decodeTab.exportSource();
+    if (!d) return { error: 'source' };
+    return { sg: d.sg, title: d.title, key: `decode:${d.key}`, seed: d.key, songs: null, shape: shapeOf(clone(d.song), absoluteClips), cover: d.cover, textsTitle: d.cover.attribution ? d.title : t('dcHeading'), jobFor: d.fragment };
+  }
   const s = playlists.session(src);
   if (s && radio) {
     const items = s.frozen || radio.rebuild(s.recipe, s.count), sg = joinItems(items, s.recipe.seed, s.recipe.options, src);
@@ -1776,8 +1826,10 @@ function textsInfo(src, kind, extra = {}) {
   if (src.songs) for (const sec of sg.meta.sections) { const n = parseInt(sec.label, 10); if (n && !songs[n - 1]) songs[n - 1] = { title: src.songs[n - 1] ? src.songs[n - 1].title : sec.label, start: T.seconds(sec.start) }; }
   const docs = src.songs ? src.songs.map(x => x.song) : [sg.doc || {}];
   const genres = docs.flatMap(d => (d && d.tags && (d.tags.genres || d.tags.styles)) || (d && typeof d.genre === 'string' ? [d.genre] : []));
-  const seconds = src.cut ? src.cut.cut : sg.meta.seconds;
-  return { kind, title: src.title, songs: songs.filter(Boolean), genres, seconds, seed: src.seed, ...(src.inspiration ? { inspiration: src.inspiration } : {}), ...extra };
+  const seconds = src.seconds ?? (src.cut ? src.cut.cut : sg.meta.seconds);
+  // a decoded track (track-to-code D16): the rights line, and with Attribution off a title that names nothing
+  const cover = src.cover ? { cover: { ...src.cover, lang: getLang() } } : {};
+  return { kind, title: src.textsTitle ?? src.title, songs: songs.filter(Boolean), genres, seconds, seed: src.seed, ...(src.inspiration ? { inspiration: src.inspiration } : {}), ...cover, ...extra };
 }
 function saveTexts(info, base) {
   const tx = textsFor(info);
@@ -1796,7 +1848,7 @@ async function makeFragments(opts = {}) {
   const bands = 'bands' in bandObj ? { bandTop: bandObj.bands, bandBottom: bandObj.bands, ...bandObj } : bandObj;
   for (const k of ['bandTop', 'bandBottom']) if (opts[k] !== undefined) bands[k] = !!opts[k];
   const o = { ...fragmentOpts({ ...(store.get(FRAG_KEY, {}) || {}), ...pick, ...bands }), stageRatio: stageRatio() };
-  const shape = shapeFor(src.sg), bpm = src.sg.meta.bpm.map(Number);
+  const shape = src.shape || shapeFor(src.sg), bpm = src.sg.meta.bpm.map(Number);
   let picks;
   if (opts.from !== undefined && opts.to !== undefined) { const f = fragmentBetween(shape, bpm, +opts.from, +opts.to); if (f.error) return f; picks = [f]; }
   else picks = pickFragments(shape, bpm, { n: Math.max(1, opts.n | 0 || 1), length: +opts.length || o.vLength, seed: `${src.seed}/${opts.seed ?? ''}` });
@@ -1813,8 +1865,8 @@ async function makeFragments(opts = {}) {
     // the files chosen (#57): the video, the audio alone (the export format), then texts and the list below
     const want = k => o.files.includes(k), saved = [];
     let stop = false;
-    if (want('video')) { const name = await exportVideoFast(src.sg, src.title, { songs: src.songs, frag: { start: p.start, end: p.end, label: o.label ? label : '', code, tagline, msgs: glitchMessages(code), o, file, noCaptions: !!opts.noCaptions } }); if (name === 'cancelled') stop = true; else if (!name) return { error: 'render', files, items }; else saved.push(name); }
-    if (!stop && want('audio')) { const name = await exportFast(src.sg, src.title, null, null, { frag: { start: p.start, end: p.end, file } }); if (name === 'cancelled') stop = true; else if (!name) return { error: 'render', files, items }; else saved.push(name); }
+    if (want('video')) { const name = await exportVideoFast(src.sg, src.title, { songs: src.songs, dec: src.jobFor ? { job: src.jobFor() } : null, frag: { start: p.start, end: p.end, label: o.label ? label : '', code, tagline, msgs: glitchMessages(code), o, file, noCaptions: !!opts.noCaptions } }); if (name === 'cancelled') stop = true; else if (!name) return { error: 'render', files, items }; else saved.push(name); }
+    if (!stop && want('audio')) { const name = await exportFast(src.sg, src.title, null, null, { dec: src.jobFor ? { job: src.jobFor() } : null, frag: { start: p.start, end: p.end, file } }); if (name === 'cancelled') stop = true; else if (!name) return { error: 'render', files, items }; else saved.push(name); }
     if (stop) break;
     const name = saved[0] || file;
     store.set(FRAG_N, n + 1);
@@ -1910,7 +1962,7 @@ function openFragMenu(source, anchor) {
     <div class="tp-actions"><button class="btn primary" data-fm="go">${esc(t('fragGo'))}</button><span class="muted small" data-fm-status></span></div>
     </div><figure class="fm-prev"><canvas id="fm-preview" width="180" height="320" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted small">${esc(t('fragPreviewHint'))}</figcaption></figure>
     <section class="fm-texts" aria-label="${esc(t('textsTitle'))}"><b class="small">${esc(t('textsTitle'))}</b><div data-fm-texts></div></section></div>`;
-  (anchor.closest('.songbar, .pl-row, .set-card') || anchor).insertAdjacentElement('afterend', el);
+  (anchor.closest('.songbar, .pl-row, .set-card, .dc-export') || anchor).insertAdjacentElement('afterend', el);
   // what the form says now, saved as the settings so the preview, Settings and the next fragments agree
   const v = id => el.querySelector(id), form = () => ({ format: v('#fm-format').value, show: v('#fm-show').value, aspect: v('#fm-aspect').value, look: v('#fm-look').value, soulView: v('#fm-soulview').value,
     files: [...el.querySelectorAll('[data-fm-file]:checked')].map(x => x.dataset.fmFile), bandTop: v('#fm-band-top').checked, bandBottom: v('#fm-band-bottom').checked, bands: v('#fm-band-top').checked || v('#fm-band-bottom').checked, bleed: v('#fm-bleed').checked, rotate: v('#fm-rotate').checked, codeMode: v('#fm-code').value, tagline: v('#fm-tagline').value, taglineMode: 'fixed', fullLine: v('#fm-full').value, vTitle: v('#fm-title').checked, label: v('#fm-label').checked, glitch: v('#fm-glitch').checked });
@@ -4547,9 +4599,10 @@ decodeTab = createDecodeTab({ root: $('#tab-decode'), app: {
     showTab('componi'); toast(t('dcOpened'));
     return true;
   },
+  outCombo, exportJob: decodeExportJob, exportDecode, openFragments: (source, anchor) => { if (!fragMenu || fragMenu.source !== source) openFragMenu(source, anchor); },
   stopCode: () => { decodeNext = null; decodeSwap = null; typing = null; if (ed && mode === 'decode') ed.stop(); },
   source: (name, level) => { source = { kind: 'decode', name, level }; renderSource(); },
-  ended: () => { decodeNext = null; decodeSwap = null; typing = null; if (ed && mode === 'decode') ed.stop(); },
+  ended: () => { decodeNext = null; decodeSwap = null; typing = null; if (ed && mode === 'decode') ed.stop(); if (decodeRec) { decodeRec.ending = true; setTimeout(() => decodeRec && decodeRec.finish(false), 2500); } },
 } });
 globalThis.codingMiskDecode = decodeTab;
 // for the browser checks (tools/check-decode.cjs, Open in Compose): the code of the song in Compose at a bar, as it plays
@@ -4750,6 +4803,9 @@ try {
   applyMaster();
   applyVolume();
   if (decodeTab) decodeTab.frame();
+  // a real time export of a decoded track stops when the track is stopped before its end (nothing is saved)
+  if (decodeRec && decodeRec.cap && !decodeRec.ending && !decodeTab.playing && performance.now() - decodeRec.t0 > 4000) decodeRec.finish(true);
+  if (decodeTab && curTab === 'decode') decodeTab.exportLabel();
   if (radio) renderPlayerBar();
   const s = sched();
   const playing = isPlaying();
