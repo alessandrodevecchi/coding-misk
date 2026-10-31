@@ -1,6 +1,6 @@
 # Tasks
 
-Estimate: about 70 agent hours (58 to 88), in the order below. Level A and its shared base first (groups 1 to 5, about 33 h), then level B (groups 6 and 7, about 15 h), export (group 8, about 6 h), then the bench, the checks and the docs (groups 9 to 11, about 15 h). The owner wants to build first and test after: each group ends with a short run in the app (dev server in the worktree: `BROWSER=none npm run dev -- --port 5251 --strictPort`), and the bench and the check scripts come after the build.
+Estimate: about 72 agent hours (60 to 90), in the order below. Level A and its shared base first (groups 1 to 5, about 33 h), then level B (groups 6 and 7, about 17 h), export (group 8, about 6 h), then the bench, the checks and the docs (groups 9 to 11, about 15 h). The owner wants to build first and test after: each group ends with a short run in the app (dev server in the worktree: `BROWSER=none npm run dev -- --port 5251 --strictPort`), and the bench and the check scripts come after the build.
 
 ## 1. Tab shell and file input (about 6 h)
 
@@ -9,10 +9,10 @@ Estimate: about 70 agent hours (58 to 88), in the order below. Level A and its s
 - [ ] 1.3 Fingerprint (size, duration, SHA-256 of three slices) and `src/decode/store.js` (IndexedDB `coding-misk-decodes`, cap 50, `ANALYSIS_VERSION`, quiet failures, file handle where available); verify that a renamed file matches, a same-size different file does not, and a reload leaves no audio in storage (DevTools storage view or a small page script).
 - [ ] 1.4 Empty state with the recent list (title, artist, length, Full done), one-click reopen with the stored handle and permission, "pick the file again" naming the expected file, remove from the list; verify by hand in the app.
 
-## 2. Light analyser and song model (about 10 h)
+## 2. misk-analyzer and song model (about 10 h)
 
 - [ ] 2.1 `src/decode/model.js`: the model shape of design D6 and `ANALYSIS_VERSION`; `src/decode/worker.js`: holds the mono PCM, answers "analyse up to t" and "analyse all", with progress and cancel; verify the worker loads in the dev server and in `npm run build`.
-- [ ] 2.2 `src/decode/engine-light.js` frames and onsets: STFT at three sizes, per-band spectral flux with the adaptive threshold, kick or bass, closed or open hat; verify on a generated click track in Node (onset times within 10 ms).
+- [ ] 2.2 `src/decode/misk-analyzer.js` frames and onsets: STFT at three sizes, per-band spectral flux with the adaptive threshold, kick or bass, closed or open hat; verify on a generated click track in Node (onset times within 10 ms).
 - [ ] 2.3 Tempo and downbeat (design D7): autocorrelation with priors, half and double candidates, uncertainty flag, downbeat votes; verify on generated tracks at 90, 124 and 174 BPM in Node.
 - [ ] 2.4 Grids, bass, chords, key, levels: 16-step grids with the hysteresis of D9, YIN bass per step, chroma and chord templates, key from chords, levels per band per bar; verify on a generated track with known chords and bass in Node.
 
@@ -39,15 +39,18 @@ Estimate: about 70 agent hours (58 to 88), in the order below. Level A and its s
 ## 6. Level B analysis (about 7 h)
 
 - [ ] 6.1 Add `essentia.js` 0.1.3 (exact version) and `src/decode/engine-essentia.js`, loaded by a dynamic import inside the worker only for level B; verify that `npm run build` puts it in its own chunk and that no other tab requests it (network log of a page script).
-- [ ] 6.2 Whole-file steps: Essentia tempo and beats, key, HPCP and `ChordsDetectionBeats` on the beats, merged with the light engine's grids, bass and levels; key mode settled by chord evidence; fallback to the light engine alone when Essentia fails; verify on the Node test tracks and with Essentia blocked.
+- [ ] 6.2 Whole-file steps: misk-analyzer calls Essentia.js for tempo and beats, key, and HPCP with `ChordsDetectionBeats` on the beats, merged with its own grids, bass, levels and sections; key mode settled by chord evidence; misk-analyzer computes the three measures itself when Essentia.js fails; level A never calls Essentia.js; verify on the Node test tracks and with Essentia blocked.
 - [ ] 6.3 Sections, variations, ending: novelty on chroma and levels for section bounds, section kinds, variant patterns that repeat, the ending bar; verify on a generated track with known sections (bounds within one bar).
 - [ ] 6.4 The growing mark and progress text in the level switch, cancel, the result stored; verify that a 4-minute file finishes in less than its length and the page stays responsive (no long task over 200 ms).
+- [ ] 6.5 Only if the npm build of Essentia.js breaks: build its WebAssembly from the current source repository and vendor it (about 3 h, not in the total); verify with the test of 6.1 and the Node tracks of 6.2.
 
-## 7. Level B code and Open in Compose (about 8 h)
+## 7. Level B code, Follow the song and Open in Compose (about 10 h)
 
-- [ ] 7.1 Growth value `follow` (D13) in `src/live/profiles.js`, `src/live/live-code.js` and `src/live/written-plan.js`, offered only for songs with a `cover` field; verify that `node tools/check-crescendo.mjs` fixtures and `SHAPES_VERSION` do not move and `npm run check:crescendo` passes.
+- [ ] 7.1 Growth value `follow` (D18) in `src/live/profiles.js`, `src/live/live-code.js` and `src/live/written-plan.js`, for every song, default for decoded songs only; verify that `node tools/check-crescendo.mjs` fixtures and `SHAPES_VERSION` do not move and `npm run check:crescendo` passes.
 - [ ] 7.2 Level B playback: several code tracks in the track list, each with mute and solo; the level switch (Live, Full), Full by default when stored; switching while playing takes over at the next bar with the code of that bar whole; verify in the app.
-- [ ] 7.3 Open in Compose (D15): runs level B when missing, saves a user song with the Live coder profile, `growth: 'follow'`, narrator off and `cover`; Compose plays it as in Decode and switches to Classic and Crescendo; verify in the app and with `node --no-warnings tools/song.mjs validate` on the saved song.
+- [ ] 7.3 "Follow the song" in the Compose growth menu (`index.html`, `src/main.js`, `src/i18n.js` en and it, its help text) and a line in the Guide card of the Live build (`src/guide.js`, en and it); verify with `npm run check:guide` and in the app.
+- [ ] 7.4 A check that every built-in song with the Live coder profile and `follow` grows and plays its steps without errors (in `npm run check:crescendo` or `npm run check:live-code`), and that the Live coder fixtures stay unchanged.
+- [ ] 7.5 Open in Compose (D15): runs level B when missing, saves a user song with the Live coder profile, `growth: 'follow'`, narrator off and `cover`; Compose plays it as in Decode and switches to Classic and Crescendo; verify in the app and with `node --no-warnings tools/song.mjs validate` on the saved song.
 
 ## 8. Export with the original (about 6 h)
 
@@ -58,9 +61,9 @@ Estimate: about 70 agent hours (58 to 88), in the order below. Level A and its s
 
 ## 9. Bench (about 7 h)
 
-- [ ] 9.1 `tools/decode-bench.mjs` (Node, no browser): ground truth from built-in songs (tempo, key, chords per bar, grids and bass from the compiled song's haps) and their WAV exports from `node tools/export-audio.cjs`; runs both levels and prints tempo and octave errors, downbeat error, key (exact, relative, fifth), chord accuracy, grid F1 per band, bass accuracy.
+- [ ] 9.1 `tools/decode-bench.mjs` (Node, no browser): ground truth from built-in songs (tempo, key, chords per bar, grids and bass from the compiled song's haps) and their WAV exports from `node tools/export-audio.cjs`; runs both levels, plus web-audio-beat-detector as a second opinion on tempo (dev dependency of the bench only), and prints tempo and octave errors, downbeat error, key (exact, relative, fifth), chord accuracy, grid F1 per band, bass accuracy.
 - [ ] 9.2 Pick about 10 built-in songs across styles and tempos; measure, tune thresholds where a score is clearly low, and record the scores in `tests/snapshots/decode-bench.json` with a margin; `npm run check:decode-bench` fails when a score drops below it.
-- [ ] 9.3 Owner files: read a git-ignored folder of the owner's audio, print the measures without ground truth, and write a short listening note template in `notes/`; compare the light engine alone with the light engine plus Essentia and record in `docs/knowledge/decisions.md` whether a Settings engine choice is worth a later change.
+- [ ] 9.3 Owner files: read a git-ignored folder of the owner's audio, print the measures without ground truth, and write a short listening note template in `notes/`; compare misk-analyzer alone with misk-analyzer plus Essentia.js and record in `docs/knowledge/decisions.md` whether a Settings engine choice is worth a later change.
 
 ## 10. Check scripts (about 5 h)
 
@@ -71,7 +74,7 @@ Estimate: about 70 agent hours (58 to 88), in the order below. Level A and its s
 ## 11. Guide, knowledge and docs (about 3 h)
 
 - [ ] 11.1 Guide card for the Decode tab in `src/guide.js`, English and Italian (what, how, good to know: the file stays local, levels, look ahead, the two tracks, Open in Compose, exports and the rights line); verify with `npm run check:guide`.
-- [ ] 11.2 Knowledge note `docs/knowledge/decode.md` (concepts, options, engines, model, checks), glossary entries, decisions (engine choice, Meyda rejected, PCM over `AnalyserNode`, `code` tracks for free chords, `follow` only for decoded songs), a recipe row "Decode a track"; `npm run knowledge` then `npm run check:knowledge`.
+- [ ] 11.2 Knowledge note `docs/knowledge/decode.md` (concepts, options, engines, model, checks), glossary entries, decisions (misk-analyzer and the three Essentia.js measures, the other libraries checked, Meyda rejected, `follow` for every song, PCM over `AnalyserNode`, `code` tracks for free chords, `follow` only for decoded songs), a recipe row "Decode a track"; `npm run knowledge` then `npm run check:knowledge`.
 - [ ] 11.3 `docs/ARCHITECTURE.md` (the Decode module, worker, master stage), `AGENTS.md` tooling lines for the new checks, `DEVLOG.md` entry in Italian with the bench scores and what the owner should listen for.
 
 ## Workflow follow-up

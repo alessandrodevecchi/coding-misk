@@ -45,7 +45,7 @@ The app already has most of the parts the tab needs. Pointers checked on `develo
 
 ### D1. A new module and a tab in the Listen mode
 
-All Decode code lives in `src/decode/`: `tab.js` (UI), `input.js` (file, tags, fingerprint, decoding), `store.js` (IndexedDB), `worker.js` (analysis), `engine-light.js` and `engine-essentia.js` (D5), `model.js` (D6), `writer.js` (D9), `mix.js` (D11), `sync.js` (D12). `index.html` gets the tab button between Songs and Playlists (`data-mode-of="ascolta" data-tab="decode"`) and a `#tab-decode` section. `src/main.js` only wires the tab, the transport and the master bus. `tools/check-modes.cjs` learns the new order.
+All Decode code lives in `src/decode/`: `tab.js` (UI), `input.js` (file, tags, fingerprint, decoding), `store.js` (IndexedDB), `worker.js` (analysis), `misk-analyzer.js` and `engine-essentia.js` (D5), `model.js` (D6), `writer.js` (D9), `mix.js` (D11), `sync.js` (D12). `index.html` gets the tab button between Songs and Playlists (`data-mode-of="ascolta" data-tab="decode"`) and a `#tab-decode` section. `src/main.js` only wires the tab, the transport and the master bus. `tools/check-modes.cjs` learns the new order.
 
 The tab uses the app's layout as every other tab does (`index.html`): the shared stage `#stagewrap` on top with its HUD (looks, renders, Code over, full screen); below it `.work`, with the modes, the tabs and the `#tab-decode` panel on the left and the code column `#codecol` on the right. The decoded track plays on the shared stage; its code is written in `#codecol` like a Compose song's code (typist, lit notes, hidden code, Copy, full screen and collapse), and shows over the stage only when Code over is on. The `#tab-decode` panel holds only the controls. On phones the page stacks as today: stage, modes and tabs, the Decode panel, then the code column. The mockup follows this layout.
 
@@ -67,33 +67,57 @@ Reopen: a stored handle asks `queryPermission({ mode: 'read' })`, then `requestP
 
 ### D4. One analyser over PCM frames, in a worker, for both levels
 
-Both levels read the decoded PCM, not an `AnalyserNode`. Level A posts "analyse up to time t" to the worker as the playhead moves; t is the playhead plus the look ahead (D8). Level B posts "analyse everything". The worker runs the same light analyser in both cases, frame by frame, and level B adds whole-file steps on top.
+Both levels read the decoded PCM, not an `AnalyserNode`. Level A posts "analyse up to time t" to the worker as the playhead moves; t is the playhead plus the look ahead (D8). Level B posts "analyse everything". The worker runs misk-analyzer (D5) in both cases, frame by frame, and level B adds whole-file steps on top.
 
 Why not `AnalyserNode` as the reference app does: the file is decoded anyway; PCM frames give exact, repeatable results; the same code runs in Node for the bench; and an `AnalyserNode` cannot look ahead.
 
-### D5. Analysis engines: our light engine for A, plus Essentia.js for B
+### D5. misk-analyzer, with Essentia.js for three measures in level B
 
-An engine is `{ id, version, incremental, analyse(frames | pcm, { onProgress, signal }) → partial model }`. Two engines in this change:
+**misk-analyzer** is the app's own analyser (`src/decode/misk-analyzer.js`), written anew and modelled on the reference app's approach. It is the frame both levels use, and it owns every step from the audio to the song model:
 
-- **light** (ours, incremental): STFT at 1024, 4096 and 16384 points on the mono PCM; per-band onsets (kick 40-130 Hz, snare or clap 1.1-5.2 kHz, hat 7-15 kHz) by positive spectral flux with a median and interquartile threshold and a refractory time; kick or bass by the pitch drop after 90 ms; closed or open hat by decay; tempo by autocorrelation with priors (D7); downbeat votes from kick, snare and chord changes; bass notes by YIN on a low-passed signal, one note per step; chroma from tonal peaks; chord per bar from 24 major and minor templates with overtones; key from chord tones against key profiles; level per band per bar. Modelled on the reference analysis, written anew.
-- **essentia** (level B only): Essentia.js `RhythmExtractor2013` (multifeature) for the global tempo and beat ticks, `KeyExtractor` for the key, `HPCP` and `ChordsDetectionBeats` on the beat ticks for chords. The light engine still gives the drum grids, the bass notes, the levels and the sections (Essentia.js has no per-band drum grid, and its build has no segmentation algorithm). When the two disagree on key, the chord evidence decides the mode (relative major or minor).
+- decoding (D2) and the frames: STFT at 1024, 4096 and 16384 points on the mono PCM;
+- drum hits per band: kick 40-130 Hz, snare or clap 1.1-5.2 kHz, hat 7-15 kHz, by positive spectral flux with a median and interquartile threshold and a refractory time; kick or bass by the pitch drop after 90 ms; closed or open hat by decay; 16-step grids with hysteresis (D9);
+- bass notes by YIN on a low-passed signal, one note per step;
+- levels per band per bar, brightness and low-end weight;
+- sections, section kinds and the ending, by novelty on chroma and levels;
+- its own simpler tempo and beats (autocorrelation with priors, D7), key (chord tones against key profiles) and chords (chroma from tonal peaks, 24 major and minor templates with overtones);
+- the song model (D6).
 
-Essentia.js is loaded only when level B runs, by a dynamic import inside the worker, so other tabs never download it.
+**Essentia.js** is the browser build (WebAssembly) of the Essentia C++ library; the C++ library itself cannot run in the browser. In level B, misk-analyzer calls it for three measures only, where it is stronger:
+
+1. whole-track tempo and beats: `RhythmExtractor2013` (multifeature);
+2. key: `KeyExtractor`, with the mode (relative major or minor) settled by misk-analyzer's chord evidence;
+3. chords: `HPCP` and `ChordsDetectionBeats` on the beat ticks.
+
+**Fallback:** if Essentia.js fails to load or to run, misk-analyzer computes the three measures with its own code, so level B always finishes. The model records which engine gave each measure.
+
+**Level A uses misk-analyzer only,** even when Essentia.js is already loaded after a level B run. Level A must start at once, stay light and give the same result every time; a stored level B result is used through the level switch, not mixed into level A.
+
+An engine is `{ id, version, incremental, analyse(frames | pcm, { onProgress, signal }) → partial model }`, so the three measures can move to another engine later without touching the rest. Essentia.js is loaded only when level B runs, by a dynamic import inside the worker, so other tabs never download it.
 
 **Verified on 2026-10-31** (npm registry, the package unpacked in a scratch folder, a test page built with the project's Vite 8 and run in the headless browser of the project's tools):
 
-- `essentia.js` 0.1.3 is the latest version (published 2021-06-24; no release since). License AGPL-3.0, compatible with the project's AGPL-3.0-or-later. Core reports `2.1-beta6-dev`.
+- `essentia.js` 0.1.3 is the latest npm version (published 2021-06-24; no npm release since). License AGPL-3.0, compatible with the project's AGPL-3.0-or-later. Core reports `2.1-beta6-dev`.
+- The projects are active: the Essentia.js source repository was updated in December 2025 and the Essentia C++ repository in October 2026 (checked by the owner).
 - The npm package is 10.1 MB unpacked because it ships every build variant. The browser needs one: the ES module with the WebAssembly inlined (`essentia-wasm.es.js`, 2.56 MB, 0.80 MB gzip) plus the core API (`essentia.js-core.es.js`, 0.32 MB). The separate `.wasm` build is 1.99 MB (0.54 MB gzip).
-- The algorithms needed exist: `RhythmExtractor2013`, `BeatTrackerMultiFeature`, `PercivalBpmEstimator`, `KeyExtractor`, `HPCP`, `ChordsDetection`, `ChordsDetectionBeats`, `OnsetDetection`, `SuperFluxExtractor`, `PitchYin`, `PitchYinFFT`, `PredominantPitchMelodia`, `NoveltyCurve`, `Danceability`. `SBic` (segmentation) is not exposed.
+- The algorithms needed exist: `RhythmExtractor2013`, `BeatTrackerMultiFeature`, `PercivalBpmEstimator`, `KeyExtractor`, `HPCP`, `ChordsDetection`, `ChordsDetectionBeats`, `OnsetDetection`, `SuperFluxExtractor`, `PitchYin`, `PitchYinFFT`, `PredominantPitchMelodia`, `NoveltyCurve`, `Danceability`. `SBic` (segmentation) is not exposed, so misk-analyzer finds the sections.
 - It runs in a module Web Worker under Vite, both in `vite build` and in the dev server, with no Vite configuration.
 - Measures on a synthetic 180-second track (124 BPM, kick, offbeat hat, chords Am F C G per bar, bass), on the owner's machine: `RhythmExtractor2013` degara 0.65 s (124.0 BPM), multifeature 3.2 s (123.4 BPM); `KeyExtractor` 0.17 s (C major: the relative major of A minor, an expected confusion that D7 settles with chord evidence); HPCP plus `ChordsDetection` over the whole track 0.85 s (right on most bars, F read as Dm on some); `PitchYin` found the bass F1 (43.6 Hz) on its bar. Level B on a 10-minute file is expected under 20 s.
 
-No blocker found. The risks are the age of the package (D5 keeps it behind the engine interface and pins the version) and its size (lazy-loaded).
+No blocker found. The risks are the age of the npm build (pinned version, behind the engine interface, misk-analyzer as fallback) and its size (lazy-loaded). If the npm build breaks in a future browser or bundler, the WebAssembly can be built from the current source repository (a few agent hours; a task only if needed, task 6.5).
+
+**Other libraries (checked 2026-10-31).** No recent library does all of it:
+
+| Library | License | Last update | What it does | Use here |
+| --- | --- | --- | --- | --- |
+| web-audio-beat-detector | MIT | 2026-08 | tempo only | second opinion on tempo in the bench (dev dependency of the bench only, unless it wins) |
+| realtime-bpm-analyzer | Apache-2.0 | 2026-10 | tempo only | not used |
+| tonal | MIT | 2026-10 | names chords and scales from notes; no audio | not used (misk-analyzer names its own chords) |
+| Meyda | MIT | 2024 | basic per-frame features (RMS, centroid, chroma, MFCC); no tempo, beat, key or chords | rejected: misk-analyzer computes the features it needs |
 
 Alternatives:
 
-- **Meyda** (MIT, 5.6.3): rejected. It gives per-frame features (RMS, spectral centroid, chroma, MFCC) and no tempo, beat, key or chord estimation. The light engine computes the features it needs; Meyda would add a dependency without replacing any step.
-- **Only the light engine for B.** Kept as the fallback: if Essentia.js fails to load or the bench (group 9 of the tasks) shows it worse on a genre, the light engine alone runs level B. A Settings choice of engine may follow; not in this change.
+- **misk-analyzer alone for level B.** Kept as the fallback. If the bench (group 9) shows it as good as Essentia.js on the three measures, level B may drop Essentia.js later. A Settings choice of engine may follow; not in this change.
 - **Machine-learning transcription or stem separation.** Out of scope (level C).
 
 ### D6. The song model
@@ -109,7 +133,7 @@ Level A fills `bars` up to the analysis horizon and `sections` with one open sec
 
 ### D7. Tempo lock
 
-The light engine estimates the tempo from the onset envelope of the last 8 seconds (or the whole file in B) by autocorrelation between 60 and 200 BPM, weighted by a prior centred on 120 BPM and by how well kick and snare fall on the beats. The two strongest of half, single and double become `bpmCandidates`; the tab shows ½× and 2× to switch. When the pulse is weak, the best candidate is kept and marked uncertain. Level B takes Essentia's tempo when its confidence is high, else the light engine's.
+misk-analyzer estimates the tempo from the onset envelope of the last 8 seconds (or the whole file in B) by autocorrelation between 60 and 200 BPM, weighted by a prior centred on 120 BPM and by how well kick and snare fall on the beats. The two strongest of half, single and double become `bpmCandidates`; the tab shows ½× and 2× to switch. When the pulse is weak, the best candidate is kept and marked uncertain. Level B takes Essentia.js's tempo when its confidence is high, else misk-analyzer's (D5).
 
 Tap tempo: the space bar in the Decode tab (no focused field). Four taps or more give the tempo (median interval) and the phase (first tap is a downbeat). The tapped tempo replaces the analysed one and is stored.
 
@@ -117,7 +141,7 @@ Tap tempo: the space bar in the Decode tab (no focused field). Four taps or more
 
 Values: Off, 2 s, 4 s, 2 bars, 4 bars, in one select (five buttons are too wide for the panel); default 2 bars. Four seconds and four bars give slow tracks and long lines more time. Two bars give the typist time for a line of about 40 characters at the human pace at 120 BPM, and land the change on its bar.
 
-The analysis horizon is the playhead plus the look ahead. The writer (D9) runs once per bar on the model up to the horizon and gives the code that bar should have; the typing aims to finish 0.2 bar before that bar starts. With Off, the horizon is the playhead, so a change is seen only after its bar has played and lands 1 to 2 bars late, as in the reference app. At Play, the first window up to the horizon is analysed before the sound starts; the light engine does that in tens of milliseconds, so Play still feels immediate.
+The analysis horizon is the playhead plus the look ahead. The writer (D9) runs once per bar on the model up to the horizon and gives the code that bar should have; the typing aims to finish 0.2 bar before that bar starts. With Off, the horizon is the playhead, so a change is seen only after its bar has played and lands 1 to 2 bars late, as in the reference app. At Play, the first window up to the horizon is analysed before the sound starts; misk-analyzer does that in tens of milliseconds, so Play still feels immediate.
 
 Look ahead applies to level A only. Level B knows the whole file.
 
@@ -166,7 +190,7 @@ The original and the code share Strudel's `AudioContext`. A play from file time 
 Decoded songs use the Live coder profile's display controls (short patterns, human typist, lit notes, code of the moment, title only) with the narrator off: the narrator would talk over the original.
 
 - **Level A:** each bar, the writer's new song gives the code for the coming bar; `typingPlan` types from the code shown to it, with the bar as deadline, and the code is evaluated on the bar. A line that does not fit is pasted, as everywhere.
-- **Level B:** the song grows with a new growth value `follow` ("Follow the song", it "Segue il brano"): no growth phase, the written part from bar 1, `planWritten` typing each change ahead and landing it on its bar. A full start pastes several lines at bar 1. `follow` is offered only for songs with a `cover` field (D15), so the Live coder fixtures and `SHAPES_VERSION` of other songs do not move.
+- **Level B:** the song grows with the growth value `follow` (D18).
 
 Alternative for B: the natural growth. Rejected by the owner: the code must follow the original's arrangement.
 
@@ -189,12 +213,29 @@ The writer's level B song is saved as a user song with `config: { profile: 'swit
 
 The owner wants to build first and test after. The tasks follow that order: levels A and B, then the bench and checks. Each group still ends with a short run in the app (dev server on 5251) so later failures stay small.
 
-The bench (`tools/decode-bench.mjs`, Node, no browser): built-in songs exported to WAV with the existing export are the ground truth (tempo, key, chords per bar, drum grids and bass notes from the compiled song's haps). It runs both levels and prints tempo error and octave errors, downbeat error, key (exact, relative, fifth), chord accuracy per bar, drum grid F1 per band, bass note accuracy per step. A few owner files, kept outside the repository, are measured without ground truth. Scores go to `tests/snapshots/decode-bench.json`; a later run fails when a score drops by more than a set margin.
+The bench (`tools/decode-bench.mjs`, Node, no browser): built-in songs exported to WAV with the existing export are the ground truth (tempo, key, chords per bar, drum grids and bass notes from the compiled song's haps). It runs both levels and prints tempo error and octave errors, downbeat error, key (exact, relative, fifth), chord accuracy per bar, drum grid F1 per band, bass note accuracy per step. A few owner files, kept outside the repository, are measured without ground truth. The bench also runs web-audio-beat-detector as a second opinion on tempo (a dev dependency of the bench only, unless it beats both engines). Scores go to `tests/snapshots/decode-bench.json`; a later run fails when a score drops by more than a set margin.
+
+### D18. "Follow the song", a growth value for every song
+
+`follow` ("Follow the song", it "Segue il brano") is a value of the Live coder's growth control, next to `crescendo`, `gradual` and `natural`. It is not a new profile. The Compose growth menu offers it for every song. Decoded songs default to it; the default growth of every existing profile stays as it is, so no fixture and no `SHAPES_VERSION` moves.
+
+On any song it means:
+
+- no build-up from zero: there is no growth phase, the written song plays from bar 1;
+- the code of each section or clip change is typed by hand, with the Live coder's typist and mistakes, so each line lands just before the bar where its part enters or changes (`planWritten`, the lines-ahead rules of `written-plan.js`);
+- a song that starts full has its first lines pasted at bar 1, as a typist could not write them in time;
+- the code view, short patterns and lit notes are the profile's, as for any Live coder song.
+
+How it differs from Classic with the Live build on: Classic builds in blocks, each track enters whole at the start of its section and the code jumps there; `follow` types line by line like a person, before the bar, with the code of the moment, and changes inside a section (a clip that starts or changes mid-section) are typed too.
+
+Why: a decoded song opened in Compose must keep exactly the same code, so the growth it uses must exist in Compose; and the owner wants the option for any song.
+
+Alternative: offer `follow` only for decoded songs. Rejected by the owner (it was the first draft's choice).
 
 ## Risks / Trade-offs
 
 - [Memory on phones: about 340 MB for a 10-minute file] → Decode the analysis copy at 44.1 kHz mono only; free the buffers when the track closes; a decoding failure shows a message, not a crash. Open question 3.
-- [Essentia.js unmaintained since 2021] → Pinned version, behind the engine interface, light engine as fallback (D5).
+- [Essentia.js npm build unchanged since 2021] → Pinned version, behind the engine interface, misk-analyzer as fallback (D5); the source repository is active, so the WebAssembly can be rebuilt if needed (task 6.5).
 - [Real tracks drift from a steady tempo (live drummers, rubato)] → Steady tempo only in this change; the bench measures drift; tempo maps later.
 - [Analysis wrong on dense mixes (kick lost under compression, relative major and minor swapped)] → The code is a cover, approximate by design; the bench guides the thresholds; tap tempo and ½× and 2× fix the worst case.
 - [Muted code tracks still cost CPU] → Measured in group 4; if the cost is high, muted code tracks stop sound generation and lit notes come from querying the pattern instead.
@@ -214,7 +255,7 @@ The owner answered the open questions of the first draft. The specs follow these
 3. **Phones:** the same 10-minute limit, with a clear message if the browser runs out of memory. Confirmed.
 4. **Files over 10 minutes are refused** in this change; longer files go to the later list in the proposal.
 5. **Attribution off keeps the generic rights line** in the texts for sharing. Confirmed.
-6. **"Follow the song" only for decoded songs** for now. Confirmed.
+6. **"Follow the song" for every song in Compose**, as a value of the Live coder growth control (D18). This replaces the first answer (decoded songs only).
 7. **`// vox: …` is always shown.** Confirmed.
 
 The owner also corrected the layout of the first mockup, which drew a stage inside the tab panel. D1 now places the tab in the app's real layout.

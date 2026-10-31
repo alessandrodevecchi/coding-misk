@@ -2168,3 +2168,9 @@ Decisioni del proprietario dopo il primo giro (`SHAPES_VERSION` 4 aveva portato 
 
 - **Layout:** il mockup ora segue l'app vera: palco condiviso `#stagewrap` in alto con il suo HUD, sotto a sinistra modalità, schede e pannello Decode (solo controlli), a destra la colonna del codice `#codecol` dove il codice si scrive come in Componi; sul palco solo con «Code over» acceso. Al telefono si impila come oggi (palco, schede, pannello, codice). Spec `decode/playback` e design D1 aggiornati.
 - **Risposte del proprietario** in design.md («Owner answers»): Guarda avanti con Off, 2 s, 4 s, 2 battute, 4 battute (un menu, predefinito 2 battute); file oltre 10 minuti rifiutati, i file più lunghi vanno tra le cose da fare dopo; il resto confermato.
+
+## 2026-10-31: spec «Decode», altre decisioni del proprietario (track-to-code)
+
+- **«Segue il brano» per tutti i brani:** nuovo valore della crescita del Live coder nel menu di Componi, per ogni brano; niente crescita da zero, ogni riga battuta poco prima della battuta in cui la sua parte entra o cambia, inizio pieno incollato. Predefinito solo per i brani decodificati; i predefiniti dei profili, i fixture e `SHAPES_VERSION` non cambiano (design D18, task 7.1-7.4).
+- **misk-analyzer:** nome del nostro analizzatore, base di tutti e due i livelli. Nel livello B chiama Essentia.js solo per tempo e battiti, tonalità e accordi; se Essentia.js non si carica, li calcola da solo. Il livello A usa solo misk-analyzer (design D5).
+- **Librerie:** Essentia.js su npm è fermo al 2021 ma i repository sono attivi (dicembre 2025, ottobre 2026); se la build npm si rompe, si ricompila il WASM (task 6.5, solo se serve). web-audio-beat-detector entra nel banco come secondo parere sul tempo.

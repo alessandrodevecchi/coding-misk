@@ -86,8 +86,23 @@ The code SHALL hold the comment line `// vox: …` after the parts, as a placeho
 - **THEN** the song plays its decoded tracks in blocks like any Classic song
 
 ### Requirement: Follow the song
-A decoded song SHALL grow with the Live coder growth value "Follow the song": no growth phase, the written song from bar 1, each line arriving just before the bar it first plays. This value SHALL be offered only for songs that come from Decode, and SHALL leave the growth of every other song unchanged.
+The Live coder growth control SHALL offer the value "Follow the song" (it: "Segue il brano") for every song in Compose. With it there SHALL be no build-up from zero: the written song plays from bar 1, and each line of a section or clip change SHALL be typed with the Live coder's typist just before the bar where its part enters or changes. Lines that cannot be typed in time SHALL be pasted. Decoded songs SHALL default to it.
 
-#### Scenario: Other songs unchanged
+#### Scenario: A normal song
+- **WHEN** the user picks "Follow the song" for a built-in song with the Live coder profile
+- **THEN** the song plays its written sections from bar 1, each change typed before its bar, without errors
+
+#### Scenario: A full start
+- **WHEN** a song with "Follow the song" has four tracks in its first section
+- **THEN** their lines are pasted at bar 1
+
+#### Scenario: Same code after Open in Compose
+- **WHEN** a decoded song is opened in Compose
+- **THEN** it uses "Follow the song" and its code at each bar matches the code it had in Decode
+
+### Requirement: Default growth unchanged
+The default growth of every existing profile SHALL stay as it is, so no song grows differently unless the user or the song picks "Follow the song".
+
+#### Scenario: Fixtures
 - **WHEN** the Live coder fixtures are checked after this change
-- **THEN** every built-in song grows as before
+- **THEN** every built-in song grows as before and the shapes version does not change

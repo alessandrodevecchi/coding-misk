@@ -16,11 +16,12 @@ A new tab **Decode** (it: Decodifica) in the Listen mode, third after Compose an
 - **Shared base.** One analyser reads audio frames: level A feeds them as the file plays (or ahead), level B all at once. Both fill the same song model (tempo, bars, downbeats, key, chord per bar, drum grid per band, bass notes, levels, sections), and one writer turns the model into code. Level B extends level A.
 - **Written like the Live coder.** The code follows the original's arrangement, not the app's growth shapes. A track that starts full grows its code fast, lines may appear at once as pasted. When the original drops the drums, the code mutes them. Level A types reactively; level B types each change just before its bar.
 - **Open in Compose.** The code becomes a normal v2 song with the Live coder profile, switchable to Classic or Crescendo like any song. The original file does not go with it.
+- **Follow the song.** A new value of the Live coder growth, offered in Compose for every song: no build-up from zero, each line typed just before the bar where its part enters or changes. Decoded songs use it, so they keep the same code in Compose. Existing defaults do not change.
 - **Sounds.** Two presets: **Our sounds** (the generator picks sounds by measure, default) and **Simple kit** (fixed sounds). The code options (comments, technical functions, code view) are the existing Options, not new settings.
 - **Tempo.** Always locked, at least approximately, with half and double candidates. Space bar taps the tempo as a fallback. This change supports a steady tempo in 4/4 only.
 - **Header.** The title line names the title and artist with "cover of" when **Attribution** is on (default). A placeholder line `// vox: …` stands for the vocals.
 - **Export.** Audio, video and fragments, with the original audio as heard. The texts for sharing carry a rights line. The user is responsible for the use of an export. The app plays the original only in the tab and in the user's own exports.
-- **Engine.** Classical analysis, no machine learning. Level A uses the app's own light analyser. Level B adds Essentia.js (AGPL-3.0), loaded only when level B runs, behind an engine interface.
+- **Engine.** Classical analysis, no machine learning. **misk-analyzer**, the app's own analyser, is the frame for both levels: decoding, frames, drum hits per band, bass notes, levels, sections and the song model. In level B it calls Essentia.js (AGPL-3.0, the browser build of the Essentia library), loaded only then, for whole-track tempo and beats, key and chords; if Essentia.js fails, misk-analyzer computes them itself. Level A uses misk-analyzer only.
 - **Checks after the build.** A bench measures both levels against the app's own songs exported to WAV, whose tempo, key, chords and grids are known, plus a few files of the owner.
 
 Out of scope, for later:
@@ -48,15 +49,15 @@ Out of scope, for later:
 
 ### Modified Capabilities
 
-None. The tab order of the Listen mode and the Live coder growth gain behaviour that only Decode songs use; both are specified under `decode/`.
+None. The tab order of the Listen mode and the new Live coder growth value are specified under `decode/`.
 
 ## Impact
 
 - New module `src/decode/` (tab, input, analysis worker, engines, model, writer, mixer, store).
 - `index.html` (tab button and panel), `src/main.js` (tab wiring, transport and master bus for the original, Open in Compose), `src/i18n.js` (en and it, mode subtitle lists the new tab), `src/guide.js` (Decode card).
-- Live coder: a growth value `follow` for decoded songs (`src/live/profiles.js`, `src/live/live-code.js`, `src/live/written-plan.js`), with no change to the fixtures of other songs.
+- Live coder: a growth value `follow` for every song (`src/live/profiles.js`, `src/live/live-code.js`, `src/live/written-plan.js`, the Compose growth menu in `index.html` and `src/main.js`), with no change to the default growths or the fixtures.
 - Export: the render page and the fragment path mix the original audio (`src/export/`, `src/render/page.js`, `src/video/`), texts for sharing (`src/video/texts.js`).
-- Dependencies: `essentia.js` 0.1.3 (AGPL-3.0), lazy-loaded. `mediabunny`, already a dependency, reads tags and the audio of video files.
+- Dependencies: `essentia.js` 0.1.3 (AGPL-3.0), lazy-loaded; `web-audio-beat-detector` (MIT) as a dev dependency of the bench. `mediabunny`, already a dependency, reads tags and the audio of video files.
 - Storage: a new IndexedDB store for decodes; the settings backup carries the analyses, not the files.
 - Tools: `tools/decode-bench.mjs`, `tools/check-decode.cjs`, `npm run check:decode`; `tools/check-modes.cjs` learns the new tab.
 - Docs: `docs/knowledge/decode.md`, `docs/knowledge/decisions.md`, glossary, `docs/ARCHITECTURE.md`, `AGENTS.md` tooling lines, `DEVLOG.md`.

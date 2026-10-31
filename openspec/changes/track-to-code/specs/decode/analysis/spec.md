@@ -56,6 +56,17 @@ Level B SHALL add to the model a global tempo and beat grid, sections with their
 - **WHEN** level B analyses a track with an intro, two verses, a break and a final chorus
 - **THEN** the model holds sections whose bounds fall within one bar of the changes in the original
 
+### Requirement: Level B always finishes
+In level B, misk-analyzer (the app's own analyser, used by both levels for decoding, frames, drum hits per band, bass notes, levels, sections and the song model) SHALL take the whole-track tempo and beats, the key and the chords from Essentia.js when it loads. When Essentia.js cannot load or fails, misk-analyzer SHALL compute these three measures with its own code, and level B SHALL still finish. Level A SHALL use misk-analyzer only.
+
+#### Scenario: Essentia.js blocked
+- **WHEN** the Essentia.js module cannot be downloaded and the user picks level B
+- **THEN** level B finishes with tempo, key and chords from misk-analyzer, and the tab works as usual
+
+#### Scenario: Level A stays the same
+- **WHEN** level B has already loaded Essentia.js and the user plays a new track in level A
+- **THEN** level A's analysis uses misk-analyzer only
+
 ### Requirement: Tempo always locks
 The analysis SHALL always settle on a tempo, at least approximately. It SHALL keep the half and double tempo as candidates, and the tab SHALL let the user pick one of them. This change SHALL support a steady tempo in 4/4 only.
 
