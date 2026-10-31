@@ -56,9 +56,37 @@ The CRT pass SHALL size its scanlines and grille in logical pixels, so the stage
 - **WHEN** the same frame is drawn with CRT on a stage at ratio 1 and at ratio 2
 - **THEN** the number of scanlines over the picture's height is the same within one line
 
+### Requirement: Density setting
+
+Settings SHALL offer a Density for the renders with Coarse, Normal (default) and Fine, one value for every screen and every output (stage, session video, fast video, fragments, live output). It SHALL scale the cell size of the density rule (Coarse 1.4 times, Fine 0.7 times the Normal cell, Normal the rule itself), while each render's floors still hold (LED dots of at least 4 device pixels, text of Terminal and the glyph forms at least 12 logical pixels high, the 1-bit work picture within 1.2 million pixels). The setting SHALL have a help text in English and Italian. CRT SHALL not change with it.
+
+#### Scenario: Coarse and Fine at full screen
+
+- **WHEN** the owner sets Density to Coarse, then Fine, with the LED render on a full-screen stage of 1080 logical pixels high
+- **THEN** the dot pitch is about 1.4 times, then 0.7 times, the Normal pitch
+
+#### Scenario: One value everywhere
+
+- **WHEN** Density is Fine and a fast video at 1080p is made with the stage at 1280 × 720 logical pixels
+- **THEN** the video and the stage draw the same rows and columns
+
+#### Scenario: Floor kept
+
+- **WHEN** Density is Fine with the Terminal render on a stage 460 logical pixels high
+- **THEN** the text stays at least 12 logical pixels high
+
+### Requirement: Any picture source
+
+The density rule and the CRT spacing SHALL depend only on the picture's logical size and device pixel ratio, not on the look that drew it.
+
+#### Scenario: Same size, other look
+
+- **WHEN** two looks are drawn at the same picture size with the same render and Density
+- **THEN** their passes have the same cells
+
 ### Requirement: Gentler light form, shown
 
-The light form (Settings → "Render on slow devices") SHALL make cells at most 1.5 times larger than the normal form, and never larger than the largest cell of the render. While the automatic light form is on, the stage's Render menu SHALL show it with a mark and a tooltip, in English and Italian. The fast video SHALL never use the light form on its own, as today.
+The light form (Settings → "Render on slow devices") SHALL make cells at most 1.5 times larger than the normal form, and never larger than the largest cell of the render at the chosen Density. A change of render, look or Density SHALL clear the automatic light form; "Never light" SHALL keep it off. While the automatic light form is on, the stage's Render menu SHALL show it with a mark and a tooltip, in English and Italian. The fast video SHALL never use the light form on its own, as today.
 
 #### Scenario: Automatic light form at full screen
 

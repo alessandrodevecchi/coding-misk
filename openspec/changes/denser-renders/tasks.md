@@ -16,10 +16,17 @@
 - [ ] 3.1 Light form × 1.5 clamped to the render's limit (D6); verify in Node.
 - [ ] 3.2 The mark and tooltip in the Render menu while the automatic light form is on, English and Italian, a Guide line in the visuals card; verify with the CPU slowed 4× in `check-render-styles.cjs`.
 
-## 4. Measure after and close (about 1.5 h)
+## 4. Density setting (about 1.5 h)
 
-- [ ] 4.1 Run `tools/measure-render-density.cjs` again; paste the "after" table next to the "before" one; crops in the owner's test folder.
-- [ ] 4.2 Run `tools/check-render-styles.cjs` (budget at 1080p, stage, fast video against Normal); if a median is over budget, tune the limits (Risks) and rerun only that render.
-- [ ] 4.3 `npx vite build`, `check:guide`, `npm run knowledge`, `check:knowledge`; DEVLOG entry in Italian with the two tables.
+- [ ] 4.1 `src/visuals/density.js`: the rules of D2 to D6 and D8 as pure functions of `(W, H, dpr, density, light)` (D9), used by the passes and the glyph forms; verify in Node the Coarse, Normal and Fine sizes per output and the floors.
+- [ ] 4.2 Settings → Look: the "Render density" row after "Render on slow devices" (`coding-misk-render-density`, Normal not stored), help text in English and Italian; the stage, the session video, the fast video, the fragments and the live output read it; Video and Fragments Render hints name it; verify with `tools/check-settings.cjs` and `tools/check-render-styles.cjs` (the setting saved, the stage and a fast video frame at the same logical size with the same rows at Fine).
+- [ ] 4.3 A change of render, look or Density clears the automatic light form; verify in the browser check.
+- [ ] 4.4 Guide line (visuals card) and knowledge note for Density, English and Italian.
 
-Total: about 6 agent hours.
+## 5. Measure after and close (about 1.5 h)
+
+- [ ] 5.1 Run `tools/measure-render-density.cjs` again; paste the "after" table next to the "before" one; crops in the owner's test folder, each render at Coarse, Normal and Fine at full screen.
+- [ ] 5.2 Run `tools/check-render-styles.cjs` (budget at 1080p, stage, fast video against Normal); if a median is over budget, tune the limits (Risks) and rerun only that render.
+- [ ] 5.3 `npx vite build`, `check:guide`, `npm run knowledge`, `check:knowledge`; DEVLOG entry in Italian with the two tables.
+
+Total: about 7.5 agent hours.

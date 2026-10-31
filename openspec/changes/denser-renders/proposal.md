@@ -13,6 +13,8 @@ The cause is in how each pass sizes its cells: LED, ASCII and Terminal use a fix
 - **Terminal and the glyph forms of Monitor and Roll:** more rows on big screens, text still readable.
 - **CRT:** its scanlines and grille sized in logical pixels, so a stage at device pixel ratio 1 and 2 and a 1080p video look alike.
 - **A gentler light form:** it makes cells at most 1.5 times larger (today 2), never below the smallest density, and the Render menu shows when it is on.
+- **A Density setting** (Coarse, Normal, Fine) in Settings → Look, one value for every screen and output: it scales the cells of the rule (× 1.4, × 1, × 0.7). Normal is the rule.
+- **Any picture source:** the rule and the CRT spacing take the picture's size, not the visual, so other sources (a video picture, later) work the same.
 - **Measurements before and after:** cell sizes, rows and columns, pass time and the light form's state for each render on the stage (window and full screen), in a 1080p video and in a 9:16 fragment, with pictures.
 
 Not in scope: new renders, the colours of the passes, the code panel (never rendered), the looks themselves.
@@ -21,7 +23,7 @@ Not in scope: new renders, the colours of the passes, the code panel (never rend
 
 ### New Capabilities
 
-- `app/render-density`: how fine each render draws for the size of the picture, the light form's limits, and the measurements that guard them.
+- `app/render-density`: how fine each render draws for the size of the picture, the Density setting, the light form's limits, and the measurements that guard them.
 
 ### Modified Capabilities
 
@@ -29,6 +31,6 @@ None in `openspec/specs/`. The passes and the light form were specified by the o
 
 ## Impact
 
-- `src/visuals/render-styles.js` (`passSizes`, the ASCII drawing, the CRT mask, the light form), `src/visuals/glyph-looks.js` (`rowsFor`), `src/visuals.js` (the light form's mark), `src/i18n.js`, `src/guide.js`.
+- `src/visuals/render-styles.js` (`passSizes`, the ASCII drawing, the CRT mask, the light form), `src/visuals/glyph-looks.js` (`rowsFor`), `src/visuals/density.js` (new: the rules), `src/visuals.js` (the light form's mark, the density), `src/main.js` and `src/settings/settings.js` (the Density setting), `index.html`, `src/i18n.js`, `src/guide.js`.
 - Checks: `check:render-styles` (pure sizes per output), `tools/check-render-styles.cjs` (budget, pictures), a new measuring script for the before/after table.
 - Videos and fragments with a render look finer; their sound and code panel do not change. No fixtures move.
