@@ -2226,3 +2226,12 @@ Due decisioni del proprietario sui widget dell'app (`._hitgrid()` e `._tonecloud
 - **Guida:** scheda «Widget dell'app» aggiornata in inglese e italiano; `docs/knowledge/code-widgets.md` e `decisions.md` allineati.
 - **Fixture:** nessuna istantanea si muove (il codice dei fixture è senza widget); cambiano solo asserzioni di `tools/check-live-code.mjs` (la voce ora ha lo scope) e se ne aggiungono di nuove (una sola nuvola su tutti i brani, righe della griglia alla battuta 1).
 - **Limite noto:** una nuvola scritta a mano due volte nello stesso codice si disegna due volte (scelta dell'utente); le righe di un brano scritto a mano senza `$:` riconoscibile restano quelle viste.
+
+## 2026-10-31: Widget del codice stabili sulla riga (#79)
+
+Segnalazione del proprietario (Componi, «Kellerlicht», profilo Live coder, widget nel codice accesi), ramo `fix/79-widget-churn`.
+
+- **Widget che cambia sulla stessa riga (bug 1):** `widgetFor` sceglieva tra principale e secondario con una chiave fatta dal testo della riga, quindi ogni modifica della riga tirava di nuovo il dado (scope, pianoroll, scope, niente). Inoltre il posizionamento non ricordava nulla: una riga nuova a metà sezione poteva prendere il posto di una riga che suonava ancora, e nel Live coder la chiamata di una riga modificata contava come nuova e aspettava un passo con tempo libero (il widget spariva).
+- **Correzione:** il tipo di widget viene dalla traccia (intestazione `// ===== nome =====` e visual) e dal seme del brano (`tracksOf`), mai dal testo. Dentro una sezione una traccia che ha un widget lo tiene, dello stesso tipo, finché una sua riga vive (suona, oppure è muta e torna entro la finestra); solo i posti liberi vengono riassegnati. Il conteggio cambia solo all'inizio di una sezione. `widgetMemory` rigioca le battute intere della sezione dalla prima, così editor, Code over, video veloce e tempo reale danno lo stesso risultato qualunque battuta venga chiesta prima. La scrittura a mano (D8) riconosce una chiamata da traccia e tipo.
+- **Controlli:** nuovi in `check:live-code` (modifica di una riga, tipo stabile nella sezione e mai perso mentre la riga vive su sei brani e profili, memoria indipendente dall'ordine).
+- **Fixture:** nessuna istantanea si muove; cambia un'asserzione di `check-live-code.mjs` (il controllo D8 usa tre brani con massimo 8, perché una chiamata ora aspetta solo quando la sua traccia entra a metà sezione).

@@ -64,6 +64,8 @@ const calls = code => (code.match(CALL) || []).length;
       return out;
     });
     check(link.length && link.every(x => x.same && x.inst && !x.inst.includes('_widget_') && !x.listed), 'scope keeps the line\'s analyze and draws that instrument, unseen by the stage', JSON.stringify(link));
+    // (CodeMirror draws only the lines in view: the scope's line scrolled into view first)
+    await page.evaluate(() => { const v = document.querySelector('strudel-editor').editor.editor, i = v.state.doc.toString().indexOf('._scope()'); if (i >= 0) v.dispatch({ effects: v.constructor.scrollIntoView(i, { y: 'center' }) }); }); await sleep(800);
     const ink = await page.evaluate(() => [...document.querySelectorAll('#edhost canvas[id*="_widget__scope"]')].map(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 20) n++; return n; }));
     check(ink.some(n => n > 200), 'a scope draws', ink.join(','));
     // bar 8: Pista starts; Classic has no step there, the widgets move with one evaluation

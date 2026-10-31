@@ -269,20 +269,25 @@ const CHECKS_WIDGETS = {
     }
   },
   'code widgets: a person typing a growth adds a widget only where it fits, else at a later step (D8)'() {
-    const C = resolveProfile('switch'), g = crescendoSong(song('kellerlicht'), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
-    const W = liveCode(g, C, { cols: () => 80, widgets: () => ({ on: true }) }), P = liveCode(g, C, { cols: () => 80 }), X = liveCode(g, { ...C, typist: 'exact' }, { cols: () => 80, widgets: () => ({ on: true }) });
+    // (#79: a call stays through edits of its line, so it waits only when its track comes in mid-section; with the
+    // maximum 8 that happens on these songs)
+    const C = resolveProfile('switch');
     assert(C.typist === 'human', 'Live coder types as a person');
-    const bars = [0, ...new Set(buildSteps(W.build).map(x => x.at))].sort((x, y) => x - y), starts = new Set(sectionStarts(W.build)), sb = barSeconds(W.build);
     let waiting = 0, made = 0;
-    for (let i = 1; i < bars.length; i++) {
-      const b = bars[i], a = bars[i - 1];
-      assert(stripWidgets(W.codeAt(b)) === P.codeAt(b), `bar ${b}: the code without widgets changed`);
-      if (calls(W.codeAt(b)).length !== calls(X.codeAt(b)).length) waiting++;
-      if (starts.has(b)) continue;
-      const usable = (() => { const av = Math.max(0.2, (b - a - 0.5) * sb - 0.2); return Math.max(0.2, av - Math.min(av * 0.5, 2)); })();
-      const need = L => { const to = L.codeAt(b), from = settleOthers(L.codeAt(a), to, b); return from === to ? 0 : typingPlan(from, to, { style: 'human', lean: true, seed: 'kellerlicht', notes: false }).natural; };
-      // (rushed as the growth counts it: more than 1.1 times the time there is)
-      if (need(P) <= usable * 1.1 && need(W) > usable * 1.1) made++;
+    for (const id of ['kellerlicht', 'settimo-cielo', 'switch-prima-luce']) {
+      const g = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
+      const W = liveCode(g, C, { cols: () => 80, widgets: () => ({ on: true, max: 8 }) }), P = liveCode(g, C, { cols: () => 80 }), X = liveCode(g, { ...C, typist: 'exact' }, { cols: () => 80, widgets: () => ({ on: true, max: 8 }) });
+      const bars = [0, ...new Set(buildSteps(W.build).map(x => x.at))].sort((x, y) => x - y), starts = new Set(sectionStarts(W.build)), sb = barSeconds(W.build);
+      for (let i = 1; i < bars.length; i++) {
+        const b = bars[i], a = bars[i - 1];
+        assert(stripWidgets(W.codeAt(b)) === P.codeAt(b), `${id} bar ${b}: the code without widgets changed`);
+        if (calls(W.codeAt(b)).length !== calls(X.codeAt(b)).length) waiting++;
+        if (starts.has(b)) continue;
+        const usable = (() => { const av = Math.max(0.2, (b - a - 0.5) * sb - 0.2); return Math.max(0.2, av - Math.min(av * 0.5, 2)); })();
+        const need = L => { const to = L.codeAt(b), from = settleOthers(L.codeAt(a), to, b); return from === to ? 0 : typingPlan(from, to, { style: 'human', lean: true, seed: id, notes: false }).natural; };
+        // (rushed as the growth counts it: more than 1.1 times the time there is)
+        if (need(P) <= usable * 1.1 && need(W) > usable * 1.1) made++;
+      }
     }
     assert(waiting > 0 && made === 0, `${waiting} steps with a widget waiting, ${made} steps made rushed by a widget`);
   },
@@ -309,6 +314,47 @@ const CHECKS_WIDGETS = {
     const muted = '_$: note("a1").analyze("bass")\n$: note("a4").analyze("hook")\n$: s("bd*4").analyze("kick")';
     const n = placeWidgets(muted, { S: widgetSettings({ on: true, max: 2, share: 0 }), sections: 1, seed: 'a', returns: () => true });
     assert(calls(n).length <= 2 && /^_\$:.*_scope\(\)/m.test(n) && calls(n).length === Math.min(2, calls(n).length), `muted bass takes a slot: ${n}`);
+  },
+  'code widgets: an edit of a line keeps its widget; the kind of a track comes from the track and the seed (#79)'() {
+    // (the tone cloud off: without a pad the bass holds it whatever the seed, cd5)
+    const S = widgetSettings({ on: true, max: 4, widgets: { tonecloud: false } }), kinds = new Set();
+    for (const seed of 'abcdefghijklmnop'.split('')) {
+      const one = l => calls(placeWidgets(`// ========== Kick · drums ==========\n${l}\n// ========== Bass · bass ==========\n$: note("a1").analyze("bass")`, { S, sections: 1, seed }));
+      const a = one('$: s("bd*4").bank("RolandTR909").lpf(4310).analyze("kick")');
+      for (const l of ['$: s("bd*4").bank("RolandTR909").lpf(9280).analyze("kick")', '$: s("bd*4").bank("RolandTR909").analyze("kick")', '$: s("bd*4").bank("RolandTR909").crunch(0.2).analyze("kick")']) assert(one(l).join() === a.join(), `seed ${seed}: ${a} → ${one(l)} after an edit`);
+      a.forEach(w => kinds.add(w));
+    }
+    assert(kinds.size >= 3, `the same kinds on every seed: ${[...kinds]}`);
+  },
+  'code widgets: over the whole growth a line keeps its widget kind within a section and never loses it while it lives (#79)'() {
+    const bad = [];
+    let held = 0, changes = 0;
+    const cases = [['kellerlicht', 'switch', {}], ['luci-rosse', 'switch', { max: 5 }], ['settimo-cielo', 'switch', {}], ['ferro', 'switch', { share: 60 }], ['switch-prima-luce', 'switch', { max: 4 }], ['luci-rosse', 'classic', { max: 8, window: 8 }]];
+    for (const [id, profile, over] of cases) {
+      const T = widgetCodes(id, profile, over), starts = new Set(sectionStarts(T.build)), total = T.build.sections.reduce((a, x) => a + x.bars, 0);
+      let prev = null;
+      for (let bar = 0; bar < total; bar++) {
+        const o = T.W.widgetsAt(bar), code = T.at(bar), tag = `${id} ${profile} bar ${bar + 1}`;
+        if (calls(code).sort().join() !== o.shown.map(h => h.w).sort().join()) bad.push(`${tag}: calls ${calls(code)}, shown ${o.shown.map(h => h.w)}`);
+        if (prev && !starts.has(bar)) {
+          for (const h of prev.holders) {
+            if (!o.alive.includes(h.track)) continue;
+            const now = o.holders.find(x => x.track === h.track);
+            if (!now || now.w !== h.w) bad.push(`${tag}: ${h.track} ${h.w} → ${now ? now.w : 'none'}`);
+          }
+          for (const h of prev.shown) if (o.alive.includes(h.track) && !o.shown.some(x => x.track === h.track && x.w === h.w)) bad.push(`${tag}: ${h.track} ${h.w} hidden while it lives`);
+        }
+        if (prev && starts.has(bar)) changes += o.holders.filter(h => !prev.holders.some(x => x.track === h.track && x.w === h.w)).length;
+        held += o.holders.length;
+        prev = o;
+      }
+    }
+    assert(!bad.length, `${bad.length} changes mid-section: ${bad.slice(0, 6).join('; ')}`);
+    assert(held > 0, 'no widgets');
+    // the memory: a bar asked first gives the same widgets as the bars played in order
+    const A = widgetCodes('kellerlicht', 'switch', {}), B = widgetCodes('kellerlicht', 'switch', {});
+    for (let b = 0; b <= 120; b++) A.at(b);
+    for (const b of [120, 60, 30]) assert(B.at(b) === A.at(b), `kellerlicht bar ${b + 1}: asked first, other widgets than in order`);
   },
 };
 const chainLinesW = c => chainLines(c);

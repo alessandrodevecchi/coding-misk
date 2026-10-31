@@ -107,7 +107,7 @@ import { createGrowthStore } from './live/growth-store.js';
 import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
-import { CW_KEY, widgetSettings, placeWidgets, widgetOptions, linkAnalysers } from './live/widgets.js';
+import { CW_KEY, widgetSettings, widgetMemory, widgetOptions, linkAnalysers } from './live/widgets.js';
 import { SW_KEY, stageSettings, stageMapping, stageScopeInstruments, layerOn } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
 const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
@@ -757,7 +757,14 @@ let labPreview = null;
 let codeBar = 0, codeFresh = false;
 const codeNow = (sg, bar) => { codeBar = bar; codeFresh = true; return codeFor(sg, bar); };
 // (a song without a code of the moment, played as written, gets its code widgets here, at the bar's section: code-widgets D10)
-const plainWidgets = (sg, bar, c) => { const S = cwSettings(); return S.on && !sg.loop && sg.meta ? placeWidgets(c, { S, bar, section: Math.max(0, sg.meta.sectionAt(bar)), sections: sg.meta.sections.length, seed: sg.id || '' }) : c; };
+// (#79: the holders of each section remembered, so a widget stays on its line within a section, whatever bar is asked)
+const plainMemory = widgetMemory();
+const plainWidgets = (sg, bar, c) => {
+  const S = cwSettings();
+  if (!(S.on && !sg.loop && sg.meta)) return c;
+  const at = b => Math.max(0, sg.meta.sectionAt(b)), opts = b => ({ S, bar: b, section: at(b), sections: sg.meta.sections.length, seed: sg.id || '' }), sec = sg.meta.sections[sg.meta.sectionAt(bar)];
+  return plainMemory.place(c, opts(bar), { key: `${sg.id || ''}\u0000${JSON.stringify(S)}\u0000${c}`, start: sec ? sec.start : Math.ceil(bar), prep: b => ({ code: c, opts: opts(b) }) });
+};
 const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.codeAt ? sg.codeAt(bar, keep) : keep && sg.codeKeep ? sg.codeKeep(keep) : plainWidgets(sg, bar, sg.code)).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
 // code-widgets D6: the code of a playing song changed only between its equal start and end, in one transaction, so the
 // widgets and the lit notes of the lines left as they were stay (a full replacement removes every widget until the

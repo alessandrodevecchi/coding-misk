@@ -79,7 +79,9 @@ const state = page => page.evaluate(() => {
 
   // 3. the Live coder: the edited line from the typing plan; the app widgets in the editor and over the stage; Copy
   {
-    const { page, ctx, errors } = await open(browser, { 'coding-misk-code-over': { stage: true }, 'coding-misk-code-widgets': { on: true, max: 4 } });
+    // (share 0: each line its primary widget, so the kick shows the hit grid from the start; a track's widget comes from
+    // the track and the seed, #79, and kellerlicht's kick draws a secondary one)
+    const { page, ctx, errors } = await open(browser, { 'coding-misk-code-over': { stage: true }, 'coding-misk-code-widgets': { on: true, max: 4, share: 0 } });
     await page.locator('#track-pick').selectOption('kellerlicht'); await sleep(800);
     await page.$eval('#live-profile [data-profile="switch"]', el => el.click()).catch(() => {});
     await page.waitForFunction(() => !document.querySelector('#play-growing:not([hidden])'), null, { timeout: 120000 }).catch(() => {});

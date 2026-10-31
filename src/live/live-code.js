@@ -11,7 +11,7 @@ import { pasteRule, barSeconds } from './typing-load.js';
 import { planWritten } from './written-plan.js';
 import { resolveProfile } from './profiles.js';
 import { rampLists } from '../song/ramps.js';
-import { placeWidgets, stripWidgets, instrumentOf, widgetSettings } from './widgets.js';
+import { widgetMemory, tracksOf, stripWidgets, instrumentOf, widgetSettings } from './widgets.js';
 import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, splitSpoken, maskBars, functionOptions, functionContext, FUNCTION_OPTIONS, lineKey, addEntry } from '../song/writer.js';
 
 // build: the live build (a song with steps); C: the controls; lang(): the language of the comments; files(): the
@@ -188,7 +188,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // split: the code shown on screen (codeAt), with the voice-track lines that are not due, or every one with "V:T code"
   // off, in the hidden tail; the plan, the paste rule and the typing load read the code without it (codeLoad), so the
   // growth and its typing stay as they were
-  const codeWith = (bar, keep, { plan = null, info = null, wrap = true, widgets: wOn = false, split = false } = {}) => {
+  const codeWith = (bar, keep, { plan = null, info = null, wrap = true, widgets: wOn = false, split = false, pre = false, allow = null, hold = null } = {}) => {
     const src = refBuild && bar < refUntil ? refBuild : build, st = stateAt(src, bar), total = build.sections.reduce((a, x) => a + x.bars, 0);
     let hide = inPlace ? [] : null;
     const voice = () => (C.narrator === false ? '' : voiceCode(build, st.song, st.upTo, total, lang(), files()));
@@ -219,7 +219,11 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     Object.assign(fns, w.fns);
     // code widgets (D4): the calls after the folding, before the line breaks and the hidden tail
     const S = wOn && !keep ? widgetsNow() : null;
-    const shown = S ? placeWidgets(w.code, { S, bar, section: sectionAt(bar), sections: build.sections.length, seed: build.id || '', insts: instsOf(lifted.code, w.code), returns: l => returnsWithin(l, bar, S.window) }) : w.code;
+    // (#79: the track of each line from the code with its headers and visuals; the holders of the section remembered,
+    // pre: the code and the options of a bar for that memory, before the calls)
+    const wo = S && { S, bar, section: sectionAt(bar), sections: build.sections.length, seed: build.id || '', insts: instsOf(lifted.code, w.code), tracks: tracksIn(v.shown, w.code), returns: l => returnsWithin(l, bar, S.window) };
+    if (pre) return wo ? { code: w.code, opts: wo } : null;
+    const shown = S ? cwMemory.place(w.code, { ...wo, allow, out: hold }, { key: `${JSON.stringify(S)}\u0000${lang()}`, start: sectionStart(bar), prep: b => codeWith(b, null, { plan: planAt(b), widgets: true, split: true, pre: true }) }) : w.code;
     let out = C.wrap && wrap ? breakLines(shown, cols()) : shown;
     if (!out.includes('$:')) out = `${out}\n$: silence`;
     if (any && w.entries.length === chainLines(out).filter(l => /^\s*[_S]?\$:/.test(l)).length) entrySets.set(plainKey(out), w.entries);
@@ -243,15 +247,20 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // (lines-ahead-balanced D2) the plan from the first step after bar 0: lines ahead are typed at growth steps too
   const planAt = bar => (planOn && bar >= (growthAhead ? 1 : returning) ? planOf() : null);
   const codeRaw = (bar, keep) => codeWith(bar, keep, { plan: planAt(bar) });
-  const codeAt = (bar, keep) => { const c = codeWith(bar, keep, { plan: planAt(bar), widgets: true, split: true }); return keep || !typedWidgets() ? c : idleWidgets(bar, c); };
+  const codeAt = (bar, keep) => codeWith(bar, keep, { plan: planAt(bar), widgets: true, split: true, allow: keep || !typedWidgets() ? null : idleAllow(bar) });
   // the code as codeAt shows it, with every voice-track line as written (voice-track-tuning D9: the typing load and the
   // growth's shape search measure this code, so voice lines shown just in time or hidden never move a growth)
-  const codeLoad = (bar, keep) => { const c = codeWith(bar, keep, { plan: planAt(bar), widgets: true }); return keep || !typedWidgets() ? c : idleWidgets(bar, c); };
+  const codeLoad = (bar, keep) => codeWith(bar, keep, { plan: planAt(bar), widgets: true, allow: keep || !typedWidgets() ? null : idleAllow(bar) });
   // code widgets: the settings now, the section of a bar, the instrument of each pattern line (from the code before the
   // writer takes the visuals out), and whether a muted line returns within the window (the code at the next steps)
   const widgetsNow = () => { const S = typeof widgets === 'function' ? widgets() : widgets; return S && S.on ? widgetSettings(S) : null; };
   const sectionAt = bar => { let a = 0; for (let k = 0; k < build.sections.length; k++) { a += build.sections[k].bars; if (bar < a) return k; } return Math.max(0, build.sections.length - 1); };
+  const sectionStart = bar => { let a = 0; for (const x of build.sections) { if (bar < a + x.bars) return a; a += x.bars; } return Math.max(0, a - (build.sections.length ? build.sections[build.sections.length - 1].bars : 0)); };
   const isLine = l => /^\s*[_S]?\$:/.test(l);
+  // #79: the track of each pattern line (its header and visual, from the code before the comments and the writer), and
+  // the widget holders of each section remembered for this growth (widgetMemory)
+  const tracksIn = (before, after) => { const t = tracksOf(before), n = chainLines(after).filter(isLine).length; return t.length === n ? t : null; };
+  const cwMemory = widgetMemory();
   const instsOf = (before, after) => { const a = chainLines(before).filter(isLine), n = chainLines(after).filter(isLine).length; return a.length === n ? a.map(instrumentOf) : null; };
   const rawMemo = new Map(), unmuted = l => stripWidgets(l).replace(/^(\s*)_\$:/, '$1$:').replace(/\s+/g, '');
   const rawLines = b => { const k = `${b}\u0000${lang()}`; if (!rawMemo.has(k)) { if (rawMemo.size > 400) rawMemo.clear(); rawMemo.set(k, new Set(chainLines(codeWith(b, null, { plan: planAt(b), wrap: false })).filter(l => isLine(l) && !/^\s*_\$:/.test(l)).map(unmuted))); } return rawMemo.get(k); };
@@ -260,18 +269,17 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // the line), and at the latest comes with the next section's first step. The growth and its steps never change.
   const typedWidgets = () => !!(build.crescendo && C.typist === 'human' && widgetsNow());
   const sbW = barSeconds(build), secStarts = new Set(); { let a = 0; for (const x of build.sections) { secStarts.add(a); a += x.bars; } }
-  const callsOf = c => { const out = new Set(); for (const l of chainLines(c)) { if (!isLine(l)) continue; const m = l.match(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/); if (m) out.add(`${stripWidgets(l).replace(/\s+/g, '')}|${m[1]}`); } return out; };
-  const keepCalls = (c, allowed) => chainLines(c).map(l => { if (!isLine(l) || !hasCall(l)) return l; const m = l.match(/\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/); return allowed.has(`${stripWidgets(l).replace(/\s+/g, '')}|${m[1]}`) ? l : stripWidgets(l); }).join('\n');
-  const hasCall = l => /\._(?:scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/.test(l);
+  // (#79: a call is known by its track and its kind, so an edit of its line keeps it on screen)
   let idleMemo = null;
   const idlePlan = () => {
     const key = `${JSON.stringify(widgetsNow())}\u0000${lang()}\u0000${cols()}`;
     if (idleMemo && idleMemo.key === key) return idleMemo;
     const bars = stepBars(), allowedAt = new Map();
+    const at = (b, allow, hold = null) => codeWith(b, null, { plan: planAt(b), widgets: true, allow, hold });
     let allowed = new Set(), prevCode = '', prevBar = 0;
     for (const b of bars) {
-      const want = codeWith(b, null, { plan: planAt(b), widgets: true }), desired = callsOf(want);
-      // calls already shown stay while their line wants them; new ones are tried
+      const o = {}, want = at(b, null, o), desired = new Set(o.holders.map(h => `${h.track}|${h.w}`));
+      // calls already shown stay while their track holds them; new ones are tried
       const kept = new Set([...allowed].filter(x => desired.has(x))), fresh = [...desired].filter(x => !kept.has(x));
       let next = kept;
       if (fresh.length) {
@@ -281,18 +289,19 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
           const avail = Math.max(0.2, (b - prevBar - 0.5) * sbW - 0.2), usable = Math.max(0.2, avail - Math.min(avail * 0.5, 2));
           const need = to => { const from = settleOthers(prevCode, to, b); return from === to ? 0 : typingPlan(from, to, { style: 'human', lean: true, seed: build.id || '', notes: false }).natural; };
           // (a widget never makes a step rushed)
-          next = need(keepCalls(want, all)) <= usable ? all : kept;
+          next = need(want) <= usable ? all : kept;
         }
       }
-      allowed = next; allowedAt.set(b, allowed); prevCode = keepCalls(want, allowed); prevBar = b;
+      allowed = next; allowedAt.set(b, allowed); prevCode = next.size === desired.size ? want : at(b, allowed); prevBar = b;
     }
     idleMemo = { key, bars, allowedAt };
     return idleMemo;
   };
-  const idleWidgets = (bar, c) => {
+  // the calls a person typing has written by a bar (null: every one)
+  const idleAllow = bar => {
     const P = idlePlan(); let s = null;
     for (const b of P.bars) { if (b > bar) break; s = b; }
-    return s === null ? c : keepCalls(c, P.allowedAt.get(s));
+    return s === null ? null : P.allowedAt.get(s);
   };
   // (a line edited while muted, reused-lines D4, returns in another form: a line of the next steps like it, by words,
   // that does not play now, counts as its return)
@@ -319,6 +328,8 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const standalone = run && (shown => { const pre = any || inPlace ? preludeText(buses, fns) : ''; return pre + shown + tail(shown, { table: any ? table : new Map(), entries: any ? entrySets.get(plainKey(shown)) || null : null, voice: hidden.get(plainKey(shown)) || '', like: lineLike, offset: pre.length, lanes: lanesOf(shown) }); });
   const out = { build, now, inPlace, codeAt, codeLoad, run, standalone, buses, fns, shownLine, plan: () => (planOn ? planOf() : { edits: new Map(), ahead: [] }) };
   self = out;
+  // the code widgets of codeAt(bar) (#79, for the checks): { holders, shown, alive } (placeWidgets' out), or null off
+  out.widgetsAt = bar => { if (!widgetsNow()) return null; const o = {}; codeWith(bar, null, { plan: planAt(bar), widgets: true, split: true, allow: typedWidgets() ? idleAllow(bar) : null, hold: o }); return o; };
   // the lines typed ahead, muted (reused-lines D8): [{ header, text, from, to }]
   out.ahead = () => (planOn ? planOf().ahead : []);
   // the returning lines edited while muted (reused-lines D4): [[id, bar]]
