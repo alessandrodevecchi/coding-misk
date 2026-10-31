@@ -245,6 +245,11 @@ const rgb = h => { const m = /^#?([0-9a-f]{6})$/i.exec(h); if (!m) return h; con
       const fill = await CT(() => ({ rule: (document.getElementById('misk-code-theme-vars') || {}).textContent || '', S: globalThis.codingMiskCodeThemes.settings().lit }));
       check(fill.S === 'fill' && /\[style\^="outline: solid 2px"\][^}]*outline: none[^}]*background-color/.test(fill.rule), 'Lit notes: Filled replaces the frame with a fill in the editor', fill.S);
       if (shots) { const c = page.locator('#tab-impostazioni .set-card').first(); await c.screenshot({ path: path.join(shots, `lit-notes-fill-${LANG}.png`) }); }
+      // Underlined (settings-polish D1): the frame goes, an inset shadow draws the line, nothing moves
+      await page.click('#tab-impostazioni [data-set-code-lit="underline"]'); await sleep(400);
+      const und = await CT(() => ({ rule: (document.getElementById('misk-code-theme-vars') || {}).textContent || '', S: globalThis.codingMiskCodeThemes.settings().lit }));
+      check(und.S === 'underline' && /\[style\^="outline: solid 2px"\][^}]*outline: none[^}]*box-shadow: inset 0 -2px 0/.test(und.rule) && !/background-color: color-mix/.test(und.rule), 'Lit notes: Underlined replaces the frame with a line under the token', und.S);
+      if (shots) { const c = page.locator('#tab-impostazioni .set-card').first(); await c.screenshot({ path: path.join(shots, `lit-notes-underline-${LANG}.png`) }); }
       await page.click('#tab-impostazioni [data-set-code-lit="outline"]'); await sleep(300);
       const back = await CT(() => ((document.getElementById('misk-code-theme-vars') || {}).textContent || '').includes('outline: none'));
       check(!back, 'Lit notes: Outline is Strudel\'s frame again');

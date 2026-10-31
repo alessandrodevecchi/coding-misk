@@ -155,7 +155,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setCodeFont'), `<select id="set-code-font" data-no-knob>${Object.keys(FONTS).map(k => opt(k, C.font, fontName(k, L))).join('')}</select>`)}
           ${row(t('setCodeSize'), seg('data-set-code-size', Object.keys(SIZES).map(k => [k, t(`codeSize:${k}`)]), C.size), t('setCodeSizeHint'))}
           ${row(t('setCodeDim'), seg('data-set-code-dim', [['1', t('cwYes')], ['0', t('cwNo')]], C.dim ? '1' : '0'), t('setCodeDimHint'))}
-          ${row(t('setCodeLit'), seg('data-set-code-lit', [['outline', t('codeLit:outline')], ['fill', t('codeLit:fill')]], C.lit || 'outline'), t('setCodeLitHint'))}`;
+          ${row(t('setCodeLit'), seg('data-set-code-lit', [['outline', t('codeLit:outline')], ['fill', t('codeLit:fill')], ['underline', t('codeLit:underline')]], C.lit || 'outline'), t('setCodeLitHint'))}`;
   }
 
   // "Code over" (code-over-visual D13): the stage mode, side, width, opacity, the edited line, lit tokens, long lines

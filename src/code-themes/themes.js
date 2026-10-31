@@ -9,7 +9,8 @@
 export const CT_KEY = 'coding-misk-code-theme';
 // theme: 'auto' or a theme id; font: a FONTS key; size: a SIZES key; dim: the text of muted `_$:` lines at about 55 %
 // (owner's answer to Q7: an option, on by default)
-// lit: the playing notes outlined (Strudel's way) or filled (code-over-visual D6, "Lit notes")
+// lit: the playing notes outlined (Strudel's way), filled (code-over-visual D6) or underlined (settings-polish D1, "Lit notes")
+export const LIT_FORMS = ['outline', 'fill', 'underline'];
 export const CT_DEFAULTS = { theme: 'auto', font: 'jetbrains', size: 'medium', dim: true, lit: 'outline' };
 // the opacity of the text of a muted line, in the panel and in videos
 export const MUTED_TEXT = 0.55;
@@ -43,7 +44,7 @@ export function codeThemeSettings(v) {
     font: FONTS[o.font] ? o.font : CT_DEFAULTS.font,
     size: SIZES[o.size] ? o.size : CT_DEFAULTS.size,
     dim: typeof o.dim === 'boolean' ? o.dim : CT_DEFAULTS.dim,
-    lit: o.lit === 'fill' ? 'fill' : 'outline',
+    lit: LIT_FORMS.includes(o.lit) ? o.lit : CT_DEFAULTS.lit,
   };
 }
 
@@ -83,6 +84,15 @@ const lum = c => { const A = parseColor(c); return [0, 1, 2].map(i => { const v 
 export function contrast(fg, bg) {
   const a = lum(over(fg, bg)), b = lum(over(bg, '#000000'));
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+// the underline of the playing notes (settings-polish D1): the theme's accent (widget accent, else the caret), or the
+// text colour when the accent has less than 3:1 against the ground (`fallback` true)
+export const UNDERLINE_MIN = 3;
+export const accentOf = R => (R.widget && R.widget.a1) || R.caret || R.text;
+export function underlineRole(R) {
+  const a = accentOf(R);
+  return contrast(a, R.bg) >= UNDERLINE_MIN ? { color: a, fallback: false } : { color: R.text, fallback: true };
 }
 
 // the text roles measured for contrast (spec: Readable contrast)
@@ -228,7 +238,9 @@ export function overRoles(R, level = 'medium') {
   const accent = (R.widget && R.widget.a1) || R.caret || R.text, edit = alpha(over(accent, R.bg), 0.94);
   // the ink of the edited line: black or white, whichever reads better on the edit band over either ground
   const editInk = worstOn('#000000', edit) >= worstOn('#ffffff', edit) ? '#000000' : '#ffffff';
-  return (c[level] = { band, opacity, edit, editInk, roles });
+  // the underline of the playing tokens on the band: the accent, or the lifted text colour under 3:1 (worst ground)
+  const underline = worstOn(accent, band) >= UNDERLINE_MIN ? accent : roles.text;
+  return (c[level] = { band, opacity, edit, editInk, roles, underline });
 }
 // (for the check) the worst contrast of a colour on a band over black and over white
 export const bandContrast = worstOn;

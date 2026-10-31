@@ -27,7 +27,7 @@ const LIVE_KEY = 'coding-misk-live-preset';
 // getCodeOver(cyc): what the "Code over" layout needs besides the code (code-over-visual): { S (its settings), aw (the app
 // widgets' settings), cursor ({ line, col, editing } of the line being typed, or null), lit ([{ evaluated (a code
 // evaluated), spans ([from, to] offsets into it of the haps sounding) }]), notes(c0, c1) (for the app widgets), meter, key, lang, render,
-// litForm ('outline' | 'fill'), song (a key: the widgets' rows start again with another song), fast (the fast video) }
+// litForm ('outline' | 'fill' | 'underline'), song (a key: the widgets' rows start again with another song), fast (the fast video) }
 export function createVideo({ getCodeOver = () => null, getCodeTheme = () => null, getWidgets = () => null, visuals, getCode, getInfo, getCaptions = () => null, getSoul, getTimeline = () => null, getHighlights = () => false, soulFrame = null, soulView = () => 'a', store, t, esc }) {
   const opts = () => { const o = { ...VIDEO_DEFAULTS, ...(store.get(KEY, {}) || {}) }; if (!LAYOUTS.includes(o.layout)) o.layout = VIDEO_DEFAULTS.layout; if (!QUALITIES[o.quality]) o.quality = VIDEO_DEFAULTS.quality; if (!CARDS.includes(o.card)) o.card = VIDEO_DEFAULTS.card; return o; };
   const setOpt = (k, v) => store.set(KEY, { ...opts(), [k]: v });

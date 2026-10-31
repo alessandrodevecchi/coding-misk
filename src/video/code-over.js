@@ -119,7 +119,7 @@ function tokens(line, R) {
 // g: a 2D context; A: the code area { x, y, w, h, fs }; F: the frame { code, cursor ({ line, col, editing } or null),
 // lit ([line, from, to] of the shown code), widgets ([{ after, frame }] from codeOverWidgets), dim (muted lines dimmed),
 // blink (the cursor blinks: real time), now (seconds) }; T: { R (code theme roles), O (overRoles), lit ('outline' |
-// 'fill'), font, long ('cut' | 'wrap') }; st: the scroll state of this picture ({} kept by the caller).
+// 'fill' | 'underline'), font, long ('cut' | 'wrap') }; st: the scroll state of this picture ({} kept by the caller).
 // → what was drawn, for the checks: { cols, rows: [{ line, x, y, w, text, edit }], widgets: [{ kind, x, y, w, h }] }
 export function drawCodeOver(g, A, F, T, st = {}) {
   const fs = A.fs || 24, lh = Math.round(fs * 1.42), font = T.font || '"JetBrains Mono", monospace';
@@ -192,6 +192,7 @@ export function drawCodeOver(g, A, F, T, st = {}) {
       if (b <= 0 || a >= text.length - (text.endsWith('…') ? 1 : 0)) continue;
       const x0 = A.x + Math.max(0, a) * cw - 2, w0 = (Math.min(b, text.length) - Math.max(0, a)) * cw + 4;
       if (T.lit === 'fill') { g.globalAlpha = 0.45; g.fillStyle = isEdit ? O.editInk : R.outline || R.text; g.fillRect(x0, y + 3, w0, lh - 6); g.globalAlpha = 1; }
+      else if (T.lit === 'underline') { const th = Math.max(2, fs / 12); g.fillStyle = isEdit ? O.editInk : O.underline; g.fillRect(x0, y + lh - 3 - th, w0, th); }
       else { g.strokeStyle = isEdit ? O.editInk : T.R.outline || R.text; g.lineWidth = Math.max(2, fs / 12); g.strokeRect(x0, y + 3, w0, lh - 6); }
     }
     if (isEdit && (!F.blink || Math.floor((F.now || 0) * 2) % 2 === 0)) {
