@@ -71,6 +71,8 @@ A chip in `.hud-row`, after "Code over", drawn icon plus the word "Widgets" (it:
 
 ## Open Questions
 
-1. One tone cloud per picture (one in the code panel and one on the stage at the same time) or one across the whole screen? Recommended: per picture; the stage is often full screen alone and in videos the code layouts already follow the code's own rule.
-2. Should the "Widgets" button also have a keyboard key? Recommended: not now; add one with the other stage keys if the owner asks.
-3. Should Monitor's panel count (2 to 6) grow now that the drums share one panel? Recommended: no, keep 6; the freed slots already show more instruments.
+Resolved by the owner on 2026-10-31:
+
+1. One tone cloud per picture (one in the code panel and one on the stage at the same time): yes, as recommended.
+2. A keyboard key for the "Widgets" button: no.
+3. Monitor's panel count stays at 6 at most.

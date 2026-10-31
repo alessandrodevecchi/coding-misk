@@ -86,6 +86,7 @@ A script `tools/measure-render-density.cjs` (dev server) sets each output (windo
 
 ## Open Questions
 
-1. Should the owner get a "Density" setting (Coarse, Normal, Fine) on top of the rule? Recommended: no for now; the rule with limits first, a setting only if the pictures after the change still disagree with the owner's taste.
+1. Should the owner get a "Density" setting (Coarse, Normal, Fine) on top of the rule? Owner, 2026-10-31: yes, likely needed, since the laptop screen, a vertical external screen and an ultrawide screen look different. To be specified (one setting for all screens or remembered per screen).
 2. Should the light form ever switch on at full screen? Recommended: yes, but gentler (× 1.5) and shown in the Render menu, so the owner can set "Never light" when the machine is fast enough.
-3. Should CRT change at all? Recommended: yes, only the spacing in logical pixels (D6); its look stays.
+3. (Owner, 2026-10-31: the passes may later run on video pictures too, for example a video visual in Decode; the density rule and CRT spacing must work on any picture source, not only the drawn visuals.)
+4. Should CRT change at all? Recommended: yes, only the spacing in logical pixels (D6); its look stays.
