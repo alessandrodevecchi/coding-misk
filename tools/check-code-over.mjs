@@ -91,6 +91,12 @@ const T = { R, O, lit: 'outline' };
   check(g4.log.some(x => x[0] === 'strokeRect'), 'a lit token framed (Outline)');
   const g5 = recorder(); drawCodeOver(g5, A, { code, cursor: null, lit: [[1, 6, 10]], widgets: [] }, { ...T, lit: 'fill' }, {});
   check(!g5.log.some(x => x[0] === 'strokeRect') && g5.log.filter(x => x[0] === 'fillRect').length > fills.length, 'a lit token filled (Filled)');
+  // Underlined (settings-polish D1): no frame, one thin filled rectangle under the token, in the underline colour
+  const g6 = recorder(); drawCodeOver(g6, A, { code, cursor: null, lit: [[1, 6, 10]], widgets: [] }, { ...T, lit: 'underline' }, {});
+  const f6 = g6.log.filter(x => x[0] === 'fillRect');
+  check(!g6.log.some(x => x[0] === 'strokeRect') && f6.length === fills.length + 1, 'a lit token underlined (Underlined): no frame, one rectangle');
+  const u6 = f6.find(x => x[4] <= 4 && x[4] >= 2);
+  check(u6 && g6.log.some(x => x[0] === '=' && x[1] === 'fillStyle' && x[2] === O.underline), 'the underline is thin and in the underline colour');
 }
 
 // ---------- lit tokens (D6, cv4) ----------

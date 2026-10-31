@@ -5,7 +5,7 @@
 //   npm run check:code-themes            exit 1 on a failure
 //   npm run check:code-themes -- --table print the contrast table
 import fs from 'node:fs';
-import { THEMES, OWN_IDS, STRUDEL_IDS, HIGH_CONTRAST, TEXT_ROLES, AUTO, autoTheme, resolveTheme, neonRoles, contrast, over, codeThemeSettings, CT_DEFAULTS, fontPx, FONTS, SIZES, MUTED_TEXT, parseColor, appRoles, overRoles, bandContrast, BAND_LEVELS, BAND_OPACITY } from '../src/code-themes/themes.js';
+import { THEMES, OWN_IDS, STRUDEL_IDS, HIGH_CONTRAST, TEXT_ROLES, AUTO, autoTheme, resolveTheme, neonRoles, contrast, over, codeThemeSettings, CT_DEFAULTS, fontPx, FONTS, SIZES, MUTED_TEXT, parseColor, appRoles, overRoles, bandContrast, underlineRole, LIT_FORMS, UNDERLINE_MIN, BAND_LEVELS, BAND_OPACITY } from '../src/code-themes/themes.js';
 
 const problems = [], table = process.argv.includes('--table');
 const fail = m => problems.push(m);
@@ -22,6 +22,17 @@ if (Object.keys(looks).length < 5) fail(`only ${Object.keys(looks).length} looks
 // (the hardware rule comes after the looks in the file: it wins where both set a token)
 const tokensOf = (look, ui) => { const t = { ...root, ...looks[look], ...(ui === 'hw' ? hw : {}) }; return { bg: t.bg, ink: t.ink, muted: t.muted, a1: t.a1, a2: t.a2, s3: t.s3 }; };
 
+// ---------- the underline of the lit notes (settings-polish D1): the accent, or the text colour under 3:1 ----------
+const fallbacks = [];
+function underlineCheck(label, R) {
+  const u = underlineRole(R);
+  if (!parseColor(u.color)) fail(`${label}: underline role missing`);
+  const c = contrast(u.color, R.bg);
+  if (u.fallback) fallbacks.push(label);
+  // the text colour is the last resort: it must reach the minimum itself (every theme's text reads at 4.5:1 or more)
+  if (c < UNDERLINE_MIN) fail(`${label}: underline ${u.color} on ${R.bg} is ${fmt(c)}:1, under ${UNDERLINE_MIN}:1`);
+}
+
 // ---------- roles and contrast ----------
 function measure(label, id, R, min) {
   for (const k of ROLES) if (!R[k] || !parseColor(R[k])) fail(`${label}: role ${k} missing or not a colour (${R[k]})`);
@@ -35,6 +46,7 @@ function measure(label, id, R, min) {
   // the playing-note outline and the flash must show on the ground
   if (contrast(R.outline, R.bg) < 3) fail(`${label}: playing-note outline ${fmt(contrast(R.outline, R.bg))}:1, under 3:1`);
   if (contrast(over(R.flash, R.bg), R.bg) < 1.15) fail(`${label}: the flash does not show on the ground`);
+  underlineCheck(label, R);
   if (table) console.log(`${label.padEnd(34)} lowest ${low.padEnd(8)} ${fmt(c[low]).padStart(5)}:1   text ${fmt(c.text).padStart(5)}   comment ${fmt(c.comment).padStart(5)}   dimmed text ${fmt(dimmed).padStart(5)}`);
   return c[low];
 }
@@ -50,6 +62,7 @@ for (const id of OWN_IDS) {
 for (const id of STRUDEL_IDS) {
   const R = THEMES[id].roles;
   for (const k of ROLES) if (!R[k] || !parseColor(R[k])) fail(`${id}: role ${k} missing`);
+  underlineCheck(id, R);
   const t = contrast(R.text, R.bg), cm = contrast(R.comment, R.bg);
   if (!R.legacy && (t < 4.5 || cm < 4.5)) fail(`${id}: text ${fmt(t)}:1, comment ${fmt(cm)}:1, under 4.5:1`);
   if (R.legacy && t < 4.5) fail(`${id}: text ${fmt(t)}:1`);
@@ -65,6 +78,9 @@ const bandCheck = (label, R) => {
     for (const k of TEXT_ROLES) { const c = bandContrast(O.roles[k], O.band); bandLow = Math.min(bandLow, c); if (c < 4.5) fail(`${label} ${level}: ${k} on the band is ${fmt(c)}:1 over black or white, under 4.5:1`); }
     const e = bandContrast(O.editInk, O.edit);
     if (e < 4.5) fail(`${label} ${level}: the edited line's ink ${O.editInk} on ${O.edit} is ${fmt(e)}:1`);
+    // the underline of the lit tokens on the band, over black and over white
+    const u = bandContrast(O.underline, O.band);
+    if (u < UNDERLINE_MIN) fail(`${label} ${level}: the underline ${O.underline} on the band is ${fmt(u)}:1 over black or white, under ${UNDERLINE_MIN}:1`);
     bands++;
   }
   if (overRoles(R, 'low').opacity > overRoles(R, 'high').opacity) fail(`${label}: Low is more opaque than High`);
@@ -96,6 +112,10 @@ if (AUTO.light !== 'contrast-light' || resolveTheme(CT_DEFAULTS, 'light').id !==
 if (autoTheme('unknown') !== 'neon') fail('Automatic: an unknown app theme falls back to Neon');
 if (resolveTheme({ ...CT_DEFAULTS, theme: 'terminal' }, 'hw').id !== 'terminal') fail('a chosen theme must not follow the app theme');
 for (const id of Object.keys(AUTO).map(k => AUTO[k])) if (!THEMES[id]) fail(`Automatic maps to an unknown theme ${id}`);
+if (LIT_FORMS.join() !== 'outline,fill,underline' || CT_DEFAULTS.lit !== 'outline') fail('lit notes: Outline (default), Filled, Underlined');
+for (const v of LIT_FORMS) if (codeThemeSettings({ lit: v }).lit !== v) fail(`lit notes: ${v} kept`);
+if (codeThemeSettings({ lit: 'wavy' }).lit !== 'outline') fail('lit notes: an unknown value falls back to Outline');
+console.log(`underline: ${fallbacks.length} theme${fallbacks.length === 1 ? '' : 's'} use the text colour (accent under ${UNDERLINE_MIN}:1)${fallbacks.length ? ': ' + [...new Set(fallbacks)].join(', ') : ''}`);
 const S0 = codeThemeSettings(null);
 if (JSON.stringify(S0) !== JSON.stringify(CT_DEFAULTS)) fail('settings: defaults');
 if (codeThemeSettings({ theme: 'nope', font: 'x', size: 'huge', dim: 'yes' }).theme !== 'auto') fail('settings: unknown theme dropped');

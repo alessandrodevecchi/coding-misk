@@ -128,5 +128,7 @@ Rows not listed keep their text: it was read and found clear (theme, follow the 
 
 ## Open Questions
 
-1. Should Underlined become the default instead of Outline? Recommended: no, keep Outline as the default (Strudel's own look), and let the owner try Underlined first.
-2. Should the tooltip of a row also show on its control (the select or the buttons), not only on the label? Recommended: label only; the controls already carry their own values and some have their own titles.
+Resolved by the owner on 2026-10-31:
+
+1. Should Underlined become the default instead of Outline? **Resolved (2026-10-31): no.** Outline stays the default (Strudel's own look); Underlined is an option.
+2. Should the tooltip of a row also show on its control (the select or the buttons), not only on the label? **Resolved (2026-10-31): label only.** The help text is the tooltip on the setting's label, not on the control.

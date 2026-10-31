@@ -8,7 +8,7 @@ import { noteToMidi } from '../node_modules/@strudel/core/util.mjs';
 import { monitorLayout, drawMonitor, drawRullo } from '../src/visuals/widget-looks.js';
 import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache, pitchOf, cwInstrument } from '../src/visuals/stage-feed.js';
 import { THEME_PALETTES, themePalette, instColour, scenePalette } from '../src/visuals/widget-palettes.js';
-import { widgetSettings } from '../src/live/widgets.js';
+import { widgetSettings, CW_DEFAULTS, CW_VERSION } from '../src/live/widgets.js';
 import { stripLayout, screenLayout, palcoScreen, drawLayer, seeThrough } from '../src/visuals/widget-layer.js';
 import { SW_DEFAULTS, stageSettings, stageMapping, layerOn, limitOf, stageScopeInstruments } from '../src/visuals/stage-settings.js';
 import { makeBackup } from '../src/settings/backup.js';
@@ -226,6 +226,14 @@ for (const look of ['monitor', 'rullo']) {
 // ---------- the looks in the menus ----------
 check(['monitor', 'rullo'].every(k => LOOKS.some(l => l[0] === k) && PICK_LOOKS.some(l => l[0] === k)), 'Monitor and Rullo are looks in every menu (LOOKS)');
 check(LOOKS.find(l => l[0] === 'rullo')[1].en === 'Roll' && LOOKS.find(l => l[0] === 'rullo')[1].it === 'Rullo', 'Rullo is "Roll" in English');
+
+// ---------- Widget notes default (settings-polish D2) ----------
+check(CW_DEFAULTS.notes === 'full' && widgetSettings(null).notes === 'full', 'Widget notes: Always full by default (and after a reset)');
+check(widgetSettings({ notes: 'volume' }).notes === 'full' && widgetSettings({ on: true, notes: 'volume', appKinds: 1 }).notes === 'full', 'Widget notes: a stored "volume" without a version moves to full');
+const keep = widgetSettings({ notes: 'volume', v: CW_VERSION });
+check(keep.notes === 'volume' && widgetSettings(keep).notes === 'volume', 'Widget notes: "volume" chosen after the move is kept');
+check(widgetSettings(widgetSettings({ notes: 'volume' })).notes === 'full' && widgetSettings({ notes: 'full', v: CW_VERSION }).notes === 'full', 'Widget notes: the move is saved with the version and does not repeat');
+check(widgetSettings(null).v === CW_VERSION, 'Widget notes: settings carry the version');
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);

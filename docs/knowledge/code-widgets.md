@@ -61,7 +61,7 @@ PORT=5196 node tools/check-code-widgets.cjs /tmp/cw   # in the browser, with scr
 
 - Strudel's `_scope` takes its colour from the haps, not its options: the wrapper colours only the drawn copy (`.color()` on the pattern given to the original).
 - Strudel's own scope takes its colour from the haps (white between two hits) and its spectrum ignores `color` and keeps its last frame per id. The app draws both itself (`scopePainter`, `spectrumPainter`, started with `.draw` on the widget's id, which stops Strudel's loop): always in the widget's colour, and a new spectrum starts blank.
-- Not done yet: the choice of the Widget notes default (measures above, screenshots in the owner's notes).
+- **Widget notes default** (settings-polish D2, owner 2026-10-31): "Always full". The stored settings carry a version `v` (`CW_VERSION` 2): a stored "Follow the volume" without it was only the old default, so `widgetSettings` reads it as "Always full" once; saved again with `v` 2, a later choice of "Follow the volume" stays. The stage panels with "Same as code widgets" follow.
 
 ## Where to read more
 

@@ -43,7 +43,7 @@ const ARROW = d => `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden=
 export function createSettings({ root, t, tx, esc, store, looks, app, toast, confirmTwice }) {
   const opt = (v, cur, label) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   const seg = (attr, items, cur) => `<div class="langs" role="group">${items.map(([v, l]) => `<button ${attr}="${esc(v)}" aria-pressed="${v === cur}">${esc(l)}</button>`).join('')}</div>`;
-  const row = (label, html, hint = '') => `<div class="set-row"><span class="lbl">${esc(label)}</span><div class="set-ctrl">${html}${hint ? `<p class="hint muted">${esc(hint)}</p>` : ''}</div></div>`;
+  const row = (label, html, hint = '') => `<div class="set-row"><span class="lbl"${hint ? ` title="${esc(hint)}"` : ''}>${esc(label)}</span><div class="set-ctrl">${html}${hint ? `<p class="hint muted">${esc(hint)}</p>` : ''}</div></div>`;
 
   function render() {
     if (root.hidden) return;
@@ -53,7 +53,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         <div class="card set-card"><h3>${esc(t('setLook'))}</h3>
           ${row(t('setTheme'), seg('data-set-ui', [['neon', 'NEON'], ['hw', 'HW'], ['light', t('uiLight')]], app.ui()), t('setThemeHint'))}
           ${row(t('setUiFollow'), seg('data-set-ui-follow', [['1', t('cwYes')], ['0', t('cwNo')]], app.uiFollow() ? '1' : '0'), t('setUiFollowHint'))}
-          ${row(t('setLang'), seg('data-set-lang', [['it', 'IT'], ['en', 'EN']], app.lang()))}
+          ${row(t('setLang'), seg('data-set-lang', [['it', 'IT'], ['en', 'EN']], app.lang()), t('helpLang'))}
           ${row(t('setRadioLook'), `<select id="set-radio-look" data-no-knob>${looks.map(([k, l]) => opt(k, store.get('coding-misk-radio-look', 'palco'), tx(l))).join('')}</select>`, t('setRadioLookHint'))}
           ${row(t('setRender'), `<select id="set-render" data-no-knob>${RENDERS.map(([k, l]) => opt(k, store.get('coding-misk-render', 'normal'), tx(l))).join('')}</select>`, t('setRenderHint'))}
           ${row(t('setRenderLight'), `<select id="set-render-light" data-no-knob>${['auto', 'on', 'off'].map(k => opt(k, store.get('coding-misk-render-light', 'auto'), t(`setRenderLight:${k}`))).join('')}</select>`, t('setRenderLightHint'))}
@@ -62,9 +62,9 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         ${captionsCard()}
         ${phrasesCard()}
         <div class="card set-card"><h3>${esc(t('setAudio'))}</h3>
-          ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`)}
+          ${row(t('setVolume'), `<span class="set-vol"><input type="range" id="set-volume" min="0" max="100" step="1" value="${app.volume()}" data-no-knob><output>${app.volume()}%</output></span>`, t('helpVolume'))}
           ${row(t('setFormat'), `<select id="set-format" data-no-knob>${FORMATS.map(f => opt(f, fmt, t(`set${f[0].toUpperCase()}${f.slice(1)}`))).join('')}</select>`, t('setFormatHint'))}
-          ${fmt === 'mp3' ? row(t('setMp3Rate'), seg('data-set-mp3', MP3_RATES.map(r => [String(r), `${r} kbps`]), String(store.get('coding-misk-export-mp3', 320)))) : ''}
+          ${fmt === 'mp3' ? row(t('setMp3Rate'), seg('data-set-mp3', MP3_RATES.map(r => [String(r), `${r} kbps`]), String(store.get('coding-misk-export-mp3', 320))), t('helpMp3')) : ''}
           ${row(t('setTyping'), `<select id="set-typing" data-no-knob>${['slow', 'normal', 'fast'].map(k => opt(k, store.get('coding-misk-typing', 'normal'), t(`setTyping:${k}`))).join('')}</select>`, t('setTypingHint'))}
           ${row(t('setSpeed'), `<select id="set-speed" data-no-knob>${opt('fast', store.get('coding-misk-export-speed', 'fast'), t('setSpeedFast'))}${opt('real', store.get('coding-misk-export-speed', 'fast'), t('setSpeedReal'))}</select>`, t('setSpeedHint'))}
         </div>
@@ -72,38 +72,38 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           <figure class="vid-preview"><canvas id="set-vid-preview" width="480" height="270" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted">${esc(t('vidPreviewHint'))}</figcaption></figure>
           ${row(t('setVidLayout'), `<select data-vid-opt="layout" data-no-knob>${LAYOUTS.map(k => opt(k, vid.layout, t(`vidLayout:${k}`))).join('')}</select>`, t(`vidLayoutHint:${vid.layout}`))}
           ${row(t('setVidQuality'), `<select data-vid-opt="quality" data-no-knob>${Object.keys(QUALITIES).map(k => opt(k, vid.quality, t(`vidQuality:${k}`))).join('')}</select>`, t('setVidQualityHint'))}
-          ${row(t('setVidCard'), `<select data-vid-opt="card" data-no-knob>${CARDS.map(k => opt(k, vid.card, t(`vidCard:${k}`))).join('')}</select>`)}
+          ${row(t('setVidCard'), `<select data-vid-opt="card" data-no-knob>${CARDS.map(k => opt(k, vid.card, t(`vidCard:${k}`))).join('')}</select>`, t('helpVidCard'))}
           ${row(t('setVidCodeColors'), `<select data-vid-opt="codeColors" data-no-knob>${CODE_COLORS.map(k => opt(k, vid.codeColors, t(`vidCodeColors:${k}`))).join('')}</select>`, t('setVidCodeColorsHint'))}
           ${row(t('setVidRealScope'), `<select data-vid-opt="realScope" data-no-knob>${REAL_SCOPES.map(k => opt(k, vid.realScope, t(`vidRealScope:${k}`))).join('')}</select>`, t('setVidRealScopeHint'))}
           ${row(t('setVidVisual'), `<select data-vid-opt="visual" data-no-knob>${opt('song', vid.visual, t('vidVisual:song'))}${looks.map(([k, l]) => opt(`fixed:${k}`, vid.visual, t('vidVisual:fixed', { look: tx(l) }))).join('')}${opt('song-cycle', vid.visual, t('vidVisual:song-cycle'))}${opt('section-cycle', vid.visual, t('vidVisual:section-cycle'))}</select>`, t('setVidVisualHint'))}
-          ${row(t('setRender'), `<select data-vid-opt="render" data-no-knob>${opt('stage', vid.render, t('renderStage'))}${RENDERS.map(([k, l]) => opt(k, vid.render, tx(l))).join('')}</select>`)}
+          ${row(t('setRender'), `<select data-vid-opt="render" data-no-knob>${opt('stage', vid.render, t('renderStage'))}${RENDERS.map(([k, l]) => opt(k, vid.render, tx(l))).join('')}</select>`, t('helpVidRender'))}
           ${row(t('setVidSoulMode'), `<select data-vid-opt="soul" data-no-knob>${SOULS.map(k => opt(k, vid.soul, t(`vidSoul:${k}`))).join('')}</select>`, t(`vidSoulHint:${vid.soul}`))}
           ${vid.layout === 'code' && vid.soul !== 'off' && vid.soul !== 'full' ? row(t('setVidSoul'), seg('data-vid-soul', [['1', t('vidSoulShown')], ['0', t('vidSoulFolded')]], vid.soulPanel ? '1' : '0'), t('setVidSoulHint')) : ''}
-          ${row(t('setCap'), `<span class="muted">${esc(t(captionSettings(store.get(CAPTIONS_KEY, null)).on && captionSettings(store.get(CAPTIONS_KEY, null)).videos ? 'capExportOn' : 'capExportOff'))} · <a href="#set-captions" data-cap-link>${esc(t('capExportLink'))}</a></span>${app.capsSkipNext ? ` <label class="rx-opt"><input type="checkbox" data-cap-skip${app.capsSkipNext() ? ' checked' : ''} data-no-knob> <span>${esc(t('capExportNone'))}</span></label>` : ''}`)}
+          ${row(t('setCap'), `<span class="muted">${esc(t(captionSettings(store.get(CAPTIONS_KEY, null)).on && captionSettings(store.get(CAPTIONS_KEY, null)).videos ? 'capExportOn' : 'capExportOff'))} · <a href="#set-captions" data-cap-link>${esc(t('capExportLink'))}</a></span>${app.capsSkipNext ? ` <label class="rx-opt"><input type="checkbox" data-cap-skip${app.capsSkipNext() ? ' checked' : ''} data-no-knob> <span>${esc(t('capExportNone'))}</span></label>` : ''}`, t('helpVidTexts'))}
           ${row(t('setVidPreset'), `<span class="vid-presets"><select id="set-vid-preset" data-no-knob><option value="">${esc(t('vidPresetPick'))}</option>${Object.keys(presets).sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select><input id="set-vid-preset-name" type="text" maxlength="40" placeholder="${esc(t('vidPresetName'))}" aria-label="${esc(t('vidPresetName'))}"><button class="btn small" id="set-vid-preset-save">${esc(t('vidPresetSave'))}</button>${Object.keys(presets).length ? `<button class="btn small danger" id="set-vid-preset-del">${esc(t('vidPresetDel'))}</button>` : ''}</span>`, t('setVidPresetHint'))}
         </div>
         <div class="card set-card" id="set-fragments"><h3>${esc(t('setVertical'))}</h3>
           <p class="muted">${esc(t('setVerticalIntro'))}</p>
           <figure class="vid-preview v"><canvas id="set-frag-preview" width="270" height="270" aria-label="${esc(t('vidPreview'))}"></canvas></figure>
-          ${row(t('fragFormat'), `<select data-frag-opt="format" data-no-knob>${Object.keys(F_FORMATS).map(k => opt(k, fr.format, t(`fragFormat:${k}`))).join('')}</select>`)}
-          ${row(t('fragShow'), `<select data-frag-opt="show" data-no-knob>${F_SHOWS.map(k => opt(k, fr.show, t(`fragShow:${k}`))).join('')}</select>`)}
+          ${row(t('fragFormat'), `<select data-frag-opt="format" data-no-knob>${Object.keys(F_FORMATS).map(k => opt(k, fr.format, t(`fragFormat:${k}`))).join('')}</select>`, t('helpFragFormat'))}
+          ${row(t('fragShow'), `<select data-frag-opt="show" data-no-knob>${F_SHOWS.map(k => opt(k, fr.show, t(`fragShow:${k}`))).join('')}</select>`, t('helpFragShow'))}
           ${row(t('fragAspect'), `<select data-frag-opt="aspect" data-no-knob>${F_ASPECTS.map(k => opt(k, fr.aspect, t(`fragAspect:${k}`))).join('')}</select>`, t('fragAspectHint'))}
-          ${row(t('fragLook'), `<select data-frag-opt="look" data-no-knob>${opt('song', fr.look, t('fragPick:song'))}${opt('random', fr.look, t('fragPick:random'))}${looks.map(([k, l]) => opt(k, fr.look, tx(l))).join('')}</select>`)}
-          ${row(t('setRender'), `<select data-frag-opt="render" data-no-knob>${opt('stage', fr.render, t('renderStage'))}${RENDERS.map(([k, l]) => opt(k, fr.render, tx(l))).join('')}</select>`)}
-          ${row(t('fragSoulView'), `<select data-frag-opt="soulView" data-no-knob>${opt('song', fr.soulView, t('fragPick:song'))}${opt('random', fr.soulView, t('fragPick:random'))}${SOUL_VIEWS.map(k => opt(k, fr.soulView, `${k.toUpperCase()} · ${SOUL_VIEW_NAMES[k]}`)).join('')}</select>`)}
+          ${row(t('fragLook'), `<select data-frag-opt="look" data-no-knob>${opt('song', fr.look, t('fragPick:song'))}${opt('random', fr.look, t('fragPick:random'))}${looks.map(([k, l]) => opt(k, fr.look, tx(l))).join('')}</select>`, t('helpFragVisual'))}
+          ${row(t('setRender'), `<select data-frag-opt="render" data-no-knob>${opt('stage', fr.render, t('renderStage'))}${RENDERS.map(([k, l]) => opt(k, fr.render, tx(l))).join('')}</select>`, t('helpFragRender'))}
+          ${row(t('fragSoulView'), `<select data-frag-opt="soulView" data-no-knob>${opt('song', fr.soulView, t('fragPick:song'))}${opt('random', fr.soulView, t('fragPick:random'))}${SOUL_VIEWS.map(k => opt(k, fr.soulView, `${k.toUpperCase()} · ${SOUL_VIEW_NAMES[k]}`)).join('')}</select>`, t('helpFragSoul'))}
           ${row(t('fragFiles'), `<span class="chips" role="group">${F_FILES.map(k => `<button class="chip" data-frag-file="${k}" aria-pressed="${fr.files.includes(k)}">${esc(t(`fragFile:${k}`))}</button>`).join('')}</span>`, t('fragFilesHint'))}
-          ${row(t('fragBandTop'), seg('data-fb-bandtop', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bandTop ? '1' : '0'))}
-          ${row(t('fragBandBottom'), seg('data-fb-bandbottom', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bandBottom ? '1' : '0'))}
+          ${row(t('fragBandTop'), seg('data-fb-bandtop', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bandTop ? '1' : '0'), t('helpFragBandTop'))}
+          ${row(t('fragBandBottom'), seg('data-fb-bandbottom', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bandBottom ? '1' : '0'), t('helpFragBandBottom'))}
           ${row(t('fragBleed'), seg('data-fb-bleed', [['1', t('fragOn')], ['0', t('fragOff')]], fr.bleed ? '1' : '0'), t('fragBleedHint'))}
           ${row(t('fragRotate'), seg('data-fb-rotate', [['1', t('fragOn')], ['0', t('fragOff')]], fr.rotate ? '1' : '0'), t('fragRotateHint'))}
           ${row(t('fragCode'), `<select data-frag-opt="codeMode" data-no-knob>${F_CODE.map(k => opt(k, fr.codeMode, t(`fragCode:${k}`))).join('')}</select>`, t(`fragCodeHint:${fr.codeMode}`))}
-          ${row(t('setFragTagline'), `<span class="die-row"><input type="text" data-frag-opt="tagline" value="${esc(fr.tagline)}" maxlength="60" data-no-knob><button class="dice" data-frag-die title="${esc(t('fragDie'))}" aria-label="${esc(t('fragDie'))}">${DICE}</button>${fr.tagline !== V_DEFAULTS.tagline ? `<button class="dice" data-frag-revert title="${esc(t('fragRevert'))}" aria-label="${esc(t('fragRevert'))}">${REVERT}</button>` : ''}</span>`)}
-          ${row(t('setFragFull'), `<input type="text" data-frag-opt="fullLine" value="${esc(fr.fullLine)}" maxlength="60" placeholder="${esc(t('setFragFullHint'))}" data-no-knob>`)}
+          ${row(t('setFragTagline'), `<span class="die-row"><input type="text" data-frag-opt="tagline" value="${esc(fr.tagline)}" maxlength="60" data-no-knob><button class="dice" data-frag-die title="${esc(t('fragDie'))}" aria-label="${esc(t('fragDie'))}">${DICE}</button>${fr.tagline !== V_DEFAULTS.tagline ? `<button class="dice" data-frag-revert title="${esc(t('fragRevert'))}" aria-label="${esc(t('fragRevert'))}">${REVERT}</button>` : ''}</span>`, t('helpFragTagline'))}
+          ${row(t('setFragFull'), `<input type="text" data-frag-opt="fullLine" value="${esc(fr.fullLine)}" maxlength="60" placeholder="${esc(t('setFragFullHint'))}" data-no-knob>`, t('helpFragFull'))}
           ${row(t('setFragTitle'), seg('data-fb-vtitle', [['1', t('fragOn')], ['0', t('fragOff')]], fr.vTitle ? '1' : '0'), t('setFragTitleHint'))}
-          ${row(t('setFragLabel'), seg('data-fb-label', [['1', t('fragOn')], ['0', t('fragOff')]], fr.label ? '1' : '0'))}
+          ${row(t('setFragLabel'), seg('data-fb-label', [['1', t('fragOn')], ['0', t('fragOff')]], fr.label ? '1' : '0'), t('helpFragLabel'))}
           ${row(t('setFragNext'), `<input type="number" id="set-frag-n" min="1" max="9999" value="${Math.max(1, +store.get('coding-misk-fragment-n', 1) || 1)}" data-no-knob>`, t('setFragNextHint'))}
-          ${row(t('setFragGlitch'), seg('data-fb-glitch', [['1', t('fragOn')], ['0', t('fragOff')]], fr.glitch ? '1' : '0'))}
-          ${row(t('setFragLength'), `<input type="number" data-frag-opt="vLength" min="5" max="180" value="${fr.vLength}" data-no-knob> s`)}
+          ${row(t('setFragGlitch'), seg('data-fb-glitch', [['1', t('fragOn')], ['0', t('fragOff')]], fr.glitch ? '1' : '0'), t('helpFragGlitch'))}
+          ${row(t('setFragLength'), `<input type="number" data-frag-opt="vLength" min="5" max="180" value="${fr.vLength}" data-no-knob> s`, t('helpFragLength'))}
           <div class="actions"><button class="btn" id="set-frag-recipe">${esc(t('setFragRecipe'))}</button></div>
         </div>
         <div class="card set-card" id="set-live"><h3>${esc(t('setLive'))}</h3>
@@ -112,11 +112,11 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           <p class="hint muted">${esc(t(app.liveOn && app.liveOn() ? 'setLiveOn' : 'setLiveHint'))}</p>
         </div>
         <div class="card set-card"><h3>${esc(t('setRadio'))}</h3>
-          ${row(t('radioTransition'), `<select data-radio-opt="transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => opt(k, r.transition, t(k === 'artist' ? 'byArtist' : `tx:${k}`))).join('')}</select>`)}
-          ${row(t('radioHarmony'), `<select data-radio-opt="harmony" data-no-knob>${['artist', ...HARMONY_MODES].map(k => opt(k, r.harmony, t(k === 'artist' ? 'byArtist' : `harmony:${k}`))).join('')}</select>`)}
+          ${row(t('radioTransition'), `<select data-radio-opt="transition" data-no-knob>${['artist', ...TRANSITION_KINDS].map(k => opt(k, r.transition, t(k === 'artist' ? 'byArtist' : `tx:${k}`))).join('')}</select>`, t('helpRadioTransition'))}
+          ${row(t('radioHarmony'), `<select data-radio-opt="harmony" data-no-knob>${['artist', ...HARMONY_MODES].map(k => opt(k, r.harmony, t(k === 'artist' ? 'byArtist' : `harmony:${k}`))).join('')}</select>`, t('helpRadioHarmony'))}
           ${row(t('radioProfile'), `<select data-radio-opt="profile" data-no-knob>${['artist', 'classic', 'crescendo', 'switch'].map(k => opt(k, r.profile || 'artist', t(k === 'artist' ? 'byArtistStyle' : `profile:${k}`))).join('')}</select>`, t('radioProfileTip'))}
-          ${row(t('setScope'), `<select data-radio-opt="scope" data-no-knob>${opt('song', r.scope, t('steerScopeSong'))}${opt('session', r.scope, t('steerScopeSession'))}</select>`)}
-          ${row(t('matDefault'), `<select data-radio-opt="material" data-no-knob>${['mix', 'patterns', 'varied', 'composed'].map(k => opt(k, r.material || 'mix', t(`mat:${k}`))).join('')}</select>`, `${t('matDefaultTip')} ${t('matSourceTip')} ${t('matVariedTip')}`)}
+          ${row(t('setScope'), `<select data-radio-opt="scope" data-no-knob>${opt('song', r.scope, t('steerScopeSong'))}${opt('session', r.scope, t('steerScopeSession'))}</select>`, t('helpRadioScope'))}
+          ${row(t('matDefault'), `<select data-radio-opt="material" data-no-knob>${['mix', 'patterns', 'varied', 'composed'].map(k => opt(k, r.material || 'mix', t(`mat:${k}`))).join('')}</select>`, t('helpRadioMaterial'))}
         </div>
         <div class="card set-card" id="set-library"><h3>${esc(t('setLibrary'))}</h3>
           <p class="muted">${esc(t('setLibraryIntro'))}</p>
@@ -152,10 +152,10 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     const C = app.codeTheme.settings(), L = app.lang();
     const themes = `${opt('auto', C.theme, t('codeTheme:auto'))}<optgroup label="${esc(t('setCodeThemeOwn'))}">${OWN_IDS.map(id => opt(id, C.theme, themeName(id, L))).join('')}</optgroup><optgroup label="${esc(t('setCodeThemeStrudel'))}">${STRUDEL_IDS.map(id => opt(id, C.theme, themeName(id, L))).join('')}</optgroup>`;
     return `${row(t('setCodeTheme'), `<select id="set-code-theme" data-no-knob>${themes}</select>`, C.theme === 'auto' ? t('setCodeThemeAuto', { name: app.codeTheme.autoName(L) }) : t('setCodeThemeChosen'))}
-          ${row(t('setCodeFont'), `<select id="set-code-font" data-no-knob>${Object.keys(FONTS).map(k => opt(k, C.font, fontName(k, L))).join('')}</select>`)}
+          ${row(t('setCodeFont'), `<select id="set-code-font" data-no-knob>${Object.keys(FONTS).map(k => opt(k, C.font, fontName(k, L))).join('')}</select>`, t('helpCodeFont'))}
           ${row(t('setCodeSize'), seg('data-set-code-size', Object.keys(SIZES).map(k => [k, t(`codeSize:${k}`)]), C.size), t('setCodeSizeHint'))}
           ${row(t('setCodeDim'), seg('data-set-code-dim', [['1', t('cwYes')], ['0', t('cwNo')]], C.dim ? '1' : '0'), t('setCodeDimHint'))}
-          ${row(t('setCodeLit'), seg('data-set-code-lit', [['outline', t('codeLit:outline')], ['fill', t('codeLit:fill')]], C.lit || 'outline'), t('setCodeLitHint'))}`;
+          ${row(t('setCodeLit'), seg('data-set-code-lit', [['outline', t('codeLit:outline')], ['fill', t('codeLit:fill')], ['underline', t('codeLit:underline')]], C.lit || 'outline'), t('setCodeLitHint'))}`;
   }
 
   // "Code over" (code-over-visual D13): the stage mode, side, width, opacity, the edited line, lit tokens, long lines
@@ -165,12 +165,12 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       <p class="muted">${esc(t('setCoIntro'))}</p>
       <figure class="vid-preview"><canvas id="set-co-preview" width="480" height="270" aria-label="${esc(t('vidPreview'))}"></canvas><figcaption class="hint muted">${esc(t('coPreviewHint'))}</figcaption></figure>
       ${row(t('coStage'), yn('data-co-stage', S.stage), t('coStageHint'))}
-      ${row(t('coSide'), seg('data-co-side', CO_SIDES.map(k => [k, t(`coSide:${k}`)]), S.side))}
+      ${row(t('coSide'), seg('data-co-side', CO_SIDES.map(k => [k, t(`coSide:${k}`)]), S.side), t('helpCoSide'))}
       ${row(t('coWidth'), `<span class="cw-unit"><input type="number" id="set-co-width" min="${CO_WIDTHS[0]}" max="${CO_WIDTHS[1]}" step="2" value="${S.width}" data-no-knob> %</span>`, t('coWidthHint'))}
       ${row(t('coOpacity'), seg('data-co-opacity', ['low', 'medium', 'high'].map(k => [k, t(`coOpacity:${k}`)]), S.opacity), t('coOpacityHint'))}
       ${row(t('coEdit'), yn('data-co-edit', S.edit), t('coEditHint'))}
       ${row(t('coLit'), seg('data-co-lit', CO_LITS.map(k => [k, t(`coLit:${k}`)]), S.lit), t('coLitHint'))}
-      ${row(t('coLong'), seg('data-co-long', CO_LONG.map(k => [k, t(`coLong:${k}`)]), S.long))}
+      ${row(t('coLong'), seg('data-co-long', CO_LONG.map(k => [k, t(`coLong:${k}`)]), S.long), t('helpCoLong'))}
       <div class="actions"><button class="btn" id="set-co-defaults">${esc(t('cwDefaults'))}</button></div>
     </div>`;
   }
@@ -182,15 +182,15 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   function appWidgetsSection() {
     const A = appWidgetSettings(store.get(AW_KEY, null));
     const ctl = (w, [k, kind, lim, step]) => {
-      const v = A[w][k], hint = t(`awp:${k}Hint`) !== `awp:${k}Hint` ? t(`awp:${k}Hint`) : '';
-      if (kind === 'num') return row(t(`awp:${k}`), `<input type="number" class="aw-num" data-aw-num="${w}:${k}" min="${lim[0]}" max="${lim[1]}" step="${step}" value="${v}" data-no-knob>`);
-      if (kind === 'bool') return row(t(`awp:${k}`), seg(`data-aw-bool="${w}:${k}" data-v`, [['1', t('cwYes')], ['0', t('cwNo')]], v ? '1' : '0'));
-      if (kind === 'seg') return row(t(`awp:${k}`), seg(`data-aw-seg="${w}:${k}" data-v`, lim.map(x => [x, t(`awp:${k}:${x}`)]), v));
+      const v = A[w][k], hk = [`awp:${w}:${k}Hint`, `awp:${k}Hint`].find(x => t(x) !== x), hint = hk ? t(hk) : '';
+      if (kind === 'num') return row(t(`awp:${k}`), `<input type="number" class="aw-num" data-aw-num="${w}:${k}" min="${lim[0]}" max="${lim[1]}" step="${step}" value="${v}" data-no-knob>`, hint);
+      if (kind === 'bool') return row(t(`awp:${k}`), seg(`data-aw-bool="${w}:${k}" data-v`, [['1', t('cwYes')], ['0', t('cwNo')]], v ? '1' : '0'), hint);
+      if (kind === 'seg') return row(t(`awp:${k}`), seg(`data-aw-seg="${w}:${k}" data-v`, lim.map(x => [x, t(`awp:${k}:${x}`)]), v), hint);
       if (kind === 'list') return row(t(`awp:${k}`), `<input type="text" data-aw-list="${w}:${k}" value="${esc(Array.isArray(v) ? v.join(', ') : '')}" data-no-knob>`, hint);
       return row(t(`awp:${k}`), `<input type="text" class="mono" data-aw-text="${w}:${k}" value="${esc(v)}" data-no-knob>`, hint);
     };
     return `<p class="hint muted">${esc(t('awHint'))}</p>${APP_WIDGET_NAMES.map(w => `<div class="aw-widget" data-aw="${w}"><h4>${esc(t(`aw:${w}`))} <code>._${w}()</code></h4>
-      ${row(t('awOn'), seg(`data-aw-on="${w}" data-v`, [['1', t('cwYes')], ['0', t('cwNo')]], A[w].on ? '1' : '0'))}
+      ${row(t('awOn'), seg(`data-aw-on="${w}" data-v`, [['1', t('cwYes')], ['0', t('cwNo')]], A[w].on ? '1' : '0'), t('helpAwOn'))}
       <canvas class="aw-preview" data-aw-preview="${w}" width="520" height="${w === 'hitgrid' ? 220 : 380}" aria-label="${esc(`${t('awPreview')}: ${t(`aw:${w}`)}`)}"></canvas>
       ${AW_PARAMS[w].map(p => ctl(w, p)).join('')}</div>`).join('')}
       <div class="actions"><button class="btn" id="set-aw-defaults">${esc(t('cwDefaults'))}</button></div>`;
@@ -228,7 +228,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       <p class="muted">${esc(t('setCwIntro'))}</p>
       ${row(t('cwOn'), seg('data-cw-on', [['1', t('cwYes')], ['0', t('cwNo')]], S.on ? '1' : '0'), t('cwOnHint'))}
       ${sec('general', `${row(t('cwMax'), `<input type="number" data-cw-num="max" min="1" max="8" step="1" value="${S.max}" data-no-knob>`, t('cwMaxHint'))}
-        ${row(t('cwRoll'), seg('data-cw-roll', [['pianoroll', 'pianoroll'], ['punchcard', 'punchcard']], S.roll))}
+        ${row(t('cwRoll'), seg('data-cw-roll', [['pianoroll', 'pianoroll'], ['punchcard', 'punchcard']], S.roll), t('helpCwRoll'))}
         ${row(t('cwOrder'), order, t('cwOrderHint'))}
         ${row(t('cwShare'), `<span class="cw-unit"><input type="number" data-cw-num="share" min="0" max="100" step="5" value="${S.share}" data-no-knob> %</span>`, t('cwShareHint'))}
         ${row(t('cwNotes'), seg('data-cw-notes', [['volume', t('cwNotes:volume')], ['full', t('cwNotes:full')]], S.notes), t('cwNotesHint'))}`)}
@@ -238,7 +238,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       ${sec('instruments', `<p class="hint muted">${esc(t('cwInstHint'))}</p>${inst}`)}
       ${sec('params', `<p class="hint muted">${esc(t('cwParamsHint'))}</p><div class="cw-checks">${CW_PARAMS.map(k => check(`data-cw-param="${k}"`, S.params[k], k)).join('')}</div>`)}
       ${sec('app', appWidgetsSection())}
-      ${sec('sizes', `<p class="hint muted">${esc(t('cwSizesHint'))}</p>${Object.keys(CW_DEFAULTS.sizes).map(k => row(t(`cwSize:${k}`), `<span class="cw-unit"><input type="number" data-cw-size="${k}" min="${CW_SIZE_LIMITS[k][0]}" max="${CW_SIZE_LIMITS[k][1]}" step="2" value="${S.sizes[k]}" data-no-knob> px</span>`)).join('')}`)}
+      ${sec('sizes', `<p class="hint muted">${esc(t('cwSizesHint'))}</p>${Object.keys(CW_DEFAULTS.sizes).map(k => row(t(`cwSize:${k}`), `<span class="cw-unit"><input type="number" data-cw-size="${k}" min="${CW_SIZE_LIMITS[k][0]}" max="${CW_SIZE_LIMITS[k][1]}" step="2" value="${S.sizes[k]}" data-no-knob> px</span>`, t('helpCwSize'))).join('')}`)}
       <div class="actions"><button class="btn" id="set-cw-defaults">${esc(t('cwDefaults'))}</button></div>
     </div>`;
   }
@@ -260,7 +260,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       ${row(t('setPhSave'), chipSeg('data-ph-set-save', SAVE.map(k => [k, t(`phSave:${k}`)]), S.save), t(`phSaveHint:${S.save}`))}
       ${row(t('setPhTemp'), `<select data-ph-set-temp data-no-knob>${TEMP.map(k => opt(k, S.temp, t(`phTemp:${k}`))).join('')}</select>`, t('setPhTempHint'))}
       ${row(t('phShareLbl'), chipSeg('data-ph-set-share', SHARE_LEVELS.map(k => [k, t(`phShare:${k}`)]), S.share), t(`phShareHint:${S.share}`))}
-      ${row(t('phSpace'), `<span id="set-ph-space" class="vt-lcd">${esc(phSpace || '…')}</span> <button class="btn small" data-ph-set-open>${esc(t('setPhOpen'))}</button>`)}
+      ${row(t('phSpace'), `<span id="set-ph-space" class="vt-lcd">${esc(phSpace || '…')}</span> <button class="btn small" data-ph-set-open>${esc(t('setPhOpen'))}</button>`, t('helpPhSpace'))}
       <div class="actions"><button class="btn small" data-ph-set-reset>${esc(t('setPhReset'))}</button></div>
     </div>`;
   }
@@ -272,10 +272,10 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       <p class="muted">${esc(t('setCapIntro'))}</p>
       ${row(t('capOn'), seg('data-cap-on', [['1', t('cwYes')], ['0', t('cwNo')]], S.on ? '1' : '0'), t('capOnHint'))}
       <div class="cap-choices"${S.on ? '' : ' hidden'}>
-        ${row(t('capShow'), `<div class="cw-checks">${check('narrator', t('capNarrator'))}${check('voice', t('capVoice'))}${check('typed', t('capTyped'))}${check('steps', t('capSteps'))}${check('claude', t('capClaude'), t('capClaudeHint'))}</div>`)}
-        ${row(t('capStepForm'), `<select data-cap-opt="stepForm" data-no-knob${S.steps ? '' : ' disabled'}>${STEP_FORMS.map(k => opt(k, S.stepForm, t(`capStepForm:${k}`))).join('')}</select>`)}
+        ${row(t('capShow'), `<div class="cw-checks">${check('narrator', t('capNarrator'))}${check('voice', t('capVoice'))}${check('typed', t('capTyped'))}${check('steps', t('capSteps'))}${check('claude', t('capClaude'), t('capClaudeHint'))}</div>`, t('helpCapShow'))}
+        ${row(t('capStepForm'), `<select data-cap-opt="stepForm" data-no-knob${S.steps ? '' : ' disabled'}>${STEP_FORMS.map(k => opt(k, S.stepForm, t(`capStepForm:${k}`))).join('')}</select>`, t('helpCapStep'))}
         ${row(t('capMarks'), kinds.map(k => `<label class="cap-mark"><span class="muted">${esc(t(`capKind:${k}`))}</span> <select data-cap-mark="${k}" data-no-knob>${MARKS.map(m => opt(m, S.marks[k], t(`capMark:${m}`))).join('')}</select></label>`).join(''), t('capMarksHint'))}
-        ${row(t('capWhere'), `<select data-cap-opt="where" data-no-knob>${WHERES.map(k => opt(k, S.where, t(`capWhere:${k}`))).join('')}</select>`)}
+        ${row(t('capWhere'), `<select data-cap-opt="where" data-no-knob>${WHERES.map(k => opt(k, S.where, t(`capWhere:${k}`))).join('')}</select>`, t('helpCapWhere'))}
         ${row(t('capVideos'), seg('data-cap-videos', [['1', t('cwYes')], ['0', t('cwNo')]], S.videos ? '1' : '0'), t('capVideosHint'))}
       </div>
     </div>`;
