@@ -6,7 +6,7 @@
 // (gain × velocity), n (the sample's variant, or undefined) }. One cycle is one bar.
 
 // extra (cv9: more rows): the onsets of these melodic instruments as rows of their own, when they play
-export const HG_DEFAULTS = Object.freeze({ steps: 16, bars: 1, rows: 'auto', names: 'short', variants: true, extra: ['bass', 'hook', 'lead', 'arp', 'guitar'], style: 'auto', trail: 2, size: 1 });
+export const HG_DEFAULTS = Object.freeze({ steps: 16, bars: 1, rows: 'auto', rowsFrom: 'song', names: 'short', variants: true, extra: ['bass', 'hook', 'lead', 'arp', 'guitar'], style: 'auto', trail: 2, size: 1 });
 // limits of the numbers a call or the settings can give
 export const HG_LIMITS = { steps: [4, 32], bars: [1, 4], trail: [0, 8], size: [0.6, 2.5] };
 // the drum instruments (`analyze` names) whose notes are hits
@@ -30,6 +30,8 @@ export function hitgridOptions(call = {}, base = HG_DEFAULTS) {
   o.style = ['blocks', 'text'].includes(o.style) ? o.style : 'auto';
   o.extra = Array.isArray(o.extra) ? o.extra.filter(x => typeof x === 'string') : [];
   o.rows = Array.isArray(o.rows) ? o.rows.filter(x => typeof x === 'string') : 'auto';
+  // which rows show while the song plays (cd1): every one the song will use ('song'), or the sounds heard so far ('playing')
+  o.rowsFrom = o.rowsFrom === 'playing' ? 'playing' : 'song';
   return o;
 }
 
@@ -48,12 +50,17 @@ function rowOf(x, o) {
 }
 
 // → { rows: [{ key, label }], hits: Map(key → Map(step → level)), step (current, 0-based), steps (shown), beats (shown),
-//   bar (1-based, the bar playing), stepInBar } . memo: a Map kept by the caller for the song (rows seen stay)
-export function hitgridData(notes, cyc, o, { meter = '4/4', memo = null } = {}) {
+//   bar (1-based, the bar playing), stepInBar } . memo: a Map kept by the caller for the song (rows seen stay).
+// songNotes (cd1): one note per sound the whole song uses ([{ inst, p, n }], src/widgets/song-rows.js): with rows 'song'
+// (the default) every row is there from the first bar, empty until its sound enters, so the grid keeps its size
+export function hitgridData(notes, cyc, o, { meter = '4/4', memo = null, songNotes = null } = {}) {
   const [perBar, beatsPerBar] = METER[meter] || METER['4/4'];
   // the meter's steps unless the call asked for others (16 stays the default of 4/4: 12 in 3/4)
   const sb = o.steps === HG_DEFAULTS.steps ? perBar : o.steps;
   const [c0, c1] = hitgridWindow(cyc, o), steps = sb * o.bars, hits = new Map(), seen = memo || new Map();
+  // (the song's rows are not kept in the memo: the memo stays what was heard)
+  const known = new Map();
+  if (o.rowsFrom === 'song' && Array.isArray(songNotes)) for (const x of songNotes) { const r = rowOf(x, o); if (r) known.set(r.key, r); }
   for (const x of notes) {
     if (!(x.b >= c0 - 1e-9 && x.b < c1 - 1e-9)) continue;
     const r = rowOf(x, o);
@@ -64,7 +71,8 @@ export function hitgridData(notes, cyc, o, { meter = '4/4', memo = null } = {}) 
     const m = hits.get(r.key);
     m.set(k, Math.max(m.get(k) || 0, Math.max(0.05, Math.min(1, x.lv ?? 1))));
   }
-  let rows = [...seen.values()].sort((a, b) => a.rank - b.rank || a.key.localeCompare(b.key));
+  for (const [k, r] of seen) known.set(k, r);
+  let rows = [...known.values()].sort((a, b) => a.rank - b.rank || a.key.localeCompare(b.key));
   if (Array.isArray(o.rows)) { const want = o.rows; rows = want.map(k => rows.find(r => r.key === k || r.label === k) || { key: k, label: k }); }
   const step = Math.max(0, Math.min(steps - 1, Math.floor((cyc - c0) * sb + 1e-9)));
   return { rows: rows.map(r => ({ key: r.key, label: r.label })), hits, step, steps, beats: beatsPerBar * o.bars, perBeat: sb / beatsPerBar, bar: Math.floor(cyc) + 1, stepInBar: (step % sb) + 1, stepsInBar: sb };

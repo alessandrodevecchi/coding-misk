@@ -194,7 +194,7 @@ const CHECKS_WIDGETS = {
     assert(one('$: note("a4").s("square").analyze("hook")')[0] === 'pianoroll', 'lead pianoroll');
     assert(one('$: s("hh*8").analyze("hats")')[0] === 'pianoroll' && one('$: s("bd*4").analyze("kick")')[0] === 'hitgrid', 'hats pianoroll, drums the hit grid');
     assert(!one('$: s("cr").analyze("fx")').length, 'fx off');
-    assert(one('$: note("c3").analyze("pad")')[0] === 'tonecloud' && one('$: s("say_it").n(3).mask("<1 0>")')[0] === 'tonecloud', 'the pad and the voice: the tone cloud');
+    assert(one('$: note("c3").analyze("pad")')[0] === 'tonecloud' && one('$: s("say_it").n(3).mask("<1 0>")')[0] === 'scope', 'the pad: the tone cloud; the voice: the scope (cd5)');
     assert(one('$: s("bd*4").analyze("kick")', { widgets: { hitgrid: false } })[0] === 'scope', 'drums with the hit grid off take scope');
     assert(one('$: note("a4").s("square").analyze("hook")', { widgets: { pianoroll: false } })[0] === 'scope', 'lead with pianoroll off takes scope');
     assert(one('$: note("a4").s("square").analyze("hook")', { roll: 'punchcard' })[0] === 'punchcard', 'punchcard');
@@ -208,6 +208,38 @@ const CHECKS_WIDGETS = {
     assert(lines({ order: ['drums', 'bass'] }, 1).join() === 'kick', `drums first in the order: ${lines({ order: ['drums', 'bass'] }, 1)}`);
     assert(!lines({ instruments: { bass: { on: false } } }, 1).includes('bass'), 'bass off gives its slot away');
     assert(!lines({ instruments: { hats: { on: false } } }, 5).includes('hats'), 'hats off');
+  },
+  'code widgets: one tone cloud at a time, on the pad, else the first of bass, lead, arp, the voice last (code-over-visual cd5)'() {
+    const L = { pad: '$: note("c4").analyze("pad")', bass: '$: note("a1").analyze("bass")', lead: '$: note("a4").analyze("hook")', arp: '$: note("c5 e5").analyze("arp")', voice: '$: s("say_it").n(3).analyze("voice")', kick: '$: s("bd*4").analyze("kick")' };
+    // every melodic line and the voice would take the cloud (primary) and every slot is open
+    const cloudy = { max: 8, share: 0, instruments: Object.fromEntries(['pad', 'bass', 'lead', 'arp', 'voice'].map(k => [k, { on: true, primary: 'tonecloud', secondary: ['scope'] }])) };
+    const at = names => placeWidgets(names.map(k => L[k]).join('\n'), { S: widgetSettings({ on: true, ...cloudy }), sections: 1, seed: 'x' }).split('\n').map(l => [l, (l.match(/\._(\w+)\(\)/) || [])[1]]);
+    const whereIs = names => { const out = at(names); return { n: out.filter(x => x[1] === 'tonecloud').length, on: names.filter((k, i) => out[i][1] === 'tonecloud') }; };
+    assert(whereIs(['bass', 'lead', 'pad', 'arp', 'voice']).n === 1 && whereIs(['bass', 'lead', 'pad', 'arp', 'voice']).on[0] === 'pad', 'a pad: the cloud sits on it, once');
+    assert(whereIs(['lead', 'arp', 'bass', 'voice']).on.join() === 'bass', `no pad: the first of bass, lead, arp (${whereIs(['lead', 'arp', 'bass', 'voice']).on})`);
+    assert(whereIs(['arp', 'lead', 'voice']).on.join() === 'lead', 'no pad, no bass: the lead');
+    assert(whereIs(['voice', 'arp']).on.join() === 'arp', 'the voice only when no other line can hold the cloud');
+    assert(whereIs(['voice', 'kick']).on.join() === 'voice', 'the voice holds it when it is the only line that can');
+    // the lines that lost the cloud take their next widget
+    const out = at(['bass', 'lead', 'pad']);
+    assert(out[0][1] === 'scope' && out[1][1] === 'scope' && out[2][1] === 'tonecloud', `the others take their next widget (${out.map(x => x[1])})`);
+    // a cloud typed by hand is the one: none is added
+    const hand = placeWidgets(['$: note("c4").analyze("pad")._tonecloud()', L.bass].join('\n'), { S: widgetSettings({ on: true, ...cloudy }), sections: 1, seed: 'x' });
+    assert(calls(hand).filter(x => x === 'tonecloud').length === 1, 'a cloud already in the code: no second');
+    // over the built-in songs' code at every bar: never two
+    const ids = JSON.parse(fs.readFileSync('songs/index.json', 'utf8')).map(x => (typeof x === 'string' ? x : x.id));
+    let seen = 0;
+    for (const id of ids) {
+      const sg = song(id); if (sg.kind && sg.kind !== 'composed' && !sg.tracks) continue;
+      const S = widgetSettings({ on: true, max: 8, share: 30 }), code = compileSong(sg);
+      for (let bar = 0; bar < sg.sections.reduce((a, x) => a + x.bars, 0); bar += 3) {
+        const c = placeWidgets(code, { S, bar, section: 0, sections: 1, seed: id });
+        const n = calls(c).filter(x => x === 'tonecloud').length;
+        seen += n;
+        assert(n <= 1, `${id} bar ${bar}: ${n} tone clouds`);
+      }
+    }
+    assert(seen > 0, 'the clouds appear over the songs');
   },
   'code widgets: about one widget in four is secondary over the built-in songs; none with share 0'() {
     const ids = JSON.parse(fs.readFileSync('songs/index.json', 'utf8')).map(x => (typeof x === 'string' ? x : x.id)).slice(0, 14);

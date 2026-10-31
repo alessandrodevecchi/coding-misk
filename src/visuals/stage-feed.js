@@ -2,7 +2,7 @@
 // levels, onsets and silences read from the notes, spectrum columns from the time. The same shape live (notes queried
 // from the playing pattern, one cycle at a time, cached) and in the fast video (notes sent by the render page).
 // Pure apart from the pattern it is given to query: checked in Node (tools/check-stage-widgets.mjs).
-import { BY_VISUAL, widgetFor } from '../live/widgets.js';
+import { BY_VISUAL, widgetFor, CLOUD_ORDER } from '../live/widgets.js';
 import { spectrumOf } from './widget-painters.js';
 
 // the pitch of a hap's value as the render page and the code widgets read it: a MIDI number, else the sound's name
@@ -133,6 +133,17 @@ export function rosterOf(store, sec, { S, max = 6, silent = 'dimmed', seed = '',
   for (const inst of new Set([...playing, ...before])) {
     const widget = widgetFor(cwInstrument(inst), S, inst, seed);
     if (widget) cands.push({ inst, widget, quiet: !playing.has(inst) });
+  }
+  // one tone cloud at most (cd5): on the holder (pad, else bass, lead, arp; the voice only when no other can); the other
+  // panels that asked for one take their next widget
+  const cloudRank = c => CLOUD_ORDER.indexOf(cwInstrument(c.inst)), canCloud = c => { const I = S.instruments[cwInstrument(c.inst)]; return !!I && I.on && S.widgets.tonecloud && (I.primary === 'tonecloud' || I.secondary.includes('tonecloud')); };
+  if (cands.some(c => c.widget === 'tonecloud')) {
+    const order = (a, b) => a.quiet - b.quiet || cloudRank(a) - cloudRank(b) || rank(a.inst) - rank(b.inst);
+    const holder = cands.filter(c => !c.quiet && cloudRank(c) >= 0 && canCloud(c)).sort(order)[0] || cands.filter(c => c.widget === 'tonecloud').sort(order)[0];
+    for (const c of [...cands]) {
+      if (c === holder) c.widget = 'tonecloud';
+      else if (c.widget === 'tonecloud') { c.widget = widgetFor(cwInstrument(c.inst), S, c.inst, seed, ['tonecloud']); if (!c.widget) cands.splice(cands.indexOf(c), 1); }
+    }
   }
   // every playing instrument first (up to the limit), then the quiet ones; then the places in slot order
   cands.sort((a, b) => a.quiet - b.quiet || rank(a.inst) - rank(b.inst) || a.inst.localeCompare(b.inst));

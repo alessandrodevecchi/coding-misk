@@ -5,7 +5,12 @@
 // code evaluating with the same haps), and the settings.
 //   npm run check:code-over
 import { codeOverAreas, codeOverSettings, CO_DEFAULTS, drawCodeOver, litSpans, firstStrings, lineKinds, codeOverWidgets } from '../src/video/code-over.js';
-import { appWidgetCalls, callOptions, commentAppWidgets, stripAppWidgets, appWidgetSettings, noteOfHap, widgetFrame, APP_WIDGET_NAMES } from '../src/widgets/app-widgets.js';
+import { appWidgetCalls, callOptions, commentAppWidgets, stripAppWidgets, appWidgetSettings, noteOfHap, widgetFrame, widgetSize, APP_WIDGET_NAMES } from '../src/widgets/app-widgets.js';
+import { songNotesOfSegments } from '../src/widgets/song-rows.js';
+import fs from 'node:fs';
+import { compileSong } from '../src/song/compile.js';
+import { fromScenes } from '../src/song/format.js';
+import { useFns } from '../src/song/writer.js';
 import { hitgridOptions, hitgridData, cellForm } from '../src/widgets/hitgrid.js';
 import { tonecloudOptions, tonecloudData, rampChar, rowText, useFlats } from '../src/widgets/tonecloud.js';
 import { neonRoles, NEON_TOKENS, overRoles } from '../src/code-themes/themes.js';
@@ -177,6 +182,48 @@ const notesOf = async (code, c0, c1) => (await S.evaluate(code)).queryArc(c0, c1
   const same = (kind, cyc) => { const a = widgetFrame(kind, {}, S0, live, cyc, { memo: new Map() }), b = widgetFrame(kind, {}, S0, fast, cyc, { memo: new Map() }); return JSON.stringify(a.D, (k, v) => (v instanceof Map ? [...v] : v instanceof Float64Array ? Array.from(v, x => +x.toFixed(6)) : v)) === JSON.stringify(b.D, (k, v) => (v instanceof Map ? [...v] : v instanceof Float64Array ? Array.from(v, x => +x.toFixed(6)) : v)); };
   check([3.3, 5.81, 8.02].every(c => same('hitgrid', c)), 'the hit grid: the same data from the haps and from the fast video\'s note store');
   check([3.3, 5.81, 8.02].every(c => same('tonecloud', c)), 'the tone cloud: the same data from the haps and from the fast video\'s note store');
+}
+
+// ---------- the hit grid keeps its rows (cd1): every row the song will use, from the first bar ----------
+{
+  const code = '$: s("bd*4").analyze("kick")\n$: s("[~ sd]*2").mask("<0 0 1>").analyze("snare")\n$: s("hh*8").n("<0 3>").mask("<0 1>").analyze("hats")\n$: note("a1*4").s("sawtooth").mask("<0!5 1>").analyze("bass")\n$: note("c4 e4").s("sine").mask("<0!5 1>").analyze("pad")';
+  const pat = await S.evaluate(code), bars = 8;
+  const live = (c0, c1) => pat.queryArc(Math.max(0, Math.floor(c0)), Math.ceil(c1)).filter(h => h.hasOnset()).map(noteOfHap).filter(x => x.e > c0 && x.b < c1);
+  const segs = [{ from: 0, to: bars, code }], sn = songNotesOfSegments(segs), S0 = appWidgetSettings(null), Sold = appWidgetSettings({ hitgrid: { rowsFrom: 'playing' } });
+  check(S0.hitgrid.rowsFrom === 'song' && Sold.hitgrid.rowsFrom === 'playing' && appWidgetSettings({ hitgrid: { rowsFrom: 'x' } }).hitgrid.rowsFrom === 'song', 'cd1: the setting reads "song" by default, "playing" for the old behaviour');
+  const keys = (cyc, S, ctx = {}) => widgetFrame('hitgrid', {}, S, live, cyc, { memo: new Map(), songNotes: sn, ...ctx }).D.rows.map(r => r.key).join();
+  const all = 'bd,sd,hh,hh:3,~bass';
+  check(keys(0.3, S0) === all, `cd1: bar 1 has every row of the song (got ${keys(0.3, S0)})`);
+  check(keys(0.3, Sold) === 'bd', `cd1: "Only the sounds playing" at bar 1 has the kick alone (got ${keys(0.3, Sold)})`);
+  check([0.3, 2.5, 5.9, 7.4].every(c => keys(c, S0) === all), 'cd1: the rows are the same at every bar');
+  const size = c => { const F = widgetFrame('hitgrid', {}, S0, live, c, { memo: new Map(), songNotes: sn }); return JSON.stringify(widgetSize(F, 14)); };
+  check(size(0.3) === size(7.4), 'cd1: the grid keeps its size from the first bar to the last');
+  check(widgetFrame('hitgrid', {}, S0, live, 0.3, { memo: new Map() }).D.rows.length === 1, 'cd1: without the song\'s sounds (a loop, an unknown code) the grid keeps its old behaviour');
+  const D = widgetFrame('hitgrid', {}, S0, live, 0.3, { memo: new Map(), songNotes: sn }).D;
+  check(D.rows.every(r => r.key === 'bd' || !(D.hits.get(r.key) || new Map()).size), 'cd1: a row whose sound has not entered is empty');
+  // the fast video's note store gives the same rows and hits
+  const st = noteStore();
+  for (const h of pat.queryArc(0, bars + 2)) if (h.hasOnset()) { h.ensureObjectValue && h.ensureObjectValue(); st.add(String(h.value.analyze), noteOf(h.whole.begin.valueOf(), h.whole.end.valueOf(), h.value)); }
+  const fast = notesOfStore(st, () => st.instruments);
+  const j = c => JSON.stringify(widgetFrame('hitgrid', {}, S0, c === 0 ? live : fast, 6.3, { memo: new Map(), songNotes: sn }).D, (k, v) => (v instanceof Map ? [...v] : v));
+  check(j(0) === j(1), 'cd1: the same rows and hits from the haps and from the fast video\'s store');
+  check(widgetFrame('hitgrid', {}, S0, fast, 0.3, { memo: new Map(), songNotes: sn }).D.rows.map(r => r.key).join() === all, 'cd1: the fast video\'s first bar has every row');
+  // the rows read from the code are the rows of the haps, on every built-in song (compiled code, Strudel in Node)
+  const ids = JSON.parse(fs.readFileSync('songs/index.json', 'utf8')).map(x => (typeof x === 'string' ? x : x.id));
+  let songs = 0;
+  for (const id of ids) {
+    let sg = JSON.parse(fs.readFileSync(`songs/${id}.json`, 'utf8'));
+    if (sg.scenes) sg = fromScenes(sg);
+    if (!Array.isArray(sg.sections) || !sg.sections.length) continue;
+    const text = compileSong(sg), n = sg.sections.reduce((a, x) => a + x.bars, 0);
+    let p; try { globalThis.miskBuses = {}; useFns({}); p = await S.evaluate(text); } catch (e) { continue; }
+    const notes = p.queryArc(0, n).filter(h => h.hasOnset() && h.whole).map(noteOfHap), o = hitgridOptions({}), seen = new Map();
+    for (let c = 0; c < n; c++) hitgridData(notes, c, o, { memo: seen });
+    const real = [...seen.keys()].sort().join(), first = hitgridData([], 0, o, { songNotes: songNotesOfSegments([{ from: 0, to: n, code: text }]) }).rows.map(r => r.key).sort().join();
+    check(real === first, `cd1: ${id}: the rows at bar 1 are the rows of the whole song (haps ${real}; code ${first})`);
+    songs++;
+  }
+  check(songs >= 30, `cd1: the rows were compared on the built-in songs (${songs})`);
 }
 
 // ---------- code leaving the app evaluates in a plain Strudel with the same haps (cv7) ----------

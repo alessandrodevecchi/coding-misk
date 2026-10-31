@@ -17,11 +17,13 @@ export const CW_INSTRUMENTS = ['bass', 'lead', 'drums', 'arp', 'hats', 'pad', 'f
 export const CW_WINDOWS = [8, 16, 32, 'always'];
 export const CW_PARAMS = ['labels', 'smear', 'fold', 'steady', 'fade'];
 // default mapping (owner, 2026-10-28): primary, then secondary widgets; fx off. code-over-visual cv8: the hit grid is
-// the drums' primary, the tone cloud the pad's and the voice's primary and a secondary of bass, lead (guitar) and arp
+// the drums' primary, the tone cloud the pad's primary and a secondary of bass, lead (guitar), arp and voice. Owner,
+// 2026-10-31 (cd5): the voice's primary is the scope (the tone cloud shows the harmony of the whole song, so there is
+// only one on screen: the pad's, else the first of bass, lead, arp playing, the voice's only when no other line can hold it)
 const MAP = {
   drums: ['hitgrid', 'scope', 'pianoroll', 'spectrum'], hats: ['pianoroll', 'scope', 'spectrum'], bass: ['scope', 'pianoroll', 'spectrum', 'tonecloud'],
   lead: ['pianoroll', 'scope', 'spectrum', 'tonecloud'], arp: ['pianoroll', 'scope', 'spectrum', 'tonecloud'], pad: ['tonecloud', 'scope', 'pianoroll'],
-  fx: ['scope', 'spectrum'], voice: ['tonecloud', 'scope', 'spectrum'],
+  fx: ['scope', 'spectrum'], voice: ['scope', 'tonecloud', 'spectrum'],
 };
 export const CW_DEFAULTS = Object.freeze({
   on: false, max: 3, roll: 'pianoroll', order: CW_INSTRUMENTS.slice(), share: 25, window: 16, dim: true,
@@ -80,7 +82,7 @@ export function instrumentOf(line) {
 }
 
 // the section lanes of a code (`const section3 = "<0!16 1!2 0!40>"`): name → value at a bar
-function lanesOf(code) {
+export function lanesOf(code) {
   const out = new Map();
   for (const m of code.matchAll(/^const (\w+) = "<([\d.! ]+)>"/gm)) {
     const v = [];
@@ -92,7 +94,7 @@ function lanesOf(code) {
 const PATTERN = /^\s*[_S]?\$:/;
 const MUTED = /^\s*_\$:/;
 // a line that plays at a bar: not muted, and its section lane (`.mask(sectionN)`) on at that bar
-function playsAt(line, lanes, bar) {
+export function playsAt(line, lanes, bar) {
   if (MUTED.test(line)) return false;
   for (const m of line.matchAll(/\.mask\((\w+)\)/g)) { const v = lanes.get(m[1]); if (v && !(v[((Math.floor(bar) % v.length) + v.length) % v.length] > 0)) return false; }
   return true;
@@ -103,10 +105,11 @@ const rand = (...k) => hashString(k.join('\u0000')) / 4294967296;
 
 // D3: the widget of an instrument's line: the primary, or with the share a secondary that is on, by the seed; the
 // first secondary on when the primary is off; pianoroll as punchcard when chosen
-export function widgetFor(inst, S, key = '', seed = '') {
+// avoid: widgets this line may not take (a second tone cloud): it falls back to its next widget
+export function widgetFor(inst, S, key = '', seed = '', avoid = []) {
   const I = S.instruments[inst];
   if (!I || !I.on) return null;
-  const on = w => { const x = w === 'pianoroll' && S.roll === 'punchcard' ? 'punchcard' : w; return S.widgets[x] ? x : null; };
+  const on = w => { const x = w === 'pianoroll' && S.roll === 'punchcard' ? 'punchcard' : w; return S.widgets[x] && !avoid.includes(x) ? x : null; };
   const secs = I.secondary.map(on).filter(Boolean), prim = on(I.primary);
   if (!prim) return secs[0] || null;
   if (secs.length && rand(seed, 'cw-secondary', key) * 100 < S.share) return secs[Math.floor(rand(seed, 'cw-which', key) * secs.length)];
@@ -174,6 +177,8 @@ export function placeWidgets(code, { S, bar = 0, section = 0, sections = 1, seed
   if (!chosen.length) return code;
   // code-over-visual D11: the hit grid covers every drum sound, so it sits once, on the first drum line playing (the
   // kick's, as a rule): a line that stays while drum lines come and go, so a person typing never moves it
+  // owner, 2026-10-31 (cd5): one tone cloud at a time, where the harmony of the song sits best (cloudHolder)
+  oneCloud(chosen, info, S, seed, lines);
   const grids = chosen.filter(c => c.w === 'hitgrid');
   if (grids.length) {
     const drums = info.filter(x => (x.inst === 'drums' || x.inst === 'hats') && x.playing && !hasWidget(x.l) && !chosen.some(c => c.i === x.i && c.w !== 'hitgrid'));
@@ -183,6 +188,32 @@ export function placeWidgets(code, { S, bar = 0, section = 0, sections = 1, seed
   }
   for (const c of chosen) if (!c.skip) lines[c.i] = withCall(lines[c.i], c.w);
   return lines.join('\n');
+}
+// The tone cloud shows the harmony of the whole song, so at most one is drawn (cd5). Its place: the pad's line; without a
+// pad, the first melodic line playing (bass, lead, arp, in that order); on the voice's line only when no other line can
+// hold it. A line that would have had a second cloud takes its next widget instead (or none when it has no other).
+export const CLOUD_ORDER = ['pad', 'bass', 'lead', 'arp', 'voice'];
+// the line that holds the cloud among the lines playing: { i } or null (a hand-typed cloud already on screen: none)
+export function cloudHolder(info, S, hasCloud = false) {
+  if (hasCloud || !S.widgets.tonecloud) return null;
+  const can = x => { const I = S.instruments[x.inst]; return !!I && I.on && (I.primary === 'tonecloud' || I.secondary.includes('tonecloud')) && x.playing && !hasWidget(x.l); };
+  for (const inst of CLOUD_ORDER) { const x = info.find(y => y.inst === inst && can(y)); if (x) return x; }
+  return null;
+}
+function oneCloud(chosen, info, S, seed, lines) {
+  const hand = lines.some(l => PATTERN.test(l) && /\._tonecloud\(/.test(l));
+  const asked = chosen.filter(c => c.w === 'tonecloud');
+  if (!asked.length) return;
+  // the cloud goes to the holder: its own slot when it has one, else the slot of the first line that asked for a cloud
+  const at = hand ? null : cloudHolder(info, S);
+  let kept = null;
+  if (at) { kept = chosen.find(c => c.i === at.i) || asked[0]; kept.i = at.i; kept.w = 'tonecloud'; }
+  for (const c of asked) {
+    if (c === kept) continue;
+    const x = info.find(y => y.i === c.i), w = x ? widgetFor(x.inst, S, seedKey(x.l), seed, ['tonecloud']) : null;
+    if (w) c.w = w; else c.drop = true;
+  }
+  for (let k = chosen.length - 1; k >= 0; k--) if (chosen[k].drop) chosen.splice(k, 1);
 }
 // the call at the end of a line, before a comment at its end
 function withCall(line, w) {
