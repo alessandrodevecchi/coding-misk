@@ -14,10 +14,11 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 95. With open tasks: 27. All tasks ticked, waiting to be archived: 68.
+OpenSpec changes not archived: 96. With open tasks: 28. All tasks ticked, waiting to be archived: 68.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
+| [code-follow-toggle](../../openspec/changes/code-follow-toggle/tasks.md) | 6 | 12 |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [code-widgets](../../openspec/changes/code-widgets/tasks.md) | 3 | 31 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |

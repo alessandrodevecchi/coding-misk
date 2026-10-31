@@ -2226,3 +2226,14 @@ Due decisioni del proprietario sui widget dell'app (`._hitgrid()` e `._tonecloud
 - **Guida:** scheda «Widget dell'app» aggiornata in inglese e italiano; `docs/knowledge/code-widgets.md` e `decisions.md` allineati.
 - **Fixture:** nessuna istantanea si muove (il codice dei fixture è senza widget); cambiano solo asserzioni di `tools/check-live-code.mjs` (la voce ora ha lo scope) e se ne aggiungono di nuove (una sola nuvola su tutti i brani, righe della griglia alla battuta 1).
 - **Limite noto:** una nuvola scritta a mano due volte nello stesso codice si disegna due volte (scelta dell'utente); le righe di un brano scritto a mano senza `$:` riconoscibile restano quelle viste.
+
+## 2026-10-31: Segui le modifiche nel pannello del codice e barra del player con il codice a schermo intero (#44)
+
+Ramo `feat/44-code-follow`, change OpenSpec `code-follow-toggle`.
+
+- **Pulsante «Follow edits» («Segui le modifiche»):** nell'intestazione del pannello del codice, prima di schermo intero e chiusura, solo icona (righe di testo con un segno sulla riga di mezzo), nome nel tooltip e nell'aria label. Acceso di default, ricordato in `coding-misk-code-follow` (finisce nel backup come ogni chiave `coding-misk-`). Spento, il pannello non scorre da solo e il codice si scrive come sempre.
+- **Pausa di 10 secondi:** rotella, tocco, tastiera (frecce, pagina, Home, Fine) e barra di scorrimento sul pannello fermano il seguire per 10 secondi dopo l'ultimo scorrimento; il pulsante mostra la pausa (spento a metà, con il segno di pausa) e premuto in pausa segue subito senza spegnersi. Lo scorrimento dell'app (`glideTo`) non ascolta questi eventi, quindi non avvia pause.
+- **Bug trovato dal controllo:** un `glideTo` già partito continuava a scrivere `scrollTop` per 300 ms e riportava il pannello in fondo dopo lo scorrimento a mano. `followPause` e il pulsante ora annullano lo scorrimento in corso.
+- **Codice a schermo intero:** terminava sotto la barra del player, che lo copriva. Ora finisce sopra la barra (altezza misurata in `--pbar-h`, anche nel tema hardware e a 400 px); Esc e il pulsante escono come prima.
+- **Controlli:** `tools/check-code-follow.cjs` (spento: nessun movimento in 16 battute; acceso: pausa di 10 s, ripresa, pulsante in pausa, ricarica, tastiera, italiano, schermo intero con la barra a 1440 e 400 px, Pausa dalla barra). Immagini in `notes/prove-2026-10-31/code-follow/`.
+- **Limite:** la pausa dura 10 s fissi (costante `FOLLOW_PAUSE_MS`); nessun controllo con touch reale, solo rotella e tastiera.
