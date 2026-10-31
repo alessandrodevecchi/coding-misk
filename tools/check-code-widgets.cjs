@@ -1,7 +1,7 @@
 // Browser checks for the code widgets (code-widgets, #79): off by default; on, the calls in the code and their widgets
 // below the lines, scope with its line's instrument, Classic moving at a section boundary without a step, widgets kept
 // while the Live coder types, muted lines dimmed, any parameter accepted, the Settings card, frame time; a widget whose kind
-// changes on a playing line redraws at once (#79).
+// changes on a playing line redraws at once, and settings saved before the app widgets get them once (#79).
 // Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-code-widgets.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('fs');
@@ -107,9 +107,36 @@ async function churn(browser) {
   check(!errors.length, 'no page errors (type change)', errors.join('; '));
   await page.close();
 }
+// 7. #79: code widgets settings saved before the app widgets existed (no mark) get the hit grid and the tone cloud once:
+// Settings shows them on the instruments and the code gets them; the stage's own copy too. CW_ONLY=migration
+async function migration(browser) {
+  const old = { on: true, max: 8, share: 25, instruments: { drums: { on: true, primary: 'scope', secondary: ['pianoroll', 'spectrum'] }, hats: { on: true, primary: 'pianoroll', secondary: ['scope', 'spectrum'] }, bass: { on: true, primary: 'scope', secondary: ['pianoroll', 'spectrum'] }, lead: { on: true, primary: 'pianoroll', secondary: ['scope', 'spectrum'] }, arp: { on: true, primary: 'pianoroll', secondary: ['scope', 'spectrum'] }, pad: { on: true, primary: 'scope', secondary: ['pianoroll'] }, fx: { on: false, primary: 'scope', secondary: ['spectrum'] }, voice: { on: true, primary: 'scope', secondary: ['spectrum'] } } };
+  const { page, errors } = await open(browser, { widgets: old });
+  await page.evaluate(o => localStorage.setItem('coding-misk-stage-widgets', JSON.stringify({ mapping: 'own', instruments: o.instruments })), old);
+  await page.reload(); await page.waitForFunction(() => document.querySelector('strudel-editor') && document.querySelector('strudel-editor').editor, null, { timeout: 30000 }); await sleep(2500);
+  const stored = await page.evaluate(() => ({ cw: JSON.parse(localStorage.getItem('coding-misk-code-widgets')), sw: JSON.parse(localStorage.getItem('coding-misk-stage-widgets')) }));
+  check(stored.cw.appKinds === 1 && stored.cw.instruments.drums.primary === 'hitgrid' && stored.cw.max === 8 && stored.sw.appKinds === 1 && stored.sw.instruments.pad.primary === 'tonecloud', 'old settings: migrated once and saved with the mark (code widgets and the stage\'s own copy)', JSON.stringify({ cw: stored.cw.instruments.drums, sw: stored.sw.instruments.pad }));
+  await page.click('#open-settings'); await sleep(800);
+  const card = await page.evaluate(() => {
+    const prim = k => (document.querySelector(`#set-widgets [data-cw-prim="${k}"]`) || {}).value;
+    const sec = k => [...document.querySelectorAll(`#set-widgets [data-cw-sec2="${k}"][aria-pressed="true"]`)].map(b => b.dataset.w);
+    return { drums: prim('drums'), pad: prim('pad'), voice: prim('voice'), bass: sec('bass'), lead: sec('lead'), arp: sec('arp'), voiceSec: sec('voice'), fx: sec('fx'), drumsSec: sec('drums') };
+  });
+  check(card.drums === 'hitgrid' && card.pad === 'tonecloud' && card.voice === 'scope' && ['bass', 'lead', 'arp'].every(k => card[k].includes('tonecloud')) && card.voiceSec[card.voiceSec.length - 1] === 'tonecloud' && !card.fx.includes('tonecloud') && card.drumsSec[0] === 'scope', 'Settings shows the hit grid and the tone cloud on the instruments', JSON.stringify(card));
+  if (SHOTS) { await page.evaluate(() => { const d = document.querySelector('#set-widgets [data-cw-sec="instruments"]'); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); } }); await sleep(400); await page.locator('#set-widgets').screenshot({ path: `${SHOTS}/churn-migrated-settings.png` }); }
+  await page.click('#open-settings'); await sleep(800);
+  await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(800);
+  await page.click('#play'); await sleep(3500);
+  await untilBar(page, 9.2);
+  const s = await st(page);
+  check(/\._hitgrid\(\)/.test(s.code) && /\._tonecloud\(\)/.test(s.code) && !s.err, 'the code gets the hit grid and the tone cloud', `${(s.code.match(CALL) || []).join(' ')}`);
+  check(!errors.length, 'no page errors (migration)', errors.join('; '));
+  await page.close();
+}
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+  if (process.env.CW_ONLY === 'migration') { await migration(browser); await browser.close(); console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed'); process.exit(failed ? 1 : 0); }
   if (process.env.CW_ONLY === 'churn') { await churn(browser); await browser.close(); console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed'); process.exit(failed ? 1 : 0); }
 
   // 1. off by default: the code of before, no widget
@@ -123,8 +150,9 @@ async function churn(browser) {
   }
 
   // 2. on, Classic (luci-rosse): calls and widgets, scope with its instrument, the move at bar 8 (no step there)
+  // (the tone cloud off: without a pad the bass holds it, cd5, and this part checks the bass's scope)
   {
-    const { page, errors } = await open(browser, { widgets: { on: true } });
+    const { page, errors } = await open(browser, { widgets: { on: true, widgets: { tonecloud: false } } });
     await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(800);
     await page.click('#play'); await sleep(3500);
     let s = await st(page);
@@ -271,7 +299,8 @@ async function churn(browser) {
   {
     const { execFileSync } = require('child_process'), os = require('os'), path = require('path');
     const fast = async (layout, realScope, limit) => {
-      const { page, errors } = await open(browser, { widgets: { on: true } });
+      // (the tone cloud off: without a pad the bass holds it, cd5, and this part needs its scope)
+      const { page, errors } = await open(browser, { widgets: { on: true, widgets: { tonecloud: false } } });
       const logs = [], downloads = [];
       page.on('console', m => { if (/\[fast video\]/.test(m.text())) logs.push(m.text()); });
       page.on('download', d => downloads.push(d));
@@ -415,6 +444,7 @@ async function churn(browser) {
   }
 
   await churn(browser);
+  await migration(browser);
 
   await browser.close();
   console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed');

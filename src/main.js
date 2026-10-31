@@ -107,7 +107,7 @@ import { createGrowthStore } from './live/growth-store.js';
 import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
-import { CW_KEY, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom } from './live/widgets.js';
+import { CW_KEY, APP_KINDS_VERSION, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom } from './live/widgets.js';
 import { SW_KEY, stageSettings, stageMapping, stageScopeInstruments, layerOn } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
 const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
@@ -137,6 +137,13 @@ const ownTexts = sg => { const b = sg && Array.isArray(sg.build) ? sg.build : nu
 setNarratorMine(narratorPick(sg => { try { return phr && sg && T && sg.id === T.id ? phr.composeSource(ownTexts(T)) : null; } catch (e) { return null; } }));
 // code widgets (code-widgets): the settings of the Settings card, read each time a code is shown
 const cwSettings = () => widgetSettings(store.get(CW_KEY, null));
+// #79: settings saved before the app widgets (hit grid, tone cloud) existed get their defaults once, then are saved
+// with the mark, so a later choice of the user stays
+{
+  const cw = store.get(CW_KEY, null), sw = store.get(SW_KEY, null);
+  if (cw && typeof cw === 'object' && cw.appKinds !== APP_KINDS_VERSION) store.set(CW_KEY, widgetSettings(cw));
+  if (sw && typeof sw === 'object' && sw.appKinds !== APP_KINDS_VERSION) store.set(SW_KEY, stageSettings(sw));
+}
 // the stage widgets (widgets-on-stage D9): their settings and the panels' mapping, read again only when one of the two
 // stored values changes (the stage asks every frame)
 const stageWidgets = (() => {

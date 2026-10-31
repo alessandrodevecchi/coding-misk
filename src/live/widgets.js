@@ -38,18 +38,42 @@ export const CW_DEFAULTS = Object.freeze({
 export const CW_SIZE_LIMITS = { row: [20, 120], round: [60, 300], spiral: [80, 400], spectrum: [40, 300] };
 
 const clampInt = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
-// the stored settings (any shape, old or partial) completed with the defaults
+// #79: the instruments of settings saved before the app widgets existed (no `appKinds` mark) get the app widgets'
+// defaults once, every other choice kept: drums take the hit grid as primary (their old primary first among the
+// secondary), the pad the tone cloud; bass, lead and arp the tone cloud among their secondary; the voice the scope as
+// primary and the tone cloud as its last secondary (one cloud at a time: the voice holds it only when no other line can).
+// fx stays as it was (its lines are risers and noise, no harmony). Saved again with the mark, they are not touched again
+export const APP_KINDS_VERSION = 1;
+const PRIMARY_APP = { drums: 'hitgrid', pad: 'tonecloud', voice: 'scope' };
+export function migrateInstruments(instruments) {
+  if (!instruments || typeof instruments !== 'object') return instruments;
+  const out = { ...instruments };
+  for (const k of CW_INSTRUMENTS) {
+    const x = out[k];
+    if (!x || typeof x !== 'object' || k === 'fx') continue;
+    let primary = WIDGETS.includes(x.primary) ? x.primary : CW_DEFAULTS.instruments[k].primary;
+    let secondary = Array.isArray(x.secondary) ? x.secondary.filter(w => WIDGETS.includes(w)) : CW_DEFAULTS.instruments[k].secondary.slice();
+    const want = PRIMARY_APP[k];
+    if (want && primary !== want) { secondary = [primary, ...secondary]; primary = want; }
+    if (k === 'voice') secondary = [...secondary.filter(w => w !== 'tonecloud'), 'tonecloud'];
+    else if (k !== 'drums' && k !== 'pad' && !secondary.includes('tonecloud')) secondary = [...secondary, 'tonecloud'];
+    out[k] = { ...x, primary, secondary: [...new Set(secondary.filter(w => w !== primary))] };
+  }
+  return out;
+}
+// the stored settings (any shape, old or partial) completed with the defaults; saved before the app widgets, migrated
 export function widgetSettings(raw) {
-  const r = raw && typeof raw === 'object' ? raw : {}, D = CW_DEFAULTS;
+  const r = raw && typeof raw === 'object' ? raw : {}, D = CW_DEFAULTS, stored = r.appKinds === APP_KINDS_VERSION ? r.instruments : migrateInstruments(r.instruments);
   const order = Array.isArray(r.order) ? r.order.filter(k => CW_INSTRUMENTS.includes(k)) : [];
   const instruments = {};
   for (const k of CW_INSTRUMENTS) {
-    const x = (r.instruments && r.instruments[k]) || {}, d = D.instruments[k];
+    const x = (stored && stored[k]) || {}, d = D.instruments[k];
     const primary = WIDGETS.includes(x.primary) ? x.primary : d.primary;
     const secondary = Array.isArray(x.secondary) ? x.secondary.filter(w => WIDGETS.includes(w) && w !== primary) : d.secondary.filter(w => w !== primary);
     instruments[k] = { on: typeof x.on === 'boolean' ? x.on : d.on, primary, secondary };
   }
   return {
+    appKinds: APP_KINDS_VERSION,
     on: r.on === true,
     max: clampInt(r.max, 1, 8, D.max),
     roll: r.roll === 'punchcard' ? 'punchcard' : 'pianoroll',
@@ -244,11 +268,13 @@ export function cloudHolder(info, S, hasCloud = false) {
 // free: the lines of the tracks without a widget; has: a cloud already on screen (typed by hand, or held)
 function oneCloud(chosen, free, S, seed, has) {
   const asked = chosen.filter(c => c.w === 'tonecloud');
-  if (!asked.length) return;
-  // the cloud goes to the holder: its own slot when it has one, else the slot of the first line that asked for a cloud
-  const at = has ? null : cloudHolder(free, S);
+  // the cloud goes to the holder: its own slot when it has one (whatever widget its seed chose: cd5, the cloud always
+  // sits on the holder; the voice, the last resort, only when a line asked for a cloud), else the slot of the first
+  // line that asked for a cloud
+  let at = has ? null : cloudHolder(free, S);
+  if (at && at.inst === 'voice' && !asked.length) at = null;
   let kept = null;
-  if (at) { kept = chosen.find(c => c.x.track === at.track) || asked[0]; kept.x = at; kept.w = 'tonecloud'; }
+  if (at) { kept = chosen.find(c => c.x.track === at.track) || asked[0] || null; if (kept) { kept.x = at; kept.w = 'tonecloud'; } }
   for (const c of asked) {
     if (c === kept) continue;
     const w = widgetFor(c.x.inst, S, c.x.track, seed, ['tonecloud']);

@@ -1,7 +1,7 @@
 // The settings of the stage widgets (widgets-on-stage D4, D5, D7, D9): the layer over the other looks, the panel limits,
 // the instruments and widgets (the code widgets card's, or the stage's own copy), colours and silent instruments.
 // Stored whole in `coding-misk-stage-widgets` (in the backup); pure, checked in Node (tools/check-stage-widgets.mjs).
-import { CW_DEFAULTS, CW_INSTRUMENTS, WIDGETS, APP_KINDS, BY_VISUAL, widgetFor, widgetSettings } from '../live/widgets.js';
+import { CW_DEFAULTS, CW_INSTRUMENTS, WIDGETS, APP_KINDS, APP_KINDS_VERSION, BY_VISUAL, widgetFor, widgetSettings } from '../live/widgets.js';
 
 export const SW_KEY = 'coding-misk-stage-widgets';
 // the sections of the card left open (working state, not in the backup)
@@ -27,8 +27,10 @@ const one = (v, list, d) => (list.includes(v) ? v : d);
 export function stageSettings(raw) {
   const r = raw && typeof raw === 'object' ? raw : {}, D = SW_DEFAULTS;
   // the instruments section as the code widgets card reads it (the same rules for primary and secondary widgets)
-  const own = widgetSettings({ instruments: r.instruments }).instruments;
+  // (#79: an own copy saved before the app widgets gets their defaults once, as the code widgets card does)
+  const own = widgetSettings({ instruments: r.instruments, appKinds: r.appKinds }).instruments;
   return {
+    appKinds: APP_KINDS_VERSION,
     layer: one(r.layer, SW_LAYERS, D.layer),
     monitor: clampInt(r.monitor, ...SW_LIMITS.monitor, D.monitor),
     strip: clampInt(r.strip, ...SW_LIMITS.strip, D.strip),

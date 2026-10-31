@@ -190,17 +190,18 @@ const CHECKS_WIDGETS = {
   },
   'code widgets: default mapping and slot order; fx off; spiral and pitchwheel off; hit grid and tone cloud (code-over-visual cv8)'() {
     const one = (line, S = {}) => calls(placeWidgets(line, { S: widgetSettings({ on: true, share: 0, ...S }) }));
-    assert(one('$: note("a1").s("sawtooth").analyze("bass")')[0] === 'scope', 'bass scope');
-    assert(one('$: note("a4").s("square").analyze("hook")')[0] === 'pianoroll', 'lead pianoroll');
+    // (a bass alone, no pad: it holds the tone cloud, cd5; with the cloud off, its primary scope)
+    assert(one('$: note("a1").s("sawtooth").analyze("bass")')[0] === 'tonecloud' && one('$: note("a1").s("sawtooth").analyze("bass")', { widgets: { tonecloud: false } })[0] === 'scope', 'bass: the cloud alone, else scope');
+    assert(one('$: note("a4").s("square").analyze("hook")', { widgets: { tonecloud: false } })[0] === 'pianoroll', 'lead pianoroll');
     assert(one('$: s("hh*8").analyze("hats")')[0] === 'pianoroll' && one('$: s("bd*4").analyze("kick")')[0] === 'hitgrid', 'hats pianoroll, drums the hit grid');
     assert(!one('$: s("cr").analyze("fx")').length, 'fx off');
     assert(one('$: note("c3").analyze("pad")')[0] === 'tonecloud' && one('$: s("say_it").n(3).mask("<1 0>")')[0] === 'scope', 'the pad: the tone cloud; the voice: the scope (cd5)');
     assert(one('$: s("bd*4").analyze("kick")', { widgets: { hitgrid: false } })[0] === 'scope', 'drums with the hit grid off take scope');
-    assert(one('$: note("a4").s("square").analyze("hook")', { widgets: { pianoroll: false } })[0] === 'scope', 'lead with pianoroll off takes scope');
-    assert(one('$: note("a4").s("square").analyze("hook")', { roll: 'punchcard' })[0] === 'punchcard', 'punchcard');
+    assert(one('$: note("a4").s("square").analyze("hook")', { widgets: { pianoroll: false, tonecloud: false } })[0] === 'scope', 'lead with pianoroll off takes scope');
+    assert(one('$: note("a4").s("square").analyze("hook")', { roll: 'punchcard', widgets: { tonecloud: false } })[0] === 'punchcard', 'punchcard');
     const S = widgetSettings({ on: true, share: 0 }), all = ['drums', 'hats', 'bass', 'lead', 'arp', 'pad'].flatMap(k => [S.instruments[k].primary, ...S.instruments[k].secondary]);
     assert(!all.includes('spiral') && !all.includes('pitchwheel') && !S.params.labels && !S.params.smear, 'spiral, pitchwheel, labels, smear off');
-    assert(one('$: note("c4 e4").analyze("arp")', { widgets: { spiral: true }, instruments: { arp: { on: true, primary: 'spiral', secondary: ['scope'] } } })[0] === 'spiral', 'spiral as the arp\'s primary');
+    assert(one('$: note("c4 e4").analyze("arp")', { appKinds: 1, widgets: { spiral: true }, instruments: { arp: { on: true, primary: 'spiral', secondary: ['scope'] } } })[0] === 'spiral', 'spiral as the arp\'s primary');
     const code = ['$: note("a4").analyze("hook")', '$: s("bd*4").analyze("kick")', '$: note("a1").analyze("bass")', '$: s("hh*8").analyze("hats")', '$: note("c4").analyze("pad")'].join('\n');
     const lines = (S2, n = 5) => placeWidgets(code, { S: widgetSettings({ on: true, max: n, share: 0, ...S2 }), sections: 1, seed: 'x' }).split('\n').filter(l => WCALL.test(l) && !(WCALL.lastIndex = 0)).map(l => l.match(/analyze\("(\w+)"\)/)[1]);
     // the first section's count is drawn by the seed: compare orders with a song of one section and the maximum 1
@@ -212,7 +213,7 @@ const CHECKS_WIDGETS = {
   'code widgets: one tone cloud at a time, on the pad, else the first of bass, lead, arp, the voice last (code-over-visual cd5)'() {
     const L = { pad: '$: note("c4").analyze("pad")', bass: '$: note("a1").analyze("bass")', lead: '$: note("a4").analyze("hook")', arp: '$: note("c5 e5").analyze("arp")', voice: '$: s("say_it").n(3).analyze("voice")', kick: '$: s("bd*4").analyze("kick")' };
     // every melodic line and the voice would take the cloud (primary) and every slot is open
-    const cloudy = { max: 8, share: 0, instruments: Object.fromEntries(['pad', 'bass', 'lead', 'arp', 'voice'].map(k => [k, { on: true, primary: 'tonecloud', secondary: ['scope'] }])) };
+    const cloudy = { appKinds: 1, max: 8, share: 0, instruments: Object.fromEntries(['pad', 'bass', 'lead', 'arp', 'voice'].map(k => [k, { on: true, primary: 'tonecloud', secondary: ['scope'] }])) };
     const at = names => placeWidgets(names.map(k => L[k]).join('\n'), { S: widgetSettings({ on: true, ...cloudy }), sections: 1, seed: 'x' }).split('\n').map(l => [l, (l.match(/\._(\w+)\(\)/) || [])[1]]);
     const whereIs = names => { const out = at(names); return { n: out.filter(x => x[1] === 'tonecloud').length, on: names.filter((k, i) => out[i][1] === 'tonecloud') }; };
     assert(whereIs(['bass', 'lead', 'pad', 'arp', 'voice']).n === 1 && whereIs(['bass', 'lead', 'pad', 'arp', 'voice']).on[0] === 'pad', 'a pad: the cloud sits on it, once');
@@ -250,9 +251,10 @@ const CHECKS_WIDGETS = {
       const meta = { sections: s.sections.length };
       for (let k = 0, a = 0; k < s.sections.length; a += s.sections[k].bars, k++) {
         const one = (SS) => chainLinesW(placeWidgets(code, { S: SS, bar: a, section: k, sections: meta.sections, seed: id })).filter(l => WCALL.test(l) && !(WCALL.lastIndex = 0));
-        // (the hit grid is the drums' primary, on the first drum line playing, which may be a hats line: code-over-visual D11)
-        for (const l of one(S)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w === S.instruments[inst].primary || w === 'hitgrid') prim++; else sec++; }
-        for (const l of one(S0)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w !== S0.instruments[inst].primary && w !== 'hitgrid') sec0++; }
+        // (the hit grid is the drums' primary, on the first drum line playing, which may be a hats line: code-over-visual D11;
+        // the tone cloud sits on its holder whatever the seed, cd5: both are placed by rule, not by the share)
+        for (const l of one(S)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w === S.instruments[inst].primary || w === 'hitgrid' || w === 'tonecloud') prim++; else sec++; }
+        for (const l of one(S0)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w !== S0.instruments[inst].primary && w !== 'hitgrid' && w !== 'tonecloud') sec0++; }
       }
     }
     const share = sec / (prim + sec);
@@ -314,6 +316,30 @@ const CHECKS_WIDGETS = {
     const muted = '_$: note("a1").analyze("bass")\n$: note("a4").analyze("hook")\n$: s("bd*4").analyze("kick")';
     const n = placeWidgets(muted, { S: widgetSettings({ on: true, max: 2, share: 0 }), sections: 1, seed: 'a', returns: () => true });
     assert(calls(n).length <= 2 && /^_\$:.*_scope\(\)/m.test(n) && calls(n).length === Math.min(2, calls(n).length), `muted bass takes a slot: ${n}`);
+  },
+  'code widgets: settings saved before the app widgets get them once, every other choice kept (#79)'() {
+    const old = { on: true, max: 5, share: 40, instruments: { drums: { on: true, primary: 'scope', secondary: ['pianoroll', 'spectrum'] }, hats: { on: false, primary: 'spectrum', secondary: [] }, bass: { on: true, primary: 'pianoroll', secondary: ['scope'] }, lead: { on: true, primary: 'pianoroll', secondary: ['scope', 'spectrum'] }, arp: { on: true, primary: 'pianoroll', secondary: [] }, pad: { on: true, primary: 'scope', secondary: ['pianoroll'] }, fx: { on: false, primary: 'scope', secondary: ['spectrum'] }, voice: { on: true, primary: 'spectrum', secondary: ['tonecloud', 'scope'] } }, widgets: { spiral: true } };
+    const S = widgetSettings(old), I = S.instruments;
+    assert(I.drums.primary === 'hitgrid' && I.drums.secondary.join() === 'scope,pianoroll,spectrum', `drums ${JSON.stringify(I.drums)}`);
+    assert(I.pad.primary === 'tonecloud' && I.pad.secondary.join() === 'scope,pianoroll', `pad ${JSON.stringify(I.pad)}`);
+    assert(['bass', 'lead', 'arp'].every(k => I[k].secondary[I[k].secondary.length - 1] === 'tonecloud' && I[k].primary === old.instruments[k].primary), 'bass, lead, arp: the tone cloud among the secondary');
+    assert(I.voice.primary === 'scope' && I.voice.secondary.join() === 'spectrum,tonecloud' && I.voice.on, `voice ${JSON.stringify(I.voice)}`);
+    assert(JSON.stringify(I.fx) === JSON.stringify(old.instruments.fx) && !I.hats.on && I.hats.primary === 'spectrum', 'fx and hats as they were');
+    assert(S.max === 5 && S.share === 40 && S.widgets.spiral && S.widgets.hitgrid && S.widgets.tonecloud && S.appKinds === 1, 'the other choices kept, the app widgets on, the mark');
+    // saved with the mark, a later choice stays
+    const later = widgetSettings({ ...S, instruments: { ...S.instruments, bass: { on: true, primary: 'scope', secondary: [] } }, widgets: { ...S.widgets, tonecloud: false } });
+    assert(later.instruments.bass.secondary.length === 0 && later.widgets.tonecloud === false, 'a choice made after the migration stays');
+    // and an explicit switch off of an app widget in old settings stays off
+    assert(widgetSettings({ widgets: { hitgrid: false } }).widgets.hitgrid === false, 'hit grid switched off stays off');
+  },
+  'code widgets: without a pad the tone cloud sits on the first of bass, lead, arp playing, whatever the seed (cd5, #79)'() {
+    const code = ['$: s("bd*4").analyze("kick")', '$: note("a4 c5").analyze("hook")', '$: note("a1").analyze("bass")', '$: note("c5 e5").analyze("arp")'].join('\n');
+    for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']) {
+      const out = placeWidgets(code, { S: widgetSettings({ on: true, max: 4 }), sections: 1, seed }).split('\n');
+      assert(out[2].endsWith('._tonecloud()') && out.filter(l => l.includes('_tonecloud')).length === 1, `seed ${seed}: ${out.map(l => (l.match(/_(\w+)\(\)$/) || [])[1])}`);
+    }
+    const voice = placeWidgets('$: s("say_it").n(3).analyze("voice")', { S: widgetSettings({ on: true, share: 0 }), sections: 1, seed: 'x' });
+    assert(voice.endsWith('._scope()'), `the voice alone keeps its scope: ${voice}`);
   },
   'code widgets: an edit of a line keeps its widget; the kind of a track comes from the track and the seed (#79)'() {
     // (the tone cloud off: without a pad the bass holds it whatever the seed, cd5)
