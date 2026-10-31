@@ -80,6 +80,8 @@ export function loopAt(list, bar, { grow = false, same = (a, b) => JSON.stringif
 // and then); chords repeat exactly
 const sameBass = (a, b) => !!(a && b) && a.filter((x, j) => x === b[j]).length >= 13;
 const loopOpts = id => (id === 'chords' ? { grow: true } : { same: sameBass });
+// level B: two bars of bass are the same line when three quarters of the steps where either plays a note agree
+const sameBassB = (a, b) => { if (!a || !b) return false; let n = 0, ok = 0; for (let j = 0; j < a.length; j++) { if (a[j] === null && b[j] === null) continue; n++; if (a[j] === b[j]) ok++; } return n === 0 || ok / n >= 0.75; };
 
 // a bar of bass notes in mini-notation: the coarsest grid (16, 8 or 4 steps) that holds every note, runs with "!"
 export function stepsMini(notes) {
@@ -185,3 +187,113 @@ export const withoutVox = code => code.replace(/\n*\/\/ vox: …\s*$/, '');
 
 // a chord name of the model in the app's spelling (for the tempo and key readout): "Am" stays "Am"
 export const chordLabel = name => { const c = parseChord(name); return c ? `${NOTE_NAMES[c.root]}${c.quality === 'min' ? 'm' : ''}` : ''; };
+
+// ---------- level B (D9, D10): sections, a loop per part and section, variations ----------
+const range = (a, z) => Array.from({ length: Math.max(0, z - a) }, (_, i) => a + i);
+const SECTION_NAMES = { intro: 'Intro', verse: 'Verse', build: 'Build', drop: 'Drop', break: 'Break', outro: 'Outro' };
+// a part heard per bar inside a section, with one-bar gaps filled and one-bar islands left out (a missed note, a fill)
+function smooth(list) {
+  const out = list.slice();
+  for (let i = 0; i < list.length; i++) { const a = !!list[i - 1], z = !!list[i + 1]; if (!list[i] && a && z) out[i] = true; if (list[i] && !a && !z) out[i] = false; }
+  return out;
+}
+const gridOf = b => Object.fromEntries(DRUM_ROWS.map(r => [r, (b.drums && b.drums[r]) || EMPTY]));
+// the loop of a part over the bars of a section (values by absolute bar, null where not heard): the smallest period of
+// 1, 2, 4 or 8 bars whose positions (bar mod L, as Strudel's `<…>` reads them) hold one value on 80 % of the bars;
+// each position's value is its most common one (bass: the bar most like the others). → [values] of length L
+export function sectionLoop(byBar, bars, { same = (a, b) => JSON.stringify(a) === JSON.stringify(b) } = {}) {
+  const heard = bars.filter(b => byBar[b] !== null && byBar[b] !== undefined);
+  if (!heard.length) return null;
+  const pickOf = list => { let best = list[0], top = -1; for (const x of list) { const n = list.filter(y => same(x, y)).length; if (n > top) { top = n; best = x; } } return best; };
+  let fallback = null;
+  for (const L of [1, 2, 4, 8]) {
+    const loop = range(0, L).map(k => { const list = heard.filter(b => ((b % L) + L) % L === k).map(b => byBar[b]); return list.length ? pickOf(list) : null; });
+    if (loop.some(x => x === null)) continue;
+    const ok = heard.filter(b => same(byBar[b], loop[((b % L) + L) % L])).length / heard.length;
+    if (ok >= 0.8 && (L === 1 || heard.length >= 2 * L || L === 8)) return loop;
+    if (!fallback || ok > fallback.ok) fallback = { loop, ok };
+  }
+  return fallback ? fallback.loop : [byBar[heard[0]]];
+}
+// per section, the drum patterns: the main grid (the most common; a grid within two steps of it counts as it) and the
+// variants, grids that come back at least twice; a one-off fill plays the main grid. → [{ main, variants, perBar }]
+function drumPlan(model) {
+  const bars = model.bars, end = model.ending ?? bars.length;
+  const grid = k => Object.fromEntries(DRUM_ROWS.map((r, j) => [r, k.split('|')[j]]));
+  return (model.sections || []).map(sec => {
+    const idx = range(sec.start, Math.min(sec.start + sec.bars, end)), on = smooth(idx.map(i => drumsHeard(bars[i])));
+    const keys = idx.map((i, j) => (on[j] && drumsHeard(bars[i]) ? gridKey(gridOf(bars[i])) : on[j] ? 'gap' : null));
+    const count = new Map(); for (const k of keys) if (k && k !== 'gap') count.set(k, (count.get(k) || 0) + 1);
+    let main = null; for (const [k, n] of count) if (!main || n > count.get(main)) main = k;
+    if (!main) return { main: null, variants: [], perBar: idx.map(() => null), grid };
+    // (a grid within three steps of the main one, or one that only misses some of its hits, is the main one heard less
+    // well: a kick under a loud bass, a hat under a crash)
+    const near = k => { const g = grid(k), M0 = grid(main); return diffSteps(g, M0) <= 3 || DRUM_ROWS.every(r => [...g[r]].every((c, j) => c !== 'x' || M0[r][j] === 'x')); };
+    const variants = [...count].filter(([k, n]) => k !== main && n >= 2 && !near(k)).map(([k]) => k);
+    const perBar = keys.map(k => (k === null ? null : variants.includes(k) ? k : main));
+    return { main, variants, perBar, grid };
+  });
+}
+// the variations of a level B model (analysis spec: Level B adds structure): per section and part, the bars that play
+// a variant of the section's main pattern
+export function variationsOf(model) {
+  const out = [];
+  drumPlan(model).forEach((p, k) => {
+    if (!p.variants.length) return;
+    const sec = model.sections[k];
+    out.push({ section: k, part: 'drums', bars: p.perBar.map((x, j) => (x && x !== p.main ? sec.start + j : null)).filter(x => x !== null) });
+  });
+  return out;
+}
+
+// the chords of a key: its diatonic triads (and the major dominant of a minor key); a section whose chords fall mostly
+// outside the key is noise of the drums in the chord band (a drums-only outro reads as Bb, Gm, F#…), not a part
+const KEY_CHORDS = { minor: [[0, 'min'], [3, 'maj'], [5, 'min'], [7, 'min'], [7, 'maj'], [8, 'maj'], [10, 'maj']], major: [[0, 'maj'], [2, 'min'], [4, 'min'], [5, 'maj'], [7, 'maj'], [9, 'min']] };
+export const inKey = key => list => {
+  if (!key || !list.length) return true;
+  const set = new Set(KEY_CHORDS[key.mode === 'major' ? 'major' : 'minor'].map(([d, q]) => `${(key.root + d) % 12}${q}`));
+  const ok = list.filter(c => { const p = parseChord(c); return p && set.has(`${p.root}${p.quality}`); }).length;
+  return ok / list.length >= 0.6;
+};
+// the song of a level B model (D9): the model's sections with their kinds as names, a drums track with each section's
+// main grid and its variants as clips, bass and chords code tracks with one loop per section; a part plays where it is
+// heard (one-bar gaps filled, one-bar islands left out); sounds by measure per section (D10); the song ends at the
+// model's ending
+export function writeFull(model, opts = {}) {
+  const bars = model.bars, end = Math.max(1, Math.min(model.ending ?? bars.length, bars.length));
+  const secs = (model.sections && model.sections.length ? model.sections : [{ start: 0, bars: end, kind: 'verse' }]).filter(s => s.start < end).map(s => ({ ...s, bars: Math.min(s.bars, end - s.start) }));
+  const M = { ...model, sections: secs, ending: end };
+  const named = new Map(), names = secs.map(s => { const base = SECTION_NAMES[s.kind] || 'Part', n = (named.get(base) || 0) + 1; named.set(base, n); return n > 1 ? `${base} ${n}` : base; });
+  const all = soundsOf(bars.slice(0, end), opts.sounds), tracks = [];
+  const pid = n => String.fromCharCode(65 + (n % 26)) + (n >= 26 ? Math.floor(n / 26) : '');
+  const runs = (list, k) => { const out = []; list.forEach((x, j) => { if (x === null) return; const last = out[out.length - 1]; if (last && last.pattern === x && last.start + last.bars === k + j) last.bars++; else out.push({ start: k + j, bars: 1, pattern: x }); }); return out; };
+  // drums
+  {
+    const plan = drumPlan(M), patterns = {}, ids = new Map(), clips = [];
+    const idOf = (key, grid) => { if (!ids.has(key)) { const id = pid(ids.size); ids.set(key, id); const g = grid(key); patterns[id] = { rows: Object.fromEntries(DRUM_ROWS.filter(r => hits(g[r])).map(r => [r, g[r]])) }; } return ids.get(key); };
+    plan.forEach((p, k) => { if (!p.main) return; clips.push(...runs(p.perBar.map(x => (x ? idOf(x, p.grid) : null)), secs[k].start)); });
+    if (clips.length) tracks.push({ id: 'drums', name: 'Drums', type: 'drums', settings: { kit: all.kit }, patterns, clips });
+  }
+  // bass and chords
+  // keep(values): whether a section's values are a part at all (chords: most of them in the song's key)
+  const part = (id, name, visual, heardOf, valueOf, code, same, keep = () => true) => {
+    const patterns = {}, ids = new Map(), clips = [];
+    secs.forEach(sec => {
+      const idx = range(sec.start, sec.start + sec.bars), on = smooth(idx.map(i => heardOf(bars[i])));
+      if (!keep(idx.filter((i, j) => on[j] && heardOf(bars[i])).map(i => valueOf(bars[i])))) return;
+      const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && heardOf(bars[i]) ? valueOf(bars[i]) : null; });
+      const loop = sectionLoop(byBar, idx, same ? { same } : {});
+      if (!loop) return;
+      const snd = soundsOf(idx.map(i => bars[i]), opts.sounds), c = code(loop, id === 'bass' ? snd.bass : snd.chords);
+      if (!ids.has(c)) { const p = pid(ids.size); ids.set(c, p); patterns[p] = { code: c }; }
+      clips.push(...runs(on.map(x => (x ? ids.get(c) : null)), sec.start));
+    });
+    if (clips.length) tracks.push({ id, name, type: 'code', settings: { visual }, patterns, clips });
+  };
+  part('bass', 'Bass', 'bass', bassHeard, b => b.bass.map(x => (x === null || x === undefined ? null : x)), bassCode, sameBassB);
+  part('chords', 'Chords', 'pad', chordsHeard, b => b.chord, chordCode, undefined, inKey(model.key));
+  const song = songShell(model, opts, end, tracks);
+  const key = formatKey(model.key), bpm = song.sections[0].bpm;
+  song.sections = secs.map((s, i) => ({ name: names[i], bars: s.bars, bpm, key }));
+  return song;
+}

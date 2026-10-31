@@ -902,7 +902,19 @@ function liveBuild(sg, s, cyc) {
 }
 // the Decode tab (track-to-code D13, level A): the next change the model shows is typed with the bar as its deadline
 // and evaluated on the bar; a change that does not fit is pasted, as everywhere
-let decodeTab = null, decodeNext = null;
+let decodeTab = null, decodeNext = null, decodeSwap = null;
+// the level switch while a decoded track plays (playback spec: Level switch): the other level's song takes over at a
+// bar with that bar's code whole; an option or the sounds changed in level B the same way (from the next bar)
+function decodeSwapTick(s) {
+  if (!decodeSwap || s.lastEnd + .1 * s.cps < decodeSwap.at) return false;
+  const w = decodeSwap;
+  decodeSwap = null; decodeNext = null; typing = null;
+  song = w.sg; built = w.sg.build ? buildSteps(w.sg.build).filter(x => x.at <= w.at).length : 0;
+  source = { kind: 'decode', name: w.sg.title, level: w.level || '' }; renderSource();
+  setCodeRange(codeNow(w.sg, w.at)); ed.evaluate();
+  if (w.done) w.done();
+  return true;
+}
 function decodeBuild(s, cyc) {
   if (!decodeTab || hand || resumeTo !== null) return;
   if (!decodeNext) {
@@ -918,16 +930,18 @@ function decodeBuild(s, cyc) {
   song = n.sg; setCodeRange(n.code); ed.evaluate();
 }
 // starts a decoded track's code at a cycle (D12): the scheduler from that cycle, then the audio time it plays it
-async function decodePlay({ cycle, sg, code }) {
+async function decodePlay({ cycle, sg, code, level }) {
   if (radio && radio.on) radio.stopped();
   if (preview) preview.stop();
-  setHand(false); resumeTo = null; paused = null; typing = null; decodeNext = null;
+  setHand(false); resumeTo = null; paused = null; typing = null; decodeNext = null; decodeSwap = null;
+  // level B: the song grows with "Follow the song" (D13, D18): the player's live build types each change before its bar
+  built = sg.build ? buildSteps(sg.build).filter(x => x.at <= Math.floor(cycle)).length : 0;
   initAudioOnce();
   await ready;
   await initAudioOnce();
   ed.stop();
   song = sg; mode = 'decode';
-  source = { kind: 'decode', name: sg.title, level: t('dcLive') }; renderSource();
+  source = { kind: 'decode', name: sg.title, level: level || t('dcLive') }; renderSource();
   ed.setCode(code);
   sched().lastEnd = cycle;
   await ed.evaluate();
@@ -4522,11 +4536,24 @@ decodeTab = createDecodeTab({ root: $('#tab-decode'), app: {
   lang: getLang, files: () => customFiles, cols: codeCols, widgets: cwSettings,
   stopOthers: () => { if (radio && radio.on) radio.stopped(); if (preview) preview.stop(); if (isPlaying() && mode !== 'decode') { paused = null; ed.stop(); } },
   play: decodePlay,
-  stopCode: () => { decodeNext = null; typing = null; if (ed && mode === 'decode') ed.stop(); },
+  swap: w => { decodeSwap = w; },
+  controller: () => { try { return globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController(); } catch (e) { return null; } },
+  // Open in Compose (D15): the decoded song becomes a song of the user's and opens in Compose
+  openInCompose: s => {
+    const tr = stamp({ ...clone(s) }, true);
+    user.tracks.push(tr); saveLibrary(); renderSongs();
+    if (!loadTrack({ ...tr, kind: 'composed' })) return false;
+    if (mode !== 'track') backToTrack(); else if (ed && !isPlaying()) ed.setCode(compiled.code);
+    showTab('componi'); toast(t('dcOpened'));
+    return true;
+  },
+  stopCode: () => { decodeNext = null; decodeSwap = null; typing = null; if (ed && mode === 'decode') ed.stop(); },
   source: (name, level) => { source = { kind: 'decode', name, level }; renderSource(); },
-  ended: () => { decodeNext = null; typing = null; if (ed && mode === 'decode') ed.stop(); },
+  ended: () => { decodeNext = null; decodeSwap = null; typing = null; if (ed && mode === 'decode') ed.stop(); },
 } });
 globalThis.codingMiskDecode = decodeTab;
+// for the browser checks (tools/check-decode.cjs, Open in Compose): the code of the song in Compose at a bar, as it plays
+globalThis.codingMiskCompose = { codeAt: bar => (compiled && compiled.codeAt && !compiled.pending ? codeFor(compiled, bar) : null), pending: () => !!(compiled && compiled.pending), song: () => JSON.parse(JSON.stringify(T)) };
 function renderSongs() {
   const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr));
   // the cards only need the written song's meta: never grow every song for the list (a growth can take seconds)
@@ -4692,7 +4719,12 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
 function songTick() {
   const s = sched();
   if (!(song && s && isPlaying() && !seeking)) return;
-  if (mode === 'decode') { decodeBuild(s, s.now()); return; }
+  if (mode === 'decode') {
+    if (decodeSwapTick(s)) return;
+    if (song.build) { if (resumeTo !== null) resumeBuild(song, s, s.now()); else if (!hand) liveBuild(song, s, s.now()); widgetTick(song, s); }
+    else decodeBuild(s, s.now());
+    return;
+  }
   const m = song.meta, cyc = s.now();
   const ahead = Math.min(m.bars - 1, Math.floor(s.lastEnd + s.cps * .1));
   const target = m.bpm[ahead] / 240;

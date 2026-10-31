@@ -1896,6 +1896,20 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .dc-tempo .chip { padding: 1px 8px; }
 .dc-unc { border-color: var(--danger); color: var(--danger); }
 .dc-seg .chip:disabled { opacity: .45; cursor: not-allowed; }
+/* level B (track-to-code): the Full chip while it runs, the progress and Cancel, the engines, the sections strip */
+.dc-level { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dc-seg .chip { display: inline-flex; align-items: center; gap: 6px; }
+.dc-seg .chip.growing { border-color: var(--a1); }
+.dc-full-run { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; font: 12px var(--mono); color: var(--muted); }
+.dc-full-run .btn { padding: 2px 8px; font-size: 12px; }
+.dc-engines { margin: 0; color: var(--muted); font-size: 12px; }
+.dc-secs-wrap { display: grid; gap: 4px; min-width: 0; }
+.dc-secs { display: flex; gap: 3px; min-width: 0; }
+.dc-sec { flex: 1 1 0; min-width: 0; display: grid; gap: 0; padding: 4px 6px; text-align: left; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); color: var(--ink); cursor: pointer; overflow: hidden; }
+.dc-sec b, .dc-sec small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.dc-sec small { font: 11px var(--mono); color: var(--muted); }
+.dc-sec.on { border-color: var(--a1); box-shadow: inset 0 -2px 0 var(--a1); }
+.dc-sec:focus-visible { outline: 2px solid var(--a1); outline-offset: 1px; }
 .dc-fold summary { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; }
 .dc-fold summary::-webkit-details-marker { display: none; }
 .dc-fold .dc-chev { transition: transform .15s; }
@@ -1928,4 +1942,6 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
   .dc-rrow .badge, .dc-rrow .dc-len { display: none; }
   .dc-trk { grid-template-columns: auto minmax(0, 1fr) auto; }
   .dc-trk .dc-meter { grid-column: 1 / -1; }
+  .dc-secs { flex-wrap: wrap; }
+  .dc-sec { flex-basis: 30%; }
 }

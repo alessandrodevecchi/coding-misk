@@ -104,7 +104,7 @@ export function customPanel({ state, t, esc, prefix }, { C = customControls(stat
   const body = `${all ? '' : fromRow}
         <div class="custom-grid">
           ${sel('build', ['blocks', 'crescendo'], 'liveStyle', 'liveStyleHint', v => t(v === 'blocks' ? 'liveBlocks' : 'liveCrescendo'))}
-          ${grow || all ? sel('growth', CONTROLS.growth, 'growthLbl', 'growthHint', v => t(`growth:${v}`), !grow) : ''}
+          ${grow || all ? sel('growth', CONTROLS.growth.filter(v => v !== 'follow'), 'growthLbl', 'growthHint', v => t(`growth:${v}`), !grow) : ''}
           ${natural || all ? duration : ''}
           ${natural || all ? shape('opening') + shape('pace') + shape('development') : ''}
           ${grow || all ? sel('view', CONTROLS.view, 'liveCodeView', 'liveCompactHint', v => t({ now: 'liveCodeNow', compact: 'liveCodeCompact', track: 'liveCodeTrack', sections: 'liveCodeSections' }[v]), !grow) : ''}

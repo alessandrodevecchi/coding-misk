@@ -38,19 +38,19 @@ Estimate: about 72 agent hours (60 to 90), in the order below. Level A and its s
 
 ## 6. Level B analysis (about 7 h)
 
-- [ ] 6.1 Add `essentia.js` 0.1.3 (exact version) and `src/decode/engine-essentia.js`, loaded by a dynamic import inside the worker only for level B; verify that `npm run build` puts it in its own chunk and that no other tab requests it (network log of a page script).
-- [ ] 6.2 Whole-file steps: misk-analyzer calls Essentia.js for tempo and beats, key, and HPCP with `ChordsDetectionBeats` on the beats, merged with its own grids, bass, levels and sections; key mode settled by chord evidence; misk-analyzer computes the three measures itself when Essentia.js fails; level A never calls Essentia.js; verify on the Node test tracks and with Essentia blocked.
-- [ ] 6.3 Sections, variations, ending: novelty on chroma and levels for section bounds, section kinds, variant patterns that repeat, the ending bar; verify on a generated track with known sections (bounds within one bar).
-- [ ] 6.4 The growing mark and progress text in the level switch, cancel, the result stored; verify that a 4-minute file finishes in less than its length and the page stays responsive (no long task over 200 ms).
+- [x] 6.1 Add `essentia.js` 0.1.3 (exact version) and `src/decode/engine-essentia.js`, loaded by a dynamic import inside the worker only for level B; verify that `npm run build` puts it in its own chunk and that no other tab requests it (network log of a page script).
+- [x] 6.2 Whole-file steps: misk-analyzer calls Essentia.js for tempo and beats, key, and HPCP with `ChordsDetectionBeats` on the beats, merged with its own grids, bass, levels and sections; key mode settled by chord evidence; misk-analyzer computes the three measures itself when Essentia.js fails; level A never calls Essentia.js; verify on the Node test tracks and with Essentia blocked.
+- [x] 6.3 Sections, variations, ending: novelty on chroma and levels for section bounds, section kinds, variant patterns that repeat, the ending bar; verify on a generated track with known sections (bounds within one bar).
+- [x] 6.4 The growing mark and progress text in the level switch, cancel, the result stored; verify that a 4-minute file finishes in less than its length and the page stays responsive (no long task over 200 ms).
 - [ ] 6.5 Only if the npm build of Essentia.js breaks: build its WebAssembly from the current source repository and vendor it (about 3 h, not in the total); verify with the test of 6.1 and the Node tracks of 6.2.
 
 ## 7. Level B code, Follow the song and Open in Compose (about 10 h)
 
-- [ ] 7.1 Growth value `follow` (D18) in `src/live/profiles.js`, `src/live/live-code.js` and `src/live/written-plan.js`, for every song, default for decoded songs only; verify that `node tools/check-crescendo.mjs` fixtures and `SHAPES_VERSION` do not move and `npm run check:crescendo` passes.
-- [ ] 7.2 Level B playback: several code tracks in the track list, each with mute and solo; the level switch (Live, Full), Full by default when stored; switching while playing takes over at the next bar with the code of that bar whole; verify in the app.
-- [ ] 7.3 "Follow the song" in the Compose growth menu (`index.html`, `src/main.js`, `src/i18n.js` en and it, its help text) and a line in the Guide card of the Live build (`src/guide.js`, en and it); verify with `npm run check:guide` and in the app.
-- [ ] 7.4 A check that every built-in song with the Live coder profile and `follow` grows and plays its steps without errors (in `npm run check:crescendo` or `npm run check:live-code`), and that the Live coder fixtures stay unchanged.
-- [ ] 7.5 Open in Compose (D15): runs level B when missing, saves a user song with the Live coder profile, `growth: 'follow'`, narrator off and `cover`; Compose plays it as in Decode and switches to Classic and Crescendo; verify in the app and with `node --no-warnings tools/song.mjs validate` on the saved song.
+- [x] 7.1 Growth value `follow` (D18) in `src/live/profiles.js`, `src/live/live-code.js` and `src/live/written-plan.js`, for every song, default for decoded songs only; verify that `node tools/check-crescendo.mjs` fixtures and `SHAPES_VERSION` do not move and `npm run check:crescendo` passes.
+- [x] 7.2 Level B playback: several code tracks in the track list, each with mute and solo; the level switch (Live, Full), Full by default when stored; switching while playing takes over at the next bar with the code of that bar whole; verify in the app.
+- [x] 7.3 "Follow the song" in the Compose growth menu (`index.html`, `src/main.js`, `src/i18n.js` en and it, its help text) and a line in the Guide card of the Live build (`src/guide.js`, en and it); verify with `npm run check:guide` and in the app.
+- [x] 7.4 A check that every built-in song with the Live coder profile and `follow` grows and plays its steps without errors (in `npm run check:crescendo` or `npm run check:live-code`), and that the Live coder fixtures stay unchanged.
+- [x] 7.5 Open in Compose (D15): runs level B when missing, saves a user song with the Live coder profile, `growth: 'follow'`, narrator off and `cover`; Compose plays it as in Decode and switches to Classic and Crescendo; verify in the app and with `node --no-warnings tools/song.mjs validate` on the saved song.
 
 ## 8. Export with the original (about 6 h)
 

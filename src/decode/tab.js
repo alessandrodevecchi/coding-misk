@@ -5,12 +5,14 @@
 import { probe, decode, fingerprint, sameFile, analysisCopy, MAX_SECONDS, ANALYSIS_RATE } from './input.js';
 import { createDecodeStore, freshModel } from './store.js';
 import { horizonOf, LOOK_AHEAD, LOOK_AHEAD_DEFAULT, LOCK_SECONDS, tapTempo } from './misk-analyzer.js';
-import { momentSong, withVox, withoutVox, keyName, SOUND_PRESETS } from './writer.js';
+import { momentSong, writeFull, withVox, withoutVox, keyName, SOUND_PRESETS } from './writer.js';
 import { defaultMix, mixApply, gainsOf, loudnessTrim, codeBus, setGain, ORIG } from './mix.js';
 import { cycleOfFile, fileOfCycle, decodeMeta, createOriginal } from './sync.js';
 import { currentModel } from './model.js';
 import { liveCode } from '../live/live-code.js';
-import { resolveProfile } from '../live/profiles.js';
+import { resolveProfile, cleanOverrides, PROFILES } from '../live/profiles.js';
+import { followSong } from '../song/crescendo.js';
+import { compileSong } from '../song/compile.js';
 import { FUNCTION_PRESETS } from '../song/writer.js';
 import { COMMENT_PRESETS } from '../song/comments.js';
 
@@ -18,11 +20,28 @@ const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(
 const VIEWS = ['now', 'compact', 'track', 'sections'];
 // the Options of a decoded track (D13): the Live coder's defaults (comments: title only; every technical function)
 export const DEFAULT_OPTIONS = { comments: 'none', functions: 'compact', view: 'now' };
-export const DEFAULT_SETTINGS = () => ({ look: LOOK_AHEAD_DEFAULT, sounds: 'ours', options: { ...DEFAULT_OPTIONS }, mix: defaultMix(['code']) });
-// the controls a decoded song plays with: the Live coder profile, narrator off (it would talk over the original)
-export function decodeControls(options = DEFAULT_OPTIONS) {
+export const DEFAULT_SETTINGS = () => ({ level: 'A', look: LOOK_AHEAD_DEFAULT, sounds: 'ours', options: { ...DEFAULT_OPTIONS }, mix: defaultMix(['code']) });
+// the overrides of the Live coder profile a decoded song plays with: narrator off (it would talk over the original), the
+// growth "Follow the song" (D18, level B and Open in Compose), the Options of the tab
+export function decodeOverrides(options = DEFAULT_OPTIONS) {
   const o = { ...DEFAULT_OPTIONS, ...(options || {}) };
-  return resolveProfile('switch', { narrator: false, ...(COMMENT_PRESETS[o.comments] || {}), ...(FUNCTION_PRESETS[o.functions] || {}), view: VIEWS.includes(o.view) ? o.view : 'now' });
+  return { narrator: false, growth: 'follow', ...(COMMENT_PRESETS[o.comments] || {}), ...(FUNCTION_PRESETS[o.functions] || {}), view: VIEWS.includes(o.view) ? o.view : 'now' };
+}
+export const decodeControls = (options = DEFAULT_OPTIONS) => resolveProfile('switch', decodeOverrides(options));
+// the configuration of a decoded song opened in Compose (D15): the Live coder profile with the tab's overrides, so the
+// song grows the same and shows the same code
+export const composeConfig = options => ({ profile: 'switch', live: true, options: cleanOverrides(decodeOverrides(options), PROFILES.switch) });
+// the bus (orbit) of each track of a song, from its compiled code: { trackId: orbit }
+export function orbitsOf(song) {
+  const out = {}, byName = new Map((song.tracks || []).map(t => [t.name || t.id, t.id]));
+  let cur = null;
+  for (const line of compileSong(song).split('\n')) {
+    const h = /^\/\/ =+ (.+?) =+$/.exec(line);
+    if (h) { cur = byName.get(h[1].split(' · ')[0]) || null; continue; }
+    const o = /\.orbit\((\d+)\)/.exec(line);
+    if (cur && o && out[cur] === undefined) out[cur] = +o[1];
+  }
+  return out;
 }
 
 const ICON = {
@@ -33,6 +52,9 @@ const ICON = {
   tap: '<svg class="dc-ico" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="9" width="12" height="4" rx="1"/><path d="M8 2v4M5.5 4.5L8 2l2.5 2.5"/></g></svg>',
   open: '<svg class="dc-ico" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5h4.5V7M13.5 2.5L7 9"/><path d="M12 9.5v3a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"/></g></svg>',
   x: '<svg class="dc-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  drums: '<svg class="dc-ico" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="8" cy="6" rx="5.5" ry="2"/><path d="M2.5 6v4.5c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V6"/></g></svg>',
+  bass: '<svg class="dc-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 9c1.5 0 1.5-4 3-4s1.5 6 3 6 1.5-6 3-6 1.5 4 3 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  chords: '<svg class="dc-ico" viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><ellipse cx="5" cy="12" rx="2" ry="1.5"/><ellipse cx="11" cy="10" rx="2" ry="1.5"/></g><g stroke="currentColor" stroke-width="1.4" fill="none"><path d="M6.8 12V4l6-2v8M6.8 6.5l6-2"/></g></svg>',
   chev: '<svg class="dc-ico dc-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
@@ -49,6 +71,10 @@ export function createDecodeTab({ root, app }) {
   let orig = null, origGain = null, origAn = null, codeAn = null, origFor = null;
   let playing = false, startedCode = false, pendingStart = null, lastUi = 0, taps = [], optionsOpen = false, inflight = 0;
   const codeMemo = new Map();
+  // level B (D5, D13): the stored or new whole-file model, the analysis running in a worker of its own, the code the
+  // player plays now ('A' or 'B')
+  let modelB = null, modelBSeq = 0, full = null, fullSeq = 0, playLevel = 'A', bMemo = null;
+  const orbitAn = new Map(), orbitGains = new Set();
 
   // ---------- the worker ----------
   function ensureWorker() {
@@ -105,7 +131,8 @@ export function createDecodeTab({ root, app }) {
     const rec = fp ? await store.get(fp.key) : null, match = rec && sameFile(fp, rec);
     // the previous track's worker and buffers go (D2: free the buffers when the track closes)
     if (worker) { worker.terminate(); worker = null; }
-    model = null; codeMemo.clear();
+    if (full) { full.w.terminate(); full = null; }
+    model = null; modelB = null; bMemo = null; codeMemo.clear();
     cur = {
       file, name: file.name, fp, info, buffer, duration: buffer.duration, handle: handle || (match && rec.handle) || null,
       title: match ? rec.title : info.title, artist: match ? rec.artist : info.artist, attribution: match ? rec.attribution !== false : true,
@@ -114,6 +141,9 @@ export function createDecodeTab({ root, app }) {
       trim: loudnessTrim(buffer.getChannelData(0), buffer.sampleRate),
     };
     if (match && freshModel(rec.modelA)) model = rec.modelA;
+    // a track with a stored level B analysis opens in Full (owner answer 1)
+    if (match && freshModel(rec.modelB) && rec.modelB.level === 'B') { modelB = rec.modelB; modelBSeq++; }
+    setLevel(modelB ? 'B' : 'A', { quiet: true });
     ensureWorker();
     const pcm = await analysisCopy(buffer);
     worker.postMessage({ type: 'load', pcm, rate: ANALYSIS_RATE }, [pcm.buffer]);
@@ -136,11 +166,10 @@ export function createDecodeTab({ root, app }) {
     if (!cur || !cur.fp) return;
     const rec = {
       fp: cur.fp.key, size: cur.fp.size, durationMs: cur.fp.durationMs, fileName: cur.name, title: cur.title, artist: cur.artist, attribution: cur.attribution,
-      settings: cur.settings, tempo: cur.tempo || null, modelA: model && model.bpm ? model : null, version: model ? model.version : null, video: cur.video,
+      settings: cur.settings, tempo: cur.tempo || null, modelA: model && model.bpm ? model : null, modelB: modelB || null, version: model ? model.version : null, video: cur.video,
       ...(cur.handle ? { handle: cur.handle } : {}),
     };
     const old = await store.get(cur.fp.key);
-    if (old && old.modelB) rec.modelB = old.modelB;
     if (old && old.created) rec.created = old.created;
     await store.put(rec);
     recent = await store.list();
@@ -182,11 +211,13 @@ export function createDecodeTab({ root, app }) {
     const f = Math.max(0, Math.min(cur.duration - 0.05, from ?? (cur.paused || 0)));
     cur.paused = null;
     playing = true; startedCode = false;
-    // level A (D8): the first window up to the horizon is analysed before the sound starts
-    const m = await analyse(Math.max(horizon(f), (model && model.bpm ? 0 : LOCK_SECONDS + 0.5)) + 0.1, true);
-    if (m) takeModel(m);
+    // level A (D8): the first window up to the horizon is analysed before the sound starts; level B knows every bar
+    if (level() !== 'B') {
+      const m = await analyse(Math.max(horizon(f), (model && model.bpm ? 0 : LOCK_SECONDS + 0.5)) + 0.1, true);
+      if (m) takeModel(m);
+    }
     if (!playing) return;
-    if (model && model.barSeconds > 0) await startCode(f);
+    if (level() === 'B' || (model && model.barSeconds > 0)) await startCode(f);
     else {
       // no tempo yet (look ahead off, or a quiet start): the original plays alone until the tempo locks
       ensureAudio();
@@ -197,22 +228,27 @@ export function createDecodeTab({ root, app }) {
   // starts the code on Strudel's clock at file time f (D12), the original at the audio time of that cycle; a source
   // already playing hands over to the new one at that time
   async function startCode(f = null) {
-    if (!cur || !model || !(model.barSeconds > 0) || pendingStart) return;
+    if (!cur || pendingStart) return;
+    if (level() === 'B' ? !(modelB && modelB.barSeconds > 0) : !(model && model.barSeconds > 0)) return;
     startedCode = true;
     pendingStart = (async () => {
       ensureAudio();
-      const ctx = app.ctx(), at = f ?? (orig && orig.playing ? orig.now() + 0.15 : 0);
-      const c = cycleOfFile(model, at), bar = Math.floor(c), P = playableAt(Math.min(bar, knownBar(at)));
-      const r = await app.play({ cycle: c, sg: P.sg, code: P.code, title: cur.title });
+      const at = f ?? (orig && orig.playing ? orig.now() + 0.15 : 0), B = level() === 'B';
+      // level B plays on its own whole-file grid (D7); level A on the grid of the bars heard
+      const M = B ? modelB : model, c = cycleOfFile(M, at), bar = Math.floor(c);
+      let sg, code;
+      if (B) { sg = playableB(); code = bar < 0 ? sg.silent : sg.codeAt(bar); }
+      else { const P = playableAt(Math.min(bar, knownBar(at))); sg = P.sg; code = P.code; }
+      playLevel = B ? 'B' : 'A';
+      const r = await app.play({ cycle: c, sg, code, title: cur.title, level: t(B ? 'dcFullLvl' : 'dcLive') });
       if (!playing || !r || !Number.isFinite(r.time)) return;
-      orig.start(r.time, fileOfCycle(model, c));
-      app.source(cur.title, t('dcLive'));
-      void ctx;
+      orig.start(r.time, fileOfCycle(M, c));
     })().finally(() => { pendingStart = null; });
     return pendingStart;
   }
   function stop({ keep = false } = {}) {
     if (saveT) { clearTimeout(saveT); saveT = 0; save(); }
+    resetOrbits();
     if (cur && keep && orig && orig.playing) cur.paused = orig.now();
     playing = false; startedCode = false;
     if (orig) orig.stop();
@@ -249,9 +285,31 @@ export function createDecodeTab({ root, app }) {
     const ctx = st.ctx, ours = app.mode() === 'decode' || playing;
     if (origGain && origFor !== st.level) { try { origGain.disconnect(); } catch (e) {} origGain.connect(st.level); origGain.connect(origAn); origFor = st.level; }
     if (!codeAn || codeAn.context !== ctx || codeAn.from !== st.codeGain) { codeAn = ctx.createAnalyser(); codeAn.fftSize = 1024; st.codeGain.connect(codeAn); codeAn.from = st.codeGain; }
-    const g = cur ? gainsOf(cur.settings.mix) : { [ORIG]: 0, code: 1 };
-    setGain(st.codeGain.gain, ours && cur ? g.code ?? 0 : 1, ctx);
+    const g = cur ? gainsOf(cur.settings.mix) : { [ORIG]: 0, code: 1 }, ids = codeIds();
+    // the code's bus: the slider's gain while any code track is heard
+    setGain(st.codeGain.gain, ours && cur ? Math.max(0, ...ids.map(id => g[id] || 0)) : 1, ctx);
     if (origGain) setGain(origGain.gain, cur ? g[ORIG] * cur.trim : 0, ctx);
+    // level B (D11): one bus per decoded part, its orbit's output at 1 when the track is heard and 0 when not (the
+    // analysers sit before it, so the stage and the lit notes still follow a muted part)
+    const sg = ours && cur && playLevel === 'B' && bMemo ? bMemo.sg : null, C = sg && app.controller();
+    if (C && C.nodes) for (const id of ids) { const o = sg.orbits[id], node = o !== undefined ? C.nodes[o] : null; if (node && node.output) { setGain(node.output.gain, g[id] > 0 ? 1 : 0, ctx); orbitGains.add(o); } }
+    else resetOrbits();
+  }
+  const codeIds = () => (cur ? cur.settings.mix.tracks.filter(x => x.kind === 'code').map(x => x.id) : []);
+  // the orbits set by level B back at 1 (another player, level A, stop)
+  function resetOrbits() {
+    if (!orbitGains.size) return;
+    const C = app.controller();
+    for (const o of orbitGains) { const node = C && C.nodes ? C.nodes[o] : null; if (node && node.output) { try { node.output.gain.cancelScheduledValues(0); } catch (e) {} node.output.gain.value = 1; } }
+    orbitGains.clear();
+  }
+  // a level B track's meter: an analyser after its orbit's gain
+  function orbitPeak(id) {
+    const sg = bMemo && bMemo.sg, C = app.controller(), o = sg ? sg.orbits[id] : undefined, node = o !== undefined && C && C.nodes ? C.nodes[o] : null;
+    if (!node || !node.output) return 0;
+    let an = orbitAn.get(o);
+    if (!an || an.from !== node.output) { an = node.output.context.createAnalyser(); an.fftSize = 1024; node.output.connect(an); an.from = node.output; orbitAn.set(o, an); }
+    return peakOf(an);
   }
   const peakOf = an => { if (!an) return 0; const d = new Float32Array(an.fftSize); an.getFloatTimeDomainData(d); let p = 0; for (const v of d) p = Math.max(p, Math.abs(v)); return p; };
 
@@ -274,6 +332,96 @@ export function createDecodeTab({ root, app }) {
     if (codeMemo.size > 400) codeMemo.clear();
     codeMemo.set(key, out);
     return out;
+  }
+  // ---------- level B (D5, D9, D13, D18) ----------
+  const level = () => (cur && cur.settings.level === 'B' && modelB ? 'B' : 'A');
+  // the song of level B (the writer's), as Open in Compose saves it
+  const songB = (id = 'decoded') => writeFull(modelB, { id, title: cur.title, artist: cur.artist, attribution: cur.attribution, sounds: cur.settings.sounds });
+  // the player's song of level B: the written song with the growth "Follow the song" in the Live coder profile, each
+  // change typed before its bar by the player's live build (D13); the code shown ends with the vocals placeholder
+  function playableB() {
+    const key = JSON.stringify([modelBSeq, cur.title, cur.artist, cur.attribution, cur.settings.sounds, cur.settings.options]);
+    if (bMemo && bMemo.key === key) return bMemo.sg;
+    const song = songB(), C = ctl(), lc = liveCode(followSong(song), C, { lang: app.lang, files: app.files, cols: app.cols, widgets: app.widgets });
+    const codeAt = (bar, keep) => withVox(lc.codeAt(Math.max(0, bar), keep));
+    const first = lc.codeAt(0), head = first.split('\n').filter(l => /^\/\/ coding-misk|^setcpm\(/.test(l)).join('\n');
+    const sg = {
+      id: `decode:${cur.fp ? cur.fp.key : 'x'}:B`, title: cur.title, kind: 'decode', code: withVox(first), meta: decodeMeta(modelB), codeAt, codeKeep: null,
+      run: c => { const x = withoutVox(c); return lc.run ? lc.run(x) : x; },
+      standalone: c => { const x = withoutVox(c); return lc.standalone ? lc.standalone(x) : x; },
+      buses: lc.buses, fns: lc.fns, build: lc.build, ctl: C, doc: lc.build, paste: lc.paste, earlier: lc.earlier, decode: true, level: 'B',
+      // before the first downbeat: the title and the tempo, no part yet
+      silent: withVox(`${head}\n\n$: silence`),
+      orbits: orbitsOf(song), tracks: song.tracks.map(x => ({ id: x.id, name: x.name })), sections: song.sections,
+    };
+    bMemo = { key, sg };
+    return sg;
+  }
+  // the code tracks of a level: one in level A, one per decoded part in level B (D11)
+  const levelTracks = lv => (lv === 'B' && modelB ? playableB().tracks.map(x => x.id) : ['code']);
+  function setLevel(lv, { quiet = false } = {}) {
+    if (!cur) return;
+    cur.settings.level = lv === 'B' && modelB ? 'B' : 'A';
+    cur.settings.mix = mixApply(cur.settings.mix, { type: 'tracks', codeIds: levelTracks(cur.settings.level) });
+    if (quiet) return;
+    saveSoon();
+    // playing: the other level takes over at the next bar with that bar's code whole (playback spec: Level switch)
+    if (playing && startedCode) {
+      const M = cur.settings.level === 'B' ? modelB : model;
+      if (M && M.barSeconds > 0) {
+        const at = Math.floor(cycleOfFile(M, fileNow())) + 1;
+        // (the buses of level B follow the code that plays: they change with it, on the bar)
+        const lv = cur.settings.level, done = () => { playLevel = lv; };
+        if (lv === 'B') { const sg = playableB(); app.swap({ at, sg, code: sg.codeAt(at), level: t('dcFullLvl'), done }); }
+        else { const P = playableAt(Math.min(at, knownBar(fileNow()))); app.swap({ at, sg: P.sg, code: P.code, level: t('dcLive'), done }); }
+      }
+    }
+    render();
+  }
+  // level B runs in a worker of its own (cancel ends it; level A goes on); then: 'switch' (to Full), 'compose' (Open in
+  // Compose) or null (stored only)
+  async function runFull(then = 'switch') {
+    if (!cur || full) { if (full && then) full.then = then; return; }
+    const w = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }), id = ++fullSeq, track = cur;
+    full = { w, id, f: 0, stage: 'frames', then, t0: performance.now() };
+    status = null;
+    w.onmessage = e => {
+      const m = e.data || {};
+      if (!full || full.id !== id || cur !== track) { w.terminate(); return; }
+      if (m.type === 'progress') { full.f = m.f; full.stage = m.stage; renderLight(); return; }
+      if (m.type === 'error') { w.terminate(); full = null; status = { kind: 'error', text: t('dcFullFailed') }; render(); return; }
+      if (m.type !== 'full') return;
+      w.terminate();
+      const job = full; full = null;
+      modelB = m.model; modelBSeq++; bMemo = null;
+      status = { kind: 'note', text: t(m.model.engines && m.model.engines.chords === 'essentia.js' ? 'dcFullReady2' : 'dcFullOwn') };
+      save();
+      if (job.then === 'compose') { openCompose(); return; }
+      if (job.then === 'switch') setLevel('B'); else render();
+      app.toast(t('dcFullDone', { s: ((performance.now() - job.t0) / 1000).toFixed(1) }));
+    };
+    w.onerror = () => { if (full && full.id === id) { full = null; status = { kind: 'error', text: t('dcFullFailed') }; render(); } };
+    render();
+    const pcm = await analysisCopy(track.buffer);
+    if (!full || full.id !== id) return;
+    w.postMessage({ type: 'load', pcm, rate: ANALYSIS_RATE }, [pcm.buffer]);
+    w.postMessage({ type: 'all', id, tempo: track.tempo || null, essentia: !globalThis.codingMiskNoEssentia });
+  }
+  // cancel (analysis spec: Cancel): the worker ends, nothing is stored for level B, level A stays
+  function cancelFull() {
+    if (!full) return;
+    full.w.terminate(); full = null;
+    status = { kind: 'note', text: t('dcFullCancelled') };
+    render();
+  }
+  // Open in Compose (D15): the level B song saved as a song of the user's, with the Live coder profile, "Follow the
+  // song", narrator off and the cover; level B runs first when missing
+  function openCompose() {
+    if (!cur) return;
+    if (!modelB) { runFull('compose'); return; }
+    const song = { ...songB(`u-${Date.now()}`), config: composeConfig(cur.settings.options) };
+    stop();
+    app.openInCompose(song);
   }
   // the next change to type (D8, D13): the earliest bar after the playing one, up to the last bar the model knows, whose
   // code differs from the code that will be playing; its code is that bar's (or the last known bar's)
@@ -300,7 +448,7 @@ export function createDecodeTab({ root, app }) {
     // level A: keep the model ahead of the horizon (one request at a time, a little past it)
     const want = horizon(f ?? 0);
     // one request in flight at a time, a little past the horizon (a lost answer frees the slot after 3 s)
-    if ((!model || (model.analysedTo || 0) < Math.min(cur.duration, want) - 0.01) && (!inflight || performance.now() - inflight > 3000)) { inflight = performance.now(); analyse(want + 0.5); }
+    if (playLevel !== 'B' && (!model || (model.analysedTo || 0) < Math.min(cur.duration, want) - 0.01) && (!inflight || performance.now() - inflight > 3000)) { inflight = performance.now(); analyse(want + 0.5); }
     const now = performance.now();
     if (now - lastUi > 250) { lastUi = now; renderLight(); }
   }
@@ -311,10 +459,14 @@ export function createDecodeTab({ root, app }) {
     cur.tempo = { bpm: Math.round(bpm * 100) / 100, downbeat: Math.max(0, downbeat), tapped };
     worker.postMessage({ type: 'tempo', ...cur.tempo });
     model = null; codeMemo.clear();
+    // a new tempo makes level B's grid old: level A plays, level B runs again with the new tempo
+    const wasB = level() === 'B';
+    if (modelB) { modelB = null; modelBSeq++; bMemo = null; setLevel('A', { quiet: true }); }
     const wasPlaying = playing, f = fileNow();
     if (wasPlaying) { if (orig) orig.stop(); app.stopCode(); play(f); }
     else analyse(horizon(f) + 4);
     save(); render();
+    if (wasB) runFull('switch');
   }
   function tap() {
     if (!cur || !playing || !orig || !orig.playing) return false;
@@ -336,14 +488,36 @@ export function createDecodeTab({ root, app }) {
       return `<div class="dc-trk${heardNow ? '' : ' silent'}" data-dc-trk="${esc(tr.id)}"><span class="dc-ti">${icon}</span><span class="dc-nm">${esc(name)}<small>${esc(sub)}</small></span><span class="dc-meter"><i data-dc-meter="${esc(tr.id)}"></i></span>
         <span class="dc-ms"><button class="mini${by === 'slider' ? ' by-slider' : ''}" data-dc-mute="${esc(tr.id)}" aria-pressed="${!!tr.mute}" title="${esc(tr.mute ? t(by === 'slider' ? 'dcLegendSlider' : 'dcLegendUser') : t('mute'))}" aria-label="${esc(`${t('mute')} · ${name}`)}">M</button><button class="mini" data-dc-solo="${esc(tr.id)}" aria-pressed="${!!tr.solo}" title="${esc(t('solo'))}" aria-label="${esc(`${t('solo')} · ${name}`)}">S</button></span></div>`;
     };
-    return mix.tracks.map(tr => (tr.kind === 'orig' ? row(tr, t('dcOrig'), t('dcOrigSub'), ICON.wave) : row(tr, t('dcCode'), t('dcCodeSub', { n: P ? P.lines : 0 }), ICON.code))).join('');
+    // level B: one row per decoded part (drums, bass, chords)
+    const part = tr => { const x = level() === 'B' && bMemo ? bMemo.sg.tracks.find(y => y.id === tr.id) : null; return x ? row(tr, t(`dcPart:${tr.id}`), t('dcPartSub'), ICON[tr.id] || ICON.code) : row(tr, t('dcCode'), t('dcCodeSub', { n: P ? P.lines : 0 }), ICON.code); };
+    return mix.tracks.map(tr => (tr.kind === 'orig' ? row(tr, t('dcOrig'), t('dcOrigSub'), ICON.wave) : part(tr))).join('');
+  };
+  // the model whose grid the tab shows: level B's in Full, else level A's
+  const shownModel = () => (level() === 'B' ? modelB : model);
+  const engineName = id => (id === 'essentia.js' ? 'Essentia.js' : id === 'tapped' ? t('dcTappedBadge') : id === 'picked' ? t('dcPicked') : 'misk-analyzer');
+  // level B: where each measure came from (D5)
+  const enginesHtml = () => { const e = modelB && modelB.engines; return level() === 'B' && e ? `<p class="note dc-engines" id="dc-engines">${esc(t('dcEngines', { tempo: engineName(e.tempo), key: engineName(e.key), chords: engineName(e.chords) }))}</p>` : ''; };
+  // the level switch: Live and Full; Full shows the growing mark and the progress while level B runs, with Cancel
+  const levelHtml = () => {
+    const lv = level(), run = full ? `<span class="dc-full-run" id="dc-full-run"><span id="dc-full-pct">${esc(fullText())}</span><button class="btn" id="dc-full-cancel">${esc(t('dcCancel'))}</button></span>` : '';
+    return `<span class="chips dc-seg" role="radiogroup" aria-label="${esc(t('dcLevel'))}"><button class="chip" role="radio" aria-checked="${lv === 'A'}" aria-pressed="${lv === 'A'}" data-dc-level="A" title="${esc(t('dcLiveTip'))}">${esc(t('dcLive'))}</button><button class="chip${full ? ' growing' : ''}" role="radio" aria-checked="${lv === 'B'}" aria-pressed="${lv === 'B'}" data-dc-level="B" title="${esc(t(modelB ? 'dcFullTip' : 'dcFullRunTip'))}">${full ? '<span class="growing-mark dc-grow" aria-hidden="true"></span>' : ''}${esc(t('dcFullLvl'))}</button></span>${run}`;
+  };
+  const STAGES = { frames: 'dcStage:frames', tempo: 'dcStage:tempo', bars: 'dcStage:bars', harmony: 'dcStage:harmony', sections: 'dcStage:sections', done: 'dcStage:sections' };
+  const fullText = () => (full ? t('dcFullProgress', { pct: Math.round((full.f || 0) * 100), stage: t(STAGES[full.stage] || 'dcStage:frames') }) : '');
+  // level B: the sections of the original, the one playing lit; a click seeks to its start
+  const sectionsHtml = () => {
+    if (level() !== 'B' || !bMemo) return '';
+    let a = 0;
+    const list = bMemo.sg.sections.map(x => { const from = a; a += x.bars; return `<button class="dc-sec" data-dc-sec="${from}" data-dc-sec-to="${a}" style="flex-grow:${x.bars}" title="${esc(t('dcSecTip', { name: x.name, from: from + 1, to: a }))}"><b>${esc(x.name)}</b><small>${from + 1}-${a}</small></button>`; }).join('');
+    return `<div class="dc-secs-wrap"><div class="lbl">${esc(t('dcSections'))}</div><div class="dc-secs" id="dc-secs">${list}</div></div>`;
   };
   const sliderNote = mix => t(mix.slider === 0 ? 'dcSliderAt0' : mix.slider === 1 ? 'dcSliderAt1' : 'dcSliderMid');
   const tempoHtml = () => {
-    if (!model || !model.bpm) return `<span class="dc-tempo muted">${esc(t(playing ? 'dcListening' : 'dcNoTempo'))}</span>`;
-    return `<span class="dc-tempo" title="${esc(t('dcTapTip'))}">${ICON.tap}<b id="dc-bpm">${esc(String(model.bpm))}</b> BPM${model.uncertain && !model.tapped ? ` <span class="badge dc-unc">${esc(t('dcUncertain'))}</span>` : ''}${model.tapped ? ` <span class="badge">${esc(t('dcTappedBadge'))}</span>` : ''}
+    const M = shownModel();
+    if (!M || !M.bpm) return `<span class="dc-tempo muted">${esc(t(playing ? 'dcListening' : 'dcNoTempo'))}</span>`;
+    return `<span class="dc-tempo" title="${esc(t('dcTapTip'))}">${ICON.tap}<b id="dc-bpm">${esc(String(Math.round(M.bpm * 100) / 100))}</b> BPM${M.uncertain && !M.tapped ? ` <span class="badge dc-unc">${esc(t('dcUncertain'))}</span>` : ''}${M.tapped ? ` <span class="badge">${esc(t('dcTappedBadge'))}</span>` : ''}
       <button class="chip" data-dc-tempo="0.5" title="${esc(t('dcHalfTip'))}">½×</button><button class="chip" data-dc-tempo="2" title="${esc(t('dcDoubleTip'))}">2×</button>
-      <span class="muted" id="dc-key">${esc(keyName(model.key))}</span></span>`;
+      <span class="muted" id="dc-key">${esc(keyName(M.key))}</span></span>`;
   };
   const optionsHtml = o => `<details class="dc-fold" id="dc-options"${optionsOpen ? ' open' : ''}><summary>${ICON.chev}<span class="lbl">${esc(t('dcOptions'))}</span> <span class="muted small">· ${esc(t('dcOptionsSub'))}</span></summary>
       <div class="dc-opts">
@@ -373,13 +547,15 @@ export function createDecodeTab({ root, app }) {
           <button class="vswitch" id="dc-attr" aria-pressed="${!!cur.attribution}" title="${esc(t('dcAttributionTip'))}"><span class="vs-lamp" aria-hidden="true"></span><span class="vs-txt">${esc(t('dcAttribution'))}</span></button></div>
         <div class="dc-ctls">
           <div class="ctrl"><span class="lbl">${esc(t('dcTempo'))}</span><span id="dc-tempo-box">${tempoHtml()}</span></div>
-          <div class="ctrl"><span class="lbl">${esc(t('dcLevel'))}</span><span class="chips dc-seg" role="radiogroup" aria-label="${esc(t('dcLevel'))}"><button class="chip" role="radio" aria-checked="true" aria-pressed="true" data-dc-level="A">${esc(t('dcLive'))}</button><button class="chip" role="radio" aria-checked="false" aria-pressed="false" disabled title="${esc(t('dcFullSoon'))}" data-dc-level="B">${esc(t('dcFullLvl'))}</button></span></div>
-          <div class="ctrl"><label class="lbl" for="dc-look" title="${esc(t('dcAheadTip'))}">${esc(t('dcAhead'))}</label><select id="dc-look" data-no-knob title="${esc(t('dcAheadTip'))}">${LOOK_AHEAD.map(k => `<option value="${k}"${s.look === k ? ' selected' : ''}>${esc(t(`dcAhead:${k}`))}</option>`).join('')}</select></div>
+          <div class="ctrl"><span class="lbl">${esc(t('dcLevel'))}</span><span class="dc-level" id="dc-level">${levelHtml()}</span></div>
+          <div class="ctrl"><label class="lbl" for="dc-look" title="${esc(t(level() === 'B' ? 'dcAheadOff' : 'dcAheadTip'))}">${esc(t('dcAhead'))}</label><select id="dc-look" data-no-knob${level() === 'B' ? ' disabled' : ''} title="${esc(t(level() === 'B' ? 'dcAheadOff' : 'dcAheadTip'))}">${LOOK_AHEAD.map(k => `<option value="${k}"${s.look === k ? ' selected' : ''}>${esc(t(`dcAhead:${k}`))}</option>`).join('')}</select></div>
           <div class="ctrl"><span class="lbl">${esc(t('dcSounds'))}</span><span class="chips" role="radiogroup" aria-label="${esc(t('dcSounds'))}">${SOUND_PRESETS.map(k => `<button class="chip" role="radio" data-dc-sounds="${k}" aria-pressed="${s.sounds === k}" aria-checked="${s.sounds === k}">${esc(t(k === 'ours' ? 'dcOurs' : 'dcSimple'))}</button>`).join('')}</span></div>
         </div>
+        ${enginesHtml()}
         ${optionsHtml(s.options)}
         <div class="dc-acts"><button class="btn primary" id="dc-play">${esc(playing ? t('pause') : t('dcPlay'))}</button><button class="btn" id="dc-stop">${esc(t('dcStop'))}</button><span class="dc-time" id="dc-time"></span>
-          <button class="btn" id="dc-compose" disabled title="${esc(t('dcSoon'))}">${ICON.open} ${esc(t('dcOpenCompose'))}</button></div>
+          <button class="btn" id="dc-compose" title="${esc(t(modelB ? 'dcComposeTip' : 'dcComposeRunTip'))}">${full && full.then === 'compose' ? '<span class="growing-mark dc-grow" aria-hidden="true"></span>' : ICON.open} ${esc(t('dcOpenCompose'))}</button></div>
+        ${sectionsHtml()}
       </div>
       <div class="card dc-panel"><div class="lbl">${esc(t('dcTracks'))}</div><div class="dc-tracks" id="dc-tracks">${tracksRows()}</div>
         <div class="dc-xf"><div class="dc-ends"><span class="${mix.slider < 0.5 ? 'on' : ''}">${esc(t('dcOrig'))}</span><span class="${mix.slider > 0.5 ? 'on' : ''}">${esc(t('dcCode'))}</span></div>
@@ -395,17 +571,26 @@ export function createDecodeTab({ root, app }) {
     if (tb) { const h = tempoHtml(); if (force || tb.dataset.h !== h) { tb.innerHTML = h; tb.dataset.h = h; } }
     const pb = root.querySelector('#dc-play'); if (pb) { const l = playing ? t('pause') : t('dcPlay'); if (pb.textContent !== l) pb.textContent = l; }
     const tm = root.querySelector('#dc-time');
-    if (tm) { const f = fileNow(), bar = model && model.barSeconds ? Math.floor(cycleOfFile(model, f)) + 1 : 0; const txt = `${clock(f)} / ${clock(cur.duration)}${bar > 0 ? ` · ${t('pbBar', { n: bar, total: decodeMeta(model).bars })}` : ''}`; if (tm.textContent !== txt) tm.textContent = txt; }
-    const tr = root.querySelector('#dc-tracks');
-    if (tr && (force || tr.dataset.k !== JSON.stringify([cur.settings.mix, modelSeq]))) { tr.innerHTML = tracksRows(); tr.dataset.k = JSON.stringify([cur.settings.mix, modelSeq]); }
-    const mo = root.querySelector('[data-dc-meter="orig"]'), mc = root.querySelector('[data-dc-meter="code"]');
+    const M = shownModel();
+    if (tm) { const f = fileNow(), bar = M && M.barSeconds ? Math.floor(cycleOfFile(M, f)) + 1 : 0; const txt = `${clock(f)} / ${clock(cur.duration)}${bar > 0 ? ` · ${t('pbBar', { n: bar, total: decodeMeta(M).bars })}` : ''}`; if (tm.textContent !== txt) tm.textContent = txt; }
+    const tr = root.querySelector('#dc-tracks'), tk = JSON.stringify([cur.settings.mix, modelSeq, modelBSeq, level()]);
+    if (tr && (force || tr.dataset.k !== tk)) { tr.innerHTML = tracksRows(); tr.dataset.k = tk; }
+    const mo = root.querySelector('[data-dc-meter="orig"]');
     if (mo) mo.style.width = `${Math.min(100, Math.round(peakOf(origAn) * 100))}%`;
-    if (mc) mc.style.width = `${Math.min(100, Math.round(peakOf(codeAn) * 100))}%`;
+    for (const id of codeIds()) { const el = root.querySelector(`[data-dc-meter="${id}"]`); if (el) el.style.width = `${Math.min(100, Math.round((playLevel === 'B' && id !== 'code' ? orbitPeak(id) : peakOf(codeAn)) * 100))}%`; }
+    // level B running: the progress; the section playing lit
+    const pct = root.querySelector('#dc-full-pct'); if (pct) { const x = fullText(); if (pct.textContent !== x) pct.textContent = x; }
+    const secs = root.querySelector('#dc-secs');
+    if (secs && M && M.barSeconds) { const bar = Math.floor(cycleOfFile(M, fileNow())); secs.querySelectorAll('[data-dc-sec]').forEach(el => { const on = bar >= +el.dataset.dcSec && bar < +el.dataset.dcSecTo; if (el.classList.contains('on') !== on) el.classList.toggle('on', on); }); }
     const sl = root.querySelector('#dc-slider'); if (sl && document.activeElement !== sl && +sl.value !== Math.round(cur.settings.mix.slider * 100)) sl.value = Math.round(cur.settings.mix.slider * 100);
     const nt = root.querySelector('#dc-xf-note'); if (nt) { const s = sliderNote(cur.settings.mix); if (nt.textContent !== s) nt.textContent = s; }
   }
   const setMix = action => { cur.settings.mix = mixApply(cur.settings.mix, action); audio(); renderLight(true); saveSoon(); };
-  const optionChanged = () => { codeMemo.clear(); saveSoon(); };
+  // an option, the sounds, the title: level A takes it from the next edit; level B's code plays it from the next bar
+  const optionChanged = () => {
+    codeMemo.clear(); saveSoon();
+    if (playing && startedCode && playLevel === 'B' && modelB) { const at = Math.floor(cycleOfFile(modelB, fileNow())) + 1, sg = playableB(); app.swap({ at, sg, code: sg.codeAt(at), level: t('dcFullLvl') }); }
+  };
 
   root.addEventListener('click', e => {
     const b = e.target.closest('button, [data-dc-reopen]');
@@ -417,7 +602,11 @@ export function createDecodeTab({ root, app }) {
     if (b.id === 'dc-play') { toggle(); return; }
     if (b.id === 'dc-stop') { stop(); cur.paused = 0; renderLight(); return; }
     if (b.id === 'dc-attr') { cur.attribution = !cur.attribution; b.setAttribute('aria-pressed', cur.attribution); optionChanged(); return; }
-    if (b.dataset.dcTempo && model && model.bpm) { setTempo(model.bpm * +b.dataset.dcTempo, model.downbeat, model.tapped); return; }
+    if (b.dataset.dcTempo && shownModel() && shownModel().bpm) { const M = shownModel(); setTempo(M.bpm * +b.dataset.dcTempo, M.downbeat, !!M.tapped); return; }
+    if (b.dataset.dcLevel) { if (b.dataset.dcLevel === 'B' && !modelB) runFull('switch'); else setLevel(b.dataset.dcLevel); return; }
+    if (b.id === 'dc-full-cancel') { cancelFull(); return; }
+    if (b.id === 'dc-compose') { openCompose(); return; }
+    if (b.dataset.dcSec !== undefined && modelB) { const f = Math.min(cur.duration - 0.1, fileOfCycle(modelB, +b.dataset.dcSec)); seek(f); return; }
     if (b.dataset.dcSounds) { cur.settings.sounds = b.dataset.dcSounds; root.querySelectorAll('[data-dc-sounds]').forEach(x => { x.setAttribute('aria-pressed', x === b); x.setAttribute('aria-checked', x === b); }); optionChanged(); return; }
     if (b.dataset.dcMute) { setMix({ type: 'mute', id: b.dataset.dcMute }); return; }
     if (b.dataset.dcSolo) { setMix({ type: 'solo', id: b.dataset.dcSolo }); return; }
@@ -455,7 +644,11 @@ export function createDecodeTab({ root, app }) {
   store.list().then(list => { recent = list; if (!cur) render(); });
   render();
   const api = {
-    render, frame, next, tap, toggle, play, pause, seek, stop, openFile,
+    render, frame, next, tap, toggle, play, pause, seek, stop, openFile, runFull, cancelFull, setLevel, openCompose,
+    get level() { return level(); },
+    get modelB() { return modelB; },
+    // the code of level B at a bar, as the player shows it (Open in Compose must show the same, D15)
+    codeB: bar => (modelB ? playableB().codeAt(bar) : null),
     get open() { return !!cur; },
     get playing() { return playing; },
     get title() { return cur ? (cur.artist ? `${cur.title} · ${cur.artist}` : cur.title) : ''; },
@@ -463,7 +656,7 @@ export function createDecodeTab({ root, app }) {
     fileNow,
     get model() { return model; },
     // for the browser checks (tools/check-decode.cjs)
-    state: () => (cur ? { bar: model && model.barSeconds ? cycleOfFile(model, fileNow()) : null, title: cur.title, artist: cur.artist, attribution: cur.attribution, settings: JSON.parse(JSON.stringify(cur.settings)), playing, startedCode, file: fileNow(), duration: cur.duration, trim: cur.trim, bars: model ? model.bars.length : 0, bpm: model ? model.bpm : 0, downbeat: model ? model.downbeat : 0, tempo: cur.tempo, levels: { orig: peakOf(origAn), code: peakOf(codeAn) }, gains: gainsOf(cur.settings.mix), sync: orig && orig.info ? { ...orig.info } : null, status } : { status, recent: recent.length }),
+    state: () => (cur ? { bar: shownModel() && shownModel().barSeconds ? cycleOfFile(shownModel(), fileNow()) : null, title: cur.title, artist: cur.artist, attribution: cur.attribution, settings: JSON.parse(JSON.stringify(cur.settings)), playing, startedCode, file: fileNow(), duration: cur.duration, trim: cur.trim, bars: model ? model.bars.length : 0, bpm: model ? model.bpm : 0, downbeat: model ? model.downbeat : 0, tempo: cur.tempo, levels: { orig: peakOf(origAn), code: peakOf(codeAn), ...Object.fromEntries(playLevel === 'B' ? codeIds().map(id => [id, orbitPeak(id)]) : []) }, gains: gainsOf(cur.settings.mix), level: level(), playLevel, full: full ? { f: full.f, stage: full.stage, then: full.then } : null, modelB: modelB ? { bpm: modelB.bpm, downbeat: modelB.downbeat, bars: modelB.bars.length, sections: modelB.sections, ending: modelB.ending, engines: modelB.engines, key: modelB.key, ms: modelB.ms } : null, orbits: bMemo ? bMemo.sg.orbits : null, sync: orig && orig.info ? { ...orig.info } : null, status } : { status, recent: recent.length }),
     store,
     // the original and the code at the same moment (two long analysers before the master stage), to measure their sync
     probe() {

@@ -31,6 +31,14 @@ export const TEST_SONGS = [
     bass('sub', ['Run']),
     pad(['Run']),
   ]),
+  // level B (track-to-code group 6): four minutes at 128 BPM with known sections: an intro of hats and chords, a verse,
+  // a break of chords alone in another progression, a drop in a third one, an outro of drums alone
+  song('decode-test-long', 'Decode test long', [sec('Intro', 16, 128, 'A', 'epica'), sec('Verse', 32, 128, 'A', 'epica'), sec('Break', 16, 128, 'A', 'notturna'), sec('Drop', 48, 128, 'A', 'malinconica'), sec('Outro', 16, 128, 'A', 'epica')], [
+    { id: 'drums', name: 'Drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' } }, H: { rows: { hh: 'x.x.x.x.x.x.x.x.' } } },
+      clips: [{ section: 'Intro', pattern: 'H' }, { section: 'Verse', pattern: 'A' }, { section: 'Drop', pattern: 'A' }, { section: 'Outro', pattern: 'A' }] },
+    bass('offbeat', ['Verse', 'Drop']),
+    pad(['Intro', 'Verse', 'Break', 'Drop']),
+  ]),
 ];
 
 const PC = { C: 0, 'C#': 1, D: 2, Eb: 3, E: 4, F: 5, 'F#': 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11 };
@@ -42,9 +50,11 @@ export function truthOf(s) {
   const bars = [];
   for (const x of s.sections) for (let i = 0; i < x.bars; i++) {
     const prog = PROGS[x.chords][1], d = s.tracks.find(t => t.type === 'drums');
-    const on = d && d.clips.some(c => c.section === x.name), padOn = s.tracks.some(t => t.type === 'pad' && t.clips.some(c => c.section === x.name));
-    bars.push({ chord: padOn ? moved(prog[i % prog.length], x.key) : null, drums: on ? { bd: E, cp: E, hh: E, oh: E, ...d.patterns.A.rows } : null, section: x.name });
+    const on = d && d.clips.find(c => c.section === x.name), padOn = s.tracks.some(t => t.type === 'pad' && t.clips.some(c => c.section === x.name));
+    bars.push({ chord: padOn ? moved(prog[i % prog.length], x.key) : null, drums: on ? { bd: E, cp: E, hh: E, oh: E, ...d.patterns[on.pattern].rows } : null, section: x.name });
   }
   const k = s.sections[0].key;
-  return { bpm: s.sections[0].bpm, key: { root: PC[k], mode: 'minor' }, bars };
+  // the bars where the sections start (level B's section bounds)
+  const starts = []; let a = 0; for (const x of s.sections) { starts.push(a); a += x.bars; }
+  return { bpm: s.sections[0].bpm, key: { root: PC[k], mode: 'minor' }, bars, starts };
 }
