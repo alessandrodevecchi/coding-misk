@@ -49,8 +49,23 @@ const minutes = s => `${Math.max(1, Math.round(s / 60))} min`;
 // a chapter time: 03:25, or 0:03:25 when the video lasts an hour or more
 const stamp = (s, long) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = String(Math.floor(s / 60) % 60).padStart(2, '0'), x = String(s % 60).padStart(2, '0'); return long ? `${h}:${m}:${x}` : `${m}:${x}`; };
 
+// the rights line of an export of a decoded track (track-to-code D16): with Attribution on it names the original as a cover;
+// off, it says the recording belongs to its rights holders without naming it (code only: the code was written over it).
+// cover: { title, artist, attribution, original (the original audio is in the export), lang: 'en' | 'it' }
+const RIGHTS = {
+  en: { on: (t, a) => `Cover of "${t}"${a ? ` by ${a}` : ''}. The original recording belongs to its rights holders.`, off: 'Contains a recording that belongs to its rights holders.', code: 'Code written over a recording that belongs to its rights holders.' },
+  it: { on: (t, a) => `Cover di "${t}"${a ? ` di ${a}` : ''}. La registrazione originale appartiene ai suoi titolari dei diritti.`, off: 'Contiene una registrazione che appartiene ai suoi titolari dei diritti.', code: 'Codice scritto su una registrazione che appartiene ai suoi titolari dei diritti.' },
+};
+export function rightsLine(cover) {
+  if (!cover) return '';
+  const R = RIGHTS[cover.lang === 'it' ? 'it' : 'en'];
+  if (cover.attribution !== false && cover.title) return R.on(cover.title, cover.artist || '');
+  return cover.original === false ? R.code : R.off;
+}
+
 // info: { kind: 'fragment' | 'video' | 'audio', title, songs: [{ title, start }], genres, seconds, seed,
-//   fragment: { label, start, end }, tagline, fullLine, inspiration: { en, it }, draw } → { title, description, tags, hashtags, category }
+//   fragment: { label, start, end }, tagline, fullLine, inspiration: { en, it }, cover (a decoded track: rightsLine), draw }
+//   → { title, description, tags, hashtags, category }
 // draw: a number that changes the mood lines and the title (the panel's "draw again"), song list and facts stay
 export function textsFor(info) {
   const r = stream(`${info.seed || 'coding-misk'}/${info.draw || 0}`, 'texts');
@@ -78,6 +93,8 @@ export function textsFor(info) {
   // what inspired the song (built-in songs only), in its own words
   const insp = info.inspiration && (typeof info.inspiration === 'string' ? info.inspiration : info.inspiration.en);
   if (insp) body.push('', r.pick(INSPIRED).replace('{x}', insp));
+  // a decoded track's export: its rights line (the title of a cover only with Attribution on, the caller keeps it out of `title` otherwise)
+  if (info.cover) body.push('', rightsLine(info.cover));
   const facts = [genres, info.seconds ? `Length ${clockOf(info.seconds)}` : '', info.seed ? `Seed ${info.seed}` : ''].filter(Boolean);
   if (facts.length) body.push('', facts.join(' · '));
   body.push('', 'coding with rhythm · misk \'til dusk');

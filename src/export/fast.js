@@ -18,13 +18,16 @@ export function segmentsOf(sg, codeFor, within = null) {
 
 // the timeline of an exported song: times in seconds from the start of the file
 // onsets: { instrument: [[t, length, level], …] } from the render
-export function timelineOf(sg, segments, onsets, seconds, lang) {
-  const T = tempoClock(sg.meta.bpm), r = x => +x.toFixed(4);
+// decoded: a decoded track's export (track-to-code D16), { cover: { title, artist, attribution }, start }: the file begins at
+// song second `start` (below 0: the original alone before the first bar), so the times of the bars move by -start
+export function timelineOf(sg, segments, onsets, seconds, lang, decoded = null) {
+  const T = tempoClock(sg.meta.bpm), r = x => +x.toFixed(4), at = c => T.seconds(c) - (decoded ? decoded.start || 0 : 0);
   return {
     format: 1, app: 'coding-misk', title: sg.title, seconds: r(seconds), bars: sg.meta.bars, bpm: sg.meta.bpm.map(b => +(+b).toFixed(3)),
-    sections: sg.meta.sections.map(s => ({ label: s.label, bar: s.start, bars: s.len, t: r(T.seconds(s.start)) })),
-    code: segments.map(s => ({ bar: s.from, t: r(T.seconds(s.from)), code: s.code })),
-    say: sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, t: r(T.seconds(x.at)), text: sayText(x.say, lang) })) : [],
+    sections: sg.meta.sections.map(s => ({ label: s.label, bar: s.start, bars: s.len, t: r(at(s.start)) })),
+    code: segments.map(s => ({ bar: s.from, t: r(at(s.from)), code: s.code })),
+    say: sg.build ? buildSteps(sg.build).filter(x => x.say).map(x => ({ bar: x.at, t: r(at(x.at)), text: sayText(x.say, lang) })) : [],
+    ...(decoded ? { cover: decoded.cover, firstBar: r(-(decoded.start || 0)) } : {}),
     instruments: onsets,
   };
 }
@@ -47,7 +50,7 @@ export function renderOffline(job, onProgress = () => {}) {
     function on(e) {
       if (e.source !== frame.contentWindow || !e.data || !e.data.codingMiskRender) return;
       const m = e.data;
-      if (m.ready) { clearTimeout(timer); alive(); try { frame.contentWindow.postMessage({ render: job }, location.origin); } catch (err) { finish(err); } }
+      if (m.ready) { clearTimeout(timer); alive(); try { frame.contentWindow.postMessage({ render: job }, location.origin, job.orig && job.orig.ch ? job.orig.ch.map(c => c.buffer) : []); } catch (err) { finish(err); } }
       else if (m.progress !== undefined) { alive(); onProgress(m.progress, m.phase); }
       else if (m.error) finish(new Error(m.error));
       else if (m.done) finish(null, { channels: m.channels, sampleRate: m.sampleRate, onsets: m.onsets, notes: m.notes || {}, stageNotes: m.stageNotes || null, lit: m.lit || null, skipped: m.skipped || [], replaced: m.replaced || [] });
@@ -71,25 +74,30 @@ export function blocksOf(total, block = BLOCK) {
 // renders a song block by block into sink.add(channels, startSeconds, blockOnsets). job: { segments, bpm, tail, sampleRate, gain, block?,
 // segmentsAt?(from, to): the segments of one block (only the tracks that play in it), start?: seconds of the song where the file
 // begins (a fragment, #57: the first block still renders from start - LEAD; times in the output, onsets included, count from start),
-// fadeIn?: seconds of fade at the start }.
+// fadeIn?: seconds of fade at the start, origAt?(from, to): a decoded track's original for the window [from, to) seconds of the
+// song as { rate, ch, at } (the samples are moved to the render page), mix?: its mix (see src/render/page.js); with `start`
+// below 0 the file begins that long before the song's first bar, the original alone sounding there (track-to-code D16) }.
 // onProgress(0..1, phase). Returns { promise, cancel }: the promise gives { seconds, sampleRate, onsets }.
 export function renderInBlocks(job, sink, onProgress = () => {}) {
   let cur = null, cancelled = false;
   const promise = (async () => {
     // job.cut: the file ends exactly there, the last job.fade seconds fading out (#5); else the song plus its tail
-    const T = tempoClock(job.bpm), length = job.cut || T.seconds(job.bpm.length), start = job.start || 0, onsets = {}, fade = job.fade || 0, fadeIn = job.fadeIn || 0;
+    const T = tempoClock(job.bpm), length = job.cut || T.seconds(job.bpm.length), start = job.start || 0, onsets = {}, fade = job.fade || 0, fadeIn = job.fadeIn || 0, floor = Math.min(0, start);
     const blocks = blocksOf(length - start, job.block || BLOCK).map(([a, b]) => [a + start, b + start]);
     let carry = null, frames = 0, sr = job.sampleRate || 48000;
     const skipped = new Set(), replaced = new Set();
     for (let i = 0; i < blocks.length; i++) {
       if (cancelled) throw { cancelled: true };
-      const [a, b] = blocks[i], last = i === blocks.length - 1, from = Math.max(0, a - LEAD);
+      const [a, b] = blocks[i], last = i === blocks.length - 1, from = Math.max(floor, a - LEAD);
       // functions stay here: the job goes to the render page by postMessage, which cannot copy them
-      const { segmentsAt, onSkipped, ...rest } = job, segments = segmentsAt ? segmentsAt(from, b) || job.segments : job.segments;
+      const { segmentsAt, onSkipped, origAt, ...rest } = job, segments = segmentsAt ? segmentsAt(from, b) || job.segments : job.segments;
+      const tail = last ? (job.cut ? 0 : job.tail) : XF;
       let r = null;
       for (let attempt = 0; !r; attempt++) {
         console.info(`[blocks] ${i + 1}/${blocks.length} ${a.toFixed(0)}-${b.toFixed(0)} s${attempt ? ` (try ${attempt + 1})` : ''}`);
-        cur = renderOffline({ ...rest, segments, from, to: b, tail: last ? (job.cut ? 0 : job.tail) : XF, keepFrom: a }, (p, phase) => onProgress((i + (phase === 'render' ? p : 0)) / blocks.length, i ? 'render' : phase));
+        // the original's span of this window, cut anew for each try (the page takes the samples)
+        const orig = origAt && (job.only === undefined || job.only === null) ? origAt(from, b + tail) : null;
+        cur = renderOffline({ ...rest, segments, from, to: b, tail, keepFrom: a, ...(orig ? { orig } : {}) }, (p, phase) => onProgress((i + (phase === 'render' ? p : 0)) / blocks.length, i ? 'render' : phase));
         try { r = await cur.promise; }
         catch (e) { if (!(e && e.stalled) || attempt >= 2 || cancelled) throw e; console.warn(`[blocks] block ${i + 1} stalled, trying again`); }
       }
