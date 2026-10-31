@@ -14,10 +14,15 @@ const rng = seed => () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = M
 
 // spec: { bpm, bars, lead: seconds of silence before bar 1, chords: ['Am', 'F', …] (one per bar, repeating),
 //   drums: { bd, cp, hh, oh: 16-step strings }, drumsOff: [[from, to]] bars without drums, bass: 16-step string ('x'
-//   plays the chord root in octave 1 or 2), bassOff, chordsOff, seed }
+//   plays the chord root in octave 1 or 2), bassOff, chordsOff, seed, sections: [{ name, bars, chords, drums, bass }]
+//   (level B: each section's own chords, drums and bass, `null` for none; `bars` in all is their sum), fills: { bar:
+//   drums } (other drums on a bar) }
 // → { pcm: Float32Array, truth: { bpm, downbeat, bars: [{ chord, drums, bass: [midi|null ×16] }] } }
 export function renderSong(spec) {
-  const { bpm, bars, lead = 0, chords = ['Am'], drums = {}, drumsOff = [], bass = '', bassOff = [], chordsOff = [], seed = 7, gain = 0.5 } = spec;
+  const { bpm, lead = 0, chords = ['Am'], drums = {}, drumsOff = [], bass = '', bassOff = [], chordsOff = [], seed = 7, gain = 0.5, sections = null } = spec;
+  const bars = sections ? sections.reduce((a, x) => a + x.bars, 0) : spec.bars;
+  // the section of a bar and the bar's index in it
+  const secAt = b => { if (!sections) return null; let a = 0; for (const x of sections) { if (b < a + x.bars) return { ...x, at: b - a, start: a }; a += x.bars; } return null; };
   const bar = 240 / bpm, step = bar / 16, n = Math.ceil((lead + bars * bar + 1) * RATE), out = new Float32Array(n), rnd = rng(seed);
   const off = (list, b) => list.some(([a, z]) => b >= a && b < z);
   const add = (t0, len, fn) => { const a = Math.round(t0 * RATE), z = Math.min(n, a + Math.round(len * RATE)); for (let i = a; i < z; i++) out[i] += fn((i - a) / RATE); };
@@ -29,13 +34,16 @@ export function renderSong(spec) {
   const hat = d => t => 0.18 * hatN() * Math.exp(-t / d);
   const truth = { bpm, downbeat: lead, bars: [] };
   for (let b = 0; b < bars; b++) {
-    const t0 = lead + b * bar, name = chords[b % chords.length], ch = chordTones(name);
-    const tb = { chord: off(chordsOff, b) ? null : name, drums: {}, bass: Array(16).fill(null) };
-    if (!off(drumsOff, b)) for (const [row, steps] of Object.entries(drums)) {
+    const S = secAt(b), cl = S && S.chords !== undefined ? S.chords : chords, bs = S && S.bass !== undefined ? S.bass : bass;
+    // (spec.fills: { bar: drums } plays other drums on that bar, a fill or a variation)
+    const dr = spec.fills && spec.fills[b] !== undefined ? spec.fills[b] : S && S.drums !== undefined ? S.drums : drums;
+    const t0 = lead + b * bar, name = cl ? cl[(S ? S.at : b) % cl.length] : chords[0], ch = chordTones(name);
+    const tb = { chord: off(chordsOff, b) || !cl ? null : name, drums: {}, bass: Array(16).fill(null), ...(S ? { section: S.name } : {}) };
+    if (!off(drumsOff, b) && dr) for (const [row, steps] of Object.entries(dr)) {
       tb.drums[row] = steps;
       for (let j = 0; j < 16; j++) if (steps[j] === 'x') add(t0 + j * step, row === 'bd' ? 0.35 : row === 'oh' ? 0.3 : 0.15, row === 'bd' ? kick : row === 'cp' ? clap : hat(row === 'oh' ? 0.12 : 0.025));
     }
-    if (!off(chordsOff, b)) {
+    if (!off(chordsOff, b) && cl) {
       // a sustained triad around C4, three detuned saws per note through a one-pole low-pass
       for (const tn of ch.tones) {
         const f = hz(57 + (((tn - 9) % 12) + 12) % 12), ph = rnd();
@@ -43,10 +51,10 @@ export function renderSong(spec) {
         add(t0, bar * 0.98, t => { const s = 2 * ((f * t + ph) % 1) - 1; lp += 0.08 * (s - lp); return 0.09 * lp * Math.min(1, t / 0.01) * Math.min(1, (bar * 0.98 - t) / 0.02); });
       }
     }
-    if (bass && !off(bassOff, b)) {
+    if (bs && !off(bassOff, b)) {
       const midi = 33 + (((ch.root - 9) % 12) + 12) % 12;
       for (let j = 0; j < 16; j++) {
-        if (bass[j] !== 'x') continue;
+        if (bs[j] !== 'x') continue;
         tb.bass[j] = midi;
         const f = hz(midi), len = step * 0.95;
         let lp = 0;

@@ -6,12 +6,18 @@
 // unchanged); Options, title, artist and Attribution in the code; ½× and tap tempo with four key presses; reload and
 // reopen with a matching file (no analysis, no audio in storage); remove from the list; 400 px without sideways
 // scroll; pictures in neon, hardware and light. --long: two minutes with the code muted (long tasks, lit notes).
-// Needs ffmpeg. Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-decode.cjs [shots-dir] [--long]   (dev server)
+// Level B (groups 6 and 7): no Essentia.js request before Full; Full on a 4-minute file while it plays (the growing
+// mark, progress and Cancel, faster than the file, no long task over 200 ms, the level B code taking over, the engines,
+// the grid, the sections and their strip); Drums, Bass and Chords with mute and solo (levels, the code text unchanged,
+// lit notes); a section change typed before its bar; Live and Full while playing; Cancel (nothing stored); Essentia.js
+// blocked (misk-analyzer alone); reopen in Full; Open in Compose (the same code at every step, "Follow the song",
+// validate, Classic and Crescendo); a built-in song with "Follow the song"; pictures fase2-*. --full runs only these.
+// Needs ffmpeg. Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-decode.cjs [shots-dir] [--long] [--full]   (dev server)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), { execFileSync } = require('node:child_process');
 const { exportTestSongs, DIR } = require('./decode-export.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const shots = process.argv.slice(2).find(a => !a.startsWith('--')), LONG = process.argv.includes('--long');
+const shots = process.argv.slice(2).find(a => !a.startsWith('--')), LONG = process.argv.includes('--long'), ONLY_B = process.argv.includes('--full');
 const PORT = process.env.PORT || 5173, URL0 = `http://localhost:${PORT}/`;
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
@@ -22,8 +28,10 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 }, acceptDownloads: true });
   const page = await ctx.newPage();
-  const errors = [];
+  const errors = [], essentiaReqs = [];
   page.on('pageerror', e => errors.push(e.message));
+  // Essentia.js (level B) must not be downloaded before Full is picked
+  page.on('request', r => { if (/essentia/i.test(r.url())) essentiaReqs.push(r.url().replace(/^.*\//, '')); });
   await page.goto(URL0); await sleep(2500);
   await page.evaluate(() => { localStorage.clear(); indexedDB.deleteDatabase('coding-misk-decodes'); });
   // the test songs as WAV, and the other files made from the first one
@@ -46,6 +54,180 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   const shown = () => page.evaluate(() => { const c = document.querySelector('#edhost .cm-content'); return c ? c.innerText : ''; });
   const open = async file => { await page.setInputFiles("#dc-file", file); for (let i = 0; i < 60; i++) { await sleep(250); const s = await stNow(); if ((s.title && !(s.status && s.status.kind === 'busy')) || (s.status && s.status.kind === 'error')) return s; } return st(); };
   const tabOrder = () => page.$$eval('.tabs .tab', xs => xs.filter(x => !x.hidden).map(x => x.textContent.trim()).join(','));
+
+  // ---------- level B (groups 6 and 7): Full, the growing mark, cancel, several tracks, Open in Compose ----------
+  async function levelB() {
+    if (shots) fs.mkdirSync(shots, { recursive: true });
+    const pic = async name => { if (shots) await page.screenshot({ path: path.join(shots, `${name}.png`), fullPage: false }); };
+    const theme = async t => { await page.click(`[data-uitheme="${t}"]`).catch(() => {}); await sleep(1200); };
+    const { TEST_SONGS, truthOf } = await import('./decode-songs.mjs');
+    const LONGW = wavs['decode-test-long'], truth = truthOf(TEST_SONGS.find(x => x.id === 'decode-test-long'));
+    check(essentiaReqs.length === 0, 'level A never downloads Essentia.js (no request before Full)', essentiaReqs.join(' '));
+    await page.click('[data-tab="decode"]'); await sleep(300);
+    let s = await open(LONGW);
+    for (let i = 0; i < 40 && !s.bpm; i++) { await sleep(250); s = await stNow(); }
+    check(s.level === 'A' && s.duration > 239 && s.duration < 250, 'a new 4-minute file opens in Live', `${s.level} · ${Math.round(s.duration)} s`);
+    await page.click('#dc-play'); await sleep(3000);
+    await page.evaluate(() => { globalThis.__lt = []; new PerformanceObserver(l => { for (const e of l.getEntries()) globalThis.__lt.push(e.duration); }).observe({ type: 'longtask', buffered: false }); });
+    const f0 = (await stNow()).file, t0 = Date.now();
+    await page.click('[data-dc-level="B"]'); await sleep(700);
+    const run = await page.evaluate(() => { const r = document.querySelector('#dc-full-run'), chip = document.querySelector('[data-dc-level="B"]'); return { shown: !!r, text: r ? r.innerText : '', mark: !!(chip && chip.querySelector('.growing-mark')), cancel: !!document.querySelector('#dc-full-cancel') }; });
+    check(run.shown && run.mark && run.cancel && /Analysing \d+ %/.test(run.text), 'Full: the growing mark on the switch, the progress and Cancel', JSON.stringify(run));
+    await page.evaluate(() => document.querySelector('#dc-level').scrollIntoView({ block: 'center' }));
+    await pic('fase2-full-loading-neon');
+    await theme('hw'); await pic('fase2-full-loading-hardware');
+    await theme('light'); await pic('fase2-full-loading-light');
+    await theme('neon');
+    for (let i = 0; i < 1200; i++) { await sleep(100); s = await stNow(); if (!s.full) break; }
+    const secs = (Date.now() - t0) / 1000;
+    const lt = await page.evaluate(() => ({ n: globalThis.__lt.length, max: Math.round(Math.max(0, ...globalThis.__lt)) }));
+    check(s.modelB && secs < 240, 'level B on a 4-minute file finishes in less than its length', `${secs.toFixed(1)} s`);
+    check(lt.max <= 200, 'the page stays responsive while level B runs (no long task over 200 ms)', JSON.stringify(lt));
+    check(s.playing && s.file > f0 + secs - 1, 'the original keeps playing while level B runs', `${f0.toFixed(1)} → ${s.file.toFixed(1)} s`);
+    await sleep(2500); s = await stNow();
+    const pid = await page.evaluate(() => { const b = globalThis.codingMiskBars(); return b.song ? b.song.id : null; });
+    check(s.level === 'B' && s.playLevel === 'B' && /:B$/.test(pid || '') && /Full/.test(await page.innerText('#src')), 'the level B code takes over while the original plays; the source line reads "Full"', `${pid} · ${await page.innerText('#src')}`);
+    check(s.modelB.engines.tempo === 'essentia.js' && s.modelB.engines.key === 'essentia.js' && s.modelB.engines.chords === 'essentia.js' && /Essentia\.js/.test(await page.innerText('#dc-engines')), 'tempo, key and chords from Essentia.js, shown under the controls', await page.innerText('#dc-engines'));
+    check(s.modelB.bpm === 128 && Math.abs(s.modelB.downbeat) < 0.02, 'level B: the whole-file grid at 128 BPM from the first downbeat', `${s.modelB.bpm} BPM, ${s.modelB.downbeat} s`);
+    const bounds = s.modelB.sections.map(x => x.start).filter(x => x > 0), err = Math.max(...truth.starts.filter(x => x > 0).map(w => Math.min(...bounds.map(b => Math.abs(b - w)))));
+    check(err <= 1 && bounds.length === 4, 'sections: bounds within one bar of the song\'s sections', `${bounds.join(',')} (truth ${truth.starts.slice(1).join(',')})`);
+    const strip = await page.$$eval('#dc-secs .dc-sec b', xs => xs.map(x => x.textContent));
+    check(strip.join(',') === 'Intro,Verse,Break,Drop,Outro', 'the sections of the original in the panel, named by kind', strip.join(','));
+    const rows = await page.$$eval('#dc-tracks .dc-trk', xs => xs.map(x => ({ name: x.querySelector('.dc-nm').childNodes[0].textContent.trim(), m: !!x.querySelector('[data-dc-mute]'), s: !!x.querySelector('[data-dc-solo]') })));
+    check(rows.map(r => r.name).join(',') === 'Original,Drums,Bass,Chords' && rows.every(r => r.m && r.s), 'level B tracks: Original, Drums, Bass and Chords, each with mute and solo', rows.map(r => r.name).join(','));
+    // in the verse, mute and solo per track (no step of the growth until bar 49)
+    await page.evaluate(f => globalThis.codingMiskDecode.seek(f), s.modelB.downbeat + 20 * (240 / 128));
+    await page.evaluate(() => { const el = document.querySelector('#dc-slider'); el.value = 50; el.dispatchEvent(new Event('input', { bubbles: true })); });
+    await sleep(3500);
+    await page.evaluate(() => document.querySelector('#dc-level').scrollIntoView({ block: 'start' }));
+    const lv = async () => { const L = {}; for (let i = 0; i < 6; i++) { const x = (await stNow()).levels; for (const k in x) L[k] = Math.max(L[k] || 0, x[k]); await sleep(120); } return L; };
+    let L = await lv();
+    check(L.drums > 0.01 && L.bass > 0.01 && L.chords > 0.01 && L.orig > 0.01, 'slider in the middle: the original and every code track heard', JSON.stringify(Object.fromEntries(Object.entries(L).map(([k, v]) => [k, +v.toFixed(3)]))));
+    await pic('fase2-full-done-neon');
+    const ev0 = await evaluated();
+    await page.click('[data-dc-mute="bass"]'); await sleep(700);
+    L = await lv();
+    const ev1 = await evaluated();
+    check(L.bass < 0.001 && L.drums > 0.01 && L.chords > 0.01, 'mute Bass: only the bass goes silent', `bass ${L.bass.toFixed(4)}, drums ${L.drums.toFixed(3)}, chords ${L.chords.toFixed(3)}`);
+    check(ev0 === ev1, 'mute changes what is heard, never the code text');
+    await page.click('[data-dc-solo="chords"]'); await sleep(700);
+    L = await lv(); s = await stNow();
+    check(L.chords > 0.01 && L.drums < 0.001 && L.bass < 0.001 && L.orig < 0.001 && s.settings.mix.slider === 1, 'solo Chords: only the code\'s chords are heard, the slider on Code', JSON.stringify(Object.fromEntries(Object.entries(L).map(([k, v]) => [k, +v.toFixed(3)]))));
+    const lit = await page.evaluate(() => document.querySelectorAll('#edhost .cm-content [style*="outline"]').length);
+    check(lit > 0, 'muted tracks still light their notes', `${lit} lit`);
+    await page.click('[data-dc-solo="chords"]'); await sleep(200);
+    await page.click('[data-dc-mute="bass"]'); await sleep(300);
+    s = await stNow();
+    check(s.settings.mix.tracks.every(t => !t.mute || t.kind === 'orig'), 'unsolo and unmute: the code tracks heard again', JSON.stringify(s.settings.mix.tracks.map(t => [t.id, t.mute])));
+    // the code of a section change is typed before its bar: at bar 49 the break's chords play
+    await page.evaluate(f => globalThis.codingMiskDecode.seek(f), s.modelB.downbeat + 44 * (240 / 128));
+    let typed = false, landed = null;
+    for (let i = 0; i < 120 && landed === null; i++) {
+      await sleep(100);
+      const [ed, ev, cur] = await Promise.all([shown(), evaluated(), stNow()]);
+      if (cur.bar > 45 && cur.bar < 48 && /Dm/.test(ed) && !/Dm/.test(ev)) typed = true;
+      if (/chord\("<Am Dm F E>"\)/.test(ev)) landed = cur.bar;
+    }
+    // (the new code is evaluated a little before its bar, so the scheduler's query from the bar on reads it)
+    check(typed && landed !== null && Math.round(landed) === 48, 'level B: the break\'s chords are typed during the bars before 49 and play from bar 49', `typed ${typed}, evaluated at bar ${landed && (landed + 1).toFixed(2)}`);
+    // Live and back, while playing: the other level takes over at the next bar
+    await page.click('[data-dc-level="A"]'); await sleep(2600); s = await stNow();
+    check(s.level === 'A' && s.playLevel === 'A' && s.playing && s.settings.mix.tracks.map(t => t.id).join() === 'orig,code', 'Live while playing: level A takes over, one code track', s.settings.mix.tracks.map(t => t.id).join());
+    await page.click('[data-dc-level="B"]'); await sleep(2600); s = await stNow();
+    check(s.level === 'B' && s.playLevel === 'B' && !s.full, 'Full again: the stored analysis, no new run');
+    // pictures: hardware, light, 400 px
+    await theme('hw'); await pic('fase2-full-done-hardware');
+    await theme('light'); await pic('fase2-full-done-light');
+    await theme('neon');
+    await page.setViewportSize({ width: 400, height: 900 }); await sleep(1200);
+    const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+    check(sw <= 402, '400 px with level B playing: no sideways scroll', `${sw}px`);
+    await page.evaluate(() => document.querySelector('#dc-level').scrollIntoView({ block: 'start' })); await sleep(300);
+    await pic('fase2-full-400px');
+    await page.evaluate(() => document.querySelector('#dc-tracks').scrollIntoView({ block: 'start' })); await sleep(300);
+    await pic('fase2-full-400px-tracks');
+    await page.setViewportSize({ width: 1400, height: 1000 }); await sleep(500);
+    await page.click('#dc-stop'); await sleep(300);
+
+    // cancel: nothing stored for level B, Live stays
+    s = await open(wavs['decode-test-90']);
+    for (let i = 0; i < 40 && !s.bpm; i++) { await sleep(250); s = await stNow(); }
+    await page.click('[data-dc-level="B"]'); await sleep(400);
+    await page.click('#dc-full-cancel'); await sleep(600);
+    s = await stNow();
+    const stored = await page.evaluate(() => globalThis.codingMiskDecode.store.list().then(l => l.map(r => ({ title: r.title, b: !!r.modelB }))));
+    check(!s.full && s.level === 'A' && !s.modelB && /cancelled/.test(s.status && s.status.text) && stored.some(r => r.title === 'decode-test-90' && !r.b), 'Cancel: the analysis stops, nothing is stored for level B, Live stays', s.status && s.status.text);
+    await page.click('#dc-play'); await sleep(2500); s = await stNow();
+    check(s.playing && s.playLevel === 'A', 'after Cancel, Live plays');
+    await page.click('#dc-stop'); await sleep(300);
+
+    // Essentia.js blocked: level B still finishes with misk-analyzer's own tempo, key and chords
+    await page.route(/essentia__js|essentia\.js-core|essentia-wasm/, r => r.abort());
+    s = await open(wavs['decode-test-174']);
+    for (let i = 0; i < 40 && !s.bpm; i++) { await sleep(250); s = await stNow(); }
+    await page.click('[data-dc-level="B"]');
+    for (let i = 0; i < 600; i++) { await sleep(100); s = await stNow(); if (!s.full) break; }
+    check(s.modelB && s.level === 'B' && Object.values(s.modelB.engines).every(x => x === 'misk-analyzer') && s.modelB.bpm === 174 && /misk-analyzer/.test(s.status && s.status.text), 'Essentia.js blocked: level B finishes with misk-analyzer alone, the tab works as usual', `${JSON.stringify(s.modelB && s.modelB.engines)} · ${s.status && s.status.text}`);
+    await page.unroute(/essentia__js|essentia\.js-core|essentia-wasm/);
+
+    // reload: a track with a stored level B analysis opens in Full
+    await page.reload(); await sleep(3000);
+    s = await open(LONGW);
+    check(s.level === 'B' && s.modelB && !s.full, 'reopened: the stored level B analysis opens in Full, no analysis runs');
+    const badge = await page.evaluate(() => globalThis.codingMiskDecode.store.list().then(l => l.filter(r => r.modelB).length));
+    check(badge >= 2, 'the stored records keep level B (the recent list says "Full ready")', `${badge}`);
+
+    // Open in Compose: the same code at every step, the Live coder with "Follow the song"
+    const steps = [0, 8, 16, 30, 48, 64, 90, 111];
+    const want = await page.evaluate(b => b.map(x => globalThis.codingMiskDecode.codeB(x)), steps);
+    await page.click('#dc-compose');
+    for (let i = 0; i < 100; i++) { await sleep(200); if (await page.evaluate(() => document.querySelector('.tab[aria-selected="true"]').dataset.tab === 'componi' && !globalThis.codingMiskCompose.pending())) break; }
+    const song = await page.evaluate(() => globalThis.codingMiskCompose.song());
+    const got = await page.evaluate(b => b.map(x => globalThis.codingMiskCompose.codeAt(x)), steps);
+    const strip2 = c => (c || '').replace(/\n*\/\/ vox: …\s*$/, '').trim();
+    const same = steps.filter((b, i) => strip2(got[i]) === strip2(want[i]));
+    check(song.config && song.config.profile === 'switch' && song.config.options.growth === 'follow' && song.config.options.narrator === false && song.cover && song.cover.title === 'decode-test-long', 'Open in Compose: a song of yours with the Live coder, "Follow the song", narrator off and the cover', JSON.stringify(song.config));
+    check(same.length === steps.length, 'Open in Compose: the code at every step matches the code in Decode (the vocals placeholder aside)', `${same.length}/${steps.length} bars`);
+    check(!JSON.stringify(song).includes('pcm') && song.tracks.map(t => t.id).join() === 'drums,bass,chords' && song.sections.length === 5, 'no audio goes with the song; its decoded sections and tracks', `${song.sections.map(x => x.name).join(',')} · ${song.tracks.map(t => t.id).join(',')}`);
+    const tmp = path.join(FILES, 'opened-song.json'); fs.writeFileSync(tmp, JSON.stringify(song));
+    let valid = ''; try { valid = execFileSync('node', ['--no-warnings', 'tools/song.mjs', 'validate', tmp], { encoding: 'utf8' }); } catch (e) { valid = `FAIL ${e.stdout || e.message}`; }
+    check(!/FAIL|error/i.test(valid), 'the saved song passes tools/song.mjs validate', valid.trim().split('\n').pop());
+    check((await page.$eval('#live-growth', el => el.value)) === 'follow' && (await page.$eval('#live-growth option[value="follow"]', o => o.textContent)) === 'Follow the song', 'the Compose growth menu shows "Follow the song"');
+    await page.evaluate(() => document.querySelector('#live-growth').scrollIntoView({ block: 'center' })); await sleep(300);
+    await pic('fase2-compose-follow-neon');
+    await page.click('#play'); await sleep(4000);
+    const e0 = errors.length;
+    for (const prof of ['classic', 'crescendo']) {
+      await page.click(`[data-profile="${prof}"]`);
+      for (let i = 0; i < 100; i++) { await sleep(200); if (!(await page.evaluate(() => globalThis.codingMiskCompose.pending()))) break; }
+      await sleep(2500);
+      const b = await page.evaluate(() => globalThis.codingMiskBars());
+      check(b.song && b.song.id === song.id && errors.length === e0, `Open in Compose: the song plays with ${prof === 'classic' ? 'Classic' : 'Crescendo'} like any song`, `${b.song && b.song.id}`);
+    }
+    await page.click('#stop'); await sleep(300);
+    // a built-in song with "Follow the song" in Compose
+    await page.selectOption('#track-pick', 'switch-prima-luce'); await sleep(1500);
+    await page.click('[data-profile="switch"]'); await sleep(300);
+    await page.selectOption('#live-growth', 'follow');
+    for (let i = 0; i < 100; i++) { await sleep(200); if (!(await page.evaluate(() => globalThis.codingMiskCompose.pending()))) break; }
+    const e1 = errors.length;
+    await page.click('#play'); await sleep(4000);
+    const bb = await page.evaluate(() => globalThis.codingMiskBars());
+    check((await page.$eval('#live-growth', el => el.value)) === 'follow' && bb.song && bb.song.id === 'switch-prima-luce' && errors.length === e1, 'a built-in song plays with "Follow the song" in Compose', bb.song && bb.song.id);
+    await page.click('#stop'); await sleep(300);
+    await page.click('[data-tab="decode"]'); await sleep(300);
+  }
+
+  if (ONLY_B) {
+    await page.reload(); await sleep(3000);
+    await page.click('[data-lang="en"]'); await sleep(300);
+    await page.click('[data-mode="ascolta"]'); await sleep(300);
+    await levelB();
+    check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
+    await browser.close();
+    console.log(failed ? `${failed} failed` : 'all passed');
+    process.exit(failed ? 1 : 0);
+  }
 
   // ---------- 1.1 the tab ----------
   await page.reload(); await sleep(3000);
@@ -256,6 +438,8 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   check(!s.playing && !/^decode:/.test(await other() || ''), 'starting a song in Songs stops the decoded track');
   await page.click('#stop'); await sleep(300);
   await page.click('[data-tab="decode"]'); await sleep(500);
+
+  await levelB();
 
   // ---------- 4.4 two minutes with the code muted ----------
   if (LONG) {

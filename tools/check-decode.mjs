@@ -4,7 +4,13 @@
 // levels, the hysteresis of a fill, drums muted when they stop), the mix rules of the slider and the mutes, the look
 // ahead horizons, tap tempo, and the code a decoded song shows at a bar with each look ahead.
 //   npm run check:decode            (about 20 s)
-//   npm run check:decode -- --app   also measures the app's own test songs exported to WAV (tools/decode-export.cjs)
+//   npm run check:decode -- --app   also measures the app's own test songs exported to WAV (tools/decode-export.cjs),
+//                                   level A and level B
+// Level B (groups 6 and 7): a generated track with known sections, with Essentia.js, misk-analyzer alone and Essentia.js
+// failing (bounds within one bar, kinds, ending, tempo, chords, key, engines), the same bar fields as level A, level A
+// never importing Essentia.js, the level B writer (sections, loops, sounds by measure, Simple kit, parts where heard,
+// variations and a one-off fill, chords out of the key), the tempo pick, Open in Compose's configuration and the same
+// code at every step in Decode and in Compose with "Follow the song".
 import { createAnalyzer, horizonOf, tapTempo, LOOK_AHEAD, LOOK_AHEAD_DEFAULT } from '../src/decode/misk-analyzer.js';
 import { writeSong, momentSong, partsByBar, soundsOf, loopAt, stepsMini, withVox, withoutVox, VOX_LINE, formatKey } from '../src/decode/writer.js';
 import { defaultMix, mixApply, gainsOf, heard, loudnessTrim } from '../src/decode/mix.js';
@@ -17,7 +23,15 @@ import { compileSong } from '../src/song/compile.js';
 import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
-import { measureApp, measureSynth } from './decode-measure.mjs';
+import { measureApp, measureSynth, measureFull } from './decode-measure.mjs';
+import { analyseFull, pickTempo, barChords, settleMode } from '../src/decode/full.js';
+import { writeFull, inKey } from '../src/decode/writer.js';
+import { composeConfig, decodeControls } from '../src/decode/tab.js';
+import { followSong, crescendoSong } from '../src/song/crescendo.js';
+import { growthRules } from '../src/live/profiles.js';
+import { buildSteps } from '../src/song/build.js';
+import { nodeEssentia } from './essentia-node.mjs';
+import fs from 'node:fs';
 
 let failed = 0, passed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (ok) passed++; else failed++; };
@@ -189,15 +203,87 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(tapTempo([1, 1.5, 2]) === null, 'three taps are not enough');
   check(emptyModel().bars.length === 0 && emptyModel().version === ANALYSIS_VERSION, 'an empty model');
 }
+// ---------- 6.1 to 6.4 level B: the whole file, Essentia.js and misk-analyzer alone ----------
+{
+  const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' };
+  // intro, two verses (another progression in the second), a break, a final chorus with open hats; bars 1 to 64
+  const SEC = { bpm: 124, lead: 0.3, bass: 'x..x..x...x.x...', sections: [
+    { name: 'Intro', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: { hh: D.hh }, bass: null },
+    { name: 'Verse', bars: 16, chords: ['Am', 'F', 'C', 'G'], drums: D },
+    { name: 'Verse 2', bars: 16, chords: ['Dm', 'Am', 'E', 'Am'], drums: D },
+    { name: 'Break', bars: 8, chords: ['F', 'G'], drums: null, bass: null },
+    { name: 'Chorus', bars: 16, chords: ['F', 'G', 'Am', 'Am'], drums: { ...D, oh: '......x.......x.' } },
+  ] };
+  const { pcm, truth } = renderSong(SEC), starts = [8, 24, 40, 48];
+  const runs = { 'Essentia.js': await analyseFull(pcm, { engine: nodeEssentia }), 'misk-analyzer alone': await analyseFull(pcm, { engine: null }) };
+  // Essentia.js that cannot be loaded: level B still finishes, with misk-analyzer's own measures
+  runs['Essentia.js failing'] = await analyseFull(pcm, { engine: async () => { throw new Error('blocked'); } });
+  for (const [name, m] of Object.entries(runs)) {
+    const b = m.sections.map(x => x.start).filter(x => x > 0), err = Math.max(...starts.map(w => Math.min(...b.map(x => Math.abs(x - w)))));
+    check(err <= 1 && b.length === starts.length, `level B (${name}): section bounds within one bar on a track with known sections`, `${b.join(',')} (truth ${starts.join(',')})`);
+    check(m.sections.map(x => x.kind).join() === 'intro,verse,verse,break,drop' && m.ending === 64, `level B (${name}): kinds and the ending`, `${m.sections.map(x => x.kind).join(',')} · ending ${m.ending}`);
+    const ok = m.bars.filter((x, i) => truth.bars[i] && x.chord === truth.bars[i].chord).length / truth.bars.length;
+    check(m.bpm === 124 && Math.abs(m.downbeat - 0.3) < 0.01 && ok >= 0.9 && m.key && m.key.root === 9 && m.key.mode === 'minor', `level B (${name}): tempo, downbeat within 10 ms, chords at least 90 %, key A minor`, `${m.bpm} BPM, ${m.downbeat} s, chords ${ok.toFixed(2)}`);
+    check(m.level === 'B' && m.version === ANALYSIS_VERSION && m.variations && m.engines, `level B (${name}): the model shape, level B and its engines`, JSON.stringify(m.engines));
+  }
+  check(Object.values(runs['Essentia.js'].engines).every(x => x === 'essentia.js'), 'with Essentia.js: tempo, key and chords from it', JSON.stringify(runs['Essentia.js'].engines));
+  check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
+  // the same model shape as level A for the same bars (analysis spec: One song model)
+  const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
+  check(JSON.stringify(Object.keys(A.bars[0]).sort()) === JSON.stringify(Object.keys(B.bars[0]).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields');
+  // level A never calls Essentia.js: the worker loads it only for "analyse all"
+  const wsrc = fs.readFileSync('src/decode/worker.js', 'utf8'), msrc = fs.readFileSync('src/decode/misk-analyzer.js', 'utf8');
+  check(!/essentia/i.test(msrc.replace(/\/\/.*$/gm, '')) && /async function all[\s\S]*import\('\.\/engine-essentia\.js'\)/.test(wsrc) && !/^import .*(engine-essentia|full)/m.test(wsrc), 'level A uses misk-analyzer only: Essentia.js is imported only by level B, inside the worker');
+  // the writer of level B (D9, D10, D15): sections, a loop per part and section, sounds by measure, valid, the same code
+  const s = writeFull(B, { id: 'night-run-full', title: 'Night Run', artist: 'Some Band', sounds: 'ours' });
+  check(!validateSong(s).errors.length, 'the level B song is a valid v2 song', JSON.stringify(validateSong(s).errors.slice(0, 2)));
+  check(s.sections.map(x => `${x.name}:${x.bars}`).join() === 'Intro:8,Verse:16,Verse 2:16,Break:8,Drop:16', 'the level B song: the model\'s sections named by kind', s.sections.map(x => `${x.name}:${x.bars}`).join());
+  const ch = s.tracks.find(x => x.id === 'chords'), chordCodes = ch.clips.map(c => ch.patterns[c.pattern].code.match(/chord\("([^"]+)"\)/)[1]);
+  check(chordCodes.join(' | ') === '<Am F C G> | <Am F C G> | <Dm Am E Am> | <F G> | <F G Am Am>', 'one chord loop per section, aligned to the bar number', chordCodes.join(' | '));
+  const lpf = ch.clips.map(c => +ch.patterns[c.pattern].code.match(/lpf\((\d+)\)/)[1]);
+  check(new Set(lpf).size >= 2 && new Set(ch.clips.map(c => ch.patterns[c.pattern].code)).size === ch.clips.length, 'Our sounds by measure: the sections get different filters', lpf.join(','));
+  const simple = writeFull(B, { title: 'x', sounds: 'simple' }), sc = simple.tracks.find(x => x.id === 'chords');
+  check(new Set(sc.clips.map(c => sc.patterns[c.pattern].code.replace(/chord\("[^"]+"\)/, ''))).size === 1, 'Simple kit: the same sounds in every section');
+  const dr = s.tracks.find(x => x.id === 'drums');
+  check(!dr.clips.some(c => c.start < 48 && c.start + c.bars > 40) && s.tracks.find(x => x.id === 'bass').clips.every(c => c.start >= 8), 'parts play where they are heard: no drums in the break, no bass in the intro', JSON.stringify(dr.clips));
+  // variations (D9): a drum variant that comes back is a pattern of its own in the section; a one-off fill stays out
+  const F = { bd: 'x...x...x...x...', cp: '....x.......xxxx', hh: '..x...x...x...x.' }, V = { bd: 'x.x...x.x.x...x.', cp: '....x.......x...', hh: 'xxxxxxxxxxxxxxxx' };
+  const vm = await analyseFull(renderSong({ bpm: 124, lead: 0.3, chords: ['Am', 'F', 'C', 'G'], bass: 'x..x..x...x.x...', bars: 24, drums: D, fills: { 5: F, 7: V, 15: V, 23: V } }).pcm, { engine: null });
+  const vbars = (vm.variations.find(x => x.part === 'drums') || { bars: [] }).bars;
+  check(vbars.includes(7) && vbars.includes(15) && !vbars.includes(5), 'a drum variation that repeats becomes a variant pattern; a one-off fill does not', `variant bars ${vbars.map(x => x + 1).join(',')}`);
+  const vs = writeFull(vm, { title: 'x' }), vd = vs.tracks.find(x => x.id === 'drums');
+  check(Object.keys(vd.patterns).length === 2 && vd.clips.some(c => c.start === 7 && c.bars === 1), 'the variant plays on its bars as a clip of its own', JSON.stringify(vd.clips.slice(0, 4)));
+  // chords that are noise of the drums (out of the key) are no chord part
+  check(inKey({ root: 9, mode: 'minor' })(['Am', 'F', 'C', 'G', 'E']) && !inKey({ root: 9, mode: 'minor' })(['G', 'Bb', 'Cm', 'Bb', 'Gm', 'F#']), 'a section\'s chords mostly out of the key are not a chord part');
+  check(pickTempo({ bpm: 174 }, { bpm: 87.2, confidence: 3.5 }).bpm === 174.4 && pickTempo({ bpm: 124 }, { bpm: 123.9, confidence: 1 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, null, { bpm: 62, tapped: false }).from === 'picked', 'level B tempo: Essentia.js when confident (in misk-analyzer\'s octave), else misk-analyzer\'s, a picked or tapped tempo first');
+  check(barChords([{ chord: 'A#m', strength: 0.9 }])[0].chord === 'Bbm' && settleMode({ root: 0, mode: 'major' }, [{ chord: 'Am' }, { chord: 'F' }, { chord: 'C' }, { chord: 'G' }, { chord: 'Am' }]).mode === 'minor', 'chord names in the app\'s spelling; the key\'s mode settled by the tonic chord on phrase starts');
+  // "Follow the song" (D18) and Open in Compose (D15): the song as the tab plays it and as Compose grows it, the same code
+  const cfg = composeConfig({ comments: 'none', functions: 'compact', view: 'now' });
+  check(cfg.profile === 'switch' && cfg.options.growth === 'follow' && cfg.options.narrator === false, 'Open in Compose: the Live coder, "Follow the song", narrator off', JSON.stringify(cfg));
+  const Cd = decodeControls({ comments: 'none', functions: 'compact', view: 'now' }), Cc = resolveProfile(cfg.profile, cfg.options);
+  const grown = crescendoSong({ ...s, config: cfg }, { rules: growthRules(Cc) }), Ld = liveCode(followSong(s), Cd, {}), Lc = liveCode(grown, Cc, {});
+  const bars = [0, ...new Set(buildSteps(Lc.build).map(x => x.at))];
+  check(JSON.stringify(Cd) === JSON.stringify(Cc) && grown.crescendo.follow && bars.every(b => Ld.codeAt(b) === Lc.codeAt(b)), 'the code at every step is the same in Decode and in Compose', `${bars.length} steps`);
+  check(bars.includes(8) && bars.includes(24) && bars.includes(40), 'Follow the song: a step at each section change', bars.join(','));
+}
 // ---------- the app's own songs (optional) ----------
 if (process.argv.includes('--app')) {
   const app = measureApp();
   if (!Object.keys(app).length) console.log('note  no WAV of the test songs in .cache/decode/wav: run tools/decode-export.cjs with the dev server');
   for (const [id, r] of Object.entries(app)) {
+    // (the long test song opens on offbeat hats alone: level A locks its beat half a beat off there, a known limit of the
+    // first seconds; level B's whole-file grid is measured below)
+    if (id === 'decode-test-long') { console.log(`info  ${id} (level A): tempo ${r.bpm}, downbeat ${r.downbeat} s (half a beat off on the hats-only intro), F1 ${JSON.stringify(r.f1)}`); continue; }
     check(Math.abs(r.bpm - r.bpmTruth) <= 0.1, `${id} (app export): tempo`, `${r.bpm}`);
     check(r.downbeat < 0.03, `${id} (app export): downbeat within 30 ms of the start`, `${r.downbeat} s`);
     check(r.f1.bd >= 0.7 && r.f1.cp >= 0.9 && r.f1.hh >= 0.8, `${id} (app export): drum grids`, JSON.stringify(r.f1));
     console.log(`info  ${id}: chords ${r.chords}, key ${r.key ? `${r.key.root} ${r.key.mode}` : '-'} (${r.keyOk ? 'right' : 'wrong'}), drums on/off ${r.drumsPresence}`);
+  }
+  // level B on the app's test songs, with Essentia.js: the whole-file grid, sections, faster than the file
+  for (const [id, r] of Object.entries(await measureFull({ essentia: true }))) {
+    check(Math.abs(r.bpm - r.bpmTruth) <= 0.01 && r.downbeat < 0.02 && r.keyOk, `${id} (app export, level B): tempo, downbeat within 20 ms, key`, `${r.bpm} BPM, ${r.downbeat} s, key ${r.keyOk ? 'right' : 'wrong'}`);
+    check(r.boundsErr <= 1 && r.ms < r.seconds * 1000, `${id} (app export, level B): section bounds within one bar, faster than the file`, `bounds ${r.bounds.join(',') || '-'} (extra ${r.extra}), ${(r.ms / 1000).toFixed(1)} s for ${r.seconds} s`);
+    console.log(`info  ${id} (level B): chords ${r.chords}, drums F1 ${JSON.stringify(r.f1)}, on/off ${r.drumsPresence}, engines ${JSON.stringify(r.engines)}`);
   }
 }
 console.log(`${passed} passed, ${failed} failed`);
