@@ -281,7 +281,40 @@ const CHECKS_WIDGETS = {
 };
 const chainLinesW = c => chainLines(c);
 Object.assign(CHECKS, CHECKS_REUSED, CHECKS_WIDGETS);
+// "Follow the song" (track-to-code D18, task 7.4): every built-in song with the Live coder profile and the growth
+// follow plays its written song from bar 1 (the same notes as the song as written at bar 0 and at every step), each
+// step's code evaluates in Strudel without errors, a song that starts full shows its lines at bar 0, and the default
+// growth of every profile stays as it was (follow is never a default)
+const ASYNC = {
+  async 'Follow the song: every built-in song plays its steps from bar 1 without errors, as written'() {
+    const { strudelInNode, hapsAt } = await import('./mixer-checks.mjs');
+    await strudelInNode();
+    assert(['classic', 'crescendo', 'switch'].every(p => resolveProfile(p).growth !== 'follow'), 'a default growth is follow');
+    const ids = JSON.parse(fs.readFileSync('songs/index.json', 'utf8')), C = resolveProfile('switch', { growth: 'follow' }), W = resolveProfile('classic');
+    const notes = h => h.map(x => `${x.at.toFixed(4)} ${x.s} ${x.note}`).sort().join('|');
+    const bad = [];
+    let steps = 0, heard = 0;
+    for (const id of ids) {
+      const s = song(id), b = crescendoSong(s, { rules: growthRules(C) });
+      if (!b.crescendo || !b.crescendo.follow || b.crescendo.growth !== 0) { bad.push(`${id}: no follow growth`); continue; }
+      const L = liveCode(b, C, { lang: () => 'it', files: () => files, cols: () => 60 }), plain = liveCode({ ...s, build: [] }, W, { lang: () => 'it', files: () => files, cols: () => 60 });
+      const bars = [0, ...new Set(buildSteps(L.build).map(x => x.at))];
+      for (const bar of bars) {
+        steps++;
+        try {
+          const got = await hapsAt(L, L.codeAt(bar), bar), want = await hapsAt(plain, plain.codeAt(bar), bar);
+          heard += got.length;
+          if (notes(got) !== notes(want)) { bad.push(`${id} bar ${bar + 1}: ${got.length} notes, as written ${want.length}`); break; }
+        } catch (e) { bad.push(`${id} bar ${bar + 1}: ${e.message}`); break; }
+      }
+    }
+    assert(!bad.length, bad.slice(0, 6).join('; '));
+    assert(heard > steps * 4, `only ${heard} notes in ${steps} steps`);
+    console.log(`      (${ids.length} songs, ${steps} steps, ${heard} notes)`);
+  },
+};
 let failed = 0;
 for (const [name, fn] of Object.entries(CHECKS)) { try { fn(); console.log(`ok    ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); } }
-console.log(failed ? `\n${failed} check(s) failed` : `\nall ${Object.keys(CHECKS).length} checks passed`);
+for (const [name, fn] of Object.entries(ASYNC)) { try { await fn(); console.log(`ok    ${name}`); } catch (e) { failed++; console.log(`FAIL  ${name}: ${e.message}`); } }
+console.log(failed ? `\n${failed} check(s) failed` : `\nall ${Object.keys(CHECKS).length + Object.keys(ASYNC).length} checks passed`);
 process.exit(failed ? 1 : 0);

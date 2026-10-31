@@ -634,6 +634,12 @@ const KEY_STEPS = ['enter', 'break', 'back', 'harmony', 'strip-first', 'last'];
 // `cap`, `all`, `keep`, `random`, `longSong`, `long` ({ from, to } seconds when the long-song rule measured every shape)
 // and `ms` in all. Without it, no extra work.
 export function crescendoSong(song, opts = {}) {
+  // "Follow the song" (track-to-code D18): no growth, the written song from bar 1, a step at each clip change
+  if (opts.rules && opts.rules.follow) {
+    const out = followSong(song);
+    if (opts.stats && typeof opts.stats === 'object') Object.assign(opts.stats, { tried: [{ development: null, pace: null, maxDetail: null, rounds: 0, rushed: null, load: null, ms: 0, bars: barsOf(out) }], kept: 0, searched: false, ms: 0 });
+    return out;
+  }
   if (!opts.stats || typeof opts.stats !== 'object') return searchShapes(song, opts, null);
   const { stats, ...rest } = opts, t0 = performance.now();
   Object.assign(stats, { tried: [], kept: -1, searched: true, cap: shapeCapOf(rest.shapeCap), all: !!rest.shapeAll, keep: shapeKeepOf(rest.shapeKeep), random: rest.shapeRandom !== false, longSong: longSongOf(rest.longSong), long: null });
@@ -1065,6 +1071,25 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   // (the bar of each unit of the growth, for crescendoSong: not saved with the song)
   Object.defineProperty(out.crescendo, 'units', { value: growth.map(u => u.at), enumerable: false });
   if (shape) out.crescendo.shape = { version: SHAPES_VERSION, opening: shape.opening, pace: shape.pace, development: shape.development, from: shape.from, leadIn: gaps[0], ...(skin ? { skin: { bpm: skin.bpm, key: skin.key, style: skin.style, at: skinBar } } : {}), ...(typing ? { relaxed: typing.relaxed } : {}), ...(typing && (typing.waited || rules.extraGaps) ? { waited: typing.waited + Object.values(rules.extraGaps || {}).reduce((a, b) => a + b, 0) } : {}) };
+  return out;
+}
+
+// "Follow the song" (track-to-code D18), a value of the Live coder growth for every song: no build-up from zero, the
+// written song plays from bar 1 (a song that starts full shows its first lines whole at bar 1), and each section or clip
+// change is a step, typed by the Live coder's typist just before its bar (the written part's typing: planWritten, the
+// lines typed ahead). The section changes are steps of the code of the moment already; the clip changes inside a
+// section are steps here, so they are typed with every code option (also without Sections). No ending is added.
+export function followSong(song) {
+  const n = normalizeSong(song), W = n.total, at = new Set([0]);
+  for (const t of n.tracks) {
+    if (t.mute || t.type === 'voice') continue;
+    for (const c of t.clips) for (const b of [c.start, c.start + c.bars]) if (b > 0 && b < W) at.add(b);
+  }
+  const out = clone(song);
+  out.build = [...at].sort((a, b) => a - b).map(b => ({ at: b }));
+  out.buildStyle = 'crescendo';
+  out.crescendo = { version: CRESCENDO_VERSION, growth: 0, sections: 0, grown: 0, ending: 'short', detail: 0, written: W, narrated: false, natural: true, coder: true, follow: true, waypoints: [], detours: 0 };
+  Object.defineProperty(out.crescendo, 'units', { value: [], enumerable: false });
   return out;
 }
 

@@ -8,8 +8,9 @@ import { OPENINGS, PACES, DEVELOPMENTS } from '../song/shapes.js';
 export const CONTROLS = {
   build: ['blocks', 'crescendo'],
   // growth (live-coder-growth): small steps, gradual (the natural growth before live-coder-growth), natural (like a live
-  // coder: waypoints and small moves); duration of the natural growth: fitted in the written length or free
-  growth: ['crescendo', 'gradual', 'natural'],
+  // coder: waypoints and small moves); follow (track-to-code D18, "Follow the song"): no growth, the written song from
+  // bar 1, each change typed before its bar; duration of the natural growth: fitted in the written length or free
+  growth: ['crescendo', 'gradual', 'natural', 'follow'],
   // planned (new-song-panel D12): inside the song's length target, as the radio grows a song on air; only a song with a
   // length target carries it (song-config.js)
   duration: ['fitted', 'free', 'planned'],
@@ -124,6 +125,7 @@ export function migrateOld(get) {
 // style recipes ({ id: recipe }, for the weights and the metamorphosis), resolved per song by crescendoSong
 export function growthRules(C, { styles } = {}) {
   if (C.growth === 'gradual') return { natural: true };
+  if (C.growth === 'follow') return { follow: true, coder: true };
   if (C.growth === 'natural') return { natural: true, coder: true, free: C.duration === 'free', shape: { opening: C.opening || 'auto', pace: C.pace || 'auto', development: C.development || 'auto' }, ...(styles ? { styles } : {}) };
   return {};
 }
