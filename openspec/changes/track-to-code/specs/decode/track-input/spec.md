@@ -29,7 +29,7 @@ A video file whose audio the browser decodes SHALL be accepted for its audio onl
 - **THEN** the tab says the file has no sound to decode
 
 ### Requirement: Length limit
-The tab SHALL accept files up to 10 minutes long. A longer file SHALL be refused with a message that names the limit, before it is decoded.
+The tab SHALL accept files up to 10 minutes long. A longer file SHALL be refused with a message that names the limit, before it is decoded. The same limit SHALL apply on phones; when the browser runs out of memory while decoding, the tab SHALL say so clearly instead of failing silently.
 
 #### Scenario: A 12-minute file
 - **WHEN** the user opens a 12-minute file

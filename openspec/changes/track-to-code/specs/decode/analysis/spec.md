@@ -28,7 +28,7 @@ With level A, Play SHALL start the file at once. The analysis SHALL follow the p
 - **THEN** the original is heard within half a second and code lines appear during the first bars
 
 ### Requirement: Look ahead
-Level A SHALL offer a Look ahead option with the values Off, 2 seconds and 2 bars, default 2 bars. With look ahead on, the analysis SHALL read the audio that far ahead of the playhead, so a change is written before its bar and lands on it. With look ahead off, the analysis SHALL read only the audio already played, and a change SHALL reach the code 1 to 2 bars after it is heard.
+Level A SHALL offer a Look ahead option, one compact choice with the values Off, 2 seconds, 4 seconds, 2 bars and 4 bars, default 2 bars. With look ahead on, the analysis SHALL read the audio that far ahead of the playhead, so a change is written before its bar and lands on it. With look ahead off, the analysis SHALL read only the audio already played, and a change SHALL reach the code 1 to 2 bars after it is heard.
 
 #### Scenario: Two bars ahead
 - **WHEN** look ahead is 2 bars and the original's drums stop at bar 33

@@ -32,9 +32,9 @@ Estimate: about 70 agent hours (58 to 88), in the order below. Level A and its s
 ## 5. Level A live (about 6 h)
 
 - [ ] 5.1 Level A loop: per bar, the model up to the horizon, the writer, `typingPlan` with the bar as deadline, evaluation on the bar; a full start pastes lines; dropped drums mute with `_$:`; verify by playing a generated track whose drums stop at bar 33.
-- [ ] 5.2 Look ahead (D8): Off, 2 seconds, 2 bars, default 2 bars, stored with the track; first window analysed before the sound starts; verify that with 2 bars the drums mute on bar 33 and with Off on bar 34 or 35.
+- [ ] 5.2 Look ahead (D8): one select with Off, 2 s, 4 s, 2 bars, 4 bars, default 2 bars, stored with the track; first window analysed before the sound starts; verify that with 2 bars the drums mute on bar 33 and with Off on bar 34 or 35.
 - [ ] 5.3 Tempo controls (D7): tempo readout with "uncertain", ½× and 2×, tap tempo with the space bar (no focused field), stored; verify by tapping in the app and by a page script that sends four key presses.
-- [ ] 5.4 The code panel and the stage: Live coder display controls, narrator off, the folded Options group (comments, technical functions, code view) stored per track, title and artist fields and the Attribution toggle updating the header; verify each option changes the code and not the sound.
+- [ ] 5.4 The code column and the shared stage (D1): the decoded code typing in `#codecol` with its source line, Code over showing it over the stage only when on, Live coder display controls, narrator off, the folded Options group (comments, technical functions, code view) stored per track, title and artist fields and the Attribution toggle updating the header; verify each option changes the code and not the sound.
 
 ## 6. Level B analysis (about 7 h)
 
@@ -65,7 +65,7 @@ Estimate: about 70 agent hours (58 to 88), in the order below. Level A and its s
 ## 10. Check scripts (about 5 h)
 
 - [ ] 10.1 `npm run check:decode` (no browser): fingerprint, store cap and version, file name fallback, writer output (header, Attribution, `// vox: …`, presets, clips from levels, hysteresis), mix consistency rules, look-ahead horizons, rights lines.
-- [ ] 10.2 `PORT=5251 node tools/check-decode.cjs [shots-dir]` (dev server): tab order and names in both languages, a generated WAV dropped, level A playing with look ahead, mute, solo and slider, tap tempo, level B with the growing mark and cancel, reopen with a matching file, Open in Compose, an export with the original, 400 px with no sideways scroll; update `tools/check-modes.cjs` for the new tab.
+- [ ] 10.2 `PORT=5251 node tools/check-decode.cjs [shots-dir]` (dev server): tab order and names in both languages, a generated WAV dropped, level A playing with each look-ahead value, the code typing in the code column, Code over on and off, mute, solo and slider, tap tempo, level B with the growing mark and cancel, reopen with a matching file, Open in Compose, an export with the original, 400 px with no sideways scroll; update `tools/check-modes.cjs` for the new tab.
 - [ ] 10.3 Run `npm run check:code`, `npm run check:songs`, `npm run check:crescendo`, `npm run check:export`, `npm run check:clips`, `node tools/check-backup.mjs` and `node tools/snapshot-levels.cjs check` (dev server on 5251, no edits under `src/` while it runs); all green.
 
 ## 11. Guide, knowledge and docs (about 3 h)

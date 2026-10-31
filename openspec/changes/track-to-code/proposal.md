@@ -6,12 +6,12 @@ The app writes code for its own songs only. The owner wants to open a real track
 
 ## What Changes
 
-A new tab **Decode** (it: Decodifica) in the Listen mode, third after Compose and Songs: Compose, Songs, Decode, Playlists, Radio. Its page heading reads "Track to code" (it: "Da brano a codice").
+A new tab **Decode** (it: Decodifica) in the Listen mode, third after Compose and Songs: Compose, Songs, Decode, Playlists, Radio. Its page heading reads "Track to code" (it: "Da brano a codice"). The track plays on the app's shared stage, the tab panel holds the controls, and the code is written in the existing code column, as in Compose.
 
 - **Open a file.** One audio file at a time: MP3, WAV, FLAC, M4A/AAC, OGG/Opus, anything the browser decodes. A video file is accepted for its audio only. At most about 10 minutes. Title and artist come from the file's tags, else from its name, and stay editable. The file is never copied or stored.
 - **Reopen.** The analysis, the code and the tab's settings are stored (small). In browsers with the File System Access API the app remembers a handle to the file, with the user's permission, so a recent track reopens in one click. Elsewhere the user picks the file again and the analysis is skipped when the file matches.
 - **Two kinds of tracks.** The tab plays the **Original** (the user's file) and the **Code** (the generated Strudel code; in level B one code track per part: drums, bass, chords and others). Original on and Code muted by default. Each track has mute and solo, and a slider **Original ↔ Code** sets the balance; the two stay consistent.
-- **Level A, live.** Press Play: the file plays and the code is written while it plays, approximate and never blocking. **Look ahead** (Off, 2 seconds, 2 bars; default 2 bars) analyses the audio ahead of the playhead, so a change lands in the code on its bar. Off, the code lags 1 to 2 bars like the reference app.
+- **Level A, live.** Press Play: the file plays and the code is written while it plays, approximate and never blocking. **Look ahead** (Off, 2 s, 4 s, 2 bars, 4 bars; default 2 bars) analyses the audio ahead of the playhead, so a change lands in the code on its bar. Off, the code lags 1 to 2 bars like the reference app.
 - **Level B, full.** The whole file is analysed first, faster than real time and away from the page, with the app's growing mark. Then the code plays in sync and richer: sections, global tempo, variations, the ending, sounds chosen by measure, several code tracks.
 - **Shared base.** One analyser reads audio frames: level A feeds them as the file plays (or ahead), level B all at once. Both fill the same song model (tempo, bars, downbeats, key, chord per bar, drum grid per band, bass notes, levels, sections), and one writer turns the model into code. Level B extends level A.
 - **Written like the Live coder.** The code follows the original's arrangement, not the app's growth shapes. A track that starts full grows its code fast, lines may appear at once as pasted. When the original drops the drums, the code mutes them. Level A types reactively; level B types each change just before its bar.
@@ -33,7 +33,8 @@ Out of scope, for later:
 - the vocals as a third voice track;
 - level C: transcription or stem separation with machine-learning models;
 - a choice of analysis engine in Settings;
-- tempo changes and meters other than 4/4.
+- tempo changes and meters other than 4/4;
+- files longer than 10 minutes.
 
 ## Capabilities
 

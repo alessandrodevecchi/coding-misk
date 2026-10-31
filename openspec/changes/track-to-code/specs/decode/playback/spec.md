@@ -67,12 +67,23 @@ The tab SHALL show a level switch: "Live" (level A) and "Full" (level B). The fi
 - **WHEN** level A plays a new track and the user picks Full
 - **THEN** the original keeps playing, the growing mark shows on the switch, and the level B code takes over at a bar boundary when the analysis ends
 
-### Requirement: The stage and the code
-The tab SHALL show the app's stage visual with the code over it, as the other players do, with the stage, look and code-over settings of the app. The visual SHALL react to the code's notes, also while the code tracks are muted.
+### Requirement: The shared stage
+The decoded track SHALL play on the app's shared stage above the tabs, with its HUD (looks, renders, Code over, full screen) as for every other player. The code SHALL appear over the stage only when Code over is on, as today. The visual SHALL react to the code's notes, also while the code tracks are muted.
 
-#### Scenario: Muted code lights up
+#### Scenario: Muted code moves the stage
 - **WHEN** the code tracks are muted and the code plays a kick on every beat
-- **THEN** the kick tokens light up on the beats
+- **THEN** the stage's kick reacts on the beats
+
+#### Scenario: Code over
+- **WHEN** the user turns Code over on while a decoded track plays
+- **THEN** the decoded code shows over the stage as it does for a song
+
+### Requirement: The code column
+The generated code SHALL be written in the app's code column, as Compose writes a song's code there: typed by the typist, with lit notes, the hidden code, Copy and the column's full screen and collapse buttons. The column's source line SHALL name the decoded track and the level. The Decode tab panel SHALL hold the controls only (file, title and artist, Attribution, tempo and key, level, look ahead, sounds, Options, tracks with mute and solo, the slider, the sections of the original in level B).
+
+#### Scenario: Code in the column
+- **WHEN** level A plays a decoded track
+- **THEN** the code column shows the decoded code typing, and its source line reads the track's title and "Live"
 
 ### Requirement: The player bar
 The player bar SHALL play the decoded track like a song: Play, Stop, the timeline, the time and the bar counter of the code. Previous and Next SHALL be disabled. Starting a song, a playlist or the radio SHALL stop the decoded track, and opening Decode SHALL not stop another player until the user presses Play there.
@@ -82,7 +93,7 @@ The player bar SHALL play the decoded track like a song: Play, Stop, the timelin
 - **THEN** the radio stops and the decoded track plays
 
 ### Requirement: Phone width
-At 400 px wide the tab SHALL show, in one column, the drop area or the track header, the level switch, the track list with mute and solo, the slider, and the stage with the code, with no horizontal scroll of the page.
+At 400 px wide the page SHALL stack as the app does on phones: the stage, the modes and tabs, the Decode panel (the drop area or the track controls, the track list with mute and solo, the slider), then the code column, with no horizontal scroll of the page.
 
 #### Scenario: 400 px
 - **WHEN** the tab is shown 400 px wide with level B playing

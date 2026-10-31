@@ -47,6 +47,8 @@ The app already has most of the parts the tab needs. Pointers checked on `develo
 
 All Decode code lives in `src/decode/`: `tab.js` (UI), `input.js` (file, tags, fingerprint, decoding), `store.js` (IndexedDB), `worker.js` (analysis), `engine-light.js` and `engine-essentia.js` (D5), `model.js` (D6), `writer.js` (D9), `mix.js` (D11), `sync.js` (D12). `index.html` gets the tab button between Songs and Playlists (`data-mode-of="ascolta" data-tab="decode"`) and a `#tab-decode` section. `src/main.js` only wires the tab, the transport and the master bus. `tools/check-modes.cjs` learns the new order.
 
+The tab uses the app's layout as every other tab does (`index.html`): the shared stage `#stagewrap` on top with its HUD (looks, renders, Code over, full screen); below it `.work`, with the modes, the tabs and the `#tab-decode` panel on the left and the code column `#codecol` on the right. The decoded track plays on the shared stage; its code is written in `#codecol` like a Compose song's code (typist, lit notes, hidden code, Copy, full screen and collapse), and shows over the stage only when Code over is on. The `#tab-decode` panel holds only the controls. On phones the page stacks as today: stage, modes and tabs, the Decode panel, then the code column. The mockup follows this layout.
+
 ### D2. Reading the file
 
 The file's tags and duration come from `mediabunny` (`Input` over a `BlobSource`, `ALL_FORMATS`, `getMetadataTags()`), which reads only the parts of the file it needs. The duration check (10 minutes) runs before decoding. Audio files decode with `AudioContext.decodeAudioData` on the file's bytes. Video containers, and audio files that `decodeAudioData` refuses, decode through `mediabunny`'s audio sample sink (WebCodecs). Title and artist fall back to the file name (`Artist - Title`).
@@ -113,7 +115,7 @@ Tap tempo: the space bar in the Decode tab (no focused field). Four taps or more
 
 ### D8. Look ahead
 
-Values: Off, 2 seconds, 2 bars; default 2 bars. Two bars give the typist time for a line of about 40 characters at the human pace at 120 BPM, and land the change on its bar.
+Values: Off, 2 s, 4 s, 2 bars, 4 bars, in one select (five buttons are too wide for the panel); default 2 bars. Four seconds and four bars give slow tracks and long lines more time. Two bars give the typist time for a line of about 40 characters at the human pace at 120 BPM, and land the change on its bar.
 
 The analysis horizon is the playhead plus the look ahead. The writer (D9) runs once per bar on the model up to the horizon and gives the code that bar should have; the typing aims to finish 0.2 bar before that bar starts. With Off, the horizon is the playhead, so a change is seen only after its bar has played and lands 1 to 2 bars late, as in the reference app. At Play, the first window up to the horizon is analysed before the sound starts; the light engine does that in tens of milliseconds, so Play still feels immediate.
 
@@ -203,14 +205,16 @@ The bench (`tools/decode-bench.mjs`, Node, no browser): built-in songs exported 
 
 No migration: a new tab, a new store and a new optional song field. Removing the tab leaves the store unused. Songs opened in Compose stay valid without the tab (the `cover` field is optional, `follow` falls back to the natural growth if removed).
 
-## Open Questions
+## Owner answers (2026-10-31)
 
-Each has a recommended option; the specs assume the recommended one.
+The owner answered the open questions of the first draft. The specs follow these answers.
 
-1. **Default level for a track with a stored level B analysis.** Recommended: open in Full (B), the richer result is ready. Alternative: always open in Live (A).
-2. **Look ahead default.** Recommended: 2 bars. Alternative: 2 seconds (shorter, changes may land late on slow tracks).
-3. **Phones.** Recommended: same 10-minute limit, with a clear message if the browser runs out of memory. Alternative: 5 minutes on small screens.
-4. **Files longer than 10 minutes.** Recommended: refuse in this change. Alternative: offer to decode the first 10 minutes.
-5. **Attribution off in the texts for sharing.** Recommended: keep the generic rights line. Alternative: no line at all.
-6. **"Follow the song" for other songs in Compose.** Recommended: only for decoded songs in this change. Alternative: offer it for every song (a growth that follows the written song from bar 1).
-7. **Vocals placeholder.** Recommended: always shown. Alternative: shown only in bars where the analysis hears a lead voice (a weak guess without machine learning).
+1. **A track with a stored level B analysis opens in Full.** Confirmed.
+2. **Look ahead:** default 2 bars, with 4 seconds and 4 bars added. The values are Off, 2 s, 4 s, 2 bars and 4 bars, in one select (D8).
+3. **Phones:** the same 10-minute limit, with a clear message if the browser runs out of memory. Confirmed.
+4. **Files over 10 minutes are refused** in this change; longer files go to the later list in the proposal.
+5. **Attribution off keeps the generic rights line** in the texts for sharing. Confirmed.
+6. **"Follow the song" only for decoded songs** for now. Confirmed.
+7. **`// vox: …` is always shown.** Confirmed.
+
+The owner also corrected the layout of the first mockup, which drew a stage inside the tab panel. D1 now places the tab in the app's real layout.
