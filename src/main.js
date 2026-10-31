@@ -47,6 +47,7 @@ import { DIRECTOR_VERSION } from './endless/director.js';
 // the versions a saved radio session is compared with (#38, radio-profiles D11)
 const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION, choosers: Object.keys(AIR_CHOOSERS) };
 import { createPlaylistsTab } from './library/playlists-tab.js';
+import { createDecodeTab } from './decode/tab.js';
 import { pickJsonFiles } from './library/library.js';
 import { createSettings } from './settings/settings.js';
 import { createGenresTab } from './library/genres-tab.js';
@@ -899,6 +900,41 @@ function liveBuild(sg, s, cyc) {
   typing = null; built = steps.filter(x => x.at <= next.at).length;
   setCodeRange(codeNow(sg, next.at)); ed.evaluate();
 }
+// the Decode tab (track-to-code D13, level A): the next change the model shows is typed with the bar as its deadline
+// and evaluated on the bar; a change that does not fit is pasted, as everywhere
+let decodeTab = null, decodeNext = null;
+function decodeBuild(s, cyc) {
+  if (!decodeTab || hand || resumeTo !== null) return;
+  if (!decodeNext) {
+    const n = decodeTab.next(cyc, playedCode !== null ? playedCode : ed.code || '');
+    if (!n) return;
+    decodeNext = n;
+    typing = makeTyping(ed.code || "", n.code, cyc, n.at - .2 * s.cps, s.cps, typingHuman(), stretchOf(n.at), Infinity, null);
+  }
+  const due = s.lastEnd + .1 * s.cps >= decodeNext.at;
+  if (!due) { typeFrame(typing, cyc); return; }
+  const n = decodeNext;
+  decodeNext = null; typing = null;
+  song = n.sg; setCodeRange(n.code); ed.evaluate();
+}
+// starts a decoded track's code at a cycle (D12): the scheduler from that cycle, then the audio time it plays it
+async function decodePlay({ cycle, sg, code }) {
+  if (radio && radio.on) radio.stopped();
+  if (preview) preview.stop();
+  setHand(false); resumeTo = null; paused = null; typing = null; decodeNext = null;
+  initAudioOnce();
+  await ready;
+  await initAudioOnce();
+  ed.stop();
+  song = sg; mode = 'decode';
+  source = { kind: 'decode', name: sg.title, level: t('dcLive') }; renderSource();
+  ed.setCode(code);
+  sched().lastEnd = cycle;
+  await ed.evaluate();
+  updateShare();
+  const s = sched();
+  return { time: (cycle - s.num_cycles_at_cps_change) / s.cps + s.seconds_at_cps_change + (Number.isFinite(s.latency) ? s.latency : 0.1) };
+}
 
 // ---------- hand live coding (#20) ----------
 function setHand(on) {
@@ -1088,8 +1124,9 @@ function resume() {
   paused = null;
   return play();
 }
-const togglePlay = () => isPlaying() ? pause() : radio && radio.paused ? radio.resume() : paused ? resume() : play();
-async function stop() { await ready; paused = null; ed.stop(); setHand(false); resumeTo = null; if (radio && radio.on) radio.stopped(); }
+const decodeHere = () => !!(decodeTab && decodeTab.open && (decodeTab.playing || mode === 'decode' || (curTab === 'decode' && !isPlaying() && !paused && !(radio && radio.paused))));
+const togglePlay = () => decodeHere() ? decodeTab.toggle() : isPlaying() ? pause() : radio && radio.paused ? radio.resume() : paused ? resume() : play();
+async function stop() { if (decodeTab && (decodeTab.playing || mode === 'decode')) decodeTab.stop(); await ready; paused = null; ed.stop(); setHand(false); resumeTo = null; if (radio && radio.on) radio.stopped(); }
 
 // ogni modifica alla composizione: brano non salvato, codice ricompilato, rivalutato se sta suonando
 function changed() {
@@ -1174,6 +1211,7 @@ function renderSource() {
     pattern: () => t('srcPattern', { name: source.name }),
     song: () => t('srcSong', { name: source.name }),
     radio: () => t('srcRadio', { name: source.name }),
+    decode: () => t('srcDecode', { name: source.name, level: source.level || '' }),
   };
   $('#src').textContent = map[source.kind]();
   $('#back').hidden = source.kind === 'track';
@@ -1234,7 +1272,7 @@ $('#stop').addEventListener('click', stop);
 document.addEventListener('keydown', e => {
   const inEditor = e.target.closest && e.target.closest('strudel-editor');
   // barra spaziatrice: play/pausa, tranne mentre si scrive o su un pulsante
-  if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !inEditor && !e.target.closest('input, select, textarea, button, [contenteditable]')) { e.preventDefault(); togglePlay(); return; }
+  if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !inEditor && !e.target.closest('input, select, textarea, button, [contenteditable]')) { e.preventDefault(); if (curTab === 'decode' && decodeTab && decodeTab.playing && !e.repeat) { decodeTab.tap(); return; } togglePlay(); return; }
   if (!(e.ctrlKey || e.metaKey)) return;
   if (e.key === 'Enter' && !inEditor) { e.preventDefault(); play(); }
   if (e.key === '.' && !inEditor) { e.preventDefault(); stop(); }
@@ -4184,10 +4222,10 @@ function syncAll() {
 }
 
 // tab
-const TABS = ['componi', 'brani', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'lezioni', 'suoni', 'voci', 'pattern', 'riferimenti'];
+const TABS = ['componi', 'brani', 'decode', 'playlist', 'impostazioni', 'generi', 'radio', 'artisti', 'stili', 'guida', 'lezioni', 'suoni', 'voci', 'pattern', 'riferimenti'];
 let cards = [];
 // two modes (#42): Listen to make and hear music, Groove Lab for its material and for learning
-const APP_MODES = { ascolta: ['componi', 'brani', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'voci', 'pattern', 'guida', 'lezioni', 'riferimenti'] };
+const APP_MODES = { ascolta: ['componi', 'brani', 'decode', 'playlist', 'radio'], lab: ['artisti', 'stili', 'generi', 'suoni', 'voci', 'pattern', 'guida', 'lezioni', 'riferimenti'] };
 const modeOf = tab => Object.keys(APP_MODES).find(m => APP_MODES[m].includes(tab)) || null;
 let modeTabs = store.get('coding-misk-mode-tabs', {});
 if (!modeTabs || typeof modeTabs !== 'object') modeTabs = {};
@@ -4213,6 +4251,7 @@ function showTab(name) {
   else if (curTab === 'pattern' && patternsTab) patternsTab.closed();
   curTab = name;
   if (name === 'radio' && radio) radio.render();
+  if (name === 'decode' && decodeTab) decodeTab.render();
   if (name === 'playlist' && playlistsTab) playlistsTab.render();
   if (name === 'impostazioni' && settingsPage) settingsPage.render();
   if (name === 'generi' && genresTab) genresTab.render();
@@ -4471,6 +4510,23 @@ playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, pla
   newSongId: () => { let id; do id = 'u-' + Date.now().toString(36) + Math.floor(Math.random() * 1e4); while (user.tracks.some(u => u.id === id)); return id; },
   addSongs: list => { if (!list.length) return; user.tracks.push(...list.map(x => stamp(clone(x)))); saveLibrary(); cards = []; renderSongs(); },
   onChange: () => { if (!$('#tab-brani').hidden) { songsView.renderBar(); songsView.apply(); } } });
+// ---------- the Decode tab (track-to-code) ----------
+// the decoded track plays on Strudel's clock (D12): the tab gives the cycle and the code of the moment, the player starts
+// the scheduler there and answers with the audio time of that cycle, where the tab starts the original
+decodeTab = createDecodeTab({ root: $('#tab-decode'), app: {
+  t, esc, toast,
+  ctx: () => { initAudioOnce(); return globalThis.getAudioContext(); },
+  output: () => { try { const c = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController(); return c && c.output; } catch (e) { return null; } },
+  mode: () => mode,
+  othersPlaying: () => isPlaying() && mode !== 'decode',
+  lang: getLang, files: () => customFiles, cols: codeCols, widgets: cwSettings,
+  stopOthers: () => { if (radio && radio.on) radio.stopped(); if (preview) preview.stop(); if (isPlaying() && mode !== 'decode') { paused = null; ed.stop(); } },
+  play: decodePlay,
+  stopCode: () => { decodeNext = null; typing = null; if (ed && mode === 'decode') ed.stop(); },
+  source: (name, level) => { source = { kind: 'decode', name, level }; renderSource(); },
+  ended: () => { decodeNext = null; typing = null; if (ed && mode === 'decode') ed.stop(); },
+} });
+globalThis.codingMiskDecode = decodeTab;
 function renderSongs() {
   const composed = composedTracks().map(tr => (tr.id === T.id ? { ...tr, ...T, kind: 'composed' } : tr));
   // the cards only need the written song's meta: never grow every song for the list (a growth can take seconds)
@@ -4636,6 +4692,7 @@ globalThis.codingMiskVolume = { node: () => volNode, master: () => volFor };
 function songTick() {
   const s = sched();
   if (!(song && s && isPlaying() && !seeking)) return;
+  if (mode === 'decode') { decodeBuild(s, s.now()); return; }
   const m = song.meta, cyc = s.now();
   const ahead = Math.min(m.bars - 1, Math.floor(s.lastEnd + s.cps * .1));
   const target = m.bpm[ahead] / 240;
@@ -4660,6 +4717,7 @@ try {
   requestAnimationFrame(transport);
   applyMaster();
   applyVolume();
+  if (decodeTab) decodeTab.frame();
   if (radio) renderPlayerBar();
   const s = sched();
   const playing = isPlaying();
@@ -4692,11 +4750,11 @@ try {
   { const txt = outLabel(), busy = !!(rec || capture || fastJob);
     $$('[data-out-lcd]').forEach(el => { if (el.textContent !== txt) el.textContent = txt; const b = el.parentElement; if (b.disabled !== busy) b.disabled = busy; }); }
   // pulsanti di trasporto
-  const playBtn = $('#play'), state = playing ? 'playing' : paused ? 'paused' : 'stopped';
+  const playBtn = $('#play'), state = playing || (decodeTab && decodeTab.playing) ? 'playing' : paused ? 'paused' : 'stopped';
   if (playBtn.dataset.state !== state) {
     playBtn.dataset.state = state;
-    playBtn.setAttribute('aria-pressed', playing);
-    playBtn.textContent = playing ? t('pause') : paused ? t('resume') : '▶ Play';
+    playBtn.setAttribute('aria-pressed', state === 'playing');
+    playBtn.textContent = state === 'playing' ? t('pause') : paused ? t('resume') : '▶ Play';
     $('#sc-pause').textContent = pauseLabel();
     $('#sc-pause').disabled = state === 'stopped';
   }
@@ -4840,6 +4898,7 @@ function seekRange() {
 $('#pb-seek').addEventListener('input', e => { pbSeeking = true; e.target.style.setProperty('--pos', `${e.target.value / 10}%`); });
 $('#pb-seek').addEventListener('change', e => {
   pbSeeking = false;
+  if (decodeTab && decodeTab.open && (mode === 'decode' || decodeTab.playing)) return decodeTab.seek(+e.target.value / 1000 * decodeTab.duration);
   const r = seekRange(); if (!r) return;
   const bar = Math.min(r.bars - .25, Math.round(+e.target.value / 1000 * r.bars * 4) / 4);
   if (mode === 'radio' && radio && radio.on) return radio.seek(bar);
@@ -4870,21 +4929,29 @@ function renderPlayerBar() {
   } else if (mode === 'free' && source && source.name) title = source.name;
   // stopped in Compose: the bar Play starts from, of the song in Compose (the written one while it still grows)
   else if (mode === 'track' && compiled && compiled.meta) bars = count(cueBar(), 0, compiled.meta.bars);
+  // the decoded track (track-to-code, playback spec: The player bar): file time, the code's bar counter
+  const dec = decodeTab && decodeTab.open && (mode === 'decode' || decodeTab.playing) ? decodeTab : null;
+  if (dec) {
+    const f = dec.fileNow(), m = dec.model;
+    title = dec.title; pos = `${clock(f)} / ${clock(dec.duration)}`;
+    bars = m && m.barSeconds ? count(Math.max(0, (f - m.downbeat) / m.barSeconds), 0, Math.max(1, Math.ceil((dec.duration - m.downbeat) / m.barSeconds))) : null;
+  }
   // timeline position (not while the user drags it)
   const seek = $('#pb-seek'), sr = seekRange();
   seek.disabled = !sr || (mode === 'free' && !(source && source.kind === 'song') && !onRadio);
   // while the timeline is dragged: the bar under the thumb
   if (pbSeeking && sr) bars = count(sr.from + +seek.value / 1000 * sr.bars, sr.from, sr.bars);
-  if (!pbSeeking && sr) {
+  if (!pbSeeking && dec) { const v = Math.round(Math.max(0, Math.min(1, dec.fileNow() / (dec.duration || 1))) * 1000); if (+seek.value !== v) { seek.value = v; seek.style.setProperty('--pos', `${v / 10}%`); } seek.disabled = false; }
+  else if (!pbSeeking && sr) {
     const cyc = onRadio ? (playing && s ? s.now() : rs && rs.paused !== undefined ? rs.paused : sr.from) : playing && s ? s.now() : paused && song && paused.id === song.id ? paused.cyc : mode === 'track' ? cueBar() : 0;
     const v = Math.round(Math.max(0, Math.min(1, (cyc - sr.from) / sr.bars)) * 1000);
     if (+seek.value !== v) { seek.value = v; seek.style.setProperty('--pos', `${v / 10}%`); }
   }
   if (!onRadio && queue && queue.current === currentSongId()) { const q = queue.position; pos = `${queue.name} · ${q.n} / ${q.total}${pos ? ` · ${pos}` : ''}`; }
   const onair = onRadio && !radio.paused;
-  const canNav = onRadio || (currentSongId() !== null && (mode === 'track' || (source && source.kind === 'song')));
+  const canNav = !dec && (onRadio || (currentSongId() !== null && (mode === 'track' || (source && source.kind === 'song'))));
   const barTxt = bars ? t('pbBar', bars) : '';
-  const key = [title, pos, barTxt, onair, canNav, shuffleOn, repeatMode].join('|');
+  const key = [title, pos, barTxt, onair, canNav, shuffleOn, repeatMode, !!dec].join('|');
   if (key === pbLast) return;
   pbLast = key;
   $('#pb-title').textContent = title || ''; $('#pb-pos').textContent = pos; { const k = barTxt.indexOf(' '); $('#pb-bar').innerHTML = k > 0 ? `<span class="pb-bar-w">${esc(barTxt.slice(0, k + 1))}</span>${esc(barTxt.slice(k + 1))}` : esc(barTxt); }
@@ -5133,12 +5200,15 @@ function changeLang(l) {
   setLang(l);
   compiled = compiled.pending ? heldCompiled() : playable({ ...T, kind: 'composed' });
   renderAll();
+  if (decodeTab) decodeTab.render();
   if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.code);
 }
 $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.dataset.lang)));
 // settings page (#31): the gear opens it, a second press goes back to the tab before
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
+    // decoded tracks (track-to-code D3): their records travel in the backup without the files' handles
+    decodes: { all: () => (decodeTab ? decodeTab.store.all() : Promise.resolve([])), import: list => (decodeTab ? decodeTab.store.importMany(list) : Promise.resolve(0)) },
     // voices and phrases (my-phrases D3, D4, D6): the card's settings, the space of the samples, the link to the Voci tab
     phrases: {
       settings: () => phr.settings, set: patch => phr.setSettings(patch), count: () => phr.items.length, open: s => openVoices(s),

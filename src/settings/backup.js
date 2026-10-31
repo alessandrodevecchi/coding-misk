@@ -6,6 +6,7 @@ import { CODE_VERSION } from '../song/writer.js';
 import { DRAFTS_KEY, mergeDrafts } from '../library/pattern-drafts.js';
 import { mergeUses } from '../library/patterns.js';
 import { PHRASES_KEY, mergePhrases } from '../voices/phrases.js';
+import { DECODES_KEY, mergeDecodes, plainRecord } from '../decode/store.js';
 
 export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
@@ -15,9 +16,11 @@ const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel
 // (coding-misk-voices-sub: the section of the Voci tab open last, my-phrases D9)
 
 // entries: [[key, value]] of the browser storage (values parsed). Returns the backup object.
-export function makeBackup(entries, now = new Date()) {
+// decodes: the decoded tracks (track-to-code D3, IndexedDB), carried without their file handles
+export function makeBackup(entries, now = new Date(), decodes = null) {
   const data = {};
   for (const [k, v] of entries) if (k.startsWith(PREFIX) && !SKIP.has(k) && v !== null && v !== undefined) data[k] = v;
+  if (Array.isArray(decodes) && decodes.length) data[DECODES_KEY] = decodes.map(plainRecord).filter(Boolean);
   return { format: BACKUP_FORMAT, version: 1, created: now.toISOString(), data };
 }
 
@@ -80,6 +83,10 @@ export function mergeBackup(backup, get) {
       const cur = get(k) && typeof get(k) === 'object' && !Array.isArray(get(k)) ? get(k) : {};
       values[k] = { ...cur, ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}) };
       counts.settings++;
+    } else if (k === DECODES_KEY) {
+      // decoded tracks (track-to-code D3) by fingerprint: the one used last wins; the import writes them to IndexedDB
+      values[k] = mergeDecodes(get(k), v);
+      counts.decodes = (counts.decodes || 0) + (Array.isArray(v) ? v.length : 0);
     } else if (k === 'coding-misk-artist-voice') {
       continue;
     } else if (k === 'coding-misk-radio-history') {

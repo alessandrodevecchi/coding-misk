@@ -21,11 +21,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const visibleTabs = () => page.$$eval('.tabs .tab', xs => xs.filter(x => !x.hidden).map(x => x.dataset.tab).join());
   const pressed = () => page.$$eval('.mode-btn', xs => xs.filter(x => x.getAttribute('aria-pressed') === 'true').map(x => x.dataset.mode).join());
   check((await pressed()) === 'lab' && await page.isVisible('#tab-stili'), 'an old remembered tab opens in its mode', await pressed());
-  check((await visibleTabs()) === 'artisti,stili,generi,suoni,pattern,guida,lezioni,riferimenti', 'Groove Lab tabs', await visibleTabs());
+  check((await visibleTabs()) === 'artisti,stili,generi,suoni,voci,pattern,guida,lezioni,riferimenti', 'Groove Lab tabs', await visibleTabs());
   if (shots) await page.screenshot({ path: path.join(shots, 'lab.png') });
 
   await page.click('[data-mode="ascolta"]'); await sleep(300);
-  check((await visibleTabs()) === 'componi,brani,playlist,radio' && await page.isVisible('#tab-componi'), 'Listen shows its tabs and its first tab', await visibleTabs());
+  check((await visibleTabs()) === 'componi,brani,decode,playlist,radio' && await page.isVisible('#tab-componi'), 'Listen shows its tabs in order (Compose, Songs, Decode, Playlists, Radio) and its first tab', await visibleTabs());
   await page.click('[data-tab="radio"]'); await sleep(300);
   await page.click('[data-mode="lab"]'); await sleep(300);
   check(await page.isVisible('#tab-stili'), 'Groove Lab reopens its last tab');
@@ -97,8 +97,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const help = await page.$('#tab-radio .g-help');
   check(!!help, 'the Radio tab has a "?"');
   if (help) { await help.click(); await sleep(500); check((await pressed()) === 'lab' && await page.isVisible('#tab-guida') && await page.$eval('#g-radio', el => el.classList.contains('g-flash')), '"?" opens the Guide on the Radio card'); }
-  for (const tb of ['componi', 'brani', 'playlist', 'artisti', 'stili', 'generi', 'suoni', 'pattern', 'lezioni', 'riferimenti']) {
-    await page.click(`[data-mode="${['componi', 'brani', 'playlist'].includes(tb) ? 'ascolta' : 'lab'}"]`); await page.click(`[data-tab="${tb}"]`); await sleep(250);
+  for (const tb of ['componi', 'brani', 'decode', 'playlist', 'artisti', 'stili', 'generi', 'suoni', 'pattern', 'lezioni', 'riferimenti']) {
+    await page.click(`[data-mode="${['componi', 'brani', 'decode', 'playlist'].includes(tb) ? 'ascolta' : 'lab'}"]`); await page.click(`[data-tab="${tb}"]`); await sleep(250);
     if (!(await page.$(`#tab-${tb} .g-help`))) check(false, `the ${tb} tab has a "?"`);
   }
   // Italian names (the English strings had slipped into the Italian ones)

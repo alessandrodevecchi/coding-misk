@@ -128,6 +128,21 @@ const CHECKS = {
     assert(by.ph_a === '5|2026-10-29' && by.ph_c === '0|' && by.ph_x === '4|2026-10-28' && !by.ph_b && counts.phrases === 2, JSON.stringify(by));
     assert(values['coding-misk-phrase-settings'].save === 'ask', 'the settings travel');
   },
+  'decoded tracks travel without their file handles and merge by fingerprint, the one used last wins (track-to-code D3)'() {
+    const handle = { kind: 'file', name: 'x.wav' };
+    const b = makeBackup([['coding-misk-ui', 'neon']], new Date(), [{ fp: '10-aa', title: 'One', used: 5, handle, modelA: { version: 1, bars: [] } }, { fp: '20-bb', title: 'Two', used: 1 }]);
+    const list = b.data['coding-misk-decodes'];
+    assert(list.length === 2 && !list.some(r => 'handle' in r) && list[0].modelA, JSON.stringify(list));
+    // no audio in the backup: only the analysis, the code's settings and the names
+    assert(!JSON.stringify(b).includes('"pcm"') && !JSON.stringify(b).includes('"buffer"'), 'no audio');
+    const cur = [{ fp: '10-aa', title: 'Old', used: 9, handle }, { fp: '30-cc', title: 'Three', used: 2 }];
+    const { values, counts } = mergeBackup(b, k => (k === 'coding-misk-decodes' ? cur : null));
+    const by = Object.fromEntries(values['coding-misk-decodes'].map(r => [r.fp, r]));
+    assert(by['10-aa'].title === 'Old' && by['10-aa'].handle === handle && by['20-bb'].title === 'Two' && by['30-cc'] && counts.decodes === 2, JSON.stringify(values['coding-misk-decodes']));
+    const newer = mergeBackup({ format: BACKUP_FORMAT, data: { 'coding-misk-decodes': [{ fp: '10-aa', title: 'New', used: 99 }] } }, () => cur).values['coding-misk-decodes'];
+    assert(newer.find(r => r.fp === '10-aa').title === 'New' && newer.find(r => r.fp === '10-aa').handle === handle, 'the newer record wins and keeps the local handle');
+    assert(!('coding-misk-decodes' in makeBackup([['coding-misk-ui', 'hw']]).data), 'no decodes: no key');
+  },
   'a file that is not a backup is refused'() { assert(mergeBackup({ format: 'x' }, () => null).error, 'accepted'); },
 };
 let failed = 0;

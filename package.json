@@ -40,6 +40,7 @@
     "check:typing": "node --no-warnings tools/check-typing.mjs",
     "check:profiles": "node --no-warnings tools/check-profiles.mjs",
     "check:clips": "node --no-warnings tools/check-clips.mjs",
+    "check:decode": "node --no-warnings tools/check-decode.mjs",
     "check:stage-widgets": "node --no-warnings tools/check-stage-widgets.mjs",
     "check:render-styles": "node --no-warnings tools/check-render-styles.mjs",
     "check:sound-guard": "node --no-warnings tools/check-sound-guard.mjs",

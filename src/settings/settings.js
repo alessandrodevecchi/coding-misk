@@ -1,6 +1,7 @@
 // The settings page (#31): appearance, audio, radio defaults and the data kept in this browser.
 // It is opened from the gear in the top bar; theme and language stay in the top bar too, for quick tests.
 import { makeBackup, mergeBackup } from './backup.js';
+import { DECODES_KEY } from '../decode/store.js';
 import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { OWN_IDS, STRUDEL_IDS, FONTS, SIZES, themeName, fontName } from '../code-themes/themes.js';
@@ -376,12 +377,13 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.dataset.vidSoul) { setVid('soulPanel', b.dataset.vidSoul === '1'); return render(); }
     // hidden built-in songs (#68, D3b): all of them back in the list, after a confirmation in the card
     if (b.id === 'set-show-hidden') { confirmInline({ anchor: b.closest('.actions'), trigger: b, key: 'show-hidden', msg: t('setShowHiddenAsk'), ok: t('setShowHiddenOk'), t, esc, onConfirm: () => { toast(t('setShowHiddenDone', { n: app.showHiddenSongs() })); render(); } }); return; }
-    if (b.id === 'set-export') { const d = new Date().toISOString().slice(0, 10); downloadJson(`coding-misk-backup-${d}`, makeBackup(entries())); toast(t('setExported')); return; }
+    if (b.id === 'set-export') { const d = new Date().toISOString().slice(0, 10); (app.decodes ? app.decodes.all() : Promise.resolve([])).catch(() => []).then(list => { downloadJson(`coding-misk-backup-${d}`, makeBackup(entries(), new Date(), list)); toast(t('setExported')); }); return; }
     if (b.id === 'set-import') {
-      return pickJsonFiles(data => {
-        const r = mergeBackup(data, k => store.get(k, null));
+      return pickJsonFiles(async data => {
+        const cur = app.decodes ? await app.decodes.all().catch(() => []) : [];
+        const r = mergeBackup(data, k => (k === DECODES_KEY ? cur : store.get(k, null)));
         if (r.error) { toast(t('setImportBad')); return; }
-        for (const [k, v] of Object.entries(r.values)) store.set(k, v);
+        for (const [k, v] of Object.entries(r.values)) { if (k === DECODES_KEY) { if (app.decodes) await app.decodes.import(v).catch(() => 0); continue; } store.set(k, v); }
         toast(t('setImported', r.counts));
         setTimeout(() => location.reload(), 900);
       });
