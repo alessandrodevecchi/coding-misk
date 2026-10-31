@@ -4,37 +4,37 @@ Estimate: about 72 agent hours (60 to 90), in the order below. Level A and its s
 
 ## 1. Tab shell and file input (about 6 h)
 
-- [ ] 1.1 Add the Decode tab between Songs and Playlists (`index.html`, `showTab` in `src/main.js`), the `#tab-decode` panel, the page heading "Track to code" / "Da brano a codice", the tab name "Decode" / "Decodifica", and the new tab in `modeListenSub` (en and it); verify in the app that the tab order is Compose, Songs, Decode, Playlists, Radio and the tab is remembered after a reload.
-- [ ] 1.2 `src/decode/input.js`: file picker and drop area, `mediabunny` tags and duration, the 10-minute refusal before decoding, decoding with `decodeAudioData` and the `mediabunny` sample sink for video files, title and artist from tags or the file name; verify with a WAV, an MP3, an MP4 video, a video without sound, a 12-minute file and an unreadable file in the app.
-- [ ] 1.3 Fingerprint (size, duration, SHA-256 of three slices) and `src/decode/store.js` (IndexedDB `coding-misk-decodes`, cap 50, `ANALYSIS_VERSION`, quiet failures, file handle where available); verify that a renamed file matches, a same-size different file does not, and a reload leaves no audio in storage (DevTools storage view or a small page script).
+- [x] 1.1 Add the Decode tab between Songs and Playlists (`index.html`, `showTab` in `src/main.js`), the `#tab-decode` panel, the page heading "Track to code" / "Da brano a codice", the tab name "Decode" / "Decodifica", and the new tab in `modeListenSub` (en and it); verify in the app that the tab order is Compose, Songs, Decode, Playlists, Radio and the tab is remembered after a reload.
+- [x] 1.2 `src/decode/input.js`: file picker and drop area, `mediabunny` tags and duration, the 10-minute refusal before decoding, decoding with `decodeAudioData` and the `mediabunny` sample sink for video files, title and artist from tags or the file name; verify with a WAV, an MP3, an MP4 video, a video without sound, a 12-minute file and an unreadable file in the app.
+- [x] 1.3 Fingerprint (size, duration, SHA-256 of three slices) and `src/decode/store.js` (IndexedDB `coding-misk-decodes`, cap 50, `ANALYSIS_VERSION`, quiet failures, file handle where available); verify that a renamed file matches, a same-size different file does not, and a reload leaves no audio in storage (DevTools storage view or a small page script).
 - [ ] 1.4 Empty state with the recent list (title, artist, length, Full done), one-click reopen with the stored handle and permission, "pick the file again" naming the expected file, remove from the list; verify by hand in the app.
 
 ## 2. misk-analyzer and song model (about 10 h)
 
-- [ ] 2.1 `src/decode/model.js`: the model shape of design D6 and `ANALYSIS_VERSION`; `src/decode/worker.js`: holds the mono PCM, answers "analyse up to t" and "analyse all", with progress and cancel; verify the worker loads in the dev server and in `npm run build`.
-- [ ] 2.2 `src/decode/misk-analyzer.js` frames and onsets: STFT at three sizes, per-band spectral flux with the adaptive threshold, kick or bass, closed or open hat; verify on a generated click track in Node (onset times within 10 ms).
-- [ ] 2.3 Tempo and downbeat (design D7): autocorrelation with priors, half and double candidates, uncertainty flag, downbeat votes; verify on generated tracks at 90, 124 and 174 BPM in Node.
-- [ ] 2.4 Grids, bass, chords, key, levels: 16-step grids with the hysteresis of D9, YIN bass per step, chroma and chord templates, key from chords, levels per band per bar; verify on a generated track with known chords and bass in Node.
+- [x] 2.1 `src/decode/model.js`: the model shape of design D6 and `ANALYSIS_VERSION`; `src/decode/worker.js`: holds the mono PCM, answers "analyse up to t" and "analyse all", with progress and cancel; verify the worker loads in the dev server and in `npm run build`.
+- [x] 2.2 `src/decode/misk-analyzer.js` frames and onsets: STFT at three sizes, per-band spectral flux with the adaptive threshold, kick or bass, closed or open hat; verify on a generated click track in Node (onset times within 10 ms).
+- [x] 2.3 Tempo and downbeat (design D7): autocorrelation with priors, half and double candidates, uncertainty flag, downbeat votes; verify on generated tracks at 90, 124 and 174 BPM in Node.
+- [x] 2.4 Grids, bass, chords, key, levels: 16-step grids with the hysteresis of D9, YIN bass per step, chroma and chord templates, key from chords, levels per band per bar; verify on a generated track with known chords and bass in Node.
 
 ## 3. Writer and sounds (about 5 h)
 
-- [ ] 3.1 `src/decode/writer.js`: model to v2 song (D9): sections, a `drums` track from the grids, `code` tracks for bass and chords, clips from levels, nearest format key; verify that `node --no-warnings tools/song.mjs validate` accepts the songs written from the Node test models.
-- [ ] 3.2 Header and placeholder (D14): the title line with and without Attribution, `// vox: …`; the `cover` song field in the validator and `docs/SONG-FORMAT.md`; verify with `npm run check:songs` and a compile of a written song.
-- [ ] 3.3 Sound presets (D10): "Our sounds" by measure from the generator's tables, "Simple kit" fixed; verify that two models with different brightness give different sounds with "Our sounds" and the same with "Simple kit".
+- [x] 3.1 `src/decode/writer.js`: model to v2 song (D9): sections, a `drums` track from the grids, `code` tracks for bass and chords, clips from levels, nearest format key; verify that `node --no-warnings tools/song.mjs validate` accepts the songs written from the Node test models.
+- [x] 3.2 Header and placeholder (D14): the title line with and without Attribution, `// vox: …`; the `cover` song field in the validator and `docs/SONG-FORMAT.md`; verify with `npm run check:songs` and a compile of a written song.
+- [x] 3.3 Sound presets (D10): "Our sounds" by measure from the generator's tables, "Simple kit" fixed; verify that two models with different brightness give different sounds with "Our sounds" and the same with "Simple kit".
 
 ## 4. Two tracks, mix and one clock (about 6 h)
 
-- [ ] 4.1 `src/decode/sync.js` (D12): the original's source on Strudel's clock, start on the first downbeat, seek, stop; the player bar (Play, Stop, timeline, time, bar counter, Previous and Next disabled, other players stopped on Play); verify by rendering a decoded click track and measuring the offset between the original's and the code's kicks (under 10 ms).
-- [ ] 4.2 `src/decode/mix.js` (D11): the `orig` gain into the master stage before the limiter, the loudness trim, equal-power slider, per-track buses, mute and solo as listening controls; verify that mute and solo never change the code text and the levels follow the slider (peak levels read in the page).
-- [ ] 4.3 The consistency rules of D11 as a pure state function with Node cases for every scenario of the playback spec (default, unmute code, user mute kept, solo the original, solo a code track).
-- [ ] 4.4 Muted code tracks at zero gain still light their notes; measure long tasks and audio underruns with 8 code lines muted for 2 minutes; if the cost is high, switch to querying the pattern for lit notes (D11 risk) and record the measure in the DEVLOG.
+- [x] 4.1 `src/decode/sync.js` (D12): the original's source on Strudel's clock, start on the first downbeat, seek, stop; the player bar (Play, Stop, timeline, time, bar counter, Previous and Next disabled, other players stopped on Play); verify by rendering a decoded click track and measuring the offset between the original's and the code's kicks (under 10 ms).
+- [x] 4.2 `src/decode/mix.js` (D11): the `orig` gain into the master stage before the limiter, the loudness trim, equal-power slider, per-track buses, mute and solo as listening controls; verify that mute and solo never change the code text and the levels follow the slider (peak levels read in the page).
+- [x] 4.3 The consistency rules of D11 as a pure state function with Node cases for every scenario of the playback spec (default, unmute code, user mute kept, solo the original, solo a code track).
+- [x] 4.4 Muted code tracks at zero gain still light their notes; measure long tasks and audio underruns with 8 code lines muted for 2 minutes; if the cost is high, switch to querying the pattern for lit notes (D11 risk) and record the measure in the DEVLOG.
 
 ## 5. Level A live (about 6 h)
 
-- [ ] 5.1 Level A loop: per bar, the model up to the horizon, the writer, `typingPlan` with the bar as deadline, evaluation on the bar; a full start pastes lines; dropped drums mute with `_$:`; verify by playing a generated track whose drums stop at bar 33.
-- [ ] 5.2 Look ahead (D8): one select with Off, 2 s, 4 s, 2 bars, 4 bars, default 2 bars, stored with the track; first window analysed before the sound starts; verify that with 2 bars the drums mute on bar 33 and with Off on bar 34 or 35.
-- [ ] 5.3 Tempo controls (D7): tempo readout with "uncertain", ½× and 2×, tap tempo with the space bar (no focused field), stored; verify by tapping in the app and by a page script that sends four key presses.
-- [ ] 5.4 The code column and the shared stage (D1): the decoded code typing in `#codecol` with its source line, Code over showing it over the stage only when on, Live coder display controls, narrator off, the folded Options group (comments, technical functions, code view) stored per track, title and artist fields and the Attribution toggle updating the header; verify each option changes the code and not the sound.
+- [x] 5.1 Level A loop: per bar, the model up to the horizon, the writer, `typingPlan` with the bar as deadline, evaluation on the bar; a full start pastes lines; dropped drums mute with `_$:`; verify by playing a generated track whose drums stop at bar 33.
+- [x] 5.2 Look ahead (D8): one select with Off, 2 s, 4 s, 2 bars, 4 bars, default 2 bars, stored with the track; first window analysed before the sound starts; verify that with 2 bars the drums mute on bar 33 and with Off on bar 34 or 35.
+- [x] 5.3 Tempo controls (D7): tempo readout with "uncertain", ½× and 2×, tap tempo with the space bar (no focused field), stored; verify by tapping in the app and by a page script that sends four key presses.
+- [x] 5.4 The code column and the shared stage (D1): the decoded code typing in `#codecol` with its source line, Code over showing it over the stage only when on, Live coder display controls, narrator off, the folded Options group (comments, technical functions, code view) stored per track, title and artist fields and the Attribution toggle updating the header; verify each option changes the code and not the sound.
 
 ## 6. Level B analysis (about 7 h)
 
