@@ -31,6 +31,11 @@ import { followSong, crescendoSong } from '../src/song/crescendo.js';
 import { growthRules } from '../src/live/profiles.js';
 import { buildSteps } from '../src/song/build.js';
 import { nodeEssentia } from './essentia-node.mjs';
+import { exportMix, mixForParts, origSpan, wholeJob, fragmentJob } from '../src/decode/export.js';
+import { timelineOf } from '../src/export/fast.js';
+import { textsFor, rightsLine } from '../src/video/texts.js';
+import { shapeOf, barScores, pickFragments } from '../src/video/fragments.js';
+import { absoluteClips } from '../src/endless/transitions.js';
 import fs from 'node:fs';
 
 let failed = 0, passed = 0;
@@ -265,6 +270,68 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   const bars = [0, ...new Set(buildSteps(Lc.build).map(x => x.at))];
   check(JSON.stringify(Cd) === JSON.stringify(Cc) && grown.crescendo.follow && bars.every(b => Ld.codeAt(b) === Lc.codeAt(b)), 'the code at every step is the same in Decode and in Compose', `${bars.length} steps`);
   check(bars.includes(8) && bars.includes(24) && bars.includes(40), 'Follow the song: a step at each section change', bars.join(','));
+}
+// ---------- export with the original (group 8, D16) ----------
+{
+  // the mix the render page gets: the original's cosine and trim, the code bus, the orbits of the parts not heard
+  const orbits = { drums: 1, bass: 9, chords: 10 }, ids = ['drums', 'bass', 'chords'];
+  const mid = mixApply(defaultMix(ids), { type: 'slider', value: 0.5 }), em = exportMix(mid, 1.5, orbits);
+  check(Math.abs(em.orig - 1.5 * Math.cos(Math.PI / 4)) < 1e-9 && Math.abs(em.code - Math.sin(Math.PI / 4)) < 1e-9 && em.mutes.length === 0 && em.hasOriginal && em.hasCode, 'export mix, slider in the middle: the original (with its trim) and the code at equal power, no part muted', JSON.stringify(em));
+  const code = exportMix(mixApply(defaultMix(ids), { type: 'slider', value: 1 }), 1.5, orbits);
+  check(code.orig === 0 && !code.hasOriginal && code.code === 1 && code.mutes.length === 0, 'export mix, slider fully on Code: no original, the code at full gain', JSON.stringify(code));
+  const orig = exportMix(defaultMix(ids), 1.5, orbits);
+  check(orig.orig === 1.5 && orig.code === 0 && !orig.hasCode && orig.mutes.join() === '1,9,10', 'export mix, slider fully on Original: the original alone, every part muted (their orbits)', JSON.stringify(orig));
+  const noBass = exportMix(mixApply(mid, { type: 'mute', id: 'bass' }), 1, orbits), solo = exportMix(mixApply(mid, { type: 'solo', id: 'chords' }), 1, orbits);
+  check(noBass.mutes.join() === '9' && noBass.hasOriginal && solo.mutes.join() === '1,9' && !solo.hasOriginal && solo.code === 1, 'export mix: mute a part and its orbit goes silent; solo a part and the others and the original go silent', `${JSON.stringify(noBass.mutes)} ${JSON.stringify(solo.mutes)}`);
+  // level A's one code track mapped to level B's parts: its mute and solo are every part's
+  const a = mixApply(mixApply(defaultMix(['code']), { type: 'slider', value: 0.5 }), { type: 'mute', id: 'code' }), mapped = mixForParts(a, ids);
+  check(mapped.tracks.length === 4 && mapped.tracks.filter(x => x.kind === 'code').every(x => x.mute) && exportMix(mapped, 1, orbits).mutes.join() === '1,9,10', 'level A\'s code track, muted: every Full part is muted in the export', mapped.tracks.map(x => `${x.id}:${x.mute}`).join(' '));
+  check(mixForParts(mid, ids) === mid, 'a mix already of the parts stays as it is');
+  // the original's samples for a window: copies, the file's own time, the lead-in before the first bar, past the ends
+  const R = 1000, L = new Float32Array(10 * R).map((_, i) => i / (10 * R)), Rr = L.map(x => -x);
+  const w = origSpan([L, Rr], R, 1.5, 2, 4);
+  check(w && w.ch.length === 2 && w.ch[0].length === 2 * R && Math.abs(w.ch[0][0] - 3.5 / 10) < 1e-6 && Math.abs(w.at) < 1e-9 && w.ch[0] !== L && w.ch[1][0] < 0, 'the original\'s span of a window starts at the downbeat plus the window\'s start, as copies', `${w && w.ch[0][0]} · at ${w && w.at}`);
+  const lead = origSpan([L], R, 1.5, -1.5, 1);
+  check(lead && lead.ch[0].length === 2.5 * R && lead.ch[0][0] === 0 && Math.abs(lead.at) < 1e-9, 'a window from the file\'s start (song second -downbeat) holds the lead-in', `${lead && lead.ch[0].length} samples`);
+  const early = origSpan([L], R, 1.5, -2, 1);
+  check(early && Math.abs(early.at - 0.5) < 1e-9 && early.ch[0].length === 2.5 * R, 'a window that starts before the file waits: the samples play 0.5 s into it', `at ${early && early.at}`);
+  check(origSpan([L], R, 1.5, 7, 12).ch[0].length === 1.5 * R && origSpan([L], R, 1.5, 20, 22) === null, 'a window past the end holds what is left, then nothing');
+  const mixed = exportMix(mid, 1.2, orbits), whole = wholeJob({ channels: [L], rate: R, downbeat: 1.5, duration: 10, mix: mixed });
+  check(whole.start === -1.5 && whole.cut === 8.5 && typeof whole.origAt === 'function' && whole.mix.orig === mixed.orig && whole.mix.code === mixed.code, 'the whole export starts the file at the file\'s start and ends where the original ends', `start ${whole.start}, cut ${whole.cut}`);
+  check(wholeJob({ channels: [L], rate: R, downbeat: 0, duration: 10, mix: code }).origAt === null && fragmentJob({ channels: [L], rate: R, downbeat: 0, mix: code }).origAt === null && typeof fragmentJob({ channels: [L], rate: R, downbeat: 0, mix: mixed }).origAt === 'function', 'with the original silent in the mix nothing of it goes to the render page');
+  // the timeline of a decoded export: bar times move by the lead-in, the cover rides along
+  const meta = decodeMeta({ duration: 10, downbeat: 1.5, barSeconds: 2, bpm: 120 }), sgT = { title: 'T', meta: { ...meta, sections: [{ label: 'Track', start: 0, len: meta.bars }] }, build: null };
+  const tl = timelineOf(sgT, [{ from: 0, to: meta.bars, code: 'x' }, { from: 2, to: meta.bars, code: 'y' }], {}, 10, 'en', { cover: { title: 'Night Run', artist: 'Some Band', attribution: true }, start: -1.5 });
+  check(Math.abs(tl.code[0].t - 1.5) < 1e-6 && Math.abs(tl.code[1].t - 5.5) < 1e-6 && tl.cover.title === 'Night Run' && tl.firstBar === 1.5, 'the timeline of a decoded export: the first bar at the lead-in, the cover named', JSON.stringify(tl.code.map(x => x.t)));
+  check(timelineOf(sgT, [{ from: 0, code: 'x' }], {}, 10, 'en').cover === undefined, 'a timeline of a song has no cover');
+  // the rights line (D16): on, off, code only, in both languages; off names neither the title nor the artist
+  const names = ['Night Run', 'Some Band'];
+  for (const lang of ['en', 'it']) {
+    const on = rightsLine({ title: 'Night Run', artist: 'Some Band', attribution: true, original: true, lang }), off = rightsLine({ title: 'Night Run', artist: 'Some Band', attribution: false, original: true, lang }), only = rightsLine({ title: 'Night Run', artist: 'Some Band', attribution: false, original: false, lang });
+    check(names.every(n => on.includes(n)) && (lang === 'en' ? /Cover of "Night Run" by Some Band/.test(on) : /Cover di "Night Run" di Some Band/.test(on)), `rights line with Attribution on (${lang}): the title and the artist as a cover`, on);
+    check(names.every(n => !off.includes(n) && !only.includes(n)) && off !== only && /rights holders|titolari dei diritti/.test(off) && /rights holders|titolari dei diritti/.test(only), `rights line with Attribution off (${lang}): the rights holders, neither the title nor the artist; code only says so`, `${off} | ${only}`);
+  }
+  check(rightsLine({ title: 'Night Run', artist: '', attribution: true, original: true, lang: 'en' }) === 'Cover of "Night Run". The original recording belongs to its rights holders.' && rightsLine(null) === '', 'the cover line without an artist; no line for a song');
+  const tx = textsFor({ kind: 'video', title: 'Track to code', seconds: 120, seed: 'abc', cover: { title: 'Night Run', artist: 'Some Band', attribution: false, original: true, lang: 'en' } });
+  check(!names.some(n => tx.description.includes(n) || tx.title.includes(n)) && /Contains a recording that belongs to its rights holders\./.test(tx.description), 'the texts of an export with Attribution off name nothing and carry the line', tx.title);
+  check(/Cover of "Night Run" by Some Band\./.test(textsFor({ kind: 'fragment', title: 'Night Run', fragment: { label: 'L' }, seed: 'x', cover: { title: 'Night Run', artist: 'Some Band', attribution: true, original: true, lang: 'en' } }).description), 'a fragment\'s texts carry it too');
+}
+// fragments of a decoded track (8.3): the picker weighs the sections the analysis named by kind
+{
+  const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' };
+  const SEC = { bpm: 124, lead: 0.3, bass: 'x..x..x...x.x...', sections: [
+    { name: 'Intro', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: { hh: D.hh }, bass: null },
+    { name: 'Verse', bars: 16, chords: ['Am', 'F', 'C', 'G'], drums: D },
+    { name: 'Break', bars: 8, chords: ['F', 'G'], drums: null, bass: null },
+    { name: 'Chorus', bars: 16, chords: ['F', 'G', 'Am', 'Am'], drums: { ...D, oh: '......x.......x.' } },
+  ] };
+  const m = await analyseFull(renderSong(SEC).pcm, { engine: null }), song = writeFull(m, { id: 'x', title: 'T' }), shape = shapeOf(song, absoluteClips);
+  const scores = barScores(shape), mean = (a, b) => { let t = 0; for (let i = a; i < b; i++) t += scores[i]; return t / (b - a); };
+  const at = name => { let from = 0; for (const x of shape.sections) { if (x.label === name) return [from, from + x.len]; from += x.len; } return [0, 1]; };
+  const kinds = shape.sections.map(x => x.label).join();
+  check(/Intro/.test(kinds) && /Drop/.test(kinds) && mean(...at('Drop')) > mean(...at('Intro')) * 2, 'fragments: the sections named by kind give the picker its weights (a drop weighs more than an intro)', `${kinds}; drop ${mean(...at('Drop')).toFixed(2)} vs intro ${mean(...at('Intro')).toFixed(2)}`);
+  const bpm = decodeMeta(m).bpm, picks = pickFragments(shape, bpm, { n: 1, length: 12, seed: 'k' }), again = pickFragments(shape, bpm, { n: 1, length: 12, seed: 'k' });
+  check(picks.length === 1 && picks[0].start > 0 && JSON.stringify(picks) === JSON.stringify(again), 'fragments: a pick on a bar line, the same for the same seed, not the first bar', JSON.stringify(picks));
 }
 // ---------- the app's own songs (optional) ----------
 if (process.argv.includes('--app')) {

@@ -4,7 +4,10 @@
 // Messages from the app: { render: job }. To the app: { ready }, { progress, phase }, { done, channels, sampleRate, onsets }, { error }.
 // job: { segments: [{ from, to, code, run?, buses?, fns? }] in bars, bpm: per bar, from / to: the window in seconds (a block of a long
 // export), tail: seconds after it, keepFrom: onsets before it belong to the block before, sampleRate, gain: the master level,
-// push: the style's push into the master limiter (level-headroom, 1 for none) }
+// push: the style's push into the master limiter (level-headroom, 1 for none),
+// orig: a decoded track's original (track-to-code D16) for this window, { rate, ch: [Float32Array], at } (the samples at the
+// original's own rate; sample 0 plays `at` seconds into the window), mixed into the master stage before the limiter as the
+// Decode tab does, mix: { orig, code, mutes } the original's gain, the code's bus gain and the orbits of the muted code tracks }
 import { repl, register as strudelRegister, Pattern, noteToMidi } from '@strudel/core';
 import { transpiler } from '@strudel/transpiler';
 import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio, registerSound, soundMap } from '@strudel/webaudio';
@@ -15,6 +18,7 @@ import { tempoClock } from './tempo.js';
 import { installHelpers, useFns } from '../song/writer.js';
 import { loadLimiter, setMasterLevel, limiterDelay } from '../sounds/limiter.js';
 import { noteOf } from '../visuals/stage-feed.js';
+import { codeBus } from '../decode/mix.js';
 
 const post = (m, transfer = []) => parent.postMessage({ codingMiskRender: true, ...m }, location.origin, transfer);
 // superdough's deprecation notices come once per voice: thousands of console lines slow the render down
@@ -54,7 +58,7 @@ const pitchOf = v => { try { if (typeof v.note === 'number') return v.note; if (
 // gain × velocity] in cycles, for the widget looks of the fast video; read from the haps scheduled anyway (no extra query)
 // lit (code-over-visual D6): the places in the code of every hap that starts in the block, for the lit tokens of "Code
 // over": { codes (the codes evaluated), haps: [[begin, end, index in codes, [from, to, …]]] } in cycles and offsets
-async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, push = 1, buses = {}, fns = {}, only = null, stageNotes = false, lit = false }) {
+async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom = from, sampleRate = 48000, gain = 1, push = 1, buses = {}, fns = {}, only = null, stageNotes = false, lit = false, orig = null, mix = null }) {
   globalThis.miskBuses = buses; useFns(fns);
   const T = tempoClock(bpm), end = to ?? T.seconds(bpm.length), length = end - from + tail;
   // the master limiter delays the sound by its look-ahead: the render runs that much longer and the file starts after it
@@ -63,6 +67,9 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   setAudioContext(ctx);
   // a new controller made on first use, from the same superdough copy (a separate import is a separate copy)
   setSuperdoughAudioController(null);
+  // the code tracks a decoded export mutes: their orbit's output starts at zero, as the Decode tab's mute and solo set it
+  const muted = new Set(mix && mix.mutes || []);
+  if (muted.size) { const C = getSuperdoughAudioController(), make = C.getOrbit.bind(C); C.getOrbit = (n, ch) => { const had = C.nodes[n] != null, o = make(n, ch); if (!had && muted.has(n)) o.output.gain.value = 0; return o; }; }
   // voices are scheduled two seconds ahead (the live player: a fraction of a second): no voice limit, or early voices would be cut
   Math.random = seeded(SEED);
   await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET_SEED], { type: 'text/javascript' })));
@@ -71,6 +78,19 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   await loadSounds();
   // the app's master level and the style's push, into the master limiter (the live player does the same on its output)
   setMasterLevel(getSuperdoughAudioController().output, gain, push);
+  // a decoded track's export (D16): the code's bus gain from the mix, the original into the master level node before the
+  // limiter (the Decode tab's graph)
+  if (mix) {
+    const st = codeBus(getSuperdoughAudioController().output);
+    if (st) st.codeGain.gain.value = mix.code;
+    if (st && orig && orig.ch && orig.ch.length && mix.orig > 0) {
+      const n = orig.ch[0].length, buf = ctx.createBuffer(orig.ch.length, n, orig.rate);
+      orig.ch.forEach((c, i) => buf.copyToChannel(c, i));
+      const src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = buf; g.gain.value = mix.orig; src.connect(g); g.connect(st.level);
+      src.start(Math.max(0, orig.at || 0));
+    }
+  }
   post({ progress: 0, phase: 'schedule' });
   const R = repl({ transpiler, defaultOutput: () => {}, getTime: () => 0 });
   const onsets = {}, skipped = new Set(), notes = {}, stage = stageNotes ? {} : null, lits = lit ? { codes: [], haps: [] } : null;

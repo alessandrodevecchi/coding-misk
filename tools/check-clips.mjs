@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { F_FORMATS, F_SHOWS, F_ASPECTS, fragmentAreas, fragmentOpts, fragmentSize, soulFocus, coverOffset } from '../src/video/layout.js';
 import { pickFragments, fragmentBetween, parseTime, clockOf, barScores, sectionWeight, fragmentCode, fragmentLabel, glitchMessages, glitchAt, shapeOf, TAGLINES, taglineFor, nextTagline, taglineAt, TYPE_START, TYPE_RATE } from '../src/video/fragments.js';
-import { textsFor, textFile } from '../src/video/texts.js';
+import { textsFor, textFile, rightsLine } from '../src/video/texts.js';
 import { absoluteClips } from '../src/endless/transitions.js';
 import { tempoClock } from '../src/render/tempo.js';
 
@@ -177,6 +177,35 @@ const CHECKS = {
     assert(f.category === 'Music' && /Category: Music/.test(textFile(f)) && /Hashtags: #Techno/.test(textFile(f)), 'category and file');
     const plain = textsFor({ kind: 'fragment', title: 'X', fragment: { label: 'L' }, seed: 'a' });
     assert(!/Inspired|Born from|A nod|in mind|Somewhere in its code/.test(plain.description), 'no inspiration, no sentence');
+  },
+  // track-to-code D16: the rights line of an export of a decoded track, with Attribution on, off and for code only
+  'texts: the rights line of a decoded track, Attribution on'() {
+    const cover = { title: 'Night Run', artist: 'Some Band', attribution: true, original: true, lang: 'en' };
+    for (const kind of ['video', 'audio', 'fragment']) {
+      const t = textsFor({ kind, title: 'Night Run', fragment: { label: 'FRAGMENT S0UL·ABCDE #001' }, seconds: 90, seed: 'k', cover });
+      assert(/^Cover of "Night Run" by Some Band\. The original recording belongs to its rights holders\.$/m.test(t.description), `${kind}: the cover line`);
+    }
+    assert(/^Cover di "Night Run" di Some Band\./m.test(textsFor({ kind: 'video', title: 'Night Run', seconds: 90, seed: 'k', cover: { ...cover, lang: 'it' } }).description), 'Italian');
+  },
+  'texts: the rights line of a decoded track, Attribution off names neither the title nor the artist'() {
+    const cover = { title: 'Night Run', artist: 'Some Band', attribution: false, original: true, lang: 'en' };
+    for (const kind of ['video', 'audio', 'fragment']) {
+      const t = textsFor({ kind, title: 'Track to code', fragment: { label: 'FRAGMENT S0UL·ABCDE #001' }, seconds: 90, seed: 'k', cover });
+      assert(/^Contains a recording that belongs to its rights holders\.$/m.test(t.description), `${kind}: the rights line`);
+      assert(!/Night Run|Some Band/.test(`${t.title}\n${t.description}\n${t.tags.join()}`), `${kind}: no title, no artist`);
+    }
+    assert(/^Contiene una registrazione che appartiene ai suoi titolari dei diritti\.$/m.test(textsFor({ kind: 'video', title: 'Da brano a codice', seconds: 90, seed: 'k', cover: { ...cover, lang: 'it' } }).description), 'Italian');
+  },
+  'texts: the rights line of a decoded track, code only'() {
+    const cover = { title: 'Night Run', artist: 'Some Band', attribution: false, original: false, lang: 'en' };
+    const t = textsFor({ kind: 'video', title: 'Track to code', seconds: 90, seed: 'k', cover });
+    assert(/^Code written over a recording that belongs to its rights holders\.$/m.test(t.description) && !/Night Run|Some Band/.test(t.description), 'code only, off');
+    assert(/^Codice scritto su una registrazione/m.test(textsFor({ kind: 'video', title: 'x', seconds: 90, seed: 'k', cover: { ...cover, lang: 'it' } }).description), 'Italian');
+    assert(/Cover of "Night Run" by Some Band/.test(rightsLine({ ...cover, attribution: true })), 'code only with Attribution on still names the cover');
+  },
+  'texts: a song with no cover has no rights line'() {
+    const t = textsFor({ kind: 'video', title: 'Kellerlicht', seconds: 90, seed: 'k' });
+    assert(!/rights holders|titolari/.test(t.description), 'none');
   },
 };
 let failed = 0;

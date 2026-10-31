@@ -150,6 +150,7 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 | "Follow the song" is a growth value for every song in Compose, never a default (track-to-code D18) | A decoded song opened in Compose must keep its code; the owner wants it for any song. The defaults and the fixtures stay. The first draft (decoded songs only) was dropped. | [design](../../openspec/changes/track-to-code/design.md) |
 | PCM frames, not an `AnalyserNode`, for the Decode analysis (track-to-code D4) | The file is decoded anyway: exact and repeatable frames, the same code in Node, and the look ahead. | [design](../../openspec/changes/track-to-code/design.md) |
 | Decoded bass and chords as `code` tracks (track-to-code D9) | The format's named progressions and eight keys cannot hold any chord; free chords in the format are left for later. | [design](../../openspec/changes/track-to-code/design.md) |
+| The export of a decoded track | It writes the Full code and starts at the original's second 0 (the lead-in is the original alone); the original is mixed in the render page before the limiter, with the tab's gains. The rights line in the texts follows Attribution; with it off the texts name neither title nor artist. | openspec `track-to-code` D16 |
 
 ## Rejected attempts
 

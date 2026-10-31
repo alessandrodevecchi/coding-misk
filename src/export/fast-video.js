@@ -36,7 +36,8 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
     out.addVideoTrack(vs, { frameRate: q.fps });
     out.addAudioTrack(as);
     await out.start();
-    // a fragment (#57) starts at job.start: frame times count from 0, the song's cycle from start
+    // a fragment (#57) starts at job.start: frame times count from 0, the song's cycle from start (below 0 for a decoded
+    // track's lead-in before its first bar: the picture waits on cycle 0)
     const T = tempoClock(job.bpm), offset = job.start || 0, total = (job.cut || T.seconds(job.bpm.length) + (job.tail || 0)) - offset, frames = Math.ceil(total * q.fps);
     const onsets = {}, levelsAt = levelsFrom(onsets), codeAt = codeFrom(job.segments, { seconds: c => T.seconds(c), speed: job.typingSpeed || 1, style: job.typingStyle, seed: job.songId || '', mistakes: job.typingMistakes !== false });
     let hist = new Float32Array(0), histAt = 0, drawn = 0, ap = 0;
@@ -71,7 +72,7 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
           for (let i = 0; i < 256; i++) wave[i] = hist[at - 2048 + i * 8] || 0;
           for (let i = 0; i < 128; i++) hook[i] = hist[at - 2048 + i * 16] || 0;
           const waveAt = (at, m = 128) => { const e = Math.round(at * sr) - histAt, out = new Float32Array(m); for (let i = 0; i < m; i++) out[i] = hist[e - (m - i) * 4] || 0; return out; };
-          drawFrame(t, T.cycleAt(offset + t), { raw: levelsAt(t), wave, hook, waveAt }, codeAt, fi);
+          drawFrame(t, Math.max(0, T.cycleAt(offset + t)), { raw: levelsAt(t), wave, hook, waveAt }, codeAt, fi);
           await vs.add(t, 1 / q.fps);
           drawn++;
           if (fi % 15 === 0) report('frames');

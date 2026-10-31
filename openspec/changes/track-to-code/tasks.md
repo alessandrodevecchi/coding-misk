@@ -54,10 +54,10 @@ Estimate: about 72 agent hours (60 to 90), in the order below. Level A and its s
 
 ## 8. Export with the original (about 6 h)
 
-- [ ] 8.1 Real-time export and recording of the mix as heard (the original through the master stage); verify a WAV export with the slider in the middle holds both and one fully on Code holds only the code.
-- [ ] 8.2 Fast export and fast video: the original's PCM span and the mix state passed to the render page, mixed before its limiter; timeline with title and artist; verify fast and real-time exports match within the tolerance of `node tools/check-export.cjs`.
-- [ ] 8.3 Fragments with the original's span, weights from section kinds; verify a 30-second 9:16 fragment's sound lines up with the original within one frame.
-- [ ] 8.4 Texts for sharing (D16): the rights line with Attribution on and off and for code only, in `textsFor`; verify with `npm run check:clips` extended with the three cases.
+- [x] 8.1 Real-time export and recording of the mix as heard (the original through the master stage); verify a WAV export with the slider in the middle holds both and one fully on Code holds only the code.
+- [x] 8.2 Fast export and fast video: the original's PCM span and the mix state passed to the render page, mixed before its limiter; timeline with title and artist; verify fast and real-time exports match within the tolerance of `node tools/check-export.cjs`.
+- [x] 8.3 Fragments with the original's span, weights from section kinds; verify a 30-second 9:16 fragment's sound lines up with the original within one frame.
+- [x] 8.4 Texts for sharing (D16): the rights line with Attribution on and off and for code only, in `textsFor`; verify with `npm run check:clips` extended with the three cases.
 
 ## 9. Bench (about 7 h)
 
