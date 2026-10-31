@@ -6,7 +6,7 @@
 import { createSession, OPTION_DEFAULTS, leadEntry, stylesNear, DIRECTOR_VERSION } from '../endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { overlapOf, extraOf } from '../endless/transitions.js';
-import { steerSong, applyBar, whyNot, COMMANDS, VARY_TYPES, varyTracks, songCurves, densityMax, extendIndex, extendSeconds, INSTRUMENTS, RECOMMENDED, TRACK_CAP, RISER_BARS, RISER_SOUNDS, instrumentOf, lockedIds, moreWarning, partHas, fitsAir, unfitReason, patternPart, TREATMENTS, KEY_MOVES, keyTo, SESSION_KINDS, biasSong } from '../endless/steering.js';
+import { steerSong, sayAir, applyBar, whyNot, COMMANDS, VARY_TYPES, varyTracks, songCurves, densityMax, extendIndex, extendSeconds, INSTRUMENTS, RECOMMENDED, TRACK_CAP, RISER_BARS, RISER_SOUNDS, instrumentOf, lockedIds, moreWarning, partHas, fitsAir, unfitReason, patternPart, TREATMENTS, KEY_MOVES, keyTo, SESSION_KINDS, biasSong } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
 import { withMine, sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, airChooserOf, holdsGrown, extraStylesOf } from '../endless/items.js';
@@ -522,6 +522,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     item.commands = item.commands.filter(x => !same(x));
     item.commands.push(cmd);
     S.recipe.steering = [...(S.recipe.steering || []).filter(x => !(x.song === item.n && same(x))), { song: item.n, ...cmd }];
+    // a typed line on a grown song goes on the song on air at once, on its bar, as steerOnAir puts it after the other
+    // commands: the steering away from the page can answer after that bar (it may wait behind the growth of the next
+    // song), and a line whose step reached the player late was never heard (fx3). The answer gives the same line
+    if (air && c.kind === 'say-live') setSong(item, sayAir(item.song, [{ at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' }]));
     resteer(item, { async: true, then: () => { keepHistory(item); player.swap(windowPlayable()); renderNow(); } });
     if (forSession) { const { at: _a, id: _i, scope: _s, at0: _b, q: _q, pend: _p, ...e } = cmd; S.recipe.arrange = [...(S.recipe.arrange || []), { song: item.n, ref: cmd.id, ...e }]; rebias(item.n); }
     keepHistory(item);
