@@ -78,7 +78,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // the growth shapes tried (shape-search D3): Advanced card, kept within 4 and 32, the default 8 not stored
   await page.click('#open-settings'); await sleep(300);
   check(await page.isVisible('#set-advanced #set-shape-cap') && (await page.inputValue('#set-shape-cap')) === '8', 'Growth shapes tried in Advanced, 8 by default');
-  check(/fewer rushed steps/.test(await page.innerText('#set-advanced')), 'its hint');
+  check(/growth shapes a Live coder song tries/.test(await page.innerText('#set-advanced')), 'its hint');
   const capOf = () => page.evaluate(() => localStorage.getItem('coding-misk-shape-cap'));
   await page.fill('#set-shape-cap', '40'); await page.press('#set-shape-cap', 'Tab'); await sleep(150);
   check((await capOf()) === '32' && (await page.inputValue('#set-shape-cap')) === '32', 'a value over 32 is kept at 32', await capOf());
@@ -173,6 +173,32 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await Promise.all([page.waitForNavigation(), page.click('#set-reset')]); await sleep(2500);
   check(await page.evaluate(() => !localStorage.getItem('coding-misk-library') || !JSON.parse(localStorage.getItem('coding-misk-library')).tracks.some(x => x.id === 'u-short')), 'second press clears the data');
 
+  // help texts (settings-polish D3): every row has a help text as the tooltip of its label, in both languages; the two
+  // languages differ; the stage widgets card names the Stage visual "Stage" in English
+  {
+    if (await page.evaluate(() => document.querySelector('#tab-impostazioni').hidden)) { await page.click('#open-settings'); await sleep(400); }
+    const rows = () => page.evaluate(() => [...document.querySelectorAll('#tab-impostazioni .set-row')].map(r => { const l = r.querySelector('.lbl'); return { label: l ? l.textContent.trim() : '', title: l ? (l.getAttribute('title') || '').trim() : '', card: (r.closest('.set-card') || {}).id || (r.closest('.set-card') && r.closest('.set-card').querySelector('h3, h2') ? r.closest('.set-card').querySelector('h3, h2').textContent.trim() : '') }; }));
+    await page.click('#tab-impostazioni [data-set-lang="en"]'); await sleep(400);
+    const en = await rows();
+    await page.click('#tab-impostazioni [data-set-lang="it"]'); await sleep(400);
+    const it = await rows();
+    const bare = r => !r.title || r.title === r.label;
+    check(en.length > 60, 'help texts: the settings page has its rows', String(en.length));
+    check(!en.some(bare), 'help texts: every row has a tooltip on its label (English)', en.filter(bare).map(r => `${r.card}/${r.label}`).join('; '));
+    check(!it.some(bare), 'help texts: every row has a tooltip on its label (Italian)', it.filter(bare).map(r => `${r.card}/${r.label}`).join('; '));
+    check(en.length === it.length && en.every((r, i) => r.title && r.title !== it[i].title), 'help texts: the Italian and English texts differ on every row', en.filter((r, i) => !it[i] || r.title === it[i].title).map(r => r.label).join('; '));
+    // no two rows of one card share an Italian label (Lit notes and Lit tokens of Code over)
+    const dup = []; const seen = new Map();
+    for (const r of it) { const k = `${r.card}|${r.label}`; if (seen.has(k) && /Note accese|Stringhe/.test(r.label)) dup.push(r.label); seen.set(k, 1); }
+    check(it.filter(r => r.label === 'Note accese').length === 1 && it.some(r => r.label === 'Stringhe accese'), 'help texts: Lit notes and Lit tokens have different Italian labels');
+    const hg = en.find(r => r.label === 'Variants apart');
+    check(hg && /hi-hat/.test(hg.title) && /own row/.test(hg.title), 'help texts: "Variants apart" says what it does', hg && hg.title);
+    await page.click('#tab-impostazioni [data-set-lang="en"]'); await sleep(400);
+    const stage = await page.evaluate(() => { const c = [...document.querySelectorAll('#tab-impostazioni .set-card')].find(x => x.querySelector('[data-sw-layer]')); return c ? { text: c.textContent, titles: [...c.querySelectorAll('[title]')].map(x => x.getAttribute('title')).join(' '), layers: [...c.querySelectorAll('[data-sw-layer]')].map(x => x.textContent.trim()) } : null; });
+    check(stage && !/Palco/.test(stage.text + stage.titles) && stage.layers.join() === 'Off,Strip,Stage', 'English stage widgets card: Off, Strip, Stage and no "Palco"', stage && stage.layers.join());
+    const kind = await page.evaluate(() => (document.querySelector('[data-out-kind]') || {}).title || '');
+    check(!kind || (!/Video runs in real time/.test(kind) && /faster than real time/.test(kind)), 'the audio/video switch says how a video renders', kind);
+  }
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `${failed} failed` : 'all passed');
