@@ -80,7 +80,7 @@ export function instrumentOf(line) {
 }
 
 // the section lanes of a code (`const section3 = "<0!16 1!2 0!40>"`): name → value at a bar
-function lanesOf(code) {
+export function lanesOf(code) {
   const out = new Map();
   for (const m of code.matchAll(/^const (\w+) = "<([\d.! ]+)>"/gm)) {
     const v = [];
@@ -92,7 +92,7 @@ function lanesOf(code) {
 const PATTERN = /^\s*[_S]?\$:/;
 const MUTED = /^\s*_\$:/;
 // a line that plays at a bar: not muted, and its section lane (`.mask(sectionN)`) on at that bar
-function playsAt(line, lanes, bar) {
+export function playsAt(line, lanes, bar) {
   if (MUTED.test(line)) return false;
   for (const m of line.matchAll(/\.mask\((\w+)\)/g)) { const v = lanes.get(m[1]); if (v && !(v[((Math.floor(bar) % v.length) + v.length) % v.length] > 0)) return false; }
   return true;

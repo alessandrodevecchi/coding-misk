@@ -176,7 +176,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   }
   // the app widgets (code-over-visual D13): each on or off, its parameters, a live preview in the code theme
   const AW_PARAMS = {
-    hitgrid: [['steps', 'num', HG_LIMITS.steps, 1], ['bars', 'num', HG_LIMITS.bars, 1], ['names', 'seg', ['short', 'long']], ['variants', 'bool'], ['extra', 'list'], ['style', 'seg', ['auto', 'blocks', 'text']], ['trail', 'num', HG_LIMITS.trail, 1], ['size', 'num', HG_LIMITS.size, 0.05]],
+    hitgrid: [['rowsFrom', 'seg', ['song', 'playing']], ['steps', 'num', HG_LIMITS.steps, 1], ['bars', 'num', HG_LIMITS.bars, 1], ['names', 'seg', ['short', 'long']], ['variants', 'bool'], ['extra', 'list'], ['style', 'seg', ['auto', 'blocks', 'text']], ['trail', 'num', HG_LIMITS.trail, 1], ['size', 'num', HG_LIMITS.size, 0.05]],
     tonecloud: [['cols', 'num', TC_LIMITS.cols, 2], ['bars', 'num', TC_LIMITS.bars, 1], ['ramp', 'text'], ['order', 'seg', ['high', 'low']], ['norm', 'seg', ['column', 'window']], ['decay', 'num', TC_LIMITS.decay, 0.05], ['spread', 'num', TC_LIMITS.spread, 0.05], ['labels', 'bool'], ['chord', 'bool'], ['from', 'list'], ['size', 'num', TC_LIMITS.size, 0.05]],
   };
   function appWidgetsSection() {

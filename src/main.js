@@ -117,6 +117,7 @@ import { noteStore } from './visuals/stage-feed.js';
 import { withWidgets } from './video/layout.js';
 import { CO_KEY, codeOverSettings } from './video/code-over.js';
 import { AW_KEY, appWidgetSettings, noteOfHap, notesOfStore, commentAppWidgets, drawAppWidgets, widgetPalette } from './widgets/app-widgets.js';
+import { songNotesOfSegments } from './widgets/song-rows.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1573,6 +1574,8 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   // the code theme read once: the whole video keeps it, whatever changes meanwhile (code-themes D8)
   const ct = videoCodeTheme();
   const segments = segmentsOf(sg, codeFor), looks = PICK_LOOKS.map(l => l[0]);
+  // the hit grid's rows from the whole song (code-over-visual cd1): known before the first frame
+  const songNotes = songNotesOfSegments(segments);
   // the parts of the file: one per song of a session ("3 Intro" belongs to song 3), or the song itself
   const parts = [];
   sg.meta.sections.forEach((sec, i) => {
@@ -1598,7 +1601,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     const P = (() => { if (ct.roles) return { ...ct.roles.widget }; const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k.replace('--', '--dk-')).trim() || cs.getPropertyValue(k).trim(); return { ink: v('--ink') || '#fff', muted: v('--muted') || '#888', a1: v('--a1') || '#f4a', a2: v('--a2') || '#fb4' }; })();
     const waves = {}, notes = {}, seen = new Set();
     // the app widgets (code-over-visual D8) from the stage notes the render page sends with each block
-    const fsn = () => globalThis.codingMiskFastStageNotes, appW = { S: awSettings(), P: ct.roles ? widgetPalette(ct.roles) : { band: P.ink === '#fff' ? '#000' : '#0d0818', ink: P.ink, comment: P.muted, hit: P.a1, now: P.a2, cur: P.muted, cell: P.muted, inv: P.a2, invInk: '#000' }, notes: (c0, c1) => (fsn() ? notesOfStore(fsn(), () => fsn().instruments)(c0, c1) : []), ctx: { lang: getLang(), font: ct.family } };
+    const fsn = () => globalThis.codingMiskFastStageNotes, appW = { S: awSettings(), P: ct.roles ? widgetPalette(ct.roles) : { band: P.ink === '#fff' ? '#000' : '#0d0818', ink: P.ink, comment: P.muted, hit: P.a1, now: P.a2, cur: P.muted, cell: P.muted, inv: P.a2, invInk: '#000' }, notes: (c0, c1) => (fsn() ? notesOfStore(fsn(), () => fsn().instruments)(c0, c1) : []), ctx: { lang: getLang(), font: ct.family, songNotes } };
     cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P, app: appW }), addNotes(block) { for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
     if (plan.instruments.length) {
       fastJob = { id: sg.id, progress: 0, phase: 'scope', cancel: () => {} };
@@ -1656,7 +1659,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
         code: codeAt(cyc), say: said ? said.text : '',
         info: { onAir: true, n: p.n, title: item ? item.title : sg.title, artist: item ? item.artist : '', bar: cyc - p.start, bars: p.end - p.start, bpm: Math.round(sg.meta.bpm[Math.min(sg.meta.bars - 1, Math.floor(cyc))]) || undefined, say: said ? said.text : '', sayAt: said ? said.bar - p.start : 0 },
         soulSrc: doc && doc.sections && doc.tracks ? { key: `fv:${p.n}`, song: doc, ctx: {}, bar: cyc - p.start } : null,
-        meta: sg.meta, seed: sg.id || '', captions: fvCaptions,
+        meta: sg.meta, seed: sg.id || '', captions: fvCaptions, songNotes,
       };
       // code-over-visual: the line typed (D5), the code evaluated and the places of the haps sounding (D6)
       if (overOn) { Object.assign(fv, { cursor: codeAt.cursor ? codeAt.cursor(cyc) : null, lit: litAt(cyc), doc: sg.doc, render: fRender, overFree: frag && fsz.comp.h >= fsz.comp.w ? 'none' : (frag ? 'right' : (S => (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right'))(coSettings())) }); }
@@ -4147,7 +4150,7 @@ function drawEditorWidgets(cyc) {
   if (!globalThis.miskAppWidgets || !globalThis.miskAppWidgets.size || !isPlaying()) return;
   try {
     const cur = codeThemes.current, X = songAt(song, cyc);
-    drawAppWidgets(awSettings(), liveNotes, cyc, widgetPalette(cur.roles), { meter: X.meter, key: X.key, lang: getLang(), render: 'normal', font: cur.family }, cur.px || 14);
+    drawAppWidgets(awSettings(), liveNotes, cyc, widgetPalette(cur.roles), { meter: X.meter, key: X.key, lang: getLang(), render: 'normal', font: cur.family, songNotes: songNotesFor(song) }, cur.px || 14);
   } catch (e) { console.warn('[app widgets]', e); }
 }
 // a frame of the overlay, after each stage frame (the render pass never touches it)
@@ -5497,6 +5500,18 @@ function liveCursor() {
   }
   return typingCursor ? { ...typingCursor, editing: false } : null;
 }
+// the sounds the whole song uses, for the hit grid's rows (cd1), read once from the code of its segments; null for a
+// loop or a song without a plan (the grid then shows the rows it has heard)
+const songNotesMemo = new WeakMap();
+function songNotesFor(sg) {
+  if (!sg || !sg.meta || sg.loop) return null;
+  if (!songNotesMemo.has(sg)) {
+    let r = null;
+    try { r = songNotesOfSegments(segmentsOf(sg, codeFor)); } catch (e) { console.warn('[hit grid rows]', e); }
+    songNotesMemo.set(sg, r);
+  }
+  return songNotesMemo.get(sg);
+}
 // the song's meter and key at a bar (the doc's section), for the hit grid's steps and the tone cloud's names
 function songAt(sg, bar) {
   const d = sg && sg.doc, i = sg && sg.meta ? sg.meta.sectionAt(Math.max(0, Math.min(sg.meta.bars - 0.001, bar))) : -1, sec = d && d.sections && d.sections[i];
@@ -5506,9 +5521,9 @@ function codeOverNow(cyc) {
   const S = coSettings(), aw = awSettings(), lit = codeThemes.current.S.lit || 'outline';
   if (fv) {
     const st = globalThis.codingMiskFastStageNotes;
-    return { S, aw, litForm: lit, fast: true, song: `fv:${fv.seed}`, cursor: fv.cursor || null, lit: fv.lit || null, notes: st ? notesOfStore(st, () => st.instruments) : null, ...songAt({ doc: fv.doc, meta: fv.meta }, cyc), lang: getLang(), render: fv.render || 'normal' };
+    return { S, aw, litForm: lit, fast: true, song: `fv:${fv.seed}`, cursor: fv.cursor || null, lit: fv.lit || null, notes: st ? notesOfStore(st, () => st.instruments) : null, songNotes: fv.songNotes || null, ...songAt({ doc: fv.doc, meta: fv.meta }, cyc), lang: getLang(), render: fv.render || 'normal' };
   }
-  return { S, aw, litForm: lit, fast: false, song: song ? song.id || song.title || '' : '', cursor: S.edit ? liveCursor() : null, lit: (sp => (sp ? [{ evaluated: evaluatedCode, spans: sp }] : null))(liveSpans()), notes: isPlaying() ? liveNotes : null, ...songAt(song, cyc), lang: getLang(), render: recRender() };
+  return { S, aw, litForm: lit, fast: false, song: song ? song.id || song.title || '' : '', cursor: S.edit ? liveCursor() : null, lit: (sp => (sp ? [{ evaluated: evaluatedCode, spans: sp }] : null))(liveSpans()), notes: isPlaying() ? liveNotes : null, songNotes: songNotesFor(song), ...songAt(song, cyc), lang: getLang(), render: recRender() };
 }
 const video = createVideo({
   visuals, store, t, esc,
