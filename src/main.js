@@ -107,7 +107,7 @@ import { createGrowthStore } from './live/growth-store.js';
 import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
-import { CW_KEY, widgetSettings, widgetMemory, widgetOptions, linkAnalysers } from './live/widgets.js';
+import { CW_KEY, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom } from './live/widgets.js';
 import { SW_KEY, stageSettings, stageMapping, stageScopeInstruments, layerOn } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
 const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
@@ -699,10 +699,13 @@ ready.then(() => {
     codeFresh = false;
     evaluatedCode = song.run(ed.code || '', bar);
     await ed.repl.evaluate(evaluatedCode, autostart);
+    if (cwLinks) cwLinks.refresh();
   };
   const iv = setInterval(() => { if (typeof globalThis.register === 'function') { clearInterval(iv); installHelpers({ register: globalThis.register }); } }, 100);
+  // #79: a widget whose id changes on a line redraws there at once (Strudel's editor kept the old canvas until a pause)
+  const iw = setInterval(() => { if (installWidgetDom(globalThis.BlockWidget)) clearInterval(iw); }, 100);
   // code widgets D4: a scope or spectrum widget reads its line's instrument
-  linkAnalysers({ pattern: () => sched() && sched().pattern, now: () => (sched() ? sched().now() : 0), active: () => isPlaying() && /\._(?:scope|spectrum)\(/.test(ed.code || '') });
+  cwLinks = linkAnalysers({ pattern: () => sched() && sched().pattern, now: () => (sched() ? sched().now() : 0), active: () => isPlaying() && /\._(?:scope|spectrum)\(/.test(ed.code || '') });
 });
 // il REPL carica solo una parte di dirt-samples: carichiamo l'archivio completo (arpy, industrial, glitch, …)
 // samples() can appear a little after the editor: wait for it, otherwise the call was skipped and only part of the archive loaded
@@ -744,6 +747,8 @@ ready.then(async () => {
   } catch (e) { console.warn('campioni personalizzati non disponibili', e); composeReady = true; growComposeAway(); cardsReady(); }
 });
 const sched = () => ed && ed.repl && ed.repl.scheduler;
+// the links of the scope and spectrum widgets to their lines' instruments (code-widgets D4), made with the editor
+let cwLinks = null;
 const isPlaying = () => !!(sched() && sched().started);
 // the pattern preview of Compose (pattern-preview), made with the track panel below
 let preview = null;
@@ -5593,7 +5598,7 @@ const video = createVideo({
   getCodeTheme: videoCodeTheme,
   getCodeOver: codeOverNow,
   // code-widgets D11: the widgets drawn in the page (never in a fast video, whose code is not the page's)
-  getWidgets: () => { const S = cwSettings(), M = globalThis.miskWidgetCanvases; if (fv) return fv.widgets ? { dim: S.dim, canvas: (type, i, key) => fv.widgets.canvas(type, i, key, fv.cyc, fv.t, fv.master) } : null; if (!S.on || !M) return null; return { dim: S.dim, canvas: (type, i) => { const k = `_widget__${type}_${i}`; for (const [id, c] of M) if (id.endsWith(k)) return c; return null; } }; },
+  getWidgets: () => { const S = cwSettings(), M = globalThis.miskWidgetCanvases; if (fv) return fv.widgets ? { dim: S.dim, canvas: (type, i, key) => fv.widgets.canvas(type, i, key, fv.cyc, fv.t, fv.master) } : null; if (!S.on || !M) return null; return { dim: S.dim, canvas: (type, i) => { const k = `_widget__${type}_${i}`; if (M.has(k)) return M.get(k); for (const [id, c] of M) if (id.endsWith(k)) return c; return null; } }; },
   soulFrame: (cyc, playing, scale) => soul.frame(cyc, playing, scale),
   soulView: () => soul.shown,
   getCode: () => (fv ? fv.code : (ed && ed.code) || ''),

@@ -1,6 +1,7 @@
 // Browser checks for the code widgets (code-widgets, #79): off by default; on, the calls in the code and their widgets
 // below the lines, scope with its line's instrument, Classic moving at a section boundary without a step, widgets kept
-// while the Live coder types, muted lines dimmed, any parameter accepted, the Settings card, frame time.
+// while the Live coder types, muted lines dimmed, any parameter accepted, the Settings card, frame time; a widget whose kind
+// changes on a playing line redraws at once (#79).
 // Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-code-widgets.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('fs');
@@ -32,8 +33,84 @@ const st = page => page.evaluate(() => {
 const untilBar = async (page, b) => { for (let k = 0; k < 400 && (await st(page)).cyc < b; k++) await sleep(100); };
 const calls = code => (code.match(CALL) || []).length;
 
+// 6. #79: a line whose widget changes kind while playing redraws at once (no pause): the line typed first, evaluated a
+// moment later, as the Live coder does; the slot below each line holds its own kind's canvas and the pixels move.
+// CW_ONLY=churn runs only this; CW_SHOT_TAG names the pictures (churn-<tag>-<step>.png in the shots dir)
+async function churn(browser) {
+  const { page, errors } = await open(browser, { widgets: { on: true, max: 1 } });
+  await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(800);
+  await page.click('#play'); await sleep(3500);
+  // the widgets below the lines: the kind of the line's call, the canvas's kind, a hash of its pixels
+  const dom = () => page.evaluate(() => {
+    const view = document.querySelector('strudel-editor').editor.editor;
+    return [...document.querySelectorAll('#edhost .cm-content > :not(.cm-line)')].filter(x => x.tagName === 'CANVAS' || x.querySelector('canvas')).map(x => {
+      const c = x.tagName === 'CANVAS' ? x : x.querySelector('canvas');
+      let line = ''; try { line = view.state.doc.lineAt(view.posAtDOM(x)).text; } catch (e) { line = ''; }
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let h = 0; for (let i = 0; i < d.length; i += 53) h = (h * 31 + d[i]) | 0;
+      return { line: (line.match(/\._(\w+)\(\)\s*$/) || [])[1] || 'none', canvas: (c.id.match(/_widget__(\w+)_\d+$/) || [])[1] || c.id, h };
+    });
+  });
+  // the calls of the first two section-1 lines set, the code typed now and evaluated after a pause, as the growth does
+  const set = (kinds, wait) => page.evaluate(async ([kinds, wait]) => {
+    const e = document.querySelector('strudel-editor').editor, view = e.editor, cur = view.state.doc.toString(), L = cur.split('\n');
+    let n = 0;
+    for (let i = 0; i < L.length; i++) {
+      if (!/^\$:/.test(L[i]) || !/mask\(section1\)/.test(L[i])) continue;
+      L[i] = L[i].replace(/\._\w+\(\)\s*$/, '');
+      if (n < kinds.length && kinds[n]) L[i] += `._${kinds[n]}()`;
+      n++;
+    }
+    const txt = L.join('\n'), m = Math.min(cur.length, txt.length);
+    let a = 0; while (a < m && cur.charCodeAt(a) === txt.charCodeAt(a)) a++;
+    let b = 0; while (b < m - a && cur.charCodeAt(cur.length - 1 - b) === txt.charCodeAt(txt.length - 1 - b)) b++;
+    view.dispatch({ changes: { from: a, to: cur.length - b, insert: txt.slice(a, txt.length - b) } });
+    await new Promise(r => setTimeout(r, wait));
+    await e.evaluate();
+    return n;
+  }, [kinds, wait]);
+  const steps = [['pianoroll', 'pianoroll'], ['scope', 'pianoroll'], ['scope', 'spectrum'], ['hitgrid', 'spectrum']];
+  const shot = async name => { if (!SHOTS) return; await page.evaluate(() => { const c = document.querySelector('#edhost [id*="_widget_"]'), sc = c && c.closest('.cm-scroller'); if (c) c.scrollIntoView({ block: 'center' }); if (sc) sc.scrollLeft = 0; }); await sleep(300); await page.locator('#edhost').screenshot({ path: `${SHOTS}/churn-${process.env.CW_SHOT_TAG || 'after'}-${name}.png` }); };
+  // (with the lit notes of Strudel's editor on, the playing lines are redrawn every frame; off, nothing redraws a line
+  // whose widget changes: both are tried; each step from bar 1, so the section-1 lines play)
+  for (const lit of [true, false]) {
+  await page.evaluate(on => document.querySelector('strudel-editor').editor.changeSetting('isPatternHighlightingEnabled', on), lit);
+  for (const [k, kinds] of steps.entries()) {
+    await page.evaluate(() => globalThis.codingMiskCaptions.seek(0)); await sleep(1500);
+    const n = await set(kinds, 900);
+    await sleep(1500);
+    // (moving: the pixels change between frames, within a second and a half: a scope is flat between two hits)
+    const a = await dom(), seen = a.map(x => new Set([x.h]));
+    for (let t = 0; t < 5; t++) { await sleep(300); (await dom()).forEach((x, i) => seen[i] && seen[i].add(x.h)); }
+    const w = a.map((x, i) => ({ ...x, moving: seen[i].size > 1 })), mine = w.filter(x => kinds.includes(x.line));
+    const ok = n >= 2 && mine.length >= kinds.length && w.every(x => x.line === x.canvas) && mine.every(x => x.moving);
+    check(ok, `type change while playing, lit notes ${lit ? 'on' : 'off'}, step ${k + 1} (${kinds.join(', ')}): each line shows its own kind and keeps drawing`, JSON.stringify(w.map(x => `${x.line}/${x.canvas}${x.moving ? '' : ' still'}`)));
+    await shot(`${lit ? 'lit' : 'unlit'}-${k + 1}-${kinds.join('-')}`);
+  }
+  }
+  // the widgets of the same code given again with their places swapped, no edit (CodeMirror redraws nothing there): each
+  // place shows the canvas of the id it holds now (Strudel's own editor kept the old ones, #79)
+  const swap = await page.evaluate(async () => {
+    const e = document.querySelector('strudel-editor').editor, view = e.editor, W = (e.widgets || []).filter(w => w.type !== 'slider').sort((a, b) => a.to - b.to);
+    if (W.length < 2) return { n: W.length };
+    const id = w => `${w.id || ''}_widget_${w.type}_${w.index}`, next = W.map((w, i) => ({ ...W[(i + 1) % W.length], to: w.to }));
+    const lineOf = el => { try { return view.state.doc.lineAt(view.posAtDOM(el)).number; } catch (err) { return -1; } };
+    globalThis.updateWidgets(view, next.map(w => ({ ...w })));
+    await new Promise(r => setTimeout(r, 300));
+    // (CodeMirror draws only the lines in view)
+    const shown = next.filter(w => w.to >= view.viewport.from && w.to <= view.viewport.to).map(w => { const at = view.state.doc.lineAt(w.to).number, el = [...view.contentDOM.querySelectorAll('canvas')].find(c => lineOf(c) === at); return { want: id(w), got: el ? el.id : null }; });
+    globalThis.miskSwapBack = () => globalThis.updateWidgets(view, W.map(w => ({ ...w })));
+    return { n: W.length, shown };
+  });
+  await shot('swapped');
+  await page.evaluate(() => globalThis.miskSwapBack && globalThis.miskSwapBack());
+  check(swap.n >= 2 && swap.shown.length >= 2 && swap.shown.every(x => x.got === x.want), 'a widget id changed with no edit: each line shows the canvas of its new id', JSON.stringify(swap));
+  check(!errors.length, 'no page errors (type change)', errors.join('; '));
+  await page.close();
+}
+
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+  if (process.env.CW_ONLY === 'churn') { await churn(browser); await browser.close(); console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed'); process.exit(failed ? 1 : 0); }
 
   // 1. off by default: the code of before, no widget
   {
@@ -336,6 +413,8 @@ const calls = code => (code.match(CALL) || []).length;
     await p2.page.locator('#set-widgets').screenshot({ path: `${SHOTS}/settings-card-phone.png` });
     await p2.page.close();
   }
+
+  await churn(browser);
 
   await browser.close();
   console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed');

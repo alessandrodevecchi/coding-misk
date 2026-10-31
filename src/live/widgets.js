@@ -374,6 +374,30 @@ export function installWidgets(Pattern, getOpts = () => globalThis.miskWidgets) 
     P[key] = f;
   }
 }
+// #79: the editor's block widgets of @strudel/codemirror (BlockWidget) say every widget equals every other (`eq()` is
+// always true) and hand CodeMirror the canvas itself. When a widget's id changes where CodeMirror does not rebuild the
+// line (the line typed before the evaluation, an index shifted by another line: ids are `_widget_<kind>_<n>`), the old
+// canvas stays below the line: frozen (no pattern draws its id any more) or showing another line's drawing (its id now
+// drawn elsewhere), until a pause rebuilds the editor. Wrapped once per page: each widget is a slot of its own that holds
+// the canvas of its id now; two widgets are equal only with the same id and the same canvas, and a slot reused by
+// CodeMirror takes the canvas of its new widget, so a canvas that moves to another line leaves its old slot empty.
+export function installWidgetDom(BlockWidget) {
+  const P = BlockWidget && BlockWidget.prototype;
+  if (!P || P.miskSlot || typeof P.toDOM !== 'function') return false;
+  const canvasOf = P.toDOM, idOf = w => { const c = w.widgetConfig || {}; return `${c.id || ''}_widget_${c.type}_${c.index}`; };
+  const held = w => (w.miskDom ? w.miskDom.firstChild : canvasOf.call(w));
+  const fill = (w, dom) => {
+    const el = canvasOf.call(w);
+    if (el && el.parentNode !== dom) { dom.textContent = ''; dom.appendChild(el); } else if (!el) dom.textContent = '';
+    w.miskDom = dom;
+    return dom;
+  };
+  P.eq = function (other) { return !!other && idOf(this) === idOf(other) && held(this) === held(other); };
+  P.toDOM = function () { const dom = document.createElement('div'); dom.className = 'cw-slot'; return fill(this, dom); };
+  P.updateDOM = function (dom) { if (!dom || !dom.classList || !dom.classList.contains('cw-slot')) return false; fill(this, dom); return true; };
+  P.miskSlot = true;
+  return true;
+}
 // a scope as Strudel draws it (drawTimeScope), always in the widget's colour
 function scopePainter(ctx, id, { color = '#ffffff', thickness = 3, scale = 1, pos = 0.5, trigger = 0, align = true, smear = 0 } = {}) {
   return () => {
@@ -445,5 +469,6 @@ export function linkAnalysers({ pattern, now, active = () => true, interval = 50
   };
   const iv = setInterval(refresh, interval);
   refresh();
-  return { stop: () => clearInterval(iv), instrument: id => inst.get(id) };
+  // (refresh(): read again now, after an evaluation, so a widget whose id is new draws its line at once, #79)
+  return { stop: () => clearInterval(iv), instrument: id => inst.get(id), refresh };
 }
