@@ -42,7 +42,7 @@ OpenSpec changes not archived: 100. With open tasks: 31. All tasks ticked, waiti
 | [player-bar](../../openspec/changes/player-bar/tasks.md) | 1 | 8 |
 | [radio-profiles](../../openspec/changes/radio-profiles/tasks.md) | 1 | 36 |
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
-| [settings-polish](../../openspec/changes/settings-polish/tasks.md) | 14 | 14 |
+| [settings-polish](../../openspec/changes/settings-polish/tasks.md) | 1 | 14 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
 | [stage-app-widgets](../../openspec/changes/stage-app-widgets/tasks.md) | 11 | 11 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
