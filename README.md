@@ -130,6 +130,7 @@ Put WAV, MP3, OGG or FLAC files in `public/samples/`: one folder per instrument 
 - Tempo ramps, starting from a bar and the extra samples only work in coding-misk, not on strudel.cc.
 - Saved tracks and the current draft live in the browser's `localStorage`. Clearing site data deletes them.
 - Strudel is licensed under AGPL-3.0. If the project is published, its code must be released under a compatible license.
+- Essentia.js (`essentia.js` 0.1.3, the browser build of the Essentia library) is licensed under AGPL-3.0. The Decode tab loads it only for its Full analysis.
 
 ## License
 

@@ -130,6 +130,7 @@ Metti file WAV, MP3, OGG o FLAC in `public/samples/`: una cartella per strumento
 - Rampe di tempo, salto a una battuta e campioni extra funzionano solo in coding-misk, non su strudel.cc.
 - I brani salvati e la bozza in corso stanno nel `localStorage` del browser. Svuotare i dati del sito li cancella.
 - Strudel è distribuito con licenza AGPL-3.0. Se il progetto viene pubblicato, il codice va rilasciato con una licenza compatibile.
+- Essentia.js (`essentia.js` 0.1.3, la versione per il browser della libreria Essentia) è distribuito con licenza AGPL-3.0. La scheda Decodifica lo carica solo per l'analisi Completa.
 
 ## Licenza
 

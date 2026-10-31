@@ -152,4 +152,7 @@ export default defineConfig({
   server: { port: 5173, open: true },
   // the fast export's hidden render page (#8); the live output's broadcast window and control room (#52)
   build: { rollupOptions: { input: { main: 'index.html', render: 'render.html', broadcast: 'broadcast.html', live: 'live.html' } } },
+  // module workers keep their dynamic imports as chunks of their own (track-to-code D5: Essentia.js is downloaded only
+  // when level B runs, not with the level A worker of the Decode tab)
+  worker: { format: 'es' },
 });

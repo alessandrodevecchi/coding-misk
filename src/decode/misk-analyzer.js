@@ -362,13 +362,73 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     while (db - bar >= -0.02) db -= bar;
     return Math.max(0, db);
   }
-  const setTempo = ({ bpm, downbeat, tapped = true }) => {
+  // a tapped or picked tempo (level A), or level B's whole-file grid (confidence and uncertainty given)
+  const setTempo = ({ bpm, downbeat, tapped = true, confidence, uncertain = false, round = 2 }) => {
     const L = lockS || { candidates: [], confidence: 0, uncertain: false };
-    const b = Math.round(bpm * 100) / 100;
-    lockS = { ...L, bpm: b, candidates: [b / 2, b, b * 2].filter(x => x >= 40 && x <= 240), downbeat: downbeat ?? L.downbeat ?? 0, uncertain: false, tapped };
+    const k = 10 ** round, b = Math.round(bpm * k) / k;
+    lockS = { ...L, bpm: b, candidates: [b / 2, b, b * 2].filter(x => x >= 40 && x <= 240).map(x => Math.round(x * k) / k), downbeat: downbeat ?? L.downbeat ?? 0, uncertain, tapped, ...(confidence !== undefined ? { confidence } : {}) };
     barCache.length = 0; held = null;
     return lockS;
   };
+
+  // ---------- level B: one beat grid for the whole file ----------
+  // the onsets that mark the grid: kicks, claps and snares, hats (lighter); each falls on a 16th of the beat
+  const gridPoints = () => {
+    advance(duration); findOnsets();
+    return [...onsets.kick.filter(kickLike).map(o => ({ t: o.t, w: 1 })), ...onsets.snare.filter(isClap).map(o => ({ t: o.t, w: 0.7 })), ...onsets.hat.filter(isHat).map(o => ({ t: o.t, w: 0.2 }))];
+  };
+  // the tempo and beat phase that put the onsets of the whole file on a 16th grid best: a weighted least-squares line
+  // through the onsets near the grid (t = a + m·P/4), three passes with a narrower window; a whole tempo when it fits
+  // almost as well. A tempo off by 0.05 BPM drifts by 0.1 s over four minutes: the line keeps the code on the beat.
+  function fitGrid(bpm, beatPhase) {
+    const all = gridPoints(), t0 = all.length ? Math.min(...all.map(p => p.t)) : 0;
+    let P = 60 / bpm, a = beatPhase, rms = Infinity, used = 0;
+    // the line grows from the first 20 seconds of music to the whole file, so a small tempo error never puts a late onset
+    // on the wrong 16th
+    const fit = (fixP = null) => {
+      let best = null;
+      for (const [span, tol] of [[20, 0.05], [40, 0.04], [80, 0.035], [160, 0.03], [Infinity, 0.03], [Infinity, 0.025]]) {
+        let sw = 0, sm = 0, st = 0, smm = 0, smt = 0;
+        const q = P / 4, list = [], pts = all.filter(p => p.t < t0 + span);
+        for (const p of pts) { const m = Math.round((p.t - a) / q), r = p.t - (a + m * q); if (Math.abs(r) <= tol) list.push({ m, t: p.t, w: p.w }); }
+        if (list.length < 8) continue;
+        for (const x of list) { sw += x.w; sm += x.w * x.m; st += x.w * x.t; smm += x.w * x.m * x.m; smt += x.w * x.m * x.t; }
+        const den = sw * smm - sm * sm;
+        let q2 = fixP ? fixP / 4 : den > 0 ? (sw * smt - sm * st) / den : q;
+        if (!(q2 > 0.5 * q && q2 < 2 * q)) q2 = q;
+        const a2 = (st - q2 * sm) / sw;
+        P = q2 * 4; a = a2;
+        let e = 0; for (const x of list) e += x.w * (x.t - (a + x.m * q2)) ** 2;
+        best = { P, a, rms: Math.sqrt(e / sw), n: list.length };
+      }
+      return best;
+    };
+    const free = fit();
+    if (!free) return { bpm, beatPhase, rms: null, n: 0 };
+    ({ P, a, rms, n: used } = free);
+    const whole = Math.round(60 / P);
+    if (Math.abs(whole - 60 / P) < 0.08) {
+      const keep = { P, a };
+      const w = fit(60 / whole);
+      if (w && w.rms <= rms * 1.15 + 0.0005) ({ P, a, rms, n: used } = w); else ({ P, a } = keep);
+    }
+    return { bpm: 60 / P, beatPhase: ((a % P) + P) % P, rms, n: used };
+  }
+  // the tempo within 1.5 % of bpm whose pulse collects the most onset strength over the whole file (a comb on the onset
+  // envelope, steps of 0.01 BPM): a tempo estimated on a few seconds, or by another engine, made exact enough for the
+  // line fit
+  function wholeTempo(bpm) {
+    advance(duration); findOnsets();
+    const env = envelope(0, done1);
+    let best = { bpm, score: -Infinity };
+    for (let b = bpm * 0.985; b <= bpm * 1.015; b += 0.01) { const c = comb(env, (60 * fr) / b); if (c.score > best.score) best = { bpm: b, score: c.score }; }
+    return best.bpm;
+  }
+  // the beat phase (seconds) from every onset of the file: kicks weigh most, then snares and claps, then hats (an
+  // intro of offbeat hats alone cannot shift the beat by half)
+  const wholePhase = bpm => { advance(duration); findOnsets(); return phaseOf(60 / bpm, 0, duration, true); };
+  // the downbeat of a beat grid over the whole file (the beat of four where kicks and chord changes fall)
+  const gridDownbeat = (bpm, beatPhase) => { advance(duration); findOnsets(); return downbeatOf(beatPhase, 60 / bpm, t1(firstSound())); };
 
   // ---------- bars ----------
   const barCache = [];
@@ -525,7 +585,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     m.sections = [{ start: 0, bars: list.length, kind: 'verse' }];
     return m;
   }
-  return { duration, advance, lock, model, setTempo, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t) };
+  return { duration, advance, lock, model, setTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t) };
 }
 
 // level A's horizon (D8): the playhead plus the look ahead; values 'off', '2s', '4s', '2bars', '4bars'
