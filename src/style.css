@@ -164,7 +164,7 @@
   .work.code-collapsed .codecol > :not(.codehead), .work.code-collapsed .codehead > div:first-child, .work.code-collapsed #back, .work.code-collapsed #code-full { display: none; }
   .work.code-collapsed .codehead { justify-content: center; }
   .work.code-collapsed #code-collapse { transform: scaleX(-1); }
-  .codecol.full { position: fixed; inset: 12px; z-index: 50; top: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; grid-template-rows: auto 1fr auto auto; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .codecol.full { position: fixed; inset: 12px 12px calc(var(--pbar-h, 52px) + 12px); z-index: 50; top: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; grid-template-rows: auto 1fr auto auto; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
   .codecol.full .edhost { max-height: none; height: 100%; }
   .codecol.full .code-resize { display: none; }
   .tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); margin-bottom: 16px; }

@@ -92,6 +92,29 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   await page.click('#edhost .cm-line >> nth=0'); await page.keyboard.press('PageUp'); await sleep(200);
   check((await state()).paused, 'keyboard scroll pauses too');
 
+  // full-screen code ends above the player bar, which stays usable (task 1.6)
+  const fullState = () => page.evaluate(() => {
+    const c = document.getElementById('codecol').getBoundingClientRect(), b = document.querySelector('.pbar').getBoundingClientRect(), p = document.getElementById('play');
+    const hit = document.elementFromPoint(p.getBoundingClientRect().x + 5, p.getBoundingClientRect().y + 5);
+    return { full: document.getElementById('codecol').classList.contains('full'), colBottom: Math.round(c.bottom), barTop: Math.round(b.top), barH: Math.round(b.height), vh: innerHeight,
+      playHit: !!(hit && (hit === p || p.contains(hit))), playing: document.querySelector('strudel-editor').editor.repl.scheduler.started, vis: !!document.querySelector('.pbar .pb-now') };
+  });
+  for (const w of [1440, 400]) {
+    await page.setViewportSize({ width: w, height: 560 }); await sleep(300);
+    await page.click('#code-full'); await sleep(300);
+    let f = await fullState();
+    check(f.full && f.colBottom <= f.barTop && f.barTop + f.barH <= f.vh + 1 && f.playHit, `${w}px: full-screen code ends above the player bar, Play/Pause reachable`, JSON.stringify(f));
+    if (shots) await page.screenshot({ path: path.join(shots, `fullscreen-bar-${w}px.png`) });
+    await page.click('#play'); await sleep(500);
+    check(!(await fullState()).playing, `${w}px: Pause in the bar pauses the song with the code full screen`);
+    await page.click('#play'); await sleep(500);
+    await page.keyboard.press('Escape'); await sleep(200);
+    check(!(await fullState()).full, `${w}px: Esc leaves the full-screen code`);
+    await page.click('#code-full'); await sleep(200); await page.click('#code-full'); await sleep(200);
+    check(!(await fullState()).full, `${w}px: the full-screen button leaves too`);
+  }
+  await page.setViewportSize({ width: 1440, height: 560 }); await sleep(300);
+
   // Italian
   await page.click('[data-lang="it"]'); await sleep(400);
   s = await state();

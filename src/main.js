@@ -4299,6 +4299,8 @@ function syncAll() {
   const setFull = v => { col.classList.toggle('full', v); $('#code-full').setAttribute('aria-pressed', v); };
   $('#code-full').addEventListener('click', () => setFull(!col.classList.contains('full')));
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && col.classList.contains('full')) setFull(false); });
+  // the full-screen code ends above the player bar (its height changes with the theme and the width)
+  { const pb = $('.pbar'), setH = () => document.documentElement.style.setProperty('--pbar-h', `${pb.offsetHeight}px`); setH(); if (window.ResizeObserver) new ResizeObserver(setH).observe(pb); }
   // code-follow: the toggle; pressed while paused it follows at once and stays on
   followSync();
   $('#code-follow').addEventListener('click', () => {
