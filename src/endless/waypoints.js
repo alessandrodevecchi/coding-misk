@@ -39,7 +39,9 @@ export const airOffset = g => (g && g.onAir && g.crescendo ? g.crescendo.growth 
 // the director's plan as steered so far; [] when none is left (late)
 export function airBoundaries(kind, rel, plan, g) {
   const off = airOffset(g), C = COMMANDS[kind] || {}, ph = plan.phrase, end = plan.bars + off, out = [];
-  if (C.bar) { for (let b = Math.floor(rel) + 1; b < end - 1 && out.length < BAR_TRIES; b++) out.push(b); return out; }
+  // (a typed line: from the first bar that starts at least half a bar later, as applyBar gives a Classic song; the next
+  // bar could be a few hundredths of a bar away, so the song with the line reached the player after its bar, fx3)
+  if (C.bar) { for (let b = kind === 'say-live' ? Math.ceil(rel + 0.5) : Math.floor(rel) + 1; b < end - 1 && out.length < BAR_TRIES; b++) out.push(b); return out; }
   const step = C.structural ? 2 * ph : ph, last = plan.bars - ph;
   for (let d = Math.max(0, (Math.floor((rel - off) / step) + 1) * step); d <= last && out.length < PHRASE_TRIES; d += step) if (d + off > rel) out.push(d + off);
   return out;

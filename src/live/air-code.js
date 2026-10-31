@@ -40,6 +40,10 @@ export function windowPart(W, songs, k, { grown = false } = {}) {
   // the song's first bar in the window: the poetic narrator says the image of an entry there on that bar, as on bar 0
   // of a song alone (after-tests-oct28 D5)
   out.start = me.start || 0;
+  // a song grown on air: where its growth ends in the window's bars, so its voice track places its lines as on the song
+  // alone (placeSpoken: a refrain the radio placed in the growth repeats there). Without it the window's code had no
+  // start for such a refrain while the captions and Coming next, read from the song alone, showed it (fx1)
+  if (src.onAir && src.crescendo && Number.isFinite(src.crescendo.growth)) out.spokenGrowth = out.start + src.crescendo.growth;
   // a song steered on air (radio-profiles D9): its reference for functions and levels, placed in the window like the song
   if (src.codeRef) {
     const ref = src.codeRef.tracks || [];

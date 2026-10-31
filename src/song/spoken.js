@@ -170,7 +170,8 @@ export function entryAfter(n, id, from) {
 export function placeSpoken(input, lang = langOf()) {
   const n = normalizeSong(input), ref = input.whole ? normalizeSong(input.whole) : n;
   const facts = sectionFacts(ref), out = [];
-  const growthBars = input.onAir && input.crescendo && Number.isFinite(input.crescendo.growth) ? input.crescendo.growth : 0;
+  // (spokenGrowth: the same bar in a radio window's bars, set by windowPart in src/live/air-code.js, fx1)
+  const growthBars = Number.isFinite(input.spokenGrowth) ? input.spokenGrowth : input.onAir && input.crescendo && Number.isFinite(input.crescendo.growth) ? input.crescendo.growth : 0;
   let k = 0;
   n.tracks.forEach((tr, ti) => {
     if (!isSpoken(tr)) return;
