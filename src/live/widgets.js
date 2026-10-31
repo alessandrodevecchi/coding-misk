@@ -27,8 +27,8 @@ const MAP = {
 };
 export const CW_DEFAULTS = Object.freeze({
   on: false, max: 3, roll: 'pianoroll', order: CW_INSTRUMENTS.slice(), share: 25, window: 16, dim: true,
-  // "Widget notes" (D15): provisional default, Strudel's behaviour, until the owner chooses after the measures (task 7.4)
-  notes: 'volume',
+  // "Widget notes" (D15): Always full since settings-polish (owner, 2026-10-31); a stored 'volume' of before moves once (CW_VERSION)
+  notes: 'full',
   widgets: { scope: true, pianoroll: true, punchcard: true, spectrum: true, spiral: false, pitchwheel: false, hitgrid: true, tonecloud: true },
   instruments: Object.fromEntries(CW_INSTRUMENTS.map(k => [k, { on: k !== 'fx', primary: MAP[k][0], secondary: MAP[k].slice(1) }])),
   params: { labels: false, smear: false, fold: true, steady: true, fade: true },
@@ -44,6 +44,9 @@ const clampInt = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Num
 // primary and the tone cloud as its last secondary (one cloud at a time: the voice holds it only when no other line can).
 // fx stays as it was (its lines are risers and noise, no harmony). Saved again with the mark, they are not touched again
 export const APP_KINDS_VERSION = 1;
+// settings-polish D2: the version of the stored code widget settings. Without it (written before) a stored
+// "Follow the volume" was only the old default, so it moves to "Always full" once; saved again with v 2, the user's choice stays
+export const CW_VERSION = 2;
 const PRIMARY_APP = { drums: 'hitgrid', pad: 'tonecloud', voice: 'scope' };
 export function migrateInstruments(instruments) {
   if (!instruments || typeof instruments !== 'object') return instruments;
@@ -74,6 +77,7 @@ export function widgetSettings(raw) {
   }
   return {
     appKinds: APP_KINDS_VERSION,
+    v: CW_VERSION,
     on: r.on === true,
     max: clampInt(r.max, 1, 8, D.max),
     roll: r.roll === 'punchcard' ? 'punchcard' : 'pianoroll',
@@ -81,7 +85,7 @@ export function widgetSettings(raw) {
     share: clampInt(r.share, 0, 100, D.share),
     window: CW_WINDOWS.includes(r.window) ? r.window : CW_WINDOWS.includes(+r.window) ? +r.window : D.window,
     dim: r.dim !== false,
-    notes: r.notes === 'full' ? 'full' : r.notes === 'volume' ? 'volume' : D.notes,
+    notes: r.notes === 'full' ? 'full' : r.notes === 'volume' && r.v >= CW_VERSION ? 'volume' : D.notes,
     widgets: Object.fromEntries(WIDGETS.map(w => [w, typeof (r.widgets || {})[w] === 'boolean' ? r.widgets[w] : D.widgets[w]])),
     instruments,
     params: Object.fromEntries(CW_PARAMS.map(p => [p, typeof (r.params || {})[p] === 'boolean' ? r.params[p] : D.params[p]])),
