@@ -75,6 +75,13 @@ function song() {
   check(rosterOf(five, A, { S: S0 }).length === 5, 'spec scenario: bass, lead, kick, arp and hats give five panels');
   // the same panels whatever the time of the section: the roster depends only on the section and the notes known
   check(JSON.stringify(rosterOf(st, A, { S: S0 })) === JSON.stringify(rosterOf(song(), A, { S: S0 })), 'the panels of a section are the same every time they are asked');
+  // code-over-visual cd5: one tone cloud at most among the panels, on the pad, else bass, lead, arp, the voice last
+  const cloudy = widgetSettings({ share: 0, max: 8, instruments: Object.fromEntries(['pad', 'bass', 'lead', 'arp', 'voice'].map(k => [k, { on: true, primary: 'tonecloud', secondary: ['scope'] }])) });
+  const clouds = (insts, S = cloudy) => { const x = noteStore(); for (const i of insts) x.add(i, [1, 1.2, 50, 1]); return rosterOf(x, A, { S, max: 8 }).filter(p => p.widget === 'tonecloud').map(p => p.inst); };
+  check(clouds(['bass', 'hook', 'pad', 'arp']).join() === 'pad', 'cd5: one tone cloud among the panels, the pad\'s', clouds(['bass', 'hook', 'pad', 'arp']).join());
+  check(clouds(['hook', 'arp', 'bass']).join() === 'bass' && clouds(['arp', 'hook']).join() === 'hook', 'cd5: without a pad the first of bass, lead, arp');
+  check(clouds(['kick', 'hats']).length === 0, 'cd5: no cloud without a line that can hold it')
+  check(rosterOf(song(), A, { S: widgetSettings({ share: 0 }), max: 8 }).filter(p => p.widget === 'tonecloud').length <= 1, 'cd5: the default settings give at most one');
   // silences and levels
   const pad = st.around('pad', 0, 16);
   check(silentAt(pad, 6.5) && silentAt(pad, 11.2) && !silentAt(pad, 13.5) && !silentAt(pad, 2.5), 'the pad is silent from bar 5 to 11 and plays again at bar 12 (spec scenario)');
