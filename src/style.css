@@ -1770,6 +1770,9 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .cw-inst .cw-prim { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .cw-inst .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; }
 .cw-inst .chip { font: 11px var(--mono); padding: 2px 8px; }
+/* #79: each code widget sits in a slot of its own below its line; the canvas fills it with no line gap */
+#edhost .cw-slot { line-height: 0; }
+#edhost .cw-slot > canvas { display: block; }
 #edhost .cw-muted { filter: grayscale(1); opacity: .4; outline: 1px dashed var(--code-muted, var(--muted)); outline-offset: -1px; }
 /* code themes (code-themes): the panel stays hidden until the theme is installed (at most 3 s), the text of muted
    lines dimmed (option, on by default), the evaluation flash in the theme's colour (Strudel's is white) */

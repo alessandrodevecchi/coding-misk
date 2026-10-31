@@ -38,18 +38,42 @@ export const CW_DEFAULTS = Object.freeze({
 export const CW_SIZE_LIMITS = { row: [20, 120], round: [60, 300], spiral: [80, 400], spectrum: [40, 300] };
 
 const clampInt = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
-// the stored settings (any shape, old or partial) completed with the defaults
+// #79: the instruments of settings saved before the app widgets existed (no `appKinds` mark) get the app widgets'
+// defaults once, every other choice kept: drums take the hit grid as primary (their old primary first among the
+// secondary), the pad the tone cloud; bass, lead and arp the tone cloud among their secondary; the voice the scope as
+// primary and the tone cloud as its last secondary (one cloud at a time: the voice holds it only when no other line can).
+// fx stays as it was (its lines are risers and noise, no harmony). Saved again with the mark, they are not touched again
+export const APP_KINDS_VERSION = 1;
+const PRIMARY_APP = { drums: 'hitgrid', pad: 'tonecloud', voice: 'scope' };
+export function migrateInstruments(instruments) {
+  if (!instruments || typeof instruments !== 'object') return instruments;
+  const out = { ...instruments };
+  for (const k of CW_INSTRUMENTS) {
+    const x = out[k];
+    if (!x || typeof x !== 'object' || k === 'fx') continue;
+    let primary = WIDGETS.includes(x.primary) ? x.primary : CW_DEFAULTS.instruments[k].primary;
+    let secondary = Array.isArray(x.secondary) ? x.secondary.filter(w => WIDGETS.includes(w)) : CW_DEFAULTS.instruments[k].secondary.slice();
+    const want = PRIMARY_APP[k];
+    if (want && primary !== want) { secondary = [primary, ...secondary]; primary = want; }
+    if (k === 'voice') secondary = [...secondary.filter(w => w !== 'tonecloud'), 'tonecloud'];
+    else if (k !== 'drums' && k !== 'pad' && !secondary.includes('tonecloud')) secondary = [...secondary, 'tonecloud'];
+    out[k] = { ...x, primary, secondary: [...new Set(secondary.filter(w => w !== primary))] };
+  }
+  return out;
+}
+// the stored settings (any shape, old or partial) completed with the defaults; saved before the app widgets, migrated
 export function widgetSettings(raw) {
-  const r = raw && typeof raw === 'object' ? raw : {}, D = CW_DEFAULTS;
+  const r = raw && typeof raw === 'object' ? raw : {}, D = CW_DEFAULTS, stored = r.appKinds === APP_KINDS_VERSION ? r.instruments : migrateInstruments(r.instruments);
   const order = Array.isArray(r.order) ? r.order.filter(k => CW_INSTRUMENTS.includes(k)) : [];
   const instruments = {};
   for (const k of CW_INSTRUMENTS) {
-    const x = (r.instruments && r.instruments[k]) || {}, d = D.instruments[k];
+    const x = (stored && stored[k]) || {}, d = D.instruments[k];
     const primary = WIDGETS.includes(x.primary) ? x.primary : d.primary;
     const secondary = Array.isArray(x.secondary) ? x.secondary.filter(w => WIDGETS.includes(w) && w !== primary) : d.secondary.filter(w => w !== primary);
     instruments[k] = { on: typeof x.on === 'boolean' ? x.on : d.on, primary, secondary };
   }
   return {
+    appKinds: APP_KINDS_VERSION,
     on: r.on === true,
     max: clampInt(r.max, 1, 8, D.max),
     roll: r.roll === 'punchcard' ? 'punchcard' : 'pianoroll',
@@ -99,9 +123,25 @@ export function playsAt(line, lanes, bar) {
   for (const m of line.matchAll(/\.mask\((\w+)\)/g)) { const v = lanes.get(m[1]); if (v && !(v[((Math.floor(bar) % v.length) + v.length) % v.length] > 0)) return false; }
   return true;
 }
-// the line without its section lanes, for the seed of its widget: a track keeps its widget from section to section
-const seedKey = line => stripWidgets(line).replace(/^\s*[_S]?\$:\s*/, '').replace(/\.mask\(\w+\)\.velocity\(\w+\)/g, '').replace(/\s+/g, '');
 const rand = (...k) => hashString(k.join('\u0000')) / 4294967296;
+// the visual name of a line (`.analyze("…")` or `.chan("…")`), '' without one
+const visualOf = line => (line.match(/\.(?:analyze|chan)\(\s*["']([\w-]+)/) || [])[1] || '';
+// churn fix (#79): the track of each pattern line of a code, the key its widget is chosen with: the track's header
+// (`// ===== name =====`, one track of the song, its lines of every section) and the line's visual (a drum track's kick,
+// snare and hats lines are apart), so an edit of the line never changes its widget; null for a line with neither
+// (placeWidgets then uses its instrument)
+export function tracksOf(code) {
+  const out = [];
+  let header = null;
+  for (const l of chainLines(String(code || ''))) {
+    const h = l.match(/^\/\/ =+ (.+?) =+$/);
+    if (h) { header = h[1]; continue; }
+    if (!PATTERN.test(l)) continue;
+    const v = visualOf(l);
+    out.push(header || v ? `${header || ''}|${v}` : null);
+  }
+  return out;
+}
 
 // D3: the widget of an instrument's line: the primary, or with the share a secondary that is on, by the seed; the
 // first secondary on when the primary is off; pianoroll as punchcard when chosen
@@ -131,22 +171,32 @@ export function targets(n, S, seed = '') {
 
 // The code with its widgets at a bar. code: the code of the moment without widgets; S: widgetSettings; section: the
 // index of the section playing; sections: how many sections the song has (for the counts); seed: the song's seed;
-// insts: the instrument of each pattern line (optional, else read from the line); returns(line): whether a muted line
-// returns within the window of muted lines (optional: muted lines get no widget without it).
+// insts: the instrument of each pattern line (optional, else read from the line); tracks: the track of each pattern
+// line (optional, tracksOf; else the header and the visual in the code, else the instrument); returns(line): whether a
+// muted line returns within the window of muted lines (optional: muted lines get no widget without it).
+// Churn fix (#79): a track's widget comes from the track and the seed, never from the line's text, so edits keep it.
+// prev: the holders after the bar before in the same section ([{ track, w }], widgetMemory): a track that holds a
+// widget keeps it, of the same kind, while one of its lines lives (plays, or is muted and returns within the window);
+// only free slots are given again. null at a section's start: every slot is given anew. out: { holders } after this
+// bar. allow: a Set of `track|kind` that may be written (a person typing, D8), the others wait (they still hold).
 // Lines already carrying a widget (code typed by hand) keep it and take a slot.
-export function placeWidgets(code, { S, bar = 0, section = 0, sections = 1, seed = '', insts = null, returns = null } = {}) {
+export function placeWidgets(code, { S, bar = 0, section = 0, sections = 1, seed = '', insts = null, tracks = null, returns = null, prev = null, allow = null, out = null } = {}) {
+  if (out) { out.holders = []; out.shown = []; out.alive = []; }
   if (!S || !S.on || typeof code !== 'string') return code;
-  const lines = chainLines(code), lanes = lanesOf(code), cands = [], info = [];
-  let k = -1, taken = 0, track = null;
+  const lines = chainLines(code), lanes = lanesOf(code), info = [], nth = {};
+  let k = -1, taken = 0, header = null;
   lines.forEach((l, i) => {
     const h = l.match(/^\/\/ =+ (.+?) =+$/);
-    if (h) { track = h[1]; return; }
+    if (h) { header = h[1]; return; }
     if (!PATTERN.test(l)) return;
     k++;
     if (hasWidget(l)) { taken++; return; }
     const inst = (insts && insts[k]) || instrumentOf(l);
     if (!inst) return;
-    info.push({ i, l, inst, track: track || `${inst}:${(l.match(/\.(?:analyze|chan)\(\s*["']([\w-]+)/) || [])[1] || ''}`, playing: playsAt(l, lanes, bar), masked: /\.mask\((\w+)\)/.test(l) && [...l.matchAll(/\.mask\((\w+)\)/g)].some(m => lanes.has(m[1])) });
+    // (a line with neither: its instrument and its place among such lines of that instrument)
+    const v = visualOf(l), track = (tracks && tracks[k]) || (header || v ? `${header || ''}|${v}` : `${inst}:${(nth[inst] = (nth[inst] || 0) + 1)}`);
+    // (the group: the song's track, its header, for D9 below)
+    info.push({ i, l, inst, track, group: track.includes('|') && track.split('|')[0] ? track.split('|')[0] : track, playing: playsAt(l, lanes, bar), masked: /\.mask\((\w+)\)/.test(l) && [...l.matchAll(/\.mask\((\w+)\)/g)].some(m => lanes.has(m[1])) });
   });
   // D9 (Classic, the lines of each section kept in the code): a track silent now keeps its widget on the line it played
   // last, when one of its lines plays again within the window of muted lines
@@ -154,7 +204,7 @@ export function placeWidgets(code, { S, bar = 0, section = 0, sections = 1, seed
   const silentKeeps = new Set();
   if (span) {
     const byTrack = new Map();
-    for (const x of info) if (x.masked && !MUTED.test(x.l)) (byTrack.get(x.track) || byTrack.set(x.track, []).get(x.track)).push(x);
+    for (const x of info) if (x.masked && !MUTED.test(x.l)) (byTrack.get(x.group) || byTrack.set(x.group, []).get(x.group)).push(x);
     for (const list of byTrack.values()) {
       if (list.some(x => x.playing)) continue;
       const until = Math.min(span - 1, bar + win);
@@ -164,29 +214,44 @@ export function placeWidgets(code, { S, bar = 0, section = 0, sections = 1, seed
       if (last) silentKeeps.add(last.i);
     }
   }
+  // the lines that may hold a widget now, one per track: a line playing first, then the line that keeps a silent
+  // track's widget (D9), then a muted line that returns within the window; the first in the code among equals
+  const alive = new Map();
   for (const x of info) {
-    if (!x.playing && !silentKeeps.has(x.i) && !(MUTED.test(x.l) && returns && returns(x.l))) continue;
-    const w = widgetFor(x.inst, S, seedKey(x.l), seed);
-    if (w) cands.push({ i: x.i, rank: S.order.indexOf(x.inst), w, playing: x.playing });
+    const o = alive.get(x.track);
+    if (o && o.lvl === 0) continue;
+    const lvl = x.playing ? 0 : silentKeeps.has(x.i) ? 1 : MUTED.test(x.l) && returns && returns(x.l) ? 2 : -1;
+    if (lvl >= 0 && (!o || lvl < o.lvl)) alive.set(x.track, { ...x, lvl });
   }
   const want = Math.max(0, targets(Math.max(1, sections), S, seed)[Math.max(0, Math.min(section, sections - 1))] - taken);
-  // the slot order, then the place in the code; lines that play before muted ones of the same instrument
+  // #79: the holders of the bar before that still live keep their widget, of the same kind (the count of a section
+  // never changes within it)
+  const held = [];
+  for (const h of prev || []) { const x = alive.get(h.track); if (x && h.w && held.length < want && !held.some(y => y.x === x)) held.push({ x, w: h.w }); }
+  const used = new Set(held.map(h => h.x.track)), free = [...alive.values()].filter(x => !used.has(x.track));
+  const cands = free.map(x => ({ x, rank: S.order.indexOf(x.inst), w: widgetFor(x.inst, S, x.track, seed), playing: x.playing })).filter(c => c.w);
+  // the free slots: the slot order, then the place in the code; lines that play before muted ones of the same instrument
   // (one line per instrument first, for variety: kick and snare lines are both drums; then the rest in the same order)
-  const sorted = cands.sort((a, b) => a.rank - b.rank || (b.playing - a.playing) || a.i - b.i), seen = new Set();
-  const first = sorted.filter(c => !seen.has(c.rank) && seen.add(c.rank)), chosen = [...first, ...sorted.filter(c => !first.includes(c))].slice(0, want);
-  if (!chosen.length) return code;
+  const sorted = cands.sort((a, b) => a.rank - b.rank || (b.playing - a.playing) || a.x.i - b.x.i), seen = new Set(held.map(h => S.order.indexOf(h.x.inst)));
+  const first = sorted.filter(c => !seen.has(c.rank) && seen.add(c.rank)), chosen = [...first, ...sorted.filter(c => !first.includes(c))].slice(0, Math.max(0, want - held.length));
   // code-over-visual D11: the hit grid covers every drum sound, so it sits once, on the first drum line playing (the
   // kick's, as a rule): a line that stays while drum lines come and go, so a person typing never moves it
   // owner, 2026-10-31 (cd5): one tone cloud at a time, where the harmony of the song sits best (cloudHolder)
-  oneCloud(chosen, info, S, seed, lines);
+  // (a cloud or a grid already held stays where it is: a new one is not drawn beside it)
+  oneCloud(chosen, free, S, seed, lines.some(l => PATTERN.test(l) && /\._tonecloud\(/.test(l)) || held.some(h => h.w === 'tonecloud'));
   const grids = chosen.filter(c => c.w === 'hitgrid');
   if (grids.length) {
-    const drums = info.filter(x => (x.inst === 'drums' || x.inst === 'hats') && x.playing && !hasWidget(x.l) && !chosen.some(c => c.i === x.i && c.w !== 'hitgrid'));
-    const at = drums.length ? drums[0].i : grids[0].i;
     for (const g of grids) g.skip = true;
-    chosen.push({ i: at, w: 'hitgrid' });
+    if (!held.some(h => h.w === 'hitgrid')) {
+      const drums = free.filter(x => (x.inst === 'drums' || x.inst === 'hats') && x.playing && !chosen.some(c => c.x.track === x.track && c.w !== 'hitgrid'));
+      chosen.push({ x: drums.length ? drums[0] : grids[0].x, w: 'hitgrid' });
+    }
   }
-  for (const c of chosen) if (!c.skip) lines[c.i] = withCall(lines[c.i], c.w);
+  const holders = [...held, ...chosen.filter(c => !c.skip)];
+  const shows = h => !allow || allow.has(`${h.x.track}|${h.w}`);
+  if (out) { out.holders = holders.map(h => ({ track: h.x.track, w: h.w })); out.shown = holders.filter(shows).map(h => ({ track: h.x.track, w: h.w })); out.alive = [...alive.keys()]; }
+  if (!holders.length) return code;
+  for (const h of holders) if (shows(h)) lines[h.x.i] = withCall(lines[h.x.i], h.w);
   return lines.join('\n');
 }
 // The tone cloud shows the harmony of the whole song, so at most one is drawn (cd5). Its place: the pad's line; without a
@@ -200,20 +265,50 @@ export function cloudHolder(info, S, hasCloud = false) {
   for (const inst of CLOUD_ORDER) { const x = info.find(y => y.inst === inst && can(y)); if (x) return x; }
   return null;
 }
-function oneCloud(chosen, info, S, seed, lines) {
-  const hand = lines.some(l => PATTERN.test(l) && /\._tonecloud\(/.test(l));
+// free: the lines of the tracks without a widget; has: a cloud already on screen (typed by hand, or held)
+function oneCloud(chosen, free, S, seed, has) {
   const asked = chosen.filter(c => c.w === 'tonecloud');
-  if (!asked.length) return;
-  // the cloud goes to the holder: its own slot when it has one, else the slot of the first line that asked for a cloud
-  const at = hand ? null : cloudHolder(info, S);
+  // the cloud goes to the holder: its own slot when it has one (whatever widget its seed chose: cd5, the cloud always
+  // sits on the holder; the voice, the last resort, only when a line asked for a cloud), else the slot of the first
+  // line that asked for a cloud
+  let at = has ? null : cloudHolder(free, S);
+  if (at && at.inst === 'voice' && !asked.length) at = null;
   let kept = null;
-  if (at) { kept = chosen.find(c => c.i === at.i) || asked[0]; kept.i = at.i; kept.w = 'tonecloud'; }
+  if (at) { kept = chosen.find(c => c.x.track === at.track) || asked[0] || null; if (kept) { kept.x = at; kept.w = 'tonecloud'; } }
   for (const c of asked) {
     if (c === kept) continue;
-    const x = info.find(y => y.i === c.i), w = x ? widgetFor(x.inst, S, seedKey(x.l), seed, ['tonecloud']) : null;
+    const w = widgetFor(c.x.inst, S, c.x.track, seed, ['tonecloud']);
     if (w) c.w = w; else c.drop = true;
   }
   for (let k = chosen.length - 1; k >= 0; k--) if (chosen[k].drop) chosen.splice(k, 1);
+}
+// #79: placement with memory. The holders of each whole bar of a section are found once, from the section's first bar
+// on, so the widgets at a bar are the same whichever bar was asked before (the editor, Code over, the fast video and
+// real time agree; a seek replays the section). place(code, opts, { key, start, prep }): opts as placeWidgets (bar,
+// section, …); key: what the code depends on besides the bar (settings, language, song); start: the section's first
+// bar; prep(b): { code, opts } at a whole bar b of that section (the code without widgets), or null
+export function widgetMemory(limit = 8000) {
+  const memo = new Map();
+  const holdersAt = (b, start, key, prep) => {
+    let x = b;
+    while (x >= start && !memo.has(`${key}:${x}`)) x--;
+    let prev = x >= start ? memo.get(`${key}:${x}`) : null;
+    for (x++; x <= b; x++) {
+      const p = prep(x), o = {};
+      if (p) { placeWidgets(p.code, { ...p.opts, prev, allow: null, out: o }); prev = o.holders; }
+      if (memo.size >= limit) memo.clear();
+      memo.set(`${key}:${x}`, prev);
+    }
+    return prev;
+  };
+  return {
+    place(code, opts, { key = '', start = 0, prep = null } = {}) {
+      const before = Math.ceil(Number(opts.bar) || 0) - 1;
+      const prev = prep && before >= start ? holdersAt(before, Math.floor(start), hashString(String(key)), prep) : null;
+      return placeWidgets(code, { ...opts, prev });
+    },
+    clear: () => memo.clear(),
+  };
 }
 // the call at the end of a line, before a comment at its end
 function withCall(line, w) {
@@ -305,6 +400,30 @@ export function installWidgets(Pattern, getOpts = () => globalThis.miskWidgets) 
     P[key] = f;
   }
 }
+// #79: the editor's block widgets of @strudel/codemirror (BlockWidget) say every widget equals every other (`eq()` is
+// always true) and hand CodeMirror the canvas itself. When a widget's id changes where CodeMirror does not rebuild the
+// line (the line typed before the evaluation, an index shifted by another line: ids are `_widget_<kind>_<n>`), the old
+// canvas stays below the line: frozen (no pattern draws its id any more) or showing another line's drawing (its id now
+// drawn elsewhere), until a pause rebuilds the editor. Wrapped once per page: each widget is a slot of its own that holds
+// the canvas of its id now; two widgets are equal only with the same id and the same canvas, and a slot reused by
+// CodeMirror takes the canvas of its new widget, so a canvas that moves to another line leaves its old slot empty.
+export function installWidgetDom(BlockWidget) {
+  const P = BlockWidget && BlockWidget.prototype;
+  if (!P || P.miskSlot || typeof P.toDOM !== 'function') return false;
+  const canvasOf = P.toDOM, idOf = w => { const c = w.widgetConfig || {}; return `${c.id || ''}_widget_${c.type}_${c.index}`; };
+  const held = w => (w.miskDom ? w.miskDom.firstChild : canvasOf.call(w));
+  const fill = (w, dom) => {
+    const el = canvasOf.call(w);
+    if (el && el.parentNode !== dom) { dom.textContent = ''; dom.appendChild(el); } else if (!el) dom.textContent = '';
+    w.miskDom = dom;
+    return dom;
+  };
+  P.eq = function (other) { return !!other && idOf(this) === idOf(other) && held(this) === held(other); };
+  P.toDOM = function () { const dom = document.createElement('div'); dom.className = 'cw-slot'; return fill(this, dom); };
+  P.updateDOM = function (dom) { if (!dom || !dom.classList || !dom.classList.contains('cw-slot')) return false; fill(this, dom); return true; };
+  P.miskSlot = true;
+  return true;
+}
 // a scope as Strudel draws it (drawTimeScope), always in the widget's colour
 function scopePainter(ctx, id, { color = '#ffffff', thickness = 3, scale = 1, pos = 0.5, trigger = 0, align = true, smear = 0 } = {}) {
   return () => {
@@ -376,5 +495,6 @@ export function linkAnalysers({ pattern, now, active = () => true, interval = 50
   };
   const iv = setInterval(refresh, interval);
   refresh();
-  return { stop: () => clearInterval(iv), instrument: id => inst.get(id) };
+  // (refresh(): read again now, after an evaluation, so a widget whose id is new draws its line at once, #79)
+  return { stop: () => clearInterval(iv), instrument: id => inst.get(id), refresh };
 }

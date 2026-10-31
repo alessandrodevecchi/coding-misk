@@ -190,17 +190,18 @@ const CHECKS_WIDGETS = {
   },
   'code widgets: default mapping and slot order; fx off; spiral and pitchwheel off; hit grid and tone cloud (code-over-visual cv8)'() {
     const one = (line, S = {}) => calls(placeWidgets(line, { S: widgetSettings({ on: true, share: 0, ...S }) }));
-    assert(one('$: note("a1").s("sawtooth").analyze("bass")')[0] === 'scope', 'bass scope');
-    assert(one('$: note("a4").s("square").analyze("hook")')[0] === 'pianoroll', 'lead pianoroll');
+    // (a bass alone, no pad: it holds the tone cloud, cd5; with the cloud off, its primary scope)
+    assert(one('$: note("a1").s("sawtooth").analyze("bass")')[0] === 'tonecloud' && one('$: note("a1").s("sawtooth").analyze("bass")', { widgets: { tonecloud: false } })[0] === 'scope', 'bass: the cloud alone, else scope');
+    assert(one('$: note("a4").s("square").analyze("hook")', { widgets: { tonecloud: false } })[0] === 'pianoroll', 'lead pianoroll');
     assert(one('$: s("hh*8").analyze("hats")')[0] === 'pianoroll' && one('$: s("bd*4").analyze("kick")')[0] === 'hitgrid', 'hats pianoroll, drums the hit grid');
     assert(!one('$: s("cr").analyze("fx")').length, 'fx off');
     assert(one('$: note("c3").analyze("pad")')[0] === 'tonecloud' && one('$: s("say_it").n(3).mask("<1 0>")')[0] === 'scope', 'the pad: the tone cloud; the voice: the scope (cd5)');
     assert(one('$: s("bd*4").analyze("kick")', { widgets: { hitgrid: false } })[0] === 'scope', 'drums with the hit grid off take scope');
-    assert(one('$: note("a4").s("square").analyze("hook")', { widgets: { pianoroll: false } })[0] === 'scope', 'lead with pianoroll off takes scope');
-    assert(one('$: note("a4").s("square").analyze("hook")', { roll: 'punchcard' })[0] === 'punchcard', 'punchcard');
+    assert(one('$: note("a4").s("square").analyze("hook")', { widgets: { pianoroll: false, tonecloud: false } })[0] === 'scope', 'lead with pianoroll off takes scope');
+    assert(one('$: note("a4").s("square").analyze("hook")', { roll: 'punchcard', widgets: { tonecloud: false } })[0] === 'punchcard', 'punchcard');
     const S = widgetSettings({ on: true, share: 0 }), all = ['drums', 'hats', 'bass', 'lead', 'arp', 'pad'].flatMap(k => [S.instruments[k].primary, ...S.instruments[k].secondary]);
     assert(!all.includes('spiral') && !all.includes('pitchwheel') && !S.params.labels && !S.params.smear, 'spiral, pitchwheel, labels, smear off');
-    assert(one('$: note("c4 e4").analyze("arp")', { widgets: { spiral: true }, instruments: { arp: { on: true, primary: 'spiral', secondary: ['scope'] } } })[0] === 'spiral', 'spiral as the arp\'s primary');
+    assert(one('$: note("c4 e4").analyze("arp")', { appKinds: 1, widgets: { spiral: true }, instruments: { arp: { on: true, primary: 'spiral', secondary: ['scope'] } } })[0] === 'spiral', 'spiral as the arp\'s primary');
     const code = ['$: note("a4").analyze("hook")', '$: s("bd*4").analyze("kick")', '$: note("a1").analyze("bass")', '$: s("hh*8").analyze("hats")', '$: note("c4").analyze("pad")'].join('\n');
     const lines = (S2, n = 5) => placeWidgets(code, { S: widgetSettings({ on: true, max: n, share: 0, ...S2 }), sections: 1, seed: 'x' }).split('\n').filter(l => WCALL.test(l) && !(WCALL.lastIndex = 0)).map(l => l.match(/analyze\("(\w+)"\)/)[1]);
     // the first section's count is drawn by the seed: compare orders with a song of one section and the maximum 1
@@ -212,7 +213,7 @@ const CHECKS_WIDGETS = {
   'code widgets: one tone cloud at a time, on the pad, else the first of bass, lead, arp, the voice last (code-over-visual cd5)'() {
     const L = { pad: '$: note("c4").analyze("pad")', bass: '$: note("a1").analyze("bass")', lead: '$: note("a4").analyze("hook")', arp: '$: note("c5 e5").analyze("arp")', voice: '$: s("say_it").n(3).analyze("voice")', kick: '$: s("bd*4").analyze("kick")' };
     // every melodic line and the voice would take the cloud (primary) and every slot is open
-    const cloudy = { max: 8, share: 0, instruments: Object.fromEntries(['pad', 'bass', 'lead', 'arp', 'voice'].map(k => [k, { on: true, primary: 'tonecloud', secondary: ['scope'] }])) };
+    const cloudy = { appKinds: 1, max: 8, share: 0, instruments: Object.fromEntries(['pad', 'bass', 'lead', 'arp', 'voice'].map(k => [k, { on: true, primary: 'tonecloud', secondary: ['scope'] }])) };
     const at = names => placeWidgets(names.map(k => L[k]).join('\n'), { S: widgetSettings({ on: true, ...cloudy }), sections: 1, seed: 'x' }).split('\n').map(l => [l, (l.match(/\._(\w+)\(\)/) || [])[1]]);
     const whereIs = names => { const out = at(names); return { n: out.filter(x => x[1] === 'tonecloud').length, on: names.filter((k, i) => out[i][1] === 'tonecloud') }; };
     assert(whereIs(['bass', 'lead', 'pad', 'arp', 'voice']).n === 1 && whereIs(['bass', 'lead', 'pad', 'arp', 'voice']).on[0] === 'pad', 'a pad: the cloud sits on it, once');
@@ -250,9 +251,10 @@ const CHECKS_WIDGETS = {
       const meta = { sections: s.sections.length };
       for (let k = 0, a = 0; k < s.sections.length; a += s.sections[k].bars, k++) {
         const one = (SS) => chainLinesW(placeWidgets(code, { S: SS, bar: a, section: k, sections: meta.sections, seed: id })).filter(l => WCALL.test(l) && !(WCALL.lastIndex = 0));
-        // (the hit grid is the drums' primary, on the first drum line playing, which may be a hats line: code-over-visual D11)
-        for (const l of one(S)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w === S.instruments[inst].primary || w === 'hitgrid') prim++; else sec++; }
-        for (const l of one(S0)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w !== S0.instruments[inst].primary && w !== 'hitgrid') sec0++; }
+        // (the hit grid is the drums' primary, on the first drum line playing, which may be a hats line: code-over-visual D11;
+        // the tone cloud sits on its holder whatever the seed, cd5: both are placed by rule, not by the share)
+        for (const l of one(S)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w === S.instruments[inst].primary || w === 'hitgrid' || w === 'tonecloud') prim++; else sec++; }
+        for (const l of one(S0)) { const inst = instrumentOf(l), w = l.match(/\._(\w+)\(\)/)[1]; if (w !== S0.instruments[inst].primary && w !== 'hitgrid' && w !== 'tonecloud') sec0++; }
       }
     }
     const share = sec / (prim + sec);
@@ -269,20 +271,25 @@ const CHECKS_WIDGETS = {
     }
   },
   'code widgets: a person typing a growth adds a widget only where it fits, else at a later step (D8)'() {
-    const C = resolveProfile('switch'), g = crescendoSong(song('kellerlicht'), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
-    const W = liveCode(g, C, { cols: () => 80, widgets: () => ({ on: true }) }), P = liveCode(g, C, { cols: () => 80 }), X = liveCode(g, { ...C, typist: 'exact' }, { cols: () => 80, widgets: () => ({ on: true }) });
+    // (#79: a call stays through edits of its line, so it waits only when its track comes in mid-section; with the
+    // maximum 8 that happens on these songs)
+    const C = resolveProfile('switch');
     assert(C.typist === 'human', 'Live coder types as a person');
-    const bars = [0, ...new Set(buildSteps(W.build).map(x => x.at))].sort((x, y) => x - y), starts = new Set(sectionStarts(W.build)), sb = barSeconds(W.build);
     let waiting = 0, made = 0;
-    for (let i = 1; i < bars.length; i++) {
-      const b = bars[i], a = bars[i - 1];
-      assert(stripWidgets(W.codeAt(b)) === P.codeAt(b), `bar ${b}: the code without widgets changed`);
-      if (calls(W.codeAt(b)).length !== calls(X.codeAt(b)).length) waiting++;
-      if (starts.has(b)) continue;
-      const usable = (() => { const av = Math.max(0.2, (b - a - 0.5) * sb - 0.2); return Math.max(0.2, av - Math.min(av * 0.5, 2)); })();
-      const need = L => { const to = L.codeAt(b), from = settleOthers(L.codeAt(a), to, b); return from === to ? 0 : typingPlan(from, to, { style: 'human', lean: true, seed: 'kellerlicht', notes: false }).natural; };
-      // (rushed as the growth counts it: more than 1.1 times the time there is)
-      if (need(P) <= usable * 1.1 && need(W) > usable * 1.1) made++;
+    for (const id of ['kellerlicht', 'settimo-cielo', 'switch-prima-luce']) {
+      const g = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
+      const W = liveCode(g, C, { cols: () => 80, widgets: () => ({ on: true, max: 8 }) }), P = liveCode(g, C, { cols: () => 80 }), X = liveCode(g, { ...C, typist: 'exact' }, { cols: () => 80, widgets: () => ({ on: true, max: 8 }) });
+      const bars = [0, ...new Set(buildSteps(W.build).map(x => x.at))].sort((x, y) => x - y), starts = new Set(sectionStarts(W.build)), sb = barSeconds(W.build);
+      for (let i = 1; i < bars.length; i++) {
+        const b = bars[i], a = bars[i - 1];
+        assert(stripWidgets(W.codeAt(b)) === P.codeAt(b), `${id} bar ${b}: the code without widgets changed`);
+        if (calls(W.codeAt(b)).length !== calls(X.codeAt(b)).length) waiting++;
+        if (starts.has(b)) continue;
+        const usable = (() => { const av = Math.max(0.2, (b - a - 0.5) * sb - 0.2); return Math.max(0.2, av - Math.min(av * 0.5, 2)); })();
+        const need = L => { const to = L.codeAt(b), from = settleOthers(L.codeAt(a), to, b); return from === to ? 0 : typingPlan(from, to, { style: 'human', lean: true, seed: id, notes: false }).natural; };
+        // (rushed as the growth counts it: more than 1.1 times the time there is)
+        if (need(P) <= usable * 1.1 && need(W) > usable * 1.1) made++;
+      }
     }
     assert(waiting > 0 && made === 0, `${waiting} steps with a widget waiting, ${made} steps made rushed by a widget`);
   },
@@ -309,6 +316,71 @@ const CHECKS_WIDGETS = {
     const muted = '_$: note("a1").analyze("bass")\n$: note("a4").analyze("hook")\n$: s("bd*4").analyze("kick")';
     const n = placeWidgets(muted, { S: widgetSettings({ on: true, max: 2, share: 0 }), sections: 1, seed: 'a', returns: () => true });
     assert(calls(n).length <= 2 && /^_\$:.*_scope\(\)/m.test(n) && calls(n).length === Math.min(2, calls(n).length), `muted bass takes a slot: ${n}`);
+  },
+  'code widgets: settings saved before the app widgets get them once, every other choice kept (#79)'() {
+    const old = { on: true, max: 5, share: 40, instruments: { drums: { on: true, primary: 'scope', secondary: ['pianoroll', 'spectrum'] }, hats: { on: false, primary: 'spectrum', secondary: [] }, bass: { on: true, primary: 'pianoroll', secondary: ['scope'] }, lead: { on: true, primary: 'pianoroll', secondary: ['scope', 'spectrum'] }, arp: { on: true, primary: 'pianoroll', secondary: [] }, pad: { on: true, primary: 'scope', secondary: ['pianoroll'] }, fx: { on: false, primary: 'scope', secondary: ['spectrum'] }, voice: { on: true, primary: 'spectrum', secondary: ['tonecloud', 'scope'] } }, widgets: { spiral: true } };
+    const S = widgetSettings(old), I = S.instruments;
+    assert(I.drums.primary === 'hitgrid' && I.drums.secondary.join() === 'scope,pianoroll,spectrum', `drums ${JSON.stringify(I.drums)}`);
+    assert(I.pad.primary === 'tonecloud' && I.pad.secondary.join() === 'scope,pianoroll', `pad ${JSON.stringify(I.pad)}`);
+    assert(['bass', 'lead', 'arp'].every(k => I[k].secondary[I[k].secondary.length - 1] === 'tonecloud' && I[k].primary === old.instruments[k].primary), 'bass, lead, arp: the tone cloud among the secondary');
+    assert(I.voice.primary === 'scope' && I.voice.secondary.join() === 'spectrum,tonecloud' && I.voice.on, `voice ${JSON.stringify(I.voice)}`);
+    assert(JSON.stringify(I.fx) === JSON.stringify(old.instruments.fx) && !I.hats.on && I.hats.primary === 'spectrum', 'fx and hats as they were');
+    assert(S.max === 5 && S.share === 40 && S.widgets.spiral && S.widgets.hitgrid && S.widgets.tonecloud && S.appKinds === 1, 'the other choices kept, the app widgets on, the mark');
+    // saved with the mark, a later choice stays
+    const later = widgetSettings({ ...S, instruments: { ...S.instruments, bass: { on: true, primary: 'scope', secondary: [] } }, widgets: { ...S.widgets, tonecloud: false } });
+    assert(later.instruments.bass.secondary.length === 0 && later.widgets.tonecloud === false, 'a choice made after the migration stays');
+    // and an explicit switch off of an app widget in old settings stays off
+    assert(widgetSettings({ widgets: { hitgrid: false } }).widgets.hitgrid === false, 'hit grid switched off stays off');
+  },
+  'code widgets: without a pad the tone cloud sits on the first of bass, lead, arp playing, whatever the seed (cd5, #79)'() {
+    const code = ['$: s("bd*4").analyze("kick")', '$: note("a4 c5").analyze("hook")', '$: note("a1").analyze("bass")', '$: note("c5 e5").analyze("arp")'].join('\n');
+    for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']) {
+      const out = placeWidgets(code, { S: widgetSettings({ on: true, max: 4 }), sections: 1, seed }).split('\n');
+      assert(out[2].endsWith('._tonecloud()') && out.filter(l => l.includes('_tonecloud')).length === 1, `seed ${seed}: ${out.map(l => (l.match(/_(\w+)\(\)$/) || [])[1])}`);
+    }
+    const voice = placeWidgets('$: s("say_it").n(3).analyze("voice")', { S: widgetSettings({ on: true, share: 0 }), sections: 1, seed: 'x' });
+    assert(voice.endsWith('._scope()'), `the voice alone keeps its scope: ${voice}`);
+  },
+  'code widgets: an edit of a line keeps its widget; the kind of a track comes from the track and the seed (#79)'() {
+    // (the tone cloud off: without a pad the bass holds it whatever the seed, cd5)
+    const S = widgetSettings({ on: true, max: 4, widgets: { tonecloud: false } }), kinds = new Set();
+    for (const seed of 'abcdefghijklmnop'.split('')) {
+      const one = l => calls(placeWidgets(`// ========== Kick · drums ==========\n${l}\n// ========== Bass · bass ==========\n$: note("a1").analyze("bass")`, { S, sections: 1, seed }));
+      const a = one('$: s("bd*4").bank("RolandTR909").lpf(4310).analyze("kick")');
+      for (const l of ['$: s("bd*4").bank("RolandTR909").lpf(9280).analyze("kick")', '$: s("bd*4").bank("RolandTR909").analyze("kick")', '$: s("bd*4").bank("RolandTR909").crunch(0.2).analyze("kick")']) assert(one(l).join() === a.join(), `seed ${seed}: ${a} → ${one(l)} after an edit`);
+      a.forEach(w => kinds.add(w));
+    }
+    assert(kinds.size >= 3, `the same kinds on every seed: ${[...kinds]}`);
+  },
+  'code widgets: over the whole growth a line keeps its widget kind within a section and never loses it while it lives (#79)'() {
+    const bad = [];
+    let held = 0, changes = 0;
+    const cases = [['kellerlicht', 'switch', {}], ['luci-rosse', 'switch', { max: 5 }], ['settimo-cielo', 'switch', {}], ['ferro', 'switch', { share: 60 }], ['switch-prima-luce', 'switch', { max: 4 }], ['luci-rosse', 'classic', { max: 8, window: 8 }]];
+    for (const [id, profile, over] of cases) {
+      const T = widgetCodes(id, profile, over), starts = new Set(sectionStarts(T.build)), total = T.build.sections.reduce((a, x) => a + x.bars, 0);
+      let prev = null;
+      for (let bar = 0; bar < total; bar++) {
+        const o = T.W.widgetsAt(bar), code = T.at(bar), tag = `${id} ${profile} bar ${bar + 1}`;
+        if (calls(code).sort().join() !== o.shown.map(h => h.w).sort().join()) bad.push(`${tag}: calls ${calls(code)}, shown ${o.shown.map(h => h.w)}`);
+        if (prev && !starts.has(bar)) {
+          for (const h of prev.holders) {
+            if (!o.alive.includes(h.track)) continue;
+            const now = o.holders.find(x => x.track === h.track);
+            if (!now || now.w !== h.w) bad.push(`${tag}: ${h.track} ${h.w} → ${now ? now.w : 'none'}`);
+          }
+          for (const h of prev.shown) if (o.alive.includes(h.track) && !o.shown.some(x => x.track === h.track && x.w === h.w)) bad.push(`${tag}: ${h.track} ${h.w} hidden while it lives`);
+        }
+        if (prev && starts.has(bar)) changes += o.holders.filter(h => !prev.holders.some(x => x.track === h.track && x.w === h.w)).length;
+        held += o.holders.length;
+        prev = o;
+      }
+    }
+    assert(!bad.length, `${bad.length} changes mid-section: ${bad.slice(0, 6).join('; ')}`);
+    assert(held > 0, 'no widgets');
+    // the memory: a bar asked first gives the same widgets as the bars played in order
+    const A = widgetCodes('kellerlicht', 'switch', {}), B = widgetCodes('kellerlicht', 'switch', {});
+    for (let b = 0; b <= 120; b++) A.at(b);
+    for (const b of [120, 60, 30]) assert(B.at(b) === A.at(b), `kellerlicht bar ${b + 1}: asked first, other widgets than in order`);
   },
 };
 const chainLinesW = c => chainLines(c);

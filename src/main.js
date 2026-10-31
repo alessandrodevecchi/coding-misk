@@ -107,7 +107,7 @@ import { createGrowthStore } from './live/growth-store.js';
 import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
-import { CW_KEY, widgetSettings, placeWidgets, widgetOptions, linkAnalysers } from './live/widgets.js';
+import { CW_KEY, APP_KINDS_VERSION, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom } from './live/widgets.js';
 import { SW_KEY, stageSettings, stageMapping, stageScopeInstruments, layerOn } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
 const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
@@ -137,6 +137,13 @@ const ownTexts = sg => { const b = sg && Array.isArray(sg.build) ? sg.build : nu
 setNarratorMine(narratorPick(sg => { try { return phr && sg && T && sg.id === T.id ? phr.composeSource(ownTexts(T)) : null; } catch (e) { return null; } }));
 // code widgets (code-widgets): the settings of the Settings card, read each time a code is shown
 const cwSettings = () => widgetSettings(store.get(CW_KEY, null));
+// #79: settings saved before the app widgets (hit grid, tone cloud) existed get their defaults once, then are saved
+// with the mark, so a later choice of the user stays
+{
+  const cw = store.get(CW_KEY, null), sw = store.get(SW_KEY, null);
+  if (cw && typeof cw === 'object' && cw.appKinds !== APP_KINDS_VERSION) store.set(CW_KEY, widgetSettings(cw));
+  if (sw && typeof sw === 'object' && sw.appKinds !== APP_KINDS_VERSION) store.set(SW_KEY, stageSettings(sw));
+}
 // the stage widgets (widgets-on-stage D9): their settings and the panels' mapping, read again only when one of the two
 // stored values changes (the stage asks every frame)
 const stageWidgets = (() => {
@@ -699,10 +706,13 @@ ready.then(() => {
     codeFresh = false;
     evaluatedCode = song.run(ed.code || '', bar);
     await ed.repl.evaluate(evaluatedCode, autostart);
+    if (cwLinks) cwLinks.refresh();
   };
   const iv = setInterval(() => { if (typeof globalThis.register === 'function') { clearInterval(iv); installHelpers({ register: globalThis.register }); } }, 100);
+  // #79: a widget whose id changes on a line redraws there at once (Strudel's editor kept the old canvas until a pause)
+  const iw = setInterval(() => { if (installWidgetDom(globalThis.BlockWidget)) clearInterval(iw); }, 100);
   // code widgets D4: a scope or spectrum widget reads its line's instrument
-  linkAnalysers({ pattern: () => sched() && sched().pattern, now: () => (sched() ? sched().now() : 0), active: () => isPlaying() && /\._(?:scope|spectrum)\(/.test(ed.code || '') });
+  cwLinks = linkAnalysers({ pattern: () => sched() && sched().pattern, now: () => (sched() ? sched().now() : 0), active: () => isPlaying() && /\._(?:scope|spectrum)\(/.test(ed.code || '') });
 });
 // il REPL carica solo una parte di dirt-samples: carichiamo l'archivio completo (arpy, industrial, glitch, …)
 // samples() can appear a little after the editor: wait for it, otherwise the call was skipped and only part of the archive loaded
@@ -744,6 +754,8 @@ ready.then(async () => {
   } catch (e) { console.warn('campioni personalizzati non disponibili', e); composeReady = true; growComposeAway(); cardsReady(); }
 });
 const sched = () => ed && ed.repl && ed.repl.scheduler;
+// the links of the scope and spectrum widgets to their lines' instruments (code-widgets D4), made with the editor
+let cwLinks = null;
 const isPlaying = () => !!(sched() && sched().started);
 // the pattern preview of Compose (pattern-preview), made with the track panel below
 let preview = null;
@@ -757,7 +769,14 @@ let labPreview = null;
 let codeBar = 0, codeFresh = false;
 const codeNow = (sg, bar) => { codeBar = bar; codeFresh = true; return codeFor(sg, bar); };
 // (a song without a code of the moment, played as written, gets its code widgets here, at the bar's section: code-widgets D10)
-const plainWidgets = (sg, bar, c) => { const S = cwSettings(); return S.on && !sg.loop && sg.meta ? placeWidgets(c, { S, bar, section: Math.max(0, sg.meta.sectionAt(bar)), sections: sg.meta.sections.length, seed: sg.id || '' }) : c; };
+// (#79: the holders of each section remembered, so a widget stays on its line within a section, whatever bar is asked)
+const plainMemory = widgetMemory();
+const plainWidgets = (sg, bar, c) => {
+  const S = cwSettings();
+  if (!(S.on && !sg.loop && sg.meta)) return c;
+  const at = b => Math.max(0, sg.meta.sectionAt(b)), opts = b => ({ S, bar: b, section: at(b), sections: sg.meta.sections.length, seed: sg.id || '' }), sec = sg.meta.sections[sg.meta.sectionAt(bar)];
+  return plainMemory.place(c, opts(bar), { key: `${sg.id || ''}\u0000${JSON.stringify(S)}\u0000${c}`, start: sec ? sec.start : Math.ceil(bar), prep: b => ({ code: c, opts: opts(b) }) });
+};
 const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.codeAt ? sg.codeAt(bar, keep) : keep && sg.codeKeep ? sg.codeKeep(keep) : plainWidgets(sg, bar, sg.code)).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
 // code-widgets D6: the code of a playing song changed only between its equal start and end, in one transaction, so the
 // widgets and the lit notes of the lines left as they were stay (a full replacement removes every widget until the
@@ -5625,7 +5644,7 @@ const video = createVideo({
   getCodeTheme: videoCodeTheme,
   getCodeOver: codeOverNow,
   // code-widgets D11: the widgets drawn in the page (never in a fast video, whose code is not the page's)
-  getWidgets: () => { const S = cwSettings(), M = globalThis.miskWidgetCanvases; if (fv) return fv.widgets ? { dim: S.dim, canvas: (type, i, key) => fv.widgets.canvas(type, i, key, fv.cyc, fv.t, fv.master) } : null; if (!S.on || !M) return null; return { dim: S.dim, canvas: (type, i) => { const k = `_widget__${type}_${i}`; for (const [id, c] of M) if (id.endsWith(k)) return c; return null; } }; },
+  getWidgets: () => { const S = cwSettings(), M = globalThis.miskWidgetCanvases; if (fv) return fv.widgets ? { dim: S.dim, canvas: (type, i, key) => fv.widgets.canvas(type, i, key, fv.cyc, fv.t, fv.master) } : null; if (!S.on || !M) return null; return { dim: S.dim, canvas: (type, i) => { const k = `_widget__${type}_${i}`; if (M.has(k)) return M.get(k); for (const [id, c] of M) if (id.endsWith(k)) return c; return null; } }; },
   soulFrame: (cyc, playing, scale) => soul.frame(cyc, playing, scale),
   soulView: () => soul.shown,
   getCode: () => (fv ? fv.code : (ed && ed.code) || ''),
