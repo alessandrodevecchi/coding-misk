@@ -6,6 +6,7 @@ While the app types the code (Live coder, Crescendo, Decode), the code panel alw
 
 - A "Follow edits" toggle in the code panel's header, next to the full-screen and collapse buttons. On: the panel scrolls to the line being edited, as today. Off: the panel stays where the person left it. The choice is remembered.
 - A pause on manual scrolling: when the person scrolls the code panel by hand while following is on, the panel stops following for 10 seconds after the last manual scroll, then follows again. The toggle shows the pause.
+- With the code panel full screen, the player bar stays visible below it (backlog of #44).
 - English and Italian labels and tooltips, and a line in the Guide card about the code panel.
 
 Not in scope: the code in videos, fragments and Code over on the stage (they have their own code view options), and the typing itself (the code keeps being typed; only the scrolling changes).

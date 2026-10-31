@@ -35,3 +35,10 @@ When the toggle is on and the person scrolls the code panel by hand (wheel, touc
 #### Scenario: Toggle off
 - **WHEN** the toggle is off and the person scrolls by hand
 - **THEN** nothing changes: the panel stays where the person leaves it
+
+### Requirement: Player bar visible with the full-screen code
+When the code panel is full screen, the player bar SHALL stay visible and usable at the bottom of the window, below the code panel, and the panel SHALL end above it. Esc and the full-screen button SHALL still leave the full-screen view.
+
+#### Scenario: Pausing from the full-screen code
+- **WHEN** the code is full screen while a song plays
+- **THEN** the player bar shows title, time and bar counter below the code, and its Pause button pauses the song
