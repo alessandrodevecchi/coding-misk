@@ -96,6 +96,54 @@ The density rule and the CRT spacing take only the picture's size (logical width
 
 A script `tools/measure-render-density.cjs` (dev server) sets each output (window 1100 × 460 at ratio 2, full screen 1920 × 1080 at ratio 1 and 2, a 1080p fast video frame, a 1080 × 1920 fragment frame), plays 30 seconds of one song on Sunset and Stage with each render, and prints a table: cell or dot in device and logical pixels, rows × columns, median pass time, the light form's state, and saves a 400 × 400 crop at 100% for each. Run once on `develop` before any code change (the "before" table and crops) and once after; both tables go in `design.md` of this change and the crops in the owner's test folder.
 
+## Measurements (D7)
+
+`tools/measure-render-density.cjs` on 2026-11-01, headless Chrome on the owner's Mac (load average about 6 from other work), Tramonto playing luci-rosse live on the stage (30 s), the video outputs from 300 frames of a made-up feed. Cell: LED pitch, ASCII and Terminal cell height, 1-bit dot, CRT scanline period, in logical pixels. "Before" ran on `develop` (2e55193) before any code change; full tables with Palco and every crop in the owner's test folder (`notes/prove-2026-11-01/render-density/`).
+
+| Output | Render | Before: cell (logical px), rows, pass, light | After: cell, rows, pass, light |
+| --- | --- | --- | --- |
+| window @2 | bit | 3.01, 153 rows, 6.4 ms, on | 1, 460 rows, 5.3 ms, off |
+| window @2 | crt | 1.5, 307 rows, 0.1 ms, off | 2, 230 rows, 0.1 ms, off |
+| window @2 | led | 11.5, 40 rows, 4.9 ms, on | 3.07, 150 rows, 5.9 ms, off |
+| window @2 | ascii | 11.5, 40 rows, 4.4 ms, off | 10.45, 44 rows, 5.4 ms, on |
+| window @2 | terminal | 10.22, 45 rows, 5.8 ms, off | 15.33, 30 rows, 5.8 ms, off |
+| full screen @1 | bit | 6, 180 rows, 10 ms, on | 2, 540 rows, 6.5 ms, off |
+| full screen @1 | crt | 3, 360 rows, 0.1 ms, off | 2, 540 rows, 0.1 ms, off |
+| full screen @1 | led | 27, 40 rows, 10.5 ms, on | 6, 180 rows, 4.4 ms, off |
+| full screen @1 | ascii | 54, 20 rows, 9.6 ms, on | 14.03, 77 rows, 7.2 ms, on |
+| full screen @1 | terminal | 36, 30 rows, 7.8 ms, on | 15.88, 68 rows, 4.3 ms, off |
+| full screen @2 | bit | 3, 360 rows, 12.4 ms, on | 1.5, 720 rows, 8.6 ms, on |
+| full screen @2 | crt | 1.5, 720 rows, 0.1 ms, off | 2, 540 rows, 0.1 ms, off |
+| full screen @2 | led | 27, 40 rows, 11.2 ms, on | 6, 180 rows, 7.2 ms, off |
+| full screen @2 | ascii | 54, 20 rows, 11 ms, on | 14.03, 77 rows, 9.6 ms, on |
+| full screen @2 | terminal | 36, 30 rows, 10.6 ms, on | 15.88, 68 rows, 7.5 ms, off |
+| video 1080p | bit | 2, 360 rows, 2.3 ms, — | 1.33, 540 rows, 3.6 ms, — |
+| video 1080p | crt | 2, 360 rows, 0 ms, — | 2, 360 rows, 0 ms, — |
+| video 1080p | led | 9, 80 rows, 1.3 ms, — | 4.8, 150 rows, 1.5 ms, — |
+| video 1080p | ascii | 18, 40 rows, 1.8 ms, — | 9, 80 rows, 3.5 ms, — |
+| video 1080p | terminal | 16, 45 rows, 1.6 ms, — | 16, 45 rows, 2.7 ms, — |
+| fragment 9:16 | bit | 1.13, 640 rows, 2.7 ms, — | 0.75, 960 rows, 3.3 ms, — |
+| fragment 9:16 | crt | 1.13, 640 rows, 0 ms, — | 1.88, 384 rows, 0 ms, — |
+| fragment 9:16 | led | 9, 80 rows, 1.3 ms, — | 2.7, 267 rows, 1.5 ms, — |
+| fragment 9:16 | ascii | 18, 40 rows, 1.3 ms, — | 6.99, 103 rows, 2.2 ms, — |
+| fragment 9:16 | terminal | 16, 45 rows, 1.2 ms, — | 14.4, 50 rows, 1.7 ms, — |
+
+Density at a full-screen stage, ratio 2 (after):
+
+| Render | Coarse: cell, rows | Normal: cell, rows | Fine: cell, rows |
+| --- | --- | --- | --- |
+| bit | 2.1, 514 (light) | 1.5, 720 (light) | 1.32, 821 (light) |
+| led | 8.37, 129 | 6, 180 | 4.2, 257 |
+| ascii | 18.95, 57 | 14.03, 77 (light) | 9.82, 110 (light) |
+| terminal | 22.04, 49 | 15.88, 68 | 14.4, 75 |
+
+Findings:
+
+- In headless Chrome the automatic light form switched on about 0.5 s after Play in almost every stage case before the change, so the full-screen "before" pictures are the light form (LED 40 rows of 27-pixel dots, ASCII 20 rows): the cause the owner saw. After, Tramonto stays in the normal form in LED, Terminal and CRT; ASCII and 1-bit still switch at full screen (after 1 to 2.5 s), now only 1.5 times coarser (1-bit 3 device pixels instead of 6, ASCII 77 rows instead of 20).
+- Terminal in the window is coarser than before (30 rows instead of 45): before, its text was about 8.5 logical pixels high, below the 12-pixel floor of D5; 30 rows is the rule's smallest count and the floor allows 31. Fine stops at 31 rows there for the same reason.
+- Palco's pass times include the look's own drawing (its glows are flushed when the pass reads the frame back), so Palco switches to the light form at once before and after; its times are not the pass alone.
+- The pass times move by up to 2 times between runs on this machine; `tools/check-render-styles.cjs` on `develop` in the same session failed the 1080p budget for 1-bit (5.7 ms), LED (4.8), ASCII (6.3) and Terminal (4.8). After the change: 1-bit 3.9, LED 1.3, ASCII 4.1, Terminal 2.1, CRT 0.6 ms (only ASCII over 4 ms). 1-bit's work picture is 2.25 times larger; its loop now writes 32 bits a pixel, which keeps it within the budget.
+
 ## Risks / Trade-offs
 
 - **Cost of ASCII and 1-bit:** more cells cost more. D3 keeps ASCII to about 80 draw calls; 1-bit's work picture can double. If a median goes above the budget, the first lever is the floor (`max` in D2 and D3, the 1.2 M cap in D4), not the light form.

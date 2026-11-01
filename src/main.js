@@ -1,4 +1,5 @@
 import '@strudel/repl';
+import { DENSITY_KEY, densityOf } from './visuals/density.js';
 import './style.css';
 import './theme-light.css';
 import { ideaCode } from './music.js';
@@ -533,6 +534,8 @@ let render = renderOf(store.get('coding-misk-render', 'normal'));
 // the render of a video or a fragment: 'stage' (the stage's, by default) or a render of its own
 const outRender = v => (v && v !== 'stage' ? renderOf(v) : render);
 const renderLight = () => (['on', 'off'].includes(store.get('coding-misk-render-light', 'auto')) ? store.get('coding-misk-render-light', 'auto') : 'auto');
+// the Density of the renders (denser-renders D8): one value for the stage, the videos, the fragments and the live output
+const renderDensity = () => densityOf(store.get(DENSITY_KEY, 'normal'));
 // the soul scene (#46) keeps the colours of the last other visual: the app's accents and the colour views' hue
 // the fast video's frame being drawn (#53): { info, code, say, soulSrc }, read instead of the live player
 let fv = null, exportCtl = null;
@@ -1751,7 +1754,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
       fv.look = fLook;
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
-      visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off' });
+      visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off', density: renderDensity() });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
       else video.composeAt({ layout, q, ct }, cyc, t);
     },
@@ -5502,7 +5505,7 @@ function stageSectionInfo(cyc) {
 const recRender = () => { try { return video.on && video.layout !== 'tab' ? outRender(video.opts().render) : render; } catch (e) { return render; } };
 const visuals = startVisuals({
   // a video being recorded from the stage (not the whole tab) draws the video's render
-  getS: () => ({ look: soulOverride ? 'soul' : look, render: recRender(), light: renderLight() }), soul,
+  getS: () => ({ look: soulOverride ? 'soul' : look, render: recRender(), light: renderLight(), density: renderDensity() }), soul,
   // light-theme: the stage stays dark, its widgets take the neon palette in the light app theme
   stage: {
     settings: () => stageWidgets().S, options: () => stageWidgets().sw, section: stageSection, theme: () => (ui === 'hw' ? 'hw' : 'neon'),

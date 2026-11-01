@@ -8,6 +8,7 @@ import { RENDER_GAIN } from '../music.js';
 import { termPalette, gridOf, termGrid, brailleWave } from './term-grid.js';
 import { spectrumOf } from './widget-painters.js';
 import { layerFree } from './widget-layer.js';
+import { ledCells, asciiCells as asciiGrid, bitCells, termRows, crtSpacing, densityOf } from './density.js';
 
 // D3: 8×8 Bayer thresholds in (0, 1), row by row
 export const BAYER8 = (() => {
@@ -31,10 +32,21 @@ export function liftTable(black, gain, gamma = 0.9) {
   if (!T) { T = new Float32Array(256); for (let i = 0; i < 256; i++) T[i] = lift(i / 255, black, gain, gamma); lifts.set(key, T); if (lifts.size > 64) lifts.delete(lifts.keys().next().value); }
   return T;
 }
+const LITTLE = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 const lum8 = (d, i) => (77 * d[i] + 150 * d[i + 1] + 29 * d[i + 2]) >> 8;
 // 1-bit: rgba pixels w×h → two colours with an ordered dither (in place when out is d)
 export function bitPixels(d, w, h, { gain = 1.5, black = 0.1, ink, paper }, out = d) {
   const L = liftTable(black, gain);
+  // (in place on a little-endian buffer: one 32-bit write a pixel and the threshold per light read once a row, about
+  // twice as fast for the larger work pictures of denser-renders D4; the same colours as the byte path)
+  if (out === d && d.byteOffset % 4 === 0 && LITTLE) {
+    const u = new Uint32Array(d.buffer, d.byteOffset, w * h), pack = c => ((255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0]) >>> 0, I = pack(ink), P = pack(paper);
+    for (let y = 0, i = 0, p = 0; y < h; y++) {
+      const row = (y & 7) << 3;
+      for (let x = 0; x < w; x++, i += 4, p++) u[p] = L[(77 * d[i] + 150 * d[i + 1] + 29 * d[i + 2]) >> 8] > BAYER8[row | (x & 7)] ? I : P;
+    }
+    return out;
+  }
   for (let y = 0, i = 0; y < h; y++) {
     const row = (y & 7) << 3;
     for (let x = 0; x < w; x++, i += 4) {
@@ -76,13 +88,32 @@ export function termPixels(d, w, h, ramp = null, out = d) {
   return out;
 }
 
-// the work sizes of a frame of cw×ch device pixels (D3), light: the slow-device form
-export function passSizes(render, cw, ch, light = false) {
-  if (render === 'bit') { const s = light ? 6 : 3; return { w: Math.max(1, Math.floor(cw / s)), h: Math.max(1, Math.floor(ch / s)) }; }
-  if (render === 'led') { const rows = light ? 40 : 80, p = ch / rows; return { w: Math.max(1, Math.floor(cw / p)), h: rows, pitch: p }; }
-  if (render === 'ascii') { const rows = light ? 20 : 40, cellH = ch / rows, cellW = cellH / 1.9; return { w: Math.max(1, Math.floor(cw / cellW)), h: rows, cellW, cellH }; }
-  if (render === 'terminal') return { rows: light ? 30 : 45 };
+// the work sizes of a frame of cw×ch device pixels (denser-renders D1 to D8): o { dpr (device pixels per logical
+// pixel, 1 by default), density ('coarse' | 'normal' | 'fine'), light (the slow-device form) }; a boolean o is the
+// light form at ratio 1 (the call before denser-renders). The rules are in density.js and take the picture's size only
+export function passSizes(render, cw, ch, o = {}) {
+  const { dpr = 1, density = 'normal', light = false } = typeof o === 'boolean' ? { light: o } : o || {}, W = cw / dpr, H = ch / dpr;
+  if (render === 'bit') return bitCells(W, H, dpr, density, light);
+  if (render === 'led') { const L = ledCells(W, H, dpr, density, light); return { w: L.cols, h: L.rows, pitch: L.pitch }; }
+  if (render === 'ascii') { const A = asciiGrid(W, H, dpr, density, light); return { w: A.cols, h: A.rows, cellW: A.cellW, cellH: A.cellH }; }
+  if (render === 'terminal') return { rows: termRows(W, H, density, light) };
+  if (render === 'crt') return crtSpacing(dpr);
   return null;
+}
+
+// ASCII a row at a time (D3): each row one fillText of its glyphs in white, the font sized so its advance (0.6 em) is
+// the cell width; letterSpacing corrects a font whose advance is not exactly that (fit: the measured offset per glyph)
+export function drawAsciiRows(g, glyphs, cols, rows, cellW, cellH, ox = 0, fit = 0) {
+  g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.textAlign = 'left';
+  g.font = `600 ${Math.max(4, cellW / 0.6).toFixed(2)}px "JetBrains Mono", monospace`;
+  if (fit) g.letterSpacing = `${fit.toFixed(3)}px`;
+  const codes = new Uint16Array(cols), ramp = [...ASCII_RAMP].map(c => c.charCodeAt(0));
+  for (let y = 0; y < rows; y++) {
+    let any = false;
+    for (let x = 0; x < cols; x++) { const k = glyphs[y * cols + x]; codes[x] = ramp[k]; if (k) any = true; }
+    if (any) g.fillText(String.fromCharCode.apply(null, codes), ox, (y + 0.5) * cellH + 0.5);
+  }
+  if (fit) g.letterSpacing = '0px';
 }
 
 // The chrome of the Terminal pass (take C): a tab bar, a braille scope of the song's wave, an eighth-block spectrum and
@@ -130,15 +161,16 @@ export function drawTermChrome(g, G, T, info) {
 }
 
 // The passes on a canvas. apply(g, c, render, o) draws the pass over the frame on c (device pixels) and returns the
-// time it took in ms. o: { look, theme, W, H (logical size of g), dpr (g's scale), light ('auto' | 'on' | 'off'),
+// time it took in ms. o: { look, theme, W, H (logical size of g), dpr (g's scale), density ('coarse' | 'normal' | 'fine'), light ('auto' | 'on' | 'off'),
 // info() → the Terminal chrome's information, fixed (no automatic light form: the fast video) }
 export function createRenderer() {
   const mk = () => document.createElement('canvas');
   // (the canvas read back is on the CPU from the first frame: a canvas Chrome moves there after a few reads would
   // smooth the first frames differently, and the same frame must give the same output)
   const gs = mk(), gsx = gs.getContext('2d'), sm = mk(), smx = sm.getContext('2d', { willReadFrequently: true }), ou = mk(), oux = ou.getContext('2d'), bl = mk(), blx = bl.getContext('2d');
-  let crt = null, crtKey = '', dots = null, dotsKey = '', atlas = null, atlasKey = '';
-  let slow = 0, autoLight = false;
+  let crt = null, crtKey = '', dots = null, dotsKey = '';
+  // the automatic light form, and what it was switched on for (a new render, look or density clears it, D6)
+  let slow = 0, autoLight = false, lightFor = '', last = null;
   const size = (cv, w, h) => { if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; } };
   // the frame read at the work size (the whole canvas, or a part of it)
   // (scaled down on the GPU first, so only the small picture is read back; the frame's own canvas is never read back,
@@ -158,16 +190,19 @@ export function createRenderer() {
     g.restore();
   }
   // CRT: the grille, scanlines and vignette as one mask, made once per size
-  function crtMask(w, h) {
-    const key = `${w}x${h}`;
+  // (D6: a grille column and a scanline period from the ratio, so ratio 1, 2 and a video show the same spacing; the
+  // lines' strength keeps today's average darkening, so the look stays)
+  function crtMask(w, h, dpr = 1) {
+    const { col, scan } = crtSpacing(dpr), key = `${w}x${h}/${col}/${scan}`;
     if (crtKey === key) return crt;
     crt = crt || mk(); size(crt, w, h);
     const m = crt.getContext('2d');
     m.globalCompositeOperation = 'source-over';
     const cols = ['rgb(255,120,120)', 'rgb(120,255,120)', 'rgb(130,130,255)'];
-    for (let x = 0; x < w; x++) { m.fillStyle = cols[x % 3]; m.fillRect(x, 0, 1, h); }
-    m.fillStyle = 'rgba(0,0,0,.32)';
-    for (let y = 0; y < h; y += 3) m.fillRect(0, y, w, 1);
+    for (let x = 0, k = 0; x < w; x += col, k++) { m.fillStyle = cols[k % 3]; m.fillRect(x, 0, col, h); }
+    const thick = Math.max(1, Math.round(scan / 3));
+    m.fillStyle = `rgba(0,0,0,${Math.min(0.6, (0.32 * scan) / (3 * thick)).toFixed(3)})`;
+    for (let y = 0; y < h; y += scan) m.fillRect(0, y, w, thick);
     const r = m.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
     r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(1, 'rgba(0,0,0,.6)');
     m.fillStyle = r; m.fillRect(0, 0, w, h);
@@ -188,53 +223,58 @@ export function createRenderer() {
     dotsKey = key;
     return dots;
   }
-  // ASCII: the ramp's glyphs in white, one cell each, made once per cell size
-  function glyphAtlas(cellW, cellH) {
-    const aw = Math.max(1, Math.round(cellW)), ah = Math.max(1, Math.round(cellH)), key = `${aw}x${ah}`;
-    if (atlasKey === key) return atlas;
-    atlas = atlas || mk(); size(atlas, aw * ASCII_RAMP.length, ah);
-    const a = atlas.getContext('2d');
-    a.clearRect(0, 0, atlas.width, ah);
-    a.fillStyle = '#fff'; a.textBaseline = 'middle'; a.textAlign = 'center';
-    a.font = `600 ${Math.max(4, Math.min(ah * 0.92, aw / 0.6)).toFixed(1)}px "JetBrains Mono", monospace`;
-    for (let i = 1; i < ASCII_RAMP.length; i++) a.fillText(ASCII_RAMP[i], i * aw + aw / 2, ah / 2 + 0.5);
-    atlasKey = key;
-    return atlas;
+  // ASCII: the letter spacing that makes a row of the font exactly cols × cellW wide, measured once per cell width
+  let fitKey = '', fitPx = 0;
+  function asciiFit(g, cellW) {
+    const key = cellW.toFixed(3);
+    if (fitKey === key) return fitPx;
+    g.save(); g.font = `600 ${Math.max(4, cellW / 0.6).toFixed(2)}px "JetBrains Mono", monospace`;
+    const n = 64, w = g.measureText('@'.repeat(n)).width; g.restore();
+    fitPx = Math.abs(w - n * cellW) > 0.5 ? (n * cellW - w) / n : 0; fitKey = key;
+    return fitPx;
   }
 
   function apply(g, c, render, o) {
     if (!render || render === 'normal') return 0;
     const t0 = performance.now(), theme = o.theme === 'hw' ? 'hw' : 'neon';
+    const density = densityOf(o.density), dpr = o.dpr || 1;
+    if (!o.fixed) { const k = `${render}|${o.look}|${density}`; if (k !== lightFor) { lightFor = k; slow = 0; autoLight = false; } }
     const light = o.light === 'on' || (o.light !== 'off' && !o.fixed && autoLight);
-    const cw = c.width, ch = c.height, gain = gainOf(o.look);
+    const cw = c.width, ch = c.height, gain = gainOf(o.look), so = { dpr, density, light };
     if (render === 'bit') {
-      const S = passSizes('bit', cw, ch, light), img = grab(c, S.w, S.h);
+      const S = passSizes('bit', cw, ch, so), img = grab(c, S.w, S.h);
+      last = { render, cellW: cw / S.w, cellH: ch / S.h, rows: S.h, cols: S.w, light };
       bitPixels(img.data, S.w, S.h, { gain, ...BIT_COLOURS[theme] });
       back(g, c, img);
     } else if (render === 'led') {
-      const S = passSizes('led', cw, ch, light), img = grab(c, S.w, S.h);
+      const S = passSizes('led', cw, ch, so), img = grab(c, S.w, S.h);
+      last = { render, cellW: S.pitch, cellH: S.pitch, rows: S.h, cols: S.w, light };
       ledPixels(img.data, S.w, S.h);
       const dw = S.w * S.pitch, dh = S.h * S.pitch;
       g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#000'; g.fillRect(0, 0, cw, ch); g.restore();
       back(g, c, img, 0, 0, dw, dh);
       g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.drawImage(dotMask(cw, ch, S.w, S.h, S.pitch), 0, 0); g.restore();
     } else if (render === 'crt') {
+      const P = crtSpacing(dpr);
+      last = { render, cellW: P.col * 3, cellH: P.scan, rows: Math.ceil(ch / P.scan), cols: Math.ceil(cw / (P.col * 3)), light: false, crt: true };
       const bw = Math.max(1, Math.round(cw / 8)), bh = Math.max(1, Math.round(ch / 8));
       size(bl, bw, bh); blx.imageSmoothingEnabled = true; blx.imageSmoothingQuality = 'medium'; blx.drawImage(c, 0, 0, bw, bh);
       g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = true;
       g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.4; g.drawImage(bl, 0, 0, cw, ch);
-      g.globalAlpha = 1; g.globalCompositeOperation = 'multiply'; g.drawImage(crtMask(cw, ch), 0, 0);
+      g.globalAlpha = 1; g.globalCompositeOperation = 'multiply'; g.drawImage(crtMask(cw, ch, dpr), 0, 0);
       g.restore();
     } else if (render === 'ascii') {
-      const S = passSizes('ascii', cw, ch, light), img = grab(c, S.w, S.h), { glyphs } = asciiCells(img.data, S.w, S.h, { gain }, undefined, img.data);
-      const A = glyphAtlas(S.cellW, S.cellH), aw = A.width / ASCII_RAMP.length, ah = A.height, ox = Math.floor((cw - S.w * S.cellW) / 2);
+      const S = passSizes('ascii', cw, ch, so), img = grab(c, S.w, S.h), { glyphs } = asciiCells(img.data, S.w, S.h, { gain }, undefined, img.data);
+      const ox = Math.floor((cw - S.w * S.cellW) / 2);
+      last = { render, cellW: S.cellW, cellH: S.cellH, rows: S.h, cols: S.w, light };
       g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
       g.fillStyle = '#000'; g.fillRect(0, 0, cw, ch);
-      for (let y = 0; y < S.h; y++) for (let x = 0; x < S.w; x++) { const k = glyphs[y * S.w + x]; if (k) g.drawImage(A, k * aw, 0, aw, ah, Math.round(ox + x * S.cellW), Math.round(y * S.cellH), aw, ah); }
+      drawAsciiRows(g, glyphs, S.w, S.h, S.cellW, S.cellH, ox, asciiFit(g, S.cellW));
       g.restore();
       back(g, c, img, ox, 0, S.w * S.cellW, S.h * S.cellH, 'multiply');
     } else if (render === 'terminal') {
-      const T = termPalette(theme), G = gridOf(o.W, o.H, passSizes('terminal', cw, ch, light).rows), k = o.dpr || 1;
+      const T = termPalette(theme), G = gridOf(o.W, o.H, passSizes('terminal', cw, ch, so).rows), k = dpr;
+      last = { render, cellW: G.cw * k, cellH: G.ch * k, rows: G.rows, cols: G.cols, light };
       // the scene between the tab bar and the status bar, two pixels per cell (half blocks)
       const pw = G.cols, ph = (G.rows - 2) * 2, img = grab(c, pw, ph);
       termPixels(img.data, pw, ph, T.ramp);
@@ -247,5 +287,6 @@ export function createRenderer() {
     if (!o.fixed && o.light !== 'on' && o.light !== 'off') { slow = ms > 8 ? slow + 1 : 0; if (slow >= 30) autoLight = true; }
     return ms;
   }
-  return { apply, get light() { return autoLight; }, reset() { slow = 0; autoLight = false; } };
+  // last: the sizes of the last pass in device pixels (for the light form's mark, the layer's grid and the measurements)
+  return { apply, get light() { return autoLight; }, get last() { return last; }, reset() { slow = 0; autoLight = false; } };
 }

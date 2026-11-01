@@ -11,6 +11,7 @@ import { monitorLayout } from './widget-looks.js';
 import { layerLayout } from './widget-layer.js';
 import { instColour } from './widget-palettes.js';
 import { gridOf, termGrid, termColour, brailleDots, brailleWave } from './term-grid.js';
+import { glyphRows, termRows } from './density.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // the words of the interface when info has none (English)
@@ -24,8 +25,9 @@ const wordOf = info => (k, vars = {}) => {
   const s = (info && info.word && info.word(k, vars)) || TERM_WORDS[k] || k;
   return s.replace(/\{(\w+)\}/g, (_, x) => (vars[x] ?? ''));
 };
-// the rows of the grid for a frame H logical pixels high: 36 rows at 720 (the video frames), fewer on a small stage
-export const rowsFor = H => clamp(Math.round(H / 20), 18, 40);
+// the rows of the grid for a frame W×H logical pixels (denser-renders D5): from the short side, text at least 12 px high,
+// at the Density of the renders (info.density); 45 rows at 1280×720
+export const rowsFor = (W, H, density = 'normal') => glyphRows(W, H, density);
 // the room left at the top for the stage's readout and look buttons, as Monitor leaves it (widget-looks.js)
 export const topRoom = (W, H) => (H > W * 1.05 ? H * 0.06 : Math.max(H * 0.09, Math.min(H * 0.18, 64)));
 // a grid below the top room: rows of the given height at most, at least minRows
@@ -144,7 +146,7 @@ function termStatus(t, F, info, word, n) {
 
 // Monitor in the Terminal render (take A): one rounded panel per instrument in Monitor's grid, a header and a status bar
 export function drawMonitorTerm(g, W, H, F, T, info = {}) {
-  const G = gridOf(W, H, rowsFor(H)), t = termGrid(g, G, T), word = wordOf(info), list = visible(F);
+  const G = gridOf(W, H, rowsFor(W, H, info.density)), t = termGrid(g, G, T), word = wordOf(info), list = visible(F);
   g.fillStyle = T.bg; g.fillRect(0, 0, W, H);
   if (!list.length) { const s = `MONITOR · ${word('waiting')}`; t.put(Math.max(1, Math.floor((G.cols - s.length) / 2)), Math.floor(G.rows / 2), s, T.dim); }
   else {
@@ -156,7 +158,7 @@ export function drawMonitorTerm(g, W, H, F, T, info = {}) {
 
 // Rullo in the Terminal render: one panel with the melodic instruments on a pitch axis (half blocks), the drums as lanes
 export function drawRulloTerm(g, W, H, F, T, info = {}) {
-  const G = gridOf(W, H, rowsFor(H)), t = termGrid(g, G, T), word = wordOf(info), cyc = F.cyc, x0 = cyc - 2;
+  const G = gridOf(W, H, rowsFor(W, H, info.density)), t = termGrid(g, G, T), word = wordOf(info), cyc = F.cyc, x0 = cyc - 2;
   g.fillStyle = T.bg; g.fillRect(0, 0, W, H);
   const lanes = F.lanes, laneRows = lanes.length ? lanes.length + 2 : 0, top = Math.ceil(topRoom(W, H) / G.ch), bottom = G.rows - 2 - laneRows, c0 = 1, w = G.cols - 2;
   // the melodic panel, its legend in the title
@@ -265,7 +267,7 @@ function asciiPanel(t, b, p, F) {
 }
 // Monitor in the ASCII render
 export function drawMonitorAscii(g, W, H, F, info = {}) {
-  const pal = F.pal, G = gridOf(W, H, rowsFor(H)), t = termGrid(g, G, pal), word = wordOf(info), list = visible(F);
+  const pal = F.pal, G = gridOf(W, H, rowsFor(W, H, info.density)), t = termGrid(g, G, pal), word = wordOf(info), list = visible(F);
   g.fillStyle = pal.bg; g.fillRect(0, 0, W, H);
   if (!list.length) { const s = `MONITOR - ${word('waiting')}`; t.put(Math.max(1, Math.floor((G.cols - s.length) / 2)), Math.floor(G.rows / 2), s, pal.muted); return; }
   const boxes = monitorLayout(list.length, W, H);
@@ -273,7 +275,7 @@ export function drawMonitorAscii(g, W, H, F, info = {}) {
 }
 // Rullo in the ASCII render
 export function drawRulloAscii(g, W, H, F, info = {}) {
-  const pal = F.pal, G = gridOf(W, H, rowsFor(H)), t = termGrid(g, G, pal), cyc = F.cyc, x0 = cyc - 2;
+  const pal = F.pal, G = gridOf(W, H, rowsFor(W, H, info.density)), t = termGrid(g, G, pal), cyc = F.cyc, x0 = cyc - 2;
   void info;
   g.fillStyle = pal.bg; g.fillRect(0, 0, W, H);
   const lanes = F.lanes, top = Math.max(2, Math.round(G.rows * 0.12)), bottom = G.rows - 1 - lanes.length - (lanes.length ? 1 : 0), iw = G.cols - 2;
@@ -450,7 +452,7 @@ export function drawLayerGlyph(g, W, H, F, kind, render, T, info = {}) {
   const list = F.dim === 'hidden' ? F.roster.filter(p => !p.quiet) : F.roster;
   if (!list.length) return [];
   const boxes = layerLayout(kind, list.length, W, H), word = wordOf(info);
-  const G = render === 'terminal' ? gridOf(W, H, passRows(H)) : gridOf(W, H, rowsFor(H));
+  const G = render === 'terminal' ? gridOf(W, H, info.termRows || termRows(W, H, info.density)) : gridOf(W, H, rowsFor(W, H, info.density));
   const t = termGrid(g, G, render === 'terminal' ? T : F.pal);
   const shown = list.slice(0, boxes.length);
   shown.forEach((p, i) => {
@@ -460,5 +462,3 @@ export function drawLayerGlyph(g, W, H, F, kind, render, T, info = {}) {
   });
   return shown;
 }
-// the rows of the Terminal pass over a scene (45 at any height, render-styles.js), so the panels sit on its cells
-const passRows = () => 45;

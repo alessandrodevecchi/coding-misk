@@ -132,6 +132,9 @@
   .hud-row, .soul-ctl { display: flex; align-items: center; gap: 6px; }
   .look-pick { border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); background: rgba(0,0,0,.55); color: var(--ink); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; }
   .look-pick:focus-visible { outline: 2px solid var(--a1); outline-offset: 2px; }
+  /* denser-renders D6: the automatic light form's mark beside the Render menu */
+  .render-light { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: rgba(0,0,0,.55); color: #ffb347; border: 1px solid color-mix(in srgb, #ffb347 45%, transparent); cursor: help; }
+  .render-light[hidden] { display: none; }
   .soul-name { min-width: 9.5em; text-align: center; font: 600 12px var(--mono); letter-spacing: .08em; color: var(--a1); text-shadow: 0 0 8px #000; }
   .soul-ctl .chip, .look-step { padding: 4px 10px; }
   .lock-ico { width: 9px; height: 11px; vertical-align: -1px; margin-left: 4px; opacity: .75; }
