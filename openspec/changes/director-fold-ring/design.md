@@ -92,6 +92,23 @@ Gestures draw from their own stream, so a seed that draws no gesture gives the s
 
 ## Open Questions
 
-1. Drop "(trial)" from Ring's label now that the director uses it? Recommended: yes; the cost limits live in the director, and a per-track worklet is a later engine change.
-2. Should the rates be the defaults above or more cautious (half) for a first listening round? Recommended: the defaults above, with a radio session per family for the owner to listen to, then tune.
-3. Should the radio console show a gesture when it plays (for example in "Coming next")? Recommended: yes, a short label like "Fold rise" in Coming next, in a later small change, so the owner can tie what he hears to a name.
+Resolved by the owner on 2026-10-31:
+
+1. Drop "(trial)" from Ring's label now that the director uses it? **Yes.** The label is "Ring" in both languages; the cost limits live in the director, a per-track worklet stays a later engine change.
+2. The rates: the defaults above or more cautious (half) for a first listening round? **The full per-genre defaults**, with one listening session per genre family for the owner, then tune.
+3. Show a gesture in the radio console when it plays ("Coming next")? **Yes, but later**, as a separate small change (a line in the owner's backlog); not in this change. The session entry already lists each song's gestures.
+
+## Implementation notes
+
+Choices made while implementing, within the decisions above:
+
+- **Roles.** The energy shapes name more roles than intro, groove, build, peak, break, drop and outro: wave, verse, chorus, trough and fall too. Busy parts for a folded phrase are groove, build, peak, wave, verse and chorus; quiet sections for a ringing held note are intro, break, trough and fall, or a busy part where few tracks play. A rise (Fold rise, FM rise) leads into a drop, or into a peak or a chorus that follows another part: only one shape has a drop, and its drop always follows a break.
+- **Metal hits.** The director takes every drum line out of a break, and the "beat" drum track carries the hats with the snare and the clap. Metal hits go on a percussion line (a texture, or a drum line without hats) through a break or a trough; without one, on such a line for one phrase of a busy part, which in practice is the kick. Never the busiest drum line, never a line with hats.
+- **Fold rise target.** In the phrase before a drop (the end of a break) the drums are out: the rise goes to a bass, lead or arp, else a drum line. A pad was tried and left out: a quiet pad folded comes up to the pad's usual peak (0.12 to 0.20 measured), louder than the spec allows.
+- **FM rise level.** A rising FM index brightens the line into its filter: a bass's peak rose 12 to 18% in the browser (0.32 to 0.36, 0.37 to 0.44). The rise lowers the track's gain to 0.8 of its value (a `set` step) and gives it back on the big moment.
+- **Busiest line.** Ring never goes on the busiest drum line (the spec's rule); a held pad may be the busiest line of a quiet song, and the ringing held note is meant for it. Notes per bar are estimated from the patterns (drum rows, arp speed, preset rhythms; four notes per pad chord).
+- **Placement and steering.** Gestures are placed once, on the song's first writing, after the moves, and kept in the plan (`plan.gestures`). A steering rewrite leaves their steps out while it rewrites the moves, so the director sees the song it saw, then puts them back: a gesture that starts at the rewrite's bar or later leaves a track the listener locked, one that started before stays as written, a Fold ends on the bar its track gets Distortion, and a gesture on a track the rewritten song no longer brings in goes. The rewritten moves are drawn anew, so a kept gesture may sit on a part that changed.
+- **Gesture-free songs.** `gestures: false` and complexity 0 give no gesture. Checks pinned by hashes recorded before this change and unrelated to gestures (`plain-steer-c`, `plain-steer-d`, the old add and remove replay) now run with `gestures: false`.
+- **Rate in practice.** A drawn gesture that finds no part or track is skipped (D4), so fewer songs carry one than the rate: over 200 songs per family, hard (berlin-techno) about 0.5, synth (synthwave) 0.5, club (trance) 0.2, beats (lo-fi) 0.3, soft (ambient) 0.2, acoustic (jazz) 0.03.
+- **Fold and the drive setting.** The drive setting writes the same `distort` stage, so a Fold gesture skips a track with drive above 0 as it skips one with Distortion. Industrial songs, often driven, get fewer Fold gestures.
+- **New song panel.** It uses the same director, so its songs may get gestures too; it has no control for them (out of scope).

@@ -29,7 +29,9 @@ import { playing, energyOf, curveParts } from '../src/endless/energy.js';
 import { chordTonesOnly, degreesOnly } from '../src/endless/mutate.js';
 import { partsKey } from '../src/endless/mix.js';
 import { allPhrases } from '../src/endless/phrases.js';
-import { GROOVES, BASS, ARPS, HOOKS } from '../src/music.js';
+import { GROOVES, BASS, ARPS, HOOKS, meterSteps } from '../src/music.js';
+import { GESTURES, GESTURE_FAMILIES, RANGES as G_RANGES, gestureRate, notesPerBar } from '../src/endless/gestures.js';
+import { foldLevel } from '../src/song/rack.js';
 
 import { PROGS } from '../src/music.js';
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -62,6 +64,12 @@ const FIXTURES = [
   { seed: 'quiet', styles: ['ambient', 'lo-fi'], energy: 0.2, complexity: 0.1, minutes: 12 },
 ];
 const sessionHash = r => hashString(JSON.stringify(r)).toString(16).padStart(8, '0');
+// the seed fixtures of director version 14, kept for director-fold-ring (D6): with the effect gestures off the director
+// must give them exactly
+const FIXTURES_V14_FILE = new URL('../tests/snapshots/endless-v14.json', import.meta.url);
+// a step of an effect gesture (director-fold-ring): a Fold, Ring or FM device put on or taken off one of the gesture's
+// tracks on its first or last bar, or on a bar of its span (a Fold that ends early in a rewrite)
+const gestureStep = (gestures, s) => (gestures || []).some(g => { const d = s.rack || s.unrack, tr = (d || s.set || {}).track, gainOnly = s.set && Object.keys(s.set).join() === 'track,gain'; return tr && g.tracks.includes(tr) && (gainOnly || (d && ['fold', 'ring', 'fm'].includes(d.device))) && s.at >= g.start && s.at <= g.end; });
 // Songs without their voice tracks (voice-full-controls): the spoken tracks, the steps that bring them in and out, and
 // the narrator's name of before ("Voice"). Every style may now draw a voice track on its own stream; the music must not
 // move, so the old fixtures still hold on this view. narrator: also leave out the narrator track (the music alone).
@@ -99,8 +107,10 @@ const PLAIN_V2 = [
 const PLAIN_STEER = [
   { seed: 'plain-steer-a', styles: ['berlin-techno'], complexity: 0, talk: 0, songs: 'c4fe1f68' },
   { seed: 'plain-steer-b', styles: ['ambient', 'jazz'], chaos: 1, complexity: 0, talk: 0, songs: '358eb686' },
-  { seed: 'plain-steer-c', styles: ['synthwave', 'drum-and-bass'], chaos: 0.5, complexity: 0.8, material: 'patterns', talk: 0, songs: 'a78978f7' },
-  { seed: 'plain-steer-d', styles: ['trance', 'lo-fi', 'phonk'], chaos: 0.8, complexity: 0.5, material: 'patterns', talk: 0, songs: 'fb29ad65' },
+  // (gestures off, director-fold-ring: these cases are about the presets of Add and More complex; the effect gestures of
+  // version 15 would move their recorded hashes, and the gestures have checks of their own)
+  { seed: 'plain-steer-c', styles: ['synthwave', 'drum-and-bass'], chaos: 0.5, complexity: 0.8, material: 'patterns', talk: 0, gestures: false, songs: 'a78978f7' },
+  { seed: 'plain-steer-d', styles: ['trance', 'lo-fi', 'phonk'], chaos: 0.8, complexity: 0.5, material: 'patterns', talk: 0, gestures: false, songs: 'fb29ad65' },
 ];
 // the steered songs of a PLAIN_STEER case: three songs, each with an Add of every type and a run of More complex
 function plainSteer({ seed, songs: _, ...o }) {
@@ -345,6 +355,8 @@ const CHECKS = {
       const e = session.songs[i], ph = e.phrase, by = new Map();
       for (const s of buildSteps(song)) {
         assert(s.at % ph === 0, `${id} song ${i}: step at bar ${s.at} is off the ${ph}-bar grid`);
+        // (the effect gestures, director-fold-ring, are written after the moves and may share their boundary)
+        if (gestureStep(e.gestures, s)) continue;
         const big = /^(break|drop)/.test(e.phrases.find(p => p.bar === s.at).moves.join(' '));
         if (big && (s.remove || s.add) && listOf(s.add || s.remove).length > 1) assert(s.at % (2 * ph) === 0, `${id} song ${i}: break or drop at bar ${s.at} not on a ${2 * ph}-bar boundary`);
         for (const t of stepTracks(s)) { const k = s.at / ph; assert(by.get(t) !== k, `${id} song ${i}: two moves on ${t} at bar ${s.at}`); assert(by.get(t) !== k - 1, `${id} song ${i}: ${t} moves on two consecutive boundaries (bar ${s.at})`); by.set(t, k); }
@@ -540,6 +552,143 @@ const CHECKS = {
     if (process.argv.includes('--write-fixtures')) { if (!process.argv.includes('--force-music')) now.forEach(music); fs.writeFileSync(FIXTURES_FILE, JSON.stringify(now, null, 2) + '\n'); console.log('      fixtures written'); return; }
     now.forEach(music);
     now.forEach((f, i) => assert(saved[i] && saved[i].hash === f.hash, `seed ${f.seed} (${f.styles}) gives ${f.hash}, fixture ${saved[i] && saved[i].hash}; if the change is intended, run npm run check:endless -- --write-fixtures`));
+  },
+  'gestures: off, the director gives the seed fixtures of version 14 (director-fold-ring D6)'() {
+    const v14 = JSON.parse(fs.readFileSync(FIXTURES_V14_FILE, 'utf8'));
+    let drew = 0;
+    FIXTURES.forEach((f, i) => {
+      const off = generateSession(loadStyles(), { ...f, gestures: false });
+      assert(v14[i] && sessionHash(off) === v14[i].hash && sessionHash(voiceless(off, { narrator: true })) === v14[i].music, `seed ${f.seed} (${f.styles}) with gestures off: ${sessionHash(off)}, version 14 ${v14[i] && v14[i].hash}`);
+      drew += generateSession(loadStyles(), f).session.songs.filter(e => e.gestures).length;
+    });
+    assert(drew > 0, 'no fixture song draws a gesture');
+    console.log(`      ${FIXTURES.length} fixtures equal to version 14 with gestures off; ${drew} of their songs draw gestures with them on`);
+  },
+  'gestures: ranges and safety rules over 300 songs, at most two per song (director-fold-ring D2, D5)'() {
+    const ids = STYLES.map(r => r.id), count = Object.fromEntries(GESTURES.map(k => [k, 0]));
+    let songs = 0, withG = 0, maxRing = 0;
+    const inR = (v, [lo, hi]) => v >= lo - 1e-9 && v <= hi + 1e-9, kindOf = t => ({ drums: 'drums', bass: 'bass', hook: 'lead', arp: 'lead', pad: 'pad', texture: 'pad' }[t.type]);
+    for (let i = 0; i < 300; i++) {
+      const styles = i % 3 === 2 ? [ids[i % ids.length], ids[(i * 7 + 3) % ids.length]] : [ids[i % ids.length]];
+      const g = createSession(STYLES, `g-rules-${i}`).next({ styles, chaos: (i % 5) / 4, complexity: 0.3 + (i % 4) * 0.2 });
+      const { song, entry, plan } = g, list = plan.gestures || [], ph = plan.phrase;
+      songs++;
+      assert(list.length <= 2 && (entry.gestures || []).length === list.length, `${styles} ${i}: ${list.length} gestures`);
+      if (!list.length) continue;
+      withG++;
+      const v = validateSong(song);
+      assert(!v.errors.length, `${styles} ${i}: ${JSON.stringify(v.errors[0])}`);
+      for (const G of list) {
+        count[G.kind]++;
+        assert(GESTURES.includes(G.kind) && G.start < G.end && G.end <= plan.bars && G.start % ph === 0, `${styles} ${i}: ${JSON.stringify(G)}`);
+        for (const id of G.tracks) { const t = song.tracks.find(x => x.id === id); assert(t && !['voice', 'spoken', 'riser', 'guitar'].includes(t.type), `${styles} ${i}: ${G.kind} on ${id}`); }
+        for (const st of G.steps) {
+          const d = st.rack;
+          if (!d) continue;
+          const t = song.tracks.find(x => x.id === d.track), K = kindOf(t);
+          if (d.device === 'fold' && d.steps) {
+            assert(inR(Math.max(...d.steps), G_RANGES[K].fold) && d.steps.every((x, j) => j === 0 || x >= d.steps[j - 1]) && st.at % d.steps.length === 0 && d.steps.length === G.end - G.start, `${styles} ${i}: Fold rise ${JSON.stringify(d)} at ${st.at}`);
+            const lv = d.steps.map(x => foldLevel(x, d.curve, t.type));
+            assert(lv.every(x => x > 0 && x <= 1), `${styles} ${i}: Fold rise levels ${lv}`);
+          } else if (d.device === 'fold') assert(inR(d.amount, G_RANGES[K].fold) && G_RANGES[K].curves.concat(K === 'bass' ? ['sharp'] : []).includes(d.curve), `${styles} ${i}: Fold ${JSON.stringify(d)} on ${t.type}`);
+          if (d.device === 'ring') {
+            if (G.kind === 'metalHits') assert(inR(d.freq, G_RANGES.drums.ring) && inR(d.amount, G_RANGES.drums.ringAmount), `${styles} ${i}: metal hits ${JSON.stringify(d)}`);
+            else assert(d.freq >= 30 && d.freq <= 2000 && inR(d.amount, G_RANGES[K].ringAmount), `${styles} ${i}: Ring ${JSON.stringify(d)} on ${t.type}`);
+            // never the busiest drum line where it starts, never a line with hats
+            const drums = playing(stateAt(song, st.at).song).filter(x => x.type === 'drums');
+            if (drums.length > 1) assert(drums.reduce((m, x) => (notesPerBar(x) > notesPerBar(m) ? x : m)).id !== t.id, `${styles} ${i}: Ring on the busiest drum line ${t.id}`);
+            assert(!(t.type === 'drums' && Object.entries((t.patterns.A || {}).rows || {}).some(([k, v2]) => ['hh', 'oh', 'rd'].includes(k) && /x/.test(v2))), `${styles} ${i}: Ring on a line with hats`);
+          }
+          if (d.device === 'fm' && d.rise) assert(d.rise.to <= 4 && d.rise.to <= G_RANGES[t.type === 'bass' ? 'bass' : 'lead'].fm[1] && d.rise.bars === G.end - G.start && st.at % d.rise.bars === 0, `${styles} ${i}: FM rise ${JSON.stringify(d)}`);
+        }
+      }
+      // at every boundary: no Fold with the drive setting or Distortion on one track; at most two Ring tracks, one above
+      // 100 notes per second (the estimate the director uses)
+      const bps = plan.bpm / 60 / (meterSteps(plan.meter) / 4);
+      for (let b = 0; b < plan.bars; b += ph) {
+        const st = stateAt(song, b).song, on = playing(st).filter(t => t.type !== 'riser');
+        for (const t of st.tracks.filter(x => x.type !== 'voice' && x.type !== 'spoken')) {
+          const fold = (t.rack || []).some(d => d.on !== false && d.device === 'fold');
+          assert(!fold || (!((t.settings || {}).drive > 0) && !(t.rack || []).some(d => d.on !== false && d.device === 'distort')), `${styles} ${i}: Fold and Distortion on ${t.id} at bar ${b}`);
+        }
+        const rings = st.tracks.filter(t => t.type !== 'voice' && (t.rack || []).some(d => d.on !== false && d.device === 'ring')).length;
+        maxRing = Math.max(maxRing, rings);
+        const dense = on.reduce((a, t) => a + notesPerBar(t), 0) * bps > 100;
+        assert(rings <= (dense ? 1 : 2), `${styles} ${i}: ${rings} Ring tracks at bar ${b}${dense ? ' (dense)' : ''}`);
+      }
+      // each gesture is over when it ends: no Fold or Ring left on its tracks, the FM rise gone
+      for (const G of list) if (G.end < plan.bars) {
+        const st = stateAt(song, G.end).song;
+        for (const id of G.tracks) { const t = st.tracks.find(x => x.id === id); assert(!(t.rack || []).some(d => d.device === 'fold' || d.device === 'ring' || (d.device === 'fm' && d.rise)), `${styles} ${i}: ${G.kind} still on ${id} at bar ${G.end}`); }
+      }
+    }
+    assert(Object.values(count).every(n => n > 0), `a gesture never placed: ${JSON.stringify(count)}`);
+    console.log(`      ${withG} of ${songs} songs with gestures ${JSON.stringify(count)}; at most ${maxRing} Ring tracks at a bar`);
+  },
+  'gestures: rate per genre family and per style (director-fold-ring D4)'() {
+    const rep = { hard: 'berlin-techno', synth: 'synthwave', club: 'trance', beats: 'lo-fi', soft: 'ambient', acoustic: 'jazz' }, out = [];
+    const run = (recipes, id, tag) => {
+      const kinds = {}; let n = 0;
+      for (let i = 0; i < 200; i++) {
+        const { entry, song } = createSession(recipes, `g-rate-${tag}-${i}`).next({ styles: [id] });
+        const list = entry.gestures || [];
+        assert(list.length <= 2, `${id} ${i}: ${list.length} gestures`);
+        if (list.length) n++;
+        for (const g of list) { kinds[g.kind] = (kinds[g.kind] || 0) + 1; if (g.kind === 'foldPhrase' && tag === 'acoustic') assert(g.tracks.every(t => ['drums', 'bass'].includes(song.tracks.find(x => x.id === t).type)), `${id} ${i}: folded phrase on ${g.tracks}`); }
+      }
+      return { n, kinds };
+    };
+    for (const [fam, id] of Object.entries(rep)) {
+      assert(gestureRate(byId[id]).family === fam, `${id} is not in the ${fam} family`);
+      const { n, kinds } = run(STYLES, id, fam), F = GESTURE_FAMILIES[fam], top = Object.entries(kinds).sort((a, b) => b[1] - a[1])[0];
+      assert(n / 200 <= F.songs + 0.08, `${fam} (${id}): ${n} of 200 songs with gestures, the rate is ${F.songs}`);
+      assert(n > 0 || F.songs < 0.1, `${fam} (${id}): no song with gestures`);
+      assert(Object.keys(kinds).every(k => F.weights[k] > 0), `${fam} (${id}): a gesture the family does not use: ${JSON.stringify(kinds)}`);
+      if (fam === 'hard') assert(top && top[0] === 'metalHits', `${id} prefers metal hits, the most frequent is ${top && top[0]}: ${JSON.stringify(kinds)}`);
+      if (fam === 'acoustic') assert(n <= 20, `${id}: ${n} of 200 songs with gestures (at most one in ten)`);
+      out.push(`${fam} (${id}) ${n}/200 ${JSON.stringify(kinds)}`);
+    }
+    // a style's own field: songs and weights
+    const own = STYLES.map(r => (r.id === 'lo-fi' ? { ...r, gestures: { songs: 0.9, weights: { metalHits: 4, foldPhrase: 1 } } } : r));
+    const { n, kinds } = run(own, 'lo-fi', 'own');
+    assert(n > 100 && (kinds.metalHits || 0) > (kinds.foldPhrase || 0) && !kinds.foldRise, `lo-fi with its own gestures field: ${n} songs ${JSON.stringify(kinds)}`);
+    out.push(`lo-fi with { songs: 0.9, metalHits 4, foldPhrase 1 }: ${n}/200 ${JSON.stringify(kinds)}`);
+    console.log(out.map(x => `      ${x}`).join('\n'));
+  },
+  'gestures: the recipe field is checked'() {
+    const r = structuredClone(loadStyles().find(x => x.id === 'lo-fi'));
+    assert(!validateRecipe({ ...r, gestures: { songs: 0.5, weights: { metalHits: 2, ringHeld: 0 } } }).errors.length, 'a good gestures field is an error');
+    for (const bad of [{ songs: 2 }, { weights: { boom: 1 } }, { weights: { foldRise: -1 } }, { often: 1 }, []]) assert(validateRecipe({ ...r, gestures: bad }).errors.some(e => e.path.startsWith('gestures')), `no error for ${JSON.stringify(bad)}`);
+  },
+  'gestures: a steering rewrite keeps them, a lock before one starts keeps it off (director-fold-ring D5)'() {
+    let kept = 0, lockedOff = 0;
+    for (let i = 0; i < 80 && (kept < 8 || lockedOff < 4); i++) {
+      const seed = `g-steer-${i}`, g = { ...createSession(STYLES, seed).next({ styles: ['berlin-techno', 'synthwave'], chaos: 0.5 }), seed };
+      const G = g.plan.gestures || [];
+      if (!G.length) continue;
+      const all = G.flatMap(x => x.steps).map(x => JSON.stringify(x));
+      const other = playing(stateAt(g.song, g.plan.phrase).song).find(t => !G.some(x => x.tracks.includes(t.id)));
+      if (other) {
+        const r = steerArr(g, [{ kind: 'volume', track: other.id, value: 0.4, at: g.plan.phrase + 1 }]);
+        const now = new Set(r.song.build.map(x => JSON.stringify(x)));
+        // (a rewrite draws the director's later moves anew; the gestures stay as placed, unless a Fold meets Distortion or
+        // the rewritten song no longer brings their track in)
+        const has = new Set(r.song.tracks.map(t => t.id)), dev = x => JSON.parse(x).rack || JSON.parse(x).unrack;
+        const lost = all.filter(x => !now.has(x)), why = lost.every(x => JSON.parse(x).at >= g.plan.phrase && (dev(x).device === 'fold' || !has.has(dev(x).track)));
+        assert(!lost.length || why, `${seed}: a volume command dropped a gesture step: ${lost[0]}`);
+        kept++;
+      }
+      const late = G.find(x => x.start >= 2 * g.plan.phrase);
+      if (late) {
+        const id = late.tracks[0], at = applyBar('lock', g.plan.phrase, g.plan);
+        if (at > late.start) continue;
+        const r = steerArr(g, [{ kind: 'lock', track: id, at }]);
+        assert(!r.song.build.some(x => x.at >= late.start && !x.by && (x.rack || x.unrack) && (x.rack || x.unrack).track === id && ['fold', 'ring', 'fm'].includes((x.rack || x.unrack).device)), `${seed}: a gesture on ${id}, locked at bar ${at}, still placed`);
+        lockedOff++;
+      }
+    }
+    assert(kept >= 8 && lockedOff >= 4, `only ${kept} rewrites and ${lockedOff} locks checked`);
+    console.log(`      ${kept} rewrites kept the gesture steps (those of a track still played), ${lockedOff} locks kept a later gesture off`);
   },
   'radio: song by song equals a whole session'() {
     const whole = generateSession(loadStyles(), { styles: ['synthwave', 'jazz'], chaos: 0.6, minutes: 12, seed: 'radio' });
@@ -1010,7 +1159,8 @@ const CHECKS = {
     for (const [seed, styles] of [['old-a', ['berlin-techno']], ['old-b', ['synthwave', 'jazz']], ['old-c', ['trance', 'phonk']]]) {
       const ses = createSession(STYLES, seed);
       for (let i = 0; i < 2; i++) {
-        const g = ses.next({ styles });
+        // (gestures off, director-fold-ring: the hash was recorded before the effect gestures of version 15)
+        const g = ses.next({ styles, gestures: false });
         const cmds = [{ kind: 'add', type: 'lead', at: applyBar('add', 20, g.plan) }, { kind: 'remove', type: 'drums', at: applyBar('remove', 36, g.plan) }, { kind: 'add', type: 'pad', at: applyBar('add', 52, g.plan) }, { kind: 'lock', track: 'bass', at: applyBar('lock', 52, g.plan) }];
         out.push(steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands: cmds, seed, n: i }).song);
       }
@@ -1143,7 +1293,8 @@ const CHECKS = {
       const r = steerArr(g, [{ kind: 'lock-part', part: 'bass', at }]), bass = onAt(g.song, at - 1).filter(t => t.type === 'bass').map(t => t.id);
       assert(bass.every(id => lockedIds(r.plan).includes(id)), `${g.style}: bass not locked`);
       // the director leaves the bass alone and it plays through breaks to the end
-      const touched = r.song.build.filter(s => s.at >= at && !s.by && stepTracks(s).some(id => bass.includes(id)));
+      // (a gesture that started before the lock stays as written, director-fold-ring D5)
+      const touched = r.song.build.filter(s => s.at >= at && !s.by && stepTracks(s).some(id => bass.includes(id)) && !gestureStep((r.plan.gestures || []).filter(x => x.start < at), s));
       assert(!touched.length, `${g.style}: the director moved a locked bass: ${JSON.stringify(touched[0])}`);
       for (let b = at; b < r.plan.bars; b += g.plan.phrase) assert(bass.every(id => onAt(r.song, b).some(t => t.id === id)), `${g.style}: locked bass silent on bar ${b}`);
       // + on a locked bass: a second bass, locked as well
@@ -1167,7 +1318,8 @@ const CHECKS = {
       const r = steerArr(g, [{ kind: 'lock-part', part: 'kick', at }]);
       assert(kicks.every(id => lockedIds(r.plan).includes(id)), `${g.style}: kick not locked`);
       // the director only takes the locked kick out and brings it back: no variation, filter, drive or effect
-      const moves = r.song.build.filter(s => s.at >= at && !s.by && stepTracks(s).some(id => kicks.includes(id)));
+      // (a gesture that started before the lock stays as written, director-fold-ring D5)
+      const moves = r.song.build.filter(s => s.at >= at && !s.by && stepTracks(s).some(id => kicks.includes(id)) && !gestureStep((r.plan.gestures || []).filter(x => x.start < at), s));
       assert(moves.every(s => !s.set && !s.pattern && !s.rack && !s.unrack), `${g.style}: the director changed a locked kick: ${JSON.stringify(moves.find(s => s.set || s.pattern || s.rack || s.unrack))}`);
       const chargeOf = d => d + 1 < P.length && P[d + 1].role === 'drop' && P[d].role !== 'drop' && (P[d].tension ?? 0) >= 0.7;
       let out = false;

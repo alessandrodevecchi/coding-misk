@@ -32,16 +32,25 @@ export const DEVICES = {
   // FM (material-generator D9): two operators at most, no feedback; the second one is off at index 0
   fm: { kind: 'sound', label: { en: 'FM', it: 'FM' }, args: [['index', 'num', 1, 0, 4, 0.05], ['harmonicity', 'choice', 1, [0.5, 0.505, 1, 1.005, 1.01, 1.015, 1.02, 1.41, 2, 2.01, 2.76, 3, 3.5, 4]], ['wave', 'choice', 'sine', ['sine', 'triangle', 'square', 'sawtooth', 'pink', 'brown']],
     ['decay', 'num', 0.3, 0.05, 1, 0.05], ['sustain', 'num', 0.5, 0, 1, 0.05], ['index2', 'num', 0, 0, 3, 0.05], ['harmonicity2', 'num', 1, 1, 10, 0.5]],
-    code: a => `.fm(${f(a.index)}).fmh(${f(a.harmonicity)})${a.wave !== 'sine' ? `.fmwave("${a.wave}")` : ''}.fmdecay(${f(a.decay)}).fmsustain(${f(a.sustain)})${a.index2 > 0 ? `.fm2(${f(a.index2)}).fmh2(${f(a.harmonicity2)})` : ''}` },
+    // rise (director-fold-ring D3): { to, bars, from? } the index climbs from `from` (0) to `to` over `bars` bars, as the
+    // FM lab's FM rise; the saw goes a little over, so its last sixteenth reaches `to` (riseTop)
+    extra: ['rise'],
+    code: a => `.fm(${a.rise ? `saw.slow(${f(a.rise.bars)}).range(${f(a.rise.from || 0)}, ${f(riseTop(a.rise))})` : f(a.index)}).fmh(${f(a.harmonicity)})${a.wave !== 'sine' ? `.fmwave("${a.wave}")` : ''}.fmdecay(${f(a.decay)}).fmsustain(${f(a.sustain)})${a.index2 > 0 ? `.fm2(${f(a.index2)}).fmh2(${f(a.harmonicity2)})` : ''}` },
   // FM-like colour for any sound, samples and voices included (fm-like-effects, #90)
   // Fold (D1, D2): superdough's distortion with a fold curve, and the level after it (foldLevel): a line never goes
   // above its own peak or the usual peak of its track type. It shares the distort stage with Distortion: the later
   // device wins.
-  fold: { kind: 'sound', label: { en: 'Fold', it: 'Piega' }, args: [['amount', 'num', 1.5, 0.1, 3, 0.05], ['curve', 'choice', 'sharp', ['sharp', 'soft'], { sharp: { en: 'Sharp', it: 'Spigolosa' }, soft: { en: 'Soft', it: 'Morbida' } }]],
-    code: (a, type) => `.distort(${f(a.amount)}).distorttype("${a.curve === 'soft' ? 'sinefold' : 'fold'}").distortvol(${f(foldLevel(a.amount, a.curve, type))})` },
-  // Ring, on trial (D3): the sound times 1 - amount + amount·sin(2π·freq·t), a Kabelsalat effect through K (one worklet
-  // per note); never above the input
-  ring: { kind: 'sound', label: { en: 'Ring (trial)', it: 'Ring (prova)' }, args: [['freq', 'num', 220, 30, 2000, 10], ['amount', 'num', 0.8, 0, 1, 0.05]],
+  // steps (director-fold-ring D3): an optional list of amounts, one per bar (a Fold rise), in place of the amount; each
+  // bar's level from foldLevel, so the level rule holds at every bar. The list starts on a bar that is a multiple of its
+  // length (the director writes it from a phrase boundary), so its first value plays first.
+  fold: { kind: 'sound', label: { en: 'Fold', it: 'Piega' }, args: [['amount', 'num', 1.5, 0.1, 3, 0.05], ['curve', 'choice', 'sharp', ['sharp', 'soft'], { sharp: { en: 'Sharp', it: 'Spigolosa' }, soft: { en: 'Soft', it: 'Morbida' } }]], extra: ['steps'],
+    code: (a, type) => (Array.isArray(a.steps) && a.steps.length
+      ? `.distort("<${a.steps.map(f).join(' ')}>").distorttype("${a.curve === 'soft' ? 'sinefold' : 'fold'}").distortvol("<${a.steps.map(x => f(foldLevel(x, a.curve, type))).join(' ')}>")`
+      : `.distort(${f(a.amount)}).distorttype("${a.curve === 'soft' ? 'sinefold' : 'fold'}").distortvol(${f(foldLevel(a.amount, a.curve, type))})`) },
+  // Ring (D3): the sound times 1 - amount + amount·sin(2π·freq·t), a Kabelsalat effect through K (one worklet per note);
+  // never above the input. No longer on trial since the director uses it (director-fold-ring, open question 1): its cost
+  // limits live in the director (at most two Ring tracks at once)
+  ring: { kind: 'sound', label: { en: 'Ring', it: 'Ring' }, args: [['freq', 'num', 220, 30, 2000, 10], ['amount', 'num', 0.8, 0, 1, 0.05]],
     code: a => `.K(audioin().mul(sine(${f(a.freq)}).mul(${f(a.amount)}).add(${f(1 - a.amount)})).out())` },
   pan: { kind: 'sound', label: { en: 'Pan', it: 'Panorama' }, args: [['position', 'num', 0.5, 0, 1, 0.05], ['motion', 'choice', 'fixed', ['fixed', 'slow', 'fast']]],
     code: a => a.motion === 'fixed' ? `.pan(${f(a.position)})` : `.pan(sine.slow(${a.motion === 'slow' ? 8 : 1}))` },
@@ -55,13 +64,17 @@ export const DEVICES = {
 export const FOLD_PEAK = { drums: 0.45, bass: 0.35, guitar: 0.4, voice: 0.35, spoken: 0.35, hook: 0.2, pad: 0.2, arp: 0.18, code: 0.3, texture: 0.15, riser: 0.1 };
 export const foldGain = (amount, curve = 'sharp') => (1 + Math.expm1(amount) / 2) * (curve === 'soft' ? Math.PI / 2 : 1);
 export const foldLevel = (amount, curve = 'sharp', type) => Math.floor(1000 * Math.max(1 / foldGain(amount, curve), FOLD_PEAK[type] ?? 0.2)) / 1000;
+// the top of an FM rise's saw (director-fold-ring D3): a saw sampled at each sixteenth's start reaches (n - 1)/n of its
+// range on the last of the n sixteenths of `bars` bars, so the range goes that much over `to` (the FM lab's 64/63 on 4 bars)
+export const riseTop = ({ to, bars, from = 0 }) => from + (to - from) * (16 * bars) / (16 * bars - 1);
 // the label of a choice value in a language (the value itself when the device names none)
 export const choiceLabel = (arg, v, lang) => (arg[4] && arg[4][v] ? arg[4][v][lang] || arg[4][v].en : String(v));
 
 // values of a device, defaults filled in
 export const deviceArgs = dev => {
   const spec = DEVICES[dev.device]; if (!spec) return {};
-  return Object.fromEntries(spec.args.map(([name, , def]) => [name, dev[name] ?? def]));
+  // (a device's extra values, director-fold-ring: Fold's steps and the FM rise, when the device has them)
+  return { ...Object.fromEntries(spec.args.map(([name, , def]) => [name, dev[name] ?? def])), ...Object.fromEntries((spec.extra || []).filter(k => dev[k] !== undefined).map(k => [k, dev[k]])) };
 };
 export const newDevice = name => ({ device: name, ...deviceArgs({ device: name }) });
 // code of the whole chain for a track type
@@ -75,6 +88,12 @@ export function checkRack(rack, p, err, warn) {
     const spec = DEVICES[d.device];
     for (const [k, v] of Object.entries(d)) {
       if (k === 'device' || k === 'on') continue;
+      if (k === 'steps' && d.device === 'fold') { if (!Array.isArray(v) || !v.length || v.length > 32 || v.some(x => typeof x !== 'number' || x < 0.1 || x > 3)) err(`${dp}.steps`, 'a list of 1 to 32 amounts, one per bar, each a number from 0.1 to 3'); continue; }
+      if (k === 'rise' && d.device === 'fm') {
+        const ok = v && typeof v === 'object' && !Array.isArray(v) && Number.isInteger(v.bars) && v.bars >= 1 && v.bars <= 16 && typeof v.to === 'number' && v.to >= 0 && v.to <= 4 && (v.from === undefined || (typeof v.from === 'number' && v.from >= 0 && v.from <= v.to)) && Object.keys(v).every(x => ['to', 'bars', 'from'].includes(x));
+        if (!ok) err(`${dp}.rise`, '{ "to": index from 0 to 4, "bars": 1 to 16, "from": index from 0 to "to" (0) }');
+        continue;
+      }
       const a = spec.args.find(x => x[0] === k);
       if (!a) { warn(`${dp}.${k}`, `unknown value for ${d.device}; values: ${spec.args.map(x => x[0]).join(', ') || 'none'}`); continue; }
       if (a[1] === 'choice' && !a[3].includes(v)) err(`${dp}.${k}`, `one of ${a[3].join(', ')}`);

@@ -2,7 +2,8 @@
 //   node --no-warnings tools/endless-recap.mjs [dir] [--lang it|en] [--out file]
 // Reads every session.json under dir (default songs/endless) and its song files; writes Markdown
 // (default <dir>/RECAP.md): per song the styles of each part, length, tempo, key, shape, sections,
-// tracks with their presets and sounds, moves and comments, target and measured energy.
+// tracks with their presets and sounds, moves and comments, target and measured energy, and a line per effect gesture
+// (director-fold-ring) with its bars, time and what to listen for.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -20,6 +21,14 @@ walk(dir);
 if (!sessions.length) { console.error(`no session.json under ${dir}; run npm run endless first`); process.exit(1); }
 
 const mmss = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+// the effect gestures (director-fold-ring): name and what to listen for, in both languages
+const GESTURE_TEXT = {
+  foldPhrase: { it: ['Frase piegata', 'il suono si piega (più brillante, metallico) per una o due frasi, poi torna pulito'], en: ['Folded phrase', 'the sound folds (brighter, metallic) for one or two phrases, then comes back clean'] },
+  foldRise: { it: ['Piega che sale fino al drop', 'la piega cresce battuta per battuta nell\'ultima frase, e sparisce sul momento forte'], en: ['Fold rise into the drop', 'the fold grows bar by bar over the last phrase and is gone on the big moment'] },
+  ringHeld: { it: ['Nota tenuta col ring', 'il pad o la texture suona come una campana, intonata sulla tonalità, per tutta la sezione'], en: ['Ringing held note', 'the pad or texture rings like a bell, tuned to the key, for the whole section'] },
+  metalHits: { it: ['Colpi di metallo', 'la percussione suona metallica (ring tra 300 e 1200 Hz)'], en: ['Metal hits', 'the percussion turns metallic (ring at 300 to 1200 Hz)'] },
+  fmRise: { it: ['Salita FM con piega', 'il synth si fa sempre più ruvido (indice FM che sale) e un po\' più piano; la seconda traccia, se c\'è, è una batteria che si piega; tutto pulito sul momento forte'], en: ['FM rise with fold', 'the synth grows harsher (the FM index climbs) and a little softer; the second track, when there is one, is a drum that folds; all clean on the big moment'] },
+};
 const avg = a => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
 // one short description of a track: its pattern names and sounds
 function trackLine(t) {
@@ -53,6 +62,9 @@ for (const file of sessions.sort()) {
     md.push(`- ${L.target} ${avg(e.phrases.map(p => p.target)).toFixed(2)}, ${L.measured} ${avg(e.phrases.map(p => p.energy)).toFixed(2)}, ${L.peak} ${Math.max(...e.phrases.map(p => p.energy)).toFixed(2)}`);
     md.push(`- ${L.moves}: ${Object.entries(kinds).map(([k, n]) => `${k} ${n}`).join(', ')} · ${said} ${L.comments}`);
     if (voice) { const v = voice.settings, c = e.voice && e.voice.character; md.push(`- ${L.voice}: ${v.speaker || 'default'}${c ? ` (${c})` : ''} · pitch ${v.pitch}, tempo ${v.tempo}, drive ${v.drive}, room ${v.room}, delay ${v.delay}, hpf ${v.hpf}, cutoff ${v.cutoff}`); }
+    // the effect gestures: bars, time from the song's start, what to listen for
+    const barSec = (Number(String(e.meter).split('/')[0]) || 4) * (4 / (Number(String(e.meter).split('/')[1]) || 4)) * 60 / e.bpm;
+    for (const g of e.gestures || []) { const [name, hear] = (GESTURE_TEXT[g.kind] || {})[lang] || [g.kind, '']; md.push(`- ${name} (${g.tracks.join(' + ')}): ${lang === 'it' ? 'battute' : 'bars'} ${g.start + 1}-${g.end}, ${mmss(g.start * barSec)}-${mmss(g.end * barSec)}; ${hear}`); }
     md.push('', `${L.tracks}:`, '', ...song.tracks.filter(t => t.type !== 'voice').map(trackLine), '', `${L.notes}:`, '', '- ', '');
   });
 }

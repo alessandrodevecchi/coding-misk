@@ -20,6 +20,7 @@ import { applyMaterial, sessionSource } from './material.js';
 import { songProfileOnAir } from './profile.js';
 import { voiceOption, PHRASE_RANGES, VOICE_WAYS, isQuietOnly, whereOf } from './voice-options.js';
 import { soundPatch } from './voice-sound.js';
+import { placeGestures, gestureSteps, gestureRate } from './gestures.js';
 
 export const SESSION_FORMAT = 'coding-misk/endless-session';
 // talk: how often the voice speaks (0 never, 0.5 about half of the boundaries with moves, 1 almost all)
@@ -47,8 +48,11 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // refrain at most 3 times a song), line A at most 3 times among mixed phrases, vocabulary lines written out without
 // repeats, a style's own line one time in two, no line of the 5 songs before in the session, my phrases counted within
 // the session; the music does not move
-export const DIRECTOR_VERSION = 14;
+// 15 (director-fold-ring, #90): effect gestures (a folded phrase, a Fold rise into the drop, a ringing held note, metal hits
+// in a break, an FM rise with fold) on some songs, by style, from a stream of their own: the songs that draw one change
+export const DIRECTOR_VERSION = 15;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
+// (gestures, director-fold-ring D6: false turns the effect gestures off; the checks use it to compare with version 14)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
 export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -254,7 +258,9 @@ export function planSong({ parts, byId, prev, opts, rng, index, recent = null })
   // (the Voce: traccia switch off, voice-full-controls D15: the draw still runs on its stream, the song gets no voice
   // track, so switching it on again gives the songs a session would have had)
   const spoken = opts.voices && opts.voices.track === false ? null : drawnSpoken;
-  return { index, parts, R, voice, spoken, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords, material, ...(recent ? { recent } : {}) };
+  // the gestures' rate (director-fold-ring D4): the dominant style's, else its genre family's
+  const gRate = gestureRate(byId[parts.dominant] || byId[parts.tempo] || R);
+  return { index, parts, R, voice, spoken, bpm, meter, swing, key, shape, phrase, bars, seconds: secondsOf(bars), plan, sections, tracks, usualHigh, hardMax, mainChords, liftChords, material, gestureRate: gRate, ...(recent ? { recent } : {}) };
 }
 
 // A part takes the strong progression on a big moment, or when the listener set a high tension (#40).
@@ -575,7 +581,10 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
   if (plan.voice.rack && plan.voice.rack.length) voice.rack = plan.voice.rack;
   const base = { tracks: [...plan.tracks.map(t => ({ ...t, mute: true, clips: [{ start: 0, bars, pattern: 'A' }] })), voice] };
   if (plan.spoken) base.tracks.splice(base.tracks.length - 1, 0, { ...JSON.parse(JSON.stringify(plan.spoken.track)), mute: true, clips: [{ start: 0, bars, pattern: 'A' }] });
-  const steps = keep.map(s => ({ ...s })), phrases = [], moved = new Map(); // track id → boundary index of its last move
+  // the effect gestures placed on the song's first writing (plan.gestures, director-fold-ring): a rewrite leaves their
+  // steps out of the director's view and puts them back at the end, so its moves are the ones the song had
+  const gKeys = new Set((plan.gestures || []).flatMap(g => g.steps.map(x => JSON.stringify(x))));
+  const steps = keep.filter(s => !gKeys.has(JSON.stringify(s))).map(s => ({ ...s })), phrases = [], moved = new Map(); // track id → boundary index of its last move
   const M = rng.moves;
   let lastKind = '', lastSay = -Infinity, brokeDrums = [], waitDrums = [];
   // the memory of the loop, from the kept steps
@@ -770,6 +779,13 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
   }
   // tracks never added would play from the start: leave them out; the others need no base mute
   const used = new Set(steps.flatMap(s => (s.add === undefined ? [] : Array.isArray(s.add) ? s.add : [s.add])));
+  // the effect gestures (director-fold-ring): placed once, on the song's first writing, from their own stream; their
+  // steps go after the director's on the same bar
+  if (plan.gestures === undefined) plan.gestures = placeGestures(plan, steps, base, opts, { locked, guard });
+  if (plan.gestures.length) {
+    const add = gestureSteps(plan.gestures, working(base, steps), from * phrase, bars, used, locked);
+    if (add.length) { steps.push(...add); steps.splice(0, steps.length, ...steps.map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x)); }
+  }
   const tracks = base.tracks.filter(t => t.type === 'voice' || used.has(t.id)).map(({ mute, ...t }) => t);
   return { tracks, steps, phrases, ctx };
 }
@@ -828,6 +844,8 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed, memory = null }) 
   const said = songSaid(song);
   if (said.length) entry.said = said;
   if (mineUsed.length) entry.mineUsed = [...mineUsed];
+  // its effect gestures (director-fold-ring): kind, tracks and bars, for reports and listening notes
+  if ((plan.gestures || []).length) entry.gestures = plan.gestures.map(g => ({ kind: g.kind, tracks: [...g.tracks], start: g.start, end: g.end }));
   return { song, entry, plan };
 }
 
