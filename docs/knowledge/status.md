@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 100. With open tasks: 30. All tasks ticked, waiting to be archived: 70.
+OpenSpec changes not archived: 100. With open tasks: 29. All tasks ticked, waiting to be archived: 71.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -22,7 +22,6 @@ OpenSpec changes not archived: 100. With open tasks: 30. All tasks ticked, waiti
 | [code-widgets](../../openspec/changes/code-widgets/tasks.md) | 3 | 31 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
-| [denser-renders](../../openspec/changes/denser-renders/tasks.md) | 12 | 12 |
 | [fm-groove-lab](../../openspec/changes/fm-groove-lab/tasks.md) | 1 | 16 |
 | [generator-followups](../../openspec/changes/generator-followups/tasks.md) | 2 | 3 |
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |
@@ -49,7 +48,7 @@ OpenSpec changes not archived: 100. With open tasks: 30. All tasks ticked, waiti
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 | [widget-render-styles](../../openspec/changes/widget-render-styles/tasks.md) | 2 | 21 |
 
-Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-follow-toggle`, `code-lanes`, `code-over-visual`, `code-themes`, `code-writing`, `continue-in-radio`, `curve-look`, `director-fold-ring`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fm-like-effects`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `my-phrases`, `narrator-ghost-row`, `pattern-followups`, `playlists`, `poetic-steps`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `saved-patterns-hide`, `saved-patterns-list`, `session-choice-prepared`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `spoken-text-on-stage`, `strudel-catalog`, `takeover-pending-edit`, `test-fixes`, `timeline-growth`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `voice-track-tuning`, `widgets-on-stage`, `written-like-coder`.
+Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-follow-toggle`, `code-lanes`, `code-over-visual`, `code-themes`, `code-writing`, `continue-in-radio`, `curve-look`, `denser-renders`, `director-fold-ring`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fm-like-effects`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `my-phrases`, `narrator-ghost-row`, `pattern-followups`, `playlists`, `poetic-steps`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `saved-patterns-hide`, `saved-patterns-list`, `session-choice-prepared`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `spoken-text-on-stage`, `strudel-catalog`, `takeover-pending-edit`, `test-fixes`, `timeline-growth`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `voice-track-tuning`, `widgets-on-stage`, `written-like-coder`.
 <!-- /generated -->
 
 Many open tasks are the owner's listening tests or short videos for the owner. They are not code to write: leave them open and mention them.
