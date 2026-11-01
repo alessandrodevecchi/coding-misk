@@ -8,9 +8,11 @@
 //   notes(inst, c0, c1), level(inst), flash(inst), silent(inst), wave(inst) → samples or null, columns(inst) → spectrum
 //   columns, pitches(inst) → the pitches of the section (low first), range() → { lo, hi } of the melodic notes,
 //   label(inst), dim ('dimmed' | 'hidden'), full (notes at full opacity), lanes: the drum instruments of Rullo,
-//   melodic: the melodic instruments of Rullo }
+//   melodic: the melodic instruments of Rullo, app (stage-app-widgets: the app widgets' settings, context and notes:
+//   { S, ctx, notes(c0, c1), memo(kind) }), render (the stage's render: the app widgets' cell forms) }
 import * as paint from './widget-painters.js';
 import { instColour } from './widget-palettes.js';
+import { widgetFrame as appFrame, widgetSize as appSize, paintWidget as appPaint } from '../widgets/app-widgets.js';
 
 const FONT = '"JetBrains Mono", monospace';
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -54,11 +56,54 @@ function background(g, W, H, pal) {
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
 }
 
+// ---------- app widgets in a panel (stage-app-widgets D1) ----------
+// The hit grid and the tone cloud are drawn by the code's painter (src/widgets/app-widgets.js) from the same notes,
+// measured at a reference font size and scaled to fit the panel's widget area, centred. Below a size floor (the font
+// size it would be drawn at) the panel shows its next widget (p.alt) instead.
+// (the floor by kind: the hit grid's cells still read at a small size, the tone cloud's characters do not)
+export const APP_FS = 14, APP_MIN_FS = { hitgrid: 3.5, tonecloud: 5.5 };
+const APP = ['hitgrid', 'tonecloud'];
+export const isAppWidget = w => APP.includes(w);
+// → { frame, sz, k } or null (no app context, or too small). render: the cell form ('normal', 'ascii', 'terminal', …)
+export function appWidgetFit(box, p, F, render = F.render || 'normal') {
+  const A = F.app;
+  if (!A || !isAppWidget(p.widget) || !(box.w > 4 && box.h > 4)) return null;
+  const frame = appFrame(p.widget, {}, A.S, A.notes, F.cyc, { ...(A.ctx || {}), render, memo: A.memo ? A.memo(p.widget) : null });
+  const sz = appSize(frame, APP_FS), k = Math.min(box.w / sz.w, box.h / sz.h);
+  return k * APP_FS >= APP_MIN_FS[p.widget] ? { frame, sz, k } : null;
+}
+// the app widgets' colours from a stage palette: the instrument's colour for hits and the chord, the ink for the rest
+export function appPalette(pal, col) {
+  return { band: 'rgba(0,0,0,0)', ink: pal.ink, comment: pal.label, hit: col, now: col, cur: pal.muted, cell: pal.muted, inv: col, invInk: pal.bg };
+}
+export function paintAppWidget(g, box, fit, P) {
+  // (painted at the fitted font size, not scaled: the painters' sizes grow with the font size, and text drawn without a
+  // scale keeps the browser's glyph cache, a third of the cost of the tone cloud on Monitor)
+  const { frame, sz, k } = fit, fs = APP_FS * k;
+  appPaint(g, box.x + (box.w - sz.w * k) / 2 + fs * 0.3, box.y + (box.h - sz.h * k) / 2, frame, P, fs);
+}
+// (for the checks: an app widget drawn, its kind and the hit grid's rows)
+export const appDrawn = fit => ({ kind: fit.frame.kind, rows: fit.frame.kind === 'hitgrid' ? fit.frame.D.rows.length : 0 });
+// the widget a panel shows in a box: an app widget too small for it gives way to its next widget
+export function shownWidget(box, p, F, render) {
+  if (!isAppWidget(p.widget)) return { widget: p.widget, fit: null };
+  const fit = appWidgetFit(box, p, F, render);
+  return fit ? { widget: p.widget, fit } : { widget: p.alt || 'scope', fit: null };
+}
+// a panel's name, level, flash and silence: the hit grid's panel (group 'drums') stands for every drum instrument
+const instsOf = p => p.members || [p.inst];
+export const panelLabel = (F, p) => F.label(p.group || p.inst);
+export const panelLevel = (F, p) => Math.max(0, ...instsOf(p).map(i => F.level(i)));
+export const panelFlash = (F, p) => Math.max(0, ...instsOf(p).map(i => F.flash(i)));
+export const panelSilent = (F, p) => instsOf(p).every(i => F.silent(i));
+
 // one panel: name and widget kind, level bar, the widget; glow with the level, a flash on onsets, dimmed when silent
 export function drawPanel(g, box, p, F) {
-  const pal = F.pal, quiet = p.quiet || F.silent(p.inst), col = quiet ? pal.dim : instColour(pal, p.inst);
-  const lv = quiet ? 0 : clamp(F.level(p.inst), 0, 1), fl = quiet ? 0 : F.flash(p.inst);
+  const pal = F.pal, quiet = p.quiet || panelSilent(F, p), col = quiet ? pal.dim : instColour(pal, p.inst);
+  const lv = quiet ? 0 : clamp(panelLevel(F, p), 0, 1), fl = quiet ? 0 : panelFlash(F, p);
   const fs = clamp(Math.round(Math.min(box.h * 0.085, box.w * 0.05)), 9, 17), pad = Math.max(6, fs * 0.8);
+  const inner = { x: box.x + pad, y: box.y + pad * 1.6 + fs, w: box.w - 2 * pad, h: box.h - pad * 2.4 - fs };
+  const shown = shownWidget(inner, p, F), name = panelLabel(F, p).toUpperCase();
   g.save();
   g.globalAlpha = (quiet ? 0.55 : 1) * F.fade;
   g.fillStyle = pal.panel; g.fillRect(box.x, box.y, box.w, box.h);
@@ -70,20 +115,20 @@ export function drawPanel(g, box, p, F) {
   g.setLineDash([]); g.shadowBlur = 0;
   // header
   g.font = `600 ${fs}px ${FONT}`; g.textBaseline = 'top'; g.textAlign = 'left';
-  g.fillStyle = col; g.fillText(F.label(p.inst).toUpperCase(), box.x + pad, box.y + pad * 0.8);
-  const nameW = g.measureText(`${F.label(p.inst).toUpperCase()} `).width;
-  g.fillStyle = quiet ? pal.dim : pal.label; g.fillText(`· ${p.widget}`, box.x + pad + nameW, box.y + pad * 0.8);
+  g.fillStyle = col; g.fillText(name, box.x + pad, box.y + pad * 0.8);
+  const nameW = g.measureText(`${name} `).width;
+  g.fillStyle = quiet ? pal.dim : pal.label; g.fillText(`· ${shown.widget}`, box.x + pad + nameW, box.y + pad * 0.8);
   // level bar, top right
   // (never over the header's text: a narrow panel of the layer gets a shorter bar)
-  const textW = nameW + g.measureText(`· ${p.widget}`).width;
+  const textW = nameW + g.measureText(`· ${shown.widget}`).width;
   const bw = Math.max(0, Math.min(box.w * 0.16, 64, box.w - 2 * pad - textW - fs * 0.6)), bh = Math.max(3, fs * 0.32), bx = box.x + box.w - pad - bw, by = box.y + pad * 0.8 + fs * 0.35;
   g.fillStyle = pal.edge; g.fillRect(bx, by, bw, bh);
   g.fillStyle = col; g.fillRect(bx, by, bw * lv, bh);
   // the widget
-  const inner = { x: box.x + pad, y: box.y + pad * 1.6 + fs, w: box.w - 2 * pad, h: box.h - pad * 2.4 - fs };
   if (inner.w > 4 && inner.h > 4) {
     g.save(); g.beginPath(); g.rect(inner.x, inner.y, inner.w, inner.h); g.clip();
-    drawWidget(g, inner, p, F, col);
+    if (shown.fit) { paintAppWidget(g, inner, shown.fit, appPalette(pal, col)); if (F.drawnApps) F.drawnApps.push(appDrawn(shown.fit)); }
+    else drawWidget(g, inner, shown.widget === p.widget ? p : { ...p, widget: shown.widget }, F, col);
     g.restore();
   }
   g.restore();

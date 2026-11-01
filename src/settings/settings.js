@@ -292,7 +292,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     </div>`; }).join('') : '';
     return `<div class="card set-card" id="set-stage-widgets"><h3>${esc(t('setSw'))}</h3>
       <p class="muted">${esc(t('setSwIntro'))}</p>
-      ${row(t('swLayer'), seg('data-sw-layer', SW_LAYERS.map(k => [k, t(`swLayer:${k}`)]), W.layer), t('swLayerHint'))}
+      ${row(t('swLayer'), seg('data-sw-layer', SW_LAYERS.map(k => [k, t(`swLayer:${k}`)]), W.layer), t(`swLayerHint:${W.layer}`))}
       ${sec('general', `${row(t('swMonitor'), `<input type="number" data-sw-num="monitor" min="${SW_LIMITS.monitor[0]}" max="${SW_LIMITS.monitor[1]}" step="1" value="${W.monitor}" data-no-knob>`, t('swMonitorHint'))}
         ${row(t('swStrip'), `<input type="number" data-sw-num="strip" min="${SW_LIMITS.strip[0]}" max="${SW_LIMITS.strip[1]}" step="1" value="${W.strip}" data-no-knob>`, t('swStripHint'))}
         ${row(t('swMapping'), seg('data-sw-mapping', SW_MAPPINGS.map(k => [k, t(`swMapping:${k}`)]), W.mapping), t('swMappingHint'))}
@@ -305,7 +305,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     </div>`;
   }
   // a change of the stage widgets' settings, stored whole (the defaults filled in)
-  const setSw = f => { const W = stageSettings(store.get(SW_KEY, null)); f(W); store.set(SW_KEY, stageSettings(W)); };
+  const setSw = f => { const W = stageSettings(store.get(SW_KEY, null)); f(W); store.set(SW_KEY, stageSettings(W)); if (app.stageWidgetsChanged) app.stageWidgetsChanged(); };
   // a change of the code widgets' settings, stored whole (the defaults filled in)
   // Code over and the app widgets, stored whole (the defaults filled in)
   const setCo = f => { const S = codeOverSettings(store.get(CO_KEY, null)); f(S); store.set(CO_KEY, codeOverSettings(S)); if (app.codeOverChanged) app.codeOverChanged(); };
@@ -354,7 +354,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     // the stage's own instruments start as a copy of the code widgets' ones (unless the stage's copy was already edited)
     if (b.dataset.swMapping) { setSw(W => { W.mapping = b.dataset.swMapping; if (W.mapping === 'own' && JSON.stringify(W.instruments) === JSON.stringify(stageSettings(null).instruments)) W.instruments = widgetSettings(store.get(CW_KEY, null)).instruments; }); return render(); }
     if (b.dataset.swSec2) { const k = b.dataset.swSec2, w = b.dataset.w; setSw(W => { const I = W.instruments[k], has = I.secondary.includes(w); I.secondary = has ? I.secondary.filter(x => x !== w) : [...I.secondary, w]; }); return render(); }
-    if (b.id === 'set-sw-defaults') { store.set(SW_KEY, stageSettings(null)); toast(t('swDefaultsDone')); return render(); }
+    if (b.id === 'set-sw-defaults') { store.set(SW_KEY, stageSettings(null)); if (app.stageWidgetsChanged) app.stageWidgetsChanged(); toast(t('swDefaultsDone')); return render(); }
     if (b.dataset.setMp3) { store.set('coding-misk-export-mp3', +b.dataset.setMp3); return render(); }
     // direction presets (#53): the whole video setting under a name
     if (b.id === 'set-vid-preset-save') {

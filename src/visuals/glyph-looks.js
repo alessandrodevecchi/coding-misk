@@ -7,7 +7,7 @@
 //
 // info: { title, section, sectionNo, sections, next, nextIn (bars), bar, bars, bpm, playing, renderName, say, sayBar
 //   (bars since the line began), secBar (bars since the section began), word(key, vars) → a word of the interface }
-import { monitorLayout } from './widget-looks.js';
+import { monitorLayout, shownWidget, paintAppWidget, appPalette, appDrawn, panelLabel, panelLevel, panelFlash, panelSilent } from './widget-looks.js';
 import { layerLayout } from './widget-layer.js';
 import { instColour } from './widget-palettes.js';
 import { gridOf, termGrid, termColour, brailleDots, brailleWave } from './term-grid.js';
@@ -68,8 +68,12 @@ const rowOfPitch = (pitches, p, n) => { const i = pitches.indexOf(p); return i <
 
 // ---------- Terminal (take A): the widget of a panel in the cells c, r, w × h ----------
 export function termWidget(t, c, r, w, h, p, F, col) {
-  const T = t.T, cyc = F.cyc, wd = p.widget;
+  const T = t.T, cyc = F.cyc;
   if (w < 2 || h < 1) return;
+  // the app widgets (stage-app-widgets D1): the code's painter in its character form, on the panel's cells
+  const box = { x: t.X(c), y: t.Y(r), w: w * t.G.cw, h: h * t.G.ch }, shown = shownWidget(box, p, F, 'terminal'), wd = shown.widget;
+  if (shown.fit && F.drawnApps) F.drawnApps.push(appDrawn(shown.fit));
+  if (shown.fit) { paintAppWidget(t.g, box, shown.fit, { band: 'rgba(0,0,0,0)', ink: T.fg, comment: T.dim, hit: col, now: col, cur: T.faint, cell: T.faint, inv: col, invInk: T.bg }); return; }
   if (wd === 'scope') { const { d, scale } = waveOf(F, p.inst); t.braille(c, r, w, h, brailleWave(w, h, d, scale), col); return; }
   if (wd === 'spectrum') { t.bars(c, r, w, h, spectrumNow(F, p.inst, w), f => (f < 0.5 ? T.green : f < 0.8 ? T.yellow : T.red)); return; }
   const list = F.notes(p.inst, cyc - 2, cyc + 2);
@@ -107,10 +111,10 @@ export function termWidget(t, c, r, w, h, p, F, col) {
 
 // a Terminal panel: rounded box titled with the instrument in its colour and the widget kind dimmed, a level line, the widget
 export function termPanel(t, b, p, F, o = {}) {
-  const T = t.T, word = o.word || wordOf(null), quiet = p.quiet || F.silent(p.inst), col = quiet ? T.dim : termColour(T, p.inst);
-  const lv = quiet ? 0 : clamp(F.level(p.inst), 0, 1), fl = quiet ? 0 : F.flash(p.inst);
+  const T = t.T, word = o.word || wordOf(null), quiet = p.quiet || panelSilent(F, p), col = quiet ? T.dim : termColour(T, p.inst);
+  const lv = quiet ? 0 : clamp(panelLevel(F, p), 0, 1), fl = quiet ? 0 : panelFlash(F, p);
   t.bg(b.c, b.r, b.w, b.h, T.bg);
-  t.box(b.c, b.r, b.w, b.h, quiet ? T.faint : fl > 0.5 ? T.fg : o.border || col, o.title || F.label(p.inst).toLowerCase(), { titleCol: col, right: o.right ?? p.widget, rightCol: T.dim });
+  t.box(b.c, b.r, b.w, b.h, quiet ? T.faint : fl > 0.5 ? T.fg : o.border || col, o.title || panelLabel(F, p).toLowerCase(), { titleCol: col, right: o.right ?? p.widget, rightCol: T.dim });
   let top = b.r + 1;
   if (!o.noLevel && b.h >= 6 && b.w >= 18) {
     const mw = Math.max(4, b.w - 17);
@@ -196,8 +200,10 @@ export function drawRulloTerm(g, W, H, F, T, info = {}) {
 // ---------- ASCII (D4): plain characters in the look's colours ----------
 const RAMP = ' .:-=+*#';
 function asciiWidget(t, c, r, w, h, p, F, col) {
-  const cyc = F.cyc, wd = p.widget, pal = F.pal;
+  const cyc = F.cyc, pal = F.pal;
   if (w < 2 || h < 1) return;
+  const box = { x: t.X(c), y: t.Y(r), w: w * t.G.cw, h: h * t.G.ch }, shown = shownWidget(box, p, F, 'ascii'), wd = shown.widget;
+  if (shown.fit) { paintAppWidget(t.g, box, shown.fit, appPalette(pal, col)); if (F.drawnApps) F.drawnApps.push(appDrawn(shown.fit)); return; }
   if (wd === 'scope') {
     const { d, scale } = waveOf(F, p.inst);
     let prev = null;
@@ -256,9 +262,9 @@ function asciiWidget(t, c, r, w, h, p, F, col) {
   }
 }
 function asciiPanel(t, b, p, F) {
-  const pal = F.pal, quiet = p.quiet || F.silent(p.inst), col = quiet ? pal.dim : instColour(pal, p.inst), a = quiet ? 0.5 : 1;
-  const lv = quiet ? 0 : clamp(F.level(p.inst), 0, 1);
-  t.box(b.c, b.r, b.w, b.h, col, `${F.label(p.inst).toUpperCase()} ${p.widget}`, { ascii: true, dash: quiet, ground: pal.bg, titleCol: col });
+  const pal = F.pal, quiet = p.quiet || panelSilent(F, p), col = quiet ? pal.dim : instColour(pal, p.inst), a = quiet ? 0.5 : 1;
+  const lv = quiet ? 0 : clamp(panelLevel(F, p), 0, 1);
+  t.box(b.c, b.r, b.w, b.h, col, `${panelLabel(F, p).toUpperCase()} ${p.widget}`, { ascii: true, dash: quiet, ground: pal.bg, titleCol: col });
   if (b.w >= 16) t.put(b.c + b.w - 12, b.r + 1, `[${'#'.repeat(Math.round(lv * 8)).padEnd(8, '.')}]`, col, { alpha: a });
   if (quiet) return;
   if (b.h > 4 && b.w > 4) asciiWidget(t, b.c + 2, b.r + 2, b.w - 4, b.h - 3, p, F, col);

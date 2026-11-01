@@ -5,12 +5,15 @@
 // Usage: npm run check:stage-widgets
 // (Strudel's own note names, from its util module: the package's entry needs a browser)
 import { noteToMidi } from '../node_modules/@strudel/core/util.mjs';
-import { monitorLayout, drawMonitor, drawRullo } from '../src/visuals/widget-looks.js';
-import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache, pitchOf, cwInstrument } from '../src/visuals/stage-feed.js';
+import { monitorLayout, drawMonitor, drawRullo, drawPanel, appWidgetFit, APP_FS, APP_MIN_FS } from '../src/visuals/widget-looks.js';
+import { drawMonitorAscii, drawMonitorTerm, drawLayerGlyph } from '../src/visuals/glyph-looks.js';
+import { termPalette } from '../src/visuals/term-grid.js';
+import { appWidgetSettings, notesOfStore, widgetFrame as appFrame } from '../src/widgets/app-widgets.js';
+import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache, pitchOf, cwInstrument, stageInstOf } from '../src/visuals/stage-feed.js';
 import { THEME_PALETTES, themePalette, instColour, scenePalette } from '../src/visuals/widget-palettes.js';
 import { widgetSettings, CW_DEFAULTS, CW_VERSION } from '../src/live/widgets.js';
 import { stripLayout, screenLayout, palcoScreen, drawLayer, seeThrough } from '../src/visuals/widget-layer.js';
-import { SW_DEFAULTS, stageSettings, stageMapping, layerOn, limitOf, stageScopeInstruments } from '../src/visuals/stage-settings.js';
+import { SW_DEFAULTS, SW_VERSION, SW_ON_LAYERS, toggleLayer, stageSettings, stageMapping, layerOn, limitOf, stageScopeInstruments } from '../src/visuals/stage-settings.js';
 import { makeBackup } from '../src/settings/backup.js';
 import { INSTRUMENTS, LOOKS, PICK_LOOKS } from '../src/music.js';
 
@@ -63,16 +66,20 @@ function song() {
 {
   const st = song(), A = { start: 0, end: 16 }, B = { start: 16, end: 32 };
   const ra = rosterOf(st, A, { S: S0, max: 6 }), rb = rosterOf(st, B, { S: S0, max: 6 });
-  check(ra.map(p => p.inst).join() === 'bass,hook,kick,arp,hats,pad', 'section A: one panel per playing instrument, in the code widgets\' slot order (fx is off there)', ra.map(p => `${p.inst}:${p.widget}`).join(' '));
+  // (stage-app-widgets D2: kick and hats share the hit grid's panel, in the kick's slot)
+  check(ra.map(p => p.inst).join() === 'bass,hook,kick,arp,pad', 'section A: one panel per playing instrument, in the code widgets\' slot order (fx is off there, hats in the hit grid)', ra.map(p => `${p.inst}:${p.widget}`).join(' '));
   check(ra.find(p => p.inst === 'bass').widget === 'scope' && ra.find(p => p.inst === 'hook').widget === 'pianoroll', 'same mapping as the code widgets: bass scope, lead pianoroll');
-  check(rb.map(p => p.inst).join() === 'bass,hook,kick,snare,arp,hats', 'section B: six playing instruments first, the pad (silent in it) left out at the limit', rb.map(p => `${p.inst}${p.quiet ? ':quiet' : ''}`).join(' '));
+  check(rb.map(p => p.inst).join() === 'bass,hook,kick,arp,pad' && rb.find(p => p.inst === 'pad').quiet, 'section B: the playing instruments first, then the pad (silent in it) dimmed', rb.map(p => `${p.inst}${p.quiet ? ':quiet' : ''}`).join(' '));
+  const r4 = rosterOf(st, B, { S: S0, max: 4 });
+  check(r4.map(p => p.inst).join() === 'bass,hook,kick,arp', 'section B with 4 panels: the pad (silent in it) left out at the limit', r4.map(p => p.inst).join(' '));
   const r5 = rosterOf(st, B, { S: S0, max: 8 });
   check(r5.some(p => p.inst === 'pad' && p.quiet), 'a silent instrument that played within the window keeps a dimmed panel');
   check(!rosterOf(st, B, { S: S0, max: 8, silent: 'hidden' }).some(p => p.inst === 'pad'), '"hidden": no panel for a silent instrument');
   const S1 = widgetSettings({ share: 0, instruments: { bass: { primary: 'spectrum' } } });
   check(rosterOf(st, A, { S: S1 }).find(p => p.inst === 'bass').widget === 'spectrum', 'the code widgets card decides the widget (bass as spectrum)');
   const five = noteStore(); for (const i of ['bass', 'hook', 'kick', 'arp', 'hats']) five.add(i, [1, 1.2, i === 'kick' || i === 'hats' ? 'x' : 50, 1]);
-  check(rosterOf(five, A, { S: S0 }).length === 5, 'spec scenario: bass, lead, kick, arp and hats give five panels');
+  check(rosterOf(five, A, { S: S0 }).length === 4, 'bass, lead, kick, arp and hats give four panels (kick and hats in one hit grid)');
+  check(rosterOf(five, A, { S: stageMapping(stageSettings({ v: SW_VERSION, widgets: { hitgrid: false } }), S0) }).length === 5, 'widgets-on-stage scenario: with the hit grid off, bass, lead, kick, arp and hats give five panels');
   // the same panels whatever the time of the section: the roster depends only on the section and the notes known
   check(JSON.stringify(rosterOf(st, A, { S: S0 })) === JSON.stringify(rosterOf(song(), A, { S: S0 })), 'the panels of a section are the same every time they are asked');
   // code-over-visual cd5: one tone cloud at most among the panels, on the pad, else bass, lead, arp, the voice last
@@ -217,7 +224,9 @@ for (const look of ['monitor', 'rullo']) {
   check(rosterOf(st, { start: 0, end: 16 }, { S: same, max: 6 }).find(p => p.inst === 'bass').widget === 'spectrum', 'spec scenario: the code widgets card maps the bass, the stage follows it');
   const segs = [{ code: '$: s("bd*4").analyze("kick")\n$: note("c2").s("saw").analyze("bass")\n$: n("0 2").s("piano").analyze("arp")' }, { code: '$: x', run: "[0,9,{gain:1,analyze:'pad'}]" }];
   const sc = stageScopeInstruments(segs, stageMapping(stageSettings(null), widgetSettings({ share: 0 })));
-  check(sc.join() === 'bass,kick,pad', 'Always real: the stage instruments with a scope or spectrum (code and hidden mixer)', sc.join());
+  check(sc.join() === 'bass', 'Always real: the stage instruments with a scope or spectrum (code and hidden mixer; the kick has the hit grid, the pad the tone cloud)', sc.join());
+  const sc2 = stageScopeInstruments(segs, stageMapping(stageSettings({ v: SW_VERSION, widgets: { hitgrid: false, tonecloud: false } }), widgetSettings({ share: 0 })));
+  check(sc2.join() === 'bass,kick,pad', 'Always real with the app widgets off: kick and pad have a scope again', sc2.join());
   const b = makeBackup([['coding-misk-stage-widgets', { strip: 2 }], ['coding-misk-sw-open', ['general']]]);
   check(b.data['coding-misk-stage-widgets'].strip === 2 && !('coding-misk-sw-open' in b.data), 'the stage widgets travel in the backup, the open sections of their card do not');
   check(JSON.stringify(SW_DEFAULTS.widgets) === JSON.stringify(D.widgets), 'the defaults read back as the defaults');
@@ -234,6 +243,97 @@ const keep = widgetSettings({ notes: 'volume', v: CW_VERSION });
 check(keep.notes === 'volume' && widgetSettings(keep).notes === 'volume', 'Widget notes: "volume" chosen after the move is kept');
 check(widgetSettings(widgetSettings({ notes: 'volume' })).notes === 'full' && widgetSettings({ notes: 'full', v: CW_VERSION }).notes === 'full', 'Widget notes: the move is saved with the version and does not repeat');
 check(widgetSettings(null).v === CW_VERSION, 'Widget notes: settings carry the version');
+
+// ---------- app widgets as stage panels (stage-app-widgets) ----------
+{
+  const A = { start: 0, end: 16 }, SM = stageMapping(stageSettings(null), widgetSettings({ share: 0 }));
+  const of = (insts, S = SM, max = 6) => { const x = noteStore(); for (const i of insts) x.add(i, [1, 1.2, ['kick', 'snare', 'hats'].includes(i) ? 'x' : 50, 1]); return rosterOf(x, A, { S, max }); };
+  const fmt = r => r.map(p => `${p.inst}:${p.widget}`).join(' ');
+  // D2: one hit grid for the drums
+  const kd = of(['kick', 'snare', 'hats', 'bass', 'pad']), grid = kd.filter(p => p.widget === 'hitgrid');
+  check(grid.length === 1 && grid[0].inst === 'kick' && grid[0].group === 'drums' && grid[0].members.join() === 'kick,snare,hats' && !kd.some(p => ['snare', 'hats'].includes(p.inst)), 'D2: kick, snare and hats share one hit grid panel, in the kick\'s slot', fmt(kd));
+  const many = of(['kick', 'snare', 'hats', 'bass', 'hook', 'arp', 'pad', 'voice']);
+  check(many.length === 6 && many.some(p => p.inst === 'pad') && many.some(p => p.inst === 'arp'), 'D2: the freed slots go to other instruments', fmt(many));
+  check(of(['snare', 'hats', 'bass']).find(p => p.widget === 'hitgrid').inst === 'snare', 'D2: without a kick the first drum instrument playing holds the hit grid');
+  const noGrid = stageMapping(stageSettings({ v: SW_VERSION, widgets: { hitgrid: false } }), widgetSettings({ share: 0 }));
+  check(!of(['kick', 'snare', 'bass'], noGrid).some(p => p.widget === 'hitgrid') && of(['kick', 'snare', 'bass'], noGrid).length === 3, 'D2: the hit grid off: a panel per drum instrument, as before');
+  // D3: one tone cloud
+  const clouds = r => r.filter(p => p.widget === 'tonecloud').map(p => p.inst).join();
+  const pv = of(['pad', 'voice', 'bass']);
+  check(clouds(pv) === 'pad' && pv.find(p => p.inst === 'voice').widget === 'scope', 'D3 scenario: pad and voice: the pad has the tone cloud, the voice a scope', fmt(pv));
+  const np = of(['bass', 'hook']);
+  check(clouds(np) === 'bass' && np.find(p => p.inst === 'hook').widget === 'pianoroll', 'D3 scenario: no pad: the bass has the tone cloud, no other panel', fmt(np));
+  check(clouds(of(['hook', 'arp'])) === 'hook' && clouds(of(['arp'])) === 'arp', 'D3: without pad and bass the lead, else the arp');
+  check(clouds(of(['voice', 'kick'])) === '' && of(['voice', 'kick']).find(p => p.inst === 'voice').widget === 'scope', 'D3: the voice alone keeps its scope (no panel asked for a cloud)');
+  const askVoice = stageMapping(stageSettings(null), widgetSettings({ share: 0, appKinds: 1, instruments: { voice: { primary: 'tonecloud', secondary: ['scope'] } } }));
+  check(clouds(of(['voice', 'kick'], askVoice)) === 'voice' && clouds(of(['voice', 'bass'], askVoice)) === 'bass', 'D3: the voice holds the cloud only when no other can and one was asked for');
+  {
+    let bad = null;
+    for (let k = 0; k < 40 && !bad; k++) {
+      const S = stageMapping(stageSettings(null), widgetSettings({ share: 100 })), r = rosterOf((() => { const x = noteStore(); for (const i of ['pad', 'bass', 'hook', 'arp', 'voice', 'kick']) x.add(i, [1, 1.2, i === 'kick' ? 'x' : 50, 1]); return x; })(), A, { S, max: 6, seed: `s${k}` });
+      if (r.filter(p => p.widget === 'tonecloud').length > 1 || r.filter(p => p.widget === 'hitgrid').length > 1) bad = fmt(r);
+    }
+    check(!bad, 'D3: never two tone clouds or two hit grids (share 100, 40 seeds)', bad || '');
+  }
+  const noCloud = stageMapping(stageSettings({ v: SW_VERSION, widgets: { tonecloud: false } }), widgetSettings({ share: 0 }));
+  const nc = of(['pad', 'bass'], noCloud);
+  check(clouds(nc) === '' && nc.find(p => p.inst === 'pad').widget === 'scope', 'spec scenario: the tone cloud turned off: the pad uses its next widget', fmt(nc));
+  check(kd.filter(p => p.widget === 'hitgrid' || p.widget === 'tonecloud').every(p => p.alt && p.alt !== 'hitgrid' && p.alt !== 'tonecloud'), 'an app widget panel has a Strudel widget to fall back on');
+  // the voice: spoken samples are the voice on the stage, the rest keeps its `analyze`
+  check(stageInstOf({ s: 'say_en_x', analyze: 'fx' }) === 'voice' && stageInstOf({ s: 'bd', analyze: 'kick' }) === 'kick' && cwInstrument('voice') === 'voice', 'a spoken sample is the voice on the stage (its line says analyze("fx"))');
+  // D4: settings
+  const D = stageSettings(null);
+  check(D.widgets.hitgrid && D.widgets.tonecloud && D.v === SW_VERSION && D.last === 'strip', 'D4: hit grid and tone cloud on by default, the version written, the quick switch\'s mode Side panels');
+  const old = stageSettings({ layer: 'palco', widgets: { hitgrid: false, tonecloud: false, scope: false }, appKinds: 1 });
+  check(old.widgets.hitgrid && old.widgets.tonecloud && !old.widgets.scope && old.layer === 'palco', 'D4: old stored settings read with both app widgets on, the other choices kept (an old Palco is Big screen)');
+  const later = stageSettings({ ...old, widgets: { ...old.widgets, tonecloud: false } });
+  check(!later.widgets.tonecloud && !stageSettings(later).widgets.tonecloud, 'D4: a later choice (tone cloud off) is kept');
+  check(SM.instruments.voice.on && SM.instruments.drums.primary === 'hitgrid' && SM.instruments.pad.primary === 'tonecloud' && SM.widgets.hitgrid, 'stageMapping keeps the app widgets and the voice');
+  // D5: the quick switch
+  check(stageSettings(toggleLayer(stageSettings(null))).layer === 'strip', 'D5: the first press turns on Side panels');
+  const big = stageSettings({ v: SW_VERSION, layer: 'palco' }), off = stageSettings(toggleLayer(big)), back = stageSettings(toggleLayer(off));
+  check(off.layer === 'off' && off.last === 'palco' && back.layer === 'palco', 'D5 scenario: Big screen, two presses: off, then Big screen again');
+  check(SW_ON_LAYERS.join() === 'strip,palco' && stageSettings({ v: SW_VERSION, layer: 'off', last: 'nope' }).last === 'strip', 'D5: an unknown last mode reads as Side panels');
+  // D1: drawn in a Monitor panel, a side panel and the big screen, by the code's painter, from the same notes
+  const st = song(); for (let c = 0; c < 32; c++) st.add('snare', [c + 0.5, c + 0.55, 'sd', 0.8]);
+  const songNotes = [{ inst: 'kick', p: 'bd' }, { inst: 'snare', p: 'sd' }, { inst: 'hats', p: 'hh' }];
+  const appCtx = { S: appWidgetSettings(null), ctx: { meter: '4/4', key: 'C minor', songNotes, lang: 'en', font: 'mono' }, notes: notesOfStore(st, () => st.instruments), memo: () => new Map() };
+  const frame = (cyc, roster) => ({ ...frameOf(st, cyc, columnCache()), roster, app: appCtx, render: 'normal' });
+  const texts = g => g.log.filter(x => x[0] === 'fillText').map(x => String(x[1]));
+  const roster = rosterOf(st, { start: 0, end: 16 }, { S: SM });
+  check(roster.some(p => p.widget === 'hitgrid') && roster.some(p => p.widget === 'tonecloud'), 'the made-up song: a hit grid panel and a tone cloud panel', fmt(roster));
+  // (the tone cloud is wide: on a 9:16 picture it fits a side panel alone, in a row of 4 it gives way to its next widget)
+  const places = { monitor: monitorLayout(roster.length, 1280, 720), 'side panel': stripLayout(4, 1280, 720), 'big screen of 2': screenLayout(2, 1280, 720), 'side panel 9:16, 4 in a row': stripLayout(4, 405, 720), 'side panel 9:16, alone': stripLayout(1, 405, 720) };
+  for (const [name, boxes] of Object.entries(places)) {
+    for (const kind of name.includes('4 in a row') ? ['hitgrid'] : ['hitgrid', 'tonecloud']) {
+      const p = roster.find(x => x.widget === kind), g = recorder();
+      drawPanel(g, boxes[0], p, frame(6.3, roster));
+      const T = texts(g), ok = kind === 'hitgrid' ? T.includes('bd') && T.includes('sd') && T.includes('hh') && T.some(x => /^bar 7/.test(x)) : T.some(x => /^chord /.test(x));
+      check(ok && T.some(x => x.includes(kind)), `D1: ${kind} drawn by the code's painter in a ${name}`, `${Math.round(boxes[0].w)}×${Math.round(boxes[0].h)}`);
+    }
+  }
+  // the same rows as the code's widget at the same bar, from the first frame
+  const cf = appFrame('hitgrid', {}, appCtx.S, appCtx.notes, 0.1, { ...appCtx.ctx, render: 'normal' });
+  check(cf.D.rows.map(r => r.key).slice(0, 3).join() === 'bd,sd,hh', 'D1: the hit grid\'s rows are the song\'s drum sounds from the first frame', cf.D.rows.map(r => r.key).join());
+  const pc = roster.find(x => x.widget === 'tonecloud'), tiny = appWidgetFit({ x: 0, y: 0, w: 60, h: 30 }, pc, frame(6.3, roster));
+  const g0 = recorder(); drawPanel(g0, { x: 0, y: 0, w: 90, h: 60 }, pc, frame(6.3, roster));
+  check(tiny === null && texts(g0).some(x => x.includes(pc.alt)) && !texts(g0).some(x => /^chord /.test(x)), `below the size floor (${APP_MIN_FS.tonecloud} px of ${APP_FS} for the tone cloud) the panel shows its next widget (${pc.alt})`);
+  // the same drawing for the same frame, Normal and the glyph forms
+  const looks = [
+    ['Monitor', (g, F) => drawMonitor(g, 1280, 720, F)],
+    ['Monitor ASCII', (g, F) => drawMonitorAscii(g, 1280, 720, { ...F, render: 'ascii' })],
+    ['Monitor Terminal', (g, F) => drawMonitorTerm(g, 1280, 720, { ...F, render: 'terminal' }, termPalette('neon'))],
+    ['side panels ASCII', (g, F) => drawLayerGlyph(g, 1280, 720, { ...F, roster: F.roster.slice(0, 4), render: 'ascii' }, 'strip', 'ascii', termPalette('neon'))],
+    ['side panels', (g, F) => drawLayer(g, 1280, 720, { ...F, roster: F.roster.slice(0, 4) }, 'strip')],
+    ['big screen of 2', (g, F) => drawLayer(g, 1280, 720, { ...F, roster: F.roster.slice(0, 2) }, 'screen')],
+  ];
+  for (const [name, draw] of looks) {
+    // (bar 14: the pad plays, so the glyph forms draw its panel's widget; the layer gets the two app widgets first)
+    const one = () => { const g = recorder(), F = frame(13.3, roster); if (/side|big/.test(name)) F.roster = [...roster.filter(p => p.widget === 'hitgrid' || p.widget === 'tonecloud'), ...roster.filter(p => p.widget !== 'hitgrid' && p.widget !== 'tonecloud')]; draw(g, F); return g; };
+    const a = one(), b = one(), T = texts(a), glyph = /ASCII|Terminal/.test(name);
+    check(JSON.stringify(a.log) === JSON.stringify(b.log) && T.includes('bd') && T.some(x => /^chord /.test(x)) && (!glyph || T.some(x => /[█·]/.test(x))), `${name}: the hit grid and the tone cloud drawn${glyph ? ' in characters' : ''}, the same twice`, `same ${JSON.stringify(a.log) === JSON.stringify(b.log)}, grid ${T.includes('bd')}, cloud ${T.some(x => /^chord /.test(x))}`);
+  }
+}
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);

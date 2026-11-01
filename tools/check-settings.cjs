@@ -195,7 +195,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(hg && /hi-hat/.test(hg.title) && /own row/.test(hg.title), 'help texts: "Variants apart" says what it does', hg && hg.title);
     await page.click('#tab-impostazioni [data-set-lang="en"]'); await sleep(400);
     const stage = await page.evaluate(() => { const c = [...document.querySelectorAll('#tab-impostazioni .set-card')].find(x => x.querySelector('[data-sw-layer]')); return c ? { text: c.textContent, titles: [...c.querySelectorAll('[title]')].map(x => x.getAttribute('title')).join(' '), layers: [...c.querySelectorAll('[data-sw-layer]')].map(x => x.textContent.trim()) } : null; });
-    check(stage && !/Palco/.test(stage.text + stage.titles) && stage.layers.join() === 'Off,Strip,Stage', 'English stage widgets card: Off, Strip, Stage and no "Palco"', stage && stage.layers.join());
+    check(stage && !/Palco/.test(stage.text + stage.titles) && stage.layers.join() === 'Off,Side panels,Big screen', 'English stage widgets card: Off, Side panels, Big screen (stage-app-widgets D6) and no "Palco"', stage && stage.layers.join());
     const kind = await page.evaluate(() => (document.querySelector('[data-out-kind]') || {}).title || '');
     check(!kind || (!/Video runs in real time/.test(kind) && /faster than real time/.test(kind)), 'the audio/video switch says how a video renders', kind);
   }

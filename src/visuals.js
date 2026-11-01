@@ -2,6 +2,7 @@ import { INSTRUMENTS, NATIVE_RENDERS } from './music.js';
 import { noteStore, liveNotes, rosterOf, levelAt, flashAt, silentAt, columnCache, cwInstrument, DRUMS } from './visuals/stage-feed.js';
 import { pitchesOf } from './visuals/widget-painters.js';
 import { drawMonitor, drawRullo } from './visuals/widget-looks.js';
+import { notesOfStore } from './widgets/app-widgets.js';
 import { themePalette, scenePalette } from './visuals/widget-palettes.js';
 import { drawLayer, seeThrough, setLayerFree } from './visuals/widget-layer.js';
 import { layerOn, limitOf } from './visuals/stage-settings.js';
@@ -216,7 +217,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const liveStore = noteStore(), live = liveNotes(liveStore);
   // per source of notes: the panels of each section, the pitches, the spectrum columns
   const wcache = new WeakMap();
-  const cacheOf = src => { let c = wcache.get(src); if (!c) { c = { rosters: new Map(), pitches: new Map(), ranges: new Map(), cols: columnCache(), S: null }; wcache.set(src, c); } return c; };
+  const cacheOf = src => { let c = wcache.get(src); if (!c) { c = { rosters: new Map(), pitches: new Map(), ranges: new Map(), cols: columnCache(), S: null, appMemo: new Map(), appNotes: notesOfStore(src, () => src.instruments) }; wcache.set(src, c); } return c; };
   const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
   // (for the checks: the time of the last widget look frames, in ms)
   const stageTimes = globalThis.codingMiskStageTimes = [];
@@ -306,8 +307,12 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       const r = C.ranges.get(key), seen = melodic.flatMap(i => around(i)).filter(n => typeof n[2] === 'number').map(n => Math.round(n[2]));
       return seen.length ? { lo: Math.min(r.lo, ...seen), hi: Math.max(r.hi, ...seen) } : r;
     };
+    // stage-app-widgets D1: the app widgets' settings and context (meter, key, the song's sounds, language) and the
+    // notes of every instrument, as the code's app widgets read them; the hit grid's rows seen kept per source of notes
+    const A = stage.app ? stage.app(cyc) : null;
+    const app = A ? { S: A.S, ctx: A.ctx, notes: C.appNotes, memo: k => { let m = C.appMemo.get(k); if (!m) { m = new Map(); C.appMemo.set(k, m); } return m; } } : null;
     return {
-      cyc, pal, roster, prev, dim: silent, full, lanes, melodic,
+      cyc, pal, roster, prev, dim: silent, full, lanes, melodic, app, render: 'normal',
       fade: same ? 1 : Math.max(0, Math.min(1, (cyc - sec.start) / 0.25)),
       notes: (inst, c0, c1) => (c0 >= cyc - 2.5 && c1 <= cyc + 2.5 ? around(inst).filter(n => n[1] > c0 && n[0] < c1) : src.around(inst, c0, c1)),
       level, flash: inst => (playing || feed ? flashAt(now(inst), cyc) : 0), silent: inst => !(playing || feed) || silentAt(now(inst), cyc),
@@ -337,12 +342,15 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   function widgetLook(look, cyc, playing, render = 'normal') {
     const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000, look === 'claude' ? 'monitor' : look, look);
     if (!F) { cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H); return false; }
+    F.render = render; F.drawnApps = [];
     const theme = stage.theme ? stage.theme() : 'neon', native = NATIVE_RENDERS.includes(render);
     let drawn = false;
     if (look === 'claude') { drawClaude(cx, W, H, F, termPalette(theme), termInfo(cyc, playing, look, render)); drawn = render === 'terminal'; }
     else if (native) { const info = termInfo(cyc, playing, look, render); if (render === 'terminal') (look === 'rullo' ? drawRulloTerm : drawMonitorTerm)(cx, W, H, F, termPalette(theme), info); else (look === 'rullo' ? drawRulloAscii : drawMonitorAscii)(cx, W, H, F, info); drawn = true; }
     else (look === 'rullo' ? drawRullo : drawMonitor)(cx, W, H, F);
     // (for the checks: the panels of Monitor, the notes Rullo shows)
+    // (for the checks: the app widgets drawn on the stage, stage-app-widgets)
+    globalThis.codingMiskStageApps = F.drawnApps;
     if (look === 'monitor') globalThis.codingMiskStagePanels = F.roster.filter(p => F.dim !== 'hidden' || !p.quiet).map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`);
     else globalThis.codingMiskStageNotes = [...F.melodic, ...F.lanes].reduce((a, i) => a + F.notes(i, cyc - 2, cyc + 2).length, 0);
     stageTimes.push(performance.now() - t0); if (stageTimes.length > 600) stageTimes.shift();
@@ -356,12 +364,13 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (!kind) { globalThis.codingMiskLayerPanels = null; return; }
     const t0 = performance.now(), F = widgetFrame(cyc, playing, clock() / 1000, kind, look);
     if (!F) return;
+    F.render = render; F.drawnApps = [];
     cx.save();
     const native = NATIVE_RENDERS.includes(render);
     const drawn = native ? drawLayerGlyph(cx, W, H, F, kind, render, termPalette(stage.theme ? stage.theme() : 'neon'), termInfo(cyc, playing, look, render)) : drawLayer(cx, W, H, F, kind);
     cx.restore();
     // (for the checks: the layer's panels and where they are)
-    globalThis.codingMiskLayerPanels = { kind, panels: drawn.map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`) };
+    globalThis.codingMiskLayerPanels = { kind, panels: drawn.map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`), apps: F.drawnApps };
     layerTimes.push(performance.now() - t0); if (layerTimes.length > 600) layerTimes.shift();
   }
 

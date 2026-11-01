@@ -2,7 +2,8 @@
 // levels, onsets and silences read from the notes, spectrum columns from the time. The same shape live (notes queried
 // from the playing pattern, one cycle at a time, cached) and in the fast video (notes sent by the render page).
 // Pure apart from the pattern it is given to query: checked in Node (tools/check-stage-widgets.mjs).
-import { BY_VISUAL, widgetFor, CLOUD_ORDER } from '../live/widgets.js';
+import { BY_VISUAL, widgetFor, CLOUD_ORDER, APP_KINDS } from '../live/widgets.js';
+import { DRUM_INSTS } from '../widgets/hitgrid.js';
 import { spectrumOf } from './widget-painters.js';
 
 // the pitch of a hap's value as the render page and the code widgets read it: a MIDI number, else the sound's name
@@ -24,12 +25,15 @@ export function pitchOf(v) {
 // (code-over-visual: a sample's variant `n` as a fifth element, for the hit grid's rows)
 export const noteOf = (b, e, v) => { const p = pitchOf(v), out = [+b.toFixed(4), +e.toFixed(4), p, +((v.gain ?? 1) * (v.velocity ?? 1)).toFixed(3)]; if (typeof p === 'string' && typeof v.n === 'number') out.push(v.n); return out; };
 
+// the stage instrument of a hap's value: its `analyze` name; a spoken sample (`say_…`, written with `analyze("fx")`) is
+// the voice (stage-app-widgets D3: the voice is a stage instrument again, apart from the effects)
+export const stageInstOf = v => (typeof v.s === 'string' && v.s.startsWith('say_') ? 'voice' : String(v.analyze));
 // the code widgets' instrument of a stage instrument (the `analyze` name): kick and snare are drums, hook a lead
-export const cwInstrument = name => BY_VISUAL[name] || 'lead';
+export const cwInstrument = name => (name === 'voice' ? 'voice' : BY_VISUAL[name] || 'lead');
 // stage instruments drawn as drum lanes in Rullo
 export const DRUMS = ['kick', 'snare', 'hats', 'perc', 'beat', 'drums'];
 // the order of the stage instruments inside one code widgets' instrument (kick before snare)
-const STAGE_ORDER = ['kick', 'snare', 'perc', 'beat', 'drums', 'hats', 'bass', 'hook', 'lead', 'guitar', 'arp', 'pad', 'texture', 'fx', 'riser'];
+const STAGE_ORDER = ['kick', 'snare', 'perc', 'beat', 'drums', 'hats', 'bass', 'hook', 'lead', 'guitar', 'arp', 'pad', 'texture', 'fx', 'riser', 'voice'];
 const LONGEST = 16;
 
 // Notes per instrument, kept sorted by start. add(inst, note) drops a note it already has (same start and pitch).
@@ -89,7 +93,7 @@ export function liveNotes(store) {
           if (b < next || b >= next + 1) continue;
           const v = h.value;
           if (!v || typeof v !== 'object' || v.analyze === undefined) continue;
-          store.add(String(v.analyze), noteOf(b, h.whole.end.valueOf(), v));
+          store.add(stageInstOf(v), noteOf(b, h.whole.end.valueOf(), v));
         }
       }
       if (c % 16 === 0) store.dropBefore(c - 80);
@@ -124,7 +128,8 @@ export const silentAt = (list, cyc) => !list.some(n => n[0] <= cyc + 0.01 && (n[
 // D5: the panels of a section. sec { start, end } in cycles; S: the code widgets' settings (slot order, instruments on,
 // primary and secondary widget, share); max: the most panels; silent: 'dimmed' (an instrument that played within the
 // window before the section and is silent in it keeps a dimmed panel) or 'hidden'; known: the cycle up to which the
-// notes are known (live: the notes queried so far). → [{ inst, widget, quiet }] in slot order
+// notes are known (live: the notes queried so far). → [{ inst, widget, quiet, alt?, group?, members? }] in slot order
+// (group 'drums' and members: the hit grid's panel stands for every drum instrument; alt: an app widget's fallback)
 export function rosterOf(store, sec, { S, max = 6, silent = 'dimmed', seed = '', known = Infinity } = {}) {
   const win = S.window === 'always' ? 64 : S.window || 16, end = Math.min(sec.end, known);
   const playing = store.startingIn(sec.start, Math.max(end, sec.start + 0.001)), before = silent === 'dimmed' ? store.startingIn(sec.start - win, sec.start) : new Set();
@@ -134,17 +139,33 @@ export function rosterOf(store, sec, { S, max = 6, silent = 'dimmed', seed = '',
     const widget = widgetFor(cwInstrument(inst), S, inst, seed);
     if (widget) cands.push({ inst, widget, quiet: !playing.has(inst) });
   }
-  // one tone cloud at most (cd5): on the holder (pad, else bass, lead, arp; the voice only when no other can); the other
-  // panels that asked for one take their next widget
-  const cloudRank = c => CLOUD_ORDER.indexOf(cwInstrument(c.inst)), canCloud = c => { const I = S.instruments[cwInstrument(c.inst)]; return !!I && I.on && S.widgets.tonecloud && (I.primary === 'tonecloud' || I.secondary.includes('tonecloud')); };
-  if (cands.some(c => c.widget === 'tonecloud')) {
-    const order = (a, b) => a.quiet - b.quiet || cloudRank(a) - cloudRank(b) || rank(a.inst) - rank(b.inst);
-    const holder = cands.filter(c => !c.quiet && cloudRank(c) >= 0 && canCloud(c)).sort(order)[0] || cands.filter(c => c.widget === 'tonecloud').sort(order)[0];
-    for (const c of [...cands]) {
-      if (c === holder) c.widget = 'tonecloud';
-      else if (c.widget === 'tonecloud') { c.widget = widgetFor(cwInstrument(c.inst), S, c.inst, seed, ['tonecloud']); if (!c.widget) cands.splice(cands.indexOf(c), 1); }
-    }
+  const order = (a, b) => a.quiet - b.quiet || rank(a.inst) - rank(b.inst) || a.inst.localeCompare(b.inst);
+  const can = (c, kind) => { const I = S.instruments[cwInstrument(c.inst)]; return !!I && I.on && !!S.widgets[kind] && (I.primary === kind || I.secondary.includes(kind)); };
+  const next = (c, avoid) => { c.widget = widgetFor(cwInstrument(c.inst), S, c.inst, seed, avoid); if (!c.widget) cands.splice(cands.indexOf(c), 1); };
+  // stage-app-widgets D2: one hit grid for the drums (cd1): the first drum instrument that can hold it (playing first,
+  // then slot order) gets it, with every drum sound as a row; the other drum instruments get no panel of their own
+  const drums = cands.filter(c => DRUM_INSTS.has(c.inst)), grid = drums.filter(c => can(c, 'hitgrid')).sort(order)[0] || null;
+  if (grid) {
+    grid.widget = 'hitgrid'; grid.group = 'drums';
+    grid.members = drums.map(c => c.inst).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+    grid.quiet = drums.every(c => c.quiet);
+    for (const c of drums) if (c !== grid) cands.splice(cands.indexOf(c), 1);
   }
+  for (const c of [...cands]) if (c !== grid && c.widget === 'hitgrid') next(c, ['hitgrid']);
+  // one tone cloud at most (cd5, D3): on the holder (pad, else the first of bass, lead, arp playing; the voice only when
+  // no other can and a panel asked for one), whatever widget its seed chose; the other panels that asked for one take
+  // their next widget. A voice without the cloud has its own widget (the scope by default)
+  const cloudRank = c => CLOUD_ORDER.indexOf(cwInstrument(c.inst)), asked = cands.filter(c => c.widget === 'tonecloud');
+  const byCloud = (a, b) => a.quiet - b.quiet || cloudRank(a) - cloudRank(b) || rank(a.inst) - rank(b.inst);
+  const fit = cands.filter(c => cloudRank(c) >= 0 && can(c, 'tonecloud')).sort(byCloud);
+  let holder = fit.find(c => !c.quiet && cwInstrument(c.inst) !== 'voice') || null;
+  if (!holder && asked.length) holder = fit.find(c => !c.quiet) || asked.sort(byCloud)[0];
+  for (const c of [...cands]) {
+    if (c === holder) c.widget = 'tonecloud';
+    else if (c.widget === 'tonecloud') next(c, ['tonecloud']);
+  }
+  // an app widget's panel too small for it shows its next widget (the painter's size floor, widget-looks.js)
+  for (const c of cands) if (APP_KINDS.includes(c.widget)) c.alt = widgetFor(cwInstrument(c.inst), S, c.inst, seed, APP_KINDS) || 'scope';
   // every playing instrument first (up to the limit), then the quiet ones; then the places in slot order
   cands.sort((a, b) => a.quiet - b.quiet || rank(a.inst) - rank(b.inst) || a.inst.localeCompare(b.inst));
   return cands.slice(0, max).sort((a, b) => rank(a.inst) - rank(b.inst) || a.inst.localeCompare(b.inst));

@@ -17,7 +17,7 @@ import { prebake } from '@strudel/repl/prebake.mjs';
 import { tempoClock } from './tempo.js';
 import { installHelpers, useFns } from '../song/writer.js';
 import { loadLimiter, setMasterLevel, limiterDelay } from '../sounds/limiter.js';
-import { noteOf } from '../visuals/stage-feed.js';
+import { noteOf, stageInstOf } from '../visuals/stage-feed.js';
 import { codeBus } from '../decode/mix.js';
 
 const post = (m, transfer = []) => parent.postMessage({ codingMiskRender: true, ...m }, location.origin, transfer);
@@ -117,7 +117,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
       const hb = hap.whole.begin.valueOf();
       if (hb < a || hb >= b) continue;
       hap.ensureObjectValue();
-      if (stage && hap.value.analyze !== undefined && hb >= T.cycleAt(keepFrom)) (stage[hap.value.analyze] ||= []).push(noteOf(hb, hap.whole.end.valueOf(), hap.value));
+      if (stage && hap.value.analyze !== undefined && hb >= T.cycleAt(keepFrom)) (stage[stageInstOf(hap.value)] ||= []).push(noteOf(hb, hap.whole.end.valueOf(), hap.value));
       if (lits && hb >= T.cycleAt(keepFrom)) {
         const L = (hap.context && hap.context.locations) || [], src = seg.run || seg.code;
         let k = lits.codes.lastIndexOf(src); if (k < 0) k = lits.codes.push(src) - 1;

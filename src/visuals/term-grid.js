@@ -63,7 +63,8 @@ export function termGrid(g, G, T) {
   g.textBaseline = 'middle'; g.textAlign = 'left';
   const X = c => x0 + c * cw, Y = r => y0 + r * ch;
   const t = {
-    G, T, X, Y,
+    // (g: the context, for the app widgets painted on the grid's cells, stage-app-widgets D1)
+    G, T, X, Y, g,
     // a filled block of cells
     bg(c, r, w, h, col) { if (w <= 0 || h <= 0) return; g.fillStyle = col; g.fillRect(X(c), Y(r), w * cw, h * ch); },
     // a string from cell (c, r); o: { bold, bg (cell background), alpha }
