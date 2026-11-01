@@ -121,7 +121,18 @@ function stateOf(song, plan, bar) {
 
 // the most tracks the song plays at once from a bar to its end (after-tests-oct28 D8): a track brought in plays on, so
 // "+" is off when 12 already play at any later bar, not only at the command's
+// (kept per song, plan and bar: the console asks it for every "+" button and saved pattern at each rebuild, #82)
+const mostMemo = new WeakMap();
 function mostFrom(song, plan, at) {
+  if (!song || !plan) return mostFromNow(song, plan, at);
+  let bySong = mostMemo.get(song);
+  if (!bySong) { bySong = new WeakMap(); mostMemo.set(song, bySong); }
+  let byPlan = bySong.get(plan);
+  if (!byPlan) { byPlan = new Map(); bySong.set(plan, byPlan); }
+  if (!byPlan.has(at)) byPlan.set(at, mostFromNow(song, plan, at));
+  return byPlan.get(at);
+}
+function mostFromNow(song, plan, at) {
   const bars = [...new Set([at, ...((song && song.build) || []).map(s => s.at).filter(b => b > at && b < plan.bars)])];
   // (on the steered song itself: its tracks include the ones the listener added, which the plan's base does not hold)
   return Math.max(0, ...bars.map(b => Math.max(playing(stateOf(song, plan, b)).filter(counted).length, playing(stateAt(song, b).song).filter(counted).length)));

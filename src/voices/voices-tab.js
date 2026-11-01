@@ -9,7 +9,7 @@ import { KINDS, TAGS, LANGS, SHARE_LEVELS, groupsOf, matches, textIn, textsOf, t
 import { MOMENT_GROUPS, POETIC_TAGS } from './moments.js';
 import { builtinKeys, classify, totals, phraseFiles, sizeText, CLASSES, bankLang, mineKeys } from './samples.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from '../song/vocabulary.js';
-import { PHRASES, SPEAKERS, saySlug, sayBank } from '../song/build.js';
+import { PHRASES, SPEAKERS, saySlug, sayBank, slugAt } from '../song/build.js';
 import { POOL } from '../endless/phrases.js';
 import { VOICE_STYLES, VOICE_STYLE_IDS } from '../song/format.js';
 import { LISTEN, PENCIL, BIN, LOCK, WAVE, MIC, QUILL, COPY, DISK, BROOM, SPARK, CLOCK, PLUS } from '../icons.js';
@@ -28,7 +28,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
   let sub = SECTIONS.includes(store.get(SUB_KEY, 'mine')) ? store.get(SUB_KEY, 'mine') : 'mine';
   const ui = { q: '', kind: 'all', form: null, confirm: null, vgroup: 'voice', bench: { text: '', speaker: '', style: 'clear' }, orphans: null, busy: '', usage: null, usageAt: 0 };
   const making = new Set();
-  const has = (bank, text) => { const f = (files() || {})[bank] || []; const slug = saySlug(text); return f.some(x => decodeURI(x).endsWith(`/${slug}.wav`)); };
+  const has = (bank, text) => { return slugAt((files() || {})[bank], saySlug(text)) >= 0; };
   const ico = (svg, label) => `<span class="vt-ico" title="${esc(label)}">${svg}</span>`;
   const kindLabel = k => t(`phKind:${k}`);
   const tagLabel = (kind, tag) => (!tag ? t('phTagAny') : kind === 'voice' ? t(`vocab:${tag}`) : kind === 'explain' ? t(`phMoment:${tag}`) : t(`phPoetic:${tag}`));

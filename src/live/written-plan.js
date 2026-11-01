@@ -21,7 +21,15 @@ const GATE_ANY = /\.mask\((\w+)\)\.(?:velocity\(\1\)|postgain\(\1\.mul\((?:-?[\d
 // part; shownLine(text): a compiled line as the code shows it; growth (lines-ahead-balanced D2): the steps of the growth
 // host lines ahead too, and their new lines may be typed ahead (false: the written part only, as the shape search
 // measures it). → { edits: Map(id → bar), ahead: [{ header, text, from, to }] }
-export function planWritten(codeWith, build, G, shownLine = x => x, { growth = true } = {}) {
+export function planWritten(codeWith, build, G, shownLine = x => x, opts = {}) {
+  const job = planWrittenSteps(codeWith, build, G, shownLine, opts);
+  let r;
+  do r = job.next(); while (!r.done);
+  return r.value;
+}
+// the same plan made a step at a time (#82): a generator that yields after each code of a step and each line weighed,
+// so the page can make it in small slices while the song plays; its value is planWritten's
+export function* planWrittenSteps(codeWith, build, G, shownLine = x => x, { growth = true } = {}) {
   const AH = { ...AHEAD, ...(globalThis.codingMiskAhead || {}) };
   const seed = build.id || '', sb = barSeconds(build);
   const steps = [...new Set([0, ...buildSteps(build).map(x => x.at)])].filter(b => b >= 0).sort((a, b) => a - b);
@@ -36,7 +44,7 @@ export function planWritten(codeWith, build, G, shownLine = x => x, { growth = t
     if (!typings.has(k)) typings.set(k, typingPlan(was, code, { style: 'human', lean: true, seed, notes: false, earlier }));
     return typings.get(k);
   };
-  const pass = plan => {
+  const pass = function* (plan) {
     const res = new Map(), seen = new Map();
     let prev = null;
     for (const at of steps) {
@@ -60,6 +68,7 @@ export function planWritten(codeWith, build, G, shownLine = x => x, { growth = t
       for (const l of chainLines(r.code)) if (PATTERN.test(l)) { seen.delete(l); seen.set(l, true); }
       res.set(at, r);
       prev = at;
+      yield;
     }
     return res;
   };
@@ -69,10 +78,11 @@ export function planWritten(codeWith, build, G, shownLine = x => x, { growth = t
 
   // D4: a muted line that returns changed is edited at the step of its silence with the most time to spare, when the
   // spare time covers the edit (the time the edits planned there take is counted); else at its return, as before
-  const A = pass(plan), silences = new Map(), spare = new Map(written.map(at => [at, A.get(at).spare]));
+  const A = yield* pass(plan), silences = new Map(), spare = new Map(written.map(at => [at, A.get(at).spare]));
   for (const at of written) for (const x of A.get(at).info) if (x.kind === 'return' && x.id && x.was !== x.ret && shownLine(x.was) !== shownLine(x.ret)) { const v = silences.get(x.id) || { x, bars: [] }; v.bars.push(at); silences.set(x.id, v); }
   for (const [id, { x, bars }] of [...silences].sort((p, q) => p[1].x.retBar - q[1].x.retBar)) {
     const need = typingPlan(shownLine(x.was), shownLine(x.ret), { style: 'human', lean: true, seed, notes: false }).natural;
+    yield;
     let best = null;
     for (const at of bars) { const sp = spare.get(at); if (sp >= need && (best === null || sp > spare.get(best))) best = at; }
     if (best === null) continue;
@@ -81,7 +91,7 @@ export function planWritten(codeWith, build, G, shownLine = x => x, { growth = t
   }
 
   // D8: new lines of a coming step typed ahead, muted, at a step with time to spare
-  const B = plan.edits.size ? pass(plan) : A;
+  const B = plan.edits.size ? yield* pass(plan) : A;
   const nextChange = s => { for (const b of [...starts].sort((x, y) => x - y)) if (b > s) return b; return Infinity; };
   const cost = line => typingPlan('', line, { style: 'human', lean: true, seed, notes: false }).natural;
   const active = s => plan.ahead.filter(a => a.from <= s && s < a.to);
@@ -105,6 +115,7 @@ export function planWritten(codeWith, build, G, shownLine = x => x, { growth = t
         cands.push({ t, x, len: shown.length, rush: T.need - T.usable, cost: cost(shown) });
       }
     }
+    yield;
     const pick = cands.filter(c => c.cost + AH.margin <= spare).sort((a, b) => (b.rush > 0) - (a.rush > 0) || (b.rush > 0 ? b.rush - a.rush : 0) || b.len - a.len || a.t - b.t)[0];
     if (!pick) continue;
     plan.ahead.push({ header: pick.x.header, text: pick.x.text, from: s, to: pick.t });
@@ -113,7 +124,7 @@ export function planWritten(codeWith, build, G, shownLine = x => x, { growth = t
   // a line typed ahead that its step would still type (its place moved, another line took it), or that a step before
   // its target does not show (lines-ahead-balanced D2: its track could not come in for it): left out
   for (let round = 0; round < 3 && plan.ahead.length; round++) {
-    const Cp = pass(plan), n = plan.ahead.length;
+    const Cp = yield* pass(plan), n = plan.ahead.length;
     plan.ahead = plan.ahead.filter(a => {
       const T = Cp.get(a.to), typed = new Set(T.typed.map(norm));
       if (typed.has(norm(shownLine(a.text.replace(GATE_ANY, ''))))) return false;

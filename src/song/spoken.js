@@ -14,7 +14,7 @@ import { stream } from '../endless/random.js';
 import { rackCode } from './rack.js';
 import { getLang, t } from '../i18n.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from './vocabulary.js';
-import { SPEAKERS, saySlug, sayBank, buildSteps } from './build.js';
+import { SPEAKERS, saySlug, sayBank, buildSteps, slugAt } from './build.js';
 
 export const WAYS = ['passage', 'refrain', 'chop', 'opening'];
 export const NARRATOR_STYLES = ['explain', 'poetic'];
@@ -100,7 +100,7 @@ function sampleOf(text, bank, virtual) {
   if (spokenContext.files === null) { const list = virtual.get(bank) || []; const n = list.indexOf(slug); return n >= 0 ? { bank, n } : null; }
   for (const b of [bank, bank.replace(/_[a-z]+$/, '')]) {
     const list = (spokenContext.files || {})[b] || [];
-    const n = list.findIndex(f => decodeURI(f).endsWith(`/${slug}.wav`));
+    const n = slugAt(list, slug);
     if (n >= 0) return { bank: b, n };
   }
   return null;

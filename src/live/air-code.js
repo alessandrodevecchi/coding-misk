@@ -126,5 +126,6 @@ export function airCode(W, songs, { lang = () => 'en', files = () => ({}), cols 
     const P = pasteRule({ build: local, codeAt: b => (LA.codeLoad || LA.codeAt)(b + A.start) }, A.ctl, { seed: A.song.id || '' });
     paste = bar => P(bar - A.start);
   }
-  return { build, codeAt, run, standalone, buses: LA.buses, fns: LA.fns, paste, ctl: A.ctl, now: LA.now, inPlace: LA.inPlace, onAir: A, hidden: () => others.filter(p => p.show === 'hidden').map(p => p.n) };
+  // prepare(): the song on air's written plan made a little at a time before the window goes on air (#82)
+  return { build, codeAt, run, standalone, buses: LA.buses, fns: LA.fns, paste, ctl: A.ctl, now: LA.now, inPlace: LA.inPlace, onAir: A, hidden: () => others.filter(p => p.show === 'hidden').map(p => p.n), prepare: slice => (LA.prepare ? LA.prepare(slice) : Promise.resolve()) };
 }

@@ -6,7 +6,7 @@ import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, RENDERS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds } from './song/build.js';
+import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds, slugAt } from './song/build.js';
 import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
@@ -241,7 +241,7 @@ function radioPlayable(W, songs = null) {
   const meta = parseSong(compileSong(stateAt(W, 0).song)), v = W.sections.flatMap(x => [x.bpm ?? 138, x.bpmEnd ?? x.bpm ?? 138]), lo = Math.min(...v), hi = Math.max(...v);
   meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   // (soundCode: every sound of the window in one code, for the soundfonts loaded ahead; hidden: the songs not shown)
-  return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, earlier: L.earlier, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), soundCode: () => compileSong({ ...W, build: undefined }) };
+  return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, earlier: L.earlier, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), prepare: L.prepare, soundCode: () => compileSong({ ...W, build: undefined }) };
 }
 // a radio session's songs joined into one playable song, as its exports play it (radio-profiles D12). A session of
 // Classic songs is the joined song with Classic controls, as before. With a grown song (or the Custom profile) the file
@@ -3025,7 +3025,7 @@ function sampleState(sp, texts) {
   const files = spokenContext.files, lang = getLang();
   if (files === null) return 'ok';
   const bank = sayBank(lang, speakerOf(T, sp));
-  const ok = x => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
+  const ok = x => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
   if (texts.every(ok)) return 'ok';
   return texts.some(x => sampleAsked.has(`${bank}/${saySlug(x)}`)) ? 'wait' : 'none';
 }
@@ -3041,10 +3041,12 @@ phr = createPhrases({ store, t, toast, getLang, helper: () => !!voiceHelper, onC
 // the collection or how often it is used changed: the narrator of the song in Compose says other lines (its code and
 // captions are written again; the growth stays), the tab and the radio console are drawn again
 function phrasesChanged(what) {
-  // (in the radio or by hand only the song in Compose is written again: changed() would leave the radio)
-  try { if (mode === 'track' && !hand) { const was = dirty; changed(); dirty = was; saveDraft(); } else compiled = playable({ ...T, kind: 'composed' }); } catch (e) { /* not ready yet */ }
+  // (in the radio or by hand only the song in Compose is written again: changed() would leave the radio; a growth it
+  // needs goes away from the page, as every growth of Compose: a line typed on the radio regrew it here, #82)
+  try { if (mode === 'track' && !hand) { const was = dirty; changed(); dirty = was; saveDraft(); } else composeCompiled(); } catch (e) { /* not ready yet */ }
   if (voicesTab) voicesTab.render();
-  if (radio && radio.on && radio.render) radio.render();
+  // (the radio drawn again in a task of its own: a line typed on the radio offers itself on the click, #82)
+  if (radio && radio.on && radio.render) setTimeout(() => { if (radio.on) radio.render(); }, 0);
   if (settingsPage && settingsPage.refresh && what === 'settings') settingsPage.refresh();
 }
 // the user's library, for the samples a delete keeps (D5): saved songs, trashed songs, songs of playlist sessions
@@ -3090,7 +3092,7 @@ document.addEventListener('click', e => { const b = e.target.closest && e.target
 async function hearLine({ text, lang, speaker = '', settings = null, temp = false }) {
   initAudioOnce();
   const bank = sayBank(lang, speaker), slug = saySlug(text);
-  const find = () => [bank, ...(speaker ? [sayBank(lang, '')] : [])].map(b => ({ b, n: (customFiles[b] || []).findIndex(f => decodeURI(f).endsWith(`/${slug}.wav`)) })).find(x => x.n >= 0);
+  const find = () => [bank, ...(speaker ? [sayBank(lang, '')] : [])].map(b => ({ b, n: slugAt(customFiles[b], slug) })).find(x => x.n >= 0);
   let s = find();
   if ((!s || s.b !== bank) && voiceHelper) {
     try {
@@ -3121,7 +3123,7 @@ function typedInput(text, lang, sg) {
 const songVocab = () => { const sp = songSpoken(), own = sp && Object.values(sp.patterns || {}).map(p => (typeof p.text === 'string' && p.text.startsWith('vocab:') ? p.text.slice(6) : Array.isArray(p.text) ? vocabGroupOf(p.text) : null)).find(Boolean); return own || ((T.tags && T.tags.styles) || []).map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null; };
 const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
-  const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
+  const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
   for (const sp of T.tracks.filter(x => x.type === 'spoken')) {
     const speaker = speakerOf(T, sp), bank = sayBank(lang, speaker);
     let rows = []; try { rows = phraseRows(T, sp.id, { lang }); } catch (e) { rows = []; }
@@ -3143,7 +3145,7 @@ function needsOf(build, C) {
   if (m && m.key === key && m.files === files) return m.list;
   let list = [];
   try {
-    const any = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x)}.wav`)));
+    const any = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
     list = spokenNeeds(build, C || {}, lang, files).filter(x => !x.has && !any(x.bank, x.text) && x.text.split(/\s+/).length <= MAX_WORDS);
   } catch (e) { list = []; }
   needMemo.set(build, { key, files, list });
@@ -3183,9 +3185,9 @@ function playLate(lines) {
     let at = Math.ceil(now * 4 + 0.01) / 4;
     if (at >= x.at + 1 || busy(at)) at = Math.floor(now) + 1;
     if (at >= x.at + 2 || busy(at)) continue;
-    const bank = [x.bank, x.bank.replace(/_[a-z]+$/, '')].find(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${saySlug(x.text)}.wav`)));
+    const bank = [x.bank, x.bank.replace(/_[a-z]+$/, '')].find(b => slugAt(files[b], saySlug(x.text)) >= 0);
     if (!bank) continue;
-    const n = files[bank].findIndex(f => decodeURI(f).endsWith(`/${saySlug(x.text)}.wav`)), tr = voiceOf(song.build), v = { gain: 1, tempo: 1, ...((tr && tr.settings) || {}) };
+    const n = slugAt(files[bank], saySlug(x.text)), tr = voiceOf(song.build), v = { gain: 1, tempo: 1, ...((tr && tr.settings) || {}) };
     try { globalThis.superdough({ s: bank, n, gain: v.gain, speed: v.tempo, orbit: 15 }, globalThis.getAudioContext().currentTime + (at - now) / cps, 2); } catch (e) { continue; }
     const sec = spokenContext.lengths[`${bank}/${saySlug(x.text)}.wav`] || 1.2, bs = barSecOf(song.meta, at);
     lateCaps.push({ build: song.build, at, until: at + Math.min(4, Math.max(2, sec + 1.5) / bs), kind, code: 'N', text: x.text, step: '', typed: false, speaker: x.speaker || '', seconds: sec });
@@ -5290,7 +5292,8 @@ radio = createRadio({
       // appears whole now, in its own view)
       const fresh = (p.air || song.air) && p.id !== song.id && !hand;
       song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
-      warmVoices(p); preloadSounds(p); source = { kind: 'radio', name: p.title }; renderSource();
+      // (the soundfonts of the window loaded in a task of its own: finding them writes the code of every step, #82)
+      warmVoices(p); setTimeout(() => { if (song === p) preloadSounds(p); }, 0); source = { kind: 'radio', name: p.title }; renderSource();
       if (fresh) { ed.setCode(codeNow(p, Math.floor(cyc))); ed.evaluate(); }
     },
     // skip: the new window takes over now, its first song starts on "bar"

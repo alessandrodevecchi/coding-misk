@@ -20,7 +20,7 @@ import { OPENINGS, PACES, DEVELOPMENTS, SHAPES_VERSION } from '../song/shapes.js
 import { CRESCENDO_VERSION } from '../song/crescendo.js';
 import { sessionVersions } from '../library/playlists.js';
 import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
-import { buildSteps, sayText, spokenSchedule, captionSchedule, spokenNeeds } from '../song/build.js';
+import { buildSteps, sayText, spokenSchedule, captionSchedule, spokenNeeds, slugAt } from '../song/build.js';
 import { spokenContext } from '../song/spoken.js';
 import { saySlug as sayFile } from '../song/build.js';
 import { liveBuildOf } from '../live/live-code.js';
@@ -220,7 +220,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const token = item.growToken = (item.growToken || 0) + 1;
     if (item.g0) airView(item);
     const args = { grown: item.g0 || null, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe) };
-    const done = r => { if (item.growToken !== token || !S) return; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); airView(item); setSong(item, r.song); };
+    // (the answer to a typed line gives the song already on air: that one is kept, so the window is not written again
+    // and its plan not made twice, #82)
+    const done = r => { if (item.growToken !== token || !S) return; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); airView(item); const same = item.said && item.said === item.song && JSON.stringify(r.song) === JSON.stringify(item.song); delete item.said; setSong(item, same ? item.song : r.song); };
     item.finish = () => { done(steerOnAir(args)); item.growToken++; };
     if (!async || !player.steer) { item.finish(); return; }
     item.growing = player.steer(args).then(done, () => { if (item.growToken === token) item.finish(); });
@@ -242,6 +244,26 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const W = windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut })));
     return player.makePlayable(W, items.map((x, i) => ({ n: x.n + 1, prefix: `s${x.n + 1}-`, start: x.start, song: x.song, title: x.song.title, profile: profileOf(x), custom: !!x.custom || !!displayOn(x), ctl: liveControlsOf(x), show: i === 0 ? 'air' : showOf(x) })));
   }
+  // A window handed to the player once its song on air's written plan is made, a little at a time, with the page free
+  // between the slices (#82: a typed line froze the page while a Live coder window made its plan in one block). It goes
+  // on air when ready, or at the latest a third of a bar before the bar `by` (in the window's bars: the first bar the
+  // change is heard; without one, the first step at least a bar ahead), and the plan is then finished at once, as before.
+  // The steps before it change nothing the new window changes. Another window handed to the player meanwhile (a swap,
+  // a skip, a start) wins, and this one is dropped.
+  let windowSeq = 0;
+  for (const k of ['swap', 'jump', 'start', 'resumeAt', 'stop']) if (typeof player[k] === 'function') { const f = player[k]; player[k] = (...a) => { windowSeq++; return f.apply(player, a); }; }
+  function swapSoon(p, by = Infinity) {
+    if (!p.prepare) { player.swap(p); return; }
+    const seq = windowSeq, mine = S, now = player.now();
+    const next = Number.isFinite(by) ? by : Math.min(...buildSteps(p.build).map(x => x.at).filter(b => b >= now + 1));
+    let done = false;
+    const go = () => { if (done) return; done = true; if (windowSeq === seq && S === mine && S && S.paused === undefined) player.swap(p); };
+    const watch = () => { if (done) return; if (windowSeq !== seq || S !== mine) { done = true; return; } if (player.now() >= next - 0.34) go(); else setTimeout(watch, 30); };
+    p.prepare().then(go, go);
+    watch();
+  }
+  // the first bar (in the window's bars) a pending command of the song on air changes, or Infinity
+  const pendingBy = item => { const rel = relNow(), bars = item.commands.filter(c => c.at > rel).map(c => c.at); return bars.length ? item.start + Math.min(...bars) : Infinity; };
   // the display controls set while the session plays (radio-profiles 9.1): those changed during a song (x.display, on
   // the song on air and the songs already prepared) and, in a replay, the console's Custom ones when it started
   // (S.display). They change only how the code looks, so they are never recorded
@@ -525,8 +547,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // a typed line on a grown song goes on the song on air at once, on its bar, as steerOnAir puts it after the other
     // commands: the steering away from the page can answer after that bar (it may wait behind the growth of the next
     // song), and a line whose step reached the player late was never heard (fx3). The answer gives the same line
-    if (air && c.kind === 'say-live') setSong(item, sayAir(item.song, [{ at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' }]));
-    resteer(item, { async: true, then: () => { keepHistory(item); player.swap(windowPlayable()); renderNow(); } });
+    if (air && c.kind === 'say-live') { setSong(item, sayAir(item.song, [{ at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' }])); item.said = item.song; }
+    // (the answer swaps the window only when it changed the song: a typed line's answer is the song already playing)
+    const swapped = item.song;
+    resteer(item, { async: true, then: () => { keepHistory(item); if (item.song !== swapped) swapSoon(windowPlayable(), pendingBy(item)); renderNow(); } });
     if (forSession) { const { at: _a, id: _i, scope: _s, at0: _b, q: _q, pend: _p, ...e } = cmd; S.recipe.arrange = [...(S.recipe.arrange || []), { song: item.n, ref: cmd.id, ...e }]; rebias(item.n); }
     keepHistory(item);
     // the whole session: energy, complexity and voice also move the sliders for the next songs
@@ -534,7 +558,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       const nudge = { 'energy-up': ['energy', 0.1], 'energy-down': ['energy', -0.1], 'more-complex': ['complexity', 0.1], 'less-complex': ['complexity', -0.1], 'talk-more': ['talk', 0.1], 'talk-less': ['talk', -0.1] }[cmd.kind];
       if (nudge) { opts[nudge[0]] = Math.round(Math.max(0, Math.min(1, opts[nudge[0]] + nudge[1])) * 100) / 100; saveOpts(); syncSliders(); }
     }
-    player.swap(windowPlayable());
+    swapSoon(windowPlayable(), item.start + at);
     renderNow();
     return true;
   }
@@ -579,7 +603,14 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the history keeps the song as steered, so saving it from there keeps the listener's changes
   function keepHistory(item) {
     const h = history.find(x => x.n === item.n && x.seed === S.recipe.seed);
-    if (h) { h.song = songOut(item); h.recipe = clone(S.recipe); try { store.set('coding-misk-radio-history', history); } catch (e) {} }
+    if (h) { h.song = songOut(item); h.recipe = clone(S.recipe); saveHistory(); }
+  }
+  // (the history written to the browser storage once, after the command or the steering answer that changed it: the
+  // whole list is written each time, #82)
+  let historyTimer = null;
+  function saveHistory() {
+    if (historyTimer !== null) return;
+    historyTimer = setTimeout(() => { historyTimer = null; try { store.set('coding-misk-radio-history', history); } catch (e) {} }, 0);
   }
   function syncSliders() {
     for (const k of ['energy', 'complexity', 'talk']) { const el = root.querySelector(`#radio-${k}`); if (el) { el.value = opts[k]; el.closest('.ctrl').querySelector('output').textContent = fmt(opts[k]); } }
@@ -842,7 +873,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     sv.line = '';
     const w = { text }; sayWait.push(w); renderSteer(true);
     // (my-phrases D2, D3: the line is offered to my phrases, kind voice, the style's vocabulary group and the style)
-    onTyped({ text, lang, song });
+    // (in a task of its own after the click: my phrases save and draw the tabs again, #82)
+    setTimeout(() => onTyped({ text, lang, song }), 0);
     const ask = fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang, speaker }) })
       .then(async r => { if (!r.ok) return false; const j = await r.json().catch(() => ({})); if (j && j.made) onSampleMade({ text, lang, bank: j.bank, song }); return true; });
     // (at the right moment: the command goes now, the line waits for its part; the sample comes meanwhile)
@@ -852,7 +884,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (!ok) { renderSteer(true); return toast(t('svSampleFailed')); }
     await reloadSamples();
     if (mode === 'now') { if (!command({ kind: 'say-live', text, lang, speaker, mode })) renderSteer(true); }
-    else if (S && S.paused === undefined) player.swap(windowPlayable());
+    else if (S && S.paused === undefined) swapSoon(windowPlayable(), pendingBy(S.stream[S.onAir]));
   }
   // the lines typed in the song on air (my-phrases D3): each keeps a small save button until the song ends, for a late
   // Salva after a Chiedi left unanswered or a Non salvare mai
@@ -1503,7 +1535,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   function needs() {
     if (!S) return [];
     const files = voiceFiles(), lang = getLang(), out = [], seen = new Set();
-    const any = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => (files[b] || []).some(f => decodeURI(f).endsWith(`/${x}.wav`)));
+    const any = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], x) >= 0);
     for (const it of [S.stream[S.onAir + 1], S.stream[S.onAir]].filter(Boolean)) {
       const C = liveControlsOf(it);
       let list = [];
@@ -1512,7 +1544,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     }
     return out.filter(x => !any(x.bank, sayFile(x.text)) && x.text.split(/\s+/).length <= 12);
   }
-  function samplesArrived() { if (S && S.paused === undefined) player.swap(windowPlayable()); }
+  function samplesArrived() { if (S && S.paused === undefined) swapSoon(windowPlayable()); }
   let prepText = '';
   function setPrep(txt) { if (txt === prepText) return; prepText = txt; const el = root.querySelector('.radio-prep'); if (el) { el.textContent = txt; el.hidden = !txt; } }
 
