@@ -93,7 +93,7 @@ Each track can chain devices after the instrument: delays, reverbs, distortion, 
 "rack": [{ "device": "delay", "amount": 0.35, "time": 0.1875, "feedback": 0.5 }, { "device": "pan", "motion": "slow" }]
 ```
 
-FM works only on synth oscillators. For an FM-like colour on drums, samples and voices, use **Fold** (the wave folded back on itself: bright, hollow, metallic; Amount and Curve) or **Ring (trial)** (the sound times a sine wave: bells, metal, robot voices; Frequency and Amount). Fold folds only what is loud enough: drums, basses and voices fold from Amount 1.5, quiet pads need 2.5 or more. A folded line never goes above its own peak or the usual peak of its track type. Fold uses the same Strudel stage as Distortion and the track's own drive (Saturation on drums, the guitar's distortion): it takes their place.
+FM works only on synth oscillators. For an FM-like colour on drums, samples and voices, use **Fold** (the wave folded back on itself: bright, hollow, metallic; Amount and Curve) or **Ring** (the sound times a sine wave: bells, metal, robot voices; Frequency and Amount). Fold folds only what is loud enough: drums, basses and voices fold from Amount 1.5, quiet pads need 2.5 or more. A folded line never goes above its own peak or the usual peak of its track type. Fold uses the same Strudel stage as Distortion and the track's own drive (Saturation on drums, the guitar's distortion): it takes their place.
 
 ```json
 "rack": [{ "device": "fold", "amount": 2, "curve": "soft" }, { "device": "ring", "freq": 440, "amount": 0.6 }]

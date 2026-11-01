@@ -11,8 +11,11 @@
 // 5. Fold with Distortion on one track: a warning, no error; Fold alone: none.
 // 6. The code scanner of check:strudel skips the Kabelsalat expression inside K(…).
 // 7. Radio voices (D6): some voices get Fold, with an amount from 0.3 to 1.2 and a known curve; none gets Ring.
+// 8. Fold's steps and the FM rise (director-fold-ring D3): a stepped Fold plays one amount per bar, each bar with its
+//    level from foldLevel; an FM rise starts at its bottom on its first bar and reaches its top on its last sixteenth;
+//    the validator checks both; Ring's label says it is no longer on trial.
 import fs from 'node:fs';
-import { DEVICES, rackCode, deviceArgs, newDevice, checkRack, foldGain, foldLevel, choiceLabel, FOLD_PEAK } from '../src/song/rack.js';
+import { DEVICES, rackCode, deviceArgs, newDevice, checkRack, foldGain, foldLevel, choiceLabel, FOLD_PEAK, riseTop } from '../src/song/rack.js';
 import { TYPES } from '../src/song/format.js';
 import { distortionAlgorithms } from 'superdough/helpers.mjs';
 import { scanCalls } from './strudel-code.mjs';
@@ -39,7 +42,8 @@ await check('Fold and Ring: sound devices, ranges, names and labels in both lang
   const [freq, amt] = R.args;
   assert(freq[0] === 'freq' && freq[2] === 220 && freq[3] === 30 && freq[4] === 2000, `ring freq ${freq}`);
   assert(amt[0] === 'amount' && amt[2] === 0.8 && amt[3] === 0 && amt[4] === 1, `ring amount ${amt}`);
-  assert(/\(trial\)/.test(R.label.en) && /\(prova\)/.test(R.label.it), 'the Ring label says it is a trial');
+  // (no longer on trial since the director uses it, director-fold-ring open question 1)
+  assert(R.label.en === 'Ring' && R.label.it === 'Ring', `the Ring label: ${JSON.stringify(R.label)}`);
   for (const k of ['arg_curve', 'arg_freq', 'arg_amount']) assert((i18n.match(new RegExp(`\\b${k}:`, 'g')) || []).length === 2, `${k} not in both languages`);
   return `${rackCode([newDevice('fold')], 'drums')} · ${rackCode([newDevice('ring')], 'drums')}`;
 });
@@ -129,6 +133,33 @@ await check('radio voices: some get Fold in its ranges, none gets Ring (D6)', ()
   assert(seen.fold > 0 && seen.fold < seen.voices, `${seen.fold} folds over ${seen.voices} voices`);
   assert(new Set(amounts).size > 1, 'every voice gets the same Fold');
   return `${seen.fold} of ${seen.voices} voices`;
+});
+
+await check('Fold steps and the FM rise: one amount per bar with its level, the rise from its bottom to its top (director-fold-ring D3)', async () => {
+  const S = await strudelInNode();
+  const steps = [0.8, 1.2, 1.6, 2, 2.2, 2.4, 2.5, 2.6];
+  for (const [type, line] of [['bass', 'note("a1*4").s("sawtooth")'], ['drums', 's("bd*4").bank("RolandTR909")'], ['hook', 'note("a3*4").s("square")']]) {
+    for (const curve of ['sharp', 'soft']) {
+      const p = await S.evaluate(`$: ${line}${rackCode([{ device: 'fold', steps, curve }], type)}.gain(0.5)`);
+      // bar 8 + i plays step i: the list starts on a bar that is a multiple of its length
+      steps.forEach((a, i) => {
+        const v = p.queryArc(8 + i, 9 + i).filter(h => h.hasOnset())[0].value;
+        assert(v.distort === a && v.distortvol === foldLevel(a, curve, type) && v.distorttype === (curve === 'soft' ? 'sinefold' : 'fold'), `${type} ${curve} bar ${i}: ${JSON.stringify(v)}`);
+      });
+    }
+  }
+  for (const rise of [{ to: 2, bars: 8 }, { to: 3, bars: 4 }, { to: 1.5, bars: 16, from: 0.5 }]) {
+    const code = rackCode([{ device: 'fm', index: 1, harmonicity: 1, wave: 'sine', decay: 0.3, sustain: 0.5, rise }], 'hook');
+    const p = await S.evaluate(`$: note("a3*16").s("square")${code}.gain(0.4)`);
+    const at = (bar, k) => p.queryArc(bar + k / 16, bar + (k + 1) / 16).filter(h => h.hasOnset())[0].value.fmi;
+    const first = at(rise.bars, 0), last = at(rise.bars, 16 * rise.bars - 1);
+    assert(Math.abs(first - (rise.from || 0)) < 1e-9 && Math.abs(last - rise.to) < 0.006, `rise ${JSON.stringify(rise)}: ${first} to ${last} (${code})`);
+    assert(Math.abs(riseTop(rise) - ((rise.from || 0) + (rise.to - (rise.from || 0)) * 16 * rise.bars / (16 * rise.bars - 1))) < 1e-12, 'riseTop');
+  }
+  const run = dev => { const errs = []; checkRack([dev], 'r', (q, m) => errs.push(`${q} ${m}`), () => {}); return errs; };
+  assert(!run({ device: 'fold', steps, curve: 'soft' }).length && !run({ device: 'fm', rise: { to: 2, bars: 8 } }).length, 'good steps or rise rejected');
+  for (const bad of [{ device: 'fold', steps: [] }, { device: 'fold', steps: [0.05, 1] }, { device: 'fold', steps: [1, 3.5] }, { device: 'fm', rise: { to: 5, bars: 8 } }, { device: 'fm', rise: { to: 2, bars: 0 } }, { device: 'fm', rise: { to: 2, bars: 8, from: 3 } }, { device: 'fm', rise: { to: 2, bars: 8, top: 1 } }]) assert(run(bad).length === 1, `no error for ${JSON.stringify(bad)}`);
+  return `${steps.length} bars of a stepped Fold on 3 types and 2 curves, 3 rises`;
 });
 
 console.log(failed ? `${failed} check(s) failed` : 'all FM-like effect checks passed');
