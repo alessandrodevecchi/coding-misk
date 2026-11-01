@@ -683,9 +683,12 @@ export function createDecodeTab({ root, app }) {
     root.classList.remove('dc-over');
     const dt = e.dataTransfer; if (!dt || !dt.files || !dt.files.length) return;
     e.preventDefault();
-    let handle = null;
-    try { const it = [...dt.items].find(x => x.kind === 'file'); if (it && it.getAsFileSystemHandle) handle = await it.getAsFileSystemHandle(); } catch (err) {}
-    openFile(dt.files[0], handle && handle.kind === 'file' ? handle : null);
+    // the file and the handle's promise before any await: after it the browser empties the drop's data
+    const file = dt.files[0];
+    let handle = null, asked = null;
+    try { const it = [...dt.items].find(x => x.kind === 'file'); if (it && it.getAsFileSystemHandle) asked = it.getAsFileSystemHandle(); } catch (err) {}
+    try { if (asked) handle = await asked; } catch (err) {}
+    openFile(file, handle && handle.kind === 'file' ? handle : null);
   });
 
   store.list().then(list => { recent = list; if (!cur) render(); });
