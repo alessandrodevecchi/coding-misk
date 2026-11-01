@@ -318,6 +318,21 @@ check(widgetSettings(null).v === CW_VERSION, 'Widget notes: settings carry the v
   const pc = roster.find(x => x.widget === 'tonecloud'), tiny = appWidgetFit({ x: 0, y: 0, w: 60, h: 30 }, pc, frame(6.3, roster));
   const g0 = recorder(); drawPanel(g0, { x: 0, y: 0, w: 90, h: 60 }, pc, frame(6.3, roster));
   check(tiny === null && texts(g0).some(x => x.includes(pc.alt)) && !texts(g0).some(x => /^chord /.test(x)), `below the size floor (${APP_MIN_FS.tonecloud} px of ${APP_FS} for the tone cloud) the panel shows its next widget (${pc.alt})`);
+  // the header names the widget the body draws (a tone cloud too small for its panel: the next widget, in every render)
+  {
+    const glyphs = { ascii: (g, W, H, F) => drawMonitorAscii(g, W, H, { ...F, render: 'ascii' }), terminal: (g, W, H, F) => drawMonitorTerm(g, W, H, { ...F, render: 'terminal' }, termPalette('neon')) };
+    const joined = g => texts(g).join('');
+    const pcf = frame(13.3, [pc]);
+    for (const [look, draw] of Object.entries(glyphs)) {
+      const small = recorder(); draw(small, 200, 120, pcf);
+      const big = recorder(); draw(big, 1280, 720, pcf);
+      check(!joined(small).includes('tonecloud') && joined(small).includes(pc.alt), `header: ${look}, a panel too small for the tone cloud is titled ${pc.alt}`);
+      check(joined(big).includes('tonecloud'), `header: ${look}, a panel that fits keeps tonecloud`);
+    }
+    const nSmall = recorder(); drawPanel(nSmall, { x: 0, y: 0, w: 90, h: 60 }, pc, pcf);
+    const nBig = recorder(); drawPanel(nBig, { x: 0, y: 0, w: 600, h: 400 }, pc, pcf);
+    check(!texts(nSmall).some(x => x.includes('tonecloud')) && texts(nBig).some(x => x.includes('tonecloud')), 'header: normal, too small gives the next widget, a fit keeps tonecloud');
+  }
   // the same drawing for the same frame, Normal and the glyph forms
   const looks = [
     ['Monitor', (g, F) => drawMonitor(g, 1280, 720, F)],

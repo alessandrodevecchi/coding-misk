@@ -69,11 +69,11 @@ const waveOf = (F, inst) => {
 const rowOfPitch = (pitches, p, n) => { const i = pitches.indexOf(p); return i < 0 ? -1 : n - 1 - Math.min(n - 1, Math.floor(((i + 0.5) * n) / Math.max(1, pitches.length))); };
 
 // ---------- Terminal (take A): the widget of a panel in the cells c, r, w × h ----------
-export function termWidget(t, c, r, w, h, p, F, col) {
+export function termWidget(t, c, r, w, h, p, F, col, known) {
   const T = t.T, cyc = F.cyc;
   if (w < 2 || h < 1) return;
   // the app widgets (stage-app-widgets D1): the code's painter in its character form, on the panel's cells
-  const box = { x: t.X(c), y: t.Y(r), w: w * t.G.cw, h: h * t.G.ch }, shown = shownWidget(box, p, F, 'terminal'), wd = shown.widget;
+  const box = { x: t.X(c), y: t.Y(r), w: w * t.G.cw, h: h * t.G.ch }, shown = known || shownWidget(box, p, F, 'terminal'), wd = shown.widget;
   if (shown.fit && F.drawnApps) F.drawnApps.push(appDrawn(shown.fit));
   if (shown.fit) { paintAppWidget(t.g, box, shown.fit, { band: 'rgba(0,0,0,0)', ink: T.fg, comment: T.dim, hit: col, now: col, cur: T.faint, cell: T.faint, inv: col, invInk: T.bg }); return; }
   if (wd === 'scope') { const { d, scale } = waveOf(F, p.inst); t.braille(c, r, w, h, brailleWave(w, h, d, scale), col); return; }
@@ -115,19 +115,20 @@ export function termWidget(t, c, r, w, h, p, F, col) {
 export function termPanel(t, b, p, F, o = {}) {
   const T = t.T, word = o.word || wordOf(null), quiet = p.quiet || panelSilent(F, p), col = quiet ? T.dim : termColour(T, p.inst);
   const lv = quiet ? 0 : clamp(panelLevel(F, p), 0, 1), fl = quiet ? 0 : panelFlash(F, p);
+  // (the body's cells first: the header names the widget the body draws, an app widget too small for its box gives way to its alt)
+  const lvRow = !o.noLevel && b.h >= 6 && b.w >= 18, top = b.r + 1 + (lvRow ? 2 : 0), ih = b.r + b.h - 1 - top;
+  const bodyBox = { x: t.X(b.c + 2), y: t.Y(top), w: (b.w - 4) * t.G.cw, h: ih * t.G.ch };
+  const shown = shownWidget(bodyBox, p, F, 'terminal'), title = typeof o.title === 'function' ? o.title(shown.widget) : o.title;
   t.bg(b.c, b.r, b.w, b.h, T.bg);
-  t.box(b.c, b.r, b.w, b.h, quiet ? T.faint : fl > 0.5 ? T.fg : o.border || col, o.title || panelLabel(F, p).toLowerCase(), { titleCol: col, right: o.right ?? p.widget, rightCol: T.dim });
-  let top = b.r + 1;
-  if (!o.noLevel && b.h >= 6 && b.w >= 18) {
+  t.box(b.c, b.r, b.w, b.h, quiet ? T.faint : fl > 0.5 ? T.fg : o.border || col, title || panelLabel(F, p).toLowerCase(), { titleCol: col, right: o.right ?? shown.widget, rightCol: T.dim });
+  if (lvRow) {
     const mw = Math.max(4, b.w - 17);
-    t.put(b.c + 2, top, word('level'), T.dim); t.meter(b.c + 6, top, mw, lv, col);
-    t.put(b.c + 7 + mw, top, quiet ? ` ${word('rest')}`.slice(0, 5).padStart(5) : `${String(Math.round(lv * 100)).padStart(4)}%`, quiet ? T.dim : T.fg);
-    t.put(b.c + b.w - 3, top, quiet ? '○' : '●', quiet ? T.dim : col);
-    top += 2;
+    t.put(b.c + 2, b.r + 1, word('level'), T.dim); t.meter(b.c + 6, b.r + 1, mw, lv, col);
+    t.put(b.c + 7 + mw, b.r + 1, quiet ? ` ${word('rest')}`.slice(0, 5).padStart(5) : `${String(Math.round(lv * 100)).padStart(4)}%`, quiet ? T.dim : T.fg);
+    t.put(b.c + b.w - 3, b.r + 1, quiet ? '○' : '●', quiet ? T.dim : col);
   }
-  const ih = b.r + b.h - 1 - top;
   if (quiet) { const s = word('silent'); if (ih > 0) t.put(b.c + Math.max(1, Math.floor((b.w - s.length) / 2)), top + Math.floor(ih / 2), s, T.dim); return; }
-  if (ih > 0 && b.w > 4) termWidget(t, b.c + 2, top, b.w - 4, ih, p, F, col);
+  if (ih > 0 && b.w > 4) termWidget(t, b.c + 2, top, b.w - 4, ih, p, F, col, shown);
 }
 
 // the status bar at the bottom of take A: the program, the song, the tempo, the bar, the section, the tracks, the play state
@@ -201,10 +202,10 @@ export function drawRulloTerm(g, W, H, F, T, info = {}) {
 
 // ---------- ASCII (D4): plain characters in the look's colours ----------
 const RAMP = ' .:-=+*#';
-function asciiWidget(t, c, r, w, h, p, F, col) {
+function asciiWidget(t, c, r, w, h, p, F, col, known) {
   const cyc = F.cyc, pal = F.pal;
   if (w < 2 || h < 1) return;
-  const box = { x: t.X(c), y: t.Y(r), w: w * t.G.cw, h: h * t.G.ch }, shown = shownWidget(box, p, F, 'ascii'), wd = shown.widget;
+  const box = { x: t.X(c), y: t.Y(r), w: w * t.G.cw, h: h * t.G.ch }, shown = known || shownWidget(box, p, F, 'ascii'), wd = shown.widget;
   if (shown.fit) { paintAppWidget(t.g, box, shown.fit, appPalette(pal, col)); if (F.drawnApps) F.drawnApps.push(appDrawn(shown.fit)); return; }
   if (wd === 'scope') {
     const { d, scale } = waveOf(F, p.inst);
@@ -266,10 +267,12 @@ function asciiWidget(t, c, r, w, h, p, F, col) {
 function asciiPanel(t, b, p, F) {
   const pal = F.pal, quiet = p.quiet || panelSilent(F, p), col = quiet ? pal.dim : instColour(pal, p.inst), a = quiet ? 0.5 : 1;
   const lv = quiet ? 0 : clamp(panelLevel(F, p), 0, 1);
-  t.box(b.c, b.r, b.w, b.h, col, `${panelLabel(F, p).toUpperCase()} ${p.widget}`, { ascii: true, dash: quiet, ground: pal.bg, titleCol: col });
+  const bodyBox = { x: t.X(b.c + 2), y: t.Y(b.r + 2), w: (b.w - 4) * t.G.cw, h: (b.h - 3) * t.G.ch };
+  const shown = shownWidget(bodyBox, p, F, 'ascii');
+  t.box(b.c, b.r, b.w, b.h, col, `${panelLabel(F, p).toUpperCase()} ${shown.widget}`, { ascii: true, dash: quiet, ground: pal.bg, titleCol: col });
   if (b.w >= 16) t.put(b.c + b.w - 12, b.r + 1, `[${'#'.repeat(Math.round(lv * 8)).padEnd(8, '.')}]`, col, { alpha: a });
   if (quiet) return;
-  if (b.h > 4 && b.w > 4) asciiWidget(t, b.c + 2, b.r + 2, b.w - 4, b.h - 3, p, F, col);
+  if (b.h > 4 && b.w > 4) asciiWidget(t, b.c + 2, b.r + 2, b.w - 4, b.h - 3, p, F, col, shown);
 }
 // Monitor in the ASCII render
 export function drawMonitorAscii(g, W, H, F, info = {}) {
@@ -374,7 +377,7 @@ export function drawClaude(g, W, H, F, T, info = {}) {
     // the large pane: the first melodic instrument with a note widget, else any note widget, else the first panel
     const DRUM = ['kick', 'snare', 'hats', 'perc', 'beat', 'drums'], note = p => !p.quiet && (p.widget === 'pianoroll' || p.widget === 'spiral');
     const bigI = Math.max(0, list.findIndex(p => note(p) && !DRUM.includes(p.inst)), list.findIndex(note)), big = list[bigI], rest = list.filter((_, i) => i !== bigI);
-    const pane = (b, p, right) => termPanel(t, b, p, F, { word, title: `${F.label(p.inst).toLowerCase()} · ${p.widget}`, right, noLevel: true, border: T.faint });
+    const pane = (b, p, right) => termPanel(t, b, p, F, { word, title: w => `${F.label(p.inst).toLowerCase()} · ${w}`, right, noLevel: true, border: T.faint });
     const barNow = Number.isFinite(info.bar) ? `bar ${info.bar.toFixed(1)}` : '';
     if (wide) {
       // (the large pane keeps its size: its height from the room before the reply block, the second pane gives way)
