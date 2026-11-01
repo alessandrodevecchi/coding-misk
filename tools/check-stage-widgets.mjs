@@ -112,6 +112,18 @@ function song() {
   L.pump(P2, 7.5, 10, 3);
   check(calls[0] === 'p2:7' && st.around('bass', 9, 10).length === 1, 'a new pattern: the notes from the current cycle on are queried again', calls.join(' '));
 }
+// a jump into the middle of a section (#79): the notes are read again from the section's start (and the window before
+// it), so its panels are those it has when played from its start (the hook plays only in its first bars)
+{
+  const pat = { queryArc(a) { const out = [{ whole: { begin: a, end: a + 0.5 }, hasOnset: () => true, value: { analyze: 'bass', note: 'c2' } }]; if (a >= 32 && a < 36) out.push({ whole: { begin: a + 0.5, end: a + 0.75 }, hasOnset: () => true, value: { analyze: 'hook', note: 'c4' } }); return out; } };
+  const sec = { start: 32, end: 48 }, roster = (st, known) => rosterOf(st, sec, { S: S0, max: 6, known }).map(p => p.inst).sort().join(',');
+  const full = noteStore(); for (let c = 16; c < 48; c++) for (const h of pat.queryArc(c, c + 1)) full.add(h.value.analyze, [h.whole.begin, h.whole.end, 48, 1]);
+  const st = noteStore(), L = liveNotes(st);
+  L.pump(pat, 2.5, 5, 3);
+  let known = -Infinity;
+  for (let f = 0; f < 120; f++) { const cyc = 40 + f / 60, c = Math.floor(cyc); known = L.pump(pat, cyc, c + 3, 3, sec.start - 16); if (known >= c + 3) known = L.pump(pat, cyc, Math.min(sec.end, c + 24), 1, sec.start - 16); }
+  check(roster(st, Math.min(known, sec.end)) === roster(full, Infinity) && roster(full, Infinity) === 'bass,hook', 'a jump to bar 40 of a section: the same panels as from its start (the hook of its first bars too)', `${roster(st, Math.min(known, sec.end))} against ${roster(full, Infinity)}`);
+}
 // pitches as the render page reads them (Strudel's noteToMidi)
 {
   const names = ['c3', 'eb4', 'f#2', 'a', 'Bb1', 'cs5', 'g-1', 'c#'];

@@ -2319,3 +2319,11 @@ Ramo `fix/79-panel-title`.
 - **Correzione:** `termPanel` e `asciiPanel` (`src/visuals/glyph-looks.js`) calcolano prima la casella del corpo e chiedono `shownWidget` per il titolo; `termWidget` e `asciiWidget` riusano lo stesso risultato. Il pannello grande di Terminal in Monitor (`title` come funzione) segue la stessa regola. Non cambiano né la scelta del widget né le misure.
 - **Controllo:** in `tools/check-stage-widgets.mjs` un pannello troppo piccolo per la nuvola, in ASCII, Terminal e Normale, porta il nome del ripiego; uno che entra tiene `tonecloud`. Le due righe di ASCII e Terminal falliscono sul codice vecchio e passano sul nuovo.
 - **Prove:** `vite build`, `check:stage-widgets` (mjs e cjs) passano; `check:render-styles` Node passa, nel browser restano solo avvisi e sforamenti di budget di tempo diversi a ogni corsa. Immagine in `notes/prove-2026-11-01/widget-filtri/fix-title-terminal.png` (Tramonto, Terminal, pannelli ai lati, «drift» a battuta 11: il pad si intitola «scope»).
+
+## 2026-11-01 (widget mancanti sul palco)
+
+Ramo `fix/79-stage-widgets-missing`.
+
+- **Dopo un salto nella timeline mancavano dei pannelli:** il palco legge le note del pattern dal ciclo del salto meno 2 in avanti, e sceglieva i pannelli della sezione solo nella sua prima battuta. Saltando a metà sezione i pannelli restavano quelli delle poche note lette, senza gli strumenti suonati prima nella sezione o nella finestra prima di essa (riprodotto: `luci-rosse`, salto alla battuta 44, mancava `hook` rispetto all'ingresso dalla battuta 38).
+- **Correzione:** dopo un salto `liveNotes.pump` rilegge le note dall'inizio della sezione meno la finestra dei pannelli attenuati (`src/visuals/stage-feed.js`, senza ripartire da capo mentre rilegge); `rosterAt` (`src/visuals.js`) ricalcola i pannelli finché crescono le note note della sezione, non solo nella prima battuta. Per i controlli, `codingMiskLayerPanels.sec` dà la sezione.
+- **Controllo:** in `tools/check-stage-widgets.mjs` un salto alla battuta 40 di una sezione dà gli stessi pannelli dell'ingresso dall'inizio: fallisce sul codice vecchio, passa sul nuovo.
