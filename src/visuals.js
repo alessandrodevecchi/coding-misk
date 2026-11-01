@@ -251,17 +251,19 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (!(feed && feed.store)) {
       const P = playing && sched && sched() ? sched().pattern : null, c = Math.floor(cyc);
       // the playhead's window first (three cycles a frame), then the rest of the section ahead (one a frame)
-      known = live.pump(P, cyc, c + 3, 3);
+      const from = sec.start - (S.window === 'always' ? 64 : S.window || 16);
+      known = live.pump(P, cyc, c + 3, 3, from);
       if (known >= c + 3) known = live.pump(P, cyc, Math.min(sec.end, c + 24), 1);
       if (!P) known = -Infinity;
     }
     const seed = stage.seed ? stage.seed() : '', silent = O.silent === 'hidden' ? 'hidden' : 'dimmed', full = S.notes === 'full';
-    // the panels of a section, decided while its notes are still coming in (live: the first bar), then kept
+    // the panels of a section, chosen again while its notes are still coming in (live: the first frames of the section,
+    // or of a jump into it), then kept
     const rosterAt = s => {
       const key = `${s.start}|${max}|${silent}`;
       let r = C.rosters.get(key);
       const k = Math.min(known, s.end);
-      if (!r || (r.known < k && cyc < s.start + 1 && cyc >= s.start)) {
+      if (!r || r.known < k) {
         r = { known: k, list: rosterOf(src, s, { S, max, silent, seed, known: k }) };
         C.rosters.set(key, r);
         if (C.rosters.size > 64) C.rosters.delete(C.rosters.keys().next().value);
@@ -313,7 +315,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const A = stage.app ? stage.app(cyc) : null;
     const app = A ? { S: A.S, ctx: A.ctx, notes: C.appNotes, memo: k => { let m = C.appMemo.get(k); if (!m) { m = new Map(); C.appMemo.set(k, m); } return m; } } : null;
     return {
-      cyc, pal, roster, prev, dim: silent, full, lanes, melodic, app, render: 'normal',
+      cyc, sec, pal, roster, prev, dim: silent, full, lanes, melodic, app, render: 'normal',
       fade: same ? 1 : Math.max(0, Math.min(1, (cyc - sec.start) / 0.25)),
       notes: (inst, c0, c1) => (c0 >= cyc - 2.5 && c1 <= cyc + 2.5 ? around(inst).filter(n => n[1] > c0 && n[0] < c1) : src.around(inst, c0, c1)),
       level, flash: inst => (playing || feed ? flashAt(now(inst), cyc) : 0), silent: inst => !(playing || feed) || silentAt(now(inst), cyc),
@@ -373,7 +375,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const drawn = native ? drawLayerGlyph(cx, W, H, F, kind, render, termPalette(stage.theme ? stage.theme() : 'neon'), termInfo(cyc, playing, look, render)) : drawLayer(cx, W, H, F, kind);
     cx.restore();
     // (for the checks: the layer's panels and where they are)
-    globalThis.codingMiskLayerPanels = { kind, panels: drawn.map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`), apps: F.drawnApps };
+    globalThis.codingMiskLayerPanels = { kind, panels: drawn.map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`), apps: F.drawnApps, sec: F.sec };
     layerTimes.push(performance.now() - t0); if (layerTimes.length > 600) layerTimes.shift();
   }
 
