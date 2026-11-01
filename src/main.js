@@ -109,7 +109,7 @@ import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
 import { CW_KEY, CW_VERSION, APP_KINDS_VERSION, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom } from './live/widgets.js';
-import { SW_KEY, stageSettings, stageMapping, stageScopeInstruments, layerOn } from './visuals/stage-settings.js';
+import { SW_KEY, SW_VERSION, stageSettings, stageMapping, stageScopeInstruments, layerOn, toggleLayer, FULL_LOOKS } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
 const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
 import { createCodeThemes } from './code-themes/install.js';
@@ -143,7 +143,8 @@ const cwSettings = () => widgetSettings(store.get(CW_KEY, null));
 {
   const cw = store.get(CW_KEY, null), sw = store.get(SW_KEY, null);
   if (cw && typeof cw === 'object' && (cw.appKinds !== APP_KINDS_VERSION || cw.v !== CW_VERSION)) store.set(CW_KEY, widgetSettings(cw));
-  if (sw && typeof sw === 'object' && sw.appKinds !== APP_KINDS_VERSION) store.set(SW_KEY, stageSettings(sw));
+  // (stage-app-widgets D4: and before the version, the app widgets on the stage were forced off, so they come on once)
+  if (sw && typeof sw === 'object' && (sw.appKinds !== APP_KINDS_VERSION || sw.v !== SW_VERSION)) store.set(SW_KEY, stageSettings(sw));
 }
 // the stage widgets (widgets-on-stage D9): their settings and the panels' mapping, read again only when one of the two
 // stored values changes (the stage asks every frame)
@@ -1747,7 +1748,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
         code: codeAt(cyc), say: said ? said.text : '',
         info: { onAir: true, n: p.n, title: item ? item.title : sg.title, artist: item ? item.artist : '', bar: cyc - p.start, bars: p.end - p.start, bpm: Math.round(sg.meta.bpm[Math.min(sg.meta.bars - 1, Math.floor(cyc))]) || undefined, say: said ? said.text : '', sayAt: said ? said.bar - p.start : 0 },
         soulSrc: doc && doc.sections && doc.tracks ? { key: `fv:${p.n}`, song: doc, ctx: {}, bar: cyc - p.start } : null,
-        meta: sg.meta, seed: sg.id || '', captions: fvCaptions, songNotes,
+        meta: sg.meta, seed: sg.id || '', captions: fvCaptions, songNotes, doc: sg.doc,
       };
       // code-over-visual: the line typed (D5), the code evaluated and the places of the haps sounding (D6)
       if (overOn) { Object.assign(fv, { cursor: codeAt.cursor ? codeAt.cursor(cyc) : null, lit: litAt(cyc), doc: sg.doc, render: fRender, overFree: frag && fsz.comp.h >= fsz.comp.w ? 'none' : (frag ? 'right' : (S => (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right'))(coSettings())) }); }
@@ -4293,8 +4294,18 @@ function syncSectionFields() {
 // the "Claude" look's transcript option beside the render menu (spoken-text-on-stage D4, C2): shown on that look only
 function syncTranscript() { const b = $('#transcript'); if (!b) return; b.hidden = look !== 'claude'; b.setAttribute('aria-pressed', String(claudeTranscript())); }
 $('#transcript').addEventListener('click', () => { store.set(TRANSCRIPT_KEY, !claudeTranscript()); syncTranscript(); });
+// the quick switch of the stage widgets (stage-app-widgets D5): on and off in one press, the last mode kept; hidden on
+// the looks the panels never go over (Monitor, Roll, the "Claude" look, the soul)
+function syncWidgetsBtn() {
+  const b = $('#sw-btn'); if (!b) return;
+  const sw = stageSettings(store.get(SW_KEY, null));
+  b.hidden = soulOverride || FULL_LOOKS.includes(look);
+  b.setAttribute('aria-pressed', String(sw.layer !== 'off'));
+}
+$('#sw-btn').addEventListener('click', () => { store.set(SW_KEY, stageSettings(toggleLayer(stageSettings(store.get(SW_KEY, null))))); syncWidgetsBtn(); if (settingsPage) settingsPage.render(); });
 function syncAll() {
   syncTranscript();
+  syncWidgetsBtn();
   document.documentElement.dataset.look = look;
   $('#stagewrap').dataset.soul = soulOverride;
   $('#soul-ctl').hidden = !soulOverride;
@@ -5377,6 +5388,8 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     volume: () => volume, setVolume: v => setVolume(v),
     // code widgets (code-widgets D1): a stopped song shows its code with the new settings; a playing one takes them at
     // its next step, section or evaluation
+    // stage-app-widgets D5: the quick switch above the visual follows the card
+    stageWidgetsChanged: () => syncWidgetsBtn(),
     widgetsChanged: () => { if (ed && !isPlaying() && mode === 'track' && compiled) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code); markMuted(); },
     // the video recorder is made after the settings: a page opened on the settings gets its preview below
     videoPreview: el => { try { video.preview(el); } catch (e) {} },
@@ -5514,6 +5527,11 @@ const visuals = startVisuals({
     lookName: l => { const x = LOOKS.find(([k]) => k === l); return x ? tx(x[1]) : l; },
     renderName: r => { const x = RENDERS.find(([k]) => k === r); return x ? tx(x[1]) : r; },
     seed: () => (fv ? fv.seed : (song && song.id) || ''),
+    // stage-app-widgets D1: the app widgets' settings and context, as the code's app widgets have them
+    app: cyc => {
+      const sg = fv ? { doc: fv.doc, meta: fv.meta } : song;
+      return { S: awSettingsCached(), ctx: { ...songAt(sg, cyc), songNotes: fv ? fv.songNotes || null : songNotesFor(song), lang: getLang(), font: '"JetBrains Mono", monospace' } };
+    },
     label: inst => { const k = `stInst:${inst}`, v = t(k); return v === k ? inst : v; },
     // code-over-visual D7: the side of the stage away from the code drawn over it (video, live picture, fast video, page)
     free: () => {
@@ -5577,6 +5595,8 @@ codeThemes.forVideo = videoCodeTheme;
 // ---------- "Code over" (code-over-visual) ----------
 const coSettings = () => codeOverSettings(store.get(CO_KEY, null));
 const awSettings = () => appWidgetSettings(store.get(AW_KEY, null));
+// (the stage asks every frame: read again only when the stored text changes)
+const awSettingsCached = (() => { let raw, cur = null; return () => { let a = null; try { a = localStorage.getItem(AW_KEY); } catch (e) {} if (!cur || a !== raw) { raw = a; cur = awSettings(); } return cur; }; })();
 // the notes of the playing pattern for the app widgets, queried a cycle at a time and kept while the pattern stays
 const liveCache = { pat: null, by: new Map() };
 function liveNotes(c0, c1) {

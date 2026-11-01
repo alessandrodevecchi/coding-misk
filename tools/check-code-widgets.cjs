@@ -226,7 +226,8 @@ async function migration(browser) {
     const blank = await page.evaluate(() => { const c = document.querySelector('#edhost canvas[id*="_widget__spectrum"]'), d = c.getContext('2d').getImageData(0, 0, Math.floor(c.width / 2), c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 10) n++; return n; });
     check(blank === 0, 'a new spectrum starts blank', `${blank} pixels of the old one`);
     const alpha = async notes => {
-      await page.evaluate(n => localStorage.setItem('coding-misk-code-widgets', JSON.stringify({ on: true, notes: n })), notes);
+      await page.evaluate(n => localStorage.setItem('coding-misk-code-widgets', JSON.stringify({ on: true, notes: n, v: 2 })), notes);
+      // (v 2: without it a stored "volume" is read as the old default and moves to "full", settings-polish D2)
       await ev('setcpm(60)\n$: note("c3 e3 g3 b3").gain(0.1).analyze("pad")._pianoroll()\n$: note("c3 e3 g3 b3").gain(0.1).analyze("arp")._punchcard()'); await sleep(1500);
       return page.evaluate(() => [...document.querySelectorAll('#edhost canvas[id*="_widget_"]')].map(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let a = 0; for (let i = 3; i < d.length; i += 4) a += d[i]; return { id: c.id.replace(/.*_widget__/, ''), a }; }));
     };

@@ -2,7 +2,9 @@
 //  - the hit grid shows every row the song will use from the first bar, empty until its sound enters, so it keeps its size
 //    (Settings → Code widgets → App widgets → Hit grid → Rows: All of the song / Only the sounds playing), in the editor,
 //    over the stage and in the fast video's frames;
-//  - at most one tone cloud on screen at a time, on three built-in songs: one with a pad, one without, one with a voice line.
+//  - at most one tone cloud on screen at a time, on three built-in songs: one with a pad, one without, one with a voice line;
+//  - on the stage (stage-app-widgets): Monitor and the side panels live and a fast video on Monitor, never two tone clouds,
+//    one hit grid with the song's rows from the first frame.
 // Usage: PORT=5255 PLAYWRIGHT_CORE=... node tools/check-widget-placement.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -134,6 +136,67 @@ const shot = async (page, name) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
     check(/righe/i.test(it) && /tutte quelle del brano/i.test(it) && /solo i suoni che suonano/i.test(it), 'in Italian: Righe, Tutte quelle del brano, Solo i suoni che suonano', it.replace(/\s+/g, ' ').slice(0, 120));
     check(!errors.length, 'no page errors', errors.join('; '));
     await ctx.close();
+  }
+
+  // 5. on the stage (stage-app-widgets): Monitor and the side panels live, and a fast video's frames on Monitor: never two
+  // tone clouds, one hit grid with the song's rows from its first frame, the code panel's own cloud apart (one per picture)
+  {
+    const stageWatch = async (page, seconds, layer) => {
+      const out = { n: 0, clouds: 0, grids: 0, rows: [], panels: new Set(), codeClouds: 0 };
+      const end = Date.now() + seconds * 1000;
+      while (Date.now() < end) {
+        const f = await page.evaluate(l => {
+          const apps = l ? ((globalThis.codingMiskLayerPanels || {}).apps || []) : (globalThis.codingMiskStageApps || []);
+          const panels = l ? ((globalThis.codingMiskLayerPanels || {}).panels || []) : (globalThis.codingMiskStagePanels || []);
+          const code = [...(globalThis.miskAppWidgets || new Map()).values()].filter(w => w.canvas.isConnected && w.canvas.style.display !== 'none' && w.kind === 'tonecloud').length;
+          return { apps, panels, code };
+        }, layer);
+        out.n++;
+        out.clouds = Math.max(out.clouds, f.apps.filter(a => a.kind === 'tonecloud').length, f.panels.filter(p => p.includes(':tonecloud')).length);
+        out.grids = Math.max(out.grids, f.apps.filter(a => a.kind === 'hitgrid').length);
+        out.codeClouds = Math.max(out.codeClouds, f.code);
+        for (const a of f.apps) if (a.kind === 'hitgrid') out.rows.push(a.rows);
+        for (const p of f.panels) out.panels.add(p.replace(/:quiet$/, ''));
+        await sleep(250);
+      }
+      return out;
+    };
+    for (const [id, look, layer] of [[PAD, 'monitor', null], [NO_PAD, 'monitor', null], [VOICE, 'monitor', null], [PAD, 'tramonto', 'strip']]) {
+      const song = await open(browser, { 'coding-misk-look': look, 'coding-misk-code-widgets': CW, ...(layer ? { 'coding-misk-stage-widgets': { v: 2, layer } } : {}) });
+      await playSong(song.page, id);
+      // (a song may bring its own look: the look is picked once it plays)
+      await song.page.locator('#looks').selectOption(look); await sleep(400);
+      const w = await stageWatch(song.page, 16, !!layer);
+      const where = layer ? 'side panels' : 'Monitor';
+      check(w.n > 30 && w.clouds <= 1 && w.grids <= 1, `${id} on ${where}: never two tone clouds, never two hit grids`, `${w.n} frames, most ${w.clouds} clouds, ${w.grids} grids; panels ${[...w.panels].join(' ')}`);
+      check(w.rows.length > 20 && Math.min(...w.rows) === Math.max(...w.rows), `${id} on ${where}: the hit grid has the song's rows in every frame from the first`, `rows ${[...new Set(w.rows)]}`);
+      if (id === PAD) check([...w.panels].some(p => p.endsWith(':tonecloud')) && [...w.panels].some(p => p.endsWith(':hitgrid')), `${id} on ${where}: a hit grid panel and a tone cloud panel`, [...w.panels].join(' '));
+      if (id === PAD && !layer) check(w.codeClouds <= 1, `${id}: one tone cloud in the code panel at most, beside the stage's (one per picture)`, `code ${w.codeClouds}`);
+      check(!song.errors.length, `${id} on ${where}: no page errors`, song.errors.join('; '));
+      await shot(song.page, `stage-${look}-${id}.png`);
+      await song.ctx.close();
+    }
+    for (const id of [PAD, NO_PAD]) {
+      const { page, ctx, errors } = await open(browser, {});
+      const seen = await page.evaluate(async song => {
+        const v = globalThis.codingMiskVideo, orig = v.composeVertical, out = { frames: 0, rows: [], clouds: 0, grids: 0, firstRows: null };
+        v.composeVertical = (...a) => {
+          const r = orig(...a), apps = globalThis.codingMiskStageApps || [];
+          out.frames++;
+          out.clouds = Math.max(out.clouds, apps.filter(x => x.kind === 'tonecloud').length);
+          out.grids = Math.max(out.grids, apps.filter(x => x.kind === 'hitgrid').length);
+          for (const x of apps) if (x.kind === 'hitgrid') { out.rows.push(x.rows); if (out.firstRows === null) out.firstRows = x.rows; }
+          return r;
+        };
+        try { await globalThis.codingMiskClips.fragments({ source: song, from: 0, to: 8, quiet: true, files: ['video'], look: 'monitor', show: 'visual' }); } finally { v.composeVertical = orig; }
+        return out;
+      }, id);
+      await sleep(1500);
+      check(seen.frames > 100 && seen.rows.length > 50 && Math.min(...seen.rows) === Math.max(...seen.rows), `${id}: a fast video on Monitor draws one hit grid with the song's rows from the first frame`, `${seen.frames} frames, rows ${[...new Set(seen.rows)]}`);
+      check(seen.clouds <= 1 && seen.grids <= 1, `${id}: the fast video on Monitor never draws two tone clouds or two hit grids`, `most ${seen.clouds} clouds, ${seen.grids} grids`);
+      check(!errors.length, `${id}: no page errors (fast video on Monitor)`, errors.join('; '));
+      await ctx.close();
+    }
   }
 
   await browser.close();

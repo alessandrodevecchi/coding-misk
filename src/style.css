@@ -139,6 +139,11 @@
   .soul-ctl .chip, .look-step { padding: 4px 10px; }
   .lock-ico { width: 9px; height: 11px; vertical-align: -1px; margin-left: 4px; opacity: .75; }
   .soul-ctl .lock-ico { margin: 0; }
+  /* the stage widgets' quick switch (stage-app-widgets D5): a drawn icon of a picture with side panels, then the word */
+  .sw-chip { display: inline-flex; align-items: center; gap: 5px; }
+  .sw-chip[hidden] { display: none; }
+  .sw-ico { width: 14px; height: 10px; flex: none; }
+  @media (max-width: 640px) { .sw-chip span { display: none; } .sw-chip { padding: 4px 9px; } }
   .stagewrap[data-soul="true"] .readout, .stagewrap[data-soul="true"] .say { display: none; }
   .stagewrap[data-soul="true"]::after { display: none; }
   @media (max-width: 640px) { .soul-name { display: none; } .soul-ctl .chip, .look-pick { padding: 3px 9px; font-size: 12px; } }

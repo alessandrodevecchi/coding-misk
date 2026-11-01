@@ -52,23 +52,33 @@ export function tonecloudData(notes, cyc, o, { key = '' } = {}) {
   const span = o.bars, dt = span / o.cols, t0 = cyc - span, E = Array.from({ length: 12 }, () => new Float64Array(o.cols)), sounding = new Map();
   const melodic = x => (o.from === 'melodic' ? !NOT_MELODIC.has(x.inst) : o.from.includes(x.inst));
   const slice0 = Math.round(t0 / dt);
+  // (the strongest note of each class and column first, B; then the spread from it: the same cells as spreading every
+  // note, since the spread only scales a note's energy, at a fraction of the cost: the cloud is drawn every frame on the
+  // stage too, stage-app-widgets)
+  const B = Array.from({ length: 12 }, () => new Float64Array(o.cols));
   const add = (pc, c, v) => { if (v > E[pc][c]) E[pc][c] = v; };
   for (const x of notes) {
     if (!melodic(x)) continue;
     const pc = pcOf(x.p);
     if (pc === null || !(x.e > x.b)) continue;
     const L = Math.max(0.05, Math.min(1, x.lv ?? 1));
-    for (let c = 0; c < o.cols; c++) {
+    // (the columns before the note gets nothing; after its end the tail only falls: the loop starts at the note and
+    // stops once the tail is below the floor, the same cells as a loop over every column, stage-app-widgets)
+    for (let c = Math.max(0, Math.floor((x.b - t0) / dt)); c < o.cols; c++) {
       const a = t0 + c * dt, z = a + dt;
       const on = Math.max(0, Math.min(z, x.e) - Math.max(a, x.b)) / dt;
       const tail = a >= x.e && o.decay > 0 ? Math.exp(-(a - x.e) / o.decay) : 0;
       const v = L * Math.max(on, tail * 0.85);
-      if (v <= 0.002) continue;
-      add(pc, c, v);
-      if (o.spread > 0) for (const [iv, k] of SPREAD) add((pc + iv) % 12, c, v * k * o.spread * grain((pc + iv) % 12, slice0 + c));
+      if (v <= 0.002) { if (a >= x.e) break; continue; }
+      if (v > B[pc][c]) B[pc][c] = v;
     }
     // the notes sounding in the last quarter of a cycle make the chord (the lowest note preferred as its root)
     if (x.b <= cyc && x.e > cyc - 0.25) { const p = Math.round(x.p); if (!sounding.has(pc) || sounding.get(pc) > p) sounding.set(pc, p); }
+  }
+  for (let p = 0; p < 12; p++) E[p].set(B[p]);
+  if (o.spread > 0) for (let p = 0; p < 12; p++) for (let c = 0; c < o.cols; c++) {
+    const v = B[p][c];
+    if (v > 0) for (const [iv, k] of SPREAD) add((p + iv) % 12, c, v * k * o.spread * grain((p + iv) % 12, slice0 + c));
   }
   // normalisation: each column between its weakest and strongest class (chord tones stand out, trails stay alive), or
   // one scale for the window; a gamma under 1 uses more of the ramp (cv9)
