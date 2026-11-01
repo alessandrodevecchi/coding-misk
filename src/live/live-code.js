@@ -8,7 +8,7 @@ import { applyComments } from '../song/comments.js';
 import { idiomatic } from '../song/idiom.js';
 import { breakLines, lineLike, chainLines, typingPlan, settleOthers } from '../song/typing.js';
 import { pasteRule, barSeconds } from './typing-load.js';
-import { planWritten } from './written-plan.js';
+import { planWrittenSteps } from './written-plan.js';
 import { resolveProfile } from './profiles.js';
 import { rampLists } from '../song/ramps.js';
 import { widgetMemory, tracksOf, stripWidgets, instrumentOf, widgetSettings } from './widgets.js';
@@ -237,13 +237,42 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   };
   // reused-lines D4, D8: in a Live coder growth, the written part's plan (planWritten), made once per language
   const planOn = inPlace && !!(build.crescendo && build.crescendo.coder) && Number.isFinite(returning);
-  let planMemo = null;
+  let planMemo = null, planJob = null;
+  const planSteps = () => planWrittenSteps(codeWith, build, returning, shownLine, { growth: growthAhead });
+  // (a plan being made in slices, preparePlan, is finished here at once when the code needs it before it is done)
   const planOf = () => {
     if (!canon) return reference().plan();
     const k = lang();
-    if (!planMemo || planMemo.k !== k) planMemo = { k, plan: planWritten(codeWith, build, returning, shownLine, { growth: growthAhead }) };
+    if (!planMemo || planMemo.k !== k) {
+      const job = planJob && planJob.k === k && planJob.files === files() ? planJob.gen : planSteps();
+      planJob = null;
+      let r;
+      do r = job.next(); while (!r.done);
+      planMemo = { k, plan: r.value };
+    }
     return planMemo.plan;
   };
+  // the plan made a little at a time, in slices of `slice` ms with the page free between them (#82: a new radio
+  // window, after a typed line, made it in one block of the main thread); resolves when it is made (the same plan)
+  const preparePlan = (slice = 8) => new Promise(resolve => {
+    if (!planOn) { resolve(); return; }
+    if (!canon) { reference().prepare(slice).then(resolve); return; }
+    const k = lang();
+    if (planMemo && planMemo.k === k) { resolve(); return; }
+    if (!planJob || planJob.k !== k || planJob.files !== files()) planJob = { k, files: files(), gen: planSteps() };
+    const job = planJob;
+    const run = () => {
+      // (finished by planOf meanwhile, or started again for another language or other samples)
+      if (planJob !== job) { if (planJob) preparePlan(slice).then(resolve); else resolve(); return; }
+      if (job.files !== files() || job.k !== lang()) { planJob = null; preparePlan(slice).then(resolve); return; }
+      const t0 = performance.now();
+      let r;
+      do r = job.gen.next(); while (!r.done && performance.now() - t0 < slice);
+      if (r.done) { planJob = null; planMemo = { k: job.k, plan: r.value }; resolve(); return; }
+      setTimeout(run, 0);
+    };
+    run();
+  });
   // (lines-ahead-balanced D2) the plan from the first step after bar 0: lines ahead are typed at growth steps too
   const planAt = bar => (planOn && bar >= (growthAhead ? 1 : returning) ? planOf() : null);
   const codeRaw = (bar, keep) => codeWith(bar, keep, { plan: planAt(bar) });
@@ -326,7 +355,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const run = !any && C.voice !== false && C.spoken !== false && !M.jit && !inPlace ? null : shown => shown + tail(shown, { table, entries: entrySets.get(plainKey(shown)) || null, voice: hidden.get(plainKey(shown)) || '', like: lineLike, lanes: lanesOf(shown) });
   // the code that plays anywhere (copied, opened in Strudel): the helpers written out, the code shown, its tail
   const standalone = run && (shown => { const pre = any || inPlace ? preludeText(buses, fns) : ''; return pre + shown + tail(shown, { table: any ? table : new Map(), entries: any ? entrySets.get(plainKey(shown)) || null : null, voice: hidden.get(plainKey(shown)) || '', like: lineLike, offset: pre.length, lanes: lanesOf(shown) }); });
-  const out = { build, now, inPlace, codeAt, codeLoad, run, standalone, buses, fns, shownLine, plan: () => (planOn ? planOf() : { edits: new Map(), ahead: [] }) };
+  const out = { build, now, inPlace, codeAt, codeLoad, run, standalone, buses, fns, shownLine, plan: () => (planOn ? planOf() : { edits: new Map(), ahead: [] }), prepare: preparePlan };
   self = out;
   // the code widgets of codeAt(bar) (#79, for the checks): { holders, shown, alive } (placeWidgets' out), or null off
   out.widgetsAt = bar => { if (!widgetsNow()) return null; const o = {}; codeWith(bar, null, { plan: planAt(bar), widgets: true, split: true, allow: typedWidgets() ? idleAllow(bar) : null, hold: o }); return o; };

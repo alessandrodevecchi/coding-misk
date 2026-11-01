@@ -108,7 +108,30 @@ export function stateAt(song, bar) {
 }
 
 // file name of a spoken comment: "Serve più ritmo!" → "serve_piu_ritmo"
-export const saySlug = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48);
+// (kept per text: the voice code, the captions and the samples prepared ask it for the same lines many times a bar)
+const slugMemo = new Map();
+export const saySlug = text => {
+  let s = slugMemo.get(text);
+  if (s === undefined) { s = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48); if (slugMemo.size > 20000) slugMemo.clear(); slugMemo.set(text, s); }
+  return s;
+};
+// the index of a sample in a bank's file list (the manifest's URLs) by its slug: the first file whose decoded name ends
+// in `/<slug>.wav`, else -1. An index per list, made once (a list of a few hundred files was searched with decodeURI
+// for every line, many times a bar: the voice code of a Live coder plan took most of its time there, #82)
+const slugIndexes = new WeakMap();
+export function slugAt(list, slug) {
+  // (a list that is not an array, as the checks' stand-in for "every sample exists", is searched as before)
+  if (!Array.isArray(list) || slug.includes('/')) return list && typeof list.findIndex === 'function' ? list.findIndex(f => decodeURI(f).endsWith(`/${slug}.wav`)) : -1;
+  if (!list.length) return -1;
+  let m = slugIndexes.get(list);
+  if (!m || m.n !== list.length) {
+    m = { n: list.length, at: new Map() };
+    list.forEach((f, i) => { const d = decodeURI(f), k = d.lastIndexOf('/'); if (k >= 0 && d.endsWith('.wav')) { const s = d.slice(k + 1, -4); if (!m.at.has(s)) m.at.set(s, i); } });
+    slugIndexes.set(list, m);
+  }
+  const i = m.at.get(slug);
+  return i === undefined ? -1 : i;
+}
 // "say" is a phrase, or one phrase per language: { "en": "more bass", "it": "più basso" }
 export const sayText = (say, lang = 'en') => !say ? '' : typeof say === 'string' ? say : say[lang] || say.en || Object.values(say)[0] || '';
 // settings of a track that steps change: { key: [bars from 0] }
@@ -170,7 +193,7 @@ export const SPEAKERS = ['eddy', 'flo', 'grandma', 'grandpa', 'reed', 'rocko', '
 // sample bank of a speaker: public/samples/say_<lang>[_<speaker>]/
 export const sayBank = (lang, speaker) => (speaker ? `say_${lang}_${speaker}` : `say_${lang}`);
 export const voiceOf = (song, step) => (song.tracks || []).find(t => t.type === 'voice' && (!step || !step.voice || t.id === step.voice)) || null;
-const sampleIndex = (list, text) => list.findIndex(f => decodeURI(f).endsWith(`/${saySlug(text)}.wav`));
+const sampleIndex = (list, text) => slugAt(list, saySlug(text));
 // every spoken comment of a song that has a sample: [{ s, n }], to load them before they play
 export function voiceSamples(song, lang, files) {
   const out = new Map();
