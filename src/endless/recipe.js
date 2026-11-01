@@ -10,6 +10,7 @@ import { WAYS, checkNarrator, MAX_WORDS } from '../song/spoken.js';
 import { VOCAB_GROUPS } from '../song/vocabulary.js';
 import { MACHINES } from '../sounds/machines.js';
 import { SOURCES, RULES, FAMILIES, SOUND_KINDS, SOUND_KIND_ALIASES, KIND_OF_TYPE } from '../material/index.js';
+import { checkGestures } from './gestures.js';
 
 // The seven energy shapes (docs/ENDLESS.md); their curves live in shapes.js.
 export const SHAPES = ['build-drop', 'slow-burn', 'waves', 'flat-groove', 'verse-chorus', 'late-peak', 'descent'];
@@ -66,7 +67,7 @@ export const recipeOrder = id => OLD_ID[id] || id;
 // an object keyed by style ids (an artist's taste) with old ids renamed
 export const styleKeys = o => (o && typeof o === 'object' && !Array.isArray(o) ? Object.fromEntries(Object.entries(o).map(([k, v]) => [styleId(k), v])) : o);
 export const RECIPE_FORMAT = 1;
-export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'profile', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'spoken', 'narrator', 'words', 'growthShapes', 'headroom', 'invented', ...Object.keys(INSTRUMENTS)];
+export const TOP_FIELDS = ['format', 'id', 'name', 'genre', 'family', 'buildStyle', 'profile', 'description', 'tempo', 'keys', 'progressions', 'meters', 'swing', 'shapes', 'minutes', 'phrase', 'tracks', 'energy', 'voice', 'spoken', 'narrator', 'words', 'growthShapes', 'headroom', 'invented', 'gestures', ...Object.keys(INSTRUMENTS)];
 // level-headroom: the peak a track line of the style's songs may reach before the level checks warn. The output peak
 // stays the hard limit (1.0); a loud genre may let single lines go higher, since every line passes the master level first
 export const HEADROOM = { default: 1, min: 1, max: 1.5 };
@@ -212,6 +213,8 @@ export function validateRecipe(r) {
     }
   }
   checkNarrator(r.narrator, 'narrator', err);
+  // the effect gestures (director-fold-ring D4): how many songs get them and which ones; without it, the genre family's
+  checkGestures(r.gestures, err);
   if (!r.words || typeof r.words !== 'object') err('words', 'title words in English, Italian and Spanish: {"en": [...], "it": [...], "es": [...]}');
   else for (const lang of ['en', 'it', 'es']) {
     const w = r.words[lang];

@@ -28,7 +28,9 @@ How loud each part is, how the app keeps it below clipping, and the devices that
 **FM-like effects** (fm-like-effects, #90). Superdough's FM lives inside the synth oscillators, so samples, drums, soundfonts and voices cannot get it. Two rack devices give them an FM-like colour:
 
 - **Fold** (`fold`: Amount, Curve sharp or soft) is superdough's distortion with its `fold` or `sinefold` curve and a level after it, `distortvol(max(1/g, P))`: `g` is the fold's slope at zero (`1 + expm1(amount)/2`, times π/2 for soft), `P` the usual peak of the track type (`FOLD_PEAK` in `src/song/rack.js`). Each note comes out at most at the higher of its own peak and `P`: a line too quiet to fold keeps its level, a folded one comes out near its type's usual peak. Fold acts only on what is loud enough (`g·|x| > 1`): drums, basses and voices fold from Amount 1.5, a quiet pad from about 2.5, and a folded quiet pad gets louder, up to the pad's usual peak. Fold writes the same Strudel stage (`distort`) as Distortion and the track's own drive (Saturation on drums, the guitar's distortion): it takes their place, and with a Distortion device only the later one is heard (the validator warns). Radio voices sometimes get a mild Fold (`DIRECTOR_VERSION` 13).
-- **Ring (trial)** (`ring`: Frequency, Amount) is `.K(audioin().mul(sine(f).mul(a).add(1 - a)).out())`: a Kabelsalat worklet per note, the sound times `1 − a + a·sin`, never louder. The worklet reads the left channel only (a stereo sample becomes mono) and sits first in the note's chain, before gain and filters. Not drawn by the director while it is on trial.
+- **Ring** (`ring`: Frequency, Amount) is `.K(audioin().mul(sine(f).mul(a).add(1 - a)).out())`: a Kabelsalat worklet per note, the sound times `1 − a + a·sin`, never louder. The worklet reads the left channel only (a stereo sample becomes mono) and sits first in the note's chain, before gain and filters. Its label lost "(trial)" when the director started to use it (director-fold-ring): the cost limits live in the director.
+- **Fold steps and the FM rise** (director-fold-ring D3): Fold may carry `steps`, one amount per bar in place of `amount` (`.distort("<0.8 1.3 …>")` with a `distortvol` list of the same length, each bar's level from `foldLevel`); the FM device may carry `rise: { to, bars, from }`, the index as `saw.slow(bars).range(from, to')`, `to'` a little over `to` so the last sixteenth reaches it (`riseTop`). Both start on a bar that is a multiple of their length, so the first value plays first.
+- **Effect gestures** (director-fold-ring, `DIRECTOR_VERSION` 15): the director puts Fold, Ring and the FM rise on some radio songs, in ranges per track type that keep these level rules (`docs/ENDLESS.md`, Effect gestures).
 
 Cost, measured 2026-10-29 on the owner's Mac while other jobs ran (load 4 to 7; `tools/check-fm-effects.cjs berlin-techno,darksynth`, a radio song stacked to 12 tracks, 30 s of real time per variant). The cost is on the audio thread (the worklet runs a JavaScript function per sample); `compileKabel` on the main thread is 0.02 to 0.1 ms per note, at most 3 ms per second.
 
@@ -39,6 +41,8 @@ Cost, measured 2026-10-29 on the owner's Mac while other jobs ran (load 4 to 7; 
 | Ring on lead, bass, snare | ×1.16; no underrun | ×1.26; 86 underruns (0.46 s) |
 | Ring on all 12 | ×2.28; no underrun | ×1.22; 5160 underruns (27.5 s of 30): unplayable |
 | Fold on all 12 | ×1.55; no underrun | ×0.72 (noise); 338 underruns (1.8 s) |
+
+Effect gestures (director-fold-ring, measured 2026-11-01 with `tools/check-gestures.cjs`, radio songs as written, profile Classic): 20 songs of darksynth, industrial, berlin-techno and ambient, 23 gestures, each played from a bar inside it with and without it. Output peak at most 0.97 with gestures (0.97 without too, on the same bars); no gesture line louder than without by more than 0.02 (a Ring compared with the same Ring at amount 0: the worklet reads the left channel only, so a stereo texture measured through a mono analyser may read higher with it, up to 0.74 against 0.44 without the worklet). A rising FM index made a bass 12 to 18 % louder before the rise lowered the gain to 0.8; a quiet pad under a Fold rise went from 0.12 to 0.20, so pads take no Fold rise. Real time, 30 s: industrial with metal hits on a texture at 106 notes/s, 0 underruns with the gesture, 1 (0.005 s) without; darksynth with an FM rise at 15 notes/s (a break), 0 underruns either way.
 
 Ring per note is fine on one or two tracks; on every line of a dense song it breaks real time. A finished Ring should run once per track (a worklet on the orbit), not once per note.
 
@@ -77,7 +81,7 @@ Ring per note is fine on one or two tracks; on every line of a dense song it bre
 | `lpf` | Low-pass (it: Passa-basso) | sound | cutoff 100-18000 (2000); reso 0-20 (0) |
 | `fm` | FM | sound | index 0-4 (1); harmonicity 0.5/0.505/1/1.005/1.01/1.015/1.02/1.41/2/2.01/2.76/3/3.5/4 (1); wave sine/triangle/square/sawtooth/pink/brown (sine); decay 0.05-1 (0.3); sustain 0-1 (0.5); index2 0-3 (0); harmonicity2 1-10 (1) |
 | `fold` | Fold (it: Piega) | sound | amount 0.1-3 (1.5); curve sharp/soft (sharp) |
-| `ring` | Ring (trial) (it: Ring (prova)) | sound | freq 30-2000 (220); amount 0-1 (0.8) |
+| `ring` | Ring | sound | freq 30-2000 (220); amount 0-1 (0.8) |
 | `pan` | Pan (it: Panorama) | sound | position 0-1 (0.5); motion fixed/slow/fast (fixed) |
 <!-- /generated -->
 

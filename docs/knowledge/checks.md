@@ -100,6 +100,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-fm-lab.cjs` |  | dev server, Chrome | Browser checks for the FM lab of the Sounds tab (fm-groove-lab). |
 | `tools/check-fm-lab.mjs` | `npm run check:fm-lab` | Node | Checks for the FM lab of the Sounds tab (fm-groove-lab, task 1.3). No browser. |
 | `tools/check-functions.mjs` | `npm run check:functions` | Node | Checks for song functions (song-functions). No browser. |
+| `tools/check-gestures.cjs` |  | dev server, Chrome | Browser check of the director's effect gestures (director-fold-ring, #90, tasks 4.1 and 4.2). Dev server on PORT. 1. Levels: for each style, radio songs whose first song draws gestures (seeds tried in turn); for each… |
 | `tools/check-growth-background.cjs` |  | dev server, Chrome | Browser check of the growth in the background (growth-in-background, #75): on luci-rosse, settimo-cielo and kellerlicht, picking Live coder in Compose and then changing the opening and the pace never blocks the page for… |
 | `tools/check-guide.mjs` | `npm run check:guide` | Node | Checks that the Guide (#48, src/guide.js) covers the app: every tab in the page has a card (or an exemption with a reason), every console command is named in the Radio card, every guide text has English and Italian, and… |
 | `tools/check-hand.cjs` |  | dev server, Chrome | Browser checks for hand live coding (#20) in Compose, on Primo Segnale (a song with its own steps). |
@@ -180,7 +181,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 ## Fixtures and versions
 
 <!-- generated:fixtures -->
-Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/endless.json`, `tests/snapshots/invented-styles.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
+Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/endless-v14.json`, `tests/snapshots/endless.json`, `tests/snapshots/invented-styles.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
 <!-- /generated -->
 
 | Fixture | Guards | Rewrite only when | Then |
@@ -189,6 +190,7 @@ Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixt
 | `tests/snapshots/code-before-ideas/` | the reference of `check-ideas.cjs` | never | |
 | `tests/snapshots/levels.json` | peaks per section and instrument | levels are meant to change | `node tools/snapshot-levels.cjs write <id>` |
 | `tests/snapshots/endless.json` | radio songs per seed | the director is meant to change | `npm run check:endless -- --write-fixtures`, raise `DIRECTOR_VERSION` |
+| `tests/snapshots/endless-v14.json` | the radio songs of director version 14: with the effect gestures off (director-fold-ring) the director gives them exactly | never | |
 | `tools/fixtures/crescendo.json` | Classic and Crescendo steps | almost never | `npm run check:crescendo -- --write`, raise `CRESCENDO_VERSION` |
 | `tools/fixtures/live-coder.json` | Live coder growth | growth shapes are meant to change | `npm run check:crescendo -- --write-fixtures`, raise `SHAPES_VERSION` |
 | `tools/fixtures/live-code.json` | code shown by Classic and Crescendo | that code is meant to change | `npm run check:live-code -- --write` |
