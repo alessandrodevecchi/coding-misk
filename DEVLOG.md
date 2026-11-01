@@ -2310,3 +2310,12 @@ Prova del proprietario del 1 novembre, ramo `fix/91-decode-drop`.
 
 - **Trascinare un file su Decode non lo apriva:** il gestore leggeva il file dopo un `await`, quando il browser ha già svuotato i dati del trascinamento. Ora prende il file prima; la scelta dalla finestra di sistema funzionava già.
 - **Controllo:** nuovo `tools/check-decode-drop.cjs`, con un trascinamento che svuota i dati come il browser vero: fallisce sul codice vecchio, passa sul nuovo.
+
+## 2026-11-01 (titolo dei pannelli)
+
+Ramo `fix/79-panel-title`.
+
+- **Il titolo diceva il widget chiesto, non quello disegnato:** quando la griglia dei colpi o la nuvola di toni non entra nel pannello, il corpo disegna il widget di ripiego (di solito lo scope), ma in ASCII e Terminal l'intestazione stampava ancora `tonecloud`/`hitgrid`. In Normale e CRT (`drawPanel`) il titolo era già giusto.
+- **Correzione:** `termPanel` e `asciiPanel` (`src/visuals/glyph-looks.js`) calcolano prima la casella del corpo e chiedono `shownWidget` per il titolo; `termWidget` e `asciiWidget` riusano lo stesso risultato. Il pannello grande di Terminal in Monitor (`title` come funzione) segue la stessa regola. Non cambiano né la scelta del widget né le misure.
+- **Controllo:** in `tools/check-stage-widgets.mjs` un pannello troppo piccolo per la nuvola, in ASCII, Terminal e Normale, porta il nome del ripiego; uno che entra tiene `tonecloud`. Le due righe di ASCII e Terminal falliscono sul codice vecchio e passano sul nuovo.
+- **Prove:** `vite build`, `check:stage-widgets` (mjs e cjs) passano; `check:render-styles` Node passa, nel browser restano solo avvisi e sforamenti di budget di tempo diversi a ogni corsa. Immagine in `notes/prove-2026-11-01/widget-filtri/fix-title-terminal.png` (Tramonto, Terminal, pannelli ai lati, «drift» a battuta 11: il pad si intitola «scope»).
