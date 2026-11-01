@@ -2303,3 +2303,10 @@ Prove del proprietario del 31 ottobre (rn2, rn4), ramo `feat/79-stage-app-widget
 - **Fixture e asserzioni cambiate:** Monitor con 6 strumenti finti ora ha 5 pannelli (hats nella griglia); gli strumenti con scope reale nel video veloce, con le impostazioni di serie, sono solo il basso; il tetto relativo di Monitor rispetto a Palco passa da 1,2 a 1,6 (resta il tetto di 4 ms); in `check-settings.cjs` le nuove etichette inglesi. `check-code-widgets.cjs` falliva già su develop («always full»): salvava «volume» senza `v: 2`, ora lo salva con la versione.
 - **Passano:** `vite build`, `check:code`, `check:code-over` (Node e browser), `check:live-code`, `check:guide`, `check:knowledge`, `check:video`, `check:render-styles` (Node e browser, solo gli avvisi di budget già noti), `check-stage-widgets` (mjs e cjs), `check-code-widgets.cjs`, `check-settings.cjs`, `check-widget-placement.cjs`.
 - **Limiti:** sul palco della pagina (largo e basso) i pannelli ai lati sono piccoli: la griglia entra in piccolo, la nuvola no e lascia il posto allo scope; con 4 pannelli ai lati il pad è il quinto in ordine e la nuvola non appare. Non posso ascoltare: nessun suono cambia. Immagini in `notes/prove-2026-11-01/stage-widgets/`.
+
+## 2026-11-01 (Decode, trascinamento)
+
+Prova del proprietario del 1 novembre, ramo `fix/91-decode-drop`.
+
+- **Trascinare un file su Decode non lo apriva:** il gestore leggeva il file dopo un `await`, quando il browser ha già svuotato i dati del trascinamento. Ora prende il file prima; la scelta dalla finestra di sistema funzionava già.
+- **Controllo:** nuovo `tools/check-decode-drop.cjs`, con un trascinamento che svuota i dati come il browser vero: fallisce sul codice vecchio, passa sul nuovo.
