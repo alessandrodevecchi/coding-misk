@@ -20,7 +20,8 @@ import { drawMonitorTerm, drawRulloTerm, drawMonitorAscii, drawRulloAscii, drawC
 // layer, limits, colours, silent), section(cyc) → { start, end } in cycles, seed(), label(instrument), theme() → 'neon' | 'hw' };
 // for the render styles and the "Claude" look (widget-render-styles): sectionInfo(cyc) → { label, i, n, end, next },
 // word(key, vars) → a word of the text interface or null, lookName(look), renderName(render)
-// getS() → { look, render ('normal' by default), light ('auto' | 'on' | 'off', the light form on slow devices) }
+// getS() → { look, render ('normal' by default), light ('auto' | 'on' | 'off', the light form on slow devices),
+// density ('coarse' | 'normal' | 'fine', the cells of the renders, denser-renders D8) }
 export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}), soul = null, afterFrame = null, stage = null }) {
   const $ = (s, r = document) => r.querySelector(s);
   const cv = $('#stage'), vcx = cv.getContext('2d');
@@ -328,6 +329,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       section: S ? S.label : '', sectionNo: S ? S.i + 1 : 0, sections: S ? S.n : 0, next: S ? S.next : null, nextIn: S ? S.end - cyc : 0,
       lookName: stage && stage.lookName ? stage.lookName(look) : look, renderName: stage && stage.renderName ? stage.renderName(render) : render,
       word: stage && stage.word ? stage.word : null, wave,
+      // (denser-renders: the Density of the renders, and the rows of the Terminal pass just drawn for the layer's panels)
+      density: curDensity, termRows: renderer.last && renderer.last.render === 'terminal' ? renderer.last.rows : null,
       stageWord: stage && stage.word ? stage.word('stage') : null, codeWord: stage && stage.word ? stage.word('code') : null,
       scopeWord: stage && stage.word ? stage.word('scope') : null, spectrumWord: stage && stage.word ? stage.word('spectrum') : null,
     };
@@ -1013,12 +1016,15 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
 
   // the render styles (widget-render-styles): the pass after the look and the flash, on the canvas drawn
   const renderer = createRenderer();
+  // the Density of the frame being drawn (denser-renders D8), and whether the light form's mark shows
+  let curDensity = 'normal', lightShown = false;
   // (for the checks: the time of the last passes, in ms, and the render drawn)
   const passTimes = globalThis.codingMiskPassTimes = [];
   // one picture of the scene: decays, then the look's drawing, then the render's pass
   // r: { render, light, fixed (no automatic light form: the fast video) }
   function paint(look, cyc, dt, playing, r = {}) {
     const render = r.render || 'normal';
+    curDensity = r.density || 'normal';
     if (!playing) echoes.length = 0;
     kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
     const pal = PAL[look] || PAL.palco;
@@ -1034,7 +1040,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (flash > .02 && !reduce && look !== 'soul' && !WIDGET_LOOKS.includes(look)) { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
     // D2: the pass over the finished frame, unless the look drew the render natively
     if (render !== 'normal' && !native) {
-      const ms = renderer.apply(cx, cc, render, { look, theme: stage && stage.theme ? stage.theme() : 'neon', W, H, dpr, light: r.light || 'auto', fixed: !!r.fixed, info: () => termInfo(cyc, playing, look, render) });
+      const ms = renderer.apply(cx, cc, render, { look, theme: stage && stage.theme ? stage.theme() : 'neon', W, H, dpr, density: curDensity, light: r.light || 'auto', fixed: !!r.fixed, info: () => termInfo(cyc, playing, look, render) });
       passTimes.push(ms); if (passTimes.length > 600) passTimes.shift();
     }
     if (NATIVE_RENDERS.includes(render) && look !== 'soul' && !WIDGET_LOOKS.includes(look)) widgetLayer(look, cyc, playing, render);
@@ -1047,10 +1053,11 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   }
   // a frame of the fast video: at time now (ms), cycle cyc, with the look and the feed given
   // feed: { raw: { instrument: level }, wave: Float32Array(256), hook: Float32Array(128) }
-  // render, light: the render of the video and its light form ('on' or 'off'; never automatic, so the frames repeat)
-  function drawAt({ now, cyc, look, feed: f, dt = 1 / 30, show = false, render = 'normal', light = 'off' }) {
+  // render, light: the render of the video and its light form ('on' or 'off'; never automatic, so the frames repeat);
+  // density: the Density of the renders, the stage's (denser-renders D8)
+  function drawAt({ now, cyc, look, feed: f, dt = 1 / 30, show = false, render = 'normal', light = 'off', density = 'normal' }) {
     feed = f; clock = () => now;
-    try { readAudio(dt, now); paint(look, cyc, dt, true, { render, light: light === 'on' ? 'on' : 'off', fixed: true }); if (show && target) showTarget(); }
+    try { readAudio(dt, now); paint(look, cyc, dt, true, { render, light: light === 'on' ? 'on' : 'off', density, fixed: true }); if (show && target) showTarget(); }
     finally { feed = null; clock = () => performance.now(); }
   }
 
@@ -1073,7 +1080,12 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const nSteps = getSteps ? getSteps() : 16;
     const step = playing ? Math.floor(cyc * nSteps) % nSteps : -1;
     if (step !== lastStep) { lastStep = step; onStep(step); }
-    { const S = getS(); paint(S.look, cyc, dt, playing, { render: S.render, light: S.light }); }
+    {
+      const S = getS(); paint(S.look, cyc, dt, playing, { render: S.render, light: S.light, density: S.density });
+      // the light form's mark beside the Render menu while the automatic light form is on (denser-renders D6)
+      const lit = !!(S.render && S.render !== 'normal' && S.light !== 'on' && S.light !== 'off' && renderer.light);
+      if (lit !== lightShown) { lightShown = lit; const m = $('#render-light'); if (m) m.hidden = !lit; }
+    }
 
     if (logo) logo.style.setProperty('--pulse', kick.toFixed(3));
     eq.forEach((el, i) => el.style.setProperty('--l', (playing ? lv[EQ[i]] : .15 + .1 * Math.sin(now / 400 + i)).toFixed(3)));
@@ -1086,5 +1098,5 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   let idle = 0, spin = 0;
   requestAnimationFrame(frame);
   // levels: the current level of each instrument (analysers live, the feed in a fast video)
-  return { setTarget, drawAt, pump, get lightForm() { return renderer.light; }, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; }, get levels() { return lastLevels; } };
+  return { setTarget, drawAt, pump, get lightForm() { return renderer.light; }, get lastPass() { return renderer.last; }, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; }, get levels() { return lastLevels; } };
 }

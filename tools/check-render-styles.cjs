@@ -39,7 +39,7 @@ async function open(browser, { lang = 'it', ui = 'neon', look = 'monitor', rende
 // draws frames of a look in a render from a made-up feed (six instruments, a song wave, levels), at w×h; returns the
 // frame times, the hashes of the frames compared and a PNG. finish: each frame waits for its drawing (the frame drawn
 // into a one-pixel canvas read back, which leaves the frame's canvas on the GPU); else the script's time only
-const synth = (page, o) => page.evaluate(async ({ look, render, w, h, times, png, seq, finish, light }) => {
+const synth = (page, o) => page.evaluate(async ({ look, render, w, h, times, png, seq, finish, light, density }) => {
   const { noteStore } = await import('/src/visuals/stage-feed.js');
   const V = globalThis.codingMiskVisuals, store = noteStore();
   const INSTS = ['bass', 'hook', 'kick', 'arp', 'hats', 'pad'];
@@ -64,7 +64,7 @@ const synth = (page, o) => page.evaluate(async ({ look, render, w, h, times, png
   const hc = document.createElement('canvas'), hx = hc.getContext('2d', { willReadFrequently: true });
   const hash = () => { const c = V.canvas; if (hc.width !== c.width || hc.height !== c.height) { hc.width = c.width; hc.height = c.height; } hx.drawImage(c, 0, 0); const d = hx.getImageData(0, 0, c.width, c.height).data; let x = 0; for (let i = 0; i < d.length; i += 3) x = (Math.imul(x, 31) + d[i]) >>> 0; return x; };
   const tiny = document.createElement('canvas'); tiny.width = tiny.height = 1; const tx = tiny.getContext('2d', { willReadFrequently: true });
-  const draw = t => { const t0 = performance.now(); V.drawAt({ now: t * 1000, cyc: cycAt(t), look, feed: feedAt(t), dt: 1 / 30, render, light }); if (finish) { tx.drawImage(V.canvas, 0, 0, 1, 1); tx.getImageData(0, 0, 1, 1); } return performance.now() - t0; };
+  const draw = t => { const t0 = performance.now(); V.drawAt({ now: t * 1000, cyc: cycAt(t), look, feed: feedAt(t), dt: 1 / 30, render, light, density }); if (finish) { tx.drawImage(V.canvas, 0, 0, 1, 1); tx.getImageData(0, 0, 1, 1); } return performance.now() - t0; };
   const out = { times: [], passes: [], hashes: {}, png: null };
   try {
     for (let k = 0; k < 3; k++) draw(0.5);
@@ -76,7 +76,7 @@ const synth = (page, o) => page.evaluate(async ({ look, render, w, h, times, png
     if (png) { draw(png); out.png = V.canvas.toDataURL('image/png'); }
   } finally { V.setTarget(null); V.hold(false); }
   return out;
-}, { light: 'off', times: [], seq: 0, finish: false, png: null, ...o });
+}, { light: 'off', density: 'normal', times: [], seq: 0, finish: false, png: null, ...o });
 const savePng = (file, url) => { if (SHOTS && url) fs.writeFileSync(`${SHOTS}/${file}`, Buffer.from(url.split(',')[1], 'base64')); };
 
 (async () => {
@@ -222,6 +222,48 @@ const savePng = (file, url) => { if (SHOTS && url) fs.writeFileSync(`${SHOTS}/${
     check(stored.r === '"led"' && stored.l === '"on"' && stored.v === 'terminal' && stored.menu === 'led', 'settings saved: the stage menu follows, the light form, the video\'s render', JSON.stringify(stored));
     await page.reload(); await page.waitForFunction(() => globalThis.codingMiskVisuals, null, { timeout: 30000 }); await sleep(1500);
     check((await page.$eval('#renders', s => s.value)) === 'led', 'the render survives a reload');
+    // denser-renders D8: the Density row after the light form, Normal not stored, Fine saved
+    if (await page.$eval('#tab-impostazioni', e => e.hidden)) { await page.click('#open-settings'); await sleep(800); }
+    const den = await page.evaluate(() => { const s = document.querySelector('#set-render-density'), row = s && s.closest('.set-row'), prev = row && row.previousElementSibling; return { v: s && s.value, opts: s ? [...s.options].map(o => `${o.value}:${o.textContent}`) : [], afterLight: !!(prev && prev.querySelector('#set-render-light')), hint: row ? row.querySelector('.hint').textContent : '', tip: row ? row.querySelector('.lbl').title : '', stored: localStorage.getItem('coding-misk-render-density') }; });
+    check(den.v === 'normal' && den.opts.join(' ') === 'coarse:Grossa normal:Normale fine:Fine' && den.afterLight && den.hint.length > 20 && den.tip === den.hint && den.stored === null, 'settings: Densità del render after the light form, Normale by default and not stored, a help text as hint and tooltip', JSON.stringify(den));
+    await page.locator('#set-render-density').selectOption('fine'); await sleep(200);
+    check((await page.evaluate(() => localStorage.getItem('coding-misk-render-density'))) === '"fine"', 'Density Fine saved');
+    // the same picture size gives the same cells on the stage and in a fast video frame (Fine)
+    await page.locator('#set-render').selectOption('ascii'); await page.locator('#set-render-light').selectOption('off'); await sleep(200);
+    await page.click('#open-settings'); await sleep(400);
+    const big = await page.addStyleTag({ content: '#stage{position:fixed!important;left:0!important;top:0!important;width:1280px!important;height:720px!important;z-index:2147483000!important;max-width:none!important;max-height:none!important}' });
+    await sleep(1500);
+    const stageCells = await page.evaluate(() => { const L = globalThis.codingMiskVisuals.lastPass; return L && { render: L.render, rows: L.rows, cols: L.cols }; });
+    // (a fast video frame, its cells read before the stage draws again)
+    const videoFrame = density => page.evaluate(d => {
+      const V = globalThis.codingMiskVisuals, feed = { raw: { kick: 0.05 }, wave: new Float32Array(256), hook: new Float32Array(128) };
+      V.hold(true); V.setTarget({ w: 1920, h: 1080 });
+      try { V.drawAt({ now: 5000, cyc: 2.5, look: 'tramonto', feed, render: 'ascii', density: d }); const L = V.lastPass; return { render: L.render, rows: L.rows, cols: L.cols }; } finally { V.setTarget(null); V.hold(false); }
+    }, density);
+    const videoCells = await videoFrame('fine'), videoNormal = (await videoFrame('normal')).rows;
+    await big.evaluate(e => e.remove()); await sleep(300);
+    check(stageCells && videoCells && stageCells.rows === videoCells.rows && stageCells.cols === videoCells.cols && videoCells.rows > videoNormal, 'Fine: the stage at 1280×720 and a 1080p fast video frame draw the same ASCII rows and columns, more than Normal', `${JSON.stringify(stageCells)} ${JSON.stringify(videoCells)}, Normal ${videoNormal} rows`);
+    // the light form's mark (D6): CPU 4× slower, the automatic light form on, the drawn mark with its tooltip; a new
+    // render clears it
+    await page.evaluate(() => { localStorage.removeItem('coding-misk-render-light'); localStorage.removeItem('coding-misk-render-density'); });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 10 });
+    await page.locator('#renders').selectOption('ascii').catch(() => page.evaluate(() => { const s = document.querySelector('#renders'); s.value = 'ascii'; s.dispatchEvent(new Event('change', { bubbles: true })); }));
+    await page.evaluate(() => document.querySelector('#play').click());
+    // (the mark read two frames after the light form switches on: a song's own look can clear it again later)
+    const mark = await page.evaluate(async () => {
+      const V = globalThis.codingMiskVisuals, raf = () => new Promise(r => requestAnimationFrame(r)), t0 = performance.now();
+      while (!V.lightForm && performance.now() - t0 < 20000) await raf();
+      await raf(); await raf();
+      const m = document.querySelector('#render-light'), L = V.lastPass;
+      return { lit: V.lightForm, hidden: m.hidden, title: m.title, aria: m.getAttribute('aria-label'), svg: !!m.querySelector('svg'), render: L && L.render, light: L && L.light };
+    });
+    check(mark.lit && !mark.hidden && mark.svg && /Forma leggera/.test(mark.title) && mark.aria === mark.title && mark.light, 'CPU 10× slower: the automatic light form on, the drawn mark beside the Render menu with its tooltip', JSON.stringify(mark));
+    const after = await page.evaluate(() => new Promise(res => { const s = document.querySelector('#renders'); s.value = 'bit'; s.dispatchEvent(new Event('change', { bubbles: true })); requestAnimationFrame(() => requestAnimationFrame(() => res({ light: globalThis.codingMiskVisuals.lastPass.light, render: globalThis.codingMiskVisuals.lastPass.render }))); }));
+    check(after.render === 'bit' && after.light === false, 'a new render clears the automatic light form', JSON.stringify(after));
+    if (SHOTS && !NO_SHOTS) { for (let k = 0; k < 20 && !(await page.evaluate(() => globalThis.codingMiskVisuals.lightForm)); k++) await sleep(500); await sleep(300); await page.locator('.hud-row').screenshot({ path: `${SHOTS}/fatto-segno-forma-leggera.png` }).catch(() => {}); }
+    await page.evaluate(() => document.querySelector('#play').click());
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     if (SHOTS && !NO_SHOTS) { if (await page.$eval('#tab-impostazioni', e => e.hidden)) await page.click('#open-settings'); await sleep(800); await page.locator('#set-render').scrollIntoViewIfNeeded(); await page.screenshot({ path: `${SHOTS}/fatto-impostazioni-render.png` }); }
     check(!errors.length, 'no page errors (menu, settings, live)', errors.join('; '));
     await page.close();

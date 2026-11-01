@@ -70,13 +70,79 @@ Terminal: `rows = clamp(S / 16, 30, 70)`, text at least 12 logical pixels high. 
 
 ### D6. CRT and the light form
 
-CRT: each grille colour column is `max(1, round(dpr / 1.5))` device pixels wide and a scanline comes every `max(2, round(2 × dpr))` device pixels (3 logical pixels at every ratio, about 1.5 times today's spacing at ratio 2), so ratio 1, ratio 2 and a 1080p video have the same number of lines over the picture. The bloom stays at 1/8.
+CRT: each grille colour column is `max(1, round(dpr / 1.5))` device pixels wide and a scanline comes every `max(2, round(2 × dpr))` device pixels: 2 logical pixels at ratio 1, 1.5 and 2 (today 3 device pixels: 3 logical at ratio 1, 1.5 at ratio 2, 2 in a 1080p video), so ratio 1, ratio 2 and a 1080p video have the same number of lines over the picture. The bloom stays at 1/8. Only the spacing changes; the look (colours, strength of the lines, vignette) stays (owner, 2026-10-31). CRT has no cells, so the Density setting (D8) does not change it.
 
-Light form: cells × 1.5 (today × 2), clamped to the render's `max`. While the automatic light form is on, the stage's Render menu shows a small drawn mark (no emoji) and a tooltip ("Light form: the render uses fewer cells because this device is slow" / «Forma leggera: il render usa meno celle perché il dispositivo è lento»). `reset()` (a new render or look) clears it, as today.
+Light form: cells × 1.5 (today × 2), clamped to the render's `max` (times the Density factor, D8); Terminal never below its smallest row count. While the automatic light form is on, the stage's Render menu shows a small drawn mark (no emoji) and a tooltip ("Light form: the render uses fewer cells because this device is slow" / «Forma leggera: il render usa meno celle perché il dispositivo è lento»). `reset()` clears it when the render, the look or the Density changes (today nothing calls `reset()`, so a light form switched on stayed until a reload). The Settings row "Render on slow devices" (Never light) still turns it off.
+
+### D8. Density setting: Coarse, Normal, Fine
+
+One value for every screen and output, `coding-misk-render-density` (`coarse`, `normal`, `fine`; Normal is not stored, so the key is absent by default and the backup carries it when set). The stage, the session video, the fast video, the fragments and the live output read the same value: a video then looks like the stage it was chosen on, and the "same frame in every output" rule holds. A per-screen value was rejected: the stage cannot tell a laptop screen from an external one reliably (the window moves between them), and a video has no screen.
+
+| Density | Factor on the cell | LED pitch at full screen 1080 | ASCII cell at full screen | Terminal rows at full screen |
+| ------- | ------------------ | ----------------------------- | ------------------------- | ---------------------------- |
+| Coarse  | 1.4                | 8.4 logical                   | 18.9 logical              | 48                           |
+| Normal  | 1                  | 6 logical (the rule)          | 13.5 logical              | 67                           |
+| Fine    | 0.7                | 4.2 logical                   | 9.5 logical               | 90 (the 12-pixel floor)      |
+
+The factor multiplies the Normal cell after the rule's clamp (`cell = clamp(S / n, min, max) × f`), so the limits move with it (`min × f`, `max × f`). Applying it before the same clamp was rejected: a full-screen stage sits at the rule's `max`, so Coarse would change nothing exactly where the owner looks, and Fine nothing on a small stage. 1.4 and 0.7 are about one step of √2 each way (1.4 × 0.7 ≈ 1), large enough to see on a 1080 screen (LED 8.4 / 6 / 4.2) and small enough that Coarse stays below today's full-screen dots (13.5). The hard floors still hold after the factor: LED at least 4 device pixels, ASCII at least 5 logical pixels high, 1-bit at least 1 device pixel and within the 1.2 million pixel work picture (so Fine can be the same as Normal at a ratio-2 full screen), Terminal and glyph text at least 12 logical pixels high (so Fine stops at `H / 12` rows) and at least 18 rows. The light form (× 1.5) applies on top of the density.
+
+Where it lives: Settings → Look, the row after "Render on slow devices" ("Render density" / «Densità del render»), with its help text in both languages (shown as the hint and the label's tooltip, `tools/check-settings.cjs`). Video and Fragments have no density of their own: they use this value, as they use the light form setting; their Render rows' hints say so. The Render menu on the stage stays one select.
+
+### D9. Any picture source
+
+The density rule and the CRT spacing take only the picture's size (logical width and height, device pixel ratio), never the look: the rules live in `src/visuals/density.js`, pure functions of `(W, H, dpr, density, light)`. The passes may later run on video pictures (owner, 2026-10-31: for example a video visual in Decode); such a source then gets the same cells for the same size with no change to the rules. No video work in this change.
 
 ### D7. Measurements
 
 A script `tools/measure-render-density.cjs` (dev server) sets each output (window 1100 × 460 at ratio 2, full screen 1920 × 1080 at ratio 1 and 2, a 1080p fast video frame, a 1080 × 1920 fragment frame), plays 30 seconds of one song on Sunset and Stage with each render, and prints a table: cell or dot in device and logical pixels, rows × columns, median pass time, the light form's state, and saves a 400 × 400 crop at 100% for each. Run once on `develop` before any code change (the "before" table and crops) and once after; both tables go in `design.md` of this change and the crops in the owner's test folder.
+
+## Measurements (D7)
+
+`tools/measure-render-density.cjs` on 2026-11-01, headless Chrome on the owner's Mac (load average about 6 from other work), Tramonto playing luci-rosse live on the stage (30 s), the video outputs from 300 frames of a made-up feed. Cell: LED pitch, ASCII and Terminal cell height, 1-bit dot, CRT scanline period, in logical pixels. "Before" ran on `develop` (2e55193) before any code change; full tables with Palco and every crop in the owner's test folder (`notes/prove-2026-11-01/render-density/`).
+
+| Output | Render | Before: cell (logical px), rows, pass, light | After: cell, rows, pass, light |
+| --- | --- | --- | --- |
+| window @2 | bit | 3.01, 153 rows, 6.4 ms, on | 1, 460 rows, 5.3 ms, off |
+| window @2 | crt | 1.5, 307 rows, 0.1 ms, off | 2, 230 rows, 0.1 ms, off |
+| window @2 | led | 11.5, 40 rows, 4.9 ms, on | 3.07, 150 rows, 5.9 ms, off |
+| window @2 | ascii | 11.5, 40 rows, 4.4 ms, off | 10.45, 44 rows, 5.4 ms, on |
+| window @2 | terminal | 10.22, 45 rows, 5.8 ms, off | 15.33, 30 rows, 5.8 ms, off |
+| full screen @1 | bit | 6, 180 rows, 10 ms, on | 2, 540 rows, 6.5 ms, off |
+| full screen @1 | crt | 3, 360 rows, 0.1 ms, off | 2, 540 rows, 0.1 ms, off |
+| full screen @1 | led | 27, 40 rows, 10.5 ms, on | 6, 180 rows, 4.4 ms, off |
+| full screen @1 | ascii | 54, 20 rows, 9.6 ms, on | 14.03, 77 rows, 7.2 ms, on |
+| full screen @1 | terminal | 36, 30 rows, 7.8 ms, on | 15.88, 68 rows, 4.3 ms, off |
+| full screen @2 | bit | 3, 360 rows, 12.4 ms, on | 1.5, 720 rows, 8.6 ms, on |
+| full screen @2 | crt | 1.5, 720 rows, 0.1 ms, off | 2, 540 rows, 0.1 ms, off |
+| full screen @2 | led | 27, 40 rows, 11.2 ms, on | 6, 180 rows, 7.2 ms, off |
+| full screen @2 | ascii | 54, 20 rows, 11 ms, on | 14.03, 77 rows, 9.6 ms, on |
+| full screen @2 | terminal | 36, 30 rows, 10.6 ms, on | 15.88, 68 rows, 7.5 ms, off |
+| video 1080p | bit | 2, 360 rows, 2.3 ms, — | 1.33, 540 rows, 3.6 ms, — |
+| video 1080p | crt | 2, 360 rows, 0 ms, — | 2, 360 rows, 0 ms, — |
+| video 1080p | led | 9, 80 rows, 1.3 ms, — | 4.8, 150 rows, 1.5 ms, — |
+| video 1080p | ascii | 18, 40 rows, 1.8 ms, — | 9, 80 rows, 3.5 ms, — |
+| video 1080p | terminal | 16, 45 rows, 1.6 ms, — | 16, 45 rows, 2.7 ms, — |
+| fragment 9:16 | bit | 1.13, 640 rows, 2.7 ms, — | 0.75, 960 rows, 3.3 ms, — |
+| fragment 9:16 | crt | 1.13, 640 rows, 0 ms, — | 1.88, 384 rows, 0 ms, — |
+| fragment 9:16 | led | 9, 80 rows, 1.3 ms, — | 2.7, 267 rows, 1.5 ms, — |
+| fragment 9:16 | ascii | 18, 40 rows, 1.3 ms, — | 6.99, 103 rows, 2.2 ms, — |
+| fragment 9:16 | terminal | 16, 45 rows, 1.2 ms, — | 14.4, 50 rows, 1.7 ms, — |
+
+Density at a full-screen stage, ratio 2 (after):
+
+| Render | Coarse: cell, rows | Normal: cell, rows | Fine: cell, rows |
+| --- | --- | --- | --- |
+| bit | 2.1, 514 (light) | 1.5, 720 (light) | 1.32, 821 (light) |
+| led | 8.37, 129 | 6, 180 | 4.2, 257 |
+| ascii | 18.95, 57 | 14.03, 77 (light) | 9.82, 110 (light) |
+| terminal | 22.04, 49 | 15.88, 68 | 14.4, 75 |
+
+Findings:
+
+- In headless Chrome the automatic light form switched on about 0.5 s after Play in almost every stage case before the change, so the full-screen "before" pictures are the light form (LED 40 rows of 27-pixel dots, ASCII 20 rows): the cause the owner saw. After, Tramonto stays in the normal form in LED, Terminal and CRT; ASCII and 1-bit still switch at full screen (after 1 to 2.5 s), now only 1.5 times coarser (1-bit 3 device pixels instead of 6, ASCII 77 rows instead of 20).
+- Terminal in the window is coarser than before (30 rows instead of 45): before, its text was about 8.5 logical pixels high, below the 12-pixel floor of D5; 30 rows is the rule's smallest count and the floor allows 31. Fine stops at 31 rows there for the same reason.
+- Palco's pass times include the look's own drawing (its glows are flushed when the pass reads the frame back), so Palco switches to the light form at once before and after; its times are not the pass alone.
+- The pass times move by up to 2 times between runs on this machine; `tools/check-render-styles.cjs` on `develop` in the same session failed the 1080p budget for 1-bit (5.7 ms), LED (4.8), ASCII (6.3) and Terminal (4.8). After the change: 1-bit 3.9, LED 1.3, ASCII 4.1, Terminal 2.1, CRT 0.6 ms (only ASCII over 4 ms). 1-bit's work picture is 2.25 times larger; its loop now writes 32 bits a pixel, which keeps it within the budget.
 
 ## Risks / Trade-offs
 
@@ -86,7 +152,9 @@ A script `tools/measure-render-density.cjs` (dev server) sets each output (windo
 
 ## Open Questions
 
-1. Should the owner get a "Density" setting (Coarse, Normal, Fine) on top of the rule? Owner, 2026-10-31: yes, likely needed, since the laptop screen, a vertical external screen and an ultrawide screen look different. To be specified (one setting for all screens or remembered per screen).
-2. Should the light form ever switch on at full screen? Recommended: yes, but gentler (× 1.5) and shown in the Render menu, so the owner can set "Never light" when the machine is fast enough.
-3. (Owner, 2026-10-31: the passes may later run on video pictures too, for example a video visual in Decode; the density rule and CRT spacing must work on any picture source, not only the drawn visuals.)
-4. Should CRT change at all? Recommended: yes, only the spacing in logical pixels (D6); its look stays.
+All resolved.
+
+1. Density setting: resolved 2026-11-01 (owner, answers of 2026-10-31 and 2026-11-01): yes, Coarse / Normal / Fine, one value for all screens (D8).
+2. Light form at full screen: resolved 2026-11-01: yes, gentler (× 1.5), with the drawn mark and tooltip in the Render menu and "Never light" to turn it off (D6), as recommended.
+3. Other picture sources: resolved 2026-11-01: the density rule and the CRT spacing take the picture size, not the visual (D9); no video work now.
+4. CRT: resolved 2026-11-01: only the spacing in logical pixels, the look stays (D6), as recommended.

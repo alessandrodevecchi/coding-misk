@@ -5,7 +5,8 @@
 // context: the same frame twice, alone and in a sequence, gives the same drawing.
 // Usage: npm run check:render-styles
 import { RENDERS, NATIVE_RENDERS, RENDER_GAIN, LOOKS, PICK_LOOKS } from '../src/music.js';
-import { BAYER8, BIT_COLOURS, bitPixels, ledPixels, asciiCells, ASCII_RAMP, termPixels, passSizes, liftTable, gainOf, drawTermChrome } from '../src/visuals/render-styles.js';
+import { BAYER8, BIT_COLOURS, bitPixels, ledPixels, asciiCells, ASCII_RAMP, termPixels, passSizes, liftTable, gainOf, drawTermChrome, drawAsciiRows } from '../src/visuals/render-styles.js';
+import { DENSITIES, DENSITY_FACTOR, densityOf, RULES, BIT_CAP, TEXT_MIN, TEXT_CELL, ROWS_MIN, glyphRows } from '../src/visuals/density.js';
 import { TERM_PALETTES, termPalette, termColour, gridOf, brailleWave, brailleDots } from '../src/visuals/term-grid.js';
 import { drawMonitorTerm, drawRulloTerm, drawMonitorAscii, drawRulloAscii, drawClaude, drawLayerGlyph, sectionChange, promptLine, rowsFor } from '../src/visuals/glyph-looks.js';
 import { noteStore, rosterOf, levelAt, flashAt, silentAt, columnCache } from '../src/visuals/stage-feed.js';
@@ -39,6 +40,7 @@ function frame(w, h, t) {
   return d;
 }
 {
+  { const f = frame(96, 54, 1.3), o = { gain: 1.5, ...BIT_COLOURS.hw }; check(same(bitPixels(f.slice(), 96, 54, o), bitPixels(f.slice(), 96, 54, o, new Uint8ClampedArray(f.length))), '1-bit: the 32-bit path in place gives the same pixels as the byte path'); }
   check(BAYER8.length === 64 && new Set(BAYER8).size === 64 && Math.min(...BAYER8) > 0 && Math.max(...BAYER8) < 1, 'Bayer 8×8: 64 different thresholds inside (0, 1)');
   const w = 96, h = 54, run = (fn, t) => fn(frame(w, h, t).slice());
   const passes = {
@@ -81,15 +83,62 @@ function frame(w, h, t) {
   check([...colours(termPixels(frame(w, h, 1), w, h, TERM_PALETTES.hw.ramp))].every(c => ramp.has(c)), 'Terminal hardware: the scene mapped to the amber ramp');
 }
 
-// ---------- work sizes and the light form ----------
+// ---------- work sizes, density and the light form (denser-renders) ----------
 {
-  const bit = passSizes('bit', 1920, 1080), bitL = passSizes('bit', 1920, 1080, true), led = passSizes('led', 1920, 1080), ledL = passSizes('led', 1920, 1080, true);
-  const asc = passSizes('ascii', 1920, 1080), ascL = passSizes('ascii', 1920, 1080, true);
-  check(bit.w === 640 && bit.h === 360 && bitL.w === 320, '1-bit works at a third of the frame, a sixth in the light form');
-  check(led.h === 80 && ledL.h === 40 && Math.abs(led.pitch - 13.5) < 1e-9, 'LED: a dot pitch of 1/80 of the height, 1/40 in the light form');
-  check(asc.h === 40 && ascL.h === 20 && Math.abs(asc.cellW * 1.9 - asc.cellH) < 1e-9, 'ASCII: cells of 1/40 of the height (1:1.9), half as many in the light form');
-  check(passSizes('terminal', 1920, 1080).rows === 45 && passSizes('terminal', 1920, 1080, true).rows === 30, 'Terminal: 45 rows of half-block cells, 30 in the light form');
-  check(passSizes('normal', 1920, 1080) === null && passSizes('crt', 1920, 1080) === null, 'Normal and CRT have no work size (CRT draws at full size)');
+  // the outputs of the design: [W, H logical, dpr]
+  const OUT = { window: [1100, 460, 2], fs2: [1920, 1080, 2], fs1: [1920, 1080, 1], video: [1280, 720, 1.5], frag: [405, 720, 1920 / 720], small: [640, 360, 2] };
+  const ps = (render, k, o = {}) => { const [W, H, d] = OUT[k]; return passSizes(render, W * d, H * d, { dpr: d, ...o }); };
+  const log = (S, k) => S.pitch / OUT[k][2];
+  // LED (D2): rows grow with the screen, the pitch stays near 3 to 6 logical pixels; fragment dots as the video's
+  const lw = ps('led', 'window'), lf = ps('led', 'fs2'), lf1 = ps('led', 'fs1'), lv = ps('led', 'video'), lg = ps('led', 'frag');
+  check(lf.h >= 150 && log(lf, 'fs2') <= 7.2 && lw.h >= 150, 'LED: at least 150 rows at full screen (80 before), pitch at most 7.2 logical px', `full screen ${lf.h} rows, ${log(lf, 'fs2').toFixed(2)} px; window ${lw.h} rows, ${log(lw, 'window').toFixed(2)} px`);
+  check(lf.h === lf1.h && lf.w === lf1.w, 'LED: the same rows and columns at ratio 1 and 2 (logical pixels)', `${lf1.h}×${lf1.w}`);
+  check(Math.abs(lv.pitch - lg.pitch) < 0.2 && lg.pitch >= 4, 'LED: a 9:16 fragment has the dots of a 1080p video (device pixels)', `${lv.pitch.toFixed(2)} / ${lg.pitch.toFixed(2)}`);
+  // ASCII (D3)
+  const af = ps('ascii', 'fs2'), as = ps('ascii', 'small');
+  check(af.h >= 75 && as.h >= 40 && Math.abs(af.cellW * 1.9 - af.cellH) < 1e-9, 'ASCII: at least 75 rows at full screen (40 before), 40 on a stage 360 px high, cells 1:1.9', `${af.h} and ${as.h} rows`);
+  // 1-bit (D4): dots of 2 device pixels, larger only past 1.2 million work pixels
+  const bv = ps('bit', 'video'), bf = ps('bit', 'fs2'), b1 = ps('bit', 'fs1');
+  check(bv.dot === 2 && bv.w === 960 && b1.dot === 2 && bf.w * bf.h <= BIT_CAP && bf.dot > 2 && bf.dot < 3, '1-bit: 2 device px dots (3 before), the work picture within 1.2 M px', `video ${bv.w}×${bv.h}, ratio 2 full screen dot ${bf.dot.toFixed(2)}`);
+  // Terminal and the glyph forms (D5): more rows on big screens, text at least 12 logical px
+  const tf = ps('terminal', 'fs2').rows, tv = ps('terminal', 'video').rows, tw = ps('terminal', 'window').rows;
+  check(tf > 45 && tv === 45 && tw === 30 && 1080 / tf / TEXT_CELL >= TEXT_MIN, 'Terminal: more rows than 45 at full screen, 45 in a 720 video, 30 in the window, text at least 12 px', `${tf}, ${tv}, ${tw}`);
+  check(glyphRows(1280, 720) === 45 && glyphRows(1920, 1080) === 64 && glyphRows(640, 200) === ROWS_MIN && rowsFor(1280, 720) === glyphRows(1280, 720), 'glyph Monitor and Roll: rows from the short side (45 at 720, 64 at 1080, at least 18)', `${glyphRows(1280, 720)}, ${glyphRows(1920, 1080)}, ${glyphRows(640, 200)}`);
+  // CRT (D6): the same number of scanlines over the picture at ratio 1, 2 and in a 1080p video
+  const lines = k => { const [, H, d] = OUT[k]; return (H * d) / ps('crt', k).scan; };
+  check(Math.abs(lines('fs1') - lines('fs2')) <= 1 && Math.abs(lines('video') - 360) <= 1 && ps('crt', 'fs2').col === 1, 'CRT: scanlines every 2 logical px at ratio 1, 2 and in a 1080p video', `${lines('fs1')}, ${lines('fs2')}, ${lines('video')}`);
+  check(passSizes('normal', 1920, 1080) === null, 'Normal has no work size');
+  // the Density setting (D8): Coarse 1.4, Fine 0.7 of the Normal cell, one rule for every output
+  check(same(DENSITIES, ['coarse', 'normal', 'fine']) && densityOf('x') === 'normal' && DENSITY_FACTOR.coarse === 1.4 && DENSITY_FACTOR.fine === 0.7, 'Density: Coarse, Normal, Fine; anything else is Normal');
+  const lc = ps('led', 'fs2', { density: 'coarse' }), ln = ps('led', 'fs2', { density: 'fine' });
+  check(Math.abs(lc.pitch / lf.pitch - 1.4) < 0.05 && Math.abs(ln.pitch / lf.pitch - 0.7) < 0.05, 'Density at full screen: the LED pitch 1.4 and 0.7 times Normal\'s', `${log(lc, 'fs2').toFixed(2)} / ${log(lf, 'fs2').toFixed(2)} / ${log(ln, 'fs2').toFixed(2)} logical px`);
+  const ac = ps('ascii', 'fs2', { density: 'coarse' }), an = ps('ascii', 'fs2', { density: 'fine' });
+  check(ac.h < af.h && an.h > af.h && Math.abs(af.cellH / an.cellH - 1 / 0.7) < 0.05, 'Density: ASCII rows fewer with Coarse, more with Fine', `${ac.h} / ${af.h} / ${an.h}`);
+  let floors = 0;
+  for (const k of Object.keys(OUT)) for (const density of DENSITIES) for (const light of [false, true]) {
+    const [W, H, d] = OUT[k], L = ps('led', k, { density, light }), A = ps('ascii', k, { density, light }), B = ps('bit', k, { density, light }), T = ps('terminal', k, { density, light }).rows, G = glyphRows(W, H, density);
+    const ok = L.pitch >= 4 && A.cellH / d >= 5 - 1e-9 && B.dot >= 1 && B.w * B.h <= BIT_CAP * 1.001 && H / T / TEXT_CELL >= TEXT_MIN - 1e-9 && T >= ROWS_MIN && G >= ROWS_MIN && H / G / TEXT_CELL >= TEXT_MIN - 1e-9;
+    floors++;
+    if (!ok) check(false, `floors kept: ${k}, ${density}${light ? ', light form' : ''}`, `LED ${L.pitch.toFixed(2)}, ASCII ${(A.cellH / d).toFixed(2)}, Terminal ${T}, glyph ${G}`);
+  }
+  check(floors === 36, 'floors kept for every output, density and light form (LED at least 4 device px, ASCII 5 px, text 12 px, 18 rows, 1-bit within 1.2 M px)', `${floors} cases`);
+  check(ps('terminal', 'window', { density: 'fine' }).rows === Math.floor(460 / (TEXT_MIN * TEXT_CELL)), 'Density Fine on a 460 px stage: Terminal stops at the 12-pixel text floor', `${ps('terminal', 'window', { density: 'fine' }).rows} rows`);
+  // the same picture size gives the same cells on the stage and in a fast video, at every density
+  for (const density of DENSITIES) {
+    const st = passSizes('ascii', 1280 * 2, 720 * 2, { dpr: 2, density }), vd = passSizes('ascii', 1920, 1080, { dpr: 1.5, density });
+    const sl = passSizes('led', 1280 * 2, 720 * 2, { dpr: 2, density }), vl = passSizes('led', 1920, 1080, { dpr: 1.5, density });
+    check(st.h === vd.h && st.w === vd.w && sl.h === vl.h && sl.w === vl.w && passSizes('terminal', 2560, 1440, { dpr: 2, density }).rows === passSizes('terminal', 1920, 1080, { dpr: 1.5, density }).rows, `the stage at 1280×720 and a 1080p video: the same rows and columns (${density})`, `ASCII ${st.h}×${st.w}, LED ${sl.h}×${sl.w}`);
+  }
+  // the light form (D6): cells at most 1.5 times larger, never past the render's max at the density
+  const lwl = ps('led', 'window', { light: true }), bvl = ps('bit', 'video', { light: true }), afl = ps('ascii', 'fs2', { light: true });
+  check(Math.abs(lwl.pitch / lw.pitch - 1.5) < 0.05 && bvl.dot === 3 && afl.cellH / 2 <= RULES.ascii.max * 1.03 && ps('led', 'fs2', { light: true }).pitch / 2 <= RULES.led.max + 1e-9, 'light form: cells 1.5 times larger (1-bit 3 device px, 6 before), never past the max', `LED window ${(lwl.pitch / 2).toFixed(2)} px, ASCII full screen ${(afl.cellH / 2).toFixed(2)} px`);
+  check(ps('terminal', 'video', { light: true }).rows === 30 && ps('terminal', 'window', { light: true }).rows === 30, 'light form: Terminal 30 rows in a 720 video, never below the smallest count in the window');
+  check(passSizes('bit', 1920, 1080, true).dot === 3 && passSizes('led', 1920, 1080).h === passSizes('led', 1920, 1080, { dpr: 1 }).h, 'passSizes keeps its old call (light as the fourth argument, ratio 1)');
+  // ASCII drawn a row at a time (D3): one fillText per row, the font's advance one cell
+  const g = recorder(), glyphs = Uint8Array.from({ length: 40 * 12 }, (_, i) => i % ASCII_RAMP.length);
+  drawAsciiRows(g, glyphs, 40, 12, 7, 13.3, 3);
+  const calls = g.log.filter(x => x[0] === 'fillText'), font = g.log.find(x => x[0] === '=' && x[1] === 'font');
+  check(calls.length === 12 && calls.every(c => [...c[1]].length === 40) && calls[0][2] === 3 && font && /^600 11\.67px/.test(font[2]), 'ASCII: one fillText per row, the font sized so its advance is the cell width', `${calls.length} calls, ${font && font[2]}`);
 }
 
 // ---------- the text interface ----------
@@ -100,7 +149,6 @@ function frame(w, h, t) {
   check(['kick', 'snare', 'hats', 'bass', 'guitar', 'arp', 'pad', 'hook', 'fx', 'riser', 'mystery'].every(i => /^#[0-9a-f]{6}$/i.test(termColour(N, i))) && termColour(N, 'mystery') === termColour(N, 'mystery'), 'Terminal: a named colour per instrument, stable for an unknown one');
   const G = gridOf(1280, 720, 36);
   check(G.rows === 36 && G.cols === 128 && G.ch === 20 && G.cw === 10, 'a grid of 128 × 36 cells at 1280 × 720 (cells twice as tall as wide)');
-  check(rowsFor(720) === 36 && rowsFor(300) === 18, 'the grid rows follow the frame height (36 at 720)');
   const B = brailleWave(10, 4, Float32Array.from({ length: 64 }, (_, i) => 0.4 * Math.sin(i / 5)));
   check(B.bits.some(b => b) && B.bits.every(b => b < 256), 'braille: a wave sets dots in its cells');
   const flat = brailleWave(10, 4, null);

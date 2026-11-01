@@ -15,6 +15,7 @@ import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shape
 import { shapeCounts } from '../song/shapes.js';
 import { AIR_CHOOSERS, AIR_CHOOSER, chooserOf, chooserName } from '../endless/waypoints.js';
 import { RENDERS } from '../music.js';
+import { DENSITIES, DENSITY_KEY, densityOf } from '../visuals/density.js';
 import { CW_KEY, CW_DEFAULTS, CW_INSTRUMENTS, CW_WINDOWS, CW_PARAMS, CW_SIZE_LIMITS, WIDGETS, widgetSettings } from '../live/widgets.js';
 import { CAPTIONS_KEY, captionSettings, WHERES, STEP_FORMS } from '../captions/captions.js';
 import { SPEAKER_KINDS, MARKS } from '../song/speakers.js';
@@ -57,6 +58,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setRadioLook'), `<select id="set-radio-look" data-no-knob>${looks.map(([k, l]) => opt(k, store.get('coding-misk-radio-look', 'palco'), tx(l))).join('')}</select>`, t('setRadioLookHint'))}
           ${row(t('setRender'), `<select id="set-render" data-no-knob>${RENDERS.map(([k, l]) => opt(k, store.get('coding-misk-render', 'normal'), tx(l))).join('')}</select>`, t('setRenderHint'))}
           ${row(t('setRenderLight'), `<select id="set-render-light" data-no-knob>${['auto', 'on', 'off'].map(k => opt(k, store.get('coding-misk-render-light', 'auto'), t(`setRenderLight:${k}`))).join('')}</select>`, t('setRenderLightHint'))}
+          ${row(t('setRenderDensity'), `<select id="set-render-density" data-no-knob>${DENSITIES.map(k => opt(k, densityOf(store.get(DENSITY_KEY, 'normal')), t(`setRenderDensity:${k}`))).join('')}</select>`, t('setRenderDensityHint'))}
           ${codeRows()}
         </div>
         ${captionsCard()}
@@ -425,6 +427,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (e.target.id === 'set-radio-look') store.set('coding-misk-radio-look', e.target.value);
     // the stage's render and its light form on slow devices (widget-render-styles D8)
     if (e.target.id === 'set-render') { if (app.setRender) app.setRender(e.target.value); else store.set('coding-misk-render', e.target.value); }
+    if (e.target.id === 'set-render-density') { if (e.target.value === 'normal') store.remove(DENSITY_KEY); else store.set(DENSITY_KEY, densityOf(e.target.value)); }
     if (e.target.id === 'set-render-light') { if (e.target.value === 'auto') store.remove('coding-misk-render-light'); else store.set('coding-misk-render-light', e.target.value); }
     if (e.target.id === 'set-code-theme') { app.codeTheme.set({ theme: e.target.value }); render(); }
     if (e.target.id === 'set-code-font') { app.codeTheme.set({ font: e.target.value }); render(); }
