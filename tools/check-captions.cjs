@@ -3,12 +3,13 @@
 // the marks of each voice, the settings card (switch off and on with the choices kept, narrator only, each of the five
 // marks, the old behaviour), the "Claude" look (reply block, no page caption, the transcript pane at 16:9 and none at
 // 9:16, an invented prompt line never captioned), the hardware theme, 400 px, and a fast video fragment's captions.
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-captions.cjs [shots-dir] [--no-video]
+// A long line under Code over (the Pixel visual, page stage and full screen, neon and hardware) is drawn whole.
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-captions.cjs [shots-dir] [--no-video] [--fit-only]
 //   (dev server on PORT, default 5173; with shots-dir: pictures of the lane and the "Claude" look)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const PORT = process.env.PORT || 5173, URL = `http://localhost:${PORT}/`, WAIT = 180000;
-const args = process.argv.slice(2), shots = args[0] && !args[0].startsWith('--') && args[0] !== '-' ? args[0] : null, noVideo = args.includes('--no-video');
+const args = process.argv.slice(2), shots = args[0] && !args[0].startsWith('--') && args[0] !== '-' ? args[0] : null, noVideo = args.includes('--no-video'), fitOnly = args.includes('--fit-only');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
@@ -56,6 +57,53 @@ async function fragShot(page, downloads, name, opts, at = 3.8) {
 }
 const shot = async (page, name, sel = '#stagewrap') => { if (shots) await page.locator(sel).screenshot({ path: path.join(shots, `${name}.png`) }); };
 
+const LONG = 'the tree is still standing where the river used to bend';
+// the lane with a long voice line added to the song playing: what the page shows, measured
+async function longLane(page) {
+  for (let k = 0; k < 3; k++) {
+    const at = Math.floor(await cap(page, C => C.now())) + 1;
+    await cap(page, (C, a) => C.addLine(a[0], a[1], 6), [LONG, at]);
+    await page.waitForFunction(a => globalThis.codingMiskCaptions.now() >= a + 0.5, at, { timeout: 30000 }).catch(() => {});
+    await sleep(400);
+    const m = await page.evaluate(() => {
+      const w = document.querySelector('#stagewrap').getBoundingClientRect(), say = document.querySelector('#say'), b = say.getBoundingClientRect();
+      const row = [...say.querySelectorAll('.cap-row')].find(r => r.dataset.kind === 'voice'), t = row && row.querySelector('.cap-txt');
+      if (!t) return null;
+      const rg = document.createRange(); rg.selectNodeContents(t);
+      const lines = [...new Set([...rg.getClientRects()].map(r => Math.round(r.top)))].length;
+      const out = [...rg.getClientRects()].some(r => r.left < b.left - 1 || r.right > b.right + 1 || r.top < b.top - 1 || r.bottom > b.bottom + 1);
+      return { text: t.textContent, hidden: t.scrollWidth > t.clientWidth + 1 || t.scrollHeight > t.clientHeight + 1, out, lines, fs: parseFloat(getComputedStyle(t).fontSize), base: parseFloat(getComputedStyle(row).fontSize), icon: !!row.querySelector('.cap-ico'),
+        box: { x: b.left - w.left, y: b.top - w.top, w: b.width, h: b.height }, stage: { w: w.width, h: w.height } };
+    });
+    if (m) return m;
+  }
+  return null;
+}
+async function fitCase(page, shot) {
+  await page.selectOption('#looks', 'pixel'); await sleep(300);
+  const coWas = await page.evaluate(() => document.querySelector('#stagewrap').classList.contains('co-on'));
+  if (!coWas) { await page.click('#code-over-btn'); await sleep(600); }
+  const width = await page.evaluate(() => { try { return (JSON.parse(localStorage.getItem('coding-misk-code-over')) || {}).width || 62; } catch (e) { return 62; } });
+  for (const theme of ['neon', 'hw']) {
+    await page.click(`[data-uitheme="${theme}"]`); await sleep(300);
+    for (const full of [false, true]) {
+      const where = `${theme} ${full ? 'full screen' : 'page stage'}`;
+      if (full) { await page.evaluate(() => document.querySelector('#stagewrap').requestFullscreen().catch(() => {})); await sleep(700); }
+      if (full && !(await page.evaluate(() => !!document.fullscreenElement))) { console.log(`skip  long line ${where}: full screen unavailable`); continue; }
+      const m = await longLane(page);
+      check(!!m && m.text === `“${LONG}”` && !m.text.includes('…') && !m.hidden, `long line under Code over, ${where}: the whole line drawn, nothing cut`, m ? `${m.text} ${m.hidden ? 'hidden part' : ''} ${m.fs}px` : 'no row');
+      check(!!m && !m.out && m.lines >= 1 && m.lines <= 3 && m.icon, `long line, ${where}: inside its box, three lines at most, the icon kept`, m ? `${m.lines} lines` : '');
+      check(!!m && m.fs >= Math.min(m.base, Math.max(14, Math.round(m.base * 0.6))), `long line, ${where}: the font not below 60%`, m ? `${m.fs}px of ${m.base}px` : '');
+      check(!!m && m.box.x >= m.stage.w * width / 100 - 1 && m.box.x + m.box.w <= m.stage.w + 1 && m.box.y >= 0 && m.box.y + m.box.h <= m.stage.h + 1, `long line, ${where}: the box in the free side of the stage`, m ? JSON.stringify(m.box) : '');
+      await shot(page, `long-line-code-over-${theme}-${full ? 'fullscreen' : 'page'}`);
+      if (full) { await page.evaluate(() => document.exitFullscreen().catch(() => {})); await sleep(500); }
+    }
+  }
+  await page.click('[data-uitheme="neon"]'); await sleep(300);
+  if (!coWas) { await page.click('#code-over-btn'); await sleep(300); }
+  await page.selectOption('#looks', 'palco'); await sleep(300);
+}
+
 (async () => {
   const browser = await launch();
   const ctx = await browser.newContext({ viewport: { width: 1300, height: 900 }, acceptDownloads: true }), page = await ctx.newPage(), downloads = [];
@@ -68,6 +116,13 @@ const shot = async (page, name, sel = '#stagewrap') => { if (shots) await page.l
   // (the design's lines are Italian)
   await page.click('.langs [data-lang="it"]'); await sleep(800);
   await cap(page, C => C.set(S => { Object.assign(S, { on: true, narrator: true, voice: true, typed: true, steps: true, claude: true, stepForm: 'tag', where: 'look', videos: true, marks: {} }); }));
+  // --fit-only: the long line under Code over alone
+  if (fitOnly) {
+    await openSong(page, 'prova-voce-notte', { style: 'explain' }); await play(page);
+    await fitCase(page, shot);
+    check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
+    await browser.close(); console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed'); process.exit(failed ? 1 : 0);
+  }
 
   // ---- luci-rosse, Live coder, explaining: each heard line is the caption, no tag
   await openSong(page, 'luci-rosse', { style: 'explain' });
@@ -191,6 +246,11 @@ const shot = async (page, name, sel = '#stagewrap') => { if (shots) await page.l
   await page.setViewportSize({ width: 400, height: 860 }); await sleep(500);
   await laneAt(page, Math.floor(voice[0].at)); await shot(page, 'lane-400px');
   await page.setViewportSize({ width: 1300, height: 900 }); await sleep(300);
+
+  // ---- a long line under Code over (caption fit): on the Pixel visual with the code on the left, in the page's stage
+  // and in full screen, neon and hardware, the whole line is drawn (no …, nothing hidden) inside its box, on up to three
+  // lines, the box in the free side of the stage, the font not below 60%
+  await fitCase(page, shot);
   await stop(page);
 
   // ---- samples prepared ahead (D9): a narrator line's sample taken away is made again by the voice helper, the song

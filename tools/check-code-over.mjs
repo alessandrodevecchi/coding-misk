@@ -1,5 +1,5 @@
 // "Code over" and the app widgets (code-over-visual), no browser: the areas by format and setting (captions and the
-// strip never under the code), the bands of the painter (as wide as the text, none on empty lines, the cut column, the
+// strip never under the code, a long caption fitted whole in the free area), the bands of the painter (as wide as the text, none on empty lines, the cut column, the
 // scroll), the lit tokens (first string only, mapped from the evaluated code), the edited line, the hit grid and the
 // tone cloud from haps of Strudel in Node, their options, the calls commented out for code leaving the app (and that
 // code evaluating with the same haps), and the settings.
@@ -18,6 +18,7 @@ import { stripLayout } from '../src/visuals/widget-layer.js';
 import { strudelInNode } from './mixer-checks.mjs';
 import { noteStore, noteOf } from '../src/visuals/stage-feed.js';
 import { notesOfStore } from '../src/widgets/app-widgets.js';
+import { drawCaptions, fitCaption, captionSettings } from '../src/captions/captions.js';
 
 const problems = []; let n = 0;
 const check = (ok, msg) => { n++; if (!ok) problems.push(msg); };
@@ -50,6 +51,42 @@ const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h 
   const T = codeOverAreas(1080, 1920);
   check(T.tall && T.code.w === Math.round(1080 * 0.92) && T.code.y + T.code.h <= 1920 * 0.84 + 1 && T.free.y >= T.code.y + T.code.h, '9:16: whole width, the caption lane below the code');
   check(codeOverAreas(W, H, codeOverSettings({ width: 75 })).code.w > A.code.w, 'the width setting widens the code');
+}
+
+// ---------- a long spoken line in the free area (caption fit): whole, never under the code ----------
+// a canvas context that measures a monospace font by its size (0.6 em a character) and records what is written
+function textCtx() {
+  const texts = []; let size = 10;
+  const t = { texts, save() {}, restore() {}, beginPath() {}, moveTo() {}, arcTo() {}, closePath() {}, fill() {}, stroke() {}, arc() {}, translate() {}, scale() {},
+    measureText: s => ({ width: String(s).length * size * 0.6 }), fillText: (s, x, y) => texts.push({ s, x, y, size }) };
+  return new Proxy(t, { set(o, k, v) { if (k === 'font') { const m = /(\d+(?:\.\d+)?)px/.exec(v); if (m) size = +m[1]; } o[k] = v; return true; } });
+}
+{
+  const LONG = 'the tree is still standing where the river used to bend';
+  const w = (s, f) => s.length * f * 0.6;
+  // the rule: one line shrunk to 80%, two lines, then the largest size on three lines, cut only at the minimum
+  const one = fitCaption(w, 'short line', 400, 34);
+  check(one.fs === 34 && one.lines.length === 1 && !one.cut, 'caption fit: a short line as it is');
+  const shrunk = fitCaption(w, 'a line just too long for it', 15 * 34 * 0.6 + 200, 34);
+  check(shrunk.lines.length === 1 && shrunk.fs < 34 && shrunk.fs >= Math.round(34 * 0.8), `caption fit: a line a little too long shrinks on one line (got ${shrunk.fs}px, ${shrunk.lines.length} lines)`);
+  const three = fitCaption(w, LONG, 400, 34);
+  check(!three.cut && three.lines.length <= 3 && three.lines.join(' ') === LONG && three.lines.every(l => w(l, three.fs) <= 400), `caption fit: a long line whole on at most three lines (got ${three.fs}px, ${three.lines.length} lines)`);
+  check(three.fs >= 20, `caption fit: not below 60% (got ${three.fs}px)`);
+  const tooLong = fitCaption(w, `${LONG} ${LONG} ${LONG}`, 300, 34);
+  check(tooLong.cut && tooLong.lines.length === 3 && tooLong.fs === 20 && tooLong.lines[2].endsWith('…') && tooLong.lines.every(l => w(l, 20) <= 300), 'caption fit: cut with … only at the minimum size on three lines');
+  check(fitCaption(w, LONG, 400, 34, { maxH: 34 * 1.2 * 2 }).lines.length <= 2, 'caption fit: the lines stay within the height given');
+  // drawn in the free area of every Code over layout, 16:9 (left, right, whole) and 9:16, neon and hardware
+  const S = captionSettings({}), frame = { rows: [{ kind: 'voice', text: LONG, fade: 1 }], tag: '', history: [] };
+  const cases = [...['left', 'right', 'whole'].map(side => ({ name: `16:9 ${side}`, A: codeOverAreas(1920, 1080, codeOverSettings({ side })), sc: 1, tall: false })),
+    { name: '9:16', A: codeOverAreas(1080, 1920), sc: 1, tall: true }];
+  for (const c of cases) for (const hw of [false, true]) {
+    const g = textCtx(), out = drawCaptions(g, c.A.free, frame, S, { scale: c.sc, tall: c.tall, hw });
+    const b = out[0] || {}, said = g.texts.map(x => x.s).join(' ');
+    check(said.includes(LONG.slice(1)) && !said.includes('…') && !b.cut, `${c.name}${hw ? ' hw' : ''}: the long line drawn whole (got "${said}")`);
+    check(b.lines && b.lines.length <= 3, `${c.name}${hw ? ' hw' : ''}: three lines at most`);
+    check(inside(b, c.A.free) && !overlap(b, c.A.code), `${c.name}${hw ? ' hw' : ''}: the caption box inside the free area, off the code (${JSON.stringify([b.x, b.y, b.w, b.h].map(Math.round))})`);
+    check(g.texts.every(x => x.x >= b.x - 0.5 && x.x + x.s.length * x.size * 0.6 <= b.x + b.w + 0.5), `${c.name}${hw ? ' hw' : ''}: every line inside its box`);
+  }
 }
 
 // ---------- the painter (D3): a recording context ----------

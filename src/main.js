@@ -7,7 +7,7 @@ import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, RENDERS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds, slugAt } from './song/build.js';
-import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml } from './captions/captions.js';
+import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml, fitCaption } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
 import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORDS, narratorStyle } from './song/spoken.js';
@@ -470,7 +470,35 @@ function capsOf(sg) {
   return list;
 }
 const NO_CAPTIONS = Object.freeze({ rows: [], tag: '', history: [] });
-let lastCapHtml = '';
+let lastCapHtml = '', lastCapFit = '';
+// the caption lane's lines fitted in the room it has (the free side of Code over, the stage, a phone): shrunk, then on
+// two or three lines, cut with … only at the smallest size (fitCaption, the same rule as the videos). The room mirrors
+// the CSS: .say's max-width and padding, the lane at the bottom 3% under a whole-width code
+let coLane = { on: false, side: 'left', width: 62 };
+const fitMeasure = document.createElement('canvas').getContext('2d');
+function fitLane(say) {
+  const wrap = say.parentElement, W = wrap.clientWidth, H = wrap.clientHeight, phone = matchMedia('(max-width: 480px)').matches;
+  const co = coLane.on && wrap.classList.contains('co-on');
+  const room = (co && coLane.side !== 'whole' ? W * (100 - coLane.width - 3) / 100 : W - (phone ? 24 : 32)) - 30;
+  const rows = [...say.querySelectorAll('.cap-row')], tag = say.querySelector('.cap-tag');
+  const tall = co && coLane.side === 'whole' ? H * 0.13 : H * 0.45;
+  // (each row may take the height the other rows leave on one line each)
+  const one = rows.map(r => parseFloat(getComputedStyle(r).fontSize) * 1.35), room0 = tall - 12 - (tag ? tag.offsetHeight : 0);
+  rows.forEach((row, i) => {
+    const txt = row.querySelector('.cap-txt'); if (!txt) return;
+    const maxH = Math.max(one[i], room0 - one.reduce((a, h, j) => a + (j === i ? 0 : h), 0));
+    const cs = getComputedStyle(txt), rs = getComputedStyle(row), fs = parseFloat(cs.fontSize), gap = parseFloat(rs.columnGap) || 0;
+    // the speaker beside the text (above it on a phone): icon, label, the hardware light, the step's "> "
+    const above = rs.flexWrap === 'wrap', dot = getComputedStyle(row, '::before').content !== 'none';
+    const head = above ? 0 : [...row.children].filter(c => c !== txt).reduce((a, c) => a + c.getBoundingClientRect().width + gap, 0) + (dot ? fs * 0.3 + gap : 0);
+    const pre = row.dataset.kind === 'step' ? '> ' : '', ls = parseFloat(cs.letterSpacing) / fs || 0;
+    const width = (x, f) => { fitMeasure.font = `${cs.fontStyle} ${cs.fontWeight} ${f}px ${cs.fontFamily}`; return fitMeasure.measureText(pre + x).width + (pre + x).length * ls * f; };
+    const text = txt.textContent, r = fitCaption(width, text, room - head, fs, { maxH, lh: 1.35 });
+    if (r.fs !== fs) txt.style.fontSize = `${r.fs}px`;
+    if (r.lines.length > 1 || r.cut) txt.innerHTML = r.lines.map(esc).join(' <br>');
+    txt.dataset.fit = `${r.fs} ${r.lines.length}${r.cut ? ' cut' : ''}`;
+  });
+}
 // texts off for the next fast video only (Settings → Video, D7); the fragments menu has its own box
 let capsSkipNext = false;
 // a link to the "Testi sul palco" card from an export panel
@@ -2712,7 +2740,10 @@ async function seekTo(bar) {
 globalThis.codingMiskCaptions = {
   lines: () => capsOf(song && song.build ? song : compiled),
   at: (cyc, o = {}) => stageCaptions(cyc, o), settings: () => capS, set: f => { setCaptions(f); if (settingsPage) settingsPage.render(); },
-  seek: bar => seekTo(bar), now: () => (isPlaying() && sched() ? sched().now() : null), slug: x => saySlug(x), reload: () => refreshSamples(), late: () => lateCaps.map(x => ({ at: x.at, text: x.text })), needs: () => prepLines(), helper: () => voiceHelper, pending: () => !!compiled.pending,
+  seek: bar => seekTo(bar), now: () => (isPlaying() && sched() ? sched().now() : null), slug: x => saySlug(x), reload: () => refreshSamples(), late: () => lateCaps.map(x => ({ at: x.at, text: x.text })),
+  // (a line heard from bar `at` for `bars` bars, added to the song playing: a long line for the fit check)
+  addLine: (text, at, bars = 4, kind = 'voice') => { if (song && song.build) lateCaps.push({ build: song.build, at, until: at + bars, kind, code: 'V', text, step: '', typed: false, speaker: '', seconds: null }); },
+  needs: () => prepLines(), helper: () => voiceHelper, pending: () => !!compiled.pending,
   info: cyc => stageInfo(cyc), lane: () => { const el = $('#say'); return { on: el.classList.contains('on'), rows: [...el.querySelectorAll('.cap-row')].map(r => ({ kind: r.dataset.kind, mark: r.dataset.mark, text: r.querySelector('.cap-txt').textContent, icon: !!r.querySelector('.cap-ico'), label: (r.querySelector('.cap-lbl') || {}).textContent || '', italic: r.querySelector('.cap-txt').classList.contains('it'), title: r.title })), tag: (el.querySelector('.cap-tag') || {}).textContent || '' }; },
 };
 let rulerDrag = null;
@@ -4241,6 +4272,7 @@ function syncCodeOver() {
   const mid = S.side === 'right' ? (100 - S.width) / 2 : S.side === 'left' ? (S.width + 100) / 2 : 50;
   w.style.setProperty('--co-say-x', `${mid}%`); w.style.setProperty('--co-say-w', S.side === 'whole' ? 'calc(100% - 32px)' : `${100 - S.width - 3}%`);
   if (say) say.dataset.coSide = S.side;
+  coLane = { on, side: S.side, width: S.width };
   if (!on) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); }
 }
 $('#code-over-btn').addEventListener('click', () => { store.set(CO_KEY, { ...codeOverSettings(store.get(CO_KEY, null)), stage: !codeOverSettings(store.get(CO_KEY, null)).stage }); syncCodeOver(); });
@@ -4926,7 +4958,9 @@ try {
   // draws its own replies (D4); while the user types by hand only the voice track shows (tp7)
   { const sayEl = $('#say'), f = playing && resumeTo === null && song && s ? stageCaptions(s.now(), { hand }) : NO_CAPTIONS;
     const html = look === 'claude' && capS.claude ? '' : captionHtml(f, capS, { label: capLabel, name: capName });
-    if (html && html !== lastCapHtml) { sayEl.innerHTML = html; sayEl.dataset.rows = f.rows.length; }
+    // (fitted again when the stage changes size: full screen, the window, the Code over side or width)
+    const fitKey = html && `${html}|${sayEl.parentElement.clientWidth}x${sayEl.parentElement.clientHeight}|${coLane.on}${coLane.side}${coLane.width}`;
+    if (html && (html !== lastCapHtml || fitKey !== lastCapFit)) { sayEl.innerHTML = html; sayEl.dataset.rows = f.rows.length; fitLane(sayEl); lastCapFit = fitKey; }
     if (html) lastCapHtml = html;
     const where = capS.where === 'top' ? 'top' : 'bottom';
     if (sayEl.dataset.where !== where) sayEl.dataset.where = where;
