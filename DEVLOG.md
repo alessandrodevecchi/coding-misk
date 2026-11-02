@@ -2338,3 +2338,14 @@ Prova del proprietario: «Say now» e «At the right moment» bloccavano tutto p
 - **Controllo:** nuovo `tools/check-say-lag.cjs` (budget 150 ms a CPU 4×): sul codice vecchio fallisce tutti e sei i casi (174-266 ms), sul nuovo passa.
 - **Prove:** `vite build`, `check:voice-heard`, `check:spoken`, `check:phrases`, `check:profiles`, `check:live-code`, `check:typing`, `check:endless`, `check:code`, `check:crescendo` (rapido), `check:knowledge`, `check:guide`, `check-voice-heard.cjs`, `check-steering.cjs` (intero e `--typed`), `check-radio.cjs`, `check-voices-tab.cjs`, `check-say-lag.cjs` passano; `check:radio-profiles` fallisce solo su «Classic sessions rebuild the same items: artist», come su develop.
 - **Limiti:** la creazione del campione (say e ffmpeg nel server di sviluppo) resta: «Say now» aspetta il campione circa un secondo prima di mettere la frase, ma la pagina non si ferma. Non posso ascoltare.
+
+## 2026-11-02 (narratore poetico: una sola regola, spec, #82)
+
+Ramo `docs/82-poetic-narrator`. Solo pianificazione, nessun codice.
+
+- **Problema:** il narratore poetico seguiva tre regole diverse. Senza Crescita raccontata diceva solo le immagini degli ingressi; con Crescita raccontata le immagini, le immagini di movimento e, sulle battute di ingresso, la riga del passo. Il proprietario la trova confusa.
+- **Decisione del proprietario (2 novembre):** il narratore poetico parla esattamente quando parlerebbe quello che spiega (i passi con `say`), con o senza Crescita raccontata. Crescita raccontata decide solo quanti passi parlano, per entrambi gli stili. Su un ingresso dice solo l'immagine (tempi di oggi); su un passo con `say` senza ingresso dice un'immagine di movimento; la riga del passo mai, salvo come ripiego quando manca l'immagine (lista vuota o testo assente nella lingua).
+- **Spec** in `openspec/changes/poetic-narrator/`: ogni ingresso tiene la sua immagine anche senza `say` (nulla di ciò che dice oggi si perde), restano il limite di una frase per battuta e la precedenza della voce traccia; le immagini di movimento contate sui passi che le dicono; didascalie invariate (immagine come didascalia, riga del passo come etichetta).
+- **Misura (Crescendo, inglese, campioni supposti presenti):** luci-rosse senza Crescita raccontata passa da 7 a 15 frasi (come lo stile che spiega), con Crescita raccontata da 38 a 32 (spariscono 6 righe del passo sulle battute di ingresso). Kellerlicht 10 → 21 e 50 → 41, settimo-cielo 7 → 19 e 44 → 38.
+- **Versioni:** `CRESCENDO_VERSION`, `SHAPES_VERSION` e `DIRECTOR_VERSION` restano (passi, crescita e brani del regista non cambiano). Le sessioni radio salvate con il narratore poetico suoneranno diverse (più frasi): domanda aperta al proprietario se basta una nota o se alzare `DIRECTOR_VERSION`.
+- **Stima:** 3-4 ore agente.
