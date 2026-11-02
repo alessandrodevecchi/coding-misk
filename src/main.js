@@ -1568,7 +1568,9 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
 }
 // a fast export keeps going in a background tab, but the browser may slow it down: say so once per export
 document.addEventListener('visibilitychange', () => { if (document.hidden && fastJob && !fastJob.warned) { fastJob.warned = true; toast(t('exportHidden')); } });
-globalThis.codingMiskExport = { encode, get job() { return fastJob ? { id: fastJob.id, progress: fastJob.progress, phase: fastJob.phase } : null; } };
+// the visuals the last fast video drew, for the checks (#57)
+const exportLooks = new Set();
+globalThis.codingMiskExport = { encode, get looks() { return [...exportLooks]; }, get job() { return fastJob ? { id: fastJob.id, progress: fastJob.progress, phase: fastJob.phase } : null; } };
 // one Export and one Record for audio and video (#27): the switch is the small display next to the button
 const outKind = () => outKindOf(store.get(OUT_KEY, 'audio'));
 const outLabel = () => outText(outKind(), exportFormat(), (store.get('coding-misk-video', {}) || {}).quality || VIDEO_DEFAULTS.quality, mp3Rate());
@@ -1740,7 +1742,9 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   // widget look or the layer can show in this video (the ones the code widgets rendered are not rendered again);
   // Automatic adds no render
   const SWS = stageWidgets(), waves = cw ? cw.waves : {};
-  const mayShow = (frag && (frag.o.look === 'random' || WIDGET_LOOKS.includes(frag.o.look))) || o.soul !== 'full' && (o.visual === 'song-cycle' || o.visual === 'section-cycle' || WIDGET_LOOKS.includes(String(o.visual).replace('fixed:', '')) || WIDGET_LOOKS.includes(own));
+  exportLooks.clear();
+  const stageLook = look; // the stage's visual when the export starts (#57)
+  const mayShow = (frag && (frag.o.look === 'random' || WIDGET_LOOKS.includes(frag.o.look))) || o.soul !== 'full' && (o.visual === 'song-cycle' || o.visual === 'section-cycle' || WIDGET_LOOKS.includes(String(o.visual === 'stage' ? stageLook : o.visual).replace('fixed:', '')) || WIDGET_LOOKS.includes(own));
   if (o.realScope === 'always' && (mayShow || SWS.sw.layer !== 'off')) {
     const more = stageScopeInstruments(segments, SWS.S, sg.id || '').filter(i => !waves[i]);
     if (more.length) {
@@ -1780,8 +1784,8 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       };
       // code-over-visual: the line typed (D5), the code evaluated and the places of the haps sounding (D6)
       if (overOn) { Object.assign(fv, { cursor: codeAt.cursor ? codeAt.cursor(cyc) : null, lit: litAt(cyc), doc: sg.doc, render: fRender, overFree: frag && fsz.comp.h >= fsz.comp.w ? 'none' : (frag ? 'right' : (S => (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right'))(coSettings())) }); }
-      const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
-      fv.look = fLook;
+      const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own, stage: stageLook });
+      fv.look = fLook; exportLooks.add(fLook);
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
       visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off', density: renderDensity() });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
@@ -2447,6 +2451,8 @@ function renderSectionPanel(total) {
   $('#sc-crash').checked = !!sc.crash; $('#sc-breath').checked = !!sc.breath; $('#sc-fill').checked = !!sc.fill;
   $('#sc-left').disabled = sel === 0; $('#sc-right').disabled = sel === T.sections.length - 1; $('#sc-del').disabled = T.sections.length === 1;
   $('#dirty').textContent = dirty ? t('unsaved') : '';
+  // the fragments menu of the song open here (#57): only for a song in the library, as on its card
+  const fragB = $('#tr-frag'); fragB.dataset.frag = T.id; fragB.hidden = !(isBuiltin(T.id) || user.tracks.some(u => u.id === T.id));
   const builtin = isBuiltin(T.id), overridden = user.tracks.some(u => u.id === T.id);
   // a built-in song: ↺ Original song (notes, tracks and configuration, its trial too); one of the user's: Delete song.
   // Disabled (aria-disabled, so the tooltip still shows) when the song itself is as written: a configuration trial

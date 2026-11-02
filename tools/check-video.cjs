@@ -136,10 +136,44 @@ const probe = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'err
     if (SHOTS) execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '12', '-i', f6, '-frames:v', '1', path.join(SHOTS, 'fast-video.png')]);
   } else check(false, 'fast video saved', downloads.slice(nf).map(d => d.suggestedFilename()).join(', '));
   check(!(await page.evaluate(() => globalThis.codingMiskVideo.on)), 'the live stage is back after the fast video');
+  check(JSON.stringify(await page.evaluate(() => globalThis.codingMiskExport.looks)) === '["pixel"]', 'fast video: a fixed visual draws that visual', await page.evaluate(() => globalThis.codingMiskExport.looks.join()));
+  // "Same as the stage" (#57): the default, and a fast video draws the visual picked on the stage when it starts
+  await page.evaluate(() => { localStorage.setItem('coding-misk-video', JSON.stringify({ layout: 'visual', quality: '720p30', card: 'off', soulPanel: true, soul: 'off' })); });
+  await page.reload(); await sleep(3000);
+  await page.click('[data-mode="ascolta"]'); await sleep(300);
+  const stageLooks = await page.evaluate(() => [...document.querySelector('#looks').options].filter(o => !o.disabled).map(o => o.value));
+  const wantLook = stageLooks.filter(k => k !== 'pixel').pop(); // not the one the fixed visual used above
+  await page.selectOption('#looks', wantLook); await sleep(500);
+  await page.click('[data-tab="brani"]'); await sleep(400);
+  const nf2 = downloads.length, tf2 = Date.now();
+  await page.click(`${card.replace('kellerlicht', 'dci-carica')} [data-act="export"]`); await sleep(1500);
+  while (Date.now() - tf2 < 300000 && await page.evaluate(() => globalThis.codingMiskExport.job)) await sleep(400);
+  await sleep(1500);
+  check(downloads.length > nf2, 'fast video with the default visual saved');
+  const lk = await page.evaluate(() => globalThis.codingMiskExport.looks);
+  check(lk.length === 1 && lk[0] === wantLook, 'fast video: "Same as the stage" draws the stage\'s visual', `${lk.join()} (stage ${wantLook})`);
   // the gear beside the radio's Export opens Settings → Video
   await page.click('[data-tab="radio"]'); await sleep(300);
   await page.click('#radio-video-set'); await sleep(700);
   check(await page.isVisible('#set-video') && await page.isVisible('#set-video select[data-vid-opt="visual"]'), 'the radio gear opens the video direction in the settings');
+
+  // Settings → Video → Visual: "Same as the stage" is the default, and a saved value is kept (#57)
+  await page.evaluate(() => { localStorage.setItem('coding-misk-video', JSON.stringify({ visual: 'song-cycle' })); });
+  await page.reload(); await sleep(3000);
+  await page.click('#open-settings'); await sleep(700);
+  check(await page.inputValue('select[data-vid-opt="visual"]') === 'song-cycle', 'Settings: a saved Visual value is kept');
+  await page.evaluate(() => { localStorage.removeItem('coding-misk-video'); });
+  await page.reload(); await sleep(3000);
+  await page.click('#open-settings'); await sleep(700);
+  const vopts = await page.evaluate(() => { const e = document.querySelector('select[data-vid-opt="visual"]'); return { v: e.value, first: e.options[0].value, text: e.options[0].textContent }; });
+  check(vopts.v === 'stage' && vopts.first === 'stage' && /stage|palco/i.test(vopts.text), 'Settings: the video Visual is "Same as the stage" by default', JSON.stringify(vopts));
+  if (SHOTS) { await page.locator('select[data-vid-opt="visual"]').scrollIntoViewIfNeeded(); await page.screenshot({ path: path.join(SHOTS, 'settings-visual.png') }); }
+  // Compose: the Fragments button beside Export opens the fragments menu of the song open there
+  await page.click('[data-tab="componi"]'); await sleep(600);
+  check(await page.isVisible('#tr-frag'), 'Compose: the Fragments button shows for a song in the library');
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'compose-fragments.png') });
+  await page.click('#tr-frag'); await sleep(700);
+  check(await page.isVisible('.frag-menu'), 'Compose: the Fragments button opens the fragments menu');
 
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
