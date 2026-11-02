@@ -2361,3 +2361,11 @@ Prova del proprietario del 2 novembre: «molto meglio ora, ma ancora un po' di l
 - **Controllo:** `tools/check-say-lag.cjs` ora con frasi nuove a ogni corsa, Annulla del messaggio salvato, budget 100 ms, la pagina senza frasi per confronto, il tempo di «Dilla ora» (almeno 2 s, non più di una battuta oltre senza slittamenti), coda e Prossimi cambi con la battuta della frase; `--cpu-profile` salva anche i task lunghi di ogni misura.
 - **Prove:** `vite build`, `check:spoken`, `check:voice-heard`, `check:phrases`, `check:guide`, `check:knowledge`, `check:endless`, `check-say-lag.cjs` (4× due volte, 1×), `check-voice-heard.cjs`, `check-voices-tab.cjs` (una corsa su quattro ha trovato 0 schede voce dopo Annulla, le altre tre passano), `check-steering.cjs` (intero e `--typed`), `check-radio.cjs` passano.
 - **Limiti:** il passaggio al brano dopo scrive ancora il piano del nuovo brano in onda in un blocco (non legato alle frasi). Non posso ascoltare.
+
+## 2026-11-02 (visual dell'export «Come il palco» e Frammenti in Compose, #57)
+
+Due ritocchi piccoli all'interfaccia.
+
+- **Impostazioni, Video, Visual:** nuovo valore `stage` («Come il palco» / "Same as the stage"), ora il predefinito (come «Render»). Il video veloce (brano, radio, sessioni) usa il visual scelto sul palco (`look`) nel momento in cui parte l'export: `lookFor` in `src/video/layout.js` lo legge da `at.stage`, `main.js` lo fissa all'inizio dell'export. Chi ha già salvato un altro valore lo tiene. Testo di aiuto aggiornato in italiano e inglese. I frammenti hanno già il loro menu «Visual» (`frag.o.look`) e non leggono questa opzione.
+- **Compose:** il pulsante «✂ Frammenti» (`#tr-frag`) accanto a «Esporta» apre lo stesso menu dei frammenti per il brano aperto; si vede solo per un brano della libreria (non per uno nuovo mai salvato), come sulla card. Scheda Guida dei frammenti aggiornata (EN e IT).
+- **Controlli:** `tools/check-video.mjs` (default `stage`, `lookFor`), `tools/check-video.cjs` (valore salvato mantenuto, default nel menu, video veloce con visual fisso e con «Come il palco» letti da `codingMiskExport.looks`, pulsante in Compose che apre il menu).

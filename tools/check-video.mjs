@@ -1,7 +1,7 @@
 // Checks for the session video (#27): layout areas fill the frame without overlap, the soul panel keeps the soul
 // screen's proportions, the recording format falls back to WebM, the title card modes. No browser.
 //   npm run check:video      exit 1 when any check fails
-import { LAYOUTS, QUALITIES, CARDS, CARD_SECONDS, layoutAreas, pickMime, extOf, cardAlpha, fileName, lookFor } from '../src/video/layout.js';
+import { LAYOUTS, QUALITIES, CARDS, CARD_SECONDS, layoutAreas, pickMime, extOf, cardAlpha, fileName, lookFor, VIDEO_DEFAULTS, VISUALS } from '../src/video/layout.js';
 import { levelsFrom, codeFrom, sayFrom } from '../src/video/feed.js';
 import { widgetLines, linesByKey, instrumentOfLine, widgetPlan, lineKey } from '../src/video/widget-frames.js';
 
@@ -65,6 +65,8 @@ const CHECKS = {
   'direction: the look of each part (#53)'() {
     const L = ['palco', 'pixel', 'studio'];
     assert(lookFor({ visual: 'song' }, L, { n: 2, own: 'pixel' }) === 'pixel' && lookFor({ visual: 'song' }, L, { own: 'nope' }) === 'palco', 'own look');
+    assert(lookFor({ visual: 'stage' }, L, { stage: 'pixel', own: 'studio' }) === 'pixel' && lookFor({}, L, { stage: 'studio' }) === 'studio' && lookFor({ visual: 'stage' }, L, { stage: 'nope', own: 'studio' }) === 'studio', 'the stage look');
+    assert(VIDEO_DEFAULTS.visual === 'stage' && VISUALS[0] === 'stage', 'Same as the stage is the default (#57)');
     assert(lookFor({ visual: 'fixed:studio' }, L, { n: 3 }) === 'studio', 'fixed');
     assert(lookFor({ visual: 'song-cycle' }, L, { n: 1 }) === 'palco' && lookFor({ visual: 'song-cycle' }, L, { n: 5 }) === 'pixel', 'a new one every song');
     assert(lookFor({ visual: 'section-cycle' }, L, { section: 2 }) === 'studio', 'every section');
