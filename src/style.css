@@ -1825,6 +1825,7 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .ph-st.none { color: var(--danger); }
 .ph-over { color: var(--danger); }
 .ph-form, .ph-confirm, .vt-bench, .vt-orphans { margin: 10px 0 14px; padding: 12px; }
+.ph-item > .ph-confirm { grid-column: 1 / -1; grid-row: 3; margin: 8px 0 2px; }
 .ph-form h3 { margin: 0 0 8px; }
 .ph-form .ctrl, .vt-bench .ctrl { display: flex; flex-direction: column; gap: 3px; }
 .ph-form input[type="text"], .vt-bench input[type="text"] { width: 100%; min-width: 0; }

@@ -98,7 +98,7 @@ import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
 import { createVoicesTab } from './voices/voices-tab.js';
-import { narratorPick, vocabGroupOf } from './voices/mine.js';
+import { narratorPick } from './voices/mine.js';
 import { setNarratorMine } from './song/build.js';
 import { PHRASES_MOMENT } from './voices/moments.js';
 import { builtinKeys, mineKeys, songKeys, sizeText } from './voices/samples.js';
@@ -3162,14 +3162,11 @@ function narratorOffer(st, text) {
   const tag = poetic ? (tr ? tr.type : 'move') : tr ? PHRASES_MOMENT[tr.type] || 'code' : st.at === 0 ? 'start' : st.remove !== undefined ? ([].concat(st.remove).length > 1 ? 'breakdown' : 'less') : null;
   return { text, lang: getLang(), kind: poetic ? 'poetic' : 'explain', tag: tag === 'spoken' ? null : tag, styles: [], source: 'narrator', from: { song: T.title || T.id } };
 }
-// a line typed in the radio console as a phrase (D2): kind voice, the vocabulary group of the song's style, the style
+// a line typed in the radio console as a phrase (D2): kind voice, any mood (changed later in Voices), the style
 function typedInput(text, lang, sg) {
   const styles = ((sg && sg.tags && sg.tags.styles) || []).slice(0, 3);
-  const tag = styles.map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null;
-  return { text, lang, kind: 'voice', tag, styles: styles.slice(0, 1), source: 'radio', from: { song: (sg && sg.title) || '', ...(styles[0] ? { style: styles[0] } : {}) } };
+  return { text, lang, kind: 'voice', tag: null, styles: styles.slice(0, 1), source: 'radio', from: { song: (sg && sg.title) || '', ...(styles[0] ? { style: styles[0] } : {}) } };
 }
-// the vocabulary group of the song's voice track (its "vocab:" line, else its style's)
-const songVocab = () => { const sp = songSpoken(), own = sp && Object.values(sp.patterns || {}).map(p => (typeof p.text === 'string' && p.text.startsWith('vocab:') ? p.text.slice(6) : Array.isArray(p.text) ? vocabGroupOf(p.text) : null)).find(Boolean); return own || ((T.tags && T.tags.styles) || []).map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null; };
 const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
   const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
@@ -3383,7 +3380,7 @@ function phraseListEvent(e) {
     const r = editText(T, id, raw, getLang(), el.value);
     if (r.error) { toast(r.error === 'words' ? t('plTooMany', { n: r.n, max: MAX_WORDS }) : t('plEmptyText')); forceVoices(); return true; }
     const tr = T.tracks.find(x => x.id === id), c = tr && tr.clips[raw], n = c ? tr.clips.filter(x => x.pattern === c.pattern).length : 1;
-    phraseEdit(r.song, n > 1 ? t('plTextShared', { n }) : t('plTextChanged'), { text: el.value, lang: getLang(), kind: 'voice', tag: songVocab(), styles: (T.tags && T.tags.styles) || [], source: 'compose', from: { song: T.title || T.id } }); return true;
+    phraseEdit(r.song, n > 1 ? t('plTextShared', { n }) : t('plTextChanged'), { text: el.value, lang: getLang(), kind: 'voice', tag: null, styles: (T.tags && T.tags.styles) || [], source: 'compose', from: { song: T.title || T.id } }); return true;
   }
   if (el.matches('[data-pl-start]') || el.matches('[data-pl-bars]')) {
     const v = Math.round(+el.value);

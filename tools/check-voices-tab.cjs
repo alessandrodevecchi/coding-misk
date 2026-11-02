@@ -59,7 +59,7 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await radioOn(page, 'my-phrases-1');
   await say(page, 'le torri non dormono mai');
   let list = await items(page), t1 = await toastText(page);
-  check(list.length === 1 && list[0].kind === 'voice' && list[0].source === 'radio' && list[0].tag === 'calm' && list[0].styles.join() === 'ambient', 'Salva sempre (default): a typed line is saved as kind voice, the style\'s vocabulary group and the style', JSON.stringify(list));
+  check(list.length === 1 && list[0].kind === 'voice' && list[0].source === 'radio' && !list[0].tag && list[0].styles.join() === 'ambient', 'Salva sempre (default): a typed line is saved as kind voice, any mood and the style', JSON.stringify(list));
   check(/Salvata nelle tue frasi/.test(t1) && /Annulla/.test(t1), 'the toast says it with Annulla', t1);
   await tap(page, '.toast .toast-act'); await sleep(200);
   check(!(await items(page)).length, 'Annulla removes the phrase');
@@ -149,6 +149,7 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   // delete "fermi tutti": its own file goes, Undo brings the phrase back
   await tap(page, `[data-ph-del="${fermi.id}"]`); await sleep(1500);
   check(/1 file/.test(await page.textContent('.ph-confirm')), 'the confirmation counts its own file');
+  check(await page.$eval('.ph-confirm', (el, id) => !!el.closest(`[data-ph-id="${id}"]`), fermi.id), 'a second delete asks inside the row of that phrase, where the click was');
   await tap(page, '[data-ph-confirm-yes]'); await sleep(1200);
   check(!fs.existsSync(path.join(SAMPLES, 'say_it', 'fermi_tutti.wav')), 'its sample is deleted');
   await tap(page, '.toast .toast-act'); await sleep(400);
