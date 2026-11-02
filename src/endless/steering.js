@@ -102,12 +102,13 @@ export function keyTo(cur, to) {
 }
 
 // The bar where a command applies, given the bar now: the next phrase, the next double phrase for structural
-// commands, the next bar for the mixer. Never past the song's last phrase.
-export function applyBar(kind, now, plan) {
+// commands, the next bar for the mixer. Never past the song's last phrase. lead: the bars a typed line leaves at least
+// before its bar (half a bar; the radio's Say now gives the bars of SAY_LEAD seconds, #82)
+export function applyBar(kind, now, plan, lead = 0.5) {
   const ph = plan.phrase, dbl = 2 * ph, last = plan.bars - ph;
   // (a typed line said now: the first bar that starts at least half a bar after the sample is ready, so its step is not
   // already past when the command lands, after-tests-oct28 D4)
-  if (kind === 'say-live') return Math.min(plan.bars - 1, Math.ceil(now + 0.5));
+  if (kind === 'say-live') return Math.min(plan.bars - 1, Math.ceil(now + Math.max(0.5, lead)));
   if (COMMANDS[kind] && COMMANDS[kind].bar) return Math.min(plan.bars - 1, Math.floor(now) + 1);
   const step = COMMANDS[kind] && COMMANDS[kind].structural ? dbl : ph;
   return Math.min(last, (Math.floor(now / step) + 1) * step);
