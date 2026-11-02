@@ -2369,3 +2369,13 @@ Due ritocchi piccoli all'interfaccia.
 - **Impostazioni, Video, Visual:** nuovo valore `stage` («Come il palco» / "Same as the stage"), ora il predefinito (come «Render»). Il video veloce (brano, radio, sessioni) usa il visual scelto sul palco (`look`) nel momento in cui parte l'export: `lookFor` in `src/video/layout.js` lo legge da `at.stage`, `main.js` lo fissa all'inizio dell'export. Chi ha già salvato un altro valore lo tiene. Testo di aiuto aggiornato in italiano e inglese. I frammenti hanno già il loro menu «Visual» (`frag.o.look`) e non leggono questa opzione.
 - **Compose:** il pulsante «✂ Frammenti» (`#tr-frag`) accanto a «Esporta» apre lo stesso menu dei frammenti per il brano aperto; si vede solo per un brano della libreria (non per uno nuovo mai salvato), come sulla card. Scheda Guida dei frammenti aggiornata (EN e IT).
 - **Controlli:** `tools/check-video.mjs` (default `stage`, `lookFor`), `tools/check-video.cjs` (valore salvato mantenuto, default nel menu, video veloce con visual fisso e con «Come il palco» letti da `codingMiskExport.looks`, pulsante in Compose che apre il menu).
+
+## 2026-11-02 (specifica: frasi che può dire qualsiasi voce, #82)
+
+Solo specifica OpenSpec `phrase-any-voice`, nessun codice toccato. Decisione del proprietario: in Voci, Le mie frasi, «Chi la dice» ottiene una quarta opzione «Qualsiasi» (`any`).
+
+- **Scelta:** `candidates()` tiene anche `p.kind === 'any'`; le altre regole (acceso, lingua, stili, quota, estrazione col seme) non cambiano.
+- **Tag:** una frase Qualsiasi non ha tag, vale per ogni tag; il selettore è nascosto e passare a Qualsiasi lo azzera.
+- **Doppioni:** passare a Qualsiasi con stesso testo e lingua già presenti unisce in una frase (usi sommati, id più vecchio, stili uniti); salvare un testo già Qualsiasi lo riusa.
+- **Campioni:** un file dipende da testo e voce; con voci diverse tra narratore e traccia voce la frase si genera una volta per voce, in automatico; elimina e liste d'uso contano tutte le voci.
+- **Resto:** vocabolari inclusi invariati, predefinito voice senza tag, nessuna migrazione. Stima: circa 1 ora agente. Domanda aperta: l'unione perde l'umore (consigliato accettare, con Annulla).
