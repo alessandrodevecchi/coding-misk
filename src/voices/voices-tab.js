@@ -99,7 +99,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     return `<div class="ph-item${p.on === false ? ' off' : ''}" data-ph-id="${esc(p.id)}">
       <div class="ph-acts"><button class="mini" data-ph-hear="${esc(p.id)}" title="${esc(t('phHear'))}" aria-label="${esc(t('phHear'))}">${LISTEN}</button><button class="mini" data-ph-edit="${esc(p.id)}" title="${esc(t('phEdit'))}" aria-label="${esc(t('phEdit'))}">${PENCIL}</button><button class="mini" data-ph-del="${esc(p.id)}" title="${esc(t('phDelete'))}" aria-label="${esc(t('phDelete'))}">${BIN}</button></div>
       <div class="ph-main">${ico(KIND_ICON[p.kind], kindLabel(p.kind))}<span class="ph-text">${esc(main)}</span>${alt ? `<span class="ph-alt muted small">${esc(alt)}</span>` : ''}</div>
-      <div class="ph-meta muted small"><span>${esc(src)}</span><span>${esc(t('phUses', { n: p.uses || 0 }))}</span><span class="ph-st ${st}"><span class="ph-led" aria-hidden="true"></span>${esc(t(`phSt:${st}`))}</span>${p.on === false ? `<span>${esc(t('phOffShort'))}</span>` : ''}</div>
+      ${ui.confirm && ui.confirm.id === p.id ? confirmHtml() : ''}<div class="ph-meta muted small"><span>${esc(src)}</span><span>${esc(t('phUses', { n: p.uses || 0 }))}</span><span class="ph-st ${st}"><span class="ph-led" aria-hidden="true"></span>${esc(t(`phSt:${st}`))}</span>${p.on === false ? `<span>${esc(t('phOffShort'))}</span>` : ''}</div>
     </div>`;
   }
   function mineHtml() {
@@ -113,7 +113,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
       <div class="chips ph-kinds">${kinds}</div>
       <div class="ph-share-row"><span class="lbl">${esc(t('phShareLbl'))}</span>${seg}<span class="hint muted small">${esc(t(`phShareHint:${share}`))}</span></div>
       ${over.length ? `<p class="hint ph-over">${esc(t('phOverCap', { n: over.length }))} <button class="btn small" data-ph-trim>${esc(t('phTrim', { n: over.length }))}</button></p>` : ''}
-      ${ui.confirm ? confirmHtml() : ''}${ui.form ? formHtml() : ''}
+      ${ui.confirm && !ui.confirm.id ? confirmHtml() : ''}${ui.form ? formHtml() : ''}
       ${groups || `<p class="muted ph-empty">${esc(t(all.length ? 'phNoMatch' : 'phEmpty'))}</p>`}`;
   }
 
@@ -233,7 +233,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     const u = await usage(true), k = keys(id), pf = u ? phraseFiles(p, u.banks, k) : { files: [], kept: [] };
     const songsWith = library().filter(s => JSON.stringify(s).includes(JSON.stringify(p.text).slice(1, -1))).length;
     const size = pf.files.reduce((a, x) => a + x.b, 0);
-    ui.confirm = { msg: t('phDeleteAsk', { text: p.text, n: pf.files.length, size: sizeText(size), songs: songsWith }), yes: t('phDelete'), run: async () => {
+    ui.confirm = { id, msg: t('phDeleteAsk', { text: p.text, n: pf.files.length, size: sizeText(size), songs: songsWith }), yes: t('phDelete'), run: async () => {
       const r = phr.remove(id);
       if (pf.files.length && helper()) {
         try { await fetch('/voice/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files: pf.files.map(x => x.rel), protect: [...k.builtin, ...k.mine, ...k.songs] }) }); } catch (e) { /* the files stay */ }
@@ -243,6 +243,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
       toast(t('phDeleted', { text: p.text }), [{ label: t('vinstUndo'), run: () => { phr.restore(r.removed, r.at); prepare(r.removed); } }]);
     } };
     ui.form = null; render();
+    const c = root.querySelector('.ph-confirm'); if (c) c.scrollIntoView({ block: 'nearest' });
   }
   function openForm(id = null) {
     const p = id ? phr.items.find(x => x.id === id) : null, lang = getLang();
