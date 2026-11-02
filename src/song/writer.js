@@ -183,7 +183,10 @@ function voiceCall(cs, ctx, used) {
   // (a line of several entries starts with n(…) and names its bank in the next call, voice-track-tuning D7)
   const head = cs[0].text.match(/s\("say_[a-z]+(?:_(\w+))?"\)/) || (/\bn\(/.test(cs[0].text) && cs[1] && cs[1].text.match(/^\s*\.s\("say_[a-z]+(?:_(\w+))?"\)/));
   if (!head) return;
-  const at = cs.findIndex(c => c.name === 'mask'), end = cs.findIndex(c => c.name === 'orbit');
+  // (the function stops before a Kabelsalat call, .K(…) from the Ring device: Strudel rewrites it only in code it
+  // transpiles, and a function is built with new Function, so it stays on the line, #82)
+  const at = cs.findIndex(c => c.name === 'mask'), orbit = cs.findIndex(c => c.name === 'orbit'), kab = cs.findIndex((c, i) => i > at && c.name === 'K');
+  const end = at >= 0 && kab >= 0 && (orbit < 0 || kab < orbit) ? kab : orbit;
   if (at < 0 || end < 0 || end - at < 2) return;
   const chain = cs.slice(at + 1, end).map(c => c.text).join('');
   let name = ctx.voices.get(chain);
