@@ -239,8 +239,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   const songOut = item => (item && item.song && item.song.onAir ? { ...(item.plain || item.song), profile: item.song.onAir.profile } : item && item.song);
   // the window and its songs, each with its own controls (radio-profiles D7, D8): the song on air in its profile's view,
   // the next one shown (Classic, as before) or hidden (a grown song) as the incoming option says
-  function windowPlayable() {
-    const items = S.stream.slice(S.onAir, S.onAir + 2);
+  // over: { item, song } the window with that song on that item, without changing it (a typed line tried first, #82)
+  function windowPlayable(over = null) {
+    const items = S.stream.slice(S.onAir, S.onAir + 2).map(x => (over && x === over.item ? { ...x, song: over.song } : x));
     const W = windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut })));
     return player.makePlayable(W, items.map((x, i) => ({ n: x.n + 1, prefix: `s${x.n + 1}-`, start: x.start, song: x.song, title: x.song.title, profile: profileOf(x), custom: !!x.custom || !!displayOn(x), ctl: liveControlsOf(x), show: i === 0 ? 'air' : showOf(x) })));
   }
@@ -249,21 +250,27 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // on air when ready, or at the latest a third of a bar before the bar `by` (in the window's bars: the first bar the
   // change is heard; without one, the first step at least a bar ahead), and the plan is then finished at once, as before.
   // The steps before it change nothing the new window changes. Another window handed to the player meanwhile (a swap,
-  // a skip, a start) wins, and this one is dropped.
-  let windowSeq = 0;
+  // a skip, a start) wins, and this one is dropped; so does a window still waiting for its plan when a newer one comes
+  // here (the newer one holds every change, and keeps the earlier of the two bars).
+  let windowSeq = 0, soon = null;
   for (const k of ['swap', 'jump', 'start', 'resumeAt', 'stop']) if (typeof player[k] === 'function') { const f = player[k]; player[k] = (...a) => { windowSeq++; return f.apply(player, a); }; }
   function swapSoon(p, by = Infinity) {
-    if (!p.prepare) { player.swap(p); return; }
+    if (!p.prepare) { if (soon) soon.done = true; soon = null; player.swap(p); return; }
     const seq = windowSeq, mine = S, now = player.now();
-    const next = Number.isFinite(by) ? by : Math.min(...buildSteps(p.build).map(x => x.at).filter(b => b >= now + 1));
-    let done = false;
-    const go = () => { if (done) return; done = true; if (windowSeq === seq && S === mine && S && S.paused === undefined) player.swap(p); };
-    const watch = () => { if (done) return; if (windowSeq !== seq || S !== mine) { done = true; return; } if (player.now() >= next - 0.34) go(); else setTimeout(watch, 30); };
-    p.prepare().then(go, go);
+    let next = Number.isFinite(by) ? by : Math.min(...buildSteps(p.build).map(x => x.at).filter(b => b >= now + 1));
+    if (soon && !soon.done) { if (soon.seq === seq && soon.S === mine) next = Math.min(next, soon.next); soon.done = true; }
+    const me = soon = { seq, S: mine, next, done: false };
+    const go = () => { if (me.done) return; me.done = true; if (soon === me) soon = null; if (windowSeq === seq && S === mine && S && S.paused === undefined) player.swap(p); };
+    const watch = () => { if (me.done) return; if (windowSeq !== seq || S !== mine) { me.done = true; return; } if (player.now() >= next - 0.34) go(); else setTimeout(watch, 30); };
+    p.prepare(12, () => !me.done && windowSeq === seq && S === mine).then(go, go);
     watch();
   }
+  // the bar a typed line goes on in a song (its clip), or null
+  const lineBarOf = (song, c) => { const sp = song && song.tracks.find(x => x.type === 'spoken'); if (!sp) return null; const k = Object.keys(sp.patterns || {}).find(q => sp.patterns[q].typed && sp.patterns[q].text && sp.patterns[q].text[c.lang] === c.text); const cl = k ? (sp.clips || []).find(x => x.pattern === k) : null; return cl ? cl.start : null; };
+  // the bar a command is heard from: a typed line's own bar (At the right moment puts it on a later free part)
+  const heardAt = (item, c) => (c.kind === 'say-live' ? lineBarOf(item.song, c) ?? c.at : c.at);
   // the first bar (in the window's bars) a pending command of the song on air changes, or Infinity
-  const pendingBy = item => { const rel = relNow(), bars = item.commands.filter(c => c.at > rel).map(c => c.at); return bars.length ? item.start + Math.min(...bars) : Infinity; };
+  const pendingBy = item => { const rel = relNow(), bars = item.commands.map(c => heardAt(item, c)).filter(b => b > rel); return bars.length ? item.start + Math.min(...bars) : Infinity; };
   // the display controls set while the session plays (radio-profiles 9.1): those changed during a song (x.display, on
   // the song on air and the songs already prepared) and, in a replay, the console's Custom ones when it started
   // (S.display). They change only how the code looks, so they are never recorded
@@ -412,7 +419,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const mine = S;
     idle(() => {
       if (S !== mine) return;
-      const it = generate(true), ready = () => { if (S !== mine) return; S.pending = false; player.swap(windowPlayable()); render(); };
+      // (the window with the next song made ready a little at a time: the song on air's plan is made again, #82)
+      const it = generate(true), ready = () => { if (S !== mine) return; S.pending = false; const nx = S.stream[S.onAir + 1]; swapSoon(windowPlayable(), nx ? nx.start : Infinity); render(); };
       if (it && it.growing) it.growing.then(ready); else ready();
     });
   }
@@ -515,7 +523,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   const secs = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
   let cmdN = 0;
   // queues a command on the song on air: rewrites it from the command's bar and swaps the window
-  function command(c) {
+  // pre (a typed line, #82): { at, song, steer, p } its bar, the song on air with it (grown on air) or the steering's
+  // result (Classic), and the window with it, already made ready: the line was tried before it was queued
+  function command(c, pre = null) {
     if (!S || S.paused !== undefined) return false;
     const item = S.stream[S.onAir], rel = relNow();
     if (!item.plan) { toast(t(item.frozen ? 'steerWhy:frozen' : 'steerWhy:lead')); return false; }
@@ -524,11 +534,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const air = airSteer(item) && item.g0, off = air ? airOffset(item.g0) : 0;
     let at;
     if (air) {
-      const cands = airBoundaries(c.kind, rel, item.plan, item.g0);
+      const cands = pre ? [pre.at] : airBoundaries(c.kind, rel, item.plan, item.g0);
       if (!cands.length || (c.kind === 'extend' && whyNot(c, item.plain || item.base.song, item.plan, rel - off, tailOf(item)))) { toast(t('steerLate')); return false; }
       at = cands[0];
     } else {
-      at = applyBar(c.kind, rel, item.plan);
+      at = pre ? pre.at : applyBar(c.kind, rel, item.plan);
       if (at <= rel || at >= barsOf(item.song) || (c.kind === 'extend' && whyNot(c, item.song, item.plan, rel, tailOf(item)))) { toast(t('steerLate')); return false; }
     }
     const cmd = { ...c, at, id: ++cmdN, ...(air ? { at0: at, q: Math.round(rel * 100) / 100, pend: true } : {}) };
@@ -547,10 +557,12 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // a typed line on a grown song goes on the song on air at once, on its bar, as steerOnAir puts it after the other
     // commands: the steering away from the page can answer after that bar (it may wait behind the growth of the next
     // song), and a line whose step reached the player late was never heard (fx3). The answer gives the same line
-    if (air && c.kind === 'say-live') { setSong(item, sayAir(item.song, [{ at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' }])); item.said = item.song; }
+    if (air && c.kind === 'say-live') { setSong(item, pre ? pre.song : sayAir(item.song, [{ at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' }])); item.said = item.song; }
     // (the answer swaps the window only when it changed the song: a typed line's answer is the song already playing)
     const swapped = item.song;
-    resteer(item, { async: true, then: () => { keepHistory(item); if (item.song !== swapped) swapSoon(windowPlayable(), pendingBy(item)); renderNow(); } });
+    // (a typed line tried on a Classic song: the steering's result is the song with it, as resteer gives it)
+    if (pre && pre.steer && !air) { const r = pre.steer; item.plan = r.plan; item.opts = r.opts; item.plain = r.song; setSong(item, r.song); }
+    else resteer(item, { async: true, then: () => { keepHistory(item); if (item.song !== swapped) swapSoon(windowPlayable(), pendingBy(item)); renderNow(); } });
     if (forSession) { const { at: _a, id: _i, scope: _s, at0: _b, q: _q, pend: _p, ...e } = cmd; S.recipe.arrange = [...(S.recipe.arrange || []), { song: item.n, ref: cmd.id, ...e }]; rebias(item.n); }
     keepHistory(item);
     // the whole session: energy, complexity and voice also move the sliders for the next songs
@@ -558,7 +570,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       const nudge = { 'energy-up': ['energy', 0.1], 'energy-down': ['energy', -0.1], 'more-complex': ['complexity', 0.1], 'less-complex': ['complexity', -0.1], 'talk-more': ['talk', 0.1], 'talk-less': ['talk', -0.1] }[cmd.kind];
       if (nudge) { opts[nudge[0]] = Math.round(Math.max(0, Math.min(1, opts[nudge[0]] + nudge[1])) * 100) / 100; saveOpts(); syncSliders(); }
     }
-    swapSoon(windowPlayable(), item.start + at);
+    // (a typed line tried first: its window is ready, made with this very song)
+    // (and the console drawn in a task of its own)
+    if (pre && pre.p) { if (soon) soon.done = true; soon = null; player.swap(pre.p); setTimeout(() => renderNow(), 0); return true; }
+    swapSoon(windowPlayable(), item.start + heardAt(item, cmd));
     renderNow();
     return true;
   }
@@ -591,13 +606,15 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       return;
     }
     if (c.at <= relNow()) return;
+    // (the window without it made ready before the bar it was heard from, #82)
+    const by = item.start + heardAt(item, c);
     if (c.scope === 'session') { S.recipe.arrange = (S.recipe.arrange || []).filter(e => !(e.song === item.n && e.ref === id)); rebias(item.n); }
     const drop = x => x.id === id || (c.kind === 'extend' && x.kind === 'curve' && x.id > id && x.at > relNow() && x.d >= c.ins);
     item.commands = item.commands.filter(x => !drop(x));
     S.recipe.steering = (S.recipe.steering || []).filter(x => !(x.song === item.n && drop(x)));
-    resteer(item, { async: true, then: () => { keepHistory(item); player.swap(windowPlayable()); renderNow(); } });
+    resteer(item, { async: true, then: () => { keepHistory(item); swapSoon(windowPlayable(), by); renderNow(); } });
     keepHistory(item);
-    player.swap(windowPlayable());
+    swapSoon(windowPlayable(), by);
     renderNow();
   }
   // the history keeps the song as steered, so saving it from there keeps the listener's changes
@@ -858,8 +875,22 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     } else if (session) toast(t('svNextOnly'));
     if (session) render();
   }
-  // a typed line (D10): its sample first (the voice helper), then "now" on the first bar after it is ready, or "at the
-  // right moment" on the next free part where the voice track may speak; recorded like any command, so Replay says it
+  // a typed line (D10): its sample first (the voice helper), then the line tried on the song on air and queued once its
+  // window is ready (#82: nothing heavy on the click, the window's plan made a little at a time). Say now means "in a few
+  // seconds" (owner, 2 November): the first bar that starts at least SAY_LEAD seconds after the click; At the right
+  // moment: the next free part where the voice track may speak from that bar. When the sample or the window is not ready
+  // a third of a bar before the line's bar, the line moves to the first bar SAY_LEAD seconds ahead again (a push), never
+  // lost; after SAY_PUSHES pushes its window is finished at once. Recorded like any command, so Replay says it
+  const SAY_LEAD = 2, SAY_PUSHES = 3, sayPushes = {};
+  // the bars of SAY_LEAD seconds at a bar of a song
+  const leadOf = (song, bar) => { let a = 0, bpm = 120; for (const x of song.sections) { bpm = x.bpm || 120; if (bar < a + x.bars) break; a += x.bars; } return SAY_LEAD * bpm / 240; };
+  // the command's bar for a typed line on the song on air, now: SAY_LEAD seconds ahead at least; null when it is late
+  function sayAt(item) {
+    const rel = relNow(), lead = leadOf(item.song, rel);
+    if (airSteer(item) && item.g0) { const c = airBoundaries('say-live', rel, item.plan, item.g0, lead); return c.length ? c[0] : null; }
+    const at = applyBar('say-live', rel, item.plan, lead);
+    return at > rel && at < barsOf(item.song) ? at : null;
+  }
   async function sayLine(mode) {
     const item = S && S.stream[S.onAir]; if (!item || !item.plan) return;
     const text = sv.line.trim().replace(/\s+/g, ' '), words = text ? text.split(' ').length : 0;
@@ -871,20 +902,67 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       if (why) return toast(t('svNoPart'));
     }
     sv.line = '';
-    const w = { text }; sayWait.push(w); renderSteer(true);
+    // (the queue shows the bar Say now aims at while the sample comes)
+    const w = { text, mode, item, at: mode === 'now' ? sayAt(item) : null }; sayWait.push(w); renderSteer(true);
     // (my-phrases D2, D3: the line is offered to my phrases, kind voice, the style's vocabulary group and the style)
     // (in a task of its own after the click: my phrases save and draw the tabs again, #82)
     setTimeout(() => onTyped({ text, lang, song }), 0);
-    const ask = fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang, speaker }) })
-      .then(async r => { if (!r.ok) return false; const j = await r.json().catch(() => ({})); if (j && j.made) onSampleMade({ text, lang, bank: j.bank, song }); return true; });
-    // (at the right moment: the command goes now, the line waits for its part; the sample comes meanwhile)
-    if (mode === 'moment') { sayWait.splice(sayWait.indexOf(w), 1); command({ kind: 'say-live', text, lang, speaker, mode }); }
-    const ok = await ask.catch(() => false);
-    if (mode === 'now') sayWait.splice(sayWait.indexOf(w), 1);
-    if (!ok) { renderSteer(true); return toast(t('svSampleFailed')); }
-    await reloadSamples();
-    if (mode === 'now') { if (!command({ kind: 'say-live', text, lang, speaker, mode })) renderSteer(true); }
-    else if (S && S.paused === undefined) swapSoon(windowPlayable(), pendingBy(S.stream[S.onAir]));
+    const got = await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang, speaker }) })
+      .then(async r => { if (!r.ok) return null; const j = await r.json().catch(() => ({})); if (j && j.made) onSampleMade({ text, lang, bank: j.bank, song }); return j || {}; })
+      .catch(() => null);
+    const drop = () => { const i = sayWait.indexOf(w); if (i >= 0) sayWait.splice(i, 1); };
+    if (!got) { drop(); renderSteer(true); return toast(t('svSampleFailed')); }
+    // (only the bank of the new sample is read again: the whole manifest took a long task, #82)
+    await reloadSamples(got.bank || null);
+    placeLine(w, { kind: 'say-live', text, lang, speaker, mode }, drop);
+  }
+  // the line tried on the song on air (the window with it made ready a little at a time), queued when ready before its
+  // bar, else pushed (see sayLine)
+  function placeLine(w, c, drop, tries = 0) {
+    const later = (ms, n = tries) => setTimeout(() => placeLine(w, c, drop, n), ms);
+    if (!S) { drop(); return; }
+    if (S.paused !== undefined) { later(300); return; }
+    const item = S.stream[S.onAir];
+    if (!item.plan) { drop(); renderSteer(true); toast(t(item.frozen ? 'steerWhy:frozen' : 'steerWhy:lead')); return; }
+    // the bar aimed at on the click while it still leaves half of SAY_LEAD (the sample came; the window is made in that
+    // time), else the first one SAY_LEAD seconds ahead (a push)
+    const rel = relNow(), lead = leadOf(item.song, rel);
+    const at = w.item === item && w.at !== null && w.at >= rel + Math.max(0.5, lead / 2) ? w.at : sayAt(item);
+    if (at === null) { drop(); renderSteer(true); toast(t('steerLate')); return; }
+    const moved = at !== w.at;
+    if (moved && w.at !== null) sayPushes[c.text] = (sayPushes[c.text] || 0) + 1;
+    w.at = at; w.item = item;
+    if (moved) renderSteer(true);
+    const air = airSteer(item) && item.g0, line = { at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' };
+    // the song with the line, as command gives it: on the grown song at once (fx3), or the Classic steering
+    let pre;
+    if (air) pre = { at, song: sayAir(item.song, [line]) };
+    else if (!item.growCtx) { const r = steerSong({ ...item.base, commands: [...item.commands, { ...c, at }], seed: S.recipe.seed, n: item.n }); pre = { at, song: r.song, steer: r }; }
+    else { drop(); renderSteer(true); command(c); return; }
+    const bar = lineBarOf(pre.song, c);
+    // (At the right moment and no free part left from that bar)
+    if (bar === null) { drop(); renderSteer(true); toast(t('svNoPart')); return; }
+    const mine = S, songNow = item.song, inWin = () => S.stream.slice(S.onAir, S.onAir + 2), win0 = inWin();
+    const still = () => S === mine && S.stream[S.onAir] === item && item.song === songNow && inWin().length === win0.length && inWin().every((x, i) => x === win0[i]);
+    // (the window made in a task of its own after the steering's song)
+    setTimeout(() => {
+      if (!still()) { later(0); return; }
+      const p = windowPlayable({ item, song: pre.song }), forced = tries >= SAY_PUSHES;
+      const commit = () => {
+        if (!still()) { later(0); return; }
+        if (S.paused !== undefined) { later(300); return; }
+        // (late: its window not ready a third of a bar before the line's bar, as swapSoon: the line moves on)
+        if (!forced && player.now() >= item.start + bar - 0.34) { later(0, tries + 1); return; }
+        drop();
+        if (!command(c, { ...pre, p })) renderSteer(true);
+      };
+      if (forced || !p.prepare) { commit(); return; }
+      // (late before it is ready: given up at once, the slices stop)
+      let gone = false;
+      const watch = () => { if (gone) return; if (!still()) { gone = true; return; } if (player.now() >= item.start + bar - 0.34) { gone = true; commit(); } else setTimeout(watch, 30); };
+      p.prepare(12, () => !gone && still()).then(() => { if (!gone) { gone = true; commit(); } }, () => { if (!gone) { gone = true; commit(); } });
+      watch();
+    }, 0);
   }
   // the lines typed in the song on air (my-phrases D3): each keeps a small save button until the song ends, for a late
   // Salva after a Chiedi left unanswered or a Non salvare mai
@@ -899,6 +977,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (!rows.length) return '';
     return `<div class="lbl">${esc(t('svTypedTitle'))}</div><ul class="steer-typed">${rows.map((x, i) => `<li><span class="sv-typed-text">«${esc(x.text)}»</span> ${x.saved ? `<span class="muted small">${esc(t('svTypedSaved'))}</span>` : `<button class="mini sv-keep" data-sv-keep="${i}" title="${esc(t('svTypedSaveTip'))}" aria-label="${esc(t('svTypedSaveTip'))}">${esc(t('phAskSave'))}</button>`}</li>`).join('')}</ul>`;
   }
+  // the song's state at a bar, kept for the bar (renderSteer runs four times a second; steps and clips are on whole bars)
+  let stateMemo = null;
+  const stateNow = (song, rel) => { const b = Math.floor(rel); if (!stateMemo || stateMemo.song !== song || stateMemo.b !== b) stateMemo = { song, b, st: stateAt(song, b).song }; return stateMemo.st; };
   function renderSteer(force = false) {
     const box = root.querySelector('#radio-steer');
     if (!box || dragging) return;
@@ -908,9 +989,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (!item.plan) { const k = item.frozen ? 'frozen' : 'lead'; if (box.dataset.k !== k) { box.dataset.k = k; steerKey = ''; box.innerHTML = `<div class="lbl">${esc(t('steerTitle'))}</div><p class="muted">${esc(t('steerWhy:' + k))}</p>`; } return; }
     box.dataset.k = '';
     const ph = item.plan.phrase;
-    const st = stateAt(item.song, rel).song, on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
+    const st = stateNow(item.song, rel), on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel || c.scope === 'session');
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => `${x.id}:${x.uses || 0}`).join(), sv.preset, sv.style, voiceHelper, sayWait.length, typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
+    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => `${x.id}:${x.uses || 0}`).join(), sv.preset, sv.style, voiceHelper, sayWait.map(w => w.at).join(), typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
     if (!force && key === steerKey) return;
     steerKey = key;
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-sv-line]') ? document.activeElement.selectionStart : null;
@@ -1021,7 +1102,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         ${group('song', btn({ kind: 'drop' }) + btn({ kind: 'stay' }) + (() => { const s = `+${Math.round(extendSeconds(item.plan))} s`; return btn({ kind: 'extend', vars: { s } }, t('steer:extend', { s })); })() + btn({ kind: 'end' }))}
       </div>
       <div class="lbl">${esc(t('steerQueue'))}</div>
-      <ul class="steer-queue">${sayWait.map(w => `<li><span class="at">…</span> ${esc(t('svQueueWait', { text: w.text }))}</li>`).join('')}${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: c.at + 1 }))}</span> ${esc(cmdLabel(c, item))}${c.scope === 'session' ? `<span class="muted"> · ${esc(t('steerForSession'))}</span>` : ''} <button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button></li>`).join('') || (sayWait.length ? '' : `<li class="muted">${esc(t('steerQueueEmpty'))}</li>`)}</ul>${typedHtml(item)}
+      <ul class="steer-queue">${sayWait.map(w => `<li><span class="at">${w.at !== null && w.item === item ? esc(t('radioBarShort', { n: w.at + 1 })) : '…'}</span> ${esc(t('svQueueWait', { text: w.text }))}</li>`).join('')}${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: heardAt(item, c) + 1 }))}</span> ${esc(cmdLabel(c, item))}${c.scope === 'session' ? `<span class="muted"> · ${esc(t('steerForSession'))}</span>` : ''} <button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button></li>`).join('') || (sayWait.length ? '' : `<li class="muted">${esc(t('steerQueueEmpty'))}</li>`)}</ul>${typedHtml(item)}
       <div class="lbl">${esc(t('steerMixer'))}</div>
       <div class="steer-mixer">${[...on, ...st.tracks.filter(x => x.mute && lk.includes(x.id))].map(x => { const locked = lk.includes(x.id), g = (x.settings || {}).gain ?? 0.5; return `<div class="mix-row"><span class="mix-name">${esc(x.name || x.id)}</span>
         <input type="range" min="0" max="1.2" step="0.05" value="${g}" data-mix-vol="${esc(x.id)}" data-no-knob aria-label="${esc(t('steerVolume', { track: x.name || x.id }))}" title="${esc(t('steerVolume', { track: x.name || x.id }))}">
@@ -1563,6 +1644,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     get sessionNow() { return S && !S.limit ? sessionItem(S.recipe, S.onAir + 1, S.stream[0].song.title) : null; },
     get steering() { if (!S) return null; const it = S.stream[S.onAir]; if (!it.plan) return { n: it.n, lead: true, commands: [], plan: null, song: it.song, recipe: clone(S.recipe) }; return { n: it.n, commands: it.commands.map(c => ({ ...c })), plan: { bars: it.plan.bars, phrase: it.plan.phrase, targets: it.plan.plan.map(d => d.target), curves: it.plan.plan.map(d => d.curves || {}), roles: it.plan.plan.map(d => d.role), locked: it.plan.locked || [], lockedParts: it.plan.lockedParts || [], added: clone(it.plan.added || []), risers: clone(it.plan.risers || []), usualHigh: it.plan.usualHigh, hardMax: it.plan.hardMax, gestures: clone(it.plan.gestures || []) }, song: it.song, recipe: clone(S.recipe) }; },
     get paused() { return !!S && S.paused !== undefined; },
+    // the console alone drawn again: my phrases changed (a typed row's save button, #82)
+    renderConsole() { renderSteer(true); },
+    // the pushes of each typed line (tools/check-say-lag.cjs)
+    get sayPushes() { return { ...sayPushes }; },
     get recording() { return recS ? { seconds: recElapsed(), list: recS.list.map(x => ({ ...x })) } : null; },
     startRec, stopRec, recordFromStart,
     // the Genres tab (#43): the radio plays these styles, with the sliders as they are

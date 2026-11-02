@@ -3071,13 +3071,25 @@ let lastSweep = 0;
 phr = createPhrases({ store, t, toast, getLang, helper: () => !!voiceHelper, onChange: what => { if (what === 'items' || what === 'settings') phrasesChanged(what); } });
 // the collection or how often it is used changed: the narrator of the song in Compose says other lines (its code and
 // captions are written again; the growth stays), the tab and the radio console are drawn again
+// (in the radio, by hand or away from Compose, every part in a task of its own and coalesced: a line typed on the
+// radio and the Undo of its "Saved" toast drew the Voices tab and wrote the song of Compose in the click's task, #82)
+let phrasesLater = null;
+const idle = fn => (globalThis.requestIdleCallback ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 50));
 function phrasesChanged(what) {
-  // (in the radio or by hand only the song in Compose is written again: changed() would leave the radio; a growth it
-  // needs goes away from the page, as every growth of Compose: a line typed on the radio regrew it here, #82)
-  try { if (mode === 'track' && !hand) { const was = dirty; changed(); dirty = was; saveDraft(); } else composeCompiled(); } catch (e) { /* not ready yet */ }
-  if (voicesTab) voicesTab.render();
-  // (the radio drawn again in a task of its own: a line typed on the radio offers itself on the click, #82)
-  if (radio && radio.on && radio.render) setTimeout(() => { if (radio.on) radio.render(); }, 0);
+  if (mode === 'track' && !hand) {
+    try { const was = dirty; changed(); dirty = was; saveDraft(); } catch (e) { /* not ready yet */ }
+    if (voicesTab) voicesTab.render();
+  } else if (!phrasesLater) {
+    phrasesLater = setTimeout(() => {
+      phrasesLater = null;
+      if (voicesTab) voicesTab.render();
+      // (only the song in Compose is written again: changed() would leave the radio; a growth it needs goes away from
+      // the page, as every growth of Compose)
+      idle(() => { try { if (!(mode === 'track' && !hand)) composeCompiled(); } catch (e) { /* not ready yet */ } });
+      // (in a task of its own: the radio reads my phrases only in its console, the typed rows' save buttons)
+      if (radio && radio.on) setTimeout(() => { if (radio.on) radio.renderConsole(); }, 0);
+    }, 0);
+  }
   if (settingsPage && settingsPage.refresh && what === 'settings') settingsPage.refresh();
 }
 // the user's library, for the samples a delete keeps (D5): saved songs, trashed songs, songs of playlist sessions
@@ -3275,14 +3287,18 @@ setInterval(() => { if (voiceHelper && !samplesBusy && !document.hidden) askSamp
 // the custom samples and their lengths read again (a new sample of the voice helper): the song is written again with
 // them; while it plays, the new code is evaluated on the next bar
 // (the samples alone, for the radio's typed lines: the radio writes its songs again itself)
-async function reloadSamples() {
+// bank: only that bank is registered again in Strudel (a typed line's new sample: the whole manifest, read a second
+// time and registered bank by bank, was a long task of its own, #82)
+async function reloadSamples(bank = null) {
   const list = await (await fetch('/samples/strudel.json')).json();
   let lengths = {};
   try { const r = await fetch('/samples/say_lengths.json'); if (r.ok) lengths = await r.json(); } catch (e) {}
   custom = Object.keys(list).filter(k => k !== '_base'); customFiles = list;
   setSpokenContext({ files: list, lengths });
   crescendoCache.clear();
-  if (globalThis.samples) await globalThis.samples('/samples/strudel.json');
+  if (!globalThis.samples) return;
+  if (bank && list[bank]) await globalThis.samples({ [bank]: list[bank] }, list._base || '/samples/');
+  else await globalThis.samples(list, list._base || '/samples/');
 }
 async function refreshSamples() {
   await reloadSamples();
@@ -5253,13 +5269,24 @@ genresTab = createGenresTab({ root: $('#tab-generi'), t, tx, esc, face: a => art
 // the radio's next song (#54): every zone of its soundfonts loads, without sound, while the song on air plays, so a broken
 // zone is in the register before its first note
 let preloaded = '';
+// (the code of each step written in a task of its own, the page free between them: in one block it took up to 170 ms
+// with the CPU slowed 4 times, #82; a newer window stops it)
+let preloadJob = 0;
 const preloadSounds = p => {
   const key = p && p.meta ? `${p.title}|${p.meta.bpm.length}` : '';
   if (!key || key === preloaded || !globalThis.soundMap) return;
   preloaded = key;
-  const names = soundfontsIn(p.soundCode ? p.soundCode() : segmentsOf(p, codeFor).map(x => x.code).join('\n'));
-  preloadFonts(names, { soundMap: globalThis.soundMap, play: v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + .2, .05) })
+  const job = ++preloadJob, done = names => preloadFonts(names, { soundMap: globalThis.soundMap, play: v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + .2, .05) })
     .then(n => { if (n) console.info(`[sounds] next song: ${n} soundfont zones loaded (${names.join(', ')})`); }, () => {});
+  if (p.soundCode) { done(soundfontsIn(p.soundCode())); return; }
+  const bars = p.meta.bars, segs = p.build ? [...new Set([0, ...buildSteps(p.build).map(x => x.at).filter(a => a > 0 && a < bars)])].sort((a, b) => a - b) : [0], codes = [];
+  const next = () => {
+    if (job !== preloadJob) return;
+    const t0 = performance.now();
+    while (segs.length && performance.now() - t0 < 12) codes.push(codeFor(p, segs.shift()));
+    if (segs.length) setTimeout(next, 0); else done(soundfontsIn(codes.join('\n')));
+  };
+  next();
 };
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
 // the radio's saved pattern preview: the pattern's loop in the song's key, chords and tempo, on an orbit well above the
@@ -5292,7 +5319,7 @@ radio = createRadio({
   // a saved pattern queued from the console (Add as a new track, Replace) counts as one use
   onPatternUsed: id => patternsStore.markUsed(id),
   // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them
-  reloadSamples: () => reloadSamples(),
+  reloadSamples: bank => reloadSamples(bank),
   // the samples manifest, for the voices of Next changes (after-tests-oct28 D2)
   voiceFiles: () => customFiles,
   // my phrases (my-phrases): the snapshot a new session records, the lines typed in the console offered to the

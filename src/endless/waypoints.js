@@ -36,12 +36,12 @@ const PHRASE_TRIES = 2, BAR_TRIES = 4;
 // form's first `from` (fitted), or before it (free, from 0)
 export const airOffset = g => (g && g.onAir && g.crescendo ? g.crescendo.growth - (g.onAir.from || 0) : 0);
 // the bars where a command on a grown song may apply, in the grown song's bars, first first; rel: the bar now; plan:
-// the director's plan as steered so far; [] when none is left (late)
-export function airBoundaries(kind, rel, plan, g) {
+// the director's plan as steered so far; [] when none is left (late); lead: as applyBar's for a typed line
+export function airBoundaries(kind, rel, plan, g, lead = 0.5) {
   const off = airOffset(g), C = COMMANDS[kind] || {}, ph = plan.phrase, end = plan.bars + off, out = [];
   // (a typed line: from the first bar that starts at least half a bar later, as applyBar gives a Classic song; the next
   // bar could be a few hundredths of a bar away, so the song with the line reached the player after its bar, fx3)
-  if (C.bar) { for (let b = kind === 'say-live' ? Math.ceil(rel + 0.5) : Math.floor(rel) + 1; b < end - 1 && out.length < BAR_TRIES; b++) out.push(b); return out; }
+  if (C.bar) { for (let b = kind === 'say-live' ? Math.ceil(rel + Math.max(0.5, lead)) : Math.floor(rel) + 1; b < end - 1 && out.length < BAR_TRIES; b++) out.push(b); return out; }
   const step = C.structural ? 2 * ph : ph, last = plan.bars - ph;
   for (let d = Math.max(0, (Math.floor((rel - off) / step) + 1) * step); d <= last && out.length < PHRASE_TRIES; d += step) if (d + off > rel) out.push(d + off);
   return out;
@@ -435,7 +435,8 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
   let N = g0, Wprev = writtenForm(song), P = plan, R = { song, plan, opts };
   const done = [];
   commands.forEach((cmd, i) => {
-    const cands = cmd.pend ? airBoundaries(cmd.kind, Number.isFinite(cmd.q) ? cmd.q : cmd.at - 1, P, g0) : [cmd.at];
+    // (a typed line keeps the bar the radio gave it: Say now leaves a few seconds before it, #82)
+    const cands = cmd.pend && !typed(cmd) ? airBoundaries(cmd.kind, Number.isFinite(cmd.q) ? cmd.q : cmd.at - 1, P, g0) : [cmd.at];
     if (typed(cmd)) { if (cands.length) { const { pend, ...kept } = cmd; done.push({ ...kept, at: cands[0] }); } return; }
     const rng = stream(seed, `waypoint:${n}:${i}`);
     let pick = null;
