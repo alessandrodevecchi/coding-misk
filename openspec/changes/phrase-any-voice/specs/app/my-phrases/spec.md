@@ -38,10 +38,15 @@ A phrase SHALL have a tag (a mood, a moment or an entering track) only when it h
 - **WHEN** the user changes a voice track phrase with the mood night to All and saves
 - **THEN** the phrase has no tag and is a candidate for any mood, moment or entering track
 
+#### Scenario: Defaults
+
+- **WHEN** the user creates a phrase in My phrases, or saves one from the radio console or a Compose voice track
+- **THEN** the tag is Any (no tag), and Who says it is as today: Narrator explaining for a new phrase in My phrases, Voice track for a phrase saved from the radio or Compose
+
 #### Scenario: Narrow a phrase
 
 - **WHEN** the user changes a phrase with All to Narrator explaining
-- **THEN** the tag field is shown again, set to Any (no tag) until the user picks a moment
+- **THEN** the tag field is shown again, set to Any (no tag), and the user can pick a moment again (a tag lost in a merge can be set again this way)
 
 ### Requirement: One phrase per text, language and kind
 
