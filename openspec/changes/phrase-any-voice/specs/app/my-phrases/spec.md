@@ -1,64 +1,69 @@
 ## ADDED Requirements
 
-### Requirement: Phrases any voice can say
+### Requirement: Who says it has five options
 
-The kind of a phrase SHALL accept a fourth value, Any, shown as "Any" in the field "Who says it". A phrase of kind Any SHALL be a candidate for the voice track, for the narrator explaining and for the narrator poetic. Every other pick rule (on/off, language, styles, share, seeded draw) SHALL apply to it unchanged. Built-in vocabularies SHALL NOT change. The default kind of a line saved from the radio console or Compose SHALL stay voice.
+A phrase SHALL store the kinds that can say it as a list drawn from `voice`, `explain` and `poetic`. The field "Who says it" SHALL offer five options: Voice track (`voice`), Narrator explaining (`explain`), Narrator poetic (`poetic`), Both narrators (`explain` and `poetic`) and All (`voice`, `explain` and `poetic`). A voice SHALL take a phrase when its kind is in the phrase's kinds. Every other pick rule (on/off, language, styles, share, seeded draw) SHALL apply unchanged. Built-in vocabularies SHALL NOT change. A line saved from the radio console or Compose SHALL be Voice track with no tag.
 
-#### Scenario: Any is picked by all three
+#### Scenario: Both narrators
 
-- **WHEN** one phrase of kind Any is on and the director draws a voice track line, an explaining line and a poetic line
+- **WHEN** a phrase with Both narrators is on and the director draws a voice track line, an explaining line and a poetic line
+- **THEN** the phrase is a candidate for the explaining and poetic draws and not for the voice track draw
+
+#### Scenario: All
+
+- **WHEN** a phrase with All is on and the director draws a voice track line, an explaining line and a poetic line
 - **THEN** the phrase is a candidate for each of the three draws
 
 #### Scenario: Other rules still apply
 
-- **WHEN** an Any phrase is switched off, or has styles that the song does not have, or has no text in the song's language
+- **WHEN** a phrase with several kinds is switched off, or has styles the song does not have, or has no text in the song's language
 - **THEN** it is not picked
 
 #### Scenario: Copy of a built-in
 
-- **WHEN** the user copies a built-in vocabulary line into My phrases and sets Who says it to Any
-- **THEN** it is a user phrase of kind Any
+- **WHEN** the user copies a built-in vocabulary line into My phrases and sets Who says it to All
+- **THEN** it is a user phrase that all three can say
 
-#### Scenario: Existing phrases
+#### Scenario: Old phrases
 
-- **WHEN** the app opens with phrases saved before this change
-- **THEN** each keeps its kind and tag, and nothing is converted
+- **WHEN** the app opens with phrases saved with a single kind
+- **THEN** each is read as a list of that one kind, keeps its tag, and says the same as before
 
-### Requirement: An Any phrase has no tag
+### Requirement: A tag only for one kind
 
-A phrase of kind Any SHALL have no tag and SHALL be shown with the tag "Any". The tag field SHALL be hidden or disabled while Who says it is Any. Switching a phrase to Any SHALL clear its tag. An Any phrase SHALL match every tag: every mood, every moment and every entering track.
+A phrase SHALL have a tag (a mood, a moment or an entering track) only when it has exactly one kind. A phrase with Both narrators or All SHALL have no tag and SHALL be shown with the tag "Any". The tag field SHALL be hidden while one of those options is chosen. Choosing one of them SHALL clear the tag. Such a phrase SHALL match every tag.
 
-#### Scenario: Switch to Any
+#### Scenario: Widen a phrase
 
-- **WHEN** the user changes a voice phrase with the mood night to Any and saves
-- **THEN** the phrase has no tag, and it is a candidate for any mood, moment or entering track
+- **WHEN** the user changes a voice track phrase with the mood night to All and saves
+- **THEN** the phrase has no tag and is a candidate for any mood, moment or entering track
 
-#### Scenario: Switch back
+#### Scenario: Narrow a phrase
 
-- **WHEN** the user changes an Any phrase to explain
-- **THEN** the tag field is shown again, set to Any (no tag) until the user picks one
+- **WHEN** the user changes a phrase with All to Narrator explaining
+- **THEN** the tag field is shown again, set to Any (no tag) until the user picks a moment
 
-### Requirement: One phrase per text and language when Any
+### Requirement: One phrase per text, language and kind
 
-An Any phrase SHALL be unique by text and language across all kinds. Setting a phrase to Any when the same text and language exist under another kind SHALL merge them into one Any phrase: the uses are summed, the older id is kept, and the styles are united. Saving a new line whose text and language already exist as Any SHALL reuse that phrase and add one use.
+A text and language SHALL belong to at most one phrase for each kind. Widening a phrase SHALL merge it with the phrases of the same text and language that have an included kind: the uses are summed, the older id is kept, the styles are united, and the kinds are the union. The app SHALL offer Undo after a merge. Saving a text that already exists in a phrase that includes the asked kind SHALL reuse that phrase and add one use.
 
 #### Scenario: Merge on edit
 
-- **WHEN** "ecco il basso" exists as explain with 2 uses and as poetic with 3 uses, and the user sets the explain phrase to Any
-- **THEN** one Any phrase remains with 5 uses, the older id, and the styles of both
+- **WHEN** "ecco il basso" exists as explain with 2 uses and as poetic with 3 uses, and the user sets the explain phrase to Both narrators
+- **THEN** one phrase remains with kinds explain and poetic, 5 uses, the older id and the styles of both, and an Undo is offered
 
 #### Scenario: Reuse on save
 
-- **WHEN** the user types a line that already exists as Any
-- **THEN** no new phrase is added and the Any phrase gets one use
+- **WHEN** the user types a line that already exists in a phrase with All, saved as Voice track
+- **THEN** no new phrase is added and that phrase gets one use
 
-### Requirement: Samples of an Any phrase follow the speakers
+### Requirement: Samples follow the speakers
 
-A sample file SHALL depend on the text and the speaker. When the voice track and the narrator have the same speaker, an Any phrase SHALL use one file for both. When they have different speakers, the app SHALL make the Any phrase once per speaker, automatically, as it does for other lines. Deleting an Any phrase SHALL count the files of every speaker and delete those that no other use needs. The usage and protect lists SHALL treat an Any phrase as used by the voice track, the narrator explaining and the narrator poetic.
+A sample file SHALL depend on the text and the speaker. A phrase SHALL have one file for each speaker that can say it, and speakers that are the same SHALL share one file. When the narrator and the voice track use different speakers, the app SHALL make the missing files automatically, as it does for other lines. Deleting a phrase SHALL count the files of all its speakers and delete those that no other use needs. The usage and protect lists SHALL count every speaker of the phrase.
 
 #### Scenario: Two speakers
 
-- **WHEN** the narrator speaks with one speaker and the voice track with another, and an Any phrase can be drawn by both
+- **WHEN** the narrator and the voice track use different speakers and a phrase with All is on
 - **THEN** a sample is made for each speaker without the user asking
 
 #### Scenario: Same speaker
@@ -68,5 +73,5 @@ A sample file SHALL depend on the text and the speaker. When the voice track and
 
 #### Scenario: Delete
 
-- **WHEN** the user deletes an Any phrase
+- **WHEN** the user deletes a phrase with several kinds
 - **THEN** the count lists the files of every speaker, and deleting removes them unless a built-in vocabulary, another phrase or a saved song needs the same file

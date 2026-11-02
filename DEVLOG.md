@@ -2370,12 +2370,12 @@ Due ritocchi piccoli all'interfaccia.
 - **Compose:** il pulsante «✂ Frammenti» (`#tr-frag`) accanto a «Esporta» apre lo stesso menu dei frammenti per il brano aperto; si vede solo per un brano della libreria (non per uno nuovo mai salvato), come sulla card. Scheda Guida dei frammenti aggiornata (EN e IT).
 - **Controlli:** `tools/check-video.mjs` (default `stage`, `lookFor`), `tools/check-video.cjs` (valore salvato mantenuto, default nel menu, video veloce con visual fisso e con «Come il palco» letti da `codingMiskExport.looks`, pulsante in Compose che apre il menu).
 
-## 2026-11-02 (specifica: frasi che può dire qualsiasi voce, #82)
+## 2026-11-02 (specifica: cinque opzioni di «Chi la dice», #82)
 
-Solo specifica OpenSpec `phrase-any-voice`, nessun codice toccato. Decisione del proprietario: in Voci, Le mie frasi, «Chi la dice» ottiene una quarta opzione «Qualsiasi» (`any`).
+Solo specifica OpenSpec `phrase-any-voice`, nessun codice toccato. Il proprietario ha rivisto la scelta: «Chi la dice» ha cinque opzioni (Traccia voce, Narratore che spiega, Narratore poetico, Entrambi i narratori, Tutte).
 
-- **Scelta:** `candidates()` tiene anche `p.kind === 'any'`; le altre regole (acceso, lingua, stili, quota, estrazione col seme) non cambiano.
-- **Tag:** una frase Qualsiasi non ha tag, vale per ogni tag; il selettore è nascosto e passare a Qualsiasi lo azzera.
-- **Doppioni:** passare a Qualsiasi con stesso testo e lingua già presenti unisce in una frase (usi sommati, id più vecchio, stili uniti); salvare un testo già Qualsiasi lo riusa.
-- **Campioni:** un file dipende da testo e voce; con voci diverse tra narratore e traccia voce la frase si genera una volta per voce, in automatico; elimina e liste d'uso contano tutte le voci.
-- **Resto:** vocabolari inclusi invariati, predefinito voice senza tag, nessuna migrazione. Stima: circa 1 ora agente. Domanda aperta: l'unione perde l'umore (consigliato accettare, con Annulla).
+- **Dati:** la frase salva `kinds` (lista), così in futuro si potrebbero offrire tutte e sette le combinazioni; il modulo ne offre cinque. Le frasi vecchie con `kind` singolo si leggono come lista di uno e si riscrivono con `kinds` al caricamento (backup compreso).
+- **Scelta:** una voce prende la frase se il suo tipo è in `kinds`; le altre regole non cambiano.
+- **Tag:** solo con un tipo solo; con Entrambi o Tutte nessun tag, campo nascosto, scegliere queste lo azzera.
+- **Doppioni:** allargare una frase la unisce a quelle con stesso testo e lingua di un tipo incluso (usi sommati, id più vecchio, stili uniti, Annulla); salvare un testo già incluso lo riusa.
+- **Campioni:** un file per voce che può dirla; elimina e liste d'uso contano tutte. Stima: circa 1,25 ore agente. Domanda aperta: l'unione perde il tag (consigliato accettare, con Annulla).
