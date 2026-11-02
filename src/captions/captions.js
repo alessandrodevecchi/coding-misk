@@ -85,26 +85,78 @@ export function captionHtml(frame, S, { label = k => k, name = () => '' } = {}) 
   return rows + (frame.tag ? `<div class="cap-tag">${escHtml(frame.tag)}</div>` : '');
 }
 
+// ---------- fitting a line (the page lane and every canvas) ----------
+// A caption is never cut while it can be read whole: one line, the font shrunk to 80% at most; then two lines with the
+// same shrink; then the largest size down to min (60%, 14 px at least) that fits on three lines; only at the minimum
+// is the last line cut with …. Lines break
+// between words. width(text, size): the text's width at that font size; maxH: the height the lines may take (lh: line
+// height in font sizes). → { fs, lines, cut }
+export const CAPTION_FIT = Object.freeze({ shrink: 0.8, min: 0.6, minPx: 14, lines: 3, lh: 1.2 });
+export function fitCaption(width, text, maxW, fs, o = {}) {
+  const s = String(text || '').trim(), F = CAPTION_FIT, maxLines = o.lines || F.lines, lh = o.lh || F.lh;
+  const min = Math.min(fs, Math.max(o.minPx ?? F.minPx, Math.round(fs * (o.min ?? F.min)))), maxH = o.maxH || Infinity;
+  const tryAt = (f, n) => { if (n * f * lh > maxH + 0.5) return null; const l = breakWords(w => width(w, f), s, maxW, n); return l ? { fs: f, lines: l, cut: false } : null; };
+  const sizes = (lo) => { const out = []; for (let f = fs; f >= lo; f--) out.push(f); if (out[out.length - 1] !== lo) out.push(lo); return out; };
+  const lo = Math.max(min, Math.round(fs * F.shrink));
+  for (const f of sizes(lo)) { const r = tryAt(f, 1); if (r) return r; }
+  if (maxLines >= 2) for (const f of sizes(lo)) { const r = tryAt(f, 2); if (r) return r; }
+  // then the largest size that fits on up to maxLines lines (the fewest lines at that size)
+  for (const f of sizes(min)) for (let n = 2; n <= maxLines; n++) { const r = tryAt(f, n); if (r) return r; }
+  // the last resort: the most lines that fit the height at the minimum, the last one cut with …
+  const n = Math.max(1, Math.min(maxLines, Math.floor(maxH / (min * lh)) || 1)), w = x => width(x, min);
+  const all = breakWords(w, s, maxW, Infinity) || [s], lines = all.slice(0, n - 1);
+  lines.push(cutLine(w, all.slice(n - 1).join(' '), maxW));
+  return { fs: min, lines, cut: true };
+}
+// words in at most n lines of width w each (a word wider than a line: null); null when they need more
+function breakWords(width, s, w, n) {
+  const out = []; let cur = '';
+  for (const word of s.split(/\s+/)) {
+    if (!word) continue;
+    if (width(word) > w) return null;
+    const next = cur ? `${cur} ${word}` : word;
+    if (!cur || width(next) <= w) cur = next;
+    else { out.push(cur); cur = word; if (out.length >= n) return null; }
+  }
+  if (cur) out.push(cur);
+  return out.length <= n ? out : null;
+}
+// a line cut at a word (or inside a word longer than the line) with …
+function cutLine(width, s, w) {
+  if (width(s) <= w) return s;
+  const words = s.split(' ');
+  while (words.length > 1 && width(`${words.join(' ')}…`) > w) words.pop();
+  let x = words.join(' ');
+  while (x.length > 1 && width(`${x}…`) > w) x = x.slice(0, -1);
+  return `${x}…`;
+}
+
 // ---------- canvases (videos, the timeline layout, fragments, the live output) ----------
-// The frame drawn in an area { x, y, w, h } of a canvas (D6). o: scale (1 at 1080p), tall (9:16: the lower third, two
-// lines at most, the speaker above the text), where ('look' | 'bottom' | 'top'), hw (the amber display with a light
-// per speaker), label(kind), font (a monospace family). → the rows drawn (for the checks)
+// The frame drawn in an area { x, y, w, h } of a canvas (D6). o: scale (1 at 1080p), tall (9:16: the lower third, the
+// speaker above the text), where ('look' | 'bottom' | 'top'), hw (the amber display with a light per speaker),
+// label(kind), font (a monospace family). A long line is fitted (fitCaption): shrunk, then on two or three lines, cut
+// only at the smallest size. → the rows drawn (for the checks: kind, lines, fs, cut, and the box x, y, w, h)
 export function drawCaptions(g, area, frame, S, o = {}) {
   if (!frame || (!frame.rows.length && !frame.tag)) return [];
   const sc = o.scale || 1, font = o.font || '"JetBrains Mono", ui-monospace, monospace', label = o.label || (k => k);
   const fs = Math.round((o.tall ? 40 : 34) * sc), small = Math.round(fs * 0.62), pad = Math.round(14 * sc), gap = Math.round(6 * sc), ico = Math.round(fs * 0.9);
   const maxW = area.w - pad * 4;
   g.save();
-  // the rows, each with its lines (two at most in 9:16)
-  const blocks = frame.rows.slice().reverse().map(r => {
+  // the rows, each with its lines fitted in the width left after the speaker (in 9:16 the speaker sits above), and
+  // in the height the other rows leave on one line each
+  const rowsIn = frame.rows.slice().reverse(), hw0 = o.hw ? 14 * sc : 0;
+  const room = (o.tall ? area.h * 0.6 : area.h * 0.8) - pad * 1.4 - (frame.tag ? small * 1.3 : 0) - (rowsIn.length - 1) * (fs * 1.2 + gap), maxH = Math.max(fs * 1.2, room);
+  const blocks = rowsIn.map(r => {
     const m = markOf(S, r.kind), st = styledText(r.kind, r.text, m.style), col = o.hw ? '#ffb347' : (m.colour && kindColour(r.kind)) || '#f3ecff';
-    g.font = `${st.italic ? 'italic ' : ''}700 ${fs}px ${font}`;
     const head = (m.icon ? ico + gap : 0) + (m.label ? measure(g, `${label(r.kind)} `, `600 ${small}px ${font}`) + gap : 0);
-    const lines = o.tall ? wrap(g, st.text, maxW, 2) : [fit(g, st.text, maxW - head)];
-    return { r, m, st, col, lines, head, w: o.tall ? Math.max(head, ...lines.map(l => g.measureText(l).width)) : head + g.measureText(lines[0]).width, h: (o.tall && head ? small + gap : 0) + lines.length * fs * 1.2 };
+    const face = f => `${st.italic ? 'italic ' : ''}700 ${f}px ${font}`;
+    const fitted = fitCaption((s, f) => measure(g, s, face(f)), st.text, maxW - (o.tall ? 0 : head + hw0), fs, { maxH: maxH - (o.tall && head ? small + gap : 0) });
+    g.font = face(fitted.fs);
+    const tw = Math.max(...fitted.lines.map(l => g.measureText(l).width));
+    return { r, m, st, col, lines: fitted.lines, fs: fitted.fs, cut: fitted.cut, face, head, tw, w: o.tall ? Math.max(head, tw) : hw0 + head + tw, h: (o.tall && head ? small + gap : 0) + fitted.lines.length * fitted.fs * 1.2 };
   });
   g.font = `600 ${small}px ${font}`;
-  const tag = frame.tag ? fit(g, frame.tag, maxW) : '';
+  const tag = frame.tag ? cutLine(s => g.measureText(s).width, frame.tag, maxW) : '';
   const tagW = tag ? g.measureText(tag).width : 0;
   const w = Math.min(area.w - pad * 2, Math.max(tagW, ...blocks.map(b => b.w), 10) + pad * 2), h = blocks.reduce((a, b) => a + b.h + gap, 0) - (blocks.length ? gap : 0) + (tag ? small * 1.3 + (blocks.length ? gap : 0) : 0) + pad * 1.4;
   const where = o.where === 'top' ? 'top' : 'bottom', x = area.x + (area.w - w) / 2;
@@ -118,20 +170,25 @@ export function drawCaptions(g, area, frame, S, o = {}) {
   g.textBaseline = 'top';
   for (const b of blocks) {
     let cx = x + (w - b.w) / 2;
+    const th = b.lines.length * b.fs * 1.2, my = o.tall ? 0 : (th - b.fs * 1.2) / 2;
     g.fillStyle = b.col;
     // the hardware display: one light per speaker, lit while it speaks
-    if (o.hw && b.r.kind !== 'step') { g.beginPath(); g.arc(x + pad * 0.6, cy + fs * 0.55, 4 * sc, 0, Math.PI * 2); g.shadowColor = '#ffb347'; g.shadowBlur = 8 * sc; g.fill(); g.shadowBlur = 0; }
-    if (b.m.icon) drawIcon(g, b.r.kind, cx, cy + (o.tall ? 0 : (fs * 1.2 - ico) / 2), o.tall ? small * 1.1 : ico, b.col, sc);
-    if (b.m.label) { g.font = `600 ${small}px ${font}`; g.fillText(label(b.r.kind), cx + (b.m.icon ? (o.tall ? small * 1.1 : ico) + gap : 0), cy + (o.tall ? 0 : (fs - small) / 2)); }
+    // (in 16:9 beside the speaker, in the middle of the text's height; in 9:16 at the box's left)
+    if (o.hw && b.r.kind !== 'step') { g.beginPath(); g.arc(o.tall ? x + pad * 0.6 : cx + 4 * sc, o.tall ? cy + fs * 0.55 : cy + my + b.fs * 0.6, 4 * sc, 0, Math.PI * 2); g.shadowColor = '#ffb347'; g.shadowBlur = 8 * sc; g.fill(); g.shadowBlur = 0; }
+    // (the speaker in the middle of the text's height, beside it; above it in 9:16)
+    cx += o.tall ? 0 : hw0;
+    if (b.m.icon) drawIcon(g, b.r.kind, cx, cy + my + (o.tall ? 0 : (b.fs * 1.2 - ico) / 2), o.tall ? small * 1.1 : ico, b.col, sc);
+    if (b.m.label) { g.font = `600 ${small}px ${font}`; g.fillText(label(b.r.kind), cx + (b.m.icon ? (o.tall ? small * 1.1 : ico) + gap : 0), cy + my + (o.tall ? 0 : (b.fs - small) / 2)); }
     if (o.tall && b.head) cy += small + gap;
     else cx += b.head;
-    g.font = `${b.st.italic ? 'italic ' : ''}700 ${fs}px ${font}`;
-    for (const l of b.lines) { g.fillText(l, o.tall ? x + (w - g.measureText(l).width) / 2 : cx, cy + fs * 0.1); cy += fs * 1.2; }
+    g.font = b.face(b.fs);
+    // each line centred in the text's column (in 9:16 in the box)
+    for (const l of b.lines) { const lw = g.measureText(l).width; g.fillText(l, o.tall ? x + (w - lw) / 2 : cx + (b.tw - lw) / 2, cy + b.fs * 0.1); cy += b.fs * 1.2; }
     cy += gap;
   }
   if (tag) { g.font = `600 ${small}px ${font}`; g.fillStyle = o.hw ? 'rgba(255,179,71,.7)' : 'rgba(243,236,255,.62)'; g.fillText(tag, x + (w - tagW) / 2, cy); }
   g.restore();
-  return blocks.map(b => ({ kind: b.r.kind, lines: b.lines, x, y, w, h }));
+  return blocks.map(b => ({ kind: b.r.kind, lines: b.lines, fs: b.fs, cut: b.cut, x, y, w, h }));
 }
 function drawIcon(g, kind, x, y, size, col, sc) {
   const k = SPEAKER_KINDS[kind];
@@ -143,26 +200,6 @@ function drawIcon(g, kind, x, y, size, col, sc) {
   void sc;
 }
 const measure = (g, s, f) => { const was = g.font; g.font = f; const w = g.measureText(s).width; g.font = was; return w; };
-// a line cut at a word with an ellipsis when it does not fit
-function fit(g, s, w) {
-  if (g.measureText(s).width <= w) return s;
-  const words = s.split(' ');
-  while (words.length > 1 && g.measureText(`${words.join(' ')}…`).width > w) words.pop();
-  return `${words.join(' ')}…`;
-}
-// words in at most n lines, never cut mid-word
-function wrap(g, s, w, n) {
-  const out = [];
-  let cur = '';
-  for (const word of s.split(' ')) {
-    const next = cur ? `${cur} ${word}` : word;
-    if (g.measureText(next).width <= w || !cur) cur = next;
-    else { out.push(cur); cur = word; }
-  }
-  if (cur) out.push(cur);
-  if (out.length > n) { const rest = out.slice(n - 1).join(' '); out.length = n - 1; out.push(fit(g, rest, w)); }
-  return out;
-}
 function round(g, x, y, w, h, r) {
   g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
 }
