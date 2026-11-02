@@ -20,6 +20,7 @@ Mistakes that cost time before. Each line says what goes wrong and what to do. T
 - **Structure comes from the left.** `s("x").n("0 6 1 ~")` plays one sample per cycle, `n` 0: the other values are never heard. `n("0 6 1 ~").s("x")` plays three. The voice track's vocabulary lines are written the first way, so they say only their first entry; captions follow that (`lineEntries`).
 - **App names over Strudel names.** An app function named like a Strudel function or synonym hides it (`o` is `orbit`, `drive` is a filter overdrive, `env` exists). `npm run check:strudel` fails on it. `docs/MUSIC-ENGINE.md` still mentions `o`, `drive` and `voice` as helpers: that is out of date, they became `chan`, `crunch` and song functions.
 - **A function the app has never written.** Look it up in [strudel-functions.md](strudel-functions.md) first: synonyms, parameters, whether it is documented.
+- **Widgets past the text.** `@strudel/codemirror` places block widgets and sliders where they were in the code evaluated, without clamping them to the editor's text. A shorter code written while an evaluation runs leaves a widget past the end, and every later edit throws "Position N is out of range" (#82). Never write two codes and evaluate twice in one tick; `guardEditorRanges` drops such widgets, `tools/check-editor-range.cjs` checks it.
 
 ## Sound and levels
 

@@ -108,7 +108,7 @@ import { createGrowthStore } from './live/growth-store.js';
 import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
-import { CW_KEY, CW_VERSION, APP_KINDS_VERSION, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom } from './live/widgets.js';
+import { CW_KEY, CW_VERSION, APP_KINDS_VERSION, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom, guardEditorRanges, recoverEditor } from './live/widgets.js';
 import { SW_KEY, SW_VERSION, stageSettings, stageMapping, stageScopeInstruments, layerOn, toggleLayer, FULL_LOOKS } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
 const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
@@ -713,7 +713,7 @@ $('#edhost').appendChild(el);
 // a song loaded or "back to this code" is written by the app too: out of the undo history (takeover-pending-edit tk2).
 // Set as soon as the editor exists, so the element's own first code is not recorded either (only its "// LOADING"
 // placeholder, cleared while it connects, stays in the history)
-if (el.editor) el.editor.setCode = code => { const v = el.editor.editor; v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: code || '' }, annotations: noHistory(v) }); };
+if (el.editor) el.editor.setCode = code => { const v = el.editor.editor; safeDispatch(v, () => ({ changes: { from: 0, to: v.state.doc.length, insert: code || '' }, annotations: noHistory(v) })); };
 const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor) { clearInterval(iv); ed = el.editor; res(ed); } }, 100); });
 // code-writing: the code evaluated is the code shown and the hidden tail of the song on air (mixer, hidden voice), by
 // hand too (Ctrl+Enter); our helpers (.chan, .crunch), the library and the song's functions are registered once Strudel
@@ -743,6 +743,8 @@ ready.then(() => {
   const iv = setInterval(() => { if (typeof globalThis.register === 'function') { clearInterval(iv); installHelpers({ register: globalThis.register }); } }, 100);
   // #79: a widget whose id changes on a line redraws there at once (Strudel's editor kept the old canvas until a pause)
   const iw = setInterval(() => { if (installWidgetDom(globalThis.BlockWidget)) clearInterval(iw); }, 100);
+  // #82: no widget of an evaluation placed past the end of the code shown
+  const ig = setInterval(() => { if (guardEditorRanges(ed.editor, globalThis)) clearInterval(ig); }, 100);
   // code widgets D4: a scope or spectrum widget reads its line's instrument
   cwLinks = linkAnalysers({ pattern: () => sched() && sched().pattern, now: () => (sched() ? sched().now() : 0), active: () => isPlaying() && /\._(?:scope|spectrum)\(/.test(ed.code || '') });
 });
@@ -817,6 +819,15 @@ const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.cod
 // the undo history, so Ctrl+Z by hand undoes only the user's edits and never brings back half-typed code. The
 // annotation comes from the editor's own CodeMirror (the transaction's class), not from a second copy.
 const noHistory = view => view.state.update({}).constructor.addToHistory.of(false);
+// #82: an edit the app writes into an editor broken by widgets past its text (see guardEditorRanges) recovers the editor
+// and applies, so the song goes on growing and evaluating; spec() is made again for the recovered state
+function safeDispatch(view, spec) {
+  try { view.dispatch(spec()); } catch (e) {
+    if (!(e instanceof RangeError) || !recoverEditor(view, globalThis)) throw e;
+    console.warn('[editor] recovered from', e.message);
+    view.dispatch(spec());
+  }
+}
 // cursorEnd (takeover-pending-edit D5, tk4): a cursor inside the replaced range goes to the end of the new text.
 // Returns the range of the new text, or null when nothing changed
 function setCodeRange(txt, cursorEnd = false) {
@@ -829,7 +840,7 @@ function setCodeRange(txt, cursorEnd = false) {
   let b = 0; while (b < n - a && cur.charCodeAt(cur.length - 1 - b) === txt.charCodeAt(txt.length - 1 - b)) b++;
   const insert = txt.slice(a, txt.length - b), sel = view.state.selection.main;
   const inside = cursorEnd && sel.empty && sel.head >= a && sel.head <= cur.length - b;
-  view.dispatch({ changes: { from: a, to: cur.length - b, insert }, annotations: noHistory(view), ...(inside ? { selection: { anchor: a + insert.length } } : {}) });
+  safeDispatch(view, () => ({ changes: { from: a, to: cur.length - b, insert }, annotations: noHistory(view), ...(inside ? { selection: { anchor: a + insert.length } } : {}) }));
   markMuted();
   return { from: a, to: a + insert.length };
 }
@@ -973,6 +984,9 @@ function liveBuild(sg, s, cyc) {
   }
   if (!due) { typeFrame(typing, cyc); return; }
   typing = null; built = steps.filter(x => x.at <= next.at).length;
+  // (#82: the step's code holds the widgets of its bar, so the section boundaries up to it are done: widgetTick in the
+  // same tick must not write an earlier bar's code over the step's)
+  cwAt = Math.max(cwAt, next.at);
   setCodeRange(codeNow(sg, next.at)); ed.evaluate();
 }
 // the Decode tab (track-to-code D13, level A): the next change the model shows is typed with the bar as its deadline
@@ -5355,7 +5369,7 @@ radio = createRadio({
       // (a window whose song on air changed while songs are shown one by one, radio-profiles D7: the new song's code
       // appears whole now, in its own view)
       const fresh = (p.air || song.air) && p.id !== song.id && !hand;
-      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
+      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length; cwAt = Math.floor(cyc);
       // (the soundfonts of the window loaded in a task of its own: finding them writes the code of every step, #82)
       warmVoices(p); setTimeout(() => { if (song === p) preloadSounds(p); }, 0); source = { kind: 'radio', name: p.title }; renderSource();
       if (fresh) { ed.setCode(codeNow(p, Math.floor(cyc))); ed.evaluate(); }
@@ -5364,7 +5378,7 @@ radio = createRadio({
     jump: (p, bar) => {
       if (mode !== 'radio' || !song) return;
       setHand(false); resumeTo = null;
-      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= bar).length;
+      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= bar).length; cwAt = bar;
       warmVoices(p); source = { kind: 'radio', name: p.title }; renderSource();
       ed.setCode(codeNow(p, bar)); ed.evaluate();
     },
