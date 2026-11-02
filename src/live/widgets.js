@@ -483,15 +483,17 @@ function scopePainter(ctx, id, { color = '#ffffff', thickness = 3, scale = 1, po
 }
 // a spectrum as Strudel draws it (drawSpectrum), its last frame kept by this widget only, in the widget's colour
 function spectrumPainter(ctx, id, { color = '#ffffff', speed = 1, min = -80, max = 0 } = {}) {
-  let last = null;
+  // (the picture scrolls by copying the canvas onto itself, never read back with getImageData: a readback every frame
+  // costs CPU, #82)
+  let size = '';
   return () => {
     const c = ctx.canvas, A = globalThis.analysers, an = A && A[id];
     let d = null;
     try { d = an && globalThis.getAnalyzerData ? globalThis.getAnalyzerData('frequency', id) : null; } catch (e) { d = null; }
     if (!d || !d.length) return;
-    if (last && (last.width !== c.width || last.height !== c.height)) last = null;
-    ctx.clearRect(0, 0, c.width, c.height);
-    if (last) ctx.putImageData(last, -speed, 0);
+    const now = `${c.width}x${c.height}`;
+    if (now !== size) { size = now; ctx.clearRect(0, 0, c.width, c.height); }
+    else { const op = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'copy'; ctx.drawImage(c, -speed, 0); ctx.globalCompositeOperation = op; }
     ctx.fillStyle = color;
     const q = c.width - speed, n = d.length;
     for (let i = 0; i < n; i++) {
@@ -499,7 +501,6 @@ function spectrumPainter(ctx, id, { color = '#ffffff', speed = 1, min = -80, max
       ctx.fillRect(q, c.height - (Math.log(i + 1) / Math.log(n)) * c.height, speed, 2);
     }
     ctx.globalAlpha = 1;
-    last = ctx.getImageData(0, 0, c.width, c.height);
   };
 }
 
