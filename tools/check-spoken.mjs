@@ -991,10 +991,10 @@ const CHECKS = {
     assert(p.cs.filter(x => x.kind === 'narrator').every(x => !p.cs.some(y => y.kind === 'step' && y.text === x.text)), 'poetic: a step line as a spoken caption');
     // poetic without Narrated growth speaks on as many bars as the explaining style (poetic-narrator D1)
     assert(p.cs.filter(x => x.kind === 'narrator').length === 19, `poetic without Narrated growth: ${p.cs.filter(x => x.kind === 'narrator').length} captions, 19 heard`);
-    // poetic with Narrated growth: bar 8 says "fase successiva, pluralità" with the tag "ritmo più fitto"
+    // poetic with Narrated growth: bar 8 says an image of the movement list (POETIC.move) with the tag "ritmo più fitto"
     const pn = { ...poetic, narrated: true }, PN = liveBuildOf(grownOf('luci-rosse', pn), pn), q = same(PN, pn, 'it', ANY), f8 = captionFrame(q.cs, 7.1, S);
     assert(q.cs.filter(x => x.kind === 'narrator').length === 33, `poetic with Narrated growth: ${q.cs.filter(x => x.kind === 'narrator').length} captions, 33 heard`);
-    assert(f8.rows[0] && f8.rows[0].text === 'fase successiva, pluralità' && f8.tag === 'ritmo più fitto', `bar 8: ${JSON.stringify(f8)}`);
+    assert(f8.rows[0] && POETIC.move.some(m => m.it === f8.rows[0].text) && f8.tag === 'ritmo più fitto', `bar 8: ${JSON.stringify(f8)}`);
     const f17 = captionFrame(q.cs, 16.1, S);
     assert(f17.rows.some(r => POETIC.bass.some(b => b.it === r.text)), `bar 17: the entry image of the bass: ${JSON.stringify(f17.rows)}`);
     // the entry's own bar 18: no narrator caption of its own, its step line only as the tag (poetic-narrator D6)

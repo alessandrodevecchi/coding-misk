@@ -11,7 +11,7 @@ export const POOL = {
   'add-guitar': [['guitars', 'chitarre'], ['plug it in', 'attacca la chitarra'], ['six strings', 'sei corde'], ['riff time', 'tempo di riff'], ['turn it up', 'alza il volume']],
   'add-texture': [['some dirt', "un po' di sporco"], ['noise', 'rumore'], ['some grain', "un po' di grana"], ['dust and crackle', 'polvere e crepitio'], ['rough edges', 'bordi ruvidi']],
   'add-riser': [['here it comes', 'sta arrivando'], ['hold on', 'tieniti forte'], ['building up', 'sale la tensione'], ['get ready', 'preparatevi'], ['up we go', 'si sale']],
-  strip: [['strip it back', 'togliamo qualcosa'], ['less is more', 'meno è meglio'], ['make room', 'facciamo spazio'], ['just the core', "solo l'essenziale"], ['pull back', 'tiriamo indietro']],
+  strip: [['strip it back', 'togliamo qualcosa'], ['less is more', 'meno è meglio'], ['make room', 'facciamo spazio'], ['just the core', "solo l'essenziale"], ['pull back', 'tiriamo indietro'], ['slice it up', 'a fette'], ['chop it down', 'a pezzi'], ['thinner, sinner', 'più snello, monello']],
   variation: [['switch it up', 'cambiamo'], ['new pattern', 'pattern nuovo'], ['twist', 'una variazione'], ['something new', 'qualcosa di nuovo'], ['flip it', 'giriamolo']],
   brighter: [['open it up', 'apriamo'], ['brighter', 'più luce'], ['more air', 'più aria'], ['let it shine', 'facciamolo brillare'], ['filter open', 'filtro aperto']],
   darker: [['darker', 'più scuro'], ['close the filter', 'chiudiamo il filtro'], ['into the shade', "verso l'ombra"], ['lower the lights', 'abbassiamo le luci'], ['deeper tone', 'suono più cupo']],
