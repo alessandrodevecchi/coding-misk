@@ -321,7 +321,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     }
     else generate();
     if (!limit) remember(S.stream[0]);
-    player.start(windowPlayable(), L ? Math.min(L.from || 0, S.stream[0].bars - 1) : 0);
+    player.start(windowPlayable(), L ? Math.min(L.from || 0, S.stream[0].bars - 1) : 0, { voices: airVoices() });
     render();
   }
   // a song from Compose or a song card goes on in the radio, in the styles closest to it
@@ -420,7 +420,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     idle(() => {
       if (S !== mine) return;
       // (the window with the next song made ready a little at a time: the song on air's plan is made again, #82)
-      const it = generate(true), ready = () => { if (S !== mine) return; S.pending = false; const nx = S.stream[S.onAir + 1]; swapSoon(windowPlayable(), nx ? nx.start : Infinity); render(); };
+      // (the next song's voice samples then load one at a time, in a task of their own, #82)
+      const it = generate(true), ready = () => { if (S !== mine) return; S.pending = false; const nx = S.stream[S.onAir + 1]; swapSoon(windowPlayable(), nx ? nx.start : Infinity); render(); setTimeout(() => { if (S === mine && player.preloadVoices && nx) player.preloadVoices(voicesOf(nx)); }, 0); };
       if (it && it.growing) it.growing.then(ready); else ready();
     });
   }
@@ -451,7 +452,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     relayout();
     S.onAir++;
     remember(S.stream[S.onAir]);
-    player.jump(windowPlayable(), S.stream[S.onAir].start);
+    player.jump(windowPlayable(), S.stream[S.onAir].start, { voices: airVoices() });
     render();
   }
   // ---------- recording (#30) ----------
@@ -649,7 +650,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     relayout();
     S.onAir++;
     remember(S.stream[S.onAir]);
-    player.jump(windowPlayable(), S.stream[S.onAir].start);
+    player.jump(windowPlayable(), S.stream[S.onAir].start, { voices: airVoices() });
     render();
     return true;
   }
@@ -658,13 +659,13 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (!S) return;
     const it = S.stream[S.onAir], bar = it.start + Math.max(0, Math.min(it.bars - .25, rel));
     if (S.paused !== undefined) { S.paused = bar; renderNow(); return; }
-    player.start(windowPlayable(), bar);
+    player.start(windowPlayable(), bar, { voices: airVoices() });
   }
   // previous in the player bar: the song on air from its first bar
   function restart() {
     if (!S) return;
     delete S.paused;
-    player.start(windowPlayable(), S.stream[S.onAir].start);
+    player.start(windowPlayable(), S.stream[S.onAir].start, { voices: airVoices() });
     render();
   }
   function remember(item) {
@@ -688,6 +689,27 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     scheduleMemo.set(item.song, { key, files, list });
     return list;
   };
+  // the voice samples of a song as it is written on air (#82): [{ s, n, at }] in the window's bars, first lines first,
+  // from the song's own schedule (the one its captions use). Not from the window's build: that holds the growth bound of
+  // the song on air only, so the next song's refrains placed in its own growth were missing and loaded on its first bar
+  function voicesOf(item) {
+    if (!item || !item.song) return [];
+    const C = liveControlsOf(item), lang = getLang(), files = voiceFiles() || {}, out = [], seen = new Set();
+    let list = [];
+    try { list = spokenNeeds(liveBuildOf(item.song, C), C, lang, files); } catch (e) { list = []; }
+    for (const x of list) {
+      // (the speaker's own sample, else the default voice's, as lineSample picks it)
+      for (const s of [x.bank, `say_${lang}`]) {
+        const n = slugAt(files[s] || [], sayFile(x.text));
+        if (n < 0) continue;
+        if (!seen.has(`${s}:${n}`)) { seen.add(`${s}:${n}`); out.push({ s, n, at: item.start + x.at }); }
+        break;
+      }
+    }
+    return out;
+  }
+  // the voice samples of the window on air: its song on air and the next one, when made
+  const airVoices = () => (S ? S.stream.slice(S.onAir, S.onAir + 2).flatMap(voicesOf) : []);
   const voiceTag = v => `<span class="vtag vtag-${v.voice === 'N' ? 'n' : 't'}" title="${esc(t(v.voice === 'N' ? 'narratorLbl' : 'vinstLbl'))}">V:${v.voice}</span> <em>“${esc(v.text)}”</em>`;
   // (a bar with many moves, the opening of a growth: the first four, the rest in the tooltip)
   const nextRow = r => `<li data-at="${r.at}"><span class="at">${esc(t('radioBarShort', { n: r.at + 1 }))}</span> ${r.labels.length ? `<span class="nx-step"${r.labels.length > 4 ? ` title="${esc(r.labels.join(' · '))}"` : ''}>${esc(r.labels.slice(0, 4).join(' · '))}${r.labels.length > 4 ? ' …' : ''}</span>` : ''}${r.voices.map(v => ` ${voiceTag(v)}`).join('')}</li>`;

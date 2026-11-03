@@ -1172,7 +1172,8 @@ function initAudioOnce() {
 
 // Riproduce un brano dalla posizione "bar" (anche frazionaria): lo scheduler di Strudel riprende
 // da lastEnd, quindi basta impostarlo prima di avviare. Il tempo lo gestisce transport() battuta per battuta.
-async function playSong(sg, bar = 0, as = 'free', { keepHand = false } = {}) {
+async function playSong(sg, bar = 0, as = 'free', opts = {}) {
+  const { keepHand = false } = opts;
   if (seeking) return;
   // (the song in Compose still growing: Play waits for it; a bar of the song as written moves past the growth span)
   const held = !!(sg && sg === compiled && compiled.pending);
@@ -1192,8 +1193,11 @@ async function playSong(sg, bar = 0, as = 'free', { keepHand = false } = {}) {
     renderSource();
     ed.stop();
     typing = null; built = sg.build ? buildSteps(sg.build).filter(x => x.at <= bar).length : 0; cwAt = bar;
-    // spoken comments load the first time they play, too late for that hit: load them all now, silently
-    if (sg.build) voiceSamples(sg.build, getLang(), customFiles).forEach(v => { try { globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05); } catch (e) {} });
+    // spoken comments load the first time they play, too late for that hit: load them all now, silently (a radio window:
+    // those of its first bars before it starts, the rest one at a time, #82)
+    radioWin = sg;
+    if (opts.voices) await voicesFirst(opts.voices, bar);
+    else if (sg.build) voiceSamples(sg.build, getLang(), customFiles).forEach(v => { try { globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05); } catch (e) {} });
     if (hand && keepHand) { song = sg; sched().lastEnd = bar; await ed.evaluate(); return; }
     setHand(false); resumeTo = null;
     ed.setCode(codeNow(sg, bar));
@@ -5289,6 +5293,8 @@ let preloaded = '';
 // (the code of each step written in a task of its own, the page free between them: in one block it took up to 170 ms
 // with the CPU slowed 4 times, #82; a newer window stops it)
 let preloadJob = 0;
+// the radio's latest window handed to the player (a skip that waits for its first voices gives way to a newer one)
+let radioWin = null;
 const preloadSounds = p => {
   const key = p && p.meta ? `${p.title}|${p.meta.bpm.length}` : '';
   if (!key || key === preloaded || !globalThis.soundMap) return;
@@ -5305,7 +5311,40 @@ const preloadSounds = p => {
   };
   next();
 };
-const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
+// Voice samples loaded ahead one at a time, each in a task of its own (#82): all of a song's samples loading together
+// made the scheduler late with the CPU slowed ("took too long", "skip query: too late"). A sample already loaded or
+// queued is skipped; warmOne resolves once its sample is loaded (a silent hit, gain 0).
+const voiceDone = new Set(), voiceQueued = new Set(), voiceQueue = [];
+let voicePumping = false;
+const voicePath = v => ((customFiles[v.s] || [])[v.n]) || `${v.s}:${v.n}`;
+const warmOne = v => { try { return Promise.resolve(globalThis.superdough({ s: v.s, n: v.n, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)).then(() => { voiceDone.add(voicePath(v)); }, () => {}); } catch (e) { return Promise.resolve(); } };
+// now: the samples of the window going on air go before those of a later song; a few (a typed line) load at once, not
+// behind the sample loading (that one can take seconds with the CPU slowed)
+function queueVoices(list, now = false) {
+  const add = [];
+  for (const v of list) { const k = voicePath(v); if (voiceDone.has(k)) continue; if (voiceQueued.has(k)) { if (!now) continue; const i = voiceQueue.findIndex(x => voicePath(x) === k); if (i < 0) continue; voiceQueue.splice(i, 1); } voiceQueued.add(k); add.push(v); }
+  if (now && add.length <= 4) for (const v of add) warmOne(v).then(() => voiceQueued.delete(voicePath(v)));
+  else if (now) voiceQueue.unshift(...add);
+  else voiceQueue.push(...add);
+  pumpVoices();
+}
+function pumpVoices() {
+  if (voicePumping || !voiceQueue.length) return;
+  voicePumping = true;
+  const v = voiceQueue.shift();
+  // (a sample that never answers does not hold the others back: 3 s at most)
+  Promise.race([warmOne(v), new Promise(r => setTimeout(r, 3000))]).then(() => { voiceQueued.delete(voicePath(v)); voicePumping = false; setTimeout(pumpVoices, 0); });
+}
+// a radio window about to start on "bar": the samples of its first 4 bars loaded first (at most `wait` ms, ~100), then
+// the rest one at a time, in bar order (voices: [{ s, n, at }] from the radio, at in the window's bars)
+async function voicesFirst(voices, bar, wait = 100) {
+  const due = voices.filter(v => v.at >= Math.floor(bar)).sort((a, b) => a.at - b.at);
+  const first = due.filter(v => v.at < bar + 4 && !voiceDone.has(voicePath(v)));
+  if (first.length && wait > 0) await Promise.race([Promise.all(first.map(warmOne)), new Promise(r => setTimeout(r, wait))]);
+  queueVoices(due, true);
+}
+globalThis.codingMiskVoiceQueue = { get pending() { return voiceQueue.length + (voicePumping ? 1 : 0); } };
+const warmVoices = sg => { try { queueVoices(voiceSamples(sg.build, getLang(), customFiles), true); } catch (e) {} };
 // the radio's saved pattern preview: the pattern's loop in the song's key, chords and tempo, on an orbit well above the
 // window's, the radio ducked to a quarter (12 dB) and never paused; it stops when the song on air changes
 radioPreview = createPreview({
@@ -5359,12 +5398,15 @@ radio = createRadio({
     grow: (song, ctx) => growAway(song, ctx),
     // and a grown song is steered there (radio-profiles stage 5: commands as waypoints)
     steer: args => growAway(null, null, args),
-    start: (p, bar) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio'); },
+    start: (p, bar, o) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio', { voices: o && o.voices }); },
+    // the next song's voice samples, as it will be written on air (#82)
+    preloadVoices: list => queueVoices(list),
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
     // a new window while the radio plays: the code on air does not change, the steps to come do
     swap: p => {
       if (mode !== 'radio' || !song) return;
+      radioWin = p;
       const s = sched(), cyc = s ? s.now() : 0;
       // (a window whose song on air changed while songs are shown one by one, radio-profiles D7: the new song's code
       // appears whole now, in its own view)
@@ -5375,11 +5417,17 @@ radio = createRadio({
       if (fresh) { ed.setCode(codeNow(p, Math.floor(cyc))); ed.evaluate(); }
     },
     // skip: the new window takes over now, its first song starts on "bar"
-    jump: (p, bar) => {
+    // (its first bars' voice samples loaded first, #82: at most 100 ms, and never past the bar it starts on)
+    jump: async (p, bar, o) => {
       if (mode !== 'radio' || !song) return;
+      radioWin = p;
+      if (o && o.voices) { const s = sched(), left = s && s.cps ? ((bar - s.now()) / s.cps) * 1000 - 60 : 0; await voicesFirst(o.voices, bar, Math.min(100, left)); }
+      else warmVoices(p);
+      // (stopped, or another window handed over, meanwhile)
+      if (mode !== 'radio' || !song || radioWin !== p || !isPlaying()) return;
       setHand(false); resumeTo = null;
       song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= bar).length; cwAt = bar;
-      warmVoices(p); source = { kind: 'radio', name: p.title }; renderSource();
+      source = { kind: 'radio', name: p.title }; renderSource();
       ed.setCode(codeNow(p, bar)); ed.evaluate();
     },
     stop: () => stop(),
