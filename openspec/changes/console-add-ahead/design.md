@@ -75,21 +75,34 @@ The `arr-pm` click calls a new `pend(kind, part)`. It checks the same reasons as
 | B keep `command` on the click, only move `steerSong` to the worker | Still one steering per press, and the window and the render stay on the click              |
 | C a faster `steerSong` (memoized `stateAt`)       | Helps every command, but still grows with the song and still runs per press; worth doing later on its own |
 
-### D2. Boundary: the next phrase that leaves 2 s and is ready
+### D2. A predictable default, later only when needed (owner answers 1 and the refinement)
 
-The target is the first phrase boundary (`applyBar` or `airBoundaries`, as today) that starts at least `ADD_LEAD` = 2 s after the press. This matches Say now's `SAY_LEAD`. The batch must be ready a third of a bar before it, the same margin as `swapSoon` and `placeLine`. When it is not ready, the batch moves to the next phrase (a push, shown in the queue). After `ADD_PUSHES` = 3 pushes it is finished at once, as `SAY_PUSHES` does. Phrase rather than bar: a new instrument entering mid-phrase sounds wrong, and today's spec already says "from the next phrase". Owner question 1 offers the bar.
+The listener must be able to predict the entry: the default is fixed, and the song moves it later only for load or preparation. There is no random variety. In practice the entry is a few bars to about 10 seconds after the press, as with Say now.
+
+- **Default.** The start of the next phrase of the song's plan (`plan.phrase`, the musical phrase, never the voice track) that is at least `ADD_LEAD` = 2 s plus the expected preparation time after the press. The expected preparation time is the last measured batch time on this page, 1 s before the first. The same press at the same point of the same song on a quiet page gives the same bar. Songs with and without a voice track behave the same.
+- **Later boundaries.** Only when needed (below), the change moves to the next sensible boundary. A half-phrase start counts when the phrase has an even number of bars (4 bars in an 8-bar phrase, 8 in a 16-bar one); otherwise the next phrase start.
+- **Ready.** The song, the window and the new tracks' sounds are ready a third of a bar before the candidate, the margin of `swapSoon` and `placeLine`.
+- **Quiet.** A load monitor in the page keeps the last 2 s of long tasks (PerformanceObserver) and of Strudel's skipped windows (the scheduler's late ticks). A candidate is taken only when there was no task over 50 ms and no skipped window in those 2 s, and the expected entry cost fits the scheduler's margin. The expected cost is the last measured evaluation of this window's code times 1.5, against the scheduler's 100 ms look-ahead. Otherwise the change moves to the next sensible boundary (a push, shown at once on the badge with a short highlight, and in the queue).
+- **Bound.** The wait ends 30 s after the press: the change then enters on the next boundary where it is ready, even under load, and the page logs `[radio] entered under load` with the bar (the check reports it). Readiness is never skipped, so the change never enters half-ready. This replaces the earlier cap of three pushes, which could force an entry while the page was busy.
+- **Half-phrase entries and the director.** A command `at` on a half-phrase start is new for `more` and `less`. The rewrite keeps every director move on phrase boundaries; only the listener's track change starts at the half phrase (its clip starts there). Task 1.3 verifies that `steerSong` and `steerOnAir` accept it and that the seed fixtures do not move.
+
+| Option                                                  | Notes                                                                                                   |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **A (chosen)** next phrase with enough time; later only for load or preparation | Predictable at the click, and no lag first; half phrase only as a later step |
+| B always the next phrase, never later                    | Predictable, but enters under load and skips notes                                                     |
+| C the first bar 2 s ahead, as Say now                   | Fastest, but an instrument can enter on any bar, which can sound off                                   |
 
 ### D3. One batch per boundary, merged per instrument
 
 - **Pending map.** `pending[boundary][part] = n`, a signed net count. "+" adds 1, "−" subtracts 1. A count of 0 removes the entry, so "+ −" leaves nothing.
 - **Limits.** The net count is clamped by the rules of D1 checked on the song with every pending change of that boundary. A press beyond them is refused with the reason, as a disabled button gives today.
 - **Settle time.** The batch starts preparing 250 ms after the last press of its boundary. A burst therefore costs one steering, and a single press waits a quarter second that nobody hears, since the boundary is seconds away.
-- **Late presses.** A press for a boundary whose batch is preparing or ready restarts the batch (the old job is dropped with the existing `growToken` and `windowSeq` guards) when at least `ADD_LEAD` remains. Otherwise it goes to the next boundary's batch.
+- **Late presses (owner answer 3).** A press for a boundary whose batch is preparing or ready joins it and restarts the batch (the old job is dropped with the existing `growToken` and `windowSeq` guards) when at least `ADD_LEAD` = 2 s remain. Otherwise it goes to the next candidate's batch.
 - **Order.** The batch is written as commands in a fixed order (instrument order of `INSTRUMENTS`, then "−" before "+"), each `|n|` times, all with the same `at`. Two presses in different orders give the same song.
 
 | Option                                    | Notes                                                                                                       |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **A (chosen)** net count per instrument   | "+ −" cancels as the owner expects; one row per instrument; the record stays in today's command form        |
+| **A (chosen, owner answer 2)** net count per instrument | "+ −" cancels, as the owner confirmed; one row per instrument; the record stays in today's command form        |
 | B keep each press as its own command      | Today's behaviour: "+ then −" brings a track in and takes one out (possibly another one), and a burst costs one steering per press |
 | C stagger: each press on its own boundary | No merge logic, but changes arrive one phrase apart, which is not what a live player means by a quick burst |
 
@@ -100,16 +113,16 @@ For a batch, in order, each step in its own task and guarded by a sequence numbe
 1. **Steering away from the page.** The batch's commands are added to the item's commands. The steering runs in the growth worker: `steerSong` for Classic (new message kind) and `steerOnAir` for grown songs, with the director's view (`directorView`: plan, opts, plain song) returned by the worker. `airView` therefore no longer runs on the main thread before the worker call. With no worker, the steering runs in the page in a task of its own, after the settle time (a fallback that stays slow but never on the click).
 2. **The window.** `windowPlayable` with the steered song, prepared with `p.prepare(12, …)`. A Classic window gets a sliced `prepare` too: its `build` steps and `codeAt` made a few per slice.
 3. **Sounds.** The sounds of the new tracks only (the diff of the window's sound list before and after) are loaded with `preloadFonts` and warmed at gain 0. The whole-window `soundCode()` compile, which runs in one task today, is replaced by this diff, made in slices.
-4. **Commit.** When all three are ready and the boundary is more than a third of a bar away, the commands are recorded (`S.recipe.steering`, the session's arrange list when the scope is the session) and `player.swap(p)` hands the window over. Otherwise the batch is pushed (D2).
+4. **Commit.** When all three are ready, the boundary is more than a third of a bar away and the page is quiet (D2), the commands are recorded (`S.recipe.steering`, the session's arrange list when the scope is the session) and `player.swap(p)` hands the window over. Otherwise the batch waits for the next candidate (D2).
 
 The entry bar keeps today's evaluation by the transport (21 to 29 ms measured). Evaluating the new code early is not needed at this cost (Risks).
 
 ### D5. What the console shows
 
-- **Badge.** Next to the instrument's name (where `×n` is today): "+1", "+2", "−1" in the accent colour, with a slow pulse while preparing and a steady look when ready. The tooltip reads "Enters on bar 81, in 6 s" (Italian: "Entra alla battuta 81, tra 6 s"). The `×n` count keeps showing the tracks playing now.
-- **Queue.** One row per instrument and boundary: "bar 81 · +2 arp" with ✕, replacing one row per press. A pushed row shows its new bar. A row that is entering (less than a third of a bar left) shows its ✕ disabled with the tooltip "Entering now".
+- **Badge with a live countdown.** At the click, next to the instrument's name (where `×n` is today): "+1 · Enters in 6 s" (Italian: "+1 · Entra tra 6 s"), counted down every second from the planned bar and the tempo. While preparing, a slow pulse; when ready, a steady look. When the entry moves later, the new time shows at once with a short highlight (a 600 ms flash of the accent, none with reduced motion). The tooltip names the bar: "Enters on bar 81". The `×n` count keeps showing the tracks playing now. A narrow console may shorten it to "+1 · 6 s".
+- **Queue.** One row per instrument and boundary: "bar 81 · +2 arp · 6 s" with ✕, replacing one row per press. A pushed row shows its new bar. A row that is entering (less than a third of a bar left) shows its ✕ disabled with the tooltip "Entering now".
 - **Cancel.** ✕ removes the instrument's entry from the batch and restarts the batch's preparation for the others. When it was the last entry, nothing is prepared and the window on air stays as it is. A cancel never touches the music before its boundary, so it costs nothing heard.
-- **Hardware theme.** The badge is a small LED next to the knob label, lit while pending, blinking while preparing.
+- **Hardware theme.** The countdown shows on the instrument's small display, next to an LED lit while pending and blinking while preparing.
 
 ### D6. Record and replay
 
@@ -122,18 +135,19 @@ A batch is recorded when it commits, as today's commands: `|n|` commands of kind
 ## Risks / Trade-offs
 
 - [The worker and the page disagree on a song] → The worker already runs `steerOnAir` with the same modules. Classic `steerSong` is pure on its inputs. The check compares the worker's song with the page's for every case (JSON equal).
-- [A change now enters later than before for a press under 2 s before the phrase] → Today such a press entered on that phrase anyway, but often with skipped notes. The badge shows the bar, so the listener knows.
+- [A change enters later than before under load] → Wanted by the owner: no lag first. The badge shows the bar and the seconds, and the 30 s bound keeps the wait finite.
+- [The load monitor waits forever on a slow machine where every bar has a long task] → The 30 s bound; the check runs at CPU 4× to see how often it is reached.
 - [Entry evaluation on a slower machine] → 21 to 29 ms at 1×. If the 4× run shows tasks over 100 ms on the entry bar, a follow-up evaluates the Classic window early (its clips already start the track on its bar, so the sound is the same). Measured in task 5.1, not assumed.
-- [Steering still grows with the song] → It now runs away from the page once per batch, so the length of a song no longer reaches the click. A memoized `stateAt` (open question 4) would also make the worker answer faster on long songs.
+- [Steering still grows with the song] → It now runs away from the page once per batch, so the length of a song no longer reaches the click. A memoized `stateAt` stays out of this change (owner answer 4).
 - [Other commands keep the old path] → Out of scope here. The pending-map model is generic, and Vary, Swap, Lock and the riser can move to it later.
 
 ## Migration Plan
 
 No data migration. Sessions recorded before replay the same, because the recorded command form does not change. Rollback is reverting the change.
 
-## Open Questions (for the owner, with the recommended option)
+## Owner answers (3 November)
 
-1. **Entry: next phrase or next bar?** Recommended: **next phrase that leaves at least 2 s** (today's musical rule, and about 10 s to prepare). Alternative: the first bar at least 2 s ahead, like Say now. It is faster to hear, but an instrument entering mid-phrase can sound off.
-2. **"+" then "−" on the same instrument before the entry: cancel or both?** Recommended: **they cancel** (nothing changes). Alternative: today's behaviour, which brings the new track in and takes another one out.
-3. **A press during a batch's preparation: join it or wait for the next phrase?** Recommended: **join while at least 2 s are left**, else the next phrase.
-4. **Make the steering itself faster in this change?** Recommended: **no, open a separate issue** (memoized `stateAt`). This change already removes the cost from the click.
+1. **Entry moment:** absence of lag first, the exact moment second. Refined: the default is the next phrase start that leaves enough time, deterministic; a later boundary only when load or preparation needs it (D2). Songs without a voice behave the same. The entry time shows at the click and counts down live, and a later entry shows at once (D5).
+2. **"+" then "−" before the entry:** they cancel out (D3).
+3. **A press during a batch's preparation:** it joins the batch when at least 2 s are left, else the next boundary (D3).
+4. **Faster steering:** out of this change, no issue for now.

@@ -13,20 +13,46 @@ Pressing "+" or "−" on an instrument in the Arrangement group SHALL record a p
 - **WHEN** a "+" is pending and its preparation is still running
 - **THEN** the song on air plays exactly as before the press, with no skipped scheduler window
 
-### Requirement: Changes enter on a ready phrase boundary
-A pending change SHALL enter on the first phrase boundary that starts at least 2 seconds after the press and for which the song, the window, the new track's samples and its soundfonts are all ready a third of a bar before it. When they are not ready in time, the change SHALL move to the next phrase boundary (a push) and the console SHALL show the new bar. A change SHALL never be lost and SHALL never enter half-ready. After three pushes the preparation SHALL be finished at once.
+### Requirement: A predictable default entry
+By default a pending change SHALL enter at the start of the next phrase that leaves enough time: at least 2 seconds after the press plus the expected preparation time. The phrase SHALL come from the song's plan of bars, the same for songs with and without a voice track. The entry moment SHALL be deterministic: the same press at the same point of the same song SHALL give the same bar, with no random variety.
 
 #### Scenario: Enough time
-- **WHEN** the listener presses "+ pad" 9 seconds before the next phrase and the preparation takes 1 second
-- **THEN** the pad starts on that phrase boundary
+- **WHEN** the listener presses "+ pad" 9 seconds before the next phrase, the preparation takes 1 second and the page is quiet
+- **THEN** the pad starts on that phrase start
 
-#### Scenario: Too close to the boundary
+#### Scenario: Too close to the phrase
 - **WHEN** the listener presses "+ pad" 1.5 seconds before the next phrase
-- **THEN** the pad is pending for the phrase after, and the badge and the queue show that bar
+- **THEN** the pad is pending for the phrase start after it, and the instrument shows that time from the click
+
+#### Scenario: The same press twice
+- **WHEN** a session is replayed and the listener presses "+ arp" at the same bar and beat as before, on a quiet page
+- **THEN** the arp is planned for the same bar as before
+
+#### Scenario: A song without a voice track
+- **WHEN** the song on air has no voice track and the listener presses "+ arp"
+- **THEN** the arp is planned for the next phrase start of the song's plan, as on a song with a voice
+
+### Requirement: A later entry only when needed
+A change SHALL move later than its planned phrase start only when its preparation is not finished a third of a bar before it, or when the page is busy: a main-thread task over 50 ms or a skipped scheduler window in the last 2 seconds, or an expected entry cost above the scheduler's margin. It SHALL then move to the next sensible boundary: a half-phrase start, else the next phrase start.
 
 #### Scenario: Preparation late
-- **WHEN** the new track's soundfont has not loaded a third of a bar before the planned boundary
-- **THEN** the change moves to the next phrase boundary, the queue shows the new bar, and the change enters there with its sound
+- **WHEN** the new track's soundfont has not loaded a third of a bar before the planned phrase start, in an 8-bar phrase
+- **THEN** the change moves to four bars later, the instrument shows the new time, and the change enters there with its sound
+
+#### Scenario: A busy page
+- **WHEN** a "+ arp" is ready but a long task of 120 ms ran 1 second before the planned phrase start
+- **THEN** the arp moves to the next sensible boundary, and the instrument and the queue show the new bar and time
+
+### Requirement: The wait under load is bounded
+A change SHALL never be lost and SHALL never enter half-ready. When the page stays busy, the change SHALL keep moving to the next sensible boundary until 30 seconds after the press. It SHALL then enter on the next boundary where it is ready, even under load, and the page SHALL log that it entered under load, with the bar.
+
+#### Scenario: The upper bound
+- **WHEN** the page stays busy for 30 seconds after the press
+- **THEN** the change enters on the next boundary where it is ready, and the page logs "entered under load" with the bar
+
+#### Scenario: Cancel while waiting
+- **WHEN** a change waits under load and the listener cancels it
+- **THEN** nothing changes at any boundary
 
 ### Requirement: The new track's sound is ready before its bar
 Before a pending change enters, the samples and soundfonts of every track it brings in SHALL be loaded and warmed, so the first note of the new track sounds on its bar. Loading SHALL be split into tasks that stay within the load budget.
@@ -40,7 +66,7 @@ Pending "+" and "−" on the same instrument for the same boundary SHALL merge i
 
 #### Scenario: Two quick "+" on arp
 - **WHEN** one arp plays and the listener presses "+ arp" twice within 300 ms
-- **THEN** one pending row "+2 arp" shows, and from its boundary three arps play
+- **THEN** the arp shows "+2" with one entry time, and from that boundary three arps play
 
 #### Scenario: Three quick "+" on pad
 - **WHEN** the listener presses "+ pad" three times within 500 ms and the track cap allows only two more tracks
@@ -63,10 +89,10 @@ Pending "+" and "−" on the same instrument for the same boundary SHALL merge i
 - **THEN** the press is refused with the reason, as today, and nothing is pending
 
 ### Requirement: Changes for one boundary enter together
-Pending changes on different instruments for the same boundary SHALL be prepared as one batch and SHALL enter together on that boundary, with one change of the window. A press made while a batch is being prepared SHALL join that batch when the batch can still be prepared again in time for its boundary, else it SHALL be pending for the next phrase boundary. The order of presses within a batch SHALL NOT change the result.
+Pending changes on different instruments for the same boundary SHALL be prepared as one batch and SHALL enter together on that boundary, with one change of the window. A press made while a batch is being prepared or ready SHALL join that batch when at least 2 seconds are left before its boundary, else it SHALL be pending for the next sensible boundary. The order of presses within a batch SHALL NOT change the result.
 
 #### Scenario: Different instruments in a burst
-- **WHEN** the listener presses "+ arp", "− bass", "+ pad" and "+ texture" within 500 ms, 9 seconds before the next phrase
+- **WHEN** the listener presses "+ arp", "− bass", "+ pad" and "+ texture" within 500 ms, 9 seconds before the next phrase, on a quiet page
 - **THEN** the four changes enter together on that phrase boundary, and no main-thread task over 100 ms runs from the first click until two bars after the boundary
 
 #### Scenario: A press during the preparation
@@ -75,14 +101,29 @@ Pending changes on different instruments for the same boundary SHALL be prepared
 
 #### Scenario: A press too late for the batch
 - **WHEN** a batch for bar 81 is ready and the listener presses "+ hook" 1 second before bar 81
-- **THEN** the batch enters on bar 81 without the hook, and "+ hook" is pending for the next phrase boundary
+- **THEN** the batch enters on bar 81 without the hook, and "+ hook" is pending for the next sensible boundary
 
-### Requirement: Pending changes are shown and can be cancelled
-Each instrument with a pending change SHALL show a small badge next to its name with the net count ("+1", "+2", "−1") and the bar it enters, with the seconds left in the tooltip. The queue SHALL show one row per instrument and boundary, for example "bar 81 · +2 arp". Each row SHALL have a cancel button until a third of a bar before its bar. The texts SHALL exist in English and Italian, with English as the reference.
+### Requirement: The entry time is shown at the click and counted down
+From the click, each instrument with a pending change SHALL show a badge with the net count and the time left, for example "+1 · Enters in 6 s", counted down every second until the entry. When the entry moves later, the badge SHALL show the new time at once with a short visible highlight. The tooltip SHALL name the bar. Texts SHALL exist in English and Italian, English as the reference.
 
-#### Scenario: Badge while pending
-- **WHEN** "+ arp" is pending for bar 17
-- **THEN** the arp's name shows a "+1" badge, its tooltip reads "Enters on bar 17, in 6 s" in English, and the queue shows "bar 17 · +1 arp"
+#### Scenario: Time at the click
+- **WHEN** the listener presses "+ arp" and the arp is planned for bar 17, 6 seconds away
+- **THEN** within 100 ms the arp shows "+1 · Enters in 6 s", and its tooltip reads "Enters on bar 17"
+
+#### Scenario: Countdown
+- **WHEN** 3 seconds pass with the arp pending for bar 17
+- **THEN** the badge reads "+1 · Enters in 3 s"
+
+#### Scenario: Moved later
+- **WHEN** the arp's entry moves from bar 17 to bar 21 because the page was busy
+- **THEN** the badge shows the new time at once with a short highlight, and the tooltip reads "Enters on bar 21"
+
+#### Scenario: Entered
+- **WHEN** the arp enters
+- **THEN** the badge goes and the instrument's track count goes up by one
+
+### Requirement: Pending changes are listed and can be cancelled
+The queue SHALL show one row per instrument and boundary, with its bar and the time left, for example "bar 81 · +2 arp · 6 s". Each row SHALL have a cancel button until a third of a bar before its bar.
 
 #### Scenario: Several pending rows
 - **WHEN** "+2 arp" and "−1 bass" are pending for bar 81
@@ -97,7 +138,7 @@ Each instrument with a pending change SHALL show a small badge next to its name 
 - **THEN** the cancel button is disabled with the tooltip "Entering now"
 
 ### Requirement: Adding and removing stay within the load budget
-From the first press of a change until two bars after it enters, the page SHALL log no "skip query: too late" and SHALL run no main-thread task over 100 ms at normal CPU speed. With the CPU slowed 4 times, no main-thread task over 100 ms SHALL run from the press until the batch is ready. This SHALL hold for "+" and "−", alone or in a burst, in Classic, Crescendo and Live coder, with up to 12 tracks.
+From the first press of a change until two bars after it enters, the page SHALL log no "skip query: too late" and SHALL run no main-thread task over 100 ms at normal CPU speed. With the CPU slowed 4 times, no main-thread task over 100 ms SHALL run from the press until the batch is ready. This SHALL hold for "+" and "−", alone or in a burst, in Classic, Crescendo and Live coder, with up to 12 tracks, except for a change that reached the 30-second bound under load.
 
 #### Scenario: Removal in Live coder
 - **WHEN** the listener presses "− pad" twice quickly on a Live coder song on bar 50
