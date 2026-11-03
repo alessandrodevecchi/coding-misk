@@ -38,7 +38,7 @@ Without Narrated growth the poetic narrator then says as many lines as the expla
 
 **Non-Goals:**
 - Changing the growth, the steps, which steps get `say`, the explaining narrator or the voice track.
-- New image vocabularies or new samples.
+- Growing the image vocabularies in this change. The owner approved new phrases (more movement images, more `any` images, more entry images per track, more director lines); they are added in a separate change (`feat/82-new-phrases`, `src/song/vocabulary.js` and `src/endless/phrases.js`). The logic of this change must not depend on the size of any list: D4's ordinal and its wrap-around hold for any list length.
 - Changing the timing of entry images.
 
 ## Decisions
@@ -64,7 +64,7 @@ So the poetic narrator may speak on a few bars where the explaining one is quiet
 
 ### D4. Movement images in turn
 
-`movementLine(song, k)` today takes `k` = the step's index in the build. With every step spoken this is nearly consecutive; with few steps spoken the index jumps, so with 12 lines two spoken steps 12 indices apart repeat a line early. `k` becomes the ordinal of the step among the steps that say a movement image (the steps with `say` whose bar has no entry and is not taken by an image), counted in the same order as `buildSteps`. It is computed once per song per language in `narration` (memoised per song object, as `releasedMemo`). The start stays drawn from the song's seed on the `poetic-move` stream, so the music's streams do not move.
+`movementLine(song, k)` today takes `k` = the step's index in the build. With every step spoken this is nearly consecutive; with few steps spoken the index jumps, so with 12 lines two spoken steps 12 indices apart repeat a line early. `k` becomes the ordinal of the step among the steps that say a movement image (the steps with `say` whose bar has no entry and is not taken by an image), counted in the same order as `buildSteps`. It is computed once per song per language in `narration` (memoised per song object, as `releasedMemo`). The start stays drawn from the song's seed on the `poetic-move` stream, so the music's streams do not move. The index is taken modulo the list's length at the time it is read, so the rule holds whatever the size of the movement list (the vocabulary grows in a separate change).
 
 This also changes which image a narrated poetic song says on a given step: the code changes anyway (D7). The key of a phrase of mine (`m:${k}`, my-phrases) follows the new `k`; `check:phrases` is updated.
 
@@ -94,11 +94,11 @@ With the built-in vocabulary an image always exists: `poeticLine` falls back to 
 
 ### D8. Saved radio sessions
 
-A saved radio session replays its songs from the director with the current code, so a session with a poetic narrator (the profile's `narratorStyle`, or a style or song that is poetic) says more lines when it is played again: the music, the steps and the length are the same. Raising `DIRECTOR_VERSION` would show the "may sound different" warning on every saved session, also the explaining ones, and break the rule that ties it to the fixtures. Recommended: no bump; a line in DEVLOG and in the release notes. Open question for the owner (Q1).
+A saved radio session replays its songs from the director with the current code, so a session with a poetic narrator (the profile's `narratorStyle`, or a style or song that is poetic) says more lines when it is played again: the music, the steps and the length are the same. Raising `DIRECTOR_VERSION` would show the "may sound different" warning on every saved session, also the explaining ones, and break the rule that ties it to the fixtures. No bump; a line in DEVLOG and in the release notes. The owner accepted this compromise (Q1, 2026-11-03).
 
 ### D9. Samples
 
-No new texts: entry images and movement images are already in `poeticTexts()`, so `npm run voices` and `check:samples` already cover them for every narrator speaker in both languages (poetic-steps D5). Songs without Narrated growth now use movement images too, so a machine with missing movement samples hears fewer lines: `npm run check:samples -- --strict` must pass before the merge, and `--make` fills the gaps. Step lines stay needed for the explaining narrator and the fallback.
+No new texts in this change (the new phrases come in a separate change, which brings its own samples): entry images and movement images are already in `poeticTexts()`, so `npm run voices` and `check:samples` already cover them for every narrator speaker in both languages (poetic-steps D5). Songs without Narrated growth now use movement images too, so a machine with missing movement samples hears fewer lines: `npm run check:samples -- --strict` must pass before the merge, and `--make` fills the gaps. Step lines stay needed for the explaining narrator and the fallback.
 
 ### D10. Texts
 
@@ -111,7 +111,7 @@ No new texts: entry images and movement images are already in `poeticTexts()`, s
 
 - [More lines without Narrated growth] The poetic narrator goes from 7 to 15 lines on luci-rosse. This is the owner's rule; Narrated growth off still gives fewer lines than on.
 - [Entry step lines disappear from narrated poetic songs] About 6 to 9 step lines per song are no longer said; the tag still shows them on stage.
-- [Movement images repeat on long songs] 12 movement images for 25 to 31 moves: each comes back about twice, as today.
+- [Movement images repeat on long songs] 12 movement images for 25 to 31 moves: each comes back about twice, as today. The separate vocabulary change (40 movement images) removes most repeats without touching this logic.
 - [Saved sessions sound different] Poetic sessions only; see D8.
 - [English image in an Italian song] Today possible via `sayText`'s fallback; now the step line is said instead (D5).
 
@@ -121,4 +121,4 @@ About 3 to 4 agent hours: code 1 h, checks (`check:spoken` cases, `check-caption
 
 ## Open Questions
 
-- Q1. Saved radio sessions with a poetic narrator: a DEVLOG and release note only (recommended), or bump `DIRECTOR_VERSION` to show the warning on every saved session?
+- Q1. Saved radio sessions with a poetic narrator: a DEVLOG and release note only, or bump `DIRECTOR_VERSION`? Answered by the owner (2026-11-03): note only in DEVLOG and the release notes, no `DIRECTOR_VERSION` bump, accepted as a compromise.

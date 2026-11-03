@@ -22,7 +22,7 @@ So Narrated growth changes both how many steps speak and what the poetic narrato
 - **Texts follow.** The Guide cards for the two voices, the live build and Crescendo (English and Italian), the hints for Narrator style and Narrated growth, and the knowledge notes are updated. Lines that contradict the new rule are removed.
 - **Saved radio sessions with a poetic narrator sound different** when they are played again: the music, the steps and the length stay the same, the narrator says more lines.
 
-Not in scope: new image vocabularies, changes to the explaining narrator, the growth, the step lines a growth writes, or the voice track.
+Not in scope: growing the image vocabularies (the owner approved new phrases; they come in a separate change, and this change's logic does not depend on the lists' sizes), changes to the explaining narrator, the growth, the step lines a growth writes, or the voice track.
 
 ## Capabilities
 
@@ -41,4 +41,4 @@ None.
 - Docs: `docs/knowledge/narrator.md`, `docs/knowledge/voice.md`, `docs/knowledge/decisions.md`, `DEVLOG.md`.
 - Checks: `check:spoken` (poetic cases rewritten), `check-captions.cjs` (poetic counts), `check:phrases` (movement image keys), `check:samples`, `check:voice-heard`, `check:code`, `check:crescendo`, `check:endless`, `check:guide`, `check:knowledge`.
 - No change to the growth, the music, the song lengths, the Crescendo, Live coder or director fixtures, so `CRESCENDO_VERSION`, `SHAPES_VERSION` and `DIRECTOR_VERSION` stay (design D7).
-- Samples: no new texts. The movement images already have samples for every narrator speaker (poetic-steps D5); more songs now use them.
+- Samples: no new texts in this change. The movement images already have samples for every narrator speaker (poetic-steps D5); more songs now use them.

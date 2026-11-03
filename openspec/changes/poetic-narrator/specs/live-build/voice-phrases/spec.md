@@ -48,11 +48,15 @@ The poetic narrator SHALL say at most one line per bar; an entry image SHALL win
 
 ### Requirement: Movement images in turn
 
-Consecutive movement images SHALL follow the movement list in order from a start drawn with the song's seed, counted over the steps that say a movement image, so that an image comes back only after the whole list, whether many or few steps speak. The list SHALL be the song's own movement lines, else its style's, else the built-in vocabulary's, in the interface language (English or Italian).
+Consecutive movement images SHALL follow the movement list in order from a start drawn with the song's seed, counted over the steps that say a movement image, so that an image comes back only after the whole list, whether many or few steps speak, and whatever the list's length. The list SHALL be the song's own movement lines, else its style's, else the built-in vocabulary's, in the interface language (English or Italian).
 
 #### Scenario: Few steps speak
 - **WHEN** a song grows without Narrated growth with the poetic style and 8 steps say a movement image
 - **THEN** the 8 movement images are all different
+
+#### Scenario: A longer list
+- **WHEN** the movement list grows (for example from 12 to 40 images)
+- **THEN** consecutive movement images still follow the list in order and wrap around at its end, with no change to the rule
 
 #### Scenario: Italian
 - **WHEN** the interface is in Italian

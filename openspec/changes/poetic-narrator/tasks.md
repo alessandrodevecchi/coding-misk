@@ -31,7 +31,7 @@
 
 ## 5. Owner
 
-- [ ] 5.1 Answer Q1 (saved radio sessions: note only, or `DIRECTOR_VERSION`)
+- [x] 5.1 Answer Q1 (saved radio sessions: note only, or `DIRECTOR_VERSION`): note only in DEVLOG and release notes, no bump (owner, 2026-11-03)
 - [ ] 5.2 Listening: luci-rosse poetic in Crescendo with Narrated growth off and on; a poetic radio session
 
 ## 6. Archive
