@@ -54,7 +54,7 @@ export const POETIC = {
     { en: 'something moves inside', it: 'qualcosa si muove dentro' }, { en: 'the night turns over', it: 'la notte si gira' },
     { en: 'ripples on the glass', it: 'cerchi sul vetro' }, { en: 'the room tilts', it: 'la stanza si inclina' },
     { en: 'tremors deep below', it: 'tremori nel profondo' }, { en: 'sailing higher and higher', it: 'sempre più in alto' },
-    { en: 'crashing down', it: 'tutto crolla' },
+    { en: 'here it rises', it: 'eccolo che sale' }, { en: 'crashing down', it: 'tutto crolla' },
     { en: 'upside down, then back', it: 'sottosopra, e poi di nuovo dritto' }, { en: 'adrift in the beat', it: 'alla deriva nel ritmo' },
     { en: 'liftoff in three', it: 'decollo tra tre' }, { en: 'in the upper atmosphere', it: "nell'alta atmosfera" },
     { en: 'a glimpse of light', it: 'un lampo di luce' }, { en: 'a glimpse of hope', it: 'uno spiraglio di speranza' },
