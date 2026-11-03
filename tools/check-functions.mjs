@@ -230,6 +230,20 @@ const CHECKS = {
     const L = r.values['coding-misk-library'];
     assert(L.code.mine === '$: s("w").lpf(400).drive(2)' && L.code.orig === '$: s("x").crunch(.4)' && L.codeVersion === 2, JSON.stringify(L.code));
   },
+  // #82: a registered function is built with new Function, not transpiled: a Kabelsalat call (.K(, from the Ring device) in its chain is
+  // an error at play time (audioin is not defined), so Ring stays on the track line
+  'no function chain holds a Kabelsalat call: Ring on a voice track stays on the line'() {
+    const song = JSON.parse(fs.readFileSync('songs/primo-segnale.json', 'utf8'));
+    song.tracks.find(t => t.type === 'voice').rack = [{ device: 'ring', freq: 300, amount: 0.5 }];
+    const B = builds(song, { voice: true, narrated: true }), bad = [];
+    let inline = 0;
+    B.bars.forEach(b => { inline += (B.c.codeAt(b).match(/\.K\(audioin\(\)/g) || []).length; });
+    for (const [name, f] of [...Object.entries(B.c.fns), ...Object.entries(B.w.fns), ...Object.entries(B.f.fns)]) if (/\.K\(|audioin/.test(f.chain)) bad.push(`${name}: ${f.chain}`);
+    for (const l of LIBRARY) if (/\.K\(|audioin/.test(l.chain)) bad.push(`library ${l.name}`);
+    bad.push(...expandSteps('primo-segnale', B, { voice: true }));
+    assert(!bad.length, bad.slice(0, 4).join('\n'));
+    assert(inline > 0, 'the Ring device is not on any line of the code');
+  },
   'the song functions of a song are found once, from the song written in full'() {
     const s = songs.find(x => x.song.id === 'switch-prima-luce').song, B = builds(s);
     const t = songFunctions(compileSong({ ...B.c.build, build: undefined }), s, functionOptions('compact'));

@@ -8,7 +8,7 @@
 // vocabulary (one sample per entry) for the speakers that speak them, and the poetic narrator's images (the
 // vocabulary's poetic group, the songs' and styles' own) for the narrator speakers. The length of every sample goes to
 // public/samples/say_lengths.json, so lines are placed from the length of the sample in use.
-//   node tools/voice.mjs [--en Samantha] [--it Alice] [--force] [--song file.json …] [--list]
+//   node tools/voice.mjs [--en Samantha] [--it Alice] [--force] [--default-only] [--song file.json …] [--list]
 // --song: also a song exported from the browser (its spoken lines and steps); --list: print the samples it would
 // make, make none. Needs macOS (`say`) and ffmpeg; the per-line part is tools/voice-sample.mjs (voice-full-controls).
 import fs from 'node:fs';
@@ -81,6 +81,13 @@ const poetic = [...poeticTexts(), ...songsAll.flatMap(s => (s.narrator && typeof
   ...recipes.flatMap(r => (r.narrator && typeof r.narrator === 'object' && r.narrator.lines ? Object.values(r.narrator.lines).flat() : []))];
 for (const sp of narrators) poetic.forEach(p => addSay(p, sp));
 
+// --default-only: every text with the default voice only; the app falls back to it for any speaker
+if (args.includes('--default-only')) for (const [key, set] of [...phrases]) {
+  const [lang, speaker] = key.split('|');
+  if (!speaker) continue;
+  const def = phrases.get(`${lang}|`) || new Set();
+  set.forEach(x => def.add(x)); phrases.set(`${lang}|`, def); phrases.delete(key);
+}
 let made = 0, kept = 0;
 const missing = new Set();
 for (const [key, set] of phrases) {

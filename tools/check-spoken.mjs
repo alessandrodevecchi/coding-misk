@@ -164,7 +164,7 @@ const CHECKS = {
     assert(spoke > 0 && kept > 0, `${spoke} narrations, ${kept} skipped`);
     assert(bars.has(24) && bars.has(16), 'spoken bars');
   },
-  'poetic narrator: explain is unchanged; poetic speaks only where a track comes in, in the bar before or on its bar'() {
+  'poetic narrator: explain is unchanged; poetic speaks on the bar before an entry (or its own first bar) and on the steps with a step line (poetic-narrator D1)'() {
     for (const s of songs.filter(x => Array.isArray(x.build) && x.build.length).slice(0, 8)) {
       const total = normalizeSong(s).total;
       for (let upTo = 1; upTo <= buildSteps(s).length; upTo++) {
@@ -176,12 +176,12 @@ const CHECKS = {
       }
     }
     const s = clone(read('songs/prova-voce-notte.json')), C = resolveProfile('crescendo'), c = crescendoSong(s, { rules: growthRules(C) });
-    const steps = buildSteps(c), total = normalizeSong(c).total, entries = new Set(steps.filter(x => enteringTrack(c, x)).map(x => x.at));
+    const steps = buildSteps(c), total = normalizeSong(c).total, entries = new Set(steps.filter(x => enteringTrack(c, x)).map(x => x.at)), says = new Set(steps.filter(x => x.say).map(x => x.at));
     let n = 0;
     for (let upTo = 1; upTo <= steps.length; upTo++) {
       const code = voiceCode(c, stateAt(c, steps[upTo - 1].at).song, upTo, total, 'en', ANY);
-      for (const b of narrated(code)) { assert(entries.has(b) || entries.has(b + 1), `poetic narration on bar ${b + 1}, no entry there or on the next bar`); n++; }
-      if (code) assert(!code.includes(`"${typeof steps[upTo - 1].say === 'object' ? steps[upTo - 1].say.en : '§'}"`) || entries.has(steps[upTo - 1].at), 'an explanation in poetic mode');
+      for (const b of narrated(code)) { assert(entries.has(b) || entries.has(b + 1) || says.has(b), `poetic narration on bar ${b + 1}: no entry there or on the next bar, no step line there`); n++; }
+      if (code) assert(!code.includes(`"${typeof steps[upTo - 1].say === 'object' ? steps[upTo - 1].say.en : '§'}"`), 'an explanation in poetic mode');
     }
     assert(n >= 3, `${n} poetic lines`);
     const all = Object.values(POETIC).flat().map(x => x.en);
@@ -542,32 +542,83 @@ const CHECKS = {
     assert(styleOf(radio) === 'radio', 'speaker and volume do not change the style');
     assert(styleOf({ ...radio, room: 0.5 }) === 'custom', 'a hand edit makes the style Custom');
   },
-  'poetic narrator with Narrated growth (voice-full-controls D11, poetic-steps): entry steps keep their lines, the other steps say movement images, the images come in addition, an image wins a shared bar'() {
-    const poetic = Object.values(POETIC).flat().map(x => x.en), move = POETIC.move.map(x => x.en), luci = read('songs/luci-rosse.json');
-    const run = (C, narrated) => {
-      const c = crescendoSong(luci, { narrated, rules: growthRules(C) }), L = liveCode(c, C, { files: () => ANY }), out = [];
-      for (const st of buildSteps(L.build)) {
-        const code = L.codeAt(st.at), bars = narrated ? [...code.matchAll(/spoken on bar (\d+)/g)].map(m => +m[1]) : [];
-        assert(new Set(bars).size === bars.length, `two narrator lines on one bar: ${bars}`);
-        for (const m of code.matchAll(/\/\/ "([^"]+)", spoken on bar (\d+)/g)) out.push({ text: m[1], bar: +m[2] - 1 });
+  'poetic narrator (poetic-narrator D1 to D4): with Narrated growth off and on, in English and Italian, the poetic narrator speaks where the explaining one does: every bar with a step line and no entry says a movement image or gives its bar to an image, every entry has its image, nothing on the entry bar itself, no step line; the movement images take turns; the explaining style unchanged'() {
+    const enters = (B, st) => { const t = enteringTrack(B, st); return !!t && t.type !== 'spoken'; };
+    const report = [];
+    for (const id of ['luci-rosse', 'kellerlicht']) {
+      const song = read(`songs/${id}.json`);
+      for (const narrated of [false, true]) for (const lang of ['en', 'it']) {
+        const images = new Set(Object.entries(POETIC).filter(([k]) => k !== 'move').flatMap(([, v]) => v.map(x => x[lang]))), move = POETIC.move.map(x => x[lang]);
+        const C = resolveProfile('crescendo', { narratorStyle: 'poetic', narrated }), c = crescendoSong(song, { narrated, rules: growthRules(C) }), B = liveBuildOf(c, C), steps = buildSteps(B);
+        const E = resolveProfile('crescendo', { narratorStyle: 'explain', narrated }), EB = liveBuildOf(crescendoSong(song, { narrated, rules: growthRules(E) }), E);
+        const tag = `${id} ${narrated ? 'narrated' : 'plain'} ${lang}`;
+        // the steps are the same for both styles: the style changes only what is said
+        assert(JSON.stringify(buildSteps(EB).map(x => [x.at, !!x.say])) === JSON.stringify(steps.map(x => [x.at, !!x.say])), `${tag}: the steps differ between the styles`);
+        const said = spokenSchedule(B, C, lang, ANY).filter(x => x.voice === 'N'), explained = spokenSchedule(EB, E, lang, ANY).filter(x => x.voice === 'N');
+        const start = 0, entryBars = new Set(steps.filter(st => enters(B, st)).map(st => st.at)), imageBar = e => (e - 1 >= start ? e - 1 : e);
+        const imageBars = new Set([...entryBars].map(imageBar));
+        // the explaining style: the step line of the latest step with "say" on each bar
+        const last = new Map();
+        for (const st of steps) if (st.say) last.set(st.at, st);
+        assert(JSON.stringify(explained.map(x => [x.at, x.text])) === JSON.stringify([...last.values()].map(st => [st.at, sayText(st.say, lang)])), `${tag}: the explaining style no longer says every step line (${explained.length} of ${last.size})`);
+        // no step line, every line an image or a movement image, one per bar
+        for (const x of said) assert(images.has(x.text) || move.includes(x.text), `${tag} bar ${x.at + 1}: "${x.text}" is not an image`);
+        assert(new Set(said.map(x => x.at)).size === said.length, `${tag}: two narrator lines on one bar`);
+        // every bar with a step line and no entry: a movement image, or an image of the next bar's entry
+        for (const [bar] of last) {
+          if (entryBars.has(bar)) continue;
+          const x = said.find(y => y.at === bar);
+          assert(x && (move.includes(x.text) || (imageBars.has(bar) && images.has(x.text))), `${tag} bar ${bar + 1}: the step line's bar says ${x ? `"${x.text}"` : 'nothing'}`);
+        }
+        // every entry its image, on the bar before (or its own first bar); nothing more on an entry's own bar
+        for (const e of entryBars) {
+          const x = said.find(y => y.at === imageBar(e));
+          assert(x && images.has(x.text), `${tag}: the entry on bar ${e + 1} has no image`);
+          if (imageBar(e) !== e && !imageBars.has(e)) assert(!said.some(y => y.at === e), `${tag}: a line on the entry's own bar ${e + 1}`);
+        }
+        // the movement images take turns: consecutive lines of the list (no voice track here, so no bar is skipped)
+        const moves = said.filter(x => move.includes(x.text)).map(x => move.indexOf(x.text));
+        for (let i = 1; i < moves.length; i++) assert(moves[i] === (moves[i - 1] + 1) % move.length, `${tag}: movement images out of turn (${moves.slice(0, i + 1)})`);
+        assert(new Set(moves.slice(0, move.length)).size === Math.min(moves.length, move.length), `${tag}: a movement image said again before the list is over`);
+        assert(moves.length >= 4, `${tag}: ${moves.length} movement images`);
+        report.push(`${tag} ${said.length} (${said.length - moves.length} images, ${moves.length} moves; explain ${explained.length})`);
       }
-      return { out, c };
-    };
-    const both = run(resolveProfile('crescendo', { narratorStyle: 'poetic', narrated: true, voice: true }), true);
-    const images = both.out.filter(x => poetic.includes(x.text) && !move.includes(x.text)), moves = both.out.filter(x => move.includes(x.text)), lines = both.out.filter(x => !poetic.includes(x.text));
-    assert(images.length >= 2 && moves.length >= 4 && lines.length >= 1, `poetic and narrated: ${images.length} images, ${moves.length} movement images, ${lines.length} step lines`);
-    const plain = run(resolveProfile('crescendo', { narrated: true, voice: true }), true).out;
-    assert(plain.length && !plain.some(x => poetic.includes(x.text)), 'explaining with Narrated growth: no images');
-    // every bar the explaining narration speaks on is spoken with the poetic style too: its step line, a movement
-    // image in its place, or an image that takes its bar
-    const imageBars = new Set(images.map(x => x.bar));
-    const missing = plain.filter(x => !imageBars.has(x.bar) && !lines.some(y => y.bar === x.bar && y.text === x.text) && !moves.some(y => y.bar === x.bar));
-    assert(!missing.length, `step lines lost: ${missing.slice(0, 3).map(x => `${x.bar + 1} ${x.text}`)}`);
-    const only = run(resolveProfile('crescendo', { narratorStyle: 'poetic', voice: true }), false).out;
-    assert(only.length && only.every(x => poetic.includes(x.text) && !move.includes(x.text)), 'poetic without Narrated growth: images only, as before');
-    console.log(`      ${images.length} images, ${moves.length} movement images and ${lines.length} step lines; ${plain.length - lines.length - moves.length} step lines give their bar to an image`);
+    }
+    console.log(`      ${report.join('; ')}`);
   },
-  'poetic steps: with the poetic style and Narrated growth a step without an entry says a movement image in English and Italian, not its step line; entry steps keep theirs; samples for every movement image'() {
+  'poetic narrator: every built-in image and movement image has English and Italian text (poetic-narrator D5)'() {
+    for (const [k, list] of Object.entries(POETIC)) list.forEach((x, i) => assert(x && typeof x.en === 'string' && x.en.trim() && typeof x.it === 'string' && x.it.trim(), `POETIC.${k}[${i}]: ${JSON.stringify(x)}`));
+  },
+  'poetic narrator fallback (poetic-narrator D5): no image list, or an image with no text in the language, says the step line instead'() {
+    const song = read('songs/luci-rosse.json');
+    const sched = (src, style, narrated, lang) => {
+      const C = resolveProfile('crescendo', { narratorStyle: style, narrated }), c = crescendoSong(src, { narrated, rules: growthRules(C) }), B = liveBuildOf(style === 'poetic' && src.narrator ? { ...c, narrator: { ...src.narrator, style } } : c, C);
+      return spokenSchedule(B, C, lang, ANY).filter(x => x.voice === 'N').map(x => [x.at, x.text]);
+    };
+    // every list empty (a test copy of the vocabulary, restored after): the poetic narrator says what the explaining one says
+    const saved = Object.fromEntries(Object.entries(POETIC).map(([k, v]) => [k, [...v]]));
+    try {
+      for (const v of Object.values(POETIC)) v.length = 0;
+      for (const narrated of [false, true]) for (const lang of ['en', 'it']) {
+        const own = { ...song, narrator: { style: 'poetic', lines: { move: [] } } };
+        const p = sched(own, 'poetic', narrated, lang), e = sched(song, 'explain', narrated, lang);
+        assert(p.length && JSON.stringify(p) === JSON.stringify(e), `no image lists, ${narrated ? 'narrated' : 'plain'} ${lang}: ${p.length} poetic lines against ${e.length} step lines`);
+      }
+    } finally { for (const [k, v] of Object.entries(saved)) { POETIC[k].length = 0; POETIC[k].push(...v); } }
+    // an empty movement list of the song's own: the vocabulary's movement images still speak
+    const own = { ...song, narrator: { style: 'poetic', lines: { move: [] } } }, move = POETIC.move.map(x => x.en);
+    assert(sched(own, 'poetic', true, 'en').some(([, t]) => move.includes(t)), 'an empty own movement list: no vocabulary movement image');
+    // images with English text only: Italian says the step lines (no English image in an Italian song), English the images
+    const types = [...new Set(song.tracks.map(t => t.type)), 'any', 'move'];
+    const en = { ...song, narrator: { style: 'poetic', lines: Object.fromEntries(types.map(t => [t, [{ en: `only english ${t}` }]])) } };
+    for (const narrated of [false, true]) {
+      const it = sched(en, 'poetic', narrated, 'it'), e = sched(song, 'explain', narrated, 'it');
+      assert(!it.some(([, t]) => t.startsWith('only english')) && JSON.stringify(it) === JSON.stringify(e), `English-only images in Italian, ${narrated ? 'narrated' : 'plain'}: ${JSON.stringify(it.slice(0, 3))}`);
+      const enSaid = sched(en, 'poetic', narrated, 'en');
+      assert(enSaid.length && enSaid.every(([, t]) => t.startsWith('only english')), `English-only images in English: ${JSON.stringify(enSaid.slice(0, 3))}`);
+    }
+  },
+  'poetic steps: with the poetic style and Narrated growth a step without an entry says a movement image in English and Italian, not its step line; nothing on the bar of an entry step; samples for every movement image'() {
     const enters = (B, st) => { const t = enteringTrack(B, st); return !!t && t.type !== 'spoken'; };
     let checked = 0;
     for (const id of ['luci-rosse', 'kellerlicht']) {
@@ -938,11 +989,17 @@ const CHECKS = {
     const poetic = { ...explain, narratorStyle: 'poetic' }, P = liveBuildOf(grownOf('luci-rosse', poetic), poetic), p = same(P, poetic, 'it', ANY);
     assert(p.cs.filter(x => x.kind === 'step').every(x => !x.heard), 'poetic: a step line counted as heard');
     assert(p.cs.filter(x => x.kind === 'narrator').every(x => !p.cs.some(y => y.kind === 'step' && y.text === x.text)), 'poetic: a step line as a spoken caption');
-    // poetic with Narrated growth: bar 8 says "la città respira" with the tag "ritmo più fitto"
+    // poetic without Narrated growth speaks on as many bars as the explaining style (poetic-narrator D1)
+    assert(p.cs.filter(x => x.kind === 'narrator').length === 19, `poetic without Narrated growth: ${p.cs.filter(x => x.kind === 'narrator').length} captions, 19 heard`);
+    // poetic with Narrated growth: bar 8 says "fase successiva, pluralità" with the tag "ritmo più fitto"
     const pn = { ...poetic, narrated: true }, PN = liveBuildOf(grownOf('luci-rosse', pn), pn), q = same(PN, pn, 'it', ANY), f8 = captionFrame(q.cs, 7.1, S);
-    assert(q.cs.filter(x => x.kind === 'narrator').length === 38, `poetic with Narrated growth: ${q.cs.filter(x => x.kind === 'narrator').length} captions, 38 heard`);
-    assert(f8.rows[0] && f8.rows[0].text === 'la città respira' && f8.tag === 'ritmo più fitto', `bar 8: ${JSON.stringify(f8)}`);
-    assert(captionFrame(q.cs, 16.1, S).rows.some(r => r.text === 'qualcosa di profondo si sveglia'), 'bar 17: the entry image');
+    assert(q.cs.filter(x => x.kind === 'narrator').length === 33, `poetic with Narrated growth: ${q.cs.filter(x => x.kind === 'narrator').length} captions, 33 heard`);
+    assert(f8.rows[0] && f8.rows[0].text === 'fase successiva, pluralità' && f8.tag === 'ritmo più fitto', `bar 8: ${JSON.stringify(f8)}`);
+    const f17 = captionFrame(q.cs, 16.1, S);
+    assert(f17.rows.some(r => POETIC.bass.some(b => b.it === r.text)), `bar 17: the entry image of the bass: ${JSON.stringify(f17.rows)}`);
+    // the entry's own bar 18: no narrator caption of its own, its step line only as the tag (poetic-narrator D6)
+    const e18 = buildSteps(PN).filter(x => x.at === 17 && x.say).pop(), f18 = captionFrame(q.cs, 17.1, S);
+    assert(e18 && !q.cs.some(x => x.kind === 'narrator' && x.at === 17) && f18.tag === sayText(e18.say, 'it') && !f18.rows.some(r => r.text === f18.tag), `bar 18: ${JSON.stringify(f18)}`);
     // a voice track: its lines captioned as the voice; the narrator off leaves them and no narrator caption or tag
     const notte = read('songs/prova-voce-notte.json'), CT = resolveProfile('switch'), NB = liveBuildOf(grownOf('prova-voce-notte', CT), CT), n = same(NB, CT, 'it', ANY);
     const voiced = n.cs.filter(x => x.kind === 'voice');

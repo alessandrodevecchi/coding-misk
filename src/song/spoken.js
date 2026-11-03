@@ -351,13 +351,15 @@ export function poeticLine(song, step, index) {
   const list = pools.map(p => p[tr.type] || null).find(x => x && x.length) || pools.map(p => p.any || null).find(x => x && x.length) || POETIC.any;
   return rngOf(song, `poetic:${index}`).pick(list);
 }
-// poetic-steps: a short image of movement for a step that brings no track in (poetic style with Narrated growth): the
-// song's "move" lines, the style's, else the vocabulary's. A start drawn with the song's seed plus the step's index, so
-// consecutive steps take consecutive lines and a line comes back only after the whole list
+// poetic-steps, poetic-narrator D4: a short image of movement for a step with a step line and no track entry on its bar
+// (poetic style): the song's "move" lines, the style's, else the vocabulary's. A start drawn with the song's seed plus
+// the ordinal of the step among the steps that say one, read modulo the list's length (any length), so consecutive
+// steps take consecutive lines and a line comes back only after the whole list. null when every list is empty
 export function movementLine(song, index) {
   const own = song.narrator && typeof song.narrator === 'object' && song.narrator.lines ? song.narrator.lines : {};
   const style = styleRecipes(song).map(x => (x.narrator && typeof x.narrator === 'object' && x.narrator.lines) || {});
   const list = [own, ...style, POETIC].map(p => p.move || null).find(x => x && x.length) || POETIC.move;
+  if (!list || !list.length) return null;
   const start = rngOf(song, 'poetic-move').int(0, list.length - 1);
   return list[(start + Math.max(0, index)) % list.length];
 }
