@@ -5,7 +5,7 @@
 //   voices:  Voci e suoni: the speakers, the voice styles to hear, a test bench
 //   samples: Campioni: space by class and bank, missing samples, orphan cleanup, temporary samples
 // The per-song voice controls stay in Compose and the radio. Strings in both languages (src/i18n.js), drawn icons only.
-import { KINDS, TAGS, LANGS, SHARE_LEVELS, groupsOf, matches, textIn, textsOf, textError, overCap, MAX_WORDS } from './phrases.js';
+import { KINDS, KIND_SETS, kindsOf, kindsId, TAGS, LANGS, SHARE_LEVELS, groupsOf, matches, textIn, textsOf, textError, overCap, MAX_WORDS } from './phrases.js';
 import { MOMENT_GROUPS, POETIC_TAGS } from './moments.js';
 import { builtinKeys, classify, totals, phraseFiles, sizeText, CLASSES, bankLang, mineKeys } from './samples.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from '../song/vocabulary.js';
@@ -17,6 +17,8 @@ import { LISTEN, PENCIL, BIN, LOCK, WAVE, MIC, QUILL, COPY, DISK, BROOM, SPARK, 
 export const SUB_KEY = 'coding-misk-voices-sub';
 export const SECTIONS = ['mine', 'vocab', 'voices', 'samples'];
 const KIND_ICON = { voice: WAVE, explain: MIC, poetic: QUILL };
+// the icons of a list of kinds side by side (phrase-any-voice D6)
+const iconsOf = kinds => kinds.map(k => KIND_ICON[k]).join('');
 // the fixed test line of the speakers and the voice styles
 export const TEST_LINE = { it: 'questa è la mia voce', en: 'this is my voice' };
 
@@ -30,7 +32,8 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
   const making = new Set();
   const has = (bank, text) => { return slugAt((files() || {})[bank], saySlug(text)) >= 0; };
   const ico = (svg, label) => `<span class="vt-ico" title="${esc(label)}">${svg}</span>`;
-  const kindLabel = k => t(`phKind:${k}`);
+  // (a list of kinds: "voice+explain+poetic"; a list the form does not offer is named by its kinds)
+  const kindLabel = k => (KIND_SETS.some(l => kindsId(l) === k) || KINDS.includes(k) ? t(`phKind:${k}`) : k.split('+').map(x => t(`phKind:${x}`)).join(' + '));
   const tagLabel = (kind, tag) => (!tag ? t('phTagAny') : kind === 'voice' ? t(`vocab:${tag}`) : kind === 'explain' ? t(`phMoment:${tag}`) : t(`phPoetic:${tag}`));
   const status = p => {
     const lang = getLang(), x = textIn(p, lang) || p.text, l = textIn(p, lang) ? lang : p.lang, bank = sayBank(l, '');
@@ -62,6 +65,11 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     if (kind === 'explain') return opt('', t('phTagAny')) + Object.entries(MOMENT_GROUPS).map(([g, list]) => `<optgroup label="${esc(t(`phMomentGroup:${g}`))}">${list.map(m => opt(m, t(`phMoment:${m}`))).join('')}</optgroup>`).join('');
     return opt('', t('phTagAny')) + (TAGS[kind] || []).map(x => opt(x, tagLabel(kind, x))).join('');
   };
+  // the five options of Who says it (phrase-any-voice D1), plus the phrase's own list when the form does not offer it
+  const kindOptions = kinds => {
+    const id = kindsId(kinds), ids = KIND_SETS.map(kindsId);
+    return [...ids, ...(ids.includes(id) ? [] : [id])].map(k => `<option value="${esc(k)}"${k === id ? ' selected' : ''}>${esc(kindLabel(k))}</option>`).join('');
+  };
   function formHtml() {
     const f = ui.form, p = f.id ? phr.items.find(x => x.id === f.id) : null, other = f.lang === 'it' ? 'en' : 'it';
     const styleChips = recipes.map(r => `<button type="button" class="chip small" data-ph-style="${esc(r.id)}" aria-pressed="${f.styles.includes(r.id)}">${esc(tx(r.name))}</button>`).join('');
@@ -79,8 +87,8 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
         <label class="ctrl ph-alt"><span class="lbl">${esc(t('phAlt', { lang: t(`phLang:${other}`) }))}</span><input type="text" data-ph-f="alt" maxlength="160" autocomplete="off" spellcheck="false" value="${esc(f.alt)}" placeholder="${esc(t('phAltPh'))}"></label>
       </div>
       <div class="ph-row">
-        <label class="ctrl"><span class="lbl">${esc(t('phKindLbl'))}</span><select data-ph-f="kind" data-no-knob>${KINDS.map(k => `<option value="${k}"${f.kind === k ? ' selected' : ''}>${esc(kindLabel(k))}</option>`).join('')}</select></label>
-        <label class="ctrl"><span class="lbl">${esc(t(`phTagLbl:${f.kind}`))}</span><select data-ph-f="tag" data-no-knob>${tagOptions(f.kind, f.tag)}</select></label>
+        <label class="ctrl"><span class="lbl">${esc(t('phKindLbl'))}</span><select data-ph-f="kind" data-no-knob>${kindOptions(f.kinds)}</select></label>
+        ${f.kinds.length === 1 ? `<label class="ctrl"><span class="lbl">${esc(t(`phTagLbl:${f.kinds[0]}`))}</span><select data-ph-f="tag" data-no-knob>${tagOptions(f.kinds[0], f.tag)}</select></label>` : `<p class="hint muted small ph-kind-hint" data-ph-kind-hint>${esc(t(`phKindHint:${kindsId(f.kinds)}`))}</p>`}
         <label class="ctrl ph-on"><input type="checkbox" data-ph-f="on"${f.on ? ' checked' : ''}> <span>${esc(t('phOn'))}</span></label>
       </div>
       <div class="ph-styles"><span class="lbl">${esc(t('phStyles'))}</span> <span class="hint muted small">${esc(t('phStylesHint'))}</span><div class="chips">${styleChips}</div></div>
@@ -98,17 +106,18 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     const st = status(p), src = [t(`phSource:${p.source}`), p.from && p.from.song ? p.from.song : '', (p.styles || []).map(id => { const r = recipes.find(x => x.id === id); return r ? tx(r.name) : id; }).join(', ')].filter(Boolean).join(' · ');
     return `<div class="ph-item${p.on === false ? ' off' : ''}" data-ph-id="${esc(p.id)}">
       <div class="ph-acts"><button class="mini" data-ph-hear="${esc(p.id)}" title="${esc(t('phHear'))}" aria-label="${esc(t('phHear'))}">${LISTEN}</button><button class="mini" data-ph-edit="${esc(p.id)}" title="${esc(t('phEdit'))}" aria-label="${esc(t('phEdit'))}">${PENCIL}</button><button class="mini" data-ph-del="${esc(p.id)}" title="${esc(t('phDelete'))}" aria-label="${esc(t('phDelete'))}">${BIN}</button></div>
-      <div class="ph-main">${ico(KIND_ICON[p.kind], kindLabel(p.kind))}<span class="ph-text">${esc(main)}</span>${alt ? `<span class="ph-alt muted small">${esc(alt)}</span>` : ''}</div>
-      ${ui.confirm && ui.confirm.id === p.id ? confirmHtml() : ''}<div class="ph-meta muted small"><span>${esc(src)}</span><span>${esc(t('phUses', { n: p.uses || 0 }))}</span><span class="ph-st ${st}"><span class="ph-led" aria-hidden="true"></span>${esc(t(`phSt:${st}`))}</span>${p.on === false ? `<span>${esc(t('phOffShort'))}</span>` : ''}</div>
+      <div class="ph-main">${ico(iconsOf(kindsOf(p)), kindLabel(kindsId(kindsOf(p))))}<span class="ph-text">${esc(main)}</span>${alt ? `<span class="ph-alt muted small">${esc(alt)}</span>` : ''}</div>
+      ${ui.confirm && ui.confirm.id === p.id ? confirmHtml() : ''}<div class="ph-meta muted small">${kindsOf(p).length > 1 ? `<span class="ph-tag">${esc(t('phTagAny'))}</span>` : ''}<span>${esc(src)}</span><span>${esc(t('phUses', { n: p.uses || 0 }))}</span><span class="ph-st ${st}"><span class="ph-led" aria-hidden="true"></span>${esc(t(`phSt:${st}`))}</span>${p.on === false ? `<span>${esc(t('phOffShort'))}</span>` : ''}</div>
     </div>`;
   }
   function mineHtml() {
-    const all = phr.items, list = all.filter(p => (ui.kind === 'all' || p.kind === ui.kind) && matches(p, ui.q));
-    const counts = Object.fromEntries(KINDS.map(k => [k, all.filter(p => p.kind === k).length]));
+    // (a phrase of several kinds shows under each kind it includes)
+    const all = phr.items, list = all.filter(p => (ui.kind === 'all' || kindsOf(p).includes(ui.kind)) && matches(p, ui.q));
+    const counts = Object.fromEntries(KINDS.map(k => [k, all.filter(p => kindsOf(p).includes(k)).length]));
     const share = phr.settings.share, over = overCap({ items: all });
     const kinds = [['all', all.length], ...KINDS.map(k => [k, counts[k]])].map(([k, n]) => `<button class="chip small" data-ph-kind="${k}" aria-pressed="${ui.kind === k}">${k === 'all' ? esc(t('phAll')) : `${KIND_ICON[k]} ${esc(kindLabel(k))}`} <span class="muted">${n}</span></button>`).join('');
     const seg = `<div class="ph-share seg" role="radiogroup" aria-label="${esc(t('phShareLbl'))}">${SHARE_LEVELS.map(l => `<button class="chip small" role="radio" data-ph-share="${l}" aria-checked="${share === l}" aria-pressed="${share === l}">${esc(t(`phShare:${l}`))}</button>`).join('')}</div>`;
-    const groups = groupsOf(list).map(g => `<div class="ph-group"><h4 class="lbl">${KIND_ICON[g.kind]} ${esc(kindLabel(g.kind))} · ${esc(tagLabel(g.kind, g.tag))} <span class="muted">${g.items.length}</span></h4>${g.items.map(rowHtml).join('')}</div>`).join('');
+    const groups = groupsOf(list).map(g => `<div class="ph-group"><h4 class="lbl">${iconsOf(g.kinds)} ${esc(kindLabel(kindsId(g.kinds)))} · ${esc(tagLabel(g.kind, g.tag))} <span class="muted">${g.items.length}</span></h4>${g.items.map(rowHtml).join('')}</div>`).join('');
     return `<div class="ph-top lib-top"><input type="search" class="sb-search" data-ph-q placeholder="${esc(t('phSearch'))}" aria-label="${esc(t('phSearch'))}" value="${esc(ui.q)}"><button class="btn primary" data-ph-new>${PLUS} ${esc(t('phNew'))}</button></div>
       <div class="chips ph-kinds">${kinds}</div>
       <div class="ph-share-row"><span class="lbl">${esc(t('phShareLbl'))}</span>${seg}<span class="hint muted small">${esc(t(`phShareHint:${share}`))}</span></div>
@@ -247,21 +256,24 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
   }
   function openForm(id = null) {
     const p = id ? phr.items.find(x => x.id === id) : null, lang = getLang();
-    ui.form = p ? { id: p.id, text: p.text, lang: p.lang, alt: textIn(p, p.lang === 'it' ? 'en' : 'it') || '', kind: p.kind, tag: p.tag || '', styles: [...(p.styles || [])], on: p.on !== false }
-      : { id: null, text: '', lang, alt: '', kind: 'explain', tag: '', styles: [], on: true };
+    ui.form = p ? { id: p.id, text: p.text, lang: p.lang, alt: textIn(p, p.lang === 'it' ? 'en' : 'it') || '', kinds: kindsOf(p), tag: p.tag || '', styles: [...(p.styles || [])], on: p.on !== false }
+      : { id: null, text: '', lang, alt: '', kinds: ['explain'], tag: '', styles: [], on: true };
     ui.confirm = null; sub = 'mine'; render();
     const i = root.querySelector('[data-ph-f="text"]'); if (i) i.focus();
   }
   function readForm() {
     const f = ui.form, v = sel => { const el = root.querySelector(`[data-ph-f="${sel}"]`); return el ? (el.type === 'checkbox' ? el.checked : el.value) : undefined; };
-    for (const k of ['text', 'lang', 'alt', 'kind', 'tag', 'on']) { const x = v(k); if (x !== undefined) f[k] = x; }
+    for (const k of ['text', 'lang', 'alt', 'tag', 'on']) { const x = v(k); if (x !== undefined) f[k] = x; }
+    const ks = v('kind'); if (ks) f.kinds = kindsOf({ kinds: ks.split('+') });
+    // (a tag only with one kind, phrase-any-voice D4)
+    if (f.kinds.length !== 1) f.tag = '';
   }
   async function saveForm() {
     readForm();
     const f = ui.form, other = f.lang === 'it' ? 'en' : 'it', err = textError(f.text) || (f.alt.trim() && textError(f.alt));
     const errEl = root.querySelector('[data-ph-err]');
     if (err) { if (errEl) errEl.textContent = t(`phErr:${err}`, { n: MAX_WORDS }); return; }
-    const input = { text: f.text, lang: f.lang, alt: f.alt.trim() ? { [other]: f.alt.trim() } : {}, kind: f.kind, tag: f.tag || null, styles: f.styles, on: !!f.on };
+    const input = { text: f.text, lang: f.lang, alt: f.alt.trim() ? { [other]: f.alt.trim() } : {}, kinds: f.kinds, tag: f.kinds.length === 1 ? f.tag || null : null, styles: f.styles, on: !!f.on };
     if (f.id) {
       const before = phr.items.find(x => x.id === f.id), u = before ? await usage(true) : null;
       const r = phr.edit(f.id, input);
@@ -271,11 +283,18 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
         const k = keys(), stale = phraseFiles(before, u.banks, { ...k, mine: mineKeys(phr.items) }).files;
         if (stale.length && helper()) fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ add: stale.map(x => ({ file: x.rel, ms: phr.tempMs(), song: 'voci', text: before.text })) }) }).catch(() => {});
       }
-      ui.form = null; render(); toast(t('phEdited')); prepare(r.phrase);
+      ui.form = null; render();
+      // (widened: merged with the phrases of the same text that share a kind, with Undo; phrase-any-voice D5)
+      if (r.merged && r.merged.length) toast(t('phMerged', { n: r.merged.length }), [{ label: t('vinstUndo'), run: () => phr.unmerge(r) }]);
+      else toast(t('phEdited'));
+      prepare(r.phrase);
     } else {
       const r = phr.add({ ...input, source: 'tab' });
       if (r.error) { if (errEl) errEl.textContent = t(`phErr:${r.error}`, { n: MAX_WORDS }); return; }
-      ui.form = null; render(); toast(r.added ? t('phAdded') : t('phKnown')); prepare(r.phrase);
+      ui.form = null; render();
+      if (r.merged && r.merged.length) toast(t('phMerged', { n: r.merged.length }), [{ label: t('vinstUndo'), run: () => phr.unmerge(r) }]);
+      else toast(r.added ? t('phAdded') : t('phKnown'));
+      prepare(r.phrase);
     }
   }
   async function hearPhrase(p) {

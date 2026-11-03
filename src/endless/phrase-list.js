@@ -211,7 +211,7 @@ export function fillRows(song, trackId, group, { styleWays = null } = {}) {
 // the app's language with its translation, keeping its bars and way; an empty list gets as many rows as Phrases per
 // song asks. phrases: the collection's items; styles: the song's. → { song, filled } or { error: 'none' | 'empty' }
 export function fillMine(song, trackId, phrases, { lang = 'en', styles = [], styleWays = null } = {}) {
-  const pool = (phrases || []).filter(p => p && p.on !== false && p.kind === 'voice' && (p.lang === lang || (p.alt && p.alt[lang])) && (!(p.styles || []).length || p.styles.some(x => styles.includes(x))))
+  const pool = (phrases || []).filter(p => p && p.on !== false && (Array.isArray(p.kinds) ? p.kinds : [p.kind]).includes('voice') && (p.lang === lang || (p.alt && p.alt[lang])) && (!(p.styles || []).length || p.styles.some(x => styles.includes(x))))
     .slice().sort((a, b) => (a.uses || 0) - (b.uses || 0) || String(a.created || '').localeCompare(String(b.created || '')))
     .map(p => ({ ...(p.alt || {}), [p.lang]: p.text }));
   if (!pool.length) return { error: 'empty' };

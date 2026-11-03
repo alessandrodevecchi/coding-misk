@@ -2,7 +2,7 @@
 // phrases (Mai and an empty collection leave every draw as it was; the share over 200 seeds; Sempre; a song's own lines
 // never replaced; Replay identical after a delete). No browser.
 //   npm run check:phrases
-import { readStore, emptyStore, addPhrase, editPhrase, deletePhrase, restorePhrase, countUses, overCap, mergePhrases, keyOf, textIn, textError, readSettings, groupsOf, matches, SHARE, CAP } from '../src/voices/phrases.js';
+import { readStore, emptyStore, addPhrase, editPhrase, deletePhrase, restorePhrase, countUses, overCap, mergePhrases, unmergePhrases, keyOf, textIn, textError, readSettings, groupsOf, matches, kindsOf, validTag, KIND_SETS, SHARE, CAP } from '../src/voices/phrases.js';
 import { MOMENTS, MOMENT_GROUPS, poolKeys, momentOfLine, PHRASES_MOMENT, POOL_MOMENT } from '../src/voices/moments.js';
 import { PHRASES } from '../src/song/build.js';
 import { POOL } from '../src/endless/phrases.js';
@@ -104,7 +104,7 @@ const DIRECTOR = {
     items.splice(0, 1);
     const b = radioSong('replay', recorded).song;
     assert(JSON.stringify(a) === JSON.stringify(b), 'the replay differs');
-    assert(b.mine && b.mine.list.length === 1 && b.mine.list[0].kind === 'explain', 'the narrator phrases go with the song');
+    assert(b.mine && b.mine.list.length === 1 && kindsOf(b.mine.list[0]).join() === 'explain', 'the narrator phrases go with the song');
   },
   "Compose: a built-in song grown in Live coder says phrases of mine of the same moment, the growth is the same; a song's own lines never change (spec: Compose growth)"() {
     const song = read('songs/luci-rosse.json'), C = resolveProfile('switch', { narrated: true }), c = crescendoSong(song, { narrated: true, rules: growthRules(C) }), B = liveBuildOf(c, C);
@@ -213,6 +213,119 @@ const DIRECTOR = {
   },
 };
 
+// phrase-any-voice: who says a phrase as a list of kinds
+const Q = (id, text, kinds, tag = null, extra = {}) => ({ id, text, lang: 'it', alt: {}, kinds, tag, styles: [], on: true, uses: 0, ...extra });
+const ANY_VOICE = {
+  'any voice: the five lists of Who says it, each voice takes a phrase whose kinds include its kind (spec: Both narrators, All)'() {
+    assert(KIND_SETS.map(l => l.join('+')).join() === 'voice,explain,poetic,explain+poetic,voice+explain+poetic', 'five lists');
+    for (const kinds of KIND_SETS) {
+      const list = [Q('a', 'una riga mia', kinds)];
+      for (const kind of ['voice', 'explain', 'poetic']) {
+        const got = candidates(list, { kind, tag: kind === 'voice' ? 'night' : kind === 'explain' ? 'bass' : 'move', lang: 'it', styles: [] }).length;
+        assert(got === (kinds.includes(kind) ? 1 : 0), `${kinds.join('+')} for ${kind}: ${got}`);
+      }
+    }
+    // other rules still apply: off, styles, language
+    const off = [Q('a', 'uno', ['voice', 'explain', 'poetic'], null, { on: false }), Q('b', 'due', ['voice', 'explain', 'poetic'], null, { styles: ['jazz'] })];
+    assert(!candidates(off, { kind: 'explain', tag: 'bass', lang: 'it', styles: ['house'] }).length && !candidates([Q('c', 'tre', ['explain', 'poetic'])], { kind: 'poetic', tag: 'move', lang: 'en', styles: [] }).length, 'off, styles or language let a phrase through');
+    // an old snapshot (a single kind) draws as before
+    assert(candidates([P('o', 'vecchia', 'voice', 'night')], { kind: 'voice', tag: 'night', lang: 'it', styles: [] }).length === 1, 'old snapshot');
+    const snap = mineSnapshot([Q('a', 'uno', ['explain', 'poetic']), P('o', 'vecchia', 'voice', 'night')], 1, 'it');
+    assert(snap.list.map(p => p.kinds.join('+')).join() === 'explain+poetic,voice' && snap.list.every(p => p.kind === undefined), JSON.stringify(snap.list));
+  },
+  'any voice: a tag only with one kind; widening clears it, narrowing lets it be set again (spec: tag)'() {
+    assert(validTag(['voice'], 'night') && !validTag(['voice', 'explain'], 'night') && validTag(['explain', 'poetic'], null) && validTag('explain', 'bass'), 'validTag');
+    let s = add(emptyStore(), { text: 'le torri', lang: 'it', kind: 'voice', tag: 'night', source: 'tab' }).store;
+    const id = s.items[0].id;
+    let e = editPhrase(s, id, { kinds: ['voice', 'explain', 'poetic'], tag: 'night' });
+    assert(!e.error && e.phrase.kinds.length === 3 && e.phrase.tag === null && e.phrase.kind === undefined, JSON.stringify(e.phrase));
+    assert(['voice', 'explain', 'poetic'].every(kind => candidates(e.store.items, { kind, tag: kind === 'voice' ? 'dark' : 'drop', lang: 'it', styles: [] }).length === 1), 'a phrase of several kinds fits every tag');
+    e = editPhrase(e.store, id, { kinds: ['explain'] });
+    const tagged = editPhrase(e.store, id, { tag: 'bass' });
+    assert(!e.error && e.phrase.tag === null && tagged.phrase.tag === 'bass', 'narrowed: tag Any, then set again');
+    e = tagged;
+    // defaults: a new phrase has no tag
+    assert(add(emptyStore(), { text: 'nuova', lang: 'it', kinds: ['explain'], source: 'tab' }).phrase.tag === null, 'default tag');
+    // a phrase of several kinds groups after the single kinds
+    s = add(e.store, { text: 'due voci', lang: 'it', kinds: ['explain', 'poetic'], source: 'tab' }).store;
+    s = add(s, { text: 'tutte', lang: 'it', kinds: ['voice', 'explain', 'poetic'], source: 'tab' }).store;
+    const g = groupsOf(s.items).map(x => `${x.kinds.join('+')}:${x.tag}`).join();
+    assert(g === 'explain:bass,explain+poetic:null,voice+explain+poetic:null', g);
+  },
+  'any voice: old phrases and old backups are read as lists of one kind with their tag (spec: old phrases)'() {
+    const old = { format: 1, items: [{ id: 'ph_a', text: 'ecco il basso', lang: 'it', kind: 'explain', tag: 'bass', uses: 2 }, { id: 'ph_b', text: 'notte', lang: 'it', kind: 'voice', tag: 'night' }, { id: 'ph_c', text: 'mai', lang: 'it', kinds: ['voice', 'nope'] }, { id: 'ph_d', text: 'vuota', lang: 'it', kinds: [] }] };
+    const s = readStore(old);
+    assert(s.items.length === 2 && s.items[0].kinds.join() === 'explain' && s.items[0].tag === 'bass' && s.items.every(p => !('kind' in p)), JSON.stringify(s.items));
+    const json = JSON.stringify(s);
+    assert(!json.includes('"kind"') && json.includes('"kinds"'), 'written back with kinds');
+    // an old backup merged into a store with a phrase of two kinds: one phrase per text, language and kind
+    const cur = { format: 1, items: [Q('ph_x', 'ecco il basso', ['explain', 'poetic'], null, { uses: 1 })] };
+    const m = mergePhrases(cur, old);
+    assert(m.items.length === 2 && m.items[0].id === 'ph_x' && m.items[0].uses === 2 && m.items[0].kinds.join() === 'explain,poetic', JSON.stringify(m.items));
+  },
+  'any voice: widening merges the phrases of the same text, Undo gives them back; saving a line already included reuses it (spec: merge, reuse)'() {
+    let s = add(emptyStore(), { text: 'ecco il basso', lang: 'it', kind: 'explain', tag: 'bass', source: 'tab', styles: ['techno'] }, { now: '2026-11-01T00:00:00Z' }).store;
+    s = add(s, { text: 'Ecco il basso', lang: 'it', kind: 'poetic', source: 'tab', styles: ['jazz'] }, { now: '2026-11-02T00:00:00Z', rand: () => 0.9 }).store;
+    s = add(s, { text: 'altro', lang: 'it', kind: 'voice', source: 'tab' }, { rand: () => 0.5 }).store;
+    const [ex, po] = s.items;
+    s = { ...s, items: s.items.map(p => (p.id === ex.id ? { ...p, uses: 2, last: '2026-11-01T10:00:00Z' } : p.id === po.id ? { ...p, uses: 3, last: '2026-11-02T10:00:00Z' } : p)) };
+    const r = editPhrase(s, ex.id, { kinds: ['explain', 'poetic'] });
+    assert(!r.error && r.store.items.length === 2 && r.phrase.id === ex.id && r.phrase.uses === 5 && r.phrase.kinds.join() === 'explain,poetic' && r.phrase.tag === null, JSON.stringify(r.phrase));
+    assert(r.phrase.styles.sort().join() === 'jazz,techno' && r.phrase.last === '2026-11-02T10:00:00Z' && r.merged.length === 1 && r.merged[0].id === po.id, 'styles, last, merged');
+    // the older id wins also when the newer phrase is the one widened
+    const r2 = editPhrase(s, po.id, { kinds: ['explain', 'poetic'] });
+    assert(!r2.error && r2.phrase.id === ex.id && r2.phrase.text === 'Ecco il basso', JSON.stringify(r2.phrase));
+    // Undo
+    const u = unmergePhrases(r.store, r);
+    assert(JSON.stringify(u.items) === JSON.stringify(s.items), 'Undo differs');
+    // reuse: a line typed as voice track that exists with All
+    let a = add(emptyStore(), { text: 'tutte le voci', lang: 'it', kinds: ['voice', 'explain', 'poetic'], source: 'tab' }).store;
+    const x = add(a, { text: 'Tutte le voci', lang: 'it', kind: 'voice', tag: null, source: 'radio' });
+    assert(!x.added && x.store.items.length === 1 && x.phrase.uses === 1, 'reused');
+    // a new phrase with All over an explaining one: one phrase, widened
+    a = add(emptyStore(), { text: 'fermi tutti', lang: 'it', kind: 'explain', source: 'tab' }).store;
+    const y = add(a, { text: 'fermi tutti', lang: 'it', kinds: ['voice', 'explain', 'poetic'], source: 'tab' });
+    assert(!y.added && y.store.items.length === 1 && y.phrase.kinds.length === 3 && y.phrase.uses === 1 && unmergePhrases(y.store, y).items[0].kinds.join() === 'explain', JSON.stringify(y.store.items));
+    // narrowing never merges, restoring a deleted phrase never makes a twin
+    const d = deletePhrase(r.store, r.phrase.id), back = add(d.store, { text: 'ecco il basso', lang: 'it', kind: 'poetic', source: 'tab' }).store;
+    assert(restorePhrase(back, d.removed).items.length === back.items.length, 'restore made a twin');
+  },
+  'any voice: the narrator says a phrase of Both narrators on the explaining steps and on the poetic ones; the voice track takes one of All (spec: Both narrators, All)'() {
+    const song = read('songs/kellerlicht.json');
+    for (const style of ['explain', 'poetic']) {
+      const C = resolveProfile('crescendo', { narrated: true, narratorStyle: style }), B = liveBuildOf(crescendoSong(song, { narrated: true, rules: growthRules(C) }), C);
+      const plain = spokenSchedule(B, C, 'it', ANY).filter(x => x.voice === 'N');
+      const both = [Q('ph_b', 'due voci insieme', ['explain', 'poetic'])];
+      setNarratorMine(narratorPick(() => ({ share: 1, lang: 'it', list: both, own: new Set() })));
+      const got = spokenSchedule(B, C, 'it', ANY).filter(x => x.voice === 'N');
+      setNarratorMine(null);
+      const mine = got.filter(x => x.text === 'due voci insieme').length;
+      assert(got.length === plain.length && got.every((x, i) => x.at === plain[i].at), `${style}: bars moved`);
+      assert(mine >= 3, `${style}: ${mine} of ${got.length}`);
+      // only the voice track: the narrator says none
+      setNarratorMine(narratorPick(() => ({ share: 1, lang: 'it', list: [Q('ph_v', 'solo traccia', ['voice'])], own: new Set() })));
+      const none = spokenSchedule(B, C, 'it', ANY).filter(x => x.voice === 'N' && x.text === 'solo traccia').length;
+      setNarratorMine(null);
+      assert(!none, `${style}: a voice-track phrase was narrated`);
+      console.log(`      ${style}: ${mine} of ${got.length} narrator lines are the Both narrators phrase`);
+    }
+    // the radio: a phrase with All replaces night vocabulary lines and goes with the song for the narrator
+    const all = [Q('ph_all', 'la notte ci guarda', ['voice', 'explain', 'poetic'])], mine = mineSnapshot(all, 1, 'it');
+    let swapped = 0;
+    for (let i = 0; i < 10; i++) { const sg = radioSong(`all-${i}`, mine).song; swapped += spokenTexts(sg).filter(x => x && x.it === 'la notte ci guarda').length; assert(sg.mine && sg.mine.list.some(p => p.id === 'ph_all'), 'the narrator list lost the phrase'); }
+    assert(swapped >= 5, `voice track lines: ${swapped}`);
+  },
+  'any voice: the files of a phrase said by two speakers, delete counts both banks (spec: samples)'() {
+    const usage = { say_it: [{ f: 'tutte_le_voci.wav', b: 10 }], say_it_reed: [{ f: 'tutte_le_voci.wav', b: 12 }], say_it_flo: [{ f: 'altro.wav', b: 5 }] };
+    const p = Q('a', 'tutte le voci', ['voice', 'explain', 'poetic']);
+    const f = phraseFiles(p, usage, { builtin: new Set(), mine: new Set(), songs: new Set() });
+    assert(f.files.map(x => x.rel).sort().join() === 'say_it/tutte_le_voci.wav,say_it_reed/tutte_le_voci.wav', JSON.stringify(f));
+    const k = phraseFiles(p, usage, { builtin: new Set(), mine: new Set(), songs: songKeys([{ id: 'u', tracks: [{ id: 'w', type: 'spoken', patterns: { A: { way: 'passage', text: { it: 'tutte le voci' } } }, clips: [] }] }]) });
+    assert(!k.files.length && k.kept.length === 2, 'a saved song keeps both files');
+    assert(mineKeys([p]).has('it|tutte_le_voci'), 'protect key');
+  },
+};
+
 export const CHECKS = {
   'store: one phrase per text, language and kind; the same line again adds a use (spec: same line twice)'() {
     let s = emptyStore();
@@ -234,7 +347,9 @@ export const CHECKS = {
     let e = editPhrase(s, a.id, { alt: { en: 'everybody stop' }, tag: 'drop' });
     assert(!e.error && e.phrase.alt.en === 'everybody stop' && e.phrase.tag === 'drop' && textIn(e.phrase, 'en') === 'everybody stop' && textIn(e.phrase, 'it') === 'fermi tutti', JSON.stringify(e));
     assert(editPhrase(e.store, a.id, { tag: 'nope' }).phrase.tag === null, 'an unknown tag is any');
-    assert(editPhrase(e.store, b.id, { text: 'Fermi tutti', kind: 'explain' }).error === 'exists', 'twin refused');
+    // (a text changed into another phrase's text and kind is refused; adding a kind merges, see phrase-any-voice)
+    const c3 = add(e.store, { text: 'altra riga', lang: 'it', kind: 'explain', source: 'tab' });
+    assert(editPhrase(c3.store, c3.phrase.id, { text: 'Fermi tutti' }).error === 'exists', 'twin refused');
     const d = deletePhrase(e.store, a.id);
     assert(d.removed && d.store.items.length === 1, 'deleted');
     const back = restorePhrase(d.store, d.removed, 0);
@@ -281,6 +396,7 @@ export const CHECKS = {
     assert(matches(s.items[1], 'NOTTE') && matches(s.items[1], 'cyberpunk') && !matches(s.items[0], 'notte'), 'search');
   },
   ...DIRECTOR,
+  ...ANY_VOICE,
 };
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -4,7 +4,9 @@
 // of the console, Non salvare mai; the tab's four sections, a new phrase, edit, delete with its protected files (a copy
 // of a vocabulary entry keeps the built-in file), Copia nelle mie frasi, the test bench (a temporary sample), a delete
 // of samples while a song plays (the code's sample numbers follow the new manifest), the Settings card, English, the
-// hardware and light themes and 400 px (no sideways scroll). With shots-dir: pictures of the tab, the phrase editor,
+// hardware and light themes and 400 px (no sideways scroll). phrase-any-voice: the five options of Chi la dice, the tag
+// field hidden for several kinds and back on Any when narrowed, the row and the kind chips, the merge with Annulla, and
+// a delete that counts the files of two speakers. With shots-dir: pictures of the tab, the phrase editor,
 // the Settings card and the Chiedi notice in neon, hardware and light, at desktop and 400 px.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices-tab.cjs [shots-dir]
 //   (dev server on PORT, default 5173, with the voice helper: macOS `say` and ffmpeg; samples in public/samples)
@@ -25,7 +27,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
 async function launch() {
   try { return await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] }); } catch (e) { return chromium.launch({ headless: true }); }
 }
-const items = page => page.evaluate(() => globalThis.codingMiskPhrases.phr.items.map(p => ({ id: p.id, text: p.text, kind: p.kind, tag: p.tag, styles: p.styles, source: p.source, uses: p.uses })));
+const items = page => page.evaluate(() => globalThis.codingMiskPhrases.phr.items.map(p => ({ id: p.id, text: p.text, kind: (p.kinds || [p.kind]).join('+'), tag: p.tag, styles: p.styles, source: p.source, uses: p.uses })));
 const toastText = page => page.evaluate(() => { const b = document.querySelector('.toast'); return b && !b.hidden ? b.textContent : ''; });
 const setPolicy = (page, save) => page.evaluate(s => globalThis.codingMiskPhrases.phr.setSettings({ save: s }), save);
 async function fresh(page, { lang = 'it', ui = 'neon', phrases = null } = {}) {
@@ -155,6 +157,64 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await tap(page, '.toast .toast-act'); await sleep(400);
   check((await items(page)).some(p => p.id === fermi.id), 'Annulla brings the phrase back (its sample comes with the next preparation)');
   await until(() => fs.existsSync(path.join(SAMPLES, 'say_it', 'fermi_tutti.wav')), 15000);
+
+  // ---------- 3b. phrase-any-voice: Chi la dice with five options, merge with Annulla, two speakers ----------
+  await tap(page, '[data-ph-new]'); await sleep(200);
+  const opts = await page.$$eval('[data-ph-f="kind"] option', o => o.map(x => `${x.value}=${x.textContent}`));
+  check(opts.join() === 'voice=Voce traccia,explain=Narratore spiega,poetic=Narratore poetico,explain+poetic=Entrambi i narratori,voice+explain+poetic=Tutte le voci', 'Chi la dice: five options', opts.join());
+  check(await page.$eval('[data-ph-f="kind"]', el => el.value) === 'explain' && await page.$eval('[data-ph-f="tag"]', el => el.value) === '', 'a new phrase: Narratore spiega, tag qualsiasi (spec: defaults)');
+  await page.fill('[data-ph-f="text"]', 'ecco il basso');
+  await page.selectOption('[data-ph-f="tag"]', 'bass');
+  await page.selectOption('[data-ph-f="kind"]', 'voice+explain+poetic'); await sleep(200);
+  check(!(await page.$('[data-ph-f="tag"]')) && await page.isVisible('[data-ph-kind-hint]'), 'Tutte le voci: the tag field hidden, a hint instead');
+  await shot(page, 'editor-all-neon');
+  await page.selectOption('[data-ph-f="kind"]', 'explain'); await sleep(200);
+  check(await page.$eval('[data-ph-f="tag"]', el => el.value) === '', 'back to one kind: the tag field again, on qualsiasi (spec: narrow)');
+  await page.selectOption('[data-ph-f="tag"]', 'bass');
+  await tap(page, '[data-ph-save]'); await sleep(400);
+  await tap(page, '[data-ph-new]'); await sleep(200);
+  await page.fill('[data-ph-f="text"]', 'ecco il basso');
+  await page.selectOption('[data-ph-f="kind"]', 'poetic'); await sleep(150);
+  await tap(page, '[data-ph-save]'); await sleep(400);
+  list = await items(page);
+  const ex = list.find(p => p.text === 'ecco il basso' && p.kind === 'explain'), po = list.find(p => p.text === 'ecco il basso' && p.kind === 'poetic');
+  check(ex && po && ex.tag === 'bass', 'the same text as explaining (moment bass) and as poetic: two phrases', JSON.stringify([ex, po]));
+  // (2 uses for the explaining one, 3 for the poetic one: the same line saved again adds a use)
+  await page.evaluate(() => { const P = globalThis.codingMiskPhrases.phr, x = { text: 'ecco il basso', lang: 'it', source: 'tab' }; for (let i = 0; i < 2; i++) P.add({ ...x, kind: 'explain' }); for (let i = 0; i < 3; i++) P.add({ ...x, kind: 'poetic' }); }); await sleep(300);
+  // widen the explaining one to Both narrators: merged, with Annulla
+  await tap(page, `[data-ph-edit="${ex.id}"]`); await sleep(200);
+  await page.selectOption('[data-ph-f="kind"]', 'explain+poetic'); await sleep(150);
+  await tap(page, '[data-ph-save]'); await sleep(400);
+  list = await items(page);
+  let both = list.filter(p => p.text === 'ecco il basso');
+  const mt = await toastText(page);
+  check(both.length === 1 && both[0].kind === 'explain+poetic' && both[0].uses === 5 && !both[0].tag && both[0].id === ex.id, 'Entrambi i narratori: one phrase, 5 uses, the older id, no tag (spec: merge on edit)', JSON.stringify(both));
+  check(/unita a 1/.test(mt) && /Annulla/.test(mt), 'the merge toast offers Annulla', mt);
+  const row = await page.$eval(`[data-ph-id="${ex.id}"]`, el => ({ icons: el.querySelectorAll('.ph-main svg').length, tag: (el.querySelector('.ph-tag') || {}).textContent || '' }));
+  check(row.icons === 2 && row.tag === 'qualsiasi', 'the row: two icons and the tag qualsiasi', JSON.stringify(row));
+  await shot(page, 'mine-merged-neon');
+  await tap(page, '[data-ph-kind="poetic"]'); await sleep(150);
+  const inPoetic = await page.$(`[data-ph-id="${ex.id}"]`);
+  await tap(page, '[data-ph-kind="voice"]'); await sleep(150);
+  const inVoice = await page.$(`[data-ph-id="${ex.id}"]`);
+  await tap(page, '[data-ph-kind="all"]'); await sleep(150);
+  check(!!inPoetic && !inVoice, 'kind chips: under Narratore poetico, not under Voce traccia');
+  await page.evaluate(() => [...document.querySelectorAll('.toast .toast-act')].find(b => b.textContent === 'Annulla').click()); await sleep(400);
+  both = (await items(page)).filter(p => p.text === 'ecco il basso');
+  check(both.length === 2 && both.some(p => p.kind === 'explain' && p.tag === 'bass' && p.uses === 2) && both.some(p => p.kind === 'poetic' && p.uses === 3), 'Annulla: the two phrases back as they were', JSON.stringify(both));
+  // widen again, to Tutte le voci, and delete it with the files of two speakers
+  await tap(page, `[data-ph-edit="${ex.id}"]`); await sleep(200);
+  await page.selectOption('[data-ph-f="kind"]', 'voice+explain+poetic'); await sleep(150);
+  await tap(page, '[data-ph-save]'); await sleep(400);
+  const own = path.join(SAMPLES, 'say_it', 'ecco_il_basso.wav'), reed = path.join(SAMPLES, 'say_it_reed', 'ecco_il_basso.wav');
+  const madeBass = await until(() => fs.existsSync(own), 15000);
+  if (madeBass && !fs.existsSync(reed)) fs.copyFileSync(own, reed);
+  await tap(page, `[data-ph-del="${ex.id}"]`); await sleep(1500);
+  const askTwo = await page.textContent('.ph-confirm');
+  check(madeBass && /2 file/.test(askTwo), 'a phrase of all three said by two speakers: the confirmation counts both files (spec: delete)', askTwo.trim().slice(0, 90));
+  await tap(page, '[data-ph-confirm-yes]'); await sleep(1200);
+  check(!fs.existsSync(own) && !fs.existsSync(reed), 'both files deleted');
+  for (const f of [own, reed]) try { fs.unlinkSync(f); } catch (e) { /* gone */ }
 
   // ---------- 4. voices and the test bench ----------
   await tap(page, '[data-vt-sub="voices"]'); await sleep(2500);

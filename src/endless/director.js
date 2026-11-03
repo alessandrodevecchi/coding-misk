@@ -829,7 +829,7 @@ function makeSong({ parts, byId, prev, opts, rng, index, seed, memory = null }) 
   // the narrator's phrases of mine (explaining and poetic) go with the song, so the song on air, Replay and a saved
   // session say the same lines after the collection changes (the narration draws them, build.js narratorMine)
   if (opts.mine) {
-    const list = mine.list.filter(p => (p.kind === 'explain' || p.kind === 'poetic') && (!(p.styles || []).length || p.styles.some(x => styles.includes(x))));
+    const list = mine.list.filter(p => (Array.isArray(p.kinds) ? p.kinds : [p.kind]).some(k => k === 'explain' || k === 'poetic') && (!(p.styles || []).length || p.styles.some(x => styles.includes(x))));
     if (list.length) song.mine = { share: mine.share, lang: mine.lang, list };
     if (mineUsed.length) song.mineUsed = mineUsed;
   }

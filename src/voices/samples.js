@@ -83,7 +83,9 @@ export function totals(rows) {
 // the keys a delete must never touch: built-in, mine (minus the phrase being deleted), songs
 export const protectList = (...sets) => [...new Set(sets.flatMap(s => [...s]))];
 // The files of a phrase in every bank (D7): its texts' slugs in the banks of their language, with the protected ones
-// apart. → { files: [{ rel, b }], kept: [{ rel, b, why }] }
+// apart. Every speaker's bank counts (say_it, say_it_reed…), so a phrase of several kinds said by several speakers
+// lists all its files (phrase-any-voice D7); the keys of the protect lists carry no speaker, so they guard every bank.
+// → { files: [{ rel, b }], kept: [{ rel, b, why }] }
 export function phraseFiles(p, usage, { builtin, mine, songs }) {
   const want = new Set(textsOf(p).map(([l, x]) => `${l}|${saySlug(x)}`)), files = [], kept = [];
   for (const [bank, list] of Object.entries(usage || {})) for (const x of list || []) {
