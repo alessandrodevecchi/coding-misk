@@ -137,14 +137,28 @@ async function fitCase(page, shot) {
   check(l0.rows[0] && l0.rows[0].icon && l0.rows[0].italic && l0.rows[0].title, 'default mark: the narrator with its icon, in italics, its name on hover', JSON.stringify(l0.rows[0]));
   await shot(page, 'lane-neon-explain');
 
-  // ---- poetic with Narrated growth: bar 8 says "la città respira" with the tag "ritmo più fitto"
+  // ---- poetic without Narrated growth (poetic-narrator D1): as many narrator captions as the explaining style
+  await stop(page);
+  await openSong(page, 'luci-rosse', { style: 'poetic', narrated: false });
+  await play(page);
+  lines = await cap(page, C => C.lines());
+  const plainN = lines.filter(x => x.kind === 'narrator');
+  check(plainN.length === 19, 'poetic without Narrated growth: 19 narrator captions, as many as explain', `${plainN.length}`);
+  // the entry on bar 18: its image on bar 17, nothing spoken on bar 18, its step line only as the tag (D6)
+  const l18p = await laneAt(page, 17);
+  check(!plainN.some(x => x.at === 17) && !l18p.rows.some(r => r.kind === 'narrator' && r.text === l18p.tag), 'poetic without Narrated growth, bar 18 (an entry): no narrator line of its own', JSON.stringify(l18p));
+
+  // ---- poetic with Narrated growth: bar 8 says "la stanza si inclina" with the tag "ritmo più fitto"
   await stop(page);
   await openSong(page, 'luci-rosse', { style: 'poetic', narrated: true });
   await play(page);
   lines = await cap(page, C => C.lines());
-  check(lines.filter(x => x.kind === 'narrator').length === 38, 'poetic with Narrated growth: 38 narrator captions', `${lines.filter(x => x.kind === 'narrator').length}`);
+  check(lines.filter(x => x.kind === 'narrator').length === 33, 'poetic with Narrated growth: 33 narrator captions', `${lines.filter(x => x.kind === 'narrator').length}`);
   let l8 = await laneAt(page, 7);
-  check(l8.rows[0] && l8.rows[0].text === 'la città respira' && l8.tag === 'ritmo più fitto', 'bar 8: "la città respira" with the step tag "ritmo più fitto"', JSON.stringify(l8));
+  check(l8.rows[0] && l8.rows[0].text === 'la stanza si inclina' && l8.tag === 'ritmo più fitto', 'bar 8: "la stanza si inclina" with the step tag "ritmo più fitto"', JSON.stringify(l8));
+  // the entry on bar 18: the step line shows only as the tag, after the image of bar 17 (poetic-narrator D6)
+  const l18 = await laneAt(page, 17);
+  check(l18.tag && !lines.some(x => x.kind === 'narrator' && x.at === 17) && !l18.rows.some(r => r.kind === 'narrator' && r.text === l18.tag), 'bar 18 (an entry): its step line as the tag, no narrator line of its own', JSON.stringify(l18));
   await shot(page, 'lane-neon-poetic-16x9');
   const l17 = await laneAt(page, 16);
   check(l17.rows.some(r => r.text === 'qualcosa di profondo si sveglia'), 'bar 17: the entry image', JSON.stringify(l17.rows));
@@ -181,7 +195,7 @@ async function fitCase(page, shot) {
   await page.selectOption('#looks', 'claude'); await sleep(400);
   const lc = await laneAt(page, 7), ic = await cap(page, C => C.info(C.now()));
   check(!lc.on, 'Claude look: no page caption');
-  check(ic.captions && ic.captions.rows.some(r => r.text === 'la città respira') && ic.prompt === 'ritmo più fitto', 'Claude look: the reply and the step prompt', JSON.stringify({ rows: ic.captions && ic.captions.rows.map(r => r.text), prompt: ic.prompt }));
+  check(ic.captions && ic.captions.rows.some(r => r.text === 'la stanza si inclina') && ic.prompt === 'ritmo più fitto', 'Claude look: the reply and the step prompt', JSON.stringify({ rows: ic.captions && ic.captions.rows.map(r => r.text), prompt: ic.prompt }));
   await shot(page, 'claude-c1-16x9');
   check(!(await page.$eval('#transcript', el => el.hidden)), 'Claude look: the Trascrizione option beside the render');
   await page.click('#transcript'); await sleep(200);
