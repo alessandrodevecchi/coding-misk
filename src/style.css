@@ -83,6 +83,8 @@
   .stagewrap.co-on .say { left: var(--co-say-x, 50%); max-width: var(--co-say-w, calc(100% - 32px)); }
   .stagewrap.co-on .say[data-co-side="whole"] { bottom: 3%; top: auto; }
   .say .cap-row { display: flex; align-items: center; gap: .35em; max-width: 100%; white-space: nowrap; pointer-events: auto; }
+  /* a long line: fitted by the page (fitLane in main.js: smaller, then two or three lines broken with <br>); the
+     ellipsis only as the last resort */
   .say .cap-txt { overflow: hidden; text-overflow: ellipsis; }
   .say .cap-txt.it { font-style: italic; }
   .say .cap-row[data-kind="narrator"]:not([data-mark="none"]) { color: #4fe3ff; }
@@ -100,11 +102,11 @@
   :root[data-ui="hw"] .say .cap-row, :root[data-ui="hw"] .say .cap-tag { color: #ffb347; }
   :root[data-ui="hw"] .say .cap-tag { opacity: .7; }
   :root[data-ui="hw"] .say .cap-row:not([data-kind="step"])::before { content: ''; flex: none; width: .3em; height: .3em; border-radius: 50%; background: #ffb347; box-shadow: 0 0 6px #ffb347; }
-  /* phone: 17 px, the speaker above, two lines without cutting a word (D8) */
+  /* phone: 17 px, the speaker above, up to three lines without cutting a word (D8, fitted by the page) */
   @media (max-width: 480px) {
     .say { font-size: 17px; max-width: calc(100% - 24px); }
     .say .cap-row { flex-wrap: wrap; justify-content: center; white-space: normal; }
-    .say .cap-row .cap-txt { flex-basis: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .say .cap-row .cap-txt { flex-basis: 100%; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   }
   .say.on { opacity: 1; transform: translate(-50%, 0); }
   /* live build on the timeline: hatched where the steps keep a track silent, a diamond where a step changes it */
@@ -1823,6 +1825,7 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .ph-st.none { color: var(--danger); }
 .ph-over { color: var(--danger); }
 .ph-form, .ph-confirm, .vt-bench, .vt-orphans { margin: 10px 0 14px; padding: 12px; }
+.ph-item > .ph-confirm { grid-column: 1 / -1; grid-row: 3; margin: 8px 0 2px; }
 .ph-form h3 { margin: 0 0 8px; }
 .ph-form .ctrl, .vt-bench .ctrl { display: flex; flex-direction: column; gap: 3px; }
 .ph-form input[type="text"], .vt-bench input[type="text"] { width: 100%; min-width: 0; }

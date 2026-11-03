@@ -7,7 +7,7 @@ import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, RENDERS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
 import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds, slugAt } from './song/build.js';
-import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml } from './captions/captions.js';
+import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml, fitCaption } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
 import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORDS, narratorStyle } from './song/spoken.js';
@@ -98,7 +98,7 @@ import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
 import { createVoicesTab } from './voices/voices-tab.js';
-import { narratorPick, vocabGroupOf } from './voices/mine.js';
+import { narratorPick } from './voices/mine.js';
 import { setNarratorMine } from './song/build.js';
 import { PHRASES_MOMENT } from './voices/moments.js';
 import { builtinKeys, mineKeys, songKeys, sizeText } from './voices/samples.js';
@@ -108,7 +108,7 @@ import { createGrowthStore } from './live/growth-store.js';
 import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
-import { CW_KEY, CW_VERSION, APP_KINDS_VERSION, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom } from './live/widgets.js';
+import { CW_KEY, CW_VERSION, APP_KINDS_VERSION, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom, guardEditorRanges, recoverEditor } from './live/widgets.js';
 import { SW_KEY, SW_VERSION, stageSettings, stageMapping, stageScopeInstruments, layerOn, toggleLayer, FULL_LOOKS } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
 const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
@@ -470,7 +470,35 @@ function capsOf(sg) {
   return list;
 }
 const NO_CAPTIONS = Object.freeze({ rows: [], tag: '', history: [] });
-let lastCapHtml = '';
+let lastCapHtml = '', lastCapFit = '';
+// the caption lane's lines fitted in the room it has (the free side of Code over, the stage, a phone): shrunk, then on
+// two or three lines, cut with … only at the smallest size (fitCaption, the same rule as the videos). The room mirrors
+// the CSS: .say's max-width and padding, the lane at the bottom 3% under a whole-width code
+let coLane = { on: false, side: 'left', width: 62 };
+const fitMeasure = document.createElement('canvas').getContext('2d');
+function fitLane(say) {
+  const wrap = say.parentElement, W = wrap.clientWidth, H = wrap.clientHeight, phone = matchMedia('(max-width: 480px)').matches;
+  const co = coLane.on && wrap.classList.contains('co-on');
+  const room = (co && coLane.side !== 'whole' ? W * (100 - coLane.width - 3) / 100 : W - (phone ? 24 : 32)) - 30;
+  const rows = [...say.querySelectorAll('.cap-row')], tag = say.querySelector('.cap-tag');
+  const tall = co && coLane.side === 'whole' ? H * 0.13 : H * 0.45;
+  // (each row may take the height the other rows leave on one line each)
+  const one = rows.map(r => parseFloat(getComputedStyle(r).fontSize) * 1.35), room0 = tall - 12 - (tag ? tag.offsetHeight : 0);
+  rows.forEach((row, i) => {
+    const txt = row.querySelector('.cap-txt'); if (!txt) return;
+    const maxH = Math.max(one[i], room0 - one.reduce((a, h, j) => a + (j === i ? 0 : h), 0));
+    const cs = getComputedStyle(txt), rs = getComputedStyle(row), fs = parseFloat(cs.fontSize), gap = parseFloat(rs.columnGap) || 0;
+    // the speaker beside the text (above it on a phone): icon, label, the hardware light, the step's "> "
+    const above = rs.flexWrap === 'wrap', dot = getComputedStyle(row, '::before').content !== 'none';
+    const head = above ? 0 : [...row.children].filter(c => c !== txt).reduce((a, c) => a + c.getBoundingClientRect().width + gap, 0) + (dot ? fs * 0.3 + gap : 0);
+    const pre = row.dataset.kind === 'step' ? '> ' : '', ls = parseFloat(cs.letterSpacing) / fs || 0;
+    const width = (x, f) => { fitMeasure.font = `${cs.fontStyle} ${cs.fontWeight} ${f}px ${cs.fontFamily}`; return fitMeasure.measureText(pre + x).width + (pre + x).length * ls * f; };
+    const text = txt.textContent, r = fitCaption(width, text, room - head, fs, { maxH, lh: 1.35 });
+    if (r.fs !== fs) txt.style.fontSize = `${r.fs}px`;
+    if (r.lines.length > 1 || r.cut) txt.innerHTML = r.lines.map(esc).join(' <br>');
+    txt.dataset.fit = `${r.fs} ${r.lines.length}${r.cut ? ' cut' : ''}`;
+  });
+}
 // texts off for the next fast video only (Settings → Video, D7); the fragments menu has its own box
 let capsSkipNext = false;
 // a link to the "Testi sul palco" card from an export panel
@@ -685,7 +713,7 @@ $('#edhost').appendChild(el);
 // a song loaded or "back to this code" is written by the app too: out of the undo history (takeover-pending-edit tk2).
 // Set as soon as the editor exists, so the element's own first code is not recorded either (only its "// LOADING"
 // placeholder, cleared while it connects, stays in the history)
-if (el.editor) el.editor.setCode = code => { const v = el.editor.editor; v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: code || '' }, annotations: noHistory(v) }); };
+if (el.editor) el.editor.setCode = code => { const v = el.editor.editor; safeDispatch(v, () => ({ changes: { from: 0, to: v.state.doc.length, insert: code || '' }, annotations: noHistory(v) })); };
 const ready = new Promise(res => { const iv = setInterval(() => { if (el.editor) { clearInterval(iv); ed = el.editor; res(ed); } }, 100); });
 // code-writing: the code evaluated is the code shown and the hidden tail of the song on air (mixer, hidden voice), by
 // hand too (Ctrl+Enter); our helpers (.chan, .crunch), the library and the song's functions are registered once Strudel
@@ -715,6 +743,8 @@ ready.then(() => {
   const iv = setInterval(() => { if (typeof globalThis.register === 'function') { clearInterval(iv); installHelpers({ register: globalThis.register }); } }, 100);
   // #79: a widget whose id changes on a line redraws there at once (Strudel's editor kept the old canvas until a pause)
   const iw = setInterval(() => { if (installWidgetDom(globalThis.BlockWidget)) clearInterval(iw); }, 100);
+  // #82: no widget of an evaluation placed past the end of the code shown
+  const ig = setInterval(() => { if (guardEditorRanges(ed.editor, globalThis)) clearInterval(ig); }, 100);
   // code widgets D4: a scope or spectrum widget reads its line's instrument
   cwLinks = linkAnalysers({ pattern: () => sched() && sched().pattern, now: () => (sched() ? sched().now() : 0), active: () => isPlaying() && /\._(?:scope|spectrum)\(/.test(ed.code || '') });
 });
@@ -789,6 +819,15 @@ const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.cod
 // the undo history, so Ctrl+Z by hand undoes only the user's edits and never brings back half-typed code. The
 // annotation comes from the editor's own CodeMirror (the transaction's class), not from a second copy.
 const noHistory = view => view.state.update({}).constructor.addToHistory.of(false);
+// #82: an edit the app writes into an editor broken by widgets past its text (see guardEditorRanges) recovers the editor
+// and applies, so the song goes on growing and evaluating; spec() is made again for the recovered state
+function safeDispatch(view, spec) {
+  try { view.dispatch(spec()); } catch (e) {
+    if (!(e instanceof RangeError) || !recoverEditor(view, globalThis)) throw e;
+    console.warn('[editor] recovered from', e.message);
+    view.dispatch(spec());
+  }
+}
 // cursorEnd (takeover-pending-edit D5, tk4): a cursor inside the replaced range goes to the end of the new text.
 // Returns the range of the new text, or null when nothing changed
 function setCodeRange(txt, cursorEnd = false) {
@@ -801,7 +840,7 @@ function setCodeRange(txt, cursorEnd = false) {
   let b = 0; while (b < n - a && cur.charCodeAt(cur.length - 1 - b) === txt.charCodeAt(txt.length - 1 - b)) b++;
   const insert = txt.slice(a, txt.length - b), sel = view.state.selection.main;
   const inside = cursorEnd && sel.empty && sel.head >= a && sel.head <= cur.length - b;
-  view.dispatch({ changes: { from: a, to: cur.length - b, insert }, annotations: noHistory(view), ...(inside ? { selection: { anchor: a + insert.length } } : {}) });
+  safeDispatch(view, () => ({ changes: { from: a, to: cur.length - b, insert }, annotations: noHistory(view), ...(inside ? { selection: { anchor: a + insert.length } } : {}) }));
   markMuted();
   return { from: a, to: a + insert.length };
 }
@@ -945,6 +984,9 @@ function liveBuild(sg, s, cyc) {
   }
   if (!due) { typeFrame(typing, cyc); return; }
   typing = null; built = steps.filter(x => x.at <= next.at).length;
+  // (#82: the step's code holds the widgets of its bar, so the section boundaries up to it are done: widgetTick in the
+  // same tick must not write an earlier bar's code over the step's)
+  cwAt = Math.max(cwAt, next.at);
   setCodeRange(codeNow(sg, next.at)); ed.evaluate();
 }
 // the Decode tab (track-to-code D13, level A): the next change the model shows is typed with the bar as its deadline
@@ -1540,7 +1582,9 @@ async function exportFast(sg, title = sg.title, after = null, cut = null, extra 
 }
 // a fast export keeps going in a background tab, but the browser may slow it down: say so once per export
 document.addEventListener('visibilitychange', () => { if (document.hidden && fastJob && !fastJob.warned) { fastJob.warned = true; toast(t('exportHidden')); } });
-globalThis.codingMiskExport = { encode, get job() { return fastJob ? { id: fastJob.id, progress: fastJob.progress, phase: fastJob.phase } : null; } };
+// the visuals the last fast video drew, for the checks (#57)
+const exportLooks = new Set();
+globalThis.codingMiskExport = { encode, get looks() { return [...exportLooks]; }, get job() { return fastJob ? { id: fastJob.id, progress: fastJob.progress, phase: fastJob.phase } : null; } };
 // one Export and one Record for audio and video (#27): the switch is the small display next to the button
 const outKind = () => outKindOf(store.get(OUT_KEY, 'audio'));
 const outLabel = () => outText(outKind(), exportFormat(), (store.get('coding-misk-video', {}) || {}).quality || VIDEO_DEFAULTS.quality, mp3Rate());
@@ -1712,7 +1756,9 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   // widget look or the layer can show in this video (the ones the code widgets rendered are not rendered again);
   // Automatic adds no render
   const SWS = stageWidgets(), waves = cw ? cw.waves : {};
-  const mayShow = (frag && (frag.o.look === 'random' || WIDGET_LOOKS.includes(frag.o.look))) || o.soul !== 'full' && (o.visual === 'song-cycle' || o.visual === 'section-cycle' || WIDGET_LOOKS.includes(String(o.visual).replace('fixed:', '')) || WIDGET_LOOKS.includes(own));
+  exportLooks.clear();
+  const stageLook = look; // the stage's visual when the export starts (#57)
+  const mayShow = (frag && (frag.o.look === 'random' || WIDGET_LOOKS.includes(frag.o.look))) || o.soul !== 'full' && (o.visual === 'song-cycle' || o.visual === 'section-cycle' || WIDGET_LOOKS.includes(String(o.visual === 'stage' ? stageLook : o.visual).replace('fixed:', '')) || WIDGET_LOOKS.includes(own));
   if (o.realScope === 'always' && (mayShow || SWS.sw.layer !== 'off')) {
     const more = stageScopeInstruments(segments, SWS.S, sg.id || '').filter(i => !waves[i]);
     if (more.length) {
@@ -1752,8 +1798,8 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       };
       // code-over-visual: the line typed (D5), the code evaluated and the places of the haps sounding (D6)
       if (overOn) { Object.assign(fv, { cursor: codeAt.cursor ? codeAt.cursor(cyc) : null, lit: litAt(cyc), doc: sg.doc, render: fRender, overFree: frag && fsz.comp.h >= fsz.comp.w ? 'none' : (frag ? 'right' : (S => (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right'))(coSettings())) }); }
-      const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own });
-      fv.look = fLook;
+      const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own, stage: stageLook });
+      fv.look = fLook; exportLooks.add(fLook);
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
       visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off', density: renderDensity() });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
@@ -2419,6 +2465,8 @@ function renderSectionPanel(total) {
   $('#sc-crash').checked = !!sc.crash; $('#sc-breath').checked = !!sc.breath; $('#sc-fill').checked = !!sc.fill;
   $('#sc-left').disabled = sel === 0; $('#sc-right').disabled = sel === T.sections.length - 1; $('#sc-del').disabled = T.sections.length === 1;
   $('#dirty').textContent = dirty ? t('unsaved') : '';
+  // the fragments menu of the song open here (#57): only for a song in the library, as on its card
+  const fragB = $('#tr-frag'); fragB.dataset.frag = T.id; fragB.hidden = !(isBuiltin(T.id) || user.tracks.some(u => u.id === T.id));
   const builtin = isBuiltin(T.id), overridden = user.tracks.some(u => u.id === T.id);
   // a built-in song: ↺ Original song (notes, tracks and configuration, its trial too); one of the user's: Delete song.
   // Disabled (aria-disabled, so the tooltip still shows) when the song itself is as written: a configuration trial
@@ -2712,7 +2760,10 @@ async function seekTo(bar) {
 globalThis.codingMiskCaptions = {
   lines: () => capsOf(song && song.build ? song : compiled),
   at: (cyc, o = {}) => stageCaptions(cyc, o), settings: () => capS, set: f => { setCaptions(f); if (settingsPage) settingsPage.render(); },
-  seek: bar => seekTo(bar), now: () => (isPlaying() && sched() ? sched().now() : null), slug: x => saySlug(x), reload: () => refreshSamples(), late: () => lateCaps.map(x => ({ at: x.at, text: x.text })), needs: () => prepLines(), helper: () => voiceHelper, pending: () => !!compiled.pending,
+  seek: bar => seekTo(bar), now: () => (isPlaying() && sched() ? sched().now() : null), slug: x => saySlug(x), reload: () => refreshSamples(), late: () => lateCaps.map(x => ({ at: x.at, text: x.text })),
+  // (a line heard from bar `at` for `bars` bars, added to the song playing: a long line for the fit check)
+  addLine: (text, at, bars = 4, kind = 'voice') => { if (song && song.build) lateCaps.push({ build: song.build, at, until: at + bars, kind, code: 'V', text, step: '', typed: false, speaker: '', seconds: null }); },
+  needs: () => prepLines(), helper: () => voiceHelper, pending: () => !!compiled.pending,
   info: cyc => stageInfo(cyc), lane: () => { const el = $('#say'); return { on: el.classList.contains('on'), rows: [...el.querySelectorAll('.cap-row')].map(r => ({ kind: r.dataset.kind, mark: r.dataset.mark, text: r.querySelector('.cap-txt').textContent, icon: !!r.querySelector('.cap-ico'), label: (r.querySelector('.cap-lbl') || {}).textContent || '', italic: r.querySelector('.cap-txt').classList.contains('it'), title: r.title })), tag: (el.querySelector('.cap-tag') || {}).textContent || '' }; },
 };
 let rulerDrag = null;
@@ -3040,13 +3091,25 @@ let lastSweep = 0;
 phr = createPhrases({ store, t, toast, getLang, helper: () => !!voiceHelper, onChange: what => { if (what === 'items' || what === 'settings') phrasesChanged(what); } });
 // the collection or how often it is used changed: the narrator of the song in Compose says other lines (its code and
 // captions are written again; the growth stays), the tab and the radio console are drawn again
+// (in the radio, by hand or away from Compose, every part in a task of its own and coalesced: a line typed on the
+// radio and the Undo of its "Saved" toast drew the Voices tab and wrote the song of Compose in the click's task, #82)
+let phrasesLater = null;
+const idle = fn => (globalThis.requestIdleCallback ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 50));
 function phrasesChanged(what) {
-  // (in the radio or by hand only the song in Compose is written again: changed() would leave the radio; a growth it
-  // needs goes away from the page, as every growth of Compose: a line typed on the radio regrew it here, #82)
-  try { if (mode === 'track' && !hand) { const was = dirty; changed(); dirty = was; saveDraft(); } else composeCompiled(); } catch (e) { /* not ready yet */ }
-  if (voicesTab) voicesTab.render();
-  // (the radio drawn again in a task of its own: a line typed on the radio offers itself on the click, #82)
-  if (radio && radio.on && radio.render) setTimeout(() => { if (radio.on) radio.render(); }, 0);
+  if (mode === 'track' && !hand) {
+    try { const was = dirty; changed(); dirty = was; saveDraft(); } catch (e) { /* not ready yet */ }
+    if (voicesTab) voicesTab.render();
+  } else if (!phrasesLater) {
+    phrasesLater = setTimeout(() => {
+      phrasesLater = null;
+      if (voicesTab) voicesTab.render();
+      // (only the song in Compose is written again: changed() would leave the radio; a growth it needs goes away from
+      // the page, as every growth of Compose)
+      idle(() => { try { if (!(mode === 'track' && !hand)) composeCompiled(); } catch (e) { /* not ready yet */ } });
+      // (in a task of its own: the radio reads my phrases only in its console, the typed rows' save buttons)
+      if (radio && radio.on) setTimeout(() => { if (radio.on) radio.renderConsole(); }, 0);
+    }, 0);
+  }
   if (settingsPage && settingsPage.refresh && what === 'settings') settingsPage.refresh();
 }
 // the user's library, for the samples a delete keeps (D5): saved songs, trashed songs, songs of playlist sessions
@@ -3113,14 +3176,11 @@ function narratorOffer(st, text) {
   const tag = poetic ? (tr ? tr.type : 'move') : tr ? PHRASES_MOMENT[tr.type] || 'code' : st.at === 0 ? 'start' : st.remove !== undefined ? ([].concat(st.remove).length > 1 ? 'breakdown' : 'less') : null;
   return { text, lang: getLang(), kind: poetic ? 'poetic' : 'explain', tag: tag === 'spoken' ? null : tag, styles: [], source: 'narrator', from: { song: T.title || T.id } };
 }
-// a line typed in the radio console as a phrase (D2): kind voice, the vocabulary group of the song's style, the style
+// a line typed in the radio console as a phrase (D2): kind voice, any mood (changed later in Voices), the style
 function typedInput(text, lang, sg) {
   const styles = ((sg && sg.tags && sg.tags.styles) || []).slice(0, 3);
-  const tag = styles.map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null;
-  return { text, lang, kind: 'voice', tag, styles: styles.slice(0, 1), source: 'radio', from: { song: (sg && sg.title) || '', ...(styles[0] ? { style: styles[0] } : {}) } };
+  return { text, lang, kind: 'voice', tag: null, styles: styles.slice(0, 1), source: 'radio', from: { song: (sg && sg.title) || '', ...(styles[0] ? { style: styles[0] } : {}) } };
 }
-// the vocabulary group of the song's voice track (its "vocab:" line, else its style's)
-const songVocab = () => { const sp = songSpoken(), own = sp && Object.values(sp.patterns || {}).map(p => (typeof p.text === 'string' && p.text.startsWith('vocab:') ? p.text.slice(6) : Array.isArray(p.text) ? vocabGroupOf(p.text) : null)).find(Boolean); return own || ((T.tags && T.tags.styles) || []).map(id => (RECIPES.find(r => r.id === id) || {}).spoken).map(x => x && x.vocab).find(g => VOCAB_GROUPS.includes(g)) || null; };
 const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
   const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
@@ -3244,14 +3304,18 @@ setInterval(() => { if (voiceHelper && !samplesBusy && !document.hidden) askSamp
 // the custom samples and their lengths read again (a new sample of the voice helper): the song is written again with
 // them; while it plays, the new code is evaluated on the next bar
 // (the samples alone, for the radio's typed lines: the radio writes its songs again itself)
-async function reloadSamples() {
+// bank: only that bank is registered again in Strudel (a typed line's new sample: the whole manifest, read a second
+// time and registered bank by bank, was a long task of its own, #82)
+async function reloadSamples(bank = null) {
   const list = await (await fetch('/samples/strudel.json')).json();
   let lengths = {};
   try { const r = await fetch('/samples/say_lengths.json'); if (r.ok) lengths = await r.json(); } catch (e) {}
   custom = Object.keys(list).filter(k => k !== '_base'); customFiles = list;
   setSpokenContext({ files: list, lengths });
   crescendoCache.clear();
-  if (globalThis.samples) await globalThis.samples('/samples/strudel.json');
+  if (!globalThis.samples) return;
+  if (bank && list[bank]) await globalThis.samples({ [bank]: list[bank] }, list._base || '/samples/');
+  else await globalThis.samples(list, list._base || '/samples/');
 }
 async function refreshSamples() {
   await reloadSamples();
@@ -3330,7 +3394,7 @@ function phraseListEvent(e) {
     const r = editText(T, id, raw, getLang(), el.value);
     if (r.error) { toast(r.error === 'words' ? t('plTooMany', { n: r.n, max: MAX_WORDS }) : t('plEmptyText')); forceVoices(); return true; }
     const tr = T.tracks.find(x => x.id === id), c = tr && tr.clips[raw], n = c ? tr.clips.filter(x => x.pattern === c.pattern).length : 1;
-    phraseEdit(r.song, n > 1 ? t('plTextShared', { n }) : t('plTextChanged'), { text: el.value, lang: getLang(), kind: 'voice', tag: songVocab(), styles: (T.tags && T.tags.styles) || [], source: 'compose', from: { song: T.title || T.id } }); return true;
+    phraseEdit(r.song, n > 1 ? t('plTextShared', { n }) : t('plTextChanged'), { text: el.value, lang: getLang(), kind: 'voice', tag: null, styles: (T.tags && T.tags.styles) || [], source: 'compose', from: { song: T.title || T.id } }); return true;
   }
   if (el.matches('[data-pl-start]') || el.matches('[data-pl-bars]')) {
     const v = Math.round(+el.value);
@@ -4241,6 +4305,7 @@ function syncCodeOver() {
   const mid = S.side === 'right' ? (100 - S.width) / 2 : S.side === 'left' ? (S.width + 100) / 2 : 50;
   w.style.setProperty('--co-say-x', `${mid}%`); w.style.setProperty('--co-say-w', S.side === 'whole' ? 'calc(100% - 32px)' : `${100 - S.width - 3}%`);
   if (say) say.dataset.coSide = S.side;
+  coLane = { on, side: S.side, width: S.width };
   if (!on) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); }
 }
 $('#code-over-btn').addEventListener('click', () => { store.set(CO_KEY, { ...codeOverSettings(store.get(CO_KEY, null)), stage: !codeOverSettings(store.get(CO_KEY, null)).stage }); syncCodeOver(); });
@@ -4926,7 +4991,9 @@ try {
   // draws its own replies (D4); while the user types by hand only the voice track shows (tp7)
   { const sayEl = $('#say'), f = playing && resumeTo === null && song && s ? stageCaptions(s.now(), { hand }) : NO_CAPTIONS;
     const html = look === 'claude' && capS.claude ? '' : captionHtml(f, capS, { label: capLabel, name: capName });
-    if (html && html !== lastCapHtml) { sayEl.innerHTML = html; sayEl.dataset.rows = f.rows.length; }
+    // (fitted again when the stage changes size: full screen, the window, the Code over side or width)
+    const fitKey = html && `${html}|${sayEl.parentElement.clientWidth}x${sayEl.parentElement.clientHeight}|${coLane.on}${coLane.side}${coLane.width}`;
+    if (html && (html !== lastCapHtml || fitKey !== lastCapFit)) { sayEl.innerHTML = html; sayEl.dataset.rows = f.rows.length; fitLane(sayEl); lastCapFit = fitKey; }
     if (html) lastCapHtml = html;
     const where = capS.where === 'top' ? 'top' : 'bottom';
     if (sayEl.dataset.where !== where) sayEl.dataset.where = where;
@@ -5219,13 +5286,24 @@ genresTab = createGenresTab({ root: $('#tab-generi'), t, tx, esc, face: a => art
 // the radio's next song (#54): every zone of its soundfonts loads, without sound, while the song on air plays, so a broken
 // zone is in the register before its first note
 let preloaded = '';
+// (the code of each step written in a task of its own, the page free between them: in one block it took up to 170 ms
+// with the CPU slowed 4 times, #82; a newer window stops it)
+let preloadJob = 0;
 const preloadSounds = p => {
   const key = p && p.meta ? `${p.title}|${p.meta.bpm.length}` : '';
   if (!key || key === preloaded || !globalThis.soundMap) return;
   preloaded = key;
-  const names = soundfontsIn(p.soundCode ? p.soundCode() : segmentsOf(p, codeFor).map(x => x.code).join('\n'));
-  preloadFonts(names, { soundMap: globalThis.soundMap, play: v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + .2, .05) })
+  const job = ++preloadJob, done = names => preloadFonts(names, { soundMap: globalThis.soundMap, play: v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + .2, .05) })
     .then(n => { if (n) console.info(`[sounds] next song: ${n} soundfont zones loaded (${names.join(', ')})`); }, () => {});
+  if (p.soundCode) { done(soundfontsIn(p.soundCode())); return; }
+  const bars = p.meta.bars, segs = p.build ? [...new Set([0, ...buildSteps(p.build).map(x => x.at).filter(a => a > 0 && a < bars)])].sort((a, b) => a - b) : [0], codes = [];
+  const next = () => {
+    if (job !== preloadJob) return;
+    const t0 = performance.now();
+    while (segs.length && performance.now() - t0 < 12) codes.push(codeFor(p, segs.shift()));
+    if (segs.length) setTimeout(next, 0); else done(soundfontsIn(codes.join('\n')));
+  };
+  next();
 };
 const warmVoices = sg => { try { voiceSamples(sg.build, getLang(), customFiles).forEach(v => globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05)); } catch (e) {} };
 // the radio's saved pattern preview: the pattern's loop in the song's key, chords and tempo, on an orbit well above the
@@ -5258,7 +5336,7 @@ radio = createRadio({
   // a saved pattern queued from the console (Add as a new track, Replace) counts as one use
   onPatternUsed: id => patternsStore.markUsed(id),
   // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them
-  reloadSamples: () => reloadSamples(),
+  reloadSamples: bank => reloadSamples(bank),
   // the samples manifest, for the voices of Next changes (after-tests-oct28 D2)
   voiceFiles: () => customFiles,
   // my phrases (my-phrases): the snapshot a new session records, the lines typed in the console offered to the
@@ -5291,7 +5369,7 @@ radio = createRadio({
       // (a window whose song on air changed while songs are shown one by one, radio-profiles D7: the new song's code
       // appears whole now, in its own view)
       const fresh = (p.air || song.air) && p.id !== song.id && !hand;
-      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length;
+      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length; cwAt = Math.floor(cyc);
       // (the soundfonts of the window loaded in a task of its own: finding them writes the code of every step, #82)
       warmVoices(p); setTimeout(() => { if (song === p) preloadSounds(p); }, 0); source = { kind: 'radio', name: p.title }; renderSource();
       if (fresh) { ed.setCode(codeNow(p, Math.floor(cyc))); ed.evaluate(); }
@@ -5300,7 +5378,7 @@ radio = createRadio({
     jump: (p, bar) => {
       if (mode !== 'radio' || !song) return;
       setHand(false); resumeTo = null;
-      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= bar).length;
+      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= bar).length; cwAt = bar;
       warmVoices(p); source = { kind: 'radio', name: p.title }; renderSource();
       ed.setCode(codeNow(p, bar)); ed.evaluate();
     },

@@ -80,8 +80,8 @@ Alternatives: one store per kind (rejected, three merges for one concept); phras
 
 | Where the user writes | Kind | Tag | Styles |
 | --- | --- | --- | --- |
-| Radio console, Say now or At the right moment | voice | the vocabulary group of the song's style (`spoken.vocab`), else none | the song's style |
-| Compose, voice track phrase list (a row edited or added) | voice | the track's vocabulary group, else the song style's | the song's styles |
+| Radio console, Say now or At the right moment | voice | none (any mood; the user changes it later in Voices) | the song's style |
+| Compose, voice track phrase list (a row edited or added) | voice | none (any mood; the user changes it later in Voices) | the song's styles |
 | Compose, narrator lines of the user's own song (explaining) | explain | the step's moment: the track type it adds (`drums`, `bass`, …), `less`, `breakdown`, `start`, `end`; else none | none |
 | Compose, narrator lines of the user's own song (poetic) | poetic | the entering track type, else `move` | none |
 | Voci tab, Nuova frase or Copia nelle mie | chosen | chosen | chosen |

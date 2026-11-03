@@ -253,18 +253,20 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     return planMemo.plan;
   };
   // the plan made a little at a time, in slices of `slice` ms with the page free between them (#82: a new radio
-  // window, after a typed line, made it in one block of the main thread); resolves when it is made (the same plan)
-  const preparePlan = (slice = 8) => new Promise(resolve => {
+  // window, after a typed line, made it in one block of the main thread); resolves when it is made (the same plan).
+  // alive(): false stops the slices (a newer window took its place); what is made stays, for planOf or a later prepare
+  const preparePlan = (slice = 8, alive = () => true) => new Promise(resolve => {
     if (!planOn) { resolve(); return; }
-    if (!canon) { reference().prepare(slice).then(resolve); return; }
+    if (!canon) { reference().prepare(slice, alive).then(resolve); return; }
     const k = lang();
     if (planMemo && planMemo.k === k) { resolve(); return; }
     if (!planJob || planJob.k !== k || planJob.files !== files()) planJob = { k, files: files(), gen: planSteps() };
     const job = planJob;
     const run = () => {
       // (finished by planOf meanwhile, or started again for another language or other samples)
-      if (planJob !== job) { if (planJob) preparePlan(slice).then(resolve); else resolve(); return; }
-      if (job.files !== files() || job.k !== lang()) { planJob = null; preparePlan(slice).then(resolve); return; }
+      if (!alive()) { resolve(); return; }
+      if (planJob !== job) { if (planJob) preparePlan(slice, alive).then(resolve); else resolve(); return; }
+      if (job.files !== files() || job.k !== lang()) { planJob = null; preparePlan(slice, alive).then(resolve); return; }
       const t0 = performance.now();
       let r;
       do r = job.gen.next(); while (!r.done && performance.now() - t0 < slice);

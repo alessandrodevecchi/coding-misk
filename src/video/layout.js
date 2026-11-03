@@ -18,23 +18,24 @@ export const QUALITIES = {
 // the title card: always on, for a few seconds when a song starts, or never
 export const CARDS = ['always', 'start', 'off'];
 export const CARD_SECONDS = 8;
-// the direction of a video (#53): visual 'song' (each song's own), 'fixed:<look>', 'song-cycle' (a new one every song),
+// the direction of a video (#53): visual 'stage' (the one on the stage when the export starts, the default, #57), 'song' (each song's own), 'fixed:<look>', 'song-cycle' (a new one every song),
 // 'section-cycle' (every section); soul 'auto' (the panel while the Soul display is on), 'off', 'panel', 'full'
-export const VISUALS = ['song', 'fixed', 'song-cycle', 'section-cycle'];
+export const VISUALS = ['stage', 'song', 'fixed', 'song-cycle', 'section-cycle'];
 export const SOULS = ['auto', 'off', 'panel', 'full'];
 // realScope (code-widgets D11, cw-5): scope and spectrum widgets in the fast video from their own instrument's render,
 // 'auto' (back to the whole song's wave when the export would take more than twice as long) or 'always'
 // codeColors (code-themes D8): the code in videos in the code theme's colours ('panel') or in the app theme's ('app')
 // render (widget-render-styles D7): the stage's render ('stage') or one of RENDERS
-export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true, visual: 'song', soul: 'auto', realScope: 'auto', codeColors: 'panel', render: 'stage' };
+export const VIDEO_DEFAULTS = { layout: 'visual', quality: '1080p30', card: 'always', soulPanel: true, visual: 'stage', soul: 'auto', realScope: 'auto', codeColors: 'panel', render: 'stage' };
 export const CODE_COLORS = ['panel', 'app'];
 export const REAL_SCOPES = ['auto', 'always'];
 
 // the look of the frame at a point of the song: dir { visual, soul }, looks: the list to pick from,
-// at { n: song number, section: index, own: the song's own look }
+// at { n: song number, section: index, own: the song's own look, stage: the stage's look when the export started }
 export function lookFor(dir, looks, at) {
   if (dir.soul === 'full') return 'soul';
-  const v = dir.visual || 'song';
+  const v = dir.visual || 'stage';
+  if (v === 'stage') return at.stage && looks.includes(at.stage) ? at.stage : at.own && looks.includes(at.own) ? at.own : looks[0];
   if (v.startsWith('fixed:')) return looks.includes(v.slice(6)) ? v.slice(6) : looks[0];
   if (v === 'song-cycle') return looks[((at.n || 1) - 1) % looks.length];
   if (v === 'section-cycle') return looks[(at.section || 0) % looks.length];

@@ -428,6 +428,40 @@ export function installWidgetDom(BlockWidget) {
   P.miskSlot = true;
   return true;
 }
+// #82: @strudel/codemirror places the block widgets and the sliders of an evaluation at the places they had in the code
+// evaluated, without looking at the editor's text (its mini locations are clamped, these are not). When the code shown
+// changed while the evaluation ran (a shorter code written in between), a widget past the end of the text breaks the
+// editor: every later edit throws "Position N is out of range", so no code changes or evaluates again and the music
+// stops growing. A transaction filter drops such widgets before they reach the editor. S: { addWidget, setSliderWidgets }
+// (Strudel's effects, from its global scope). Returns false while they are not there yet.
+export function guardEditorRanges(view, S) {
+  if (!view || !S || !S.addWidget || !S.setSliderWidgets) return false;
+  if (view.miskRangeGuard) return true;
+  const State = view.state.constructor, Effect = S.addWidget.of([]).constructor;
+  if (!State.transactionFilter || !Effect.appendConfig) return false;
+  const inside = (w, len) => w && (w.type === 'slider' ? w.from >= 0 && w.to <= len : w.to >= 0 && w.to <= len);
+  const filter = tr => {
+    if (tr.docChanged) return tr;
+    const len = tr.newDoc.length;
+    let hit = false;
+    const effects = tr.effects.map(e => {
+      const type = e.is(S.addWidget) ? S.addWidget : e.is(S.setSliderWidgets) ? S.setSliderWidgets : null;
+      if (!type || !Array.isArray(e.value) || e.value.every(w => inside(w, len))) return e;
+      hit = true;
+      return type.of(e.value.filter(w => inside(w, len)));
+    });
+    return hit ? { effects, ...(tr.selection ? { selection: tr.selection } : {}), scrollIntoView: tr.scrollIntoView } : tr;
+  };
+  view.dispatch({ effects: Effect.appendConfig.of(State.transactionFilter.of(filter)) });
+  view.miskRangeGuard = true;
+  return true;
+}
+// #82: an editor already broken by places past its text (see guardEditorRanges) is set again without Strudel's widgets
+// and sliders, so the next edit applies; true when it was recovered
+export function recoverEditor(view, S) {
+  if (!view || !S || !S.addWidget || !S.setSliderWidgets) return false;
+  try { view.setState(view.state.update({ effects: [S.addWidget.of([]), S.setSliderWidgets.of([])] }).state); return true; } catch (e) { return false; }
+}
 // a scope as Strudel draws it (drawTimeScope), always in the widget's colour
 function scopePainter(ctx, id, { color = '#ffffff', thickness = 3, scale = 1, pos = 0.5, trigger = 0, align = true, smear = 0 } = {}) {
   return () => {
@@ -449,15 +483,17 @@ function scopePainter(ctx, id, { color = '#ffffff', thickness = 3, scale = 1, po
 }
 // a spectrum as Strudel draws it (drawSpectrum), its last frame kept by this widget only, in the widget's colour
 function spectrumPainter(ctx, id, { color = '#ffffff', speed = 1, min = -80, max = 0 } = {}) {
-  let last = null;
+  // (the picture scrolls by copying the canvas onto itself, never read back with getImageData: a readback every frame
+  // costs CPU, #82)
+  let size = '';
   return () => {
     const c = ctx.canvas, A = globalThis.analysers, an = A && A[id];
     let d = null;
     try { d = an && globalThis.getAnalyzerData ? globalThis.getAnalyzerData('frequency', id) : null; } catch (e) { d = null; }
     if (!d || !d.length) return;
-    if (last && (last.width !== c.width || last.height !== c.height)) last = null;
-    ctx.clearRect(0, 0, c.width, c.height);
-    if (last) ctx.putImageData(last, -speed, 0);
+    const now = `${c.width}x${c.height}`;
+    if (now !== size) { size = now; ctx.clearRect(0, 0, c.width, c.height); }
+    else { const op = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'copy'; ctx.drawImage(c, -speed, 0); ctx.globalCompositeOperation = op; }
     ctx.fillStyle = color;
     const q = c.width - speed, n = d.length;
     for (let i = 0; i < n; i++) {
@@ -465,7 +501,6 @@ function spectrumPainter(ctx, id, { color = '#ffffff', speed = 1, min = -80, max
       ctx.fillRect(q, c.height - (Math.log(i + 1) / Math.log(n)) * c.height, speed, 2);
     }
     ctx.globalAlpha = 1;
-    last = ctx.getImageData(0, 0, c.width, c.height);
   };
 }
 
