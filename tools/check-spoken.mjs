@@ -938,11 +938,11 @@ const CHECKS = {
     const poetic = { ...explain, narratorStyle: 'poetic' }, P = liveBuildOf(grownOf('luci-rosse', poetic), poetic), p = same(P, poetic, 'it', ANY);
     assert(p.cs.filter(x => x.kind === 'step').every(x => !x.heard), 'poetic: a step line counted as heard');
     assert(p.cs.filter(x => x.kind === 'narrator').every(x => !p.cs.some(y => y.kind === 'step' && y.text === x.text)), 'poetic: a step line as a spoken caption');
-    // poetic with Narrated growth: bar 8 says "la città respira" with the tag "ritmo più fitto"
+    // poetic with Narrated growth: bar 8 says "sempre più in alto" with the tag "ritmo più fitto"
     const pn = { ...poetic, narrated: true }, PN = liveBuildOf(grownOf('luci-rosse', pn), pn), q = same(PN, pn, 'it', ANY), f8 = captionFrame(q.cs, 7.1, S);
     assert(q.cs.filter(x => x.kind === 'narrator').length === 38, `poetic with Narrated growth: ${q.cs.filter(x => x.kind === 'narrator').length} captions, 38 heard`);
-    assert(f8.rows[0] && f8.rows[0].text === 'la città respira' && f8.tag === 'ritmo più fitto', `bar 8: ${JSON.stringify(f8)}`);
-    assert(captionFrame(q.cs, 16.1, S).rows.some(r => r.text === 'qualcosa di profondo si sveglia'), 'bar 17: the entry image');
+    assert(f8.rows[0] && f8.rows[0].text === 'sempre più in alto' && f8.tag === 'ritmo più fitto', `bar 8: ${JSON.stringify(f8)}`);
+    assert(captionFrame(q.cs, 16.1, S).rows.some(r => r.text === 'il piano sotto il piano'), 'bar 17: the entry image');
     // a voice track: its lines captioned as the voice; the narrator off leaves them and no narrator caption or tag
     const notte = read('songs/prova-voce-notte.json'), CT = resolveProfile('switch'), NB = liveBuildOf(grownOf('prova-voce-notte', CT), CT), n = same(NB, CT, 'it', ANY);
     const voiced = n.cs.filter(x => x.kind === 'voice');
