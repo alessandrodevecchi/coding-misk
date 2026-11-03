@@ -96,11 +96,12 @@ function voiceless(x, { narrator = false } = {}) {
   return r;
 }
 // songs of director version 2 at complexity 0 (material-generator): complexity 0 must keep giving them
+// (hashes of director version 16: the explaining phrases of the director grew, #82 new-phrases, so the drawn lines moved)
 const PLAIN_V2 = [
-  { seed: 'plain-a', styles: ['berlin-techno'], complexity: 0, songs: '2785ea56' },
-  { seed: 'plain-b', styles: ['synthwave', 'jazz', 'country'], chaos: 1, complexity: 0, songs: '33215bd9' },
-  { seed: 'plain-c', styles: ['trance', 'phonk', 'melodic-metal', 'drum-and-bass'], chaos: 0.6, complexity: 0, energy: 0.9, minutes: 20, songs: '13b9b2d5' },
-  { seed: 'plain-d', styles: ['ambient', 'lo-fi', 'industrial', 'classic-rock', 'acid', 'house'], chaos: 0.8, complexity: 0, energy: 0.3, minutes: 20, songs: 'dc778f05' },
+  { seed: 'plain-a', styles: ['berlin-techno'], complexity: 0, songs: 'c85769a0' },
+  { seed: 'plain-b', styles: ['synthwave', 'jazz', 'country'], chaos: 1, complexity: 0, songs: '84611c8f' },
+  { seed: 'plain-c', styles: ['trance', 'phonk', 'melodic-metal', 'drum-and-bass'], chaos: 0.6, complexity: 0, energy: 0.9, minutes: 20, songs: 'd63f95d6' },
+  { seed: 'plain-d', styles: ['ambient', 'lo-fi', 'industrial', 'classic-rock', 'acid', 'house'], chaos: 0.8, complexity: 0, energy: 0.3, minutes: 20, songs: 'e3a41aeb' },
 ];
 // steered songs at complexity 0 and with the source "patterns" (radio-variation): Add and More complex keep today's presets.
 // Hashes recorded before radio-variation; talk 0 (a listener's Add used to fail when the voice commented it).
@@ -1169,7 +1170,8 @@ const CHECKS = {
     for (const sg of out) for (const t of sg.tracks) if (t.type === 'voice' && Array.isArray(t.rack)) { t.rack = t.rack.filter(d => d.device !== 'fold'); if (!t.rack.length) delete t.rack; }
     const h = hashString(JSON.stringify(voiceless(out))).toString(16).padStart(8, '0');
     // (since director version 14 the voice tracks are left out, voiceless: 9475a713 is a6e28951 without them, on develop 0307b02)
-    assert(h === '9475a713', `old commands give other songs: ${h}`);
+    // (director version 16, #82 new-phrases: the director's explaining phrases grew, the drawn lines moved: 9475a713 became 080dfd70)
+    assert(h === '080dfd70', `old commands give other songs: ${h}`);
   },
   'arrangement: + and − per instrument, several tracks of one instrument'() {
     let checked = 0;

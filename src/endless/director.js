@@ -50,7 +50,8 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // the session; the music does not move
 // 15 (director-fold-ring, #90): effect gestures (a folded phrase, a Fold rise into the drop, a ringing held note, metal hits
 // in a break, an FM rise with fold) on some songs, by style, from a stream of their own: the songs that draw one change
-export const DIRECTOR_VERSION = 15;
+// 16 (new-phrases, #82): the director's explaining phrases (POOL) grew by 63, so the lines it draws move; the music does not
+export const DIRECTOR_VERSION = 16;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // (gestures, director-fold-ring D6: false turns the effect gestures off; the checks use it to compare with version 14)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
