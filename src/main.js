@@ -97,6 +97,7 @@ import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternTo
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
+import { textIn } from './voices/phrases.js';
 import { createVoicesTab } from './voices/voices-tab.js';
 import { narratorPick } from './voices/mine.js';
 import { setNarratorMine } from './song/build.js';
@@ -3201,14 +3202,17 @@ const lineSamples = () => {
 const needMemo = new WeakMap();
 function needsOf(build, C) {
   if (!build) return [];
-  const lang = getLang(), files = customFiles, key = `${lang}|${JSON.stringify(C || {})}`, m = needMemo.get(build);
-  if (m && m.key === key && m.files === files) return m.list;
+  const lang = getLang(), files = customFiles, key = `${lang}|${JSON.stringify(C || {})}`, m = needMemo.get(build), items = phr ? phr.items : null;
+  if (m && m.key === key && m.files === files && m.items === items) return m.list;
   let list = [];
   try {
     const any = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
-    list = spokenNeeds(build, C || {}, lang, files).filter(x => !x.has && !any(x.bank, x.text) && x.text.split(/\s+/).length <= MAX_WORDS);
+    // (phrase-any-voice D7: a phrase of mine gets a sample in the bank of each speaker that says it, also when the
+    // default voice's sample exists and speaks it meanwhile, lineSample; a built-in line only when no voice has it)
+    const mine = new Set((items || []).map(p => textIn(p, lang)).filter(Boolean).map(x => saySlug(x)));
+    list = spokenNeeds(build, C || {}, lang, files).filter(x => !x.has && (mine.has(saySlug(x.text)) || !any(x.bank, x.text)) && x.text.split(/\s+/).length <= MAX_WORDS);
   } catch (e) { list = []; }
-  needMemo.set(build, { key, files, list });
+  needMemo.set(build, { key, files, items, list });
   return list;
 }
 // the lines to make now: the radio's next song (its first lines first) and the song on air, else the song in Compose

@@ -2381,6 +2381,16 @@ Due ritocchi piccoli all'interfaccia.
 - **Compose:** il pulsante «✂ Frammenti» (`#tr-frag`) accanto a «Esporta» apre lo stesso menu dei frammenti per il brano aperto; si vede solo per un brano della libreria (non per uno nuovo mai salvato), come sulla card. Scheda Guida dei frammenti aggiornata (EN e IT).
 - **Controlli:** `tools/check-video.mjs` (default `stage`, `lookFor`), `tools/check-video.cjs` (valore salvato mantenuto, default nel menu, video veloce con visual fisso e con «Come il palco» letti da `codingMiskExport.looks`, pulsante in Compose che apre il menu).
 
+## 2026-11-02 (specifica: cinque opzioni di «Chi la dice», #82)
+
+Solo specifica OpenSpec `phrase-any-voice`, nessun codice toccato. Il proprietario ha rivisto la scelta: «Chi la dice» ha cinque opzioni (Traccia voce, Narratore che spiega, Narratore poetico, Entrambi i narratori, Tutte).
+
+- **Dati:** la frase salva `kinds` (lista), così in futuro si potrebbero offrire tutte e sette le combinazioni; il modulo ne offre cinque. Le frasi vecchie con `kind` singolo si leggono come lista di uno e si riscrivono con `kinds` al caricamento (backup compreso).
+- **Scelta:** una voce prende la frase se il suo tipo è in `kinds`; le altre regole non cambiano.
+- **Tag:** solo con un tipo solo; con Entrambi o Tutte nessun tag, campo nascosto, scegliere queste lo azzera.
+- **Doppioni:** allargare una frase la unisce a quelle con stesso testo e lingua di un tipo incluso (usi sommati, id più vecchio, stili uniti, Annulla); salvare un testo già incluso lo riusa.
+- **Campioni:** un file per voce che può dirla; elimina e liste d'uso contano tutte. Stima: circa 1,25 ore agente. Domanda aperta: l'unione perde il tag (consigliato accettare, con Annulla).
+
 ## 2026-11-02 (Ring dentro una funzione tecnica, #82)
 
 «Primo Segnale · live build» con il profilo Live coder a volte non partiva: `audioin is not defined`.
@@ -2420,3 +2430,14 @@ Ramo `feat/82-poetic-narrator`, change OpenSpec `poetic-narrator` approvata dal 
 - 3 nov: aggiunta l'immagine di movimento «here it rises / eccolo che sale» (al posto di «here it comes», già frase dell'explaining). `tools/voice.mjs --default-only` crea i samples solo con la voce di default: le altre voci ricadono su quella (fallback già presente).
 
 - 3 nov (sera): altre frasi del proprietario. Poetico: 11 immagini generali (es. «la tracotanza della folla», «verve · profondità · calamità», «la resa dei conti», «scandendo ogni tuo passo»), 4 per strumento, 3 di movimento. Radio, momento «strip»: «a fette», «a pezzi», «più snello, monello». Samples solo con la voce di default.
+## 2026-11-03 (le mie frasi: «Chi la dice» con cinque opzioni, implementazione, #82)
+
+Ramo `feat/82-phrase-any-voice`, change OpenSpec `phrase-any-voice` approvata dal proprietario.
+
+- **Dati:** una frase salva `kinds` (lista di `voice`, `explain`, `poetic`); `KIND_SETS` in `src/voices/phrases.js` tiene le cinque liste del modulo. `readStore` legge il vecchio `kind` come lista di uno (tag tenuto) e il servizio riscrive subito il negozio con `kinds`; il backup passa da `readStore`. Tag solo con un tipo solo.
+- **Scelta:** `candidates()` prende una frase se il tipo è nella lista (anche le istantanee vecchie con `kind`); `mineSnapshot` copia `kinds`. Aggiornati anche i filtri del regista (`song.mine`, `src/endless/director.js`) e di «Riempi con» (`src/endless/phrase-list.js`). Con frasi di un tipo solo le estrazioni restano uguali (`check:endless` 94, fixture ferme).
+- **Doppioni:** allargare una frase la unisce alle frasi con stesso testo e lingua che condividono un tipo (id più vecchio, usi sommati, stili e tipi uniti, tag tolto se i tipi sono più di uno); avviso con Annulla (`unmergePhrases`). Una nuova frase che include un tipo già salvato riusa o allarga quella esistente. Cambiare solo il testo verso un doppione resta rifiutato.
+- **Tab Voci:** cinque opzioni (Entrambi i narratori, Tutte le voci, con suggerimento), campo del tag nascosto con più tipi e di nuovo «qualsiasi» quando si restringe, icone affiancate e «qualsiasi» nella riga, chip dei tipi che mostrano la frase sotto ogni tipo, gruppi delle liste dopo i tre tipi singoli. Scheda Guida «Le mie frasi» (en, it) e `docs/knowledge/phrases.md`.
+- **Campioni:** in Componi una frase mia che il brano dice riceve il campione nel banco di ogni voce che la dice (`needsOf` in `src/main.js`), anche quando esiste quello della voce predefinita; fino ad allora parla la voce predefinita (`lineSample`, regola del proprietario). `phraseFiles` contava già ogni banco. La radio non è toccata (altro ramo su `radio.js`): lì resta il ripiego sulla voce predefinita.
+- **Narratore poetico:** una frase di Entrambi i narratori viene detta sia sui passi del narratore che spiega sia su quelli del poetico (kellerlicht, Sempre: 44 su 44 e 41 su 41).
+- **Prove:** `check:phrases` (23, 6 nuovi), `check:spoken`, `check:endless` (94), `check:guide`, `check:knowledge` (solo avvisi già presenti), `check:samples` (421 righe senza campione proprio, tutte dette dalla voce predefinita), `vite build`; nel browser `check-voices-tab.cjs` (58), `check-voices.cjs` (65), `check-say-lag.cjs`, con i campioni del checkout principale collegati per la prova. Non posso ascoltare.

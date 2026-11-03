@@ -1,14 +1,17 @@
 // My phrases in the page (my-phrases D3, D4, D6): the collection and its settings in the browser storage, the save
 // policy with its toasts, the temporary samples of unsaved lines, the use counts and what the narrator and the radio
 // may draw. The pure parts are in phrases.js, mine.js and samples.js.
-import { PHRASES_KEY, SETTINGS_KEY, readStore, readSettings, addPhrase, editPhrase, deletePhrase, restorePhrase, countUses, find, textIn, textError, SHARE, TEMP_MS, textsOf } from './phrases.js';
+import { PHRASES_KEY, SETTINGS_KEY, readStore, readSettings, addPhrase, editPhrase, deletePhrase, restorePhrase, countUses, find, textIn, textError, SHARE, TEMP_MS, textsOf, kindsOf, unmergePhrases } from './phrases.js';
 import { mineSnapshot, idsSaid } from './mine.js';
 import { saySlug } from '../song/build.js';
 
 // store: { get, set }; toast(msg, actions, { ms, onTimeout }); t: strings; getLang(); helper(): whether the voice
 // helper runs; onChange(what): 'items' | 'settings'
 export function createPhrases({ store, t, toast, getLang, helper = () => false, onChange = () => {} }) {
-  let S = readStore(store.get(PHRASES_KEY, null));
+  const raw0 = store.get(PHRASES_KEY, null);
+  let S = readStore(raw0);
+  // (phrase-any-voice D2: phrases saved with a single kind are written back with their list of kinds)
+  if (raw0 && Array.isArray(raw0.items) && raw0.items.some(x => x && typeof x === 'object' && !Array.isArray(x.kinds))) store.set(PHRASES_KEY, S);
   let cfg = readSettings(store.get(SETTINGS_KEY, null));
   const listeners = new Set();
   const emit = what => { onChange(what); for (const f of listeners) { try { f(what); } catch (e) { /* a listener's error stays its own */ } } };
@@ -28,7 +31,7 @@ export function createPhrases({ store, t, toast, getLang, helper = () => false, 
     if (!text || textError(text)) { plain(); return 'invalid'; }
     const it = { ...input, text };
     // a line already in the collection only adds a use, with no toast of its own
-    if (find(S, it.kind, it.lang, text)) { add(it, { use: true }); plain(); return 'known'; }
+    if (kindsOf(it).length && kindsOf(it).every(k => find(S, k, it.lang, text))) { add(it, { use: true }); plain(); return 'known'; }
     if (cfg.save === 'never') { plain(); return 'never'; }
     const head = msg ? `${msg} · ` : '';
     if (cfg.save === 'always') {
@@ -63,6 +66,8 @@ export function createPhrases({ store, t, toast, getLang, helper = () => false, 
     remove,
     restore(p, at) { save(restorePhrase(S, p, at)); },
     edit(id, patch) { const r = editPhrase(S, id, patch); if (!r.error) { save(r.store); keepFiles(r.phrase); } return r; },
+    // Undo of an edit that merged phrases (phrase-any-voice D5)
+    unmerge(r) { save(unmergePhrases(S, r)); },
     isSaved: (text, lang, kind = 'voice') => !!find(S, kind, lang, text),
     // use counts (D4): a song that says them is played; texts: the lines the song says
     countPlayed(texts, lang = getLang()) { const ids = idsSaid(texts, S.items, lang); if (ids.length) save(countUses(S, ids), 'uses'); return ids; },

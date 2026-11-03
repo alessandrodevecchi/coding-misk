@@ -11,7 +11,7 @@ checks: [npm run check:phrases, node tools/check-voices-tab.cjs, node --no-warni
 
 My phrases (it: "Le mie frasi", my-phrases, #82) is the user's own collection of spoken lines, kept in the browser (`coding-misk-phrases`) and in the backup. Every line the user writes is offered to it: the lines typed in the radio console (Say now, At the right moment), the lines of the voice track's phrase list in Compose, the narrator lines of the user's own songs, and the phrases written in the Voices tab. The director and the narrator can say them again in place of lines from the built-in pools.
 
-A phrase has a text (at most 12 words, 160 characters), a language, an optional translation, a kind (`voice`, `explain`, `poetic`), a tag (a vocabulary group, a moment, an entering track type or `move`; none is "any"), optional styles, an on/off switch for the director, its source, a use count and its last use. One phrase per text, language and kind: writing the same line again adds a use.
+A phrase has a text (at most 12 words, 160 characters), a language, an optional translation, the kinds that can say it (`kinds`, a list of `voice`, `explain`, `poetic`; the form offers five lists: Voice track, Narrator explaining, Narrator poetic, Both narrators, All), a tag (a vocabulary group, a moment, an entering track type or `move`; none is "any"; only with exactly one kind), optional styles, an on/off switch for the director, its source, a use count and its last use. One phrase per text, language and kind: writing the same line again adds a use, and widening a phrase merges it with the phrases of the same text that share a kind (uses summed, older id, styles united, Undo). A phrase saved with a single `kind` is read as a list of one and written back with `kinds` (`phrase-any-voice`). Samples follow the speakers: in Compose a phrase of mine the song says gets a file in the bank of each speaker that says it (the default voice's file speaks it until then, `lineSample`); delete counts the files of every bank.
 
 The Voices tab (it: "Voci", Groove Lab, after Sounds) has four sections: My phrases, Built-in vocabularies (read-only, Copy into my phrases), Voices and sounds (speakers, voice styles, test bench) and Samples (space, missing samples, orphan cleanup, temporary samples).
 
@@ -31,14 +31,14 @@ The Voices tab (it: "Voci", Groove Lab, after Sounds) has four sections: My phra
 
 - Save: `always`, `ask`, `never`. Lifetime of unsaved samples (`temp`): `song` (when the song ends, at least an hour), `24h` (default), `7d`.
 - How often (`share`): `never` 0, `sometimes` 0.25 (default), `often` 0.5, `lots` 0.8, `always` 1 (every replaceable line with a candidate).
-- A candidate: switched on, the same kind, a text in the app's language (its own or its translation), the tag equal or none, its styles none or one of the song's.
+- A candidate: switched on, its kind among the phrase's kinds, a text in the app's language (its own or its translation), the tag equal or none, its styles none or one of the song's.
 - Settings → Voices and phrases holds the three settings and the space; the Voices tab mirrors How often.
 
 ## Example
 
 ```json
 { "format": 1, "items": [{ "id": "ph_k3x9ab", "text": "le torri non dormono mai", "lang": "it", "alt": { "en": "the towers never sleep" },
-  "kind": "voice", "tag": "night", "styles": ["synthwave"], "on": true, "source": "radio", "from": { "song": "Riflesso", "style": "synthwave" },
+  "kinds": ["voice"], "tag": "night", "styles": ["synthwave"], "on": true, "source": "radio", "from": { "song": "Riflesso", "style": "synthwave" },
   "created": "2026-10-29T21:04:00Z", "uses": 6, "last": "2026-10-29T22:10:00Z" }] }
 ```
 

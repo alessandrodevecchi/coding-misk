@@ -6,14 +6,15 @@
 // was. Least used first: among the candidates with the fewest uses, one is drawn. Pure: the app and the Node checks
 // draw the same way.
 import { stream } from '../endless/random.js';
-import { textIn, lineOfPhrase } from './phrases.js';
+import { textIn, lineOfPhrase, kindsOf } from './phrases.js';
 import { momentOfLine } from './moments.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from '../song/vocabulary.js';
 
-// The candidates for a pool line: switched on, the same kind, a text in the language, the tag equal or none, the styles
-// none or one of the song's. list: phrases (the collection's items, or a snapshot)
+// The candidates for a pool line: switched on, the kind among the phrase's kinds (phrase-any-voice D3: a phrase of
+// several kinds has no tag, so it fits every tag), a text in the language, the tag equal or none, the styles none or
+// one of the song's. list: phrases (the collection's items, or a snapshot, also an old one with a single kind)
 export function candidates(list, { kind, tag = null, lang, styles = [] }) {
-  return (list || []).filter(p => p && p.on !== false && p.kind === kind && !!textIn(p, lang)
+  return (list || []).filter(p => p && p.on !== false && kindsOf(p).includes(kind) && !!textIn(p, lang)
     && (!p.tag || p.tag === tag) && (!(p.styles || []).length || p.styles.some(s => styles.includes(s))));
 }
 // The phrase that replaces a pool line, or null: share 0 or no candidate reads no stream
@@ -31,7 +32,7 @@ export function drawMine(cands, share, seed, kind, key) {
 // the same lines after the collection changed.
 export function mineSnapshot(items, share, lang) {
   if (!(share > 0)) return null;
-  const list = (items || []).filter(p => p && p.on !== false && textIn(p, lang)).map(p => ({ id: p.id, text: p.text, lang: p.lang, alt: { ...(p.alt || {}) }, kind: p.kind, tag: p.tag || null, styles: [...(p.styles || [])], uses: p.uses || 0 }));
+  const list = (items || []).filter(p => p && p.on !== false && textIn(p, lang)).map(p => ({ id: p.id, text: p.text, lang: p.lang, alt: { ...(p.alt || {}) }, kinds: kindsOf(p), tag: p.tag || null, styles: [...(p.styles || [])], uses: p.uses || 0 }));
   return list.length ? { share, lang, list } : null;
 }
 
