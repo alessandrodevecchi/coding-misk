@@ -144,6 +144,16 @@ const DIRECTOR = {
     const changed = got.filter((x, i) => x.text !== plain[i].text);
     assert(changed.length && changed.every(x => items.some(p => p.text === x.text)), `${changed.length} changed`);
     console.log(`      ${changed.length} of ${got.length} poetic lines are mine with Sempre`);
+    // the movement images' keys (poetic-narrator D4): m:<ordinal among the steps that say one>, from m:0 in turn, with
+    // Narrated growth on and off
+    for (const narrated of [true, false]) {
+      const Cn = resolveProfile('crescendo', { narrated, narratorStyle: 'poetic' }), Bn = liveBuildOf(crescendoSong(song, { narrated, rules: growthRules(Cn) }), Cn), keys = new Map();
+      setNarratorMine((s, o) => { if (o.kind === 'poetic' && o.tag === 'move') keys.set(o.key, true); return null; });
+      const n = spokenSchedule(Bn, Cn, 'it', ANY).filter(x => x.voice === 'N').length;
+      setNarratorMine(null);
+      const ks = [...keys.keys()].map(k => +k.slice(2)).sort((a, b) => a - b);
+      assert(ks.length >= 4 && ks.every((k, i) => k === i), `${narrated ? 'narrated' : 'plain'}: movement keys ${ks.slice(0, 8)} of ${n} lines`);
+    }
   },
   'samples: the built-in text set is the one of check:samples (every line tools/voice.mjs lists is built-in)'() {
     const songs = songFiles('songs').map(read), keys = builtinKeys({ songs, styles: RECIPES });

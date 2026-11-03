@@ -200,8 +200,8 @@ export function voiceSamples(song, lang, files) {
   const poetic = narratorStyle(song) === 'poetic';
   const steps = buildSteps(song);
   steps.forEach((st, i) => {
-    // (a poetic narrator says images, and with Narrated growth the step lines or their movement images too)
-    const texts = poetic ? [enteringTrack(song, st) ? poeticText(song, poeticLine(song, st, i), enteringTrack(song, st).type, `p:${i}`, lang) : '', narratedGrowth(song) && st.say ? stepSaid(song, steps, st, lang) : ''] : [st.say ? stepText(song, st, lang) : ''];
+    // (a poetic narrator says images and movement images, and a step line only where no image exists: poetic-narrator)
+    const texts = poetic ? [entering(song, st) ? entryText(song, st, i, lang) : '', st.say && !bringsSpoken(song, st) ? stepSaid(song, steps, st, lang) : ''] : [st.say ? stepText(song, st, lang) : ''];
     for (const text of texts.filter(Boolean)) {
       const { bank, n } = lineSample(voiceOf(song, st), lang, files, text);
       if (n >= 0) out.set(`${bank}:${n}`, { s: bank, n });
@@ -233,20 +233,61 @@ export function lineSample(track, lang, files, text) {
 // step's bar with the settings and rack of its voice track (in "state": the song at that bar, so steps can change them).
 // The volume is applied after the effects, so distortion does not make it louder.
 // files: the custom samples manifest ({ say_en: ["say_en/more_bass.wav", …] }); no file, no voice
-// voice-instrument: the poetic narrator speaks only where a track comes in, with a short image, in the bar before the
-// entry when the code of the step before is still playing there (else on the entry's bar); the narrator yields to the
+// voice-instrument: the poetic narrator says a short image where a track comes in, in the bar before the entry when
+// the code of the step before is still playing there (else on the entry's bar); the narrator yields to the
 // voice instrument: a comment on a bar where a spoken line sounds is skipped (D5)
 // (the narrator never announces the voice instrument: a step that brings in a spoken track is not narrated)
 const entering = (song, step) => { const t = step && enteringTrack(song, step); return t && t.type !== 'spoken' ? t : null; };
 const bringsSpoken = (song, step) => { const t = step && enteringTrack(song, step); return !!t && t.type === 'spoken'; };
-// a growth that narrates its steps (Narrated growth, Crescendo and Live coder)
-const narratedGrowth = song => !!(song && song.crescendo && song.crescendo.narrated);
-// the words of a step with "say": its step line; with the poetic style and Narrated growth, a short image of movement
-// when no step on its bar brings a track in (poetic-steps D1; an entry's bar keeps the step line, its image is said the
-// bar before)
+// poetic-narrator: the poetic narrator speaks on the same steps as the explaining one (the steps with "say"), with or
+// without Narrated growth (D1). It says the image of every entry (D2), a movement image on a step's bar with no entry
+// (D3), and the step line only where no image exists for that moment (D5).
+// an image's text in this language, '' when it has none (no English fallback for images, D5)
+const imageText = (line, lang) => (!line ? '' : typeof line === 'string' ? line : typeof line[lang] === 'string' ? line[lang] : '');
+// the entry image of a step that brings a track in: '' when there is none in this language
+const entryText = (song, step, i, lang) => { const line = poeticLine(song, step, i); return imageText(line, lang) ? poeticText(song, line, entering(song, step).type, `p:${i}`, lang) : ''; };
+// The poetic plan of a song in a language (memoised per song object): the entry bars (first entering step of each bar
+// and whether its image exists), the bars an image is said on, and the ordinal of every step that says a movement
+// image among the steps that say one, in build order (D4). The ordinal does not depend on the list's length: the list
+// is read modulo its length when the line is taken (movementLine), so a longer vocabulary changes nothing here.
+const poeticMemo = new WeakMap();
+function poeticPlan(song, lang) {
+  let byLang = poeticMemo.get(song);
+  if (!byLang) poeticMemo.set(song, (byLang = new Map()));
+  const start = Number.isFinite(song.start) ? song.start : 0, key = `${lang}|${start}|${Array.isArray(song.build) ? song.build.length : 0}`;
+  const kept = byLang.get(key);
+  if (kept && kept.build === song.build) return kept;
+  const steps = buildSteps(song);
+  const entries = new Map(), images = new Map(), moves = new Map();
+  steps.forEach((x, i) => {
+    if (entries.has(x.at) || !entering(song, x)) return;
+    const has = !!imageText(poeticLine(song, x, i), lang);
+    entries.set(x.at, has);
+    const at = x.at - 1 >= start ? x.at - 1 : x.at;
+    if (has) images.set(at, (images.get(at) || 0) + 1);
+  });
+  // the step said on each bar is the latest one with "say" on it (spokenSchedule plays the last state of a bar)
+  const last = new Map();
+  steps.forEach(x => { if (x.say) last.set(x.at, x); });
+  let k = 0;
+  for (const [bar, x] of [...last.entries()].sort((p, q) => p[0] - q[0])) {
+    if (entries.has(bar) || bringsSpoken(song, x) || (images.get(bar) || 0) >= perBar('narrator')) continue;
+    moves.set(bar, k++);
+  }
+  const plan = { entries, images, moves, build: song.build };
+  byLang.set(key, plan);
+  return plan;
+}
+// the words of a step with "say" (D3, D5): the step line for the explaining style; for the poetic style, on an entry's
+// bar nothing (the entry's image is said) or the step line when that image is missing, on a bar an image already takes
+// nothing, elsewhere a movement image, or the step line when it has no text in this language
 function stepSaid(song, steps, step, lang) {
-  if (narratorStyle(song) === 'poetic' && narratedGrowth(song) && !steps.some(x => x.at === step.at && entering(song, x))) { const k = steps.indexOf(step); return poeticText(song, movementLine(song, k), 'move', `m:${k}`, lang); }
-  return stepText(song, step, lang);
+  if (narratorStyle(song) !== 'poetic') return stepText(song, step, lang);
+  const plan = poeticPlan(song, lang);
+  if (plan.entries.has(step.at)) return plan.entries.get(step.at) ? '' : stepText(song, step, lang);
+  if (!plan.moves.has(step.at)) return '';
+  const k = plan.moves.get(step.at), line = movementLine(song, k);
+  return imageText(line, lang) ? poeticText(song, line, 'move', `m:${k}`, lang) : stepText(song, step, lang);
 }
 function narration(song, upTo, lang) {
   const steps = buildSteps(song), step = steps[upTo - 1];
@@ -265,14 +306,14 @@ function narration(song, upTo, lang) {
     // (an entry on this state's own bar is said here only on the song's first bar; later ones were said the bar before)
     if (at < a || at >= b || (x.at === a && at !== a)) return;
     seen.add(x.at);
-    out.push({ step: x, text: poeticText(song, poeticLine(song, x, i), entering(song, x).type, `p:${i}`, lang), at });
+    out.push({ step: x, text: entryText(song, x, i, lang), at });
   });
-  // Narrated growth with the poetic style (voice-full-controls D11): the step lines stay, the images come in addition;
-  // on a shared bar the image is said and the step keeps its line on stage. A step whose bar has no entry says an image
-  // of movement instead of its step line (poetic-steps)
-  if (narratedGrowth(song)) {
-    const said = sayStep(steps, upTo), text = said && !bringsSpoken(song, said) && stepSaid(song, steps, said, lang);
-    // (the narrator says at most perBar lines on a bar: the registry's rule, D11)
+  // the step with "say" on this state's bar (D1): nothing more on an entry's bar, unless its image is missing (the step
+  // line, D5); a movement image on a bar with no entry, unless an image already takes the bar (the registry's per-bar
+  // rule: the images are pushed first and win, D3)
+  const said = sayStep(steps, upTo);
+  if (said && !bringsSpoken(song, said)) {
+    const text = stepSaid(song, steps, said, lang);
     if (text && out.filter(x => x.at === said.at && x.text).length < perBar('narrator')) out.push({ step: said, text, at: said.at });
   }
   return out.filter(x => x.text);

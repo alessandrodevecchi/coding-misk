@@ -30,7 +30,7 @@ Check a file with `node --no-warnings tools/song.mjs validate songs/my-song.json
 | `inspiration` | no | `{ "en": "...", "it": "..." }`: what inspired the song, a short note per language (at most 120 characters). The texts for sharing mention it in a sentence of their own. |
 | `origin` | no | `"endless"` for songs made by the director; kept when the song is saved from the radio |
 | `cover` | no | a song written from a decoded track (Decode tab): `{ "title": "Night Run", "artist": "Some Band", "attribution": true }`. With `attribution` true (or left out) the title line of the code reads `// coding-misk · cover of "Night Run" by Some Band` (without "by" when there is no artist); with `false` it holds the song's title only. No audio or file reference goes with it |
-| `narrator` | no | how the narrator speaks: `"explain"` (default, it says what each step does) or `"poetic"` (a short image before each track comes in, nothing at the other steps), or `{ "style": "poetic", "lines": { "bass": [{ "en": "…", "it": "…" }], "any": […] } }` with the song's own images by track type. See [Voice instrument](#voice-instrument) |
+| `narrator` | no | how the narrator speaks: `"explain"` (default, it says what each step does) or `"poetic"` (a short image before each track comes in and a short image of movement at the other steps with a comment), or `{ "style": "poetic", "lines": { "bass": [{ "en": "…", "it": "…" }], "any": […] } }` with the song's own images by track type. See [Voice instrument](#voice-instrument) |
 
 ## Sections
 
@@ -290,7 +290,7 @@ A **quiet section** has at most half the tracks of the fullest section (voice an
 
 **Speakers and language.** A spoken track speaks with its `speaker`, else one of its style's `spoken.speakers`, else any speaker, never the narrator's. Lines follow the app's language when they have a text in it.
 
-**Narrator.** The narrator yields: a step comment on a bar where a spoken line sounds is not spoken, and a step that brings in a spoken track is not narrated. With `"narrator": "poetic"` it speaks only where a track comes in (an `add`, a clone or an unmute), a short image from the song's `narrator.lines`, its style's, else the vocabulary's poetic group, in the bar before the entry when the code of the step before still plays there.
+**Narrator.** The narrator yields: a step comment on a bar where a spoken line sounds is not spoken, and a step that brings in a spoken track is not narrated. With `"narrator": "poetic"` it speaks where a track comes in (an `add`, a clone or an unmute), a short image from the song's `narrator.lines`, its style's, else the vocabulary's poetic group, in the bar before the entry when the code of the step before still plays there; at the other steps with a comment it says a short image of movement (the key `move`), and the comment itself only when no image exists in the current language.
 
 **Live build.** A spoken track is never thinned and is not part of a Crescendo growth: it enters on the bar of its first line. With the Live coder's `voice` opening, the first spoken track with an opening line is the first sound of the build: the line is said just before the next track comes in, ending a beat or more before it (the bars before it are the time that track's line takes to type).
 
