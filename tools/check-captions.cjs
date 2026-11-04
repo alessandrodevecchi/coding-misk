@@ -144,9 +144,10 @@ async function fitCase(page, shot) {
   lines = await cap(page, C => C.lines());
   const plainN = lines.filter(x => x.kind === 'narrator');
   check(plainN.length === 19, 'poetic without Narrated growth: 19 narrator captions, as many as explain', `${plainN.length}`);
-  // the entry on bar 18: its image on bar 17, nothing spoken on bar 18, its step line only as the tag (D6)
-  const l18p = await laneAt(page, 17);
-  check(!plainN.some(x => x.at === 17) && !l18p.rows.some(r => r.kind === 'narrator' && r.text === l18p.tag), 'poetic without Narrated growth, bar 18 (an entry): no narrator line of its own', JSON.stringify(l18p));
+  // the entry on bar 18: its image on bar 17 with bar 18's step line as its tag, nothing spoken on bar 18
+  // (narrator-caption-sync D1, superseding poetic-narrator D6 on the tag)
+  const s18p = lines.find(x => x.kind === 'step' && x.at === 17), l17p = await laneAt(page, 16);
+  check(!plainN.some(x => x.at === 17) && s18p && l17p.rows.some(r => r.kind === 'narrator') && l17p.tag === s18p.text, 'poetic without Narrated growth, bar 17: the entry image with bar 18\'s step line as its tag, no narrator line on bar 18', JSON.stringify({ l17p, s18: s18p && s18p.text }));
 
   // ---- poetic with Narrated growth: bar 8 says "la stanza si inclina" with the tag "ritmo più fitto"
   await stop(page);
@@ -156,12 +157,11 @@ async function fitCase(page, shot) {
   check(lines.filter(x => x.kind === 'narrator').length === 33, 'poetic with Narrated growth: 33 narrator captions', `${lines.filter(x => x.kind === 'narrator').length}`);
   let l8 = await laneAt(page, 7);
   check(l8.rows[0] && l8.rows[0].text === 'la stanza si inclina' && l8.tag === 'ritmo più fitto', 'bar 8: "la stanza si inclina" with the step tag "ritmo più fitto"', JSON.stringify(l8));
-  // the entry on bar 18: the step line shows only as the tag, after the image of bar 17 (poetic-narrator D6)
-  const l18 = await laneAt(page, 17);
-  check(l18.tag && !lines.some(x => x.kind === 'narrator' && x.at === 17) && !l18.rows.some(r => r.kind === 'narrator' && r.text === l18.tag), 'bar 18 (an entry): its step line as the tag, no narrator line of its own', JSON.stringify(l18));
-  await shot(page, 'lane-neon-poetic-16x9');
-  const l17 = await laneAt(page, 16);
+  // the entry on bar 18: its step line is the tag under bar 17's image, shown and gone with it (narrator-caption-sync D1)
+  const s18 = lines.find(x => x.kind === 'step' && x.at === 17), l17 = await laneAt(page, 16);
   check(l17.rows.some(r => r.text === 'qualcosa di profondo si sveglia'), 'bar 17: the entry image', JSON.stringify(l17.rows));
+  check(s18 && l17.tag === s18.text && !lines.some(x => x.kind === 'narrator' && x.at === 17), 'bar 17 (the image of bar 18\'s entry): bar 18\'s step line as its tag, no narrator line on bar 18', JSON.stringify({ l17, s18: s18 && s18.text }));
+  await shot(page, 'lane-neon-poetic-16x9');
   // the old behaviour: the step line as the caption
   await cap(page, C => C.set(S => { S.stepForm = 'instead'; }));
   l8 = await laneAt(page, 7);

@@ -10,7 +10,7 @@ import { loadStyles } from './styles-dir.mjs';
 import { validateSong } from '../src/song/validate.js';
 import { compileSong } from '../src/song/compile.js';
 import { normalizeSong, VOICE_DEFAULT, VOICE_CHARACTERS, VOICE_LIMITS, VOICE_STYLES as SOUND_STYLES, VOICE_STYLE_IDS, VOICE_SOUND_KEYS, styleOf } from '../src/song/format.js';
-import { buildSteps, stateAt, deriveBuild, voiceCode, SPEAKERS, saySlug, sayText } from '../src/song/build.js';
+import { buildSteps, stateAt, deriveBuild, voiceCode, SPEAKERS, saySlug, sayText, slugAt } from '../src/song/build.js';
 import { growOnAir } from '../src/endless/growth.js';
 import { placeSpoken, spokenBars, setSpokenContext, spokenContext, speakerOf, narratorSpeaker, lineOf, enteringTrack, WAYS } from '../src/song/spoken.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from '../src/song/vocabulary.js';
@@ -41,7 +41,7 @@ import { sessionItems, GROWTH_ON_AIR } from '../src/endless/items.js';
 import { airControls } from '../src/endless/growth.js';
 import { validateRecipe, recipeOrder } from '../src/endless/recipe.js';
 import { setLang } from '../src/i18n.js';
-import { captionSchedule, spokenNeeds, narratorLines } from '../src/song/build.js';
+import { captionSchedule, spokenNeeds, narratorLines, captionHold, lateLines, voicesAt, stepText, sayBank } from '../src/song/build.js';
 import { captionFrame, captionSettings } from '../src/captions/captions.js';
 import { SPEAKER_KINDS, kindOf, outranks, applyExclusive, captionRows } from '../src/song/speakers.js';
 import { barSeconds } from '../src/song/spoken.js';
@@ -997,9 +997,10 @@ const CHECKS = {
     assert(f8.rows[0] && POETIC.move.some(m => m.it === f8.rows[0].text) && f8.tag === 'ritmo più fitto', `bar 8: ${JSON.stringify(f8)}`);
     const f17 = captionFrame(q.cs, 16.1, S);
     assert(f17.rows.some(r => POETIC.bass.some(b => b.it === r.text)), `bar 17: the entry image of the bass: ${JSON.stringify(f17.rows)}`);
-    // the entry's own bar 18: no narrator caption of its own, its step line only as the tag (poetic-narrator D6)
-    const e18 = buildSteps(PN).filter(x => x.at === 17 && x.say).pop(), f18 = captionFrame(q.cs, 17.1, S);
-    assert(e18 && !q.cs.some(x => x.kind === 'narrator' && x.at === 17) && f18.tag === sayText(e18.say, 'it') && !f18.rows.some(r => r.text === f18.tag), `bar 18: ${JSON.stringify(f18)}`);
+    // the entry's own bar 18: no narrator caption of its own; its step line is the tag of bar 17's image, shown with it
+    // (narrator-caption-sync D1, superseding poetic-narrator D6 on the tag)
+    const e18 = buildSteps(PN).filter(x => x.at === 17 && x.say).pop();
+    assert(e18 && !q.cs.some(x => x.kind === 'narrator' && x.at === 17) && f17.tag === sayText(e18.say, 'it') && !f17.rows.some(r => r.text === f17.tag), `bar 17: the tag under the image is not bar 18's step line: ${JSON.stringify(f17)}`);
     // a voice track: its lines captioned as the voice; the narrator off leaves them and no narrator caption or tag
     const notte = read('songs/prova-voce-notte.json'), CT = resolveProfile('switch'), NB = liveBuildOf(grownOf('prova-voce-notte', CT), CT), n = same(NB, CT, 'it', ANY);
     const voiced = n.cs.filter(x => x.kind === 'voice');
@@ -1011,11 +1012,16 @@ const CHECKS = {
     const said = a.cs.find(x => x.kind === 'narrator' && x.at > 0), only = new Proxy({}, { get: () => ({ findIndex: f => (['/' + saySlug(said.text) + '.wav'].some(s => f(`x${s}`)) ? -1 : 0) }) });
     const ns = captionSchedule(A, explain, 'it', only, {});
     assert(!ns.some(x => x.kind === 'narrator' && x.text === said.text) && captionFrame(ns, said.at + 0.01, S).tag === said.text, `no sample: "${said.text}" captioned, or no tag`);
-    // timing: the sample's length plus 1.5 s, at least 2 s, at most 4 bars, 2 bars without a length
+    // timing (narrator-caption-sync D3): the sample's length plus 1.5 s, at least 3 s, at most 4 bars, 2 bars (at least
+    // 3 s) without a length
     const bs = barSeconds(A, said.at), lens = { [`say_it/${saySlug(said.text)}.wav`]: 1.3 }, timed = captionSchedule(A, explain, 'it', ANY, lens).find(x => x.kind === 'narrator' && x.text === said.text);
-    const nextN = a.cs.find(x => x.kind === 'narrator' && x.at > said.at), want = Math.min(4, 2.8 / bs, nextN ? nextN.at - said.at : 4);
+    const nextN = a.cs.find(x => x.kind === 'narrator' && x.at > said.at), want = Math.min(4, 3 / bs, nextN ? nextN.at - said.at : 4);
     assert(Math.abs(timed.until - timed.at - want) < 1e-9, `a 1.3 s line holds ${((timed.until - timed.at) * bs).toFixed(2)} s`);
-    assert(a.cs.filter(x => x.kind === 'narrator').every((x, i, l) => x.until - x.at <= 4 && (x.until - x.at === 2 || (l[i + 1] && x.until === l[i + 1].at))), 'without lengths a caption holds 2 bars (or up to the next one)');
+    assert(a.cs.filter(x => x.kind === 'narrator').every((x, i, l) => x.until - x.at <= 4 && (Math.abs(x.until - x.at - captionHold(null, barSeconds(A, x.at))) < 1e-9 || (l[i + 1] && x.until === l[i + 1].at))), 'without lengths a caption holds 2 bars, at least 3 s (or up to the next one)');
+    // the spec's scenarios at 124 BPM (a bar 60 / 124 * 4 s): a 1.3 s line 3 s, a 2 s line 3.5 s, no length 2 bars
+    const b124 = 240 / 124;
+    assert(Math.abs(captionHold(1.3, b124) * b124 - 3) < 1e-9 && Math.abs(captionHold(2, b124) * b124 - 3.5) < 1e-9 && captionHold(null, b124) === 2 && captionHold(0.8, b124) * b124 === 3, `captionHold at 124 BPM: ${[1.3, 2, null, 0.8].map(l => captionHold(l, b124) * b124)}`);
+    assert(captionHold(9, b124) === 4 && Math.abs(captionHold(null, 240 / 180) * (240 / 180) - 3) < 1e-9, 'captionHold: over 4 bars, or under 3 s at 180 BPM');
     // a typed line: a voice-track caption marked typed, hidden with "Lines typed in the console" off
     let typedOk = 0;
     for (let i = 0; i < 30 && !typedOk; i++) {
@@ -1038,6 +1044,112 @@ const CHECKS = {
     assert(old.rows.length === 1 && old.rows[0].kind === 'step' && old.rows[0].text === 'ritmo più fitto' && !old.tag, `old behaviour: ${JSON.stringify(old.rows)}`);
     assert(!captionFrame(q.cs, 7.1, S, { hand: true }).rows.length && voiced.every(x => captionFrame(n.cs, x.at + 0.01, S, { hand: true }).rows.some(r => r.kind === 'voice')), 'typing by hand: the narrator shows, or the voice track does not');
     console.log(`      luci-rosse: explain ${a.cs.filter(x => x.kind === 'narrator').length}, poetic ${p.cs.filter(x => x.kind === 'narrator').length}, poetic Narrated growth ${q.cs.filter(x => x.kind === 'narrator').length} captions; prova-voce-notte ${voiced.length} voice-track captions; a typed line captioned`);
+  },
+  'caption sync (narrator-caption-sync D1 to D3, D7): luci-rosse in Crescendo, poetic, Narrated growth off and on, English and Italian, the frame every 1/8 bar: the tag is the step line of the step the narrator line speaks for (the entering step for an entry image) and leaves with it, no tag without its narrator line, an entry with no step line has no tag, a step no line speaks for never shows, a caption lasts at least 3 s unless the next line of its speaker replaces it, never over 4 bars; the voice track on prova-voce-notte the same'() {
+    // The state before this change (the investigation behind hand tests pn1 and pn2; luci-rosse, Crescendo, poetic,
+    // English, the samples of the owner's machine):
+    //   without Narrated growth the image "a low tide rising" on bar 12 showed under "more hats" (bar 9's step), and
+    //   "need bass" showed only from bar 13, after the image had gone at 13.36;
+    //   with Narrated growth "a low tide rising" on bar 6 showed under "more hats", and "bass in" appeared on bar 7;
+    //   every poetic caption left 1.5 to 2.5 bars before its tag.
+    const S = captionSettings({}), grownOf = (id, C) => crescendoSong({ ...read(`songs/${id}.json`), kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles: recipes }) });
+    // the lengths of this machine's samples, else 0.06 s a character (short lines hit the 3-second floor)
+    let real = {};
+    try { real = read('public/samples/say_lengths.json'); } catch (e) { real = {}; }
+    const lengths = new Proxy(real, { get: (o, k) => (typeof k !== 'string' ? undefined : Number.isFinite(o[k]) ? o[k] : 0.06 * k.replace(/^.*\//, '').replace(/\.wav$/, '').length) });
+    const held = (cs, kind, B, label) => {
+      const list = cs.filter(x => x.kind === kind && !x.hold);
+      list.forEach(x => {
+        const sec = (x.until - x.at) * barSeconds(B, x.at), next = list.find(y => y.at > x.at);
+        assert(x.until - x.at <= 4 + 1e-9, `${label}: "${x.text}" on bar ${x.at + 1} lasts ${(x.until - x.at).toFixed(2)} bars`);
+        if (x.seconds) assert(sec >= 3 - 1e-9 || (next && Math.abs(x.until - next.at) < 1e-9), `${label}: "${x.text}" on bar ${x.at + 1} lasts ${sec.toFixed(2)} s, not cut by the next line`);
+      });
+      return list.length;
+    };
+    const st = { frames: 0, tagged: 0, entries: 0, unsaid: 0 };
+    for (const narrated of [false, true]) for (const lang of ['en', 'it']) {
+      const C = { ...resolveProfile('switch'), narratorStyle: 'poetic', narrated }, B = liveBuildOf(grownOf('luci-rosse', C), C), s = withNarratorStyle(B, 'poetic');
+      const sch = spokenSchedule(B, C, lang, ANY), cs = captionSchedule(B, C, lang, ANY, lengths), label = `luci-rosse ${lang}${narrated ? ', Narrated growth' : ''}`;
+      const N = cs.filter(x => x.kind === 'narrator');
+      // the expected tag of a caption: the step line of its schedule line's step; an entry image is said on the bar
+      // before its step, which brings a track in
+      const want = x => {
+        const l = sch.find(y => y.voice === 'N' && y.at === x.at && y.text === x.text);
+        assert(l && l.step, `${label}: no schedule line for "${x.text}" on bar ${x.at + 1}`);
+        const entry = l.step.at === l.at + 1;
+        if (entry) assert(enteringTrack(s, l.step), `${label}: "${x.text}" on bar ${x.at + 1} speaks for bar ${l.step.at + 1}, which brings no track in`);
+        const tag = stepText(s, l.step, lang);
+        return { tag: tag && tag !== x.text ? tag : '', entry };
+      };
+      const tags = new Set(), last = Math.ceil(Math.max(...cs.map(x => x.until))) + 1;
+      for (let k = 0; k <= last * 8; k++) {
+        const b = k / 8, f = captionFrame(cs, b, S), nr = f.rows.find(r => r.kind === 'narrator');
+        st.frames++;
+        if (f.tag) { st.tagged++; tags.add(f.tag); assert(nr, `${label}, bar ${(b + 1).toFixed(3)}: the tag "${f.tag}" shows without its narrator line`); }
+        if (!nr) continue;
+        const c = N.filter(x => x.at <= b && b < x.until).pop(), w = want(c);
+        assert(f.tag === w.tag, `${label}, bar ${(b + 1).toFixed(3)}: under "${c.text}" the tag is "${f.tag}", not "${w.tag}"${w.entry ? ' (the entering step\'s line)' : ''}`);
+        if (w.entry) st.entries++;
+      }
+      // a step no narrator line speaks for never shows as a tag
+      const paired = new Set(cs.filter(x => x.kind === 'step' && x.paired).map(x => x.text));
+      for (const x of cs.filter(y => y.kind === 'step')) {
+        assert(x.tagless, `${label}: the step line "${x.text}" of bar ${x.at + 1} is not tagless in the poetic style`);
+        if (!x.paired && !paired.has(x.text)) { st.unsaid++; assert(!tags.has(x.text), `${label}: "${x.text}" (bar ${x.at + 1}) shows as a tag, but no narrator line speaks for it`); }
+      }
+      assert(N.some(x => want(x).entry && want(x).tag), `${label}: no entry image with its entering step's line`);
+      held(cs, 'narrator', B, label);
+    }
+    // an entry whose step has no step line (none in luci-rosse: every entering step says something): its image alone
+    {
+      const C = { ...resolveProfile('switch'), narratorStyle: 'poetic' }, B = liveBuildOf(grownOf('luci-rosse', C), C);
+      const sch = [{ at: 22, voice: 'N', text: 'the pad wakes', bank: 'say_en', step: { at: 23, add: 'pad' } }];
+      const f = captionFrame(captionSchedule({ ...B, build: [] }, C, 'en', ANY, {}, { schedule: sch }), 22.5, S);
+      assert(f.rows.some(r => r.kind === 'narrator' && r.text === 'the pad wakes') && !f.tag, `an entry with no step line: ${JSON.stringify(f)}`);
+    }
+    // the voice track: the same timing
+    const CT = resolveProfile('switch'), NB = liveBuildOf(grownOf('prova-voce-notte', CT), CT), voiced = held(captionSchedule(NB, CT, 'it', ANY, lengths), 'voice', NB, 'prova-voce-notte');
+    assert(voiced >= 4, `prova-voce-notte: ${voiced} voice-track captions`);
+    console.log(`      ${st.frames} frames, ${st.tagged} with a tag, ${st.entries} entry-image frames, ${st.unsaid} step lines no line speaks for; prova-voce-notte ${voiced} voice-track captions`);
+  },
+  'no replay (narrator-caption-sync D4, D5): a line the voice helper made after the default voice spoke it is not played late; a line with no sample at all is; none of a batch the speaker spoke already; spokenNeeds carries the step line a narrator line speaks for (sub)'() {
+    const wav = (bank, text) => `${bank}/${saySlug(text)}.wav`, heard = 'just google it', fresh = 'a line nobody recorded';
+    const got = [heard, fresh].map(text => ({ text, bank: 'say_en_reed', lang: 'en', voice: 'N', at: 8 }));
+    const kept = lateLines(got, { say_en: [wav('say_en', heard)], say_en_reed: [] }, 'en');
+    assert(kept.length === 1 && kept[0].text === fresh, `the default voice's sample present: ${JSON.stringify(kept.map(x => x.text))} played late`);
+    assert(lateLines(got, {}, 'en').length === 2, 'no sample at all: a line not played late');
+    assert(!lateLines(got, { say_en_reed: got.map(x => wav('say_en_reed', x.text)) }, 'en').length, 'the speaker spoke them already: a line played late');
+    // sub: the step line of the step the line speaks for, the same as its caption's tag (D5)
+    const C = { ...resolveProfile('switch'), narratorStyle: 'poetic', narrated: true }, B = liveBuildOf(crescendoSong({ ...read('songs/luci-rosse.json'), kind: 'composed' }, { narrated: true, rules: growthRules(C, { styles: recipes }) }), C);
+    const needs = spokenNeeds(B, C, 'it', {}).filter(x => x.voice === 'N'), cs = captionSchedule(B, C, 'it', ANY, {});
+    assert(needs.length && needs.every(x => { const c = cs.find(y => y.kind === 'narrator' && y.at === x.at && y.text === x.text); return c && c.step === x.sub; }), 'spokenNeeds: a sub that is not its caption\'s step line');
+    assert(needs.some(x => x.sub && x.sub !== x.text), 'spokenNeeds: no narrator line with a step line of its own');
+    console.log(`      ${needs.length} narrator lines with their step line`);
+  },
+  'voice samples in bar order (narrator-caption-sync D6): voicesAt gives what the radio\'s voicesOf gave before, on two radio songs, with the speaker\'s own sample or the default voice\'s'() {
+    // the radio's voicesOf before this change (src/radio/radio.js), without the item's start
+    const before = (B, C, lang, files) => {
+      const out = [], seen = new Set();
+      for (const x of spokenNeeds(B, C, lang, files)) for (const s of [x.bank, `say_${lang}`]) {
+        const n = slugAt(files[s] || [], saySlug(x.text));
+        if (n < 0) continue;
+        if (!seen.has(`${s}:${n}`)) { seen.add(`${s}:${n}`); out.push({ s, n, at: x.at }); }
+        break;
+      }
+      return out;
+    };
+    let n = 0;
+    for (const it of radioSongs('classic', 'synthwave', 'cap-voices', 2)) {
+      const B = liveBuildOf(it.song, it.C), needs = spokenNeeds(B, it.C, 'en', {}), files = {};
+      // every line in the default voice; every other line in its speaker's bank too
+      const add = (bank, text) => { const l = (files[bank] = files[bank] || []), f = `${bank}/${saySlug(text)}.wav`; if (!l.includes(f)) l.push(f); };
+      needs.forEach((x, i) => { add(sayBank('en'), x.text); if (i % 2) add(x.bank, x.text); });
+      const a = voicesAt(B, it.C, 'en', files), b = before(B, it.C, 'en', files);
+      assert(a.length && JSON.stringify(a) === JSON.stringify(b), `${it.song.title}: voicesAt ${a.length}, voicesOf ${b.length}`);
+      assert(a.every((v, i) => !i || a[i - 1].at <= v.at), `${it.song.title}: not in bar order`);
+      n += a.length;
+    }
+    console.log(`      ${n} samples, the same list`);
   },
   async 'voice-track captions (voice-track-tuning D7): a line of several entries plays every entry on its quarter of the bar, and the stage and Coming next show the entry heard, never the entries joined; an entry with no sample is a silent quarter with no caption; the sample the code plays at each voice hap is the caption on the stage (Strudel in Node), also with the first entry only in the default voice'() {
     // the owner's radio: synthwave, Voice track always, many phrases, mixed, every way, quiet, medium and busy parts

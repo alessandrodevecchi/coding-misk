@@ -67,7 +67,16 @@ export function captionFrame(lines, bar, S, opts = {}) {
   const st = S.steps && !hand ? lines.filter(x => x.kind === 'step' && live(x)).pop() : null;
   let tag = '';
   if (st && instead) rows.push({ ...row(st), kind: 'step' });
-  else if (st && !st.heard && !rows.some(r => r.text === st.text)) tag = st.text;
+  else if (S.steps && !hand) {
+    // the tag (narrator-caption-sync D2): the step line of the narrator caption live in the schedule (also with the
+    // narrator rows hidden, so the tag keeps its timing), shown and gone with it; else, with the explaining style only,
+    // the latest live step line not heard (an explaining line with no sample, 4 bars from its bar). The poetic style's
+    // step lines are tagless: no tag without its narrator line
+    const nr = lines.filter(x => x.kind === 'narrator' && live(x)).pop();
+    const own = nr && nr.step && nr.step !== nr.text ? nr.step : '';
+    const text = own || (st && !st.tagless && !st.heard ? st.text : '');
+    if (text && !rows.some(r => r.text === text)) tag = text;
+  }
   const history = opts.history ? lines.filter(x => x.at <= b && shownLine(x, S, hand)).map(row) : [];
   return { rows, tag, history };
 }
