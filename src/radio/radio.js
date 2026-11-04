@@ -20,9 +20,10 @@ import { OPENINGS, PACES, DEVELOPMENTS, SHAPES_VERSION } from '../song/shapes.js
 import { CRESCENDO_VERSION } from '../song/crescendo.js';
 import { sessionVersions } from '../library/playlists.js';
 import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
-import { buildSteps, sayText, spokenSchedule, captionSchedule, spokenNeeds, slugAt } from '../song/build.js';
+import { buildSteps, sayText, spokenSchedule, captionSchedule, spokenNeeds, missingNeeds, slugAt } from '../song/build.js';
 import { spokenContext } from '../song/spoken.js';
 import { saySlug as sayFile } from '../song/build.js';
+import { textIn } from '../voices/phrases.js';
 import { liveBuildOf } from '../live/live-code.js';
 import { nextRows } from './next-changes.js';
 import { QUIRKS } from '../endless/quirks.js';
@@ -1633,21 +1634,31 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     return { lines, offset: it.start };
   }
 
-  // the lines the next song (first lines first), then the song on air, would speak with no sample at all (D9): the app
-  // asks the voice helper for them; samplesArrived writes the songs again with the new samples
+  // the lines the next song (first lines first), then the song on air, would speak with no sample at all (D9), and the
+  // phrases of mine whose speaker has no sample of its own (radio-phrase-speaker D1, D2: the session's snapshot of my
+  // phrases, the ones its songs draw): the app asks the voice helper for them; samplesArrived writes the songs again
+  // with the new samples
   function needs() {
     if (!S) return [];
     const files = voiceFiles(), lang = getLang(), out = [], seen = new Set();
-    const any = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], x) >= 0);
+    const snap = S.recipe && S.recipe.mine && S.recipe.mine.list;
+    const mineSlugs = new Set((snap || []).map(p => textIn(p, lang)).filter(Boolean).map(x => sayFile(x)));
     for (const it of [S.stream[S.onAir + 1], S.stream[S.onAir]].filter(Boolean)) {
       const C = liveControlsOf(it);
       let list = [];
       try { list = spokenNeeds(liveBuildOf(it.song, C), C, lang, files); } catch (e) { list = []; }
       for (const x of list) { const slug = x.text.toLowerCase(); const k = `${x.bank}|${slug}`; if (x.has || seen.has(k)) continue; seen.add(k); out.push(x); }
     }
-    return out.filter(x => !any(x.bank, sayFile(x.text)) && x.text.split(/\s+/).length <= 12);
+    return missingNeeds(out, files, mineSlugs);
   }
-  function samplesArrived() { if (S && S.paused === undefined) swapSoon(windowPlayable()); }
+  // (a sample made after the next song was preloaded, a speaker's sample of a phrase of mine among them, is queued for
+  // it at once, so it loads before the next song's first bar: radio-phrase-speaker D3; loaded ones are skipped)
+  function samplesArrived() {
+    if (!S) return;
+    if (S.paused === undefined) swapSoon(windowPlayable());
+    const nx = S.stream[S.onAir + 1];
+    if (nx && nx.song && player.preloadVoices) player.preloadVoices(voicesOf(nx));
+  }
   let prepText = '';
   function setPrep(txt) { if (txt === prepText) return; prepText = txt; const el = root.querySelector('.radio-prep'); if (el) { el.textContent = txt; el.hidden = !txt; } }
 

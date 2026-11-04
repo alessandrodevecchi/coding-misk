@@ -16,7 +16,8 @@ import { sampleUsage, deleteSamples, keepTemp, sweepTemp, readTemp } from './voi
 import { loadStyles } from './styles-dir.mjs';
 import { createSession } from '../src/endless/director.js';
 import { mineSnapshot, candidates, drawMine, narratorPick, vocabGroupOf } from '../src/voices/mine.js';
-import { setNarratorMine, spokenSchedule, buildSteps, sayText, deriveBuild } from '../src/song/build.js';
+import { setNarratorMine, spokenSchedule, buildSteps, sayText, deriveBuild, spokenNeeds, missingNeeds, saySlug, slugAt } from '../src/song/build.js';
+import { speakerOf } from '../src/song/spoken.js';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules } from '../src/live/profiles.js';
 import { liveBuildOf, liveCode } from '../src/live/live-code.js';
@@ -323,6 +324,31 @@ const ANY_VOICE = {
     const k = phraseFiles(p, usage, { builtin: new Set(), mine: new Set(), songs: songKeys([{ id: 'u', tracks: [{ id: 'w', type: 'spoken', patterns: { A: { way: 'passage', text: { it: 'tutte le voci' } } }, clips: [] }] }]) });
     assert(!k.files.length && k.kept.length === 2, 'a saved song keeps both files');
     assert(mineKeys([p]).has('it|tutte_le_voci'), 'protect key');
+  },
+  'radio: a phrase of mine asks for its speaker\'s sample also when the default voice has it, a built-in line does not (radio-phrase-speaker D1, D2)'() {
+    const p = Q('ph_all', 'la notte ci guarda', ['voice', 'explain', 'poetic']), mine = mineSnapshot([p], 1, 'it');
+    const song = radioSong('rps-1', mine).song, tr = song.tracks.find(t => t.type === 'spoken'), X = tr && speakerOf(song, tr);
+    assert(X, 'a voice track with a speaker of its own');
+    const ph = spokenNeeds(song, {}, 'it', {}).find(x => x.text === p.text);
+    assert(ph && ph.voice === 'T' && ph.bank === `say_it_${X}`, `the phrase's bank: ${JSON.stringify(ph)}`);
+    const built = spokenNeeds(song, {}, 'it', {}).find(x => x.text !== p.text && x.bank !== 'say_it');
+    assert(built, 'a built-in line said by a speaker');
+    // (only the default voice's samples: the phrase and the built-in line)
+    const files = { say_it: [`/samples/say_it/${saySlug(p.text)}.wav`, `/samples/say_it/${saySlug(built.text)}.wav`] };
+    const list = spokenNeeds(song, {}, 'it', files);
+    const mineSlugs = new Set(mine.list.map(q => textIn(q, 'it')).filter(Boolean).map(saySlug));
+    const got = missingNeeds(list, files, mineSlugs);
+    assert(got.some(x => x.text === p.text && x.bank === `say_it_${X}`), 'the phrase of mine is asked in its speaker\'s bank');
+    assert(!got.some(x => x.text === built.text), 'the built-in line the default voice has is not asked');
+    // no phrases of mine (Never): the radio's filter before this change
+    const any = (bank, slug) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], slug) >= 0);
+    const old = list.filter(x => !x.has).filter(x => !any(x.bank, saySlug(x.text)) && x.text.split(/\s+/).length <= 12);
+    for (const none of [new Set(), null]) assert(JSON.stringify(missingNeeds(list, files, none)) === JSON.stringify(old), 'without phrases of mine the list changed');
+    assert(!old.some(x => x.text === p.text), 'the old filter dropped the phrase');
+    // the speaker's own sample made: nothing more to ask for the phrase
+    const made = { ...files, [`say_it_${X}`]: [`/samples/say_it_${X}/${saySlug(p.text)}.wav`] };
+    assert(!missingNeeds(spokenNeeds(song, {}, 'it', made), made, mineSlugs).some(x => x.text === p.text), 'asked again once made');
+    console.log(`      speaker ${X}: ${got.length} lines asked, ${old.length} without my phrases`);
   },
 };
 
