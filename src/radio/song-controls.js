@@ -40,20 +40,25 @@ export function artistSelect({ state, t, esc, artists, prefix }) {
 }
 // the style chips, after the trial style's chip when one is being tried (invented-styles D9)
 export const styleChips = ({ state, recipes, t, tx, esc }) => `${trialChip({ state, t, tx, esc })}<div class="chips" role="group">${recipes.map(r => `<button class="chip" data-style="${esc(r.id)}" aria-pressed="${state.styles.includes(r.id)}" title="${esc(r.description || t('tipStyles'))}">${esc(tx(r.name))}</button>`).join('')}</div>${trialHint({ state, recipes, t, tx, esc })}`;
-// under the chips during a trial: where the parts come from, and what × gives back
-export function trialHint({ state, recipes, t, tx, esc }) {
-  const r = state.tempStyle;
+// under the chips during a trial: where the parts come from, and what × gives back. `style` is the style shown (the
+// trial style by default); `back` the styles × gives back (none for a compilation style)
+export function trialHint({ state, recipes, t, tx, esc, style = state && state.tempStyle, label = t('inventTrialHint'), back = true }) {
+  const r = style;
   if (!r) return '';
-  const back = ((state.trialBefore || {}).styles || []).map(id => recipes.find(x => x.id === id)).filter(Boolean).map(x => tx(x.name));
-  return `<p class="hint muted small trial-hint"><strong>${esc(t('inventTrialHint'))}</strong> ${esc(r.description || '')}${back.length ? ` ${esc(t('inventDropBack', { styles: back.join(' + ') }))}` : ''}</p>`;
+  const was = back ? ((state.trialBefore || {}).styles || []).map(id => recipes.find(x => x.id === id)).filter(Boolean).map(x => tx(x.name)) : [];
+  return `<p class="hint muted small trial-hint"><strong>${esc(label)}</strong> ${esc(r.description || '')}${was.length ? ` ${esc(t('inventDropBack', { styles: was.join(' + ') }))}` : ''}</p>`;
 }
-// the trial style (invented-styles D9): its name, "in prova", its genre, and Tieni, Ancora, ×; the name toggles it like
-// any style chip. The tooltip says where each part came from and the seed
-export function trialChip({ state, t, tx, esc }) {
-  const r = state.tempStyle;
+// an invented style's chip (invented-styles D9; radio-invented-style-chip D1): its name, a label ("in prova", or
+// "inventato" for the compilation), its genre, Tieni and, for the Invent trial, Ancora and ×. `actions` is 'trial' (the
+// name toggles it like any style chip; Keep, Again, ×) or 'keep' (the compilation's: the name does nothing, Keep only,
+// `keepAttr` the data attribute of its Keep button). The tooltip says where each part came from and the seed
+export function trialChip({ state, t, tx, esc, style = state && state.tempStyle, actions = 'trial', label = t('inventTrial'), keepAttr = 'data-trial-keep' }) {
+  const r = style;
   if (!r) return '';
-  const on = state.styles.includes(r.id), tip = `${r.description || ''} · ${t('diceSeed', { seed: (r.invented || {}).seed || '' })}`;
-  return `<div class="chips trial-row"><span class="chip trial-style" aria-pressed="${on}"><button class="plain" data-style="${esc(r.id)}" aria-pressed="${on}" title="${esc(tip)}"><strong>${esc(tx(r.name))}</strong> · <em>${esc(t('inventTrial'))}</em> <span class="muted">(${esc(t('inventGenreOf', { g: t(`g:${r.genre || 'experimental'}`) }))})</span></button><button class="plain keep" data-trial-keep title="${esc(t('inventKeepHint'))}">${esc(t('diceKeep'))}</button><button class="plain" data-trial-again title="${esc(t('inventAgainHint'))}">${esc(t('inventAgain'))}</button><button class="plain" data-trial-drop aria-label="${esc(t('inventDropHint'))}" title="${esc(t('inventDropHint'))}">×</button></span></div>`;
+  const trial = actions === 'trial', on = trial ? state.styles.includes(r.id) : true, tip = `${r.description || ''} · ${t('diceSeed', { seed: (r.invented || {}).seed || '' })}`;
+  const name = `<strong>${esc(tx(r.name))}</strong> · <em>${esc(label)}</em> <span class="muted">(${esc(t('inventGenreOf', { g: t(`g:${r.genre || 'experimental'}`) }))})</span>`;
+  const keep = `<button class="plain keep" ${keepAttr} title="${esc(t('inventKeepHint'))}">${esc(t('diceKeep'))}</button>`;
+  return `<div class="chips trial-row"><span class="chip trial-style" aria-pressed="${on}">${trial ? `<button class="plain" data-style="${esc(r.id)}" aria-pressed="${on}" title="${esc(tip)}">${name}</button>` : `<span class="trial-name" title="${esc(tip)}">${name}</span>`}${keep}${trial ? `<button class="plain" data-trial-again title="${esc(t('inventAgainHint'))}">${esc(t('inventAgain'))}</button><button class="plain" data-trial-drop aria-label="${esc(t('inventDropHint'))}" title="${esc(t('inventDropHint'))}">×</button>` : ''}</span></div>`;
 }
 // the name of a style id: a known style, the trial style, or the id itself
 export const styleNameOf = (recipes, state, tx) => id => { const r = recipes.find(x => x.id === id) || (state && state.tempStyle && state.tempStyle.id === id ? state.tempStyle : null); return r ? tx(r.name) : id; };
