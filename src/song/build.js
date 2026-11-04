@@ -5,7 +5,7 @@
 // shown in the editor always agree. Tracks named by an "add" step are silent before it; the others play from the start.
 import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
-import { spokenBars, narratorStyle, poeticLine, movementLine, enteringTrack, placeSpoken, lineTexts, lineSounds, lineBank, lineEntries, withNarratorStyle, sampleSeconds, barSeconds, spokenContext } from './spoken.js';
+import { spokenBars, narratorStyle, poeticLine, movementLine, enteringTrack, placeSpoken, lineTexts, lineSounds, lineBank, lineEntries, withNarratorStyle, sampleSeconds, barSeconds, spokenContext, MAX_WORDS } from './spoken.js';
 import { kindOf, outranks, perBar, applyExclusive } from './speakers.js';
 import { POETIC } from './vocabulary.js';
 
@@ -405,6 +405,18 @@ export function spokenNeeds(song, C = {}, lang = 'en', files = {}) {
   return out;
 }
 
+// The lines of spokenNeeds to ask the voice helper for (radio-phrase-speaker D1), one rule for Compose and the radio:
+// a line whose speaker has no sample of its own, when its text is a phrase of mine (mineSlugs: their saySlugs; it gets
+// a sample in the bank of each speaker that says it, also when the default voice's sample exists and speaks it
+// meanwhile, phrase-any-voice D7) or no bank of its language has it (a built-in line), and at most MAX_WORDS words
+export function missingNeeds(list, files = {}, mineSlugs = null) {
+  const fl = files || {}, any = (bank, slug) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(fl[b], slug) >= 0);
+  return (list || []).filter(x => {
+    if (x.has) return false;
+    const slug = saySlug(x.text);
+    return ((mineSlugs && mineSlugs.has(slug)) || !any(x.bank, slug)) && x.text.split(/\s+/).length <= MAX_WORDS;
+  });
+}
 // The captions of a song (spoken-text-on-stage D1): what is heard, from spokenSchedule, with its speaker and how long it
 // shows: [{ at, until, kind, code, text, step, typed, track, way, seconds }] in bars (at carries a voice-track line's
 // offset), sorted by start. until: the sample's length (lengths: { "bank/slug.wav": seconds }, say_lengths.json) plus

@@ -6,7 +6,7 @@ import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, RENDERS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds, slugAt } from './song/build.js';
+import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds, missingNeeds, slugAt } from './song/build.js';
 import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml, fitCaption } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
@@ -3210,11 +3210,11 @@ function needsOf(build, C) {
   if (m && m.key === key && m.files === files && m.items === items) return m.list;
   let list = [];
   try {
-    const any = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
     // (phrase-any-voice D7: a phrase of mine gets a sample in the bank of each speaker that says it, also when the
-    // default voice's sample exists and speaks it meanwhile, lineSample; a built-in line only when no voice has it)
+    // default voice's sample exists and speaks it meanwhile, lineSample; a built-in line only when no voice has it;
+    // the rule shared with the radio, missingNeeds)
     const mine = new Set((items || []).map(p => textIn(p, lang)).filter(Boolean).map(x => saySlug(x)));
-    list = spokenNeeds(build, C || {}, lang, files).filter(x => !x.has && (mine.has(saySlug(x.text)) || !any(x.bank, x.text)) && x.text.split(/\s+/).length <= MAX_WORDS);
+    list = missingNeeds(spokenNeeds(build, C || {}, lang, files), files, mine);
   } catch (e) { list = []; }
   needMemo.set(build, { key, files, items, list });
   return list;

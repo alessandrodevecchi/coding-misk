@@ -6,21 +6,53 @@
 // bar before its first line. A line in the first 4 bars of a start, a seek or a skip only has to start on its bar: those
 // bars wait for their samples at most about 100 ms, so with the CPU slowed one may still arrive just in time. The
 // scheduler's "took too long" and "skip query: too late" are counted, for information.
+// --speaker (radio-phrase-speaker): the same run with one phrase of All in My phrases (Sempre), new on each run, whose
+// default-voice sample the voice helper makes first. The radio must ask the helper for the speaker's sample of the
+// phrase although the default voice has it, the next song's speaker sample must be fetched before that song's first bar,
+// and the phrase must play there from the speaker's bank, not from say_en. Without the voice helper: a skip note.
 // Needs the voice samples in public/samples/say_*.
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voice-preload.cjs [--seed vp82a] [--rate 4] [--list]
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voice-preload.cjs [--seed vp82a] [--rate 4] [--list] [--speaker]
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
+const fs = require('node:fs');
+const path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
-const SEED = arg('--seed', 'vp82a'), RATE = +arg('--rate', 4);
+const SEED = arg('--seed', 'vp82a'), RATE = +arg('--rate', 4), BASE = `http://localhost:${process.env.PORT || 5173}`;
+let SPEAKER = process.argv.includes('--speaker');
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
+// (the app's saySlug)
+const slugOf = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48);
+// a phrase no speaker bank has yet, so its speaker samples are made during the run
+function freshPhrase() {
+  const dir = path.join(__dirname, '..', 'public', 'samples');
+  const banks = fs.existsSync(dir) ? fs.readdirSync(dir).filter(b => /^say_en_[a-z]+$/.test(b)) : [];
+  const A = ['copper', 'amber', 'cobalt', 'violet', 'silver', 'crimson', 'jade', 'ivory'], B = ['harbour', 'tower', 'bridge', 'station', 'market', 'river', 'tunnel', 'square'];
+  const k0 = Math.floor(Math.random() * 64);
+  for (let i = 0; i < 64; i++) {
+    const k = (k0 + i) % 64, text = `the ${A[k % 8]} rain falls on the ${B[Math.floor(k / 8)]}`;
+    if (!banks.some(b => fs.existsSync(path.join(dir, b, `${slugOf(text)}.wav`)))) return { text, fresh: true };
+  }
+  return { text: `the ${A[k0 % 8]} rain falls on the ${B[Math.floor(k0 / 8)]}`, fresh: false };
+}
 
 (async () => {
+  // --speaker: the voice helper, the phrase and its default-voice sample (as the Voices tab or Say now make it)
+  let PH = null;
+  if (SPEAKER) {
+    const ok = await fetch(`${BASE}/voice/status`).then(r => r.json()).then(j => !!(j && j.ok), () => false);
+    if (!ok) { console.log('skip  --speaker: no voice helper on this dev server (macOS say and ffmpeg)'); SPEAKER = false; }
+    else {
+      PH = freshPhrase();
+      const r = await fetch(`${BASE}/voice/say`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: PH.text, lang: 'en', speaker: '' }) });
+      check(r.ok, 'the default voice\'s sample of the phrase made first', `"${PH.text}"${PH.fresh ? '' : ', its speaker samples exist already'}`);
+    }
+  }
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1300, height: 1100 } });
   // every voice sample: fetched, decoded, started (bar in the window's bars and page time); silent warm-ups left out
   await ctx.addInitScript(() => {
-    window.__ev = []; window.__warm = []; window.__reach = {}; window.__set = {};
+    window.__ev = []; window.__warm = []; window.__reach = {}; window.__set = {}; window.__asked = [];
     const sch = () => { try { return document.querySelector('strudel-editor').editor.repl.scheduler; } catch (e) { return null; } };
     const bar = () => { const s = sch(); return s ? s.now() : -1; };
     window.__bar = bar;
@@ -32,6 +64,8 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     window.fetch = async (u, ...a) => {
       const url = String((u && u.url) || u), say = url.includes('/samples/say_') && url.endsWith('.wav');
       if (say) window.__ev.push({ k: 'fetch', f: decodeURI(url.split('/samples/')[1]), bar: bar(), t: performance.now() });
+      // (the samples the page asks the voice helper for: --speaker)
+      if (url.includes('/voice/say') && a[0] && typeof a[0].body === 'string') { try { window.__asked.push({ ...JSON.parse(a[0].body), bar: bar() }); } catch (e) { /* not JSON */ } }
       const r = await of(u, ...a);
       if (say) { const ab = r.arrayBuffer.bind(r); r.arrayBuffer = async () => { const b = await ab(); tagOf.set(b, url); return b; }; }
       return r;
@@ -48,8 +82,15 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   const errors = [], logs = { long: 0, late: 0 };
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { const x = m.text(); if (/took too long/.test(x)) logs.long++; if (/skip query: too late/.test(x)) logs.late++; });
-  await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
-  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['synthwave'], chaos: 0.3, energy: 0.5, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: 'switch', compilation: 'off', voice: { presence: 'always', phrases: 'many', kind: 'mixed' } })); });
+  await page.goto(`${BASE}/`); await sleep(2500);
+  await page.evaluate(ph => {
+    localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['synthwave'], chaos: 0.3, energy: 0.5, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: 'switch', compilation: 'off', voice: { presence: 'always', phrases: 'many', kind: 'mixed' } }));
+    // (--speaker: the phrase of All, said on every vocabulary line, Sempre)
+    if (ph) {
+      localStorage.setItem('coding-misk-phrases', JSON.stringify({ format: 1, items: [{ id: 'ph_rps82', text: ph.text, lang: 'en', alt: {}, kinds: ['voice', 'explain', 'poetic'], tag: null, styles: [], on: true, source: 'tab', from: {}, created: new Date().toISOString(), uses: 0, last: null }] }));
+      localStorage.setItem('coding-misk-phrase-settings', JSON.stringify({ save: 'always', temp: '24h', share: 'always' }));
+    }
+  }, SPEAKER ? PH : null);
   await page.reload(); await sleep(3500);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   const cdp = await ctx.newCDPSession(page);
@@ -72,6 +113,12 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   check(made, 'the next song is made', made ? (await state()).stream[1].title : '');
   await until(() => page.evaluate(() => !globalThis.codingMiskVoiceQueue || globalThis.codingMiskVoiceQueue.pending === 0), 60000);
   await sleep(3000);
+  if (SPEAKER) {
+    // (the helper makes the phrase's speaker samples, the next song first; each one is queued for it when it arrives)
+    const done = await until(() => page.evaluate(t => !globalThis.codingMiskRadio.needs().some(x => x.text === t), PH.text), 240000);
+    check(done, 'the speaker samples of the phrase are made while the song on air plays', `bar ${((await state()).bar + 1).toFixed(2)}`);
+    await until(() => page.evaluate(() => !globalThis.codingMiskVoiceQueue || globalThis.codingMiskVoiceQueue.pending === 0), 60000);
+  }
   // played on across the change into the next song (no seek: a start loads the window's samples itself)
   s = await state();
   const s1 = s.stream[1];
@@ -85,7 +132,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   await page.evaluate(B => window.__watch(B), s2.start);
   parts.push({ name: 'skip', B: s2.start });
   await until(async () => (await state()).bar >= s2.start + 8, 120000);
-  const r = await page.evaluate(() => ({ ev: window.__ev, reach: window.__reach, set: window.__set }));
+  const r = await page.evaluate(() => ({ ev: window.__ev, reach: window.__reach, set: window.__set, asked: window.__asked }));
   r.set[s2.start] = tSkip;
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 
@@ -113,6 +160,15 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   for (const e of s1Fetch) if (firstOf('fetch', e.f, Infinity) === e) notAhead.push(`${e.f} fetched on bar ${(e.bar + 1).toFixed(2)}`);
   check(!notAhead.length, `the next song's samples load before it starts (bar ${s1.start + 1})`, notAhead.join('; '));
   check(!late.length, 'every sample decoded at least a bar before its first line (the first 4 bars of a start or a skip: started on its bar)', late.join('; '));
+  if (SPEAKER) {
+    const slug = slugOf(PH.text), asked = r.asked.filter(x => x.text === PH.text);
+    check(!PH.fresh || asked.some(x => x.speaker), 'the radio asks the voice helper for the phrase\'s speaker sample, the default voice\'s existing', asked.map(x => `${x.speaker || 'default'} on bar ${(x.bar + 1).toFixed(2)}`).join(', '));
+    const inNext = plays.filter(p => songOf(p.bar) === s1 && p.f.endsWith(`/${slug}.wav`)), banks = [...new Set(inNext.map(p => p.f.split('/')[0]))];
+    check(inNext.length > 0, 'the phrase heard in the next song', `${inNext.length} times`);
+    check(inNext.length > 0 && !banks.includes('say_en'), 'the phrase plays from its speaker\'s bank in the next song, not from say_en', banks.join(', '));
+    const fetched = [...new Set(inNext.map(p => p.f))].map(f => ({ f, e: firstOf('fetch', f, Infinity) }));
+    check(fetched.length > 0 && fetched.every(x => x.e && x.e.bar < s1.start), `the speaker sample is fetched before the next song's first bar (bar ${s1.start + 1})`, fetched.map(x => `${x.f} ${x.e ? `on bar ${(x.e.bar + 1).toFixed(2)}` : 'never'}`).join('; '));
+  }
   console.log(`      scheduler: ${logs.long} "took too long", ${logs.late} "skip query: too late" (CPU slowed ${RATE}x)`);
   check(!errors.length, 'no page errors', errors.slice(0, 2).join(' | '));
   await page.click('#radio-start').catch(() => {});
