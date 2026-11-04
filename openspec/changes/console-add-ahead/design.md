@@ -132,6 +132,19 @@ A batch is recorded when it commits, as today's commands: `|n|` commands of kind
 
 `tools/check-add-lag.cjs` (dev server on PORT): Classic, Crescendo and Live coder; the cases of the table above plus a 12-track song (11 tracks, then "+ arp" and "− bass"); CPU at 1× and at 4×. It checks the spec's budget, that the badge shows within 100 ms, the bar each change enters, the net result ("+ −" changes nothing, "+ + +" stops at the cap), cancel, a push (preparation slowed on purpose) and a replay. It reports the longest task and the skips per case, as `check-say-lag.cjs` does.
 
+### After (4 November, `tools/check-add-lag.cjs`, same machine under load)
+
+| Case | Classic | Crescendo | Live coder |
+| --- | --- | --- | --- |
+| "+ arp" late (bar 96 to 100): longest task, own work, "too late" | 92 ms (page), 11 ms, 0 | 0 ms, 4 ms, 0 | 0 ms, 7 ms, 0 |
+| steering, ready after | 0.1 s, 1.3 s | 0.7 s, 1.0 s | 6.7 s, 7.2 s |
+| burst of four: longest task, "too late" | 69 ms, 0 | 0 ms, 0 | 0 ms, 0 |
+| CPU 4×, press until ready: own work, ready after | 7 ms, 1.2 s | 7 ms, 0.9 s | 24 ms, 3.7 s |
+| 11 tracks, "+ arp" and "− bass" | 64 ms, 0 "too late" | | |
+| nothing pressed, CPU 1× and 4× (15 s) | 56 and 125 ms | 0 and 0 ms | 59 and 88 ms |
+
+Before: 112 to 583 ms per press on the click. The badge shows within 5 ms of the click in every case; the press itself costs at most 4 ms with the CPU slowed 4 times.
+
 ## Risks / Trade-offs
 
 - [The worker and the page disagree on a song] → The worker already runs `steerOnAir` with the same modules. Classic `steerSong` is pure on its inputs. The check compares the worker's song with the page's for every case (JSON equal).

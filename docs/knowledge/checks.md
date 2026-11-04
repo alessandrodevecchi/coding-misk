@@ -19,7 +19,7 @@ Node checks need nothing but `npm install`. Browser checks need the dev server (
 | The compiler, presets, ideas, `src/music.js` | `check:code`, `check:songs`, `check:ideas`, `check:patterns`, `check:crescendo`, `check:live-code` | `check-ideas.cjs`, `check-compact-code.cjs`, `snapshot-levels.cjs check` |
 | A style or an artist | `check:styles`, `check:endless`, `check:random`, `check:invent` | `check-style-sounds.cjs`, `check-endless-play.cjs`, `check-library.cjs`, `check-invented.cjs` |
 | The style maker (`src/endless/style-maker.js`) | `check:invent` (seed fixtures: raise `STYLE_MAKER_VERSION` with `--write-fixtures`), `check:endless` (fixtures must not move) | `check-invented.cjs` |
-| The director, steering, transitions | `check:endless`, `check:compilation` | `check-radio.cjs`, `check-steering.cjs`, `check-transitions.cjs` |
+| The director, steering, transitions | `check:endless`, `check:compilation` | `check-radio.cjs`, `check-steering.cjs`, `check-transitions.cjs`, `check-add-lag.cjs` (the console's "+" and "−" prepared ahead) |
 | Profiles and growth on air, the code on air, commands as waypoints (`src/endless/growth.js`, `src/endless/items.js`, `src/endless/waypoints.js`, `src/live/air-code.js`) | `check:radio-profiles`, `check:endless`, `check:live-code` | `check-radio.cjs`, `check-compact-code.cjs` (radio window), `check-transitions.cjs` (Live coder runs), `check-steering.cjs` (Live coder steering at its end) |
 | The material generator | `check:material`, `check:endless`, `check:patterns` | `check-patterns.cjs` |
 | Rack devices (`src/song/rack.js`), the FM-like effects | `check:fm-effects`, `check:songs`, `check:endless`, `check:strudel` | `check-fm-effects.cjs` |
@@ -72,6 +72,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 <!-- generated:checks -->
 | Tool | npm script | Needs | What it covers |
 | --- | --- | --- | --- |
+| `tools/check-add-lag.cjs` |  | dev server, Chrome | "+" and "−" of the radio console prepared ahead (console-add-ahead, #82): a press records a pending change, the song is steered away from the page and the change enters on a phrase start, with no lag. On a radio song in… |
 | `tools/check-arrangement-levels.cjs` |  | dev server, Chrome | Levels and load of a radio song stacked to 12 tracks with "+" (radio-arrangement D4, D5, tasks 1.5 and 1.8): for each style, a radio session where the console adds tracks of every instrument until 12 play; then the… |
 | `tools/check-backup.mjs` |  | Node | Checks for the backup of everything in the browser (#31). No browser. |
 | `tools/check-captions.cjs` |  | dev server, Chrome | Browser check of the stage captions (spoken-text-on-stage, #82): the cases of the design measured again (the caption is the line heard on every spoken bar, the voice track's lines shown, nothing shown that is not heard)… |
