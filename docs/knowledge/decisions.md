@@ -170,6 +170,10 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 | One tone cloud per picture (stage-app-widgets, owner 2026-10-31) | One in the code panel and one on the stage may show at the same time; each picture keeps at most one. Monitor keeps at most 6 panels. | [design](../../openspec/changes/stage-app-widgets/design.md) |
 | The stage widgets' quick switch is a chip above the visual, without a keyboard key (stage-app-widgets D5, owner 2026-10-31) | Beside the other stage toggles and visible in full screen, where the code panel is hidden; a three-way selector would crowd the row on a phone. | [design](../../openspec/changes/stage-app-widgets/design.md) |
 
+- **A press of "+" or "−" does no steering (`console-add-ahead`).** It records a pending change, a net count per instrument and boundary; the batch is steered once away from the page and enters on a phrase start when ready and the page is quiet, else on the next one, within 30 s. The recorded commands are today's, so replays stay the same. Each press used to rewrite the whole song on the main thread (up to 583 ms per press late in a song).
+- **Console changes have a worker of their own.** In the growth worker a batch waited behind the next song's growth (13 to 24 s measured).
+- **The steering of a grown song stays slow late in a song.** `steerOnAir` replays every standing command (about 2 s per energy command in Node, 17.5 s for nine); a batch then waits for it and enters a few phrases later, or not at all near the end of the song. Making the steering incremental is a separate change.
+
 ## Rejected attempts
 
 | Attempt | Why it was dropped | Source |

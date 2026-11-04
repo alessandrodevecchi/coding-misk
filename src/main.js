@@ -14,7 +14,8 @@ import { setSpokenContext, spokenContext, placeSpoken, WAYS, speakerOf, MAX_WORD
 import { airCode } from './live/air-code.js';
 import { growOnAir, airControls, composeGrowth } from './endless/growth.js';
 import { controlsProfile, customControls } from './endless/profile.js';
-import { steerOnAir, AIR_CHOOSERS } from './endless/waypoints.js';
+import { steerOnAir, steerView, AIR_CHOOSERS } from './endless/waypoints.js';
+import { steerSong } from './endless/steering.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, writtenOptions } from './live/profiles.js';
 import { TRIALS_KEY, configOf, controlsOf, cleanTrials, setTrial, withConfig, compactConfig, plannedOf, normalConfig, setDuration } from './live/song-config.js';
@@ -287,20 +288,25 @@ function sessionPlayable(items, seed, options, id, air = null) {
 }
 // radio songs grow away from the page (radio-profiles stage 4, src/endless/grow-worker.js): the music stays on time;
 // the worker gets the voice instrument's context and the language of the page, so a song grows there as it would here
-let growWorker = null, growN = 0;
-const growWaits = new Map();
+// (a console change of the radio, console-add-ahead D4, goes to a worker of its own: in the growth worker it waited
+// behind the next song's growth, up to 20 s)
+const lanes = { grow: { worker: null, waits: new Map() }, console: { worker: null, waits: new Map() } };
+let growN = 0;
 // (steering a grown song, radio-profiles stage 5: the commands as waypoints are worked out there too)
-function growAway(song, ctx, steer = null) {
-  const here = () => Promise.resolve().then(() => (steer ? (({ song: s, grown, commands }) => ({ song: s, grown, commands }))(steerOnAir(steer)) : growOnAir(song, ctx)));
+// (and a Classic song's steering, console-add-ahead D4: classic holds steerSong's arguments; a steer with view also gives
+// the director's view of the grown song back. Without the worker both run in the page, in a task of their own)
+function growAway(song, ctx, steer = null, classic = null, lane = 'grow') {
+  const here = () => (classic || (steer && steer.view) ? new Promise(r => setTimeout(r, 0)) : Promise.resolve()).then(() => (classic ? (({ song: s, plan, opts }) => ({ song: s, plan, opts }))(steerSong(classic)) : steer ? (r => ({ song: r.song, grown: r.grown, commands: r.commands, ...(steer.view ? { view: steerView(steer, r) } : {}) }))(steerOnAir(steer)) : growOnAir(song, ctx)));
+  const L = lanes[lane];
   try {
-    if (!growWorker) {
-      growWorker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
-      growWorker.onmessage = e => { const w = growWaits.get(e.data && e.data.id); if (!w) return; growWaits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.song); };
-      growWorker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of growWaits.values()) w.reject(new Error('worker')); growWaits.clear(); growWorker = false; };
+    if (!L.worker) {
+      L.worker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
+      L.worker.onmessage = e => { const w = L.waits.get(e.data && e.data.id); if (!w) return; L.waits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.song); };
+      L.worker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of L.waits.values()) w.reject(new Error('worker')); L.waits.clear(); L.worker = false; };
     }
-    if (growWorker === false) return here();
+    if (L.worker === false) return here();
     const id = ++growN, spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
-    return new Promise((resolve, reject) => { growWaits.set(id, { resolve, reject }); growWorker.postMessage({ id, song, ctx, spoken, steer }); });
+    return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject }); L.worker.postMessage({ id, song, ctx, spoken, steer, classic }); });
   } catch (e) { return here(); }
 }
 // the page's own growths away from the page (grow-worker.js, a second worker so the radio never waits for them): the
@@ -988,8 +994,12 @@ function liveBuild(sg, s, cyc) {
   // (#82: the step's code holds the widgets of its bar, so the section boundaries up to it are done: widgetTick in the
   // same tick must not write an earlier bar's code over the step's)
   cwAt = Math.max(cwAt, next.at);
+  const t0 = performance.now();
   setCodeRange(codeNow(sg, next.at)); ed.evaluate();
+  lastStepMs = performance.now() - t0;
 }
+// (the main thread's cost of the last step, for the radio's entry of a console change, console-add-ahead D2)
+let lastStepMs = 0;
 // the Decode tab (track-to-code D13, level A): the next change the model shows is typed with the bar as its deadline
 // and evaluated on the bar; a change that does not fit is pasted, as everywhere
 let decodeTab = null, decodeNext = null, decodeSwap = null;
@@ -5359,6 +5369,33 @@ async function voicesFirst(voices, bar, wait = 100) {
   queueVoices(due, true);
   if (wait === COLD_WAIT) queueVoices(voices.filter(v => v.at < Math.floor(bar)).sort((a, b) => a.at - b.at));
 }
+// the sounds of tracks brought in by a console change (console-add-ahead D4): every string of the tracks that names a
+// sound of the sound map, and the hits of a drum machine they name; soundfonts get every zone loaded (preloadFonts),
+// samples one silent hit each. One sound per task; fonts already loaded this way are not loaded again
+const warmedFonts = new Set();
+function soundsOfTracks(tracks) {
+  const map = (globalThis.soundMap && globalThis.soundMap.get && globalThis.soundMap.get()) || {}, keys = Object.keys(map), out = new Set();
+  const walk = v => { if (typeof v === 'string') { if (map[v]) out.add(v); else if (v.length > 2 && keys.length) for (const k of keys) if (k.startsWith(`${v}_`)) out.add(k); } else if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') Object.values(v).forEach(walk); };
+  for (const t of tracks || []) walk({ settings: t.settings, sound: t.sound, bank: t.bank, patterns: t.patterns });
+  return [...out].slice(0, 24);
+}
+async function warmTracks(tracks) {
+  let names = [];
+  try { names = soundsOfTracks(tracks); } catch (e) { return 0; }
+  const map = (globalThis.soundMap && globalThis.soundMap.get()) || {}, ac = globalThis.getAudioContext && globalThis.getAudioContext();
+  if (!ac || !globalThis.superdough) return 0;
+  const play = v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + .2, .05);
+  let n = 0;
+  for (const name of names) {
+    const s = map[name];
+    await new Promise(r => setTimeout(r, 0));
+    const one = s && s.data && Array.isArray(s.data.fonts) ? (warmedFonts.has(name) ? Promise.resolve() : preloadFonts([name], { soundMap: globalThis.soundMap, play }).then(() => warmedFonts.add(name)))
+      : Promise.resolve().then(() => play({ s: name, gain: 0 }));
+    await Promise.race([one.catch(() => {}), new Promise(r => setTimeout(r, 4000))]);
+    n++;
+  }
+  return n;
+}
 globalThis.codingMiskVoiceQueue = { get pending() { return voiceQueue.length + (voicePumping ? 1 : 0); } };
 const warmVoices = sg => { try { queueVoices(voiceSamples(sg.build, getLang(), customFiles), true); } catch (e) {} };
 // the radio's saved pattern preview: the pattern's loop in the song's key, chords and tempo, on an orbit well above the
@@ -5414,6 +5451,20 @@ radio = createRadio({
     grow: (song, ctx) => growAway(song, ctx),
     // and a grown song is steered there (radio-profiles stage 5: commands as waypoints)
     steer: args => growAway(null, null, args),
+    // a Classic song steered there too (console-add-ahead D4: the console's "+" and "−")
+    steerClassic: args => growAway(null, null, null, args, 'console'),
+    // a grown song's console change steered there, with the director's view (console-add-ahead D4)
+    steerAhead: args => growAway(null, null, args, null, 'console'),
+    // (a Classic song of an old session that grows after its steering: grown there too)
+    growAhead: (song, ctx) => growAway(song, ctx, null, null, 'console'),
+    // a console change dropped while its steering runs (a newer press, a push): the worker stops it, so the next one does
+    // not wait behind it (its promise fails with "cancelled")
+    cancelAhead: () => { const L = lanes.console; if (!L.worker || !L.waits.size) return; L.worker.terminate(); for (const w of L.waits.values()) w.reject(new Error('cancelled')); L.waits.clear(); L.worker = null; },
+    // the sounds of the tracks a console change brings in, loaded and warmed at gain 0 before its bar (console-add-ahead
+    // D4): resolves when done (each sound in a task of its own; a sound that never answers is given up after 4 s)
+    warmTracks: tracks => warmTracks(tracks),
+    // the main thread's cost of the last step evaluated by the transport, in ms (console-add-ahead D2)
+    lastStep: () => lastStepMs,
     start: (p, bar, o) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio', { voices: o && o.voices }); },
     // the next song's voice samples, as it will be written on air (#82)
     preloadVoices: list => queueVoices(list),

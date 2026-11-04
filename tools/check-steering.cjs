@@ -16,6 +16,9 @@ let failed = 0;
 // wait for a condition, not a fixed pause: polls fn until it returns something truthy or ms pass (the page can be
 // slow under load); returns the last value
 const until = async (fn, ms = 8000, step = 50) => { const t = Date.now(); for (;;) { let v = null; try { v = await fn(); } catch (e) {} if (v || Date.now() - t > ms) return v; await sleep(step); } };
+// "+" and "−" of an instrument are prepared ahead and enter on a phrase start (console-add-ahead): wait until no batch
+// is pending
+const settle = () => until(async () => ((await page.evaluate(() => (globalThis.codingMiskRadio.pendingAdds || []).length)) === 0 ? true : null), 60000, 40);
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
 const shots = process.argv.slice(2).find(a => !a.startsWith('--'));
 const typedOnly = process.argv.includes('--typed'), manyOnly = process.argv.includes('--many');
@@ -296,6 +299,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const typeBtn = await page.$('#radio-steer [data-cmd="less"]:not([disabled])') || await page.$('#radio-steer [data-cmd="more"]:not([disabled])');
   const kind = await typeBtn.getAttribute('data-cmd'), type = await typeBtn.getAttribute('data-inst');
   await page.click(`#radio-steer [data-cmd="${kind}"]${type ? `[data-inst="${type}"]` : ''}:not([disabled])`);
+  await settle();
   st = await until(async () => { const x = await ST(); return x.commands.length ? x : null; }) || await ST();
   const cmd = st.commands[0];
   check(cmd && cmd.kind === kind && st.build.some(x => x.at === cmd.at && (x.add || x.remove)), `${kind} ${type} written as the listener's step`, JSON.stringify(st.build));
@@ -630,30 +634,43 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const p0 = (await A()).on.filter(id => /^pad/.test(id)).length;
     await page.click('#radio-steer [data-cmd="more"][data-inst="pad"]'); await sleep(250);
     await page.click('#radio-steer [data-cmd="more"][data-inst="pad"]'); await sleep(300);
+    const qp = await page.innerText('#radio-steer .steer-queue');
+    // (a kick in the same batch: two kicks from the same phrase; the queue's text kept as it changes)
+    await page.click('#radio-steer [data-cmd="more"][data-inst="kick"]'); await sleep(100);
+    await page.evaluate(() => { window.__q = []; new MutationObserver(() => { const q = document.querySelector('#radio-steer .steer-queue'); if (q) window.__q.push(q.innerText); }).observe(document.querySelector('#radio-steer'), { subtree: true, childList: true, characterData: true }); });
+    check(/\+2 pad · \d+ s/i.test(qp) && /\+2 · Enters in \d+ s/.test(await page.innerText('#radio-steer [data-arr="pad"] .arr-pend')), 'two quick + pad: one pending row and badge "+2"', qp.replace(/\n/g, ' | '));
+    await settle();
+    // (the batch is handed over a third of a bar before its bar: the queue names its tracks until they enter)
+    const q = (await page.evaluate(() => window.__q.find(x => /\+ pad \(Pad/.test(x)) || window.__q.join(' / ')));
     let a = await A();
     const at = a.commands[a.commands.length - 1].at, pads = (await onAt(at)).filter(id => /^pad/.test(id));
     check(pads.length === p0 + 2, '+ pad twice: two more pads from the next phrase', `${p0} → ${pads}`);
-    const q = await page.innerText('#radio-steer .steer-queue');
     check(/\+ pad \(Pad( \d)?\)/.test(q), 'the queue names the track: "+ pad (Pad 2)"', q.replace(/\n/g, ' | '));
+    // (a pending − cancelled from its queue row changes nothing; the steering of "−" itself is checked through command)
     await page.click('#radio-steer [data-cmd="less"][data-inst="pad"]'); await sleep(300);
+    await page.click('#radio-steer [data-pend-cancel$=":pad"]'); await sleep(300);
+    check(!(await page.evaluate(() => globalThis.codingMiskRadio.pendingAdds.length)) && (await onAt(at)).filter(id => /^pad/.test(id)).length === p0 + 2, 'a pending − pad cancelled from the queue changes nothing');
+    await page.evaluate(() => globalThis.codingMiskRadio.command({ kind: 'less', part: 'pad' })); await sleep(300);
     a = await A();
-    const left = (await onAt(at)).filter(id => /^pad/.test(id));
+    const lessAt = a.commands.find(c => c.kind === 'less').at;
+    const left = (await onAt(lessAt)).filter(id => /^pad/.test(id));
     check(left.length === p0 + 1 && !left.includes(a.s.plan.added[a.s.plan.added.length - 1] && a.s.plan.added.slice(-1)[0].id === pads[pads.length - 1] ? 'x' : pads[pads.length - 1]), '− pad takes the last one added', `${pads} → ${left}`);
     // cancel the −: both pads again
     const lessId = a.commands.find(c => c.kind === 'less').id;
     await page.click(`#radio-steer [data-cancel="${lessId}"]`); await sleep(300);
-    check((await onAt(at)).filter(id => /^pad/.test(id)).length === p0 + 2, 'cancel brings the pad back');
+    check((await onAt(lessAt)).filter(id => /^pad/.test(id)).length === p0 + 2, 'cancel brings the pad back');
     // two kicks: the badge and the warning line
-    await page.click('#radio-steer [data-cmd="more"][data-inst="kick"]'); await sleep(300);
     a = await A();
-    const kicks = (await onAt(at)).filter(id => /^kick/.test(id)).length;
+    const kickAt = at;
+    const kicks = (await onAt(kickAt)).filter(id => /^kick/.test(id)).length;
     const badge = await page.$eval('#radio-steer [data-arr="kick"]', x => ({ over: x.classList.contains('over'), n: (x.querySelector('.arr-count') || {}).textContent || '' })).catch(() => ({}));
     const warn = await page.isVisible('#radio-steer .arr-warn') ? await page.innerText('#radio-steer .arr-warn') : '';
     // (the badge counts the next phrase; the + applies there)
     check(kicks >= 2, 'a second kick plays', `${kicks}`);
     // the owner's test in the browser: seek two phrases past the + pad, the pads still play and have mixer rows
-    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), at + 2 * a.s.plan.phrase + 0.3); await sleep(1500);
-    const later = (await onAt(at + 2 * a.s.plan.phrase)).filter(id => /^pad/.test(id));
+    const at2 = Math.max(at + 2 * a.s.plan.phrase, kickAt);
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), at2 + 0.3); await sleep(1500);
+    const later = (await onAt(at2)).filter(id => /^pad/.test(id));
     const rows = await page.$$eval('#radio-steer [data-mix-vol]', xs => xs.map(x => x.dataset.mixVol));
     check(later.length === p0 + 2 && later.every(id => rows.includes(id)), "owner's test: two phrases later the added pads still play, with their mixer rows", `${later} / ${rows}`);
     const b2 = await page.$eval('#radio-steer [data-arr="kick"]', x => ({ over: x.classList.contains('over'), n: (x.querySelector('.arr-count') || {}).textContent || '' })).catch(() => ({}));
@@ -707,11 +724,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     // shortcuts: a digit adds, Shift and the digit removes
     const order = await page.$$eval('#radio-steer .arr-inst', xs => xs.map(x => x.dataset.arr));
     const n0 = (await A()).commands.length;
-    await page.mouse.click(5, 5); await page.keyboard.press('Digit3'); await sleep(300);
+    await page.mouse.click(5, 5); await page.keyboard.press('Digit3'); await sleep(300); await settle();
     a = await A();
     const last = a.commands[a.commands.length - 1];
     check(a.commands.length === n0 + 1 && last.kind === 'more' && last.part === order[2], 'shortcut 3 adds the third instrument', JSON.stringify(last));
-    await page.keyboard.press('Shift+Digit3'); await sleep(300);
+    await page.keyboard.press('Shift+Digit3'); await sleep(300); await settle();
     a = await A();
     check(a.commands[a.commands.length - 1].kind === 'less' && a.commands[a.commands.length - 1].part === order[2], 'Shift+3 removes one', JSON.stringify(a.commands.slice(-1)));
     // the cap: 12 tracks, then every + is off with its reason
@@ -863,7 +880,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   {
     if ((await page.getAttribute('#steer-scope', 'aria-pressed')) !== 'true') { await page.click('#steer-scope'); await sleep(200); }
     const plus = await page.$('#radio-steer [data-cmd="more"]:not([disabled])'), part = plus && await plus.getAttribute('data-inst');
-    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]:not([disabled])`); await sleep(400);
+    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]:not([disabled])`); await sleep(400); await settle();
     let x = await ST();
     const c = x.commands.slice(-1)[0];
     check(c && c.kind === 'more' && c.scope === 'session' && (x.recipe.arrange || []).length === 1 && x.recipe.arrange[0].part === part, `"+ ${part}" for the session goes to the recipe`, JSON.stringify(x.recipe.arrange));
@@ -873,7 +890,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     await page.click(`#radio-steer [data-cancel="${c.id}"]`); await sleep(400);
     x = await ST();
     check(!(x.recipe.arrange || []).length, 'cancel takes it out of the session');
-    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]`); await sleep(400);
+    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]`); await sleep(400); await settle();
     // the next song gets one more track of that instrument from the session
     await page.evaluate(() => globalThis.codingMiskRadio.skip()); await sleep(3000);
     x = await ST();
@@ -903,7 +920,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(r.stream.length === 2 && r.stream[1].growing, 'the next song is still growing when the choice is given', JSON.stringify(r.stream));
     // (the console renders again while the song grows: the button is found by its instrument)
     const part = await page.getAttribute('#radio-steer [data-cmd="more"]:not([disabled])', 'data-inst');
-    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]`);
+    await page.click(`#radio-steer [data-cmd="more"][data-inst="${part}"]`); await settle();
     for (let t0 = Date.now(); Date.now() - t0 < 90000; ) { await sleep(500); r = await RS(); if (r.stream.every(x => !x.growing)) break; }
     const win = await page.evaluate(() => ({ fresh: globalThis.codingMiskRadio.airPlayable.meta.bars, player: globalThis.codingMiskBars().song.bars }));
     check(r.stream.length === 2 && r.stream[1].grown && win.player === win.fresh, 'the window on air holds the song being prepared with the session choice', JSON.stringify({ stream: r.stream, ...win }));

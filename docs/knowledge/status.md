@@ -20,6 +20,7 @@ OpenSpec changes not archived: 104. With open tasks: 30. All tasks ticked, waiti
 | --- | --- | --- |
 | [code-now](../../openspec/changes/code-now/tasks.md) | 1 | 9 |
 | [code-widgets](../../openspec/changes/code-widgets/tasks.md) | 3 | 31 |
+| [console-add-ahead](../../openspec/changes/console-add-ahead/tasks.md) | 4 | 18 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
 | [fm-groove-lab](../../openspec/changes/fm-groove-lab/tasks.md) | 1 | 16 |

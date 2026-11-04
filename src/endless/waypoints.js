@@ -436,7 +436,9 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
   const done = [];
   commands.forEach((cmd, i) => {
     // (a typed line keeps the bar the radio gave it: Say now leaves a few seconds before it, #82)
-    const cands = cmd.pend && !typed(cmd) ? airBoundaries(cmd.kind, Number.isFinite(cmd.q) ? cmd.q : cmd.at - 1, P, g0) : [cmd.at];
+    // (min: the first boundary a console change prepared ahead may take, console-add-ahead D2; the steering moves it
+    // later only when its typing does not fit)
+    const cands = cmd.pend && !typed(cmd) ? airBoundaries(cmd.kind, Number.isFinite(cmd.q) ? cmd.q : cmd.at - 1, P, g0).filter(b => !Number.isFinite(cmd.min) || b >= cmd.min) : [cmd.at];
     if (typed(cmd)) { if (cands.length) { const { pend, ...kept } = cmd; done.push({ ...kept, at: cands[0] }); } return; }
     const rng = stream(seed, `waypoint:${n}:${i}`);
     let pick = null;
@@ -481,4 +483,13 @@ export function directorView({ song, plan, opts, commands, seed, n, grown }) {
   const off = airOffset(grown);
   // (typed lines live on the grown song only, as in steerOnAir)
   return steerSong({ song, plan, opts, commands: commands.filter(c => c.kind !== 'say-live').map(c => { const { q, pend, at0, ...rest } = c; return { ...rest, at: c.at - off }; }), seed, n });
+}
+
+// the director's view of a grown song after its steering: the commands as the steering placed them (a pending one that
+// found no boundary left out), as the radio's airSettle and airView make it in the page
+export function steerView(args, r) {
+  const byId = new Map(r.commands.map(c => [c.id, c]));
+  const commands = args.commands.flatMap(c => { const x = byId.get(c.id); if (!x) return c.pend ? [] : [c]; const { pend, ...y } = { ...c, ...x }; return [y]; });
+  const v = directorView({ song: args.song, plan: args.plan, opts: args.opts, commands, seed: args.seed, n: args.n, grown: r.grown });
+  return { plan: v.plan, opts: v.opts, song: v.song };
 }
