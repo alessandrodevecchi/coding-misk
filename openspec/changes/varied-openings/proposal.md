@@ -10,6 +10,8 @@ Radio and Compose songs almost always open on the same sound. A probe over 440 r
 - **The first kick varies.** When a song opens on the kick, the first kick pattern is drawn from a small set of kick starts (`one`, `four`, `push`, `off`, `two`), weighted per style through a new `growthShapes.kicks` field. Today it is always one kick on beat one.
 - **Default weights.** `DEFAULT_WEIGHTS.opening.slow` goes from 2 to 1, and the new openings get default weights.
 - **More instruments per style.** Each style gets a few more drum machines and sounds per role, chosen from genre research and taken only from banks and sounds the project already loads. See the appendix of `design.md` for the table and the reasons.
+- **Opening control in Crescendo.** The Compose «Opening» control steers the first track in Crescendo too, with the lead openings only.
+- **Kit menu.** The new kits join the hand-pick kit list (`KITS`), at its end.
 - **Versions.** `CRESCENDO_VERSION` 2 to 3, `SHAPES_VERSION` 8 to 9, `DIRECTOR_VERSION` 16 to 17, `STYLE_MAKER_VERSION` 1 to 2 if the invented-style fixtures move. All growth, endless and invent fixtures are regenerated, and `npm run durations` is run.
 - **Check.** The opening probe is kept as a tool and run before and after, with target ranges.
 
@@ -25,7 +27,7 @@ Radio and Compose songs almost always open on the same sound. A probe over 440 r
 
 ## Impact
 
-- **Code:** `src/song/shapes.js` (opening list, default weights, kick starts, `canPlay` for the new openings, recipe checks), `src/song/crescendo.js` (first track by weights when there is no shape, `orderByShape` for the new openings, kick-start core in `beatForms`, `rowForms` and `thinRows`), `src/song/coder.js` (drums later for `bass`, `chord` and `top`), `src/endless/recipe.js` (validation of `growthShapes.kicks`), `src/live/profiles.js` and the Compose opening control (new ids, labels in `src/i18n.js`).
+- **Code:** `src/song/shapes.js` (opening list, default weights, kick starts, `canPlay` for the new openings, recipe checks), `src/song/crescendo.js` (first track by weights when there is no shape, `orderByShape` for the new openings, kick-start core in `beatForms`, `rowForms` and `thinRows`), `src/song/coder.js` (drums later for `bass`, `chord` and `top`), `src/endless/recipe.js` (validation of `growthShapes.kicks`), `src/live/profiles.js` and the Compose opening control (new ids, Crescendo reads it, labels in `src/i18n.js`), `src/music.js` (`KITS`, `KIT_MISSING`), `src/endless/steering.js` (longer kit fallback).
 - **Data:** all 20 `styles/*.json`.
 - **Fixtures:** `tools/check-crescendo.mjs` (Crescendo and Live coder), `tools/check-endless.mjs` seed fixtures, `tools/check-invent.mjs` seed fixtures, song card durations.
 - **Existing songs:** saved Compose and library songs keep their written tracks; their grown build is recomputed and can open differently. Radio sessions saved before the change replay with the new rules and show the existing "may sound different" warning. Details in `design.md`, Migration.

@@ -40,6 +40,17 @@ When a live build has no growth shape (the Crescendo profile), its first track S
 - **WHEN** a style weighs `typed` and `muted-base` and a song of it plays with the Crescendo profile
 - **THEN** its lead track comes from the other weighted openings only
 
+### Requirement: Compose opening control in Crescendo
+The Compose «Opening» control SHALL steer the first track of a Crescendo build as it steers a Live coder build. With the Crescendo profile the control SHALL list Auto and the lead openings only. A chosen lead opening SHALL win over the song's `growthShape.opening` and the style weights; Auto SHALL leave the draw to the song, the style and the seed. Pace and Development SHALL stay Live coder only.
+
+#### Scenario: Crescendo with a chosen opening
+- **WHEN** the user picks the opening `bass` in Compose and plays a song with a bass track in the Crescendo profile
+- **THEN** the build opens on the bass
+
+#### Scenario: Live-coder-only opening kept from before
+- **WHEN** the control holds `typed` from a Live coder session and the user switches the song to Crescendo
+- **THEN** the Crescendo build treats it as Auto, and the control shows Auto
+
 ### Requirement: Classic unchanged
 The Classic profile SHALL NOT change.
 

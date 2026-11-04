@@ -32,3 +32,14 @@ Every built-in style SHALL offer more than one drum machine when its genre is pl
 #### Scenario: Added sounds exist
 - **WHEN** the style sounds check runs with the app's sounds loaded
 - **THEN** every drum machine and sound named by a built-in recipe is present, and every drum row its grooves play has a sample in each of its drum machines
+
+### Requirement: Hand-pick kit list
+The kit list offered for hand picks (the Compose and Groove lab kit menus, the Styles tab, and the radio kit steering when a style lists one kit or none) SHALL include every drum machine a built-in style lists. New kits SHALL be added at the end of the list, so the existing order stays.
+
+#### Scenario: New kit in the menu
+- **WHEN** the user opens the kit menu of a drum track in Compose
+- **THEN** `KorgM1` and the other kits added to the styles are listed after the kits listed before this change
+
+#### Scenario: Radio kit steering
+- **WHEN** the user asks the radio for another kit on a song whose style lists one kit
+- **THEN** the new kit is drawn from the longer list, and it plays with its missing rows falling back

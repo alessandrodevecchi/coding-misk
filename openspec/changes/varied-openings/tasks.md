@@ -22,7 +22,8 @@
 - [ ] 4.1 Write `tests/snapshots/kit-rows.json` from the drum machine index (rows per bank) with a small script, and a Node check (`npm run check:kit-rows`, or a part of `check:styles`) that fails when a recipe kit lacks a row its grooves play and `KIT_MISSING` does not cover it. Verify: the check passes on `develop` and fails on a test recipe with `RolandTR727`.
 - [ ] 4.2 Add `KIT_MISSING` entries for `RolandCompurhythm78` (`cp`, `rd`, `cr`, `rim`, `mt`, `ht`) and `MPC1000` (`rd`, `cr`, `rim`, `mt`, `ht`), as the snapshot lists them. Verify: `npm run check:code` unchanged for built-in songs.
 - [ ] 4.3 Add the kits and sounds of `design.md` (Appendix, Instruments per style) to all 20 `styles/*.json`. Verify: `npm run check:styles` without new warnings, the kit-rows check passes, and `PORT=5173 node tools/check-style-sounds.cjs` finds every sound (dev server on 5173 started by the owner or on another free port; never start a server on 5173-5175 from the agent).
-- [ ] 4.4 Bump `DIRECTOR_VERSION` to 17. Verify: `npm run check:endless` reports the fixture move until 7.2.
+- [ ] 4.4 Append every new kit to `KITS` in `src/music.js` (at the end, order kept); extend the kit-rows check to `KITS`; add a line per new kit to the knowledge sounds note. Verify: `KITS[2]` and `KITS[4]` unchanged (decode writer), `npm run check:knowledge` passes, the Styles tab and the Patterns tab kit menus fit at 400 px.
+- [ ] 4.5 Steering with the longer list: a single-kit user style still draws another kit, and the drawn kit plays with fallbacks. Verify: `npm run check:endless` steering checks pass (fixtures regenerated in 7.2), `PORT=<free port> node tools/check-steering.cjs` kit swap passes.
 
 ## 5. Opening weights in the style recipes
 
@@ -31,12 +32,17 @@
 
 ## 6. Compose, Guide and docs
 
-- [ ] 6.1 Compose opening control: the new ids with labels in English and Italian (`src/i18n.js`), and the Settings count of openings (`shapeCounts`). Verify: `npm run check:guide` passes; the control lists 13 openings.
-- [ ] 6.2 Docs: `docs/STYLES.md` (`growthShapes.kicks`, new openings, the kit-rows rule), `docs/COMPOSING.md` and `docs/SONG-FORMAT.md` (new opening ids), the Guide card on growth shapes (EN and IT), `npm run knowledge` then `npm run check:knowledge`. Verify: both checks pass.
-- [ ] 6.3 `CHANGELOG.md` under `[Unreleased]` (Added: new openings, kick starts, instruments per style; Changed: Crescendo opening, default weights) and a `DEVLOG.md` entry in Italian with the probe numbers before and after. Verify: entries present.
-- [ ] 6.4 Owner listening pass: a short list in `design.md` (Appendix) of one radio seed per style that opens on a new kit or sound, for the owner to play; drop any addition the owner rejects. Verify: the owner's answer recorded.
+- [ ] 6.1 Compose opening control: the new ids with labels in English and Italian (`src/i18n.js`), and the Settings count of openings (`shapeCounts`). Verify: `npm run check:guide` passes; the control lists 13 openings in Live coder.
+- [ ] 6.2 Crescendo reads the control: `growthRules` returns the lead opening for the Crescendo growth; `resolveLead` takes it first; the control shows in Compose with the Crescendo profile with Auto and the lead openings only, Pace and Development hidden; a stored Live-coder-only value reads as Auto. Verify: a check in `tools/check-crescendo.mjs` grows a song in Crescendo with `lead: 'bass'` and gets the bass first; `npm run check:song-options` passes; in the browser (owner's dev server) the control appears and steers a Crescendo song.
+- [ ] 6.3 Docs: `docs/STYLES.md` (`growthShapes.kicks`, new openings, the kit-rows rule), `docs/COMPOSING.md` and `docs/SONG-FORMAT.md` (new opening ids), the Guide card on growth shapes (EN and IT), `npm run knowledge` then `npm run check:knowledge`. Verify: both checks pass.
+- [ ] 6.4 `CHANGELOG.md` under `[Unreleased]` (Added: new openings, kick starts, instruments per style, new kits in the kit menu; Changed: Crescendo opening and the Opening control in Crescendo, default weights) and a `DEVLOG.md` entry in Italian with the probe numbers before and after. Verify: entries present.
+- [ ] 6.5 Owner listening pass: a short list in `design.md` (Appendix) of one radio seed per style that opens on a new kit or sound, for the owner to play; drop any addition the owner rejects. Verify: the owner's answer recorded.
 
-## 7. Fixtures and full checks
+## 7. Versions, fixtures and full checks
+
+Fixtures are regenerated once, here at the end, after every rule and recipe change. If the voice speakers change lands on `develop` first, rebase on it, keep one `DIRECTOR_VERSION` bump and regenerate once.
+
+- [ ] 7.0 Bump `DIRECTOR_VERSION` to 17 (or keep the other change's bump if it already raised it in this release). Verify: `npm run check:endless` reports the fixture move until 7.2.
 
 - [ ] 7.1 `npm run check:crescendo -- --write` and `-- --write-fixtures` (Crescendo and Live coder fixtures move together on purpose, both versions raised), then `npm run check:crescendo -- --full`. Verify: full level passes.
 - [ ] 7.2 `npm run check:endless -- --write-fixtures`, `npm run check:radio-profiles -- --write-fixtures`, and `npm run check:invent -- --write-fixtures` only if its fixtures moved (then `STYLE_MAKER_VERSION` 2). Verify: `check:endless`, `check:radio-profiles`, `check:invent`, `check:material`, `check:spoken` pass; `endless-v14.json` still matches with gestures off.

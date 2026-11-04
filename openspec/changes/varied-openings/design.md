@@ -85,15 +85,31 @@ Each style gets one to three more drum machines and one or two more sounds per r
 
 ### D7. No timbre analysis tool
 
-The choice here is which existing bank or sound fits a genre. That is genre knowledge, not timbre analysis: the catalog already names each bank's machine and each sound's family. The timbre-description tool parked in the backlog describes the timbre of a rendered sound. It would help to pick among many samples of one bank, or to search sounds by description, which this change does not do. It is Python with large models and runs offline only. The owner's listening pass (task 6.4) is the check instead.
+The choice here is which existing bank or sound fits a genre. That is genre knowledge, not timbre analysis: the catalog already names each bank's machine and each sound's family. The timbre-description tool parked in the backlog describes the timbre of a rendered sound. It would help to pick among many samples of one bank, or to search sounds by description, which this change does not do. It is Python with large models and runs offline only. The owner's listening pass (task 6.5) is the check instead.
 
 ### D8. Versions
 
 - `CRESCENDO_VERSION` 2 to 3: the lead draw and the kick start move Crescendo builds. The stream name `crescendo-1` stays.
 - `SHAPES_VERSION` 8 to 9: new openings, default weights, lead draw for typed, muted-base and mid-set. `SHAPES_SEED` stays 5, so a song whose weights did not change keeps its drawn pace and development.
-- `DIRECTOR_VERSION` 16 to 17: new kits and sounds in the recipes change the director's picks, so the endless fixtures move.
+- `DIRECTOR_VERSION` 16 to 17: new kits and sounds in the recipes, and the longer `KITS` fallback of the steering, change the director's picks, so the endless fixtures move. The bump and the regeneration happen once, at the end of the work (task group 7), so a parallel change that also moves the director (fewer voice speakers) can share the same bump: whichever change lands second rebases, keeps one bump and regenerates the fixtures once.
 - `STYLE_MAKER_VERSION` 1 to 2 only if the invent seed fixtures move (the style maker trims the recipes' kit and sound lists).
 - `AGENTS.md` says the Crescendo fixtures must not move with a shapes bump. This change moves both on purpose, with both versions raised in the same commit; the commit message says so.
+
+### D9. The Compose opening control steers Crescendo
+
+`growthRules` (`src/live/profiles.js`) returns `{}` for the Crescendo growth today, so the control is ignored. It will return `{ lead: C.opening || 'auto' }` (plus `styles`), and `resolveLead` takes the user's lead opening first. With the Crescendo profile the control lists Auto and the nine lead openings; a stored Live-coder-only value (typed, voice, muted-base, mid-set) reads as Auto there and is kept for Live coder. Pace and Development stay hidden for Crescendo. The growth cache key already holds the profile's controls, so a changed control grows the song again.
+
+Alternative: a separate Crescendo control. Rejected: one control with a filtered list is what the user already knows.
+
+### D10. New kits in the hand-pick list
+
+Every kit added to a style is appended to `KITS` (`src/music.js`). Users of the list and what to watch:
+
+- `src/decode/writer.js` picks `KITS[2]` and `KITS[4]` by index: appending keeps them.
+- `src/endless/steering.js` falls back to `KITS` for styles with one kit or none (kit swaps and allowed sounds). After this change every built-in style lists two kits or more, so the fallback is used by user and invented styles only; their steering draws move, and the endless fixtures are regenerated once at the end.
+- `src/library/styles-tab.js` and `src/library/patterns-tab.js` list the kits in menus; the longer list must still fit at 400 px.
+- `tools/knowledge.mjs` marks every `KITS` entry as described, so the sounds note needs a line per new kit (`npm run check:knowledge`).
+- `kitRow` falls back only for kits in `KIT_MISSING`, so every new `KITS` entry must be complete for the six rows or have an entry there (the kit-rows check covers `KITS` too).
 
 ## Risks / Trade-offs
 
@@ -115,10 +131,6 @@ What happens to existing songs:
 - There are no shared seed links in the app today.
 
 Rollback: revert the change; the growth store hash changes again and songs grow with the old rules.
-
-## Open Questions
-
-- Should Crescendo show the Compose opening control too (today only Live coder reads it)? The spec lets a song's `growthShape.opening` steer Crescendo; a Compose control can come later without changing the rules here.
 
 ## Appendix: per-style tables
 
@@ -216,7 +228,7 @@ Rejected: `RolandTR727` (percussion only), `BossDR55` and `CasioRZ1` (no `oh`), 
 
 ### Instruments per style
 
-Each addition is an existing bank id or sound name. "Kits" are added to `drums.kits`; the other columns add to `waves` of that role. The reason is the genre's usual instrument, from genre research and general genre knowledge; the owner's listening pass (task 6.4) confirms or drops each one.
+Each addition is an existing bank id or sound name. "Kits" are added to `drums.kits`; the other columns add to `waves` of that role. The reason is the genre's usual instrument, from genre research and general genre knowledge; the owner's listening pass (task 6.5) confirms or drops each one.
 
 | Style             | + Kits                             | + Sounds by role                                                         | Reason |
 | ----------------- | ---------------------------------- | ------------------------------------------------------------------------ | ------ |
