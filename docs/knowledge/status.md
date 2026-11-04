@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 103. With open tasks: 29. All tasks ticked, waiting to be archived: 74.
+OpenSpec changes not archived: 104. With open tasks: 30. All tasks ticked, waiting to be archived: 74.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -33,6 +33,7 @@ OpenSpec changes not archived: 103. With open tasks: 29. All tasks ticked, waiti
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |
 | [material-generator](../../openspec/changes/material-generator/tasks.md) | 1 | 22 |
+| [narrator-caption-sync](../../openspec/changes/narrator-caption-sync/tasks.md) | 1 | 20 |
 | [natural-growth](../../openspec/changes/natural-growth/tasks.md) | 2 | 10 |
 | [new-song-panel](../../openspec/changes/new-song-panel/tasks.md) | 1 | 21 |
 | [pattern-library](../../openspec/changes/pattern-library/tasks.md) | 1 | 16 |
