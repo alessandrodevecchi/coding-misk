@@ -6,7 +6,7 @@ import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, RENDERS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds, missingNeeds, slugAt } from './song/build.js';
+import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds, missingNeeds, slugAt, captionHold, lateLines, voicesAt } from './song/build.js';
 import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml, fitCaption } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
@@ -1194,11 +1194,12 @@ async function playSong(sg, bar = 0, as = 'free', opts = {}) {
     renderSource();
     ed.stop();
     typing = null; built = sg.build ? buildSteps(sg.build).filter(x => x.at <= bar).length : 0; cwAt = bar;
-    // spoken comments load the first time they play, too late for that hit: load them all now, silently (a radio window:
-    // those of its first bars before it starts, the rest one at a time, #82)
+    // spoken comments load the first time they play, too late for that hit: those of the first 4 bars from the play
+    // position are loaded before it starts (a radio window: at most ~100 ms; Compose, also a seek: at most COLD_WAIT,
+    // narrator-caption-sync D6), the rest one at a time in bar order (#82)
     radioWin = sg;
     if (opts.voices) await voicesFirst(opts.voices, bar);
-    else if (sg.build) voiceSamples(sg.build, getLang(), customFiles).forEach(v => { try { globalThis.superdough({ ...v, gain: 0 }, globalThis.getAudioContext().currentTime + .3, .05); } catch (e) {} });
+    else if (sg.build) { let list = []; try { list = voicesAt(sg.build, sg.segmentAt ? { narrator: true } : sg.ctl || {}, getLang(), customFiles); } catch (e) { list = []; } await voicesFirst(list, bar, COLD_WAIT); }
     if (hand && keepHand) { song = sg; sched().lastEnd = bar; await ed.evaluate(); return; }
     setHand(false); resumeTo = null;
     ed.setCode(codeNow(sg, bar));
@@ -3257,8 +3258,10 @@ function playLate(lines) {
     if (!bank) continue;
     const n = slugAt(files[bank], saySlug(x.text)), tr = voiceOf(song.build), v = { gain: 1, tempo: 1, ...((tr && tr.settings) || {}) };
     try { globalThis.superdough({ s: bank, n, gain: v.gain, speed: v.tempo, orbit: 15 }, globalThis.getAudioContext().currentTime + (at - now) / cps, 2); } catch (e) { continue; }
+    // (the caption: the hold of every caption, captionHold, and the step line of its schedule line as its tag,
+    // narrator-caption-sync D3, D5)
     const sec = spokenContext.lengths[`${bank}/${saySlug(x.text)}.wav`] || 1.2, bs = barSecOf(song.meta, at);
-    lateCaps.push({ build: song.build, at, until: at + Math.min(4, Math.max(2, sec + 1.5) / bs), kind, code: 'N', text: x.text, step: '', typed: false, speaker: x.speaker || '', seconds: sec });
+    lateCaps.push({ build: song.build, at, until: at + captionHold(sec, bs), kind, code: 'N', text: x.text, step: x.sub || '', typed: false, speaker: x.speaker || '', seconds: sec });
     console.info(`[voice] "${x.text}": its sample came late, spoken on bar ${Math.floor(at) + 1}`);
   }
 }
@@ -3301,7 +3304,12 @@ async function askSamples() {
       }
       if (got.length) {
         if (batch[0].src === 'radio') { await reloadSamples(); if (radio && radio.samplesArrived) radio.samplesArrived(); }
-        else { await refreshSamples(); playLate(got); }
+        else {
+          // (a line whose text already had a sample, the default voice's, was heard: not played again; the next time
+          // it comes up it uses the speaker's new sample, narrator-caption-sync D4)
+          const late = lateLines(got, customFiles, getLang());
+          await refreshSamples(); playLate(late);
+        }
       }
     }
     prep.done = 0; prep.total = 0; prepNote();
@@ -5341,11 +5349,15 @@ function pumpVoices() {
 }
 // a radio window about to start on "bar": the samples of its first 4 bars loaded first (at most `wait` ms, ~100), then
 // the rest one at a time, in bar order (voices: [{ s, n, at }] from the radio, at in the window's bars)
+// (Compose's Play and seek: at most COLD_WAIT ms, and the samples before "bar" queued after the others, for a later seek
+// back, narrator-caption-sync D6)
+const COLD_WAIT = 400;
 async function voicesFirst(voices, bar, wait = 100) {
   const due = voices.filter(v => v.at >= Math.floor(bar)).sort((a, b) => a.at - b.at);
   const first = due.filter(v => v.at < bar + 4 && !voiceDone.has(voicePath(v)));
   if (first.length && wait > 0) await Promise.race([Promise.all(first.map(warmOne)), new Promise(r => setTimeout(r, wait))]);
   queueVoices(due, true);
+  if (wait === COLD_WAIT) queueVoices(voices.filter(v => v.at < Math.floor(bar)).sort((a, b) => a.at - b.at));
 }
 globalThis.codingMiskVoiceQueue = { get pending() { return voiceQueue.length + (voicePumping ? 1 : 0); } };
 const warmVoices = sg => { try { queueVoices(voiceSamples(sg.build, getLang(), customFiles), true); } catch (e) {} };

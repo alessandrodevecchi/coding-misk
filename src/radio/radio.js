@@ -20,7 +20,7 @@ import { OPENINGS, PACES, DEVELOPMENTS, SHAPES_VERSION } from '../song/shapes.js
 import { CRESCENDO_VERSION } from '../song/crescendo.js';
 import { sessionVersions } from '../library/playlists.js';
 import { validateRecipe, recipeOrder, styleId, styleKeys } from '../endless/recipe.js';
-import { buildSteps, sayText, spokenSchedule, captionSchedule, spokenNeeds, missingNeeds, slugAt } from '../song/build.js';
+import { buildSteps, sayText, spokenSchedule, captionSchedule, spokenNeeds, missingNeeds, voicesAt } from '../song/build.js';
 import { spokenContext } from '../song/spoken.js';
 import { saySlug as sayFile } from '../song/build.js';
 import { textIn } from '../voices/phrases.js';
@@ -695,19 +695,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the song on air only, so the next song's refrains placed in its own growth were missing and loaded on its first bar
   function voicesOf(item) {
     if (!item || !item.song) return [];
-    const C = liveControlsOf(item), lang = getLang(), files = voiceFiles() || {}, out = [], seen = new Set();
+    const C = liveControlsOf(item), lang = getLang(), files = voiceFiles() || {};
+    // (one list with Compose's Play, voicesAt: the speaker's own sample, else the default voice's, as lineSample picks it)
     let list = [];
-    try { list = spokenNeeds(liveBuildOf(item.song, C), C, lang, files); } catch (e) { list = []; }
-    for (const x of list) {
-      // (the speaker's own sample, else the default voice's, as lineSample picks it)
-      for (const s of [x.bank, `say_${lang}`]) {
-        const n = slugAt(files[s] || [], sayFile(x.text));
-        if (n < 0) continue;
-        if (!seen.has(`${s}:${n}`)) { seen.add(`${s}:${n}`); out.push({ s, n, at: item.start + x.at }); }
-        break;
-      }
-    }
-    return out;
+    try { list = voicesAt(liveBuildOf(item.song, C), C, lang, files); } catch (e) { list = []; }
+    return list.map(v => ({ ...v, at: item.start + v.at }));
   }
   // the voice samples of the window on air: its song on air and the next one, when made
   const airVoices = () => (S ? S.stream.slice(S.onAir, S.onAir + 2).flatMap(voicesOf) : []);
