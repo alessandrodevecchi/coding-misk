@@ -154,3 +154,23 @@ A session SHALL record the net changes that entered, with their boundary, in the
 #### Scenario: Replay after a burst
 - **WHEN** a session had "+ arp", "+ arp", "− arp" and "+ pad" pressed quickly for bar 33 and is replayed
 - **THEN** the replay has one more arp and one more pad from bar 33, as heard
+
+### Requirement: A lock press is prepared ahead like "+" and "−"
+Pressing the lock of an instrument in the Arrangement group, or the lock of a track in the mixer, SHALL record a pending lock change and SHALL NOT rewrite the song in the click's task. The change SHALL follow the rules of "+" and "−": the default entry at the next phrase start that leaves enough time, a later entry only for preparation or load, the 30-second bound, one batch per boundary with the "+" and "−" changes of that boundary, and the load budget. A lock and an unlock of the same instrument or track for one boundary SHALL cancel out. From the click the lock SHALL show its pending state and the time left, and its tooltip SHALL name the bar.
+
+#### Scenario: A lock late in a song
+- **WHEN** the listener presses the lock of the kick on bar 75 of a Classic song with six commands already applied
+- **THEN** the lock shows its pending state within 100 ms, no main-thread task over 100 ms runs from the click on, and the kick is locked from the next phrase start that leaves enough time
+
+#### Scenario: Lock and unlock before the entry
+- **WHEN** the listener locks the bass and unlocks it again before the change enters
+- **THEN** nothing is pending for the bass and nothing changes at the boundary
+
+#### Scenario: A lock with a "+" in a burst
+- **WHEN** the listener presses "+ arp" and the lock of the bass within 500 ms, 9 seconds before the next phrase
+- **THEN** both enter together on that phrase start, with one steering and one change of the window
+
+#### Scenario: A lock in the mixer
+- **WHEN** the listener presses the lock of one track in the mixer
+- **THEN** the same rules apply to that track, and its lock button shows the pending state until the change enters
+

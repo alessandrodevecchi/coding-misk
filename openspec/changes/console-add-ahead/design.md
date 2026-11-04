@@ -145,6 +145,18 @@ A batch is recorded when it commits, as today's commands: `|n|` commands of kind
 
 Before: 112 to 583 ms per press on the click. The badge shows within 5 ms of the click in every case; the press itself costs at most 4 ms with the CPU slowed 4 times.
 
+### D8. Locks (proposed, 4 November, waiting for the owner)
+
+The owner reported that a press on a lock of the console lags too. Measured (Classic, `berlin-techno`, bar 75, six commands standing, CPU not slowed): a lock click ran one task of 125 ms, an unlock 147 ms with one "skip query: too late". The cause is the one of "+" and "−": the lock button calls `command({ kind: 'lock-part' | 'unlock-part' })` (the mixer's lock `lock` or `unlock`), which rewrites the whole song on the main thread (`resteer` → `steerSong` → `stateAt` from bar 0; a grown song also `airView` before the worker). A lock applies at the next phrase start (`applyBar`, as "+" and "−"): it keeps the director out of the instrument's tracks from there.
+
+| Option | What the listener notices |
+| --- | --- |
+| **A (recommended)** the same pending path as "+" and "−" | No lag; the lock enters with the batch of its boundary, on the next phrase start that leaves 2 s plus the preparation (one phrase later than today when pressed less than that before a phrase); lock then unlock cancels; the button shows the pending state with the time |
+| B the steering off the main thread, the boundary as today | No lag on the click; a lock pressed just before a phrase start can miss it, and the director may still move that instrument on that phrase; a second path to keep next to the batches |
+| C keep today's path | The lag stays |
+
+Option A needs no new mechanism: the batch holds signed counts for "+" and "−" and a last state (locked or open) for each lock, written as today's commands.
+
 ## Risks / Trade-offs
 
 - [The worker and the page disagree on a song] → The worker already runs `steerOnAir` with the same modules. Classic `steerSong` is pure on its inputs. The check compares the worker's song with the page's for every case (JSON equal).
