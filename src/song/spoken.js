@@ -14,7 +14,7 @@ import { stream } from '../endless/random.js';
 import { rackCode } from './rack.js';
 import { getLang, t } from '../i18n.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from './vocabulary.js';
-import { SPEAKERS, saySlug, sayBank, buildSteps, slugAt } from './build.js';
+import { SPEAKERS, speakerId, saySlug, sayBank, buildSteps, slugAt } from './build.js';
 
 export const WAYS = ['passage', 'refrain', 'chop', 'opening'];
 export const NARRATOR_STYLES = ['explain', 'poetic'];
@@ -81,13 +81,14 @@ export const lineTexts = (line, lang) => (line.parts ? line.parts.map(p => textO
 
 // ---------- speakers ----------
 // the narrator's speaker ('' the default voice); the voice instrument's: its own setting, else a draw from the style's
-// speakers, else from every speaker, never the narrator's (design D4)
-export const narratorSpeaker = song => { const v = (song.tracks || []).find(x => x.type === 'voice'); return (v && v.settings && v.settings.speaker) || ''; };
+// speakers, else from every speaker, never the narrator's (design D4). A removed speaker reads as the default voice
+// (real-voices D3): saved songs and frozen sessions keep the voice they always had (the removed ones spoke with it).
+export const narratorSpeaker = song => { const v = (song.tracks || []).find(x => x.type === 'voice'); return speakerId(v && v.settings && v.settings.speaker); };
 export function speakerOf(song, track) {
-  const own = track.settings && track.settings.speaker;
-  if (own) return own;
+  const raw = track.settings && track.settings.speaker;
+  if (raw) return speakerId(raw);
   const nar = narratorSpeaker(song);
-  const style = [...new Set(styleRecipes(song).flatMap(x => (x.spoken && x.spoken.speakers) || []))].filter(x => x && x !== nar);
+  const style = [...new Set(styleRecipes(song).flatMap(x => (x.spoken && x.spoken.speakers) || []).map(speakerId))].filter(x => x && x !== nar);
   const all = SPEAKERS.filter(x => x !== nar);
   return rngOf(song, `speaker:${track.id}`).pick(style.length ? style : all);
 }

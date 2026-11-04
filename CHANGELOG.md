@@ -30,6 +30,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Dev-server voice helper that makes the samples of new and edited lines.
 - `npm run voices -- --song <file>` and `--list`.
 - Faders for the voice Sound controls in the hardware theme.
+- `npm run check:speakers`: every speaker is installed and sounds different from the default voice.
+- `npm run voices -- --jobs N` makes several samples at a time.
+- `node tools/voice.mjs --prune` lists the sample banks of removed speakers; `--prune --yes` deletes them.
 
 ### Changed
 
@@ -47,10 +50,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - The radio narrator switch works with every profile.
 - The poetic narrator keeps the step lines with Narrated growth.
 - The narrator track of generated and built-in songs is named Narrator.
+- The speakers are Albert, Fred, Junior and Kathy, in English only; in Italian Alice speaks their lines.
+- A removed speaker in a saved song, session or style plays with the default voice.
+- `npm run voices` leaves out a speaker that speaks like the default voice.
 
 ### Removed
 
 - The radio button Apply to the song on air (the console's Voice group replaces it).
+- The speakers Eddy, Flo, Grandma, Grandpa, Reed, Rocko, Sandy and Shelley.
 
 ## [0.6.0-beta.2] - 2026-10-25
 

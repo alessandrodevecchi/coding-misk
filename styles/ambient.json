@@ -128,8 +128,8 @@
   },
   "voice": {
     "speakers": [
-      "grandma",
-      "shelley"
+      "kathy",
+      ""
     ],
     "gain": 0.28,
     "pitch": [
@@ -157,7 +157,7 @@
     "weight": 0.3,
     "ways": { "passage": 2, "refrain": 1 },
     "vocab": "calm",
-    "speakers": ["flo", "sandy"],
+    "speakers": ["albert"],
     "lines": {
       "passage": [
         { "en": "The water is slow today. Let the light come in.", "it": "L'acqua è lenta oggi. Lascia entrare la luce." }

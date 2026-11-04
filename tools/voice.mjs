@@ -2,19 +2,28 @@
 // Collects every "say" phrase of the songs in songs/, the comments of derived live builds and Crescendo builds, the endless
 // director's phrase pool (src/endless/phrases.js) with the interlude comments (transitions.js), and writes one
 // WAV per phrase, language and speaker: public/samples/say_<lang>[_<speaker>]/<slug>.wav (speaker: the voice
-// track's `speaker` setting, see SPEAKERS in src/song/build.js; none = the default voice).
+// track's `speaker` setting, see SPEAKERS in src/song/build.js; none = the default voice; a speaker that does not speak
+// the language: the default voice's bank, real-voices D2).
 // The app plays them on the bar of their step. Files are git-ignored (Apple voices): run this again to make them.
 // Voice instrument (voice-instrument): the lines of the songs' spoken tracks, the styles' spoken lines and the
 // vocabulary (one sample per entry) for the speakers that speak them, and the poetic narrator's images (the
 // vocabulary's poetic group, the songs' and styles' own) for the narrator speakers. The length of every sample goes to
 // public/samples/say_lengths.json, so lines are placed from the length of the sample in use.
-//   node tools/voice.mjs [--en Samantha] [--it Alice] [--force] [--default-only] [--song file.json …] [--list]
+//   node tools/voice.mjs [--en Samantha] [--it Alice] [--force] [--default-only] [--song file.json …] [--list] [--jobs 4]
+//                        [--root public/samples]
+//   node tools/voice.mjs --prune [--yes] [--root public/samples]
 // --song: also a song exported from the browser (its spoken lines and steps); --list: print the samples it would
-// make, make none. Needs macOS (`say`) and ffmpeg; the per-line part is tools/voice-sample.mjs (voice-full-controls).
+// make, make none; --jobs N: make up to N samples at a time (default 4, at most the number of cores; real-voices D6).
+// A speaker that speaks like the default voice is not installed (real-voices D5): its lines are left out with a warning,
+// and a speaker sample that came out as a copy of the default voice's is deleted.
+// --prune: list the banks of removed speakers and of languages a speaker does not speak, with their size; --prune
+// --yes: delete exactly those banks (real-voices D7). Nothing else deletes banks.
+// Needs macOS (`say`) and ffmpeg; the per-line part is tools/voice-sample.mjs (voice-full-controls).
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { songFiles } from './songs-dir.mjs';
-import { PHRASES, saySlug, sayBank, voiceOf } from '../src/song/build.js';
+import { PHRASES, saySlug, sayBank, voiceOf, speaks } from '../src/song/build.js';
 import { CRESCENDO_PHRASES } from '../src/song/crescendo.js';
 import { loadStyles } from './styles-dir.mjs';
 import { allPhrases } from '../src/endless/phrases.js';
@@ -23,10 +32,34 @@ import { SPEAKERS } from '../src/song/build.js';
 import { lineOf, lineTexts, speakerOf, setSpokenContext } from '../src/song/spoken.js';
 import { vocabularyTexts, poeticTexts } from '../src/song/vocabulary.js';
 
-import { systemVoice, makeSample, writeLengths } from './voice-sample.mjs';
+import { systemVoice, realVoice, makeSampleAsync, writeLengths, readTemp, writeTemp } from './voice-sample.mjs';
 
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const DEFAULT_VOICE = { en: opt('en', 'Samantha'), it: opt('it', 'Alice') }, force = args.includes('--force'), listOnly = args.includes('--list');
+const ROOT = opt('root', path.join('public', 'samples'));
+const JOBS = Math.max(1, Math.min(os.cpus().length || 1, parseInt(opt('jobs', '4'), 10) || 4));
+
+// --prune (real-voices D7): the say_<lang>_<id> banks whose id is not a speaker or does not speak <lang>
+if (args.includes('--prune')) {
+  const yes = args.includes('--yes'), banks = [];
+  const dirSize = d => fs.readdirSync(d).reduce((a, f) => { const st = fs.statSync(path.join(d, f)); return { n: a.n + (st.isFile() ? 1 : 0), b: a.b + (st.isFile() ? st.size : 0) }; }, { n: 0, b: 0 });
+  for (const d of fs.existsSync(ROOT) ? fs.readdirSync(ROOT).sort() : []) {
+    const m = /^say_([a-z]{2})_([a-z]+)$/.exec(d);
+    if (!m || speaks(m[1], m[2]) || !fs.statSync(path.join(ROOT, d)).isDirectory()) continue;
+    banks.push({ bank: d, ...dirSize(path.join(ROOT, d)) });
+  }
+  const mb = b => `${(b / 1024 / 1024).toFixed(1)} MB`;
+  if (!banks.length) { console.log(`prune: no old bank in ${ROOT}`); process.exit(0); }
+  for (const x of banks) console.log(`  ${x.bank.padEnd(18)} ${String(x.n).padStart(5)} files  ${mb(x.b).padStart(9)}`);
+  console.log(`prune: ${banks.length} old bank(s), ${mb(banks.reduce((a, x) => a + x.b, 0))} in ${ROOT}`);
+  if (!yes) { console.log('nothing deleted; add --yes to delete exactly these banks'); process.exit(0); }
+  for (const x of banks) fs.rmSync(path.join(ROOT, x.bank), { recursive: true, force: true });
+  writeLengths(ROOT);
+  const t = readTemp(ROOT), gone = Object.keys(t).filter(rel => banks.some(x => rel.startsWith(`${x.bank}/`)));
+  if (gone.length) { for (const rel of gone) delete t[rel]; writeTemp(ROOT, t); }
+  console.log(`deleted ${banks.length} bank(s); say_lengths.json written again${gone.length ? `, ${gone.length} temporary sample(s) left the ledger` : ''}`);
+  process.exit(0);
+}
 // songs exported from the browser (--song file.json, as many times as needed)
 const extraSongs = args.flatMap((a, i) => (a === '--song' && args[i + 1] ? [args[i + 1]] : []));
 // phrases per language and speaker: "en|rocko" → Set
@@ -36,7 +69,8 @@ const addSay = (say, speaker = '') => {
   for (const lang of ['en', 'it']) {
     const text = typeof say === 'string' ? say : say[lang];
     if (!text) continue;
-    const key = `${lang}|${speaker}`;
+    // (a speaker that does not speak the language, or a removed one: the default voice's bank, real-voices D2)
+    const key = `${lang}|${speaks(lang, speaker) ? speaker : ''}`;
     if (!phrases.has(key)) phrases.set(key, new Set());
     phrases.get(key).add(text);
   }
@@ -89,18 +123,31 @@ if (args.includes('--default-only')) for (const [key, set] of [...phrases]) {
   set.forEach(x => def.add(x)); phrases.set(`${lang}|`, def); phrases.delete(key);
 }
 let made = 0, kept = 0;
-const missing = new Set();
-for (const [key, set] of phrases) {
+const missing = new Set(), copies = [], todo = [];
+// the default voice first, so the copy guard of a speaker's sample finds the default voice's sample of the same text
+for (const [key, set] of [...phrases].sort((a, b) => a[0].localeCompare(b[0]))) {
   const [lang, speaker] = key.split('|');
   if (!systemVoice(lang, speaker, DEFAULT_VOICE)) { missing.add(`${speaker} (${lang})`); continue; }
-  for (const text of set) {
-    if (listOnly) { console.log(path.join(sayBank(lang, speaker), `${saySlug(text)}.wav`)); continue; }
-    const r = makeSample(text, lang, speaker, { force, defaults: DEFAULT_VOICE });
-    if (r && r.made) made++; else kept++;
-  }
+  if (listOnly) { for (const text of set) console.log(path.join(sayBank(lang, speaker), `${saySlug(text)}.wav`)); continue; }
+  // (the probe of D5, once per speaker and language, before the pool starts)
+  if (speaker && !realVoice(lang, speaker, DEFAULT_VOICE)) { missing.add(`${speaker} (${lang}: it speaks like the default voice)`); continue; }
+  for (const text of set) todo.push({ text, lang, speaker });
 }
 if (listOnly) process.exit(0);
-// the length of every sample (seconds), read from the WAV header: { "say_en_eddy/the_city.wav": 1.42 }
-writeLengths(path.join('public', 'samples'));
-console.log(`spoken comments: ${made} made, ${kept} already there (${phrases.size} banks; default voices: en ${DEFAULT_VOICE.en}, it ${DEFAULT_VOICE.it})`);
-if (missing.size) console.log(`speakers not installed, left out: ${[...missing].join(', ')}`);
+// a pool of JOBS samples at a time; the default voice's samples before any speaker's (the copy guard reads them)
+const pool = async list => {
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(JOBS, list.length) }, async () => {
+    while (i < list.length) {
+      const x = list[i++], r = await makeSampleAsync(x.text, x.lang, x.speaker, { root: ROOT, force, defaults: DEFAULT_VOICE });
+      if (r && r.copy) copies.push(`${r.bank}/${saySlug(x.text)}.wav`); else if (r && r.made) made++; else kept++;
+    }
+  }));
+};
+await pool(todo.filter(x => !x.speaker));
+await pool(todo.filter(x => x.speaker));
+// the length of every sample (seconds), read from the WAV header: { "say_en_fred/the_city.wav": 1.42 }
+writeLengths(ROOT);
+console.log(`spoken comments: ${made} made, ${kept} already there (${phrases.size} banks, ${JOBS} jobs; default voices: en ${DEFAULT_VOICE.en}, it ${DEFAULT_VOICE.it})`);
+if (copies.length) console.log(`warning: ${copies.length} speaker sample(s) came out as the default voice and were deleted (the voice falls back for some text): ${copies.slice(0, 5).join(', ')}${copies.length > 5 ? ' …' : ''}`);
+if (missing.size) console.log(`speakers not installed, left out: ${[...missing].join(', ')} (install them in System Settings, Accessibility, Spoken Content; npm run check:speakers)`);

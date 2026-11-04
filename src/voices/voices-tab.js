@@ -9,7 +9,8 @@ import { KINDS, KIND_SETS, kindsOf, kindsId, TAGS, LANGS, SHARE_LEVELS, groupsOf
 import { MOMENT_GROUPS, POETIC_TAGS } from './moments.js';
 import { builtinKeys, classify, totals, phraseFiles, sizeText, CLASSES, bankLang, mineKeys } from './samples.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from '../song/vocabulary.js';
-import { PHRASES, SPEAKERS, saySlug, sayBank, slugAt } from '../song/build.js';
+import { PHRASES, SPEAKERS, saySlug, sayBank, slugAt, speaks } from '../song/build.js';
+import { speakerLabel, DEFAULT_VOICE_NAME } from '../endless/voice-sound.js';
 import { POOL } from '../endless/phrases.js';
 import { VOICE_STYLES, VOICE_STYLE_IDS } from '../song/format.js';
 import { LISTEN, PENCIL, BIN, LOCK, WAVE, MIC, QUILL, COPY, DISK, BROOM, SPARK, CLOCK, PLUS } from '../icons.js';
@@ -147,7 +148,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
   }
   function vocabHtml() {
     const groups = vocabGroups(), cur = groups.find(g => g.id === ui.vgroup) || groups[0], lang = getLang();
-    const banks = [sayBank(lang, ''), ...SPEAKERS.map(s => sayBank(lang, s))];
+    const banks = [...new Set([sayBank(lang, ''), ...SPEAKERS.map(s => sayBank(lang, s))])];
     const nav = `<div class="vt-nav" role="tablist">${groups.map(g => `<button class="chip small" role="tab" data-vt-group="${esc(g.id)}" aria-pressed="${g.id === cur.id}" aria-selected="${g.id === cur.id}">${esc(g.title)} <span class="muted">${g.rows.length}</span></button>`).join('')}</div>`;
     const rows = cur.rows.map((x, i) => {
       const main = x[lang] || x.en, other = x[lang === 'it' ? 'en' : 'it'];
@@ -168,6 +169,8 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     const cards = ['', ...SPEAKERS].map(sp => {
       const name = sp ? sp[0].toUpperCase() + sp.slice(1) : t('phDefaultVoice');
       const per = LANGS.map(l => {
+        // (a speaker that does not speak the language: the default voice speaks for it, real-voices)
+        if (sp && !speaks(l, sp)) return `<li><span class="lbl">${esc(t(`phLang:${l}`))}</span> <span class="muted">${esc(t('phSpeaksInstead', { lang: t(`phLang:${l}`), voice: DEFAULT_VOICE_NAME[l] || '' }))}</span></li>`;
         const sys = u && u.voices ? u.voices[l][sp] : undefined;
         const v = sys === undefined ? '' : sys ? esc(sys) : `<span class="ph-st none"><span class="ph-led"></span>${esc(t('phNotInstalled', { lang: t(`phLang:${l}`) }))}</span>`;
         return `<li><span class="lbl">${esc(t(`phLang:${l}`))}</span> ${v} <span class="muted small">${esc(t('phSamplesN', { n: count(sayBank(l, sp)) }))}</span></li>`;
@@ -178,7 +181,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     const b = ui.bench;
     const bench = `<div class="card vt-bench"><h4>${SPARK} ${esc(t('phBench'))}</h4>
       <div class="ph-row"><label class="ctrl ph-text"><span class="lbl">${esc(t('phText'))}</span><input type="text" data-vt-bench="text" maxlength="160" autocomplete="off" spellcheck="false" value="${esc(b.text)}" placeholder="${esc(TEST_LINE[lang])}"></label></div>
-      <div class="ph-row"><label class="ctrl"><span class="lbl">${esc(t('phSpeaker'))}</span><select data-vt-bench="speaker" data-no-knob>${['', ...SPEAKERS].map(sp => `<option value="${sp}"${b.speaker === sp ? ' selected' : ''}>${esc(sp ? sp[0].toUpperCase() + sp.slice(1) : t('phDefaultVoice'))}</option>`).join('')}</select></label>
+      <div class="ph-row"><label class="ctrl"><span class="lbl">${esc(t('phSpeaker'))}</span><select data-vt-bench="speaker" data-no-knob>${['', ...SPEAKERS].map(sp => `<option value="${sp}"${b.speaker === sp ? ' selected' : ''}>${esc(sp ? speakerLabel(sp, lang, t) : t('phDefaultVoice'))}</option>`).join('')}</select></label>
       <label class="ctrl"><span class="lbl">${esc(t('phVoiceStyle'))}</span><select data-vt-bench="style" data-no-knob>${VOICE_STYLE_IDS.map(id => `<option value="${id}"${b.style === id ? ' selected' : ''}>${esc(t(`voiceStyle:${id}`))}</option>`).join('')}</select></label></div>
       <div class="actions"><button class="btn primary" data-vt-bench-hear>${LISTEN} ${esc(t('phListen'))}</button><button class="btn" data-vt-bench-save>${esc(t('phSaveMine'))}</button></div>
       <p class="hint muted small">${esc(t('phBenchHint'))}</p></div>`;

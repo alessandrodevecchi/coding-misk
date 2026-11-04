@@ -4,7 +4,7 @@
 import { KEYS, PROGS, METERS, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEXTURES, TEX_RHYTHMS, GROOVES, MODES, WAVES } from '../music.js';
 import { SETTING_FIELDS, VOICE_DEFAULT, GENRES } from '../song/format.js';
 import { SYNTHS } from '../song/validate.js';
-import { SPEAKERS } from '../song/build.js';
+import { SPEAKERS, REMOVED_SPEAKERS } from '../song/build.js';
 import { checkGrowthShapes } from '../song/shapes.js';
 import { WAYS, checkNarrator, MAX_WORDS } from '../song/spoken.js';
 import { VOCAB_GROUPS } from '../song/vocabulary.js';
@@ -102,6 +102,8 @@ export function validateRecipe(r) {
   const errors = [], warnings = [];
   const err = (path, msg) => errors.push({ path, msg });
   const warn = (path, msg) => warnings.push({ path, msg });
+  // (a removed speaker, real-voices D3: the default voice speaks for it; an older user style still loads)
+  const removedMsg = `a removed speaker: the default voice speaks; speakers: ${SPEAKERS.join(', ')}`;
   if (!r || typeof r !== 'object' || Array.isArray(r)) { err('', 'a recipe is a JSON object'); return { errors, warnings }; }
   for (const k of Object.keys(r)) if (!TOP_FIELDS.includes(k)) warn(k, `unknown field; recipe fields: ${TOP_FIELDS.join(', ')}`);
 
@@ -182,8 +184,8 @@ export function validateRecipe(r) {
     if (!v || typeof v !== 'object' || Array.isArray(v)) err('voice', `voice track settings: ${keys.join(', ')}`);
     else for (const [k, x] of Object.entries(v)) {
       if (!keys.includes(k)) { warn(`voice.${k}`, `unknown voice setting; settings: ${keys.join(', ')}`); continue; }
-      if (k === 'speakers') { if (!Array.isArray(x) || !x.length || x.some(y => y !== '' && !SPEAKERS.includes(y))) err('voice.speakers', `a list of speakers: ${SPEAKERS.join(', ')}, or "" for the default voice`); continue; }
-      if (k === 'speaker') { if (x !== '' && !SPEAKERS.includes(x)) err('voice.speaker', `a speaker: ${SPEAKERS.join(', ')}, or "" for the default voice`); continue; }
+      if (k === 'speakers') { if (!Array.isArray(x) || !x.length || x.some(y => y !== '' && !SPEAKERS.includes(y) && !REMOVED_SPEAKERS.includes(y))) err('voice.speakers', `a list of speakers: ${SPEAKERS.join(', ')}, or "" for the default voice`); else if (x.some(y => REMOVED_SPEAKERS.includes(y))) warn('voice.speakers', removedMsg); continue; }
+      if (k === 'speaker') { if (x !== '' && !SPEAKERS.includes(x) && !REMOVED_SPEAKERS.includes(x)) err('voice.speaker', `a speaker: ${SPEAKERS.join(', ')}, or "" for the default voice`); else if (REMOVED_SPEAKERS.includes(x)) warn('voice.speaker', removedMsg); continue; }
       if (Array.isArray(x)) { range(`voice.${k}`, x, k === 'pitch' || k === 'tempo' ? 0.25 : 0, k === 'pitch' || k === 'tempo' ? 4 : 20000); continue; }
       if (!isNum(x)) err(`voice.${k}`, 'a number or a range [low, high]');
       else if ((k === 'pitch' || k === 'tempo') && (x < 0.25 || x > 4)) err(`voice.${k}`, 'a number from 0.25 to 4');
@@ -208,7 +210,8 @@ export function validateRecipe(r) {
           list.forEach((x, i) => { const w = s => String(s || '').trim().split(/\s+/).filter(Boolean).length; if (!x || typeof x !== 'object' || typeof x.en !== 'string' || !x.en.trim() || w(x.en) > MAX_WORDS || (x.it !== undefined && (typeof x.it !== 'string' || w(x.it) > MAX_WORDS))) err(`spoken.lines.${k}[${i}]`, `{ "en": "…", "it": "…" }, at most ${MAX_WORDS} words`); });
         }
       }
-      if (v.speakers !== undefined && (!Array.isArray(v.speakers) || !v.speakers.length || v.speakers.some(y => !SPEAKERS.includes(y)))) err('spoken.speakers', `a list of speakers: ${SPEAKERS.join(', ')}`);
+      if (v.speakers !== undefined && (!Array.isArray(v.speakers) || !v.speakers.length || v.speakers.some(y => !SPEAKERS.includes(y) && !REMOVED_SPEAKERS.includes(y)))) err('spoken.speakers', `a list of speakers: ${SPEAKERS.join(', ')}`);
+      else if (v.speakers !== undefined && v.speakers.some(y => REMOVED_SPEAKERS.includes(y))) warn('spoken.speakers', removedMsg);
       if (v.vocab !== undefined && !VOCAB_GROUPS.includes(v.vocab)) err('spoken.vocab', `a vocabulary group: ${VOCAB_GROUPS.join(', ')}`);
     }
   }

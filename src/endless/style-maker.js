@@ -9,7 +9,8 @@ import { PARTS, PART_NAMES, validateRecipe, withDefaults, recipeOrder, RECIPE_FO
 import { GENRES } from '../song/format.js';
 
 // raise it when an intended change moves the seed fixtures (tests/snapshots/invented-styles.json), like DIRECTOR_VERSION
-export const STYLE_MAKER_VERSION = 1;
+// 2 (real-voices): the styles' speakers changed, and an invented style copies a style's voice part
+export const STYLE_MAKER_VERSION = 2;
 export const MAX_TRIES = 8;
 // a style closer than this to an existing one is a copy: drawn again
 export const COPY_LIMIT = 0.8;

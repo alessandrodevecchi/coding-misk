@@ -11,7 +11,7 @@ import { presetOf, compose } from '../material/index.js';
 import { rewriteSpoken, nextQuiet, newSpokenTrack, wherePartsOf } from './voice-track.js';
 import { whereOfTrack } from '../song/spoken.js';
 import { normalizeSong, VOICE_STYLES } from '../song/format.js';
-import { SPEAKERS } from '../song/build.js';
+import { SPEAKERS, speakerId } from '../song/build.js';
 import { treat, treatmentsFor, TREATMENTS } from './part-harmony.js';
 export { TREATMENTS };
 
@@ -831,9 +831,9 @@ export function sayAir(song, list) {
     const tracks = cur.tracks.map(t => t);
     let ti = tracks.findIndex(t => t.type === 'spoken'), build = (cur.build || []).slice();
     if (ti < 0) {
-      const nar = (tracks.find(t => t.type === 'voice') || { settings: {} }).settings.speaker || '';
+      const nar = speakerId((tracks.find(t => t.type === 'voice') || { settings: {} }).settings.speaker), sp = speakerId(e.speaker);
       const t = newSpokenTrack(cur);
-      t.settings = { ...t.settings, ...VOICE_STYLES.clear, speaker: e.speaker && e.speaker !== nar ? e.speaker : SPEAKERS.find(x => x !== nar) };
+      t.settings = { ...t.settings, ...VOICE_STYLES.clear, speaker: sp && sp !== nar ? sp : SPEAKERS.find(x => x !== nar) };
       const v = tracks.findIndex(x => x.type === 'voice');
       tracks.splice(v >= 0 ? v : tracks.length, 0, t); ti = tracks.indexOf(t);
       build.push({ at, add: t.id, by: 'listener' });

@@ -265,7 +265,7 @@ A song without `build` can also build itself: the "Live build" switch above the 
 A track of type `spoken` plays spoken lines as part of the music (voice-instrument, #39). It is not the narrator: the narrator (`voice` tracks) speaks the comments of a live build; a spoken track plays in the song as written, in exports and in every live build. Its patterns are lines and its clips place them:
 
 ```json
-{ "id": "words", "type": "spoken", "settings": { "speaker": "reed", "gain": 0.55 },
+{ "id": "words", "type": "spoken", "settings": { "speaker": "fred", "gain": 0.55 },
   "patterns": {
     "open": { "way": "opening", "text": { "en": "the city is still awake", "it": "la città è ancora sveglia" }, "before": "drums" },
     "chop": { "way": "chop", "text": { "en": "signal", "it": "segnale" }, "slices": 8, "rhythm": "0 ~ 1 ~ 2 3 ~ 3" },
@@ -288,7 +288,7 @@ A **quiet section** has at most half the tracks of the fullest section (voice an
 
 **Samples.** `npm run voices` makes every line of the songs, the styles' lines, every vocabulary entry for the speakers of the styles' voice instrument, and the poetic narrator's images; it also writes `public/samples/say_lengths.json` (git-ignored), the length of each sample, used to place the lines. Without it the length is estimated from the words.
 
-**Speakers and language.** A spoken track speaks with its `speaker`, else one of its style's `spoken.speakers`, else any speaker, never the narrator's. Lines follow the app's language when they have a text in it.
+**Speakers and language.** A spoken track speaks with its `speaker`, else one of its style's `spoken.speakers`, else any speaker, never the narrator's. Lines follow the app's language when they have a text in it. The speakers (`albert`, `fred`, `junior`, `kathy`) speak English only: in Italian the default voice (Alice) speaks their lines, with the track's sound. A removed speaker (`eddy`, `flo`, `grandma`, `grandpa`, `reed`, `rocko`, `sandy`, `shelley`) reads as the default voice, with a validation warning.
 
 **Narrator.** The narrator yields: a step comment on a bar where a spoken line sounds is not spoken, and a step that brings in a spoken track is not narrated. With `"narrator": "poetic"` it speaks where a track comes in (an `add`, a clone or an unmute), a short image from the song's `narrator.lines`, its style's, else the vocabulary's poetic group, in the bar before the entry when the code of the step before still plays there; at the other steps with a comment it says a short image of movement (the key `move`), and the comment itself only when no image exists in the current language.
 

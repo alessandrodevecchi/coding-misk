@@ -105,8 +105,8 @@
   },
   "voice": {
     "speakers": [
-      "grandpa",
-      "rocko"
+      "albert",
+      "fred"
     ],
     "gain": 0.32,
     "pitch": [

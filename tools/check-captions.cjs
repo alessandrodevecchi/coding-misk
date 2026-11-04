@@ -149,17 +149,21 @@ async function fitCase(page, shot) {
   const s18p = lines.find(x => x.kind === 'step' && x.at === 17), l17p = await laneAt(page, 16);
   check(!plainN.some(x => x.at === 17) && s18p && l17p.rows.some(r => r.kind === 'narrator') && l17p.tag === s18p.text, 'poetic without Narrated growth, bar 17: the entry image with bar 18\'s step line as its tag, no narrator line on bar 18', JSON.stringify({ l17p, s18: s18p && s18p.text }));
 
-  // ---- poetic with Narrated growth: bar 8 says "la stanza si inclina" with the tag "ritmo più fitto"
+  // ---- poetic with Narrated growth: bar 8 says a movement image with the tag "ritmo più fitto"
   await stop(page);
   await openSong(page, 'luci-rosse', { style: 'poetic', narrated: true });
   await play(page);
+  // (the poetic narrator draws its images from the vocabulary's lists, so the checks accept any movement image (POETIC.move)
+  // or entry image (the other POETIC groups) in either language, not one hand-picked line, as check-spoken.mjs does)
+  const poetic = await page.evaluate(async () => { const { POETIC } = await import('/src/song/vocabulary.js'); const all = l => l.flatMap(x => [x.it, x.en]); return { move: all(POETIC.move), images: all(Object.entries(POETIC).filter(([k]) => k !== 'move').flatMap(([, v]) => v)) }; });
+  const isMove = t => poetic.move.includes(t), isImage = t => poetic.images.includes(t);
   lines = await cap(page, C => C.lines());
   check(lines.filter(x => x.kind === 'narrator').length === 33, 'poetic with Narrated growth: 33 narrator captions', `${lines.filter(x => x.kind === 'narrator').length}`);
   let l8 = await laneAt(page, 7);
-  check(l8.rows[0] && l8.rows[0].text === 'la stanza si inclina' && l8.tag === 'ritmo più fitto', 'bar 8: "la stanza si inclina" with the step tag "ritmo più fitto"', JSON.stringify(l8));
+  check(l8.rows[0] && isMove(l8.rows[0].text) && l8.tag === 'ritmo più fitto', 'bar 8: a movement image with the step tag "ritmo più fitto"', JSON.stringify(l8));
   // the entry on bar 18: its step line is the tag under bar 17's image, shown and gone with it (narrator-caption-sync D1)
   const s18 = lines.find(x => x.kind === 'step' && x.at === 17), l17 = await laneAt(page, 16);
-  check(l17.rows.some(r => r.text === 'qualcosa di profondo si sveglia'), 'bar 17: the entry image', JSON.stringify(l17.rows));
+  check(l17.rows.some(r => isImage(r.text)), 'bar 17: an entry image', JSON.stringify(l17.rows));
   check(s18 && l17.tag === s18.text && !lines.some(x => x.kind === 'narrator' && x.at === 17), 'bar 17 (the image of bar 18\'s entry): bar 18\'s step line as its tag, no narrator line on bar 18', JSON.stringify({ l17, s18: s18 && s18.text }));
   await shot(page, 'lane-neon-poetic-16x9');
   // the old behaviour: the step line as the caption
@@ -195,7 +199,7 @@ async function fitCase(page, shot) {
   await page.selectOption('#looks', 'claude'); await sleep(400);
   const lc = await laneAt(page, 7), ic = await cap(page, C => C.info(C.now()));
   check(!lc.on, 'Claude look: no page caption');
-  check(ic.captions && ic.captions.rows.some(r => r.text === 'la stanza si inclina') && ic.prompt === 'ritmo più fitto', 'Claude look: the reply and the step prompt', JSON.stringify({ rows: ic.captions && ic.captions.rows.map(r => r.text), prompt: ic.prompt }));
+  check(ic.captions && ic.captions.rows.some(r => isMove(r.text)) && ic.prompt === 'ritmo più fitto', 'Claude look: the reply (a movement image) and the step prompt', JSON.stringify({ rows: ic.captions && ic.captions.rows.map(r => r.text), prompt: ic.prompt }));
   await shot(page, 'claude-c1-16x9');
   check(!(await page.$eval('#transcript', el => el.hidden)), 'Claude look: the Trascrizione option beside the render');
   await page.click('#transcript'); await sleep(200);

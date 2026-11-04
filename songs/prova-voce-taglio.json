@@ -45,7 +45,7 @@
     },
     {
       "id": "chop", "name": "Chop", "type": "spoken",
-      "settings": { "speaker": "eddy", "gain": 0.5, "pitch": 0.7, "drive": 2, "hpf": 300 },
+      "settings": { "speaker": "fred", "gain": 0.5, "pitch": 0.7, "drive": 2, "hpf": 300 },
       "rack": [ { "device": "crush", "bits": 8 } ],
       "patterns": {
         "open": { "way": "opening", "text": { "en": "system online, here we go", "it": "sistema attivo, si parte" } },
@@ -55,7 +55,7 @@
     },
     {
       "id": "story", "name": "Story", "type": "spoken",
-      "settings": { "speaker": "flo", "gain": 0.55, "room": 0.3 },
+      "settings": { "speaker": "kathy", "gain": 0.55, "room": 0.3 },
       "patterns": { "passage": { "way": "passage", "text": "vocab:machine" } },
       "clips": [ { "section": "Break", "pattern": "passage" } ]
     }

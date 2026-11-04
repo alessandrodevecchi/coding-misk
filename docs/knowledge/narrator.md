@@ -11,7 +11,7 @@ checks: [npm run check:spoken, npm run check:endless, npm run check:profiles]
 
 The narrator, labelled "Voice: narrator" (it: "Voce: narratore"), is the voice that speaks the comments of a live build. A step can carry a short phrase, its `say`. The phrase is written in the code as `// > …` and is spoken by a track of type `voice`; what is spoken shows over the stage as a caption (spoken-text-on-stage, below).
 
-`npm run voices` makes one sample per phrase and language with the system voices of macOS. A line without the speaker's own sample is spoken by the default voice's sample of the same line, with the speaker's sound (`lineSample`, D10); without either it is only written, and on the stage it shows only as the small step tag. `npm run check:samples` lists the lines with no sample.
+`npm run voices` makes one sample per phrase and language with the system voices of macOS (a speaker only in the languages it speaks, never a speaker that speaks like the default voice: real-voices). A line without the speaker's own sample is spoken by the default voice's sample of the same line, with the speaker's sound (`lineSample`, D10); without either it is only written, and on the stage it shows only as the small step tag. `npm run check:samples` lists the lines with no sample.
 
 ## How it connects
 
@@ -43,7 +43,7 @@ Each radio song has its own voice. The style gives a speaker list and ranges for
 <!-- generated:narrator -->
 Narrator styles: `explain`, `poetic`.
 
-Speakers (`SPEAKERS`): `eddy`, `flo`, `grandma`, `grandpa`, `reed`, `rocko`, `sandy`, `shelley`.
+Speakers (`SPEAKERS`, with the languages each speaks): `albert` (en), `fred` (en), `junior` (en), `kathy` (en); in a language a speaker does not speak, the default voice (Samantha in English, Alice in Italian) speaks.
 <!-- /generated -->
 
 - `explain`: the default. It says what each step does.

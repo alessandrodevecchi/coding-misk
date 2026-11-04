@@ -3,7 +3,8 @@
 // (the next songs, D4). The ranges are the track panel's (CONTROLS.voice in main.js). In the hardware theme the
 // controls are horizontal faders (data-fader="h", D17). Pure: the app and the Node checks build the same panel.
 import { VOICE_DEFAULT, VOICE_STYLES, VOICE_STYLE_IDS, VOICE_SOUND_KEYS, styleOf } from '../song/format.js';
-import { SPEAKERS } from '../song/build.js';
+import { SPEAKERS, speaks, speakerId } from '../song/build.js';
+import { getLang } from '../i18n.js';
 
 export const VOICES = ['narrator', 'spoken'];
 // [key, label, min, max, step, format]: format "pct" shows 50%, "num" the number, "cut" the filter on a log scale
@@ -18,6 +19,11 @@ export const rangeToCut = v => Math.round(100 * Math.pow(200, v / 100));
 export const soundText = (k, v) => (k === 'cutoff' ? (v >= 18000 ? '∞' : `${v} Hz`) : SOUND_CONTROLS.find(c => c[0] === k)[5] === 'pct' ? `${Math.round(v * 100)}%` : String(v));
 const cap = s => s[0].toUpperCase() + s.slice(1);
 export const speakerName = s => (s ? cap(s) : '');
+// the default voice of a language (the system voice tools/voice-sample.mjs uses)
+export const DEFAULT_VOICE_NAME = { en: 'Samantha', it: 'Alice' };
+// a speaker's name in a picker; in a language it does not speak, with the note that the default voice speaks for it
+// (real-voices: every speaker stays selectable in every language)
+export const speakerLabel = (s, lang, t) => (!s || speaks(lang, s) ? speakerName(s) : t('speakerOtherLang', { name: speakerName(s), voice: DEFAULT_VOICE_NAME[lang] || '' }));
 
 // The radio sound option of a voice ({ style: 'auto' | <style> | 'custom', settings?, speaker? }), cleaned: unknown
 // values read as "auto" (each song draws its voice, as before)
@@ -48,7 +54,7 @@ export const soundShown = raw => ({ ...VOICE_DEFAULT, ...soundPatch(raw) });
 
 // the one-line summary of a sound: "Deep · Shelley" (the style, the speaker)
 export function soundSummary(settings, { t, radio = null, voice = 'narrator' }) {
-  const style = radio ? cleanSound(radio).style : styleOf(settings), sp = radio ? cleanSound(radio).speaker || '' : (settings && settings.speaker) || '';
+  const style = radio ? cleanSound(radio).style : styleOf(settings), sp = radio ? cleanSound(radio).speaker || '' : speakerId(settings && settings.speaker);
   const spk = sp ? speakerName(sp) : t(radio ? 'speakerStyle' : voice === 'narrator' ? 'speakerDefaultShort' : 'speakerDrawnShort');
   return `${t(`voiceStyle:${style}`)} · ${spk}`;
 }
@@ -57,15 +63,16 @@ export function soundSummary(settings, { t, radio = null, voice = 'narrator' }) 
 // speaker and the eight controls. voice: 'narrator' | 'spoken'; settings: the values shown; radio: the radio option
 // (the picker then offers "As the style"); off: the reason the controls are disabled (a tooltip), or ''.
 // tag: the end of the controls' ids, so two views of the same voice keep apart ids (new-song-panel: the radio '-r')
-export function voiceSoundHtml({ voice, settings, t, esc, radio = null, off = '', open = false, fold = '', tag = null }) {
+export function voiceSoundHtml({ voice, settings, t, esc, radio = null, off = '', open = false, fold = '', tag = null, lang = getLang() }) {
   const idEnd = tag !== null ? tag : radio ? '-r' : '';
   const v = { ...VOICE_DEFAULT, ...(settings || {}) }, dis = off ? ' disabled' : '', tip = off ? ` title="${esc(off)}"` : '';
   const style = radio ? cleanSound(radio).style : styleOf(v);
   const styles = [...(radio ? ['auto'] : []), ...VOICE_STYLE_IDS, 'custom'];
   const styleSel = `<label class="ctrl vs-style"${tip}><span class="lbl">${esc(t('voiceStyleLbl'))}</span><select data-vsound-style="${voice}" data-no-knob title="${esc(off || t('voiceStyleTip'))}"${dis}>${styles.map(s => `<option value="${s}"${s === style ? ' selected' : ''}${s === 'custom' ? ' disabled' : ''}>${esc(t(`voiceStyle:${s}`))}</option>`).join('')}</select></label>`;
-  const sp = radio ? cleanSound(radio).speaker || '' : v.speaker || '';
+  // (a removed speaker in a saved song shows as the default option, real-voices D3)
+  const sp = radio ? cleanSound(radio).speaker || '' : speakerId(v.speaker);
   const first = radio ? t('speakerStyle') : voice === 'narrator' ? t('speakerDefault') : t('speakerDrawn');
-  const spkSel = `<label class="ctrl vs-speaker"${tip}><span class="lbl">${esc(t('speaker'))}</span><select data-vsound="${voice}:speaker" data-no-knob title="${esc(off || t('speaker'))}"${dis}><option value="">${esc(first)}</option>${SPEAKERS.map(k => `<option value="${k}"${k === sp ? ' selected' : ''}>${esc(speakerName(k))}</option>`).join('')}</select></label>`;
+  const spkSel = `<label class="ctrl vs-speaker"${tip}><span class="lbl">${esc(t('speaker'))}</span><select data-vsound="${voice}:speaker" data-no-knob title="${esc(off || t('speaker'))}"${dis}><option value="">${esc(first)}</option>${SPEAKERS.map(k => `<option value="${k}"${k === sp ? ' selected' : ''}>${esc(speakerLabel(k, lang, t))}</option>`).join('')}</select></label>`;
   const ranges = SOUND_CONTROLS.map(([k, label, min, max, step]) => {
     const val = k === 'cutoff' ? cutToRange(v[k]) : v[k];
     return `<div class="ctrl vs-ctl" data-vs-ctl="${k}"${tip}><div class="row"><label class="lbl" for="vs-${voice}-${k}${idEnd}">${esc(t(label))}</label><output data-vsound-out="${voice}:${k}">${esc(soundText(k, v[k]))}</output></div><input type="range" id="vs-${voice}-${k}${idEnd}" data-vsound="${voice}:${k}" data-fader="h" min="${min}" max="${max}" step="${step}" value="${val}" title="${esc(off || t(label))}"${dis}></div>`;

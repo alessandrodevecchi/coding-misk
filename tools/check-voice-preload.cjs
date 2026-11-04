@@ -9,7 +9,8 @@
 // --speaker (radio-phrase-speaker): the same run with one phrase of All in My phrases (Sempre), new on each run, whose
 // default-voice sample the voice helper makes first. The radio must ask the helper for the speaker's sample of the
 // phrase although the default voice has it, the next song's speaker sample must be fetched before that song's first bar,
-// and the phrase must play there from the speaker's bank, not from say_en. Without the voice helper: a skip note.
+// and the phrase must play there from the speaker's bank, not from say_en. In Italian (the speakers speak English only)
+// no speaker bank is asked, and the helper answers fred in Italian from say_it. Without the voice helper: a skip note.
 // Needs the voice samples in public/samples/say_*.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voice-preload.cjs [--seed vp82a] [--rate 4] [--list] [--speaker]
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -168,6 +169,15 @@ function freshPhrase() {
     check(inNext.length > 0 && !banks.includes('say_en'), 'the phrase plays from its speaker\'s bank in the next song, not from say_en', banks.join(', '));
     const fetched = [...new Set(inNext.map(p => p.f))].map(f => ({ f, e: firstOf('fetch', f, Infinity) }));
     check(fetched.length > 0 && fetched.every(x => x.e && x.e.bar < s1.start), `the speaker sample is fetched before the next song's first bar (bar ${s1.start + 1})`, fetched.map(x => `${x.f} ${x.e ? `on bar ${(x.e.bar + 1).toFixed(2)}` : 'never'}`).join('; '));
+  }
+  if (SPEAKER) {
+    // (real-voices D2: the speakers speak English only; in Italian the radio asks for no speaker bank, and the helper
+    // answers a request for fred in Italian with the default voice's sample)
+    const it = await page.evaluate(async () => { const m = await import('/src/i18n.js'); m.setLang('it'); const n = globalThis.codingMiskRadio.needs(); m.setLang('en'); return n.map(x => x.bank); });
+    check(it.every(b => b === 'say_it'), 'in Italian the radio asks for no speaker bank', [...new Set(it)].join(', ') || 'nothing to ask');
+    const dir = path.join(__dirname, '..', 'public', 'samples', 'say_it_fred'), had = fs.existsSync(dir);
+    const j = await fetch(`${BASE}/voice/say`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'la pioggia cade sul ponte', lang: 'it', speaker: 'fred' }) }).then(x => x.json()).catch(() => ({}));
+    check(j.bank === 'say_it' && (had || !fs.existsSync(dir)), 'the voice helper answers fred in Italian from say_it and writes no say_it_fred', JSON.stringify(j));
   }
   console.log(`      scheduler: ${logs.long} "took too long", ${logs.late} "skip query: too late" (CPU slowed ${RATE}x)`);
   check(!errors.length, 'no page errors', errors.slice(0, 2).join(' | '));

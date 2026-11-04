@@ -70,7 +70,9 @@ node --no-warnings tools/song.mjs validate songs/my-song.json   # check a v2 son
 node --no-warnings tools/song.mjs compile songs/my-song.json    # print its Strudel code
 node --no-warnings tools/song.mjs list                          # songs in songs/
 npm run check:songs                                    # validate every song in songs/
-npm run voices                                         # spoken comments for live builds (macOS say + ffmpeg); -- --song <file> for a song from the browser, --list to print the files only; the dev server also makes the samples of lines edited in the page (/voice/say)
+npm run voices                                         # spoken comments for live builds (macOS say + ffmpeg); -- --song <file> for a song from the browser, --list to print the files only, --jobs N samples at a time (default 4), --root <dir> another samples folder; a speaker that speaks like the default voice is left out (not installed); the dev server also makes the samples of lines edited in the page (/voice/say)
+node tools/voice.mjs --prune [--yes]                   # lists the sample banks of removed speakers and of languages a speaker does not speak (size per bank); --yes deletes exactly those, rewrites say_lengths.json; nothing else deletes banks
+npm run check:speakers                                 # every speaker (albert, fred, junior, kathy) is installed and sounds different from the default voice; no speaker sample is a copy of the default voice's; warns for the banks --prune would list (macOS say + ffmpeg, else skips)
 npm run endless -- --styles berlin-techno,jazz --chaos 0.5 --minutes 20 --seed aurora --join   # endless session in songs/endless/ (git-ignored), with a report
 npm run check:styles                                   # validate the style recipes in styles/
 node --no-warnings tools/artist.mjs validate|list      # artists in artists/; npm run endless -- --artist night-owl

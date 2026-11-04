@@ -6,7 +6,8 @@ import { validateRecipe, INSTRUMENTS, SHAPES, RECIPE_FORMAT, familyId } from '..
 const FAMILY_NAMES = { 'live-coder': 'Live coder' };
 const familyLabel = f => FAMILY_NAMES[familyId(f)] || null;
 import { MACHINES } from '../sounds/machines.js';
-import { SPEAKERS } from '../song/build.js';
+import { SPEAKERS, speaks } from '../song/build.js';
+import { speakerLabel } from '../endless/voice-sound.js';
 import { GENRES } from '../song/format.js';
 import { downloadJson, pickJsonFiles, userStore, freeId, errorsByPath } from './library.js';
 import { DICE, INVENT } from '../icons.js';
@@ -38,7 +39,8 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
   // the styles the radio and the director may use: built-ins plus the user's valid ones
   const usable = () => [...builtins, ...mine.all.filter(r => !check(r).errors.length && !builtinIds().includes(r.id))];
 
-  const chips = (list, on, path) => `<div class="chips">${list.map(x => `<button class="chip small" data-pick="${esc(path)}" data-val="${esc(x)}" aria-pressed="${on.includes(x)}">${esc(x)}</button>`).join('')}</div>`;
+  // (note: a tooltip per value, as the speakers' language note, real-voices)
+  const chips = (list, on, path, note = () => '') => `<div class="chips">${list.map(x => `<button class="chip small" data-pick="${esc(path)}" data-val="${esc(x)}" aria-pressed="${on.includes(x)}"${note(x) ? ` title="${esc(note(x))}"` : ''}>${esc(x)}${note(x) ? ` <span class="muted">${esc(t('speakerOnlyShort'))}</span>` : ''}</button>`).join('')}</div>`;
   const tagList = list => (list && list.length ? list.map(x => `<span class="tag-chip">${esc(x)}</span>`).join(' ') : `<span class="muted">${esc(t('libNone'))}</span>`);
   const range = r => (Array.isArray(r) ? `${r[0]}–${r[1]}` : r ?? '');
   // the presets of an instrument link to the Patterns tab
@@ -125,7 +127,7 @@ export function createStylesTab({ root, t, tx, esc, store, builtins, toast, onCh
           <div class="ctrl"><span class="lbl">${esc(t('libProgressions'))}</span>${chips(Object.keys(PROGS), r.progressions || [], 'progressions')}${err('progressions')}</div>
           <div class="ctrl"><span class="lbl">${esc(t('libMeters'))}</span>${chips(METERS.map(m => m[0]), r.meters || ['4/4'], 'meters')}</div></div>
         <div class="sheet-block"><h4>${esc(t('voiceTitle'))}</h4>
-          <div class="ctrl"><span class="lbl">${esc(t('libSpeakers'))}</span>${chips(['', ...SPEAKERS].map(s => s || 'default'), ((r.voice || {}).speakers || []).map(s => s || 'default'), 'voice.speakers')}</div>
+          <div class="ctrl"><span class="lbl">${esc(t('libSpeakers'))}</span>${chips(['', ...SPEAKERS].map(s => s || 'default'), ((r.voice || {}).speakers || []).map(s => s || 'default'), 'voice.speakers', s => (s !== 'default' && !speaks(getLang(), s) ? speakerLabel(s, getLang(), t) : ''))}</div>
           <p class="muted small">${esc(t('libVoiceJson'))}</p></div>
         ${ins}
         <div class="sheet-block"><h4>${esc(t('libWords'))}</h4>${['en', 'it', 'es'].map(l => `<div class="ctrl"><span class="lbl">${l}</span><input type="text" data-list="words.${l}" value="${esc(((r.words || {})[l] || []).join(', '))}">${err(`words.${l}`)}</div>`).join('')}</div>

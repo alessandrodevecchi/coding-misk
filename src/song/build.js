@@ -188,10 +188,20 @@ export function annotate(code, song, upTo, lang) {
 }
 
 // the voice track a step speaks with: the one named by "voice", otherwise the first voice track (none: default settings)
-// system voices that speak both English and Italian (macOS); '' is the default (Samantha, Alice)
-export const SPEAKERS = ['eddy', 'flo', 'grandma', 'grandpa', 'reed', 'rocko', 'sandy', 'shelley'];
-// sample bank of a speaker: public/samples/say_<lang>[_<speaker>]/
-export const sayBank = (lang, speaker) => (speaker ? `say_${lang}_${speaker}` : `say_${lang}`);
+// the speakers and the languages each speaks (macOS system voices, real-voices D1); '' is the default voice (Samantha in
+// English, Alice in Italian). tools/voice-sample.mjs keeps a copy of this table (check:spoken asserts they agree).
+export const SPEAKER_LANGS = { albert: ['en'], fred: ['en'], junior: ['en'], kathy: ['en'] };
+export const SPEAKERS = Object.keys(SPEAKER_LANGS);
+// removed by real-voices: they were never installed (#63); read as the default voice
+export const REMOVED_SPEAKERS = ['eddy', 'flo', 'grandma', 'grandpa', 'reed', 'rocko', 'sandy', 'shelley'];
+// a speaker read from data: a listed id, else '' (the default voice)
+export const speakerId = s => (SPEAKERS.includes(s) ? s : '');
+export const speaks = (lang, s) => (SPEAKER_LANGS[s] || []).includes(lang);
+// the speaker that speaks a line in a language: the speaker when it speaks it, else '' (the default voice)
+export const speakerIn = (lang, s) => (speaks(lang, s) ? s : '');
+// sample bank of a speaker: public/samples/say_<lang>[_<speaker>]/; the default voice's bank for a speaker that does
+// not speak the language or is not listed (real-voices D2)
+export const sayBank = (lang, speaker) => (speaker && speaks(lang, speaker) ? `say_${lang}_${speaker}` : `say_${lang}`);
 export const voiceOf = (song, step) => (song.tracks || []).find(t => t.type === 'voice' && (!step || !step.voice || t.id === step.voice)) || null;
 const sampleIndex = (list, text) => slugAt(list, saySlug(text));
 // every spoken comment of a song that has a sample: [{ s, n }], to load them before they play
@@ -220,8 +230,8 @@ export function voiceSamples(song, lang, files) {
 // n: -1 } without a sample. A fallback is noted once in the dev console (the visible side of #63).
 const fellBack = new Set();
 export function lineSample(track, lang, files, text) {
-  const speaker = (track && track.settings && track.settings.speaker) || '', own = sayBank(lang, speaker);
-  for (const bank of speaker ? [own, sayBank(lang)] : [own]) {
+  const own = sayBank(lang, (track && track.settings && track.settings.speaker) || ''), def = sayBank(lang);
+  for (const bank of own !== def ? [own, def] : [own]) {
     const n = sampleIndex((files || {})[bank] || [], text);
     if (n < 0) continue;
     if (bank !== own && !fellBack.has(`${own}/${text}`)) { fellBack.add(`${own}/${text}`); try { console.info(`[voice] "${text}": no sample in ${own}, the default voice speaks it`); } catch (e) {} }

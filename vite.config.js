@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import { readdirSync, statSync, existsSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { canSpeak, makeSampleAsync, writeLengths, wavSeconds, MAX_WORDS, sampleUsage, deleteSamples, keepTemp, sweepTemp, readTemp, systemVoice } from './tools/voice-sample.mjs';
+import { canSpeak, makeSampleAsync, writeLengths, wavSeconds, MAX_WORDS, sampleUsage, deleteSamples, keepTemp, sweepTemp, readTemp, realVoiceAsync, SPEAKERS, speaks } from './tools/voice-sample.mjs';
 
 // Campioni personalizzati: ogni cartella in public/samples/ diventa un suono (voce/01.wav → s("voce").n(0)),
 // ogni file sciolto diventa un suono col suo nome. L'elenco per Strudel si genera da solo.
@@ -39,7 +39,9 @@ const customSamples = () => ({
 // here (macOS `say` and ffmpeg); POST /voice/say { text, lang, speaker } makes public/samples/say_<lang>[_<speaker>]/
 // <slug>.wav, adds its length to say_lengths.json and answers { bank, n, seconds }. One request at a time (a queue);
 // at most 12 words; only from this machine. The samples folder is not a module, so a new file reloads no page.
-const SPEAKER_IDS = ['', 'eddy', 'flo', 'grandma', 'grandpa', 'reed', 'rocko', 'sandy', 'shelley'];
+// The speakers come from the table in tools/voice-sample.mjs (real-voices D2): a speaker asked for in a language it does
+// not speak gets the default voice's sample (say_<lang>); a speaker that speaks like the default voice is not installed.
+const SPEAKER_IDS = ['', ...SPEAKERS];
 const voiceHelper = () => ({
   name: 'coding-misk-voice',
   apply: 'serve',
@@ -70,7 +72,13 @@ const voiceHelper = () => ({
     const list = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string') : []);
     server.middlewares.use('/voice/usage', (req, res) => {
       if (!local(req)) return send(res, 403, { error: 'local only' });
-      try { if (ok === null) ok = canSpeak(); const voices = ok ? Object.fromEntries(['it', 'en'].map(l => [l, Object.fromEntries(SPEAKER_IDS.map(sp => [sp, systemVoice(l, sp)]))])) : null; send(res, 200, { banks: sampleUsage(SAMPLES_DIR), temp: readTemp(SAMPLES_DIR), playing: playingNow(), voices }); } catch (e) { send(res, 500, { error: String(e && e.message || e).slice(0, 200) }); }
+      // (voices: the system voice of each speaker per language, null where it is not installed; a speaker that does not
+      // speak the language is left out of that language)
+      (async () => {
+        if (ok === null) ok = canSpeak();
+        const voices = ok ? Object.fromEntries(await Promise.all(['it', 'en'].map(async l => [l, Object.fromEntries(await Promise.all(SPEAKER_IDS.filter(sp => !sp || speaks(l, sp)).map(async sp => [sp, await realVoiceAsync(l, sp)])))]))) : null;
+        send(res, 200, { banks: sampleUsage(SAMPLES_DIR), temp: readTemp(SAMPLES_DIR), playing: playingNow(), voices });
+      })().catch(e => send(res, 500, { error: String(e && e.message || e).slice(0, 200) }));
     });
     server.middlewares.use('/voice/delete', (req, res) => body(req, res, b => {
       queue = queue.then(() => { try { send(res, 200, deleteSamples(SAMPLES_DIR, list(b.files), list(b.protect))); } catch (e) { send(res, 500, { error: String(e && e.message || e).slice(0, 200) }); } });
@@ -91,16 +99,17 @@ const voiceHelper = () => ({
       req.on('end', () => {
         let b = null;
         try { b = JSON.parse(raw); } catch (e) { return send(res, 400, { error: 'json' }); }
-        const text = typeof b.text === 'string' ? b.text.trim().replace(/\s+/g, ' ') : '', lang = b.lang, speaker = typeof b.speaker === 'string' ? b.speaker : '';
+        const text = typeof b.text === 'string' ? b.text.trim().replace(/\s+/g, ' ') : '', lang = b.lang, asked = typeof b.speaker === 'string' ? b.speaker : '';
         if (!text || text.length > 160 || text.split(' ').length > MAX_WORDS) return send(res, 400, { error: 'text' });
-        if (!['en', 'it'].includes(lang) || !SPEAKER_IDS.includes(speaker)) return send(res, 400, { error: 'voice' });
+        if (!['en', 'it'].includes(lang) || !SPEAKER_IDS.includes(asked)) return send(res, 400, { error: 'voice' });
+        const speaker = speaks(lang, asked) ? asked : '';
         if (ok === null) ok = canSpeak();
         if (!ok) return send(res, 503, { error: 'no generator' });
         const t0 = Date.now();
         queue = queue.then(async () => {
           try {
             const r = await makeSampleAsync(text, lang, speaker, { root: SAMPLES_DIR });
-            if (!r) return send(res, 404, { error: 'speaker not installed' });
+            if (!r || r.copy) return send(res, 404, { error: 'speaker not installed' });
             writeLengths(SAMPLES_DIR, [r.file]);
             const files = readdirSync(join(SAMPLES_DIR, r.bank)).filter(f => AUDIO.test(f)).sort();
             send(res, 200, { bank: r.bank, n: files.indexOf(r.file.split(sep).pop()), seconds: wavSeconds(r.file), made: r.made, ms: Date.now() - t0 });

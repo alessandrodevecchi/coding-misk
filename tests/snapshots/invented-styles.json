@@ -1,5 +1,5 @@
 {
- "maker": 1,
+ "maker": 2,
  "styles": [
   {
    "seed": "fixture-0",
@@ -18,7 +18,7 @@
     "pads": "synthwave",
     "voice": "darksynth"
    },
-   "hash": "7cd09e06"
+   "hash": "933c09ed"
   },
   {
    "seed": "fixture-1",
@@ -37,7 +37,7 @@
     "pads": "progressive-house",
     "voice": "gated-trance"
    },
-   "hash": "8b1641"
+   "hash": "63afbdf9"
   },
   {
    "seed": "fixture-2",
@@ -56,7 +56,7 @@
     "pads": "country",
     "voice": "country"
    },
-   "hash": "9a09e11f"
+   "hash": "7ba87982"
   },
   {
    "seed": "fixture-3",
@@ -75,7 +75,7 @@
     "pads": "melodic-metal",
     "voice": "melodic-metal"
    },
-   "hash": "8c2c0390"
+   "hash": "e37a6c55"
   },
   {
    "seed": "fixture-4",
@@ -94,7 +94,7 @@
     "pads": "acid",
     "voice": "acid"
    },
-   "hash": "9bd9d56d"
+   "hash": "6bbf4fc4"
   },
   {
    "seed": "fixture-5",
@@ -113,7 +113,7 @@
     "pads": "synthwave",
     "voice": "classic-rock"
    },
-   "hash": "fd88bdd"
+   "hash": "9044d8c4"
   },
   {
    "seed": "fixture-6",
@@ -132,7 +132,7 @@
     "pads": "classic-rock",
     "voice": "classic-rock"
    },
-   "hash": "ffa39b2e"
+   "hash": "66947df1"
   },
   {
    "seed": "fixture-7",
@@ -151,7 +151,7 @@
     "pads": "drum-and-bass",
     "voice": "acid"
    },
-   "hash": "7a82e510"
+   "hash": "fe008ba3"
   },
   {
    "seed": "fixture-8",
@@ -170,7 +170,7 @@
     "pads": "phonk",
     "voice": "pure-trance"
    },
-   "hash": "f1e42995"
+   "hash": "fd49d14d"
   },
   {
    "seed": "fixture-9",
@@ -189,7 +189,7 @@
     "pads": "acid",
     "voice": "berlin-techno"
    },
-   "hash": "d576f722"
+   "hash": "10775303"
   },
   {
    "seed": "fixture-10",
@@ -208,7 +208,7 @@
     "pads": "country",
     "voice": "country"
    },
-   "hash": "6a69141"
+   "hash": "53369cf0"
   },
   {
    "seed": "fixture-11",
@@ -227,7 +227,7 @@
     "pads": "progressive-house",
     "voice": "progressive-house"
    },
-   "hash": "a09ab7f5"
+   "hash": "ac70cb79"
   },
   {
    "seed": "fixture-12",
@@ -246,7 +246,7 @@
     "pads": "berlin-techno",
     "voice": "berlin-techno"
    },
-   "hash": "7375b2c1"
+   "hash": "e680a050"
   },
   {
    "seed": "fixture-13",
@@ -265,7 +265,7 @@
     "pads": "jazz",
     "voice": "industrial"
    },
-   "hash": "bf474952"
+   "hash": "963b51f7"
   },
   {
    "seed": "fixture-14",
@@ -284,7 +284,7 @@
     "pads": "melodic-metal",
     "voice": "industrial"
    },
-   "hash": "8cf11629"
+   "hash": "595779b0"
   },
   {
    "seed": "fixture-15",
@@ -303,7 +303,7 @@
     "pads": "melodic-metal",
     "voice": "melodic-metal"
    },
-   "hash": "fbb2043"
+   "hash": "2297f54"
   },
   {
    "seed": "fixture-16",
@@ -322,7 +322,7 @@
     "pads": "classic-rock",
     "voice": "classic-rock"
    },
-   "hash": "5ac3a86e"
+   "hash": "9dc5b11"
   },
   {
    "seed": "fixture-17",
@@ -341,7 +341,7 @@
     "pads": "house",
     "voice": "house"
    },
-   "hash": "cc3fc678"
+   "hash": "723b8de5"
   },
   {
    "seed": "fixture-18",
@@ -360,7 +360,7 @@
     "pads": "classic-rock",
     "voice": "classic-rock"
    },
-   "hash": "cf9eeae5"
+   "hash": "b0059c"
   },
   {
    "seed": "fixture-19",
@@ -379,7 +379,7 @@
     "pads": "melodic-metal",
     "voice": "melodic-metal"
    },
-   "hash": "249e8fbf"
+   "hash": "ff465a0"
   },
   {
    "seed": "fixture-20",
@@ -398,7 +398,7 @@
     "pads": "ambient",
     "voice": "ambient"
    },
-   "hash": "66b547b5"
+   "hash": "6fe47103"
   },
   {
    "seed": "fixture-21",
@@ -417,7 +417,7 @@
     "pads": "ambient",
     "voice": "ambient"
    },
-   "hash": "c5fc9125"
+   "hash": "8dcb0fad"
   },
   {
    "seed": "fixture-22",
@@ -436,7 +436,7 @@
     "pads": "progressive-house",
     "voice": "progressive-house"
    },
-   "hash": "855efbcf"
+   "hash": "54b3df35"
   },
   {
    "seed": "fixture-23",
@@ -455,7 +455,7 @@
     "pads": "country",
     "voice": "jazz"
    },
-   "hash": "63084721"
+   "hash": "7053b785"
   },
   {
    "seed": "fixture-24",
@@ -474,7 +474,7 @@
     "pads": "lo-fi",
     "voice": "dreamy-cyberpunk"
    },
-   "hash": "c4239ec6"
+   "hash": "dac7c99a"
   },
   {
    "seed": "fixture-25",
@@ -493,7 +493,7 @@
     "pads": "industrial",
     "voice": "trance"
    },
-   "hash": "c7e8f9a7"
+   "hash": "7faaee6f"
   },
   {
    "seed": "fixture-26",
@@ -512,7 +512,7 @@
     "pads": "darksynth",
     "voice": "phonk"
    },
-   "hash": "a2c48afc"
+   "hash": "936c2009"
   },
   {
    "seed": "fixture-27",
@@ -531,7 +531,7 @@
     "pads": "jazz",
     "voice": "ambient"
    },
-   "hash": "dbafe204"
+   "hash": "1352a32a"
   },
   {
    "seed": "fixture-28",
@@ -550,7 +550,7 @@
     "pads": "dark-cyberpunk",
     "voice": "country"
    },
-   "hash": "a24dd59b"
+   "hash": "ab2273e6"
   },
   {
    "seed": "fixture-29",
@@ -569,7 +569,7 @@
     "pads": "dark-cyberpunk",
     "voice": "dark-cyberpunk"
    },
-   "hash": "ca48d1ae"
+   "hash": "383461fb"
   }
  ]
 }
