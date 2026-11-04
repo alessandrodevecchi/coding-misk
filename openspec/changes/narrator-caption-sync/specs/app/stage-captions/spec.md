@@ -2,7 +2,7 @@
 
 ### Requirement: Caption timing
 
-A caption SHALL appear on the bar its line is spoken and SHALL stay for the length of its sample plus 1.5 seconds, at least 3 seconds and at most 4 bars, or until the next line of the same speaker starts, which replaces it at once. A line without a measured length SHALL stay 2 bars, at least 3 seconds. A line spoken late, after its sample was made, SHALL follow the same rule.
+A caption SHALL appear on the bar its line is spoken. Its time on screen SHALL be the length of its sample plus 1.5 seconds, never less than 3 seconds and at most 4 bars. When the next line of the same speaker starts earlier, it SHALL replace the caption at once, also before 3 seconds. The last line of a run SHALL follow the same rule. A line without a measured length SHALL stay 2 bars, at least 3 seconds. The rule SHALL hold for every speaker and for a line spoken late.
 
 #### Scenario: Short line
 
@@ -17,7 +17,17 @@ A caption SHALL appear on the bar its line is spoken and SHALL stay for the leng
 #### Scenario: The next line comes first
 
 - **WHEN** a narrator line starts on bar 5 and the next narrator line starts on bar 6, 1.94 seconds later at 124 BPM
-- **THEN** the first caption shows until bar 6 and the second replaces it there, with no gap and no overlap
+- **THEN** the first caption shows until bar 6 and the second replaces it there, before 3 seconds, with no gap and no overlap
+
+#### Scenario: The last line of a run
+
+- **WHEN** a narrator line whose sample lasts 1 second is followed by no other narrator line for 8 bars
+- **THEN** its caption shows for 3 seconds and then leaves
+
+#### Scenario: The voice track
+
+- **WHEN** a voice-track line whose sample lasts 0.8 seconds starts and no other voice-track line follows within 3 seconds
+- **THEN** its caption shows for 3 seconds
 
 #### Scenario: A line spoken late
 
@@ -26,7 +36,7 @@ A caption SHALL appear on the bar its line is spoken and SHALL stay for the leng
 
 ### Requirement: Step line tag
 
-When a narrator line is shown, the step line of the step it speaks for SHALL show as a small secondary tag below it, in the same box, unless the setting hides it: for an entry image the entering step's line, for a movement image or an explaining line the line of the step on its bar. The tag SHALL appear and leave with its narrator line. When the step line equals the line heard only the caption SHALL show. A step line that no narrator line speaks for SHALL show alone as the tag for 4 bars from its step's bar, while no narrator line with a tag of its own is shown. A step line that is not spoken SHALL show only as this tag.
+When a narrator line is shown, the step line of the step it speaks for SHALL show as a small secondary tag below it, in the same box, unless the setting hides it: for an entry image the entering step's line, for a movement image the line of the step on its bar. The tag SHALL appear and leave with its narrator line. With the poetic style, a tag SHALL NOT show without its narrator line, and a step that no narrator line speaks for SHALL show no tag. An entry whose step has no step line SHALL show its image with no tag. With the explaining style the behaviour SHALL stay as before this change.
 
 #### Scenario: Explaining style
 
@@ -43,15 +53,20 @@ When a narrator line is shown, the step line of the step it speaks for SHALL sho
 - **WHEN** the poetic narrator says the bass's image on bar 12, the bar before the step "need bass" brings the bass in on bar 13
 - **THEN** the tag under the image is "need bass" from bar 12, not the line of the step before, and it leaves with the image
 
+#### Scenario: An entry with no step line
+
+- **WHEN** the pad enters on bar 24 from a step with no step line and the poetic narrator says the pad's image on bar 23
+- **THEN** the image shows with no tag
+
 #### Scenario: A step no line speaks for
 
-- **WHEN** a step with the step line "more hats" on bar 6 says nothing, because an entry image takes its bar
-- **THEN** "more hats" shows alone as the tag once the image and its own tag have left, until bar 10 or until the next narrator line with a tag
+- **WHEN** a step with the step line "more hats" on bar 6 says nothing with the poetic style, because an entry image takes its bar
+- **THEN** "more hats" never shows as a tag, neither under the image nor after it
 
-#### Scenario: A line with no sample
+#### Scenario: Explaining line with no sample
 
 - **WHEN** an explaining line has no sample in any bank and no voice helper runs
-- **THEN** no caption shows it and its step line shows alone as the tag for 4 bars from its bar
+- **THEN** no caption shows it and its step line shows alone as the tag for 4 bars from its bar, as before this change
 
 #### Scenario: Old behaviour unchanged
 
