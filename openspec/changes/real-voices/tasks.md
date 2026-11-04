@@ -20,8 +20,8 @@
 
 ## 4. Pickers and the Voices tab
 
-- [ ] 4.1 Speaker pickers in `src/main.js` (`CONTROLS.voice`, `CONTROLS.spoken`), `src/endless/voice-sound.js`, `src/voices/voices-tab.js` (test bench) and `src/library/styles-tab.js` list the new speakers; in Italian, an English-only speaker's option carries a note that Alice speaks in Italian; a stored removed id shows as the default option; new strings in both languages in `src/i18n.js`; verify with `tools/check-voices.cjs` (picks `fred`, checks the Italian note) and `npm run check:guide`
-- [ ] 4.2 The Voices tab cards show, for an English-only speaker in Italian, that Alice speaks instead of the "not installed" warning; verify with `tools/check-voices-tab.cjs` (delete test on `say_en_kathy`, card text in Italian and English) and screenshots of the cards in neon, hardware, light and 400 px
+- [x] 4.1 Speaker pickers in `src/main.js` (`CONTROLS.voice`, `CONTROLS.spoken`), `src/endless/voice-sound.js`, `src/voices/voices-tab.js` (test bench) and `src/library/styles-tab.js` list the new speakers; in Italian, an English-only speaker's option carries a note that Alice speaks in Italian; a stored removed id shows as the default option; new strings in both languages in `src/i18n.js`; verify with `tools/check-voices.cjs` (picks `fred`, checks the Italian note) and `npm run check:guide`
+- [x] 4.2 The Voices tab cards show, for an English-only speaker in Italian, that Alice speaks instead of the "not installed" warning; verify with `tools/check-voices-tab.cjs` (delete test on `say_en_kathy`, card text in Italian and English) and screenshots of the cards in neon, hardware, light and 400 px
 - [x] 4.3 Update the Voices tab card of `src/guide.js` (speakers and languages) in English and Italian; verify `npm run check:guide`
 
 ## 5. Generator, voice helper and prune
@@ -41,9 +41,9 @@
 
 ## 7. Sample banks on the owner's Mac
 
-- [ ] 7.1 The owner runs `npm run voices -- --jobs 4`, then `npm run check:speakers`; verify the four English banks exist and `check:speakers` passes
-- [ ] 7.2 The owner runs `node tools/voice.mjs --prune` and reads the list of the 16 old banks, then runs `node tools/voice.mjs --prune --yes` or confirms that an agent runs it; verify `npm run check:speakers` shows no old bank and `npm run check:samples` passes
-- [ ] 7.3 Run `npm run check:voice-heard`, `PORT=5173 node tools/check-voice-heard.cjs` and `node tools/check-spoken-play.cjs` with the new banks; verify every line starts on its bar and the example song stays below clipping
+- [x] 7.1 The owner runs `npm run voices -- --jobs 4`, then `npm run check:speakers`; verify the four English banks exist and `check:speakers` passes
+- [x] 7.2 The owner runs `node tools/voice.mjs --prune` and reads the list of the 16 old banks, then runs `node tools/voice.mjs --prune --yes` or confirms that an agent runs it; verify `npm run check:speakers` shows no old bank and `npm run check:samples` passes
+- [x] 7.3 Run `npm run check:voice-heard`, `PORT=5173 node tools/check-voice-heard.cjs` and `node tools/check-spoken-play.cjs` with the new banks; verify every line starts on its bar and the example song stays below clipping
 
 ## 8. Versions and fixtures
 
@@ -54,4 +54,4 @@
 ## 9. Changelog, devlog and integration
 
 - [x] 9.1 Add the change to `CHANGELOG.md` under `## [Unreleased]` (Changed: speakers; Removed: the eight speakers; Added: `check:speakers`, `--jobs`, `--prune`), mark `#63` in `docs/knowledge/status.md`, and add the Italian `DEVLOG.md` entry; verify `npm run check:knowledge`
-- [ ] 9.2 Run `npm run check:code`, `npm run check:songs`, `npm run check:spoken`, `npm run check:phrases`, `npm run check:samples`, `npm run check:speakers`, `PORT=5173 node tools/check-voices.cjs`, `PORT=5173 node tools/check-voices-tab.cjs` and `PORT=5173 node tools/check-captions.cjs --no-video`; verify all pass, apart from the fixture checks that wait for the last merge (task 8.3)
+- [x] 9.2 Run `npm run check:code`, `npm run check:songs`, `npm run check:spoken`, `npm run check:phrases`, `npm run check:samples`, `npm run check:speakers`, `PORT=5173 node tools/check-voices.cjs`, `PORT=5173 node tools/check-voices-tab.cjs` and `PORT=5173 node tools/check-captions.cjs --no-video`; verify all pass, apart from the fixture checks that wait for the last merge (task 8.3)

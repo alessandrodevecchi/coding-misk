@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 105. With open tasks: 31. All tasks ticked, waiting to be archived: 74.
+OpenSpec changes not archived: 105. With open tasks: 30. All tasks ticked, waiting to be archived: 75.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -42,7 +42,6 @@ OpenSpec changes not archived: 105. With open tasks: 31. All tasks ticked, waiti
 | [poetic-narrator](../../openspec/changes/poetic-narrator/tasks.md) | 4 | 24 |
 | [radio-profiles](../../openspec/changes/radio-profiles/tasks.md) | 1 | 36 |
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
-| [real-voices](../../openspec/changes/real-voices/tasks.md) | 29 | 29 |
 | [settings-polish](../../openspec/changes/settings-polish/tasks.md) | 1 | 14 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
@@ -50,7 +49,7 @@ OpenSpec changes not archived: 105. With open tasks: 31. All tasks ticked, waiti
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 | [widget-render-styles](../../openspec/changes/widget-render-styles/tasks.md) | 2 | 21 |
 
-Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-follow-toggle`, `code-lanes`, `code-over-visual`, `code-themes`, `code-writing`, `continue-in-radio`, `curve-look`, `denser-renders`, `director-fold-ring`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fm-like-effects`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `my-phrases`, `narrator-ghost-row`, `pattern-followups`, `phrase-any-voice`, `playlists`, `poetic-steps`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-phrase-speaker`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `reused-lines`, `saved-patterns-hide`, `saved-patterns-list`, `session-choice-prepared`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `spoken-text-on-stage`, `stage-app-widgets`, `strudel-catalog`, `takeover-pending-edit`, `test-fixes`, `timeline-growth`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `voice-track-tuning`, `widgets-on-stage`, `written-like-coder`.
+Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-follow-toggle`, `code-lanes`, `code-over-visual`, `code-themes`, `code-writing`, `continue-in-radio`, `curve-look`, `denser-renders`, `director-fold-ring`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fm-like-effects`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `my-phrases`, `narrator-ghost-row`, `pattern-followups`, `phrase-any-voice`, `playlists`, `poetic-steps`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-knob-locks`, `radio-phrase-speaker`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `real-voices`, `reused-lines`, `saved-patterns-hide`, `saved-patterns-list`, `session-choice-prepared`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `spoken-text-on-stage`, `stage-app-widgets`, `strudel-catalog`, `takeover-pending-edit`, `test-fixes`, `timeline-growth`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `voice-track-tuning`, `widgets-on-stage`, `written-like-coder`.
 <!-- /generated -->
 
 Many open tasks are the owner's listening tests or short videos for the owner. They are not code to write: leave them open and mention them.
