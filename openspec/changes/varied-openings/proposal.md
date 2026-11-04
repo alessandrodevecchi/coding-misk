@@ -9,7 +9,7 @@ Radio and Compose songs almost always open on the same sound. A probe over 440 r
 - **Crescendo follows the style.** When no growth shape applies (the Crescendo profile), the first track is drawn from the style's opening weights instead of always the drums. Classic stays as it is.
 - **The first kick varies.** When a song opens on the kick, the first kick pattern is drawn from a small set of kick starts (`one`, `four`, `push`, `off`, `two`), weighted per style through a new `growthShapes.kicks` field. Today it is always one kick on beat one.
 - **Default weights.** `DEFAULT_WEIGHTS.opening.slow` goes from 2 to 1, and the new openings get default weights.
-- **More instruments per style.** Each style gets a few more drum machines and sounds per role, chosen from genre research and taken only from banks and sounds the project already loads. See `research.md` for the table and the reasons.
+- **More instruments per style.** Each style gets a few more drum machines and sounds per role, chosen from genre research and taken only from banks and sounds the project already loads. See the appendix of `design.md` for the table and the reasons.
 - **Versions.** `CRESCENDO_VERSION` 2 to 3, `SHAPES_VERSION` 8 to 9, `DIRECTOR_VERSION` 16 to 17, `STYLE_MAKER_VERSION` 1 to 2 if the invented-style fixtures move. All growth, endless and invent fixtures are regenerated, and `npm run durations` is run.
 - **Check.** The opening probe is kept as a tool and run before and after, with target ranges.
 

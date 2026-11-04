@@ -1,7 +1,7 @@
 ## 1. Baseline and probe tool
 
-- [ ] 1.1 Add `tools/opening-probe.mjs` from the investigation's `probe.mjs` and `an.mjs`: grow N songs per built-in style with the Crescendo and Live coder profiles (default 24, `--n 12` for a quick run), find the first sounding `$:` line, and report per profile and per style: kick-led share, share of each exact first line, kick patterns among kick-led openings, banks, and the opening drawn with its source. Add `npm run probe:openings`. Verify: it runs without a browser and prints the baseline of `research.md` (about 94% kick in Crescendo, 73% in Live coder) on `develop`.
-- [ ] 1.2 Add a `--check` mode that compares the result with the targets of the spec (Opening distribution) and the per-style kick-led shares in `research.md`, and exits 1 naming each style and target missed. Verify: `--check` fails on the baseline.
+- [ ] 1.1 Add `tools/opening-probe.mjs` from the investigation's `probe.mjs` and `an.mjs`: grow N songs per built-in style with the Crescendo and Live coder profiles (default 24, `--n 12` for a quick run), find the first sounding `$:` line, and report per profile and per style: kick-led share, share of each exact first line, kick patterns among kick-led openings, banks, and the opening drawn with its source. Add `npm run probe:openings`. Verify: it runs without a browser and prints the baseline of `design.md` (Appendix) (about 94% kick in Crescendo, 73% in Live coder) on `develop`.
+- [ ] 1.2 Add a `--check` mode that compares the result with the targets of the spec (Opening distribution) and the per-style kick-led shares in `design.md` (Appendix), and exits 1 naming each style and target missed. Verify: `--check` fails on the baseline.
 
 ## 2. Openings and kick starts in the shape rules
 
@@ -21,20 +21,20 @@
 
 - [ ] 4.1 Write `tests/snapshots/kit-rows.json` from the drum machine index (rows per bank) with a small script, and a Node check (`npm run check:kit-rows`, or a part of `check:styles`) that fails when a recipe kit lacks a row its grooves play and `KIT_MISSING` does not cover it. Verify: the check passes on `develop` and fails on a test recipe with `RolandTR727`.
 - [ ] 4.2 Add `KIT_MISSING` entries for `RolandCompurhythm78` (`cp`, `rd`, `cr`, `rim`, `mt`, `ht`) and `MPC1000` (`rd`, `cr`, `rim`, `mt`, `ht`), as the snapshot lists them. Verify: `npm run check:code` unchanged for built-in songs.
-- [ ] 4.3 Add the kits and sounds of `research.md` (Instruments per style) to all 20 `styles/*.json`. Verify: `npm run check:styles` without new warnings, the kit-rows check passes, and `PORT=5173 node tools/check-style-sounds.cjs` finds every sound (dev server on 5173 started by the owner or on another free port; never start a server on 5173-5175 from the agent).
+- [ ] 4.3 Add the kits and sounds of `design.md` (Appendix, Instruments per style) to all 20 `styles/*.json`. Verify: `npm run check:styles` without new warnings, the kit-rows check passes, and `PORT=5173 node tools/check-style-sounds.cjs` finds every sound (dev server on 5173 started by the owner or on another free port; never start a server on 5173-5175 from the agent).
 - [ ] 4.4 Bump `DIRECTOR_VERSION` to 17. Verify: `npm run check:endless` reports the fixture move until 7.2.
 
 ## 5. Opening weights in the style recipes
 
-- [ ] 5.1 Add `growthShapes.openings` and `growthShapes.kicks` from `research.md` (Openings per style) to all 20 recipes, replacing the six existing opening tables. Verify: `npm run check:styles` passes, and every recipe has both fields.
-- [ ] 5.2 Run `npm run probe:openings -- --check`. Tune weights (not rules) until every target passes; record the final numbers in `research.md` (section Result). Verify: exit code 0, and the result table committed.
+- [ ] 5.1 Add `growthShapes.openings` and `growthShapes.kicks` from `design.md` (Appendix, Openings per style) to all 20 recipes, replacing the six existing opening tables. Verify: `npm run check:styles` passes, and every recipe has both fields.
+- [ ] 5.2 Run `npm run probe:openings -- --check`. Tune weights (not rules) until every target passes; record the final numbers in `design.md` (Appendix, section Result). Verify: exit code 0, and the result table committed.
 
 ## 6. Compose, Guide and docs
 
 - [ ] 6.1 Compose opening control: the new ids with labels in English and Italian (`src/i18n.js`), and the Settings count of openings (`shapeCounts`). Verify: `npm run check:guide` passes; the control lists 13 openings.
 - [ ] 6.2 Docs: `docs/STYLES.md` (`growthShapes.kicks`, new openings, the kit-rows rule), `docs/COMPOSING.md` and `docs/SONG-FORMAT.md` (new opening ids), the Guide card on growth shapes (EN and IT), `npm run knowledge` then `npm run check:knowledge`. Verify: both checks pass.
 - [ ] 6.3 `CHANGELOG.md` under `[Unreleased]` (Added: new openings, kick starts, instruments per style; Changed: Crescendo opening, default weights) and a `DEVLOG.md` entry in Italian with the probe numbers before and after. Verify: entries present.
-- [ ] 6.4 Owner listening pass: a short list in `research.md` of one radio seed per style that opens on a new kit or sound, for the owner to play; drop any addition the owner rejects. Verify: the owner's answer recorded.
+- [ ] 6.4 Owner listening pass: a short list in `design.md` (Appendix) of one radio seed per style that opens on a new kit or sound, for the owner to play; drop any addition the owner rejects. Verify: the owner's answer recorded.
 
 ## 7. Fixtures and full checks
 
