@@ -52,7 +52,7 @@ Manual sources, which this change does not touch: the track panel style select (
 - The value is the list of allowed style ids (`VOICE_STYLE_IDS`). The characters of `VOICE_CHARACTERS` use the style of the same name (the code already asserts that a style and a character with that name sound the same), so one list covers both. `distant` and `clear` exist only as styles and `clear` is not a character.
 - No entry for a speaker, a language or the whole file means all styles allowed.
 - `clear` is always allowed, even when the list leaves it out: it is the fallback (D4) and the neutral sound.
-- The initial file is `{ "format": 1 }`, or lists every style for each speaker. Recommended: `{ "format": 1 }` plus a short README line in `docs/knowledge/voice.md`; the owner adds entries as he listens. Listing every style for every speaker as a starting template is easier to edit by hand, so the file ships with that template (all allowed) and the check treats a full list and a missing entry the same.
+- The file ships with every style listed for every speaker and for `default` in each language (a template that is easy to edit by hand). The check treats a full list and a missing entry the same. The owner removes the styles he does not want after listening.
 
 ### D2. One module: `src/voices/combos.js`
 
