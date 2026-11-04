@@ -14,14 +14,18 @@ A style invented by the compilation for the song on air SHALL show in "Now playi
 - **THEN** Now playing shows the chip with the style name, its genre, its description and a visible Keep button
 
 ### Requirement: The style also shows in the left column
-While a compilation-invented style plays, the STYLES block of the On air column SHALL show the same chip and hint, so the column looks the same with and without the compilation. The chip SHALL NOT toggle the style and SHALL have no Again or discard action.
+While a compilation-invented style plays, the STYLES block of the On air column SHALL show the same chip and hint above the style chips, so the column looks the same with and without the compilation. The chip SHALL have no Again and no discard action. It SHALL be a normal full-colour chip: not greyed, not disabled, and outside the dimming of the set-aside style chips. Clicking it SHALL run the same action as Keep; it SHALL NOT toggle the style.
 
 #### Scenario: Chip in both places
 - **WHEN** an invented style plays with the compilation on
 - **THEN** the same chip shows in Now playing and in On air, STYLES, with the same name and the same Keep
 
+#### Scenario: Left-column chip is live
+- **WHEN** the compilation is on and the listener clicks the chip in On air, STYLES
+- **THEN** the style is kept as with Keep in Now playing, and the chip looks as active as any normal chip before the click
+
 ### Requirement: Keep saves like Invent's Keep
-Keep on a compilation-invented style SHALL save it among the user's styles exactly as Keep on the Invent trial style does (Styles tab, same recipe, toast "kept"). One click SHALL be enough, also while Now playing is redrawn. After Keep the chip SHALL no longer show in either place. There SHALL be no double-click action.
+Keep on a compilation-invented style SHALL save it among the user's styles exactly as Keep on the Invent trial style does (Styles tab, same recipe, toast "kept"). One click SHALL be enough, also while Now playing is redrawn (the Keep button acts on pointer down). After Keep the chip SHALL no longer show in either place. There SHALL be no double-click action.
 
 #### Scenario: Keep with one click
 - **WHEN** the listener clicks Keep once on the chip in Now playing or in the left column
