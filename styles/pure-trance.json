@@ -117,8 +117,8 @@
   "riser": {},
   "voice": {
     "speakers": [
-      "flo",
-      "sandy"
+      "kathy",
+      ""
     ],
     "gain": 0.3,
     "pitch": [
@@ -146,7 +146,7 @@
     "weight": 0.3,
     "ways": { "opening": 2, "chop": 1 },
     "vocab": "machine",
-    "speakers": ["eddy", "reed"],
+    "speakers": ["junior", "fred"],
     "lines": {
       "opening": [
         { "en": "system online, here we go", "it": "sistema attivo, si parte" }

@@ -3,7 +3,7 @@
 // Pure and deterministic: no Node or browser APIs, no Math.random (randomness comes from random.js).
 import { BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, TEX_RHYTHMS, GROOVES, ROWS, DEFAULT, KEYS, fitSteps, meterSteps } from '../music.js';
 import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT, VOICE_CHARACTERS, VOICE_LIMITS } from '../song/format.js';
-import { stateAt, SPEAKERS } from '../song/build.js';
+import { stateAt, SPEAKERS, speakerId } from '../song/build.js';
 import { VOCAB_GROUPS, VOCABULARY } from '../song/vocabulary.js';
 import { makeRng, freshSeed, stream } from './random.js';
 import { withDefaults, PART_NAMES, styleId } from './recipe.js';
@@ -51,7 +51,9 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // 15 (director-fold-ring, #90): effect gestures (a folded phrase, a Fold rise into the drop, a ringing held note, metal hits
 // in a break, an FM rise with fold) on some songs, by style, from a stream of their own: the songs that draw one change
 // 16 (new-phrases, #82): the director's explaining phrases (POOL) grew by 63, so the lines it draws move; the music does not
-export const DIRECTOR_VERSION = 16;
+// 17 (real-voices, #63): the speakers are albert, fred, junior and kathy (the eight before were never installed), so the
+// drawn speakers move; the same number of draws, the music and the lines do not
+export const DIRECTOR_VERSION = 17;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // (gestures, director-fold-ring D6: false turns the effect gestures off; the checks use it to compare with version 14)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
@@ -313,7 +315,8 @@ export function voiceFor(R, opts, rng, index = 0) {
   }
   const free = Object.keys(VOICE_LIMITS).filter(k => !Array.isArray(v[k]));
   for (const k of rng.shuffle(free).slice(0, rng.chance(0.3 + 0.4 * chaos) ? rng.int(1, 2) : 0)) base[k] = round(rng.range(...VOICE_LIMITS[k]));
-  const own = Array.isArray(v.speakers) && v.speakers.length ? v.speakers : [v.speaker ?? ''];
+  // (a removed speaker in a user style reads as the default voice, duplicates dropped: real-voices D3)
+  const own = [...new Set((Array.isArray(v.speakers) && v.speakers.length ? v.speakers : [v.speaker ?? '']).map(speakerId))];
   base.speaker = rng.chance(0.15 + 0.3 * opts.chaos) ? rng.pick(['', ...SPEAKERS]) : rng.pick(own);
   let character = null;
   const chance = opts.voiceChance ?? 0.4 + 0.4 * opts.chaos;
@@ -401,8 +404,8 @@ export function spokenFor(R, opts, voice, rng, more = null, speakers = [], recen
   const group = VOCAB_GROUPS.includes(sp.vocab) ? sp.vocab : rng.pick(VOCAB_GROUPS);
   sp = { ...sp, vocab: group };
   const used = new Set(), text = drawLine(rng, way, { lines: (sp.lines && sp.lines[way]) || [], group, used, recent });
-  const nar = (voice && voice.settings && voice.settings.speaker) || '';
-  const own = (sp.speakers || []).filter(x => x && x !== nar), speaker = rng.pick(own.length ? own : SPEAKERS.filter(x => x !== nar));
+  const nar = speakerId(voice && voice.settings && voice.settings.speaker);
+  const own = (sp.speakers || []).map(speakerId).filter(x => x && x !== nar), speaker = rng.pick(own.length ? own : SPEAKERS.filter(x => x !== nar));
   const settings = { ...VOICE_DEFAULT, gain: 0.5, room: 0.3, speaker };
   // a character now and then (more often on a chop, which may go further)
   if (rng.chance(way === 'chop' ? 0.6 : 0.25 + 0.3 * (opts.chaos ?? 0.3))) Object.assign(settings, VOICE_CHARACTERS[rng.pick(way === 'chop' ? ['robot', 'radio', 'dirty', 'echo'] : ['radio', 'deep', 'cathedral', 'echo', 'slow'])]);

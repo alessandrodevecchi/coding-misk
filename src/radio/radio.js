@@ -40,7 +40,7 @@ import { SESSION_SOURCES } from '../material/index.js';
 import { cleanVoice, voiceOption, applyPreset, VOICE_PRESET_IDS } from '../endless/voice-options.js';
 import { VOICE_STYLE_IDS } from '../song/format.js';
 import { speakerOf, narratorSpeaker } from '../song/spoken.js';
-import { SPEAKERS } from '../song/build.js';
+import { SPEAKERS, speakerIn } from '../song/build.js';
 import { voicePanel, voiceEvent } from '../endless/voice-panel.js';
 import { voiceSoundHtml, syncVoiceSound, soundEvent, nextSound, cleanSound, isAutoSound, soundShown } from '../endless/voice-sound.js';
 import { dieHtml, knobSlider, artistChips, styleChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, lengthChips, applyTrial } from './song-controls.js';
@@ -911,7 +911,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const text = sv.line.trim().replace(/\s+/g, ' '), words = text ? text.split(' ').length : 0;
     if (!text) return toast(t('plEmptyText'));
     if (words > 12) return toast(t('plTooMany', { n: words, max: 12 }));
-    const song = item.plain || item.song, lang = getLang(), speaker = lineSpeaker(song);
+    const song = item.plain || item.song, lang = getLang(), speaker = speakerIn(lang, lineSpeaker(song));
     if (mode === 'moment') {
       const why = whyNot({ kind: 'say-live', mode }, song, item.plan, relNow());
       if (why) return toast(t('svNoPart'));

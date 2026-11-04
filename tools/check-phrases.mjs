@@ -164,7 +164,7 @@ const DIRECTOR = {
     console.log(`      ${new Set(listed.map(f => keyOfFile(f.split('/')[0], f.split('/')[1]))).size} listed keys, ${keys.size} built-in keys`);
   },
   'samples: classes, a shared file stays built-in, the files of a phrase minus the protected ones (spec: shared file)'() {
-    const usage = { say_it: [{ f: 'l_ultimo_treno.wav', b: 10 }, { f: 'le_torri.wav', b: 20 }, { f: 'nella_mia_canzone.wav', b: 30 }, { f: 'provvisoria.wav', b: 40 }, { f: 'vecchia.wav', b: 50 }], say_it_reed: [{ f: 'le_torri.wav', b: 25 }], say_en: [{ f: 'the_towers.wav', b: 5 }] };
+    const usage = { say_it: [{ f: 'l_ultimo_treno.wav', b: 10 }, { f: 'le_torri.wav', b: 20 }, { f: 'nella_mia_canzone.wav', b: 30 }, { f: 'provvisoria.wav', b: 40 }, { f: 'vecchia.wav', b: 50 }], say_en_fred: [{ f: 'the_towers.wav', b: 25 }], say_en: [{ f: 'the_towers.wav', b: 5 }] };
     const builtin = builtinKeys({ songs: [], styles: [] });
     const items = [P('a', 'le torri', 'voice', 'night', { alt: { en: 'the towers' } }), P('b', "l'ultimo treno", 'voice', 'night')];
     const mine = mineKeys(items), songs = songKeys([{ id: 'u-1', tracks: [{ id: 'w', type: 'spoken', patterns: { A: { way: 'passage', text: { it: 'nella mia canzone' } } }, clips: [] }] }]);
@@ -178,7 +178,7 @@ const DIRECTOR = {
     const f1 = phraseFiles(items[1], usage, { builtin, mine: others, songs });
     assert(!f1.files.length && f1.kept.length === 1 && f1.kept[0].why === 'builtin', JSON.stringify(f1));
     const f2 = phraseFiles(items[0], usage, { builtin, mine: mineKeys(items.filter(p => p.id !== 'a')), songs });
-    assert(f2.files.map(x => x.rel).sort().join() === 'say_en/the_towers.wav,say_it/le_torri.wav,say_it_reed/le_torri.wav' && !f2.kept.length, JSON.stringify(f2));
+    assert(f2.files.map(x => x.rel).sort().join() === 'say_en/the_towers.wav,say_en_fred/the_towers.wav,say_it/le_torri.wav' && !f2.kept.length, JSON.stringify(f2));
   },
   'voice helper files: delete only named say_* files never protected, the ledger, the sweep never a playing song'() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cm-samples-'));
@@ -317,28 +317,29 @@ const ANY_VOICE = {
     assert(swapped >= 5, `voice track lines: ${swapped}`);
   },
   'any voice: the files of a phrase said by two speakers, delete counts both banks (spec: samples)'() {
-    const usage = { say_it: [{ f: 'tutte_le_voci.wav', b: 10 }], say_it_reed: [{ f: 'tutte_le_voci.wav', b: 12 }], say_it_flo: [{ f: 'altro.wav', b: 5 }] };
-    const p = Q('a', 'tutte le voci', ['voice', 'explain', 'poetic']);
+    const usage = { say_en: [{ f: 'all_the_voices.wav', b: 10 }], say_en_fred: [{ f: 'all_the_voices.wav', b: 12 }], say_en_kathy: [{ f: 'other.wav', b: 5 }] };
+    const p = Q('a', 'all the voices', ['voice', 'explain', 'poetic'], null, { lang: 'en' });
     const f = phraseFiles(p, usage, { builtin: new Set(), mine: new Set(), songs: new Set() });
-    assert(f.files.map(x => x.rel).sort().join() === 'say_it/tutte_le_voci.wav,say_it_reed/tutte_le_voci.wav', JSON.stringify(f));
-    const k = phraseFiles(p, usage, { builtin: new Set(), mine: new Set(), songs: songKeys([{ id: 'u', tracks: [{ id: 'w', type: 'spoken', patterns: { A: { way: 'passage', text: { it: 'tutte le voci' } } }, clips: [] }] }]) });
+    assert(f.files.map(x => x.rel).sort().join() === 'say_en/all_the_voices.wav,say_en_fred/all_the_voices.wav', JSON.stringify(f));
+    const k = phraseFiles(p, usage, { builtin: new Set(), mine: new Set(), songs: songKeys([{ id: 'u', tracks: [{ id: 'w', type: 'spoken', patterns: { A: { way: 'passage', text: { en: 'all the voices' } } }, clips: [] }] }]) });
     assert(!k.files.length && k.kept.length === 2, 'a saved song keeps both files');
-    assert(mineKeys([p]).has('it|tutte_le_voci'), 'protect key');
+    assert(mineKeys([p]).has('en|all_the_voices'), 'protect key');
   },
   'radio: a phrase of mine asks for its speaker\'s sample also when the default voice has it, a built-in line does not (radio-phrase-speaker D1, D2)'() {
-    const p = Q('ph_all', 'la notte ci guarda', ['voice', 'explain', 'poetic']), mine = mineSnapshot([p], 1, 'it');
+    // (in English: the speakers speak English only, an Italian line is always the default voice's, real-voices D2)
+    const p = Q('ph_all', 'the night is watching us', ['voice', 'explain', 'poetic'], null, { lang: 'en' }), mine = mineSnapshot([p], 1, 'en');
     const song = radioSong('rps-1', mine).song, tr = song.tracks.find(t => t.type === 'spoken'), X = tr && speakerOf(song, tr);
     assert(X, 'a voice track with a speaker of its own');
-    const ph = spokenNeeds(song, {}, 'it', {}).find(x => x.text === p.text);
-    assert(ph && ph.voice === 'T' && ph.bank === `say_it_${X}`, `the phrase's bank: ${JSON.stringify(ph)}`);
-    const built = spokenNeeds(song, {}, 'it', {}).find(x => x.text !== p.text && x.bank !== 'say_it');
+    const ph = spokenNeeds(song, {}, 'en', {}).find(x => x.text === p.text);
+    assert(ph && ph.voice === 'T' && ph.bank === `say_en_${X}`, `the phrase's bank: ${JSON.stringify(ph)}`);
+    const built = spokenNeeds(song, {}, 'en', {}).find(x => x.text !== p.text && x.bank !== 'say_en');
     assert(built, 'a built-in line said by a speaker');
     // (only the default voice's samples: the phrase and the built-in line)
-    const files = { say_it: [`/samples/say_it/${saySlug(p.text)}.wav`, `/samples/say_it/${saySlug(built.text)}.wav`] };
-    const list = spokenNeeds(song, {}, 'it', files);
-    const mineSlugs = new Set(mine.list.map(q => textIn(q, 'it')).filter(Boolean).map(saySlug));
+    const files = { say_en: [`/samples/say_en/${saySlug(p.text)}.wav`, `/samples/say_en/${saySlug(built.text)}.wav`] };
+    const list = spokenNeeds(song, {}, 'en', files);
+    const mineSlugs = new Set(mine.list.map(q => textIn(q, 'en')).filter(Boolean).map(saySlug));
     const got = missingNeeds(list, files, mineSlugs);
-    assert(got.some(x => x.text === p.text && x.bank === `say_it_${X}`), 'the phrase of mine is asked in its speaker\'s bank');
+    assert(got.some(x => x.text === p.text && x.bank === `say_en_${X}`), 'the phrase of mine is asked in its speaker\'s bank');
     assert(!got.some(x => x.text === built.text), 'the built-in line the default voice has is not asked');
     // no phrases of mine (Never): the radio's filter before this change
     const any = (bank, slug) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], slug) >= 0);
@@ -346,8 +347,12 @@ const ANY_VOICE = {
     for (const none of [new Set(), null]) assert(JSON.stringify(missingNeeds(list, files, none)) === JSON.stringify(old), 'without phrases of mine the list changed');
     assert(!old.some(x => x.text === p.text), 'the old filter dropped the phrase');
     // the speaker's own sample made: nothing more to ask for the phrase
-    const made = { ...files, [`say_it_${X}`]: [`/samples/say_it_${X}/${saySlug(p.text)}.wav`] };
-    assert(!missingNeeds(spokenNeeds(song, {}, 'it', made), made, mineSlugs).some(x => x.text === p.text), 'asked again once made');
+    const made = { ...files, [`say_en_${X}`]: [`/samples/say_en_${X}/${saySlug(p.text)}.wav`] };
+    assert(!missingNeeds(spokenNeeds(song, {}, 'en', made), made, mineSlugs).some(x => x.text === p.text), 'asked again once made');
+    // in Italian no speaker bank is asked: a phrase of mine in Italian, the same speaker, every line from say_it
+    const q = Q('ph_it', 'la notte ci guarda', ['voice', 'explain', 'poetic']), mi = mineSnapshot([q], 1, 'it'), si = radioSong('rps-1', mi).song;
+    const needIt = spokenNeeds(si, {}, 'it', {}), askIt = missingNeeds(needIt, {}, new Set([saySlug(q.text)]));
+    assert(needIt.length && needIt.every(x => x.bank === 'say_it') && askIt.every(x => x.bank === 'say_it'), `an Italian speaker bank: ${[...new Set(needIt.map(x => x.bank))]}`);
     console.log(`      speaker ${X}: ${got.length} lines asked, ${old.length} without my phrases`);
   },
 };

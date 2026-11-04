@@ -6,7 +6,7 @@ import { ideaCode } from './music.js';
 import { ideaRows } from './song/ideas.js';
 import { METERS, meterSteps, fitSteps, channelSteps, GUITAR_TYPES, GUITAR_PATTERNS, HARMONIES, KEYS, PROGS, WAVES, MOVES, BASS, ARPS, HOOKS, MODES, VOWELS, PADS, TEXTURES, TEX_RHYTHMS, KITS, ROWS, GROOVES, LOOKS, PICK_LOOKS, HIDDEN_LOOKS, RENDERS, DEFAULT, withVisuals, chordName } from './music.js';
 import { compileSong } from './song/compile.js';
-import { SPEAKERS, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds, missingNeeds, slugAt, captionHold, lateLines, voicesAt } from './song/build.js';
+import { SPEAKERS, speakerIn, speakerId, hasBuild, buildSteps, stateAt, sayAt, deriveBuild, buildMap, sayText, voiceSamples, voiceOf, stepKeys, saySlug, sayBank, narratorMarks, captionSchedule, spokenNeeds, missingNeeds, slugAt, captionHold, lateLines, voicesAt } from './song/build.js';
 import { CAPTIONS_KEY, captionSettings, captionFrame, captionHtml, fitCaption } from './captions/captions.js';
 import { typingFrames, settleOthers, typingPlan, TYPING_SPEEDS } from './song/typing.js';
 import { crescendoSong, waypointSong, CRESCENDO_VERSION, shapeCapOf, shapeKeepOf, longSongOf } from './song/crescendo.js';
@@ -60,7 +60,7 @@ import { createSession, stylesNear } from './endless/director.js';
 import { freshSeed } from './endless/random.js';
 import { cleanVoice, voiceOption, presetOf as voicePresetOf } from './endless/voice-options.js';
 import { voicePanel, voiceEvent } from './endless/voice-panel.js';
-import { voiceSoundHtml, syncVoiceSound, soundEvent } from './endless/voice-sound.js';
+import { voiceSoundHtml, syncVoiceSound, soundEvent, speakerLabel } from './endless/voice-sound.js';
 import { phraseRows, listVocab, editText, editBars, editWay, removeRow, addRow, fillRows, fillMine, freeParts, FILL_GROUPS } from './endless/phrase-list.js';
 import { rewriteSpoken, trackVoice } from './endless/voice-track.js';
 import { styleId, stylePush } from './endless/recipe.js';
@@ -3160,6 +3160,8 @@ document.addEventListener('click', e => { const b = e.target.closest && e.target
 // line nobody saved: temporary), played once through the voice's settings
 async function hearLine({ text, lang, speaker = '', settings = null, temp = false }) {
   initAudioOnce();
+  // (a speaker that does not speak the language: the default voice's line, real-voices D2)
+  speaker = speakerIn(lang, speaker);
   const bank = sayBank(lang, speaker), slug = saySlug(text);
   const find = () => [bank, ...(speaker ? [sayBank(lang, '')] : [])].map(b => ({ b, n: slugAt(customFiles[b], slug) })).find(x => x.n >= 0);
   let s = find();
@@ -3191,13 +3193,13 @@ const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
   const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
   for (const sp of T.tracks.filter(x => x.type === 'spoken')) {
-    const speaker = speakerOf(T, sp), bank = sayBank(lang, speaker);
+    const speaker = speakerIn(lang, speakerOf(T, sp)), bank = sayBank(lang, speaker);
     let rows = []; try { rows = phraseRows(T, sp.id, { lang }); } catch (e) { rows = []; }
     // (the lines written here: edited or typed; the vocabulary and the styles' lines come with npm run voices)
     for (const r of rows) if (r.source === 'own') for (const x of r.texts) if (!has(bank, x)) out.push({ text: x, lang, speaker, bank });
   }
   // (the narrator's own written steps)
-  const nt = voiceOf(T), nsp = (nt && nt.settings && nt.settings.speaker) || '', nb = sayBank(lang, nsp);
+  const nt = voiceOf(T), nsp = speakerIn(lang, speakerId(nt && nt.settings && nt.settings.speaker)), nb = sayBank(lang, nsp);
   if (hasBuild(T)) for (const st of buildSteps(T)) { const x = st.say && sayText(st.say, lang); if (x && narratorEdited.has(x) && !has(nb, x)) out.push({ text: x, lang, speaker: nsp, bank: nb }); }
   return out.filter(x => x.text.split(/\s+/).length <= MAX_WORDS);
 };
@@ -3616,11 +3618,11 @@ const CONTROLS = {
   riser: [['range', 'gain', 'volume'], ['select', 'bars', 'length', () => ['2', '4', '8', '16'].map(n => [n, t('nBars', { n })])],
     ['select', 'dir', 'direction', () => [['up', t('up')], ['down', t('down')]]]],
   code: [['select', 'visual', 'visualOpt', () => VISUALS.map(v => [v, v])]],
-  voice: [['select', 'speaker', 'speaker', () => [['', t('speakerDefault')], ...SPEAKERS.map(k => [k, k[0].toUpperCase() + k.slice(1)])]], ['range', 'gain', 'volume'], ['range', 'pitch', 'pitch', { min: .5, max: 2, step: .05, fmt: 'num' }], ['range', 'tempo', 'voiceTempo', { min: .25, max: 2, step: .05, fmt: 'num' }], ['cutoff', 'cutoff', 'filter'],
+  voice: [['select', 'speaker', 'speaker', () => [['', t('speakerDefault')], ...SPEAKERS.map(k => [k, speakerLabel(k, getLang(), t)])]], ['range', 'gain', 'volume'], ['range', 'pitch', 'pitch', { min: .5, max: 2, step: .05, fmt: 'num' }], ['range', 'tempo', 'voiceTempo', { min: .25, max: 2, step: .05, fmt: 'num' }], ['cutoff', 'cutoff', 'filter'],
     ['range', 'hpf', 'lowCut', { max: 2000, step: 10, fmt: 'num' }], ['range', 'drive', 'drive', NUM4], ['range', 'room', 'reverb'], ['range', 'delay', 'delay']],
 };
 // the voice instrument (voice-instrument): the voice settings; no speaker named: one drawn, never the narrator's
-CONTROLS.spoken = [['select', 'speaker', 'speaker', () => [['', t('speakerDrawn')], ...SPEAKERS.map(k => [k, k[0].toUpperCase() + k.slice(1)])]], ...CONTROLS.voice.slice(1)];
+CONTROLS.spoken = [['select', 'speaker', 'speaker', () => [['', t('speakerDrawn')], ...SPEAKERS.map(k => [k, speakerLabel(k, getLang(), t)])]], ...CONTROLS.voice.slice(1)];
 // suoni per strumento: quelli scelti a mano, poi tutti gli strumenti General MIDI e i synth caricati
 function allWaves() {
   const map = (globalThis.soundMap && globalThis.soundMap.get && globalThis.soundMap.get()) || {}, have = new Set(WAVES.map(([k]) => k.split(',')[0]));

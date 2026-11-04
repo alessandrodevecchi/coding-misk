@@ -61,7 +61,7 @@
       "id": "words",
       "name": "Words",
       "type": "spoken",
-      "settings": { "speaker": "reed", "gain": 0.55, "room": 0.25, "pitch": 0.9 },
+      "settings": { "speaker": "fred", "gain": 0.55, "room": 0.25, "pitch": 0.9 },
       "patterns": {
         "open": { "way": "opening", "text": { "en": "the city is still awake", "it": "la città è ancora sveglia" }, "before": "drums" },
         "chop": { "way": "chop", "text": { "en": "signal", "it": "segnale" }, "slices": 8, "rhythm": "0 ~ 1 ~ 2 3 ~ 3" },
@@ -73,7 +73,7 @@
       "id": "story",
       "name": "Story",
       "type": "spoken",
-      "settings": { "speaker": "flo", "gain": 0.6, "room": 0.2 },
+      "settings": { "speaker": "junior", "gain": 0.6, "room": 0.2 },
       "patterns": {
         "passage": { "way": "passage", "text": { "en": "The rain stopped. Every window is a small light in the dark.", "it": "La pioggia è finita. Ogni finestra è una piccola luce nel buio." } }
       },
@@ -83,7 +83,7 @@
       "id": "voice",
       "name": "Narrator",
       "type": "voice",
-      "settings": { "speaker": "shelley", "gain": 0.5, "room": 0.3 },
+      "settings": { "speaker": "kathy", "gain": 0.5, "room": 0.3 },
       "patterns": {},
       "clips": []
     }

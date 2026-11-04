@@ -41,7 +41,9 @@ import { sessionItems, GROWTH_ON_AIR } from '../src/endless/items.js';
 import { airControls } from '../src/endless/growth.js';
 import { validateRecipe, recipeOrder } from '../src/endless/recipe.js';
 import { setLang } from '../src/i18n.js';
-import { captionSchedule, spokenNeeds, narratorLines, captionHold, lateLines, voicesAt, stepText, sayBank } from '../src/song/build.js';
+import { captionSchedule, spokenNeeds, narratorLines, captionHold, lateLines, voicesAt, stepText, sayBank, SPEAKER_LANGS, REMOVED_SPEAKERS, speakerId, speaks, voiceSamples, lineSample } from '../src/song/build.js';
+import { voiceFor, spokenFor } from '../src/endless/director.js';
+import { stream } from '../src/endless/random.js';
 import { captionFrame, captionSettings } from '../src/captions/captions.js';
 import { SPEAKER_KINDS, kindOf, outranks, applyExclusive, captionRows } from '../src/song/speakers.js';
 import { barSeconds } from '../src/song/spoken.js';
@@ -218,7 +220,7 @@ const CHECKS = {
       assert(speakerOf(s, s.tracks[1]) !== narratorSpeaker(s), `${sp}: same speaker`);
     }
     const it = placeSpoken(EXAMPLE, 'it').find(p => p.key === 'open'), en = placeSpoken(EXAMPLE, 'en').find(p => p.key === 'open');
-    assert(it.texts[0] === 'la città è ancora sveglia' && en.texts[0] === 'the city is still awake' && it.bank === 'say_it_reed', `${it.texts} ${it.bank}`);
+    assert(it.texts[0] === 'la città è ancora sveglia' && en.texts[0] === 'the city is still awake' && it.bank === 'say_it' && en.bank === 'say_en_fred', `${it.texts} ${it.bank} ${en.bank}`);
     const one = clone(EXAMPLE); one.tracks.find(t => t.id === 'words').patterns.open.text = { en: 'only english' };
     assert(placeSpoken(one, 'it').find(p => p.key === 'open').texts[0] === 'only english', 'a line with one language');
   },
@@ -704,8 +706,8 @@ const CHECKS = {
       const strip = s => JSON.stringify({ ...s, tracks: s.tracks.filter(t => t.type !== 'voice') });
       assert(strip(base[i]) === strip(dist[i]), 'the music moved');
     }
-    const sp = generateSession(recipes, { styles: ['ambient'], seed: 'suono-t', minutes: 40, voice: { presence: 'always', sound: { style: 'robot', speaker: 'shelley' } } }).songs.map(s => s.tracks.find(t => t.type === 'spoken'));
-    assert(sp.length && sp.every(t => t.settings.speaker === 'shelley' && t.settings.drive === 3.5 && t.settings.pitch === 0.7), 'voice track sound');
+    const sp = generateSession(recipes, { styles: ['ambient'], seed: 'suono-t', minutes: 40, voice: { presence: 'always', sound: { style: 'robot', speaker: 'kathy' } } }).songs.map(s => s.tracks.find(t => t.type === 'spoken'));
+    assert(sp.length && sp.every(t => t.settings.speaker === 'kathy' && t.settings.drive === 3.5 && t.settings.pitch === 0.7), 'voice track sound');
   },
   'phrase list (D5, D6, D16): sorted rows, heard bars, text and bars edits, fill, add, remove'() {
     const ex = EXAMPLE, id = ex.tracks.find(t => t.type === 'spoken').id;
@@ -736,7 +738,65 @@ const CHECKS = {
   },
   'voice helper (D8): the sample file names and banks of tools/voice-sample.mjs are the app\'s'() {
     for (const x of ['Serve più ritmo!', "l'ultimo treno", 'a brand new line, here']) assert(VS.saySlug(x) === saySlug(x), x);
-    assert(VS.sayBank('it', 'eddy') === 'say_it_eddy' && VS.sayBank('en', '') === 'say_en' && VS.MAX_WORDS === 12, 'banks');
+    assert(VS.sayBank('en', 'kathy') === 'say_en_kathy' && VS.sayBank('en', '') === 'say_en' && VS.MAX_WORDS === 12, 'banks');
+  },
+  'real voices (D1, D2): the speaker table, the language rule of sayBank, the same in tools/voice-sample.mjs'() {
+    assert(SPEAKERS.join() === 'albert,fred,junior,kathy' && SPEAKERS.every(s => SPEAKER_LANGS[s].join() === 'en'), `speakers ${SPEAKERS}`);
+    assert(sayBank('it', 'kathy') === 'say_it' && sayBank('en', 'kathy') === 'say_en_kathy' && sayBank('en', 'reed') === 'say_en' && sayBank('it', '') === 'say_it', 'sayBank');
+    assert(JSON.stringify(VS.SPEAKER_LANGS) === JSON.stringify(SPEAKER_LANGS) && VS.SPEAKERS.join() === SPEAKERS.join(), 'the two speaker tables differ');
+    for (const lang of ['en', 'it', 'es']) for (const s of ['', ...SPEAKERS, ...REMOVED_SPEAKERS, 'nobody']) {
+      assert(VS.sayBank(lang, s) === sayBank(lang, s), `sayBank ${lang} ${s}: ${VS.sayBank(lang, s)} against ${sayBank(lang, s)}`);
+      assert(VS.speaks(lang, s) === speaks(lang, s), `speaks ${lang} ${s}`);
+    }
+    assert(SPEAKERS.every(s => speakerId(s) === s) && REMOVED_SPEAKERS.every(s => speakerId(s) === '') && speakerId(undefined) === '', 'speakerId');
+    // (in Italian nobody but the default voice: a speaker's line is asked from say_it, never say_it_<speaker>)
+    assert(['', ...SPEAKERS].filter(s => !s || speaks('it', s)).join() === '', 'Italian speakers');
+  },
+  'real voices (D3): a removed speaker reads as the default voice: an old song, a user style, validation'() {
+    const keep = { ...spokenContext };
+    try {
+      // an old song: narrator reed, a voice track grandpa and a story flo
+      const old = clone(EXAMPLE);
+      old.tracks.find(t => t.type === 'voice').settings.speaker = 'reed';
+      old.tracks.find(t => t.id === 'words').settings.speaker = 'grandpa';
+      const story = old.tracks.find(t => t.id === 'story'); if (story) story.settings.speaker = 'flo';
+      // (the removed speakers always spoke with the default voice: they still do, none is drawn in their place)
+      for (const t of old.tracks.filter(x => x.type === 'spoken')) assert(speakerOf(old, t) === '', `${t.id}: ${speakerOf(old, t)} for a removed speaker`);
+      assert(narratorSpeaker(old) === '', 'the narrator of a removed speaker');
+      const v = validateSong(old);
+      assert(!v.errors.length, `errors: ${JSON.stringify(v.errors)}`);
+      assert(v.warnings.some(w => /removed speaker/.test(w.msg)), 'no removed-speaker warning');
+      // every narrator line of the old song plays from say_<lang> in either language (frozen sessions sound as before)
+      setSpokenContext({ files: null });
+      const nar = old.tracks.find(t => t.type === 'voice');
+      for (const lang of ['en', 'it']) {
+        const files = { [`say_${lang}`]: ['/samples/x/the_city.wav'], [`say_${lang}_reed`]: ['/samples/x/the_city.wav'] };
+        const got = lineSample(nar, lang, files, 'the city');
+        assert(got.bank === `say_${lang}` && got.n === 0, `${lang}: ${JSON.stringify(got)}`);
+        assert(voiceSamples(old, lang, files).every(x => x.s === `say_${lang}` || /^say_[a-z]{2}_(albert|fred|junior|kathy)$/.test(x.s)), `${lang}: a removed bank asked`);
+      }
+      // an old frozen radio song with flo and grandpa: every bank of its lines is a default or listed one
+      const frozen = { ...clone(EXAMPLE), tracks: clone(EXAMPLE).tracks.map(t => (t.type === 'voice' ? { ...t, settings: { ...t.settings, speaker: 'flo' } } : t.type === 'spoken' ? { ...t, settings: { ...t.settings, speaker: 'grandpa' } } : t)) };
+      for (const lang of ['en', 'it']) for (const p of placeSpoken(frozen, lang)) assert(p.bank === `say_${lang}`, `frozen ${lang}: ${p.bank}`);
+    } finally { Object.assign(spokenContext, keep); setSpokenContext(keep); }
+    // a user style with voice.speakers ["rocko", "kathy"]: valid with a warning, the director draws only "" or kathy
+    const base = recipes.find(r => r.id === 'berlin-techno'), R = { ...clone(base), voice: { ...clone(base.voice), speakers: ['rocko', 'kathy'] }, spoken: { weight: 1, ways: { refrain: 1 }, speakers: ['shelley', 'kathy'] } };
+    const vr = validateRecipe(R);
+    assert(!vr.errors.length && vr.warnings.some(w => /removed speaker/.test(w.msg)), `recipe: ${JSON.stringify(vr)}`);
+    assert(validateRecipe({ ...R, voice: { ...R.voice, speakers: ['nobody'] } }).errors.length, 'an unknown speaker is still an error');
+    // (the style's list reads as ["", "kathy"]: every draw over 200 seeds is the one of that list; the director's
+    // "another speaker now and then" still draws from every listed speaker, never a removed one)
+    const S = { ...R, voice: { ...R.voice, speakers: ['', 'kathy'] }, spoken: { ...R.spoken, speakers: ['kathy'] } }, drawn = new Set(), inst = new Set();
+    for (let k = 0; k < 200; k++) {
+      const a = voiceFor(R, { chaos: 0 }, stream(`rv-${k}`, 'voice')), b = voiceFor(S, { chaos: 0 }, stream(`rv-${k}`, 'voice'));
+      assert(JSON.stringify(a) === JSON.stringify(b), `seed rv-${k}: the voice differs from the style with ["", "kathy"]`);
+      drawn.add(a.settings.speaker);
+      const x = spokenFor(R, { complexity: 0.5 }, { settings: { speaker: '' } }, stream(`rv-${k}`, 'spoken')), y = spokenFor(S, { complexity: 0.5 }, { settings: { speaker: '' } }, stream(`rv-${k}`, 'spoken'));
+      assert(JSON.stringify(x) === JSON.stringify(y), `seed rv-${k}: the voice instrument differs`);
+      if (x) inst.add(x.track.settings.speaker);
+    }
+    assert([...drawn].every(s => s === '' || SPEAKERS.includes(s)) && drawn.has('kathy') && drawn.has(''), `voice draws: ${[...drawn]}`);
+    assert(inst.size === 1 && inst.has('kathy'), `voice instrument draws: ${[...inst]}`);
   },
   'next changes (after-tests-oct28 D1): every step of grown radio songs has a label naming its track, no "undefined", a section step has no row'() {
     const pat = { track: 'kick', level: 1 }, song0 = { tracks: [{ id: 'kick', name: 'kick' }] };
@@ -1114,11 +1174,11 @@ const CHECKS = {
   },
   'no replay (narrator-caption-sync D4, D5): a line the voice helper made after the default voice spoke it is not played late; a line with no sample at all is; none of a batch the speaker spoke already; spokenNeeds carries the step line a narrator line speaks for (sub)'() {
     const wav = (bank, text) => `${bank}/${saySlug(text)}.wav`, heard = 'just google it', fresh = 'a line nobody recorded';
-    const got = [heard, fresh].map(text => ({ text, bank: 'say_en_reed', lang: 'en', voice: 'N', at: 8 }));
-    const kept = lateLines(got, { say_en: [wav('say_en', heard)], say_en_reed: [] }, 'en');
+    const got = [heard, fresh].map(text => ({ text, bank: 'say_en_fred', lang: 'en', voice: 'N', at: 8 }));
+    const kept = lateLines(got, { say_en: [wav('say_en', heard)], say_en_fred: [] }, 'en');
     assert(kept.length === 1 && kept[0].text === fresh, `the default voice's sample present: ${JSON.stringify(kept.map(x => x.text))} played late`);
     assert(lateLines(got, {}, 'en').length === 2, 'no sample at all: a line not played late');
-    assert(!lateLines(got, { say_en_reed: got.map(x => wav('say_en_reed', x.text)) }, 'en').length, 'the speaker spoke them already: a line played late');
+    assert(!lateLines(got, { say_en_fred: got.map(x => wav('say_en_fred', x.text)) }, 'en').length, 'the speaker spoke them already: a line played late');
     // sub: the step line of the step the line speaks for, the same as its caption's tag (D5)
     const C = { ...resolveProfile('switch'), narratorStyle: 'poetic', narrated: true }, B = liveBuildOf(crescendoSong({ ...read('songs/luci-rosse.json'), kind: 'composed' }, { narrated: true, rules: growthRules(C, { styles: recipes }) }), C);
     const needs = spokenNeeds(B, C, 'it', {}).filter(x => x.voice === 'N'), cs = captionSchedule(B, C, 'it', ANY, {});
@@ -1314,8 +1374,8 @@ const CHECKS = {
     // a fake kind: X, above the voice track
     SPEAKER_KINDS.test = { code: 'X', rank: 5, icon: 'note', style: 'sung', colour: 'amber', mark: 'icon+style', exclusive: false, multiCaption: true };
     try {
-      const base = [{ at: 4, voice: 'T', text: 'the towers', bank: 'say_en_reed' }, { at: 4, voice: 'N', text: 'more bass', bank: 'say_en' }];
-      const sch = [...base, { at: 4, voice: 'X', text: 'la la', bank: 'say_en_flo' }];
+      const base = [{ at: 4, voice: 'T', text: 'the towers', bank: 'say_en_fred' }, { at: 4, voice: 'N', text: 'more bass', bank: 'say_en' }];
+      const sch = [...base, { at: 4, voice: 'X', text: 'la la', bank: 'say_en_kathy' }];
       const cs = captionSchedule({ ...B, build: [] }, C, 'en', ANY, {}, { schedule: sch }), S = captionSettings({});
       const rows = captionFrame(cs, 4.1, S).rows;
       assert(cs.some(x => x.kind === 'test' && x.text === 'la la') && rows.map(r => r.kind).join() === 'test,voice,narrator', `fake kind, multiCaption: rows ${rows.map(r => r.kind)}`);

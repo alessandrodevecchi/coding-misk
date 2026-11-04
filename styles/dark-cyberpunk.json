@@ -146,8 +146,8 @@
   "riser": {},
   "voice": {
     "speakers": [
-      "rocko",
-      "eddy"
+      "fred",
+      "junior"
     ],
     "gain": 0.32,
     "pitch": [
@@ -179,7 +179,7 @@
     "weight": 0.3,
     "ways": { "refrain": 2, "passage": 1 },
     "vocab": "dark",
-    "speakers": ["reed", "grandpa"],
+    "speakers": ["albert", "kathy"],
     "lines": {
       "refrain": [
         { "en": "the signal never sleeps", "it": "il segnale non dorme mai" },

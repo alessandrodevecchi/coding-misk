@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 104. With open tasks: 30. All tasks ticked, waiting to be archived: 74.
+OpenSpec changes not archived: 105. With open tasks: 31. All tasks ticked, waiting to be archived: 74.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -42,6 +42,7 @@ OpenSpec changes not archived: 104. With open tasks: 30. All tasks ticked, waiti
 | [poetic-narrator](../../openspec/changes/poetic-narrator/tasks.md) | 4 | 24 |
 | [radio-profiles](../../openspec/changes/radio-profiles/tasks.md) | 1 | 36 |
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
+| [real-voices](../../openspec/changes/real-voices/tasks.md) | 29 | 29 |
 | [settings-polish](../../openspec/changes/settings-polish/tasks.md) | 1 | 14 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
@@ -60,7 +61,7 @@ Snapshot of 2026-10-19 (`gh issue list`). Well-defined work lives in GitHub issu
 
 - **Variety and growth:** `#64` live build in small steps, `#70` parts as ideas, `#71` composed parts, `#72` pattern library, `#73` song functions, `#69` Strudel catalog, `#74` this knowledge base.
 - **Radio:** `#18` endless mode and its phases `#21` to `#26`, `#24` steering, `#40` curves, `#45` extend the song on air, `#49` compilation, `#59` knobs during a compilation, `#38` sessions in playlists.
-- **Voice:** `#39` long spoken passages, `#62` spoken comments in Spanish, `#63` speaker variants sound the same, `#66` more varied voices.
+- **Voice:** `#39` long spoken passages, `#62` spoken comments in Spanish, `#63` speaker variants sound the same (fixed by `real-voices`: four real English speakers), `#66` more varied voices.
 - **Output:** `#8` fast export, `#27` video, `#53` fast video, `#55` console view in the video picture, `#56` new code in the spotlight, `#57` vertical clips, `#60` fragments ready for sharing, `#61` long exports to disk, `#65` timeline in the picture, `#52` a second window with only the picture.
 - **Library and interface:** `#31` settings, `#32` player bar, `#33` code versions, `#34` search, `#36` playlists, `#42` two modes, `#43` genres view, `#44` interface review, `#48` the Guide, `#67` song dates, `#68` trash.
 - **Later or concept:** `#7` more genres, `#16` tracker module track, `#19` device panels, `#26` MCP server (builds on this knowledge base), `#37` use from any device, `#41` add an instrument the song lacks, `#46` song soul, `#47` curves look, `#50` random tools, `#51` invented styles, `#58` new visual scenes.

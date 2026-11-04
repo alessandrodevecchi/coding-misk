@@ -55,7 +55,7 @@
     },
     {
       "id": "words", "name": "Words", "type": "spoken",
-      "settings": { "speaker": "reed", "gain": 0.55, "pitch": 0.8, "room": 0.35, "cutoff": 6000 },
+      "settings": { "speaker": "fred", "gain": 0.55, "pitch": 0.8, "room": 0.35, "cutoff": 6000 },
       "patterns": {
         "open": { "way": "opening", "text": { "en": "the towers never sleep", "it": "le torri non dormono mai" }, "before": "kick" },
         "refrain": { "way": "refrain", "every": 4 }
@@ -64,7 +64,7 @@
     },
     {
       "id": "voice", "name": "Narrator", "type": "voice",
-      "settings": { "speaker": "rocko", "gain": 0.45, "room": 0.4, "cutoff": 7000 },
+      "settings": { "speaker": "albert", "gain": 0.45, "room": 0.4, "cutoff": 7000 },
       "patterns": {}, "clips": []
     }
   ]

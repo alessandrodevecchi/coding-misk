@@ -135,8 +135,10 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   const gs = await page.evaluate(() => ({ room: +document.querySelector('[data-vsound="narrator:room"]').value, style: document.querySelector('[data-vsound-style="narrator"]').value }));
   const ps = await page.evaluate(ti => (document.querySelector(`#track-panel [data-ptrk="${ti}"] [data-vstyle]`) || {}).value, ti);
   check(gs.room === 0.5 && gs.style === 'custom' && ps === 'custom', 'panel to group: the reverb moved in the panel shows in the group, and both style pickers say Custom', JSON.stringify({ gs, ps }));
-  await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'reed'); await sleep(600);
-  check(await page.$eval('[data-vsound="narrator:speaker"]', s => s.value) === 'reed', 'panel to group: the speaker Reed picked in the panel shows in the group');
+  await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'fred'); await sleep(600);
+  check(await page.$eval('[data-vsound="narrator:speaker"]', s => s.value) === 'fred', 'panel to group: the speaker Fred picked in the panel shows in the group');
+  { const o = await page.$eval('[data-vsound="narrator:speaker"]', s => [...s.options].map(x => x.value + '=' + x.textContent));
+    check(o.join() === '=Default (Samantha),albert=Albert,fred=Fred,junior=Junior,kathy=Kathy', 'English speakers (real-voices): the default voice, Albert, Fred, Junior and Kathy, no note', o.join()); }
   await page.click('#cfg-reset').catch(() => {}); await sleep(600);
 
   // ---------- Compose: the voice track ----------
@@ -309,6 +311,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await live('crescendo');
   v = await voices();
   check(v.label === 'Voci' && v.sub === 'Voce: narratore' && v.switchTxt === 'Accesa' && v.narrated === 'Crescita raccontata', 'Italian Compose: Voci, Voce: narratore with Accesa, Crescita raccontata', JSON.stringify(v));
+  // (real-voices: every speaker stays selectable in Italian, with the note that Alice speaks for it; choosing Fred keeps
+  // fred in the song)
+  { const o = await page.$eval('[data-vsound="narrator:speaker"]', s => [...s.options].map(x => x.value + '=' + x.textContent));
+    check(o[0] === '=Predefinita (Alice)' && o.length === 5 && o.slice(1).every(x => /\(solo inglese: in italiano parla Alice\)$/.test(x)) && o[2] === 'fred=Fred (solo inglese: in italiano parla Alice)', 'Italian speakers: each English-only speaker with the note that Alice speaks in Italian', o.join(' | '));
+  }
   const addTxt = await page.evaluate(() => { const b = document.querySelector('#live-vinst [data-vinst-add]'); return b ? b.textContent : ''; });
   check(addTxt === 'Aggiungi Voce: traccia', 'Italian: Aggiungi Voce: traccia', addTxt);
   await page.evaluate(() => localStorage.setItem('coding-misk-voice-folds', JSON.stringify({ 'compose-narrator-sound': true, 'compose-narrator-lines': true })));
@@ -333,6 +340,13 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   if (shots) { await page.evaluate(() => document.querySelector('#radio-steer .steer-voice').scrollIntoView({ block: 'center' })); await shot('#radio-steer .steer-voice', 'console-voce-it.png'); }
   await page.click('#radio-start'); await sleep(800);
   await page.selectOption('#radio-voice [data-vinst="presence"]', 'style'); await sleep(300);
+  // (real-voices, last: an English-only speaker chosen in Italian stays in the song)
+  await open('kellerlicht'); await live('crescendo');
+  await page.evaluate(() => { const d = document.querySelector('[data-vsound="narrator:speaker"]').closest('details'); if (d) d.open = true; });
+  await page.selectOption('[data-vsound="narrator:speaker"]', 'fred'); await sleep(800);
+  { const sp = await page.evaluate(() => { const T = globalThis.codingMiskPatterns.compose().T, n = T.tracks.find(x => x.type === 'voice'); return n && n.settings.speaker; });
+    check(sp === 'fred', 'Italian: choosing Fred keeps fred in the song', String(sp)); }
+  await page.click('#cfg-reset').catch(() => {}); await sleep(600);
 
   check(!errors.length, 'no page errors', errors.join(' | '));
   await browser.close();

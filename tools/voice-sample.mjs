@@ -2,12 +2,17 @@
 // dev server's voice helper (vite.config.js). Today macOS `say` + ffmpeg; another local generator can replace
 // makeSample behind the same signature. Text goes to the programs as an argument, never through a shell.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, execFile } from 'node:child_process';
 // (the file name and bank of src/song/build.js, written again here: vite.config.js loads this file, and a config that
 // imports src/ would restart the dev server at every edit; check:spoken asserts they stay the same)
 export const saySlug = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48);
-export const sayBank = (lang, speaker) => (speaker ? `say_${lang}_${speaker}` : `say_${lang}`);
+// (the speaker table of src/song/build.js, the same way: the speakers and the languages each speaks, real-voices D1, D2)
+export const SPEAKER_LANGS = { albert: ['en'], fred: ['en'], junior: ['en'], kathy: ['en'] };
+export const SPEAKERS = Object.keys(SPEAKER_LANGS);
+export const speaks = (lang, s) => (SPEAKER_LANGS[s] || []).includes(lang);
+export const sayBank = (lang, speaker) => (speaker && speaks(lang, speaker) ? `say_${lang}_${speaker}` : `say_${lang}`);
 
 export const DEFAULT_VOICE = { en: 'Samantha', it: 'Alice' };
 export const MAX_WORDS = 12;
@@ -24,42 +29,122 @@ export function canSpeak() {
   if (!installedVoices().length) return false;
   try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true; } catch (e) { return false; }
 }
-// system voice of a speaker for a language: "Eddy (English (US))" or "Eddy (Inglese (USA))" depending on the system language
+// system voice of a speaker for a language: "Kathy", or "Kathy (English (US))" / "Kathy (Inglese (USA))" depending on the
+// system language; the listed name exactly, so an id never matches a longer name by its start. null when the speaker
+// does not speak the language (real-voices D1) or is not listed.
 export function systemVoice(lang, speaker, defaults = DEFAULT_VOICE) {
   if (!speaker) return defaults[lang];
-  const want = lang === 'it' ? ['it_IT'] : ['en_US', 'en_GB'];
-  for (const loc of want) { const v = installedVoices().find(x => x.locale === loc && x.name.toLowerCase().startsWith(speaker)); if (v) return v.name; }
+  if (!speaks(lang, speaker)) return null;
+  const want = lang === 'it' ? ['it_IT'] : ['en_US', 'en_GB'], is = n => { const x = n.toLowerCase(); return x === speaker || x.startsWith(`${speaker} (`); };
+  for (const loc of want) { const v = installedVoices().find(x => x.locale === loc && is(x.name)); if (v) return v.name; }
   return null;
 }
+// cut the silence at the start, so the word lands on the beat; even loudness for every phrase
+const FFMPEG = (src, out) => ['-y', '-loglevel', 'error', '-i', src, '-af', 'silenceremove=start_periods=1:start_threshold=-45dB,loudnorm=I=-16:TP=-1.5', '-ar', '44100', '-ac', '1', out];
+const run = (cmd, args) => new Promise((res, rej) => execFile(cmd, args, err => (err ? rej(err) : res())));
+// the audio data of a WAV (its `data` chunk, not the header), or null
+export function audioData(file) {
+  let b;
+  try { b = fs.readFileSync(file); } catch (e) { return null; }
+  if (b.toString('ascii', 0, 4) !== 'RIFF') return null;
+  for (let at = 12; at + 8 <= b.length;) {
+    const id = b.toString('ascii', at, at + 4), size = b.readUInt32LE(at + 4);
+    if (id === 'data') return b.subarray(at + 8, Math.min(b.length, at + 8 + size));
+    at += 8 + size + (size % 2);
+  }
+  return null;
+}
+// two WAVs with the same audio data (a speaker that spoke with the default voice: #63)
+export function sameAudio(a, b) { const x = audioData(a), y = audioData(b); return !!(x && y && x.equals(y)); }
+
+// The "not installed" guard (real-voices D5): `say` speaks a voice it lists but does not have with the system voice,
+// without an error. A probe line is made with the voice and with the default voice; the same audio data means the
+// voice is not really there. Cached for the process (one probe per voice and language).
+export const PROBE = { en: 'the city is still awake', it: 'la città è ancora sveglia' };
+const probes = new Map();
+// two renders of the probe line, compared (a sync and an async form: the voice helper must not block)
+const render = (dir, lang, voice, defaults) => [['a', voice], ['b', defaults[lang]]].map(([n, v]) => ({ v, aiff: path.join(dir, `${n}.aiff`), wav: path.join(dir, `${n}.wav`) }));
+async function probe(lang, voice, defaults) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coding-misk-probe-')), r = render(dir, lang, voice, defaults);
+  try {
+    for (const x of r) { await run('say', ['-v', x.v, '-o', x.aiff, PROBE[lang]]); await run('ffmpeg', FFMPEG(x.aiff, x.wav)); }
+    return !sameAudio(r[0].wav, r[1].wav);
+  } catch (e) { return false; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+function probeSync(lang, voice, defaults) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coding-misk-probe-')), r = render(dir, lang, voice, defaults);
+  try {
+    for (const x of r) { execFileSync('say', ['-v', x.v, '-o', x.aiff, PROBE[lang]]); execFileSync('ffmpeg', FFMPEG(x.aiff, x.wav)); }
+    return !sameAudio(r[0].wav, r[1].wav);
+  } catch (e) { return false; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+// whether a system voice sounds different from the default voice of the language (false: listed, not installed).
+// The sync form blocks (npm run voices, checks); the async one does not (the dev server's voice helper).
+const probeKey = (lang, voice, defaults) => `${lang}|${voice}|${defaults[lang]}`;
+export function voiceDiffers(lang, voice, defaults = DEFAULT_VOICE) {
+  if (voice === defaults[lang]) return true;
+  const k = probeKey(lang, voice, defaults), got = probes.get(k);
+  if (typeof got === 'boolean') return got;
+  const r = probeSync(lang, voice, defaults);
+  probes.set(k, r);
+  return r;
+}
+export async function voiceDiffersAsync(lang, voice, defaults = DEFAULT_VOICE) {
+  if (voice === defaults[lang]) return true;
+  const k = probeKey(lang, voice, defaults);
+  if (!probes.has(k)) probes.set(k, probe(lang, voice, defaults).then(r => { probes.set(k, r); return r; }));
+  return probes.get(k);
+}
+// the system voice of a speaker when it is really there: its name, or null (not listed, not in that language, or it
+// speaks like the default voice)
+export function realVoice(lang, speaker, defaults = DEFAULT_VOICE) {
+  const v = systemVoice(lang, speaker, defaults);
+  return v && (!speaker || voiceDiffers(lang, v, defaults)) ? v : null;
+}
+export async function realVoiceAsync(lang, speaker, defaults = DEFAULT_VOICE) {
+  const v = systemVoice(lang, speaker, defaults);
+  return v && (!speaker || (await voiceDiffersAsync(lang, v, defaults))) ? v : null;
+}
+// The per-sample copy guard (D5): a speaker sample with the same audio data as the default voice's sample of the same
+// text is deleted. → true when it was a copy
+export function dropCopy(root, lang, speaker, text) {
+  const bank = sayBank(lang, speaker), def = sayBank(lang);
+  if (bank === def) return false;
+  const f = path.join(root, bank, `${saySlug(text)}.wav`), d = path.join(root, def, `${saySlug(text)}.wav`);
+  if (!fs.existsSync(f) || !fs.existsSync(d) || !sameAudio(f, d)) return false;
+  fs.rmSync(f, { force: true });
+  return true;
+}
 // The sample of a text: public/samples/say_<lang>[_<speaker>]/<slug>.wav. → { bank, file, made } or null when the
-// speaker is not installed. force: make it again when it exists.
+// speaker is not installed (not listed, or it speaks like the default voice); { bank, file: null, made: false, copy:
+// true } when the new sample was a copy of the default voice's (deleted). force: make it again when it exists.
 export function makeSample(text, lang, speaker = '', { root = path.join('public', 'samples'), force = false, defaults = DEFAULT_VOICE } = {}) {
-  const voice = systemVoice(lang, speaker, defaults);
+  const voice = realVoice(lang, speaker, defaults);
   if (!voice) return null;
   const bank = sayBank(lang, speaker), dir = path.join(root, bank), out = path.join(dir, `${saySlug(text)}.wav`);
   if (fs.existsSync(out) && !force) return { bank, file: out, made: false };
   fs.mkdirSync(dir, { recursive: true });
-  const tmp = path.join(dir, `.tmp-${process.pid}-${Date.now()}.aiff`);
+  const tmp = path.join(dir, `.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.aiff`);
   try {
     execFileSync('say', ['-v', voice, '-o', tmp, text]);
-    // cut the silence at the start, so the word lands on the beat; even loudness for every phrase
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', tmp, '-af', 'silenceremove=start_periods=1:start_threshold=-45dB,loudnorm=I=-16:TP=-1.5', '-ar', '44100', '-ac', '1', out]);
+    execFileSync('ffmpeg', FFMPEG(tmp, out));
   } finally { fs.rmSync(tmp, { force: true }); }
+  if (speaker && dropCopy(root, lang, speaker, text)) return { bank, file: null, made: false, copy: true };
   return { bank, file: out, made: true };
 }
-// the same, without blocking (the dev server's voice helper): → a promise of { bank, file, made } or null
-const run = (cmd, args) => new Promise((res, rej) => execFile(cmd, args, err => (err ? rej(err) : res())));
+// the same, without blocking (the dev server's voice helper, npm run voices --jobs): → a promise of the same
 export async function makeSampleAsync(text, lang, speaker = '', { root = path.join('public', 'samples'), force = false, defaults = DEFAULT_VOICE } = {}) {
-  const voice = systemVoice(lang, speaker, defaults);
+  const voice = await realVoiceAsync(lang, speaker, defaults);
   if (!voice) return null;
   const bank = sayBank(lang, speaker), dir = path.join(root, bank), out = path.join(dir, `${saySlug(text)}.wav`);
   if (fs.existsSync(out) && !force) return { bank, file: out, made: false };
   fs.mkdirSync(dir, { recursive: true });
-  const tmp = path.join(dir, `.tmp-${process.pid}-${Date.now()}.aiff`);
+  const tmp = path.join(dir, `.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.aiff`);
   try {
     await run('say', ['-v', voice, '-o', tmp, text]);
-    await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', tmp, '-af', 'silenceremove=start_periods=1:start_threshold=-45dB,loudnorm=I=-16:TP=-1.5', '-ar', '44100', '-ac', '1', out]);
+    await run('ffmpeg', FFMPEG(tmp, out));
   } finally { fs.rmSync(tmp, { force: true }); }
+  if (speaker && dropCopy(root, lang, speaker, text)) return { bank, file: null, made: false, copy: true };
   return { bank, file: out, made: true };
 }
 // the length of a WAV in seconds, read from its header
@@ -75,7 +160,7 @@ export function wavSeconds(file) {
   }
   return null;
 }
-// public/samples/say_lengths.json: the length of every sample ({ "say_en_eddy/the_city.wav": 1.42 }); only: the
+// public/samples/say_lengths.json: the length of every sample ({ "say_en_fred/the_city.wav": 1.42 }); only: the
 // samples to add to the file as it is (the voice helper), else every bank is read again
 export function writeLengths(root = path.join('public', 'samples'), only = null) {
   const file = path.join(root, 'say_lengths.json');
@@ -91,7 +176,7 @@ export function writeLengths(root = path.join('public', 'samples'), only = null)
 // ---------- my-phrases: sample housekeeping (D5, D6, D8), shared with the dev server's voice helper ----------
 // A sample's path relative to public/samples: say_<lang>[_<speaker>]/<slug>.wav, nothing else
 export const SAMPLE_PATH = /^say_([a-z]{2})(_[a-z]+)?\/([a-z0-9_]{1,48})\.wav$/;
-// "say_it_reed/x.wav" → "it|x": the key a page protects (by language and slug, every bank of that language)
+// "say_en_fred/x.wav" → "en|x": the key a page protects (by language and slug, every bank of that language)
 export const protectKey = rel => { const m = SAMPLE_PATH.exec(rel); return m ? `${m[1]}|${m[3]}` : null; };
 // Every say_* bank with its files and sizes (GET /voice/usage): { say_it: [{ f: 'x.wav', b: 81234 }] }
 export function sampleUsage(root = path.join('public', 'samples')) {

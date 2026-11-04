@@ -97,21 +97,23 @@ function voiceless(x, { narrator = false } = {}) {
 }
 // songs of director version 2 at complexity 0 (material-generator): complexity 0 must keep giving them
 // (hashes of director version 16: the explaining phrases of the director grew, #82 new-phrases, so the drawn lines moved)
+// (hashes of director version 17, real-voices: the drawn speakers moved; the songs without speaker fields are the same)
 const PLAIN_V2 = [
-  { seed: 'plain-a', styles: ['berlin-techno'], complexity: 0, songs: '9e725e92' },
-  { seed: 'plain-b', styles: ['synthwave', 'jazz', 'country'], chaos: 1, complexity: 0, songs: '5828d0dd' },
-  { seed: 'plain-c', styles: ['trance', 'phonk', 'melodic-metal', 'drum-and-bass'], chaos: 0.6, complexity: 0, energy: 0.9, minutes: 20, songs: 'ba9a9285' },
-  { seed: 'plain-d', styles: ['ambient', 'lo-fi', 'industrial', 'classic-rock', 'acid', 'house'], chaos: 0.8, complexity: 0, energy: 0.3, minutes: 20, songs: 'edb67a1d' },
+  { seed: 'plain-a', styles: ['berlin-techno'], complexity: 0, songs: '49d8ad72' },
+  { seed: 'plain-b', styles: ['synthwave', 'jazz', 'country'], chaos: 1, complexity: 0, songs: 'cb69eb7f' },
+  { seed: 'plain-c', styles: ['trance', 'phonk', 'melodic-metal', 'drum-and-bass'], chaos: 0.6, complexity: 0, energy: 0.9, minutes: 20, songs: '375ecb97' },
+  { seed: 'plain-d', styles: ['ambient', 'lo-fi', 'industrial', 'classic-rock', 'acid', 'house'], chaos: 0.8, complexity: 0, energy: 0.3, minutes: 20, songs: 'a06d34fc' },
 ];
 // steered songs at complexity 0 and with the source "patterns" (radio-variation): Add and More complex keep today's presets.
 // Hashes recorded before radio-variation; talk 0 (a listener's Add used to fail when the voice commented it).
+// (director version 17, real-voices: the drawn speakers moved, nothing else; hashes recorded again)
 const PLAIN_STEER = [
-  { seed: 'plain-steer-a', styles: ['berlin-techno'], complexity: 0, talk: 0, songs: 'c4fe1f68' },
-  { seed: 'plain-steer-b', styles: ['ambient', 'jazz'], chaos: 1, complexity: 0, talk: 0, songs: '358eb686' },
+  { seed: 'plain-steer-a', styles: ['berlin-techno'], complexity: 0, talk: 0, songs: '8c8e45a6' },
+  { seed: 'plain-steer-b', styles: ['ambient', 'jazz'], chaos: 1, complexity: 0, talk: 0, songs: '251c398e' },
   // (gestures off, director-fold-ring: these cases are about the presets of Add and More complex; the effect gestures of
   // version 15 would move their recorded hashes, and the gestures have checks of their own)
-  { seed: 'plain-steer-c', styles: ['synthwave', 'drum-and-bass'], chaos: 0.5, complexity: 0.8, material: 'patterns', talk: 0, gestures: false, songs: 'a78978f7' },
-  { seed: 'plain-steer-d', styles: ['trance', 'lo-fi', 'phonk'], chaos: 0.8, complexity: 0.5, material: 'patterns', talk: 0, gestures: false, songs: 'fb29ad65' },
+  { seed: 'plain-steer-c', styles: ['synthwave', 'drum-and-bass'], chaos: 0.5, complexity: 0.8, material: 'patterns', talk: 0, gestures: false, songs: '0bc11ba7' },
+  { seed: 'plain-steer-d', styles: ['trance', 'lo-fi', 'phonk'], chaos: 0.8, complexity: 0.5, material: 'patterns', talk: 0, gestures: false, songs: '6b870ef9' },
 ];
 // the steered songs of a PLAIN_STEER case: three songs, each with an Add of every type and a run of More complex
 function plainSteer({ seed, songs: _, ...o }) {
@@ -1171,7 +1173,8 @@ const CHECKS = {
     const h = hashString(JSON.stringify(voiceless(out))).toString(16).padStart(8, '0');
     // (since director version 14 the voice tracks are left out, voiceless: 9475a713 is a6e28951 without them, on develop 0307b02)
     // (director version 16, #82 new-phrases: the director's explaining phrases grew, the drawn lines moved: 9475a713 became 23c4b440)
-    assert(h === '23c4b440', `old commands give other songs: ${h}`);
+    // (director version 17, real-voices: the drawn speakers moved, nothing else: 23c4b440 became 37ce6a37)
+    assert(h === '37ce6a37', `old commands give other songs: ${h}`);
   },
   'arrangement: + and − per instrument, several tracks of one instrument'() {
     let checked = 0;

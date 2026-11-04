@@ -13,6 +13,8 @@ The voice instrument, labelled "Voice: track" (it: "Voce: traccia"; "voice track
 
 Lines are samples made on macOS by `npm run voices`. Without them the track stays silent and the song plays on.
 
+**Speakers and samples (real-voices).** The speakers are `albert`, `fred`, `junior` and `kathy`, English only (`SPEAKER_LANGS` in `src/song/build.js`, copied in `tools/voice-sample.mjs`); the default voice is Samantha in English and Alice in Italian. A line in a language its speaker does not speak plays from the default bank (`sayBank` gives `say_<lang>`), with the track's sound. A removed speaker (`eddy`, `flo`, `grandma`, `grandpa`, `reed`, `rocko`, `sandy`, `shelley`) in saved data reads as the default voice (`speakerId`). `npm run voices` (`--jobs N`, default 4) writes no sample for a speaker whose probe line has the same audio data as the default voice's (listed by `say -v '?'` but not installed), and deletes a speaker sample that came out as a copy of the default voice's; the dev server's voice helper answers 404 `speaker not installed` then. `node tools/voice.mjs --prune` lists the banks of removed speakers and of languages a speaker does not speak; `--prune --yes` deletes exactly those. `npm run check:speakers` proves every speaker sounds different from the default voice.
+
 ## How it connects
 
 - **My phrases (my-phrases, #82).** A line typed in the phrase list or the radio console is offered to the user's phrases (save policy in Settings → Voices and phrases). A vocabulary line of a generated song, of Fill with or New phrases may become a phrase of mine (kind `voice`, the same group or none), drawn on its own stream after the vocabulary; a song's or a style's own lines never change ([phrases.md](phrases.md)).
@@ -81,7 +83,7 @@ Several phrases: one pattern per line (A, B, C…) and one clip per phrase, each
 A spoken track with a chopped word:
 
 ```json
-{"id": "words", "type": "spoken", "settings": {"speaker": "reed", "gain": 0.55}, "patterns": {"chop": {"way": "chop", "text": {"en": "signal", "it": "segnale"}, "slices": 8, "rhythm": "0 ~ 1 ~ 2 3 ~ 3"}}, "clips": [{"start": 16, "bars": 8, "pattern": "chop"}]}
+{"id": "words", "type": "spoken", "settings": {"speaker": "fred", "gain": 0.55}, "patterns": {"chop": {"way": "chop", "text": {"en": "signal", "it": "segnale"}, "slices": 8, "rhythm": "0 ~ 1 ~ 2 3 ~ 3"}}, "clips": [{"start": 16, "bars": 8, "pattern": "chop"}]}
 ```
 
 It plays the word in eight slices on that rhythm, every bar from bar 17 to 24. The Voices example (`songs/examples/06-voices.json`) uses all four ways.

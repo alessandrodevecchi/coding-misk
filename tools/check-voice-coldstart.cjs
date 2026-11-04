@@ -148,7 +148,7 @@ const barNow = page => page.evaluate(() => window.__bar());
   // ---- --repeat: a line heard from the default voice is not played again when the speaker's sample arrives
   if (REPEAT) {
     const ok = await fetch(`${BASE}/voice/status`).then(r => r.json()).then(j => !!(j && j.ok), () => false);
-    const SONG = 'switch-tappe', SPK = 'flo', BANK = `say_en_${SPK}`;
+    const SONG = 'switch-tappe', SPK = 'kathy', BANK = `say_en_${SPK}`;
     const text = ok ? freshPhrase(BANK) : null;
     if (!ok) console.log('skip  --repeat: no voice helper on this dev server (macOS say and ffmpeg)');
     else if (!text) console.log(`skip  --repeat: no fresh phrase left for ${BANK}`);

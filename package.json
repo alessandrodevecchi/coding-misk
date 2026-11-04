@@ -56,6 +56,7 @@
     "check:spoken": "node --no-warnings tools/check-spoken.mjs",
     "check:voice-heard": "node --no-warnings tools/check-voice-heard.mjs",
     "check:samples": "node --no-warnings tools/check-samples.mjs",
+    "check:speakers": "node --no-warnings tools/check-speakers.mjs",
     "knowledge": "node --no-warnings tools/knowledge.mjs",
     "check:knowledge": "node --no-warnings tools/check-knowledge.mjs",
     "durations": "node --no-warnings tools/song-durations.mjs write",

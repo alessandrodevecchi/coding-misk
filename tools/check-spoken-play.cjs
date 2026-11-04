@@ -43,7 +43,7 @@ async function measure(page, i, seconds) {
   {
     const { page, errors } = await open(browser);
     const code = await page.evaluate(() => document.querySelector('strudel-editor').editor.code || '');
-    check(/s\("say_(en|it)_reed"\)/.test(code) && /orbit\(14\)/.test(code), 'the code holds the spoken lines (orbits 13 and 14)');
+    check(/s\("say_(en_fred|it)"\)/.test(code) && /orbit\(14\)/.test(code), 'the code holds the spoken lines (orbits 13 and 14)');
     await page.click('#play'); await sleep(2000);
     if (!(await page.isChecked('#sc-loop'))) await page.click('#sc-loop');
     for (const [i, name] of [[2, 'Break'], [4, 'Outro'], [1, 'Groove']]) {

@@ -21,7 +21,7 @@ import { TRANSITION_KINDS, HARMONY_MODES } from '../src/endless/artist.js';
 import { PRESETS as COMPILATION_PRESETS } from '../src/endless/compilation.js';
 import { SESSION_SOURCES } from '../src/material/index.js';
 import { WAYS, NARRATOR_STYLES } from '../src/song/spoken.js';
-import { SPEAKERS, BUILD_ACTIONS, buildSteps, stateAt } from '../src/song/build.js';
+import { SPEAKERS, SPEAKER_LANGS, BUILD_ACTIONS, buildSteps, stateAt } from '../src/song/build.js';
 import { TYPES } from '../src/song/format.js';
 import { IDEA_KINDS } from '../src/song/ideas.js';
 import { KINDS as PATTERN_KINDS, KIND_TYPE, savedFromTrack, loopSong } from '../src/library/patterns.js';
@@ -444,7 +444,7 @@ const BLOCKS = {
     'spoken-ways'() { return table(['Way', 'Name'], WAYS.map(w => [code(w), both(`way:${w}`)])); },
   },
   narrator: {
-    narrator() { return [`Narrator styles: ${NARRATOR_STYLES.map(code).join(', ')}.`, '', `Speakers (\`SPEAKERS\`): ${SPEAKERS.map(code).join(', ')}.`].join('\n'); },
+    narrator() { return [`Narrator styles: ${NARRATOR_STYLES.map(code).join(', ')}.`, '', `Speakers (\`SPEAKERS\`, with the languages each speaks): ${SPEAKERS.map(s => `${code(s)} (${SPEAKER_LANGS[s].join(', ')})`).join(', ')}; in a language a speaker does not speak, the default voice (Samantha in English, Alice in Italian) speaks.`].join('\n'); },
   },
   sounds: {
     synths() {

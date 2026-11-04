@@ -147,7 +147,7 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   const askDel = await page.textContent('.ph-confirm');
   check(/0 file/.test(askDel), 'deleting a copy of a vocabulary entry deletes no file (spec: shared file)', askDel.trim().slice(0, 90));
   await tap(page, '[data-ph-confirm-yes]'); await sleep(800);
-  check(fs.existsSync(path.join(SAMPLES, 'say_it_reed', 'l_ultimo_treno.wav')) && !(await items(page)).some(p => p.id === copied.id), 'the phrase goes, the built-in sample stays');
+  check(fs.existsSync(path.join(SAMPLES, 'say_it', 'l_ultimo_treno.wav')) && !(await items(page)).some(p => p.id === copied.id), 'the phrase goes, the built-in sample stays');
   // delete "fermi tutti": its own file goes, Undo brings the phrase back
   await tap(page, `[data-ph-del="${fermi.id}"]`); await sleep(1500);
   check(/1 file/.test(await page.textContent('.ph-confirm')), 'the confirmation counts its own file');
@@ -202,24 +202,30 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await page.evaluate(() => [...document.querySelectorAll('.toast .toast-act')].find(b => b.textContent === 'Annulla').click()); await sleep(400);
   both = (await items(page)).filter(p => p.text === 'ecco il basso');
   check(both.length === 2 && both.some(p => p.kind === 'explain' && p.tag === 'bass' && p.uses === 2) && both.some(p => p.kind === 'poetic' && p.uses === 3), 'Annulla: the two phrases back as they were', JSON.stringify(both));
-  // widen again, to Tutte le voci, and delete it with the files of two speakers
+  // widen again, to Tutte le voci with an English translation, and delete it with the files of two speakers (the
+  // speakers speak English only, real-voices: the speaker's file is the English line's, in say_en_kathy)
   await tap(page, `[data-ph-edit="${ex.id}"]`); await sleep(200);
   await page.selectOption('[data-ph-f="kind"]', 'voice+explain+poetic'); await sleep(150);
+  await page.fill('[data-ph-f="alt"]', 'here comes the bass check'); await sleep(100);
   await tap(page, '[data-ph-save]'); await sleep(400);
-  const own = path.join(SAMPLES, 'say_it', 'ecco_il_basso.wav'), reed = path.join(SAMPLES, 'say_it_reed', 'ecco_il_basso.wav');
+  const own = path.join(SAMPLES, 'say_it', 'ecco_il_basso.wav'), kathy = path.join(SAMPLES, 'say_en_kathy', 'here_comes_the_bass_check.wav'), enFile = path.join(SAMPLES, 'say_en', 'here_comes_the_bass_check.wav');
   const madeBass = await until(() => fs.existsSync(own), 15000);
-  if (madeBass && !fs.existsSync(reed)) fs.copyFileSync(own, reed);
+  if (madeBass && !fs.existsSync(kathy)) { fs.mkdirSync(path.dirname(kathy), { recursive: true }); fs.copyFileSync(own, kathy); }
   await tap(page, `[data-ph-del="${ex.id}"]`); await sleep(1500);
-  const askTwo = await page.textContent('.ph-confirm');
-  check(madeBass && /2 file/.test(askTwo), 'a phrase of all three said by two speakers: the confirmation counts both files (spec: delete)', askTwo.trim().slice(0, 90));
+  const askTwo = await page.textContent('.ph-confirm'), nTwo = +((/(\d+) file/.exec(askTwo) || [])[1] || 0);
+  // (the default voice's English sample may still be on its way: 2 or 3 files)
+  check(madeBass && nTwo >= 2 && nTwo <= 3, 'a phrase of all three said by two speakers: the confirmation counts the default voice\'s file and Kathy\'s (spec: delete)', askTwo.trim().slice(0, 90));
   await tap(page, '[data-ph-confirm-yes]'); await sleep(1200);
-  check(!fs.existsSync(own) && !fs.existsSync(reed), 'both files deleted');
-  for (const f of [own, reed]) try { fs.unlinkSync(f); } catch (e) { /* gone */ }
+  check(!fs.existsSync(own) && !fs.existsSync(kathy), 'both files deleted');
+  for (const f of [own, kathy, enFile]) try { fs.unlinkSync(f); } catch (e) { /* gone */ }
 
   // ---------- 4. voices and the test bench ----------
   await tap(page, '[data-vt-sub="voices"]'); await sleep(2500);
   const cards = await page.$$eval('.vt-speaker', c => c.length);
-  check(cards === 9, 'Voci e suoni: the default voice and eight speakers', String(cards));
+  check(cards === 5, 'Voci e suoni: the default voice and four speakers', String(cards));
+  // (real-voices: an English-only speaker's Italian row says Alice speaks instead, never "not installed")
+  { const k = await page.$eval('.vt-speaker[data-vt-speaker="kathy"]', el => el.textContent.replace(/\s+/g, ' '));
+    check(/non parla italiano: parla Alice al suo posto/.test(k) && !/non installata/.test(k) && /Kathy/.test(k), 'Voci e suoni: Kathy in Italian, Alice speaks instead, no "not installed"', k.slice(0, 160)); }
   await page.fill('[data-vt-bench="text"]', 'prova del banco notturno'); await tap(page, '[data-vt-bench-hear]'); await sleep(2500);
   const ledger = (() => { try { return JSON.parse(fs.readFileSync(path.join(SAMPLES, 'say_temp.json'), 'utf8')); } catch (e) { return {}; } })();
   check(!!ledger['say_it/prova_del_banco_notturno.wav'], 'the test bench line is a temporary sample', Object.keys(ledger).join());
@@ -294,6 +300,9 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await openTab(page, 'mine');
   const en = await page.$$eval('[data-vt-sub]', b => b.map(x => x.textContent).join(','));
   check(en === 'My phrases,Built-in vocabularies,Voices and sounds,Samples', 'English section names', en);
+  await openTab(page, 'voices'); await sleep(2500);
+  { const k = await page.$eval('.vt-speaker[data-vt-speaker="kathy"]', el => el.textContent.replace(/\s+/g, ' '));
+    check(/English Kathy/.test(k) && /does not speak Italian: Alice speaks instead/.test(k) && !/not installed/.test(k), 'Voices and sounds in English: Kathy\'s system voice for English, Alice speaks instead in Italian', k.slice(0, 160)); }
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `\n${failed} failed` : '\nall passed');
