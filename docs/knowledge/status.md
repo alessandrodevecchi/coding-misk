@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 104. With open tasks: 30. All tasks ticked, waiting to be archived: 74.
+OpenSpec changes not archived: 107. With open tasks: 33. All tasks ticked, waiting to be archived: 74.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -41,8 +41,10 @@ OpenSpec changes not archived: 104. With open tasks: 30. All tasks ticked, waiti
 | [performance-profiles](../../openspec/changes/performance-profiles/tasks.md) | 1 | 9 |
 | [player-bar](../../openspec/changes/player-bar/tasks.md) | 1 | 8 |
 | [poetic-narrator](../../openspec/changes/poetic-narrator/tasks.md) | 4 | 24 |
+| [radio-invented-style-chip](../../openspec/changes/radio-invented-style-chip/tasks.md) | 7 | 7 |
 | [radio-profiles](../../openspec/changes/radio-profiles/tasks.md) | 1 | 36 |
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
+| [real-voices](../../openspec/changes/real-voices/tasks.md) | 29 | 29 |
 | [settings-polish](../../openspec/changes/settings-polish/tasks.md) | 1 | 14 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |

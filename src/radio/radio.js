@@ -43,7 +43,7 @@ import { speakerOf, narratorSpeaker } from '../song/spoken.js';
 import { SPEAKERS } from '../song/build.js';
 import { voicePanel, voiceEvent } from '../endless/voice-panel.js';
 import { voiceSoundHtml, syncVoiceSound, soundEvent, nextSound, cleanSound, isAutoSound, soundShown } from '../endless/voice-sound.js';
-import { dieHtml, knobSlider, artistChips, styleChips, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, lengthChips, applyTrial } from './song-controls.js';
+import { dieHtml, knobSlider, artistChips, styleChips, trialChip, trialHint, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, lengthChips, applyTrial } from './song-controls.js';
 import { hasLength } from '../endless/song-options.js';
 import { createLoadMonitor } from './load-monitor.js';
 
@@ -1546,6 +1546,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     spObserve(el);
   }
 
+  // a style the compilation invented for the song on air: the Invent trial's chip and hint, with Keep only
+  // (radio-invented-style-chip D1, D2); the same in Now playing and in the STYLES block
+  const compStyleOf = item => item && item.comp && item.comp.kind === 'invented' && item.comp.style && !recipes.some(r => r.id === item.comp.style.id) ? item.comp.style : null;
+  const compChip = style => trialChip({ t, tx, esc, style, actions: 'keep', label: t('inventBadgeShort'), keepAttr: 'data-comp-keep-style' });
+  const compHint = style => trialHint({ t, tx, esc, recipes, style, label: t('inventCompHint'), back: false });
   function renderNow(cyc) {
     const box = root.querySelector('#radio-now');
     if (!box || dragging) return;
@@ -1560,9 +1565,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const next = nextRows(song, scheduleOf(item), rel, 3);
     const nextSong = S.stream[S.onAir + 1];
     box.innerHTML = `<div class="lbl">${esc(t('radioNow'))} · ${esc(e.lead ? t('radioLeadShort') : t('radioSongN', { n: item.n + 1 }))}</div>
-      ${item.comp ? `<div class="comp-tag"><span class="chip small">${esc(item.comp.start + item.comp.length - item.n <= 1 ? t('compNextOne') : t('compNext', { n: item.comp.start + item.comp.length - item.n }))}</span>${item.comp.kind === 'random' && !artists().some(a => a.name === item.comp.artist.name) ? `<button class="chip small" data-comp-keep title="${esc(t('diceKeepHint'))}">${esc(t('diceKeep'))} ${esc(item.comp.artist.name)}</button>` : ''}${item.comp.kind === 'invented' && item.comp.style && !recipes.some(r => r.id === item.comp.style.id) ? `<button class="chip small" data-comp-keep-style title="${esc(t('inventKeepHint'))}">${esc(t('diceKeep'))} ${esc(tx(item.comp.style.name))} · ${esc(t('inventBadgeShort'))}</button>` : ''}</div>` : ''}
+      ${item.comp ? `<div class="comp-tag"><span class="chip small">${esc(item.comp.start + item.comp.length - item.n <= 1 ? t('compNextOne') : t('compNext', { n: item.comp.start + item.comp.length - item.n }))}</span>${item.comp.kind === 'random' && !artists().some(a => a.name === item.comp.artist.name) ? `<button class="chip small" data-comp-keep title="${esc(t('diceKeepHint'))}">${esc(t('diceKeep'))} ${esc(item.comp.artist.name)}</button>` : ''}</div>${compStyleOf(item) ? `${compChip(compStyleOf(item))}${compHint(compStyleOf(item))}` : ''}` : ''}
       ${e.artist ? `<div class="radio-artist">${(() => { const a = artistOf(e.artist.id); return a ? `<img class="portrait tiny" src="${face(a)}" alt="">` : ''; })()}<span>${esc(e.artist.name)}</span>${e.artist.quirks && e.artist.quirks.length ? `<span class="muted small">· ${esc(e.artist.quirks.map(q => tx(QUIRKS[q] || { en: q })).join(', '))}</span>` : ''}</div>` : ''}
-      ${onTrial(e) ? `<div class="trial-tag"><span class="chip small" title="${esc(t('inventTrialSongTip'))}">${esc(t('inventTrialSong'))}</span></div>` : ''}
+      ${onTrial(e) && !compStyleOf(item) ? `<div class="trial-tag"><span class="chip small" title="${esc(t('inventTrialSongTip'))}">${esc(t('inventTrialSong'))}</span></div>` : ''}
       <h3 class="radio-title">${esc(song.title)}</h3>
       <div class="radio-meta">${esc(e.key)} · ${e.bpm} BPM · ${esc(e.meter)}${e.shape ? ` · ${esc(t('shape_' + e.shape))}` : ''}</div>
       <div class="radio-profile-now" data-profile-now="${esc(profileOf(item))}" title="${esc(t('radioProfileNowTip'))}">${profileLine(item)}</div>
@@ -1636,15 +1641,18 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         <div class="comp-row"><span class="out-combo"><button class="btn comp-btn" id="radio-comp" aria-pressed="${opts.compilation !== 'off'}" title="${esc(t('compTip'))} · ${esc(opts.compilation === 'song' ? t('compEverySong') : opts.compilation === 'some' ? t('compEverySome') : t('compOff'))}">${esc(t('compBtn'))}<span class="comp-lamps" aria-hidden="true"><i class="${opts.compilation === 'song' ? 'on' : ''}"></i><b>1</b><i class="${opts.compilation === 'some' ? 'on' : ''}"></i><b>2–4</b></span></button>
           <button class="comp-setup-btn" id="radio-comp-setup" aria-expanded="${compOpen}" aria-label="${esc(t('compSetup'))}" ${tip('compSetupTip')}>${GEAR}<span class="comp-lcd">${esc(presetName(opts.compPreset))}</span></button></span></div>
         ${compOpen ? setupPanel() : ''}
-        <div class="${opts.compilation !== 'off' ? 'set-aside' : ''}">
-        ${opts.compilation !== 'off' ? `<p class="hint muted small">${esc(t('compAside'))}</p>` : ''}
-        <div class="ctrl" ${tip('tipArtist')}><span class="lbl">${esc(t('radioArtist'))} ${die('artist', 'diceArtist')}</span>
+        ${(() => {
+          // the compilation sets artist and styles aside; the invented style's chip is live, so it sits outside the dimming
+          const aside = h => (comp ? `<div class="set-aside">${h}</div>` : h), cs = compStyleOf(S && S.stream[S.onAir]);
+          const hintP = comp ? `<p class="hint muted small">${esc(t('compAside'))}</p>` : '';
+          const artistCtrl = `<div class="ctrl" ${tip('tipArtist')}><span class="lbl">${esc(t('radioArtist'))} ${die('artist', 'diceArtist')}</span>
           ${artistChips({ state: opts, t, tx, esc, artists: artists(), face })}
-        </div>
-        <div class="ctrl" ${tip('tipStyles')}><span class="lbl">${esc(t('radioStyles'))} ${die('styles', 'diceStyles', t('diceStylesLbl'))} ${die('genre', 'diceGenre', t('diceGenreLbl'))} ${die('invent', 'diceInvent', t('diceInventLbl'))}</span>
-          ${styleChips({ state: opts, recipes, t, tx, esc })}
-        </div>
-        </div>
+        </div>`;
+          const stylesLbl = `<span class="lbl">${esc(t('radioStyles'))} ${die('styles', 'diceStyles', t('diceStylesLbl'))} ${die('genre', 'diceGenre', t('diceGenreLbl'))} ${die('invent', 'diceInvent', t('diceInventLbl'))}</span>`;
+          const chips = styleChips({ state: opts, recipes, t, tx, esc });
+          if (!cs) return `<div class="${comp ? 'set-aside' : ''}">${hintP}${artistCtrl}<div class="ctrl" ${tip('tipStyles')}>${stylesLbl}${chips}</div></div>`;
+          return `<div class="${comp ? 'set-aside' : ''}">${hintP}${artistCtrl}</div><div class="ctrl" ${tip('tipStyles')}>${aside(stylesLbl)}<div class="comp-style-live">${compChip(cs)}${compHint(cs)}</div>${aside(chips)}</div>`;
+        })()}
         ${diceRow(sc)}
         ${comp ? `<p class="hint muted small comp-knobs-hint">${esc(t('compKnobAutoTip'))}</p>` : ''}<div class="ctrls three">${slider('chaos', 'radioChaos', 'tipChaos')}${slider('energy', 'radioEnergy', 'tipEnergy')}${slider('complexity', 'radioComplexity', 'tipComplexity')}</div>
         ${materialSeg(sc, { showDefault: true })}
@@ -1742,7 +1750,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (b.dataset.compRandom !== undefined) return editSetup(S0 => { S0.randomArtists = !S0.randomArtists; });
     // invented styles in the compilation (invented-styles D11, phase 2): off by default
     if (b.dataset.compInvented !== undefined) return editSetup(S0 => { S0.invented = S0.invented !== true; });
-    if (b.dataset.compKeepStyle !== undefined && S) { const it = S.stream[S.onAir]; if (it.comp && it.comp.style && keepStyle) { keepStyle(it.comp.style); toast(t('inventKept')); renderNow(); } return; }
+    // (Keep acts on pointerdown, see below; a click with no pointer, from the keyboard, does the same)
+    if (b.dataset.compKeepStyle !== undefined) { if (e.detail === 0) keepCompStyle(); return; }
     if (b.id === 'comp-save') { const name = (root.querySelector('#comp-name').value || '').trim(); if (!name || PRESETS[name]) { toast(t('compNameBad')); return; } const all = userPresets(); all[name] = JSON.parse(JSON.stringify(opts.compSetup)); store.set('coding-misk-comp-presets', all); opts.compPreset = name; saveOpts(); render(); return toast(t('compSaved', { name })); }
     if (b.id === 'comp-del') { const all = userPresets(); delete all[opts.compPreset]; store.set('coding-misk-comp-presets', all); opts.compPreset = 'custom'; saveOpts(); return render(); }
     if (b.dataset.compKeep !== undefined && S) { const it = S.stream[S.onAir]; if (it.comp && it.comp.artist) { keepArtist(it.comp.artist); toast(t('diceKept')); renderNow(); } return; }
@@ -1807,7 +1816,16 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // dragging a handle of a curve: the square follows the pointer, the values box shows the part, the command is
   // queued on release
   const onAir = () => S && S.stream[S.onAir];
+  // Keep for a style the compilation invented: on pointer down, because Now playing is redrawn about every 250 ms and a
+  // click (down and up on the same button) is lost when the button is rebuilt between the two (radio-invented-style-chip D4)
+  function keepCompStyle() {
+    const style = compStyleOf(S && S.stream[S.onAir]);
+    if (!style || !keepStyle) return;
+    keepStyle(style); toast(t('inventKept')); render();
+  }
   root.addEventListener('pointerdown', e => {
+    const kb = e.target.closest && e.target.closest('[data-comp-keep-style]');
+    if (kb && e.button === 0) { e.preventDefault(); return keepCompStyle(); }
     const hnd = e.target.closest('rect.handle'); if (!hnd || !S) return;
     const svg = hnd.closest('svg');
     dragging = { d: +hnd.dataset.d, curve: hnd.dataset.curve, hnd, svg, value: null };

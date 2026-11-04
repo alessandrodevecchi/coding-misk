@@ -33,6 +33,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Radio: a style the compilation invents shows in Now playing and in On air, STYLES as the same chip and hint as the Invent die's trial style, with an explicit Keep.
 - "Fully narrated" is now "Narrated growth".
 - The Compose Voices group is always shown; narrator controls that cannot apply are disabled with the reason.
 - New-song voice instrument settings moved from the Compose toolbar to the "In the next song" row of the Voices group.
@@ -47,6 +48,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - The radio narrator switch works with every profile.
 - The poetic narrator keeps the step lines with Narrated growth.
 - The narrator track of generated and built-in songs is named Narrator.
+
+### Fixed
+
+- Radio: Keep on a style invented by the compilation saves it with one click while Now playing is redrawn.
 
 ### Removed
 
