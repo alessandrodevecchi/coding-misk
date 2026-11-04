@@ -9,7 +9,7 @@ With the compilation on, "Now playing" shows a small chip "Keep Pollendrive · i
 - **Now playing:** the chip for a style invented by the compilation becomes the same chip and hint as the trial style of the Invent die: name, "invented", genre, description, an explicit Keep button. Keep saves the style exactly as Invent's Keep does.
 - **Left column:** while a compilation-invented style plays, it also shows in the STYLES block as the same chip, so the column looks the same with and without the compilation.
 - **Click reliability:** Keep reacts to a single click while the card is rebuilt: the Keep button acts on `pointerdown`.
-- **Left-column chip is live:** full colour, not greyed, above the greyed style chips; clicking it keeps the style.
+- **Left-column chip is live:** full colour, not greyed, above the greyed style chips; its Keep button keeps the style (the name does nothing).
 - **Unchanged:** compilation off, the Invent die, the Styles tab, the saved session recipe, how the director picks and invents styles. No new setting.
 
 ## Capabilities

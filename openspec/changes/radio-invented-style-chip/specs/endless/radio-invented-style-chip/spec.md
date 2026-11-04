@@ -14,14 +14,14 @@ A style invented by the compilation for the song on air SHALL show in "Now playi
 - **THEN** Now playing shows the chip with the style name, its genre, its description and a visible Keep button
 
 ### Requirement: The style also shows in the left column
-While a compilation-invented style plays, the STYLES block of the On air column SHALL show the same chip and hint above the style chips, so the column looks the same with and without the compilation. The chip SHALL have no Again and no discard action. It SHALL be a normal full-colour chip: not greyed, not disabled, and outside the dimming of the set-aside style chips. Clicking it SHALL run the same action as Keep; it SHALL NOT toggle the style.
+While a compilation-invented style plays, the STYLES block of the On air column SHALL show the same chip and hint above the style chips, so the column looks the same with and without the compilation. The chip SHALL have no Again and no discard action. It SHALL be a normal full-colour chip: not greyed, not disabled, and outside the dimming of the set-aside style chips. Only its Keep button SHALL save the style, with the same action as Keep in Now playing; clicking the name SHALL do nothing and SHALL NOT toggle the style.
 
 #### Scenario: Chip in both places
 - **WHEN** an invented style plays with the compilation on
 - **THEN** the same chip shows in Now playing and in On air, STYLES, with the same name and the same Keep
 
 #### Scenario: Left-column chip is live
-- **WHEN** the compilation is on and the listener clicks the chip in On air, STYLES
+- **WHEN** the compilation is on and the listener clicks Keep on the chip in On air, STYLES
 - **THEN** the style is kept as with Keep in Now playing, and the chip looks as active as any normal chip before the click
 
 ### Requirement: Keep saves like Invent's Keep
