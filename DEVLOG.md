@@ -2513,3 +2513,13 @@ Ramo `feat/82-invented-style-chip`, change OpenSpec `radio-invented-style-chip` 
 - **Codice:** `trialChip` e `trialHint` in `src/radio/song-controls.js` prendono stile, azioni ed etichetta come parametri; `compStyleOf`, `compChip`, `compHint` e `keepCompStyle` in `src/radio/radio.js`; una chiave nuova `inventCompHint`. Il tag «style on trial» di Now playing non compare più per questi stili (sarebbe in contrasto con «invented»).
 - **Clic perso (task 1.1):** riprodotto prima della correzione con un clic lento (giù, 600 ms, su): `renderNow` ricostruisce il nodo ogni ~250 ms, il clic non parte, lo stile non viene salvato. Causa confermata. Correzione: Keep agisce su `pointerdown` solo su questo bottone; da tastiera resta il `click` (`detail === 0`).
 - **Controlli:** nuovo `tools/check-invented-chip.cjs` (chip nei due posti, colore pieno, nessun Again/×, nome inerte, segue il brano, clic lento, Keep a sinistra, compilation off invariata).
+
+## 2026-11-05 modifica di una frase persa in background
+
+Ramo `feat/82-voice-style-combos`.
+
+- **Sintomo:** `tools/check-voices-tab.cjs` falliva su «Modifica: the moment changed» su `develop` dopo il merge di real-voices.
+- **Causa:** bug dell'app, non del test. Il tab Voci ridisegna tutto (`render()`) quando finisce un campione (`prepare`), quando legge l'uso dei campioni e quando cambiano le frasi; il form di modifica aperto viene ricostruito da `ui.form`, che contiene solo i valori dell'ultima apertura. Una scelta non ancora salvata (il momento, il testo) spariva se il ridisegno arrivava tra la scelta e Salva. Il test modifica la frase subito dopo che il suo campione esiste: con il campione già presente nella cartella (rimasto da giri precedenti) il ridisegno di fine `prepare` cade proprio lì. A server caldo passa, a freddo no: per questo sembrava comparire col merge.
+- **Riprodotto:** risposta di `/voice/say` ritardata di 1,5 s, modifica aperta, momento cambiato: dopo il ridisegno il form tornava a «breakdown» e veniva salvato quello.
+- **Correzione:** `refresh()` in `src/voices/voices-tab.js` legge il form aperto (`readForm`) prima di ridisegnare; la usano i ridisegni che non vengono dal form (campione fatto, uso letto, frasi cambiate altrove). I ridisegni del form stesso (apertura, cambio di tipo) restano `render()`.
+- **Controllo:** nuovo caso in `check-voices-tab.cjs` con la risposta ritardata («a sample made while the form is open keeps the moment picked»); 66 su 66.

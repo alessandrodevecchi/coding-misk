@@ -57,6 +57,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- An unsaved change in the phrase editor of the Voices tab is no longer lost when a sample finishes in the background.
 - Radio: Keep on a style invented by the compilation saves it with one click while Now playing is redrawn.
 
 ### Removed

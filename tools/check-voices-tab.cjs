@@ -6,8 +6,9 @@
 // of samples while a song plays (the code's sample numbers follow the new manifest), the Settings card, English, the
 // hardware and light themes and 400 px (no sideways scroll). phrase-any-voice: the five options of Chi la dice, the tag
 // field hidden for several kinds and back on Any when narrowed, the row and the kind chips, the merge with Annulla, and
-// a delete that counts the files of two speakers. With shots-dir: pictures of the tab, the phrase editor,
-// the Settings card and the Chiedi notice in neon, hardware and light, at desktop and 400 px.
+// a delete that counts the files of two speakers; a sample made while the edit form is open. With shots-dir: pictures
+// of the tab, the phrase editor, the Settings card and the Chiedi notice in neon, hardware and light, at desktop and
+// 400 px.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices-tab.cjs [shots-dir]
 //   (dev server on PORT, default 5173, with the voice helper: macOS `say` and ffmpeg; samples in public/samples)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -133,6 +134,17 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await tap(page, `[data-ph-edit="${fermi.id}"]`); await sleep(200);
   await page.selectOption('[data-ph-f="tag"]', 'drop'); await tap(page, '[data-ph-save]'); await sleep(300);
   check((await items(page)).find(p => p.id === fermi.id).tag === 'drop', 'Modifica: the moment changed');
+  // a sample made while the form is open (the tab renders again in the background) keeps what was picked and not saved
+  await page.route('**/voice/say', async r => { await sleep(1200); await r.fulfill({ status: 200, contentType: 'application/json', body: '{"bank":"say_it","n":0,"seconds":1,"made":true}' }).catch(() => {}); });
+  await tap(page, '[data-ph-new]'); await sleep(200);
+  await page.fill('[data-ph-f="text"]', 'corsa contro il tempo'); await page.selectOption('[data-ph-f="kind"]', 'explain'); await sleep(200);
+  await tap(page, '[data-ph-save]'); await sleep(200);
+  const corsa = (await items(page)).find(p => p.text === 'corsa contro il tempo');
+  await tap(page, `[data-ph-edit="${corsa.id}"]`); await sleep(100);
+  await page.selectOption('[data-ph-f="tag"]', 'drop'); await sleep(1800);
+  await tap(page, '[data-ph-save]'); await sleep(300);
+  check((await items(page)).find(p => p.id === corsa.id).tag === 'drop', 'Modifica: a sample made while the form is open keeps the moment picked');
+  await page.evaluate(id => globalThis.codingMiskPhrases.phr.remove(id), corsa.id); await page.unroute('**/voice/say'); await sleep(300);
   // copy a vocabulary entry: kind voice, tag night, source copy (spec: copy)
   await tap(page, '[data-vt-sub="vocab"]'); await sleep(300);
   await tap(page, '[data-vt-group="voice-night"]'); await sleep(200);
