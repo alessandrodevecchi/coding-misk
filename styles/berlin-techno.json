@@ -239,5 +239,9 @@
     "weight": 0.1,
     "ways": { "refrain": 1, "chop": 1 },
     "vocab": "machine"
+  },
+  "growthShapes": {
+    "openings": { "full-kick": 1, "filtered": 2, "slow": 2, "broken": 1, "top": 1, "bass": 1, "typed": 1 },
+    "kicks": { "four": 1, "one": 1, "off": 1, "two": 1 }
   }
 }

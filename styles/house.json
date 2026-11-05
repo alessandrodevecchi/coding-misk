@@ -187,7 +187,8 @@
     ]
   },
   "growthShapes": {
-    "openings": { "broken": 2, "muted-base": 2, "slow": 1 },
+    "openings": { "full-kick": 2, "filtered": 1, "slow": 2, "broken": 1, "chord": 2, "bass": 1, "top": 1, "muted-base": 1 },
+    "kicks": { "four": 2, "one": 1, "two": 1, "push": 1 },
     "paces": { "medium": 2, "fast": 1 }
   },
   "spoken": {

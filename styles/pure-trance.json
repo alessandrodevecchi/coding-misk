@@ -190,7 +190,8 @@
     ]
   },
   "growthShapes": {
-    "openings": { "full-kick": 3, "slow": 1, "typed": 1 },
+    "openings": { "full-kick": 3, "filtered": 1, "slow": 1, "pad": 1, "melodic": 1, "typed": 1 },
+    "kicks": { "four": 2, "one": 1, "two": 1 },
     "paces": { "fast": 3, "medium": 1 }
   }
 }

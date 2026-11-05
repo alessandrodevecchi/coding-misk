@@ -185,5 +185,9 @@
     "weight": 0.15,
     "ways": { "opening": 1, "refrain": 1, "chop": 1 },
     "vocab": "night"
+  },
+  "growthShapes": {
+    "openings": { "melodic": 2, "pad": 2, "bass": 2, "chord": 1, "full-kick": 1, "slow": 1, "filtered": 1 },
+    "kicks": { "four": 2, "two": 2, "one": 1 }
   }
 }

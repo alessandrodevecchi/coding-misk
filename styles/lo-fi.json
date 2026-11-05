@@ -188,7 +188,8 @@
     ]
   },
   "growthShapes": {
-    "openings": { "pad": 2, "melodic": 2, "typed": 1 },
+    "openings": { "chord": 3, "bass": 2, "melodic": 1, "pad": 1, "top": 1, "slow": 1, "typed": 1 },
+    "kicks": { "one": 1, "pair": 2, "two": 1 },
     "paces": { "slow": 3, "medium": 1 }
   },
   "spoken": {

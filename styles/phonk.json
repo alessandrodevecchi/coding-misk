@@ -174,5 +174,9 @@
     "weight": 0.1,
     "ways": { "refrain": 1, "chop": 1 },
     "vocab": "dark"
+  },
+  "growthShapes": {
+    "openings": { "melodic": 3, "bass": 2, "broken": 1, "slow": 1, "top": 1, "voice": 1 },
+    "kicks": { "pair": 2, "one": 1, "two": 1 }
   }
 }

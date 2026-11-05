@@ -176,5 +176,9 @@
     "weight": 0.05,
     "ways": { "opening": 1, "passage": 1 },
     "vocab": "dark"
+  },
+  "growthShapes": {
+    "openings": { "chord": 2, "full-kick": 2, "melodic": 2, "pad": 1, "top": 1 },
+    "kicks": { "four": 1, "two": 1, "one": 1 }
   }
 }

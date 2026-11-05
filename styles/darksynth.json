@@ -220,5 +220,9 @@
     "weight": 0.15,
     "ways": { "opening": 1, "refrain": 1, "chop": 1 },
     "vocab": "dark"
+  },
+  "growthShapes": {
+    "openings": { "bass": 2, "full-kick": 2, "melodic": 2, "filtered": 1, "slow": 1, "pad": 1 },
+    "kicks": { "four": 1, "two": 1, "one": 1 }
   }
 }

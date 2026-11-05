@@ -28,8 +28,8 @@
 
 ## 5. Opening weights in the style recipes
 
-- [ ] 5.1 Add `growthShapes.openings` and `growthShapes.kicks` from `design.md` (Appendix, Openings per style) to all 20 recipes, replacing the six existing opening tables. Verify: `npm run check:styles` passes, and every recipe has both fields.
-- [ ] 5.2 Run `npm run probe:openings -- --check`. Tune weights (not rules) until every target passes; record the final numbers in `design.md` (Appendix, section Result). Verify: exit code 0, and the result table committed.
+- [x] 5.1 Add `growthShapes.openings` and `growthShapes.kicks` from `design.md` (Appendix, Openings per style) to all 20 recipes, replacing the six existing opening tables. Verify: `npm run check:styles` passes, and every recipe has both fields.
+- [x] 5.2 Run `npm run probe:openings -- --check`. Tune weights (not rules) until every target passes; record the final numbers in `design.md` (Appendix, section Result). Verify: exit code 0, and the result table committed.
 
 ## 6. Compose, Guide and docs
 

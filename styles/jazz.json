@@ -165,5 +165,9 @@
     "weight": 0.05,
     "ways": { "opening": 1, "passage": 1 },
     "vocab": "night"
+  },
+  "growthShapes": {
+    "openings": { "top": 3, "bass": 3, "chord": 2, "melodic": 1, "typed": 0.5 },
+    "kicks": { "one": 1, "two": 1 }
   }
 }

@@ -203,7 +203,8 @@
     ]
   },
   "growthShapes": {
-    "openings": { "pad": 3, "melodic": 1, "typed": 1 },
+    "openings": { "pad": 3, "melodic": 1, "chord": 1, "typed": 1, "voice": 0.5 },
+    "kicks": { "one": 1, "off": 1 },
     "paces": { "slow": 3, "medium": 1 }
   }
 }

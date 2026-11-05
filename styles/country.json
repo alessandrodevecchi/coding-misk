@@ -167,5 +167,9 @@
       "Frontera"
     ]
   },
-  "spoken": { "weight": 0 }
+  "spoken": { "weight": 0 },
+  "growthShapes": {
+    "openings": { "chord": 3, "bass": 1, "top": 1, "melodic": 1, "slow": 1 },
+    "kicks": { "two": 2, "one": 2 }
+  }
 }
