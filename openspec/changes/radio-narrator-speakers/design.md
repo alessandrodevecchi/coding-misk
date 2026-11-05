@@ -56,9 +56,11 @@ Narrator texts: 248 unique (112 POOL phrases, 6 interlude comments, 132 poetic i
 
 `combos.json` (voice-style-combos) limits the characters a speaker gets (`allowedCharacters`, `allowedForDraw`), not the speakers that narrate. A speaker with no allowed character still narrates with its plain voice. So the narrator set of D1 is not filtered by `combos.json`, and the sound a line gets does not depend on which sample exists. The change only makes the sample of the speaker already drawn. Alternative: drop a speaker with no allowed style from the set. Rejected because the director still draws it, and its lines would fall back to the default voice again.
 
-### D3. On-demand narrator lines in the radio
+### D3. On-demand speaker lines in the radio
 
-`missingNeeds(list, files, mineSlugs, { narrator: true })` also keeps a line when `x.voice === 'N'`, its speaker has no sample (`!x.has`) and the speaker is not the default voice. `needs()` in the radio passes `{ narrator: true }`. Compose's `needsOf` does not, so Compose asks for the same lines as before. The existing queue (one at a time, batches of up to 6, next song first) and `samplesArrived()` preload (radio-phrase-speaker D3) handle the new requests. This supersedes the radio-phrase-speaker scenario "Built-in line" for narrator lines only; voice-track lines and vocabulary keep that rule.
+`missingNeeds(list, files, mineSlugs, { speakers: true })` also keeps a line when it has a speaker (`x.speaker`, not the default voice) and that speaker has no sample (`!x.has`), whatever the line's kind: a narrator line, a voice-track line or a vocabulary entry (owner answer, Open Question 2). `needs()` in the radio passes `{ speakers: true }`. Compose's `needsOf` does not, so Compose asks for the same lines as before. The existing queue (one at a time, batches of up to 6, next song first) and `samplesArrived()` preload (radio-phrase-speaker D3) handle the new requests. This supersedes the radio-phrase-speaker scenario "Built-in line" in the radio; Compose keeps that rule.
+
+`spokenNeeds` lists a narrator line under its speaker's own bank (`narratorLines` with `all`), also when the default voice's sample would speak it, as its comment already said. Before, a narrator line whose speaker had no sample was listed under `say_en` with `has: true`, so no rule could ask for it. Compose's result is the same for built-in lines (the default voice has them); a phrase of mine said by a narrator speaker is now asked in that speaker's bank in Compose too, as phrase-any-voice D7 asks.
 
 Alternative: only D1 (no on-demand). Rejected as the only fix because banks made before this change, user styles and a later speaker would keep the gap until someone runs `tools/voice.mjs` again. Alternative: only D3. Rejected because a run without the voice helper (a build, a phone, a recording) would keep the default voice, and the helper would make up to 513 samples during play.
 
@@ -68,22 +70,24 @@ Alternative: only D1 (no on-demand). Rejected as the only fix because banks made
 
 ### D5. Checks per speaker
 
-`tools/check-samples.mjs --speaker <id>` limits the report to `say_<lang>_<id>` banks, so a run after `tools/voice.mjs` shows `0 missing` for that speaker. `tools/check-voice-preload.cjs --speaker` adds a step: a session whose next song has a narrator speaker X and a built-in narrator line with no X sample. With the helper, the sample is fetched before the next song's first bar and the line plays from `say_en_X`.
+`tools/check-samples.mjs --speaker <id>` limits the report to `say_<lang>_<id>` banks, so a run after `tools/voice.mjs` shows `0 missing` for that speaker. `--strict` does not fail on narrator gaps (Resolved Question 4). `tools/check-voice-preload.cjs --speaker` adds a step: a session whose next song has a narrator speaker X and a built-in narrator line with no X sample. With the helper, the sample is fetched before the next song's first bar and the line plays from `say_en_X`.
 
 ## Risks / Trade-offs
 
 - [Risk] 48 MB more local samples → Mitigation: git-ignored; `--prune` and `--default-only` still work; the size is measured and printed by `check:samples`.
 - [Risk] About 15 minutes to make the samples once → Mitigation: `--jobs`; existing samples are kept, so later runs only make new ones.
 - [Risk] More helper calls in the radio when banks are old → Mitigation: next song first, bounded by the narrator lines one song says; after `tools/voice.mjs` there are none.
-- [Risk] A speaker sample that comes out as the default voice (D5 of real-voices copy guard) is deleted, and D3 would ask for it again in every song → Mitigation: a request that does not give the speaker's sample is not sent again in the same session (use the existing queue's memory if it has one, else a per-session set in `needs()`).
+- [Risk] A speaker sample that comes out as the default voice (D5 of real-voices copy guard) is deleted, and D3 would ask for it again in every song → Mitigation: a request is not sent again in the same page: the queue's memory `sampleAsked` (`src/main.js`) already skips every `bank/slug` asked once, whatever the result.
 
 ## Estimate
 
 About 1.5 agent hours: `voice.mjs` narrator set and combos rule 0.25, `missingNeeds` narrator option and radio caller 0.25, Node checks 0.25, `check-samples --speaker` 0.15, `check-voice-preload --speaker` narrator step 0.35, making the samples and running the checks 0.15 (plus about 15 minutes of machine time), docs and DEVLOG 0.1.
 
-## Open Questions
+## Resolved Questions
 
-1. Make the samples ahead (D1), ask on demand (D3), or both? Recommendation: both. D1 covers runs without the helper; D3 covers old banks and user styles.
-2. Should D3 also ask for a voice-track line or vocabulary entry with no speaker sample? Recommendation: no. `tools/voice.mjs` already makes them for every listed speaker, and the measured gaps are 0.
-3. Should junior's 247 samples (19.3 MB) wait until a style or song uses junior more? Recommendation: no. Eight styles name junior in `voice.speakers`, and the chaos draw can pick it in any style.
-4. Should `check:samples` fail (`--strict`) on narrator gaps in CI-like runs? Recommendation: no change; it stays a report, because samples are local and git-ignored.
+Answered by the owner on 2026-11-05.
+
+1. Make the samples ahead (D1), ask on demand (D3), or both? Both. D1 covers runs without the helper; D3 covers old banks and user styles.
+2. Should D3 also ask for a voice-track line or vocabulary entry with no speaker sample? Yes. D3 keeps every built-in line with no sample of its speaker, not only narrator lines.
+3. Should junior's 247 samples (19.3 MB) wait until a style or song uses junior more? No. They are made for all four speakers, junior included.
+4. Should `check:samples --strict` fail on narrator gaps? No. Narrator gaps are reported only; `--strict` does not count them.

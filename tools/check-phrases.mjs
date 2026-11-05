@@ -5,7 +5,7 @@
 import { readStore, emptyStore, addPhrase, editPhrase, deletePhrase, restorePhrase, countUses, overCap, mergePhrases, unmergePhrases, keyOf, textIn, textError, readSettings, groupsOf, matches, kindsOf, validTag, KIND_SETS, SHARE, CAP } from '../src/voices/phrases.js';
 import { MOMENTS, MOMENT_GROUPS, poolKeys, momentOfLine, PHRASES_MOMENT, POOL_MOMENT } from '../src/voices/moments.js';
 import { PHRASES } from '../src/song/build.js';
-import { POOL } from '../src/endless/phrases.js';
+import { POOL, allPhrases } from '../src/endless/phrases.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -354,6 +354,40 @@ const ANY_VOICE = {
     const needIt = spokenNeeds(si, {}, 'it', {}), askIt = missingNeeds(needIt, {}, new Set([saySlug(q.text)]));
     assert(needIt.length && needIt.every(x => x.bank === 'say_it') && askIt.every(x => x.bank === 'say_it'), `an Italian speaker bank: ${[...new Set(needIt.map(x => x.bank))]}`);
     console.log(`      speaker ${X}: ${got.length} lines asked, ${old.length} without my phrases`);
+  },
+  'radio: a built-in line of a speaker with no sample of its own is asked also when the default voice has it, narrator, voice track and vocabulary (radio-narrator-speakers D3)'() {
+    // (seed nar-0: a voice track with its own speaker and a narrator drawn to another speaker; the explaining narrator
+    // says the director's POOL phrases)
+    const pool = new Set(allPhrases().map(p => p.en)), C = { narratorStyle: 'explain' };
+    const song = radioSong('nar-0', null, undefined).song;
+    const all = spokenNeeds(song, C, 'en', {});
+    const nar = all.find(x => x.voice === 'N' && x.speaker && pool.has(x.text)), voc = all.find(x => x.voice === 'T' && x.speaker);
+    assert(nar, `a POOL phrase said by a narrator speaker: ${JSON.stringify(all.slice(0, 3))}`);
+    assert(voc, 'a voice-track line said by a speaker');
+    // (only the default voice's samples, every text of the song)
+    const files = { say_en: [...new Set(all.map(x => `/samples/say_en/${saySlug(x.text)}.wav`))] };
+    const list = spokenNeeds(song, C, 'en', files);
+    assert(list.every(x => !x.speaker || !x.has), 'a speaker sample came from nowhere');
+    const got = missingNeeds(list, files, null, { speakers: true });
+    assert(got.some(x => x.text === nar.text && x.bank === `say_en_${nar.speaker}`), `the narrator line is not asked in say_en_${nar.speaker}: ${JSON.stringify(nar)} ${JSON.stringify(list.filter(x => x.text === nar.text))}`);
+    assert(got.some(x => x.text === voc.text && x.bank === `say_en_${voc.speaker}`), `the voice-track line is not asked in say_en_${voc.speaker}`);
+    assert(got.every(x => x.speaker), 'a default-voice line with its sample was asked');
+    // (a vocabulary entry: the radio's voice tracks say vocabulary lines; the same rule, by speaker, whatever the kind)
+    const vocab = { at: 0, voice: 'T', text: 'neon rain', bank: `say_en_${voc.speaker}`, lang: 'en', speaker: voc.speaker, has: false, sub: '' };
+    const vf = { say_en: [`/samples/say_en/${saySlug(vocab.text)}.wav`] };
+    assert(missingNeeds([vocab], vf, null, { speakers: true }).length === 1 && !missingNeeds([vocab], vf, null).length, 'a vocabulary entry');
+    // without the option: the old filter (Compose), none of them is asked
+    const any = (bank, slug) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], slug) >= 0);
+    const old = list.filter(x => !x.has).filter(x => !any(x.bank, saySlug(x.text)) && x.text.split(/\s+/).length <= 12);
+    for (const o of [undefined, {}, { speakers: false }]) assert(JSON.stringify(missingNeeds(list, files, null, o)) === JSON.stringify(old), 'without the option the list changed');
+    assert(!old.length, `the old filter asked ${old.length}`);
+    // the speaker's sample made: not asked again
+    const made = { ...files, [nar.bank]: [`/samples/${nar.bank}/${saySlug(nar.text)}.wav`] };
+    assert(!missingNeeds(spokenNeeds(song, C, 'en', made), made, null, { speakers: true }).some(x => x.text === nar.text && x.bank === nar.bank), 'asked again once made');
+    // in Italian no speaker bank is asked
+    const it = spokenNeeds(song, C, 'it', {});
+    assert(missingNeeds(it, {}, null, { speakers: true }).every(x => x.bank === 'say_it'), 'an Italian speaker bank');
+    console.log(`      narrator ${nar.speaker}, voice track ${voc.speaker}: ${got.length} lines asked, ${old.length} before`);
   },
 };
 

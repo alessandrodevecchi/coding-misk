@@ -2020,9 +2020,12 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
 
   // the lines the next song (first lines first), then the song on air, would speak with no sample at all (D9), and the
   // phrases of mine whose speaker has no sample of its own (radio-phrase-speaker D1, D2: the session's snapshot of my
-  // phrases, the ones its songs draw): the app asks the voice helper for them; samplesArrived writes the songs again
-  // with the new samples
-  function needs() {
+  // phrases, the ones its songs draw), and every built-in line whose speaker has no sample of its own (narrator,
+  // voice-track and vocabulary lines, radio-narrator-speakers D3; the app asks each bank/slug once per page): the app
+  // asks the voice helper for them; samplesArrived writes the songs again with the new samples
+  // ({ every: true }: every line of the two songs, with its sample or not, next: of the next song; for
+  // tools/check-voice-preload.cjs --speaker)
+  function needs({ every = false } = {}) {
     if (!S) return [];
     const files = voiceFiles(), lang = getLang(), out = [], seen = new Set();
     const snap = S.recipe && S.recipe.mine && S.recipe.mine.list;
@@ -2031,9 +2034,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       const C = liveControlsOf(it);
       let list = [];
       try { list = spokenNeeds(liveBuildOf(it.song, C), C, lang, files); } catch (e) { list = []; }
-      for (const x of list) { const slug = x.text.toLowerCase(); const k = `${x.bank}|${slug}`; if (x.has || seen.has(k)) continue; seen.add(k); out.push(x); }
+      for (const x of list) { const slug = x.text.toLowerCase(); const k = `${x.bank}|${slug}`; if ((x.has && !every) || seen.has(k)) continue; seen.add(k); out.push(every ? { ...x, next: it === S.stream[S.onAir + 1] } : x); }
     }
-    return missingNeeds(out, files, mineSlugs);
+    return every ? out : missingNeeds(out, files, mineSlugs, { speakers: true });
   }
   // (a sample made after the next song was preloaded, a speaker's sample of a phrase of mine among them, is queued for
   // it at once, so it loads before the next song's first bar: radio-phrase-speaker D3; loaded ones are skipped)
