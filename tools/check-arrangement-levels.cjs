@@ -29,8 +29,13 @@ async function runScenario(page, style) {
   const cmds = [['more', 'arp'], ['more', 'arp'], ['more', 'pad'], ['more', 'pad'], ['more', 'pad'], ['more', 'kick'], ['more', 'kick'], ['lock-part', 'bass']].map(([kind, part]) => ({ kind, part }));
   for (const c of cmds) { await page.evaluate(c => globalThis.codingMiskRadio.command(c), c); await sleep(150); }
   await page.evaluate(() => globalThis.codingMiskRadio.command({ kind: 'riser', bars: 'auto', dir: 'up', sound: 'noise' })); await sleep(150);
+  // the saved panel shown (#sp-toggle) and in cards (#sp-view): only the cards carry "add as a new track" (saved-patterns-hide)
   if ((await page.getAttribute('#sp-toggle', 'aria-expanded')) !== 'true') { await page.click('#sp-toggle'); await sleep(300); }
-  await page.click('#radio-steer [data-sp-new="p-scenario"]').catch(() => {}); await sleep(300);
+  if (!(await page.$('#radio-steer .sp-cards'))) { await page.click('#sp-view'); await sleep(300); }
+  const spAdd = await page.$('#radio-steer [data-sp-new="p-scenario"]:not([disabled])');
+  check(!!spAdd, `${style}: the saved bassline has its add button`);
+  if (spAdd) { await spAdd.click(); await sleep(300); }
+  check(await page.evaluate(() => globalThis.codingMiskRadio.steering.commands.some(c => c.kind === 'pattern' && c.mode === 'new')), `${style}: the saved bassline is queued as a new track`);
   await page.evaluate(() => globalThis.codingMiskRadio.command({ kind: 'voicing', type: 'pad', target: 'auto', treatment: 'auto' })); await sleep(300);
   const s0 = await page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return { added: s.plan.added, risers: s.plan.risers, at: Math.min(...s.commands.map(c => c.at)), phrase: s.plan.phrase, roles: s.plan.roles, bars: s.plan.bars, kinds: s.commands.map(c => c.kind) }; });
   console.log(`${style}: ${s0.kinds.join(', ')}; added ${s0.added.map(a => a.id).join(', ')}; riser ${JSON.stringify(s0.risers[0] || null)}`);
